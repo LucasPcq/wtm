@@ -8,6 +8,10 @@ import (
 
 // InstallCommandFromHooks returns the first bare on_create hook (no cwd) — the
 // conventional install command that `wtm init` writes first. Returns "" if none.
+//
+// "" is the expected result for an independent monorepo, whose seeded hooks all
+// carry a cwd: re-init then falls back to fresh detection, which regenerates the
+// per-directory hooks. That is the intended behaviour, not a missing case.
 func InstallCommandFromHooks(onCreate []domain.HookCommand) string {
 	for _, h := range onCreate {
 		if h.Cwd == "" {

@@ -133,9 +133,12 @@ func TestBuildProjectAnswers_SkipEnvIgnoresInvalidStrategy(t *testing.T) {
 
 func TestBuildProjectAnswers_SkipHooks(t *testing.T) {
 	detection := domain.InitDetectionResult{
-		BaseBranch:       "main",
-		InstallCommand:   "pnpm install",
-		MonorepoPackages: []string{"packages/a"},
+		BaseBranch:     "main",
+		InstallCommand: "pnpm install",
+		Monorepo: domain.MonorepoLayout{
+			Kind:              domain.MonorepoKindWorkspace,
+			WorkspacePackages: []string{"packages/a"},
+		},
 	}
 	got, err := rules.BuildProjectAnswers(rules.InitProjectFlags{SkipHooks: true}, detection)
 	if err != nil {
@@ -190,7 +193,7 @@ func TestInitProjectRecapFields_ResolvedValues(t *testing.T) {
 		BasePath:    "../.trees",
 		BaseBranch:  "main",
 		EnvStrategy: domain.EnvStrategyExample,
-		OnCreate:    []domain.HookCommand{{Cmd: "pnpm install"}, {Cmd: "pnpm install", Cwd: "packages/a"}},
+		OnCreate:    []domain.HookCommand{{Cmd: "npm install", Cwd: "front"}, {Cmd: "pip install -r requirements.txt", Cwd: "api"}},
 		OnClean:     []domain.HookCommand{{Cmd: "docker compose down"}},
 	})
 	got := map[string]string{}
@@ -203,7 +206,7 @@ func TestInitProjectRecapFields_ResolvedValues(t *testing.T) {
 	if got[domain.InitRecapLabelEnvStrategy] != string(domain.EnvStrategyExample) {
 		t.Errorf("env_strategy = %q, want %q", got[domain.InitRecapLabelEnvStrategy], domain.EnvStrategyExample)
 	}
-	if got[domain.InitRecapLabelOnCreate] != "pnpm install  (+1 more)" {
+	if got[domain.InitRecapLabelOnCreate] != "npm install  (+1 more)" {
 		t.Errorf("on_create = %q, want condensed +more form", got[domain.InitRecapLabelOnCreate])
 	}
 	if got[domain.InitRecapLabelOnClean] != "docker compose down" {
@@ -255,24 +258,58 @@ func TestDisplayPath(t *testing.T) {
 	}
 }
 
-func TestBuildProjectAnswers_MonorepoToHooks(t *testing.T) {
+// TestBuildProjectAnswers_WorkspaceMonorepoSeedsSingleHook: the root install of a
+// workspace monorepo already installs every package, so no per-package hook is
+// seeded.
+func TestBuildProjectAnswers_WorkspaceMonorepoSeedsSingleHook(t *testing.T) {
 	detection := domain.InitDetectionResult{
-		BaseBranch:       "main",
-		InstallCommand:   "pnpm install",
-		MonorepoPackages: []string{"packages/a", "packages/b"},
+		BaseBranch:     "main",
+		InstallCommand: "pnpm install",
+		Monorepo: domain.MonorepoLayout{
+			Kind:              domain.MonorepoKindWorkspace,
+			WorkspacePackages: []string{"packages/a", "packages/b"},
+		},
 	}
 	got, err := rules.BuildProjectAnswers(rules.InitProjectFlags{}, detection)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// on_create = bare install + one hook per monorepo package.
-	if len(got.OnCreate) != 3 {
-		t.Fatalf("expected 3 on_create hooks, got %d", len(got.OnCreate))
+	if len(got.OnCreate) != 1 {
+		t.Fatalf("expected 1 on_create hook for a workspace, got %d: %+v", len(got.OnCreate), got.OnCreate)
 	}
 	if got.OnCreate[0].Cmd != "pnpm install" || got.OnCreate[0].Cwd != "" {
-		t.Errorf("first hook should be the bare install command: %+v", got.OnCreate[0])
+		t.Errorf("hook should be the bare install command: %+v", got.OnCreate[0])
 	}
-	if got.OnCreate[1].Cwd != "packages/a" || got.OnCreate[2].Cwd != "packages/b" {
-		t.Errorf("monorepo hooks missing: %+v", got.OnCreate)
+}
+
+// TestBuildProjectAnswers_IndependentMonorepoFansOut: a repo with no workspace
+// declaration but per-directory lockfiles gets one hook per directory, each with
+// that directory's own package manager.
+func TestBuildProjectAnswers_IndependentMonorepoFansOut(t *testing.T) {
+	detection := domain.InitDetectionResult{
+		BaseBranch: "main",
+		Monorepo: domain.MonorepoLayout{
+			Kind: domain.MonorepoKindIndependent,
+			SubProjects: []domain.SubProject{
+				{Dir: "api", PackageManager: domain.PkgManagerPip},
+				{Dir: "front", PackageManager: domain.PkgManagerNpm},
+			},
+		},
+	}
+	got, err := rules.BuildProjectAnswers(rules.InitProjectFlags{}, detection)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []domain.HookCommand{
+		{Cmd: domain.InstallCommandPip, Cwd: "api"},
+		{Cmd: domain.InstallCommandNpm, Cwd: "front"},
+	}
+	if len(got.OnCreate) != len(want) {
+		t.Fatalf("got %d hooks, want %d: %+v", len(got.OnCreate), len(want), got.OnCreate)
+	}
+	for i := range want {
+		if got.OnCreate[i] != want[i] {
+			t.Errorf("hook[%d] = %+v, want %+v", i, got.OnCreate[i], want[i])
+		}
 	}
 }

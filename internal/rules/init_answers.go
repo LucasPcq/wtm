@@ -66,9 +66,10 @@ func BuildGlobalAnswers(flags InitGlobalFlags) (domain.InitGlobalAnswers, error)
 
 // BuildProjectAnswers resolves project config from flags and auto-detection,
 // mirroring the wizard defaults: flags win, then detection, then constants.
-// Conditional multi-selects (env files, package scripts, docker compose,
-// monorepo packages) take every detected value, matching the wizard's
-// pre-selection.
+// Conditional multi-selects (env files, package scripts, docker compose) take
+// every detected value, matching the wizard's pre-selection. The on_create
+// install hooks come from BuildInstallHooks, which decides from the detected
+// monorepo layout whether a single root install suffices.
 func BuildProjectAnswers(flags InitProjectFlags, detection domain.InitDetectionResult) (domain.InitProjectAnswers, error) {
 	basePath := flags.BasePath
 	if basePath == "" {
@@ -112,12 +113,11 @@ func BuildProjectAnswers(flags InitProjectFlags, detection domain.InitDetectionR
 		if installCommand == "" {
 			installCommand = detection.InstallCommand
 		}
-		if installCommand != "" {
-			answers.OnCreate = append(answers.OnCreate, domain.HookCommand{Cmd: installCommand})
-			for _, pkg := range detection.MonorepoPackages {
-				answers.OnCreate = append(answers.OnCreate, domain.HookCommand{Cmd: installCommand, Cwd: pkg})
-			}
-		}
+		answers.OnCreate = BuildInstallHooks(InstallHooksParams{
+			RootCommand: installCommand,
+			Kind:        detection.Monorepo.Kind,
+			SubProjects: detection.Monorepo.SubProjects,
+		})
 	}
 
 	// on_clean has no auto-detected seed (nothing to detect); it stays empty
@@ -165,11 +165,17 @@ func initEnvValue(answers domain.InitProjectAnswers) string {
 }
 
 // initHookValue renders a hook section for the recap: "skipped" when opted out,
-// empty (omitted row) when unset, else the first command with a "(+N more)" suffix.
+// empty (omitted row) when unset, else the condensed HookSummary form.
 func initHookValue(skip bool, hooks []domain.HookCommand) string {
 	if skip {
 		return domain.InitRecapValueSkipped
 	}
+	return HookSummary(hooks)
+}
+
+// HookSummary condenses a hook list to one line: "" when empty, the single
+// command on its own, else the first command with a "(+N more)" suffix.
+func HookSummary(hooks []domain.HookCommand) string {
 	if len(hooks) == 0 {
 		return ""
 	}

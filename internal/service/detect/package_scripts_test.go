@@ -66,6 +66,11 @@ func TestPackageJSONScriptsMonorepo(t *testing.T) {
 		"dev": "tsx watch src",
 	})
 
+	// A globbed directory that is not a package must not reach script discovery.
+	if err := os.MkdirAll(filepath.Join(dir, "apps", "fixtures"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
 	got := PackageJSONScripts(dir)
 	// root: 1, apps/api: 1, apps/web: 2 = 4 total
 	if len(got) != 4 {

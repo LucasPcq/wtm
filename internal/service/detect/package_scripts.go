@@ -11,7 +11,8 @@ import (
 )
 
 // PackageJSONScripts returns all package.json scripts under projectDir,
-// including pnpm workspace packages when pnpm-workspace.yaml is present.
+// including workspace packages when a workspace is declared at the root
+// (pnpm-workspace.yaml or a package.json "workspaces" field).
 // Results are ordered: root scripts first (alphabetically), then workspace
 // packages (alphabetically by dir, then by script name within each package).
 // Returns nil if no package.json is found at the project root.
@@ -23,7 +24,7 @@ func PackageJSONScripts(projectDir string) []domain.PackageScript {
 
 	scripts := append([]domain.PackageScript{}, root...)
 
-	for _, wsDir := range PnpmWorkspacePackages(projectDir) {
+	for _, wsDir := range WorkspacePackages(projectDir) {
 		ws := readPackageScripts(filepath.Join(projectDir, wsDir), wsDir)
 		scripts = append(scripts, ws...)
 	}
@@ -37,7 +38,7 @@ type packageJSONFile struct {
 }
 
 func readPackageScripts(dir, workspace string) []domain.PackageScript {
-	data, err := os.ReadFile(filepath.Join(dir, "package.json"))
+	data, err := os.ReadFile(filepath.Join(dir, domain.PackageJSONFile))
 	if err != nil {
 		return nil
 	}

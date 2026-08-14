@@ -32,7 +32,11 @@ func RunHooks(params RunHooksParams) error {
 
 	for _, hook := range params.Hooks {
 		resolved := rules.ResolveTemplateVars(hook, params.Vars)
-		err := runSingleHook(resolved, params.WorkDir, output)
+		err := runSingleHook(runSingleHookParams{
+			Hook:    resolved,
+			WorkDir: params.WorkDir,
+			Output:  output,
+		})
 		if err == nil {
 			continue
 		}
@@ -45,19 +49,26 @@ func RunHooks(params RunHooksParams) error {
 	return nil
 }
 
-func runSingleHook(hook domain.HookCommand, defaultDir string, output io.Writer) error {
+// runSingleHookParams holds the inputs for running one hook command.
+type runSingleHookParams struct {
+	// Hook has already had its template variables resolved.
+	Hook domain.HookCommand
+	// WorkDir is the worktree root the hook runs in unless it sets its own Cwd.
+	WorkDir string
+	Output  io.Writer
+}
+
+func runSingleHook(params runSingleHookParams) error {
+	hook := params.Hook
+	output := params.Output
+
 	parts := strings.Fields(hook.Cmd)
 	if len(parts) == 0 {
 		return nil
 	}
 
 	cmd := exec.Command(parts[0], parts[1:]...)
-
-	if hook.Cwd != "" {
-		cmd.Dir = hook.Cwd
-	} else {
-		cmd.Dir = defaultDir
-	}
+	cmd.Dir = rules.HookDir(rules.HookDirParams{Cwd: hook.Cwd, WorkDir: params.WorkDir})
 
 	var stderr bytes.Buffer
 	cmd.Stdout = output

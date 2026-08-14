@@ -70,7 +70,7 @@
                 "required": ["cmd"],
                 "properties": {
                   "cmd": { "type": "string", "description": "Shell command to run." },
-                  "cwd": { "type": "string", "description": "Working directory relative to the worktree root." },
+                  "cwd": { "type": "string", "description": "Working directory. Relative paths are resolved against the worktree root; absolute paths are used as-is." },
                   "continue_on_error": { "type": "boolean", "description": "If true, a non-zero exit doesn't abort subsequent hooks." }
                 }
               }
@@ -89,7 +89,7 @@
                 "required": ["cmd"],
                 "properties": {
                   "cmd": { "type": "string", "description": "Shell command to run." },
-                  "cwd": { "type": "string", "description": "Working directory relative to the worktree root." },
+                  "cwd": { "type": "string", "description": "Working directory. Relative paths are resolved against the worktree root; absolute paths are used as-is." },
                   "continue_on_error": { "type": "boolean", "description": "If true, a non-zero exit doesn't abort subsequent hooks or the removal." }
                 }
               }

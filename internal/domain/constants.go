@@ -112,6 +112,29 @@ const (
 	InstallCommandGo   = "go mod download"
 	InstallCommandPip  = "pip install -r requirements.txt"
 
+	// Workspace declaration files — their presence means one root install already
+	// covers every package in the repo, so no per-package install is seeded.
+	WorkspaceFilePnpm  = "pnpm-workspace.yaml"
+	WorkspaceFileGo    = "go.work"
+	WorkspaceFileTurbo = "turbo.json"
+	WorkspaceFileNx    = "nx.json"
+	WorkspaceFileLerna = "lerna.json"
+
+	// PackageJSONFile is the npm manifest, used for script discovery and as the
+	// marker that a globbed workspace pattern matched a real package.
+	PackageJSONFile = "package.json"
+
+	// MonorepoScanMaxDepth caps how deep sub-project discovery and globstar
+	// workspace patterns descend below the project root (1 = direct children).
+	MonorepoScanMaxDepth = 3
+
+	// Directory names excluded from every project scan.
+	ScanSkipNodeModules = "node_modules"
+	ScanSkipTrees       = ".trees"
+	ScanSkipGit         = ".git"
+	ScanSkipVendor      = "vendor"
+	ScanSkipDist        = "dist"
+
 	// EnvGoFile is the environment variable used by the shell wrapper to pass the go-file path.
 	EnvGoFile = "WTM_GO_FILE"
 

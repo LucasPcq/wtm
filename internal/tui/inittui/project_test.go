@@ -3,8 +3,39 @@ package inittui
 import (
 	"testing"
 
+	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/tui/components"
 )
+
+// TestDetectedHooks asserts the hooks-gate summary reflects what init would
+// actually seed: a workspace monorepo shows a single install, an independent one
+// shows the per-directory fan-out.
+func TestDetectedHooks(t *testing.T) {
+	workspace := domain.InitDetectionResult{
+		InstallCommand: domain.InstallCommandPnpm,
+		Monorepo: domain.MonorepoLayout{
+			Kind:              domain.MonorepoKindWorkspace,
+			WorkspacePackages: []string{"apps/web", "apps/api"},
+		},
+	}
+	if got := detectedHooks(workspace); got != domain.InstallCommandPnpm {
+		t.Errorf("workspace summary = %q, want %q", got, domain.InstallCommandPnpm)
+	}
+
+	independent := domain.InitDetectionResult{
+		Monorepo: domain.MonorepoLayout{
+			Kind: domain.MonorepoKindIndependent,
+			SubProjects: []domain.SubProject{
+				{Dir: "front", PackageManager: domain.PkgManagerNpm},
+				{Dir: "api", PackageManager: domain.PkgManagerPip},
+			},
+		},
+	}
+	want := "npm install  (+1 more)"
+	if got := detectedHooks(independent); got != want {
+		t.Errorf("independent summary = %q, want %q", got, want)
+	}
+}
 
 func TestMoveToFront(t *testing.T) {
 	items := []components.SelectItem{

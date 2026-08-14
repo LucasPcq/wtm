@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/tui/branchrefresh"
 	"github.com/LucasPcq/wtm/internal/tui/components"
 )
@@ -385,11 +386,8 @@ func addHooksSteps(s *stepSet, detection domain.InitDetectionResult, autoSkip fu
 	var hooks []domain.HookCommand
 	if prefill != nil {
 		hooks = prefill.OnCreate
-	} else if detection.InstallCommand != "" {
-		hooks = append(hooks, domain.HookCommand{Cmd: detection.InstallCommand})
-		for _, pkg := range detection.MonorepoPackages {
-			hooks = append(hooks, domain.HookCommand{Cmd: detection.InstallCommand, Cwd: pkg})
-		}
+	} else {
+		hooks = detectedInstallHooks(detection)
 	}
 
 	s.add(stepHooks, components.Step{
@@ -757,6 +755,18 @@ func selectEnvFiles(detected []domain.EnvFile, targets []string) []domain.EnvFil
 	return files
 }
 
+// detectedHooks summarises what init would seed on the hooks gate: the install
+// command, plus a "+N more" when independent sub-projects each get their own.
 func detectedHooks(d domain.InitDetectionResult) string {
-	return d.InstallCommand
+	return rules.HookSummary(detectedInstallHooks(d))
+}
+
+// detectedInstallHooks is the wizard's pre-selection for the on_create step,
+// delegating every decision to the shared rule.
+func detectedInstallHooks(d domain.InitDetectionResult) []domain.HookCommand {
+	return rules.BuildInstallHooks(rules.InstallHooksParams{
+		RootCommand: d.InstallCommand,
+		Kind:        d.Monorepo.Kind,
+		SubProjects: d.Monorepo.SubProjects,
+	})
 }

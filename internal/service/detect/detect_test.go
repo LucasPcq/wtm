@@ -259,34 +259,6 @@ func TestDockerComposeFilesMultiple(t *testing.T) {
 	}
 }
 
-func TestPnpmWorkspacePackagesNone(t *testing.T) {
-	dir := t.TempDir()
-	pkgs := PnpmWorkspacePackages(dir)
-	if pkgs != nil {
-		t.Errorf("expected nil, got %v", pkgs)
-	}
-}
-
-func TestPnpmWorkspacePackages(t *testing.T) {
-	dir := t.TempDir()
-
-	// Create pnpm-workspace.yaml
-	ws := "packages:\n  - \"apps/*\"\n  - \"packages/*\"\n"
-	if err := os.WriteFile(filepath.Join(dir, "pnpm-workspace.yaml"), []byte(ws), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	// Create matching directories
-	os.MkdirAll(filepath.Join(dir, "apps", "web"), 0o755)
-	os.MkdirAll(filepath.Join(dir, "apps", "api"), 0o755)
-	os.MkdirAll(filepath.Join(dir, "packages", "shared"), 0o755)
-
-	pkgs := PnpmWorkspacePackages(dir)
-	if len(pkgs) != 3 {
-		t.Fatalf("expected 3 packages, got %d: %v", len(pkgs), pkgs)
-	}
-}
-
 func TestParsePnpmWorkspace(t *testing.T) {
 	content := "packages:\n  - 'apps/*'\n  - \"packages/*\"\n  - '!tests'\n"
 	patterns := parsePnpmWorkspace(content)
@@ -299,5 +271,31 @@ func TestParsePnpmWorkspace(t *testing.T) {
 	}
 	if patterns[1] != "packages/*" {
 		t.Errorf("expected packages/*, got %s", patterns[1])
+	}
+}
+
+// TestParsePnpmWorkspaceTolerantFormatting locks the hardened scanner: blank
+// lines, comments and irregular dash spacing must not truncate the list, and a
+// following top-level key must end it.
+func TestParsePnpmWorkspaceTolerantFormatting(t *testing.T) {
+	content := "# top comment\n" +
+		"packages:  # the workspace globs\n" +
+		"\n" +
+		"  - 'apps/*'\n" +
+		"  # a comment inside the list\n" +
+		"  -   \"packages/*\"\n" +
+		"\n" +
+		"onlyBuiltDependencies:\n" +
+		"  - esbuild\n"
+
+	patterns := parsePnpmWorkspace(content)
+	want := []string{"apps/*", "packages/*"}
+	if len(patterns) != len(want) {
+		t.Fatalf("expected %v, got %v", want, patterns)
+	}
+	for i, p := range want {
+		if patterns[i] != p {
+			t.Errorf("patterns[%d] = %q, want %q", i, patterns[i], p)
+		}
 	}
 }

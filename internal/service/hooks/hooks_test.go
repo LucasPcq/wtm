@@ -1,6 +1,9 @@
 package hooks
 
 import (
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -65,14 +68,55 @@ func TestRunHooksEmptyList(t *testing.T) {
 	}
 }
 
-func TestRunHooksCwdOverride(t *testing.T) {
-	dir := t.TempDir()
+// TestRunHooksRelativeCwdJoinsWorkDir locks the documented contract: a relative
+// cwd is resolved against the worktree root, not the process working directory.
+// The marker file only exists under WorkDir, so the hook fails if cwd is used raw.
+func TestRunHooksRelativeCwdJoinsWorkDir(t *testing.T) {
+	workDir := t.TempDir()
+	sub := filepath.Join(workDir, "apps", "api")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sub, "marker.txt"), []byte("ok"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// The marker lives only in the sub-directory, so a hook without cwd must fail:
+	// that is what makes the cwd assertion below meaningful.
 	err := RunHooks(RunHooksParams{
-		Hooks:   []domain.HookCommand{{Cmd: "pwd", Cwd: dir}},
-		WorkDir: "/tmp",
+		Hooks:   []domain.HookCommand{{Cmd: "cat marker.txt"}},
+		WorkDir: workDir,
+		Output:  io.Discard,
+	})
+	if err == nil {
+		t.Fatal("sanity: hook without cwd should not find the sub-directory marker")
+	}
+
+	err = RunHooks(RunHooksParams{
+		Hooks:   []domain.HookCommand{{Cmd: "cat marker.txt", Cwd: filepath.Join("apps", "api")}},
+		WorkDir: workDir,
+		Output:  io.Discard,
 	})
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("relative cwd should resolve under WorkDir: %v", err)
+	}
+}
+
+// TestRunHooksAbsoluteCwdUsedAsIs guards the other branch — an absolute cwd
+// (including one produced by interpolating {{worktree}}) is never joined.
+func TestRunHooksAbsoluteCwdUsedAsIs(t *testing.T) {
+	elsewhere := t.TempDir()
+	if err := os.WriteFile(filepath.Join(elsewhere, "marker.txt"), []byte("ok"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := RunHooks(RunHooksParams{
+		Hooks:   []domain.HookCommand{{Cmd: "cat marker.txt", Cwd: elsewhere}},
+		WorkDir: t.TempDir(),
+		Output:  io.Discard,
+	})
+	if err != nil {
+		t.Fatalf("absolute cwd should be used as-is: %v", err)
 	}
 }
 

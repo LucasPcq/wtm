@@ -12,8 +12,41 @@ const (
 	PkgManagerNone PackageManager = "none"
 )
 
+// MonorepoKind classifies how a repository installs its dependencies.
+type MonorepoKind string
+
+const (
+	// MonorepoKindNone is a plain single project: one install at the root.
+	MonorepoKindNone MonorepoKind = "none"
+
+	// MonorepoKindWorkspace has a root workspace declaration (pnpm-workspace.yaml,
+	// package.json "workspaces", go.work, turbo/nx/lerna). The root install already
+	// covers every package, so no per-package hook is seeded.
+	MonorepoKindWorkspace MonorepoKind = "workspace"
+
+	// MonorepoKindIndependent has no workspace declaration but sub-directories that
+	// carry their own lockfile; each installs on its own.
+	MonorepoKindIndependent MonorepoKind = "independent"
+)
+
+// SubProject is an independently-installable directory below the project root.
+// Dir is slash-separated and relative to the root.
+type SubProject struct {
+	Dir            string
+	PackageManager PackageManager
+}
+
+// MonorepoLayout holds the detected facts that decide the install-hook list.
+// WorkspacePackages is informational (workspace kind only); SubProjects is the
+// only field that drives hook fan-out.
+type MonorepoLayout struct {
+	Kind              MonorepoKind
+	WorkspacePackages []string
+	SubProjects       []SubProject
+}
+
 // PackageScript is one script entry discovered via package.json, possibly
-// inside a pnpm workspace package.
+// inside a workspace package.
 type PackageScript struct {
 	Name      string  // script name, e.g. "dev"
 	Cmd       string  // raw script value from package.json
@@ -31,7 +64,7 @@ type InitDetectionResult struct {
 	InstallCommand     string
 	DockerComposeFiles []string
 	DockerComposeCmd   string
-	MonorepoPackages   []string
+	Monorepo           MonorepoLayout
 	PackageScripts     []PackageScript
 }
 

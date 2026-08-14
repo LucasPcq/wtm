@@ -221,8 +221,8 @@ local  = true
 [hooks]
 on_create = [
   "pnpm install",                                             # string: runs from worktree root
-  { cmd = "pnpm install", cwd = "apps/api" },                 # object: runs from a subdir
-  { cmd = "pnpm install", cwd = "apps/web", continue_on_error = true },  # non-fatal
+  { cmd = "pnpm db:migrate", cwd = "apps/api" },              # object: runs from a subdir
+  { cmd = "pnpm build", cwd = "apps/web", continue_on_error = true },  # non-fatal
 ]
 on_clean = [
   "docker compose down",                                      # runs right before a worktree is removed
@@ -233,6 +233,15 @@ on_clean = [
 just before it is removed by `clean`/`prune` (e.g. to tear down external resources). A
 non-zero hook aborts the operation unless the entry sets `continue_on_error`. Hooks
 interpolate `{{worktree}}`, `{{branch}}`, `{{root}}`, and (for `on_create`) `{{from_branch}}`.
+A `cwd` is resolved against the worktree root when relative; absolute paths (including
+`{{worktree}}`-interpolated ones) are used as-is.
+
+`wtm init` seeds `on_create` from what it detects. A workspace monorepo
+(`pnpm-workspace.yaml`, a `workspaces` field in `package.json`, `go.work`, or
+turbo/nx/lerna) gets a **single** root install, since that already installs every
+package. A repo with no workspace declaration but per-directory lockfiles — say
+`front/package-lock.json` next to `api/requirements.txt` — gets one install per
+directory instead, each using that directory's own package manager.
 
 ### Env strategies
 

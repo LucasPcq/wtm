@@ -7,6 +7,29 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
+func TestHookDir(t *testing.T) {
+	tests := []struct {
+		name    string
+		cwd     string
+		workDir string
+		want    string
+	}{
+		{name: "empty cwd runs at the worktree root", cwd: "", workDir: "/trees/feat", want: "/trees/feat"},
+		{name: "relative cwd is joined onto the worktree root", cwd: "apps/api", workDir: "/trees/feat", want: "/trees/feat/apps/api"},
+		{name: "dotted relative cwd is cleaned", cwd: "./sub", workDir: "/trees/feat", want: "/trees/feat/sub"},
+		{name: "absolute cwd is used as-is", cwd: "/elsewhere/dir", workDir: "/trees/feat", want: "/elsewhere/dir"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := rules.HookDir(rules.HookDirParams{Cwd: tt.cwd, WorkDir: tt.workDir})
+			if got != tt.want {
+				t.Errorf("HookDir = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestInterpolate(t *testing.T) {
 	vars := rules.TemplateVars{
 		Worktree:   "/path/to/worktree",
