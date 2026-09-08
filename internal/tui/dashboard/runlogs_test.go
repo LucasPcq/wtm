@@ -34,7 +34,7 @@ func TestOpeningTheLogsPanelTailsTheJob(t *testing.T) {
 			return []string{"ready in 380ms"}, nil
 		},
 	}, "a")
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}})
 
 	model, cmd := model.openLogsTabOn("web")
 	if model.logsJob != "web" || model.logsBranch != "a" {
@@ -79,7 +79,7 @@ func TestSelectingAnotherWorktreeClosesTheLogsPanel(t *testing.T) {
 
 func TestLogsPanelHeadsWithTheJobAndKeepsTheLastLines(t *testing.T) {
 	model := logsModel(t, RunParams{}, "a")
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}})
 	model.jobs = []domain.JobInfo{{
 		Name: "web", Status: domain.JobStatusRunning, WorkDir: "/tmp/a",
 		StartedAt: time.Now().Add(-72 * time.Minute),
@@ -106,7 +106,7 @@ func TestLogsPanelHeadsWithTheJobAndKeepsTheLastLines(t *testing.T) {
 
 func TestLogsPanelDropsTheOldestLinesWhenTheBudgetIsShort(t *testing.T) {
 	model := logsModel(t, RunParams{}, "a")
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}})
 	model.panelTab, model.logsBranch, model.logsJob = panelLogs, "a", "web"
 	for index := range 200 {
 		model.logsLines = append(model.logsLines, "line "+string(rune('a'+index%26))+string(rune('0'+index/26)))
@@ -126,7 +126,7 @@ func TestLogsPanelDropsTheOldestLinesWhenTheBudgetIsShort(t *testing.T) {
 
 func TestLogsPanelSaysWhyItCouldNotRead(t *testing.T) {
 	model := logsModel(t, RunParams{}, "a")
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}})
 	model.panelTab, model.logsBranch, model.logsJob = panelLogs, "a", "web"
 	model.logsErr = errors.New("no log for web")
 
@@ -140,7 +140,7 @@ func TestLogsPanelSaysWhyItCouldNotRead(t *testing.T) {
 func TestTheDetailPanelYieldsToTheLogsPanelWhileItIsOpen(t *testing.T) {
 	model := logsModel(t, RunParams{}, "a")
 	model.detailOpen = true
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}})
 	model.panelTab, model.logsBranch, model.logsJob = panelLogs, "a", "web"
 	model.logsLines = []string{"tailed"}
 
@@ -169,7 +169,7 @@ func TestClickingAJobWithNoURLOpensItsLogs(t *testing.T) {
 	model := logsModel(t, RunParams{
 		LogsLoader: func(logsRequest) ([]string, error) { return []string{"ready"}, nil },
 	}, "a")
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "pg"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "pg"}})
 	model.jobs = []domain.JobInfo{{Name: "pg", Status: domain.JobStatusRunning, WorkDir: "/tmp/a"}}
 	model.addresses = map[string]map[string]domain.JobAddress{"a": {"pg": {Ports: []int{5432}}}}
 	renderAndWait(t, model, runRowZone("pg"))
@@ -184,7 +184,7 @@ func TestClickingAJobWithNoURLOpensItsLogs(t *testing.T) {
 
 func TestTheJobColumnNamesEveryDeclaredJobAndMarksWhatIsUp(t *testing.T) {
 	model := logsModel(t, RunParams{}, "a")
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}, {Name: "api"}, {Name: "pg"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}, {Name: "api"}, {Name: "pg"}})
 	model.jobs = []domain.JobInfo{{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/tmp/a"}}
 	model.addresses = map[string]map[string]domain.JobAddress{"a": {"web": {URL: "http://web.wtm"}}}
 	model.panelTab, model.logsBranch, model.logsJob = panelLogs, "a", "web"
@@ -196,10 +196,10 @@ func TestTheJobColumnNamesEveryDeclaredJobAndMarksWhatIsUp(t *testing.T) {
 			t.Errorf("column = %q, misses %q: a stopped job's tail is still readable", column, name)
 		}
 	}
-	if !strings.Contains(column, domain.DetailJobUpGlyph) || !strings.Contains(column, domain.DetailJobDownGlyph) {
-		t.Errorf("column = %q, want up and down told apart", column)
+	if !strings.Contains(column, domain.DetailJobUpGlyph) || !strings.Contains(column, domain.DetailJobRanGlyph) {
+		t.Errorf("column = %q, want what is up told apart from what merely ran", column)
 	}
-	if address := stripANSI(model.logsAddressLine(60)); !strings.Contains(address, "http://web.wtm") {
+	if address := stripANSI(strings.Join(model.logsAddressLines(60), "\n")); !strings.Contains(address, "http://web.wtm") {
 		t.Errorf("address line = %q, want the current job's address", address)
 	}
 }
@@ -212,7 +212,7 @@ func TestTheJobColumnHoldsEveryJobOfALongList(t *testing.T) {
 		jobs = append(jobs, domain.JobConfig{Name: fmt.Sprintf("service-%02d", i)})
 	}
 	model := logsModel(t, RunParams{}, "a")
-	model.runConfig = domain.RunConfig{Jobs: jobs}
+	model = declaringRunJobs(model, jobs)
 	model.panelTab, model.logsBranch, model.logsJob = panelLogs, "a", "service-09"
 
 	column := stripANSI(strings.Join(model.logsJobColumn(logsJobColumnParams{Width: 20, Rows: 10}), "\n"))
@@ -229,7 +229,7 @@ func TestTheJobColumnHoldsEveryJobOfALongList(t *testing.T) {
 
 func TestSteppingTheJobStaysInsideItsWorktree(t *testing.T) {
 	model := logsModel(t, RunParams{}, "a", "b")
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}, {Name: "api"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}, {Name: "api"}})
 	model.logsBranch, model.logsJob = "a", "web"
 
 	model = model.stepLogsJob(1)
@@ -253,7 +253,7 @@ func TestSteppingTheJobRetailsIt(t *testing.T) {
 	model := logsModel(t, RunParams{
 		LogsLoader: func(req logsRequest) ([]string, error) { asked <- req.Job; return nil, nil },
 	}, "a")
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}, {Name: "api"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}, {Name: "api"}})
 	model.panelTab, model.logsBranch, model.logsJob = panelLogs, "a", "web"
 
 	model = model.stepLogsJob(1)
@@ -275,7 +275,7 @@ func TestSteppingTheJobRetailsIt(t *testing.T) {
 // and the tailed one part company.
 func TestTheLogsAddressIsReadOffTheTailedBranch(t *testing.T) {
 	model := logsModel(t, RunParams{}, "a", "b")
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}})
 	model.addresses = map[string]map[string]domain.JobAddress{
 		"a": {"web": {URL: "http://web.a.wtm"}},
 		"b": {"web": {URL: "http://web.b.wtm"}},
@@ -289,7 +289,7 @@ func TestTheLogsAddressIsReadOffTheTailedBranch(t *testing.T) {
 
 func TestTheLogsKeyOpensTheTabWithoutAPicker(t *testing.T) {
 	model := logsModel(t, RunParams{}, "a")
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "worker"}, {Name: "web"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "worker"}, {Name: "web"}})
 	model.jobs = []domain.JobInfo{{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/tmp/a"}}
 
 	next, _ := updateCmd(model, key(domain.KeyRunLogs))
@@ -325,26 +325,48 @@ func TestTheLogsTabOpensWithoutARunModuleAndSaysWhatIsMissing(t *testing.T) {
 	}
 }
 
-func TestTheLogsViewTellsANeverRunJobFromAQuietOne(t *testing.T) {
-	model := logsModel(t, RunParams{}, "a")
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}}}
-	model.panelTab, model.logsBranch, model.logsJob = panelLogs, "a", "web"
-
-	down := stripANSI(strings.Join(model.logsViewBody(logsViewParams{Width: 60, Height: 20}), "\n"))
-	if !strings.Contains(down, domain.DashboardLogsNeverRan) {
-		t.Errorf("body = %q, want a stopped job told it has never run here", down)
+// Four different silences, four different answers. "Never ran" used to be
+// inferred from the job not being up, which said it of a job that had run, been
+// stopped and written nothing; the log on disk now answers instead.
+func TestTheLogsViewTellsTheKindsOfSilenceApart(t *testing.T) {
+	body := func(model Model) string {
+		return stripANSI(strings.Join(model.logsViewBody(logsViewParams{Width: 60, Height: 20}), "\n"))
 	}
 
-	model.jobs = []domain.JobInfo{{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/tmp/a"}}
-	up := stripANSI(strings.Join(model.logsViewBody(logsViewParams{Width: 60, Height: 20}), "\n"))
-	if !strings.Contains(up, domain.DashboardLogsQuiet) {
-		t.Errorf("body = %q, want a running job that wrote nothing told apart", up)
+	// A project that declares nothing at all.
+	bare := logsModel(t, RunParams{}, "a")
+	bare.panelTab, bare.logsBranch, bare.logsJob = panelLogs, "a", ""
+	if got := body(bare); !strings.Contains(got, domain.DashboardLogsNoModule) {
+		t.Errorf("body = %q, want a project with no run module pointed at `run init`", got)
+	}
+
+	// Declared, but nothing has ever been started in this worktree.
+	idle := logsModel(t, RunParams{}, "a")
+	idle.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}}}
+	idle.panelTab, idle.logsBranch, idle.logsJob = panelLogs, "a", "web"
+	if got := body(idle); !strings.Contains(got, domain.DashboardLogsNothingRan) {
+		t.Errorf("body = %q, want a worktree that has started nothing told so", got)
+	}
+
+	// It ran here and wrote nothing: its log exists and is empty.
+	silent := logsModel(t, RunParams{}, "a")
+	silent = declaringRunJobs(silent, []domain.JobConfig{{Name: "web"}})
+	silent.panelTab, silent.logsBranch, silent.logsJob = panelLogs, "a", "web"
+	if got := body(silent); !strings.Contains(got, domain.DashboardLogsSilent) {
+		t.Errorf("body = %q, want a run that produced no output told apart", got)
+	}
+
+	// It is up and has not written yet.
+	quiet := silent
+	quiet.jobs = []domain.JobInfo{{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/tmp/a"}}
+	if got := body(quiet); !strings.Contains(got, domain.DashboardLogsQuiet) {
+		t.Errorf("body = %q, want a running job that wrote nothing told apart", got)
 	}
 }
 
 func TestArrowsWalkTheJobsWhileTheLogsTabIsUp(t *testing.T) {
 	model := logsModel(t, RunParams{}, "a")
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}, {Name: "api"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}, {Name: "api"}})
 	model.panelTab, model.logsBranch, model.logsJob = panelLogs, "a", "web"
 
 	next, _ := updateCmd(model, namedKey(tea.KeyRight))
@@ -359,7 +381,7 @@ func TestArrowsWalkTheJobsWhileTheLogsTabIsUp(t *testing.T) {
 
 func TestEnterHandsRunviewTheJobOnScreen(t *testing.T) {
 	model := logsModel(t, RunParams{}, "a")
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}, {Name: "api"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}, {Name: "api"}})
 	model.panelTab, model.logsBranch, model.logsJob = panelLogs, "a", "api"
 
 	request := model.watchLogsRequest()
@@ -374,7 +396,7 @@ func TestEnterHandsRunviewTheJobOnScreen(t *testing.T) {
 
 func TestChangingTabClosesTheLogsView(t *testing.T) {
 	model := logsModel(t, RunParams{}, "a")
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}})
 	model.panelTab, model.logsBranch, model.logsJob = panelLogs, "a", "web"
 
 	next, _ := updateCmd(model, key(keyTab))
@@ -392,7 +414,7 @@ func TestClickingAJobChipSwitchesToIt(t *testing.T) {
 		LogsLoader: func(req logsRequest) ([]string, error) { tailed <- req.Job; return nil, nil },
 	}, "a")
 	model.detailOpen = true
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}, {Name: "api"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}, {Name: "api"}})
 	model.panelTab, model.logsBranch, model.logsJob = panelLogs, "a", "web"
 	renderAndWait(t, model, logsJobZone("api"))
 
@@ -419,7 +441,7 @@ func TestClickingAJobChipSwitchesToIt(t *testing.T) {
 func TestClickingTheChipAlreadyShownChangesNothing(t *testing.T) {
 	model := logsModel(t, RunParams{}, "a")
 	model.detailOpen = true
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}, {Name: "api"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}, {Name: "api"}})
 	model.panelTab, model.logsBranch, model.logsJob = panelLogs, "a", "web"
 	model.logsLines = []string{"kept"}
 	renderAndWait(t, model, logsJobZone("web"))
@@ -438,7 +460,7 @@ func TestClickingTheAddressInTheLogsViewOpensIt(t *testing.T) {
 		URLOpener: func(url string) error { opened <- url; return nil },
 	}, "a")
 	model.detailOpen = true
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}})
 	model.addresses = map[string]map[string]domain.JobAddress{"a": {"web": {URL: "http://web.wtm"}}}
 	model.panelTab, model.logsBranch, model.logsJob = panelLogs, "a", "web"
 	renderAndWait(t, model, logsURLZone())
@@ -465,7 +487,7 @@ func TestClickingTheAddressInTheLogsViewOpensIt(t *testing.T) {
 func TestAJobWithoutAnAddressMarksNoZoneInTheLogsView(t *testing.T) {
 	model := logsModel(t, RunParams{}, "a")
 	model.detailOpen = true
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "pg"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "pg"}})
 	model.addresses = map[string]map[string]domain.JobAddress{"a": {"pg": {Ports: []int{5432}}}}
 	model.panelTab, model.logsBranch, model.logsJob = panelLogs, "a", "pg"
 	renderAndWait(t, model, zoneDetail)
@@ -488,7 +510,7 @@ func TestTheLogsPanelHostsTheRunView(t *testing.T) {
 		BoardLoader: func(logsRequest) runlogs.Board { return board },
 		LogsLoader:  func(logsRequest) ([]string, error) { return nil, nil },
 	}, "a")
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}})
 
 	model, _ = model.openLogsTabOn("web")
 	if !model.previewOn {
@@ -514,7 +536,7 @@ func TestTheLogsPanelFallsBackToTheTailWithoutABoard(t *testing.T) {
 	model := logsModel(t, RunParams{
 		LogsLoader: func(logsRequest) ([]string, error) { return []string{"ready in 380ms"}, nil },
 	}, "a")
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}})
 
 	model, cmd := model.openLogsTabOn("web")
 	if model.previewOn {
@@ -538,7 +560,7 @@ func TestTheLogsPanelKeepsItsHeightWithAndWithoutAnAddress(t *testing.T) {
 	model := logsModel(t, RunParams{
 		LogsLoader: func(logsRequest) ([]string, error) { return []string{"ready"}, nil },
 	}, "a")
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}, {Name: "worker"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}, {Name: "worker"}})
 	model.addresses = map[string]map[string]domain.JobAddress{"a": {"web": {URL: "http://web.wtm"}}}
 
 	published, _ := model.openLogsTabOn("web")
@@ -571,7 +593,7 @@ func TestTheJobColumnLinesUpWithThePaneTitle(t *testing.T) {
 		BoardLoader: func(logsRequest) runlogs.Board { return board },
 		LogsLoader:  func(logsRequest) ([]string, error) { return nil, nil },
 	}, "a")
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}, {Name: "worker"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}, {Name: "worker"}})
 
 	model, _ = model.openLogsTabOn("web")
 	rows := strings.Split(stripANSI(strings.Join(model.logsBody(model.layout()), "\n")), "\n")
@@ -603,7 +625,7 @@ func TestThePreviewFollowsTheOutputPanelOpening(t *testing.T) {
 		BoardLoader: func(logsRequest) runlogs.Board { return board },
 		LogsLoader:  func(logsRequest) ([]string, error) { return nil, nil },
 	}, "a")
-	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}}}
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}})
 
 	model, _ = model.openLogsTabOn("web")
 	before := len(model.logsBody(model.layout()))
@@ -621,5 +643,107 @@ func TestThePreviewFollowsTheOutputPanelOpening(t *testing.T) {
 	rendered := len(strings.Split(strings.Join(expanded.logsBody(expanded.layout()), "\n"), "\n"))
 	if rendered != after {
 		t.Errorf("body renders %d rows for a %d-row box", rendered, after)
+	}
+}
+
+// The preview builds its own addresses, so it needs the one worktree fact it
+// cannot read for itself. Without it the pane announced ports under a header
+// announcing the url — the same job's address spelled two ways, two lines apart.
+func TestThePreviewsBoardIsToldWhetherTheWorktreeAnswersOnItsPorts(t *testing.T) {
+	board := runlogstest.NewBoard(runlogstest.BoardParams{
+		Views: []runlogs.JobView{{Name: "web", Kind: domain.JobKindService, Status: domain.JobStatusRunning}},
+	})
+
+	var asked logsRequest
+	model := logsModel(t, RunParams{
+		BoardLoader: func(req logsRequest) runlogs.Board {
+			asked = req
+			return board
+		},
+		LogsLoader: func(logsRequest) ([]string, error) { return nil, nil },
+	}, "a")
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}})
+	model.portAddressed = map[string]bool{"a": true}
+
+	model, _ = model.openLogsTabOn("web")
+
+	if !model.previewOn {
+		t.Fatal("the panel opened without a preview although a board was available")
+	}
+	if !asked.PortAddressed {
+		t.Error("the preview's board was opened without the worktree's addressing verdict")
+	}
+}
+
+// declaringRunJobs gives a model its run.toml and marks every job in it as
+// having run in each worktree on screen. What a surface shows is decided by
+// rules.VisibleJobs and tested there; these tests are about the column, the
+// tail and the preview, and would otherwise all be asserting the same rule a
+// second time.
+func declaringRunJobs(model Model, jobs []domain.JobConfig) Model {
+	model.runConfig = domain.RunConfig{Jobs: jobs}
+
+	logged := make(map[string]bool, len(jobs))
+	for _, job := range jobs {
+		logged[job.Name] = true
+	}
+	model.logged = make(map[string]map[string]bool, len(model.statuses))
+	for _, status := range model.statuses {
+		model.logged[status.Branch] = logged
+	}
+	return model
+}
+
+// A runner publishes nothing of its own, so the addresses a reader came for are
+// its children's. The view used to head with their number alone — naming
+// something it gave no way to reach — and now heads with one line per address,
+// each opening its own url. They sit in the row where an address has always
+// been read, not in the job column, which is for picking a log.
+func TestTheLogsViewHeadsWithEachAddressARunnerAnswersFor(t *testing.T) {
+	opened := make(chan string, 1)
+	model := logsModel(t, RunParams{
+		URLOpener:  func(url string) error { opened <- url; return nil },
+		LogsLoader: func(logsRequest) ([]string, error) { return nil, nil },
+	}, "a")
+	model = declaringRunJobs(model, []domain.JobConfig{{Name: "dev", Runs: []string{"web", "api"}}})
+	model.addresses = map[string]map[string]domain.JobAddress{"a": {"dev": {Held: []domain.JobURLEntry{
+		{Job: "web", URL: "http://web.wtm"},
+		{Job: "api", URL: "http://api.wtm"},
+	}}}}
+	model.panelTab, model.logsBranch, model.logsJob = panelLogs, "a", "dev"
+
+	head := stripANSI(strings.Join(model.logsAddressLines(60), "\n"))
+	for _, want := range []string{"web", "http://web.wtm", "api", "http://api.wtm"} {
+		if !strings.Contains(head, want) {
+			t.Errorf("head = %q, misses %q", head, want)
+		}
+	}
+	// The column stays a job selector: the addresses are not in it.
+	column := stripANSI(strings.Join(model.logsJobColumn(logsJobColumnParams{Width: 20, Rows: 10}), "\n"))
+	if strings.Contains(column, "http://") {
+		t.Errorf("column = %q, want no address in the job selector", column)
+	}
+
+	renderAndWait(t, model, logsHeldZone("web"))
+	zone := model.zones.Get(logsHeldZone("web"))
+	if zone.IsZero() {
+		t.Fatal("an address the view heads with has no zone of its own")
+	}
+	next, cmd := updateCmd(model, click(zone.StartX, zone.StartY))
+	if cmd == nil {
+		t.Fatal("clicking an address did nothing")
+	}
+	// The pane keeps showing the runner: it is the process writing that output.
+	if next.logsJob != "dev" {
+		t.Errorf("logsJob = %q, want the runner still on screen", next.logsJob)
+	}
+	cmd()
+	select {
+	case got := <-opened:
+		if got != "http://web.wtm" {
+			t.Errorf("opened %q, want the address on the line clicked", got)
+		}
+	default:
+		t.Fatal("the address was not opened")
 	}
 }

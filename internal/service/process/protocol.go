@@ -30,10 +30,11 @@ type Request struct {
 	// daemon is global and long-lived, so the environment it inherited belongs
 	// to whichever worktree happened to fork it.
 	Env map[string]string `json:"env,omitempty"`
-	// RouteHost is the hostname the proxy serves this job under, resolved by the
-	// client for the same reason LogDir and Env are: the daemon is global, and
-	// only the client can ask git which worktree and which repository this is.
-	RouteHost string `json:"route_host,omitempty"`
+	// Routes are the names the proxy is to serve once this job runs — its own,
+	// and one per published job it runs itself. They are resolved by the client
+	// for the same reason LogDir and Env are: the daemon is global, and only the
+	// client can ask git which worktree and which repository this is.
+	Routes []domain.JobRoute `json:"routes,omitempty"`
 	// Cols and Rows size the job's PTY: once on ActionAttach, then on every
 	// ActionResize as the pane rendering the job changes size.
 	Cols int `json:"cols,omitempty"`

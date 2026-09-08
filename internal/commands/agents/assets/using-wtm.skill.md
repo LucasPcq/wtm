@@ -107,7 +107,7 @@ self-documenting:
 | Jobs running right now, every repo (+ `started_at`, `exit_code`, `url`, `work_dir`) | `wtm run ps --output json` |
 | Where a job answers in a worktree | `wtm run url [worktree] --output json` |
 | What serves the named URLs (bind port, public port, redirection) | `wtm run proxy status --output json` |
-| What a `run up` started, with each job's `url` | `wtm run up -d --output json` |
+| What a `run up` started, with each job's `url` (plus `held` for a runner) | `wtm run up -d --output json` |
 | What a job printed | `wtm run logs [worktree] --job <name> --output json` → `[{job, at, text}]` |
 | Resolved project config | `wtm config show --output json` |
 | A branch's worktree path | `wtm resolve <branch> --output json` |
@@ -450,6 +450,12 @@ and **experimental**: the global `wtm init` does not configure it.
   one — including the log of a crash you just restarted past. The file itself is
   `<git-common-dir>/wtm/logs/<url-escaped-branch>/<url-escaped-job>.log` (rotated 5 MB x 3
   *within* a run) if you need more than the last 1000 lines.
+- **It covers the jobs that live or have run in that worktree, not everything `run.toml`
+  declares.** A job the worktree has never started has no log and no entries, and is left
+  out entirely rather than replayed as an empty group — so an absent job means "never
+  started here", not "started and silent". Its log file is created the moment it starts,
+  so a job that ran and printed nothing *is* present, with no entries. Do not read the
+  array as a roster of the project's jobs: `wtm run job list --output json` is that.
 - **`status` has four values, and `detached` is not a weaker `running`.** A service with
   a `stop` command (a `docker compose up -d`) is reported `detached` from the moment its
   launcher exits: the real work runs outside wtm, nothing about it was verified, and
@@ -545,11 +551,21 @@ and **experimental**: the global `wtm init` does not configure it.
   - `runs = ["web-dev", "api-dev"]` (`--runs`, repeatable, replaces the list) — the
     declared jobs this one starts itself, typically a root `turbo run dev` behind a
     filter. **wtm infers nothing from the command**: the relation is written, never
-    detected. It gives the runner its children's ports at start time (a variable name
+    detected. It **nests and fans out**: a runner may name another runner (`dev` runs
+    `dev:shop`, which runs the shop apps — what a root holds is read through the whole
+    chain), and two runners may name the same job (`dev` and `dev:shop` both starting
+    `shop-web`). The only refusal is a cycle. It gives the runner its children's ports at start time (a variable name
     two children declare differently is left unresolved, as with the lifecycle hooks),
     lets the port check look at those ports, and makes `run up` **refuse** a profile
     asking for a runner and one of its own children — the same process twice on the
     same port. A job that runs others is not itself reported as portless.
+    **A runner also publishes its children's names.** Starting it registers one proxy
+    route per published job it runs, so `http://web.<worktree>.<repo>.localhost` answers
+    while the only job the daemon holds is the runner. Those addresses are reported on
+    the runner, never on the children: `run up --output json` carries them as
+    `held: [{job, url}]` beside the runner's own `url`, and the human surfaces list them
+    under its line. A child of a running runner has no row of its own in `wtm ui` — it
+    is a subprocess, and its address is on the parent.
 - **The addressing mode decides what a `.env` value pointing at another job holds.**
   `addressing` in run.toml, `"names"` (the default when absent) or `"ports"`, asked by
   `run init` whenever any job publishes a url. It is the one setting with a consequence

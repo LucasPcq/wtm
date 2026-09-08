@@ -66,6 +66,17 @@ func (m Model) addressLines(outcome runlogs.Outcome) []string {
 		if view.WorkDir != outcome.WorkDir || !started[view.Name] {
 			continue
 		}
+		// A runner answers for its children and for nothing of its own, so its
+		// addresses are theirs: one line each, under the runner's, which is the
+		// only place they are written at all. Nothing folds on a terminal the view
+		// is handing back.
+		if len(view.Address.Held) > 0 {
+			lines = append(lines, styles.Muted.Render(fmt.Sprintf(domain.RunViewRecapAddressFmt, view.Name, rules.HeldSummaryText(len(view.Address.Held)))))
+			for _, held := range rules.HeldAddressLines(view.Address.Held) {
+				lines = append(lines, styles.Muted.Render(domain.RunViewRecapHeldIndent+held))
+			}
+			continue
+		}
 		address := rules.JobAddressText(view.Address)
 		if address == "" {
 			continue

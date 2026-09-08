@@ -402,6 +402,11 @@ contains `dev`, and not a root `dev` a workspace package also declares — that 
 orchestrator (`turbo run dev`, `pnpm -r dev`) and running it beside the packages it fans
 out to would start each of them twice on the same ports. Nothing unchecked is written.
 
+It asks which of them starts the others — the relation is declared, never inferred from a
+command. A root can name another root, so `dev` → `dev:shop` → the shop apps is written one
+row at a time and what the top one holds is read through the whole chain; two roots may
+also name the same app. Only a cycle is refused.
+
 It also asks which jobs should answer under their own name, and proposes every service that
 declares the port it listens on — `PORT`, or `<JOB>_PORT` for the ones after the first. A
 port a job only dials (`DB_PORT`, `REDIS_PORT`) is never proposed: a name nothing answers
@@ -650,6 +655,13 @@ cookie jar — a job opts in with `url = { port = "PORT" }` in `run.toml`, which
 init` writes for the services it detects. Both keys default
 to the values above; the proxy lives in the background daemon and dies with it, and a port
 it cannot bind costs the names, never the jobs.
+
+A job started **by another job** is served too. A root `turbo run dev` is one process
+holding several apps, declared as `runs = ["web", "api"]`: starting it registers the name
+of every published job it runs, so `http://web.<worktree>.<repo>.localhost:11080` answers
+even though the only job the daemon holds is the runner. Those addresses are reported on
+the runner — under its line in a run, on its row in `wtm ui` — and the apps it holds get
+no row of their own while it is up: they are its subprocesses, not jobs beside it.
 
 ## IDE autocomplete + validation
 

@@ -73,10 +73,10 @@ type ManagedJob struct {
 	// `docker compose down` that lost COMPOSE_PROJECT_NAME tears down the wrong
 	// project, or nothing at all.
 	Env map[string]string
-	// RouteHost is the hostname the proxy serves this job under, empty for one
-	// that publishes none. Kept so the route is withdrawn by the same name it
-	// was published under, whatever the config has become since.
-	RouteHost string
+	// Routes are the names the proxy serves this job under — its own, and one
+	// per published job it runs. Kept so they are withdrawn by the same names
+	// they were published under, whatever the config has become since.
+	Routes []domain.JobRoute
 	// LogDir is where this job's output is persisted, kept for the index: a
 	// daemon adopting the job must be able to hand it back to `run logs`.
 	LogDir string
@@ -157,7 +157,7 @@ func (m *Manager) Adopt(records []domain.JobRecord) {
 			WorkDir:   record.WorkDir,
 			StartedAt: record.StartedAt,
 			Env:       record.Env,
-			RouteHost: record.RouteHost,
+			Routes:    record.Routes,
 			LogDir:    record.LogDir,
 			exited:    exited,
 		}
@@ -192,7 +192,7 @@ func (m *Manager) upRecordsLocked() []domain.JobRecord {
 			WorkDir:   job.WorkDir,
 			Config:    job.Config,
 			Env:       job.Env,
-			RouteHost: job.RouteHost,
+			Routes:    job.Routes,
 			LogDir:    job.LogDir,
 			StartedAt: job.StartedAt,
 		})
@@ -230,10 +230,10 @@ type StartParams struct {
 	// persists nothing.
 	LogDir string
 	Env    map[string]string
-	// RouteHost is the hostname the proxy serves this job under, resolved by the
+	// Routes are the names the proxy serves this job under, resolved by the
 	// client for the same reason LogDir and Env are.
-	RouteHost string
-	Streamer  io.Writer
+	Routes   []domain.JobRoute
+	Streamer io.Writer
 }
 
 // Start blocks for two of the three kinds it serves, which its signature does
@@ -301,7 +301,7 @@ func (m *Manager) Start(params StartParams) error {
 		WorkDir:   params.WorkDir,
 		StartedAt: time.Now(),
 		Env:       env,
-		RouteHost: params.RouteHost,
+		Routes:    params.Routes,
 		LogDir:    params.LogDir,
 		output:    hub,
 		logs:      logs,
@@ -1063,28 +1063,35 @@ func (m *Manager) waitForExit(job *ManagedJob) {
 	m.persist()
 }
 
-// publishRoute makes a started job reachable by name. A job declaring no url, or
-// one whose published port did not resolve, names nothing and is skipped.
+// publishRoute makes a started job reachable by name — under its own, and under
+// each of the names it holds for the jobs it runs itself. A route whose port did
+// not resolve is skipped rather than published on a guess: the process is one,
+// but the ports it was given are its children's too.
 func (m *Manager) publishRoute(job *ManagedJob) {
-	if m.routes == nil || job.RouteHost == "" || job.Config.URL == nil {
+	if m.routes == nil {
 		return
 	}
-	port, resolved := jobPorts(job.Config, job.Env)[job.Config.URL.Port]
-	if !resolved {
-		return
+	ports := jobPorts(job.Config, job.Env)
+	for _, route := range job.Routes {
+		port, resolved := ports[route.Port]
+		if !resolved {
+			continue
+		}
+		m.routes.Add(domain.ProxyRoute{
+			Host:     route.Host,
+			Target:   fmt.Sprintf(domain.ProxyTargetFmt, port),
+			Job:      route.Job,
+			Worktree: job.Env[domain.EnvWorktree],
+			Project:  job.Env[domain.EnvProject],
+		})
 	}
-	m.routes.Add(domain.ProxyRoute{
-		Host:     job.RouteHost,
-		Target:   fmt.Sprintf(domain.ProxyTargetFmt, port),
-		Job:      job.Name,
-		Worktree: job.Env[domain.EnvWorktree],
-		Project:  job.Env[domain.EnvProject],
-	})
 }
 
 func (m *Manager) withdrawRoute(job *ManagedJob) {
-	if m.routes == nil || job.RouteHost == "" {
+	if m.routes == nil {
 		return
 	}
-	m.routes.Remove(job.RouteHost)
+	for _, route := range job.Routes {
+		m.routes.Remove(route.Host)
+	}
 }

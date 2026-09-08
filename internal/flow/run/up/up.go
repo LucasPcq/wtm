@@ -269,7 +269,14 @@ func (f *upFlow) start(answers flow.Answers) (Outcome, error) {
 		ProbeBudget:   rules.PortProbeBudget(f.request.Config),
 		NoProbe:       f.request.NoProbe,
 		ProxyPort:     rules.ProxyPort(f.ctx.Config.Global),
+		PublicPort:    process.PublicProxyPort(rules.ProxyPort(f.ctx.Config.Global)),
 	})
+
+	// Before anything starts: a run defines what its worktrees' log directories
+	// hold, the way LUC-198 made each file hold one run. Otherwise the directory
+	// only ever grew, and every surface reading it showed what the worktree ran
+	// last fortnight beside what it is running now.
+	set.PruneLogs(seam.PruneParams{Jobs: profile.Jobs, Running: f.jobs})
 
 	results, err := f.presenter.Sequence(seam.SequenceParams{
 		Board:     set.Board(),

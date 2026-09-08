@@ -112,6 +112,7 @@ func (f *logsFlow) run() (Outcome, error) {
 		Jobs:          f.request.Config.Jobs,
 		PortAddressed: addresses.PortAddressed,
 		ProxyPort:     rules.ProxyPort(f.ctx.Config.Global),
+		PublicPort:    process.PublicProxyPort(rules.ProxyPort(f.ctx.Config.Global)),
 	})
 
 	return Outcome{WorkDirs: workDirs}, f.presenter.Show(ShowParams{

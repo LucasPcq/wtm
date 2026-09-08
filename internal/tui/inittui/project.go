@@ -1126,7 +1126,7 @@ func runnerListSummary(model any) string {
 	}
 	attached := 0
 	for _, choice := range rl.Choices() {
-		if choice.Runner != "" {
+		if len(choice.Runners) > 0 {
 			attached++
 		}
 	}

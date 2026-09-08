@@ -270,12 +270,15 @@ func (m Model) statusWithAddress(view runlogs.JobView) string {
 	key := viewKey(view)
 	label := string(view.Status)
 
+	// A url already carries the port it answers on, so the two are the same fact
+	// twice — the rule JobAddressText states, applied here too. The observed url
+	// still wins over the predicted one: only the run knows what the proxy really
+	// served.
+	if url := m.sequence.urls[key]; url != "" {
+		return label + domain.RunViewSeparator + url
+	}
 	if ports := m.sequence.ports[key]; len(ports) > 0 {
-		status := rules.LabelWithPorts(rules.LabelWithPortsParams{Label: label, Ports: ports})
-		if url := m.sequence.urls[key]; url != "" {
-			status += domain.RunViewSeparator + url
-		}
-		return status
+		return rules.LabelWithPorts(rules.LabelWithPortsParams{Label: label, Ports: ports})
 	}
 
 	if address := rules.JobAddressText(view.Address); address != "" {

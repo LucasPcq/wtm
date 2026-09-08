@@ -49,10 +49,10 @@ func TestManagerRoutesPublishesAStartedJob(t *testing.T) {
 	dir := t.TempDir()
 
 	err := m.Start(StartParams{
-		Job:       publishedJob(),
-		WorkDir:   dir,
-		Env:       map[string]string{domain.EnvPortOffset: "10", domain.EnvWorktree: "feat", domain.EnvProject: "myapp"},
-		RouteHost: "web.feat.myapp.localhost",
+		Job:     publishedJob(),
+		WorkDir: dir,
+		Env:     map[string]string{domain.EnvPortOffset: "10", domain.EnvWorktree: "feat", domain.EnvProject: "myapp"},
+		Routes:  []domain.JobRoute{{Job: "web", Host: "web.feat.myapp.localhost", Port: "PORT"}},
 	})
 	if err != nil {
 		t.Fatalf("start: %v", err)
@@ -80,10 +80,10 @@ func TestManagerRoutesWithdrawsAStoppedJob(t *testing.T) {
 	dir := t.TempDir()
 
 	if err := m.Start(StartParams{
-		Job:       publishedJob(),
-		WorkDir:   dir,
-		Env:       map[string]string{domain.EnvPortOffset: "10"},
-		RouteHost: "web.feat.myapp.localhost",
+		Job:     publishedJob(),
+		WorkDir: dir,
+		Env:     map[string]string{domain.EnvPortOffset: "10"},
+		Routes:  []domain.JobRoute{{Job: "web", Host: "web.feat.myapp.localhost", Port: "PORT"}},
 	}); err != nil {
 		t.Fatalf("start: %v", err)
 	}
@@ -118,5 +118,87 @@ func TestManagerRoutesIgnoresAJobThatPublishesNothing(t *testing.T) {
 	added, _ := routes.snapshot()
 	if len(added) != 0 {
 		t.Errorf("added = %v, want nothing: the job declares no url", added)
+	}
+}
+
+// runnerJob is the shape a `turbo run dev` takes once the surface has resolved
+// it: one process, carrying the ports of the apps it starts.
+func runnerJob() domain.JobConfig {
+	return domain.JobConfig{
+		Name:  "dev",
+		Kind:  domain.JobKindService,
+		Cmd:   "sleep 30",
+		Ports: map[string]int{"PORT": 3000, "API_PORT": 4000},
+		Runs:  []string{"web", "api"},
+	}
+}
+
+func runnerRoutes() []domain.JobRoute {
+	return []domain.JobRoute{
+		{Job: "web", Host: "web.feat.myapp.localhost", Port: "PORT"},
+		{Job: "api", Host: "api.feat.myapp.localhost", Port: "API_PORT"},
+	}
+}
+
+func TestManagerRoutesPublishesTheChildrenOfARunner(t *testing.T) {
+	routes := &routeRecorder{}
+	m := NewManagerWithRoutes(routes)
+	dir := t.TempDir()
+
+	err := m.Start(StartParams{
+		Job:     runnerJob(),
+		WorkDir: dir,
+		Env:     map[string]string{domain.EnvPortOffset: "10", domain.EnvWorktree: "feat", domain.EnvProject: "myapp"},
+		Routes:  runnerRoutes(),
+	})
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	t.Cleanup(func() { _ = m.StopAll() })
+
+	// One process, two names: the apps are subprocesses of the runner, so the
+	// only job the daemon knows about is the one that has to publish them.
+	added, _ := routes.snapshot()
+	if len(added) != 2 {
+		t.Fatalf("added = %+v, want one route per published child", added)
+	}
+	byHost := map[string]domain.ProxyRoute{}
+	for _, route := range added {
+		byHost[route.Host] = route
+	}
+	if got := byHost["web.feat.myapp.localhost"]; got.Target != "localhost:3010" || got.Job != "web" {
+		t.Errorf("web route = %+v, want the child's own port and name", got)
+	}
+	if got := byHost["api.feat.myapp.localhost"]; got.Target != "localhost:4010" {
+		t.Errorf("api route = %+v, want localhost:4010", got)
+	}
+}
+
+func TestManagerRoutesWithdrawsEveryNameARunnerHeld(t *testing.T) {
+	routes := &routeRecorder{}
+	m := NewManagerWithRoutes(routes)
+	dir := t.TempDir()
+
+	if err := m.Start(StartParams{
+		Job:     runnerJob(),
+		WorkDir: dir,
+		Env:     map[string]string{domain.EnvPortOffset: "10"},
+		Routes:  runnerRoutes(),
+	}); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if err := m.Stop("dev", dir); err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+
+	_, removed := routes.snapshot()
+	held := map[string]bool{}
+	for _, host := range removed {
+		held[host] = true
+	}
+	for _, route := range runnerRoutes() {
+		if !held[route.Host] {
+			t.Errorf("stopping the runner left %q published", route.Host)
+		}
 	}
 }

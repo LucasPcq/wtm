@@ -251,6 +251,7 @@ func TestWriteJobLogsJSONNeverAttaches(t *testing.T) {
 		Jobs:    []domain.JobConfig{{Name: "api", Kind: domain.JobKindService}},
 		WorkDir: "/wt",
 		LogDir:  "/state/logs/wt",
+		Logged:  map[string]bool{"api": true},
 	})
 
 	cmd, out, _ := linesCmd()

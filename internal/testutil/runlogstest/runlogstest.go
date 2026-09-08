@@ -13,10 +13,10 @@ import (
 )
 
 type StartCall struct {
-	Job       domain.JobConfig
-	WorkDir   string
-	LogDir    string
-	RouteHost string
+	Job     domain.JobConfig
+	WorkDir string
+	LogDir  string
+	Routes  []domain.JobRoute
 }
 
 type Service struct {
@@ -60,7 +60,7 @@ type Service struct {
 }
 
 func (s *Service) Start(ctx context.Context, req runlogs.StartRequest) (runlogs.StartResult, error) {
-	s.Started = append(s.Started, StartCall{Job: req.Job, WorkDir: req.WorkDir, LogDir: req.LogDir, RouteHost: req.RouteHost})
+	s.Started = append(s.Started, StartCall{Job: req.Job, WorkDir: req.WorkDir, LogDir: req.LogDir, Routes: req.Routes})
 
 	if s.Starting != nil {
 		s.Starting(req.Job.Name)

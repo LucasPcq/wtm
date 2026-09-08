@@ -30,35 +30,66 @@ func RunnerCandidates(params RunnerChoicesParams) []string {
 	return names
 }
 
-// RunnerChoices is one row per service declared in a subdirectory: the jobs a
-// root-level service could be starting. Pre-filled from the relation run.toml
-// already holds, so a re-init shows what was settled rather than asking again.
+// RunnerChoices is one row per service a root-level one could be starting: the
+// apps declared in a subdirectory, and the runners themselves — a `dev` fanning
+// out to `dev:shop` and `dev:crm`, each fanning out to its own apps, is the
+// shape a turborepo takes, and it cannot be written a row at a time otherwise.
+// Pre-filled from the relation run.toml already holds, so a re-init shows what
+// was settled rather than asking again.
 func RunnerChoices(params RunnerChoicesParams) []domain.JobRunnerChoice {
 	runners := RunnerCandidates(params)
 	if len(runners) == 0 {
 		return nil
 	}
 
-	options := append([]string{""}, runners...)
 	isRunner := namesSet(runners)
 	exempt := namesSet(params.ComposeJobs)
 
 	var choices []domain.JobRunnerChoice
 	for _, job := range params.Config.Jobs {
-		if job.Kind != domain.JobKindService || isRunner[job.Name] || exempt[job.Name] || runsCompose(job) {
+		if job.Kind != domain.JobKindService || exempt[job.Name] || runsCompose(job) {
 			continue
 		}
-		if ScriptJobCwd(job.Cwd) == ScriptJobCwd("") {
+		if ScriptJobCwd(job.Cwd) == ScriptJobCwd("") && !isRunner[job.Name] {
+			continue
+		}
+		options := runnerOptionsFor(runnerOptionsParams{
+			Config: params.Config, Job: job.Name, Runners: runners,
+		})
+		if len(options) == 1 {
 			continue
 		}
 		choices = append(choices, domain.JobRunnerChoice{
 			Job:     job.Name,
 			Label:   JobLabelWithCwd(job),
-			Runner:  runnerOf(params.Config, job.Name, isRunner),
+			Runners: directRunnersOf(params.Config, job.Name, isRunner),
 			Options: options,
 		})
 	}
 	return choices
+}
+
+type runnerOptionsParams struct {
+	Config  domain.RunConfig
+	Job     string
+	Runners []string
+}
+
+// runnerOptionsFor is what a row may be set to: no runner, or any candidate that
+// would not end up running itself. A runner offered as its own parent — directly
+// or through the chain it already starts — is a config run.toml refuses to load,
+// so the step never proposes it.
+func runnerOptionsFor(params runnerOptionsParams) []string {
+	reached := namesSet(RunnerChildren(params.Config, params.Job))
+
+	options := []string{""}
+	for _, runner := range params.Runners {
+		if runner == params.Job || reached[runner] {
+			continue
+		}
+		options = append(options, runner)
+	}
+	return options
 }
 
 // JobLabelWithCwd names a job by where it runs, which is what tells two `dev`
@@ -70,13 +101,24 @@ func JobLabelWithCwd(job domain.JobConfig) string {
 	return job.Name + domain.RunnerListCwdSep + job.Cwd
 }
 
-func runnerOf(cfg domain.RunConfig, job string, candidates map[string]bool) string {
-	for _, runner := range RunnersOf(cfg, job) {
-		if candidates[runner] {
-			return runner
+// directRunnersOf names the candidates that start this job themselves. The
+// transitive reading belongs to what a runner holds, never to what a row says:
+// a grandparent shown as the answer would be written back as a direct relation,
+// flattening the chain the reader composed.
+func directRunnersOf(cfg domain.RunConfig, job string, candidates map[string]bool) []string {
+	var runners []string
+	for _, candidate := range cfg.Jobs {
+		if !candidates[candidate.Name] {
+			continue
+		}
+		for _, child := range candidate.Runs {
+			if child == job {
+				runners = append(runners, candidate.Name)
+				break
+			}
 		}
 	}
-	return ""
+	return runners
 }
 
 type ApplyRunnerChoicesParams struct {
@@ -104,8 +146,8 @@ func ApplyRunnerChoices(params ApplyRunnerChoicesParams) domain.RunConfig {
 				touched[option] = true
 			}
 		}
-		if choice.Runner != "" {
-			children[choice.Runner] = append(children[choice.Runner], choice.Job)
+		for _, runner := range choice.Runners {
+			children[runner] = append(children[runner], choice.Job)
 		}
 	}
 

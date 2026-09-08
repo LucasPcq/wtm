@@ -185,14 +185,14 @@ func TestReduceEnvPortValueKeepsRealConflictsVisible(t *testing.T) {
 }
 
 func TestElideEnvValueHidesCredentials(t *testing.T) {
-	got := ElideEnvValue("postgres://user:supersecret@localhost:5442/app")
+	got := ElideEnvValue(ElideEnvValueParams{Value: "postgres://user:supersecret@localhost:5442/app"})
 	if got != "…@localhost:5442/app" {
 		t.Fatalf("ElideEnvValue() = %q, want the credentials elided", got)
 	}
 }
 
 func TestElideEnvValueKeepsShortValues(t *testing.T) {
-	if got := ElideEnvValue("http://localhost:3010"); got != "http://localhost:3010" {
+	if got := ElideEnvValue(ElideEnvValueParams{Value: "http://localhost:3010"}); got != "http://localhost:3010" {
 		t.Errorf("ElideEnvValue() = %q, want it unchanged", got)
 	}
 }

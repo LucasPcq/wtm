@@ -97,6 +97,9 @@ const (
 	DetailCellName    DetailCellKind = "name"
 	DetailCellAddress DetailCellKind = "address"
 	DetailCellMeta    DetailCellKind = "meta"
+	// DetailCellFold is the marker on a row that opens and closes, drawn where
+	// the eye already is — at the end of the row it belongs to.
+	DetailCellFold DetailCellKind = "fold"
 	// DetailCellNote is a standalone muted body line inside a rowed section —
 	// the "… N more" fold, which is not a job and has no columns to align on.
 	DetailCellNote DetailCellKind = "note"
@@ -121,6 +124,14 @@ type DetailRow struct {
 	Cells []DetailCell
 	Up    bool
 	URL   string
+	// Depth indents a row under the one it belongs to. Only a runner's children
+	// use it: they are addresses of a job the daemon does not hold, so they hang
+	// off the row of the process that started them rather than standing beside it.
+	Depth int
+	// Fold marks a row that opens and closes. Its Key is what a surface toggles
+	// on, and Folded says which way it currently reads.
+	Fold   bool
+	Folded bool
 }
 
 // DetailSection is one block of the detail panel, already reduced to its plain
@@ -148,6 +159,11 @@ const (
 	// ServicesRowNote closes a worktree's block with what has to be said about
 	// the addresses above it.
 	ServicesRowNote ServicesRowKind = "note"
+	// ServicesRowHeld is one address a runner answers for, shown under it once
+	// unfolded. It is drawn like a job row and is not one: the cursor skips it,
+	// and the job menu has nothing to act on there — the process belongs to the
+	// runner above.
+	ServicesRowHeld ServicesRowKind = "held"
 )
 
 // ServicesRow is one drawn line of the Services tab. The tab is a flat list

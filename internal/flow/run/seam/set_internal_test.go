@@ -2,6 +2,7 @@ package seam
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 
@@ -122,5 +123,68 @@ func TestAWorktreeThatAbortsLeavesTheOthersAlone(t *testing.T) {
 	}
 	if outcomes[1].Aborted() || len(outcomes[1].Started) != 1 {
 		t.Errorf("the other worktree concluded %+v, want it started regardless", outcomes[1])
+	}
+}
+
+// The bind port and the port a name answers on diverge exactly when the
+// redirection on the 80 is installed. A board built from the bind port then
+// announces urls nobody can reach, which is how the logs preview came to
+// contradict the header above it.
+func TestABoardBuildsItsAddressesFromThePublicPortNotTheBindPort(t *testing.T) {
+	published := domain.JobConfig{
+		Name:  "web",
+		Kind:  domain.JobKindService,
+		Ports: map[string]int{"PORT": 3000},
+		URL:   &domain.JobURLConfig{Port: "PORT"},
+	}
+
+	addresses := boardAddresses(boardAddressParams{
+		Params: Params{
+			ProjectDir: "/work/shop",
+			Jobs:       []domain.JobConfig{published},
+			ProxyPort:  8787,
+			PublicPort: 80,
+		},
+		Env: map[string]string{domain.EnvWorktree: "dev-crm", domain.EnvPortOffset: "0"},
+	})
+
+	url := addresses[published.Name].URL
+	if url == "" {
+		t.Fatalf("web has no url, want the name the proxy publishes")
+	}
+	if strings.Contains(url, "8787") {
+		t.Errorf("url = %q, want the public port and never the bind port", url)
+	}
+}
+
+// PortAddressed is the one worktree fact a board cannot read for itself: the
+// name is published, but the .env still answers on the port, so handing out the
+// name would hand out an address that fails.
+func TestAPortAddressedWorktreeIsHandedItsPortsRatherThanItsNames(t *testing.T) {
+	published := domain.JobConfig{
+		Name:  "web",
+		Kind:  domain.JobKindService,
+		Ports: map[string]int{"PORT": 3000},
+		URL:   &domain.JobURLConfig{Port: "PORT"},
+	}
+
+	addresses := boardAddresses(boardAddressParams{
+		Params: Params{
+			ProjectDir:    "/work/shop",
+			Jobs:          []domain.JobConfig{published},
+			PublicPort:    80,
+			PortAddressed: true,
+		},
+		Env: map[string]string{domain.EnvWorktree: "dev-crm", domain.EnvPortOffset: "0"},
+	})
+
+	// Not an absent address: a plain port url is the entrance that works, and
+	// handing out a name nothing answers to would be worse than handing out none.
+	url := addresses[published.Name].URL
+	if !strings.Contains(url, "3000") {
+		t.Errorf("url = %q, want the port the .env actually answers on", url)
+	}
+	if strings.Contains(url, "dev-crm") {
+		t.Errorf("url = %q, want no published name while the worktree answers on its ports", url)
 	}
 }

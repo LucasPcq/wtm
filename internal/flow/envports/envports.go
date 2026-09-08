@@ -75,7 +75,7 @@ func Settle(params Params) error {
 	params.Presenter.Status(flow.Notice{
 		Kind:  flow.NoticeMessage,
 		Text:  rules.EnvPortOffsetLabel(plan.Offset),
-		Lines: rules.EnvPortTableLines(plan),
+		Lines: rules.EnvPortTableLines(rules.EnvPortTableParams{Plan: plan}),
 	})
 
 	_, err = envsvc.ApplyEnvPorts(resolved)

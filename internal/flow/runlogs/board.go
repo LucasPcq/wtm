@@ -21,6 +21,11 @@ type BoardParams struct {
 	// job name. Computed by the surface, which is the side that reads the
 	// worktree's offset and the proxy's port.
 	Addresses map[string]domain.JobAddress
+	// Logged names the jobs that left output in this worktree. With the daemon's
+	// index it decides which declared jobs the board lists at all: a project
+	// declaring fifteen of them listed all fifteen, and opening any of the twelve
+	// that had never run here answered "No output recorded for this job."
+	Logged map[string]bool
 }
 
 // NewBoard builds the surface's view of a worktree's jobs. It reads nothing
@@ -34,6 +39,7 @@ func NewBoard(params BoardParams) Board {
 		worktree:  params.Worktree,
 		logDir:    params.LogDir,
 		addresses: params.Addresses,
+		logged:    params.Logged,
 	}
 }
 
@@ -44,6 +50,7 @@ type board struct {
 	worktree  string
 	logDir    string
 	addresses map[string]domain.JobAddress
+	logged    map[string]bool
 
 	// mu guards live, which a surface refreshes off the goroutine that renders it.
 	mu        sync.RWMutex
@@ -81,14 +88,22 @@ func (b *board) Jobs() []JobView {
 	live, order := b.live, b.liveOrder
 	b.mu.RUnlock()
 
+	// A job that neither lives nor left a trace here has nothing to show and no
+	// stream to bind: listing it only ever led the reader to an empty pane.
+	visible, _ := rules.VisibleJobs(rules.VisibleJobsParams{
+		Jobs: b.jobs, Up: live, Traces: b.logged,
+	})
+
 	declared := make(map[string]bool, len(b.jobs))
-	views := make([]JobView, 0, len(b.jobs))
+	views := make([]JobView, 0, len(visible))
 	for _, job := range b.jobs {
 		declared[job.Name] = true
+	}
+	for _, job := range visible {
 		views = append(views, b.own(declaredView(declaredViewParams{
-			Job:     job,
-			Info:    live[job.Name],
-			Address: b.addresses[job.Name],
+			Job:     job.Job,
+			Info:    live[job.Job.Name],
+			Address: b.addresses[job.Job.Name],
 		})))
 	}
 

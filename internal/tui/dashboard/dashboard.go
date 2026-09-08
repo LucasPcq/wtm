@@ -58,6 +58,12 @@ type RunParams struct {
 	// BoardLoader opens the board a live preview attaches through. Nil leaves the
 	// panel on LogsLoader's persisted tail, which is what a test installs.
 	BoardLoader func(logsRequest) runlogs.Board
+	// TraceLoader names, per branch, the jobs that left output in that worktree.
+	// It is asked about every worktree rather than only the ones with a job up:
+	// a job that left a trace is precisely one the daemon no longer holds, and
+	// asking only about live worktrees would hide every finished task and every
+	// crash — the two things one opens this panel for.
+	TraceLoader func(branches []string) map[string]map[string]bool
 	// Version is the running wtm version and UpgradeLatest the newer release the
 	// last passive check found, or "" when there is none. Both are resolved by
 	// the command layer: the dashboard renders them, it decides nothing.
@@ -98,12 +104,23 @@ type AddressRequest struct {
 // rather than a field of jobsMsg because the two reads cannot be ordered: Init
 // loads the worktrees and the jobs in parallel, and whichever answers last is
 // the one that knows enough to ask.
+// tracesMsg lands what each worktree has left on disk. Its own message, like
+// addressesMsg and for the same reason: it is read off the worktrees, which may
+// land after the jobs.
+type tracesMsg struct {
+	logged map[string]map[string]bool
+}
+
 type addressesMsg struct {
 	addresses map[string]map[string]domain.JobAddress
 	// notes is what has to be said about an address, keyed by branch: a
 	// worktree served its ports because its .env was never settled on the names
 	// it publishes says so, or the reader wonders why it alone has no name.
 	notes map[string]string
+	// portAddressed keys the worktrees served their ports rather than their
+	// names. The preview's own board needs the verdict, not the line: it builds
+	// its addresses itself and has to reach the same one.
+	portAddressed map[string]bool
 }
 
 type jobsMsg struct {
@@ -192,6 +209,19 @@ type Model struct {
 	// addressNotes is one line per worktree whose .env is unsettled; see
 	// addressesMsg.
 	addressNotes map[string]string
+	// portAddressed follows the addresses, and is handed to the board the logs
+	// preview opens; see addressesMsg.
+	portAddressed map[string]bool
+	// logged names the jobs that left output in each worktree, by branch. With
+	// the daemon's index it decides what every surface here shows; see
+	// rules.VisibleJobs.
+	logged map[string]map[string]bool
+	// runExpanded keys the runners whose held addresses are unfolded, by job
+	// name. Folded is the default and the state lives here rather than on disk:
+	// it is how the panel is being read right now, not a preference — but it
+	// outlives moving between worktrees, which is what makes comparing two of
+	// them bearable.
+	runExpanded map[string]bool
 	// board is what the daemon holds up, per worktree. Rebuilt when the jobs,
 	// the worktrees or the addresses land — never in the renderer, which asked
 	// for it six times a frame with a different time.Now() each time.
@@ -440,10 +470,14 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Only the worktrees ask here, and only while the jobs have not been read
 		// yet: past the first poll it is applyJobs that knows something changed,
 		// and both asking would run the read twice every tick.
-		return model, tea.Batch(animCmd, detailCmd, next.firstAddressesCmd())
+		return model, tea.Batch(animCmd, detailCmd, next.firstAddressesCmd(), next.resolveTracesCmd())
+
+	case tracesMsg:
+		m.logged = msg.logged
+		return m.withBoard(), nil
 
 	case addressesMsg:
-		m.addresses, m.addressNotes = msg.addresses, msg.notes
+		m.addresses, m.addressNotes, m.portAddressed = msg.addresses, msg.notes, msg.portAddressed
 		return m.withBoard(), nil
 
 	case prsMsg:
@@ -1170,6 +1204,7 @@ func (m Model) withBoard() Model {
 		Jobs:      m.jobs,
 		Addresses: m.addresses,
 		Notes:     m.addressNotes,
+		Expanded:  m.runExpanded,
 		Statuses:  m.statuses,
 		Now:       time.Now(),
 	})
@@ -1194,6 +1229,22 @@ func (m Model) firstAddressesCmd() tea.Cmd {
 	return m.resolveAddressesCmd()
 }
 
+// resolveTracesCmd asks what each worktree has left on disk. Unlike the
+// addresses it covers every worktree the list holds, running or not: a trace is
+// what a job leaves once the daemon has dropped it, so the worktrees with
+// nothing up are exactly the ones with something to report.
+func (m Model) resolveTracesCmd() tea.Cmd {
+	if m.params.TraceLoader == nil || len(m.runConfig.Jobs) == 0 || len(m.statuses) == 0 {
+		return nil
+	}
+	branches := make([]string, 0, len(m.statuses))
+	for _, status := range m.statuses {
+		branches = append(branches, status.Branch)
+	}
+	load := m.params.TraceLoader
+	return func() tea.Msg { return tracesMsg{logged: load(branches)} }
+}
+
 // resolveAddressesCmd asks where the running worktrees' jobs answer. It is
 // built from the model the jobs have already been applied to, never captured by
 // the command that read them: Init loads the worktrees and the jobs in
@@ -1214,7 +1265,7 @@ func (m Model) resolveAddressesCmd() tea.Cmd {
 	load, request := m.params.AddressLoader, AddressRequest{Branches: branches, Config: m.runConfig}
 	return func() tea.Msg {
 		answer := load(request)
-		return addressesMsg{addresses: answer.ByBranch, notes: answer.Notes}
+		return addressesMsg{addresses: answer.ByBranch, notes: answer.Notes, portAddressed: answer.PortAddressed}
 	}
 }
 
@@ -1247,8 +1298,8 @@ func (m Model) applyJobs(msg jobsMsg) (Model, tea.Cmd) {
 	// stale one until they are rebuilt.
 	m = m.withBoard()
 	if !changed {
-		return m, tea.Batch(m.treeCmd(), m.resolveAddressesCmd())
+		return m, tea.Batch(m.treeCmd(), m.resolveAddressesCmd(), m.resolveTracesCmd())
 	}
 	next, detailCmd := m.invalidateDetail(m.selectedBranch())
-	return next, tea.Batch(next.treeCmd(), detailCmd, next.resolveAddressesCmd())
+	return next, tea.Batch(next.treeCmd(), detailCmd, next.resolveAddressesCmd(), next.resolveTracesCmd())
 }

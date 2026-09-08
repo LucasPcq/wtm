@@ -7,6 +7,8 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
+	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/service/process"
 )
 
 type SetParams struct {
@@ -25,9 +27,11 @@ type SetParams struct {
 	// PortAddressed keys the worktrees whose .env still spells its addresses as
 	// ports; see Params.PortAddressed.
 	PortAddressed map[string]bool
-	ProxyPort     int
-	ProbeBudget   time.Duration
-	NoProbe       bool
+	// ProxyPort and PublicPort are Params' own; see the fields there.
+	ProxyPort   int
+	PublicPort  int
+	ProbeBudget time.Duration
+	NoProbe     bool
 }
 
 // Set is the seam over several worktrees at once. It holds one Seam each and
@@ -47,6 +51,7 @@ func OpenSet(params SetParams) Set {
 			Jobs:          params.Jobs,
 			Declared:      params.Declared,
 			ProxyPort:     params.ProxyPort,
+			PublicPort:    params.PublicPort,
 			PortAddressed: params.PortAddressed[workDir],
 			ProbeBudget:   params.ProbeBudget,
 			NoProbe:       params.NoProbe,
@@ -127,4 +132,40 @@ func (l *lockedSink) Emit(event runlogs.Event) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.sink.Emit(event)
+}
+
+type PruneParams struct {
+	// Jobs are the ones this run starts. Their logs are the run's own and are
+	// opened fresh by the daemon anyway.
+	Jobs []domain.JobConfig
+	// Running is the daemon's whole index. A job up in one of these worktrees
+	// keeps its log whatever this run starts: its sink is writing to that file.
+	Running []domain.JobInfo
+}
+
+// PruneLogs makes each worktree's log directory hold this run and nothing else.
+// It is `run up`'s to call and not the runner's: `run start` adds a job to a
+// session rather than defining one, and clearing the directory under it would
+// throw away the logs of everything already standing beside it.
+func (s Set) PruneLogs(params PruneParams) {
+	keep := make(map[string]bool, len(params.Jobs))
+	for _, job := range params.Jobs {
+		keep[job.Name] = true
+	}
+	for _, seam := range s.seams {
+		s.pruneOne(seam, keep, params.Running)
+	}
+}
+
+func (s Set) pruneOne(worktree Seam, starting map[string]bool, running []domain.JobInfo) {
+	keep := make(map[string]bool, len(starting)+len(running))
+	for name := range starting {
+		keep[name] = true
+	}
+	for _, info := range running {
+		if info.WorkDir == worktree.workDir && rules.IsJobUp(info.Status) {
+			keep[info.Name] = true
+		}
+	}
+	process.PruneJobLogs(process.PruneLogsParams{LogDir: worktree.logDir, Keep: keep})
 }

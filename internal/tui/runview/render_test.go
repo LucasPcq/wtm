@@ -211,3 +211,37 @@ func TestPaneSetsTheOutputOffFromTheTitle(t *testing.T) {
 		t.Errorf("frame is %d rows, want the terminal's %d: the blank row overflowed it", got, h.model.height)
 	}
 }
+
+// A url already carries the port it answers on, so a title spelling both says
+// the same thing twice — and, in the dashboard's logs preview, contradicted the
+// header one line above it, which had only ever shown the url.
+func TestAPaneTitleShowsTheUrlAloneWhenTheRunObservedBoth(t *testing.T) {
+	view := running("web")
+	key := viewKey(view)
+
+	model := Model{}
+	model.sequence.ports = map[jobKey]map[string]int{key: {"PORT": 3010}}
+	model.sequence.urls = map[jobKey]string{key: "http://web.dev-crm.shop.localhost"}
+
+	status := model.statusWithAddress(view)
+	if !strings.Contains(status, "http://web.dev-crm.shop.localhost") {
+		t.Fatalf("status = %q, want the url the run observed", status)
+	}
+	if strings.Contains(status, "3010") {
+		t.Errorf("status = %q, want no port beside the url that already carries one", status)
+	}
+}
+
+// With no url to show, the ports are the address: they are what the reader has
+// left to reach the job with.
+func TestAPaneTitleFallsBackToThePortsWhenNoNameIsPublished(t *testing.T) {
+	view := running("web")
+	key := viewKey(view)
+
+	model := Model{}
+	model.sequence.ports = map[jobKey]map[string]int{key: {"PORT": 3010}}
+
+	if status := model.statusWithAddress(view); !strings.Contains(status, "3010") {
+		t.Errorf("status = %q, want the ports when nothing publishes a name", status)
+	}
+}

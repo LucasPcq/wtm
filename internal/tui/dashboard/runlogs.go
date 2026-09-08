@@ -23,6 +23,11 @@ type logsRequest struct {
 	Job     string
 	Jobs    []domain.JobConfig
 	Lines   int
+	// PortAddressed says this worktree's .env still answers on ports, which is
+	// the one thing the board cannot read for itself. Without it the preview
+	// announced ports under a header announcing the url — the same job's address
+	// spelled two ways, two lines apart.
+	PortAddressed bool
 }
 
 type logsTailMsg struct {
@@ -35,6 +40,11 @@ type logsTailMsg struct {
 type LogsLoaderParams struct {
 	ProjectDir string
 	StateDir   string
+	// PublicPort is where a published name answers. It is a func because it is
+	// dialed, and dialing belongs off the goroutine that draws: the daemon may
+	// have been started after the dashboard was opened, and a port read once at
+	// startup would leave every preview address unpublished for the session.
+	PublicPort func() int
 }
 
 // DefaultBoardLoader opens the worktree's board, which is what a live preview
@@ -43,13 +53,24 @@ type LogsLoaderParams struct {
 func DefaultBoardLoader(params LogsLoaderParams) func(logsRequest) runlogs.Board {
 	return func(req logsRequest) runlogs.Board {
 		return seam.Open(seam.Params{
-			ProjectDir: params.ProjectDir,
-			StateDir:   params.StateDir,
-			WorkDir:    req.WorkDir,
-			Jobs:       req.Jobs,
-			NoProbe:    true,
+			ProjectDir:    params.ProjectDir,
+			StateDir:      params.StateDir,
+			WorkDir:       req.WorkDir,
+			Jobs:          req.Jobs,
+			PublicPort:    publicPortOf(params),
+			PortAddressed: req.PortAddressed,
+			NoProbe:       true,
 		}).Board()
 	}
+}
+
+// publicPortOf is zero for a surface that was given no dialer — a test, or a
+// dashboard opened with no run module.
+func publicPortOf(params LogsLoaderParams) int {
+	if params.PublicPort == nil {
+		return 0
+	}
+	return params.PublicPort()
 }
 
 // DefaultLogsLoader reads back what a job persisted, whether or not it still
@@ -138,8 +159,9 @@ func (m Model) openPreview() (Model, tea.Cmd) {
 	m = m.closePreview()
 
 	board := m.params.BoardLoader(logsRequest{
-		WorkDir: m.statusFor(m.logsBranch).Path,
-		Jobs:    m.runConfig.Jobs,
+		WorkDir:       m.statusFor(m.logsBranch).Path,
+		Jobs:          m.runConfig.Jobs,
+		PortAddressed: m.portAddressed[m.logsBranch],
 	})
 	if board == nil {
 		return m, nil
@@ -265,12 +287,23 @@ func (m Model) applyLogsTail(msg logsTailMsg) Model {
 	return m
 }
 
-// clickLogsAddress answers a click on the address the logs view shows.
+// clickLogsAddress answers a click on one of the addresses the logs view heads
+// with — the job's own, or one of those a runner answers for.
 func (m Model) clickLogsAddress(msg tea.MouseMsg) (tea.Model, tea.Cmd, bool) {
-	if !m.logsOpen() || !m.inZone(logsURLZone(), msg) {
+	if !m.logsOpen() {
 		return m, nil, false
 	}
-	model, cmd := m.openJobURL(m.logsAddress().URL)
+	address := m.logsAddress()
+	for _, held := range address.Held {
+		if m.inZone(logsHeldZone(held.Job), msg) {
+			model, cmd := m.openJobURL(held.URL)
+			return model, cmd, true
+		}
+	}
+	if !m.inZone(logsURLZone(), msg) {
+		return m, nil, false
+	}
+	model, cmd := m.openJobURL(address.URL)
 	return model, cmd, true
 }
 
@@ -293,23 +326,68 @@ func (m Model) clickLogsJob(msg tea.MouseMsg) (tea.Model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-// logsJobs are the jobs the selection line offers: every declared one, in
-// run.toml's order. A stopped job keeps its place — History reads back what it
-// persisted, which is exactly what one looks for after a crash.
-func (m Model) logsJobs() []domain.JobConfig { return m.runConfig.Jobs }
+// logsJobs are the jobs the column offers, read by the very rule the RUN
+// section reads: what lives or left a trace in this worktree, in run.toml's
+// order. Offering every declaration put fifteen names in front of a reader of
+// whom twelve answered "No output recorded for this job." — the column proposed
+// what it had no way to show.
+//
+// A stopped or crashed job keeps its place, which is the whole point: History
+// reads back what it persisted, and that is exactly what one comes here for.
+func (m Model) logsJobs() []domain.JobConfig {
+	visible, _ := m.visibleLogsJobs()
+	jobs := make([]domain.JobConfig, 0, len(visible))
+	for _, job := range visible {
+		jobs = append(jobs, job.Job)
+	}
+	return jobs
+}
 
-// logsAddressLine heads the logs view with where the job on screen answers. It
-// gets a line of its own rather than a corner of the selection row: the address
-// is the thing one opens the view to copy.
-func (m Model) logsAddressLine(width int) string {
+// logsDeclaredMore is what run.toml holds beyond the column, for the line that
+// closes it — the same catalogue the RUN section closes with.
+func (m Model) logsDeclaredMore() int {
+	_, hidden := m.visibleLogsJobs()
+	return hidden
+}
+
+func (m Model) visibleLogsJobs() ([]rules.VisibleJob, int) {
+	status := m.statusFor(m.logsBranch)
+	return rules.VisibleJobs(rules.VisibleJobsParams{
+		Jobs: m.runConfig.Jobs,
+		Up:   rules.IndexedJobsByName(m.jobs, status.Path),
+		// The logs view is the one surface whose subject is the archive: `run up`
+		// clears the logs of what it is not starting, so what is left on disk is
+		// this run — including the jobs of it that have already finished.
+		Traces: m.logged[m.logsBranch],
+	})
+}
+
+// logsAddressLines head the logs view with where the job on screen answers. A
+// job publishing one name gets one line; a runner, which publishes nothing of
+// its own and answers for its children, gets one line per address it holds.
+// They belong here and not in the job column beside them: this row has always
+// been where an address is read, and the column is for picking a log.
+//
+// Each line is its own zone, so each address is a thing to click — the count
+// they used to share named something it gave no way to reach.
+func (m Model) logsAddressLines(width int) []string {
 	address := m.logsAddress()
+	if len(address.Held) > 0 {
+		lines := make([]string, 0, len(address.Held))
+		for index, text := range rules.HeldAddressLines(address.Held) {
+			lines = append(lines, m.marks().Mark(logsHeldZone(address.Held[index].Job),
+				styles.DashboardURL.Render(truncate(text, width))))
+		}
+		return lines
+	}
+
 	if text := rules.JobAddressText(address); text != "" {
 		// Only a url is a zone: a click has to lead somewhere, and a list of ports
 		// leads nowhere.
 		if address.URL == "" {
-			return styles.DashboardRowMeta.Render(truncate(text, width))
+			return []string{styles.DashboardRowMeta.Render(truncate(text, width))}
 		}
-		return m.marks().Mark(logsURLZone(), styles.DashboardURL.Render(truncate(text, width)))
+		return []string{m.marks().Mark(logsURLZone(), styles.DashboardURL.Render(truncate(text, width)))}
 	}
 
 	// A job that declares no port has no address to show, and the row is kept
@@ -317,9 +395,19 @@ func (m Model) logsAddressLine(width int) string {
 	// finding `run init` reports, at the moment one wonders where to reach the
 	// job.
 	if m.logsJob == "" {
-		return ""
+		return []string{""}
 	}
-	return styles.DashboardRowMeta.Render(truncate(domain.DashboardLogsNoAddress, width))
+	return []string{styles.DashboardRowMeta.Render(truncate(domain.DashboardLogsNoAddress, width))}
+}
+
+// logsHeadRows is what the head costs the body. It is read by the renderer and
+// by the sizer alike: an emulator fed at one height and drawn at another shows
+// the wrong rows.
+func (m Model) logsHeadRows() int {
+	if held := len(m.logsAddress().Held); held > 0 {
+		return held + domain.DashboardLogsHead - 1
+	}
+	return domain.DashboardLogsHead
 }
 
 type logsJobColumnParams struct {
@@ -360,6 +448,13 @@ func (m Model) logsJobColumn(params logsJobColumnParams) []string {
 		chip := truncate(m.logsJobChip(job), params.Width)
 		rows = append(rows, m.marks().Mark(logsJobZone(job.Name), pad(chip, params.Width)))
 	}
+	// The catalogue closes the column as it closes the RUN section, and only
+	// when the whole list is on screen: a line saying what run.toml holds beyond
+	// a window that is itself scrolled would be counting two different things.
+	if more := m.logsDeclaredMore(); more > 0 && window.End == len(jobs) && len(rows) < params.Rows {
+		note := truncate(styles.DashboardRowMeta.Render(fmt.Sprintf(domain.DetailDeclaredMoreFmt, more)), params.Width)
+		rows = append(rows, pad(note, params.Width))
+	}
 	for len(rows) < params.Rows {
 		rows = append(rows, strings.Repeat(" ", params.Width))
 	}
@@ -374,10 +469,23 @@ func jobNames(jobs []domain.JobConfig) []string {
 	return names
 }
 
+// The column is a job selector and nothing else. A runner's addresses were
+// listed under it for a while: on a twenty-column list that doubled its length,
+// buried the jobs, and mixed two gestures — picking a log to read, and reaching
+// a url. They head the view instead, in the row that has always been where an
+// address is read.
 func (m Model) logsJobChip(job domain.JobConfig) string {
-	glyph, style := domain.DetailJobDownGlyph, styles.DashboardRowMeta
+	visible, _ := m.visibleLogsJobs()
+	state := rules.JobStateStopped
+	for _, entry := range visible {
+		if entry.Job.Name == job.Name {
+			state = entry.State
+		}
+	}
+
+	glyph, style := rules.JobStateGlyph(state), styles.DashboardRowMeta
 	if m.jobIsUp(job.Name) {
-		glyph, style = domain.DetailJobUpGlyph, styles.DashboardValue
+		style = styles.DashboardValue
 	}
 	if job.Name == m.logsJob {
 		style = styles.DashboardRowSelected
@@ -450,7 +558,7 @@ func (m Model) logsTailRect(params logsViewParams) logsViewParams {
 	}
 	return logsViewParams{
 		Width:  max(width, 0),
-		Height: max(params.Height-domain.DashboardLogsHead-domain.DashboardLogsChrome, 0),
+		Height: max(params.Height-m.logsHeadRows()-domain.DashboardLogsChrome, 0),
 	}
 }
 
@@ -468,7 +576,7 @@ func (m Model) logsViewBody(params logsViewParams) []string {
 	// whose body moves up and down as jobs are walked is a panel the eye has to
 	// find again on every keystroke. No rule under it — the tab bar already
 	// draws one two rows above, and a second so close reads as a box.
-	head := []string{m.logsAddressLine(params.Width), ""}
+	head := append(m.logsAddressLines(params.Width), "")
 	hint := styles.DashboardRowMeta.Render(truncate(domain.DashboardLogsHint, params.Width))
 	tail := m.logsTailRect(params)
 	budget := tail.Height
@@ -558,19 +666,30 @@ func (m Model) logsTailLines(params logsTailParams) []string {
 	return rendered
 }
 
-// logsEmptyLines tells the three ways this view can have nothing to show apart,
-// because the answer differs: a project with no run module needs `wtm run init`,
-// a job that never ran needs starting, and a job that ran and wrote nothing is
+// logsEmptyLines tells the four ways this view can have nothing to show apart,
+// because the answer differs every time: a project with no run module needs
+// `wtm run init`, a worktree that has started nothing needs a `run up`, a job
+// that never ran here needs starting, and a job that ran and wrote nothing is
 // simply quiet. Returns nil when there is a tail to draw.
+//
+// "Never ran" used to be inferred from the job not being up, which said it of a
+// job that had run, been stopped, and written nothing. The log on disk is what
+// actually answers the question, and it is now read rather than guessed at.
 func (m Model) logsEmptyLines(width int) []string {
-	if len(m.logsJobs()) == 0 {
+	if len(m.runConfig.Jobs) == 0 {
 		return m.logsNotice(width, domain.DashboardLogsNoModule, domain.DashboardLogsNoModuleHint)
+	}
+	if len(m.logsJobs()) == 0 {
+		return m.logsNotice(width, domain.DashboardLogsNothingRan, domain.DashboardLogsNothingRanHint)
 	}
 	if len(m.logsLines) > 0 || m.logsErr != nil {
 		return nil
 	}
 	if m.jobIsUp(m.logsJob) {
 		return m.logsNotice(width, domain.DashboardLogsQuiet, domain.DashboardLogsQuietHint)
+	}
+	if m.logged[m.logsBranch][m.logsJob] {
+		return m.logsNotice(width, domain.DashboardLogsSilent, domain.DashboardLogsSilentHint)
 	}
 	return m.logsNotice(width, domain.DashboardLogsNeverRan, domain.DashboardLogsNeverRanHint)
 }

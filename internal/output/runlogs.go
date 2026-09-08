@@ -73,9 +73,11 @@ func (p *RunPrinter) Emit(event runlogs.Event) {
 			return
 		}
 		Success(p.out, p.jobLine(jobLineParams{Format: domain.RunStreamStartedFmt, Event: event}))
+		p.held(event.Held)
 		p.devOrigins(event.DevOrigins)
 	case runlogs.PhaseDone:
 		Success(p.out, p.jobLine(jobLineParams{Format: domain.RunStreamDoneFmt, Event: event}))
+		p.held(event.Held)
 	case runlogs.PhaseFailed:
 		Error(p.err, p.qualify(event.Reason, event.Worktree))
 	case runlogs.PhaseNotice:
@@ -150,6 +152,14 @@ func JobLine(params JobLineParams) string {
 		URL:     params.URL,
 		Enabled: params.Hyperlinks,
 	})
+}
+
+// held names the jobs a runner started, under its own line. They have no line
+// of their own: they are subprocesses of the one job the daemon holds.
+func (p *RunPrinter) held(entries []domain.JobURLEntry) {
+	for _, line := range rules.HeldAddressLines(entries) {
+		Message(p.out, Indent+line)
+	}
 }
 
 // devOrigins reports the one line a Next project is missing before its own name

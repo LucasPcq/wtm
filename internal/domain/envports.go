@@ -132,4 +132,10 @@ type EnvPortPlan struct {
 type RunAddresses struct {
 	ByBranch map[string]map[string]JobAddress
 	Notes    map[string]string
+	// PortAddressed keys the worktrees served their ports rather than the names
+	// they publish. It is carried out with the addresses because a surface that
+	// opens a board of its own has to reach the same verdict: deriving it from
+	// Notes would not, since a worktree can drift enough to warrant a line
+	// without being addressed by port.
+	PortAddressed map[string]bool
 }

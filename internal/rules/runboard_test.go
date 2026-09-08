@@ -164,3 +164,66 @@ func TestRunningWorktreeDirsNamesTheBlocksThatRun(t *testing.T) {
 		t.Errorf("RunningWorktreeDirs = %v, want one entry per block, as git spells it", got)
 	}
 }
+
+// The Services tab answers "what is running", and nothing else. A worktree with
+// a stopped job, a crashed one, or a log directory full of what it ran last week
+// has no block at all: it briefly gained one, and the tab turned into a list of
+// every worktree the repository has ever run something in.
+func TestRunBoardSkipsAWorktreeWithNothingUp(t *testing.T) {
+	blocks := RunBoard(RunBoardParams{
+		Config: domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}, {Name: "api"}}},
+		Jobs: []domain.JobInfo{
+			{Name: "web", Status: domain.JobStatusStopped, WorkDir: "/wt/idle"},
+			{Name: "api", Status: domain.JobStatusCrashed, WorkDir: "/wt/idle"},
+			{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/wt/live"},
+		},
+		Statuses: []domain.WorktreeStatus{
+			{Branch: "idle", Path: "/wt/idle"},
+			{Branch: "live", Path: "/wt/live"},
+		},
+		Now: time.Now(),
+	})
+
+	if len(blocks) != 1 {
+		t.Fatalf("blocks = %+v, want only the worktree with something up", blocks)
+	}
+	if blocks[0].Branch != "live" || blocks[0].Up != 1 {
+		t.Errorf("block = %+v, want live with one job up", blocks[0])
+	}
+	if len(blocks[0].Rows) != 1 {
+		t.Errorf("rows = %+v, want the running job alone", blocks[0].Rows)
+	}
+}
+
+// A runner's addresses fold here as they do in the detail panel, and its
+// children never count as jobs: they are one process, and the header counts
+// processes.
+func TestRunBoardFoldsARunnersAddressesAndCountsItOnce(t *testing.T) {
+	params := RunBoardParams{
+		Config: domain.RunConfig{Jobs: []domain.JobConfig{{Name: "dev", Runs: []string{"web", "api"}}}},
+		Jobs:   []domain.JobInfo{{Name: "dev", Status: domain.JobStatusRunning, WorkDir: "/wt/live"}},
+		Addresses: map[string]map[string]domain.JobAddress{"live": {"dev": {Held: []domain.JobURLEntry{
+			{Job: "web", URL: "http://web.wtm"},
+			{Job: "api", URL: "http://api.wtm"},
+		}}}},
+		Statuses: []domain.WorktreeStatus{{Branch: "live", Path: "/wt/live"}},
+		Now:      time.Now(),
+	}
+
+	folded := RunBoard(params)
+	if len(folded[0].Rows) != 1 {
+		t.Fatalf("rows = %+v, want the runner alone while it is folded", folded[0].Rows)
+	}
+
+	params.Expanded = map[string]bool{"dev": true}
+	open := RunBoard(params)
+	if len(open[0].Rows) != 3 {
+		t.Fatalf("rows = %+v, want the runner and one row per address", open[0].Rows)
+	}
+	if open[0].Up != 1 {
+		t.Errorf("up = %d, want the runner counted once and not its addresses", open[0].Up)
+	}
+	if rows := ServicesRows(open); rows[2].Kind != domain.ServicesRowHeld {
+		t.Errorf("child row kind = %q, want it drawn but not selectable", rows[2].Kind)
+	}
+}
