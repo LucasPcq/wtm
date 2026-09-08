@@ -406,11 +406,24 @@ func (m Model) runLogs(params runLogsParams) (Model, tea.Cmd) {
 // one. A job that publishes none leads to its logs instead.
 func (m Model) clickRunRow(msg tea.MouseMsg) (tea.Model, tea.Cmd, bool) {
 	for _, job := range m.runConfig.Jobs {
+		address := m.addressFor(job.Name)
+		// A runner's children are rows of their own, each carrying its own url —
+		// which is the whole point of unfolding them. Answered before the runner
+		// so a click inside the fold does not toggle it shut.
+		for _, entry := range address.Held {
+			if m.inZone(runURLZone(rules.HeldRowKey(job.Name, entry.Job)), msg) {
+				model, cmd := m.openJobURL(entry.URL)
+				return model, cmd, true
+			}
+		}
 		// The address cell first: clicking what you read opens what you read,
 		// and the rest of the row leads to the job's logs.
 		if m.inZone(runURLZone(job.Name), msg) {
-			model, cmd := m.openJobURL(m.addressFor(job.Name).URL)
+			model, cmd := m.openJobURL(address.URL)
 			return model, cmd, true
+		}
+		if m.inZone(runFoldZone(job.Name), msg) {
+			return m.toggleRunFold(job.Name), nil, true
 		}
 		if !m.inZone(runRowZone(job.Name), msg) {
 			continue
@@ -419,6 +432,19 @@ func (m Model) clickRunRow(msg tea.MouseMsg) (tea.Model, tea.Cmd, bool) {
 		return model, cmd, true
 	}
 	return m, nil, false
+}
+
+// toggleRunFold opens or closes a runner's addresses. Keyed by job name across
+// every worktree: unfolding `dev` in one and finding it folded in the next is
+// the opposite of what comparing two worktrees needs.
+func (m Model) toggleRunFold(job string) Model {
+	expanded := make(map[string]bool, len(m.runExpanded)+1)
+	for name, open := range m.runExpanded {
+		expanded[name] = open
+	}
+	expanded[job] = !expanded[job]
+	m.runExpanded = expanded
+	return m
 }
 
 // addressFor is where the selected worktree's job answers.

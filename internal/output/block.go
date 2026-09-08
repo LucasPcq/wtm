@@ -102,20 +102,46 @@ func Callout(w io.Writer, title string, lines []string) {
 	// Bounded to the terminal: a box grows to its longest line, and one line
 	// naming eight jobs made a 178-column frame that wrapped into mush on any
 	// normal window.
-	box := styles.Callout.Width(calloutWidth()).Render(strings.Join(rows, "\n"))
+	box := styles.Callout.Width(calloutWidth(lines)).Render(strings.Join(rows, "\n"))
 	fmt.Fprintf(w, "%s\n", box)
 }
 
 // calloutWidth is what a callout's body may fill: the terminal less the box's
-// own margin, border and padding, capped so a very wide window does not
-// stretch a short notice across it. Zero when there is no terminal to measure —
+// own margin, border and padding. Zero when there is no terminal to measure —
 // a pipe or a test — which leaves the box at its content's width, as before.
-func calloutWidth() int {
+//
+// The cap is on the empty space, never on the content: a short notice is not
+// stretched across a very wide window, but a body already wider than the cap
+// takes the room it needs rather than being wrapped into mush. A table is the
+// case that made the difference — its lines are columns, and a wrapped column
+// is not a narrower table but an unreadable one.
+func calloutWidth(lines []string) int {
 	cols, _, err := term.GetSize(int(os.Stdout.Fd()))
 	if err != nil || cols <= 0 {
 		return 0
 	}
-	return min(cols-domain.CalloutChrome, domain.CalloutMaxWidth)
+	return min(cols-domain.CalloutChrome, max(domain.CalloutMaxWidth, widestRow(lines)))
+}
+
+// widestRow measures the body, never the title: the title is styled, and the
+// escape sequences in it would be counted as room the box does not need.
+func widestRow(lines []string) int {
+	widest := 0
+	for _, line := range lines {
+		widest = max(widest, len([]rune(line)))
+	}
+	return widest
+}
+
+// TerminalWidth is what a report has to draw in, zero when there is no terminal
+// to measure. A section is not boxed, so it is the surface itself that has to
+// hand the figure to whatever builds its columns.
+func TerminalWidth() int {
+	cols, _, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil || cols <= 0 {
+		return 0
+	}
+	return cols
 }
 
 // Section prints a bold title above indented lines, with no frame. It is what a

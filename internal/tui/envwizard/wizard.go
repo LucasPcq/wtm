@@ -188,7 +188,12 @@ func recapActions(plan domain.EnvPortPlan) []components.SelectItem {
 
 // portRecapLines announces the [[env_port]] pass that rides along with the apply.
 func portRecapLines(plan domain.EnvPortPlan) []string {
-	table := rules.EnvPortTableLines(plan)
+	// The recap draws inside the wizard's frame, so the table gets the terminal
+	// less what the frame spends on either side of it.
+	table := rules.EnvPortTableLines(rules.EnvPortTableParams{
+		Plan:  plan,
+		Width: recapTableWidth(),
+	})
 	if len(table) == 0 {
 		return nil
 	}
@@ -196,6 +201,16 @@ func portRecapLines(plan domain.EnvPortPlan) []string {
 		"",
 		styles.Bold.Render(rules.EnvPortOffsetLabel(plan.Offset)),
 	}, table...)
+}
+
+// recapTableWidth is what a table has inside the recap's frame, zero when there
+// is no terminal to measure — where the table falls back to its own defaults.
+func recapTableWidth() int {
+	cols := components.TerminalWidth()
+	if cols <= 0 {
+		return 0
+	}
+	return cols - domain.RecapFrameChrome
 }
 
 // driftBadge renders the per-worktree env-drift pill for the selection list.

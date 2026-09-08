@@ -420,3 +420,51 @@ func TestLogSinkRetiresARecordBiggerThanTheThreshold(t *testing.T) {
 		t.Error("the line written after the oversized one is missing from the active log")
 	}
 }
+
+// A log directory holds one run, the way a log file holds one (LUC-198).
+// Without this it only ever grew: a worktree used for a fortnight held the logs
+// of every profile ever started in it, plus jobs run.toml no longer declares,
+// and every surface reading it showed that instead of what was running.
+func TestPruneJobLogsLeavesTheRunAndDropsWhatCameBefore(t *testing.T) {
+	dir := t.TempDir()
+	for _, job := range []string{"docker-compose", "dev:crm", "dev:shop", "crm-admin-dev", "build"} {
+		path := JobLogPath(JobLogPathParams{LogDir: dir, Job: job})
+		if err := os.WriteFile(path, []byte("line\n"), 0o644); err != nil {
+			t.Fatalf("seed %s: %v", job, err)
+		}
+	}
+	// A rotated backup belongs to its job and goes with it.
+	if err := os.WriteFile(backupPath(JobLogPath(JobLogPathParams{LogDir: dir, Job: "build"}), 1), []byte("old\n"), 0o644); err != nil {
+		t.Fatalf("seed backup: %v", err)
+	}
+	// Something this store never wrote is not ours to judge.
+	if err := os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("hi\n"), 0o644); err != nil {
+		t.Fatalf("seed stranger: %v", err)
+	}
+
+	PruneJobLogs(PruneLogsParams{
+		LogDir: dir,
+		// The run starts dev:crm; docker-compose is already up beside it.
+		Keep: map[string]bool{"dev:crm": true, "docker-compose": true},
+	})
+
+	left := map[string]bool{}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	for _, entry := range entries {
+		left[entry.Name()] = true
+	}
+
+	for _, name := range []string{"dev:crm.log", "docker-compose.log", "notes.txt"} {
+		if !left[name] {
+			t.Errorf("%s was removed, want it kept", name)
+		}
+	}
+	for _, name := range []string{"dev:shop.log", "crm-admin-dev.log", "build.log", "build.log.1"} {
+		if left[name] {
+			t.Errorf("%s survived, want a previous run's log dropped", name)
+		}
+	}
+}

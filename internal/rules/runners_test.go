@@ -188,7 +188,7 @@ func TestTheRecapStopsWarningAboutAnAnsweredService(t *testing.T) {
 func TestTheRecapStopsWarningAboutARunner(t *testing.T) {
 	cfg := monorepoConfig()
 	choices := RunnerChoices(RunnerChoicesParams{Config: cfg, ComposeJobs: []string{"docker-compose"}})
-	choices[0].Runner = "dev:crm"
+	setRunner(t, choices, "crm-web-dev", "dev:crm")
 
 	written := ApplyInitAnswers(ApplyInitAnswersParams{Config: cfg, Runners: choices})
 	for _, name := range ServicesWithoutPorts(written) {

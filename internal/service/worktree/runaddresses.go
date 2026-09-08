@@ -69,8 +69,9 @@ func RunAddressesFor(params RunAddressesForParams) domain.RunAddresses {
 
 	paths := pathsByBranch(params.ProjectDir)
 	answer := domain.RunAddresses{
-		ByBranch: make(map[string]map[string]domain.JobAddress, len(params.Branches)),
-		Notes:    map[string]string{},
+		ByBranch:      make(map[string]map[string]domain.JobAddress, len(params.Branches)),
+		Notes:         map[string]string{},
+		PortAddressed: map[string]bool{},
 	}
 	for _, branch := range params.Branches {
 		env, err := BranchEnv(WorktreeRef{
@@ -89,6 +90,7 @@ func RunAddressesFor(params RunAddressesForParams) domain.RunAddresses {
 		publicPort := params.ProxyPort
 		if rules.AddressedByPort(plan) {
 			publicPort = 0
+			answer.PortAddressed[branch] = true
 		}
 		if note := rules.AddressingDriftLine(rules.AddressingDriftParams{Worktree: branch, Plan: plan}); note != "" {
 			answer.Notes[branch] = note

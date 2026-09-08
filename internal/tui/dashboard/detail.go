@@ -71,6 +71,7 @@ func (m Model) detailBody(layout domain.DashboardLayout) []string {
 		RunConfig:     m.runConfig,
 		Jobs:          m.jobs,
 		Addresses:     m.addresses[status.Branch],
+		Expanded:      m.runExpanded,
 		AddressNote:   m.addressNotes[status.Branch],
 		Height:        budget,
 	})
@@ -183,6 +184,8 @@ type detailSectionsInput struct {
 	RunConfig domain.RunConfig
 	Jobs      []domain.JobInfo
 	Addresses map[string]domain.JobAddress
+	// Expanded keys the runners whose children are showing.
+	Expanded map[string]bool
 	// AddressNote is what has to be said about those addresses, empty when the
 	// worktree's .env answers on what its jobs publish.
 	AddressNote string
@@ -201,6 +204,7 @@ func (m Model) detailSections(input detailSectionsInput) []domain.DetailSection 
 		RunConfig:     input.RunConfig,
 		Jobs:          input.Jobs,
 		Addresses:     input.Addresses,
+		Expanded:      input.Expanded,
 		AddressNote:   input.AddressNote,
 		Parent:        input.Parent,
 		Height:        input.Height,
@@ -241,7 +245,16 @@ func (m Model) runRowLines(section domain.DetailSection, width int, stale bool) 
 		},
 	})
 	for index, row := range section.Rows {
-		if index >= len(lines) || !row.Up {
+		if index >= len(lines) {
+			continue
+		}
+		// A foldable row takes the fold zone: it is the outer one, so the address
+		// cell inside it keeps answering first.
+		if row.Fold {
+			lines[index] = m.marks().Mark(runFoldZone(row.Key), lines[index])
+			continue
+		}
+		if !row.Up {
 			continue
 		}
 		lines[index] = m.marks().Mark(runRowZone(row.Key), lines[index])
@@ -340,7 +353,9 @@ func rowLeft(params rowLeftParams) string {
 	if params.Row.Up {
 		glyphStyle = styles.Success
 	}
-	head := domain.DetailListIndent +
+	// A child hangs under its runner rather than beside it: it has no state of
+	// its own to mark, so the glyph column becomes its indent.
+	head := domain.DetailListIndent + strings.Repeat(domain.DetailHeldIndent, params.Row.Depth) +
 		styleText(params.Stale, glyphStyle, cellText(params.Row, domain.DetailCellGlyph)) +
 		domain.DetailGlyphGap +
 		styleText(params.Stale, styles.DashboardRowMeta,
@@ -364,6 +379,9 @@ func rowLeft(params rowLeftParams) string {
 
 func rowMetaCell(row domain.DetailRow, stale bool) string {
 	meta := cellText(row, domain.DetailCellMeta)
+	if fold := cellText(row, domain.DetailCellFold); fold != "" {
+		meta = strings.TrimSpace(fold + domain.DetailGlyphGap + meta)
+	}
 	if meta == "" {
 		return ""
 	}

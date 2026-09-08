@@ -115,8 +115,15 @@ const (
 	// there before display: what precedes it is a password, what follows is the
 	// host and the port the reader is actually looking for.
 	EnvCredentialsSeparator = "@"
-	// EnvValueDisplayWidth caps an elided .env value in the port table.
+	// EnvValueDisplayWidth caps an elided .env value in the port table, for a
+	// surface that could not measure itself. EnvValueMinWidth is the floor a
+	// measured one never goes under: below it the value is unrecognisable, and
+	// a wrapped line says more than an elided one that says nothing.
 	EnvValueDisplayWidth = 44
+	EnvValueMinWidth     = 24
+	// RecapFrameChrome is what a wizard recap spends around its body: the
+	// indentation on either side and the border between them.
+	RecapFrameChrome = 8
 	// Ellipsis marks a value the display cut short.
 	Ellipsis = "\u2026"
 
@@ -559,6 +566,9 @@ const (
 	// EnvPortTableRowFmt aligns key, port name, the port move, and the value the
 	// key lands on — the only column that can be long, and the only one elided.
 	EnvPortTableRowFmt = "%s  %s  %s  %s"
+	// EnvPortColumnGap is what EnvPortTableRowFmt puts between two columns,
+	// named so the width left for the value can be worked out from it.
+	EnvPortColumnGap = "  "
 	// EnvPortFileRuleFmt opens a file's group; EnvPortRuleRune fills it out to
 	// the table's width.
 	EnvPortFileRuleFmt = "── %s "
@@ -1590,7 +1600,7 @@ const (
 	// DaemonStateVersion is the index format. A file carrying anything else is
 	// read as empty and never written back, so an older binary cannot destroy
 	// the index of a newer one.
-	DaemonStateVersion = 1
+	DaemonStateVersion = 2
 
 	// CtrlCByte is the ASCII code for Ctrl+C, used for PTY detach.
 	CtrlCByte byte = 0x03
@@ -1954,10 +1964,17 @@ const (
 
 	// RunURLSuffixSep sets a job's URL apart from the line announcing it, far
 	// enough that a terminal-detected link does not swallow the ports before it.
-	RunURLSuffixSep     = "   "
-	RunStreamAlreadyFmt = "%s already running"
-	RunStreamDoneFmt    = "%s done"
-	RunStreamNextHint   = "wtm run logs to attach · wtm run down to stop"
+	RunURLSuffixSep = "   "
+	// RunStreamHeldFmt is one line under a runner's, naming a job it started and
+	// where that job answers. They are the addresses a reader came for, and the
+	// runner's own line has none of its own to give.
+	RunStreamHeldFmt = "%s  %s"
+	// RunViewRecapHeldIndent hangs a runner's addresses under its own line in the
+	// recap, where nothing folds.
+	RunViewRecapHeldIndent = "  "
+	RunStreamAlreadyFmt    = "%s already running"
+	RunStreamDoneFmt       = "%s done"
+	RunStreamNextHint      = "wtm run logs to attach · wtm run down to stop"
 
 	// RunAbort* report the partial state a profile that gave up left behind, on
 	// the surface that has no room to draw it: where it stopped, what nothing
@@ -2926,12 +2943,19 @@ const (
 	DashboardLogsHint   = "↑↓ job    esc detail    ↵ full session"
 	// DashboardLogs* tell apart the three ways the logs view can have nothing to
 	// show: the answer differs, so the message does.
-	DashboardLogsNoModule     = "This project runs nothing"
-	DashboardLogsNoModuleHint = "declare jobs with `wtm run init`"
-	DashboardLogsNeverRan     = "This job has never run here"
-	DashboardLogsNeverRanHint = "start it with `wtm run start --job`, or from the worktree's menu"
-	DashboardLogsQuiet        = "Nothing logged yet"
-	DashboardLogsQuietHint    = "the job is up and has written nothing so far"
+	DashboardLogsNoModule       = "This project runs nothing"
+	DashboardLogsNoModuleHint   = "declare jobs with `wtm run init`"
+	DashboardLogsNothingRan     = "Nothing has run in this worktree"
+	DashboardLogsNothingRanHint = "start a profile with `wtm run up`, or from the worktree's menu"
+	DashboardLogsNeverRan       = "This job has never run here"
+	DashboardLogsNeverRanHint   = "start it with `wtm run start --job`, or from the worktree's menu"
+	DashboardLogsQuiet          = "Nothing logged yet"
+	DashboardLogsQuietHint      = "the job is up and has written nothing so far"
+	// DashboardLogsSilent is the run that happened and said nothing. A job's log
+	// file is created when it starts, so an empty one is a real answer and not a
+	// job that was never started — which is what this used to be read as.
+	DashboardLogsSilent     = "This run wrote nothing"
+	DashboardLogsSilentHint = "the job ran here and produced no output"
 	// DashboardLogsJobGap separates the job column from the tail it labels.
 	DashboardLogsJobGap = " "
 	// DashboardLogsJobColumnMax caps that column: past it a long job name eats
@@ -3000,11 +3024,14 @@ const (
 	// The runner step: which root-level service starts each of the others. The
 	// relation is declared, never inferred — RunnerListNone is what a row says
 	// when nothing starts it but the reader.
-	RunnerListStepName          = "Runners"
-	RunnerListStepTitle         = "Which service starts the others?"
-	RunnerListStepDesc          = "A root script often starts several apps at once — `turbo run dev`, `pnpm -r dev`.\nSaying so here gives it their ports, and stops wtm from starting an app twice.\nLeave a row on — when nothing but you starts it."
-	RunnerListCwdSep            = "  "
-	RunnerListNone              = "—"
+	RunnerListStepName  = "Runners"
+	RunnerListStepTitle = "Which service starts the others?"
+	RunnerListStepDesc  = "A root script often starts several apps at once — `turbo run dev`, `pnpm -r dev`.\nSaying so here gives it their ports, and stops wtm from starting an app twice.\nLeave a row on — when nothing but you starts it."
+	RunnerListCwdSep    = "  "
+	RunnerListNone      = "—"
+	// RunnerListSep joins the runners of a row that holds more than one, which
+	// only a hand-written run.toml produces: the step sets one at a time.
+	RunnerListSep               = ", "
 	RunnerListGap               = 3
 	RunnerListSummaryFmt        = "%d of %d attached to a runner"
 	SkipReasonNoRunnerCandidate = "no root-level service that could start the others"
@@ -3070,12 +3097,33 @@ const (
 	DetailSectionActivity = "ACTIVITY"
 	DetailSectionLinks    = "LINKS"
 
-	// DetailJob* draw one row of the RUN section. A declared job that is not
-	// running is an answer, not an absence, so it keeps its row — and says
-	// nothing beyond its glyph, which already reads as down.
-	DetailJobUpGlyph   = "●"
-	DetailJobDownGlyph = "○"
-	DetailJobPortFmt   = ":%d"
+	// DetailJob* draw one row of the RUN section. A row exists for a job that
+	// lives or that left a trace in this worktree, never for one the project
+	// merely declares: fifteen declarations listed as "down" said nothing true
+	// about any of them, and a task — which never runs, it executes and exits —
+	// wore that glyph for ever.
+	//
+	// DetailJobRanGlyph is the honest answer for a job the daemon no longer
+	// indexes but whose log is on disk: it ran here, and how it ended is not
+	// something the index kept.
+	DetailJobUpGlyph     = "●"
+	DetailJobDownGlyph   = "○"
+	DetailJobFailedGlyph = "✗"
+	DetailJobRanGlyph    = "·"
+	DetailJobPortFmt     = ":%d"
+	// DetailDeclaredMoreFmt closes RUN and the logs column alike: what the
+	// project can run is a catalogue, reachable from the run menu, and laying it
+	// flat in a state panel is what buried the three jobs that were up.
+	DetailDeclaredMoreFmt = "+ %d declared"
+	// DetailHeld* draw a runner's children. A runner publishes nothing of its
+	// own, so the addresses a reader came for are the apps' — six of them joined
+	// on the runner's line ran past the panel and were cut, taking four urls with
+	// them and leaving a row that could not be clicked. They are their own rows
+	// now, folded away until asked for.
+	DetailHeldCountFmt  = "%d addresses"
+	DetailHeldOpenGlyph = "▾"
+	DetailHeldShutGlyph = "▸"
+	DetailHeldIndent    = "  "
 	// DetailColumnGap separates two columns of a detail-section table. Two spaces
 	// rather than one: a single one reads as a word break inside a cell.
 	// DetailGlyphGap follows the state glyph, which is a mark on its row rather

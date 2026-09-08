@@ -127,8 +127,9 @@ func (f *startFlow) run() (Outcome, error) {
 		PortAddressed: addresses.PortAddressed[workDir],
 		// The board lists every declared job, not just this one: starting a job is
 		// no reason to hide the ones already up beside it.
-		Jobs:      f.request.Config.Jobs,
-		ProxyPort: rules.ProxyPort(f.ctx.Config.Global),
+		Jobs:       f.request.Config.Jobs,
+		ProxyPort:  rules.ProxyPort(f.ctx.Config.Global),
+		PublicPort: process.PublicProxyPort(rules.ProxyPort(f.ctx.Config.Global)),
 	})
 
 	result, err := f.presenter.Sequence(seam.SequenceParams{

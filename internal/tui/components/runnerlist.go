@@ -12,6 +12,11 @@ import (
 // RunnerListModel attaches each service to the root-level one that starts it.
 // The answers sit on the row and cycle under ←→, the way the kind step names a
 // type: what the reader is choosing between is visible without being remembered.
+//
+// A row can hold several runners — run.toml allows two roots to start the same
+// app — but it is set one at a time: cycling replaces what the row held. A row
+// left alone keeps every runner it arrived with, which is what stops a re-init
+// from flattening a relation written by hand.
 type RunnerListModel struct {
 	choices []domain.JobRunnerChoice
 	cursor  int
@@ -88,8 +93,10 @@ func (m RunnerListModel) cycle(step int) RunnerListModel {
 
 	row := m.choices[m.cursor]
 	at := 0
+	// A row holding several starts its cycle from the first: whichever it lands
+	// on replaces the set, and that is the reader's own gesture.
 	for i, option := range row.Options {
-		if option == row.Runner {
+		if len(row.Runners) > 0 && option == row.Runners[0] {
 			at = i
 			break
 		}
@@ -97,7 +104,10 @@ func (m RunnerListModel) cycle(step int) RunnerListModel {
 
 	choices := make([]domain.JobRunnerChoice, len(m.choices))
 	copy(choices, m.choices)
-	choices[m.cursor].Runner = row.Options[((at+step)%len(row.Options)+len(row.Options))%len(row.Options)]
+	choices[m.cursor].Runners = nil
+	if next := row.Options[((at+step)%len(row.Options)+len(row.Options))%len(row.Options)]; next != "" {
+		choices[m.cursor].Runners = []string{next}
+	}
 	m.choices = choices
 	return m
 }
@@ -132,7 +142,7 @@ func (m RunnerListModel) helpModal() string { return "" }
 
 func (m RunnerListModel) renderRow(b *strings.Builder, choice domain.JobRunnerChoice, selected bool, column int) {
 	label := choice.Label
-	runner := choice.Runner
+	runner := strings.Join(choice.Runners, domain.RunnerListSep)
 	if runner == "" {
 		runner = domain.RunnerListNone
 	}

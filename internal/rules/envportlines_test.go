@@ -25,7 +25,7 @@ func samplePlan(t *testing.T) domain.EnvPortPlan {
 }
 
 func TestEnvPortTableLinesGroupsFilesUnderNamedRules(t *testing.T) {
-	got := strings.Join(EnvPortTableLines(samplePlan(t)), "\n")
+	got := strings.Join(EnvPortTableLines(EnvPortTableParams{Plan: samplePlan(t)}), "\n")
 	want := strings.Join([]string{
 		"KEY           FOLLOWS        PORT         BECOMES",
 		"── .env ────────────────────────────────────────────────────────",
@@ -52,7 +52,7 @@ func TestEnvPortTableLinesWidensColumnsToFitTheHeader(t *testing.T) {
 		Lines:  map[string][]domain.EnvLine{".env": ParseEnv("DB=http://x:5432\n")},
 	})
 
-	lines := EnvPortTableLines(plan)
+	lines := EnvPortTableLines(EnvPortTableParams{Plan: plan})
 	header, row := lines[0], lines[len(lines)-1]
 	if runeIndex(header, domain.EnvPortHeaderBecomes) != runeIndex(row, "http://") {
 		t.Errorf("header and row columns do not line up:\n%s\n%s", header, row)
@@ -70,7 +70,7 @@ func runeIndex(s, substr string) int {
 // A rule is filled out to the table's own width, never past it: the report sits
 // inside a callout that would otherwise be stretched by the divider alone.
 func TestEnvPortTableLinesRuleMatchesTheWidestRow(t *testing.T) {
-	lines := EnvPortTableLines(samplePlan(t))
+	lines := EnvPortTableLines(EnvPortTableParams{Plan: samplePlan(t)})
 
 	widest := 0
 	for _, l := range lines {
@@ -84,7 +84,7 @@ func TestEnvPortTableLinesRuleMatchesTheWidestRow(t *testing.T) {
 }
 
 func TestEnvPortTableLinesNeverPrintsCredentials(t *testing.T) {
-	for _, line := range EnvPortTableLines(samplePlan(t)) {
+	for _, line := range EnvPortTableLines(EnvPortTableParams{Plan: samplePlan(t)}) {
 		if strings.Contains(line, "motdepasse") {
 			t.Fatalf("table line leaked a password: %q", line)
 		}
@@ -92,7 +92,7 @@ func TestEnvPortTableLinesNeverPrintsCredentials(t *testing.T) {
 }
 
 func TestEnvPortTableLinesEmptyPlanRendersNothing(t *testing.T) {
-	if lines := EnvPortTableLines(domain.EnvPortPlan{}); lines != nil {
+	if lines := EnvPortTableLines(EnvPortTableParams{Plan: domain.EnvPortPlan{}}); lines != nil {
 		t.Errorf("EnvPortTableLines() = %v, want nil", lines)
 	}
 }
@@ -152,5 +152,56 @@ func TestEnvPortLinkLines(t *testing.T) {
 func TestEnvPortLinkLinesEmpty(t *testing.T) {
 	if lines := EnvPortLinkLines(nil, nil); len(lines) != 0 {
 		t.Errorf("EnvPortLinkLines() = %v, want none", lines)
+	}
+}
+
+// A named origin runs past fifty characters. Cut to a fixed budget it read as
+// an ellipsis with a worktree in it, on a terminal with room to spare.
+func namedOriginPlan(t *testing.T) domain.EnvPortPlan {
+	t.Helper()
+	job := domain.JobConfig{
+		Name: "admin", Kind: domain.JobKindService,
+		Ports: map[string]int{"ADMIN_PORT": 3000},
+		URL:   &domain.JobURLConfig{Port: "ADMIN_PORT"},
+	}
+	return PlanEnvPorts(PlanEnvPortsParams{
+		Links:  []domain.EnvPortLink{{File: ".env", Key: "VITE_ADMIN_URL", Job: "admin", Port: "ADMIN_PORT"}},
+		Bases:  map[domain.PortRef]int{{Job: "admin", Name: "ADMIN_PORT"}: 3000},
+		Offset: 10,
+		Lines:  map[string][]domain.EnvLine{".env": ParseEnv("VITE_ADMIN_URL=http://localhost:3000\n")},
+		Origins: OriginContext{
+			Addressing: domain.AddressingNames,
+			Jobs:       map[string]domain.JobConfig{"admin": job},
+			Worktree:   "feat-x", Project: "monorepo-exemple-wtm", PublicPort: 11080,
+		},
+	})
+}
+
+func TestEnvPortTableLinesSpendsTheWidthItIsGivenOnTheValue(t *testing.T) {
+	const origin = "http://admin.feat-x.monorepo-exemple-wtm.localhost:11080"
+
+	wide := strings.Join(EnvPortTableLines(EnvPortTableParams{Plan: namedOriginPlan(t), Width: 120}), "\n")
+	if !strings.Contains(wide, origin) {
+		t.Errorf("wide table =\n%s\nwant the whole origin, unelided", wide)
+	}
+
+	// Unmeasured stays as it was: a pipe and a test read the same table they
+	// always did.
+	narrow := strings.Join(EnvPortTableLines(EnvPortTableParams{Plan: namedOriginPlan(t)}), "\n")
+	if strings.Contains(narrow, origin) {
+		t.Errorf("unmeasured table =\n%s\nwant the value elided to its default", narrow)
+	}
+}
+
+func TestEnvPortTableLinesKeepsTheValueRecognisableOnANarrowSurface(t *testing.T) {
+	lines := EnvPortTableLines(EnvPortTableParams{Plan: namedOriginPlan(t), Width: 40})
+
+	// The three fixed columns already exceed 40 here. The value keeps its floor
+	// rather than being cut to nothing: a wrapped line says more than an
+	// elided one that says nothing.
+	for _, line := range lines[1:] {
+		if strings.Contains(line, "http") && !strings.Contains(line, "http://admin.feat") {
+			t.Errorf("line = %q, want a value a reader can still recognise", line)
+		}
 	}
 }

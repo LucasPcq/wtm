@@ -507,17 +507,34 @@ func envPairByKey(lines []domain.EnvLine, key string) (domain.EnvLine, bool) {
 	return domain.EnvLine{}, false
 }
 
+type ElideEnvValueParams struct {
+	Value string
+	// Width is the room the value has. Zero is a surface that could not measure
+	// itself — a pipe, a test — and falls back to the default.
+	Width int
+}
+
 // ElideEnvValue shortens a value for display. Cutting at the credentials
 // separator is not only about width: a DATABASE_URL printed whole puts a
 // password on screen, and the part worth reading is the host and the port.
-func ElideEnvValue(value string) string {
+//
+// The width is an input because a named origin is long by nature —
+// `http://admin.feat-x.monorepo.localhost:11080` is past fifty characters — and
+// a value cut to a fixed budget on a wide terminal is unreadable for no reason.
+func ElideEnvValue(params ElideEnvValueParams) string {
+	width := params.Width
+	if width <= 0 {
+		width = domain.EnvValueDisplayWidth
+	}
+
+	value := params.Value
 	if at := strings.LastIndex(value, domain.EnvCredentialsSeparator); at >= 0 {
 		value = domain.Ellipsis + value[at:]
 	}
-	if len(value) <= domain.EnvValueDisplayWidth {
+	if len(value) <= width {
 		return value
 	}
-	return value[:domain.EnvValueDisplayWidth-len(domain.Ellipsis)] + domain.Ellipsis
+	return value[:max(width-len(domain.Ellipsis), 0)] + domain.Ellipsis
 }
 
 type EnvPortCandidatesParams struct {

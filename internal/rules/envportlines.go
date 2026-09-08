@@ -9,6 +9,16 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
+type EnvPortTableParams struct {
+	Plan domain.EnvPortPlan
+	// Width is the room the surface has to draw in, zero when it cannot measure
+	// itself. It is an input rather than a constant because the value column is
+	// what is left of it: a named origin runs past fifty characters, and a table
+	// that cut them all to the same fixed budget was the reason a single key
+	// took two lines on a wide terminal.
+	Width int
+}
+
 // EnvPortTableLines renders the rewrites of a plan as one aligned table, each
 // file introduced by a rule bearing its name. Two things carry the structure and
 // both are load-bearing.
@@ -26,8 +36,8 @@ import (
 // and printing both whole values would double the width for nothing. The value is
 // elided, which is not only about width — a DATABASE_URL printed whole puts a
 // password on screen.
-func EnvPortTableLines(plan domain.EnvPortPlan) []string {
-	entries := EnvPortRewrites(plan)
+func EnvPortTableLines(params EnvPortTableParams) []string {
+	entries := EnvPortRewrites(params.Plan)
 	if len(entries) == 0 {
 		return nil
 	}
@@ -38,6 +48,9 @@ func EnvPortTableLines(plan domain.EnvPortPlan) []string {
 			pad(key, keyWidth), pad(port, portWidth), pad(move, moveWidth), value), " ")
 	}
 
+	valueWidth := envPortValueWidth(envPortValueWidthParams{
+		Width: params.Width, Key: keyWidth, Port: portWidth, Move: moveWidth,
+	})
 	rows := []string{row(
 		domain.EnvPortHeaderKey,
 		domain.EnvPortHeaderFollows,
@@ -45,7 +58,8 @@ func EnvPortTableLines(plan domain.EnvPortPlan) []string {
 		domain.EnvPortHeaderBecomes,
 	)}
 	for _, e := range entries {
-		rows = append(rows, row(e.Key, e.Port, envPortMove(e), ElideEnvValue(e.NewValue)))
+		rows = append(rows, row(e.Key, e.Port, envPortMove(e),
+			ElideEnvValue(ElideEnvValueParams{Value: e.NewValue, Width: valueWidth})))
 	}
 
 	return withFileRules(withFileRulesParams{Entries: entries, Rows: rows, Width: widestLine(rows)})
@@ -160,6 +174,23 @@ func envPortMove(e domain.EnvPortEntry) string {
 	}
 	return fmt.Sprintf(domain.EnvPortMoveFmt,
 		strings.Join(bases, domain.CmdListVarSep), strings.Join(resolved, domain.CmdListVarSep))
+}
+
+type envPortValueWidthParams struct {
+	Width           int
+	Key, Port, Move int
+}
+
+// envPortValueWidth is what the last column has left once the three fixed ones
+// are placed. Below a floor the value says nothing at all, so a surface too
+// narrow to hold the table is given a value it can still recognise and left to
+// wrap — cutting to four characters would only hide the anomaly.
+func envPortValueWidth(params envPortValueWidthParams) int {
+	if params.Width <= 0 {
+		return domain.EnvValueDisplayWidth
+	}
+	fixed := params.Key + params.Port + params.Move + 3*len(domain.EnvPortColumnGap)
+	return max(params.Width-fixed, domain.EnvValueMinWidth)
 }
 
 func envPortColumnWidths(entries []domain.EnvPortEntry) (key, port, move int) {

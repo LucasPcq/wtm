@@ -15,11 +15,16 @@ const workDir = "/work/api"
 
 func newBoard(t *testing.T, service *runlogstest.Service, jobs ...domain.JobConfig) runlogs.Board {
 	t.Helper()
+	logged := make(map[string]bool, len(jobs))
+	for _, job := range jobs {
+		logged[job.Name] = true
+	}
 	board := runlogs.NewBoard(runlogs.BoardParams{
 		Service: service,
 		Jobs:    jobs,
 		WorkDir: workDir,
 		LogDir:  "/state/logs/api",
+		Logged:  logged,
 	})
 	if err := board.Refresh(); err != nil {
 		t.Fatalf("Refresh: %v", err)
@@ -37,6 +42,8 @@ func running(name string, kind domain.JobKind) domain.JobInfo {
 	}
 }
 
+// A declared job keeps its place once it has run here, running or not: History
+// reads back what it persisted, which is what one opens this for after a crash.
 func TestBoardListsDeclaredJobsWhetherOrNotTheyRun(t *testing.T) {
 	service := &runlogstest.Service{Infos: []domain.JobInfo{running("api", domain.JobKindService)}}
 
@@ -218,12 +225,44 @@ func TestBoardIgnoresAnotherWorktreesJobsAndKeepsUndeclaredOnes(t *testing.T) {
 
 func TestBoardRefreshSurfacesTheDaemonsError(t *testing.T) {
 	service := &runlogstest.Service{ListErr: errors.New("connect to daemon: no such file")}
-	board := runlogs.NewBoard(runlogs.BoardParams{Service: service, Jobs: []domain.JobConfig{api}, WorkDir: workDir})
+	// The log on disk is what carries the job through an unreachable daemon —
+	// which is exactly the case one opens the logs in.
+	board := runlogs.NewBoard(runlogs.BoardParams{
+		Service: service, Jobs: []domain.JobConfig{api}, WorkDir: workDir,
+		Logged: map[string]bool{api.Name: true},
+	})
 
 	if err := board.Refresh(); err == nil {
 		t.Fatal("Refresh swallowed the daemon error")
 	}
 	if views := board.Jobs(); len(views) != 1 || views[0].Status != domain.JobStatusStopped {
 		t.Fatalf("jobs after a failed refresh = %+v", views)
+	}
+}
+
+// The board lists what this worktree has to do with, not what the project can
+// run: a monorepo declaring fifteen jobs offered all fifteen, and opening any of
+// the twelve that had never run here answered "No output recorded for this job."
+func TestBoardLeavesOutWhatNeverRanInThisWorktree(t *testing.T) {
+	service := &runlogstest.Service{Infos: []domain.JobInfo{running("api", domain.JobKindService)}}
+
+	board := runlogs.NewBoard(runlogs.BoardParams{
+		Service: service,
+		Jobs:    []domain.JobConfig{migrate, api, docker},
+		WorkDir: workDir,
+		LogDir:  "/state/logs/api",
+		// migrate ran here once and the daemon has long dropped it; docker never did.
+		Logged: map[string]bool{"migrate": true},
+	})
+	if err := board.Refresh(); err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+
+	names := make([]string, 0, 2)
+	for _, view := range board.Jobs() {
+		names = append(names, view.Name)
+	}
+	if !reflect.DeepEqual(names, []string{"migrate", "api"}) {
+		t.Fatalf("jobs %v, want the one that ran and the one that runs, in declared order", names)
 	}
 }

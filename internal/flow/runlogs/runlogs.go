@@ -88,9 +88,10 @@ type StartRequest struct {
 	WorkDir string
 	LogDir  string
 	Env     map[string]string
-	// RouteHost is the hostname the proxy is to serve this job under, empty when
-	// the job publishes none or the proxy is off.
-	RouteHost string
+	// Routes are the names the proxy is to serve once this job runs — its own,
+	// and one per published job it runs itself. Empty when nothing is published
+	// or the proxy is off.
+	Routes []domain.JobRoute
 	// OnOutput receives what the job writes while it starts — everything for a
 	// task or a detached launcher, nothing for a job the daemon backgrounds.
 	OnOutput func([]byte)
@@ -204,6 +205,9 @@ type Event struct {
 	// URL is where a PhaseStarted or PhaseDone job is reachable, empty for one
 	// that publishes no name.
 	URL string
+	// Held are the addresses a PhaseStarted or PhaseDone job answers for besides
+	// its own — the apps a runner started, which have no line of their own.
+	Held []domain.JobURLEntry
 	// Probes is what PhaseProbed observed on one job's declared ports.
 	Probes []domain.PortProbe
 	// DevOrigins are the config lines a PhaseStarted job needs before it will

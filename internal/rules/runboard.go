@@ -13,8 +13,10 @@ type RunBoardParams struct {
 	// said about them, by branch.
 	Addresses map[string]map[string]domain.JobAddress
 	Notes     map[string]string
-	Statuses  []domain.WorktreeStatus
-	Now       time.Time
+	// Expanded keys the runners whose held addresses are unfolded, by job name.
+	Expanded map[string]bool
+	Statuses []domain.WorktreeStatus
+	Now      time.Time
 }
 
 type RunWorktreeBlock struct {
@@ -27,38 +29,54 @@ type RunWorktreeBlock struct {
 	Note string
 }
 
-// RunBoard is what the daemon holds up, worktree by worktree. Unlike the detail
-// panel's RUN section — which speaks of one worktree and keeps a declared job
-// listed as down — this board answers "what is running", so a worktree with
-// nothing up has no block and a stopped job has no row.
+// RunBoard is what the daemon holds up, worktree by worktree. This board
+// answers "what is running" and nothing else: a worktree with nothing up has no
+// block, and a job that is not up has no row. It is the one surface that is
+// purely about the present — the detail panel keeps this session's stopped and
+// crashed jobs, and the logs view is where an archive is read.
 func RunBoard(params RunBoardParams) []RunWorktreeBlock {
 	blocks := make([]RunWorktreeBlock, 0, len(params.Statuses))
 	for _, status := range params.Statuses {
-		infos := upJobsByName(params.Jobs, status.Path)
-		if len(infos) == 0 {
-			continue
-		}
-
+		indexed := IndexedJobsByName(params.Jobs, status.Path)
 		addresses := params.Addresses[status.Branch]
-		rows := make([]domain.DetailRow, 0, len(infos))
+
+		rows := make([]domain.DetailRow, 0, len(indexed))
 		for _, job := range params.Config.Jobs {
-			info, up := infos[job.Name]
-			if !up {
+			info, held := indexed[job.Name]
+			if !held || !IsJobUp(info.Status) {
 				continue
 			}
 			rows = append(rows, jobRow(jobRowParams{
-				Job: job, Info: info, Up: true, Address: addresses[job.Name], Now: params.Now,
+				Visible:  VisibleJob{Job: job, State: JobStateUp, Info: info},
+				Address:  addresses[job.Name],
+				Expanded: params.Expanded[job.Name],
+				Now:      params.Now,
 			}))
+			if params.Expanded[job.Name] {
+				rows = append(rows, heldRows(job.Name, addresses[job.Name])...)
+			}
 		}
 		if len(rows) == 0 {
 			continue
 		}
 		blocks = append(blocks, RunWorktreeBlock{
-			Branch: status.Branch, Path: status.Path, Up: len(rows), Rows: rows,
+			Branch: status.Branch, Path: status.Path, Up: countUpRows(rows), Rows: rows,
 			Note: params.Notes[status.Branch],
 		})
 	}
 	return blocks
+}
+
+// countUpRows counts the jobs, not the rows: a runner's unfolded children are
+// addresses of one process, and counting them would inflate what is running.
+func countUpRows(rows []domain.DetailRow) int {
+	up := 0
+	for _, row := range rows {
+		if row.Up {
+			up++
+		}
+	}
+	return up
 }
 
 // ServicesRows flattens the board into the lines the Services tab draws. Every
@@ -75,8 +93,12 @@ func ServicesRows(blocks []RunWorktreeBlock) []domain.ServicesRow {
 			Kind: domain.ServicesRowHeader, Branch: block.Branch, Path: block.Path, Up: block.Up,
 		})
 		for _, job := range block.Rows {
+			kind := domain.ServicesRowJob
+			if job.Depth > 0 {
+				kind = domain.ServicesRowHeld
+			}
 			rows = append(rows, domain.ServicesRow{
-				Kind: domain.ServicesRowJob, Branch: block.Branch, Path: block.Path, Job: job,
+				Kind: kind, Branch: block.Branch, Path: block.Path, Job: job,
 			})
 		}
 		if block.Note != "" {

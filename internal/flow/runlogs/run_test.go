@@ -455,7 +455,131 @@ func TestRunEmitsTheNamedURLWhenTheProxyServes(t *testing.T) {
 	}
 	// The daemon is told the same name the event shows, or the browser would
 	// resolve a route nothing registered.
-	if service.Started[0].RouteHost != "web.feat-auth.myapp.localhost" {
-		t.Errorf("RouteHost = %q, want the host the URL names", service.Started[0].RouteHost)
+	routes := service.Started[0].Routes
+	if len(routes) != 1 || routes[0].Host != "web.feat-auth.myapp.localhost" {
+		t.Errorf("Routes = %+v, want the host the URL names", routes)
+	}
+}
+
+func TestRunSendsTheNamesARunnerHoldsForItsChildren(t *testing.T) {
+	// The shape the surface hands over: one job to start, carrying the ports of
+	// the apps it runs, and the whole declaration beside it.
+	runner := domain.JobConfig{
+		Name: "dev", Kind: domain.JobKindService, Cmd: "turbo run dev",
+		Ports: map[string]int{"PORT": 3000},
+		Runs:  []string{"web"},
+	}
+	web := domain.JobConfig{
+		Name: "web", Kind: domain.JobKindService, Cmd: "vite", Cwd: "apps/web",
+		Ports: map[string]int{"PORT": 3000},
+		URL:   &domain.JobURLConfig{Port: "PORT"},
+	}
+	service := &runlogstest.Service{Ports: map[string]map[string]int{"dev": {"PORT": 3010}}, ProxyPort: 4000}
+
+	if _, err := runlogs.Run(context.Background(), runlogs.RunParams{
+		Service:   service,
+		Jobs:      []domain.JobConfig{runner},
+		Declared:  []domain.JobConfig{runner, web},
+		WorkDir:   "/w",
+		Env:       map[string]string{domain.EnvWorktree: "feat-auth"},
+		Project:   "myapp",
+		ProxyPort: 4000,
+	}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	routes := service.Started[0].Routes
+	if len(routes) != 1 {
+		t.Fatalf("Routes = %+v, want the one name the runner holds", routes)
+	}
+	if routes[0].Job != "web" || routes[0].Host != "web.feat-auth.myapp.localhost" {
+		t.Errorf("route = %+v, want the child published under its own name", routes[0])
+	}
+}
+
+func TestRunReportsWhereTheAppsARunnerStartedAnswer(t *testing.T) {
+	runner := domain.JobConfig{
+		Name: "dev", Kind: domain.JobKindService, Cmd: "turbo run dev",
+		Ports: map[string]int{"PORT": 3000, "API_PORT": 4000},
+		Runs:  []string{"web", "api"},
+	}
+	web := domain.JobConfig{
+		Name: "web", Kind: domain.JobKindService, Cwd: "apps/web",
+		Ports: map[string]int{"PORT": 3000}, URL: &domain.JobURLConfig{Port: "PORT"},
+	}
+	api := domain.JobConfig{
+		Name: "api", Kind: domain.JobKindService, Cwd: "apps/api",
+		Ports: map[string]int{"API_PORT": 4000}, URL: &domain.JobURLConfig{Port: "API_PORT"},
+	}
+	service := &runlogstest.Service{
+		Ports:     map[string]map[string]int{"dev": {"PORT": 3010, "API_PORT": 4010}},
+		ProxyPort: 4000,
+	}
+	sink := &runlogstest.Sink{}
+
+	outcome, err := runlogs.Run(context.Background(), runlogs.RunParams{
+		Service:   service,
+		Sink:      sink,
+		Jobs:      []domain.JobConfig{runner},
+		Declared:  []domain.JobConfig{runner, web, api},
+		WorkDir:   "/w",
+		Env:       map[string]string{domain.EnvWorktree: "feat-auth"},
+		Project:   "myapp",
+		ProxyPort: 4000,
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	// The runner publishes nothing of its own, so without this the one line the
+	// run prints for it carries no address at all.
+	held := outcome.Results[0].Held
+	if len(held) != 2 {
+		t.Fatalf("held = %+v, want one entry per app the runner started", held)
+	}
+	if held[0].Job != "web" || held[0].URL != "http://web.feat-auth.myapp.localhost:4000" {
+		t.Errorf("held[0] = %+v, want web under its own name", held[0])
+	}
+	// The port is the one the daemon answered it bound, not the declared base.
+	if held[1].URL != "http://api.feat-auth.myapp.localhost:4000" {
+		t.Errorf("held[1] = %+v, want api under its own name", held[1])
+	}
+	for _, e := range sink.Events {
+		if e.Phase == runlogs.PhaseStarted && len(e.Held) != 2 {
+			t.Errorf("started event held = %+v, want the addresses carried to the surface", e.Held)
+		}
+	}
+}
+
+func TestRunHandsOutPortsWhenTheEnvStillSpellsThem(t *testing.T) {
+	runner := domain.JobConfig{
+		Name: "dev", Kind: domain.JobKindService, Cmd: "turbo run dev",
+		Ports: map[string]int{"PORT": 3000}, Runs: []string{"web"},
+	}
+	web := domain.JobConfig{
+		Name: "web", Kind: domain.JobKindService, Cwd: "apps/web",
+		Ports: map[string]int{"PORT": 3000}, URL: &domain.JobURLConfig{Port: "PORT"},
+	}
+	service := &runlogstest.Service{Ports: map[string]map[string]int{"dev": {"PORT": 3010}}, ProxyPort: 4000}
+
+	outcome, err := runlogs.Run(context.Background(), runlogs.RunParams{
+		Service:       service,
+		Jobs:          []domain.JobConfig{runner},
+		Declared:      []domain.JobConfig{runner, web},
+		WorkDir:       "/w",
+		Env:           map[string]string{domain.EnvWorktree: "feat-auth"},
+		Project:       "myapp",
+		ProxyPort:     4000,
+		PortAddressed: true,
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	// The name is registered either way, but the .env answers on the port, so
+	// the port is the entrance a reader must be given.
+	held := outcome.Results[0].Held
+	if len(held) != 1 || held[0].URL != "http://localhost:3010" {
+		t.Fatalf("held = %+v, want the port the app answers on", held)
 	}
 }

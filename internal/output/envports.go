@@ -18,7 +18,12 @@ import (
 // It emits a raw body with no surrounding blank lines; the caller's frame owns
 // the padding. A plan with nothing to say prints nothing.
 func EnvPortsReport(w io.Writer, plan domain.EnvPortPlan, check bool) {
-	rows := rules.EnvPortTableLines(plan)
+	// The section is indented twice like every Message it prints, and that is
+	// room the table does not have.
+	rows := rules.EnvPortTableLines(rules.EnvPortTableParams{
+		Plan:  plan,
+		Width: reportWidth(),
+	})
 	anomalies := rules.EnvPortAnomalyLines(plan)
 	notices := rules.EnvPortNotices(plan)
 	if len(rows) == 0 && len(anomalies) == 0 && len(notices) == 0 {
@@ -55,6 +60,16 @@ func EnvPortsReport(w io.Writer, plan domain.EnvPortPlan, check bool) {
 	}
 	printEnvPortAnomalies(w, anomalies)
 	printEnvPortNotices(w, notices, len(rows) == 0 && len(anomalies) == 0)
+}
+
+// reportWidth is what a table printed as a section has left, zero when there is
+// no terminal to measure.
+func reportWidth() int {
+	cols := TerminalWidth()
+	if cols <= 0 {
+		return 0
+	}
+	return cols - len([]rune(Indent))
 }
 
 // printEnvPortNotices closes the section with what the machine, rather than any

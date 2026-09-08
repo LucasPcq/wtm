@@ -32,9 +32,17 @@ type Params struct {
 	// A port is owned by whichever job binds it, and the job holding the base
 	// port may well be one this profile never names. Empty falls back to Jobs.
 	Declared []domain.JobConfig
-	// ProxyPort is where the run proxy serves the jobs' names. Zero leaves them
-	// on their own ports.
+	// ProxyPort is the port the run proxy is configured to bind. It is only ever
+	// reported — it is what the "proxy unavailable" notice names — and must not
+	// be used to build an address: a redirection installed on the 80 makes the
+	// port a name answers on differ from the port the proxy binds.
 	ProxyPort int
+	// PublicPort is the port a published name actually answers on, which is what
+	// every address this seam hands out is built from. Zero leaves the jobs on
+	// their own ports. Kept apart from ProxyPort because the two diverge exactly
+	// when the redirection is installed, and a board built from the bind port
+	// then announces urls nobody can reach.
+	PublicPort int
 	// PortAddressed says this worktree's .env still spells its addresses as
 	// ports. The names are published all the same, but nothing behind them
 	// answers on one yet, so the board hands out the ports that do.
@@ -79,13 +87,17 @@ func Open(params Params) Seam {
 			Worktree:  branch,
 			LogDir:    logDir,
 			Addresses: boardAddresses(boardAddressParams{Params: params, Env: env}),
+			// Read once, here: the board is the side that knows the log directory,
+			// and every surface over it then reads the same trace rather than
+			// listing its own idea of what this worktree has run.
+			Logged: process.LoggedJobs(logDir),
 		}),
 		workDir:       params.WorkDir,
 		worktree:      branch,
 		logDir:        logDir,
 		env:           env,
 		jobs:          params.Jobs,
-		declared:      params.Declared,
+		declared:      declaredOf(params),
 		prober:        newProber(params.ProbeBudget, params.NoProbe),
 		project:       filepath.Base(params.ProjectDir),
 		proxyPort:     params.ProxyPort,
@@ -117,6 +129,7 @@ func (s Seam) run(ctx context.Context, sink runlogs.Sink, params StartParams) (r
 		Service:       s.service,
 		Sink:          sink,
 		Jobs:          params.Jobs,
+		Declared:      s.declared,
 		Profile:       params.Profile,
 		WorkDir:       s.workDir,
 		Worktree:      s.worktree,
@@ -129,6 +142,18 @@ func (s Seam) run(ctx context.Context, sink runlogs.Sink, params StartParams) (r
 	})
 }
 
+// declaredOf is every job run.toml holds, falling back to the ones this run
+// lists when the surface named no wider set. Three readings need it — which
+// worktree owns a base port, which children a runner publishes, and where those
+// children answer — and all three are wrong when they only see the jobs of this
+// run: `run up` lists a profile, and a runner's children are rarely in it.
+func declaredOf(params Params) []domain.JobConfig {
+	if len(params.Declared) > 0 {
+		return params.Declared
+	}
+	return params.Jobs
+}
+
 // baseOwners names the worktree bound to each declared base port, so the probe
 // does not blame a command for a port the main checkout holds. An unreachable
 // daemon yields nothing, which restores the older message rather than refusing
@@ -138,13 +163,9 @@ func (s Seam) baseOwners() map[int]string {
 	if err != nil {
 		return nil
 	}
-	jobs := s.declared
-	if len(jobs) == 0 {
-		jobs = s.jobs
-	}
 	return rules.BasePortOwners(rules.BasePortOwnersParams{
 		SelfWorkDir: s.workDir,
-		Jobs:        jobs,
+		Jobs:        s.declared,
 		Running:     running,
 		Holders:     holdersOf(running),
 	})
@@ -178,12 +199,12 @@ type boardAddressParams struct {
 // proxy's port; every surface then reads the same figures off the board rather
 // than deriving its own.
 func boardAddresses(params boardAddressParams) map[string]domain.JobAddress {
-	publicPort := params.Params.ProxyPort
+	publicPort := params.Params.PublicPort
 	if params.Params.PortAddressed {
 		publicPort = 0
 	}
 	return rules.WorktreeJobAddresses(rules.WorktreeJobAddressesParams{
-		Config:     domain.RunConfig{Jobs: params.Params.Jobs},
+		Config:     domain.RunConfig{Jobs: declaredOf(params.Params)},
 		PortOffset: rules.PortOffsetFromEnv(params.Env),
 		Worktree:   params.Env[domain.EnvWorktree],
 		Project:    filepath.Base(params.Params.ProjectDir),

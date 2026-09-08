@@ -107,7 +107,22 @@ func buildRunParams(params buildParams) dashboard.RunParams {
 		BoardLoader: dashboard.DefaultBoardLoader(dashboard.LogsLoaderParams{
 			ProjectDir: result.ProjectDir,
 			StateDir:   result.StateDir,
+			PublicPort: func() int {
+				return process.PublicProxyPort(rules.ProxyPort(result.Config.Global))
+			},
 		}),
+		// One directory listing per worktree, off the UI goroutine like the rest:
+		// this is the only read that says what a worktree ran and no longer runs.
+		TraceLoader: func(branches []string) map[string]map[string]bool {
+			logged := make(map[string]map[string]bool, len(branches))
+			for _, branch := range branches {
+				logged[branch] = process.LoggedJobs(rules.WorktreeLogDir(rules.WorktreeLogDirParams{
+					StateDir: result.StateDir,
+					Branch:   branch,
+				}))
+			}
+			return logged
+		},
 		// The public port is dialed here rather than once at startup: the loader
 		// already runs off the UI goroutine, and a daemon started after the
 		// dashboard was opened must not leave every address unpublished.

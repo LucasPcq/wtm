@@ -211,12 +211,12 @@ func (d *daemonServer) handleStart(encoder replyEncoder, req Request) {
 		// (`run up` / `run start`). Start blocks until every chunk has been
 		// flushed, so the terminal response below never races the stream.
 		err := d.manager.Start(StartParams{
-			Job:       *req.Job,
-			WorkDir:   req.WorkDir,
-			LogDir:    req.LogDir,
-			Env:       req.Env,
-			RouteHost: req.RouteHost,
-			Streamer:  responseStreamWriter{encoder: encoder},
+			Job:      *req.Job,
+			WorkDir:  req.WorkDir,
+			LogDir:   req.LogDir,
+			Env:      req.Env,
+			Routes:   req.Routes,
+			Streamer: responseStreamWriter{encoder: encoder},
 		})
 		if err != nil {
 			code := exitCodeOf(err)
@@ -234,12 +234,12 @@ func (d *daemonServer) handleStart(encoder replyEncoder, req Request) {
 	// shows the launcher's lines as they happen, then send the terminal "started".
 	if rules.IsDetached(*req.Job) {
 		if err := d.manager.Start(StartParams{
-			Job:       *req.Job,
-			WorkDir:   req.WorkDir,
-			LogDir:    req.LogDir,
-			Env:       req.Env,
-			RouteHost: req.RouteHost,
-			Streamer:  responseStreamWriter{encoder: encoder},
+			Job:      *req.Job,
+			WorkDir:  req.WorkDir,
+			LogDir:   req.LogDir,
+			Env:      req.Env,
+			Routes:   req.Routes,
+			Streamer: responseStreamWriter{encoder: encoder},
 		}); err != nil {
 			encoder.Encode(Response{Status: StatusError, Message: err.Error()})
 			return
@@ -248,7 +248,7 @@ func (d *daemonServer) handleStart(encoder replyEncoder, req Request) {
 		return
 	}
 
-	if err := d.manager.Start(StartParams{Job: *req.Job, WorkDir: req.WorkDir, LogDir: req.LogDir, Env: req.Env, RouteHost: req.RouteHost}); err != nil {
+	if err := d.manager.Start(StartParams{Job: *req.Job, WorkDir: req.WorkDir, LogDir: req.LogDir, Env: req.Env, Routes: req.Routes}); err != nil {
 		encoder.Encode(Response{Status: StatusError, Message: err.Error()})
 		return
 	}
@@ -327,7 +327,7 @@ func (d *daemonServer) jobInfoOf(job ManagedJob) domain.JobInfo {
 		URL: rules.JobURL(rules.JobURLParams{
 			Job:        job.Config,
 			Ports:      jobPorts(job.Config, job.Env),
-			Host:       job.RouteHost,
+			Host:       rules.JobOwnRoute(job.Routes, job.Name),
 			PublicPort: d.publicPort(),
 		}),
 	}

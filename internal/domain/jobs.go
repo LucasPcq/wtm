@@ -81,8 +81,6 @@ type JobConfig struct {
 	Runs []string `toml:"runs,omitempty" json:"runs,omitempty"`
 }
 
-// JobURLEntry is one published job as a surface reports it: the job's name and
-// where it answers in this worktree.
 // JobURLChoice is one job's answer to "should this be reachable by name": the
 // port to publish and whether to publish it. Publish false is an answer too — it
 // withdraws a url the config already carried.
@@ -92,6 +90,8 @@ type JobURLChoice struct {
 	Publish bool
 }
 
+// JobURLEntry is one published job as a surface reports it: the job's name and
+// where it answers in this worktree.
 type JobURLEntry struct {
 	Job string `json:"job"`
 	URL string `json:"url"`
@@ -104,6 +104,11 @@ type JobURLEntry struct {
 type JobAddress struct {
 	Ports []int
 	URL   string
+	// Held are the names this job's process answers for besides its own: one per
+	// published job it runs. A runner is a single process — `turbo run dev` —
+	// and the addresses a reader came for belong to the apps behind it, which
+	// have no row of their own while it holds them.
+	Held []JobURLEntry
 }
 
 // ProfileConfig defines a named, ordered group of jobs.
@@ -161,9 +166,24 @@ const (
 	JobStatusDetached JobStatus = "detached"
 )
 
+// JobRoute is one name the proxy serves a started job under: the job the name
+// belongs to, the host it answers on, and the port variable whose resolved
+// value sits behind it.
+//
+// A job publishing its own url has exactly one. A runner has one per published
+// job it starts: `turbo run dev` is a single process holding six apps, and
+// their names are served by the only job the daemon knows about — itself.
+type JobRoute struct {
+	Job  string `json:"job"`
+	Host string `json:"host"`
+	// Port is the variable's name, not its value: the resolved port is the
+	// daemon's to compute, from the same environment it gave the process.
+	Port string `json:"port"`
+}
+
 // JobRecord is one entry of the daemon's durable index: which worktree started
 // which job, and everything needed to stop it later from a daemon that never
-// spawned it. Env, RouteHost and LogDir are resolved by a client — the daemon
+// spawned it. Env, Routes and LogDir are resolved by a client — the daemon
 // cannot run git — so losing them would mean losing the ability to tear the job
 // down (a `docker compose down` without COMPOSE_PROJECT_NAME dismantles the
 // wrong project, or nothing at all).
@@ -175,7 +195,7 @@ type JobRecord struct {
 	WorkDir   string            `json:"work_dir"`
 	Config    JobConfig         `json:"config"`
 	Env       map[string]string `json:"env,omitempty"`
-	RouteHost string            `json:"route_host,omitempty"`
+	Routes    []JobRoute        `json:"routes,omitempty"`
 	LogDir    string            `json:"log_dir,omitempty"`
 	StartedAt time.Time         `json:"started_at,omitzero"`
 }
@@ -234,6 +254,10 @@ type JobActionResult struct {
 	Ports []PortProbe `json:"ports,omitempty"`
 	// URL is where the job is reachable, absent for one that publishes no name.
 	URL string `json:"url,omitempty"`
+	// Held are the addresses this job answers for besides its own: one per
+	// published job it runs. A runner is one process, and the apps behind it
+	// have no entry of their own in a run that only started it.
+	Held []JobURLEntry `json:"held,omitempty"`
 }
 
 // WorktreeRunResult is one worktree's half of a run over several of them. A run
@@ -346,13 +370,18 @@ type JobConflict struct {
 	Runner string
 }
 
-// JobRunnerChoice is one job and the runner that starts it, empty for none.
+// JobRunnerChoice is one job and the runners that start it, empty for none.
 // Options carries the answers the step can cycle through, the empty one first:
 // no relation is the default, because guessing which command fans out into
 // which jobs is the one thing wtm refuses to infer.
+//
+// Runners is a list because run.toml has always allowed one: two roots may each
+// start the same app. The step sets one at a time — cycling a row replaces what
+// it held — but it never drops what it did not show, so a relation written by
+// hand survives a re-init that leaves its row alone.
 type JobRunnerChoice struct {
 	Job     string
 	Label   string
-	Runner  string
+	Runners []string
 	Options []string
 }

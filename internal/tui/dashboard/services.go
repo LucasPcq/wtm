@@ -109,8 +109,8 @@ func (m Model) servicesBody(layout domain.DashboardLayout) []string {
 	// would break that read.
 	nameWidth := 0
 	for _, row := range m.services {
-		if row.Kind == domain.ServicesRowJob {
-			nameWidth = max(nameWidth, len([]rune(row.Job.Key)))
+		if row.Kind == domain.ServicesRowJob || row.Kind == domain.ServicesRowHeld {
+			nameWidth = max(nameWidth, len([]rune(cellText(row.Job, domain.DetailCellName))))
 		}
 	}
 
@@ -129,14 +129,24 @@ func (m Model) servicesBody(layout domain.DashboardLayout) []string {
 				styles.DashboardRowMeta.Render(fmt.Sprintf(domain.DashboardServicesUpFmt, row.Up)),
 				width,
 			))
-		case domain.ServicesRowJob:
+		case domain.ServicesRowJob, domain.ServicesRowHeld:
 			line := sectionRowLines(sectionRowLinesParams{
 				Rows: []domain.DetailRow{row.Job}, Width: width, NameWidth: nameWidth,
 				MarkAddress: func(_ domain.DetailRow, cell string) string {
 					return m.marks().Mark(servicesURLZone(index), cell)
 				},
 			})[0]
-			lines = append(lines, m.marks().Mark(servicesRowZone(index), m.servicesJobLine(servicesJobLineParams{Index: index, Line: line})))
+			// A held address is drawn like a job and selected like none: the cursor
+			// and the menu act on processes, and the runner above owns this one.
+			if row.Kind == domain.ServicesRowHeld {
+				lines = append(lines, line)
+				continue
+			}
+			line = m.servicesJobLine(servicesJobLineParams{Index: index, Line: line})
+			if row.Job.Fold {
+				line = m.marks().Mark(servicesFoldZone(index), line)
+			}
+			lines = append(lines, m.marks().Mark(servicesRowZone(index), line))
 		}
 	}
 	return lines
@@ -199,14 +209,19 @@ func (m Model) clickServiceRow(msg tea.MouseMsg) (tea.Model, tea.Cmd, bool) {
 		return m, nil, false
 	}
 	for index, row := range m.services {
-		if row.Kind != domain.ServicesRowJob {
+		if row.Kind != domain.ServicesRowJob && row.Kind != domain.ServicesRowHeld {
 			continue
 		}
 		if m.inZone(servicesURLZone(index), msg) {
 			model, cmd := m.openJobURL(row.Job.URL)
 			return model, cmd, true
 		}
-		if !m.inZone(servicesRowZone(index), msg) {
+		if row.Job.Fold && m.inZone(servicesFoldZone(index), msg) {
+			// withBoard, not reflow: this tab's rows are built once and cached, so
+			// the fold only shows once the board is rebuilt around it.
+			return m.toggleRunFold(row.Job.Key).withBoard(), nil, true
+		}
+		if row.Kind == domain.ServicesRowHeld || !m.inZone(servicesRowZone(index), msg) {
 			continue
 		}
 		m.servicesCursor = index

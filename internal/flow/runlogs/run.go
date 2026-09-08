@@ -100,6 +100,10 @@ type RunParams struct {
 	Service Service
 	Sink    Sink
 	Jobs    []domain.JobConfig
+	// Declared is every job run.toml holds, handed over by the surface the way
+	// BaseOwners is: a runner publishes the names of the jobs it starts itself,
+	// and only the declaration knows who they are. Empty falls back to Jobs.
+	Declared []domain.JobConfig
 	// Profile is what the surface resolved Jobs from, carried through to the
 	// Outcome so a recap can name it.
 	Profile string
@@ -153,6 +157,7 @@ func Run(ctx context.Context, params RunParams) (Outcome, error) {
 		service:       params.Service,
 		sink:          params.Sink,
 		jobs:          params.Jobs,
+		declared:      params.Declared,
 		profile:       params.Profile,
 		workDir:       params.WorkDir,
 		worktree:      params.Worktree,
@@ -181,6 +186,7 @@ type runner struct {
 	service  Service
 	sink     Sink
 	jobs     []domain.JobConfig
+	declared []domain.JobConfig
 	profile  string
 	workDir  string
 	worktree string
@@ -227,18 +233,20 @@ func (r *runner) run() Outcome {
 		r.emit(Event{Phase: PhaseStarting, Job: job.Name, Step: i + 1})
 
 		r.captured = nil
-		host := rules.RouteHost(rules.RouteHostParams{
+		routes := rules.JobRoutes(rules.JobRoutesParams{
+			Config:   domain.RunConfig{Jobs: r.declaredJobs()},
 			Job:      job,
 			Worktree: r.env[domain.EnvWorktree],
 			Project:  r.project,
 		})
+		host := rules.JobOwnRoute(routes, job.Name)
 
 		result, err := r.service.Start(r.ctx, StartRequest{
-			Job:       job,
-			WorkDir:   r.workDir,
-			LogDir:    r.logDir,
-			Env:       r.env,
-			RouteHost: host,
+			Job:     job,
+			WorkDir: r.workDir,
+			LogDir:  r.logDir,
+			Env:     r.env,
+			Routes:  routes,
 			OnOutput: func(chunk []byte) {
 				r.captured = append(r.captured, chunk...)
 				r.emit(Event{Phase: PhaseOutput, Job: job.Name, Kind: job.Kind, Step: i + 1, Chunk: chunk})
@@ -267,17 +275,19 @@ func (r *runner) run() Outcome {
 
 		if job.Kind == domain.JobKindTask {
 			r.completed = append(r.completed, job.Name)
-			r.results = append(r.results, domain.JobActionResult{Name: job.Name, Status: domain.JobActionDone, URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host})})
-			r.emit(Event{Phase: PhaseDone, Job: job.Name, Step: i + 1, Ports: result.Ports, URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host})})
+			held := r.heldURLs(job, routes, result.Ports)
+			r.results = append(r.results, domain.JobActionResult{Name: job.Name, Status: domain.JobActionDone, URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host}), Held: held})
+			r.emit(Event{Phase: PhaseDone, Job: job.Name, Step: i + 1, Ports: result.Ports, URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host}), Held: held})
 			continue
 		}
 
 		r.started = append(r.started, job.Name)
-		r.results = append(r.results, domain.JobActionResult{Name: job.Name, Status: domain.JobActionStarted, URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host})})
+		held := r.heldURLs(job, routes, result.Ports)
+		r.results = append(r.results, domain.JobActionResult{Name: job.Name, Status: domain.JobActionStarted, URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host}), Held: held})
 		if rules.ShouldProbeJob(rules.ShouldProbeJobParams{Kind: job.Kind, Ports: result.Ports, Probe: job.Probe}) {
 			r.probeTargets = append(r.probeTargets, probeTarget{job: job.Name, resolved: result.Ports})
 		}
-		r.emit(Event{Phase: PhaseStarted, Job: job.Name, Step: i + 1, AlreadyRunning: alreadyRunning, Ports: result.Ports, URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host}), DevOrigins: r.devOrigins(job, host)})
+		r.emit(Event{Phase: PhaseStarted, Job: job.Name, Step: i + 1, AlreadyRunning: alreadyRunning, Ports: result.Ports, URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host}), Held: held, DevOrigins: r.devOrigins(job, host)})
 	}
 
 	// The probe dials first because its wait is also the time a job needs to die:
@@ -430,6 +440,15 @@ func (r *runner) markCrashed(name string) {
 
 // devOrigins is only ever asked when the proxy actually serves the job: under
 // its own port, Next has nothing to allow.
+// declaredJobs is what the runner relation is read against: everything run.toml
+// holds, or the jobs of this run alone when the surface said nothing.
+func (r *runner) declaredJobs() []domain.JobConfig {
+	if len(r.declared) > 0 {
+		return r.declared
+	}
+	return r.jobs
+}
+
 func (r *runner) devOrigins(job domain.JobConfig, host string) []domain.DevOriginFix {
 	if r.nextConfig == nil || host == "" || r.servedPort == 0 {
 		return nil
@@ -454,16 +473,48 @@ type jobURLParams struct {
 // jobURL answers with the port the daemon says it is really serving, never the
 // one this run asked for: a name nothing serves is worse than a port.
 func (r *runner) jobURL(params jobURLParams) string {
-	publicPort := r.servedPort
-	if r.portAddressed {
-		publicPort = 0
-	}
 	return rules.JobURL(rules.JobURLParams{
 		Job:        params.Job,
 		Ports:      params.Ports,
 		Host:       params.Host,
-		PublicPort: publicPort,
+		PublicPort: r.publicPort(),
 	})
+}
+
+// heldURLs is where each job this one runs answers, for the surfaces that show
+// one line per started job: the apps behind a runner are subprocesses, so this
+// is the only line their addresses can appear on.
+//
+// The port comes from what the daemon answered it bound, never from the
+// declaration: the runner was given its children's ports, and reporting a
+// number it did not bind is the one thing a "started" line must not do.
+func (r *runner) heldURLs(job domain.JobConfig, routes []domain.JobRoute, ports map[string]int) []domain.JobURLEntry {
+	var held []domain.JobURLEntry
+	for _, route := range routes {
+		if route.Job == job.Name {
+			continue
+		}
+		url := rules.JobOrigin(rules.JobOriginParams{
+			Host:       route.Host,
+			PublicPort: r.publicPort(),
+			DirectPort: ports[route.Port],
+		})
+		if url == "" {
+			continue
+		}
+		held = append(held, domain.JobURLEntry{Job: route.Job, URL: url})
+	}
+	return held
+}
+
+// publicPort is what a name announces in this run, zero for a worktree whose
+// .env still spells its addresses as ports — where the port is the entrance
+// that works.
+func (r *runner) publicPort() int {
+	if r.portAddressed {
+		return 0
+	}
+	return r.servedPort
 }
 
 // noticeProxyRefused explains, once, why the names this run promised are not

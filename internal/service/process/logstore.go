@@ -255,3 +255,74 @@ func splitLogLines(content []byte) []string {
 	}
 	return strings.Split(trimmed, "\n")
 }
+
+// LoggedJobs names the jobs that have left output in a worktree's log
+// directory. It is the trace half of what a surface shows: the daemon's index
+// says what lives, this says what ran, and a job in neither was never started
+// here and has nothing to show for itself.
+//
+// An unreadable directory answers nothing rather than failing: a surface that
+// cannot list the logs still has the index to draw, and refusing to draw at all
+// would be the worse answer.
+func LoggedJobs(logDir string) map[string]bool {
+	if logDir == "" {
+		return nil
+	}
+	entries, err := os.ReadDir(logDir)
+	if err != nil {
+		return nil
+	}
+
+	logged := make(map[string]bool, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if job := rules.JobFromLogFileName(entry.Name()); job != "" {
+			logged[job] = true
+		}
+	}
+	return logged
+}
+
+type PruneLogsParams struct {
+	LogDir string
+	// Keep names the jobs whose logs survive: the ones this run is starting, and
+	// the ones already up in this worktree. Anything else in the directory is a
+	// previous run's — another profile's jobs, or a job run.toml no longer even
+	// declares — and is what made "this job has a log here" mean "this job ran
+	// here at some point in the last fortnight".
+	Keep map[string]bool
+}
+
+// PruneJobLogs makes the log directory hold one run, the way OpenLogSink makes
+// each file hold one (LUC-198): starting a run drops the logs of the jobs it is
+// not starting. Without it the directory only ever grew, and every surface
+// reading it showed the worktree's archaeology rather than its state.
+//
+// A job that is up is kept whatever the run is starting: its sink is writing to
+// that file right now, and deleting it under a live job loses the output of
+// something nobody asked to stop.
+//
+// Best effort, like the rest of this store: a log that cannot be removed is not
+// a reason to refuse a run.
+func PruneJobLogs(params PruneLogsParams) {
+	if params.LogDir == "" {
+		return
+	}
+	entries, err := os.ReadDir(params.LogDir)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		job := rules.JobFromLogFileName(entry.Name())
+		// A file this store did not write is left alone: it is not ours to judge.
+		if job == "" || params.Keep[job] {
+			continue
+		}
+		os.Remove(filepath.Join(params.LogDir, entry.Name()))
+	}
+}

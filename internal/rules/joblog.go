@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -160,4 +161,27 @@ func stripControlRunes(s string) string {
 		}
 		return r
 	}, s)
+}
+
+// JobFromLogFileName is JobLogFileName read backwards, rotation suffix
+// included: a job whose only surviving output is in `web.log.2` has still left
+// a trace. It answers empty for anything that is not a job log, so a directory
+// holding something else never invents a job.
+func JobFromLogFileName(name string) string {
+	trimmed := name
+	// Rotation appends `.N` after the extension, so the rank comes off first.
+	if ext := filepath.Ext(trimmed); ext != "" && ext != domain.JobLogFileExt {
+		if _, err := strconv.Atoi(strings.TrimPrefix(ext, ".")); err != nil {
+			return ""
+		}
+		trimmed = strings.TrimSuffix(trimmed, ext)
+	}
+	if !strings.HasSuffix(trimmed, domain.JobLogFileExt) {
+		return ""
+	}
+	job, err := url.PathUnescape(strings.TrimSuffix(trimmed, domain.JobLogFileExt))
+	if err != nil {
+		return ""
+	}
+	return job
 }

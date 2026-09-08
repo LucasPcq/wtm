@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 )
 
 // The coordinates below are derived from the layout rules, not read back from
@@ -562,4 +563,50 @@ func callsMadeBy(sources map[string]string, name string) []string {
 		}
 	}
 	return called
+}
+
+// A runner's addresses are folded until asked for, and unfolding one gives each
+// app it answers for a row that can be clicked — which the joined cell they used
+// to share never was, having no url of its own to carry.
+func TestUnfoldingARunnerGivesEachAddressItsOwnClickableRow(t *testing.T) {
+	opened := make(chan string, 1)
+	model := runningDetailModel(t,
+		RunParams{URLOpener: func(url string) error { opened <- url; return nil }},
+		map[string]domain.JobAddress{"dev": {Held: []domain.JobURLEntry{
+			{Job: "web", URL: "http://web.wtm"},
+			{Job: "api", URL: "http://api.wtm"},
+		}}},
+		domain.JobConfig{Name: "dev", Runs: []string{"web", "api"}},
+	)
+	renderAndWait(t, model, runFoldZone("dev"))
+
+	child := rules.HeldRowKey("dev", "web")
+	if !model.zones.Get(runURLZone(child)).IsZero() {
+		t.Fatal("a runner's children were on screen before anything unfolded them")
+	}
+
+	fold := model.zones.Get(runFoldZone("dev"))
+	model, _ = updateCmd(model, click(fold.EndX, fold.StartY))
+	if !model.runExpanded["dev"] {
+		t.Fatal("clicking the fold marker did not open the runner")
+	}
+	renderAndWait(t, model, runURLZone(child))
+
+	address := model.zones.Get(runURLZone(child))
+	if address.IsZero() {
+		t.Fatal("an unfolded child has no address zone of its own")
+	}
+	_, cmd := updateCmd(model, click(address.StartX, address.StartY))
+	if cmd == nil {
+		t.Fatal("clicking a child's address did nothing")
+	}
+	cmd()
+	select {
+	case got := <-opened:
+		if got != "http://web.wtm" {
+			t.Errorf("opened %q, want the child's own url", got)
+		}
+	default:
+		t.Fatal("the child's address was not opened")
+	}
 }

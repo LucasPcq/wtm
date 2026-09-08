@@ -19,6 +19,35 @@ func monorepoConfig() domain.RunConfig {
 	}}
 }
 
+// runnerRowOf is the row the step offered for one job, failing rather than
+// indexing: the rows now cover the candidates too, so their order is no longer
+// something a test may assume.
+func runnerRowOf(t *testing.T, choices []domain.JobRunnerChoice, job string) domain.JobRunnerChoice {
+	t.Helper()
+	for _, choice := range choices {
+		if choice.Job == job {
+			return choice
+		}
+	}
+	t.Fatalf("no row for %q in %+v", job, choices)
+	return domain.JobRunnerChoice{}
+}
+
+func setRunner(t *testing.T, choices []domain.JobRunnerChoice, job, runner string) {
+	t.Helper()
+	for i, choice := range choices {
+		if choice.Job != job {
+			continue
+		}
+		choices[i].Runners = nil
+		if runner != "" {
+			choices[i].Runners = []string{runner}
+		}
+		return
+	}
+	t.Fatalf("no row for %q", job)
+}
+
 func TestRunnerCandidatesAreTheRootServicesHoldingNoPort(t *testing.T) {
 	names := RunnerCandidates(RunnerChoicesParams{Config: monorepoConfig(), ComposeJobs: []string{"docker-compose"}})
 
@@ -30,15 +59,52 @@ func TestRunnerCandidatesAreTheRootServicesHoldingNoPort(t *testing.T) {
 func TestRunnerChoicesOfferOneRowPerNestedService(t *testing.T) {
 	choices := RunnerChoices(RunnerChoicesParams{Config: monorepoConfig(), ComposeJobs: []string{"docker-compose"}})
 
-	if len(choices) != 1 || choices[0].Job != "crm-web-dev" {
-		t.Fatalf("got %+v — a task binds nothing and a root service is a candidate, not a row", choices)
+	// A task binds nothing and a compose stack is a tree of its own, so neither
+	// is a row. A root runner is: `dev` fanning out to `dev:crm` and `dev:shop`
+	// is the shape a turborepo takes, and it cannot be said any other way.
+	if len(choices) != 3 {
+		t.Fatalf("got %+v, want a row per nested service and per candidate", choices)
 	}
-	if choices[0].Runner != "" {
+	byJob := map[string]domain.JobRunnerChoice{}
+	for _, choice := range choices {
+		byJob[choice.Job] = choice
+	}
+	app, offered := byJob["crm-web-dev"]
+	if !offered {
+		t.Fatal("the service the step exists for has no row")
+	}
+	if len(app.Runners) != 0 {
 		t.Fatal("no relation is the default: which command fans out is the one thing wtm refuses to infer")
 	}
-	if len(choices[0].Options) != 3 || choices[0].Options[0] != "" {
-		t.Fatalf("options = %+v, want none first then both candidates", choices[0].Options)
+	if len(app.Options) != 3 || app.Options[0] != "" {
+		t.Fatalf("options = %+v, want none first then both candidates", app.Options)
 	}
+	// A candidate is never offered itself, so its row is one shorter.
+	if got := byJob["dev:crm"].Options; len(got) != 2 || got[1] != "dev:shop" {
+		t.Fatalf("dev:crm options = %+v, want none and the other candidate", got)
+	}
+}
+
+func TestRunnerChoicesNeverOfferARunnerAChainAlreadyReaches(t *testing.T) {
+	cfg := monorepoConfig()
+	// A third root, so dev:shop still has something to be offered once it runs
+	// dev:crm — otherwise its row disappears for want of any answer at all.
+	cfg.Jobs = append(cfg.Jobs, domain.JobConfig{Name: "dev", Kind: domain.JobKindService, Cmd: "pnpm run dev", Cwd: "."})
+	cfg.Jobs[2].Runs = []string{"dev:crm"} // dev:shop runs dev:crm
+
+	choices := RunnerChoices(RunnerChoicesParams{Config: cfg, ComposeJobs: []string{"docker-compose"}})
+	for _, choice := range choices {
+		if choice.Job != "dev:shop" {
+			continue
+		}
+		for _, option := range choice.Options {
+			if option == "dev:crm" {
+				t.Fatal("a runner offered a parent it already starts would write a cycle run.toml refuses")
+			}
+		}
+		return
+	}
+	t.Fatal("dev:shop has no row")
 }
 
 func TestRunnerChoicesAreEmptyWithoutACandidate(t *testing.T) {
@@ -56,15 +122,15 @@ func TestRunnerChoicesArePreFilledFromTheConfig(t *testing.T) {
 	cfg.Jobs[1].Runs = []string{"crm-web-dev"}
 
 	choices := RunnerChoices(RunnerChoicesParams{Config: cfg, ComposeJobs: []string{"docker-compose"}})
-	if choices[0].Runner != "dev:crm" {
-		t.Fatalf("a re-init shows what was settled: %+v", choices[0])
+	if got := runnerRowOf(t, choices, "crm-web-dev").Runners; len(got) != 1 || got[0] != "dev:crm" {
+		t.Fatalf("a re-init shows what was settled: %+v", got)
 	}
 }
 
 func TestApplyRunnerChoicesWritesTheRelation(t *testing.T) {
 	cfg := monorepoConfig()
 	choices := RunnerChoices(RunnerChoicesParams{Config: cfg, ComposeJobs: []string{"docker-compose"}})
-	choices[0].Runner = "dev:crm"
+	setRunner(t, choices, "crm-web-dev", "dev:crm")
 
 	out := ApplyRunnerChoices(ApplyRunnerChoicesParams{Config: cfg, Choices: choices})
 	crm, _ := FindJob(out, "dev:crm")
@@ -81,7 +147,7 @@ func TestApplyRunnerChoicesWithdrawsWhatARowGaveBack(t *testing.T) {
 	cfg.Jobs[1].Runs = []string{"crm-web-dev"}
 
 	choices := RunnerChoices(RunnerChoicesParams{Config: cfg, ComposeJobs: []string{"docker-compose"}})
-	choices[0].Runner = ""
+	setRunner(t, choices, "crm-web-dev", "")
 
 	out := ApplyRunnerChoices(ApplyRunnerChoicesParams{Config: cfg, Choices: choices})
 	if crm, _ := FindJob(out, "dev:crm"); len(crm.Runs) != 0 {
@@ -102,7 +168,7 @@ func TestApplyRunnerChoicesLeavesAJobTheStepNeverOffered(t *testing.T) {
 func TestPortEntriesForFollowsTheRelationTheStepJustSettled(t *testing.T) {
 	cfg := monorepoConfig()
 	choices := RunnerChoices(RunnerChoicesParams{Config: cfg, ComposeJobs: []string{"docker-compose"}})
-	choices[0].Runner = "dev:crm"
+	setRunner(t, choices, "crm-web-dev", "dev:crm")
 
 	entries := PortEntriesFor(PortEntriesForParams{
 		Config:      ApplyRunnerChoices(ApplyRunnerChoicesParams{Config: cfg, Choices: choices}),
@@ -190,7 +256,7 @@ func TestApplyRunnerChoicesKeepsAChildTheStepNeverOffered(t *testing.T) {
 	cfg.Jobs[1].Runs = []string{"seed"}
 
 	choices := RunnerChoices(RunnerChoicesParams{Config: cfg, ComposeJobs: []string{"docker-compose"}})
-	choices[0].Runner = "dev:crm"
+	setRunner(t, choices, "crm-web-dev", "dev:crm")
 
 	out := ApplyRunnerChoices(ApplyRunnerChoicesParams{Config: cfg, Choices: choices})
 	crm, _ := FindJob(out, "dev:crm")
@@ -199,5 +265,50 @@ func TestApplyRunnerChoicesKeepsAChildTheStepNeverOffered(t *testing.T) {
 	}
 	if crm.Runs[0] != "seed" {
 		t.Fatalf("got %+v", crm.Runs)
+	}
+}
+
+// run.toml has always allowed two roots to start the same app. The step used to
+// read one parent and write the row back over both, so a re-init silently took
+// the app out of the second runner.
+func TestApplyRunnerChoicesKeepsARowsSecondRunner(t *testing.T) {
+	cfg := monorepoConfig()
+	cfg.Jobs[1].Runs = []string{"crm-web-dev"} // dev:crm
+	cfg.Jobs[2].Runs = []string{"crm-web-dev"} // dev:shop
+
+	choices := RunnerChoices(RunnerChoicesParams{Config: cfg, ComposeJobs: []string{"docker-compose"}})
+	if got := runnerRowOf(t, choices, "crm-web-dev").Runners; len(got) != 2 {
+		t.Fatalf("row = %+v, want both runners shown", got)
+	}
+
+	out := ApplyRunnerChoices(ApplyRunnerChoicesParams{Config: cfg, Choices: choices})
+	for _, runner := range []string{"dev:crm", "dev:shop"} {
+		job, _ := FindJob(out, runner)
+		if len(job.Runs) != 1 || job.Runs[0] != "crm-web-dev" {
+			t.Errorf("%s runs = %+v, want the relation left as it was", runner, job.Runs)
+		}
+	}
+	if _, errs := ValidateRun(out); len(errs) != 0 {
+		t.Fatalf("what it writes must load back: %v", errs)
+	}
+}
+
+func TestApplyRunnerChoicesWritesTheChainARowComposed(t *testing.T) {
+	cfg := monorepoConfig()
+
+	choices := RunnerChoices(RunnerChoicesParams{Config: cfg, ComposeJobs: []string{"docker-compose"}})
+	setRunner(t, choices, "crm-web-dev", "dev:crm")
+	setRunner(t, choices, "dev:crm", "dev:shop")
+
+	out := ApplyRunnerChoices(ApplyRunnerChoicesParams{Config: cfg, Choices: choices})
+	if _, errs := ValidateRun(out); len(errs) != 0 {
+		t.Fatalf("a chain must load back: %v", errs)
+	}
+	// What the root holds is read transitively, which is the whole reason a
+	// runner may be another's child: one row per level, and the top one starts
+	// everything below it.
+	children := RunnerChildren(out, "dev:shop")
+	if len(children) != 2 || children[0] != "dev:crm" || children[1] != "crm-web-dev" {
+		t.Fatalf("children = %+v, want the chain walked to the app", children)
 	}
 }
