@@ -103,16 +103,20 @@ func runReinit(cmd *cobra.Command, dir, stateDir string, sections []string) erro
 		answers = wizardAnswers
 	}
 
-	output.FrameStart(cmd.OutOrStdout())
-
-	if contains(sections, domain.SectionWorktrees) || contains(sections, domain.SectionEnv) || contains(sections, domain.SectionHooks) {
-		if err := applyConfigReinit(cmd, stateDir, sections, answers); err != nil {
-			return err
-		}
+	if !contains(sections, domain.SectionWorktrees) && !contains(sections, domain.SectionEnv) && !contains(sections, domain.SectionHooks) {
+		return nil
 	}
 
-	output.FrameEnd(cmd.OutOrStdout())
-	return nil
+	var applyErr error
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		applyErr = applyConfigReinit(applyReinitParams{
+			Out:      w,
+			StateDir: stateDir,
+			Sections: sections,
+			Answers:  answers,
+		})
+	})
+	return applyErr
 }
 
 // buildPrefill snapshots the current config so the interactive re-init wizard
@@ -185,7 +189,15 @@ func buildReinitAnswers(cmd *cobra.Command, stateDir string, detection domain.In
 
 // applyConfigReinit rewrites config.toml, updating only the requested sections
 // and preserving every other section's current values.
-func applyConfigReinit(cmd *cobra.Command, stateDir string, sections []string, answers domain.InitProjectAnswers) error {
+type applyReinitParams struct {
+	Out      io.Writer
+	StateDir string
+	Sections []string
+	Answers  domain.InitProjectAnswers
+}
+
+func applyConfigReinit(params applyReinitParams) error {
+	stateDir, sections, answers := params.StateDir, params.Sections, params.Answers
 	cfg, err := config.LoadProjectRaw(stateDir)
 	if err != nil {
 		return fmt.Errorf("load project config: %w", err)
@@ -207,7 +219,7 @@ func applyConfigReinit(cmd *cobra.Command, stateDir string, sections []string, a
 		return fmt.Errorf("write project config: %w", err)
 	}
 
-	output.Success(cmd.OutOrStdout(), "Rewrote config.toml")
+	output.Success(params.Out, "Rewrote config.toml")
 	return nil
 }
 

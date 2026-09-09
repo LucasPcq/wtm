@@ -2,6 +2,7 @@ package initcmd
 
 import (
 	"bytes"
+	"io"
 	"strings"
 	"testing"
 
@@ -89,7 +90,12 @@ func TestApplyConfigReinitOnlyRewritesRequestedSection(t *testing.T) {
 		EnvFiles:    []domain.EnvFile{{Target: ".env.local", Local: true}},
 	}
 
-	if err := applyConfigReinit(newReinitTestCmd(), dir, []string{domain.SectionEnv}, answers); err != nil {
+	if err := applyConfigReinit(applyReinitParams{
+		Out:      io.Discard,
+		StateDir: dir,
+		Sections: []string{domain.SectionEnv},
+		Answers:  answers,
+	}); err != nil {
 		t.Fatalf("applyConfigReinit: %v", err)
 	}
 

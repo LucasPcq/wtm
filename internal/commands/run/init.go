@@ -331,18 +331,18 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 			Config:    outcome.Config,
 			ProxyPort: proxyPort,
 		}), proxyPort); len(lines) > 0 {
-			output.Callout(cmd.ErrOrStderr(), domain.ProxyPortCollisionTitle, lines)
+			output.Callout(w, domain.ProxyPortCollisionTitle, lines)
 		}
 		if lines := rules.ProxyInstallHintLines(rules.ProxyInstallHintParams{
 			Config:     outcome.Config,
 			Status:     proxy.NewRedirector(proxy.RedirectorParams{}).Inspect(),
 			ExampleURL: fmt.Sprintf(domain.ProxyURLFmt, domain.ProxyHostShape, proxyPort),
 		}); len(lines) > 0 {
-			output.Callout(cmd.ErrOrStderr(), domain.ProxyInstallHintTitle, lines)
+			output.Callout(w, domain.ProxyInstallHintTitle, lines)
 		}
 		// The main checkout is the one no command ever provisions, so it is the
 		// one the addressing just chosen leaves behind.
-		noticeAddressingDrift(cmd, res, res.ProjectDir)
+		noticeAddressingDrift(w, res, res.ProjectDir)
 		output.Blank(w)
 		output.NextStep(w, output.NextStepParams{Command: domain.RunInitNextUp, Note: domain.RunInitNextUpNote})
 		output.NextStep(w, output.NextStepParams{Command: domain.RunInitNextJobAdd, Note: domain.RunInitNextJobAddNote})

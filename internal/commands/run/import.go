@@ -97,7 +97,9 @@ func runImport(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if rules.IsHumanFormat(format) {
-		noticeAddressingDrift(cmd, result, result.ProjectDir)
+		output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
+			noticeAddressingDrift(w, result, result.ProjectDir)
+		})
 	}
 	return nil
 }

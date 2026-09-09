@@ -137,24 +137,32 @@ type syncPresenter struct {
 	shared.CLIPresenter
 }
 
-// Planned prints the cascade a run that could not ask never saw in a recap. It
-// opens the frame on stderr, where the plan has always been written.
+// sync writes across two streams — the plan and the spinners on stderr, the
+// recap and the push on stdout — so its frame cannot be a closure. One rule
+// holds it together instead: every section opens with exactly one blank line on
+// the stream it is about to write to, and Synced closes with the frame's own.
+// The first of those blanks is the frame's leading one, whichever section runs
+// first; the rest are inter-section separators. Same call, same output, one
+// mechanism.
+func (p syncPresenter) section(w io.Writer) io.Writer {
+	output.Blank(w)
+	return output.Barred(w)
+}
+
+// Planned prints the cascade a run that could not ask never saw in a recap.
 func (p syncPresenter) Planned(plan domain.SyncPlan) {
 	if !p.Human {
 		return
 	}
-	output.FrameStart(p.Cmd.ErrOrStderr())
-	output.FormatSyncPlan(output.Barred(p.Cmd.ErrOrStderr()), plan)
+	output.FormatSyncPlan(p.section(p.Cmd.ErrOrStderr()), plan)
 }
 
-// Rebased is the recap the user reads BEFORE being asked to push. Its single
-// leading blank separates the plan/spinner section (stderr) from the recap.
+// Rebased is the recap the user reads BEFORE being asked to push.
 func (p syncPresenter) Rebased(result domain.SyncResult) {
 	if !p.Human {
 		return
 	}
-	output.Blank(p.Cmd.OutOrStdout())
-	output.FormatSyncResult(output.Barred(p.Cmd.OutOrStdout()), result)
+	output.FormatSyncResult(p.section(p.Cmd.OutOrStdout()), result)
 }
 
 func (p syncPresenter) Synced(outcome syncflow.Outcome) error {

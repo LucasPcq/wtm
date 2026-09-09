@@ -138,7 +138,7 @@ func writeJobLogsJSON(params jobLinesParams) error {
 			// One unreadable file is not the whole document: the other jobs still
 			// have something to hand over, and stdout stays a clean document
 			// because the reason goes to stderr.
-			output.Error(params.Cmd.ErrOrStderr(), fmt.Sprintf("%s: %v", view.Name, historyErr))
+			output.Error(output.Barred(params.Cmd.ErrOrStderr()), fmt.Sprintf("%s: %v", view.Name, historyErr))
 			continue
 		}
 		for _, line := range lines {
@@ -185,7 +185,7 @@ func writeJobLines(params jobLinesParams) error {
 		if !view.Attachable {
 			lines, historyErr := params.Board.History(runlogs.HistoryParams{Job: view.Name, WorkDir: view.WorkDir})
 			if historyErr != nil {
-				output.Error(params.Cmd.ErrOrStderr(), fmt.Sprintf("%s: %v", view.Name, historyErr))
+				output.Error(output.Barred(params.Cmd.ErrOrStderr()), fmt.Sprintf("%s: %v", view.Name, historyErr))
 				continue
 			}
 			for _, line := range lines {
@@ -196,7 +196,7 @@ func writeJobLines(params jobLinesParams) error {
 
 		stream, attachErr := params.Board.Attach(runlogs.AttachParams{Job: view.Name, WorkDir: view.WorkDir})
 		if attachErr != nil {
-			output.Error(params.Cmd.ErrOrStderr(), fmt.Sprintf("%s: %v", view.Name, attachErr))
+			output.Error(output.Barred(params.Cmd.ErrOrStderr()), fmt.Sprintf("%s: %v", view.Name, attachErr))
 			continue
 		}
 
