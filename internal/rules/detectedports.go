@@ -101,6 +101,17 @@ func ResolveDetectedPorts(params ResolveDetectedPortsParams) DetectedPortsOutcom
 		Conflicts: conflicts,
 	})...)
 
+	// Applied to the merged config, not only to the jobs just built: a re-init
+	// never rebuilds a compose file that already has a job, so the scope answers
+	// would otherwise reach nothing at all.
+	merged = ApplySharedServices(ApplySharedServicesParams{
+		Config:     merged,
+		Shared:     params.Answers.SharedServices,
+		Asked:      params.Answers.ScopesAsked,
+		Scans:      params.Answers.Scans,
+		ComposeCmd: params.Answers.DockerComposeCmd,
+	})
+
 	backfilled := BackfillDockerPorts(BackfillDockerPortsParams{
 		Config:      merged,
 		PortsByFile: ports,
