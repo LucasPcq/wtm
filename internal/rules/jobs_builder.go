@@ -189,7 +189,7 @@ func BuildDockerJobs(params BuildDockerJobsParams) domain.RunConfig {
 			name = fmt.Sprintf("%s-%d", base, counts[base])
 		}
 
-		jobs = append(jobs, sharedComposeJobs(sharedComposeJobsParams{Params: params, File: f})...)
+		jobs = append(jobs, sharedComposeJobs(sharedComposeJobsParams{Params: params, File: f, Taken: counts})...)
 
 		stays := servicesStaying(params, f)
 		// Every service of this file is shared, so the file has nothing left to
@@ -212,6 +212,11 @@ func BuildDockerJobs(params BuildDockerJobsParams) domain.RunConfig {
 type sharedComposeJobsParams struct {
 	Params BuildDockerJobsParams
 	File   string
+	// Taken counts the names already used, so two files each declaring "db"
+	// produce two jobs rather than two entries sharing one key — which no
+	// validation caught, and which had `run up` refuse the second as already
+	// running.
+	Taken map[string]int
 }
 
 // sharedComposeJobs is one job per service lifted out of this file. Its stop is
@@ -224,8 +229,13 @@ func sharedComposeJobs(params sharedComposeJobsParams) []domain.JobConfig {
 			continue
 		}
 		flag := DockerComposeFileFlag(params.File)
+		params.Taken[shared.Service]++
+		name := shared.Service
+		if params.Taken[shared.Service] > 1 {
+			name = fmt.Sprintf("%s-%d", shared.Service, params.Taken[shared.Service])
+		}
 		jobs = append(jobs, domain.JobConfig{
-			Name:   shared.Service,
+			Name:   name,
 			Kind:   domain.JobKindService,
 			Cmd:    fmt.Sprintf("%s %sup -d %s", params.Params.ComposeCmd, flag, shared.Service),
 			Stop:   fmt.Sprintf("%s %sstop %s", params.Params.ComposeCmd, flag, shared.Service),

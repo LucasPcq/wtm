@@ -85,6 +85,7 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 		Links:        cfg.EnvPorts,
 		Owned:        owned,
 		Bases:        rules.EnvPortBases(cfg),
+		Shared:       rules.SharedJobNames(cfg),
 		Offset:       offset,
 		Block:        rules.EffectivePortOffsetBlock(cfg),
 		Origins: rules.OriginContext{

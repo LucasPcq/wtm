@@ -101,7 +101,12 @@ func ResolveDetectedPorts(params ResolveDetectedPortsParams) DetectedPortsOutcom
 		Conflicts: conflicts,
 	})...)
 
-	backfilled := BackfillDockerPorts(BackfillDockerPortsParams{Config: merged, PortsByFile: ports})
+	backfilled := BackfillDockerPorts(BackfillDockerPortsParams{
+		Config:      merged,
+		PortsByFile: ports,
+		Declared:    params.Plan.Declared,
+		Shared:      params.Answers.SharedServices,
+	})
 	fromEnv := BackfillScriptPorts(BackfillScriptPortsParams{
 		Config:         backfilled.Config,
 		PackageManager: params.PackageManager,

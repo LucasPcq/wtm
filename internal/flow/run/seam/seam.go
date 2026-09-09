@@ -79,15 +79,20 @@ func Open(params Params) Seam {
 		StateDir:   params.StateDir,
 		WorkDir:    params.WorkDir,
 	})
+	// Resolved once, and only when something declares a shared job: it costs a
+	// git worktree list plus a full environment resolution for the main
+	// checkout, and every run command opens a seam.
+	shared := sharedContext(params)
 	return Seam{
 		service: service,
 		board: runlogs.NewBoard(runlogs.BoardParams{
-			Service:   service,
-			Jobs:      params.Jobs,
-			WorkDir:   params.WorkDir,
-			Worktree:  branch,
-			LogDir:    logDir,
-			Addresses: boardAddresses(boardAddressParams{Params: params, Env: env}),
+			Service:      service,
+			Jobs:         params.Jobs,
+			WorkDir:      params.WorkDir,
+			Worktree:     branch,
+			LogDir:       logDir,
+			SharedLogDir: sharedLogDirOf(shared),
+			Addresses:    boardAddresses(boardAddressParams{Params: params, Env: env}),
 			// Read once, here: the board is the side that knows the log directory,
 			// and every surface over it then reads the same trace rather than
 			// listing its own idea of what this worktree has run.
@@ -104,7 +109,7 @@ func Open(params Params) Seam {
 		proxyPort:     params.ProxyPort,
 		portAddressed: params.PortAddressed,
 		projectDir:    params.ProjectDir,
-		shared:        sharedContext(params),
+		shared:        shared,
 	}
 }
 
@@ -112,7 +117,21 @@ func Open(params Params) Seam {
 // per seam, because it is the one place that may ask git which worktree is the
 // main one — and it is deliberately nil rather than a guess when there is none:
 // the daemon then refuses a shared job instead of running one per worktree.
+// sharedLogDirOf is where the repository's shared services persist their output.
+// Empty when there is no main checkout to run one in.
+func sharedLogDirOf(shared *domain.SharedJobContext) string {
+	if shared == nil {
+		return ""
+	}
+	return shared.LogDir
+}
+
+// A project declaring no shared job pays nothing — the git calls below would
+// otherwise be added to every single run command, `run ps` included.
 func sharedContext(params Params) *domain.SharedJobContext {
+	if !rules.AnySharedJob(declaredOf(params)) {
+		return nil
+	}
 	main, err := worktree.MainCheckout(worktree.MainCheckoutParams{ProjectDir: params.ProjectDir})
 	if err != nil {
 		return nil

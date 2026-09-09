@@ -72,6 +72,10 @@ type PlanEnvPortsParams struct {
 	// path the link spells. A file absent from the map contributes missing keys
 	// rather than nothing, so a link never disappears silently from the report.
 	Lines map[string][]domain.EnvLine
+	// Shared names the jobs that run once for the repository. Their ports never
+	// take this worktree's offset — the service binds what it declares — so a
+	// .env shifted for them would address something that answers elsewhere.
+	Shared map[string]bool
 }
 
 // PlanEnvPorts resolves every link against the value its .env currently holds,
@@ -95,6 +99,7 @@ func PlanEnvPorts(params PlanEnvPortsParams) domain.EnvPortPlan {
 			Block:   params.Block,
 			Lines:   params.Lines[group.File],
 			Origins: params.Origins,
+			Shared:  params.Shared,
 		}))
 	}
 
@@ -141,6 +146,7 @@ type planEnvPortKeyParams struct {
 	Block   int
 	Lines   []domain.EnvLine
 	Origins OriginContext
+	Shared  map[string]bool
 }
 
 // planEnvPortKey folds every link a key follows over the same value, each one
@@ -155,7 +161,7 @@ func planEnvPortKey(params planEnvPortKeyParams) domain.EnvPortEntry {
 		Lines:   params.Lines,
 		Origins: params.Origins,
 	})
-	merged.Moves = []domain.EnvPortMove{moveOf(params.Group.Links[0], params.Group.Bases[0], params.Offset)}
+	merged.Moves = []domain.EnvPortMove{moveOf(params.Group.Links[0], params.Group.Bases[0], offsetFor(params, 0))}
 	if len(params.Group.Links) == 1 {
 		return merged
 	}
@@ -176,9 +182,18 @@ func planEnvPortKey(params planEnvPortKeyParams) domain.EnvPortEntry {
 			Origins: params.Origins,
 		})
 		merged = foldEnvPortEntry(merged, next)
-		merged.Moves = append(merged.Moves, moveOf(params.Group.Links[i], params.Group.Bases[i], params.Offset))
+		merged.Moves = append(merged.Moves, moveOf(params.Group.Links[i], params.Group.Bases[i], offsetFor(params, i)))
 	}
 	return merged
+}
+
+// offsetFor is this worktree's shift, or none at all when the link names a
+// shared job: such a job binds its declared port in every worktree.
+func offsetFor(params planEnvPortKeyParams, index int) int {
+	if params.Shared[params.Group.Links[index].Job] {
+		return 0
+	}
+	return params.Offset
 }
 
 func moveOf(link domain.EnvPortLink, base, offset int) domain.EnvPortMove {

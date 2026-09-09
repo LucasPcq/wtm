@@ -80,6 +80,11 @@ type ManagedJob struct {
 	// LogDir is where this job's output is persisted, kept for the index: a
 	// daemon adopting the job must be able to hand it back to `run logs`.
 	LogDir string
+	// SharedDir is the main checkout a shared job runs in — set on the real job
+	// and on every claim, so a claim finds its service by key rather than by
+	// name. The daemon is machine-wide: matching on the name alone would let two
+	// repositories that both declare "db" release each other's.
+	SharedDir string
 	// ExitCode, like Status, is written by the goroutine that reaps the process
 	// and read by List: both are only ever touched under the manager lock.
 	ExitCode *int
@@ -99,7 +104,11 @@ type Manager struct {
 	jobs   map[string]*ManagedJob
 	routes RouteSink
 	index  JobIndex
-	mu     sync.Mutex
+	// tenantBudget bounds the retries of a tenant's attach. Zero takes
+	// domain.TenantAttachTimeout; a test sets it so a command that is simply
+	// wrong does not hold the suite for the whole budget.
+	tenantBudget time.Duration
+	mu           sync.Mutex
 }
 
 func NewManager() *Manager {
@@ -119,13 +128,17 @@ type ManagerParams struct {
 	// in memory, which is what a job whose process dies with us would want
 	// anyway.
 	Index JobIndex
+	// TenantBudget bounds the retries of a shared job's tenant attach. Zero
+	// takes domain.TenantAttachTimeout.
+	TenantBudget time.Duration
 }
 
 func NewManagerWith(params ManagerParams) *Manager {
 	return &Manager{
-		jobs:   make(map[string]*ManagedJob),
-		routes: params.Routes,
-		index:  params.Index,
+		jobs:         make(map[string]*ManagedJob),
+		routes:       params.Routes,
+		index:        params.Index,
+		tenantBudget: params.TenantBudget,
 	}
 }
 
@@ -159,6 +172,7 @@ func (m *Manager) Adopt(records []domain.JobRecord) {
 			Env:       record.Env,
 			Routes:    record.Routes,
 			LogDir:    record.LogDir,
+			SharedDir: record.SharedDir,
 			exited:    exited,
 		}
 	}
@@ -196,6 +210,7 @@ func (m *Manager) upRecordsLocked() []domain.JobRecord {
 			LogDir:    job.LogDir,
 			StartedAt: job.StartedAt,
 			Attached:  job.Status == domain.JobStatusAttached,
+			SharedDir: job.SharedDir,
 		})
 	}
 	return records
@@ -318,6 +333,7 @@ func (m *Manager) Start(params StartParams) error {
 		Env:       env,
 		Routes:    params.Routes,
 		LogDir:    params.LogDir,
+		SharedDir: sharedDirOf(params),
 		output:    hub,
 		logs:      logs,
 		exited:    make(chan struct{}),
@@ -920,7 +936,7 @@ func (m *Manager) attachableJob(ref jobRef) (*ManagedJob, error) {
 	// checkout's key, so a pane opened on it from any worktree reads the one
 	// output there is — which is what a shared service means.
 	if ok && job.Status == domain.JobStatusAttached {
-		job, ok = m.realSharedLocked(ref.Name)
+		job, ok = m.realSharedLocked(sharedRef{Name: ref.Name, Dir: job.SharedDir})
 	}
 	// Snapshotted, never re-read: Status is written by whichever goroutine reaps
 	// or stops the job, so a second read outside the lock is a race.

@@ -232,6 +232,11 @@ type JobRecord struct {
 	// process state: without it a claim would come back from the index as a
 	// foreground service the daemon had lost, and be reported crashed.
 	Attached bool `json:"attached,omitempty"`
+	// SharedDir is the main checkout a shared job runs in, carried by the real
+	// job and by every claim on it. Without it the two would have to be paired
+	// by name, and the daemon is machine-wide: two repositories declaring a job
+	// called "db" would then release each other's.
+	SharedDir string `json:"shared_dir,omitempty"`
 }
 
 // TenantRef is one worktree's slice of one shared service, named by what it

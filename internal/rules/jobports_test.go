@@ -350,3 +350,52 @@ func TestJobPortsAppliesOffsetWhenPerWorktree(t *testing.T) {
 		t.Errorf("port = %d, want 5732", got["CRM_DB_PORT"])
 	}
 }
+
+// A shared job binds its declared port in every worktree, so a hook and a .env
+// must read that port and not this worktree's shift — otherwise the whole
+// worktree addresses a service that answers elsewhere.
+func TestLifecyclePortsDoNotShiftASharedJob(t *testing.T) {
+	cfg := domain.RunConfig{Jobs: []domain.JobConfig{
+		{Name: "db", Scope: domain.JobScopeShared, Ports: map[string]int{"POSTGRES_PORT": 5432}},
+		{Name: "web", Ports: map[string]int{"WEB_PORT": 3000}},
+	}}
+
+	got := LifecyclePorts(LifecyclePortsParams{Config: cfg, PortOffset: 30})
+	if got["POSTGRES_PORT"] != 5432 {
+		t.Errorf("POSTGRES_PORT = %d, want 5432 unshifted", got["POSTGRES_PORT"])
+	}
+	if got["WEB_PORT"] != 3030 {
+		t.Errorf("WEB_PORT = %d, want 3030", got["WEB_PORT"])
+	}
+}
+
+// Two shared declarations never move, so they meet only where they are already
+// equal — a gap of one block between them is not a collision.
+func TestPortCollisionsBetweenTwoSharedDeclarations(t *testing.T) {
+	apart := domain.RunConfig{PortOffsetBlock: 10, Jobs: []domain.JobConfig{
+		{Name: "a", Scope: domain.JobScopeShared, Ports: map[string]int{"A": 5432}},
+		{Name: "b", Scope: domain.JobScopeShared, Ports: map[string]int{"B": 5442}},
+	}}
+	if got := PortCollisions(apart); len(got) != 0 {
+		t.Errorf("collisions = %v, want none: neither declaration ever moves", got)
+	}
+
+	same := domain.RunConfig{PortOffsetBlock: 10, Jobs: []domain.JobConfig{
+		{Name: "a", Scope: domain.JobScopeShared, Ports: map[string]int{"A": 5432}},
+		{Name: "b", Scope: domain.JobScopeShared, Ports: map[string]int{"B": 5432}},
+	}}
+	if got := PortCollisions(same); len(got) != 1 {
+		t.Errorf("collisions = %v, want one: both sit on 5432", got)
+	}
+}
+
+// A per-worktree job still walks onto a fixed one every block.
+func TestPortCollisionsSharedAgainstPerWorktree(t *testing.T) {
+	cfg := domain.RunConfig{PortOffsetBlock: 10, Jobs: []domain.JobConfig{
+		{Name: "db", Scope: domain.JobScopeShared, Ports: map[string]int{"A": 5432}},
+		{Name: "web", Ports: map[string]int{"B": 5422}},
+	}}
+	if got := PortCollisions(cfg); len(got) != 1 {
+		t.Errorf("collisions = %v, want one: the moving side reaches 5432", got)
+	}
+}

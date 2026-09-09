@@ -27,11 +27,16 @@ func (m *Manager) startShared(params StartParams) error {
 	realKey := jobKey(params.Job.Name, shared.WorkDir)
 
 	m.mu.Lock()
-	if _, held := m.jobs[ownKey]; held {
+	// Membership is not the question — a stopped or crashed job stays in the map
+	// so `run logs` can still read it back. Asking it here would have a service
+	// answer "already running" for ever once stopped, and post claims onto a
+	// corpse.
+	if held, ok := m.jobs[ownKey]; ok && rules.IsJobUp(held.Status) {
 		m.mu.Unlock()
 		return fmt.Errorf("job %s %s", params.Job.Name, domain.JobAlreadyRunningSuffix)
 	}
-	_, up := m.jobs[realKey]
+	real, found := m.jobs[realKey]
+	up := found && rules.IsJobUp(real.Status)
 	m.mu.Unlock()
 
 	if !up {
@@ -48,28 +53,60 @@ func (m *Manager) startShared(params StartParams) error {
 		}
 	}
 
+	// The claim is posted before the tenant is carved out, and withdrawn if that
+	// fails: a service left running with nothing referencing it is invisible to
+	// `run ps` in the worktree that started it, and only a `run down` from the
+	// main checkout would ever take it back down.
+	m.claim(claimParams{Key: ownKey, Real: realKey, Params: params})
 	if err := m.runTenant(tenantParams{Job: params.Job, Env: params.Env, WorkDir: params.WorkDir, Attach: true}); err != nil {
+		m.releaseClaim(releaseParams{Key: ownKey, Name: params.Job.Name, Dir: shared.WorkDir})
 		return err
 	}
-
-	// The main checkout's own claim is the real job: posting a second record
-	// under the same key is impossible, and unnecessary — stopShared counts the
-	// attachments beside it, so the service outlives a `run down` there exactly
-	// as long as another worktree still holds it.
-	if ownKey == realKey {
-		return nil
-	}
-	m.attach(attachParams{Key: ownKey, Params: params})
 	m.persist()
 	return nil
 }
 
-type attachParams struct {
+type releaseParams struct {
+	Key  string
+	Name string
+	Dir  string
+}
+
+// releaseClaim withdraws a claim the run could not honour, and takes the
+// service with it when nothing else holds it — the state before the start,
+// rather than a service nobody can reach.
+func (m *Manager) releaseClaim(params releaseParams) {
+	m.mu.Lock()
+	claim, held := m.jobs[params.Key]
+	if held && claim.Status == domain.JobStatusAttached {
+		delete(m.jobs, params.Key)
+	}
+	remaining := m.attachmentsLocked(sharedRef{Name: params.Name, Dir: params.Dir})
+	real, found := m.realSharedLocked(sharedRef{Name: params.Name, Dir: params.Dir})
+	realRunning := found && real.Status == domain.JobStatusRunning
+	m.mu.Unlock()
+
+	m.persist()
+	if remaining > 0 || !found {
+		return
+	}
+	_ = m.stopProcess(stopProcessParams{Job: real, Running: realRunning})
+}
+
+type claimParams struct {
 	Key    string
+	Real   string
 	Params StartParams
 }
 
-func (m *Manager) attach(params attachParams) {
+// claim posts a worktree's hold on a shared service. The main checkout's own
+// hold is the real job — there is no second record to put under the same key,
+// and stopShared counts the claims beside it, so the service outlives a `run
+// down` there exactly as long as another worktree still holds it.
+func (m *Manager) claim(params claimParams) {
+	if params.Key == params.Real {
+		return
+	}
 	exited := make(chan struct{})
 	close(exited)
 
@@ -82,6 +119,7 @@ func (m *Manager) attach(params attachParams) {
 		StartedAt: time.Now(),
 		Env:       params.Params.Env,
 		LogDir:    params.Params.LogDir,
+		SharedDir: params.Params.Shared.WorkDir,
 		exited:    exited,
 	}
 	m.mu.Unlock()
@@ -93,11 +131,12 @@ func (m *Manager) attach(params attachParams) {
 // command unusable.
 func (m *Manager) stopShared(job *ManagedJob) error {
 	m.mu.Lock()
+	ref := sharedRef{Name: job.Name, Dir: job.SharedDir}
 	if job.Status == domain.JobStatusAttached {
 		delete(m.jobs, jobKey(job.Name, job.WorkDir))
 	}
-	remaining := m.attachmentsLocked(job.Name)
-	real, found := m.realSharedLocked(job.Name)
+	remaining := m.attachmentsLocked(ref)
+	real, found := m.realSharedLocked(ref)
 	// Snapshotted under the lock, like stopByKey does: Status is written by the
 	// goroutine that reaps the process, and reading it outside is a race.
 	realRunning := found && real.Status == domain.JobStatusRunning
@@ -113,26 +152,46 @@ func (m *Manager) stopShared(job *ManagedJob) error {
 	return m.stopProcess(stopProcessParams{Job: real, Running: realRunning})
 }
 
+// sharedRef identifies one shared service: its name and the main checkout it
+// runs in. The pair is what keeps two repositories that both declare "db" from
+// releasing each other's — the daemon is machine-wide, and a name alone says
+// nothing about which repository asked.
+type sharedRef struct {
+	Name string
+	Dir  string
+}
+
 // attachmentsLocked counts the claims standing on a shared job, the real job
 // excluded: it is the main checkout's own claim, and the whole point is that it
 // stops once nobody else holds it.
-func (m *Manager) attachmentsLocked(name string) int {
+func (m *Manager) attachmentsLocked(ref sharedRef) int {
 	count := 0
 	for _, job := range m.jobs {
-		if job.Name == name && job.Status == domain.JobStatusAttached {
+		if job.Name == ref.Name && job.SharedDir == ref.Dir && job.Status == domain.JobStatusAttached {
 			count++
 		}
 	}
 	return count
 }
 
-func (m *Manager) realSharedLocked(name string) (*ManagedJob, bool) {
-	for _, job := range m.jobs {
-		if job.Name == name && job.Status != domain.JobStatusAttached {
-			return job, true
-		}
+// realSharedLocked is a direct lookup, not a search: the claim carries the very
+// key the service is registered under.
+func (m *Manager) realSharedLocked(ref sharedRef) (*ManagedJob, bool) {
+	if ref.Dir == "" {
+		return nil, false
 	}
-	return nil, false
+	job, found := m.jobs[jobKey(ref.Name, ref.Dir)]
+	if !found || job.Status == domain.JobStatusAttached {
+		return nil, false
+	}
+	return job, true
+}
+
+func sharedDirOf(params StartParams) string {
+	if !rules.IsShared(params.Job) || params.Shared == nil {
+		return ""
+	}
+	return params.Shared.WorkDir
 }
 
 type tenantParams struct {
@@ -206,7 +265,11 @@ type tenantAttemptParams struct {
 // connections yet" far more often than it means the command is wrong. A detach
 // runs against a service already up, so it is asked exactly once.
 func (m *Manager) tenantAttempt(params tenantAttemptParams) error {
-	deadline := time.Now().Add(domain.TenantAttachTimeout)
+	budget := m.tenantBudget
+	if budget <= 0 {
+		budget = domain.TenantAttachTimeout
+	}
+	deadline := time.Now().Add(budget)
 	for {
 		err := runTenantCommand(params)
 		if err == nil {

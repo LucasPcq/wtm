@@ -24,6 +24,9 @@ type EnvPortsParams struct {
 	// Owned are the wtm-derived keys this worktree's .env carries, resolved by
 	// the caller — the only one that can ask git which worktree this is.
 	Owned []domain.EnvOwnedEntry
+	// Shared names the jobs that run once for the repository, so their ports are
+	// written into the .env unshifted — the service binds what it declares.
+	Shared map[string]bool
 }
 
 // Empty reports whether the project declares no link at all, which is the common
@@ -46,6 +49,7 @@ func ComputeEnvPorts(params EnvPortsParams) (domain.EnvPortPlan, error) {
 		Block:   params.Block,
 		Lines:   lines,
 		Origins: params.Origins,
+		Shared:  params.Shared,
 	})
 	owned, err := planOwned(params)
 	if err != nil {

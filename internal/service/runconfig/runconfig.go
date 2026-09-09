@@ -33,6 +33,7 @@ func Save(params SaveParams) error {
 	_, errs := rules.ValidateRun(params.Config)
 	errs = append(errs, shellSyntaxErrors(params.Config)...)
 	errs = append(errs, rules.ValidateTenants(params.Config)...)
+	errs = append(errs, rules.ValidateJobNames(params.Config)...)
 	if len(errs) > 0 {
 		return fmt.Errorf("invalid run config: %s", strings.Join(errs, "; "))
 	}

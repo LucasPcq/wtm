@@ -181,6 +181,7 @@ const (
 	TenantOnPerWorktreeFmt = `job %q: [job.tenant] only means something on a job with scope = "shared"`
 	TenantBadTokenFmt      = "job %q: %v"
 	UnknownScopeFmt        = "job %q: unknown scope %q (expected %q)"
+	DuplicateJobNameFmt    = "job %q is declared twice: two jobs of one name share a single key, so the second can never start"
 	// TenantProbeWorktree expands a tenant at load with a stand-in worktree, so
 	// an unknown placeholder is named there rather than in a shell.
 	TenantProbeWorktree = "probe"

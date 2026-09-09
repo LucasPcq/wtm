@@ -27,7 +27,7 @@ func newSharedFixture(t *testing.T, tenant *domain.JobTenantConfig) sharedFixtur
 	t.Helper()
 	root := t.TempDir()
 	fixture := sharedFixture{
-		manager: NewManager(),
+		manager: NewManagerWith(ManagerParams{TenantBudget: 50 * time.Millisecond}),
 		main:    filepath.Join(root, "main"),
 		first:   filepath.Join(root, "feat-a"),
 		second:  filepath.Join(root, "feat-b"),
@@ -341,5 +341,121 @@ func TestAttachOnAClaimReachesTheRealService(t *testing.T) {
 	}
 	if !strings.Contains(string(session.History), "shared-output") {
 		t.Errorf("history = %q, want the shared service's output", session.History)
+	}
+}
+
+// A stopped job stays in the map so `run logs` can read it back, so membership
+// is not the question a restart must ask. Asking it had a service answer
+// "already running" for ever once stopped, and post claims onto a corpse.
+func TestStartSharedRestartsAfterAStop(t *testing.T) {
+	f := newSharedFixture(t, nil)
+
+	if err := f.start(t, f.first, "feat_a"); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if err := f.manager.Stop("db", f.first); err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+	if status, _ := f.statusIn(f.main); status != domain.JobStatusStopped {
+		t.Fatalf("service status = %q, want stopped", status)
+	}
+
+	if err := f.start(t, f.first, "feat_a"); err != nil {
+		t.Fatalf("restart: %v", err)
+	}
+	if status, _ := f.statusIn(f.main); status != domain.JobStatusRunning {
+		t.Errorf("service status = %q, want running again", status)
+	}
+	if status, _ := f.statusIn(f.first); status != domain.JobStatusAttached {
+		t.Errorf("claim status = %q, want attached", status)
+	}
+}
+
+func TestStartSharedRestartsFromTheMainCheckoutAfterAStop(t *testing.T) {
+	f := newSharedFixture(t, nil)
+
+	if err := f.start(t, f.main, "main"); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if err := f.manager.Stop("db", f.main); err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+	if err := f.start(t, f.main, "main"); err != nil {
+		t.Errorf("restart from the main checkout: %v", err)
+	}
+	if status, _ := f.statusIn(f.main); status != domain.JobStatusRunning {
+		t.Errorf("status = %q, want running", status)
+	}
+}
+
+// The daemon is machine-wide, so two repositories may both declare "db".
+// Matching a claim to its service by name alone had one release the other's.
+func TestStopSharedNeverTouchesAnotherRepositorysJobOfTheSameName(t *testing.T) {
+	f := newSharedFixture(t, nil)
+	foreign := t.TempDir()
+
+	if err := f.start(t, f.first, "feat_a"); err != nil {
+		t.Fatalf("start shared: %v", err)
+	}
+	// Another repository's ordinary job, sharing only its name.
+	if err := f.manager.Start(StartParams{
+		Job:     domain.JobConfig{Name: "db", Kind: domain.JobKindService, Cmd: "sleep 30"},
+		WorkDir: foreign,
+	}); err != nil {
+		t.Fatalf("start foreign: %v", err)
+	}
+
+	if err := f.manager.Stop("db", f.first); err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+
+	f.manager.mu.Lock()
+	foreignJob := f.manager.jobs[jobKey("db", foreign)]
+	f.manager.mu.Unlock()
+	if foreignJob == nil || foreignJob.Status != domain.JobStatusRunning {
+		t.Errorf("the other repository's job is %v; releasing a claim must not reach it", foreignJob)
+	}
+}
+
+// A foreign claim must not keep a service alive either.
+func TestStopSharedIgnoresAForeignRepositorysClaims(t *testing.T) {
+	f := newSharedFixture(t, nil)
+	foreignMain := t.TempDir()
+	foreignWork := t.TempDir()
+
+	if err := f.start(t, f.first, "feat_a"); err != nil {
+		t.Fatalf("start shared: %v", err)
+	}
+	if err := f.manager.Start(StartParams{
+		Job:     f.job,
+		WorkDir: foreignWork,
+		Env:     map[string]string{domain.EnvWorktree: "other", domain.EnvOrdinal: "1"},
+		Shared:  &domain.SharedJobContext{WorkDir: foreignMain, Env: map[string]string{domain.EnvWorktree: "other_main"}},
+	}); err != nil {
+		t.Fatalf("start foreign shared: %v", err)
+	}
+
+	if err := f.manager.Stop("db", f.first); err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+	if status, _ := f.statusIn(f.main); status != domain.JobStatusStopped {
+		t.Errorf("status = %q, want stopped: the only claim on THIS service was released", status)
+	}
+}
+
+// A service left running with nothing referencing it is invisible to `run ps`
+// in the worktree that started it.
+func TestStartSharedWithdrawsItsClaimWhenTheAttachFails(t *testing.T) {
+	f := newSharedFixture(t, &domain.JobTenantConfig{Name: "t_{worktree}", Attach: "exit 9"})
+
+	err := f.start(t, f.first, "feat_a")
+	if err == nil {
+		t.Fatal("a failing attach was reported as a success")
+	}
+	if _, held := f.statusIn(f.first); held {
+		t.Error("the claim survived an attach that failed")
+	}
+	if status, _ := f.statusIn(f.main); status == domain.JobStatusRunning {
+		t.Error("the service is still running with nothing referencing it")
 	}
 }

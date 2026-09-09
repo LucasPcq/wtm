@@ -158,3 +158,46 @@ func TenantEnv(params TenantEnvParams) map[string]string {
 		domain.EnvOrdinal:  strconv.Itoa(params.Ordinal),
 	}
 }
+
+// SharedJobNames is what a plan needs to know a link's port does not move: the
+// jobs that run once for the repository, by name.
+func SharedJobNames(cfg domain.RunConfig) map[string]bool {
+	shared := map[string]bool{}
+	for _, job := range cfg.Jobs {
+		if IsShared(job) {
+			shared[job.Name] = true
+		}
+	}
+	return shared
+}
+
+// ValidateJobNames refuses a config with two jobs of one name. They share a
+// single key in the daemon, so the second is refused as already running, a stop
+// is ambiguous, and a shared service's claims cannot tell them apart.
+//
+// It guards the write path only. A structural error must not block a read: a
+// run.toml already holding a duplicate has to stay loadable, or the very
+// commands that would let its owner fix it stop working.
+func ValidateJobNames(cfg domain.RunConfig) []string {
+	seen := map[string]bool{}
+	var errs []string
+	for _, job := range cfg.Jobs {
+		if seen[job.Name] {
+			errs = append(errs, fmt.Sprintf(domain.DuplicateJobNameFmt, job.Name))
+			continue
+		}
+		seen[job.Name] = true
+	}
+	return errs
+}
+
+// AnySharedJob is the cheap gate before resolving where shared jobs would run:
+// that resolution costs git calls, and most projects declare none.
+func AnySharedJob(jobs []domain.JobConfig) bool {
+	for _, job := range jobs {
+		if IsShared(job) {
+			return true
+		}
+	}
+	return false
+}
