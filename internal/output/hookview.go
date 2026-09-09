@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -112,12 +111,10 @@ func (v *HookView) OnHook(beat domain.HookBeat) {
 	for _, line := range failed {
 		v.tailLine(line)
 	}
-	// The tail is bounded, so the stderr that names the failure may have scrolled
-	// out of it. It is the one line the reader came for.
-	for _, line := range strings.Split(beat.Stderr, "\n") {
-		if strings.TrimSpace(line) != "" {
-			v.tailLine(line)
-		}
+	// stderr reached the tail as it was produced, so only what the bounded tail
+	// dropped is printed again — and it is the line the reader came for.
+	for _, line := range rules.HookStderrBeyondTail(rules.HookStderrBeyondTailParams{Stderr: beat.Stderr, Tail: failed}) {
+		v.tailLine(line)
 	}
 	if v.log != nil {
 		Message(v.w, styles.Muted.Render(Indent+fmt.Sprintf(domain.HookLogTailFmt, v.logPath)))

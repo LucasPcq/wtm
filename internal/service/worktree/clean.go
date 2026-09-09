@@ -131,7 +131,7 @@ func RunCleanHooks(params domain.CleanHooksParams) error {
 		Output: params.Output,
 		OnHook: params.OnHook,
 	}); err != nil {
-		return fmt.Errorf("on_clean hooks: %w", err)
+		return fmt.Errorf("%s: %w", domain.HookOnClean, err)
 	}
 
 	return nil

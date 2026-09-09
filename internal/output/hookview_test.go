@@ -45,21 +45,52 @@ func TestHookViewLeavesOnlyTheResultLine(t *testing.T) {
 // stays, and so does the way to the whole of it.
 func TestHookViewKeepsTheTailOfAFailingHook(t *testing.T) {
 	logPath := filepath.Join(t.TempDir(), "on_create"+domain.HooksLogFileExt)
-	out := runHookView(t, logPath, func(view *HookView) {
-		view.OnHook(domain.HookBeat{Cmd: "pnpm install", Started: true})
-		_, _ = view.Write([]byte("ERR_PNPM_NO_LOCKFILE\n"))
-		view.OnHook(domain.HookBeat{
-			Cmd:      "pnpm install",
-			Duration: 2 * time.Second,
-			Err:      "exit status 1",
-			Stderr:   "lockfile is absent",
-		})
+	var buf bytes.Buffer
+	view := NewHookView(HookViewParams{W: &buf, LogPath: logPath})
+	view.OnHook(domain.HookBeat{Cmd: "pnpm install", Started: true})
+	// stderr reaches the view through the stream, as the runner tees it.
+	_, _ = view.Write([]byte("ERR_PNPM_NO_LOCKFILE\nlockfile is absent\n"))
+
+	// Only the record the hook leaves behind is under test; the live repaints
+	// above it were erased.
+	buf.Reset()
+	view.OnHook(domain.HookBeat{
+		Cmd:      "pnpm install",
+		Duration: 2 * time.Second,
+		Err:      "exit status 1",
+		Stderr:   "lockfile is absent",
 	})
+	view.Close()
+	out := buf.String()
 
 	for _, want := range []string{domain.HookGlyphFailed, "ERR_PNPM_NO_LOCKFILE", "lockfile is absent", logPath} {
 		if !strings.Contains(out, want) {
 			t.Errorf("a failed hook never showed %q:\n%s", want, out)
 		}
+	}
+	// It is in the tail already: printing the beat's copy underneath says the
+	// same line twice, right where the reader is looking for the cause.
+	if got := strings.Count(out, "lockfile is absent"); got != 1 {
+		t.Errorf("the stderr line appears %d times, want once:\n%s", got, out)
+	}
+}
+
+// What the bounded tail dropped is the one thing worth printing again.
+func TestHookViewPrintsTheStderrTheTailLost(t *testing.T) {
+	var buf bytes.Buffer
+	view := NewHookView(HookViewParams{W: &buf})
+	view.OnHook(domain.HookBeat{Cmd: "build", Started: true})
+	_, _ = view.Write([]byte("early failure\n"))
+	for i := 0; i < domain.HookViewTailLines; i++ {
+		_, _ = view.Write([]byte("noise\n"))
+	}
+
+	buf.Reset()
+	view.OnHook(domain.HookBeat{Cmd: "build", Err: "exit status 1", Stderr: "early failure"})
+	view.Close()
+
+	if out := buf.String(); !strings.Contains(out, "early failure") {
+		t.Errorf("the cause scrolled out of the tail and was never printed again:\n%s", out)
 	}
 }
 

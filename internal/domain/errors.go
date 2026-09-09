@@ -9,6 +9,12 @@ var (
 	// ErrWorktreeExists is returned when attempting to create a duplicate worktree.
 	ErrWorktreeExists = errors.New("worktree already exists")
 
+	// ErrHookFailed is a lifecycle hook exiting non-zero. It deliberately does not
+	// name the hook: every surface running a phase has already printed that hook's
+	// own result line, and an error repeating it spells a long install command
+	// twice on one screen.
+	ErrHookFailed = errors.New("hook failed")
+
 	// ErrConfigNotFound is returned when no configuration file is found.
 	ErrConfigNotFound = errors.New("config file not found")
 

@@ -1,6 +1,7 @@
 package hooks
 
 import (
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -168,5 +169,25 @@ func TestRunHooksCarriesTheFailureStderrOnTheBeat(t *testing.T) {
 	}
 	if beats[1].Stderr != "boom" {
 		t.Errorf("stderr = %q, want %q", beats[1].Stderr, "boom")
+	}
+}
+
+// The error a failed hook returns names the phase and what went wrong, never the
+// command: the beat that just went to the surface already spelled it out, and a
+// long install command printed twice is the noise this whole seam exists to
+// remove.
+func TestRunHooksFailureDoesNotRepeatTheCommand(t *testing.T) {
+	cmd := "exit 3"
+	err := RunHooks(RunHooksParams{
+		Hooks:   []domain.HookCommand{{Cmd: cmd}},
+		WorkDir: t.TempDir(),
+		Output:  io.Discard,
+		OnHook:  func(domain.HookBeat) {},
+	})
+	if !errors.Is(err, domain.ErrHookFailed) {
+		t.Fatalf("err = %v, want it to identify as a hook failure", err)
+	}
+	if strings.Contains(err.Error(), cmd) {
+		t.Errorf("err = %q, want the command left to the beat", err)
 	}
 }

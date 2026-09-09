@@ -167,7 +167,7 @@ func RunCreateHooks(params domain.CreateHooksParams) error {
 		Output: params.Output,
 		OnHook: params.OnHook,
 	}); err != nil {
-		return fmt.Errorf("on_create hooks: %w", err)
+		return fmt.Errorf("%s: %w", domain.HookOnCreate, err)
 	}
 	return nil
 }

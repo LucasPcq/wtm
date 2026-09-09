@@ -124,7 +124,7 @@ func runSingleHook(params runSingleHookParams) error {
 	params.Report(beat)
 
 	if err != nil {
-		return fmt.Errorf("hook %q failed: %w", hook.Cmd, err)
+		return fmt.Errorf("%w: %w", domain.ErrHookFailed, err)
 	}
 	return nil
 }

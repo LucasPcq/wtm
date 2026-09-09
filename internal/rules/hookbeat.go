@@ -3,6 +3,7 @@ package rules
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -63,4 +64,29 @@ func HooksLogPath(params HooksLogPathParams) string {
 		name += domain.HooksLogNameSeparator + EncodeBranchSegment(params.Branch)
 	}
 	return filepath.Join(params.StateDir, domain.HooksLogDirName, name+domain.HooksLogFileExt)
+}
+
+type HookStderrBeyondTailParams struct {
+	Stderr string
+	Tail   []string
+}
+
+// HookStderrBeyondTail is the stderr a surface still has to print. A hook's
+// stderr goes to the sink as it is produced, so it is already in the tail the
+// view kept; only what the bounded tail dropped is worth printing again.
+func HookStderrBeyondTail(params HookStderrBeyondTailParams) []string {
+	shown := make(map[string]bool, len(params.Tail))
+	for _, line := range params.Tail {
+		shown[strings.TrimSpace(line)] = true
+	}
+
+	var missing []string
+	for _, line := range strings.Split(params.Stderr, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || shown[trimmed] {
+			continue
+		}
+		missing = append(missing, line)
+	}
+	return missing
 }
