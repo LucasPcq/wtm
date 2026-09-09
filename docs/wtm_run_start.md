@@ -24,6 +24,12 @@ wtm run start [worktree] [flags]
   -y, --yes             Skip all prompts; --job is then required
 ```
 
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+```
+
 ### SEE ALSO
 
 * [wtm run](wtm_run.md)	 - Manage dev jobs (services + tasks)

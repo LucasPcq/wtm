@@ -30,6 +30,9 @@ import (
 )
 
 func init() {
+	rootCmd.PersistentFlags().BoolP(domain.FlagQuiet, "q", false,
+		"Silence human output; errors and the exit code are unaffected, and --output json still emits its document")
+
 	rootCmd.AddGroup(
 		&cobra.Group{ID: domain.CmdGroupWorktrees, Title: domain.CmdGroupWorktreesTitle},
 		&cobra.Group{ID: domain.CmdGroupNavigate, Title: domain.CmdGroupNavigateTitle},
@@ -141,6 +144,7 @@ var rootCmd = &cobra.Command{
 	RunE:    rootRunE,
 	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
 		startUpdateCheck(cmd)
+		silenceHumanOutput(cmd)
 	},
 	SilenceErrors: true,
 	SilenceUsage:  true,
@@ -148,6 +152,29 @@ var rootCmd = &cobra.Command{
 
 func rootRunE(cmd *cobra.Command, _ []string) error {
 	return cmd.Help()
+}
+
+// silenceHumanOutput is the whole of --quiet: the command's writers become
+// io.Discard, so every framed conclusion, notice and progress line goes nowhere
+// while the exit code and the error still do — Execute prints those to
+// os.Stderr, not through the command.
+//
+// It never touches a machine contract: --output json still emits its document,
+// and a command whose stdout IS the answer (a path, a script, a URL) says so
+// with an annotation. Asking for less noise is not asking for less answer.
+func silenceHumanOutput(cmd *cobra.Command) {
+	quiet, _ := cmd.Flags().GetBool(domain.FlagQuiet)
+	if !quiet {
+		return
+	}
+	if format, _ := cmd.Flags().GetString(domain.FlagOutput); format == domain.OutputJSON {
+		return
+	}
+	if cmd.Annotations[domain.AnnotationMachineOutput] != "" {
+		return
+	}
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
 }
 
 func globalUpdateCheck() *bool {
@@ -162,6 +189,9 @@ func globalUpdateCheck() *bool {
 // printUpdateNotice drains the passive check started in PersistentPreRun. It is
 // nil-safe: a suppressed check leaves updateCheck nil.
 func printUpdateNotice() {
+	if quiet, _ := rootCmd.Flags().GetBool(domain.FlagQuiet); quiet {
+		return
+	}
 	current, latest, method, ok := updateCheck.Notice(domain.UpdateNoticeWait)
 	if !ok {
 		return

@@ -30,6 +30,12 @@ wtm upgrade [flags]
   -y, --yes              Skip the confirmation prompt
 ```
 
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+```
+
 ### SEE ALSO
 
 * [wtm](wtm.md)	 - Orchestrate git worktrees and team dev workflows from the terminal

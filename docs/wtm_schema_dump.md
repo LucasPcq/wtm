@@ -18,6 +18,12 @@ wtm schema dump [flags]
   -h, --help     help for dump
 ```
 
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+```
+
 ### SEE ALSO
 
 * [wtm schema](wtm_schema.md)	 - Inspect or extract bundled JSON Schemas

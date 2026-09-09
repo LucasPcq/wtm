@@ -24,9 +24,10 @@ import (
 // wrapper (`wtm go`) consumes; `--output json` emits {path, branch} for scripts.
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "resolve [branch]",
-		Short: "Resolve a branch to its worktree path",
-		RunE:  runResolve,
+		Use:         "resolve [branch]",
+		Annotations: map[string]string{domain.AnnotationMachineOutput: domain.AnnotationOn},
+		Short:       "Resolve a branch to its worktree path",
+		RunE:        runResolve,
 	}
 	shared.AddOutputFlag(cmd)
 	return cmd

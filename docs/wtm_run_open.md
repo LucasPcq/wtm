@@ -20,6 +20,12 @@ wtm run open [worktree] [flags]
   -y, --yes             Skip the pickers; --job is then required when several jobs publish a url
 ```
 
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+```
+
 ### SEE ALSO
 
 * [wtm run](wtm_run.md)	 - Manage dev jobs (services + tasks)

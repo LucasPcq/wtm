@@ -21,6 +21,12 @@ wtm run job list [flags]
   -y, --yes             Skip the picker; print the table instead
 ```
 
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+```
+
 ### SEE ALSO
 
 * [wtm run job](wtm_run_job.md)	 - Add, remove, or edit jobs in run.toml

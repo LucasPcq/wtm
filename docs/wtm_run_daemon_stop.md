@@ -20,6 +20,12 @@ wtm run daemon stop [flags]
   -y, --yes             Skip the confirmation
 ```
 
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+```
+
 ### SEE ALSO
 
 * [wtm run daemon](wtm_run_daemon.md)	 - Inspect, stop or restart the process that runs the jobs

@@ -26,6 +26,12 @@ wtm create [branch] [flags]
   -y, --yes               Skip all prompts; resolve every decision from flags and safe defaults (branch name required; source defaults to the base branch for a new branch, and --from is required for one that already exists)
 ```
 
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+```
+
 ### SEE ALSO
 
 * [wtm](wtm.md)	 - Orchestrate git worktrees and team dev workflows from the terminal

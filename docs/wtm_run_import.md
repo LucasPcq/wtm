@@ -27,6 +27,12 @@ wtm run import [file] [flags]
   -y, --yes             Replace run.toml without confirming
 ```
 
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+```
+
 ### SEE ALSO
 
 * [wtm run](wtm_run.md)	 - Manage dev jobs (services + tasks)
