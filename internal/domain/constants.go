@@ -254,8 +254,10 @@ const (
 		"\n" +
 		"  ● name      what this worktree's slice is called\n" +
 		"              for a postgres, the database name — e.g. app_{worktree}\n" +
-		"              → reaches your commands as $WTM_NAMESPACE, and is what\n" +
-		"                `wtm clean` names before destroying it\n" +
+		"              {worktree} and {ordinal} are filled in by wtm, here and\n" +
+		"              nowhere else: a name is data, no shell ever sees it\n" +
+		"              → your commands read the result as $WTM_NAMESPACE, and\n" +
+		"                it is what `wtm clean` names before destroying it\n" +
 		"\n" +
 		"  ● create    run once, the first time this worktree claims the service\n" +
 		"              an inline command or the path to a script — both are a\n" +
@@ -271,9 +273,14 @@ const (
 	NamespaceEmptyValue  = "—"
 	NamespaceVarsHeading = "available"
 	NamespaceVarWorktree = "worktree"
-	NamespaceVarPorts    = "ports"
-	NamespaceVarRowFmt   = "%-*s  %s"
-	NamespaceVarSep      = "  "
+	// NamespaceVarSubstituted labels the placeholders wtm replaces in a value it
+	// never runs, as against the environment variables a shell expands in a
+	// command. The two are not two spellings of one thing: nothing would expand
+	// $WTM_WORKTREE in a name, since no shell ever sees it.
+	NamespaceVarSubstituted = "substituted"
+	NamespaceVarPorts       = "ports"
+	NamespaceVarRowFmt      = "%-*s  %s"
+	NamespaceVarSep         = "  "
 	// NamespaceVarIndent sets the group rows in under the heading, and the wrap
 	// of a long group in under its own first variable.
 	NamespaceVarIndent    = "  "

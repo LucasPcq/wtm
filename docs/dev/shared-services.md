@@ -26,10 +26,12 @@ Releasing a claim stops the service only once no worktree holds it. Two worktree
 
 `[job.namespace]` is the worktree's slice of the shared service, and it is **singular**. It does not name an object of the provider: four keycloak realms are one namespace, whose internal shape belongs to the create script. That is the direct consequence of the principle above, and it is what keeps a list of realms or databases out of the TOML.
 
-Two syntaxes, one per place, never mixed:
+Two mechanisms, not two spellings of one:
 
-- `{worktree}` and `{ordinal}` in **configuration values** (`namespace.name`, `namespace.env`);
-- `$WTM_WORKTREE`, `$WTM_ORDINAL`, `$WTM_NAMESPACE` in **commands**, which already go through a shell.
+- `{worktree}` and `{ordinal}` are **wtm's own substitution into data** — `namespace.name` and `namespace.env` are never executed, and wtm fills them in before anything runs;
+- `$WTM_WORKTREE`, `$WTM_ORDINAL`, `$WTM_NAMESPACE` are **environment variables**, expanded by `/bin/sh` when `create` or `remove` runs.
+
+`$WTM_WORKTREE` in a `name` would expand to nothing: no shell ever sees a name. Making wtm expand it there would be worse — it would look like shell syntax while only three variables worked, so `$HOME` would silently fail beside it. The step therefore offers each row only what that row takes.
 
 `attach` and `detach` run with the **worktree's whole resolved environment** — ports and URLs included. That is what makes keycloak possible at all: a realm's `redirectUris` point at the fronts of the worktree asking for it, and the script needs those URLs. Without that access the design would handle postgres and leave keycloak stranded.
 

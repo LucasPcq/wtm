@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -165,13 +166,36 @@ func TestNamespacesFromFieldsDropsAServiceWithNoCreate(t *testing.T) {
 	}
 }
 
-// The variables are grouped by where they come from: the half that is the same
-// everywhere, and the half that is this job's.
-func TestNamespaceVarsAreGrouped(t *testing.T) {
+// The name is data wtm substitutes into before anything runs, so it takes the
+// {…} placeholders. Offering it $WTM_WORKTREE advertised something that cannot
+// work there: no shell ever sees a name, so nothing would expand it.
+func TestNamespaceVarsOnTheNameRowAreThePlaceholders(t *testing.T) {
 	got := NamespaceFields(NamespaceFieldsParams{
 		Shared: []domain.SharedComposeService{{Service: "db"}},
 		Ports:  map[string][]string{"db": {"CRM_DB_PORT"}},
 	})[0].Vars
+
+	if len(got) != 1 || got[0].Label != domain.NamespaceVarSubstituted {
+		t.Fatalf("groups = %+v, want the substituted placeholders alone", got)
+	}
+	if got[0].Vars[0] != domain.NamespaceTokenWorktree {
+		t.Errorf("vars = %v, want %s", got[0].Vars, domain.NamespaceTokenWorktree)
+	}
+	for _, name := range got[0].Vars {
+		if strings.HasPrefix(name, "$") {
+			t.Errorf("the name row offers %s, which no shell expands there", name)
+		}
+	}
+}
+
+// The two commands are /bin/sh lines, so they take environment variables,
+// grouped by the half that is the same everywhere and the half that is this
+// job's.
+func TestNamespaceVarsOnACommandRowAreEnvironmentVariables(t *testing.T) {
+	got := NamespaceFields(NamespaceFieldsParams{
+		Shared: []domain.SharedComposeService{{Service: "db"}},
+		Ports:  map[string][]string{"db": {"CRM_DB_PORT"}},
+	})[1].Vars
 
 	if len(got) != 2 || got[0].Label != domain.NamespaceVarWorktree || got[1].Label != domain.NamespaceVarPorts {
 		t.Fatalf("groups = %+v", got)
@@ -185,7 +209,7 @@ func TestNamespaceVarsAreGrouped(t *testing.T) {
 func TestNamespaceVarsOmitAnEmptyPortsGroup(t *testing.T) {
 	got := NamespaceFields(NamespaceFieldsParams{
 		Shared: []domain.SharedComposeService{{Service: "keycloak"}},
-	})[0].Vars
+	})[1].Vars
 	if len(got) != 1 {
 		t.Errorf("groups = %+v, want the worktree one alone", got)
 	}

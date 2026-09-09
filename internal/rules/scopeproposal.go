@@ -171,7 +171,6 @@ func NamespaceFields(params NamespaceFieldsParams) []domain.NamespaceField {
 	var fields []domain.NamespaceField
 	for _, shared := range params.Shared {
 		held := existingNamespace(params.Existing, shared.Service, shared.Namespace)
-		vars := namespaceVars(params.Ports[shared.Service])
 		for _, kind := range []domain.NamespaceFieldKind{
 			domain.NamespaceFieldName, domain.NamespaceFieldCreate, domain.NamespaceFieldRemove,
 		} {
@@ -179,7 +178,7 @@ func NamespaceFields(params NamespaceFieldsParams) []domain.NamespaceField {
 				Job:   shared.Service,
 				Field: kind,
 				Value: namespaceValue(held, kind),
-				Vars:  vars,
+				Vars:  namespaceVars(namespaceVarsParams{Field: kind, Ports: params.Ports[shared.Service]}),
 			})
 		}
 	}
@@ -211,21 +210,34 @@ func namespaceValue(held domain.JobNamespaceConfig, kind domain.NamespaceFieldKi
 	}
 }
 
-// namespaceVars is what a command may read: the worktree's own, then the ports
-// this job declares under the names it declares them by. Listing them is the
-// whole of what wtm can honestly offer here, and grouping them says which half
-// is the same everywhere and which half is this job's.
-func namespaceVars(ports []string) []domain.NamespaceVarGroup {
+type namespaceVarsParams struct {
+	Field domain.NamespaceFieldKind
+	Ports []string
+}
+
+// namespaceVars is what THIS field may read, which is not the same thing from
+// one row to the next. The name is data wtm substitutes into before anything
+// runs, so it takes the {…} placeholders and nothing else; the two commands are
+// /bin/sh lines, so they take environment variables. Offering a command's
+// variables on the name row advertised three that could not work there.
+func namespaceVars(params namespaceVarsParams) []domain.NamespaceVarGroup {
+	if params.Field == domain.NamespaceFieldName {
+		return []domain.NamespaceVarGroup{{
+			Label: domain.NamespaceVarSubstituted,
+			Vars:  []string{domain.NamespaceTokenWorktree, domain.NamespaceTokenOrdinal},
+		}}
+	}
+
 	groups := []domain.NamespaceVarGroup{{
 		Label: domain.NamespaceVarWorktree,
 		Vars:  []string{"$" + domain.EnvNamespace, "$" + domain.EnvWorktree, "$" + domain.EnvOrdinal},
 	}}
-	if len(ports) == 0 {
+	if len(params.Ports) == 0 {
 		return groups
 	}
 
-	named := make([]string, 0, len(ports))
-	for _, port := range ports {
+	named := make([]string, 0, len(params.Ports))
+	for _, port := range params.Ports {
 		named = append(named, "$"+port)
 	}
 	return append(groups, domain.NamespaceVarGroup{Label: domain.NamespaceVarPorts, Vars: named})

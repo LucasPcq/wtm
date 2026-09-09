@@ -184,9 +184,36 @@ func TestNamespaceStepDescriptionCoversTheThreeFields(t *testing.T) {
 		"the path to a script",
 		"share the service outright",
 		"stopping is not destroying",
+		// The two syntaxes are the thing a reader stumbles on first.
+		"{worktree}", "$WTM_NAMESPACE", "no shell ever sees it",
 	} {
 		if !strings.Contains(domain.NamespaceStepDesc, want) {
 			t.Errorf("the description never mentions %q", want)
 		}
+	}
+}
+
+// The name takes {…} placeholders and the commands take environment variables.
+// Offering a command's variables on the name row advertised three that could
+// not work there — no shell ever sees a name.
+func TestNamespaceListOffersWhatEachFieldActuallyTakes(t *testing.T) {
+	fields := []domain.NamespaceField{
+		{Job: "db", Field: domain.NamespaceFieldName,
+			Vars: []domain.NamespaceVarGroup{{Label: "substituted", Vars: []string{"{worktree}", "{ordinal}"}}}},
+		{Job: "db", Field: domain.NamespaceFieldCreate, Vars: testVarGroups()},
+	}
+
+	name := nsKey(NewNamespaceList(NewNamespaceListParams{Fields: fields}), tea.KeyEnter)
+	view := name.View()
+	if !strings.Contains(view, "{worktree}") {
+		t.Errorf("the name row does not offer {worktree}:\n%s", view)
+	}
+	if strings.Contains(view, "$WTM_WORKTREE") {
+		t.Errorf("the name row offers $WTM_WORKTREE, which no shell expands there:\n%s", view)
+	}
+
+	create := nsKey(nsKey(NewNamespaceList(NewNamespaceListParams{Fields: fields}), tea.KeyDown), tea.KeyEnter)
+	if got := create.View(); !strings.Contains(got, "$WTM_NAMESPACE") {
+		t.Errorf("the create row does not offer $WTM_NAMESPACE:\n%s", got)
 	}
 }
