@@ -55,18 +55,24 @@ func TestReinitLiftsASharedServiceOutOfAnExistingJob(t *testing.T) {
 	}
 
 	file, _ := findJob(got.Config, "docker-compose")
-	if !strings.HasSuffix(file.Cmd, "up -d web") {
-		t.Errorf("cmd = %q, want the file's job left with web alone", file.Cmd)
+	if !strings.HasSuffix(file.Cmd, "up -d --no-deps web") {
+		t.Errorf("cmd = %q, want the file's job left with web alone and its deps held back", file.Cmd)
 	}
 }
 
 // A service taken out of the stack a profile started must keep starting with
-// it, or the profile silently stops bringing its database up.
+// it, or the profile silently stops bringing its database up. The join runs
+// after the profiles are settled: the wizard re-proposes them from the config
+// on disk, which discarded an insertion made any earlier.
 func TestReinitPutsTheLiftedJobInTheProfilesOfItsHost(t *testing.T) {
-	got := ResolveDetectedPorts(ResolveDetectedPortsParams{
-		Answers:  reinitAnswers(domain.SharedComposeService{File: "docker-compose.yml", Service: "db"}),
+	shared := []domain.SharedComposeService{{File: "docker-compose.yml", Service: "db"}}
+	resolved := ResolveDetectedPorts(ResolveDetectedPortsParams{
+		Answers:  reinitAnswers(shared...),
 		Existing: existingComposeConfig(),
 	})
+	got := DetectedPortsOutcome{Config: JoinSharedProfiles(JoinSharedProfilesParams{
+		Config: resolved.Config, Shared: shared,
+	})}
 
 	for _, profile := range got.Config.Profiles {
 		if profile.Name != "dev" {
@@ -159,5 +165,62 @@ func TestReinitWithoutTheQuestionChangesNothing(t *testing.T) {
 	file, _ := findJob(got.Config, "docker-compose")
 	if file.Cmd != existing.Jobs[0].Cmd {
 		t.Errorf("cmd = %q, want it untouched", file.Cmd)
+	}
+}
+
+// Rewriting the command was not enough: the lifted job and the one it came out
+// of both declared the same base, which reads as a collision and had wtm refuse
+// to load run.toml at all. The links naming those variables follow, or they
+// still point at a job that no longer declares them — the other half of the
+// same refusal.
+func TestReinitMovesThePortsAndTheLinksWithTheLiftedService(t *testing.T) {
+	existing := existingComposeConfig()
+	existing.Jobs[0].Ports = map[string]int{"POSTGRES_PORT": 5432, "REDIS_PORT": 6379}
+	existing.EnvPorts = []domain.EnvPortLink{
+		{File: ".env", Key: "POSTGRES_PORT", Job: "docker-compose", Port: "POSTGRES_PORT"},
+		{File: "apps/api/.env", Key: "DATABASE_URL", Job: "docker-compose", Port: "POSTGRES_PORT"},
+		{File: ".env", Key: "REDIS_PORT", Job: "docker-compose", Port: "REDIS_PORT"},
+	}
+
+	answers := reinitAnswers(domain.SharedComposeService{File: "docker-compose.yml", Service: "db"})
+	answers.Scans = map[string]domain.ComposeScan{"docker-compose.yml": {
+		Services: []domain.ComposeService{{Name: "db"}, {Name: "web"}},
+		Bindings: []domain.ComposePortBinding{
+			{File: "docker-compose.yml", Service: "db", Var: "POSTGRES_PORT", Base: 5432},
+			{File: "docker-compose.yml", Service: "web", Var: "REDIS_PORT", Base: 6379},
+		},
+	}}
+
+	got := ResolveDetectedPorts(ResolveDetectedPortsParams{
+		Answers:  answers,
+		Existing: existing,
+		Plan:     ComposePortPlan{Declared: map[string][]domain.ComposePortBinding{"docker-compose.yml": answers.Scans["docker-compose.yml"].Bindings}},
+	})
+
+	shared, _ := findJob(got.Config, "db")
+	if shared.Ports["POSTGRES_PORT"] != 5432 {
+		t.Errorf("the lifted job declares %v, want POSTGRES_PORT", shared.Ports)
+	}
+	file, _ := findJob(got.Config, "docker-compose")
+	if _, still := file.Ports["POSTGRES_PORT"]; still {
+		t.Errorf("the file's job still declares POSTGRES_PORT: %v", file.Ports)
+	}
+	if file.Ports["REDIS_PORT"] != 6379 {
+		t.Errorf("a port that stayed was taken away: %v", file.Ports)
+	}
+
+	// The config must load, which is the whole point.
+	if errs := ValidateRunPorts(got.Config); len(errs) != 0 {
+		t.Errorf("ValidateRunPorts = %v, want none", errs)
+	}
+
+	for _, link := range got.Config.EnvPorts {
+		want := "docker-compose"
+		if link.Port == "POSTGRES_PORT" {
+			want = "db"
+		}
+		if link.Job != want {
+			t.Errorf("link %s/%s points at %q, want %q", link.File, link.Key, link.Job, want)
+		}
 	}
 }

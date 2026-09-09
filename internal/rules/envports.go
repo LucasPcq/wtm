@@ -154,14 +154,14 @@ type planEnvPortKeyParams struct {
 // declares, a port belonging to nothing here — exactly as it found it.
 func planEnvPortKey(params planEnvPortKeyParams) domain.EnvPortEntry {
 	merged := planEnvPortEntry(planEnvPortEntryParams{
-		Link:    params.Group.Links[0],
-		Base:    params.Group.Bases[0],
-		Offset:  params.Offset,
-		Block:   params.Block,
-		Lines:   params.Lines,
-		Origins: params.Origins,
+		Link:     params.Group.Links[0],
+		Base:     params.Group.Bases[0],
+		Resolved: resolvedPort(params, 0),
+		Block:    params.Block,
+		Lines:    params.Lines,
+		Origins:  params.Origins,
 	})
-	merged.Moves = []domain.EnvPortMove{moveOf(params.Group.Links[0], params.Group.Bases[0], offsetFor(params, 0))}
+	merged.Moves = []domain.EnvPortMove{moveOf(params.Group.Links[0], params.Group.Bases[0], resolvedPort(params, 0))}
 	if len(params.Group.Links) == 1 {
 		return merged
 	}
@@ -174,30 +174,37 @@ func planEnvPortKey(params planEnvPortKeyParams) domain.EnvPortEntry {
 			lines = ApplyEnvPorts(lines, []domain.EnvPortEntry{merged})
 		}
 		next := planEnvPortEntry(planEnvPortEntryParams{
-			Link:    params.Group.Links[i],
-			Base:    params.Group.Bases[i],
-			Offset:  params.Offset,
-			Block:   params.Block,
-			Lines:   lines,
-			Origins: params.Origins,
+			Link:     params.Group.Links[i],
+			Base:     params.Group.Bases[i],
+			Resolved: resolvedPort(params, i),
+			Block:    params.Block,
+			Lines:    lines,
+			Origins:  params.Origins,
 		})
 		merged = foldEnvPortEntry(merged, next)
-		merged.Moves = append(merged.Moves, moveOf(params.Group.Links[i], params.Group.Bases[i], offsetFor(params, i)))
+		merged.Moves = append(merged.Moves, moveOf(params.Group.Links[i], params.Group.Bases[i], resolvedPort(params, i)))
 	}
 	return merged
 }
 
-// offsetFor is this worktree's shift, or none at all when the link names a
-// shared job: such a job binds its declared port in every worktree.
-func offsetFor(params planEnvPortKeyParams, index int) int {
+// resolvedPort is what one link's port becomes in this worktree, and it is the
+// only place that answers it. A shared job takes no shift: it binds its declared
+// port in every worktree, so a .env shifted for it addresses something that
+// answers elsewhere.
+//
+// Everything downstream reads the result rather than recomputing it. Two sites
+// deriving it independently is exactly how the report came to say 5432 while
+// the file was written 5452.
+func resolvedPort(params planEnvPortKeyParams, index int) int {
+	base := params.Group.Bases[index]
 	if params.Shared[params.Group.Links[index].Job] {
-		return 0
+		return base
 	}
-	return params.Offset
+	return base + params.Offset
 }
 
-func moveOf(link domain.EnvPortLink, base, offset int) domain.EnvPortMove {
-	return domain.EnvPortMove{Port: link.Port, Job: link.Job, Base: base, Resolved: base + offset}
+func moveOf(link domain.EnvPortLink, base, resolved int) domain.EnvPortMove {
+	return domain.EnvPortMove{Port: link.Port, Job: link.Job, Base: base, Resolved: resolved}
 }
 
 // foldEnvPortEntry keeps what the run has done so far and what the next link
@@ -228,12 +235,15 @@ func foldEnvPortEntry(into, next domain.EnvPortEntry) domain.EnvPortEntry {
 }
 
 type planEnvPortEntryParams struct {
-	Link    domain.EnvPortLink
-	Base    int
-	Offset  int
-	Block   int
-	Lines   []domain.EnvLine
-	Origins OriginContext
+	Link domain.EnvPortLink
+	Base int
+	// Resolved is the port this link takes in this worktree, decided by
+	// resolvedPort. It is passed in rather than derived here so that the answer
+	// exists once: a second derivation is a second thing to keep in step.
+	Resolved int
+	Block    int
+	Lines    []domain.EnvLine
+	Origins  OriginContext
 }
 
 func planEnvPortEntry(params planEnvPortEntryParams) domain.EnvPortEntry {
@@ -242,7 +252,7 @@ func planEnvPortEntry(params planEnvPortEntryParams) domain.EnvPortEntry {
 		Key:        params.Link.Key,
 		Port:       params.Link.Port,
 		Base:       params.Base,
-		Resolved:   params.Base + params.Offset,
+		Resolved:   params.Resolved,
 		Addressing: domain.AddressingPorts,
 	}
 

@@ -3417,7 +3417,13 @@ var WtmOwnedEnvKeys = []string{EnvComposeProjectName}
 // ComposeCmdSpaced and ComposeCmdHyphened are the two spellings a job's command
 // uses to drive compose, and how wtm recognizes the stack's project directory.
 const (
-	ComposeCmdSpaced   = "docker compose"
+	ComposeCmdSpaced = "docker compose"
+	// ComposeNoDeps keeps a file's own job from raising the services lifted out
+	// of it. `up -d a b c` also starts whatever a, b or c depends_on, so an
+	// adminer depending on a shared postgres brought a second postgres up, per
+	// worktree, on the very port the shared one binds. Safe because every
+	// service that stayed is named explicitly.
+	ComposeNoDeps      = "--no-deps "
 	ComposeCmdHyphened = "docker-compose"
 )
 

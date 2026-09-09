@@ -201,7 +201,7 @@ func BuildDockerJobs(params BuildDockerJobsParams) domain.RunConfig {
 		jobs = append(jobs, domain.JobConfig{
 			Name: name,
 			Kind: domain.JobKindService,
-			Cmd:  strings.TrimRight(fmt.Sprintf("%s %sup -d %s", params.ComposeCmd, DockerComposeFileFlag(f), strings.Join(stays.names, " ")), " "),
+			Cmd:  composeUpCmd(composeUpParams{ComposeCmd: params.ComposeCmd, File: f, Services: stays.names, Lifted: stays.lifted}),
 			Stop: fmt.Sprintf("%s %sdown --remove-orphans", params.ComposeCmd, DockerComposeFileFlag(f)),
 			Cwd:  ".",
 		})
@@ -285,4 +285,25 @@ func jobNameFromComposeFile(path string) string {
 	}
 	base = strings.TrimPrefix(base, "docker-compose.")
 	return "docker-compose-" + base
+}
+
+type composeUpParams struct {
+	ComposeCmd string
+	File       string
+	Services   []string
+	// Lifted says something was taken out of this file, which is the only case
+	// where the services that stayed have to be named and their dependencies
+	// held back.
+	Lifted bool
+}
+
+// composeUpCmd is the one place a compose job's start command is spelled, so the
+// file's own job and the one a re-init rewrites cannot drift apart.
+func composeUpCmd(params composeUpParams) string {
+	flag := DockerComposeFileFlag(params.File)
+	if !params.Lifted {
+		return fmt.Sprintf("%s %sup -d", params.ComposeCmd, flag)
+	}
+	return strings.TrimRight(fmt.Sprintf("%s %sup -d %s%s",
+		params.ComposeCmd, flag, domain.ComposeNoDeps, strings.Join(params.Services, " ")), " ")
 }

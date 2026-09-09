@@ -109,6 +109,7 @@ func ResolveDetectedPorts(params ResolveDetectedPortsParams) DetectedPortsOutcom
 		Shared:     params.Answers.SharedServices,
 		Asked:      params.Answers.ScopesAsked,
 		Scans:      params.Answers.Scans,
+		Bindings:   params.Plan.Declared,
 		ComposeCmd: params.Answers.DockerComposeCmd,
 	})
 

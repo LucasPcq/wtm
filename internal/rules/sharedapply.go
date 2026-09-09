@@ -3,7 +3,6 @@ package rules
 import (
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 )
@@ -17,7 +16,10 @@ type ApplySharedServicesParams struct {
 	Asked  bool
 	// Scans say what each file declares, which is what names the services that
 	// stay in a file's own job once one is lifted out of it.
-	Scans      map[string]domain.ComposeScan
+	Scans map[string]domain.ComposeScan
+	// Bindings say which service declares which port variable, so a lifted one
+	// takes its ports with it.
+	Bindings   map[string][]domain.ComposePortBinding
 	ComposeCmd string
 }
 
@@ -30,10 +32,6 @@ type ApplySharedServicesParams struct {
 // ways — a service unshared has its lifted job removed and its file's job given
 // back the whole stack.
 func ApplySharedServices(params ApplySharedServicesParams) domain.RunConfig {
-	if !params.Asked {
-		return params.Config
-	}
-
 	cfg := params.Config
 	for _, file := range sortedScanFiles(params.Scans) {
 		cfg = applyFileSharing(applyFileSharingParams{
@@ -60,9 +58,21 @@ func applyFileSharing(params applyFileSharingParams) domain.RunConfig {
 		}
 	}
 
+	// A run that never put the question withdraws nothing and touches a file
+	// that shares nothing at all — but it still normalises what the config
+	// already declares shared. Moving a lifted service's ports onto it is not
+	// changing an answer, it is making the file agree with the scope it carries;
+	// left undone, run.toml refuses to load.
+	if !params.Params.Asked && len(wanted) == 0 {
+		return cfg
+	}
+
 	// Withdrawn first: a service that stops being shared has to give its name
 	// back before the file's job is recomputed around what is left.
 	for _, service := range params.Params.Scans[params.File].Services {
+		if !params.Params.Asked {
+			break
+		}
 		if _, still := wanted[service.Name]; still {
 			continue
 		}
@@ -77,9 +87,15 @@ func applyFileSharing(params applyFileSharingParams) domain.RunConfig {
 			continue
 		}
 		cfg = upsertSharedJob(upsertSharedJobParams{
-			Config: cfg, Shared: shared, ComposeCmd: params.Params.ComposeCmd, Profiles: fileJob,
+			Config: cfg, Shared: shared, ComposeCmd: params.Params.ComposeCmd,
 		})
 	}
+
+	cfg = moveLiftedPorts(moveLiftedPortsParams{
+		Config: cfg, File: params.File, Host: fileJob,
+		Services: params.Params.Scans[params.File].Services, Shared: wanted,
+		Bindings: params.Params.Bindings[params.File],
+	})
 
 	return rewriteFileJob(rewriteFileJobParams{
 		Config: cfg, File: params.File, Job: fileJob,
@@ -92,10 +108,6 @@ type upsertSharedJobParams struct {
 	Config     domain.RunConfig
 	Shared     domain.SharedComposeService
 	ComposeCmd string
-	// Profiles names the file's own job, whose profiles the lifted one joins:
-	// a service taken out of the stack a profile started must keep starting
-	// with it, or the profile silently stops bringing its database up.
-	Profiles string
 }
 
 func upsertSharedJob(params upsertSharedJobParams) domain.RunConfig {
@@ -124,12 +136,29 @@ func upsertSharedJob(params upsertSharedJobParams) domain.RunConfig {
 		Scope:     domain.JobScopeShared,
 		Namespace: params.Shared.Namespace,
 	})
-	return joinProfilesOf(cfg, params.Profiles, params.Shared.Service)
+	return cfg
 }
 
-// joinProfilesOf puts the lifted job in every profile that starts the job it was
-// taken out of, right after it. A profile that used to bring a stack up must
-// keep bringing all of it up.
+type JoinSharedProfilesParams struct {
+	Config domain.RunConfig
+	Shared []domain.SharedComposeService
+}
+
+// JoinSharedProfiles puts every lifted job in the profiles that start the job it
+// was taken out of. It runs after the profiles are settled, not while the jobs
+// are: the wizard re-proposes them from the config on disk, which discarded an
+// insertion made any earlier — and a profile that no longer starts the database
+// leaves every worktree pointing at one that was never created.
+func JoinSharedProfiles(params JoinSharedProfilesParams) domain.RunConfig {
+	cfg := params.Config
+	for _, shared := range params.Shared {
+		cfg = joinProfilesOf(cfg, ComposeJobName(ComposeJobNameParams{Config: cfg, File: shared.File}), shared.Service)
+	}
+	return cfg
+}
+
+// joinProfilesOf puts one lifted job in every profile that starts the job it was
+// taken out of, right after it.
 func joinProfilesOf(cfg domain.RunConfig, host, name string) domain.RunConfig {
 	if host == "" {
 		return cfg
@@ -193,20 +222,12 @@ func rewriteFileJob(params rewriteFileJobParams) domain.RunConfig {
 
 	jobs := make([]domain.JobConfig, len(cfg.Jobs))
 	copy(jobs, cfg.Jobs)
-	flag := DockerComposeFileFlag(params.File)
-	jobs[index].Cmd = strings.TrimRight(
-		fmt.Sprintf("%s %sup -d %s", params.ComposeCmd, flag, strings.Join(namesLifted(params.Shared, stays), " ")), " ")
+	jobs[index].Cmd = composeUpCmd(composeUpParams{
+		ComposeCmd: params.ComposeCmd, File: params.File,
+		Services: stays, Lifted: len(params.Shared) > 0,
+	})
 	cfg.Jobs = jobs
 	return cfg
-}
-
-// namesLifted is the list a file's job spells out, empty when nothing was taken
-// from it — an untouched project keeps the plain `up -d` it always had.
-func namesLifted(shared map[string]domain.SharedComposeService, stays []string) []string {
-	if len(shared) == 0 {
-		return nil
-	}
-	return stays
 }
 
 func jobIndex(cfg domain.RunConfig, name string) (int, bool) {
@@ -233,4 +254,93 @@ func sortedScanFiles(scans map[string]domain.ComposeScan) []string {
 	}
 	sort.Strings(files)
 	return files
+}
+
+type moveLiftedPortsParams struct {
+	Config   domain.RunConfig
+	File     string
+	Host     string
+	Services []domain.ComposeService
+	Shared   map[string]domain.SharedComposeService
+	Bindings []domain.ComposePortBinding
+}
+
+// moveLiftedPorts hands a lifted service the port variables it actually binds,
+// and takes them off the job it came out of. Rewriting the command was not
+// enough: the two then declared the same base, which reads as a collision and
+// had wtm refuse to load run.toml at all.
+//
+// The [[env_port]] links naming those variables follow, or they would still
+// point at a job that no longer declares them — the other half of the same
+// refusal.
+func moveLiftedPorts(params moveLiftedPortsParams) domain.RunConfig {
+	if len(params.Shared) == 0 || params.Host == "" {
+		return params.Config
+	}
+
+	owners := map[string]string{}
+	for _, binding := range params.Bindings {
+		if _, lifted := params.Shared[binding.Service]; lifted && binding.Var != "" {
+			owners[binding.Var] = binding.Service
+		}
+	}
+	if len(owners) == 0 {
+		return params.Config
+	}
+
+	cfg := params.Config
+	jobs := make([]domain.JobConfig, len(cfg.Jobs))
+	copy(jobs, cfg.Jobs)
+
+	for name, service := range owners {
+		host, hostFound := jobIndex(cfg, params.Host)
+		target, targetFound := jobIndex(cfg, service)
+		if !hostFound || !targetFound {
+			continue
+		}
+		base, declared := jobs[host].Ports[name]
+		if !declared {
+			continue
+		}
+		jobs[host].Ports = withoutPort(jobs[host].Ports, name)
+		jobs[target].Ports = withPort(jobs[target].Ports, name, base)
+	}
+	cfg.Jobs = jobs
+
+	return repointEnvPorts(cfg, params.Host, owners)
+}
+
+func withoutPort(ports map[string]int, name string) map[string]int {
+	out := make(map[string]int, len(ports))
+	for key, value := range ports {
+		if key != name {
+			out[key] = value
+		}
+	}
+	return out
+}
+
+func withPort(ports map[string]int, name string, base int) map[string]int {
+	out := make(map[string]int, len(ports)+1)
+	for key, value := range ports {
+		out[key] = value
+	}
+	out[name] = base
+	return out
+}
+
+// repointEnvPorts follows a variable to the job that now declares it. A link
+// left on the old one names a port that job no longer has, which the loader
+// refuses — naming the right job in the message, which is how this was found.
+func repointEnvPorts(cfg domain.RunConfig, host string, owners map[string]string) domain.RunConfig {
+	links := make([]domain.EnvPortLink, len(cfg.EnvPorts))
+	copy(links, cfg.EnvPorts)
+	for i, link := range links {
+		service, moved := owners[link.Port]
+		if moved && link.Job == host {
+			links[i].Job = service
+		}
+	}
+	cfg.EnvPorts = links
+	return cfg
 }

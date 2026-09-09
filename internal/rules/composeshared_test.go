@@ -71,8 +71,11 @@ func TestBuildDockerJobsNamesTheServicesThatStay(t *testing.T) {
 	if !ok {
 		t.Fatalf("no job for the file; jobs = %v", cfg.Jobs)
 	}
-	if !strings.HasSuffix(file.Cmd, "up -d api web") {
-		t.Errorf("cmd = %q, want only the services that stayed", file.Cmd)
+	// --no-deps as well as the explicit list: `up -d api web` also raises
+	// whatever api or web depends_on, which is how a lifted postgres came back
+	// per worktree on the very port the shared one binds.
+	if !strings.HasSuffix(file.Cmd, "up -d --no-deps api web") {
+		t.Errorf("cmd = %q, want the services that stayed, with their deps held back", file.Cmd)
 	}
 	if strings.Contains(file.Cmd, " db") {
 		t.Errorf("cmd = %q still starts the shared service", file.Cmd)
@@ -152,7 +155,39 @@ func TestBuildDockerJobsKeepsFilesApart(t *testing.T) {
 	}
 
 	jobA, _ := findJob(cfg, "docker-compose-a")
-	if !strings.HasSuffix(jobA.Cmd, "up -d api") {
+	if !strings.HasSuffix(jobA.Cmd, "up -d --no-deps api") {
 		t.Errorf("cmd = %q, want a.yml left with api only", jobA.Cmd)
+	}
+}
+
+// `up -d a b c` also starts whatever a, b or c depends_on. An adminer depending
+// on a lifted postgres therefore raised a second postgres, in the worktree's own
+// compose project, on the very port the shared one binds — which is what the
+// user saw in their Docker dashboard.
+func TestBuildDockerJobsHoldsBackTheDependenciesOfWhatStays(t *testing.T) {
+	cfg := BuildDockerJobs(BuildDockerJobsParams{
+		ComposeCmd: "docker compose",
+		Files:      []string{"docker-compose.yml"},
+		Scans:      map[string]domain.ComposeScan{"docker-compose.yml": scanOf("docker-compose.yml", "postgres", "adminer")},
+		Shared:     []domain.SharedComposeService{{File: "docker-compose.yml", Service: "postgres"}},
+	})
+
+	file, _ := findJob(cfg, "docker-compose")
+	if !strings.Contains(file.Cmd, domain.ComposeNoDeps) {
+		t.Errorf("cmd = %q, want --no-deps: adminer depends on the service just lifted", file.Cmd)
+	}
+}
+
+// A file that lifted nothing keeps the plain command it always had: --no-deps
+// there would change the behaviour of every project that shares nothing.
+func TestBuildDockerJobsLeavesAnUntouchedFileAlone(t *testing.T) {
+	cfg := BuildDockerJobs(BuildDockerJobsParams{
+		ComposeCmd: "docker compose",
+		Files:      []string{"docker-compose.yml"},
+	})
+
+	file, _ := findJob(cfg, "docker-compose")
+	if strings.Contains(file.Cmd, "--no-deps") {
+		t.Errorf("cmd = %q, want the plain form", file.Cmd)
 	}
 }

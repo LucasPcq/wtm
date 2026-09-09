@@ -222,6 +222,15 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 		NewJobs:         outcome.Merge.Added,
 	})
 
+	// After the profiles are settled: the step re-proposes them from the config
+	// on disk, so a lifted job inserted any earlier is discarded — and a profile
+	// that no longer starts the database leaves every worktree addressing one
+	// that was never created.
+	outcome.Config = rules.JoinSharedProfiles(rules.JoinSharedProfilesParams{
+		Config: outcome.Config,
+		Shared: answers.SharedServices,
+	})
+
 	links := resolveEnvPortLinks(resolveEnvPortLinksParams{
 		// The wizard already put the question as a step; asking again outside it
 		// is the orphaned prompt this flow used to end on.
