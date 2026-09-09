@@ -151,9 +151,9 @@ func (f *cleanFlow) deleteStep() flow.Step {
 		return flow.StepContent{
 			Title: domain.CleanDeleteTitle,
 			Description: deleteRecap(deleteRecapParams{
-				Check:    check,
-				Reparent: f.reparentLine(answers),
-				Tenants:  f.tenantLines(answers.Value(KeyWorktree)),
+				Check:      check,
+				Reparent:   f.reparentLine(answers),
+				Namespaces: f.namespaceLines(answers.Value(KeyWorktree)),
 			}),
 			Options:  deleteOptions(check),
 			Blockers: blockersOf(check),
@@ -220,10 +220,10 @@ func blockersOf(check domain.CleanCheckResult) []flow.Blocker {
 type deleteRecapParams struct {
 	Check    domain.CleanCheckResult
 	Reparent string
-	// Tenants are the lines naming the data this clean gives back, or the one
+	// Namespaces are the lines naming the data this clean gives back, or the one
 	// saying it is kept. A flag must never make a line disappear from a recap,
 	// and this one carries a DROP DATABASE.
-	Tenants []string
+	Namespaces []string
 }
 
 func deleteRecap(params deleteRecapParams) string {
@@ -240,22 +240,22 @@ func deleteRecap(params deleteRecapParams) string {
 		domain.CleanWillDeleteWorktree+check.WorktreePath,
 		domain.CleanWillDeleteBranch+check.Branch,
 	)
-	lines = append(lines, params.Tenants...)
+	lines = append(lines, params.Namespaces...)
 	if params.Reparent != "" {
 		lines = append(lines, "", params.Reparent)
 	}
 	return strings.Join(lines, "\n")
 }
 
-// tenantLines says what this clean does to the data the worktree carved out of
+// namespaceLines says what this clean does to the data the worktree carved out of
 // the repository's shared services — given back by default, kept under
 // --keep-data. Silence is not an option: the default runs a DROP DATABASE.
-func (f *cleanFlow) tenantLines(branchName string) []string {
+func (f *cleanFlow) namespaceLines(branchName string) []string {
 	cfg, err := runconfig.Load(f.ctx.StateDir)
 	if err != nil {
 		return nil
 	}
-	held := worktree.TenantsOf(worktree.ParentBranchParams{StateDir: f.ctx.StateDir, Branch: branchName})
+	held := worktree.NamespacesOf(worktree.ParentBranchParams{StateDir: f.ctx.StateDir, Branch: branchName})
 	if len(held) == 0 {
 		return nil
 	}
@@ -263,17 +263,17 @@ func (f *cleanFlow) tenantLines(branchName string) []string {
 
 	var lines []string
 	for _, job := range rules.JobsHeld(cfg, held).Jobs {
-		if !rules.HasTenant(job) || rules.IsBlankCommand(job.Tenant.Detach) {
+		if !rules.HasNamespace(job) || rules.IsBlankCommand(job.Namespace.Remove) {
 			continue
 		}
 		if f.request.KeepData {
 			return []string{domain.CleanKeepDataLine}
 		}
-		tenant, expandErr := rules.ExpandTenant(rules.ExpandTenantParams{Tenant: *job.Tenant, Worktree: slug})
+		namespace, expandErr := rules.ExpandNamespace(rules.ExpandNamespaceParams{Namespace: *job.Namespace, Worktree: slug})
 		if expandErr != nil {
 			continue
 		}
-		lines = append(lines, fmt.Sprintf(domain.CleanWillDeleteTenantFmt, tenant.Name, job.Name))
+		lines = append(lines, fmt.Sprintf(domain.CleanWillDeleteNamespaceFmt, namespace.Name, job.Name))
 	}
 	return lines
 }

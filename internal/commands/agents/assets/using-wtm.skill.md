@@ -138,7 +138,7 @@ flagged; everything else is what the name implies.
   source. The response adds `existing_branch: true` and `origin_state`
   (`up-to-date`/`behind`/`ahead`/`diverged`) so you can tell reuse from creation.
 - `wtm clean <branch>` / `wtm prune [filters]` — remove one / batch-remove finished
-  worktrees. **`clean` also gives back the tenants that worktree carved out of shared
+  worktrees. **`clean` also gives back the namespaces that worktree carved out of shared
   services** (it drops its database): pass `--keep-data` to withhold that, including under
   `--yes`; the interactive recap names each database it will drop. Only worktrees that
   actually started the shared job owe anything — one created and thrown away owes nothing.
@@ -292,12 +292,12 @@ and **experimental**: the global `wtm init` does not configure it.
   Starting one from a worktree other than the main checkout reports `attached`, not `started`.
   `run stop` in a worktree releases only that worktree's claim; the service itself stops when
   the last one goes.
-- **A shared job may carve out a tenant per worktree.** `[job.tenant]` names it (`name`,
+- **A shared job may carve out a namespace per worktree.** `[job.namespace]` names it (`name`,
   `attach`, `detach`, `env`) so each worktree keeps its own data — a database, a set of
   keycloak realms. wtm runs the declared commands and knows nothing else about them; they get
-  the worktree's whole environment plus `$WTM_TENANT`, `$WTM_WORKTREE`, `$WTM_ORDINAL`.
+  the worktree's whole environment plus `$WTM_NAMESPACE`, `$WTM_WORKTREE`, `$WTM_ORDINAL`.
   Configuration values use `{worktree}` / `{ordinal}`; commands use the `$WTM_*` variables.
-  A shared job with **no** `[job.tenant]` is valid and means one instance with one set of data.
+  A shared job with **no** `[job.namespace]` is valid and means one instance with one set of data.
 - **Re-running `run init` is symmetric.** Every step is pre-filled from the existing
   `run.toml`: what stays checked is kept, and what you uncheck is **removed** along with the
   profile entries and `[[env_port]]` links naming it — a profile left with no job goes too.

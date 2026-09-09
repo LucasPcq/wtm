@@ -385,8 +385,8 @@ func TestRunAbortedRemovesNothing(t *testing.T) {
 // reader confirm a DROP DATABASE they were never shown.
 func TestDeleteRecapNamesTheDataItGivesBack(t *testing.T) {
 	recap := deleteRecap(deleteRecapParams{
-		Check:   domain.CleanCheckResult{Branch: "feat", WorktreePath: "/w/feat"},
-		Tenants: []string{fmt.Sprintf(domain.CleanWillDeleteTenantFmt, "crm_feat", "db")},
+		Check:      domain.CleanCheckResult{Branch: "feat", WorktreePath: "/w/feat"},
+		Namespaces: []string{fmt.Sprintf(domain.CleanWillDeleteNamespaceFmt, "crm_feat", "db")},
 	})
 	for _, want := range []string{"crm_feat", "db"} {
 		if !strings.Contains(recap, want) {
@@ -397,8 +397,8 @@ func TestDeleteRecapNamesTheDataItGivesBack(t *testing.T) {
 
 func TestDeleteRecapSaysWhenTheDataIsKept(t *testing.T) {
 	recap := deleteRecap(deleteRecapParams{
-		Check:   domain.CleanCheckResult{Branch: "feat", WorktreePath: "/w/feat"},
-		Tenants: []string{domain.CleanKeepDataLine},
+		Check:      domain.CleanCheckResult{Branch: "feat", WorktreePath: "/w/feat"},
+		Namespaces: []string{domain.CleanKeepDataLine},
 	})
 	if !strings.Contains(recap, "--keep-data") {
 		t.Errorf("recap does not say the data is kept:\n%s", recap)
@@ -407,9 +407,9 @@ func TestDeleteRecapSaysWhenTheDataIsKept(t *testing.T) {
 
 // The line is built from run.toml, so a project with no shared service adds
 // nothing and the recap reads exactly as it did before.
-func TestTenantLinesEmptyWithoutASharedService(t *testing.T) {
+func TestNamespaceLinesEmptyWithoutASharedService(t *testing.T) {
 	flow := &cleanFlow{ctx: flow.Context{StateDir: t.TempDir()}}
-	if got := flow.tenantLines("feat"); len(got) != 0 {
+	if got := flow.namespaceLines("feat"); len(got) != 0 {
 		t.Errorf("lines = %v, want none", got)
 	}
 }

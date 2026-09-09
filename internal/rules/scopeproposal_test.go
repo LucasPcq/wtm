@@ -43,8 +43,11 @@ func TestServiceScopeChoicesLeavesAnImageOpen(t *testing.T) {
 	if got[0].Scope != domain.JobScopePerWorktree {
 		t.Errorf("scope = %q, want the safe default", got[0].Scope)
 	}
-	if got[0].Tenant == nil || got[0].Tenant.Attach == "" {
-		t.Errorf("tenant = %+v, want the postgres recipe pre-filled", got[0].Tenant)
+	// Deliberately nothing: a recipe for postgres would guess the port variable,
+	// the user and the host, and a wrong command that is accepted reads as a wtm
+	// bug rather than as a line to write.
+	if got[0].Namespace != nil {
+		t.Errorf("namespace = %+v, want none pre-filled", got[0].Namespace)
 	}
 }
 
@@ -53,15 +56,15 @@ func TestServiceScopeChoicesLeavesAnImageOpen(t *testing.T) {
 func TestServiceScopeChoicesReadTheExistingConfigFirst(t *testing.T) {
 	existing := domain.RunConfig{Jobs: []domain.JobConfig{{
 		Name: "db", Scope: domain.JobScopeShared,
-		Tenant: &domain.JobTenantConfig{Name: "mine_{worktree}", Attach: "my-script"},
+		Namespace: &domain.JobNamespaceConfig{Name: "mine_{worktree}", Create: "my-script"},
 	}}}
 
 	got := choicesFor(t, existing, domain.ComposeService{Name: "db", Image: "postgres:16"})
 	if got[0].Scope != domain.JobScopeShared {
 		t.Errorf("scope = %q, want the config's own answer", got[0].Scope)
 	}
-	if got[0].Tenant == nil || got[0].Tenant.Attach != "my-script" {
-		t.Errorf("tenant = %+v, want the one already written, not the recipe", got[0].Tenant)
+	if got[0].Namespace == nil || got[0].Namespace.Create != "my-script" {
+		t.Errorf("namespace = %+v, want the one already written, not the recipe", got[0].Namespace)
 	}
 }
 
@@ -70,7 +73,7 @@ func TestServiceScopeChoicesReadTheExistingConfigFirst(t *testing.T) {
 func TestServiceScopeChoicesKeepAPerWorktreeAnswer(t *testing.T) {
 	existing := domain.RunConfig{Jobs: []domain.JobConfig{{Name: "db"}}}
 	got := choicesFor(t, existing, domain.ComposeService{Name: "db", Image: "postgres:16"})
-	if got[0].Scope != domain.JobScopePerWorktree || got[0].Tenant != nil {
+	if got[0].Scope != domain.JobScopePerWorktree || got[0].Namespace != nil {
 		t.Errorf("choice = %+v, want the config's per-worktree answer with no recipe", got[0])
 	}
 }
@@ -86,19 +89,8 @@ func TestServiceScopeChoicesListsEveryService(t *testing.T) {
 	if len(got) != 3 {
 		t.Fatalf("choices = %d, want every service listed", len(got))
 	}
-	if got[2].Tenant != nil {
-		t.Errorf("keycloak tenant = %+v, want none: wtm knows no realm recipe", got[2].Tenant)
-	}
-}
-
-func TestKnownTenantRecipeReadsThroughRegistryAndTag(t *testing.T) {
-	for _, image := range []string{"postgres:16", "postgres", "docker.io/library/postgres:15-alpine"} {
-		if got := KnownTenantRecipe(image); got == nil || got.Name != domain.TenantPostgresName {
-			t.Errorf("KnownTenantRecipe(%q) = %+v, want the postgres recipe", image, got)
-		}
-	}
-	if got := KnownTenantRecipe("redis:7"); got != nil {
-		t.Errorf("KnownTenantRecipe(redis) = %+v, want none", got)
+	if got[2].Namespace != nil {
+		t.Errorf("keycloak namespace = %+v, want none", got[2].Namespace)
 	}
 }
 

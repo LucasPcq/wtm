@@ -53,12 +53,12 @@ func (m *Manager) startShared(params StartParams) error {
 		}
 	}
 
-	// The claim is posted before the tenant is carved out, and withdrawn if that
+	// The claim is posted before the namespace is carved out, and withdrawn if that
 	// fails: a service left running with nothing referencing it is invisible to
 	// `run ps` in the worktree that started it, and only a `run down` from the
 	// main checkout would ever take it back down.
 	m.claim(claimParams{Key: ownKey, Real: realKey, Params: params})
-	if err := m.runTenant(tenantParams{Job: params.Job, Env: params.Env, WorkDir: params.WorkDir, Attach: true}); err != nil {
+	if err := m.runNamespace(namespaceParams{Job: params.Job, Env: params.Env, WorkDir: params.WorkDir, Creating: true}); err != nil {
 		m.releaseClaim(releaseParams{Key: ownKey, Name: params.Job.Name, Dir: shared.WorkDir})
 		return err
 	}
@@ -125,7 +125,7 @@ func (m *Manager) claim(params claimParams) {
 }
 
 // stopShared releases one worktree's claim and stops the service only once no
-// claim is left anywhere. The tenant is deliberately not detached: stopping is
+// claim is left anywhere. The namespace is deliberately not detached: stopping is
 // not destroying, and a `run down` that dropped a database would make the
 // command unusable.
 func (m *Manager) stopShared(job *ManagedJob) error {
@@ -193,36 +193,38 @@ func sharedDirOf(params StartParams) string {
 	return params.Shared.WorkDir
 }
 
-type tenantParams struct {
+type namespaceParams struct {
 	Job     domain.JobConfig
 	Env     map[string]string
 	WorkDir string
-	Attach  bool
+	// Creating tells the two directions apart: carving the namespace out, or
+	// giving it back.
+	Creating bool
 }
 
-// runTenant carves out — or gives back — this worktree's slice of a shared
-// service. wtm never learns what a database or a realm is: it names the tenant
+// runNamespace carves out — or gives back — this worktree's slice of a shared
+// service. wtm never learns what a database or a realm is: it names the namespace
 // and hands the user's own command the worktree's whole environment, ports and
 // URLs included, which is what lets a keycloak realm's redirect URIs point at
 // the fronts of the worktree asking.
-func (m *Manager) runTenant(params tenantParams) error {
-	if !rules.HasTenant(params.Job) {
+func (m *Manager) runNamespace(params namespaceParams) error {
+	if !rules.HasNamespace(params.Job) {
 		return nil
 	}
-	line := params.Job.Tenant.Attach
-	if !params.Attach {
-		line = params.Job.Tenant.Detach
+	line := params.Job.Namespace.Create
+	if !params.Creating {
+		line = params.Job.Namespace.Remove
 	}
 	if rules.IsBlankCommand(line) {
 		return nil
 	}
 
-	expand := rules.ExpandTenantParams{
-		Tenant:   *params.Job.Tenant,
-		Worktree: params.Env[domain.EnvWorktree],
-		Ordinal:  ordinalOf(params.Env),
+	expand := rules.ExpandNamespaceParams{
+		Namespace: *params.Job.Namespace,
+		Worktree:  params.Env[domain.EnvWorktree],
+		Ordinal:   ordinalOf(params.Env),
 	}
-	expanded, err := rules.ExpandTenant(expand)
+	expanded, err := rules.ExpandNamespace(expand)
 	if err != nil {
 		return fmt.Errorf("job %s: %w", params.Job.Name, err)
 	}
@@ -233,7 +235,7 @@ func (m *Manager) runTenant(params tenantParams) error {
 	if overrides == nil {
 		overrides = map[string]string{}
 	}
-	for key, value := range rules.TenantTokens(expand) {
+	for key, value := range rules.NamespaceTokens(expand) {
 		overrides[key] = value
 	}
 	for key, value := range expanded.Env {
@@ -241,47 +243,47 @@ func (m *Manager) runTenant(params tenantParams) error {
 	}
 	env := jobEnv(jobEnvParams{Kind: domain.JobKindTask, Overrides: overrides})
 
-	last := m.tenantAttempt(tenantAttemptParams{Line: line, Dir: params.WorkDir, Env: env, Retry: params.Attach})
+	last := m.namespaceAttempt(namespaceAttemptParams{Line: line, Dir: params.WorkDir, Env: env, Retry: params.Creating})
 	if last == nil {
 		return nil
 	}
-	format := domain.TenantDetachFailedFmt
-	if params.Attach {
-		format = domain.TenantAttachFailedFmt
+	format := domain.NamespaceRemoveFailedFmt
+	if params.Creating {
+		format = domain.NamespaceCreateFailedFmt
 	}
 	return fmt.Errorf(format, params.Job.Name, expanded.Name, last)
 }
 
-type tenantAttemptParams struct {
+type namespaceAttemptParams struct {
 	Line  string
 	Dir   string
 	Env   []string
 	Retry bool
 }
 
-// tenantAttempt retries an attach within a budget: the service it talks to was
+// namespaceAttempt retries an attach within a budget: the service it talks to was
 // started moments ago, so a first refusal means "postgres is not accepting
 // connections yet" far more often than it means the command is wrong. A detach
 // runs against a service already up, so it is asked exactly once.
-func (m *Manager) tenantAttempt(params tenantAttemptParams) error {
-	budget := m.tenantBudget
+func (m *Manager) namespaceAttempt(params namespaceAttemptParams) error {
+	budget := m.namespaceBudget
 	if budget <= 0 {
-		budget = domain.TenantAttachTimeout
+		budget = domain.NamespaceCreateTimeout
 	}
 	deadline := time.Now().Add(budget)
 	for {
-		err := runTenantCommand(params)
+		err := runNamespaceCommand(params)
 		if err == nil {
 			return nil
 		}
 		if !params.Retry || time.Now().After(deadline) {
 			return err
 		}
-		time.Sleep(domain.TenantAttachInterval)
+		time.Sleep(domain.NamespaceCreateInterval)
 	}
 }
 
-func runTenantCommand(params tenantAttemptParams) error {
+func runNamespaceCommand(params namespaceAttemptParams) error {
 	spec := rules.ShellCommand(params.Line)
 	cmd := exec.Command(spec.Name, spec.Args...)
 	cmd.Dir = params.Dir

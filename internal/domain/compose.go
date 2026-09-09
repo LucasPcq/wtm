@@ -116,7 +116,7 @@ type ComposeEdit struct {
 // names the services that stay, since `docker compose up` otherwise starts the
 // whole file — including the one just lifted out.
 type SharedComposeService struct {
-	File    string
-	Service string
-	Tenant  *JobTenantConfig
+	File      string
+	Service   string
+	Namespace *JobNamespaceConfig
 }

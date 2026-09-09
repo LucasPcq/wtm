@@ -18,16 +18,16 @@ type sharedFixture struct {
 	first   string
 	second  string
 	job     domain.JobConfig
-	// witness is where a tenant command appends the tenant it was handed, so a
+	// witness is where a namespace command appends the namespace it was handed, so a
 	// test reads what actually ran rather than trusting a return value.
 	witness string
 }
 
-func newSharedFixture(t *testing.T, tenant *domain.JobTenantConfig) sharedFixture {
+func newSharedFixture(t *testing.T, namespace *domain.JobNamespaceConfig) sharedFixture {
 	t.Helper()
 	root := t.TempDir()
 	fixture := sharedFixture{
-		manager: NewManagerWith(ManagerParams{TenantBudget: 50 * time.Millisecond}),
+		manager: NewManagerWith(ManagerParams{NamespaceBudget: 50 * time.Millisecond}),
 		main:    filepath.Join(root, "main"),
 		first:   filepath.Join(root, "feat-a"),
 		second:  filepath.Join(root, "feat-b"),
@@ -40,7 +40,7 @@ func newSharedFixture(t *testing.T, tenant *domain.JobTenantConfig) sharedFixtur
 	}
 	fixture.job = domain.JobConfig{
 		Name: "db", Kind: domain.JobKindService, Cmd: "sleep 30",
-		Scope: domain.JobScopeShared, Tenant: tenant,
+		Scope: domain.JobScopeShared, Namespace: namespace,
 	}
 	t.Cleanup(func() { _ = fixture.manager.StopAll() })
 	return fixture
@@ -223,12 +223,12 @@ func TestStopSharedFromTheMainCheckoutSpareTheServiceWhileHeld(t *testing.T) {
 	}
 }
 
-func TestSharedTenantAttachesOncePerWorktree(t *testing.T) {
-	f := newSharedFixture(t, &domain.JobTenantConfig{
+func TestSharedNamespaceAttachesOncePerWorktree(t *testing.T) {
+	f := newSharedFixture(t, &domain.JobNamespaceConfig{
 		Name:   "crm_{worktree}",
-		Attach: "printf '%s\\n' \"$WTM_TENANT\" >> " + "WITNESS",
+		Create: "printf '%s\\n' \"$WTM_NAMESPACE\" >> " + "WITNESS",
 	})
-	f.job.Tenant.Attach = strings.Replace(f.job.Tenant.Attach, "WITNESS", f.witness, 1)
+	f.job.Namespace.Create = strings.Replace(f.job.Namespace.Create, "WITNESS", f.witness, 1)
 
 	if err := f.start(t, f.first, "feat_a"); err != nil {
 		t.Fatalf("first start: %v", err)
@@ -246,12 +246,12 @@ func TestSharedTenantAttachesOncePerWorktree(t *testing.T) {
 // Stopping is not destroying: a `run down` that dropped a database would make
 // the command unusable.
 func TestSharedStopNeverDetaches(t *testing.T) {
-	f := newSharedFixture(t, &domain.JobTenantConfig{
+	f := newSharedFixture(t, &domain.JobNamespaceConfig{
 		Name:   "crm_{worktree}",
-		Attach: "true",
-		Detach: "printf 'detached\\n' >> " + "WITNESS",
+		Create: "true",
+		Remove: "printf 'detached\\n' >> " + "WITNESS",
 	})
-	f.job.Tenant.Detach = strings.Replace(f.job.Tenant.Detach, "WITNESS", f.witness, 1)
+	f.job.Namespace.Remove = strings.Replace(f.job.Namespace.Remove, "WITNESS", f.witness, 1)
 
 	if err := f.start(t, f.first, "feat_a"); err != nil {
 		t.Fatalf("start: %v", err)
@@ -446,7 +446,7 @@ func TestStopSharedIgnoresAForeignRepositorysClaims(t *testing.T) {
 // A service left running with nothing referencing it is invisible to `run ps`
 // in the worktree that started it.
 func TestStartSharedWithdrawsItsClaimWhenTheAttachFails(t *testing.T) {
-	f := newSharedFixture(t, &domain.JobTenantConfig{Name: "t_{worktree}", Attach: "exit 9"})
+	f := newSharedFixture(t, &domain.JobNamespaceConfig{Name: "t_{worktree}", Create: "exit 9"})
 
 	err := f.start(t, f.first, "feat_a")
 	if err == nil {

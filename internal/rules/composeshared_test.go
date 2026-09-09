@@ -33,7 +33,7 @@ func TestBuildDockerJobsLiftsASharedServiceIntoItsOwnJob(t *testing.T) {
 		Scans:      map[string]domain.ComposeScan{"docker-compose.yml": scanOf("docker-compose.yml", "db", "api", "web")},
 		Shared: []domain.SharedComposeService{{
 			File: "docker-compose.yml", Service: "db",
-			Tenant: &domain.JobTenantConfig{Name: "app_{worktree}", Attach: "true"},
+			Namespace: &domain.JobNamespaceConfig{Name: "app_{worktree}", Create: "true"},
 		}},
 	})
 
@@ -44,8 +44,8 @@ func TestBuildDockerJobsLiftsASharedServiceIntoItsOwnJob(t *testing.T) {
 	if shared.Scope != domain.JobScopeShared {
 		t.Errorf("scope = %q, want shared", shared.Scope)
 	}
-	if shared.Tenant == nil || shared.Tenant.Name != "app_{worktree}" {
-		t.Errorf("tenant = %+v", shared.Tenant)
+	if shared.Namespace == nil || shared.Namespace.Name != "app_{worktree}" {
+		t.Errorf("namespace = %+v", shared.Namespace)
 	}
 	if !strings.HasSuffix(shared.Cmd, "up -d db") {
 		t.Errorf("cmd = %q, want it to start only db", shared.Cmd)

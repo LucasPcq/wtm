@@ -165,65 +165,65 @@ const (
 	// project name both derive from it.
 	EnvProject = "WTM_PROJECT"
 
-	// EnvTenant is the resolved tenant name a shared job's attach and detach
+	// EnvNamespace is the resolved namespace name a shared job's create and remove
 	// commands read, so they never repeat the template their config already
 	// carries.
-	EnvTenant = "WTM_TENANT"
+	EnvNamespace = "WTM_NAMESPACE"
 
-	// TenantToken* are the placeholders a tenant's configuration values carry.
+	// NamespaceToken* are the placeholders a namespace's configuration values carry.
 	// Commands read the $WTM_* variables instead: one syntax per place, never
 	// the two mixed in a single string.
-	TenantTokenWorktree = "{worktree}"
-	TenantTokenOrdinal  = "{ordinal}"
+	NamespaceTokenWorktree = "{worktree}"
+	NamespaceTokenOrdinal  = "{ordinal}"
 
-	// The reasons a [job.tenant] block is refused at load.
-	TenantIncompleteFmt    = "job %q: a [job.tenant] block needs both a name and an attach command"
-	TenantOnPerWorktreeFmt = `job %q: [job.tenant] only means something on a job with scope = "shared"`
-	TenantBadTokenFmt      = "job %q: %v"
-	UnknownScopeFmt        = "job %q: unknown scope %q (expected %q)"
-	DuplicateJobNameFmt    = "job %q is declared twice: two jobs of one name share a single key, so the second can never start"
-	// TenantProbeWorktree expands a tenant at load with a stand-in worktree, so
+	// The reasons a [job.namespace] block is refused at load.
+	NamespaceIncompleteFmt    = "job %q: a [job.namespace] block needs both a name and a create command"
+	NamespaceOnPerWorktreeFmt = `job %q: [job.namespace] only means something on a job with scope = "shared"`
+	NamespaceBadTokenFmt      = "job %q: %v"
+	UnknownScopeFmt           = "job %q: unknown scope %q (expected %q)"
+	DuplicateJobNameFmt       = "job %q is declared twice: two jobs of one name share a single key, so the second can never start"
+	// NamespaceProbeWorktree expands a namespace at load with a stand-in worktree, so
 	// an unknown placeholder is named there rather than in a shell.
-	TenantProbeWorktree = "probe"
+	NamespaceProbeWorktree = "probe"
 
-	// TenantAttachTimeout bounds the retries of a tenant's attach command, and
-	// TenantAttachInterval paces them. A shared service is asked to carve out a
-	// tenant the instant it is started, which is before postgres accepts a
+	// NamespaceCreateTimeout bounds the retries of a namespace's create command, and
+	// NamespaceCreateInterval paces them. A shared service is asked to carve out a
+	// namespace the instant it is started, which is before postgres accepts a
 	// connection — so a first failure means "not ready yet" far more often than
 	// it means "wrong command". The budget is what keeps a genuinely wrong one
 	// from retrying for ever.
-	TenantAttachTimeout  = 30 * time.Second
-	TenantAttachInterval = time.Second
+	NamespaceCreateTimeout  = 30 * time.Second
+	NamespaceCreateInterval = time.Second
 
-	// TenantAttachFailedFmt names the tenant, the job and the last error a
+	// NamespaceCreateFailedFmt names the namespace, the job and the last error a
 	// budget's worth of retries ended on.
-	TenantAttachFailedFmt = "job %s: could not attach tenant %s: %w"
-	TenantDetachFailedFmt = "job %s: could not detach tenant %s: %w"
+	NamespaceCreateFailedFmt = "job %s: could not attach namespace %s: %w"
+	NamespaceRemoveFailedFmt = "job %s: could not detach namespace %s: %w"
 	// SharedNoContextFmt is a shared job whose main checkout the client could
 	// not resolve — a bare clone, typically.
 	SharedNoContextFmt = "job %s: %w"
 
-	// PendingDetachFileName is the queue of tenants a clean could not give back
+	// PendingRemovalsFileName is the queue of namespaces a clean could not give back
 	// because the shared service holding them was down. It is a queue and not a
 	// registry: entries are only ever added by a failure and removed by a
 	// success, so it cannot drift out of step with anything.
-	PendingDetachFileName = "pending-detach.toml"
+	PendingRemovalsFileName = "pending-removals.toml"
 
-	// FlagKeepData withholds the detach a clean would otherwise run. The default
+	// FlagKeepData withholds the removal a clean would otherwise run. The default
 	// is to detach: clean is the destructive command, and destroying a worktree
 	// without its data would leave an orphan behind on every iteration.
 	FlagKeepData     = "keep-data"
-	FlagKeepDataDesc = "keep the tenants this worktree carved out of shared services"
+	FlagKeepDataDesc = "keep the namespaces this worktree carved out of shared services"
 
-	CleanDetachedTenantFmt = "released %s from %s"
-	CleanDeferredTenantFmt = "%s is down: %s kept, `wtm prune` will give it back"
-	PruneSettledTenantFmt  = "gave back %s on %s, owed since its worktree was removed"
+	CleanRemovedNamespaceFmt  = "released %s from %s"
+	CleanDeferredNamespaceFmt = "%s is down: %s kept, `wtm prune` will give it back"
+	PruneSettledNamespaceFmt  = "gave back %s on %s, owed since its worktree was removed"
 
 	// ScopeStepName, Title and Desc introduce the question run init asks of each
 	// compose service.
 	ScopeStepName  = "Shared services"
 	ScopeStepTitle = "Which services run once for the whole repository?"
-	ScopeStepDesc  = "A shared service runs once instead of once per worktree — a postgres, a keycloak. Each worktree still gets its own data through a tenant. Space toggles, enter confirms."
+	ScopeStepDesc  = "A shared service runs once instead of once per worktree — a postgres, a keycloak. Each worktree still gets its own data through a namespace. Space toggles, enter confirms."
 
 	// ScopeReasonBuild is why a service built here can never be shared: it
 	// serves this worktree's own source, whatever its name suggests.
@@ -235,15 +235,13 @@ const (
 	ScopesSkipNoServices  = "no compose service to share"
 	ScopesSkipAllBuilt    = "every service is built from this worktree's source"
 
-	// TenantRecipe* are the attach and detach a known image needs, pre-filled so
-	// the common case is not left to be written by hand. The tenant name is
-	// wtm's; everything the command does with it belongs to the project.
-	TenantPostgresName   = "app_{worktree}"
-	TenantPostgresAttach = `psql -h 127.0.0.1 -p $POSTGRES_PORT -U postgres -c "CREATE DATABASE $WTM_TENANT"`
-	TenantPostgresDetach = `psql -h 127.0.0.1 -p $POSTGRES_PORT -U postgres -c "DROP DATABASE IF EXISTS $WTM_TENANT"`
-	TenantMySQLName      = "app_{worktree}"
-	TenantMySQLAttach    = `mysql -h 127.0.0.1 -P $MYSQL_PORT -u root -e "CREATE DATABASE $WTM_TENANT"`
-	TenantMySQLDetach    = `mysql -h 127.0.0.1 -P $MYSQL_PORT -u root -e "DROP DATABASE IF EXISTS $WTM_TENANT"`
+	// NamespaceNameDefault is the only thing wtm proposes: a name derived from
+	// the worktree. The commands are never pre-filled — a recipe for postgres
+	// would guess the port variable, the user, the host and whether psql is even
+	// on this machine, and a wrong command that is accepted reads as a wtm bug
+	// rather than as a line to write. Same decision as the port flag of every
+	// framework, already settled in LUC-55.
+	NamespaceNameDefault = "app_{worktree}"
 
 	// MainWorktreeOrdinal is never persisted: the main worktree has no meta.json,
 	// so 0 in a linked worktree's metadata means "not allocated yet".
@@ -2446,13 +2444,13 @@ const (
 	CleanWillDelete         = "Will delete:"
 	CleanWillDeleteWorktree = "  worktree  "
 	CleanWillDeleteBranch   = "  branch    "
-	// CleanWillDeleteTenantFmt names the data a clean gives back, one line per
+	// CleanWillDeleteNamespaceFmt names the data a clean gives back, one line per
 	// shared service. A recap that stayed silent about a DROP DATABASE told the
 	// reader they were removing a worktree and nothing else.
-	CleanWillDeleteTenantFmt = "  data      %s in %s"
-	CleanKeepDataLine        = "  data      kept (--keep-data)"
-	CleanRecapReparentFmt    = "Then reparent %d child worktree(s) onto %s."
-	CleanRecapOrphanFmt      = "Then leave %d child worktree(s) orphaned."
+	CleanWillDeleteNamespaceFmt = "  data      %s in %s"
+	CleanKeepDataLine           = "  data      kept (--keep-data)"
+	CleanRecapReparentFmt       = "Then reparent %d child worktree(s) onto %s."
+	CleanRecapOrphanFmt         = "Then leave %d child worktree(s) orphaned."
 	// CleanBlockerDirty, CleanBlockerUnpushed and CleanBlockerOpenPR key the
 	// removal refusals a surface lists one by one (rules.CleanBlockers).
 	CleanBlockerDirty    = "dirty"

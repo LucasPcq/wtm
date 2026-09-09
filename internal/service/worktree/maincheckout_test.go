@@ -57,10 +57,10 @@ func TestMainCheckoutErrorsOutsideARepository(t *testing.T) {
 	}
 }
 
-// The metadata is the only durable record that a worktree holds a tenant: a
+// The metadata is the only durable record that a worktree holds a namespace: a
 // claim on a shared service goes with a `run stop`, and without this a clean
-// would either give back a tenant that was never created or leak one that was.
-func TestRecordTenantsIsAdditiveAndIdempotent(t *testing.T) {
+// would either give back a namespace that was never created or leak one that was.
+func TestRecordNamespacesIsAdditiveAndIdempotent(t *testing.T) {
 	repo := gittest.InitRepo(t)
 	stateDir := filepath.Join(repo, ".git", "wtm")
 	metaDir := filepath.Join(stateDir, "worktrees", "feat-x")
@@ -72,24 +72,24 @@ func TestRecordTenantsIsAdditiveAndIdempotent(t *testing.T) {
 	}
 
 	params := worktree.ParentBranchParams{StateDir: stateDir, Branch: "feat-x"}
-	if got := worktree.TenantsOf(params); len(got) != 0 {
-		t.Fatalf("tenants = %v, want none", got)
+	if got := worktree.NamespacesOf(params); len(got) != 0 {
+		t.Fatalf("namespaces = %v, want none", got)
 	}
 
 	record := func(jobs ...string) {
 		t.Helper()
-		if err := worktree.RecordTenants(worktree.RecordTenantsParams{
+		if err := worktree.RecordNamespaces(worktree.RecordNamespacesParams{
 			StateDir: stateDir, Branch: "feat-x", Jobs: jobs,
 		}); err != nil {
-			t.Fatalf("RecordTenants: %v", err)
+			t.Fatalf("RecordNamespaces: %v", err)
 		}
 	}
 
 	record("db")
 	record("db", "keycloak")
-	got := worktree.TenantsOf(params)
+	got := worktree.NamespacesOf(params)
 	if len(got) != 2 || got[0] != "db" || got[1] != "keycloak" {
-		t.Errorf("tenants = %v, want [db keycloak] recorded once each", got)
+		t.Errorf("namespaces = %v, want [db keycloak] recorded once each", got)
 	}
 
 	// The rest of the file survives: the ordinal is what every port derives from.
@@ -100,14 +100,14 @@ func TestRecordTenantsIsAdditiveAndIdempotent(t *testing.T) {
 }
 
 // The main checkout has no meta.json, and recording must not create one.
-func TestRecordTenantsCreatesNoMetadata(t *testing.T) {
+func TestRecordNamespacesCreatesNoMetadata(t *testing.T) {
 	stateDir := t.TempDir()
-	if err := worktree.RecordTenants(worktree.RecordTenantsParams{
+	if err := worktree.RecordNamespaces(worktree.RecordNamespacesParams{
 		StateDir: stateDir, Branch: "main", Jobs: []string{"db"},
 	}); err != nil {
-		t.Fatalf("RecordTenants: %v", err)
+		t.Fatalf("RecordNamespaces: %v", err)
 	}
-	if got := worktree.TenantsOf(worktree.ParentBranchParams{StateDir: stateDir, Branch: "main"}); len(got) != 0 {
-		t.Errorf("tenants = %v, want none", got)
+	if got := worktree.NamespacesOf(worktree.ParentBranchParams{StateDir: stateDir, Branch: "main"}); len(got) != 0 {
+		t.Errorf("namespaces = %v, want none", got)
 	}
 }

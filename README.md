@@ -122,8 +122,8 @@ A few ideas explain how the commands fit together:
   a worktree today. See [`run`](docs/wtm_run.md) and [Run config](#run-config--runtoml).
 - **Shared services** *(experimental)* — a job declared `scope = "shared"` runs **once for
   the repository** instead of once per worktree, in the main checkout: a postgres, a
-  keycloak. Each worktree still keeps its own data through a `[job.tenant]` block, whose
-  `attach` and `detach` commands you write — wtm names the tenant and hands them the
+  keycloak. Each worktree still keeps its own data through a `[job.namespace]` block, whose
+  `attach` and `detach` commands you write — wtm names the namespace and hands them the
   worktree's environment, and knows nothing else about them. It exists for the case that
   makes isolation expensive: two worktrees of a monorepo with four databases and a JVM.
 

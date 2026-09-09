@@ -106,23 +106,23 @@ func upsertSharedJob(params upsertSharedJobParams) domain.RunConfig {
 		jobs := make([]domain.JobConfig, len(cfg.Jobs))
 		copy(jobs, cfg.Jobs)
 		jobs[index].Scope = domain.JobScopeShared
-		// A tenant already written by hand outranks a recipe the wizard offered:
+		// A namespace already written by hand outranks a recipe the wizard offered:
 		// the config speaks, detection does not.
-		if jobs[index].Tenant == nil {
-			jobs[index].Tenant = params.Shared.Tenant
+		if jobs[index].Namespace == nil {
+			jobs[index].Namespace = params.Shared.Namespace
 		}
 		cfg.Jobs = jobs
 		return cfg
 	}
 
 	cfg.Jobs = append(cfg.Jobs, domain.JobConfig{
-		Name:   params.Shared.Service,
-		Kind:   domain.JobKindService,
-		Cmd:    fmt.Sprintf("%s %sup -d %s", params.ComposeCmd, flag, params.Shared.Service),
-		Stop:   fmt.Sprintf("%s %sstop %s", params.ComposeCmd, flag, params.Shared.Service),
-		Cwd:    ".",
-		Scope:  domain.JobScopeShared,
-		Tenant: params.Shared.Tenant,
+		Name:      params.Shared.Service,
+		Kind:      domain.JobKindService,
+		Cmd:       fmt.Sprintf("%s %sup -d %s", params.ComposeCmd, flag, params.Shared.Service),
+		Stop:      fmt.Sprintf("%s %sstop %s", params.ComposeCmd, flag, params.Shared.Service),
+		Cwd:       ".",
+		Scope:     domain.JobScopeShared,
+		Namespace: params.Shared.Namespace,
 	})
 	return joinProfilesOf(cfg, params.Profiles, params.Shared.Service)
 }

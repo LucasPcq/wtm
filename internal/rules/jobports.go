@@ -31,7 +31,7 @@ type JobPortsParams struct {
 	PortOffset int
 	// Scope zeroes the offset for a shared job: it runs in the main checkout,
 	// so the port it declares is the port it binds in every worktree's reading.
-	// That stability is what lets a tenant's env write its URL literally.
+	// That stability is what lets a namespace's env write its URL literally.
 	Scope domain.JobScope
 }
 

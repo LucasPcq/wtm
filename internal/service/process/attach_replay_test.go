@@ -13,7 +13,7 @@ import (
 )
 
 // TestAttachKeepsTheHistorySentWithTheAcceptance pins what the run view's
-// replay depends on: the daemon answers the attach and writes the job's
+// replay depends on: the daemon answers the create command and writes the job's
 // buffered history right behind it, so a single read carries both.
 func TestAttachKeepsTheHistorySentWithTheAcceptance(t *testing.T) {
 	const history = "web:dev ready in 412ms\nrebuilt in 97ms\n"

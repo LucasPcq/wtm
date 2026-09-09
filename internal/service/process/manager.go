@@ -104,11 +104,11 @@ type Manager struct {
 	jobs   map[string]*ManagedJob
 	routes RouteSink
 	index  JobIndex
-	// tenantBudget bounds the retries of a tenant's attach. Zero takes
-	// domain.TenantAttachTimeout; a test sets it so a command that is simply
+	// namespaceBudget bounds the retries of a namespace's attach. Zero takes
+	// domain.NamespaceCreateTimeout; a test sets it so a command that is simply
 	// wrong does not hold the suite for the whole budget.
-	tenantBudget time.Duration
-	mu           sync.Mutex
+	namespaceBudget time.Duration
+	mu              sync.Mutex
 }
 
 func NewManager() *Manager {
@@ -128,17 +128,17 @@ type ManagerParams struct {
 	// in memory, which is what a job whose process dies with us would want
 	// anyway.
 	Index JobIndex
-	// TenantBudget bounds the retries of a shared job's tenant attach. Zero
-	// takes domain.TenantAttachTimeout.
-	TenantBudget time.Duration
+	// NamespaceBudget bounds the retries of a shared job's namespace attach. Zero
+	// takes domain.NamespaceCreateTimeout.
+	NamespaceBudget time.Duration
 }
 
 func NewManagerWith(params ManagerParams) *Manager {
 	return &Manager{
-		jobs:         make(map[string]*ManagedJob),
-		routes:       params.Routes,
-		index:        params.Index,
-		tenantBudget: params.TenantBudget,
+		jobs:            make(map[string]*ManagedJob),
+		routes:          params.Routes,
+		index:           params.Index,
+		namespaceBudget: params.NamespaceBudget,
 	}
 }
 

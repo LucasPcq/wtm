@@ -262,7 +262,7 @@ func (r *runner) run() Outcome {
 			},
 		})
 		if err != nil {
-			// A read the detach itself broke says nothing about the job.
+			// A read the removal itself broke says nothing about the job.
 			if r.ctx.Err() != nil {
 				return r.detached(i)
 			}

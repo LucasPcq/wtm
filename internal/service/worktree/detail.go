@@ -55,17 +55,17 @@ func loadMetadata(stateDir, branch string) (domain.WorktreeMetadata, error) {
 	return meta, nil
 }
 
-type RecordTenantsParams struct {
+type RecordNamespacesParams struct {
 	StateDir string
 	Branch   string
 	Jobs     []string
 }
 
-// RecordTenants remembers that this worktree holds a tenant in each of these
+// RecordNamespaces remembers that this worktree holds a namespace in each of these
 // shared services, so `clean` gives back exactly what exists. Additive and
 // idempotent: a job already recorded is not recorded twice, and a worktree with
 // no metadata — the main checkout — records nothing rather than creating some.
-func RecordTenants(params RecordTenantsParams) error {
+func RecordNamespaces(params RecordNamespacesParams) error {
 	if len(params.Jobs) == 0 {
 		return nil
 	}
@@ -74,8 +74,8 @@ func RecordTenants(params RecordTenantsParams) error {
 		return nil
 	}
 
-	held := make(map[string]bool, len(meta.Tenants))
-	for _, job := range meta.Tenants {
+	held := make(map[string]bool, len(meta.Namespaces))
+	for _, job := range meta.Namespaces {
 		held[job] = true
 	}
 	changed := false
@@ -84,7 +84,7 @@ func RecordTenants(params RecordTenantsParams) error {
 			continue
 		}
 		held[job] = true
-		meta.Tenants = append(meta.Tenants, job)
+		meta.Namespaces = append(meta.Namespaces, job)
 		changed = true
 	}
 	if !changed {
@@ -93,11 +93,11 @@ func RecordTenants(params RecordTenantsParams) error {
 	return writeMetadata(rules.WorktreeMetaDir(params.StateDir, params.Branch), meta)
 }
 
-// TenantsOf is what this worktree has to give back when it goes.
-func TenantsOf(params ParentBranchParams) []string {
+// NamespacesOf is what this worktree has to give back when it goes.
+func NamespacesOf(params ParentBranchParams) []string {
 	meta, err := loadMetadata(params.StateDir, params.Branch)
 	if err != nil {
 		return nil
 	}
-	return meta.Tenants
+	return meta.Namespaces
 }

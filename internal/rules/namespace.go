@@ -9,80 +9,80 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
-type ExpandTenantParams struct {
-	Tenant   domain.JobTenantConfig
-	Worktree string
-	Ordinal  int
+type ExpandNamespaceParams struct {
+	Namespace domain.JobNamespaceConfig
+	Worktree  string
+	Ordinal   int
 }
 
-type ExpandedTenant struct {
+type ExpandedNamespace struct {
 	Name string
 	Env  map[string]string
 }
 
-// tenantToken matches every `{word}`, so one wtm does not define is refused
+// namespaceToken matches every `{word}`, so one wtm does not define is refused
 // rather than reaching a shell as literal braces.
-var tenantToken = regexp.MustCompile(`\{[a-zA-Z_]+\}`)
+var namespaceToken = regexp.MustCompile(`\{[a-zA-Z_]+\}`)
 
-func ExpandTenant(params ExpandTenantParams) (ExpandedTenant, error) {
-	name, err := expandTenantValue(params.Tenant.Name, params)
+func ExpandNamespace(params ExpandNamespaceParams) (ExpandedNamespace, error) {
+	name, err := expandNamespaceValue(params.Namespace.Name, params)
 	if err != nil {
-		return ExpandedTenant{}, err
+		return ExpandedNamespace{}, err
 	}
-	if len(params.Tenant.Env) == 0 {
-		return ExpandedTenant{Name: name}, nil
+	if len(params.Namespace.Env) == 0 {
+		return ExpandedNamespace{Name: name}, nil
 	}
 
-	env := make(map[string]string, len(params.Tenant.Env))
-	for key, value := range params.Tenant.Env {
-		expanded, expandErr := expandTenantValue(value, params)
+	env := make(map[string]string, len(params.Namespace.Env))
+	for key, value := range params.Namespace.Env {
+		expanded, expandErr := expandNamespaceValue(value, params)
 		if expandErr != nil {
-			return ExpandedTenant{}, expandErr
+			return ExpandedNamespace{}, expandErr
 		}
 		env[key] = expanded
 	}
-	return ExpandedTenant{Name: name, Env: env}, nil
+	return ExpandedNamespace{Name: name, Env: env}, nil
 }
 
-func expandTenantValue(value string, params ExpandTenantParams) (string, error) {
+func expandNamespaceValue(value string, params ExpandNamespaceParams) (string, error) {
 	replaced := strings.NewReplacer(
-		domain.TenantTokenWorktree, params.Worktree,
-		domain.TenantTokenOrdinal, strconv.Itoa(params.Ordinal),
+		domain.NamespaceTokenWorktree, params.Worktree,
+		domain.NamespaceTokenOrdinal, strconv.Itoa(params.Ordinal),
 	).Replace(value)
 
-	if leftover := tenantToken.FindString(replaced); leftover != "" {
-		return "", fmt.Errorf("%w: %s", domain.ErrTenantUnknownToken, leftover)
+	if leftover := namespaceToken.FindString(replaced); leftover != "" {
+		return "", fmt.Errorf("%w: %s", domain.ErrNamespaceUnknownToken, leftover)
 	}
 	return replaced, nil
 }
 
-// TenantTokens is what an attach or detach command reads. A tenant whose value
+// NamespaceTokens is what an attach or remove command reads. A namespace whose value
 // does not expand yields none: the caller has already been refused at load.
-func TenantTokens(params ExpandTenantParams) map[string]string {
-	expanded, err := ExpandTenant(params)
+func NamespaceTokens(params ExpandNamespaceParams) map[string]string {
+	expanded, err := ExpandNamespace(params)
 	if err != nil {
 		return nil
 	}
 	return map[string]string{
-		domain.EnvTenant:   expanded.Name,
-		domain.EnvWorktree: params.Worktree,
-		domain.EnvOrdinal:  strconv.Itoa(params.Ordinal),
+		domain.EnvNamespace: expanded.Name,
+		domain.EnvWorktree:  params.Worktree,
+		domain.EnvOrdinal:   strconv.Itoa(params.Ordinal),
 	}
 }
 
 func IsShared(job domain.JobConfig) bool { return job.Scope == domain.JobScopeShared }
 
-// HasTenant reports a block complete enough to act on. An incomplete one is
+// HasNamespace reports a block complete enough to act on. An incomplete one is
 // refused at load, so a caller reading false here has a job that carves out
 // nothing — shared for good, one set of data for every worktree.
-func HasTenant(job domain.JobConfig) bool {
-	return job.Tenant != nil && job.Tenant.Name != "" && job.Tenant.Attach != ""
+func HasNamespace(job domain.JobConfig) bool {
+	return job.Namespace != nil && job.Namespace.Name != "" && job.Namespace.Create != ""
 }
 
-// ValidateTenants is read at load, not at write: a scope or a tenant nobody
+// ValidateNamespaces is read at load, not at write: a scope or a namespace nobody
 // recognizes would otherwise reach a shell, where an unexpanded placeholder
 // creates a database literally called "{branch}".
-func ValidateTenants(cfg domain.RunConfig) []string {
+func ValidateNamespaces(cfg domain.RunConfig) []string {
 	var errs []string
 	for _, job := range cfg.Jobs {
 		errs = append(errs, jobScopeErrors(job)...)
@@ -97,22 +97,22 @@ func jobScopeErrors(job domain.JobConfig) []string {
 		return []string{fmt.Sprintf(domain.UnknownScopeFmt, job.Name, job.Scope, domain.JobScopeShared)}
 	}
 
-	if job.Tenant == nil {
+	if job.Namespace == nil {
 		return nil
 	}
 	if !IsShared(job) {
-		return []string{fmt.Sprintf(domain.TenantOnPerWorktreeFmt, job.Name)}
+		return []string{fmt.Sprintf(domain.NamespaceOnPerWorktreeFmt, job.Name)}
 	}
-	if !HasTenant(job) {
-		return []string{fmt.Sprintf(domain.TenantIncompleteFmt, job.Name)}
+	if !HasNamespace(job) {
+		return []string{fmt.Sprintf(domain.NamespaceIncompleteFmt, job.Name)}
 	}
 
-	_, err := ExpandTenant(ExpandTenantParams{
-		Tenant:   *job.Tenant,
-		Worktree: domain.TenantProbeWorktree,
+	_, err := ExpandNamespace(ExpandNamespaceParams{
+		Namespace: *job.Namespace,
+		Worktree:  domain.NamespaceProbeWorktree,
 	})
 	if err != nil {
-		return []string{fmt.Sprintf(domain.TenantBadTokenFmt, job.Name, err)}
+		return []string{fmt.Sprintf(domain.NamespaceBadTokenFmt, job.Name, err)}
 	}
 	return nil
 }
@@ -122,7 +122,7 @@ type SharedJobsUpParams struct {
 	Config domain.RunConfig
 }
 
-// SharedJobsUp names the shared services actually running, so a tenant is only
+// SharedJobsUp names the shared services actually running, so a namespace is only
 // ever given back to something that can take it.
 //
 // A claim is deliberately not evidence: it is a worktree's hold on a service,
@@ -146,7 +146,7 @@ func SharedJobsUp(params SharedJobsUpParams) map[string]bool {
 	return up
 }
 
-// JobsHeld narrows a config to the jobs a worktree recorded a tenant in, in the
+// JobsHeld narrows a config to the jobs a worktree recorded a namespace in, in the
 // config's own order so a recap and a run agree on what they list.
 func JobsHeld(cfg domain.RunConfig, held []string) domain.RunConfig {
 	if len(held) == 0 {
@@ -166,8 +166,8 @@ func JobsHeld(cfg domain.RunConfig, held []string) domain.RunConfig {
 	return domain.RunConfig{Jobs: jobs}
 }
 
-// JobsNamed narrows a config to one job, so a caller acting on a single tenant
-// hands the detach exactly that one rather than filtering downstream.
+// JobsNamed narrows a config to one job, so a caller acting on a single namespace
+// hands the removal exactly that one rather than filtering downstream.
 func JobsNamed(cfg domain.RunConfig, name string) domain.RunConfig {
 	for _, job := range cfg.Jobs {
 		if job.Name == name {
@@ -177,15 +177,15 @@ func JobsNamed(cfg domain.RunConfig, name string) domain.RunConfig {
 	return domain.RunConfig{}
 }
 
-type TenantEnvParams struct {
+type NamespaceEnvParams struct {
 	Worktree string
 	Ordinal  int
 }
 
-// TenantEnv rebuilds the little a settled debt needs: the worktree it belonged
+// NamespaceEnv rebuilds the little a settled debt needs: the worktree it belonged
 // to is gone, so its full environment cannot be resolved any more, and the
-// tenant's own name is all that identifies what to give back.
-func TenantEnv(params TenantEnvParams) map[string]string {
+// namespace's own name is all that identifies what to give back.
+func NamespaceEnv(params NamespaceEnvParams) map[string]string {
 	return map[string]string{
 		domain.EnvWorktree: params.Worktree,
 		domain.EnvOrdinal:  strconv.Itoa(params.Ordinal),
@@ -235,16 +235,16 @@ func AnySharedJob(jobs []domain.JobConfig) bool {
 	return false
 }
 
-type TenantJobsStartedParams struct {
+type NamespaceJobsStartedParams struct {
 	Jobs []domain.JobConfig
 	// Started names the jobs the run left running.
 	Started []string
 }
 
-// TenantJobsStarted narrows a run to the shared jobs that actually came up and
-// carve a tenant out. Only those leave anything behind to give back, so only
+// NamespaceJobsStarted narrows a run to the shared jobs that actually came up and
+// carve a namespace out. Only those leave anything behind to give back, so only
 // those are worth remembering — a job the run never reached created nothing.
-func TenantJobsStarted(params TenantJobsStartedParams) []string {
+func NamespaceJobsStarted(params NamespaceJobsStartedParams) []string {
 	if len(params.Started) == 0 {
 		return nil
 	}
@@ -255,7 +255,7 @@ func TenantJobsStarted(params TenantJobsStartedParams) []string {
 
 	var jobs []string
 	for _, job := range params.Jobs {
-		if started[job.Name] && IsShared(job) && HasTenant(job) {
+		if started[job.Name] && IsShared(job) && HasNamespace(job) {
 			jobs = append(jobs, job.Name)
 		}
 	}

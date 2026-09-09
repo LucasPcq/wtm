@@ -124,27 +124,27 @@ func TestReinitIsIdempotent(t *testing.T) {
 	}
 }
 
-// A tenant written by hand outranks the recipe the wizard offers: the config
+// A namespace written by hand outranks the recipe the wizard offers: the config
 // speaks, detection does not.
-func TestReinitKeepsAHandWrittenTenant(t *testing.T) {
+func TestReinitKeepsAHandWrittenNamespace(t *testing.T) {
 	existing := existingComposeConfig()
 	existing.Jobs = append(existing.Jobs, domain.JobConfig{
 		Name: "db", Kind: domain.JobKindService, Scope: domain.JobScopeShared,
-		Cmd:    "docker compose -f docker-compose.yml up -d db",
-		Tenant: &domain.JobTenantConfig{Name: "mine_{worktree}", Attach: "my-script"},
+		Cmd:       "docker compose -f docker-compose.yml up -d db",
+		Namespace: &domain.JobNamespaceConfig{Name: "mine_{worktree}", Create: "my-script"},
 	})
 
 	got := ResolveDetectedPorts(ResolveDetectedPortsParams{
 		Answers: reinitAnswers(domain.SharedComposeService{
 			File: "docker-compose.yml", Service: "db",
-			Tenant: &domain.JobTenantConfig{Name: "app_{worktree}", Attach: "recipe"},
+			Namespace: &domain.JobNamespaceConfig{Name: "app_{worktree}", Create: "recipe"},
 		}),
 		Existing: existing,
 	})
 
 	shared, _ := findJob(got.Config, "db")
-	if shared.Tenant == nil || shared.Tenant.Attach != "my-script" {
-		t.Errorf("tenant = %+v, want the one already written", shared.Tenant)
+	if shared.Namespace == nil || shared.Namespace.Create != "my-script" {
+		t.Errorf("namespace = %+v, want the one already written", shared.Namespace)
 	}
 }
 

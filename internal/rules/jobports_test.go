@@ -329,7 +329,7 @@ func TestProxyPortCollisionLinesNommeLesDeuxPorts(t *testing.T) {
 
 // A shared job runs in the main checkout, so its declared port is its real
 // port: 5432 stays 5432 whichever worktree asked. That stability is what lets a
-// tenant's env write its URL literally.
+// namespace's env write its URL literally.
 func TestJobPortsIgnoresOffsetWhenShared(t *testing.T) {
 	got := JobPorts(JobPortsParams{
 		Ports:      map[string]int{"CRM_DB_PORT": 5432},

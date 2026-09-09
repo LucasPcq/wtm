@@ -1,10 +1,6 @@
 package rules
 
-import (
-	"strings"
-
-	"github.com/LucasPcq/wtm/internal/domain"
-)
+import "github.com/LucasPcq/wtm/internal/domain"
 
 // ServiceScopeChoice is one compose service as the scope step lists it: what it
 // is, what wtm proposes, and — when the proposal is not a question at all — why.
@@ -14,9 +10,9 @@ type ServiceScopeChoice struct {
 	Image   string
 	Scope   domain.JobScope
 	// Fixed says the answer is not the reader's to give. Reason says why.
-	Fixed  bool
-	Reason string
-	Tenant *domain.JobTenantConfig
+	Fixed     bool
+	Reason    string
+	Namespace *domain.JobNamespaceConfig
 }
 
 type ServiceScopeChoicesParams struct {
@@ -68,14 +64,13 @@ func scopeChoiceFor(params scopeChoiceParams) ServiceScopeChoice {
 	// The config outranks detection wherever it speaks: a re-init must show what
 	// was decided, not what a fresh look would propose.
 	if job, found := existingSharedJob(params.Existing, params.Service.Name); found {
-		choice.Scope, choice.Tenant = domain.JobScopeShared, job.Tenant
+		choice.Scope, choice.Namespace = domain.JobScopeShared, job.Namespace
 		return choice
 	}
 	if declaredPerWorktree(params.Existing, params.Service.Name) {
 		return choice
 	}
 
-	choice.Tenant = KnownTenantRecipe(params.Service.Image)
 	return choice
 }
 
@@ -97,36 +92,6 @@ func declaredPerWorktree(cfg domain.RunConfig, name string) bool {
 	return false
 }
 
-// KnownTenantRecipe pre-fills the attach and detach an image is known to need,
-// so the common case is not left to be written by hand. It is a convenience and
-// never a requirement: an unknown image gets no recipe, and a shared service
-// with no tenant at all is a valid answer.
-func KnownTenantRecipe(image string) *domain.JobTenantConfig {
-	base := strings.ToLower(image)
-	if index := strings.Index(base, ":"); index >= 0 {
-		base = base[:index]
-	}
-	if index := strings.LastIndex(base, "/"); index >= 0 {
-		base = base[index+1:]
-	}
-
-	switch base {
-	case "postgres", "postgis":
-		return &domain.JobTenantConfig{
-			Name:   domain.TenantPostgresName,
-			Attach: domain.TenantPostgresAttach,
-			Detach: domain.TenantPostgresDetach,
-		}
-	case "mysql", "mariadb":
-		return &domain.JobTenantConfig{
-			Name:   domain.TenantMySQLName,
-			Attach: domain.TenantMySQLAttach,
-			Detach: domain.TenantMySQLDetach,
-		}
-	}
-	return nil
-}
-
 // SharedFromChoices is what the step's answers become for the job builder.
 func SharedFromChoices(choices []ServiceScopeChoice) []domain.SharedComposeService {
 	var shared []domain.SharedComposeService
@@ -135,7 +100,7 @@ func SharedFromChoices(choices []ServiceScopeChoice) []domain.SharedComposeServi
 			continue
 		}
 		shared = append(shared, domain.SharedComposeService{
-			File: choice.File, Service: choice.Service, Tenant: choice.Tenant,
+			File: choice.File, Service: choice.Service, Namespace: choice.Namespace,
 		})
 	}
 	return shared
@@ -180,7 +145,7 @@ func SharedFromConfig(params SharedFromConfigParams) []domain.SharedComposeServi
 				continue
 			}
 			shared = append(shared, domain.SharedComposeService{
-				File: file, Service: service.Name, Tenant: job.Tenant,
+				File: file, Service: service.Name, Namespace: job.Namespace,
 			})
 		}
 	}

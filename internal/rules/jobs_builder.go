@@ -235,13 +235,13 @@ func sharedComposeJobs(params sharedComposeJobsParams) []domain.JobConfig {
 			name = fmt.Sprintf("%s-%d", shared.Service, params.Taken[shared.Service])
 		}
 		jobs = append(jobs, domain.JobConfig{
-			Name:   name,
-			Kind:   domain.JobKindService,
-			Cmd:    fmt.Sprintf("%s %sup -d %s", params.Params.ComposeCmd, flag, shared.Service),
-			Stop:   fmt.Sprintf("%s %sstop %s", params.Params.ComposeCmd, flag, shared.Service),
-			Cwd:    ".",
-			Scope:  domain.JobScopeShared,
-			Tenant: shared.Tenant,
+			Name:      name,
+			Kind:      domain.JobKindService,
+			Cmd:       fmt.Sprintf("%s %sup -d %s", params.Params.ComposeCmd, flag, shared.Service),
+			Stop:      fmt.Sprintf("%s %sstop %s", params.Params.ComposeCmd, flag, shared.Service),
+			Cwd:       ".",
+			Scope:     domain.JobScopeShared,
+			Namespace: shared.Namespace,
 		})
 	}
 	return jobs

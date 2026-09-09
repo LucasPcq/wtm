@@ -27,7 +27,7 @@ type Request struct {
 	// prompt it opens belongs to sudo and takes the terminal, so only a surface
 	// that can hand it over sets this.
 	AllowPrivileged bool
-	// KeepData withholds the tenants this worktree carved out of shared
+	// KeepData withholds the namespaces this worktree carved out of shared
 	// services. The default is to give them back: clean is the destructive
 	// command, and removing a worktree without its data would leave an orphan
 	// database behind on every iteration.
@@ -153,7 +153,7 @@ func (f *cleanFlow) remove(p removeParams) (Outcome, error) {
 	insideRemoved := worktreePath != "" && cwd != "" &&
 		rules.IsPathWithin(flow.ResolveSymlinks(worktreePath), flow.ResolveSymlinks(cwd))
 
-	f.detachTenants(params.Branch)
+	f.removeNamespaces(params.Branch)
 	f.stopServices(params.Branch)
 
 	// Hooks run as their own phase before the removal, so they don't fight the
@@ -222,10 +222,10 @@ func (f *cleanFlow) purgeJobLogs(branch string) {
 	}))
 }
 
-// detachTenants gives back what this worktree carved out of the shared
+// removeNamespaces gives back what this worktree carved out of the shared
 // services, before stopServices releases its claims: a claim released may be
-// the last one, and a tenant cannot be given back to a service that is down.
-func (f *cleanFlow) detachTenants(branchName string) {
+// the last one, and a namespace cannot be given back to a service that is down.
+func (f *cleanFlow) removeNamespaces(branchName string) {
 	if f.request.KeepData {
 		return
 	}
@@ -252,35 +252,35 @@ func (f *cleanFlow) detachTenants(branchName string) {
 	// Only what this worktree actually carved out. A worktree created and thrown
 	// away without ever starting the stack owes nothing, and running its detach
 	// would be a DROP DATABASE on a database that never existed.
-	held := worktree.TenantsOf(worktree.ParentBranchParams{StateDir: f.ctx.StateDir, Branch: branchName})
+	held := worktree.NamespacesOf(worktree.ParentBranchParams{StateDir: f.ctx.StateDir, Branch: branchName})
 	if len(held) == 0 {
 		return
 	}
 
-	result := runjobs.DetachWorktree(runjobs.DetachParams{
+	result := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
 		Config:  rules.JobsHeld(cfg, held),
 		Env:     env,
 		WorkDir: wt.Path,
 		Up:      rules.SharedJobsUp(rules.SharedJobsUpParams{Jobs: runjobs.Load(), Config: cfg}),
 	})
-	f.reportDetach(result)
+	f.reportNamespaces(result)
 
-	if err := runjobs.QueueDetach(runjobs.QueueDetachParams{StateDir: f.ctx.StateDir, Refs: result.Deferred}); err != nil {
+	if err := runjobs.QueueRemovals(runjobs.QueueRemovalsParams{StateDir: f.ctx.StateDir, Refs: result.Deferred}); err != nil {
 		f.presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: err.Error()})
 	}
 }
 
-func (f *cleanFlow) reportDetach(result runjobs.DetachResult) {
+func (f *cleanFlow) reportNamespaces(result runjobs.RemoveNamespacesResult) {
 	for _, ref := range result.Released {
 		f.presenter.Status(flow.Notice{
 			Kind: flow.NoticeSuccess,
-			Text: fmt.Sprintf(domain.CleanDetachedTenantFmt, ref.Worktree, ref.Job),
+			Text: fmt.Sprintf(domain.CleanRemovedNamespaceFmt, ref.Worktree, ref.Job),
 		})
 	}
 	for _, ref := range result.Deferred {
 		f.presenter.Status(flow.Notice{
 			Kind: flow.NoticeWarning,
-			Text: fmt.Sprintf(domain.CleanDeferredTenantFmt, ref.Job, ref.Worktree),
+			Text: fmt.Sprintf(domain.CleanDeferredNamespaceFmt, ref.Job, ref.Worktree),
 		})
 	}
 	for _, err := range result.Errs {

@@ -73,7 +73,7 @@ type harnessParams struct {
 }
 
 // newHarness opens a view over a scripted board and hands it the job list,
-// including the attach that selecting the first job triggers.
+// including the create command that selecting the first job triggers.
 func newHarness(t *testing.T, params harnessParams) *testHarness {
 	t.Helper()
 

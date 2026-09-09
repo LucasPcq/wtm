@@ -26,13 +26,13 @@ const (
 	JobScopeShared      JobScope = "shared"
 )
 
-// JobTenantConfig is the worktree's slice of a shared service. It names one
-// tenant and never a list: four keycloak realms are one tenant, whose internal
-// shape belongs to the attach script rather than to wtm.
-type JobTenantConfig struct {
+// JobNamespaceConfig is the worktree's slice of a shared service. It names one
+// namespace and never a list: four keycloak realms are one namespace, whose internal
+// shape belongs to the create script rather than to wtm.
+type JobNamespaceConfig struct {
 	Name   string            `toml:"name"             json:"name"`
-	Attach string            `toml:"attach,omitempty" json:"attach,omitempty"`
-	Detach string            `toml:"detach,omitempty" json:"detach,omitempty"`
+	Create string            `toml:"create,omitempty" json:"create,omitempty"`
+	Remove string            `toml:"remove,omitempty" json:"remove,omitempty"`
 	Env    map[string]string `toml:"env,omitempty"    json:"env,omitempty"`
 }
 
@@ -99,10 +99,10 @@ type JobConfig struct {
 	// that fans out. wtm learns nothing about the runner from it: the relation
 	// is declared, never inferred from the command.
 	Runs []string `toml:"runs,omitempty" json:"runs,omitempty"`
-	// A nil Tenant on a shared job means shared for good: one instance, one set
+	// A nil Namespace on a shared job means shared for good: one instance, one set
 	// of data.
-	Scope  JobScope         `toml:"scope,omitempty"  json:"scope,omitempty"`
-	Tenant *JobTenantConfig `toml:"tenant,omitempty" json:"tenant,omitempty"`
+	Scope     JobScope            `toml:"scope,omitempty"     json:"scope,omitempty"`
+	Namespace *JobNamespaceConfig `toml:"namespace,omitempty" json:"namespace,omitempty"`
 }
 
 // JobURLChoice is one job's answer to "should this be reachable by name": the
@@ -238,10 +238,10 @@ type JobRecord struct {
 	SharedDir string `json:"shared_dir,omitempty"`
 }
 
-// TenantRef is one worktree's slice of one shared service, named by what it
+// NamespaceRef is one worktree's slice of one shared service, named by what it
 // takes to recompute it: run.toml still holds the template, so an entry keeps
 // only what the worktree itself contributed.
-type TenantRef struct {
+type NamespaceRef struct {
 	Job      string `toml:"job"      json:"job"`
 	Worktree string `toml:"worktree" json:"worktree"`
 	Ordinal  int    `toml:"ordinal"  json:"ordinal"`

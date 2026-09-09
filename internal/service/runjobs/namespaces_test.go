@@ -10,11 +10,11 @@ import (
 	"github.com/LucasPcq/wtm/internal/service/runjobs"
 )
 
-func tenantConfig(detach string) domain.RunConfig {
+func namespaceConfig(detach string) domain.RunConfig {
 	return domain.RunConfig{Jobs: []domain.JobConfig{{
 		Name: "db", Kind: domain.JobKindService, Cmd: "sleep 1",
-		Scope:  domain.JobScopeShared,
-		Tenant: &domain.JobTenantConfig{Name: "crm_{worktree}", Attach: "true", Detach: detach},
+		Scope:     domain.JobScopeShared,
+		Namespace: &domain.JobNamespaceConfig{Name: "crm_{worktree}", Create: "true", Remove: detach},
 	}}}
 }
 
@@ -22,12 +22,12 @@ func worktreeEnv() map[string]string {
 	return map[string]string{domain.EnvWorktree: "feat_a", domain.EnvOrdinal: "2"}
 }
 
-func TestDetachWorktreeRunsTheCommandWithTheTenantName(t *testing.T) {
+func TestDetachWorktreeRunsTheCommandWithTheNamespaceName(t *testing.T) {
 	dir := t.TempDir()
 	witness := filepath.Join(dir, "witness")
 
-	got := runjobs.DetachWorktree(runjobs.DetachParams{
-		Config:  tenantConfig("printf '%s\\n' \"$WTM_TENANT\" >> " + witness),
+	got := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
+		Config:  namespaceConfig("printf '%s\\n' \"$WTM_NAMESPACE\" >> " + witness),
 		Env:     worktreeEnv(),
 		WorkDir: dir,
 		Up:      map[string]bool{"db": true},
@@ -53,8 +53,8 @@ func TestDetachWorktreeDefersWhenTheServiceIsDown(t *testing.T) {
 	dir := t.TempDir()
 	witness := filepath.Join(dir, "witness")
 
-	got := runjobs.DetachWorktree(runjobs.DetachParams{
-		Config:  tenantConfig("printf 'ran\\n' >> " + witness),
+	got := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
+		Config:  namespaceConfig("printf 'ran\\n' >> " + witness),
 		Env:     worktreeEnv(),
 		WorkDir: dir,
 		Up:      map[string]bool{},
@@ -67,13 +67,13 @@ func TestDetachWorktreeDefersWhenTheServiceIsDown(t *testing.T) {
 		t.Errorf("deferred = %v, want one entry for feat_a", got.Deferred)
 	}
 	if _, err := os.Stat(witness); !os.IsNotExist(err) {
-		t.Error("the detach ran against a service that is down")
+		t.Error("the removal ran against a service that is down")
 	}
 }
 
 func TestDetachWorktreeDefersAFailedCommand(t *testing.T) {
-	got := runjobs.DetachWorktree(runjobs.DetachParams{
-		Config:  tenantConfig("exit 3"),
+	got := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
+		Config:  namespaceConfig("exit 3"),
 		Env:     worktreeEnv(),
 		WorkDir: t.TempDir(),
 		Up:      map[string]bool{"db": true},
@@ -83,42 +83,42 @@ func TestDetachWorktreeDefersAFailedCommand(t *testing.T) {
 		t.Errorf("errs = %v, want one", got.Errs)
 	}
 	if len(got.Deferred) != 1 {
-		t.Errorf("deferred = %v, want the failed tenant owed rather than lost", got.Deferred)
+		t.Errorf("deferred = %v, want the failed namespace owed rather than lost", got.Deferred)
 	}
 }
 
 func TestPendingDetachQueueRoundTrips(t *testing.T) {
 	stateDir := t.TempDir()
-	ref := domain.TenantRef{Job: "db", Worktree: "feat_a", Ordinal: 2}
+	ref := domain.NamespaceRef{Job: "db", Worktree: "feat_a", Ordinal: 2}
 
-	if err := runjobs.QueueDetach(runjobs.QueueDetachParams{StateDir: stateDir, Refs: []domain.TenantRef{ref}}); err != nil {
+	if err := runjobs.QueueRemovals(runjobs.QueueRemovalsParams{StateDir: stateDir, Refs: []domain.NamespaceRef{ref}}); err != nil {
 		t.Fatalf("queue: %v", err)
 	}
-	if got := runjobs.LoadPendingDetach(stateDir); len(got) != 1 || got[0] != ref {
+	if got := runjobs.LoadPendingRemovals(stateDir); len(got) != 1 || got[0] != ref {
 		t.Fatalf("loaded = %v, want %v", got, ref)
 	}
 
-	// The same worktree cleaned twice owes one tenant, not two.
-	if err := runjobs.QueueDetach(runjobs.QueueDetachParams{StateDir: stateDir, Refs: []domain.TenantRef{ref}}); err != nil {
+	// The same worktree cleaned twice owes one namespace, not two.
+	if err := runjobs.QueueRemovals(runjobs.QueueRemovalsParams{StateDir: stateDir, Refs: []domain.NamespaceRef{ref}}); err != nil {
 		t.Fatalf("queue again: %v", err)
 	}
-	if got := runjobs.LoadPendingDetach(stateDir); len(got) != 1 {
+	if got := runjobs.LoadPendingRemovals(stateDir); len(got) != 1 {
 		t.Errorf("loaded = %v, want one entry", got)
 	}
 
-	if err := runjobs.SettleDetach(runjobs.SettleDetachParams{StateDir: stateDir, Refs: []domain.TenantRef{ref}}); err != nil {
+	if err := runjobs.SettleRemovals(runjobs.SettleRemovalsParams{StateDir: stateDir, Refs: []domain.NamespaceRef{ref}}); err != nil {
 		t.Fatalf("settle: %v", err)
 	}
-	if got := runjobs.LoadPendingDetach(stateDir); len(got) != 0 {
+	if got := runjobs.LoadPendingRemovals(stateDir); len(got) != 0 {
 		t.Errorf("loaded = %v, want an empty queue", got)
 	}
-	if _, err := os.Stat(filepath.Join(stateDir, domain.PendingDetachFileName)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(stateDir, domain.PendingRemovalsFileName)); !os.IsNotExist(err) {
 		t.Error("an empty queue left its file behind")
 	}
 }
 
 func TestLoadPendingDetachOfAnAbsentFileIsEmpty(t *testing.T) {
-	if got := runjobs.LoadPendingDetach(t.TempDir()); len(got) != 0 {
+	if got := runjobs.LoadPendingRemovals(t.TempDir()); len(got) != 0 {
 		t.Errorf("loaded = %v, want none", got)
 	}
 }

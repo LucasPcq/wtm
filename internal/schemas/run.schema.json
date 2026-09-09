@@ -104,35 +104,35 @@
             ],
             "description": "Set to \"shared\" to run this job ONCE for the whole repository instead of once per worktree \u2014 a postgres, a keycloak. It runs in the main checkout, so it takes no port offset (a declared 5432 is the 5432 it binds everywhere) and its published URL carries no worktree segment. Other worktrees hold a claim on it, reported as status \"attached\" with pid 0; the service stops when the last claim goes. Omit for the default, one instance per worktree."
           },
-          "tenant": {
+          "namespace": {
             "type": "object",
             "additionalProperties": false,
             "required": [
               "name",
-              "attach"
+              "create"
             ],
-            "description": "The slice of a shared service this worktree gets, so each keeps its own data \u2014 a database, a set of keycloak realms. Only valid on a job with scope = \"shared\"; a shared job without one means one instance with one set of data. wtm names the tenant and runs the commands below, and knows nothing else about them.",
+            "description": "The slice of a shared service this worktree gets, so each keeps its own data \u2014 a database, a set of keycloak realms. Only valid on a job with scope = \"shared\"; a shared job without one means one instance with one set of data. wtm names the slice and runs the commands below, and knows nothing else about them.",
             "properties": {
               "name": {
                 "type": "string",
                 "minLength": 1,
-                "description": "The tenant's name. {worktree} and {ordinal} are substituted; the resolved value reaches the commands as $WTM_TENANT. e.g. \"app_{worktree}\"."
+                "description": "The slice's name, which wtm substitutes {worktree} and {ordinal} into and hands to the commands as $WTM_NAMESPACE. For a postgres it is the database name \u2014 e.g. \"app_{worktree}\". wtm never interprets it; it only names what a clean is about to destroy."
               },
-              "attach": {
+              "create": {
                 "type": "string",
                 "minLength": 1,
-                "description": "Command run the first time a worktree claims the service, to carve its tenant out \u2014 e.g. a CREATE DATABASE. Runs as a /bin/sh line with the worktree's whole environment (its ports and URLs) plus $WTM_TENANT, $WTM_WORKTREE and $WTM_ORDINAL. Retried for a while: the service was started moments earlier and may not be accepting connections yet."
+                "description": "Command run the first time a worktree claims the service, to carve its namespace out \u2014 a CREATE DATABASE, a kcadm create realms, a script of your own. Runs as a /bin/sh line in the worktree, with its whole environment (its ports and URLs) plus $WTM_NAMESPACE, $WTM_WORKTREE and $WTM_ORDINAL. Retried for a while: the service was started moments earlier and may not be accepting connections yet."
               },
-              "detach": {
+              "remove": {
                 "type": "string",
-                "description": "Command run by `wtm clean` when the worktree goes, to give the tenant back \u2014 e.g. a DROP DATABASE. Never run by `run stop` or `run down`: stopping is not destroying. `wtm clean --keep-data` withholds it. Same environment as attach."
+                "description": "Command run by `wtm clean` when the worktree goes, to give the namespace back. Never run by `run stop` or `run down`: stopping is not destroying. `wtm clean --keep-data` withholds it. Same environment as create."
               },
               "env": {
                 "type": "object",
                 "additionalProperties": {
                   "type": "string"
                 },
-                "description": "Variables the tenant contributes, with {worktree} and {ordinal} substituted \u2014 e.g. CRM_DATABASE_URL = \"postgres://postgres@127.0.0.1:5432/crm_{worktree}\". They reach the attach and detach commands."
+                "description": "Variables this namespace contributes, with {worktree} and {ordinal} substituted \u2014 e.g. CRM_DATABASE_URL = \"postgres://postgres@127.0.0.1:5432/crm_{worktree}\". They reach the create and remove commands."
               }
             }
           }

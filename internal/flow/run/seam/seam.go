@@ -169,13 +169,13 @@ func (s Seam) Starter(params StartParams) runlogs.StartFunc {
 func (s Seam) run(ctx context.Context, sink runlogs.Sink, params StartParams) (runlogs.Outcome, error) {
 	outcome, err := s.start(ctx, sink, params)
 	// Recorded after the run, from the jobs it actually started: it is the only
-	// durable trace that this worktree holds a tenant, and `clean` reads it to
+	// durable trace that this worktree holds a namespace, and `clean` reads it to
 	// give back exactly what exists rather than everything run.toml declares.
 	if s.shared != nil {
-		_ = worktree.RecordTenants(worktree.RecordTenantsParams{
+		_ = worktree.RecordNamespaces(worktree.RecordNamespacesParams{
 			StateDir: s.stateDir,
 			Branch:   s.worktree,
-			Jobs:     rules.TenantJobsStarted(rules.TenantJobsStartedParams{Jobs: params.Jobs, Started: outcome.Started}),
+			Jobs:     rules.NamespaceJobsStarted(rules.NamespaceJobsStartedParams{Jobs: params.Jobs, Started: outcome.Started}),
 		})
 	}
 	return outcome, err
