@@ -2,6 +2,7 @@ package shared
 
 import (
 	"github.com/spf13/cobra"
+	"io"
 
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/output"
@@ -55,13 +56,13 @@ func (p CLIPresenter) HookPhase(params flow.HookPhaseParams) error {
 
 func (p CLIPresenter) Notice(notice flow.Notice) {
 	if notice.Kind == flow.NoticeWarning {
-		output.Frame(p.Cmd.ErrOrStderr(), func() {
-			output.Warning(p.Cmd.ErrOrStderr(), notice.Text)
+		output.Frame(p.Cmd.ErrOrStderr(), func(w io.Writer) {
+			output.Warning(w, notice.Text)
 		})
 		return
 	}
-	output.Frame(p.Cmd.OutOrStdout(), func() {
-		output.Message(p.Cmd.OutOrStdout(), notice.Text)
+	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		output.Message(w, notice.Text)
 	})
 }
 

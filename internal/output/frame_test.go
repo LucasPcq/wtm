@@ -2,13 +2,17 @@ package output
 
 import (
 	"bytes"
+	"io"
+	"strings"
 	"testing"
+
+	"github.com/LucasPcq/wtm/internal/domain"
 )
 
 func TestFrame_WrapsBodyInSingleTopAndBottomBlank(t *testing.T) {
 	var buf bytes.Buffer
-	Frame(&buf, func() {
-		Success(&buf, "done")
+	Frame(&buf, func(w io.Writer) {
+		Success(w, "done")
 	})
 
 	// The body line carries styled bytes; assert the frame shape rather than the
@@ -24,8 +28,8 @@ func TestFrame_WrapsBodyInSingleTopAndBottomBlank(t *testing.T) {
 
 func TestFrame_NoStackedBlankLines(t *testing.T) {
 	var buf bytes.Buffer
-	Frame(&buf, func() {
-		Message(&buf, "hello")
+	Frame(&buf, func(w io.Writer) {
+		Message(w, "hello")
 	})
 
 	if got := buf.String(); containsTripleNewline(got) {
@@ -50,4 +54,33 @@ func containsTripleNewline(s string) bool {
 		}
 	}
 	return false
+}
+
+// The bar is the CLI's own mark, so it never reaches a log: a buffer, a pipe or
+// a redirection gets the bare text and a grep over it stays clean.
+func TestBarredLeavesANonTerminalAlone(t *testing.T) {
+	var buf bytes.Buffer
+	if Barred(&buf) != io.Writer(&buf) {
+		t.Error("a non-terminal writer was wrapped")
+	}
+}
+
+// Every line of a block carries the bar, blank separators included — a gap in
+// the rule reads as two blocks.
+func TestBarWriterMarksEveryLineIncludingBlankOnes(t *testing.T) {
+	var buf bytes.Buffer
+	bar := &barWriter{w: &buf, atLineStart: true}
+	if _, err := io.WriteString(bar, "one\n\ntwo\n"); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSuffix(buf.String(), "\n"), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("wrote %d lines, want 3: %q", len(lines), buf.String())
+	}
+	for i, line := range lines {
+		if !strings.Contains(line, domain.AccentBarGlyph) {
+			t.Errorf("line %d carries no bar: %q", i, line)
+		}
+	}
 }

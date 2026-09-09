@@ -3,6 +3,7 @@ package resolve
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -53,8 +54,8 @@ func runResolve(cmd *cobra.Command, args []string) error {
 		if format == domain.OutputJSON {
 			return err
 		}
-		output.Frame(cmd.ErrOrStderr(), func() {
-			output.Warning(cmd.ErrOrStderr(), fmt.Sprintf("No worktree found matching %q", query))
+		output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
+			output.Warning(w, fmt.Sprintf("No worktree found matching %q", query))
 		})
 		return nil
 	}

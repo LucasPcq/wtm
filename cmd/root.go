@@ -3,6 +3,7 @@ package cmd
 
 import (
 	"errors"
+	"io"
 	"os"
 	"strings"
 
@@ -166,8 +167,8 @@ func printUpdateNotice() {
 		return
 	}
 
-	output.Frame(os.Stderr, func() {
-		output.UpdateNotice(os.Stderr, output.UpdateNoticeParams{Current: current, Latest: latest, Method: method})
+	output.Frame(os.Stderr, func(w io.Writer) {
+		output.UpdateNotice(w, output.UpdateNoticeParams{Current: current, Latest: latest, Method: method})
 	})
 }
 

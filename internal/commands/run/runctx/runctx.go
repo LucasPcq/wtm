@@ -118,7 +118,7 @@ func (c Context) Listing(params ListingParams) (bool, error) {
 	if c.Interactive {
 		return false, nil
 	}
-	output.Frame(out, func() { params.Table(out) })
+	output.Frame(out, func(w io.Writer) { params.Table(w) })
 	return true, nil
 }
 

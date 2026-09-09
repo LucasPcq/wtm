@@ -3,6 +3,7 @@ package initcmd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -90,9 +91,9 @@ func runInit(cmd *cobra.Command, _ []string) error {
 	}
 
 	if detect.ProjectConfigExists(stateDir) {
-		output.Frame(cmd.OutOrStdout(), func() {
-			output.Message(cmd.OutOrStdout(), fmt.Sprintf("%s already exists.", filepath.Join(stateDir, domain.ConfigFileName)))
-			output.Message(cmd.OutOrStdout(), "Reconfigure a section with `wtm init --only env|hooks|worktrees`, or edit by hand with `wtm config edit`. Configure services with `wtm run init`.")
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			output.Message(w, fmt.Sprintf("%s already exists.", filepath.Join(stateDir, domain.ConfigFileName)))
+			output.Message(w, "Reconfigure a section with `wtm init --only env|hooks|worktrees`, or edit by hand with `wtm config edit`. Configure services with `wtm run init`.")
 		})
 		return nil
 	}
@@ -120,8 +121,8 @@ func ensureGlobalConfig(cmd *cobra.Command, flagged bool) error {
 		return err
 	}
 
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.InitGlobalRecap(cmd.OutOrStdout(), output.InitGlobalRecapParams{
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.InitGlobalRecap(w, output.InitGlobalRecapParams{
 			Fields:    rules.InitGlobalRecapFields(answers),
 			NextSteps: []string{domain.InitNextStepShell},
 		})
@@ -213,8 +214,8 @@ func createProjectConfig(cmd *cobra.Command, dir, stateDir string, flagged bool)
 		return err
 	}
 
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.InitProjectRecap(cmd.OutOrStdout(), output.InitProjectRecapParams{
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.InitProjectRecap(w, output.InitProjectRecapParams{
 			ConfigPath: rules.DisplayPath(rules.DisplayPathParams{Base: dir, Target: filepath.Join(stateDir, domain.ConfigFileName)}),
 			Fields:     rules.InitProjectRecapFields(answers),
 			NextSteps: []string{

@@ -1,6 +1,7 @@
 package proxycmd
 
 import (
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -50,8 +51,8 @@ func runInstall(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.ProxyPlanReport(cmd.OutOrStdout(), output.ProxyPlanReportParams{
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.ProxyPlanReport(w, output.ProxyPlanReportParams{
 			Files:      plan.Files,
 			Script:     plan.Script,
 			Full:       full,
@@ -73,8 +74,8 @@ func runInstall(cmd *cobra.Command, _ []string) error {
 	if applyErr := redirector.Apply(); applyErr != nil {
 		return applyErr
 	}
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.Success(cmd.OutOrStdout(), domain.ProxyInstallDone)
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.Success(w, domain.ProxyInstallDone)
 	})
 	return nil
 }
@@ -98,8 +99,8 @@ func runUninstall(cmd *cobra.Command, _ []string) error {
 		plan.Files[i].Change = domain.ProxyUninstallChange
 	}
 
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.ProxyPlanReport(cmd.OutOrStdout(), output.ProxyPlanReportParams{Files: plan.Files})
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.ProxyPlanReport(w, output.ProxyPlanReportParams{Files: plan.Files})
 	})
 
 	confirmed, err := confirm(cmd, components.NewConfirmParams{
@@ -113,8 +114,8 @@ func runUninstall(cmd *cobra.Command, _ []string) error {
 	if removeErr := redirector.Remove(); removeErr != nil {
 		return removeErr
 	}
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.Success(cmd.OutOrStdout(), domain.ProxyUninstallDone)
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.Success(w, domain.ProxyUninstallDone)
 	})
 	return nil
 }

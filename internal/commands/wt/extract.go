@@ -3,6 +3,7 @@ package wt
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -123,8 +124,8 @@ func runExtract(cmd *cobra.Command, args []string) error {
 		statuses:   statuses,
 	})
 	if errors.Is(err, domain.ErrNoDirtyWorktrees) {
-		output.Frame(cmd.OutOrStdout(), func() {
-			output.Message(cmd.OutOrStdout(), domain.ErrNoDirtyWorktrees.Error())
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			output.Message(w, domain.ErrNoDirtyWorktrees.Error())
 		})
 		return nil
 	}
@@ -150,8 +151,8 @@ func runExtract(cmd *cobra.Command, args []string) error {
 			if format == domain.OutputJSON {
 				return output.WriteExtractJSON(cmd.OutOrStdout(), domain.ExtractResult{Files: []domain.ExtractFile{}})
 			}
-			output.Frame(cmd.OutOrStdout(), func() {
-				output.Message(cmd.OutOrStdout(), domain.ErrNoChangesToExtract.Error())
+			output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+				output.Message(w, domain.ErrNoChangesToExtract.Error())
 			})
 			return nil
 		}
@@ -170,8 +171,8 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	})
 	if errors.Is(err, domain.ErrUserAborted) {
 		if rules.IsHumanFormat(format) {
-			output.Frame(cmd.OutOrStdout(), func() {
-				output.Message(cmd.OutOrStdout(), "Aborted.")
+			output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+				output.Message(w, "Aborted.")
 			})
 		}
 		return nil
@@ -189,8 +190,8 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	})
 	if errors.Is(err, domain.ErrUserAborted) {
 		if rules.IsHumanFormat(format) {
-			output.Frame(cmd.OutOrStdout(), func() {
-				output.Message(cmd.OutOrStdout(), "Cancelled — nothing was changed.")
+			output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+				output.Message(w, "Cancelled — nothing was changed.")
 			})
 		}
 		return nil
@@ -216,13 +217,13 @@ func runExtract(cmd *cobra.Command, args []string) error {
 		return output.WriteExtractJSON(cmd.OutOrStdout(), result)
 	}
 	if len(result.Conflicts) > 0 {
-		output.Frame(cmd.OutOrStdout(), func() {
-			output.PrintExtractConflicts(cmd.OutOrStdout(), result)
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			output.PrintExtractConflicts(w, result)
 		})
 		return nil
 	}
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.PrintExtractResult(cmd.OutOrStdout(), output.ExtractResultParams{
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.PrintExtractResult(w, output.ExtractResultParams{
 			Result:  result,
 			EnvNote: rules.EnvPortSettlementNote(sel.target.envPorts),
 		})

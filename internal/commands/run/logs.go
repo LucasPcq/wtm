@@ -169,12 +169,13 @@ func writeJobLines(params jobLinesParams) error {
 	}
 	out := params.Cmd.OutOrStdout()
 	if len(views) == 0 {
-		output.Frame(out, func() { output.Message(out, domain.RunLogsNoJobs) })
+		output.Frame(out, func(w io.Writer) { output.Message(w, domain.RunLogsNoJobs) })
 		return nil
 	}
 
 	output.FrameStart(out)
-	writer := &lineWriter{out: out}
+	barred := output.Barred(out)
+	writer := &lineWriter{out: barred}
 	var wg sync.WaitGroup
 	attached := false
 
@@ -215,7 +216,7 @@ func writeJobLines(params jobLinesParams) error {
 	// A worktree whose jobs are all down and none of which ever wrote a line has
 	// nothing to show; saying so beats an empty frame.
 	if !attached && !writer.wrote {
-		output.Message(out, domain.RunLogsNoJobs)
+		output.Message(barred, domain.RunLogsNoJobs)
 	}
 	output.FrameEnd(out)
 	return nil

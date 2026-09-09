@@ -124,6 +124,13 @@ const (
 	// RecapFrameChrome is what a wizard recap spends around its body: the
 	// indentation on either side and the border between them.
 	RecapFrameChrome = 8
+	// AccentBarGlyph is the left rule marking a block as wtm's own output. It sits
+	// in column zero, left of everything else the CLI prints, which is what makes
+	// it a marker rather than one more indent.
+	AccentBarGlyph = "┃"
+	// AccentBarWidth is the room it takes from whatever draws inside it.
+	AccentBarWidth = 1
+
 	// Ellipsis marks a value the display cut short.
 	Ellipsis = "\u2026"
 

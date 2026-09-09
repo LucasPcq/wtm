@@ -2,6 +2,7 @@ package run
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -138,12 +139,12 @@ func (p stopPresenter) Stopped(outcome stopflow.Outcome) error {
 	}
 	out := p.Cmd.OutOrStdout()
 	if outcome.NoDaemon {
-		output.Frame(out, func() { output.Message(out, domain.RunNoJobsRunning) })
+		output.Frame(out, func(w io.Writer) { output.Message(w, domain.RunNoJobsRunning) })
 		return nil
 	}
-	output.Frame(out, func() {
+	output.Frame(out, func(w io.Writer) {
 		for _, worktree := range outcome.Results {
-			output.Success(out, p.qualify(fmt.Sprintf(domain.RunStoppedFmt, outcome.Job), outcome, worktree))
+			output.Success(w, p.qualify(fmt.Sprintf(domain.RunStoppedFmt, outcome.Job), outcome, worktree))
 		}
 	})
 	return nil

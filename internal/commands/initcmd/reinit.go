@@ -3,6 +3,7 @@ package initcmd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -91,8 +92,8 @@ func runReinit(cmd *cobra.Command, dir, stateDir string, sections []string) erro
 			Confirm:    confirm,
 		})
 		if errors.Is(err, domain.ErrUserAborted) {
-			output.Frame(cmd.OutOrStdout(), func() {
-				output.Message(cmd.OutOrStdout(), "Aborted.")
+			output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+				output.Message(w, "Aborted.")
 			})
 			return nil
 		}

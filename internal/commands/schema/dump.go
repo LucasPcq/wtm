@@ -2,6 +2,7 @@ package schema
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -38,9 +39,9 @@ func runDump(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return err
 		}
-		output.Frame(cmd.OutOrStdout(), func() {
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
 			for _, p := range written {
-				output.Success(cmd.OutOrStdout(), fmt.Sprintf("Wrote %s", p))
+				output.Success(w, fmt.Sprintf("Wrote %s", p))
 			}
 		})
 		return nil
@@ -59,9 +60,9 @@ func runDump(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	output.Frame(cmd.OutOrStdout(), func() {
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
 		for _, p := range written {
-			output.Success(cmd.OutOrStdout(), fmt.Sprintf("Wrote %s", p))
+			output.Success(w, fmt.Sprintf("Wrote %s", p))
 		}
 	})
 	return nil

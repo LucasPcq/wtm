@@ -79,8 +79,8 @@ func runImport(cmd *cobra.Command, args []string) error {
 	}
 
 	if !confirmImport(confirmImportParams{Interactive: interactive, Incoming: incoming}) {
-		output.Frame(cmd.OutOrStdout(), func() {
-			output.Message(cmd.OutOrStdout(), domain.ImportDeclined)
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			output.Message(w, domain.ImportDeclined)
 		})
 		return nil
 	}
@@ -137,8 +137,8 @@ func reportImport(cmd *cobra.Command, cfg domain.RunConfig, format string) error
 	if format == domain.OutputJSON {
 		return output.WriteImportResultJSON(cmd.OutOrStdout(), ir)
 	}
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.WriteImportResultText(cmd.OutOrStdout(), ir)
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.WriteImportResultText(w, ir)
 	})
 	return nil
 }

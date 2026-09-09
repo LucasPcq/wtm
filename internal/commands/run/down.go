@@ -2,6 +2,7 @@ package run
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
 
@@ -79,7 +80,7 @@ func (p downPresenter) Downed(outcome downflow.Outcome) error {
 
 	out, errOut := p.Cmd.OutOrStdout(), p.Cmd.ErrOrStderr()
 	if outcome.NoDaemon || len(outcome.Stopped()) == 0 {
-		output.Frame(out, func() { output.Message(out, p.nothingRunning(outcome)) })
+		output.Frame(out, func(w io.Writer) { output.Message(w, p.nothingRunning(outcome)) })
 		return nil
 	}
 
@@ -95,8 +96,8 @@ func (p downPresenter) Downed(outcome downflow.Outcome) error {
 		}
 	}
 
-	output.Frame(out, func() {
-		fmt.Fprint(out, output.FormatRunDownRecap(output.RunDownRecapParams{
+	output.Frame(out, func(w io.Writer) {
+		fmt.Fprint(w, output.FormatRunDownRecap(output.RunDownRecapParams{
 			Profile: outcome.Profile,
 			Results: outcome.Results,
 		}))

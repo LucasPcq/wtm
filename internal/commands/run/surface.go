@@ -2,6 +2,7 @@ package run
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -55,7 +56,7 @@ func openRunView(params viewParams) (runlogs.Outcomes, error) {
 
 	if result.Recap != "" {
 		out := params.Cmd.OutOrStdout()
-		output.Frame(out, func() { fmt.Fprintln(out, result.Recap) })
+		output.Frame(out, func(w io.Writer) { fmt.Fprintln(w, result.Recap) })
 	}
 	return result.Outcomes, nil
 }
@@ -78,8 +79,8 @@ func runOnStream(params streamParams) (runlogs.Outcomes, error) {
 
 	output.FrameStart(out)
 	outcomes, err := params.Start(params.Cmd.Context(), output.NewRunPrinter(output.RunPrinterParams{
-		Out:        out,
-		Err:        errOut,
+		Out:        output.Barred(out),
+		Err:        output.Barred(errOut),
 		Profile:    params.Profile,
 		Worktrees:  params.Worktrees,
 		Hyperlinks: params.Hyperlinks,

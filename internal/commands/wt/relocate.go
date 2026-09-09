@@ -2,6 +2,7 @@ package wt
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -142,8 +143,8 @@ func runRelocate(cmd *cobra.Command, _ []string) error {
 	}
 
 	if interactive {
-		output.Frame(cmd.OutOrStdout(), func() {
-			output.FormatRelocateResult(cmd.OutOrStdout(), result)
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			output.FormatRelocateResult(w, result)
 		})
 	} else if jsonErr := output.WriteRelocateResultJSON(cmd.OutOrStdout(), result); jsonErr != nil {
 		return jsonErr
@@ -232,9 +233,10 @@ type renderDryRunParams struct {
 func renderRelocateDryRun(p renderDryRunParams) error {
 	if p.Interactive {
 		output.FrameStart(p.Cmd.ErrOrStderr())
-		output.FormatRelocatePlan(p.Cmd.ErrOrStderr(), p.Plan)
-		output.Blank(p.Cmd.ErrOrStderr())
-		output.Message(p.Cmd.ErrOrStderr(), "Dry run — no changes made.")
+		barred := output.Barred(p.Cmd.ErrOrStderr())
+		output.FormatRelocatePlan(barred, p.Plan)
+		output.Blank(barred)
+		output.Message(barred, "Dry run — no changes made.")
 		output.FrameEnd(p.Cmd.ErrOrStderr())
 		return nil
 	}
@@ -246,8 +248,8 @@ func renderRelocateDryRun(p renderDryRunParams) error {
 }
 
 func renderRelocateAborted(cmd *cobra.Command) error {
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.Message(cmd.OutOrStdout(), "Aborted.")
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.Message(w, "Aborted.")
 	})
 	return nil
 }
@@ -263,8 +265,8 @@ func renderEmptyRelocate(cmd *cobra.Command, interactive bool) error {
 	if !interactive {
 		return output.WriteRelocateResultJSON(cmd.OutOrStdout(), domain.RelocateResult{})
 	}
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.Message(cmd.OutOrStdout(), "All worktrees are already aligned with base_path.")
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.Message(w, "All worktrees are already aligned with base_path.")
 	})
 	return nil
 }

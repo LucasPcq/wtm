@@ -2,6 +2,7 @@ package daemoncmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -82,8 +83,8 @@ func reportStopped(cmd *cobra.Command, message string) error {
 	if format, _ := cmd.Flags().GetString(domain.FlagOutput); format == domain.OutputJSON {
 		return output.WriteDaemonStatusJSON(cmd.OutOrStdout(), collectStatus())
 	}
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.Success(cmd.OutOrStdout(), message)
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.Success(w, message)
 	})
 	return nil
 }

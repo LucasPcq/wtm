@@ -117,6 +117,7 @@ func Callout(w io.Writer, title string, lines []string) {
 // is not a narrower table but an unreadable one.
 func calloutWidth(lines []string) int {
 	cols, _, err := term.GetSize(int(os.Stdout.Fd()))
+	cols -= domain.AccentBarWidth
 	if err != nil || cols <= 0 {
 		return 0
 	}

@@ -2,6 +2,7 @@ package run
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
 
@@ -37,8 +38,8 @@ func runList(cmd *cobra.Command, _ []string) error {
 	}
 
 	if !ctx.Interactive || (len(ctx.Run.Jobs) == 0 && len(ctx.Run.Profiles) == 0) {
-		output.Frame(cmd.OutOrStdout(), func() {
-			fmt.Fprint(cmd.OutOrStdout(), output.FormatRunConfig(ctx.Run))
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			fmt.Fprint(w, output.FormatRunConfig(ctx.Run))
 		})
 		return nil
 	}

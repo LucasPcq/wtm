@@ -2,6 +2,7 @@ package run
 
 import (
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -54,8 +55,8 @@ func runPs(cmd *cobra.Command, _ []string) error {
 	}
 
 	out := cmd.OutOrStdout()
-	output.Frame(out, func() {
-		fmt.Fprint(out, output.FormatRunningJobs(output.FormatRunningJobsParams{Jobs: jobs, Now: time.Now()}))
+	output.Frame(out, func(w io.Writer) {
+		fmt.Fprint(w, output.FormatRunningJobs(output.FormatRunningJobsParams{Jobs: jobs, Now: time.Now()}))
 	})
 	return nil
 }

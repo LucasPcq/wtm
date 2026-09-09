@@ -74,8 +74,8 @@ func runInstall(cmd *cobra.Command, _ []string) error {
 		if format == domain.OutputJSON {
 			return writeAgentsJSON(cmd.OutOrStdout(), nil)
 		}
-		output.Frame(cmd.OutOrStdout(), func() {
-			output.Message(cmd.OutOrStdout(), "No destinations selected.")
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			output.Message(w, "No destinations selected.")
 		})
 		return nil
 	}
@@ -222,7 +222,7 @@ func writeAgentsJSON(w io.Writer, results []agentInstallResult) error {
 }
 
 func printAgentResults(w io.Writer, results []agentInstallResult) {
-	output.Frame(w, func() {
+	output.Frame(w, func(w io.Writer) {
 		for _, r := range results {
 			switch r.Action {
 			case agentActionCreated:

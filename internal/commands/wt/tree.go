@@ -2,6 +2,7 @@ package wt
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -80,8 +81,8 @@ func runTree(cmd *cobra.Command, _ []string) error {
 	case domain.OutputMermaid:
 		return output.WriteTreeMermaid(cmd.OutOrStdout(), forest)
 	default:
-		output.Frame(cmd.OutOrStdout(), func() {
-			fmt.Fprintln(cmd.OutOrStdout(), strings.TrimRight(output.FormatTree(forest), "\n"))
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			fmt.Fprintln(w, strings.TrimRight(output.FormatTree(forest), "\n"))
 		})
 		return nil
 	}

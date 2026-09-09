@@ -3,6 +3,7 @@ package wt
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -328,8 +329,8 @@ func writeEnvResult(cmd *cobra.Command, result domain.EnvSyncResult, format stri
 	if format == domain.OutputJSON {
 		return output.WriteEnvJSON(cmd.OutOrStdout(), result)
 	}
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.PrintEnvReport(cmd.OutOrStdout(), result)
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.PrintEnvReport(w, result)
 	})
 	return nil
 }
@@ -374,8 +375,8 @@ func resolveEnvStrategyAndParent(cfg shared.ConfigResult, branch, from string) e
 // abortedEnv prints the framed "Aborted." line on the human path and returns nil.
 func abortedEnv(cmd *cobra.Command, format string) error {
 	if rules.IsHumanFormat(format) {
-		output.Frame(cmd.OutOrStdout(), func() {
-			output.Message(cmd.OutOrStdout(), "Aborted.")
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			output.Message(w, "Aborted.")
 		})
 	}
 	return nil

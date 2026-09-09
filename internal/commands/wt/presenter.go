@@ -2,6 +2,7 @@ package wt
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -37,8 +38,8 @@ func (p createPresenter) Created(outcome createflow.Outcome) error {
 		})
 	}
 
-	output.Frame(p.Cmd.OutOrStdout(), func() {
-		output.FormatCreateResult(p.Cmd.OutOrStdout(), output.CreateResultParams{
+	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		output.FormatCreateResult(w, output.CreateResultParams{
 			Branch:        outcome.Branch,
 			AlreadyExists: outcome.Result.AlreadyExists,
 			From:          outcome.FromBranch,
@@ -70,8 +71,8 @@ func (p cleanPresenter) Cleaned(outcome cleanflow.Outcome) error {
 				AlreadyAbsent: true,
 			})
 		}
-		output.Frame(p.Cmd.OutOrStdout(), func() {
-			output.Message(p.Cmd.OutOrStdout(), fmt.Sprintf(domain.CleanAlreadyAbsentFmt, outcome.Branch))
+		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			output.Message(w, fmt.Sprintf(domain.CleanAlreadyAbsentFmt, outcome.Branch))
 		})
 		return nil
 	}
@@ -85,13 +86,13 @@ func (p cleanPresenter) Cleaned(outcome cleanflow.Outcome) error {
 		})
 	}
 
-	output.Frame(p.Cmd.OutOrStdout(), func() {
-		output.Success(p.Cmd.OutOrStdout(), fmt.Sprintf(domain.CleanedFmt, outcome.Branch))
+	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		output.Success(w, fmt.Sprintf(domain.CleanedFmt, outcome.Branch))
 		for _, child := range outcome.Reparented {
-			output.Success(p.Cmd.OutOrStdout(), fmt.Sprintf(domain.CleanReparentedFmt, child.Branch, child.NewParent))
+			output.Success(w, fmt.Sprintf(domain.CleanReparentedFmt, child.Branch, child.NewParent))
 		}
 		for _, child := range outcome.OrphanedChildren {
-			output.Warning(p.Cmd.OutOrStdout(), fmt.Sprintf(domain.CleanStillOrphanedFmt, child.Branch, child.OldParent))
+			output.Warning(w, fmt.Sprintf(domain.CleanStillOrphanedFmt, child.Branch, child.OldParent))
 		}
 	})
 	return nil
@@ -109,8 +110,8 @@ func (p prunePresenter) Pruned(outcome pruneflow.Outcome) error {
 		if p.Format == domain.OutputJSON {
 			return output.WritePruneResultJSON(p.Cmd.OutOrStdout(), domain.PruneResult{})
 		}
-		output.Frame(p.Cmd.OutOrStdout(), func() {
-			output.Message(p.Cmd.OutOrStdout(), domain.PruneNothingToPrune)
+		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			output.Message(w, domain.PruneNothingToPrune)
 		})
 		return nil
 	}
@@ -120,14 +121,14 @@ func (p prunePresenter) Pruned(outcome pruneflow.Outcome) error {
 	}
 
 	if outcome.Result.DryRun {
-		output.Frame(p.Cmd.OutOrStdout(), func() {
-			output.FormatPrunePlan(p.Cmd.OutOrStdout(), outcome.Plan)
+		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			output.FormatPrunePlan(w, outcome.Plan)
 		})
 		return nil
 	}
 
-	output.Frame(p.Cmd.OutOrStdout(), func() {
-		output.FormatPruneResult(p.Cmd.OutOrStdout(), outcome.Result)
+	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		output.FormatPruneResult(w, outcome.Result)
 	})
 	return nil
 }
@@ -143,7 +144,7 @@ func (p syncPresenter) Planned(plan domain.SyncPlan) {
 		return
 	}
 	output.FrameStart(p.Cmd.ErrOrStderr())
-	output.FormatSyncPlan(p.Cmd.ErrOrStderr(), plan)
+	output.FormatSyncPlan(output.Barred(p.Cmd.ErrOrStderr()), plan)
 }
 
 // Rebased is the recap the user reads BEFORE being asked to push. Its single
@@ -153,7 +154,7 @@ func (p syncPresenter) Rebased(result domain.SyncResult) {
 		return
 	}
 	output.Blank(p.Cmd.OutOrStdout())
-	output.FormatSyncResult(p.Cmd.OutOrStdout(), result)
+	output.FormatSyncResult(output.Barred(p.Cmd.OutOrStdout()), result)
 }
 
 func (p syncPresenter) Synced(outcome syncflow.Outcome) error {
@@ -161,12 +162,12 @@ func (p syncPresenter) Synced(outcome syncflow.Outcome) error {
 		return output.WriteSyncResultJSON(p.Cmd.OutOrStdout(), outcome.Result)
 	}
 	if outcome.Empty {
-		output.Frame(p.Cmd.OutOrStdout(), func() {
-			output.Message(p.Cmd.OutOrStdout(), domain.SyncNothingToSync)
+		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			output.Message(w, domain.SyncNothingToSync)
 		})
 		return nil
 	}
-	output.FormatSyncPushSummary(p.Cmd.OutOrStdout(), outcome.Result.Steps)
+	output.FormatSyncPushSummary(output.Barred(p.Cmd.OutOrStdout()), outcome.Result.Steps)
 	output.FrameEnd(p.Cmd.OutOrStdout())
 	return nil
 }
@@ -180,11 +181,11 @@ func (p reparentPresenter) Reparented(outcome reparentflow.Outcome) error {
 		return output.WriteReparentJSON(p.Cmd.OutOrStdout(), outcome.Results)
 	}
 
-	output.Frame(p.Cmd.OutOrStdout(), func() {
+	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
 		for _, result := range outcome.Results {
-			output.Success(p.Cmd.OutOrStdout(), fmt.Sprintf(domain.ReparentedFmt, result.Branch, result.OldParent, result.NewParent))
+			output.Success(w, fmt.Sprintf(domain.ReparentedFmt, result.Branch, result.OldParent, result.NewParent))
 		}
-		output.Message(p.Cmd.OutOrStdout(), reparentSyncHint(outcome.Results))
+		output.Message(w, reparentSyncHint(outcome.Results))
 	})
 	return nil
 }
@@ -207,13 +208,13 @@ func (p ffPresenter) FastForwarded(outcome ffflow.Outcome) error {
 		return output.WriteFastForwardJSON(p.Cmd.OutOrStdout(), outcome.Results)
 	}
 	if outcome.Empty {
-		output.Frame(p.Cmd.OutOrStdout(), func() {
-			output.Message(p.Cmd.OutOrStdout(), domain.FastForwardNothingToDo)
+		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			output.Message(w, domain.FastForwardNothingToDo)
 		})
 		return nil
 	}
-	output.Frame(p.Cmd.OutOrStdout(), func() {
-		output.FormatFastForwardResults(p.Cmd.OutOrStdout(), outcome.Results)
+	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		output.FormatFastForwardResults(w, outcome.Results)
 	})
 	return nil
 }

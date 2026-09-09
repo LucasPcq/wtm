@@ -5,6 +5,7 @@ package checkout
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 
@@ -346,8 +347,8 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 		})
 	}
 
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.Success(cmd.OutOrStdout(), fmt.Sprintf("Checked out PR #%d (%s) at %s", p.Number, p.Branch, createResult.Path))
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.Success(w, fmt.Sprintf("Checked out PR #%d (%s) at %s", p.Number, p.Branch, createResult.Path))
 		if createResult.ExistingBranch {
 			note := shared.ReusedBranchNote(shared.ReusedBranchNoteParams{
 				Branch: target.Branch,
@@ -355,12 +356,12 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 				Behind: target.AheadBehind.Behind,
 			})
 			if note.Warning {
-				output.Warning(cmd.OutOrStdout(), note.Text)
+				output.Warning(w, note.Text)
 			} else {
-				output.Message(cmd.OutOrStdout(), note.Text)
+				output.Message(w, note.Text)
 			}
 		}
-		output.GoHint(cmd.OutOrStdout(), fmt.Sprintf(domain.GoCommandFmt, p.Branch))
+		output.GoHint(w, fmt.Sprintf(domain.GoCommandFmt, p.Branch))
 	})
 	return nil
 }
