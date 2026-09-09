@@ -36,7 +36,8 @@ func LoadRun(stateDir string) (domain.RunConfig, error) {
 	// Enforced on read like the port layout, and for the same reason: an
 	// addressing nobody recognizes would read as the default and write the wrong
 	// thing into a .env, with nothing pointing back at run.toml.
-	if errs := append(rules.ValidateRunPorts(cfg), rules.ValidateAddressing(cfg)...); len(errs) > 0 {
+	errs := append(rules.ValidateRunPorts(cfg), rules.ValidateAddressing(cfg)...)
+	if errs = append(errs, rules.ValidateTenants(cfg)...); len(errs) > 0 {
 		return domain.RunConfig{}, fmt.Errorf("invalid run config: %s", strings.Join(errs, "; "))
 	}
 

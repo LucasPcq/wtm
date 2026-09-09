@@ -16,6 +16,26 @@ const (
 	JobKindTask JobKind = "task"
 )
 
+// JobScope says whether a job has one instance per worktree or one for the
+// whole repository. Empty is per-worktree, which keeps every run.toml written
+// before this existed reading unchanged.
+type JobScope string
+
+const (
+	JobScopePerWorktree JobScope = ""
+	JobScopeShared      JobScope = "shared"
+)
+
+// JobTenantConfig is the worktree's slice of a shared service. It names one
+// tenant and never a list: four keycloak realms are one tenant, whose internal
+// shape belongs to the attach script rather than to wtm.
+type JobTenantConfig struct {
+	Name   string            `toml:"name"             json:"name"`
+	Attach string            `toml:"attach,omitempty" json:"attach,omitempty"`
+	Detach string            `toml:"detach,omitempty" json:"detach,omitempty"`
+	Env    map[string]string `toml:"env,omitempty"    json:"env,omitempty"`
+}
+
 // JobURLConfig is a job's [[job]].url table: which of its declared ports speaks
 // HTTP, and the host label it is published under. Port names a key of Ports, not
 // a number — the number depends on the worktree, only the declaration is stable.
@@ -79,6 +99,11 @@ type JobConfig struct {
 	// that fans out. wtm learns nothing about the runner from it: the relation
 	// is declared, never inferred from the command.
 	Runs []string `toml:"runs,omitempty" json:"runs,omitempty"`
+	// Scope makes this job one instance for the repository instead of one per
+	// worktree. Tenant is the slice each worktree then gets of it; nil means
+	// shared for good, one instance and one set of data.
+	Scope  JobScope         `toml:"scope,omitempty"  json:"scope,omitempty"`
+	Tenant *JobTenantConfig `toml:"tenant,omitempty" json:"tenant,omitempty"`
 }
 
 // JobURLChoice is one job's answer to "should this be reachable by name": the
@@ -164,6 +189,10 @@ const (
 	// a weaker "running": nothing was ever verified, before or after a daemon
 	// restart, and there is no stream to attach to.
 	JobStatusDetached JobStatus = "detached"
+	// JobStatusAttached is a worktree's claim on a shared service running under
+	// the main checkout's key. It owns no process: it is the pointer that keeps
+	// the real job alive, which is what makes the job table the reference count.
+	JobStatusAttached JobStatus = "attached"
 )
 
 // JobRoute is one name the proxy serves a started job under: the job the name

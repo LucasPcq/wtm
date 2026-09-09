@@ -24,6 +24,14 @@ var (
 	// ErrUserAborted is returned when the user cancels an interactive prompt.
 	ErrUserAborted = errors.New("user aborted")
 
+	// ErrTenantUnknownToken names the placeholder a tenant value used and wtm
+	// does not define. Caught at load rather than in a shell, where literal
+	// braces would silently create a database called "{branch}".
+	ErrTenantUnknownToken = errors.New("unknown placeholder in a [job.tenant] value")
+	// ErrNoMainCheckout is a repository with no main worktree to run a shared
+	// job in — a bare clone whose worktrees are all linked.
+	ErrNoMainCheckout = errors.New("no main checkout to run a shared job in")
+
 	// ErrAborted signals a command that failed after already printing its own
 	// report (e.g. a profile aborted by a failing task). The top-level handler
 	// exits non-zero without printing a second, redundant error line.

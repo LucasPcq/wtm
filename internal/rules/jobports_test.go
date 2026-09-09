@@ -326,3 +326,27 @@ func TestProxyPortCollisionLinesNommeLesDeuxPorts(t *testing.T) {
 		t.Errorf("ligne = %q, want la base 3990 et le port 4000 nommés", lines[0])
 	}
 }
+
+// A shared job runs in the main checkout, so its declared port is its real
+// port: 5432 stays 5432 whichever worktree asked. That stability is what lets a
+// tenant's env write its URL literally.
+func TestJobPortsIgnoresOffsetWhenShared(t *testing.T) {
+	got := JobPorts(JobPortsParams{
+		Ports:      map[string]int{"CRM_DB_PORT": 5432},
+		PortOffset: 300,
+		Scope:      domain.JobScopeShared,
+	})
+	if got["CRM_DB_PORT"] != 5432 {
+		t.Errorf("port = %d, want 5432", got["CRM_DB_PORT"])
+	}
+}
+
+func TestJobPortsAppliesOffsetWhenPerWorktree(t *testing.T) {
+	got := JobPorts(JobPortsParams{
+		Ports:      map[string]int{"CRM_DB_PORT": 5432},
+		PortOffset: 300,
+	})
+	if got["CRM_DB_PORT"] != 5732 {
+		t.Errorf("port = %d, want 5732", got["CRM_DB_PORT"])
+	}
+}

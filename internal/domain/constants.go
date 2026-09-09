@@ -165,6 +165,26 @@ const (
 	// project name both derive from it.
 	EnvProject = "WTM_PROJECT"
 
+	// EnvTenant is the resolved tenant name a shared job's attach and detach
+	// commands read, so they never repeat the template their config already
+	// carries.
+	EnvTenant = "WTM_TENANT"
+
+	// TenantToken* are the placeholders a tenant's configuration values carry.
+	// Commands read the $WTM_* variables instead: one syntax per place, never
+	// the two mixed in a single string.
+	TenantTokenWorktree = "{worktree}"
+	TenantTokenOrdinal  = "{ordinal}"
+
+	// The reasons a [job.tenant] block is refused at load.
+	TenantIncompleteFmt    = "job %q: a [job.tenant] block needs both a name and an attach command"
+	TenantOnPerWorktreeFmt = `job %q: [job.tenant] only means something on a job with scope = "shared"`
+	TenantBadTokenFmt      = "job %q: %v"
+	UnknownScopeFmt        = "job %q: unknown scope %q (expected %q)"
+	// TenantProbeWorktree expands a tenant at load with a stand-in worktree, so
+	// an unknown placeholder is named there rather than in a shell.
+	TenantProbeWorktree = "probe"
+
 	// MainWorktreeOrdinal is never persisted: the main worktree has no meta.json,
 	// so 0 in a linked worktree's metadata means "not allocated yet".
 	MainWorktreeOrdinal = 0

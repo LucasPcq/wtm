@@ -29,6 +29,10 @@ func EffectivePortOffsetBlock(cfg domain.RunConfig) int {
 type JobPortsParams struct {
 	Ports      map[string]int
 	PortOffset int
+	// Scope zeroes the offset for a shared job: it runs in the main checkout,
+	// so the port it declares is the port it binds in every worktree's reading.
+	// That stability is what lets a tenant's env write its URL literally.
+	Scope domain.JobScope
 }
 
 // JobPorts resolves a job's declared base ports for the worktree it is about to
@@ -37,9 +41,13 @@ func JobPorts(params JobPortsParams) map[string]int {
 	if len(params.Ports) == 0 {
 		return nil
 	}
+	offset := params.PortOffset
+	if params.Scope == domain.JobScopeShared {
+		offset = 0
+	}
 	resolved := make(map[string]int, len(params.Ports))
 	for name, base := range params.Ports {
-		resolved[name] = base + params.PortOffset
+		resolved[name] = base + offset
 	}
 	return resolved
 }
