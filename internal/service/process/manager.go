@@ -932,9 +932,7 @@ type jobRef struct {
 func (m *Manager) attachableJob(ref jobRef) (*ManagedJob, error) {
 	m.mu.Lock()
 	job, ok := m.jobs[jobKey(ref.Name, ref.WorkDir)]
-	// A claim owns no stream. The service it holds does, under the main
-	// checkout's key, so a pane opened on it from any worktree reads the one
-	// output there is — which is what a shared service means.
+	// A claim owns no stream; the service it holds does.
 	if ok && job.Status == domain.JobStatusAttached {
 		job, ok = m.realSharedLocked(sharedRef{Name: ref.Name, Dir: job.SharedDir})
 	}

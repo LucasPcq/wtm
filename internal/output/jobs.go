@@ -226,7 +226,7 @@ func FormatRunConfig(cfg domain.RunConfig) string {
 			// They are the bases as written, not the resolved ones — each worktree
 			// shifts them by its own offset.
 			ports := styles.DashboardValue.Render(jobPortsCell(j))
-			b.WriteString(strings.TrimRight(fmt.Sprintf("%s%-*s  %s  %s  %s", Indent, nameWidth, j.Name, kind, cmd, ports), " ") + "\n")
+			b.WriteString(strings.TrimRight(fmt.Sprintf("%s%-*s  %s  %s  %s%s", Indent, nameWidth, j.Name, kind, cmd, ports, sharedTag(j)), " ") + "\n")
 		}
 	}
 
@@ -236,6 +236,16 @@ func FormatRunConfig(cfg domain.RunConfig) string {
 	}
 
 	return b.String()
+}
+
+// sharedTag marks a job that runs once for the repository. Without it the row
+// reads like every other, and its declared ports read as shifting per worktree
+// — which is exactly what a shared job's do not do.
+func sharedTag(job domain.JobConfig) string {
+	if !rules.IsShared(job) {
+		return ""
+	}
+	return "  " + styles.Success.Render(domain.SharedJobTag)
 }
 
 type FormatRunningJobsParams struct {

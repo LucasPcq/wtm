@@ -15,9 +15,6 @@ type ExpandTenantParams struct {
 	Ordinal  int
 }
 
-// ExpandedTenant is one worktree's slice of a shared service, ready to be
-// handed to a shell: the tenant's resolved name, and the variables the
-// worktree's own .env receives.
 type ExpandedTenant struct {
 	Name string
 	Env  map[string]string

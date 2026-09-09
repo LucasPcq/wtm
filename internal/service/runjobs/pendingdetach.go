@@ -5,7 +5,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
-// LoadPendingDetach is what a clean owes and a prune settles.
 func LoadPendingDetach(stateDir string) []domain.TenantRef {
 	return config.LoadPendingDetach(stateDir)
 }

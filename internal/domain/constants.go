@@ -1411,6 +1411,15 @@ const (
 
 	// Job action result statuses emitted by `run *` JSON output.
 	JobActionStarted = "started"
+	// JobActionAttached is a worktree joining a shared service rather than
+	// starting one. Reporting "started" in three worktrees read as three
+	// services, which is the misreading this whole feature has to avoid.
+	JobActionAttached = "attached"
+	// SharedJobTag marks a job that runs once for the repository wherever jobs
+	// are listed. Rendered like any other, it read as one service per worktree —
+	// and the declared ports beside it would be read as shifting, which they do
+	// not.
+	SharedJobTag     = "shared"
 	JobActionStopped = "stopped"
 	JobActionDone    = "done"
 	JobActionError   = "error"

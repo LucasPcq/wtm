@@ -100,9 +100,7 @@ type claimParams struct {
 }
 
 // claim posts a worktree's hold on a shared service. The main checkout's own
-// hold is the real job — there is no second record to put under the same key,
-// and stopShared counts the claims beside it, so the service outlives a `run
-// down` there exactly as long as another worktree still holds it.
+// hold is the real job, so there is no second record to put under its key.
 func (m *Manager) claim(params claimParams) {
 	if params.Key == params.Real {
 		return
@@ -118,7 +116,8 @@ func (m *Manager) claim(params claimParams) {
 		WorkDir:   params.Params.WorkDir,
 		StartedAt: time.Now(),
 		Env:       params.Params.Env,
-		LogDir:    params.Params.LogDir,
+		LogDir:    params.Params.Shared.LogDir,
+		Routes:    params.Params.Routes,
 		SharedDir: params.Params.Shared.WorkDir,
 		exited:    exited,
 	}

@@ -99,9 +99,8 @@ type JobConfig struct {
 	// that fans out. wtm learns nothing about the runner from it: the relation
 	// is declared, never inferred from the command.
 	Runs []string `toml:"runs,omitempty" json:"runs,omitempty"`
-	// Scope makes this job one instance for the repository instead of one per
-	// worktree. Tenant is the slice each worktree then gets of it; nil means
-	// shared for good, one instance and one set of data.
+	// A nil Tenant on a shared job means shared for good: one instance, one set
+	// of data.
 	Scope  JobScope         `toml:"scope,omitempty"  json:"scope,omitempty"`
 	Tenant *JobTenantConfig `toml:"tenant,omitempty" json:"tenant,omitempty"`
 }

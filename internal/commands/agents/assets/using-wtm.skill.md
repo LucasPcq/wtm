@@ -289,6 +289,7 @@ and **experimental**: the global `wtm init` does not configure it.
   are the same stream whichever worktree you read them from. In `run ps` / `--output json`
   the worktrees holding it report status **`attached`** with `pid: 0`: that is a claim on the
   one running instance, not a second process — never count one service per worktree from it.
+  Starting one from a worktree other than the main checkout reports `attached`, not `started`.
   `run stop` in a worktree releases only that worktree's claim; the service itself stops when
   the last one goes.
 - **A shared job may carve out a tenant per worktree.** `[job.tenant]` names it (`name`,

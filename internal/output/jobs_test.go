@@ -309,3 +309,29 @@ func TestFormatRunConfigShowsDeclaredPortsAfterTheCommand(t *testing.T) {
 		}
 	}
 }
+
+// A shared job listed like every other read as one service per worktree, and
+// its declared ports read as shifting — which is exactly what they do not do.
+func TestFormatRunConfigMarksASharedJob(t *testing.T) {
+	got := FormatRunConfig(domain.RunConfig{Jobs: []domain.JobConfig{
+		{Name: "db", Kind: domain.JobKindService, Cmd: "docker compose up db", Scope: domain.JobScopeShared},
+		{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev"},
+	}})
+
+	lines := strings.Split(got, "\n")
+	var dbLine, webLine string
+	for _, line := range lines {
+		if strings.Contains(line, "db ") || strings.Contains(line, "db\t") {
+			dbLine = line
+		}
+		if strings.Contains(line, "web") {
+			webLine = line
+		}
+	}
+	if !strings.Contains(dbLine, domain.SharedJobTag) {
+		t.Errorf("the shared job carries no marker:\n%s", got)
+	}
+	if strings.Contains(webLine, domain.SharedJobTag) {
+		t.Errorf("a per-worktree job was marked shared:\n%s", got)
+	}
+}

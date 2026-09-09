@@ -292,7 +292,7 @@ func (r *runner) run() Outcome {
 
 		r.started = append(r.started, job.Name)
 		held := r.heldURLs(job, routes, result.Ports)
-		r.results = append(r.results, domain.JobActionResult{Name: job.Name, Status: domain.JobActionStarted, URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host}), Held: held})
+		r.results = append(r.results, domain.JobActionResult{Name: job.Name, Status: r.startedStatus(job), URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host}), Held: held})
 		if rules.ShouldProbeJob(rules.ShouldProbeJobParams{Kind: job.Kind, Ports: result.Ports, Probe: job.Probe}) {
 			r.probeTargets = append(r.probeTargets, probeTarget{job: job.Name, resolved: result.Ports})
 		}
@@ -665,4 +665,14 @@ func jobNames(jobs []domain.JobConfig) []string {
 		names[i] = job.Name
 	}
 	return names
+}
+
+// startedStatus tells joining a shared service apart from starting one. Only the
+// main checkout ever spawns the process; every other worktree attaches to it,
+// and saying "started" in each of them read as one service per worktree.
+func (r *runner) startedStatus(job domain.JobConfig) string {
+	if rules.IsShared(job) && r.shared != nil && r.workDir != r.shared.WorkDir {
+		return domain.JobActionAttached
+	}
+	return domain.JobActionStarted
 }
