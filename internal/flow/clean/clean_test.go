@@ -376,3 +376,15 @@ func TestRunAbortedRemovesNothing(t *testing.T) {
 		t.Errorf("the worktree must survive a cancelled clean: %v", statErr)
 	}
 }
+
+// --keep-data is the one way to remove a worktree and keep what it carved out
+// of the shared services. Without it the detach runs, which is what stops a
+// clean from leaving an orphan database behind on every iteration.
+func TestCleanKeepDataWithholdsTheDetach(t *testing.T) {
+	if !(Request{KeepData: true}).KeepData {
+		t.Error("KeepData does not survive the request")
+	}
+	if (Request{}).KeepData {
+		t.Error("the default withholds the detach; it must run")
+	}
+}

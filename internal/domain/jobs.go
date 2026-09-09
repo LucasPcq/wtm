@@ -234,6 +234,15 @@ type JobRecord struct {
 	Attached bool `json:"attached,omitempty"`
 }
 
+// TenantRef is one worktree's slice of one shared service, named by what it
+// takes to recompute it: run.toml still holds the template, so an entry keeps
+// only what the worktree itself contributed.
+type TenantRef struct {
+	Job      string `toml:"job"      json:"job"`
+	Worktree string `toml:"worktree" json:"worktree"`
+	Ordinal  int    `toml:"ordinal"  json:"ordinal"`
+}
+
 // SharedJobContext is what a shared job needs and only the client can resolve:
 // the main checkout it runs in, and that checkout's own environment and log
 // directory rather than those of the worktree asking for it.

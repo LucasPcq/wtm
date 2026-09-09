@@ -12,6 +12,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/github"
 	"github.com/LucasPcq/wtm/internal/service/process"
+	"github.com/LucasPcq/wtm/internal/service/runconfig"
+	"github.com/LucasPcq/wtm/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/internal/service/shell"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
@@ -291,7 +293,48 @@ func (f *pruneFlow) insidePruned() bool {
 }
 
 func (f *pruneFlow) conclude(outcome Outcome) (Outcome, error) {
+	f.settleOwedTenants()
 	return outcome, f.presenter.Pruned(outcome)
+}
+
+// settleOwedTenants gives back what a clean could not, because the shared
+// service holding it was down at the time. A dry run settles nothing: it
+// previews, and giving a tenant back is a mutation like any other.
+func (f *pruneFlow) settleOwedTenants() {
+	if f.request.DryRun {
+		return
+	}
+	owed := runjobs.LoadPendingDetach(f.ctx.StateDir)
+	if len(owed) == 0 {
+		return
+	}
+	cfg, err := runconfig.Load(f.ctx.StateDir)
+	if err != nil {
+		return
+	}
+
+	up := rules.SharedJobsUp(runjobs.Load())
+	var settled []domain.TenantRef
+	for _, ref := range owed {
+		if !up[ref.Job] {
+			continue
+		}
+		result := runjobs.DetachWorktree(runjobs.DetachParams{
+			Config:  rules.JobsNamed(cfg, ref.Job),
+			Env:     rules.TenantEnv(rules.TenantEnvParams{Worktree: ref.Worktree, Ordinal: ref.Ordinal}),
+			WorkDir: f.ctx.ProjectDir,
+			Up:      up,
+		})
+		if len(result.Released) == 0 {
+			continue
+		}
+		settled = append(settled, ref)
+		f.presenter.Status(flow.Notice{
+			Kind: flow.NoticeSuccess,
+			Text: fmt.Sprintf(domain.PruneSettledTenantFmt, ref.Job, ref.Worktree),
+		})
+	}
+	_ = runjobs.SettleDetach(runjobs.SettleDetachParams{StateDir: f.ctx.StateDir, Refs: settled})
 }
 
 func (f *pruneFlow) params() domain.PruneParams {

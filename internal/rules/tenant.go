@@ -119,3 +119,42 @@ func jobScopeErrors(job domain.JobConfig) []string {
 	}
 	return nil
 }
+
+// SharedJobsUp names the shared services actually running, so a tenant is only
+// ever given back to something that can take it. A claim counts: the worktree
+// holding one is looking at a service that is up.
+func SharedJobsUp(jobs []domain.JobInfo) map[string]bool {
+	up := map[string]bool{}
+	for _, job := range jobs {
+		if IsJobUp(job.Status) {
+			up[job.Name] = true
+		}
+	}
+	return up
+}
+
+// JobsNamed narrows a config to one job, so a caller acting on a single tenant
+// hands the detach exactly that one rather than filtering downstream.
+func JobsNamed(cfg domain.RunConfig, name string) domain.RunConfig {
+	for _, job := range cfg.Jobs {
+		if job.Name == name {
+			return domain.RunConfig{Jobs: []domain.JobConfig{job}}
+		}
+	}
+	return domain.RunConfig{}
+}
+
+type TenantEnvParams struct {
+	Worktree string
+	Ordinal  int
+}
+
+// TenantEnv rebuilds the little a settled debt needs: the worktree it belonged
+// to is gone, so its full environment cannot be resolved any more, and the
+// tenant's own name is all that identifies what to give back.
+func TenantEnv(params TenantEnvParams) map[string]string {
+	return map[string]string{
+		domain.EnvWorktree: params.Worktree,
+		domain.EnvOrdinal:  strconv.Itoa(params.Ordinal),
+	}
+}

@@ -26,6 +26,7 @@ func newCleanCmd() *cobra.Command {
 	cmd.Flags().Bool(domain.FlagForce, false, "Lift safety refusals (dirty/unpushed/open-PR); still asks to confirm unless --yes")
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (keeps safety checks unless --force)")
 	cmd.Flags().Bool(domain.FlagReparentChildren, false, "Reparent orphaned child worktrees onto the grandparent (no prompt)")
+	cmd.Flags().Bool(domain.FlagKeepData, false, domain.FlagKeepDataDesc)
 	shared.AddOutputFlag(cmd)
 
 	return cmd
@@ -35,6 +36,7 @@ func runClean(cmd *cobra.Command, args []string) error {
 	force, _ := cmd.Flags().GetBool(domain.FlagForce)
 	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
 	reparentFlag, _ := cmd.Flags().GetBool(domain.FlagReparentChildren)
+	keepData, _ := cmd.Flags().GetBool(domain.FlagKeepData)
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 
 	if format == domain.OutputJSON && !yes {
@@ -66,6 +68,7 @@ func runClean(cmd *cobra.Command, args []string) error {
 			Branch:           branchName,
 			Force:            force,
 			ReparentChildren: reparentFlag,
+			KeepData:         keepData,
 			BaseBranch:       resolveBase("", config),
 			// The CLI owns the terminal it prompts on, so it can hand it to sudo.
 			AllowPrivileged: true,

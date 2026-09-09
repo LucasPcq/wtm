@@ -202,6 +202,22 @@ const (
 	// not resolve — a bare clone, typically.
 	SharedNoContextFmt = "job %s: %w"
 
+	// PendingDetachFileName is the queue of tenants a clean could not give back
+	// because the shared service holding them was down. It is a queue and not a
+	// registry: entries are only ever added by a failure and removed by a
+	// success, so it cannot drift out of step with anything.
+	PendingDetachFileName = "pending-detach.toml"
+
+	// FlagKeepData withholds the detach a clean would otherwise run. The default
+	// is to detach: clean is the destructive command, and destroying a worktree
+	// without its data would leave an orphan behind on every iteration.
+	FlagKeepData     = "keep-data"
+	FlagKeepDataDesc = "keep the tenants this worktree carved out of shared services"
+
+	CleanDetachedTenantFmt = "released %s from %s"
+	CleanDeferredTenantFmt = "%s is down: %s kept, `wtm prune` will give it back"
+	PruneSettledTenantFmt  = "gave back %s on %s, owed since its worktree was removed"
+
 	// MainWorktreeOrdinal is never persisted: the main worktree has no meta.json,
 	// so 0 in a linked worktree's metadata means "not allocated yet".
 	MainWorktreeOrdinal = 0
