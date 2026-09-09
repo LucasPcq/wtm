@@ -72,7 +72,7 @@ func (p cleanPresenter) Cleaned(outcome cleanflow.Outcome) error {
 			})
 		}
 		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-			output.Message(w, fmt.Sprintf(domain.CleanAlreadyAbsentFmt, outcome.Branch))
+			output.Unchanged(w, fmt.Sprintf(domain.CleanAlreadyAbsentFmt, outcome.Branch))
 		})
 		return nil
 	}
@@ -111,7 +111,7 @@ func (p prunePresenter) Pruned(outcome pruneflow.Outcome) error {
 			return output.WritePruneResultJSON(p.Cmd.OutOrStdout(), domain.PruneResult{})
 		}
 		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-			output.Message(w, domain.PruneNothingToPrune)
+			output.Unchanged(w, domain.PruneNothingToPrune)
 		})
 		return nil
 	}
@@ -163,7 +163,7 @@ func (p syncPresenter) Synced(outcome syncflow.Outcome) error {
 	}
 	if outcome.Empty {
 		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-			output.Message(w, domain.SyncNothingToSync)
+			output.Unchanged(w, domain.SyncNothingToSync)
 		})
 		return nil
 	}
@@ -185,7 +185,10 @@ func (p reparentPresenter) Reparented(outcome reparentflow.Outcome) error {
 		for _, result := range outcome.Results {
 			output.Success(w, fmt.Sprintf(domain.ReparentedFmt, result.Branch, result.OldParent, result.NewParent))
 		}
-		output.Message(w, reparentSyncHint(outcome.Results))
+		output.NextStep(w, output.NextStepParams{
+			Command: reparentSyncHint(outcome.Results),
+			Note:    domain.ReparentSyncHintNote,
+		})
 	})
 	return nil
 }
@@ -209,7 +212,7 @@ func (p ffPresenter) FastForwarded(outcome ffflow.Outcome) error {
 	}
 	if outcome.Empty {
 		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-			output.Message(w, domain.FastForwardNothingToDo)
+			output.Unchanged(w, domain.FastForwardNothingToDo)
 		})
 		return nil
 	}

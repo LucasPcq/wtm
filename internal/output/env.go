@@ -73,7 +73,7 @@ func printEnvSummary(w io.Writer, result domain.EnvSyncResult) {
 		Success(w, summary.Text)
 		return
 	}
-	Message(w, styles.Muted.Render(summary.Text))
+	Unchanged(w, summary.Text)
 }
 
 // WriteEnvJSON writes the reconciliation result as pretty-printed JSON. The

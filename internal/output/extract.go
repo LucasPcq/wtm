@@ -44,7 +44,7 @@ func PrintExtractResult(w io.Writer, params ExtractResultParams) {
 		InfoLine(w, "env", params.EnvNote)
 	}
 	Blank(w)
-	GoHint(w, fmt.Sprintf(domain.GoCommandFmt, result.TargetBranch))
+	NextStep(w, NextStepParams{Command: fmt.Sprintf(domain.GoCommandFmt, result.TargetBranch)})
 }
 
 // sourceState describes what happened to the source worktree after a clean

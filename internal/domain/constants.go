@@ -124,6 +124,21 @@ const (
 	// RecapFrameChrome is what a wizard recap spends around its body: the
 	// indentation on either side and the border between them.
 	RecapFrameChrome = 8
+	// A conclusion's counted summary: "3 applied · 1 skipped", zero counts dropped.
+	TallyPartFmt    = "%d %s"
+	TallyApplied    = "applied"
+	TallySkipped    = "skipped"
+	TallyBlocked    = "blocked"
+	TallyPruned     = "pruned"
+	TallyStopped    = "stopped"
+	TallyReparented = "reparented"
+	TallyOrphaned   = "orphaned"
+	TallySeparator  = " · "
+	// NextStepGlyph opens the one forward-pointing line of a conclusion, and
+	// NextStepNoteSeparator holds off what the command does from the command.
+	NextStepGlyph         = "→"
+	NextStepNoteSeparator = "   "
+
 	// AccentBarGlyph is the left rule marking a block as wtm's own output. It sits
 	// in column zero, left of everything else the CLI prints, which is what makes
 	// it a marker rather than one more indent.
@@ -2019,7 +2034,10 @@ const (
 	RunViewRecapHeldIndent = "  "
 	RunStreamAlreadyFmt    = "%s already running"
 	RunStreamDoneFmt       = "%s done"
-	RunStreamNextHint      = "wtm run logs to attach · wtm run down to stop"
+	RunStreamAttachHint    = "wtm run logs"
+	RunStreamAttachNote    = "attach to the output"
+	RunStreamStopHint      = "wtm run down"
+	RunStreamStopNote      = "stop them"
 
 	// RunAbort* report the partial state a profile that gave up left behind, on
 	// the surface that has no room to draw it: where it stopped, what nothing
@@ -2125,6 +2143,7 @@ const (
 	SyncParentLineFmt         = "%s is %s behind %s%s — %s rebase onto it."
 	SyncConfirmOption         = "Yes, sync"
 	SyncNothingToSync         = "No worktrees to sync."
+	SyncUpToDateSuffix        = "already up to date"
 	// SyncNoRebaseStep and SyncNoStaleParent are why a decision was never put to
 	// the user: nothing is rebased, or no parent is behind its remote.
 	SyncNoRebaseStep  = "nothing to rebase"
@@ -2490,8 +2509,9 @@ const (
 	ReparentedFmt        = "Reparented %s: %s → %s"
 	// ReparentSyncHintFmt and ReparentSyncHintBare tell the user how the recorded
 	// change is applied: reparent only rewrites metadata, the rebase is `wtm sync`.
-	ReparentSyncHintFmt  = "Run `wtm sync %s` to rebase onto the new parent."
-	ReparentSyncHintBare = "Run `wtm sync` to rebase the reparented worktrees onto their new parent."
+	ReparentSyncHintFmt  = "wtm sync %s"
+	ReparentSyncHintBare = "wtm sync"
+	ReparentSyncHintNote = "rebase onto the new parent"
 
 	AbortedMessage = "Aborted."
 	// WizardCancelLabel is the constant final option on every wizard recap step —

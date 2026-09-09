@@ -282,9 +282,9 @@ type CreateResultParams struct {
 // frame owns the outer padding.
 func FormatCreateResult(w io.Writer, p CreateResultParams) {
 	if p.AlreadyExists {
-		Success(w, fmt.Sprintf("Worktree %s already exists at %s", p.Branch, p.Path))
+		Unchanged(w, fmt.Sprintf("Worktree %s already exists at %s", p.Branch, p.Path))
 		Blank(w)
-		GoHint(w, p.GoCommand)
+		NextStep(w, NextStepParams{Command: p.GoCommand})
 		return
 	}
 
@@ -311,7 +311,7 @@ func FormatCreateResult(w io.Writer, p CreateResultParams) {
 		}
 	}
 	Blank(w)
-	GoHint(w, p.GoCommand)
+	NextStep(w, NextStepParams{Command: p.GoCommand})
 }
 
 type noteParams struct {
@@ -324,12 +324,6 @@ func withNote(params noteParams) string {
 		return params.Value
 	}
 	return params.Value + styles.Muted.Render(domain.EnvRecapNoteSeparator+params.Note)
-}
-
-// GoHint prints the highlighted jump-in step shared by every worktree-creating
-// command (create, extract, checkout): a primary arrow + the bold `wtm go` command.
-func GoHint(w io.Writer, goCommand string) {
-	fmt.Fprintf(w, "%s%s  %s\n", Indent, styles.Primary.Render("→"), styles.Bold.Render(goCommand))
 }
 
 // writeAlignedFields prints indented "label   value" rows with values aligned to a

@@ -145,11 +145,11 @@ func FormatRelocateResult(w io.Writer, result domain.RelocateResult) {
 	}
 
 	hasIssue := len(blocked) > 0 || len(errored) > 0
-	headline := relocateTally(relocateTallyParams{
-		Applied: len(done),
-		Skipped: len(skipped),
-		Issues:  len(blocked) + len(errored),
-	})
+	headline := Tally(
+		TallyPart{Count: len(done), Label: domain.TallyApplied},
+		TallyPart{Count: len(skipped), Label: domain.TallySkipped},
+		TallyPart{Count: len(blocked) + len(errored), Label: domain.TallyBlocked},
+	)
 	if hasIssue {
 		Warning(w, "Relocation finished with issues  "+styles.Muted.Render(headline))
 	} else {
@@ -178,31 +178,6 @@ func FormatRelocateResult(w io.Writer, result domain.RelocateResult) {
 		Blank(w)
 		Success(w, fmt.Sprintf("config base_path updated to %q", result.BasePath))
 	}
-}
-
-type relocateTallyParams struct {
-	Applied int
-	Skipped int
-	Issues  int
-}
-
-// relocateTally renders a compact "N applied · N skipped · N blocked" summary,
-// omitting zero counts.
-func relocateTally(params relocateTallyParams) string {
-	parts := make([]string, 0, 3)
-	if params.Applied > 0 {
-		parts = append(parts, fmt.Sprintf("%d applied", params.Applied))
-	}
-	if params.Skipped > 0 {
-		parts = append(parts, fmt.Sprintf("%d skipped", params.Skipped))
-	}
-	if params.Issues > 0 {
-		parts = append(parts, fmt.Sprintf("%d blocked", params.Issues))
-	}
-	if len(parts) == 0 {
-		return "nothing to do"
-	}
-	return strings.Join(parts, " · ")
 }
 
 func resultDoneLine(basePath string, step domain.RelocateStepResult) string {

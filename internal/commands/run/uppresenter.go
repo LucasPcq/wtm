@@ -139,7 +139,7 @@ func (p stopPresenter) Stopped(outcome stopflow.Outcome) error {
 	}
 	out := p.Cmd.OutOrStdout()
 	if outcome.NoDaemon {
-		output.Frame(out, func(w io.Writer) { output.Message(w, domain.RunNoJobsRunning) })
+		output.Frame(out, func(w io.Writer) { output.Unchanged(w, domain.RunNoJobsRunning) })
 		return nil
 	}
 	output.Frame(out, func(w io.Writer) {

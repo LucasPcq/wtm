@@ -76,7 +76,7 @@ func TestRunUpDetachedNeverOpensTheView(t *testing.T) {
 	if len(view.calls) != 0 {
 		t.Fatalf("-d opened the view: %+v", view.calls)
 	}
-	for _, want := range []string{"docker started", "api started", domain.RunStreamNextHint} {
+	for _, want := range []string{"docker started", "api started", domain.RunStreamAttachHint} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("stdout is missing %q\n--- stdout ---\n%s", want, stdout)
 		}

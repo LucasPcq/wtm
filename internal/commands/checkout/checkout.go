@@ -361,7 +361,7 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 				output.Message(w, note.Text)
 			}
 		}
-		output.GoHint(w, fmt.Sprintf(domain.GoCommandFmt, p.Branch))
+		output.NextStep(w, output.NextStepParams{Command: fmt.Sprintf(domain.GoCommandFmt, p.Branch)})
 	})
 	return nil
 }

@@ -227,7 +227,8 @@ func (p *RunPrinter) ready(outcome runlogs.Outcome) {
 	}
 	p.readied = true
 	Blank(p.out)
-	Loading(p.out, domain.RunStreamNextHint)
+	NextStep(p.out, NextStepParams{Command: domain.RunStreamAttachHint, Note: domain.RunStreamAttachNote})
+	NextStep(p.out, NextStepParams{Command: domain.RunStreamStopHint, Note: domain.RunStreamStopNote})
 }
 
 // WriteRunOutcomeJSON writes what a run did as the array of job results every

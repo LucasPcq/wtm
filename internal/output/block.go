@@ -162,6 +162,45 @@ func IsTerminal(w io.Writer) bool {
 	return term.IsTerminal(int(file.Fd()))
 }
 
+// TallyPart is one count of a result summary. A zero count is dropped: a
+// conclusion counts what happened, never what did not.
+type TallyPart struct {
+	Count int
+	Label string
+}
+
+// Tally renders the counted half of a multi-item conclusion — "3 applied ·
+// 1 skipped". It is what replaces one line per success: the reader checks the
+// count, and only the exceptions are worth a line of their own.
+func Tally(parts ...TallyPart) string {
+	kept := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part.Count == 0 {
+			continue
+		}
+		kept = append(kept, fmt.Sprintf(domain.TallyPartFmt, part.Count, part.Label))
+	}
+	return strings.Join(kept, domain.TallySeparator)
+}
+
+type NextStepParams struct {
+	// Command is ready to run as printed; Note says what it does, when the
+	// command alone does not.
+	Command string
+	Note    string
+}
+
+// NextStep prints the one forward-pointing line of a conclusion: "→ wtm go x".
+// It is the only shape a hint takes anywhere in the CLI — a command in bold
+// after an arrow — so a reader learns once where to look for what to do next.
+func NextStep(w io.Writer, params NextStepParams) {
+	line := styles.Bold.Render(params.Command)
+	if params.Note != "" {
+		line += styles.Muted.Render(domain.NextStepNoteSeparator + params.Note)
+	}
+	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Primary.Render(domain.NextStepGlyph), line)
+}
+
 // Section prints a bold title above indented lines, with no frame. It is what a
 // command reports having done; Callout's bordered frame is reserved for what the
 // reader still has to act on. Mixing the two made every outcome look equally

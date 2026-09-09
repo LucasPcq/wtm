@@ -118,8 +118,7 @@ func printStep(w io.Writer, step domain.SyncStepResult) {
 	case domain.SyncStatusSynced:
 		Success(w, syncedLine(step))
 	case domain.SyncStatusUpToDate:
-		Message(w, fmt.Sprintf("%s %s %s",
-			styles.Muted.Render("="), step.Branch, styles.Muted.Render("already up to date")))
+		Unchanged(w, fmt.Sprintf("%s %s", step.Branch, domain.SyncUpToDateSuffix))
 	case domain.SyncStatusSkippedDirty:
 		Warning(w, fmt.Sprintf("%s skipped — uncommitted changes (descendants skipped)", step.Branch))
 	case domain.SyncStatusSkippedAncestor:
