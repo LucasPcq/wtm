@@ -67,6 +67,7 @@ type Seam struct {
 	projectDir    string
 	jobs          []domain.JobConfig
 	declared      []domain.JobConfig
+	shared        *domain.SharedJobContext
 }
 
 func Open(params Params) Seam {
@@ -103,6 +104,27 @@ func Open(params Params) Seam {
 		proxyPort:     params.ProxyPort,
 		portAddressed: params.PortAddressed,
 		projectDir:    params.ProjectDir,
+		shared:        sharedContext(params),
+	}
+}
+
+// sharedContext is where this repository's shared jobs run. Resolved here, once
+// per seam, because it is the one place that may ask git which worktree is the
+// main one — and it is deliberately nil rather than a guess when there is none:
+// the daemon then refuses a shared job instead of running one per worktree.
+func sharedContext(params Params) *domain.SharedJobContext {
+	main, err := worktree.MainCheckout(worktree.MainCheckoutParams{ProjectDir: params.ProjectDir})
+	if err != nil {
+		return nil
+	}
+	return &domain.SharedJobContext{
+		WorkDir: main,
+		Env: JobEnv(JobEnvParams{
+			ProjectDir: params.ProjectDir,
+			StateDir:   params.StateDir,
+			WorkDir:    main,
+		}),
+		LogDir: logDirOf(params.StateDir, target.BranchOf(main)),
 	}
 }
 
@@ -139,6 +161,7 @@ func (s Seam) run(ctx context.Context, sink runlogs.Sink, params StartParams) (r
 		Project:       s.project,
 		ProxyPort:     s.proxyPort,
 		PortAddressed: s.portAddressed,
+		Shared:        s.shared,
 	})
 }
 

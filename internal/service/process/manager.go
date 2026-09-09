@@ -195,6 +195,7 @@ func (m *Manager) upRecordsLocked() []domain.JobRecord {
 			Routes:    job.Routes,
 			LogDir:    job.LogDir,
 			StartedAt: job.StartedAt,
+			Attached:  job.Status == domain.JobStatusAttached,
 		})
 	}
 	return records
@@ -234,6 +235,16 @@ type StartParams struct {
 	// client for the same reason LogDir and Env are.
 	Routes   []domain.JobRoute
 	Streamer io.Writer
+	// Shared is where a shared job actually runs and with what. Nil for a
+	// per-worktree job, and cleared by startShared before it starts the real one
+	// so the ordinary path takes over.
+	Shared *domain.SharedJobContext
+	// real marks the second pass startShared makes to spawn the service itself.
+	// Without it a nil Shared would mean two different things — "this is the
+	// real start" and "the client resolved nothing" — and the second would
+	// quietly run one instance per worktree, which is the whole thing this
+	// feature exists to stop.
+	real bool
 }
 
 // Start blocks for two of the three kinds it serves, which its signature does
@@ -247,6 +258,10 @@ func (m *Manager) Start(params StartParams) error {
 
 	if rules.IsBlankCommand(job.Cmd) {
 		return fmt.Errorf("job %s has empty cmd", job.Name)
+	}
+
+	if rules.IsShared(job) && !params.real {
+		return m.startShared(params)
 	}
 
 	hub := newJobHub(job)
@@ -837,20 +852,37 @@ func (m *Manager) stopByKey(key string) error {
 		return nil
 	}
 
-	m.withdrawRoute(job)
+	// A shared job is released, not stopped: the claim goes, and the service
+	// only follows it once no worktree holds it any more.
+	if rules.IsShared(job.Config) {
+		return m.stopShared(job)
+	}
+
+	return m.stopProcess(stopProcessParams{Job: job, Running: isRunning})
+}
+
+type stopProcessParams struct {
+	Job     *ManagedJob
+	Running bool
+}
+
+// stopProcess is the tear-down itself, reached either directly or, for a shared
+// job, once stopShared has established that no worktree holds it any more.
+func (m *Manager) stopProcess(params stopProcessParams) error {
+	m.withdrawRoute(params.Job)
 
 	// Always run the stop command if configured — handles detached processes
 	// like "docker compose up -d" where the launcher exits but services keep
 	// running.
-	if job.Config.Stop != "" {
-		return m.stopWithCommand(job)
+	if params.Job.Config.Stop != "" {
+		return m.stopWithCommand(params.Job)
 	}
 
-	if !isRunning {
+	if !params.Running {
 		return nil
 	}
 
-	return m.stopWithSignal(job)
+	return m.stopWithSignal(params.Job)
 }
 
 // AttachSession hands out the job's live PTY, for stdin forwarding and
@@ -884,6 +916,12 @@ type jobRef struct {
 func (m *Manager) attachableJob(ref jobRef) (*ManagedJob, error) {
 	m.mu.Lock()
 	job, ok := m.jobs[jobKey(ref.Name, ref.WorkDir)]
+	// A claim owns no stream. The service it holds does, under the main
+	// checkout's key, so a pane opened on it from any worktree reads the one
+	// output there is — which is what a shared service means.
+	if ok && job.Status == domain.JobStatusAttached {
+		job, ok = m.realSharedLocked(ref.Name)
+	}
 	// Snapshotted, never re-read: Status is written by whichever goroutine reaps
 	// or stops the job, so a second read outside the lock is a race.
 	var status domain.JobStatus

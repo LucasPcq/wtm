@@ -92,6 +92,9 @@ type StartRequest struct {
 	// and one per published job it runs itself. Empty when nothing is published
 	// or the proxy is off.
 	Routes []domain.JobRoute
+	// Shared is where a shared job runs — the main checkout, with its own
+	// environment and log directory. Nil for a per-worktree job.
+	Shared *domain.SharedJobContext
 	// OnOutput receives what the job writes while it starts — everything for a
 	// task or a detached launcher, nothing for a job the daemon backgrounds.
 	OnOutput func([]byte)

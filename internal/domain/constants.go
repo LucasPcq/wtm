@@ -185,6 +185,23 @@ const (
 	// an unknown placeholder is named there rather than in a shell.
 	TenantProbeWorktree = "probe"
 
+	// TenantAttachTimeout bounds the retries of a tenant's attach command, and
+	// TenantAttachInterval paces them. A shared service is asked to carve out a
+	// tenant the instant it is started, which is before postgres accepts a
+	// connection — so a first failure means "not ready yet" far more often than
+	// it means "wrong command". The budget is what keeps a genuinely wrong one
+	// from retrying for ever.
+	TenantAttachTimeout  = 30 * time.Second
+	TenantAttachInterval = time.Second
+
+	// TenantAttachFailedFmt names the tenant, the job and the last error a
+	// budget's worth of retries ended on.
+	TenantAttachFailedFmt = "job %s: could not attach tenant %s: %w"
+	TenantDetachFailedFmt = "job %s: could not detach tenant %s: %w"
+	// SharedNoContextFmt is a shared job whose main checkout the client could
+	// not resolve — a bare clone, typically.
+	SharedNoContextFmt = "job %s: %w"
+
 	// MainWorktreeOrdinal is never persisted: the main worktree has no meta.json,
 	// so 0 in a linked worktree's metadata means "not allocated yet".
 	MainWorktreeOrdinal = 0

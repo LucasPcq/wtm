@@ -227,6 +227,20 @@ type JobRecord struct {
 	Routes    []JobRoute        `json:"routes,omitempty"`
 	LogDir    string            `json:"log_dir,omitempty"`
 	StartedAt time.Time         `json:"started_at,omitzero"`
+	// Attached says this entry is a worktree's claim on a shared service rather
+	// than a process of its own. It is a fact about what the entry is, not a
+	// process state: without it a claim would come back from the index as a
+	// foreground service the daemon had lost, and be reported crashed.
+	Attached bool `json:"attached,omitempty"`
+}
+
+// SharedJobContext is what a shared job needs and only the client can resolve:
+// the main checkout it runs in, and that checkout's own environment and log
+// directory rather than those of the worktree asking for it.
+type SharedJobContext struct {
+	WorkDir string            `json:"work_dir"`
+	Env     map[string]string `json:"env,omitempty"`
+	LogDir  string            `json:"log_dir,omitempty"`
 }
 
 // DaemonState is the index as it sits on disk.

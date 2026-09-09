@@ -26,6 +26,12 @@ func ReconcileJob(params ReconcileJobParams) ReconcileDecision {
 	if !params.WorkDirExists {
 		return ReconcileDecision{}
 	}
+	// A claim on a shared service owns no process, so nothing about it can have
+	// died with the daemon: it comes back exactly as it was, which is what keeps
+	// the job table a usable reference count across a restart.
+	if params.Record.Attached {
+		return ReconcileDecision{Status: domain.JobStatusAttached, Adopt: true}
+	}
 	if params.Record.Config.Kind != domain.JobKindService {
 		return ReconcileDecision{}
 	}
@@ -43,5 +49,7 @@ func ReconcileJob(params ReconcileJobParams) ReconcileDecision {
 // durable index keeps, which is why a stop needs no explicit purge: the entry
 // leaves with the state.
 func IsJobUp(status domain.JobStatus) bool {
-	return status == domain.JobStatusRunning || status == domain.JobStatusDetached
+	return status == domain.JobStatusRunning ||
+		status == domain.JobStatusDetached ||
+		status == domain.JobStatusAttached
 }
