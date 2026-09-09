@@ -17,6 +17,11 @@ import (
 func hermeticEnv(t *testing.T) {
 	t.Helper()
 
+	// GOBIN short-circuits goBinDir, which Notice reaches through DetectInstall:
+	// without it every notice shells out to `go env`, and the go command writes a
+	// telemetry directory under the fake config home asynchronously — after the
+	// subprocess exits, racing t.TempDir's cleanup.
+	t.Setenv("GOBIN", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv(domain.EnvCI, "")

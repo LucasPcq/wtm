@@ -29,7 +29,7 @@ func CreateWorktree(params CreateWorktreeParams) error {
 }
 
 func createWorktreeNew(params CreateWorktreeParams) error {
-	cmd := exec.Command("git", "worktree", "add", "-b", params.Branch, params.Path, params.FromBranch)
+	cmd := exec.Command("git", "worktree", "add", "--no-track", "-b", params.Branch, params.Path, params.FromBranch)
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {

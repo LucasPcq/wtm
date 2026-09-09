@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.27.1 — Un worktree enfant ne pousse plus sur la branche de son parent
+
+### Bug fixes
+
+- **Un worktree créé depuis un parent qui n'existe que sur `origin` poussait sur la branche du parent.** wtm passait la ref distante telle quelle à `git worktree add -b`, et git — via son défaut `branch.autoSetupMerge` — configurait alors `origin/<parent>` comme upstream de la branche enfant. Un `git push` avec `push.default = upstream` écrasait directement la branche du parent sur le remote ; avec le défaut `simple`, git refusait mais suggérait `git push origin HEAD:<parent>`, qui fait exactement la même chose. La création passe désormais `--no-track` : la branche enfant n'a plus d'upstream tant qu'elle n'a pas été poussée, et `git push` propose la bonne branche. Le flag prime sur `branch.autoSetupMerge` quelle que soit sa valeur, donc aucune configuration git ne peut ramener le problème. Au passage, `wtm prune --gone` ne proposera plus de supprimer un worktree enfant jamais poussé parce que la branche du parent a disparu du remote.
+
+  **Le correctif n'est pas rétroactif.** Les worktrees enfants créés par une version antérieure gardent leur upstream erroné. Pour vérifier un worktree suspect, depuis son répertoire : `git rev-parse --abbrev-ref @{upstream}` — s'il répond le nom d'une *autre* branche que la sienne, corrigez avec `git branch --unset-upstream`, puis publiez la branche normalement avec `git push -u origin HEAD`.
+
 ## v0.27.0 — `wtm upgrade`, `wtm fast-forward` et une aide qui se lit
 
 Deux nouvelles commandes : `wtm upgrade` met le CLI à jour tout seul, `wtm fast-forward` avance une branche sur son homologue distant sans rien rejouer. L'overlay d'aide du dashboard est repris de zéro pour redevenir une référence consultable.
