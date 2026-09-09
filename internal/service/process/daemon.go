@@ -335,8 +335,11 @@ func (d *daemonServer) jobInfoOf(job ManagedJob) domain.JobInfo {
 	}
 }
 
+// A claim, like a detached launcher, has no process of its own to report: the
+// service it holds runs under the main checkout's key, and printing its PID
+// beside three worktrees would read as three processes.
 func detachedAwarePID(job ManagedJob) int {
-	if job.Status == domain.JobStatusDetached {
+	if job.Status == domain.JobStatusDetached || job.Status == domain.JobStatusAttached {
 		return 0
 	}
 	return job.PID

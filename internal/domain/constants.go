@@ -1794,7 +1794,11 @@ const (
 	// RunViewMarkDetached differs in shape rather than in colour: a detached
 	// service is up like a running one, but nothing about it can be attached.
 	RunViewMarkDetached = "◆"
-	RunViewMarkCrashed  = "✗"
+	// RunViewMarkShared says one instance serves every worktree: the same colour
+	// as running, since it is running, and a shape of its own so a reader does
+	// not count one service per worktree.
+	RunViewMarkShared  = "◈"
+	RunViewMarkCrashed = "✗"
 
 	// RunViewPaneWaiting and RunViewPaneNoHistory stand in
 	// for a pane with nothing in it yet, and RunViewPane*Label say where what is

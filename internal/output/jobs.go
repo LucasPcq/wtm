@@ -315,7 +315,7 @@ func FormatRunningJobs(params FormatRunningJobsParams) string {
 
 func styleJobStatus(status domain.JobStatus) string {
 	switch status {
-	case domain.JobStatusRunning, domain.JobStatusDetached:
+	case domain.JobStatusRunning, domain.JobStatusDetached, domain.JobStatusAttached:
 		return styles.Success.Render(string(status))
 	case domain.JobStatusCrashed:
 		return styles.Warning.Render(string(status))
