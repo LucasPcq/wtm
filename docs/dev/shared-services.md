@@ -43,6 +43,14 @@ A claim goes with a `run stop`, so it cannot be what tells `clean` there is a da
 
 A worktree created and thrown away without ever starting the stack therefore owes nothing.
 
+### Writing the two commands
+
+`run init` asks. After the scope step, a step lists three rows per shared service — its name, its `create`, its `remove` — and only the name carries a proposal. wtm has nothing honest to say about the other two: a recipe for postgres would guess the port variable, the user, the host and whether `psql` is even on this machine, and a pre-filled command that is accepted and then fails inside the retry budget reads as a wtm bug rather than as a line to write. It is the same decision LUC-55 already recorded for the port flag of every framework.
+
+What wtm *does* know it shows, while the field is open: the variables the command may read, which are `$WTM_NAMESPACE`, `$WTM_WORKTREE`, `$WTM_ORDINAL` and the ports **this job** declares, under the names it declares them by. Both an inline command and the path to a script are accepted — both are a `/bin/sh` line run in the worktree.
+
+An empty `create` is an answer, not an omission: the service is then shared outright, data included.
+
 ## Stopping is not destroying
 
 `run stop` and `run down` never run `detach`. A `run down` that dropped a database would make the command unusable.

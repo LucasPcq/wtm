@@ -151,3 +151,126 @@ func SharedFromConfig(params SharedFromConfigParams) []domain.SharedComposeServi
 	}
 	return shared
 }
+
+type NamespaceFieldsParams struct {
+	// Shared are the services the scope step marked, in the order it listed them.
+	Shared []domain.SharedComposeService
+	// Ports are each lifted job's declared port variables, keyed by service.
+	// They are what a create command actually has to reach the service with, and
+	// wtm knows them because it injects them.
+	Ports map[string][]string
+	// Existing is run.toml as it stands, so a namespace already written is
+	// opened for amendment rather than asked for again from scratch.
+	Existing domain.RunConfig
+}
+
+// NamespaceFields is the namespace step's rows: three per shared service, in a
+// stable order. Only the name carries a proposal — wtm has nothing to say about
+// the two commands, and a guess there would be wrong more often than right.
+func NamespaceFields(params NamespaceFieldsParams) []domain.NamespaceField {
+	var fields []domain.NamespaceField
+	for _, shared := range params.Shared {
+		held := existingNamespace(params.Existing, shared.Service, shared.Namespace)
+		vars := namespaceVars(params.Ports[shared.Service])
+		for _, kind := range []domain.NamespaceFieldKind{
+			domain.NamespaceFieldName, domain.NamespaceFieldCreate, domain.NamespaceFieldRemove,
+		} {
+			fields = append(fields, domain.NamespaceField{
+				Job:   shared.Service,
+				Field: kind,
+				Value: namespaceValue(held, kind),
+				Vars:  vars,
+			})
+		}
+	}
+	return fields
+}
+
+// existingNamespace is what run.toml already holds for this service, falling
+// back to what the scope step carried and finally to the one proposal wtm makes.
+func existingNamespace(cfg domain.RunConfig, service string, carried *domain.JobNamespaceConfig) domain.JobNamespaceConfig {
+	for _, job := range cfg.Jobs {
+		if job.Name == service && job.Namespace != nil {
+			return *job.Namespace
+		}
+	}
+	if carried != nil {
+		return *carried
+	}
+	return domain.JobNamespaceConfig{Name: domain.NamespaceNameDefault}
+}
+
+func namespaceValue(held domain.JobNamespaceConfig, kind domain.NamespaceFieldKind) string {
+	switch kind {
+	case domain.NamespaceFieldName:
+		return held.Name
+	case domain.NamespaceFieldCreate:
+		return held.Create
+	default:
+		return held.Remove
+	}
+}
+
+// namespaceVars is what a command may read: the worktree's own, then the ports
+// this job declares under the names it declares them by. Listing them is the
+// whole of what wtm can honestly offer here.
+func namespaceVars(ports []string) []string {
+	vars := []string{"$" + domain.EnvNamespace, "$" + domain.EnvWorktree, "$" + domain.EnvOrdinal}
+	for _, port := range ports {
+		vars = append(vars, "$"+port)
+	}
+	return vars
+}
+
+// NamespacesFromFields folds the step's rows back into what the write side
+// needs. A service whose create is empty carries no namespace at all: it is
+// shared outright, data included, which is a valid answer.
+func NamespacesFromFields(fields []domain.NamespaceField) map[string]*domain.JobNamespaceConfig {
+	byJob := map[string]*domain.JobNamespaceConfig{}
+	for _, field := range fields {
+		if byJob[field.Job] == nil {
+			byJob[field.Job] = &domain.JobNamespaceConfig{}
+		}
+		switch field.Field {
+		case domain.NamespaceFieldName:
+			byJob[field.Job].Name = field.Value
+		case domain.NamespaceFieldCreate:
+			byJob[field.Job].Create = field.Value
+		case domain.NamespaceFieldRemove:
+			byJob[field.Job].Remove = field.Value
+		}
+	}
+
+	for job, namespace := range byJob {
+		if namespace.Name == "" || namespace.Create == "" {
+			byJob[job] = nil
+		}
+	}
+	return byJob
+}
+
+// WithNamespaces carries the step's answers onto the services it asked about.
+func WithNamespaces(shared []domain.SharedComposeService, byJob map[string]*domain.JobNamespaceConfig) []domain.SharedComposeService {
+	out := make([]domain.SharedComposeService, len(shared))
+	copy(out, shared)
+	for i := range out {
+		out[i].Namespace = byJob[out[i].Service]
+	}
+	return out
+}
+
+// ComposeServicePortVars is the port variables each lifted service declares, so
+// the step can say what a command may actually read. It is derived from the
+// file's own bindings, never guessed: wtm injects these names, so it is the one
+// side that knows them.
+func ComposeServicePortVars(scans map[string]domain.ComposeScan, shared []domain.SharedComposeService) map[string][]string {
+	vars := map[string][]string{}
+	for _, service := range shared {
+		for _, binding := range scans[service.File].Bindings {
+			if binding.Service == service.Service && binding.Var != "" {
+				vars[service.Service] = append(vars[service.Service], binding.Var)
+			}
+		}
+	}
+	return vars
+}

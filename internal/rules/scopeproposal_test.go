@@ -104,3 +104,61 @@ func TestSharedFromChoicesKeepsOnlyWhatWasShared(t *testing.T) {
 		t.Errorf("shared = %v, want db alone: a fixed choice is never shared", got)
 	}
 }
+
+// Three rows per shared service, and only the name carries a proposal: wtm has
+// nothing honest to say about the two commands.
+func TestNamespaceFieldsProposeOnlyTheName(t *testing.T) {
+	got := NamespaceFields(NamespaceFieldsParams{
+		Shared: []domain.SharedComposeService{{File: "c.yml", Service: "db-crm"}},
+		Ports:  map[string][]string{"db-crm": {"CRM_DB_PORT"}},
+	})
+
+	if len(got) != 3 {
+		t.Fatalf("fields = %d, want three", len(got))
+	}
+	if got[0].Field != domain.NamespaceFieldName || got[0].Value != domain.NamespaceNameDefault {
+		t.Errorf("name row = %+v", got[0])
+	}
+	if got[1].Value != "" || got[2].Value != "" {
+		t.Errorf("a command was pre-filled: %+v %+v", got[1], got[2])
+	}
+	// The variables are the job's own, under the names it declares them by.
+	if len(got[1].Vars) == 0 || got[1].Vars[len(got[1].Vars)-1] != "$CRM_DB_PORT" {
+		t.Errorf("vars = %v, want the job's own port variable last", got[1].Vars)
+	}
+}
+
+// A namespace already in run.toml is opened for amendment, not asked for again.
+func TestNamespaceFieldsOpenOnWhatIsAlreadyWritten(t *testing.T) {
+	existing := domain.RunConfig{Jobs: []domain.JobConfig{{
+		Name: "db-crm", Scope: domain.JobScopeShared,
+		Namespace: &domain.JobNamespaceConfig{Name: "mine_{worktree}", Create: "./scripts/create.sh"},
+	}}}
+
+	got := NamespaceFields(NamespaceFieldsParams{
+		Shared:   []domain.SharedComposeService{{File: "c.yml", Service: "db-crm"}},
+		Existing: existing,
+	})
+	if got[0].Value != "mine_{worktree}" || got[1].Value != "./scripts/create.sh" {
+		t.Errorf("fields = %+v, want the config's own values", got[:2])
+	}
+}
+
+// An empty create is an answer: the service is shared outright, data included.
+func TestNamespacesFromFieldsDropsAServiceWithNoCreate(t *testing.T) {
+	got := NamespacesFromFields([]domain.NamespaceField{
+		{Job: "db", Field: domain.NamespaceFieldName, Value: "app_{worktree}"},
+		{Job: "db", Field: domain.NamespaceFieldCreate},
+		{Job: "db", Field: domain.NamespaceFieldRemove},
+		{Job: "kc", Field: domain.NamespaceFieldName, Value: "{worktree}"},
+		{Job: "kc", Field: domain.NamespaceFieldCreate, Value: "./scripts/kc.sh"},
+		{Job: "kc", Field: domain.NamespaceFieldRemove, Value: "./scripts/kc-rm.sh"},
+	})
+
+	if got["db"] != nil {
+		t.Errorf("db = %+v, want none: no create means shared outright", got["db"])
+	}
+	if got["kc"] == nil || got["kc"].Create != "./scripts/kc.sh" {
+		t.Errorf("kc = %+v", got["kc"])
+	}
+}

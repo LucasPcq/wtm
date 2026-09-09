@@ -247,6 +247,27 @@ type NamespaceRef struct {
 	Ordinal  int    `toml:"ordinal"  json:"ordinal"`
 }
 
+// NamespaceField is one editable line of the namespace step: which job it
+// belongs to, which of the three fields it is, and what has been typed. Vars are
+// the variables that field's command may read — the worktree's own plus the
+// ports THIS job declares, under the names it declares them by, so nothing has
+// to be guessed at.
+type NamespaceField struct {
+	Job   string
+	Field NamespaceFieldKind
+	Value string
+	Vars  []string
+}
+
+// NamespaceFieldKind is which of a namespace's three inputs a line carries.
+type NamespaceFieldKind string
+
+const (
+	NamespaceFieldName   NamespaceFieldKind = "name"
+	NamespaceFieldCreate NamespaceFieldKind = "create"
+	NamespaceFieldRemove NamespaceFieldKind = "remove"
+)
+
 // SharedJobContext is what a shared job needs and only the client can resolve:
 // the main checkout it runs in, and that checkout's own environment and log
 // directory rather than those of the worktree asking for it.

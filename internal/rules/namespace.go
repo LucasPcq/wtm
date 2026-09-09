@@ -261,3 +261,15 @@ func NamespaceJobsStarted(params NamespaceJobsStartedParams) []string {
 	}
 	return jobs
 }
+
+// NamespaceJobWidth aligns the field column across every row, so the three
+// lines of one service read as one block rather than as three unrelated ones.
+func NamespaceJobWidth(fields []domain.NamespaceField) int {
+	width := 0
+	for _, field := range fields {
+		if len(field.Job) > width {
+			width = len(field.Job)
+		}
+	}
+	return width
+}

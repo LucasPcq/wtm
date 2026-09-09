@@ -298,6 +298,8 @@ and **experimental**: the global `wtm init` does not configure it.
   the worktree's whole environment plus `$WTM_NAMESPACE`, `$WTM_WORKTREE`, `$WTM_ORDINAL`.
   Configuration values use `{worktree}` / `{ordinal}`; commands use the `$WTM_*` variables.
   A shared job with **no** `[job.namespace]` is valid and means one instance with one set of data.
+  `run init` asks for the three fields; wtm proposes only the name and never a command,
+  so `create`/`remove` are always the project's own — inline or a script path.
 - **Re-running `run init` is symmetric.** Every step is pre-filled from the existing
   `run.toml`: what stays checked is kept, and what you uncheck is **removed** along with the
   profile entries and `[[env_port]]` links naming it — a profile left with no job goes too.

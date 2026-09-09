@@ -30,6 +30,7 @@ const (
 	stepComposePatch   = "compose_patch"
 	stepScriptKinds    = "script_kinds"
 	stepScopes         = "scopes"
+	stepNamespaces     = "namespaces"
 	stepPorts          = "ports"
 	stepURLs           = "urls"
 	stepCmds           = "cmds"
@@ -681,6 +682,81 @@ func addScopeStep(s *stepSet, params addServicesStepsParams) {
 		Summary:    scopeListSummary,
 		Callout:    true,
 	})
+}
+
+// addNamespaceStep asks what each worktree gets of the services just marked
+// shared. wtm proposes only the name: it knows the variables a command may
+// read, never what a database or a realm is, and a guessed command would be
+// wrong more often than right — and wrong-and-accepted reads as a wtm bug.
+func addNamespaceStep(s *stepSet, params addServicesStepsParams) {
+	scopes := s.at(stepScopes)
+	if scopes < 0 {
+		return
+	}
+
+	skipReason := ""
+	s.add(stepNamespaces, components.Step{
+		Name: domain.NamespaceStepName,
+		Build: func(prev []components.Step) any {
+			return components.NewNamespaceList(components.NewNamespaceListParams{
+				Title:       domain.NamespaceStepTitle,
+				Description: domain.NamespaceStepDesc,
+				Fields:      namespaceFields(prev, scopes, params),
+			})
+		},
+		AutoSkip: func(w components.WizardModel) bool {
+			skip := len(namespaceFields(w.Steps(), scopes, params)) == 0
+			if skip {
+				skipReason = domain.NamespaceSkipNoShared
+			}
+			return skip
+		},
+		SkipReason: func() string { return skipReason },
+		Summary:    namespaceListSummary,
+		Callout:    true,
+	})
+}
+
+func namespaceFields(prev []components.Step, scopes int, params addServicesStepsParams) []domain.NamespaceField {
+	shared := sharedFromStep(prev, scopes)
+	if len(shared) == 0 {
+		return nil
+	}
+	return rules.NamespaceFields(rules.NamespaceFieldsParams{
+		Shared:   shared,
+		Ports:    rules.ComposeServicePortVars(params.Detection.ComposeScans, shared),
+		Existing: params.Existing,
+	})
+}
+
+func sharedFromStep(prev []components.Step, scopes int) []domain.SharedComposeService {
+	if scopes < 0 || scopes >= len(prev) {
+		return nil
+	}
+	model, ok := prev[scopes].Model.(components.ScopeListModel)
+	if !ok {
+		return nil
+	}
+	return rules.SharedFromChoices(model.Entries())
+}
+
+func namespaceListSummary(model any) string {
+	list, ok := model.(components.NamespaceListModel)
+	if !ok {
+		return ""
+	}
+	fields := list.Fields()
+	if len(fields) == 0 {
+		return domain.RecapNotAsked
+	}
+	byJob := rules.NamespacesFromFields(fields)
+	configured := 0
+	for _, namespace := range byJob {
+		if namespace != nil {
+			configured++
+		}
+	}
+	return fmt.Sprintf(domain.NamespaceSummaryFmt, configured, len(byJob))
 }
 
 type scopeChoicesParams struct {
@@ -1381,6 +1457,9 @@ func addServicesSteps(s *stepSet, params addServicesStepsParams) (steps services
 	// Before the ports step, and not after: a shared job takes no offset, so
 	// which services are shared has to be settled before their ports are.
 	addScopeStep(s, params)
+	// After the scope step and reading it: which services are shared is what
+	// decides whether this one has anything to ask at all.
+	addNamespaceStep(s, params)
 
 	// Declared last on purpose: the step resolves the ports of both selections,
 	// so it must be able to read them — a .env port can withdraw a compose
@@ -1585,6 +1664,11 @@ func extractProjectAnswers(final components.WizardModel, detection domain.InitDe
 		if m, ok := steps[i].Model.(components.ScopeListModel); ok {
 			answers.SharedServices = rules.SharedFromChoices(m.Entries())
 			answers.ScopesAsked = true
+		}
+	}
+	if i := at(stepNamespaces); i >= 0 && !final.Skipped(i) {
+		if m, ok := steps[i].Model.(components.NamespaceListModel); ok {
+			answers.SharedServices = rules.WithNamespaces(answers.SharedServices, rules.NamespacesFromFields(m.Fields()))
 		}
 	}
 	answers.Scans = detection.ComposeScans

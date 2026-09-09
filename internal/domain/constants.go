@@ -243,6 +243,23 @@ const (
 	// framework, already settled in LUC-55.
 	NamespaceNameDefault = "app_{worktree}"
 
+	// The namespace step: what it asks, and what it says is available. The list
+	// of variables is built from the job's own declaration rather than written
+	// here — wtm knows the ports it injects, and nothing else.
+	NamespaceStepName  = "Shared service data"
+	NamespaceStepTitle = "What does each worktree get of these shared services?"
+	NamespaceStepDesc  = "A shared service runs once, so each worktree needs its own slice of it — a database, a set of realms. Give the name of that slice and the commands that create and give it back. Either an inline command or the path to a script; both run as a /bin/sh line in the worktree. Leave create empty to share the service outright, data included."
+
+	NamespaceRowFmt       = "%-*s  %-7s  %s"
+	NamespaceRowEditFmt   = "%-*s  %-7s  %s"
+	NamespaceEmptyValue   = "—"
+	NamespaceVarsFmt      = "available: %s"
+	NamespaceVarSep       = "  "
+	NamespaceNameEmptyErr = "a namespace needs a name; it is what clean says it is about to destroy"
+	NamespaceEditHelp     = "enter save · esc cancel"
+	NamespaceSummaryFmt   = "%d of %d configured"
+	NamespaceSkipNoShared = "no shared service to carve up"
+
 	// MainWorktreeOrdinal is never persisted: the main worktree has no meta.json,
 	// so 0 in a linked worktree's metadata means "not allocated yet".
 	MainWorktreeOrdinal = 0
