@@ -828,6 +828,8 @@ Rules:
   `output.Blank` is allowed only as a genuine *inter-section* separator inside a body.
 - **No stacked blanks** (`\n\n\n`+). Spinners do not self-pad — the frame owns the
   leading blank, so open the frame before starting a spinner.
+- **A block has to earn its place**: it prints when it changes what the reader does next. Success contracts to a count, anomalies are named one by one; detail belongs to the command whose subject it is (ports → `wtm env`, not `create`); a successful run has a fixed shape whatever happened. See CLAUDE.md, "What a block of output has to earn".
+- **A hook phase is shown, not kept**: `output.HookView` draws a bounded tail and replaces it with one result line per hook, logging the whole stream to `<state-dir>/hooks.log`. Terminals only (`output.IsTerminal`) — a pipe or `--output json` gets the raw stream. The phase reports through `flow.HookSink` (output + `domain.HookBeat`); `service/hooks` renders only its no-reporter fallback.
 - **TUI views own their single top/bottom blank** (`WizardModel`/`standaloneModel`
   both open with one leading `\n`); don't add a manual blank before launching a wizard.
 

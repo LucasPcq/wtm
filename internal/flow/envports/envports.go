@@ -41,7 +41,7 @@ func Linked(ctx flow.Context) bool {
 // It never asks: the question belongs to the run that creates the worktree,
 // where it is one confirmation among the others rather than a second one, put
 // after the point of no return. What is left here is a report of what happened.
-func Settle(params Params) error {
+func Settle(params Params) (domain.EnvPortSettlement, error) {
 	resolved, err := worktree.ResolveEnvPorts(worktree.ResolveEnvPortsParams{
 		ProjectDir:   params.Context.ProjectDir,
 		StateDir:     params.Context.StateDir,
@@ -51,12 +51,12 @@ func Settle(params Params) error {
 		Global:       params.Context.Config.Global,
 	})
 	if err != nil || resolved.Empty() {
-		return err
+		return domain.EnvPortSettlement{}, err
 	}
 
 	plan, err := envsvc.ComputeEnvPorts(resolved)
 	if err != nil {
-		return err
+		return domain.EnvPortSettlement{}, err
 	}
 	if anomalies := rules.EnvPortAnomalyLines(plan); len(anomalies) > 0 {
 		params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: domain.EnvPortAnomaliesTitle, Lines: anomalies})
@@ -64,20 +64,13 @@ func Settle(params Params) error {
 	for _, notice := range rules.EnvPortNotices(plan) {
 		params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: notice.Title, Lines: []string{notice.Line}})
 	}
-	if owned := rules.OwnedEnvLines(plan); len(owned) > 0 {
-		params.Presenter.Status(flow.Notice{Kind: flow.NoticeMessage, Text: domain.EnvOwnedKeysTitle, Lines: owned})
+
+	settlement := domain.EnvPortSettlement{Shifted: len(rules.EnvPortRewrites(plan)), Offset: plan.Offset}
+	if !params.Rewrite || settlement.Shifted == 0 {
+		return settlement, envsvc.ApplyOwnedEnv(resolved)
 	}
 
-	if !params.Rewrite || len(rules.EnvPortRewrites(plan)) == 0 {
-		return envsvc.ApplyOwnedEnv(resolved)
-	}
-
-	params.Presenter.Status(flow.Notice{
-		Kind:  flow.NoticeMessage,
-		Text:  rules.EnvPortOffsetLabel(plan.Offset),
-		Lines: rules.EnvPortTableLines(rules.EnvPortTableParams{Plan: plan}),
-	})
-
+	settlement.Applied = true
 	_, err = envsvc.ApplyEnvPorts(resolved)
-	return err
+	return settlement, err
 }

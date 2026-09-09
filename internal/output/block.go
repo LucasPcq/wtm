@@ -133,15 +133,32 @@ func widestRow(lines []string) int {
 	return widest
 }
 
-// TerminalWidth is what a report has to draw in, zero when there is no terminal
-// to measure. A section is not boxed, so it is the surface itself that has to
-// hand the figure to whatever builds its columns.
-func TerminalWidth() int {
-	cols, _, err := term.GetSize(int(os.Stdout.Fd()))
+// TerminalWidthOf is what a surface has to draw in, zero when the stream is no
+// terminal. It measures the stream actually written to: a surface that draws on
+// stderr and measures stdout gets 0 the moment stdout is redirected,
+// which is the common `wtm create > out.txt`; every line it then draws too wide
+// wraps, and a block redrawn in place cannot count the rows it took.
+func TerminalWidthOf(w io.Writer) int {
+	file, ok := w.(*os.File)
+	if !ok {
+		return 0
+	}
+	cols, _, err := term.GetSize(int(file.Fd()))
 	if err != nil || cols <= 0 {
 		return 0
 	}
 	return cols
+}
+
+// IsTerminal reports whether w is a terminal this process may repaint. A pipe, a
+// buffer or a file is not: a surface that moves the cursor there writes escape
+// sequences into someone's log.
+func IsTerminal(w io.Writer) bool {
+	file, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	return term.IsTerminal(int(file.Fd()))
 }
 
 // Section prints a bold title above indented lines, with no frame. It is what a

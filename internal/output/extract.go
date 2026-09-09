@@ -14,11 +14,19 @@ func WriteExtractJSON(w io.Writer, result domain.ExtractResult) error {
 	return encodeJSON(w, result)
 }
 
+type ExtractResultParams struct {
+	Result domain.ExtractResult
+	// EnvNote is what the port pass did in a worktree the extraction created —
+	// a count and an offset (rules.EnvPortSettlementNote), empty otherwise.
+	EnvNote string
+}
+
 // PrintExtractResult renders the human-facing summary of an extraction: a
 // headline, the moved files with colored status tags, and the target worktree.
 // It emits a raw body with no outer blank lines; the caller's frame owns the
 // outer vertical padding.
-func PrintExtractResult(w io.Writer, result domain.ExtractResult) {
+func PrintExtractResult(w io.Writer, params ExtractResultParams) {
+	result := params.Result
 	verb := "Moved"
 	if result.Kept {
 		verb = "Copied"
@@ -32,6 +40,9 @@ func PrintExtractResult(w io.Writer, result domain.ExtractResult) {
 	Blank(w)
 	InfoLine(w, "source", result.SourceBranch+" · "+sourceState(result.Kept))
 	InfoLine(w, "worktree", result.TargetPath)
+	if params.EnvNote != "" {
+		InfoLine(w, "env", params.EnvNote)
+	}
 	Blank(w)
 	GoHint(w, fmt.Sprintf(domain.GoCommandFmt, result.TargetBranch))
 }

@@ -22,7 +22,7 @@ func PrintEnvReport(w io.Writer, result domain.EnvSyncResult) {
 		if i > 0 {
 			Blank(w)
 		}
-		printEnvFile(w, f, result.Check, rules.EnvPortPlanTouches(result.Ports, f.Target))
+		printEnvFile(w, f, result.Check, rules.EnvPortsMoveIn(rules.EnvPortsMoveInParams{Result: result, Target: f.Target}))
 	}
 	EnvPortsReport(w, result.Ports, result.Check)
 	Blank(w)

@@ -257,7 +257,11 @@ type CreateResultParams struct {
 	AlreadyExists bool
 	From          string
 	EnvStrategy   string
-	Path          string
+	// EnvNote qualifies the env line with what the port pass did — a count and an
+	// offset, resolved by the caller (rules.EnvPortSettlementNote). Empty when the
+	// run moved no linked value.
+	EnvNote string
+	Path    string
 	// ExistingBranch reports that an existing local branch was checked out as-is,
 	// which retitles the headline and relabels From as the sync parent.
 	ExistingBranch bool
@@ -295,7 +299,7 @@ func FormatCreateResult(w io.Writer, p CreateResultParams) {
 	Blank(w)
 	writeAlignedFields(w, []domain.RecapField{
 		{Label: sourceLabel, Value: p.From},
-		{Label: domain.CreateRecapLabelEnv, Value: p.EnvStrategy},
+		{Label: domain.CreateRecapLabelEnv, Value: withNote(noteParams{Value: p.EnvStrategy, Note: p.EnvNote})},
 		{Label: domain.CreateRecapLabelPath, Value: p.Path},
 	})
 	if p.ReusedNote != "" {
@@ -308,6 +312,18 @@ func FormatCreateResult(w io.Writer, p CreateResultParams) {
 	}
 	Blank(w)
 	GoHint(w, p.GoCommand)
+}
+
+type noteParams struct {
+	Value string
+	Note  string
+}
+
+func withNote(params noteParams) string {
+	if params.Note == "" {
+		return params.Value
+	}
+	return params.Value + styles.Muted.Render(domain.EnvRecapNoteSeparator+params.Note)
 }
 
 // GoHint prints the highlighted jump-in step shared by every worktree-creating

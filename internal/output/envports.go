@@ -1,75 +1,36 @@
 package output
 
 import (
-	"fmt"
 	"io"
-	"strconv"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
-	"github.com/LucasPcq/wtm/internal/styles"
 )
 
-// EnvPortsReport prints the .env values a worktree's offset moves, and the links
-// wtm declined to act on. It is a section like the file blocks it follows, not a
-// boxed callout: the two describe the same run on the same files, and two visual
-// languages in one report make it read as two unrelated reports.
+// EnvPortsReport prints what the reader still has to act on after a port pass —
+// the links wtm declined to act on, and what the machine made of the run — plus
+// a single line for the pass itself.
+//
+// It lists no value. A settled port is a fact nobody decides on, and the table
+// that named them all spent a screen restating what the .env beside it already
+// holds; the count and the offset are the whole of what a reader checks.
 //
 // It emits a raw body with no surrounding blank lines; the caller's frame owns
 // the padding. A plan with nothing to say prints nothing.
 func EnvPortsReport(w io.Writer, plan domain.EnvPortPlan, check bool) {
-	// The section is indented twice like every Message it prints, and that is
-	// room the table does not have.
-	rows := rules.EnvPortTableLines(rules.EnvPortTableParams{
-		Plan:  plan,
-		Width: reportWidth(),
-	})
+	outcome := rules.EnvPortOutcomeLine(rules.EnvPortOutcomeParams{Plan: plan, Check: check})
 	anomalies := rules.EnvPortAnomalyLines(plan)
 	notices := rules.EnvPortNotices(plan)
-	if len(rows) == 0 && len(anomalies) == 0 && len(notices) == 0 {
+	if outcome == "" && len(anomalies) == 0 && len(notices) == 0 {
 		return
 	}
 
 	Blank(w)
-
-	// A declined pass collapses to one line. The table was the proposal; once the
-	// answer is no, re-printing it in the result report is a list of things that
-	// did not happen. A --check run is a preview, so it keeps its table.
-	declined := len(rows) > 0 && !plan.Applied && !check
-	if declined {
-		Unchanged(w, fmt.Sprintf(domain.EnvPortsLeftAloneFmt, len(rules.EnvPortRewrites(plan))))
-		printEnvPortAnomalies(w, anomalies)
-		printEnvPortNotices(w, notices, false)
-		return
-	}
-
-	// The title names the table, so it comes with one. A pass that only has a
-	// notice to give — every value already settled — would otherwise print a
-	// heading over nothing.
-	if len(rows) > 0 {
-		SectionTitle(w, fmt.Sprintf(domain.EnvFileHeaderFmt,
-			domain.EnvPortsTitle,
-			styles.Muted.Render(domain.EnvPortOffsetPrefix+strconv.Itoa(plan.Offset))))
-	}
-
-	for _, line := range rows {
-		Message(w, line)
-	}
-	if len(rows) > 0 && len(anomalies) > 0 {
-		Blank(w)
+	if outcome != "" {
+		Unchanged(w, outcome)
 	}
 	printEnvPortAnomalies(w, anomalies)
-	printEnvPortNotices(w, notices, len(rows) == 0 && len(anomalies) == 0)
-}
-
-// reportWidth is what a table printed as a section has left, zero when there is
-// no terminal to measure.
-func reportWidth() int {
-	cols := TerminalWidth()
-	if cols <= 0 {
-		return 0
-	}
-	return cols - len([]rune(Indent))
+	printEnvPortNotices(w, notices, outcome == "" && len(anomalies) == 0)
 }
 
 // printEnvPortNotices closes the section with what the machine, rather than any

@@ -12,6 +12,7 @@ import (
 	reparentflow "github.com/LucasPcq/wtm/internal/flow/reparent"
 	syncflow "github.com/LucasPcq/wtm/internal/flow/sync"
 	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/rules"
 )
 
 type createPresenter struct {
@@ -42,6 +43,7 @@ func (p createPresenter) Created(outcome createflow.Outcome) error {
 			AlreadyExists: outcome.Result.AlreadyExists,
 			From:          outcome.FromBranch,
 			EnvStrategy:   string(outcome.Result.Metadata.EnvStrategy),
+			EnvNote:       rules.EnvPortSettlementNote(outcome.EnvPorts),
 			Path: createDisplayPath(displayPathParams{
 				Config:     p.config.Config,
 				ProjectDir: p.config.ProjectDir,

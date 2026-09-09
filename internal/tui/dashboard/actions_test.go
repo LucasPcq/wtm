@@ -69,8 +69,8 @@ func TestHooksStreamIntoTheOutputPanelLineByLine(t *testing.T) {
 
 	err := p.HookPhase(flow.HookPhaseParams{
 		Title: domain.HooksTitleOnCreate,
-		Run: func(sink io.Writer) error {
-			if _, writeErr := io.WriteString(sink, "installing\npar"); writeErr != nil {
+		Run: func(sink flow.HookSink) error {
+			if _, writeErr := io.WriteString(sink.Output, "installing\npar"); writeErr != nil {
 				return writeErr
 			}
 			// Title line + its opStageMsg (the locked row's progress) + the
@@ -78,7 +78,7 @@ func TestHooksStreamIntoTheOutputPanelLineByLine(t *testing.T) {
 			if len(msgs) != 3 {
 				t.Errorf("%d messages posted mid-run, want the title, its stage and the first line already out", len(msgs))
 			}
-			_, writeErr := io.WriteString(sink, "tial tail")
+			_, writeErr := io.WriteString(sink.Output, "tial tail")
 			return writeErr
 		},
 	})

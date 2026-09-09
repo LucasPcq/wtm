@@ -101,6 +101,7 @@ func (p *ScriptedPrompter) AskedKeys() string { return strings.Join(p.Asked, ","
 type Recorder struct {
 	Stages   []string
 	Hooks    []string
+	Beats    []domain.HookBeat
 	Notices  []flow.Notice
 	Statuses []flow.Notice
 }
@@ -113,7 +114,9 @@ func (r *Recorder) Stage(params flow.StageParams) error {
 func (r *Recorder) HookPhase(params flow.HookPhaseParams) error {
 	r.Hooks = append(r.Hooks, params.Title)
 	var sink strings.Builder
-	return params.Run(&sink)
+	return params.Run(flow.HookSink{Output: &sink, OnHook: func(beat domain.HookBeat) {
+		r.Beats = append(r.Beats, beat)
+	}})
 }
 
 func (r *Recorder) Notice(notice flow.Notice) { r.Notices = append(r.Notices, notice) }

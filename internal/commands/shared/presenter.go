@@ -33,11 +33,24 @@ func (p CLIPresenter) Stage(params flow.StageParams) error {
 	})
 }
 
+// HookPhase draws the phase only where it can be undrawn. A terminal gets a
+// bounded tail replaced by one result line per hook; anything else — a pipe, a
+// CI log, a JSON run — gets the stream whole, which is what a reader who cannot
+// watch it live came for.
 func (p CLIPresenter) HookPhase(params flow.HookPhaseParams) error {
-	if p.Human {
-		output.HooksSection(p.Cmd.ErrOrStderr(), params.Title)
+	stderr := p.Cmd.ErrOrStderr()
+	if !p.Human {
+		return params.Run(flow.HookSink{Output: stderr})
 	}
-	return params.Run(p.Cmd.ErrOrStderr())
+
+	output.HooksSection(stderr, params.Title)
+	if !output.IsTerminal(stderr) {
+		return params.Run(flow.HookSink{Output: stderr})
+	}
+
+	view := output.NewHookView(output.HookViewParams{W: stderr, LogPath: params.LogPath})
+	defer view.Close()
+	return params.Run(flow.HookSink{Output: view, OnHook: view.OnHook})
 }
 
 func (p CLIPresenter) Notice(notice flow.Notice) {

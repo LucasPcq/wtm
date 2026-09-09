@@ -139,3 +139,13 @@ type RunAddresses struct {
 	// without being addressed by port.
 	PortAddressed map[string]bool
 }
+
+// EnvPortSettlement is what a create-like run reports of its port pass: how many
+// linked values moved and by how much, never which ones. The values themselves
+// are in the .env the run just wrote, and `wtm env` is the command whose subject
+// they are.
+type EnvPortSettlement struct {
+	Shifted int
+	Offset  int
+	Applied bool
+}

@@ -247,6 +247,14 @@ machine output (shell-eval: `resolve` success, `shell-init`) are never framed.
 Route on `rules.IsHumanFormat(format)`. See the `go-cli` skill (Output section) for
 the full convention.
 
+**What a block of output has to earn.** Vertical spacing is settled above; *whether a block prints at all* is the rule that was missing, and it is the one that decides how a command reads. A block earns its place when it changes what the reader does next. Three consequences, in the order they bite:
+
+- **Success contracts, anomaly expands.** A pass that did exactly what was asked is a count; a refusal, a conflict or a link matching nothing is named one by one. The port pass is the reference: `rules.EnvPortAnomalyLines` still lists every link wtm declined to act on, while the twelve values it settled are `4 ports shifted (+10)` on the recap's env line. Giving the nominal path as much room as the actionable one is what makes a CLI read as noise.
+- **Detail belongs to the command whose subject it is.** Ports are the subject of `wtm env` and `run init`; in `create` and `extract` they are a side effect, so they collapse to one line there. A reader who wants the values runs the command that is about them — or opens the file the run just wrote.
+- **A successful run has a fixed shape.** What makes output feel bloated is that its size varies with what happened, so it can never be recognised at a glance. `wtm create` is six lines whether it settled three ports or thirty.
+
+**What is shown is not what is kept.** A hook that runs for forty seconds must be visible while it runs — silence reads as a hang — and must not survive in the scrollback, which nobody rereads. `output.HookView` is the shape: a bounded tail redrawn in place, erased and replaced by one `✓ <hook> (12.4s)` line, the whole stream written to `<state-dir>/hooks.log` regardless, and the tail kept on screen when the hook failed. It only ever applies to a terminal this process may repaint (`output.IsTerminal`): a pipe, a CI log or `--output json` gets the raw stream, unconditionally and unchanged. A phase reports through `flow.HookSink` — the raw output *and* the `domain.HookBeat` of each hook starting and finishing — so the surface decides what to draw; `service/hooks` renders only the fallback for a caller that installed no reporter.
+
 **The `flow/` layer (LUC-175).** A command's flow lives in `internal/flow/`, not in
 `commands/`: `runCreate`/`runClean` read the flags, decide *who may be asked* and
 *where output goes*, then call `create.Run` / `clean.Run`. One package per command,

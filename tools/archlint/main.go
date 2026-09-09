@@ -62,7 +62,8 @@ var layers = map[string]layer{
 		why:      "formats and prints, zero decision logic",
 	},
 	"styles": {
-		external: []string{"github.com/charmbracelet/lipgloss", "github.com/muesli/termenv"},
+		internal: []string{"domain"},
+		external: []string{"github.com/charmbracelet/lipgloss", "github.com/charmbracelet/x/ansi", "github.com/muesli/termenv"},
 		why:      "the only package that instantiates a lipgloss.Style",
 	},
 	"tui": {

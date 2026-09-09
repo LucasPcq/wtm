@@ -1,9 +1,9 @@
 package hooks
 
 import (
+	"io"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -124,21 +124,49 @@ func TestResolveTemplateVars(t *testing.T) {
 	}
 }
 
-func TestFormatDuration(t *testing.T) {
-	tests := []struct {
-		ms   int
-		want string
-	}{
-		{50, "50ms"},
-		{500, "500ms"},
-		{1500, "1.5s"},
-		{10000, "10.0s"},
+// A caller that reports the beats itself gets them, and the runner writes no
+// decoration of its own — the whole point of the seam is that only one of the
+// two draws the phase.
+func TestRunHooksReportsEachBeatToTheCaller(t *testing.T) {
+	var beats []domain.HookBeat
+	var out strings.Builder
+	if err := RunHooks(RunHooksParams{
+		Hooks:   []domain.HookCommand{{Cmd: "echo hello"}},
+		WorkDir: t.TempDir(),
+		Output:  &out,
+		OnHook:  func(beat domain.HookBeat) { beats = append(beats, beat) },
+	}); err != nil {
+		t.Fatalf("RunHooks: %v", err)
 	}
 
-	for _, tt := range tests {
-		got := formatDuration(time.Duration(tt.ms) * time.Millisecond)
-		if !strings.Contains(got, tt.want[:len(tt.want)-1]) {
-			t.Errorf("formatDuration(%dms) = %q, want ~%q", tt.ms, got, tt.want)
-		}
+	if len(beats) != 2 || !beats[0].Started || beats[1].Started {
+		t.Fatalf("beats = %+v, want the hook starting then finished", beats)
+	}
+	if beats[1].Err != "" {
+		t.Errorf("a hook that succeeded reported %q", beats[1].Err)
+	}
+	if got := out.String(); got != "hello\n" {
+		t.Errorf("output = %q, want the hook's own output and nothing else", got)
+	}
+}
+
+// A failing hook hands its stderr to the caller: the surface decides whether to
+// show it, and it is gone from the stream by then.
+func TestRunHooksCarriesTheFailureStderrOnTheBeat(t *testing.T) {
+	var beats []domain.HookBeat
+	err := RunHooks(RunHooksParams{
+		Hooks:   []domain.HookCommand{{Cmd: "echo boom >&2; false"}},
+		WorkDir: t.TempDir(),
+		Output:  io.Discard,
+		OnHook:  func(beat domain.HookBeat) { beats = append(beats, beat) },
+	})
+	if err == nil {
+		t.Fatal("expected the failing hook to abort")
+	}
+	if len(beats) != 2 || beats[1].Err == "" {
+		t.Fatalf("beats = %+v, want the failure on the closing beat", beats)
+	}
+	if beats[1].Stderr != "boom" {
+		t.Errorf("stderr = %q, want %q", beats[1].Stderr, "boom")
 	}
 }

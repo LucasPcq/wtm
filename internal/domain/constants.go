@@ -556,12 +556,7 @@ const (
 	FlagNoProbe = "no-probe"
 
 	// The .env port report ([[env_port]] links resolved for one worktree).
-	EnvPortsTitle = "Env ports"
-	// EnvOwnedKeysTitle heads the worktree identity a .env carries, and
-	// EnvOwnedKeyLineFmt spells one of its keys.
-	EnvOwnedKeysTitle  = "Worktree identity"
-	EnvOwnedKeyLineFmt = "%s → %s"
-
+	EnvPortsTitle       = "Env ports"
 	EnvPortOffsetPrefix = "offset +"
 	// EnvPortTableRowFmt aligns key, port name, the port move, and the value the
 	// key lands on — the only column that can be long, and the only one elided.
@@ -611,11 +606,11 @@ const (
 	// The trailing verdict of `wtm env`.
 	EnvCheckDriftMessage = "Read-only check — run `wtm env` to reconcile."
 	// EnvFileInSyncMessage closes a file block with nothing to do.
-	// EnvFileKeysInSyncMessage replaces it when the port pass below still moves
-	// a value in that same file — "in sync" there would contradict the next
-	// section about the very same file.
+	// EnvFileKeysInSyncMessage replaces it when the port pass still moves
+	// a value in that same file — "in sync" there would contradict the summary
+	// counting that very file's linked values as settled.
 	EnvFileInSyncMessage     = "in sync — nothing to reconcile"
-	EnvFileKeysInSyncMessage = "keys in sync — port values below"
+	EnvFileKeysInSyncMessage = "keys in sync — its linked port values still move"
 
 	// The detail column of a file block's key rows.
 	EnvKeyRowGap         = "  "
@@ -641,8 +636,20 @@ const (
 	// port pass is proposed, as `wtm create` proposes it, and never imposed.
 	EnvApplyActionLabel       = "Yes, apply"
 	EnvApplyWithoutPortsLabel = "Apply, but leave the port values alone"
-	// EnvPortsLeftAloneFmt replaces the table when the pass was declined.
-	EnvPortsLeftAloneFmt       = "Env ports left alone — %d linked value(s) left as they were"
+	// EnvPortsLeftAloneFmt is the pass the user declined.
+	EnvPortsLeftAloneFmt = "Env ports left alone — %d linked value(s) left as they were"
+	// EnvPortsWouldShiftFmt is what a --check preview says instead of listing
+	// every value: the count and the offset are the whole of the decision, and
+	// the values are in the files the report already names.
+	EnvPortsWouldShiftFmt = "%d linked .env value(s) would be shifted (offset +%d)"
+	// EnvPortsRecapShiftedFmt and EnvPortsRecapKeptFmt qualify the env line of a
+	// create-like recap, where the port pass is a side effect rather than the
+	// subject.
+	EnvPortsRecapShiftedFmt = "%d port(s) shifted (+%d)"
+	EnvPortsRecapKeptFmt    = "%d linked value(s) left as they were"
+	// EnvRecapNoteSeparator joins a recap value to the note qualifying it.
+	EnvRecapNoteSeparator = " · "
+
 	EnvCheckCleanMessage       = "No drift."
 	EnvNothingWrittenMessage   = "No changes written."
 	EnvReconciledFmt           = "Reconciled %d file(s)."
@@ -1291,8 +1298,39 @@ const (
 	InitRecapValueSkippedTemplate = "skipped (template)"
 	InitRecapHookMoreFmt          = "%s  (+%d more)"
 
-	// Hook phase titles: shown as a bold section header above the streamed hook
-	// output, so create/clean read as distinct phases instead of loose lines.
+	// A hook phase's beats: how a hook is named, timed and marked, plus where the
+	// whole of its output is kept once a surface has collapsed what it showed.
+	HookCwdLabelFmt       = "%s (cwd: %s)"
+	HookResultLabelFmt    = "%s (%s)"
+	HookDurationMsFmt     = "%dms"
+	HookDurationSecFmt    = "%.1fs"
+	HookGlyphStart        = "→"
+	HookGlyphDone         = "✓"
+	HookGlyphFailed       = "✗"
+	HooksLogDirName       = "hooks"
+	HooksLogNameSeparator = "-"
+	HooksLogFileExt       = ".log"
+	HookLogTailFmt        = "full output: %s"
+	// The fallback rendering of a phase nobody drew: the beats separated by
+	// blank lines, with the hook's own output between them.
+	HookFallbackStartFmt = "\n  %s\n\n"
+	HookFallbackDoneFmt  = "\n  %s\n"
+	HookViewTailLines    = 8
+	// HookViewFallbackWidth is what the tail is cut to with no terminal to
+	// measure, wide enough that a cut line still says which one it was.
+	HookViewFallbackWidth = 100
+	// HookViewMinWidth is the floor a cut never goes under: on a window too narrow
+	// to hold anything, giving up on cutting means wrapping, and a wrapped row
+	// breaks the count the repaint moves the cursor back by.
+	HookViewMinWidth = 8
+	// TabWidth is what a tab is expanded to before a line is measured.
+	TabWidth = 8
+	// The cursor moves a surface makes to redraw a block it already printed.
+	AnsiCursorUpFmt = "\x1b[%dA"
+	AnsiClearBelow  = "\x1b[J"
+	AnsiReset       = "\x1b[0m"
+	// Hook phase titles: a bold section header above the phase, so create and
+	// clean read as distinct phases instead of loose lines.
 	HooksTitleOnCreate = "Running on_create hooks"
 	HooksTitleOnClean  = "Running on_clean hooks"
 

@@ -39,12 +39,19 @@ func (p presenter) Stage(params flow.StageParams) error {
 
 // HookPhase streams the hooks as they run: RunHooks writes from this goroutine,
 // so the sink turns its bytes into lines and posts each one as a message rather
-// than touching the model.
+// than touching the model. The panel scrolls and cannot repaint, so it keeps the
+// stream and takes the beats as two more lines around it.
 func (p presenter) HookPhase(params flow.HookPhaseParams) error {
 	p.line(params.Title)
 	p.send(opStageMsg{id: p.id, stage: params.Title})
 	sink := &flow.LineWriter{Emit: p.line}
-	err := params.Run(sink)
+	err := params.Run(flow.HookSink{
+		Output: sink,
+		OnHook: func(beat domain.HookBeat) {
+			sink.Flush()
+			p.line(rules.HookBeatLine(beat))
+		},
+	})
 	sink.Flush()
 	return err
 }
@@ -76,6 +83,9 @@ func (p createPresenter) Created(outcome createflow.Outcome) error {
 		return nil
 	}
 	p.line(fmt.Sprintf(domain.DashboardFinishedFmt, domain.OpKindCreate, outcome.Branch))
+	if note := rules.EnvPortSettlementNote(outcome.EnvPorts); note != "" {
+		p.line(note)
+	}
 	p.send(createdMsg{branch: outcome.Branch})
 	return nil
 }

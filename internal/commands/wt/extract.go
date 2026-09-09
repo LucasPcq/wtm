@@ -222,7 +222,10 @@ func runExtract(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 	output.Frame(cmd.OutOrStdout(), func() {
-		output.PrintExtractResult(cmd.OutOrStdout(), result)
+		output.PrintExtractResult(cmd.OutOrStdout(), output.ExtractResultParams{
+			Result:  result,
+			EnvNote: rules.EnvPortSettlementNote(sel.target.envPorts),
+		})
 	})
 	return nil
 }
@@ -596,6 +599,9 @@ func extractCreateParams(cfg shared.ConfigResult, sourceBranch string) newpicker
 type extractTarget struct {
 	path   string
 	branch string
+	// envPorts is what the port pass did in a worktree this extraction created,
+	// zero for one that already existed and was never provisioned.
+	envPorts domain.EnvPortSettlement
 }
 
 type resolveTargetParams struct {
@@ -741,13 +747,14 @@ func createTarget(params createTargetParams) (extractTarget, error) {
 	// Before the hooks: one of them may read the .env, and it has to read the
 	// ports this worktree binds rather than the ones it was copied from.
 	format, _ := params.cmd.Flags().GetString(domain.FlagOutput)
-	if err := envports.Settle(envports.Params{
+	settlement, err := envports.Settle(envports.Params{
 		Context:      shared.FlowContext(params.cfg),
 		Branch:       res.Branch,
 		WorktreePath: res.Path,
 		Rewrite:      params.adjustEnvPorts,
 		Presenter:    shared.NewPresenter(params.cmd, format),
-	}); err != nil {
+	})
+	if err != nil {
 		return extractTarget{}, err
 	}
 
@@ -764,5 +771,5 @@ func createTarget(params createTargetParams) (extractTarget, error) {
 	}); err != nil {
 		return extractTarget{}, err
 	}
-	return extractTarget{path: res.Path, branch: res.Branch}, nil
+	return extractTarget{path: res.Path, branch: res.Branch, envPorts: settlement}, nil
 }
