@@ -138,7 +138,10 @@ flagged; everything else is what the name implies.
   source. The response adds `existing_branch: true` and `origin_state`
   (`up-to-date`/`behind`/`ahead`/`diverged`) so you can tell reuse from creation.
 - `wtm clean <branch>` / `wtm prune [filters]` — remove one / batch-remove finished
-  worktrees. **In JSON mode surviving children are left orphaned unless you pass
+  worktrees. **`clean` also gives back the tenants that worktree carved out of shared
+  services** (it drops its database): pass `--keep-data` to withhold that, including under
+  `--yes`. If the shared service is down at the time the drop is deferred, and the next
+  `wtm prune` settles it once the service is up again. **In JSON mode surviving children are left orphaned unless you pass
   `--reparent-children`** (they reparent onto the grandparent). `prune` decides "finished"
   from **GitHub PR state via the `gh` CLI** (not local commits): `--merged` = PR merged,
   `--closed` = PR closed without merging, `--gone` = remote branch deleted; no filter = all
@@ -276,6 +279,22 @@ and **experimental**: the global `wtm init` does not configure it.
   `16` (run module not initialized) until at least one job/profile is declared. Non-TTY it
   auto-generates and **removes nothing**. `run job add` / `run profile add` also work before
   init (they create the first job).
+- **A job may be shared across worktrees.** `scope = "shared"` in `run.toml` makes it run
+  **once for the whole repository**, in the main checkout, instead of once per worktree — a
+  postgres, a keycloak. Consequences you must expect: it takes **no port offset** (its
+  declared port is the port it binds, in every worktree), its published URL carries **no
+  worktree segment** (`db.projet.localhost`, not `db.feat-x.projet.localhost`), and its logs
+  are the same stream whichever worktree you read them from. In `run ps` / `--output json`
+  the worktrees holding it report status **`attached`** with `pid: 0`: that is a claim on the
+  one running instance, not a second process — never count one service per worktree from it.
+  `run stop` in a worktree releases only that worktree's claim; the service itself stops when
+  the last one goes.
+- **A shared job may carve out a tenant per worktree.** `[job.tenant]` names it (`name`,
+  `attach`, `detach`, `env`) so each worktree keeps its own data — a database, a set of
+  keycloak realms. wtm runs the declared commands and knows nothing else about them; they get
+  the worktree's whole environment plus `$WTM_TENANT`, `$WTM_WORKTREE`, `$WTM_ORDINAL`.
+  Configuration values use `{worktree}` / `{ordinal}`; commands use the `$WTM_*` variables.
+  A shared job with **no** `[job.tenant]` is valid and means one instance with one set of data.
 - **Re-running `run init` is symmetric.** Every step is pre-filled from the existing
   `run.toml`: what stays checked is kept, and what you uncheck is **removed** along with the
   profile entries and `[[env_port]]` links naming it — a profile left with no job goes too.
