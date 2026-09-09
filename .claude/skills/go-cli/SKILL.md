@@ -787,6 +787,9 @@ Never write a literal `"  "` for padding — always use the constant.
 
 ```go
 output.Blank(w)                    // empty line — use ONLY as an inter-section separator
+output.Unchanged(w, "…")           // = already in the desired state — EVERY no-op, no exception
+output.NextStep(w, output.NextStepParams{Command: "wtm go x", Note: "jump in"})  // → the only hint shape
+output.Tally(output.TallyPart{Count: 3, Label: domain.TallyApplied}, …)          // "3 applied · 1 skipped"
 output.Success(w, "Done")          // ✓ Done
 output.Warning(w, "Be careful")    // ! Be careful
 output.Error(w, "Failed")          // ✗ Failed
@@ -807,13 +810,15 @@ only the top/bottom.
 
 ```go
 // Simple buffered output — one leading + one trailing blank line:
-output.Frame(w, func() {
+output.Frame(w, func(w io.Writer) {
+    // Write to the writer the frame HANDS you, never to the one it was given:
+    // that is what puts the accent bar on every line of the block.
     output.Success(w, "Created worktree feature-x")
 })
 
 // Streaming / split-stream (plan on stderr, result on stdout) — explicit pair:
 output.FrameStart(cmd.ErrOrStderr())
-output.FormatSyncPlan(cmd.ErrOrStderr(), plan)   // raw
+output.FormatSyncPlan(output.Barred(cmd.ErrOrStderr()), plan)   // raw, barred by the caller
 // … spinner, work …
 output.FormatSyncResult(cmd.OutOrStdout(), result) // raw
 output.FrameEnd(cmd.OutOrStdout())
@@ -828,6 +833,7 @@ Rules:
   `output.Blank` is allowed only as a genuine *inter-section* separator inside a body.
 - **No stacked blanks** (`\n\n\n`+). Spinners do not self-pad — the frame owns the
   leading blank, so open the frame before starting a spinner.
+- **The full reference is [`docs/dev/output.md`](../../../docs/dev/output.md)** — the four levels, the two shapes of a conclusion, the glyph vocabulary, the two-stream split, `--quiet`. Read it before adding a command or changing what one prints.
 - **A block has to earn its place**: it prints when it changes what the reader does next. Success contracts to a count, anomalies are named one by one; detail belongs to the command whose subject it is (ports → `wtm env`, not `create`); a successful run has a fixed shape whatever happened. See CLAUDE.md, "What a block of output has to earn".
 - **A hook phase is shown, not kept**: `output.HookView` draws a bounded tail and replaces it with one result line per hook, logging the whole stream to `<state-dir>/hooks.log`. Terminals only (`output.IsTerminal`) — a pipe or `--output json` gets the raw stream. The phase reports through `flow.HookSink` (output + `domain.HookBeat`); `service/hooks` renders only its no-reporter fallback.
 - **TUI views own their single top/bottom blank** (`WizardModel`/`standaloneModel`
