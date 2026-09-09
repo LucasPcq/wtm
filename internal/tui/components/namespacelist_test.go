@@ -161,3 +161,32 @@ func TestNamespaceListEnterOnTheLastRowConfirms(t *testing.T) {
 		t.Error("enter on the done row did not confirm")
 	}
 }
+
+// The callout re-wraps a line that is too long and loses the hanging indent
+// with it, which turns the block back into the run-on prose it replaced. The
+// bound is the house convention, held by the steps that came before.
+func TestNamespaceStepDescriptionLinesStayWithinTheCallout(t *testing.T) {
+	const maxWidth = 72
+
+	for _, line := range strings.Split(domain.NamespaceStepDesc, "\n") {
+		if got := len([]rune(line)); got > maxWidth {
+			t.Errorf("line is %d wide, past %d — it will wrap and break its indent:\n%s", got, maxWidth, line)
+		}
+	}
+}
+
+// Each of the three fields is explained, and each says what leaving it empty
+// means — the escape hatches are the part a reader cannot guess.
+func TestNamespaceStepDescriptionCoversTheThreeFields(t *testing.T) {
+	for _, want := range []string{
+		"name", "create", "remove",
+		"$WTM_NAMESPACE",
+		"the path to a script",
+		"share the service outright",
+		"stopping is not destroying",
+	} {
+		if !strings.Contains(domain.NamespaceStepDesc, want) {
+			t.Errorf("the description never mentions %q", want)
+		}
+	}
+}

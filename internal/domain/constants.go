@@ -248,7 +248,23 @@ const (
 	// here — wtm knows the ports it injects, and nothing else.
 	NamespaceStepName  = "Shared service data"
 	NamespaceStepTitle = "What does each worktree get of these shared services?"
-	NamespaceStepDesc  = "A shared service runs once, so each worktree needs its own slice of it — a database, a set of realms. Give the name of that slice and the commands that create and give it back. Either an inline command or the path to a script; both run as a /bin/sh line in the worktree. Leave create empty to share the service outright, data included."
+	NamespaceStepDesc  = "A shared service runs once, so each worktree needs its own slice of it —\n" +
+		"a database, a set of realms. wtm names the slice and runs your commands;\n" +
+		"it never guesses them.\n" +
+		"\n" +
+		"  ● name      what this worktree's slice is called\n" +
+		"              for a postgres, the database name — e.g. app_{worktree}\n" +
+		"              → reaches your commands as $WTM_NAMESPACE, and is what\n" +
+		"                `wtm clean` names before destroying it\n" +
+		"\n" +
+		"  ● create    run once, the first time this worktree claims the service\n" +
+		"              an inline command or the path to a script — both are a\n" +
+		"              /bin/sh line run in the worktree\n" +
+		"              → leave empty to share the service outright, data included\n" +
+		"\n" +
+		"  ● remove    run by `wtm clean` when the worktree goes — never by\n" +
+		"              `run stop` or `run down`: stopping is not destroying\n" +
+		"              → leave empty to keep the slice once the worktree is gone"
 
 	NamespaceRowFmt      = "%-*s  %-7s  %s"
 	NamespaceRowEditFmt  = "%-*s  %-7s  %s"
