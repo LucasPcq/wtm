@@ -101,7 +101,7 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 	var envScans map[string]domain.EnvPortScan
 	_ = components.RunLoading(components.LoadingParams{
 		Message: "Detecting services…",
-		Animate: interactive,
+		Animate: shared.Animate(cmd, interactive),
 		Work: func() error {
 			detection = detect.ProjectEnvironment(res.ProjectDir)
 			detection.ComposeScans = compose.ScanAll(compose.ScanAllParams{

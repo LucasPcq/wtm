@@ -191,7 +191,7 @@ func createProjectConfig(cmd *cobra.Command, dir, stateDir string, flagged bool)
 	var detection domain.InitDetectionResult
 	_ = components.RunLoading(components.LoadingParams{
 		Message: "Detecting project settings…",
-		Animate: !flagged,
+		Animate: shared.Animate(cmd, !flagged),
 		Work:    func() error { detection = detect.ProjectEnvironment(dir); return nil },
 	})
 

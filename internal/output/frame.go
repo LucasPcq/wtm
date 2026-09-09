@@ -60,13 +60,16 @@ type barWriter struct {
 
 func (b *barWriter) Write(p []byte) (int, error) {
 	var out bytes.Buffer
-	for _, c := range p {
+	for i, c := range p {
 		if b.atLineStart {
 			out.WriteString(styles.Primary.Render(domain.AccentBarGlyph))
 			b.atLineStart = false
 		}
 		out.WriteByte(c)
-		if c == '\n' {
+		// A carriage return puts the cursor back in column zero, over the bar this
+		// line already carries, so the row has to be marked again. A CRLF is one
+		// break, not two: marking between the two would leave a bar on its own.
+		if c == '\n' || (c == '\r' && !(i+1 < len(p) && p[i+1] == '\n')) {
 			b.atLineStart = true
 		}
 	}

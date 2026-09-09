@@ -66,7 +66,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 
 	err = components.RunLoading(components.LoadingParams{
 		Message: "Loading worktrees…",
-		Animate: rules.IsHumanFormat(format),
+		Animate: shared.Animate(cmd, rules.IsHumanFormat(format)),
 		Work: func() error {
 			wg.Add(2)
 			go func() {

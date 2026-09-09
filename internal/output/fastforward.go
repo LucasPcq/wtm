@@ -19,16 +19,19 @@ func FormatFastForwardResults(w io.Writer, results []domain.FastForwardResult) {
 	Success(w, Tally(
 		TallyPart{Count: len(moved), Label: domain.TallyFastForwarded},
 		TallyPart{Count: len(results) - len(moved) - len(notable) - len(failed), Label: domain.TallyUpToDate},
-		TallyPart{Count: len(notable) + len(failed), Label: domain.TallySkipped},
+		TallyPart{Count: len(notable), Label: domain.TallySkipped},
+		TallyPart{Count: len(failed), Label: domain.TallyFailed},
 	))
 	if len(moved) > 0 {
 		Message(w, styles.Muted.Render(strings.Join(rules.FastForwardBranches(moved), ", ")))
 	}
+	// A branch with no upstream, or one that diverged, did not fail: it is a state
+	// the reader has to decide about, and calling it a failure says the run broke.
 	for _, result := range notable {
-		Warning(w, fmt.Sprintf(domain.FastForwardFailedFmt, result.Branch, rules.FastForwardStatusLabel(result.Status)))
+		Warning(w, fmt.Sprintf(domain.FastForwardStateFmt, result.Branch, rules.FastForwardStatusLabel(result.Status)))
 	}
 	for _, result := range failed {
-		Warning(w, fmt.Sprintf(domain.FastForwardFailedFmt, result.Branch, result.Detail))
+		Error(w, fmt.Sprintf(domain.FastForwardStateFmt, result.Branch, result.Detail))
 	}
 }
 

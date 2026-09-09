@@ -17,11 +17,10 @@ import (
 
 func newDumpCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:         "dump",
-		Annotations: map[string]string{domain.AnnotationMachineOutput: domain.AnnotationOn},
-		Short:       "Write embedded schemas to <state-dir>/schemas/ (or the global config's schemas/ with --global)",
-		Long:        "Extract every JSON Schema bundled with this wtm binary so editors can resolve the `#:schema` directives in your TOML files.\nProject schemas land in <git-common-dir>/wtm/schemas/. Use --global to write the global schema next to the global wtm config, whose path `wtm run proxy status` prints.",
-		RunE:        runDump,
+		Use:   "dump",
+		Short: "Write embedded schemas to <state-dir>/schemas/ (or the global config's schemas/ with --global)",
+		Long:  "Extract every JSON Schema bundled with this wtm binary so editors can resolve the `#:schema` directives in your TOML files.\nProject schemas land in <git-common-dir>/wtm/schemas/. Use --global to write the global schema next to the global wtm config, whose path `wtm run proxy status` prints.",
+		RunE:  runDump,
 	}
 	cmd.Flags().Bool(domain.FlagGlobal, false, "Write the global config schema instead of the project ones")
 	return cmd

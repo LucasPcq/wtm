@@ -135,7 +135,7 @@ func runRelocate(cmd *cobra.Command, _ []string) error {
 	var result domain.RelocateResult
 	err = components.RunLoading(components.LoadingParams{
 		Message: "Relocating worktrees…",
-		Animate: interactive,
+		Animate: shared.Animate(cmd, interactive),
 		Work:    func() error { var e error; result, e = worktree.Relocate(params); return e },
 	})
 	if err != nil {

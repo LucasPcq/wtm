@@ -136,9 +136,8 @@ const (
 	TallySkipped       = "skipped"
 	TallyBlocked       = "blocked"
 	TallyPruned        = "pruned"
-	TallyStopped       = "stopped"
+	ReparentedPairFmt  = "%s → %s"
 	TallyReparented    = "reparented"
-	TallyOrphaned      = "orphaned"
 	TallySeparator     = " · "
 	// NextStepGlyph opens the one forward-pointing line of a conclusion, and
 	// NextStepNoteSeparator holds off what the command does from the command.
@@ -488,15 +487,12 @@ const (
 	PortKeysSummaryFmt      = "%d port(s) written into the env files"
 	ComposeNamesSummaryFmt  = "%d compose name(s) scoped to the worktree"
 
-	ComposePatchedTitle  = "Compose ports templatized"
-	ComposePortsTitle    = "Ports declared"
 	ComposeWithheldTitle = "Ports left alone"
 	ComposeDroppedTitle  = "Ports withdrawn — they could not coexist"
 	// ComposeFixIndentFmt indents the geste under the port it belongs to.
 	ComposeFixIndentFmt = "  %s"
 
 	// The section titles of the absolute-name report.
-	ComposeNamesPatchedTitle  = "Compose names scoped to the worktree"
 	ComposeNamesWithheldTitle = "Names left alone"
 	// ComposeNamesVolumeWarning follows a renamed volume: the isolation is the
 	// point, but the data already written does not travel into it, and a reader
@@ -710,14 +706,12 @@ const (
 	EnvPortLinkByDirFmt  = "%s   follows %s (%d, matched by directory)"
 	EnvPortJobSeparator  = "."
 	EnvPortLinkSeparator = " · "
-	EnvPortsLinkedTitle  = "Env keys now following a port"
 
 	// PortKeysTitle heads the keys a run has just materialized, and
 	// PortKeyLineFmt spells one: the file it landed in, the key and its base.
 	// PortKeyTargetSuffix marks a file the project did not provision yet.
 	PortKeysTitle       = "Ports written into the env files"
 	PortKeyColumnSep    = "   "
-	PortKeyLineFmt      = "%s" + PortKeyColumnSep + "%s=%d"
 	PortKeyTargetSuffix = "   (+ env target)"
 
 	// The route step: where a job learns the port it binds. The .env route is
@@ -796,7 +790,6 @@ const (
 	// The .env port report. Unlike a compose mapping, a declared port only
 	// isolates the job if its command actually reads the variable — which wtm
 	// does not know and does not guess, so the notice asks.
-	EnvPortsDetectedTitle   = "Ports detected from .env"
 	EnvPortDetectedLineFmt  = "%s · %s=%d (%s)"
 	PortIsolationTitle      = "These jobs will bind the same port in every worktree"
 	PortIsolationLineFmt    = "%s   %s"
@@ -1427,8 +1420,7 @@ const (
 	JobRemovedRunnersFmt  = "No longer started by: %s"
 	// RunInitJobsRemovedFmt reports what the unchecking dropped, next to what
 	// the same run added.
-	RunInitJobsRemovedFmt = "Jobs removed (unchecked): %s"
-	JobActionUpdated      = "updated"
+	JobActionUpdated = "updated"
 
 	// RunCRUD* is the vocabulary of `run job` and `run profile` — the questions
 	// they ask and the wording of their answers. They live here rather than
@@ -2177,6 +2169,7 @@ const (
 	SyncUpToDateSuffix        = "already up to date"
 	SyncRebasedLineFmt        = "%s rebased onto %s   %s%s"
 	SyncCommitsReplayedFmt    = "%d commits"
+	FastForwardStateFmt       = "%s — %s"
 	// SyncNoRebaseStep and SyncNoStaleParent are why a decision was never put to
 	// the user: nothing is rebased, or no parent is behind its remote.
 	SyncNoRebaseStep  = "nothing to rebase"
@@ -2263,7 +2256,6 @@ const (
 	FastForwardUpToDateFmt = "%s is already up to date"
 	FastForwardResultFmt   = "%s: %s"
 	FastForwardFailedFmt   = "%s: failed — %s"
-	FastForwardHeader      = "Fast-forward"
 
 	// Source-reconciliation and env-fallback prompts shared by the create and
 	// extract flows — used both by the in-wizard confirmation steps and the

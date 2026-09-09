@@ -100,7 +100,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	var statuses []domain.WorktreeStatus
 	if err := components.RunLoading(components.LoadingParams{
 		Message: domain.ExtractScanLoading,
-		Animate: interactive,
+		Animate: shared.Animate(cmd, interactive),
 		Work: func() error {
 			var listErr error
 			statuses, listErr = worktree.List(domain.ListParams{
@@ -138,7 +138,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	if !needSource {
 		if err := components.RunLoading(components.LoadingParams{
 			Message: domain.ExtractScanLoading,
-			Animate: interactive,
+			Animate: shared.Animate(cmd, interactive),
 			Work: func() error {
 				var filesErr error
 				source.available, filesErr = listExtractFiles(source.path)
@@ -649,7 +649,11 @@ func resolveTarget(params resolveTargetParams) (extractTarget, error) {
 		// ask. Under --yes / no TTY / JSON it is non-prompting — fast-forward only when
 		// --ff was passed, otherwise leave the branch as-is.
 		if params.interactive {
-			if !maybeFastForwardSource(params.cfg.ProjectDir, ffSubjectBranch) {
+			if !maybeFastForwardSource(fastForwardSourceParams{
+				Cmd:        params.cmd,
+				ProjectDir: params.cfg.ProjectDir,
+				Source:     ffSubjectBranch,
+			}) {
 				return extractTarget{}, domain.ErrUserAborted
 			}
 		} else if ffFlag, _ := params.cmd.Flags().GetBool(domain.FlagFF); ffFlag {
@@ -683,7 +687,11 @@ func resolveTarget(params resolveTargetParams) (extractTarget, error) {
 	// wizard (already confirmed on its recap). Only the accepted fast-forward is
 	// executed here; its failure-recovery prompt is a legitimate post-exec standalone.
 	if params.create.FastForwardBranch != "" &&
-		!executeFastForwardSource(params.cfg.ProjectDir, params.create.FastForwardBranch) {
+		!executeFastForwardSource(fastForwardSourceParams{
+			Cmd:        params.cmd,
+			ProjectDir: params.cfg.ProjectDir,
+			Source:     params.create.FastForwardBranch,
+		}) {
 		return extractTarget{}, domain.ErrUserAborted
 	}
 	return createTarget(createTargetParams{

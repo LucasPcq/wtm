@@ -43,7 +43,7 @@ func runPs(cmd *cobra.Command, _ []string) error {
 	var jobs []domain.JobInfo
 	loadErr := components.RunLoading(components.LoadingParams{
 		Message: "Loading jobs…",
-		Animate: true,
+		Animate: shared.Animate(cmd, true),
 		Work: func() error {
 			var e error
 			jobs, e = shared.LoadJobs()

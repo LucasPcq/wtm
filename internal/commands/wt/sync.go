@@ -108,7 +108,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 		},
 		// The picker may be reached through the shell wrapper, which consumes stdout.
 		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),
-		Presenter: syncPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
+		Presenter: syncPresenter{CLIPresenter: shared.NewPresenter(cmd, format), opened: new(bool)},
 	})
 	return err
 }

@@ -97,7 +97,9 @@ func runOnStream(params streamParams) (runlogs.Outcomes, error) {
 	// A stream has no band to hold it, so the warning follows the lines it
 	// qualifies rather than sitting above them.
 	if len(params.Warnings) > 0 {
-		output.Callout(errOut, domain.AddressingDriftTitle, params.Warnings)
+		output.Frame(errOut, func(w io.Writer) {
+			output.Callout(w, domain.AddressingDriftTitle, params.Warnings)
+		})
 	}
 	return outcomes, nil
 }

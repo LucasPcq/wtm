@@ -99,6 +99,7 @@ func (p downPresenter) Downed(outcome downflow.Outcome) error {
 				output.Error(barred, p.qualify(fmt.Sprintf("%s: %s", result.Name, result.Message), outcome, worktree))
 			}
 		}
+		output.FrameEnd(errOut)
 	}
 
 	output.Frame(out, func(w io.Writer) {

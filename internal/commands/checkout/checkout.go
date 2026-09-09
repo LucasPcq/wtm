@@ -102,7 +102,7 @@ func checkoutByNumber(cmd *cobra.Command, result shared.ConfigResult, number int
 	var p domain.PRInfo
 	err := components.RunLoading(components.LoadingParams{
 		Message: "Fetching PR…",
-		Animate: !opts.jsonMode,
+		Animate: shared.Animate(cmd, !opts.jsonMode),
 		Work: func() error {
 			var e error
 			p, e = ghservice.GetPRDetail(ghservice.GetPRDetailParams{
@@ -269,7 +269,7 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 
 	fetchErr := components.RunLoading(components.LoadingParams{
 		Message: "Fetching branch from origin…",
-		Animate: !params.jsonMode,
+		Animate: shared.Animate(cmd, !params.jsonMode),
 		Work: func() error {
 			return infra.FetchBranch(infra.FetchBranchParams{
 				ProjectDir: result.ProjectDir,
@@ -294,7 +294,7 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 	if reused {
 		startPoint = ""
 		if params.interactive {
-			updated, ok := reconcileReusedBranch(reconcileReusedBranchParams{ProjectDir: result.ProjectDir, Target: target})
+			updated, ok := reconcileReusedBranch(reconcileReusedBranchParams{Cmd: cmd, ProjectDir: result.ProjectDir, Target: target})
 			if !ok {
 				return nil
 			}
@@ -368,6 +368,7 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 
 // reconcileReusedBranchParams holds inputs for reconcileReusedBranch.
 type reconcileReusedBranchParams struct {
+	Cmd        *cobra.Command
 	ProjectDir string
 	Target     domain.BranchTarget
 }
@@ -395,7 +396,7 @@ func reconcileReusedBranch(p reconcileReusedBranchParams) (updated domain.Branch
 
 	ffErr := components.RunLoading(components.LoadingParams{
 		Message: fmt.Sprintf(domain.SourceFastForwardLoadingFmt, target.Branch),
-		Animate: true,
+		Animate: shared.Animate(p.Cmd, true),
 		Work: func() error {
 			return branch.FastForwardToOrigin(branch.BranchParams{ProjectDir: p.ProjectDir, Branch: target.Branch})
 		},

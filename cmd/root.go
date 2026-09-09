@@ -167,7 +167,9 @@ func silenceHumanOutput(cmd *cobra.Command) {
 	if !quiet {
 		return
 	}
-	if format, _ := cmd.Flags().GetString(domain.FlagOutput); format == domain.OutputJSON {
+	// Text is the only human format. Every other one — json, mermaid, whatever is
+	// added next — is a document someone asked for, and --quiet is about noise.
+	if format, _ := cmd.Flags().GetString(domain.FlagOutput); format != "" && format != domain.OutputText {
 		return
 	}
 	if cmd.Annotations[domain.AnnotationMachineOutput] != "" {

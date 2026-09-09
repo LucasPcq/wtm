@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"fmt"
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
@@ -350,4 +351,14 @@ func PrunedBranches(result domain.PruneResult) []string {
 		names = append(names, c.Branch)
 	}
 	return names
+}
+
+// ReparentedPairs names each moved child and the parent it now records, on one
+// line: the branch a later `wtm sync` will rebase onto is not a count.
+func ReparentedPairs(results []domain.ReparentResult) []string {
+	pairs := make([]string, 0, len(results))
+	for _, r := range results {
+		pairs = append(pairs, fmt.Sprintf(domain.ReparentedPairFmt, r.Branch, r.NewParent))
+	}
+	return pairs
 }

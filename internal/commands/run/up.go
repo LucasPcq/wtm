@@ -1,7 +1,6 @@
 package run
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -103,5 +102,7 @@ func reportRunConfig(cmd *cobra.Command, cfg domain.RunConfig) error {
 	if len(errs) == 0 {
 		return nil
 	}
-	return fmt.Errorf("invalid run config")
+	// The block above IS the report; ErrAborted is how a command says so without
+	// Execute printing a second, emptier line under it.
+	return domain.ErrAborted
 }

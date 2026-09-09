@@ -160,7 +160,7 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 	// wait as far as the reader is concerned, and two boxes in a row flicker.
 	if err := components.RunLoading(components.LoadingParams{
 		Message: domain.EnvScanLoading,
-		Animate: true,
+		Animate: shared.Animate(cmd, true),
 		Work: func() error {
 			var err error
 			statuses, err = worktree.List(domain.ListParams{

@@ -221,8 +221,8 @@ func writeAgentsJSON(w io.Writer, results []agentInstallResult) error {
 	return enc.Encode(results)
 }
 
-func printAgentResults(w io.Writer, results []agentInstallResult) {
-	output.Frame(w, func(w io.Writer) {
+func printAgentResults(dest io.Writer, results []agentInstallResult) {
+	output.Frame(dest, func(w io.Writer) {
 		for _, r := range results {
 			switch r.Action {
 			case agentActionCreated:

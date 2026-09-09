@@ -135,6 +135,10 @@ func (p prunePresenter) Pruned(outcome pruneflow.Outcome) error {
 
 type syncPresenter struct {
 	shared.CLIPresenter
+	// opened distinguishes the frame's own leading blank, which sits outside the
+	// block and carries no bar, from the separators between sections, which sit
+	// inside it and do. It is a pointer because a presenter is passed by value.
+	opened *bool
 }
 
 // sync writes across two streams — the plan and the spinners on stderr, the
@@ -145,8 +149,14 @@ type syncPresenter struct {
 // first; the rest are inter-section separators. Same call, same output, one
 // mechanism.
 func (p syncPresenter) section(w io.Writer) io.Writer {
-	output.Blank(w)
-	return output.Barred(w)
+	barred := output.Barred(w)
+	if *p.opened {
+		output.Blank(barred)
+		return barred
+	}
+	*p.opened = true
+	output.FrameStart(w)
+	return barred
 }
 
 // Planned prints the cascade a run that could not ask never saw in a recap.

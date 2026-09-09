@@ -55,7 +55,7 @@ func runTree(cmd *cobra.Command, _ []string) error {
 	var forest domain.Forest
 	err = components.RunLoading(components.LoadingParams{
 		Message: "Building worktree tree…",
-		Animate: rules.IsHumanFormat(format),
+		Animate: shared.Animate(cmd, rules.IsHumanFormat(format)),
 		Work: func() error {
 			var prs []domain.PRInfo
 			if withPRs {

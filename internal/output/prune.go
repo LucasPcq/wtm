@@ -60,6 +60,11 @@ func FormatPruneResult(w io.Writer, result domain.PruneResult) {
 		))
 		Message(w, styles.Muted.Render(strings.Join(rules.PrunedBranches(result), ", ")))
 	}
+	// Which parent a child was moved onto is not accounting: its next `wtm sync`
+	// rebases onto that branch.
+	if len(result.Reparented) > 0 {
+		Message(w, styles.Muted.Render(strings.Join(rules.ReparentedPairs(result.Reparented), ", ")))
+	}
 	for _, o := range result.Orphaned {
 		Warning(w, fmt.Sprintf("%s still points at the removed parent %s — reparent it with `wtm reparent`", o.Branch, o.OldParent))
 	}

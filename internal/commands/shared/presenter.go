@@ -29,7 +29,7 @@ func NewPresenter(cmd *cobra.Command, format string) CLIPresenter {
 func (p CLIPresenter) Stage(params flow.StageParams) error {
 	return components.RunLoading(components.LoadingParams{
 		Message: params.Message,
-		Animate: p.Human,
+		Animate: Animate(p.Cmd, p.Human),
 		Work:    params.Work,
 	})
 }
