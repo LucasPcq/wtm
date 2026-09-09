@@ -3,25 +3,33 @@ package output
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/styles"
 )
 
-// FormatFastForwardResults prints one line per branch. Raw body: the command's
-// frame owns the outer vertical padding.
+// FormatFastForwardResults counts what moved and names only what did not: a
+// branch already up to date is the same non-event repeated, and one line for all
+// of them says it once. Raw body: the command's frame owns the outer padding.
 func FormatFastForwardResults(w io.Writer, results []domain.FastForwardResult) {
-	SectionTitle(w, domain.FastForwardHeader)
-	for _, result := range results {
-		InfoLine(w, result.Branch, fastForwardLine(result))
-	}
-}
+	moved, notable, failed := rules.FastForwardSplit(results)
 
-func fastForwardLine(result domain.FastForwardResult) string {
-	if result.Status == domain.FFFailed {
-		return fmt.Sprintf(domain.SyncLabelErrorFmt, result.Detail)
+	Success(w, Tally(
+		TallyPart{Count: len(moved), Label: domain.TallyFastForwarded},
+		TallyPart{Count: len(results) - len(moved) - len(notable) - len(failed), Label: domain.TallyUpToDate},
+		TallyPart{Count: len(notable) + len(failed), Label: domain.TallySkipped},
+	))
+	if len(moved) > 0 {
+		Message(w, styles.Muted.Render(strings.Join(rules.FastForwardBranches(moved), ", ")))
 	}
-	return rules.FastForwardStatusLabel(result.Status)
+	for _, result := range notable {
+		Warning(w, fmt.Sprintf(domain.FastForwardFailedFmt, result.Branch, rules.FastForwardStatusLabel(result.Status)))
+	}
+	for _, result := range failed {
+		Warning(w, fmt.Sprintf(domain.FastForwardFailedFmt, result.Branch, result.Detail))
+	}
 }
 
 func WriteFastForwardJSON(w io.Writer, results []domain.FastForwardResult) error {

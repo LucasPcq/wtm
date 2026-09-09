@@ -284,16 +284,13 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 
 	runPath := filepath.Join(res.StateDir, domain.RunFileName)
 	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-		output.Success(w, fmt.Sprintf("Configured run module → %s", runPath))
-		if len(outcome.Merge.Added) > 0 {
-			output.Message(w, fmt.Sprintf("Jobs added: %s", strings.Join(outcome.Merge.Added, ", ")))
-		}
-		if len(outcome.Removed) > 0 {
-			output.Message(w, fmt.Sprintf(domain.RunInitJobsRemovedFmt, strings.Join(outcome.Removed, ", ")))
-		}
-		if len(outcome.Merge.Skipped) > 0 {
-			output.Message(w, fmt.Sprintf("Already present (kept): %s", strings.Join(outcome.Merge.Skipped, ", ")))
-		}
+		// The jobs are counted, not named: the reader ticked them one by one in the
+		// wizard, and run.toml is where they live now.
+		output.Success(w, fmt.Sprintf(domain.RunInitConfiguredFmt, runPath, output.Tally(
+			output.TallyPart{Count: len(outcome.Merge.Added), Label: domain.TallyAdded},
+			output.TallyPart{Count: len(outcome.Removed), Label: domain.TallyRemoved},
+			output.TallyPart{Count: len(outcome.Merge.Skipped), Label: domain.TallyKept},
+		)))
 		output.DetectedPortsReport(w, output.DetectedPortsReportParams{
 			Patched:       outcome.Patches,
 			Written:       outcome.Written,
@@ -347,7 +344,8 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 		// one the addressing just chosen leaves behind.
 		noticeAddressingDrift(cmd, res, res.ProjectDir)
 		output.Blank(w)
-		output.Message(w, "Next: `wtm run up` to start · `wtm run job add` to add more")
+		output.NextStep(w, output.NextStepParams{Command: domain.RunInitNextUp, Note: domain.RunInitNextUpNote})
+		output.NextStep(w, output.NextStepParams{Command: domain.RunInitNextJobAdd, Note: domain.RunInitNextJobAddNote})
 		output.Blank(w)
 		output.Message(w, domain.ExperimentalRunNotice)
 	})

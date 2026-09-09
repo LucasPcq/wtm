@@ -1,6 +1,7 @@
 package output
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -58,22 +59,22 @@ func printEnvPortAnomalies(w io.Writer, anomalies []string) {
 	}
 }
 
-// EnvPortLinksReport names the links a `run init` just wrote. It is deliberately
-// not a count: a reader told "1 link written" has to open run.toml to learn what
-// they agreed to.
+// EnvPortLinksReport counts the links a `run init` just wrote. The links
+// themselves are in run.toml, which the wizard proposed them from and which is
+// the file a reader edits to change them.
 func EnvPortLinksReport(w io.Writer, links []domain.EnvPortLink, bases map[domain.PortRef]int) {
 	if len(links) == 0 {
 		return
 	}
 	Blank(w)
-	Section(w, domain.EnvPortsLinkedTitle, rules.EnvPortLinkLines(links, bases))
+	Success(w, fmt.Sprintf(domain.EnvPortLinksSummaryFmt, len(links)))
 }
 
-// PortKeysReport names the ports a run just wrote into the project's env files.
+// PortKeysReport counts the ports a run just wrote into the project's env files.
 func PortKeysReport(w io.Writer, writes []domain.PortKeyWrite) {
 	if len(writes) == 0 {
 		return
 	}
 	Blank(w)
-	Section(w, domain.PortKeysTitle, rules.PortKeyLines(writes))
+	Success(w, fmt.Sprintf(domain.PortKeysSummaryFmt, len(writes)))
 }

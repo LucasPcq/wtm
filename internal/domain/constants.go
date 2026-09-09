@@ -125,15 +125,21 @@ const (
 	// indentation on either side and the border between them.
 	RecapFrameChrome = 8
 	// A conclusion's counted summary: "3 applied · 1 skipped", zero counts dropped.
-	TallyPartFmt    = "%d %s"
-	TallyApplied    = "applied"
-	TallySkipped    = "skipped"
-	TallyBlocked    = "blocked"
-	TallyPruned     = "pruned"
-	TallyStopped    = "stopped"
-	TallyReparented = "reparented"
-	TallyOrphaned   = "orphaned"
-	TallySeparator  = " · "
+	TallyPartFmt       = "%d %s"
+	TallyApplied       = "applied"
+	TallyFastForwarded = "fast-forwarded"
+	TallyUpToDate      = "already up to date"
+	TallyFailed        = "failed"
+	TallyAdded         = "added"
+	TallyRemoved       = "removed"
+	TallyKept          = "kept"
+	TallySkipped       = "skipped"
+	TallyBlocked       = "blocked"
+	TallyPruned        = "pruned"
+	TallyStopped       = "stopped"
+	TallyReparented    = "reparented"
+	TallyOrphaned      = "orphaned"
+	TallySeparator     = " · "
 	// NextStepGlyph opens the one forward-pointing line of a conclusion, and
 	// NextStepNoteSeparator holds off what the command does from the command.
 	NextStepGlyph         = "→"
@@ -466,6 +472,22 @@ const (
 	ComposeFixDefaultFmt = "add a default, e.g. %s"
 
 	// The section titles of the compose port report.
+	// The detection of `run init`, counted rather than listed: run.toml is the
+	// record of what was written.
+	// RunInitConfiguredFmt heads the conclusion with where the config went and
+	// what changed in it, counted.
+	RunInitConfiguredFmt  = "Configured run module → %s   %s"
+	RunInitNextUp         = "wtm run up"
+	RunInitNextUpNote     = "start the jobs"
+	RunInitNextJobAdd     = "wtm run job add"
+	RunInitNextJobAddNote = "declare another"
+
+	DetectedPortsSummaryFmt = "%d port(s) declared in run.toml"
+	DetectedPortsPatchedFmt = ", %d compose file(s) templatized"
+	EnvPortLinksSummaryFmt  = "%d .env value(s) now follow a port"
+	PortKeysSummaryFmt      = "%d port(s) written into the env files"
+	ComposeNamesSummaryFmt  = "%d compose name(s) scoped to the worktree"
+
 	ComposePatchedTitle  = "Compose ports templatized"
 	ComposePortsTitle    = "Ports declared"
 	ComposeWithheldTitle = "Ports left alone"
@@ -2144,6 +2166,8 @@ const (
 	SyncConfirmOption         = "Yes, sync"
 	SyncNothingToSync         = "No worktrees to sync."
 	SyncUpToDateSuffix        = "already up to date"
+	SyncRebasedLineFmt        = "%s rebased onto %s   %s%s"
+	SyncCommitsReplayedFmt    = "%d commits"
 	// SyncNoRebaseStep and SyncNoStaleParent are why a decision was never put to
 	// the user: nothing is rebased, or no parent is behind its remote.
 	SyncNoRebaseStep  = "nothing to rebase"

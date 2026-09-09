@@ -39,18 +39,6 @@ func FormatRelocatePlan(w io.Writer, plan domain.RelocatePlan) {
 		}
 	}
 
-	fmt.Fprintln(w, styles.RenderIntro(styles.IntroParams{
-		Width: 80,
-		Title: "Relocate worktrees",
-		Body: fmt.Sprintf(
-			"Aligns every worktree with base_path %q: scattered worktrees are moved there, and "+
-				"worktrees created outside wtm are adopted (their parent recorded so `wtm sync` can use them).\n"+
-				"Dirty or locked worktrees are skipped — re-run with --force to move them. "+
-				"A target path that is already occupied is never overwritten.",
-			plan.BasePath),
-	}))
-	Blank(w)
-
 	// Sections are separated by a blank line but none trails the last one, so the
 	// caller controls the spacing to whatever follows (the wizard, or "Dry run").
 	section := newSectionWriter(w)

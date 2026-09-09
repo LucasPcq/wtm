@@ -33,27 +33,21 @@ type DetectedPortsReportParams struct {
 	EnvUnreadable []domain.EnvPortScan
 }
 
-// DetectedPortsReport prints what the detection did and, just as importantly,
-// what it declined to do. It emits a raw body with no surrounding blank lines;
-// the caller's frame owns the padding. Nothing to say prints nothing.
+// DetectedPortsReport counts what the detection did and names, one by one, what
+// it declined to do. The asymmetry is the design: a port written as expected is
+// a fact run.toml already holds, while a binding left alone is a decision the
+// reader still has to make, and only the second is worth a line.
+//
+// It emits a raw body with no surrounding blank lines; the caller's frame owns
+// the padding. Nothing to say prints nothing.
 func DetectedPortsReport(w io.Writer, params DetectedPortsReportParams) {
-	if len(params.Patched) > 0 {
+	if summary := rules.DetectedPortsSummary(rules.DetectedPortsSummaryParams{
+		Patched:    params.Patched,
+		Written:    params.Written,
+		EnvWritten: params.EnvWritten,
+	}); summary != "" {
 		Blank(w)
-		Section(w, domain.ComposePatchedTitle, rules.ComposePatchLines(params.Patched))
-	}
-
-	if len(params.Written) > 0 {
-		Blank(w)
-		Section(w, domain.ComposePortsTitle, rules.ComposePortsWrittenLines(params.Written))
-	}
-
-	if len(params.EnvWritten) > 0 {
-		Blank(w)
-		lines := rules.EnvPortsWrittenLines(rules.EnvPortsWrittenLinesParams{
-			Written: params.EnvWritten,
-			Sources: params.EnvSources,
-		})
-		Section(w, domain.EnvPortsDetectedTitle, lines)
+		Success(w, summary)
 	}
 
 	if len(params.Withheld) > 0 {

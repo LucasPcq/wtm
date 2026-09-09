@@ -340,3 +340,14 @@ func PruneReasonLabel(reason string) string {
 		return reason
 	}
 }
+
+// PrunedBranches names what a prune removed, in the order it removed them. It is
+// the one list a destructive result keeps: what is gone is actionable, even when
+// the picker showed it twice already.
+func PrunedBranches(result domain.PruneResult) []string {
+	names := make([]string, 0, len(result.Pruned))
+	for _, c := range result.Pruned {
+		names = append(names, c.Branch)
+	}
+	return names
+}

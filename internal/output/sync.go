@@ -148,13 +148,12 @@ func syncedLine(step domain.SyncStepResult) string {
 	if step.Pushed {
 		pushed = styles.Success.Render("  (pushed)")
 	}
-	return fmt.Sprintf("%s rebased onto %s (%s)   %s   %s → %s%s",
+	// The three short SHAs this line used to carry are in the reflog of the branch
+	// it names, and nobody read them off a terminal to use them.
+	return fmt.Sprintf(domain.SyncRebasedLineFmt,
 		step.Branch,
 		step.SourceBranch,
-		styles.Muted.Render(step.OntoTip),
-		styles.Muted.Render(fmt.Sprintf("%d commits", step.CommitsReplayed)),
-		styles.Muted.Render(step.OldTip),
-		styles.Muted.Render(step.NewTip),
+		styles.Muted.Render(fmt.Sprintf(domain.SyncCommitsReplayedFmt, step.CommitsReplayed)),
 		pushed)
 }
 
