@@ -218,6 +218,32 @@ const (
 	CleanDeferredTenantFmt = "%s is down: %s kept, `wtm prune` will give it back"
 	PruneSettledTenantFmt  = "gave back %s on %s, owed since its worktree was removed"
 
+	// ScopeStepName, Title and Desc introduce the question run init asks of each
+	// compose service.
+	ScopeStepName  = "Shared services"
+	ScopeStepTitle = "Which services run once for the whole repository?"
+	ScopeStepDesc  = "A shared service runs once instead of once per worktree — a postgres, a keycloak. Each worktree still gets its own data through a tenant. Space toggles, enter confirms."
+
+	// ScopeReasonBuild is why a service built here can never be shared: it
+	// serves this worktree's own source, whatever its name suggests.
+	ScopeReasonBuild = "built from this worktree's source"
+
+	ScopeLabelShared      = "shared"
+	ScopeLabelPerWorktree = "per worktree"
+	ScopeSummaryFmt       = "%d shared, %d per worktree"
+	ScopesSkipNoServices  = "no compose service to share"
+	ScopesSkipAllBuilt    = "every service is built from this worktree's source"
+
+	// TenantRecipe* are the attach and detach a known image needs, pre-filled so
+	// the common case is not left to be written by hand. The tenant name is
+	// wtm's; everything the command does with it belongs to the project.
+	TenantPostgresName   = "app_{worktree}"
+	TenantPostgresAttach = `psql -h 127.0.0.1 -p $POSTGRES_PORT -U postgres -c "CREATE DATABASE $WTM_TENANT"`
+	TenantPostgresDetach = `psql -h 127.0.0.1 -p $POSTGRES_PORT -U postgres -c "DROP DATABASE IF EXISTS $WTM_TENANT"`
+	TenantMySQLName      = "app_{worktree}"
+	TenantMySQLAttach    = `mysql -h 127.0.0.1 -P $MYSQL_PORT -u root -e "CREATE DATABASE $WTM_TENANT"`
+	TenantMySQLDetach    = `mysql -h 127.0.0.1 -P $MYSQL_PORT -u root -e "DROP DATABASE IF EXISTS $WTM_TENANT"`
+
 	// MainWorktreeOrdinal is never persisted: the main worktree has no meta.json,
 	// so 0 in a linked worktree's metadata means "not allocated yet".
 	MainWorktreeOrdinal = 0
@@ -455,6 +481,8 @@ const (
 
 	// The docker-compose keys wtm reads.
 	ComposeServicesKey      = "services"
+	ComposeImageKey         = "image"
+	ComposeBuildKey         = "build"
 	ComposePortsKey         = "ports"
 	ComposePublishedKey     = "published"
 	ComposeTargetKey        = "target"
@@ -1004,6 +1032,13 @@ const (
 	KindRadioOff       = "○"
 	KindListSummaryFmt = "%d services, %d tasks"
 	KindListGap        = 2
+
+	// ScopeList* mirror the KindList shape: the service on the left, its two
+	// scopes as a radio pair on the right. A fixed row shows its reason in place
+	// of the pair, since there is no answer to give.
+	ScopeListEntryFmt  = "%s — %s"
+	ScopeListRadiosFmt = "%s per worktree   %s shared"
+	ScopeListFixedFmt  = "per worktree — %s"
 
 	// Why a wizard step was never put. An auto-skipped step leaves this line in
 	// the recap: a step that vanishes silently while the counter jumps over it
@@ -3076,6 +3111,7 @@ const (
 	HelpMerge     = "f merge"
 	HelpNew       = "n new"
 	HelpSetKind   = "←→ set type"
+	HelpSetScope  = "←→ set scope"
 	HelpSetRunner = "←→ set runner"
 
 	// The runner step: which root-level service starts each of the others. The

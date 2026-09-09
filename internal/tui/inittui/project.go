@@ -29,6 +29,7 @@ const (
 	stepDocker         = "docker"
 	stepComposePatch   = "compose_patch"
 	stepScriptKinds    = "script_kinds"
+	stepScopes         = "scopes"
 	stepPorts          = "ports"
 	stepURLs           = "urls"
 	stepCmds           = "cmds"
@@ -646,6 +647,66 @@ func addScriptKindStep(s *stepSet, params addServicesStepsParams) {
 		Summary:    kindListSummary,
 		Callout:    true,
 	})
+}
+
+// addScopeStep asks which compose services run once for the whole repository.
+// It enumerates services and not files, unlike every other step here: wtm
+// generates one job per compose file, so a service only becomes shareable once
+// it has been named — and marking one lifts it out of its file's job.
+func addScopeStep(s *stepSet, params addServicesStepsParams) {
+	docker := s.at(stepDocker)
+	if docker < 0 {
+		return
+	}
+
+	skipReason := ""
+	s.add(stepScopes, components.Step{
+		Name: domain.ScopeStepName,
+		Build: func(prev []components.Step) any {
+			return components.NewScopeList(components.NewScopeListParams{
+				Title:       domain.ScopeStepTitle,
+				Description: domain.ScopeStepDesc,
+				Entries:     scopeChoices(scopeChoicesParams{Prev: prev, Docker: docker, Params: params}),
+			})
+		},
+		AutoSkip: func(w components.WizardModel) bool {
+			choices := scopeChoices(scopeChoicesParams{Prev: w.Steps(), Docker: docker, Params: params})
+			skip := !rules.AnyScopeAnswerable(choices)
+			if skip {
+				skipReason = rules.ScopesSkipReason(len(choices))
+			}
+			return skip
+		},
+		SkipReason: func() string { return skipReason },
+		Summary:    scopeListSummary,
+		Callout:    true,
+	})
+}
+
+type scopeChoicesParams struct {
+	Prev   []components.Step
+	Docker int
+	Params addServicesStepsParams
+}
+
+func scopeChoices(p scopeChoicesParams) []rules.ServiceScopeChoice {
+	return rules.ServiceScopeChoices(rules.ServiceScopeChoicesParams{
+		Scans:    p.Params.Detection.ComposeScans,
+		Files:    selectedComposeFiles(p.Prev, p.Docker),
+		Existing: p.Params.Existing,
+	})
+}
+
+func scopeListSummary(model any) string {
+	list, ok := model.(components.ScopeListModel)
+	if !ok {
+		return ""
+	}
+	if len(list.Entries()) == 0 {
+		return domain.RecapNotAsked
+	}
+	shared := len(rules.SharedFromChoices(list.Entries()))
+	return fmt.Sprintf(domain.ScopeSummaryFmt, shared, len(list.Entries())-shared)
 }
 
 type scriptKindChoicesParams struct {
@@ -1317,6 +1378,9 @@ func addServicesSteps(s *stepSet, params addServicesStepsParams) (steps services
 	}
 
 	addScriptKindStep(s, params)
+	// Before the ports step, and not after: a shared job takes no offset, so
+	// which services are shared has to be settled before their ports are.
+	addScopeStep(s, params)
 
 	// Declared last on purpose: the step resolves the ports of both selections,
 	// so it must be able to read them — a .env port can withdraw a compose
@@ -1513,6 +1577,17 @@ func extractProjectAnswers(final components.WizardModel, detection domain.InitDe
 			})
 		}
 	}
+
+	// ScopesAsked is the pair every step whose answer may legitimately be empty
+	// is read as: emptied-and-asked withdraws every sharing, where a run that
+	// never asked leaves what run.toml already declares standing.
+	if i := at(stepScopes); i >= 0 && !final.Skipped(i) {
+		if m, ok := steps[i].Model.(components.ScopeListModel); ok {
+			answers.SharedServices = rules.SharedFromChoices(m.Entries())
+			answers.ScopesAsked = true
+		}
+	}
+	answers.Scans = detection.ComposeScans
 
 	return answers
 }

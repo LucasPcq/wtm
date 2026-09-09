@@ -53,6 +53,7 @@ func Scan(params ScanParams) domain.ComposeScan {
 		file:     params.File,
 		taken:    referencedNames(&root),
 	})
+	scan.Services = collectServices(mappingValue(root.Content[0], domain.ComposeServicesKey))
 	scan.Names = collectNames(collectNamesParams{
 		root:    root.Content[0],
 		lines:   lines,
@@ -293,4 +294,25 @@ func mappingValue(node *yaml.Node, key string) *yaml.Node {
 		}
 	}
 	return nil
+}
+
+// collectServices reads what each service is, not what it binds: whether it
+// comes from a registry image or is built here is the one structural fact that
+// separates a service which could be shared from one which never can.
+func collectServices(services *yaml.Node) []domain.ComposeService {
+	if services == nil || services.Kind != yaml.MappingNode {
+		return nil
+	}
+
+	var found []domain.ComposeService
+	for i := 0; i+1 < len(services.Content); i += 2 {
+		body := services.Content[i+1]
+		service := domain.ComposeService{Name: services.Content[i].Value}
+		if image := mappingValue(body, domain.ComposeImageKey); image != nil {
+			service.Image = image.Value
+		}
+		service.HasBuild = mappingValue(body, domain.ComposeBuildKey) != nil
+		found = append(found, service)
+	}
+	return found
 }

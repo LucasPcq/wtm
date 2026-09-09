@@ -75,6 +75,15 @@ type InitProjectAnswers struct {
 	// would have pre-checked, and reading that as a refusal would delete the
 	// jobs an earlier run configured.
 	SelectionAsked bool
+	// SharedServices are the compose services to run once for the repository,
+	// each lifted out of its file's job into one of its own. ScopesAsked says
+	// the step ran at all: emptying the list withdraws every sharing, where a
+	// run that never asked leaves what run.toml already declares standing.
+	SharedServices []SharedComposeService
+	ScopesAsked    bool
+	// ComposeScans is what each selected file declares, needed to name the
+	// services that stay behind when one is lifted out.
+	Scans map[string]ComposeScan
 	// Ports is what the wizard settled for the detected ports, and Profiles the
 	// split `run up` will offer. ProfilesAsked says the step ran at all:
 	// emptying the list withdraws every profile, where a run that never asked

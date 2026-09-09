@@ -141,6 +141,19 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	// A run that never put the scope question leaves what run.toml declares
+	// standing: the pair (value, asked) again — emptied-and-asked withdraws,
+	// not-asked keeps. Scans travel with the answers because naming the services
+	// that stay in a file's job needs them.
+	answers.Scans = detection.ComposeScans
+	if !answers.ScopesAsked {
+		answers.SharedServices = rules.SharedFromConfig(rules.SharedFromConfigParams{
+			Existing: existing,
+			Scans:    detection.ComposeScans,
+			Files:    answers.DockerComposeFiles,
+		})
+	}
+
 	plan := rules.PlanComposePorts(rules.PlanComposePortsParams{
 		Scans: detection.ComposeScans,
 		Files: answers.DockerComposeFiles,

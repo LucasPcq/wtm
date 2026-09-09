@@ -140,7 +140,12 @@ func scriptJobName(s domain.PackageScript) string {
 func BuildInitRunConfig(answers domain.InitProjectAnswers, pm domain.PackageManager) domain.RunConfig {
 	runCfg := domain.RunConfig{}
 	if len(answers.DockerComposeFiles) > 0 {
-		runCfg = BuildDockerJobs(answers.DockerComposeCmd, answers.DockerComposeFiles)
+		runCfg = BuildDockerJobs(BuildDockerJobsParams{
+			ComposeCmd: answers.DockerComposeCmd,
+			Files:      answers.DockerComposeFiles,
+			Scans:      answers.Scans,
+			Shared:     answers.SharedServices,
+		})
 	}
 	if len(answers.SelectedPackageScripts) > 0 {
 		scriptsCfg := BuildScriptJobs(BuildScriptJobsParams{
@@ -156,29 +161,107 @@ func BuildInitRunConfig(answers domain.InitProjectAnswers, pm domain.PackageMana
 	return runCfg
 }
 
+type BuildDockerJobsParams struct {
+	// ComposeCmd is "docker compose" or "docker-compose", as detection found it.
+	ComposeCmd string
+	Files      []string
+	// Scans say what each file declares, keyed by file. Only needed when a
+	// service is to be lifted out: the file's job then has to name the ones that
+	// stay, since `docker compose up` otherwise starts the whole file.
+	Scans map[string]domain.ComposeScan
+	// Shared are the services to run once for the repository rather than once
+	// per worktree, each lifted into a job of its own.
+	Shared []domain.SharedComposeService
+}
+
 // BuildDockerJobs builds a RunConfig with one [[job]] entry per detected
-// docker-compose file, using the provided compose command (e.g.
-// "docker compose" or "docker-compose"). Each job is kind="service" with a
-// stop command, meaning they run as detached services. No profile is emitted.
-func BuildDockerJobs(composeCmd string, files []string) domain.RunConfig {
-	jobs := make([]domain.JobConfig, 0, len(files))
+// docker-compose file, plus one per service lifted out of them to be shared.
+// Each job is kind="service" with a stop command, meaning they run as detached
+// services. No profile is emitted.
+func BuildDockerJobs(params BuildDockerJobsParams) domain.RunConfig {
+	jobs := make([]domain.JobConfig, 0, len(params.Files))
 	counts := map[string]int{}
-	for _, f := range files {
+	for _, f := range params.Files {
 		base := jobNameFromComposeFile(f)
 		counts[base]++
 		name := base
 		if counts[base] > 1 {
 			name = fmt.Sprintf("%s-%d", base, counts[base])
 		}
+
+		jobs = append(jobs, sharedComposeJobs(sharedComposeJobsParams{Params: params, File: f})...)
+
+		stays := servicesStaying(params, f)
+		// Every service of this file is shared, so the file has nothing left to
+		// run. A job that started it anyway would bring the shared ones up a
+		// second time, behind their own jobs' backs.
+		if stays.lifted && len(stays.names) == 0 {
+			continue
+		}
 		jobs = append(jobs, domain.JobConfig{
 			Name: name,
 			Kind: domain.JobKindService,
-			Cmd:  fmt.Sprintf("%s %sup -d", composeCmd, DockerComposeFileFlag(f)),
-			Stop: fmt.Sprintf("%s %sdown --remove-orphans", composeCmd, DockerComposeFileFlag(f)),
+			Cmd:  strings.TrimRight(fmt.Sprintf("%s %sup -d %s", params.ComposeCmd, DockerComposeFileFlag(f), strings.Join(stays.names, " ")), " "),
+			Stop: fmt.Sprintf("%s %sdown --remove-orphans", params.ComposeCmd, DockerComposeFileFlag(f)),
 			Cwd:  ".",
 		})
 	}
 	return domain.RunConfig{Jobs: jobs}
+}
+
+type sharedComposeJobsParams struct {
+	Params BuildDockerJobsParams
+	File   string
+}
+
+// sharedComposeJobs is one job per service lifted out of this file. Its stop is
+// `stop <service>` and never `down`: down would tear the whole file apart,
+// taking with it the services that stayed in the file's own job.
+func sharedComposeJobs(params sharedComposeJobsParams) []domain.JobConfig {
+	var jobs []domain.JobConfig
+	for _, shared := range params.Params.Shared {
+		if shared.File != params.File {
+			continue
+		}
+		flag := DockerComposeFileFlag(params.File)
+		jobs = append(jobs, domain.JobConfig{
+			Name:   shared.Service,
+			Kind:   domain.JobKindService,
+			Cmd:    fmt.Sprintf("%s %sup -d %s", params.Params.ComposeCmd, flag, shared.Service),
+			Stop:   fmt.Sprintf("%s %sstop %s", params.Params.ComposeCmd, flag, shared.Service),
+			Cwd:    ".",
+			Scope:  domain.JobScopeShared,
+			Tenant: shared.Tenant,
+		})
+	}
+	return jobs
+}
+
+type stayingServices struct {
+	names []string
+	// lifted says at least one service was taken out of this file, which is the
+	// only case where the remaining ones have to be named explicitly.
+	lifted bool
+}
+
+func servicesStaying(params BuildDockerJobsParams, file string) stayingServices {
+	shared := map[string]bool{}
+	for _, entry := range params.Shared {
+		if entry.File == file {
+			shared[entry.Service] = true
+		}
+	}
+	if len(shared) == 0 {
+		return stayingServices{}
+	}
+
+	var names []string
+	for _, service := range params.Scans[file].Services {
+		if !shared[service.Name] {
+			names = append(names, service.Name)
+		}
+	}
+	return stayingServices{names: names, lifted: true}
 }
 
 // jobNameFromComposeFile turns "docker-compose.dev.yml" into
