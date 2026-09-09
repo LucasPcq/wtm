@@ -250,11 +250,17 @@ const (
 	NamespaceStepTitle = "What does each worktree get of these shared services?"
 	NamespaceStepDesc  = "A shared service runs once, so each worktree needs its own slice of it — a database, a set of realms. Give the name of that slice and the commands that create and give it back. Either an inline command or the path to a script; both run as a /bin/sh line in the worktree. Leave create empty to share the service outright, data included."
 
-	NamespaceRowFmt       = "%-*s  %-7s  %s"
-	NamespaceRowEditFmt   = "%-*s  %-7s  %s"
-	NamespaceEmptyValue   = "—"
-	NamespaceVarsFmt      = "available: %s"
-	NamespaceVarSep       = "  "
+	NamespaceRowFmt      = "%-*s  %-7s  %s"
+	NamespaceRowEditFmt  = "%-*s  %-7s  %s"
+	NamespaceEmptyValue  = "—"
+	NamespaceVarsHeading = "available"
+	NamespaceVarWorktree = "worktree"
+	NamespaceVarPorts    = "ports"
+	NamespaceVarRowFmt   = "%-*s  %s"
+	NamespaceVarSep      = "  "
+	// NamespaceVarIndent sets the group rows in under the heading, and the wrap
+	// of a long group in under its own first variable.
+	NamespaceVarIndent    = "  "
 	NamespaceNameEmptyErr = "a namespace needs a name; it is what clean says it is about to destroy"
 	NamespaceEditHelp     = "enter save · esc cancel"
 	NamespaceSummaryFmt   = "%d of %d configured"

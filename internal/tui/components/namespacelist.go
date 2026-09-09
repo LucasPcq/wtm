@@ -147,22 +147,57 @@ func (m NamespaceListModel) View() string {
 
 	var b strings.Builder
 	for i, field := range m.fields {
-		m.renderRow(&b, namespaceRowParams{Field: field, JobWidth: jobWidth, Editing: m.editing && i == m.cursor}, i == m.cursor)
+		// The job is named once per service, not on each of its three lines: it
+		// is one question in three parts, and repeating the name made six rows
+		// read as six unrelated ones.
+		heads := i == 0 || m.fields[i-1].Job != field.Job
+		m.renderRow(&b, namespaceRowParams{
+			Field: field, JobWidth: jobWidth, Heads: heads, Editing: m.editing && i == m.cursor,
+		}, i == m.cursor)
 		b.WriteString("\n")
 	}
 	m.renderRow(&b, namespaceRowParams{Done: true}, m.cursor == m.doneRow())
 
 	// The variables are shown while typing, where they are needed, and they are
 	// this job's own: the ports it declares under the names it declares them by.
-	if m.editing && len(m.fields[m.cursor].Vars) > 0 {
-		b.WriteString("\n\n")
-		b.WriteString(styles.Indent)
-		b.WriteString(styles.Muted.Render(fmt.Sprintf(domain.NamespaceVarsFmt,
-			strings.Join(m.fields[m.cursor].Vars, domain.NamespaceVarSep))))
+	if m.editing {
+		b.WriteString(m.renderVars(m.fields[m.cursor].Vars))
 	}
 	if m.err != "" {
 		b.WriteString("\n\n")
 		b.WriteString(errorBanner(m.err))
+	}
+	return b.String()
+}
+
+// renderVars lays the groups out as a small aligned table, each wrapping under
+// its own first variable. One run-on line stopped being readable as soon as a
+// job declared more than one port.
+func (m NamespaceListModel) renderVars(groups []domain.NamespaceVarGroup) string {
+	if len(groups) == 0 {
+		return ""
+	}
+
+	labelWidth := rules.NamespaceVarLabelWidth(groups)
+	indent := styles.Indent + domain.NamespaceVarIndent
+	room := max(m.width-PrintableWidth(indent)-labelWidth-len(domain.NamespaceVarSep), domain.CmdListMinWidth)
+
+	var b strings.Builder
+	b.WriteString("\n\n")
+	b.WriteString(styles.Indent)
+	b.WriteString(styles.Muted.Render(domain.NamespaceVarsHeading))
+
+	for _, group := range groups {
+		for i, line := range rules.WrapVars(group.Vars, room) {
+			label := group.Label
+			if i > 0 {
+				label = ""
+			}
+			b.WriteString("\n")
+			b.WriteString(indent)
+			b.WriteString(styles.Muted.Render(fmt.Sprintf(domain.NamespaceVarRowFmt,
+				labelWidth, label, strings.Join(line, domain.NamespaceVarSep))))
+		}
 	}
 	return b.String()
 }
@@ -179,8 +214,11 @@ func (m NamespaceListModel) helpModal() string {
 type namespaceRowParams struct {
 	Field    domain.NamespaceField
 	JobWidth int
-	Editing  bool
-	Done     bool
+	// Heads says this row is the first of its service, and so the one that
+	// carries its name.
+	Heads   bool
+	Editing bool
+	Done    bool
 }
 
 func (m NamespaceListModel) renderRow(b *strings.Builder, params namespaceRowParams, selected bool) {
@@ -192,7 +230,11 @@ func (m NamespaceListModel) renderRow(b *strings.Builder, params namespaceRowPar
 		} else if value == "" {
 			value = styles.Muted.Render(domain.NamespaceEmptyValue)
 		}
-		label = fmt.Sprintf(domain.NamespaceRowFmt, params.JobWidth, params.Field.Job, string(params.Field.Field), value)
+		job := params.Field.Job
+		if !params.Heads {
+			job = ""
+		}
+		label = fmt.Sprintf(domain.NamespaceRowFmt, params.JobWidth, job, string(params.Field.Field), value)
 	}
 
 	if selected {

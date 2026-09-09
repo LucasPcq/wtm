@@ -256,6 +256,15 @@ type NamespaceField struct {
 	Job   string
 	Field NamespaceFieldKind
 	Value string
+	Vars  []NamespaceVarGroup
+}
+
+// NamespaceVarGroup is one labelled row of the variables a command may read.
+// They are grouped by where they come from — the worktree, then this job's own
+// ports — because a single run-on line stops being readable as soon as a job
+// declares more than one port.
+type NamespaceVarGroup struct {
+	Label string
 	Vars  []string
 }
 

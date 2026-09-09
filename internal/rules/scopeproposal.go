@@ -213,13 +213,59 @@ func namespaceValue(held domain.JobNamespaceConfig, kind domain.NamespaceFieldKi
 
 // namespaceVars is what a command may read: the worktree's own, then the ports
 // this job declares under the names it declares them by. Listing them is the
-// whole of what wtm can honestly offer here.
-func namespaceVars(ports []string) []string {
-	vars := []string{"$" + domain.EnvNamespace, "$" + domain.EnvWorktree, "$" + domain.EnvOrdinal}
-	for _, port := range ports {
-		vars = append(vars, "$"+port)
+// whole of what wtm can honestly offer here, and grouping them says which half
+// is the same everywhere and which half is this job's.
+func namespaceVars(ports []string) []domain.NamespaceVarGroup {
+	groups := []domain.NamespaceVarGroup{{
+		Label: domain.NamespaceVarWorktree,
+		Vars:  []string{"$" + domain.EnvNamespace, "$" + domain.EnvWorktree, "$" + domain.EnvOrdinal},
+	}}
+	if len(ports) == 0 {
+		return groups
 	}
-	return vars
+
+	named := make([]string, 0, len(ports))
+	for _, port := range ports {
+		named = append(named, "$"+port)
+	}
+	return append(groups, domain.NamespaceVarGroup{Label: domain.NamespaceVarPorts, Vars: named})
+}
+
+// NamespaceVarLabelWidth aligns the group labels into a column, so the two rows
+// read as a small table rather than as two sentences.
+func NamespaceVarLabelWidth(groups []domain.NamespaceVarGroup) int {
+	width := 0
+	for _, group := range groups {
+		if len(group.Label) > width {
+			width = len(group.Label)
+		}
+	}
+	return width
+}
+
+// WrapVars breaks one group over as many lines as the width needs, never
+// mid-variable. The caller indents the continuations under the first one.
+func WrapVars(vars []string, width int) [][]string {
+	if width <= 0 || len(vars) == 0 {
+		return [][]string{vars}
+	}
+
+	var lines [][]string
+	line, used := []string{}, 0
+	for _, name := range vars {
+		next := len(name)
+		if len(line) > 0 {
+			next += len(domain.NamespaceVarSep)
+		}
+		if len(line) > 0 && used+next > width {
+			lines = append(lines, line)
+			line, used = []string{name}, len(name)
+			continue
+		}
+		line = append(line, name)
+		used += next
+	}
+	return append(lines, line)
 }
 
 // NamespacesFromFields folds the step's rows back into what the write side

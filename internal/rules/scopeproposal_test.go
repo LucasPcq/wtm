@@ -122,9 +122,11 @@ func TestNamespaceFieldsProposeOnlyTheName(t *testing.T) {
 	if got[1].Value != "" || got[2].Value != "" {
 		t.Errorf("a command was pre-filled: %+v %+v", got[1], got[2])
 	}
-	// The variables are the job's own, under the names it declares them by.
-	if len(got[1].Vars) == 0 || got[1].Vars[len(got[1].Vars)-1] != "$CRM_DB_PORT" {
-		t.Errorf("vars = %v, want the job's own port variable last", got[1].Vars)
+	// The variables are the job's own, under the names it declares them by;
+	// TestNamespaceVarsAreGrouped covers how they are laid out.
+	last := got[1].Vars[len(got[1].Vars)-1]
+	if len(last.Vars) == 0 || last.Vars[0] != "$CRM_DB_PORT" {
+		t.Errorf("vars = %+v, want the job's own port variable", got[1].Vars)
 	}
 }
 
@@ -160,5 +162,65 @@ func TestNamespacesFromFieldsDropsAServiceWithNoCreate(t *testing.T) {
 	}
 	if got["kc"] == nil || got["kc"].Create != "./scripts/kc.sh" {
 		t.Errorf("kc = %+v", got["kc"])
+	}
+}
+
+// The variables are grouped by where they come from: the half that is the same
+// everywhere, and the half that is this job's.
+func TestNamespaceVarsAreGrouped(t *testing.T) {
+	got := NamespaceFields(NamespaceFieldsParams{
+		Shared: []domain.SharedComposeService{{Service: "db"}},
+		Ports:  map[string][]string{"db": {"CRM_DB_PORT"}},
+	})[0].Vars
+
+	if len(got) != 2 || got[0].Label != domain.NamespaceVarWorktree || got[1].Label != domain.NamespaceVarPorts {
+		t.Fatalf("groups = %+v", got)
+	}
+	if got[1].Vars[0] != "$CRM_DB_PORT" {
+		t.Errorf("ports = %v, want the job's own variable", got[1].Vars)
+	}
+}
+
+// A job that declares no port gets no ports row rather than an empty one.
+func TestNamespaceVarsOmitAnEmptyPortsGroup(t *testing.T) {
+	got := NamespaceFields(NamespaceFieldsParams{
+		Shared: []domain.SharedComposeService{{Service: "keycloak"}},
+	})[0].Vars
+	if len(got) != 1 {
+		t.Errorf("groups = %+v, want the worktree one alone", got)
+	}
+}
+
+func TestWrapVarsBreaksOnlyBetweenVariables(t *testing.T) {
+	vars := []string{"$AAAA", "$BBBB", "$CCCC", "$DDDD"}
+	got := WrapVars(vars, 14)
+
+	if len(got) < 2 {
+		t.Fatalf("lines = %v, want a wrap", got)
+	}
+	seen := 0
+	for _, line := range got {
+		width := 0
+		for i, name := range line {
+			if i > 0 {
+				width += len(domain.NamespaceVarSep)
+			}
+			width += len(name)
+			seen++
+		}
+		if width > 14 && len(line) > 1 {
+			t.Errorf("line %v is %d wide, past 14", line, width)
+		}
+	}
+	if seen != len(vars) {
+		t.Errorf("wrapped %d variables, want %d — none may be dropped", seen, len(vars))
+	}
+}
+
+// A variable longer than the room gets its own line rather than being cut.
+func TestWrapVarsNeverCutsAVariable(t *testing.T) {
+	got := WrapVars([]string{"$A_VERY_LONG_PORT_VARIABLE_NAME", "$B"}, 8)
+	if got[0][0] != "$A_VERY_LONG_PORT_VARIABLE_NAME" {
+		t.Errorf("lines = %v, want the long name whole on its own line", got)
 	}
 }
