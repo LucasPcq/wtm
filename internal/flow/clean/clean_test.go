@@ -1,6 +1,7 @@
 package clean
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,14 +19,14 @@ import (
 func answers(values map[string]string) flow.Answers { return flow.NewAnswers(values) }
 
 func TestDeleteRecapStatesWarningsAndTarget(t *testing.T) {
-	recap := deleteRecap(domain.CleanCheckResult{
+	recap := deleteRecap(deleteRecapParams{Check: domain.CleanCheckResult{
 		Branch:          "feat",
 		WorktreePath:    "/w/feat",
 		IsDirty:         true,
 		UnpushedCommits: 2,
 		HasOpenPR:       true,
 		PRUrl:           "http://pr",
-	}, "")
+	}})
 
 	for _, want := range []string{"uncommitted changes", "2 commit(s)", "http://pr", "Will delete:", "/w/feat", "feat"} {
 		if !strings.Contains(recap, want) {
@@ -35,8 +36,10 @@ func TestDeleteRecapStatesWarningsAndTarget(t *testing.T) {
 }
 
 func TestDeleteRecapCarriesTheReparentDecision(t *testing.T) {
-	recap := deleteRecap(domain.CleanCheckResult{Branch: "feat", WorktreePath: "/w/feat"},
-		"Then leave 2 child worktree(s) orphaned.")
+	recap := deleteRecap(deleteRecapParams{
+		Check:    domain.CleanCheckResult{Branch: "feat", WorktreePath: "/w/feat"},
+		Reparent: "Then leave 2 child worktree(s) orphaned.",
+	})
 	if !strings.Contains(recap, "orphaned") {
 		t.Errorf("recap should state what happens to the children:\n%s", recap)
 	}
@@ -377,14 +380,36 @@ func TestRunAbortedRemovesNothing(t *testing.T) {
 	}
 }
 
-// --keep-data is the one way to remove a worktree and keep what it carved out
-// of the shared services. Without it the detach runs, which is what stops a
-// clean from leaving an orphan database behind on every iteration.
-func TestCleanKeepDataWithholdsTheDetach(t *testing.T) {
-	if !(Request{KeepData: true}).KeepData {
-		t.Error("KeepData does not survive the request")
+// The default drops the worktree's databases, so the recap has to say so: a
+// flag must never make a line disappear from it, and silence here would have a
+// reader confirm a DROP DATABASE they were never shown.
+func TestDeleteRecapNamesTheDataItGivesBack(t *testing.T) {
+	recap := deleteRecap(deleteRecapParams{
+		Check:   domain.CleanCheckResult{Branch: "feat", WorktreePath: "/w/feat"},
+		Tenants: []string{fmt.Sprintf(domain.CleanWillDeleteTenantFmt, "crm_feat", "db")},
+	})
+	for _, want := range []string{"crm_feat", "db"} {
+		if !strings.Contains(recap, want) {
+			t.Errorf("recap missing %q:\n%s", want, recap)
+		}
 	}
-	if (Request{}).KeepData {
-		t.Error("the default withholds the detach; it must run")
+}
+
+func TestDeleteRecapSaysWhenTheDataIsKept(t *testing.T) {
+	recap := deleteRecap(deleteRecapParams{
+		Check:   domain.CleanCheckResult{Branch: "feat", WorktreePath: "/w/feat"},
+		Tenants: []string{domain.CleanKeepDataLine},
+	})
+	if !strings.Contains(recap, "--keep-data") {
+		t.Errorf("recap does not say the data is kept:\n%s", recap)
+	}
+}
+
+// The line is built from run.toml, so a project with no shared service adds
+// nothing and the recap reads exactly as it did before.
+func TestTenantLinesEmptyWithoutASharedService(t *testing.T) {
+	flow := &cleanFlow{ctx: flow.Context{StateDir: t.TempDir()}}
+	if got := flow.tenantLines("feat"); len(got) != 0 {
+		t.Errorf("lines = %v, want none", got)
 	}
 }

@@ -54,3 +54,50 @@ func loadMetadata(stateDir, branch string) (domain.WorktreeMetadata, error) {
 	}
 	return meta, nil
 }
+
+type RecordTenantsParams struct {
+	StateDir string
+	Branch   string
+	Jobs     []string
+}
+
+// RecordTenants remembers that this worktree holds a tenant in each of these
+// shared services, so `clean` gives back exactly what exists. Additive and
+// idempotent: a job already recorded is not recorded twice, and a worktree with
+// no metadata — the main checkout — records nothing rather than creating some.
+func RecordTenants(params RecordTenantsParams) error {
+	if len(params.Jobs) == 0 {
+		return nil
+	}
+	meta, err := loadMetadata(params.StateDir, params.Branch)
+	if err != nil {
+		return nil
+	}
+
+	held := make(map[string]bool, len(meta.Tenants))
+	for _, job := range meta.Tenants {
+		held[job] = true
+	}
+	changed := false
+	for _, job := range params.Jobs {
+		if held[job] {
+			continue
+		}
+		held[job] = true
+		meta.Tenants = append(meta.Tenants, job)
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	return writeMetadata(rules.WorktreeMetaDir(params.StateDir, params.Branch), meta)
+}
+
+// TenantsOf is what this worktree has to give back when it goes.
+func TenantsOf(params ParentBranchParams) []string {
+	meta, err := loadMetadata(params.StateDir, params.Branch)
+	if err != nil {
+		return nil
+	}
+	return meta.Tenants
+}

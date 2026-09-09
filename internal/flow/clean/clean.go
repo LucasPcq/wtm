@@ -249,11 +249,19 @@ func (f *cleanFlow) detachTenants(branchName string) {
 		return
 	}
 
+	// Only what this worktree actually carved out. A worktree created and thrown
+	// away without ever starting the stack owes nothing, and running its detach
+	// would be a DROP DATABASE on a database that never existed.
+	held := worktree.TenantsOf(worktree.ParentBranchParams{StateDir: f.ctx.StateDir, Branch: branchName})
+	if len(held) == 0 {
+		return
+	}
+
 	result := runjobs.DetachWorktree(runjobs.DetachParams{
-		Config:  cfg,
+		Config:  rules.JobsHeld(cfg, held),
 		Env:     env,
 		WorkDir: wt.Path,
-		Up:      rules.SharedJobsUp(runjobs.Load()),
+		Up:      rules.SharedJobsUp(rules.SharedJobsUpParams{Jobs: runjobs.Load(), Config: cfg}),
 	})
 	f.reportDetach(result)
 

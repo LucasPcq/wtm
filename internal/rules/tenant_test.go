@@ -112,3 +112,39 @@ func TestIsSharedAndHasTenant(t *testing.T) {
 		t.Error("HasTenant with name and attach = false")
 	}
 }
+
+// A worktree created and thrown away without ever starting the stack holds no
+// tenant, so a clean owes nothing — running its detach would be a DROP DATABASE
+// on a database that never existed.
+func TestTenantJobsStartedOnlyRemembersWhatCameUp(t *testing.T) {
+	jobs := []domain.JobConfig{
+		{Name: "db", Scope: domain.JobScopeShared, Tenant: &domain.JobTenantConfig{Name: "n", Attach: "true"}},
+		{Name: "cache", Scope: domain.JobScopeShared},
+		{Name: "web"},
+	}
+
+	if got := rules.TenantJobsStarted(rules.TenantJobsStartedParams{Jobs: jobs}); len(got) != 0 {
+		t.Errorf("nothing started, got %v", got)
+	}
+
+	got := rules.TenantJobsStarted(rules.TenantJobsStartedParams{Jobs: jobs, Started: []string{"db", "cache", "web"}})
+	if len(got) != 1 || got[0] != "db" {
+		t.Errorf("got %v, want db alone: cache carves nothing out and web is not shared", got)
+	}
+}
+
+func TestJobsHeldNarrowsToTheRecordedSharedJobs(t *testing.T) {
+	cfg := domain.RunConfig{Jobs: []domain.JobConfig{
+		{Name: "db", Scope: domain.JobScopeShared},
+		{Name: "cache", Scope: domain.JobScopeShared},
+		{Name: "web"},
+	}}
+
+	got := rules.JobsHeld(cfg, []string{"db", "web"})
+	if len(got.Jobs) != 1 || got.Jobs[0].Name != "db" {
+		t.Errorf("jobs = %v, want db alone: web is not shared", got.Jobs)
+	}
+	if len(rules.JobsHeld(cfg, nil).Jobs) != 0 {
+		t.Error("an empty record must narrow to nothing")
+	}
+}

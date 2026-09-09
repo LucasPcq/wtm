@@ -22,6 +22,12 @@ type WorktreeMetadata struct {
 	// is derived from. Zero means unallocated: the main worktree is ordinal 0 by
 	// definition and never gets a meta.json of its own.
 	Ordinal int `json:"ordinal,omitempty"`
+	// Tenants names the shared services this worktree has carved a tenant out
+	// of. It is the only durable record that one exists: a claim on a shared
+	// service goes with a `run stop`, and without this a clean would either give
+	// back a tenant that was never created or leak one that was. It lives here
+	// because the file is removed with the worktree it describes.
+	Tenants []string `json:"tenants,omitempty"`
 }
 
 // WorktreeStatus holds the display state of a worktree for wtm ls.

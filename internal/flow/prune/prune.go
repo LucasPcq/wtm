@@ -313,7 +313,7 @@ func (f *pruneFlow) settleOwedTenants() {
 		return
 	}
 
-	up := rules.SharedJobsUp(runjobs.Load())
+	up := rules.SharedJobsUp(rules.SharedJobsUpParams{Jobs: runjobs.Load(), Config: cfg})
 	var settled []domain.TenantRef
 	for _, ref := range owed {
 		if !up[ref.Job] {

@@ -65,6 +65,7 @@ type Seam struct {
 	proxyPort     int
 	portAddressed bool
 	projectDir    string
+	stateDir      string
 	jobs          []domain.JobConfig
 	declared      []domain.JobConfig
 	shared        *domain.SharedJobContext
@@ -109,6 +110,7 @@ func Open(params Params) Seam {
 		proxyPort:     params.ProxyPort,
 		portAddressed: params.PortAddressed,
 		projectDir:    params.ProjectDir,
+		stateDir:      params.StateDir,
 		shared:        shared,
 	}
 }
@@ -165,6 +167,21 @@ func (s Seam) Starter(params StartParams) runlogs.StartFunc {
 }
 
 func (s Seam) run(ctx context.Context, sink runlogs.Sink, params StartParams) (runlogs.Outcome, error) {
+	outcome, err := s.start(ctx, sink, params)
+	// Recorded after the run, from the jobs it actually started: it is the only
+	// durable trace that this worktree holds a tenant, and `clean` reads it to
+	// give back exactly what exists rather than everything run.toml declares.
+	if s.shared != nil {
+		_ = worktree.RecordTenants(worktree.RecordTenantsParams{
+			StateDir: s.stateDir,
+			Branch:   s.worktree,
+			Jobs:     rules.TenantJobsStarted(rules.TenantJobsStartedParams{Jobs: params.Jobs, Started: outcome.Started}),
+		})
+	}
+	return outcome, err
+}
+
+func (s Seam) start(ctx context.Context, sink runlogs.Sink, params StartParams) (runlogs.Outcome, error) {
 	return runlogs.Run(ctx, runlogs.RunParams{
 		BaseOwners:    s.baseOwners(),
 		Service:       s.service,

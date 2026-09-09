@@ -95,7 +95,14 @@ func runDetach(job domain.JobConfig, params DetachParams) error {
 	spec := rules.ShellCommand(job.Tenant.Detach)
 	cmd := exec.Command(spec.Name, spec.Args...)
 	cmd.Dir = params.WorkDir
-	cmd.Env = rules.MergeEnv(rules.MergeEnvParams{Env: os.Environ(), Overrides: overrides})
+	// Cleared, like every other command wtm runs for a worktree: `wtm prune`
+	// typed inside worktree X settles a debt owed by worktree Y, and X's WTM_*
+	// and port variables must not reach Y's detach.
+	cmd.Env = rules.MergeEnv(rules.MergeEnvParams{
+		Env:       os.Environ(),
+		Clear:     domain.WorktreeScopedEnv,
+		Overrides: overrides,
+	})
 	if output, runErr := cmd.CombinedOutput(); runErr != nil {
 		return fmt.Errorf(domain.TenantDetachFailedFmt, job.Name, expanded.Name,
 			fmt.Errorf("%w: %s", runErr, rules.SanitizeLogLine(string(output))))

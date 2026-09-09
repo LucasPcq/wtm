@@ -140,8 +140,10 @@ flagged; everything else is what the name implies.
 - `wtm clean <branch>` / `wtm prune [filters]` — remove one / batch-remove finished
   worktrees. **`clean` also gives back the tenants that worktree carved out of shared
   services** (it drops its database): pass `--keep-data` to withhold that, including under
-  `--yes`. If the shared service is down at the time the drop is deferred, and the next
-  `wtm prune` settles it once the service is up again. **In JSON mode surviving children are left orphaned unless you pass
+  `--yes`; the interactive recap names each database it will drop. Only worktrees that
+  actually started the shared job owe anything — one created and thrown away owes nothing.
+  If the shared service is down the drop is deferred, and the next `wtm prune` settles it
+  once the service is up again. **In JSON mode surviving children are left orphaned unless you pass
   `--reparent-children`** (they reparent onto the grandparent). `prune` decides "finished"
   from **GitHub PR state via the `gh` CLI** (not local commits): `--merged` = PR merged,
   `--closed` = PR closed without merging, `--gone` = remote branch deleted; no filter = all

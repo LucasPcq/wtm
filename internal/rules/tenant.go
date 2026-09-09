@@ -120,17 +120,53 @@ func jobScopeErrors(job domain.JobConfig) []string {
 	return nil
 }
 
+type SharedJobsUpParams struct {
+	Jobs   []domain.JobInfo
+	Config domain.RunConfig
+}
+
 // SharedJobsUp names the shared services actually running, so a tenant is only
-// ever given back to something that can take it. A claim counts: the worktree
-// holding one is looking at a service that is up.
-func SharedJobsUp(jobs []domain.JobInfo) map[string]bool {
+// ever given back to something that can take it.
+//
+// A claim is deliberately not evidence: it is a worktree's hold on a service,
+// and it outlives a daemon restart that left the service itself crashed. The
+// worktree being cleaned always holds one, so counting it made the map true for
+// every job and had `clean` run DROP DATABASE against a service that was down.
+// The config narrows it further: the daemon is machine-wide, and another
+// repository's job of the same name says nothing about this one.
+func SharedJobsUp(params SharedJobsUpParams) map[string]bool {
+	shared := SharedJobNames(params.Config)
+
 	up := map[string]bool{}
-	for _, job := range jobs {
-		if IsJobUp(job.Status) {
+	for _, job := range params.Jobs {
+		if !shared[job.Name] {
+			continue
+		}
+		if job.Status == domain.JobStatusRunning || job.Status == domain.JobStatusDetached {
 			up[job.Name] = true
 		}
 	}
 	return up
+}
+
+// JobsHeld narrows a config to the jobs a worktree recorded a tenant in, in the
+// config's own order so a recap and a run agree on what they list.
+func JobsHeld(cfg domain.RunConfig, held []string) domain.RunConfig {
+	if len(held) == 0 {
+		return domain.RunConfig{}
+	}
+	wanted := make(map[string]bool, len(held))
+	for _, name := range held {
+		wanted[name] = true
+	}
+
+	var jobs []domain.JobConfig
+	for _, job := range cfg.Jobs {
+		if wanted[job.Name] && IsShared(job) {
+			jobs = append(jobs, job)
+		}
+	}
+	return domain.RunConfig{Jobs: jobs}
 }
 
 // JobsNamed narrows a config to one job, so a caller acting on a single tenant
@@ -200,4 +236,31 @@ func AnySharedJob(jobs []domain.JobConfig) bool {
 		}
 	}
 	return false
+}
+
+type TenantJobsStartedParams struct {
+	Jobs []domain.JobConfig
+	// Started names the jobs the run left running.
+	Started []string
+}
+
+// TenantJobsStarted narrows a run to the shared jobs that actually came up and
+// carve a tenant out. Only those leave anything behind to give back, so only
+// those are worth remembering — a job the run never reached created nothing.
+func TenantJobsStarted(params TenantJobsStartedParams) []string {
+	if len(params.Started) == 0 {
+		return nil
+	}
+	started := make(map[string]bool, len(params.Started))
+	for _, name := range params.Started {
+		started[name] = true
+	}
+
+	var jobs []string
+	for _, job := range params.Jobs {
+		if started[job.Name] && IsShared(job) && HasTenant(job) {
+			jobs = append(jobs, job.Name)
+		}
+	}
+	return jobs
 }

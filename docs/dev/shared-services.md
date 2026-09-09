@@ -37,6 +37,12 @@ Two syntaxes, one per place, never mixed:
 
 An absent `[job.tenant]` is a valid answer: shared for good, one instance and one set of data.
 
+### Knowing a tenant exists
+
+A claim goes with a `run stop`, so it cannot be what tells `clean` there is a database to drop. The worktree's own `meta.json` carries `tenants`: the shared services it has actually carved a slice out of, recorded after a run from the jobs that came up. It lives there because the file is removed with the worktree it describes, and because both wrong answers are bad — giving back a tenant that was never created runs a `DROP DATABASE` on nothing, and missing one leaks a database on every iteration.
+
+A worktree created and thrown away without ever starting the stack therefore owes nothing.
+
 ## Stopping is not destroying
 
 `run stop` and `run down` never run `detach`. A `run down` that dropped a database would make the command unusable.
@@ -62,3 +68,9 @@ Where `run.toml` has an opinion it outranks detection, and a run that never put 
 - Its published host carries **no worktree segment** (`db.projet.localhost`). One instance cannot answer under two names, and keeping the segment would have two worktrees' `.env` files disagree about where a single service answers.
 - Its compose volume and network names need no special handling: they are already templated `${COMPOSE_PROJECT_NAME:-default}`, and a service running in the main checkout inherits that checkout's project name — so one stable name, automatically.
 - A claim reports `pid: 0` and its own mark. Printing a PID beside three worktrees would read as three processes.
+- A claim is **attachable**: it owns no stream, and the daemon resolves it to the one there is — so `run logs` works from any worktree. Its persisted tail is read from the main checkout's log directory, not from its own.
+- Both the real job and every claim carry the main checkout they belong to. The daemon is machine-wide, so matching a claim to its service by name alone let two repositories that both declare `db` release each other's.
+
+## What it costs when nothing is shared
+
+Nothing. `sharedContext` is resolved once per seam and only when `run.toml` declares a shared job — otherwise every `run` command, `run ps` included, would pay a `git worktree list` plus a full environment resolution for the main checkout.

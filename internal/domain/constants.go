@@ -2437,8 +2437,13 @@ const (
 	CleanWillDelete         = "Will delete:"
 	CleanWillDeleteWorktree = "  worktree  "
 	CleanWillDeleteBranch   = "  branch    "
-	CleanRecapReparentFmt   = "Then reparent %d child worktree(s) onto %s."
-	CleanRecapOrphanFmt     = "Then leave %d child worktree(s) orphaned."
+	// CleanWillDeleteTenantFmt names the data a clean gives back, one line per
+	// shared service. A recap that stayed silent about a DROP DATABASE told the
+	// reader they were removing a worktree and nothing else.
+	CleanWillDeleteTenantFmt = "  data      %s in %s"
+	CleanKeepDataLine        = "  data      kept (--keep-data)"
+	CleanRecapReparentFmt    = "Then reparent %d child worktree(s) onto %s."
+	CleanRecapOrphanFmt      = "Then leave %d child worktree(s) orphaned."
 	// CleanBlockerDirty, CleanBlockerUnpushed and CleanBlockerOpenPR key the
 	// removal refusals a surface lists one by one (rules.CleanBlockers).
 	CleanBlockerDirty    = "dirty"
