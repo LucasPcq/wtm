@@ -18,7 +18,9 @@ type ComposeProbe struct {
 }
 
 // ComposeProbeFor recognizes a compose launcher in a job's command and builds the
-// query that verifies it. It is deliberately one tool with one stable subcommand,
+// query that verifies it. The two spellings it accepts are the two
+// infra.DockerComposeCommand writes into a generated job, which is why both ends
+// read the same constants. It is deliberately one tool with one stable subcommand,
 // not a framework of launchers: everything unrecognized keeps saying what wtm
 // actually knows, which is that it started the job and has not seen it since.
 //

@@ -2052,8 +2052,13 @@ const (
 	DockerBin           = "docker"
 	ComposeLegacyBin    = "docker-compose"
 	ComposeSubcommand   = "compose"
+	ComposeVersionArg   = "version"
 	ComposeFileFlag     = "-f"
 	ComposeFileFlagLong = "--file"
+	// ComposeCommand is what detection writes into a generated job's cmd, and
+	// therefore one of the two spellings the probe has to read back. The two ends
+	// share these constants so they cannot drift apart in silence.
+	ComposeCommand = DockerBin + " " + ComposeSubcommand
 
 	// ShellBin is the interpreter every command written in a config file runs
 	// through — a job's cmd and stop, and every lifecycle hook. POSIX sh rather
