@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://raw.githubusercontent.com/LucasPcq/wtm/main/schemas/run.schema.json",
   "title": "wtm run config",
-  "description": "Schema for .wtm/run.toml — declares jobs (services and tasks) and profiles that compose them.",
+  "description": "Schema for .wtm/run.toml \u2014 declares jobs (services and tasks) and profiles that compose them.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -39,7 +39,7 @@
           },
           "cmd": {
             "type": "string",
-            "description": "Command to start the job, run as a `/bin/sh` line: quotes, `&&`, pipes, redirections and globs all mean what they mean in a terminal, and `${VAR}` expands from the job's environment — including the ports declared below. Write `pnpm dev --port ${PORT}` for a server that only takes its port as a CLI flag."
+            "description": "Command to start the job, run as a `/bin/sh` line: quotes, `&&`, pipes, redirections and globs all mean what they mean in a terminal, and `${VAR}` expands from the job's environment \u2014 including the ports declared below. Write `pnpm dev --port ${PORT}` for a server that only takes its port as a CLI flag."
           },
           "stop": {
             "type": "string",
@@ -67,11 +67,11 @@
             "required": [
               "port"
             ],
-            "description": "Publishes one of this job's declared ports under a name, so the worktree gets its own hostname instead of a port to remember — and its own cookie jar, since cookies ignore the port. Omit for a job that does not speak HTTP.",
+            "description": "Publishes one of this job's declared ports under a name, so the worktree gets its own hostname instead of a port to remember \u2014 and its own cookie jar, since cookies ignore the port. Omit for a job that does not speak HTTP.",
             "properties": {
               "port": {
                 "type": "string",
-                "description": "Name of the port to publish. Must be one of the keys declared in `ports` above — the name, not the number: the number depends on the worktree."
+                "description": "Name of the port to publish. Must be one of the keys declared in `ports` above \u2014 the name, not the number: the number depends on the worktree."
               },
               "host": {
                 "type": "string",
@@ -83,19 +83,58 @@
           "probe": {
             "type": "boolean",
             "default": true,
-            "description": "Whether `wtm run up` checks that this job's declared ports were actually bound. Set to false to stop reporting a service that binds the base port because its command never reads the injected variable — the fix is to pass --port ${PORT} to it, and this key acknowledges the warning until then. Omitted means true."
+            "description": "Whether `wtm run up` checks that this job's declared ports were actually bound. Set to false to stop reporting a service that binds the base port because its command never reads the injected variable \u2014 the fix is to pass --port ${PORT} to it, and this key acknowledges the warning until then. Omitted means true."
           },
           "binds_no_port": {
             "type": "boolean",
             "default": false,
-            "description": "Whether this service listens on nothing by design — a build in watch mode, a worker, or a runner whose children hold the ports. Silence reads as an oversight, so `wtm run init` keeps offering a port and the report keeps naming the job; this key answers the question once. A job declaring ports must not set it."
+            "description": "Whether this service listens on nothing by design \u2014 a build in watch mode, a worker, or a runner whose children hold the ports. Silence reads as an oversight, so `wtm run init` keeps offering a port and the report keeps naming the job; this key answers the question once. A job declaring ports must not set it."
           },
           "runs": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "The declared jobs this one starts itself — a `turbo run dev` against a filter, any single process that fans out. wtm infers nothing from the command: the relation is declared here. It gives the runner its children's urls, lets the port check look at their ports, and lets wtm refuse to start a runner alongside one of its own children."
+            "description": "The declared jobs this one starts itself \u2014 a `turbo run dev` against a filter, any single process that fans out. wtm infers nothing from the command: the relation is declared here. It gives the runner its children's urls, lets the port check look at their ports, and lets wtm refuse to start a runner alongside one of its own children."
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "shared"
+            ],
+            "description": "Set to \"shared\" to run this job ONCE for the whole repository instead of once per worktree \u2014 a postgres, a keycloak. It runs in the main checkout, so it takes no port offset (a declared 5432 is the 5432 it binds everywhere) and its published URL carries no worktree segment. Other worktrees hold a claim on it, reported as status \"attached\" with pid 0; the service stops when the last claim goes. Omit for the default, one instance per worktree."
+          },
+          "namespace": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "create"
+            ],
+            "description": "The slice of a shared service this worktree gets, so each keeps its own data \u2014 a database, a set of keycloak realms. Only valid on a job with scope = \"shared\"; a shared job without one means one instance with one set of data. wtm names the slice and runs the commands below, and knows nothing else about them.",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The slice's name, which wtm substitutes {worktree} and {ordinal} into and hands to the commands as $WTM_NAMESPACE. For a postgres it is the database name \u2014 e.g. \"app_{worktree}\". wtm never interprets it; it only names what a clean is about to destroy."
+              },
+              "create": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Command run every time a worktree starts the shared service, to carve its namespace out \u2014 a CREATE DATABASE, a kcadm create realms, a script of your own. Runs as a /bin/sh line in the worktree, with its whole environment (its ports and URLs) plus $WTM_NAMESPACE, $WTM_WORKTREE and $WTM_ORDINAL. It must be safe to run again \u2014 wtm runs it on every start and never remembers having run it, so carve the slice out if it is absent and do nothing if it is already there. Retried for a while: the service was started moments earlier and may not be accepting connections yet, which is what the retries are for; a command that fails the same way every time simply fails."
+              },
+              "remove": {
+                "type": "string",
+                "description": "Command run by `wtm clean` when the worktree goes, to give the namespace back. Never run by `run stop` or `run down`: stopping is not destroying. `wtm clean --keep-data` withholds it. Same environment as create."
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Extra variables the create and remove commands read, with {worktree} and {ordinal} substituted. They reach those two commands and nothing else \u2014 to put a namespace-derived value into a worktree's .env, declare an [[env]] link."
+              }
+            }
           }
         },
         "allOf": [
@@ -153,7 +192,7 @@
     },
     "env_port": {
       "type": "array",
-      "description": "Links a .env key to a declared port. wtm rewrites the port inside that key's value for each worktree, leaving the rest of the value untouched — so a hard-coded host:port in a URL follows the worktree's offset.",
+      "description": "Links a .env key to a declared port. wtm rewrites the port inside that key's value for each worktree, leaving the rest of the value untouched \u2014 so a hard-coded host:port in a URL follows the worktree's offset.",
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -175,12 +214,46 @@
           },
           "job": {
             "type": "string",
-            "description": "The job whose port the key follows. Two jobs may each declare a PORT — their environments are separate — so the port name alone does not identify a base. Required: every port belongs to exactly one job."
+            "description": "The job whose port the key follows. Two jobs may each declare a PORT \u2014 their environments are separate \u2014 so the port name alone does not identify a base. Required: every port belongs to exactly one job."
           },
           "port": {
             "type": "string",
             "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
             "description": "The port variable declared in a job's `ports` table, whose base is looked for inside the value."
+          }
+        }
+      }
+    },
+    "env": {
+      "type": "array",
+      "description": "Links a .env key to a value wtm writes in full, from a template over what only wtm knows: the slice of a shared service this worktree holds, the ports it binds, the address it answers on. Use it where [[env_port]] cannot reach \u2014 a keycloak realm name, a database name \u2014 since a port link only ever rewrites a port inside a value it otherwise leaves alone. A key may not be written by both tables.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file",
+          "key",
+          "job",
+          "value"
+        ],
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "The .env target holding the key, as configured under [env] in .wtm.toml (e.g. \".env\", \"apps/web/.env\")."
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+            "description": "The .env key wtm writes. Its whole value is wtm's \u2014 anything a worktree's copy held there is replaced, and the reconciliation stops reporting it as drift."
+          },
+          "job": {
+            "type": "string",
+            "description": "The job the value speaks about: whose namespace {namespace} resolves to, whose ports {port.NAME} reads, whose published address {origin} is."
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template. Placeholders: {namespace} the job's slice for this worktree (needs a [job.namespace]); {port.NAME} one of the job's declared ports, shifted by the worktree's offset unless the job is shared; {origin} where the job answers by name (needs a [job.url] and a proxy); {worktree} and {ordinal}. Anything else is refused when run.toml is read, rather than written to a file as literal braces. E.g. \"{origin}/realms/{namespace}\" or \"postgresql://app:app@localhost:{port.POSTGRES_PORT}/{namespace}\"."
           }
         }
       }

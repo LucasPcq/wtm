@@ -230,6 +230,195 @@ const (
 	// project name both derive from it.
 	EnvProject = "WTM_PROJECT"
 
+	// EnvNamespace is the resolved namespace name a shared job's create and remove
+	// commands read, so they never repeat the template their config already
+	// carries.
+	EnvNamespace = "WTM_NAMESPACE"
+
+	// NamespaceToken* are the placeholders a namespace's configuration values carry.
+	// Commands read the $WTM_* variables instead: one syntax per place, never
+	// the two mixed in a single string.
+	NamespaceTokenWorktree = "{worktree}"
+	NamespaceTokenOrdinal  = "{ordinal}"
+
+	// The reasons a [job.namespace] block is refused at load.
+	NamespaceIncompleteFmt    = "job %q: a [job.namespace] block needs both a name and a create command"
+	NamespaceOnPerWorktreeFmt = `job %q: [job.namespace] only means something on a job with scope = "shared"`
+	NamespaceBadTokenFmt      = "job %q: %v"
+	UnknownScopeFmt           = "job %q: unknown scope %q (expected %q)"
+	DuplicateJobNameFmt       = "job %q is declared twice: two jobs of one name share a single key, so the second can never start"
+	// EnvValueToken* are the placeholders an [[env]] link's value carries. The
+	// vocabulary is closed: anything else is refused at load, so a typo never
+	// reaches a .env as literal braces.
+	EnvValueTokenNamespace = "{namespace}"
+	EnvValueTokenWorktree  = "{worktree}"
+	EnvValueTokenOrdinal   = "{ordinal}"
+	EnvValueTokenOrigin    = "{origin}"
+	// EnvValueTokenPortPrefix opens the one family of tokens: {port.NAME} is the
+	// job's declared port NAME, resolved for this worktree.
+	EnvValueTokenPortPrefix = "{port."
+
+	// EnvValueLinkFileRequiredFmt and friends are what a bad [[env]] link is
+	// refused with, naming the line to fix rather than the rule it broke.
+	EnvValueLinkFileRequiredFmt = "env %s: file is required"
+	EnvValueLinkValueEmptyFmt   = "env %s in %s: value is required — it is the whole point of the link"
+	EnvValueLinkBadKeyFmt       = "env in %s: %q is not a valid environment variable name"
+	EnvValueLinkNoJobFmt        = "env %s in %s: no job named %q"
+	EnvValueLinkNoNamespaceFmt  = "env %s in %s: job %q declares no [job.namespace], so {namespace} means nothing"
+	EnvValueLinkNoPortFmt       = "env %s in %s: job %q declares no port named %q"
+	EnvValueLinkTwiceFmt        = "env %s in %s is declared twice"
+	EnvValueLinkConstantFmt     = "env %s in %s: the value holds no placeholder, so every worktree would get the same one — put {namespace} where the slice belongs, or drop the link"
+	EnvValueLinkNoOriginFmt     = "env %s in %s: job %q publishes no address, so {origin} has no answer — publish a [job.url] for it, or write the host yourself"
+	EnvValueLinkBadNamespaceFmt = "env %s in %s: %v"
+	EnvValueUnclosedTokenFmt    = "env %s in %s: a {port.…} placeholder is never closed"
+	// EnvValueLinkClashesPortFmt refuses a key two tables both write. They are
+	// not complementary: an [[env]] value writes the port itself when it needs
+	// one, so a key holding both is a line to delete, not a merge to define.
+	EnvValueLinkClashesPortFmt = "%s in %s is written by both an [[env]] link and an [[env_port]] link — an [[env]] value writes its own port, so drop the [[env_port]] line"
+	// EnvValueUnknownTokenFmt names the placeholder rather than the value, since
+	// a long URL makes the offending braces hard to find.
+	EnvValueUnknownTokenFmt = "env %s in %s: unknown placeholder %s"
+
+	// NamespaceProbeWorktree expands a namespace at load with a stand-in worktree, so
+	// an unknown placeholder is named there rather than in a shell.
+	NamespaceProbeWorktree = "probe"
+
+	// NamespaceCreateTimeout bounds the retries of a namespace's create command, and
+	// NamespaceCreateInterval paces them. A shared service is asked to carve out a
+	// namespace the instant it is started, which is before postgres accepts a
+	// connection — so a first failure means "not ready yet" far more often than
+	// it means "wrong command". The budget is what keeps a genuinely wrong one
+	// from retrying for ever.
+	NamespaceCreateTimeout  = 30 * time.Second
+	NamespaceCreateInterval = time.Second
+
+	// NamespaceCreateFailedFmt names the namespace, the job and the last error a
+	// budget's worth of retries ended on.
+	NamespaceCreateFailedFmt = "job %s: could not attach namespace %s: %w (the attach runs on every start, so it must be safe to run again)"
+	NamespaceRemoveFailedFmt = "job %s: could not detach namespace %s: %w"
+	// SharedNoContextFmt is a shared job whose main checkout the client could
+	// not resolve — a bare clone, typically.
+	SharedNoContextFmt = "job %s: %w"
+
+	// PendingRemovalsFileName is the queue of namespaces a clean could not give back
+	// because the shared service holding them was down. It is a queue and not a
+	// registry: entries are only ever added by a failure and removed by a
+	// success, so it cannot drift out of step with anything.
+	PendingRemovalsFileName = "pending-removals.toml"
+
+	// FlagKeepData withholds the removal a clean would otherwise run. The default
+	// is to detach: clean is the destructive command, and destroying a worktree
+	// without its data would leave an orphan behind on every iteration.
+	FlagKeepData     = "keep-data"
+	FlagKeepDataDesc = "keep the namespaces this worktree carved out of shared services"
+
+	CleanRemovedNamespaceFmt  = "released %s from %s"
+	CleanDeferredNamespaceFmt = "%s is down: %s kept, `wtm prune` will give it back"
+	PruneSettledNamespaceFmt  = "gave back %s on %s, owed since its worktree was removed"
+
+	// ScopeStepName, Title and Desc introduce the question run init asks of each
+	// compose service.
+	ScopeStepName  = "Shared services"
+	ScopeStepTitle = "Which services run once for the whole repository?"
+	ScopeStepDesc  = "A shared service runs once instead of once per worktree — a postgres, a keycloak. Each worktree still gets its own data through a namespace. Space toggles, enter confirms."
+
+	// ScopeReasonBuild is why a service built here can never be shared: it
+	// serves this worktree's own source, whatever its name suggests.
+	ScopeReasonBuild = "built from this worktree's source"
+
+	ScopeLabelShared      = "shared"
+	ScopeLabelPerWorktree = "per worktree"
+	ScopeSummaryFmt       = "%d shared, %d per worktree"
+	ScopesSkipNoServices  = "no compose service to share"
+	ScopesSkipAllBuilt    = "every service is built from this worktree's source"
+
+	// NamespaceNameDefault is the only thing wtm proposes: a name derived from
+	// the worktree. The commands are never pre-filled — a recipe for postgres
+	// would guess the port variable, the user, the host and whether psql is even
+	// on this machine, and a wrong command that is accepted reads as a wtm bug
+	// rather than as a line to write. Same decision as the port flag of every
+	// framework, already settled in LUC-55.
+	NamespaceNameDefault = "app_{worktree}"
+
+	// The namespace step: what it asks, and what it says is available. The list
+	// of variables is built from the job's own declaration rather than written
+	// here — wtm knows the ports it injects, and nothing else.
+	NamespaceStepName  = "Shared service data"
+	NamespaceStepTitle = "What does each worktree get of these shared services?"
+	NamespaceStepDesc  = "A shared service runs once, so each worktree needs its own slice of it —\n" +
+		"a database, a set of realms. wtm names the slice and runs your commands;\n" +
+		"it never guesses them.\n" +
+		"\n" +
+		"  ● name      what this worktree's slice is called\n" +
+		"              for a postgres, the database name — e.g. app_{worktree}\n" +
+		"              {worktree} and {ordinal} are filled in by wtm, here and\n" +
+		"              nowhere else: a name is data, no shell ever sees it\n" +
+		"              → your commands read the result as $WTM_NAMESPACE, and\n" +
+		"                it is what `wtm clean` names before destroying it\n" +
+		"\n" +
+		"  ● create    run every time this worktree starts the service, so it\n" +
+		"              must be safe to run again: carve the slice out if it is\n" +
+		"              absent, do nothing if it is already there\n" +
+		"              an inline command or the path to a script — both are a\n" +
+		"              /bin/sh line run in the worktree\n" +
+		"              → leave empty to share the service outright, data included\n" +
+		"\n" +
+		"  ● remove    run by `wtm clean` when the worktree goes — never by\n" +
+		"              `run stop` or `run down`: stopping is not destroying\n" +
+		"              → leave empty to keep the slice once the worktree is gone"
+
+	EnvValueStepName  = "Shared service keys"
+	EnvValueStepTitle = "Which .env keys name each worktree's slice?"
+	EnvValueStepDesc  = "A shared service answers at one address for every worktree — that is what\n" +
+		"[[env_port]] already writes. What differs per worktree is the slice: a\n" +
+		"realm, a database. wtm cannot tell which key holds one — a realm name is\n" +
+		"just a word — so it lists the keys it manages and you point.\n" +
+		"\n" +
+		"  space     link a key, so wtm writes its whole value per worktree\n" +
+		"  enter     edit the template — it starts at {namespace}\n" +
+		"\n" +
+		"Keys already checked are the ones whose name starts with the service's,\n" +
+		"or that run.toml already links. A linked key stops being reported as\n" +
+		"drift: its value is wtm's, not the one your worktree was copied from."
+	EnvValueRowFmt       = "%s %-*s  %s"
+	EnvValueGroupFmt     = "%s · %s"
+	EnvValueCurrentFmt   = "  (now %s)"
+	EnvValueMarkOn       = "[✓]"
+	EnvValueMarkOff      = "[ ]"
+	EnvValueEmptyValue   = "—"
+	EnvValueSummaryFmt   = "%d key(s) linked"
+	EnvValueSkipNoShared = "no shared service carves out a slice"
+	EnvValueSkipNoKeys   = "no managed .env key to link"
+	EnvValueEmptyErr     = "a linked key needs a template; {namespace} is the usual one"
+	// EnvValueConstantErr refuses a template that never varies. The field is
+	// pre-filled with the value on disk so a long URL is edited rather than
+	// retyped, which makes "accepted unchanged" the easy mistake to make.
+	EnvValueConstantErr = "this template never changes, so every worktree would get the same value — put {namespace} where the slice belongs"
+	EnvValueNowFmt      = "now  %s"
+	EnvValueEditHelp    = "enter save · esc cancel"
+	EnvValueHelpLink    = "space link"
+
+	NamespaceRowFmt      = "%-*s  %-7s  %s"
+	NamespaceRowEditFmt  = "%-*s  %-7s  %s"
+	NamespaceEmptyValue  = "—"
+	NamespaceVarsHeading = "available"
+	NamespaceVarWorktree = "worktree"
+	// NamespaceVarSubstituted labels the placeholders wtm replaces in a value it
+	// never runs, as against the environment variables a shell expands in a
+	// command. The two are not two spellings of one thing: nothing would expand
+	// $WTM_WORKTREE in a name, since no shell ever sees it.
+	NamespaceVarSubstituted = "substituted"
+	NamespaceVarPorts       = "ports"
+	NamespaceVarRowFmt      = "%-*s  %s"
+	NamespaceVarSep         = "  "
+	// NamespaceVarIndent sets the group rows in under the heading, and the wrap
+	// of a long group in under its own first variable.
+	NamespaceVarIndent    = "  "
+	NamespaceNameEmptyErr = "a namespace needs a name; it is what clean says it is about to destroy"
+	NamespaceEditHelp     = "enter save · esc cancel"
+	NamespaceSummaryFmt   = "%d of %d configured"
+	NamespaceSkipNoShared = "no shared service to carve up"
+
 	// MainWorktreeOrdinal is never persisted: the main worktree has no meta.json,
 	// so 0 in a linked worktree's metadata means "not allocated yet".
 	MainWorktreeOrdinal = 0
@@ -473,6 +662,8 @@ const (
 
 	// The docker-compose keys wtm reads.
 	ComposeServicesKey      = "services"
+	ComposeImageKey         = "image"
+	ComposeBuildKey         = "build"
 	ComposePortsKey         = "ports"
 	ComposePublishedKey     = "published"
 	ComposeTargetKey        = "target"
@@ -1065,6 +1256,13 @@ const (
 	KindListSummaryFmt = "%d services, %d tasks"
 	KindListGap        = 2
 
+	// ScopeList* mirror the KindList shape: the service on the left, its two
+	// scopes as a radio pair on the right. A fixed row shows its reason in place
+	// of the pair, since there is no answer to give.
+	ScopeListEntryFmt  = "%s — %s"
+	ScopeListRadiosFmt = "%s per worktree   %s shared"
+	ScopeListFixedFmt  = "per worktree — %s"
+
 	// Why a wizard step was never put. An auto-skipped step leaves this line in
 	// the recap: a step that vanishes silently while the counter jumps over it
 	// reads as a bug.
@@ -1480,6 +1678,15 @@ const (
 
 	// Job action result statuses emitted by `run *` JSON output.
 	JobActionStarted = "started"
+	// JobActionAttached is a worktree joining a shared service rather than
+	// starting one. Reporting "started" in three worktrees read as three
+	// services, which is the misreading this whole feature has to avoid.
+	JobActionAttached = "attached"
+	// SharedJobTag marks a job that runs once for the repository wherever jobs
+	// are listed. Rendered like any other, it read as one service per worktree —
+	// and the declared ports beside it would be read as shifting, which they do
+	// not.
+	SharedJobTag     = "shared"
 	JobActionStopped = "stopped"
 	JobActionDone    = "done"
 	JobActionError   = "error"
@@ -1916,7 +2123,11 @@ const (
 	// RunViewMarkDetached differs in shape rather than in colour: a detached
 	// service is up like a running one, but nothing about it can be attached.
 	RunViewMarkDetached = "◆"
-	RunViewMarkCrashed  = "✗"
+	// RunViewMarkShared says one instance serves every worktree: the same colour
+	// as running, since it is running, and a shape of its own so a reader does
+	// not count one service per worktree.
+	RunViewMarkShared  = "◈"
+	RunViewMarkCrashed = "✗"
 
 	// RunViewPaneWaiting and RunViewPaneNoHistory stand in
 	// for a pane with nothing in it yet, and RunViewPane*Label say where what is
@@ -2530,8 +2741,13 @@ const (
 	CleanWillDelete         = "Will delete:"
 	CleanWillDeleteWorktree = "  worktree  "
 	CleanWillDeleteBranch   = "  branch    "
-	CleanRecapReparentFmt   = "Then reparent %d child worktree(s) onto %s."
-	CleanRecapOrphanFmt     = "Then leave %d child worktree(s) orphaned."
+	// CleanWillDeleteNamespaceFmt names the data a clean gives back, one line per
+	// shared service. A recap that stayed silent about a DROP DATABASE told the
+	// reader they were removing a worktree and nothing else.
+	CleanWillDeleteNamespaceFmt = "  data      %s in %s"
+	CleanKeepDataLine           = "  data      kept (--keep-data)"
+	CleanRecapReparentFmt       = "Then reparent %d child worktree(s) onto %s."
+	CleanRecapOrphanFmt         = "Then leave %d child worktree(s) orphaned."
 	// CleanBlockerDirty, CleanBlockerUnpushed and CleanBlockerOpenPR key the
 	// removal refusals a surface lists one by one (rules.CleanBlockers).
 	CleanBlockerDirty    = "dirty"
@@ -3206,6 +3422,7 @@ const (
 	HelpMerge     = "f merge"
 	HelpNew       = "n new"
 	HelpSetKind   = "←→ set type"
+	HelpSetScope  = "←→ set scope"
 	HelpSetRunner = "←→ set runner"
 
 	// The runner step: which root-level service starts each of the others. The
@@ -3452,7 +3669,13 @@ var WtmOwnedEnvKeys = []string{EnvComposeProjectName}
 // ComposeCmdSpaced and ComposeCmdHyphened are the two spellings a job's command
 // uses to drive compose, and how wtm recognizes the stack's project directory.
 const (
-	ComposeCmdSpaced   = "docker compose"
+	ComposeCmdSpaced = "docker compose"
+	// ComposeNoDeps keeps a file's own job from raising the services lifted out
+	// of it. `up -d a b c` also starts whatever a, b or c depends_on, so an
+	// adminer depending on a shared postgres brought a second postgres up, per
+	// worktree, on the very port the shared one binds. Safe because every
+	// service that stayed is named explicitly.
+	ComposeNoDeps      = "--no-deps "
 	ComposeCmdHyphened = "docker-compose"
 )
 

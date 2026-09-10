@@ -46,7 +46,7 @@ func TestDecideRunSurface(t *testing.T) {
 			want:   domain.RunSurfaceMachine,
 		},
 		{
-			name:   "json wins over the detach flag",
+			name:   "json wins over the removal flag",
 			params: RunSurfaceParams{Detach: true, TTY: true, Format: domain.OutputJSON},
 			want:   domain.RunSurfaceMachine,
 		},

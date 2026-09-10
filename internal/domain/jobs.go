@@ -16,6 +16,26 @@ const (
 	JobKindTask JobKind = "task"
 )
 
+// JobScope says whether a job has one instance per worktree or one for the
+// whole repository. Empty is per-worktree, which keeps every run.toml written
+// before this existed reading unchanged.
+type JobScope string
+
+const (
+	JobScopePerWorktree JobScope = ""
+	JobScopeShared      JobScope = "shared"
+)
+
+// JobNamespaceConfig is the worktree's slice of a shared service. It names one
+// namespace and never a list: four keycloak realms are one namespace, whose internal
+// shape belongs to the create script rather than to wtm.
+type JobNamespaceConfig struct {
+	Name   string            `toml:"name"             json:"name"`
+	Create string            `toml:"create,omitempty" json:"create,omitempty"`
+	Remove string            `toml:"remove,omitempty" json:"remove,omitempty"`
+	Env    map[string]string `toml:"env,omitempty"    json:"env,omitempty"`
+}
+
 // JobURLConfig is a job's [[job]].url table: which of its declared ports speaks
 // HTTP, and the host label it is published under. Port names a key of Ports, not
 // a number — the number depends on the worktree, only the declaration is stable.
@@ -79,6 +99,10 @@ type JobConfig struct {
 	// that fans out. wtm learns nothing about the runner from it: the relation
 	// is declared, never inferred from the command.
 	Runs []string `toml:"runs,omitempty" json:"runs,omitempty"`
+	// A nil Namespace on a shared job means shared for good: one instance, one set
+	// of data.
+	Scope     JobScope            `toml:"scope,omitempty"     json:"scope,omitempty"`
+	Namespace *JobNamespaceConfig `toml:"namespace,omitempty" json:"namespace,omitempty"`
 }
 
 // JobURLChoice is one job's answer to "should this be reachable by name": the
@@ -135,6 +159,9 @@ type RunConfig struct {
 	// EnvPorts links a .env key to one of the ports declared above, so a value
 	// holding a hard-coded host port follows the worktree's offset.
 	EnvPorts []EnvPortLink `toml:"env_port,omitempty" json:"env_port,omitempty"`
+	// EnvValues are the .env keys wtm writes in full, from a template. They say
+	// what this worktree holds of a shared service, which no port can express.
+	EnvValues []EnvValueLink `toml:"env,omitempty" json:"env,omitempty"`
 	// Addressing is what those links write. Empty means AddressingNames: a
 	// project that publishes names wants its .env values to reach them, and one
 	// that publishes none is unaffected either way.
@@ -164,6 +191,10 @@ const (
 	// a weaker "running": nothing was ever verified, before or after a daemon
 	// restart, and there is no stream to attach to.
 	JobStatusDetached JobStatus = "detached"
+	// JobStatusAttached is a worktree's claim on a shared service running under
+	// the main checkout's key. It owns no process: it is the pointer that keeps
+	// the real job alive, which is what makes the job table the reference count.
+	JobStatusAttached JobStatus = "attached"
 )
 
 // JobRoute is one name the proxy serves a started job under: the job the name
@@ -198,6 +229,64 @@ type JobRecord struct {
 	Routes    []JobRoute        `json:"routes,omitempty"`
 	LogDir    string            `json:"log_dir,omitempty"`
 	StartedAt time.Time         `json:"started_at,omitzero"`
+	// Attached says this entry is a worktree's claim on a shared service rather
+	// than a process of its own. It is a fact about what the entry is, not a
+	// process state: without it a claim would come back from the index as a
+	// foreground service the daemon had lost, and be reported crashed.
+	Attached bool `json:"attached,omitempty"`
+	// SharedDir is the main checkout a shared job runs in, carried by the real
+	// job and by every claim on it. Without it the two would have to be paired
+	// by name, and the daemon is machine-wide: two repositories declaring a job
+	// called "db" would then release each other's.
+	SharedDir string `json:"shared_dir,omitempty"`
+}
+
+// NamespaceRef is one worktree's slice of one shared service, named by what it
+// takes to recompute it: run.toml still holds the template, so an entry keeps
+// only what the worktree itself contributed.
+type NamespaceRef struct {
+	Job      string `toml:"job"      json:"job"`
+	Worktree string `toml:"worktree" json:"worktree"`
+	Ordinal  int    `toml:"ordinal"  json:"ordinal"`
+}
+
+// NamespaceField is one editable line of the namespace step: which job it
+// belongs to, which of the three fields it is, and what has been typed. Vars are
+// the variables that field's command may read — the worktree's own plus the
+// ports THIS job declares, under the names it declares them by, so nothing has
+// to be guessed at.
+type NamespaceField struct {
+	Job   string
+	Field NamespaceFieldKind
+	Value string
+	Vars  []NamespaceVarGroup
+}
+
+// NamespaceVarGroup is one labelled row of the variables a command may read.
+// They are grouped by where they come from — the worktree, then this job's own
+// ports — because a single run-on line stops being readable as soon as a job
+// declares more than one port.
+type NamespaceVarGroup struct {
+	Label string
+	Vars  []string
+}
+
+// NamespaceFieldKind is which of a namespace's three inputs a line carries.
+type NamespaceFieldKind string
+
+const (
+	NamespaceFieldName   NamespaceFieldKind = "name"
+	NamespaceFieldCreate NamespaceFieldKind = "create"
+	NamespaceFieldRemove NamespaceFieldKind = "remove"
+)
+
+// SharedJobContext is what a shared job needs and only the client can resolve:
+// the main checkout it runs in, and that checkout's own environment and log
+// directory rather than those of the worktree asking for it.
+type SharedJobContext struct {
+	WorkDir string            `json:"work_dir"`
+	Env     map[string]string `json:"env,omitempty"`
+	LogDir  string            `json:"log_dir,omitempty"`
 }
 
 // DaemonState is the index as it sits on disk.

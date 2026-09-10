@@ -143,7 +143,12 @@ flagged; everything else is what the name implies.
   source. The response adds `existing_branch: true` and `origin_state`
   (`up-to-date`/`behind`/`ahead`/`diverged`) so you can tell reuse from creation.
 - `wtm clean <branch>` / `wtm prune [filters]` — remove one / batch-remove finished
-  worktrees. **In JSON mode surviving children are left orphaned unless you pass
+  worktrees. **`clean` also gives back the namespaces that worktree carved out of shared
+  services** (it drops its database): pass `--keep-data` to withhold that, including under
+  `--yes`; the interactive recap names each database it will drop. Only worktrees that
+  actually started the shared job owe anything — one created and thrown away owes nothing.
+  If the shared service is down the drop is deferred, and the next `wtm prune` settles it
+  once the service is up again. **In JSON mode surviving children are left orphaned unless you pass
   `--reparent-children`** (they reparent onto the grandparent). `prune` decides "finished"
   from **GitHub PR state via the `gh` CLI** (not local commits): `--merged` = PR merged,
   `--closed` = PR closed without merging, `--gone` = remote branch deleted; no filter = all
@@ -281,9 +286,43 @@ and **experimental**: the global `wtm init` does not configure it.
   `16` (run module not initialized) until at least one job/profile is declared. Non-TTY it
   auto-generates and **removes nothing**. `run job add` / `run profile add` also work before
   init (they create the first job).
+- **A job may be shared across worktrees.** `scope = "shared"` in `run.toml` makes it run
+  **once for the whole repository**, in the main checkout, instead of once per worktree — a
+  postgres, a keycloak. Consequences you must expect: it takes **no port offset** (its
+  declared port is the port it binds, in every worktree), its published URL carries **no
+  worktree segment** (`db.projet.localhost`, not `db.feat-x.projet.localhost`), and its logs
+  are the same stream whichever worktree you read them from. In `run ps` / `--output json`
+  the worktrees holding it report status **`attached`** with `pid: 0`: that is a claim on the
+  one running instance, not a second process — never count one service per worktree from it.
+  Starting one from a worktree other than the main checkout reports `attached`, not `started`.
+  `run stop` in a worktree releases only that worktree's claim; the service itself stops when
+  the last one goes.
+- **A shared job may carve out a namespace per worktree.** `[job.namespace]` names it (`name`,
+  `create`, `remove`, `env`) so each worktree keeps its own data — a database, a set of
+  keycloak realms. wtm runs the declared commands and knows nothing else about them; they get
+  the worktree's whole environment plus `$WTM_NAMESPACE`, `$WTM_WORKTREE`, `$WTM_ORDINAL`.
+  `create` runs on **every** start of the shared service, so it must be safe to run again —
+  wtm keeps no record of having run it. A `create` that fails when the slice already exists
+  fails the run.
+  Configuration values use `{worktree}` / `{ordinal}`; commands use the `$WTM_*` variables.
+  A shared job with **no** `[job.namespace]` is valid and means one instance with one set of data.
+- **`[[env]]` is how a slice reaches the app.** `[[env_port]]` rewrites the port *inside* a
+  value and leaves the rest alone — it says where a service answers. `[[env]]` writes a key's
+  **whole** value from a template, which is the only way to express something opaque like a
+  realm or a database name: `file`, `key`, `job`, `value`, where value draws on `{namespace}`,
+  `{port.NAME}`, `{origin}`, `{worktree}`, `{ordinal}` and nothing else. A shared service has
+  one address for every worktree, so its URL stays an `[[env_port]]` while its realm becomes an
+  `[[env]]`. A key written by both tables is refused when `run.toml` is read, as is a
+  placeholder outside the list. wtm owns an `[[env]]` key's line: a worktree's own value there
+  is replaced, and `wtm env` never reports it as drift.
+  `run init` asks for the three fields; wtm proposes only the name and never a command,
+  so `create`/`remove` are always the project's own — inline or a script path.
 - **Re-running `run init` is symmetric.** Every step is pre-filled from the existing
   `run.toml`: what stays checked is kept, and what you uncheck is **removed** along with the
-  profile entries and `[[env_port]]` links naming it — a profile left with no job goes too.
+  profile entries and `[[env_port]]` / `[[env]]` links naming it — a profile left with no job
+  goes too. The `[[env]]` step lists every managed .env key and pre-checks those named after a
+  shared service; a key whose value carries that service's port is left to `[[env_port]]`, and
+  marking a key the port table already writes moves it rather than declaring it twice.
   Only jobs the wizard itself proposed can be removed: one added with `run job add` appears
   in no detected list, so it is never touched. The same symmetry holds for the URLs step (a
   job you unpublish stays unpublished) and the profiles step (deleting them all keeps them

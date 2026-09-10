@@ -116,6 +116,15 @@ func declareComposePort(params declareComposePortParams) {
 type BackfillDockerPortsParams struct {
 	Config      domain.RunConfig
 	PortsByFile map[string]map[string]int
+	// Declared keeps the bindings behind PortsByFile, which is what says
+	// *which service* declares each variable. It is only needed once a service
+	// has been lifted out of its file: the lifted job and the file's own job
+	// both carry the same `-f <file>` flag, so without it each would receive
+	// every port of the file and the two would collide on all of them.
+	Declared map[string][]domain.ComposePortBinding
+	// Shared are the services lifted out, so a port goes to the job that
+	// actually binds it.
+	Shared []domain.SharedComposeService
 }
 
 type BackfillDockerPortsResult struct {
@@ -142,11 +151,16 @@ func BackfillDockerPorts(params BackfillDockerPortsParams) BackfillDockerPortsRe
 		ports := params.PortsByFile[file]
 		needle := DockerComposeFileFlag(file)
 
+		owners := portOwners(portOwnersParams{Params: params, File: file})
+
 		for i, job := range result.Config.Jobs {
 			if !jobRunsComposeFile(job, needle) {
 				continue
 			}
 			for _, name := range sortedPortNames(ports) {
+				if !portBelongsTo(portBelongsParams{Owners: owners, Var: name, Job: job}) {
+					continue
+				}
 				if _, declared := result.Config.Jobs[i].Ports[name]; declared {
 					continue
 				}
@@ -287,4 +301,55 @@ func RemoveDroppedPorts(params RemoveDroppedPortsParams) map[string]map[string]i
 		}
 	}
 	return out
+}
+
+type portOwnersParams struct {
+	Params BackfillDockerPortsParams
+	File   string
+}
+
+// portOwners names, for each variable of one file, the lifted job that owns it —
+// empty meaning the file's own job keeps it. Nil when the file lifted nothing,
+// which is the case every project had before sharing existed and which must
+// keep behaving exactly as it did.
+func portOwners(params portOwnersParams) map[string]string {
+	lifted := map[string]bool{}
+	for _, shared := range params.Params.Shared {
+		if shared.File == params.File {
+			lifted[shared.Service] = true
+		}
+	}
+	if len(lifted) == 0 {
+		return nil
+	}
+
+	owners := map[string]string{}
+	for _, binding := range params.Params.Declared[params.File] {
+		if !lifted[binding.Service] {
+			continue
+		}
+		owners[binding.Var] = binding.Service
+	}
+	return owners
+}
+
+type portBelongsParams struct {
+	Owners map[string]string
+	Var    string
+	Job    domain.JobConfig
+}
+
+// portBelongsTo keeps a lifted service's ports on its own job and the rest on
+// the file's. Without it both jobs declared every port of the file at the same
+// base, which reads as a collision on every one of them and has the whole file
+// pruned of its ports.
+func portBelongsTo(params portBelongsParams) bool {
+	if params.Owners == nil {
+		return true
+	}
+	owner, lifted := params.Owners[params.Var]
+	if !lifted {
+		return params.Job.Scope != domain.JobScopeShared
+	}
+	return params.Job.Name == owner
 }

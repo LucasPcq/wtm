@@ -101,7 +101,34 @@ func ResolveDetectedPorts(params ResolveDetectedPortsParams) DetectedPortsOutcom
 		Conflicts: conflicts,
 	})...)
 
-	backfilled := BackfillDockerPorts(BackfillDockerPortsParams{Config: merged, PortsByFile: ports})
+	// Applied to the merged config, not only to the jobs just built: a re-init
+	// never rebuilds a compose file that already has a job, so the scope answers
+	// would otherwise reach nothing at all.
+	merged = ApplySharedServices(ApplySharedServicesParams{
+		Config:     merged,
+		Shared:     params.Answers.SharedServices,
+		Asked:      params.Answers.ScopesAsked,
+		Scans:      params.Answers.Scans,
+		Bindings:   params.Plan.Declared,
+		ComposeCmd: params.Answers.DockerComposeCmd,
+	})
+
+	// After the namespaces are settled and before the ports are backfilled: a
+	// link reads the slice the step above just named, and may take an
+	// [[env_port]] off a key it now writes in full.
+	merged = ApplyEnvValues(ApplyEnvValuesParams{
+		Config:  merged,
+		Values:  params.Answers.EnvValues,
+		Asked:   params.Answers.EnvValuesAsked,
+		Offered: params.Answers.EnvValuesOffered,
+	})
+
+	backfilled := BackfillDockerPorts(BackfillDockerPortsParams{
+		Config:      merged,
+		PortsByFile: ports,
+		Declared:    params.Plan.Declared,
+		Shared:      params.Answers.SharedServices,
+	})
 	fromEnv := BackfillScriptPorts(BackfillScriptPortsParams{
 		Config:         backfilled.Config,
 		PackageManager: params.PackageManager,

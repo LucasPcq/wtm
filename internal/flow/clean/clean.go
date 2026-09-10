@@ -10,6 +10,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
+	"github.com/LucasPcq/wtm/internal/service/runconfig"
+	"github.com/LucasPcq/wtm/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/internal/service/shell"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
@@ -24,6 +26,11 @@ type Request struct {
 	// prompt it opens belongs to sudo and takes the terminal, so only a surface
 	// that can hand it over sets this.
 	AllowPrivileged bool
+	// KeepData withholds the namespaces this worktree carved out of shared
+	// services. The default is to give them back: clean is the destructive
+	// command, and removing a worktree without its data would leave an orphan
+	// database behind on every iteration.
+	KeepData bool
 }
 
 type Outcome struct {
@@ -145,6 +152,7 @@ func (f *cleanFlow) remove(p removeParams) (Outcome, error) {
 	insideRemoved := worktreePath != "" && cwd != "" &&
 		rules.IsPathWithin(flow.ResolveSymlinks(worktreePath), flow.ResolveSymlinks(cwd))
 
+	f.removeNamespaces(params.Branch)
 	f.stopServices(params.Branch)
 
 	// Hooks run as their own phase before the removal, so they don't fight the
@@ -211,6 +219,72 @@ func (f *cleanFlow) purgeJobLogs(branch string) {
 		StateDir: f.ctx.StateDir,
 		Branch:   branch,
 	}))
+}
+
+// removeNamespaces gives back what this worktree carved out of the shared
+// services, before stopServices releases its claims: a claim released may be
+// the last one, and a namespace cannot be given back to a service that is down.
+func (f *cleanFlow) removeNamespaces(branchName string) {
+	if f.request.KeepData {
+		return
+	}
+	cfg, err := runconfig.Load(f.ctx.StateDir)
+	if err != nil || len(cfg.Jobs) == 0 {
+		return
+	}
+	wt, err := worktree.FindByBranch(worktree.FindByBranchParams{
+		ProjectDir: f.ctx.ProjectDir,
+		Branch:     branchName,
+	})
+	if err != nil {
+		return
+	}
+	env, err := worktree.JobEnv(worktree.JobEnvParams{
+		ProjectDir: f.ctx.ProjectDir,
+		StateDir:   f.ctx.StateDir,
+		Dir:        wt.Path,
+	})
+	if err != nil {
+		return
+	}
+
+	// Only what this worktree actually carved out. A worktree created and thrown
+	// away without ever starting the stack owes nothing, and running its detach
+	// would be a DROP DATABASE on a database that never existed.
+	held := worktree.NamespacesOf(worktree.ParentBranchParams{StateDir: f.ctx.StateDir, Branch: branchName})
+	if len(held) == 0 {
+		return
+	}
+
+	result := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
+		Config:  rules.JobsHeld(cfg, held),
+		Env:     env,
+		WorkDir: wt.Path,
+		Up:      rules.SharedJobsUp(rules.SharedJobsUpParams{Jobs: runjobs.Load(), Config: cfg}),
+	})
+	f.reportNamespaces(result)
+
+	if err := runjobs.QueueRemovals(runjobs.QueueRemovalsParams{StateDir: f.ctx.StateDir, Refs: result.Deferred}); err != nil {
+		f.presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: err.Error()})
+	}
+}
+
+func (f *cleanFlow) reportNamespaces(result runjobs.RemoveNamespacesResult) {
+	for _, ref := range result.Released {
+		f.presenter.Status(flow.Notice{
+			Kind: flow.NoticeSuccess,
+			Text: fmt.Sprintf(domain.CleanRemovedNamespaceFmt, ref.Worktree, ref.Job),
+		})
+	}
+	for _, ref := range result.Deferred {
+		f.presenter.Status(flow.Notice{
+			Kind: flow.NoticeWarning,
+			Text: fmt.Sprintf(domain.CleanDeferredNamespaceFmt, ref.Job, ref.Worktree),
+		})
+	}
+	for _, err := range result.Errs {
+		f.presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: err.Error()})
+	}
 }
 
 func (f *cleanFlow) stopServices(branchName string) {

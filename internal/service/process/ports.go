@@ -16,7 +16,7 @@ func jobPorts(job domain.JobConfig, env map[string]string) map[string]int {
 	if err != nil {
 		offset = 0
 	}
-	return rules.JobPorts(rules.JobPortsParams{Ports: job.Ports, PortOffset: offset})
+	return rules.JobPorts(rules.JobPortsParams{Ports: job.Ports, PortOffset: offset, Scope: job.Scope})
 }
 
 func withJobPorts(job domain.JobConfig, env map[string]string) map[string]string {

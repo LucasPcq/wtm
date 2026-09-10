@@ -153,9 +153,10 @@ type runFile struct {
 	Addressing       domain.Addressing  `toml:"addressing,omitempty"`
 	Concurrency      domain.Concurrency `toml:"concurrency,omitempty"`
 
-	Jobs     []domain.JobConfig     `toml:"job"`
-	Profiles []domain.ProfileConfig `toml:"profile,omitempty"`
-	EnvPorts []domain.EnvPortLink   `toml:"env_port,omitempty"`
+	Jobs      []domain.JobConfig     `toml:"job"`
+	Profiles  []domain.ProfileConfig `toml:"profile,omitempty"`
+	EnvPorts  []domain.EnvPortLink   `toml:"env_port,omitempty"`
+	EnvValues []domain.EnvValueLink  `toml:"env,omitempty"`
 }
 
 func runFileOf(cfg domain.RunConfig) runFile {
@@ -165,6 +166,7 @@ func runFileOf(cfg domain.RunConfig) runFile {
 		Jobs:        cfg.Jobs,
 		Profiles:    cfg.Profiles,
 		EnvPorts:    cfg.EnvPorts,
+		EnvValues:   cfg.EnvValues,
 	}
 	if cfg.PortOffsetBlock != 0 {
 		file.PortOffsetBlock = &cfg.PortOffsetBlock

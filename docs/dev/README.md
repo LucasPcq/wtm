@@ -15,6 +15,7 @@ code as delivered, not the design that preceded it.
 | [adding-a-mutation-command.md](adding-a-mutation-command.md) | End-to-end recipe for a new worktree-mutating command |
 | [output.md](output.md) | What a command prints: the one question a block has to answer, the frame and the accent bar, the four levels, the two shapes of a conclusion, the glyph vocabulary, `--quiet` |
 | [run-addressing.md](run-addressing.md) | Named URLs: proxy vs redirection vs public port, and what `addressing` writes into a `.env` |
+| [shared-services.md](shared-services.md) | `scope = "shared"`: one instance for the repository, one namespace per worktree, and why the job table is the reference count |
 
 For the coding standards themselves (immutability, struct params, constants, comment
 density), see [`CLAUDE.md`](../../CLAUDE.md) and the `go-cli` skill in

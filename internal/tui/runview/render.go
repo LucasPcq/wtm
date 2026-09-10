@@ -207,6 +207,8 @@ func renderMark(mark domain.JobMark) string {
 		return styles.Success.Render(domain.RunViewMarkRunning)
 	case domain.JobMarkDetached:
 		return styles.Success.Render(domain.RunViewMarkDetached)
+	case domain.JobMarkShared:
+		return styles.Success.Render(domain.RunViewMarkShared)
 	case domain.JobMarkDone:
 		return styles.Success.Render(domain.RunViewMarkDone)
 	case domain.JobMarkCrashed:

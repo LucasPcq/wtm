@@ -279,11 +279,11 @@ func TestServiceStartGivesUpOnTheDaemonWhenTheRunDetaches(t *testing.T) {
 	select {
 	case err := <-answered:
 		if !errors.Is(err, context.Canceled) {
-			t.Fatalf("Start after the detach: %v, want context.Canceled", err)
+			t.Fatalf("Start after the removal: %v, want context.Canceled", err)
 		}
 	case <-time.After(2 * time.Second):
 		// Held on the socket read, with its goroutine, its connection and its
 		// buffer, until the task the user walked away from ends.
-		t.Fatal("Start held on to the daemon after the detach")
+		t.Fatal("Start held on to the daemon after the removal")
 	}
 }

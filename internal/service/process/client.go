@@ -231,7 +231,7 @@ func afterResponseDelimiter(held []byte) []byte {
 	return bytes.TrimPrefix(held, []byte("\n"))
 }
 
-// prefixedConn replays what the decoder read past the attach response before
+// prefixedConn replays what the decoder read past the create command response before
 // the rest of the connection. The daemon writes the job's buffered history
 // right behind that response, so a single read commonly carries both, and
 // whatever the decoder kept would otherwise be dropped with it.
