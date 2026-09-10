@@ -113,3 +113,26 @@ func TestBarredCarriageReturnRemarksTheRow(t *testing.T) {
 		t.Fatalf("bar over a redrawn row = %q, want %q", buf.String(), want)
 	}
 }
+
+// A surface that has to know whether it may repaint reads the stream, not the
+// wrapper: a hook phase handed a barred writer would otherwise decide it was
+// writing to a pipe and stream its whole output instead of a tail.
+func TestUnwrapStream_ReadsThroughTheBar(t *testing.T) {
+	var buf bytes.Buffer
+
+	stream, barred := unwrapStream(Barred(&buf))
+	if barred {
+		t.Errorf("a non-terminal is handed back unwrapped, so nothing reports a bar")
+	}
+	if stream != io.Writer(&buf) {
+		t.Errorf("unwrapStream returned %T, want the buffer underneath", stream)
+	}
+
+	stream, barred = unwrapStream(&barWriter{w: &buf})
+	if !barred {
+		t.Errorf("a barred writer must report the column its bar takes")
+	}
+	if stream != io.Writer(&buf) {
+		t.Errorf("unwrapStream returned %T, want the buffer underneath", stream)
+	}
+}

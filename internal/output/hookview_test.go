@@ -188,3 +188,34 @@ func TestHookViewMeasuresATabAsTheColumnsItTakes(t *testing.T) {
 		t.Errorf("ExpandTabs(%q) = %q, want the tab spelled out", "a\tb", got)
 	}
 }
+
+// A phase drawn inside a block bars the lines it keeps, and nothing else. The
+// cursor moves must reach the terminal untouched: a bar written before one lands
+// on the row the cursor is about to leave, survives the erase below it, and
+// leaves every repaint one column off.
+func TestHookViewBarsTheLinesItKeepsAndNotTheCursorMoves(t *testing.T) {
+	var buf bytes.Buffer
+	view := NewHookView(HookViewParams{W: &buf})
+	view.line = &barWriter{w: &buf, atLineStart: true}
+
+	view.OnHook(domain.HookBeat{Cmd: "pnpm install", Started: true})
+	_, _ = view.Write([]byte("resolving\n"))
+	if !strings.Contains(buf.String(), domain.AccentBarGlyph) {
+		t.Errorf("the phase drew no bar: %q", buf.String())
+	}
+
+	buf.Reset()
+	view.OnHook(domain.HookBeat{Cmd: "pnpm install"})
+	got := buf.String()
+
+	escape := strings.Index(got, "\x1b[")
+	if escape < 0 {
+		t.Fatalf("the tail was never erased: %q", got)
+	}
+	if strings.Contains(got[:escape], domain.AccentBarGlyph) {
+		t.Errorf("a bar was drawn before the cursor move: %q", got)
+	}
+	if !strings.Contains(got[escape:], domain.AccentBarGlyph) {
+		t.Errorf("the result line that survives must carry the bar: %q", got)
+	}
+}

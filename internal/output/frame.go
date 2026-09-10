@@ -94,3 +94,9 @@ func (b *barWriter) Write(p []byte) (int, error) {
 	}
 	return len(p), nil
 }
+
+// Unwrap gives back the writer underneath the bar, so a caller that has to know
+// what it is really writing to — is it a terminal, how wide is it — reads the
+// file rather than the wrapper. Without it a barred hook phase would decide it
+// was writing to a pipe and stream its whole output instead of a tail.
+func (b *barWriter) Unwrap() io.Writer { return b.w }

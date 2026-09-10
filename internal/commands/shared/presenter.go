@@ -21,10 +21,44 @@ type CLIPresenter struct {
 	// human means the output is meant for a person: progress is animated and the
 	// hook phase gets its title.
 	Human bool
+	// opened says the mid-run block already carries its frame. It is a pointer
+	// because a presenter is copied by value into each command's own, and the
+	// block is one across all of them.
+	opened *bool
 }
 
 func NewPresenter(cmd *cobra.Command, format string) CLIPresenter {
-	return CLIPresenter{Cmd: cmd, Format: format, Human: rules.IsHumanFormat(format)}
+	return CLIPresenter{Cmd: cmd, Format: format, Human: rules.IsHumanFormat(format), opened: new(bool)}
+}
+
+// phase is where everything a run says while it is still running goes: the hook
+// phases and the status lines. They used to write straight to stderr, which left
+// them the only human output of a migrated command outside the accent bar — and
+// what a hook phase leaves behind is kept, so it belongs inside it.
+//
+// The block opens on its first line and is closed by whoever writes next: every
+// terminal block in the tree, the error path included, opens with its own blank
+// line. separate asks for the blank that sets a titled section apart from the
+// lines above it; a bare status line takes none.
+func (p CLIPresenter) phase(separate bool) io.Writer {
+	p.openPhase(separate)
+	return output.Barred(p.Cmd.ErrOrStderr())
+}
+
+// openPhase is phase for a caller that draws on the raw stream itself — the hook
+// phase, whose cursor moves cannot go through the bar.
+func (p CLIPresenter) openPhase(separate bool) {
+	stderr := p.Cmd.ErrOrStderr()
+	if p.opened != nil && *p.opened {
+		if separate {
+			output.Blank(output.Barred(stderr))
+		}
+		return
+	}
+	output.FrameStart(stderr)
+	if p.opened != nil {
+		*p.opened = true
+	}
 }
 
 func (p CLIPresenter) Stage(params flow.StageParams) error {
@@ -36,9 +70,13 @@ func (p CLIPresenter) Stage(params flow.StageParams) error {
 }
 
 func (p CLIPresenter) HookPhase(params flow.HookPhaseParams) error {
+	if p.Human {
+		p.openPhase(true)
+	}
 	return DrawHookPhase(DrawHookPhaseParams{
 		Stderr:  p.Cmd.ErrOrStderr(),
 		Human:   p.Human,
+		Bar:     p.Human,
 		Title:   params.Title,
 		LogPath: params.LogPath,
 		Run:     params.Run,
@@ -49,7 +87,11 @@ type DrawHookPhaseParams struct {
 	Stderr io.Writer
 	// Human titles the phase and lets it be collapsed; a JSON run gets the raw
 	// stream and no title.
-	Human   bool
+	Human bool
+	// Bar draws the phase inside the accent bar of an already-open block. Only a
+	// surface that opened one sets it: a bar with no frame around it is half a
+	// block.
+	Bar     bool
 	Title   string
 	LogPath string
 	Run     func(flow.HookSink) error
@@ -81,12 +123,16 @@ func DrawHookPhase(params DrawHookPhaseParams) error {
 		return params.Run(flow.HookSink{Output: stream})
 	}
 
-	output.HooksSection(params.Stderr, params.Title)
+	titled := params.Stderr
+	if params.Bar {
+		titled = output.Barred(params.Stderr)
+	}
+	output.SectionTitle(titled, params.Title)
 	if !output.IsTerminal(params.Stderr) {
 		return params.Run(flow.HookSink{Output: stream})
 	}
 
-	view := output.NewHookView(output.HookViewParams{W: params.Stderr, Log: log, LogPath: params.LogPath})
+	view := output.NewHookView(output.HookViewParams{W: params.Stderr, Log: log, LogPath: params.LogPath, Bar: params.Bar})
 	defer view.Close()
 	return params.Run(flow.HookSink{Output: view, OnHook: view.OnHook})
 }
@@ -118,23 +164,45 @@ func (p CLIPresenter) Notice(notice flow.Notice) {
 // coloured box in a CI log is a picture nobody asked for.
 func (p CLIPresenter) Status(notice flow.Notice) {
 	if len(notice.Lines) > 0 {
-		if !p.Human {
-			output.Warning(p.Cmd.ErrOrStderr(), notice.Text)
-			for _, line := range notice.Lines {
-				output.Message(p.Cmd.ErrOrStderr(), output.Indent+line)
-			}
-			return
-		}
-		output.Blank(p.Cmd.ErrOrStderr())
-		output.Callout(p.Cmd.ErrOrStderr(), notice.Text, notice.Lines)
+		p.statusBlock(notice)
 		return
 	}
+	if !p.Human {
+		p.statusLine(p.Cmd.ErrOrStderr(), notice)
+		return
+	}
+	p.statusLine(p.phase(false), notice)
+}
+
+func (p CLIPresenter) statusLine(w io.Writer, notice flow.Notice) {
 	switch notice.Kind {
 	case flow.NoticeWarning:
-		output.Warning(p.Cmd.ErrOrStderr(), notice.Text)
+		output.Warning(w, notice.Text)
+	case flow.NoticeNote:
+		output.Message(w, notice.Text)
 	default:
-		output.Success(p.Cmd.ErrOrStderr(), notice.Text)
+		output.Success(w, notice.Text)
 	}
+}
+
+// statusBlock renders the two registers a titled notice takes. A note is what
+// the reader has nothing to do about — the bar and an indent subordinate it. The
+// border is kept for what still has to be acted on, which is the only reason it
+// reads as one.
+func (p CLIPresenter) statusBlock(notice flow.Notice) {
+	if !p.Human {
+		output.Warning(p.Cmd.ErrOrStderr(), notice.Text)
+		for _, line := range notice.Lines {
+			output.Message(p.Cmd.ErrOrStderr(), output.Indent+line)
+		}
+		return
+	}
+	w := p.phase(true)
+	if notice.Kind == flow.NoticeNote {
+		output.Section(w, notice.Text, notice.Lines)
+		return
+	}
+	output.Callout(w, notice.Text, notice.Lines)
 }
 
 // FlowContext: the flow cannot load the config itself, which reads cobra flags.

@@ -61,8 +61,11 @@ func Settle(params Params) (domain.EnvPortSettlement, error) {
 	if anomalies := rules.EnvPortAnomalyLines(plan); len(anomalies) > 0 {
 		params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: domain.EnvPortAnomaliesTitle, Lines: anomalies})
 	}
+	// A note, not a warning: nothing here was declined and nothing is broken —
+	// it says what the machine made of the pass, which the bordered box above is
+	// reserved against.
 	for _, notice := range rules.EnvPortNotices(plan) {
-		params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: notice.Title, Lines: []string{notice.Line}})
+		params.Presenter.Status(flow.Notice{Kind: flow.NoticeNote, Text: notice.Title, Lines: []string{notice.Line}})
 	}
 
 	settlement := domain.EnvPortSettlement{Shifted: len(rules.EnvPortRewrites(plan)), Offset: plan.Offset}

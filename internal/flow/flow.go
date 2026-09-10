@@ -276,6 +276,10 @@ const (
 	NoticeMessage NoticeKind = iota
 	NoticeWarning
 	NoticeSuccess
+	// NoticeNote is what the reader has nothing to do about: a property of the
+	// machine or of the file that was just written, said once. It is the register
+	// that keeps the bordered box for what still has to be acted on.
+	NoticeNote
 )
 
 type Notice struct {
