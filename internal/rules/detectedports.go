@@ -113,6 +113,16 @@ func ResolveDetectedPorts(params ResolveDetectedPortsParams) DetectedPortsOutcom
 		ComposeCmd: params.Answers.DockerComposeCmd,
 	})
 
+	// After the namespaces are settled and before the ports are backfilled: a
+	// link reads the slice the step above just named, and may take an
+	// [[env_port]] off a key it now writes in full.
+	merged = ApplyEnvValues(ApplyEnvValuesParams{
+		Config:  merged,
+		Values:  params.Answers.EnvValues,
+		Asked:   params.Answers.EnvValuesAsked,
+		Offered: params.Answers.EnvValuesOffered,
+	})
+
 	backfilled := BackfillDockerPorts(BackfillDockerPortsParams{
 		Config:      merged,
 		PortsByFile: ports,

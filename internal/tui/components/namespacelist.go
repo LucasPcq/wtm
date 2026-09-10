@@ -161,43 +161,13 @@ func (m NamespaceListModel) View() string {
 	// The variables are shown while typing, where they are needed, and they are
 	// this job's own: the ports it declares under the names it declares them by.
 	if m.editing {
-		b.WriteString(m.renderVars(m.fields[m.cursor].Vars))
+		b.WriteString(renderVarGroups(renderVarGroupsParams{
+			Groups: m.fields[m.cursor].Vars, Width: m.width,
+		}))
 	}
 	if m.err != "" {
 		b.WriteString("\n\n")
 		b.WriteString(errorBanner(m.err))
-	}
-	return b.String()
-}
-
-// renderVars lays the groups out as a small aligned table, each wrapping under
-// its own first variable. One run-on line stopped being readable as soon as a
-// job declared more than one port.
-func (m NamespaceListModel) renderVars(groups []domain.NamespaceVarGroup) string {
-	if len(groups) == 0 {
-		return ""
-	}
-
-	labelWidth := rules.NamespaceVarLabelWidth(groups)
-	indent := styles.Indent + domain.NamespaceVarIndent
-	room := max(m.width-PrintableWidth(indent)-labelWidth-len(domain.NamespaceVarSep), domain.CmdListMinWidth)
-
-	var b strings.Builder
-	b.WriteString("\n\n")
-	b.WriteString(styles.Indent)
-	b.WriteString(styles.Muted.Render(domain.NamespaceVarsHeading))
-
-	for _, group := range groups {
-		for i, line := range rules.WrapVars(group.Vars, room) {
-			label := group.Label
-			if i > 0 {
-				label = ""
-			}
-			b.WriteString("\n")
-			b.WriteString(indent)
-			b.WriteString(styles.Muted.Render(fmt.Sprintf(domain.NamespaceVarRowFmt,
-				labelWidth, label, strings.Join(line, domain.NamespaceVarSep))))
-		}
 	}
 	return b.String()
 }

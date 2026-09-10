@@ -75,6 +75,23 @@ A key may not be written by both tables. They are not complementary — an `[[en
 
 Nothing here needs the daemon: `{namespace}` is `name` with `{worktree}` substituted, known without running anything. So the links settle at the same moments the port links do — when a worktree is created, and on `wtm env` or a `sync` reconciliation.
 
+### `run init` and the keys it cannot detect
+
+A port is detectable: the key is named `PORT` or `*_PORT`, the value is a number, and it matches a port a job declares. Three signs agreeing. `KEYCLOAK_REALM=myapp` has none of them — a realm name is an opaque word — so **the step asks**, and every managed key is a row. Filtering the list would hide the only key the reader wanted.
+
+Two things narrow it without wtm pretending to know what a realm is:
+
+- **A key whose value carries a port the service binds is its address, never its slice.** That is the `[[env_port]]` table's business, and the signal is structural rather than a guess about the key's name. It works on a first init, where no link exists yet. A key an `[[env_port]]` already writes is excluded for the same reason.
+- **A key whose name starts with the job's own name is pre-checked** — `KEYCLOAK_*` beside a job called `keycloak`. That is a deduction from a name the user chose, not knowledge of the service.
+
+On the pair that motivated the design, the two rules split it exactly: `KEYCLOAK_URL` holds `8080` and stays with the port table, `KEYCLOAK_REALM` is pre-checked and becomes an `[[env]]` link. Everything else is offered, unchecked, with the value it holds today beside it.
+
+The one proposal wtm makes for a template is `{namespace}` — the same decision as `app_{worktree}` for the name, and as the two commands it proposes nothing for. Editing a template links its row: editing is asking for it to be written.
+
+The step **migrates rather than stacks**. Marking a key that an `[[env_port]]` link already writes takes that link off, since the two are refused together at load — a wizard that wrote both would produce a config wtm then refuses to read, which is the worst outcome a wizard can have. The pruning happens once both tables are complete: the init pipeline settles the values and then appends more port links, so the last word is taken after that append.
+
+Re-init is symmetric like every other step (`EnvValuesAsked`, the same `(value, asked)` pair): unchecking every row withdraws every link the step offered, a run that never asked leaves run.toml standing, and a link on a file the step never showed — one `.wtm.toml` no longer configures — survives untouched. A step may only remove what it proposed.
+
 ### Knowing a namespace exists
 
 A claim goes with a `run stop`, so it cannot be what tells `clean` there is a database to drop. The worktree's own `meta.json` carries `namespaces`: the shared services it has actually carved a slice out of, recorded after a run from the jobs that came up. It lives there because the file is removed with the worktree it describes, and because both wrong answers are bad — giving back a namespace that was never created runs a `DROP DATABASE` on nothing, and missing one leaks a database on every iteration.

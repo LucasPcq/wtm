@@ -10,6 +10,8 @@ import (
 func sharedKeycloakJob() domain.JobConfig {
 	return domain.JobConfig{
 		Name:  "keycloak",
+		Kind:  domain.JobKindService,
+		Cmd:   "docker compose up -d keycloak",
 		Scope: domain.JobScopeShared,
 		Ports: map[string]int{"KEYCLOAK_PORT": 8080},
 		URL:   &domain.JobURLConfig{Port: "KEYCLOAK_PORT"},

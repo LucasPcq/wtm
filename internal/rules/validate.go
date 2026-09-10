@@ -406,15 +406,15 @@ func validateEnvValueLinks(cfg domain.RunConfig) []string {
 	for _, job := range cfg.Jobs {
 		byName[job.Name] = job
 	}
-	ports := map[envKeyRef]bool{}
+	ports := map[domain.EnvKeyRef]bool{}
 	for _, link := range cfg.EnvPorts {
-		ports[envKeyRef{File: link.File, Key: link.Key}] = true
+		ports[domain.EnvKeyRef{File: link.File, Key: link.Key}] = true
 	}
 
 	var errs []string
-	seen := map[envKeyRef]bool{}
+	seen := map[domain.EnvKeyRef]bool{}
 	for _, link := range cfg.EnvValues {
-		ref := envKeyRef{File: link.File, Key: link.Key}
+		ref := domain.EnvKeyRef{File: link.File, Key: link.Key}
 		if link.File == "" {
 			errs = append(errs, fmt.Sprintf(domain.EnvValueLinkFileRequiredFmt, link.Key))
 		}
@@ -469,13 +469,6 @@ func envValueProbeOrigin(job domain.JobConfig) string {
 		return ""
 	}
 	return domain.NamespaceProbeWorktree
-}
-
-// envKeyRef is one .env key in one file, the pair every table writing a value
-// competes for.
-type envKeyRef struct {
-	File string
-	Key  string
 }
 
 // envPortLinkError names the jobs that do declare the port, so the fix is the

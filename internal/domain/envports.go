@@ -38,6 +38,33 @@ type EnvValueLink struct {
 	Value string `toml:"value" json:"value"`
 }
 
+// EnvKeyRef is one .env key in one file — the pair every table writing a value
+// competes for, and the identity a step's row is remembered by.
+type EnvKeyRef struct {
+	File string
+	Key  string
+}
+
+// EnvValueField is one candidate row of the [[env]] step: a .env key that could
+// follow a shared service's slice. wtm cannot detect which key is a realm or a
+// database name — the value is opaque, with none of the three signs that make a
+// port recognizable — so every managed key is offered and the reader points.
+type EnvValueField struct {
+	File string
+	Key  string
+	// Job is the shared service this row would follow.
+	Job string
+	// Current is what the key holds today, shown beside the row: it is the only
+	// thing that lets a reader recognize which key is the one they mean.
+	Current string
+	// Value is the template written when Linked. It starts at {namespace}, the
+	// one proposal wtm can make honestly.
+	Value  string
+	Linked bool
+	// Vars is the vocabulary, shown while the template is being edited.
+	Vars []NamespaceVarGroup
+}
+
 // PortKeyWrite is one declared port materialized as a .env key: the base goes
 // into the value file and into its committed template, and the [[env_port]]
 // link makes each worktree's offset follow.

@@ -321,6 +321,22 @@ func WithNamespaces(shared []domain.SharedComposeService, byJob map[string]*doma
 // the step can say what a command may actually read. It is derived from the
 // file's own bindings, never guessed: wtm injects these names, so it is the one
 // side that knows them.
+// ComposeServicePortBases are the host ports each shared service declares. They
+// are what tells an address key from a slice key: a value carrying the port a
+// service binds is where that service answers, which the [[env_port]] table
+// already speaks for.
+func ComposeServicePortBases(scans map[string]domain.ComposeScan, shared []domain.SharedComposeService) map[string][]int {
+	bases := map[string][]int{}
+	for _, service := range shared {
+		for _, binding := range scans[service.File].Bindings {
+			if binding.Service == service.Service && binding.Base > 0 {
+				bases[service.Service] = append(bases[service.Service], binding.Base)
+			}
+		}
+	}
+	return bases
+}
+
 func ComposeServicePortVars(scans map[string]domain.ComposeScan, shared []domain.SharedComposeService) map[string][]string {
 	vars := map[string][]string{}
 	for _, service := range shared {

@@ -314,7 +314,10 @@ and **experimental**: the global `wtm init` does not configure it.
   so `create`/`remove` are always the project's own — inline or a script path.
 - **Re-running `run init` is symmetric.** Every step is pre-filled from the existing
   `run.toml`: what stays checked is kept, and what you uncheck is **removed** along with the
-  profile entries and `[[env_port]]` links naming it — a profile left with no job goes too.
+  profile entries and `[[env_port]]` / `[[env]]` links naming it — a profile left with no job
+  goes too. The `[[env]]` step lists every managed .env key and pre-checks those named after a
+  shared service; a key whose value carries that service's port is left to `[[env_port]]`, and
+  marking a key the port table already writes moves it rather than declaring it twice.
   Only jobs the wizard itself proposed can be removed: one added with `run job add` appears
   in no detected list, so it is never touched. The same symmetry holds for the URLs step (a
   job you unpublish stays unpublished) and the profiles step (deleting them all keeps them

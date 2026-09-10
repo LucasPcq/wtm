@@ -301,6 +301,32 @@ const (
 		"              `run stop` or `run down`: stopping is not destroying\n" +
 		"              → leave empty to keep the slice once the worktree is gone"
 
+	EnvValueStepName  = "Shared service keys"
+	EnvValueStepTitle = "Which .env keys name each worktree's slice?"
+	EnvValueStepDesc  = "A shared service answers at one address for every worktree — that is what\n" +
+		"[[env_port]] already writes. What differs per worktree is the slice: a\n" +
+		"realm, a database. wtm cannot tell which key holds one — a realm name is\n" +
+		"just a word — so it lists the keys it manages and you point.\n" +
+		"\n" +
+		"  space     link a key, so wtm writes its whole value per worktree\n" +
+		"  enter     edit the template — it starts at {namespace}\n" +
+		"\n" +
+		"Keys already checked are the ones whose name starts with the service's,\n" +
+		"or that run.toml already links. A linked key stops being reported as\n" +
+		"drift: its value is wtm's, not the one your worktree was copied from."
+	EnvValueRowFmt       = "%s %-*s  %s"
+	EnvValueGroupFmt     = "%s · %s"
+	EnvValueCurrentFmt   = "  (now %s)"
+	EnvValueMarkOn       = "[✓]"
+	EnvValueMarkOff      = "[ ]"
+	EnvValueEmptyValue   = "—"
+	EnvValueSummaryFmt   = "%d key(s) linked"
+	EnvValueSkipNoShared = "no shared service carves out a slice"
+	EnvValueSkipNoKeys   = "no managed .env key to link"
+	EnvValueEmptyErr     = "a linked key needs a template; {namespace} is the usual one"
+	EnvValueEditHelp     = "enter save · esc cancel"
+	EnvValueHelpLink     = "space link"
+
 	NamespaceRowFmt      = "%-*s  %-7s  %s"
 	NamespaceRowEditFmt  = "%-*s  %-7s  %s"
 	NamespaceEmptyValue  = "—"

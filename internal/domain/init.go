@@ -117,9 +117,16 @@ type InitProjectAnswers struct {
 	// and got "no" is not mistaken for one that never asked.
 	LinkEnv       bool
 	EnvLinksAsked bool
-	SkipEnv       bool
-	SkipHooks     bool
-	SkipClean     bool
+	// EnvValues is what the [[env]] step settled: the .env keys wtm writes in
+	// full from a template. EnvValuesOffered are the keys it showed, which is
+	// the only set it may withdraw a link from, and EnvValuesAsked says the
+	// question was put at all.
+	EnvValues        []EnvValueLink
+	EnvValuesOffered map[EnvKeyRef]bool
+	EnvValuesAsked   bool
+	SkipEnv          bool
+	SkipHooks        bool
+	SkipClean        bool
 }
 
 // PortRoute is where a job learns the port it binds. The .env route isolates it

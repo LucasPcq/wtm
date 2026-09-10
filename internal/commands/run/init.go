@@ -263,6 +263,11 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 		Existing: outcome.Config.EnvPorts,
 	})...)
 
+	// Last, once both tables are complete: a key an [[env]] link writes in full
+	// has no port link, and the two are refused together at load — so a run that
+	// only added the value link would write a config wtm then refuses to read.
+	outcome.Config = rules.PruneEnvPortClashes(outcome.Config)
+
 	// The rewrites come first: a compose templatized without run.toml behind it
 	// keeps binding its defaults, while a run.toml declaring ports the compose
 	// does not read would announce an isolation that is not there.
