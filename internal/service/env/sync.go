@@ -305,6 +305,7 @@ func computeFile(paths envPaths, f domain.EnvFile) (computedFile, error) {
 		Mode:       paths.Mode,
 		PortValues: EnvValueRefsFor(paths.Ports, f.Target),
 		PortBlock:  paths.Ports.Block,
+		Owned:      rules.EnvValueOwnedKeys(paths.Ports.ValueLinks, f.Target),
 	})
 
 	return computedFile{

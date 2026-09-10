@@ -53,7 +53,7 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 	// The identity needs neither an ordinal nor an offset, so a project with no
 	// link resolves without asking git anything — EnsureOrdinal writes, and this
 	// function is on the read path of every address wtm hands out.
-	if len(cfg.EnvPorts) == 0 {
+	if len(cfg.EnvPorts) == 0 && len(cfg.EnvValues) == 0 {
 		if len(owned) == 0 {
 			return envsvc.EnvPortsParams{}, nil
 		}
@@ -80,21 +80,39 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 		return envsvc.EnvPortsParams{}, fmt.Errorf("resolve port offset: %w", err)
 	}
 
+	origins := rules.OriginContext{
+		Addressing: rules.EffectiveAddressing(cfg),
+		Jobs:       jobsByName(cfg),
+		Worktree:   env[domain.EnvWorktree],
+		Project:    filepath.Base(params.ProjectDir),
+		PublicPort: process.PublicProxyPort(rules.ProxyPort(params.Global)),
+	}
+
+	ordinal, err := strconv.Atoi(env[domain.EnvOrdinal])
+	if err != nil {
+		return envsvc.EnvPortsParams{}, fmt.Errorf("resolve ordinal: %w", err)
+	}
+	values, err := rules.EnvValueWrites(rules.EnvValueWritesParams{
+		Config:   cfg,
+		Worktree: env[domain.EnvWorktree],
+		Ordinal:  ordinal,
+		Offset:   offset,
+		Origins:  origins,
+	})
+	if err != nil {
+		return envsvc.EnvPortsParams{}, err
+	}
+
 	return envsvc.EnvPortsParams{
 		WorktreePath: params.WorktreePath,
 		Links:        cfg.EnvPorts,
-		Owned:        owned,
+		ValueLinks:   cfg.EnvValues,
+		Owned:        append(owned, values...),
 		Bases:        rules.EnvPortBases(cfg),
 		Shared:       rules.SharedJobNames(cfg),
 		Offset:       offset,
 		Block:        rules.EffectivePortOffsetBlock(cfg),
-		Origins: rules.OriginContext{
-			Addressing: rules.EffectiveAddressing(cfg),
-			Jobs:       jobsByName(cfg),
-			Worktree:   env[domain.EnvWorktree],
-			Project:    filepath.Base(params.ProjectDir),
-			PublicPort: process.PublicProxyPort(rules.ProxyPort(params.Global)),
-		},
+		Origins:      origins,
 	}, nil
 }
 

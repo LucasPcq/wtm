@@ -182,6 +182,37 @@ const (
 	NamespaceBadTokenFmt      = "job %q: %v"
 	UnknownScopeFmt           = "job %q: unknown scope %q (expected %q)"
 	DuplicateJobNameFmt       = "job %q is declared twice: two jobs of one name share a single key, so the second can never start"
+	// EnvValueToken* are the placeholders an [[env]] link's value carries. The
+	// vocabulary is closed: anything else is refused at load, so a typo never
+	// reaches a .env as literal braces.
+	EnvValueTokenNamespace = "{namespace}"
+	EnvValueTokenWorktree  = "{worktree}"
+	EnvValueTokenOrdinal   = "{ordinal}"
+	EnvValueTokenOrigin    = "{origin}"
+	// EnvValueTokenPortPrefix opens the one family of tokens: {port.NAME} is the
+	// job's declared port NAME, resolved for this worktree.
+	EnvValueTokenPortPrefix = "{port."
+
+	// EnvValueLinkFileRequiredFmt and friends are what a bad [[env]] link is
+	// refused with, naming the line to fix rather than the rule it broke.
+	EnvValueLinkFileRequiredFmt = "env %s: file is required"
+	EnvValueLinkValueEmptyFmt   = "env %s in %s: value is required — it is the whole point of the link"
+	EnvValueLinkBadKeyFmt       = "env in %s: %q is not a valid environment variable name"
+	EnvValueLinkNoJobFmt        = "env %s in %s: no job named %q"
+	EnvValueLinkNoNamespaceFmt  = "env %s in %s: job %q declares no [job.namespace], so {namespace} means nothing"
+	EnvValueLinkNoPortFmt       = "env %s in %s: job %q declares no port named %q"
+	EnvValueLinkTwiceFmt        = "env %s in %s is declared twice"
+	EnvValueLinkNoOriginFmt     = "env %s in %s: job %q publishes no address, so {origin} has no answer — publish a [job.url] for it, or write the host yourself"
+	EnvValueLinkBadNamespaceFmt = "env %s in %s: %v"
+	EnvValueUnclosedTokenFmt    = "env %s in %s: a {port.…} placeholder is never closed"
+	// EnvValueLinkClashesPortFmt refuses a key two tables both write. They are
+	// not complementary: an [[env]] value writes the port itself when it needs
+	// one, so a key holding both is a line to delete, not a merge to define.
+	EnvValueLinkClashesPortFmt = "%s in %s is written by both an [[env]] link and an [[env_port]] link — an [[env]] value writes its own port, so drop the [[env_port]] line"
+	// EnvValueUnknownTokenFmt names the placeholder rather than the value, since
+	// a long URL makes the offending braces hard to find.
+	EnvValueUnknownTokenFmt = "env %s in %s: unknown placeholder %s"
+
 	// NamespaceProbeWorktree expands a namespace at load with a stand-in worktree, so
 	// an unknown placeholder is named there rather than in a shell.
 	NamespaceProbeWorktree = "probe"

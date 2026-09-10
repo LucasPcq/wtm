@@ -132,7 +132,7 @@
                 "additionalProperties": {
                   "type": "string"
                 },
-                "description": "Extra variables the create and remove commands read, with {worktree} and {ordinal} substituted. They reach those two commands and nothing else."
+                "description": "Extra variables the create and remove commands read, with {worktree} and {ordinal} substituted. They reach those two commands and nothing else \u2014 to put a namespace-derived value into a worktree's .env, declare an [[env]] link."
               }
             }
           }
@@ -220,6 +220,40 @@
             "type": "string",
             "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
             "description": "The port variable declared in a job's `ports` table, whose base is looked for inside the value."
+          }
+        }
+      }
+    },
+    "env": {
+      "type": "array",
+      "description": "Links a .env key to a value wtm writes in full, from a template over what only wtm knows: the slice of a shared service this worktree holds, the ports it binds, the address it answers on. Use it where [[env_port]] cannot reach \u2014 a keycloak realm name, a database name \u2014 since a port link only ever rewrites a port inside a value it otherwise leaves alone. A key may not be written by both tables.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file",
+          "key",
+          "job",
+          "value"
+        ],
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "The .env target holding the key, as configured under [env] in .wtm.toml (e.g. \".env\", \"apps/web/.env\")."
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+            "description": "The .env key wtm writes. Its whole value is wtm's \u2014 anything a worktree's copy held there is replaced, and the reconciliation stops reporting it as drift."
+          },
+          "job": {
+            "type": "string",
+            "description": "The job the value speaks about: whose namespace {namespace} resolves to, whose ports {port.NAME} reads, whose published address {origin} is."
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template. Placeholders: {namespace} the job's slice for this worktree (needs a [job.namespace]); {port.NAME} one of the job's declared ports, shifted by the worktree's offset unless the job is shared; {origin} where the job answers by name (needs a [job.url] and a proxy); {worktree} and {ordinal}. Anything else is refused when run.toml is read, rather than written to a file as literal braces. E.g. \"{origin}/realms/{namespace}\" or \"postgresql://app:app@localhost:{port.POSTGRES_PORT}/{namespace}\"."
           }
         }
       }

@@ -20,6 +20,24 @@ type EnvPortLink struct {
 	ByDir bool `toml:"-" json:"-"`
 }
 
+// EnvValueLink is a .env key whose whole value wtm writes, from a template over
+// what only wtm knows: the slice of a shared service this worktree holds, the
+// ports it binds, the address it answers on. It is the counterpart of
+// EnvPortLink and not a wider spelling of it — a port link substitutes the port
+// inside a value it otherwise leaves alone, which is what lets a password never
+// be spelled in run.toml; this one owns the line.
+type EnvValueLink struct {
+	File string `toml:"file" json:"file"`
+	Key  string `toml:"key"  json:"key"`
+	// Job names the service the value speaks about: whose namespace {namespace}
+	// resolves to, whose ports {port.NAME} reads, whose published address
+	// {origin} is.
+	Job string `toml:"job" json:"job"`
+	// Value is the template. See domain.EnvValueToken* for the vocabulary; a
+	// placeholder outside it is refused at load rather than written to a file.
+	Value string `toml:"value" json:"value"`
+}
+
 // PortKeyWrite is one declared port materialized as a .env key: the base goes
 // into the value file and into its committed template, and the [[env_port]]
 // link makes each worktree's offset follow.

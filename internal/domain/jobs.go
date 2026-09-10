@@ -159,6 +159,9 @@ type RunConfig struct {
 	// EnvPorts links a .env key to one of the ports declared above, so a value
 	// holding a hard-coded host port follows the worktree's offset.
 	EnvPorts []EnvPortLink `toml:"env_port,omitempty" json:"env_port,omitempty"`
+	// EnvValues are the .env keys wtm writes in full, from a template. They say
+	// what this worktree holds of a shared service, which no port can express.
+	EnvValues []EnvValueLink `toml:"env,omitempty" json:"env,omitempty"`
 	// Addressing is what those links write. Empty means AddressingNames: a
 	// project that publishes names wants its .env values to reach them, and one
 	// that publishes none is unaffected either way.

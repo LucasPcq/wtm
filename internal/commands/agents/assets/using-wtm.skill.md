@@ -301,6 +301,15 @@ and **experimental**: the global `wtm init` does not configure it.
   fails the run.
   Configuration values use `{worktree}` / `{ordinal}`; commands use the `$WTM_*` variables.
   A shared job with **no** `[job.namespace]` is valid and means one instance with one set of data.
+- **`[[env]]` is how a slice reaches the app.** `[[env_port]]` rewrites the port *inside* a
+  value and leaves the rest alone — it says where a service answers. `[[env]]` writes a key's
+  **whole** value from a template, which is the only way to express something opaque like a
+  realm or a database name: `file`, `key`, `job`, `value`, where value draws on `{namespace}`,
+  `{port.NAME}`, `{origin}`, `{worktree}`, `{ordinal}` and nothing else. A shared service has
+  one address for every worktree, so its URL stays an `[[env_port]]` while its realm becomes an
+  `[[env]]`. A key written by both tables is refused when `run.toml` is read, as is a
+  placeholder outside the list. wtm owns an `[[env]]` key's line: a worktree's own value there
+  is replaced, and `wtm env` never reports it as drift.
   `run init` asks for the three fields; wtm proposes only the name and never a command,
   so `create`/`remove` are always the project's own — inline or a script path.
 - **Re-running `run init` is symmetric.** Every step is pre-filled from the existing

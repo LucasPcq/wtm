@@ -43,6 +43,38 @@ The daemon is what runs it, and a daemon that considered itself idle while doing
 
 An absent `[job.namespace]` is a valid answer: shared for good, one instance and one set of data.
 
+### Reaching the app: the `[[env]]` link
+
+Carving a slice out is half the work. The app has to be told which slice is its own, and that is not something a port can say.
+
+`[[env_port]]` rewrites **the port inside** a value and leaves the rest alone, which is what lets a password live in a `.env` and never in `run.toml`. It can express "the shared keycloak answers here" and nothing else. A realm name is opaque — no number, no shape, nothing to anchor a substitution on.
+
+So a second table, `[[env]]`, writes a key's **whole** value from a template:
+
+```toml
+[[env_port]]                          # the shared instance: one address for all
+file = "apps/web/.env"
+key  = "KEYCLOAK_URL"
+job  = "keycloak"
+port = "KEYCLOAK_PORT"
+
+[[env]]                               # the slice: one per worktree
+file  = "apps/web/.env"
+key   = "KEYCLOAK_REALM"
+job   = "keycloak"
+value = "{namespace}"
+```
+
+That is the line between the two, and it is worth stating once: **`[[env_port]]` says where the service answers, `[[env]]` says which slice of it this worktree holds.** A shared service has one address for every worktree — its published host carries no worktree segment and its port takes no offset — so the first is not per-worktree at all.
+
+The vocabulary is closed: `{namespace}`, `{port.NAME}`, `{origin}`, `{worktree}`, `{ordinal}`. Anything else is refused when `run.toml` is read, against a stand-in worktree, so a typo is caught for every worktree at once rather than the first time one is created. `{port.NAME}` goes through `rules.ResolvedPort`, the one place that answers what a declared port becomes in a worktree — deriving it a second time here is exactly how a report once said 5432 while the file was written 5452.
+
+A resolved link becomes a `domain.EnvOwnedEntry`, which is the mechanism that already existed for `COMPOSE_PROJECT_NAME`: wtm owns the line, plans it, reports it when it changed, and takes it out of the reconciliation's verdict. A key wtm writes in full differs from its source by construction, so calling it a conflict would have every `wtm env` offer to undo the isolation it had just set up.
+
+A key may not be written by both tables. They are not complementary — an `[[env]]` value writes its own port when it needs one (`postgresql://app:app@localhost:{port.POSTGRES_PORT}/{namespace}`), so a key both claim is a line to delete rather than a merge order to invent. It is refused at load, naming both.
+
+Nothing here needs the daemon: `{namespace}` is `name` with `{worktree}` substituted, known without running anything. So the links settle at the same moments the port links do — when a worktree is created, and on `wtm env` or a `sync` reconciliation.
+
 ### Knowing a namespace exists
 
 A claim goes with a `run stop`, so it cannot be what tells `clean` there is a database to drop. The worktree's own `meta.json` carries `namespaces`: the shared services it has actually carved a slice out of, recorded after a run from the jobs that came up. It lives there because the file is removed with the worktree it describes, and because both wrong answers are bad — giving back a namespace that was never created runs a `DROP DATABASE` on nothing, and missing one leaks a database on every iteration.

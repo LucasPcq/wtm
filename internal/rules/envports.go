@@ -196,11 +196,28 @@ func planEnvPortKey(params planEnvPortKeyParams) domain.EnvPortEntry {
 // deriving it independently is exactly how the report came to say 5432 while
 // the file was written 5452.
 func resolvedPort(params planEnvPortKeyParams, index int) int {
-	base := params.Group.Bases[index]
-	if params.Shared[params.Group.Links[index].Job] {
-		return base
+	return ResolvedPort(ResolvedPortParams{
+		Base:   params.Group.Bases[index],
+		Offset: params.Offset,
+		Shared: params.Shared[params.Group.Links[index].Job],
+	})
+}
+
+type ResolvedPortParams struct {
+	Base   int
+	Offset int
+	Shared bool
+}
+
+// ResolvedPort is what a declared port becomes in one worktree. Exported so the
+// [[env]] templates read the same answer rather than deriving their own: two
+// sites computing it independently is exactly how the report came to say 5432
+// while the file was written 5452.
+func ResolvedPort(params ResolvedPortParams) int {
+	if params.Shared {
+		return params.Base
 	}
-	return base + params.Offset
+	return params.Base + params.Offset
 }
 
 func moveOf(link domain.EnvPortLink, base, resolved int) domain.EnvPortMove {
