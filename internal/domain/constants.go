@@ -197,7 +197,7 @@ const (
 
 	// NamespaceCreateFailedFmt names the namespace, the job and the last error a
 	// budget's worth of retries ended on.
-	NamespaceCreateFailedFmt = "job %s: could not attach namespace %s: %w"
+	NamespaceCreateFailedFmt = "job %s: could not attach namespace %s: %w (the attach runs on every start, so it must be safe to run again)"
 	NamespaceRemoveFailedFmt = "job %s: could not detach namespace %s: %w"
 	// SharedNoContextFmt is a shared job whose main checkout the client could
 	// not resolve — a bare clone, typically.
@@ -259,7 +259,9 @@ const (
 		"              → your commands read the result as $WTM_NAMESPACE, and\n" +
 		"                it is what `wtm clean` names before destroying it\n" +
 		"\n" +
-		"  ● create    run once, the first time this worktree claims the service\n" +
+		"  ● create    run every time this worktree starts the service, so it\n" +
+		"              must be safe to run again: carve the slice out if it is\n" +
+		"              absent, do nothing if it is already there\n" +
 		"              an inline command or the path to a script — both are a\n" +
 		"              /bin/sh line run in the worktree\n" +
 		"              → leave empty to share the service outright, data included\n" +

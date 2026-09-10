@@ -121,7 +121,7 @@
               "create": {
                 "type": "string",
                 "minLength": 1,
-                "description": "Command run the first time a worktree claims the service, to carve its namespace out \u2014 a CREATE DATABASE, a kcadm create realms, a script of your own. Runs as a /bin/sh line in the worktree, with its whole environment (its ports and URLs) plus $WTM_NAMESPACE, $WTM_WORKTREE and $WTM_ORDINAL. Retried for a while: the service was started moments earlier and may not be accepting connections yet."
+                "description": "Command run every time a worktree starts the shared service, to carve its namespace out \u2014 a CREATE DATABASE, a kcadm create realms, a script of your own. Runs as a /bin/sh line in the worktree, with its whole environment (its ports and URLs) plus $WTM_NAMESPACE, $WTM_WORKTREE and $WTM_ORDINAL. It must be safe to run again \u2014 wtm runs it on every start and never remembers having run it, so carve the slice out if it is absent and do nothing if it is already there. Retried for a while: the service was started moments earlier and may not be accepting connections yet, which is what the retries are for; a command that fails the same way every time simply fails."
               },
               "remove": {
                 "type": "string",
@@ -132,7 +132,7 @@
                 "additionalProperties": {
                   "type": "string"
                 },
-                "description": "Variables this namespace contributes, with {worktree} and {ordinal} substituted \u2014 e.g. CRM_DATABASE_URL = \"postgres://postgres@127.0.0.1:5432/crm_{worktree}\". They reach the create and remove commands."
+                "description": "Extra variables the create and remove commands read, with {worktree} and {ordinal} substituted. They reach those two commands and nothing else."
               }
             }
           }

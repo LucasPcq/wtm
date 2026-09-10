@@ -35,7 +35,11 @@ Two mechanisms, not two spellings of one:
 
 `attach` and `detach` run with the **worktree's whole resolved environment** — ports and URLs included. That is what makes keycloak possible at all: a realm's `redirectUris` point at the fronts of the worktree asking for it, and the script needs those URLs. Without that access the design would handle postgres and leave keycloak stranded.
 
-`create` is retried within `domain.NamespaceCreateTimeout`: the service it talks to was started moments ago, so a first refusal means "postgres is not accepting connections yet" far more often than it means the command is wrong. The budget is what stops a genuinely wrong command retrying for ever.
+`create` runs on **every** start of the shared service, not once — wtm keeps no ledger of having run it, and a ledger would be wrong the moment the data went away behind wtm's back (`docker compose down -v`). So the command must be safe to run again: carve the slice out if it is absent, do nothing if it is there. That is the whole contract, and it is stated where the command is written — the schema, the `run init` step, and the failure message.
+
+It is retried within `domain.NamespaceCreateTimeout`: the service it talks to was started moments ago, so a first refusal means "postgres is not accepting connections yet" far more often than it means the command is wrong. The budget is what stops a genuinely wrong command retrying for ever. It cannot tell a refusal that will pass from one that never will — which is exactly why the idempotence is the command's job and not wtm's guess.
+
+The daemon is what runs it, and a daemon that considered itself idle while doing so used to exit under its own handler: a shared service launches detached, so nothing is left `Running` to keep it alive. The idle watcher counts connections in flight beside the running jobs.
 
 An absent `[job.namespace]` is a valid answer: shared for good, one instance and one set of data.
 
@@ -79,7 +83,7 @@ The step sits **before** the ports step: a shared job takes no offset, so which 
 
 A service with a `build:` is shown with its reason and no answer to give. That is structural, not a guess about the image's name — such a service compiles this worktree's source, so sharing it would serve one worktree's build to all of them.
 
-Where `run.toml` has an opinion it outranks detection, and a run that never put the question leaves what it declares standing (`ScopesAsked`, the same `(value, asked)` pair as `URLsAsked` and the others). Postgres and mysql images get a namespace recipe pre-filled; an unknown image gets none.
+Where `run.toml` has an opinion it outranks detection, and a run that never put the question leaves what it declares standing (`ScopesAsked`, the same `(value, asked)` pair as `URLsAsked` and the others).
 
 ## What a shared service changes on the surfaces
 

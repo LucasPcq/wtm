@@ -293,9 +293,12 @@ and **experimental**: the global `wtm init` does not configure it.
   `run stop` in a worktree releases only that worktree's claim; the service itself stops when
   the last one goes.
 - **A shared job may carve out a namespace per worktree.** `[job.namespace]` names it (`name`,
-  `attach`, `detach`, `env`) so each worktree keeps its own data — a database, a set of
+  `create`, `remove`, `env`) so each worktree keeps its own data — a database, a set of
   keycloak realms. wtm runs the declared commands and knows nothing else about them; they get
   the worktree's whole environment plus `$WTM_NAMESPACE`, `$WTM_WORKTREE`, `$WTM_ORDINAL`.
+  `create` runs on **every** start of the shared service, so it must be safe to run again —
+  wtm keeps no record of having run it. A `create` that fails when the slice already exists
+  fails the run.
   Configuration values use `{worktree}` / `{ordinal}`; commands use the `$WTM_*` variables.
   A shared job with **no** `[job.namespace]` is valid and means one instance with one set of data.
   `run init` asks for the three fields; wtm proposes only the name and never a command,
