@@ -73,18 +73,6 @@ func ComposeUnreadableLine(scan domain.ComposeScan) string {
 	return fmt.Sprintf(domain.ComposeUnreadableFmt, scan.File, scan.Err)
 }
 
-// ComposePortsWrittenLines emits one port per line: a job declaring six of them
-// would otherwise run off the terminal.
-func ComposePortsWrittenLines(added map[string]map[string]int) []string {
-	var lines []string
-	for _, job := range sortedKeys(added) {
-		for _, entry := range PortEntries(added[job]) {
-			lines = append(lines, fmt.Sprintf(domain.RunPortsSuffixFmt, job, entry))
-		}
-	}
-	return lines
-}
-
 type ComposeJobNameParams struct {
 	Config domain.RunConfig
 	File   string

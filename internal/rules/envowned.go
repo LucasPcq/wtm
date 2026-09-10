@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"fmt"
 	"path"
 	"slices"
 	"strings"
@@ -125,17 +124,4 @@ func UpsertEnvPair(params UpsertEnvPairParams) (lines []domain.EnvLine, changed 
 	out = append(out, lines[:at]...)
 	out = append(out, pair)
 	return append(out, lines[at:]...), true
-}
-
-// OwnedEnvLines names each identity key a run has just settled, changed ones
-// only: a value the file already held is not news.
-func OwnedEnvLines(plan domain.EnvPortPlan) []string {
-	var lines []string
-	for _, entry := range plan.Owned {
-		if !entry.Changed {
-			continue
-		}
-		lines = append(lines, fmt.Sprintf(domain.EnvOwnedKeyLineFmt, entry.Key, entry.Value))
-	}
-	return lines
 }

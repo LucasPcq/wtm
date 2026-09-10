@@ -4,6 +4,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/styles"
 )
 
@@ -12,7 +13,7 @@ import (
 func errorBanner(msg string) string {
 	var b strings.Builder
 	b.WriteString(styles.Indent)
-	b.WriteString(styles.DangerText.Render("✗"))
+	b.WriteString(styles.DangerText.Render(domain.GlyphFailure))
 	b.WriteString(" ")
 	b.WriteString(styles.DangerText.Render(capitalizeFirst(msg)))
 	return b.String()
@@ -23,7 +24,7 @@ func errorBanner(msg string) string {
 func warningBanner(msg string) string {
 	var b strings.Builder
 	b.WriteString(styles.Indent)
-	b.WriteString(styles.BadgeWarning.Render("!"))
+	b.WriteString(styles.BadgeWarning.Render(domain.GlyphAttention))
 	b.WriteString(" ")
 	b.WriteString(styles.Warning.Render(capitalizeFirst(msg)))
 	return b.String()

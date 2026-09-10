@@ -12,7 +12,7 @@ import (
 // InitGlobalRecapParams holds inputs for the framed end-of-init global recap.
 type InitGlobalRecapParams struct {
 	Fields    []domain.RecapField
-	NextSteps []string
+	NextSteps []NextStepParams
 }
 
 // InitGlobalRecap prints the framed recap shown after the global config is written:
@@ -30,7 +30,7 @@ func InitGlobalRecap(w io.Writer, p InitGlobalRecapParams) {
 type InitProjectRecapParams struct {
 	ConfigPath string
 	Fields     []domain.RecapField
-	NextSteps  []string
+	NextSteps  []NextStepParams
 }
 
 // InitProjectRecap prints the framed recap shown after the project config is
@@ -52,7 +52,7 @@ type initRecap struct {
 	Title     string
 	Lead      string
 	Fields    []domain.RecapField
-	NextSteps []string
+	NextSteps []NextStepParams
 }
 
 func printInitRecap(w io.Writer, r initRecap) {
@@ -66,14 +66,15 @@ func printInitRecap(w io.Writer, r initRecap) {
 		b.WriteString("\n\n")
 		b.WriteString(styles.Bold.Render(domain.InitRecapNextSteps))
 		for _, step := range r.NextSteps {
-			b.WriteString("\n" + Indent + styles.Muted.Render("• ") + step)
+			b.WriteString("\n" + NextStepLine(step))
 		}
 	}
 
 	fmt.Fprintln(w, styles.RenderRecap(styles.IntroParams{
-		Width: domain.RecapWidth,
-		Title: "✓ " + r.Title,
-		Body:  b.String(),
+		Width:   domain.RecapWidth,
+		Title:   domain.GlyphSuccess + " " + r.Title,
+		Body:    b.String(),
+		InFrame: true,
 	}))
 }
 

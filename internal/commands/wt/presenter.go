@@ -2,6 +2,7 @@ package wt
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -12,6 +13,7 @@ import (
 	reparentflow "github.com/LucasPcq/wtm/internal/flow/reparent"
 	syncflow "github.com/LucasPcq/wtm/internal/flow/sync"
 	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/rules"
 )
 
 type createPresenter struct {
@@ -36,12 +38,13 @@ func (p createPresenter) Created(outcome createflow.Outcome) error {
 		})
 	}
 
-	output.Frame(p.Cmd.OutOrStdout(), func() {
-		output.FormatCreateResult(p.Cmd.OutOrStdout(), output.CreateResultParams{
+	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		output.FormatCreateResult(w, output.CreateResultParams{
 			Branch:        outcome.Branch,
 			AlreadyExists: outcome.Result.AlreadyExists,
 			From:          outcome.FromBranch,
 			EnvStrategy:   string(outcome.Result.Metadata.EnvStrategy),
+			EnvNote:       rules.EnvPortSettlementNote(outcome.EnvPorts),
 			Path: createDisplayPath(displayPathParams{
 				Config:     p.config.Config,
 				ProjectDir: p.config.ProjectDir,
@@ -68,8 +71,8 @@ func (p cleanPresenter) Cleaned(outcome cleanflow.Outcome) error {
 				AlreadyAbsent: true,
 			})
 		}
-		output.Frame(p.Cmd.OutOrStdout(), func() {
-			output.Message(p.Cmd.OutOrStdout(), fmt.Sprintf(domain.CleanAlreadyAbsentFmt, outcome.Branch))
+		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			output.Unchanged(w, fmt.Sprintf(domain.CleanAlreadyAbsentFmt, outcome.Branch))
 		})
 		return nil
 	}
@@ -83,13 +86,13 @@ func (p cleanPresenter) Cleaned(outcome cleanflow.Outcome) error {
 		})
 	}
 
-	output.Frame(p.Cmd.OutOrStdout(), func() {
-		output.Success(p.Cmd.OutOrStdout(), fmt.Sprintf(domain.CleanedFmt, outcome.Branch))
+	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		output.Success(w, fmt.Sprintf(domain.CleanedFmt, outcome.Branch))
 		for _, child := range outcome.Reparented {
-			output.Success(p.Cmd.OutOrStdout(), fmt.Sprintf(domain.CleanReparentedFmt, child.Branch, child.NewParent))
+			output.Success(w, fmt.Sprintf(domain.CleanReparentedFmt, child.Branch, child.NewParent))
 		}
 		for _, child := range outcome.OrphanedChildren {
-			output.Warning(p.Cmd.OutOrStdout(), fmt.Sprintf(domain.CleanStillOrphanedFmt, child.Branch, child.OldParent))
+			output.Warning(w, fmt.Sprintf(domain.CleanStillOrphanedFmt, child.Branch, child.OldParent))
 		}
 	})
 	return nil
@@ -107,8 +110,8 @@ func (p prunePresenter) Pruned(outcome pruneflow.Outcome) error {
 		if p.Format == domain.OutputJSON {
 			return output.WritePruneResultJSON(p.Cmd.OutOrStdout(), domain.PruneResult{})
 		}
-		output.Frame(p.Cmd.OutOrStdout(), func() {
-			output.Message(p.Cmd.OutOrStdout(), domain.PruneNothingToPrune)
+		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			output.Unchanged(w, domain.PruneNothingToPrune)
 		})
 		return nil
 	}
@@ -118,40 +121,58 @@ func (p prunePresenter) Pruned(outcome pruneflow.Outcome) error {
 	}
 
 	if outcome.Result.DryRun {
-		output.Frame(p.Cmd.OutOrStdout(), func() {
-			output.FormatPrunePlan(p.Cmd.OutOrStdout(), outcome.Plan)
+		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			output.FormatPrunePlan(w, outcome.Plan)
 		})
 		return nil
 	}
 
-	output.Frame(p.Cmd.OutOrStdout(), func() {
-		output.FormatPruneResult(p.Cmd.OutOrStdout(), outcome.Result)
+	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		output.FormatPruneResult(w, outcome.Result)
 	})
 	return nil
 }
 
 type syncPresenter struct {
 	shared.CLIPresenter
+	// opened distinguishes the frame's own leading blank, which sits outside the
+	// block and carries no bar, from the separators between sections, which sit
+	// inside it and do. It is a pointer because a presenter is passed by value.
+	opened *bool
 }
 
-// Planned prints the cascade a run that could not ask never saw in a recap. It
-// opens the frame on stderr, where the plan has always been written.
+// sync writes across two streams — the plan and the spinners on stderr, the
+// recap and the push on stdout — so its frame cannot be a closure. One rule
+// holds it together instead: every section opens with exactly one blank line on
+// the stream it is about to write to, and Synced closes with the frame's own.
+// The first of those blanks is the frame's leading one, whichever section runs
+// first; the rest are inter-section separators. Same call, same output, one
+// mechanism.
+func (p syncPresenter) section(w io.Writer) io.Writer {
+	barred := output.Barred(w)
+	if *p.opened {
+		output.Blank(barred)
+		return barred
+	}
+	*p.opened = true
+	output.FrameStart(w)
+	return barred
+}
+
+// Planned prints the cascade a run that could not ask never saw in a recap.
 func (p syncPresenter) Planned(plan domain.SyncPlan) {
 	if !p.Human {
 		return
 	}
-	output.FrameStart(p.Cmd.ErrOrStderr())
-	output.FormatSyncPlan(p.Cmd.ErrOrStderr(), plan)
+	output.FormatSyncPlan(p.section(p.Cmd.ErrOrStderr()), plan)
 }
 
-// Rebased is the recap the user reads BEFORE being asked to push. Its single
-// leading blank separates the plan/spinner section (stderr) from the recap.
+// Rebased is the recap the user reads BEFORE being asked to push.
 func (p syncPresenter) Rebased(result domain.SyncResult) {
 	if !p.Human {
 		return
 	}
-	output.Blank(p.Cmd.OutOrStdout())
-	output.FormatSyncResult(p.Cmd.OutOrStdout(), result)
+	output.FormatSyncResult(p.section(p.Cmd.OutOrStdout()), result)
 }
 
 func (p syncPresenter) Synced(outcome syncflow.Outcome) error {
@@ -159,12 +180,12 @@ func (p syncPresenter) Synced(outcome syncflow.Outcome) error {
 		return output.WriteSyncResultJSON(p.Cmd.OutOrStdout(), outcome.Result)
 	}
 	if outcome.Empty {
-		output.Frame(p.Cmd.OutOrStdout(), func() {
-			output.Message(p.Cmd.OutOrStdout(), domain.SyncNothingToSync)
+		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			output.Unchanged(w, domain.SyncNothingToSync)
 		})
 		return nil
 	}
-	output.FormatSyncPushSummary(p.Cmd.OutOrStdout(), outcome.Result.Steps)
+	output.FormatSyncPushSummary(output.Barred(p.Cmd.OutOrStdout()), outcome.Result.Steps)
 	output.FrameEnd(p.Cmd.OutOrStdout())
 	return nil
 }
@@ -178,11 +199,14 @@ func (p reparentPresenter) Reparented(outcome reparentflow.Outcome) error {
 		return output.WriteReparentJSON(p.Cmd.OutOrStdout(), outcome.Results)
 	}
 
-	output.Frame(p.Cmd.OutOrStdout(), func() {
+	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
 		for _, result := range outcome.Results {
-			output.Success(p.Cmd.OutOrStdout(), fmt.Sprintf(domain.ReparentedFmt, result.Branch, result.OldParent, result.NewParent))
+			output.Success(w, fmt.Sprintf(domain.ReparentedFmt, result.Branch, result.OldParent, result.NewParent))
 		}
-		output.Message(p.Cmd.OutOrStdout(), reparentSyncHint(outcome.Results))
+		output.NextStep(w, output.NextStepParams{
+			Command: reparentSyncHint(outcome.Results),
+			Note:    domain.ReparentSyncHintNote,
+		})
 	})
 	return nil
 }
@@ -205,13 +229,13 @@ func (p ffPresenter) FastForwarded(outcome ffflow.Outcome) error {
 		return output.WriteFastForwardJSON(p.Cmd.OutOrStdout(), outcome.Results)
 	}
 	if outcome.Empty {
-		output.Frame(p.Cmd.OutOrStdout(), func() {
-			output.Message(p.Cmd.OutOrStdout(), domain.FastForwardNothingToDo)
+		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			output.Unchanged(w, domain.FastForwardNothingToDo)
 		})
 		return nil
 	}
-	output.Frame(p.Cmd.OutOrStdout(), func() {
-		output.FormatFastForwardResults(p.Cmd.OutOrStdout(), outcome.Results)
+	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		output.FormatFastForwardResults(w, outcome.Results)
 	})
 	return nil
 }

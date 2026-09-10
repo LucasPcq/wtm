@@ -3,6 +3,7 @@ package wt
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -159,7 +160,7 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 	// wait as far as the reader is concerned, and two boxes in a row flicker.
 	if err := components.RunLoading(components.LoadingParams{
 		Message: domain.EnvScanLoading,
-		Animate: true,
+		Animate: shared.Animate(cmd, true),
 		Work: func() error {
 			var err error
 			statuses, err = worktree.List(domain.ListParams{
@@ -328,8 +329,8 @@ func writeEnvResult(cmd *cobra.Command, result domain.EnvSyncResult, format stri
 	if format == domain.OutputJSON {
 		return output.WriteEnvJSON(cmd.OutOrStdout(), result)
 	}
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.PrintEnvReport(cmd.OutOrStdout(), result)
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.PrintEnvReport(w, result)
 	})
 	return nil
 }
@@ -374,8 +375,8 @@ func resolveEnvStrategyAndParent(cfg shared.ConfigResult, branch, from string) e
 // abortedEnv prints the framed "Aborted." line on the human path and returns nil.
 func abortedEnv(cmd *cobra.Command, format string) error {
 	if rules.IsHumanFormat(format) {
-		output.Frame(cmd.OutOrStdout(), func() {
-			output.Message(cmd.OutOrStdout(), "Aborted.")
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			output.Unchanged(w, domain.AbortedMessage)
 		})
 	}
 	return nil

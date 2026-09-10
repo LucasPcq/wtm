@@ -9,7 +9,8 @@ wtm [flags]
 ### Options
 
 ```
-  -h, --help   help for wtm
+  -h, --help    help for wtm
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
 ```
 
 ### SEE ALSO

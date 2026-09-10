@@ -120,6 +120,23 @@ type CreateHooksParams struct {
 	Hooks        []HookCommand
 	// Output receives the hook output as it is produced; nil keeps stderr.
 	Output io.Writer
+	// OnHook receives each hook starting and finishing. A surface that reports
+	// the beats itself sets it; nil leaves the runner to write them to Output.
+	OnHook func(HookBeat)
+}
+
+// HookBeat is one beat of a lifecycle-hook phase: the same hook is reported
+// starting, then finished. It carries facts and no rendering — whether a
+// finished hook reads as a line, a glyph or nothing at all is the surface's.
+type HookBeat struct {
+	Cmd string
+	Cwd string
+	// Started distinguishes the two beats; a finished hook carries the rest.
+	Started  bool
+	Duration time.Duration
+	// Err is empty on success, and Stderr what a failing hook wrote there.
+	Err    string
+	Stderr string
 }
 
 // CreateResult holds the output of a successful worktree creation.
@@ -167,6 +184,9 @@ type CleanHooksParams struct {
 	Hooks        []HookCommand
 	// Output receives the hook output as it is produced; nil keeps stderr.
 	Output io.Writer
+	// OnHook receives each hook starting and finishing. A surface that reports
+	// the beats itself sets it; nil leaves the runner to write them to Output.
+	OnHook func(HookBeat)
 }
 
 // ForceCleanParams holds inputs for the forced worktree recovery: delete the

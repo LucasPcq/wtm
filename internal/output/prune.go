@@ -3,6 +3,7 @@ package output
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -41,18 +42,27 @@ func FormatPrunePlan(w io.Writer, plan domain.PrunePlan) {
 	}
 }
 
-// FormatPruneResult renders the outcome of an executed prune: a success line per
-// removed worktree, the reparenting applied, any children left orphaned, and
-// skipped-with-reason warnings. Raw body — the command's frame owns the padding.
+// FormatPruneResult renders the outcome of an executed prune: what was removed,
+// counted and named on one line, then a line for each thing the reader still has
+// to deal with. A prune names what it destroyed — knowing what is gone is
+// actionable — but the picker and the recap have already shown that list twice,
+// so it does not get a line each. Raw body — the command's frame owns the padding.
 func FormatPruneResult(w io.Writer, result domain.PruneResult) {
 	if len(result.Pruned) == 0 {
-		Message(w, "Nothing to prune.")
+		Unchanged(w, domain.PruneNothingToPrune)
 	}
-	for _, c := range result.Pruned {
-		Success(w, fmt.Sprintf("Pruned %s (%s)", c.Branch, rules.PruneReasonLabel(c.Reason)))
+	if len(result.Pruned) > 0 {
+		Success(w, Tally(
+			TallyPart{Count: len(result.Pruned), Label: domain.TallyPruned},
+			TallyPart{Count: len(result.Reparented), Label: domain.TallyReparented},
+			TallyPart{Count: len(result.Skipped), Label: domain.TallySkipped},
+		))
+		Message(w, Indent+strings.Join(rules.PrunedBranches(result), ", "))
 	}
-	for _, r := range result.Reparented {
-		Success(w, fmt.Sprintf("Reparented %s onto %s", r.Branch, r.NewParent))
+	// Which parent a child was moved onto is not accounting: its next `wtm sync`
+	// rebases onto that branch.
+	if len(result.Reparented) > 0 {
+		Message(w, Indent+strings.Join(rules.ReparentedPairs(result.Reparented), ", "))
 	}
 	for _, o := range result.Orphaned {
 		Warning(w, fmt.Sprintf("%s still points at the removed parent %s — reparent it with `wtm reparent`", o.Branch, o.OldParent))

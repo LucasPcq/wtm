@@ -44,3 +44,16 @@ func DaemonVersionLabel(version string) string {
 	}
 	return version
 }
+
+// WorktreeJobsHaveErrors reports whether any job of any worktree refused the
+// action, which is what decides whether the failures get a block of their own.
+func WorktreeJobsHaveErrors(results []domain.WorktreeJobResults) bool {
+	for _, worktree := range results {
+		for _, job := range worktree.Jobs {
+			if job.Status == domain.JobActionError {
+				return true
+			}
+		}
+	}
+	return false
+}

@@ -22,6 +22,12 @@ wtm run profile rm [name] [flags]
   -y, --yes             Skip the picker; [name] is then required
 ```
 
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+```
+
 ### SEE ALSO
 
 * [wtm run profile](wtm_run_profile.md)	 - Add, remove, or edit profiles in run.toml

@@ -2,6 +2,7 @@ package wt
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -54,7 +55,7 @@ func runTree(cmd *cobra.Command, _ []string) error {
 	var forest domain.Forest
 	err = components.RunLoading(components.LoadingParams{
 		Message: "Building worktree tree…",
-		Animate: rules.IsHumanFormat(format),
+		Animate: shared.Animate(cmd, rules.IsHumanFormat(format)),
 		Work: func() error {
 			var prs []domain.PRInfo
 			if withPRs {
@@ -80,8 +81,8 @@ func runTree(cmd *cobra.Command, _ []string) error {
 	case domain.OutputMermaid:
 		return output.WriteTreeMermaid(cmd.OutOrStdout(), forest)
 	default:
-		output.Frame(cmd.OutOrStdout(), func() {
-			fmt.Fprintln(cmd.OutOrStdout(), strings.TrimRight(output.FormatTree(forest), "\n"))
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			fmt.Fprintln(w, strings.TrimRight(output.FormatTree(forest), "\n"))
 		})
 		return nil
 	}

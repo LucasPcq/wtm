@@ -5,6 +5,7 @@ package checkout
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 
@@ -101,7 +102,7 @@ func checkoutByNumber(cmd *cobra.Command, result shared.ConfigResult, number int
 	var p domain.PRInfo
 	err := components.RunLoading(components.LoadingParams{
 		Message: "Fetching PR…",
-		Animate: !opts.jsonMode,
+		Animate: shared.Animate(cmd, !opts.jsonMode),
 		Work: func() error {
 			var e error
 			p, e = ghservice.GetPRDetail(ghservice.GetPRDetailParams{
@@ -268,7 +269,7 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 
 	fetchErr := components.RunLoading(components.LoadingParams{
 		Message: "Fetching branch from origin…",
-		Animate: !params.jsonMode,
+		Animate: shared.Animate(cmd, !params.jsonMode),
 		Work: func() error {
 			return infra.FetchBranch(infra.FetchBranchParams{
 				ProjectDir: result.ProjectDir,
@@ -293,7 +294,7 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 	if reused {
 		startPoint = ""
 		if params.interactive {
-			updated, ok := reconcileReusedBranch(reconcileReusedBranchParams{ProjectDir: result.ProjectDir, Target: target})
+			updated, ok := reconcileReusedBranch(reconcileReusedBranchParams{Cmd: cmd, ProjectDir: result.ProjectDir, Target: target})
 			if !ok {
 				return nil
 			}
@@ -301,21 +302,26 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 		}
 	}
 
-	if !params.jsonMode {
-		output.Loading(cmd.ErrOrStderr(), fmt.Sprintf("Creating worktree %s…", p.Branch))
-	}
-	createResult, err := worktree.Create(domain.CreateParams{
-		ProjectDir:      result.ProjectDir,
-		StateDir:        result.StateDir,
-		Branch:          p.Branch,
-		FromBranch:      startPoint,
-		SourceBranch:    params.parent,
-		Config:          result.Config,
-		EnvFromOverride: params.env,
-		SkipHooks:       true,
-	})
-	if err != nil {
-		return err
+	var createResult domain.CreateResult
+	var err error
+	if loadErr := components.RunLoading(components.LoadingParams{
+		Message: fmt.Sprintf("Creating worktree %s…", p.Branch),
+		Animate: shared.Animate(cmd, !params.jsonMode),
+		Work: func() error {
+			createResult, err = worktree.Create(domain.CreateParams{
+				ProjectDir:      result.ProjectDir,
+				StateDir:        result.StateDir,
+				Branch:          p.Branch,
+				FromBranch:      startPoint,
+				SourceBranch:    params.parent,
+				Config:          result.Config,
+				EnvFromOverride: params.env,
+				SkipHooks:       true,
+			})
+			return err
+		},
+	}); loadErr != nil {
+		return loadErr
 	}
 
 	// on_create hooks as a distinct, titled phase (shared with create/extract).
@@ -346,8 +352,8 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 		})
 	}
 
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.Success(cmd.OutOrStdout(), fmt.Sprintf("Checked out PR #%d (%s) at %s", p.Number, p.Branch, createResult.Path))
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.Success(w, fmt.Sprintf("Checked out PR #%d (%s) at %s", p.Number, p.Branch, createResult.Path))
 		if createResult.ExistingBranch {
 			note := shared.ReusedBranchNote(shared.ReusedBranchNoteParams{
 				Branch: target.Branch,
@@ -355,18 +361,19 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 				Behind: target.AheadBehind.Behind,
 			})
 			if note.Warning {
-				output.Warning(cmd.OutOrStdout(), note.Text)
+				output.Warning(w, note.Text)
 			} else {
-				output.Message(cmd.OutOrStdout(), note.Text)
+				output.Message(w, note.Text)
 			}
 		}
-		output.GoHint(cmd.OutOrStdout(), fmt.Sprintf(domain.GoCommandFmt, p.Branch))
+		output.NextStep(w, output.NextStepParams{Command: fmt.Sprintf(domain.GoCommandFmt, p.Branch)})
 	})
 	return nil
 }
 
 // reconcileReusedBranchParams holds inputs for reconcileReusedBranch.
 type reconcileReusedBranchParams struct {
+	Cmd        *cobra.Command
 	ProjectDir string
 	Target     domain.BranchTarget
 }
@@ -394,7 +401,7 @@ func reconcileReusedBranch(p reconcileReusedBranchParams) (updated domain.Branch
 
 	ffErr := components.RunLoading(components.LoadingParams{
 		Message: fmt.Sprintf(domain.SourceFastForwardLoadingFmt, target.Branch),
-		Animate: true,
+		Animate: shared.Animate(p.Cmd, true),
 		Work: func() error {
 			return branch.FastForwardToOrigin(branch.BranchParams{ProjectDir: p.ProjectDir, Branch: target.Branch})
 		},

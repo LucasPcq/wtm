@@ -175,10 +175,17 @@ func envFallbackPrompt(projectDir string, config domain.Config, source, override
 
 // executeFastForwardSource returns false only when the post-failure recovery
 // ("create from the stale branch anyway?") is declined.
-func executeFastForwardSource(projectDir, source string) bool {
+type fastForwardSourceParams struct {
+	Cmd        *cobra.Command
+	ProjectDir string
+	Source     string
+}
+
+func executeFastForwardSource(params fastForwardSourceParams) bool {
+	projectDir, source := params.ProjectDir, params.Source
 	ffErr := components.RunLoading(components.LoadingParams{
 		Message: fmt.Sprintf(domain.SourceFastForwardLoadingFmt, source),
-		Animate: true,
+		Animate: shared.Animate(params.Cmd, true),
 		Work: func() error {
 			return branch.FastForwardToOrigin(branch.BranchParams{ProjectDir: projectDir, Branch: source})
 		},
@@ -197,7 +204,8 @@ func executeFastForwardSource(projectDir, source string) bool {
 
 // maybeFastForwardSource reconciles a --from source where no wizard hosts the
 // confirmation. Returns false only when the user cancels creation.
-func maybeFastForwardSource(projectDir, source string) bool {
+func maybeFastForwardSource(params fastForwardSourceParams) bool {
+	projectDir, source := params.ProjectDir, params.Source
 	prompt := sourceUpdatePrompt(sourceUpdatePromptParams{
 		ProjectDir: projectDir,
 		Target:     memoizedTarget(projectDir),
@@ -213,5 +221,5 @@ func maybeFastForwardSource(projectDir, source string) bool {
 	if !confirmed {
 		return true
 	}
-	return executeFastForwardSource(projectDir, source)
+	return executeFastForwardSource(params)
 }

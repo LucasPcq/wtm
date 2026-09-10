@@ -3,6 +3,7 @@ package shared
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -65,6 +66,14 @@ func LoadConfig(cmd *cobra.Command, dir string) (ConfigResult, error) {
 }
 
 // AddOutputFlag registers the standard --output flag on cmd.
+// Animate answers whether a spinner may draw: a run whose writers were replaced
+// by io.Discard asked for silence, and a spinner is progress like any other.
+// It reads the writer rather than the flag because that is what --quiet actually
+// did, and a surface handed a discarded stream is silent whoever silenced it.
+func Animate(cmd *cobra.Command, want bool) bool {
+	return want && cmd.ErrOrStderr() != io.Discard
+}
+
 func AddOutputFlag(cmd *cobra.Command) {
 	cmd.Flags().String(domain.FlagOutput, domain.OutputText, "Output format: text or json")
 }

@@ -289,12 +289,15 @@ func indentOf(line string) int {
 // The declared ports come last and unaligned: a compose stack declaring seven
 // of them used to push every command off the screen.
 func TestFormatRunConfigShowsDeclaredPortsAfterTheCommand(t *testing.T) {
-	out := ansi.Strip(FormatRunConfig(domain.RunConfig{
-		Jobs: []domain.JobConfig{
-			{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm run dev",
-				Ports: map[string]int{"VITE_PORT": 5173}, URL: &domain.JobURLConfig{Port: "VITE_PORT"}},
-			{Name: "worker", Kind: domain.JobKindService, Cmd: "pnpm run worker"},
+	out := ansi.Strip(FormatRunConfig(FormatRunConfigParams{
+		Config: domain.RunConfig{
+			Jobs: []domain.JobConfig{
+				{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm run dev",
+					Ports: map[string]int{"VITE_PORT": 5173}, URL: &domain.JobURLConfig{Port: "VITE_PORT"}},
+				{Name: "worker", Kind: domain.JobKindService, Cmd: "pnpm run worker"},
+			},
 		},
+		Empty: domain.RunListEmpty,
 	}))
 
 	if !strings.Contains(out, "VITE_PORT=5173") {
@@ -307,5 +310,17 @@ func TestFormatRunConfigShowsDeclaredPortsAfterTheCommand(t *testing.T) {
 		if strings.Contains(line, "worker") && strings.HasSuffix(line, " ") {
 			t.Errorf("a job with no port left trailing padding: %q", line)
 		}
+	}
+}
+
+// An empty inventory is a non-event like any other, and it answers the question
+// that was actually asked: a jobs-only listing never mentions profiles.
+func TestFormatRunConfigEmptyNamesWhatWasAsked(t *testing.T) {
+	out := ansi.Strip(FormatRunConfig(FormatRunConfigParams{Empty: domain.RunJobsEmpty}))
+	if !strings.Contains(out, domain.GlyphUnchanged) {
+		t.Errorf("empty listing = %q, want the no-op glyph", out)
+	}
+	if strings.Contains(out, "profiles") {
+		t.Errorf("jobs-only listing = %q, want it to name jobs alone", out)
 	}
 }

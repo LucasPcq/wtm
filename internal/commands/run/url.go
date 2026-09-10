@@ -14,11 +14,12 @@ import (
 
 func newURLCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   domain.CmdURL + " [worktree]",
-		Short: "Print where a job is reachable in a worktree",
-		Long:  "Write a job's URL on stdout and nothing else, for $(…). [worktree] defaults to the current one, and no picker ever opens here — an ambiguity is an error naming --job. --raw prints the job's own port instead of its name, which every OS resolves and no proxy has to serve.",
-		Args:  cobra.MaximumNArgs(1),
-		RunE:  runURL,
+		Use:         domain.CmdURL + " [worktree]",
+		Annotations: map[string]string{domain.AnnotationMachineOutput: domain.AnnotationOn},
+		Short:       "Print where a job is reachable in a worktree",
+		Long:        "Write a job's URL on stdout and nothing else, for $(…). [worktree] defaults to the current one, and no picker ever opens here — an ambiguity is an error naming --job. --raw prints the job's own port instead of its name, which every OS resolves and no proxy has to serve.",
+		Args:        cobra.MaximumNArgs(1),
+		RunE:        runURL,
 	}
 	shared.AddJobFlag(cmd, "Job whose URL to print (required when several jobs publish one)")
 	cmd.Flags().Bool(domain.FlagRaw, false, "Print the direct http://localhost:<port> address")

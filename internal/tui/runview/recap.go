@@ -124,15 +124,16 @@ func (m Model) recap() string {
 		lines = append(lines, m.recapBlock(outcome)...)
 	}
 
-	hints := []string{styles.Muted.Render(domain.RunViewRecapLogsHint)}
+	hints := []string{styles.NextStepLine(styles.NextStepParams{Command: domain.RunStreamAttachHint, Note: domain.RunStreamAttachNote})}
 	if m.anythingStarted() {
-		hints = append(hints, styles.Muted.Render(domain.RunViewRecapDownHint))
+		hints = append(hints, styles.NextStepLine(styles.NextStepParams{Command: domain.RunStreamStopHint, Note: domain.RunStreamStopNote}))
 	}
 	body := strings.Join(append(lines, append([]string{""}, hints...)...), "\n")
 
 	return styles.RenderRecap(styles.IntroParams{
-		Width: m.width,
-		Title: domain.RunViewRecapTitle,
-		Body:  body,
+		Width:   m.width,
+		Title:   domain.RunViewRecapTitle,
+		Body:    body,
+		InFrame: true,
 	})
 }

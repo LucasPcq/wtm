@@ -4,7 +4,6 @@ package clean
 import (
 	"errors"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -249,15 +248,17 @@ func (f *cleanFlow) runHooks(worktreePath, branchName string) error {
 		return nil
 	}
 	return f.presenter.HookPhase(flow.HookPhaseParams{
-		Title: domain.HooksTitleOnClean,
-		Run: func(sink io.Writer) error {
+		Title:   domain.HooksTitleOnClean,
+		LogPath: rules.HooksLogPath(rules.HooksLogPathParams{StateDir: f.ctx.StateDir, Phase: domain.HookOnClean, Branch: branchName}),
+		Run: func(sink flow.HookSink) error {
 			return worktree.RunCleanHooks(domain.CleanHooksParams{
 				ProjectDir:   f.ctx.ProjectDir,
 				StateDir:     f.ctx.StateDir,
 				WorktreePath: worktreePath,
 				Branch:       branchName,
 				Hooks:        hooks,
-				Output:       sink,
+				Output:       sink.Output,
+				OnHook:       sink.OnHook,
 			})
 		},
 	})

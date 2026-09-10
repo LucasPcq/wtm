@@ -5,6 +5,7 @@ package profilecmd
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
 
@@ -43,14 +44,14 @@ func (p presenter) Changed(outcome profileflow.Outcome) error {
 		})
 	}
 
-	output.Frame(out, func() {
+	output.Frame(out, func(w io.Writer) {
 		switch outcome.Status {
 		case domain.JobActionUpdated:
-			output.Update(out, fmt.Sprintf(domain.RunProfileUpdatedFmt, outcome.Name))
+			output.Update(w, fmt.Sprintf(domain.RunProfileUpdatedFmt, outcome.Name))
 		case domain.JobActionRemoved:
-			output.Success(out, fmt.Sprintf(domain.RunProfileRemovedFmt, outcome.Name))
+			output.Success(w, fmt.Sprintf(domain.RunProfileRemovedFmt, outcome.Name))
 		default:
-			output.Success(out, fmt.Sprintf(domain.RunProfileAddedFmt, outcome.Name))
+			output.Success(w, fmt.Sprintf(domain.RunProfileAddedFmt, outcome.Name))
 		}
 	})
 	return nil

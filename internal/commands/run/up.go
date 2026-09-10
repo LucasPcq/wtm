@@ -2,6 +2,7 @@ package run
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
 
@@ -88,14 +89,22 @@ func runUp(cmd *cobra.Command, args []string) error {
 // warnings are advice, errors refuse the run.
 func reportRunConfig(cmd *cobra.Command, cfg domain.RunConfig) error {
 	warnings, errs := rules.ValidateRun(cfg)
-	for _, warning := range warnings {
-		output.Warning(cmd.ErrOrStderr(), warning)
+	if len(warnings) == 0 && len(errs) == 0 {
+		return nil
 	}
+	output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
+		for _, warning := range warnings {
+			output.Warning(w, warning)
+		}
+		for _, e := range errs {
+			output.Error(w, e)
+		}
+	})
 	if len(errs) == 0 {
 		return nil
 	}
-	for _, e := range errs {
-		output.Error(cmd.ErrOrStderr(), e)
-	}
-	return fmt.Errorf("invalid run config")
+	// The block above IS the report; ErrAborted is how a command says so without
+	// Execute printing a second, emptier line under it. The cause rides along for
+	// the run whose report went to io.Discard.
+	return fmt.Errorf("%w: %s", domain.ErrAborted, errs[0])
 }

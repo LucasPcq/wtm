@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
@@ -36,7 +38,7 @@ func sampleForest() domain.Forest {
 }
 
 func TestFormatTreeEmpty(t *testing.T) {
-	if got := FormatTree(domain.Forest{}); got != "No worktrees found." {
+	if got := ansi.Strip(FormatTree(domain.Forest{})); got != UnchangedLine(domain.NoWorktreesMessage) {
 		t.Errorf("unexpected output: %q", got)
 	}
 }

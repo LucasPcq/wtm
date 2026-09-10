@@ -342,7 +342,7 @@ func TestRecapNamesWhatIsRunningAndHowToActOnIt(t *testing.T) {
 	})
 
 	recap := ansi.Strip(h.model.result().Recap)
-	for _, want := range []string{"api, db", "migrate", domain.RunViewRecapLogsHint, domain.RunViewRecapDownHint} {
+	for _, want := range []string{"api, db", "migrate", domain.RunStreamAttachHint, domain.RunStreamStopHint} {
 		if !strings.Contains(recap, want) {
 			t.Fatalf("recap = %q, want %q", recap, want)
 		}
@@ -372,7 +372,7 @@ func TestRecapSaysWhenNothingIsLeftRunning(t *testing.T) {
 	if !strings.Contains(recap, domain.RunViewRecapNoneRunning) {
 		t.Fatalf("recap = %q, want it to say nothing is left running", recap)
 	}
-	if strings.Contains(recap, domain.RunViewRecapDownHint) {
+	if strings.Contains(recap, domain.RunStreamStopHint) {
 		t.Fatal("the recap offers to stop jobs that are not running")
 	}
 }

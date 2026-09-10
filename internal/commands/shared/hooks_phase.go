@@ -4,7 +4,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
 
@@ -30,15 +31,28 @@ func RunCreateHooksPhase(p CreateHooksPhaseParams) error {
 	if len(p.Hooks) == 0 {
 		return nil
 	}
-	if p.ShowHeader {
-		output.HooksSection(p.Cmd.ErrOrStderr(), domain.HooksTitleOnCreate)
-	}
-	return worktree.RunCreateHooks(domain.CreateHooksParams{
+
+	params := domain.CreateHooksParams{
 		ProjectDir:   p.ProjectDir,
 		StateDir:     p.StateDir,
 		WorktreePath: p.WorktreePath,
 		Branch:       p.Branch,
 		FromBranch:   p.FromBranch,
 		Hooks:        p.Hooks,
+	}
+
+	return DrawHookPhase(DrawHookPhaseParams{
+		Stderr: p.Cmd.ErrOrStderr(),
+		Human:  p.ShowHeader,
+		Title:  domain.HooksTitleOnCreate,
+		LogPath: rules.HooksLogPath(rules.HooksLogPathParams{
+			StateDir: p.StateDir,
+			Phase:    domain.HookOnCreate,
+			Branch:   p.Branch,
+		}),
+		Run: func(sink flow.HookSink) error {
+			params.Output, params.OnHook = sink.Output, sink.OnHook
+			return worktree.RunCreateHooks(params)
+		},
 	})
 }

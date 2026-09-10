@@ -90,8 +90,8 @@ func TestEnvOutcomeSummaryCountsThePortPass(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			got := EnvOutcomeSummary(c.result)
-			if got.Text != c.want || got.Done != c.done {
-				t.Errorf("EnvOutcomeSummary() = %+v, want {%q %v}", got, c.want, c.done)
+			if got.Text != c.want || (got.Verdict == domain.EnvVerdictDone) != c.done {
+				t.Errorf("EnvOutcomeSummary() = %+v, want {%q done=%v}", got, c.want, c.done)
 			}
 		})
 	}
@@ -99,14 +99,16 @@ func TestEnvOutcomeSummaryCountsThePortPass(t *testing.T) {
 
 func TestEnvOutcomeSummaryCheckMode(t *testing.T) {
 	clean := domain.EnvSyncResult{Check: true, Files: []domain.EnvFileResult{{Target: ".env"}}}
-	if got := EnvOutcomeSummary(clean); got.Text != "No drift." || !got.Done {
+	if got := EnvOutcomeSummary(clean); got.Text != "No drift." || got.Verdict != domain.EnvVerdictDone {
 		t.Errorf("EnvOutcomeSummary() = %+v, want a clean verdict", got)
 	}
 
 	// --check must not answer "no drift" about a worktree whose .env still points
 	// at another worktree's services.
 	drifting := domain.EnvSyncResult{Check: true, Files: []domain.EnvFileResult{{Target: ".env"}}, Ports: planWithRewrites(t, 1)}
-	if got := EnvOutcomeSummary(drifting); got.Done {
+	// Drift found is not "nothing to do": it reads in the register that says the
+	// reader has something left to act on.
+	if got := EnvOutcomeSummary(drifting); got.Verdict != domain.EnvVerdictAttention {
 		t.Errorf("EnvOutcomeSummary() = %+v, want drift reported for a pending port shift", got)
 	}
 }
@@ -132,7 +134,7 @@ func TestEnvSummaryRefusesToCallAnUnresolvableFileClean(t *testing.T) {
 		},
 	})
 
-	if summary.Done {
+	if summary.Verdict == domain.EnvVerdictDone {
 		t.Error("summary reported the run as done over a file that exists nowhere")
 	}
 	if !strings.Contains(summary.Text, "1") {

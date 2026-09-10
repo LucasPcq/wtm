@@ -124,6 +124,71 @@ const (
 	// RecapFrameChrome is what a wizard recap spends around its body: the
 	// indentation on either side and the border between them.
 	RecapFrameChrome = 8
+	// A conclusion's counted summary: "3 applied · 1 skipped", zero counts dropped.
+	TallyPartFmt       = "%d %s"
+	TallyApplied       = "applied"
+	TallyFastForwarded = "fast-forwarded"
+	TallyUpToDate      = "already up to date"
+	TallyFailed        = "failed"
+	TallyAdded         = "added"
+	TallyRemoved       = "removed"
+	TallyKept          = "kept"
+	TallySkipped       = "skipped"
+	TallyBlocked       = "blocked"
+	TallyPruned        = "pruned"
+	ReparentedPairFmt  = "%s → %s"
+	TallyReparented    = "reparented"
+	TallySeparator     = " · "
+	// The glyph vocabulary. Six runes, one register each, and no seventh: a line
+	// that fits none of them is not a line that needs a new glyph, it is a line
+	// that has not decided what it says. Each is one column wide and carries the
+	// only colour on its row — the message beside it stays in the terminal's own
+	// foreground, so a block reads as text with a margin of signals rather than
+	// as a wall of colour.
+	GlyphSuccess = "✓"
+	// GlyphAttention is something left for the reader to act on, the run
+	// carrying on regardless. There is no red counterpart: a refusal and a crash
+	// are the same register, and which of the two it was belongs in the sentence.
+	GlyphAttention = "!"
+	GlyphFailure   = "✗"
+	// GlyphUnchanged is the one register whose whole line is muted, because the
+	// line itself is the non-event: already in the desired state, nothing done.
+	GlyphUnchanged = "="
+	// GlyphProgress is ephemeral by contract — a line drawn only to be erased.
+	// Anything that survives in the scrollback takes another glyph.
+	GlyphProgress = "›"
+	// GlyphUpdate is an existing thing replaced rather than created.
+	GlyphUpdate = "↻"
+
+	// MoveArrowGlyph is punctuation inside a value — `branch → path` — never the
+	// head of a line. It shares the rune with NextStepGlyph and nothing else: at
+	// the head of a line an arrow always means "what to do next".
+	MoveArrowGlyph = "→"
+	// DryRunNoChanges closes a preview. A preview is the answer to what was
+	// asked, so it goes to stdout like any other result — `prune --dry-run`
+	// always did, and `relocate --dry-run` wrote the same thing to stderr.
+	DryRunNoChanges = "Dry run — no changes made."
+	// SyncPlanEmpty and SyncNothingToPush are non-events, so they take the `=`
+	// register rather than a muted bare line — which is the same thing with the
+	// glyph filed off.
+	SyncPlanEmpty     = "No worktrees to sync."
+	SyncNothingToPush = "Everything is in sync with origin — nothing to push."
+	// HookLogTailLabel labels the path a collapsed phase kept its output at. A
+	// label is chrome, so it is muted and the path is not.
+	HookLogTailLabel = "full output:"
+
+	// NextStepGlyph opens the one forward-pointing line of a conclusion, and
+	// NextStepNoteSeparator holds off what the command does from the command.
+	NextStepGlyph         = "→"
+	NextStepNoteSeparator = "   "
+
+	// AccentBarGlyph is the left rule marking a block as wtm's own output. It sits
+	// in column zero, left of everything else the CLI prints, which is what makes
+	// it a marker rather than one more indent.
+	AccentBarGlyph = "┃"
+	// AccentBarWidth is the room it takes from whatever draws inside it.
+	AccentBarWidth = 1
+
 	// Ellipsis marks a value the display cut short.
 	Ellipsis = "\u2026"
 
@@ -312,34 +377,40 @@ const (
 
 	// What `wtm run proxy status` prints, and the callout it raises when the
 	// redirection is declared but does not reach the proxy that is running.
-	ProxyStatusTitle        = "Run proxy"
-	ProxyStatusBindFmt      = "Bind port: %d"
-	ProxyStatusPublicFmt    = "Public port: %s"
-	ProxyStatusRedirectFmt  = "Redirection: %s"
-	ProxyStatusConfigFmt    = "Config: %s"
-	ProxyStatusExampleFmt   = "Example: %s"
-	ProxyStatusUnsupported  = "not implemented on this platform — named URLs keep their port"
-	ProxyStatusNotInstalled = "not installed — `wtm run proxy install` serves named URLs on port 80"
-	ProxyStatusInstalledFmt = "installed (%s) → port %d"
+	ProxyStatusTitle = "Run proxy"
+	// The readout's fields. Labels only: the alignment is output.Announce's, and
+	// hand-spacing it inside the wording is how two sibling readouts ended up
+	// aligned two different ways.
+	ProxyStatusBindLabel    = "Bind port"
+	ProxyStatusPublicLabel  = "Public port"
+	ProxyStatusConfigLabel  = "Config"
+	ProxyStatusExampleLabel = "Example"
+	// The conclusion the readout hangs under. `not installed` is a non-event and
+	// takes the `=` register rather than hiding as a field value.
+	ProxyStatusUnsupported  = "Redirection not implemented on this platform — named URLs keep their port"
+	ProxyStatusNotInstalled = "Redirection not installed — named URLs carry their port"
+	ProxyStatusInstalledFmt = "Redirection installed (%s) → port %d"
 	ProxyDivergedTitle      = "The redirection does not reach this proxy"
 	ProxyDivergedLine       = "Port 80 is redirected, but what answers there is not the proxy now running"
 	ProxyDivergedFix        = "Re-run `wtm run proxy install` to point it at the port the proxy actually bound"
 
 	// The install and uninstall recaps name the file and the command; the
 	// contents are a --dry-run away.
-	ProxyInstallRecapTitleFmt  = "wtm will change %d file(s) in your home directory"
-	ProxyInstallRecapScript    = "and run"
-	ProxyPlanFileFmt           = "%s\n    %s"
-	ProxyInstallRecapReverse   = "`wtm run proxy uninstall` reverses every change"
-	ProxyInstallRecapFull      = "`wtm run proxy install --dry-run` prints the file in full and writes nothing"
-	ProxyInstallConfirmTitle   = "Install the redirection?"
-	ProxyInstallConfirmDesc    = "No sudo, no system file: launchd binds port 80 for you. `wtm run proxy uninstall` reverses it."
-	ProxyInstallDone           = "Port 80 now reaches the run proxy — named URLs drop their port"
-	ProxyUninstallRecapTitle   = "wtm will remove this LaunchAgent"
-	ProxyUninstallConfirmTitle = "Remove the redirection?"
-	ProxyUninstallConfirmDesc  = "Named URLs go back to carrying the proxy's port."
-	ProxyUninstallDone         = "Redirection removed — named URLs carry the proxy's port again"
-	ProxyUninstallChange       = "unloaded from launchd and deleted"
+	ProxyInstallRecapTitleFmt    = "wtm will change %d file(s) in your home directory"
+	ProxyInstallRecapScript      = "and run"
+	ProxyPlanFileFmt             = "%s\n    %s"
+	ProxyInstallRecapReverse     = "wtm run proxy uninstall"
+	ProxyInstallRecapReverseNote = "reverses every change"
+	ProxyInstallRecapFull        = "wtm run proxy install --dry-run"
+	ProxyInstallRecapFullNote    = "print the files in full, write nothing"
+	ProxyInstallConfirmTitle     = "Install the redirection?"
+	ProxyInstallConfirmDesc      = "No sudo, no system file: launchd binds port 80 for you. `wtm run proxy uninstall` reverses it."
+	ProxyInstallDone             = "Port 80 now reaches the run proxy — named URLs drop their port"
+	ProxyUninstallRecapTitle     = "wtm will remove this LaunchAgent"
+	ProxyUninstallConfirmTitle   = "Remove the redirection?"
+	ProxyUninstallConfirmDesc    = "Named URLs go back to carrying the proxy's port."
+	ProxyUninstallDone           = "Redirection removed — named URLs carry the proxy's port again"
+	ProxyUninstallChange         = "unloaded from launchd and deleted"
 
 	// The one place wtm mentions the redirection outside its own commands.
 	// ProxyHostShape names the shape rather than one job: run init speaks about
@@ -444,15 +515,28 @@ const (
 	ComposeFixDefaultFmt = "add a default, e.g. %s"
 
 	// The section titles of the compose port report.
-	ComposePatchedTitle  = "Compose ports templatized"
-	ComposePortsTitle    = "Ports declared"
+	// The detection of `run init`, counted rather than listed: run.toml is the
+	// record of what was written.
+	// RunInitConfiguredFmt heads the conclusion with where the config went and
+	// what changed in it, counted.
+	RunInitConfiguredFmt  = "Configured run module → %s   %s"
+	RunInitNextUp         = "wtm run up"
+	RunInitNextUpNote     = "start the jobs"
+	RunInitNextJobAdd     = "wtm run job add"
+	RunInitNextJobAddNote = "declare another"
+
+	DetectedPortsSummaryFmt = "%d port(s) declared in run.toml"
+	DetectedPortsPatchedFmt = ", %d compose file(s) templatized"
+	EnvPortLinksSummaryFmt  = "%d .env value(s) now follow a port"
+	PortKeysSummaryFmt      = "%d port(s) written into the env files"
+	ComposeNamesSummaryFmt  = "%d compose name(s) scoped to the worktree"
+
 	ComposeWithheldTitle = "Ports left alone"
 	ComposeDroppedTitle  = "Ports withdrawn — they could not coexist"
 	// ComposeFixIndentFmt indents the geste under the port it belongs to.
 	ComposeFixIndentFmt = "  %s"
 
 	// The section titles of the absolute-name report.
-	ComposeNamesPatchedTitle  = "Compose names scoped to the worktree"
 	ComposeNamesWithheldTitle = "Names left alone"
 	// ComposeNamesVolumeWarning follows a renamed volume: the isolation is the
 	// point, but the data already written does not travel into it, and a reader
@@ -507,10 +591,26 @@ const (
 	// .env hint is there because the write reconciles nothing: the values a job
 	// reads still hold whatever the previous config left them at.
 	ImportEmptyMessage = "run.toml replaced by an empty configuration."
-	ImportJobsFmt      = "%d job(s): %s"
-	ImportProfilesFmt  = "%d profile(s): %s"
-	ImportEnvPortsFmt  = "%d .env port link(s)"
-	ImportEnvHint      = "Run `wtm env` to reconcile the .env files against this configuration."
+	// The empty-detection branch of `run init`: nothing was configured, so it is
+	// a non-event, and what to do about it is two commands like anywhere else.
+	RunInitNothingDetected = "No docker-compose files or package scripts detected — nothing to configure automatically."
+	RunInitByHandJob       = "wtm run job add"
+	RunInitByHandJobNote   = "declare a job by hand"
+	RunInitByHandProfile   = "wtm run profile add"
+	RunInitByHandProfNote  = "group jobs into a profile"
+	// The already-configured branch of `wtm init`.
+	InitAlreadyExistsFmt = "%s already exists."
+	InitReconfigureCmd   = "wtm init --only env|hooks|worktrees"
+	InitReconfigureNote  = "reconfigure one section"
+	InitEditCmd          = "wtm config edit"
+	InitEditNote         = "edit it by hand"
+	InitRunInitCmd       = "wtm run init"
+	InitRunInitNote      = "configure per-worktree services"
+	ImportJobsFmt        = "%d job(s): %s"
+	ImportProfilesFmt    = "%d profile(s): %s"
+	ImportEnvPortsFmt    = "%d .env port link(s)"
+	ImportEnvHint        = "wtm env"
+	ImportEnvHintNote    = "reconcile the .env files against this configuration"
 
 	ImportNeedsYesFmt    = "replacing run.toml is destructive: pass --%s to confirm it without a prompt"
 	ImportDeclined       = "run.toml left unchanged."
@@ -556,12 +656,7 @@ const (
 	FlagNoProbe = "no-probe"
 
 	// The .env port report ([[env_port]] links resolved for one worktree).
-	EnvPortsTitle = "Env ports"
-	// EnvOwnedKeysTitle heads the worktree identity a .env carries, and
-	// EnvOwnedKeyLineFmt spells one of its keys.
-	EnvOwnedKeysTitle  = "Worktree identity"
-	EnvOwnedKeyLineFmt = "%s → %s"
-
+	EnvPortsTitle       = "Env ports"
 	EnvPortOffsetPrefix = "offset +"
 	// EnvPortTableRowFmt aligns key, port name, the port move, and the value the
 	// key lands on — the only column that can be long, and the only one elided.
@@ -611,11 +706,11 @@ const (
 	// The trailing verdict of `wtm env`.
 	EnvCheckDriftMessage = "Read-only check — run `wtm env` to reconcile."
 	// EnvFileInSyncMessage closes a file block with nothing to do.
-	// EnvFileKeysInSyncMessage replaces it when the port pass below still moves
-	// a value in that same file — "in sync" there would contradict the next
-	// section about the very same file.
+	// EnvFileKeysInSyncMessage replaces it when the port pass still moves
+	// a value in that same file — "in sync" there would contradict the summary
+	// counting that very file's linked values as settled.
 	EnvFileInSyncMessage     = "in sync — nothing to reconcile"
-	EnvFileKeysInSyncMessage = "keys in sync — port values below"
+	EnvFileKeysInSyncMessage = "keys in sync — its linked port values still move"
 
 	// The detail column of a file block's key rows.
 	EnvKeyRowGap         = "  "
@@ -641,8 +736,20 @@ const (
 	// port pass is proposed, as `wtm create` proposes it, and never imposed.
 	EnvApplyActionLabel       = "Yes, apply"
 	EnvApplyWithoutPortsLabel = "Apply, but leave the port values alone"
-	// EnvPortsLeftAloneFmt replaces the table when the pass was declined.
-	EnvPortsLeftAloneFmt       = "Env ports left alone — %d linked value(s) left as they were"
+	// EnvPortsLeftAloneFmt is the pass the user declined.
+	EnvPortsLeftAloneFmt = "Env ports left alone — %d linked value(s) left as they were"
+	// EnvPortsWouldShiftFmt is what a --check preview says instead of listing
+	// every value: the count and the offset are the whole of the decision, and
+	// the values are in the files the report already names.
+	EnvPortsWouldShiftFmt = "%d linked .env value(s) would be shifted (offset +%d)"
+	// EnvPortsRecapShiftedFmt and EnvPortsRecapKeptFmt qualify the env line of a
+	// create-like recap, where the port pass is a side effect rather than the
+	// subject.
+	EnvPortsRecapShiftedFmt = "%d port(s) shifted (+%d)"
+	EnvPortsRecapKeptFmt    = "%d linked value(s) left as they were"
+	// EnvRecapNoteSeparator joins a recap value to the note qualifying it.
+	EnvRecapNoteSeparator = " · "
+
 	EnvCheckCleanMessage       = "No drift."
 	EnvNothingWrittenMessage   = "No changes written."
 	EnvReconciledFmt           = "Reconciled %d file(s)."
@@ -659,14 +766,12 @@ const (
 	EnvPortLinkByDirFmt  = "%s   follows %s (%d, matched by directory)"
 	EnvPortJobSeparator  = "."
 	EnvPortLinkSeparator = " · "
-	EnvPortsLinkedTitle  = "Env keys now following a port"
 
 	// PortKeysTitle heads the keys a run has just materialized, and
 	// PortKeyLineFmt spells one: the file it landed in, the key and its base.
 	// PortKeyTargetSuffix marks a file the project did not provision yet.
 	PortKeysTitle       = "Ports written into the env files"
 	PortKeyColumnSep    = "   "
-	PortKeyLineFmt      = "%s" + PortKeyColumnSep + "%s=%d"
 	PortKeyTargetSuffix = "   (+ env target)"
 
 	// The route step: where a job learns the port it binds. The .env route is
@@ -745,7 +850,6 @@ const (
 	// The .env port report. Unlike a compose mapping, a declared port only
 	// isolates the job if its command actually reads the variable — which wtm
 	// does not know and does not guess, so the notice asks.
-	EnvPortsDetectedTitle   = "Ports detected from .env"
 	EnvPortDetectedLineFmt  = "%s · %s=%d (%s)"
 	PortIsolationTitle      = "These jobs will bind the same port in every worktree"
 	PortIsolationLineFmt    = "%s   %s"
@@ -783,34 +887,43 @@ const (
 	ComposeProjectFallback = "wtm"
 
 	// Flag names.
-	FlagFrom       = "from"
-	FlagFF         = "ff"
-	FlagEnvFrom    = "env-from"
-	FlagForce      = "force"
-	FlagBase       = "base"
-	FlagExclusive  = "exclusive"
-	FlagParallel   = "parallel"
-	FlagDetach     = "detach"
-	FlagProfile    = "profile"
-	FlagOutput     = "output"
-	FlagYes        = "yes"
-	FlagAll        = "all"
-	FlagGlobal     = "global"
-	FlagMine       = "mine"
-	FlagReview     = "review"
-	FlagCmd        = "cmd"
-	FlagKind       = "kind"
-	FlagStop       = "stop"
-	FlagCwd        = "cwd"
-	FlagPort       = "port"
-	FlagName       = "name"
-	FlagJob        = "job"
-	FlagJobs       = "jobs"
-	FlagDefault    = "default"
-	FlagTo         = "to"
-	FlagKeep       = "keep"
-	FlagFiles      = "files"
-	FlagOnConflict = "on-conflict"
+	FlagFrom      = "from"
+	FlagFF        = "ff"
+	FlagEnvFrom   = "env-from"
+	FlagForce     = "force"
+	FlagBase      = "base"
+	FlagExclusive = "exclusive"
+	FlagParallel  = "parallel"
+	FlagDetach    = "detach"
+	FlagProfile   = "profile"
+	FlagOutput    = "output"
+	// FlagQuiet silences a command's human output. It is the output axis, not the
+	// confirmation one: --quiet still asks and --yes still reports, so a script
+	// wanting neither passes both.
+	FlagQuiet = "quiet"
+	// AnnotationMachineOutput marks a command whose stdout IS its contract — a
+	// path, a script, a URL, a document. --quiet never silences one: a caller
+	// asking for less noise did not ask for less answer.
+	AnnotationMachineOutput = "wtm.machine-output"
+	AnnotationOn            = "true"
+	FlagYes                 = "yes"
+	FlagAll                 = "all"
+	FlagGlobal              = "global"
+	FlagMine                = "mine"
+	FlagReview              = "review"
+	FlagCmd                 = "cmd"
+	FlagKind                = "kind"
+	FlagStop                = "stop"
+	FlagCwd                 = "cwd"
+	FlagPort                = "port"
+	FlagName                = "name"
+	FlagJob                 = "job"
+	FlagJobs                = "jobs"
+	FlagDefault             = "default"
+	FlagTo                  = "to"
+	FlagKeep                = "keep"
+	FlagFiles               = "files"
+	FlagOnConflict          = "on-conflict"
 	// FlagProxyPort tells the forked daemon where to serve the named URLs.
 	FlagProxyPort = "proxy-port"
 	// FlagURLPort and FlagURLHost declare a job's [[job]].url without a wizard.
@@ -1291,8 +1404,46 @@ const (
 	InitRecapValueSkippedTemplate = "skipped (template)"
 	InitRecapHookMoreFmt          = "%s  (+%d more)"
 
-	// Hook phase titles: shown as a bold section header above the streamed hook
-	// output, so create/clean read as distinct phases instead of loose lines.
+	// A hook phase's beats: how a hook is named, timed and marked, plus where the
+	// whole of its output is kept once a surface has collapsed what it showed.
+	HookCwdLabelFmt       = "%s (cwd: %s)"
+	HookResultLabelFmt    = "%s (%s)"
+	HookDurationMsFmt     = "%dms"
+	HookDurationSecFmt    = "%.1fs"
+	HookGlyphStart        = "→"
+	HookGlyphDone         = "✓"
+	HookGlyphFailed       = "✗"
+	HooksLogDirName       = "hooks"
+	HooksLogNameSeparator = "-"
+	HooksLogFileExt       = ".log"
+	HookLogTailFmt        = "full output: %s"
+	// QuietAbortedMessage stands in for a report --quiet discarded: a run that
+	// exits non-zero with nothing on either stream is indistinguishable from one
+	// that hung.
+	QuietAbortedMessage = "aborted — rerun without --quiet for the report"
+	// HookFailedNamedFmt is the error of a hook nobody reported: with no surface
+	// drawing the phase, the error is the only place the command can appear.
+	HookFailedNamedFmt = "%s: %w: %w"
+	// The fallback rendering of a phase nobody drew: the beats separated by
+	// blank lines, with the hook's own output between them.
+	HookFallbackStartFmt = "\n  %s\n\n"
+	HookFallbackDoneFmt  = "\n  %s\n"
+	HookViewTailLines    = 8
+	// HookViewFallbackWidth is what the tail is cut to with no terminal to
+	// measure, wide enough that a cut line still says which one it was.
+	HookViewFallbackWidth = 100
+	// HookViewMinWidth is the floor a cut never goes under: on a window too narrow
+	// to hold anything, giving up on cutting means wrapping, and a wrapped row
+	// breaks the count the repaint moves the cursor back by.
+	HookViewMinWidth = 8
+	// TabWidth is what a tab is expanded to before a line is measured.
+	TabWidth = 8
+	// The cursor moves a surface makes to redraw a block it already printed.
+	AnsiCursorUpFmt = "\x1b[%dA"
+	AnsiClearBelow  = "\x1b[J"
+	AnsiReset       = "\x1b[0m"
+	// Hook phase titles: a bold section header above the phase, so create and
+	// clean read as distinct phases instead of loose lines.
 	HooksTitleOnCreate = "Running on_create hooks"
 	HooksTitleOnClean  = "Running on_clean hooks"
 
@@ -1310,10 +1461,17 @@ const (
 
 	// Next-step bullets printed in the recap. Each is a single line so the
 	// "Next steps" block stays flat (no cascading indentation).
-	InitNextStepShell    = "Add to your shell config:  " + ShellInitCommand
-	InitNextStepCreate   = "wtm create <branch>  — create a worktree to get started"
-	InitNextStepRelocate = "wtm relocate  — adopt & align pre-existing worktrees"
-	InitNextStepRunInit  = "wtm run init  — (experimental) configure per-worktree services"
+	// The init recap's forward-pointing lines, as command/gloss pairs like every
+	// other hint in the tree. They used to be sentences rendered as muted bullets,
+	// which is one more place a reader had to learn to look.
+	InitNextStepShell        = ShellInitCommand
+	InitNextStepShellNote    = "add to your shell config"
+	InitNextStepCreate       = "wtm create <branch>"
+	InitNextStepCreateNote   = "create a worktree to get started"
+	InitNextStepRelocate     = "wtm relocate"
+	InitNextStepRelocateNote = "adopt & align pre-existing worktrees"
+	InitNextStepRunInit      = "wtm run init"
+	InitNextStepRunInitNote  = "(experimental) configure per-worktree services"
 
 	// SchemasDirName is the directory (inside <state-dir>/ or under the global
 	// config dir) where `wtm schema dump` writes the JSON Schema files
@@ -1336,8 +1494,7 @@ const (
 	JobRemovedRunnersFmt  = "No longer started by: %s"
 	// RunInitJobsRemovedFmt reports what the unchecking dropped, next to what
 	// the same run added.
-	RunInitJobsRemovedFmt = "Jobs removed (unchecked): %s"
-	JobActionUpdated      = "updated"
+	JobActionUpdated = "updated"
 
 	// RunCRUD* is the vocabulary of `run job` and `run profile` — the questions
 	// they ask and the wording of their answers. They live here rather than
@@ -1580,15 +1737,17 @@ const (
 
 	// The `run daemon` surface's wording.
 	DaemonStatusTitle      = "Run daemon"
-	DaemonStatusStateFmt   = "State      %s"
-	DaemonStatusStopped    = "not running"
-	DaemonStatusUpFmt      = "running (pid %d)"
-	DaemonStatusVersFmt    = "Version    %s"
-	DaemonStatusJobsFmt    = "Jobs       %d foreground · %d detached"
-	DaemonStatusSocketFmt  = "Socket     %s"
-	DaemonStatusIndexFmt   = "Index      %s"
-	DaemonStatusProxyFmt   = "Proxy      port %d"
+	DaemonStatusStopped    = "No daemon running."
+	DaemonStatusUpFmt      = "Daemon running (pid %d)"
+	DaemonStatusVersLabel  = "Version"
+	DaemonStatusJobsLabel  = "Jobs"
+	DaemonStatusJobsFmt    = "%d foreground · %d detached"
+	DaemonStatusSocketLbl  = "Socket"
+	DaemonStatusIndexLabel = "Index"
+	DaemonStatusProxyLabel = "Proxy"
+	DaemonStatusProxyFmt   = "port %d"
 	DaemonStopped          = "Daemon stopped."
+	DaemonRestarted        = "Daemon restarted."
 	DaemonAlreadyStopped   = "No daemon running."
 	DaemonStopConfirmTitle = "Stop the run daemon?"
 	DaemonStopConfirmFmt   = "%d foreground service(s) are drained through it and will be stopped. Detached services keep running."
@@ -1832,14 +1991,13 @@ const (
 	// RunViewRecapAddressFmt lists where a started job answers. Reading the recap
 	// is the moment one goes looking for it.
 	RunViewRecapAddressFmt = "  %s  %s"
-	RunViewRecapLogsHint   = "wtm run logs  — reopen this view"
-	RunViewRecapDownHint   = "wtm run down  — stop the jobs"
+
 	// RunDownRecap* are the same recap seen from the other side: `run down` says
 	// what it took down where `run up` says what it left standing, in the same box
 	// and with the same labels. The two are halves of one command and used to
 	// read as two different programs.
 	RunDownRecapStoppedFmt = "Stopped:      %s"
-	RunDownRecapUpHint     = "wtm run up    — start them again"
+
 	// RunViewRecapListSep joins the jobs named on one recap line.
 	RunViewRecapListSep = ", "
 
@@ -1946,6 +2104,13 @@ const (
 	RunStoppedFmt    = "%s stopped"
 	RunNoJobsRunning = "No jobs running."
 	RunNoJobsHere    = "No jobs running in this worktree."
+	// NoWorktreesMessage is the empty worktree inventory, wherever it is drawn.
+	NoWorktreesMessage = "No worktrees found."
+	// The empty run inventories name what was actually asked for: a jobs-only
+	// listing that says "no jobs or profiles" answers a question nobody put.
+	RunListEmpty     = "No jobs or profiles defined in run.toml."
+	RunJobsEmpty     = "No jobs defined in run.toml."
+	RunProfilesEmpty = "No profiles defined in run.toml."
 	RunStoppingJobs  = "Stopping jobs…"
 
 	// RunStoppingOthers and RunStoppedOtherFmt report the worktrees an exclusive
@@ -1974,7 +2139,17 @@ const (
 	RunViewRecapHeldIndent = "  "
 	RunStreamAlreadyFmt    = "%s already running"
 	RunStreamDoneFmt       = "%s done"
-	RunStreamNextHint      = "wtm run logs to attach · wtm run down to stop"
+	// The three commands a run points at, and one gloss each. They are shared by
+	// every surface the module concludes on — the live stream, the view's recap
+	// once it gives the terminal back, `run down`'s — because one command telling
+	// the reader two different things about `wtm run logs` depending on how it was
+	// watched is the drift the vocabulary exists to stop.
+	RunStreamAttachHint = "wtm run logs"
+	RunStreamAttachNote = "attach to the output"
+	RunStreamStopHint   = "wtm run down"
+	RunStreamStopNote   = "stop the jobs"
+	RunStreamUpHint     = "wtm run up"
+	RunStreamUpNote     = "start them again"
 
 	// RunAbort* report the partial state a profile that gave up left behind, on
 	// the surface that has no room to draw it: where it stopped, what nothing
@@ -1982,7 +2157,13 @@ const (
 	RunAbortStepFmt         = "Profile aborted at step %d/%d (%s)."
 	RunAbortRunningLabel    = "Left running:"
 	RunAbortNotStartedLabel = "Not started: "
-	RunAbortHint            = "fix and re-run `wtm run up` · `wtm run down` to stop everything"
+	// The abort's way out reads like every other hint in the tree: one command
+	// per line, through output.NextStep. It used to be one prose string under the
+	// ephemeral `›`, in a block that stays in the scrollback.
+	RunAbortRetryHint = "wtm run up"
+	RunAbortRetryNote = "re-run once fixed"
+	RunAbortStopHint  = "wtm run down"
+	RunAbortStopNote  = "stop what did start"
 
 	// RunLogsPrefixFmt marks which job a line came from when several of them
 	// share one stream, RunLogsHistoryHint says a job that is not running is
@@ -1990,7 +2171,9 @@ const (
 	// worktree with nothing to read.
 	RunLogsPrefixFmt   = "[%s]"
 	RunLogsHistoryHint = "%s is not running — reading back its log file."
-	RunLogsNoJobs      = "No running jobs in this worktree."
+	// One state, one sentence: `run down`, `run ps`, `run stop` and `run logs`
+	// all report it, and three wordings read as three different findings.
+	RunLogsNoJobs = RunNoJobsHere
 
 	// RunDaemonConnecting, RunStartingFmt and RunTaskRunningFmt are what a run
 	// command says while it waits on the daemon.
@@ -2080,6 +2263,10 @@ const (
 	SyncParentLineFmt         = "%s is %s behind %s%s — %s rebase onto it."
 	SyncConfirmOption         = "Yes, sync"
 	SyncNothingToSync         = "No worktrees to sync."
+	SyncUpToDateSuffix        = "already up to date"
+	SyncRebasedLineFmt        = "%s rebased onto %s   %s%s"
+	SyncCommitsReplayedFmt    = "%d commits"
+	FastForwardStateFmt       = "%s — %s"
 	// SyncNoRebaseStep and SyncNoStaleParent are why a decision was never put to
 	// the user: nothing is rebased, or no parent is behind its remote.
 	SyncNoRebaseStep  = "nothing to rebase"
@@ -2166,7 +2353,6 @@ const (
 	FastForwardUpToDateFmt = "%s is already up to date"
 	FastForwardResultFmt   = "%s: %s"
 	FastForwardFailedFmt   = "%s: failed — %s"
-	FastForwardHeader      = "Fast-forward"
 
 	// Source-reconciliation and env-fallback prompts shared by the create and
 	// extract flows — used both by the in-wizard confirmation steps and the
@@ -2445,8 +2631,9 @@ const (
 	ReparentedFmt        = "Reparented %s: %s → %s"
 	// ReparentSyncHintFmt and ReparentSyncHintBare tell the user how the recorded
 	// change is applied: reparent only rewrites metadata, the rebase is `wtm sync`.
-	ReparentSyncHintFmt  = "Run `wtm sync %s` to rebase onto the new parent."
-	ReparentSyncHintBare = "Run `wtm sync` to rebase the reparented worktrees onto their new parent."
+	ReparentSyncHintFmt  = "wtm sync %s"
+	ReparentSyncHintBare = "wtm sync"
+	ReparentSyncHintNote = "rebase onto the new parent"
 
 	AbortedMessage = "Aborted."
 	// WizardCancelLabel is the constant final option on every wizard recap step —
@@ -2648,7 +2835,7 @@ const (
 	// this means the listing itself did not go as expected. Neutral wording on
 	// purpose: naming an action ("press n…") here would be confident advice in
 	// the one state where the surface does not know what is going on.
-	DashboardEmptyList   = "No worktrees found."
+	DashboardEmptyList   = NoWorktreesMessage
 	DashboardEmptyTree   = "No worktrees to lay out."
 	DashboardLoadingTree = "Building the tree…"
 	// DashboardTreeVirtual marks a node standing in for a parent branch that has

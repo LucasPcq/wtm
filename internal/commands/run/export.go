@@ -12,10 +12,11 @@ import (
 // newExportCmd creates the wtm run export subcommand.
 func newExportCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   domain.CmdExport,
-		Short: "Export run.toml as JSON on stdout",
-		Long:  "Emit the current run config as JSON. Pipe to a file and use with wtm run import to share configurations.",
-		RunE:  runExport,
+		Use:         domain.CmdExport,
+		Annotations: map[string]string{domain.AnnotationMachineOutput: domain.AnnotationOn},
+		Short:       "Export run.toml as JSON on stdout",
+		Long:        "Emit the current run config as JSON. Pipe to a file and use with wtm run import to share configurations.",
+		RunE:        runExport,
 	}
 	cmd.Flags().String(domain.FlagProfile, "", "Export only this profile and its jobs")
 	return cmd

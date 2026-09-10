@@ -22,7 +22,7 @@ func PrintEnvReport(w io.Writer, result domain.EnvSyncResult) {
 		if i > 0 {
 			Blank(w)
 		}
-		printEnvFile(w, f, result.Check, rules.EnvPortPlanTouches(result.Ports, f.Target))
+		printEnvFile(w, f, result.Check, rules.EnvPortsMoveIn(rules.EnvPortsMoveInParams{Result: result, Target: f.Target}))
 	}
 	EnvPortsReport(w, result.Ports, result.Check)
 	Blank(w)
@@ -66,14 +66,19 @@ func printEnvKeyRow(w io.Writer, row domain.EnvKeyRow) {
 	fmt.Fprintf(w, "%s%s %s\n", Indent, glyph, text)
 }
 
-// printEnvSummary prints the trailing one-line verdict.
+// printEnvSummary prints the trailing one-line verdict in the register the rule
+// gave it: `=` is what a run that had nothing to do says, and saying it over
+// drift a --check run just found calls an open question a settled one.
 func printEnvSummary(w io.Writer, result domain.EnvSyncResult) {
 	summary := rules.EnvOutcomeSummary(result)
-	if summary.Done {
+	switch summary.Verdict {
+	case domain.EnvVerdictDone:
 		Success(w, summary.Text)
-		return
+	case domain.EnvVerdictAttention:
+		Warning(w, summary.Text)
+	default:
+		Unchanged(w, summary.Text)
 	}
-	Message(w, styles.Muted.Render(summary.Text))
 }
 
 // WriteEnvJSON writes the reconciliation result as pretty-printed JSON. The

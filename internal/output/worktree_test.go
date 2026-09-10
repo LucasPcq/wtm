@@ -1,9 +1,12 @@
 package output
 
 import (
+	"bytes"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/x/ansi"
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -14,8 +17,8 @@ func init() {
 }
 
 func TestFormatWorktreeListEmpty(t *testing.T) {
-	got := FormatWorktreeList(FormatWorktreeListParams{})
-	if got != "No worktrees found." {
+	got := ansi.Strip(FormatWorktreeList(FormatWorktreeListParams{}))
+	if got != UnchangedLine(domain.NoWorktreesMessage) {
 		t.Errorf("unexpected output: %q", got)
 	}
 }
@@ -185,5 +188,34 @@ func TestPrintableLenEmpty(t *testing.T) {
 func TestAnsiOverheadPlainString(t *testing.T) {
 	if ansiOverhead("hello world") != 0 {
 		t.Error("expected ansiOverhead of plain string to be 0")
+	}
+}
+
+// The port pass rides on the env line as a count. It is the whole of what create
+// says about it: the values are in the .env the run just wrote, and `wtm env` is
+// the command they belong to.
+func TestFormatCreateResultCarriesThePortPassAsANote(t *testing.T) {
+	render := func(note string) string {
+		var buf bytes.Buffer
+		FormatCreateResult(&buf, CreateResultParams{
+			Branch:      "feat/x",
+			From:        "main",
+			EnvStrategy: "main",
+			EnvNote:     note,
+			Path:        ".worktrees/feat-x",
+			GoCommand:   "wtm go feat/x",
+		})
+		return buf.String()
+	}
+
+	with := render("4 port(s) shifted (+10)")
+	if !strings.Contains(with, "main") || !strings.Contains(with, "4 port(s) shifted (+10)") {
+		t.Errorf("the env line dropped its note:\n%s", with)
+	}
+	if strings.Count(with, "\n") != strings.Count(render(""), "\n") {
+		t.Errorf("the note cost the recap a line:\n%s", with)
+	}
+	if strings.Contains(render(""), domain.EnvRecapNoteSeparator) {
+		t.Errorf("a run that moved nothing still printed a separator:\n%s", render(""))
 	}
 }

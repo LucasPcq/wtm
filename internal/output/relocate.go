@@ -39,18 +39,6 @@ func FormatRelocatePlan(w io.Writer, plan domain.RelocatePlan) {
 		}
 	}
 
-	fmt.Fprintln(w, styles.RenderIntro(styles.IntroParams{
-		Width: 80,
-		Title: "Relocate worktrees",
-		Body: fmt.Sprintf(
-			"Aligns every worktree with base_path %q: scattered worktrees are moved there, and "+
-				"worktrees created outside wtm are adopted (their parent recorded so `wtm sync` can use them).\n"+
-				"Dirty or locked worktrees are skipped — re-run with --force to move them. "+
-				"A target path that is already occupied is never overwritten.",
-			plan.BasePath),
-	}))
-	Blank(w)
-
 	// Sections are separated by a blank line but none trails the last one, so the
 	// caller controls the spacing to whatever follows (the wizard, or "Dry run").
 	section := newSectionWriter(w)
@@ -75,13 +63,13 @@ func FormatRelocatePlan(w io.Writer, plan domain.RelocatePlan) {
 		section(func() {
 			SectionTitle(w, fmt.Sprintf("Blocked (%d)", len(blocked)))
 			for _, step := range blocked {
-				Danger(w, fmt.Sprintf("%s — target path already occupied: %s", step.Branch, step.ToPath))
+				Error(w, fmt.Sprintf("%s — target path already occupied: %s", step.Branch, step.ToPath))
 			}
 		})
 	}
 	if noops > 0 {
 		section(func() {
-			Message(w, styles.Muted.Render(fmt.Sprintf("%d worktree(s) already in place.", noops)))
+			Unchanged(w, fmt.Sprintf("%d worktree(s) already in place.", noops))
 		})
 	}
 	if adoptions > 0 {
@@ -112,7 +100,7 @@ func planApplyLine(basePath string, step domain.RelocateStep) string {
 	if step.Adopt {
 		suffix = styles.Muted.Render(" (+ adopt)")
 	}
-	return fmt.Sprintf("%s %s %s%s", step.Branch, styles.Muted.Render("→"), relTarget(basePath, step.ToPath), suffix)
+	return fmt.Sprintf("%s %s %s%s", step.Branch, styles.Muted.Render(domain.MoveArrowGlyph), relTarget(basePath, step.ToPath), suffix)
 }
 
 func planSkipLine(step domain.RelocateStep) string {
@@ -145,15 +133,15 @@ func FormatRelocateResult(w io.Writer, result domain.RelocateResult) {
 	}
 
 	hasIssue := len(blocked) > 0 || len(errored) > 0
-	headline := relocateTally(relocateTallyParams{
-		Applied: len(done),
-		Skipped: len(skipped),
-		Issues:  len(blocked) + len(errored),
-	})
+	headline := Tally(
+		TallyPart{Count: len(done), Label: domain.TallyApplied},
+		TallyPart{Count: len(skipped), Label: domain.TallySkipped},
+		TallyPart{Count: len(blocked) + len(errored), Label: domain.TallyBlocked},
+	)
 	if hasIssue {
-		Warning(w, "Relocation finished with issues  "+styles.Muted.Render(headline))
+		Warning(w, "Relocation finished with issues  "+headline)
 	} else {
-		Success(w, "Relocation complete  "+styles.Muted.Render(headline))
+		Success(w, "Relocation complete  "+headline)
 	}
 	Blank(w)
 
@@ -168,7 +156,9 @@ func FormatRelocateResult(w io.Writer, result domain.RelocateResult) {
 		Warning(w, fmt.Sprintf("Skipped: %s (re-run with --force)", strings.Join(skipped, ", ")))
 	}
 	if len(blocked) > 0 {
-		Danger(w, fmt.Sprintf("Blocked: %s (target path occupied)", strings.Join(blocked, ", ")))
+		// Blocked is not skipped: --force does not lift it, so the move failed
+		// rather than being held back.
+		Error(w, fmt.Sprintf("Blocked: %s (target path occupied)", strings.Join(blocked, ", ")))
 	}
 	for _, step := range errored {
 		Error(w, fmt.Sprintf("%s failed — %s", step.Branch, step.Detail))
@@ -180,39 +170,14 @@ func FormatRelocateResult(w io.Writer, result domain.RelocateResult) {
 	}
 }
 
-type relocateTallyParams struct {
-	Applied int
-	Skipped int
-	Issues  int
-}
-
-// relocateTally renders a compact "N applied · N skipped · N blocked" summary,
-// omitting zero counts.
-func relocateTally(params relocateTallyParams) string {
-	parts := make([]string, 0, 3)
-	if params.Applied > 0 {
-		parts = append(parts, fmt.Sprintf("%d applied", params.Applied))
-	}
-	if params.Skipped > 0 {
-		parts = append(parts, fmt.Sprintf("%d skipped", params.Skipped))
-	}
-	if params.Issues > 0 {
-		parts = append(parts, fmt.Sprintf("%d blocked", params.Issues))
-	}
-	if len(parts) == 0 {
-		return "nothing to do"
-	}
-	return strings.Join(parts, " · ")
-}
-
 func resultDoneLine(basePath string, step domain.RelocateStepResult) string {
 	switch step.Status {
 	case domain.RelocateStatusAdopted:
 		return fmt.Sprintf("%s adopted in place (parent: %s)", step.Branch, step.Parent)
 	case domain.RelocateStatusMovedAdopted:
-		return fmt.Sprintf("%s %s %s (adopted, parent: %s)", step.Branch, styles.Muted.Render("→"), relTarget(basePath, step.ToPath), step.Parent)
+		return fmt.Sprintf("%s %s %s (adopted, parent: %s)", step.Branch, styles.Muted.Render(domain.MoveArrowGlyph), relTarget(basePath, step.ToPath), step.Parent)
 	default:
-		return fmt.Sprintf("%s %s %s", step.Branch, styles.Muted.Render("→"), relTarget(basePath, step.ToPath))
+		return fmt.Sprintf("%s %s %s", step.Branch, styles.Muted.Render(domain.MoveArrowGlyph), relTarget(basePath, step.ToPath))
 	}
 }
 
