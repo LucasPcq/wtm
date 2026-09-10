@@ -1642,8 +1642,8 @@ const (
 	AnsiReset       = "\x1b[0m"
 	// Hook phase titles: a bold section header above the phase, so create and
 	// clean read as distinct phases instead of loose lines.
-	HooksTitleOnCreate = "Running on_create hooks"
-	HooksTitleOnClean  = "Running on_clean hooks"
+	HooksTitleOnCreate = "Hooks · On Create"
+	HooksTitleOnClean  = "Hooks · On Clean"
 
 	// create result recap labels (aligned "label   value" rows). "from" names the
 	// start-point of a newly created branch; "parent" replaces it when an existing

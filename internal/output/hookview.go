@@ -33,7 +33,12 @@ import (
 // pty for every hook, which is a great deal of machinery for output this
 // deliberately throws away.
 type HookView struct {
-	w       io.Writer
+	w io.Writer
+	// line is where every composed line goes, barred when the phase draws inside
+	// a block. The escapes of clear() go to w instead: they move the cursor
+	// rather than open a row, and a bar drawn before one lands on the line the
+	// cursor is about to leave — then survives the erase, one column off.
+	line    io.Writer
 	logPath string
 	log     io.Writer
 	buf     bytes.Buffer
@@ -54,10 +59,17 @@ type HookViewParams struct {
 	// LogPath is what the failure line points the reader at. Empty prints no such
 	// line.
 	LogPath string
+	// Bar draws the phase inside the accent bar. What a phase leaves behind — a
+	// result line per hook, and the record of a failed one — is kept, so it
+	// belongs in the block; only the live tail is thrown away.
+	Bar bool
 }
 
 func NewHookView(params HookViewParams) *HookView {
-	view := &HookView{w: params.W, logPath: params.LogPath}
+	view := &HookView{w: params.W, line: params.W, logPath: params.LogPath}
+	if params.Bar {
+		view.line = Barred(params.W)
+	}
 	if params.Log != nil {
 		view.log = params.Log
 	}
@@ -120,11 +132,11 @@ func (v *HookView) OnHook(beat domain.HookBeat) {
 	v.header, v.tail, v.rewrite = "", nil, false
 
 	if beat.Err == "" {
-		Success(v.w, rules.HookResultLabel(beat))
+		Success(v.line, rules.HookResultLabel(beat))
 		return
 	}
 
-	Error(v.w, rules.HookResultLabel(beat))
+	Error(v.line, rules.HookResultLabel(beat))
 	for _, line := range failed {
 		v.tailLine(line)
 	}
@@ -134,7 +146,7 @@ func (v *HookView) OnHook(beat domain.HookBeat) {
 		v.tailLine(line)
 	}
 	if v.logPath != "" {
-		InfoLine(v.w, domain.HookLogTailLabel, v.logPath)
+		InfoLine(v.line, domain.HookLogTailLabel, v.logPath)
 	}
 }
 
@@ -174,7 +186,7 @@ func (v *HookView) repaint() {
 	v.clear()
 	width := v.width()
 	if v.header != "" {
-		fmt.Fprintf(v.w, "%s%s\n", Indent, styles.Truncate(styles.TruncateParams{Value: v.header, Width: width}))
+		fmt.Fprintf(v.line, "%s%s\n", Indent, styles.Truncate(styles.TruncateParams{Value: v.header, Width: width}))
 		v.painted++
 	}
 	for _, line := range v.tail {
@@ -184,7 +196,7 @@ func (v *HookView) repaint() {
 
 func (v *HookView) paintTail(line string, width int) {
 	body := styles.Truncate(styles.TruncateParams{Value: styles.ExpandTabs(line), Width: max(width, domain.HookViewMinWidth)})
-	fmt.Fprintf(v.w, "%s%s%s\n", Indent, Indent, styles.Muted.Render(body))
+	fmt.Fprintf(v.line, "%s%s%s\n", Indent, Indent, styles.Muted.Render(body))
 	v.painted++
 }
 
@@ -195,7 +207,7 @@ func (v *HookView) tailLine(line string) {
 	body := styles.Truncate(styles.TruncateParams{Value: styles.ExpandTabs(line), Width: max(v.width()-len([]rune(Indent)), domain.HookViewMinWidth)})
 	// Not muted: this is the record a failed hook leaves, and it is the half the
 	// reader came for. The indent is what makes it subordinate.
-	Message(v.w, Indent+body)
+	Message(v.line, Indent+body)
 }
 
 func (v *HookView) clear() {
@@ -207,7 +219,7 @@ func (v *HookView) clear() {
 }
 
 func (v *HookView) width() int {
-	cols := TerminalWidthOf(v.w)
+	cols := TerminalWidthOf(v.line)
 	if cols <= 0 {
 		return domain.HookViewFallbackWidth
 	}
