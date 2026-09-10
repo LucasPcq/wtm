@@ -28,6 +28,12 @@ Three registers, and only the third may grow with what happened:
 
 Progress is erased, so it is never barred and never framed — the bar marks what stays. Attention is the only register allowed one line per item.
 
+The corollary is that **everything a run says while it is still running, and keeps, is one block**. A migrated command's status lines and hook phases used to write straight to stderr, which left them the only human output outside the bar; `shared.OpenBlock` puts them inside one, and the conclusion is a second block on stdout — which is what "exactly once" already allows.
+
+**A surface remembers where its last block left the cursor**, and that is why the bookkeeping lives in `output` rather than in the presenter. The blank closing a block and the blank opening the next are the same line on screen, so a caller deciding whether to open one cannot answer from what it did itself: the frame beside it is written by code that never sees it — `run up`'s own frame around a job's output is the case that made this necessary. `FrameStart` therefore writes no blank on a surface already at a boundary, writes the separator on one whose block is still open, and `BlockOpen` is what `OpenBlock` and `syncPresenter.section` both read. stdout and stderr are **one** surface when both are the same terminal: the reader sees one column of blocks, whichever stream wrote them.
+
+The consequence for a flow: **never report from inside a `Stage`**. A spinner owns the stream while it runs, so a line written under it is repainted over — and the block it opened is then marked open with nothing on screen to show for it. Collect what happened and report it after the stage returns (`internal/flow/run/up/up.go`, `clearOthers`).
+
 ## The frame
 
 Every human conclusion is framed **exactly once**, with `output.Frame` or — for a command writing across two streams — the `FrameStart`/`FrameEnd` pair. The frame owns two things at once: the single blank line above and below the block, and the accent bar down its left edge.
@@ -146,6 +152,8 @@ A **state readout** may not hide a non-event as a field value either. `not runni
 | `Section` | title + indented free lines | a script, a file's contents, a listing |
 | `Callout` | a bordered box | **only** something the reader still has to act on |
 
+`flow.Notice` carries that last distinction across the seam: `NoticeNote` is what the reader has nothing to do about — a property of the machine, or of the file that was just written — and takes `Section`; a warning carrying lines is what wtm declined to do, and keeps the border. The port pass is both at once: the links it left alone are bordered, `Addresses carry the proxy's port` is not.
+
 The alignment belongs to `Announce`, never to the wording: a format string spelling `"State      %s"` hand-aligns one block against nothing, and its sibling three files away picks a different column.
 
 **A `--dry-run` answers on stdout.** A preview is what the caller asked for, so it is the result and not a diagnostic. A plan shown *before* a real run — `sync`'s — is a preamble and stays on stderr.
@@ -177,6 +185,8 @@ It applies to a terminal this process may repaint. A pipe, a CI log or `--output
 Both paths go through one function, `commands/shared.DrawHookPhase`, and it is one function on purpose: the two callers — the migrated commands through `CLIPresenter`, `extract` and `checkout` through `RunCreateHooksPhase` — drifted apart once, and a hook has to read the same whichever command ran it. It owns the log rather than the view, opening `<state-dir>/hooks/<phase>-<branch>.log` and teeing the raw stream into it on **every** path: the run whose output the reader could not watch is exactly the one whose record has to survive. And it always hands the sink a real writer — the command's own — because a sink left nil falls back to `os.Stderr` in the runner, which is how a hook finds its way onto a terminal that asked for `--quiet`.
 
 A hook's own bytes are never barred, for the same reason progress is not: `barWriter` re-marks the row after every carriage return, so a bar drawn over a redrawing progress line lands on top of its content. The rule reaches the run module too — `output.RunPrinter` bars the lines it composes and writes a job's chunks through untouched.
+
+What the phase *keeps* is barred, and that is the whole of the distinction: `HookView` composes every line it prints — the tail included — so those go through the bar, while the cursor moves of `clear()` go to the raw stream. A bar written before one lands on the row the cursor is about to leave, survives the erase below it, and leaves every repaint one column off. `HookViewParams.Bar` is what says which writer a line takes. `DrawHookPhase` joins the run's block itself rather than leaving that to each caller: `extract` holds a presenter that may already have opened one for the port pass, and a phase that decided for itself drew an unbarred block beside a barred one.
 
 The seam that makes it possible is worth copying for anything similar: `service/hooks` reports `domain.HookBeat` values through `flow.HookSink` — the raw output *and* the beat of each hook starting and finishing — so the surface decides what to draw and the service formats only the fallback for a caller that installed no reporter.
 

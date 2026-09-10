@@ -14,8 +14,8 @@ import (
 // to flow/ (extract, checkout) so hooks read the same way in both.
 type CreateHooksPhaseParams struct {
 	Cmd *cobra.Command
-	// ShowHeader prints the "Running on_create hooks" title before the streamed
-	// output; set it only on human-facing runs (never JSON).
+	// ShowHeader prints the phase title before the streamed output; set it only
+	// on human-facing runs (never JSON).
 	ShowHeader   bool
 	ProjectDir   string
 	StateDir     string
