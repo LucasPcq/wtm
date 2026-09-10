@@ -71,6 +71,9 @@ func TestStateStoreNeverOverwritesAnUnknownFormat(t *testing.T) {
 	if records := store.Load(); records != nil {
 		t.Fatal("an unknown format must read as empty")
 	}
+	if !store.Frozen() {
+		t.Fatal("a newer binary's index freezes the store, which is what a command has to be able to report")
+	}
 	if err := store.Save([]domain.JobRecord{detachedRecord(t, "/wt/feature")}); err != nil {
 		t.Fatalf("save: %v", err)
 	}
@@ -85,5 +88,29 @@ func TestStateStoreNeverOverwritesAnUnknownFormat(t *testing.T) {
 	}
 	if state.Version != 99 {
 		t.Fatal("an older binary must not destroy the index of a newer one")
+	}
+}
+
+// The bug LUC-229 fixed: a stale file from an older format froze the store, so
+// every Save became a no-op and the daemon silently recorded nothing at all.
+func TestStateStoreReplacesAnIndexFromAnOlderFormat(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "jobs.json")
+	if err := os.WriteFile(path, []byte(`{"version":1,"jobs":[]}`), 0o600); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	store := NewStateStore(path)
+	if got := store.Load(); len(got) != 0 {
+		t.Fatalf("loaded %d records from a format this binary does not read", len(got))
+	}
+	if store.Frozen() {
+		t.Fatal("an older format must not freeze the store: that is how a daemon stops recording anything")
+	}
+
+	if err := store.Save([]domain.JobRecord{detachedRecord(t, "/wt/feature")}); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	if got := NewStateStore(path).Load(); len(got) != 1 {
+		t.Fatalf("reloaded %d records, want the one just saved over the stale file", len(got))
 	}
 }

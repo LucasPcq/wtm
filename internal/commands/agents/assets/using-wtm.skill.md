@@ -529,7 +529,11 @@ and **experimental**: the global `wtm init` does not configure it.
   them. `run down`, `clean` and `prune` start a daemon by themselves when that index
   holds something for the worktree they act on.
 - `run daemon status` reports whether a daemon is up, its build, its PID and what it
-  holds (`--output json` gives one object). `run daemon stop` ends it — detached services
+  holds (`--output json` gives one object). **`index_frozen: true` in that object means
+  the index belongs to a newer wtm**, so this build records nothing it starts: a detached
+  stack will not be picked back up and an orphaned service is never reaped. It is the one
+  state in which `run ps` and `run down` can be right about now and useless after the
+  daemon exits — report it rather than working around it. The field is absent otherwise. `run daemon stop` ends it — detached services
   keep running — and `run daemon restart` hands its jobs to a daemon built from the
   current binary. Both only prompt when foreground services would be stopped; pass
   `--yes` (required without a terminal, and in JSON).

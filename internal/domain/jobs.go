@@ -463,6 +463,11 @@ type DaemonStatus struct {
 	ProxyPort     int    `json:"proxy_port,omitempty"`
 	Foreground    int    `json:"foreground_jobs"`
 	Detached      int    `json:"detached_jobs"`
+	// IndexFrozen says a newer wtm owns the index, so this build records nothing
+	// it starts. It is read from the file rather than asked of the daemon: the
+	// two versions are all it takes to know, and the warning has to work when no
+	// daemon is up.
+	IndexFrozen bool `json:"index_frozen,omitempty"`
 }
 
 // JobConflict is a job that would be started twice at once: on its own, and by

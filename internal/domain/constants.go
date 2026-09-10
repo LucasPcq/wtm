@@ -1963,9 +1963,18 @@ const (
 	// refuse on.
 	DaemonMismatchTitle = "Version mismatch"
 
-	// DaemonStateVersion is the index format. A file carrying anything else is
-	// read as empty and never written back, so an older binary cannot destroy
-	// the index of a newer one.
+	// DaemonIndexFrozen* head and fill the callout for an index a newer binary
+	// owns. The store goes read-only rather than destroy that binary's record, so
+	// nothing this one starts is written down — which used to happen in silence.
+	DaemonIndexFrozenTitle  = "Index read-only"
+	DaemonIndexFrozenWhy    = "the index on disk was written by a newer wtm, so this build will not write over it"
+	DaemonIndexFrozenCost   = "nothing started from here is recorded: a detached stack is not picked back up, and an orphaned service is never reaped"
+	DaemonIndexFrozenFixFmt = "run the newer wtm, or remove %s once nothing is running"
+
+	// DaemonStateVersion is the index format. A file from a newer binary is read
+	// as empty and never written back, so an older binary cannot destroy the
+	// index of a newer one; an older file is a format this build has moved past
+	// and the next write simply replaces it.
 	DaemonStateVersion = 2
 
 	// CtrlCByte is the ASCII code for Ctrl+C, used for PTY detach.
