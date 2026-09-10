@@ -41,6 +41,20 @@ type ComposeScan struct {
 	Err      string
 	Bindings []ComposePortBinding
 	Names    []ComposeAbsoluteName
+	// Services is what the file declares, in declaration order. It is what the
+	// scope step enumerates: wtm generates one job per compose file, so a
+	// service is only a candidate for sharing once it has been named here.
+	Services []ComposeService
+}
+
+// ComposeService is one entry under `services:`. Image and HasBuild are what
+// separate a candidate for sharing from a service that cannot be one: a service
+// built from this worktree's source serves this worktree's code, whatever its
+// name suggests.
+type ComposeService struct {
+	Name     string
+	Image    string
+	HasBuild bool
 }
 
 // ComposeNameKind names which absolute identifier a finding pins. All three
@@ -95,4 +109,14 @@ type ComposeEdit struct {
 	Column      int
 	Token       string
 	Replacement string
+}
+
+// SharedComposeService is one service lifted out of its file's job into a job
+// of its own, because it is to run once for the repository. The file's job then
+// names the services that stay, since `docker compose up` otherwise starts the
+// whole file — including the one just lifted out.
+type SharedComposeService struct {
+	File      string
+	Service   string
+	Namespace *JobNamespaceConfig
 }

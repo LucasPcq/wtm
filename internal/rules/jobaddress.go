@@ -32,7 +32,7 @@ func WorktreeJobAddresses(params WorktreeJobAddressesParams) map[string]domain.J
 	addresses := make(map[string]domain.JobAddress, len(params.Config.Jobs))
 	for _, job := range params.Config.Jobs {
 		ports := JobPorts(JobPortsParams{
-			Ports: EffectiveJobPorts(params.Config, job), PortOffset: params.PortOffset,
+			Ports: EffectiveJobPorts(params.Config, job), PortOffset: params.PortOffset, Scope: job.Scope,
 		})
 		addresses[job.Name] = domain.JobAddress{
 			Ports: sortedPortValues(ports),
@@ -66,7 +66,7 @@ func heldAddresses(params WorktreeJobAddressesParams, job domain.JobConfig) []do
 	var held []domain.JobURLEntry
 	for _, name := range children {
 		child := byName[name]
-		ports := JobPorts(JobPortsParams{Ports: child.Ports, PortOffset: params.PortOffset})
+		ports := JobPorts(JobPortsParams{Ports: child.Ports, PortOffset: params.PortOffset, Scope: child.Scope})
 		if url := jobAddressURL(params, child, ports); url != "" {
 			held = append(held, domain.JobURLEntry{Job: name, URL: url})
 		}

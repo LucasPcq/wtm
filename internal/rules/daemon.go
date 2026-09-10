@@ -29,6 +29,16 @@ func DaemonVersionMismatchLines(params DaemonVersionMismatchParams) []string {
 	}
 }
 
+// IndexFrozenLines says what a read-only index costs, in the order a reader needs
+// it: why it happened, what stops being recorded, and the way out.
+func IndexFrozenLines(statePath string) []string {
+	return []string{
+		domain.DaemonIndexFrozenWhy,
+		domain.DaemonIndexFrozenCost,
+		fmt.Sprintf(domain.DaemonIndexFrozenFixFmt, statePath),
+	}
+}
+
 // DaemonVersionDiverged reports a daemon this binary did not build. `status` is
 // the one command that says so instead of refusing: it exists to be run when
 // something else already refused.

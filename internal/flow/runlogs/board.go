@@ -17,6 +17,9 @@ type BoardParams struct {
 	// worktree's rows.
 	Worktree string
 	LogDir   string
+	// SharedLogDir is the main checkout's, where a shared service persists its
+	// output. Empty leaves every job reading LogDir, as before sharing existed.
+	SharedLogDir string
 	// Addresses is where each declared job answers in this worktree, keyed by
 	// job name. Computed by the surface, which is the side that reads the
 	// worktree's offset and the proxy's port.
@@ -33,24 +36,29 @@ type BoardParams struct {
 // nobody has started yet is still a job to show.
 func NewBoard(params BoardParams) Board {
 	return &board{
-		service:   params.Service,
-		jobs:      params.Jobs,
-		workDir:   params.WorkDir,
-		worktree:  params.Worktree,
-		logDir:    params.LogDir,
-		addresses: params.Addresses,
-		logged:    params.Logged,
+		service:      params.Service,
+		jobs:         params.Jobs,
+		workDir:      params.WorkDir,
+		worktree:     params.Worktree,
+		logDir:       params.LogDir,
+		sharedLogDir: params.SharedLogDir,
+		addresses:    params.Addresses,
+		logged:       params.Logged,
 	}
 }
 
 type board struct {
-	service   Service
-	jobs      []domain.JobConfig
-	workDir   string
-	worktree  string
-	logDir    string
-	addresses map[string]domain.JobAddress
-	logged    map[string]bool
+	service  Service
+	jobs     []domain.JobConfig
+	workDir  string
+	worktree string
+	logDir   string
+	// sharedLogDir is the main checkout's, where a shared service persists its
+	// output. A claim carries no log of its own, so reading a shared job's tail
+	// from this worktree's directory found an empty file.
+	sharedLogDir string
+	addresses    map[string]domain.JobAddress
+	logged       map[string]bool
 
 	// mu guards live, which a surface refreshes off the goroutine that renders it.
 	mu        sync.RWMutex
@@ -142,7 +150,7 @@ func (b *board) History(params HistoryParams) ([]string, error) {
 	if lines <= 0 {
 		lines = domain.JobLogTailLines
 	}
-	return b.service.Tail(TailRequest{LogDir: b.logDir, Job: params.Job, Lines: lines})
+	return b.service.Tail(TailRequest{LogDir: b.logDirFor(params.Job), Job: params.Job, Lines: lines})
 }
 
 func (b *board) view(name string) (JobView, bool) {
@@ -172,7 +180,11 @@ func declaredView(params declaredViewParams) JobView {
 		view.StartedAt = params.Info.StartedAt
 		view.ExitCode = params.Info.ExitCode
 	}
-	view.Attachable = view.Status == domain.JobStatusRunning && !rules.IsDetached(params.Job)
+	// A claim on a shared service is attachable too: it owns no stream of its
+	// own, and the daemon resolves it to the one there is. Refusing it here left
+	// every worktree but the main checkout unable to read a shared job's output.
+	up := view.Status == domain.JobStatusRunning || view.Status == domain.JobStatusAttached
+	view.Attachable = up && !rules.IsDetached(params.Job)
 	return view
 }
 
@@ -186,6 +198,20 @@ func undeclaredView(info domain.JobInfo) JobView {
 		Status:     info.Status,
 		StartedAt:  info.StartedAt,
 		ExitCode:   info.ExitCode,
-		Attachable: info.Status == domain.JobStatusRunning,
+		Attachable: info.Status == domain.JobStatusRunning || info.Status == domain.JobStatusAttached,
 	}
+}
+
+// logDirFor is where a job's persisted output lives: the main checkout's for a
+// shared service, this worktree's for everything else.
+func (b *board) logDirFor(name string) string {
+	if b.sharedLogDir == "" {
+		return b.logDir
+	}
+	for _, job := range b.jobs {
+		if job.Name == name && rules.IsShared(job) {
+			return b.sharedLogDir
+		}
+	}
+	return b.logDir
 }

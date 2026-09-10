@@ -35,6 +35,8 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	warnIndexFrozen(cmd)
+
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 	detach, _ := cmd.Flags().GetBool(domain.FlagDetach)
 	job, _ := cmd.Flags().GetString(domain.FlagJob)

@@ -72,6 +72,10 @@ type PlanEnvPortsParams struct {
 	// path the link spells. A file absent from the map contributes missing keys
 	// rather than nothing, so a link never disappears silently from the report.
 	Lines map[string][]domain.EnvLine
+	// Shared names the jobs that run once for the repository. Their ports never
+	// take this worktree's offset — the service binds what it declares — so a
+	// .env shifted for them would address something that answers elsewhere.
+	Shared map[string]bool
 }
 
 // PlanEnvPorts resolves every link against the value its .env currently holds,
@@ -95,6 +99,7 @@ func PlanEnvPorts(params PlanEnvPortsParams) domain.EnvPortPlan {
 			Block:   params.Block,
 			Lines:   params.Lines[group.File],
 			Origins: params.Origins,
+			Shared:  params.Shared,
 		}))
 	}
 
@@ -141,6 +146,7 @@ type planEnvPortKeyParams struct {
 	Block   int
 	Lines   []domain.EnvLine
 	Origins OriginContext
+	Shared  map[string]bool
 }
 
 // planEnvPortKey folds every link a key follows over the same value, each one
@@ -148,14 +154,14 @@ type planEnvPortKeyParams struct {
 // declares, a port belonging to nothing here — exactly as it found it.
 func planEnvPortKey(params planEnvPortKeyParams) domain.EnvPortEntry {
 	merged := planEnvPortEntry(planEnvPortEntryParams{
-		Link:    params.Group.Links[0],
-		Base:    params.Group.Bases[0],
-		Offset:  params.Offset,
-		Block:   params.Block,
-		Lines:   params.Lines,
-		Origins: params.Origins,
+		Link:     params.Group.Links[0],
+		Base:     params.Group.Bases[0],
+		Resolved: resolvedPort(params, 0),
+		Block:    params.Block,
+		Lines:    params.Lines,
+		Origins:  params.Origins,
 	})
-	merged.Moves = []domain.EnvPortMove{moveOf(params.Group.Links[0], params.Group.Bases[0], params.Offset)}
+	merged.Moves = []domain.EnvPortMove{moveOf(params.Group.Links[0], params.Group.Bases[0], resolvedPort(params, 0))}
 	if len(params.Group.Links) == 1 {
 		return merged
 	}
@@ -168,21 +174,54 @@ func planEnvPortKey(params planEnvPortKeyParams) domain.EnvPortEntry {
 			lines = ApplyEnvPorts(lines, []domain.EnvPortEntry{merged})
 		}
 		next := planEnvPortEntry(planEnvPortEntryParams{
-			Link:    params.Group.Links[i],
-			Base:    params.Group.Bases[i],
-			Offset:  params.Offset,
-			Block:   params.Block,
-			Lines:   lines,
-			Origins: params.Origins,
+			Link:     params.Group.Links[i],
+			Base:     params.Group.Bases[i],
+			Resolved: resolvedPort(params, i),
+			Block:    params.Block,
+			Lines:    lines,
+			Origins:  params.Origins,
 		})
 		merged = foldEnvPortEntry(merged, next)
-		merged.Moves = append(merged.Moves, moveOf(params.Group.Links[i], params.Group.Bases[i], params.Offset))
+		merged.Moves = append(merged.Moves, moveOf(params.Group.Links[i], params.Group.Bases[i], resolvedPort(params, i)))
 	}
 	return merged
 }
 
-func moveOf(link domain.EnvPortLink, base, offset int) domain.EnvPortMove {
-	return domain.EnvPortMove{Port: link.Port, Job: link.Job, Base: base, Resolved: base + offset}
+// resolvedPort is what one link's port becomes in this worktree, and it is the
+// only place that answers it. A shared job takes no shift: it binds its declared
+// port in every worktree, so a .env shifted for it addresses something that
+// answers elsewhere.
+//
+// Everything downstream reads the result rather than recomputing it. Two sites
+// deriving it independently is exactly how the report came to say 5432 while
+// the file was written 5452.
+func resolvedPort(params planEnvPortKeyParams, index int) int {
+	return ResolvedPort(ResolvedPortParams{
+		Base:   params.Group.Bases[index],
+		Offset: params.Offset,
+		Shared: params.Shared[params.Group.Links[index].Job],
+	})
+}
+
+type ResolvedPortParams struct {
+	Base   int
+	Offset int
+	Shared bool
+}
+
+// ResolvedPort is what a declared port becomes in one worktree. Exported so the
+// [[env]] templates read the same answer rather than deriving their own: two
+// sites computing it independently is exactly how the report came to say 5432
+// while the file was written 5452.
+func ResolvedPort(params ResolvedPortParams) int {
+	if params.Shared {
+		return params.Base
+	}
+	return params.Base + params.Offset
+}
+
+func moveOf(link domain.EnvPortLink, base, resolved int) domain.EnvPortMove {
+	return domain.EnvPortMove{Port: link.Port, Job: link.Job, Base: base, Resolved: resolved}
 }
 
 // foldEnvPortEntry keeps what the run has done so far and what the next link
@@ -213,12 +252,15 @@ func foldEnvPortEntry(into, next domain.EnvPortEntry) domain.EnvPortEntry {
 }
 
 type planEnvPortEntryParams struct {
-	Link    domain.EnvPortLink
-	Base    int
-	Offset  int
-	Block   int
-	Lines   []domain.EnvLine
-	Origins OriginContext
+	Link domain.EnvPortLink
+	Base int
+	// Resolved is the port this link takes in this worktree, decided by
+	// resolvedPort. It is passed in rather than derived here so that the answer
+	// exists once: a second derivation is a second thing to keep in step.
+	Resolved int
+	Block    int
+	Lines    []domain.EnvLine
+	Origins  OriginContext
 }
 
 func planEnvPortEntry(params planEnvPortEntryParams) domain.EnvPortEntry {
@@ -227,7 +269,7 @@ func planEnvPortEntry(params planEnvPortEntryParams) domain.EnvPortEntry {
 		Key:        params.Link.Key,
 		Port:       params.Link.Port,
 		Base:       params.Base,
-		Resolved:   params.Base + params.Offset,
+		Resolved:   params.Resolved,
 		Addressing: domain.AddressingPorts,
 	}
 

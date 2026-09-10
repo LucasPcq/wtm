@@ -135,6 +135,12 @@ type RunParams struct {
 	// not build it: it reads neither the repository's config nor the daemon's
 	// index across worktrees.
 	BaseOwners map[int]string
+	// Shared is where this run's shared jobs run: the main checkout, with its
+	// own environment and log directory. Resolved by the surface, the only side
+	// that can ask git which worktree is the main one. Nil leaves a shared job
+	// with nowhere to run, and the daemon refuses it rather than starting one
+	// instance per worktree.
+	Shared *domain.SharedJobContext
 }
 
 // Run starts a profile's jobs in their declared order and reports each step to
@@ -162,6 +168,7 @@ func Run(ctx context.Context, params RunParams) (Outcome, error) {
 		workDir:       params.WorkDir,
 		worktree:      params.Worktree,
 		logDir:        params.LogDir,
+		shared:        params.Shared,
 		env:           params.Env,
 		prober:        params.Prober,
 		project:       params.Project,
@@ -203,6 +210,7 @@ type runner struct {
 	portAddressed bool
 	nextConfig    NextConfigLookup
 	baseOwners    map[int]string
+	shared        *domain.SharedJobContext
 	// servedPort is what the daemon answered its proxy is really on, and
 	// noticedProxy records that the run has already explained a refusal — the
 	// fact belongs to the run, not to each job that would repeat it.
@@ -247,6 +255,7 @@ func (r *runner) run() Outcome {
 			LogDir:  r.logDir,
 			Env:     r.env,
 			Routes:  routes,
+			Shared:  r.shared,
 			OnOutput: func(chunk []byte) {
 				r.captured = append(r.captured, chunk...)
 				r.emit(Event{Phase: PhaseOutput, Job: job.Name, Kind: job.Kind, Step: i + 1, Chunk: chunk})
@@ -286,7 +295,7 @@ func (r *runner) run() Outcome {
 
 		r.started = append(r.started, job.Name)
 		held := r.heldURLs(job, routes, result.Ports)
-		r.results = append(r.results, domain.JobActionResult{Name: job.Name, Status: domain.JobActionStarted, URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host}), Held: held})
+		r.results = append(r.results, domain.JobActionResult{Name: job.Name, Status: r.startedStatus(job), URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host}), Held: held})
 		if rules.ShouldProbeJob(rules.ShouldProbeJobParams{Kind: job.Kind, Ports: result.Ports, Probe: job.Probe}) {
 			r.probeTargets = append(r.probeTargets, probeTarget{job: job.Name, resolved: result.Ports})
 		}
@@ -663,4 +672,14 @@ func jobNames(jobs []domain.JobConfig) []string {
 		names[i] = job.Name
 	}
 	return names
+}
+
+// startedStatus tells joining a shared service apart from starting one. Only the
+// main checkout ever spawns the process; every other worktree attaches to it,
+// and saying "started" in each of them read as one service per worktree.
+func (r *runner) startedStatus(job domain.JobConfig) string {
+	if rules.IsShared(job) && r.shared != nil && r.workDir != r.shared.WorkDir {
+		return domain.JobActionAttached
+	}
+	return domain.JobActionStarted
 }

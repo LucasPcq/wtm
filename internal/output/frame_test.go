@@ -113,3 +113,44 @@ func TestBarredCarriageReturnRemarksTheRow(t *testing.T) {
 		t.Fatalf("bar over a redrawn row = %q, want %q", buf.String(), want)
 	}
 }
+
+// A surface that has to know whether it may repaint, or how wide it is, reads
+// the stream and not the wrapper: a hook phase handed a barred writer would
+// otherwise decide it was writing to a pipe and stream its whole output instead
+// of a tail. The bars are counted rather than flagged, so a doubly wrapped
+// writer does not over-report its width by a column.
+func TestUnwrapStream_ReadsThroughTheBarAndCountsIt(t *testing.T) {
+	var buf bytes.Buffer
+
+	for _, tc := range []struct {
+		name  string
+		given io.Writer
+		bars  int
+	}{
+		{name: "bare", given: &buf, bars: 0},
+		{name: "barred", given: &barWriter{w: &buf}, bars: 1},
+		{name: "barred twice", given: &barWriter{w: &barWriter{w: &buf}}, bars: 2},
+	} {
+		stream, bars := unwrapStream(tc.given)
+		if stream != io.Writer(&buf) {
+			t.Errorf("%s: unwrapStream returned %T, want the buffer underneath", tc.name, stream)
+		}
+		if bars != tc.bars {
+			t.Errorf("%s: counted %d bars, want %d", tc.name, bars, tc.bars)
+		}
+	}
+}
+
+// The blank closing a block and the blank opening the next are one line on
+// screen. A surface remembers which, because the block beside this one is
+// written by code that never sees it.
+func TestFrame_ConsecutiveBlocksShareOneBlankLine(t *testing.T) {
+	var buf bytes.Buffer
+
+	Frame(&buf, func(w io.Writer) { Message(w, "first") })
+	Frame(&buf, func(w io.Writer) { Message(w, "second") })
+
+	if got := buf.String(); containsTripleNewline(got) {
+		t.Errorf("two blocks in a row must not stack their blanks, got %q", got)
+	}
+}

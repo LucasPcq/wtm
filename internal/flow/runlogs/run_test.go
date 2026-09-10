@@ -302,7 +302,7 @@ func TestRunStopsReportingWhenTheSurfaceDetaches(t *testing.T) {
 		t.Fatalf("Run: %v, want context.Canceled", err)
 	}
 	if got := service.StartedNames(); !reflect.DeepEqual(got, []string{"docker", "migrate"}) {
-		t.Fatalf("started %v, want the sequence stopped at the detach", got)
+		t.Fatalf("started %v, want the sequence stopped at the removal", got)
 	}
 	if outcome.Aborted() {
 		t.Fatalf("a detach reads as an abort: %+v", outcome)
@@ -317,10 +317,10 @@ func TestRunStopsReportingWhenTheSurfaceDetaches(t *testing.T) {
 	if !reflect.DeepEqual(outcome.NotStarted, []string{"api"}) {
 		t.Fatalf("not started %v, want only the job the detach really cut short", outcome.NotStarted)
 	}
-	// migrate was announced before the detach reached the runner; nothing it
+	// migrate was announced before the removal reached the runner; nothing it
 	// printed, nor how it ended, is reported after.
 	if got := trace(sink); got != "starting:docker started:docker starting:migrate" {
-		t.Fatalf("trace = %q, want nothing emitted past the detach", got)
+		t.Fatalf("trace = %q, want nothing emitted past the removal", got)
 	}
 }
 
@@ -346,16 +346,16 @@ func TestRunStopsTheSequenceWhenTheDetachLandsBetweenTwoJobs(t *testing.T) {
 		t.Fatalf("Run: %v, want context.Canceled", err)
 	}
 	if got := service.StartedNames(); !reflect.DeepEqual(got, []string{"docker"}) {
-		t.Fatalf("started %v, want the sequence stopped at the detach", got)
+		t.Fatalf("started %v, want the sequence stopped at the removal", got)
 	}
 	if !reflect.DeepEqual(outcome.Started, []string{"docker"}) {
 		t.Fatalf("left running %v, want the launcher the daemon did start", outcome.Started)
 	}
 	if !reflect.DeepEqual(outcome.NotStarted, []string{"migrate", "api"}) {
-		t.Fatalf("not started %v, want what the detach cut short", outcome.NotStarted)
+		t.Fatalf("not started %v, want what the removal cut short", outcome.NotStarted)
 	}
 	if got := trace(sink); got != "starting:docker" {
-		t.Fatalf("trace = %q, want nothing emitted past the detach", got)
+		t.Fatalf("trace = %q, want nothing emitted past the removal", got)
 	}
 }
 

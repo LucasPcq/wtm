@@ -42,7 +42,7 @@ type JobUptimeParams struct {
 // than counting backwards, and a caller that did not say when now is gets no
 // answer at all rather than a 0s reading as a job that just started.
 func JobUptime(params JobUptimeParams) string {
-	if params.Now.IsZero() || !IsJobUp(params.Job.Status) || params.Job.StartedAt.IsZero() {
+	if params.Now.IsZero() || !livedUntilNow(params.Job.Status) || params.Job.StartedAt.IsZero() {
 		return ""
 	}
 
@@ -57,6 +57,15 @@ func JobUptime(params JobUptimeParams) string {
 	default:
 		return fmt.Sprintf(domain.JobUptimeDayFmt, int(elapsed.Hours())/24, int(elapsed.Hours())%24)
 	}
+}
+
+// livedUntilNow is the condition an uptime needs, and it is not quite IsJobUp: a
+// reaped job was running right up to the instant it was reaped, so now minus its
+// start is its real lifetime — the twelve days being the whole point of the row.
+// A crashed or stopped job died at a moment nobody recorded, and counting to now
+// would report an age it never reached.
+func livedUntilNow(status domain.JobStatus) bool {
+	return IsJobUp(status) || status == domain.JobStatusReaped
 }
 
 // DefaultProfile returns the profile marked as default, or the first one.

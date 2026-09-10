@@ -29,6 +29,9 @@ const (
 	stepDocker         = "docker"
 	stepComposePatch   = "compose_patch"
 	stepScriptKinds    = "script_kinds"
+	stepScopes         = "scopes"
+	stepNamespaces     = "namespaces"
+	stepEnvValues      = "envvalues"
 	stepPorts          = "ports"
 	stepURLs           = "urls"
 	stepCmds           = "cmds"
@@ -646,6 +649,231 @@ func addScriptKindStep(s *stepSet, params addServicesStepsParams) {
 		Summary:    kindListSummary,
 		Callout:    true,
 	})
+}
+
+// addScopeStep asks which compose services run once for the whole repository.
+// It enumerates services and not files, unlike every other step here: wtm
+// generates one job per compose file, so a service only becomes shareable once
+// it has been named — and marking one lifts it out of its file's job.
+func addScopeStep(s *stepSet, params addServicesStepsParams) {
+	docker := s.at(stepDocker)
+	if docker < 0 {
+		return
+	}
+
+	skipReason := ""
+	s.add(stepScopes, components.Step{
+		Name: domain.ScopeStepName,
+		Build: func(prev []components.Step) any {
+			return components.NewScopeList(components.NewScopeListParams{
+				Title:       domain.ScopeStepTitle,
+				Description: domain.ScopeStepDesc,
+				Entries:     scopeChoices(scopeChoicesParams{Prev: prev, Docker: docker, Params: params}),
+			})
+		},
+		AutoSkip: func(w components.WizardModel) bool {
+			choices := scopeChoices(scopeChoicesParams{Prev: w.Steps(), Docker: docker, Params: params})
+			skip := !rules.AnyScopeAnswerable(choices)
+			if skip {
+				skipReason = rules.ScopesSkipReason(len(choices))
+			}
+			return skip
+		},
+		SkipReason: func() string { return skipReason },
+		Summary:    scopeListSummary,
+		Callout:    true,
+	})
+}
+
+// addNamespaceStep asks what each worktree gets of the services just marked
+// shared. wtm proposes only the name: it knows the variables a command may
+// read, never what a database or a realm is, and a guessed command would be
+// wrong more often than right — and wrong-and-accepted reads as a wtm bug.
+func addNamespaceStep(s *stepSet, params addServicesStepsParams) {
+	scopes := s.at(stepScopes)
+	if scopes < 0 {
+		return
+	}
+
+	skipReason := ""
+	s.add(stepNamespaces, components.Step{
+		Name: domain.NamespaceStepName,
+		Build: func(prev []components.Step) any {
+			return components.NewNamespaceList(components.NewNamespaceListParams{
+				Title:       domain.NamespaceStepTitle,
+				Description: domain.NamespaceStepDesc,
+				Fields:      namespaceFields(prev, scopes, params),
+			})
+		},
+		AutoSkip: func(w components.WizardModel) bool {
+			skip := len(namespaceFields(w.Steps(), scopes, params)) == 0
+			if skip {
+				skipReason = domain.NamespaceSkipNoShared
+			}
+			return skip
+		},
+		SkipReason: func() string { return skipReason },
+		Summary:    namespaceListSummary,
+		Callout:    true,
+	})
+}
+
+// addEnvValueStep asks which .env keys name each worktree's slice. It is the
+// write-side counterpart of the namespace step: carving a slice out is half the
+// work, and the app has to be told which one is its own. wtm cannot detect it —
+// a realm name is an opaque word — so every managed key is offered.
+func addEnvValueStep(s *stepSet, params addServicesStepsParams) {
+	scopes, namespaces := s.at(stepScopes), s.at(stepNamespaces)
+	if scopes < 0 || namespaces < 0 {
+		return
+	}
+
+	skipReason := ""
+	s.add(stepEnvValues, components.Step{
+		Name: domain.EnvValueStepName,
+		Build: func(prev []components.Step) any {
+			return components.NewEnvValueList(components.NewEnvValueListParams{
+				Title:       domain.EnvValueStepTitle,
+				Description: domain.EnvValueStepDesc,
+				Fields:      envValueFields(prev, envValueStepRefs{Scopes: scopes, Namespaces: namespaces}, params),
+			})
+		},
+		AutoSkip: func(w components.WizardModel) bool {
+			refs := envValueStepRefs{Scopes: scopes, Namespaces: namespaces}
+			skip := len(envValueFields(w.Steps(), refs, params)) == 0
+			if skip {
+				skipReason = envValueSkipReason(w.Steps(), refs)
+			}
+			return skip
+		},
+		SkipReason: func() string { return skipReason },
+		Summary:    envValueListSummary,
+		Callout:    true,
+	})
+}
+
+type envValueStepRefs struct {
+	Scopes     int
+	Namespaces int
+}
+
+// envValueFields reads the namespace step rather than the scope step alone: a
+// shared service that carves nothing out has no slice for a key to name, and
+// that is only known once the namespaces are answered.
+func envValueFields(prev []components.Step, refs envValueStepRefs, params addServicesStepsParams) []domain.EnvValueField {
+	shared := sharedWithNamespaces(prev, refs)
+	if len(shared) == 0 {
+		return nil
+	}
+	return rules.EnvValueFields(rules.EnvValueFieldsParams{
+		Shared:   shared,
+		Lines:    params.EnvLines,
+		Files:    params.EnvFiles,
+		Existing: params.Existing,
+		Ports:    rules.ComposeServicePortVars(params.Detection.ComposeScans, shared),
+		Bases:    rules.ComposeServicePortBases(params.Detection.ComposeScans, shared),
+	})
+}
+
+func sharedWithNamespaces(prev []components.Step, refs envValueStepRefs) []domain.SharedComposeService {
+	shared := sharedFromStep(prev, refs.Scopes)
+	if len(shared) == 0 || refs.Namespaces >= len(prev) {
+		return nil
+	}
+	model, ok := prev[refs.Namespaces].Model.(components.NamespaceListModel)
+	if !ok {
+		return shared
+	}
+	return rules.WithNamespaces(shared, rules.NamespacesFromFields(model.Fields()))
+}
+
+// envValueSkipReason tells the two silences apart: nothing shared to speak
+// about, and nothing in the .env files to link.
+func envValueSkipReason(prev []components.Step, refs envValueStepRefs) string {
+	if len(sharedWithNamespaces(prev, refs)) == 0 {
+		return domain.EnvValueSkipNoShared
+	}
+	return domain.EnvValueSkipNoKeys
+}
+
+func envValueListSummary(model any) string {
+	list, ok := model.(components.EnvValueListModel)
+	if !ok {
+		return ""
+	}
+	fields := list.Fields()
+	if len(fields) == 0 {
+		return domain.RecapNotAsked
+	}
+	return fmt.Sprintf(domain.EnvValueSummaryFmt, len(rules.EnvValuesFromFields(fields)))
+}
+
+func namespaceFields(prev []components.Step, scopes int, params addServicesStepsParams) []domain.NamespaceField {
+	shared := sharedFromStep(prev, scopes)
+	if len(shared) == 0 {
+		return nil
+	}
+	return rules.NamespaceFields(rules.NamespaceFieldsParams{
+		Shared:   shared,
+		Ports:    rules.ComposeServicePortVars(params.Detection.ComposeScans, shared),
+		Existing: params.Existing,
+	})
+}
+
+func sharedFromStep(prev []components.Step, scopes int) []domain.SharedComposeService {
+	if scopes < 0 || scopes >= len(prev) {
+		return nil
+	}
+	model, ok := prev[scopes].Model.(components.ScopeListModel)
+	if !ok {
+		return nil
+	}
+	return rules.SharedFromChoices(model.Entries())
+}
+
+func namespaceListSummary(model any) string {
+	list, ok := model.(components.NamespaceListModel)
+	if !ok {
+		return ""
+	}
+	fields := list.Fields()
+	if len(fields) == 0 {
+		return domain.RecapNotAsked
+	}
+	byJob := rules.NamespacesFromFields(fields)
+	configured := 0
+	for _, namespace := range byJob {
+		if namespace != nil {
+			configured++
+		}
+	}
+	return fmt.Sprintf(domain.NamespaceSummaryFmt, configured, len(byJob))
+}
+
+type scopeChoicesParams struct {
+	Prev   []components.Step
+	Docker int
+	Params addServicesStepsParams
+}
+
+func scopeChoices(p scopeChoicesParams) []rules.ServiceScopeChoice {
+	return rules.ServiceScopeChoices(rules.ServiceScopeChoicesParams{
+		Scans:    p.Params.Detection.ComposeScans,
+		Files:    selectedComposeFiles(p.Prev, p.Docker),
+		Existing: p.Params.Existing,
+	})
+}
+
+func scopeListSummary(model any) string {
+	list, ok := model.(components.ScopeListModel)
+	if !ok {
+		return ""
+	}
+	if len(list.Entries()) == 0 {
+		return domain.RecapNotAsked
+	}
+	shared := len(rules.SharedFromChoices(list.Entries()))
+	return fmt.Sprintf(domain.ScopeSummaryFmt, shared, len(list.Entries())-shared)
 }
 
 type scriptKindChoicesParams struct {
@@ -1317,6 +1545,15 @@ func addServicesSteps(s *stepSet, params addServicesStepsParams) (steps services
 	}
 
 	addScriptKindStep(s, params)
+	// Before the ports step, and not after: a shared job takes no offset, so
+	// which services are shared has to be settled before their ports are.
+	addScopeStep(s, params)
+	// After the scope step and reading it: which services are shared is what
+	// decides whether this one has anything to ask at all.
+	addNamespaceStep(s, params)
+	// After the namespace step and reading it: a key can only follow a slice
+	// once that slice has a name.
+	addEnvValueStep(s, params)
 
 	// Declared last on purpose: the step resolves the ports of both selections,
 	// so it must be able to read them — a .env port can withdraw a compose
@@ -1513,6 +1750,31 @@ func extractProjectAnswers(final components.WizardModel, detection domain.InitDe
 			})
 		}
 	}
+
+	// ScopesAsked is the pair every step whose answer may legitimately be empty
+	// is read as: emptied-and-asked withdraws every sharing, where a run that
+	// never asked leaves what run.toml already declares standing.
+	if i := at(stepScopes); i >= 0 && !final.Skipped(i) {
+		if m, ok := steps[i].Model.(components.ScopeListModel); ok {
+			answers.SharedServices = rules.SharedFromChoices(m.Entries())
+			answers.ScopesAsked = true
+		}
+	}
+	if i := at(stepNamespaces); i >= 0 && !final.Skipped(i) {
+		if m, ok := steps[i].Model.(components.NamespaceListModel); ok {
+			answers.SharedServices = rules.WithNamespaces(answers.SharedServices, rules.NamespacesFromFields(m.Fields()))
+		}
+	}
+	// The same (value, asked) pair: emptying the list withdraws every link the
+	// step offered, where a run that never asked leaves run.toml standing.
+	if i := at(stepEnvValues); i >= 0 && !final.Skipped(i) {
+		if m, ok := steps[i].Model.(components.EnvValueListModel); ok {
+			answers.EnvValues = rules.EnvValuesFromFields(m.Fields())
+			answers.EnvValuesOffered = rules.EnvValuesOffered(m.Fields())
+			answers.EnvValuesAsked = true
+		}
+	}
+	answers.Scans = detection.ComposeScans
 
 	return answers
 }

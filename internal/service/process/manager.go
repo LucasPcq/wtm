@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -69,9 +68,13 @@ type ManagedJob struct {
 	// closed by whichever goroutine reaps or stops the job, holding nothing. A
 	// user of it must therefore hold a reference on the descriptor itself
 	// (setWinsize) rather than read its number out.
-	PTY       *os.File
-	Status    domain.JobStatus
-	PID       int
+	PTY    *os.File
+	Status domain.JobStatus
+	PID    int
+	// PGID is the group every signal actually targets. Recorded rather than
+	// derived from PID: Setsid and Setpgid make the two equal today, and an
+	// assumption like that breaks in silence.
+	PGID      int
 	WorkDir   string
 	StartedAt time.Time
 	// Env is kept so the stop command runs in the environment the start did: a
@@ -85,6 +88,11 @@ type ManagedJob struct {
 	// LogDir is where this job's output is persisted, kept for the index: a
 	// daemon adopting the job must be able to hand it back to `run logs`.
 	LogDir string
+	// SharedDir is the main checkout a shared job runs in — set on the real job
+	// and on every claim, so a claim finds its service by key rather than by
+	// name. The daemon is machine-wide: matching on the name alone would let two
+	// repositories that both declare "db" release each other's.
+	SharedDir string
 	// ExitCode, like Status, is written by the goroutine that reaps the process
 	// and read by List: both are only ever touched under the manager lock.
 	ExitCode *int
@@ -110,7 +118,13 @@ type Manager struct {
 	jobs   map[string]*ManagedJob
 	routes RouteSink
 	index  JobIndex
-	mu     sync.Mutex
+	// namespaceBudget bounds the retries of a namespace's attach. Zero takes
+	// domain.NamespaceCreateTimeout; a test sets it so a command that is simply
+	// wrong does not hold the suite for the whole budget.
+	namespaceBudget time.Duration
+	orphans         Orphans
+	stacks          Stacks
+	mu              sync.Mutex
 }
 
 func NewManager() *Manager {
@@ -119,8 +133,10 @@ func NewManager() *Manager {
 
 func NewManagerWithRoutes(routes RouteSink) *Manager {
 	return &Manager{
-		jobs:   make(map[string]*ManagedJob),
-		routes: routes,
+		jobs:    make(map[string]*ManagedJob),
+		routes:  routes,
+		orphans: systemOrphans{},
+		stacks:  systemStacks{},
 	}
 }
 
@@ -130,27 +146,62 @@ type ManagerParams struct {
 	// in memory, which is what a job whose process dies with us would want
 	// anyway.
 	Index JobIndex
+	// NamespaceBudget bounds the retries of a shared job's namespace attach. Zero
+	// takes domain.NamespaceCreateTimeout.
+	NamespaceBudget time.Duration
+	// Orphans finds and takes down the process groups a killed daemon left
+	// behind. Nil takes the real one, which signals; a test supplies its own so
+	// Adopt neither forks a ps nor kills anything.
+	Orphans Orphans
+	// Stacks verifies what a detached launcher started. Nil takes the real one,
+	// which shells out to docker.
+	Stacks Stacks
 }
 
 func NewManagerWith(params ManagerParams) *Manager {
+	orphans := params.Orphans
+	if orphans == nil {
+		orphans = systemOrphans{}
+	}
+	stacks := params.Stacks
+	if stacks == nil {
+		stacks = systemStacks{}
+	}
 	return &Manager{
-		jobs:   make(map[string]*ManagedJob),
-		routes: params.Routes,
-		index:  params.Index,
+		jobs:            make(map[string]*ManagedJob),
+		routes:          params.Routes,
+		index:           params.Index,
+		namespaceBudget: params.NamespaceBudget,
+		orphans:         orphans,
+		stacks:          stacks,
 	}
 }
 
-// Adopt takes over the jobs a previous daemon left behind. It starts nothing and
-// stops nothing — it registers what rules.ReconcileJob makes of each entry, so
-// `run ps` can report it and `run down` can tear it down. The adopted jobs carry
-// no process, and every path that would reach for one gates on a status they do
-// not have.
+// Adopt takes over the jobs a previous daemon left behind. It registers what
+// rules.ReconcileJob makes of each entry, so `run ps` can report it and
+// `run down` can tear it down; the adopted jobs carry no process, and every path
+// that would reach for one gates on a status they do not have.
+//
+// It has exactly one effect on the machine, and it is the reason this pass
+// exists: a foreground service whose group is still alive and still identifiably
+// ours is killed here. A daemon dies without running a handler often enough —
+// SIGKILL, a crash, an OOM — and nothing downstream of that death can clean up
+// after it. The next start-up is the only place left.
 func (m *Manager) Adopt(records []domain.JobRecord) {
+	states := m.orphans.Probe(orphanQueries(records))
+	stacks := m.stacks.Probe(stackQueriesOf(records))
+
+	var reap []int
 	m.mu.Lock()
 	for _, record := range records {
+		state := states[record.PGID]
+		stack := stacks[jobKey(record.Name, record.WorkDir)]
 		decision := rules.ReconcileJob(rules.ReconcileJobParams{
-			Record:        record,
-			WorkDirExists: dirExists(record.WorkDir),
+			Record:            record,
+			WorkDirExists:     dirExists(record.WorkDir),
+			GroupAlive:        state.Alive,
+			IdentityConfirmed: state.IdentityConfirmed,
+			StackKnownDown:    stack.Known && !stack.Up,
 		})
 		if !decision.Adopt {
 			continue
@@ -158,6 +209,9 @@ func (m *Manager) Adopt(records []domain.JobRecord) {
 		key := jobKey(record.Name, record.WorkDir)
 		if _, taken := m.jobs[key]; taken {
 			continue
+		}
+		if decision.Reap {
+			reap = append(reap, record.PGID)
 		}
 		exited := make(chan struct{})
 		close(exited)
@@ -167,14 +221,20 @@ func (m *Manager) Adopt(records []domain.JobRecord) {
 			Status:    decision.Status,
 			WorkDir:   record.WorkDir,
 			StartedAt: record.StartedAt,
+			PID:       record.PID,
+			PGID:      record.PGID,
 			Env:       record.Env,
 			Routes:    record.Routes,
 			LogDir:    record.LogDir,
+			SharedDir: record.SharedDir,
 			exited:    exited,
 		}
 	}
+	m.dropDanglingClaimsLocked()
 	adopted := m.upRecordsLocked()
 	m.mu.Unlock()
+
+	m.orphans.Reap(reap)
 
 	for _, job := range m.List() {
 		if job.Status == domain.JobStatusDetached {
@@ -182,6 +242,37 @@ func (m *Manager) Adopt(records []domain.JobRecord) {
 		}
 	}
 	m.saveIndex(adopted)
+}
+
+// orphanQueries asks about the only entries wtm owns a process for. A claim owns
+// nothing and a detached stack belongs to Docker, so probing either would spend a
+// syscall to learn something no decision reads.
+func orphanQueries(records []domain.JobRecord) []GroupQuery {
+	queries := make([]GroupQuery, 0, len(records))
+	for _, record := range records {
+		if !rules.IsForegroundService(record) || record.PGID <= 1 {
+			continue
+		}
+		queries = append(queries, GroupQuery{PGID: record.PGID, StartedAt: record.StartedAt})
+	}
+	return queries
+}
+
+// dropDanglingClaimsLocked removes the claims left standing on a shared service
+// that is no longer up — the one this pass has just reaped, typically. A claim is
+// what makes the job table a reference count, so one pointing at nothing would
+// have the next worktree told its service is already running.
+func (m *Manager) dropDanglingClaimsLocked() {
+	for key, job := range m.jobs {
+		if job.Status != domain.JobStatusAttached {
+			continue
+		}
+		service, found := m.realSharedLocked(sharedRef{Name: job.Name, Dir: job.SharedDir})
+		if found && rules.IsJobUp(service.Status) {
+			continue
+		}
+		delete(m.jobs, key)
+	}
 }
 
 func dirExists(path string) bool {
@@ -206,6 +297,10 @@ func (m *Manager) upRecordsLocked() []domain.JobRecord {
 			Routes:    job.Routes,
 			LogDir:    job.LogDir,
 			StartedAt: job.StartedAt,
+			Attached:  job.Status == domain.JobStatusAttached,
+			SharedDir: job.SharedDir,
+			PID:       job.PID,
+			PGID:      job.PGID,
 		})
 	}
 	return records
@@ -245,6 +340,16 @@ type StartParams struct {
 	// client for the same reason LogDir and Env are.
 	Routes   []domain.JobRoute
 	Streamer io.Writer
+	// Shared is where a shared job actually runs and with what. Nil for a
+	// per-worktree job, and cleared by startShared before it starts the real one
+	// so the ordinary path takes over.
+	Shared *domain.SharedJobContext
+	// real marks the second pass startShared makes to spawn the service itself.
+	// Without it a nil Shared would mean two different things — "this is the
+	// real start" and "the client resolved nothing" — and the second would
+	// quietly run one instance per worktree, which is the whole thing this
+	// feature exists to stop.
+	real bool
 }
 
 // Start blocks for two of the three kinds it serves, which its signature does
@@ -258,6 +363,10 @@ func (m *Manager) Start(params StartParams) error {
 
 	if rules.IsBlankCommand(job.Cmd) {
 		return fmt.Errorf("job %s has empty cmd", job.Name)
+	}
+
+	if rules.IsShared(job) && !params.real {
+		return m.startShared(params)
 	}
 
 	hub := newJobHub(job)
@@ -275,13 +384,7 @@ func (m *Manager) Start(params StartParams) error {
 
 	spec := rules.ShellCommand(job.Cmd)
 	cmd := exec.Command(spec.Name, spec.Args...)
-	if job.Cwd != "" && !filepath.IsAbs(job.Cwd) {
-		cmd.Dir = filepath.Join(params.WorkDir, job.Cwd)
-	} else if job.Cwd != "" {
-		cmd.Dir = job.Cwd
-	} else {
-		cmd.Dir = params.WorkDir
-	}
+	cmd.Dir = rules.JobDir(rules.JobDirParams{WorkDir: params.WorkDir, Cwd: job.Cwd})
 	// Resolved once and kept on the job: the stop command must run with the same
 	// ports its start did, or it tears down a stack it never brought up.
 	env := withJobPorts(job, params.Env)
@@ -309,11 +412,13 @@ func (m *Manager) Start(params StartParams) error {
 		PTY:       outputFile,
 		Status:    domain.JobStatusRunning,
 		PID:       cmd.Process.Pid,
+		PGID:      processGroupOf(cmd.Process.Pid),
 		WorkDir:   params.WorkDir,
 		StartedAt: time.Now(),
 		Env:       env,
 		Routes:    params.Routes,
 		LogDir:    params.LogDir,
+		SharedDir: sharedDirOf(params),
 		output:    hub,
 		logs:      logs,
 		exited:    make(chan struct{}),
@@ -878,20 +983,37 @@ func (m *Manager) stopByKey(key string) error {
 		return nil
 	}
 
-	m.withdrawRoute(job)
+	// A shared job is released, not stopped: the claim goes, and the service
+	// only follows it once no worktree holds it any more.
+	if rules.IsShared(job.Config) {
+		return m.stopShared(job)
+	}
+
+	return m.stopProcess(stopProcessParams{Job: job, Running: isRunning})
+}
+
+type stopProcessParams struct {
+	Job     *ManagedJob
+	Running bool
+}
+
+// stopProcess is the tear-down itself, reached either directly or, for a shared
+// job, once stopShared has established that no worktree holds it any more.
+func (m *Manager) stopProcess(params stopProcessParams) error {
+	m.withdrawRoute(params.Job)
 
 	// Always run the stop command if configured — handles detached processes
 	// like "docker compose up -d" where the launcher exits but services keep
 	// running.
-	if job.Config.Stop != "" {
-		return m.stopWithCommand(job)
+	if params.Job.Config.Stop != "" {
+		return m.stopWithCommand(params.Job)
 	}
 
-	if !isRunning {
+	if !params.Running {
 		return nil
 	}
 
-	return m.stopWithSignal(job)
+	return m.stopWithSignal(params.Job)
 }
 
 // AttachSession hands out the job's live PTY, for stdin forwarding and
@@ -925,6 +1047,10 @@ type jobRef struct {
 func (m *Manager) attachableJob(ref jobRef) (*ManagedJob, error) {
 	m.mu.Lock()
 	job, ok := m.jobs[jobKey(ref.Name, ref.WorkDir)]
+	// A claim owns no stream; the service it holds does.
+	if ok && job.Status == domain.JobStatusAttached {
+		job, ok = m.realSharedLocked(sharedRef{Name: ref.Name, Dir: job.SharedDir})
+	}
 	// Snapshotted, never re-read: Status is written by whichever goroutine reaps
 	// or stops the job, so a second read outside the lock is a race.
 	var status domain.JobStatus

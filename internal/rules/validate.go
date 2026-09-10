@@ -317,7 +317,8 @@ func ValidateRunPorts(cfg domain.RunConfig) []string {
 	}
 
 	errs = append(errs, validateJobURLs(cfg)...)
-	return append(errs, validateEnvPortLinks(cfg)...)
+	errs = append(errs, validateEnvPortLinks(cfg)...)
+	return append(errs, validateEnvValueLinks(cfg)...)
 }
 
 // validateJobURLs checks what run.toml can answer for on its own. The collision
@@ -391,6 +392,89 @@ func validateEnvPortLinks(cfg domain.RunConfig) []string {
 		seen[pair] = true
 	}
 	return errs
+}
+
+// validateEnvValueLinks checks what run.toml can answer for on its own about the
+// keys wtm writes in full: a job that exists, a template whose every placeholder
+// resolves, and a key no other table already writes.
+func validateEnvValueLinks(cfg domain.RunConfig) []string {
+	if len(cfg.EnvValues) == 0 {
+		return nil
+	}
+
+	byName := make(map[string]domain.JobConfig, len(cfg.Jobs))
+	for _, job := range cfg.Jobs {
+		byName[job.Name] = job
+	}
+	ports := map[domain.EnvKeyRef]bool{}
+	for _, link := range cfg.EnvPorts {
+		ports[domain.EnvKeyRef{File: link.File, Key: link.Key}] = true
+	}
+
+	var errs []string
+	seen := map[domain.EnvKeyRef]bool{}
+	for _, link := range cfg.EnvValues {
+		ref := domain.EnvKeyRef{File: link.File, Key: link.Key}
+		if link.File == "" {
+			errs = append(errs, fmt.Sprintf(domain.EnvValueLinkFileRequiredFmt, link.Key))
+		}
+		if !IsEnvVarName(link.Key) {
+			errs = append(errs, fmt.Sprintf(domain.EnvValueLinkBadKeyFmt, link.File, link.Key))
+		}
+		if link.Value == "" {
+			errs = append(errs, fmt.Sprintf(domain.EnvValueLinkValueEmptyFmt, link.Key, link.File))
+		}
+		// A template holding no placeholder writes the same value into every
+		// worktree and takes the key out of the reconciliation's verdict at the
+		// same time, which is strictly worse than leaving the key alone.
+		if link.Value != "" && !EnvValueHasPlaceholder(link.Value) {
+			errs = append(errs, fmt.Sprintf(domain.EnvValueLinkConstantFmt, link.Key, link.File))
+		}
+		if seen[ref] {
+			errs = append(errs, fmt.Sprintf(domain.EnvValueLinkTwiceFmt, link.Key, link.File))
+		}
+		seen[ref] = true
+		if ports[ref] {
+			errs = append(errs, fmt.Sprintf(domain.EnvValueLinkClashesPortFmt, link.Key, link.File))
+		}
+
+		job, found := byName[link.Job]
+		if !found {
+			errs = append(errs, fmt.Sprintf(domain.EnvValueLinkNoJobFmt, link.Key, link.File, link.Job))
+			continue
+		}
+		errs = append(errs, envValueTemplateErrors(link, job)...)
+	}
+	return errs
+}
+
+// envValueTemplateErrors expands the template against a stand-in worktree, which
+// is how a placeholder nobody defined is caught at load rather than the first
+// time a worktree is created. The ports and the origin are the only parts that
+// vary per worktree, and neither changes which placeholders resolve.
+func envValueTemplateErrors(link domain.EnvValueLink, job domain.JobConfig) []string {
+	_, err := ExpandEnvValue(ExpandEnvValueParams{
+		Link:     link,
+		Job:      job,
+		Worktree: domain.NamespaceProbeWorktree,
+		Shared:   IsShared(job),
+		Origin:   envValueProbeOrigin(job),
+	})
+	if err == nil {
+		return nil
+	}
+	return []string{err.Error()}
+}
+
+// envValueProbeOrigin stands in for an address at load: whether the machine
+// serves names is not run.toml's business, and refusing a template here for a
+// proxy that happens to be off would refuse the config on one machine and not
+// on another.
+func envValueProbeOrigin(job domain.JobConfig) string {
+	if job.URL == nil {
+		return ""
+	}
+	return domain.NamespaceProbeWorktree
 }
 
 // envPortLinkError names the jobs that do declare the port, so the fix is the

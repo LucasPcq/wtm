@@ -92,7 +92,7 @@ func jobStateOf(params jobStateParams) (state JobState, shown bool) {
 		switch {
 		case IsJobUp(params.Info.Status):
 			return JobStateUp, true
-		case params.Info.Status == domain.JobStatusCrashed:
+		case params.Info.Status == domain.JobStatusCrashed, params.Info.Status == domain.JobStatusReaped:
 			return JobStateFailed, true
 		default:
 			return JobStateStopped, true

@@ -35,6 +35,11 @@ type Request struct {
 	// for the same reason LogDir and Env are: the daemon is global, and only the
 	// client can ask git which worktree and which repository this is.
 	Routes []domain.JobRoute `json:"routes,omitempty"`
+	// Shared is where a shared job actually runs, resolved by the client for the
+	// same reason LogDir and Env are: only it can ask git which worktree is the
+	// main one. Absent on a per-worktree job, and a shared job without it is
+	// refused rather than run once per worktree.
+	Shared *domain.SharedJobContext `json:"shared,omitempty"`
 	// Cols and Rows size the job's PTY: once on ActionAttach, then on every
 	// ActionResize as the pane rendering the job changes size.
 	Cols int `json:"cols,omitempty"`

@@ -75,6 +75,15 @@ type InitProjectAnswers struct {
 	// would have pre-checked, and reading that as a refusal would delete the
 	// jobs an earlier run configured.
 	SelectionAsked bool
+	// SharedServices are the compose services to run once for the repository,
+	// each lifted out of its file's job into one of its own. ScopesAsked says
+	// the step ran at all: emptying the list withdraws every sharing, where a
+	// run that never asked leaves what run.toml already declares standing.
+	SharedServices []SharedComposeService
+	ScopesAsked    bool
+	// ComposeScans is what each selected file declares, needed to name the
+	// services that stay behind when one is lifted out.
+	Scans map[string]ComposeScan
 	// Ports is what the wizard settled for the detected ports, and Profiles the
 	// split `run up` will offer. ProfilesAsked says the step ran at all:
 	// emptying the list withdraws every profile, where a run that never asked
@@ -108,9 +117,16 @@ type InitProjectAnswers struct {
 	// and got "no" is not mistaken for one that never asked.
 	LinkEnv       bool
 	EnvLinksAsked bool
-	SkipEnv       bool
-	SkipHooks     bool
-	SkipClean     bool
+	// EnvValues is what the [[env]] step settled: the .env keys wtm writes in
+	// full from a template. EnvValuesOffered are the keys it showed, which is
+	// the only set it may withdraw a link from, and EnvValuesAsked says the
+	// question was put at all.
+	EnvValues        []EnvValueLink
+	EnvValuesOffered map[EnvKeyRef]bool
+	EnvValuesAsked   bool
+	SkipEnv          bool
+	SkipHooks        bool
+	SkipClean        bool
 }
 
 // PortRoute is where a job learns the port it binds. The .env route isolates it

@@ -27,6 +27,29 @@ func NewPresenter(cmd *cobra.Command, format string) CLIPresenter {
 	return CLIPresenter{Cmd: cmd, Format: format, Human: rules.IsHumanFormat(format)}
 }
 
+// OpenBlock puts the caller inside the block a run keeps while it is still
+// running — its status lines and its hook phases — and returns the writer that
+// block draws on. separate asks for the blank that sets a titled section apart
+// from the lines above it; a bare status line takes none.
+//
+// The surface, not the caller, says whether a block is already open: the frames
+// beside this one are written by code that never sees this presenter.
+func OpenBlock(w io.Writer, separate bool) io.Writer {
+	if !output.BlockOpen(w) {
+		output.FrameStart(w)
+		return output.Barred(w)
+	}
+	barred := output.Barred(w)
+	if separate {
+		output.Blank(barred)
+	}
+	return barred
+}
+
+func (p CLIPresenter) phase(separate bool) io.Writer {
+	return OpenBlock(p.Cmd.ErrOrStderr(), separate)
+}
+
 func (p CLIPresenter) Stage(params flow.StageParams) error {
 	return components.RunLoading(components.LoadingParams{
 		Message: params.Message,
@@ -81,12 +104,16 @@ func DrawHookPhase(params DrawHookPhaseParams) error {
 		return params.Run(flow.HookSink{Output: stream})
 	}
 
-	output.HooksSection(params.Stderr, params.Title)
+	// The phase joins the run's block rather than opening one beside it, and it
+	// does so here rather than in each caller: extract and checkout reach this
+	// through RunCreateHooksPhase, and they used to draw a phase the migrated
+	// commands' presenter had already put a bar on.
+	output.SectionTitle(OpenBlock(params.Stderr, true), params.Title)
 	if !output.IsTerminal(params.Stderr) {
 		return params.Run(flow.HookSink{Output: stream})
 	}
 
-	view := output.NewHookView(output.HookViewParams{W: params.Stderr, Log: log, LogPath: params.LogPath})
+	view := output.NewHookView(output.HookViewParams{W: params.Stderr, Log: log, LogPath: params.LogPath, Bar: true})
 	defer view.Close()
 	return params.Run(flow.HookSink{Output: view, OnHook: view.OnHook})
 }
@@ -118,23 +145,41 @@ func (p CLIPresenter) Notice(notice flow.Notice) {
 // coloured box in a CI log is a picture nobody asked for.
 func (p CLIPresenter) Status(notice flow.Notice) {
 	if len(notice.Lines) > 0 {
-		if !p.Human {
-			output.Warning(p.Cmd.ErrOrStderr(), notice.Text)
-			for _, line := range notice.Lines {
-				output.Message(p.Cmd.ErrOrStderr(), output.Indent+line)
-			}
-			return
-		}
-		output.Blank(p.Cmd.ErrOrStderr())
-		output.Callout(p.Cmd.ErrOrStderr(), notice.Text, notice.Lines)
+		p.statusBlock(notice)
 		return
 	}
+	if !p.Human {
+		p.statusLine(p.Cmd.ErrOrStderr(), notice)
+		return
+	}
+	p.statusLine(p.phase(false), notice)
+}
+
+func (p CLIPresenter) statusLine(w io.Writer, notice flow.Notice) {
 	switch notice.Kind {
 	case flow.NoticeWarning:
-		output.Warning(p.Cmd.ErrOrStderr(), notice.Text)
+		output.Warning(w, notice.Text)
+	case flow.NoticeNote:
+		output.Unchanged(w, notice.Text)
 	default:
-		output.Success(p.Cmd.ErrOrStderr(), notice.Text)
+		output.Success(w, notice.Text)
 	}
+}
+
+func (p CLIPresenter) statusBlock(notice flow.Notice) {
+	if !p.Human {
+		output.Warning(p.Cmd.ErrOrStderr(), notice.Text)
+		for _, line := range notice.Lines {
+			output.Message(p.Cmd.ErrOrStderr(), output.Indent+line)
+		}
+		return
+	}
+	w := p.phase(true)
+	if notice.Kind == flow.NoticeNote {
+		output.Section(w, notice.Text, notice.Lines)
+		return
+	}
+	output.Callout(w, notice.Text, notice.Lines)
 }
 
 // FlowContext: the flow cannot load the config itself, which reads cobra flags.

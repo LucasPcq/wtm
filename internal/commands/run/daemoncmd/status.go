@@ -38,9 +38,10 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 // disagreed with `run ps` would be worse than no status at all.
 func collectStatus() domain.DaemonStatus {
 	status := domain.DaemonStatus{
-		SocketPath: process.SocketPath(),
-		StatePath:  process.StatePath(),
-		Version:    domain.Version,
+		SocketPath:  process.SocketPath(),
+		StatePath:   process.StatePath(),
+		Version:     domain.Version,
+		IndexFrozen: process.IndexFrozen(),
 	}
 	if !process.IsDaemonRunning(status.SocketPath) {
 		return status

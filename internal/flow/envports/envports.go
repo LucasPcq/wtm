@@ -62,7 +62,7 @@ func Settle(params Params) (domain.EnvPortSettlement, error) {
 		params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: domain.EnvPortAnomaliesTitle, Lines: anomalies})
 	}
 	for _, notice := range rules.EnvPortNotices(plan) {
-		params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: notice.Title, Lines: []string{notice.Line}})
+		params.Presenter.Status(flow.Notice{Kind: flow.NoticeNote, Text: notice.Title, Lines: []string{notice.Line}})
 	}
 
 	settlement := domain.EnvPortSettlement{Shifted: len(rules.EnvPortRewrites(plan)), Offset: plan.Offset}

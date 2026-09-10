@@ -188,3 +188,58 @@ func TestHookViewMeasuresATabAsTheColumnsItTakes(t *testing.T) {
 		t.Errorf("ExpandTabs(%q) = %q, want the tab spelled out", "a\tb", got)
 	}
 }
+
+// A phase drawn inside a block bars the lines it keeps, and nothing else. The
+// cursor moves must reach the terminal untouched: a bar written before one lands
+// on the row the cursor is about to leave, survives the erase below it, and
+// leaves every repaint one column off.
+func TestHookViewBarsTheLinesItKeepsAndNotTheCursorMoves(t *testing.T) {
+	var buf bytes.Buffer
+	// Barred no-ops on anything but a terminal, so the wiring NewHookView does
+	// on a real one is asserted separately below and the bar installed by hand
+	// here.
+	view := NewHookView(HookViewParams{W: &buf})
+	view.line = &barWriter{w: &buf, atLineStart: true}
+
+	view.OnHook(domain.HookBeat{Cmd: "pnpm install", Started: true})
+	_, _ = view.Write([]byte("resolving\n"))
+	if !strings.Contains(buf.String(), domain.AccentBarGlyph) {
+		t.Errorf("the phase drew no bar: %q", buf.String())
+	}
+
+	buf.Reset()
+	view.OnHook(domain.HookBeat{Cmd: "pnpm install"})
+	got := buf.String()
+
+	escape := strings.Index(got, "\x1b[")
+	if escape < 0 {
+		t.Fatalf("the tail was never erased: %q", got)
+	}
+	if strings.Contains(got[:escape], domain.AccentBarGlyph) {
+		t.Errorf("a bar was drawn before the cursor move: %q", got)
+	}
+	if !strings.Contains(got[escape:], domain.AccentBarGlyph) {
+		t.Errorf("the result line that survives must carry the bar: %q", got)
+	}
+}
+
+// Bar is what puts the phase inside the run's block; a view that took the flag
+// and drew on the raw stream anyway would leave a hook phase the one thing
+// outside it, which is the whole point of the flag.
+// Barred only wraps a real terminal, so this is the one assertion that needs
+// one. A run with no controlling terminal — CI — skips it; the invariant it
+// guards is asserted on the drawing above, which does not.
+func TestNewHookViewBarsOnlyWhenAsked(t *testing.T) {
+	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
+	if err != nil {
+		t.Skip("no controlling terminal")
+	}
+	defer func() { _ = tty.Close() }()
+
+	if view := NewHookView(HookViewParams{W: tty}); view.line != io.Writer(tty) {
+		t.Errorf("without Bar the view draws on the stream itself, got %T", view.line)
+	}
+	if view := NewHookView(HookViewParams{W: tty, Bar: true}); view.line == io.Writer(tty) {
+		t.Errorf("with Bar the view draws through the bar, got the raw stream")
+	}
+}

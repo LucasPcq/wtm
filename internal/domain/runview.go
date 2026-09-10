@@ -51,6 +51,10 @@ const (
 	// JobMarkDetached is up but not ours: its launcher exited and left the work
 	// to something else, so there is nothing to attach to.
 	JobMarkDetached
+	// JobMarkShared is one instance serving every worktree. Up, like running,
+	// but a reader who saw it as running in three worktrees would believe there
+	// were three of them.
+	JobMarkShared
 	JobMarkDone
 	JobMarkCrashed
 )

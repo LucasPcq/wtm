@@ -89,7 +89,7 @@ func TestBuildScriptJobsNameDedup(t *testing.T) {
 }
 
 func TestBuildDockerJobsKind(t *testing.T) {
-	cfg := BuildDockerJobs("docker compose", []string{"docker-compose.yml"})
+	cfg := BuildDockerJobs(BuildDockerJobsParams{ComposeCmd: "docker compose", Files: []string{"docker-compose.yml"}})
 	if len(cfg.Jobs) != 1 {
 		t.Fatalf("expected 1 job, got %d", len(cfg.Jobs))
 	}

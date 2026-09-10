@@ -143,7 +143,12 @@ flagged; everything else is what the name implies.
   source. The response adds `existing_branch: true` and `origin_state`
   (`up-to-date`/`behind`/`ahead`/`diverged`) so you can tell reuse from creation.
 - `wtm clean <branch>` / `wtm prune [filters]` — remove one / batch-remove finished
-  worktrees. **In JSON mode surviving children are left orphaned unless you pass
+  worktrees. **`clean` also gives back the namespaces that worktree carved out of shared
+  services** (it drops its database): pass `--keep-data` to withhold that, including under
+  `--yes`; the interactive recap names each database it will drop. Only worktrees that
+  actually started the shared job owe anything — one created and thrown away owes nothing.
+  If the shared service is down the drop is deferred, and the next `wtm prune` settles it
+  once the service is up again. **In JSON mode surviving children are left orphaned unless you pass
   `--reparent-children`** (they reparent onto the grandparent). `prune` decides "finished"
   from **GitHub PR state via the `gh` CLI** (not local commits): `--merged` = PR merged,
   `--closed` = PR closed without merging, `--gone` = remote branch deleted; no filter = all
@@ -281,9 +286,43 @@ and **experimental**: the global `wtm init` does not configure it.
   `16` (run module not initialized) until at least one job/profile is declared. Non-TTY it
   auto-generates and **removes nothing**. `run job add` / `run profile add` also work before
   init (they create the first job).
+- **A job may be shared across worktrees.** `scope = "shared"` in `run.toml` makes it run
+  **once for the whole repository**, in the main checkout, instead of once per worktree — a
+  postgres, a keycloak. Consequences you must expect: it takes **no port offset** (its
+  declared port is the port it binds, in every worktree), its published URL carries **no
+  worktree segment** (`db.projet.localhost`, not `db.feat-x.projet.localhost`), and its logs
+  are the same stream whichever worktree you read them from. In `run ps` / `--output json`
+  the worktrees holding it report status **`attached`** with `pid: 0`: that is a claim on the
+  one running instance, not a second process — never count one service per worktree from it.
+  Starting one from a worktree other than the main checkout reports `attached`, not `started`.
+  `run stop` in a worktree releases only that worktree's claim; the service itself stops when
+  the last one goes.
+- **A shared job may carve out a namespace per worktree.** `[job.namespace]` names it (`name`,
+  `create`, `remove`, `env`) so each worktree keeps its own data — a database, a set of
+  keycloak realms. wtm runs the declared commands and knows nothing else about them; they get
+  the worktree's whole environment plus `$WTM_NAMESPACE`, `$WTM_WORKTREE`, `$WTM_ORDINAL`.
+  `create` runs on **every** start of the shared service, so it must be safe to run again —
+  wtm keeps no record of having run it. A `create` that fails when the slice already exists
+  fails the run.
+  Configuration values use `{worktree}` / `{ordinal}`; commands use the `$WTM_*` variables.
+  A shared job with **no** `[job.namespace]` is valid and means one instance with one set of data.
+- **`[[env]]` is how a slice reaches the app.** `[[env_port]]` rewrites the port *inside* a
+  value and leaves the rest alone — it says where a service answers. `[[env]]` writes a key's
+  **whole** value from a template, which is the only way to express something opaque like a
+  realm or a database name: `file`, `key`, `job`, `value`, where value draws on `{namespace}`,
+  `{port.NAME}`, `{origin}`, `{worktree}`, `{ordinal}` and nothing else. A shared service has
+  one address for every worktree, so its URL stays an `[[env_port]]` while its realm becomes an
+  `[[env]]`. A key written by both tables is refused when `run.toml` is read, as is a
+  placeholder outside the list. wtm owns an `[[env]]` key's line: a worktree's own value there
+  is replaced, and `wtm env` never reports it as drift.
+  `run init` asks for the three fields; wtm proposes only the name and never a command,
+  so `create`/`remove` are always the project's own — inline or a script path.
 - **Re-running `run init` is symmetric.** Every step is pre-filled from the existing
   `run.toml`: what stays checked is kept, and what you uncheck is **removed** along with the
-  profile entries and `[[env_port]]` links naming it — a profile left with no job goes too.
+  profile entries and `[[env_port]]` / `[[env]]` links naming it — a profile left with no job
+  goes too. The `[[env]]` step lists every managed .env key and pre-checks those named after a
+  shared service; a key whose value carries that service's port is left to `[[env_port]]`, and
+  marking a key the port table already writes moves it rather than declaring it twice.
   Only jobs the wizard itself proposed can be removed: one added with `run job add` appears
   in no detected list, so it is never touched. The same symmetry holds for the URLs step (a
   job you unpublish stays unpublished) and the profiles step (deleting them all keeps them
@@ -461,14 +500,33 @@ and **experimental**: the global `wtm init` does not configure it.
   started here", not "started and silent". Its log file is created the moment it starts,
   so a job that ran and printed nothing *is* present, with no entries. Do not read the
   array as a roster of the project's jobs: `wtm run job list --output json` is that.
-- **`status` has four values, and `detached` is not a weaker `running`.** A service with
+- **`status` has six values, and `detached` is not a weaker `running`.** A service with
   a `stop` command (a `docker compose up -d`) is reported `detached` from the moment its
-  launcher exits: the real work runs outside wtm, nothing about it was verified, and
-  there is **nothing to attach to** — `run logs` on it prints its persisted file and
-  returns. It is up: it counts as a running job for `run down`, and `wtm run up` on it
-  simply relaunches the launcher rather than refusing "already running". `running` is a
-  foreground service the daemon holds a terminal for, `crashed` one whose process died,
-  `stopped` one that was stopped.
+  launcher exits: the real work runs outside wtm, and there is **nothing to attach to** —
+  `run logs` on it prints its persisted file and returns. A compose launcher is the one
+  wtm can check: when a daemon starts it asks `docker compose ps` about each such entry,
+  and one whose containers are gone — a `docker compose down` run by hand, a
+  `docker system prune` — is reported **`stopped`** instead. Any other launcher, a
+  machine without docker, or a call that fails leaves the entry `detached`, which says
+  what wtm actually knows rather than what it could not check. The check runs when a
+  daemon adopts the index, not on every listing: a `run ps` served by a daemon that was
+  already up reports what that daemon holds.
+  While it says `detached` it is up: it counts as a running job for `run down`, and
+  `wtm run up` on it simply relaunches the launcher rather than refusing "already
+  running". Of the rest, `running` is a foreground service the daemon holds a terminal
+  for, `crashed` one whose process died on its own, `stopped` one that was stopped —
+  by `run stop`, or by whoever took a verified compose stack down — and `attached` a
+  worktree's claim on a shared service (see the shared-services section: `pid` is 0 on
+  a claim, and on a launcher whatever became of it).
+- **`reaped` is the sixth, and it says wtm killed something.** A daemon killed without
+  running a handler — `SIGKILL`, a crash, an OOM — leaves its foreground services alive
+  and unreadable. The next daemon finds them from the index, proves the process group is
+  the recorded one (its start time has to match), kills it, and reports the entry
+  `reaped` **once**: the entry is not up, so it leaves the index straight away. `uptime`
+  on such a row is the orphan's real age, which is the point of showing it. A group whose
+  identity could not be confirmed is never signalled and never reported — a group id
+  handed to a stranger is not something to kill. Nothing is reaped for a `detached`
+  stack: those belong to Docker.
 - **`run ps` is the one global listing**, and the only `run` command that works from
   anywhere: it lists what the daemon holds across every repository, so it needs neither a
   run-initialized repo nor a worktree. It only ever lists — to act on those jobs, open the
@@ -480,7 +538,11 @@ and **experimental**: the global `wtm init` does not configure it.
   them. `run down`, `clean` and `prune` start a daemon by themselves when that index
   holds something for the worktree they act on.
 - `run daemon status` reports whether a daemon is up, its build, its PID and what it
-  holds (`--output json` gives one object). `run daemon stop` ends it — detached services
+  holds (`--output json` gives one object). **`index_frozen: true` in that object means
+  the index belongs to a newer wtm**, so this build records nothing it starts: a detached
+  stack will not be picked back up and an orphaned service is never reaped. It is the one
+  state in which `run ps` and `run down` can be right about now and useless after the
+  daemon exits — report it rather than working around it. The field is absent otherwise. `run daemon stop` ends it — detached services
   keep running — and `run daemon restart` hands its jobs to a daemon built from the
   current binary. Both only prompt when foreground services would be stopped; pass
   `--yes` (required without a terminal, and in JSON).

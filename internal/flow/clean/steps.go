@@ -9,6 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/service/runconfig"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
 
@@ -148,10 +149,14 @@ func (f *cleanFlow) deleteStep() flow.Step {
 	content := func(answers flow.Answers) (flow.StepContent, error) {
 		check, _ := f.checkCached(answers.Value(KeyWorktree))
 		return flow.StepContent{
-			Title:       domain.CleanDeleteTitle,
-			Description: deleteRecap(check, f.reparentLine(answers)),
-			Options:     deleteOptions(check),
-			Blockers:    blockersOf(check),
+			Title: domain.CleanDeleteTitle,
+			Description: deleteRecap(deleteRecapParams{
+				Check:      check,
+				Reparent:   f.reparentLine(answers),
+				Namespaces: f.namespaceLines(answers.Value(KeyWorktree)),
+			}),
+			Options:  deleteOptions(check),
+			Blockers: blockersOf(check),
 		}, nil
 	}
 
@@ -212,7 +217,17 @@ func blockersOf(check domain.CleanCheckResult) []flow.Blocker {
 	return blockers
 }
 
-func deleteRecap(check domain.CleanCheckResult, reparentLine string) string {
+type deleteRecapParams struct {
+	Check    domain.CleanCheckResult
+	Reparent string
+	// Namespaces are the lines naming the data this clean gives back, or the one
+	// saying it is kept. A flag must never make a line disappear from a recap,
+	// and this one carries a DROP DATABASE.
+	Namespaces []string
+}
+
+func deleteRecap(params deleteRecapParams) string {
+	check := params.Check
 	var lines []string
 	for _, blocker := range rules.CleanBlockers(check) {
 		lines = append(lines, blocker.Label)
@@ -225,10 +240,42 @@ func deleteRecap(check domain.CleanCheckResult, reparentLine string) string {
 		domain.CleanWillDeleteWorktree+check.WorktreePath,
 		domain.CleanWillDeleteBranch+check.Branch,
 	)
-	if reparentLine != "" {
-		lines = append(lines, "", reparentLine)
+	lines = append(lines, params.Namespaces...)
+	if params.Reparent != "" {
+		lines = append(lines, "", params.Reparent)
 	}
 	return strings.Join(lines, "\n")
+}
+
+// namespaceLines says what this clean does to the data the worktree carved out of
+// the repository's shared services — given back by default, kept under
+// --keep-data. Silence is not an option: the default runs a DROP DATABASE.
+func (f *cleanFlow) namespaceLines(branchName string) []string {
+	cfg, err := runconfig.Load(f.ctx.StateDir)
+	if err != nil {
+		return nil
+	}
+	held := worktree.NamespacesOf(worktree.ParentBranchParams{StateDir: f.ctx.StateDir, Branch: branchName})
+	if len(held) == 0 {
+		return nil
+	}
+	slug := rules.WorktreeSlug(branchName)
+
+	var lines []string
+	for _, job := range rules.JobsHeld(cfg, held).Jobs {
+		if !rules.HasNamespace(job) || rules.IsBlankCommand(job.Namespace.Remove) {
+			continue
+		}
+		if f.request.KeepData {
+			return []string{domain.CleanKeepDataLine}
+		}
+		namespace, expandErr := rules.ExpandNamespace(rules.ExpandNamespaceParams{Namespace: *job.Namespace, Worktree: slug})
+		if expandErr != nil {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf(domain.CleanWillDeleteNamespaceFmt, namespace.Name, job.Name))
+	}
+	return lines
 }
 
 func (f *cleanFlow) reparentLine(answers flow.Answers) string {

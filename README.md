@@ -120,6 +120,12 @@ A few ideas explain how the commands fit together:
   run view opens one pane per job, leaving it detaches without stopping anything, and
   `-d` skips it. The flow is still stabilizing — `wtm go` is the recommended way to enter
   a worktree today. See [`run`](docs/wtm_run.md) and [Run config](#run-config--runtoml).
+- **Shared services** *(experimental)* — a job declared `scope = "shared"` runs **once for
+  the repository** instead of once per worktree, in the main checkout: a postgres, a
+  keycloak. Each worktree still keeps its own data through a `[job.namespace]` block, whose
+  `attach` and `detach` commands you write — wtm names the namespace and hands them the
+  worktree's environment, and knows nothing else about them. It exists for the case that
+  makes isolation expensive: two worktrees of a monorepo with four databases and a JVM.
 
 ## Commands
 

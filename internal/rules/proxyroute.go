@@ -26,6 +26,13 @@ func RouteHost(params RouteHostParams) string {
 	if label == "" {
 		return ""
 	}
+	// A shared job answers on one address for the whole repository, so its host
+	// carries no worktree: keeping the segment would publish two names onto one
+	// target, and the .env files of two worktrees would then disagree about
+	// where a single service answers.
+	if IsShared(params.Job) {
+		return strings.Join([]string{label, HostLabel(params.Project), domain.ProxyTLD}, ".")
+	}
 	return strings.Join([]string{
 		label,
 		HostLabel(params.Worktree),

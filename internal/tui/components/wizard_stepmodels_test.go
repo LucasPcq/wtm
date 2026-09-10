@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 )
 
 // everyStepModel is one instance of each model a Step may carry. The wizard
@@ -31,6 +32,9 @@ func everyStepModel() []Step {
 		{Name: "profiles", Model: NewProfileList(NewProfileListParams{Title: "t", Description: desc, Profiles: []domain.ProfileConfig{{Name: "all"}}})},
 		{Name: "routes", Model: NewRouteList(NewRouteListParams{Title: "t", Description: desc, Rows: []domain.PortRouteRow{{Job: "web", Port: "PORT", Base: 3000, File: ".env"}}})},
 		{Name: "runners", Model: NewRunnerList(NewRunnerListParams{Title: "t", Description: desc, Choices: []domain.JobRunnerChoice{{Job: "web", Label: "web  apps/web", Options: []string{"", "dev"}}}})},
+		{Name: "scopes", Model: NewScopeList(NewScopeListParams{Title: "t", Description: desc, Entries: []rules.ServiceScopeChoice{{File: "docker-compose.yml", Service: "db"}}})},
+		{Name: "namespaces", Model: NewNamespaceList(NewNamespaceListParams{Title: "t", Description: desc, Fields: []domain.NamespaceField{{Job: "db", Field: domain.NamespaceFieldName, Value: "app_{worktree}"}}})},
+		{Name: "envvalues", Model: NewEnvValueList(NewEnvValueListParams{Title: "t", Description: desc, Fields: []domain.EnvValueField{{Job: "db", File: ".env", Key: "DATABASE_URL", Value: "{namespace}"}}})},
 	}
 }
 

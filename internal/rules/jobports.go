@@ -29,6 +29,10 @@ func EffectivePortOffsetBlock(cfg domain.RunConfig) int {
 type JobPortsParams struct {
 	Ports      map[string]int
 	PortOffset int
+	// Scope zeroes the offset for a shared job: it runs in the main checkout,
+	// so the port it declares is the port it binds in every worktree's reading.
+	// That stability is what lets a namespace's env write its URL literally.
+	Scope domain.JobScope
 }
 
 // JobPorts resolves a job's declared base ports for the worktree it is about to
@@ -37,9 +41,13 @@ func JobPorts(params JobPortsParams) map[string]int {
 	if len(params.Ports) == 0 {
 		return nil
 	}
+	offset := params.PortOffset
+	if params.Scope == domain.JobScopeShared {
+		offset = 0
+	}
 	resolved := make(map[string]int, len(params.Ports))
 	for name, base := range params.Ports {
-		resolved[name] = base + params.PortOffset
+		resolved[name] = base + offset
 	}
 	return resolved
 }
@@ -50,6 +58,9 @@ type PortDeclaration struct {
 	Job  string
 	Name string
 	Base int
+	// Scope is the declaring job's. A shared job binds its declared port in
+	// every worktree, so its declaration never moves.
+	Scope domain.JobScope
 }
 
 // PortCollision is a pair of declarations that end up on the same port.
@@ -67,7 +78,7 @@ func PortDeclarations(cfg domain.RunConfig) []PortDeclaration {
 	var decls []PortDeclaration
 	for _, job := range cfg.Jobs {
 		for _, name := range sortedPortNames(job.Ports) {
-			decls = append(decls, PortDeclaration{Job: job.Name, Name: name, Base: job.Ports[name]})
+			decls = append(decls, PortDeclaration{Job: job.Name, Name: name, Base: job.Ports[name], Scope: job.Scope})
 		}
 	}
 	return decls
@@ -89,7 +100,15 @@ func PortCollisions(cfg domain.RunConfig) []PortCollision {
 			if gap < 0 {
 				gap = -gap
 			}
-			if gap%block != 0 {
+			// Two shared declarations never move, so they meet only where they
+			// are already equal. A shared one against a per-worktree one is the
+			// ordinary arithmetic: the moving side still walks onto the fixed
+			// one every block.
+			if decls[i].Scope == domain.JobScopeShared && decls[j].Scope == domain.JobScopeShared {
+				if gap != 0 {
+					continue
+				}
+			} else if gap%block != 0 {
 				continue
 			}
 			if apart := gap / block; apart <= domain.PortCollisionHorizon {
@@ -237,6 +256,13 @@ func LifecyclePorts(params LifecyclePortsParams) map[string]int {
 	ports := map[string]int{}
 	for _, decl := range decls {
 		if jobs[decl.Name] > 1 {
+			continue
+		}
+		// A shared job binds its declared port in every worktree, so the value a
+		// hook and a .env read must be that port and not this worktree's shift —
+		// or the whole worktree would address a service that answers elsewhere.
+		if decl.Scope == domain.JobScopeShared {
+			ports[decl.Name] = decl.Base
 			continue
 		}
 		ports[decl.Name] = decl.Base + params.PortOffset

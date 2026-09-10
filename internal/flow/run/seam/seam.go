@@ -65,8 +65,10 @@ type Seam struct {
 	proxyPort     int
 	portAddressed bool
 	projectDir    string
+	stateDir      string
 	jobs          []domain.JobConfig
 	declared      []domain.JobConfig
+	shared        *domain.SharedJobContext
 }
 
 func Open(params Params) Seam {
@@ -78,15 +80,20 @@ func Open(params Params) Seam {
 		StateDir:   params.StateDir,
 		WorkDir:    params.WorkDir,
 	})
+	// Resolved once, and only when something declares a shared job: it costs a
+	// git worktree list plus a full environment resolution for the main
+	// checkout, and every run command opens a seam.
+	shared := sharedContext(params)
 	return Seam{
 		service: service,
 		board: runlogs.NewBoard(runlogs.BoardParams{
-			Service:   service,
-			Jobs:      params.Jobs,
-			WorkDir:   params.WorkDir,
-			Worktree:  branch,
-			LogDir:    logDir,
-			Addresses: boardAddresses(boardAddressParams{Params: params, Env: env}),
+			Service:      service,
+			Jobs:         params.Jobs,
+			WorkDir:      params.WorkDir,
+			Worktree:     branch,
+			LogDir:       logDir,
+			SharedLogDir: sharedLogDirOf(shared),
+			Addresses:    boardAddresses(boardAddressParams{Params: params, Env: env}),
 			// Read once, here: the board is the side that knows the log directory,
 			// and every surface over it then reads the same trace rather than
 			// listing its own idea of what this worktree has run.
@@ -103,6 +110,42 @@ func Open(params Params) Seam {
 		proxyPort:     params.ProxyPort,
 		portAddressed: params.PortAddressed,
 		projectDir:    params.ProjectDir,
+		stateDir:      params.StateDir,
+		shared:        shared,
+	}
+}
+
+// sharedContext is where this repository's shared jobs run. Resolved here, once
+// per seam, because it is the one place that may ask git which worktree is the
+// main one — and it is deliberately nil rather than a guess when there is none:
+// the daemon then refuses a shared job instead of running one per worktree.
+// sharedLogDirOf is where the repository's shared services persist their output.
+// Empty when there is no main checkout to run one in.
+func sharedLogDirOf(shared *domain.SharedJobContext) string {
+	if shared == nil {
+		return ""
+	}
+	return shared.LogDir
+}
+
+// A project declaring no shared job pays nothing — the git calls below would
+// otherwise be added to every single run command, `run ps` included.
+func sharedContext(params Params) *domain.SharedJobContext {
+	if !rules.AnySharedJob(declaredOf(params)) {
+		return nil
+	}
+	main, err := worktree.MainCheckout(worktree.MainCheckoutParams{ProjectDir: params.ProjectDir})
+	if err != nil {
+		return nil
+	}
+	return &domain.SharedJobContext{
+		WorkDir: main,
+		Env: JobEnv(JobEnvParams{
+			ProjectDir: params.ProjectDir,
+			StateDir:   params.StateDir,
+			WorkDir:    main,
+		}),
+		LogDir: logDirOf(params.StateDir, target.BranchOf(main)),
 	}
 }
 
@@ -124,6 +167,21 @@ func (s Seam) Starter(params StartParams) runlogs.StartFunc {
 }
 
 func (s Seam) run(ctx context.Context, sink runlogs.Sink, params StartParams) (runlogs.Outcome, error) {
+	outcome, err := s.start(ctx, sink, params)
+	// Recorded after the run, from the jobs it actually started: it is the only
+	// durable trace that this worktree holds a namespace, and `clean` reads it to
+	// give back exactly what exists rather than everything run.toml declares.
+	if s.shared != nil {
+		_ = worktree.RecordNamespaces(worktree.RecordNamespacesParams{
+			StateDir: s.stateDir,
+			Branch:   s.worktree,
+			Jobs:     rules.NamespaceJobsStarted(rules.NamespaceJobsStartedParams{Jobs: params.Jobs, Started: outcome.Started}),
+		})
+	}
+	return outcome, err
+}
+
+func (s Seam) start(ctx context.Context, sink runlogs.Sink, params StartParams) (runlogs.Outcome, error) {
 	return runlogs.Run(ctx, runlogs.RunParams{
 		BaseOwners:    s.baseOwners(),
 		Service:       s.service,
@@ -139,6 +197,7 @@ func (s Seam) run(ctx context.Context, sink runlogs.Sink, params StartParams) (r
 		Project:       s.project,
 		ProxyPort:     s.proxyPort,
 		PortAddressed: s.portAddressed,
+		Shared:        s.shared,
 	})
 }
 

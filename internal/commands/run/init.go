@@ -142,6 +142,19 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	// A run that never put the scope question leaves what run.toml declares
+	// standing: the pair (value, asked) again — emptied-and-asked withdraws,
+	// not-asked keeps. Scans travel with the answers because naming the services
+	// that stay in a file's job needs them.
+	answers.Scans = detection.ComposeScans
+	if !answers.ScopesAsked {
+		answers.SharedServices = rules.SharedFromConfig(rules.SharedFromConfigParams{
+			Existing: existing,
+			Scans:    detection.ComposeScans,
+			Files:    answers.DockerComposeFiles,
+		})
+	}
+
 	plan := rules.PlanComposePorts(rules.PlanComposePortsParams{
 		Scans: detection.ComposeScans,
 		Files: answers.DockerComposeFiles,
@@ -212,6 +225,15 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 		NewJobs:         outcome.Merge.Added,
 	})
 
+	// After the profiles are settled: the step re-proposes them from the config
+	// on disk, so a lifted job inserted any earlier is discarded — and a profile
+	// that no longer starts the database leaves every worktree addressing one
+	// that was never created.
+	outcome.Config = rules.JoinSharedProfiles(rules.JoinSharedProfilesParams{
+		Config: outcome.Config,
+		Shared: answers.SharedServices,
+	})
+
 	links := resolveEnvPortLinks(resolveEnvPortLinksParams{
 		// The wizard already put the question as a step; asking again outside it
 		// is the orphaned prompt this flow used to end on.
@@ -243,6 +265,11 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 		Writes:   portKeys,
 		Existing: outcome.Config.EnvPorts,
 	})...)
+
+	// Last, once both tables are complete: a key an [[env]] link writes in full
+	// has no port link, and the two are refused together at load — so a run that
+	// only added the value link would write a config wtm then refuses to read.
+	outcome.Config = rules.PruneEnvPortClashes(outcome.Config)
 
 	// The rewrites come first: a compose templatized without run.toml behind it
 	// keeps binding its defaults, while a run.toml declaring ports the compose

@@ -22,8 +22,16 @@ type EnvPortsParams struct {
 	// value plans ports, which is every caller that knows nothing of the proxy.
 	Origins rules.OriginContext
 	// Owned are the wtm-derived keys this worktree's .env carries, resolved by
-	// the caller — the only one that can ask git which worktree this is.
+	// the caller — the only one that can ask git which worktree this is. The
+	// [[env]] links resolve into these too: one key wtm writes in full is one
+	// mechanism, whatever declared it.
 	Owned []domain.EnvOwnedEntry
+	// ValueLinks are the [[env]] declarations behind those entries, kept so the
+	// reconciliation knows which keys it must not call a drift.
+	ValueLinks []domain.EnvValueLink
+	// Shared names the jobs that run once for the repository, so their ports are
+	// written into the .env unshifted — the service binds what it declares.
+	Shared map[string]bool
 }
 
 // Empty reports whether the project declares no link at all, which is the common
@@ -46,6 +54,7 @@ func ComputeEnvPorts(params EnvPortsParams) (domain.EnvPortPlan, error) {
 		Block:   params.Block,
 		Lines:   lines,
 		Origins: params.Origins,
+		Shared:  params.Shared,
 	})
 	owned, err := planOwned(params)
 	if err != nil {

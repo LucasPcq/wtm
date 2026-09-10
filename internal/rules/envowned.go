@@ -125,3 +125,17 @@ func UpsertEnvPair(params UpsertEnvPairParams) (lines []domain.EnvLine, changed 
 	out = append(out, pair)
 	return append(out, lines[at:]...), true
 }
+
+// OwnedEnvRewrites is the owned entries a run would change, the counterpart of
+// EnvPortRewrites for the keys wtm writes in full. A report that counted only
+// the port rewrites called a run that moved a DATABASE_URL onto this worktree's
+// slice "no changes written".
+func OwnedEnvRewrites(plan domain.EnvPortPlan) []domain.EnvOwnedEntry {
+	out := make([]domain.EnvOwnedEntry, 0, len(plan.Owned))
+	for _, entry := range plan.Owned {
+		if entry.Changed {
+			out = append(out, entry)
+		}
+	}
+	return out
+}
