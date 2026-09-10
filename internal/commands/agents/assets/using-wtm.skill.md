@@ -16,6 +16,11 @@ self-documenting:
 
 - **`wtm <cmd> --help`** — the full, always-current flags for any command.
 - **`wtm <cmd> --output json`** — run it once to learn a command's exact JSON schema.
+- **`wtm <cmd> --quiet`** — silences the human report and nothing else: the exit code,
+  the errors and every machine contract (`--output json`, `resolve`, `run url`,
+  `shell-init`, `run export`) still come through. Use it when you only need the exit
+  code. It is the output axis only — it does not stop prompts, so pair it with `--yes`
+  on a mutating command.
   The payload mirrors wtm's Go structs (stable `snake_case` fields); trust what you see
   over any field list you remember.
 

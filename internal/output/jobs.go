@@ -112,7 +112,7 @@ func WriteImportResultJSON(w io.Writer, result ImportResult) error {
 // padding.
 func WriteImportResultText(w io.Writer, result ImportResult) {
 	if len(result.Jobs) == 0 && len(result.Profiles) == 0 {
-		Message(w, domain.ImportEmptyMessage)
+		Unchanged(w, domain.ImportEmptyMessage)
 		return
 	}
 	Success(w, fmt.Sprintf(domain.ImportJobsFmt, len(result.Jobs), strings.Join(result.Jobs, domain.CmdListVarSep)))
@@ -123,7 +123,7 @@ func WriteImportResultText(w io.Writer, result ImportResult) {
 		Success(w, fmt.Sprintf(domain.ImportEnvPortsFmt, result.EnvPorts))
 	}
 	Blank(w)
-	Message(w, domain.ImportEnvHint)
+	NextStep(w, NextStepParams{Command: domain.ImportEnvHint, Note: domain.ImportEnvHintNote})
 }
 
 // WriteRunConfigJSON writes the JSON payload for `run list`.
@@ -176,7 +176,16 @@ func jobPortsCell(job domain.JobConfig) string {
 	return cell
 }
 
-func FormatRunConfig(cfg domain.RunConfig) string {
+type FormatRunConfigParams struct {
+	Config domain.RunConfig
+	// Empty is what an inventory with nothing in it says. It is the caller's
+	// because the caller is the one who knows what was asked for: `run job list`
+	// and `run list` read the same config and answer different questions.
+	Empty string
+}
+
+func FormatRunConfig(params FormatRunConfigParams) string {
+	cfg := params.Config
 	var b strings.Builder
 
 	if len(cfg.Profiles) > 0 {
@@ -225,14 +234,13 @@ func FormatRunConfig(cfg domain.RunConfig) string {
 			// seven of them would otherwise push every command off the screen.
 			// They are the bases as written, not the resolved ones — each worktree
 			// shifts them by its own offset.
-			ports := styles.DashboardValue.Render(jobPortsCell(j))
+			ports := jobPortsCell(j)
 			b.WriteString(strings.TrimRight(fmt.Sprintf("%s%-*s  %s  %s  %s%s", Indent, nameWidth, j.Name, kind, cmd, ports, sharedTag(j)), " ") + "\n")
 		}
 	}
 
 	if len(cfg.Profiles) == 0 && len(cfg.Jobs) == 0 {
-		b.WriteString(Indent)
-		b.WriteString("No jobs or profiles defined in run.toml.\n")
+		b.WriteString(UnchangedLine(params.Empty))
 	}
 
 	return b.String()
@@ -258,7 +266,7 @@ type FormatRunningJobsParams struct {
 // outer vertical padding.
 func FormatRunningJobs(params FormatRunningJobsParams) string {
 	if len(params.Jobs) == 0 {
-		return Indent + "No jobs running.\n"
+		return UnchangedLine(domain.RunNoJobsHere)
 	}
 
 	uptimes := make([]string, len(params.Jobs))

@@ -3,6 +3,7 @@ package resolve
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -23,9 +24,10 @@ import (
 // wrapper (`wtm go`) consumes; `--output json` emits {path, branch} for scripts.
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "resolve [branch]",
-		Short: "Resolve a branch to its worktree path",
-		RunE:  runResolve,
+		Use:         "resolve [branch]",
+		Annotations: map[string]string{domain.AnnotationMachineOutput: domain.AnnotationOn},
+		Short:       "Resolve a branch to its worktree path",
+		RunE:        runResolve,
 	}
 	shared.AddOutputFlag(cmd)
 	return cmd
@@ -53,8 +55,8 @@ func runResolve(cmd *cobra.Command, args []string) error {
 		if format == domain.OutputJSON {
 			return err
 		}
-		output.Frame(cmd.ErrOrStderr(), func() {
-			output.Warning(cmd.ErrOrStderr(), fmt.Sprintf("No worktree found matching %q", query))
+		output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
+			output.Warning(w, fmt.Sprintf("No worktree found matching %q", query))
 		})
 		return nil
 	}
@@ -112,7 +114,7 @@ func pickAmbiguousWorktree(cmd *cobra.Command, cwd, projectDir string, matches [
 
 	loadErr := components.RunLoading(components.LoadingParams{
 		Message: "Loading worktrees…",
-		Animate: true,
+		Animate: shared.Animate(cmd, true),
 		Work: func() error {
 			wg.Add(2)
 			go func() {

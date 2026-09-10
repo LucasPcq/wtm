@@ -3,6 +3,7 @@ package run
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -100,7 +101,7 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 	var envScans map[string]domain.EnvPortScan
 	_ = components.RunLoading(components.LoadingParams{
 		Message: "Detecting services…",
-		Animate: interactive,
+		Animate: shared.Animate(cmd, interactive),
 		Work: func() error {
 			detection = detect.ProjectEnvironment(res.ProjectDir)
 			detection.ComposeScans = compose.ScanAll(compose.ScanAllParams{
@@ -189,11 +190,13 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 	})
 
 	if !rules.IsRunInitialized(outcome.Config) {
-		output.Frame(cmd.OutOrStdout(), func() {
-			output.Message(cmd.OutOrStdout(), "No docker-compose files or package scripts detected — nothing to configure automatically.")
-			output.Message(cmd.OutOrStdout(), "Add jobs by hand with `wtm run job add`, then group them with `wtm run profile add`.")
-			output.Blank(cmd.OutOrStdout())
-			output.Message(cmd.OutOrStdout(), domain.ExperimentalRunNotice)
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			output.Unchanged(w, domain.RunInitNothingDetected)
+			output.Blank(w)
+			output.NextStep(w, output.NextStepParams{Command: domain.RunInitByHandJob, Note: domain.RunInitByHandJobNote})
+			output.NextStep(w, output.NextStepParams{Command: domain.RunInitByHandProfile, Note: domain.RunInitByHandProfNote})
+			output.Blank(w)
+			output.Message(w, domain.ExperimentalRunNotice)
 		})
 		return nil
 	}
@@ -309,18 +312,15 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 	})
 
 	runPath := filepath.Join(res.StateDir, domain.RunFileName)
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.Success(cmd.OutOrStdout(), fmt.Sprintf("Configured run module → %s", runPath))
-		if len(outcome.Merge.Added) > 0 {
-			output.Message(cmd.OutOrStdout(), fmt.Sprintf("Jobs added: %s", strings.Join(outcome.Merge.Added, ", ")))
-		}
-		if len(outcome.Removed) > 0 {
-			output.Message(cmd.OutOrStdout(), fmt.Sprintf(domain.RunInitJobsRemovedFmt, strings.Join(outcome.Removed, ", ")))
-		}
-		if len(outcome.Merge.Skipped) > 0 {
-			output.Message(cmd.OutOrStdout(), fmt.Sprintf("Already present (kept): %s", strings.Join(outcome.Merge.Skipped, ", ")))
-		}
-		output.DetectedPortsReport(cmd.OutOrStdout(), output.DetectedPortsReportParams{
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		// The jobs are counted, not named: the reader ticked them one by one in the
+		// wizard, and run.toml is where they live now.
+		output.Success(w, fmt.Sprintf(domain.RunInitConfiguredFmt, runPath, output.Tally(
+			output.TallyPart{Count: len(outcome.Merge.Added), Label: domain.TallyAdded},
+			output.TallyPart{Count: len(outcome.Removed), Label: domain.TallyRemoved},
+			output.TallyPart{Count: len(outcome.Merge.Skipped), Label: domain.TallyKept},
+		)))
+		output.DetectedPortsReport(w, output.DetectedPortsReportParams{
 			Patched:       outcome.Patches,
 			Written:       outcome.Written,
 			Withheld:      outcome.Withheld,
@@ -333,16 +333,16 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 			EnvSources:    outcome.EnvSources,
 			EnvUnreadable: outcome.EnvUnreadable,
 		})
-		output.ComposeNamesReport(cmd.OutOrStdout(), output.ComposeNamesReportParams{
+		output.ComposeNamesReport(w, output.ComposeNamesReportParams{
 			Patched:  namePatches,
 			Withheld: namePlan.Withheld,
 		})
-		output.EnvPortLinksReport(cmd.OutOrStdout(), links, rules.EnvPortBases(outcome.Config))
-		output.PortKeysReport(cmd.OutOrStdout(), reportedKeys)
+		output.EnvPortLinksReport(w, links, rules.EnvPortBases(outcome.Config))
+		output.PortKeysReport(w, reportedKeys)
 		// Last, and alone in a frame: everything above is what the run did, this
 		// is what it could not do without the reader.
 		composeJobs := rules.ComposeJobsFor(rules.ComposeJobsParams{Config: outcome.Config, Files: answers.DockerComposeFiles})
-		output.PortIsolationReport(cmd.OutOrStdout(), output.PortIsolationReportParams{
+		output.PortIsolationReport(w, output.PortIsolationReportParams{
 			Unported: rules.ServicesWithoutPorts(outcome.Config),
 			Ignoring: rules.JobsMissingPortRef(rules.JobsMissingPortRefParams{
 				Config: outcome.Config,
@@ -350,7 +350,7 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 					rules.JobsReadingTheirEnv(rules.JobsReadingTheirEnvParams{Config: outcome.Config, ScansByDir: envScans})...),
 			}),
 		})
-		output.PortCommandOnlyReport(cmd.OutOrStdout(), rules.JobsIsolatedByCommand(rules.JobsIsolatedByCommandParams{
+		output.PortCommandOnlyReport(w, rules.JobsIsolatedByCommand(rules.JobsIsolatedByCommandParams{
 			Config:     outcome.Config,
 			Exempt:     composeJobs,
 			ScansByDir: envScans,
@@ -360,22 +360,23 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 			Config:    outcome.Config,
 			ProxyPort: proxyPort,
 		}), proxyPort); len(lines) > 0 {
-			output.Callout(cmd.ErrOrStderr(), domain.ProxyPortCollisionTitle, lines)
+			output.Callout(w, domain.ProxyPortCollisionTitle, lines)
 		}
 		if lines := rules.ProxyInstallHintLines(rules.ProxyInstallHintParams{
 			Config:     outcome.Config,
 			Status:     proxy.NewRedirector(proxy.RedirectorParams{}).Inspect(),
 			ExampleURL: fmt.Sprintf(domain.ProxyURLFmt, domain.ProxyHostShape, proxyPort),
 		}); len(lines) > 0 {
-			output.Callout(cmd.ErrOrStderr(), domain.ProxyInstallHintTitle, lines)
+			output.Callout(w, domain.ProxyInstallHintTitle, lines)
 		}
 		// The main checkout is the one no command ever provisions, so it is the
 		// one the addressing just chosen leaves behind.
-		noticeAddressingDrift(cmd, res, res.ProjectDir)
-		output.Blank(cmd.OutOrStdout())
-		output.Message(cmd.OutOrStdout(), "Next: `wtm run up` to start · `wtm run job add` to add more")
-		output.Blank(cmd.OutOrStdout())
-		output.Message(cmd.OutOrStdout(), domain.ExperimentalRunNotice)
+		noticeAddressingDrift(w, res, res.ProjectDir)
+		output.Blank(w)
+		output.NextStep(w, output.NextStepParams{Command: domain.RunInitNextUp, Note: domain.RunInitNextUpNote})
+		output.NextStep(w, output.NextStepParams{Command: domain.RunInitNextJobAdd, Note: domain.RunInitNextJobAddNote})
+		output.Blank(w)
+		output.Message(w, domain.ExperimentalRunNotice)
 	})
 	return nil
 }

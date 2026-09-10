@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"fmt"
 	"path"
 	"slices"
 	"strings"
@@ -139,14 +138,4 @@ func OwnedEnvRewrites(plan domain.EnvPortPlan) []domain.EnvOwnedEntry {
 		}
 	}
 	return out
-}
-
-// OwnedEnvLines names each key wtm writes in full that a run has just settled,
-// changed ones only: a value the file already held is not news.
-func OwnedEnvLines(plan domain.EnvPortPlan) []string {
-	var lines []string
-	for _, entry := range OwnedEnvRewrites(plan) {
-		lines = append(lines, fmt.Sprintf(domain.EnvOwnedKeyLineFmt, entry.Key, entry.Value))
-	}
-	return lines
 }

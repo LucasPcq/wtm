@@ -6,11 +6,11 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
-// EnvSummary is the trailing verdict of `wtm env`: what to say, and whether it
-// reads as an accomplishment or as a plain note.
+// EnvSummary is the trailing verdict of `wtm env`: what to say, and which
+// register to say it in.
 type EnvSummary struct {
-	Text string
-	Done bool
+	Text    string
+	Verdict domain.EnvVerdict
 }
 
 // EnvOutcomeSummary tallies everything the run actually wrote. The port pass is
@@ -33,13 +33,15 @@ func EnvOutcomeSummary(result domain.EnvSyncResult) EnvSummary {
 	// is missing from it because nothing can ever be in it, and the fix is in
 	// config.toml rather than in any worktree.
 	if unresolvable := EnvUnresolvableFiles(result); len(unresolvable) > 0 {
-		return EnvSummary{Text: fmt.Sprintf(domain.EnvUnresolvableSummaryFmt, len(unresolvable))}
+		return EnvSummary{Text: fmt.Sprintf(domain.EnvUnresolvableSummaryFmt, len(unresolvable)), Verdict: domain.EnvVerdictAttention}
 	}
 	if result.Check {
 		if EnvHasDrift(result) {
-			return EnvSummary{Text: domain.EnvCheckDriftMessage}
+			// A read-only run that found drift did not leave the worktree in the
+			// state it wants: there is something to do, and it is the reader's.
+			return EnvSummary{Text: domain.EnvCheckDriftMessage, Verdict: domain.EnvVerdictAttention}
 		}
-		return EnvSummary{Text: domain.EnvCheckCleanMessage, Done: true}
+		return EnvSummary{Text: domain.EnvCheckCleanMessage, Verdict: domain.EnvVerdictDone}
 	}
 
 	// The owned keys are counted with the ports: both are values wtm writes into
@@ -53,10 +55,10 @@ func EnvOutcomeSummary(result domain.EnvSyncResult) EnvSummary {
 	case files == 0 && ports == 0:
 		return EnvSummary{Text: domain.EnvNothingWrittenMessage}
 	case ports == 0:
-		return EnvSummary{Text: fmt.Sprintf(domain.EnvReconciledFmt, files), Done: true}
+		return EnvSummary{Text: fmt.Sprintf(domain.EnvReconciledFmt, files), Verdict: domain.EnvVerdictDone}
 	case files == 0:
-		return EnvSummary{Text: fmt.Sprintf(domain.EnvPortsShiftedFmt, ports), Done: true}
+		return EnvSummary{Text: fmt.Sprintf(domain.EnvPortsShiftedFmt, ports), Verdict: domain.EnvVerdictDone}
 	default:
-		return EnvSummary{Text: fmt.Sprintf(domain.EnvReconciledAndShiftedFmt, files, ports), Done: true}
+		return EnvSummary{Text: fmt.Sprintf(domain.EnvReconciledAndShiftedFmt, files, ports), Verdict: domain.EnvVerdictDone}
 	}
 }

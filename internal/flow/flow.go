@@ -252,9 +252,22 @@ type StageParams struct {
 	Work    func() error
 }
 
+// HookSink is where a hook phase reports: the raw output as it is produced, and
+// the beat of each hook starting and finishing. The two are separate because a
+// surface may keep one without the other — a terminal that can repaint replaces
+// the stream with the beats, a scrolling panel keeps both.
+type HookSink struct {
+	Output io.Writer
+	OnHook func(domain.HookBeat)
+}
+
 type HookPhaseParams struct {
 	Title string
-	Run   func(sink io.Writer) error
+	// LogPath is where the phase's whole output belongs whatever the surface
+	// shows of it: a stream a surface collapsed still has to be readable after
+	// the hook that failed.
+	LogPath string
+	Run     func(sink HookSink) error
 }
 
 type NoticeKind int

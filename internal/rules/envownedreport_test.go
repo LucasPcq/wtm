@@ -32,8 +32,8 @@ func TestEnvOutcomeSummaryCountsAKeyWtmWritesInFull(t *testing.T) {
 	if summary.Text == domain.EnvNothingWrittenMessage {
 		t.Fatal("summary says nothing was written, but DATABASE_URL was rewritten")
 	}
-	if !summary.Done {
-		t.Error("summary reads as a plain note, want it as an accomplishment")
+	if summary.Verdict != domain.EnvVerdictDone {
+		t.Errorf("verdict = %v, want it read as an accomplishment", summary.Verdict)
 	}
 	if !strings.Contains(summary.Text, "1") {
 		t.Errorf("summary = %q, want it to count the one value settled", summary.Text)

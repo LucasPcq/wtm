@@ -303,3 +303,37 @@ func writesAddresses(plan domain.EnvPortPlan) bool {
 func EnvPortOffsetLabel(offset int) string {
 	return domain.EnvPortsTitle + " " + domain.EnvPortOffsetPrefix + strconv.Itoa(offset)
 }
+
+// EnvPortSettlementNote is the port pass as a create-like recap carries it: a
+// count and an offset, never the values. Empty when the run moved nothing.
+func EnvPortSettlementNote(settlement domain.EnvPortSettlement) string {
+	if settlement.Shifted == 0 {
+		return ""
+	}
+	if !settlement.Applied {
+		return fmt.Sprintf(domain.EnvPortsRecapKeptFmt, settlement.Shifted)
+	}
+	return fmt.Sprintf(domain.EnvPortsRecapShiftedFmt, settlement.Shifted, settlement.Offset)
+}
+
+type EnvPortOutcomeParams struct {
+	Plan  domain.EnvPortPlan
+	Check bool
+}
+
+// EnvPortOutcomeLine is what a report says of the port pass beyond its anomalies.
+// An applied pass says nothing: the trailing summary already counts it, and a
+// second telling is what the table used to be.
+func EnvPortOutcomeLine(params EnvPortOutcomeParams) string {
+	rewrites := len(EnvPortRewrites(params.Plan))
+	if rewrites == 0 {
+		return ""
+	}
+	if params.Check {
+		return fmt.Sprintf(domain.EnvPortsWouldShiftFmt, rewrites, params.Plan.Offset)
+	}
+	if !params.Plan.Applied {
+		return fmt.Sprintf(domain.EnvPortsLeftAloneFmt, rewrites)
+	}
+	return ""
+}

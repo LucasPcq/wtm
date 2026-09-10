@@ -2,6 +2,7 @@ package wt
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -134,7 +135,7 @@ func runRelocate(cmd *cobra.Command, _ []string) error {
 	var result domain.RelocateResult
 	err = components.RunLoading(components.LoadingParams{
 		Message: "Relocating worktrees…",
-		Animate: interactive,
+		Animate: shared.Animate(cmd, interactive),
 		Work:    func() error { var e error; result, e = worktree.Relocate(params); return e },
 	})
 	if err != nil {
@@ -142,8 +143,8 @@ func runRelocate(cmd *cobra.Command, _ []string) error {
 	}
 
 	if interactive {
-		output.Frame(cmd.OutOrStdout(), func() {
-			output.FormatRelocateResult(cmd.OutOrStdout(), result)
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			output.FormatRelocateResult(w, result)
 		})
 	} else if jsonErr := output.WriteRelocateResultJSON(cmd.OutOrStdout(), result); jsonErr != nil {
 		return jsonErr
@@ -231,11 +232,13 @@ type renderDryRunParams struct {
 // result (the service performs no writes when DryRun is set).
 func renderRelocateDryRun(p renderDryRunParams) error {
 	if p.Interactive {
-		output.FrameStart(p.Cmd.ErrOrStderr())
-		output.FormatRelocatePlan(p.Cmd.ErrOrStderr(), p.Plan)
-		output.Blank(p.Cmd.ErrOrStderr())
-		output.Message(p.Cmd.ErrOrStderr(), "Dry run — no changes made.")
-		output.FrameEnd(p.Cmd.ErrOrStderr())
+		// stdout: a preview is what the caller asked for, so it is the result and
+		// not a diagnostic. `prune --dry-run` already answered there.
+		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			output.FormatRelocatePlan(w, p.Plan)
+			output.Blank(w)
+			output.Unchanged(w, domain.DryRunNoChanges)
+		})
 		return nil
 	}
 	result, err := worktree.Relocate(p.Params)
@@ -246,8 +249,8 @@ func renderRelocateDryRun(p renderDryRunParams) error {
 }
 
 func renderRelocateAborted(cmd *cobra.Command) error {
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.Message(cmd.OutOrStdout(), "Aborted.")
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.Unchanged(w, domain.AbortedMessage)
 	})
 	return nil
 }
@@ -263,8 +266,8 @@ func renderEmptyRelocate(cmd *cobra.Command, interactive bool) error {
 	if !interactive {
 		return output.WriteRelocateResultJSON(cmd.OutOrStdout(), domain.RelocateResult{})
 	}
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.Message(cmd.OutOrStdout(), "All worktrees are already aligned with base_path.")
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.Message(w, "All worktrees are already aligned with base_path.")
 	})
 	return nil
 }

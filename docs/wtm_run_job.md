@@ -12,6 +12,12 @@ Manage jobs declared in <git-common-dir>/wtm/run.toml.
   -h, --help   help for job
 ```
 
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+```
+
 ### SEE ALSO
 
 * [wtm run](wtm_run.md)	 - Manage dev jobs (services + tasks)

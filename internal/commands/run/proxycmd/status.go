@@ -2,6 +2,7 @@ package proxycmd
 
 import (
 	"github.com/spf13/cobra"
+	"io"
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/config"
@@ -33,8 +34,8 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	if format, _ := cmd.Flags().GetString(domain.FlagOutput); format == domain.OutputJSON {
 		return output.WriteProxyStatusJSON(cmd.OutOrStdout(), status)
 	}
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.ProxyStatusReport(cmd.OutOrStdout(), status)
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.ProxyStatusReport(w, status)
 	})
 	return nil
 }

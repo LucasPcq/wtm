@@ -140,24 +140,6 @@ func PortKeyTargets(params PortKeyTargetsParams) []domain.EnvFile {
 	return targets
 }
 
-// PortKeyLines names each key a run wrote, aligned on the file it landed in.
-func PortKeyLines(writes []domain.PortKeyWrite) []string {
-	width := 0
-	for _, write := range writes {
-		width = max(width, len([]rune(write.File)))
-	}
-
-	lines := make([]string, 0, len(writes))
-	for _, write := range writes {
-		line := fmt.Sprintf(domain.PortKeyLineFmt, pad(write.File, width), write.Port, write.Base)
-		if write.AddTarget {
-			line += domain.PortKeyTargetSuffix
-		}
-		lines = append(lines, line)
-	}
-	return lines
-}
-
 // PortRouteEnvPorts names the declarations the wizard routed to their own .env.
 // A run that never put the question answers nil, which every caller reads as
 // "every declared port" — the flag's meaning.

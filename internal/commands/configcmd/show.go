@@ -3,6 +3,7 @@ package configcmd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -77,13 +78,13 @@ func runValidate(cmd *cobra.Command, stateDir string, format string) error {
 	}
 
 	if err != nil {
-		output.Frame(cmd.ErrOrStderr(), func() {
-			output.Error(cmd.ErrOrStderr(), err.Error())
+		output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
+			output.Error(w, err.Error())
 		})
 		return domain.ErrAborted
 	}
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.Success(cmd.OutOrStdout(), "Config is valid.")
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.Success(w, "Config is valid.")
 	})
 	return nil
 }
@@ -93,8 +94,8 @@ func runShowText(cmd *cobra.Command, stateDir string) error {
 	path := filepath.Join(stateDir, domain.ConfigFileName)
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		output.Frame(cmd.ErrOrStderr(), func() {
-			output.Warning(cmd.ErrOrStderr(), fmt.Sprintf("No config at %s. Run `wtm init` first.", path))
+		output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
+			output.Warning(w, fmt.Sprintf("No config at %s. Run `wtm init` first.", path))
 		})
 		return nil
 	}
@@ -103,10 +104,10 @@ func runShowText(cmd *cobra.Command, stateDir string) error {
 	}
 
 	var writeErr error
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.InfoLine(cmd.OutOrStdout(), "path", path)
-		output.Blank(cmd.OutOrStdout())
-		_, writeErr = cmd.OutOrStdout().Write(data)
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.InfoLine(w, "path", path)
+		output.Blank(w)
+		_, writeErr = w.Write(data)
 	})
 	if writeErr != nil {
 		return writeErr

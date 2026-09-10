@@ -289,12 +289,15 @@ func indentOf(line string) int {
 // The declared ports come last and unaligned: a compose stack declaring seven
 // of them used to push every command off the screen.
 func TestFormatRunConfigShowsDeclaredPortsAfterTheCommand(t *testing.T) {
-	out := ansi.Strip(FormatRunConfig(domain.RunConfig{
-		Jobs: []domain.JobConfig{
-			{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm run dev",
-				Ports: map[string]int{"VITE_PORT": 5173}, URL: &domain.JobURLConfig{Port: "VITE_PORT"}},
-			{Name: "worker", Kind: domain.JobKindService, Cmd: "pnpm run worker"},
+	out := ansi.Strip(FormatRunConfig(FormatRunConfigParams{
+		Config: domain.RunConfig{
+			Jobs: []domain.JobConfig{
+				{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm run dev",
+					Ports: map[string]int{"VITE_PORT": 5173}, URL: &domain.JobURLConfig{Port: "VITE_PORT"}},
+				{Name: "worker", Kind: domain.JobKindService, Cmd: "pnpm run worker"},
+			},
 		},
+		Empty: domain.RunListEmpty,
 	}))
 
 	if !strings.Contains(out, "VITE_PORT=5173") {
@@ -313,10 +316,10 @@ func TestFormatRunConfigShowsDeclaredPortsAfterTheCommand(t *testing.T) {
 // A shared job listed like every other read as one service per worktree, and
 // its declared ports read as shifting — which is exactly what they do not do.
 func TestFormatRunConfigMarksASharedJob(t *testing.T) {
-	got := FormatRunConfig(domain.RunConfig{Jobs: []domain.JobConfig{
+	got := ansi.Strip(FormatRunConfig(FormatRunConfigParams{Config: domain.RunConfig{Jobs: []domain.JobConfig{
 		{Name: "db", Kind: domain.JobKindService, Cmd: "docker compose up db", Scope: domain.JobScopeShared},
 		{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev"},
-	}})
+	}}}))
 
 	lines := strings.Split(got, "\n")
 	var dbLine, webLine string
@@ -333,5 +336,17 @@ func TestFormatRunConfigMarksASharedJob(t *testing.T) {
 	}
 	if strings.Contains(webLine, domain.SharedJobTag) {
 		t.Errorf("a per-worktree job was marked shared:\n%s", got)
+	}
+}
+
+// An empty inventory is a non-event like any other, and it answers the question
+// that was actually asked: a jobs-only listing never mentions profiles.
+func TestFormatRunConfigEmptyNamesWhatWasAsked(t *testing.T) {
+	out := ansi.Strip(FormatRunConfig(FormatRunConfigParams{Empty: domain.RunJobsEmpty}))
+	if !strings.Contains(out, domain.GlyphUnchanged) {
+		t.Errorf("empty listing = %q, want the no-op glyph", out)
+	}
+	if strings.Contains(out, "profiles") {
+		t.Errorf("jobs-only listing = %q, want it to name jobs alone", out)
 	}
 }

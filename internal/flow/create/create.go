@@ -4,7 +4,6 @@ package create
 import (
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
@@ -27,6 +26,7 @@ type Outcome struct {
 	Result     domain.CreateResult
 	Branch     string
 	FromBranch string
+	EnvPorts   domain.EnvPortSettlement
 	Aborted    bool
 }
 
@@ -135,15 +135,18 @@ func (f *createFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 
+	var settlement domain.EnvPortSettlement
 	if !result.AlreadyExists {
 		// Before the hooks: one of them may well read the .env this settles.
-		if portErr := envports.Settle(envports.Params{
+		var portErr error
+		settlement, portErr = envports.Settle(envports.Params{
 			Context:      f.ctx,
 			Branch:       branchName,
 			WorktreePath: result.Path,
 			Rewrite:      answers.Value(KeyEnvPorts) != portsKeep,
 			Presenter:    f.presenter,
-		}); portErr != nil {
+		})
+		if portErr != nil {
 			return Outcome{}, portErr
 		}
 		if hookErr := f.runHooks(result.Path, branchName, fromBranch); hookErr != nil {
@@ -151,7 +154,7 @@ func (f *createFlow) run() (Outcome, error) {
 		}
 	}
 
-	outcome := Outcome{Result: result, Branch: branchName, FromBranch: fromBranch}
+	outcome := Outcome{Result: result, Branch: branchName, FromBranch: fromBranch, EnvPorts: settlement}
 	return outcome, f.presenter.Created(outcome)
 }
 
@@ -161,8 +164,9 @@ func (f *createFlow) runHooks(worktreePath, branchName, fromBranch string) error
 		return nil
 	}
 	return f.presenter.HookPhase(flow.HookPhaseParams{
-		Title: domain.HooksTitleOnCreate,
-		Run: func(sink io.Writer) error {
+		Title:   domain.HooksTitleOnCreate,
+		LogPath: rules.HooksLogPath(rules.HooksLogPathParams{StateDir: f.ctx.StateDir, Phase: domain.HookOnCreate, Branch: branchName}),
+		Run: func(sink flow.HookSink) error {
 			return worktree.RunCreateHooks(domain.CreateHooksParams{
 				ProjectDir:   f.ctx.ProjectDir,
 				StateDir:     f.ctx.StateDir,
@@ -170,7 +174,8 @@ func (f *createFlow) runHooks(worktreePath, branchName, fromBranch string) error
 				Branch:       branchName,
 				FromBranch:   fromBranch,
 				Hooks:        hooks,
-				Output:       sink,
+				Output:       sink.Output,
+				OnHook:       sink.OnHook,
 			})
 		},
 	})

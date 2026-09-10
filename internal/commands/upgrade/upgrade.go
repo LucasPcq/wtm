@@ -3,6 +3,7 @@ package upgrade
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"runtime"
 
@@ -138,7 +139,7 @@ func apply(cmd *cobra.Command, install selfupdate.Install, release domain.Releas
 		}
 		if !ran {
 			w := cmd.ErrOrStderr()
-			output.Frame(w, func() {
+			output.Frame(w, func(w io.Writer) {
 				output.Warning(w, fmt.Sprintf("run `%s` to update", rules.UpgradeCommandFor(install.Method)))
 			})
 		}
@@ -162,7 +163,7 @@ func report(cmd *cobra.Command, format string, result domain.UpgradeResult) erro
 		return output.UpgradeResultJSON(w, result)
 	}
 
-	output.Frame(w, func() { output.UpgradeReport(w, result) })
+	output.Frame(w, func(w io.Writer) { output.UpgradeReport(w, result) })
 
 	return nil
 }

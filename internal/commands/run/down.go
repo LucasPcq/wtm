@@ -2,6 +2,7 @@ package run
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	downflow "github.com/LucasPcq/wtm/internal/flow/run/down"
 	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/rules"
 )
 
 // newDownCmd creates the wtm run down subcommand.
@@ -79,24 +81,29 @@ func (p downPresenter) Downed(outcome downflow.Outcome) error {
 
 	out, errOut := p.Cmd.OutOrStdout(), p.Cmd.ErrOrStderr()
 	if outcome.NoDaemon || len(outcome.Stopped()) == 0 {
-		output.Frame(out, func() { output.Message(out, p.nothingRunning(outcome)) })
+		output.Frame(out, func(w io.Writer) { output.Message(w, p.nothingRunning(outcome)) })
 		return nil
 	}
 
 	// A job left standing is named on stderr as it is refused, so the reason
 	// reaches a reader piping stdout; the recap then accounts for it alongside
 	// what did go down.
-	for _, worktree := range outcome.Results {
-		for _, result := range worktree.Jobs {
-			if result.Status != domain.JobActionError {
-				continue
+	if rules.WorktreeJobsHaveErrors(outcome.Results) {
+		output.FrameStart(errOut)
+		barred := output.Barred(errOut)
+		for _, worktree := range outcome.Results {
+			for _, result := range worktree.Jobs {
+				if result.Status != domain.JobActionError {
+					continue
+				}
+				output.Error(barred, p.qualify(fmt.Sprintf("%s: %s", result.Name, result.Message), outcome, worktree))
 			}
-			output.Error(errOut, p.qualify(fmt.Sprintf("%s: %s", result.Name, result.Message), outcome, worktree))
 		}
+		output.FrameEnd(errOut)
 	}
 
-	output.Frame(out, func() {
-		fmt.Fprint(out, output.FormatRunDownRecap(output.RunDownRecapParams{
+	output.Frame(out, func(w io.Writer) {
+		fmt.Fprint(w, output.FormatRunDownRecap(output.RunDownRecapParams{
 			Profile: outcome.Profile,
 			Results: outcome.Results,
 		}))

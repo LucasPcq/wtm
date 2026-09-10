@@ -3,6 +3,7 @@ package configcmd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -39,8 +40,8 @@ func runEdit(cmd *cobra.Command, _ []string) error {
 
 	path := filepath.Join(stateDir, domain.ConfigFileName)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		output.Frame(cmd.ErrOrStderr(), func() {
-			output.Warning(cmd.ErrOrStderr(), fmt.Sprintf("No config at %s. Run `wtm init` first.", path))
+		output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
+			output.Warning(w, fmt.Sprintf("No config at %s. Run `wtm init` first.", path))
 		})
 		return nil
 	}
@@ -60,19 +61,21 @@ func runEdit(cmd *cobra.Command, _ []string) error {
 
 	if _, err := config.Load(config.LoadParams{StateDir: stateDir}); err != nil {
 		if errors.Is(err, domain.ErrConfigNotFound) {
-			output.Frame(cmd.ErrOrStderr(), func() {
-				output.Warning(cmd.ErrOrStderr(), "Config file is missing after edit.")
+			output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
+				output.Warning(w, "Config file is missing after edit.")
 			})
 			return nil
 		}
-		output.Frame(cmd.ErrOrStderr(), func() {
-			output.Error(cmd.ErrOrStderr(), fmt.Sprintf("Config no longer valid: %v", err))
+		output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
+			output.Error(w, fmt.Sprintf("Config no longer valid: %v", err))
 		})
-		return err
+		// The block above IS the report — returning err would have Execute spell
+		// the same message a second time, unframed.
+		return fmt.Errorf("%w: %w", domain.ErrAborted, err)
 	}
 
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.Success(cmd.OutOrStdout(), "Config saved and validated.")
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.Success(w, "Config saved and validated.")
 	})
 	return nil
 }

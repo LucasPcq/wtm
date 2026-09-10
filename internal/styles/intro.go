@@ -41,8 +41,8 @@ func RenderRecap(p IntroParams) string {
 	if width <= 0 {
 		width = 80
 	}
-	// Reserve room for margin (2) + border (1) + left padding (2) + right slack.
-	inner := width - 8
+	box, chrome := recapBox(p)
+	inner := width - chrome
 	if inner < 24 {
 		inner = 24
 	}
@@ -60,7 +60,7 @@ func RenderRecap(p IntroParams) string {
 		b.WriteString(IntroNote.Render(p.Note))
 	}
 
-	return IntroBox.Width(inner).Render(b.String())
+	return box.Width(inner).Render(b.String())
 }
 
 // IntroParams holds the inputs for RenderIntro.
@@ -69,6 +69,21 @@ type IntroParams struct {
 	Title string
 	Body  string
 	Note  string
+	// InFrame drops the box's own left rule. A CLI frame already marks the block
+	// as wtm's own with the accent bar in column zero, and a second vertical rule
+	// two columns in reads as a nested block that is not there. A TUI surface,
+	// which has no frame, leaves it false.
+	InFrame bool
+}
+
+// recapBox is the box a recap is drawn in, and how much room it costs. In a
+// frame it is a plain indent: the frame's own bar is the marker.
+func recapBox(params IntroParams) (lipgloss.Style, int) {
+	if params.InFrame {
+		return lipgloss.NewStyle().MarginLeft(2), 4
+	}
+	// Margin (2) + border (1) + left padding (2) + right slack.
+	return IntroBox, 8
 }
 
 // RenderIntro renders a section-intro callout: a bold title, a word-wrapped

@@ -705,6 +705,22 @@ func sortedPortRefs(bases map[domain.PortRef]int) []domain.PortRef {
 	return refs
 }
 
+type EnvPortsMoveInParams struct {
+	Result domain.EnvSyncResult
+	Target string
+}
+
+// EnvPortsMoveIn reports whether the port pass changes this file, which is what
+// keeps its block from claiming to be in sync. A pass the user declined changes
+// nothing: saying its values "still move" there would contradict the line right
+// under it saying they were left alone.
+func EnvPortsMoveIn(params EnvPortsMoveInParams) bool {
+	if !params.Result.Check && !params.Result.Ports.Applied {
+		return false
+	}
+	return EnvPortPlanTouches(params.Result.Ports, params.Target)
+}
+
 // EnvPortPlanTouches reports whether a plan rewrites anything in one env target.
 func EnvPortPlanTouches(plan domain.EnvPortPlan, target string) bool {
 	for _, e := range EnvPortRewrites(plan) {

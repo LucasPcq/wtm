@@ -3,6 +3,7 @@ package wt
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -99,7 +100,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	var statuses []domain.WorktreeStatus
 	if err := components.RunLoading(components.LoadingParams{
 		Message: domain.ExtractScanLoading,
-		Animate: interactive,
+		Animate: shared.Animate(cmd, interactive),
 		Work: func() error {
 			var listErr error
 			statuses, listErr = worktree.List(domain.ListParams{
@@ -123,8 +124,8 @@ func runExtract(cmd *cobra.Command, args []string) error {
 		statuses:   statuses,
 	})
 	if errors.Is(err, domain.ErrNoDirtyWorktrees) {
-		output.Frame(cmd.OutOrStdout(), func() {
-			output.Message(cmd.OutOrStdout(), domain.ErrNoDirtyWorktrees.Error())
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			output.Message(w, domain.ErrNoDirtyWorktrees.Error())
 		})
 		return nil
 	}
@@ -137,7 +138,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	if !needSource {
 		if err := components.RunLoading(components.LoadingParams{
 			Message: domain.ExtractScanLoading,
-			Animate: interactive,
+			Animate: shared.Animate(cmd, interactive),
 			Work: func() error {
 				var filesErr error
 				source.available, filesErr = listExtractFiles(source.path)
@@ -150,8 +151,8 @@ func runExtract(cmd *cobra.Command, args []string) error {
 			if format == domain.OutputJSON {
 				return output.WriteExtractJSON(cmd.OutOrStdout(), domain.ExtractResult{Files: []domain.ExtractFile{}})
 			}
-			output.Frame(cmd.OutOrStdout(), func() {
-				output.Message(cmd.OutOrStdout(), domain.ErrNoChangesToExtract.Error())
+			output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+				output.Message(w, domain.ErrNoChangesToExtract.Error())
 			})
 			return nil
 		}
@@ -170,8 +171,8 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	})
 	if errors.Is(err, domain.ErrUserAborted) {
 		if rules.IsHumanFormat(format) {
-			output.Frame(cmd.OutOrStdout(), func() {
-				output.Message(cmd.OutOrStdout(), "Aborted.")
+			output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+				output.Unchanged(w, domain.AbortedMessage)
 			})
 		}
 		return nil
@@ -189,8 +190,8 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	})
 	if errors.Is(err, domain.ErrUserAborted) {
 		if rules.IsHumanFormat(format) {
-			output.Frame(cmd.OutOrStdout(), func() {
-				output.Message(cmd.OutOrStdout(), "Cancelled — nothing was changed.")
+			output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+				output.Unchanged(w, domain.AbortedMessage)
 			})
 		}
 		return nil
@@ -216,13 +217,16 @@ func runExtract(cmd *cobra.Command, args []string) error {
 		return output.WriteExtractJSON(cmd.OutOrStdout(), result)
 	}
 	if len(result.Conflicts) > 0 {
-		output.Frame(cmd.OutOrStdout(), func() {
-			output.PrintExtractConflicts(cmd.OutOrStdout(), result)
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			output.PrintExtractConflicts(w, result)
 		})
 		return nil
 	}
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.PrintExtractResult(cmd.OutOrStdout(), result)
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.PrintExtractResult(w, output.ExtractResultParams{
+			Result:  result,
+			EnvNote: rules.EnvPortSettlementNote(sel.target.envPorts),
+		})
 	})
 	return nil
 }
@@ -596,6 +600,9 @@ func extractCreateParams(cfg shared.ConfigResult, sourceBranch string) newpicker
 type extractTarget struct {
 	path   string
 	branch string
+	// envPorts is what the port pass did in a worktree this extraction created,
+	// zero for one that already existed and was never provisioned.
+	envPorts domain.EnvPortSettlement
 }
 
 type resolveTargetParams struct {
@@ -642,7 +649,11 @@ func resolveTarget(params resolveTargetParams) (extractTarget, error) {
 		// ask. Under --yes / no TTY / JSON it is non-prompting — fast-forward only when
 		// --ff was passed, otherwise leave the branch as-is.
 		if params.interactive {
-			if !maybeFastForwardSource(params.cfg.ProjectDir, ffSubjectBranch) {
+			if !maybeFastForwardSource(fastForwardSourceParams{
+				Cmd:        params.cmd,
+				ProjectDir: params.cfg.ProjectDir,
+				Source:     ffSubjectBranch,
+			}) {
 				return extractTarget{}, domain.ErrUserAborted
 			}
 		} else if ffFlag, _ := params.cmd.Flags().GetBool(domain.FlagFF); ffFlag {
@@ -676,7 +687,11 @@ func resolveTarget(params resolveTargetParams) (extractTarget, error) {
 	// wizard (already confirmed on its recap). Only the accepted fast-forward is
 	// executed here; its failure-recovery prompt is a legitimate post-exec standalone.
 	if params.create.FastForwardBranch != "" &&
-		!executeFastForwardSource(params.cfg.ProjectDir, params.create.FastForwardBranch) {
+		!executeFastForwardSource(fastForwardSourceParams{
+			Cmd:        params.cmd,
+			ProjectDir: params.cfg.ProjectDir,
+			Source:     params.create.FastForwardBranch,
+		}) {
 		return extractTarget{}, domain.ErrUserAborted
 	}
 	return createTarget(createTargetParams{
@@ -741,13 +756,14 @@ func createTarget(params createTargetParams) (extractTarget, error) {
 	// Before the hooks: one of them may read the .env, and it has to read the
 	// ports this worktree binds rather than the ones it was copied from.
 	format, _ := params.cmd.Flags().GetString(domain.FlagOutput)
-	if err := envports.Settle(envports.Params{
+	settlement, err := envports.Settle(envports.Params{
 		Context:      shared.FlowContext(params.cfg),
 		Branch:       res.Branch,
 		WorktreePath: res.Path,
 		Rewrite:      params.adjustEnvPorts,
 		Presenter:    shared.NewPresenter(params.cmd, format),
-	}); err != nil {
+	})
+	if err != nil {
 		return extractTarget{}, err
 	}
 
@@ -764,5 +780,5 @@ func createTarget(params createTargetParams) (extractTarget, error) {
 	}); err != nil {
 		return extractTarget{}, err
 	}
-	return extractTarget{path: res.Path, branch: res.Branch}, nil
+	return extractTarget{path: res.Path, branch: res.Branch, envPorts: settlement}, nil
 }

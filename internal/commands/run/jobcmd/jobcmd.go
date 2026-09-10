@@ -5,6 +5,7 @@ package jobcmd
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -47,18 +48,18 @@ func (p presenter) Changed(outcome jobflow.Outcome) error {
 		})
 	}
 
-	output.Frame(out, func() {
+	output.Frame(out, func(w io.Writer) {
 		switch outcome.Status {
 		case domain.JobActionUpdated:
-			output.Update(out, fmt.Sprintf(domain.RunJobUpdatedFmt, outcome.Name))
+			output.Update(w, fmt.Sprintf(domain.RunJobUpdatedFmt, outcome.Name))
 		case domain.JobActionRemoved:
-			output.Success(out, fmt.Sprintf(domain.RunJobRemovedFmt, outcome.Name))
+			output.Success(w, fmt.Sprintf(domain.RunJobRemovedFmt, outcome.Name))
 		default:
-			output.Success(out, fmt.Sprintf(domain.RunJobAddedFmt, outcome.Name))
+			output.Success(w, fmt.Sprintf(domain.RunJobAddedFmt, outcome.Name))
 		}
 		// What the removal dragged along, each named so the reader can put it back.
 		for _, line := range removalLines(outcome.Effect) {
-			output.Message(out, line)
+			output.Message(w, output.Indent+line)
 		}
 	})
 	return nil

@@ -20,6 +20,12 @@ wtm agents install [flags]
       --yes             Non-interactive: install into every detected destination
 ```
 
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+```
+
 ### SEE ALSO
 
 * [wtm agents](wtm_agents.md)	 - Manage LLM agent integrations for wtm

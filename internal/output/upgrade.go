@@ -25,7 +25,7 @@ func UpgradeReport(w io.Writer, result domain.UpgradeResult) {
 		Success(w, fmt.Sprintf("%s %s → %s", domain.AppName, result.Installed, result.Latest))
 	case domain.UpgradeActionChecked:
 		Update(w, fmt.Sprintf("%s %s → %s available", domain.AppName, result.Installed, result.Latest))
-		Message(w, styles.Muted.Render("run "+rules.UpgradeCommandFor(result.Method)))
+		NextStep(w, NextStepParams{Command: rules.UpgradeCommandFor(result.Method)})
 	default:
 		Unchanged(w, fmt.Sprintf("%s %s unchanged", domain.AppName, result.Installed))
 	}

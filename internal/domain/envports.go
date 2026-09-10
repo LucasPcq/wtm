@@ -184,3 +184,29 @@ type RunAddresses struct {
 	// without being addressed by port.
 	PortAddressed map[string]bool
 }
+
+// EnvPortSettlement is what a create-like run reports of its port pass: how many
+// linked values moved and by how much, never which ones. The values themselves
+// are in the .env the run just wrote, and `wtm env` is the command whose subject
+// they are.
+type EnvPortSettlement struct {
+	Shifted int
+	Offset  int
+	Applied bool
+}
+
+// EnvVerdict is the register the trailing line of `wtm env` reads in. It is a
+// verdict and not a glyph: the three registers are the ones every command
+// shares — something was done, something is left to do, nothing was needed —
+// and a run with drift to reconcile is never the third.
+type EnvVerdict int
+
+const (
+	// EnvVerdictNeutral is a run that changed nothing and had nothing to change.
+	EnvVerdictNeutral EnvVerdict = iota
+	// EnvVerdictDone is a run that changed state and it worked.
+	EnvVerdictDone
+	// EnvVerdictAttention is a state the reader has to act on: drift a --check
+	// run only reported, or files config.toml names that exist nowhere.
+	EnvVerdictAttention
+)

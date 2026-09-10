@@ -23,7 +23,7 @@ type FormatWorktreeListParams struct {
 // FormatWorktreeList renders a list of worktree statuses as an aligned table string.
 func FormatWorktreeList(params FormatWorktreeListParams) string {
 	if len(params.Statuses) == 0 {
-		return "No worktrees found."
+		return UnchangedLine(domain.NoWorktreesMessage)
 	}
 
 	rows := buildRows(params.Statuses, params.ActiveBranch, params.PRInfos, params.Services)
@@ -257,7 +257,11 @@ type CreateResultParams struct {
 	AlreadyExists bool
 	From          string
 	EnvStrategy   string
-	Path          string
+	// EnvNote qualifies the env line with what the port pass did — a count and an
+	// offset, resolved by the caller (rules.EnvPortSettlementNote). Empty when the
+	// run moved no linked value.
+	EnvNote string
+	Path    string
 	// ExistingBranch reports that an existing local branch was checked out as-is,
 	// which retitles the headline and relabels From as the sync parent.
 	ExistingBranch bool
@@ -278,9 +282,9 @@ type CreateResultParams struct {
 // frame owns the outer padding.
 func FormatCreateResult(w io.Writer, p CreateResultParams) {
 	if p.AlreadyExists {
-		Success(w, fmt.Sprintf("Worktree %s already exists at %s", p.Branch, p.Path))
+		Unchanged(w, fmt.Sprintf("Worktree %s already exists at %s", p.Branch, p.Path))
 		Blank(w)
-		GoHint(w, p.GoCommand)
+		NextStep(w, NextStepParams{Command: p.GoCommand})
 		return
 	}
 
@@ -295,7 +299,7 @@ func FormatCreateResult(w io.Writer, p CreateResultParams) {
 	Blank(w)
 	writeAlignedFields(w, []domain.RecapField{
 		{Label: sourceLabel, Value: p.From},
-		{Label: domain.CreateRecapLabelEnv, Value: p.EnvStrategy},
+		{Label: domain.CreateRecapLabelEnv, Value: withNote(noteParams{Value: p.EnvStrategy, Note: p.EnvNote})},
 		{Label: domain.CreateRecapLabelPath, Value: p.Path},
 	})
 	if p.ReusedNote != "" {
@@ -307,13 +311,19 @@ func FormatCreateResult(w io.Writer, p CreateResultParams) {
 		}
 	}
 	Blank(w)
-	GoHint(w, p.GoCommand)
+	NextStep(w, NextStepParams{Command: p.GoCommand})
 }
 
-// GoHint prints the highlighted jump-in step shared by every worktree-creating
-// command (create, extract, checkout): a primary arrow + the bold `wtm go` command.
-func GoHint(w io.Writer, goCommand string) {
-	fmt.Fprintf(w, "%s%s  %s\n", Indent, styles.Primary.Render("→"), styles.Bold.Render(goCommand))
+type noteParams struct {
+	Value string
+	Note  string
+}
+
+func withNote(params noteParams) string {
+	if params.Note == "" {
+		return params.Value
+	}
+	return params.Value + styles.Muted.Render(domain.EnvRecapNoteSeparator+params.Note)
 }
 
 // writeAlignedFields prints indented "label   value" rows with values aligned to a

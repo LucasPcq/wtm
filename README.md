@@ -211,6 +211,11 @@ wtm checkout 42 --output json | jq '.path'
 wtm run ps --output json | jq '.[] | select(.status=="running" or .status=="detached").name'
 ```
 
+`--quiet` (`-q`) is the other half: it silences the human report on **every** command
+while leaving the exit code, the errors and the machine contracts untouched — a JSON
+document, a resolved path, a shell script or a URL still comes through. It is the
+output axis only, so a fully unattended run pairs it with `--yes`.
+
 Non-interactive note: `--output json` never prompts, so destructive commands need an
 explicit flag — `clean`/`prune` need `--yes` (or `--force`), and `sync` needs branch
 args or `--all`. See each command's `--help`.

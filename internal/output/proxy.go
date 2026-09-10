@@ -13,33 +13,35 @@ func WriteProxyStatusJSON(w io.Writer, status domain.ProxyStatus) error {
 	return encodeJSON(w, status)
 }
 
+// ProxyStatusReport is a conclusion and then its detail. Whether the
+// redirection is installed is the question the command was asked, so it is the
+// line above the readout rather than one row inside it.
 func ProxyStatusReport(w io.Writer, status domain.ProxyStatus) {
-	lines := []string{
-		fmt.Sprintf(domain.ProxyStatusBindFmt, status.BindPort),
-		fmt.Sprintf(domain.ProxyStatusPublicFmt, strconv.Itoa(status.PublicPort)),
-		fmt.Sprintf(domain.ProxyStatusRedirectFmt, redirectState(status)),
+	switch {
+	case !status.Supported:
+		Warning(w, domain.ProxyStatusUnsupported)
+	case !status.Installed:
+		Unchanged(w, domain.ProxyStatusNotInstalled)
+	default:
+		Success(w, fmt.Sprintf(domain.ProxyStatusInstalledFmt, status.Mechanism, status.BindPort))
+	}
+	Blank(w)
+
+	items := []AnnounceItem{
+		{Label: domain.ProxyStatusBindLabel, Value: strconv.Itoa(status.BindPort)},
+		{Label: domain.ProxyStatusPublicLabel, Value: strconv.Itoa(status.PublicPort)},
 	}
 	if status.ConfigPath != "" {
-		lines = append(lines, fmt.Sprintf(domain.ProxyStatusConfigFmt, status.ConfigPath))
+		items = append(items, AnnounceItem{Label: domain.ProxyStatusConfigLabel, Value: status.ConfigPath})
 	}
 	if status.ExampleURL != "" {
-		lines = append(lines, fmt.Sprintf(domain.ProxyStatusExampleFmt, status.ExampleURL))
+		items = append(items, AnnounceItem{Label: domain.ProxyStatusExampleLabel, Value: status.ExampleURL})
 	}
-	Section(w, domain.ProxyStatusTitle, lines)
+	Announce(w, domain.ProxyStatusTitle, items)
 
 	if status.Diverged {
 		Callout(w, domain.ProxyDivergedTitle, []string{domain.ProxyDivergedLine, domain.ProxyDivergedFix})
 	}
-}
-
-func redirectState(status domain.ProxyStatus) string {
-	if !status.Supported {
-		return domain.ProxyStatusUnsupported
-	}
-	if !status.Installed {
-		return domain.ProxyStatusNotInstalled
-	}
-	return fmt.Sprintf(domain.ProxyStatusInstalledFmt, status.Mechanism, status.BindPort)
 }
 
 type ProxyPlanReportParams struct {
@@ -77,9 +79,9 @@ func ProxyPlanReport(w io.Writer, params ProxyPlanReportParams) {
 		Blank(w)
 	}
 	if params.Reversible {
-		Message(w, domain.ProxyInstallRecapReverse)
+		NextStep(w, NextStepParams{Command: domain.ProxyInstallRecapReverse, Note: domain.ProxyInstallRecapReverseNote})
 		if !params.Full {
-			Message(w, domain.ProxyInstallRecapFull)
+			NextStep(w, NextStepParams{Command: domain.ProxyInstallRecapFull, Note: domain.ProxyInstallRecapFullNote})
 		}
 	}
 }

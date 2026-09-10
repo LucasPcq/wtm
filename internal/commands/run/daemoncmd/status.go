@@ -2,6 +2,7 @@ package daemoncmd
 
 import (
 	"github.com/spf13/cobra"
+	"io"
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -26,8 +27,8 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	if format, _ := cmd.Flags().GetString(domain.FlagOutput); format == domain.OutputJSON {
 		return output.WriteDaemonStatusJSON(cmd.OutOrStdout(), status)
 	}
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.DaemonStatusReport(cmd.OutOrStdout(), status)
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.DaemonStatusReport(w, status)
 	})
 	return nil
 }

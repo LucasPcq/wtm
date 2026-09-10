@@ -22,6 +22,12 @@ wtm run down [worktree...] [flags]
   -y, --yes              Skip all prompts; stops what the worktree has running
 ```
 
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+```
+
 ### SEE ALSO
 
 * [wtm run](wtm_run.md)	 - Manage dev jobs (services + tasks)

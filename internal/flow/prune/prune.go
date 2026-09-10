@@ -4,7 +4,6 @@ package prune
 import (
 	"errors"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -213,8 +212,9 @@ func (f *pruneFlow) runHooks() error {
 		return nil
 	}
 	return f.presenter.HookPhase(flow.HookPhaseParams{
-		Title: domain.HooksTitleOnClean,
-		Run: func(sink io.Writer) error {
+		Title:   domain.HooksTitleOnClean,
+		LogPath: rules.HooksLogPath(rules.HooksLogPathParams{StateDir: f.ctx.StateDir, Phase: domain.HookOnClean}),
+		Run: func(sink flow.HookSink) error {
 			for _, candidate := range f.plan.Selected {
 				if candidate.Path == "" {
 					continue
@@ -225,7 +225,8 @@ func (f *pruneFlow) runHooks() error {
 					WorktreePath: candidate.Path,
 					Branch:       candidate.Branch,
 					Hooks:        hooks,
-					Output:       sink,
+					Output:       sink.Output,
+					OnHook:       sink.OnHook,
 				}); err != nil {
 					return err
 				}

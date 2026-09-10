@@ -24,7 +24,7 @@ func TestSettleWithoutLinksReportsNothing(t *testing.T) {
 		t.Error("a project with no [[env_port]] link must not pose the step")
 	}
 
-	err := envports.Settle(envports.Params{
+	settlement, err := envports.Settle(envports.Params{
 		Context:      ctx,
 		Branch:       "feat/x",
 		WorktreePath: t.TempDir(),
@@ -33,6 +33,9 @@ func TestSettleWithoutLinksReportsNothing(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if settlement.Shifted != 0 {
+		t.Errorf("settled %d value(s), want none", settlement.Shifted)
 	}
 	if len(presenter.Statuses) != 0 {
 		t.Errorf("reported %+v, want nothing", presenter.Statuses)
@@ -78,13 +81,14 @@ func TestSettleMovesTheCopiedPortsWhenTheRunSaidSo(t *testing.T) {
 	}
 
 	presenter := &flowtest.Recorder{}
-	if err := envports.Settle(envports.Params{
+	settlement, err := envports.Settle(envports.Params{
 		Context:      ctx,
 		Branch:       "feature",
 		WorktreePath: worktreePath,
 		Rewrite:      true,
 		Presenter:    presenter,
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("Settle: %v", err)
 	}
 
@@ -92,10 +96,13 @@ func TestSettleMovesTheCopiedPortsWhenTheRunSaidSo(t *testing.T) {
 	if strings.Contains(body, "WEB_PORT=3000") {
 		t.Errorf(".env = %q, want the copied port moved onto this worktree's", body)
 	}
-	// What was asked before the worktree existed is reported once it does: the
-	// table is an account of what happened, never a second question.
-	if len(presenter.Statuses) == 0 {
-		t.Error("the rewrite was applied without saying what it did")
+	// The pass reports a count to whoever concludes the run, and prints nothing
+	// itself: the values it moved are in the .env beside it.
+	if !settlement.Applied || settlement.Shifted != 1 {
+		t.Errorf("settlement = %+v, want 1 value applied", settlement)
+	}
+	if len(presenter.Statuses) != 0 {
+		t.Errorf("reported %+v, want nothing to print", presenter.Statuses)
 	}
 }
 
@@ -104,14 +111,18 @@ func TestSettleMovesTheCopiedPortsWhenTheRunSaidSo(t *testing.T) {
 func TestSettleLeavesTheValuesAloneWhenTheRunSaidSo(t *testing.T) {
 	ctx, worktreePath := settleFixture(t)
 
-	if err := envports.Settle(envports.Params{
+	settlement, err := envports.Settle(envports.Params{
 		Context:      ctx,
 		Branch:       "feature",
 		WorktreePath: worktreePath,
 		Rewrite:      false,
 		Presenter:    &flowtest.Recorder{},
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("Settle: %v", err)
+	}
+	if settlement.Applied {
+		t.Error("a declined pass must not report itself as applied")
 	}
 
 	if body := readEnv(t, worktreePath); !strings.Contains(body, "WEB_PORT=3000") {

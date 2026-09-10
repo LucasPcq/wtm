@@ -3,6 +3,7 @@ package cmd
 
 import (
 	"errors"
+	"io"
 	"os"
 	"strings"
 
@@ -29,6 +30,9 @@ import (
 )
 
 func init() {
+	rootCmd.PersistentFlags().BoolP(domain.FlagQuiet, "q", false,
+		"Silence human output; errors and the exit code are unaffected, and --output json still emits its document")
+
 	rootCmd.AddGroup(
 		&cobra.Group{ID: domain.CmdGroupWorktrees, Title: domain.CmdGroupWorktreesTitle},
 		&cobra.Group{ID: domain.CmdGroupNavigate, Title: domain.CmdGroupNavigateTitle},
@@ -140,6 +144,7 @@ var rootCmd = &cobra.Command{
 	RunE:    rootRunE,
 	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
 		startUpdateCheck(cmd)
+		silenceHumanOutput(cmd)
 	},
 	SilenceErrors: true,
 	SilenceUsage:  true,
@@ -147,6 +152,48 @@ var rootCmd = &cobra.Command{
 
 func rootRunE(cmd *cobra.Command, _ []string) error {
 	return cmd.Help()
+}
+
+// silenceHumanOutput is the whole of --quiet: the command's writers become
+// io.Discard, so every framed conclusion, notice and progress line goes nowhere
+// while the exit code and the error still do — Execute prints those to
+// os.Stderr, not through the command.
+//
+// It never touches a machine contract: --output json still emits its document,
+// and a command whose stdout IS the answer (a path, a script, a URL) says so
+// with an annotation. Asking for less noise is not asking for less answer.
+func silenceHumanOutput(cmd *cobra.Command) {
+	quiet, _ := cmd.Flags().GetBool(domain.FlagQuiet)
+	if !quiet {
+		return
+	}
+	// Text is the only human format. Every other one — json, mermaid, whatever is
+	// added next — is a document someone asked for, and --quiet is about noise.
+	if format, _ := cmd.Flags().GetString(domain.FlagOutput); format != "" && format != domain.OutputText {
+		return
+	}
+	if cmd.Annotations[domain.AnnotationMachineOutput] != "" {
+		return
+	}
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	humanOutputSilenced = true
+}
+
+// humanOutputSilenced records that --quiet actually took a command's writers
+// away. It is what makes ErrAborted safe: that sentinel means "the report is
+// already on screen", which stops being true the moment the screen was
+// io.Discard.
+var humanOutputSilenced bool
+
+// abortLine is what a silenced run says instead of nothing. A wrapped cause is
+// printed as it is; the bare sentinel has no text worth reading, so it points at
+// the flag that took the report away rather than pretending to explain.
+func abortLine(err error) string {
+	if errors.Is(err, domain.ErrAborted) && err.Error() == domain.ErrAborted.Error() {
+		return domain.QuietAbortedMessage
+	}
+	return err.Error()
 }
 
 func globalUpdateCheck() *bool {
@@ -161,13 +208,16 @@ func globalUpdateCheck() *bool {
 // printUpdateNotice drains the passive check started in PersistentPreRun. It is
 // nil-safe: a suppressed check leaves updateCheck nil.
 func printUpdateNotice() {
+	if quiet, _ := rootCmd.Flags().GetBool(domain.FlagQuiet); quiet {
+		return
+	}
 	current, latest, method, ok := updateCheck.Notice(domain.UpdateNoticeWait)
 	if !ok {
 		return
 	}
 
-	output.Frame(os.Stderr, func() {
-		output.UpdateNotice(os.Stderr, output.UpdateNoticeParams{Current: current, Latest: latest, Method: method})
+	output.Frame(os.Stderr, func(w io.Writer) {
+		output.UpdateNotice(w, output.UpdateNoticeParams{Current: current, Latest: latest, Method: method})
 	})
 }
 
@@ -207,10 +257,11 @@ func Root() *cobra.Command {
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		// ErrAborted means the command already printed its own report; just
-		// propagate the non-zero exit without a second error line.
-		if !errors.Is(err, domain.ErrAborted) {
+		// propagate the non-zero exit without a second error line — unless --quiet
+		// discarded that report, in which case this is the only line there is.
+		if !errors.Is(err, domain.ErrAborted) || humanOutputSilenced {
 			output.Blank(os.Stderr)
-			output.Error(os.Stderr, err.Error())
+			output.Error(os.Stderr, abortLine(err))
 			output.Blank(os.Stderr)
 		}
 		printUpdateNotice()

@@ -1,6 +1,7 @@
 package output
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -16,12 +17,13 @@ type ComposeNamesReportParams struct {
 // compose files pin absolutely, and what it left colliding.
 func ComposeNamesReport(w io.Writer, params ComposeNamesReportParams) {
 	if len(params.Patched) > 0 {
-		lines := rules.ComposeNamePatchLines(params.Patched)
-		if rules.ComposeNamesRenameAVolume(params.Patched) {
-			lines = append(lines, "", domain.ComposeNamesVolumeWarning)
-		}
 		Blank(w)
-		Section(w, domain.ComposeNamesPatchedTitle, lines)
+		Success(w, fmt.Sprintf(domain.ComposeNamesSummaryFmt, len(params.Patched)))
+		// The volume warning is not part of the count: a renamed volume is data the
+		// reader may have to move by hand.
+		if rules.ComposeNamesRenameAVolume(params.Patched) {
+			Warning(w, domain.ComposeNamesVolumeWarning)
+		}
 	}
 
 	if len(params.Withheld) > 0 {

@@ -29,7 +29,7 @@ func TestRunPrinterReportsEachStepOfTheSequence(t *testing.T) {
 		runlogs.Event{Phase: runlogs.PhaseReady, Outcome: runlogs.Outcome{Started: []string{"api"}, Completed: []string{"migrate"}}},
 	)
 
-	for _, want := range []string{"[1/2] migrate", "applying 001", "migrate done", "[2/2] api", "api started", domain.RunStreamNextHint} {
+	for _, want := range []string{"[1/2] migrate", "applying 001", "migrate done", "[2/2] api", "api started", domain.RunStreamAttachHint} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("stdout is missing %q\n--- stdout ---\n%s", want, stdout)
 		}
@@ -88,7 +88,7 @@ func TestRunPrinterSaysNothingAboutWhatDidNotHappen(t *testing.T) {
 func TestRunPrinterHintsAtNothingWhenNothingIsRunning(t *testing.T) {
 	stdout, _ := emit(runlogs.Event{Phase: runlogs.PhaseReady, Outcome: runlogs.Outcome{Completed: []string{"migrate"}}})
 
-	if strings.Contains(stdout, domain.RunStreamNextHint) {
+	if strings.Contains(stdout, domain.RunStreamAttachHint) {
 		t.Errorf("a run that left nothing up still offered `run down`:\n%s", stdout)
 	}
 }
@@ -199,7 +199,7 @@ func TestRunPrinterClosesTheRunOnce(t *testing.T) {
 	printer.Emit(runlogs.Event{Phase: runlogs.PhaseReady, Outcome: runlogs.Outcome{Worktree: "main", Started: []string{"web"}}})
 	printer.Emit(runlogs.Event{Phase: runlogs.PhaseReady, Outcome: runlogs.Outcome{Worktree: "feature", Started: []string{"web"}}})
 
-	if got := strings.Count(out.String(), domain.RunStreamNextHint); got != 1 {
+	if got := strings.Count(out.String(), domain.RunStreamAttachHint); got != 1 {
 		t.Errorf("the hint was printed %d times, want once", got)
 	}
 }

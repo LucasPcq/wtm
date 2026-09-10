@@ -2,6 +2,7 @@ package wt
 
 import (
 	"github.com/spf13/cobra"
+	"io"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/output"
@@ -18,10 +19,10 @@ func newGoCmd() *cobra.Command {
 }
 
 func runGo(cmd *cobra.Command, _ []string) error {
-	output.Frame(cmd.ErrOrStderr(), func() {
-		output.Warning(cmd.ErrOrStderr(), "wtm go requires shell integration to change your working directory.")
-		output.Blank(cmd.ErrOrStderr())
-		output.Message(cmd.ErrOrStderr(), domain.MsgShellInitHint)
+	output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
+		output.Warning(w, "wtm go requires shell integration to change your working directory.")
+		output.Blank(w)
+		output.Message(w, domain.MsgShellInitHint)
 	})
 	return nil
 }

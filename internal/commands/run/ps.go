@@ -2,6 +2,7 @@ package run
 
 import (
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -42,7 +43,7 @@ func runPs(cmd *cobra.Command, _ []string) error {
 	var jobs []domain.JobInfo
 	loadErr := components.RunLoading(components.LoadingParams{
 		Message: "Loading jobs…",
-		Animate: true,
+		Animate: shared.Animate(cmd, true),
 		Work: func() error {
 			var e error
 			jobs, e = shared.LoadJobs()
@@ -54,8 +55,8 @@ func runPs(cmd *cobra.Command, _ []string) error {
 	}
 
 	out := cmd.OutOrStdout()
-	output.Frame(out, func() {
-		fmt.Fprint(out, output.FormatRunningJobs(output.FormatRunningJobsParams{Jobs: jobs, Now: time.Now()}))
+	output.Frame(out, func(w io.Writer) {
+		fmt.Fprint(w, output.FormatRunningJobs(output.FormatRunningJobsParams{Jobs: jobs, Now: time.Now()}))
 	})
 	return nil
 }

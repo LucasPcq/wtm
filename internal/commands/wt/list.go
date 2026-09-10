@@ -3,6 +3,7 @@ package wt
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -65,7 +66,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 
 	err = components.RunLoading(components.LoadingParams{
 		Message: "Loading worktrees…",
-		Animate: rules.IsHumanFormat(format),
+		Animate: shared.Animate(cmd, rules.IsHumanFormat(format)),
 		Work: func() error {
 			wg.Add(2)
 			go func() {
@@ -104,8 +105,8 @@ func runList(cmd *cobra.Command, _ []string) error {
 				Services: services,
 			})
 		}
-		output.Frame(cmd.OutOrStdout(), func() {
-			fmt.Fprintln(cmd.OutOrStdout(), strings.TrimRight(output.FormatWorktreeList(output.FormatWorktreeListParams{
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			fmt.Fprintln(w, strings.TrimRight(output.FormatWorktreeList(output.FormatWorktreeListParams{
 				Statuses:     statuses,
 				ActiveBranch: activeBranch,
 				PRInfos:      prs,
@@ -116,8 +117,8 @@ func runList(cmd *cobra.Command, _ []string) error {
 	}
 
 	if len(statuses) == 0 {
-		output.Frame(cmd.OutOrStdout(), func() {
-			output.Message(cmd.OutOrStdout(), "No worktrees found.")
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			output.Unchanged(w, domain.NoWorktreesMessage)
 		})
 		return nil
 	}

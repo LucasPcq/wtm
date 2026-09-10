@@ -2,6 +2,7 @@ package run
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -55,7 +56,7 @@ func openRunView(params viewParams) (runlogs.Outcomes, error) {
 
 	if result.Recap != "" {
 		out := params.Cmd.OutOrStdout()
-		output.Frame(out, func() { fmt.Fprintln(out, result.Recap) })
+		output.Frame(out, func(w io.Writer) { fmt.Fprintln(w, result.Recap) })
 	}
 	return result.Outcomes, nil
 }
@@ -96,7 +97,9 @@ func runOnStream(params streamParams) (runlogs.Outcomes, error) {
 	// A stream has no band to hold it, so the warning follows the lines it
 	// qualifies rather than sitting above them.
 	if len(params.Warnings) > 0 {
-		output.Callout(errOut, domain.AddressingDriftTitle, params.Warnings)
+		output.Frame(errOut, func(w io.Writer) {
+			output.Callout(w, domain.AddressingDriftTitle, params.Warnings)
+		})
 	}
 	return outcomes, nil
 }

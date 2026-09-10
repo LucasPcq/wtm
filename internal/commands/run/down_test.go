@@ -97,7 +97,7 @@ func TestRunDownConcludesInTheSameBoxRunUpDoes(t *testing.T) {
 	for _, want := range []string{
 		domain.RunViewRecapTitle,
 		fmt.Sprintf(domain.RunViewRecapProfileFmt, "dev"),
-		domain.RunDownRecapUpHint,
+		domain.RunStreamUpHint,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("run down is missing %q:\n%s", want, body)

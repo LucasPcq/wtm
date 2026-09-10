@@ -90,14 +90,6 @@ func (p logsPresenter) Show(show logsflow.ShowParams) error {
 	}
 }
 
-// jobColors cycles through distinct colors for each job's log prefix.
-var jobColors = []func(string) string{
-	func(s string) string { return styles.Primary.Render(s) },
-	func(s string) string { return styles.Success.Render(s) },
-	func(s string) string { return styles.Warning.Render(s) },
-	func(s string) string { return styles.Muted.Render(s) },
-}
-
 type jobLinesParams struct {
 	Cmd   *cobra.Command
 	Board runlogs.Board
@@ -110,12 +102,15 @@ type jobLinesParams struct {
 
 // prefixOf labels a job's lines, naming its worktree only above several of
 // them — two jobs called `web` are otherwise the same prefix twice.
-func (p jobLinesParams) prefixOf(view runlogs.JobView, index int) string {
+func (p jobLinesParams) prefixOf(view runlogs.JobView) string {
 	label := view.Name
 	if len(p.Worktrees) > 1 && view.Worktree != "" {
 		label = fmt.Sprintf(domain.RunStreamWorktreeFmt, label, view.Worktree)
 	}
-	return jobColors[index%len(jobColors)](fmt.Sprintf(domain.RunLogsPrefixFmt, label))
+	// Muted, and the same for every job: the prefix says which job a line came
+	// from, which is chrome. Cycling the status palette over it made green and
+	// yellow mean "job 2" and "job 3" in the one command whose body is job output.
+	return styles.Muted.Render(fmt.Sprintf(domain.RunLogsPrefixFmt, label))
 }
 
 // writeJobLogsJSON is `run logs --output json`: what each job persisted, as one
@@ -138,7 +133,7 @@ func writeJobLogsJSON(params jobLinesParams) error {
 			// One unreadable file is not the whole document: the other jobs still
 			// have something to hand over, and stdout stays a clean document
 			// because the reason goes to stderr.
-			output.Error(params.Cmd.ErrOrStderr(), fmt.Sprintf("%s: %v", view.Name, historyErr))
+			output.Error(output.Barred(params.Cmd.ErrOrStderr()), fmt.Sprintf("%s: %v", view.Name, historyErr))
 			continue
 		}
 		for _, line := range lines {
@@ -169,22 +164,23 @@ func writeJobLines(params jobLinesParams) error {
 	}
 	out := params.Cmd.OutOrStdout()
 	if len(views) == 0 {
-		output.Frame(out, func() { output.Message(out, domain.RunLogsNoJobs) })
+		output.Frame(out, func(w io.Writer) { output.Unchanged(w, domain.RunLogsNoJobs) })
 		return nil
 	}
 
 	output.FrameStart(out)
-	writer := &lineWriter{out: out}
+	barred := output.Barred(out)
+	writer := &lineWriter{out: barred}
 	var wg sync.WaitGroup
 	attached := false
 
-	for i, view := range views {
-		prefix := params.prefixOf(view, i)
+	for _, view := range views {
+		prefix := params.prefixOf(view)
 
 		if !view.Attachable {
 			lines, historyErr := params.Board.History(runlogs.HistoryParams{Job: view.Name, WorkDir: view.WorkDir})
 			if historyErr != nil {
-				output.Error(params.Cmd.ErrOrStderr(), fmt.Sprintf("%s: %v", view.Name, historyErr))
+				output.Error(output.Barred(params.Cmd.ErrOrStderr()), fmt.Sprintf("%s: %v", view.Name, historyErr))
 				continue
 			}
 			for _, line := range lines {
@@ -195,7 +191,7 @@ func writeJobLines(params jobLinesParams) error {
 
 		stream, attachErr := params.Board.Attach(runlogs.AttachParams{Job: view.Name, WorkDir: view.WorkDir})
 		if attachErr != nil {
-			output.Error(params.Cmd.ErrOrStderr(), fmt.Sprintf("%s: %v", view.Name, attachErr))
+			output.Error(output.Barred(params.Cmd.ErrOrStderr()), fmt.Sprintf("%s: %v", view.Name, attachErr))
 			continue
 		}
 
@@ -215,7 +211,7 @@ func writeJobLines(params jobLinesParams) error {
 	// A worktree whose jobs are all down and none of which ever wrote a line has
 	// nothing to show; saying so beats an empty frame.
 	if !attached && !writer.wrote {
-		output.Message(out, domain.RunLogsNoJobs)
+		output.Unchanged(barred, domain.RunLogsNoJobs)
 	}
 	output.FrameEnd(out)
 	return nil
