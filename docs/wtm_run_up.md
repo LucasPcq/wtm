@@ -15,7 +15,8 @@ Tasks block the profile and abort it on failure; services launch in the backgrou
 When another worktree is already running jobs, wtm asks once what to do about it and can
 remember the answer as run.toml's `concurrency`; --exclusive and --parallel override it
 for one run. --exclusive is refused on several worktrees, since it stops all but one.
-The run view opens on the jobs as they start; leaving it detaches without stopping them, and -d skips it.
+The run view opens on the jobs as they start; leaving it detaches without stopping them —
+the rest of the profile keeps starting, reported line by line — and -d skips the view.
 
 ```
 wtm run up [worktree...] [flags]

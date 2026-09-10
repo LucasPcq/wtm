@@ -1906,6 +1906,18 @@ const (
 	RunViewRenderFPS        = 30
 	RunViewPreviewRenderFPS = 10
 
+	// RunDetachedNotice heads what a run prints after the reader has left its
+	// view. The sequence is the client's to finish — the daemon cannot take it
+	// over — so leaving stops the watching, not the run, and the reader has to be
+	// told where the rest of it is going.
+	RunDetachedNotice = "Left the view. The rest of the run is reported here."
+
+	// RunDetachHeldChunks caps the job output held while a detached run waits for
+	// its new reporter. The hand-over is the terminal being given back — a few
+	// milliseconds — so the cap is only there to keep a job that prints without
+	// pause from growing a buffer nobody is reading.
+	RunDetachHeldChunks = 256
+
 	// RunViewScrollLines is how far one scroll key moves through a pane's
 	// history; a page moves by the pane's own height.
 	RunViewScrollLines = 3

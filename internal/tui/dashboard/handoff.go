@@ -40,6 +40,11 @@ type handoffDoneMsg struct {
 // typed: a child process could only have returned an exit code.
 type handoff struct {
 	params seam.SequenceParams
+	// detached is where the run reports if the reader closes the view before it
+	// ends. It posts to the model, which is safe from here: tea.Exec has the
+	// event loop blocked, so the messages queue and are handled once the
+	// terminal comes back.
+	detached detachedRun
 
 	in  io.Reader
 	out io.Writer
@@ -60,6 +65,7 @@ func (h *handoff) Run() error {
 		Warnings:  h.params.Warnings,
 		Start:     h.params.Start,
 		Open:      integration.OpenURL,
+		Detach:    runview.Detach{Sink: h.detached},
 		In:        h.in,
 		Out:       h.out,
 	})
@@ -74,8 +80,8 @@ func (h *handoff) Run() error {
 // asked for again: RestoreTerminal puts back the alternate screen, the bracketed
 // paste and the focus reporting, but never the mouse tracking it turned off —
 // and every one of this dashboard's click targets depends on it.
-func handoffCmd(msg handoffMsg) tea.Cmd {
-	cmd := &handoff{params: msg.params}
+func handoffCmd(msg handoffMsg, send func(tea.Msg)) tea.Cmd {
+	cmd := &handoff{params: msg.params, detached: detachedRun{send: send}}
 	return tea.Exec(cmd, func(err error) tea.Msg {
 		return handoffDoneMsg{
 			reply:    msg.reply,

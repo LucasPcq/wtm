@@ -33,6 +33,10 @@ type Params struct {
 	// scrollback under it: a reader who only sees them on the way out has
 	// already followed the URL they qualify.
 	Warnings []string
+	// Detach is what leaving does to a run that is still going; see Detach. The
+	// zero value cancels it, which is what a surface with nowhere to report the
+	// rest installs.
+	Detach Detach
 	// Open hands a job's URL to the desktop. Nil leaves the open key without an
 	// object, which is what a surface that cannot open a browser installs.
 	Open OpenFunc
@@ -42,6 +46,22 @@ type Params struct {
 	// programs read the same keyboard at once.
 	In  io.Reader
 	Out io.Writer
+}
+
+// Detach is what happens to a run the reader walks out on. The sequence is the
+// client's, not the daemon's — nobody else can finish it — so leaving the view
+// hands it to Sink rather than cancelling it, and Notice is called once, first,
+// so the surface can say where the rest of the run went before it starts
+// arriving. A zero Detach cancels the run instead: a surface with nowhere to
+// report the rest cannot honestly claim it continues.
+type Detach struct {
+	Notice func()
+	Sink   runlogs.Sink
+	// Await holds Run until the sequence ends. A command has to: its process is
+	// the one running the sequence, and returning would exit out from under it.
+	// A surface that outlives the view — a dashboard — sets it false and gets
+	// its terminal back while the run reports into it.
+	Await bool
 }
 
 // OpenFunc opens a URL outside the terminal. The view never dials anything
@@ -89,6 +109,16 @@ type Model struct {
 	ticking bool
 
 	start runlogs.StartFunc
+	// relay is where the run reports: the view while the reader is there, the
+	// surface's own reporter once they have left.
+	relay *relay
+	// finished carries what the run concluded to whoever is left to read it.
+	// Buffered, because after the reader leaves nobody may ever be.
+	finished chan runFinishedMsg
+	onLeave  Detach
+	// runDone reports that the sequence is over, which is what makes leaving an
+	// ordinary quit rather than a detach.
+	runDone bool
 	// profile names the run the view is reporting on, for the header and the recap.
 	profile string
 	open    OpenFunc
@@ -115,14 +145,19 @@ type Model struct {
 
 func New(params Params) Model {
 	ctx, cancel := context.WithCancel(context.Background())
+	panes := newPaneStore(PaneSize{})
+	msgs := make(chan tea.Msg, domain.RunViewMsgBuffer)
 	return Model{
 		board:    params.Board,
 		wantJob:  params.Job,
 		warnings: params.Warnings,
 		profile:  params.Profile,
-		panes:    newPaneStore(PaneSize{}),
-		msgs:     make(chan tea.Msg, domain.RunViewMsgBuffer),
+		panes:    panes,
+		msgs:     msgs,
+		relay:    newRelay(sink{panes: panes, msgs: msgs, done: ctx.Done()}),
 		start:    params.Start,
+		onLeave:  params.Detach,
+		finished: make(chan runFinishedMsg, 1),
 		open:     params.Open,
 		started:  params.Start != nil,
 		// A run feeds panes from its own goroutine, so the clock has to be
@@ -214,7 +249,36 @@ func Run(params Params) (Result, error) {
 	if !ok {
 		return Result{}, nil
 	}
-	return last.result(), nil
+	return last.awaitDetached(), nil
+}
+
+// awaitDetached finishes a run the reader walked out on. It runs with the
+// terminal already given back, which is the whole reason it is here rather than
+// inside the program: the surface's reporter writes to the scrollback, and the
+// alternate screen has to be gone first.
+func (m Model) awaitDetached() Result {
+	if m.runDone || m.start == nil || m.onLeave.Sink == nil {
+		m.cancel()
+		return m.result()
+	}
+	// The context stays live: cancelling it is what would abort the very
+	// sequence this is handing over. What it still holds — a parked listener and
+	// the redraw clock — ends with the run, which releases it below or, for a
+	// surface that does not wait, when the sequence posts its result.
+	if m.onLeave.Notice != nil {
+		m.onLeave.Notice()
+	}
+	m.relay.redirect(m.onLeave.Sink)
+
+	if !m.onLeave.Await {
+		go func() { <-m.finished; m.cancel() }()
+		return Result{Detached: true}
+	}
+	defer m.cancel()
+	done := <-m.finished
+	// The recap belongs to the view, and the view is gone: what the run
+	// concluded was reported line by line as it happened.
+	return Result{Outcomes: done.outcomes, Detached: true}
 }
 
 func (m Model) Init() tea.Cmd {
@@ -229,11 +293,14 @@ func (m Model) Init() tea.Cmd {
 // through the sink, which writes a job's output straight into that job's pane
 // and posts only the phases the view has to draw.
 func (m Model) startCmd() tea.Cmd {
-	start, ctx := m.start, m.runCtx
-	emitter := sink{panes: m.panes, msgs: m.msgs, done: ctx.Done()}
+	start, ctx, relay, finished := m.start, m.runCtx, m.relay, m.finished
 	return func() tea.Msg {
-		outcomes, err := start(ctx, emitter)
-		return runFinishedMsg{outcomes: outcomes, err: err}
+		outcomes, err := start(ctx, relay)
+		done := runFinishedMsg{outcomes: outcomes, err: err}
+		// The view may be gone; Run is then the only reader left, and it is not
+		// listening yet. One slot, never blocking either of them.
+		finished <- done
+		return done
 	}
 }
 

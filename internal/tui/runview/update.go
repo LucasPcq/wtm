@@ -201,11 +201,16 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m.setSelection(m.resolveSelection())
 }
 
-// detach leaves the view. Nothing is stopped: cancelling ends the reporting of
-// a run in progress, not the run, and the jobs behind the dropped streams keep
-// running.
+// detach leaves the view. Nothing is stopped — the jobs behind the dropped
+// streams keep running — and a sequence still in flight keeps going too: the
+// run is the client's to finish, so leaving hands it to whoever the surface
+// named rather than abandoning the jobs it had not reached yet. A surface that
+// named nobody cancels instead, which is the only honest thing left to do.
 func (m Model) detach() (tea.Model, tea.Cmd) {
-	m.cancel()
+	if m.runDone || m.start == nil || m.onLeave.Sink == nil {
+		m.cancel()
+	}
+	m.relay.detach()
 	m.panes.closeAll()
 	return m, tea.Quit
 }

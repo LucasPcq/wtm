@@ -310,8 +310,12 @@ func TestRunStopsReportingWhenTheSurfaceDetaches(t *testing.T) {
 	if !reflect.DeepEqual(outcome.Started, []string{"docker"}) {
 		t.Fatalf("left running %v, want docker — a detach tears nothing down", outcome.Started)
 	}
-	if !reflect.DeepEqual(outcome.NotStarted, []string{"migrate", "api"}) {
-		t.Fatalf("not started %v, want what the detach cut short", outcome.NotStarted)
+	// migrate is not among them: the detach landed while its request was in
+	// flight, and the daemon took it — StartedNames says so. Naming a job that
+	// is running among the ones never started is what made leaving the view look
+	// like it had killed the job.
+	if !reflect.DeepEqual(outcome.NotStarted, []string{"api"}) {
+		t.Fatalf("not started %v, want only the job the detach really cut short", outcome.NotStarted)
 	}
 	// migrate was announced before the detach reached the runner; nothing it
 	// printed, nor how it ended, is reported after.
