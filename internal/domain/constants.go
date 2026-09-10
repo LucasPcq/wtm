@@ -139,6 +139,44 @@ const (
 	ReparentedPairFmt  = "%s → %s"
 	TallyReparented    = "reparented"
 	TallySeparator     = " · "
+	// The glyph vocabulary. Six runes, one register each, and no seventh: a line
+	// that fits none of them is not a line that needs a new glyph, it is a line
+	// that has not decided what it says. Each is one column wide and carries the
+	// only colour on its row — the message beside it stays in the terminal's own
+	// foreground, so a block reads as text with a margin of signals rather than
+	// as a wall of colour.
+	GlyphSuccess = "✓"
+	// GlyphAttention is something left for the reader to act on, the run
+	// carrying on regardless. There is no red counterpart: a refusal and a crash
+	// are the same register, and which of the two it was belongs in the sentence.
+	GlyphAttention = "!"
+	GlyphFailure   = "✗"
+	// GlyphUnchanged is the one register whose whole line is muted, because the
+	// line itself is the non-event: already in the desired state, nothing done.
+	GlyphUnchanged = "="
+	// GlyphProgress is ephemeral by contract — a line drawn only to be erased.
+	// Anything that survives in the scrollback takes another glyph.
+	GlyphProgress = "›"
+	// GlyphUpdate is an existing thing replaced rather than created.
+	GlyphUpdate = "↻"
+
+	// MoveArrowGlyph is punctuation inside a value — `branch → path` — never the
+	// head of a line. It shares the rune with NextStepGlyph and nothing else: at
+	// the head of a line an arrow always means "what to do next".
+	MoveArrowGlyph = "→"
+	// DryRunNoChanges closes a preview. A preview is the answer to what was
+	// asked, so it goes to stdout like any other result — `prune --dry-run`
+	// always did, and `relocate --dry-run` wrote the same thing to stderr.
+	DryRunNoChanges = "Dry run — no changes made."
+	// SyncPlanEmpty and SyncNothingToPush are non-events, so they take the `=`
+	// register rather than a muted bare line — which is the same thing with the
+	// glyph filed off.
+	SyncPlanEmpty     = "No worktrees to sync."
+	SyncNothingToPush = "Everything is in sync with origin — nothing to push."
+	// HookLogTailLabel labels the path a collapsed phase kept its output at. A
+	// label is chrome, so it is muted and the path is not.
+	HookLogTailLabel = "full output:"
+
 	// NextStepGlyph opens the one forward-pointing line of a conclusion, and
 	// NextStepNoteSeparator holds off what the command does from the command.
 	NextStepGlyph         = "→"
@@ -339,34 +377,40 @@ const (
 
 	// What `wtm run proxy status` prints, and the callout it raises when the
 	// redirection is declared but does not reach the proxy that is running.
-	ProxyStatusTitle        = "Run proxy"
-	ProxyStatusBindFmt      = "Bind port: %d"
-	ProxyStatusPublicFmt    = "Public port: %s"
-	ProxyStatusRedirectFmt  = "Redirection: %s"
-	ProxyStatusConfigFmt    = "Config: %s"
-	ProxyStatusExampleFmt   = "Example: %s"
-	ProxyStatusUnsupported  = "not implemented on this platform — named URLs keep their port"
-	ProxyStatusNotInstalled = "not installed — `wtm run proxy install` serves named URLs on port 80"
-	ProxyStatusInstalledFmt = "installed (%s) → port %d"
+	ProxyStatusTitle = "Run proxy"
+	// The readout's fields. Labels only: the alignment is output.Announce's, and
+	// hand-spacing it inside the wording is how two sibling readouts ended up
+	// aligned two different ways.
+	ProxyStatusBindLabel    = "Bind port"
+	ProxyStatusPublicLabel  = "Public port"
+	ProxyStatusConfigLabel  = "Config"
+	ProxyStatusExampleLabel = "Example"
+	// The conclusion the readout hangs under. `not installed` is a non-event and
+	// takes the `=` register rather than hiding as a field value.
+	ProxyStatusUnsupported  = "Redirection not implemented on this platform — named URLs keep their port"
+	ProxyStatusNotInstalled = "Redirection not installed — named URLs carry their port"
+	ProxyStatusInstalledFmt = "Redirection installed (%s) → port %d"
 	ProxyDivergedTitle      = "The redirection does not reach this proxy"
 	ProxyDivergedLine       = "Port 80 is redirected, but what answers there is not the proxy now running"
 	ProxyDivergedFix        = "Re-run `wtm run proxy install` to point it at the port the proxy actually bound"
 
 	// The install and uninstall recaps name the file and the command; the
 	// contents are a --dry-run away.
-	ProxyInstallRecapTitleFmt  = "wtm will change %d file(s) in your home directory"
-	ProxyInstallRecapScript    = "and run"
-	ProxyPlanFileFmt           = "%s\n    %s"
-	ProxyInstallRecapReverse   = "`wtm run proxy uninstall` reverses every change"
-	ProxyInstallRecapFull      = "`wtm run proxy install --dry-run` prints the file in full and writes nothing"
-	ProxyInstallConfirmTitle   = "Install the redirection?"
-	ProxyInstallConfirmDesc    = "No sudo, no system file: launchd binds port 80 for you. `wtm run proxy uninstall` reverses it."
-	ProxyInstallDone           = "Port 80 now reaches the run proxy — named URLs drop their port"
-	ProxyUninstallRecapTitle   = "wtm will remove this LaunchAgent"
-	ProxyUninstallConfirmTitle = "Remove the redirection?"
-	ProxyUninstallConfirmDesc  = "Named URLs go back to carrying the proxy's port."
-	ProxyUninstallDone         = "Redirection removed — named URLs carry the proxy's port again"
-	ProxyUninstallChange       = "unloaded from launchd and deleted"
+	ProxyInstallRecapTitleFmt    = "wtm will change %d file(s) in your home directory"
+	ProxyInstallRecapScript      = "and run"
+	ProxyPlanFileFmt             = "%s\n    %s"
+	ProxyInstallRecapReverse     = "wtm run proxy uninstall"
+	ProxyInstallRecapReverseNote = "reverses every change"
+	ProxyInstallRecapFull        = "wtm run proxy install --dry-run"
+	ProxyInstallRecapFullNote    = "print the files in full, write nothing"
+	ProxyInstallConfirmTitle     = "Install the redirection?"
+	ProxyInstallConfirmDesc      = "No sudo, no system file: launchd binds port 80 for you. `wtm run proxy uninstall` reverses it."
+	ProxyInstallDone             = "Port 80 now reaches the run proxy — named URLs drop their port"
+	ProxyUninstallRecapTitle     = "wtm will remove this LaunchAgent"
+	ProxyUninstallConfirmTitle   = "Remove the redirection?"
+	ProxyUninstallConfirmDesc    = "Named URLs go back to carrying the proxy's port."
+	ProxyUninstallDone           = "Redirection removed — named URLs carry the proxy's port again"
+	ProxyUninstallChange         = "unloaded from launchd and deleted"
 
 	// The one place wtm mentions the redirection outside its own commands.
 	// ProxyHostShape names the shape rather than one job: run init speaks about
@@ -547,10 +591,26 @@ const (
 	// .env hint is there because the write reconciles nothing: the values a job
 	// reads still hold whatever the previous config left them at.
 	ImportEmptyMessage = "run.toml replaced by an empty configuration."
-	ImportJobsFmt      = "%d job(s): %s"
-	ImportProfilesFmt  = "%d profile(s): %s"
-	ImportEnvPortsFmt  = "%d .env port link(s)"
-	ImportEnvHint      = "Run `wtm env` to reconcile the .env files against this configuration."
+	// The empty-detection branch of `run init`: nothing was configured, so it is
+	// a non-event, and what to do about it is two commands like anywhere else.
+	RunInitNothingDetected = "No docker-compose files or package scripts detected — nothing to configure automatically."
+	RunInitByHandJob       = "wtm run job add"
+	RunInitByHandJobNote   = "declare a job by hand"
+	RunInitByHandProfile   = "wtm run profile add"
+	RunInitByHandProfNote  = "group jobs into a profile"
+	// The already-configured branch of `wtm init`.
+	InitAlreadyExistsFmt = "%s already exists."
+	InitReconfigureCmd   = "wtm init --only env|hooks|worktrees"
+	InitReconfigureNote  = "reconfigure one section"
+	InitEditCmd          = "wtm config edit"
+	InitEditNote         = "edit it by hand"
+	InitRunInitCmd       = "wtm run init"
+	InitRunInitNote      = "configure per-worktree services"
+	ImportJobsFmt        = "%d job(s): %s"
+	ImportProfilesFmt    = "%d profile(s): %s"
+	ImportEnvPortsFmt    = "%d .env port link(s)"
+	ImportEnvHint        = "wtm env"
+	ImportEnvHintNote    = "reconcile the .env files against this configuration"
 
 	ImportNeedsYesFmt    = "replacing run.toml is destructive: pass --%s to confirm it without a prompt"
 	ImportDeclined       = "run.toml left unchanged."
@@ -1357,6 +1417,13 @@ const (
 	HooksLogNameSeparator = "-"
 	HooksLogFileExt       = ".log"
 	HookLogTailFmt        = "full output: %s"
+	// QuietAbortedMessage stands in for a report --quiet discarded: a run that
+	// exits non-zero with nothing on either stream is indistinguishable from one
+	// that hung.
+	QuietAbortedMessage = "aborted — rerun without --quiet for the report"
+	// HookFailedNamedFmt is the error of a hook nobody reported: with no surface
+	// drawing the phase, the error is the only place the command can appear.
+	HookFailedNamedFmt = "%s: %w: %w"
 	// The fallback rendering of a phase nobody drew: the beats separated by
 	// blank lines, with the hook's own output between them.
 	HookFallbackStartFmt = "\n  %s\n\n"
@@ -1394,10 +1461,17 @@ const (
 
 	// Next-step bullets printed in the recap. Each is a single line so the
 	// "Next steps" block stays flat (no cascading indentation).
-	InitNextStepShell    = "Add to your shell config:  " + ShellInitCommand
-	InitNextStepCreate   = "wtm create <branch>  — create a worktree to get started"
-	InitNextStepRelocate = "wtm relocate  — adopt & align pre-existing worktrees"
-	InitNextStepRunInit  = "wtm run init  — (experimental) configure per-worktree services"
+	// The init recap's forward-pointing lines, as command/gloss pairs like every
+	// other hint in the tree. They used to be sentences rendered as muted bullets,
+	// which is one more place a reader had to learn to look.
+	InitNextStepShell        = ShellInitCommand
+	InitNextStepShellNote    = "add to your shell config"
+	InitNextStepCreate       = "wtm create <branch>"
+	InitNextStepCreateNote   = "create a worktree to get started"
+	InitNextStepRelocate     = "wtm relocate"
+	InitNextStepRelocateNote = "adopt & align pre-existing worktrees"
+	InitNextStepRunInit      = "wtm run init"
+	InitNextStepRunInitNote  = "(experimental) configure per-worktree services"
 
 	// SchemasDirName is the directory (inside <state-dir>/ or under the global
 	// config dir) where `wtm schema dump` writes the JSON Schema files
@@ -1663,15 +1737,17 @@ const (
 
 	// The `run daemon` surface's wording.
 	DaemonStatusTitle      = "Run daemon"
-	DaemonStatusStateFmt   = "State      %s"
-	DaemonStatusStopped    = "not running"
-	DaemonStatusUpFmt      = "running (pid %d)"
-	DaemonStatusVersFmt    = "Version    %s"
-	DaemonStatusJobsFmt    = "Jobs       %d foreground · %d detached"
-	DaemonStatusSocketFmt  = "Socket     %s"
-	DaemonStatusIndexFmt   = "Index      %s"
-	DaemonStatusProxyFmt   = "Proxy      port %d"
+	DaemonStatusStopped    = "No daemon running."
+	DaemonStatusUpFmt      = "Daemon running (pid %d)"
+	DaemonStatusVersLabel  = "Version"
+	DaemonStatusJobsLabel  = "Jobs"
+	DaemonStatusJobsFmt    = "%d foreground · %d detached"
+	DaemonStatusSocketLbl  = "Socket"
+	DaemonStatusIndexLabel = "Index"
+	DaemonStatusProxyLabel = "Proxy"
+	DaemonStatusProxyFmt   = "port %d"
 	DaemonStopped          = "Daemon stopped."
+	DaemonRestarted        = "Daemon restarted."
 	DaemonAlreadyStopped   = "No daemon running."
 	DaemonStopConfirmTitle = "Stop the run daemon?"
 	DaemonStopConfirmFmt   = "%d foreground service(s) are drained through it and will be stopped. Detached services keep running."
@@ -1915,14 +1991,13 @@ const (
 	// RunViewRecapAddressFmt lists where a started job answers. Reading the recap
 	// is the moment one goes looking for it.
 	RunViewRecapAddressFmt = "  %s  %s"
-	RunViewRecapLogsHint   = "wtm run logs  — reopen this view"
-	RunViewRecapDownHint   = "wtm run down  — stop the jobs"
+
 	// RunDownRecap* are the same recap seen from the other side: `run down` says
 	// what it took down where `run up` says what it left standing, in the same box
 	// and with the same labels. The two are halves of one command and used to
 	// read as two different programs.
 	RunDownRecapStoppedFmt = "Stopped:      %s"
-	RunDownRecapUpHint     = "wtm run up    — start them again"
+
 	// RunViewRecapListSep joins the jobs named on one recap line.
 	RunViewRecapListSep = ", "
 
@@ -2029,6 +2104,13 @@ const (
 	RunStoppedFmt    = "%s stopped"
 	RunNoJobsRunning = "No jobs running."
 	RunNoJobsHere    = "No jobs running in this worktree."
+	// NoWorktreesMessage is the empty worktree inventory, wherever it is drawn.
+	NoWorktreesMessage = "No worktrees found."
+	// The empty run inventories name what was actually asked for: a jobs-only
+	// listing that says "no jobs or profiles" answers a question nobody put.
+	RunListEmpty     = "No jobs or profiles defined in run.toml."
+	RunJobsEmpty     = "No jobs defined in run.toml."
+	RunProfilesEmpty = "No profiles defined in run.toml."
 	RunStoppingJobs  = "Stopping jobs…"
 
 	// RunStoppingOthers and RunStoppedOtherFmt report the worktrees an exclusive
@@ -2057,10 +2139,17 @@ const (
 	RunViewRecapHeldIndent = "  "
 	RunStreamAlreadyFmt    = "%s already running"
 	RunStreamDoneFmt       = "%s done"
-	RunStreamAttachHint    = "wtm run logs"
-	RunStreamAttachNote    = "attach to the output"
-	RunStreamStopHint      = "wtm run down"
-	RunStreamStopNote      = "stop them"
+	// The three commands a run points at, and one gloss each. They are shared by
+	// every surface the module concludes on — the live stream, the view's recap
+	// once it gives the terminal back, `run down`'s — because one command telling
+	// the reader two different things about `wtm run logs` depending on how it was
+	// watched is the drift the vocabulary exists to stop.
+	RunStreamAttachHint = "wtm run logs"
+	RunStreamAttachNote = "attach to the output"
+	RunStreamStopHint   = "wtm run down"
+	RunStreamStopNote   = "stop the jobs"
+	RunStreamUpHint     = "wtm run up"
+	RunStreamUpNote     = "start them again"
 
 	// RunAbort* report the partial state a profile that gave up left behind, on
 	// the surface that has no room to draw it: where it stopped, what nothing
@@ -2068,7 +2157,13 @@ const (
 	RunAbortStepFmt         = "Profile aborted at step %d/%d (%s)."
 	RunAbortRunningLabel    = "Left running:"
 	RunAbortNotStartedLabel = "Not started: "
-	RunAbortHint            = "fix and re-run `wtm run up` · `wtm run down` to stop everything"
+	// The abort's way out reads like every other hint in the tree: one command
+	// per line, through output.NextStep. It used to be one prose string under the
+	// ephemeral `›`, in a block that stays in the scrollback.
+	RunAbortRetryHint = "wtm run up"
+	RunAbortRetryNote = "re-run once fixed"
+	RunAbortStopHint  = "wtm run down"
+	RunAbortStopNote  = "stop what did start"
 
 	// RunLogsPrefixFmt marks which job a line came from when several of them
 	// share one stream, RunLogsHistoryHint says a job that is not running is
@@ -2076,7 +2171,9 @@ const (
 	// worktree with nothing to read.
 	RunLogsPrefixFmt   = "[%s]"
 	RunLogsHistoryHint = "%s is not running — reading back its log file."
-	RunLogsNoJobs      = "No running jobs in this worktree."
+	// One state, one sentence: `run down`, `run ps`, `run stop` and `run logs`
+	// all report it, and three wordings read as three different findings.
+	RunLogsNoJobs = RunNoJobsHere
 
 	// RunDaemonConnecting, RunStartingFmt and RunTaskRunningFmt are what a run
 	// command says while it waits on the daemon.
@@ -2738,7 +2835,7 @@ const (
 	// this means the listing itself did not go as expected. Neutral wording on
 	// purpose: naming an action ("press n…") here would be confident advice in
 	// the one state where the surface does not know what is going on.
-	DashboardEmptyList   = "No worktrees found."
+	DashboardEmptyList   = NoWorktreesMessage
 	DashboardEmptyTree   = "No worktrees to lay out."
 	DashboardLoadingTree = "Building the tree…"
 	// DashboardTreeVirtual marks a node standing in for a parent branch that has

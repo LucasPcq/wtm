@@ -90,14 +90,6 @@ func (p logsPresenter) Show(show logsflow.ShowParams) error {
 	}
 }
 
-// jobColors cycles through distinct colors for each job's log prefix.
-var jobColors = []func(string) string{
-	func(s string) string { return styles.Primary.Render(s) },
-	func(s string) string { return styles.Success.Render(s) },
-	func(s string) string { return styles.Warning.Render(s) },
-	func(s string) string { return styles.Muted.Render(s) },
-}
-
 type jobLinesParams struct {
 	Cmd   *cobra.Command
 	Board runlogs.Board
@@ -110,12 +102,15 @@ type jobLinesParams struct {
 
 // prefixOf labels a job's lines, naming its worktree only above several of
 // them — two jobs called `web` are otherwise the same prefix twice.
-func (p jobLinesParams) prefixOf(view runlogs.JobView, index int) string {
+func (p jobLinesParams) prefixOf(view runlogs.JobView) string {
 	label := view.Name
 	if len(p.Worktrees) > 1 && view.Worktree != "" {
 		label = fmt.Sprintf(domain.RunStreamWorktreeFmt, label, view.Worktree)
 	}
-	return jobColors[index%len(jobColors)](fmt.Sprintf(domain.RunLogsPrefixFmt, label))
+	// Muted, and the same for every job: the prefix says which job a line came
+	// from, which is chrome. Cycling the status palette over it made green and
+	// yellow mean "job 2" and "job 3" in the one command whose body is job output.
+	return styles.Muted.Render(fmt.Sprintf(domain.RunLogsPrefixFmt, label))
 }
 
 // writeJobLogsJSON is `run logs --output json`: what each job persisted, as one
@@ -179,8 +174,8 @@ func writeJobLines(params jobLinesParams) error {
 	var wg sync.WaitGroup
 	attached := false
 
-	for i, view := range views {
-		prefix := params.prefixOf(view, i)
+	for _, view := range views {
+		prefix := params.prefixOf(view)
 
 		if !view.Attachable {
 			lines, historyErr := params.Board.History(runlogs.HistoryParams{Job: view.Name, WorkDir: view.WorkDir})

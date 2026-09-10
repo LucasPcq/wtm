@@ -191,3 +191,72 @@ func TestRunHooksFailureDoesNotRepeatTheCommand(t *testing.T) {
 		t.Errorf("err = %q, want the command left to the beat", err)
 	}
 }
+
+// unguardedSink is a sink that keeps state without protecting it, which is what
+// every surface's sink is: os/exec hands a hook two copier goroutines — Stdout
+// and Stderr are distinct writer values, so it never dedupes them — and both
+// land here. Under -race this fails unless the runner serializes them.
+type unguardedSink struct {
+	lines int
+	body  []byte
+}
+
+func (s *unguardedSink) Write(p []byte) (int, error) {
+	s.body = append(s.body, p...)
+	s.lines++
+	return len(p), nil
+}
+
+func TestRunHooksSerializesTheTwoStreamsOntoOneSink(t *testing.T) {
+	sink := &unguardedSink{}
+	err := RunHooks(RunHooksParams{
+		Hooks: []domain.HookCommand{{
+			Cmd: "for i in 1 2 3 4 5 6 7 8 9 10; do echo out; echo err >&2; done",
+		}},
+		WorkDir: t.TempDir(),
+		Output:  sink,
+		OnHook:  func(domain.HookBeat) {},
+	})
+	if err != nil {
+		t.Fatalf("RunHooks() = %v, want the hook to succeed", err)
+	}
+	if !strings.Contains(string(sink.body), "out") || !strings.Contains(string(sink.body), "err") {
+		t.Errorf("sink holds %q, want both streams", sink.body)
+	}
+}
+
+// With no reporter installed nobody has drawn the hook's result line, so the
+// error is the only place its command can still appear.
+func TestRunHooksNamesTheHookWhenNoSurfaceReportedIt(t *testing.T) {
+	err := RunHooks(RunHooksParams{
+		Hooks:   []domain.HookCommand{{Cmd: "exit 3"}},
+		WorkDir: t.TempDir(),
+		Output:  io.Discard,
+	})
+	if err == nil {
+		t.Fatal("RunHooks() = nil, want the failing hook reported")
+	}
+	if !errors.Is(err, domain.ErrHookFailed) {
+		t.Errorf("RunHooks() = %v, want it to wrap ErrHookFailed", err)
+	}
+	if !strings.Contains(err.Error(), "exit 3") {
+		t.Errorf("RunHooks() = %q, want the hook named", err)
+	}
+}
+
+// A surface that reported the beats already printed the command; repeating it in
+// the error spells a long install line twice on one screen.
+func TestRunHooksLeavesTheHookUnnamedWhenASurfaceReportedIt(t *testing.T) {
+	err := RunHooks(RunHooksParams{
+		Hooks:   []domain.HookCommand{{Cmd: "exit 3"}},
+		WorkDir: t.TempDir(),
+		Output:  io.Discard,
+		OnHook:  func(domain.HookBeat) {},
+	})
+	if err == nil {
+		t.Fatal("RunHooks() = nil, want the failing hook reported")
+	}
+	if strings.Contains(err.Error(), "exit 3") {
+		t.Errorf("RunHooks() = %q, want the hook left unnamed", err)
+	}
+}

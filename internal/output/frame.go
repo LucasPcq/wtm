@@ -56,21 +56,37 @@ func Barred(w io.Writer) io.Writer {
 type barWriter struct {
 	w           io.Writer
 	atLineStart bool
+	// afterCR says the last byte written was a carriage return, so a newline
+	// arriving next closes the same break rather than opening a second one. It is
+	// state and not a lookahead because a streamed body is cut wherever the
+	// producer flushed: a CRLF straddling two writes would otherwise put a bar
+	// between the two halves, and the CR would paint it over the line it just
+	// finished.
+	afterCR bool
 }
 
 func (b *barWriter) Write(p []byte) (int, error) {
 	var out bytes.Buffer
-	for i, c := range p {
+	for _, c := range p {
+		// A CRLF is one break, not two: the row was already marked by the \r.
+		if c == '\n' && b.afterCR {
+			out.WriteByte(c)
+			b.afterCR = false
+			continue
+		}
+		b.afterCR = false
 		if b.atLineStart {
 			out.WriteString(styles.Primary.Render(domain.AccentBarGlyph))
 			b.atLineStart = false
 		}
 		out.WriteByte(c)
 		// A carriage return puts the cursor back in column zero, over the bar this
-		// line already carries, so the row has to be marked again. A CRLF is one
-		// break, not two: marking between the two would leave a bar on its own.
-		if c == '\n' || (c == '\r' && !(i+1 < len(p) && p[i+1] == '\n')) {
+		// line already carries, so the row has to be marked again.
+		if c == '\n' {
 			b.atLineStart = true
+		}
+		if c == '\r' {
+			b.atLineStart, b.afterCR = true, true
 		}
 	}
 	if _, err := b.w.Write(out.Bytes()); err != nil {

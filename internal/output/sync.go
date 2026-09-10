@@ -16,7 +16,7 @@ import (
 func FormatSyncPlan(w io.Writer, plan domain.SyncPlan) {
 	SectionTitle(w, domain.SyncPlanHeader)
 	if len(plan.Steps) == 0 {
-		Message(w, styles.Muted.Render("No worktrees to sync."))
+		Unchanged(w, domain.SyncPlanEmpty)
 		return
 	}
 	for i, step := range plan.Steps {
@@ -130,11 +130,14 @@ func printStep(w io.Writer, step domain.SyncStepResult) {
 	case domain.SyncStatusUnknownParent:
 		Warning(w, fmt.Sprintf("%s skipped — no recorded parent branch", step.Branch))
 	case domain.SyncStatusConflict:
+		// A conflict is the branch failing to sync, like SyncStatusError under it:
+		// what the reader does about it belongs in the sentence, not in a third
+		// glyph nobody can tell from the other two.
 		if step.KeptInProgress {
-			Danger(w, fmt.Sprintf("%s conflict on %s — left in progress (%s); descendants skipped",
+			Error(w, fmt.Sprintf("%s conflict on %s — left in progress (%s); descendants skipped",
 				step.Branch, step.SourceBranch, conflictCount(step.ConflictFiles)))
 		} else {
-			Danger(w, fmt.Sprintf("%s conflict on %s — aborted, tree clean (%s); descendants skipped",
+			Error(w, fmt.Sprintf("%s conflict on %s — aborted, tree clean (%s); descendants skipped",
 				step.Branch, step.SourceBranch, conflictCount(step.ConflictFiles)))
 			printConflictFiles(w, step.ConflictFiles)
 		}
@@ -179,7 +182,7 @@ func printPushSummary(w io.Writer, steps []domain.SyncStepResult) {
 		Message(w, fmt.Sprintf("%d branch(es) ready to push (force-with-lease).", len(ready)))
 	}
 	if len(pushed) == 0 && len(ready) == 0 {
-		Message(w, styles.Muted.Render("Everything is in sync with origin — nothing to push."))
+		Unchanged(w, domain.SyncNothingToPush)
 	}
 }
 

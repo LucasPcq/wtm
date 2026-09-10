@@ -12,6 +12,9 @@ import (
 )
 
 type RunPrinterParams struct {
+	// Out and Err are the command's own streams, unbarred. The printer bars the
+	// lines it composes itself and writes a job's bytes through untouched — see
+	// Worktrees.
 	Out io.Writer
 	Err io.Writer
 	// Profile names the run being reported. Empty prints no heading: a run.toml
@@ -32,8 +35,16 @@ type RunPrinterParams struct {
 // command was launched from. It writes a raw body: the command's frame owns the
 // outer padding, and the blank line between two steps is this printer's.
 type RunPrinter struct {
-	out        io.Writer
-	err        io.Writer
+	out io.Writer
+	err io.Writer
+	// raw is where a job's own bytes go: the same stream as out, without the
+	// accent bar. A bar re-marks a row after every carriage return, which is
+	// exactly what a progress bar redrawing itself produces.
+	raw io.Writer
+	// midLine says the last chunk left the cursor somewhere other than column
+	// zero, so the next composed line has to break first or it would continue the
+	// job's unfinished row.
+	midLine    bool
 	profile    string
 	hyperlinks bool
 	multi      bool
@@ -44,8 +55,9 @@ type RunPrinter struct {
 
 func NewRunPrinter(params RunPrinterParams) *RunPrinter {
 	return &RunPrinter{
-		out:        params.Out,
-		err:        params.Err,
+		out:        Barred(params.Out),
+		err:        Barred(params.Err),
+		raw:        params.Out,
 		profile:    params.Profile,
 		hyperlinks: params.Hyperlinks,
 		multi:      len(params.Worktrees) > 1,
@@ -54,19 +66,26 @@ func NewRunPrinter(params RunPrinterParams) *RunPrinter {
 }
 
 func (p *RunPrinter) Emit(event runlogs.Event) {
+	if event.Phase != runlogs.PhaseOutput {
+		p.breakJobLine()
+	}
 	switch event.Phase {
 	case runlogs.PhaseStarting:
 		if p.printed {
 			Blank(p.out)
 		}
 		if !p.printed && p.profile != "" {
-			Message(p.out, styles.Bold.Render(p.heading()))
+			SectionTitle(p.out, p.heading())
 			Blank(p.out)
 		}
 		p.printed = true
 		Loading(p.out, p.qualify(fmt.Sprintf(domain.RunStreamStepFmt, event.Step, event.Steps, event.Job), event.Worktree))
 	case runlogs.PhaseOutput:
-		_, _ = p.out.Write(event.Chunk)
+		if len(event.Chunk) == 0 {
+			return
+		}
+		_, _ = p.raw.Write(event.Chunk)
+		p.midLine = event.Chunk[len(event.Chunk)-1] != '\n'
 	case runlogs.PhaseStarted:
 		if event.AlreadyRunning {
 			Success(p.out, p.qualify(fmt.Sprintf(domain.RunStreamAlreadyFmt, event.Job), event.Worktree))
@@ -92,6 +111,17 @@ func (p *RunPrinter) Emit(event runlogs.Event) {
 	case runlogs.PhaseReady:
 		p.ready(event.Outcome)
 	}
+}
+
+// breakJobLine closes a row a job left open. Its bytes are not barred, so a
+// composed line following them on the same row would carry no bar either — and
+// would read as part of the job's output rather than as wtm's own.
+func (p *RunPrinter) breakJobLine() {
+	if !p.midLine {
+		return
+	}
+	_, _ = io.WriteString(p.raw, "\n")
+	p.midLine = false
 }
 
 // qualify names the worktree a line came from, and leaves it out above a single
@@ -215,7 +245,8 @@ func (p *RunPrinter) aborted(outcome runlogs.Outcome) {
 	}
 
 	Blank(p.err)
-	Loading(p.err, domain.RunAbortHint)
+	NextStep(p.err, NextStepParams{Command: domain.RunAbortRetryHint, Note: domain.RunAbortRetryNote})
+	NextStep(p.err, NextStepParams{Command: domain.RunAbortStopHint, Note: domain.RunAbortStopNote})
 }
 
 // ready closes the run with the hint on what to do next. N worktrees each end
@@ -318,14 +349,16 @@ func FormatRunDownRecap(params RunDownRecapParams) string {
 		lines = append(lines, downRecapBlock(worktree)...)
 	}
 
-	body := strings.Join(append(lines, "", styles.Muted.Render(domain.RunDownRecapUpHint)), "\n")
+	hint := NextStepLine(NextStepParams{Command: domain.RunStreamUpHint, Note: domain.RunStreamUpNote})
+	body := strings.Join(append(lines, "", hint), "\n")
 	// Terminated, like every other Format* body in this package: the frame writes
 	// one blank line after what it is given, and a body whose last line has no
 	// break of its own swallows it.
 	return styles.RenderRecap(styles.IntroParams{
-		Width: domain.RecapWidth,
-		Title: domain.RunViewRecapTitle,
-		Body:  body,
+		Width:   domain.RecapWidth,
+		Title:   domain.RunViewRecapTitle,
+		Body:    body,
+		InFrame: true,
 	}) + "\n"
 }
 

@@ -1,8 +1,9 @@
 package shared
 
 import (
-	"github.com/spf13/cobra"
 	"io"
+
+	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/output"
@@ -34,27 +35,72 @@ func (p CLIPresenter) Stage(params flow.StageParams) error {
 	})
 }
 
-// HookPhase draws the phase only where it can be undrawn. A terminal gets a
-// bounded tail replaced by one result line per hook; anything else — a pipe, a
-// CI log, a JSON run — gets the stream whole, which is what a reader who cannot
-// watch it live came for.
 func (p CLIPresenter) HookPhase(params flow.HookPhaseParams) error {
-	stderr := p.Cmd.ErrOrStderr()
-	if !p.Human {
-		return params.Run(flow.HookSink{Output: stderr})
+	return DrawHookPhase(DrawHookPhaseParams{
+		Stderr:  p.Cmd.ErrOrStderr(),
+		Human:   p.Human,
+		Title:   params.Title,
+		LogPath: params.LogPath,
+		Run:     params.Run,
+	})
+}
+
+type DrawHookPhaseParams struct {
+	Stderr io.Writer
+	// Human titles the phase and lets it be collapsed; a JSON run gets the raw
+	// stream and no title.
+	Human   bool
+	Title   string
+	LogPath string
+	Run     func(flow.HookSink) error
+}
+
+// DrawHookPhase draws the phase only where it can be undrawn. A terminal gets a
+// bounded tail replaced by one result line per hook; anything else — a pipe, a
+// CI log, a JSON run, a quiet one — gets the stream whole, which is what a
+// reader who cannot watch it live came for. Whichever it is, the sink is the
+// writer the command was given and the log is written: a hook must never find
+// its own way to the terminal, and its record must not depend on who was
+// watching.
+//
+// It is one function because the two callers — the migrated commands through
+// CLIPresenter, extract and checkout through RunCreateHooksPhase — drifted apart
+// once already, and a hook has to read the same whichever command ran it.
+func DrawHookPhase(params DrawHookPhaseParams) error {
+	log := output.HookLog(params.LogPath)
+	if log != nil {
+		defer func() { _ = log.Close() }()
 	}
 
-	output.HooksSection(stderr, params.Title)
-	if !output.IsTerminal(stderr) {
-		return params.Run(flow.HookSink{Output: stderr})
+	stream := params.Stderr
+	if log != nil {
+		stream = io.MultiWriter(params.Stderr, log)
 	}
 
-	view := output.NewHookView(output.HookViewParams{W: stderr, LogPath: params.LogPath})
+	if !params.Human {
+		return params.Run(flow.HookSink{Output: stream})
+	}
+
+	output.HooksSection(params.Stderr, params.Title)
+	if !output.IsTerminal(params.Stderr) {
+		return params.Run(flow.HookSink{Output: stream})
+	}
+
+	view := output.NewHookView(output.HookViewParams{W: params.Stderr, Log: log, LogPath: params.LogPath})
 	defer view.Close()
 	return params.Run(flow.HookSink{Output: view, OnHook: view.OnHook})
 }
 
 func (p CLIPresenter) Notice(notice flow.Notice) {
+	// Backing out changed nothing, which is the definition of the `=` register.
+	// A bare sentence there reads as a result, and is how the tree ended up with
+	// four wordings for one outcome.
+	if notice.IsAbort() {
+		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			output.Unchanged(w, notice.Text)
+		})
+		return
+	}
 	if notice.Kind == flow.NoticeWarning {
 		output.Frame(p.Cmd.ErrOrStderr(), func(w io.Writer) {
 			output.Warning(w, notice.Text)
@@ -66,8 +112,20 @@ func (p CLIPresenter) Notice(notice flow.Notice) {
 	})
 }
 
+// Status is one line inside an ongoing phase, on stderr. It is a diagnostic and
+// not the answer, so it is emitted whatever the format — stdout is the machine
+// contract, stderr never was — but a JSON run gets it as plain lines: a bordered,
+// coloured box in a CI log is a picture nobody asked for.
 func (p CLIPresenter) Status(notice flow.Notice) {
 	if len(notice.Lines) > 0 {
+		if !p.Human {
+			output.Warning(p.Cmd.ErrOrStderr(), notice.Text)
+			for _, line := range notice.Lines {
+				output.Message(p.Cmd.ErrOrStderr(), output.Indent+line)
+			}
+			return
+		}
+		output.Blank(p.Cmd.ErrOrStderr())
 		output.Callout(p.Cmd.ErrOrStderr(), notice.Text, notice.Lines)
 		return
 	}

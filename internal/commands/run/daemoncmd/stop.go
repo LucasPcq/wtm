@@ -30,7 +30,8 @@ func newStopCmd() *cobra.Command {
 func runStop(cmd *cobra.Command, _ []string) error {
 	status := collectStatus()
 	if !status.Running {
-		return reportStopped(cmd, domain.DaemonAlreadyStopped)
+		// Nothing was stopped, so nothing succeeded: a tick here reads as an act.
+		return reportStopped(cmd, reportStoppedParams{Message: domain.DaemonAlreadyStopped, Noop: true})
 	}
 
 	confirmed, err := confirmStop(cmd, status)
@@ -44,7 +45,7 @@ func runStop(cmd *cobra.Command, _ []string) error {
 	if err := shutdown(); err != nil {
 		return err
 	}
-	return reportStopped(cmd, domain.DaemonStopped)
+	return reportStopped(cmd, reportStoppedParams{Message: domain.DaemonStopped})
 }
 
 // confirmStop only asks when there is something to lose. A daemon holding
@@ -79,12 +80,21 @@ func shutdown() error {
 	return process.AwaitDaemonStopped(process.SocketPath())
 }
 
-func reportStopped(cmd *cobra.Command, message string) error {
+type reportStoppedParams struct {
+	Message string
+	Noop    bool
+}
+
+func reportStopped(cmd *cobra.Command, params reportStoppedParams) error {
 	if format, _ := cmd.Flags().GetString(domain.FlagOutput); format == domain.OutputJSON {
 		return output.WriteDaemonStatusJSON(cmd.OutOrStdout(), collectStatus())
 	}
 	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-		output.Success(w, message)
+		if params.Noop {
+			output.Unchanged(w, params.Message)
+			return
+		}
+		output.Success(w, params.Message)
 	})
 	return nil
 }

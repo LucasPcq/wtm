@@ -149,3 +149,19 @@ type EnvPortSettlement struct {
 	Offset  int
 	Applied bool
 }
+
+// EnvVerdict is the register the trailing line of `wtm env` reads in. It is a
+// verdict and not a glyph: the three registers are the ones every command
+// shares — something was done, something is left to do, nothing was needed —
+// and a run with drift to reconcile is never the third.
+type EnvVerdict int
+
+const (
+	// EnvVerdictNeutral is a run that changed nothing and had nothing to change.
+	EnvVerdictNeutral EnvVerdict = iota
+	// EnvVerdictDone is a run that changed state and it worked.
+	EnvVerdictDone
+	// EnvVerdictAttention is a state the reader has to act on: drift a --check
+	// run only reported, or files config.toml names that exist nowhere.
+	EnvVerdictAttention
+)

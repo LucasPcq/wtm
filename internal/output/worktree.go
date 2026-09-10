@@ -23,7 +23,7 @@ type FormatWorktreeListParams struct {
 // FormatWorktreeList renders a list of worktree statuses as an aligned table string.
 func FormatWorktreeList(params FormatWorktreeListParams) string {
 	if len(params.Statuses) == 0 {
-		return "No worktrees found."
+		return UnchangedLine(domain.NoWorktreesMessage)
 	}
 
 	rows := buildRows(params.Statuses, params.ActiveBranch, params.PRInfos, params.Services)

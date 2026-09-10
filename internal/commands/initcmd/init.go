@@ -92,8 +92,11 @@ func runInit(cmd *cobra.Command, _ []string) error {
 
 	if detect.ProjectConfigExists(stateDir) {
 		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-			output.Message(w, fmt.Sprintf("%s already exists.", filepath.Join(stateDir, domain.ConfigFileName)))
-			output.Message(w, "Reconfigure a section with `wtm init --only env|hooks|worktrees`, or edit by hand with `wtm config edit`. Configure services with `wtm run init`.")
+			output.Unchanged(w, fmt.Sprintf(domain.InitAlreadyExistsFmt, filepath.Join(stateDir, domain.ConfigFileName)))
+			output.Blank(w)
+			output.NextStep(w, output.NextStepParams{Command: domain.InitReconfigureCmd, Note: domain.InitReconfigureNote})
+			output.NextStep(w, output.NextStepParams{Command: domain.InitEditCmd, Note: domain.InitEditNote})
+			output.NextStep(w, output.NextStepParams{Command: domain.InitRunInitCmd, Note: domain.InitRunInitNote})
 		})
 		return nil
 	}
@@ -123,8 +126,10 @@ func ensureGlobalConfig(cmd *cobra.Command, flagged bool) error {
 
 	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
 		output.InitGlobalRecap(w, output.InitGlobalRecapParams{
-			Fields:    rules.InitGlobalRecapFields(answers),
-			NextSteps: []string{domain.InitNextStepShell},
+			Fields: rules.InitGlobalRecapFields(answers),
+			NextSteps: []output.NextStepParams{
+				{Command: domain.InitNextStepShell, Note: domain.InitNextStepShellNote},
+			},
 		})
 	})
 
@@ -218,10 +223,10 @@ func createProjectConfig(cmd *cobra.Command, dir, stateDir string, flagged bool)
 		output.InitProjectRecap(w, output.InitProjectRecapParams{
 			ConfigPath: rules.DisplayPath(rules.DisplayPathParams{Base: dir, Target: filepath.Join(stateDir, domain.ConfigFileName)}),
 			Fields:     rules.InitProjectRecapFields(answers),
-			NextSteps: []string{
-				domain.InitNextStepCreate,
-				domain.InitNextStepRelocate,
-				domain.InitNextStepRunInit,
+			NextSteps: []output.NextStepParams{
+				{Command: domain.InitNextStepCreate, Note: domain.InitNextStepCreateNote},
+				{Command: domain.InitNextStepRelocate, Note: domain.InitNextStepRelocateNote},
+				{Command: domain.InitNextStepRunInit, Note: domain.InitNextStepRunInitNote},
 			},
 		})
 	})

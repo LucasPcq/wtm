@@ -75,7 +75,7 @@ func runInstall(cmd *cobra.Command, _ []string) error {
 			return writeAgentsJSON(cmd.OutOrStdout(), nil)
 		}
 		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-			output.Message(w, "No destinations selected.")
+			output.Unchanged(w, "No destinations selected.")
 		})
 		return nil
 	}

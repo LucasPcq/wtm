@@ -34,9 +34,11 @@ func runList(cmd *cobra.Command, _ []string) error {
 	}
 
 	answered, err := ctx.Listing(runctx.ListingParams{
-		Cmd:   cmd,
-		JSON:  func(w io.Writer) error { return output.WriteJobsJSON(w, ctx.Run.Jobs) },
-		Table: func(w io.Writer) { fmt.Fprint(w, output.FormatRunConfig(domain.RunConfig{Jobs: ctx.Run.Jobs})) },
+		Cmd:  cmd,
+		JSON: func(w io.Writer) error { return output.WriteJobsJSON(w, ctx.Run.Jobs) },
+		Table: func(w io.Writer) {
+			fmt.Fprint(w, output.FormatRunConfig(output.FormatRunConfigParams{Config: domain.RunConfig{Jobs: ctx.Run.Jobs}, Empty: domain.RunJobsEmpty}))
+		},
 	})
 	if answered || err != nil {
 		return err

@@ -79,8 +79,8 @@ func runOnStream(params streamParams) (runlogs.Outcomes, error) {
 
 	output.FrameStart(out)
 	outcomes, err := params.Start(params.Cmd.Context(), output.NewRunPrinter(output.RunPrinterParams{
-		Out:        output.Barred(out),
-		Err:        output.Barred(errOut),
+		Out:        out,
+		Err:        errOut,
 		Profile:    params.Profile,
 		Worktrees:  params.Worktrees,
 		Hyperlinks: params.Hyperlinks,

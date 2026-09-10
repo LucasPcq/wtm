@@ -177,6 +177,23 @@ func silenceHumanOutput(cmd *cobra.Command) {
 	}
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
+	humanOutputSilenced = true
+}
+
+// humanOutputSilenced records that --quiet actually took a command's writers
+// away. It is what makes ErrAborted safe: that sentinel means "the report is
+// already on screen", which stops being true the moment the screen was
+// io.Discard.
+var humanOutputSilenced bool
+
+// abortLine is what a silenced run says instead of nothing. A wrapped cause is
+// printed as it is; the bare sentinel has no text worth reading, so it points at
+// the flag that took the report away rather than pretending to explain.
+func abortLine(err error) string {
+	if errors.Is(err, domain.ErrAborted) && err.Error() == domain.ErrAborted.Error() {
+		return domain.QuietAbortedMessage
+	}
+	return err.Error()
 }
 
 func globalUpdateCheck() *bool {
@@ -240,10 +257,11 @@ func Root() *cobra.Command {
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		// ErrAborted means the command already printed its own report; just
-		// propagate the non-zero exit without a second error line.
-		if !errors.Is(err, domain.ErrAborted) {
+		// propagate the non-zero exit without a second error line — unless --quiet
+		// discarded that report, in which case this is the only line there is.
+		if !errors.Is(err, domain.ErrAborted) || humanOutputSilenced {
 			output.Blank(os.Stderr)
-			output.Error(os.Stderr, err.Error())
+			output.Error(os.Stderr, abortLine(err))
 			output.Blank(os.Stderr)
 		}
 		printUpdateNotice()

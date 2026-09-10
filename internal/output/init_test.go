@@ -12,7 +12,7 @@ func TestInitGlobalRecap(t *testing.T) {
 	var buf bytes.Buffer
 	InitGlobalRecap(&buf, InitGlobalRecapParams{
 		Fields:    []domain.RecapField{{Label: domain.InitRecapLabelShell, Value: "zsh"}},
-		NextSteps: []string{domain.InitNextStepShell},
+		NextSteps: []NextStepParams{{Command: domain.InitNextStepShell, Note: domain.InitNextStepShellNote}},
 	})
 	out := buf.String()
 
@@ -38,7 +38,11 @@ func TestInitProjectRecap(t *testing.T) {
 			{Label: domain.InitRecapLabelBaseBranch, Value: "main"},
 			{Label: domain.InitRecapLabelEnvStrategy, Value: "example"},
 		},
-		NextSteps: []string{domain.InitNextStepCreate, domain.InitNextStepRelocate, domain.InitNextStepRunInit},
+		NextSteps: []NextStepParams{
+			{Command: domain.InitNextStepCreate, Note: domain.InitNextStepCreateNote},
+			{Command: domain.InitNextStepRelocate, Note: domain.InitNextStepRelocateNote},
+			{Command: domain.InitNextStepRunInit, Note: domain.InitNextStepRunInitNote},
+		},
 	})
 	out := buf.String()
 

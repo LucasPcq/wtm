@@ -39,7 +39,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 
 	if !ctx.Interactive || (len(ctx.Run.Jobs) == 0 && len(ctx.Run.Profiles) == 0) {
 		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-			fmt.Fprint(w, output.FormatRunConfig(ctx.Run))
+			fmt.Fprint(w, output.FormatRunConfig(output.FormatRunConfigParams{Config: ctx.Run, Empty: domain.RunListEmpty}))
 		})
 		return nil
 	}

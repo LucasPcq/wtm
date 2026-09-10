@@ -35,7 +35,7 @@ import (
 type HookView struct {
 	w       io.Writer
 	logPath string
-	log     *os.File
+	log     io.Writer
 	buf     bytes.Buffer
 	// rewrite says the last segment ended on a carriage return, so the next one
 	// overwrites it rather than following it — that is what a progress bar means.
@@ -47,24 +47,41 @@ type HookView struct {
 
 type HookViewParams struct {
 	W io.Writer
-	// LogPath is where the phase's whole output is kept. Empty keeps no log, and
-	// a path that cannot be opened is not an error: the log is what makes the
-	// collapse safe, never what makes the hook run.
+	// Log is the open log, or nil. The view neither opens nor closes it: the log
+	// is kept whatever the surface draws, so it outlives any one view — see
+	// HookLog.
+	Log io.Writer
+	// LogPath is what the failure line points the reader at. Empty prints no such
+	// line.
 	LogPath string
 }
 
 func NewHookView(params HookViewParams) *HookView {
 	view := &HookView{w: params.W, logPath: params.LogPath}
-	if params.LogPath == "" {
-		return view
-	}
-	if err := os.MkdirAll(filepath.Dir(params.LogPath), 0o755); err != nil {
-		return view
-	}
-	if file, err := os.Create(params.LogPath); err == nil {
-		view.log = file
+	if params.Log != nil {
+		view.log = params.Log
 	}
 	return view
+}
+
+// HookLog opens the file a hook phase's whole output is kept in. Every surface
+// opens it, not only one that collapses the stream: a run whose output the
+// reader could not watch — a pipe, a CI log, a JSON run, a quiet one — is
+// exactly the one whose record has to survive. Nil when there is no path or it
+// cannot be opened: the log is what makes the collapse safe, never what makes
+// the hook run.
+func HookLog(path string) *os.File {
+	if path == "" {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return nil
+	}
+	file, err := os.Create(path)
+	if err != nil {
+		return nil
+	}
+	return file
 }
 
 // Write splits on carriage returns as well as newlines. A hook that only ever
@@ -116,8 +133,8 @@ func (v *HookView) OnHook(beat domain.HookBeat) {
 	for _, line := range rules.HookStderrBeyondTail(rules.HookStderrBeyondTailParams{Stderr: beat.Stderr, Tail: failed}) {
 		v.tailLine(line)
 	}
-	if v.log != nil {
-		Message(v.w, styles.Muted.Render(Indent+fmt.Sprintf(domain.HookLogTailFmt, v.logPath)))
+	if v.logPath != "" {
+		InfoLine(v.w, domain.HookLogTailLabel, v.logPath)
 	}
 }
 
@@ -127,9 +144,6 @@ func (v *HookView) OnHook(beat domain.HookBeat) {
 func (v *HookView) Close() {
 	v.flush()
 	v.clear()
-	if v.log != nil {
-		_ = v.log.Close()
-	}
 }
 
 func (v *HookView) push(line string) {
@@ -179,7 +193,9 @@ func (v *HookView) paintTail(line string, width int) {
 // survives, so it is the one where a wrapped or self-erasing line shows.
 func (v *HookView) tailLine(line string) {
 	body := styles.Truncate(styles.TruncateParams{Value: styles.ExpandTabs(line), Width: max(v.width()-len([]rune(Indent)), domain.HookViewMinWidth)})
-	Message(v.w, styles.Muted.Render(Indent+body))
+	// Not muted: this is the record a failed hook leaves, and it is the half the
+	// reader came for. The indent is what makes it subordinate.
+	Message(v.w, Indent+body)
 }
 
 func (v *HookView) clear() {

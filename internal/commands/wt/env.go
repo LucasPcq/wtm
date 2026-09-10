@@ -376,7 +376,7 @@ func resolveEnvStrategyAndParent(cfg shared.ConfigResult, branch, from string) e
 func abortedEnv(cmd *cobra.Command, format string) error {
 	if rules.IsHumanFormat(format) {
 		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-			output.Message(w, "Aborted.")
+			output.Unchanged(w, domain.AbortedMessage)
 		})
 	}
 	return nil

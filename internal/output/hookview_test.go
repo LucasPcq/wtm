@@ -3,6 +3,7 @@ package output
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,10 +17,23 @@ import (
 func runHookView(t *testing.T, logPath string, run func(view *HookView)) string {
 	t.Helper()
 	var buf bytes.Buffer
-	view := NewHookView(HookViewParams{W: &buf, LogPath: logPath})
+	view := NewHookView(HookViewParams{W: &buf, Log: openHookLog(t, logPath), LogPath: logPath})
 	run(view)
 	view.Close()
 	return buf.String()
+}
+
+// openHookLog opens the log the way the surface does, since the view no longer
+// owns it. A nil *os.File in an io.Writer is not a nil writer, so the empty case
+// returns nil explicitly.
+func openHookLog(t *testing.T, path string) io.Writer {
+	t.Helper()
+	log := HookLog(path)
+	if log == nil {
+		return nil
+	}
+	t.Cleanup(func() { _ = log.Close() })
+	return log
 }
 
 // What a hook leaves on screen is its result, not its output: the tail is drawn
@@ -46,7 +60,7 @@ func TestHookViewLeavesOnlyTheResultLine(t *testing.T) {
 func TestHookViewKeepsTheTailOfAFailingHook(t *testing.T) {
 	logPath := filepath.Join(t.TempDir(), "on_create"+domain.HooksLogFileExt)
 	var buf bytes.Buffer
-	view := NewHookView(HookViewParams{W: &buf, LogPath: logPath})
+	view := NewHookView(HookViewParams{W: &buf, Log: openHookLog(t, logPath), LogPath: logPath})
 	view.OnHook(domain.HookBeat{Cmd: "pnpm install", Started: true})
 	// stderr reaches the view through the stream, as the runner tees it.
 	_, _ = view.Write([]byte("ERR_PNPM_NO_LOCKFILE\nlockfile is absent\n"))

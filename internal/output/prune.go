@@ -7,7 +7,6 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
-	"github.com/LucasPcq/wtm/internal/styles"
 )
 
 // FormatPrunePlan renders the dry-run / preview of a prune: the worktrees that
@@ -58,12 +57,12 @@ func FormatPruneResult(w io.Writer, result domain.PruneResult) {
 			TallyPart{Count: len(result.Reparented), Label: domain.TallyReparented},
 			TallyPart{Count: len(result.Skipped), Label: domain.TallySkipped},
 		))
-		Message(w, styles.Muted.Render(strings.Join(rules.PrunedBranches(result), ", ")))
+		Message(w, Indent+strings.Join(rules.PrunedBranches(result), ", "))
 	}
 	// Which parent a child was moved onto is not accounting: its next `wtm sync`
 	// rebases onto that branch.
 	if len(result.Reparented) > 0 {
-		Message(w, styles.Muted.Render(strings.Join(rules.ReparentedPairs(result.Reparented), ", ")))
+		Message(w, Indent+strings.Join(rules.ReparentedPairs(result.Reparented), ", "))
 	}
 	for _, o := range result.Orphaned {
 		Warning(w, fmt.Sprintf("%s still points at the removed parent %s — reparent it with `wtm reparent`", o.Branch, o.OldParent))

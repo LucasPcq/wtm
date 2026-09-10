@@ -1,6 +1,7 @@
 package run
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -103,6 +104,7 @@ func reportRunConfig(cmd *cobra.Command, cfg domain.RunConfig) error {
 		return nil
 	}
 	// The block above IS the report; ErrAborted is how a command says so without
-	// Execute printing a second, emptier line under it.
-	return domain.ErrAborted
+	// Execute printing a second, emptier line under it. The cause rides along for
+	// the run whose report went to io.Discard.
+	return fmt.Errorf("%w: %s", domain.ErrAborted, errs[0])
 }

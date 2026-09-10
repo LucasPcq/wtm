@@ -118,7 +118,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 
 	if len(statuses) == 0 {
 		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-			output.Message(w, "No worktrees found.")
+			output.Unchanged(w, domain.NoWorktreesMessage)
 		})
 		return nil
 	}

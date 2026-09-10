@@ -69,7 +69,9 @@ func runEdit(cmd *cobra.Command, _ []string) error {
 		output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
 			output.Error(w, fmt.Sprintf("Config no longer valid: %v", err))
 		})
-		return err
+		// The block above IS the report — returning err would have Execute spell
+		// the same message a second time, unframed.
+		return fmt.Errorf("%w: %w", domain.ErrAborted, err)
 	}
 
 	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {

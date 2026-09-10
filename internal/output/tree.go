@@ -14,7 +14,7 @@ import (
 // body is raw (no outer blank lines); the command frames it.
 func FormatTree(forest domain.Forest) string {
 	if len(forest.Roots) == 0 {
-		return "No worktrees found."
+		return UnchangedLine(domain.NoWorktreesMessage)
 	}
 
 	lines := make([]treeLine, 0, len(forest.Roots))

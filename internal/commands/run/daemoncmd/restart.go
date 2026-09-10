@@ -54,7 +54,11 @@ func runRestart(cmd *cobra.Command, _ []string) error {
 		return output.WriteDaemonStatusJSON(cmd.OutOrStdout(), collectStatus())
 	}
 	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-		output.DaemonStatusReport(w, collectStatus())
+		// The readout is the detail; without a conclusion above it the reader has
+		// to infer the outcome from a `State` field, which every sibling states.
+		output.Success(w, domain.DaemonRestarted)
+		output.Blank(w)
+		output.DaemonStatusFields(w, collectStatus())
 	})
 	return nil
 }

@@ -172,7 +172,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	if errors.Is(err, domain.ErrUserAborted) {
 		if rules.IsHumanFormat(format) {
 			output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-				output.Message(w, "Aborted.")
+				output.Unchanged(w, domain.AbortedMessage)
 			})
 		}
 		return nil
@@ -191,7 +191,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	if errors.Is(err, domain.ErrUserAborted) {
 		if rules.IsHumanFormat(format) {
 			output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-				output.Message(w, "Cancelled — nothing was changed.")
+				output.Unchanged(w, domain.AbortedMessage)
 			})
 		}
 		return nil

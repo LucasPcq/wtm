@@ -178,8 +178,10 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 
 	if !rules.IsRunInitialized(outcome.Config) {
 		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-			output.Message(w, "No docker-compose files or package scripts detected — nothing to configure automatically.")
-			output.Message(w, "Add jobs by hand with `wtm run job add`, then group them with `wtm run profile add`.")
+			output.Unchanged(w, domain.RunInitNothingDetected)
+			output.Blank(w)
+			output.NextStep(w, output.NextStepParams{Command: domain.RunInitByHandJob, Note: domain.RunInitByHandJobNote})
+			output.NextStep(w, output.NextStepParams{Command: domain.RunInitByHandProfile, Note: domain.RunInitByHandProfNote})
 			output.Blank(w)
 			output.Message(w, domain.ExperimentalRunNotice)
 		})

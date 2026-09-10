@@ -232,12 +232,13 @@ type renderDryRunParams struct {
 // result (the service performs no writes when DryRun is set).
 func renderRelocateDryRun(p renderDryRunParams) error {
 	if p.Interactive {
-		output.FrameStart(p.Cmd.ErrOrStderr())
-		barred := output.Barred(p.Cmd.ErrOrStderr())
-		output.FormatRelocatePlan(barred, p.Plan)
-		output.Blank(barred)
-		output.Message(barred, "Dry run — no changes made.")
-		output.FrameEnd(p.Cmd.ErrOrStderr())
+		// stdout: a preview is what the caller asked for, so it is the result and
+		// not a diagnostic. `prune --dry-run` already answered there.
+		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			output.FormatRelocatePlan(w, p.Plan)
+			output.Blank(w)
+			output.Unchanged(w, domain.DryRunNoChanges)
+		})
 		return nil
 	}
 	result, err := worktree.Relocate(p.Params)
@@ -249,7 +250,7 @@ func renderRelocateDryRun(p renderDryRunParams) error {
 
 func renderRelocateAborted(cmd *cobra.Command) error {
 	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-		output.Message(w, "Aborted.")
+		output.Unchanged(w, domain.AbortedMessage)
 	})
 	return nil
 }

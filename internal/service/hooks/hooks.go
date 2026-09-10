@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -38,9 +39,15 @@ func RunHooks(params RunHooksParams) error {
 		output = os.Stderr
 	}
 
+	// os/exec gives a hook two copier goroutines — Stdout and Stderr are distinct
+	// writer values, so it never dedupes them — and a sink is not required to be
+	// safe for concurrent use. Serializing here means every surface gets that for
+	// free, rather than each having to defend itself.
+	sink := &syncWriter{w: output}
+
 	report := params.OnHook
 	if report == nil {
-		report = writerReporter(output)
+		report = writerReporter(sink)
 	}
 
 	for _, hook := range params.Hooks {
@@ -49,8 +56,11 @@ func RunHooks(params RunHooksParams) error {
 			Hook:       resolved,
 			DefaultDir: params.WorkDir,
 			Env:        params.Env,
-			Output:     output,
+			Output:     sink,
 			Report:     report,
+			// With no reporter installed, nobody has printed this hook's result
+			// line and the error is the only thing the reader will see.
+			Named: params.OnHook == nil,
 		})
 		if err == nil {
 			continue
@@ -70,6 +80,18 @@ type runSingleHookParams struct {
 	Env        map[string]string
 	Output     io.Writer
 	Report     func(domain.HookBeat)
+	Named      bool
+}
+
+type syncWriter struct {
+	mu sync.Mutex
+	w  io.Writer
+}
+
+func (s *syncWriter) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.w.Write(p)
 }
 
 // writerReporter is the fallback rendering for a caller that gave no reporter:
@@ -124,6 +146,9 @@ func runSingleHook(params runSingleHookParams) error {
 	params.Report(beat)
 
 	if err != nil {
+		if params.Named {
+			return fmt.Errorf(domain.HookFailedNamedFmt, hook.Cmd, domain.ErrHookFailed, err)
+		}
 		return fmt.Errorf("%w: %w", domain.ErrHookFailed, err)
 	}
 	return nil

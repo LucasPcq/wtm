@@ -261,11 +261,114 @@ func checkFile(fset *token.FileSet, path string, file *ast.File) []finding {
 		report(pos, "typeassert", "type assertion without the comma-ok form: a wrong type must be an error, not a panic")
 	}
 
+	findings = append(findings, checkOutputVocabulary(fset, own, file)...)
+
 	if own == "commands" {
 		findings = append(findings, checkYesFlag(fset, path, file)...)
 		findings = append(findings, checkMutation(fset, path, file)...)
 	}
 	return findings
+}
+
+// glyphVocabulary is docs/dev/output.md's table, as runes. A seventh glyph is a
+// decision; typing one is not.
+var glyphVocabulary = map[string]string{
+	"✓": "GlyphSuccess",
+	"!": "GlyphAttention",
+	"✗": "GlyphFailure",
+	"=": "GlyphUnchanged",
+	"›": "GlyphProgress",
+	"→": "NextStepGlyph (a line head) or MoveArrowGlyph (punctuation inside a value)",
+	"↻": "GlyphUpdate",
+}
+
+// drawingLayers are the ones that put glyphs on a screen. rules/ and service/
+// are left out on purpose: `=` and `!` are ordinary bytes to an env parser or a
+// pnpm workspace pattern, and a rule that cannot tell those apart is a rule
+// people work around.
+var drawingLayers = map[string]bool{"output": true, "styles": true, "tui": true}
+
+// checkOutputVocabulary is docs/dev/output.md made mechanical. The three rules
+// it enforces are the ones the surface actually drifted on once the glyph table
+// alone proved not to be enough:
+//
+//   - glyph: the vocabulary lives in domain, so a seventh rune cannot be
+//     introduced by typing one, and an existing one cannot quietly take a
+//     second meaning.
+//   - tuistyle: a badge or a dashboard style is a widget's vocabulary. In a
+//     line of CLI output a filled chip carries its own padding, which is what
+//     made an attention line two columns wider — and louder — than the failure
+//     line under it.
+//   - mutedline: a bare line muted whole is the `=` register with its glyph
+//     filed off. Muted has two jobs — chrome, and a non-event line that carries
+//     its glyph — and secondary detail is subordinated by indentation.
+func checkOutputVocabulary(fset *token.FileSet, own string, file *ast.File) []finding {
+	if !drawingLayers[own] {
+		return nil
+	}
+
+	var findings []finding
+	report := func(pos token.Pos, rule, format string, args ...any) {
+		findings = append(findings, finding{pos: fset.Position(pos), rule: rule, msg: fmt.Sprintf(format, args...)})
+	}
+
+	ast.Inspect(file, func(node ast.Node) bool {
+		switch n := node.(type) {
+		case *ast.BasicLit:
+			if own == "domain" || n.Kind != token.STRING {
+				return true
+			}
+			text, err := strconv.Unquote(n.Value)
+			if err != nil {
+				return true
+			}
+			if name, ok := glyphVocabulary[text]; ok {
+				report(n.Pos(), "glyph", "the glyph %q is domain.%s — the vocabulary is declared once, see docs/dev/output.md", text, name)
+			}
+		case *ast.SelectorExpr:
+			if own != "output" {
+				return true
+			}
+			pkg, ok := n.X.(*ast.Ident)
+			if !ok || pkg.Name != "styles" {
+				return true
+			}
+			if strings.HasPrefix(n.Sel.Name, "Badge") || strings.HasPrefix(n.Sel.Name, "Dashboard") {
+				report(n.Pos(), "tuistyle", "internal/output must not use styles.%s: a badge is a TUI widget and a dashboard style belongs to that surface — a line of CLI output is text", n.Sel.Name)
+			}
+		case *ast.CallExpr:
+			if !isMessageCall(n.Fun) || len(n.Args) != 2 {
+				return true
+			}
+			if isMutedRender(n.Args[1]) {
+				report(n.Pos(), "mutedline", "a bare line muted whole is the `=` register without its glyph: use output.Unchanged for a non-event, or subordinate detail with an indent — see docs/dev/output.md")
+			}
+		}
+		return true
+	})
+	return findings
+}
+
+func isMessageCall(fun ast.Expr) bool {
+	if ident, ok := fun.(*ast.Ident); ok {
+		return ident.Name == "Message"
+	}
+	return isSelector(fun, "output", "Message")
+}
+
+// isMutedRender is `styles.Muted.Render(x)` — the whole argument and nothing
+// else. A muted fragment concatenated with content is a label, which is exactly
+// what Muted is for.
+func isMutedRender(expr ast.Expr) bool {
+	call, ok := expr.(*ast.CallExpr)
+	if !ok {
+		return false
+	}
+	render, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || render.Sel.Name != "Render" {
+		return false
+	}
+	return isSelector(render.X, "styles", "Muted") || isSelector(render.X, "", "Muted")
 }
 
 // unguardedAssertions is every `x.(T)` a wrong type would panic on. The two

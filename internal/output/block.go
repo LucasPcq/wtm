@@ -18,16 +18,12 @@ import (
 // The canonical definition lives in styles.Indent; this alias keeps callers unchanged.
 const Indent = styles.Indent
 
-// Warning prints a styled warning line: "  ! message".
+// Warning prints the attention line: "  ! message". The glyph is a plain rune
+// like every other: it used to be a filled chip, which carried its own padding
+// and made an attention line two columns wider — and therefore louder — than
+// the failure line under it.
 func Warning(w io.Writer, msg string) {
-	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.BadgeWarning.Render("!"), styles.Warning.Render(msg))
-}
-
-// Danger prints a styled failure line in the danger theme: "  ! message"
-// (red badge + red text) — the red counterpart of Warning, for failures that
-// should read like a skip rather than a hard crash.
-func Danger(w io.Writer, msg string) {
-	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.BadgeDanger.Render("!"), styles.DangerText.Render(msg))
+	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Warning.Render(domain.GlyphAttention), msg)
 }
 
 // InfoLine prints a styled key-value pair: "  label  value".
@@ -42,37 +38,46 @@ func SectionTitle(w io.Writer, title string) {
 
 // Success prints a styled success line: "  ✓ message".
 func Success(w io.Writer, msg string) {
-	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Success.Render("✓"), msg)
+	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Success.Render(domain.GlyphSuccess), msg)
 }
 
 // Update prints a styled update line: "  ↻ message".
 // Mirrors Success but signals that an existing artifact was refreshed.
 func Update(w io.Writer, msg string) {
-	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Primary.Render("↻"), msg)
+	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Primary.Render(domain.GlyphUpdate), msg)
 }
 
-// Unchanged prints a muted no-op line: "  = message".
-// Use it when an artifact already matched the desired state and nothing was written.
+// Unchanged prints the no-op line: "  = message", muted whole. Use it when an
+// artifact already matched the desired state and nothing was written — and for
+// an inventory that came back empty, which is the same non-event.
 func Unchanged(w io.Writer, msg string) {
-	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Muted.Render("="), styles.Muted.Render(msg))
+	fmt.Fprint(w, UnchangedLine(msg))
 }
 
-// Error prints a styled error line: "  ✗ message".
-// If msg contains newlines (e.g. captured subprocess output), only the first
-// line rides next to the cross; the rest is indented underneath so terminal
-// rendering stays readable.
+// UnchangedLine is Unchanged for a formatter that returns a body instead of
+// writing one. Those formatters used to answer an empty inventory with a bare
+// sentence, which is how one state ended up with five renderings across the
+// tree.
+func UnchangedLine(msg string) string {
+	return fmt.Sprintf("%s%s %s\n", Indent, styles.Muted.Render(domain.GlyphUnchanged), styles.Muted.Render(msg))
+}
+
+// Error prints the failure line: "  ✗ message". A msg carrying newlines — a
+// subprocess's own output — puts its first line next to the cross and indents
+// the rest under it. Those lines are not muted: indentation is what makes them
+// subordinate, and muting the detail of a failure hides the half a reader came
+// for.
 func Error(w io.Writer, msg string) {
-	cross := styles.DangerText.Render("✗")
 	lines := strings.Split(strings.TrimRight(msg, "\n"), "\n")
-	fmt.Fprintf(w, "%s%s %s\n", Indent, cross, lines[0])
+	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.DangerText.Render(domain.GlyphFailure), lines[0])
 	for _, line := range lines[1:] {
-		fmt.Fprintf(w, "%s  %s\n", Indent, styles.Muted.Render(line))
+		fmt.Fprintf(w, "%s  %s\n", Indent, line)
 	}
 }
 
 // Loading prints a styled loading/status line: "  › message".
 func Loading(w io.Writer, msg string) {
-	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Muted.Render("›"), styles.Muted.Render(msg))
+	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Muted.Render(domain.GlyphProgress), styles.Muted.Render(msg))
 }
 
 // Message prints a plain indented message.
@@ -194,17 +199,22 @@ type NextStepParams struct {
 // It is the only shape a hint takes anywhere in the CLI — a command in bold
 // after an arrow — so a reader learns once where to look for what to do next.
 func NextStep(w io.Writer, params NextStepParams) {
-	line := styles.Bold.Render(params.Command)
-	if params.Note != "" {
-		line += styles.Muted.Render(domain.NextStepNoteSeparator + params.Note)
-	}
-	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Primary.Render(domain.NextStepGlyph), line)
+	fmt.Fprintln(w, NextStepLine(params))
 }
 
-// Section prints a bold title above indented lines, with no frame. It is what a
-// command reports having done; Callout's bordered frame is reserved for what the
-// reader still has to act on. Mixing the two made every outcome look equally
-// urgent, which is the same as flagging none of them.
+// NextStepLine is NextStep for a caller composing a body rather than writing
+// one — a recap built as a single string, printed once the surface it belongs
+// to has given the terminal back. Those used to hand-roll their own hint, which
+// is how "what to do next" ended up with five renderings.
+func NextStepLine(params NextStepParams) string {
+	return styles.NextStepLine(styles.NextStepParams{Command: params.Command, Note: params.Note})
+}
+
+// Section prints a bold title above indented free lines, with no frame — a
+// script, a file's contents, a listing. Rows of `label  value` belong in
+// Announce instead, and Callout's bordered frame is reserved for what the reader
+// still has to act on. Mixing the two made every outcome look equally urgent,
+// which is the same as flagging none of them.
 func Section(w io.Writer, title string, lines []string) {
 	SectionTitle(w, title)
 	for _, line := range lines {
@@ -218,13 +228,25 @@ type AnnounceItem struct {
 	Value string
 }
 
-// Announce prints a raw block with a bold section title followed by indented
-// key-value rows. Use it before an interactive picker to describe what is about
-// to happen. It emits no surrounding blank lines; the caller's frame owns the
-// outer vertical padding.
+// Announce prints a titled block of `label  value` rows, its labels aligned to
+// a common column. It is the shape of anything a reader looks *up* — a plan
+// before a picker, a state readout — as against Section, which is a titled
+// block of free lines. Blocks that hand-aligned their labels with spaces inside
+// a format string belong here: the alignment is the block's business, not the
+// wording's.
+//
+// It emits no surrounding blank lines; the caller's frame owns the outer
+// vertical padding.
 func Announce(w io.Writer, title string, items []AnnounceItem) {
 	SectionTitle(w, title)
+	width := 0
 	for _, item := range items {
-		InfoLine(w, item.Label, item.Value)
+		width = max(width, len(item.Label))
+	}
+	for _, item := range items {
+		// Labels are plain ASCII, so byte length is printable width; the padding is
+		// computed before rendering because the style adds bytes that take no room.
+		pad := strings.Repeat(" ", width-len(item.Label))
+		fmt.Fprintf(w, "%s%s%s  %s\n", Indent, styles.Muted.Render(item.Label), pad, item.Value)
 	}
 }

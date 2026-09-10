@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/x/ansi"
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -15,8 +17,8 @@ func init() {
 }
 
 func TestFormatWorktreeListEmpty(t *testing.T) {
-	got := FormatWorktreeList(FormatWorktreeListParams{})
-	if got != "No worktrees found." {
+	got := ansi.Strip(FormatWorktreeList(FormatWorktreeListParams{}))
+	if got != UnchangedLine(domain.NoWorktreesMessage) {
 		t.Errorf("unexpected output: %q", got)
 	}
 }

@@ -59,7 +59,7 @@ func (p presenter) Changed(outcome jobflow.Outcome) error {
 		}
 		// What the removal dragged along, each named so the reader can put it back.
 		for _, line := range removalLines(outcome.Effect) {
-			output.Message(w, line)
+			output.Message(w, output.Indent+line)
 		}
 	})
 	return nil

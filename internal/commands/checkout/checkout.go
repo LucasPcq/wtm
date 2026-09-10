@@ -302,21 +302,26 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 		}
 	}
 
-	if !params.jsonMode {
-		output.Loading(cmd.ErrOrStderr(), fmt.Sprintf("Creating worktree %s…", p.Branch))
-	}
-	createResult, err := worktree.Create(domain.CreateParams{
-		ProjectDir:      result.ProjectDir,
-		StateDir:        result.StateDir,
-		Branch:          p.Branch,
-		FromBranch:      startPoint,
-		SourceBranch:    params.parent,
-		Config:          result.Config,
-		EnvFromOverride: params.env,
-		SkipHooks:       true,
-	})
-	if err != nil {
-		return err
+	var createResult domain.CreateResult
+	var err error
+	if loadErr := components.RunLoading(components.LoadingParams{
+		Message: fmt.Sprintf("Creating worktree %s…", p.Branch),
+		Animate: shared.Animate(cmd, !params.jsonMode),
+		Work: func() error {
+			createResult, err = worktree.Create(domain.CreateParams{
+				ProjectDir:      result.ProjectDir,
+				StateDir:        result.StateDir,
+				Branch:          p.Branch,
+				FromBranch:      startPoint,
+				SourceBranch:    params.parent,
+				Config:          result.Config,
+				EnvFromOverride: params.env,
+				SkipHooks:       true,
+			})
+			return err
+		},
+	}); loadErr != nil {
+		return loadErr
 	}
 
 	// on_create hooks as a distinct, titled phase (shared with create/extract).

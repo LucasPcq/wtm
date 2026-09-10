@@ -7,7 +7,6 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
-	"github.com/LucasPcq/wtm/internal/styles"
 )
 
 // FormatFastForwardResults counts what moved and names only what did not: a
@@ -16,14 +15,25 @@ import (
 func FormatFastForwardResults(w io.Writer, results []domain.FastForwardResult) {
 	moved, notable, failed := rules.FastForwardSplit(results)
 
-	Success(w, Tally(
+	tally := Tally(
 		TallyPart{Count: len(moved), Label: domain.TallyFastForwarded},
 		TallyPart{Count: len(results) - len(moved) - len(notable) - len(failed), Label: domain.TallyUpToDate},
 		TallyPart{Count: len(notable), Label: domain.TallySkipped},
 		TallyPart{Count: len(failed), Label: domain.TallyFailed},
-	))
+	)
+	// The glyph answers "did this run do what it was asked", so it reads the run
+	// and not the count: a tally is one line for several outcomes, and a tick on
+	// top of nothing but failures claims a success the exit code denies.
+	switch {
+	case len(failed) > 0:
+		Error(w, tally)
+	case len(moved) > 0:
+		Success(w, tally)
+	default:
+		Unchanged(w, tally)
+	}
 	if len(moved) > 0 {
-		Message(w, styles.Muted.Render(strings.Join(rules.FastForwardBranches(moved), ", ")))
+		Message(w, Indent+strings.Join(rules.FastForwardBranches(moved), ", "))
 	}
 	// A branch with no upstream, or one that diverged, did not fail: it is a state
 	// the reader has to decide about, and calling it a failure says the run broke.
