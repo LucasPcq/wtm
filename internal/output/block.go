@@ -136,7 +136,7 @@ func widestRow(lines []string) int {
 // which is the common `wtm create > out.txt`; every line it then draws too wide
 // wraps, and a block redrawn in place cannot count the rows it took.
 func TerminalWidthOf(w io.Writer) int {
-	stream, barred := unwrapStream(w)
+	stream, bars := unwrapStream(w)
 	file, ok := stream.(*os.File)
 	if !ok {
 		return 0
@@ -145,23 +145,22 @@ func TerminalWidthOf(w io.Writer) int {
 	if err != nil || cols <= 0 {
 		return 0
 	}
-	if barred {
-		cols -= domain.AccentBarWidth
-	}
-	return cols
+	return max(cols-bars*domain.AccentBarWidth, 0)
 }
 
-// unwrapStream reads through the accent bar to the stream underneath, and says
-// whether it went through one. A barred writer is the terminal it wraps, less
-// the column the bar takes.
-func unwrapStream(w io.Writer) (io.Writer, bool) {
-	barred := false
+// unwrapStream reads through the accent bar to the stream underneath, and counts
+// the bars it went through: a barred writer is the terminal it wraps, less a
+// column per bar. Counting rather than flagging is what keeps a doubly wrapped
+// writer from over-reporting by a column — enough to wrap a hook's tail and
+// desynchronise the rows it moves back over.
+func unwrapStream(w io.Writer) (io.Writer, int) {
+	bars := 0
 	for {
 		unwrapper, ok := w.(interface{ Unwrap() io.Writer })
 		if !ok {
-			return w, barred
+			return w, bars
 		}
-		w, barred = unwrapper.Unwrap(), true
+		w, bars = unwrapper.Unwrap(), bars+1
 	}
 }
 

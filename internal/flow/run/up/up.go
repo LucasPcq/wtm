@@ -215,26 +215,40 @@ func (f *upFlow) clearOthers(answers flow.Answers) error {
 	sort.Strings(dirs)
 
 	client := process.NewClient(process.SocketPath())
-	return f.presenter.Stage(flow.StageParams{
+	// Reported after the stage, never inside it: a spinner owns the stream while
+	// it runs, so a line written under it is repainted over — and the block it
+	// opened is then marked open with nothing on screen to show for it.
+	var reports []flow.Notice
+	err := f.presenter.Stage(flow.StageParams{
 		Message: domain.RunStoppingOthers,
 		Work: func() error {
 			for _, dir := range dirs {
-				resp, err := client.Send(process.Request{Action: process.ActionStopAll, WorkDir: dir})
-				switch {
-				case err != nil:
-					f.presenter.Status(warning(fmt.Sprintf(domain.RunStopOtherFailFmt, filepath.Base(dir), err)))
-				case resp.Status == process.StatusError:
-					f.presenter.Status(warning(fmt.Sprintf(domain.RunStopOtherFailFmt, filepath.Base(dir), resp.Message)))
-				default:
-					f.presenter.Status(flow.Notice{
-						Kind: flow.NoticeSuccess,
-						Text: fmt.Sprintf(domain.RunStoppedOtherFmt, filepath.Base(dir)),
-					})
-				}
+				reports = append(reports, stopReport(client, dir))
 			}
 			return nil
 		},
 	})
+	if err != nil {
+		return err
+	}
+	for _, report := range reports {
+		f.presenter.Status(report)
+	}
+	return nil
+}
+
+func stopReport(client *process.Client, dir string) flow.Notice {
+	resp, err := client.Send(process.Request{Action: process.ActionStopAll, WorkDir: dir})
+	if err != nil {
+		return warning(fmt.Sprintf(domain.RunStopOtherFailFmt, filepath.Base(dir), err))
+	}
+	if resp.Status == process.StatusError {
+		return warning(fmt.Sprintf(domain.RunStopOtherFailFmt, filepath.Base(dir), resp.Message))
+	}
+	return flow.Notice{
+		Kind: flow.NoticeSuccess,
+		Text: fmt.Sprintf(domain.RunStoppedOtherFmt, filepath.Base(dir)),
+	}
 }
 
 func warning(text string) flow.Notice {

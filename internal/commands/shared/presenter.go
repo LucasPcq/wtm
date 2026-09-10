@@ -21,44 +21,33 @@ type CLIPresenter struct {
 	// human means the output is meant for a person: progress is animated and the
 	// hook phase gets its title.
 	Human bool
-	// opened says the mid-run block already carries its frame. It is a pointer
-	// because a presenter is copied by value into each command's own, and the
-	// block is one across all of them.
-	opened *bool
 }
 
 func NewPresenter(cmd *cobra.Command, format string) CLIPresenter {
-	return CLIPresenter{Cmd: cmd, Format: format, Human: rules.IsHumanFormat(format), opened: new(bool)}
+	return CLIPresenter{Cmd: cmd, Format: format, Human: rules.IsHumanFormat(format)}
 }
 
-// phase is where everything a run says while it is still running goes: the hook
-// phases and the status lines. They used to write straight to stderr, which left
-// them the only human output of a migrated command outside the accent bar — and
-// what a hook phase leaves behind is kept, so it belongs inside it.
+// OpenBlock puts the caller inside the block a run keeps while it is still
+// running — its status lines and its hook phases — and returns the writer that
+// block draws on. separate asks for the blank that sets a titled section apart
+// from the lines above it; a bare status line takes none.
 //
-// The block opens on its first line and is closed by whoever writes next: every
-// terminal block in the tree, the error path included, opens with its own blank
-// line. separate asks for the blank that sets a titled section apart from the
-// lines above it; a bare status line takes none.
-func (p CLIPresenter) phase(separate bool) io.Writer {
-	p.openPhase(separate)
-	return output.Barred(p.Cmd.ErrOrStderr())
+// The surface, not the caller, says whether a block is already open: the frames
+// beside this one are written by code that never sees this presenter.
+func OpenBlock(w io.Writer, separate bool) io.Writer {
+	if !output.BlockOpen(w) {
+		output.FrameStart(w)
+		return output.Barred(w)
+	}
+	barred := output.Barred(w)
+	if separate {
+		output.Blank(barred)
+	}
+	return barred
 }
 
-// openPhase is phase for a caller that draws on the raw stream itself — the hook
-// phase, whose cursor moves cannot go through the bar.
-func (p CLIPresenter) openPhase(separate bool) {
-	stderr := p.Cmd.ErrOrStderr()
-	if p.opened != nil && *p.opened {
-		if separate {
-			output.Blank(output.Barred(stderr))
-		}
-		return
-	}
-	output.FrameStart(stderr)
-	if p.opened != nil {
-		*p.opened = true
-	}
+func (p CLIPresenter) phase(separate bool) io.Writer {
+	return OpenBlock(p.Cmd.ErrOrStderr(), separate)
 }
 
 func (p CLIPresenter) Stage(params flow.StageParams) error {
@@ -70,13 +59,9 @@ func (p CLIPresenter) Stage(params flow.StageParams) error {
 }
 
 func (p CLIPresenter) HookPhase(params flow.HookPhaseParams) error {
-	if p.Human {
-		p.openPhase(true)
-	}
 	return DrawHookPhase(DrawHookPhaseParams{
 		Stderr:  p.Cmd.ErrOrStderr(),
 		Human:   p.Human,
-		Bar:     p.Human,
 		Title:   params.Title,
 		LogPath: params.LogPath,
 		Run:     params.Run,
@@ -87,11 +72,7 @@ type DrawHookPhaseParams struct {
 	Stderr io.Writer
 	// Human titles the phase and lets it be collapsed; a JSON run gets the raw
 	// stream and no title.
-	Human bool
-	// Bar draws the phase inside the accent bar of an already-open block. Only a
-	// surface that opened one sets it: a bar with no frame around it is half a
-	// block.
-	Bar     bool
+	Human   bool
 	Title   string
 	LogPath string
 	Run     func(flow.HookSink) error
@@ -123,16 +104,16 @@ func DrawHookPhase(params DrawHookPhaseParams) error {
 		return params.Run(flow.HookSink{Output: stream})
 	}
 
-	titled := params.Stderr
-	if params.Bar {
-		titled = output.Barred(params.Stderr)
-	}
-	output.SectionTitle(titled, params.Title)
+	// The phase joins the run's block rather than opening one beside it, and it
+	// does so here rather than in each caller: extract and checkout reach this
+	// through RunCreateHooksPhase, and they used to draw a phase the migrated
+	// commands' presenter had already put a bar on.
+	output.SectionTitle(OpenBlock(params.Stderr, true), params.Title)
 	if !output.IsTerminal(params.Stderr) {
 		return params.Run(flow.HookSink{Output: stream})
 	}
 
-	view := output.NewHookView(output.HookViewParams{W: params.Stderr, Log: log, LogPath: params.LogPath, Bar: params.Bar})
+	view := output.NewHookView(output.HookViewParams{W: params.Stderr, Log: log, LogPath: params.LogPath, Bar: true})
 	defer view.Close()
 	return params.Run(flow.HookSink{Output: view, OnHook: view.OnHook})
 }
@@ -179,16 +160,12 @@ func (p CLIPresenter) statusLine(w io.Writer, notice flow.Notice) {
 	case flow.NoticeWarning:
 		output.Warning(w, notice.Text)
 	case flow.NoticeNote:
-		output.Message(w, notice.Text)
+		output.Unchanged(w, notice.Text)
 	default:
 		output.Success(w, notice.Text)
 	}
 }
 
-// statusBlock renders the two registers a titled notice takes. A note is what
-// the reader has nothing to do about — the bar and an indent subordinate it. The
-// border is kept for what still has to be acted on, which is the only reason it
-// reads as one.
 func (p CLIPresenter) statusBlock(notice flow.Notice) {
 	if !p.Human {
 		output.Warning(p.Cmd.ErrOrStderr(), notice.Text)

@@ -5,7 +5,6 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
@@ -40,13 +39,6 @@ func RunCreateHooksPhase(p CreateHooksPhaseParams) error {
 		Branch:       p.Branch,
 		FromBranch:   p.FromBranch,
 		Hooks:        p.Hooks,
-	}
-
-	// The blank that sets the phase apart is the caller's: a migrated command
-	// opens its mid-run block with one, and these two — extract and checkout —
-	// have no block to open yet.
-	if p.ShowHeader {
-		output.Blank(p.Cmd.ErrOrStderr())
 	}
 
 	return DrawHookPhase(DrawHookPhaseParams{

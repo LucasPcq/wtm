@@ -2,14 +2,29 @@ package shared
 
 import (
 	"bytes"
+	"io"
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/output"
 )
+
+// bordered asks the style itself what a box is drawn with, so this stops
+// answering "no box" the day the border set changes.
+func bordered(got string) bool {
+	border := lipgloss.RoundedBorder()
+	for _, edge := range []string{border.TopLeft, border.TopRight, border.BottomLeft, border.BottomRight} {
+		if strings.Contains(got, edge) {
+			return true
+		}
+	}
+	return false
+}
 
 func testPresenter(t *testing.T) (CLIPresenter, *bytes.Buffer) {
 	t.Helper()
@@ -36,7 +51,7 @@ func TestStatus_NoteIsNotBordered(t *testing.T) {
 	if !strings.Contains(got, domain.EnvOriginPortedTitle) || !strings.Contains(got, "written with :8080") {
 		t.Fatalf("the note lost its content: %q", got)
 	}
-	if strings.ContainsAny(got, "─│╭╮╰╯") {
+	if bordered(got) {
 		t.Errorf("a note must not be boxed, got %q", got)
 	}
 }
@@ -50,7 +65,7 @@ func TestStatus_WarningWithLinesKeepsTheBox(t *testing.T) {
 		Lines: []string{"API_URL  no such key in this file"},
 	})
 
-	if got := stderr.String(); !strings.ContainsAny(got, "─│╭╮╰╯") {
+	if got := stderr.String(); !bordered(got) {
 		t.Errorf("what the reader has to act on stays bordered, got %q", got)
 	}
 }
@@ -86,7 +101,7 @@ func TestStatus_MachineOutputStaysBare(t *testing.T) {
 	})
 
 	got := stderr.String()
-	if strings.HasPrefix(got, "\n") || strings.ContainsAny(got, "─│╭╮╰╯") {
+	if strings.HasPrefix(got, "\n") || bordered(got) {
 		t.Errorf("machine output takes neither frame nor box, got %q", got)
 	}
 }
@@ -115,5 +130,71 @@ func TestHookPhase_JoinsTheMidRunBlock(t *testing.T) {
 	}
 	if strings.Count(got, "\n\n") != 1 {
 		t.Errorf("the phase takes exactly one blank line off the lines above it, got %q", got)
+	}
+}
+
+// The block a run keeps while it runs is closed by whoever writes next, and the
+// blank that closes it is the blank the next one opens on. A presenter that
+// remembered this itself could not know: the frame between the two is written
+// by code that never sees it — `run up` around a job's output is the case that
+// made this fail.
+func TestStatus_TakesNoSecondBlankAfterAFrameClosedTheBlock(t *testing.T) {
+	presenter, stderr := testPresenter(t)
+
+	presenter.Status(flow.Notice{Kind: flow.NoticeSuccess, Text: "stopped services on a"})
+	output.Frame(stderr, func(w io.Writer) { output.Message(w, "a job's output") })
+	stderr.Reset()
+	presenter.Status(flow.Notice{Kind: flow.NoticeMessage, Text: "port probes silenced for web"})
+
+	if got := stderr.String(); strings.HasPrefix(got, "\n") {
+		t.Errorf("the frame's closing blank is this block's opening one, got %q", got)
+	}
+}
+
+// The same line, whether or not an unrelated status was emitted earlier in the
+// run: what decided the spacing used to be an event with nothing to do with it.
+func TestStatus_ReadsTheSameWhicheverRanBefore(t *testing.T) {
+	first, firstErr := testPresenter(t)
+	output.Frame(firstErr, func(w io.Writer) { output.Message(w, "a job's output") })
+	firstErr.Reset()
+	first.Status(flow.Notice{Kind: flow.NoticeMessage, Text: "silenced"})
+
+	second, secondErr := testPresenter(t)
+	second.Status(flow.Notice{Kind: flow.NoticeSuccess, Text: "stopped services on a"})
+	output.Frame(secondErr, func(w io.Writer) { output.Message(w, "a job's output") })
+	secondErr.Reset()
+	second.Status(flow.Notice{Kind: flow.NoticeMessage, Text: "silenced"})
+
+	if firstErr.String() != secondErr.String() {
+		t.Errorf("the line reads %q after a frame alone and %q after a status and a frame", firstErr, secondErr)
+	}
+}
+
+// extract reaches a hook phase through RunCreateHooksPhase while holding a
+// presenter of its own, which may already have opened the block for the port
+// pass. The phase joins that block instead of drawing a second, unbarred one
+// beside it.
+func TestDrawHookPhase_JoinsAnAlreadyOpenBlock(t *testing.T) {
+	var stderr bytes.Buffer
+	output.FrameStart(&stderr)
+	output.Message(output.Barred(&stderr), "a port was left alone")
+	stderr.Reset()
+
+	err := DrawHookPhase(DrawHookPhaseParams{
+		Stderr: &stderr,
+		Human:  true,
+		Title:  domain.HooksTitleOnCreate,
+		Run:    func(flow.HookSink) error { return nil },
+	})
+	if err != nil {
+		t.Fatalf("DrawHookPhase() = %v", err)
+	}
+
+	got := stderr.String()
+	if !strings.HasPrefix(got, "\n") || strings.HasPrefix(got, "\n\n") {
+		t.Errorf("the phase takes exactly one blank off the block it joins, got %q", got)
+	}
+	if !strings.Contains(got, domain.HooksTitleOnCreate) {
+		t.Errorf("the phase lost its title: %q", got)
 	}
 }

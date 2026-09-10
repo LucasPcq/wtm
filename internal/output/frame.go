@@ -3,6 +3,8 @@ package output
 import (
 	"bytes"
 	"io"
+	"reflect"
+	"sync"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/styles"
@@ -23,6 +25,73 @@ func Frame(w io.Writer, render func(io.Writer)) {
 	FrameEnd(w)
 }
 
+// A surface remembers where its last block left the cursor, because the blank
+// line closing one block and the blank opening the next are the same line on
+// screen. A caller that has to decide whether to open one — a run reporting
+// while it is still running — cannot answer from what it did itself: the block
+// beside it is opened by code that never sees it, `run up`'s own frame around a
+// job's output being the case that made this necessary.
+//
+// stdout and stderr are one surface when both are the same terminal: a reader
+// looking at it sees one column of blocks, whichever stream wrote them.
+type surfaceState int
+
+const (
+	surfaceFresh surfaceState = iota
+	// surfaceBoundary: a blank line is the last thing written, so the next block
+	// opens on it rather than under a second one.
+	surfaceBoundary
+	surfaceOpen
+)
+
+var (
+	surfacesMu sync.Mutex
+	surfaces   = map[any]surfaceState{}
+	// theTerminal keys every stream that reaches the terminal, since they all
+	// draw on the one the reader is watching.
+	theTerminal = new(int)
+)
+
+// surfaceOf keys w by what a reader actually sees. An untracked writer — one
+// that cannot be a map key — reads fresh and records nothing, which is the
+// behaviour every caller had before a surface remembered anything.
+func surfaceOf(w io.Writer) (any, bool) {
+	stream, _ := unwrapStream(w)
+	if IsTerminal(stream) {
+		return theTerminal, true
+	}
+	if !reflect.TypeOf(stream).Comparable() {
+		return nil, false
+	}
+	return stream, true
+}
+
+func surfaceAt(w io.Writer) surfaceState {
+	key, ok := surfaceOf(w)
+	if !ok {
+		return surfaceFresh
+	}
+	surfacesMu.Lock()
+	defer surfacesMu.Unlock()
+	return surfaces[key]
+}
+
+func markSurface(w io.Writer, state surfaceState) {
+	key, ok := surfaceOf(w)
+	if !ok {
+		return
+	}
+	surfacesMu.Lock()
+	defer surfacesMu.Unlock()
+	surfaces[key] = state
+}
+
+// BlockOpen reports whether w draws on a surface whose block is still open, so
+// a caller adds to it instead of opening a second one beside it.
+func BlockOpen(w io.Writer) bool {
+	return surfaceAt(w) == surfaceOpen
+}
+
 // FrameStart writes the single leading blank line of a command frame. Pair it
 // with exactly one FrameEnd, and wrap the body's writer in Barred yourself.
 // Prefer Frame; use the explicit pair only for streaming, spinner-driven, or
@@ -30,7 +99,14 @@ func Frame(w io.Writer, render func(io.Writer)) {
 // starts on stderr (a plan or spinner) and finishes on stdout (the result), or
 // output interleaved with live spinners.
 func FrameStart(w io.Writer) {
-	Blank(w)
+	// A surface already at a boundary carries the blank this frame would write:
+	// the block that closed there and this one are separated by one line, not
+	// two. An open block gets that one line as its close and this one's open at
+	// once, which is the same rule read from the other side.
+	if surfaceAt(w) != surfaceBoundary {
+		Blank(w)
+	}
+	markSurface(w, surfaceOpen)
 }
 
 // FrameEnd writes the single trailing blank line of a command frame. For
@@ -38,6 +114,7 @@ func FrameStart(w io.Writer) {
 // (e.g. FrameStart(stderr) … FrameEnd(stdout)).
 func FrameEnd(w io.Writer) {
 	Blank(w)
+	markSurface(w, surfaceBoundary)
 }
 
 // Barred wraps w so every line of a block carries the accent bar. On anything
