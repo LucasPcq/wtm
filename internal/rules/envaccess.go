@@ -59,10 +59,11 @@ func EnvPortAnomalies(plan domain.EnvPortPlan) []domain.EnvPortEntry {
 }
 
 // EnvHasDrift reports whether the worktree is not fully reconciled: a key
-// needing attention (missing, conflicting, orphaned) in any file, or a linked
-// value still carrying another worktree's port. Leaving the ports out would let
-// `--check` answer "no drift" about a worktree whose .env points at the wrong
-// services.
+// needing attention (missing, conflicting, orphaned) in any file, a linked
+// value still carrying another worktree's port, or a key wtm writes in full
+// still holding the value this worktree was copied from. Leaving any of them out
+// would let `--check` answer "no drift" about a worktree whose .env points at
+// the wrong services — or at another worktree's slice of a shared one.
 func EnvHasDrift(result domain.EnvSyncResult) bool {
 	for _, file := range result.Files {
 		for _, status := range []domain.EnvKeyStatus{domain.EnvKeyMissing, domain.EnvKeyConflict, domain.EnvKeyOrphan} {
@@ -71,7 +72,7 @@ func EnvHasDrift(result domain.EnvSyncResult) bool {
 			}
 		}
 	}
-	return len(EnvPortRewrites(result.Ports)) > 0
+	return len(EnvPortRewrites(result.Ports))+len(OwnedEnvRewrites(result.Ports)) > 0
 }
 
 // EnvAppliedFiles counts the env files whose reconciled content was written back.

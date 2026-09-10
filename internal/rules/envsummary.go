@@ -42,9 +42,12 @@ func EnvOutcomeSummary(result domain.EnvSyncResult) EnvSummary {
 		return EnvSummary{Text: domain.EnvCheckCleanMessage, Done: true}
 	}
 
+	// The owned keys are counted with the ports: both are values wtm writes into
+	// the same .env, and a run whose only work was moving a DATABASE_URL onto
+	// this worktree's slice has written changes.
 	files, ports := EnvAppliedFiles(result), 0
 	if result.Ports.Applied {
-		ports = len(EnvPortRewrites(result.Ports))
+		ports = len(EnvPortRewrites(result.Ports)) + len(OwnedEnvRewrites(result.Ports))
 	}
 	switch {
 	case files == 0 && ports == 0:

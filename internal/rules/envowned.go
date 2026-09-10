@@ -127,14 +127,25 @@ func UpsertEnvPair(params UpsertEnvPairParams) (lines []domain.EnvLine, changed 
 	return append(out, lines[at:]...), true
 }
 
-// OwnedEnvLines names each identity key a run has just settled, changed ones
-// only: a value the file already held is not news.
+// OwnedEnvRewrites is the owned entries a run would change, the counterpart of
+// EnvPortRewrites for the keys wtm writes in full. A report that counted only
+// the port rewrites called a run that moved a DATABASE_URL onto this worktree's
+// slice "no changes written".
+func OwnedEnvRewrites(plan domain.EnvPortPlan) []domain.EnvOwnedEntry {
+	out := make([]domain.EnvOwnedEntry, 0, len(plan.Owned))
+	for _, entry := range plan.Owned {
+		if entry.Changed {
+			out = append(out, entry)
+		}
+	}
+	return out
+}
+
+// OwnedEnvLines names each key wtm writes in full that a run has just settled,
+// changed ones only: a value the file already held is not news.
 func OwnedEnvLines(plan domain.EnvPortPlan) []string {
 	var lines []string
-	for _, entry := range plan.Owned {
-		if !entry.Changed {
-			continue
-		}
+	for _, entry := range OwnedEnvRewrites(plan) {
 		lines = append(lines, fmt.Sprintf(domain.EnvOwnedKeyLineFmt, entry.Key, entry.Value))
 	}
 	return lines
