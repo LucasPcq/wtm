@@ -99,6 +99,30 @@ func TestLogSinkWritesSanitizedTimestampedLines(t *testing.T) {
 	}
 }
 
+// The dashboard's tail and `wtm run logs` read this file while the job is still
+// running, so batching the writes may cost the reader the flush interval and
+// nothing more — certainly not the end of the job.
+func TestLogSinkMakesALineReadableWhileTheJobRuns(t *testing.T) {
+	dir := t.TempDir()
+	sink, err := OpenLogSink(LogSinkParams{LogDir: dir, Job: "web"})
+	if err != nil {
+		t.Fatalf("open sink: %v", err)
+	}
+	t.Cleanup(func() { sink.Close() })
+
+	sink.Write([]byte("listening on 3000\n"))
+
+	path := filepath.Join(dir, "web.log")
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if strings.Contains(readLog(t, path), "listening on 3000") {
+			return
+		}
+		time.Sleep(domain.JobLogFlushInterval / 4)
+	}
+	t.Fatal("the line never reached the file: a reader tailing it would wait for the job to end")
+}
+
 func TestLogSinkStartsAnEmptyLogOnEveryRun(t *testing.T) {
 	dir := t.TempDir()
 

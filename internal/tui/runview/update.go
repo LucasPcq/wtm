@@ -242,6 +242,7 @@ func (m Model) setSelection(key jobKey) (Model, tea.Cmd) {
 		}
 		m.selected, m.focused = key, false
 	}
+	m.panes.follow(key)
 	// The offset is measured over rows rather than over jobs: a worktree heading
 	// takes a row of the sidebar like any other, and counting jobs alone would
 	// scroll the last one out of the panel it was measured to fit.

@@ -1,6 +1,7 @@
 package process
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"os"
@@ -45,8 +46,11 @@ type LogSink struct {
 	path     string
 	maxBytes int64
 
-	mu      sync.Mutex
-	file    *os.File
+	mu   sync.Mutex
+	file *os.File
+	// A reader tailing the log waits on this timer, never on the job's next chunk.
+	buf     *bufio.Writer
+	flush   *time.Timer
 	size    int64
 	pending string
 }
@@ -74,7 +78,12 @@ func OpenLogSink(params LogSinkParams) (*LogSink, error) {
 		return nil, fmt.Errorf("open job log: %w", err)
 	}
 
-	return &LogSink{path: path, maxBytes: resolveMaxBytes(params.MaxBytes), file: file}, nil
+	return &LogSink{
+		path:     path,
+		maxBytes: resolveMaxBytes(params.MaxBytes),
+		file:     file,
+		buf:      bufio.NewWriterSize(file, domain.JobLogBufferBytes),
+	}, nil
 }
 
 func resolveMaxBytes(configured int64) int64 {
@@ -116,10 +125,15 @@ func (s *LogSink) Close() error {
 		s.append([]domain.LogRecord{{At: time.Now(), Text: text}})
 	}
 	s.pending = ""
+	s.stopFlush()
 
-	file := s.file
-	s.file = nil
-	return file.Close()
+	// append may have given up on the file on its way — a rotation that failed.
+	if s.file == nil {
+		return nil
+	}
+	flushed, file := s.buf.Flush(), s.file
+	s.file, s.buf = nil, nil
+	return errors.Join(flushed, file.Close())
 }
 
 func (s *LogSink) append(records []domain.LogRecord) {
@@ -140,12 +154,13 @@ func (s *LogSink) append(records []domain.LogRecord) {
 		}
 	}
 
-	written, err := s.file.WriteString(buf.String())
+	written, err := s.buf.WriteString(buf.String())
 	s.size += int64(written)
 	if err != nil {
 		s.disable()
 		return
 	}
+	s.armFlush()
 
 	// Rotating only before the write let a batch bigger than the threshold land
 	// in the active file and stay there, growing it without bound. A record is
@@ -159,6 +174,9 @@ func (s *LogSink) append(records []domain.LogRecord) {
 }
 
 func (s *LogSink) rotate() error {
+	if err := s.buf.Flush(); err != nil {
+		return err
+	}
 	if err := s.file.Close(); err != nil {
 		return err
 	}
@@ -178,15 +196,48 @@ func (s *LogSink) rotate() error {
 		return err
 	}
 	s.file = file
+	s.buf.Reset(file)
 	s.size = 0
 	return nil
 }
 
+// armFlush is set from the first write of a batch and never pushed back by the
+// ones after it: the interval bounds how stale a reader's tail can be, and a
+// timer that kept moving would never bound anything.
+func (s *LogSink) armFlush() {
+	if s.flush != nil {
+		return
+	}
+	s.flush = time.AfterFunc(domain.JobLogFlushInterval, s.flushPending)
+}
+
+func (s *LogSink) flushPending() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.flush = nil
+	if s.file == nil {
+		return
+	}
+	if err := s.buf.Flush(); err != nil {
+		s.disable()
+	}
+}
+
+func (s *LogSink) stopFlush() {
+	if s.flush == nil {
+		return
+	}
+	s.flush.Stop()
+	s.flush = nil
+}
+
 func (s *LogSink) disable() {
+	s.stopFlush()
 	if s.file != nil {
 		s.file.Close()
 		s.file = nil
 	}
+	s.buf = nil
 }
 
 func removeBackups(path string) {

@@ -84,8 +84,8 @@ type Model struct {
 	// pending is the job whose pane is being filled — an attach or a history
 	// read in flight — so a second one is not started behind it.
 	pending jobKey
-	// ticking reports whether a redraw tick is already scheduled: a pane being
-	// written to is redrawn on a clock, never once per chunk.
+	// ticking reports whether a redraw clock is already running; see frameCmd
+	// for why it outlives the last frame.
 	ticking bool
 
 	start runlogs.StartFunc
@@ -220,7 +220,7 @@ func Run(params Params) (Result, error) {
 func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{m.refreshCmd(), pollCmd(), m.listenCmd()}
 	if m.start != nil {
-		cmds = append(cmds, m.startCmd(), frameCmd())
+		cmds = append(cmds, m.startCmd(), m.frameCmd())
 	}
 	return tea.Batch(cmds...)
 }
@@ -307,8 +307,37 @@ func pollCmd() tea.Cmd {
 	return tea.Tick(domain.RunViewPollSeconds*time.Second, func(time.Time) tea.Msg { return pollMsg{} })
 }
 
-func frameCmd() tea.Cmd {
-	return tea.Tick(time.Second/domain.RunViewRenderFPS, func(time.Time) tea.Msg { return frameMsg{} })
+// frameCmd answers only with a frame the screen does not already hold: a tick
+// with nothing written since the last one produces no message at all, and
+// Bubbletea skips View() entirely for a command that returns nil. The view has
+// no animation of its own, so a frame no byte asked for redraws the same pixels.
+//
+// It runs until the view does. Once the last stream has ended nothing raises
+// the flag again, so the loop parks on the ticker rather than reporting itself
+// out — which is also why m.ticking may stay true with no frame in sight.
+func (m Model) frameCmd() tea.Cmd {
+	panes, done, interval := m.panes, m.runCtx.Done(), m.frameInterval()
+	return func() tea.Msg {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return nil
+			case <-ticker.C:
+				if panes.takeDirty() {
+					return frameMsg{}
+				}
+			}
+		}
+	}
+}
+
+func (m Model) frameInterval() time.Duration {
+	if m.preview {
+		return time.Second / domain.RunViewPreviewRenderFPS
+	}
+	return time.Second / domain.RunViewRenderFPS
 }
 
 // listenCmd takes the next message the stream readers and the run posted, and
@@ -382,7 +411,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ticking = false
 			return m, nil
 		}
-		return m, frameCmd()
+		return m, m.frameCmd()
 	}
 
 	return m, nil
@@ -565,15 +594,14 @@ func (m Model) applyHistory(msg historyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// startTicking schedules the redraw clock unless it is already running: a pane
-// is written to as the bytes arrive and drawn at domain.RunViewRenderFPS, which
-// is only worth a tick while something is feeding one.
+// startTicking schedules the redraw clock unless one is already running: bytes
+// are taken as they arrive and drawn on the clock, never once per chunk.
 func (m Model) startTicking() (Model, tea.Cmd) {
 	if m.ticking {
 		return m, nil
 	}
 	m.ticking = true
-	return m, frameCmd()
+	return m, m.frameCmd()
 }
 
 type writeParams struct {

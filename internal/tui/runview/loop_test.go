@@ -174,3 +174,111 @@ func TestTheModelKeepsHearingFromTheReadersPastAStreamEnding(t *testing.T) {
 	second.Close()
 	p.waitFor("the end of web's stream", func(m Model) bool { return m.panes.stream("web") == nil })
 }
+
+// startClock runs the redraw clock on its own goroutine and hands back what it
+// answers. One clock, the way the loop holds it: a second one racing it for the
+// same flag would take a frame the first was owed.
+func startClock(m Model) <-chan tea.Msg {
+	answers := make(chan tea.Msg, 1)
+	go func() { answers <- m.frameCmd()() }()
+	return answers
+}
+
+// quietWindow is long enough for the clock to have ticked many times over.
+const quietWindow = 10 * time.Second / domain.RunViewRenderFPS
+
+func expectSilence(t *testing.T, answers <-chan tea.Msg, why string) {
+	t.Helper()
+	select {
+	case msg := <-answers:
+		t.Fatalf("the clock asked for a frame (%T) %s", msg, why)
+	case <-time.After(quietWindow):
+	}
+}
+
+func expectFrame(t *testing.T, answers <-chan tea.Msg, why string) {
+	t.Helper()
+	select {
+	case msg := <-answers:
+		if _, isFrame := msg.(frameMsg); !isFrame {
+			t.Fatalf("the clock answered %T, want a frame: %s", msg, why)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatalf("nothing was redrawn: %s", why)
+	}
+}
+
+// The clock coalesces writes, it does not repaint: the view has no animation of
+// its own, so a frame nothing wrote for redraws what the screen already holds.
+func TestTheClockAsksForNoFrameWhileTheJobSaysNothing(t *testing.T) {
+	model := New(Params{})
+	defer model.cancel()
+	key := jobKeyOf("", "api")
+	model.panes.follow(key)
+	model.panes.open(openPaneParams{Key: key, Source: sourceLive})
+
+	expectSilence(t, startClock(model), "no byte was written for")
+}
+
+func TestTheClockAsksForAFrameOnceTheJobWrites(t *testing.T) {
+	model := New(Params{})
+	defer model.cancel()
+	key := jobKeyOf("", "api")
+	model.panes.follow(key)
+	answers := startClock(model)
+
+	model.panes.write(writeChunkParams{Key: key, Source: sourceLive, Chunk: []byte("listening\r\n")})
+	expectFrame(t, answers, "the job on screen wrote a line")
+}
+
+// Only one pane is drawn at a time, and a starting profile feeds every pane it
+// opens. The clock reads the followed job from the store rather than from a
+// copy of the model, so moving the cursor moves it without restarting it.
+func TestTheClockFollowsTheCursorAndIgnoresTheJobsBehindIt(t *testing.T) {
+	model := New(Params{})
+	defer model.cancel()
+	shown, hidden := jobKeyOf("", "api"), jobKeyOf("", "worker")
+	model.panes.follow(shown)
+	model.panes.open(openPaneParams{Key: shown, Source: sourceLive})
+	answers := startClock(model)
+
+	model.panes.write(writeChunkParams{Key: hidden, Source: sourceLive, Chunk: []byte("noise\r\n")})
+	expectSilence(t, answers, "for a job nobody is looking at")
+
+	model.panes.follow(hidden)
+	expectFrame(t, answers, "the cursor moved onto a job that had written")
+}
+
+// The clock runs on its own goroutine for as long as the view does: it has to
+// give up when the view goes, the way the listener does, or it outlives the
+// program that started it.
+func TestTheClockStopsWithTheView(t *testing.T) {
+	model := New(Params{})
+	key := jobKeyOf("", "api")
+	model.panes.follow(key)
+	model.panes.open(openPaneParams{Key: key, Source: sourceLive})
+	answers := startClock(model)
+
+	model.cancel()
+
+	select {
+	case msg := <-answers:
+		if msg != nil {
+			t.Fatalf("the clock answered %T on its way out, want nothing to draw", msg)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the clock outlived the view it was drawing")
+	}
+}
+
+func TestAHostedPreviewRedrawsSlowerThanTheFullView(t *testing.T) {
+	full := New(Params{})
+	defer full.cancel()
+	preview := NewPreview(PreviewParams{})
+	defer preview.cancel()
+
+	if preview.frameInterval() <= full.frameInterval() {
+		t.Fatalf("a preview frame (%s) costs a whole dashboard repaint; it must not be paced like a full view (%s)",
+			preview.frameInterval(), full.frameInterval())
+	}
+}
