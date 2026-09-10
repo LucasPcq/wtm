@@ -1963,9 +1963,18 @@ const (
 	// refuse on.
 	DaemonMismatchTitle = "Version mismatch"
 
-	// DaemonStateVersion is the index format. A file carrying anything else is
-	// read as empty and never written back, so an older binary cannot destroy
-	// the index of a newer one.
+	// DaemonIndexFrozen* head and fill the callout for an index a newer binary
+	// owns. The store goes read-only rather than destroy that binary's record, so
+	// nothing this one starts is written down — which used to happen in silence.
+	DaemonIndexFrozenTitle  = "Index read-only"
+	DaemonIndexFrozenWhy    = "the index on disk was written by a newer wtm, so this build will not write over it"
+	DaemonIndexFrozenCost   = "nothing started from here is recorded: a detached stack is not picked back up, and an orphaned service is never reaped"
+	DaemonIndexFrozenFixFmt = "run the newer wtm, or remove %s once nothing is running"
+
+	// DaemonStateVersion is the index format. A file from a newer binary is read
+	// as empty and never written back, so an older binary cannot destroy the
+	// index of a newer one; an older file is a format this build has moved past
+	// and the next write simply replaces it.
 	DaemonStateVersion = 2
 
 	// CtrlCByte is the ASCII code for Ctrl+C, used for PTY detach.
@@ -2036,6 +2045,20 @@ const (
 	// pane needs to count the lines each write pushes, which a buffer that is
 	// evicting no longer reports. It is given back at the live tail.
 	JobPaneScrollbackBurstFactor = 2
+
+	// The compose vocabulary a detached job's liveness is verified through. One
+	// tool with one stable subcommand, deliberately: a launcher wtm does not
+	// recognize keeps reporting what it actually knows rather than a guess.
+	DockerBin           = "docker"
+	ComposeLegacyBin    = "docker-compose"
+	ComposeSubcommand   = "compose"
+	ComposeVersionArg   = "version"
+	ComposeFileFlag     = "-f"
+	ComposeFileFlagLong = "--file"
+	// ComposeCommand is what detection writes into a generated job's cmd, and
+	// therefore one of the two spellings the probe has to read back. The two ends
+	// share these constants so they cannot drift apart in silence.
+	ComposeCommand = DockerBin + " " + ComposeSubcommand
 
 	// ShellBin is the interpreter every command written in a config file runs
 	// through — a job's cmd and stop, and every lifecycle hook. POSIX sh rather
@@ -3665,6 +3688,10 @@ var EnvTemplateSuffixes = []string{
 // value differs per worktree by construction, so the reconciliation reports them
 // neither as drift nor as a conflict.
 var WtmOwnedEnvKeys = []string{EnvComposeProjectName}
+
+// ComposePSArgs asks compose which of the project's containers are running. `ps`
+// lists only running ones without -a, so an empty answer is the whole verdict.
+var ComposePSArgs = []string{"ps", "-q"}
 
 // ComposeCmdSpaced and ComposeCmdHyphened are the two spellings a job's command
 // uses to drive compose, and how wtm recognizes the stack's project directory.

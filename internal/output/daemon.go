@@ -42,6 +42,10 @@ func DaemonStatusFields(w io.Writer, status domain.DaemonStatus) {
 	)
 	Announce(w, domain.DaemonStatusTitle, items)
 
+	if status.IndexFrozen {
+		Callout(w, domain.DaemonIndexFrozenTitle, rules.IndexFrozenLines(status.StatePath))
+	}
+
 	if rules.DaemonVersionDiverged(status) {
 		Callout(w, domain.DaemonMismatchTitle, rules.DaemonVersionMismatchLines(rules.DaemonVersionMismatchParams{
 			Client: status.Version,

@@ -30,13 +30,13 @@ func BaseBranch(dir string) string {
 // host: "docker compose" (v2 plugin), "docker-compose" (v1 standalone), or
 // "docker compose" as a safe default when neither is detectable.
 func DockerComposeCommand() string {
-	if _, err := exec.LookPath("docker"); err == nil {
-		if err := exec.Command("docker", "compose", "version").Run(); err == nil {
-			return "docker compose"
+	if _, err := exec.LookPath(domain.DockerBin); err == nil {
+		if err := exec.Command(domain.DockerBin, domain.ComposeSubcommand, domain.ComposeVersionArg).Run(); err == nil {
+			return domain.ComposeCommand
 		}
 	}
-	if _, err := exec.LookPath("docker-compose"); err == nil {
-		return "docker-compose"
+	if _, err := exec.LookPath(domain.ComposeLegacyBin); err == nil {
+		return domain.ComposeLegacyBin
 	}
-	return "docker compose"
+	return domain.ComposeCommand
 }

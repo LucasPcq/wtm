@@ -335,7 +335,7 @@ func styleJobStatus(status domain.JobStatus) string {
 	switch status {
 	case domain.JobStatusRunning, domain.JobStatusDetached, domain.JobStatusAttached:
 		return styles.Success.Render(string(status))
-	case domain.JobStatusCrashed:
+	case domain.JobStatusCrashed, domain.JobStatusReaped:
 		return styles.Warning.Render(string(status))
 	default:
 		return styles.Muted.Render(string(status))

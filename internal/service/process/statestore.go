@@ -8,6 +8,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/rules"
 )
 
 // JobIndex is where a Manager records what is up. The daemon backs it with a
@@ -22,9 +23,11 @@ type JobIndex interface {
 // the whole file is rewritten rather than amended.
 type StateStore struct {
 	path string
-	// frozen is set when the file on disk carries a format this binary does not
-	// know. Reading it gives nothing, and writing over it would destroy a newer
-	// binary's index, so the store goes read-only for the rest of its life.
+	// frozen is set when the file on disk belongs to a NEWER binary. Reading it
+	// gives nothing, and writing over it would destroy that binary's record of
+	// what it started, so the store goes read-only for the rest of its life. An
+	// older format never freezes: see rules.ClassifyIndexVersion for why that
+	// distinction is the difference between a cautious store and a dead one.
 	frozen bool
 }
 
@@ -59,11 +62,31 @@ func (s *StateStore) Load() []domain.JobRecord {
 	if err := json.Unmarshal(data, &state); err != nil {
 		return nil
 	}
-	if state.Version != domain.DaemonStateVersion {
-		s.frozen = true
+	access := rules.ClassifyIndexVersion(rules.IndexVersionParams{
+		File:   state.Version,
+		Binary: domain.DaemonStateVersion,
+	})
+	s.frozen = access.Freeze
+	if !access.Read {
 		return nil
 	}
 	return state.Jobs
+}
+
+// Frozen reports whether this store has gone read-only, which is a fact about
+// the file rather than about this instance: any reader comparing the two versions
+// reaches the same verdict. It is what lets a command warn that nothing it starts
+// will be recorded, without a daemon to ask.
+func (s *StateStore) Frozen() bool { return s.frozen }
+
+// IndexFrozen answers that question for a caller holding nothing: it reads the
+// index and reports whether a newer binary owns it. False for every ordinary
+// case, an unreadable file included — a store that cannot be read is one the
+// next write replaces.
+func IndexFrozen() bool {
+	store := NewStateStore(StatePath())
+	store.Load()
+	return store.Frozen()
 }
 
 func (s *StateStore) Save(records []domain.JobRecord) error {

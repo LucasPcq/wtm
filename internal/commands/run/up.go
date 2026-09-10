@@ -55,6 +55,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 	if err := reportRunConfig(cmd, ctx.Run); err != nil {
 		return err
 	}
+	warnIndexFrozen(cmd)
 
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 	detach, _ := cmd.Flags().GetBool(domain.FlagDetach)

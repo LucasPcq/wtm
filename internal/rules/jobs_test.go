@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -331,5 +332,36 @@ func TestFilterToProfileDoesNotMutateInput(t *testing.T) {
 	}
 	if len(cfg.Jobs) != 2 || len(cfg.EnvPorts) != 1 {
 		t.Errorf("input mutated: %+v", cfg)
+	}
+}
+
+func TestJobUptimeCountsTheLifetimeOfAReapedOrphan(t *testing.T) {
+	now := time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC)
+	got := JobUptime(JobUptimeParams{
+		Job: domain.JobInfo{
+			Status:    domain.JobStatusReaped,
+			StartedAt: now.Add(-12 * 24 * time.Hour),
+		},
+		Now: now,
+	})
+
+	if got == "" {
+		t.Fatal("a reaped job ran until the instant it was reaped: its age is what the row is for")
+	}
+	if !strings.Contains(got, "12") {
+		t.Fatalf("uptime = %q, want the twelve days it had been running", got)
+	}
+}
+
+func TestJobUptimeStaysSilentForAJobThatDiedUnwatched(t *testing.T) {
+	now := time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC)
+	for _, status := range []domain.JobStatus{domain.JobStatusCrashed, domain.JobStatusStopped} {
+		got := JobUptime(JobUptimeParams{
+			Job: domain.JobInfo{Status: status, StartedAt: now.Add(-12 * 24 * time.Hour)},
+			Now: now,
+		})
+		if got != "" {
+			t.Errorf("uptime for %q = %q, want none: it died at a moment nobody recorded", status, got)
+		}
 	}
 }

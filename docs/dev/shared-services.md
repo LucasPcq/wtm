@@ -20,6 +20,8 @@ Every other worktree posts an attachment under `<its worktree>:<name>`, with sta
 
 A claim owns no stream: attaching to one from any worktree reaches the one output there is.
 
+A claim is dropped when its service is no longer up, and `Manager.Adopt` is where that is enforced: a daemon killed without running a handler may leave a shared foreground service to be reaped at the next start-up, and a claim outliving it would be a reference count on nothing — the next worktree would be told its service is already running. The pass runs on every adoption, not only after a reap, because the same hole opens whenever the real job's record is gone and the claims' are not (a deleted main checkout, for one). See LUC-227.
+
 Releasing a claim stops the service only once no worktree holds it. Two worktrees racing to start the same service both succeed — `run up --all` fans out, and losing that race is not a failure. A shared job whose main checkout the client could not resolve is **refused**, never run once per worktree.
 
 ## The namespace
