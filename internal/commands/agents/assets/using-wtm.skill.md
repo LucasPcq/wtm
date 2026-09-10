@@ -500,14 +500,24 @@ and **experimental**: the global `wtm init` does not configure it.
   started here", not "started and silent". Its log file is created the moment it starts,
   so a job that ran and printed nothing *is* present, with no entries. Do not read the
   array as a roster of the project's jobs: `wtm run job list --output json` is that.
-- **`status` has four values, and `detached` is not a weaker `running`.** A service with
+- **`status` has six values, and `detached` is not a weaker `running`.** A service with
   a `stop` command (a `docker compose up -d`) is reported `detached` from the moment its
   launcher exits: the real work runs outside wtm, nothing about it was verified, and
   there is **nothing to attach to** — `run logs` on it prints its persisted file and
   returns. It is up: it counts as a running job for `run down`, and `wtm run up` on it
   simply relaunches the launcher rather than refusing "already running". `running` is a
   foreground service the daemon holds a terminal for, `crashed` one whose process died,
-  `stopped` one that was stopped.
+  `stopped` one that was stopped, and `attached` a worktree's claim on a shared service
+  (see the shared-services section: `pid` is 0 on a claim).
+- **`reaped` is the sixth, and it says wtm killed something.** A daemon killed without
+  running a handler — `SIGKILL`, a crash, an OOM — leaves its foreground services alive
+  and unreadable. The next daemon finds them from the index, proves the process group is
+  the recorded one (its start time has to match), kills it, and reports the entry
+  `reaped` **once**: the entry is not up, so it leaves the index straight away. `uptime`
+  on such a row is the orphan's real age, which is the point of showing it. A group whose
+  identity could not be confirmed is never signalled and never reported — a group id
+  handed to a stranger is not something to kill. Nothing is reaped for a `detached`
+  stack: those belong to Docker.
 - **`run ps` is the one global listing**, and the only `run` command that works from
   anywhere: it lists what the daemon holds across every repository, so it needs neither a
   run-initialized repo nor a worktree. It only ever lists — to act on those jobs, open the

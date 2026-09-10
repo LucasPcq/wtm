@@ -195,6 +195,11 @@ const (
 	// the main checkout's key. It owns no process: it is the pointer that keeps
 	// the real job alive, which is what makes the job table the reference count.
 	JobStatusAttached JobStatus = "attached"
+	// JobStatusReaped is a foreground service that outlived the daemon which
+	// owned it and was killed by the next one. Distinct from Crashed because the
+	// two say opposite things about who acted: crashed is a process that died on
+	// its own, reaped is one wtm found still running days later and took down.
+	JobStatusReaped JobStatus = "reaped"
 )
 
 // JobRoute is one name the proxy serves a started job under: the job the name
@@ -229,6 +234,14 @@ type JobRecord struct {
 	Routes    []JobRoute        `json:"routes,omitempty"`
 	LogDir    string            `json:"log_dir,omitempty"`
 	StartedAt time.Time         `json:"started_at,omitzero"`
+	// PID and PGID are the fingerprint that lets the next daemon tell a
+	// foreground service it lost from one it left running. PGID is what gets
+	// signalled: the leader is a `sh -c` that often dies before its children, so
+	// asking whether the PID is alive answers no about a group that still holds
+	// a port. Zero on a record written before the fingerprint existed, which
+	// reads as "not reapable" rather than as a group to guess at.
+	PID  int `json:"pid,omitempty"`
+	PGID int `json:"pgid,omitempty"`
 	// Attached says this entry is a worktree's claim on a shared service rather
 	// than a process of its own. It is a fact about what the entry is, not a
 	// process state: without it a claim would come back from the index as a

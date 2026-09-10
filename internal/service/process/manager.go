@@ -64,9 +64,13 @@ type ManagedJob struct {
 	// closed by whichever goroutine reaps or stops the job, holding nothing. A
 	// user of it must therefore hold a reference on the descriptor itself
 	// (setWinsize) rather than read its number out.
-	PTY       *os.File
-	Status    domain.JobStatus
-	PID       int
+	PTY    *os.File
+	Status domain.JobStatus
+	PID    int
+	// PGID is the group every signal actually targets. Recorded rather than
+	// derived from PID: Setsid and Setpgid make the two equal today, and an
+	// assumption like that breaks in silence.
+	PGID      int
 	WorkDir   string
 	StartedAt time.Time
 	// Env is kept so the stop command runs in the environment the start did: a
@@ -108,6 +112,7 @@ type Manager struct {
 	// domain.NamespaceCreateTimeout; a test sets it so a command that is simply
 	// wrong does not hold the suite for the whole budget.
 	namespaceBudget time.Duration
+	orphans         Orphans
 	mu              sync.Mutex
 }
 
@@ -117,8 +122,9 @@ func NewManager() *Manager {
 
 func NewManagerWithRoutes(routes RouteSink) *Manager {
 	return &Manager{
-		jobs:   make(map[string]*ManagedJob),
-		routes: routes,
+		jobs:    make(map[string]*ManagedJob),
+		routes:  routes,
+		orphans: systemOrphans{},
 	}
 }
 
@@ -131,28 +137,48 @@ type ManagerParams struct {
 	// NamespaceBudget bounds the retries of a shared job's namespace attach. Zero
 	// takes domain.NamespaceCreateTimeout.
 	NamespaceBudget time.Duration
+	// Orphans finds and takes down the process groups a killed daemon left
+	// behind. Nil takes the real one, which signals; a test supplies its own so
+	// Adopt neither forks a ps nor kills anything.
+	Orphans Orphans
 }
 
 func NewManagerWith(params ManagerParams) *Manager {
+	orphans := params.Orphans
+	if orphans == nil {
+		orphans = systemOrphans{}
+	}
 	return &Manager{
 		jobs:            make(map[string]*ManagedJob),
 		routes:          params.Routes,
 		index:           params.Index,
 		namespaceBudget: params.NamespaceBudget,
+		orphans:         orphans,
 	}
 }
 
-// Adopt takes over the jobs a previous daemon left behind. It starts nothing and
-// stops nothing — it registers what rules.ReconcileJob makes of each entry, so
-// `run ps` can report it and `run down` can tear it down. The adopted jobs carry
-// no process, and every path that would reach for one gates on a status they do
-// not have.
+// Adopt takes over the jobs a previous daemon left behind. It registers what
+// rules.ReconcileJob makes of each entry, so `run ps` can report it and
+// `run down` can tear it down; the adopted jobs carry no process, and every path
+// that would reach for one gates on a status they do not have.
+//
+// It has exactly one effect on the machine, and it is the reason this pass
+// exists: a foreground service whose group is still alive and still identifiably
+// ours is killed here. A daemon dies without running a handler often enough —
+// SIGKILL, a crash, an OOM — and nothing downstream of that death can clean up
+// after it. The next start-up is the only place left.
 func (m *Manager) Adopt(records []domain.JobRecord) {
+	states := m.orphans.Probe(orphanQueries(records))
+
+	var reap []int
 	m.mu.Lock()
 	for _, record := range records {
+		state := states[record.PGID]
 		decision := rules.ReconcileJob(rules.ReconcileJobParams{
-			Record:        record,
-			WorkDirExists: dirExists(record.WorkDir),
+			Record:            record,
+			WorkDirExists:     dirExists(record.WorkDir),
+			GroupAlive:        state.Alive,
+			IdentityConfirmed: state.IdentityConfirmed,
 		})
 		if !decision.Adopt {
 			continue
@@ -160,6 +186,9 @@ func (m *Manager) Adopt(records []domain.JobRecord) {
 		key := jobKey(record.Name, record.WorkDir)
 		if _, taken := m.jobs[key]; taken {
 			continue
+		}
+		if decision.Reap {
+			reap = append(reap, record.PGID)
 		}
 		exited := make(chan struct{})
 		close(exited)
@@ -169,6 +198,8 @@ func (m *Manager) Adopt(records []domain.JobRecord) {
 			Status:    decision.Status,
 			WorkDir:   record.WorkDir,
 			StartedAt: record.StartedAt,
+			PID:       record.PID,
+			PGID:      record.PGID,
 			Env:       record.Env,
 			Routes:    record.Routes,
 			LogDir:    record.LogDir,
@@ -176,8 +207,11 @@ func (m *Manager) Adopt(records []domain.JobRecord) {
 			exited:    exited,
 		}
 	}
+	m.dropDanglingClaimsLocked()
 	adopted := m.upRecordsLocked()
 	m.mu.Unlock()
+
+	m.orphans.Reap(reap)
 
 	for _, job := range m.List() {
 		if job.Status == domain.JobStatusDetached {
@@ -185,6 +219,37 @@ func (m *Manager) Adopt(records []domain.JobRecord) {
 		}
 	}
 	m.saveIndex(adopted)
+}
+
+// orphanQueries asks about the only entries wtm owns a process for. A claim owns
+// nothing and a detached stack belongs to Docker, so probing either would spend a
+// syscall to learn something no decision reads.
+func orphanQueries(records []domain.JobRecord) []GroupQuery {
+	queries := make([]GroupQuery, 0, len(records))
+	for _, record := range records {
+		if !rules.IsForegroundService(record) || record.PGID <= 1 {
+			continue
+		}
+		queries = append(queries, GroupQuery{PGID: record.PGID, StartedAt: record.StartedAt})
+	}
+	return queries
+}
+
+// dropDanglingClaimsLocked removes the claims left standing on a shared service
+// that is no longer up — the one this pass has just reaped, typically. A claim is
+// what makes the job table a reference count, so one pointing at nothing would
+// have the next worktree told its service is already running.
+func (m *Manager) dropDanglingClaimsLocked() {
+	for key, job := range m.jobs {
+		if job.Status != domain.JobStatusAttached {
+			continue
+		}
+		service, found := m.realSharedLocked(sharedRef{Name: job.Name, Dir: job.SharedDir})
+		if found && rules.IsJobUp(service.Status) {
+			continue
+		}
+		delete(m.jobs, key)
+	}
 }
 
 func dirExists(path string) bool {
@@ -211,6 +276,8 @@ func (m *Manager) upRecordsLocked() []domain.JobRecord {
 			StartedAt: job.StartedAt,
 			Attached:  job.Status == domain.JobStatusAttached,
 			SharedDir: job.SharedDir,
+			PID:       job.PID,
+			PGID:      job.PGID,
 		})
 	}
 	return records
@@ -328,6 +395,7 @@ func (m *Manager) Start(params StartParams) error {
 		PTY:       outputFile,
 		Status:    domain.JobStatusRunning,
 		PID:       cmd.Process.Pid,
+		PGID:      processGroupOf(cmd.Process.Pid),
 		WorkDir:   params.WorkDir,
 		StartedAt: time.Now(),
 		Env:       env,
