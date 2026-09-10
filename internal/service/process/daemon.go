@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -19,7 +20,13 @@ import (
 	"github.com/LucasPcq/wtm/internal/service/proxy"
 )
 
-var daemonIdleTimeout = time.Duration(domain.DaemonIdleTimeoutSeconds) * time.Second
+var (
+	daemonIdleTimeout = time.Duration(domain.DaemonIdleTimeoutSeconds) * time.Second
+	// daemonNamespaceBudget is how long a shared job's attach may retry. It is a
+	// variable for the same reason daemonIdleTimeout is: the two interact, and a
+	// test wants both wound down together.
+	daemonNamespaceBudget = domain.NamespaceCreateTimeout
+)
 
 // DaemonParams holds inputs for starting the daemon.
 type DaemonParams struct {
@@ -38,7 +45,14 @@ type daemonServer struct {
 	// name nothing serves.
 	proxyPort int
 	clients   sync.WaitGroup
-	shutdown  chan struct{}
+	// inflight counts the connections being served. The idle watcher reads it
+	// beside the job count: a shared service launches detached and leaves
+	// nothing Running, so the request carving out its namespace — seconds of
+	// retries against a database that has just been started — would otherwise be
+	// auto-exited under, and the caller would read a closed socket instead of
+	// what the command said.
+	inflight atomic.Int64
+	shutdown chan struct{}
 }
 
 // RunDaemon starts the daemon, listens on the Unix socket, and blocks until shutdown.
@@ -57,7 +71,7 @@ func RunDaemon(params DaemonParams) error {
 
 	registry := proxy.NewRegistry()
 	store := NewStateStore(StatePath())
-	manager := NewManagerWith(ManagerParams{Routes: registry, Index: store})
+	manager := NewManagerWith(ManagerParams{Routes: registry, Index: store, NamespaceBudget: daemonNamespaceBudget})
 	d := &daemonServer{
 		manager:    manager,
 		listener:   listener,
@@ -106,8 +120,10 @@ func RunDaemon(params DaemonParams) error {
 			}
 		}
 		d.clients.Add(1)
+		d.inflight.Add(1)
 		go func() {
 			defer d.clients.Done()
+			defer d.inflight.Add(-1)
 			d.handleConnection(conn)
 		}()
 	}
@@ -144,7 +160,7 @@ func (d *daemonServer) idleWatcher() {
 		case <-d.shutdown:
 			return
 		case <-ticker.C:
-			if !d.manager.IsRunning() {
+			if !d.manager.IsRunning() && d.inflight.Load() == 0 {
 				d.stop()
 				return
 			}
