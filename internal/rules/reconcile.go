@@ -16,6 +16,12 @@ type ReconcileJobParams struct {
 	// the job did. Group ids come from the same space as PIDs and are recycled,
 	// so without it a twelve-day-old entry would aim at a stranger.
 	IdentityConfirmed bool
+	// StackKnownDown says a probe actually verified that a detached launcher's
+	// work is gone. Only true is a fact; false covers both "still up" and "could
+	// not tell", and the two are deliberately the same answer here — an
+	// unrecognized launcher, a missing docker or a failed call must leave the
+	// entry saying what wtm knows rather than what it failed to check.
+	StackKnownDown bool
 }
 
 // ReconcileDecision is what becomes of one indexed job when a daemon reads the
@@ -48,6 +54,14 @@ func ReconcileJob(params ReconcileJobParams) ReconcileDecision {
 	}
 	if params.Record.Config.Kind != domain.JobKindService {
 		return ReconcileDecision{}
+	}
+	// Verified gone rather than assumed up. `detached` was always honest — "we
+	// launched it and have not looked since" — but a `docker compose down` run by
+	// hand made it wrong, and a listing that names a stack nobody can reach is
+	// worse than one that admits it ended. Reported once, like every state that
+	// is not up, then out of the index.
+	if params.StackKnownDown {
+		return ReconcileDecision{Status: domain.JobStatusStopped, Adopt: true}
 	}
 	return ReconcileDecision{Status: domain.JobStatusDetached, Adopt: true}
 }

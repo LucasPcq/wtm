@@ -139,3 +139,27 @@ func TestDaemonHandleStopAll_SnapshotsTheJobsItStopped(t *testing.T) {
 		t.Errorf("exit_code = %v, want no key at all in a pre-stop snapshot", code)
 	}
 }
+
+// A detached launcher's PID exited long before the row is drawn, so it must stay
+// out of every state that entry can reach — not just `detached`.
+func TestJobInfoReportsNoPIDForALauncherWhateverBecameOfIt(t *testing.T) {
+	server := &daemonServer{manager: NewManager()}
+	launcher := domain.JobConfig{Name: "db", Kind: domain.JobKindService, Cmd: "docker compose up -d", Stop: "docker compose down"}
+
+	for _, status := range []domain.JobStatus{domain.JobStatusDetached, domain.JobStatusStopped} {
+		info := server.jobInfoOf(ManagedJob{Name: "db", Config: launcher, Status: status, PID: 4058})
+		if info.PID != 0 {
+			t.Errorf("status %q reports pid %d: the launcher exited, so that number points at nothing or at a stranger", status, info.PID)
+		}
+	}
+}
+
+func TestJobInfoKeepsThePIDOfAReapedForegroundService(t *testing.T) {
+	server := &daemonServer{manager: NewManager()}
+	service := domain.JobConfig{Name: "dev", Kind: domain.JobKindService, Cmd: "pnpm dev"}
+
+	info := server.jobInfoOf(ManagedJob{Name: "dev", Config: service, Status: domain.JobStatusReaped, PID: 70382})
+	if info.PID != 70382 {
+		t.Fatalf("pid = %d, want the group that was just reaped: it is the most useful thing on the row", info.PID)
+	}
+}

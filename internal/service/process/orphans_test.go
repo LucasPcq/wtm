@@ -100,7 +100,7 @@ func TestAdoptAsksNothingAboutADetachedStack(t *testing.T) {
 	record.PGID = orphanPGID
 	orphans := &fakeOrphans{}
 
-	manager := NewManagerWith(ManagerParams{Orphans: orphans})
+	manager := NewManagerWith(ManagerParams{Orphans: orphans, Stacks: &unknownStacks{}})
 	manager.Adopt([]domain.JobRecord{record})
 
 	if len(orphans.asked) != 0 {

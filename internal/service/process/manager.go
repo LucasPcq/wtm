@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -113,6 +112,7 @@ type Manager struct {
 	// wrong does not hold the suite for the whole budget.
 	namespaceBudget time.Duration
 	orphans         Orphans
+	stacks          Stacks
 	mu              sync.Mutex
 }
 
@@ -125,6 +125,7 @@ func NewManagerWithRoutes(routes RouteSink) *Manager {
 		jobs:    make(map[string]*ManagedJob),
 		routes:  routes,
 		orphans: systemOrphans{},
+		stacks:  systemStacks{},
 	}
 }
 
@@ -141,6 +142,9 @@ type ManagerParams struct {
 	// behind. Nil takes the real one, which signals; a test supplies its own so
 	// Adopt neither forks a ps nor kills anything.
 	Orphans Orphans
+	// Stacks verifies what a detached launcher started. Nil takes the real one,
+	// which shells out to docker.
+	Stacks Stacks
 }
 
 func NewManagerWith(params ManagerParams) *Manager {
@@ -148,12 +152,17 @@ func NewManagerWith(params ManagerParams) *Manager {
 	if orphans == nil {
 		orphans = systemOrphans{}
 	}
+	stacks := params.Stacks
+	if stacks == nil {
+		stacks = systemStacks{}
+	}
 	return &Manager{
 		jobs:            make(map[string]*ManagedJob),
 		routes:          params.Routes,
 		index:           params.Index,
 		namespaceBudget: params.NamespaceBudget,
 		orphans:         orphans,
+		stacks:          stacks,
 	}
 }
 
@@ -169,16 +178,19 @@ func NewManagerWith(params ManagerParams) *Manager {
 // after it. The next start-up is the only place left.
 func (m *Manager) Adopt(records []domain.JobRecord) {
 	states := m.orphans.Probe(orphanQueries(records))
+	stacks := m.stacks.Probe(stackQueriesOf(records))
 
 	var reap []int
 	m.mu.Lock()
 	for _, record := range records {
 		state := states[record.PGID]
+		stack := stacks[jobKey(record.Name, record.WorkDir)]
 		decision := rules.ReconcileJob(rules.ReconcileJobParams{
 			Record:            record,
 			WorkDirExists:     dirExists(record.WorkDir),
 			GroupAlive:        state.Alive,
 			IdentityConfirmed: state.IdentityConfirmed,
+			StackKnownDown:    stack.Known && !stack.Up,
 		})
 		if !decision.Adopt {
 			continue
@@ -361,13 +373,7 @@ func (m *Manager) Start(params StartParams) error {
 
 	spec := rules.ShellCommand(job.Cmd)
 	cmd := exec.Command(spec.Name, spec.Args...)
-	if job.Cwd != "" && !filepath.IsAbs(job.Cwd) {
-		cmd.Dir = filepath.Join(params.WorkDir, job.Cwd)
-	} else if job.Cwd != "" {
-		cmd.Dir = job.Cwd
-	} else {
-		cmd.Dir = params.WorkDir
-	}
+	cmd.Dir = rules.JobDir(rules.JobDirParams{WorkDir: params.WorkDir, Cwd: job.Cwd})
 	// Resolved once and kept on the job: the stop command must run with the same
 	// ports its start did, or it tears down a stack it never brought up.
 	env := withJobPorts(job, params.Env)

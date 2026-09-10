@@ -354,8 +354,14 @@ func (d *daemonServer) jobInfoOf(job ManagedJob) domain.JobInfo {
 // A claim, like a detached launcher, has no process of its own to report: the
 // service it holds runs under the main checkout's key, and printing its PID
 // beside three worktrees would read as three processes.
+//
+// Read off the config rather than the status, because a detached launcher's entry
+// outlives the `detached` state: verified gone or stopped by hand, it still only
+// ever knew a PID that has since exited — and points at nothing, or in time at a
+// stranger. A foreground service keeps its PID in every state, reaped included,
+// where it is the most useful thing on the row.
 func detachedAwarePID(job ManagedJob) int {
-	if job.Status == domain.JobStatusDetached || job.Status == domain.JobStatusAttached {
+	if job.Status == domain.JobStatusAttached || rules.IsDetached(job.Config) {
 		return 0
 	}
 	return job.PID

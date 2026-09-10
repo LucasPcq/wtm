@@ -2046,6 +2046,15 @@ const (
 	// evicting no longer reports. It is given back at the live tail.
 	JobPaneScrollbackBurstFactor = 2
 
+	// The compose vocabulary a detached job's liveness is verified through. One
+	// tool with one stable subcommand, deliberately: a launcher wtm does not
+	// recognize keeps reporting what it actually knows rather than a guess.
+	DockerBin           = "docker"
+	ComposeLegacyBin    = "docker-compose"
+	ComposeSubcommand   = "compose"
+	ComposeFileFlag     = "-f"
+	ComposeFileFlagLong = "--file"
+
 	// ShellBin is the interpreter every command written in a config file runs
 	// through — a job's cmd and stop, and every lifecycle hook. POSIX sh rather
 	// than the user's own shell: a run.toml shared across a team must behave the
@@ -3674,6 +3683,10 @@ var EnvTemplateSuffixes = []string{
 // value differs per worktree by construction, so the reconciliation reports them
 // neither as drift nor as a conflict.
 var WtmOwnedEnvKeys = []string{EnvComposeProjectName}
+
+// ComposePSArgs asks compose which of the project's containers are running. `ps`
+// lists only running ones without -a, so an empty answer is the whole verdict.
+var ComposePSArgs = []string{"ps", "-q"}
 
 // ComposeCmdSpaced and ComposeCmdHyphened are the two spellings a job's command
 // uses to drive compose, and how wtm recognizes the stack's project directory.

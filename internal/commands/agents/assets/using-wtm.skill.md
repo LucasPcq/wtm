@@ -502,13 +502,22 @@ and **experimental**: the global `wtm init` does not configure it.
   array as a roster of the project's jobs: `wtm run job list --output json` is that.
 - **`status` has six values, and `detached` is not a weaker `running`.** A service with
   a `stop` command (a `docker compose up -d`) is reported `detached` from the moment its
-  launcher exits: the real work runs outside wtm, nothing about it was verified, and
-  there is **nothing to attach to** — `run logs` on it prints its persisted file and
-  returns. It is up: it counts as a running job for `run down`, and `wtm run up` on it
-  simply relaunches the launcher rather than refusing "already running". `running` is a
-  foreground service the daemon holds a terminal for, `crashed` one whose process died,
-  `stopped` one that was stopped, and `attached` a worktree's claim on a shared service
-  (see the shared-services section: `pid` is 0 on a claim).
+  launcher exits: the real work runs outside wtm, and there is **nothing to attach to** —
+  `run logs` on it prints its persisted file and returns. A compose launcher is the one
+  wtm can check: when a daemon starts it asks `docker compose ps` about each such entry,
+  and one whose containers are gone — a `docker compose down` run by hand, a
+  `docker system prune` — is reported **`stopped`** instead. Any other launcher, a
+  machine without docker, or a call that fails leaves the entry `detached`, which says
+  what wtm actually knows rather than what it could not check. The check runs when a
+  daemon adopts the index, not on every listing: a `run ps` served by a daemon that was
+  already up reports what that daemon holds.
+  While it says `detached` it is up: it counts as a running job for `run down`, and
+  `wtm run up` on it simply relaunches the launcher rather than refusing "already
+  running". Of the rest, `running` is a foreground service the daemon holds a terminal
+  for, `crashed` one whose process died on its own, `stopped` one that was stopped —
+  by `run stop`, or by whoever took a verified compose stack down — and `attached` a
+  worktree's claim on a shared service (see the shared-services section: `pid` is 0 on
+  a claim, and on a launcher whatever became of it).
 - **`reaped` is the sixth, and it says wtm killed something.** A daemon killed without
   running a handler — `SIGKILL`, a crash, an OOM — leaves its foreground services alive
   and unreadable. The next daemon finds them from the index, proves the process group is

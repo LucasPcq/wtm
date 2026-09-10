@@ -152,3 +152,32 @@ func TestIsJobUpKeepsOnlyLiveEntries(t *testing.T) {
 		}
 	}
 }
+
+func TestReconcileJobReportsAVerifiedDeadStackAsStopped(t *testing.T) {
+	decision := rules.ReconcileJob(rules.ReconcileJobParams{
+		Record:         detachedRecord(),
+		WorkDirExists:  true,
+		StackKnownDown: true,
+	})
+
+	if decision.Status != domain.JobStatusStopped {
+		t.Fatalf("status = %q, want %q: a stack taken down by hand is not still detached", decision.Status, domain.JobStatusStopped)
+	}
+	if !decision.Adopt {
+		t.Fatal("the entry must be kept long enough for run ps to say it ended")
+	}
+	if decision.Reap {
+		t.Fatal("nothing to reap: the launcher's work belongs to Docker, and it is already gone")
+	}
+}
+
+func TestReconcileJobKeepsAStackItCouldNotVerifyDetached(t *testing.T) {
+	decision := rules.ReconcileJob(rules.ReconcileJobParams{
+		Record:        detachedRecord(),
+		WorkDirExists: true,
+	})
+
+	if decision.Status != domain.JobStatusDetached {
+		t.Fatalf("status = %q, want %q: an unverifiable launcher must say what wtm knows, not what it failed to check", decision.Status, domain.JobStatusDetached)
+	}
+}

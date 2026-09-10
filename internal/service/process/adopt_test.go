@@ -18,7 +18,7 @@ func (r *recordingIndex) Save(records []domain.JobRecord) error {
 
 func TestAdoptRegistersDetachedJobsAsDetached(t *testing.T) {
 	dir := t.TempDir()
-	manager := NewManagerWith(ManagerParams{Index: &recordingIndex{}})
+	manager := NewManagerWith(ManagerParams{Index: &recordingIndex{}, Stacks: &unknownStacks{}})
 
 	manager.Adopt([]domain.JobRecord{detachedRecord(t, dir)})
 
@@ -36,7 +36,7 @@ func TestAdoptRegistersDetachedJobsAsDetached(t *testing.T) {
 
 func TestAdoptedDetachedJobLeavesTheDaemonFreeToExit(t *testing.T) {
 	dir := t.TempDir()
-	manager := NewManagerWith(ManagerParams{})
+	manager := NewManagerWith(ManagerParams{Stacks: &unknownStacks{}})
 
 	manager.Adopt([]domain.JobRecord{detachedRecord(t, dir)})
 
@@ -50,7 +50,7 @@ func TestAdoptDropsEntriesOfDeletedWorktrees(t *testing.T) {
 	record := detachedRecord(t, dir)
 	os.RemoveAll(dir)
 
-	manager := NewManagerWith(ManagerParams{})
+	manager := NewManagerWith(ManagerParams{Stacks: &unknownStacks{}})
 	manager.Adopt([]domain.JobRecord{record})
 
 	if len(manager.List()) != 0 {
@@ -63,7 +63,7 @@ func TestAdoptRewritesTheIndexWithWhatItKept(t *testing.T) {
 	gone := detachedRecord(t, "/definitely/not/here")
 	index := &recordingIndex{}
 
-	manager := NewManagerWith(ManagerParams{Index: index})
+	manager := NewManagerWith(ManagerParams{Index: index, Stacks: &unknownStacks{}})
 	manager.Adopt([]domain.JobRecord{detachedRecord(t, dir), gone})
 
 	if len(index.saved) != 1 {
@@ -81,7 +81,7 @@ func TestStopOnAnAdoptedJobRunsItsStopCommandAndClearsTheIndex(t *testing.T) {
 	record.Config.Stop = "touch " + marker
 	index := &recordingIndex{}
 
-	manager := NewManagerWith(ManagerParams{Index: index})
+	manager := NewManagerWith(ManagerParams{Index: index, Stacks: &unknownStacks{}})
 	manager.Adopt([]domain.JobRecord{record})
 
 	if err := manager.Stop("db", dir); err != nil {
