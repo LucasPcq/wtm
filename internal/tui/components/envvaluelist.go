@@ -83,8 +83,7 @@ func (m EnvValueListModel) Update(msg tea.Msg) (EnvValueListModel, tea.Cmd) {
 		return m.toggle(), nil
 	case "enter":
 		if m.cursor == m.doneRow() {
-			m.done = true
-			return m, nil
+			return m.finish(), nil
 		}
 		return m.startEdit(), nil
 	case "esc":
@@ -92,6 +91,23 @@ func (m EnvValueListModel) Update(msg tea.Msg) (EnvValueListModel, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// finish refuses to leave with a linked row whose template never varies, and
+// puts the cursor on it: the field opens on the value from disk, so accepting one
+// unchanged is the easy mistake, and it would pin every worktree to one value.
+func (m EnvValueListModel) finish() EnvValueListModel {
+	for i, field := range m.fields {
+		if !field.Linked || rules.EnvValueHasPlaceholder(field.Value) {
+			continue
+		}
+		m.cursor = i
+		m.err = domain.EnvValueConstantErr
+		return m
+	}
+	m.done = true
+	m.err = ""
+	return m
 }
 
 func (m EnvValueListModel) toggle() EnvValueListModel {
@@ -149,6 +165,10 @@ func (m EnvValueListModel) saveEdit() EnvValueListModel {
 		m.err = domain.EnvValueEmptyErr
 		return m
 	}
+	if !rules.EnvValueHasPlaceholder(value) {
+		m.err = domain.EnvValueConstantErr
+		return m
+	}
 
 	m.fields[m.cursor].Value = value
 	m.editing = false
@@ -179,6 +199,7 @@ func (m EnvValueListModel) View() string {
 	m.renderRow(&b, envValueRowParams{Done: true}, m.cursor == m.doneRow())
 
 	if m.editing {
+		b.WriteString(m.renderCurrent(m.fields[m.cursor].Current))
 		b.WriteString(renderVarGroups(renderVarGroupsParams{
 			Groups: m.fields[m.cursor].Vars, Width: m.width,
 		}))
@@ -188,6 +209,15 @@ func (m EnvValueListModel) View() string {
 		b.WriteString(errorBanner(m.err))
 	}
 	return b.String()
+}
+
+// renderCurrent keeps the value on disk in view while the template is written:
+// it is what the new one is derived from, and the input sits on top of it.
+func (m EnvValueListModel) renderCurrent(current string) string {
+	if current == "" {
+		return ""
+	}
+	return "\n\n" + styles.Indent + styles.Muted.Render(fmt.Sprintf(domain.EnvValueNowFmt, current))
 }
 
 func (m EnvValueListModel) helpActions() []string { return []string{domain.EnvValueHelpLink} }
@@ -228,6 +258,8 @@ func (m EnvValueListModel) renderRow(b *strings.Builder, params envValueRowParam
 // when it is not: an unlinked row shows the reader what the key is, a linked one
 // shows what it becomes.
 func (m EnvValueListModel) rowValue(params envValueRowParams) string {
+	// The row shows only the input while it is open: the value it came from is
+	// on its own line below, where the eye already is.
 	if params.Editing {
 		return m.input.View()
 	}

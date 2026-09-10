@@ -424,6 +424,12 @@ func validateEnvValueLinks(cfg domain.RunConfig) []string {
 		if link.Value == "" {
 			errs = append(errs, fmt.Sprintf(domain.EnvValueLinkValueEmptyFmt, link.Key, link.File))
 		}
+		// A template holding no placeholder writes the same value into every
+		// worktree and takes the key out of the reconciliation's verdict at the
+		// same time, which is strictly worse than leaving the key alone.
+		if link.Value != "" && !EnvValueHasPlaceholder(link.Value) {
+			errs = append(errs, fmt.Sprintf(domain.EnvValueLinkConstantFmt, link.Key, link.File))
+		}
 		if seen[ref] {
 			errs = append(errs, fmt.Sprintf(domain.EnvValueLinkTwiceFmt, link.Key, link.File))
 		}

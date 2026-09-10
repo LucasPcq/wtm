@@ -202,6 +202,7 @@ const (
 	EnvValueLinkNoNamespaceFmt  = "env %s in %s: job %q declares no [job.namespace], so {namespace} means nothing"
 	EnvValueLinkNoPortFmt       = "env %s in %s: job %q declares no port named %q"
 	EnvValueLinkTwiceFmt        = "env %s in %s is declared twice"
+	EnvValueLinkConstantFmt     = "env %s in %s: the value holds no placeholder, so every worktree would get the same one — put {namespace} where the slice belongs, or drop the link"
 	EnvValueLinkNoOriginFmt     = "env %s in %s: job %q publishes no address, so {origin} has no answer — publish a [job.url] for it, or write the host yourself"
 	EnvValueLinkBadNamespaceFmt = "env %s in %s: %v"
 	EnvValueUnclosedTokenFmt    = "env %s in %s: a {port.…} placeholder is never closed"
@@ -324,8 +325,13 @@ const (
 	EnvValueSkipNoShared = "no shared service carves out a slice"
 	EnvValueSkipNoKeys   = "no managed .env key to link"
 	EnvValueEmptyErr     = "a linked key needs a template; {namespace} is the usual one"
-	EnvValueEditHelp     = "enter save · esc cancel"
-	EnvValueHelpLink     = "space link"
+	// EnvValueConstantErr refuses a template that never varies. The field is
+	// pre-filled with the value on disk so a long URL is edited rather than
+	// retyped, which makes "accepted unchanged" the easy mistake to make.
+	EnvValueConstantErr = "this template never changes, so every worktree would get the same value — put {namespace} where the slice belongs"
+	EnvValueNowFmt      = "now  %s"
+	EnvValueEditHelp    = "enter save · esc cancel"
+	EnvValueHelpLink    = "space link"
 
 	NamespaceRowFmt      = "%-*s  %-7s  %s"
 	NamespaceRowEditFmt  = "%-*s  %-7s  %s"

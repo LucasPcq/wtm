@@ -183,3 +183,11 @@ func EnvValueOwnedKeys(links []domain.EnvValueLink, file string) map[string]bool
 	}
 	return keys
 }
+
+// EnvValueHasPlaceholder says the template varies per worktree at all. One that
+// does not writes the same value into every worktree and takes the key out of
+// the reconciliation's verdict at the same time — which is strictly worse than
+// leaving the key alone, and never what a link is for.
+func EnvValueHasPlaceholder(value string) bool {
+	return envValueToken.MatchString(value)
+}

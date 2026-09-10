@@ -68,8 +68,23 @@ func TestEnvValueFieldsPrechecksByTheJobsOwnName(t *testing.T) {
 	if fieldFor(t, fields, "KEYCLOAK_URL").Linked {
 		t.Error("KEYCLOAK_URL: linked, want the address left to [[env_port]]")
 	}
-	if got := fieldFor(t, fields, "KEYCLOAK_REALM").Value; got != "{namespace}" {
-		t.Errorf("value = %q, want the one proposal wtm makes", got)
+	// The template opens on the value the file holds, so a long URL is edited
+	// where it differs rather than retyped whole. It is a starting point, not an
+	// answer: one that never varies is refused before it can be written.
+	if got := fieldFor(t, fields, "KEYCLOAK_REALM").Value; got != "myapp" {
+		t.Errorf("value = %q, want the value on disk as the starting point", got)
+	}
+}
+
+// A key holding nothing has no starting point, so it opens on the one proposal
+// wtm makes.
+func TestEnvValueFieldsProposeTheNamespaceForAnEmptyKey(t *testing.T) {
+	params := keycloakFieldsParams()
+	params.Lines["apps/web/.env"] = append(params.Lines["apps/web/.env"],
+		domain.EnvLine{Kind: domain.EnvLinePair, Key: "KEYCLOAK_TENANT"})
+
+	if got := fieldFor(t, EnvValueFields(params), "KEYCLOAK_TENANT").Value; got != "{namespace}" {
+		t.Errorf("value = %q, want {namespace}", got)
 	}
 }
 
@@ -104,6 +119,13 @@ func TestEnvValueFieldsSkipAServiceWithoutANamespace(t *testing.T) {
 // an [[env_port]] concern, the realm becomes an [[env]] link.
 func TestEnvValuesFromFieldsKeepsOnlyLinkedRows(t *testing.T) {
 	fields := EnvValueFields(keycloakFieldsParams())
+
+	// As the user leaves the step: the realm's template edited onto the slice.
+	for i := range fields {
+		if fields[i].Key == "KEYCLOAK_REALM" {
+			fields[i].Value = "{namespace}"
+		}
+	}
 
 	links := EnvValuesFromFields(fields)
 	if len(links) != 1 {

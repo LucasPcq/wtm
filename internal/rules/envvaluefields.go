@@ -77,7 +77,7 @@ type envValueFieldParams struct {
 func envValueField(params envValueFieldParams) domain.EnvValueField {
 	field := domain.EnvValueField{
 		Job: params.Job, File: params.File, Key: params.Key,
-		Current: params.Current, Value: domain.EnvValueTokenNamespace,
+		Current: params.Current, Value: envValueTemplate(params.Current),
 		Vars: params.Vars,
 	}
 	if held, found := params.Linked[domain.EnvKeyRef{File: params.File, Key: params.Key}]; found {
@@ -112,6 +112,17 @@ func carriesPort(value string, bases []int) bool {
 		}
 	}
 	return false
+}
+
+// envValueTemplate opens on the value the file holds, so a long URL is edited
+// where it differs rather than retyped whole. It is a starting point and not an
+// answer — a template that never varies is refused — and a key holding nothing
+// starts at the one proposal wtm makes.
+func envValueTemplate(current string) string {
+	if current == "" {
+		return domain.EnvValueTokenNamespace
+	}
+	return current
 }
 
 // namesAfter is the whole of wtm's guess: KEYCLOAK_REALM beside a job called

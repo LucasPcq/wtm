@@ -13,7 +13,9 @@ func envValueList() EnvValueListModel {
 	return NewEnvValueList(NewEnvValueListParams{
 		Title: "t", Description: "d",
 		Fields: []domain.EnvValueField{
-			{Job: "keycloak", File: "apps/web/.env", Key: "KEYCLOAK_URL", Current: "http://localhost:8080"},
+			// Value mirrors what rules.EnvValueFields produces: the template opens
+			// on the value the file holds.
+			{Job: "keycloak", File: "apps/web/.env", Key: "KEYCLOAK_URL", Current: "http://localhost:8080", Value: "http://localhost:8080"},
 			{Job: "keycloak", File: "apps/web/.env", Key: "KEYCLOAK_REALM", Current: "myapp", Value: "{namespace}", Linked: true, Vars: testVarGroups()},
 		},
 	})
@@ -119,5 +121,46 @@ func TestEnvValueListShowsTheVocabularyWhileEditing(t *testing.T) {
 
 	if !strings.Contains(m.View(), domain.NamespaceVarsHeading) {
 		t.Errorf("view = %q, want the vocabulary while editing", m.View())
+	}
+}
+
+// The value on disk stays visible while the template is being written: it is
+// what the new one is derived from, and hiding it behind the input is what made
+// the field hard to fill.
+func TestEnvValueListShowsTheValueOnDiskWhileEditing(t *testing.T) {
+	m := evKey(envValueList(), tea.KeyEnter)
+
+	if !strings.Contains(m.View(), "http://localhost:8080") {
+		t.Errorf("view = %q, want the current value visible while editing", m.View())
+	}
+}
+
+// A template with no placeholder pins every worktree to one value and takes the
+// key out of the drift report at the same time. It is refused, and the message
+// says what to put there.
+func TestEnvValueListRefusesATemplateThatNeverVaries(t *testing.T) {
+	m := evKey(envValueList(), tea.KeyEnter)
+	m = evType(m, "-plain")
+	m = evKey(m, tea.KeyEnter)
+
+	if !strings.Contains(m.View(), "never changes") {
+		t.Errorf("view = %q, want the constant template refused", m.View())
+	}
+}
+
+// And Done cannot slip one past: a row pre-filled from disk and never edited
+// carries exactly such a template.
+func TestEnvValueListRefusesDoneWhileALinkedRowNeverVaries(t *testing.T) {
+	m := evSpace(envValueList())
+	for range 3 {
+		m = evKey(m, tea.KeyDown)
+	}
+	m = evKey(m, tea.KeyEnter)
+
+	if m.Done() {
+		t.Error("the step accepted a linked row whose template never varies")
+	}
+	if !strings.Contains(m.View(), "never changes") {
+		t.Errorf("view = %q, want the offending row named", m.View())
 	}
 }
