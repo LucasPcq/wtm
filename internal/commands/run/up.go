@@ -30,7 +30,8 @@ func newUpCmd() *cobra.Command {
 			"When another worktree is already running jobs, wtm asks once what to do about it and can\n" +
 			"remember the answer as run.toml's `concurrency`; --exclusive and --parallel override it\n" +
 			"for one run. --exclusive is refused on several worktrees, since it stops all but one.\n" +
-			"The run view opens on the jobs as they start; leaving it detaches without stopping them, and -d skips it.",
+			"The run view opens on the jobs as they start; leaving it detaches without stopping them —\n" +
+			"the rest of the profile keeps starting, reported line by line — and -d skips the view.",
 		Args: cobra.ArbitraryArgs,
 		RunE: runUp,
 	}

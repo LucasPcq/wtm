@@ -195,6 +195,7 @@ func (m Model) followSequence(event runlogs.Event) (Model, tea.Cmd) {
 func (m Model) applyRunFinished(msg runFinishedMsg) (Model, tea.Cmd) {
 	noticeLines := len(m.report())
 	m.sequence.active = false
+	m.runDone = true
 	for _, outcome := range msg.outcomes {
 		m.sequence.record(outcome)
 	}

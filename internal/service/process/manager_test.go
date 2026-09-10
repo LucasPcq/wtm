@@ -422,3 +422,96 @@ func TestExitCodeOfReadsTheCodeAFailureCarries(t *testing.T) {
 		t.Errorf("exitCodeOf(nil) = %d, want 0", got)
 	}
 }
+
+// The window is what an error report and a pane's replay are built from, so a
+// wrap must not scramble the order or lose the newest bytes — the two things a
+// reader opened them for.
+func TestTheOutputWindowKeepsTheLastBytesInOrder(t *testing.T) {
+	cases := []struct {
+		name     string
+		capacity int
+		chunks   []string
+		want     string
+	}{
+		{name: "short of the window", capacity: 8, chunks: []string{"ab", "cd"}, want: "abcd"},
+		{name: "exactly the window", capacity: 4, chunks: []string{"ab", "cd"}, want: "abcd"},
+		{name: "wrapped once", capacity: 4, chunks: []string{"abc", "de"}, want: "bcde"},
+		{name: "wrapped many times", capacity: 4, chunks: []string{"ab", "cd", "ef", "gh", "ij"}, want: "ghij"},
+		{name: "a chunk bigger than the window", capacity: 4, chunks: []string{"x", "abcdefgh"}, want: "efgh"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ring := newRingBuffer(c.capacity)
+			for _, chunk := range c.chunks {
+				if n, err := ring.Write([]byte(chunk)); n != len(chunk) || err != nil {
+					t.Fatalf("Write(%q) = %d, %v, want %d bytes taken", chunk, n, err, len(chunk))
+				}
+			}
+			if got := ring.String(); got != c.want {
+				t.Errorf("window = %q, want %q", got, c.want)
+			}
+			if got := string(ring.Snapshot()); got != c.want {
+				t.Errorf("snapshot = %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
+// The window is a fixed array, so a job printing megabytes must not grow it or
+// recopy it: that reallocation is what made an idle daemon collect garbage.
+func TestTheOutputWindowNeverGrows(t *testing.T) {
+	ring := newRingBuffer(64)
+	held := &ring.buf[0]
+
+	for i := 0; i < 10_000; i++ {
+		ring.Write([]byte("a line of output from a job\n"))
+	}
+
+	if len(ring.buf) != 64 || &ring.buf[0] != held {
+		t.Errorf("the window moved or grew to %d bytes; it must stay the array it was allocated as", len(ring.buf))
+	}
+}
+
+// The daemon stops its services on the way out and exits as soon as they report
+// stopped. Reaping the process is not the end of its output — the tail is still
+// being copied out of the PTY, and the sink batches its writes — so a Stop that
+// returns before the drain is done lets the daemon exit on top of the shutdown
+// lines the log is opened for.
+func TestStoppingAServiceWaitsForItsOutputToReachTheLog(t *testing.T) {
+	m := NewManager()
+	dir := t.TempDir()
+	logDir := filepath.Join(dir, "logs")
+
+	job := domain.JobConfig{
+		Name: "web",
+		Cmd:  "trap 'echo shutting-down; exit 0' TERM; echo listening; while true; do sleep 0.05; done",
+	}
+	if err := m.Start(StartParams{Job: job, WorkDir: dir, LogDir: logDir}); err != nil {
+		t.Fatalf("start service: %v", err)
+	}
+	path := JobLogPath(JobLogPathParams{LogDir: logDir, Job: "web"})
+	waitForLogLine(t, path, "listening")
+
+	m.mu.Lock()
+	managed := m.jobs[jobKey("web", dir)]
+	m.mu.Unlock()
+	if managed == nil || managed.drained == nil {
+		t.Fatal("a foreground service must carry the drain its Stop waits on")
+	}
+
+	if err := m.Stop("web", dir); err != nil {
+		t.Fatalf("stop service: %v", err)
+	}
+
+	// Deterministic in the presence of the wait, and the only assertion that is:
+	// racing the drain from the test would pass either way.
+	select {
+	case <-managed.drained:
+	default:
+		t.Error("Stop reported the job stopped while its last bytes were still in flight")
+	}
+	if logged := readLog(t, path); !strings.Contains(logged, "shutting-down") {
+		t.Errorf("log = %q, want the line the job printed on its way out", logged)
+	}
+}

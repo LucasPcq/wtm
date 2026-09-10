@@ -47,6 +47,11 @@ const (
 // enough that the user doesn't notice a hang.
 const stopGracePeriod = 5 * time.Second
 
+// drainGracePeriod bounds the wait for a stopped job's last bytes to reach its
+// log. It is short because the process is already reaped: what is left is a
+// read of what the PTY still holds.
+const drainGracePeriod = time.Second
+
 // detachedDrainGracePeriod bounds how long the PTY drain goroutine is awaited
 // to reach natural EOF after the process exits, before force-closing the master
 // to unblock it. It backstops both waitDetached (detached launchers) and runTask
@@ -94,6 +99,12 @@ type ManagedJob struct {
 	output   *outputHub    // nil for detached launcher-style services
 	logs     *LogSink      // nil when the client asked for no persisted log
 	exited   chan struct{} // closed when the underlying process has been reaped
+	// drained is closed once the PTY has been copied to its natural EOF and the
+	// log sink closed. Reaping is not the end of the output: the tail of what a
+	// job printed on its way out is still in flight when exited closes, and the
+	// sink batches its writes. Nil for a job with no drain of its own — one
+	// adopted from the index, a task, a detached launcher.
+	drained chan struct{}
 }
 
 // RouteSink is where a started job's route is published. The proxy implements
@@ -411,6 +422,9 @@ func (m *Manager) Start(params StartParams) error {
 		output:    hub,
 		logs:      logs,
 		exited:    make(chan struct{}),
+	}
+	if job.Kind != domain.JobKindTask && !rules.IsDetached(job) {
+		managed.drained = make(chan struct{})
 	}
 	m.jobs[key] = managed
 	m.mu.Unlock()
@@ -751,28 +765,52 @@ func cleanPTYOutput(raw string) string {
 	return strings.Join(lines, "\n")
 }
 
+// ringBuffer is a fixed array written round. Sliding a slice forward over an
+// appended one instead spends its remaining capacity, so append reallocates and
+// recopies the whole window every capacity bytes of output — per job, for the
+// life of the daemon.
 type ringBuffer struct {
-	buf []byte
-	cap int
+	buf  []byte
+	next int
+	// full tells a partial window from a whole one once next has come back round
+	// to zero.
+	full bool
 }
 
-func newRingBuffer(cap int) *ringBuffer {
-	return &ringBuffer{buf: make([]byte, 0, cap), cap: cap}
+func newRingBuffer(capacity int) *ringBuffer {
+	return &ringBuffer{buf: make([]byte, capacity)}
 }
 
 func (r *ringBuffer) Write(p []byte) (int, error) {
-	r.buf = append(r.buf, p...)
-	if len(r.buf) > r.cap {
-		r.buf = r.buf[len(r.buf)-r.cap:]
+	if len(p) >= len(r.buf) {
+		copy(r.buf, p[len(p)-len(r.buf):])
+		r.next, r.full = 0, true
+		return len(p), nil
+	}
+
+	head := copy(r.buf[r.next:], p)
+	if head < len(p) {
+		copy(r.buf, p[head:])
+	}
+	r.next += len(p)
+	if r.next >= len(r.buf) {
+		r.next -= len(r.buf)
+		r.full = true
 	}
 	return len(p), nil
 }
 
-func (r *ringBuffer) String() string { return string(r.buf) }
+func (r *ringBuffer) String() string { return string(r.Snapshot()) }
 
 func (r *ringBuffer) Snapshot() []byte {
+	if !r.full {
+		out := make([]byte, r.next)
+		copy(out, r.buf[:r.next])
+		return out
+	}
 	out := make([]byte, len(r.buf))
-	copy(out, r.buf)
+	tail := copy(out, r.buf[r.next:])
+	copy(out[tail:], r.buf[:r.next])
 	return out
 }
 
@@ -857,6 +895,9 @@ func (h *outputHub) close() {
 // drainToHub runs for the job's whole life: without a continuous reader the OS
 // PTY buffer fills up and blocks the job's own writes before any client attaches.
 func (m *Manager) drainToHub(job *ManagedJob) {
+	if job.drained != nil {
+		defer close(job.drained)
+	}
 	var sink io.Writer = job.output
 	if job.logs != nil {
 		sink = io.MultiWriter(job.output, job.logs)
@@ -1163,9 +1204,25 @@ func (m *Manager) stopWithSignal(job *ManagedJob) error {
 		_ = syscall.Kill(-pid, syscall.SIGKILL)
 		<-job.exited
 	}
+	waitDrained(job)
 
 	m.markStopped(job)
 	return nil
+}
+
+// waitDrained holds until the job's last bytes have reached its log. The daemon
+// stops its jobs on the way out and exits as soon as they report stopped, so
+// without this the shutdown output — the one thing the log is opened for — is
+// still in the sink's buffer when the process goes. Bounded: a PTY whose other
+// end is held open by an orphan would otherwise never reach EOF.
+func waitDrained(job *ManagedJob) {
+	if job.drained == nil {
+		return
+	}
+	select {
+	case <-job.drained:
+	case <-time.After(drainGracePeriod):
+	}
 }
 
 func (m *Manager) waitForExit(job *ManagedJob) {

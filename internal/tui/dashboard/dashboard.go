@@ -5,6 +5,7 @@ package dashboard
 
 import (
 	"fmt"
+	"maps"
 	"path/filepath"
 	"time"
 
@@ -139,6 +140,8 @@ type prsMsg struct {
 }
 
 type pollMsg struct{}
+
+type gitPollMsg struct{}
 
 // tabSlideTickMsg redraws while the tab rule is sliding. The handler is where
 // the sequence ends: it re-arms only while the slide is still short of its
@@ -342,11 +345,15 @@ func (m Model) Init() tea.Cmd {
 	// The spinner is started on demand, at the point a detail load actually
 	// begins (fireDetailTick, reloadDetailCmd) — not here, or it would tick for
 	// the life of the program whether or not anything is loading.
-	return tea.Batch(m.loadWorktreesCmd(false), m.loadPRsCmd(), m.loadJobsCmd(true), pollCmd(), listenCmd(m.msgs))
+	return tea.Batch(m.loadWorktreesCmd(false), m.loadPRsCmd(), m.loadJobsCmd(true), pollCmd(), gitPollCmd(), listenCmd(m.msgs))
 }
 
 func pollCmd() tea.Cmd {
 	return tea.Tick(domain.DashboardPollSeconds*time.Second, func(time.Time) tea.Msg { return pollMsg{} })
+}
+
+func gitPollCmd() tea.Cmd {
+	return tea.Tick(domain.DashboardGitPollSeconds*time.Second, func(time.Time) tea.Msg { return gitPollMsg{} })
 }
 
 func tabSlideTickCmd() tea.Cmd {
@@ -467,10 +474,11 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		next, animCmd := m.applyWorktrees(msg)
 		next = next.withBoard()
 		model, detailCmd := next.triggerDetailReload(before)
-		// Only the worktrees ask here, and only while the jobs have not been read
-		// yet: past the first poll it is applyJobs that knows something changed,
-		// and both asking would run the read twice every tick.
-		return model, tea.Batch(animCmd, detailCmd, next.firstAddressesCmd(), next.resolveTracesCmd())
+		// An address is not a function of the jobs alone: the loader dials the
+		// proxy and reads the worktree's .env, so a proxy that came up late or a
+		// port that moved under a job still running is only ever caught here.
+		// This is the git clock, and KeyRefresh comes through it too.
+		return model, tea.Batch(animCmd, detailCmd, next.resolveAddressesCmd(), next.resolveTracesCmd())
 
 	case tracesMsg:
 		m.logged = msg.logged
@@ -488,8 +496,13 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.applyJobs(msg)
 
 	case pollMsg:
+		// The logs tail is the detail panel's one exception to being absent from
+		// every clock — a tail nobody refreshes is a screenshot.
+		return m, tea.Batch(m.loadJobsCmd(false), m.tailLogsCmd(), pollCmd())
+
+	case gitPollMsg:
 		if m.loading {
-			return m, pollCmd()
+			return m, gitPollCmd()
 		}
 		m.loading = true
 		// The tree only refreshes on the poll while it is on screen; rebuilding a
@@ -501,9 +514,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// The detail panel is deliberately absent from the poll: a reload every
 		// few seconds mutes the whole panel behind a "refreshing" marker while
 		// the user is reading it. It reloads when the selection changes, when an
-		// operation touches its branch, and on KeyRefresh — never on a timer. Its
-		// logs view is the exception: a tail nobody refreshes is a screenshot.
-		return m, tea.Batch(m.loadWorktreesCmd(false), m.loadJobsCmd(false), tree, m.tailLogsCmd(), pollCmd())
+		// operation touches its branch, and on KeyRefresh — never on a timer.
+		return m, tea.Batch(m.loadWorktreesCmd(false), tree, gitPollCmd())
 
 	case treeMsg:
 		before := m.selectedBranch()
@@ -1218,17 +1230,6 @@ func (m Model) withBoard() Model {
 	return m.reflow()
 }
 
-// firstAddressesCmd covers the one case applyJobs cannot: Init reads the
-// worktrees and the jobs in parallel, so the jobs may have landed while the
-// list was still empty. Once the addresses are in, the poll's own path owns
-// them.
-func (m Model) firstAddressesCmd() tea.Cmd {
-	if len(m.addresses) > 0 {
-		return nil
-	}
-	return m.resolveAddressesCmd()
-}
-
 // resolveTracesCmd asks what each worktree has left on disk. Unlike the
 // addresses it covers every worktree the list holds, running or not: a trace is
 // what a job leaves once the daemon has dropped it, so the worktrees with
@@ -1291,12 +1292,22 @@ func defaultJobsLoader(wake bool) ([]domain.JobInfo, bool) {
 func (m Model) applyJobs(msg jobsMsg) (Model, tea.Cmd) {
 	changed := !rules.SameRunJobs(m.runConfig, msg.config)
 	m.runConfig = msg.config
+	// What the ordinals, the traces and the tree's per-node counts are derived
+	// from is the running set, counts included: a job stopping beside another
+	// still up moves no branch in or out, and the tree would carry the old count
+	// until the git clock came round. A poll that finds it unmoved — the
+	// overwhelming majority of them — re-derives nothing.
+	moved := changed
 	if msg.known {
+		moved = moved || !maps.Equal(m.running, msg.running)
 		m.jobs, m.running = msg.jobs, msg.running
 	}
 	// The tree carries the count on its nodes, so the rows already drawn hold a
 	// stale one until they are rebuilt.
 	m = m.withBoard()
+	if !moved {
+		return m, nil
+	}
 	if !changed {
 		return m, tea.Batch(m.treeCmd(), m.resolveAddressesCmd(), m.resolveTracesCmd())
 	}

@@ -26,12 +26,13 @@ func (p upPresenter) Sequence(params seam.SequenceParams) (runlogs.Outcomes, err
 	switch rules.DecideRunSurface(rules.RunSurfaceParams{Detach: p.detach, TTY: isTTY(), Format: p.Format}) {
 	case domain.RunSurfaceView:
 		return showRunView(viewParams{
-			Cmd:       p.Cmd,
-			Board:     params.Board,
-			Profile:   params.Profile,
-			Worktrees: params.Worktrees,
-			Warnings:  params.Warnings,
-			Start:     params.Start,
+			Cmd:        p.Cmd,
+			Board:      params.Board,
+			Profile:    params.Profile,
+			Worktrees:  params.Worktrees,
+			Warnings:   params.Warnings,
+			Start:      params.Start,
+			Hyperlinks: p.Human && isTTY(),
 		})
 	case domain.RunSurfaceMachine:
 		return runForMachine(streamParams{Cmd: p.Cmd, Start: params.Start})
@@ -78,6 +79,7 @@ func (p startPresenter) Sequence(params seam.SequenceParams) (runlogs.Outcomes, 
 		return showRunView(viewParams{
 			Cmd: p.Cmd, Board: params.Board, Job: params.Job,
 			Warnings: params.Warnings, Start: params.Start,
+			Hyperlinks: p.Human && isTTY(),
 		})
 	case domain.RunSurfaceMachine:
 		return p.machine(params)

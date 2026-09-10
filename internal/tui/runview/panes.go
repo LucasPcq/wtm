@@ -38,6 +38,9 @@ type paneStore struct {
 	mu    sync.Mutex
 	size  PaneSize
 	panes map[jobKey]*jobPane
+	// followed is the only job whose writes are worth a frame: a starting profile
+	// feeds every pane it opens, and one of them is on screen.
+	followed jobKey
 }
 
 func newPaneStore(size PaneSize) *paneStore {
@@ -192,6 +195,24 @@ func (s *paneStore) stream(job jobKey) runlogs.Stream {
 		return nil
 	}
 	return entry.stream
+}
+
+// follow is set from the one place the cursor moves, so the redraw clock keeps
+// watching the drawn pane without being restarted when the selection changes.
+func (s *paneStore) follow(key jobKey) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.followed = key
+}
+
+func (s *paneStore) takeDirty() bool {
+	s.mu.Lock()
+	entry, held := s.panes[s.followed]
+	s.mu.Unlock()
+	if !held {
+		return false
+	}
+	return entry.pane.TakeDirty()
 }
 
 // hasStream reports whether anything is still feeding a pane, which is the

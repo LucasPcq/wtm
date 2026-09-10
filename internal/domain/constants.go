@@ -1994,6 +1994,14 @@ const (
 	JobLogMaxBytes = 5 << 20
 	JobLogMaxFiles = 3
 
+	// JobLogBufferBytes batches the writes to a job's log: a PTY hands over a
+	// chunk at a time, and a job redrawing a progress bar turns that into a
+	// syscall per frame. JobLogFlushInterval bounds what the batching costs the
+	// reader — the file is what `wtm run logs` and the dashboard's tail read, so
+	// a line may wait that long to be readable and not a moment more.
+	JobLogBufferBytes   = 16 << 10
+	JobLogFlushInterval = 200 * time.Millisecond
+
 	// JobLogMaxPendingBytes caps the unterminated tail the sanitizer carries
 	// between two chunks. A job that redraws one line forever without ever
 	// emitting a newline (a progress bar) would otherwise hold — and re-scan —
@@ -2121,7 +2129,24 @@ const (
 	// RunViewRenderFPS throttles the redraw of a pane being written to. Writing
 	// a chunk into the emulator costs a fraction of rendering the grid, so the
 	// bytes are taken as they come and only the drawing is paced.
-	RunViewRenderFPS = 30
+	//
+	// RunViewPreviewRenderFPS paces a preview a dashboard hosts: one of its
+	// frames repaints every panel of the host and rescans the screen for mouse
+	// zones, where a frame of the full view repaints only itself.
+	RunViewRenderFPS        = 30
+	RunViewPreviewRenderFPS = 10
+
+	// RunDetachedNotice heads what a run prints after the reader has left its
+	// view. The sequence is the client's to finish — the daemon cannot take it
+	// over — so leaving stops the watching, not the run, and the reader has to be
+	// told where the rest of it is going.
+	RunDetachedNotice = "Left the view. The rest of the run is reported here."
+
+	// RunDetachHeldChunks caps the job output held while a detached run waits for
+	// its new reporter. The hand-over is the terminal being given back — a few
+	// milliseconds — so the cap is only there to keep a job that prints without
+	// pause from growing a buffer nobody is reading.
+	RunDetachHeldChunks = 256
 
 	// RunViewScrollLines is how far one scroll key moves through a pane's
 	// history; a page moves by the pane's own height.
@@ -2930,9 +2955,17 @@ const (
 	// DashboardNarrowWidth is the terminal width under which the dashboard drops
 	// the side-by-side detail panel for a list-only view, detail on a key.
 	DashboardNarrowWidth = 100
-	// DashboardPollSeconds paces the local-git poll. `gh` is never polled: PRs load
-	// once asynchronously and refresh only on KeyRefresh.
-	DashboardPollSeconds = 3
+	// DashboardPollSeconds paces the daemon poll: a socket round-trip, and a tail
+	// of a log file when no live preview is already reading that output.
+	//
+	// DashboardGitPollSeconds paces the git one, which costs a `git status` over
+	// the whole working tree plus a rev-list and a divergence read per worktree —
+	// several processes per worktree, and the dashboard's only real background
+	// cost. Local git state does not move on its own, so it is read on a slow
+	// clock; KeyRefresh stays the explicit gesture, and the only one that fetches.
+	// `gh` is never polled at all: PRs load once and refresh only on KeyRefresh.
+	DashboardPollSeconds    = 3
+	DashboardGitPollSeconds = 20
 	// DashboardDetailCommits is the number of commits requested for ACTIVITY.
 	// DashboardDetailChanges is CHANGES' equivalent fixed cap. Both are fixed
 	// maximums, not a budget split with the leftover height: a list either

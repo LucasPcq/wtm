@@ -16,6 +16,10 @@ import (
 type Result struct {
 	Recap    string
 	Outcomes runlogs.Outcomes
+	// Detached reports that the reader left before the run ended, so the rest of
+	// it was reported by the surface's own sink rather than by this view. Recap
+	// is empty then: the account was given line by line as it happened.
+	Detached bool
 }
 
 func (m Model) result() Result {

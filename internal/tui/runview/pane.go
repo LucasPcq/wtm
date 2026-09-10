@@ -30,6 +30,7 @@ type Pane struct {
 	size       PaneSize
 	scrollback int
 	offset     int
+	dirty      bool
 }
 
 func NewPane(params PaneParams) *Pane {
@@ -49,7 +50,18 @@ func (p *Pane) Write(b []byte) (int, error) {
 	held := p.term.ScrollbackLen()
 	n, err := p.term.Write(b)
 	p.followLocked(held)
+	p.dirty = true
 	return n, err
+}
+
+// TakeDirty raises on writes alone: a scroll, a resize or a selection reaches
+// the screen on the message that caused it, which Bubbletea redraws after.
+func (p *Pane) TakeDirty() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	written := p.dirty
+	p.dirty = false
+	return written
 }
 
 // Resize reports whether the size actually changed. x/vt never reflows, so only

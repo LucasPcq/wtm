@@ -262,9 +262,12 @@ func (r *runner) run() Outcome {
 			},
 		})
 		if err != nil {
-			// A read the removal itself broke says nothing about the job.
+			// A read the detach itself broke says nothing about the job: the
+			// daemon took the request and is running it. Naming it among the ones
+			// not started is the one thing the report must not do — it is what
+			// made leaving look like it had killed the job.
 			if r.ctx.Err() != nil {
-				return r.detached(i)
+				return r.detached(i + 1)
 			}
 			return r.abort(abortParams{Index: i, Job: job, Reason: err.Error()})
 		}
@@ -625,9 +628,13 @@ func (r *runner) abort(params abortParams) Outcome {
 // detached is the sequence stopping because nobody is watching any more. It is
 // not an abort: nothing failed, nothing is torn down, and the jobs already up
 // stay up.
+// detached is the run giving up its account of itself, index being the first
+// job it can honestly say it never reached. A detach caught before the daemon
+// was asked leaves the job at index unstarted; one caught while the request was
+// in flight does not — the daemon has it, and it is already running.
 func (r *runner) detached(index int) Outcome {
 	outcome := r.outcome()
-	outcome.NotStarted = jobNames(r.jobs[index:])
+	outcome.NotStarted = jobNames(r.jobs[min(index, len(r.jobs)):])
 	return outcome
 }
 

@@ -33,6 +33,9 @@ type viewParams struct {
 	Worktrees []string
 	Warnings  []string
 	Start     runlogs.StartFunc
+	// Hyperlinks says whether a job's URL may be wrapped in an OSC-8 sequence,
+	// for the lines a detached run prints once the view is gone.
+	Hyperlinks bool
 }
 
 // openRunView hands the terminal to the full-screen view and frames what it
@@ -41,6 +44,8 @@ type viewParams struct {
 // scrollback underneath it. What the run concluded goes back to the flow, which
 // is what turns it into an exit code.
 func openRunView(params viewParams) (runlogs.Outcomes, error) {
+	out := params.Cmd.OutOrStdout()
+	rest := &detachedRun{params: params}
 	result, err := runview.Run(runview.Params{
 		Board:     params.Board,
 		Job:       params.Job,
@@ -49,16 +54,52 @@ func openRunView(params viewParams) (runlogs.Outcomes, error) {
 		Warnings:  params.Warnings,
 		Start:     params.Start,
 		Open:      integration.OpenURL,
+		Detach:    runview.Detach{Notice: rest.open, Sink: rest, Await: true},
 	})
 	if err != nil {
 		return nil, err
 	}
 
+	if result.Detached {
+		output.FrameEnd(out)
+		return result.Outcomes, nil
+	}
 	if result.Recap != "" {
-		out := params.Cmd.OutOrStdout()
 		output.Frame(out, func(w io.Writer) { fmt.Fprintln(w, result.Recap) })
 	}
 	return result.Outcomes, nil
+}
+
+// detachedRun reports what is left of a run once the reader has closed the
+// view: the same lines `-d` prints, in a frame opened only if they actually
+// left. It is built before the view opens and stays inert until then, because
+// the view is the only thing that knows whether they did.
+type detachedRun struct {
+	params  viewParams
+	printer *output.RunPrinter
+}
+
+// open runs with the terminal already given back, which is what makes writing
+// to the scrollback safe: the alternate screen is gone by the time the view has
+// said the reader left.
+func (d *detachedRun) open() {
+	out, errOut := d.params.Cmd.OutOrStdout(), d.params.Cmd.ErrOrStderr()
+	output.FrameStart(out)
+	output.Message(out, domain.RunDetachedNotice)
+	d.printer = output.NewRunPrinter(output.RunPrinterParams{
+		Out:        out,
+		Err:        errOut,
+		Profile:    d.params.Profile,
+		Worktrees:  d.params.Worktrees,
+		Hyperlinks: d.params.Hyperlinks,
+	})
+}
+
+func (d *detachedRun) Emit(event runlogs.Event) {
+	if d.printer == nil {
+		return
+	}
+	d.printer.Emit(event)
 }
 
 type streamParams struct {
