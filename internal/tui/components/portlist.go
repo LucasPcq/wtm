@@ -24,6 +24,7 @@ const (
 type PortListModel struct {
 	entries []domain.PortEntry
 	cursor  int
+	offset  int
 	width   int
 	height  int
 	title   string
@@ -98,7 +99,7 @@ func (m PortListModel) Update(msg tea.Msg) (PortListModel, tea.Cmd) {
 		m.aborted = true
 	}
 
-	return m, nil
+	return m.scrolled(), nil
 }
 
 // toggleBindsNothing answers the row, and un-answers it: the same key both
@@ -186,23 +187,38 @@ func (m PortListModel) saveEdit() PortListModel {
 }
 
 func (m PortListModel) View() string {
+	body, _ := windowBody(m.window())
+	return body
+}
+
+func (m PortListModel) window() bodyWindowParams {
 	jobWidth, nameWidth := rules.PortEntryWidths(m.entries)
 
-	var b strings.Builder
+	rows := make([]string, 0, len(m.entries)+1)
 	for i, entry := range m.entries {
 		label := rules.PortEntryLabel(entry, jobWidth, nameWidth)
 		if m.editing && i == m.cursor {
 			label = rules.PortEntryEditLabel(entry, m.input.View(), jobWidth, nameWidth)
 		}
-		m.renderRow(&b, label, i == m.cursor)
-		b.WriteString("\n")
+		rows = append(rows, m.renderRow(label, i == m.cursor))
 	}
-	m.renderRow(&b, domain.WizardDoneRow, m.cursor == m.doneRow())
+	rows = append(rows, m.renderRow(domain.WizardDoneRow, m.cursor == m.doneRow()))
+
+	extras := ""
 	if m.err != "" {
-		b.WriteString("\n\n")
-		b.WriteString(errorBanner(m.err))
+		extras = "\n\n" + errorBanner(m.err)
 	}
-	return b.String()
+	return bodyWindowParams{
+		Rows: rows, Offset: m.offset, Height: m.height,
+		Top: m.cursor, Bottom: m.cursor, Extras: extras,
+	}
+}
+
+// scrolled settles where the window sits after the cursor moved, so the next
+// render scrolls from there rather than snapping back to the top of the list.
+func (m PortListModel) scrolled() PortListModel {
+	_, m.offset = windowBody(m.window())
+	return m
 }
 
 func (m PortListModel) helpActions() []string { return []string{domain.HelpBindsNoPort} }
@@ -214,14 +230,13 @@ func (m PortListModel) helpModal() string {
 	return ""
 }
 
-func (m PortListModel) renderRow(b *strings.Builder, label string, selected bool) {
+func (m PortListModel) renderRow(label string, selected bool) string {
 	if selected {
 		line := "▸ " + label
 		if pad := m.width - PrintableWidth(line); pad > 0 {
 			line += strings.Repeat(" ", pad)
 		}
-		b.WriteString(styles.ListItemSelected.Render(line))
-		return
+		return styles.ListItemSelected.Render(line)
 	}
-	b.WriteString(styles.ListItemNormal.Render(styles.Indent + label))
+	return styles.ListItemNormal.Render(styles.Indent + label)
 }

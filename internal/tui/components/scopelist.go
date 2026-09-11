@@ -18,6 +18,7 @@ import (
 type ScopeListModel struct {
 	entries []rules.ServiceScopeChoice
 	cursor  int
+	offset  int
 	width   int
 	height  int
 	title   string
@@ -75,7 +76,7 @@ func (m ScopeListModel) Update(msg tea.Msg) (ScopeListModel, tea.Cmd) {
 		m.aborted = true
 	}
 
-	return m, nil
+	return m.scrolled(), nil
 }
 
 // nextAnswerable walks past the rows whose answer is not the reader's, in the
@@ -105,15 +106,27 @@ func (m ScopeListModel) setScope(scope domain.JobScope) ScopeListModel {
 }
 
 func (m ScopeListModel) View() string {
-	var b strings.Builder
+	body, _ := windowBody(m.window())
+	return body
+}
+
+func (m ScopeListModel) window() bodyWindowParams {
 	column := m.scopeColumn()
+	rows := make([]string, 0, len(m.entries))
 	for i, entry := range m.entries {
-		m.renderRow(&b, entry, i == m.cursor, column)
-		if i < len(m.entries)-1 {
-			b.WriteString("\n")
-		}
+		rows = append(rows, m.renderRow(entry, i == m.cursor, column))
 	}
-	return b.String()
+	return bodyWindowParams{
+		Rows: rows, Offset: m.offset, Height: m.height,
+		Top: m.cursor, Bottom: m.cursor,
+	}
+}
+
+// scrolled settles where the window sits after the cursor moved, so the next
+// render scrolls from there rather than snapping back to the top of the list.
+func (m ScopeListModel) scrolled() ScopeListModel {
+	_, m.offset = windowBody(m.window())
+	return m
 }
 
 func (m ScopeListModel) scopeColumn() int {
@@ -130,7 +143,7 @@ func (m ScopeListModel) helpActions() []string { return []string{domain.HelpSetS
 
 func (m ScopeListModel) helpModal() string { return "" }
 
-func (m ScopeListModel) renderRow(b *strings.Builder, entry rules.ServiceScopeChoice, selected bool, column int) {
+func (m ScopeListModel) renderRow(entry rules.ServiceScopeChoice, selected bool, column int) string {
 	prefix := styles.Indent
 	if selected {
 		prefix = "▸ "
@@ -144,17 +157,15 @@ func (m ScopeListModel) renderRow(b *strings.Builder, entry rules.ServiceScopeCh
 	line := left + strings.Repeat(" ", gap) + scopeAnswer(entry)
 
 	if entry.Fixed {
-		b.WriteString(styles.Muted.Render(line))
-		return
+		return styles.Muted.Render(line)
 	}
 	if !selected {
-		b.WriteString(styles.ListItemNormal.Render(line))
-		return
+		return styles.ListItemNormal.Render(line)
 	}
 	if pad := m.width - PrintableWidth(line); pad > 0 {
 		line += strings.Repeat(" ", pad)
 	}
-	b.WriteString(styles.ListItemSelected.Render(line))
+	return styles.ListItemSelected.Render(line)
 }
 
 func scopeLabel(entry rules.ServiceScopeChoice) string {

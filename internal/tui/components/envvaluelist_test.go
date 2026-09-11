@@ -1,6 +1,7 @@
 package components
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -162,5 +163,71 @@ func TestEnvValueListRefusesDoneWhileALinkedRowNeverVaries(t *testing.T) {
 	}
 	if !strings.Contains(m.View(), "never changes") {
 		t.Errorf("view = %q, want the offending row named", m.View())
+	}
+}
+
+// manyEnvValueFields builds the shape the step takes on a real monorepo: many
+// apps, each with a handful of managed keys.
+func manyEnvValueFields(jobs, keys int) []domain.EnvValueField {
+	fields := make([]domain.EnvValueField, 0, jobs*keys)
+	for j := range jobs {
+		for k := range keys {
+			fields = append(fields, domain.EnvValueField{
+				Job:     fmt.Sprintf("service-%d", j),
+				File:    fmt.Sprintf("apps/app-%d/.env", j),
+				Key:     fmt.Sprintf("KEY_%d_%d", j, k),
+				Current: "http://localhost:8080",
+				Value:   "http://localhost:8080",
+			})
+		}
+	}
+	return fields
+}
+
+// TestEnvValueListFitsTerminalHeight is the regression for the env-value step on
+// a project with many apps: the list must window instead of growing past the
+// terminal, which pushed the breadcrumb and the answered steps off the top.
+func TestEnvValueListFitsTerminalHeight(t *testing.T) {
+	const termHeight = 24
+	m := NewWizard([]Step{{
+		Name: "Env values",
+		Model: NewEnvValueList(NewEnvValueListParams{
+			Title: "Env values", Description: "d",
+			Fields: manyEnvValueFields(10, 6),
+		}),
+		Summary: func(any) string { return "" },
+	}})
+	m = updateWizard(m, tea.WindowSizeMsg{Width: 100, Height: termHeight})
+
+	if h := renderHeight(m.View()); h > termHeight {
+		t.Fatalf("render height = %d, want <= %d", h, termHeight)
+	}
+	if !strings.Contains(m.View(), "Env values") {
+		t.Error("the breadcrumb scrolled off the top of the render")
+	}
+}
+
+// TestEnvValueListScrollsToTheCursor checks that a row far down the list is
+// drawn once the cursor reaches it — a window that never moved would leave the
+// reader typing into a row they cannot see.
+func TestEnvValueListScrollsToTheCursor(t *testing.T) {
+	m := NewEnvValueList(NewEnvValueListParams{
+		Title: "t", Description: "d", Fields: manyEnvValueFields(10, 6),
+	})
+	m.SetSize(SetSizeParams{Width: 100, Height: 12})
+
+	for range 40 {
+		m = evKey(m, tea.KeyDown)
+	}
+
+	view := m.View()
+	if !strings.Contains(view, "KEY_6_4") {
+		t.Errorf("the row under the cursor is not in the window:\n%s", view)
+	}
+	if strings.Contains(view, "KEY_0_0") {
+		t.Error("the window never scrolled: the first row is still drawn")
+	}
+	if h := renderHeight(view); h > 12 {
+		t.Errorf("body height = %d, want <= 12", h)
 	}
 }

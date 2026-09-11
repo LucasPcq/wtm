@@ -16,6 +16,7 @@ import (
 type KindListModel struct {
 	entries []domain.JobKindChoice
 	cursor  int
+	offset  int
 	width   int
 	height  int
 	title   string
@@ -75,7 +76,7 @@ func (m KindListModel) Update(msg tea.Msg) (KindListModel, tea.Cmd) {
 		m.aborted = true
 	}
 
-	return m, nil
+	return m.scrolled(), nil
 }
 
 func (m KindListModel) other() domain.JobKind {
@@ -94,15 +95,27 @@ func (m KindListModel) setKind(kind domain.JobKind) KindListModel {
 }
 
 func (m KindListModel) View() string {
-	var b strings.Builder
+	body, _ := windowBody(m.window())
+	return body
+}
+
+func (m KindListModel) window() bodyWindowParams {
 	column := m.kindColumn()
+	rows := make([]string, 0, len(m.entries))
 	for i, entry := range m.entries {
-		m.renderRow(&b, entry, i == m.cursor, column)
-		if i < len(m.entries)-1 {
-			b.WriteString("\n")
-		}
+		rows = append(rows, m.renderRow(entry, i == m.cursor, column))
 	}
-	return b.String()
+	return bodyWindowParams{
+		Rows: rows, Offset: m.offset, Height: m.height,
+		Top: m.cursor, Bottom: m.cursor,
+	}
+}
+
+// scrolled settles where the window sits after the cursor moved, so the next
+// render scrolls from there rather than snapping back to the top of the list.
+func (m KindListModel) scrolled() KindListModel {
+	_, m.offset = windowBody(m.window())
+	return m
 }
 
 // kindColumn is where the two kinds start on every row: just past the longest
@@ -124,7 +137,7 @@ func (m KindListModel) helpModal() string { return "" }
 
 // renderRow lays the job out on the left and its two kinds on the right, padded
 // apart so the kinds line up into a column the eye can scan.
-func (m KindListModel) renderRow(b *strings.Builder, entry domain.JobKindChoice, selected bool, column int) {
+func (m KindListModel) renderRow(entry domain.JobKindChoice, selected bool, column int) string {
 	prefix := styles.Indent
 	if selected {
 		prefix = "▸ "
@@ -138,13 +151,12 @@ func (m KindListModel) renderRow(b *strings.Builder, entry domain.JobKindChoice,
 	line := left + strings.Repeat(" ", gap) + kindRadios(entry.Kind)
 
 	if !selected {
-		b.WriteString(styles.ListItemNormal.Render(line))
-		return
+		return styles.ListItemNormal.Render(line)
 	}
 	if pad := m.width - PrintableWidth(line); pad > 0 {
 		line += strings.Repeat(" ", pad)
 	}
-	b.WriteString(styles.ListItemSelected.Render(line))
+	return styles.ListItemSelected.Render(line)
 }
 
 func kindRadios(kind domain.JobKind) string {

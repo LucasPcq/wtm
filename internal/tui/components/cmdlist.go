@@ -19,6 +19,7 @@ import (
 type CmdListModel struct {
 	fixes   []domain.JobCmdFix
 	cursor  int
+	offset  int
 	width   int
 	height  int
 	title   string
@@ -86,7 +87,7 @@ func (m CmdListModel) Update(msg tea.Msg) (CmdListModel, tea.Cmd) {
 		m.aborted = true
 	}
 
-	return m, nil
+	return m.scrolled(), nil
 }
 
 // startEdit opens on the current command: it is amended, not retyped.
@@ -140,23 +141,38 @@ func (m CmdListModel) saveEdit() CmdListModel {
 }
 
 func (m CmdListModel) View() string {
+	body, _ := windowBody(m.window())
+	return body
+}
+
+func (m CmdListModel) window() bodyWindowParams {
 	jobWidth, varsWidth := rules.CmdFixWidths(m.fixes)
 
-	var b strings.Builder
+	rows := make([]string, 0, len(m.fixes)+1)
 	for i, fix := range m.fixes {
 		label := rules.CmdFixLabel(fix, jobWidth, varsWidth)
 		if m.editing && i == m.cursor {
 			label = fmt.Sprintf(domain.CmdListEditFmt, fix.Job, strings.Join(fix.Vars, domain.CmdListVarSep), m.input.View())
 		}
-		m.renderRow(&b, label, i == m.cursor)
-		b.WriteString("\n")
+		rows = append(rows, m.renderRow(label, i == m.cursor))
 	}
-	m.renderRow(&b, domain.WizardDoneRow, m.cursor == m.doneRow())
+	rows = append(rows, m.renderRow(domain.WizardDoneRow, m.cursor == m.doneRow()))
+
+	extras := ""
 	if m.err != "" {
-		b.WriteString("\n\n")
-		b.WriteString(errorBanner(m.err))
+		extras = "\n\n" + errorBanner(m.err)
 	}
-	return b.String()
+	return bodyWindowParams{
+		Rows: rows, Offset: m.offset, Height: m.height,
+		Top: m.cursor, Bottom: m.cursor, Extras: extras,
+	}
+}
+
+// scrolled settles where the window sits after the cursor moved, so the next
+// render scrolls from there rather than snapping back to the top of the list.
+func (m CmdListModel) scrolled() CmdListModel {
+	_, m.offset = windowBody(m.window())
+	return m
 }
 
 func (m CmdListModel) helpActions() []string { return nil }
@@ -168,14 +184,13 @@ func (m CmdListModel) helpModal() string {
 	return ""
 }
 
-func (m CmdListModel) renderRow(b *strings.Builder, label string, selected bool) {
+func (m CmdListModel) renderRow(label string, selected bool) string {
 	if selected {
 		line := "▸ " + label
 		if pad := m.width - PrintableWidth(line); pad > 0 {
 			line += strings.Repeat(" ", pad)
 		}
-		b.WriteString(styles.ListItemSelected.Render(line))
-		return
+		return styles.ListItemSelected.Render(line)
 	}
-	b.WriteString(styles.ListItemNormal.Render(styles.Indent + label))
+	return styles.ListItemNormal.Render(styles.Indent + label)
 }

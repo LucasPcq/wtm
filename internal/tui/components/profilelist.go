@@ -27,6 +27,7 @@ const (
 type ProfileListModel struct {
 	profiles []domain.ProfileConfig
 	cursor   int
+	offset   int
 	mark     int
 	width    int
 	height   int
@@ -115,7 +116,7 @@ func (m ProfileListModel) Update(msg tea.Msg) (ProfileListModel, tea.Cmd) {
 		m.aborted = true
 	}
 
-	return m, nil
+	return m.scrolled(), nil
 }
 
 func (m ProfileListModel) remove() ProfileListModel {
@@ -269,7 +270,16 @@ func (m ProfileListModel) saveName() ProfileListModel {
 }
 
 func (m ProfileListModel) View() string {
-	var b strings.Builder
+	body, _ := windowBody(m.window())
+	return body
+}
+
+// window lays the list out one line per row and, alongside it, the span the
+// cursor occupies — its row plus the jobs that unfold under it, so a scroll
+// never separates a profile from the services it holds.
+func (m ProfileListModel) window() bodyWindowParams {
+	rows := make([]string, 0, len(m.profiles)+1)
+	top, bottom := 0, 0
 	for i, profile := range m.profiles {
 		selected := i == m.cursor
 		label := profileHeadLabel(profile)
@@ -279,27 +289,41 @@ func (m ProfileListModel) View() string {
 		if i == m.mark {
 			label = domain.ProfileListMarkPrefix + label
 		}
-		m.renderRow(&b, label, selected)
-		b.WriteString("\n")
+		if selected {
+			top = len(rows)
+		}
+		rows = append(rows, m.renderRow(label, selected))
 		if !selected {
 			continue
 		}
 		for _, line := range m.jobLines(profile) {
-			b.WriteString(styles.Muted.Render(domain.ProfileListJobsIndent + line))
-			b.WriteString("\n")
+			rows = append(rows, styles.Muted.Render(domain.ProfileListJobsIndent+line))
 		}
+		bottom = len(rows) - 1
 	}
 	if m.naming && m.namingNew {
-		m.renderRow(&b, m.input.View(), true)
-		b.WriteString("\n")
+		rows = append(rows, m.renderRow(m.input.View(), true))
 	}
-	m.renderRow(&b, domain.WizardDoneRow, m.cursor == m.doneRow())
+	if m.cursor == m.doneRow() {
+		top, bottom = len(rows), len(rows)
+	}
+	rows = append(rows, m.renderRow(domain.WizardDoneRow, m.cursor == m.doneRow()))
 
+	extras := ""
 	if m.err != "" {
-		b.WriteString("\n\n")
-		b.WriteString(errorBanner(m.err))
+		extras = "\n\n" + errorBanner(m.err)
 	}
-	return b.String()
+	return bodyWindowParams{
+		Rows: rows, Offset: m.offset, Height: m.height,
+		Top: top, Bottom: bottom, Extras: extras,
+	}
+}
+
+// scrolled settles where the window sits after the cursor moved, so the next
+// render scrolls from there rather than snapping back to the top of the list.
+func (m ProfileListModel) scrolled() ProfileListModel {
+	_, m.offset = windowBody(m.window())
+	return m
 }
 
 // helpHint is the wizard help bar for this step. Marking a row changes what the
@@ -359,16 +383,15 @@ func (m ProfileListModel) jobLines(profile domain.ProfileConfig) []string {
 	return lines
 }
 
-func (m ProfileListModel) renderRow(b *strings.Builder, label string, selected bool) {
+func (m ProfileListModel) renderRow(label string, selected bool) string {
 	if selected {
 		line := truncateLabel("▸ "+label, m.width)
 		if pad := m.width - PrintableWidth(line); pad > 0 {
 			line += strings.Repeat(" ", pad)
 		}
-		b.WriteString(styles.ListItemSelected.Render(line))
-		return
+		return styles.ListItemSelected.Render(line)
 	}
-	b.WriteString(styles.ListItemNormal.Render(truncateLabel(styles.Indent+label, m.width)))
+	return styles.ListItemNormal.Render(truncateLabel(styles.Indent+label, m.width))
 }
 
 // truncateLabel keeps a row inside the terminal. A label longer than the screen

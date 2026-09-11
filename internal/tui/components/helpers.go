@@ -80,3 +80,66 @@ func renderVarGroups(params renderVarGroupsParams) string {
 	}
 	return b.String()
 }
+
+// listWindowParams describes a scrollable body: Total rows, of which Height fit
+// on screen, and the row span [Top, Bottom] the cursor occupies — Top being the
+// group heading above it when it has one, so scrolling never orphans a row from
+// the name that says what it belongs to.
+type listWindowParams struct {
+	Offset int
+	Height int
+	Total  int
+	Top    int
+	Bottom int
+}
+
+// clampListOffset scrolls the body as little as it takes to bring the cursor's
+// span back on screen. A list that outgrows the terminal would otherwise push
+// the wizard's breadcrumb and its answered steps off the top.
+func clampListOffset(params listWindowParams) int {
+	if params.Height <= 0 || params.Total <= params.Height {
+		return 0
+	}
+
+	offset := min(params.Offset, params.Total-params.Height)
+	if params.Bottom >= offset+params.Height {
+		offset = params.Bottom - params.Height + 1
+	}
+	if params.Top < offset && params.Bottom-params.Top < params.Height {
+		offset = params.Top
+	}
+	return max(offset, 0)
+}
+
+type bodyWindowParams struct {
+	Rows   []string
+	Offset int
+	Height int
+	Top    int
+	Bottom int
+	// Extras is what hangs below the list and never scrolls — an open input's
+	// context, an error banner. The window is sized around it.
+	Extras string
+}
+
+// windowBody joins the rows visible at the settled offset, and returns that
+// offset so a model can remember where it scrolled to. Callers use both: View
+// takes the body, Update takes the offset.
+func windowBody(params bodyWindowParams) (body string, offset int) {
+	// A model bubbletea has not sized yet draws whole; once sized, the extras
+	// take their rows off the top of the budget and the list keeps at least one,
+	// since an open input taller than the terminal must not uncap the list.
+	if params.Height <= 0 {
+		return strings.Join(params.Rows, "\n") + params.Extras, 0
+	}
+	height := max(params.Height-strings.Count(params.Extras, "\n"), 1)
+	if height >= len(params.Rows) {
+		return strings.Join(params.Rows, "\n") + params.Extras, 0
+	}
+
+	offset = clampListOffset(listWindowParams{
+		Offset: params.Offset, Height: height, Total: len(params.Rows),
+		Top: params.Top, Bottom: params.Bottom,
+	})
+	return strings.Join(params.Rows[offset:offset+height], "\n") + params.Extras, offset
+}

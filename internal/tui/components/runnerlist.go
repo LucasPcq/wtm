@@ -20,6 +20,7 @@ import (
 type RunnerListModel struct {
 	choices []domain.JobRunnerChoice
 	cursor  int
+	offset  int
 	width   int
 	height  int
 	title   string
@@ -83,7 +84,7 @@ func (m RunnerListModel) Update(msg tea.Msg) (RunnerListModel, tea.Cmd) {
 		m.aborted = true
 	}
 
-	return m, nil
+	return m.scrolled(), nil
 }
 
 func (m RunnerListModel) cycle(step int) RunnerListModel {
@@ -113,15 +114,28 @@ func (m RunnerListModel) cycle(step int) RunnerListModel {
 }
 
 func (m RunnerListModel) View() string {
-	column := m.runnerColumn()
+	body, _ := windowBody(m.window())
+	return body
+}
 
-	var b strings.Builder
+func (m RunnerListModel) window() bodyWindowParams {
+	column := m.runnerColumn()
+	rows := make([]string, 0, len(m.choices)+1)
 	for i, choice := range m.choices {
-		m.renderRow(&b, choice, i == m.cursor, column)
-		b.WriteString("\n")
+		rows = append(rows, m.renderRow(choice, i == m.cursor, column))
 	}
-	m.renderDoneRow(&b, m.cursor == m.doneRow())
-	return b.String()
+	rows = append(rows, m.renderDoneRow(m.cursor == m.doneRow()))
+	return bodyWindowParams{
+		Rows: rows, Offset: m.offset, Height: m.height,
+		Top: m.cursor, Bottom: m.cursor,
+	}
+}
+
+// scrolled settles where the window sits after the cursor moved, so the next
+// render scrolls from there rather than snapping back to the top of the list.
+func (m RunnerListModel) scrolled() RunnerListModel {
+	_, m.offset = windowBody(m.window())
+	return m
 }
 
 // runnerColumn is where the answer starts on every row: just past the longest
@@ -140,7 +154,7 @@ func (m RunnerListModel) helpActions() []string { return []string{domain.HelpSet
 
 func (m RunnerListModel) helpModal() string { return "" }
 
-func (m RunnerListModel) renderRow(b *strings.Builder, choice domain.JobRunnerChoice, selected bool, column int) {
+func (m RunnerListModel) renderRow(choice domain.JobRunnerChoice, selected bool, column int) string {
 	label := choice.Label
 	runner := strings.Join(choice.Runners, domain.RunnerListSep)
 	if runner == "" {
@@ -157,20 +171,18 @@ func (m RunnerListModel) renderRow(b *strings.Builder, choice domain.JobRunnerCh
 		if pad := m.width - PrintableWidth("▸ "+line[len(styles.Indent):]); pad > 0 {
 			line = "▸ " + line[len(styles.Indent):] + strings.Repeat(" ", pad)
 		}
-		b.WriteString(styles.ListItemSelected.Render(line))
-		return
+		return styles.ListItemSelected.Render(line)
 	}
-	b.WriteString(styles.ListItemNormal.Render(line))
+	return styles.ListItemNormal.Render(line)
 }
 
-func (m RunnerListModel) renderDoneRow(b *strings.Builder, selected bool) {
+func (m RunnerListModel) renderDoneRow(selected bool) string {
 	if selected {
 		line := "▸ " + domain.WizardDoneRow
 		if pad := m.width - PrintableWidth(line); pad > 0 {
 			line += strings.Repeat(" ", pad)
 		}
-		b.WriteString(styles.ListItemSelected.Render(line))
-		return
+		return styles.ListItemSelected.Render(line)
 	}
-	b.WriteString(styles.ListItemNormal.Render(styles.Indent + domain.WizardDoneRow))
+	return styles.ListItemNormal.Render(styles.Indent + domain.WizardDoneRow)
 }

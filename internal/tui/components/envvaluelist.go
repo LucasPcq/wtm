@@ -20,6 +20,7 @@ import (
 type EnvValueListModel struct {
 	fields  []domain.EnvValueField
 	cursor  int
+	offset  int
 	width   int
 	height  int
 	title   string
@@ -90,7 +91,14 @@ func (m EnvValueListModel) Update(msg tea.Msg) (EnvValueListModel, tea.Cmd) {
 		m.aborted = true
 	}
 
-	return m, nil
+	return m.scrolled(), nil
+}
+
+// scrolled settles where the window sits after the cursor moved, so the next
+// render scrolls from there rather than snapping back to the top of the list.
+func (m EnvValueListModel) scrolled() EnvValueListModel {
+	_, m.offset = windowBody(m.window())
+	return m
 }
 
 // finish refuses to leave with a linked row whose template never varies, and
@@ -103,7 +111,7 @@ func (m EnvValueListModel) finish() EnvValueListModel {
 		}
 		m.cursor = i
 		m.err = domain.EnvValueConstantErr
-		return m
+		return m.scrolled()
 	}
 	m.done = true
 	m.err = ""
@@ -177,27 +185,66 @@ func (m EnvValueListModel) saveEdit() EnvValueListModel {
 }
 
 func (m EnvValueListModel) View() string {
-	keyWidth := rules.EnvValueKeyWidth(m.fields)
+	body, _ := windowBody(m.window())
+	return body
+}
 
-	var b strings.Builder
+func (m EnvValueListModel) window() bodyWindowParams {
+	rows, spans := m.layout()
+	return bodyWindowParams{
+		Rows:   rows,
+		Offset: m.offset,
+		Height: m.height,
+		Top:    spans[m.cursor].top,
+		Bottom: spans[m.cursor].bottom,
+		Extras: m.extras(),
+	}
+}
+
+// envValueSpan is the row span one cursor position occupies: its own line, and
+// the group heading above it when it opens a group.
+type envValueSpan struct {
+	top    int
+	bottom int
+}
+
+// layout renders the body one line per row and, alongside it, the span each
+// cursor position occupies — the single place the two are kept in step, so the
+// window scrolls over exactly what it draws.
+func (m EnvValueListModel) layout() ([]string, []envValueSpan) {
+	keyWidth := rules.EnvValueKeyWidth(m.fields)
+	lines := make([]string, 0, len(m.fields)+1)
+	spans := make([]envValueSpan, 0, len(m.fields)+1)
+
 	for i, field := range m.fields {
+		top := len(lines)
 		// The service and the file are named once per group, not on each row:
 		// repeating them turned thirty keys into thirty unrelated lines.
 		if i == 0 || m.fields[i-1].Job != field.Job || m.fields[i-1].File != field.File {
 			if i > 0 {
-				b.WriteString("\n")
+				lines = append(lines, "")
 			}
-			b.WriteString(styles.Indent)
-			b.WriteString(styles.Muted.Render(fmt.Sprintf(domain.EnvValueGroupFmt, field.Job, field.File)))
-			b.WriteString("\n")
+			lines = append(lines, styles.Indent+styles.Muted.Render(
+				fmt.Sprintf(domain.EnvValueGroupFmt, field.Job, field.File)))
 		}
-		m.renderRow(&b, envValueRowParams{
-			Field: field, KeyWidth: keyWidth, Editing: m.editing && i == m.cursor,
-		}, i == m.cursor)
-		b.WriteString("\n")
+		spans = append(spans, envValueSpan{top: top, bottom: len(lines)})
+		lines = append(lines, m.renderRow(envValueRowParams{
+			Field: field, KeyWidth: keyWidth,
+			Editing: m.editing && i == m.cursor, Selected: i == m.cursor,
+		}))
 	}
-	m.renderRow(&b, envValueRowParams{Done: true}, m.cursor == m.doneRow())
 
+	spans = append(spans, envValueSpan{top: len(lines), bottom: len(lines)})
+	lines = append(lines, m.renderRow(envValueRowParams{
+		Done: true, Selected: m.cursor == m.doneRow(),
+	}))
+	return lines, spans
+}
+
+// extras is what hangs below the list — the open input's context and the error —
+// and never scrolls: the window is sized around it.
+func (m EnvValueListModel) extras() string {
+	var b strings.Builder
 	if m.editing {
 		b.WriteString(m.renderCurrent(m.fields[m.cursor].Current))
 		b.WriteString(renderVarGroups(renderVarGroupsParams{
@@ -234,24 +281,24 @@ type envValueRowParams struct {
 	KeyWidth int
 	Editing  bool
 	Done     bool
+	Selected bool
 }
 
-func (m EnvValueListModel) renderRow(b *strings.Builder, params envValueRowParams, selected bool) {
+func (m EnvValueListModel) renderRow(params envValueRowParams) string {
 	label := domain.WizardDoneRow
 	if !params.Done {
 		label = fmt.Sprintf(domain.EnvValueRowFmt, envValueMark(params.Field),
 			params.KeyWidth, params.Field.Key, m.rowValue(params))
 	}
 
-	if selected {
+	if params.Selected {
 		line := "▸ " + label
 		if pad := m.width - PrintableWidth(line); pad > 0 {
 			line += strings.Repeat(" ", pad)
 		}
-		b.WriteString(styles.ListItemSelected.Render(line))
-		return
+		return styles.ListItemSelected.Render(line)
 	}
-	b.WriteString(styles.ListItemNormal.Render(styles.Indent + label))
+	return styles.ListItemNormal.Render(styles.Indent + label)
 }
 
 // rowValue is the template when the key is wtm's, and what the file holds today
