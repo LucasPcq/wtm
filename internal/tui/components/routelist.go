@@ -16,6 +16,7 @@ import (
 type RouteListModel struct {
 	rows    []domain.PortRouteRow
 	cursor  int
+	offset  int
 	width   int
 	height  int
 	title   string
@@ -83,7 +84,7 @@ func (m RouteListModel) Update(msg tea.Msg) (RouteListModel, tea.Cmd) {
 		m.aborted = true
 	}
 
-	return m, nil
+	return m.scrolled(), nil
 }
 
 func (m RouteListModel) toggle() RouteListModel {
@@ -99,29 +100,43 @@ func (m RouteListModel) toggle() RouteListModel {
 }
 
 func (m RouteListModel) View() string {
+	body, _ := windowBody(m.window())
+	return body
+}
+
+func (m RouteListModel) window() bodyWindowParams {
 	jobWidth, portWidth := rules.PortRouteWidths(m.rows)
 
-	var b strings.Builder
+	lines := make([]string, 0, len(m.rows)+1)
 	for i, row := range m.rows {
-		m.renderRow(&b, rules.PortRouteRowLabel(row, jobWidth, portWidth), i == m.cursor)
-		b.WriteString("\n")
+		lines = append(lines, m.renderRow(rules.PortRouteRowLabel(row, jobWidth, portWidth), i == m.cursor))
 	}
-	m.renderRow(&b, domain.WizardDoneRow, m.cursor == m.doneRow())
-	return b.String()
+	lines = append(lines, m.renderRow(domain.WizardDoneRow, m.cursor == m.doneRow()))
+
+	return bodyWindowParams{
+		Rows: lines, Offset: m.offset, Height: m.height,
+		Top: m.cursor, Bottom: m.cursor,
+	}
+}
+
+// scrolled settles where the window sits after the cursor moved, so the next
+// render scrolls from there rather than snapping back to the top of the list.
+func (m RouteListModel) scrolled() RouteListModel {
+	_, m.offset = windowBody(m.window())
+	return m
 }
 
 func (m RouteListModel) helpActions() []string { return []string{domain.HelpSwitchRoute} }
 
 func (m RouteListModel) helpModal() string { return "" }
 
-func (m RouteListModel) renderRow(b *strings.Builder, label string, selected bool) {
+func (m RouteListModel) renderRow(label string, selected bool) string {
 	if selected {
 		line := "▸ " + label
 		if pad := m.width - PrintableWidth(line); pad > 0 {
 			line += strings.Repeat(" ", pad)
 		}
-		b.WriteString(styles.ListItemSelected.Render(line))
-		return
+		return styles.ListItemSelected.Render(line)
 	}
-	b.WriteString(styles.ListItemNormal.Render(styles.Indent + label))
+	return styles.ListItemNormal.Render(styles.Indent + label)
 }

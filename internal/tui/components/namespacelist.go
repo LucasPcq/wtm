@@ -19,6 +19,7 @@ import (
 type NamespaceListModel struct {
 	fields  []domain.NamespaceField
 	cursor  int
+	offset  int
 	width   int
 	height  int
 	title   string
@@ -86,7 +87,7 @@ func (m NamespaceListModel) Update(msg tea.Msg) (NamespaceListModel, tea.Cmd) {
 		m.aborted = true
 	}
 
-	return m, nil
+	return m.scrolled(), nil
 }
 
 // startEdit opens on what is already there: a command is amended, not retyped.
@@ -143,21 +144,26 @@ func (m NamespaceListModel) saveEdit() NamespaceListModel {
 }
 
 func (m NamespaceListModel) View() string {
+	body, _ := windowBody(m.window())
+	return body
+}
+
+func (m NamespaceListModel) window() bodyWindowParams {
 	jobWidth := rules.NamespaceJobWidth(m.fields)
 
-	var b strings.Builder
+	rows := make([]string, 0, len(m.fields)+1)
 	for i, field := range m.fields {
 		// The job is named once per service, not on each of its three lines: it
 		// is one question in three parts, and repeating the name made six rows
 		// read as six unrelated ones.
 		heads := i == 0 || m.fields[i-1].Job != field.Job
-		m.renderRow(&b, namespaceRowParams{
+		rows = append(rows, m.renderRow(namespaceRowParams{
 			Field: field, JobWidth: jobWidth, Heads: heads, Editing: m.editing && i == m.cursor,
-		}, i == m.cursor)
-		b.WriteString("\n")
+		}, i == m.cursor))
 	}
-	m.renderRow(&b, namespaceRowParams{Done: true}, m.cursor == m.doneRow())
+	rows = append(rows, m.renderRow(namespaceRowParams{Done: true}, m.cursor == m.doneRow()))
 
+	var b strings.Builder
 	// The variables are shown while typing, where they are needed, and they are
 	// this job's own: the ports it declares under the names it declares them by.
 	if m.editing {
@@ -169,7 +175,31 @@ func (m NamespaceListModel) View() string {
 		b.WriteString("\n\n")
 		b.WriteString(errorBanner(m.err))
 	}
-	return b.String()
+
+	return bodyWindowParams{
+		Rows: rows, Offset: m.offset, Height: m.height,
+		Top: m.jobHead(m.cursor), Bottom: m.cursor, Extras: b.String(),
+	}
+}
+
+// jobHead is the row naming the job the cursor sits in: a scroll that left it
+// behind would show three unlabelled lines belonging to nothing.
+func (m NamespaceListModel) jobHead(cursor int) int {
+	if cursor >= len(m.fields) {
+		return cursor
+	}
+	head := cursor
+	for head > 0 && m.fields[head-1].Job == m.fields[cursor].Job {
+		head--
+	}
+	return head
+}
+
+// scrolled settles where the window sits after the cursor moved, so the next
+// render scrolls from there rather than snapping back to the top of the list.
+func (m NamespaceListModel) scrolled() NamespaceListModel {
+	_, m.offset = windowBody(m.window())
+	return m
 }
 
 func (m NamespaceListModel) helpActions() []string { return nil }
@@ -191,7 +221,7 @@ type namespaceRowParams struct {
 	Done    bool
 }
 
-func (m NamespaceListModel) renderRow(b *strings.Builder, params namespaceRowParams, selected bool) {
+func (m NamespaceListModel) renderRow(params namespaceRowParams, selected bool) string {
 	label := domain.WizardDoneRow
 	if !params.Done {
 		value := params.Field.Value
@@ -212,8 +242,7 @@ func (m NamespaceListModel) renderRow(b *strings.Builder, params namespaceRowPar
 		if pad := m.width - PrintableWidth(line); pad > 0 {
 			line += strings.Repeat(" ", pad)
 		}
-		b.WriteString(styles.ListItemSelected.Render(line))
-		return
+		return styles.ListItemSelected.Render(line)
 	}
-	b.WriteString(styles.ListItemNormal.Render(styles.Indent + label))
+	return styles.ListItemNormal.Render(styles.Indent + label)
 }
