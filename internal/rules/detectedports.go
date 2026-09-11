@@ -188,14 +188,27 @@ func unreadableEnvScans(scans map[string]domain.EnvPortScan) []domain.EnvPortSca
 func survivingPatches(cfg domain.RunConfig, patches map[string][]domain.ComposePortBinding) map[string][]domain.ComposePortBinding {
 	kept := map[string][]domain.ComposePortBinding{}
 	for _, file := range SortedComposeFiles(patches) {
-		job := jobNamed(cfg, ComposeJobName(ComposeJobNameParams{Config: cfg, File: file}))
+		jobs := ComposeJobsRunningFile(cfg, file)
 		for _, binding := range patches[file] {
-			if base, declared := job.Ports[binding.Var]; declared && base == binding.Base {
+			if declaredAt(jobs, binding) {
 				kept[file] = append(kept[file], binding)
 			}
 		}
 	}
 	return kept
+}
+
+// declaredAt says one of the jobs running the file declares the variable at the
+// base the mapping has. Any of them answers: a lifted service took its own
+// ports out of the file's job, and the rewrite is about the mapping, not about
+// which job ended up holding it.
+func declaredAt(jobs []domain.JobConfig, binding domain.ComposePortBinding) bool {
+	for _, job := range jobs {
+		if base, declared := job.Ports[binding.Var]; declared && base == binding.Base {
+			return true
+		}
+	}
+	return false
 }
 
 // sharedVarsAcrossFiles maps a job to the variables its files disagree on.
@@ -290,7 +303,7 @@ func withheldForConflicts(params withheldForConflictsParams) []domain.ComposePor
 func orphanedComposeFiles(cfg domain.RunConfig, ports map[string]map[string]int) []string {
 	var orphaned []string
 	for _, file := range SortedComposeFiles(ports) {
-		if len(ports[file]) > 0 && ComposeJobName(ComposeJobNameParams{Config: cfg, File: file}) == "" {
+		if len(ports[file]) > 0 && len(ComposeJobsRunningFile(cfg, file)) == 0 {
 			orphaned = append(orphaned, file)
 		}
 	}

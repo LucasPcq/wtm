@@ -941,12 +941,13 @@ func kindListSummary(model any) string {
 // detection pre-filled, then the split `run up` will offer. Both read the live
 // selections, so both are declared after the steps they read.
 func addPortsAndProfilesSteps(s *stepSet, params addServicesStepsParams) (steps servicesSteps) {
-	docker, scripts := s.at(stepDocker), s.at(stepScripts)
+	docker, scripts, scopes := s.at(stepDocker), s.at(stepScripts), s.at(stepScopes)
 	detection := params.Detection
 
 	resolved := func(prev []components.Step) rules.DetectedPortsOutcome {
 		answers := answersFromSteps(answersFromStepsParams{
-			Prev: prev, Docker: docker, Scripts: scripts, Detection: detection,
+			Prev: prev, Docker: docker, Scripts: scripts, Scopes: scopes,
+			Detection: detection, Existing: params.Existing,
 		})
 		answers.SelectionAsked = true
 		return rules.ResolveDetectedPorts(rules.ResolveDetectedPortsParams{
@@ -1991,7 +1992,7 @@ type addComposePatchStepParams struct {
 
 func addComposePatchStep(s *stepSet, params addComposePatchStepParams) {
 	detection := params.Detection
-	docker, scripts := s.at(stepDocker), s.at(stepScripts)
+	docker, scripts, scopes := s.at(stepDocker), s.at(stepScripts), s.at(stepScopes)
 	if docker < 0 || len(detection.ComposeScans) == 0 {
 		return
 	}
@@ -2006,6 +2007,7 @@ func addComposePatchStep(s *stepSet, params addComposePatchStepParams) {
 				Prev:      prev,
 				Docker:    docker,
 				Scripts:   scripts,
+				Scopes:    scopes,
 				Detection: detection,
 				Existing:  params.Existing,
 				EnvScans:  params.EnvScans,
@@ -2029,6 +2031,7 @@ type composePatchesForParams struct {
 	Prev      []components.Step
 	Docker    int
 	Scripts   int
+	Scopes    int
 	Detection domain.InitDetectionResult
 	Existing  domain.RunConfig
 	EnvScans  map[string]domain.EnvPortScan
@@ -2041,7 +2044,9 @@ func composePatchesFor(params composePatchesForParams) map[string][]domain.Compo
 		Prev:      params.Prev,
 		Docker:    params.Docker,
 		Scripts:   params.Scripts,
+		Scopes:    params.Scopes,
 		Detection: params.Detection,
+		Existing:  params.Existing,
 	})
 	if len(answers.DockerComposeFiles) == 0 {
 		return nil
@@ -2064,7 +2069,11 @@ type answersFromStepsParams struct {
 	Prev      []components.Step
 	Docker    int
 	Scripts   int
+	Scopes    int
 	Detection domain.InitDetectionResult
+	// Existing is run.toml as it stands, read for the sharing a step that has
+	// not run yet cannot answer for.
+	Existing domain.RunConfig
 }
 
 // answersFromSteps reads the wizard's live selections as an answers struct, so a
@@ -2081,7 +2090,30 @@ func answersFromSteps(params answersFromStepsParams) domain.InitProjectAnswers {
 			answers.DockerComposeFiles = selected.Values()
 		}
 	}
+	// The scope answer travels with the rest, or a preview plans on a config
+	// where nothing was lifted: the ports step then offers a lifted service's
+	// port on the job it was taken out of, and folding that answer back in
+	// declares the same base twice — run.toml refused at the end of the wizard.
+	answers.Scans = params.Detection.ComposeScans
+	answers.SharedServices, answers.ScopesAsked = sharedFromSteps(params, answers.DockerComposeFiles)
 	return answers
+}
+
+// sharedFromSteps is the (value, asked) pair the write side reads: the step's
+// own answer once it is behind us, else what run.toml already declares — which
+// is exactly what `run init` falls back to when the step never ran.
+func sharedFromSteps(params answersFromStepsParams, files []string) ([]domain.SharedComposeService, bool) {
+	if shared := sharedFromStep(params.Prev, params.Scopes); len(shared) > 0 {
+		return shared, true
+	}
+	if params.Scopes >= 0 && params.Scopes < len(params.Prev) {
+		return nil, true
+	}
+	return rules.SharedFromConfig(rules.SharedFromConfigParams{
+		Existing: params.Existing,
+		Scans:    params.Detection.ComposeScans,
+		Files:    files,
+	}), false
 }
 
 // selectedScripts reads a scripts multi-select back into the scripts it names,

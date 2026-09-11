@@ -234,7 +234,7 @@ func ApplyInitAnswers(params ApplyInitAnswersParams) domain.RunConfig {
 				cfg.Jobs[i].BindsNoPort = entry.BindsNone
 			}
 		}
-		if entry.Base <= 0 {
+		if entry.Base <= 0 || portEntryWouldCollide(cfg, entry) {
 			continue
 		}
 		for i, job := range cfg.Jobs {
@@ -277,6 +277,38 @@ func ApplyInitAnswers(params ApplyInitAnswersParams) domain.RunConfig {
 		cfg.Profiles = params.Profiles
 	}
 	return cfg
+}
+
+// portEntryWouldCollide guards the one place an answer is written back over a
+// decision taken after it was proposed: a service lifted out of its compose
+// file takes its ports with it, and the step that offered them read a config
+// where it had not moved yet. Writing one back would put the same base on two
+// jobs — refused at load, at the very end of a wizard, taking every other
+// answer down with it.
+func portEntryWouldCollide(cfg domain.RunConfig, entry domain.PortEntry) bool {
+	candidate := cfg
+	candidate.Jobs = make([]domain.JobConfig, len(cfg.Jobs))
+	copy(candidate.Jobs, cfg.Jobs)
+	for i, job := range candidate.Jobs {
+		if job.Name != entry.Job {
+			continue
+		}
+		if base, declared := job.Ports[entry.Name]; declared && base == entry.Base {
+			return false
+		}
+		candidate.Jobs[i].Ports = clonePorts(job.Ports)
+		candidate.Jobs[i].Ports[entry.Name] = entry.Base
+	}
+
+	for _, collision := range PortCollisions(candidate) {
+		if collision.A.Job == entry.Job && collision.A.Name == entry.Name {
+			return true
+		}
+		if collision.B.Job == entry.Job && collision.B.Name == entry.Name {
+			return true
+		}
+	}
+	return false
 }
 
 // publishedURL answers a job's url choice without ever writing through the
