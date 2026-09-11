@@ -224,3 +224,117 @@ func TestReinitMovesThePortsAndTheLinksWithTheLiftedService(t *testing.T) {
 		}
 	}
 }
+
+func liftedInitAnswers() (domain.InitProjectAnswers, ComposePortPlan) {
+	file := "docker-compose.dev.yml"
+	scans := map[string]domain.ComposeScan{file: {
+		File: file,
+		Services: []domain.ComposeService{
+			{Name: "app"}, {Name: "keycloak"}, {Name: "keycloak_postgres"},
+		},
+		Bindings: []domain.ComposePortBinding{
+			{File: file, Service: "app", Var: "APP_PORT", Base: 3000, Container: 3000, Status: domain.ComposePortTemplated},
+			{File: file, Service: "keycloak", Var: "KEYCLOAK_PORT", Base: 8080, Container: 8080, Status: domain.ComposePortTemplated},
+			{File: file, Service: "keycloak_postgres", Var: "KEYCLOAK_POSTGRES_PORT", Base: 5436, Container: 5432, Status: domain.ComposePortTemplated},
+		},
+	}}
+	answers := domain.InitProjectAnswers{
+		DockerComposeCmd:   "docker compose",
+		DockerComposeFiles: []string{file},
+		Scans:              scans,
+		ScopesAsked:        true,
+		SharedServices: []domain.SharedComposeService{
+			{File: file, Service: "keycloak"},
+			{File: file, Service: "keycloak_postgres"},
+		},
+	}
+	return answers, PlanComposePorts(PlanComposePortsParams{Scans: scans, Files: []string{file}, Patch: true})
+}
+
+// A first init builds the lifted jobs before the file's own, so the first job
+// carrying "-f <file> " is a lifted one — and the rewrite meant for the file's
+// job landed on it, leaving `keycloak` starting the services that stayed.
+func TestInitKeepsALiftedJobStartingItsOwnService(t *testing.T) {
+	answers, plan := liftedInitAnswers()
+	got := ResolveDetectedPorts(ResolveDetectedPortsParams{Answers: answers, Plan: plan})
+
+	shared, found := findJob(got.Config, "keycloak")
+	if !found {
+		t.Fatalf("the shared service was never lifted; jobs = %+v", got.Config.Jobs)
+	}
+	if !strings.HasSuffix(shared.Cmd, "up -d keycloak") {
+		t.Errorf("cmd = %q, want it to start only keycloak", shared.Cmd)
+	}
+	file, _ := findJob(got.Config, "docker-compose-dev")
+	if !strings.HasSuffix(file.Cmd, "up -d --no-deps app") {
+		t.Errorf("cmd = %q, want the file's job left with app alone", file.Cmd)
+	}
+}
+
+// A file whose every service is lifted has no job of its own, and is still
+// entirely run: its ports belong to the jobs that took them, and reading the
+// file as orphaned would drop every one of them.
+func TestInitKeepsThePortsOfAFileWithNoJobLeft(t *testing.T) {
+	file := "docker-compose.yml"
+	scans := map[string]domain.ComposeScan{file: {
+		File:     file,
+		Services: []domain.ComposeService{{Name: "db"}, {Name: "cache"}},
+		Bindings: []domain.ComposePortBinding{
+			{File: file, Service: "db", Var: "DB_PORT", Base: 5432, Status: domain.ComposePortTemplated},
+			{File: file, Service: "cache", Var: "CACHE_PORT", Base: 6379, Status: domain.ComposePortTemplated},
+		},
+	}}
+	answers := domain.InitProjectAnswers{
+		DockerComposeCmd: "docker compose", DockerComposeFiles: []string{file},
+		Scans: scans, ScopesAsked: true,
+		SharedServices: []domain.SharedComposeService{
+			{File: file, Service: "db"}, {File: file, Service: "cache"},
+		},
+	}
+	got := ResolveDetectedPorts(ResolveDetectedPortsParams{
+		Answers: answers,
+		Plan:    PlanComposePorts(PlanComposePortsParams{Scans: scans, Files: []string{file}, Patch: true}),
+	})
+
+	if db, _ := findJob(got.Config, "db"); db.Ports["DB_PORT"] != 5432 {
+		t.Errorf("db declares %v, want DB_PORT", db.Ports)
+	}
+	if cache, _ := findJob(got.Config, "cache"); cache.Ports["CACHE_PORT"] != 6379 {
+		t.Errorf("cache declares %v, want CACHE_PORT", cache.Ports)
+	}
+	if len(got.Patches[file]) != 0 {
+		t.Errorf("patches = %+v, want none for an already templated file", got.Patches[file])
+	}
+}
+
+// The ports step is built before the scopes are settled in some orders, and its
+// rows are folded back after the lifting moved the port. Writing one back would
+// declare the same base on two jobs, which the loader refuses — at the very end
+// of the wizard, losing every answer with it.
+func TestInitAnswersNeverResurrectALiftedPort(t *testing.T) {
+	answers, plan := liftedInitAnswers()
+	resolved := ResolveDetectedPorts(ResolveDetectedPortsParams{Answers: answers, Plan: plan})
+
+	got := ApplyInitAnswers(ApplyInitAnswersParams{
+		Config: resolved.Config,
+		Ports: []domain.PortEntry{
+			{Job: "docker-compose-dev", Name: "APP_PORT", Base: 3000},
+			{Job: "docker-compose-dev", Name: "KEYCLOAK_PORT", Base: 8080},
+			{Job: "docker-compose-dev", Name: "KEYCLOAK_POSTGRES_PORT", Base: 5436},
+		},
+	})
+
+	if errs := ValidateRunPorts(got); len(errs) > 0 {
+		t.Errorf("ValidateRunPorts = %v, want none", errs)
+	}
+	file, _ := findJob(got, "docker-compose-dev")
+	if file.Ports["APP_PORT"] != 3000 {
+		t.Errorf("the answer that did not collide was dropped: %v", file.Ports)
+	}
+	if _, back := file.Ports["KEYCLOAK_PORT"]; back {
+		t.Errorf("the file's job got a lifted port back: %v", file.Ports)
+	}
+	if shared, _ := findJob(got, "keycloak"); shared.Ports["KEYCLOAK_PORT"] != 8080 {
+		t.Errorf("the lifted job lost its port: %v", shared.Ports)
+	}
+}

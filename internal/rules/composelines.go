@@ -80,14 +80,34 @@ type ComposeJobNameParams struct {
 
 // ComposeJobName matches on the same "-f <file> " fragment BuildDockerJobs
 // emits. Empty when no job runs the file.
+//
+// A lifted job carries that fragment too, and is emitted before the job it was
+// taken out of — so the first match is not the file's own job. Skipping the
+// shared ones is what makes this the file's job whatever the order: the rewrite
+// that trims the stack to what stayed landed on the lifted job itself
+// otherwise, leaving it starting every service but its own.
 func ComposeJobName(params ComposeJobNameParams) string {
 	needle := DockerComposeFileFlag(params.File)
 	for _, job := range params.Config.Jobs {
-		if jobRunsComposeFile(job, needle) {
+		if !IsShared(job) && jobRunsComposeFile(job, needle) {
 			return job.Name
 		}
 	}
 	return ""
+}
+
+// ComposeJobsRunningFile is the other question: not which job is the file's
+// own, but whether the file is run at all. A file whose every service was
+// lifted has no job of its own and is still entirely covered.
+func ComposeJobsRunningFile(cfg domain.RunConfig, file string) []domain.JobConfig {
+	needle := DockerComposeFileFlag(file)
+	var jobs []domain.JobConfig
+	for _, job := range cfg.Jobs {
+		if jobRunsComposeFile(job, needle) {
+			jobs = append(jobs, job)
+		}
+	}
+	return jobs
 }
 
 type ComposeFilesNeedingAJobParams struct {
@@ -104,7 +124,7 @@ func ComposeFilesNeedingAJob(params ComposeFilesNeedingAJobParams) []string {
 	}
 	needing := make([]string, 0, len(params.Files))
 	for _, file := range params.Files {
-		if ComposeJobName(ComposeJobNameParams{Config: params.Config, File: file}) == "" {
+		if len(ComposeJobsRunningFile(params.Config, file)) == 0 {
 			needing = append(needing, file)
 		}
 	}
