@@ -587,3 +587,28 @@ func TestRunHandsOutPortsWhenTheEnvStillSpellsThem(t *testing.T) {
 		t.Fatalf("held = %+v, want the port the app answers on", held)
 	}
 }
+
+// A job refused as already running comes back with nothing about the proxy.
+// Reading that silence as "the proxy is off" told a run whose jobs were all up
+// that its port was taken.
+func TestRunSaysNothingAboutTheProxyOnAnAlreadyRunningJob(t *testing.T) {
+	service := &runlogstest.Service{
+		Refusals:  map[string]string{"api": "job api " + domain.JobAlreadyRunningSuffix},
+		ProxyPort: 4000,
+	}
+	sink := &runlogstest.Sink{}
+
+	if _, err := runlogs.Run(context.Background(), runlogs.RunParams{
+		Service:   service,
+		Sink:      sink,
+		Jobs:      []domain.JobConfig{api},
+		WorkDir:   "/w",
+		ProxyPort: 4000,
+	}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	if notice, found := sink.Last(runlogs.PhaseNotice); found {
+		t.Errorf("notice = %q, want none: the proxy said nothing either way", notice.Notice)
+	}
+}

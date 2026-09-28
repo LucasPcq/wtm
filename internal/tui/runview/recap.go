@@ -81,11 +81,16 @@ func (m Model) addressLines(outcome runlogs.Outcome) []string {
 			}
 			continue
 		}
-		address := rules.JobAddressText(view.Address)
-		if address == "" {
+		// The namespace rides on the address line: the view that showed it is
+		// gone, and this is the part of the run that stays in the scrollback.
+		detail := rules.JobAddressText(view.Address)
+		if namespace := m.sequence.namespaces[viewKey(view)]; namespace != "" {
+			detail = strings.TrimPrefix(detail+domain.RunViewSeparator+namespace, domain.RunViewSeparator)
+		}
+		if detail == "" {
 			continue
 		}
-		lines = append(lines, styles.Muted.Render(fmt.Sprintf(domain.RunViewRecapAddressFmt, view.Name, address)))
+		lines = append(lines, styles.Muted.Render(fmt.Sprintf(domain.RunViewRecapAddressFmt, view.Name, detail)))
 	}
 	return lines
 }

@@ -360,6 +360,9 @@ type JobActionResult struct {
 	// published job it runs. A runner is one process, and the apps behind it
 	// have no entry of their own in a run that only started it.
 	Held []JobURLEntry `json:"held,omitempty"`
+	// Namespace is what a shared job's start carved out of it for this worktree
+	// — the database or realm its create command made sure exists.
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // WorktreeRunResult is one worktree's half of a run over several of them. A run

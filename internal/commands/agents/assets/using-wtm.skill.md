@@ -295,6 +295,8 @@ and **experimental**: the global `wtm init` does not configure it.
   the worktrees holding it report status **`attached`** with `pid: 0`: that is a claim on the
   one running instance, not a second process — never count one service per worktree from it.
   Starting one from a worktree other than the main checkout reports `attached`, not `started`.
+  When the start carved out this worktree's namespace, the job's result carries it as
+  `namespace` (`app_feat-x`) — absent on a start refused as already running, which ran no create.
   `run stop` in a worktree releases only that worktree's claim; the service itself stops when
   the last one goes.
 - **A shared job may carve out a namespace per worktree.** `[job.namespace]` names it (`name`,

@@ -35,6 +35,9 @@ type sequence struct {
 	// urls is where each job answers, kept for the same reason as ports: the run
 	// is the only moment it is reported.
 	urls map[jobKey]string
+	// namespaces are what each shared job's start carved out, shown beside its
+	// status: the database a clean will drop, seen being made.
+	namespaces map[jobKey]string
 	// devOrigins are the config lines the started jobs are missing, collected as
 	// they are reported so the recap can name them all at once.
 	devOrigins []domain.DevOriginFix
@@ -308,6 +311,12 @@ func (s *sequence) remember(event runlogs.Event) {
 		s.ports[eventKey(event)] = event.Ports
 	}
 	s.devOrigins = append(s.devOrigins, event.DevOrigins...)
+	if event.Namespace != "" {
+		if s.namespaces == nil {
+			s.namespaces = map[jobKey]string{}
+		}
+		s.namespaces[eventKey(event)] = event.Namespace
+	}
 
 	if event.URL == "" {
 		return

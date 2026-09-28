@@ -278,7 +278,11 @@ func (r *runner) run() Outcome {
 		if result.PublicPort > 0 {
 			r.servedPort = result.PublicPort
 		}
-		r.noticeProxyRefused(i + 1)
+		// A refusal carries no word on the proxy: reading its silence as "the
+		// proxy is off" told a run whose jobs were all up that its port was taken.
+		if !result.Refused {
+			r.noticeProxyRefused(i + 1)
+		}
 
 		alreadyRunning := result.Refused && job.Kind != domain.JobKindTask && rules.IsAlreadyRunning(result.Message)
 		if result.Refused && !alreadyRunning {
@@ -295,11 +299,13 @@ func (r *runner) run() Outcome {
 
 		r.started = append(r.started, job.Name)
 		held := r.heldURLs(job, routes, result.Ports)
-		r.results = append(r.results, domain.JobActionResult{Name: job.Name, Status: r.startedStatus(job), URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host}), Held: held})
+		status := r.startedStatus(job)
+		namespace := r.carved(job, alreadyRunning)
+		r.results = append(r.results, domain.JobActionResult{Name: job.Name, Status: status, URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host}), Held: held, Namespace: namespace})
 		if rules.ShouldProbeJob(rules.ShouldProbeJobParams{Kind: job.Kind, Ports: result.Ports, Probe: job.Probe}) {
 			r.probeTargets = append(r.probeTargets, probeTarget{job: job.Name, resolved: result.Ports})
 		}
-		r.emit(Event{Phase: PhaseStarted, Job: job.Name, Step: i + 1, AlreadyRunning: alreadyRunning, Ports: result.Ports, URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host}), Held: held, DevOrigins: r.devOrigins(job, host)})
+		r.emit(Event{Phase: PhaseStarted, Job: job.Name, Step: i + 1, AlreadyRunning: alreadyRunning, Attached: status == domain.JobActionAttached, Namespace: namespace, Ports: result.Ports, URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host}), Held: held, DevOrigins: r.devOrigins(job, host)})
 	}
 
 	// The probe dials first because its wait is also the time a job needs to die:
@@ -672,6 +678,15 @@ func jobNames(jobs []domain.JobConfig) []string {
 		names[i] = job.Name
 	}
 	return names
+}
+
+// carved is the namespace this start made sure exists. A start refused as
+// already running ran no create: the slice was carved by the start that is.
+func (r *runner) carved(job domain.JobConfig, alreadyRunning bool) string {
+	if alreadyRunning {
+		return ""
+	}
+	return rules.CarvedNamespace(rules.CarvedNamespaceParams{Job: job, Env: r.env})
 }
 
 // startedStatus tells joining a shared service apart from starting one. Only the

@@ -88,10 +88,21 @@ func (p *RunPrinter) Emit(event runlogs.Event) {
 		p.midLine = event.Chunk[len(event.Chunk)-1] != '\n'
 	case runlogs.PhaseStarted:
 		if event.AlreadyRunning {
-			Success(p.out, p.qualify(fmt.Sprintf(domain.RunStreamAlreadyFmt, event.Job), event.Worktree))
+			already := domain.RunStreamAlreadyFmt
+			if event.Attached {
+				already = domain.RunStreamAlreadyAttachedFmt
+			}
+			Success(p.out, p.qualify(fmt.Sprintf(already, event.Job), event.Worktree))
 			return
 		}
-		Success(p.out, p.jobLine(jobLineParams{Format: domain.RunStreamStartedFmt, Event: event}))
+		format := domain.RunStreamStartedFmt
+		if event.Attached {
+			format = domain.RunStreamAttachedFmt
+		}
+		Success(p.out, p.jobLine(jobLineParams{Format: format, Event: event}))
+		if event.Namespace != "" {
+			Success(p.out, p.qualify(fmt.Sprintf(domain.RunStreamNamespaceFmt, event.Namespace, event.Job), event.Worktree))
+		}
 		p.held(event.Held)
 		p.devOrigins(event.DevOrigins)
 	case runlogs.PhaseDone:

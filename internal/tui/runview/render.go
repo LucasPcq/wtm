@@ -271,6 +271,9 @@ func (m Model) renderPaneTitle(params paneTitleParams) string {
 func (m Model) statusWithAddress(view runlogs.JobView) string {
 	key := viewKey(view)
 	label := string(view.Status)
+	if namespace := m.sequence.namespaces[key]; namespace != "" {
+		label += domain.RunViewSeparator + namespace
+	}
 
 	// A url already carries the port it answers on, so the two are the same fact
 	// twice — the rule JobAddressText states, applied here too. The observed url

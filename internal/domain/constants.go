@@ -2424,8 +2424,15 @@ const (
 	// RunViewRecapHeldIndent hangs a runner's addresses under its own line in the
 	// recap, where nothing folds.
 	RunViewRecapHeldIndent = "  "
-	RunStreamAlreadyFmt    = "%s already running"
-	RunStreamDoneFmt       = "%s done"
+	// RunStreamAttachedFmt is a worktree joining a shared service another one
+	// runs: "started" there read as one service per worktree.
+	RunStreamAttachedFmt = "%s attached"
+	// RunStreamNamespaceFmt is the slice a shared job's create made sure exists,
+	// on its own line so the one thing a clean will drop is seen being made.
+	RunStreamNamespaceFmt       = "%s ready in %s"
+	RunStreamAlreadyFmt         = "%s already running"
+	RunStreamAlreadyAttachedFmt = "%s already attached"
+	RunStreamDoneFmt            = "%s done"
 	// The three commands a run points at, and one gloss each. They are shared by
 	// every surface the module concludes on — the live stream, the view's recap
 	// once it gives the terminal back, `run down`'s — because one command telling
@@ -3395,12 +3402,15 @@ const (
 
 	// RunDetached* report a start nobody is watching: the surface gave the
 	// terminal back, so each step says what it did instead of showing it.
-	RunDetachedStartingFmt = "starting %s (%d/%d)"
-	RunDetachedStartedFmt  = "%s is up"
-	RunDetachedDoneFmt     = "%s finished"
-	RunDetachedAddressFmt  = "%s → %s"
-	RunDetachedFailedFmt   = "%s failed: %s"
-	RunDetachedAlreadyFmt  = "%s was already up"
+	RunDetachedStartingFmt        = "starting %s (%d/%d)"
+	RunDetachedStartedFmt         = "%s is up"
+	RunDetachedDoneFmt            = "%s finished"
+	RunDetachedAddressFmt         = "%s → %s"
+	RunDetachedFailedFmt          = "%s failed: %s"
+	RunDetachedAttachedFmt        = "%s attached"
+	RunDetachedNamespaceFmt       = "%s: %s ready"
+	RunDetachedAlreadyFmt         = "%s was already up"
+	RunDetachedAlreadyAttachedFmt = "%s was already attached"
 
 	// DashboardLogsLines is how far back the detail panel's logs view reads. It
 	// is a glance, not a session: runview is what scrolls.

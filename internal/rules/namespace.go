@@ -299,3 +299,29 @@ func NamespaceName(params NamespaceNameParams) string {
 	}
 	return params.Ref.Worktree
 }
+
+type CarvedNamespaceParams struct {
+	Job domain.JobConfig
+	// Env is the worktree's: its WTM_WORKTREE and WTM_ORDINAL name the slice.
+	Env map[string]string
+}
+
+// CarvedNamespace is the namespace a start of this job carves out for the
+// worktree, empty when it carves none: a job that is not shared, declares no
+// namespace, or has no create command to run.
+func CarvedNamespace(params CarvedNamespaceParams) string {
+	job := params.Job
+	if !IsShared(job) || !HasNamespace(job) || IsBlankCommand(job.Namespace.Create) {
+		return ""
+	}
+	ordinal, _ := strconv.Atoi(params.Env[domain.EnvOrdinal])
+	expanded, err := ExpandNamespace(ExpandNamespaceParams{
+		Namespace: *job.Namespace,
+		Worktree:  params.Env[domain.EnvWorktree],
+		Ordinal:   ordinal,
+	})
+	if err != nil {
+		return ""
+	}
+	return expanded.Name
+}

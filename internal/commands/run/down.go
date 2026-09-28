@@ -81,7 +81,7 @@ func (p downPresenter) Downed(outcome downflow.Outcome) error {
 
 	out, errOut := p.Cmd.OutOrStdout(), p.Cmd.ErrOrStderr()
 	if outcome.NoDaemon || len(outcome.Stopped()) == 0 {
-		output.Frame(out, func(w io.Writer) { output.Message(w, p.nothingRunning(outcome)) })
+		output.Frame(out, func(w io.Writer) { output.Unchanged(w, p.nothingRunning(outcome)) })
 		return nil
 	}
 

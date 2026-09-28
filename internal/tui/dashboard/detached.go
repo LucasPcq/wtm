@@ -53,10 +53,21 @@ func (s detachedSink) Emit(event runlogs.Event) {
 		s.emit(stage, event)
 	case runlogs.PhaseStarted:
 		if event.AlreadyRunning {
-			s.emit(fmt.Sprintf(domain.RunDetachedAlreadyFmt, event.Job), event)
+			already := domain.RunDetachedAlreadyFmt
+			if event.Attached {
+				already = domain.RunDetachedAlreadyAttachedFmt
+			}
+			s.emit(fmt.Sprintf(already, event.Job), event)
 			return
 		}
-		s.emit(fmt.Sprintf(domain.RunDetachedStartedFmt, event.Job), event)
+		started := domain.RunDetachedStartedFmt
+		if event.Attached {
+			started = domain.RunDetachedAttachedFmt
+		}
+		s.emit(fmt.Sprintf(started, event.Job), event)
+		if event.Namespace != "" {
+			s.emit(fmt.Sprintf(domain.RunDetachedNamespaceFmt, event.Job, event.Namespace), event)
+		}
 		if event.URL != "" {
 			s.emit(fmt.Sprintf(domain.RunDetachedAddressFmt, event.Job, event.URL), event)
 		}

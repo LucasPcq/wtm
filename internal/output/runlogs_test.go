@@ -203,3 +203,14 @@ func TestRunPrinterClosesTheRunOnce(t *testing.T) {
 		t.Errorf("the hint was printed %d times, want once", got)
 	}
 }
+
+func TestRunPrinterSaysASharedJobWasAttachedAndWhatItCarved(t *testing.T) {
+	stdout, _ := emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "postgres", Attached: true, Namespace: "app_feat_x"})
+
+	if !strings.Contains(stdout, "postgres attached") || strings.Contains(stdout, "postgres started") {
+		t.Errorf("stdout = %q, want the job attached, not started", stdout)
+	}
+	if !strings.Contains(stdout, "app_feat_x ready in postgres") {
+		t.Errorf("stdout = %q, want the namespace on a line of its own", stdout)
+	}
+}
