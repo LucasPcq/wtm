@@ -72,7 +72,7 @@ func (m Model) addressLines(outcome runlogs.Outcome) []string {
 		entries = append(entries, m.reachOf(view))
 	}
 	var lines []string
-	for i, section := range rules.ReachSections(rules.ReachLinesParams{Entries: entries, Width: domain.RecapWidth}) {
+	for i, section := range rules.ReachSections(rules.ReachLinesParams{Entries: entries, Width: domain.RecapWidth, Here: outcome.Worktree}) {
 		if i > 0 {
 			lines = append(lines, section.Title)
 		}

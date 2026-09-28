@@ -3645,20 +3645,21 @@ const (
 	DetailHeldCountFmt = "%d addresses"
 	// ReachTitle heads the one block that says where every job of a run is
 	// reached; the Reach* formats are its fragments.
-	ReachTitle          = "Where to reach it"
-	ReachSharedTitleFmt = "Shared, running in %s"
-	ReachURLsFmt        = "%d urls"
-	ReachPortsFmt       = "%d ports"
-	ReachPortFmt        = ":%d"
-	ReachNamedPortFmt   = "%s :%d"
-	ReachCellGap        = "   "
-	ReachLabelGap       = "  "
-	ReachDetailSep      = " · "
-	ReachPortSuffix     = "_PORT"
-	ReachDefaultWidth   = 72
-	DetailHeldOpenGlyph = "▾"
-	DetailHeldShutGlyph = "▸"
-	DetailHeldIndent    = "  "
+	ReachTitle           = "Where to reach it"
+	ReachSharedTitleFmt  = "Shared, running in %s"
+	ReachSharedHereTitle = "Shared with other worktrees"
+	ReachURLsFmt         = "%d urls"
+	ReachPortsFmt        = "%d ports"
+	ReachPortFmt         = ":%d"
+	ReachNamedPortFmt    = "%s :%d"
+	ReachCellGap         = "   "
+	ReachLabelGap        = "  "
+	ReachDetailSep       = " · "
+	ReachPortSuffix      = "_PORT"
+	ReachDefaultWidth    = 72
+	DetailHeldOpenGlyph  = "▾"
+	DetailHeldShutGlyph  = "▸"
+	DetailHeldIndent     = "  "
 	// DetailColumnGap separates two columns of a detail-section table. Two spaces
 	// rather than one: a single one reads as a word break inside a cell.
 	// DetailGlyphGap follows the state glyph, which is a mark on its row rather

@@ -122,3 +122,18 @@ func TestReachSectionsSetTheSharedServicesApart(t *testing.T) {
 		t.Errorf("second section = %+v, want postgres under main, aligned with the first", sections[1])
 	}
 }
+
+// From main, a service main joined runs here: it is shared with the others,
+// not "running in main".
+func TestReachSectionsSayWhoSharesAServiceRunningHere(t *testing.T) {
+	sections := rules.ReachSections(rules.ReachLinesParams{
+		Here: "main",
+		Entries: []domain.ReachEntry{
+			{Job: "postgres", Ports: []domain.NamedPort{{Port: 5432}}, SharedIn: "main"},
+		},
+	})
+
+	if len(sections) != 1 || sections[0].Title != domain.ReachSharedHereTitle {
+		t.Errorf("sections = %+v, want the service shared with other worktrees", sections)
+	}
+}

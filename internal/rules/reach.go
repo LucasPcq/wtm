@@ -48,6 +48,9 @@ type ReachLinesParams struct {
 	// Width is what the block may take, label column included. Zero takes
 	// domain.ReachDefaultWidth.
 	Width int
+	// Here is the worktree the block is about. A shared service running here
+	// is main's own, held by others too: "running in main" read oddly from main.
+	Here string
 }
 
 type reachRow struct {
@@ -94,7 +97,11 @@ func ReachSections(params ReachLinesParams) []domain.ReachSection {
 	}
 	add(domain.ReachTitle, own)
 	for _, worktree := range sharedOrder {
-		add(fmt.Sprintf(domain.ReachSharedTitleFmt, worktree), shared[worktree])
+		title := fmt.Sprintf(domain.ReachSharedTitleFmt, worktree)
+		if worktree == params.Here {
+			title = domain.ReachSharedHereTitle
+		}
+		add(title, shared[worktree])
 	}
 	return sections
 }

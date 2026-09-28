@@ -295,7 +295,7 @@ func (p *RunPrinter) Conclude(warnings []string) {
 		return
 	}
 	for _, worktree := range p.reachOrder {
-		for _, section := range rules.ReachSections(rules.ReachLinesParams{Entries: p.reach[worktree], Width: p.reachWidth()}) {
+		for _, section := range rules.ReachSections(rules.ReachLinesParams{Entries: p.reach[worktree], Width: p.reachWidth(), Here: worktree}) {
 			title := section.Title
 			if p.multi && worktree != "" {
 				title = fmt.Sprintf(domain.RunStreamWorktreeFmt, title, worktree)

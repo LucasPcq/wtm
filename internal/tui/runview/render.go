@@ -326,12 +326,13 @@ func (m Model) reachSectionsIn(params reachLinesInParams) []domain.ReachSection 
 		}
 		entries = append(entries, m.reachOf(view))
 	}
-	return rules.ReachSections(rules.ReachLinesParams{Entries: entries, Width: params.Width})
+	return rules.ReachSections(rules.ReachLinesParams{Entries: entries, Width: params.Width, Here: params.Worktree})
 }
 
 type reachLinesInParams struct {
-	WorkDir string
-	Width   int
+	WorkDir  string
+	Worktree string
+	Width    int
 }
 
 // namespaceOf prefers what the run reported carving to what the board reads
@@ -357,7 +358,7 @@ func (m Model) reachBody(width int) []string {
 			continue
 		}
 		seen[view.WorkDir] = true
-		sections := m.reachSectionsIn(reachLinesInParams{WorkDir: view.WorkDir, Width: width})
+		sections := m.reachSectionsIn(reachLinesInParams{WorkDir: view.WorkDir, Worktree: view.Worktree, Width: width})
 		if len(sections) == 0 {
 			continue
 		}
