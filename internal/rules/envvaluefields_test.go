@@ -68,11 +68,38 @@ func TestEnvValueFieldsPrechecksByTheJobsOwnName(t *testing.T) {
 	if fieldFor(t, fields, "KEYCLOAK_URL").Linked {
 		t.Error("KEYCLOAK_URL: linked, want the address left to [[env_port]]")
 	}
-	// The template opens on the value the file holds, so a long URL is edited
-	// where it differs rather than retyped whole. It is a starting point, not an
-	// answer: one that never varies is refused before it can be written.
-	if got := fieldFor(t, fields, "KEYCLOAK_REALM").Value; got != "myapp" {
+	// A guess is proposed whole: the value on disk never varies, and a checked
+	// row nobody touched must be one Done accepts.
+	if got := fieldFor(t, fields, "KEYCLOAK_REALM").Value; got != "{namespace}" {
+		t.Errorf("value = %q, want {namespace}", got)
+	}
+	// A row left unchecked still opens on the value on disk, so a long URL is
+	// edited where it differs rather than retyped whole.
+	if got := fieldFor(t, fields, "SENTRY_DSN").Value; got != "https://example" {
 		t.Errorf("value = %q, want the value on disk as the starting point", got)
+	}
+}
+
+// The service's prefix alone is not a slice: POSTGRES_USER and
+// POSTGRES_PASSWORD are the same for every worktree, and pre-checking them left
+// a step Done refused until each was unchecked by hand.
+func TestEnvValueFieldsLeaveTheServicesCredentialsUnchecked(t *testing.T) {
+	params := keycloakFieldsParams()
+	params.Shared[0].Service = "postgres"
+	params.Lines["apps/web/.env"] = []domain.EnvLine{
+		{Kind: domain.EnvLinePair, Key: "POSTGRES_USER", Value: "app"},
+		{Kind: domain.EnvLinePair, Key: "POSTGRES_PASSWORD", Value: "secret"},
+		{Kind: domain.EnvLinePair, Key: "POSTGRES_DB", Value: "app"},
+	}
+	fields := EnvValueFields(params)
+
+	for _, key := range []string{"POSTGRES_USER", "POSTGRES_PASSWORD"} {
+		if fieldFor(t, fields, key).Linked {
+			t.Errorf("%s: linked, want it left alone", key)
+		}
+	}
+	if db := fieldFor(t, fields, "POSTGRES_DB"); !db.Linked || db.Value != "{namespace}" {
+		t.Errorf("POSTGRES_DB = %+v, want it linked to {namespace}", db)
 	}
 }
 
@@ -119,13 +146,6 @@ func TestEnvValueFieldsSkipAServiceWithoutANamespace(t *testing.T) {
 // an [[env_port]] concern, the realm becomes an [[env]] link.
 func TestEnvValuesFromFieldsKeepsOnlyLinkedRows(t *testing.T) {
 	fields := EnvValueFields(keycloakFieldsParams())
-
-	// As the user leaves the step: the realm's template edited onto the slice.
-	for i := range fields {
-		if fields[i].Key == "KEYCLOAK_REALM" {
-			fields[i].Value = "{namespace}"
-		}
-	}
 
 	links := EnvValuesFromFields(fields)
 	if len(links) != 1 {

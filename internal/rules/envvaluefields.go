@@ -87,7 +87,11 @@ func envValueField(params envValueFieldParams) domain.EnvValueField {
 		}
 		return field
 	}
-	field.Linked = !params.Addressed && namesAfter(params.Key, params.Job)
+	// A guess is proposed whole: the value on disk never varies, and a checked
+	// row the reader did not touch must not be one Done refuses.
+	if !params.Addressed && namesSlice(params.Key, params.Job) {
+		field.Linked, field.Value = true, domain.EnvValueTokenNamespace
+	}
 	return field
 }
 
@@ -125,11 +129,22 @@ func envValueTemplate(current string) string {
 	return current
 }
 
-// namesAfter is the whole of wtm's guess: KEYCLOAK_REALM beside a job called
-// keycloak. It never reaches a key run.toml already speaks about.
-func namesAfter(key, job string) bool {
+// namesSlice is the whole of wtm's guess: KEYCLOAK_REALM beside a job called
+// keycloak. The prefix alone also claimed POSTGRES_USER and POSTGRES_PASSWORD,
+// which are the same for every worktree. It never reaches a key run.toml
+// already speaks about.
+func namesSlice(key, job string) bool {
 	prefix := strings.ToUpper(strings.NewReplacer("-", "_", ".", "_", ":", "_").Replace(job))
-	return prefix != "" && strings.HasPrefix(strings.ToUpper(key), prefix+"_")
+	upper := strings.ToUpper(key)
+	if prefix == "" || !strings.HasPrefix(upper, prefix+"_") {
+		return false
+	}
+	for _, suffix := range domain.EnvSliceKeySuffixes {
+		if strings.HasSuffix(upper, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 func namespacedShared(shared []domain.SharedComposeService) []string {

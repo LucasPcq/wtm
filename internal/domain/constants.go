@@ -391,17 +391,14 @@ const (
 
 	EnvValueStepName  = "Shared service keys"
 	EnvValueStepTitle = "Which .env keys name each worktree's slice?"
-	EnvValueStepDesc  = "A shared service answers at one address for every worktree — that is what\n" +
-		"[[env_port]] already writes. What differs per worktree is the slice: a\n" +
-		"realm, a database. wtm cannot tell which key holds one — a realm name is\n" +
-		"just a word — so it lists the keys it manages and you point.\n" +
+	EnvValueStepDesc  = "What differs per worktree is the slice a shared service carves out — a\n" +
+		"database, a realm. wtm cannot recognize one, so it lists every key it manages.\n" +
 		"\n" +
 		"  space     link a key, so wtm writes its whole value per worktree\n" +
-		"  enter     edit the template — it starts at {namespace}\n" +
+		"  enter     edit the template — {namespace} is this worktree's slice\n" +
 		"\n" +
-		"Keys already checked are the ones whose name starts with the service's,\n" +
-		"or that run.toml already links. A linked key stops being reported as\n" +
-		"drift: its value is wtm's, not the one your worktree was copied from."
+		"Keys already checked name the service's slice — POSTGRES_DB,\n" +
+		"KEYCLOAK_REALM — or are linked by run.toml."
 	EnvValueRowFmt       = "%s %-*s  %s"
 	EnvValueGroupFmt     = "%s · %s"
 	EnvValueCurrentFmt   = "  (now %s)"
@@ -415,7 +412,7 @@ const (
 	// EnvValueConstantErr refuses a template that never varies. The field is
 	// pre-filled with the value on disk so a long URL is edited rather than
 	// retyped, which makes "accepted unchanged" the easy mistake to make.
-	EnvValueConstantErr = "this template never changes, so every worktree would get the same value — put {namespace} where the slice belongs"
+	EnvValueConstantErr = "this template never changes, so every worktree would get the same value — put {namespace} where the slice belongs, or press space to unlink the key"
 	EnvValueNowFmt      = "now  %s"
 	EnvValueEditHelp    = "enter save · esc cancel"
 	EnvValueHelpLink    = "space link"
@@ -3812,6 +3809,14 @@ var EnvTemplateSuffixes = []string{
 // value differs per worktree by construction, so the reconciliation reports them
 // neither as drift nor as a conflict.
 var WtmOwnedEnvKeys = []string{EnvComposeProjectName}
+
+// EnvSliceKeySuffixes are the endings of a key that names a service's slice —
+// POSTGRES_DB, KEYCLOAK_REALM — as against its credentials or its address,
+// which POSTGRES_USER and POSTGRES_PASSWORD share the service's prefix with.
+var EnvSliceKeySuffixes = []string{
+	"_DB", "_DATABASE", "_DB_NAME", "_DATABASE_NAME", "_SCHEMA",
+	"_REALM", "_TENANT", "_NAMESPACE", "_BUCKET", "_INDEX", "_PREFIX", "_VHOST",
+}
 
 // ComposePSArgs asks compose which of the project's containers are running. `ps`
 // lists only running ones without -a, so an empty answer is the whole verdict.
