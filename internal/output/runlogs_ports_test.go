@@ -21,7 +21,7 @@ func TestRunPrinterReportsBoundPorts(t *testing.T) {
 		Ports: map[string]int{"PORT": 3010},
 	})
 
-	if !strings.Contains(out.String(), "web started") || !strings.Contains(out.String(), "PORT=3010") {
+	if !strings.Contains(out.String(), "web started · :3010") {
 		t.Errorf("got %q", out.String())
 	}
 }

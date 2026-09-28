@@ -124,9 +124,9 @@ type RunParams struct {
 	// ProxyPort is where the proxy serves those routes. Zero means it is off,
 	// and a job's URL is then its own address.
 	ProxyPort int
-	// PortAddressed says this worktree's .env still spells its addresses as
-	// ports; see runner.portAddressed.
-	PortAddressed bool
+	// PublicPort is what a name is expected to announce, read only for a job
+	// the daemon refused as already running: its answer says nothing of the proxy.
+	PublicPort int
 	// NextConfig reads a job's next.config.*, so the run can say what a Next
 	// project is missing before its own name reaches it. Nil skips the check.
 	NextConfig NextConfigLookup
@@ -159,23 +159,23 @@ func Run(ctx context.Context, params RunParams) (Outcome, error) {
 	}
 
 	r := &runner{
-		ctx:           ctx,
-		service:       params.Service,
-		sink:          params.Sink,
-		jobs:          params.Jobs,
-		declared:      params.Declared,
-		profile:       params.Profile,
-		workDir:       params.WorkDir,
-		worktree:      params.Worktree,
-		logDir:        params.LogDir,
-		shared:        params.Shared,
-		env:           params.Env,
-		prober:        params.Prober,
-		project:       params.Project,
-		proxyPort:     params.ProxyPort,
-		portAddressed: params.PortAddressed,
-		nextConfig:    params.NextConfig,
-		baseOwners:    params.BaseOwners,
+		ctx:            ctx,
+		service:        params.Service,
+		sink:           params.Sink,
+		jobs:           params.Jobs,
+		declared:       params.Declared,
+		profile:        params.Profile,
+		workDir:        params.WorkDir,
+		worktree:       params.Worktree,
+		logDir:         params.LogDir,
+		shared:         params.Shared,
+		env:            params.Env,
+		prober:         params.Prober,
+		project:        params.Project,
+		proxyPort:      params.ProxyPort,
+		expectedPublic: params.PublicPort,
+		nextConfig:     params.NextConfig,
+		baseOwners:     params.BaseOwners,
 	}
 	if r.nextConfig == nil {
 		r.nextConfig = func(job domain.JobConfig) (string, string) {
@@ -202,20 +202,17 @@ type runner struct {
 	prober   Prober
 	// project and proxyPort together decide whether a job's URL is its name or
 	// its port; both come from the surface, which is the side that reads config.
-	project   string
-	proxyPort int
-	// portAddressed says this worktree's .env still spells its addresses as
-	// ports, so a started job is announced under the port it binds. The route is
-	// registered all the same: the name works the moment `wtm env` settles it.
-	portAddressed bool
-	nextConfig    NextConfigLookup
-	baseOwners    map[int]string
-	shared        *domain.SharedJobContext
+	project    string
+	proxyPort  int
+	nextConfig NextConfigLookup
+	baseOwners map[int]string
+	shared     *domain.SharedJobContext
 	// servedPort is what the daemon answered its proxy is really on, and
 	// noticedProxy records that the run has already explained a refusal — the
 	// fact belongs to the run, not to each job that would repeat it.
-	servedPort   int
-	noticedProxy bool
+	servedPort     int
+	expectedPublic int
+	noticedProxy   bool
 
 	// probeTargets are the started services that declared ports, kept in start
 	// order so the check runs once, at the end, when everything is up.
@@ -289,26 +286,32 @@ func (r *runner) run() Outcome {
 			return r.abort(abortParams{Index: i, Job: job, Reason: result.Message, ExitCode: result.ExitCode})
 		}
 
+		public := r.publicPort(alreadyRunning)
+		ports := result.Ports
+		if alreadyRunning && len(ports) == 0 {
+			ports = r.declaredPorts(job)
+		}
+		url := r.jobURL(jobURLParams{Job: job, Ports: ports, Host: host, Public: public})
+		held := r.heldURLs(heldURLsParams{Job: job, Routes: routes, Ports: ports, Public: public})
+
 		if job.Kind == domain.JobKindTask {
 			r.completed = append(r.completed, job.Name)
-			held := r.heldURLs(job, routes, result.Ports)
-			r.results = append(r.results, domain.JobActionResult{Name: job.Name, Status: domain.JobActionDone, URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host}), Held: held})
-			r.emit(Event{Phase: PhaseDone, Job: job.Name, Step: i + 1, Ports: result.Ports, URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host}), Held: held})
+			r.results = append(r.results, domain.JobActionResult{Name: job.Name, Status: domain.JobActionDone, URL: url, Held: held})
+			r.emit(Event{Phase: PhaseDone, Job: job.Name, Step: i + 1, Ports: ports, URL: url, Held: held})
 			continue
 		}
 
 		r.started = append(r.started, job.Name)
-		held := r.heldURLs(job, routes, result.Ports)
 		status := r.startedStatus(job)
 		if result.Joined {
 			status = domain.JobActionAttached
 		}
 		namespace := r.carved(job, alreadyRunning)
-		r.results = append(r.results, domain.JobActionResult{Name: job.Name, Status: status, URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host}), Held: held, Namespace: namespace})
+		r.results = append(r.results, domain.JobActionResult{Name: job.Name, Status: status, URL: url, Held: held, Namespace: namespace})
 		if rules.ShouldProbeJob(rules.ShouldProbeJobParams{Kind: job.Kind, Ports: result.Ports, Probe: job.Probe}) {
 			r.probeTargets = append(r.probeTargets, probeTarget{job: job.Name, resolved: result.Ports})
 		}
-		r.emit(Event{Phase: PhaseStarted, Job: job.Name, Step: i + 1, AlreadyRunning: alreadyRunning, Attached: status == domain.JobActionAttached, Namespace: namespace, Ports: result.Ports, URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host}), Held: held, DevOrigins: r.devOrigins(job, host)})
+		r.emit(Event{Phase: PhaseStarted, Job: job.Name, Step: i + 1, AlreadyRunning: alreadyRunning, Attached: status == domain.JobActionAttached, Namespace: namespace, Ports: ports, URL: url, Held: held, DevOrigins: r.devOrigins(job, host)})
 	}
 
 	// The probe dials first because its wait is also the time a job needs to die:
@@ -486,9 +489,10 @@ func (r *runner) devOrigins(job domain.JobConfig, host string) []domain.DevOrigi
 }
 
 type jobURLParams struct {
-	Job   domain.JobConfig
-	Ports map[string]int
-	Host  string
+	Job    domain.JobConfig
+	Ports  map[string]int
+	Host   string
+	Public int
 }
 
 // jobURL answers with the port the daemon says it is really serving, never the
@@ -498,7 +502,7 @@ func (r *runner) jobURL(params jobURLParams) string {
 		Job:        params.Job,
 		Ports:      params.Ports,
 		Host:       params.Host,
-		PublicPort: r.publicPort(),
+		PublicPort: params.Public,
 	})
 }
 
@@ -509,16 +513,23 @@ func (r *runner) jobURL(params jobURLParams) string {
 // The port comes from what the daemon answered it bound, never from the
 // declaration: the runner was given its children's ports, and reporting a
 // number it did not bind is the one thing a "started" line must not do.
-func (r *runner) heldURLs(job domain.JobConfig, routes []domain.JobRoute, ports map[string]int) []domain.JobURLEntry {
+type heldURLsParams struct {
+	Job    domain.JobConfig
+	Routes []domain.JobRoute
+	Ports  map[string]int
+	Public int
+}
+
+func (r *runner) heldURLs(params heldURLsParams) []domain.JobURLEntry {
 	var held []domain.JobURLEntry
-	for _, route := range routes {
-		if route.Job == job.Name {
+	for _, route := range params.Routes {
+		if route.Job == params.Job.Name {
 			continue
 		}
 		url := rules.JobOrigin(rules.JobOriginParams{
 			Host:       route.Host,
-			PublicPort: r.publicPort(),
-			DirectPort: ports[route.Port],
+			PublicPort: params.Public,
+			DirectPort: params.Ports[route.Port],
 		})
 		if url == "" {
 			continue
@@ -528,14 +539,21 @@ func (r *runner) heldURLs(job domain.JobConfig, routes []domain.JobRoute, ports 
 	return held
 }
 
-// publicPort is what a name announces in this run, zero for a worktree whose
-// .env still spells its addresses as ports — where the port is the entrance
-// that works.
-func (r *runner) publicPort() int {
-	if r.portAddressed {
-		return 0
+// publicPort is what a name announces in this run: the proxy's, whatever the
+// worktree's .env still spells — a .env out of step is said once, on its own
+// line, rather than by hiding the name. A refusal says nothing of the proxy, so
+// a job found already running is given the port the proxy is expected on.
+func (r *runner) publicPort(alreadyRunning bool) int {
+	if r.servedPort == 0 && alreadyRunning {
+		return r.expectedPublic
 	}
 	return r.servedPort
+}
+
+// declaredPorts is where a job found already running binds: its declaration
+// shifted by this worktree's offset — the numbers its start was given.
+func (r *runner) declaredPorts(job domain.JobConfig) map[string]int {
+	return rules.JobPorts(rules.JobPortsParams{Ports: job.Ports, PortOffset: rules.PortOffsetFromEnv(r.env), Scope: job.Scope})
 }
 
 // noticeProxyRefused explains, once, why the names this run promised are not

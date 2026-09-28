@@ -24,9 +24,6 @@ type SetParams struct {
 	Jobs []domain.JobConfig
 	// Declared is every job run.toml holds; see Params.Declared.
 	Declared []domain.JobConfig
-	// PortAddressed keys the worktrees whose .env still spells its addresses as
-	// ports; see Params.PortAddressed.
-	PortAddressed map[string]bool
 	// ProxyPort and PublicPort are Params' own; see the fields there.
 	ProxyPort   int
 	PublicPort  int
@@ -45,16 +42,15 @@ func OpenSet(params SetParams) Set {
 	seams := make([]Seam, 0, len(params.WorkDirs))
 	for _, workDir := range params.WorkDirs {
 		seams = append(seams, Open(Params{
-			ProjectDir:    params.ProjectDir,
-			StateDir:      params.StateDir,
-			WorkDir:       workDir,
-			Jobs:          params.Jobs,
-			Declared:      params.Declared,
-			ProxyPort:     params.ProxyPort,
-			PublicPort:    params.PublicPort,
-			PortAddressed: params.PortAddressed[workDir],
-			ProbeBudget:   params.ProbeBudget,
-			NoProbe:       params.NoProbe,
+			ProjectDir:  params.ProjectDir,
+			StateDir:    params.StateDir,
+			WorkDir:     workDir,
+			Jobs:        params.Jobs,
+			Declared:    params.Declared,
+			ProxyPort:   params.ProxyPort,
+			PublicPort:  params.PublicPort,
+			ProbeBudget: params.ProbeBudget,
+			NoProbe:     params.NoProbe,
 		}))
 	}
 	return Set{seams: seams}

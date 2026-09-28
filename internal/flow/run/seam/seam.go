@@ -43,10 +43,6 @@ type Params struct {
 	// when the redirection is installed, and a board built from the bind port
 	// then announces urls nobody can reach.
 	PublicPort int
-	// PortAddressed says this worktree's .env still spells its addresses as
-	// ports. The names are published all the same, but nothing behind them
-	// answers on one yet, so the board hands out the ports that do.
-	PortAddressed bool
 	// ProbeBudget is how long the port check may dial for; zero or NoProbe skips
 	// it entirely.
 	ProbeBudget time.Duration
@@ -54,21 +50,21 @@ type Params struct {
 }
 
 type Seam struct {
-	service       runlogs.Service
-	board         runlogs.Board
-	workDir       string
-	worktree      string
-	logDir        string
-	env           map[string]string
-	prober        runlogs.Prober
-	project       string
-	proxyPort     int
-	portAddressed bool
-	projectDir    string
-	stateDir      string
-	jobs          []domain.JobConfig
-	declared      []domain.JobConfig
-	shared        *domain.SharedJobContext
+	service    runlogs.Service
+	board      runlogs.Board
+	workDir    string
+	worktree   string
+	logDir     string
+	env        map[string]string
+	prober     runlogs.Prober
+	project    string
+	proxyPort  int
+	publicPort int
+	projectDir string
+	stateDir   string
+	jobs       []domain.JobConfig
+	declared   []domain.JobConfig
+	shared     *domain.SharedJobContext
 }
 
 func Open(params Params) Seam {
@@ -99,19 +95,19 @@ func Open(params Params) Seam {
 			// listing its own idea of what this worktree has run.
 			Logged: process.LoggedJobs(logDir),
 		}),
-		workDir:       params.WorkDir,
-		worktree:      branch,
-		logDir:        logDir,
-		env:           env,
-		jobs:          params.Jobs,
-		declared:      declaredOf(params),
-		prober:        newProber(params.ProbeBudget, params.NoProbe),
-		project:       filepath.Base(params.ProjectDir),
-		proxyPort:     params.ProxyPort,
-		portAddressed: params.PortAddressed,
-		projectDir:    params.ProjectDir,
-		stateDir:      params.StateDir,
-		shared:        shared,
+		workDir:    params.WorkDir,
+		worktree:   branch,
+		logDir:     logDir,
+		env:        env,
+		jobs:       params.Jobs,
+		declared:   declaredOf(params),
+		prober:     newProber(params.ProbeBudget, params.NoProbe),
+		project:    filepath.Base(params.ProjectDir),
+		proxyPort:  params.ProxyPort,
+		publicPort: params.PublicPort,
+		projectDir: params.ProjectDir,
+		stateDir:   params.StateDir,
+		shared:     shared,
 	}
 }
 
@@ -183,21 +179,21 @@ func (s Seam) run(ctx context.Context, sink runlogs.Sink, params StartParams) (r
 
 func (s Seam) start(ctx context.Context, sink runlogs.Sink, params StartParams) (runlogs.Outcome, error) {
 	return runlogs.Run(ctx, runlogs.RunParams{
-		BaseOwners:    s.baseOwners(),
-		Service:       s.service,
-		Sink:          sink,
-		Jobs:          params.Jobs,
-		Declared:      s.declared,
-		Profile:       params.Profile,
-		WorkDir:       s.workDir,
-		Worktree:      s.worktree,
-		LogDir:        s.logDir,
-		Env:           s.env,
-		Prober:        s.prober,
-		Project:       s.project,
-		ProxyPort:     s.proxyPort,
-		PortAddressed: s.portAddressed,
-		Shared:        s.shared,
+		BaseOwners: s.baseOwners(),
+		Service:    s.service,
+		Sink:       sink,
+		Jobs:       params.Jobs,
+		Declared:   s.declared,
+		Profile:    params.Profile,
+		WorkDir:    s.workDir,
+		Worktree:   s.worktree,
+		LogDir:     s.logDir,
+		Env:        s.env,
+		Prober:     s.prober,
+		Project:    s.project,
+		ProxyPort:  s.proxyPort,
+		PublicPort: s.publicPort,
+		Shared:     s.shared,
 	})
 }
 
@@ -259,9 +255,6 @@ type boardAddressParams struct {
 // than deriving its own.
 func boardAddresses(params boardAddressParams) map[string]domain.JobAddress {
 	publicPort := params.Params.PublicPort
-	if params.Params.PortAddressed {
-		publicPort = 0
-	}
 	return rules.WorktreeJobAddresses(rules.WorktreeJobAddressesParams{
 		Config:     domain.RunConfig{Jobs: declaredOf(params.Params)},
 		PortOffset: rules.PortOffsetFromEnv(params.Env),

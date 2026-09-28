@@ -28,7 +28,14 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case domain.RunViewFocusKey:
 		return m.focus()
 	case keyEscape:
+		if m.reaching {
+			m.reaching = false
+			return m, nil
+		}
 		return m.dismiss()
+	case keyReach:
+		m.reaching = !m.reaching
+		return m, nil
 	case keyQuit, keyInterrupt:
 		return m.detach()
 	case keyUp, keyVimUp:

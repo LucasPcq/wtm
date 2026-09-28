@@ -121,12 +121,33 @@ type JobURLEntry struct {
 	URL string `json:"url"`
 }
 
+// ReachEntry is where one started job is reached: the URLs it answers on — its
+// own, or one per app a runner holds — else the ports it binds, and the
+// namespace a shared job carved out for this worktree. Every run surface
+// renders the same list, at its own density.
+type ReachEntry struct {
+	Job       string
+	URLs      []JobURLEntry
+	Ports     []NamedPort
+	Namespace string
+}
+
+// NamedPort is a port as a reader reaches it: its declared name, empty when
+// only the number is known.
+type NamedPort struct {
+	Name string
+	Port int
+}
+
 // JobAddress is where a declared job answers in one worktree: the ports it
 // binds there, and the name it is published under when it publishes one. It is
 // a property of the worktree's offset, known whether or not anything is
 // running.
 type JobAddress struct {
 	Ports []int
+	// Named is Ports with the name each one is declared under, for a surface
+	// that lists several: six numbers alone say nothing of which is redis.
+	Named []NamedPort
 	URL   string
 	// Held are the names this job's process answers for besides its own: one per
 	// published job it runs. A runner is a single process — `turbo run dev` —

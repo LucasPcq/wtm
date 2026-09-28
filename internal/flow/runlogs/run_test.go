@@ -555,39 +555,6 @@ func TestRunReportsWhereTheAppsARunnerStartedAnswer(t *testing.T) {
 	}
 }
 
-func TestRunHandsOutPortsWhenTheEnvStillSpellsThem(t *testing.T) {
-	runner := domain.JobConfig{
-		Name: "dev", Kind: domain.JobKindService, Cmd: "turbo run dev",
-		Ports: map[string]int{"PORT": 3000}, Runs: []string{"web"},
-	}
-	web := domain.JobConfig{
-		Name: "web", Kind: domain.JobKindService, Cwd: "apps/web",
-		Ports: map[string]int{"PORT": 3000}, URL: &domain.JobURLConfig{Port: "PORT"},
-	}
-	service := &runlogstest.Service{Ports: map[string]map[string]int{"dev": {"PORT": 3010}}, ProxyPort: 4000}
-
-	outcome, err := runlogs.Run(context.Background(), runlogs.RunParams{
-		Service:       service,
-		Jobs:          []domain.JobConfig{runner},
-		Declared:      []domain.JobConfig{runner, web},
-		WorkDir:       "/w",
-		Env:           map[string]string{domain.EnvWorktree: "feat-auth"},
-		Project:       "myapp",
-		ProxyPort:     4000,
-		PortAddressed: true,
-	})
-	if err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-
-	// The name is registered either way, but the .env answers on the port, so
-	// the port is the entrance a reader must be given.
-	held := outcome.Results[0].Held
-	if len(held) != 1 || held[0].URL != "http://localhost:3010" {
-		t.Fatalf("held = %+v, want the port the app answers on", held)
-	}
-}
-
 // A job refused as already running comes back with nothing about the proxy.
 // Reading that silence as "the proxy is off" told a run whose jobs were all up
 // that its port was taken.

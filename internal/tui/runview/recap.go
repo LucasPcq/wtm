@@ -56,41 +56,24 @@ func (m Model) recapBlock(outcome runlogs.Outcome) []string {
 	return lines
 }
 
-// addressLines say where the jobs left running answer. Only the ones that have
-// an address are listed: a job with neither a published name nor a declared
-// port has nothing to point at, and a blank column would read as a failure.
+// addressLines say where the jobs left running are reached: the same block the
+// stream ends on, since the view that showed it is gone and this is what stays
+// in the scrollback.
 func (m Model) addressLines(outcome runlogs.Outcome) []string {
 	started := make(map[string]bool, len(outcome.Started))
 	for _, name := range outcome.Started {
 		started[name] = true
 	}
-
-	var lines []string
+	var entries []domain.ReachEntry
 	for _, view := range m.jobs {
 		if view.WorkDir != outcome.WorkDir || !started[view.Name] {
 			continue
 		}
-		// A runner answers for its children and for nothing of its own, so its
-		// addresses are theirs: one line each, under the runner's, which is the
-		// only place they are written at all. Nothing folds on a terminal the view
-		// is handing back.
-		if len(view.Address.Held) > 0 {
-			lines = append(lines, styles.Muted.Render(fmt.Sprintf(domain.RunViewRecapAddressFmt, view.Name, rules.HeldSummaryText(len(view.Address.Held)))))
-			for _, held := range rules.HeldAddressLines(view.Address.Held) {
-				lines = append(lines, styles.Muted.Render(domain.RunViewRecapHeldIndent+held))
-			}
-			continue
-		}
-		// The namespace rides on the address line: the view that showed it is
-		// gone, and this is the part of the run that stays in the scrollback.
-		detail := rules.JobAddressText(view.Address)
-		if namespace := m.sequence.namespaces[viewKey(view)]; namespace != "" {
-			detail = strings.TrimPrefix(detail+domain.RunViewSeparator+namespace, domain.RunViewSeparator)
-		}
-		if detail == "" {
-			continue
-		}
-		lines = append(lines, styles.Muted.Render(fmt.Sprintf(domain.RunViewRecapAddressFmt, view.Name, detail)))
+		entries = append(entries, m.reachOf(view))
+	}
+	lines := rules.ReachLines(rules.ReachLinesParams{Entries: entries, Width: domain.RecapWidth})
+	for i, line := range lines {
+		lines[i] = domain.RunViewRecapHeldIndent + line
 	}
 	return lines
 }
@@ -131,6 +114,13 @@ func (m Model) recap() string {
 			lines = append(lines, "")
 		}
 		lines = append(lines, m.recapBlock(outcome)...)
+	}
+
+	if len(m.warnings) > 0 {
+		lines = append(lines, "")
+		for _, warning := range m.warnings {
+			lines = append(lines, styles.Warning.Render(domain.GlyphAttention)+" "+warning)
+		}
 	}
 
 	hints := []string{styles.NextStepLine(styles.NextStepParams{Command: domain.RunStreamAttachHint, Note: domain.RunStreamAttachNote})}

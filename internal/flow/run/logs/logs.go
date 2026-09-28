@@ -104,22 +104,21 @@ func (f *logsFlow) run() (Outcome, error) {
 	}
 
 	workDirs := target.WorkDirs(target.WorkDirsParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})
-	addresses := addressing.Read(addressing.Params{Context: f.ctx, WorkDirs: workDirs})
+	warnings := addressing.Lines(addressing.Params{Context: f.ctx, WorkDirs: workDirs})
 	set := seam.OpenSet(seam.SetParams{
-		ProjectDir:    f.ctx.ProjectDir,
-		StateDir:      f.ctx.StateDir,
-		WorkDirs:      workDirs,
-		Jobs:          f.request.Config.Jobs,
-		PortAddressed: addresses.PortAddressed,
-		ProxyPort:     rules.ProxyPort(f.ctx.Config.Global),
-		PublicPort:    process.PublicProxyPort(rules.ProxyPort(f.ctx.Config.Global)),
+		ProjectDir: f.ctx.ProjectDir,
+		StateDir:   f.ctx.StateDir,
+		WorkDirs:   workDirs,
+		Jobs:       f.request.Config.Jobs,
+		ProxyPort:  rules.ProxyPort(f.ctx.Config.Global),
+		PublicPort: process.PublicProxyPort(rules.ProxyPort(f.ctx.Config.Global)),
 	})
 
 	return Outcome{WorkDirs: workDirs}, f.presenter.Show(ShowParams{
 		Board:     set.Board(),
 		Job:       f.request.Job,
 		Worktrees: set.Worktrees(),
-		Warnings:  addresses.Warnings,
+		Warnings:  warnings,
 	})
 }
 

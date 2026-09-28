@@ -119,12 +119,11 @@ func (f *startFlow) run() (Outcome, error) {
 		return Outcome{}, fmt.Errorf("%s:\n%s", domain.JobConflictTitle, strings.Join(rules.JobConflictLines(conflicts), "\n"))
 	}
 
-	addresses := addressing.Read(addressing.Params{Context: f.ctx, WorkDirs: []string{workDir}})
+	warnings := addressing.Lines(addressing.Params{Context: f.ctx, WorkDirs: []string{workDir}})
 	runSeam := seam.Open(seam.Params{
-		ProjectDir:    f.ctx.ProjectDir,
-		StateDir:      f.ctx.StateDir,
-		WorkDir:       workDir,
-		PortAddressed: addresses.PortAddressed[workDir],
+		ProjectDir: f.ctx.ProjectDir,
+		StateDir:   f.ctx.StateDir,
+		WorkDir:    workDir,
 		// The board lists every declared job, not just this one: starting a job is
 		// no reason to hide the ones already up beside it.
 		Jobs:       f.request.Config.Jobs,
@@ -136,7 +135,7 @@ func (f *startFlow) run() (Outcome, error) {
 		Board:    runSeam.Board(),
 		Job:      job.Name,
 		Inline:   job.Kind == domain.JobKindTask,
-		Warnings: addresses.Warnings,
+		Warnings: warnings,
 		Start:    runSeam.Starter(seam.StartParams{Jobs: rules.JobsWithEffectivePorts(f.request.Config, []domain.JobConfig{job})}),
 	})
 	if err != nil {

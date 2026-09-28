@@ -98,6 +98,10 @@ A `✓` headline, nought to three aligned fields, at most one next step. Budget:
 
 One nuance that is not a matter of taste: a **destructive** run names what it destroyed — knowing what is gone is actionable — but on one line, because the picker and the recap have already shown that list twice. A non-destructive run counts.
 
+### A run's addresses
+
+A run is the one conclusion that lists addresses, and it does it once: each job line carries a single fragment (`rules.ReachSummary` — the URL, `:5432`, `3 urls`, `6 ports`), and the full list is the **Where to reach it** block (`rules.ReachLines`) the run ends on, the run view shows behind `a`, and its recap keeps. A port list on a job line is how `docker-compose` came to take 160 columns; see [run-addressing.md](run-addressing.md#where-to-reach-it--one-model-for-every-surface).
+
 ## The glyph vocabulary
 
 Exhaustive. One glyph per line, at its head; never two vocabularies in one block.

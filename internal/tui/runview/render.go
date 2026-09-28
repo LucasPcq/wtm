@@ -228,13 +228,17 @@ func (m Model) renderPanePanel(layout domain.RunViewLayout) string {
 		Found: found,
 		Width: max(layout.PaneCols-2*domain.RunViewTitleIndent, 0),
 	})
+	body := m.renderPaneBody(paneBodyParams{View: view, Found: found, Layout: layout})
+	if m.reaching {
+		title = styles.Bold.Render(domain.ReachTitle)
+		body = m.reachBody(layout.PaneCols - domain.RunViewTitleIndent)
+	}
 	if title != "" {
 		title = strings.Repeat(" ", domain.RunViewTitleIndent) + title
 	}
 	// A blank row under the title, as the sidebar has under its own: the first
 	// line a job writes is not a continuation of its name.
-	lines := append([]string{title, ""},
-		m.renderPaneBody(paneBodyParams{View: view, Found: found, Layout: layout})...)
+	lines := append([]string{title, ""}, body...)
 
 	return m.paneStyle().
 		Width(layout.Pane.Width - domain.RunViewBorderWidth).
@@ -269,27 +273,81 @@ func (m Model) renderPaneTitle(params paneTitleParams) string {
 // sequence; `run logs` opens the same view with nothing started, and it used to
 // show no address at all — the one difference between the two views.
 func (m Model) statusWithAddress(view runlogs.JobView) string {
-	key := viewKey(view)
 	label := string(view.Status)
-	if namespace := m.sequence.namespaces[key]; namespace != "" {
-		label += domain.RunViewSeparator + namespace
-	}
-
-	// A url already carries the port it answers on, so the two are the same fact
-	// twice — the rule JobAddressText states, applied here too. The observed url
-	// still wins over the predicted one: only the run knows what the proxy really
-	// served.
-	if url := m.sequence.urls[key]; url != "" {
-		return label + domain.RunViewSeparator + url
-	}
-	if ports := m.sequence.ports[key]; len(ports) > 0 {
-		return rules.LabelWithPorts(rules.LabelWithPortsParams{Label: label, Ports: ports})
-	}
-
-	if address := rules.JobAddressText(view.Address); address != "" {
-		return label + domain.RunViewSeparator + address
+	if summary := rules.ReachSummary(m.reachOf(view)); summary != "" {
+		return label + domain.RunViewSeparator + summary
 	}
 	return label
+}
+
+// reachOf is where one job is reached, preferring what this run observed to
+// what the config predicts: only the run knows what the proxy really served and
+// what each port is called.
+func (m Model) reachOf(view runlogs.JobView) domain.ReachEntry {
+	key := viewKey(view)
+	url := m.sequence.urls[key]
+	if url == "" {
+		url = view.Address.URL
+	}
+	entry := rules.ReachEntryFor(rules.ReachEntryParams{
+		Job:       view.Name,
+		URL:       url,
+		Held:      view.Address.Held,
+		Ports:     m.sequence.ports[key],
+		Namespace: m.sequence.namespaces[key],
+	})
+	if len(entry.URLs) == 0 && len(entry.Ports) == 0 {
+		entry.Ports = view.Address.Named
+	}
+	return entry
+}
+
+// reachLinesIn is the block's body for one worktree: every job up there.
+func (m Model) reachLinesIn(params reachLinesInParams) []string {
+	var entries []domain.ReachEntry
+	for _, view := range m.jobs {
+		if view.WorkDir != params.WorkDir || !rules.IsJobUp(view.Status) {
+			continue
+		}
+		entries = append(entries, m.reachOf(view))
+	}
+	return rules.ReachLines(rules.ReachLinesParams{Entries: entries, Width: params.Width})
+}
+
+type reachLinesInParams struct {
+	WorkDir string
+	Width   int
+}
+
+// reachBody is the pane behind the reach key: the block per worktree, headed by
+// the worktree above several of them.
+func (m Model) reachBody(width int) []string {
+	pad := strings.Repeat(" ", domain.RunViewTitleIndent)
+	var lines []string
+	seen := map[string]bool{}
+	for _, view := range m.jobs {
+		if seen[view.WorkDir] {
+			continue
+		}
+		seen[view.WorkDir] = true
+		block := m.reachLinesIn(reachLinesInParams{WorkDir: view.WorkDir, Width: width})
+		if len(block) == 0 {
+			continue
+		}
+		if m.worktreeCount() > 1 {
+			if len(lines) > 0 {
+				lines = append(lines, "")
+			}
+			lines = append(lines, pad+styles.Bold.Render(view.Worktree))
+		}
+		for _, line := range block {
+			lines = append(lines, pad+line)
+		}
+	}
+	if len(lines) == 0 {
+		return paneNote(domain.RunViewReachNothing, width)
+	}
+	return lines
 }
 
 // paneOrigin says what the pane is showing: the job as it prints, the log file

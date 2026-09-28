@@ -272,18 +272,17 @@ func (f *upFlow) start(answers flow.Answers) (Outcome, error) {
 		return Outcome{}, fmt.Errorf("%s:\n%s", domain.JobConflictTitle, strings.Join(rules.JobConflictLines(conflicts), "\n"))
 	}
 
-	addresses := addressing.Read(addressing.Params{Context: f.ctx, WorkDirs: workDirs})
+	warnings := addressing.Lines(addressing.Params{Context: f.ctx, WorkDirs: workDirs})
 	set := seam.OpenSet(seam.SetParams{
-		ProjectDir:    f.ctx.ProjectDir,
-		StateDir:      f.ctx.StateDir,
-		WorkDirs:      workDirs,
-		Jobs:          profile.Jobs,
-		Declared:      f.request.Config.Jobs,
-		PortAddressed: addresses.PortAddressed,
-		ProbeBudget:   rules.PortProbeBudget(f.request.Config),
-		NoProbe:       f.request.NoProbe,
-		ProxyPort:     rules.ProxyPort(f.ctx.Config.Global),
-		PublicPort:    process.PublicProxyPort(rules.ProxyPort(f.ctx.Config.Global)),
+		ProjectDir:  f.ctx.ProjectDir,
+		StateDir:    f.ctx.StateDir,
+		WorkDirs:    workDirs,
+		Jobs:        profile.Jobs,
+		Declared:    f.request.Config.Jobs,
+		ProbeBudget: rules.PortProbeBudget(f.request.Config),
+		NoProbe:     f.request.NoProbe,
+		ProxyPort:   rules.ProxyPort(f.ctx.Config.Global),
+		PublicPort:  process.PublicProxyPort(rules.ProxyPort(f.ctx.Config.Global)),
 	})
 
 	// Before anything starts: a run defines what its worktrees' log directories
@@ -296,7 +295,7 @@ func (f *upFlow) start(answers flow.Answers) (Outcome, error) {
 		Board:     set.Board(),
 		Profile:   profile.Name,
 		Worktrees: set.Worktrees(),
-		Warnings:  addresses.Warnings,
+		Warnings:  warnings,
 		Start:     set.Starter(seam.StartParams{Profile: profile.Name, Jobs: rules.JobsWithEffectivePorts(f.request.Config, profile.Jobs)}),
 	})
 	if err != nil {

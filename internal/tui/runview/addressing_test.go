@@ -27,7 +27,7 @@ func viewWithWarnings(t *testing.T, warnings []string) string {
 // `run logs` starts nothing, so every other band stays empty — and it is the
 // surface where a reader would otherwise only learn this on the way out.
 func TestTheBandCarriesTheAddressingWarningWithNoRun(t *testing.T) {
-	view := viewWithWarnings(t, []string{driftLine, domain.AddressingDriftWhy})
+	view := viewWithWarnings(t, []string{driftLine})
 
 	if !strings.Contains(view, domain.AddressingDriftTitle) {
 		t.Fatalf("the notice band shows no addressing title:\n%s", view)

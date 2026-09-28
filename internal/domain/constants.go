@@ -622,9 +622,8 @@ const (
 	// is not there to say the same thing.
 	AddressingDriftGlyph = "⚠ "
 	AddressingDriftTitle = "Published names, unsettled .env"
-	AddressingPortedFmt  = "%s answers on its ports: its .env was never settled on the names it publishes — `wtm env %s` switches it"
-	AddressingDriftFmt   = "%s: its .env is out of step with the addresses it publishes — `wtm env %s` settles it"
-	AddressingDriftWhy   = "A cross-origin call is refused whenever the browser's origin and the .env disagree"
+	AddressingPortedFmt  = "%s's .env still spells ports — `wtm env %s` aligns it"
+	AddressingDriftFmt   = "%s's .env is out of step with its names — `wtm env %s` settles it"
 
 	// FlagKeepEnv withholds the .env pass of `run addressing`, as --keep-data
 	// withholds the namespace removal of a clean.
@@ -2229,7 +2228,7 @@ const (
 
 	// RunViewHelpBrowse and RunViewHelpFilter are the footer's key reminders,
 	// one per mode the keyboard can be in.
-	RunViewHelpBrowse = "↑↓ job · / filter · pgup/pgdn scroll · enter focus · o open · r refresh · q detach"
+	RunViewHelpBrowse = "↑↓ job · / filter · pgup/pgdn scroll · enter focus · o open · a addresses · q detach"
 	RunViewHelpFilter = "type to filter · enter apply · esc clear"
 
 	// RunViewFocusKey passes every keystroke to the job. Taking them back needs
@@ -2436,6 +2435,7 @@ const (
 	// RunStreamNamespaceFmt is the slice a shared job's create made sure exists,
 	// on its own line so the one thing a clean will drop is seen being made.
 	RunStreamNamespaceFmt       = "%s ready in %s"
+	RunStreamNamespaceReadyFmt  = "%s ready"
 	RunStreamAlreadyFmt         = "%s already running"
 	RunStreamAlreadyAttachedFmt = "%s already attached"
 	RunStreamDoneFmt            = "%s done"
@@ -3491,6 +3491,11 @@ const (
 
 	// KeyOpenURL opens the selected job's URL in a browser.
 	KeyOpenURL = "o"
+	// RunViewReachKey swaps the run view's pane for the block saying where every
+	// job is reached.
+	RunViewReachKey = "a"
+	// RunViewReachNothing stands in the reach pane when nothing up has an address.
+	RunViewReachNothing = "Nothing running here has an address."
 	// KeyRunLogs reads a job's logs in the detail panel. Upper case: "l" is the
 	// list's vim-right.
 	KeyRunLogs = "L"
@@ -3624,7 +3629,19 @@ const (
 	// on the runner's line ran past the panel and were cut, taking four urls with
 	// them and leaving a row that could not be clicked. They are their own rows
 	// now, folded away until asked for.
-	DetailHeldCountFmt  = "%d addresses"
+	DetailHeldCountFmt = "%d addresses"
+	// ReachTitle heads the one block that says where every job of a run is
+	// reached; the Reach* formats are its fragments.
+	ReachTitle          = "Where to reach it"
+	ReachURLsFmt        = "%d urls"
+	ReachPortsFmt       = "%d ports"
+	ReachPortFmt        = ":%d"
+	ReachNamedPortFmt   = "%s :%d"
+	ReachCellGap        = "   "
+	ReachLabelGap       = "  "
+	ReachDetailSep      = " · "
+	ReachPortSuffix     = "_PORT"
+	ReachDefaultWidth   = 72
 	DetailHeldOpenGlyph = "▾"
 	DetailHeldShutGlyph = "▸"
 	DetailHeldIndent    = "  "

@@ -91,6 +91,8 @@ type Model struct {
 
 	filtering bool
 	filter    string
+	// reaching swaps the pane for the block saying where every job is reached.
+	reaching bool
 	// focused reports that the keyboard belongs to the selected job rather than
 	// to this view.
 	focused bool

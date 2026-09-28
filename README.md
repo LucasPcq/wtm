@@ -581,11 +581,10 @@ The rewrite happens where wtm provisions: a worktree, when it is created and whe
 checkout that exists without wtm, the one a colleague clones and a `docker compose up` reads.
 So under `names` its values still hold ports — and then **the working entrance is the port**,
 not the name: the browser on `localhost:5175` sends an `Origin` the API's `CORS_ORIGIN`
-recognises, while the named URL sends one it does not. wtm follows the file rather than the
-setting: a worktree whose `.env` still spells ports is handed `http://localhost:<port>`
-everywhere — `run up`, `run url`, `run open`, the run view, the `wtm ui` panel — with one line
-saying why, and the named URL comes back the moment the file says so. The route is registered
-either way, so nothing has to restart:
+recognises, while the named URL sends one it does not. wtm still hands out the name everywhere
+— `run up`, `run url`, `run open`, the run view, the `wtm ui` panel — and adds one line saying
+the `.env` is out of step and which command aligns it (`--raw` gives the port). The route is
+registered either way, so nothing has to restart:
 
 ```bash
 wtm env main        # the positional takes the main checkout like any other worktree

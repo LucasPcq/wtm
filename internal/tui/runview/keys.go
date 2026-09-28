@@ -20,4 +20,5 @@ const (
 	keyScrollDwn = "shift+down"
 	keyLive      = "G"
 	keyOpenURL   = domain.KeyOpenURL
+	keyReach     = domain.RunViewReachKey
 )

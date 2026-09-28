@@ -100,10 +100,10 @@ ports = { PORT = 4001 }
 	}
 }
 
-// The address a surface hands out follows the .env, not the config's intent: a
-// worktree still spelling ports answers on them, and a named URL pointing at it
-// is the one entrance nothing behind it accepts.
-func TestRunAddressesForServesThePortsOfAnUnsettledWorktree(t *testing.T) {
+// The name is the address whatever the .env still spells: hiding it behind the
+// port made the one URL a reader came for disappear. The .env out of step is
+// said once, in the note.
+func TestRunAddressesForServesTheNameOfAnUnsettledWorktree(t *testing.T) {
 	globaldir.Isolate(t)
 	repo := newOrdinalRepo(t)
 	writeRunConfig(t, repo.stateDir, namedRunConfig)
@@ -119,11 +119,11 @@ func TestRunAddressesForServesThePortsOfAnUnsettledWorktree(t *testing.T) {
 	})
 
 	url := answer.ByBranch["main"]["api-dev"].URL
-	if !strings.HasPrefix(url, "http://localhost:") {
-		t.Errorf("url = %q, want the port the job binds while the .env spells ports", url)
+	if !strings.Contains(url, ".localhost:11080") {
+		t.Errorf("url = %q, want the published name", url)
 	}
 	if answer.Notes["main"] == "" {
-		t.Error("the ports were served with no word about why, which reads as a worktree without names")
+		t.Error("a .env out of step with the names it publishes must be said")
 	}
 }
 

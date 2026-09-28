@@ -51,6 +51,10 @@ type RunPrinter struct {
 	worktrees  int
 	printed    bool
 	readied    bool
+	// reach is where each started job is reached, per worktree in the order
+	// they reported: the block the run concludes on.
+	reach      map[string][]domain.ReachEntry
+	reachOrder []string
 }
 
 func NewRunPrinter(params RunPrinterParams) *RunPrinter {
@@ -92,22 +96,19 @@ func (p *RunPrinter) Emit(event runlogs.Event) {
 			if event.Attached {
 				already = domain.RunStreamAlreadyAttachedFmt
 			}
-			Success(p.out, p.qualify(fmt.Sprintf(already, event.Job), event.Worktree))
+			p.remember(event)
+			Success(p.out, p.jobLine(jobLineParams{Format: already, Event: event}))
 			return
 		}
 		format := domain.RunStreamStartedFmt
 		if event.Attached {
 			format = domain.RunStreamAttachedFmt
 		}
+		p.remember(event)
 		Success(p.out, p.jobLine(jobLineParams{Format: format, Event: event}))
-		if event.Namespace != "" {
-			Success(p.out, p.qualify(fmt.Sprintf(domain.RunStreamNamespaceFmt, event.Namespace, event.Job), event.Worktree))
-		}
-		p.held(event.Held)
 		p.devOrigins(event.DevOrigins)
 	case runlogs.PhaseDone:
 		Success(p.out, p.jobLine(jobLineParams{Format: domain.RunStreamDoneFmt, Event: event}))
-		p.held(event.Held)
 	case runlogs.PhaseFailed:
 		Error(p.err, p.qualify(event.Reason, event.Worktree))
 	case runlogs.PhaseNotice:
@@ -159,48 +160,54 @@ type jobLineParams struct {
 	Event  runlogs.Event
 }
 
+// jobLine carries one address fragment, never the list: the URL, the lone
+// port, or how many — the block the run ends on has the rest. A namespace a
+// shared start carved rides on the same line.
 func (p *RunPrinter) jobLine(params jobLineParams) string {
-	return JobLine(JobLineParams{
-		Label:      p.qualify(fmt.Sprintf(params.Format, params.Event.Job), params.Event.Worktree),
-		Ports:      params.Event.Ports,
-		URL:        params.Event.URL,
-		Hyperlinks: p.hyperlinks,
-	})
-}
-
-type JobLineParams struct {
-	Label string
-	Ports map[string]int
-	// URL is where the job answers, empty for one that publishes no name.
-	URL string
-	// Hyperlinks turns the URL into an OSC-8 link.
-	Hyperlinks bool
-}
-
-// JobLine is how every human surface announces a job: what it is, the ports it
-// bound, and where to reach it. Shared so `run up` and `run start` cannot drift
-// into saying the same thing two ways.
-func JobLine(params JobLineParams) string {
-	line := rules.LabelWithPorts(rules.LabelWithPortsParams{
-		Label: params.Label,
-		Ports: params.Ports,
-	})
-	if params.URL == "" {
-		return line
+	event := params.Event
+	line := p.qualify(fmt.Sprintf(params.Format, event.Job), event.Worktree)
+	entry := reachEntryOf(event)
+	if summary := rules.ReachSummary(entry); summary != "" {
+		if len(entry.URLs) == 1 {
+			summary = Hyperlink(HyperlinkParams{Text: summary, URL: summary, Enabled: p.hyperlinks})
+		}
+		line += domain.ReachDetailSep + summary
 	}
-	return line + domain.RunURLSuffixSep + Hyperlink(HyperlinkParams{
-		Text:    params.URL,
-		URL:     params.URL,
-		Enabled: params.Hyperlinks,
+	if event.Namespace != "" {
+		line += domain.ReachDetailSep + fmt.Sprintf(domain.RunStreamNamespaceReadyFmt, event.Namespace)
+	}
+	return line
+}
+
+func reachEntryOf(event runlogs.Event) domain.ReachEntry {
+	return rules.ReachEntryFor(rules.ReachEntryParams{
+		Job:       event.Job,
+		URL:       event.URL,
+		Held:      event.Held,
+		Ports:     event.Ports,
+		Namespace: event.Namespace,
 	})
 }
 
-// held names the jobs a runner started, under its own line. They have no line
-// of their own: they are subprocesses of the one job the daemon holds.
-func (p *RunPrinter) held(entries []domain.JobURLEntry) {
-	for _, line := range rules.HeldAddressLines(entries) {
-		Message(p.out, Indent+line)
+// reachWidth is what the block may take inside its section's indent: the
+// terminal's, or the default on a pipe.
+func (p *RunPrinter) reachWidth() int {
+	width := TerminalWidthOf(p.out)
+	if width == 0 {
+		return 0
 	}
+	return max(width-3*len(Indent), 0)
+}
+
+// remember keeps a started job for the block the run concludes on.
+func (p *RunPrinter) remember(event runlogs.Event) {
+	if p.reach == nil {
+		p.reach = map[string][]domain.ReachEntry{}
+	}
+	if _, seen := p.reach[event.Worktree]; !seen {
+		p.reachOrder = append(p.reachOrder, event.Worktree)
+	}
+	p.reach[event.Worktree] = append(p.reach[event.Worktree], reachEntryOf(event))
 }
 
 // devOrigins reports the one line a Next project is missing before its own name
@@ -264,10 +271,37 @@ func (p *RunPrinter) aborted(outcome runlogs.Outcome) {
 // their own sequence, and the hint is about the run rather than about any of
 // them, so it is printed once however many reported.
 func (p *RunPrinter) ready(outcome runlogs.Outcome) {
-	if len(outcome.Started) == 0 || p.readied {
+	if len(outcome.Started) > 0 {
+		p.readied = true
+	}
+}
+
+// Conclude is the one place the run says where everything is reached: the
+// block, then a line for each worktree whose .env is out of step with it, then
+// what to do next. It follows every worktree's sequence, so a run over several
+// is concluded once.
+func (p *RunPrinter) Conclude(warnings []string) {
+	if !p.readied {
 		return
 	}
-	p.readied = true
+	for _, worktree := range p.reachOrder {
+		lines := rules.ReachLines(rules.ReachLinesParams{Entries: p.reach[worktree], Width: p.reachWidth()})
+		if len(lines) == 0 {
+			continue
+		}
+		title := domain.ReachTitle
+		if p.multi && worktree != "" {
+			title = fmt.Sprintf(domain.RunStreamWorktreeFmt, title, worktree)
+		}
+		Blank(p.out)
+		Section(p.out, title, lines)
+	}
+	if len(warnings) > 0 {
+		Blank(p.out)
+		for _, warning := range warnings {
+			Warning(p.out, warning)
+		}
+	}
 	Blank(p.out)
 	NextStep(p.out, NextStepParams{Command: domain.RunStreamAttachHint, Note: domain.RunStreamAttachNote})
 	NextStep(p.out, NextStepParams{Command: domain.RunStreamStopHint, Note: domain.RunStreamStopNote})

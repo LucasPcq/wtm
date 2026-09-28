@@ -107,7 +107,7 @@ func TestAddressingDriftIgnoresAProjectOnPorts(t *testing.T) {
 	}
 }
 
-func TestAddressingDriftLinesExplainWhyItMatters(t *testing.T) {
+func TestAddressingDriftLinesNameEachDriftingWorktreeOnce(t *testing.T) {
 	drifting := domain.EnvPortEntry{
 		Key: "CORS_ORIGIN", Addressing: domain.AddressingNames, Status: domain.EnvPortStatusRewrite,
 	}
@@ -117,8 +117,8 @@ func TestAddressingDriftLinesExplainWhyItMatters(t *testing.T) {
 		{Worktree: "feat/aligned", Plan: namedPlan()},
 	})
 
-	if len(lines) != 3 || lines[2] != domain.AddressingDriftWhy {
-		t.Fatalf("lines = %+v, want one per drifting worktree and the reason once", lines)
+	if len(lines) != 2 {
+		t.Fatalf("lines = %+v, want one per drifting worktree", lines)
 	}
 	if !strings.Contains(lines[0], "main") || !strings.Contains(lines[1], "feat/x") {
 		t.Errorf("lines = %+v, want each drifting worktree named", lines)

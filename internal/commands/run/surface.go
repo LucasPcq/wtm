@@ -61,6 +61,9 @@ func openRunView(params viewParams) (runlogs.Outcomes, error) {
 	}
 
 	if result.Detached {
+		if rest.printer != nil {
+			rest.printer.Conclude(params.Warnings)
+		}
 		output.FrameEnd(out)
 		return result.Outcomes, nil
 	}
@@ -119,13 +122,14 @@ func runOnStream(params streamParams) (runlogs.Outcomes, error) {
 	out, errOut := params.Cmd.OutOrStdout(), params.Cmd.ErrOrStderr()
 
 	output.FrameStart(out)
-	outcomes, err := params.Start(params.Cmd.Context(), output.NewRunPrinter(output.RunPrinterParams{
+	printer := output.NewRunPrinter(output.RunPrinterParams{
 		Out:        out,
 		Err:        errOut,
 		Profile:    params.Profile,
 		Worktrees:  params.Worktrees,
 		Hyperlinks: params.Hyperlinks,
-	}))
+	})
+	outcomes, err := params.Start(params.Cmd.Context(), printer)
 	if err != nil {
 		return nil, err
 	}
@@ -134,14 +138,8 @@ func runOnStream(params streamParams) (runlogs.Outcomes, error) {
 		output.FrameEnd(errOut)
 		return outcomes, nil
 	}
+	printer.Conclude(params.Warnings)
 	output.FrameEnd(out)
-	// A stream has no band to hold it, so the warning follows the lines it
-	// qualifies rather than sitting above them.
-	if len(params.Warnings) > 0 {
-		output.Frame(errOut, func(w io.Writer) {
-			output.Callout(w, domain.AddressingDriftTitle, params.Warnings)
-		})
-	}
 	return outcomes, nil
 }
 
