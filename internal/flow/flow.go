@@ -348,6 +348,30 @@ func KeepBranches(candidates []domain.BranchCandidate, exclude []string) []domai
 	return kept
 }
 
+// MergeContent lays what a step builds over what it declares statically, so a
+// Build only returns the parts that change. Both surfaces rendering a step read
+// it through here: two copies of this merge had drifted apart, and each had
+// dropped the cursor a picker opens on.
+func MergeContent(step Step, built StepContent) StepContent {
+	content := StepContent{Title: step.Title, Description: step.Description, Options: step.Options, Default: step.Default}
+	if built.Title != "" {
+		content.Title = built.Title
+	}
+	if built.Description != "" {
+		content.Description = built.Description
+	}
+	if len(built.Options) > 0 {
+		content.Options = built.Options
+	}
+	if built.Default != "" {
+		content.Default = built.Default
+	}
+	content.Start = built.Start
+	content.Blockers = built.Blockers
+	content.ExcludeBranches = built.ExcludeBranches
+	return content
+}
+
 // SummarizeSet renders a set answer for a breadcrumb: the names, capped so a
 // large selection does not overflow the line.
 func SummarizeSet(answer Answer) string {

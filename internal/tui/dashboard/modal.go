@@ -425,29 +425,18 @@ func branchItems(step flow.Step, content flow.StepContent) []components.SelectIt
 // stepContent merges what a step declares statically with what it derives from
 // the answers, so a Build only returns the parts that change.
 func stepContent(step flow.Step, answers flow.Answers) (flow.StepContent, error) {
-	content := flow.StepContent{Title: step.Title, Description: step.Description, Options: step.Options}
 	build := step.Build
 	if build == nil {
 		build = step.Load
 	}
 	if build == nil {
-		return content, nil
+		return flow.MergeContent(step, flow.StepContent{}), nil
 	}
 	built, err := build(answers)
 	if err != nil {
 		return flow.StepContent{}, err
 	}
-	if built.Title != "" {
-		content.Title = built.Title
-	}
-	if built.Description != "" {
-		content.Description = built.Description
-	}
-	if len(built.Options) > 0 {
-		content.Options = built.Options
-	}
-	content.Blockers = built.Blockers
-	return content, nil
+	return flow.MergeContent(step, built), nil
 }
 
 func loadingMessage(step flow.Step) string {
