@@ -93,7 +93,9 @@ func Open(params Params) Seam {
 			// Read once, here: the board is the side that knows the log directory,
 			// and every surface over it then reads the same trace rather than
 			// listing its own idea of what this worktree has run.
-			Logged: process.LoggedJobs(logDir),
+			Logged:         process.LoggedJobs(logDir),
+			SharedWorktree: sharedWorktreeOf(sharedWorktreeParams{Shared: shared, WorkDir: params.WorkDir}),
+			Env:            env,
 		}),
 		workDir:    params.WorkDir,
 		worktree:   branch,
@@ -145,6 +147,20 @@ func sharedContext(params Params) *domain.SharedJobContext {
 	}
 }
 
+type sharedWorktreeParams struct {
+	Shared  *domain.SharedJobContext
+	WorkDir string
+}
+
+// sharedWorktreeOf names where this worktree's shared services run, empty when
+// they run here.
+func sharedWorktreeOf(params sharedWorktreeParams) string {
+	if params.Shared == nil || params.Shared.WorkDir == params.WorkDir {
+		return ""
+	}
+	return target.BranchOf(params.Shared.WorkDir)
+}
+
 func (s Seam) Board() runlogs.Board { return s.board }
 func (s Seam) Worktree() string     { return s.worktree }
 
@@ -179,21 +195,22 @@ func (s Seam) run(ctx context.Context, sink runlogs.Sink, params StartParams) (r
 
 func (s Seam) start(ctx context.Context, sink runlogs.Sink, params StartParams) (runlogs.Outcome, error) {
 	return runlogs.Run(ctx, runlogs.RunParams{
-		BaseOwners: s.baseOwners(),
-		Service:    s.service,
-		Sink:       sink,
-		Jobs:       params.Jobs,
-		Declared:   s.declared,
-		Profile:    params.Profile,
-		WorkDir:    s.workDir,
-		Worktree:   s.worktree,
-		LogDir:     s.logDir,
-		Env:        s.env,
-		Prober:     s.prober,
-		Project:    s.project,
-		ProxyPort:  s.proxyPort,
-		PublicPort: s.publicPort,
-		Shared:     s.shared,
+		BaseOwners:     s.baseOwners(),
+		Service:        s.service,
+		Sink:           sink,
+		Jobs:           params.Jobs,
+		Declared:       s.declared,
+		Profile:        params.Profile,
+		WorkDir:        s.workDir,
+		Worktree:       s.worktree,
+		LogDir:         s.logDir,
+		Env:            s.env,
+		Prober:         s.prober,
+		Project:        s.project,
+		ProxyPort:      s.proxyPort,
+		PublicPort:     s.publicPort,
+		Shared:         s.shared,
+		SharedWorktree: sharedWorktreeOf(sharedWorktreeParams{Shared: s.shared, WorkDir: s.workDir}),
 	})
 }
 

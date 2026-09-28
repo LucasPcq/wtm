@@ -35,6 +35,10 @@ type JobView struct {
 	// surface reads one source: `run up`, `run logs` and the dashboard used to
 	// compute it three times, and only the first of them showed it.
 	Address domain.JobAddress
+	// SharedIn is the worktree a shared service runs in when this worktree only
+	// holds it; Namespace is what it carved out for this worktree.
+	SharedIn  string
+	Namespace string
 }
 
 type Size struct {
@@ -224,6 +228,8 @@ type Event struct {
 	// Namespace is what a PhaseStarted shared job carved out for this worktree,
 	// empty when it carves none or was already running here.
 	Namespace string
+	// SharedIn is the worktree an attached shared job runs in.
+	SharedIn string
 	// Notice is what PhaseNotice has to say: a fact about the run that belongs
 	// to no single job. Empty on every other phase.
 	Notice string

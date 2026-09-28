@@ -2431,7 +2431,8 @@ const (
 	RunViewRecapHeldIndent = "  "
 	// RunStreamAttachedFmt is a worktree joining a shared service another one
 	// runs: "started" there read as one service per worktree.
-	RunStreamAttachedFmt = "%s attached"
+	RunStreamAttachedFmt   = "%s attached"
+	RunStreamAttachedToFmt = "%s attached to %s"
 	// RunStreamNamespaceFmt is the slice a shared job's create made sure exists,
 	// on its own line so the one thing a clean will drop is seen being made.
 	RunStreamNamespaceFmt       = "%s ready in %s"
@@ -3496,6 +3497,10 @@ const (
 	RunViewReachKey = "a"
 	// RunViewReachNothing stands in the reach pane when nothing up has an address.
 	RunViewReachNothing = "Nothing running here has an address."
+	// RunViewSharedRowFmt heads, in the job list, the shared services a worktree
+	// holds in another.
+	RunViewSharedRowFmt  = "shared · %s"
+	RunViewAttachedToFmt = "attached to %s"
 	// KeyRunLogs reads a job's logs in the detail panel. Upper case: "l" is the
 	// list's vim-right.
 	KeyRunLogs = "L"
@@ -3633,6 +3638,7 @@ const (
 	// ReachTitle heads the one block that says where every job of a run is
 	// reached; the Reach* formats are its fragments.
 	ReachTitle          = "Where to reach it"
+	ReachSharedTitleFmt = "Shared, running in %s"
 	ReachURLsFmt        = "%d urls"
 	ReachPortsFmt       = "%d ports"
 	ReachPortFmt        = ":%d"

@@ -1,6 +1,9 @@
 package runview
 
 import (
+	"fmt"
+
+	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
 )
 
@@ -12,6 +15,9 @@ import (
 type sidebarRow struct {
 	Spacer bool
 	Header string
+	// Shared heads the shared services a worktree holds in another, under its
+	// own jobs: they keep running when this worktree stops.
+	Shared string
 	View   runlogs.JobView
 }
 
@@ -22,7 +28,7 @@ type sidebarRow struct {
 func (m Model) rows() []sidebarRow {
 	visible := m.visible()
 	rows := make([]sidebarRow, 0, len(visible)+2)
-	current, opened := "", false
+	current, opened, sharedOpen := "", false, false
 	for _, view := range visible {
 		heading := headingOf(view)
 		// A worktree git cannot name gets no heading rather than a blank one: an
@@ -34,8 +40,12 @@ func (m Model) rows() []sidebarRow {
 			if opened {
 				rows = append(rows, sidebarRow{Spacer: true})
 			}
-			current, opened = view.WorkDir, true
+			current, opened, sharedOpen = view.WorkDir, true, false
 			rows = append(rows, sidebarRow{Header: heading})
+		}
+		if view.SharedIn != "" && !sharedOpen {
+			sharedOpen = true
+			rows = append(rows, sidebarRow{Shared: fmt.Sprintf(domain.RunViewSharedRowFmt, view.SharedIn)})
 		}
 		rows = append(rows, sidebarRow{View: view})
 	}
@@ -82,7 +92,7 @@ func stickyHeader(rows []sidebarRow, offset int) string {
 	if offset <= 0 || offset >= len(rows) {
 		return ""
 	}
-	if rows[offset].Spacer || rows[offset].Header != "" {
+	if rows[offset].Spacer || rows[offset].Header != "" || rows[offset].Shared != "" {
 		return ""
 	}
 	for index := offset - 1; index >= 0; index-- {
@@ -97,7 +107,7 @@ func stickyHeader(rows []sidebarRow, offset int) string {
 // is what the sidebar's scroll offset is measured against.
 func selectedRowIndex(rows []sidebarRow, selected jobKey) int {
 	for index, row := range rows {
-		if row.Spacer || row.Header != "" {
+		if row.Spacer || row.Header != "" || row.Shared != "" {
 			continue
 		}
 		if viewKey(row.View) == selected {

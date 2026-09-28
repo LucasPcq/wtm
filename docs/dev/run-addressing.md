@@ -189,6 +189,12 @@ own density, so none of them decides on its own what to show:
 | run view | pane title `job · status · fragment` | behind `a`, and in the recap left on exit |
 | `run ps` | `ADDRESS` column, `WORKTREE` as the branch | — |
 
+A shared service a linked worktree only holds runs in main, and every surface says so the same
+way: `postgres attached to main` on its line, a **Shared, running in main** section in the block
+(`rules.ReachSections`), a `shared · main` line above it in the run view's job list, and a pane
+title naming where it runs rather than the worktree holding it. Stopping the worktree leaves
+those running — which is the one thing the reader has to be able to see.
+
 ## Related
 
 - `internal/rules/envorigins.go` — the whole origin surgery, pure and testable

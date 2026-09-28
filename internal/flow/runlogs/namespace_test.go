@@ -65,3 +65,25 @@ func TestRunNamesNoNamespaceWhenTheServiceWasAlreadyHeld(t *testing.T) {
 		t.Errorf("namespace = %q, want none for a start that ran no create", started.Namespace)
 	}
 }
+
+// A linked worktree holding main's service is told where it runs.
+func TestRunSaysWhereAnAttachedServiceRuns(t *testing.T) {
+	sink := &runlogstest.Sink{}
+	if _, err := runlogs.Run(t.Context(), runlogs.RunParams{
+		Service:        &runlogstest.Service{},
+		Sink:           sink,
+		Jobs:           []domain.JobConfig{sharedPostgres},
+		WorkDir:        "/trees/feat-x",
+		Worktree:       "feat/x",
+		Env:            map[string]string{domain.EnvWorktree: "feat_x", domain.EnvOrdinal: "1"},
+		Shared:         &domain.SharedJobContext{WorkDir: "/main"},
+		SharedWorktree: "main",
+	}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	started, _ := sink.Last(runlogs.PhaseStarted)
+	if started.SharedIn != "main" {
+		t.Errorf("shared in = %q, want main", started.SharedIn)
+	}
+}

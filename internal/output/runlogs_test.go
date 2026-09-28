@@ -250,3 +250,24 @@ func TestRunPrinterConcludesOnWhereToReachIt(t *testing.T) {
 		t.Errorf("the .env line came after the hints:\n%s", stdout)
 	}
 }
+
+// A service this worktree only holds says where it runs, on its line and in a
+// section of its own: stopping the worktree leaves it up.
+func TestRunPrinterSetsAServiceHeldInMainApart(t *testing.T) {
+	var out, errOut bytes.Buffer
+	printer := NewRunPrinter(RunPrinterParams{Out: &out, Err: &errOut})
+
+	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "compose", Worktree: "feat/x", Ports: map[string]int{"REDIS_PORT": 6389, "MINIO_PORT": 9010}})
+	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "postgres", Worktree: "feat/x", Attached: true, SharedIn: "main", Ports: map[string]int{"POSTGRES_PORT": 5432}})
+	printer.Emit(runlogs.Event{Phase: runlogs.PhaseReady, Outcome: runlogs.Outcome{Started: []string{"compose", "postgres"}}})
+	printer.Conclude(nil)
+
+	stdout := out.String()
+	if !strings.Contains(stdout, "postgres attached to main · :5432") {
+		t.Errorf("stdout = %q, want the line to say where postgres runs", stdout)
+	}
+	own, shared := strings.Index(stdout, domain.ReachTitle), strings.Index(stdout, "Shared, running in main")
+	if own < 0 || shared < own || strings.LastIndex(stdout, "postgres") < shared {
+		t.Errorf("stdout = %q, want postgres in a section of its own after the worktree's", stdout)
+	}
+}

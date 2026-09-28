@@ -166,6 +166,10 @@ func (m Model) renderJobRows(params jobRowsParams) []string {
 			rendered = append(rendered, styles.Muted.Render(truncate(row.Header, params.Width)))
 			continue
 		}
+		if row.Shared != "" {
+			rendered = append(rendered, styles.Muted.Render(truncate(m.indent()+row.Shared, params.Width)))
+			continue
+		}
 		rendered = append(rendered, m.renderJobRow(jobRowParams{View: row.View, Width: params.Width, Now: now}))
 	}
 	return rendered
@@ -264,7 +268,13 @@ func (m Model) renderPaneTitle(params paneTitleParams) string {
 		return ""
 	}
 	status := m.statusWithAddress(params.View)
-	left := styles.Bold.Render(m.qualify(params.View.Name, params.View.Worktree)) + styles.Muted.Render(domain.RunViewSeparator+status)
+	// A service held in another worktree is named by where it runs: this
+	// worktree's name beside it read as its own process.
+	name := m.qualify(params.View.Name, params.View.Worktree)
+	if params.View.SharedIn != "" {
+		name = params.View.Name
+	}
+	left := styles.Bold.Render(name) + styles.Muted.Render(domain.RunViewSeparator+status)
 	return spread(spreadParams{Left: left, Right: styles.Muted.Render(m.paneOrigin(params.View)), Width: params.Width})
 }
 
@@ -274,6 +284,9 @@ func (m Model) renderPaneTitle(params paneTitleParams) string {
 // show no address at all — the one difference between the two views.
 func (m Model) statusWithAddress(view runlogs.JobView) string {
 	label := string(view.Status)
+	if view.SharedIn != "" {
+		label = fmt.Sprintf(domain.RunViewAttachedToFmt, view.SharedIn)
+	}
 	if summary := rules.ReachSummary(m.reachOf(view)); summary != "" {
 		return label + domain.RunViewSeparator + summary
 	}
@@ -294,7 +307,8 @@ func (m Model) reachOf(view runlogs.JobView) domain.ReachEntry {
 		URL:       url,
 		Held:      view.Address.Held,
 		Ports:     m.sequence.ports[key],
-		Namespace: m.sequence.namespaces[key],
+		Namespace: namespaceOf(m.sequence.namespaces[key], view),
+		SharedIn:  view.SharedIn,
 	})
 	if len(entry.URLs) == 0 && len(entry.Ports) == 0 {
 		entry.Ports = view.Address.Named
@@ -302,21 +316,34 @@ func (m Model) reachOf(view runlogs.JobView) domain.ReachEntry {
 	return entry
 }
 
-// reachLinesIn is the block's body for one worktree: every job up there.
-func (m Model) reachLinesIn(params reachLinesInParams) []string {
+// reachSectionsIn is the block for one worktree: every job up there, the
+// shared services it holds in another set apart.
+func (m Model) reachSectionsIn(params reachLinesInParams) []domain.ReachSection {
 	var entries []domain.ReachEntry
-	for _, view := range m.jobs {
+	for _, view := range m.visible() {
 		if view.WorkDir != params.WorkDir || !rules.IsJobUp(view.Status) {
 			continue
 		}
 		entries = append(entries, m.reachOf(view))
 	}
-	return rules.ReachLines(rules.ReachLinesParams{Entries: entries, Width: params.Width})
+	return rules.ReachSections(rules.ReachLinesParams{Entries: entries, Width: params.Width})
 }
 
 type reachLinesInParams struct {
 	WorkDir string
 	Width   int
+}
+
+// namespaceOf prefers what the run reported carving to what the board reads
+// off the config: `run logs` started nothing, and still has a namespace to show.
+func namespaceOf(reported string, view runlogs.JobView) string {
+	if reported != "" {
+		return reported
+	}
+	if rules.IsJobUp(view.Status) {
+		return view.Namespace
+	}
+	return ""
 }
 
 // reachBody is the pane behind the reach key: the block per worktree, headed by
@@ -330,8 +357,8 @@ func (m Model) reachBody(width int) []string {
 			continue
 		}
 		seen[view.WorkDir] = true
-		block := m.reachLinesIn(reachLinesInParams{WorkDir: view.WorkDir, Width: width})
-		if len(block) == 0 {
+		sections := m.reachSectionsIn(reachLinesInParams{WorkDir: view.WorkDir, Width: width})
+		if len(sections) == 0 {
 			continue
 		}
 		if m.worktreeCount() > 1 {
@@ -340,8 +367,14 @@ func (m Model) reachBody(width int) []string {
 			}
 			lines = append(lines, pad+styles.Bold.Render(view.Worktree))
 		}
-		for _, line := range block {
-			lines = append(lines, pad+line)
+		for i, section := range sections {
+			// The pane's title already says what the first section is.
+			if i > 0 {
+				lines = append(lines, "", pad+styles.Bold.Render(section.Title))
+			}
+			for _, line := range section.Lines {
+				lines = append(lines, pad+line)
+			}
 		}
 	}
 	if len(lines) == 0 {

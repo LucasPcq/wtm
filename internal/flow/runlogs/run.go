@@ -124,6 +124,9 @@ type RunParams struct {
 	// ProxyPort is where the proxy serves those routes. Zero means it is off,
 	// and a job's URL is then its own address.
 	ProxyPort int
+	// SharedWorktree is the branch a shared service runs in, empty when it runs
+	// in this worktree.
+	SharedWorktree string
 	// PublicPort is what a name is expected to announce, read only for a job
 	// the daemon refused as already running: its answer says nothing of the proxy.
 	PublicPort int
@@ -174,6 +177,7 @@ func Run(ctx context.Context, params RunParams) (Outcome, error) {
 		project:        params.Project,
 		proxyPort:      params.ProxyPort,
 		expectedPublic: params.PublicPort,
+		sharedIn:       params.SharedWorktree,
 		nextConfig:     params.NextConfig,
 		baseOwners:     params.BaseOwners,
 	}
@@ -212,6 +216,7 @@ type runner struct {
 	// fact belongs to the run, not to each job that would repeat it.
 	servedPort     int
 	expectedPublic int
+	sharedIn       string
 	noticedProxy   bool
 
 	// probeTargets are the started services that declared ports, kept in start
@@ -311,7 +316,7 @@ func (r *runner) run() Outcome {
 		if rules.ShouldProbeJob(rules.ShouldProbeJobParams{Kind: job.Kind, Ports: result.Ports, Probe: job.Probe}) {
 			r.probeTargets = append(r.probeTargets, probeTarget{job: job.Name, resolved: result.Ports})
 		}
-		r.emit(Event{Phase: PhaseStarted, Job: job.Name, Step: i + 1, AlreadyRunning: alreadyRunning, Attached: status == domain.JobActionAttached, Namespace: namespace, Ports: ports, URL: url, Held: held, DevOrigins: r.devOrigins(job, host)})
+		r.emit(Event{Phase: PhaseStarted, Job: job.Name, Step: i + 1, AlreadyRunning: alreadyRunning, Attached: status == domain.JobActionAttached, SharedIn: r.heldIn(status), Namespace: namespace, Ports: ports, URL: url, Held: held, DevOrigins: r.devOrigins(job, host)})
 	}
 
 	// The probe dials first because its wait is also the time a job needs to die:
@@ -699,6 +704,18 @@ func jobNames(jobs []domain.JobConfig) []string {
 		names[i] = job.Name
 	}
 	return names
+}
+
+// heldIn is where an attached job runs: main's branch from a linked worktree,
+// and main itself when main joined a service another worktree started.
+func (r *runner) heldIn(status string) string {
+	if status != domain.JobActionAttached {
+		return ""
+	}
+	if r.sharedIn != "" {
+		return r.sharedIn
+	}
+	return r.worktree
 }
 
 // carved is the namespace this start made sure exists. A start refused as

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sort"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -765,6 +766,9 @@ func (m Model) qualify(line, worktree string) string {
 	return fmt.Sprintf(domain.RunStreamWorktreeFmt, line, worktree)
 }
 
+// visible is the list as it reads and as the cursor walks it: within each
+// worktree its own jobs, then the shared services it holds in another — the
+// sidebar sets those apart under a line of their own.
 func (m Model) visible() []runlogs.JobView {
 	views := make([]runlogs.JobView, 0, len(m.jobs))
 	for _, view := range m.jobs {
@@ -772,6 +776,18 @@ func (m Model) visible() []runlogs.JobView {
 			views = append(views, view)
 		}
 	}
+	group := map[string]int{}
+	for _, view := range views {
+		if _, seen := group[view.WorkDir]; !seen {
+			group[view.WorkDir] = len(group)
+		}
+	}
+	sort.SliceStable(views, func(a, b int) bool {
+		if group[views[a].WorkDir] != group[views[b].WorkDir] {
+			return group[views[a].WorkDir] < group[views[b].WorkDir]
+		}
+		return views[a].SharedIn == "" && views[b].SharedIn != ""
+	})
 	return views
 }
 

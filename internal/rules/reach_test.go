@@ -103,3 +103,22 @@ func TestReachLinesBalanceTheWrappedPorts(t *testing.T) {
 		t.Errorf("lines = %q, want six ports as three and three", lines)
 	}
 }
+
+// A shared service this worktree only holds is told apart: stopping the
+// worktree leaves it running, and that is the one thing a reader must see.
+func TestReachSectionsSetTheSharedServicesApart(t *testing.T) {
+	sections := rules.ReachSections(rules.ReachLinesParams{Entries: []domain.ReachEntry{
+		{Job: "docker-compose", Ports: []domain.NamedPort{{Name: "REDIS_PORT", Port: 6389}, {Name: "MINIO_PORT", Port: 9010}}},
+		{Job: "postgres", Ports: []domain.NamedPort{{Name: "POSTGRES_PORT", Port: 5432}}, Namespace: "app_feat", SharedIn: "main"},
+	}})
+
+	if len(sections) != 2 {
+		t.Fatalf("sections = %+v, want this worktree's jobs then main's", sections)
+	}
+	if sections[0].Title != domain.ReachTitle || !strings.HasPrefix(sections[0].Lines[0], "docker-compose") {
+		t.Errorf("first section = %+v, want the worktree's own jobs", sections[0])
+	}
+	if sections[1].Title != "Shared, running in main" || sections[1].Lines[0] != "postgres        :5432 · app_feat" {
+		t.Errorf("second section = %+v, want postgres under main, aligned with the first", sections[1])
+	}
+}

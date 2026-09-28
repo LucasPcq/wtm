@@ -97,18 +97,14 @@ func (p *RunPrinter) Emit(event runlogs.Event) {
 				already = domain.RunStreamAlreadyAttachedFmt
 			}
 			p.remember(event)
-			Success(p.out, p.jobLine(jobLineParams{Format: already, Event: event}))
+			Success(p.out, p.jobLine(jobLineParams{Label: fmt.Sprintf(already, event.Job), Event: event}))
 			return
 		}
-		format := domain.RunStreamStartedFmt
-		if event.Attached {
-			format = domain.RunStreamAttachedFmt
-		}
 		p.remember(event)
-		Success(p.out, p.jobLine(jobLineParams{Format: format, Event: event}))
+		Success(p.out, p.jobLine(jobLineParams{Label: startedLabel(event), Event: event}))
 		p.devOrigins(event.DevOrigins)
 	case runlogs.PhaseDone:
-		Success(p.out, p.jobLine(jobLineParams{Format: domain.RunStreamDoneFmt, Event: event}))
+		Success(p.out, p.jobLine(jobLineParams{Label: fmt.Sprintf(domain.RunStreamDoneFmt, event.Job), Event: event}))
 	case runlogs.PhaseFailed:
 		Error(p.err, p.qualify(event.Reason, event.Worktree))
 	case runlogs.PhaseNotice:
@@ -156,8 +152,21 @@ func (p *RunPrinter) heading() string {
 }
 
 type jobLineParams struct {
-	Format string
-	Event  runlogs.Event
+	Label string
+	Event runlogs.Event
+}
+
+// startedLabel says where a started job runs when that is not here: a shared
+// service this worktree only holds is main's, and stopping this worktree
+// leaves it up.
+func startedLabel(event runlogs.Event) string {
+	switch {
+	case event.Attached && event.SharedIn != "" && event.SharedIn != event.Worktree:
+		return fmt.Sprintf(domain.RunStreamAttachedToFmt, event.Job, event.SharedIn)
+	case event.Attached:
+		return fmt.Sprintf(domain.RunStreamAttachedFmt, event.Job)
+	}
+	return fmt.Sprintf(domain.RunStreamStartedFmt, event.Job)
 }
 
 // jobLine carries one address fragment, never the list: the URL, the lone
@@ -165,7 +174,7 @@ type jobLineParams struct {
 // shared start carved rides on the same line.
 func (p *RunPrinter) jobLine(params jobLineParams) string {
 	event := params.Event
-	line := p.qualify(fmt.Sprintf(params.Format, event.Job), event.Worktree)
+	line := p.qualify(params.Label, event.Worktree)
 	entry := reachEntryOf(event)
 	if summary := rules.ReachSummary(entry); summary != "" {
 		if len(entry.URLs) == 1 {
@@ -186,6 +195,7 @@ func reachEntryOf(event runlogs.Event) domain.ReachEntry {
 		Held:      event.Held,
 		Ports:     event.Ports,
 		Namespace: event.Namespace,
+		SharedIn:  event.SharedIn,
 	})
 }
 
@@ -285,16 +295,14 @@ func (p *RunPrinter) Conclude(warnings []string) {
 		return
 	}
 	for _, worktree := range p.reachOrder {
-		lines := rules.ReachLines(rules.ReachLinesParams{Entries: p.reach[worktree], Width: p.reachWidth()})
-		if len(lines) == 0 {
-			continue
+		for _, section := range rules.ReachSections(rules.ReachLinesParams{Entries: p.reach[worktree], Width: p.reachWidth()}) {
+			title := section.Title
+			if p.multi && worktree != "" {
+				title = fmt.Sprintf(domain.RunStreamWorktreeFmt, title, worktree)
+			}
+			Blank(p.out)
+			Section(p.out, title, section.Lines)
 		}
-		title := domain.ReachTitle
-		if p.multi && worktree != "" {
-			title = fmt.Sprintf(domain.RunStreamWorktreeFmt, title, worktree)
-		}
-		Blank(p.out)
-		Section(p.out, title, lines)
 	}
 	if len(warnings) > 0 {
 		Blank(p.out)

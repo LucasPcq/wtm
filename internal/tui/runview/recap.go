@@ -65,15 +65,20 @@ func (m Model) addressLines(outcome runlogs.Outcome) []string {
 		started[name] = true
 	}
 	var entries []domain.ReachEntry
-	for _, view := range m.jobs {
+	for _, view := range m.visible() {
 		if view.WorkDir != outcome.WorkDir || !started[view.Name] {
 			continue
 		}
 		entries = append(entries, m.reachOf(view))
 	}
-	lines := rules.ReachLines(rules.ReachLinesParams{Entries: entries, Width: domain.RecapWidth})
-	for i, line := range lines {
-		lines[i] = domain.RunViewRecapHeldIndent + line
+	var lines []string
+	for i, section := range rules.ReachSections(rules.ReachLinesParams{Entries: entries, Width: domain.RecapWidth}) {
+		if i > 0 {
+			lines = append(lines, section.Title)
+		}
+		for _, line := range section.Lines {
+			lines = append(lines, domain.RunViewRecapHeldIndent+line)
+		}
 	}
 	return lines
 }

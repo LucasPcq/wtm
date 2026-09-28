@@ -51,3 +51,33 @@ func TestTheReachKeyShowsTheBlockAndEscGoesBack(t *testing.T) {
 		t.Error("esc left the block on screen")
 	}
 }
+
+func sharedIn(view runlogs.JobView, worktree string) runlogs.JobView {
+	view.Status = domain.JobStatusAttached
+	view.SharedIn = worktree
+	return view
+}
+
+// A shared service this worktree only holds sits under its own jobs, below a
+// line saying where it runs — and its title names that worktree, not this one.
+func TestASharedServiceIsSetApartAndNamedByWhereItRuns(t *testing.T) {
+	h := newHarness(t, harnessParams{
+		Views: []runlogs.JobView{
+			inWorktree(sharedIn(running("postgres"), "main"), "/work/feat", "feat/x"),
+			inWorktree(running("compose"), "/work/feat", "feat/x"),
+		},
+		Streams: []string{"postgres", "compose"},
+	})
+
+	frame := ansi.Strip(h.model.View())
+	compose, shared, postgres := strings.Index(frame, "compose"), strings.Index(frame, "shared · main"), strings.Index(frame, "postgres")
+	if compose < 0 || shared < 0 || !(compose < shared && shared < postgres) {
+		t.Fatalf("frame = %q, want compose, then the shared line, then postgres", frame)
+	}
+
+	h.press(t, key("j"))
+	frame = ansi.Strip(h.model.View())
+	if !strings.Contains(frame, "postgres · attached to main") || strings.Contains(frame, "postgres · feat/x") {
+		t.Errorf("frame = %q, want the title to say where postgres runs", frame)
+	}
+}

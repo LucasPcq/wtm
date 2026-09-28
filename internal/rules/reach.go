@@ -61,8 +61,47 @@ type reachRow struct {
 // their ports in columns wrapped to the width. A job with nothing to reach —
 // a task, a launcher that binds nothing — has no row.
 func ReachLines(params ReachLinesParams) []string {
-	var urlRows, portRows []reachRow
+	rows := reachRows(params.Entries)
+	return renderReachRows(renderReachParams{Rows: rows, LabelWidth: labelWidthOf(rows), Width: params.Width})
+}
+
+// ReachSections splits the block in two: what runs in this worktree, then the
+// shared services it holds in another — the one fact a reader has to be told,
+// since stopping this worktree leaves those running. The label column is
+// shared, so the two read as one list.
+func ReachSections(params ReachLinesParams) []domain.ReachSection {
+	var own []domain.ReachEntry
+	var sharedOrder []string
+	shared := map[string][]domain.ReachEntry{}
 	for _, entry := range params.Entries {
+		if entry.SharedIn == "" {
+			own = append(own, entry)
+			continue
+		}
+		if _, seen := shared[entry.SharedIn]; !seen {
+			sharedOrder = append(sharedOrder, entry.SharedIn)
+		}
+		shared[entry.SharedIn] = append(shared[entry.SharedIn], entry)
+	}
+
+	width := labelWidthOf(reachRows(params.Entries))
+	var sections []domain.ReachSection
+	add := func(title string, entries []domain.ReachEntry) {
+		lines := renderReachRows(renderReachParams{Rows: reachRows(entries), LabelWidth: width, Width: params.Width})
+		if len(lines) > 0 {
+			sections = append(sections, domain.ReachSection{Title: title, Lines: lines})
+		}
+	}
+	add(domain.ReachTitle, own)
+	for _, worktree := range sharedOrder {
+		add(fmt.Sprintf(domain.ReachSharedTitleFmt, worktree), shared[worktree])
+	}
+	return sections
+}
+
+func reachRows(entries []domain.ReachEntry) []reachRow {
+	var urlRows, portRows []reachRow
+	for _, entry := range entries {
 		if len(entry.URLs) > 0 {
 			for i, url := range entry.URLs {
 				value := url.URL
@@ -78,29 +117,41 @@ func ReachLines(params ReachLinesParams) []string {
 		}
 		portRows = append(portRows, reachRow{label: entry.Job, values: portCells(entry)})
 	}
-	rows := append(urlRows, portRows...)
-	if len(rows) == 0 {
-		return nil
-	}
+	return append(urlRows, portRows...)
+}
 
-	labelWidth := 0
+func labelWidthOf(rows []reachRow) int {
+	width := 0
 	for _, row := range rows {
-		labelWidth = max(labelWidth, len([]rune(row.label)))
+		width = max(width, len([]rune(row.label)))
+	}
+	return width
+}
+
+type renderReachParams struct {
+	Rows       []reachRow
+	LabelWidth int
+	Width      int
+}
+
+func renderReachRows(params renderReachParams) []string {
+	if len(params.Rows) == 0 {
+		return nil
 	}
 	width := params.Width
 	if width <= 0 {
 		width = domain.ReachDefaultWidth
 	}
-	room := max(width-labelWidth-len(domain.ReachLabelGap), 1)
+	room := max(width-params.LabelWidth-len(domain.ReachLabelGap), 1)
 
 	var lines []string
-	for _, row := range rows {
+	for _, row := range params.Rows {
 		for i, line := range wrapCells(row.values, room) {
 			label := ""
 			if i == 0 {
 				label = row.label
 			}
-			lines = append(lines, strings.TrimRight(pad(label, labelWidth)+domain.ReachLabelGap+line, " "))
+			lines = append(lines, strings.TrimRight(pad(label, params.LabelWidth)+domain.ReachLabelGap+line, " "))
 		}
 	}
 	return lines
@@ -168,13 +219,14 @@ type ReachEntryParams struct {
 	// Ports are what the job bound, read only when it answers on no URL.
 	Ports     map[string]int
 	Namespace string
+	SharedIn  string
 }
 
 // ReachEntryFor is one started job as the block lists it. A runner answers for
 // the apps it holds rather than for itself: their URLs are the ones a reader
 // came for, and the ports on the runner are theirs.
 func ReachEntryFor(params ReachEntryParams) domain.ReachEntry {
-	entry := domain.ReachEntry{Job: params.Job, Namespace: params.Namespace}
+	entry := domain.ReachEntry{Job: params.Job, Namespace: params.Namespace, SharedIn: params.SharedIn}
 	switch {
 	case len(params.Held) > 0:
 		entry.URLs = params.Held

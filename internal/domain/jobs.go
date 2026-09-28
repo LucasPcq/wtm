@@ -130,6 +130,16 @@ type ReachEntry struct {
 	URLs      []JobURLEntry
 	Ports     []NamedPort
 	Namespace string
+	// SharedIn is the worktree a shared service runs in when this worktree only
+	// holds it — main, by construction. Empty for a job that runs here.
+	SharedIn string
+}
+
+// ReachSection is one titled part of the reach block: this worktree's own
+// jobs, or the shared services it holds in another.
+type ReachSection struct {
+	Title string
+	Lines []string
 }
 
 // NamedPort is a port as a reader reaches it: its declared name, empty when
