@@ -202,11 +202,31 @@ func BuildDockerJobs(params BuildDockerJobsParams) domain.RunConfig {
 			Name: name,
 			Kind: domain.JobKindService,
 			Cmd:  composeUpCmd(composeUpParams{ComposeCmd: params.ComposeCmd, File: f, Services: stays.names, Lifted: stays.lifted}),
-			Stop: fmt.Sprintf("%s %sdown --remove-orphans", params.ComposeCmd, DockerComposeFileFlag(f)),
+			Stop: composeStopCmd(composeStopParams{ComposeCmd: params.ComposeCmd, File: f, Services: stays.names, Lifted: stays.lifted}),
 			Cwd:  ".",
 		})
 	}
 	return domain.RunConfig{Jobs: jobs}
+}
+
+type composeStopParams struct {
+	ComposeCmd string
+	File       string
+	Services   []string
+	Lifted     bool
+}
+
+// composeStopCmd tears the file's job down. Once a service has been lifted out
+// to be shared, `down` is the one thing it must not run: in the main checkout
+// the file's project is the shared service's too, and `down` removes every
+// container of the project — the postgres every other worktree holds included.
+// `rm -s -f` stops and removes the services this job started, and only those.
+func composeStopCmd(params composeStopParams) string {
+	flag := DockerComposeFileFlag(params.File)
+	if !params.Lifted {
+		return fmt.Sprintf("%s %sdown --remove-orphans", params.ComposeCmd, flag)
+	}
+	return fmt.Sprintf("%s %srm -s -f %s", params.ComposeCmd, flag, strings.Join(params.Services, " "))
 }
 
 type sharedComposeJobsParams struct {

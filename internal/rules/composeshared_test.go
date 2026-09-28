@@ -82,6 +82,35 @@ func TestBuildDockerJobsNamesTheServicesThatStay(t *testing.T) {
 	}
 }
 
+// In the main checkout the file's project is the shared service's too, and
+// `down` removes every container of the project: the file's job stops only the
+// services it started.
+func TestBuildDockerJobsStopsOnlyTheServicesThatStay(t *testing.T) {
+	cfg := BuildDockerJobs(BuildDockerJobsParams{
+		ComposeCmd: "docker compose",
+		Files:      []string{"docker-compose.yml"},
+		Scans:      map[string]domain.ComposeScan{"docker-compose.yml": scanOf("docker-compose.yml", "db", "api", "web")},
+		Shared:     []domain.SharedComposeService{{File: "docker-compose.yml", Service: "db"}},
+	})
+
+	file, _ := findJob(cfg, "docker-compose")
+	if file.Stop != "docker compose -f docker-compose.yml rm -s -f api web" {
+		t.Errorf("stop = %q, want only api and web stopped and removed", file.Stop)
+	}
+}
+
+func TestBuildDockerJobsKeepsDownWithNothingShared(t *testing.T) {
+	cfg := BuildDockerJobs(BuildDockerJobsParams{
+		ComposeCmd: "docker compose",
+		Files:      []string{"docker-compose.yml"},
+	})
+
+	file, _ := findJob(cfg, "docker-compose")
+	if !strings.HasSuffix(file.Stop, "down --remove-orphans") {
+		t.Errorf("stop = %q, want the whole file torn down when nothing is shared", file.Stop)
+	}
+}
+
 // Nothing left to run means no job at all, rather than one that starts the
 // whole file behind the shared services' backs.
 func TestBuildDockerJobsDropsAFileWhoseServicesAreAllShared(t *testing.T) {

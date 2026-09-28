@@ -45,6 +45,9 @@ func runDown(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	if err := reportRunConfig(cmd, ctx.Run); err != nil {
+		return err
+	}
 
 	outcome, err := downflow.Run(downflow.Params{
 		Context: ctx.FlowContext(),

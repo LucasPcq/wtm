@@ -2433,6 +2433,14 @@ const (
 	// runs: "started" there read as one service per worktree.
 	RunStreamAttachedFmt   = "%s attached"
 	RunStreamAttachedToFmt = "%s attached to %s"
+	// The compose verbs a stop is read by. ComposeStopWarningFmt names a file
+	// job whose `down` would remove a shared service's container in main, and
+	// the stop to put instead.
+	ComposeWord           = "compose"
+	ComposeUpVerb         = "up "
+	ComposeDownVerb       = "down"
+	ComposeRmStopVerb     = "rm -s -f"
+	ComposeStopWarningFmt = "job %s: its stop removes the shared %s in main — set stop = %q in run.toml"
 	// RunStreamNamespaceFmt is the slice a shared job's create made sure exists,
 	// on its own line so the one thing a clean will drop is seen being made.
 	RunStreamNamespaceFmt       = "%s ready in %s"
