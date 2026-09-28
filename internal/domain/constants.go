@@ -626,6 +626,25 @@ const (
 	AddressingDriftFmt   = "%s: its .env is out of step with the addresses it publishes — `wtm env %s` settles it"
 	AddressingDriftWhy   = "A cross-origin call is refused whenever the browser's origin and the .env disagree"
 
+	// FlagKeepEnv withholds the .env pass of `run addressing`, as --keep-data
+	// withholds the namespace removal of a clean.
+	FlagKeepEnv     = "keep-env"
+	FlagKeepEnvDesc = "switch run.toml only, leaving the worktrees' .env files as they are"
+
+	AddressingInvalidFmt      = "unknown addressing %q: expected %q or %q"
+	AddressingSwitchedFmt     = "addressing: %s " + MoveArrowGlyph + " %s"
+	AddressingUnchangedFmt    = "addressing is already %s"
+	AddressingSettleStepName  = "Settle"
+	AddressingSettleNothing   = "every worktree already spells it"
+	AddressingSettleTitleFmt  = "Settle the .env of %s?"
+	AddressingSettleDescFmt   = "%s out of step with it: %s.\nSettling rewrites the values wtm links to a job's address; nothing else in the .env is touched."
+	AddressingSettleYes       = "Yes, settle them"
+	AddressingSettleNo        = "No, only run.toml"
+	AddressingSettledFmt      = "%s settled"
+	AddressingPendingFmt      = "%s still out of step — `wtm env <worktree>` settles one"
+	AddressingSettleFailedFmt = "%s: %v"
+	AddressingWorktreeNoun    = "worktree"
+
 	// ProxyPortCollisionFmt is the one collision a job cannot see coming: the
 	// daemon already holds the port by the time the job tries to bind it.
 	ProxyPortCollisionFmt   = "port %s (job %q, base %d) reaches the run proxy's port %d after %d worktree(s) — that job will fail to bind there; move the base, or set [proxy] port in " + GlobalConfigLabel
@@ -1880,6 +1899,9 @@ const (
 	CmdDaemon = "daemon"
 	CmdURL    = "url"
 	CmdProxy  = "proxy"
+	// CmdAddressing switches run.toml's addressing, and the .env files that
+	// spell it, in one gesture.
+	CmdAddressing = "addressing"
 	// CmdProxyForward is what launchd runs, never a user: it serves the socket
 	// launchd bound on the privileged port.
 	CmdProxyForward = "proxy-forward"

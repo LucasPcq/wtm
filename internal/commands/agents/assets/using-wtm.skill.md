@@ -737,15 +737,21 @@ and **experimental**: the global `wtm init` does not configure it.
   the others. Two refusals are reported and never guessed: an `https` value (the proxy serves
   plain HTTP) and a URL pointing at a host no job here serves.
 - **`addressing` at the top of `run.toml`** picks between the two: `names` (the default) and
-  `ports`. Setting `ports` is a real inverse — a later `wtm env` puts port numbers back into
-  values wtm wrote as addresses. On a machine where the proxy is off (`[proxy] enabled = false`),
+  `ports`. **Switch it with `wtm run addressing <names|ports>`**, never by editing run.toml:
+  the command writes the setting, then settles every worktree whose `.env` spells the other
+  one — the main checkout included. Under `--yes` the mode argument is required and the
+  worktrees are settled unless `--keep-env` is passed; `--output json` prints
+  `{addressing, previous, changed, settled: [branch], pending: [branch]}`. Running it with the
+  mode already in place is how to settle the worktrees an earlier `--keep-env` left behind.
+  Setting `ports` is a real inverse — port numbers go back into values wtm wrote as addresses. On a machine where the proxy is off (`[proxy] enabled = false`),
   ports are written whatever the project asked for, and the pass says so in one notice.
   **Under `names`, the named URL is the only working entrance** — the raw `localhost:<port>`
   sends an `Origin` the API no longer accepts, so always read the address from `run url`.
 - **The main checkout is never provisioned, so under `names` its `.env` still holds ports.**
-  wtm writes a worktree's `.env` at creation and on `wtm env`; nothing writes main's. Its jobs
-  are still published under names, so a cross-origin call made through them is refused until
-  `wtm env main` aligns it — the positional takes the main checkout like any other worktree.
+  wtm writes a worktree's `.env` at creation and on `wtm env`; nothing writes main's on its own.
+  Its jobs are still published under names, so a cross-origin call made through them is refused
+  until `wtm env main` (or `wtm run addressing names`, which settles every worktree) aligns it —
+  the positional takes the main checkout like any other worktree.
   **The address every surface hands out follows the `.env`, not the setting**: while the file
   spells ports, `run up`, `run url`, `run open`, the run view and the `wtm ui` panel all give
   `http://localhost:<port>` — the entrance the app actually answers on — and the named URL
@@ -754,8 +760,8 @@ and **experimental**: the global `wtm init` does not configure it.
   a note under the RUN rows in `wtm ui`. Only keys declared as `[[env_port]]` links are seen,
   so silence means nothing **linked** is out of step. A `.env` already on names whose port
   went stale keeps its names and is told they are out of step. Aligning main is a **choice**: it stops behaving as a
-  checkout without wtm, and going back means `addressing = "ports"` → `wtm env main` → `names`
-  again, `addressing` having no per-worktree scope. Same applies to a linked worktree whose
+  checkout without wtm, and going back means `wtm run addressing ports` →
+  `wtm run addressing names --keep-env`, `addressing` having no per-worktree scope. Same applies to a linked worktree whose
   port pass was declined.
 - Two base ports must not differ by a multiple of the block, or two worktrees land on the
   same port: `3000` and `3010` are refused **when run.toml is read** (with both sides named),

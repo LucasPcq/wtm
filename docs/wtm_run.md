@@ -21,6 +21,7 @@ Run commands and profiles declared in <git-common-dir>/wtm/run.toml — long-run
 ### SEE ALSO
 
 * [wtm](wtm.md)	 - Orchestrate git worktrees and team dev workflows from the terminal
+* [wtm run addressing](wtm_run_addressing.md)	 - Switch how the .env files spell a job's address
 * [wtm run daemon](wtm_run_daemon.md)	 - Inspect, stop or restart the process that runs the jobs
 * [wtm run down](wtm_run_down.md)	 - Stop a worktree's running jobs
 * [wtm run export](wtm_run_export.md)	 - Export run.toml as JSON on stdout

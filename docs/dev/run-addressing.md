@@ -70,6 +70,15 @@ apps/web/.env   VITE_API_URL      → http://api-dev.feat-x.monorepo.localhost:1
 `addressing = "ports"` is the escape hatch, and it is a real inverse: a value wtm wrote
 as an origin is recognised as such and rendered back to `http://localhost:<base+offset>`.
 
+`wtm run addressing` is how it is switched (`flow/run/addressing`, `Switch`). Its two
+questions are steps of one session — the mode, then whether to settle the worktrees — so the
+wizard can go back from the second to the first. The second reads every worktree's plan
+under the mode just picked, **before** run.toml is written: `ResolveEnvPortsParams.Addressing`
+overrides the file's, and the count is cached per mode so going back does not reread every
+`.env`. It lists the main checkout like any other, by name — that question is the explicit
+choice this page says aligning main has to be. The settle itself is `envports.Settle`, the
+pass `create` and `extract` run, so the three cannot write different values.
+
 ## Recognising wtm's own writing
 
 A value already carrying a route host is recognised **structurally** — the authority
