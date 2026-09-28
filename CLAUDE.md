@@ -241,17 +241,18 @@ make dupl     # clone report, informative only
 | -- | -- | -- |
 | `fmt` | unformatted files | it is not a formatter, and this fails rather than rewrites: a formatting fix belongs in the commit that caused it |
 | `vet` | the stdlib's own suspicions | — |
-| `arch` (`tools/archlint`) | the layer graph of section 9, the `styles/` monopoly on `lipgloss.Style`, type assertions without comma-ok, a command that reads the interactive gate without offering `--yes`, a worktree-mutating command that skips `flow/`, and the three output rules below | it checks a package against itself, and knows nothing about this project's layers |
+| `arch` (`tools/archlint`) | the layer graph of section 9, the `styles/` monopoly on `lipgloss.Style`, type assertions without comma-ok, a command that reads the interactive gate without offering `--yes`, a worktree-mutating command that skips `flow/`, and the four output rules below | it checks a package against itself, and knows nothing about this project's layers |
 | `dead` (`deadcode`) | functions no path reaches, **test paths included** | it reports the unused *within* a package; a function exported and called by nobody is invisible to it |
 | `staticcheck` | the rest | — |
 
-**The output vocabulary is enforced, not remembered.** The glyph table was written down and the surface diverged anyway — sixty commands, five renderings of "nothing to do", `!` alone rendered as a filled chip. Three `archlint` rules hold the parts that a table cannot say, and they run only over the layers that put glyphs on a screen (`output`, `styles`, `tui`): `rules/` and `service/` are left out because `=` and `!` are ordinary bytes to an env parser or a pnpm workspace pattern, and a check that cannot tell those apart is one people work around.
+**The output vocabulary is enforced, not remembered.** The glyph table was written down and the surface diverged anyway — sixty commands, five renderings of "nothing to do", `!` alone rendered as a filled chip. Four `archlint` rules hold the parts that a table cannot say. The first three run only over the layers that put glyphs on a screen (`output`, `styles`, `tui`): `rules/` and `service/` are left out because `=` and `!` are ordinary bytes to an env parser or a pnpm workspace pattern, and a check that cannot tell those apart is one people work around. `fontcover` runs over every string, since the runes it is about are declared in `domain`.
 
 | Rule | Catches |
 | -- | -- |
 | `glyph` | a vocabulary rune written as a literal — `"✓"`, `"!"`, `"→"` … — instead of its `domain` constant, which is how a seventh glyph appears and how an existing one takes a second meaning |
 | `tuistyle` | `styles.Badge*` or `styles.Dashboard*` used from `internal/output`: a badge is a widget, and its padding made an attention line two columns wider than the failure line under it |
 | `mutedline` | `Message(w, styles.Muted.Render(x))` — a bare line muted whole, which is the `=` register with its glyph filed off. Muted has two jobs, chrome and a glyphed non-event line; secondary detail is subordinated by an indent |
+| `fontcover` | a non-letter rune missing from common monospace fonts, in any string of `internal/` — the terminal borrows it from a wider fallback face and it eats the space after it (`↻` did, in Ghostty). The allowed set, `fontSafe`, was measured over thirteen fonts; `fontLegacy` holds the runes that predate the rule and may only shrink |
 
 **`tools/archlint` is where a new architectural rule goes.** Its `layers` table is section 9's dependency graph written once, so a new dependency between two layers is a deliberate edit to that table rather than something that lands unnoticed. Adding a rule there is cheaper than adding a paragraph here, and it is the only kind of rule that survives.
 

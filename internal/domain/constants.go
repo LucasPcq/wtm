@@ -157,8 +157,10 @@ const (
 	// GlyphProgress is ephemeral by contract — a line drawn only to be erased.
 	// Anything that survives in the scrollback takes another glyph.
 	GlyphProgress = "›"
-	// GlyphUpdate is an existing thing replaced rather than created.
-	GlyphUpdate = "↻"
+	// GlyphUpdate is an existing thing replaced rather than created — `~`, as in
+	// a Terraform plan. It was `↻`, which common monospace fonts lack: the
+	// terminal borrowed it from a wider fallback face and it ate the space after it.
+	GlyphUpdate = "~"
 
 	// MoveArrowGlyph is punctuation inside a value — `branch → path` — never the
 	// head of a line. It shares the rune with NextStepGlyph and nothing else: at
@@ -3088,7 +3090,7 @@ const (
 	DashboardServicesEmpty    = "Nothing is running"
 	DashboardServicesUpFmt    = "%d up"
 	DashboardServicesCountFmt = "%d running"
-	DashboardHelpServices     = "↑↓ job · ↵ logs · u open · m menu · r refresh · q quit"
+	DashboardHelpServices     = "↑↓ job · enter logs · u open · m menu · r refresh · q quit"
 	DashboardListTitle        = "Worktrees"
 	DashboardTreeTitle        = "Worktree tree"
 	DashboardDetailTitle      = "Detail"
@@ -3399,7 +3401,7 @@ const (
 	// live one.
 	DetailLogsHeaderFmt = "%s · %s"
 	DetailJobUpLabel    = "up"
-	DashboardLogsHint   = "↑↓ job    esc detail    ↵ full session"
+	DashboardLogsHint   = "↑↓ job    esc detail    enter full session"
 	// DashboardLogs* tell apart the three ways the logs view can have nothing to
 	// show: the answer differs, so the message does.
 	DashboardLogsNoModule       = "This project runs nothing"
@@ -3651,7 +3653,7 @@ const (
 	// labels are what a raw GHReviewDecision* enum value maps to.
 	DetailChecksPassedGlyph  = "✓"
 	DetailChecksFailedGlyph  = "✗"
-	DetailChecksPendingGlyph = "⧗"
+	DetailChecksPendingGlyph = "…"
 	DetailChecksFmt          = "checks " + DetailChecksPassedGlyph + " %d  " + DetailChecksFailedGlyph + " %d"
 	DetailChecksPendingFmt   = "  " + DetailChecksPendingGlyph + " %d"
 	DetailReviewDecisionFmt  = "review  %s"

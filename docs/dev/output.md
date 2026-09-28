@@ -106,7 +106,7 @@ Exhaustive. One glyph per line, at its head; never two vocabularies in one block
 | -- | -- | -- |
 | `✓` | changed state, and it worked | `output.Success` |
 | `=` | was already in the desired state | `output.Unchanged` |
-| `↻` | an existing thing was replaced | `output.Update` |
+| `~` | an existing thing was replaced | `output.Update` |
 | `!` | needs attention; the run continues | `output.Warning` |
 | `✗` | failed | `output.Error` |
 | `›` | in progress — ephemeral only | `output.Loading` |
@@ -122,7 +122,7 @@ The table above was already written, and the surface diverged anyway — because
 
 Which kills `output.Danger`, and with it the third failure register. `!` is something left to do, `✗` is a failure; a refusal and a crash are the same register, and which of the two it was belongs in the sentence. The old boundary was decided file by file — `sync` and `relocate` called a blockage `Danger`, `fast-forward` called the same idea `Warning`.
 
-**2. Every glyph is one column.** `!` used to render as a filled chip carrying its own padding, so an attention line sat two columns wider — and read louder — than the failure line under it. `internal/output/env.go` had already left the vocabulary over this, rendering a bare `!` because the badge "made the rows wander a column apart". Badges belong to the TUI, where a chip is a widget; a line of CLI output is text.
+**2. Every glyph is one column.** `!` used to render as a filled chip carrying its own padding, so an attention line sat two columns wider — and read louder — than the failure line under it. `internal/output/env.go` had already left the vocabulary over this, rendering a bare `!` because the badge "made the rows wander a column apart". Badges belong to the TUI, where a chip is a widget; a line of CLI output is text. One column is also a property of the **font**, not only of the rune: a glyph the terminal's font lacks is drawn from a fallback face, often wider, and overflows onto the space after it. `↻` did exactly that under JetBrains Mono (Ghostty's default), which is why the update glyph is `~`. `make lint` holds this through `archlint`'s `fontcover` rule: a non-letter rune in any string of `internal/` must belong to `fontSafe`, measured as present in thirteen common monospace fonts (box drawing and block elements are exempt, terminals draw those themselves). The runes that predated the rule — `▸`, `⚠`, `●`… — are listed in `fontLegacy`, report as migrating, and that list may only shrink.
 
 **3. `Muted` has exactly two jobs, and detail is not one of them.**
 
