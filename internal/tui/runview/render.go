@@ -151,8 +151,8 @@ func (m Model) renderJobRows(params jobRowsParams) []string {
 	rendered := make([]string, 0, params.Rows)
 	// The pinned heading costs the row it occupies: a group whose name has
 	// scrolled away is worth more than the job that would have taken its place.
-	if sticky := stickyHeader(all, m.offset); sticky != "" {
-		rendered = append(rendered, styles.Muted.Render(truncate(sticky, params.Width)))
+	if sticky, found := stickyHeader(all, m.offset); found {
+		rendered = append(rendered, renderHeading(headingParams{Row: sticky, Width: params.Width}))
 	}
 	for _, row := range all[min(m.offset, len(all)):] {
 		if len(rendered) == params.Rows {
@@ -163,16 +163,25 @@ func (m Model) renderJobRows(params jobRowsParams) []string {
 			continue
 		}
 		if row.Header != "" {
-			rendered = append(rendered, styles.Muted.Render(truncate(row.Header, params.Width)))
-			continue
-		}
-		if row.Shared != "" {
-			rendered = append(rendered, styles.Muted.Render(truncate(m.indent()+row.Shared, params.Width)))
+			rendered = append(rendered, renderHeading(headingParams{Row: row, Width: params.Width}))
 			continue
 		}
 		rendered = append(rendered, m.renderJobRow(jobRowParams{View: row.View, Width: params.Width, Now: now}))
 	}
 	return rendered
+}
+
+type headingParams struct {
+	Row   sidebarRow
+	Width int
+}
+
+func renderHeading(params headingParams) string {
+	text := truncate(params.Row.Header, params.Width)
+	if params.Row.Shared {
+		return styles.RunViewSharedHeading.Render(text)
+	}
+	return styles.RunViewWorktreeHeading.Render(text)
 }
 
 type jobRowParams struct {
@@ -200,7 +209,7 @@ func (m Model) renderJobRow(params jobRowParams) string {
 
 func (m Model) jobMark(view runlogs.JobView) string {
 	step, tracked := m.sequence.states[viewKey(view)]
-	return renderMark(rules.JobMark(rules.JobMarkParams{Status: view.Status, Step: step, Tracked: tracked}))
+	return renderMark(rules.JobMark(rules.JobMarkParams{Status: view.Status, Step: step, Tracked: tracked, Shared: sharedHostOf(view) != ""}))
 }
 
 func renderMark(mark domain.JobMark) string {
@@ -308,7 +317,7 @@ func (m Model) reachOf(view runlogs.JobView) domain.ReachEntry {
 		Held:      view.Address.Held,
 		Ports:     m.sequence.ports[key],
 		Namespace: namespaceOf(m.sequence.namespaces[key], view),
-		SharedIn:  view.SharedIn,
+		SharedIn:  sharedHostOf(view),
 	})
 	if len(entry.URLs) == 0 && len(entry.Ports) == 0 {
 		entry.Ports = view.Address.Named
@@ -316,23 +325,67 @@ func (m Model) reachOf(view runlogs.JobView) domain.ReachEntry {
 	return entry
 }
 
-// reachSectionsIn is the block for one worktree: every job up there, the
-// shared services it holds in another set apart.
-func (m Model) reachSectionsIn(params reachLinesInParams) []domain.ReachSection {
-	var entries []domain.ReachEntry
-	for _, view := range m.visible() {
-		if view.WorkDir != params.WorkDir || !rules.IsJobUp(view.Status) {
-			continue
-		}
-		entries = append(entries, m.reachOf(view))
-	}
-	return rules.ReachSections(rules.ReachLinesParams{Entries: entries, Width: params.Width, Here: params.Worktree})
+type reachWorktreesParams struct {
+	// Keep says which jobs count; nil keeps every job that is up.
+	Keep func(runlogs.JobView) bool
 }
 
-type reachLinesInParams struct {
-	WorkDir  string
-	Worktree string
-	Width    int
+// reachWorktrees is every worktree's part of the block, in the order the view
+// lists them, the holds on a shared service included: which slice of it each
+// worktree carved is theirs to show.
+func (m Model) reachWorktrees(params reachWorktreesParams) []rules.ReachWorktree {
+	keep := params.Keep
+	if keep == nil {
+		keep = func(view runlogs.JobView) bool { return rules.IsJobUp(view.Status) }
+	}
+	var worktrees []rules.ReachWorktree
+	index := map[string]int{}
+	for _, view := range m.jobs {
+		if !keep(view) {
+			continue
+		}
+		at, seen := index[view.WorkDir]
+		if !seen {
+			at = len(worktrees)
+			index[view.WorkDir] = at
+			worktrees = append(worktrees, rules.ReachWorktree{Name: headingOf(view)})
+		}
+		worktrees[at].Entries = append(worktrees[at].Entries, m.reachOf(view))
+	}
+	return worktrees
+}
+
+type reachSectionLinesParams struct {
+	Sections []domain.ReachSection
+	// Untitled is a title the surface already shows above the block.
+	Untitled string
+}
+
+// reachSectionLines draws the block: each section under its heading, its rows
+// indented beneath it, a blank line between two sections.
+func reachSectionLines(params reachSectionLinesParams) []string {
+	var lines []string
+	for _, section := range params.Sections {
+		if len(lines) > 0 {
+			lines = append(lines, "")
+		}
+		indent := ""
+		if section.Title != params.Untitled {
+			lines = append(lines, reachHeading(section))
+			indent = styles.Indent
+		}
+		for _, line := range section.Lines {
+			lines = append(lines, indent+line)
+		}
+	}
+	return lines
+}
+
+func reachHeading(section domain.ReachSection) string {
+	if section.Shared {
+		return styles.RunViewSharedHeading.Render(domain.RunViewMarkShared + " " + section.Title)
+	}
+	return styles.RunViewWorktreeHeading.Render(section.Title)
 }
 
 // namespaceOf prefers what the run reported carving to what the board reads
@@ -347,39 +400,19 @@ func namespaceOf(reported string, view runlogs.JobView) string {
 	return ""
 }
 
-// reachBody is the pane behind the reach key: the block per worktree, headed by
-// the worktree above several of them.
+// reachBody is the pane behind the reach key: the shared services once, then
+// every worktree's own jobs.
 func (m Model) reachBody(width int) []string {
-	pad := strings.Repeat(" ", domain.RunViewTitleIndent)
-	var lines []string
-	seen := map[string]bool{}
-	for _, view := range m.jobs {
-		if seen[view.WorkDir] {
-			continue
-		}
-		seen[view.WorkDir] = true
-		sections := m.reachSectionsIn(reachLinesInParams{WorkDir: view.WorkDir, Worktree: view.Worktree, Width: width})
-		if len(sections) == 0 {
-			continue
-		}
-		if m.worktreeCount() > 1 {
-			if len(lines) > 0 {
-				lines = append(lines, "")
-			}
-			lines = append(lines, pad+styles.Bold.Render(view.Worktree))
-		}
-		for i, section := range sections {
-			// The pane's title already says what the first section is.
-			if i > 0 {
-				lines = append(lines, "", pad+styles.Bold.Render(section.Title))
-			}
-			for _, line := range section.Lines {
-				lines = append(lines, pad+line)
-			}
-		}
-	}
-	if len(lines) == 0 {
+	sections := rules.ReachBlock(rules.ReachBlockParams{Worktrees: m.reachWorktrees(reachWorktreesParams{})})
+	if len(sections) == 0 {
 		return paneNote(domain.RunViewReachNothing, width)
+	}
+	pad := strings.Repeat(" ", domain.RunViewTitleIndent)
+	lines := reachSectionLines(reachSectionLinesParams{Sections: sections, Untitled: domain.ReachTitle})
+	for index, line := range lines {
+		if line != "" {
+			lines[index] = pad + line
+		}
 	}
 	return lines
 }

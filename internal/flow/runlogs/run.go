@@ -316,7 +316,7 @@ func (r *runner) run() Outcome {
 		if rules.ShouldProbeJob(rules.ShouldProbeJobParams{Kind: job.Kind, Ports: result.Ports, Probe: job.Probe}) {
 			r.probeTargets = append(r.probeTargets, probeTarget{job: job.Name, resolved: result.Ports})
 		}
-		r.emit(Event{Phase: PhaseStarted, Job: job.Name, Step: i + 1, AlreadyRunning: alreadyRunning, Attached: status == domain.JobActionAttached, SharedIn: r.heldIn(status), Namespace: namespace, Ports: ports, URL: url, Held: held, DevOrigins: r.devOrigins(job, host)})
+		r.emit(Event{Phase: PhaseStarted, Job: job.Name, Step: i + 1, AlreadyRunning: alreadyRunning, Attached: status == domain.JobActionAttached, SharedIn: r.heldIn(heldInParams{Job: job, Status: status}), Namespace: namespace, Ports: ports, URL: url, Held: held, DevOrigins: r.devOrigins(job, host)})
 	}
 
 	// The probe dials first because its wait is also the time a job needs to die:
@@ -706,10 +706,15 @@ func jobNames(jobs []domain.JobConfig) []string {
 	return names
 }
 
-// heldIn is where an attached job runs: main's branch from a linked worktree,
-// and main itself when main joined a service another worktree started.
-func (r *runner) heldIn(status string) string {
-	if status != domain.JobActionAttached {
+type heldInParams struct {
+	Job    domain.JobConfig
+	Status string
+}
+
+// heldIn is where a shared job runs: main's branch from a linked worktree, and
+// main itself when main started or joined it. A per-worktree job has none.
+func (r *runner) heldIn(params heldInParams) string {
+	if params.Status != domain.JobActionAttached && !rules.IsShared(params.Job) {
 		return ""
 	}
 	if r.sharedIn != "" {

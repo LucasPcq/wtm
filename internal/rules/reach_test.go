@@ -62,24 +62,21 @@ func TestReachLinesPutURLsFirstAndNameARunnersApps(t *testing.T) {
 	}
 }
 
-func TestReachLinesWrapManyPortsInColumns(t *testing.T) {
+func TestReachLinesListManyPortsOnePerLine(t *testing.T) {
 	lines := rules.ReachLines(rules.ReachLinesParams{
-		Width: 50,
 		Entries: []domain.ReachEntry{{Job: "compose", Ports: rules.NamedPorts(map[string]int{
 			"REDIS_PORT": 6379, "MINIO_PORT": 9000, "MINIO_CONSOLE_PORT": 9001, "ADMINER_PORT": 8080,
 		})}},
 	})
 
-	if len(lines) != 2 {
-		t.Fatalf("lines = %q, want the four ports wrapped over two lines at width 50", lines)
+	want := []string{
+		"compose  adminer        :8080",
+		"         minio-console  :9001",
+		"         minio          :9000",
+		"         redis          :6379",
 	}
-	if !strings.HasPrefix(lines[0], "compose  adminer :8080") || !strings.HasPrefix(lines[1], "         ") {
-		t.Errorf("lines = %q, want the label once and the next line aligned under the first cell", lines)
-	}
-	for _, line := range lines {
-		if len([]rune(line)) > 50 {
-			t.Errorf("line %q is wider than 50", line)
-		}
+	if strings.Join(lines, "\n") != strings.Join(want, "\n") {
+		t.Errorf("lines =\n%s\nwant\n%s", strings.Join(lines, "\n"), strings.Join(want, "\n"))
 	}
 }
 
@@ -89,51 +86,67 @@ func TestReachLinesSayNothingWhenNothingIsReachable(t *testing.T) {
 	}
 }
 
-func TestReachLinesBalanceTheWrappedPorts(t *testing.T) {
-	ports := map[string]int{}
-	for i, name := range []string{"A_PORT", "B_PORT", "C_PORT", "D_PORT", "E_PORT", "F_PORT"} {
-		ports[name] = 9000 + i
-	}
-	lines := rules.ReachLines(rules.ReachLinesParams{
-		Width:   60,
-		Entries: []domain.ReachEntry{{Job: "compose", Ports: rules.NamedPorts(ports)}},
-	})
-
-	if len(lines) != 2 || strings.Count(lines[0], ":") != 3 || strings.Count(lines[1], ":") != 3 {
-		t.Errorf("lines = %q, want six ports as three and three", lines)
-	}
-}
-
-// A shared service this worktree only holds is told apart: stopping the
-// worktree leaves it running, and that is the one thing a reader must see.
-func TestReachSectionsSetTheSharedServicesApart(t *testing.T) {
-	sections := rules.ReachSections(rules.ReachLinesParams{Entries: []domain.ReachEntry{
-		{Job: "docker-compose", Ports: []domain.NamedPort{{Name: "REDIS_PORT", Port: 6389}, {Name: "MINIO_PORT", Port: 9010}}},
-		{Job: "postgres", Ports: []domain.NamedPort{{Name: "POSTGRES_PORT", Port: 5432}}, Namespace: "app_feat", SharedIn: "main"},
-	}})
+// A shared service is told apart and comes first: stopping the worktree leaves
+// it running, and that is the one thing a reader must see.
+func TestReachBlockSetsTheSharedServicesApart(t *testing.T) {
+	sections := rules.ReachBlock(rules.ReachBlockParams{Worktrees: []rules.ReachWorktree{{
+		Name: "feat",
+		Entries: []domain.ReachEntry{
+			{Job: "docker-compose", Ports: []domain.NamedPort{{Name: "REDIS_PORT", Port: 6389}, {Name: "MINIO_PORT", Port: 9010}}},
+			{Job: "postgres", Ports: []domain.NamedPort{{Name: "POSTGRES_PORT", Port: 5432}}, Namespace: "app_feat", SharedIn: "main"},
+		},
+	}}})
 
 	if len(sections) != 2 {
-		t.Fatalf("sections = %+v, want this worktree's jobs then main's", sections)
+		t.Fatalf("sections = %+v, want main's shared service then the worktree's jobs", sections)
 	}
-	if sections[0].Title != domain.ReachTitle || !strings.HasPrefix(sections[0].Lines[0], "docker-compose") {
-		t.Errorf("first section = %+v, want the worktree's own jobs", sections[0])
+	if !sections[0].Shared || sections[0].Title != "Shared, running in main" || sections[0].Lines[0] != "postgres        :5432 · app_feat" {
+		t.Errorf("first section = %+v, want postgres under main, aligned with the second", sections[0])
 	}
-	if sections[1].Title != "Shared, running in main" || sections[1].Lines[0] != "postgres        :5432 · app_feat" {
-		t.Errorf("second section = %+v, want postgres under main, aligned with the first", sections[1])
+	if sections[1].Title != domain.ReachTitle || !strings.HasPrefix(sections[1].Lines[0], "docker-compose") {
+		t.Errorf("second section = %+v, want the worktree's own jobs", sections[1])
 	}
 }
 
 // From main, a service main joined runs here: it is shared with the others,
 // not "running in main".
-func TestReachSectionsSayWhoSharesAServiceRunningHere(t *testing.T) {
-	sections := rules.ReachSections(rules.ReachLinesParams{
-		Here: "main",
-		Entries: []domain.ReachEntry{
-			{Job: "postgres", Ports: []domain.NamedPort{{Port: 5432}}, SharedIn: "main"},
-		},
-	})
+func TestReachBlockSaysWhoSharesAServiceRunningHere(t *testing.T) {
+	sections := rules.ReachBlock(rules.ReachBlockParams{Worktrees: []rules.ReachWorktree{{
+		Name:    "main",
+		Entries: []domain.ReachEntry{{Job: "postgres", Ports: []domain.NamedPort{{Port: 5432}}, SharedIn: "main"}},
+	}}})
 
 	if len(sections) != 1 || sections[0].Title != domain.ReachSharedHereTitle {
 		t.Errorf("sections = %+v, want the service shared with other worktrees", sections)
+	}
+}
+
+// Above several worktrees a shared service is listed once, each holder's
+// namespace under it, and every worktree's own jobs under its own name.
+func TestReachBlockListsASharedServiceOnceAboveSeveralWorktrees(t *testing.T) {
+	postgres := func(namespace string) domain.ReachEntry {
+		return domain.ReachEntry{Job: "postgres", Ports: []domain.NamedPort{{Port: 5432}}, Namespace: namespace, SharedIn: "main"}
+	}
+	web := func(worktree string) domain.ReachEntry {
+		return domain.ReachEntry{Job: "web", URLs: []domain.JobURLEntry{{Job: "web", URL: "http://web." + worktree}}}
+	}
+	sections := rules.ReachBlock(rules.ReachBlockParams{Worktrees: []rules.ReachWorktree{
+		{Name: "main", Entries: []domain.ReachEntry{web("main"), postgres("app_main")}},
+		{Name: "feat", Entries: []domain.ReachEntry{web("feat"), postgres("app_feat")}},
+	}})
+
+	if len(sections) != 3 {
+		t.Fatalf("sections = %+v, want the shared service once, then each worktree", sections)
+	}
+	want := []string{
+		"postgres  :5432",
+		"          main  app_main",
+		"          feat  app_feat",
+	}
+	if strings.Join(sections[0].Lines, "\n") != strings.Join(want, "\n") {
+		t.Errorf("shared lines =\n%s\nwant\n%s", strings.Join(sections[0].Lines, "\n"), strings.Join(want, "\n"))
+	}
+	if sections[1].Title != "main" || sections[2].Title != "feat" || sections[2].Worktree != "feat" {
+		t.Errorf("sections = %+v, want main then feat, titled by name", sections)
 	}
 }

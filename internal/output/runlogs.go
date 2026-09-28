@@ -199,16 +199,6 @@ func reachEntryOf(event runlogs.Event) domain.ReachEntry {
 	})
 }
 
-// reachWidth is what the block may take inside its section's indent: the
-// terminal's, or the default on a pipe.
-func (p *RunPrinter) reachWidth() int {
-	width := TerminalWidthOf(p.out)
-	if width == 0 {
-		return 0
-	}
-	return max(width-3*len(Indent), 0)
-}
-
 // remember keeps a started job for the block the run concludes on.
 func (p *RunPrinter) remember(event runlogs.Event) {
 	if p.reach == nil {
@@ -294,15 +284,13 @@ func (p *RunPrinter) Conclude(warnings []string) {
 	if !p.readied {
 		return
 	}
+	worktrees := make([]rules.ReachWorktree, 0, len(p.reachOrder))
 	for _, worktree := range p.reachOrder {
-		for _, section := range rules.ReachSections(rules.ReachLinesParams{Entries: p.reach[worktree], Width: p.reachWidth(), Here: worktree}) {
-			title := section.Title
-			if p.multi && worktree != "" {
-				title = fmt.Sprintf(domain.RunStreamWorktreeFmt, title, worktree)
-			}
-			Blank(p.out)
-			Section(p.out, title, section.Lines)
-		}
+		worktrees = append(worktrees, rules.ReachWorktree{Name: worktree, Entries: p.reach[worktree]})
+	}
+	for _, section := range rules.ReachBlock(rules.ReachBlockParams{Worktrees: worktrees}) {
+		Blank(p.out)
+		Section(p.out, section.Title, section.Lines)
 	}
 	if len(warnings) > 0 {
 		Blank(p.out)
@@ -402,7 +390,7 @@ func FormatRunDownRecap(params RunDownRecapParams) string {
 		lines = append(lines, downRecapBlock(worktree)...)
 	}
 
-	hint := NextStepLine(NextStepParams{Command: domain.RunStreamUpHint, Note: domain.RunStreamUpNote})
+	hint := styles.NextStepText(styles.NextStepParams{Command: domain.RunStreamUpHint, Note: domain.RunStreamUpNote})
 	body := strings.Join(append(lines, "", hint), "\n")
 	// Terminated, like every other Format* body in this package: the frame writes
 	// one blank line after what it is given, and a body whose last line has no

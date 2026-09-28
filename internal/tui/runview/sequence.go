@@ -9,6 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/styles"
 )
 
 // sequence is what the view knows of a profile being started. It decides
@@ -125,6 +126,17 @@ type sink struct {
 }
 
 func (s sink) Emit(event runlogs.Event) {
+	// The create runs in the daemon and prints nothing; the line the service's
+	// log records for it is written here too, so the pane the run is filling
+	// shows it the moment it happens rather than on the next read of the log.
+	if event.Phase == runlogs.PhaseStarted && event.Namespace != "" {
+		note := fmt.Sprintf(domain.NamespaceReadyLogFmt, event.Namespace, event.Worktree)
+		s.panes.write(writeChunkParams{
+			Key:    eventKey(event),
+			Source: sourceSequence,
+			Chunk:  []byte("\r\n" + styles.Muted.Render(note) + "\r\n"),
+		})
+	}
 	if event.Phase == runlogs.PhaseOutput {
 		s.panes.write(writeChunkParams{
 			Key:          eventKey(event),

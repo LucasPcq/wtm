@@ -32,11 +32,10 @@ func (m Model) result() Result {
 func (m Model) recapBlock(outcome runlogs.Outcome) []string {
 	var lines []string
 	if outcome.Worktree != "" {
-		lines = append(lines, styles.Bold.Render(outcome.Worktree))
+		lines = append(lines, styles.RunViewWorktreeHeading.Render(outcome.Worktree))
 	}
 	if len(outcome.Started) > 0 {
 		lines = append(lines, fmt.Sprintf(domain.RunViewRecapRunningFmt, joinJobs(outcome.Started)))
-		lines = append(lines, m.addressLines(outcome)...)
 	}
 	if len(outcome.Completed) > 0 {
 		lines = append(lines, fmt.Sprintf(domain.RunViewRecapCompletedFmt, joinJobs(outcome.Completed)))
@@ -59,28 +58,17 @@ func (m Model) recapBlock(outcome runlogs.Outcome) []string {
 // addressLines say where the jobs left running are reached: the same block the
 // stream ends on, since the view that showed it is gone and this is what stays
 // in the scrollback.
-func (m Model) addressLines(outcome runlogs.Outcome) []string {
-	started := make(map[string]bool, len(outcome.Started))
-	for _, name := range outcome.Started {
-		started[name] = true
-	}
-	var entries []domain.ReachEntry
-	for _, view := range m.visible() {
-		if view.WorkDir != outcome.WorkDir || !started[view.Name] {
-			continue
-		}
-		entries = append(entries, m.reachOf(view))
-	}
-	var lines []string
-	for i, section := range rules.ReachSections(rules.ReachLinesParams{Entries: entries, Width: domain.RecapWidth, Here: outcome.Worktree}) {
-		if i > 0 {
-			lines = append(lines, section.Title)
-		}
-		for _, line := range section.Lines {
-			lines = append(lines, domain.RunViewRecapHeldIndent+line)
+func (m Model) addressLines() []string {
+	started := map[jobKey]bool{}
+	for _, outcome := range m.sequence.outcomes {
+		for _, name := range outcome.Started {
+			started[jobKeyOf(outcome.WorkDir, name)] = true
 		}
 	}
-	return lines
+	worktrees := m.reachWorktrees(reachWorktreesParams{Keep: func(view runlogs.JobView) bool {
+		return started[viewKey(view)]
+	}})
+	return reachSectionLines(reachSectionLinesParams{Sections: rules.ReachBlock(rules.ReachBlockParams{Worktrees: worktrees})})
 }
 
 func crashedNames(exits []domain.JobExit) []string {
@@ -120,6 +108,9 @@ func (m Model) recap() string {
 		}
 		lines = append(lines, m.recapBlock(outcome)...)
 	}
+	if addresses := m.addressLines(); len(addresses) > 0 {
+		lines = append(append(lines, ""), addresses...)
+	}
 
 	if len(m.warnings) > 0 {
 		lines = append(lines, "")
@@ -128,9 +119,9 @@ func (m Model) recap() string {
 		}
 	}
 
-	hints := []string{styles.NextStepLine(styles.NextStepParams{Command: domain.RunStreamAttachHint, Note: domain.RunStreamAttachNote})}
+	hints := []string{styles.NextStepText(styles.NextStepParams{Command: domain.RunStreamAttachHint, Note: domain.RunStreamAttachNote})}
 	if m.anythingStarted() {
-		hints = append(hints, styles.NextStepLine(styles.NextStepParams{Command: domain.RunStreamStopHint, Note: domain.RunStreamStopNote}))
+		hints = append(hints, styles.NextStepText(styles.NextStepParams{Command: domain.RunStreamStopHint, Note: domain.RunStreamStopNote}))
 	}
 	body := strings.Join(append(lines, append([]string{""}, hints...)...), "\n")
 

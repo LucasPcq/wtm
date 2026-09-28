@@ -297,6 +297,9 @@ const (
 	// NamespaceCreateFailedFmt names the namespace, the job and the last error a
 	// budget's worth of retries ended on.
 	NamespaceCreateFailedFmt = "job %s: could not attach namespace %s: %w (the attach runs on every start, so it must be safe to run again)"
+	// NamespaceReadyLogFmt is the line a shared service's log gains when a
+	// worktree's slice of it is made: namespace, then worktree.
+	NamespaceReadyLogFmt     = "[wtm] namespace %s ready for %s"
 	NamespaceRemoveFailedFmt = "job %s: could not detach namespace %s: %w"
 	// SharedNoContextFmt is a shared job whose main checkout the client could
 	// not resolve — a bare clone, typically.
@@ -3666,12 +3669,9 @@ const (
 	ReachURLsFmt         = "%d urls"
 	ReachPortsFmt        = "%d ports"
 	ReachPortFmt         = ":%d"
-	ReachNamedPortFmt    = "%s :%d"
-	ReachCellGap         = "   "
 	ReachLabelGap        = "  "
 	ReachDetailSep       = " · "
 	ReachPortSuffix      = "_PORT"
-	ReachDefaultWidth    = 72
 	DetailHeldOpenGlyph  = "▾"
 	DetailHeldShutGlyph  = "▸"
 	DetailHeldIndent     = "  "

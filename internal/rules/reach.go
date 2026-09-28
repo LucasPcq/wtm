@@ -45,12 +45,6 @@ func ReachSummary(entry domain.ReachEntry) string {
 
 type ReachLinesParams struct {
 	Entries []domain.ReachEntry
-	// Width is what the block may take, label column included. Zero takes
-	// domain.ReachDefaultWidth.
-	Width int
-	// Here is the worktree the block is about. A shared service running here
-	// is main's own, held by others too: "running in main" read oddly from main.
-	Here string
 }
 
 type reachRow struct {
@@ -60,50 +54,173 @@ type reachRow struct {
 
 // ReachLines is the body of the block that says where every job of a run is
 // reached. URLs come first, one row each and labelled by the job that answers
-// them — a runner's apps by their own names. Then the jobs reached by port,
-// their ports in columns wrapped to the width. A job with nothing to reach —
-// a task, a launcher that binds nothing — has no row.
+// them — a runner's apps by their own names. Then the jobs reached by port, one
+// port per line. A job with nothing to reach — a task, a launcher that binds
+// nothing — has no row.
 func ReachLines(params ReachLinesParams) []string {
 	rows := reachRows(params.Entries)
-	return renderReachRows(renderReachParams{Rows: rows, LabelWidth: labelWidthOf(rows), Width: params.Width})
+	return renderReachRows(renderReachParams{Rows: rows, LabelWidth: labelWidthOf(rows)})
 }
 
-// ReachSections splits the block in two: what runs in this worktree, then the
-// shared services it holds in another — the one fact a reader has to be told,
-// since stopping this worktree leaves those running. The label column is
-// shared, so the two read as one list.
-func ReachSections(params ReachLinesParams) []domain.ReachSection {
-	var own []domain.ReachEntry
-	var sharedOrder []string
-	shared := map[string][]domain.ReachEntry{}
-	for _, entry := range params.Entries {
-		if entry.SharedIn == "" {
-			own = append(own, entry)
+// ReachWorktree is one worktree's part of the block: the jobs up there, the
+// shared services it holds included.
+type ReachWorktree struct {
+	Name    string
+	Entries []domain.ReachEntry
+}
+
+type ReachBlockParams struct {
+	Worktrees []ReachWorktree
+}
+
+// ReachBlock is the whole block, one section per thing a reader looks up. The
+// shared services come first and once: a postgres three worktrees hold is one
+// process, and listing it under each of them read as three. Each holder's
+// namespace hangs under it when there are several worktrees to tell apart.
+// Then every worktree's own jobs, titled by the worktree when there are
+// several. The label column is common to every section, so they read as one
+// list.
+func ReachBlock(params ReachBlockParams) []domain.ReachSection {
+	multi := len(params.Worktrees) > 1
+	shared := sharedServicesOf(params.Worktrees)
+
+	var all []reachRow
+	for _, service := range shared {
+		all = append(all, service.rows(multi)...)
+	}
+	for _, worktree := range params.Worktrees {
+		all = append(all, reachRows(ownEntries(worktree.Entries))...)
+	}
+	width := labelWidthOf(all)
+
+	var sections []domain.ReachSection
+	for _, host := range sharedHosts(shared) {
+		var rows []reachRow
+		for _, service := range shared {
+			if service.host == host {
+				rows = append(rows, service.rows(multi)...)
+			}
+		}
+		sections = append(sections, domain.ReachSection{
+			Title:  sharedTitle(sharedTitleParams{Host: host, Worktrees: params.Worktrees}),
+			Shared: true,
+			Lines:  renderReachRows(renderReachParams{Rows: rows, LabelWidth: width}),
+		})
+	}
+	for _, worktree := range params.Worktrees {
+		lines := renderReachRows(renderReachParams{Rows: reachRows(ownEntries(worktree.Entries)), LabelWidth: width})
+		if len(lines) == 0 {
 			continue
 		}
-		if _, seen := shared[entry.SharedIn]; !seen {
-			sharedOrder = append(sharedOrder, entry.SharedIn)
+		title := domain.ReachTitle
+		if multi {
+			title = worktree.Name
 		}
-		shared[entry.SharedIn] = append(shared[entry.SharedIn], entry)
-	}
-
-	width := labelWidthOf(reachRows(params.Entries))
-	var sections []domain.ReachSection
-	add := func(title string, entries []domain.ReachEntry) {
-		lines := renderReachRows(renderReachParams{Rows: reachRows(entries), LabelWidth: width, Width: params.Width})
-		if len(lines) > 0 {
-			sections = append(sections, domain.ReachSection{Title: title, Lines: lines})
-		}
-	}
-	add(domain.ReachTitle, own)
-	for _, worktree := range sharedOrder {
-		title := fmt.Sprintf(domain.ReachSharedTitleFmt, worktree)
-		if worktree == params.Here {
-			title = domain.ReachSharedHereTitle
-		}
-		add(title, shared[worktree])
+		sections = append(sections, domain.ReachSection{Title: title, Worktree: worktree.Name, Lines: lines})
 	}
 	return sections
+}
+
+func ownEntries(entries []domain.ReachEntry) []domain.ReachEntry {
+	var own []domain.ReachEntry
+	for _, entry := range entries {
+		if entry.SharedIn == "" {
+			own = append(own, entry)
+		}
+	}
+	return own
+}
+
+type sharedHolder struct {
+	worktree  string
+	namespace string
+}
+
+type sharedService struct {
+	host    string
+	entry   domain.ReachEntry
+	holders []sharedHolder
+}
+
+// rows lays a shared service out. Held by one worktree, its namespace rides the
+// port line as it always has; above several, each holder gets a line of its
+// own, since whose slice is whose is the whole question.
+func (s sharedService) rows(multi bool) []reachRow {
+	entry := s.entry
+	if !multi {
+		if len(s.holders) > 0 {
+			entry.Namespace = s.holders[0].namespace
+		}
+		return reachRows([]domain.ReachEntry{entry})
+	}
+	entry.Namespace = ""
+	rows := reachRows([]domain.ReachEntry{entry})
+	if len(rows) == 0 {
+		rows = []reachRow{{label: entry.Job}}
+	}
+	width := 0
+	for _, holder := range s.holders {
+		width = max(width, len([]rune(holder.worktree)))
+	}
+	for _, holder := range s.holders {
+		if holder.namespace == "" {
+			continue
+		}
+		rows[len(rows)-1].values = append(rows[len(rows)-1].values, pad(holder.worktree, width)+domain.ReachLabelGap+holder.namespace)
+	}
+	return rows
+}
+
+// sharedServicesOf gathers every worktree's hold on the same service into one:
+// a service is its name and the worktree it runs in.
+func sharedServicesOf(worktrees []ReachWorktree) []sharedService {
+	var services []sharedService
+	index := map[[2]string]int{}
+	for _, worktree := range worktrees {
+		for _, entry := range worktree.Entries {
+			if entry.SharedIn == "" {
+				continue
+			}
+			key := [2]string{entry.Job, entry.SharedIn}
+			at, seen := index[key]
+			if !seen {
+				at = len(services)
+				index[key] = at
+				services = append(services, sharedService{host: entry.SharedIn, entry: entry})
+			}
+			if len(services[at].entry.Ports) == 0 && len(services[at].entry.URLs) == 0 {
+				services[at].entry.Ports, services[at].entry.URLs = entry.Ports, entry.URLs
+			}
+			services[at].holders = append(services[at].holders, sharedHolder{worktree: worktree.Name, namespace: entry.Namespace})
+		}
+	}
+	return services
+}
+
+func sharedHosts(services []sharedService) []string {
+	var hosts []string
+	seen := map[string]bool{}
+	for _, service := range services {
+		if !seen[service.host] {
+			seen[service.host] = true
+			hosts = append(hosts, service.host)
+		}
+	}
+	return hosts
+}
+
+type sharedTitleParams struct {
+	Host      string
+	Worktrees []ReachWorktree
+}
+
+// sharedTitle says where a shared service runs — except to the worktree it runs
+// in, where "running in main" read oddly from main.
+func sharedTitle(params sharedTitleParams) string {
+	if len(params.Worktrees) == 1 && params.Worktrees[0].Name == params.Host {
+		return domain.ReachSharedHereTitle
+	}
+	return fmt.Sprintf(domain.ReachSharedTitleFmt, params.Host)
 }
 
 func reachRows(entries []domain.ReachEntry) []reachRow {
@@ -138,34 +255,33 @@ func labelWidthOf(rows []reachRow) int {
 type renderReachParams struct {
 	Rows       []reachRow
 	LabelWidth int
-	Width      int
 }
 
+// renderReachRows writes a row's values one per line, the label on the first:
+// ports laid out in columns across the width scanned as a grid to decode rather
+// than a list to read down.
 func renderReachRows(params renderReachParams) []string {
 	if len(params.Rows) == 0 {
 		return nil
 	}
-	width := params.Width
-	if width <= 0 {
-		width = domain.ReachDefaultWidth
-	}
-	room := max(width-params.LabelWidth-len(domain.ReachLabelGap), 1)
-
 	var lines []string
 	for _, row := range params.Rows {
-		for i, line := range wrapCells(row.values, room) {
+		for i, value := range row.values {
 			label := ""
 			if i == 0 {
 				label = row.label
 			}
-			lines = append(lines, strings.TrimRight(pad(label, params.LabelWidth)+domain.ReachLabelGap+line, " "))
+			lines = append(lines, strings.TrimRight(pad(label, params.LabelWidth)+domain.ReachLabelGap+value, " "))
+		}
+		if len(row.values) == 0 {
+			lines = append(lines, row.label)
 		}
 	}
 	return lines
 }
 
-// portCells is a port-only job's ports as cells: a lone one bare, several by
-// name so the reader knows which is which.
+// portCells is a port-only job's ports, one per line: a lone one bare, several
+// by name with the ports aligned, so the reader knows which is which.
 func portCells(entry domain.ReachEntry) []string {
 	if len(entry.Ports) == 0 {
 		return []string{entry.Namespace}
@@ -177,46 +293,24 @@ func portCells(entry domain.ReachEntry) []string {
 		}
 		return []string{cell}
 	}
+	nameWidth := 0
+	for _, port := range entry.Ports {
+		if port.Name != "" {
+			nameWidth = max(nameWidth, len([]rune(ShortPortName(port.Name))))
+		}
+	}
 	cells := make([]string, 0, len(entry.Ports)+1)
 	for _, port := range entry.Ports {
-		if port.Name == "" {
-			cells = append(cells, fmt.Sprintf(domain.ReachPortFmt, port.Port))
-			continue
+		name := ""
+		if port.Name != "" {
+			name = ShortPortName(port.Name)
 		}
-		cells = append(cells, fmt.Sprintf(domain.ReachNamedPortFmt, ShortPortName(port.Name), port.Port))
+		cells = append(cells, pad(name, nameWidth)+domain.ReachLabelGap+fmt.Sprintf(domain.ReachPortFmt, port.Port))
 	}
 	if entry.Namespace != "" {
 		cells = append(cells, entry.Namespace)
 	}
 	return cells
-}
-
-// wrapCells lays cells out in aligned columns, as many per line as the room
-// takes. A single cell is never padded, so a URL row ends where its URL does.
-func wrapCells(cells []string, room int) []string {
-	if len(cells) == 1 {
-		return cells
-	}
-	cellWidth := 0
-	for _, cell := range cells {
-		cellWidth = max(cellWidth, len([]rune(cell)))
-	}
-	fits := max((room+len(domain.ReachCellGap))/(cellWidth+len(domain.ReachCellGap)), 1)
-	// Balanced over the lines it takes anyway: six ports five-and-one read as a
-	// row and a stray, three-and-three as a grid.
-	rows := (len(cells) + fits - 1) / fits
-	perLine := (len(cells) + rows - 1) / rows
-
-	var lines []string
-	for start := 0; start < len(cells); start += perLine {
-		end := min(start+perLine, len(cells))
-		padded := make([]string, 0, end-start)
-		for _, cell := range cells[start:end] {
-			padded = append(padded, pad(cell, cellWidth))
-		}
-		lines = append(lines, strings.Join(padded, domain.ReachCellGap))
-	}
-	return lines
 }
 
 type ReachEntryParams struct {

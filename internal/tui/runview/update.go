@@ -248,6 +248,7 @@ func (m Model) move(delta int) (tea.Model, tea.Cmd) {
 // the selected job holds a subscription, so the one being left has to give its
 // own up before the next is opened.
 func (m Model) setSelection(key jobKey) (Model, tea.Cmd) {
+	key = m.canonical(key)
 	if key != m.selected {
 		if !m.sequenceHolds(m.selected) {
 			m.panes.release(m.selected)

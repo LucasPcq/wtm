@@ -125,6 +125,7 @@ func (b *board) Jobs() []JobView {
 		if view.Status == domain.JobStatusAttached {
 			view.SharedIn = b.sharedIn
 		}
+		view.Shared = rules.IsShared(job.Job)
 		view.Namespace = rules.CarvedNamespace(rules.CarvedNamespaceParams{Job: job.Job, Env: b.env})
 		views = append(views, b.own(view))
 	}

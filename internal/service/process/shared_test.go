@@ -243,6 +243,41 @@ func TestSharedNamespaceAttachesOncePerWorktree(t *testing.T) {
 	}
 }
 
+// The create runs silently, so the service's log is where a reader sees each
+// worktree's slice being made.
+func TestSharedNamespaceIsRecordedInTheServicesLog(t *testing.T) {
+	f := newSharedFixture(t, &domain.JobNamespaceConfig{Name: "crm_{worktree}", Create: "true"})
+	logDir := t.TempDir()
+	for _, worktree := range []struct{ dir, name string }{{f.first, "feat_a"}, {f.second, "feat_b"}} {
+		err := f.manager.Start(StartParams{
+			Job:     f.job,
+			WorkDir: worktree.dir,
+			Env:     map[string]string{domain.EnvWorktree: worktree.name, domain.EnvOrdinal: "1"},
+			Shared:  &domain.SharedJobContext{WorkDir: f.main, LogDir: logDir, Env: map[string]string{domain.EnvWorktree: "main"}},
+		})
+		if err != nil {
+			t.Fatalf("start %s: %v", worktree.name, err)
+		}
+	}
+
+	// The service's sink batches its writes, so the line lands within a flush.
+	var log string
+	for deadline := time.Now().Add(2 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		lines, err := TailJobLog(TailParams{LogDir: logDir, Job: "db", Lines: 10})
+		if err != nil {
+			t.Fatalf("tail: %v", err)
+		}
+		if log = strings.Join(lines, "\n"); strings.Count(log, "ready for") == 2 {
+			break
+		}
+	}
+	for _, want := range []string{"namespace crm_feat_a ready for feat_a", "namespace crm_feat_b ready for feat_b"} {
+		if !strings.Contains(log, want) {
+			t.Errorf("log = %q, want it to record %q", log, want)
+		}
+	}
+}
+
 // Stopping is not destroying: a `run down` that dropped a database would make
 // the command unusable.
 func TestSharedStopNeverDetaches(t *testing.T) {

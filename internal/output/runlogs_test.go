@@ -252,7 +252,7 @@ func TestRunPrinterConcludesOnWhereToReachIt(t *testing.T) {
 }
 
 // A service this worktree only holds says where it runs, on its line and in a
-// section of its own: stopping the worktree leaves it up.
+// section of its own, first: stopping the worktree leaves it up.
 func TestRunPrinterSetsAServiceHeldInMainApart(t *testing.T) {
 	var out, errOut bytes.Buffer
 	printer := NewRunPrinter(RunPrinterParams{Out: &out, Err: &errOut})
@@ -267,7 +267,7 @@ func TestRunPrinterSetsAServiceHeldInMainApart(t *testing.T) {
 		t.Errorf("stdout = %q, want the line to say where postgres runs", stdout)
 	}
 	own, shared := strings.Index(stdout, domain.ReachTitle), strings.Index(stdout, "Shared, running in main")
-	if own < 0 || shared < own || strings.LastIndex(stdout, "postgres") < shared {
-		t.Errorf("stdout = %q, want postgres in a section of its own after the worktree's", stdout)
+	if shared < 0 || own < shared || strings.LastIndex(stdout, "postgres") > own {
+		t.Errorf("stdout = %q, want postgres in a section of its own before the worktree's", stdout)
 	}
 }

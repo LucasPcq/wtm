@@ -42,7 +42,7 @@ func TestTheReachKeyShowsTheBlockAndEscGoesBack(t *testing.T) {
 
 	h.press(t, key(domain.RunViewReachKey))
 	frame := ansi.Strip(h.model.View())
-	if !strings.Contains(frame, domain.ReachTitle) || !strings.Contains(frame, "redis :6379") {
+	if !strings.Contains(frame, domain.ReachTitle) || !strings.Contains(frame, "redis  :6379") {
 		t.Fatalf("frame = %q, want the block with each port by name", frame)
 	}
 
@@ -58,26 +58,51 @@ func sharedIn(view runlogs.JobView, worktree string) runlogs.JobView {
 	return view
 }
 
-// A shared service this worktree only holds sits under its own jobs, below a
-// line saying where it runs — and its title names that worktree, not this one.
+// A shared service is set apart above the worktree's own jobs, under a line
+// saying where it runs — and its title names that worktree, not this one.
 func TestASharedServiceIsSetApartAndNamedByWhereItRuns(t *testing.T) {
 	h := newHarness(t, harnessParams{
 		Views: []runlogs.JobView{
-			inWorktree(sharedIn(running("postgres"), "main"), "/work/feat", "feat/x"),
 			inWorktree(running("compose"), "/work/feat", "feat/x"),
+			inWorktree(sharedIn(running("postgres"), "main"), "/work/feat", "feat/x"),
 		},
 		Streams: []string{"postgres", "compose"},
 	})
 
 	frame := ansi.Strip(h.model.View())
-	compose, shared, postgres := strings.Index(frame, "compose"), strings.Index(frame, "shared · main"), strings.Index(frame, "postgres")
-	if compose < 0 || shared < 0 || !(compose < shared && shared < postgres) {
-		t.Fatalf("frame = %q, want compose, then the shared line, then postgres", frame)
+	shared, postgres := strings.Index(frame, "shared · main"), strings.Index(frame, "◈  postgres")
+	heading, compose := strings.Index(frame, "feat/x"), strings.Index(frame, "●  compose")
+	if shared < 0 || !(shared < postgres && postgres < heading && heading < compose) {
+		t.Fatalf("frame = %q, want the shared line and postgres above the worktree and its jobs", frame)
 	}
 
-	h.press(t, key("j"))
-	frame = ansi.Strip(h.model.View())
 	if !strings.Contains(frame, "postgres · attached to main") || strings.Contains(frame, "postgres · feat/x") {
 		t.Errorf("frame = %q, want the title to say where postgres runs", frame)
+	}
+}
+
+// Held by two worktrees, a shared service is still one process: one row in the
+// list, and one entry in the block, each worktree's slice under it.
+func TestASharedServiceHeldByTwoWorktreesIsListedOnce(t *testing.T) {
+	main := inWorktree(running("postgres"), "/work/main", "main")
+	main.Shared, main.Namespace = true, "app_main"
+	feat := inWorktree(sharedIn(running("postgres"), "main"), "/work/feat", "feat")
+	feat.Shared, feat.Namespace = true, "app_feat"
+	h := newHarness(t, harnessParams{
+		Views:   []runlogs.JobView{main, inWorktree(running("web"), "/work/main", "main"), feat},
+		Streams: []string{"postgres", "web"},
+	})
+
+	if count := strings.Count(ansi.Strip(h.model.renderSidebar(h.model.layout())), "postgres"); count != 1 {
+		t.Errorf("postgres is listed %d times, want once", count)
+	}
+	if visible := h.model.visible(); len(visible) != 2 || viewKey(visible[0]) != viewKey(main) {
+		t.Errorf("visible = %+v, want main's postgres first, then web", visible)
+	}
+
+	h.press(t, key(domain.RunViewReachKey))
+	frame := ansi.Strip(h.model.View())
+	if strings.Count(frame, "postgres") != 2 || !strings.Contains(frame, "main  app_main") || !strings.Contains(frame, "feat  app_feat") {
+		t.Errorf("frame = %q, want postgres once with each worktree's namespace under it", frame)
 	}
 }
