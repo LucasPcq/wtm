@@ -317,8 +317,23 @@ const (
 	// The three name the namespace itself — app_feat_x, not feat-x — because it
 	// is what was destroyed, and the service it was destroyed in.
 	CleanRemovedNamespaceFmt  = "dropped %s from %s"
-	CleanDeferredNamespaceFmt = "%s is down: %s kept, `wtm prune` will drop it"
+	CleanDeferredNamespaceFmt = "%s is down: %s kept, dropped on its next start"
 	PruneSettledNamespaceFmt  = "dropped %s from %s, left over from removed worktree %s"
+	// OwedRecreatedFmt withdraws a debt whose worktree exists again: the
+	// namespace is the new worktree's now. OwedStillFmt counts what a service
+	// that is down still owes, and when it will be paid.
+	OwedRecreatedFmt     = "%s kept: worktree %s exists again, so it is its own"
+	OwedStillFmt         = "%s still owed to %s — dropped on its next start"
+	OwedOneFmt           = "%d namespace"
+	OwedManyFmt          = "%d namespaces"
+	OwedBringUpFailedFmt = "could not start %s: %s"
+	// The question a clean asks when a shared service is down: start it now to
+	// drop the namespace, or leave it owed until the service next starts.
+	OwedBringUpTitleFmt = "%s is down — start it to drop %s now?"
+	OwedBringUpDesc     = "Otherwise it is kept and dropped the next time the service starts, from any worktree."
+	OwedBringUpYesFmt   = "Start %s and drop it"
+	OwedBringUpNo       = "Keep it for its next start"
+	OwedBringUpStageFmt = "Starting %s"
 
 	// ScopeStepName, Title and Desc introduce the question run init asks of each
 	// compose service.

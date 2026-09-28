@@ -8,6 +8,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
 	"github.com/LucasPcq/wtm/internal/service/runconfig"
@@ -256,17 +257,124 @@ func (f *cleanFlow) removeNamespaces(branchName string) {
 		return
 	}
 
+	up := rules.SharedJobsUp(rules.SharedJobsUpParams{Jobs: runjobs.Load(), Config: cfg})
 	result := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
 		Config:  rules.JobsHeld(cfg, held),
 		Env:     env,
 		WorkDir: wt.Path,
-		Up:      rules.SharedJobsUp(rules.SharedJobsUpParams{Jobs: runjobs.Load(), Config: cfg}),
+		Up:      up,
 	})
+	result = f.offerToBringUp(bringUpOffer{Config: cfg, Env: env, WorkDir: wt.Path, Up: up, Result: result})
 	f.reportNamespaces(cfg, result)
 
 	if err := runjobs.QueueRemovals(runjobs.QueueRemovalsParams{StateDir: f.ctx.StateDir, Refs: result.Deferred}); err != nil {
 		f.presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: err.Error()})
 	}
+}
+
+type bringUpOffer struct {
+	Config  domain.RunConfig
+	Env     map[string]string
+	WorkDir string
+	Up      map[string]bool
+	Result  runjobs.RemoveNamespacesResult
+}
+
+// offerToBringUp asks, for each shared service that was down, whether to start
+// it now and drop the namespace rather than leave it owed. Only a run that can
+// ask does: starting a service nobody asked for is not a safe default, so an
+// unattended clean keeps deferring.
+func (f *cleanFlow) offerToBringUp(offer bringUpOffer) runjobs.RemoveNamespacesResult {
+	result := offer.Result
+	if !f.prompter.Interactive() {
+		return result
+	}
+	for _, job := range downJobs(offer) {
+		name := rules.NamespaceName(rules.NamespaceNameParams{Config: offer.Config, Ref: refOf(result.Deferred, job)})
+		start, err := f.prompter.Confirm(flow.ConfirmParams{
+			Title:       fmt.Sprintf(domain.OwedBringUpTitleFmt, job, name),
+			Description: domain.OwedBringUpDesc,
+			DefaultYes:  true,
+			YesLabel:    fmt.Sprintf(domain.OwedBringUpYesFmt, job),
+			NoLabel:     domain.OwedBringUpNo,
+		})
+		if err != nil || !start {
+			continue
+		}
+		result = f.dropWithServiceUp(dropParams{Offer: offer, Job: job, Result: result})
+	}
+	return result
+}
+
+type dropParams struct {
+	Offer  bringUpOffer
+	Job    string
+	Result runjobs.RemoveNamespacesResult
+}
+
+func (f *cleanFlow) dropWithServiceUp(params dropParams) runjobs.RemoveNamespacesResult {
+	result := params.Result
+	var release func()
+	err := f.presenter.Stage(flow.StageParams{
+		Message: fmt.Sprintf(domain.OwedBringUpStageFmt, params.Job),
+		Work: func() error {
+			var bringErr error
+			release, bringErr = owed.BringUp(owed.BringUpParams{Context: f.ctx, Config: params.Offer.Config, Job: params.Job})
+			return bringErr
+		},
+	})
+	if err != nil {
+		result.Errs = append(result.Errs, err)
+		return result
+	}
+	defer release()
+
+	retry := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
+		Config:  rules.JobsNamed(params.Offer.Config, params.Job),
+		Env:     params.Offer.Env,
+		WorkDir: params.Offer.WorkDir,
+		Up:      map[string]bool{params.Job: true},
+	})
+	result.Deferred = withoutJob(result.Deferred, params.Job)
+	result.Released = append(result.Released, retry.Released...)
+	result.Deferred = append(result.Deferred, retry.Deferred...)
+	result.Errs = append(result.Errs, retry.Errs...)
+	return result
+}
+
+// downJobs are the services a namespace was deferred for because they were
+// down — not because their remove command failed, which starting them again
+// would not fix.
+func downJobs(offer bringUpOffer) []string {
+	var jobs []string
+	seen := map[string]bool{}
+	for _, ref := range offer.Result.Deferred {
+		if offer.Up[ref.Job] || seen[ref.Job] {
+			continue
+		}
+		seen[ref.Job] = true
+		jobs = append(jobs, ref.Job)
+	}
+	return jobs
+}
+
+func refOf(refs []domain.NamespaceRef, job string) domain.NamespaceRef {
+	for _, ref := range refs {
+		if ref.Job == job {
+			return ref
+		}
+	}
+	return domain.NamespaceRef{Job: job}
+}
+
+func withoutJob(refs []domain.NamespaceRef, job string) []domain.NamespaceRef {
+	kept := make([]domain.NamespaceRef, 0, len(refs))
+	for _, ref := range refs {
+		if ref.Job != job {
+			kept = append(kept, ref)
+		}
+	}
+	return kept
 }
 
 func (f *cleanFlow) reportNamespaces(cfg domain.RunConfig, result runjobs.RemoveNamespacesResult) {

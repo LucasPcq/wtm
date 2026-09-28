@@ -3,6 +3,7 @@ package rules
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -334,4 +335,25 @@ func StoppedFmt(status string) string {
 		return domain.RunReleasedFmt
 	}
 	return domain.RunStoppedFmt
+}
+
+// OwedLines say what a service that is down still owes, one line per service
+// in a stable order, and when it will be paid.
+func OwedLines(owed map[string]int) []string {
+	jobs := make([]string, 0, len(owed))
+	for job, count := range owed {
+		if count > 0 {
+			jobs = append(jobs, job)
+		}
+	}
+	sort.Strings(jobs)
+	lines := make([]string, 0, len(jobs))
+	for _, job := range jobs {
+		count := fmt.Sprintf(domain.OwedManyFmt, owed[job])
+		if owed[job] == 1 {
+			count = fmt.Sprintf(domain.OwedOneFmt, owed[job])
+		}
+		lines = append(lines, fmt.Sprintf(domain.OwedStillFmt, count, job))
+	}
+	return lines
 }

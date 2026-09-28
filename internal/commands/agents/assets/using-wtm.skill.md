@@ -147,8 +147,10 @@ flagged; everything else is what the name implies.
   services** (it drops its database): pass `--keep-data` to withhold that, including under
   `--yes`; the interactive recap names each database it will drop. Only worktrees that
   actually started the shared job owe anything — one created and thrown away owes nothing.
-  If the shared service is down the drop is deferred, and the next `wtm prune` settles it
-  once the service is up again. **In JSON mode surviving children are left orphaned unless you pass
+  If the shared service is down, an interactive clean offers to start it and drop the
+  namespace now; under `--yes` the drop is owed instead, and paid the next time the service
+  starts — any `run up` / `run start` that brings it up, or `prune`, which also reports what
+  is still owed. A debt whose worktree was re-created since is withdrawn, never paid. **In JSON mode surviving children are left orphaned unless you pass
   `--reparent-children`** (they reparent onto the grandparent). `prune` decides "finished"
   from **GitHub PR state via the `gh` CLI** (not local commits): `--merged` = PR merged,
   `--closed` = PR closed without merging, `--gone` = remote branch deleted; no filter = all

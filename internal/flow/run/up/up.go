@@ -11,6 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/run/addressing"
+	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/flow/run/seam"
 	"github.com/LucasPcq/wtm/internal/flow/run/target"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
@@ -305,6 +306,9 @@ func (f *upFlow) start(answers flow.Answers) (Outcome, error) {
 	if err := f.offerToSilenceProbes(results); err != nil {
 		return Outcome{}, err
 	}
+	// A shared service this run brought up is the moment to pay what a clean
+	// owed it while it was down.
+	owed.Settle(owed.Params{Context: f.ctx, Presenter: f.presenter})
 
 	return Outcome{
 		WorkDirs: workDirs,

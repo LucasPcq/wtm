@@ -9,6 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/run/addressing"
+	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/flow/run/seam"
 	"github.com/LucasPcq/wtm/internal/flow/run/target"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
@@ -140,6 +141,9 @@ func (f *startFlow) run() (Outcome, error) {
 	})
 	if err != nil {
 		return Outcome{}, err
+	}
+	if rules.IsShared(job) {
+		owed.Settle(owed.Params{Context: f.ctx, Presenter: f.presenter})
 	}
 	return Outcome{WorkDir: workDir, Job: job, Result: result.One(), Aborted: result.Aborted()}, nil
 }
