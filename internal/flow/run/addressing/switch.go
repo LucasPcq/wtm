@@ -47,7 +47,10 @@ type SwitchOutcome struct {
 	// onto the addressing, and the ones it left out of step.
 	Settled []string
 	Pending []string
-	Aborted bool
+	// MainLeft is the main checkout's branch when it is out of step and the mode
+	// is one no bulk pass moves it onto: `wtm env main` is then its own decision.
+	MainLeft string
+	Aborted  bool
 }
 
 // Switch sets run.toml's addressing, then settles every worktree whose .env
@@ -59,7 +62,7 @@ func Switch(params SwitchParams) (SwitchOutcome, error) {
 	}
 
 	previous := rules.EffectiveAddressing(params.Request.Config)
-	pending := pendingByMode{ctx: params.Context, cache: map[string][]domain.GitWorktree{}}
+	pending := pendingByMode{ctx: params.Context, cache: map[string]outOfStep{}}
 	answers, err := params.Prompter.Ask(flow.Session{
 		ErrLabel: domain.CmdAddressing,
 		Steps:    []flow.Step{modeStep(previous), settleStep(&pending)},
@@ -83,12 +86,13 @@ func Switch(params SwitchParams) (SwitchOutcome, error) {
 		outcome.Changed = true
 	}
 
-	worktrees := pending.of(string(outcome.Current))
+	found := pending.of(string(outcome.Current))
+	outcome.MainLeft = found.MainLeft
 	if answers.Value(stepSettle) != settleYes {
-		outcome.Pending = branchesOf(worktrees)
+		outcome.Pending = branchesOf(found.Settle)
 		return outcome, params.Presenter.Switched(outcome)
 	}
-	outcome = settle(params, outcome, worktrees)
+	outcome = settle(params, outcome, found.Settle)
 	return outcome, params.Presenter.Switched(outcome)
 }
 
@@ -138,17 +142,21 @@ func settleStep(pending *pendingByMode) flow.Step {
 		Label: domain.AddressingSettleStepName,
 		Flag:  domain.FlagKeepEnv,
 		Skip: func(answers flow.Answers) (bool, string) {
-			if len(pending.of(answers.Value(stepMode))) == 0 {
+			if len(pending.of(answers.Value(stepMode)).Settle) == 0 {
 				return true, domain.AddressingSettleNothing
 			}
 			return false, ""
 		},
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
-			worktrees := pending.of(answers.Value(stepMode))
-			count := rules.WorktreeCountLabel(len(worktrees))
+			found := pending.of(answers.Value(stepMode))
+			count := rules.WorktreeCountLabel(len(found.Settle))
+			description := fmt.Sprintf(domain.AddressingSettleDescFmt, count, strings.Join(branchesOf(found.Settle), ", "))
+			if found.MainLeft != "" {
+				description += fmt.Sprintf(domain.AddressingMainLeftDescFmt, found.MainLeft)
+			}
 			return flow.StepContent{
 				Title:       fmt.Sprintf(domain.AddressingSettleTitleFmt, count),
-				Description: fmt.Sprintf(domain.AddressingSettleDescFmt, count, strings.Join(branchesOf(worktrees), ", ")),
+				Description: description,
 				Options: []flow.Option{
 					{Label: domain.AddressingSettleYes, Value: settleYes},
 					{Label: domain.AddressingSettleNo, Value: settleNo},
@@ -207,26 +215,33 @@ func (s *statusOnce) Status(notice flow.Notice) {
 // going back to change the mode must not read every .env a third time.
 type pendingByMode struct {
 	ctx   flow.Context
-	cache map[string][]domain.GitWorktree
+	cache map[string]outOfStep
 }
 
-func (p *pendingByMode) of(mode string) []domain.GitWorktree {
+// outOfStep splits the worktrees a mode would move into the ones this pass
+// settles and the main checkout, when rules.BulkSettlesMain keeps it out.
+type outOfStep struct {
+	Settle   []domain.GitWorktree
+	MainLeft string
+}
+
+func (p *pendingByMode) of(mode string) outOfStep {
 	if cached, ok := p.cache[mode]; ok {
 		return cached
 	}
-	found := outOfStep(p.ctx, domain.Addressing(mode))
+	found := readOutOfStep(p.ctx, domain.Addressing(mode))
 	p.cache[mode] = found
 	return found
 }
 
-// outOfStep reads each worktree's plan under the mode given rather than the one
-// run.toml holds: the question is asked before anything is written.
-func outOfStep(ctx flow.Context, mode domain.Addressing) []domain.GitWorktree {
+// readOutOfStep reads each worktree's plan under the mode given rather than the
+// one run.toml holds: the question is asked before anything is written.
+func readOutOfStep(ctx flow.Context, mode domain.Addressing) outOfStep {
 	all, err := worktree.ListAll(worktree.ListAllParams{ProjectDir: ctx.ProjectDir})
 	if err != nil {
-		return nil
+		return outOfStep{}
 	}
-	var pending []domain.GitWorktree
+	var found outOfStep
 	for _, wt := range all {
 		if wt.Branch == "" {
 			continue
@@ -243,9 +258,13 @@ func outOfStep(ctx flow.Context, mode domain.Addressing) []domain.GitWorktree {
 		if planErr != nil || len(rules.EnvPortRewrites(plan)) == 0 {
 			continue
 		}
-		pending = append(pending, wt)
+		if wt.IsMain && !rules.BulkSettlesMain(mode) {
+			found.MainLeft = wt.Branch
+			continue
+		}
+		found.Settle = append(found.Settle, wt)
 	}
-	return pending
+	return found
 }
 
 func branchesOf(worktrees []domain.GitWorktree) []string {

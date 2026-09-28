@@ -17,9 +17,11 @@ func newAddressingCmd() *cobra.Command {
 		Use:   domain.CmdAddressing + " [names|ports]",
 		Short: "Switch how the .env files spell a job's address",
 		Long: "Set run.toml's addressing — named urls (http://api.feat-x.myrepo.localhost) or\n" +
-			"ports (http://localhost:4012) — then settle the .env of every worktree that spells\n" +
+			"ports (http://localhost:4012) — then settle the .env of the worktrees that spell\n" +
 			"the other one. Settling runs even when the mode is already the one given, for a\n" +
 			"worktree an earlier switch left out of step.\n\n" +
+			"The main checkout is settled back to ports, never onto names: it is the checkout\n" +
+			"that works without wtm, and `wtm env main` is how it is moved onto names.\n\n" +
 			"Without an argument, prompts for the mode; under --yes the argument is required\n" +
 			"and the worktrees are settled unless --keep-env is passed.",
 		Args:      cobra.MaximumNArgs(1),
@@ -69,6 +71,7 @@ func (p addressingPresenter) Switched(outcome addressingflow.SwitchOutcome) erro
 		Changed:    outcome.Changed,
 		Settled:    outcome.Settled,
 		Pending:    outcome.Pending,
+		MainLeft:   outcome.MainLeft,
 	}
 	out := p.Cmd.OutOrStdout()
 	if p.Format == domain.OutputJSON {

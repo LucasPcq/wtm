@@ -176,7 +176,7 @@ no longer touches services). Until then, run commands stop with a hint pointing 
 | [`run url`](docs/wtm_run_url.md) / [`open`](docs/wtm_run_open.md) | Print / open where a job answers in this worktree |
 | [`run export`](docs/wtm_run_export.md) / [`import`](docs/wtm_run_import.md) | Share a job layout between machines |
 | [`run job`](docs/wtm_run_job.md) / [`profile`](docs/wtm_run_profile.md) | Add / remove / edit jobs and profiles |
-| [`run addressing`](docs/wtm_run_addressing.md) | Switch the `.env` files between named URLs and ports, and settle every worktree on it |
+| [`run addressing`](docs/wtm_run_addressing.md) | Switch the `.env` files between named URLs and ports, and settle the worktrees on it |
 | [`run proxy`](docs/wtm_run_proxy.md) | Report, install or remove the redirection that serves named URLs on port 80 |
 | [`run daemon`](docs/wtm_run_daemon.md) | Inspect, stop or restart the process that runs the jobs |
 
@@ -568,15 +568,16 @@ port (`…localhost:11080`), which changes nothing for CORS and nothing for cook
 a port is part of an origin, but never part of a *cookie's* origin.
 
 `wtm run addressing ports` keeps port numbers everywhere, and `wtm run addressing names` goes
-back: it writes `addressing` in `run.toml`, then offers to settle every worktree whose `.env`
-spells the other one — main included, named in the question. It is a real inverse, and
-`--keep-env` switches the setting alone. On a machine where the proxy is off,
+back: it writes `addressing` in `run.toml`, then offers to settle the worktrees whose `.env`
+spells the other one. It is a real inverse, and `--keep-env` switches the setting alone. The
+main checkout follows the rule below: the switch brings it back to ports, and never moves it
+onto names. On a machine where the proxy is off,
 ports are written whatever the project asked for, and a notice says so. Under `names` the
 named URL becomes the only working entrance: opening `localhost:5183` directly sends an
 `Origin` the API no longer knows. `wtm run url` and `wtm run open` hand out the right link.
 
 The rewrite happens where wtm provisions: a worktree, when it is created and whenever
-`wtm env` or `wtm run addressing` reconciles it. **Nothing writes the main checkout's `.env` on its own** — it is the one
+`wtm env` reconciles it. **Nothing moves the main checkout's `.env` onto names unless you name it** — it is the one
 checkout that exists without wtm, the one a colleague clones and a `docker compose up` reads.
 So under `names` its values still hold ports — and then **the working entrance is the port**,
 not the name: the browser on `localhost:5175` sends an `Origin` the API's `CORS_ORIGIN`
@@ -600,9 +601,10 @@ Doing it is a choice, not a formality. Main then stops behaving as a checkout wi
 whoever reads that `.env`, or starts the stack from it, depends on the proxy being up. Two
 moments make it worth doing — right after switching a project to `names`, and after
 `wtm run proxy install`, which drops the `:11080` from the origins already written. Going
-back takes three steps, `addressing` being a project setting with no per-worktree scope:
-`wtm run addressing ports`, then `wtm run addressing names --keep-env` — main stays on ports until
-a `wtm env main` says otherwise. And `wtm create` from main is unaffected either way: a copied
+back is `wtm run addressing ports` then `wtm run addressing names`: the first brings main back to
+ports with every other worktree, the second moves the others onto names again and leaves main
+where it is — a pass over every worktree may return main to ports, only `wtm env main` takes it
+to names. And `wtm create` from main is unaffected either way: a copied
 value carrying main's segment is recognised and rewound to the new worktree's.
 
 Two base ports must not differ by a **multiple of the block**, or two worktrees end up on

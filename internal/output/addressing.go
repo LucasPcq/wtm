@@ -14,6 +14,7 @@ type AddressingResult struct {
 	Changed    bool              `json:"changed"`
 	Settled    []string          `json:"settled"`
 	Pending    []string          `json:"pending"`
+	MainLeft   string            `json:"main_left,omitempty"`
 }
 
 // AddressingSwitched is the counted readout of `run addressing`: the mode, then
@@ -30,6 +31,9 @@ func AddressingSwitched(w io.Writer, result AddressingResult) {
 	}
 	if len(result.Pending) > 0 {
 		Warning(w, fmt.Sprintf(domain.AddressingPendingFmt, rules.WorktreeCountLabel(len(result.Pending))))
+	}
+	if result.MainLeft != "" {
+		Warning(w, fmt.Sprintf(domain.AddressingMainLeftFmt, result.MainLeft, result.MainLeft))
 	}
 }
 

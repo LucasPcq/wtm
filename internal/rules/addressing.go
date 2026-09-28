@@ -35,3 +35,12 @@ func WorktreeCountLabel(n int) string {
 	}
 	return fmt.Sprintf(domain.DashboardCountFmt, n)
 }
+
+// BulkSettlesMain says whether a pass over every worktree may rewrite the main
+// checkout's .env. Main is the one checkout that exists without wtm, the one a
+// clone and a bare `docker compose up` read. A bulk pass may bring it back to
+// ports, which is that state; moving it onto names makes it depend on the
+// proxy, and is only ever done by naming it — `wtm env main`.
+func BulkSettlesMain(mode domain.Addressing) bool {
+	return mode == domain.AddressingPorts
+}

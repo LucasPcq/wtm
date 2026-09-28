@@ -75,9 +75,24 @@ questions are steps of one session — the mode, then whether to settle the work
 wizard can go back from the second to the first. The second reads every worktree's plan
 under the mode just picked, **before** run.toml is written: `ResolveEnvPortsParams.Addressing`
 overrides the file's, and the count is cached per mode so going back does not reread every
-`.env`. It lists the main checkout like any other, by name — that question is the explicit
-choice this page says aligning main has to be. The settle itself is `envports.Settle`, the
-pass `create` and `extract` run, so the three cannot write different values.
+`.env`. The settle itself is `envports.Settle`, the pass `create` and `extract` run, so the
+three cannot write different values.
+
+Which worktrees it takes is the one place the main checkout is treated apart, and the rule is
+`rules.BulkSettlesMain`: a pass over every worktree brings main back to ports, and never moves
+it onto names. See the next section for why main is left alone; the asymmetry is what keeps the
+two commands consistent with it:
+
+| Command | Linked worktrees | Main |
+| -- | -- | -- |
+| `wtm env <worktree>` | aligned on the mode | aligned on the mode — naming it is the choice |
+| `wtm run addressing ports` | settled | settled: ports is the state main has without wtm |
+| `wtm run addressing names` | settled | left as is, and said so — `wtm env main` is its own decision |
+
+Without the return leg, `wtm run addressing ports` after a `wtm env main` would leave main on
+names under a project that says ports, and silently: the drift warning only reads a project on
+names. The condition lives in the command's choice of worktrees, not in the pass — the plan and
+the drift reading stay free of any main-shaped condition, as below.
 
 ## Recognising wtm's own writing
 

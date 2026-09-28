@@ -5,9 +5,12 @@ Switch how the .env files spell a job's address
 ### Synopsis
 
 Set run.toml's addressing — named urls (http://api.feat-x.myrepo.localhost) or
-ports (http://localhost:4012) — then settle the .env of every worktree that spells
+ports (http://localhost:4012) — then settle the .env of the worktrees that spell
 the other one. Settling runs even when the mode is already the one given, for a
 worktree an earlier switch left out of step.
+
+The main checkout is settled back to ports, never onto names: it is the checkout
+that works without wtm, and `wtm env main` is how it is moved onto names.
 
 Without an argument, prompts for the mode; under --yes the argument is required
 and the worktrees are settled unless --keep-env is passed.

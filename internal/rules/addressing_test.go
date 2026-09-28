@@ -38,3 +38,12 @@ func TestValidateAddressing(t *testing.T) {
 		t.Fatalf("a typo must be refused, got %v", errs)
 	}
 }
+
+func TestBulkSettlesMainOnlyBackToPorts(t *testing.T) {
+	if !rules.BulkSettlesMain(domain.AddressingPorts) {
+		t.Error("a bulk pass must be able to bring main back to ports")
+	}
+	if rules.BulkSettlesMain(domain.AddressingNames) {
+		t.Error("a bulk pass must never move main onto names")
+	}
+}

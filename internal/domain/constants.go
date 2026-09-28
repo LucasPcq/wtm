@@ -642,6 +642,8 @@ const (
 	AddressingSettleNo        = "No, only run.toml"
 	AddressingSettledFmt      = "%s settled"
 	AddressingPendingFmt      = "%s still out of step — `wtm env <worktree>` settles one"
+	AddressingMainLeftFmt     = "%s left as is — `wtm env %s` moves it onto names, if you want it to"
+	AddressingMainLeftDescFmt = "\n%s is left out: a pass over every worktree never moves it onto names."
 	AddressingSettleFailedFmt = "%s: %v"
 	AddressingWorktreeNoun    = "worktree"
 

@@ -9,8 +9,10 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/envports"
 	"github.com/LucasPcq/wtm/internal/service/runconfig"
 	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
+	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
 
 var portsConfig = strings.Replace(namedConfig, `addressing = "names"`, `addressing = "ports"`, 1)
@@ -40,9 +42,46 @@ func (r repo) switchParams(request SwitchRequest, prompter flow.Prompter) (Switc
 	}, presenter
 }
 
+const portsEnv = "VITE_API_URL=http://localhost:4001\n"
+
+// withFeature adds a linked worktree holding the .env it was copied with — main's
+// port, which is not its own.
+func (r repo) withFeature(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "feature")
+	gittest.Git(t, r.dir, "worktree", "add", "-b", "feature", path)
+	if err := os.WriteFile(filepath.Join(path, ".env"), []byte(portsEnv), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// alignMain is `wtm env main` under names: the one way main's .env is moved
+// onto names.
+func (r repo) alignMain(t *testing.T) {
+	t.Helper()
+	if _, err := envports.Settle(envports.Params{
+		Context:      r.params().Context,
+		Branch:       "main",
+		WorktreePath: r.dir,
+		Rewrite:      true,
+		Presenter:    &flowtest.Recorder{},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(r.env(t), ".localhost") {
+		t.Fatalf("main .env = %q, want it on names", r.env(t))
+	}
+}
+
 func (r repo) env(t *testing.T) string {
 	t.Helper()
-	body, err := os.ReadFile(filepath.Join(r.dir, ".env"))
+	return readFile(t, filepath.Join(r.dir, ".env"))
+}
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	body, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,8 +97,9 @@ func (r repo) addressing(t *testing.T) domain.Addressing {
 	return cfg.Addressing
 }
 
-func TestSwitchWritesTheModeAndSettlesTheWorktrees(t *testing.T) {
-	r := newRepo(t, portsConfig, "VITE_API_URL=http://localhost:4001\n")
+func TestSwitchToNamesSettlesTheWorktreesButNotMain(t *testing.T) {
+	r := newRepo(t, portsConfig, portsEnv)
+	feature := r.withFeature(t)
 	params, presenter := r.switchParams(SwitchRequest{Mode: domain.AddressingNames}, flow.Unattended{})
 
 	outcome, err := Switch(params)
@@ -70,19 +110,43 @@ func TestSwitchWritesTheModeAndSettlesTheWorktrees(t *testing.T) {
 	if got := r.addressing(t); got != domain.AddressingNames {
 		t.Errorf("run.toml addressing = %q, want names", got)
 	}
-	if !strings.Contains(r.env(t), ".localhost") {
-		t.Errorf(".env = %q, want the value moved onto the published name", r.env(t))
+	if body := readFile(t, filepath.Join(feature, ".env")); !strings.Contains(body, ".localhost") {
+		t.Errorf("feature .env = %q, want the value moved onto the published name", body)
 	}
-	if !outcome.Changed || outcome.Previous != domain.AddressingPorts || !slices.Equal(outcome.Settled, []string{"main"}) {
-		t.Errorf("outcome = %+v, want ports → names with main settled", outcome)
+	if r.env(t) != portsEnv {
+		t.Errorf("main .env = %q, want it untouched: only `wtm env main` moves it onto names", r.env(t))
+	}
+	if !outcome.Changed || !slices.Equal(outcome.Settled, []string{"feature"}) || outcome.MainLeft != "main" {
+		t.Errorf("outcome = %+v, want feature settled and main left as is", outcome)
 	}
 	if len(presenter.outcomes) != 1 {
 		t.Errorf("concluded %d time(s), want once", len(presenter.outcomes))
 	}
 }
 
+// Back to ports is the inverse of a `wtm env main`: main returns to the state it
+// has without wtm, so the pass takes it along.
+func TestSwitchToPortsBringsMainBack(t *testing.T) {
+	r := newRepo(t, namedConfig, portsEnv)
+	r.alignMain(t)
+	params, _ := r.switchParams(SwitchRequest{Mode: domain.AddressingPorts}, flow.Unattended{})
+
+	outcome, err := Switch(params)
+	if err != nil {
+		t.Fatalf("Switch: %v", err)
+	}
+
+	if r.env(t) != portsEnv {
+		t.Errorf("main .env = %q, want its port back", r.env(t))
+	}
+	if !slices.Equal(outcome.Settled, []string{"main"}) || outcome.MainLeft != "" {
+		t.Errorf("outcome = %+v, want main settled", outcome)
+	}
+}
+
 func TestSwitchKeepEnvLeavesTheFilesOutOfStep(t *testing.T) {
-	r := newRepo(t, portsConfig, "VITE_API_URL=http://localhost:4001\n")
+	r := newRepo(t, portsConfig, portsEnv)
+	feature := r.withFeature(t)
 	params, _ := r.switchParams(SwitchRequest{Mode: domain.AddressingNames, KeepEnv: true}, flow.Unattended{})
 
 	outcome, err := Switch(params)
@@ -93,18 +157,19 @@ func TestSwitchKeepEnvLeavesTheFilesOutOfStep(t *testing.T) {
 	if got := r.addressing(t); got != domain.AddressingNames {
 		t.Errorf("run.toml addressing = %q, want names", got)
 	}
-	if r.env(t) != "VITE_API_URL=http://localhost:4001\n" {
-		t.Errorf(".env = %q, want it untouched", r.env(t))
+	if body := readFile(t, filepath.Join(feature, ".env")); body != portsEnv {
+		t.Errorf("feature .env = %q, want it untouched", body)
 	}
-	if len(outcome.Settled) != 0 || !slices.Equal(outcome.Pending, []string{"main"}) {
-		t.Errorf("outcome = %+v, want main left pending", outcome)
+	if len(outcome.Settled) != 0 || !slices.Equal(outcome.Pending, []string{"feature"}) {
+		t.Errorf("outcome = %+v, want feature left pending", outcome)
 	}
 }
 
 // The mode already in place is not a no-op while a worktree still spells the
 // other one: that is the drift a previous --keep-env left behind.
 func TestSwitchToTheCurrentModeStillSettlesTheDrift(t *testing.T) {
-	r := newRepo(t, namedConfig, "VITE_API_URL=http://localhost:4001\n")
+	r := newRepo(t, namedConfig, portsEnv)
+	r.withFeature(t)
 	params, _ := r.switchParams(SwitchRequest{Mode: domain.AddressingNames}, flow.Unattended{})
 
 	outcome, err := Switch(params)
@@ -115,13 +180,14 @@ func TestSwitchToTheCurrentModeStillSettlesTheDrift(t *testing.T) {
 	if outcome.Changed {
 		t.Error("run.toml already said names, nothing to write")
 	}
-	if !slices.Equal(outcome.Settled, []string{"main"}) {
-		t.Errorf("settled = %v, want main", outcome.Settled)
+	if !slices.Equal(outcome.Settled, []string{"feature"}) {
+		t.Errorf("settled = %v, want feature", outcome.Settled)
 	}
 }
 
 func TestSwitchDeclinedLeavesTheFilesPending(t *testing.T) {
-	r := newRepo(t, portsConfig, "VITE_API_URL=http://localhost:4001\n")
+	r := newRepo(t, portsConfig, portsEnv)
+	feature := r.withFeature(t)
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{
 		stepMode:   string(domain.AddressingNames),
 		stepSettle: settleNo,
@@ -136,19 +202,20 @@ func TestSwitchDeclinedLeavesTheFilesPending(t *testing.T) {
 	if prompter.AskedKeys() != stepMode+","+stepSettle {
 		t.Errorf("asked %q, want the mode then the settle question, as steps of one session", prompter.AskedKeys())
 	}
-	if !strings.Contains(prompter.Content[stepSettle].Title, "1 worktree") {
-		t.Errorf("settle title = %q, want the count read under the mode just picked", prompter.Content[stepSettle].Title)
+	description := prompter.Content[stepSettle].Description
+	if !strings.Contains(description, "1 worktree") || !strings.Contains(description, "main is left out") {
+		t.Errorf("settle description = %q, want the count and main named as left out", description)
 	}
-	if r.env(t) != "VITE_API_URL=http://localhost:4001\n" {
-		t.Errorf(".env = %q, want it untouched", r.env(t))
+	if body := readFile(t, filepath.Join(feature, ".env")); body != portsEnv {
+		t.Errorf("feature .env = %q, want it untouched", body)
 	}
-	if !outcome.Changed || !slices.Equal(outcome.Pending, []string{"main"}) {
-		t.Errorf("outcome = %+v, want the switch written and main pending", outcome)
+	if !outcome.Changed || !slices.Equal(outcome.Pending, []string{"feature"}) {
+		t.Errorf("outcome = %+v, want the switch written and feature pending", outcome)
 	}
 }
 
 func TestSwitchUnattendedNeedsTheMode(t *testing.T) {
-	r := newRepo(t, portsConfig, "VITE_API_URL=http://localhost:4001\n")
+	r := newRepo(t, portsConfig, portsEnv)
 	params, _ := r.switchParams(SwitchRequest{}, flow.Unattended{})
 
 	_, err := Switch(params)
@@ -161,7 +228,7 @@ func TestSwitchUnattendedNeedsTheMode(t *testing.T) {
 }
 
 func TestSwitchRefusesAnUnknownMode(t *testing.T) {
-	r := newRepo(t, portsConfig, "VITE_API_URL=http://localhost:4001\n")
+	r := newRepo(t, portsConfig, portsEnv)
 	params, _ := r.switchParams(SwitchRequest{Mode: "hosts"}, flow.Unattended{})
 
 	if _, err := Switch(params); err == nil || !strings.Contains(err.Error(), `"hosts"`) {
@@ -169,11 +236,11 @@ func TestSwitchRefusesAnUnknownMode(t *testing.T) {
 	}
 }
 
-// Nothing to move means nothing to ask: the question would be a yes with no
-// consequence.
-func TestSwitchSkipsTheSettleStepWhenEveryWorktreeIsInStep(t *testing.T) {
-	r := newRepo(t, portsConfig, "VITE_API_URL=http://localhost:4001\n")
-	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{stepMode: string(domain.AddressingPorts)}}
+// Nothing the pass may move means nothing to ask: main alone out of step under
+// names is its own decision, not a yes with no consequence.
+func TestSwitchSkipsTheSettleStepWhenOnlyMainIsOutOfStep(t *testing.T) {
+	r := newRepo(t, portsConfig, portsEnv)
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{stepMode: string(domain.AddressingNames)}}
 	params, _ := r.switchParams(SwitchRequest{}, prompter)
 
 	outcome, err := Switch(params)
@@ -183,7 +250,7 @@ func TestSwitchSkipsTheSettleStepWhenEveryWorktreeIsInStep(t *testing.T) {
 	if prompter.AskedKeys() != stepMode {
 		t.Errorf("asked %q, want only the mode", prompter.AskedKeys())
 	}
-	if outcome.Changed || len(outcome.Settled)+len(outcome.Pending) != 0 {
-		t.Errorf("outcome = %+v, want nothing done", outcome)
+	if len(outcome.Settled)+len(outcome.Pending) != 0 || outcome.MainLeft != "main" {
+		t.Errorf("outcome = %+v, want nothing settled and main left", outcome)
 	}
 }
