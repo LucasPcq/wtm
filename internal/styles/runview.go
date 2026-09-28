@@ -25,4 +25,11 @@ var (
 
 	// RunViewJobSelected marks the job whose pane is on screen.
 	RunViewJobSelected = lipgloss.NewStyle().Foreground(ColorPrimary).Bold(true)
+
+	// RunViewWorktreeHeading and RunViewSharedHeading head the groups of the job
+	// list and of the reach block. A worktree reads in the foreground, bold, so
+	// it outranks the jobs under it; the shared services take the colour of
+	// their mark, since they are the one group no worktree owns.
+	RunViewWorktreeHeading = lipgloss.NewStyle().Bold(true)
+	RunViewSharedHeading   = lipgloss.NewStyle().Foreground(ColorSuccess).Bold(true)
 )

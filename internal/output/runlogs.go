@@ -51,6 +51,10 @@ type RunPrinter struct {
 	worktrees  int
 	printed    bool
 	readied    bool
+	// reach is where each started job is reached, per worktree in the order
+	// they reported: the block the run concludes on.
+	reach      map[string][]domain.ReachEntry
+	reachOrder []string
 }
 
 func NewRunPrinter(params RunPrinterParams) *RunPrinter {
@@ -88,15 +92,19 @@ func (p *RunPrinter) Emit(event runlogs.Event) {
 		p.midLine = event.Chunk[len(event.Chunk)-1] != '\n'
 	case runlogs.PhaseStarted:
 		if event.AlreadyRunning {
-			Success(p.out, p.qualify(fmt.Sprintf(domain.RunStreamAlreadyFmt, event.Job), event.Worktree))
+			already := domain.RunStreamAlreadyFmt
+			if event.Attached {
+				already = domain.RunStreamAlreadyAttachedFmt
+			}
+			p.remember(event)
+			Success(p.out, p.jobLine(jobLineParams{Label: fmt.Sprintf(already, event.Job), Event: event}))
 			return
 		}
-		Success(p.out, p.jobLine(jobLineParams{Format: domain.RunStreamStartedFmt, Event: event}))
-		p.held(event.Held)
+		p.remember(event)
+		Success(p.out, p.jobLine(jobLineParams{Label: startedLabel(event), Event: event}))
 		p.devOrigins(event.DevOrigins)
 	case runlogs.PhaseDone:
-		Success(p.out, p.jobLine(jobLineParams{Format: domain.RunStreamDoneFmt, Event: event}))
-		p.held(event.Held)
+		Success(p.out, p.jobLine(jobLineParams{Label: fmt.Sprintf(domain.RunStreamDoneFmt, event.Job), Event: event}))
 	case runlogs.PhaseFailed:
 		Error(p.err, p.qualify(event.Reason, event.Worktree))
 	case runlogs.PhaseNotice:
@@ -144,52 +152,62 @@ func (p *RunPrinter) heading() string {
 }
 
 type jobLineParams struct {
-	Format string
-	Event  runlogs.Event
-}
-
-func (p *RunPrinter) jobLine(params jobLineParams) string {
-	return JobLine(JobLineParams{
-		Label:      p.qualify(fmt.Sprintf(params.Format, params.Event.Job), params.Event.Worktree),
-		Ports:      params.Event.Ports,
-		URL:        params.Event.URL,
-		Hyperlinks: p.hyperlinks,
-	})
-}
-
-type JobLineParams struct {
 	Label string
-	Ports map[string]int
-	// URL is where the job answers, empty for one that publishes no name.
-	URL string
-	// Hyperlinks turns the URL into an OSC-8 link.
-	Hyperlinks bool
+	Event runlogs.Event
 }
 
-// JobLine is how every human surface announces a job: what it is, the ports it
-// bound, and where to reach it. Shared so `run up` and `run start` cannot drift
-// into saying the same thing two ways.
-func JobLine(params JobLineParams) string {
-	line := rules.LabelWithPorts(rules.LabelWithPortsParams{
-		Label: params.Label,
-		Ports: params.Ports,
-	})
-	if params.URL == "" {
-		return line
+// startedLabel says where a started job runs when that is not here: a shared
+// service this worktree only holds is main's, and stopping this worktree
+// leaves it up.
+func startedLabel(event runlogs.Event) string {
+	switch {
+	case event.Attached && event.SharedIn != "" && event.SharedIn != event.Worktree:
+		return fmt.Sprintf(domain.RunStreamAttachedToFmt, event.Job, event.SharedIn)
+	case event.Attached:
+		return fmt.Sprintf(domain.RunStreamAttachedFmt, event.Job)
 	}
-	return line + domain.RunURLSuffixSep + Hyperlink(HyperlinkParams{
-		Text:    params.URL,
-		URL:     params.URL,
-		Enabled: params.Hyperlinks,
+	return fmt.Sprintf(domain.RunStreamStartedFmt, event.Job)
+}
+
+// jobLine carries one address fragment, never the list: the URL, the lone
+// port, or how many — the block the run ends on has the rest. A namespace a
+// shared start carved rides on the same line.
+func (p *RunPrinter) jobLine(params jobLineParams) string {
+	event := params.Event
+	line := p.qualify(params.Label, event.Worktree)
+	entry := reachEntryOf(event)
+	if summary := rules.ReachSummary(entry); summary != "" {
+		if len(entry.URLs) == 1 {
+			summary = Hyperlink(HyperlinkParams{Text: summary, URL: summary, Enabled: p.hyperlinks})
+		}
+		line += domain.ReachDetailSep + summary
+	}
+	if event.Namespace != "" {
+		line += domain.ReachDetailSep + fmt.Sprintf(domain.RunStreamNamespaceReadyFmt, event.Namespace)
+	}
+	return line
+}
+
+func reachEntryOf(event runlogs.Event) domain.ReachEntry {
+	return rules.ReachEntryFor(rules.ReachEntryParams{
+		Job:       event.Job,
+		URL:       event.URL,
+		Held:      event.Held,
+		Ports:     event.Ports,
+		Namespace: event.Namespace,
+		SharedIn:  event.SharedIn,
 	})
 }
 
-// held names the jobs a runner started, under its own line. They have no line
-// of their own: they are subprocesses of the one job the daemon holds.
-func (p *RunPrinter) held(entries []domain.JobURLEntry) {
-	for _, line := range rules.HeldAddressLines(entries) {
-		Message(p.out, Indent+line)
+// remember keeps a started job for the block the run concludes on.
+func (p *RunPrinter) remember(event runlogs.Event) {
+	if p.reach == nil {
+		p.reach = map[string][]domain.ReachEntry{}
 	}
+	if _, seen := p.reach[event.Worktree]; !seen {
+		p.reachOrder = append(p.reachOrder, event.Worktree)
+	}
+	p.reach[event.Worktree] = append(p.reach[event.Worktree], reachEntryOf(event))
 }
 
 // devOrigins reports the one line a Next project is missing before its own name
@@ -253,10 +271,33 @@ func (p *RunPrinter) aborted(outcome runlogs.Outcome) {
 // their own sequence, and the hint is about the run rather than about any of
 // them, so it is printed once however many reported.
 func (p *RunPrinter) ready(outcome runlogs.Outcome) {
-	if len(outcome.Started) == 0 || p.readied {
+	if len(outcome.Started) > 0 {
+		p.readied = true
+	}
+}
+
+// Conclude is the one place the run says where everything is reached: the
+// block, then a line for each worktree whose .env is out of step with it, then
+// what to do next. It follows every worktree's sequence, so a run over several
+// is concluded once.
+func (p *RunPrinter) Conclude(warnings []string) {
+	if !p.readied {
 		return
 	}
-	p.readied = true
+	worktrees := make([]rules.ReachWorktree, 0, len(p.reachOrder))
+	for _, worktree := range p.reachOrder {
+		worktrees = append(worktrees, rules.ReachWorktree{Name: worktree, Entries: p.reach[worktree]})
+	}
+	for _, section := range rules.ReachBlock(rules.ReachBlockParams{Worktrees: worktrees}) {
+		Blank(p.out)
+		Section(p.out, section.Title, section.Lines)
+	}
+	if len(warnings) > 0 {
+		Blank(p.out)
+		for _, warning := range warnings {
+			Warning(p.out, warning)
+		}
+	}
 	Blank(p.out)
 	NextStep(p.out, NextStepParams{Command: domain.RunStreamAttachHint, Note: domain.RunStreamAttachNote})
 	NextStep(p.out, NextStepParams{Command: domain.RunStreamStopHint, Note: domain.RunStreamStopNote})
@@ -349,7 +390,7 @@ func FormatRunDownRecap(params RunDownRecapParams) string {
 		lines = append(lines, downRecapBlock(worktree)...)
 	}
 
-	hint := NextStepLine(NextStepParams{Command: domain.RunStreamUpHint, Note: domain.RunStreamUpNote})
+	hint := styles.NextStepText(styles.NextStepParams{Command: domain.RunStreamUpHint, Note: domain.RunStreamUpNote})
 	body := strings.Join(append(lines, "", hint), "\n")
 	// Terminated, like every other Format* body in this package: the frame writes
 	// one blank line after what it is given, and a body whose last line has no
@@ -366,13 +407,16 @@ func FormatRunDownRecap(params RunDownRecapParams) string {
 // to go. The worktree is always named — a recap that says which worktree only
 // when there are two leaves the reader guessing on the run they do most.
 func downRecapBlock(worktree domain.WorktreeJobResults) []string {
-	var stopped, failed []string
+	var stopped, released, failed []string
 	for _, result := range worktree.Jobs {
-		if result.Status == domain.JobActionError {
+		switch result.Status {
+		case domain.JobActionError:
 			failed = append(failed, result.Name)
-			continue
+		case domain.JobActionReleased:
+			released = append(released, result.Name)
+		default:
+			stopped = append(stopped, result.Name)
 		}
-		stopped = append(stopped, result.Name)
 	}
 
 	var lines []string
@@ -381,6 +425,9 @@ func downRecapBlock(worktree domain.WorktreeJobResults) []string {
 	}
 	if len(stopped) > 0 {
 		lines = append(lines, fmt.Sprintf(domain.RunDownRecapStoppedFmt, joinJobNames(stopped)))
+	}
+	if len(released) > 0 {
+		lines = append(lines, fmt.Sprintf(domain.RunDownRecapReleasedFmt, joinJobNames(released)))
 	}
 	if len(failed) > 0 {
 		lines = append(lines, styles.DangerText.Render(fmt.Sprintf(domain.RunViewRecapFailedFmt, joinJobNames(failed))))

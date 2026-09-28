@@ -157,8 +157,10 @@ const (
 	// GlyphProgress is ephemeral by contract — a line drawn only to be erased.
 	// Anything that survives in the scrollback takes another glyph.
 	GlyphProgress = "›"
-	// GlyphUpdate is an existing thing replaced rather than created.
-	GlyphUpdate = "↻"
+	// GlyphUpdate is an existing thing replaced rather than created — `~`, as in
+	// a Terraform plan. It was `↻`, which common monospace fonts lack: the
+	// terminal borrowed it from a wider fallback face and it ate the space after it.
+	GlyphUpdate = "~"
 
 	// MoveArrowGlyph is punctuation inside a value — `branch → path` — never the
 	// head of a line. It shares the rune with NextStepGlyph and nothing else: at
@@ -295,6 +297,9 @@ const (
 	// NamespaceCreateFailedFmt names the namespace, the job and the last error a
 	// budget's worth of retries ended on.
 	NamespaceCreateFailedFmt = "job %s: could not attach namespace %s: %w (the attach runs on every start, so it must be safe to run again)"
+	// NamespaceReadyLogFmt is the line a shared service's log gains when a
+	// worktree's slice of it is made: namespace, then worktree.
+	NamespaceReadyLogFmt     = "[wtm] namespace %s ready for %s"
 	NamespaceRemoveFailedFmt = "job %s: could not detach namespace %s: %w"
 	// SharedNoContextFmt is a shared job whose main checkout the client could
 	// not resolve — a bare clone, typically.
@@ -312,9 +317,26 @@ const (
 	FlagKeepData     = "keep-data"
 	FlagKeepDataDesc = "keep the namespaces this worktree carved out of shared services"
 
-	CleanRemovedNamespaceFmt  = "released %s from %s"
-	CleanDeferredNamespaceFmt = "%s is down: %s kept, `wtm prune` will give it back"
-	PruneSettledNamespaceFmt  = "gave back %s on %s, owed since its worktree was removed"
+	// The three name the namespace itself — app_feat_x, not feat-x — because it
+	// is what was destroyed, and the service it was destroyed in.
+	CleanRemovedNamespaceFmt  = "dropped %s from %s"
+	CleanDeferredNamespaceFmt = "%s is down: %s kept, dropped on its next start"
+	PruneSettledNamespaceFmt  = "dropped %s from %s, left over from removed worktree %s"
+	// OwedRecreatedFmt withdraws a debt whose worktree exists again: the
+	// namespace is the new worktree's now. OwedStillFmt counts what a service
+	// that is down still owes, and when it will be paid.
+	OwedRecreatedFmt     = "%s kept: worktree %s exists again, so it is its own"
+	OwedStillFmt         = "%s still owed to %s — dropped on its next start"
+	OwedOneFmt           = "%d namespace"
+	OwedManyFmt          = "%d namespaces"
+	OwedBringUpFailedFmt = "could not start %s: %s"
+	// The question a clean asks when a shared service is down: start it now to
+	// drop the namespace, or leave it owed until the service next starts.
+	OwedBringUpTitleFmt = "%s is down — start it to drop %s now?"
+	OwedBringUpDesc     = "Otherwise it is kept and dropped the next time the service starts, from any worktree."
+	OwedBringUpYesFmt   = "Start %s and drop it"
+	OwedBringUpNo       = "Keep it for its next start"
+	OwedBringUpStageFmt = "Starting %s"
 
 	// ScopeStepName, Title and Desc introduce the question run init asks of each
 	// compose service.
@@ -369,17 +391,14 @@ const (
 
 	EnvValueStepName  = "Shared service keys"
 	EnvValueStepTitle = "Which .env keys name each worktree's slice?"
-	EnvValueStepDesc  = "A shared service answers at one address for every worktree — that is what\n" +
-		"[[env_port]] already writes. What differs per worktree is the slice: a\n" +
-		"realm, a database. wtm cannot tell which key holds one — a realm name is\n" +
-		"just a word — so it lists the keys it manages and you point.\n" +
+	EnvValueStepDesc  = "What differs per worktree is the slice a shared service carves out — a\n" +
+		"database, a realm. wtm cannot recognize one, so it lists every key it manages.\n" +
 		"\n" +
 		"  space     link a key, so wtm writes its whole value per worktree\n" +
-		"  enter     edit the template — it starts at {namespace}\n" +
+		"  enter     edit the template — {namespace} is this worktree's slice\n" +
 		"\n" +
-		"Keys already checked are the ones whose name starts with the service's,\n" +
-		"or that run.toml already links. A linked key stops being reported as\n" +
-		"drift: its value is wtm's, not the one your worktree was copied from."
+		"Keys already checked name the service's slice — POSTGRES_DB,\n" +
+		"KEYCLOAK_REALM — or are linked by run.toml."
 	EnvValueRowFmt       = "%s %-*s  %s"
 	EnvValueGroupFmt     = "%s · %s"
 	EnvValueCurrentFmt   = "  (now %s)"
@@ -393,7 +412,7 @@ const (
 	// EnvValueConstantErr refuses a template that never varies. The field is
 	// pre-filled with the value on disk so a long URL is edited rather than
 	// retyped, which makes "accepted unchanged" the easy mistake to make.
-	EnvValueConstantErr = "this template never changes, so every worktree would get the same value — put {namespace} where the slice belongs"
+	EnvValueConstantErr = "this template never changes, so every worktree would get the same value — put {namespace} where the slice belongs, or press space to unlink the key"
 	EnvValueNowFmt      = "now  %s"
 	EnvValueEditHelp    = "enter save · esc cancel"
 	EnvValueHelpLink    = "space link"
@@ -618,9 +637,29 @@ const (
 	// is not there to say the same thing.
 	AddressingDriftGlyph = "⚠ "
 	AddressingDriftTitle = "Published names, unsettled .env"
-	AddressingPortedFmt  = "%s answers on its ports: its .env was never settled on the names it publishes — `wtm env %s` switches it"
-	AddressingDriftFmt   = "%s: its .env is out of step with the addresses it publishes — `wtm env %s` settles it"
-	AddressingDriftWhy   = "A cross-origin call is refused whenever the browser's origin and the .env disagree"
+	AddressingPortedFmt  = "%s's .env still spells ports — `wtm env %s` aligns it"
+	AddressingDriftFmt   = "%s's .env is out of step with its names — `wtm env %s` settles it"
+
+	// FlagKeepEnv withholds the .env pass of `run addressing`, as --keep-data
+	// withholds the namespace removal of a clean.
+	FlagKeepEnv     = "keep-env"
+	FlagKeepEnvDesc = "switch run.toml only, leaving the worktrees' .env files as they are"
+
+	AddressingInvalidFmt      = "unknown addressing %q: expected %q or %q"
+	AddressingSwitchedFmt     = "addressing: %s " + MoveArrowGlyph + " %s"
+	AddressingUnchangedFmt    = "addressing is already %s"
+	AddressingSettleStepName  = "Settle"
+	AddressingSettleNothing   = "every worktree already spells it"
+	AddressingSettleTitleFmt  = "Settle the .env of %s?"
+	AddressingSettleDescFmt   = "%s out of step with it: %s.\nSettling rewrites the values wtm links to a job's address; nothing else in the .env is touched."
+	AddressingSettleYes       = "Yes, settle them"
+	AddressingSettleNo        = "No, only run.toml"
+	AddressingSettledFmt      = "%s settled"
+	AddressingPendingFmt      = "%s still out of step — `wtm env <worktree>` settles one"
+	AddressingMainLeftFmt     = "%s left as is — `wtm env %s` moves it onto names, if you want it to"
+	AddressingMainLeftDescFmt = "\n%s is left out: a pass over every worktree never moves it onto names."
+	AddressingSettleFailedFmt = "%s: %v"
+	AddressingWorktreeNoun    = "worktree"
 
 	// ProxyPortCollisionFmt is the one collision a job cannot see coming: the
 	// daemon already holds the port by the time the job tries to bind it.
@@ -1688,11 +1727,15 @@ const (
 	// not.
 	SharedJobTag     = "shared"
 	JobActionStopped = "stopped"
-	JobActionDone    = "done"
-	JobActionError   = "error"
-	JobActionCrashed = "crashed"
-	JobActionAdded   = "added"
-	JobActionRemoved = "removed"
+	// JobActionReleased is a stop that let go of a shared job without stopping
+	// it: another worktree still holds it, and saying "stopped" there read as a
+	// service taken away from everyone.
+	JobActionReleased = "released"
+	JobActionDone     = "done"
+	JobActionError    = "error"
+	JobActionCrashed  = "crashed"
+	JobActionAdded    = "added"
+	JobActionRemoved  = "removed"
 	// JobRemovedProfilesFmt and JobRemovedEnvPortsFmt report what a removal
 	// dragged along with the job, each named so the reader can put it back.
 	JobRemovedProfilesFmt = "Stripped from profile(s): %s"
@@ -1876,6 +1919,9 @@ const (
 	CmdDaemon = "daemon"
 	CmdURL    = "url"
 	CmdProxy  = "proxy"
+	// CmdAddressing switches run.toml's addressing, and the .env files that
+	// spell it, in one gesture.
+	CmdAddressing = "addressing"
 	// CmdProxyForward is what launchd runs, never a user: it serves the socket
 	// launchd bound on the privileged port.
 	CmdProxyForward = "proxy-forward"
@@ -2197,7 +2243,7 @@ const (
 
 	// RunViewHelpBrowse and RunViewHelpFilter are the footer's key reminders,
 	// one per mode the keyboard can be in.
-	RunViewHelpBrowse = "↑↓ job · / filter · pgup/pgdn scroll · enter focus · o open · r refresh · q detach"
+	RunViewHelpBrowse = "↑↓ job · / filter · pgup/pgdn scroll · enter focus · o open · a addresses · q detach"
 	RunViewHelpFilter = "type to filter · enter apply · esc clear"
 
 	// RunViewFocusKey passes every keystroke to the job. Taking them back needs
@@ -2255,7 +2301,8 @@ const (
 	// what it took down where `run up` says what it left standing, in the same box
 	// and with the same labels. The two are halves of one command and used to
 	// read as two different programs.
-	RunDownRecapStoppedFmt = "Stopped:      %s"
+	RunDownRecapStoppedFmt  = "Stopped:      %s"
+	RunDownRecapReleasedFmt = "Released:     %s — still up elsewhere"
 
 	// RunViewRecapListSep joins the jobs named on one recap line.
 	RunViewRecapListSep = ", "
@@ -2361,6 +2408,7 @@ const (
 	// as `run stop` and `run down` report it.
 	RunStoppingFmt   = "Stopping %s…"
 	RunStoppedFmt    = "%s stopped"
+	RunReleasedFmt   = "%s released — still up elsewhere"
 	RunNoJobsRunning = "No jobs running."
 	RunNoJobsHere    = "No jobs running in this worktree."
 	// NoWorktreesMessage is the empty worktree inventory, wherever it is drawn.
@@ -2396,8 +2444,25 @@ const (
 	// RunViewRecapHeldIndent hangs a runner's addresses under its own line in the
 	// recap, where nothing folds.
 	RunViewRecapHeldIndent = "  "
-	RunStreamAlreadyFmt    = "%s already running"
-	RunStreamDoneFmt       = "%s done"
+	// RunStreamAttachedFmt is a worktree joining a shared service another one
+	// runs: "started" there read as one service per worktree.
+	RunStreamAttachedFmt   = "%s attached"
+	RunStreamAttachedToFmt = "%s attached to %s"
+	// The compose verbs a stop is read by. ComposeStopWarningFmt names a file
+	// job whose `down` would remove a shared service's container in main, and
+	// the stop to put instead.
+	ComposeWord           = "compose"
+	ComposeUpVerb         = "up "
+	ComposeDownVerb       = "down"
+	ComposeRmStopVerb     = "rm -s -f"
+	ComposeStopWarningFmt = "job %s: its stop removes the shared %s in main — set stop = %q in run.toml"
+	// RunStreamNamespaceFmt is the slice a shared job's create made sure exists,
+	// on its own line so the one thing a clean will drop is seen being made.
+	RunStreamNamespaceFmt       = "%s ready in %s"
+	RunStreamNamespaceReadyFmt  = "%s ready"
+	RunStreamAlreadyFmt         = "%s already running"
+	RunStreamAlreadyAttachedFmt = "%s already attached"
+	RunStreamDoneFmt            = "%s done"
 	// The three commands a run points at, and one gloss each. They are shared by
 	// every surface the module concludes on — the live stream, the view's recap
 	// once it gives the terminal back, `run down`'s — because one command telling
@@ -3088,7 +3153,7 @@ const (
 	DashboardServicesEmpty    = "Nothing is running"
 	DashboardServicesUpFmt    = "%d up"
 	DashboardServicesCountFmt = "%d running"
-	DashboardHelpServices     = "↑↓ job · ↵ logs · u open · m menu · r refresh · q quit"
+	DashboardHelpServices     = "↑↓ job · enter logs · u open · m menu · r refresh · q quit"
 	DashboardListTitle        = "Worktrees"
 	DashboardTreeTitle        = "Worktree tree"
 	DashboardDetailTitle      = "Detail"
@@ -3367,12 +3432,15 @@ const (
 
 	// RunDetached* report a start nobody is watching: the surface gave the
 	// terminal back, so each step says what it did instead of showing it.
-	RunDetachedStartingFmt = "starting %s (%d/%d)"
-	RunDetachedStartedFmt  = "%s is up"
-	RunDetachedDoneFmt     = "%s finished"
-	RunDetachedAddressFmt  = "%s → %s"
-	RunDetachedFailedFmt   = "%s failed: %s"
-	RunDetachedAlreadyFmt  = "%s was already up"
+	RunDetachedStartingFmt        = "starting %s (%d/%d)"
+	RunDetachedStartedFmt         = "%s is up"
+	RunDetachedDoneFmt            = "%s finished"
+	RunDetachedAddressFmt         = "%s → %s"
+	RunDetachedFailedFmt          = "%s failed: %s"
+	RunDetachedAttachedFmt        = "%s attached"
+	RunDetachedNamespaceFmt       = "%s: %s ready"
+	RunDetachedAlreadyFmt         = "%s was already up"
+	RunDetachedAlreadyAttachedFmt = "%s was already attached"
 
 	// DashboardLogsLines is how far back the detail panel's logs view reads. It
 	// is a glance, not a session: runview is what scrolls.
@@ -3399,7 +3467,7 @@ const (
 	// live one.
 	DetailLogsHeaderFmt = "%s · %s"
 	DetailJobUpLabel    = "up"
-	DashboardLogsHint   = "↑↓ job    esc detail    ↵ full session"
+	DashboardLogsHint   = "↑↓ job    esc detail    enter full session"
 	// DashboardLogs* tell apart the three ways the logs view can have nothing to
 	// show: the answer differs, so the message does.
 	DashboardLogsNoModule       = "This project runs nothing"
@@ -3447,6 +3515,15 @@ const (
 
 	// KeyOpenURL opens the selected job's URL in a browser.
 	KeyOpenURL = "o"
+	// RunViewReachKey swaps the run view's pane for the block saying where every
+	// job is reached.
+	RunViewReachKey = "a"
+	// RunViewReachNothing stands in the reach pane when nothing up has an address.
+	RunViewReachNothing = "Nothing running here has an address."
+	// RunViewSharedRowFmt heads, in the job list, the shared services a worktree
+	// holds in another.
+	RunViewSharedRowFmt  = "shared · %s"
+	RunViewAttachedToFmt = "attached to %s"
 	// KeyRunLogs reads a job's logs in the detail panel. Upper case: "l" is the
 	// list's vim-right.
 	KeyRunLogs = "L"
@@ -3580,10 +3657,21 @@ const (
 	// on the runner's line ran past the panel and were cut, taking four urls with
 	// them and leaving a row that could not be clicked. They are their own rows
 	// now, folded away until asked for.
-	DetailHeldCountFmt  = "%d addresses"
-	DetailHeldOpenGlyph = "▾"
-	DetailHeldShutGlyph = "▸"
-	DetailHeldIndent    = "  "
+	DetailHeldCountFmt = "%d addresses"
+	// ReachTitle heads the one block that says where every job of a run is
+	// reached; the Reach* formats are its fragments.
+	ReachTitle           = "Where to reach it"
+	ReachSharedTitleFmt  = "Shared, running in %s"
+	ReachSharedHereTitle = "Shared with other worktrees"
+	ReachURLsFmt         = "%d urls"
+	ReachPortsFmt        = "%d ports"
+	ReachPortFmt         = ":%d"
+	ReachLabelGap        = "  "
+	ReachDetailSep       = " · "
+	ReachPortSuffix      = "_PORT"
+	DetailHeldOpenGlyph  = "▾"
+	DetailHeldShutGlyph  = "▸"
+	DetailHeldIndent     = "  "
 	// DetailColumnGap separates two columns of a detail-section table. Two spaces
 	// rather than one: a single one reads as a word break inside a cell.
 	// DetailGlyphGap follows the state glyph, which is a mark on its row rather
@@ -3651,7 +3739,7 @@ const (
 	// labels are what a raw GHReviewDecision* enum value maps to.
 	DetailChecksPassedGlyph  = "✓"
 	DetailChecksFailedGlyph  = "✗"
-	DetailChecksPendingGlyph = "⧗"
+	DetailChecksPendingGlyph = "…"
 	DetailChecksFmt          = "checks " + DetailChecksPassedGlyph + " %d  " + DetailChecksFailedGlyph + " %d"
 	DetailChecksPendingFmt   = "  " + DetailChecksPendingGlyph + " %d"
 	DetailReviewDecisionFmt  = "review  %s"
@@ -3721,6 +3809,14 @@ var EnvTemplateSuffixes = []string{
 // value differs per worktree by construction, so the reconciliation reports them
 // neither as drift nor as a conflict.
 var WtmOwnedEnvKeys = []string{EnvComposeProjectName}
+
+// EnvSliceKeySuffixes are the endings of a key that names a service's slice —
+// POSTGRES_DB, KEYCLOAK_REALM — as against its credentials or its address,
+// which POSTGRES_USER and POSTGRES_PASSWORD share the service's prefix with.
+var EnvSliceKeySuffixes = []string{
+	"_DB", "_DATABASE", "_DB_NAME", "_DATABASE_NAME", "_SCHEMA",
+	"_REALM", "_TENANT", "_NAMESPACE", "_BUCKET", "_INDEX", "_PREFIX", "_VHOST",
+}
 
 // ComposePSArgs asks compose which of the project's containers are running. `ps`
 // lists only running ones without -a, so an empty answer is the whole verdict.

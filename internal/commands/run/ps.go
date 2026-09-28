@@ -9,6 +9,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/flow/run/target"
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/tui/components"
 )
@@ -18,7 +19,7 @@ func newPsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   domain.CmdPs,
 		Short: "List currently running jobs",
-		Long: "Show the jobs managed by the background daemon (name, kind, status, PID, uptime, worktree).\n" +
+		Long: "Show the jobs managed by the background daemon (name, kind, status, address, uptime, worktree).\n" +
 			"It lists every repository the daemon knows, so it works from anywhere — inside a\n" +
 			"run-initialized repository or not.\n" +
 			"To act on those jobs, open the run view with `wtm run logs`, which covers as many\n" +
@@ -56,7 +57,20 @@ func runPs(cmd *cobra.Command, _ []string) error {
 
 	out := cmd.OutOrStdout()
 	output.Frame(out, func(w io.Writer) {
-		fmt.Fprint(w, output.FormatRunningJobs(output.FormatRunningJobsParams{Jobs: jobs, Now: time.Now()}))
+		fmt.Fprint(w, output.FormatRunningJobs(output.FormatRunningJobsParams{Jobs: jobs, Now: time.Now(), Branches: branchesOf(jobs)}))
 	})
 	return nil
+}
+
+// branchesOf names each work dir once: a table of eight jobs in two worktrees
+// asks git twice, not eight times.
+func branchesOf(jobs []domain.JobInfo) map[string]string {
+	branches := map[string]string{}
+	for _, job := range jobs {
+		if _, seen := branches[job.WorkDir]; seen {
+			continue
+		}
+		branches[job.WorkDir] = target.BranchOf(job.WorkDir)
+	}
+	return branches
 }

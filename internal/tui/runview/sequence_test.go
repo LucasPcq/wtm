@@ -502,3 +502,21 @@ func TestRedrawClockIsArmedAgainWhenTheSequenceStarts(t *testing.T) {
 		t.Fatal("the sequence became active with no frame scheduled: what it writes into panes will never be drawn")
 	}
 }
+
+// The view is gone once the recap prints, so the namespace a shared job carved
+// has to be in what stays on the terminal.
+func TestRecapNamesTheNamespaceASharedJobCarved(t *testing.T) {
+	h := startedHarness(t, harnessParams{
+		Views: []runlogs.JobView{running("postgres")},
+	}, func(emitter runlogs.Sink) runlogs.Outcome {
+		emitter.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "postgres", Step: 1, Steps: 1, Attached: true, Namespace: "app_feat_x"})
+		outcome := runlogs.Outcome{Started: []string{"postgres"}, Steps: 1}
+		emitter.Emit(runlogs.Event{Phase: runlogs.PhaseReady, Outcome: outcome})
+		return outcome
+	})
+
+	recap := ansi.Strip(h.model.result().Recap)
+	if !strings.Contains(recap, "app_feat_x") {
+		t.Fatalf("recap = %q, want the namespace carved", recap)
+	}
+}

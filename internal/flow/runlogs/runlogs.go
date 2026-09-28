@@ -35,6 +35,12 @@ type JobView struct {
 	// surface reads one source: `run up`, `run logs` and the dashboard used to
 	// compute it three times, and only the first of them showed it.
 	Address domain.JobAddress
+	// SharedIn is the worktree a shared service runs in when this worktree only
+	// holds it; Namespace is what it carved out for this worktree. Shared is
+	// true on the main checkout's own instance too, where SharedIn is empty.
+	SharedIn  string
+	Namespace string
+	Shared    bool
 }
 
 type Size struct {
@@ -117,6 +123,8 @@ type StartResult struct {
 	// PublicPort is what a named URL announces, which the redirection may have
 	// stripped of its port.
 	PublicPort int
+	// Joined marks a shared job the main checkout joined rather than spawned.
+	Joined bool
 }
 
 type AttachRequest struct {
@@ -216,6 +224,14 @@ type Event struct {
 	// DevOrigins are the config lines a PhaseStarted job needs before it will
 	// answer under the name the proxy serves it under.
 	DevOrigins []domain.DevOriginFix
+	// Attached marks a PhaseStarted shared job this worktree joined rather than
+	// started: the process is the main checkout's.
+	Attached bool
+	// Namespace is what a PhaseStarted shared job carved out for this worktree,
+	// empty when it carves none or was already running here.
+	Namespace string
+	// SharedIn is the worktree a shared job runs in, this one included.
+	SharedIn string
 	// Notice is what PhaseNotice has to say: a fact about the run that belongs
 	// to no single job. Empty on every other phase.
 	Notice string

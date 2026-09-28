@@ -555,35 +555,27 @@ func TestRunReportsWhereTheAppsARunnerStartedAnswer(t *testing.T) {
 	}
 }
 
-func TestRunHandsOutPortsWhenTheEnvStillSpellsThem(t *testing.T) {
-	runner := domain.JobConfig{
-		Name: "dev", Kind: domain.JobKindService, Cmd: "turbo run dev",
-		Ports: map[string]int{"PORT": 3000}, Runs: []string{"web"},
+// A job refused as already running comes back with nothing about the proxy.
+// Reading that silence as "the proxy is off" told a run whose jobs were all up
+// that its port was taken.
+func TestRunSaysNothingAboutTheProxyOnAnAlreadyRunningJob(t *testing.T) {
+	service := &runlogstest.Service{
+		Refusals:  map[string]string{"api": "job api " + domain.JobAlreadyRunningSuffix},
+		ProxyPort: 4000,
 	}
-	web := domain.JobConfig{
-		Name: "web", Kind: domain.JobKindService, Cwd: "apps/web",
-		Ports: map[string]int{"PORT": 3000}, URL: &domain.JobURLConfig{Port: "PORT"},
-	}
-	service := &runlogstest.Service{Ports: map[string]map[string]int{"dev": {"PORT": 3010}}, ProxyPort: 4000}
+	sink := &runlogstest.Sink{}
 
-	outcome, err := runlogs.Run(context.Background(), runlogs.RunParams{
-		Service:       service,
-		Jobs:          []domain.JobConfig{runner},
-		Declared:      []domain.JobConfig{runner, web},
-		WorkDir:       "/w",
-		Env:           map[string]string{domain.EnvWorktree: "feat-auth"},
-		Project:       "myapp",
-		ProxyPort:     4000,
-		PortAddressed: true,
-	})
-	if err != nil {
+	if _, err := runlogs.Run(context.Background(), runlogs.RunParams{
+		Service:   service,
+		Sink:      sink,
+		Jobs:      []domain.JobConfig{api},
+		WorkDir:   "/w",
+		ProxyPort: 4000,
+	}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
-	// The name is registered either way, but the .env answers on the port, so
-	// the port is the entrance a reader must be given.
-	held := outcome.Results[0].Held
-	if len(held) != 1 || held[0].URL != "http://localhost:3010" {
-		t.Fatalf("held = %+v, want the port the app answers on", held)
+	if notice, found := sink.Last(runlogs.PhaseNotice); found {
+		t.Errorf("notice = %q, want none: the proxy said nothing either way", notice.Notice)
 	}
 }

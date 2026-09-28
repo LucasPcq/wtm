@@ -147,8 +147,10 @@ flagged; everything else is what the name implies.
   services** (it drops its database): pass `--keep-data` to withhold that, including under
   `--yes`; the interactive recap names each database it will drop. Only worktrees that
   actually started the shared job owe anything — one created and thrown away owes nothing.
-  If the shared service is down the drop is deferred, and the next `wtm prune` settles it
-  once the service is up again. **In JSON mode surviving children are left orphaned unless you pass
+  If the shared service is down, an interactive clean offers to start it and drop the
+  namespace now; under `--yes` the drop is owed instead, and paid the next time the service
+  starts — any `run up` / `run start` that brings it up, or `prune`, which also reports what
+  is still owed. A debt whose worktree was re-created since is withdrawn, never paid. **In JSON mode surviving children are left orphaned unless you pass
   `--reparent-children`** (they reparent onto the grandparent). `prune` decides "finished"
   from **GitHub PR state via the `gh` CLI** (not local commits): `--merged` = PR merged,
   `--closed` = PR closed without merging, `--gone` = remote branch deleted; no filter = all
@@ -295,8 +297,14 @@ and **experimental**: the global `wtm init` does not configure it.
   the worktrees holding it report status **`attached`** with `pid: 0`: that is a claim on the
   one running instance, not a second process — never count one service per worktree from it.
   Starting one from a worktree other than the main checkout reports `attached`, not `started`.
+  When the start carved out this worktree's namespace, the job's result carries it as
+  `namespace` (`app_feat-x`) — absent on a start refused as already running, which ran no create.
   `run stop` in a worktree releases only that worktree's claim; the service itself stops when
-  the last one goes.
+  the last hold goes — **the main checkout's own start counts as one**, so a linked worktree
+  letting go never takes down a service main asked for. A stop that let go without stopping
+  reports status **`released`** (human: `released — still up elsewhere`), not `stopped`. Main
+  starting a service another worktree already runs joins it (`attached`) and carves its own
+  namespace.
 - **A shared job may carve out a namespace per worktree.** `[job.namespace]` names it (`name`,
   `create`, `remove`, `env`) so each worktree keeps its own data — a database, a set of
   keycloak realms. wtm runs the declared commands and knows nothing else about them; they get
@@ -737,25 +745,32 @@ and **experimental**: the global `wtm init` does not configure it.
   the others. Two refusals are reported and never guessed: an `https` value (the proxy serves
   plain HTTP) and a URL pointing at a host no job here serves.
 - **`addressing` at the top of `run.toml`** picks between the two: `names` (the default) and
-  `ports`. Setting `ports` is a real inverse — a later `wtm env` puts port numbers back into
-  values wtm wrote as addresses. On a machine where the proxy is off (`[proxy] enabled = false`),
+  `ports`. **Switch it with `wtm run addressing <names|ports>`**, never by editing run.toml:
+  the command writes the setting, then settles the worktrees whose `.env` spells the other one.
+  **The main checkout is settled back to `ports`, never onto `names`**: moving main onto names
+  makes it depend on the proxy, and only `wtm env main` — naming it — does that; the output then
+  says main was left as is. Under `--yes` the mode argument is required and the worktrees are
+  settled unless `--keep-env` is passed; `--output json` prints
+  `{addressing, previous, changed, settled: [branch], pending: [branch], main_left?: branch}`.
+  Running it with the mode already in place settles what an earlier `--keep-env` left behind.
+  Setting `ports` is a real inverse — port numbers go back into values wtm wrote as addresses. On a machine where the proxy is off (`[proxy] enabled = false`),
   ports are written whatever the project asked for, and the pass says so in one notice.
   **Under `names`, the named URL is the only working entrance** — the raw `localhost:<port>`
   sends an `Origin` the API no longer accepts, so always read the address from `run url`.
 - **The main checkout is never provisioned, so under `names` its `.env` still holds ports.**
-  wtm writes a worktree's `.env` at creation and on `wtm env`; nothing writes main's. Its jobs
-  are still published under names, so a cross-origin call made through them is refused until
-  `wtm env main` aligns it — the positional takes the main checkout like any other worktree.
-  **The address every surface hands out follows the `.env`, not the setting**: while the file
-  spells ports, `run up`, `run url`, `run open`, the run view and the `wtm ui` panel all give
-  `http://localhost:<port>` — the entrance the app actually answers on — and the named URL
-  comes back once `wtm env <worktree>` settles the file. The route is registered either way,
-  so nothing restarts. One line says why: a band in the run view, a callout beside a stream,
-  a note under the RUN rows in `wtm ui`. Only keys declared as `[[env_port]]` links are seen,
+  wtm writes a worktree's `.env` at creation and on `wtm env`; nothing moves main's onto names
+  unless it is named. Its jobs are still published under names, so a cross-origin call made
+  through them is refused until `wtm env main` aligns it — the positional takes the main
+  checkout like any other worktree.
+  **Every surface hands out the named URL whatever the `.env` spells**; a worktree whose `.env`
+  is out of step gets one warning line naming the command that aligns it (`wtm env <worktree>`)
+  — a `!` line in the stream, a band in the run view, a note under the RUN rows in `wtm ui`.
+  Until it runs, a cross-origin call through the name is refused; `run url --raw` gives the
+  port that works meanwhile. The route is registered either way, so nothing restarts. Only keys declared as `[[env_port]]` links are seen,
   so silence means nothing **linked** is out of step. A `.env` already on names whose port
   went stale keeps its names and is told they are out of step. Aligning main is a **choice**: it stops behaving as a
-  checkout without wtm, and going back means `addressing = "ports"` → `wtm env main` → `names`
-  again, `addressing` having no per-worktree scope. Same applies to a linked worktree whose
+  checkout without wtm, and going back means `wtm run addressing ports` (which brings main back
+  with every worktree) → `wtm run addressing names` (which leaves main on ports), `addressing` having no per-worktree scope. Same applies to a linked worktree whose
   port pass was declined.
 - Two base ports must not differ by a multiple of the block, or two worktrees land on the
   same port: `3000` and `3010` are refused **when run.toml is read** (with both sides named),

@@ -122,7 +122,15 @@ An empty `create` is an answer, not an omission: the service is then shared outr
 
 The detach belongs to `clean` and `prune`, and runs **before** the claims are released — releasing one may be the last, and a namespace cannot be given back to a service that is down. The default is to detach, since `clean` is the destructive command and removing a worktree without its data would leave an orphan behind on every iteration; `--keep-data` withholds it, under `--yes` as much as anywhere.
 
-A service already down leaves a debt rather than being relit for a `DROP DATABASE`. The debt lives in `<git-common-dir>/wtm/pending-removals.toml`, beside the repository, because the worktree's own state directory is exactly what `clean` removes. It is a **queue and not a registry** — entries are only ever added by a failure and removed by a success — and `prune` settles it once the service is up.
+A service already down leaves a debt rather than being relit behind the reader's back for a `DROP DATABASE`. The debt lives in `<git-common-dir>/wtm/pending-removals.toml`, beside the repository, because the worktree's own state directory is exactly what `clean` removes. It is a **queue and not a registry** — entries are only ever added by a failure and removed by a success.
+
+The debt is paid wherever the service is next seen up, by one piece of code, `flow/run/owed`:
+
+- **`run up` and `run start`** settle it after their sequence, from any worktree. Cleaning late, with nothing running, is the common case, and waiting for someone to remember `prune` while a stack happened to be up is how debts piled up.
+- **`clean` asks**, when it can: `postgres is down — start it to drop app_x now?`. Yes starts the service from the main checkout (`owed.BringUp`), drops the namespace, and releases main's hold — the service stops again unless a worktree took a claim meanwhile. `--yes` keeps deferring: starting a service nobody asked for is not a safe default.
+- **`prune`** settles it too, and says what is still owed (`2 namespaces still owed to postgres — dropped on its next start`) instead of passing over it.
+
+A debt whose worktree **exists again** is withdrawn, never paid: the namespace is derived from the worktree's name, so it now belongs to the re-created worktree, and paying the debt would drop that worktree's data.
 
 ## `run init` and the compose granularity
 

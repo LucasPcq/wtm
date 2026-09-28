@@ -252,7 +252,7 @@ func (f *downFlow) stopProfile(outcome Outcome, workDir string) ([]domain.JobAct
 		case resp.Status == process.StatusError:
 			results = append(results, domain.JobActionResult{Name: job.Name, Status: domain.JobActionError, Message: resp.Message})
 		default:
-			results = append(results, domain.JobActionResult{Name: job.Name, Status: domain.JobActionStopped})
+			results = append(results, domain.JobActionResult{Name: job.Name, Status: stoppedStatus(resp.Released)})
 		}
 	}
 	return results, nil
@@ -275,7 +275,7 @@ func (f *downFlow) stopEverywhere(outcome Outcome) ([]domain.WorktreeJobResults,
 			order = append(order, job.WorkDir)
 		}
 		byDir[job.WorkDir] = append(byDir[job.WorkDir],
-			domain.JobActionResult{Name: job.Name, Status: domain.JobActionStopped})
+			domain.JobActionResult{Name: job.Name, Status: stoppedStatus(job.Released)})
 	}
 
 	results := make([]domain.WorktreeJobResults, 0, len(order))
@@ -296,7 +296,7 @@ func (f *downFlow) stopAll(outcome Outcome, workDir string) ([]domain.JobActionR
 	}
 	stopped := make([]domain.JobActionResult, 0, len(jobs))
 	for _, job := range jobs {
-		stopped = append(stopped, domain.JobActionResult{Name: job.Name, Status: domain.JobActionStopped})
+		stopped = append(stopped, domain.JobActionResult{Name: job.Name, Status: stoppedStatus(job.Released)})
 	}
 	return stopped, nil
 }
@@ -356,4 +356,13 @@ func (f *downFlow) running() map[string]int {
 		return nil
 	}
 	return target.RunningJobs(runlogs.NewService(runlogs.ServiceParams{SocketPath: socket}))
+}
+
+// stoppedStatus tells a shared job this worktree let go of apart from one that
+// went down: another worktree may still hold it.
+func stoppedStatus(released bool) string {
+	if released {
+		return domain.JobActionReleased
+	}
+	return domain.JobActionStopped
 }

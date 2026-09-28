@@ -8,11 +8,10 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/github"
 	"github.com/LucasPcq/wtm/internal/service/process"
-	"github.com/LucasPcq/wtm/internal/service/runconfig"
-	"github.com/LucasPcq/wtm/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/internal/service/shell"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
@@ -299,43 +298,17 @@ func (f *pruneFlow) conclude(outcome Outcome) (Outcome, error) {
 }
 
 // settleOwedNamespaces gives back what a clean could not, because the shared
-// service holding it was down at the time. A dry run settles nothing: it
-// previews, and giving a namespace back is a mutation like any other.
+// service holding it was down at the time, and says what is still owed rather
+// than passing over it. A dry run settles nothing: it previews, and giving a
+// namespace back is a mutation like any other.
 func (f *pruneFlow) settleOwedNamespaces() {
 	if f.request.DryRun {
 		return
 	}
-	owed := runjobs.LoadPendingRemovals(f.ctx.StateDir)
-	if len(owed) == 0 {
-		return
+	result := owed.Settle(owed.Params{Context: f.ctx, Presenter: f.presenter})
+	for _, line := range rules.OwedLines(result.Owed) {
+		f.presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: line})
 	}
-	cfg, err := runconfig.Load(f.ctx.StateDir)
-	if err != nil {
-		return
-	}
-
-	up := rules.SharedJobsUp(rules.SharedJobsUpParams{Jobs: runjobs.Load(), Config: cfg})
-	var settled []domain.NamespaceRef
-	for _, ref := range owed {
-		if !up[ref.Job] {
-			continue
-		}
-		result := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
-			Config:  rules.JobsNamed(cfg, ref.Job),
-			Env:     rules.NamespaceEnv(rules.NamespaceEnvParams{Worktree: ref.Worktree, Ordinal: ref.Ordinal}),
-			WorkDir: f.ctx.ProjectDir,
-			Up:      up,
-		})
-		if len(result.Released) == 0 {
-			continue
-		}
-		settled = append(settled, ref)
-		f.presenter.Status(flow.Notice{
-			Kind: flow.NoticeSuccess,
-			Text: fmt.Sprintf(domain.PruneSettledNamespaceFmt, ref.Job, ref.Worktree),
-		})
-	}
-	_ = runjobs.SettleRemovals(runjobs.SettleRemovalsParams{StateDir: f.ctx.StateDir, Refs: settled})
 }
 
 func (f *pruneFlow) params() domain.PruneParams {

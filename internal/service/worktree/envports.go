@@ -25,6 +25,9 @@ type ResolveEnvPortsParams struct {
 	// Global carries the machine's [proxy] table. The project says whether it
 	// wants addresses; this says whether the machine can serve them.
 	Global domain.GlobalConfig
+	// Addressing overrides run.toml's when set: a plan read before a switch is
+	// written, to know what the switch would move.
+	Addressing domain.Addressing
 }
 
 // ResolveEnvPorts gathers what a worktree needs to reconcile the ports written
@@ -35,6 +38,9 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 	cfg, err := config.LoadRun(params.StateDir)
 	if err != nil {
 		return envsvc.EnvPortsParams{}, err
+	}
+	if params.Addressing != "" {
+		cfg.Addressing = params.Addressing
 	}
 
 	// Resolved from the branch and the repository alone: this value is written to

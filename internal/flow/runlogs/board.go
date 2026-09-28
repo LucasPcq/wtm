@@ -29,6 +29,11 @@ type BoardParams struct {
 	// declaring fifteen of them listed all fifteen, and opening any of the twelve
 	// that had never run here answered "No output recorded for this job."
 	Logged map[string]bool
+	// SharedWorktree is the branch a shared service runs in, empty on the main
+	// checkout's own board — where nothing is held elsewhere.
+	SharedWorktree string
+	// Env is the worktree's, which names the namespace a shared job carves.
+	Env map[string]string
 }
 
 // NewBoard builds the surface's view of a worktree's jobs. It reads nothing
@@ -44,6 +49,8 @@ func NewBoard(params BoardParams) Board {
 		sharedLogDir: params.SharedLogDir,
 		addresses:    params.Addresses,
 		logged:       params.Logged,
+		sharedIn:     params.SharedWorktree,
+		env:          params.Env,
 	}
 }
 
@@ -59,6 +66,8 @@ type board struct {
 	sharedLogDir string
 	addresses    map[string]domain.JobAddress
 	logged       map[string]bool
+	sharedIn     string
+	env          map[string]string
 
 	// mu guards live, which a surface refreshes off the goroutine that renders it.
 	mu        sync.RWMutex
@@ -108,11 +117,17 @@ func (b *board) Jobs() []JobView {
 		declared[job.Name] = true
 	}
 	for _, job := range visible {
-		views = append(views, b.own(declaredView(declaredViewParams{
+		view := declaredView(declaredViewParams{
 			Job:     job.Job,
 			Info:    live[job.Job.Name],
 			Address: b.addresses[job.Job.Name],
-		})))
+		})
+		if view.Status == domain.JobStatusAttached {
+			view.SharedIn = b.sharedIn
+		}
+		view.Shared = rules.IsShared(job.Job)
+		view.Namespace = rules.CarvedNamespace(rules.CarvedNamespaceParams{Job: job.Job, Env: b.env})
+		views = append(views, b.own(view))
 	}
 
 	// A job the daemon holds but run.toml no longer declares is still running:

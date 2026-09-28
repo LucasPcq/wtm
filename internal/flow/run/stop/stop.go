@@ -110,13 +110,14 @@ func (f *stopFlow) run() (Outcome, error) {
 	// ends the run: unlike a start, there is nothing partial to leave standing —
 	// the caller asked for the job to be down and it is not.
 	for _, workDir := range outcome.WorkDirs {
-		if err := f.stop(socket, outcome.Job, workDir); err != nil {
+		status, err := f.stop(socket, outcome.Job, workDir)
+		if err != nil {
 			return Outcome{}, err
 		}
 		outcome.Results = append(outcome.Results, domain.WorktreeJobResults{
 			Worktree: f.branchOf(workDir),
 			Path:     workDir,
-			Jobs:     []domain.JobActionResult{{Name: outcome.Job, Status: domain.JobActionStopped}},
+			Jobs:     []domain.JobActionResult{{Name: outcome.Job, Status: status}},
 		})
 	}
 	return outcome, f.presenter.Stopped(outcome)
@@ -133,7 +134,7 @@ func (f *stopFlow) branchOf(workDir string) string {
 	return target.BranchOf(workDir)
 }
 
-func (f *stopFlow) stop(socket, job, workDir string) error {
+func (f *stopFlow) stop(socket, job, workDir string) (string, error) {
 	client := process.NewClient(socket)
 	var resp process.Response
 	if err := f.presenter.Stage(flow.StageParams{
@@ -148,12 +149,15 @@ func (f *stopFlow) stop(socket, job, workDir string) error {
 			return sendErr
 		},
 	}); err != nil {
-		return fmt.Errorf("stop %s: %w", job, err)
+		return "", fmt.Errorf("stop %s: %w", job, err)
 	}
 	if resp.Status == process.StatusError {
-		return fmt.Errorf("stop %s: %s", job, resp.Message)
+		return "", fmt.Errorf("stop %s: %s", job, resp.Message)
 	}
-	return nil
+	if resp.Released {
+		return domain.JobActionReleased, nil
+	}
+	return domain.JobActionStopped, nil
 }
 
 // session never wakes a daemon to decorate its picker: `run stop` is the one

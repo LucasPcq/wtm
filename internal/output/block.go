@@ -41,7 +41,7 @@ func Success(w io.Writer, msg string) {
 	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Success.Render(domain.GlyphSuccess), msg)
 }
 
-// Update prints a styled update line: "  ↻ message".
+// Update prints a styled update line: "  ~ message".
 // Mirrors Success but signals that an existing artifact was refreshed.
 func Update(w io.Writer, msg string) {
 	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Primary.Render(domain.GlyphUpdate), msg)

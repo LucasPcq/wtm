@@ -32,11 +32,10 @@ func (m Model) result() Result {
 func (m Model) recapBlock(outcome runlogs.Outcome) []string {
 	var lines []string
 	if outcome.Worktree != "" {
-		lines = append(lines, styles.Bold.Render(outcome.Worktree))
+		lines = append(lines, styles.RunViewWorktreeHeading.Render(outcome.Worktree))
 	}
 	if len(outcome.Started) > 0 {
 		lines = append(lines, fmt.Sprintf(domain.RunViewRecapRunningFmt, joinJobs(outcome.Started)))
-		lines = append(lines, m.addressLines(outcome)...)
 	}
 	if len(outcome.Completed) > 0 {
 		lines = append(lines, fmt.Sprintf(domain.RunViewRecapCompletedFmt, joinJobs(outcome.Completed)))
@@ -56,38 +55,20 @@ func (m Model) recapBlock(outcome runlogs.Outcome) []string {
 	return lines
 }
 
-// addressLines say where the jobs left running answer. Only the ones that have
-// an address are listed: a job with neither a published name nor a declared
-// port has nothing to point at, and a blank column would read as a failure.
-func (m Model) addressLines(outcome runlogs.Outcome) []string {
-	started := make(map[string]bool, len(outcome.Started))
-	for _, name := range outcome.Started {
-		started[name] = true
+// addressLines say where the jobs left running are reached: the same block the
+// stream ends on, since the view that showed it is gone and this is what stays
+// in the scrollback.
+func (m Model) addressLines() []string {
+	started := map[jobKey]bool{}
+	for _, outcome := range m.sequence.outcomes {
+		for _, name := range outcome.Started {
+			started[jobKeyOf(outcome.WorkDir, name)] = true
+		}
 	}
-
-	var lines []string
-	for _, view := range m.jobs {
-		if view.WorkDir != outcome.WorkDir || !started[view.Name] {
-			continue
-		}
-		// A runner answers for its children and for nothing of its own, so its
-		// addresses are theirs: one line each, under the runner's, which is the
-		// only place they are written at all. Nothing folds on a terminal the view
-		// is handing back.
-		if len(view.Address.Held) > 0 {
-			lines = append(lines, styles.Muted.Render(fmt.Sprintf(domain.RunViewRecapAddressFmt, view.Name, rules.HeldSummaryText(len(view.Address.Held)))))
-			for _, held := range rules.HeldAddressLines(view.Address.Held) {
-				lines = append(lines, styles.Muted.Render(domain.RunViewRecapHeldIndent+held))
-			}
-			continue
-		}
-		address := rules.JobAddressText(view.Address)
-		if address == "" {
-			continue
-		}
-		lines = append(lines, styles.Muted.Render(fmt.Sprintf(domain.RunViewRecapAddressFmt, view.Name, address)))
-	}
-	return lines
+	worktrees := m.reachWorktrees(reachWorktreesParams{Keep: func(view runlogs.JobView) bool {
+		return started[viewKey(view)]
+	}})
+	return reachSectionLines(reachSectionLinesParams{Sections: rules.ReachBlock(rules.ReachBlockParams{Worktrees: worktrees})})
 }
 
 func crashedNames(exits []domain.JobExit) []string {
@@ -127,10 +108,20 @@ func (m Model) recap() string {
 		}
 		lines = append(lines, m.recapBlock(outcome)...)
 	}
+	if addresses := m.addressLines(); len(addresses) > 0 {
+		lines = append(append(lines, ""), addresses...)
+	}
 
-	hints := []string{styles.NextStepLine(styles.NextStepParams{Command: domain.RunStreamAttachHint, Note: domain.RunStreamAttachNote})}
+	if len(m.warnings) > 0 {
+		lines = append(lines, "")
+		for _, warning := range m.warnings {
+			lines = append(lines, styles.Warning.Render(domain.GlyphAttention)+" "+warning)
+		}
+	}
+
+	hints := []string{styles.NextStepText(styles.NextStepParams{Command: domain.RunStreamAttachHint, Note: domain.RunStreamAttachNote})}
 	if m.anythingStarted() {
-		hints = append(hints, styles.NextStepLine(styles.NextStepParams{Command: domain.RunStreamStopHint, Note: domain.RunStreamStopNote}))
+		hints = append(hints, styles.NextStepText(styles.NextStepParams{Command: domain.RunStreamStopHint, Note: domain.RunStreamStopNote}))
 	}
 	body := strings.Join(append(lines, append([]string{""}, hints...)...), "\n")
 

@@ -118,10 +118,6 @@ type addressesMsg struct {
 	// worktree served its ports because its .env was never settled on the names
 	// it publishes says so, or the reader wonders why it alone has no name.
 	notes map[string]string
-	// portAddressed keys the worktrees served their ports rather than their
-	// names. The preview's own board needs the verdict, not the line: it builds
-	// its addresses itself and has to reach the same one.
-	portAddressed map[string]bool
 }
 
 type jobsMsg struct {
@@ -212,9 +208,6 @@ type Model struct {
 	// addressNotes is one line per worktree whose .env is unsettled; see
 	// addressesMsg.
 	addressNotes map[string]string
-	// portAddressed follows the addresses, and is handed to the board the logs
-	// preview opens; see addressesMsg.
-	portAddressed map[string]bool
 	// logged names the jobs that left output in each worktree, by branch. With
 	// the daemon's index it decides what every surface here shows; see
 	// rules.VisibleJobs.
@@ -485,7 +478,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.withBoard(), nil
 
 	case addressesMsg:
-		m.addresses, m.addressNotes, m.portAddressed = msg.addresses, msg.notes, msg.portAddressed
+		m.addresses, m.addressNotes = msg.addresses, msg.notes
 		return m.withBoard(), nil
 
 	case prsMsg:
@@ -1266,7 +1259,7 @@ func (m Model) resolveAddressesCmd() tea.Cmd {
 	load, request := m.params.AddressLoader, AddressRequest{Branches: branches, Config: m.runConfig}
 	return func() tea.Msg {
 		answer := load(request)
-		return addressesMsg{addresses: answer.ByBranch, notes: answer.Notes, portAddressed: answer.PortAddressed}
+		return addressesMsg{addresses: answer.ByBranch, notes: answer.Notes}
 	}
 }
 

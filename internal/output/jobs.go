@@ -3,7 +3,6 @@ package output
 import (
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 	"time"
 
@@ -259,6 +258,9 @@ func sharedTag(job domain.JobConfig) string {
 type FormatRunningJobsParams struct {
 	Jobs []domain.JobInfo
 	Now  time.Time
+	// Branches names each work dir the way a reader recognises it; a dir missing
+	// from it is shown as its path.
+	Branches map[string]string
 }
 
 // FormatRunningJobs renders a table of running (or recently running) jobs. It
@@ -274,7 +276,7 @@ func FormatRunningJobs(params FormatRunningJobsParams) string {
 		uptimes[i] = rules.JobUptime(rules.JobUptimeParams{Job: j, Now: params.Now})
 	}
 
-	nameW, kindW, statusW, pidW, upW := len("NAME"), len("KIND"), len("STATUS"), len("PID"), len("UPTIME")
+	nameW, kindW, statusW, addrW, upW := len("NAME"), len("KIND"), len("STATUS"), len("ADDRESS"), len("UPTIME")
 	for i, j := range params.Jobs {
 		if len(j.Name) > nameW {
 			nameW = len(j.Name)
@@ -285,9 +287,8 @@ func FormatRunningJobs(params FormatRunningJobsParams) string {
 		if len(string(j.Status)) > statusW {
 			statusW = len(string(j.Status))
 		}
-		pid := strconv.Itoa(j.PID)
-		if len(pid) > pidW {
-			pidW = len(pid)
+		if len(j.URL) > addrW {
+			addrW = len(j.URL)
 		}
 		if len(uptimes[i]) > upW {
 			upW = len(uptimes[i])
@@ -303,7 +304,7 @@ func FormatRunningJobs(params FormatRunningJobsParams) string {
 		nameW, "NAME",
 		kindW, "KIND",
 		statusW, "STATUS",
-		pidW, "PID",
+		addrW, "ADDRESS",
 		upW, "UPTIME",
 		"WORKTREE",
 	)
@@ -312,18 +313,18 @@ func FormatRunningJobs(params FormatRunningJobsParams) string {
 
 	for i, j := range params.Jobs {
 		status := styleJobStatus(j.Status)
-		pid := ""
-		if j.PID != 0 {
-			pid = strconv.Itoa(j.PID)
+		worktree := params.Branches[j.WorkDir]
+		if worktree == "" {
+			worktree = j.WorkDir
 		}
 		line := fmt.Sprintf("%s%-*s  %-*s  %-*s  %-*s  %-*s  %s\n",
 			Indent,
 			nameW, j.Name,
 			kindW, string(j.Kind),
 			statusW+ansiOverhead(status), status,
-			pidW, pid,
+			addrW, j.URL,
 			upW, uptimes[i],
-			styles.Muted.Render(j.WorkDir),
+			worktree,
 		)
 		b.WriteString(line)
 	}

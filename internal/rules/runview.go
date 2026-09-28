@@ -106,6 +106,9 @@ type JobMarkParams struct {
 	// Tracked is false for a job no start sequence has said anything about, and
 	// for every job of a view that is only reading what already runs.
 	Tracked bool
+	// Shared is a shared service, main's own instance included: it wears the
+	// shared mark whatever launched it, since it is the same one process.
+	Shared bool
 }
 
 // JobMark reconciles what the start sequence knows of a job with what the
@@ -115,7 +118,7 @@ type JobMarkParams struct {
 // crashed since.
 func JobMark(params JobMarkParams) domain.JobMark {
 	if !params.Tracked {
-		return statusMark(params.Status)
+		return upMark(params)
 	}
 	switch params.Step {
 	case domain.JobStepStarting:
@@ -124,6 +127,13 @@ func JobMark(params JobMarkParams) domain.JobMark {
 		return domain.JobMarkDone
 	case domain.JobStepFailed:
 		return domain.JobMarkCrashed
+	}
+	return upMark(params)
+}
+
+func upMark(params JobMarkParams) domain.JobMark {
+	if params.Shared && IsJobUp(params.Status) {
+		return domain.JobMarkShared
 	}
 	return statusMark(params.Status)
 }

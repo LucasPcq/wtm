@@ -75,7 +75,7 @@ func TestStatus_WarningWithLinesKeepsTheBox(t *testing.T) {
 func TestStatus_OpensTheMidRunBlockExactlyOnce(t *testing.T) {
 	presenter, stderr := testPresenter(t)
 
-	presenter.Status(flow.Notice{Kind: flow.NoticeSuccess, Text: "released a from b"})
+	presenter.Status(flow.Notice{Kind: flow.NoticeSuccess, Text: "dropped a from b"})
 	presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: "c is down"})
 
 	got := stderr.String()
@@ -112,7 +112,7 @@ func TestStatus_MachineOutputStaysBare(t *testing.T) {
 func TestHookPhase_JoinsTheMidRunBlock(t *testing.T) {
 	presenter, stderr := testPresenter(t)
 
-	presenter.Status(flow.Notice{Kind: flow.NoticeSuccess, Text: "released a from b"})
+	presenter.Status(flow.Notice{Kind: flow.NoticeSuccess, Text: "dropped a from b"})
 	err := presenter.HookPhase(flow.HookPhaseParams{
 		Title: domain.HooksTitleOnCreate,
 		Run:   func(flow.HookSink) error { return nil },

@@ -333,27 +333,14 @@ func combine(handlers ...components.WizardMsgHandler) components.WizardMsgHandle
 // content merges what a step declares statically with what it derives from the
 // answers, so a Build only returns the parts that change.
 func (p *plan) content(step flow.Step, answers flow.Answers) (flow.StepContent, error) {
-	content := flow.StepContent{Title: step.Title, Description: step.Description, Options: step.Options, Default: step.Default}
 	if step.Build == nil {
-		return content, nil
+		return flow.MergeContent(step, flow.StepContent{}), nil
 	}
 	built, err := step.Build(answers)
 	if err != nil {
 		return flow.StepContent{}, err
 	}
-	if built.Title != "" {
-		content.Title = built.Title
-	}
-	if built.Description != "" {
-		content.Description = built.Description
-	}
-	if len(built.Options) > 0 {
-		content.Options = built.Options
-	}
-	if built.Default != "" {
-		content.Default = built.Default
-	}
-	return content, nil
+	return flow.MergeContent(step, built), nil
 }
 
 func (p *plan) rebuild(step flow.Step, prev []components.Step) flow.StepContent {

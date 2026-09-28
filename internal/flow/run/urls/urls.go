@@ -9,7 +9,6 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
-	"github.com/LucasPcq/wtm/internal/flow/run/addressing"
 	"github.com/LucasPcq/wtm/internal/flow/run/seam"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
@@ -48,7 +47,7 @@ func (r Reader) In(dir string) []domain.JobURLEntry {
 	env := seam.JobEnv(seam.JobEnvParams{ProjectDir: r.ctx.ProjectDir, StateDir: r.ctx.StateDir, WorkDir: dir})
 	offset, _ := strconv.Atoi(env[domain.EnvPortOffset])
 	project := filepath.Base(r.ctx.ProjectDir)
-	proxyPort := r.publicPortIn(dir)
+	proxyPort := r.proxyPort
 
 	var entries []domain.JobURLEntry
 	for _, job := range r.config.Jobs {
@@ -65,17 +64,4 @@ func (r Reader) In(dir string) []domain.JobURLEntry {
 		entries = append(entries, domain.JobURLEntry{Job: job.Name, URL: url})
 	}
 	return entries
-}
-
-// publicPortIn is zero for a worktree whose .env still spells its addresses as
-// ports: the name is published, but the only entrance the app answers on is the
-// port, and handing out a url that fails is worse than handing out a plain one.
-func (r Reader) publicPortIn(dir string) int {
-	if r.proxyPort == 0 {
-		return 0
-	}
-	if addressing.Read(addressing.Params{Context: r.ctx, WorkDirs: []string{dir}}).PortAddressed[dir] {
-		return 0
-	}
-	return r.proxyPort
 }

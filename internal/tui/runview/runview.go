@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sort"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -91,6 +92,8 @@ type Model struct {
 
 	filtering bool
 	filter    string
+	// reaching swaps the pane for the block saying where every job is reached.
+	reaching bool
 	// focused reports that the keyboard belongs to the selected job rather than
 	// to this view.
 	focused bool
@@ -763,14 +766,76 @@ func (m Model) qualify(line, worktree string) string {
 	return fmt.Sprintf(domain.RunStreamWorktreeFmt, line, worktree)
 }
 
+// visible is the list as it reads and as the cursor walks it: the shared
+// services first, each once — a postgres three worktrees hold is one process —
+// then every worktree's own jobs.
 func (m Model) visible() []runlogs.JobView {
-	views := make([]runlogs.JobView, 0, len(m.jobs))
+	var shared, own []runlogs.JobView
 	for _, view := range m.jobs {
-		if rules.MatchesJobFilter(view.Name, m.filter) {
-			views = append(views, view)
+		if !rules.MatchesJobFilter(view.Name, m.filter) {
+			continue
+		}
+		if sharedHostOf(view) == "" {
+			own = append(own, view)
+			continue
+		}
+		if representative, _ := m.sharedRepresentative(view); viewKey(representative) == viewKey(view) {
+			shared = append(shared, view)
 		}
 	}
-	return views
+	group := map[string]int{}
+	for _, view := range own {
+		if _, seen := group[view.WorkDir]; !seen {
+			group[view.WorkDir] = len(group)
+		}
+	}
+	sort.SliceStable(own, func(a, b int) bool {
+		return group[own[a].WorkDir] < group[own[b].WorkDir]
+	})
+	sort.SliceStable(shared, func(a, b int) bool {
+		return sharedHostOf(shared[a]) < sharedHostOf(shared[b])
+	})
+	return append(shared, own...)
+}
+
+// sharedRepresentative is the one row a shared service gets in the list: the
+// instance of the worktree it runs in when the view covers it, since that is
+// the process itself, and the first hold on it otherwise.
+func (m Model) sharedRepresentative(view runlogs.JobView) (runlogs.JobView, bool) {
+	host := sharedHostOf(view)
+	if host == "" {
+		return view, false
+	}
+	var first *runlogs.JobView
+	for index := range m.jobs {
+		candidate := m.jobs[index]
+		if candidate.Name != view.Name || sharedHostOf(candidate) != host {
+			continue
+		}
+		if candidate.SharedIn == "" {
+			return candidate, true
+		}
+		if first == nil {
+			first = &m.jobs[index]
+		}
+	}
+	if first == nil {
+		return view, true
+	}
+	return *first, true
+}
+
+// canonical is the row a job is selected through: a hold on a shared service
+// is selected as the service's one row.
+func (m Model) canonical(key jobKey) jobKey {
+	for _, view := range m.jobs {
+		if viewKey(view) != key {
+			continue
+		}
+		representative, _ := m.sharedRepresentative(view)
+		return viewKey(representative)
+	}
+	return key
 }
 
 func (m Model) selectedView() (runlogs.JobView, bool) {

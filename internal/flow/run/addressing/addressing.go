@@ -1,4 +1,5 @@
-// Package addressing is the warning the run flows put under the URLs they hand
+// Package addressing is `wtm run addressing` — switching the mode and settling
+// the .env files on it — and the warning the run flows put under the URLs they hand
 // out: the worktrees whose .env still answers on ports while their jobs are
 // published by name.
 package addressing

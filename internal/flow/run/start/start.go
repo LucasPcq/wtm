@@ -9,6 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/run/addressing"
+	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/flow/run/seam"
 	"github.com/LucasPcq/wtm/internal/flow/run/target"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
@@ -119,12 +120,11 @@ func (f *startFlow) run() (Outcome, error) {
 		return Outcome{}, fmt.Errorf("%s:\n%s", domain.JobConflictTitle, strings.Join(rules.JobConflictLines(conflicts), "\n"))
 	}
 
-	addresses := addressing.Read(addressing.Params{Context: f.ctx, WorkDirs: []string{workDir}})
+	warnings := addressing.Lines(addressing.Params{Context: f.ctx, WorkDirs: []string{workDir}})
 	runSeam := seam.Open(seam.Params{
-		ProjectDir:    f.ctx.ProjectDir,
-		StateDir:      f.ctx.StateDir,
-		WorkDir:       workDir,
-		PortAddressed: addresses.PortAddressed[workDir],
+		ProjectDir: f.ctx.ProjectDir,
+		StateDir:   f.ctx.StateDir,
+		WorkDir:    workDir,
 		// The board lists every declared job, not just this one: starting a job is
 		// no reason to hide the ones already up beside it.
 		Jobs:       f.request.Config.Jobs,
@@ -136,11 +136,14 @@ func (f *startFlow) run() (Outcome, error) {
 		Board:    runSeam.Board(),
 		Job:      job.Name,
 		Inline:   job.Kind == domain.JobKindTask,
-		Warnings: addresses.Warnings,
+		Warnings: warnings,
 		Start:    runSeam.Starter(seam.StartParams{Jobs: rules.JobsWithEffectivePorts(f.request.Config, []domain.JobConfig{job})}),
 	})
 	if err != nil {
 		return Outcome{}, err
+	}
+	if rules.IsShared(job) {
+		owed.Settle(owed.Params{Context: f.ctx, Presenter: f.presenter})
 	}
 	return Outcome{WorkDir: workDir, Job: job, Result: result.One(), Aborted: result.Aborted()}, nil
 }

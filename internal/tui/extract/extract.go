@@ -450,7 +450,7 @@ func newFileSelect(files []domain.ExtractFile, preselected []string) components.
 
 func newTargetSelect(worktrees []domain.WorktreeStatus, sourceBranch string) components.SelectListModel {
 	items := []components.SelectItem{
-		{Label: "✚ Create a new worktree…", Value: newWorktreeValue},
+		{Label: "+ Create a new worktree…", Value: newWorktreeValue},
 	}
 
 	existing := make([]components.SelectItem, 0, len(worktrees))

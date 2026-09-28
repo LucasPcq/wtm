@@ -36,6 +36,7 @@ func WorktreeJobAddresses(params WorktreeJobAddressesParams) map[string]domain.J
 		})
 		addresses[job.Name] = domain.JobAddress{
 			Ports: sortedPortValues(ports),
+			Named: NamedPorts(ports),
 			URL:   jobAddressURL(params, job, ports),
 			Held:  heldAddresses(params, job),
 		}

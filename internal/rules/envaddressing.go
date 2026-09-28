@@ -71,9 +71,8 @@ func AddressingDriftLine(params AddressingDriftParams) string {
 	return fmt.Sprintf(domain.AddressingDriftFmt, params.Worktree, params.Worktree)
 }
 
-// AddressingDriftLines is the same warning as a callout, over as many worktrees
-// as a run covers: one line each, and the reason once at the end. Nil when every
-// worktree given is aligned.
+// AddressingDriftLines is the same warning over as many worktrees as a run
+// covers, one line each. Nil when every worktree given is aligned.
 func AddressingDriftLines(drifts []AddressingDriftParams) []string {
 	var lines []string
 	for _, drift := range drifts {
@@ -81,8 +80,5 @@ func AddressingDriftLines(drifts []AddressingDriftParams) []string {
 			lines = append(lines, line)
 		}
 	}
-	if len(lines) == 0 {
-		return nil
-	}
-	return append(lines, domain.AddressingDriftWhy)
+	return lines
 }

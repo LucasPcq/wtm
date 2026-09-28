@@ -603,3 +603,26 @@ func TestEveryDrawableKindIsReadBack(t *testing.T) {
 		}
 	}
 }
+
+// A step that builds its content — the worktree picker of every run command —
+// sets its cursor there too. The merge kept the options and dropped the start,
+// so the picker opened on main whatever worktree the command was typed in.
+func TestABuiltStepKeepsItsStartingValue(t *testing.T) {
+	step := flow.Step{
+		Kind: flow.StepSelect, Key: "worktree", Label: "Worktree",
+		Build: func(flow.Answers) (flow.StepContent, error) {
+			return flow.StepContent{
+				Options: []flow.Option{{Label: "main", Value: "/wt/main"}, {Label: "feat", Value: "/wt/feat"}},
+				Start:   "/wt/feat",
+			}, nil
+		},
+	}
+
+	content, err := (&plan{}).content(step, flow.Answers{})
+	if err != nil {
+		t.Fatalf("content: %v", err)
+	}
+	if got := selectList(content).Value(); got != "/wt/feat" {
+		t.Errorf("cursor = %q, want the start the step built", got)
+	}
+}

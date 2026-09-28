@@ -149,6 +149,7 @@ func TestFormatRunningJobs_ShowsUptime(t *testing.T) {
 			Kind:      domain.JobKindService,
 			Status:    domain.JobStatusRunning,
 			PID:       4242,
+			URL:       "http://dev.feat.app.localhost:11080",
 			WorkDir:   "/work/feat",
 			StartedAt: now.Add(-5 * time.Minute),
 		}},
@@ -186,6 +187,7 @@ func TestFormatRunningJobs_NoUptimeWithoutARunningStart(t *testing.T) {
 				Kind:      domain.JobKindService,
 				Status:    c.status,
 				PID:       7,
+				URL:       "http://dev.feat.app.localhost:11080",
 				WorkDir:   "/work/feat",
 				StartedAt: c.startedAt,
 			}
@@ -348,5 +350,27 @@ func TestFormatRunConfigEmptyNamesWhatWasAsked(t *testing.T) {
 	}
 	if strings.Contains(out, "profiles") {
 		t.Errorf("jobs-only listing = %q, want it to name jobs alone", out)
+	}
+}
+
+// A job is read by where it answers and in which worktree, not by its PID: the
+// address takes the column, and the worktree is its branch rather than a path.
+func TestFormatRunningJobsShowsTheAddressAndTheBranch(t *testing.T) {
+	out := FormatRunningJobs(FormatRunningJobsParams{
+		Jobs: []domain.JobInfo{{
+			Name: "web", Kind: domain.JobKindService, Status: domain.JobStatusRunning, PID: 99,
+			URL: "http://web.feat.app.localhost:11080", WorkDir: "/work/feat",
+		}},
+		Now:      time.Now(),
+		Branches: map[string]string{"/work/feat": "feat/x"},
+	})
+
+	for _, want := range []string{"ADDRESS", "http://web.feat.app.localhost:11080", "feat/x"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("table is missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "/work/feat") || strings.Contains(out, "99") {
+		t.Errorf("table still shows the path or the PID:\n%s", out)
 	}
 }

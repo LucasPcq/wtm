@@ -3,6 +3,7 @@ package rules
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -272,4 +273,87 @@ func NamespaceJobWidth(fields []domain.NamespaceField) int {
 		}
 	}
 	return width
+}
+
+type NamespaceNameParams struct {
+	Config domain.RunConfig
+	Ref    domain.NamespaceRef
+}
+
+// NamespaceName is what a clean or a prune names when it drops a namespace. It
+// falls back on the worktree when run.toml no longer declares the job, since a
+// debt queued by an older config must still be reported by something.
+func NamespaceName(params NamespaceNameParams) string {
+	for _, job := range params.Config.Jobs {
+		if job.Name != params.Ref.Job || job.Namespace == nil {
+			continue
+		}
+		expanded, err := ExpandNamespace(ExpandNamespaceParams{
+			Namespace: *job.Namespace,
+			Worktree:  params.Ref.Worktree,
+			Ordinal:   params.Ref.Ordinal,
+		})
+		if err != nil {
+			break
+		}
+		return expanded.Name
+	}
+	return params.Ref.Worktree
+}
+
+type CarvedNamespaceParams struct {
+	Job domain.JobConfig
+	// Env is the worktree's: its WTM_WORKTREE and WTM_ORDINAL name the slice.
+	Env map[string]string
+}
+
+// CarvedNamespace is the namespace a start of this job carves out for the
+// worktree, empty when it carves none: a job that is not shared, declares no
+// namespace, or has no create command to run.
+func CarvedNamespace(params CarvedNamespaceParams) string {
+	job := params.Job
+	if !IsShared(job) || !HasNamespace(job) || IsBlankCommand(job.Namespace.Create) {
+		return ""
+	}
+	ordinal, _ := strconv.Atoi(params.Env[domain.EnvOrdinal])
+	expanded, err := ExpandNamespace(ExpandNamespaceParams{
+		Namespace: *job.Namespace,
+		Worktree:  params.Env[domain.EnvWorktree],
+		Ordinal:   ordinal,
+	})
+	if err != nil {
+		return ""
+	}
+	return expanded.Name
+}
+
+// StoppedFmt is the line a stop is reported with: a shared job this worktree
+// only let go of is still up for another one, and "stopped" there read as a
+// service taken away from everyone.
+func StoppedFmt(status string) string {
+	if status == domain.JobActionReleased {
+		return domain.RunReleasedFmt
+	}
+	return domain.RunStoppedFmt
+}
+
+// OwedLines say what a service that is down still owes, one line per service
+// in a stable order, and when it will be paid.
+func OwedLines(owed map[string]int) []string {
+	jobs := make([]string, 0, len(owed))
+	for job, count := range owed {
+		if count > 0 {
+			jobs = append(jobs, job)
+		}
+	}
+	sort.Strings(jobs)
+	lines := make([]string, 0, len(jobs))
+	for _, job := range jobs {
+		count := fmt.Sprintf(domain.OwedManyFmt, owed[job])
+		if owed[job] == 1 {
+			count = fmt.Sprintf(domain.OwedOneFmt, owed[job])
+		}
+		lines = append(lines, fmt.Sprintf(domain.OwedStillFmt, count, job))
+	}
+	return lines
 }

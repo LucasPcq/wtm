@@ -113,6 +113,19 @@ func (s *LogSink) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// Note records a line of wtm's own as a record of its own, never joined to a
+// line the job left unterminated. It reports false once the sink is closed,
+// when the file is no longer this sink's to write.
+func (s *LogSink) Note(text string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.file == nil {
+		return false
+	}
+	s.append([]domain.LogRecord{{At: time.Now(), Text: text}})
+	return true
+}
+
 // Close flushes the line the job left unterminated and releases the file.
 func (s *LogSink) Close() error {
 	s.mu.Lock()
@@ -248,6 +261,30 @@ func removeBackups(path string) {
 
 func backupPath(path string, rank int) string {
 	return path + "." + strconv.Itoa(rank)
+}
+
+type AppendJobLogParams struct {
+	LogDir string
+	Job    string
+	Text   string
+}
+
+// AppendJobLog adds one line of wtm's own to the log of a job whose sink is
+// closed. Opening a sink instead would empty the file.
+func AppendJobLog(params AppendJobLogParams) error {
+	path := JobLogPath(JobLogPathParams{LogDir: params.LogDir, Job: params.Job})
+	if path == "" {
+		return nil
+	}
+	if err := os.MkdirAll(params.LogDir, 0o755); err != nil {
+		return fmt.Errorf("create log dir: %w", err)
+	}
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return fmt.Errorf("open job log: %w", err)
+	}
+	_, err = file.WriteString(rules.FormatLogRecord(domain.LogRecord{At: time.Now(), Text: params.Text}) + "\n")
+	return errors.Join(err, file.Close())
 }
 
 type TailParams struct {

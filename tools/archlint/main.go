@@ -22,6 +22,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 const modulePath = "github.com/LucasPcq/wtm/"
@@ -95,6 +96,9 @@ type finding struct {
 	pos  token.Position
 	rule string
 	msg  string
+	// legacy marks what predates its rule and is tracked in the code rather than
+	// in .archlint-migrating, keyed so its sites collapse to one line.
+	legacy string
 }
 
 func main() {
@@ -131,7 +135,7 @@ func main() {
 		switch {
 		case warned[f.rule]:
 			tag = " (warning)"
-		case migrating.covers(f):
+		case f.legacy != "" || migrating.covers(f):
 			tag = " (migrating)"
 		default:
 			failed = true
@@ -210,6 +214,7 @@ func check(root string) ([]finding, error) {
 		return nil, err
 	}
 
+	findings = collapseLegacy(findings)
 	sort.Slice(findings, func(i, j int) bool {
 		if findings[i].rule != findings[j].rule {
 			return findings[i].rule < findings[j].rule
@@ -262,6 +267,7 @@ func checkFile(fset *token.FileSet, path string, file *ast.File) []finding {
 	}
 
 	findings = append(findings, checkOutputVocabulary(fset, own, file)...)
+	findings = append(findings, checkFontCoverage(fset, file)...)
 
 	if own == "commands" {
 		findings = append(findings, checkYesFlag(fset, path, file)...)
@@ -279,7 +285,7 @@ var glyphVocabulary = map[string]string{
 	"=": "GlyphUnchanged",
 	"›": "GlyphProgress",
 	"→": "NextStepGlyph (a line head) or MoveArrowGlyph (punctuation inside a value)",
-	"↻": "GlyphUpdate",
+	"~": "GlyphUpdate",
 }
 
 // drawingLayers are the ones that put glyphs on a screen. rules/ and service/
@@ -347,6 +353,100 @@ func checkOutputVocabulary(fset *token.FileSet, own string, file *ast.File) []fi
 		return true
 	})
 	return findings
+}
+
+// fontSafe is every non-letter rune a string may put on a screen. It was
+// measured, not chosen: present in all of Cascadia Code, DejaVu Sans Mono, Fira
+// Code, Hack, IBM Plex Mono, Inconsolata, JetBrains Mono, Roboto Mono, Source
+// Code Pro, Ubuntu Mono, Menlo, Monaco and SF Mono. A rune a font lacks is drawn
+// from a fallback face, often wider than the cell, and eats the space after it —
+// which is how `↻ Updated profile` lost its space in Ghostty.
+var fontSafe = map[rune]string{
+	'§': "", '·': "", '×': "", '—': "", '•': "", '…': "", '‹': "", '›': "", '−': "",
+	'✓': "missing from Hack, Monaco and Roboto/Ubuntu Mono, kept as the success glyph every CLI uses",
+	'✗': "missing from 8 of the 13, kept as the failure glyph every CLI uses",
+	'←': "missing only from Monaco and Roboto/Ubuntu Mono",
+	'↑': "missing only from Monaco and Roboto/Ubuntu Mono",
+	'→': "missing only from Roboto/Ubuntu Mono",
+	'↓': "missing only from Roboto/Ubuntu Mono",
+}
+
+// fontLegacy predates the rule. Each reports once as migrating; the list may
+// only shrink, towards a rune of fontSafe.
+var fontLegacy = map[rune]bool{
+	'↗': true, '⊘': true, '⋯': true, '▸': true, '▾': true, '▶': true, '◆': true,
+	'◈': true, '◉': true, '○': true, '◌': true, '●': true, '⚠': true, '❯': true,
+}
+
+// isTerminalDrawn is box drawing and block elements, which terminals render as
+// their own sprites rather than from the font.
+func isTerminalDrawn(r rune) bool {
+	return r >= 0x2500 && r <= 0x259F
+}
+
+func checkFontCoverage(fset *token.FileSet, file *ast.File) []finding {
+	var findings []finding
+	ast.Inspect(file, func(node ast.Node) bool {
+		lit, ok := node.(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			return true
+		}
+		text, err := strconv.Unquote(lit.Value)
+		if err != nil {
+			return true
+		}
+		seen := map[rune]bool{}
+		for _, r := range text {
+			if r < 0x80 || seen[r] || unicode.IsLetter(r) || unicode.Is(unicode.Mn, r) || isTerminalDrawn(r) {
+				continue
+			}
+			seen[r] = true
+			if _, ok := fontSafe[r]; ok {
+				continue
+			}
+			f := finding{
+				pos:  fset.Position(lit.Pos()),
+				rule: "fontcover",
+				msg:  fmt.Sprintf("%q (U+%04X) is missing from common monospace fonts: the terminal draws it from a wider fallback face — use a rune of fontSafe, see docs/dev/output.md", r, r),
+			}
+			if fontLegacy[r] {
+				f.legacy = string(r)
+			}
+			findings = append(findings, f)
+		}
+		return true
+	})
+	return findings
+}
+
+// collapseLegacy keeps the first site of each legacy key and counts the rest,
+// so a tracked debt is one line of the report rather than a page of it.
+func collapseLegacy(findings []finding) []finding {
+	sort.SliceStable(findings, func(i, j int) bool {
+		return findings[i].pos.String() < findings[j].pos.String()
+	})
+	counts := map[string]int{}
+	for _, f := range findings {
+		if f.legacy != "" {
+			counts[f.rule+f.legacy]++
+		}
+	}
+	var kept []finding
+	done := map[string]bool{}
+	for _, f := range findings {
+		key := f.rule + f.legacy
+		if f.legacy == "" {
+			kept = append(kept, f)
+			continue
+		}
+		if done[key] {
+			continue
+		}
+		done[key] = true
+		f.msg = fmt.Sprintf("%s (%d sites)", f.msg, counts[key])
+		kept = append(kept, f)
+	}
+	return kept
 }
 
 func isMessageCall(fun ast.Expr) bool {

@@ -646,35 +646,6 @@ func TestThePreviewFollowsTheOutputPanelOpening(t *testing.T) {
 	}
 }
 
-// The preview builds its own addresses, so it needs the one worktree fact it
-// cannot read for itself. Without it the pane announced ports under a header
-// announcing the url — the same job's address spelled two ways, two lines apart.
-func TestThePreviewsBoardIsToldWhetherTheWorktreeAnswersOnItsPorts(t *testing.T) {
-	board := runlogstest.NewBoard(runlogstest.BoardParams{
-		Views: []runlogs.JobView{{Name: "web", Kind: domain.JobKindService, Status: domain.JobStatusRunning}},
-	})
-
-	var asked logsRequest
-	model := logsModel(t, RunParams{
-		BoardLoader: func(req logsRequest) runlogs.Board {
-			asked = req
-			return board
-		},
-		LogsLoader: func(logsRequest) ([]string, error) { return nil, nil },
-	}, "a")
-	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}})
-	model.portAddressed = map[string]bool{"a": true}
-
-	model, _ = model.openLogsTabOn("web")
-
-	if !model.previewOn {
-		t.Fatal("the panel opened without a preview although a board was available")
-	}
-	if !asked.PortAddressed {
-		t.Error("the preview's board was opened without the worktree's addressing verdict")
-	}
-}
-
 // declaringRunJobs gives a model its run.toml and marks every job in it as
 // having run in each worktree on screen. What a surface shows is decided by
 // rules.VisibleJobs and tested there; these tests are about the column, the

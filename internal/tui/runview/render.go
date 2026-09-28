@@ -151,8 +151,8 @@ func (m Model) renderJobRows(params jobRowsParams) []string {
 	rendered := make([]string, 0, params.Rows)
 	// The pinned heading costs the row it occupies: a group whose name has
 	// scrolled away is worth more than the job that would have taken its place.
-	if sticky := stickyHeader(all, m.offset); sticky != "" {
-		rendered = append(rendered, styles.Muted.Render(truncate(sticky, params.Width)))
+	if sticky, found := stickyHeader(all, m.offset); found {
+		rendered = append(rendered, renderHeading(headingParams{Row: sticky, Width: params.Width}))
 	}
 	for _, row := range all[min(m.offset, len(all)):] {
 		if len(rendered) == params.Rows {
@@ -163,12 +163,25 @@ func (m Model) renderJobRows(params jobRowsParams) []string {
 			continue
 		}
 		if row.Header != "" {
-			rendered = append(rendered, styles.Muted.Render(truncate(row.Header, params.Width)))
+			rendered = append(rendered, renderHeading(headingParams{Row: row, Width: params.Width}))
 			continue
 		}
 		rendered = append(rendered, m.renderJobRow(jobRowParams{View: row.View, Width: params.Width, Now: now}))
 	}
 	return rendered
+}
+
+type headingParams struct {
+	Row   sidebarRow
+	Width int
+}
+
+func renderHeading(params headingParams) string {
+	text := truncate(params.Row.Header, params.Width)
+	if params.Row.Shared {
+		return styles.RunViewSharedHeading.Render(text)
+	}
+	return styles.RunViewWorktreeHeading.Render(text)
 }
 
 type jobRowParams struct {
@@ -196,7 +209,7 @@ func (m Model) renderJobRow(params jobRowParams) string {
 
 func (m Model) jobMark(view runlogs.JobView) string {
 	step, tracked := m.sequence.states[viewKey(view)]
-	return renderMark(rules.JobMark(rules.JobMarkParams{Status: view.Status, Step: step, Tracked: tracked}))
+	return renderMark(rules.JobMark(rules.JobMarkParams{Status: view.Status, Step: step, Tracked: tracked, Shared: sharedHostOf(view) != ""}))
 }
 
 func renderMark(mark domain.JobMark) string {
@@ -228,13 +241,17 @@ func (m Model) renderPanePanel(layout domain.RunViewLayout) string {
 		Found: found,
 		Width: max(layout.PaneCols-2*domain.RunViewTitleIndent, 0),
 	})
+	body := m.renderPaneBody(paneBodyParams{View: view, Found: found, Layout: layout})
+	if m.reaching {
+		title = styles.Bold.Render(domain.ReachTitle)
+		body = m.reachBody(layout.PaneCols - domain.RunViewTitleIndent)
+	}
 	if title != "" {
 		title = strings.Repeat(" ", domain.RunViewTitleIndent) + title
 	}
 	// A blank row under the title, as the sidebar has under its own: the first
 	// line a job writes is not a continuation of its name.
-	lines := append([]string{title, ""},
-		m.renderPaneBody(paneBodyParams{View: view, Found: found, Layout: layout})...)
+	lines := append([]string{title, ""}, body...)
 
 	return m.paneStyle().
 		Width(layout.Pane.Width - domain.RunViewBorderWidth).
@@ -260,7 +277,13 @@ func (m Model) renderPaneTitle(params paneTitleParams) string {
 		return ""
 	}
 	status := m.statusWithAddress(params.View)
-	left := styles.Bold.Render(m.qualify(params.View.Name, params.View.Worktree)) + styles.Muted.Render(domain.RunViewSeparator+status)
+	// A service held in another worktree is named by where it runs: this
+	// worktree's name beside it read as its own process.
+	name := m.qualify(params.View.Name, params.View.Worktree)
+	if params.View.SharedIn != "" {
+		name = params.View.Name
+	}
+	left := styles.Bold.Render(name) + styles.Muted.Render(domain.RunViewSeparator+status)
 	return spread(spreadParams{Left: left, Right: styles.Muted.Render(m.paneOrigin(params.View)), Width: params.Width})
 }
 
@@ -269,24 +292,129 @@ func (m Model) renderPaneTitle(params paneTitleParams) string {
 // sequence; `run logs` opens the same view with nothing started, and it used to
 // show no address at all — the one difference between the two views.
 func (m Model) statusWithAddress(view runlogs.JobView) string {
-	key := viewKey(view)
 	label := string(view.Status)
-
-	// A url already carries the port it answers on, so the two are the same fact
-	// twice — the rule JobAddressText states, applied here too. The observed url
-	// still wins over the predicted one: only the run knows what the proxy really
-	// served.
-	if url := m.sequence.urls[key]; url != "" {
-		return label + domain.RunViewSeparator + url
+	if view.SharedIn != "" {
+		label = fmt.Sprintf(domain.RunViewAttachedToFmt, view.SharedIn)
 	}
-	if ports := m.sequence.ports[key]; len(ports) > 0 {
-		return rules.LabelWithPorts(rules.LabelWithPortsParams{Label: label, Ports: ports})
-	}
-
-	if address := rules.JobAddressText(view.Address); address != "" {
-		return label + domain.RunViewSeparator + address
+	if summary := rules.ReachSummary(m.reachOf(view)); summary != "" {
+		return label + domain.RunViewSeparator + summary
 	}
 	return label
+}
+
+// reachOf is where one job is reached, preferring what this run observed to
+// what the config predicts: only the run knows what the proxy really served and
+// what each port is called.
+func (m Model) reachOf(view runlogs.JobView) domain.ReachEntry {
+	key := viewKey(view)
+	url := m.sequence.urls[key]
+	if url == "" {
+		url = view.Address.URL
+	}
+	entry := rules.ReachEntryFor(rules.ReachEntryParams{
+		Job:       view.Name,
+		URL:       url,
+		Held:      view.Address.Held,
+		Ports:     m.sequence.ports[key],
+		Namespace: namespaceOf(m.sequence.namespaces[key], view),
+		SharedIn:  sharedHostOf(view),
+	})
+	if len(entry.URLs) == 0 && len(entry.Ports) == 0 {
+		entry.Ports = view.Address.Named
+	}
+	return entry
+}
+
+type reachWorktreesParams struct {
+	// Keep says which jobs count; nil keeps every job that is up.
+	Keep func(runlogs.JobView) bool
+}
+
+// reachWorktrees is every worktree's part of the block, in the order the view
+// lists them, the holds on a shared service included: which slice of it each
+// worktree carved is theirs to show.
+func (m Model) reachWorktrees(params reachWorktreesParams) []rules.ReachWorktree {
+	keep := params.Keep
+	if keep == nil {
+		keep = func(view runlogs.JobView) bool { return rules.IsJobUp(view.Status) }
+	}
+	var worktrees []rules.ReachWorktree
+	index := map[string]int{}
+	for _, view := range m.jobs {
+		if !keep(view) {
+			continue
+		}
+		at, seen := index[view.WorkDir]
+		if !seen {
+			at = len(worktrees)
+			index[view.WorkDir] = at
+			worktrees = append(worktrees, rules.ReachWorktree{Name: headingOf(view)})
+		}
+		worktrees[at].Entries = append(worktrees[at].Entries, m.reachOf(view))
+	}
+	return worktrees
+}
+
+type reachSectionLinesParams struct {
+	Sections []domain.ReachSection
+	// Untitled is a title the surface already shows above the block.
+	Untitled string
+}
+
+// reachSectionLines draws the block: each section under its heading, its rows
+// indented beneath it, a blank line between two sections.
+func reachSectionLines(params reachSectionLinesParams) []string {
+	var lines []string
+	for _, section := range params.Sections {
+		if len(lines) > 0 {
+			lines = append(lines, "")
+		}
+		indent := ""
+		if section.Title != params.Untitled {
+			lines = append(lines, reachHeading(section))
+			indent = styles.Indent
+		}
+		for _, line := range section.Lines {
+			lines = append(lines, indent+line)
+		}
+	}
+	return lines
+}
+
+func reachHeading(section domain.ReachSection) string {
+	if section.Shared {
+		return styles.RunViewSharedHeading.Render(domain.RunViewMarkShared + " " + section.Title)
+	}
+	return styles.RunViewWorktreeHeading.Render(section.Title)
+}
+
+// namespaceOf prefers what the run reported carving to what the board reads
+// off the config: `run logs` started nothing, and still has a namespace to show.
+func namespaceOf(reported string, view runlogs.JobView) string {
+	if reported != "" {
+		return reported
+	}
+	if rules.IsJobUp(view.Status) {
+		return view.Namespace
+	}
+	return ""
+}
+
+// reachBody is the pane behind the reach key: the shared services once, then
+// every worktree's own jobs.
+func (m Model) reachBody(width int) []string {
+	sections := rules.ReachBlock(rules.ReachBlockParams{Worktrees: m.reachWorktrees(reachWorktreesParams{})})
+	if len(sections) == 0 {
+		return paneNote(domain.RunViewReachNothing, width)
+	}
+	pad := strings.Repeat(" ", domain.RunViewTitleIndent)
+	lines := reachSectionLines(reachSectionLinesParams{Sections: sections, Untitled: domain.ReachTitle})
+	for index, line := range lines {
+		if line != "" {
+			lines[index] = pad + line
+		}
+	}
+	return lines
 }
 
 // paneOrigin says what the pane is showing: the job as it prints, the log file

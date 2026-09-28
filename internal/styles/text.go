@@ -39,9 +39,16 @@ type NextStepParams struct {
 // than in output/ because tui/ concludes on the same line — a run recap printed
 // once the view gives the terminal back — and tui/ may not import output/.
 func NextStepLine(params NextStepParams) string {
+	return Indent + NextStepText(params)
+}
+
+// NextStepText is the hint without the indent a free line carries, for a body
+// that is already set in: indenting it twice pushed the hint off the column
+// every other line of the recap starts on.
+func NextStepText(params NextStepParams) string {
 	line := Bold.Render(params.Command)
 	if params.Note != "" {
 		line += Muted.Render(domain.NextStepNoteSeparator + params.Note)
 	}
-	return Indent + Primary.Render(domain.NextStepGlyph) + " " + line
+	return Primary.Render(domain.NextStepGlyph) + " " + line
 }

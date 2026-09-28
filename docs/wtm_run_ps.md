@@ -4,7 +4,7 @@ List currently running jobs
 
 ### Synopsis
 
-Show the jobs managed by the background daemon (name, kind, status, PID, uptime, worktree).
+Show the jobs managed by the background daemon (name, kind, status, address, uptime, worktree).
 It lists every repository the daemon knows, so it works from anywhere — inside a
 run-initialized repository or not.
 To act on those jobs, open the run view with `wtm run logs`, which covers as many

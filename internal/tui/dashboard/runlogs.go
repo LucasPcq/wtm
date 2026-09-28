@@ -23,11 +23,6 @@ type logsRequest struct {
 	Job     string
 	Jobs    []domain.JobConfig
 	Lines   int
-	// PortAddressed says this worktree's .env still answers on ports, which is
-	// the one thing the board cannot read for itself. Without it the preview
-	// announced ports under a header announcing the url — the same job's address
-	// spelled two ways, two lines apart.
-	PortAddressed bool
 }
 
 type logsTailMsg struct {
@@ -53,13 +48,12 @@ type LogsLoaderParams struct {
 func DefaultBoardLoader(params LogsLoaderParams) func(logsRequest) runlogs.Board {
 	return func(req logsRequest) runlogs.Board {
 		return seam.Open(seam.Params{
-			ProjectDir:    params.ProjectDir,
-			StateDir:      params.StateDir,
-			WorkDir:       req.WorkDir,
-			Jobs:          req.Jobs,
-			PublicPort:    publicPortOf(params),
-			PortAddressed: req.PortAddressed,
-			NoProbe:       true,
+			ProjectDir: params.ProjectDir,
+			StateDir:   params.StateDir,
+			WorkDir:    req.WorkDir,
+			Jobs:       req.Jobs,
+			PublicPort: publicPortOf(params),
+			NoProbe:    true,
 		}).Board()
 	}
 }
@@ -159,9 +153,8 @@ func (m Model) openPreview() (Model, tea.Cmd) {
 	m = m.closePreview()
 
 	board := m.params.BoardLoader(logsRequest{
-		WorkDir:       m.statusFor(m.logsBranch).Path,
-		Jobs:          m.runConfig.Jobs,
-		PortAddressed: m.portAddressed[m.logsBranch],
+		WorkDir: m.statusFor(m.logsBranch).Path,
+		Jobs:    m.runConfig.Jobs,
 	})
 	if board == nil {
 		return m, nil

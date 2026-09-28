@@ -2,6 +2,7 @@ package rules_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -146,5 +147,39 @@ func TestJobsHeldNarrowsToTheRecordedSharedJobs(t *testing.T) {
 	}
 	if len(rules.JobsHeld(cfg, nil).Jobs) != 0 {
 		t.Error("an empty record must narrow to nothing")
+	}
+}
+
+func TestNamespaceNameExpandsTheJobTemplate(t *testing.T) {
+	cfg := domain.RunConfig{Jobs: []domain.JobConfig{
+		{Name: "postgres", Namespace: &domain.JobNamespaceConfig{Name: "app_{worktree}"}},
+	}}
+	got := rules.NamespaceName(rules.NamespaceNameParams{
+		Config: cfg,
+		Ref:    domain.NamespaceRef{Job: "postgres", Worktree: "feat_x"},
+	})
+	if got != "app_feat_x" {
+		t.Errorf("name = %q, want app_feat_x", got)
+	}
+}
+
+func TestNamespaceNameFallsBackOnTheWorktree(t *testing.T) {
+	got := rules.NamespaceName(rules.NamespaceNameParams{
+		Ref: domain.NamespaceRef{Job: "gone", Worktree: "feat_x"},
+	})
+	if got != "feat_x" {
+		t.Errorf("name = %q, want feat_x", got)
+	}
+}
+
+func TestOwedLinesCountWhatEachServiceStillOwes(t *testing.T) {
+	lines := rules.OwedLines(map[string]int{"postgres": 2, "keycloak": 1, "redis": 0})
+
+	want := []string{
+		"1 namespace still owed to keycloak — dropped on its next start",
+		"2 namespaces still owed to postgres — dropped on its next start",
+	}
+	if strings.Join(lines, "\n") != strings.Join(want, "\n") {
+		t.Errorf("lines = %q, want %q", lines, want)
 	}
 }

@@ -16,6 +16,7 @@ func emit(events ...runlogs.Event) (stdout string, stderr string) {
 	for _, event := range events {
 		printer.Emit(event)
 	}
+	printer.Conclude(nil)
 	return out.String(), errOut.String()
 }
 
@@ -198,8 +199,75 @@ func TestRunPrinterClosesTheRunOnce(t *testing.T) {
 
 	printer.Emit(runlogs.Event{Phase: runlogs.PhaseReady, Outcome: runlogs.Outcome{Worktree: "main", Started: []string{"web"}}})
 	printer.Emit(runlogs.Event{Phase: runlogs.PhaseReady, Outcome: runlogs.Outcome{Worktree: "feature", Started: []string{"web"}}})
+	printer.Conclude(nil)
 
 	if got := strings.Count(out.String(), domain.RunStreamAttachHint); got != 1 {
 		t.Errorf("the hint was printed %d times, want once", got)
+	}
+}
+
+func TestRunPrinterSaysASharedJobWasAttachedAndWhatItCarved(t *testing.T) {
+	stdout, _ := emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "postgres", Attached: true, Namespace: "app_feat_x"})
+
+	if !strings.Contains(stdout, "postgres attached") || strings.Contains(stdout, "postgres started") {
+		t.Errorf("stdout = %q, want the job attached, not started", stdout)
+	}
+	if !strings.Contains(stdout, "postgres attached · app_feat_x ready") {
+		t.Errorf("stdout = %q, want the namespace on the job's own line", stdout)
+	}
+}
+
+// The run concludes where every job is reached: one block, the URLs a runner
+// holds by their apps' names and never under the runner's line, then the .env
+// out of step in one line, then what to do next.
+func TestRunPrinterConcludesOnWhereToReachIt(t *testing.T) {
+	var out, errOut bytes.Buffer
+	printer := NewRunPrinter(RunPrinterParams{Out: &out, Err: &errOut})
+
+	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "postgres", Ports: map[string]int{"POSTGRES_PORT": 5432}, Namespace: "app_main"})
+	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "dev", Held: []domain.JobURLEntry{
+		{Job: "web", URL: "http://web.main.app.localhost:11080"},
+		{Job: "api", URL: "http://api.main.app.localhost:11080"},
+	}})
+	printer.Emit(runlogs.Event{Phase: runlogs.PhaseReady, Outcome: runlogs.Outcome{Started: []string{"postgres", "dev"}}})
+	printer.Conclude([]string{"main's .env still spells ports — `wtm env main` aligns it"})
+
+	stdout := out.String()
+	for _, want := range []string{
+		"postgres started · :5432 · app_main ready",
+		"dev started · 2 urls",
+		domain.ReachTitle,
+		"web       http://web.main.app.localhost:11080",
+		"postgres  :5432 · app_main",
+		"wtm env main",
+		domain.RunStreamAttachHint,
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout is missing %q\n%s", want, stdout)
+		}
+	}
+	if strings.Index(stdout, "wtm env main") > strings.Index(stdout, domain.RunStreamAttachHint) {
+		t.Errorf("the .env line came after the hints:\n%s", stdout)
+	}
+}
+
+// A service this worktree only holds says where it runs, on its line and in a
+// section of its own, first: stopping the worktree leaves it up.
+func TestRunPrinterSetsAServiceHeldInMainApart(t *testing.T) {
+	var out, errOut bytes.Buffer
+	printer := NewRunPrinter(RunPrinterParams{Out: &out, Err: &errOut})
+
+	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "compose", Worktree: "feat/x", Ports: map[string]int{"REDIS_PORT": 6389, "MINIO_PORT": 9010}})
+	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "postgres", Worktree: "feat/x", Attached: true, SharedIn: "main", Ports: map[string]int{"POSTGRES_PORT": 5432}})
+	printer.Emit(runlogs.Event{Phase: runlogs.PhaseReady, Outcome: runlogs.Outcome{Started: []string{"compose", "postgres"}}})
+	printer.Conclude(nil)
+
+	stdout := out.String()
+	if !strings.Contains(stdout, "postgres attached to main · :5432") {
+		t.Errorf("stdout = %q, want the line to say where postgres runs", stdout)
+	}
+	own, shared := strings.Index(stdout, domain.ReachTitle), strings.Index(stdout, "Shared, running in main")
+	if shared < 0 || own < shared || strings.LastIndex(stdout, "postgres") > own {
+		t.Errorf("stdout = %q, want postgres in a section of its own before the worktree's", stdout)
 	}
 }

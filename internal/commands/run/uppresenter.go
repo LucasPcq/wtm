@@ -146,7 +146,9 @@ func (p stopPresenter) Stopped(outcome stopflow.Outcome) error {
 	}
 	output.Frame(out, func(w io.Writer) {
 		for _, worktree := range outcome.Results {
-			output.Success(w, p.qualify(fmt.Sprintf(domain.RunStoppedFmt, outcome.Job), outcome, worktree))
+			for _, result := range worktree.Jobs {
+				output.Success(w, p.qualify(fmt.Sprintf(rules.StoppedFmt(result.Status), result.Name), outcome, worktree))
+			}
 		}
 	})
 	return nil
@@ -159,6 +161,9 @@ func (p stopPresenter) Stopped(outcome stopflow.Outcome) error {
 func (p stopPresenter) machine(outcome stopflow.Outcome) error {
 	if len(outcome.Results) > 1 {
 		return output.WriteWorktreeJobResultsJSON(p.Cmd.OutOrStdout(), outcome.Results)
+	}
+	if len(outcome.Results) == 1 && len(outcome.Results[0].Jobs) == 1 {
+		return output.WriteJobResultJSON(p.Cmd.OutOrStdout(), outcome.Results[0].Jobs[0])
 	}
 	return output.WriteJobResultJSON(p.Cmd.OutOrStdout(), domain.JobActionResult{
 		Name:   outcome.Job,

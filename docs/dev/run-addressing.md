@@ -70,6 +70,30 @@ apps/web/.env   VITE_API_URL      → http://api-dev.feat-x.monorepo.localhost:1
 `addressing = "ports"` is the escape hatch, and it is a real inverse: a value wtm wrote
 as an origin is recognised as such and rendered back to `http://localhost:<base+offset>`.
 
+`wtm run addressing` is how it is switched (`flow/run/addressing`, `Switch`). Its two
+questions are steps of one session — the mode, then whether to settle the worktrees — so the
+wizard can go back from the second to the first. The second reads every worktree's plan
+under the mode just picked, **before** run.toml is written: `ResolveEnvPortsParams.Addressing`
+overrides the file's, and the count is cached per mode so going back does not reread every
+`.env`. The settle itself is `envports.Settle`, the pass `create` and `extract` run, so the
+three cannot write different values.
+
+Which worktrees it takes is the one place the main checkout is treated apart, and the rule is
+`rules.BulkSettlesMain`: a pass over every worktree brings main back to ports, and never moves
+it onto names. See the next section for why main is left alone; the asymmetry is what keeps the
+two commands consistent with it:
+
+| Command | Linked worktrees | Main |
+| -- | -- | -- |
+| `wtm env <worktree>` | aligned on the mode | aligned on the mode — naming it is the choice |
+| `wtm run addressing ports` | settled | settled: ports is the state main has without wtm |
+| `wtm run addressing names` | settled | left as is, and said so — `wtm env main` is its own decision |
+
+Without the return leg, `wtm run addressing ports` after a `wtm env main` would leave main on
+names under a project that says ports, and silently: the drift warning only reads a project on
+names. The condition lives in the command's choice of worktrees, not in the pass — the plan and
+the drift reading stay free of any main-shaped condition, as below.
+
 ## Recognising wtm's own writing
 
 A value already carrying a route host is recognised **structurally** — the authority
@@ -142,19 +166,34 @@ state, and main is only the one that is there by construction.
 
 Do not add a main-shaped condition here.
 
-**The address a surface hands out follows the `.env`, not the setting.** While the file spells
-ports, the port *is* the working entrance — both sides of a cross-origin call agree on it —
-and the published name is the one nothing behind it answers on. So `rules.AddressedByPort`
-zeroes the public port for that worktree and `rules.JobURL` falls back to
-`http://localhost:<port>`, in the board, in `run url`, in the start sequence's line and in the
-dashboard's loader alike. The route is still registered with the proxy: settling the file with
-`wtm env` is enough to get the name back, with nothing to restart.
+**The address a surface hands out is the name, whatever the `.env` spells.** It used to follow
+the file — a worktree still on ports was handed `http://localhost:<port>` everywhere — and the
+result was that the one URL a reader came for disappeared on the checkout they use most, with
+the reason in a callout at the very bottom. Now every surface hands out the published name, and
+a worktree whose `.env` is out of step gets **one** `!` line naming the command that aligns it
+(`rules.AddressingDriftLine`; `rules.AddressedByPort` only picks which of its two sentences).
+The trade is explicit: until that command runs, a cross-origin call made through the name is
+refused, and the line is what says so. `--raw` on `run url` / `run open` still gives the port.
 
-That is deliberately not "hide what is broken". It is the same reading in both directions —
-what the `.env` says is where the app answers — which is why `AddressedByPort` looks at the
-value the file holds and not at the plan's verdict: a value already on a **stale named origin**
-keeps its names and is only told they are out of step. Sending it back to ports would take away
-what the file actually says.
+## Where to reach it — one model for every surface
+
+A run says where each job is reached in **one** place, `rules.ReachLines` over
+`domain.ReachEntry` (`internal/rules/reach.go`): the URLs first — a runner's by the apps it
+holds — then the jobs reached by port, their ports named (`REDIS_PORT` → `redis`) and wrapped in
+balanced columns, a shared job's namespace beside it. Every surface renders that block at its
+own density, so none of them decides on its own what to show:
+
+| Surface | Line / title | The block |
+| -- | -- | -- |
+| stream (`run up -d`, a pipe) | one fragment per job — the URL, `:5432`, `3 urls`, `6 ports` (`rules.ReachSummary`) | concludes the run, before the `!` lines and the hints |
+| run view | pane title `job · status · fragment` | behind `a`, and in the recap left on exit |
+| `run ps` | `ADDRESS` column, `WORKTREE` as the branch | — |
+
+A shared service a linked worktree only holds runs in main, and every surface says so the same
+way: `postgres attached to main` on its line, a **Shared, running in main** section in the block
+(`rules.ReachSections`), a `shared · main` line above it in the run view's job list, and a pane
+title naming where it runs rather than the worktree holding it. Stopping the worktree leaves
+those running — which is the one thing the reader has to be able to see.
 
 ## Related
 

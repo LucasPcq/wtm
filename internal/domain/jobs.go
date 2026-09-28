@@ -121,12 +121,45 @@ type JobURLEntry struct {
 	URL string `json:"url"`
 }
 
+// ReachEntry is where one started job is reached: the URLs it answers on — its
+// own, or one per app a runner holds — else the ports it binds, and the
+// namespace a shared job carved out for this worktree. Every run surface
+// renders the same list, at its own density.
+type ReachEntry struct {
+	Job       string
+	URLs      []JobURLEntry
+	Ports     []NamedPort
+	Namespace string
+	// SharedIn is the worktree a shared service runs in when this worktree only
+	// holds it — main, by construction. Empty for a job that runs here.
+	SharedIn string
+}
+
+// ReachSection is one titled part of the reach block: a worktree's own jobs,
+// or the shared services the worktrees hold. Worktree is empty on the second.
+type ReachSection struct {
+	Title    string
+	Worktree string
+	Shared   bool
+	Lines    []string
+}
+
+// NamedPort is a port as a reader reaches it: its declared name, empty when
+// only the number is known.
+type NamedPort struct {
+	Name string
+	Port int
+}
+
 // JobAddress is where a declared job answers in one worktree: the ports it
 // binds there, and the name it is published under when it publishes one. It is
 // a property of the worktree's offset, known whether or not anything is
 // running.
 type JobAddress struct {
 	Ports []int
+	// Named is Ports with the name each one is declared under, for a surface
+	// that lists several: six numbers alone say nothing of which is redis.
+	Named []NamedPort
 	URL   string
 	// Held are the names this job's process answers for besides its own: one per
 	// published job it runs. A runner is a single process — `turbo run dev` —
@@ -252,6 +285,9 @@ type JobRecord struct {
 	// by name, and the daemon is machine-wide: two repositories declaring a job
 	// called "db" would then release each other's.
 	SharedDir string `json:"shared_dir,omitempty"`
+	// MainHolds is the main checkout's own hold on a shared service, carried by
+	// the real job: main posts no claim, so this is the only record of it.
+	MainHolds bool `json:"main_holds,omitempty"`
 }
 
 // NamespaceRef is one worktree's slice of one shared service, named by what it
@@ -325,6 +361,9 @@ type JobInfo struct {
 	// signal killed it. A detached launcher exiting does not end its job, so it
 	// keeps a nil code for as long as the service it started is registered.
 	ExitCode *int `json:"exit_code,omitempty"`
+	// Released marks a shared job this stop let go of without stopping it: the
+	// service is still up for another worktree.
+	Released bool `json:"released,omitempty"`
 }
 
 // JobExit is a job that was started and did not survive the sequence: what the
@@ -360,6 +399,9 @@ type JobActionResult struct {
 	// published job it runs. A runner is one process, and the apps behind it
 	// have no entry of their own in a run that only started it.
 	Held []JobURLEntry `json:"held,omitempty"`
+	// Namespace is what a shared job's start carved out of it for this worktree
+	// — the database or realm its create command made sure exists.
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // WorktreeRunResult is one worktree's half of a run over several of them. A run

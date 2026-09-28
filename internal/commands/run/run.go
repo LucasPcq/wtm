@@ -34,6 +34,7 @@ func NewCmd() *cobra.Command {
 	cmd.AddCommand(newImportCmd())
 	cmd.AddCommand(jobcmd.NewCmd())
 	cmd.AddCommand(profilecmd.NewCmd())
+	cmd.AddCommand(newAddressingCmd())
 	cmd.AddCommand(proxycmd.NewCmd())
 	cmd.AddCommand(daemoncmd.NewCmd())
 

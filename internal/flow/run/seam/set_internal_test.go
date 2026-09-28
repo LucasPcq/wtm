@@ -156,35 +156,3 @@ func TestABoardBuildsItsAddressesFromThePublicPortNotTheBindPort(t *testing.T) {
 		t.Errorf("url = %q, want the public port and never the bind port", url)
 	}
 }
-
-// PortAddressed is the one worktree fact a board cannot read for itself: the
-// name is published, but the .env still answers on the port, so handing out the
-// name would hand out an address that fails.
-func TestAPortAddressedWorktreeIsHandedItsPortsRatherThanItsNames(t *testing.T) {
-	published := domain.JobConfig{
-		Name:  "web",
-		Kind:  domain.JobKindService,
-		Ports: map[string]int{"PORT": 3000},
-		URL:   &domain.JobURLConfig{Port: "PORT"},
-	}
-
-	addresses := boardAddresses(boardAddressParams{
-		Params: Params{
-			ProjectDir:    "/work/shop",
-			Jobs:          []domain.JobConfig{published},
-			PublicPort:    80,
-			PortAddressed: true,
-		},
-		Env: map[string]string{domain.EnvWorktree: "dev-crm", domain.EnvPortOffset: "0"},
-	})
-
-	// Not an absent address: a plain port url is the entrance that works, and
-	// handing out a name nothing answers to would be worse than handing out none.
-	url := addresses[published.Name].URL
-	if !strings.Contains(url, "3000") {
-		t.Errorf("url = %q, want the port the .env actually answers on", url)
-	}
-	if strings.Contains(url, "dev-crm") {
-		t.Errorf("url = %q, want no published name while the worktree answers on its ports", url)
-	}
-}
