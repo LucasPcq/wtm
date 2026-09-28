@@ -314,9 +314,11 @@ const (
 	FlagKeepData     = "keep-data"
 	FlagKeepDataDesc = "keep the namespaces this worktree carved out of shared services"
 
-	CleanRemovedNamespaceFmt  = "released %s from %s"
-	CleanDeferredNamespaceFmt = "%s is down: %s kept, `wtm prune` will give it back"
-	PruneSettledNamespaceFmt  = "gave back %s on %s, owed since its worktree was removed"
+	// The three name the namespace itself — app_feat_x, not feat-x — because it
+	// is what was destroyed, and the service it was destroyed in.
+	CleanRemovedNamespaceFmt  = "dropped %s from %s"
+	CleanDeferredNamespaceFmt = "%s is down: %s kept, `wtm prune` will drop it"
+	PruneSettledNamespaceFmt  = "dropped %s from %s, left over from removed worktree %s"
 
 	// ScopeStepName, Title and Desc introduce the question run init asks of each
 	// compose service.

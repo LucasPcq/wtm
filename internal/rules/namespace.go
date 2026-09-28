@@ -273,3 +273,29 @@ func NamespaceJobWidth(fields []domain.NamespaceField) int {
 	}
 	return width
 }
+
+type NamespaceNameParams struct {
+	Config domain.RunConfig
+	Ref    domain.NamespaceRef
+}
+
+// NamespaceName is what a clean or a prune names when it drops a namespace. It
+// falls back on the worktree when run.toml no longer declares the job, since a
+// debt queued by an older config must still be reported by something.
+func NamespaceName(params NamespaceNameParams) string {
+	for _, job := range params.Config.Jobs {
+		if job.Name != params.Ref.Job || job.Namespace == nil {
+			continue
+		}
+		expanded, err := ExpandNamespace(ExpandNamespaceParams{
+			Namespace: *job.Namespace,
+			Worktree:  params.Ref.Worktree,
+			Ordinal:   params.Ref.Ordinal,
+		})
+		if err != nil {
+			break
+		}
+		return expanded.Name
+	}
+	return params.Ref.Worktree
+}

@@ -148,3 +148,25 @@ func TestJobsHeldNarrowsToTheRecordedSharedJobs(t *testing.T) {
 		t.Error("an empty record must narrow to nothing")
 	}
 }
+
+func TestNamespaceNameExpandsTheJobTemplate(t *testing.T) {
+	cfg := domain.RunConfig{Jobs: []domain.JobConfig{
+		{Name: "postgres", Namespace: &domain.JobNamespaceConfig{Name: "app_{worktree}"}},
+	}}
+	got := rules.NamespaceName(rules.NamespaceNameParams{
+		Config: cfg,
+		Ref:    domain.NamespaceRef{Job: "postgres", Worktree: "feat_x"},
+	})
+	if got != "app_feat_x" {
+		t.Errorf("name = %q, want app_feat_x", got)
+	}
+}
+
+func TestNamespaceNameFallsBackOnTheWorktree(t *testing.T) {
+	got := rules.NamespaceName(rules.NamespaceNameParams{
+		Ref: domain.NamespaceRef{Job: "gone", Worktree: "feat_x"},
+	})
+	if got != "feat_x" {
+		t.Errorf("name = %q, want feat_x", got)
+	}
+}

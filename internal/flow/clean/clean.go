@@ -262,24 +262,26 @@ func (f *cleanFlow) removeNamespaces(branchName string) {
 		WorkDir: wt.Path,
 		Up:      rules.SharedJobsUp(rules.SharedJobsUpParams{Jobs: runjobs.Load(), Config: cfg}),
 	})
-	f.reportNamespaces(result)
+	f.reportNamespaces(cfg, result)
 
 	if err := runjobs.QueueRemovals(runjobs.QueueRemovalsParams{StateDir: f.ctx.StateDir, Refs: result.Deferred}); err != nil {
 		f.presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: err.Error()})
 	}
 }
 
-func (f *cleanFlow) reportNamespaces(result runjobs.RemoveNamespacesResult) {
+func (f *cleanFlow) reportNamespaces(cfg domain.RunConfig, result runjobs.RemoveNamespacesResult) {
 	for _, ref := range result.Released {
+		name := rules.NamespaceName(rules.NamespaceNameParams{Config: cfg, Ref: ref})
 		f.presenter.Status(flow.Notice{
 			Kind: flow.NoticeSuccess,
-			Text: fmt.Sprintf(domain.CleanRemovedNamespaceFmt, ref.Worktree, ref.Job),
+			Text: fmt.Sprintf(domain.CleanRemovedNamespaceFmt, name, ref.Job),
 		})
 	}
 	for _, ref := range result.Deferred {
+		name := rules.NamespaceName(rules.NamespaceNameParams{Config: cfg, Ref: ref})
 		f.presenter.Status(flow.Notice{
 			Kind: flow.NoticeWarning,
-			Text: fmt.Sprintf(domain.CleanDeferredNamespaceFmt, ref.Job, ref.Worktree),
+			Text: fmt.Sprintf(domain.CleanDeferredNamespaceFmt, ref.Job, name),
 		})
 	}
 	for _, err := range result.Errs {

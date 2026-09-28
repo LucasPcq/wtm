@@ -332,7 +332,7 @@ func (f *pruneFlow) settleOwedNamespaces() {
 		settled = append(settled, ref)
 		f.presenter.Status(flow.Notice{
 			Kind: flow.NoticeSuccess,
-			Text: fmt.Sprintf(domain.PruneSettledNamespaceFmt, ref.Job, ref.Worktree),
+			Text: fmt.Sprintf(domain.PruneSettledNamespaceFmt, rules.NamespaceName(rules.NamespaceNameParams{Config: cfg, Ref: ref}), ref.Job, ref.Worktree),
 		})
 	}
 	_ = runjobs.SettleRemovals(runjobs.SettleRemovalsParams{StateDir: f.ctx.StateDir, Refs: settled})
