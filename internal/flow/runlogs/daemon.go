@@ -40,7 +40,7 @@ func (s *daemonService) Start(ctx context.Context, req StartRequest) (StartResul
 	if resp.Status == process.StatusError {
 		return StartResult{Refused: true, Message: resp.Message, ExitCode: resp.ExitCode}, nil
 	}
-	return StartResult{ExitCode: resp.ExitCode, Ports: resp.Ports, ProxyPort: resp.ProxyPort, PublicPort: resp.ProxyPublicPort}, nil
+	return StartResult{ExitCode: resp.ExitCode, Ports: resp.Ports, ProxyPort: resp.ProxyPort, PublicPort: resp.ProxyPublicPort, Joined: resp.Joined}, nil
 }
 
 func (s *daemonService) List(workDir string) ([]domain.JobInfo, error) {

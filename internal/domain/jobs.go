@@ -252,6 +252,9 @@ type JobRecord struct {
 	// by name, and the daemon is machine-wide: two repositories declaring a job
 	// called "db" would then release each other's.
 	SharedDir string `json:"shared_dir,omitempty"`
+	// MainHolds is the main checkout's own hold on a shared service, carried by
+	// the real job: main posts no claim, so this is the only record of it.
+	MainHolds bool `json:"main_holds,omitempty"`
 }
 
 // NamespaceRef is one worktree's slice of one shared service, named by what it
@@ -325,6 +328,9 @@ type JobInfo struct {
 	// signal killed it. A detached launcher exiting does not end its job, so it
 	// keeps a nil code for as long as the service it started is registered.
 	ExitCode *int `json:"exit_code,omitempty"`
+	// Released marks a shared job this stop let go of without stopping it: the
+	// service is still up for another worktree.
+	Released bool `json:"released,omitempty"`
 }
 
 // JobExit is a job that was started and did not survive the sequence: what the

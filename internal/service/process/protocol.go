@@ -85,4 +85,9 @@ type Response struct {
 	// ProxyPublicPort is what a named URL announces: ProxyPrivilegedPort when
 	// the probe reached us behind it, ProxyPort otherwise.
 	ProxyPublicPort int `json:"proxy_public_port,omitempty"`
+	// Joined marks a start of a shared job the main checkout joined rather than
+	// spawned: another worktree had it up already.
+	Joined bool `json:"joined,omitempty"`
+	// Released marks a stop that let go of a shared job without stopping it.
+	Released bool `json:"released,omitempty"`
 }

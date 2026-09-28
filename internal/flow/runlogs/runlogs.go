@@ -117,6 +117,8 @@ type StartResult struct {
 	// PublicPort is what a named URL announces, which the redirection may have
 	// stripped of its port.
 	PublicPort int
+	// Joined marks a shared job the main checkout joined rather than spawned.
+	Joined bool
 }
 
 type AttachRequest struct {

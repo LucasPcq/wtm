@@ -3,6 +3,7 @@ package output_test
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/charmbracelet/x/ansi"
 	"strings"
 	"testing"
 
@@ -201,5 +202,25 @@ func TestRunDownRecapEndsOnItsOwnLineBreak(t *testing.T) {
 	}
 	if strings.HasSuffix(recap, "\n\n") {
 		t.Errorf("recap ends on a blank line of its own, which the frame adds: %q", recap[max(len(recap)-40, 0):])
+	}
+}
+
+// A shared job another worktree still holds was let go of, not stopped: the
+// recap says so apart, or the reader believes the service is gone for everyone.
+func TestRunDownRecapTellsAReleasedJobApart(t *testing.T) {
+	recap := ansi.Strip(output.FormatRunDownRecap(output.RunDownRecapParams{
+		Results: []domain.WorktreeJobResults{
+			{Worktree: "feat/x", Path: "/work/x", Jobs: []domain.JobActionResult{
+				{Name: "web", Status: domain.JobActionStopped},
+				{Name: "postgres", Status: domain.JobActionReleased},
+			}},
+		},
+	}))
+
+	if !strings.Contains(recap, "Stopped:      web") || strings.Contains(recap, "Stopped:      web, postgres") {
+		t.Errorf("recap = %q, want only web stopped", recap)
+	}
+	if !strings.Contains(recap, "Released:     postgres") {
+		t.Errorf("recap = %q, want postgres released", recap)
 	}
 }

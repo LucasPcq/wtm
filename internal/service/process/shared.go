@@ -25,13 +25,15 @@ func (m *Manager) startShared(params StartParams) error {
 
 	ownKey := jobKey(params.Job.Name, params.WorkDir)
 	realKey := jobKey(params.Job.Name, shared.WorkDir)
+	mainAsks := ownKey == realKey
 
 	m.mu.Lock()
 	// Membership is not the question — a stopped or crashed job stays in the map
 	// so `run logs` can still read it back. Asking it here would have a service
 	// answer "already running" for ever once stopped, and post claims onto a
-	// corpse.
-	if held, ok := m.jobs[ownKey]; ok && rules.IsJobUp(held.Status) {
+	// corpse. Main's own key is the real job, so a service another worktree
+	// started is not main's until main asks for it.
+	if held, ok := m.jobs[ownKey]; ok && rules.IsJobUp(held.Status) && (!mainAsks || held.MainHolds) {
 		m.mu.Unlock()
 		return fmt.Errorf("job %s %s", params.Job.Name, domain.JobAlreadyRunningSuffix)
 	}
@@ -57,13 +59,33 @@ func (m *Manager) startShared(params StartParams) error {
 	// fails: a service left running with nothing referencing it is invisible to
 	// `run ps` in the worktree that started it, and only a `run down` from the
 	// main checkout would ever take it back down.
-	m.claim(claimParams{Key: ownKey, Real: realKey, Params: params})
+	if mainAsks {
+		m.holdByMain(holdParams{Key: realKey, Holds: true})
+	} else {
+		m.claim(claimParams{Key: ownKey, Real: realKey, Params: params})
+	}
 	if err := m.runNamespace(namespaceParams{Job: params.Job, Env: params.Env, WorkDir: params.WorkDir, Creating: true}); err != nil {
+		if mainAsks {
+			m.holdByMain(holdParams{Key: realKey, Holds: false})
+		}
 		m.releaseClaim(releaseParams{Key: ownKey, Name: params.Job.Name, Dir: shared.WorkDir})
 		return err
 	}
 	m.persist()
 	return nil
+}
+
+type holdParams struct {
+	Key   string
+	Holds bool
+}
+
+func (m *Manager) holdByMain(params holdParams) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if real, ok := m.jobs[params.Key]; ok && real.Status != domain.JobStatusAttached {
+		real.MainHolds = params.Holds
+	}
 }
 
 type releaseParams struct {
@@ -87,7 +109,7 @@ func (m *Manager) releaseClaim(params releaseParams) {
 	m.mu.Unlock()
 
 	m.persist()
-	if remaining > 0 || !found {
+	if remaining > 0 || !found || real.MainHolds {
 		return
 	}
 	_ = m.stopProcess(stopProcessParams{Job: real, Running: realRunning})
@@ -124,31 +146,70 @@ func (m *Manager) claim(params claimParams) {
 	m.mu.Unlock()
 }
 
-// stopShared releases one worktree's claim and stops the service only once no
-// claim is left anywhere. The namespace is deliberately not detached: stopping is
-// not destroying, and a `run down` that dropped a database would make the
-// command unusable.
+// stopShared releases one worktree's hold and stops the service only once
+// nobody holds it: no claim left, and main not holding it itself. The namespace
+// is deliberately not detached: stopping is not destroying, and a `run down`
+// that dropped a database would make the command unusable.
 func (m *Manager) stopShared(job *ManagedJob) error {
 	m.mu.Lock()
 	ref := sharedRef{Name: job.Name, Dir: job.SharedDir}
 	if job.Status == domain.JobStatusAttached {
 		delete(m.jobs, jobKey(job.Name, job.WorkDir))
+	} else {
+		job.MainHolds = false
 	}
 	remaining := m.attachmentsLocked(ref)
 	real, found := m.realSharedLocked(ref)
 	// Snapshotted under the lock, like stopByKey does: Status is written by the
 	// goroutine that reaps the process, and reading it outside is a race.
 	realRunning := found && real.Status == domain.JobStatusRunning
+	mainHolds := found && real.MainHolds
 	m.mu.Unlock()
 
 	m.persist()
 
-	if remaining > 0 || !found {
+	if remaining > 0 || !found || mainHolds {
 		return nil
 	}
 	// The tear-down itself, never stopByKey: that would come straight back here
 	// and find the same zero claims, for ever.
 	return m.stopProcess(stopProcessParams{Job: real, Running: realRunning})
+}
+
+// sharedRefOf is the service a job stands on, zero for one that is not shared.
+// Read before a stop, since stopping a claim deletes the only record naming it.
+func (m *Manager) sharedRefOf(key string) sharedRef {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	job, ok := m.jobs[key]
+	if !ok || !rules.IsShared(job.Config) {
+		return sharedRef{}
+	}
+	return sharedRef{Name: job.Name, Dir: job.SharedDir}
+}
+
+// stillServing says a shared service outlived a stop: the stop released a
+// hold, and someone else still holds it.
+func (m *Manager) stillServing(ref sharedRef) bool {
+	if ref.Dir == "" {
+		return false
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	real, found := m.realSharedLocked(ref)
+	return found && rules.IsJobUp(real.Status)
+}
+
+// mainJoins says a start from the main checkout will join a shared service
+// another worktree already has up, rather than spawn it.
+func (m *Manager) mainJoins(job domain.JobConfig, workDir string, shared *domain.SharedJobContext) bool {
+	if !rules.IsShared(job) || shared == nil || shared.WorkDir != workDir {
+		return false
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	real, found := m.realSharedLocked(sharedRef{Name: job.Name, Dir: shared.WorkDir})
+	return found && rules.IsJobUp(real.Status) && !real.MainHolds
 }
 
 // sharedRef identifies one shared service: its name and the main checkout it

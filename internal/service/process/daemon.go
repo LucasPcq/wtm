@@ -220,6 +220,7 @@ func (d *daemonServer) handleStart(encoder replyEncoder, req Request) {
 	}
 
 	ports := jobPorts(*req.Job, req.Env)
+	joined := d.manager.mainJoins(*req.Job, req.WorkDir, req.Shared)
 
 	if req.Job.Kind == domain.JobKindTask {
 		// Tasks block until the command exits and stream their output back over
@@ -262,7 +263,7 @@ func (d *daemonServer) handleStart(encoder replyEncoder, req Request) {
 			encoder.Encode(Response{Status: StatusError, Message: err.Error()})
 			return
 		}
-		encoder.Encode(Response{Status: StatusOK, Message: fmt.Sprintf("job %s started", req.Job.Name), Ports: ports, ProxyPort: d.proxyPort, ProxyPublicPort: d.publicPort()})
+		encoder.Encode(Response{Status: StatusOK, Message: fmt.Sprintf("job %s started", req.Job.Name), Ports: ports, ProxyPort: d.proxyPort, ProxyPublicPort: d.publicPort(), Joined: joined})
 		return
 	}
 
@@ -271,7 +272,7 @@ func (d *daemonServer) handleStart(encoder replyEncoder, req Request) {
 		return
 	}
 
-	encoder.Encode(Response{Status: StatusOK, Message: fmt.Sprintf("job %s started", req.Job.Name), Ports: ports, ProxyPort: d.proxyPort, ProxyPublicPort: d.publicPort()})
+	encoder.Encode(Response{Status: StatusOK, Message: fmt.Sprintf("job %s started", req.Job.Name), Ports: ports, ProxyPort: d.proxyPort, ProxyPublicPort: d.publicPort(), Joined: joined})
 }
 
 // handleShutdown answers before it stops, since stopping closes the socket the
@@ -284,18 +285,20 @@ func (d *daemonServer) handleShutdown(encoder replyEncoder) {
 }
 
 func (d *daemonServer) handleStop(encoder replyEncoder, req Request) {
+	ref := d.manager.sharedRefOf(jobKey(req.Name, req.WorkDir))
 	if err := d.manager.Stop(req.Name, req.WorkDir); err != nil {
 		encoder.Encode(Response{Status: StatusError, Message: err.Error()})
 		return
 	}
 
-	encoder.Encode(Response{Status: StatusOK, Message: fmt.Sprintf("job %s stopped", req.Name)})
+	encoder.Encode(Response{Status: StatusOK, Message: fmt.Sprintf("job %s stopped", req.Name), Released: d.manager.stillServing(ref)})
 }
 
 func (d *daemonServer) handleStopAll(encoder replyEncoder, req Request) {
 	// Snapshot the jobs that are about to be stopped so the client can report
 	// which ones (or say "none running" when the list is empty).
 	var stopped []domain.JobInfo
+	var refs []sharedRef
 	for _, job := range d.manager.List() {
 		if !rules.IsJobUp(job.Status) {
 			continue
@@ -304,6 +307,7 @@ func (d *daemonServer) handleStopAll(encoder replyEncoder, req Request) {
 			continue
 		}
 		stopped = append(stopped, d.jobInfoOf(job))
+		refs = append(refs, d.manager.sharedRefOf(jobKey(job.Name, job.WorkDir)))
 	}
 
 	var err error
@@ -317,6 +321,9 @@ func (d *daemonServer) handleStopAll(encoder replyEncoder, req Request) {
 		return
 	}
 
+	for i, ref := range refs {
+		stopped[i].Released = d.manager.stillServing(ref)
+	}
 	encoder.Encode(Response{Status: StatusOK, Jobs: stopped})
 }
 

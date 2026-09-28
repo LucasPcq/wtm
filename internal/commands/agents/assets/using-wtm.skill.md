@@ -298,7 +298,11 @@ and **experimental**: the global `wtm init` does not configure it.
   When the start carved out this worktree's namespace, the job's result carries it as
   `namespace` (`app_feat-x`) — absent on a start refused as already running, which ran no create.
   `run stop` in a worktree releases only that worktree's claim; the service itself stops when
-  the last one goes.
+  the last hold goes — **the main checkout's own start counts as one**, so a linked worktree
+  letting go never takes down a service main asked for. A stop that let go without stopping
+  reports status **`released`** (human: `released — still up elsewhere`), not `stopped`. Main
+  starting a service another worktree already runs joins it (`attached`) and carves its own
+  namespace.
 - **A shared job may carve out a namespace per worktree.** `[job.namespace]` names it (`name`,
   `create`, `remove`, `env`) so each worktree keeps its own data — a database, a set of
   keycloak realms. wtm runs the declared commands and knows nothing else about them; they get

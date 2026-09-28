@@ -325,3 +325,13 @@ func CarvedNamespace(params CarvedNamespaceParams) string {
 	}
 	return expanded.Name
 }
+
+// StoppedFmt is the line a stop is reported with: a shared job this worktree
+// only let go of is still up for another one, and "stopped" there read as a
+// service taken away from everyone.
+func StoppedFmt(status string) string {
+	if status == domain.JobActionReleased {
+		return domain.RunReleasedFmt
+	}
+	return domain.RunStoppedFmt
+}

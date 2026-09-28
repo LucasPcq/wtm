@@ -377,13 +377,16 @@ func FormatRunDownRecap(params RunDownRecapParams) string {
 // to go. The worktree is always named — a recap that says which worktree only
 // when there are two leaves the reader guessing on the run they do most.
 func downRecapBlock(worktree domain.WorktreeJobResults) []string {
-	var stopped, failed []string
+	var stopped, released, failed []string
 	for _, result := range worktree.Jobs {
-		if result.Status == domain.JobActionError {
+		switch result.Status {
+		case domain.JobActionError:
 			failed = append(failed, result.Name)
-			continue
+		case domain.JobActionReleased:
+			released = append(released, result.Name)
+		default:
+			stopped = append(stopped, result.Name)
 		}
-		stopped = append(stopped, result.Name)
 	}
 
 	var lines []string
@@ -392,6 +395,9 @@ func downRecapBlock(worktree domain.WorktreeJobResults) []string {
 	}
 	if len(stopped) > 0 {
 		lines = append(lines, fmt.Sprintf(domain.RunDownRecapStoppedFmt, joinJobNames(stopped)))
+	}
+	if len(released) > 0 {
+		lines = append(lines, fmt.Sprintf(domain.RunDownRecapReleasedFmt, joinJobNames(released)))
 	}
 	if len(failed) > 0 {
 		lines = append(lines, styles.DangerText.Render(fmt.Sprintf(domain.RunViewRecapFailedFmt, joinJobNames(failed))))

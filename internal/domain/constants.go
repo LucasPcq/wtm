@@ -1713,11 +1713,15 @@ const (
 	// not.
 	SharedJobTag     = "shared"
 	JobActionStopped = "stopped"
-	JobActionDone    = "done"
-	JobActionError   = "error"
-	JobActionCrashed = "crashed"
-	JobActionAdded   = "added"
-	JobActionRemoved = "removed"
+	// JobActionReleased is a stop that let go of a shared job without stopping
+	// it: another worktree still holds it, and saying "stopped" there read as a
+	// service taken away from everyone.
+	JobActionReleased = "released"
+	JobActionDone     = "done"
+	JobActionError    = "error"
+	JobActionCrashed  = "crashed"
+	JobActionAdded    = "added"
+	JobActionRemoved  = "removed"
 	// JobRemovedProfilesFmt and JobRemovedEnvPortsFmt report what a removal
 	// dragged along with the job, each named so the reader can put it back.
 	JobRemovedProfilesFmt = "Stripped from profile(s): %s"
@@ -2283,7 +2287,8 @@ const (
 	// what it took down where `run up` says what it left standing, in the same box
 	// and with the same labels. The two are halves of one command and used to
 	// read as two different programs.
-	RunDownRecapStoppedFmt = "Stopped:      %s"
+	RunDownRecapStoppedFmt  = "Stopped:      %s"
+	RunDownRecapReleasedFmt = "Released:     %s — still up elsewhere"
 
 	// RunViewRecapListSep joins the jobs named on one recap line.
 	RunViewRecapListSep = ", "
@@ -2389,6 +2394,7 @@ const (
 	// as `run stop` and `run down` report it.
 	RunStoppingFmt   = "Stopping %s…"
 	RunStoppedFmt    = "%s stopped"
+	RunReleasedFmt   = "%s released — still up elsewhere"
 	RunNoJobsRunning = "No jobs running."
 	RunNoJobsHere    = "No jobs running in this worktree."
 	// NoWorktreesMessage is the empty worktree inventory, wherever it is drawn.

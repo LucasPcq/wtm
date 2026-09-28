@@ -210,7 +210,7 @@ func (p downPresenter) Downed(outcome downflow.Outcome) error {
 			p.line(fmt.Sprintf("%s: %s", result.Name, result.Message))
 			continue
 		}
-		p.line(fmt.Sprintf(domain.RunStoppedFmt, result.Name))
+		p.line(fmt.Sprintf(rules.StoppedFmt(result.Status), result.Name))
 	}
 	return nil
 }
@@ -224,7 +224,11 @@ func (p stopPresenter) Stopped(outcome stopflow.Outcome) error {
 		p.line(domain.RunNoJobsHere)
 		return nil
 	}
-	p.line(fmt.Sprintf(domain.RunStoppedFmt, outcome.Job))
+	for _, worktree := range outcome.Results {
+		for _, result := range worktree.Jobs {
+			p.line(fmt.Sprintf(rules.StoppedFmt(result.Status), result.Name))
+		}
+	}
 	return nil
 }
 

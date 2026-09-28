@@ -93,6 +93,11 @@ type ManagedJob struct {
 	// name. The daemon is machine-wide: matching on the name alone would let two
 	// repositories that both declare "db" release each other's.
 	SharedDir string
+	// MainHolds says the main checkout asked for this shared service itself, on
+	// the real job only. Main has no claim of its own — its hold is the real job
+	// — so without it the last linked worktree to let go would stop a service
+	// main was still using.
+	MainHolds bool
 	// ExitCode, like Status, is written by the goroutine that reaps the process
 	// and read by List: both are only ever touched under the manager lock.
 	ExitCode *int
@@ -227,6 +232,7 @@ func (m *Manager) Adopt(records []domain.JobRecord) {
 			Routes:    record.Routes,
 			LogDir:    record.LogDir,
 			SharedDir: record.SharedDir,
+			MainHolds: record.MainHolds,
 			exited:    exited,
 		}
 	}
@@ -299,6 +305,7 @@ func (m *Manager) upRecordsLocked() []domain.JobRecord {
 			StartedAt: job.StartedAt,
 			Attached:  job.Status == domain.JobStatusAttached,
 			SharedDir: job.SharedDir,
+			MainHolds: job.MainHolds,
 			PID:       job.PID,
 			PGID:      job.PGID,
 		})

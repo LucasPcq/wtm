@@ -300,6 +300,9 @@ func (r *runner) run() Outcome {
 		r.started = append(r.started, job.Name)
 		held := r.heldURLs(job, routes, result.Ports)
 		status := r.startedStatus(job)
+		if result.Joined {
+			status = domain.JobActionAttached
+		}
 		namespace := r.carved(job, alreadyRunning)
 		r.results = append(r.results, domain.JobActionResult{Name: job.Name, Status: status, URL: r.jobURL(jobURLParams{Job: job, Ports: result.Ports, Host: host}), Held: held, Namespace: namespace})
 		if rules.ShouldProbeJob(rules.ShouldProbeJobParams{Kind: job.Kind, Ports: result.Ports, Probe: job.Probe}) {

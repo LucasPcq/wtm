@@ -459,3 +459,106 @@ func TestStartSharedWithdrawsItsClaimWhenTheAttachFails(t *testing.T) {
 		t.Error("the service is still running with nothing referencing it")
 	}
 }
+
+// Main asked for the service itself, so the last linked worktree letting go of
+// it must leave it up: main has no claim of its own to count.
+func TestStopSharedSparesTheServiceMainHolds(t *testing.T) {
+	f := newSharedFixture(t, nil)
+
+	if err := f.start(t, f.main, "main"); err != nil {
+		t.Fatalf("main start: %v", err)
+	}
+	if err := f.start(t, f.first, "feat_a"); err != nil {
+		t.Fatalf("worktree start: %v", err)
+	}
+	ref := f.manager.sharedRefOf(jobKey("db", f.first))
+
+	if err := f.manager.Stop("db", f.first); err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+
+	if status, _ := f.statusIn(f.main); status != domain.JobStatusRunning {
+		t.Errorf("service status = %q, want running: main still holds it", status)
+	}
+	if !f.manager.stillServing(ref) {
+		t.Error("the stop let go of a service still up, and must say released")
+	}
+}
+
+// A service a linked worktree started is main's once main asks for it: main
+// joins it, carves its own namespace, and then holds it like any other.
+func TestStartSharedFromMainJoinsAServiceAWorktreeStarted(t *testing.T) {
+	f := newSharedFixture(t, &domain.JobNamespaceConfig{
+		Name:   "crm_{worktree}",
+		Create: "printf '%s\\n' \"$WTM_NAMESPACE\" >> " + "WITNESS",
+	})
+	f.job.Namespace.Create = strings.Replace(f.job.Namespace.Create, "WITNESS", f.witness, 1)
+
+	if err := f.start(t, f.first, "feat_a"); err != nil {
+		t.Fatalf("worktree start: %v", err)
+	}
+	if !f.manager.mainJoins(f.job, f.main, &domain.SharedJobContext{WorkDir: f.main}) {
+		t.Error("main asking for a service feat-a started must read as joining it")
+	}
+	if err := f.start(t, f.main, "main"); err != nil {
+		t.Fatalf("main start: %v", err)
+	}
+
+	if got := f.witnessed(t); got != "crm_feat_a\ncrm_main\n" {
+		t.Errorf("attach ran with %q, want main's namespace carved too", got)
+	}
+	if got := f.processes(); got != 1 {
+		t.Errorf("processes = %d, want 1: main joined, it did not spawn a second", got)
+	}
+	err := f.start(t, f.main, "main")
+	if err == nil || !strings.HasSuffix(err.Error(), domain.JobAlreadyRunningSuffix) {
+		t.Errorf("err = %v, want main's second ask refused as already running", err)
+	}
+
+	if err := f.manager.Stop("db", f.first); err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+	if status, _ := f.statusIn(f.main); status != domain.JobStatusRunning {
+		t.Errorf("service status = %q, want running: main joined it", status)
+	}
+}
+
+// Main letting go while a worktree still holds it releases main's hold only;
+// the next linked stop is then the last one, and takes the service down.
+func TestStopSharedFromMainDropsItsHold(t *testing.T) {
+	f := newSharedFixture(t, nil)
+
+	if err := f.start(t, f.main, "main"); err != nil {
+		t.Fatalf("main start: %v", err)
+	}
+	if err := f.start(t, f.first, "feat_a"); err != nil {
+		t.Fatalf("worktree start: %v", err)
+	}
+	if err := f.manager.Stop("db", f.main); err != nil {
+		t.Fatalf("main stop: %v", err)
+	}
+	if err := f.manager.Stop("db", f.first); err != nil {
+		t.Fatalf("worktree stop: %v", err)
+	}
+
+	if status, _ := f.statusIn(f.main); status != domain.JobStatusStopped {
+		t.Errorf("service status = %q, want stopped: nobody holds it any more", status)
+	}
+}
+
+// The hold has to survive a daemon restart, or the next one would stop main's
+// service with the last linked claim again.
+func TestMainHoldSurvivesTheIndex(t *testing.T) {
+	f := newSharedFixture(t, nil)
+
+	if err := f.start(t, f.main, "main"); err != nil {
+		t.Fatalf("main start: %v", err)
+	}
+	f.manager.mu.Lock()
+	records := f.manager.upRecordsLocked()
+	f.manager.mu.Unlock()
+
+	if len(records) != 1 || !records[0].MainHolds {
+		t.Errorf("records = %+v, want the real job carrying main's hold", records)
+	}
+}
