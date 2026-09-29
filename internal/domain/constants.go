@@ -3602,6 +3602,7 @@ const (
 	HelpSetKind   = "←→ set type"
 	HelpSetScope  = "←→ set scope"
 	HelpSetRunner = "←→ set runner"
+	HelpSetTouch  = "←→ set service"
 
 	// The runner step: which root-level service starts each of the others. The
 	// relation is declared, never inferred — RunnerListNone is what a row says
@@ -3617,9 +3618,18 @@ const (
 	RunnerListGap               = 3
 	RunnerListSummaryFmt        = "%d of %d attached to a runner"
 	SkipReasonNoRunnerCandidate = "no root-level service that could start the others"
-	SkipReasonNoName            = "no job publishes a name, so nothing is addressed by one"
-	HelpSwitchRoute             = "space switch route"
-	HelpBindsNoPort             = "n binds no port"
+
+	// The touches step: which service's data each task changes. wtm proposes
+	// what a task's name says — a data verb and a word it shares with one
+	// service — and the reader confirms; nothing is written unasked.
+	TouchListStepName      = "Data tasks"
+	TouchListStepTitle     = "Which service's data does each task change?"
+	TouchListStepDesc      = "A migration, a reset or a seed changes a database. Saying which one lets `wtm run up` stop before running it against data the worktree does not own —\nits source's when the worktree is verbatim, every worktree's for a shared service with no namespace.\nLeave a row on — when the task changes no service's data."
+	TouchListSummaryFmt    = "%d of %d task(s) change a service's data"
+	SkipReasonNoTouchTasks = "no task, or no service holding data"
+	SkipReasonNoName       = "no job publishes a name, so nothing is addressed by one"
+	HelpSwitchRoute        = "space switch route"
+	HelpBindsNoPort        = "n binds no port"
 
 	// The addressing step. The mode was a silent default, and its consequence is
 	// the one a reader has to weigh before anything is written into a .env:
@@ -3854,6 +3864,10 @@ var EnvTemplateSuffixes = []string{
 // value differs per worktree by construction, so the reconciliation reports them
 // neither as drift nor as a conflict.
 var WtmOwnedEnvKeys = []string{EnvComposeProjectName}
+
+// TouchDataVerbs are the words that make a task's name read as a change to a
+// service's data. They only ever shape a proposal the reader confirms.
+var TouchDataVerbs = []string{"reset", "migrate", "migration", "migrations", "seed", "init", "drop", "truncate", "db", "orm", "prisma", "schema", "fixtures"}
 
 // EnvSliceKeySuffixes are the endings of a key that names a service's slice —
 // POSTGRES_DB, KEYCLOAK_REALM — as against its credentials or its address,

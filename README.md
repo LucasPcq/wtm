@@ -137,7 +137,8 @@ A few ideas explain how the commands fit together:
   `create` that **clones** main's database (`CREATE DATABASE … TEMPLATE app`) starts each
   worktree from main's data without sharing it — see
   [Starting a slice from main's data](docs/dev/shared-services.md#starting-a-slice-from-mains-data).
-  A job that changes data declares it with `touches = ["postgres"]`, and `wtm run up` stops
+  A job that changes data declares it with `touches = ["postgres"]` — `wtm run init` asks it
+  task by task and pre-fills what the names make obvious — and `wtm run up` stops
   before running it against data the worktree does not own — a verbatim worktree's source,
   or a shared service with no namespace — unless you confirm or pass `--force`.
 

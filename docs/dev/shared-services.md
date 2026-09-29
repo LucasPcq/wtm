@@ -144,7 +144,7 @@ A Keycloak realm follows the same shape: export main's realm, rewrite its name t
 
 A slice protects a worktree's data only as long as the jobs it runs write to that slice. Two cases break that on purpose: a **verbatim** worktree, whose `.env` names its source's databases, and a shared service with **no** `[job.namespace]`, which holds one set of data for every worktree. A profile running `orm:reset` there resets someone else's database.
 
-wtm cannot see that from a command, so the job says it: `touches = ["postgres"]` names the services whose data it changes. `rules.ForeignDataRisks` reads those declarations against the worktree's isolation — from `WTM_ISOLATION`, the same answer the daemon acts on — and `internal/flow/run/foreigndata` stops `run up` and `run start` before the job starts:
+wtm cannot see that from a command, so the job says it: `touches = ["postgres"]` names the services whose data it changes. `run init` asks it in its *Data tasks* step, after the runners: one row per task, cycling through the services that hold data (the shared ones and the compose stacks) under the names the configuration being built gives them. `rules.TouchChoices` pre-sets a row only from what run.toml already says, or when the task's name carries a data verb and shares a word with exactly one service — `orm:pay:reset` and `postgres-pay`; anything less certain is left on none for the reader. The step reuses the runner list, which already cycles one job name per row. `rules.ForeignDataRisks` reads those declarations against the worktree's isolation — from `WTM_ISOLATION`, the same answer the daemon acts on — and `internal/flow/run/foreigndata` stops `run up` and `run start` before the job starts:
 
 | Surface | What happens |
 | -- | -- |

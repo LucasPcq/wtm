@@ -25,6 +25,7 @@ type RunnerListModel struct {
 	height  int
 	title   string
 	desc    string
+	help    string
 	done    bool
 	aborted bool
 }
@@ -33,6 +34,9 @@ type NewRunnerListParams struct {
 	Title       string
 	Description string
 	Choices     []domain.JobRunnerChoice
+	// Help names what a row cycles through; empty says runner. The data-tasks
+	// step reuses the list, since cycling one job name per row is all it does.
+	Help string
 }
 
 func NewRunnerList(params NewRunnerListParams) RunnerListModel {
@@ -40,6 +44,7 @@ func NewRunnerList(params NewRunnerListParams) RunnerListModel {
 		choices: params.Choices,
 		title:   params.Title,
 		desc:    params.Description,
+		help:    params.Help,
 		width:   80,
 	}
 }
@@ -150,7 +155,12 @@ func (m RunnerListModel) runnerColumn() int {
 	return PrintableWidth(styles.Indent) + longest + domain.RunnerListGap
 }
 
-func (m RunnerListModel) helpActions() []string { return []string{domain.HelpSetRunner} }
+func (m RunnerListModel) helpActions() []string {
+	if m.help != "" {
+		return []string{m.help}
+	}
+	return []string{domain.HelpSetRunner}
+}
 
 func (m RunnerListModel) helpModal() string { return "" }
 

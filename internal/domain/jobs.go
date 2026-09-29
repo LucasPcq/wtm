@@ -560,6 +560,15 @@ type JobRunnerChoice struct {
 	Options []string
 }
 
+// JobTouchChoice is one row of the init step asking which services a task
+// changes the data of. Options holds "" first, for none.
+type JobTouchChoice struct {
+	Job     string
+	Label   string
+	Touches []string
+	Options []string
+}
+
 // DataOwner is whose data a job would change, when it is not the worktree's.
 type DataOwner string
 

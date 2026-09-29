@@ -328,8 +328,12 @@ and **experimental**: the global `wtm init` does not configure it.
   since `create` runs at every start. Suggest it; do not suggest sharing main's database,
   which lets one branch's migration break the other.
 - **`touches` marks a job that changes data** (a migration, a reset, a seed):
-  `touches = ["postgres-pay"]` names the services it writes to; `run job edit <job> --touches
-  <service>` sets it (repeatable, replaces the list, `''` drops it). `run up` and `run start`
+  `touches = ["postgres-pay"]` names the services it writes to. `run init` asks it in its
+  "Data tasks" step — one row per task, cycling through the shared and compose services,
+  pre-set when the task's name carries a data verb (`reset`, `migrate`, `seed`, `init`, `orm`…)
+  and shares a word with exactly one service (`orm:pay:reset` → `postgres-pay`); a task
+  run.toml already gives touches keeps them. Outside the wizard, `run job edit <job> --touches
+  <service>` sets it (repeatable, replaces the list, `''` drops it); nothing sets it unasked. `run up` and `run start`
   refuse to start such a job where the data is not the worktree's own — its source's for a
   **verbatim** worktree, everyone's for a shared service with **no** namespace. On your paths
   that is an error (exit 1) naming the jobs, `--force` and `wtm env <wt> --isolation isolated`;
