@@ -97,10 +97,6 @@ func unsupportedKindErr(step flow.Step) error {
 	return fmt.Errorf("flowui: step %q has no renderer for kind %d", step.Key, step.Kind)
 }
 
-func conditionalKindErr(step flow.Step) error {
-	return fmt.Errorf("flowui: step %q has no conditional renderer for kind %d", step.Key, step.Kind)
-}
-
 type binding struct {
 	key  string
 	kind flow.StepKind

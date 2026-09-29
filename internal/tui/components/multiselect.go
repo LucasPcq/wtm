@@ -36,6 +36,8 @@ type MultiSelectItem struct {
 	// per Variant on normal rows and left plain on the highlighted row.
 	Tag     string
 	Variant TagVariant
+	// Badges are trailing words right-aligned on the row, as on a SelectList.
+	Badges []Badge
 }
 
 // MultiSelectModel is a checkbox list with space toggle, enter confirm, and
@@ -67,7 +69,21 @@ func NewMultiSelect(params NewMultiSelectParams) MultiSelectModel {
 		width:    80,
 	}
 	m.refilter()
+	m.startOn(params.Start)
 	return m
+}
+
+// startOn places the cursor on the named value, as SelectListModel does.
+func (m *MultiSelectModel) startOn(value string) {
+	if value == "" {
+		return
+	}
+	for i, idx := range m.filtered {
+		if m.items[idx].Value == value {
+			m.cursor = i
+			return
+		}
+	}
 }
 
 // NewMultiSelectParams holds inputs for NewMultiSelect.
@@ -78,6 +94,8 @@ type NewMultiSelectParams struct {
 	// Validate is called on Enter and after each toggle. When it returns an
 	// error, Enter does not advance and the message is rendered below the list.
 	Validate func([]string) error
+	// Start is the value the cursor opens on; empty or unknown leaves it first.
+	Start string
 }
 
 // Done returns true after the user confirmed.
@@ -288,14 +306,18 @@ func (m MultiSelectModel) View() string {
 			// The same focus language as SelectListModel: an accent bar and the
 			// subtle row tint, not the heavy highlight this list was left on. Plain
 			// (ANSI-free) content so the tint fills every cell.
-			block := check + " " + plainTag(item.Tag) + item.Label
+			left := check + " " + plainTag(item.Tag) + item.Label
+			badges := plainBadges(item.Badges)
+			block := left + m.badgeFill(badgeFillParams{Left: PrintableWidth(left), Badges: PrintableWidth(badges)}) + badges
 			if pad := m.width - selectedMarkerWidth - PrintableWidth(block); pad > 0 {
 				block += strings.Repeat(" ", pad)
 			}
 			b.WriteString(styles.SelectedMarker.Render("▌ ") + styles.ListItemTinted.Render(block))
 		} else {
-			line := styles.Indent + check + " " + coloredTag(item.Tag, item.Variant) + item.Label
-			b.WriteString(styles.ListItemNormal.Render(line))
+			left := check + " " + plainTag(item.Tag) + item.Label
+			fill := m.badgeFill(badgeFillParams{Left: PrintableWidth(left), Badges: PrintableWidth(plainBadges(item.Badges))})
+			line := styles.Indent + check + " " + coloredTag(item.Tag, item.Variant) + item.Label + fill
+			b.WriteString(styles.ListItemNormal.Render(line) + styledBadges(item.Badges))
 		}
 
 		if vi < end-1 {
@@ -309,6 +331,37 @@ func (m MultiSelectModel) View() string {
 	}
 
 	return b.String()
+}
+
+type badgeFillParams struct {
+	Left   int
+	Badges int
+}
+
+// badgeFill is the run of spaces that pushes a row's badges against its right
+// edge, less the gap SelectListModel keeps there. A row without badges gets
+// none.
+func (m MultiSelectModel) badgeFill(params badgeFillParams) string {
+	if params.Badges == 0 {
+		return ""
+	}
+	return strings.Repeat(" ", max(m.width-selectedMarkerWidth-params.Left-params.Badges-rowTagGap, 1))
+}
+
+func plainBadges(badges []Badge) string {
+	parts := make([]string, 0, len(badges))
+	for _, badge := range badges {
+		parts = append(parts, badge.Text)
+	}
+	return strings.Join(parts, strings.Repeat(" ", rowTagGap))
+}
+
+func styledBadges(badges []Badge) string {
+	parts := make([]string, 0, len(badges))
+	for _, badge := range badges {
+		parts = append(parts, badge.Render())
+	}
+	return strings.Join(parts, strings.Repeat(" ", rowTagGap))
 }
 
 // plainTag returns the padded, uncolored tag followed by a space, or an empty
