@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"errors"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -165,7 +166,12 @@ func (m Model) runBlock(params runBlockParams) []menuItem {
 	return params.Actions
 }
 
+// runConfigCause is the innermost error: the entry already says which file, and
+// the path the loader wraps it with would fill the whole caption.
 func runConfigCause(err error) string {
+	for inner := errors.Unwrap(err); inner != nil; inner = errors.Unwrap(err) {
+		err = inner
+	}
 	cause, _, _ := strings.Cut(err.Error(), "\n")
 	return truncate(cause, domain.DashboardMenuCaptionMax)
 }

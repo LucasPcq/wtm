@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,6 +102,19 @@ func TestAnInvalidRunTomlStillStopsWhatRuns(t *testing.T) {
 	items := update(model, key(domain.KeyMenu)).menuItems()
 	if !hasMenuEntry(items, menuEntryAction, domain.DashboardMenuRunDown) {
 		t.Errorf("menu = %q, want the stop kept for a row with jobs up", labelsOf(items))
+	}
+}
+
+// The loader wraps the parser's error with the file's absolute path, which
+// filled the caption before the cause could be read.
+func TestTheInvalidEntryCarriesTheCauseNotThePath(t *testing.T) {
+	model := newTestModel(t, testWidth, testHeight, "a")
+	cause := errors.New("toml: line 3: expected value")
+	model = update(model, jobsMsg{configErr: fmt.Errorf("parse /very/long/state/dir/run.toml: %w", cause), known: true})
+
+	entry, _ := findEntry(update(model, key(domain.KeyMenu)).menuItems(), domain.DashboardRunConfigInvalid)
+	if !strings.HasPrefix(entry.disabled, "toml: line 3") {
+		t.Errorf("caption = %q, want the parser's own words", entry.disabled)
 	}
 }
 
