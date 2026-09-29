@@ -66,9 +66,8 @@ func BuildGlobalAnswers(flags InitGlobalFlags) (domain.InitGlobalAnswers, error)
 
 // BuildProjectAnswers resolves project config from flags and auto-detection,
 // mirroring the wizard defaults: flags win, then detection, then constants.
-// Conditional multi-selects (env files, package scripts, docker compose,
-// monorepo packages) take every detected value, matching the wizard's
-// pre-selection.
+// Conditional multi-selects take every detected value, matching the wizard's
+// pre-selection. A declared workspace is installed once, from its root.
 func BuildProjectAnswers(flags InitProjectFlags, detection domain.InitDetectionResult) (domain.InitProjectAnswers, error) {
 	basePath := flags.BasePath
 	if basePath == "" {
@@ -114,9 +113,6 @@ func BuildProjectAnswers(flags InitProjectFlags, detection domain.InitDetectionR
 		}
 		if installCommand != "" {
 			answers.OnCreate = append(answers.OnCreate, domain.HookCommand{Cmd: installCommand})
-			for _, pkg := range detection.MonorepoPackages {
-				answers.OnCreate = append(answers.OnCreate, domain.HookCommand{Cmd: installCommand, Cwd: pkg})
-			}
 		}
 	}
 

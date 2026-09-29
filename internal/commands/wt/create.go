@@ -27,6 +27,8 @@ func newCreateCmd() *cobra.Command {
 			"A branch that already exists locally is checked out as-is, keeping its commits.\n" +
 			"Its parent can't be inferred, so --from then names the branch recorded for\n" +
 			"`wtm sync` — asked in the wizard, required without it.\n" +
+			"When run.toml declares jobs, a branch whose derived name a live worktree already\n" +
+			"carries (feat.x next to feat/x: one compose project, one proxy host) is refused.\n" +
 			"Without arguments, prompts for the branch name interactively.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: runCreate,

@@ -8,6 +8,8 @@ Create a git worktree with env provisioning, metadata, and hooks.
 A branch that already exists locally is checked out as-is, keeping its commits.
 Its parent can't be inferred, so --from then names the branch recorded for
 `wtm sync` — asked in the wizard, required without it.
+When run.toml declares jobs, a branch whose derived name a live worktree already
+carries (feat.x next to feat/x: one compose project, one proxy host) is refused.
 Without arguments, prompts for the branch name interactively.
 
 ```

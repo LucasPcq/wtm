@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/service/process"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
@@ -119,5 +120,28 @@ func TestRunRefusesAWorktreeWhoseEnvCannotBeResolved(t *testing.T) {
 				t.Errorf("started %v on another worktree's ports, want nothing", got)
 			}
 		})
+	}
+}
+
+// The proxy port is the run module's: a value no socket can bind is refused by
+// the commands that would start it, naming the key, instead of a daemon that
+// silently serves no name.
+func TestRunUpRefusesAProxyPortOutOfRange(t *testing.T) {
+	setupStartProject(t, &fakeDaemon{})
+	stateDir := os.Getenv("WTM_STATE_DIR")
+	t.Chdir(projectDirOf(stateDir))
+	fakeTTY(t, false)
+
+	path := config.GlobalPath()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("shell = \"zsh\"\n\n[proxy]\nport = 70000\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, _, err := runCmd(t, domain.CmdUp, "--"+domain.FlagYes)
+	if err == nil || !strings.Contains(err.Error(), "70000") {
+		t.Fatalf("run up = %v, want a refusal naming the port", err)
 	}
 }

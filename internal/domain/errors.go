@@ -52,6 +52,11 @@ var (
 	// not exist as a local branch or an origin remote-tracking branch.
 	ErrBranchNotFound = errors.New("branch not found")
 
+	// ErrWorktreeNameTaken refuses a worktree whose derived name another live
+	// worktree carries: the two would share a compose project, a namespace and
+	// a proxy host.
+	ErrWorktreeNameTaken = errors.New("worktree name already taken")
+
 	// ErrWorktreePathExists is returned when the target worktree directory already exists.
 	ErrWorktreePathExists = errors.New("worktree path already exists")
 

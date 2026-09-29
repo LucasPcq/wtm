@@ -69,6 +69,13 @@ type applyFileSharingParams struct {
 func applyFileSharing(params applyFileSharingParams) SharedServicesOutcome {
 	outcome := SharedServicesOutcome{Config: params.Config}
 	services := params.Params.Scans[params.File].Services
+	fileJob := ComposeJobName(ComposeJobNameParams{Config: outcome.Config, File: params.File})
+	composeCmd := params.Params.ComposeCmd
+	if job, found := jobByName(outcome.Config, fileJob); found {
+		if invoked := composeInvocation(job, params.File); invoked != "" {
+			composeCmd = invoked
+		}
+	}
 
 	wanted := map[string]domain.SharedComposeService{}
 	for _, shared := range params.Params.Shared {
@@ -86,7 +93,10 @@ func applyFileSharing(params applyFileSharingParams) SharedServicesOutcome {
 		return outcome
 	}
 
-	fileJob := ComposeJobName(ComposeJobNameParams{Config: outcome.Config, File: params.File})
+	// Nothing was shared and nothing is: the file's job starts the whole file,
+	// however the config spells it, and a re-init has no reason to overrule it.
+	untouched := len(wanted) == 0 && !sharesAny(sharesAnyParams{Config: outcome.Config, File: params.File, Services: services})
+
 	withdrawn := withdrawnSharedJobs(withdrawnSharedJobsParams{
 		Config: outcome.Config, File: params.File, Services: services,
 		Wanted: wanted, Asked: params.Params.Asked,
@@ -96,7 +106,7 @@ func applyFileSharing(params applyFileSharingParams) SharedServicesOutcome {
 	// references had nowhere to go and were deleted with them.
 	if len(withdrawn) > 0 && fileJob == "" {
 		outcome.Config, fileJob = addFileJob(addFileJobParams{
-			Config: outcome.Config, File: params.File, ComposeCmd: params.Params.ComposeCmd,
+			Config: outcome.Config, File: params.File, ComposeCmd: composeCmd,
 		})
 	}
 	for _, name := range withdrawn {
@@ -113,7 +123,7 @@ func applyFileSharing(params applyFileSharingParams) SharedServicesOutcome {
 		}
 		var renamed string
 		outcome.Config, renamed = upsertSharedJob(upsertSharedJobParams{
-			Config: outcome.Config, Shared: shared, ComposeCmd: params.Params.ComposeCmd,
+			Config: outcome.Config, Shared: shared, ComposeCmd: composeCmd,
 		})
 		if renamed != "" {
 			outcome.Renamed = append(outcome.Renamed, renamed)
@@ -126,9 +136,12 @@ func applyFileSharing(params applyFileSharingParams) SharedServicesOutcome {
 		Bindings: params.Params.Bindings[params.File],
 	})
 
+	if untouched {
+		return outcome
+	}
 	rewritten := rewriteFileJob(rewriteFileJobParams{
 		Config: outcome.Config, File: params.File, Job: fileJob,
-		Services: services, Shared: wanted, ComposeCmd: params.Params.ComposeCmd,
+		Services: services, Shared: wanted, ComposeCmd: composeCmd,
 	})
 	outcome.Config = rewritten.Config
 	outcome.Withdrawn = append(outcome.Withdrawn, rewritten.Withdrawn...)
@@ -277,6 +290,32 @@ func withdrawShared(params withdrawSharedParams) (domain.RunConfig, []string) {
 	cfg = RenameJobRefs(RenameJobRefsParams{Config: cfg, From: params.Job, To: params.Into})
 	cfg, _ = RemoveJob(cfg, params.Job)
 	return cfg, unlinked
+}
+
+// composeInvocation is how a job already calls compose on a file — `docker
+// compose`, `docker-compose`, a wrapper — empty when its cmd does not.
+func composeInvocation(job domain.JobConfig, file string) string {
+	before, _, found := strings.Cut(job.Cmd, " "+DockerComposeFileFlag(file))
+	if !found {
+		return ""
+	}
+	return strings.TrimSpace(before)
+}
+
+type sharesAnyParams struct {
+	Config   domain.RunConfig
+	File     string
+	Services []domain.ComposeService
+}
+
+func sharesAny(params sharesAnyParams) bool {
+	for _, service := range params.Services {
+		name := LiftedJobName(LiftedJobNameParams{Config: params.Config, File: params.File, Service: service.Name})
+		if job, found := jobByName(params.Config, name); found && IsShared(job) {
+			return true
+		}
+	}
+	return false
 }
 
 type upsertSharedJobParams struct {

@@ -284,6 +284,8 @@ const (
 	// not complementary: an [[env]] value writes the port itself when it needs
 	// one, so a key holding both is a line to delete, not a merge to define.
 	EnvValueLinkClashesPortFmt = "%s in %s is written by both an [[env]] link and an [[env_port]] link — an [[env]] value writes its own port, so drop the [[env_port]] line"
+
+	EnvValueLinkUnconfiguredFileFmt = "env %s references %s, which is not a configured env file — add it to [env] in %s or drop the link"
 	// EnvValueUnknownTokenFmt names the placeholder rather than the value, since
 	// a long URL makes the offending braces hard to find.
 	EnvValueUnknownTokenFmt = "env %s in %s: unknown placeholder %s"
@@ -508,6 +510,9 @@ const (
 	// Gecko's `amanda` port: every named URL answered ERR_UNSAFE_PORT while the
 	// proxy itself was serving perfectly. See rules.IsBrowserBlockedPort.
 	ProxyDefaultPort = 11080
+	// ProxyPortOutOfRangeFmt refuses a [proxy] port no socket can bind. Zero is
+	// not refused: it is what an absent key reads as, the default.
+	ProxyPortOutOfRangeFmt = "invalid [proxy] port %d in %s — use %d-%d, or leave it out for %d"
 	// ProxyPortScanSpan is how many ports past the configured one the proxy
 	// tries before giving up. A name answering on an unexpected port beats a
 	// name answering nowhere, but a port far from the one asked for is no
@@ -1682,6 +1687,10 @@ const (
 	// not probe for pre-existing worktrees, the hint is cheap and always relevant.
 	MsgRelocateHint = "Worktrees created before wtm ? Adopt and align them with `wtm relocate`."
 
+	// RelocateBlockedJobsFmt is the move refused because jobs run in the
+	// worktree, naming the command that frees it (branch, branch).
+	RelocateBlockedJobsFmt = "%s — jobs are running in it: run `wtm run down %s` first"
+
 	// Init recap (LUC-125): labels and copy for the framed end-of-init recap
 	// (accent-bar box + pill title) that summarizes the written config and lists
 	// the next steps. RecapWidth is the fixed render width shared with `relocate`.
@@ -1863,6 +1872,9 @@ const (
 
 	RunJobURLHostOrphan = "--%s names the host but nothing is published — add --%s"
 	RunJobURLNoneFmt    = "job %q publishes no url — these do: %s"
+
+	RunJobUnknownKindFmt = "job %q: unknown kind %q (expected service or task)"
+
 	// RunJobNameSpacesFmt refuses whitespace in a name that is also the daemon's
 	// key for the job, the value of --job, and the identity of a TOML table.
 	RunJobNameSpacesFmt = "job %q: a job name cannot contain whitespace — it is what --job takes and what the daemon keys on"
@@ -2922,6 +2934,14 @@ const (
 	// because another worktree already holds it (branch, path, branch). Phrased to
 	// read on from the ErrWorktreeExists sentinel it is wrapped in.
 	BranchCheckedOutElsewhereFmt = "%s is checked out at %s — run `wtm go %s` to jump in"
+
+	// WorktreeNameClashFmt refuses a worktree whose derived name — compose
+	// project, namespace, proxy host — another live worktree already carries
+	// (new branch, live branch, shared name).
+	WorktreeNameClashFmt = "%s would share its name with %s (%s) — pick another name"
+	// RelocateNameClashFmt is the same clash met by an adoption, where the
+	// worktree already exists (branch, live branch, shared name).
+	RelocateNameClashFmt = "%s shares its name with %s (%s) — rename one of the two branches to adopt it"
 	// BranchReusedSuffix marks the branch line of a recap when the worktree checks
 	// out an existing local branch instead of creating one.
 	BranchReusedSuffix = " (existing local branch — reused)"

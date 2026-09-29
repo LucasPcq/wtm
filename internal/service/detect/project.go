@@ -22,7 +22,6 @@ func ProjectEnvironment(dir string) domain.InitDetectionResult {
 		InstallCommand:     rules.InstallCommand(pm),
 		DockerComposeFiles: DockerComposeFiles(dir),
 		DockerComposeCmd:   DockerComposeCommand(),
-		MonorepoPackages:   WorkspacePackages(dir),
 		PackageScripts:     scripts,
 	}
 }

@@ -33,9 +33,8 @@ type InitDetectionResult struct {
 	DockerComposeCmd   string
 	// ComposeScans holds each detected file's port mappings, keyed by the same
 	// relative path as DockerComposeFiles.
-	ComposeScans     map[string]ComposeScan
-	MonorepoPackages []string
-	PackageScripts   []PackageScript
+	ComposeScans   map[string]ComposeScan
+	PackageScripts []PackageScript
 }
 
 // InitGlobalAnswers holds the wizard answers for global config setup.

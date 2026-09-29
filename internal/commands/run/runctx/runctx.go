@@ -17,6 +17,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/runconfig"
 )
 
@@ -70,6 +71,9 @@ func Open(params OpenParams) (Context, error) {
 	cfg, runErr := runconfig.Load(result.StateDir)
 	if runErr != nil && !params.TolerateRunConfig {
 		return Context{}, fmt.Errorf("load run.toml: %w", runErr)
+	}
+	if err := rules.ValidateProxy(result.Config.Global.Proxy); err != nil && !params.TolerateRunConfig {
+		return Context{}, err
 	}
 	if !params.SkipGuard && runErr == nil {
 		if err := shared.RequireRunInitialized(cfg); err != nil {

@@ -245,3 +245,21 @@ ports = { PG_PORT = 5432 }
 		t.Errorf("db must carry no url, got %+v", cfg.Jobs[2].URL)
 	}
 }
+
+// A misspelt kind read as neither a service nor a task would run the job under
+// rules nobody chose; it is refused where the file is read, naming the job.
+func TestLoadRunRejectsAnUnknownKind(t *testing.T) {
+	dir := writeRunFile(t, `
+[[job]]
+name = "api"
+kind = "servce"
+cmd = "pnpm dev"
+`)
+	_, err := LoadRun(dir)
+	if err == nil {
+		t.Fatal("expected kind = \"servce\" to be refused")
+	}
+	if !strings.Contains(err.Error(), `"api"`) || !strings.Contains(err.Error(), `"servce"`) {
+		t.Errorf("error should name the job and the kind, got: %v", err)
+	}
+}

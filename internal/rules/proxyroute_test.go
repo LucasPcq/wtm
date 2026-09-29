@@ -79,3 +79,12 @@ func TestProxyPort(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateProxy(t *testing.T) {
+	for port, ok := range map[int]bool{0: true, 1: true, 11080: true, 65535: true, -1: false, 65536: false, 70000: false} {
+		err := ValidateProxy(domain.ProxyConfig{Port: port})
+		if (err == nil) != ok {
+			t.Errorf("ValidateProxy(port %d) = %v, want ok=%v", port, err, ok)
+		}
+	}
+}

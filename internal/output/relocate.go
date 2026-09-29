@@ -32,7 +32,7 @@ func FormatRelocatePlan(w io.Writer, plan domain.RelocatePlan) {
 			}
 		case domain.RelocateStatusSkippedDirty, domain.RelocateStatusSkippedLocked:
 			skipped = append(skipped, step)
-		case domain.RelocateStatusBlockedDest:
+		case domain.RelocateStatusBlockedDest, domain.RelocateStatusBlockedJobs, domain.RelocateStatusBlockedName:
 			blocked = append(blocked, step)
 		case domain.RelocateStatusNoop:
 			noops++
@@ -63,7 +63,7 @@ func FormatRelocatePlan(w io.Writer, plan domain.RelocatePlan) {
 		section(func() {
 			SectionTitle(w, fmt.Sprintf("Blocked (%d)", len(blocked)))
 			for _, step := range blocked {
-				Error(w, fmt.Sprintf("%s — target path already occupied: %s", step.Branch, step.ToPath))
+				Error(w, planBlockedLine(step))
 			}
 		})
 	}
@@ -103,6 +103,17 @@ func planApplyLine(basePath string, step domain.RelocateStep) string {
 	return fmt.Sprintf("%s %s %s%s", step.Branch, styles.Muted.Render(domain.MoveArrowGlyph), relTarget(basePath, step.ToPath), suffix)
 }
 
+func planBlockedLine(step domain.RelocateStep) string {
+	switch step.Status {
+	case domain.RelocateStatusBlockedJobs:
+		return fmt.Sprintf(domain.RelocateBlockedJobsFmt, step.Branch, step.Branch)
+	case domain.RelocateStatusBlockedName:
+		return step.Detail
+	default:
+		return fmt.Sprintf("%s — target path already occupied: %s", step.Branch, step.ToPath)
+	}
+}
+
 func planSkipLine(step domain.RelocateStep) string {
 	if step.Status == domain.RelocateStatusSkippedLocked {
 		return fmt.Sprintf("%s — worktree is locked (use --force)", step.Branch)
@@ -117,7 +128,7 @@ func planSkipLine(step domain.RelocateStep) string {
 // like a repeat of the opening preview. It emits a raw body with no trailing
 // blank line; the caller's frame owns the outer vertical padding.
 func FormatRelocateResult(w io.Writer, result domain.RelocateResult) {
-	var done, errored []domain.RelocateStepResult
+	var done, errored, refused []domain.RelocateStepResult
 	var skipped, blocked []string
 	for _, step := range result.Steps {
 		switch step.Status {
@@ -127,16 +138,18 @@ func FormatRelocateResult(w io.Writer, result domain.RelocateResult) {
 			skipped = append(skipped, step.Branch)
 		case domain.RelocateStatusBlockedDest:
 			blocked = append(blocked, step.Branch)
+		case domain.RelocateStatusBlockedJobs, domain.RelocateStatusBlockedName:
+			refused = append(refused, step)
 		case domain.RelocateStatusError:
 			errored = append(errored, step)
 		}
 	}
 
-	hasIssue := len(blocked) > 0 || len(errored) > 0
+	hasIssue := len(blocked) > 0 || len(errored) > 0 || len(refused) > 0
 	headline := Tally(
 		TallyPart{Count: len(done), Label: domain.TallyApplied},
 		TallyPart{Count: len(skipped), Label: domain.TallySkipped},
-		TallyPart{Count: len(blocked) + len(errored), Label: domain.TallyBlocked},
+		TallyPart{Count: len(blocked) + len(errored) + len(refused), Label: domain.TallyBlocked},
 	)
 	if hasIssue {
 		Warning(w, "Relocation finished with issues  "+headline)
@@ -148,7 +161,7 @@ func FormatRelocateResult(w io.Writer, result domain.RelocateResult) {
 	for _, step := range done {
 		Success(w, resultDoneLine(result.BasePath, step))
 	}
-	if len(done) > 0 && (len(skipped) > 0 || len(blocked) > 0 || len(errored) > 0) {
+	if len(done) > 0 && (hasIssue || len(skipped) > 0) {
 		Blank(w)
 	}
 
@@ -160,6 +173,9 @@ func FormatRelocateResult(w io.Writer, result domain.RelocateResult) {
 		// rather than being held back.
 		Error(w, fmt.Sprintf("Blocked: %s (target path occupied)", strings.Join(blocked, ", ")))
 	}
+	for _, step := range refused {
+		Error(w, resultBlockedLine(step))
+	}
 	for _, step := range errored {
 		Error(w, fmt.Sprintf("%s failed — %s", step.Branch, step.Detail))
 	}
@@ -168,6 +184,13 @@ func FormatRelocateResult(w io.Writer, result domain.RelocateResult) {
 		Blank(w)
 		Success(w, fmt.Sprintf("config base_path updated to %q", result.BasePath))
 	}
+}
+
+func resultBlockedLine(step domain.RelocateStepResult) string {
+	if step.Status == domain.RelocateStatusBlockedName {
+		return step.Detail
+	}
+	return fmt.Sprintf(domain.RelocateBlockedJobsFmt, step.Branch, step.Branch)
 }
 
 func resultDoneLine(basePath string, step domain.RelocateStepResult) string {
@@ -206,6 +229,8 @@ func SprintRelocateRecap(params RelocateRecapParams) string {
 			skipped = append(skipped, step.Branch+" — locked")
 		case domain.RelocateStatusBlockedDest:
 			blocked = append(blocked, step.Branch+" — target path occupied")
+		case domain.RelocateStatusBlockedJobs, domain.RelocateStatusBlockedName:
+			blocked = append(blocked, planBlockedLine(step))
 		}
 	}
 

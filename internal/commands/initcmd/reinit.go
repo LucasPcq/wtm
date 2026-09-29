@@ -163,9 +163,6 @@ func buildReinitAnswers(cmd *cobra.Command, stateDir string, detection domain.In
 		envStrategy = string(cfg.Env.Strategy)
 	}
 	installCommand, _ := cmd.Flags().GetString(domain.FlagInstallCommand)
-	if installCommand == "" {
-		installCommand = rules.InstallCommandFromHooks(cfg.Hooks.OnCreate)
-	}
 	cleanCommand, _ := cmd.Flags().GetString(domain.FlagCleanCommand)
 
 	answers, err := rules.BuildProjectAnswers(rules.InitProjectFlags{
@@ -178,8 +175,11 @@ func buildReinitAnswers(cmd *cobra.Command, stateDir string, detection domain.In
 		return domain.InitProjectAnswers{}, err
 	}
 
-	// on_clean has no single-command reverse like the install command, so preserve
-	// the existing list when --clean-command was not provided.
+	// The config speaks for its hooks: the first of them is not an install
+	// command to rebuild the list from.
+	if installCommand == "" && len(cfg.Hooks.OnCreate) > 0 {
+		answers.OnCreate = cfg.Hooks.OnCreate
+	}
 	if cleanCommand == "" {
 		answers.OnClean = cfg.Hooks.OnClean
 	}
