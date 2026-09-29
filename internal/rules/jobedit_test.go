@@ -188,7 +188,7 @@ func TestRenameJobRefs(t *testing.T) {
 		},
 	}
 
-	got := rules.RenameJobRefs(cfg, "api", "backend")
+	got := rules.RenameJobRefs(rules.RenameJobRefsParams{Config: cfg, From: "api", To: "backend"})
 
 	if got.Profiles[0].Jobs[0] != "backend" || got.Profiles[0].Jobs[1] != "web" {
 		t.Errorf("dev jobs = %v, want [backend web]", got.Profiles[0].Jobs)
@@ -213,7 +213,7 @@ func TestRenameJobRefsRewritesEnvPortLinks(t *testing.T) {
 		},
 	}
 
-	got := rules.RenameJobRefs(cfg, "api", "api-server")
+	got := rules.RenameJobRefs(rules.RenameJobRefsParams{Config: cfg, From: "api", To: "api-server"})
 
 	if got.EnvPorts[0].Job != "api-server" || got.EnvPorts[1].Job != "api-server" {
 		t.Errorf("env_port jobs = %q/%q, want both renamed", got.EnvPorts[0].Job, got.EnvPorts[1].Job)

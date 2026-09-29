@@ -85,7 +85,7 @@ func TestRemovingAJobDropsItFromTouches(t *testing.T) {
 
 func TestRenamingAJobFollowsItsTouches(t *testing.T) {
 	cfg := touchingConfig()
-	out := RenameJobRefs(cfg, "pg", "postgres")
+	out := RenameJobRefs(RenameJobRefsParams{Config: cfg, From: "pg", To: "postgres"})
 	for _, job := range out.Jobs {
 		if job.Name == "reset" && (len(job.Touches) != 1 || job.Touches[0] != "postgres") {
 			t.Errorf("reset touches %v, want the new name", job.Touches)
@@ -133,7 +133,7 @@ func TestRenamingAJobFollowsItsRunnersAndEnvValues(t *testing.T) {
 	)
 	cfg.EnvValues = []domain.EnvValueLink{{File: ".env", Key: "DATABASE", Job: "pg", Value: "{namespace}"}}
 
-	out := RenameJobRefs(RenameJobRefs(cfg, "web", "front"), "pg", "postgres")
+	out := RenameJobRefs(RenameJobRefsParams{Config: RenameJobRefs(RenameJobRefsParams{Config: cfg, From: "web", To: "front"}), From: "pg", To: "postgres"})
 	for i := range out.Jobs {
 		switch out.Jobs[i].Name {
 		case "web":

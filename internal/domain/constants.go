@@ -1120,6 +1120,12 @@ const (
 	ComposeChangedTitle = "Compose files skipped — they changed while wtm was reading them"
 	ComposeOrphanTitle  = "Compose files with no job to carry their ports"
 	ComposeOrphanFmt    = "%s · no job in run.toml runs this file, so its ports were not declared"
+	// ComposeSharedRenamedFmt names a service lifted under another name because a
+	// job already answers to its own, and ComposeUnlinkedFmt an [[env]] key that
+	// read the namespace of a service no longer shared.
+	ComposeSharingTitle     = "Shared services — check run.toml"
+	ComposeSharedRenamedFmt = "%s · service %s shared as job %s — job %s already exists"
+	ComposeUnlinkedFmt      = "%s · no longer linked: it read the namespace of a service that is no longer shared"
 
 	// EnvPortKeyName and EnvPortKeySuffix are the whole convention wtm reads a
 	// dev server's port by: a key named PORT, or one ending in _PORT.

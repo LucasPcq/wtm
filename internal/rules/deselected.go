@@ -63,8 +63,8 @@ func scriptJobKey(cmd, cwd string) string {
 func composeJobsFor(cfg domain.RunConfig, files []string) map[string]bool {
 	jobs := make(map[string]bool, len(files))
 	for _, file := range files {
-		if name := ComposeJobName(ComposeJobNameParams{Config: cfg, File: file}); name != "" {
-			jobs[name] = true
+		for _, job := range ComposeJobsRunningFile(cfg, file) {
+			jobs[job.Name] = true
 		}
 	}
 	return jobs

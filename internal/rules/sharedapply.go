@@ -2,7 +2,9 @@ package rules
 
 import (
 	"fmt"
+	"slices"
 	"sort"
+	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 )
@@ -23,22 +25,39 @@ type ApplySharedServicesParams struct {
 	ComposeCmd string
 }
 
+// SharedServicesOutcome is the config the scope answers produced, and what they
+// took out of it that the reader has to hear about.
+type SharedServicesOutcome struct {
+	Config domain.RunConfig
+	// Withdrawn are the jobs removed from run.toml: a lifted service given back
+	// to its file, or a file's job left with nothing to run.
+	Withdrawn []string
+	// Unlinked are the .env keys whose link could follow nothing any more.
+	Unlinked []string
+	// Renamed are the lines naming a service lifted under another name.
+	Renamed []string
+}
+
 // ApplySharedServices carries the scope step's answers into a configuration that
 // already exists. Building them is not enough: a re-init on a project whose
 // compose file already has a job never rebuilds it, so the answer reached
 // nothing and the service came back per-worktree on the next run.
 //
-// It is the write-side counterpart of ServiceScopeChoices, and it goes both
-// ways — a service unshared has its lifted job removed and its file's job given
-// back the whole stack.
-func ApplySharedServices(params ApplySharedServicesParams) domain.RunConfig {
-	cfg := params.Config
+// It goes both ways. A service no longer shared gives its job back to the file's
+// own — rebuilt when every service had been lifted — and every reference to it
+// follows there, rather than being deleted with it.
+func ApplySharedServices(params ApplySharedServicesParams) SharedServicesOutcome {
+	outcome := SharedServicesOutcome{Config: params.Config}
 	for _, file := range sortedScanFiles(params.Scans) {
-		cfg = applyFileSharing(applyFileSharingParams{
-			Config: cfg, File: file, Params: params,
+		applied := applyFileSharing(applyFileSharingParams{
+			Config: outcome.Config, File: file, Params: params,
 		})
+		outcome.Config = applied.Config
+		outcome.Withdrawn = append(outcome.Withdrawn, applied.Withdrawn...)
+		outcome.Unlinked = append(outcome.Unlinked, applied.Unlinked...)
+		outcome.Renamed = append(outcome.Renamed, applied.Renamed...)
 	}
-	return cfg
+	return outcome
 }
 
 type applyFileSharingParams struct {
@@ -47,9 +66,9 @@ type applyFileSharingParams struct {
 	Params ApplySharedServicesParams
 }
 
-func applyFileSharing(params applyFileSharingParams) domain.RunConfig {
-	cfg := params.Config
-	fileJob := ComposeJobName(ComposeJobNameParams{Config: cfg, File: params.File})
+func applyFileSharing(params applyFileSharingParams) SharedServicesOutcome {
+	outcome := SharedServicesOutcome{Config: params.Config}
+	services := params.Params.Scans[params.File].Services
 
 	wanted := map[string]domain.SharedComposeService{}
 	for _, shared := range params.Params.Shared {
@@ -64,44 +83,200 @@ func applyFileSharing(params applyFileSharingParams) domain.RunConfig {
 	// changing an answer, it is making the file agree with the scope it carries;
 	// left undone, run.toml refuses to load.
 	if !params.Params.Asked && len(wanted) == 0 {
-		return cfg
+		return outcome
 	}
 
-	// Withdrawn first: a service that stops being shared has to give its name
-	// back before the file's job is recomputed around what is left.
-	for _, service := range params.Params.Scans[params.File].Services {
-		if !params.Params.Asked {
-			break
-		}
-		if _, still := wanted[service.Name]; still {
-			continue
-		}
-		if job, found := jobByName(cfg, service.Name); found && IsShared(job) {
-			cfg, _ = RemoveJob(cfg, service.Name)
-		}
+	fileJob := ComposeJobName(ComposeJobNameParams{Config: outcome.Config, File: params.File})
+	withdrawn := withdrawnSharedJobs(withdrawnSharedJobsParams{
+		Config: outcome.Config, File: params.File, Services: services,
+		Wanted: wanted, Asked: params.Params.Asked,
+	})
+	// Every service had been lifted, so the file has no job left to take back
+	// the ones given up. It is rebuilt first: without it the withdrawn jobs'
+	// references had nowhere to go and were deleted with them.
+	if len(withdrawn) > 0 && fileJob == "" {
+		outcome.Config, fileJob = addFileJob(addFileJobParams{
+			Config: outcome.Config, File: params.File, ComposeCmd: params.Params.ComposeCmd,
+		})
+	}
+	for _, name := range withdrawn {
+		var unlinked []string
+		outcome.Config, unlinked = withdrawShared(withdrawSharedParams{Config: outcome.Config, Job: name, Into: fileJob})
+		outcome.Withdrawn = append(outcome.Withdrawn, name)
+		outcome.Unlinked = append(outcome.Unlinked, unlinked...)
 	}
 
-	for _, service := range params.Params.Scans[params.File].Services {
+	for _, service := range services {
 		shared, want := wanted[service.Name]
 		if !want {
 			continue
 		}
-		cfg = upsertSharedJob(upsertSharedJobParams{
-			Config: cfg, Shared: shared, ComposeCmd: params.Params.ComposeCmd,
+		var renamed string
+		outcome.Config, renamed = upsertSharedJob(upsertSharedJobParams{
+			Config: outcome.Config, Shared: shared, ComposeCmd: params.Params.ComposeCmd,
 		})
+		if renamed != "" {
+			outcome.Renamed = append(outcome.Renamed, renamed)
+		}
 	}
 
-	cfg = moveLiftedPorts(moveLiftedPortsParams{
-		Config: cfg, File: params.File, Host: fileJob,
-		Services: params.Params.Scans[params.File].Services, Shared: wanted,
+	outcome.Config = moveLiftedPorts(moveLiftedPortsParams{
+		Config: outcome.Config, File: params.File, Host: fileJob,
+		Services: services, Shared: wanted,
 		Bindings: params.Params.Bindings[params.File],
 	})
 
-	return rewriteFileJob(rewriteFileJobParams{
-		Config: cfg, File: params.File, Job: fileJob,
-		Services: params.Params.Scans[params.File].Services,
-		Shared:   wanted, ComposeCmd: params.Params.ComposeCmd,
+	rewritten := rewriteFileJob(rewriteFileJobParams{
+		Config: outcome.Config, File: params.File, Job: fileJob,
+		Services: services, Shared: wanted, ComposeCmd: params.Params.ComposeCmd,
 	})
+	outcome.Config = rewritten.Config
+	outcome.Withdrawn = append(outcome.Withdrawn, rewritten.Withdrawn...)
+	outcome.Unlinked = append(outcome.Unlinked, rewritten.Unlinked...)
+	return outcome
+}
+
+type withdrawnSharedJobsParams struct {
+	Config   domain.RunConfig
+	File     string
+	Services []domain.ComposeService
+	Wanted   map[string]domain.SharedComposeService
+	Asked    bool
+}
+
+func withdrawnSharedJobs(params withdrawnSharedJobsParams) []string {
+	if !params.Asked {
+		return nil
+	}
+	var names []string
+	for _, service := range params.Services {
+		if _, still := params.Wanted[service.Name]; still {
+			continue
+		}
+		name := LiftedJobName(LiftedJobNameParams{Config: params.Config, File: params.File, Service: service.Name})
+		if job, found := jobByName(params.Config, name); found && IsShared(job) {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
+type LiftedJobNameParams struct {
+	Config  domain.RunConfig
+	File    string
+	Service string
+}
+
+// LiftedJobName is the job carrying a compose service lifted out of its file,
+// empty when there is none. The name alone is not enough: a script job may
+// already answer to the service's, and treating it as the service turned a
+// `pnpm db:seed` into a shared service. A job running the file comes first,
+// then one lifted under another name, then a shared job declared by hand.
+func LiftedJobName(params LiftedJobNameParams) string {
+	needle := DockerComposeFileFlag(params.File)
+	for _, job := range params.Config.Jobs {
+		if job.Name == params.Service && jobRunsComposeFile(job, needle) {
+			return job.Name
+		}
+	}
+	for _, job := range params.Config.Jobs {
+		fields := strings.Fields(job.Cmd)
+		if IsShared(job) && jobRunsComposeFile(job, needle) && len(fields) > 0 && fields[len(fields)-1] == params.Service {
+			return job.Name
+		}
+	}
+	for _, job := range params.Config.Jobs {
+		if job.Name == params.Service && IsShared(job) {
+			return job.Name
+		}
+	}
+	return ""
+}
+
+type addFileJobParams struct {
+	Config     domain.RunConfig
+	File       string
+	ComposeCmd string
+}
+
+// addFileJob declares the file's own job again, under the name the first init
+// gave it. Its command is settled by rewriteFileJob, from what stays.
+func addFileJob(params addFileJobParams) (domain.RunConfig, string) {
+	cfg := params.Config
+	name := freeJobName(cfg, jobNameFromComposeFile(params.File))
+	cfg.Jobs = append(slices.Clone(cfg.Jobs), domain.JobConfig{
+		Name: name,
+		Kind: domain.JobKindService,
+		Cmd:  composeUpCmd(composeUpParams{ComposeCmd: params.ComposeCmd, File: params.File}),
+		Stop: composeStopCmd(composeStopParams{ComposeCmd: params.ComposeCmd, File: params.File}),
+		Cwd:  ".",
+	})
+	return cfg, name
+}
+
+// freeJobName is base, or base-N for the first N no job answers to — the
+// suffix BuildDockerJobs gives a second file declaring the same service.
+func freeJobName(cfg domain.RunConfig, base string) string {
+	name := base
+	for n := 2; ; n++ {
+		if _, taken := jobIndex(cfg, name); !taken {
+			return name
+		}
+		name = fmt.Sprintf("%s-%d", base, n)
+	}
+}
+
+type withdrawSharedParams struct {
+	Config domain.RunConfig
+	Job    string
+	Into   string
+}
+
+// withdrawShared gives a lifted service back to its file's job: its ports, its
+// url when the file's job publishes none, what it touches, and every reference
+// naming it. Only a value reading its namespace cannot follow — the file's job
+// has none — and that is what it returns, to be said.
+func withdrawShared(params withdrawSharedParams) (domain.RunConfig, []string) {
+	cfg := params.Config
+	from, fromFound := jobIndex(cfg, params.Job)
+	into, intoFound := jobIndex(cfg, params.Into)
+	if !fromFound || !intoFound {
+		return cfg, nil
+	}
+
+	jobs := slices.Clone(cfg.Jobs)
+	for name, base := range jobs[from].Ports {
+		if _, declared := jobs[into].Ports[name]; !declared {
+			jobs[into].Ports = withPort(jobs[into].Ports, name, base)
+		}
+	}
+	if jobs[into].URL == nil {
+		jobs[into].URL = jobs[from].URL
+	}
+	for _, touched := range jobs[from].Touches {
+		if touched != params.Into && !slices.Contains(jobs[into].Touches, touched) {
+			jobs[into].Touches = append(slices.Clone(jobs[into].Touches), touched)
+		}
+	}
+	cfg.Jobs = jobs
+
+	var unlinked []string
+	kept := make([]domain.EnvValueLink, 0, len(cfg.EnvValues))
+	for _, link := range cfg.EnvValues {
+		if link.Job == params.Job && strings.Contains(link.Value, domain.EnvValueTokenNamespace) {
+			unlinked = append(unlinked, link.Key)
+			continue
+		}
+		kept = append(kept, link)
+	}
+	cfg.EnvValues = kept
+	if len(kept) == 0 {
+		cfg.EnvValues = nil
+	}
+
+	cfg = RenameJobRefs(RenameJobRefsParams{Config: cfg, From: params.Job, To: params.Into})
+	cfg, _ = RemoveJob(cfg, params.Job)
+	return cfg, unlinked
 }
 
 type upsertSharedJobParams struct {
@@ -110,13 +285,15 @@ type upsertSharedJobParams struct {
 	ComposeCmd string
 }
 
-func upsertSharedJob(params upsertSharedJobParams) domain.RunConfig {
+// upsertSharedJob returns the line to say when the service had to be lifted
+// under another name.
+func upsertSharedJob(params upsertSharedJobParams) (domain.RunConfig, string) {
 	cfg := params.Config
 	flag := DockerComposeFileFlag(params.Shared.File)
+	lifted := LiftedJobName(LiftedJobNameParams{Config: cfg, File: params.Shared.File, Service: params.Shared.Service})
 
-	if index, found := jobIndex(cfg, params.Shared.Service); found {
-		jobs := make([]domain.JobConfig, len(cfg.Jobs))
-		copy(jobs, cfg.Jobs)
+	if index, found := jobIndex(cfg, lifted); found && lifted != "" {
+		jobs := slices.Clone(cfg.Jobs)
 		jobs[index].Scope = domain.JobScopeShared
 		// A namespace already written by hand outranks a recipe the wizard offered:
 		// the config speaks, detection does not.
@@ -124,11 +301,12 @@ func upsertSharedJob(params upsertSharedJobParams) domain.RunConfig {
 			jobs[index].Namespace = params.Shared.Namespace
 		}
 		cfg.Jobs = jobs
-		return cfg
+		return cfg, ""
 	}
 
-	cfg.Jobs = append(cfg.Jobs, domain.JobConfig{
-		Name:      params.Shared.Service,
+	name := freeJobName(cfg, params.Shared.Service)
+	cfg.Jobs = append(slices.Clone(cfg.Jobs), domain.JobConfig{
+		Name:      name,
 		Kind:      domain.JobKindService,
 		Cmd:       fmt.Sprintf("%s %sup -d %s", params.ComposeCmd, flag, params.Shared.Service),
 		Stop:      fmt.Sprintf("%s %sstop %s", params.ComposeCmd, flag, params.Shared.Service),
@@ -136,7 +314,10 @@ func upsertSharedJob(params upsertSharedJobParams) domain.RunConfig {
 		Scope:     domain.JobScopeShared,
 		Namespace: params.Shared.Namespace,
 	})
-	return cfg
+	if name == params.Shared.Service {
+		return cfg, ""
+	}
+	return cfg, fmt.Sprintf(domain.ComposeSharedRenamedFmt, params.Shared.File, params.Shared.Service, name, params.Shared.Service)
 }
 
 type JoinSharedProfilesParams struct {
@@ -152,7 +333,11 @@ type JoinSharedProfilesParams struct {
 func JoinSharedProfiles(params JoinSharedProfilesParams) domain.RunConfig {
 	cfg := params.Config
 	for _, shared := range params.Shared {
-		cfg = joinProfilesOf(cfg, ComposeJobName(ComposeJobNameParams{Config: cfg, File: shared.File}), shared.Service)
+		lifted := LiftedJobName(LiftedJobNameParams{Config: cfg, File: shared.File, Service: shared.Service})
+		if lifted == "" {
+			continue
+		}
+		cfg = joinProfilesOf(cfg, ComposeJobName(ComposeJobNameParams{Config: cfg, File: shared.File}), lifted)
 	}
 	return cfg
 }
@@ -196,14 +381,15 @@ type rewriteFileJobParams struct {
 	ComposeCmd string
 }
 
-// rewriteFileJob makes the file's own job start only what stayed in it. Left
-// alone it would bring the lifted services up a second time, behind the backs
-// of the jobs that now own them.
-func rewriteFileJob(params rewriteFileJobParams) domain.RunConfig {
+// rewriteFileJob makes the file's own job start and stop only what stayed in
+// it. Left alone it would bring the lifted services up a second time, behind the
+// backs of the jobs that now own them — or, once one is given back, leave it out
+// of the stack for good.
+func rewriteFileJob(params rewriteFileJobParams) SharedServicesOutcome {
 	cfg := params.Config
 	index, found := jobIndex(cfg, params.Job)
 	if !found {
-		return cfg
+		return SharedServicesOutcome{Config: cfg}
 	}
 
 	var stays []string
@@ -216,18 +402,49 @@ func rewriteFileJob(params rewriteFileJobParams) domain.RunConfig {
 	// Nothing left to run: a job that started the file anyway would raise every
 	// lifted service again.
 	if len(params.Shared) > 0 && len(stays) == 0 {
-		next, _ := RemoveJob(cfg, params.Job)
-		return next
+		return retireFileJob(params)
 	}
 
-	jobs := make([]domain.JobConfig, len(cfg.Jobs))
-	copy(jobs, cfg.Jobs)
+	lifted := len(params.Shared) > 0
+	jobs := slices.Clone(cfg.Jobs)
 	jobs[index].Cmd = composeUpCmd(composeUpParams{
 		ComposeCmd: params.ComposeCmd, File: params.File,
-		Services: stays, Lifted: len(params.Shared) > 0,
+		Services: stays, Lifted: lifted,
 	})
+	if generatedComposeStop(jobs[index].Stop, params.File) {
+		jobs[index].Stop = composeStopCmd(composeStopParams{
+			ComposeCmd: params.ComposeCmd, File: params.File,
+			Services: stays, Lifted: lifted,
+		})
+	}
 	cfg.Jobs = jobs
-	return cfg
+	return SharedServicesOutcome{Config: cfg}
+}
+
+// generatedComposeStop says the stop command is one wtm wrote, so it may be
+// rewritten with the stack. One written by hand is the reader's.
+func generatedComposeStop(stop, file string) bool {
+	needle := DockerComposeFileFlag(file)
+	return strings.HasSuffix(stop, needle+"down --remove-orphans") || strings.Contains(stop, needle+"rm -s -f ")
+}
+
+// retireFileJob removes a file's job whose every service was lifted, handing
+// what named it to the jobs that took them over. A .env link on one of its own
+// ports cannot follow — the port went nowhere — and is returned to be said.
+func retireFileJob(params rewriteFileJobParams) SharedServicesOutcome {
+	var heirs []string
+	for _, service := range params.Services {
+		if name := LiftedJobName(LiftedJobNameParams{Config: params.Config, File: params.File, Service: service.Name}); name != "" {
+			heirs = append(heirs, name)
+		}
+	}
+	cfg := redirectJobRefs(redirectJobRefsParams{Config: params.Config, From: params.Job, To: heirs})
+	cfg, effect := RemoveJob(cfg, params.Job)
+	return SharedServicesOutcome{
+		Config:    cfg,
+		Withdrawn: []string{params.Job},
+		Unlinked:  append(effect.EnvPorts, effect.EnvValues...),
+	}
 }
 
 func jobIndex(cfg domain.RunConfig, name string) (int, bool) {
@@ -281,7 +498,7 @@ func moveLiftedPorts(params moveLiftedPortsParams) domain.RunConfig {
 	owners := map[string]string{}
 	for _, binding := range params.Bindings {
 		if _, lifted := params.Shared[binding.Service]; lifted && binding.Var != "" {
-			owners[binding.Var] = binding.Service
+			owners[binding.Var] = LiftedJobName(LiftedJobNameParams{Config: params.Config, File: params.File, Service: binding.Service})
 		}
 	}
 	if len(owners) == 0 {
@@ -292,9 +509,9 @@ func moveLiftedPorts(params moveLiftedPortsParams) domain.RunConfig {
 	jobs := make([]domain.JobConfig, len(cfg.Jobs))
 	copy(jobs, cfg.Jobs)
 
-	for name, service := range owners {
+	for name, owner := range owners {
 		host, hostFound := jobIndex(cfg, params.Host)
-		target, targetFound := jobIndex(cfg, service)
+		target, targetFound := jobIndex(cfg, owner)
 		if !hostFound || !targetFound {
 			continue
 		}

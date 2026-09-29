@@ -337,6 +337,13 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 			EnvSources:    outcome.EnvSources,
 			EnvUnreadable: outcome.EnvUnreadable,
 		})
+		if lines := rules.ComposeSharingLines(rules.ComposeSharingLinesParams{
+			Renamed:  outcome.Renamed,
+			Unlinked: outcome.Unlinked,
+		}); len(lines) > 0 {
+			output.Blank(w)
+			output.Callout(w, domain.ComposeSharingTitle, lines)
+		}
 		output.ComposeNamesReport(w, output.ComposeNamesReportParams{
 			Patched:  namePatches,
 			Withheld: namePlan.Withheld,

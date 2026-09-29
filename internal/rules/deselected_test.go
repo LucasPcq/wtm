@@ -191,3 +191,23 @@ func TestJobsByCwdIgnoreLesTasksVoisines(t *testing.T) {
 		t.Errorf("jobs par répertoire = %v, want apps/api -> api-dev", got)
 	}
 }
+
+// The jobs lifted out of a file go with it: they run nothing else, and keeping
+// them left a shared service starting a stack nobody selected any more.
+func TestDeselectedJobsTakesTheSharedJobsOfAnUncheckedFile(t *testing.T) {
+	cfg := domain.RunConfig{Jobs: []domain.JobConfig{
+		{Name: "db", Scope: domain.JobScopeShared, Cmd: "docker compose -f docker-compose.yml up -d db"},
+		{Name: "redis", Scope: domain.JobScopeShared, Cmd: "docker compose -f docker-compose.yml up -d redis"},
+	}}
+
+	got := rules.DeselectedJobs(rules.DeselectedJobsParams{
+		Asked:                true,
+		Existing:             cfg,
+		PackageManager:       domain.PkgManagerPnpm,
+		DetectedComposeFiles: []string{"docker-compose.yml"},
+	})
+
+	if len(got) != 2 {
+		t.Errorf("jobs to remove = %v, want both shared jobs", got)
+	}
+}

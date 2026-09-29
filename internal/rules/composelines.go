@@ -2,6 +2,7 @@ package rules
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -148,4 +149,20 @@ func ComposeSuggestedDefault(b domain.ComposePortBinding) string {
 		return strings.Replace(b.Token, braced, withDefault, 1)
 	}
 	return strings.Replace(b.Token, "$"+b.Var, withDefault, 1)
+}
+
+type ComposeSharingLinesParams struct {
+	Renamed  []string
+	Unlinked []string
+}
+
+// ComposeSharingLines is what the scope answers changed that run.toml alone does
+// not make obvious: a service lifted under another name, and a .env key whose
+// link was dropped with the namespace it read.
+func ComposeSharingLines(params ComposeSharingLinesParams) []string {
+	lines := slices.Clone(params.Renamed)
+	for _, key := range params.Unlinked {
+		lines = append(lines, fmt.Sprintf(domain.ComposeUnlinkedFmt, key))
+	}
+	return lines
 }

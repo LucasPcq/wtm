@@ -130,7 +130,7 @@ func editNamed(params EditParams, name string) (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	cfg := rules.RenameJobRefs(params.Request.Config, current.Name, updated.Name)
+	cfg := rules.RenameJobRefs(rules.RenameJobRefsParams{Config: params.Request.Config, From: current.Name, To: updated.Name})
 	for i, job := range cfg.Jobs {
 		if job.Name == current.Name {
 			cfg.Jobs[i] = updated
