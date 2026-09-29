@@ -159,7 +159,6 @@ func (d *daemonServer) stop() {
 		close(d.shutdown)
 		d.listener.Close()
 		d.manager.StopForeground()
-		os.Remove(d.socketPath)
 		d.clients.Wait()
 		close(d.stopped)
 	})

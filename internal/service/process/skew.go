@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -43,7 +45,12 @@ func DaemonPeerPID(socketPath string) (int, error) {
 // Shutdown asks the daemon to exit and waits until its socket stops answering.
 // A daemon predating the shutdown request refuses it as an unknown action; it
 // is then sent the signal its own shutdown path was written for.
+//
+// It returns once the process is gone, not merely its socket: the socket closes
+// first, while foreground jobs are still in their grace period, and a daemon
+// started in that window would be one of two.
 func Shutdown(socketPath string) error {
+	pid, _ := DaemonPeerPID(socketPath)
 	resp, err := NewClient(socketPath).SendUnchecked(Request{Action: ActionShutdown})
 	if err != nil {
 		return fmt.Errorf("stop daemon: %w", err)
@@ -52,25 +59,40 @@ func Shutdown(socketPath string) error {
 		return fmt.Errorf("stop daemon: %s", resp.Message)
 	}
 	if resp.Status == StatusError {
-		if err := terminateOlder(socketPath); err != nil {
+		if err := terminateOlder(pid); err != nil {
 			return err
 		}
 	}
-	return AwaitDaemonStopped(socketPath)
+	if err := AwaitDaemonStopped(socketPath); err != nil {
+		return err
+	}
+	return awaitExit(pid)
 }
 
-func terminateOlder(socketPath string) error {
-	pid, err := DaemonPeerPID(socketPath)
-	if err != nil {
-		return fmt.Errorf("stop daemon: %w", err)
-	}
+func terminateOlder(pid int) error {
 	if pid <= 1 {
-		return fmt.Errorf("stop daemon: no pid for the process holding %s", socketPath)
+		return fmt.Errorf("stop daemon: no pid for the process holding the socket")
 	}
 	if err := terminate(pid); err != nil && !errors.Is(err, syscall.ESRCH) {
 		return fmt.Errorf("stop daemon (pid %d): %w", pid, err)
 	}
 	return nil
+}
+
+// awaitExit waits for the daemon's process to be gone. The test process is its
+// own peer, so a pid that is ours is never waited on.
+func awaitExit(pid int) error {
+	if pid <= 1 || pid == os.Getpid() {
+		return nil
+	}
+	deadline := time.Now().Add(domain.DaemonStopTimeout)
+	for time.Now().Before(deadline) {
+		if err := syscall.Kill(pid, 0); errors.Is(err, syscall.ESRCH) {
+			return nil
+		}
+		time.Sleep(domain.DaemonPollInterval)
+	}
+	return fmt.Errorf("daemon (pid %d) did not exit within %v", pid, domain.DaemonStopTimeout)
 }
 
 // EnsureCurrentDaemon is EnsureDaemon for a command about to start something: a
