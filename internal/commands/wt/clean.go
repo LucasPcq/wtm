@@ -18,9 +18,22 @@ func newCleanCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   domain.CmdClean + " [branch]",
 		Short: "Remove a worktree and its local branch",
-		Long:  "Remove a git worktree and delete the local branch. The remote branch is never touched.\nWithout arguments, shows an interactive picker.",
-		Args:  cobra.MaximumNArgs(1),
-		RunE:  runClean,
+		Long: "Remove a git worktree and delete the local branch. The remote branch is never touched.\n" +
+			"Without arguments, shows an interactive picker.\n" +
+			"\n" +
+			"The removal runs in a fixed order: the worktree's jobs are stopped and checked gone (a job\n" +
+			"that will not stop refuses the removal unless --force), the on_clean hooks run, git removes\n" +
+			"the worktree — and only then is its data dropped. A failure before that last step leaves\n" +
+			"the data where it was.\n" +
+			"\n" +
+			"By default, clean DROPS the namespaces the worktree carved out of shared services (a\n" +
+			"database per worktree in a shared postgres, say): the confirmation names each one, and\n" +
+			"--output json reports each as dropped, deferred or kept. --keep-data withholds the drop. A\n" +
+			"service that is down cannot take its data back: the form asks whether to start it now or\n" +
+			"keep the data until wtm next starts it; --yes keeps it, --drop-data starts it. A namespace\n" +
+			"another worktree reaches under the same name is never dropped.",
+		Args: cobra.MaximumNArgs(1),
+		RunE: runClean,
 	}
 
 	cmd.Flags().Bool(domain.FlagForce, false, "Lift safety refusals (dirty/unpushed/open-PR); still asks to confirm unless --yes")

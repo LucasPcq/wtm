@@ -44,7 +44,12 @@ func newPruneCmd() *cobra.Command {
 			"Like clean, prune gives back the data the removed worktrees carved out of shared\n" +
 			"services (--keep-data withholds it); when such a service is down, the form asks whether\n" +
 			"to start it and drop the data now, or keep it until the service next starts. --yes keeps\n" +
-			"it; --drop-data drops it, starting the services that are down.",
+			"it; --drop-data drops it, starting the services that are down.\n" +
+			"\n" +
+			"Each worktree goes through clean's whole sequence — jobs stopped, hooks, removal, then its\n" +
+			"data — before the next one starts. The first that fails stops the prune: the ones before\n" +
+			"it are gone with their data, it and the ones after keep theirs, and the report (and the\n" +
+			"`failed` field of --output json) names where it stopped.",
 		Args: cobra.NoArgs,
 		RunE: runPrune,
 	}

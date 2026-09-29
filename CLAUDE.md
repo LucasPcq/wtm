@@ -129,6 +129,7 @@ internal/
     clean/                    ←   `wtm clean`: the run (clean.go) + its questions (steps.go)
     reparent/                 ←   `wtm reparent`: the run (reparent.go) + its questions (steps.go)
     prune/                    ←   `wtm prune`: the run (prune.go) + its questions (steps.go)
+    teardown/                 ←   the per-worktree removal clean and prune share: stop, hooks, remove, then drop
     sync/                     ←   `wtm sync`: the run (sync.go) + its questions (steps.go)
     runlogs/                  ←   the jobs a surface shows (`Board`), their live streams,
                                   and the profile start sequence (reports events, not steps)

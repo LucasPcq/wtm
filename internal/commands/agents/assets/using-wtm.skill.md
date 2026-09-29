@@ -175,14 +175,26 @@ flagged; everything else is what the name implies.
   One exception for `prune`: when **every** match is unsafe, nothing survives the
   selection and the JSON is empty — `pruned: []` and `skipped: []` both. Read an empty
   result as "nothing was removed", not as "nothing matched".
-  Both also run any configured **`on_clean`** hooks in the worktree just before removing it
-  (e.g. `docker compose down`); a hook that exits non-zero **aborts the removal** unless its
-  entry sets `continue_on_error`. For `prune`, every selected worktree is hooked before the
-  first one is removed, so a hook failing partway aborts with nothing deleted — but the
-  worktrees already hooked have had their teardown run, which is why `on_clean` hooks must
-  be idempotent. If `git worktree remove` then fails on undeletable files
-  (e.g. root-owned Docker files), interactive runs offer a `sudo rm -rf` fallback — this
-  never triggers in JSON/`--yes` mode, where the failure is surfaced as an error.
+  **Each removal runs in a fixed order**: the worktree's jobs are stopped and checked gone,
+  its **`on_clean`** hooks run (e.g. `docker compose down`), git removes the worktree, and
+  **only then** is its data dropped and its hold on the shared services released — so any
+  failure before the removal leaves the data intact. A job that will not stop (a daemon of
+  another wtm build: the error says `wtm run daemon restart`) **refuses the removal unless
+  `--force`**; a hook that exits non-zero aborts it unless its entry sets
+  `continue_on_error`. `prune` runs that whole sequence on one worktree before the next and
+  **stops at the first that fails**: the ones before are gone with their data, it and the
+  ones after keep theirs, the JSON names it under `failed` (`branch`, `path`, `error`), and
+  the exit code is non-zero. The JSON of both carries **`namespaces`**: one entry per
+  namespace a removed worktree held — `branch`, `job`, `name` (e.g. `app_feat-x`),
+  `status` `dropped` / `deferred` (service down, a drop it refused, or a drop past its 30 s
+  timeout — owed, paid next time wtm finds it up; `reason` says which) / `kept`
+  (`--keep-data`, or another live worktree reduces to the same name, e.g. `feat.x` beside
+  `feat/x`, so the namespace is its too — never dropped). If `git worktree remove` fails on
+  undeletable files (e.g. root-owned Docker files), interactive runs offer a `sudo rm -rf`
+  fallback; otherwise, since git has already forgotten the worktree, the removal is
+  completed (branch deleted, data dropped) and a warning names the leftover directory to
+  delete. A removal git refused outright (a locked worktree) is an error with nothing
+  touched.
 - `wtm extract <source> --files <a,b> --to <branch>` — move part of the `<source>`
   worktree's uncommitted changes onto another branch (split an oversized PR). In JSON mode pass
   `--yes` plus the source arg, `--files`, and `--to` — all **required** (omitting any errors

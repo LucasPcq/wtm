@@ -8,9 +8,11 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/service/process/processtest"
 	"github.com/LucasPcq/wtm/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
+	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
 
 func snapshotWith(up bool) Snapshot {
@@ -99,22 +101,42 @@ func holdingFixture(t *testing.T) (flow.Context, string) {
 	return ctx, witness
 }
 
-func TestDetachDropsWhatAServiceUpHolds(t *testing.T) {
-	ctx, witness := holdingFixture(t)
+// removeWorktree takes feat-live away the way a clean does before its data is
+// dropped, so a drop that still needed its directory would fail here.
+func removeWorktree(t *testing.T, ctx flow.Context) {
+	t.Helper()
+	wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: ctx.ProjectDir, Branch: "feat-live"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gittest.Git(t, ctx.ProjectDir, "worktree", "remove", "--force", wt.Path)
+}
+
+func readHolding(t *testing.T, ctx flow.Context, up bool) Snapshot {
+	t.Helper()
 	snapshot := Read(ReadParams{Context: ctx, Branches: []string{"feat-live"}})
 	if len(snapshot.Holdings) != 1 {
 		t.Fatalf("holdings = %+v, want feat-live's", snapshot.Holdings)
 	}
-	snapshot.Up = map[string]bool{"postgres": true}
+	snapshot.Up = map[string]bool{"postgres": up}
+	return snapshot
+}
+
+func TestDropperDropsWhatAServiceUpHoldsOnceTheWorktreeIsGone(t *testing.T) {
+	ctx, witness := holdingFixture(t)
+	snapshot := readHolding(t, ctx, true)
+	removeWorktree(t, ctx)
 	presenter := &flowtest.Recorder{}
 
-	Detach(DetachParams{Context: ctx, Presenter: presenter, Snapshot: snapshot})
+	dropper := NewDropper(DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot})
+	outcomes := dropper.Drop("feat-live")
+	dropper.Close()
 
 	if body, _ := os.ReadFile(witness); strings.TrimSpace(string(body)) != "app_feat-live" {
 		t.Errorf("remove ran with %q, want app_feat-live", body)
 	}
-	if len(presenter.Stages) != 1 {
-		t.Errorf("stages = %v, want the drop under one", presenter.Stages)
+	if len(outcomes) != 1 || outcomes[0].Status != domain.NamespaceDropped || outcomes[0].Branch != "feat-live" || outcomes[0].Job != "postgres" {
+		t.Errorf("outcomes = %+v, want app_feat-live dropped from postgres", outcomes)
 	}
 	if left := runjobs.LoadPendingRemovals(ctx.StateDir); len(left) != 0 {
 		t.Errorf("queue = %+v, want nothing owed", left)
@@ -122,13 +144,12 @@ func TestDetachDropsWhatAServiceUpHolds(t *testing.T) {
 }
 
 // Kept, the data is owed to the service's next start, and the run says so.
-func TestDetachQueuesWhatAServiceDownHolds(t *testing.T) {
+func TestDropperQueuesWhatAServiceDownHolds(t *testing.T) {
 	ctx, witness := holdingFixture(t)
-	snapshot := Read(ReadParams{Context: ctx, Branches: []string{"feat-live"}})
-	snapshot.Up = map[string]bool{}
+	snapshot := readHolding(t, ctx, false)
 	presenter := &flowtest.Recorder{}
 
-	Detach(DetachParams{Context: ctx, Presenter: presenter, Snapshot: snapshot})
+	outcomes := NewDropper(DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot}).Drop("feat-live")
 
 	if body, _ := os.ReadFile(witness); len(body) != 0 {
 		t.Errorf("remove ran with %q against a service down", body)
@@ -137,7 +158,144 @@ func TestDetachQueuesWhatAServiceDownHolds(t *testing.T) {
 	if len(left) != 1 || left[0].Worktree != "feat-live" {
 		t.Errorf("queue = %+v, want feat-live's namespace owed", left)
 	}
-	if len(presenter.Statuses) != 1 || presenter.Statuses[0].Kind != flow.NoticeWarning {
+	if len(presenter.Statuses) != 1 || !strings.Contains(presenter.Statuses[0].Text, "postgres is down") {
 		t.Errorf("statuses = %+v, want the deferral said", presenter.Statuses)
+	}
+	if len(outcomes) != 1 || outcomes[0].Status != domain.NamespaceDeferred {
+		t.Errorf("outcomes = %+v, want it deferred", outcomes)
+	}
+}
+
+// A service up that refused the drop is not down, and saying so sends the
+// reader after the wrong cause.
+func TestDropperNamesTheCauseOfADropRefusedByAServiceUp(t *testing.T) {
+	ctx, _ := holdingFixture(t)
+	snapshot := readHolding(t, ctx, true)
+	snapshot.Holdings[0].Config.Jobs[0].Namespace.Remove = "echo 'database is being accessed by other users' >&2; exit 1"
+	presenter := &flowtest.Recorder{}
+
+	outcomes := NewDropper(DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot}).Drop("feat-live")
+
+	if len(presenter.Statuses) != 1 {
+		t.Fatalf("statuses = %+v, want one line", presenter.Statuses)
+	}
+	text := presenter.Statuses[0].Text
+	if strings.Contains(text, "is down") || !strings.Contains(text, "being accessed by other users") {
+		t.Errorf("status = %q, want the real cause", text)
+	}
+	if len(outcomes) != 1 || outcomes[0].Status != domain.NamespaceDeferred || !strings.Contains(outcomes[0].Reason, "being accessed") {
+		t.Errorf("outcomes = %+v, want it deferred with its cause", outcomes)
+	}
+	if left := runjobs.LoadPendingRemovals(ctx.StateDir); len(left) != 1 {
+		t.Errorf("queue = %+v, want the namespace owed", left)
+	}
+}
+
+// A debt left by an earlier attempt is paid by the drop that succeeds.
+func TestDropperSettlesAnOlderDebtForTheNamespaceItDrops(t *testing.T) {
+	ctx, _ := holdingFixture(t)
+	if err := runjobs.QueueRemovals(runjobs.QueueRemovalsParams{StateDir: ctx.StateDir, Refs: []domain.NamespaceRef{
+		{Job: "postgres", Worktree: "feat-live", Ordinal: 1},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := readHolding(t, ctx, true)
+
+	NewDropper(DropperParams{Context: ctx, Presenter: &flowtest.Recorder{}, Snapshot: snapshot}).Drop("feat-live")
+
+	if left := runjobs.LoadPendingRemovals(ctx.StateDir); len(left) != 0 {
+		t.Errorf("queue = %+v, want the old debt settled", left)
+	}
+}
+
+func TestDropperWithKeepDataRunsNothing(t *testing.T) {
+	ctx, witness := holdingFixture(t)
+	snapshot := readHolding(t, ctx, true)
+	presenter := &flowtest.Recorder{}
+
+	outcomes := NewDropper(DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot, KeepData: true}).Drop("feat-live")
+
+	if body, _ := os.ReadFile(witness); len(body) != 0 {
+		t.Errorf("remove ran with %q under --keep-data", body)
+	}
+	if len(outcomes) != 1 || outcomes[0].Status != domain.NamespaceKept || outcomes[0].Name != "app_feat-live" {
+		t.Errorf("outcomes = %+v, want app_feat-live kept", outcomes)
+	}
+	if len(presenter.Stages)+len(presenter.Statuses) != 0 {
+		t.Errorf("presented %v %v, want nothing", presenter.Stages, presenter.Statuses)
+	}
+}
+
+// feat/live and feat-live reduce to the same slug, so the namespace is both
+// of theirs: cleaning one must not drop the other's database.
+func TestDropperKeepsANamespaceAnotherWorktreeSharesByItsSlug(t *testing.T) {
+	ctx, witness := holdingFixture(t)
+	gittest.Git(t, ctx.ProjectDir, "worktree", "add", "-b", "feat/live", filepath.Join(t.TempDir(), "feat-slash-live"))
+	snapshot := readHolding(t, ctx, true)
+	if got := snapshot.Held()[0].SharedWith; got != "feat/live" {
+		t.Fatalf("shared with = %q, want feat/live", got)
+	}
+	presenter := &flowtest.Recorder{}
+
+	outcomes := NewDropper(DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot}).Drop("feat-live")
+
+	if body, _ := os.ReadFile(witness); len(body) != 0 {
+		t.Errorf("remove ran with %q on a namespace feat/live still uses", body)
+	}
+	if len(presenter.Statuses) != 1 || !strings.Contains(presenter.Statuses[0].Text, "feat/live") {
+		t.Errorf("statuses = %+v, want the collision named", presenter.Statuses)
+	}
+	if len(outcomes) != 1 || outcomes[0].Status != domain.NamespaceKept {
+		t.Errorf("outcomes = %+v, want it kept", outcomes)
+	}
+	if left := runjobs.LoadPendingRemovals(ctx.StateDir); len(left) != 0 {
+		t.Errorf("queue = %+v: a namespace still in use is owed to nobody", left)
+	}
+}
+
+// A service down is started from the main checkout to take its data back, and
+// let go once it has.
+func TestDropperStartsAServiceDownAndLetsItGoAfterwards(t *testing.T) {
+	ctx, witness := holdingFixture(t)
+	daemon := processtest.Serve(t, nil)
+	snapshot := readHolding(t, ctx, false)
+	presenter := &flowtest.Recorder{}
+
+	dropper := NewDropper(DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot, StartDown: true})
+	outcomes := dropper.Drop("feat-live")
+	dropper.Close()
+
+	if body, _ := os.ReadFile(witness); strings.TrimSpace(string(body)) != "app_feat-live" {
+		t.Errorf("remove ran with %q, want app_feat-live once postgres was started", body)
+	}
+	if len(outcomes) != 1 || outcomes[0].Status != domain.NamespaceDropped {
+		t.Errorf("outcomes = %+v, want it dropped", outcomes)
+	}
+	main, err := worktree.MainCheckout(worktree.MainCheckoutParams{ProjectDir: ctx.ProjectDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "start:@" + main + " stop:postgres@" + main; strings.Join(daemon.Actions(), " ") != want {
+		t.Errorf("requests = %v, want postgres started then let go in the main checkout", daemon.Actions())
+	}
+}
+
+// A service that cannot be started leaves its data owed, and says why.
+func TestDropperDefersWhatAServiceThatWouldNotStartHolds(t *testing.T) {
+	ctx, witness := holdingFixture(t)
+	snapshot := readHolding(t, ctx, false)
+	snapshot.Config = domain.RunConfig{}
+	presenter := &flowtest.Recorder{}
+
+	outcomes := NewDropper(DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot, StartDown: true}).Drop("feat-live")
+
+	if body, _ := os.ReadFile(witness); len(body) != 0 {
+		t.Errorf("remove ran with %q against a service that never started", body)
+	}
+	if len(presenter.Statuses) == 0 || !strings.Contains(presenter.Statuses[0].Text, domain.ErrJobNotFound.Error()) {
+		t.Errorf("statuses = %+v, want the start failure said", presenter.Statuses)
+	}
+	if len(outcomes) != 1 || outcomes[0].Status != domain.NamespaceDeferred {
+		t.Errorf("outcomes = %+v, want it deferred", outcomes)
 	}
 }

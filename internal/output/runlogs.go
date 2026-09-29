@@ -110,6 +110,8 @@ func (p *RunPrinter) Emit(event runlogs.Event) {
 	case runlogs.PhaseNotice:
 		Blank(p.err)
 		Callout(p.err, domain.ProxyUnavailableTitle, []string{event.Notice})
+	case runlogs.PhaseWarning:
+		Warning(p.err, event.Notice)
 	case runlogs.PhaseProbed:
 		p.probed(event.Probes)
 	case runlogs.PhaseCrashed:

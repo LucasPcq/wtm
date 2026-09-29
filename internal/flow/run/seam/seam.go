@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -182,20 +183,61 @@ func (s Seam) Starter(params StartParams) runlogs.StartFunc {
 }
 
 func (s Seam) run(ctx context.Context, sink runlogs.Sink, params StartParams) (runlogs.Outcome, error) {
-	outcome, err := s.start(ctx, sink, params)
-	// Recorded after the run, from the jobs it actually started: it is the only
-	// durable trace that this worktree holds a namespace, and `clean` reads it to
-	// give back exactly what exists rather than everything run.toml declares.
-	// A verbatim worktree carves nothing — the daemon refused to — so there is
-	// nothing for a clean to give back.
-	if s.shared != nil && !rules.IsVerbatim(domain.Isolation(s.env[domain.EnvIsolation])) {
-		_ = worktree.RecordNamespaces(worktree.RecordNamespacesParams{
-			StateDir: s.stateDir,
-			Branch:   s.worktree,
-			Jobs:     rules.NamespaceJobsStarted(rules.NamespaceJobsStartedParams{Jobs: params.Jobs, Started: outcome.Started}),
-		})
+	return s.start(ctx, s.recording(recordingParams{Sink: sink, Jobs: params.Jobs}), params)
+}
+
+type recordingParams struct {
+	Sink runlogs.Sink
+	Jobs []domain.JobConfig
+}
+
+// recording remembers each namespace the moment its service reports started,
+// not once the whole sequence is over: it is the only durable trace that this
+// worktree holds one, `clean` reads it to give back exactly what exists, and a
+// run interrupted after the create would otherwise leave a database nothing
+// will ever drop. A verbatim worktree carves nothing — the daemon refused to.
+func (s Seam) recording(params recordingParams) runlogs.Sink {
+	sink := params.Sink
+	if sink == nil {
+		sink = discard{}
 	}
-	return outcome, err
+	if s.shared == nil || rules.IsVerbatim(domain.Isolation(s.env[domain.EnvIsolation])) {
+		return sink
+	}
+	carving := rules.NamespaceJobs(params.Jobs)
+	if len(carving) == 0 {
+		return sink
+	}
+	return namespaceRecorder{inner: sink, jobs: carving, stateDir: s.stateDir, worktree: s.worktree}
+}
+
+type discard struct{}
+
+func (discard) Emit(runlogs.Event) {}
+
+type namespaceRecorder struct {
+	inner    runlogs.Sink
+	jobs     []string
+	stateDir string
+	worktree string
+}
+
+func (r namespaceRecorder) Emit(event runlogs.Event) {
+	r.inner.Emit(event)
+	if event.Phase != runlogs.PhaseStarted || !slices.Contains(r.jobs, event.Job) {
+		return
+	}
+	err := worktree.RecordNamespaces(worktree.RecordNamespacesParams{StateDir: r.stateDir, Branch: r.worktree, Jobs: []string{event.Job}})
+	if err == nil {
+		return
+	}
+	r.inner.Emit(runlogs.Event{
+		Phase:    runlogs.PhaseWarning,
+		Job:      event.Job,
+		WorkDir:  event.WorkDir,
+		Worktree: event.Worktree,
+		Notice:   fmt.Sprintf(domain.NamespaceRecordFailedFmt, event.Job, err),
+	})
 }
 
 func (s Seam) start(ctx context.Context, sink runlogs.Sink, params StartParams) (runlogs.Outcome, error) {

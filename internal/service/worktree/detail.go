@@ -2,6 +2,8 @@ package worktree
 
 import (
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -65,13 +67,18 @@ type RecordNamespacesParams struct {
 // shared services, so `clean` gives back exactly what exists. Additive and
 // idempotent: a job already recorded is not recorded twice, and a worktree with
 // no metadata — the main checkout — records nothing rather than creating some.
+// Any other failure is returned: a namespace nobody recorded is one no clean
+// will ever drop.
 func RecordNamespaces(params RecordNamespacesParams) error {
 	if len(params.Jobs) == 0 {
 		return nil
 	}
 	meta, err := loadMetadata(params.StateDir, params.Branch)
-	if err != nil {
+	if errors.Is(err, fs.ErrNotExist) {
 		return nil
+	}
+	if err != nil {
+		return err
 	}
 
 	held := make(map[string]bool, len(meta.Namespaces))

@@ -9,8 +9,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
+	"github.com/LucasPcq/wtm/internal/flow/teardown"
 	"github.com/LucasPcq/wtm/internal/rules"
-	"github.com/LucasPcq/wtm/internal/service/process"
 	"github.com/LucasPcq/wtm/internal/service/shell"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
@@ -40,7 +40,10 @@ type Outcome struct {
 	AlreadyAbsent    bool
 	Reparented       []domain.ReparentResult
 	OrphanedChildren []domain.ReparentResult
-	Aborted          bool
+	// Namespaces is what became of the data the worktree held in the shared
+	// services.
+	Namespaces []domain.NamespaceOutcome
+	Aborted    bool
 }
 
 type Presenter interface {
@@ -143,27 +146,37 @@ type removeParams struct {
 
 func (f *cleanFlow) remove(p removeParams) (Outcome, error) {
 	params := p.Params
-	worktreePath := ""
+	target := teardown.Target{Branch: params.Branch}
 	if wt, err := worktree.FindByBranch(worktree.FindByBranchParams{
 		ProjectDir: params.ProjectDir,
 		Branch:     params.Branch,
 	}); err == nil {
-		worktreePath = wt.Path
+		target.Path = wt.Path
 	}
 
 	// Decided before the removal, while the paths still resolve.
 	cwd, _ := os.Getwd()
-	insideRemoved := worktreePath != "" && cwd != "" &&
-		rules.IsPathWithin(flow.ResolveSymlinks(worktreePath), flow.ResolveSymlinks(cwd))
+	insideRemoved := target.Path != "" && cwd != "" &&
+		rules.IsPathWithin(flow.ResolveSymlinks(target.Path), flow.ResolveSymlinks(cwd))
 
-	f.removeNamespaces(params.Branch, p.StartDown)
-	f.stopServices(params.Branch)
+	// Read afresh rather than from the wizard: a service may have gone down, or
+	// come up, while the recap was on screen. And read now, while the worktree
+	// whose environment it needs still exists.
+	dropper := owed.NewDropper(owed.DropperParams{
+		Context:   f.ctx,
+		Presenter: f.presenter,
+		Snapshot:  owed.Read(owed.ReadParams{Context: f.ctx, Branches: []string{params.Branch}}),
+		StartDown: p.StartDown,
+		KeepData:  f.request.KeepData,
+	})
+	defer dropper.Close()
 
-	// Hooks run as their own phase before the removal, so they don't fight the
-	// removal progress for the terminal; the service then skips them.
+	if err := teardown.Stop(teardown.StopParams{Context: f.ctx, Presenter: f.presenter, Target: target, Force: params.Force}); err != nil {
+		return Outcome{}, err
+	}
 	params.SkipHooks = true
-	if hookErr := f.runHooks(worktreePath, params.Branch); hookErr != nil {
-		return Outcome{}, hookErr
+	if err := teardown.Hooks(teardown.HooksParams{Context: f.ctx, Presenter: f.presenter, Target: target, Title: domain.HooksTitleOnClean}); err != nil {
+		return Outcome{}, err
 	}
 
 	err := f.presenter.Stage(flow.StageParams{
@@ -179,24 +192,14 @@ func (f *cleanFlow) remove(p removeParams) (Outcome, error) {
 		return Outcome{Branch: params.Branch}, nil
 	}
 	if errors.Is(err, domain.ErrWorktreeRemoveFailed) {
-		recovered, rErr := f.recoverRemoveFailure(recoverParams{
-			Params: params,
-			Path:   worktreePath,
-			Cause:  err,
-		})
-		if rErr != nil {
-			return Outcome{}, rErr
-		}
-		if !recovered {
-			return Outcome{}, err
-		}
-		err = nil
+		err = f.recoverRemoveFailure(recoverParams{Params: params, Path: target.Path, Cause: err})
 	}
 	if err != nil {
 		return Outcome{}, err
 	}
 
-	f.purgeJobLogs(params.Branch)
+	namespaces := teardown.Reclaim(teardown.ReclaimParams{Context: f.ctx, Target: target, Dropper: dropper})
+	teardown.Release(teardown.ReleaseParams{Presenter: f.presenter, Target: target})
 
 	if insideRemoved {
 		shell.RequestCd(params.ProjectDir)
@@ -209,84 +212,12 @@ func (f *cleanFlow) remove(p removeParams) (Outcome, error) {
 
 	outcome := Outcome{
 		Branch:           params.Branch,
-		Path:             worktreePath,
+		Path:             target.Path,
 		Reparented:       reparented,
 		OrphanedChildren: orphanedChildren(p.ReparentPlan, p.ApplyReparent),
+		Namespaces:       namespaces,
 	}
 	return outcome, f.presenter.Cleaned(outcome)
-}
-
-// purgeJobLogs drops the removed worktree's persisted job logs. Best effort:
-// leftover log files are not worth failing a removal that already happened.
-func (f *cleanFlow) purgeJobLogs(branch string) {
-	_ = process.PurgeWorktreeLogs(rules.WorktreeLogDir(rules.WorktreeLogDirParams{
-		StateDir: f.ctx.StateDir,
-		Branch:   branch,
-	}))
-}
-
-// removeNamespaces reads the holdings afresh rather than from the wizard: a
-// service may have gone down, or come up, while the recap was on screen.
-func (f *cleanFlow) removeNamespaces(branchName string, startDown bool) {
-	if f.request.KeepData {
-		return
-	}
-	owed.Detach(owed.DetachParams{
-		Context:   f.ctx,
-		Presenter: f.presenter,
-		Snapshot:  owed.Read(owed.ReadParams{Context: f.ctx, Branches: []string{branchName}}),
-		StartDown: startDown,
-	})
-}
-
-func (f *cleanFlow) stopServices(branchName string) {
-	wt, err := worktree.FindByBranch(worktree.FindByBranchParams{
-		ProjectDir: f.ctx.ProjectDir,
-		Branch:     branchName,
-	})
-	if err != nil {
-		return
-	}
-
-	if !process.WorktreeHasJobs(wt.Path) {
-		return
-	}
-	stopped := false
-	_ = f.presenter.Stage(flow.StageParams{
-		Message: fmt.Sprintf(domain.CleanStoppingServicesFmt, branchName),
-		Work: func() error {
-			stopped = process.StopWorktreeJobs(wt.Path)
-			return nil
-		},
-	})
-	if stopped {
-		f.presenter.Status(flow.Notice{
-			Kind: flow.NoticeSuccess,
-			Text: fmt.Sprintf(domain.CleanStoppedServicesFmt, branchName),
-		})
-	}
-}
-
-func (f *cleanFlow) runHooks(worktreePath, branchName string) error {
-	hooks := f.ctx.Config.Project.Hooks.OnClean
-	if len(hooks) == 0 || worktreePath == "" {
-		return nil
-	}
-	return f.presenter.HookPhase(flow.HookPhaseParams{
-		Title:   domain.HooksTitleOnClean,
-		LogPath: rules.HooksLogPath(rules.HooksLogPathParams{StateDir: f.ctx.StateDir, Phase: domain.HookOnClean, Branch: branchName}),
-		Run: func(sink flow.HookSink) error {
-			return worktree.RunCleanHooks(domain.CleanHooksParams{
-				ProjectDir:   f.ctx.ProjectDir,
-				StateDir:     f.ctx.StateDir,
-				WorktreePath: worktreePath,
-				Branch:       branchName,
-				Hooks:        hooks,
-				Output:       sink.Output,
-				OnHook:       sink.OnHook,
-			})
-		},
-	})
 }
 
 type recoverParams struct {
@@ -296,11 +227,13 @@ type recoverParams struct {
 }
 
 // recoverRemoveFailure offers the privileged removal when `git worktree remove`
-// failed on files the current user cannot delete (typically root-owned files left by
-// a container). recovered=true resumes the normal post-removal flow.
-func (f *cleanFlow) recoverRemoveFailure(p recoverParams) (bool, error) {
+// failed on files the current user cannot delete (typically root-owned files
+// left by a container). Declined or out of reach, what git did is settled as it
+// stands. A nil error resumes the normal post-removal flow.
+func (f *cleanFlow) recoverRemoveFailure(p recoverParams) error {
+	salvage := teardown.SalvageParams{Presenter: f.presenter, Clean: p.Params, Path: p.Path, Cause: p.Cause}
 	if !f.request.AllowPrivileged || !f.prompter.Interactive() || p.Path == "" {
-		return false, nil
+		return teardown.Salvage(salvage)
 	}
 
 	f.presenter.Status(flow.Notice{
@@ -313,19 +246,16 @@ func (f *cleanFlow) recoverRemoveFailure(p recoverParams) (bool, error) {
 		DefaultYes: false,
 	})
 	if err != nil || !confirmed {
-		return false, nil
+		return teardown.Salvage(salvage)
 	}
 
-	if forceErr := worktree.ForceClean(domain.ForceCleanParams{
+	return worktree.ForceClean(domain.ForceCleanParams{
 		ProjectDir: p.Params.ProjectDir,
 		StateDir:   p.Params.StateDir,
 		Path:       p.Path,
 		Branch:     p.Params.Branch,
 		Force:      p.Params.Force,
-	}); forceErr != nil {
-		return false, forceErr
-	}
-	return true, nil
+	})
 }
 
 func (f *cleanFlow) applyReparent(plan domain.CleanReparentPlan, apply bool) ([]domain.ReparentResult, error) {

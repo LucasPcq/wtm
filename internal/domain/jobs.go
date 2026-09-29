@@ -355,14 +355,36 @@ type NamespaceHolding struct {
 	WorkDir string
 	Env     map[string]string
 	Config  RunConfig
+	// SharedWith is another live worktree whose name reduces to the same slug:
+	// the namespace is its as much as this one's, so nothing is dropped.
+	SharedWith string
 }
 
 // HeldNamespace is one line of what a removal gives back: the namespace, the
 // shared service holding it, and whether that service is up to take it.
 type HeldNamespace struct {
-	Name string
-	Job  string
-	Up   bool
+	Name       string
+	Job        string
+	Up         bool
+	SharedWith string
+}
+
+type NamespaceStatus string
+
+const (
+	NamespaceDropped  NamespaceStatus = "dropped"
+	NamespaceDeferred NamespaceStatus = "deferred"
+	NamespaceKept     NamespaceStatus = "kept"
+)
+
+// NamespaceOutcome is what a clean or a prune did with one namespace a removed
+// worktree held: dropped, deferred to the service's next start, or kept.
+type NamespaceOutcome struct {
+	Branch string          `json:"branch"`
+	Job    string          `json:"job"`
+	Name   string          `json:"name"`
+	Status NamespaceStatus `json:"status"`
+	Reason string          `json:"reason,omitempty"`
 }
 
 // NamespaceField is one editable line of the namespace step: which job it

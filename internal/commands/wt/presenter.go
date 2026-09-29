@@ -83,6 +83,7 @@ func (p cleanPresenter) Cleaned(outcome cleanflow.Outcome) error {
 			Path:             outcome.Path,
 			Reparented:       outcome.Reparented,
 			OrphanedChildren: outcome.OrphanedChildren,
+			Namespaces:       outcome.Namespaces,
 		})
 	}
 

@@ -31,6 +31,11 @@ services (--keep-data withholds it); when such a service is down, the form asks 
 to start it and drop the data now, or keep it until the service next starts. --yes keeps
 it; --drop-data drops it, starting the services that are down.
 
+Each worktree goes through clean's whole sequence — jobs stopped, hooks, removal, then its
+data — before the next one starts. The first that fails stops the prune: the ones before
+it are gone with their data, it and the ones after keep theirs, and the report (and the
+`failed` field of --output json) names where it stopped.
+
 ```
 wtm prune [flags]
 ```

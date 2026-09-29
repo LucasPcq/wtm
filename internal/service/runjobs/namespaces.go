@@ -1,12 +1,15 @@
 package runjobs
 
 import (
+	"context"
 	"fmt"
 	"maps"
 	"os"
 	"os/exec"
 	"sort"
 	"strconv"
+	"syscall"
+	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -17,21 +20,37 @@ type RemoveNamespacesParams struct {
 	// Env is the worktree's own, so a remove command reads the same ports and
 	// URLs its attach did.
 	Env map[string]string
-	// WorkDir is where the command runs. A clean detaches before removing, so
-	// the directory is still there.
+	// WorkDir is where the command runs. The worktree is gone by the time its
+	// data is dropped, so it is a directory that outlives it.
 	WorkDir string
 	// Up says which shared jobs are actually running. A namespace cannot be given
 	// back to a service that is down, and relighting one to drop a database is
 	// worse than deferring it.
 	Up map[string]bool
+	// Timeout bounds each remove command; zero is domain.NamespaceRemoveTimeout.
+	Timeout time.Duration
 }
 
-// RemoveNamespacesResult is what a clean reports and what it owes. Deferred entries are
-// the queue's whole population.
+type FailedRemoval struct {
+	Ref domain.NamespaceRef
+	Err error
+}
+
+// RemoveNamespacesResult tells a service that was down from a drop that failed
+// while it was up: both are owed, but only one of them is the service's fault.
 type RemoveNamespacesResult struct {
 	Released []domain.NamespaceRef
-	Deferred []domain.NamespaceRef
-	Errs     []error
+	Down     []domain.NamespaceRef
+	Failed   []FailedRemoval
+}
+
+// Deferred is everything still owed: the queue's whole population.
+func (r RemoveNamespacesResult) Deferred() []domain.NamespaceRef {
+	deferred := append([]domain.NamespaceRef{}, r.Down...)
+	for _, failed := range r.Failed {
+		deferred = append(deferred, failed.Ref)
+	}
+	return deferred
 }
 
 // RemoveWorktreeNamespaces gives back every namespace this worktree carved out of a shared
@@ -47,12 +66,11 @@ func RemoveWorktreeNamespaces(params RemoveNamespacesParams) RemoveNamespacesRes
 			Ordinal:  ordinalOf(params.Env),
 		}
 		if !params.Up[job.Name] {
-			result.Deferred = append(result.Deferred, ref)
+			result.Down = append(result.Down, ref)
 			continue
 		}
 		if err := runRemoval(job, params); err != nil {
-			result.Errs = append(result.Errs, err)
-			result.Deferred = append(result.Deferred, ref)
+			result.Failed = append(result.Failed, FailedRemoval{Ref: ref, Err: err})
 			continue
 		}
 		result.Released = append(result.Released, ref)
@@ -92,9 +110,21 @@ func runRemoval(job domain.JobConfig, params RemoveNamespacesParams) error {
 	maps.Copy(overrides, rules.NamespaceTokens(expand))
 	maps.Copy(overrides, expanded.Env)
 
+	timeout := params.Timeout
+	if timeout <= 0 {
+		timeout = domain.NamespaceRemoveTimeout
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	spec := rules.ShellCommand(job.Namespace.Remove)
-	cmd := exec.Command(spec.Name, spec.Args...)
+	cmd := exec.CommandContext(ctx, spec.Name, spec.Args...)
 	cmd.Dir = params.WorkDir
+	// The whole group goes on a timeout: killing the shell alone leaves its
+	// psql holding the output pipe, and the read would wait on it regardless.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+	cmd.WaitDelay = domain.NamespaceRemoveKillGrace
 	// Cleared, like every other command wtm runs for a worktree: `wtm prune`
 	// typed inside worktree X settles a debt owed by worktree Y, and X's WTM_*
 	// and port variables must not reach Y's detach.
@@ -103,7 +133,12 @@ func runRemoval(job domain.JobConfig, params RemoveNamespacesParams) error {
 		Clear:     domain.WorktreeScopedEnv,
 		Overrides: overrides,
 	})
-	if output, runErr := cmd.CombinedOutput(); runErr != nil {
+	output, runErr := cmd.CombinedOutput()
+	if ctx.Err() != nil {
+		return fmt.Errorf(domain.NamespaceRemoveFailedFmt, job.Name, expanded.Name,
+			fmt.Errorf(domain.NamespaceRemoveTimedOutFmt, timeout))
+	}
+	if runErr != nil {
 		return fmt.Errorf(domain.NamespaceRemoveFailedFmt, job.Name, expanded.Name,
 			fmt.Errorf("%w: %s", runErr, rules.SanitizeLogLine(string(output))))
 	}

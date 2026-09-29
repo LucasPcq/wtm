@@ -305,6 +305,17 @@ const (
 	// worktree's slice of it is made: namespace, then worktree.
 	NamespaceReadyLogFmt     = "[wtm] namespace %s ready for %s"
 	NamespaceRemoveFailedFmt = "job %s: could not detach namespace %s: %w"
+	// NamespaceRecordFailedFmt is a namespace created but not written down in
+	// meta.json: no clean will know to drop it.
+	NamespaceRecordFailedFmt = "%s: could not record this worktree's namespace (%s) — `wtm clean` will not know to drop it"
+	// NamespaceRemoveTimeout bounds a namespace's remove command: a DROP waiting
+	// on a lock held by a connection nobody closed would otherwise hold the clean
+	// for ever. Past it, the namespace is owed like one whose service is down.
+	NamespaceRemoveTimeout     = 30 * time.Second
+	NamespaceRemoveTimedOutFmt = "timed out after %s"
+	// NamespaceRemoveKillGrace is how long the remove command's own children get
+	// to let go of its output once it is killed.
+	NamespaceRemoveKillGrace = time.Second
 	// SharedNoContextFmt is a shared job whose main checkout the client could
 	// not resolve — a bare clone, typically.
 	SharedNoContextFmt = "job %s: %w"
@@ -330,7 +341,20 @@ const (
 	// is what was destroyed, and the service it was destroyed in.
 	CleanRemovedNamespaceFmt  = "dropped %s from %s"
 	CleanDeferredNamespaceFmt = "%s is down: %s kept, dropped on its next start"
-	PruneSettledNamespaceFmt  = "dropped %s from %s, left over from removed worktree %s"
+	// CleanDropFailedFmt is a drop the service refused while it was up: the
+	// namespace, the service, the cause.
+	CleanDropFailedFmt = "could not drop %s from %s: %s — kept, dropped the next time wtm finds it up"
+	// CleanNamespaceSharedFmt keeps a namespace another live worktree reaches
+	// under the same name: namespace, that worktree's branch, the shared slug.
+	CleanNamespaceSharedFmt       = "%s kept: %s is named %s too, so the namespace is also its own"
+	CleanNamespaceSharedReasonFmt = "%s is named %s too"
+	// NamespaceServiceDownFmt is why a namespace was deferred rather than dropped.
+	NamespaceServiceDownFmt = "%s is down"
+	// CleanDataSharedRecapFmt is the recap line of a namespace kept for that reason.
+	CleanDataSharedRecapFmt = "  data      %s kept: %s shares its name"
+	// CleanKeptByFlag is the JSON reason of a namespace --keep-data withheld.
+	CleanKeptByFlag          = "--keep-data"
+	PruneSettledNamespaceFmt = "dropped %s from %s, left over from removed worktree %s"
 	// OwedRecreatedFmt withdraws a debt whose worktree exists again: the
 	// namespace is the new worktree's now. OwedStillFmt counts what a service
 	// that is down still owes, and when it will be paid.
@@ -2951,7 +2975,7 @@ const (
 	// CleanWillDeleteNamespaceFmt names the data a clean gives back, one line per
 	// shared service. A recap that stayed silent about a DROP DATABASE told the
 	// reader they were removing a worktree and nothing else.
-	CleanWillDeleteNamespaceFmt = "  data      %s in %s"
+	CleanWillDeleteNamespaceFmt = "  data      %s, dropped from %s"
 	CleanKeepDataLine           = "  data      kept (--keep-data)"
 	CleanRecapReparentFmt       = "Then reparent %d child worktree(s) onto %s."
 	CleanRecapOrphanFmt         = "Then leave %d child worktree(s) orphaned."
@@ -2973,6 +2997,19 @@ const (
 	CleanStillOrphanedFmt    = "%s still points at the removed parent %s — reparent it with `wtm reparent`"
 	CleanStoppedServicesFmt  = "Stopped services on %s"
 	CleanStoppingServicesFmt = "Stopping services on %s…"
+	// CleanStopRefusedFmt refuses a removal whose jobs would not stop: the
+	// branch, the cause, then the branch again for the way out.
+	CleanStopRefusedFmt = "could not stop the jobs of %s, so nothing was removed: %s — stop them with `wtm run down %s`, or pass --force to remove it anyway"
+	// CleanStopForcedFmt is the same failure let through by --force.
+	CleanStopForcedFmt = "removing %s with jobs that would not stop (--force): %s"
+	// CleanReleaseFailedFmt is a claim on a shared service the daemon would not
+	// let go of once the worktree was gone.
+	CleanReleaseFailedFmt = "could not release %s's hold on its shared services: %s"
+	// CleanLeftOnDiskFmt is a removal git completed while leaving files it could
+	// not delete: branch, path, cause, path.
+	CleanLeftOnDiskFmt = "%s is removed, but %s is still on disk (%s) — delete what is left with `sudo rm -rf %s`"
+	// StopWorktreeSurvivorsFmt names the jobs still up after their stop.
+	StopWorktreeSurvivorsFmt = "still running after the stop: %s"
 	CleanRemovalFailedFmt    = "Removal failed: %s"
 	CleanWizardErrLabel      = "clean wizard"
 	// CleanSudoConfirmFmt is the confirmation title for the privileged `sudo rm -rf`
@@ -2996,9 +3033,13 @@ const (
 	// PruneScanning and PruneFetchAndScanning distinguish the two costs of the
 	// planning phase: the second one also hits the network (gh, and the fetch
 	// gone-detection runs first).
-	PruneScanning          = "Scanning worktrees…"
-	PruneFetchAndScanning  = "Fetching remotes and scanning worktrees…"
-	PruneRemoving          = "Pruning worktrees…"
+	PruneScanning         = "Scanning worktrees…"
+	PruneFetchAndScanning = "Fetching remotes and scanning worktrees…"
+	// PruneHooksTitleFmt titles one pruned worktree's on_clean phase.
+	PruneHooksTitleFmt = "Hooks · On Clean · %s"
+	// PruneFailedFmt is where a prune stopped: the branch, the cause. The
+	// worktrees after it are untouched, and so is its data.
+	PruneFailedFmt         = "stopped at %s: %s — it and the worktrees after it were left as they were"
 	PruneNothingToPrune    = "Nothing to prune."
 	PruneConfirmOption     = "Yes, prune"
 	PruneForceOption       = "Yes, force prune (bypass safety checks)"
