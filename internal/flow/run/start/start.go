@@ -114,6 +114,9 @@ func (f *startFlow) run() (Outcome, error) {
 		Named:   f.named,
 		Cwd:     f.request.Cwd,
 	})
+	if err := seam.RequireEnv(seam.RequireEnvParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, WorkDirs: []string{workDir}}); err != nil {
+		return Outcome{}, err
+	}
 	// Refused rather than started: a runner and one of its own children are the
 	// same process twice on the same port, whether the other one was asked for
 	// in this gesture or is already up.

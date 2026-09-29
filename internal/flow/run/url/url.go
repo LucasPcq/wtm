@@ -51,11 +51,14 @@ func Run(params Params) (Outcome, error) {
 	}
 
 	workDir := target.WorkDir(target.WorkDirParams{Named: named, Cwd: params.Request.Cwd})
-	entries := urls.Open(urls.Params{
+	entries, err := urls.Open(urls.Params{
 		Context: params.Context,
 		Config:  params.Request.Config,
 		Raw:     params.Request.Raw,
 	}).In(workDir)
+	if err != nil {
+		return Outcome{}, err
+	}
 
 	if params.Request.Job != "" {
 		entry, err := rules.PickPublishedURL(entries, params.Request.Job)

@@ -334,6 +334,7 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 		}
 	}
 
+	preflight := envports.Preflight(shared.FlowContext(result))
 	var createResult domain.CreateResult
 	var err error
 	if loadErr := components.RunLoading(components.LoadingParams{
@@ -360,15 +361,15 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 	// Before the hooks: one of them may read the .env, and it has to read what
 	// this worktree binds rather than what it was copied with.
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
-	settlement, err := envports.Settle(envports.Params{
-		Context:      shared.FlowContext(result),
-		Branch:       createResult.Branch,
-		WorktreePath: createResult.Path,
-		Presenter:    shared.NewPresenter(cmd, format),
+	settlement, warnings := envports.SettleFresh(envports.FreshParams{
+		Params: envports.Params{
+			Context:      shared.FlowContext(result),
+			Branch:       createResult.Branch,
+			WorktreePath: createResult.Path,
+			Presenter:    shared.NewPresenter(cmd, format),
+		},
+		Preflight: preflight,
 	})
-	if err != nil {
-		return err
-	}
 
 	// on_create hooks as a distinct, titled phase (shared with create/extract).
 	// A reused branch has no start-point, so the hooks see its recorded parent.
@@ -395,6 +396,7 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 			Draft:          p.Draft,
 			ExistingBranch: createResult.ExistingBranch,
 			OriginState:    createResult.OriginState,
+			Warnings:       warnings,
 		})
 	}
 

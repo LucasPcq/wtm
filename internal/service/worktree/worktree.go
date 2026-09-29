@@ -89,20 +89,13 @@ func Create(params domain.CreateParams) (domain.CreateResult, error) {
 		}
 	}
 
-	ordinal, err := EnsureOrdinal(WorktreeRef{
-		ProjectDir: params.ProjectDir,
-		StateDir:   params.StateDir,
-		Branch:     params.Branch,
-	})
-	if err != nil {
-		return domain.CreateResult{}, fmt.Errorf("allocate ordinal: %w", err)
-	}
-
+	// No ordinal: it is the run module's, allocated the first time something
+	// asks for the worktree's ports, so a neighbour's unreadable record can
+	// never fail a creation.
 	metadata := domain.WorktreeMetadata{
 		SourceBranch: sourceBranch,
 		CreatedAt:    time.Now().UTC().Format(time.RFC3339),
 		EnvStrategy:  strategy,
-		Ordinal:      ordinal,
 		Isolation:    rules.EffectiveIsolation(params.Isolation),
 	}
 

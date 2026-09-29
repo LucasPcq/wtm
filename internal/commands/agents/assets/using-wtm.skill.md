@@ -134,6 +134,12 @@ flagged; everything else is what the name implies.
   `--isolation isolated|verbatim` decides how the worktree stands against its source (see
   "Isolation" under the run module below); without it, your paths take run.toml's
   `isolation`, else `isolated`. `extract` and `checkout` take the same flag.
+  **The run module never fails a creation.** A `run.toml` that cannot be read or is
+  refused (an unknown key, an `[[env_port]]` on a file `config.toml` no longer provisions)
+  or a neighbour's unreadable `meta.json` only skips the port pass: the worktree is
+  created, the `.env` copied as is, the hooks run, and the JSON of `create` / `extract` /
+  `checkout` carries a `warnings` array naming the cause and "ports not settled — run
+  `wtm env <branch>` once run.toml is fixed". Fix the cause, then run that command.
   Add `--ff` to fast-forward a behind-only `--from` branch to origin first (so the worktree
   starts up to date); a diverged branch is left as-is (no prompt in JSON mode). `extract`
   accepts the same `--ff` for the parent branch of a newly-created target.
@@ -227,6 +233,8 @@ flagged; everything else is what the name implies.
   `ports.applied` says whether those rewrites were written, and the trailing summary counts
   them alongside the files (a run that only shifted a port still reports what it wrote).
   `isolation` is the worktree's; a `verbatim` one always has an empty `ports` block.
+  A `run.toml` that cannot be used never stops the key reconciliation: only the port pass
+  is skipped, and a `warnings` array names why.
   `--isolation isolated|verbatim` records a new isolation for the worktree **before**
   reconciling, so the same run applies it: `--isolation isolated` on a verbatim worktree
   writes every port, identity and slice its creation left alone. It is refused with
@@ -454,6 +462,12 @@ and **experimental**: the global `wtm init` does not configure it.
   leaves the others running, and the command exits non-zero if any did. `run start` stays
   single-worktree. Above one worktree the JSON changes shape (see the arity rule below) and
   every human line names the worktree it came from.
+- **Stopping never depends on `run.toml`.** `run down`, `run stop` and `run ps` still work
+  when it cannot be read: they warn on stderr and stop (or list) what the daemon runs —
+  `run stop` then takes `--job` as given. `run up` and `run start` refuse it, and also
+  refuse a worktree whose environment cannot be resolved (a detached HEAD, an unreadable
+  `meta.json`), naming the cause: a job is never started on the main checkout's ports.
+  `run url` / `run open` refuse such a worktree the same way.
 - `run up [worktree] --profile <name>` / `run down [worktree]` — start / stop a profile.
   On `run up` **`--profile` is repeatable**: `--profile front --profile back` starts the
   union of both, in the order given, and a job several of them list starts once.

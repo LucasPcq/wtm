@@ -32,6 +32,8 @@ type PRCheckoutJSON struct {
 	// OriginState is the reused branch's divergence from origin, using the same
 	// labels as `list` and `tree`. Empty when the branch was created.
 	OriginState string `json:"origin_state,omitempty"`
+	// Warnings are what the run module could not do for the new worktree.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // WriteJobResultsJSON writes the JSON array describing each job outcome.

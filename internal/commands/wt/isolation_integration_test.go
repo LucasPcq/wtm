@@ -1,6 +1,7 @@
 package wt
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -115,5 +116,43 @@ func TestEnvRefusesIsolationWithCheck(t *testing.T) {
 	_, _, err := runWtCmd(t, domain.CmdEnv, "main", "--check", "--"+domain.FlagIsolation, "verbatim")
 	if err == nil || !strings.Contains(err.Error(), "--check") {
 		t.Errorf("err = %v, want --isolation refused under --check", err)
+	}
+}
+
+// G1: run.toml is the run module's. A broken one leaves the key
+// reconciliation as it always was and only skips the port pass, saying so.
+func TestEnvReconcilesKeysOverAnInvalidRunToml(t *testing.T) {
+	dir := isolationRepo(t)
+	if _, _, err := runWtCmd(t, domain.CmdCreate, "feat/e", "--from", "main", "--yes"); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte(mainEnv+"NEW_KEY=1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".git", "wtm", domain.RunFileName), []byte("bogus_key = 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, _, err := runWtCmd(t, domain.CmdEnv, "feat/e", "--yes", "--output", domain.OutputJSON)
+	if err != nil {
+		t.Fatalf("env must not fail over run.toml: %v", err)
+	}
+	if got := worktreeEnv(t, dir, "feat/e"); !strings.Contains(got, "NEW_KEY=1") {
+		t.Errorf(".env = %q, want the missing key added", got)
+	}
+	var result domain.EnvSyncResult
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("decode env result: %v\n%s", err, out)
+	}
+	if len(result.Warnings) != 1 || !strings.Contains(result.Warnings[0], "bogus_key") || !strings.Contains(result.Warnings[0], "wtm env feat/e") {
+		t.Errorf("warnings = %v, want the skipped port pass named", result.Warnings)
+	}
+
+	human, _, err := runWtCmd(t, domain.CmdEnv, "feat/e", "--yes")
+	if err != nil {
+		t.Fatalf("env: %v", err)
+	}
+	if !strings.Contains(human, "bogus_key") {
+		t.Errorf("report = %q, want the skipped port pass named", human)
 	}
 }

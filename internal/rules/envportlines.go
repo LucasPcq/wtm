@@ -337,3 +337,29 @@ func EnvPortOutcomeLine(params EnvPortOutcomeParams) string {
 	}
 	return ""
 }
+
+type PortsNotSettledParams struct {
+	Branch string
+	// RunConfig says run.toml is what stood in the way, rather than a record
+	// the pass needed from elsewhere (a neighbour's ordinal).
+	RunConfig bool
+}
+
+// portsNotSettledHint is what a core command says of a port pass it left
+// undone: the ports stay as copied, and how to settle them later.
+func portsNotSettledHint(params PortsNotSettledParams) string {
+	if params.RunConfig {
+		return fmt.Sprintf(domain.EnvPortsNotSettledRunFmt, params.Branch)
+	}
+	return fmt.Sprintf(domain.EnvPortsNotSettledOtherFmt, params.Branch)
+}
+
+type PortsNotSettledWarningParams struct {
+	Cause string
+	PortsNotSettledParams
+}
+
+// PortsNotSettledWarning is the cause and what it left undone, in one line.
+func PortsNotSettledWarning(params PortsNotSettledWarningParams) string {
+	return fmt.Sprintf(domain.RunWarningFmt, params.Cause, portsNotSettledHint(params.PortsNotSettledParams))
+}

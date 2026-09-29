@@ -29,6 +29,9 @@ type Context struct {
 	Dir    string
 	Config shared.ConfigResult
 	Run    domain.RunConfig
+	// RunErr is why run.toml could not be read, under TolerateRunConfig only:
+	// Run is then empty.
+	RunErr error
 	Format string
 	// Interactive is the prompt-capability gate in the one spelling the whole
 	// CLI uses: a human format, on a terminal, and not bypassed by --yes.
@@ -45,6 +48,9 @@ type OpenParams struct {
 	// SkipGuard leaves the opt-in guard out, for the two `add` commands: a
 	// run.toml declaring nothing yet is exactly what they are for.
 	SkipGuard bool
+	// TolerateRunConfig keeps a run.toml that cannot be read in RunErr instead
+	// of refusing: stopping what runs must work whatever the file says.
+	TolerateRunConfig bool
 }
 
 func Open(params OpenParams) (Context, error) {
@@ -61,11 +67,11 @@ func Open(params OpenParams) (Context, error) {
 	if err != nil {
 		return Context{}, err
 	}
-	cfg, err := runconfig.Load(result.StateDir)
-	if err != nil {
-		return Context{}, fmt.Errorf("load run.toml: %w", err)
+	cfg, runErr := runconfig.Load(result.StateDir)
+	if runErr != nil && !params.TolerateRunConfig {
+		return Context{}, fmt.Errorf("load run.toml: %w", runErr)
 	}
-	if !params.SkipGuard {
+	if !params.SkipGuard && runErr == nil {
 		if err := shared.RequireRunInitialized(cfg); err != nil {
 			return Context{}, err
 		}
@@ -77,6 +83,7 @@ func Open(params OpenParams) (Context, error) {
 		Dir:    dir,
 		Config: result,
 		Run:    cfg,
+		RunErr: runErr,
 		Format: format,
 		Interactive: shared.Interactive(shared.UnattendedParams{
 			TTY: IsTTY(), Format: format, Yes: yes,

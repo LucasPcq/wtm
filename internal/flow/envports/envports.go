@@ -81,3 +81,44 @@ func Settle(params Params) (domain.EnvPortSettlement, error) {
 	_, err = envsvc.ApplyEnvPorts(resolved)
 	return settlement, err
 }
+
+// Preflight is what run.toml would be refused for, read before the worktree
+// exists so the creation can go ahead without the run part.
+func Preflight(ctx flow.Context) error {
+	return runconfig.Check(runconfig.CheckParams{StateDir: ctx.StateDir, EnvFiles: ctx.Config.Project.Env.Files})
+}
+
+type FreshParams struct {
+	Params
+	// Preflight is what Preflight returned before the worktree was created.
+	Preflight error
+}
+
+// SettleFresh is Settle for a worktree a core command has just created, which
+// the run module must never fail: whatever stands in the way is a warning,
+// returned for the command's JSON, and the .env stays as it was copied.
+func SettleFresh(params FreshParams) (domain.EnvPortSettlement, []string) {
+	if params.Preflight != nil {
+		return domain.EnvPortSettlement{}, notSettled(notSettledParams{Params: params.Params, Cause: params.Preflight, RunConfig: true})
+	}
+	settlement, err := Settle(params.Params)
+	if err != nil {
+		return domain.EnvPortSettlement{}, notSettled(notSettledParams{Params: params.Params, Cause: err})
+	}
+	return settlement, nil
+}
+
+type notSettledParams struct {
+	Params
+	Cause     error
+	RunConfig bool
+}
+
+func notSettled(params notSettledParams) []string {
+	warning := rules.PortsNotSettledWarning(rules.PortsNotSettledWarningParams{
+		Cause:                 params.Cause.Error(),
+		PortsNotSettledParams: rules.PortsNotSettledParams{Branch: params.Branch, RunConfig: params.RunConfig},
+	})
+	params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: warning})
+	return []string{warning}
+}

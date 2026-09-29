@@ -170,6 +170,9 @@ type CreateResult struct {
 	// created (OriginState empty) or up to date.
 	OriginAhead  int `json:"origin_ahead,omitempty"`
 	OriginBehind int `json:"origin_behind,omitempty"`
+	// Warnings are what the run module could not do for the worktree, which
+	// never fails its creation (a port pass left undone, and why).
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // CleanParams holds inputs for cleaning a worktree.

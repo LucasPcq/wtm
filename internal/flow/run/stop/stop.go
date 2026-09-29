@@ -19,6 +19,10 @@ type Request struct {
 	// Config is run.toml: the job is resolved against it so a typo'd name fails
 	// with a precise error instead of silently no-opping at the daemon.
 	Config domain.RunConfig
+	// ByName says run.toml could not be read: the job is stopped by the name
+	// given, and the picker offers what the daemon runs, since stopping must
+	// never depend on the file.
+	ByName bool
 }
 
 type Outcome struct {
@@ -91,13 +95,13 @@ func (f *stopFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	job, err := target.DeclaredJob(f.request.Config, answers.Value(target.KeyJob))
+	job, err := f.job(answers)
 	if err != nil {
 		return Outcome{}, err
 	}
 	outcome := Outcome{
 		WorkDirs: target.WorkDirs(target.WorkDirsParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd}),
-		Job:      job.Name,
+		Job:      job,
 	}
 
 	socket := process.SocketPath()
@@ -121,6 +125,15 @@ func (f *stopFlow) run() (Outcome, error) {
 		})
 	}
 	return outcome, f.presenter.Stopped(outcome)
+}
+
+func (f *stopFlow) job(answers flow.Answers) (string, error) {
+	name := answers.Value(target.KeyJob)
+	if f.request.ByName && name != "" {
+		return name, nil
+	}
+	job, err := target.DeclaredJob(f.request.Config, name)
+	return job.Name, err
 }
 
 // branchOf names a worktree the way a reader recognises it, falling back to the
@@ -174,9 +187,30 @@ func (f *stopFlow) session() flow.Session {
 				Selected:   target.Dirs(f.named),
 				Running:    f.running(),
 			}),
-			target.JobStep(target.JobParams{Jobs: f.request.Config.Jobs, Flag: domain.FlagJob}),
+			target.JobStep(target.JobParams{Jobs: f.pickable(), Flag: domain.FlagJob}),
 		},
 	}
+}
+
+func (f *stopFlow) pickable() []domain.JobConfig {
+	if !f.request.ByName {
+		return f.request.Config.Jobs
+	}
+	socket := process.SocketPath()
+	if !process.IsDaemonRunning(socket) {
+		return nil
+	}
+	infos, _ := runlogs.NewService(runlogs.ServiceParams{SocketPath: socket}).List("")
+	seen := map[string]bool{}
+	var jobs []domain.JobConfig
+	for _, info := range infos {
+		if seen[info.Name] {
+			continue
+		}
+		seen[info.Name] = true
+		jobs = append(jobs, domain.JobConfig{Name: info.Name, Kind: info.Kind})
+	}
+	return jobs
 }
 
 func (f *stopFlow) running() map[string]int {

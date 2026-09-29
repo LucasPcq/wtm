@@ -940,6 +940,17 @@ const (
 	// command the reader can run is a better address than one they must locate.
 	EnvOriginProxyOffLine = "The run proxy is off on this machine, so ports were written instead — `wtm run proxy status` reports what serves names"
 
+	// RunConfigIgnoredFmt is what a stopping command says of a run.toml it
+	// cannot read: it stops what runs regardless.
+	RunConfigIgnoredFmt = "%v — run.toml ignored, stopping what runs anyway"
+
+	// A port pass a core command could not do. The cause heads the warning;
+	// this line says what was left undone and how to finish it (G1).
+	EnvPortsNotSettledRunFmt   = "ports not settled — run `wtm env %s` once run.toml is fixed"
+	EnvPortsNotSettledOtherFmt = "ports not settled — run `wtm env %s` once this is fixed"
+	// RunWarningFmt joins a warning's cause and what it left undone in one line.
+	RunWarningFmt = "%s — %s"
+
 	// EnvPortAnomaliesTitle heads the links wtm reports instead of applying.
 	EnvPortAnomaliesTitle = "Env ports left alone"
 	EnvPortAnomalyRowFmt  = "%s  %s  %s"

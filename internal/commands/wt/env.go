@@ -14,6 +14,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	envsvc "github.com/LucasPcq/wtm/internal/service/env"
+	"github.com/LucasPcq/wtm/internal/service/runconfig"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 	"github.com/LucasPcq/wtm/internal/tui/components"
 	"github.com/LucasPcq/wtm/internal/tui/envwizard"
@@ -135,10 +136,7 @@ func runEnvNonInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg strin
 	}
 
 	ctx := resolveEnvStrategyAndParent(cfg, wt.Branch, f.from)
-	ports, err := resolveEnvPorts(cfg, wt.Branch, wt.Path)
-	if err != nil {
-		return err
-	}
+	ports, warnings := resolveEnvPorts(cfg, wt.Branch, wt.Path)
 	result, err := envsvc.SyncEnv(envsvc.SyncEnvParams{
 		Branch:             wt.Branch,
 		MainPath:           cfg.ProjectDir,
@@ -157,6 +155,7 @@ func runEnvNonInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg strin
 		return err
 	}
 	result.Isolation = isolationOf(cfg, wt.Branch)
+	result.Warnings = warnings
 	return writeEnvResult(cmd, result, f.format)
 }
 
@@ -247,10 +246,7 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 
 	ctx := resolveEnvStrategyAndParent(cfg, res.Branch, f.from)
 	worktreePath := worktreePathForBranch(statuses, res.Branch)
-	ports, err := resolveEnvPorts(cfg, res.Branch, worktreePath)
-	if err != nil {
-		return err
-	}
+	ports, warnings := resolveEnvPorts(cfg, res.Branch, worktreePath)
 	result, err := envsvc.ApplyEnvSync(envsvc.ApplyEnvSyncParams{
 		Branch:             res.Branch,
 		MainPath:           cfg.ProjectDir,
@@ -267,6 +263,7 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 		return err
 	}
 	result.Isolation = isolationOf(cfg, res.Branch)
+	result.Warnings = warnings
 	return writeEnvResult(cmd, result, f.format)
 }
 
@@ -274,10 +271,7 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 func computeBranchDiff(cfg shared.ConfigResult, statuses []domain.WorktreeStatus, branch string, f envFlags) ([]domain.EnvFileResult, error) {
 	ctx := resolveEnvStrategyAndParent(cfg, branch, f.from)
 	worktreePath := worktreePathForBranch(statuses, branch)
-	ports, err := resolveEnvPorts(cfg, branch, worktreePath)
-	if err != nil {
-		return nil, err
-	}
+	ports, _ := resolveEnvPorts(cfg, branch, worktreePath)
 	return envsvc.ComputeEnvDiff(envsvc.ComputeEnvParams{
 		Branch:             branch,
 		MainPath:           cfg.ProjectDir,
@@ -294,18 +288,26 @@ func computeBranchDiff(cfg shared.ConfigResult, statuses []domain.WorktreeStatus
 // computeBranchPorts resolves one worktree's port pass for the wizard recap, so
 // the apply is announced before it happens rather than discovered after.
 func computeBranchPorts(cfg shared.ConfigResult, statuses []domain.WorktreeStatus, branch string) (domain.EnvPortPlan, error) {
-	ports, err := resolveEnvPorts(cfg, branch, worktreePathForBranch(statuses, branch))
-	if err != nil || ports.Empty() {
-		return domain.EnvPortPlan{}, err
+	ports, _ := resolveEnvPorts(cfg, branch, worktreePathForBranch(statuses, branch))
+	if ports.Empty() {
+		return domain.EnvPortPlan{}, nil
 	}
 	return envsvc.ComputeEnvPorts(ports)
 }
 
 // resolveEnvPorts gathers the [[env_port]] links and the offset this worktree
 // binds on. A project with no run.toml, or none declared, resolves to nothing and
-// the reconciliation runs exactly as it did before.
-func resolveEnvPorts(cfg shared.ConfigResult, branch string, worktreePath string) (envsvc.EnvPortsParams, error) {
-	return worktree.ResolveEnvPorts(worktree.ResolveEnvPortsParams{
+// the reconciliation runs exactly as it did before — and so does one whose
+// run.toml cannot be used: the keys never depend on it, only the port pass is
+// skipped, and the warning says why.
+func resolveEnvPorts(cfg shared.ConfigResult, branch string, worktreePath string) (envsvc.EnvPortsParams, []string) {
+	if err := runconfig.Check(runconfig.CheckParams{StateDir: cfg.StateDir, EnvFiles: cfg.Config.Project.Env.Files}); err != nil {
+		return envsvc.EnvPortsParams{}, []string{rules.PortsNotSettledWarning(rules.PortsNotSettledWarningParams{
+			Cause:                 err.Error(),
+			PortsNotSettledParams: rules.PortsNotSettledParams{Branch: branch, RunConfig: true},
+		})}
+	}
+	ports, err := worktree.ResolveEnvPorts(worktree.ResolveEnvPortsParams{
 		ProjectDir:   cfg.ProjectDir,
 		StateDir:     cfg.StateDir,
 		Branch:       branch,
@@ -313,6 +315,13 @@ func resolveEnvPorts(cfg shared.ConfigResult, branch string, worktreePath string
 		EnvFiles:     cfg.Config.Project.Env.Files,
 		Global:       cfg.Config.Global,
 	})
+	if err != nil {
+		return envsvc.EnvPortsParams{}, []string{rules.PortsNotSettledWarning(rules.PortsNotSettledWarningParams{
+			Cause:                 err.Error(),
+			PortsNotSettledParams: rules.PortsNotSettledParams{Branch: branch},
+		})}
+	}
+	return ports, nil
 }
 
 // recordIsolation writes --isolation, or the recap's verbatim answer, to the

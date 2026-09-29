@@ -205,3 +205,16 @@ func TestEnvPortTableLinesKeepsTheValueRecognisableOnANarrowSurface(t *testing.T
 		}
 	}
 }
+
+func TestPortsNotSettledNamesWhatToFix(t *testing.T) {
+	run := PortsNotSettledWarning(PortsNotSettledWarningParams{
+		Cause:                 "unknown keys in run.toml: bogus",
+		PortsNotSettledParams: PortsNotSettledParams{Branch: "feat/x", RunConfig: true},
+	})
+	if run != "unknown keys in run.toml: bogus — ports not settled — run `wtm env feat/x` once run.toml is fixed" {
+		t.Errorf("warning = %q", run)
+	}
+	if other := portsNotSettledHint(PortsNotSettledParams{Branch: "feat/x"}); strings.Contains(other, "run.toml") {
+		t.Errorf("hint = %q, must not blame run.toml for another cause", other)
+	}
+}

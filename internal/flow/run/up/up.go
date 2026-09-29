@@ -137,6 +137,9 @@ func (f *upFlow) run() (Outcome, error) {
 		f.presenter.Notice(flow.AbortedNotice)
 		return Outcome{Aborted: true}, nil
 	}
+	if err := seam.RequireEnv(seam.RequireEnvParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, WorkDirs: f.workDirs(answers)}); err != nil {
+		return Outcome{}, err
+	}
 	// Before anything is stopped: a selection that is its own conflict must not
 	// cost the other worktrees their jobs first.
 	if clashes := rules.SelfPortClashes(f.startingClaims(answers)); len(clashes) > 0 {

@@ -177,3 +177,39 @@ func TestCreateFromPRNonInteractiveDoesNotFastForward(t *testing.T) {
 		t.Errorf("origin_state = %q, want %q", got.OriginState, domain.DivergenceLabelBehind)
 	}
 }
+
+// G1: a run.toml the port pass refuses leaves the PR worktree created and
+// its hooks run, with the pass left undone named in the JSON.
+func TestCreateFromPRGoesAheadOverAnInvalidRunToml(t *testing.T) {
+	work := repoWithRemote(t)
+	result := loadResult(t, work)
+	result.Config.Project.Hooks.OnCreate = []domain.HookCommand{{Cmd: "touch hook-ran"}}
+	if err := os.WriteFile(filepath.Join(result.StateDir, domain.RunFileName), []byte("bogus_key = 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	branch := "feat/pr-broken-run"
+	git(t, work, "branch", branch)
+	git(t, work, "push", "origin", branch)
+	git(t, work, "branch", "-D", branch)
+
+	cmd, out := runCmd()
+	if err := createFromPR(cmd, result, createFromPRParams{
+		pr:           domain.PRInfo{Number: 3, Branch: branch, BaseBranch: "main"},
+		parent:       "main",
+		jsonMode:     true,
+		envConfirmed: true,
+	}); err != nil {
+		t.Fatalf("createFromPR must not fail over run.toml: %v", err)
+	}
+
+	var got output.PRCheckoutJSON
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatalf("decode checkout JSON: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(got.Path, "hook-ran")); err != nil {
+		t.Errorf("on_create hooks did not run: %v", err)
+	}
+	if len(got.Warnings) != 1 || !strings.Contains(got.Warnings[0], "bogus_key") {
+		t.Errorf("warnings = %v, want the refused run.toml named", got.Warnings)
+	}
+}

@@ -25,6 +25,12 @@ func PrintEnvReport(w io.Writer, result domain.EnvSyncResult) {
 		printEnvFile(w, f, result.Check, rules.EnvPortsMoveIn(rules.EnvPortsMoveInParams{Result: result, Target: f.Target}))
 	}
 	EnvPortsReport(w, result.Ports, result.Check)
+	if len(result.Warnings) > 0 {
+		Blank(w)
+	}
+	for _, warning := range result.Warnings {
+		Warning(w, warning)
+	}
 	Blank(w)
 	printEnvSummary(w, result)
 }

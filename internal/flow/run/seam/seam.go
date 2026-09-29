@@ -6,6 +6,7 @@ package seam
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -56,6 +57,7 @@ type Seam struct {
 	worktree   string
 	logDir     string
 	env        map[string]string
+	envErr     error
 	prober     runlogs.Prober
 	project    string
 	proxyPort  int
@@ -71,7 +73,7 @@ func Open(params Params) Seam {
 	branch := target.BranchOf(params.WorkDir)
 	logDir := logDirOf(params.StateDir, branch)
 	service := runlogs.NewService(runlogs.ServiceParams{SocketPath: process.SocketPath()})
-	env := JobEnv(JobEnvParams{
+	env, envErr := JobEnv(JobEnvParams{
 		ProjectDir: params.ProjectDir,
 		StateDir:   params.StateDir,
 		WorkDir:    params.WorkDir,
@@ -101,6 +103,7 @@ func Open(params Params) Seam {
 		worktree:   branch,
 		logDir:     logDir,
 		env:        env,
+		envErr:     envErr,
 		jobs:       params.Jobs,
 		declared:   declaredOf(params),
 		prober:     newProber(params.ProbeBudget, params.NoProbe),
@@ -136,14 +139,14 @@ func sharedContext(params Params) *domain.SharedJobContext {
 	if err != nil {
 		return nil
 	}
+	env, err := JobEnv(JobEnvParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, WorkDir: main})
+	if err != nil {
+		return nil
+	}
 	return &domain.SharedJobContext{
 		WorkDir: main,
-		Env: JobEnv(JobEnvParams{
-			ProjectDir: params.ProjectDir,
-			StateDir:   params.StateDir,
-			WorkDir:    main,
-		}),
-		LogDir: logDirOf(params.StateDir, target.BranchOf(main)),
+		Env:     env,
+		LogDir:  logDirOf(params.StateDir, target.BranchOf(main)),
 	}
 }
 
@@ -196,6 +199,9 @@ func (s Seam) run(ctx context.Context, sink runlogs.Sink, params StartParams) (r
 }
 
 func (s Seam) start(ctx context.Context, sink runlogs.Sink, params StartParams) (runlogs.Outcome, error) {
+	if s.envErr != nil {
+		return runlogs.Outcome{}, s.envErr
+	}
 	return runlogs.Run(ctx, runlogs.RunParams{
 		BaseOwners:     s.baseOwners(),
 		Service:        s.service,
@@ -310,19 +316,35 @@ type JobEnvParams struct {
 }
 
 // JobEnv resolves the worktree-scoped environment handed to every job of this
-// run. Like LogDir it degrades to nothing rather than to another worktree's
-// values: a run whose worktree cannot be named injects no isolation instead of
-// the wrong one.
-func JobEnv(params JobEnvParams) map[string]string {
+// run. It fails rather than degrade: a worktree with no offset and no name is
+// one whose jobs would bind the main checkout's ports.
+func JobEnv(params JobEnvParams) (map[string]string, error) {
 	env, err := worktree.JobEnv(worktree.JobEnvParams{
 		ProjectDir: params.ProjectDir,
 		StateDir:   params.StateDir,
 		Dir:        params.WorkDir,
 	})
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("%w: %s: %w", domain.ErrWorktreeEnvUnresolved, params.WorkDir, err)
 	}
-	return env
+	return env, nil
+}
+
+type RequireEnvParams struct {
+	ProjectDir string
+	StateDir   string
+	WorkDirs   []string
+}
+
+// RequireEnv refuses a start before anything is started when one of its
+// worktrees has no environment to give its jobs.
+func RequireEnv(params RequireEnvParams) error {
+	for _, dir := range params.WorkDirs {
+		if _, err := JobEnv(JobEnvParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, WorkDir: dir}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // dialProber is this side of the runlogs.Prober seam: the run says which ports

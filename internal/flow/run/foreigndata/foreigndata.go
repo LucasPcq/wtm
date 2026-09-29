@@ -28,7 +28,10 @@ func Allow(params Params) (bool, error) {
 	if params.Force {
 		return true, nil
 	}
-	risks := Risks(params)
+	risks, err := Risks(params)
+	if err != nil {
+		return false, err
+	}
 	if len(risks) == 0 {
 		return true, nil
 	}
@@ -50,13 +53,16 @@ func Allow(params Params) (bool, error) {
 
 // Risks reads each worktree's isolation from the environment its jobs would
 // get, which is the same answer the daemon acts on.
-func Risks(params Params) []domain.DataRisk {
+func Risks(params Params) ([]domain.DataRisk, error) {
 	if !declaresTouches(params.Jobs) {
-		return nil
+		return nil, nil
 	}
 	var risks []domain.DataRisk
 	for _, dir := range params.WorkDirs {
-		env := seam.JobEnv(seam.JobEnvParams{ProjectDir: params.Context.ProjectDir, StateDir: params.Context.StateDir, WorkDir: dir})
+		env, err := seam.JobEnv(seam.JobEnvParams{ProjectDir: params.Context.ProjectDir, StateDir: params.Context.StateDir, WorkDir: dir})
+		if err != nil {
+			return nil, err
+		}
 		risks = append(risks, rules.ForeignDataRisks(rules.ForeignDataParams{
 			Config:    params.Config,
 			Jobs:      params.Jobs,
@@ -65,7 +71,7 @@ func Risks(params Params) []domain.DataRisk {
 			Main:      env[domain.EnvOrdinal] == fmt.Sprint(domain.MainWorktreeOrdinal),
 		})...)
 	}
-	return risks
+	return risks, nil
 }
 
 func declaresTouches(jobs []domain.JobConfig) bool {

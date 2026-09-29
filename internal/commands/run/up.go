@@ -113,3 +113,21 @@ func reportRunConfig(cmd *cobra.Command, cfg domain.RunConfig) error {
 	// the run whose report went to io.Discard.
 	return fmt.Errorf("%w: %s", domain.ErrAborted, errs[0])
 }
+
+// warnRunConfig is reportRunConfig for the commands that stop what runs: they
+// must work whatever run.toml says, so nothing in it refuses them.
+func warnRunConfig(cmd *cobra.Command, ctx runctx.Context) {
+	warnings, errs := rules.ValidateRun(ctx.Run)
+	lines := append(warnings, errs...)
+	if ctx.RunErr != nil {
+		lines = append([]string{fmt.Sprintf(domain.RunConfigIgnoredFmt, ctx.RunErr)}, lines...)
+	}
+	if len(lines) == 0 {
+		return
+	}
+	output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
+		for _, line := range lines {
+			output.Warning(w, line)
+		}
+	})
+}

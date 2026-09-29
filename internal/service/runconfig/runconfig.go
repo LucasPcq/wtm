@@ -20,6 +20,25 @@ func Load(stateDir string) (domain.RunConfig, error) {
 	return config.LoadRun(stateDir)
 }
 
+type CheckParams struct {
+	StateDir string
+	EnvFiles []domain.EnvFile
+}
+
+// Check is everything the port pass would refuse run.toml for, read before a
+// worktree exists: a core command then leaves the run part out rather than
+// stopping half-way through a creation.
+func Check(params CheckParams) error {
+	cfg, err := config.LoadRun(params.StateDir)
+	if err != nil {
+		return err
+	}
+	if errs := rules.ValidateEnvPortTargets(cfg.EnvPorts, params.EnvFiles); len(errs) > 0 {
+		return fmt.Errorf("invalid run config: %s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
 // SaveParams holds the inputs for Save.
 type SaveParams struct {
 	StateDir string

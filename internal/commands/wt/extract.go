@@ -216,6 +216,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	result.Warnings = sel.target.warnings
 
 	if format == domain.OutputJSON {
 		return output.WriteExtractJSON(cmd.OutOrStdout(), result)
@@ -619,6 +620,7 @@ type extractTarget struct {
 	// envPorts is what the port pass did in a worktree this extraction created,
 	// zero for one that already existed and was never provisioned.
 	envPorts domain.EnvPortSettlement
+	warnings []string
 }
 
 type resolveTargetParams struct {
@@ -755,6 +757,8 @@ type createTargetParams struct {
 }
 
 func createTarget(params createTargetParams) (extractTarget, error) {
+	ctx := shared.FlowContext(params.cfg)
+	preflight := envports.Preflight(ctx)
 	res, err := worktree.Create(domain.CreateParams{
 		ProjectDir: params.cfg.ProjectDir,
 		StateDir:   params.cfg.StateDir,
@@ -771,15 +775,15 @@ func createTarget(params createTargetParams) (extractTarget, error) {
 	// Before the hooks: one of them may read the .env, and it has to read the
 	// ports this worktree binds rather than the ones it was copied from.
 	format, _ := params.cmd.Flags().GetString(domain.FlagOutput)
-	settlement, err := envports.Settle(envports.Params{
-		Context:      shared.FlowContext(params.cfg),
-		Branch:       res.Branch,
-		WorktreePath: res.Path,
-		Presenter:    shared.NewPresenter(params.cmd, format),
+	settlement, warnings := envports.SettleFresh(envports.FreshParams{
+		Params: envports.Params{
+			Context:      ctx,
+			Branch:       res.Branch,
+			WorktreePath: res.Path,
+			Presenter:    shared.NewPresenter(params.cmd, format),
+		},
+		Preflight: preflight,
 	})
-	if err != nil {
-		return extractTarget{}, err
-	}
 
 	// on_create hooks as a distinct, titled phase (shared with create/checkout).
 	if err := shared.RunCreateHooksPhase(shared.CreateHooksPhaseParams{
@@ -794,5 +798,5 @@ func createTarget(params createTargetParams) (extractTarget, error) {
 	}); err != nil {
 		return extractTarget{}, err
 	}
-	return extractTarget{path: res.Path, branch: res.Branch, envPorts: settlement}, nil
+	return extractTarget{path: res.Path, branch: res.Branch, envPorts: settlement, warnings: warnings}, nil
 }

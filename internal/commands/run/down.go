@@ -41,13 +41,11 @@ func runDown(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("--%s cannot be combined with a worktree or --%s", domain.FlagAll, domain.FlagProfile)
 	}
 
-	ctx, err := runctx.Open(runctx.OpenParams{Cmd: cmd})
+	ctx, err := runctx.Open(runctx.OpenParams{Cmd: cmd, TolerateRunConfig: true})
 	if err != nil {
 		return err
 	}
-	if err := reportRunConfig(cmd, ctx.Run); err != nil {
-		return err
-	}
+	warnRunConfig(cmd, ctx)
 
 	outcome, err := downflow.Run(downflow.Params{
 		Context: ctx.FlowContext(),

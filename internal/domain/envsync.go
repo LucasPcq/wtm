@@ -37,4 +37,7 @@ type EnvSyncResult struct {
 	Ports EnvPortPlan `json:"ports,omitzero"`
 	// Isolation is the worktree's, which decides whether Ports can hold anything.
 	Isolation Isolation `json:"isolation,omitempty"`
+	// Warnings name a port pass left undone, and why: the reconciliation of
+	// the keys never depends on run.toml.
+	Warnings []string `json:"warnings,omitempty"`
 }

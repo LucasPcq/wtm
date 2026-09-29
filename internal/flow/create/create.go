@@ -114,6 +114,8 @@ func (f *createFlow) run() (Outcome, error) {
 		startPoint = ""
 	}
 
+	preflight := envports.Preflight(f.ctx)
+
 	var result domain.CreateResult
 	err = f.presenter.Stage(flow.StageParams{
 		Message: fmt.Sprintf(domain.CreateLoadingFmt, branchName),
@@ -141,16 +143,15 @@ func (f *createFlow) run() (Outcome, error) {
 	var settlement domain.EnvPortSettlement
 	if !result.AlreadyExists {
 		// Before the hooks: one of them may well read the .env this settles.
-		var portErr error
-		settlement, portErr = envports.Settle(envports.Params{
-			Context:      f.ctx,
-			Branch:       branchName,
-			WorktreePath: result.Path,
-			Presenter:    f.presenter,
+		settlement, result.Warnings = envports.SettleFresh(envports.FreshParams{
+			Params: envports.Params{
+				Context:      f.ctx,
+				Branch:       branchName,
+				WorktreePath: result.Path,
+				Presenter:    f.presenter,
+			},
+			Preflight: preflight,
 		})
-		if portErr != nil {
-			return Outcome{}, portErr
-		}
 		if hookErr := f.runHooks(result.Path, branchName, fromBranch); hookErr != nil {
 			return Outcome{}, hookErr
 		}

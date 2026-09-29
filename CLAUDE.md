@@ -122,7 +122,9 @@ internal/
     envports/                 ←   settling a fresh .env's host ports onto the ones the
                                   worktree binds, per its isolation (isolated / verbatim,
                                   recorded in meta.json and read by the daemon too) —
-                                  shared by `create`, `extract` and `checkout`
+                                  shared by `create`, `extract` and `checkout`, which it
+                                  never fails: a refused run.toml or an unreadable ordinal
+                                  is a warning (`SettleFresh`), the run part left undone
     create/                   ←   `wtm create`: the run (create.go) + its questions (steps.go)
     clean/                    ←   `wtm clean`: the run (clean.go) + its questions (steps.go)
     reparent/                 ←   `wtm reparent`: the run (reparent.go) + its questions (steps.go)

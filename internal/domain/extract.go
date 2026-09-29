@@ -60,4 +60,7 @@ type ExtractResult struct {
 	// Conflicts lists the files written with conflict markers in resolve mode.
 	// Empty on a clean extraction.
 	Conflicts []string `json:"conflicts"`
+	// Warnings are what the run module could not do for a target this
+	// extraction created, which never fails it.
+	Warnings []string `json:"warnings,omitempty"`
 }

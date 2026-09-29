@@ -43,8 +43,11 @@ func (r Reader) Serving() bool { return r.proxyPort > 0 }
 
 // In lists the jobs reachable in one worktree. The worktree is what makes the
 // addresses differ: its ordinal decides every port.
-func (r Reader) In(dir string) []domain.JobURLEntry {
-	env := seam.JobEnv(seam.JobEnvParams{ProjectDir: r.ctx.ProjectDir, StateDir: r.ctx.StateDir, WorkDir: dir})
+func (r Reader) In(dir string) ([]domain.JobURLEntry, error) {
+	env, err := seam.JobEnv(seam.JobEnvParams{ProjectDir: r.ctx.ProjectDir, StateDir: r.ctx.StateDir, WorkDir: dir})
+	if err != nil {
+		return nil, err
+	}
 	offset, _ := strconv.Atoi(env[domain.EnvPortOffset])
 	project := filepath.Base(r.ctx.ProjectDir)
 	proxyPort := r.proxyPort
@@ -63,5 +66,5 @@ func (r Reader) In(dir string) []domain.JobURLEntry {
 		}
 		entries = append(entries, domain.JobURLEntry{Job: job.Name, URL: url})
 	}
-	return entries
+	return entries, nil
 }

@@ -25,13 +25,11 @@ func newStopCmd() *cobra.Command {
 }
 
 func runStop(cmd *cobra.Command, args []string) error {
-	ctx, err := runctx.Open(runctx.OpenParams{Cmd: cmd})
+	ctx, err := runctx.Open(runctx.OpenParams{Cmd: cmd, TolerateRunConfig: true})
 	if err != nil {
 		return err
 	}
-	if err := reportRunConfig(cmd, ctx.Run); err != nil {
-		return err
-	}
+	warnRunConfig(cmd, ctx)
 
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 	job, _ := cmd.Flags().GetString(domain.FlagJob)
@@ -43,6 +41,7 @@ func runStop(cmd *cobra.Command, args []string) error {
 			Cwd:       ctx.Dir,
 			Job:       job,
 			Config:    ctx.Run,
+			ByName:    ctx.RunErr != nil,
 		},
 		Prompter:  ctx.Prompter(ctx.Interactive),
 		Presenter: stopPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},

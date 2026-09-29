@@ -80,6 +80,11 @@ var (
 	// the ordinal exists to prevent.
 	ErrOrdinalUnreadable = errors.New("cannot read a live worktree's ordinal")
 
+	// ErrWorktreeEnvUnresolved refuses to start a job in a worktree whose ports
+	// and names cannot be resolved: falling back to none is running it on the
+	// main checkout's.
+	ErrWorktreeEnvUnresolved = errors.New("cannot resolve the worktree's environment")
+
 	// ErrIsolationMain refuses to make the main checkout verbatim: it is the
 	// source every other .env is copied from, so there is nothing for it to copy.
 	ErrIsolationMain = errors.New("the main checkout is always isolated: it is the one the others copy from")

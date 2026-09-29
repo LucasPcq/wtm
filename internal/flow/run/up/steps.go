@@ -211,7 +211,11 @@ func (f *upFlow) startingClaims(answers flow.Answers) []domain.PortClaim {
 	jobs := rules.JobsWithEffectivePorts(f.request.Config, profile.Jobs)
 	var claims []domain.PortClaim
 	for _, dir := range f.workDirs(answers) {
-		claims = append(claims, rules.PortClaims(rules.PortClaimsParams{Jobs: jobs, WorkDir: dir, Offset: f.offsetOf(dir)})...)
+		offset, known := f.offsetOf(dir)
+		if !known {
+			continue
+		}
+		claims = append(claims, rules.PortClaims(rules.PortClaimsParams{Jobs: jobs, WorkDir: dir, Offset: offset})...)
 	}
 	return claims
 }
@@ -234,27 +238,36 @@ func (f *upFlow) heldClaims(answers flow.Answers) []domain.PortClaim {
 		if !known || !rules.IsJobUp(info.Status) || selected[info.WorkDir] {
 			continue
 		}
+		offset, resolved := f.offsetOf(info.WorkDir)
+		if !resolved {
+			continue
+		}
 		claims = append(claims, rules.PortClaims(rules.PortClaimsParams{
 			Jobs:    []domain.JobConfig{job},
 			WorkDir: info.WorkDir,
-			Offset:  f.offsetOf(info.WorkDir),
+			Offset:  offset,
 		})...)
 	}
 	return claims
 }
 
 // offsetOf is the offset a worktree runs on, read once per worktree: the steps
-// ask again every time the wizard moves.
-func (f *upFlow) offsetOf(dir string) int {
+// ask again every time the wizard moves. A worktree whose offset cannot be
+// resolved claims nothing rather than main's ports; the run refuses it anyway.
+func (f *upFlow) offsetOf(dir string) (int, bool) {
 	if offset, known := f.offsets[dir]; known {
-		return offset
+		return offset, true
 	}
-	offset := rules.PortOffsetFromEnv(seam.JobEnv(seam.JobEnvParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, WorkDir: dir}))
+	env, err := seam.JobEnv(seam.JobEnvParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, WorkDir: dir})
+	if err != nil {
+		return 0, false
+	}
+	offset := rules.PortOffsetFromEnv(env)
 	if f.offsets == nil {
 		f.offsets = map[string]int{}
 	}
 	f.offsets[dir] = offset
-	return offset
+	return offset, true
 }
 
 // othersRunning is measured against the worktree the run targets, never against
