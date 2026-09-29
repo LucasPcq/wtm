@@ -110,6 +110,9 @@ const (
 	EnvAssign        = "="
 	EnvQuoteDouble   = '"'
 	EnvQuoteSingle   = '\''
+	EnvCR            = "\r"
+	// EnvInterpolation is what a dotenv reader expands outside single quotes.
+	EnvInterpolation = "$"
 
 	// EnvCredentialsSeparator ends the userinfo part of a URL. A value is elided
 	// there before display: what precedes it is a password, what follows is the

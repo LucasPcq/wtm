@@ -1,6 +1,8 @@
 package rules
 
 import (
+	"strings"
+
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
@@ -112,11 +114,12 @@ func classifyKey(params classifyKeyParams) domain.EnvKeyDiff {
 	_, inMain := params.Main[k]
 	expected := inTemplate || inParent || inMain
 
-	srcVal, srcLabel, srcExport, hasSrc := resolveSource(resolveSourceParams{
+	srcLine, srcLabel, hasSrc := resolveSource(resolveSourceParams{
 		Key:    k,
 		Parent: params.Parent,
 		Main:   params.Main,
 	})
+	srcVal := srcLine.Value
 
 	diff := domain.EnvKeyDiff{Key: k}
 
@@ -146,7 +149,8 @@ func classifyKey(params classifyKeyParams) domain.EnvKeyDiff {
 		diff.Status = domain.EnvKeyResolved
 		diff.ResolvedValue = srcVal
 		diff.Source = srcLabel
-		diff.Export = srcExport
+		diff.Export = srcLine.Export
+		diff.SourceLine = srcLine
 		return diff
 	}
 
@@ -154,6 +158,7 @@ func classifyKey(params classifyKeyParams) domain.EnvKeyDiff {
 	if tmpl, ok := params.Template[k]; ok {
 		diff.Placeholder = tmpl.Value
 		diff.Export = tmpl.Export
+		diff.SourceLine = tmpl
 	}
 	return diff
 }
@@ -165,16 +170,16 @@ type resolveSourceParams struct {
 	Main   map[string]domain.EnvLine
 }
 
-// resolveSource returns the first non-empty value in the parent -> main cascade,
-// its source label and export flag. ok is false when neither source resolves.
-func resolveSource(params resolveSourceParams) (value, source string, export, ok bool) {
+// resolveSource returns the first line with a non-empty value in the parent ->
+// main cascade and its source label. ok is false when neither source resolves.
+func resolveSource(params resolveSourceParams) (line domain.EnvLine, source string, ok bool) {
 	if l, present := params.Parent[params.Key]; present && l.Value != "" {
-		return l.Value, domain.EnvSourceParent, l.Export, true
+		return l, domain.EnvSourceParent, true
 	}
 	if l, present := params.Main[params.Key]; present && l.Value != "" {
-		return l.Value, domain.EnvSourceMain, l.Export, true
+		return l, domain.EnvSourceMain, true
 	}
-	return "", "", false, false
+	return domain.EnvLine{}, "", false
 }
 
 // ApplyEnvDiffParams holds the inputs to materialize a resolved diff. Child is the
@@ -235,19 +240,33 @@ func ApplyEnvDiff(params ApplyEnvDiffParams) []domain.EnvLine {
 		}
 	}
 
+	var added []domain.EnvLine
 	for _, e := range params.Diff.Entries {
-		if childKeys[e.Key] {
-			continue
-		}
-		if params.SkipKeys[e.Key] {
+		if childKeys[e.Key] || params.SkipKeys[e.Key] {
 			continue
 		}
 		if line, ok := addedLine(e, params.FilledValues); ok {
-			out = append(out, line)
+			added = append(added, line)
 		}
 	}
+	return insertBeforeTrailingBlanks(out, added)
+}
 
-	return out
+// insertBeforeTrailingBlanks lands new lines after the last one holding
+// something: a parsed document keeps its final newline as a trailing blank line,
+// and appending past it would drop that newline and open a gap instead.
+func insertBeforeTrailingBlanks(lines, added []domain.EnvLine) []domain.EnvLine {
+	if len(added) == 0 {
+		return lines
+	}
+	at := len(lines)
+	for at > 0 && lines[at-1].Kind == domain.EnvLineBlank && lines[at-1].Raw == "" {
+		at--
+	}
+	out := make([]domain.EnvLine, 0, len(lines)+len(added))
+	out = append(out, lines[:at]...)
+	out = append(out, added...)
+	return append(out, lines[at:]...)
 }
 
 // resolveConflict returns the child line settled per FilledValues (edit) or the
@@ -268,12 +287,12 @@ func addedLine(entry domain.EnvKeyDiff, filled map[string]string) (domain.EnvLin
 	switch entry.Status {
 	case domain.EnvKeyResolved:
 		if v, ok := filled[entry.Key]; ok {
-			return newPair(entry.Key, v, entry.Export), true
+			return newPair(entry, v), true
 		}
-		return newPair(entry.Key, entry.ResolvedValue, entry.Export), true
+		return newPair(entry, entry.ResolvedValue), true
 	case domain.EnvKeyMissing:
 		if v, ok := filled[entry.Key]; ok {
-			return newPair(entry.Key, v, entry.Export), true
+			return newPair(entry, v), true
 		}
 		return domain.EnvLine{}, false
 	default:
@@ -281,16 +300,19 @@ func addedLine(entry domain.EnvKeyDiff, filled map[string]string) (domain.EnvLin
 	}
 }
 
-// mutatedPair returns line with a new value and Raw cleared so RenderEnv re-emits it.
 func mutatedPair(line domain.EnvLine, value string) domain.EnvLine {
-	line.Value = value
-	line.Raw = ""
-	return line
+	return WithEnvValue(line, value)
 }
 
-// newPair builds a fresh pair with no Raw, to be rendered canonically.
-func newPair(key, value string, export bool) domain.EnvLine {
-	return domain.EnvLine{Kind: domain.EnvLinePair, Key: key, Value: value, Export: export}
+// newPair copies the line the key comes from, its line ending left to the file
+// it lands in, and renders a fresh one when there is none.
+func newPair(entry domain.EnvKeyDiff, value string) domain.EnvLine {
+	source := entry.SourceLine
+	if source.Kind != domain.EnvLinePair || source.Raw == "" {
+		return domain.EnvLine{Kind: domain.EnvLinePair, Key: entry.Key, Value: value, Export: entry.Export}
+	}
+	source.Raw = strings.TrimSuffix(source.Raw, domain.EnvCR)
+	return WithEnvValue(source, value)
 }
 
 // pairsByKey indexes the pair lines by key, last occurrence winning.

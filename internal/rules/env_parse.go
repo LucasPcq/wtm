@@ -44,18 +44,125 @@ func classifyLine(physical []string, i int) (domain.EnvLine, int) {
 }
 
 // RenderEnv serializes logical lines back to .env content. A pair whose Raw is
-// still present is emitted verbatim; a pair whose Raw was cleared (mutated by a
-// consumer) is re-rendered canonically. Comment and blank lines always emit Raw.
+// still present is emitted verbatim; a pair with no Raw (a new one) is rendered
+// canonically. A file whose lines end in CRLF keeps doing so, new lines included.
 func RenderEnv(lines []domain.EnvLine) string {
+	crlf := endsInCRLF(lines)
 	parts := make([]string, len(lines))
 	for i, l := range lines {
+		part := l.Raw
 		if l.Kind == domain.EnvLinePair && l.Raw == "" {
-			parts[i] = renderPair(l)
-			continue
+			part = renderPair(l)
 		}
-		parts[i] = l.Raw
+		if crlf && i < len(lines)-1 && !strings.HasSuffix(part, domain.EnvCR) {
+			part += domain.EnvCR
+		}
+		parts[i] = part
 	}
 	return strings.Join(parts, "\n")
+}
+
+// endsInCRLF reads the document's line ending off its terminated lines: the
+// last one is never terminated, so it has no say.
+func endsInCRLF(lines []domain.EnvLine) bool {
+	crlf, terminated := 0, 0
+	for _, l := range lines[:max(len(lines)-1, 0)] {
+		if l.Raw == "" {
+			continue
+		}
+		terminated++
+		if strings.HasSuffix(l.Raw, domain.EnvCR) {
+			crlf++
+		}
+	}
+	return crlf > 0 && crlf*2 >= terminated
+}
+
+// WithEnvValue sets a pair's value by replacing it inside the line as written,
+// so its quotes, inline comment, export prefix and line ending all survive. The
+// line is re-quoted only when its own quoting cannot hold the new value.
+func WithEnvValue(line domain.EnvLine, value string) domain.EnvLine {
+	if line.Value == value {
+		return line
+	}
+	span, located := valueSpan(line)
+	line.Value = value
+	if !located {
+		line.Raw = ""
+		return line
+	}
+
+	prefix, suffix := line.Raw[:span.start], line.Raw[span.end:]
+	if kept := span.quoted(value); kept != "" {
+		if candidate := prefix + kept + suffix; reparsesTo(candidate, line) {
+			line.Raw = candidate
+			return line
+		}
+	}
+	line.Raw = prefix + renderValue(value) + suffix
+	return line
+}
+
+// envValueSpan is where a pair's value sits in its raw line, quotes included.
+type envValueSpan struct {
+	start, end int
+	quote      byte
+	// dollar says the value it held already carried a `$`, so a bare `$` in its
+	// replacement is the file's own interpolation rather than one wtm adds.
+	dollar bool
+}
+
+func (s envValueSpan) quoted(value string) string {
+	if s.quote != 0 {
+		return string(s.quote) + value + string(s.quote)
+	}
+	if needsQuote(value) || (strings.Contains(value, domain.EnvInterpolation) && !s.dollar) {
+		return ""
+	}
+	return value
+}
+
+func valueSpan(line domain.EnvLine) (envValueSpan, bool) {
+	raw := line.Raw
+	eq := strings.Index(raw, domain.EnvAssign)
+	if line.Kind != domain.EnvLinePair || eq < 0 {
+		return envValueSpan{}, false
+	}
+	dollar := strings.Contains(line.Value, domain.EnvInterpolation)
+
+	rest := raw[eq+1:]
+	start := eq + 1 + len(rest) - len(strings.TrimLeft(rest, " \t"))
+	if start < len(raw) && isEnvQuote(raw[start]) {
+		quote := raw[start]
+		end := start + 1 + len(line.Value)
+		if end >= len(raw) || raw[start+1:end] != line.Value || raw[end] != quote {
+			return envValueSpan{}, false
+		}
+		return envValueSpan{start: start, end: end + 1, quote: quote, dollar: dollar}, true
+	}
+	if line.Value == "" {
+		return envValueSpan{start: eq + 1, end: eq + 1}, true
+	}
+	end := start + len(line.Value)
+	if end > len(raw) || raw[start:end] != line.Value {
+		return envValueSpan{}, false
+	}
+	return envValueSpan{start: start, end: end, dollar: dollar}, true
+}
+
+func isEnvQuote(c byte) bool {
+	return c == byte(domain.EnvQuoteDouble) || c == byte(domain.EnvQuoteSingle)
+}
+
+// reparsesTo checks a rewritten line reads back as the pair it is meant to be:
+// a value the quoting cannot hold would otherwise be written and misread.
+func reparsesTo(raw string, want domain.EnvLine) bool {
+	parsed := ParseEnv(raw)
+	if len(parsed) != 1 {
+		return false
+	}
+	got := parsed[0]
+	return got.Kind == domain.EnvLinePair && got.Key == want.Key && got.Value == want.Value && got.Export == want.Export
 }
 
 // parsePair attempts to read physical[start] — spanning following lines when a
@@ -200,9 +307,13 @@ func renderPair(l domain.EnvLine) string {
 	return b.String()
 }
 
-// renderValue double-quotes a value only when leaving it bare would not parse back
-// to the same text; embedded double quotes are escaped inside the quotes.
+// renderValue quotes a value only when leaving it bare would not parse back to
+// the same text. A `$` takes single quotes, where no dotenv reader expands it.
 func renderValue(v string) string {
+	if strings.Contains(v, domain.EnvInterpolation) && !strings.ContainsRune(v, domain.EnvQuoteSingle) {
+		sq := string(domain.EnvQuoteSingle)
+		return sq + v + sq
+	}
 	if !needsQuote(v) {
 		return v
 	}

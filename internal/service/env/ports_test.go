@@ -104,3 +104,20 @@ func TestEnvValueRefsForNarrowsToOneTarget(t *testing.T) {
 		t.Errorf("EnvValueRefsFor() = %v, want only the web target's key", got)
 	}
 }
+
+func TestApplyEnvPortsKeepsQuotesCommentsAndCRLF(t *testing.T) {
+	dir := t.TempDir()
+	body := "# db\r\nDATABASE_URL='postgres://u:pa$w0rd@localhost:5432/app' # main db\r\nOTHER=\"keep\"\r\n"
+	writePortsFile(t, dir, ".env", body)
+	writePortsFile(t, dir, "apps/web/.env", "export VITE_API_URL=\"http://localhost:3000\" # api\n")
+
+	if _, err := ApplyEnvPorts(portsParams(dir)); err != nil {
+		t.Fatalf("ApplyEnvPorts() error = %v", err)
+	}
+	if got, want := readFile(t, filepath.Join(dir, ".env")), "# db\r\nDATABASE_URL='postgres://u:pa$w0rd@localhost:5442/app' # main db\r\nOTHER=\"keep\"\r\n"; got != want {
+		t.Errorf(".env =\n%q\nwant\n%q", got, want)
+	}
+	if got, want := readFile(t, filepath.Join(dir, "apps/web/.env")), "export VITE_API_URL=\"http://localhost:3010\" # api\n"; got != want {
+		t.Errorf("apps/web/.env =\n%q\nwant\n%q", got, want)
+	}
+}

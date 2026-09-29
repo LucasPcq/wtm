@@ -96,8 +96,7 @@ type UpsertEnvPairParams struct {
 }
 
 // UpsertEnvPair sets Key to Value, in place when the document already holds it
-// and inserted otherwise. Raw is cleared on a mutated line so RenderEnv re-emits
-// it from Key and Value.
+// and inserted otherwise.
 func UpsertEnvPair(params UpsertEnvPairParams) (lines []domain.EnvLine, changed bool) {
 	lines = params.Lines
 	for i, line := range lines {
@@ -108,8 +107,7 @@ func UpsertEnvPair(params UpsertEnvPairParams) (lines []domain.EnvLine, changed 
 			return lines, false
 		}
 		out := slices.Clone(lines)
-		out[i].Value = params.Value
-		out[i].Raw = ""
+		out[i] = WithEnvValue(line, params.Value)
 		return out, true
 	}
 	// Inserted after the last line that holds something, not at the very end: a
