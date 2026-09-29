@@ -146,7 +146,6 @@ func (f *createFlow) run() (Outcome, error) {
 			Context:      f.ctx,
 			Branch:       branchName,
 			WorktreePath: result.Path,
-			Rewrite:      !rules.IsVerbatim(f.isolation(answers)),
 			Presenter:    f.presenter,
 		})
 		if portErr != nil {

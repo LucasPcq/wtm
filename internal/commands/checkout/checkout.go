@@ -364,7 +364,6 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 		Context:      shared.FlowContext(result),
 		Branch:       createResult.Branch,
 		WorktreePath: createResult.Path,
-		Rewrite:      !rules.IsVerbatim(params.isolation),
 		Presenter:    shared.NewPresenter(cmd, format),
 	})
 	if err != nil {

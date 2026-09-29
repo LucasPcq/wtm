@@ -64,7 +64,6 @@ func (r repo) alignMain(t *testing.T) {
 		Context:      r.params().Context,
 		Branch:       "main",
 		WorktreePath: r.dir,
-		Rewrite:      true,
 		Presenter:    &flowtest.Recorder{},
 	}); err != nil {
 		t.Fatal(err)

@@ -775,7 +775,6 @@ func createTarget(params createTargetParams) (extractTarget, error) {
 		Context:      shared.FlowContext(params.cfg),
 		Branch:       res.Branch,
 		WorktreePath: res.Path,
-		Rewrite:      !rules.IsVerbatim(params.isolation),
 		Presenter:    shared.NewPresenter(params.cmd, format),
 	})
 	if err != nil {

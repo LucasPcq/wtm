@@ -10,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/envports"
+	"github.com/LucasPcq/wtm/internal/service/worktree"
 	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
@@ -28,7 +29,6 @@ func TestSettleWithoutLinksReportsNothing(t *testing.T) {
 		Context:      ctx,
 		Branch:       "feat/x",
 		WorktreePath: t.TempDir(),
-		Rewrite:      true,
 		Presenter:    presenter,
 	})
 	if err != nil {
@@ -60,7 +60,8 @@ func settleFixture(t *testing.T) (flow.Context, string) {
 				Name: "web", Kind: domain.JobKindService, Cmd: "true",
 				Ports: map[string]int{"PORT": 3000},
 			}},
-			EnvPorts: []domain.EnvPortLink{{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"}},
+			EnvPorts:  []domain.EnvPortLink{{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"}},
+			EnvValues: []domain.EnvValueLink{{File: ".env", Key: "REALM", Job: "web", Value: "app-{worktree}"}},
 		},
 	}); err != nil {
 		t.Fatalf("write run config: %v", err)
@@ -85,7 +86,6 @@ func TestSettleMovesTheCopiedPortsWhenTheRunSaidSo(t *testing.T) {
 		Context:      ctx,
 		Branch:       "feature",
 		WorktreePath: worktreePath,
-		Rewrite:      true,
 		Presenter:    presenter,
 	})
 	if err != nil {
@@ -95,6 +95,9 @@ func TestSettleMovesTheCopiedPortsWhenTheRunSaidSo(t *testing.T) {
 	body := readEnv(t, worktreePath)
 	if strings.Contains(body, "WEB_PORT=3000") {
 		t.Errorf(".env = %q, want the copied port moved onto this worktree's", body)
+	}
+	if !strings.Contains(body, "REALM=app-feature") {
+		t.Errorf(".env = %q, want the [[env]] link written for this worktree", body)
 	}
 	// The pass reports a count to whoever concludes the run, and prints nothing
 	// itself: the values it moved are in the .env beside it.
@@ -106,27 +109,32 @@ func TestSettleMovesTheCopiedPortsWhenTheRunSaidSo(t *testing.T) {
 	}
 }
 
-// The user answered "leave the copied values as they are" in the run that
-// created the worktree. Nothing may rewrite them behind that answer.
-func TestSettleLeavesTheValuesAloneWhenTheRunSaidSo(t *testing.T) {
+// The worktree was created verbatim: its .env is what was copied, and nothing
+// wtm derives — ports, identity, slices — may be written behind that answer.
+func TestSettleLeavesAVerbatimWorktreeAsCopied(t *testing.T) {
 	ctx, worktreePath := settleFixture(t)
+	if err := worktree.SetIsolation(worktree.SetIsolationParams{
+		Ref:       worktree.WorktreeRef{ProjectDir: ctx.ProjectDir, StateDir: ctx.StateDir, Branch: "feature"},
+		Isolation: domain.IsolationVerbatim,
+	}); err != nil {
+		t.Fatalf("SetIsolation: %v", err)
+	}
 
 	settlement, err := envports.Settle(envports.Params{
 		Context:      ctx,
 		Branch:       "feature",
 		WorktreePath: worktreePath,
-		Rewrite:      false,
 		Presenter:    &flowtest.Recorder{},
 	})
 	if err != nil {
 		t.Fatalf("Settle: %v", err)
 	}
-	if settlement.Applied {
-		t.Error("a declined pass must not report itself as applied")
+	if settlement.Applied || settlement.Shifted != 0 {
+		t.Errorf("settlement = %+v, want nothing settled", settlement)
 	}
 
-	if body := readEnv(t, worktreePath); !strings.Contains(body, "WEB_PORT=3000") {
-		t.Errorf(".env = %q, want the copied value untouched", body)
+	if body := readEnv(t, worktreePath); body != "WEB_PORT=3000\n" {
+		t.Errorf(".env = %q, want it exactly as copied", body)
 	}
 }
 

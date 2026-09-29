@@ -177,7 +177,6 @@ func settle(params SwitchParams, outcome SwitchOutcome, worktrees []domain.GitWo
 			Context:      params.Context,
 			Branch:       wt.Branch,
 			WorktreePath: wt.Path,
-			Rewrite:      true,
 			Presenter:    once,
 		})
 		if err != nil {

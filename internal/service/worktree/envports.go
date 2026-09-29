@@ -43,6 +43,13 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 		cfg.Addressing = params.Addressing
 	}
 
+	// A verbatim worktree keeps its .env exactly as it was copied: no identity,
+	// no port, no slice. Resolving to nothing here is what makes every writer —
+	// create, `wtm env`, an addressing switch — leave it alone alike.
+	if rules.IsVerbatim(IsolationOf(WorktreeRef{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: params.Branch})) {
+		return envsvc.EnvPortsParams{}, nil
+	}
+
 	// Resolved from the branch and the repository alone: this value is written to
 	// a file, so it must not inherit the COMPOSE_PROJECT_NAME the calling process
 	// happens to carry — a `wtm env` run from inside another worktree, or from a
