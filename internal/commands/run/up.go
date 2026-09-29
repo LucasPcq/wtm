@@ -42,6 +42,7 @@ func newUpCmd() *cobra.Command {
 	cmd.MarkFlagsMutuallyExclusive(domain.FlagExclusive, domain.FlagParallel)
 	cmd.Flags().BoolP(domain.FlagDetach, "d", false, "Start the jobs and return immediately instead of opening their output")
 	cmd.Flags().Bool(domain.FlagNoProbe, false, "Skip the check that each declared port was actually bound")
+	cmd.Flags().Bool(domain.FlagForce, false, "Lift the refusal to start a job whose touches reach data this worktree does not own (its source's when verbatim, everyone's for a shared service with no namespace); other questions are still asked unless --yes")
 	shared.AddYesFlag(cmd, "Skip all prompts; leaves the other worktrees' jobs running unless --exclusive")
 	shared.AddOutputFlag(cmd)
 
@@ -63,6 +64,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 	exclusive, _ := cmd.Flags().GetBool(domain.FlagExclusive)
 	parallel, _ := cmd.Flags().GetBool(domain.FlagParallel)
 	noProbe, _ := cmd.Flags().GetBool(domain.FlagNoProbe)
+	force, _ := cmd.Flags().GetBool(domain.FlagForce)
 	profiles, _ := cmd.Flags().GetStringSlice(domain.FlagProfile)
 
 	outcome, err := upflow.Run(upflow.Params{
@@ -74,6 +76,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 			Exclusive: exclusive,
 			Parallel:  parallel,
 			NoProbe:   noProbe,
+			Force:     force,
 			Config:    ctx.Run,
 		},
 		// The run wizard may be reached through the shell wrapper, which

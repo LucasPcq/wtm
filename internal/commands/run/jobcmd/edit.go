@@ -39,6 +39,7 @@ func newEditCmd() *cobra.Command {
 	cmd.Flags().String(domain.FlagURLHost, "", "Host segment to publish under (pass '' to fall back to the job's name)")
 	cmd.Flags().StringArray(domain.FlagRuns, nil, "Declared job this one starts itself, repeatable — replaces the list (pass '' to drop it)")
 	cmd.Flags().Bool(domain.FlagBindsNoPort, false, "This service listens on nothing by design, so stop offering it a port")
+	cmd.Flags().StringArray(domain.FlagTouches, nil, "Declared service whose data this job changes (a migration, a reset, a seed), repeatable — replaces the list (pass '' to drop it)")
 	shared.AddYesFlag(cmd, "Skip all prompts; a field flag is then required")
 	shared.AddOutputFlag(cmd)
 	return cmd
@@ -70,6 +71,10 @@ func jobPatchFromFlags(cmd *cobra.Command) (rules.JobPatch, error) {
 	if cmd.Flags().Changed(domain.FlagRuns) {
 		runs, _ := cmd.Flags().GetStringArray(domain.FlagRuns)
 		patch.Runs = &runs
+	}
+	if cmd.Flags().Changed(domain.FlagTouches) {
+		touches, _ := cmd.Flags().GetStringArray(domain.FlagTouches)
+		patch.Touches = &touches
 	}
 	if cmd.Flags().Changed(domain.FlagBindsNoPort) {
 		binds, _ := cmd.Flags().GetBool(domain.FlagBindsNoPort)

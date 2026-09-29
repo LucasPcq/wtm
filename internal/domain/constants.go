@@ -1216,6 +1216,7 @@ const (
 	FlagLinkEnv        = "link-env"
 	FlagWritePortKeys  = "write-port-keys"
 	FlagRuns           = "runs"
+	FlagTouches        = "touches"
 	FlagBindsNoPort    = "binds-no-port"
 	FlagShell          = "shell"
 	FlagBasePath       = "base-path"
@@ -1754,6 +1755,7 @@ const (
 	JobRemovedEmptiedFmt  = "Removed profile(s) left with no job: %s"
 	JobRemovedEnvPortsFmt = "Unlinked .env key(s): %s"
 	JobRemovedRunnersFmt  = "No longer started by: %s"
+	JobRemovedTouchersFmt = "Dropped from the touches of: %s"
 	// RunInitJobsRemovedFmt reports what the unchecking dropped, next to what
 	// the same run added.
 	JobActionUpdated = "updated"
@@ -2414,6 +2416,19 @@ const (
 	// or `concurrency = "parallel"` cannot be honoured, and stopping another
 	// worktree is not a default to take silently.
 	RunPortClashRefusedFmt = "ports already bound by another worktree:\n%s\nstop it first with --%s, or give this worktree its own ports: wtm env <branch> --%s %s"
+	// RunForeignData* is the stop before a job that changes data the worktree
+	// does not own — its source's when verbatim, everyone's for a shared
+	// service with no namespace. It is a safety refusal: --force lifts it.
+	RunForeignDataTitle       = "Jobs that change data this worktree does not own"
+	RunForeignDataDesc        = "They run against data another checkout uses too, and whatever they reset or migrate there is reset or migrated for it as well."
+	RunForeignDataLineFmt     = "%s changes %s — %s"
+	RunForeignDataInFmt       = "%s (in %s)"
+	RunForeignDataOwnerSource = "its source's data: this worktree is verbatim"
+	RunForeignDataOwnerShared = "every worktree's data: a shared service with no [job.namespace]"
+	RunForeignDataYes         = "Run them anyway"
+	RunForeignDataNo          = "Don't start"
+	RunForeignDataRefusedFmt  = "%s:\n%s\npass --%s to run them anyway, or give this worktree its own data: wtm env <branch> --%s %s"
+
 	// RunSelfPortClashFmt refuses a run that brings up two worktrees on the same
 	// ports: there is nothing to stop, the selection is the conflict.
 	RunSelfPortClashFmt = "these worktrees bind the same ports and cannot run at once:\n%s"

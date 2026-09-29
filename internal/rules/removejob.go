@@ -13,6 +13,8 @@ type RemoveJobEffect struct {
 	// at a job that no longer exists fails validation, so the removal that
 	// leaves it behind cannot be written at all.
 	Runners []string
+	// Touchers are the jobs whose `touches` named this one, for the same reason.
+	Touchers []string
 }
 
 // RemoveJob takes a job out of a config along with everything that named it. A
@@ -82,6 +84,15 @@ func RemoveJob(cfg domain.RunConfig, name string) (domain.RunConfig, RemoveJobEf
 		}
 	}
 
+	for i, job := range out.Jobs {
+		kept := withoutName(job.Touches, name)
+		if len(kept) == len(job.Touches) {
+			continue
+		}
+		effect.Touchers = append(effect.Touchers, job.Name)
+		out.Jobs[i].Touches = kept
+	}
+
 	out.EnvPorts = make([]domain.EnvPortLink, 0, len(cfg.EnvPorts))
 	for _, link := range cfg.EnvPorts {
 		if link.Job == name {
@@ -92,4 +103,18 @@ func RemoveJob(cfg domain.RunConfig, name string) (domain.RunConfig, RemoveJobEf
 	}
 
 	return out, effect
+}
+
+// withoutName is names without one of them, nil when nothing is left.
+func withoutName(names []string, name string) []string {
+	kept := make([]string, 0, len(names))
+	for _, candidate := range names {
+		if candidate != name {
+			kept = append(kept, candidate)
+		}
+	}
+	if len(kept) == 0 {
+		return nil
+	}
+	return kept
 }

@@ -214,6 +214,7 @@ func fromAnswers(answers flow.Answers, initial domain.JobConfig) (domain.JobConf
 		Ports:       ports,
 		URL:         url,
 		Runs:        initial.Runs,
+		Touches:     initial.Touches,
 		BindsNoPort: initial.BindsNoPort,
 		Probe:       initial.Probe,
 	}, nil

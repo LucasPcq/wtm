@@ -75,6 +75,7 @@ func removalLines(effect rules.RemoveJobEffect) []string {
 		{domain.JobRemovedEmptiedFmt, effect.EmptiedProfiles},
 		{domain.JobRemovedEnvPortsFmt, effect.EnvPorts},
 		{domain.JobRemovedRunnersFmt, effect.Runners},
+		{domain.JobRemovedTouchersFmt, effect.Touchers},
 	} {
 		if len(part.names) == 0 {
 			continue

@@ -26,6 +26,8 @@ type JobPatch struct {
 	// runner's children are read as a set, never merged one at a time.
 	Runs        *[]string
 	BindsNoPort *bool
+	// Touches replaces the whole list, like Runs.
+	Touches *[]string
 }
 
 // Empty reports a patch that would change nothing, which is how a runner tells
@@ -33,7 +35,7 @@ type JobPatch struct {
 func (p JobPatch) Empty() bool {
 	return p.Name == nil && p.Cmd == nil && p.Kind == nil && p.Stop == nil &&
 		p.Cwd == nil && p.URLPort == nil && p.URLHost == nil &&
-		p.Runs == nil && p.BindsNoPort == nil &&
+		p.Runs == nil && p.BindsNoPort == nil && p.Touches == nil &&
 		len(p.Ports) == 0 && !p.ClearPorts
 }
 
@@ -80,6 +82,9 @@ func ApplyJobPatch(params ApplyJobPatchParams) (domain.JobConfig, error) {
 	}
 	if patch.BindsNoPort != nil {
 		job.BindsNoPort = *patch.BindsNoPort
+	}
+	if patch.Touches != nil {
+		job.Touches = trimmedNames(*patch.Touches)
 	}
 
 	ports, err := patchedPorts(job.Ports, patch)
@@ -170,6 +175,22 @@ func RenameJobRefs(cfg domain.RunConfig, from, to string) domain.RunConfig {
 			}
 		}
 		out.Profiles[i].Jobs = jobs
+	}
+
+	out.Jobs = make([]domain.JobConfig, len(cfg.Jobs))
+	copy(out.Jobs, cfg.Jobs)
+	for i, job := range out.Jobs {
+		if len(job.Touches) == 0 {
+			continue
+		}
+		touches := make([]string, len(job.Touches))
+		for j, ref := range job.Touches {
+			touches[j] = ref
+			if ref == from {
+				touches[j] = to
+			}
+		}
+		out.Jobs[i].Touches = touches
 	}
 
 	out.EnvPorts = make([]domain.EnvPortLink, len(cfg.EnvPorts))

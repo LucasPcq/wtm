@@ -9,6 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/run/addressing"
+	"github.com/LucasPcq/wtm/internal/flow/run/foreigndata"
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/flow/run/seam"
 	"github.com/LucasPcq/wtm/internal/flow/run/target"
@@ -23,6 +24,9 @@ type Request struct {
 	Worktree string
 	Cwd      string
 	Job      string
+	// Force starts a job that changes data the worktree does not own without
+	// asking.
+	Force bool
 	// Config is run.toml, so a job name matching nothing fails here rather than
 	// at the daemon.
 	Config domain.RunConfig
@@ -118,6 +122,22 @@ func (f *startFlow) run() (Outcome, error) {
 		Starting: append([]string{job.Name}, rules.JobsUpIn(f.jobs, []string{workDir})...),
 	}); len(conflicts) > 0 {
 		return Outcome{}, fmt.Errorf("%s:\n%s", domain.JobConflictTitle, strings.Join(rules.JobConflictLines(conflicts), "\n"))
+	}
+
+	proceed, err := foreigndata.Allow(foreigndata.Params{
+		Context:  f.ctx,
+		Config:   f.request.Config,
+		Jobs:     []domain.JobConfig{job},
+		WorkDirs: []string{workDir},
+		Force:    f.request.Force,
+		Prompter: f.prompter,
+	})
+	if err != nil {
+		return Outcome{}, err
+	}
+	if !proceed {
+		f.presenter.Notice(flow.AbortedNotice)
+		return Outcome{Aborted: true}, nil
 	}
 
 	warnings := addressing.Lines(addressing.Params{Context: f.ctx, WorkDirs: []string{workDir}})

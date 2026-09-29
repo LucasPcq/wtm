@@ -240,7 +240,29 @@ func validateJobRelations(cfg domain.RunConfig, jobNames map[string]bool) []stri
 			seen[ref] = true
 		}
 	}
+	errs = append(errs, touchesErrors(cfg, jobNames)...)
 	errs = append(errs, runnerCycles(cfg)...)
+	return errs
+}
+
+// touchesErrors refuses a `touches` naming a job that does not exist: a guard
+// keyed on a typo would never fire, and say nothing about it.
+func touchesErrors(cfg domain.RunConfig, jobNames map[string]bool) []string {
+	var errs []string
+	for _, job := range cfg.Jobs {
+		seen := map[string]bool{}
+		for _, ref := range job.Touches {
+			switch {
+			case ref == job.Name:
+				errs = append(errs, fmt.Sprintf("job %q: touches itself", job.Name))
+			case !jobNames[ref]:
+				errs = append(errs, fmt.Sprintf("job %q: touches unknown job %q", job.Name, ref))
+			case seen[ref]:
+				errs = append(errs, fmt.Sprintf("job %q: touches %q twice", job.Name, ref))
+			}
+			seen[ref] = true
+		}
+	}
 	return errs
 }
 

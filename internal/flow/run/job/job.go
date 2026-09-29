@@ -230,9 +230,10 @@ func removeNamed(params RemoveParams, name string) (Outcome, error) {
 // namedBy is everything a removal would drag along, which is what the refusal
 // has to name: a reader deciding whether to lift it needs to know what goes.
 func namedBy(effect rules.RemoveJobEffect) []string {
-	named := make([]string, 0, len(effect.Profiles)+len(effect.Runners))
+	named := make([]string, 0, len(effect.Profiles)+len(effect.Runners)+len(effect.Touchers))
 	named = append(named, effect.Profiles...)
-	return append(named, effect.Runners...)
+	named = append(named, effect.Runners...)
+	return append(named, effect.Touchers...)
 }
 
 // liftReference asks to lift the safety refusal, and refuses naming --force

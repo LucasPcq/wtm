@@ -97,6 +97,13 @@
             },
             "description": "The declared jobs this one starts itself \u2014 a `turbo run dev` against a filter, any single process that fans out. wtm infers nothing from the command: the relation is declared here. It gives the runner its children's urls, lets the port check look at their ports, and lets wtm refuse to start a runner alongside one of its own children."
           },
+          "touches": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The declared services whose data this job changes \u2014 a migration, a reset, a seed, e.g. [\"postgres\"]. wtm infers nothing from the command. `wtm run up` and `wtm run start` stop before starting such a job where the data is not the worktree's own: its source's for a verbatim worktree, everyone's for a shared service with no [job.namespace]. A terminal is asked to confirm; --yes refuses unless --force is given."
+          },
           "scope": {
             "type": "string",
             "enum": [

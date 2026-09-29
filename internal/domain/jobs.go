@@ -116,6 +116,11 @@ type JobConfig struct {
 	// that fans out. wtm learns nothing about the runner from it: the relation
 	// is declared, never inferred from the command.
 	Runs []string `toml:"runs,omitempty" json:"runs,omitempty"`
+	// Touches names the declared services whose data this job changes — a
+	// migration, a reset, a seed. wtm cannot read that from a command, and it
+	// is what lets `run up` stop before a job rewrites data the worktree does
+	// not own: its source's, for a verbatim worktree.
+	Touches []string `toml:"touches,omitempty" json:"touches,omitempty"`
 	// A nil Namespace on a shared job means shared for good: one instance, one set
 	// of data.
 	Scope     JobScope            `toml:"scope,omitempty"     json:"scope,omitempty"`
@@ -553,6 +558,27 @@ type JobRunnerChoice struct {
 	Label   string
 	Runners []string
 	Options []string
+}
+
+// DataOwner is whose data a job would change, when it is not the worktree's.
+type DataOwner string
+
+const (
+	// DataOwnerSource is a verbatim worktree's source: its .env names the
+	// source's databases and realms.
+	DataOwnerSource DataOwner = "source"
+	// DataOwnerEveryone is a shared service carving no namespace: one set of
+	// data for every worktree.
+	DataOwnerEveryone DataOwner = "everyone"
+)
+
+// DataRisk is a job this run would start that changes data the worktree does
+// not own.
+type DataRisk struct {
+	Job     string
+	Service string
+	Owner   DataOwner
+	WorkDir string
 }
 
 // PortClaim is one port a job binds in one worktree.
