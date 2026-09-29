@@ -569,9 +569,6 @@ func addHooksSteps(s *stepSet, detection domain.InitDetectionResult, autoSkip fu
 		hooks = prefill.OnCreate
 	} else if detection.InstallCommand != "" {
 		hooks = append(hooks, domain.HookCommand{Cmd: detection.InstallCommand})
-		for _, pkg := range detection.MonorepoPackages {
-			hooks = append(hooks, domain.HookCommand{Cmd: detection.InstallCommand, Cwd: pkg})
-		}
 	}
 
 	s.add(stepHooks, components.Step{
