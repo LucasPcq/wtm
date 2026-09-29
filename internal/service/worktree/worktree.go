@@ -50,6 +50,10 @@ func Create(params domain.CreateParams) (domain.CreateResult, error) {
 			domain.ErrWorktreeExists, params.Branch, target.WorktreePath, params.Branch)
 	}
 
+	if err := checkNameFree(checkNameFreeParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: params.Branch}); err != nil {
+		return domain.CreateResult{}, err
+	}
+
 	reuseBranch := target.State == domain.BranchTargetExisting
 	if err := infra.CreateWorktree(infra.CreateWorktreeParams{
 		ProjectDir:  params.ProjectDir,

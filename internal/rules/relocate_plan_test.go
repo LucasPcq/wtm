@@ -2,6 +2,7 @@ package rules_test
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -341,5 +342,22 @@ func TestBuildRelocatePlanRunningJobsDoNotBlockAnAdoptionInPlace(t *testing.T) {
 	})
 	if step := stepFor(t, plan, "feat/x"); step.Status != domain.RelocateStatusAdopt {
 		t.Fatalf("expected adopt, got %q", step.Status)
+	}
+}
+
+// Adopting a worktree whose derived name a live one carries would give the two
+// one compose project, one namespace and one proxy host: blocked, naming both.
+func TestBuildRelocatePlanBlocksTheAdoptionOfAClashingName(t *testing.T) {
+	plan := planFor(t, true, rules.RelocateCandidate{
+		Branch:    "feat.x",
+		FromPath:  desired("feat.x"),
+		NameClash: &domain.WorktreeNameClash{Branch: "feat/x", Name: "feat-x"},
+	})
+	step := stepFor(t, plan, "feat.x")
+	if step.Status != domain.RelocateStatusBlockedName {
+		t.Fatalf("expected blocked_name, got %q", step.Status)
+	}
+	if !strings.Contains(step.Detail, "feat/x (feat-x)") {
+		t.Errorf("detail = %q, want the live branch and the shared name", step.Detail)
 	}
 }

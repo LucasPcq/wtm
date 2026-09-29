@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -39,6 +40,9 @@ type RelocateCandidate struct {
 	// HasJobs reports jobs running in the worktree. They are keyed on its path,
 	// so it only matters when the worktree needs to move.
 	HasJobs bool
+	// NameClash is the live worktree an external one shares its derived name
+	// with, nil when none does or the run module declares no job.
+	NameClash *domain.WorktreeNameClash
 }
 
 // BuildRelocatePlanParams holds inputs for building a relocate plan.
@@ -102,6 +106,11 @@ func classifyCandidate(params classifyParams) domain.RelocateStep {
 	}
 	if external {
 		step.Parent = params.BaseBranch
+	}
+	if external && c.NameClash != nil {
+		step.Status = domain.RelocateStatusBlockedName
+		step.Detail = fmt.Sprintf(domain.RelocateNameClashFmt, c.Branch, c.NameClash.Branch, c.NameClash.Name)
+		return step
 	}
 
 	if samePath(c.FromPath, to) {
@@ -223,7 +232,8 @@ func PlanAdoptions(plan domain.RelocatePlan) []domain.RelocateStep {
 // (an execution error or a blocked target path). Skips are not failures.
 func RelocateHasFailure(result domain.RelocateResult) bool {
 	for _, step := range result.Steps {
-		if step.Status == domain.RelocateStatusError || step.Status == domain.RelocateStatusBlockedDest || step.Status == domain.RelocateStatusBlockedJobs {
+		switch step.Status {
+		case domain.RelocateStatusError, domain.RelocateStatusBlockedDest, domain.RelocateStatusBlockedJobs, domain.RelocateStatusBlockedName:
 			return true
 		}
 	}

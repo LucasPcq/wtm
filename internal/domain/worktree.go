@@ -34,6 +34,13 @@ type WorktreeMetadata struct {
 	Isolation Isolation `json:"isolation,omitempty"`
 }
 
+// WorktreeNameClash names the live worktree whose derived name a branch would
+// share, and that name.
+type WorktreeNameClash struct {
+	Branch string
+	Name   string
+}
+
 // WorktreeStatus holds the display state of a worktree for wtm ls.
 type WorktreeStatus struct {
 	Branch       string

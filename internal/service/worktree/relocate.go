@@ -94,6 +94,7 @@ func collectRelocateCandidates(params RelocateParams) ([]rules.RelocateCandidate
 		return nil, err
 	}
 
+	names := nameClashes(nameClashesParams{StateDir: params.StateDir, Worktrees: worktrees})
 	candidates := make([]rules.RelocateCandidate, 0, len(worktrees))
 	for _, w := range worktrees {
 		if w.IsMain {
@@ -112,10 +113,12 @@ func collectRelocateCandidates(params RelocateParams) ([]rules.RelocateCandidate
 			Branch:     w.Branch,
 		})
 
+		managed := isManaged(params.StateDir, w.Branch)
 		candidates = append(candidates, rules.RelocateCandidate{
 			Branch:       w.Branch,
 			FromPath:     w.Path,
-			IsManaged:    isManaged(params.StateDir, w.Branch),
+			IsManaged:    managed,
+			NameClash:    names.of(nameClashOfParams{Branch: w.Branch, Managed: managed}),
 			IsDirty:      dirty,
 			InspectErr:   dirtyErr != nil,
 			IsLocked:     w.Locked,
@@ -154,6 +157,7 @@ func executeRelocateStep(p executeRelocateStepParams) domain.RelocateStepResult 
 	default:
 		// Noop and every skip/block status carry through unchanged.
 		res.Status = p.Step.Status
+		res.Detail = p.Step.Detail
 		return res
 	}
 }

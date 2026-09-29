@@ -93,7 +93,7 @@ self-documenting:
 | `0` | success |
 | `1` | generic error |
 | `2` | bad usage / invalid flags |
-| `10` | worktree (or its path) already exists — or the branch is checked out in another worktree |
+| `10` | worktree (or its path) already exists — or the branch is checked out in another worktree, or (with run jobs declared) its derived name is taken |
 | `11` | branch not found |
 | `12` | config not found — repo not initialized (`wtm init`) |
 | `14` | service/job not declared in `run.toml` |
@@ -141,6 +141,12 @@ flagged; everything else is what the name implies.
   created, the `.env` copied as is, the hooks run, and the JSON of `create` / `extract` /
   `checkout` carries a `warnings` array naming the cause and "ports not settled — run
   `wtm env <branch>` once run.toml is fixed". Fix the cause, then run that command.
+  **A name two worktrees would share is refused** (exit `10`, before anything is created)
+  when `run.toml` declares a job: `feat.x` next to a live `feat/x` would get the same compose
+  project, namespaces and proxy host (`feat-x`), and `feat/a_b` next to `feat/a-b` the same
+  host. The error names both branches and the shared name — pick another branch name. The
+  same holds for `extract --to` / `checkout`, and `relocate` leaves such an external
+  worktree unadopted (`blocked_name`, exit non-zero).
   Add `--ff` to fast-forward a behind-only `--from` branch to origin first (so the worktree
   starts up to date); a diverged branch is left as-is (no prompt in JSON mode). `extract`
   accepts the same `--ff` for the parent branch of a newly-created target.

@@ -2891,6 +2891,14 @@ const (
 	// because another worktree already holds it (branch, path, branch). Phrased to
 	// read on from the ErrWorktreeExists sentinel it is wrapped in.
 	BranchCheckedOutElsewhereFmt = "%s is checked out at %s — run `wtm go %s` to jump in"
+
+	// WorktreeNameClashFmt refuses a worktree whose derived name — compose
+	// project, namespace, proxy host — another live worktree already carries
+	// (new branch, live branch, shared name).
+	WorktreeNameClashFmt = "%s would share its name with %s (%s) — pick another name"
+	// RelocateNameClashFmt is the same clash met by an adoption, where the
+	// worktree already exists (branch, live branch, shared name).
+	RelocateNameClashFmt = "%s shares its name with %s (%s) — rename one of the two branches to adopt it"
 	// BranchReusedSuffix marks the branch line of a recap when the worktree checks
 	// out an existing local branch instead of creating one.
 	BranchReusedSuffix = " (existing local branch — reused)"

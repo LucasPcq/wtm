@@ -16,6 +16,7 @@ func recapPlan() domain.RelocatePlan {
 			{Branch: "experiment", Status: domain.RelocateStatusSkippedDirty},
 			{Branch: "conflicted", Status: domain.RelocateStatusBlockedDest},
 			{Branch: "serving", Status: domain.RelocateStatusBlockedJobs},
+			{Branch: "feat.x", Status: domain.RelocateStatusBlockedName, Detail: "feat.x shares its name with feat/x (feat-x) — rename one of the two branches to adopt it"},
 		},
 	}
 }
@@ -34,6 +35,7 @@ func TestSprintRelocateRecapGroupsAndResolvesParents(t *testing.T) {
 		"Blocked:",
 		"conflicted — target path occupied",
 		"serving — jobs are running in it: run `wtm run down serving` first",
+		"feat.x shares its name with feat/x (feat-x)",
 	} {
 		if !strings.Contains(recap, want) {
 			t.Errorf("recap missing %q in:\n%s", want, recap)
