@@ -2493,7 +2493,14 @@ const (
 	RunForeignDataOwnerShared = "every worktree's data: a shared service with no [job.namespace]"
 	RunForeignDataYes         = "Run them anyway"
 	RunForeignDataNo          = "Don't start"
-	RunForeignDataRefusedFmt  = "%s:\n%s\npass --%s to run them anyway, or give this worktree its own data: wtm env <branch> --%s %s"
+	RunForeignDataViaFmt      = "%s (run by %s)"
+	// RunForeignDataRefusedFmt takes the title, the risks, the --force flag and
+	// the hints: each cause has its own way out, and isolating a worktree does
+	// nothing for a shared service with no namespace.
+	RunForeignDataRefusedFmt       = "%s:\n%s\npass --%s to run them anyway, or %s"
+	RunForeignDataIsolateHintFmt   = "give this worktree its own data: wtm env <branch> --%s %s"
+	RunForeignDataNamespaceHintFmt = "give each worktree its own slice of %s: declare a [job.namespace] on it in run.toml"
+	RunForeignDataHintSep          = "; or "
 
 	// RunSelfPortClashFmt refuses a run that brings up two worktrees on the same
 	// ports: there is nothing to stop, the selection is the conflict.

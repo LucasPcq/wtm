@@ -629,6 +629,9 @@ type DataRisk struct {
 	Service string
 	Owner   DataOwner
 	WorkDir string
+	// Via is the runner that starts Job as one of its `runs`, empty when the run
+	// starts Job itself.
+	Via string
 }
 
 // PortClaim is one port a job binds in one worktree.

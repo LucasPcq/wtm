@@ -352,8 +352,11 @@ and **experimental**: the global `wtm init` does not configure it.
   run.toml already gives touches keeps them. Outside the wizard, `run job edit <job> --touches
   <service>` sets it (repeatable, replaces the list, `''` drops it); nothing sets it unasked. `run up` and `run start`
   refuse to start such a job where the data is not the worktree's own — its source's for a
-  **verbatim** worktree, everyone's for a shared service with **no** namespace. On your paths
-  that is an error (exit 1) naming the jobs, `--force` and `wtm env <wt> --isolation isolated`;
+  **verbatim** worktree, everyone's for a shared service with **no** namespace. A task a
+  runner starts through its `runs` counts too (`migrate (run by dev)`). On your paths
+  that is an error (exit 1) naming the jobs, `--force` and the fix for each cause —
+  `wtm env <wt> --isolation isolated` for a verbatim worktree, a `[job.namespace]` on the
+  service for a shared one (isolating does nothing for it);
   **pass `--force` only when the user asked** for the reset to reach that data. The main
   checkout is never stopped, and a job without `touches` is never checked.
 - **`[[env]]` is how a slice reaches the app.** `[[env_port]]` rewrites the port *inside* a
