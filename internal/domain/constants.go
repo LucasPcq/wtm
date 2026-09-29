@@ -2000,6 +2000,10 @@ const (
 	RunProfileAddedFmt      = "Added profile %q"
 	RunProfileUpdatedFmt    = "Updated profile %q"
 	RunProfileRemovedFmt    = "Removed profile %q"
+	// RunProfileDefaultReplacedFmt and RunProfileDefaultRemovedFmt say what a
+	// change to the default did to `run up`, which starts the default profile.
+	RunProfileDefaultReplacedFmt = "%s is no longer the default profile: %s is"
+	RunProfileDefaultRemovedFmt  = "%s was the default profile: run up now starts %s, the first declared — choose another with `wtm run profile edit <name> --default`"
 
 	// MetaFileName is the metadata file created per worktree inside
 	// <state-dir>/worktrees/<branch>/.

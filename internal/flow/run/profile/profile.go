@@ -58,6 +58,7 @@ func Add(params AddParams) (Outcome, error) {
 	}
 
 	added := fromAnswers(answers)
+	previous := explicitDefault(params.Request.Config)
 	cfg := params.Request.Config
 	cfg.Profiles = append(cfg.Profiles, added)
 	if added.Default {
@@ -66,6 +67,7 @@ func Add(params AddParams) (Outcome, error) {
 	if err := save(params.Context, cfg); err != nil {
 		return Outcome{}, err
 	}
+	sayDefaultReplaced(defaultReplacedParams{Presenter: params.Presenter, Previous: previous, Current: defaultName(added)})
 	return conclude(params.Presenter, Outcome{Name: added.Name, Status: domain.JobActionAdded})
 }
 
@@ -113,6 +115,10 @@ func editNamed(params EditParams, name string) (Outcome, error) {
 		return Outcome{}, err
 	}
 
+	previous := explicitDefault(params.Request.Config)
+	if previous == current.Name {
+		previous = ""
+	}
 	cfg := params.Request.Config
 	for i, profile := range cfg.Profiles {
 		if profile.Name == current.Name {
@@ -126,6 +132,7 @@ func editNamed(params EditParams, name string) (Outcome, error) {
 	if err := save(params.Context, cfg); err != nil {
 		return Outcome{}, err
 	}
+	sayDefaultReplaced(defaultReplacedParams{Presenter: params.Presenter, Previous: previous, Current: defaultName(updated)})
 	return conclude(params.Presenter, Outcome{Name: updated.Name, Status: domain.JobActionUpdated})
 }
 
@@ -184,7 +191,8 @@ func Remove(params RemoveParams) (Outcome, error) {
 // removeNamed leaves the jobs the profile started untouched: a profile is a way
 // of naming them together, not what they belong to.
 func removeNamed(params RemoveParams, name string) (Outcome, error) {
-	if _, exists := rules.FindProfile(params.Request.Config, name); !exists {
+	removed, exists := rules.FindProfile(params.Request.Config, name)
+	if !exists {
 		return Outcome{}, fmt.Errorf(domain.RunProfileNotFoundFmt, name)
 	}
 
@@ -192,6 +200,12 @@ func removeNamed(params RemoveParams, name string) (Outcome, error) {
 	cfg.Profiles = slices.DeleteFunc(cfg.Profiles, func(p domain.ProfileConfig) bool { return p.Name == name })
 	if err := save(params.Context, cfg); err != nil {
 		return Outcome{}, err
+	}
+	if fallback, any := rules.DefaultProfile(cfg); removed.Default && any {
+		params.Presenter.Notice(flow.Notice{
+			Kind: flow.NoticeWarning,
+			Text: fmt.Sprintf(domain.RunProfileDefaultRemovedFmt, name, fallback.Name),
+		})
 	}
 	return conclude(params.Presenter, Outcome{Name: name, Status: domain.JobActionRemoved})
 }
@@ -240,6 +254,40 @@ func List(params ListParams) (Outcome, error) {
 		}, name)
 	}
 	return Outcome{Aborted: true}, nil
+}
+
+// explicitDefault is the profile run.toml marks as default, never the first-one
+// fallback: replacing a fallback takes nothing away from anyone.
+func explicitDefault(cfg domain.RunConfig) string {
+	for _, p := range cfg.Profiles {
+		if p.Default {
+			return p.Name
+		}
+	}
+	return ""
+}
+
+func defaultName(profile domain.ProfileConfig) string {
+	if !profile.Default {
+		return ""
+	}
+	return profile.Name
+}
+
+type defaultReplacedParams struct {
+	Presenter Presenter
+	Previous  string
+	Current   string
+}
+
+func sayDefaultReplaced(params defaultReplacedParams) {
+	if params.Previous == "" || params.Current == "" || params.Previous == params.Current {
+		return
+	}
+	params.Presenter.Notice(flow.Notice{
+		Kind: flow.NoticeWarning,
+		Text: fmt.Sprintf(domain.RunProfileDefaultReplacedFmt, params.Previous, params.Current),
+	})
 }
 
 func pickStep(cfg domain.RunConfig, title string) flow.Step {

@@ -728,7 +728,9 @@ and **experimental**: the global `wtm init` does not configure it.
   the list (its order is the start order, so give it in full), `--default` /
   `--default=false` hands the default over or takes it away. Same rules as above: a flag
   left out keeps the field, no flag opens the form, and `--yes` or no TTY means an error
-  rather than a picker.
+  rather than a picker. Taking the default from another profile (`add`/`edit --default`)
+  or removing the default profile prints a `!` warning on stderr naming what `run up`
+  now starts — the first declared profile when none is marked default.
 - Every job runs with the worktree's identity in its environment (an `on_create` /
   `on_clean` hook too, but **only** when run.toml declares a `docker compose` job **and**
   the worktree recorded its isolation in meta.json — otherwise a hook's environment is
