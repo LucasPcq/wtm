@@ -15,6 +15,7 @@ func recapPlan() domain.RelocatePlan {
 			{Branch: "legacy", ToPath: "/repo/../.trees/legacy", Status: domain.RelocateStatusAdopt, Adopt: true, Parent: "main"},
 			{Branch: "experiment", Status: domain.RelocateStatusSkippedDirty},
 			{Branch: "conflicted", Status: domain.RelocateStatusBlockedDest},
+			{Branch: "serving", Status: domain.RelocateStatusBlockedJobs},
 		},
 	}
 }
@@ -32,6 +33,7 @@ func TestSprintRelocateRecapGroupsAndResolvesParents(t *testing.T) {
 		"experiment — uncommitted changes",
 		"Blocked:",
 		"conflicted — target path occupied",
+		"serving — jobs are running in it: run `wtm run down serving` first",
 	} {
 		if !strings.Contains(recap, want) {
 			t.Errorf("recap missing %q in:\n%s", want, recap)
@@ -60,5 +62,19 @@ func TestSprintRelocateRecapEmpty(t *testing.T) {
 	})
 	if !strings.Contains(recap, "Nothing to relocate") {
 		t.Errorf("expected an empty-state message, got:\n%s", recap)
+	}
+}
+
+func TestFormatRelocateNamesTheWayOutOfRunningJobs(t *testing.T) {
+	var plan strings.Builder
+	FormatRelocatePlan(&plan, recapPlan())
+	var result strings.Builder
+	FormatRelocateResult(&result, domain.RelocateResult{BasePath: "../.trees", Steps: []domain.RelocateStepResult{
+		{Branch: "serving", Status: domain.RelocateStatusBlockedJobs},
+	}})
+	for name, out := range map[string]string{"plan": plan.String(), "result": result.String()} {
+		if !strings.Contains(out, "wtm run down serving") {
+			t.Errorf("%s does not name `wtm run down serving`:\n%s", name, out)
+		}
 	}
 }

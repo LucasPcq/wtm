@@ -36,6 +36,9 @@ type RelocateCandidate struct {
 	// DestOccupied reports whether the target path already exists as an unrelated
 	// directory; it only matters when the worktree needs to move.
 	DestOccupied bool
+	// HasJobs reports jobs running in the worktree. They are keyed on its path,
+	// so it only matters when the worktree needs to move.
+	HasJobs bool
 }
 
 // BuildRelocatePlanParams holds inputs for building a relocate plan.
@@ -125,6 +128,9 @@ type moveStatusParams struct {
 func moveStatus(params moveStatusParams) domain.RelocateStatus {
 	if params.Candidate.DestOccupied {
 		return domain.RelocateStatusBlockedDest
+	}
+	if params.Candidate.HasJobs {
+		return domain.RelocateStatusBlockedJobs
 	}
 	if params.Force {
 		return domain.RelocateStatusMove
@@ -217,7 +223,7 @@ func PlanAdoptions(plan domain.RelocatePlan) []domain.RelocateStep {
 // (an execution error or a blocked target path). Skips are not failures.
 func RelocateHasFailure(result domain.RelocateResult) bool {
 	for _, step := range result.Steps {
-		if step.Status == domain.RelocateStatusError || step.Status == domain.RelocateStatusBlockedDest {
+		if step.Status == domain.RelocateStatusError || step.Status == domain.RelocateStatusBlockedDest || step.Status == domain.RelocateStatusBlockedJobs {
 			return true
 		}
 	}

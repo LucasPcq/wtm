@@ -22,6 +22,9 @@ const (
 	// RelocateStatusBlockedDest means the target path is already occupied by an
 	// unrelated directory; the move is blocked and --force does not override it.
 	RelocateStatusBlockedDest RelocateStatus = "blocked_dest"
+	// RelocateStatusBlockedJobs means jobs run in the worktree: they are keyed
+	// on its path, so moving it would orphan them. --force does not lift it.
+	RelocateStatusBlockedJobs RelocateStatus = "blocked_jobs"
 	// RelocateStatusMoved means the worktree was moved to its target path.
 	RelocateStatusMoved RelocateStatus = "moved"
 	// RelocateStatusAdopted means a meta.json was created for the worktree in place.

@@ -314,3 +314,32 @@ func TestReprojectRelocatePlanRetargetsAndReclassifies(t *testing.T) {
 		t.Errorf("external should move + stay adopted, got status=%v adopt=%v", ext.Status, ext.Adopt)
 	}
 }
+
+// A worktree whose jobs are running is blocked, --force or not: they are keyed
+// on its path, and the way out is to stop them, not to move them blind.
+func TestBuildRelocatePlanRunningJobsBlockEvenWithForce(t *testing.T) {
+	plan := planFor(t, true, rules.RelocateCandidate{
+		Branch:    "feat/x",
+		FromPath:  "/somewhere/else",
+		IsManaged: true,
+		HasJobs:   true,
+	})
+	step := stepFor(t, plan, "feat/x")
+	if step.Status != domain.RelocateStatusBlockedJobs {
+		t.Fatalf("expected blocked_jobs, got %q", step.Status)
+	}
+	if !rules.RelocateHasFailure(domain.RelocateResult{Steps: []domain.RelocateStepResult{{Status: step.Status}}}) {
+		t.Error("a move refused for running jobs must fail the run")
+	}
+}
+
+func TestBuildRelocatePlanRunningJobsDoNotBlockAnAdoptionInPlace(t *testing.T) {
+	plan := planFor(t, false, rules.RelocateCandidate{
+		Branch:   "feat/x",
+		FromPath: desired("feat/x"),
+		HasJobs:  true,
+	})
+	if step := stepFor(t, plan, "feat/x"); step.Status != domain.RelocateStatusAdopt {
+		t.Fatalf("expected adopt, got %q", step.Status)
+	}
+}

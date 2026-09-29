@@ -1665,6 +1665,10 @@ const (
 	// not probe for pre-existing worktrees, the hint is cheap and always relevant.
 	MsgRelocateHint = "Worktrees created before wtm ? Adopt and align them with `wtm relocate`."
 
+	// RelocateBlockedJobsFmt is the move refused because jobs run in the
+	// worktree, naming the command that frees it (branch, branch).
+	RelocateBlockedJobsFmt = "%s — jobs are running in it: run `wtm run down %s` first"
+
 	// Init recap (LUC-125): labels and copy for the framed end-of-init recap
 	// (accent-bar box + pill title) that summarizes the written config and lists
 	// the next steps. RecapWidth is the fixed render width shared with `relocate`.

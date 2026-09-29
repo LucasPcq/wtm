@@ -251,7 +251,8 @@ flagged; everything else is what the name implies.
 - `wtm relocate` — realign worktrees with `base_path` and adopt externally-created ones.
   `--to <path>` sets a new `base_path` non-interactively; the interactive wizard also lets
   the user change it. You can't drive the wizard — in JSON mode pass `--yes` (and `--to` to
-  change base_path).
+  change base_path). A worktree whose jobs are running is never moved (`blocked_jobs` in the
+  JSON, exit non-zero, `--force` does not lift it): run `wtm run down <branch>`, then retry.
 
 **Stacked branches**
 - `wtm fast-forward <branch…>` (alias `ff`) / `wtm fast-forward --all` — advance the
