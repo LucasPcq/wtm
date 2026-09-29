@@ -12,10 +12,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
-	"github.com/LucasPcq/wtm/internal/schemas"
 	"github.com/LucasPcq/wtm/internal/service/detect"
 	"github.com/LucasPcq/wtm/internal/tui/components"
 	initwizard "github.com/LucasPcq/wtm/internal/tui/inittui"
@@ -120,9 +118,6 @@ func ensureGlobalConfig(cmd *cobra.Command, flagged bool) error {
 	if err := config.WriteGlobal(answers); err != nil {
 		return fmt.Errorf("write global config: %w", err)
 	}
-	if err := dumpGlobalSchema(); err != nil {
-		return err
-	}
 
 	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
 		output.InitGlobalRecap(w, output.InitGlobalRecapParams{
@@ -215,10 +210,6 @@ func createProjectConfig(cmd *cobra.Command, dir, stateDir string, flagged bool)
 		return fmt.Errorf("write project config: %w", err)
 	}
 
-	if err := dumpProjectSchemas(stateDir); err != nil {
-		return err
-	}
-
 	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
 		output.InitProjectRecap(w, output.InitProjectRecapParams{
 			ConfigPath: rules.DisplayPath(rules.DisplayPathParams{Base: dir, Target: filepath.Join(stateDir, domain.ConfigFileName)}),
@@ -230,40 +221,5 @@ func createProjectConfig(cmd *cobra.Command, dir, stateDir string, flagged bool)
 			},
 		})
 	})
-	return nil
-}
-
-// dumpGlobalSchema writes the global config schema beside that config so
-// editors can resolve its `#:schema` directive.
-func dumpGlobalSchema() error {
-	globalDir, err := infra.GlobalDir()
-	if err != nil {
-		return nil // best effort — global schema dump isn't critical
-	}
-	dir := filepath.Join(globalDir, domain.SchemasDirName)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", dir, err)
-	}
-	path := filepath.Join(dir, schemas.Global.Filename())
-	if err := os.WriteFile(path, schemas.Global.Bytes(), 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", path, err)
-	}
-	return nil
-}
-
-// dumpProjectSchemas extracts the bundled JSON Schemas into <state-dir>/schemas/
-// alongside the project config files so editors (Taplo, etc.) can resolve
-// the `#:schema ./schemas/...json` directive at the top of each TOML.
-func dumpProjectSchemas(stateDir string) error {
-	schemaDir := filepath.Join(stateDir, domain.SchemasDirName)
-	if err := os.MkdirAll(schemaDir, 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", schemaDir, err)
-	}
-	for _, s := range []schemas.Schema{schemas.Project, schemas.Run} {
-		path := filepath.Join(schemaDir, s.Filename())
-		if err := os.WriteFile(path, s.Bytes(), 0o644); err != nil {
-			return fmt.Errorf("write %s: %w", path, err)
-		}
-	}
 	return nil
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/schemas"
 )
 
 // ErrRunFileExists is returned by WriteRun when the target file already
@@ -73,6 +74,22 @@ func renderProjectConfig(stateDir string, data projectTemplateData) error {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 
+	return writeSchema(stateDir, schemas.Project)
+}
+
+// writeSchema puts this binary's schema beside the file that points at it, on
+// every write rather than once at init: an upgrade otherwise leaves the editor
+// validating against the version the repository was first set up with. Loading
+// writes nothing — `wtm schema dump` refreshes them without touching a config.
+func writeSchema(dir string, schema schemas.Schema) error {
+	schemaDir := filepath.Join(dir, domain.SchemasDirName)
+	if err := os.MkdirAll(schemaDir, 0o755); err != nil {
+		return fmt.Errorf("create %s: %w", schemaDir, err)
+	}
+	path := filepath.Join(schemaDir, schema.Filename())
+	if err := os.WriteFile(path, schema.Bytes(), 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
+	}
 	return nil
 }
 
@@ -138,7 +155,7 @@ func WriteRun(params WriteRunParams) error {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 
-	return nil
+	return writeSchema(params.StateDir, schemas.Run)
 }
 
 // runFile is run.toml as it is written. It exists for the two settings whose
@@ -251,7 +268,7 @@ func WriteRunTemplate(params WriteRunParams) error {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 
-	return nil
+	return writeSchema(params.StateDir, schemas.Run)
 }
 
 // WriteGlobal creates the global config directory and writes config.toml.
@@ -272,7 +289,7 @@ func WriteGlobal(answers domain.InitGlobalAnswers) error {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 
-	return nil
+	return writeSchema(dir, schemas.Global)
 }
 
 // WriteGlobalTo writes the global config to a specific path (for testing).
@@ -288,5 +305,5 @@ func WriteGlobalTo(path string, answers domain.InitGlobalAnswers) error {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 
-	return nil
+	return writeSchema(dir, schemas.Global)
 }

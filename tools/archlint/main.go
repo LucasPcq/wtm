@@ -44,7 +44,7 @@ var layers = map[string]layer{
 		why:      "I/O, git exec, filesystem wrappers",
 	},
 	"config": {
-		internal: []string{"domain", "infra", "rules"},
+		internal: []string{"domain", "infra", "rules", "schemas"},
 		external: []string{"github.com/BurntSushi/toml"},
 		why:      "load and validate the config files",
 	},

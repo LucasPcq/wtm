@@ -719,8 +719,9 @@ no row of their own while it is up: they are its subprocesses, not jobs beside i
 Every TOML file `wtm init` writes starts with a `#:schema ./schemas/...json` directive.
 Pair it with [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml)
 (or the bundled JetBrains TOML plugin) for autocomplete, hover docs, and real-time
-validation. Schemas ship with the binary and are written locally by `wtm init` — no
-internet required. Re-extract them after upgrading:
+validation. Schemas ship with the binary and are written beside each file every time wtm
+writes it (`init`, `init --only`, `run init`, `run job` / `run profile`, `relocate`…) — no
+internet required. To refresh them after upgrading without touching a config:
 
 ```bash
 wtm schema dump            # <git-common-dir>/wtm/schemas/{run,project}.schema.json
