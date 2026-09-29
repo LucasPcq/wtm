@@ -106,3 +106,52 @@ func TestJobPatchReplacesTouches(t *testing.T) {
 		t.Errorf("touches = %v, want the list replaced", job.Touches)
 	}
 }
+
+// A removed job takes its [[env]] links with it: left behind, every create and
+// `wtm env` refused on a link naming nothing.
+func TestRemovingAJobDropsItsEnvValueLinks(t *testing.T) {
+	cfg := touchingConfig()
+	cfg.EnvValues = []domain.EnvValueLink{
+		{File: ".env", Key: "DATABASE", Job: "pg", Value: "{namespace}"},
+		{File: ".env", Key: "BUCKET", Job: "minio", Value: "b-{worktree}"},
+	}
+	out, effect := RemoveJob(cfg, "pg")
+	if len(effect.EnvValues) != 1 || effect.EnvValues[0] != "DATABASE" {
+		t.Errorf("EnvValues = %v, want DATABASE", effect.EnvValues)
+	}
+	if len(out.EnvValues) != 1 || out.EnvValues[0].Key != "BUCKET" {
+		t.Errorf("links = %+v, want BUCKET alone", out.EnvValues)
+	}
+}
+
+// A rename follows every place a job is named, or the config refuses to load.
+func TestRenamingAJobFollowsItsRunnersAndEnvValues(t *testing.T) {
+	cfg := touchingConfig()
+	cfg.Jobs = append(cfg.Jobs,
+		domain.JobConfig{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm web"},
+		domain.JobConfig{Name: "dev", Kind: domain.JobKindService, Cmd: "turbo dev", BindsNoPort: true, Runs: []string{"web"}},
+	)
+	cfg.EnvValues = []domain.EnvValueLink{{File: ".env", Key: "DATABASE", Job: "pg", Value: "{namespace}"}}
+
+	out := RenameJobRefs(RenameJobRefs(cfg, "web", "front"), "pg", "postgres")
+	for i := range out.Jobs {
+		switch out.Jobs[i].Name {
+		case "web":
+			out.Jobs[i].Name = "front"
+		case "pg":
+			out.Jobs[i].Name = "postgres"
+		}
+	}
+	if got := out.Jobs[len(out.Jobs)-1].Runs; len(got) != 1 || got[0] != "front" {
+		t.Errorf("runs = %v, want the renamed child", got)
+	}
+	if out.EnvValues[0].Job != "postgres" {
+		t.Errorf("[[env]] job = %q, want the new name", out.EnvValues[0].Job)
+	}
+	if _, errs := ValidateRun(out); len(errs) != 0 {
+		t.Errorf("the rename left an invalid config: %v", errs)
+	}
+	if cfg.Jobs[len(cfg.Jobs)-1].Runs[0] != "web" || cfg.EnvValues[0].Job != "pg" {
+		t.Error("the rename wrote through to the config it was given")
+	}
+}

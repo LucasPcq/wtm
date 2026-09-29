@@ -9,6 +9,9 @@ type RemoveJobEffect struct {
 	Profiles        []string
 	EmptiedProfiles []string
 	EnvPorts        []string
+	// EnvValues are the keys of the [[env]] links that named this job. Left
+	// behind, every create and `wtm env` would refuse on a link naming nothing.
+	EnvValues []string
 	// Runners are the jobs whose `runs` named this one. A runner left pointing
 	// at a job that no longer exists fails validation, so the removal that
 	// leaves it behind cannot be written at all.
@@ -100,6 +103,18 @@ func RemoveJob(cfg domain.RunConfig, name string) (domain.RunConfig, RemoveJobEf
 			continue
 		}
 		out.EnvPorts = append(out.EnvPorts, link)
+	}
+
+	out.EnvValues = make([]domain.EnvValueLink, 0, len(cfg.EnvValues))
+	for _, link := range cfg.EnvValues {
+		if link.Job == name {
+			effect.EnvValues = append(effect.EnvValues, link.Key)
+			continue
+		}
+		out.EnvValues = append(out.EnvValues, link)
+	}
+	if len(out.EnvValues) == 0 {
+		out.EnvValues = nil
 	}
 
 	return out, effect

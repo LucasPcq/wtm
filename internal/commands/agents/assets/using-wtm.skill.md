@@ -776,8 +776,11 @@ and **experimental**: the global `wtm init` does not configure it.
   writing, and counts a pending shift as drift.
   Three refusals, reported and never guessed: the key is absent from the file, the base
   appears **more than once** in the value, or **neither the base nor any offset of it** is
-  there. A link naming a port no job declares, an invalid key, or the same `(file, key)`
-  twice makes `run.toml` refuse to load; so does a link missing `job`, which is **required** —
+  there. A link naming a port no job declares, an invalid key, or the same
+  `(file, key, job, port)` twice makes `run.toml` refuse to load. One key linked to **two
+  different ports** is allowed on purpose (a CORS origin list names one front per port), so
+  a key linked by mistake to another job's port is not refused: it shows up at every create
+  as the third refusal above — tell the user to delete that line; so does a link missing `job`, which is **required** —
   two apps may each declare a `PORT`, and the name alone would not say which base the key
   follows. The error names the jobs that do declare the port, so the fix is the line to
   write. A link naming a `.env` that is not a configured

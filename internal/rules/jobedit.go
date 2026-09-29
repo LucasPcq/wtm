@@ -177,20 +177,23 @@ func RenameJobRefs(cfg domain.RunConfig, from, to string) domain.RunConfig {
 		out.Profiles[i].Jobs = jobs
 	}
 
+	// A job is named by the runners that start it and the tasks that touch it
+	// too: renaming it without them leaves a config that refuses to load.
 	out.Jobs = make([]domain.JobConfig, len(cfg.Jobs))
 	copy(out.Jobs, cfg.Jobs)
 	for i, job := range out.Jobs {
-		if len(job.Touches) == 0 {
-			continue
-		}
-		touches := make([]string, len(job.Touches))
-		for j, ref := range job.Touches {
-			touches[j] = ref
-			if ref == from {
-				touches[j] = to
+		out.Jobs[i].Runs = renamedIn(job.Runs, from, to)
+		out.Jobs[i].Touches = renamedIn(job.Touches, from, to)
+	}
+
+	if len(cfg.EnvValues) > 0 {
+		out.EnvValues = make([]domain.EnvValueLink, len(cfg.EnvValues))
+		copy(out.EnvValues, cfg.EnvValues)
+		for i, link := range out.EnvValues {
+			if link.Job == from {
+				out.EnvValues[i].Job = to
 			}
 		}
-		out.Jobs[i].Touches = touches
 	}
 
 	out.EnvPorts = make([]domain.EnvPortLink, len(cfg.EnvPorts))
@@ -201,5 +204,20 @@ func RenameJobRefs(cfg domain.RunConfig, from, to string) domain.RunConfig {
 		}
 	}
 
+	return out
+}
+
+// renamedIn copies names with one of them renamed, keeping nil as nil.
+func renamedIn(names []string, from, to string) []string {
+	if len(names) == 0 {
+		return names
+	}
+	out := make([]string, len(names))
+	for i, name := range names {
+		out[i] = name
+		if name == from {
+			out[i] = to
+		}
+	}
 	return out
 }
