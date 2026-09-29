@@ -140,14 +140,15 @@ func (p stopPresenter) Stopped(outcome stopflow.Outcome) error {
 		return p.machine(outcome)
 	}
 	out := p.Cmd.OutOrStdout()
-	if outcome.NoDaemon {
-		output.Frame(out, func(w io.Writer) { output.Unchanged(w, domain.RunNoJobsRunning) })
-		return nil
-	}
 	output.Frame(out, func(w io.Writer) {
 		for _, worktree := range outcome.Results {
 			for _, result := range worktree.Jobs {
-				output.Success(w, p.qualify(fmt.Sprintf(rules.StoppedFmt(result.Status), result.Name), outcome, worktree))
+				line := p.qualify(fmt.Sprintf(rules.StoppedFmt(result.Status), result.Name), outcome, worktree)
+				if result.Status == domain.JobActionNotRunning {
+					output.Unchanged(w, line)
+					continue
+				}
+				output.Success(w, line)
 			}
 		}
 	})
@@ -157,7 +158,7 @@ func (p stopPresenter) Stopped(outcome stopflow.Outcome) error {
 // machine answers with an object for the one job the command names, and with a
 // document per worktree once it names the same job in several: the shape
 // follows the arity, never the branch the command happened to take (LUC-198).
-// Nothing was running is not a branch — the job is stopped either way.
+// Nothing running is a status of its own, never "stopped".
 func (p stopPresenter) machine(outcome stopflow.Outcome) error {
 	if len(outcome.Results) > 1 {
 		return output.WriteWorktreeJobResultsJSON(p.Cmd.OutOrStdout(), outcome.Results)
@@ -167,7 +168,7 @@ func (p stopPresenter) machine(outcome stopflow.Outcome) error {
 	}
 	return output.WriteJobResultJSON(p.Cmd.OutOrStdout(), domain.JobActionResult{
 		Name:   outcome.Job,
-		Status: domain.JobActionStopped,
+		Status: domain.JobActionNotRunning,
 	})
 }
 

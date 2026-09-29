@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/service/process"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
@@ -19,6 +20,16 @@ func breakRunTOML(t *testing.T, stateDir string) {
 }
 
 func projectDirOf(stateDir string) string { return filepath.Dir(filepath.Dir(stateDir)) }
+
+// gitToplevel spells a worktree the way the run commands key it on the daemon.
+func gitToplevel(t *testing.T, dir string) string {
+	t.Helper()
+	top, err := infra.Toplevel(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return top
+}
 
 func (d *fakeDaemon) actions() []string {
 	d.mu.Lock()
@@ -57,6 +68,7 @@ func TestRunStopStopsByNameOverAnInvalidRunToml(t *testing.T) {
 	breakRunTOML(t, stateDir)
 	t.Chdir(projectDirOf(stateDir))
 	fakeTTY(t, false)
+	daemon.setJobs([]domain.JobInfo{{Name: "api", Status: domain.JobStatusRunning, WorkDir: gitToplevel(t, projectDirOf(stateDir))}})
 
 	_, stderr, err := runCmd(t, domain.CmdStop, "--"+domain.FlagJob, "api", "--"+domain.FlagYes)
 	if err != nil {

@@ -325,7 +325,9 @@ and **experimental**: the global `wtm init` does not configure it.
   `run stop` in a worktree releases only that worktree's claim; the service itself stops when
   the last hold goes — **the main checkout's own start counts as one**, so a linked worktree
   letting go never takes down a service main asked for. A stop that let go without stopping
-  reports status **`released`** (human: `released — still up elsewhere`), not `stopped`. Main
+  reports status **`released`** (human: `released — still up elsewhere`), not `stopped`.
+  A `run stop` that found nothing up under that name in that worktree reports
+  **`not_running`** (human: `= api not running`, exit 0) — never `stopped`. Main
   starting a service another worktree already runs joins it (`attached`) and carves its own
   namespace.
 - **A shared job may carve out a namespace per worktree.** `[job.namespace]` names it (`name`,
@@ -629,10 +631,13 @@ and **experimental**: the global `wtm init` does not configure it.
   keep running — and `run daemon restart` hands its jobs to a daemon built from the
   current binary. Both only prompt when foreground services would be stopped; pass
   `--yes` (required without a terminal, and in JSON).
-- **A version mismatch is refused, never worked around.** The daemon is what runs the
-  jobs, so one built from another version of wtm keeps applying its own behavior. Every
-  command refuses with a message naming both versions; the way out is
-  `wtm run daemon restart`. Do not retry the command — it will refuse identically.
+- **A daemon of another version can always be listed, stopped and replaced.** `run ps`,
+  `run stop`, `run down`, `run daemon status|stop|restart` work against it (`run ps` warns
+  that it should be restarted). `run up` / `run start` replace an older daemon that holds
+  no job without asking; one that holds jobs is refused with `daemon <v> running with N
+  job(s)` and the way out, `wtm run daemon restart` — run it (it prompts only when
+  foreground services would stop) rather than retrying the start, which refuses
+  identically.
 - `run proxy status` reports what actually serves those names: the proxy's bind port, the
   public port announced in URLs, and whether the port-80 redirection is installed.
   `--output json` gives the whole thing as one object. `run proxy install` needs no

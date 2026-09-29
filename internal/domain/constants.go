@@ -1770,11 +1770,14 @@ const (
 	// it: another worktree still holds it, and saying "stopped" there read as a
 	// service taken away from everyone.
 	JobActionReleased = "released"
-	JobActionDone     = "done"
-	JobActionError    = "error"
-	JobActionCrashed  = "crashed"
-	JobActionAdded    = "added"
-	JobActionRemoved  = "removed"
+	// JobActionNotRunning is a stop that found nothing up under that name in
+	// that worktree: "stopped" there claimed an act that never happened.
+	JobActionNotRunning = "not_running"
+	JobActionDone       = "done"
+	JobActionError      = "error"
+	JobActionCrashed    = "crashed"
+	JobActionAdded      = "added"
+	JobActionRemoved    = "removed"
 	// JobRemovedProfilesFmt and JobRemovedEnvPortsFmt report what a removal
 	// dragged along with the job, each named so the reader can put it back.
 	JobRemovedProfilesFmt = "Stripped from profile(s): %s"
@@ -2516,6 +2519,7 @@ const (
 	RunStoppingFmt   = "Stopping %s…"
 	RunStoppedFmt    = "%s stopped"
 	RunReleasedFmt   = "%s released — still up elsewhere"
+	RunNotRunningFmt = "%s not running"
 	RunNoJobsRunning = "No jobs running."
 	RunNoJobsHere    = "No jobs running in this worktree."
 	// NoWorktreesMessage is the empty worktree inventory, wherever it is drawn.

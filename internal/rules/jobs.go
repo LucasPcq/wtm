@@ -258,3 +258,19 @@ func DistinctValues(values map[string]string) int {
 	}
 	return len(seen)
 }
+
+type JobUpInParams struct {
+	Jobs    []domain.JobInfo
+	Name    string
+	WorkDir string
+}
+
+// JobUpIn says the daemon holds this job up in this worktree.
+func JobUpIn(params JobUpInParams) bool {
+	for _, job := range params.Jobs {
+		if job.Name == params.Name && job.WorkDir == params.WorkDir && IsJobUp(job.Status) {
+			return true
+		}
+	}
+	return false
+}
