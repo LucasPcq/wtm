@@ -369,7 +369,7 @@ func buildCombinedRecap(prev []components.Step, params RunParams) components.Rec
 			if cr.FastForwardBranch != "" && cr.FastForwardBranch != cr.FromBranch {
 				lines = append(lines, fmt.Sprintf(domain.RecapUpdateFastForward, cr.FastForwardBranch))
 			}
-			if line, shown := newpicker.EnvPortsRecapLine(prev, params.Create); shown {
+			if line, shown := newpicker.IsolationRecapLine(prev, params.Create); shown {
 				lines = append(lines, line)
 			}
 			action = "create & extract"

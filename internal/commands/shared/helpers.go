@@ -78,6 +78,17 @@ func AddOutputFlag(cmd *cobra.Command) {
 	cmd.Flags().String(domain.FlagOutput, domain.OutputText, "Output format: text or json")
 }
 
+// AddIsolationFlag registers --isolation on a command that creates a worktree.
+func AddIsolationFlag(cmd *cobra.Command) {
+	cmd.Flags().String(domain.FlagIsolation, "", "How the new worktree stands against its source: isolated (its own ports, compose project and service slices, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated")
+}
+
+// IsolationFlag reads --isolation, refusing a value that is neither answer.
+func IsolationFlag(cmd *cobra.Command) (domain.Isolation, error) {
+	value, _ := cmd.Flags().GetString(domain.FlagIsolation)
+	return rules.ParseIsolation(value)
+}
+
 // AddJobFlag and AddProfileFlag register the run module's second axis. The
 // worktree is the positional subject there, as everywhere else in the CLI, so
 // the job or profile is named by a flag the way --to and --from are.

@@ -20,8 +20,8 @@ func TestSettleWithoutLinksReportsNothing(t *testing.T) {
 	presenter := &flowtest.Recorder{}
 	ctx := flow.Context{ProjectDir: t.TempDir(), StateDir: t.TempDir()}
 
-	if envports.Linked(ctx) {
-		t.Error("a project with no [[env_port]] link must not pose the step")
+	if envports.IsolationApplies(ctx) {
+		t.Error("a project with no run.toml must not pose the step")
 	}
 
 	settlement, err := envports.Settle(envports.Params{
@@ -76,8 +76,8 @@ func settleFixture(t *testing.T) (flow.Context, string) {
 
 func TestSettleMovesTheCopiedPortsWhenTheRunSaidSo(t *testing.T) {
 	ctx, worktreePath := settleFixture(t)
-	if !envports.Linked(ctx) {
-		t.Fatal("the fixture links a value to a port, so the step must be posed")
+	if !envports.IsolationApplies(ctx) {
+		t.Fatal("the fixture declares a port, so the step must be posed")
 	}
 
 	presenter := &flowtest.Recorder{}

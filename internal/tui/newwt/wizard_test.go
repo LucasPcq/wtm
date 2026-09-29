@@ -59,37 +59,40 @@ func TestCreateStepsSourceRefreshWiring(t *testing.T) {
 	}
 }
 
-// extract embeds this sub-flow, so the env-ports question has to read the same
+// extract embeds this sub-flow, so the isolation question has to read the same
 // there as it does in `wtm create` — same step, same prose, same recap line.
-func TestEnvPortsStepMirrorsTheCreateFlow(t *testing.T) {
-	subflow := CreateSteps(WizardParams{IncludeEnvPorts: true}, nil)
+func TestIsolationStepMirrorsTheCreateFlow(t *testing.T) {
+	subflow := CreateSteps(WizardParams{IsolationApplies: true}, nil)
 
 	var found bool
 	for _, step := range subflow.Steps {
-		if step.Name == domain.CreateEnvPortsStepName {
+		if step.Name == domain.IsolationStepName {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatal("the sub-flow declares no env-ports step")
+		t.Fatal("the sub-flow declares no isolation step")
 	}
 
 	if steps := CreateSteps(WizardParams{}, nil).Steps; len(steps) != len(subflow.Steps)-1 {
-		t.Errorf("a project that links no .env value to a port must not be asked")
+		t.Errorf("a project with nothing to isolate must not be asked")
+	}
+	if steps := CreateSteps(WizardParams{IsolationApplies: true, IsolationOverride: domain.IsolationVerbatim}, nil).Steps; len(steps) != len(subflow.Steps)-1 {
+		t.Errorf("--isolation answers the step, so it must not be asked")
 	}
 }
 
-// The answer defaults to adjusting wherever the step was never posed: a .env
-// left pointing at another worktree's services is not the safer outcome.
-func TestEnvPortsDefaultsToAdjustingWhenNeverAsked(t *testing.T) {
-	if !adjustsEnvPorts(nil, WizardParams{}) {
-		t.Error("a wizard that never posed the step must still adjust the ports")
+// A step --isolation answered still takes its recap line, and one never asked
+// falls back to the project's default.
+func TestIsolationRecapLine(t *testing.T) {
+	if _, shown := IsolationRecapLine(nil, WizardParams{}); shown {
+		t.Error("a project with nothing to isolate must not take a recap line")
 	}
-	if _, shown := EnvPortsRecapLine(nil, WizardParams{}); shown {
-		t.Error("a step that was never posed must not take a recap line")
+	line, shown := IsolationRecapLine(nil, WizardParams{IsolationApplies: true, IsolationOverride: domain.IsolationVerbatim})
+	if !shown || !strings.Contains(line, domain.IsolationSummaryVerbatim) {
+		t.Errorf("recap line = %q (shown=%v), want the flag's answer named", line, shown)
 	}
-	line, shown := EnvPortsRecapLine(nil, WizardParams{IncludeEnvPorts: true})
-	if !shown || !strings.Contains(line, domain.EnvPortsSummaryAdjust) {
-		t.Errorf("recap line = %q (shown=%v), want the answer named", line, shown)
+	if got := resolveIsolation(nil, WizardParams{IsolationDefault: domain.IsolationVerbatim}); got != domain.IsolationVerbatim {
+		t.Errorf("unasked isolation = %q, want the project's default", got)
 	}
 }

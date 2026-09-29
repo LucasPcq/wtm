@@ -2756,27 +2756,28 @@ const (
 	// recap line blank.
 	EnvSummaryConfigDefault = "config default"
 
-	// The env-ports step: asked while the worktree is still being described,
-	// because the values it settles are a consequence of the .env this very run
-	// provisions. It says what it will do rather than showing the table — which
-	// values change is only knowable once the files exist, and the run reports
-	// them then.
-	CreateEnvPortsStepName        = "Env ports"
-	CreateEnvPortsStepDescription = "The .env files are copied with the ports of the worktree they come from. wtm can move the values run.toml links to a port onto the ones this worktree binds."
-	EnvPortsOptionAdjust          = "Adjust them to this worktree"
-	EnvPortsOptionKeep            = "Leave the copied values as they are"
-	EnvPortsSummaryAdjust         = "adjusted to this worktree"
-	EnvPortsSummaryKeep           = "left as copied"
-	// EnvPortsStepUnlinked is why the step is not asked: with no [[env_port]]
-	// link, no value follows a port and there is nothing to move.
-	EnvPortsStepUnlinked = "no .env value is linked to a port"
+	// Isolation* is the question every create-like run asks when run.toml
+	// declares something a worktree can isolate. It is one choice for the .env
+	// and for the jobs `wtm run` starts, because the two disagreeing is what
+	// wires a worktree to its neighbour's services without a word.
+	IsolationStepName        = "Isolation"
+	IsolationStepDescription = "The .env files are copied from another checkout, with its ports and its service slices.\n" +
+		"Isolated: wtm moves them onto this worktree's — in the .env and when `wtm run` starts its jobs — so both can run side by side.\n" +
+		"Verbatim: wtm writes nothing into the .env and runs this worktree on the ports and data it was copied with, so it cannot run while its source does."
+	IsolationOptionIsolated  = "Isolate it — its own ports, compose project and service slices"
+	IsolationOptionVerbatim  = "Keep the .env verbatim — its source's ports and data, one of the two runs at a time"
+	IsolationSummaryIsolated = "isolated"
+	IsolationSummaryVerbatim = "verbatim — .env kept as copied"
+	// IsolationStepIrrelevant is why the step is not asked: with nothing to
+	// isolate, both answers do exactly the same thing.
+	IsolationStepIrrelevant = "run.toml declares nothing a worktree isolates"
 
 	// RecapField* are the aligned labels of the create recap body.
 	RecapFieldBranch       = "Branch:  "
 	RecapFieldSource       = "Source:  "
 	RecapFieldParent       = "Parent:  "
 	RecapFieldEnv          = "Env:     "
-	RecapFieldEnvPorts     = "Ports:   "
+	RecapFieldIsolation    = "Mode:    "
 	RecapFastForwardSuffix = " (fast-forward to origin)"
 	WarningPrefix          = "⚠ "
 	WizardErrLabel         = "wizard"

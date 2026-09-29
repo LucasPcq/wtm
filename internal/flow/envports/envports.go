@@ -23,15 +23,26 @@ type Params struct {
 	Presenter flow.Presenter
 }
 
-// Linked says whether this project links any .env value to a port, which is what
-// makes the question worth asking at all. A surface reads it to skip its step —
-// before the worktree exists, so it cannot be derived from the plan.
-func Linked(ctx flow.Context) bool {
+// IsolationApplies says whether run.toml declares anything a worktree could
+// isolate, which is what makes the question worth asking at all. A surface
+// reads it before the worktree exists, so it cannot be derived from the plan.
+func IsolationApplies(ctx flow.Context) bool {
 	cfg, err := runconfig.Load(ctx.StateDir)
 	if err != nil {
 		return false
 	}
-	return len(cfg.EnvPorts) > 0
+	return rules.IsolationApplies(cfg)
+}
+
+// DefaultIsolation is what a new worktree gets when nobody is asked: run.toml's
+// answer, else isolated. An unreadable run.toml is refused by whatever reads it
+// next; here it falls back to what every worktree got before the choice.
+func DefaultIsolation(ctx flow.Context) domain.Isolation {
+	cfg, err := runconfig.Load(ctx.StateDir)
+	if err != nil {
+		return domain.IsolationIsolated
+	}
+	return rules.EffectiveIsolation(cfg.Isolation)
 }
 
 // Settle moves the host ports a freshly provisioned .env holds onto the ones

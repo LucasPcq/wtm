@@ -51,3 +51,39 @@ func IsolationApplies(cfg domain.RunConfig) bool {
 	}
 	return false
 }
+
+// IsolationChoices lists both answers with the given one first, which is where
+// every surface starts the cursor.
+func IsolationChoices(first domain.Isolation) []domain.Isolation {
+	if IsVerbatim(first) {
+		return []domain.Isolation{domain.IsolationVerbatim, domain.IsolationIsolated}
+	}
+	return []domain.Isolation{domain.IsolationIsolated, domain.IsolationVerbatim}
+}
+
+// IsolationOptionLabel is how a picker offers the answer.
+func IsolationOptionLabel(isolation domain.Isolation) string {
+	if IsVerbatim(isolation) {
+		return domain.IsolationOptionVerbatim
+	}
+	return domain.IsolationOptionIsolated
+}
+
+// IsolationSummary is how a recap reads the answer back.
+func IsolationSummary(isolation domain.Isolation) string {
+	if IsVerbatim(isolation) {
+		return domain.IsolationSummaryVerbatim
+	}
+	return domain.IsolationSummaryIsolated
+}
+
+// FirstIsolation is the first answer given, in the order the caller trusts
+// them: a flag before a default.
+func FirstIsolation(values ...domain.Isolation) domain.Isolation {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}

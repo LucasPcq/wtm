@@ -17,14 +17,12 @@ const (
 	KeyBranch       = "create.branch"
 	KeySource       = "create.source"
 	KeyEnv          = "create.env"
-	KeyEnvPorts     = "create.env_ports"
+	KeyIsolation    = "create.isolation"
 	KeySourceUpdate = "create.source_update"
 	KeyRecap        = "create.recap"
 )
 
 const (
-	portsAdjust       = "adjust"
-	portsKeep         = "keep-ports"
 	updateFastForward = "ff"
 	updateKeep        = "keep"
 	confirmCreate     = "create"
@@ -46,15 +44,16 @@ func (f *createFlow) session() flow.Session {
 	return flow.Session{
 		ErrLabel: domain.WizardErrLabel,
 		Presets: flow.NewAnswers(map[string]string{
-			KeyBranch: f.request.Branch,
-			KeySource: f.request.From,
-			KeyEnv:    f.request.EnvFrom,
+			KeyBranch:    f.request.Branch,
+			KeySource:    f.request.From,
+			KeyEnv:       f.request.EnvFrom,
+			KeyIsolation: string(f.request.Isolation),
 		}),
 		Steps: []flow.Step{
 			f.branchStep(),
 			f.sourceStep(),
 			f.envStep(),
-			f.envPortsStep(),
+			f.isolationStep(),
 			f.sourceUpdateStep(),
 			f.recapStep(),
 		},
@@ -149,48 +148,44 @@ func envSummary(answer flow.Answer) string {
 	return domain.EnvSummaryConfigDefault
 }
 
-// envPortsStep is asked here rather than after the worktree exists: the values it
-// settles are a consequence of the .env this very run provisions, so it is one
-// confirmation among the others instead of a second one, put to the user past
-// the point where saying no leaves anything but a broken .env.
-//
-// It says what it will do rather than showing what changes: which values move is
-// only knowable once the files are there, and the run reports them then.
-func (f *createFlow) envPortsStep() flow.Step {
+// isolationStep is asked here rather than after the worktree exists: what it
+// decides is written into the .env this very run provisions, so it is one
+// confirmation among the others instead of a second one past the point of no
+// return.
+func (f *createFlow) isolationStep() flow.Step {
 	// Read once, as the session is built: Skip is called again on every step the
 	// wizard advances through or steps back over, and run.toml does not change
 	// under a run that is being answered.
-	linked := envports.Linked(f.ctx)
+	applies := envports.IsolationApplies(f.ctx)
+	fallback := envports.DefaultIsolation(f.ctx)
 	return flow.Step{
 		Kind:        flow.StepSelect,
-		Key:         KeyEnvPorts,
-		Label:       domain.CreateEnvPortsStepName,
-		Title:       domain.CreateEnvPortsStepName,
-		Description: domain.CreateEnvPortsStepDescription,
+		Key:         KeyIsolation,
+		Label:       domain.IsolationStepName,
+		Title:       domain.IsolationStepName,
+		Description: domain.IsolationStepDescription,
 		Skip: func(flow.Answers) (bool, string) {
-			if linked {
+			if applies {
 				return false, ""
 			}
-			return true, domain.EnvPortsStepUnlinked
+			return true, domain.IsolationStepIrrelevant
 		},
-		Options: []flow.Option{
-			{Label: domain.EnvPortsOptionAdjust, Value: portsAdjust},
-			{Label: domain.EnvPortsOptionKeep, Value: portsKeep},
-		},
-		// Leaving a .env pointing at another worktree's services does not make the
-		// run safer, it makes it useless: adjusting is the safe default.
+		Options: isolationOptions(fallback),
 		Resolve: func(flow.Answers) (flow.Answer, error) {
-			return flow.Answer{Value: portsAdjust}, nil
+			return flow.Answer{Value: string(fallback)}, nil
 		},
-		Summarize: envPortsSummary,
+		Summarize: func(answer flow.Answer) string { return rules.IsolationSummary(domain.Isolation(answer.Value)) },
+		Flag:      domain.FlagIsolation,
 	}
 }
 
-func envPortsSummary(answer flow.Answer) string {
-	if answer.Value == portsKeep {
-		return domain.EnvPortsSummaryKeep
+func isolationOptions(first domain.Isolation) []flow.Option {
+	choices := rules.IsolationChoices(first)
+	options := make([]flow.Option, 0, len(choices))
+	for _, choice := range choices {
+		options = append(options, flow.Option{Label: rules.IsolationOptionLabel(choice), Value: string(choice)})
 	}
-	return domain.EnvPortsSummaryAdjust
+	return options
 }
 
 // sourceUpdateStep applies only to a behind-only branch; a diverged one is not a
@@ -298,8 +293,8 @@ func (f *createFlow) recap(answers flow.Answers) string {
 		lines = append(lines, domain.RecapFieldBranch+branchLabel)
 	}
 	lines = append(lines, sourceField+sourceLabel, domain.RecapFieldEnv+envLabel)
-	if ports := answers.Value(KeyEnvPorts); ports != "" {
-		lines = append(lines, domain.RecapFieldEnvPorts+envPortsSummary(flow.Answer{Value: ports}))
+	if isolation := answers.Value(KeyIsolation); isolation != "" {
+		lines = append(lines, domain.RecapFieldIsolation+rules.IsolationSummary(domain.Isolation(isolation)))
 	}
 	if ffBranch != "" && ffBranch != source {
 		lines = append(lines, fmt.Sprintf(domain.RecapUpdateFastForward, ffBranch))

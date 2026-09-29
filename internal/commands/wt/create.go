@@ -37,6 +37,7 @@ func newCreateCmd() *cobra.Command {
 	cmd.Flags().String(domain.FlagFrom, "", "Source branch to start from — or, when the branch already exists locally, the parent to record for wtm sync (required there without the wizard)")
 	cmd.Flags().Bool(domain.FlagFF, false, "Fast-forward to origin before creating — the source branch, or the branch itself when it already exists locally (non-interactive; skipped when it has diverged)")
 	cmd.Flags().String(domain.FlagEnvFrom, "", "Override env strategy (example, main, parent)")
+	shared.AddIsolationFlag(cmd)
 	cmd.Flags().Bool(domain.FlagIfNotExists, false, "Succeed silently if the worktree already exists (idempotent)")
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (branch name required; source defaults to the base branch for a new branch, and --from is required for one that already exists)")
 	shared.AddOutputFlag(cmd)
@@ -55,6 +56,10 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	ifNotExists, _ := cmd.Flags().GetBool(domain.FlagIfNotExists)
 	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
+	isolation, err := shared.IsolationFlag(cmd)
+	if err != nil {
+		return err
+	}
 
 	if format == domain.OutputJSON && !yes {
 		return fmt.Errorf("--output json requires --%s (prompts cannot run in JSON mode)", domain.FlagYes)
@@ -82,6 +87,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 			EnvFrom:     envFromFlag,
 			FastForward: ffFlag,
 			IfNotExists: ifNotExists,
+			Isolation:   isolation,
 		},
 		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive}),
 		Presenter: createPresenter{CLIPresenter: shared.NewPresenter(cmd, format), config: config},
