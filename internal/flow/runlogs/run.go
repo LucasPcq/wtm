@@ -243,12 +243,7 @@ func (r *runner) run() Outcome {
 		r.emit(Event{Phase: PhaseStarting, Job: job.Name, Step: i + 1})
 
 		r.captured = nil
-		routes := rules.JobRoutes(rules.JobRoutesParams{
-			Config:   domain.RunConfig{Jobs: r.declaredJobs()},
-			Job:      job,
-			Worktree: r.env[domain.EnvWorktree],
-			Project:  r.project,
-		})
+		routes := r.routes(job)
 		host := rules.JobOwnRoute(routes, job.Name)
 
 		result, err := r.service.Start(r.ctx, StartRequest{
@@ -491,6 +486,20 @@ func (r *runner) devOrigins(job domain.JobConfig, host string) []domain.DevOrigi
 		Config: path,
 		Line:   fmt.Sprintf(domain.DevOriginsFixFmt, job.Name, rules.DevOriginsPattern(r.servedPort), path),
 	}}
+}
+
+// routes are the names this job is published under, none when the run hands
+// out ports: a route registered with the proxy is a name `run ps` announces.
+func (r *runner) routes(job domain.JobConfig) []domain.JobRoute {
+	if r.proxyPort == 0 {
+		return nil
+	}
+	return rules.JobRoutes(rules.JobRoutesParams{
+		Config:   domain.RunConfig{Jobs: r.declaredJobs()},
+		Job:      job,
+		Worktree: r.env[domain.EnvWorktree],
+		Project:  r.project,
+	})
 }
 
 type jobURLParams struct {

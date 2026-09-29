@@ -141,6 +141,7 @@ func (f *startFlow) run() (Outcome, error) {
 	}
 
 	warnings := addressing.Lines(addressing.Params{Context: f.ctx, WorkDirs: []string{workDir}})
+	proxy := seam.ProxyPortsFor(seam.ProxyPortsParams{Global: f.ctx.Config.Global, Run: f.request.Config})
 	runSeam := seam.Open(seam.Params{
 		ProjectDir: f.ctx.ProjectDir,
 		StateDir:   f.ctx.StateDir,
@@ -148,8 +149,8 @@ func (f *startFlow) run() (Outcome, error) {
 		// The board lists every declared job, not just this one: starting a job is
 		// no reason to hide the ones already up beside it.
 		Jobs:       f.request.Config.Jobs,
-		ProxyPort:  rules.ProxyPort(f.ctx.Config.Global),
-		PublicPort: process.PublicProxyPort(rules.ProxyPort(f.ctx.Config.Global)),
+		ProxyPort:  proxy.Bind,
+		PublicPort: proxy.Public,
 	})
 
 	result, err := f.presenter.Sequence(seam.SequenceParams{

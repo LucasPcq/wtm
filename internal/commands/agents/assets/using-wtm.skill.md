@@ -708,7 +708,10 @@ and **experimental**: the global `wtm init` does not configure it.
   launches dev servers by hand wants `"ports"`. When the proxy is disabled on the machine
   (`[proxy] port = 0`), wtm writes ports whatever the mode says, and reports it. Only the
   values of jobs that publish a url are affected: a `DATABASE_URL` or a bare `*_PORT`
-  stays a port either way.
+  stays a port either way. The mode also decides **what the run surfaces announce**: under
+  `"ports"`, `run up` / `run start` / `run ps` / `run url` / `run open` and the run view hand
+  out `http://localhost:<port>` and register no name with the proxy, even though the proxy
+  still runs — a name nothing in the `.env` files knows of would fail CORS.
 - **`run up` verifies the ports.** Declaring a port injects a variable; nothing forces
   the command to read it. After the jobs start, wtm dials each declared port and reports
   the silent ones under "Ports declared but not bound". When the *base* port answers
