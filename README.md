@@ -131,9 +131,15 @@ A few ideas explain how the commands fit together:
 - **Shared services** *(experimental)* — a job declared `scope = "shared"` runs **once for
   the repository** instead of once per worktree, in the main checkout: a postgres, a
   keycloak. Each worktree still keeps its own data through a `[job.namespace]` block, whose
-  `attach` and `detach` commands you write — wtm names the namespace and hands them the
+  `create` and `remove` commands you write — wtm names the namespace and hands them the
   worktree's environment, and knows nothing else about them. It exists for the case that
-  makes isolation expensive: two worktrees of a monorepo with four databases and a JVM.
+  makes isolation expensive: two worktrees of a monorepo with four databases and a JVM. A
+  `create` that **clones** main's database (`CREATE DATABASE … TEMPLATE app`) starts each
+  worktree from main's data without sharing it — see
+  [Starting a slice from main's data](docs/dev/shared-services.md#starting-a-slice-from-mains-data).
+  A job that changes data declares it with `touches = ["postgres"]`, and `wtm run up` stops
+  before running it against data the worktree does not own — a verbatim worktree's source,
+  or a shared service with no namespace — unless you confirm or pass `--force`.
 
 ## Commands
 

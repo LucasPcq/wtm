@@ -322,6 +322,19 @@ and **experimental**: the global `wtm init` does not configure it.
   fails the run.
   Configuration values use `{worktree}` / `{ordinal}`; commands use the `$WTM_*` variables.
   A shared job with **no** `[job.namespace]` is valid and means one instance with one set of data.
+  When a user finds isolation expensive (an empty database to migrate and seed, a realm to
+  rebuild), the answer is a `create` that **clones** the data main uses rather than an empty
+  slice — e.g. `CREATE DATABASE "$WTM_NAMESPACE" TEMPLATE app`, guarded by an existence check
+  since `create` runs at every start. Suggest it; do not suggest sharing main's database,
+  which lets one branch's migration break the other.
+- **`touches` marks a job that changes data** (a migration, a reset, a seed):
+  `touches = ["postgres-pay"]` names the services it writes to; `run job edit <job> --touches
+  <service>` sets it (repeatable, replaces the list, `''` drops it). `run up` and `run start`
+  refuse to start such a job where the data is not the worktree's own — its source's for a
+  **verbatim** worktree, everyone's for a shared service with **no** namespace. On your paths
+  that is an error (exit 1) naming the jobs, `--force` and `wtm env <wt> --isolation isolated`;
+  **pass `--force` only when the user asked** for the reset to reach that data. The main
+  checkout is never stopped, and a job without `touches` is never checked.
 - **`[[env]]` is how a slice reaches the app.** `[[env_port]]` rewrites the port *inside* a
   value and leaves the rest alone — it says where a service answers. `[[env]]` writes a key's
   **whole** value from a template, which is the only way to express something opaque like a

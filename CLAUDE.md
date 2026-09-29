@@ -136,6 +136,8 @@ internal/
       urls/                   ←     where every address the module hands out is computed
       seam/                   ←     the daemon as a flow uses it: board, env, log dir,
                                     port prober, and the start sequence a surface drives
+      foreigndata/            ←     the stop before a job whose `touches` reach data the
+                                    worktree does not own, shared by `up` and `start`
       up/ down/ start/        ←     one package per command, as everywhere else
       stop/ logs/ open/ url/
       list/                   ←     `run list`: which entry was picked and what to do to it

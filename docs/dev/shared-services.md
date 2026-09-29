@@ -116,6 +116,44 @@ The first row is the same everywhere; the second is the ports **this job** decla
 
 An empty `create` is an answer, not an omission: the service is then shared outright, data included.
 
+### Starting a slice from main's data
+
+What makes isolation feel expensive is rarely the slice itself — it is an empty database to migrate and seed, a realm to rebuild by hand. That cost belongs in `create`, not in wtm: **clone the data main uses instead of creating an empty slice.** The worktree then starts where main is, and still owns its copy — nothing it migrates or resets reaches main, which is exactly what sharing main's data outright could not promise.
+
+For Postgres it is one statement, guarded because `create` runs on **every** start of the shared service:
+
+```sh
+#!/bin/sh
+# scripts/db-worktree-add.sh — the [job.namespace] create of a shared postgres.
+set -e
+psql="psql -h localhost -p $POSTGRES_PORT -U postgres -v ON_ERROR_STOP=1"
+exists=$($psql -tAc "SELECT 1 FROM pg_database WHERE datname = '$WTM_NAMESPACE'")
+[ "$exists" = 1 ] && exit 0
+$psql -c "CREATE DATABASE \"$WTM_NAMESPACE\" TEMPLATE app"
+```
+
+Three things to know about it:
+
+- **`app` is the database main's `.env` actually names**, not the namespace wtm would give main: main predates wtm, and its `.env` is only rewritten by a `wtm env main`.
+- **`TEMPLATE` refuses a source with open connections.** Stop main's backend while the clone runs, or trade the instant copy for `pg_dump app | psql "$WTM_NAMESPACE"` after a `CREATE DATABASE`, which copies around them.
+- `$POSTGRES_PORT` is there because the command gets the job's own ports under the names it declares them by, next to `$WTM_NAMESPACE`, `$WTM_WORKTREE` and `$WTM_ORDINAL`.
+
+A Keycloak realm follows the same shape: export main's realm, rewrite its name to `$WTM_NAMESPACE`, import it — skipped when the realm already exists.
+
+## A job that changes someone else's data
+
+A slice protects a worktree's data only as long as the jobs it runs write to that slice. Two cases break that on purpose: a **verbatim** worktree, whose `.env` names its source's databases, and a shared service with **no** `[job.namespace]`, which holds one set of data for every worktree. A profile running `orm:reset` there resets someone else's database.
+
+wtm cannot see that from a command, so the job says it: `touches = ["postgres"]` names the services whose data it changes. `rules.ForeignDataRisks` reads those declarations against the worktree's isolation — from `WTM_ISOLATION`, the same answer the daemon acts on — and `internal/flow/run/foreigndata` stops `run up` and `run start` before the job starts:
+
+| Surface | What happens |
+| -- | -- |
+| a terminal | *Run them anyway* / *Don't start*, naming each job, the service and whose data it is |
+| `--yes`, JSON, no TTY | refused, naming `--force` and `wtm env <branch> --isolation isolated` |
+| `--force` | let through without a question — the safety axis, never implied by `--yes` |
+
+The main checkout is never stopped: it owns its data, and every other checkout is either carved beside it or copied from it. A job with no `touches` is never stopped either — the guard reads what the config declares and nothing else, so a project that declares nothing keeps the behaviour it had.
+
 ## Stopping is not destroying
 
 `run stop` and `run down` never run `detach`. A `run down` that dropped a database would make the command unusable.
