@@ -112,7 +112,7 @@ func WorktreesStep(params WorktreesParams) flow.Step {
 	return flow.Step{
 		Kind:  flow.StepMultiSelect,
 		Key:   KeyWorktree,
-		Label: domain.RunWorktreeStepName,
+		Label: domain.RunWorktreesStepName,
 		Skip: func(flow.Answers) (bool, string) {
 			worktrees, err := list.get()
 			if err != nil {

@@ -439,7 +439,7 @@ func TestTheRowMenuLeadsWithFastForwardThenSync(t *testing.T) {
 // The base row had no menu at all: it hangs off nothing, so there is nothing to
 // rebase it onto — only its own refresh.
 func TestTheBaseRowOffersTheBaseRefreshAlone(t *testing.T) {
-	model := newTestModel(t, testWidth, testHeight)
+	model := withRunJobs(newTestModel(t, testWidth, testHeight))
 	model = update(model, worktreesMsg{
 		statuses: []domain.WorktreeStatus{{Branch: "main", IsParent: true}},
 		parents:  map[string]string{},
@@ -522,7 +522,7 @@ func TestTheBaseRowStartsItsOwnFastForward(t *testing.T) {
 }
 
 func TestWorktreeMenuLeadsWithFastForward(t *testing.T) {
-	items := menuActions(worktreeActions(domain.WorktreeStatus{
+	items := menuActions(Model{}.worktreeActions(domain.WorktreeStatus{
 		Branch:       "feat",
 		OriginState:  domain.DivergenceBehind,
 		OriginBehind: 2,
@@ -536,7 +536,7 @@ func TestWorktreeMenuLeadsWithFastForward(t *testing.T) {
 }
 
 func TestBaseRowOffersTheSameFastForwardEntry(t *testing.T) {
-	items := menuActions(worktreeActions(domain.WorktreeStatus{
+	items := menuActions(Model{}.worktreeActions(domain.WorktreeStatus{
 		Branch:      "main",
 		IsParent:    true,
 		OriginState: domain.DivergenceBehind,
@@ -560,7 +560,7 @@ func TestFastForwardIsNeverGatedOnTheCachedOriginBadges(t *testing.T) {
 		domain.DivergenceUnknown,
 	}
 	for _, state := range states {
-		items := menuActions(worktreeActions(domain.WorktreeStatus{Branch: "feat", OriginState: state}))
+		items := menuActions(Model{}.worktreeActions(domain.WorktreeStatus{Branch: "feat", OriginState: state}))
 		if items[0].disabled != "" {
 			t.Errorf("state %v: disabled = %q, want it enabled", state, items[0].disabled)
 		}
@@ -611,7 +611,7 @@ func actionsOf(items []menuItem) string {
 // "Start jobs" named neither a profile nor a job. The two are different
 // requests, so the menu names them apart and groups them under a heading.
 func TestTheWorktreeMenuIsReadInSections(t *testing.T) {
-	model := newTestModel(t, testWidth, testHeight, "a", "b")
+	model := withRunJobs(newTestModel(t, testWidth, testHeight, "a", "b"))
 	model = update(model, key(domain.KeyMenu))
 
 	items := model.menuItems()
@@ -647,7 +647,7 @@ func TestTheMenuCursorWalksOverHeadingsAndRules(t *testing.T) {
 // A heading answers no keypress and no click: activating one would fire the
 // action its zero value happens to name.
 func TestActivatingAHeadingDoesNothing(t *testing.T) {
-	model := newTestModel(t, testWidth, testHeight, "a", "b")
+	model := withRunJobs(newTestModel(t, testWidth, testHeight, "a", "b"))
 	model = update(model, key(domain.KeyMenu))
 
 	started, cmd := model.activateMenu(0)
@@ -683,7 +683,7 @@ func TestRunMenuLabelsCarryNoEllipsis(t *testing.T) {
 // The run module's batch gestures sit where the git ones already do: a context
 // menu hangs off one worktree, and these act on worktrees picked inside the run.
 func TestTheActionsMenuOffersTheBatchRunGestures(t *testing.T) {
-	model := newTestModel(t, testWidth, testHeight, "a", "b")
+	model := withRunJobs(newTestModel(t, testWidth, testHeight, "a", "b"))
 	model = update(model, key(domain.KeyActions))
 
 	for action, label := range map[menuAction]string{

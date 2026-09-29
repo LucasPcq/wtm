@@ -305,26 +305,6 @@ func TestTheLogsKeyOpensTheTabWithoutAPicker(t *testing.T) {
 	}
 }
 
-// The tab always opens: a greyed-out tab left the reader guessing, and a
-// project with no run module has something to be told rather than a door that
-// does not answer.
-func TestTheLogsTabOpensWithoutARunModuleAndSaysWhatIsMissing(t *testing.T) {
-	model := logsModel(t, RunParams{}, "a")
-
-	next, _ := updateCmd(model, key(domain.KeyRunLogs))
-
-	if next.panelTab != panelLogs {
-		t.Fatal("the LOGS tab did not open")
-	}
-	body := stripANSI(strings.Join(next.detailBody(next.layout()), "\n"))
-	if !strings.Contains(body, domain.DashboardLogsNoModule) {
-		t.Errorf("body = %q, want it to say the project runs nothing", body)
-	}
-	if !strings.Contains(body, domain.DashboardLogsNoModuleHint) {
-		t.Errorf("body = %q, want `wtm run init` named", body)
-	}
-}
-
 // Four different silences, four different answers. "Never ran" used to be
 // inferred from the job not being up, which said it of a job that had run, been
 // stopped and written nothing; the log on disk now answers instead.
@@ -512,7 +492,8 @@ func TestTheLogsPanelHostsTheRunView(t *testing.T) {
 	}, "a")
 	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}})
 
-	model, _ = model.openLogsTabOn("web")
+	model, cmd := model.openLogsTabOn("web")
+	model = landPreview(t, model, cmd)
 	if !model.previewOn {
 		t.Fatal("the panel opened without a preview although a board was available")
 	}
@@ -595,7 +576,8 @@ func TestTheJobColumnLinesUpWithThePaneTitle(t *testing.T) {
 	}, "a")
 	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}, {Name: "worker"}})
 
-	model, _ = model.openLogsTabOn("web")
+	model, cmd := model.openLogsTabOn("web")
+	model = landPreview(t, model, cmd)
 	rows := strings.Split(stripANSI(strings.Join(model.logsBody(model.layout()), "\n")), "\n")
 
 	border, first := -1, -1
@@ -627,7 +609,11 @@ func TestThePreviewFollowsTheOutputPanelOpening(t *testing.T) {
 	}, "a")
 	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}})
 
-	model, _ = model.openLogsTabOn("web")
+	model, cmd := model.openLogsTabOn("web")
+	model = landPreview(t, model, cmd)
+	if !model.previewOn {
+		t.Fatal("no preview to follow")
+	}
 	before := len(model.logsBody(model.layout()))
 
 	next, _ := model.Update(key(keyToggleOutput))

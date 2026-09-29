@@ -15,6 +15,15 @@ import (
 )
 
 func (m Model) renderDetail(layout domain.DashboardLayout) string {
+	if !m.runModule() {
+		return m.renderPanel(panelParams{
+			Rect:       layout.Detail,
+			Title:      domain.DashboardDetailTitle,
+			TitleRight: m.detailFreshnessMarker(),
+			Body:       m.detailBody(layout),
+			Zone:       zoneDetail,
+		})
+	}
 	width := max(layout.Detail.Width-borderWidth-paddingWidth, 0)
 	return m.renderPanel(panelParams{
 		Rect: layout.Detail,

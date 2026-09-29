@@ -2452,10 +2452,11 @@ const (
 	RunProfilePickerDesc  = "Which profiles to start? A job named by several starts once."
 	// RunProfileOptionFmt keeps a profile's row to its name and a count: spelling
 	// out eight job names made the list unreadable in the repos that have them.
-	RunProfileOptionFmt = "%s · %d jobs"
-	RunWorktreeStepName = "Worktree"
-	RunJobStepName      = "Job"
-	RunProfileStepName  = "Profile"
+	RunProfileOptionFmt  = "%s · %d jobs"
+	RunWorktreeStepName  = "Worktree"
+	RunWorktreesStepName = "Worktrees"
+	RunJobStepName       = "Job"
+	RunProfileStepName   = "Profile"
 
 	// Run*Skip reasons say why a target step was never asked. A step that cannot
 	// list the worktrees is skipped rather than failed: acting where you stand is
@@ -2525,6 +2526,7 @@ const (
 	// as `run stop` and `run down` report it.
 	RunStoppingFmt   = "Stopping %s…"
 	RunStoppedFmt    = "%s stopped"
+	RunStopFailedFmt = "%s: %s"
 	RunReleasedFmt   = "%s released — still up elsewhere"
 	RunNoJobsRunning = "No jobs running."
 	RunNoJobsHere    = "No jobs running in this worktree."
@@ -3451,9 +3453,9 @@ const (
 	// profile and a job are two different requests, so they are two different
 	// entries, and the block groups them by grain rather than by verb — what an
 	// entry acts on is what a reader picks it by.
-	DashboardMenuRunUp    = "Start profile"
+	DashboardMenuRunUp    = "Start a profile"
 	DashboardMenuRunStart = "Start a job"
-	DashboardMenuRunDown  = "Stop this worktree"
+	DashboardMenuRunDown  = "Stop this worktree's jobs"
 	DashboardMenuRunStop  = "Stop a job"
 	DashboardMenuRunLogs  = "View logs"
 	// DashboardMenuRunStopThis stops the job a surface already designates — the
@@ -3462,11 +3464,13 @@ const (
 	DashboardMenuRunStopThis = "Stop this job"
 	// DashboardMenuRun*All are the same gestures over a selection the user makes
 	// inside the run, which is why they live in the global menu: a context menu
-	// hangs off one worktree. The plural is the whole difference, as it already
-	// is between DashboardMenuSync and DashboardMenuSyncAll.
-	DashboardMenuRunUpAll   = "Start profiles"
+	// hangs off one worktree. They name worktrees, as DashboardMenuSyncAll does:
+	// the row entries name a profile, a job or this worktree, and "View logs"
+	// twice read as one entry offered in two menus. The global one opens the full
+	// run view, the row one the panel's LOGS tab.
+	DashboardMenuRunUpAll   = "Start worktrees"
 	DashboardMenuRunDownAll = "Stop worktrees"
-	DashboardMenuRunLogsAll = "View logs"
+	DashboardMenuRunLogsAll = "Watch worktree logs"
 	// DashboardMenuSection* head the blocks of a context menu. A block is what
 	// tells "move this worktree" and "start its services" apart at a glance.
 	DashboardMenuSectionGit = "GIT"
@@ -3474,6 +3478,15 @@ const (
 	// DashboardRunNotConfigured is what a row offers when the project has no run
 	// module: the answer is `wtm run init`, not a picker with nothing in it.
 	DashboardRunNotConfigured = "No run jobs are configured for this project"
+	// DashboardRunConfigInvalid stands in for the whole RUN block when run.toml
+	// cannot be read, its cause hanging under it; DashboardRunConfigInvalidFmt is
+	// the refusal a run gesture meets then. "Not configured" would send the reader
+	// to `wtm run init` over a file that only needs fixing.
+	DashboardRunConfigInvalid    = "run.toml invalid"
+	DashboardRunConfigInvalidFmt = "run.toml invalid: %v"
+	// DashboardMenuCaptionMax bounds the caption under an inert entry: a parse
+	// error is a sentence, and the menu is sized on its longest line.
+	DashboardMenuCaptionMax = 48
 	// DashboardMenuEmpty stands in for the actions of a worktree that has none.
 	DashboardMenuEmpty = "No actions available"
 	// DashboardMenuChrome is what the menu box spends on its borders and padding.
@@ -3495,7 +3508,7 @@ const (
 	// DashboardRun*AllTitle head the batch runs started from the global menu. A
 	// modal renaming the entry the user just picked reads as a different action,
 	// so each title is its entry.
-	DashboardRunUpAllTitle   = "Start profiles"
+	DashboardRunUpAllTitle   = "Start worktrees"
 	DashboardRunDownAllTitle = "Stop worktrees"
 	// DashboardSync*Fmt report a finished cascade in the output panel, one line per
 	// branch it touched. Verbs: branch, then what became of it.
@@ -3577,6 +3590,17 @@ const (
 	RunDetachedNamespaceFmt       = "%s: %s ready"
 	RunDetachedAlreadyFmt         = "%s was already up"
 	RunDetachedAlreadyAttachedFmt = "%s was already attached"
+	// RunDetached{Crashed,Probe*,Left*,Concluded,Aborted}* are the rest of what the
+	// CLI says about a run, in the panel's register: a line each, the glyph
+	// leading, detail indented under the line it belongs to.
+	RunDetachedCrashedFmt    = GlyphAttention + " " + RunStreamCrashedFmt
+	RunDetachedProbeTitle    = GlyphAttention + " " + PortProbeTitle
+	RunDetachedDetailFmt     = "  %s"
+	RunDetachedLeftRunning   = "  left running: %s"
+	RunDetachedNotStarted    = "  not started: %s"
+	RunDetachedConcludedFmt  = GlyphSuccess + " %s %s"
+	RunDetachedCrashedEndFmt = GlyphAttention + " %s %s: %s exited after starting"
+	RunDetachedAbortedFmt    = GlyphFailure + " %s %s: aborted at step %d/%d (%s)"
 
 	// DashboardLogsLines is how far back the detail panel's logs view reads. It
 	// is a glance, not a session: runview is what scrolls.

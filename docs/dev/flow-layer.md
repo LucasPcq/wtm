@@ -762,7 +762,7 @@ removes it instead of asking about it. Descendants are left out: dragging them i
 makes the same entry mean one worktree from a leaf and four from a root, an asymmetry
 no label lets you predict.
 
-The run module's batch entries (`Start profiles`, `Stop worktrees`, `View logs`) split
+The run module's batch entries (`Start worktrees`, `Stop worktrees`, `Watch worktree logs`) split
 it the same way: a **start** is about where you are, so it passes no precheck at all —
 `target.WorktreesStep` already opens with the current worktree ticked — while a
 **stop** and a **view** are about what is standing, and pass the worktrees the board

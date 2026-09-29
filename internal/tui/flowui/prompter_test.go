@@ -626,3 +626,42 @@ func TestABuiltStepKeepsItsStartingValue(t *testing.T) {
 		t.Errorf("cursor = %q, want the start the step built", got)
 	}
 }
+
+// The worktree step declares "N running" and "current" and where the cursor
+// opens; the wizard drew neither.
+func TestAMultiSelectCarriesItsBadgesAndStart(t *testing.T) {
+	step := flow.Step{Kind: flow.StepMultiSelect, Key: "w"}
+	model := multiSelect(step, flow.StepContent{
+		Options: []flow.Option{
+			{Label: "main", Value: "/wt/main", Badges: []flow.Badge{{Text: "2 running", Tone: domain.ToneSuccess}}},
+			{Label: "feat/x", Value: "/wt/x", Badges: []flow.Badge{{Text: "current"}}},
+		},
+		Start: "/wt/x",
+	})
+	view := model.View()
+	for _, want := range []string{"2 running", "current"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("view = %q, want %q", view, want)
+		}
+	}
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")})
+	if got := strings.Join(model.Values(), ","); got != "/wt/x" {
+		t.Errorf("space toggled %q, want the row the step starts on", got)
+	}
+}
+
+// A conditional step whose Build fails must fail with its own cause: "has no
+// conditional renderer" sent the reader after the wizard over a git error.
+func TestAConditionalStepsBuildErrorIsItsOwn(t *testing.T) {
+	step := multiSelectStep("b")
+	step.Options = nil
+	step.Skip = func(flow.Answers) (bool, string) { return false, "" }
+	step.Build = func(flow.Answers) (flow.StepContent, error) {
+		return flow.StepContent{}, errors.New("list worktrees: boom")
+	}
+
+	_, err := build(flow.Session{Steps: []flow.Step{selectStep("a", "one"), step}})
+	if err == nil || !strings.Contains(err.Error(), "list worktrees: boom") {
+		t.Fatalf("err = %v, want the step's own cause", err)
+	}
+}

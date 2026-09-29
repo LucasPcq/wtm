@@ -92,6 +92,9 @@ func DefaultLogsLoader(params LogsLoaderParams) func(logsRequest) ([]string, err
 // Services tab that is its own body: arming the right-hand panel there left an
 // invisible view holding esc, enter and the arrows.
 func (m Model) openLogsTab() (Model, tea.Cmd) {
+	if !m.runModule() {
+		return m, nil
+	}
 	// From the Services tab the panel is not drawn at all: arming it there left
 	// an invisible view holding esc, enter and the arrows. The tab opens the full
 	// run view on the job under its cursor instead.
@@ -143,30 +146,57 @@ func (m Model) closePanelLogs() Model {
 	return m.forgetHiddenLogs()
 }
 
-// openPreview holds a run view at the panel's size, on the job the panel is
+// previewBoardMsg lands the board a live preview attaches through. Opening one
+// resolves the worktree's environment and dials the daemon, which is why it is
+// read off the UI goroutine.
+type previewBoardMsg struct {
+	branch string
+	board  runlogs.Board
+}
+
+// openPreview asks for a run view at the panel's size, on the job the panel is
 // showing. Without a BoardLoader — a test, a surface with no daemon — the panel
-// keeps its persisted tail and nothing else changes.
+// keeps its persisted tail and nothing else changes. A worktree whose job has
+// neither run nor left a trace has nothing to preview, and a board would give
+// it an ordinal it never asked for.
 func (m Model) openPreview() (Model, tea.Cmd) {
-	if m.params.BoardLoader == nil || !m.logsOpen() || m.logsJob == "" {
+	if m.params.BoardLoader == nil || !m.logsOpen() || !m.logsJobHasRun() {
 		return m, nil
 	}
 	m = m.closePreview()
 
-	board := m.params.BoardLoader(logsRequest{
-		WorkDir: m.statusFor(m.logsBranch).Path,
-		Jobs:    m.runConfig.Jobs,
-	})
-	if board == nil {
+	load, branch := m.params.BoardLoader, m.logsBranch
+	request := logsRequest{WorkDir: m.statusFor(branch).Path, Jobs: m.runConfig.Jobs}
+	return m, func() tea.Msg { return previewBoardMsg{branch: branch, board: load(request)} }
+}
+
+// applyPreviewBoard draws the board that landed, unless the reader has moved to
+// another worktree or closed the view since it was asked for.
+func (m Model) applyPreviewBoard(msg previewBoardMsg) (Model, tea.Cmd) {
+	if msg.board == nil || !m.logsOpen() || msg.branch != m.logsBranch || m.previewOn || m.logsJob == "" {
 		return m, nil
 	}
-
-	m.preview = runview.NewPreview(runview.PreviewParams{Board: board, Job: m.logsJob})
+	m.preview = runview.NewPreview(runview.PreviewParams{Board: msg.board, Job: m.logsJob})
 	m.previewOn = true
 
 	// Init is what asks the board for its jobs and opens the stream: a preview
 	// whose commands are never run shows an empty pane for ever.
 	model, sizeCmd := m.sizePreview(m.layout())
 	return model, tea.Batch(model.preview.Init(), sizeCmd)
+}
+
+// logsJobHasRun is whether the job on screen is one this worktree has anything
+// about: the daemon indexes it there, or it left a log.
+func (m Model) logsJobHasRun() bool {
+	if m.logsJob == "" {
+		return false
+	}
+	for _, job := range m.logsJobs() {
+		if job.Name == m.logsJob {
+			return true
+		}
+	}
+	return false
 }
 
 // closePreview releases the stream the panel was holding. A panel closed
@@ -232,6 +262,12 @@ func (m Model) logsOpen() bool { return m.panelTab == panelLogs }
 // retailAndPreview follows a job change on both readings: the persisted tail
 // the panel falls back to, and the live preview when one is held.
 func (m Model) retailAndPreview() (Model, tea.Cmd) {
+	// A view opened on a job with nothing to show holds no preview; the next
+	// job may well have one.
+	if !m.previewOn {
+		model, previewCmd := m.openPreview()
+		return model, tea.Batch(model.tailLogsCmd(), previewCmd)
+	}
 	model, previewCmd := m.showPreviewJob()
 	return model, tea.Batch(model.tailLogsCmd(), previewCmd)
 }
@@ -250,7 +286,7 @@ func (m Model) watchLogsRequest() logsflow.Request {
 func (m Model) tailLogsCmd() tea.Cmd {
 	// A live preview reads the same output from the daemon: re-reading the log
 	// file behind it would be a disk read per job change for lines nothing shows.
-	if m.params.LogsLoader == nil || !m.logsOpen() || m.previewOn {
+	if m.params.LogsLoader == nil || !m.logsOpen() || m.previewOn || !m.logsJobHasRun() {
 		return nil
 	}
 	load, branch, job := m.params.LogsLoader, m.logsBranch, m.logsJob
@@ -669,6 +705,9 @@ func (m Model) logsTailLines(params logsTailParams) []string {
 // job that had run, been stopped, and written nothing. The log on disk is what
 // actually answers the question, and it is now read rather than guessed at.
 func (m Model) logsEmptyLines(width int) []string {
+	if m.runConfigErr != nil {
+		return m.logsNotice(width, domain.DashboardRunConfigInvalid, runConfigCause(m.runConfigErr))
+	}
 	if len(m.runConfig.Jobs) == 0 {
 		return m.logsNotice(width, domain.DashboardLogsNoModule, domain.DashboardLogsNoModuleHint)
 	}
