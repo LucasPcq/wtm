@@ -9,6 +9,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
@@ -135,6 +136,26 @@ func TestPresetReparentAnswersTheStep(t *testing.T) {
 	}
 	if got := (&cleanFlow{}).presetReparent(); got != "" {
 		t.Errorf("preset = %q, want the step left to be answered", got)
+	}
+}
+
+// --drop-data is how an unattended clean asks for what --yes will not do by
+// default: start the services that are down and drop the data now.
+func TestDropDataAnswersTheDataStep(t *testing.T) {
+	cases := map[string]struct {
+		request Request
+		want    string
+	}{
+		"--drop-data": {request: Request{Branch: "feat", DropData: true}, want: owed.DataStart},
+		"--yes alone": {request: Request{Branch: "feat"}, want: ""},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := &cleanFlow{request: c.request}
+			if got := f.session().Presets.Value(KeyData); got != c.want {
+				t.Errorf("preset = %q, want %q", got, c.want)
+			}
+		})
 	}
 }
 
@@ -407,9 +428,9 @@ func TestDeleteRecapSaysWhenTheDataIsKept(t *testing.T) {
 
 // The line is built from run.toml, so a project with no shared service adds
 // nothing and the recap reads exactly as it did before.
-func TestNamespaceLinesEmptyWithoutASharedService(t *testing.T) {
+func TestHoldingsEmptyWithoutASharedService(t *testing.T) {
 	flow := &cleanFlow{ctx: flow.Context{StateDir: t.TempDir()}}
-	if got := flow.namespaceLines("feat"); len(got) != 0 {
-		t.Errorf("lines = %v, want none", got)
+	if got := flow.holdings("feat").Held(); len(got) != 0 {
+		t.Errorf("held = %v, want none", got)
 	}
 }

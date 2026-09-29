@@ -32,7 +32,7 @@ type Reader struct {
 func Open(params Params) Reader {
 	proxyPort := 0
 	if !params.Raw {
-		proxyPort = process.PublicProxyPort(rules.ProxyPort(params.Context.Config.Global))
+		proxyPort = process.PublicProxyPort(rules.RunProxyPort(rules.RunProxyPortParams{Run: params.Config, Global: params.Context.Config.Global}))
 	}
 	return Reader{ctx: params.Context, config: params.Config, proxyPort: proxyPort}
 }

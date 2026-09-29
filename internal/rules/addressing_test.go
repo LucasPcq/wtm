@@ -47,3 +47,24 @@ func TestBulkSettlesMainOnlyBackToPorts(t *testing.T) {
 		t.Error("a bulk pass must never move main onto names")
 	}
 }
+
+// The proxy is the machine's, the addressing the project's: under ports a run
+// is given no proxy port whatever the machine runs.
+func TestRunProxyPortFollowsTheAddressing(t *testing.T) {
+	cases := map[string]struct {
+		addressing domain.Addressing
+		want       int
+	}{
+		"names":   {addressing: domain.AddressingNames, want: domain.ProxyDefaultPort},
+		"default": {want: domain.ProxyDefaultPort},
+		"ports":   {addressing: domain.AddressingPorts, want: 0},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := rules.RunProxyPort(rules.RunProxyPortParams{Run: domain.RunConfig{Addressing: c.addressing}})
+			if got != c.want {
+				t.Errorf("RunProxyPort = %d, want %d", got, c.want)
+			}
+		})
+	}
+}

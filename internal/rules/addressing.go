@@ -44,3 +44,19 @@ func WorktreeCountLabel(n int) string {
 func BulkSettlesMain(mode domain.Addressing) bool {
 	return mode == domain.AddressingPorts
 }
+
+type RunProxyPortParams struct {
+	Run    domain.RunConfig
+	Global domain.GlobalConfig
+}
+
+// RunProxyPort is the proxy port a run addresses its jobs through, zero when
+// it hands out their own ports. The proxy is the machine's, the addressing the
+// project's: under ports every .env spells localhost, so a name announced
+// beside it would be one the apps' CORS origins and API urls know nothing of.
+func RunProxyPort(params RunProxyPortParams) int {
+	if EffectiveAddressing(params.Run) == domain.AddressingPorts {
+		return 0
+	}
+	return ProxyPort(params.Global)
+}

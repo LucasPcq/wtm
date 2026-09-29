@@ -312,6 +312,7 @@ func (f *upFlow) start(answers flow.Answers) (Outcome, error) {
 	}
 
 	warnings := addressing.Lines(addressing.Params{Context: f.ctx, WorkDirs: workDirs})
+	proxy := seam.ProxyPortsFor(seam.ProxyPortsParams{Global: f.ctx.Config.Global, Run: f.request.Config})
 	set := seam.OpenSet(seam.SetParams{
 		ProjectDir:  f.ctx.ProjectDir,
 		StateDir:    f.ctx.StateDir,
@@ -320,8 +321,8 @@ func (f *upFlow) start(answers flow.Answers) (Outcome, error) {
 		Declared:    f.request.Config.Jobs,
 		ProbeBudget: rules.PortProbeBudget(f.request.Config),
 		NoProbe:     f.request.NoProbe,
-		ProxyPort:   rules.ProxyPort(f.ctx.Config.Global),
-		PublicPort:  process.PublicProxyPort(rules.ProxyPort(f.ctx.Config.Global)),
+		ProxyPort:   proxy.Bind,
+		PublicPort:  proxy.Public,
 	})
 
 	// Before anything starts: a run defines what its worktrees' log directories

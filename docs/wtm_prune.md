@@ -26,6 +26,11 @@ commits, or have an open PR are unsafe and need --force. Use --yes to skip the
 prompts (required with --output json); non-interactively, children are left orphaned
 unless --reparent-children is passed. --dry-run previews without changing anything.
 
+Like clean, prune gives back the data the removed worktrees carved out of shared
+services (--keep-data withholds it); when such a service is down, the form asks whether
+to start it and drop the data now, or keep it until the service next starts. --yes keeps
+it; --drop-data drops it, starting the services that are down.
+
 ```
 wtm prune [flags]
 ```
@@ -34,10 +39,12 @@ wtm prune [flags]
 
 ```
       --closed              Restrict to worktrees whose PR was closed without merging (needs gh)
+      --drop-data           drop the removed worktrees' data now, starting the shared services that are down to do it
       --dry-run             Preview what would be pruned without removing anything
       --force               Lift safety refusals (dirty/unpushed/open-PR): also remove unsafe worktrees; still asks to confirm unless --yes
       --gone                Restrict to worktrees whose upstream branch was deleted on the remote
   -h, --help                help for prune
+      --keep-data           keep the namespaces the removed worktrees carved out of shared services
       --merged              Restrict to worktrees whose PR was merged on GitHub (needs gh)
       --no-fetch            Skip the git fetch --prune that gone-detection performs; use already-fetched state
       --output string       Output format: text or json (default "text")

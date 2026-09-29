@@ -1,8 +1,6 @@
 package runview
 
 import (
-	"fmt"
-
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -41,10 +39,10 @@ func (m Model) rows() []sidebarRow {
 		rows = append(rows, header)
 	}
 	for _, view := range visible {
-		if host := sharedHostOf(view); host != "" {
-			if current != sharedGroup+host {
-				current = sharedGroup + host
-				open(sidebarRow{Header: fmt.Sprintf(domain.RunViewSharedRowFmt, host), Shared: true})
+		if sharedHostOf(view) != "" {
+			if current != sharedGroup {
+				current = sharedGroup
+				open(sidebarRow{Header: domain.RunViewSharedHeading, Shared: true})
 			}
 			rows = append(rows, sidebarRow{View: view})
 			continue
@@ -62,7 +60,7 @@ func (m Model) rows() []sidebarRow {
 }
 
 // sharedGroup keeps the shared group's key apart from any work dir.
-const sharedGroup = "\x00shared:"
+const sharedGroup = "\x00shared"
 
 // sharedHostOf is the worktree a shared service runs in, empty for a job that
 // is not one or is not up: a stopped shared job is only this worktree's history.

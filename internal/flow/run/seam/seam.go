@@ -372,3 +372,21 @@ type SequenceParams struct {
 type Watcher interface {
 	Sequence(SequenceParams) (runlogs.Outcomes, error)
 }
+
+type ProxyPortsParams struct {
+	Global domain.GlobalConfig
+	Run    domain.RunConfig
+}
+
+// ProxyPorts is what a seam is opened with: the port the proxy binds, and the
+// one a published name answers on. Both are zero under ports addressing, which
+// leaves every address this run hands out on the job's own port.
+type ProxyPorts struct {
+	Bind   int
+	Public int
+}
+
+func ProxyPortsFor(params ProxyPortsParams) ProxyPorts {
+	bind := rules.RunProxyPort(rules.RunProxyPortParams{Run: params.Run, Global: params.Global})
+	return ProxyPorts{Bind: bind, Public: process.PublicProxyPort(bind)}
+}

@@ -53,11 +53,18 @@ func Settle(params Params) Result {
 			result.Owed[ref.Job]++
 			continue
 		}
-		removed := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
-			Config:  rules.JobsNamed(cfg, ref.Job),
-			Env:     rules.NamespaceEnv(rules.NamespaceEnvParams{Worktree: ref.Worktree, Ordinal: ref.Ordinal}),
-			WorkDir: params.Context.ProjectDir,
-			Up:      up,
+		var removed runjobs.RemoveNamespacesResult
+		_ = params.Presenter.Stage(flow.StageParams{
+			Message: fmt.Sprintf(domain.OwedDroppingFmt, name, ref.Job),
+			Work: func() error {
+				removed = runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
+					Config:  rules.JobsNamed(cfg, ref.Job),
+					Env:     rules.NamespaceEnv(rules.NamespaceEnvParams{Worktree: ref.Worktree, Ordinal: ref.Ordinal}),
+					WorkDir: params.Context.ProjectDir,
+					Up:      up,
+				})
+				return nil
+			},
 		})
 		for _, err := range removed.Errs {
 			params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: err.Error()})

@@ -70,7 +70,7 @@ func TestASharedServiceIsSetApartAndNamedByWhereItRuns(t *testing.T) {
 	})
 
 	frame := ansi.Strip(h.model.View())
-	shared, postgres := strings.Index(frame, "shared · main"), strings.Index(frame, "◈  postgres")
+	shared, postgres := strings.Index(frame, "shared"), strings.Index(frame, "◈  postgres")
 	heading, compose := strings.Index(frame, "feat/x"), strings.Index(frame, "●  compose")
 	if shared < 0 || !(shared < postgres && postgres < heading && heading < compose) {
 		t.Fatalf("frame = %q, want the shared line and postgres above the worktree and its jobs", frame)

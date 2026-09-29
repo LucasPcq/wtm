@@ -465,6 +465,42 @@ func TestRunEmitsTheNamedURLWhenTheProxyServes(t *testing.T) {
 	}
 }
 
+// Under ports addressing the surface opens the run with no proxy port, while the
+// machine's proxy still serves: the job is announced on its own port, the one
+// its .env spells, and no name is registered for `run ps` to announce.
+func TestRunHandsOutPortsWhenTheRunAddressesNoName(t *testing.T) {
+	job := domain.JobConfig{
+		Name:  "web",
+		Kind:  domain.JobKindService,
+		Cmd:   "pnpm dev",
+		Ports: map[string]int{"PORT": 3000},
+		URL:   &domain.JobURLConfig{Port: "PORT"},
+	}
+	service := &runlogstest.Service{Ports: map[string]map[string]int{"web": {"PORT": 3010}}, ProxyPort: 4000}
+	sink := &runlogstest.Sink{}
+
+	if _, err := runlogs.Run(context.Background(), runlogs.RunParams{
+		Service: service,
+		Sink:    sink,
+		Jobs:    []domain.JobConfig{job},
+		WorkDir: "/w",
+		Env:     map[string]string{domain.EnvWorktree: "feat-auth"},
+		Project: "myapp",
+	}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	const want = "http://localhost:3010"
+	for _, e := range sink.Events {
+		if e.Phase == runlogs.PhaseStarted && e.URL != want {
+			t.Errorf("started URL = %q, want %q", e.URL, want)
+		}
+	}
+	if routes := service.Started[0].Routes; len(routes) != 0 {
+		t.Errorf("Routes = %+v, want none registered", routes)
+	}
+}
+
 func TestRunSendsTheNamesARunnerHoldsForItsChildren(t *testing.T) {
 	// The shape the surface hands over: one job to start, carrying the ports of
 	// the apps it runs, and the whole declaration beside it.

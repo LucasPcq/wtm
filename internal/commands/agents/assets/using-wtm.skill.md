@@ -146,14 +146,17 @@ flagged; everything else is what the name implies.
   source. The response adds `existing_branch: true` and `origin_state`
   (`up-to-date`/`behind`/`ahead`/`diverged`) so you can tell reuse from creation.
 - `wtm clean <branch>` / `wtm prune [filters]` — remove one / batch-remove finished
-  worktrees. **`clean` also gives back the namespaces that worktree carved out of shared
-  services** (it drops its database): pass `--keep-data` to withhold that, including under
-  `--yes`; the interactive recap names each database it will drop. Only worktrees that
-  actually started the shared job owe anything — one created and thrown away owes nothing.
-  If the shared service is down, an interactive clean offers to start it and drop the
-  namespace now; under `--yes` the drop is owed instead, and paid the next time the service
-  starts — any `run up` / `run start` that brings it up, or `prune`, which also reports what
-  is still owed. A debt whose worktree was re-created since is withdrawn, never paid. **In JSON mode surviving children are left orphaned unless you pass
+  worktrees. **Both also give back the namespaces the removed worktrees carved out of
+  shared services** (they drop their databases): pass `--keep-data` to withhold that,
+  including under `--yes`; the interactive recap names each database it will drop. Only
+  worktrees that actually started the shared job owe anything — one created and thrown away
+  owes nothing. If a shared service is down, the interactive form asks — before the recap —
+  whether to start it and drop the data now, or keep it until the service next starts; under
+  `--yes` it is kept, and the drop is paid the next time wtm starts the service — any
+  `run up` / `run start` that brings it up, or `prune`, which also reports what is still
+  owed. A service started outside wtm pays nothing, so **pass `--drop-data` when the user
+  wants the data gone**: it drops it now, starting the services that are down (and letting
+  them go again afterwards). `--drop-data` and `--keep-data` are mutually exclusive. A debt whose worktree was re-created since is withdrawn, never paid. **In JSON mode surviving children are left orphaned unless you pass
   `--reparent-children`** (they reparent onto the grandparent). `prune` decides "finished"
   from **GitHub PR state via the `gh` CLI** (not local commits): `--merged` = PR merged,
   `--closed` = PR closed without merging, `--gone` = remote branch deleted; no filter = all
@@ -705,7 +708,10 @@ and **experimental**: the global `wtm init` does not configure it.
   launches dev servers by hand wants `"ports"`. When the proxy is disabled on the machine
   (`[proxy] port = 0`), wtm writes ports whatever the mode says, and reports it. Only the
   values of jobs that publish a url are affected: a `DATABASE_URL` or a bare `*_PORT`
-  stays a port either way.
+  stays a port either way. The mode also decides **what the run surfaces announce**: under
+  `"ports"`, `run up` / `run start` / `run ps` / `run url` / `run open` and the run view hand
+  out `http://localhost:<port>` and register no name with the proxy, even though the proxy
+  still runs — a name nothing in the `.env` files knows of would fail CORS.
 - **`run up` verifies the ports.** Declaring a port injects a variable; nothing forces
   the command to read it. After the jobs start, wtm dials each declared port and reports
   the silent ones under "Ports declared but not bound". When the *base* port answers

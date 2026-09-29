@@ -16,7 +16,7 @@ constants and CLI copy use these and no synonyms.
 | **public port** | What a URL *announces*, as opposed to what anything binds: nothing (i.e. `:80`) when the redirection is live, the bind port otherwise | `rules.PublicPort` |
 | **route host** | `<job>.<worktree>.<project>.localhost` — the name a published job answers under | `rules.RouteHost` |
 | **origin** | `scheme://host[:port]` — the thing a browser sends in `Origin:` and CORS compares. The port is part of an origin; it is **not** part of a cookie's origin | `rules.JobOrigin` |
-| **addressing** | `ports` or `names`: which of the two an `[[env_port]]` link writes into a `.env` value | `rules.EffectiveAddressing` |
+| **addressing** | `ports` or `names`: which of the two an `[[env_port]]` link writes into a `.env` value, and which of the two a run announces | `rules.EffectiveAddressing`, `rules.RunProxyPort` |
 
 ## What follows from the distinction
 
@@ -35,6 +35,8 @@ same name works perfectly, carrying `:11080`.
 so as long as both sides carry the same one — port included — it passes. And cookie
 isolation, the reason named URLs exist, keys on the **host** and ignores the port
 entirely: `feat-x` and `feat-y` are separate jars whether or not `:11080` is there.
+
+**A run announces what the `.env` files spell.** Under `ports` a run is opened with no proxy port (`rules.RunProxyPort`, through `seam.ProxyPortsFor`): it registers no route, and `run up`, `run ps`, `run url`, `run open` and the run view's reach pane hand out `http://localhost:<port>` — while the machine's proxy keeps running for any other project. Announcing the name there would point the reader at an origin the app's CORS settings and API urls know nothing of.
 
 **Addressing is a project setting, the proxy is a machine setting.** `run.toml` says
 what the project wants; the global config says what this machine can do. When
@@ -191,7 +193,7 @@ own density, so none of them decides on its own what to show:
 
 A shared service a linked worktree only holds runs in main, and every surface says so the same
 way: `postgres attached to main` on its line, a **Shared, running in main** section in the block
-(`rules.ReachSections`), a `shared · main` line above it in the run view's job list, and a pane
+(`rules.ReachSections`), a `shared` line above it in the run view's job list, and a pane
 title naming where it runs rather than the worktree holding it. Stopping the worktree leaves
 those running — which is the one thing the reader has to be able to see.
 

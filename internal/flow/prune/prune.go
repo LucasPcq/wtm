@@ -30,6 +30,11 @@ type Request struct {
 	// an output mode: it changes what the run does, not how it reads.
 	DryRun     bool
 	BaseBranch string
+	// KeepData withholds the namespaces the pruned worktrees carved out of shared
+	// services, which are otherwise given back as clean gives them back.
+	KeepData bool
+	// DropData drops it now instead, starting the services that are down.
+	DropData bool
 }
 
 type Outcome struct {
@@ -77,7 +82,8 @@ type pruneFlow struct {
 	prompter  flow.Prompter
 	presenter Presenter
 
-	plan domain.PrunePlan
+	plan      domain.PrunePlan
+	snapshots map[string]owed.Snapshot
 }
 
 func (f *pruneFlow) run() (Outcome, error) {
@@ -118,7 +124,10 @@ func (f *pruneFlow) run() (Outcome, error) {
 		return f.conclude(Outcome{Empty: true})
 	}
 
-	return f.remove(answers.Value(KeyReparent) == reparentYes)
+	return f.remove(removeParams{
+		ReparentChildren: answers.Value(KeyReparent) == reparentYes,
+		StartDown:        answers.Value(KeyData) == owed.DataStart,
+	})
 }
 
 // scan classifies with force whenever someone can still deselect, so unsafe
@@ -160,9 +169,14 @@ func (f *pruneFlow) scanMessage(needPRs bool) string {
 	return domain.PruneScanning
 }
 
-func (f *pruneFlow) remove(reparentChildren bool) (Outcome, error) {
+type removeParams struct {
+	ReparentChildren bool
+	StartDown        bool
+}
+
+func (f *pruneFlow) remove(params removeParams) (Outcome, error) {
 	orphaned := f.plan.Reparents
-	if reparentChildren {
+	if params.ReparentChildren {
 		orphaned = nil
 	} else {
 		f.plan.Reparents = nil
@@ -171,6 +185,10 @@ func (f *pruneFlow) remove(reparentChildren bool) (Outcome, error) {
 	// Decided before the removal, while the paths still resolve their symlinks.
 	insidePruned := f.insidePruned()
 
+	// Old debts first: their lines would otherwise repeat the ones this removal
+	// is about to print for the same services.
+	f.settleOwedNamespaces()
+	f.removeNamespaces(params.StartDown)
 	for _, candidate := range f.plan.Selected {
 		f.stopServices(candidate.Branch)
 	}
@@ -199,7 +217,31 @@ func (f *pruneFlow) remove(reparentChildren bool) (Outcome, error) {
 	if insidePruned {
 		shell.RequestCd(f.ctx.ProjectDir)
 	}
-	return f.conclude(Outcome{Result: result})
+	outcome := Outcome{Result: result}
+	return outcome, f.presenter.Pruned(outcome)
+}
+
+// removeNamespaces gives back what the pruned worktrees carved out of the shared
+// services, before stopServices releases their claims. Read afresh: a service
+// may have changed state while the recap was on screen.
+func (f *pruneFlow) removeNamespaces(startDown bool) {
+	if f.request.KeepData {
+		return
+	}
+	owed.Detach(owed.DetachParams{
+		Context:   f.ctx,
+		Presenter: f.presenter,
+		Snapshot:  owed.Read(owed.ReadParams{Context: f.ctx, Branches: f.selectedBranches()}),
+		StartDown: startDown,
+	})
+}
+
+func (f *pruneFlow) selectedBranches() []string {
+	branches := make([]string, 0, len(f.plan.Selected))
+	for _, candidate := range f.plan.Selected {
+		branches = append(branches, candidate.Branch)
+	}
+	return branches
 }
 
 // runHooks hooks every selected worktree before the first removal, which is
@@ -253,19 +295,18 @@ func (f *pruneFlow) stopServices(branchName string) {
 		return
 	}
 
-	socket := process.SocketPath()
-	if !process.IsDaemonRunning(socket) {
-		// Nothing listening does not mean nothing running: a detached stack
-		// outlives its daemon. The index is what says whether waking one is
-		// worth a fork.
-		if !process.HasIndexedJobs(wt.Path) {
-			return
-		}
-		if err := process.EnsureDaemon(process.DaemonParams{SocketPath: socket}); err != nil {
-			return
-		}
+	if !process.WorktreeHasJobs(wt.Path) {
+		return
 	}
-	if process.StopWorktreeJobs(process.NewClient(socket), wt.Path) {
+	stopped := false
+	_ = f.presenter.Stage(flow.StageParams{
+		Message: fmt.Sprintf(domain.CleanStoppingServicesFmt, branchName),
+		Work: func() error {
+			stopped = process.StopWorktreeJobs(wt.Path)
+			return nil
+		},
+	})
+	if stopped {
 		f.presenter.Status(flow.Notice{
 			Kind: flow.NoticeSuccess,
 			Text: fmt.Sprintf(domain.CleanStoppedServicesFmt, branchName),

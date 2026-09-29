@@ -27,6 +27,8 @@ func newCleanCmd() *cobra.Command {
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (keeps safety checks unless --force)")
 	cmd.Flags().Bool(domain.FlagReparentChildren, false, "Reparent orphaned child worktrees onto the grandparent (no prompt)")
 	cmd.Flags().Bool(domain.FlagKeepData, false, domain.FlagKeepDataDesc)
+	cmd.Flags().Bool(domain.FlagDropData, false, domain.FlagDropDataDesc)
+	cmd.MarkFlagsMutuallyExclusive(domain.FlagKeepData, domain.FlagDropData)
 	shared.AddOutputFlag(cmd)
 
 	return cmd
@@ -37,6 +39,7 @@ func runClean(cmd *cobra.Command, args []string) error {
 	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
 	reparentFlag, _ := cmd.Flags().GetBool(domain.FlagReparentChildren)
 	keepData, _ := cmd.Flags().GetBool(domain.FlagKeepData)
+	dropData, _ := cmd.Flags().GetBool(domain.FlagDropData)
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 
 	if format == domain.OutputJSON && !yes {
@@ -69,6 +72,7 @@ func runClean(cmd *cobra.Command, args []string) error {
 			Force:            force,
 			ReparentChildren: reparentFlag,
 			KeepData:         keepData,
+			DropData:         dropData,
 			BaseBranch:       resolveBase("", config),
 			// The CLI owns the terminal it prompts on, so it can hand it to sudo.
 			AllowPrivileged: true,

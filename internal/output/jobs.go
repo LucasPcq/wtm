@@ -261,6 +261,9 @@ type FormatRunningJobsParams struct {
 	// Branches names each work dir the way a reader recognises it; a dir missing
 	// from it is shown as its path.
 	Branches map[string]string
+	// Hyperlinks makes each address clickable. Off for a pipe: the escape would
+	// reach whatever reads the table.
+	Hyperlinks bool
 }
 
 // FormatRunningJobs renders a table of running (or recently running) jobs. It
@@ -317,12 +320,18 @@ func FormatRunningJobs(params FormatRunningJobsParams) string {
 		if worktree == "" {
 			worktree = j.WorkDir
 		}
-		line := fmt.Sprintf("%s%-*s  %-*s  %-*s  %-*s  %-*s  %s\n",
+		// Padded before it is linked: the escape has no width, and a width
+		// counted in bytes would push every column after it to the right.
+		address := j.URL + strings.Repeat(" ", addrW-len(j.URL))
+		if params.Hyperlinks {
+			address = rules.LinkURLs(address)
+		}
+		line := fmt.Sprintf("%s%-*s  %-*s  %-*s  %s  %-*s  %s\n",
 			Indent,
 			nameW, j.Name,
 			kindW, string(j.Kind),
 			statusW+ansiOverhead(status), status,
-			addrW, j.URL,
+			address,
 			upW, uptimes[i],
 			worktree,
 		)

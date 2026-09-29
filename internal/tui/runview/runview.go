@@ -41,6 +41,10 @@ type Params struct {
 	// Open hands a job's URL to the desktop. Nil leaves the open key without an
 	// object, which is what a surface that cannot open a browser installs.
 	Open OpenFunc
+	// Hyperlinks wraps every address the view draws in an OSC-8 link. Off for a
+	// view hosted by the dashboard, whose click zones measure an escape as text,
+	// and whose output panel cuts its lines by rune.
+	Hyperlinks bool
 	// In and Out are the terminal the view takes over. Nil means os.Stdin and
 	// os.Stdout, which is every case but one: a dashboard handing the terminal
 	// over is given the streams by bubbletea and has to pass them on, or the two
@@ -125,6 +129,8 @@ type Model struct {
 	// profile names the run the view is reporting on, for the header and the recap.
 	profile string
 	open    OpenFunc
+	// hyperlinks — see Params.Hyperlinks.
+	hyperlinks bool
 	// started reports that a run was asked for, which is what makes a recap
 	// worth printing on the way out.
 	started  bool
@@ -151,18 +157,19 @@ func New(params Params) Model {
 	panes := newPaneStore(PaneSize{})
 	msgs := make(chan tea.Msg, domain.RunViewMsgBuffer)
 	return Model{
-		board:    params.Board,
-		wantJob:  params.Job,
-		warnings: params.Warnings,
-		profile:  params.Profile,
-		panes:    panes,
-		msgs:     msgs,
-		relay:    newRelay(sink{panes: panes, msgs: msgs, done: ctx.Done()}),
-		start:    params.Start,
-		onLeave:  params.Detach,
-		finished: make(chan runFinishedMsg, 1),
-		open:     params.Open,
-		started:  params.Start != nil,
+		board:      params.Board,
+		wantJob:    params.Job,
+		warnings:   params.Warnings,
+		profile:    params.Profile,
+		panes:      panes,
+		msgs:       msgs,
+		relay:      newRelay(sink{panes: panes, msgs: msgs, done: ctx.Done()}),
+		start:      params.Start,
+		onLeave:    params.Detach,
+		finished:   make(chan runFinishedMsg, 1),
+		open:       params.Open,
+		hyperlinks: params.Hyperlinks,
+		started:    params.Start != nil,
 		// A run feeds panes from its own goroutine, so the clock has to be
 		// running before the first chunk lands.
 		ticking:   params.Start != nil,

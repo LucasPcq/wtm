@@ -15,6 +15,7 @@ import (
 	ghservice "github.com/LucasPcq/wtm/internal/service/github"
 	"github.com/LucasPcq/wtm/internal/service/integration"
 	"github.com/LucasPcq/wtm/internal/service/process"
+	"github.com/LucasPcq/wtm/internal/service/runconfig"
 	"github.com/LucasPcq/wtm/internal/service/selfupdate"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 	"github.com/LucasPcq/wtm/internal/tui/dashboard"
@@ -107,8 +108,11 @@ func buildRunParams(params buildParams) dashboard.RunParams {
 		BoardLoader: dashboard.DefaultBoardLoader(dashboard.LogsLoaderParams{
 			ProjectDir: result.ProjectDir,
 			StateDir:   result.StateDir,
+			// run.toml is read on each call, like the port: `wtm run addressing`
+			// may switch the project while the dashboard is open.
 			PublicPort: func() int {
-				return process.PublicProxyPort(rules.ProxyPort(result.Config.Global))
+				run, _ := runconfig.Load(result.StateDir)
+				return process.PublicProxyPort(rules.RunProxyPort(rules.RunProxyPortParams{Run: run, Global: result.Config.Global}))
 			},
 		}),
 		// One directory listing per worktree, off the UI goroutine like the rest:
@@ -134,7 +138,7 @@ func buildRunParams(params buildParams) dashboard.RunParams {
 				Branches:   request.Branches,
 				EnvFiles:   result.Config.Project.Env.Files,
 				Global:     result.Config.Global,
-				ProxyPort:  process.PublicProxyPort(rules.ProxyPort(result.Config.Global)),
+				ProxyPort:  process.PublicProxyPort(rules.RunProxyPort(rules.RunProxyPortParams{Run: request.Config, Global: result.Config.Global})),
 			})
 		},
 	}

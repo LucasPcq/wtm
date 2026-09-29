@@ -63,8 +63,14 @@ func Run(params RunParams) (Result, error) {
 		return selectValue(prev, worktreeIdx)
 	}
 
-	resolveIdx := len(steps)
-	steps = append(steps, resolveStep(params, branchOf))
+	// The wizard never auto-skips its first step, which is where a preset branch
+	// puts the resolver: with nothing to decide it would sit there empty, so it is
+	// left out here instead.
+	resolveIdx := -1
+	if params.PresetBranch == "" || !resolveModel(params, params.PresetBranch).Empty() {
+		resolveIdx = len(steps)
+		steps = append(steps, resolveStep(params, branchOf))
+	}
 
 	recapIdx := len(steps)
 	steps = append(steps, recapStep(recapStepParams{
@@ -89,7 +95,7 @@ func Run(params RunParams) (Result, error) {
 	}
 
 	res := Result{Branch: branchOf(done), Verbatim: action == applyVerbatimAction}
-	if m, ok := done[resolveIdx].Model.(components.EnvResolveModel); ok {
+	if m, ok := stepModel(done, resolveIdx).(components.EnvResolveModel); ok {
 		res.Decisions = m.Decisions()
 	}
 	return res, nil
@@ -127,12 +133,7 @@ func resolveStep(params RunParams, branchOf func([]components.Step) string) comp
 		Model:   components.NewEnvResolve(components.NewEnvResolveParams{}),
 		Callout: true, // renders the glossary (the model's desc) as a legend callout
 		Build: func(prev []components.Step) any {
-			branch := branchOf(prev)
-			return components.NewEnvResolve(components.NewEnvResolveParams{
-				Title:       "Resolve drift — " + branch,
-				Description: components.EnvResolveGlossary(),
-				Files:       params.DiffByBranch[branch],
-			})
+			return resolveModel(params, branchOf(prev))
 		},
 		AutoSkip: func(w components.WizardModel) bool {
 			m, ok := w.CurrentStepModel().(components.EnvResolveModel)
@@ -141,6 +142,14 @@ func resolveStep(params RunParams, branchOf func([]components.Step) string) comp
 		SkipReason: func() string { return "only safe additions" },
 		Summary:    components.EnvResolveSummary,
 	}
+}
+
+func resolveModel(params RunParams, branch string) components.EnvResolveModel {
+	return components.NewEnvResolve(components.NewEnvResolveParams{
+		Title:       "Resolve drift — " + branch,
+		Description: components.EnvResolveGlossary(),
+		Files:       params.DiffByBranch[branch],
+	})
 }
 
 type recapStepParams struct {
@@ -157,12 +166,11 @@ func recapStep(params recapStepParams) components.Step {
 		Build: func(prev []components.Step) components.RecapContent {
 			branch := params.BranchOf(prev)
 			lines := []string{styles.Muted.Render("Worktree:") + "  " + styles.Bold.Render(branch), ""}
-			if m, ok := stepModel(prev, params.ResolveIdx).(components.EnvResolveModel); ok {
-				if body := m.RecapLines(); len(body) > 0 {
-					lines = append(lines, body...)
-				} else {
-					lines = append(lines, "Only safe additions will be applied.")
-				}
+			m, ok := stepModel(prev, params.ResolveIdx).(components.EnvResolveModel)
+			if body := m.RecapLines(); ok && len(body) > 0 {
+				lines = append(lines, body...)
+			} else {
+				lines = append(lines, "Only safe additions will be applied.")
 			}
 			lines = append(lines, portRecapLines(params.PortsByBranch[branch])...)
 			return components.RecapContent{

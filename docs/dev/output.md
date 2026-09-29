@@ -194,6 +194,13 @@ What the phase *keeps* is barred, and that is the whole of the distinction: `Hoo
 
 The seam that makes it possible is worth copying for anything similar: `service/hooks` reports `domain.HookBeat` values through `flow.HookSink` — the raw output *and* the beat of each hook starting and finishing — so the surface decides what to draw and the service formats only the fallback for a caller that installed no reporter.
 
+## Addresses are clickable
+
+Every job address a person reads can be followed with a click, and there are two mechanisms because there are two kinds of surface.
+
+- **Text a command prints** wraps each address in an OSC-8 link with `rules.LinkURLs`, on a terminal only (`output.IsTerminal`). A pipe, a CI log, `--output json` and machine output (`run url`, meant for `$(…)`) never receive the escape. Link **after** padding or truncating: the escape has no width, and a column measured in bytes or runes would push everything after it. `run ps` pads its ADDRESS column first, then links it.
+- **A full-screen surface holds the mouse**, so the terminal never sees a plain click on a link. The run view and the dashboard open the address under a click themselves with `components.URLAt`, which reads it off the frame they last drew, so an address is clickable wherever it lands without declaring a zone. A truncated address (ending in `…`) is never followed. The run view also draws OSC-8 links (Params.Hyperlinks) for the terminal's modifier-click; the dashboard does not, because bubblezone measures the escape as text and would shift every zone on that row.
+
 ## Adding a command
 
 1. Pick the form: an act (A) or a readout (B). If it is neither, it is a table or a machine contract.
