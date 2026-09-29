@@ -893,9 +893,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.outputExpanded = !m.outputExpanded
 		return m.reflow(), nil
 	case keyTab:
-		return m.selectTab((m.tab + 1) % len(tabs))
+		return m.selectTab(m.stepTab(1))
 	case keyShiftTab:
-		return m.selectTab((m.tab + len(tabs) - 1) % len(tabs))
+		return m.selectTab(m.stepTab(-1))
 	case keyUp, keyVimUp:
 		return m.moveCursor(-1), nil
 	case keyDown, keyVimDown:
@@ -930,6 +930,41 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// runModule is whether the project has a run module to show: run.toml declares
+// jobs, or cannot be read — which is said in the run tabs rather than hidden.
+// Without one the dashboard is v0.27.1's: no Services tab, no LOGS tab.
+func (m Model) runModule() bool {
+	return len(m.runConfig.Jobs) > 0 || m.runConfigErr != nil
+}
+
+func (m Model) shownTabs() []int {
+	if m.runModule() {
+		return []int{tabWorktrees, tabTree, tabServices}
+	}
+	return []int{tabWorktrees, tabTree}
+}
+
+// stepTab is the tab delta positions away among those drawn, wrapping.
+func (m Model) stepTab(delta int) int {
+	shown := m.shownTabs()
+	position := 0
+	for index, tab := range shown {
+		if tab == m.tab {
+			position = index
+		}
+	}
+	return shown[(position+delta+len(shown))%len(shown)]
+}
+
+// withoutRunTabs leaves the run tabs once run.toml stops declaring anything: a
+// view left open on a tab that is no longer drawn kept the keyboard.
+func (m Model) withoutRunTabs() Model {
+	if m.tab == tabServices {
+		m.tab = tabWorktrees
+	}
+	return m.closePanelLogs()
+}
+
 // selectTab moves to a tab and, the first time the Tree tab is opened, asks for
 // the forest it has never built. It also starts the tab rule's slide toward
 // its new position, when ui.animations has not turned that off and the rule
@@ -939,12 +974,12 @@ func (m Model) selectTab(index int) (Model, tea.Cmd) {
 	// change it kept esc and enter while showing nothing.
 	m = m.closePanelLogs()
 	width := m.layout().Tabs.Width
-	from := tabStart(width, m.tab)
+	from := m.tabStart(width, m.tab)
 	m.tab = index
 
 	var slideCmd tea.Cmd
 	if rules.AnimationsEnabled(m.params.Config) {
-		if to := tabStart(width, index); to != from {
+		if to := m.tabStart(width, index); to != from {
 			m.tabSlideFrom, m.tabSlideSince = from, time.Now()
 			slideCmd = tabSlideTickCmd()
 		}
@@ -999,7 +1034,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	for index := range tabs {
+	for _, index := range m.shownTabs() {
 		if m.inZone(tabZone(index), msg) {
 			return m.selectTab(index)
 		}
@@ -1301,6 +1336,9 @@ func (m Model) jobsLoader() func(bool) ([]domain.JobInfo, bool) {
 func (m Model) applyJobs(msg jobsMsg) (Model, tea.Cmd) {
 	changed := !rules.SameRunJobs(m.runConfig, msg.config)
 	m.runConfig, m.runConfigErr = msg.config, msg.configErr
+	if !m.runModule() {
+		m = m.withoutRunTabs()
+	}
 	// What the ordinals, the traces and the tree's per-node counts are derived
 	// from is the running set, counts included: a job stopping beside another
 	// still up moves no branch in or out, and the tree would carry the old count

@@ -305,26 +305,6 @@ func TestTheLogsKeyOpensTheTabWithoutAPicker(t *testing.T) {
 	}
 }
 
-// The tab always opens: a greyed-out tab left the reader guessing, and a
-// project with no run module has something to be told rather than a door that
-// does not answer.
-func TestTheLogsTabOpensWithoutARunModuleAndSaysWhatIsMissing(t *testing.T) {
-	model := logsModel(t, RunParams{}, "a")
-
-	next, _ := updateCmd(model, key(domain.KeyRunLogs))
-
-	if next.panelTab != panelLogs {
-		t.Fatal("the LOGS tab did not open")
-	}
-	body := stripANSI(strings.Join(next.detailBody(next.layout()), "\n"))
-	if !strings.Contains(body, domain.DashboardLogsNoModule) {
-		t.Errorf("body = %q, want it to say the project runs nothing", body)
-	}
-	if !strings.Contains(body, domain.DashboardLogsNoModuleHint) {
-		t.Errorf("body = %q, want `wtm run init` named", body)
-	}
-}
-
 // Four different silences, four different answers. "Never ran" used to be
 // inferred from the job not being up, which said it of a job that had run, been
 // stopped and written nothing; the log on disk now answers instead.

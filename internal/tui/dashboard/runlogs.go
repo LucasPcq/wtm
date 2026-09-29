@@ -92,6 +92,9 @@ func DefaultLogsLoader(params LogsLoaderParams) func(logsRequest) ([]string, err
 // Services tab that is its own body: arming the right-hand panel there left an
 // invisible view holding esc, enter and the arrows.
 func (m Model) openLogsTab() (Model, tea.Cmd) {
+	if !m.runModule() {
+		return m, nil
+	}
 	// From the Services tab the panel is not drawn at all: arming it there left
 	// an invisible view holding esc, enter and the arrows. The tab opens the full
 	// run view on the job under its cursor instead.
@@ -702,6 +705,9 @@ func (m Model) logsTailLines(params logsTailParams) []string {
 // job that had run, been stopped, and written nothing. The log on disk is what
 // actually answers the question, and it is now read rather than guessed at.
 func (m Model) logsEmptyLines(width int) []string {
+	if m.runConfigErr != nil {
+		return m.logsNotice(width, domain.DashboardRunConfigInvalid, runConfigCause(m.runConfigErr))
+	}
 	if len(m.runConfig.Jobs) == 0 {
 		return m.logsNotice(width, domain.DashboardLogsNoModule, domain.DashboardLogsNoModuleHint)
 	}

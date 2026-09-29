@@ -105,7 +105,7 @@ func TestTheTreeReportsAFailureInsteadOfDrawingNothing(t *testing.T) {
 // Each tab keeps its own cursor: coming back to a tab must not have moved what
 // was selected there.
 func TestEachTabKeepsItsOwnCursor(t *testing.T) {
-	model := treeModel(t, "main", "feat", "feat-ui")
+	model := withRunJobs(treeModel(t, "main", "feat", "feat-ui"))
 	model = update(model, key("j"))
 	model = update(model, key("j"))
 	if model.treeCursor != 2 {
@@ -181,7 +181,7 @@ func TestTheMainWorktreeOffersOnlyTheBaseRefreshFromTheTree(t *testing.T) {
 }
 
 func TestTheHeaderCountsWhatTheActiveTabLists(t *testing.T) {
-	model := treeModel(t, "main", "feat", "feat-ui")
+	model := withRunJobs(treeModel(t, "main", "feat", "feat-ui"))
 
 	if got := model.countLabel(); !strings.Contains(got, "4") {
 		t.Errorf("count = %q, want the four nodes of the forest", got)

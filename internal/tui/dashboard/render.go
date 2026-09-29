@@ -284,7 +284,8 @@ func (m Model) countLineVariant(params countLineParams) string {
 func (m Model) renderTabBar(width int, right func(room int) string) (bar string, activeStart, activeWidth int) {
 	rendered := make([]string, 0, len(tabs))
 	used := 0
-	for index, title := range tabs {
+	for _, index := range m.shownTabs() {
+		title := tabs[index]
 		style := styles.DashboardTabInactive
 		if index == m.tab {
 			style = styles.DashboardTabActive
@@ -522,10 +523,10 @@ func (m Model) countLabel() string {
 
 // Both tab styles share the same padding, so the column does not depend on which
 // tab is active — which is what lets the slide animation measure from and to it.
-func tabStart(width, index int) int {
+func (m Model) tabStart(width, index int) int {
 	used := 0
-	for i, title := range tabs {
-		w := lipgloss.Width(styles.DashboardTabInactive.Render(title))
+	for _, i := range m.shownTabs() {
+		w := lipgloss.Width(styles.DashboardTabInactive.Render(tabs[i]))
 		if used+w > width {
 			break
 		}
