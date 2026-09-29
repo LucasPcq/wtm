@@ -18,6 +18,16 @@ func IsolationOf(ref WorktreeRef) domain.Isolation {
 	return rules.EffectiveIsolation(meta.Isolation)
 }
 
+// RecordedIsolation is the choice meta.json holds, empty for a worktree that
+// never made one — created before the choice existed, or never by wtm.
+func RecordedIsolation(ref WorktreeRef) domain.Isolation {
+	meta, err := loadMetadata(ref.StateDir, ref.Branch)
+	if err != nil {
+		return ""
+	}
+	return meta.Isolation
+}
+
 type SetIsolationParams struct {
 	Ref       WorktreeRef
 	Isolation domain.Isolation

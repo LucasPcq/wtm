@@ -142,18 +142,21 @@ func TestRunStartInjectsWorktreeEnv(t *testing.T) {
 	})
 }
 
-func TestRunUpKeepsUserComposeProjectName(t *testing.T) {
+// The shell a command is typed in may belong to another worktree, or be a
+// job's: its COMPOSE_PROJECT_NAME would recreate this worktree's stack under
+// that one's name.
+func TestRunUpIgnoresTheCallersComposeProjectName(t *testing.T) {
 	daemon := setupUpProject(t, &fakeDaemon{})
 	fakeTTY(t, false)
 	enterWorktree(t, addWorktree(t, os.Getenv("WTM_PROJECT_DIR"), "feat/z"))
-	t.Setenv(domain.EnvComposeProjectName, "perso")
+	t.Setenv(domain.EnvComposeProjectName, "launched-from-another-worktree")
 
 	if _, _, err := runCmd(t, domain.CmdUp, "--"+domain.FlagDetach); err != nil {
 		t.Fatalf("run up: %v", err)
 	}
 
 	assertEnv(t, daemon.startEnv(t, "docker"), map[string]string{
-		domain.EnvComposeProjectName: "perso",
+		domain.EnvComposeProjectName: composeProject(t, "feat-z"),
 		domain.EnvOrdinal:            "1",
 	})
 }

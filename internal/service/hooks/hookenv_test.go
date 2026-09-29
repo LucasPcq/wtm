@@ -61,3 +61,30 @@ func TestRunHooksWithoutEnvKeepsProcessEnvironment(t *testing.T) {
 		t.Errorf("hook saw %q, want %q", strings.TrimSpace(string(got)), "inherited")
 	}
 }
+
+// A hook given a worktree's variables gets that worktree's alone: what the
+// launching shell carries for another worktree does not fill a name left unset.
+func TestRunHooksWithEnvDropsTheCallersWorktreeVariables(t *testing.T) {
+	t.Setenv(domain.EnvComposeProjectName, "launched-from-another-worktree")
+
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "seen")
+
+	var out bytes.Buffer
+	if err := RunHooks(RunHooksParams{
+		Hooks:   []domain.HookCommand{{Cmd: "printenv " + domain.EnvComposeProjectName + " > " + marker + " || true"}},
+		WorkDir: dir,
+		Env:     map[string]string{domain.EnvIsolation: string(domain.IsolationVerbatim)},
+		Output:  &out,
+	}); err != nil {
+		t.Fatalf("RunHooks: %v", err)
+	}
+
+	got, err := os.ReadFile(marker)
+	if err != nil {
+		t.Fatalf("hook left no marker: %v", err)
+	}
+	if strings.TrimSpace(string(got)) != "" {
+		t.Errorf("hook saw %s=%q, want it unset", domain.EnvComposeProjectName, strings.TrimSpace(string(got)))
+	}
+}

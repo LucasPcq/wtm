@@ -153,10 +153,9 @@ func RunCreateHooks(params domain.CreateHooksParams) error {
 			Root:       mainPath,
 			FromBranch: params.FromBranch,
 		},
-		Env: hookEnv(WorktreeRef{
-			ProjectDir: params.ProjectDir,
-			StateDir:   params.StateDir,
-			Branch:     params.Branch,
+		Env: hookEnv(hookEnvParams{
+			Ref:          WorktreeRef{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: params.Branch},
+			WorktreePath: params.WorktreePath,
 		}),
 		Output: params.Output,
 		OnHook: params.OnHook,

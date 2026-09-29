@@ -295,6 +295,15 @@ just before it is removed by `clean`/`prune` (e.g. to tear down external resourc
 non-zero hook aborts the operation unless the entry sets `continue_on_error`. Hooks
 interpolate `{{worktree}}`, `{{branch}}`, `{{root}}`, and (for `on_create`) `{{from_branch}}`.
 
+A hook also gets the worktree's run variables (`COMPOSE_PROJECT_NAME`, `WTM_*` and the
+declared ports, see [Run config](#run-config--runtoml)) **only when** `run.toml` declares
+a job running `docker compose` **and** the worktree recorded its isolation (`isolation` in its
+`meta.json`: every worktree created since the choice exists, or adopted with
+`wtm env <branch> --isolation isolated`). Otherwise a hook runs with the environment it
+always had, and resolving nothing allocates no ordinal. When the worktree's own `.env` (in
+the directory a compose job runs from) sets `COMPOSE_PROJECT_NAME`, that value is the one a
+hook gets.
+
 ### Env strategies
 
 | Strategy | Behavior |
@@ -363,8 +372,8 @@ Jobs are scoped per worktree at runtime: starting `docker` from worktree A runs 
 `cwd = A`; a separate process runs from worktree B. `wtm run down` only stops the current
 worktree's jobs unless you pass `--all`.
 
-Every job — and every `on_create` / `on_clean` hook — also runs with the worktree's own
-identity in its environment, so two worktrees running the same services never share a
+Every job — and every `on_create` / `on_clean` hook, under the condition given in
+[Project config](#project-config--configtoml) — also runs with the worktree's own identity in its environment, so two worktrees running the same services never share a
 resource:
 
 | Variable | Value |
@@ -374,7 +383,7 @@ resource:
 | `WTM_ORDINAL` | the worktree's stable number. The main checkout is always `0`; every other worktree gets the smallest number free, kept for its whole life and released when it is cleaned |
 | `WTM_PORT_OFFSET` | `WTM_ORDINAL` × the block (`port_offset_block`, 10 by default) — the main checkout keeps the project's default ports, and so does a verbatim worktree |
 | `WTM_ISOLATION` | `isolated` or `verbatim`, as chosen when the worktree was created |
-| `COMPOSE_PROJECT_NAME` | `<repo>-<WTM_WORKTREE>`, unless your own environment already defines it. The Docker daemon is machine-wide, so the repository qualifies the name: two clones both sitting on `main` do not share a stack. Not set for a verbatim worktree: its copied `.env` decides. The main checkout is named without its branch — its own `.env`'s value, else `<repo>` — so the shared services it hosts stay one stack whatever it has checked out |
+| `COMPOSE_PROJECT_NAME` | `<repo>-<WTM_WORKTREE>`, derived from the worktree itself — never from the shell the command is typed in, which may belong to another worktree. The Docker daemon is machine-wide, so the repository qualifies the name: two clones both sitting on `main` do not share a stack. Not set for a verbatim worktree: its copied `.env` decides. The main checkout is named without its branch — its own `.env`'s value, else `<repo>` — so the shared services it hosts stay one stack whatever it has checked out |
 
 `COMPOSE_PROJECT_NAME` is what keeps two worktrees' containers, networks and volumes
 apart — nothing to declare, it works as soon as your jobs use `docker compose`. It reaches

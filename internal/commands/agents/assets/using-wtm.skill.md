@@ -668,14 +668,17 @@ and **experimental**: the global `wtm init` does not configure it.
   `--default=false` hands the default over or takes it away. Same rules as above: a flag
   left out keeps the field, no flag opens the form, and `--yes` or no TTY means an error
   rather than a picker.
-- Every job — and every `on_create` / `on_clean` hook — runs with the worktree's identity
-  in its environment, so parallel worktrees do not fight over the same resources:
+- Every job runs with the worktree's identity in its environment (an `on_create` /
+  `on_clean` hook too, but **only** when run.toml declares a `docker compose` job **and**
+  the worktree recorded its isolation in meta.json — otherwise a hook's environment is
+  untouched, and a `COMPOSE_PROJECT_NAME` set in the worktree's own `.env` wins for hooks), so parallel worktrees do not fight over the same resources:
   `WTM_BRANCH` (the branch verbatim), `WTM_WORKTREE` (its slug, safe as a Docker project
   or network name), `WTM_ORDINAL` (`0` for the main checkout, then the smallest free
   number, stable for the worktree's life), `WTM_PORT_OFFSET` (`WTM_ORDINAL` times the
   `port_offset_block` of run.toml, 10 by default — **0 for a verbatim worktree**),
   `WTM_ISOLATION` (`isolated` or `verbatim`), and `COMPOSE_PROJECT_NAME`
-  (= `<repo>-<WTM_WORKTREE>`, left alone if the environment already sets it, and **not set
+  (= `<repo>-<WTM_WORKTREE>`, derived from the target worktree — the caller's environment is
+  never read — and **not set
   at all for a verbatim worktree**, whose copied `.env` or directory name decides).
   **The main checkout's name never follows its branch**: it is the `COMPOSE_PROJECT_NAME`
   of the main's own `.env` (the one in the directory its compose jobs run from), else the

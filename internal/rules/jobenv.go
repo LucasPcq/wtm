@@ -88,10 +88,33 @@ type MainComposeProjectNameParams struct {
 // and orphans the first. It is the name `docker compose` itself picks there when
 // the environment does not carry one.
 func MainComposeProjectName(params MainComposeProjectNameParams) string {
-	for _, lines := range params.EnvFiles {
+	if name := DeclaredComposeProject(params.EnvFiles); name != "" {
+		return name
+	}
+	return WorktreeSlug(params.Project)
+}
+
+// DeclaredComposeProject is the first COMPOSE_PROJECT_NAME the .env files set,
+// empty when none does.
+func DeclaredComposeProject(envFiles [][]domain.EnvLine) string {
+	for _, lines := range envFiles {
 		if line, found := envPairByKey(lines, domain.EnvComposeProjectName); found && line.Value != "" {
 			return line.Value
 		}
 	}
-	return WorktreeSlug(params.Project)
+	return ""
+}
+
+type RunEnvReachesHooksParams struct {
+	Config domain.RunConfig
+	// Recorded is the isolation meta.json holds, empty for a worktree created
+	// before the choice existed.
+	Recorded domain.Isolation
+}
+
+// RunEnvReachesHooks says whether a lifecycle hook runs with the worktree's run
+// variables. A worktree that never chose its isolation, or a project with no
+// compose stack to name, keeps the environment hooks always had.
+func RunEnvReachesHooks(params RunEnvReachesHooksParams) bool {
+	return params.Recorded != "" && len(ComposeProjectDirs(params.Config)) > 0
 }

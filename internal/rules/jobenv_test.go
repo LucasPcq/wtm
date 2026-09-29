@@ -233,3 +233,38 @@ func TestPurgeableMetaDir(t *testing.T) {
 		})
 	}
 }
+
+func TestRunEnvReachesHooks(t *testing.T) {
+	compose := domain.RunConfig{Jobs: []domain.JobConfig{{Name: "db", Cmd: "docker compose up -d"}}}
+	script := domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web", Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}}}}
+
+	cases := []struct {
+		name     string
+		params   RunEnvReachesHooksParams
+		expected bool
+	}{
+		{"isolated with a compose job", RunEnvReachesHooksParams{Config: compose, Recorded: domain.IsolationIsolated}, true},
+		{"verbatim with a compose job", RunEnvReachesHooksParams{Config: compose, Recorded: domain.IsolationVerbatim}, true},
+		{"never chose", RunEnvReachesHooksParams{Config: compose}, false},
+		{"no compose job", RunEnvReachesHooksParams{Config: script, Recorded: domain.IsolationIsolated}, false},
+		{"no run config", RunEnvReachesHooksParams{Recorded: domain.IsolationIsolated}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := RunEnvReachesHooks(tc.params); got != tc.expected {
+				t.Errorf("RunEnvReachesHooks = %v, want %v", got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestDeclaredComposeProjectIsEmptyWhenNoFileNamesOne(t *testing.T) {
+	files := [][]domain.EnvLine{ParseEnv("PORT=1\n"), ParseEnv("COMPOSE_PROJECT_NAME=\n")}
+	if got := DeclaredComposeProject(files); got != "" {
+		t.Errorf("DeclaredComposeProject = %q, want empty", got)
+	}
+	files = append(files, ParseEnv("COMPOSE_PROJECT_NAME=stack\n"))
+	if got := DeclaredComposeProject(files); got != "stack" {
+		t.Errorf("DeclaredComposeProject = %q, want %q", got, "stack")
+	}
+}
