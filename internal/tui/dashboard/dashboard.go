@@ -1292,16 +1292,7 @@ func (m Model) jobsLoader() func(bool) ([]domain.JobInfo, bool) {
 	if m.params.JobsLoader != nil {
 		return m.params.JobsLoader
 	}
-	return defaultJobsLoader
-}
-
-// A waking read always knows: it opens the daemon rather than asking whether
-// one happens to be listening.
-func defaultJobsLoader(wake bool) ([]domain.JobInfo, bool) {
-	if wake {
-		return runjobs.Load(), true
-	}
-	return runjobs.Peek()
+	return runjobs.Read
 }
 
 // applyJobs also reloads the detail on screen when the project's declared jobs
