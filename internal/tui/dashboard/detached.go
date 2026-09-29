@@ -34,9 +34,8 @@ func (w detachedWatcher) Sequence(params seam.SequenceParams) (runlogs.Outcomes,
 }
 
 // detachedSink turns the sequence's events into output-panel lines and into the
-// stage the held row shows beside its spinner. PhaseOutput, PhaseAborted and
-// PhaseProbed say nothing: a job's raw bytes belong to the logs view, and an
-// abort is already carried by the Outcome Sequence returns.
+// stage the held row shows beside its spinner. PhaseOutput says nothing: a job's
+// raw bytes belong to the logs view.
 type detachedSink struct {
 	send  func(tea.Msg)
 	id    int
@@ -79,6 +78,10 @@ func (s detachedSink) Emit(event runlogs.Event) {
 		s.emit(fmt.Sprintf(domain.RunDetachedFailedFmt, event.Job, event.Reason), event)
 	case runlogs.PhaseNotice:
 		s.emit(event.Notice, event)
+	default:
+		for _, line := range runEventLines(event) {
+			s.emit(line, event)
+		}
 	}
 }
 

@@ -200,19 +200,30 @@ type runPresenter struct {
 type downPresenter struct{ presenter }
 
 func (p downPresenter) Downed(outcome downflow.Outcome) error {
-	stopped := outcome.Stopped()
-	if outcome.NoDaemon || len(stopped) == 0 {
+	if outcome.NoDaemon || len(outcome.Stopped()) == 0 {
 		p.line(domain.RunNoJobsHere)
 		return nil
 	}
-	for _, result := range stopped {
-		if result.Status == domain.JobActionError {
-			p.line(fmt.Sprintf("%s: %s", result.Name, result.Message))
-			continue
-		}
-		p.line(fmt.Sprintf(rules.StoppedFmt(result.Status), result.Name))
-	}
+	p.stopLines(outcome.Results)
 	return nil
+}
+
+// stopLines names the worktree at the end of each line once there are several,
+// as the CLI does: two worktrees each stopping `web` otherwise read as one line
+// said twice.
+func (p presenter) stopLines(results []domain.WorktreeJobResults) {
+	for _, worktree := range results {
+		for _, result := range worktree.Jobs {
+			line := fmt.Sprintf(rules.StoppedFmt(result.Status), result.Name)
+			if result.Status == domain.JobActionError {
+				line = fmt.Sprintf(domain.RunStopFailedFmt, result.Name, result.Message)
+			}
+			if len(results) > 1 && worktree.Worktree != "" {
+				line = fmt.Sprintf(domain.RunStreamWorktreeFmt, line, worktree.Worktree)
+			}
+			p.line(line)
+		}
+	}
 }
 
 // stopPresenter reports a single job stopped. Like downPresenter it has no view
@@ -224,11 +235,7 @@ func (p stopPresenter) Stopped(outcome stopflow.Outcome) error {
 		p.line(domain.RunNoJobsHere)
 		return nil
 	}
-	for _, worktree := range outcome.Results {
-		for _, result := range worktree.Jobs {
-			p.line(fmt.Sprintf(rules.StoppedFmt(result.Status), result.Name))
-		}
-	}
+	p.stopLines(outcome.Results)
 	return nil
 }
 

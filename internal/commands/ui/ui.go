@@ -38,9 +38,10 @@ func NewCmd(params NewCmdParams) *cobra.Command {
 			"creates a worktree; right-click a row (or press `m`) to reparent, sync, or delete\n" +
 			"it; `a` opens the actions that run over several worktrees at once, syncing or\n" +
 			"reparenting a selection of them; `L` reads a job's logs in the detail panel.\n" +
-			"The list's local git state refreshes on a short poll; the detail panel reloads\n" +
-			"when the selection changes or an operation touches it, and pull requests load\n" +
-			"once — both refresh on demand with `r`.\n" +
+			fmt.Sprintf("The list's local git state is re-read every %d seconds, when the terminal\n", domain.DashboardGitPollSeconds) +
+			"regains focus and after each action; the detail panel reloads when the selection\n" +
+			"changes or an operation touches it, and pull requests load once. Nothing is\n" +
+			"fetched on its own: `r` fetches the remote and refreshes all of it.\n" +
 			"Press `?` for the key reference.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {

@@ -512,7 +512,8 @@ func TestTheLogsPanelHostsTheRunView(t *testing.T) {
 	}, "a")
 	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}})
 
-	model, _ = model.openLogsTabOn("web")
+	model, cmd := model.openLogsTabOn("web")
+	model = landPreview(t, model, cmd)
 	if !model.previewOn {
 		t.Fatal("the panel opened without a preview although a board was available")
 	}
@@ -595,7 +596,8 @@ func TestTheJobColumnLinesUpWithThePaneTitle(t *testing.T) {
 	}, "a")
 	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}, {Name: "worker"}})
 
-	model, _ = model.openLogsTabOn("web")
+	model, cmd := model.openLogsTabOn("web")
+	model = landPreview(t, model, cmd)
 	rows := strings.Split(stripANSI(strings.Join(model.logsBody(model.layout()), "\n")), "\n")
 
 	border, first := -1, -1
@@ -627,7 +629,11 @@ func TestThePreviewFollowsTheOutputPanelOpening(t *testing.T) {
 	}, "a")
 	model = declaringRunJobs(model, []domain.JobConfig{{Name: "web"}})
 
-	model, _ = model.openLogsTabOn("web")
+	model, cmd := model.openLogsTabOn("web")
+	model = landPreview(t, model, cmd)
+	if !model.previewOn {
+		t.Fatal("no preview to follow")
+	}
 	before := len(model.logsBody(model.layout()))
 
 	next, _ := model.Update(key(keyToggleOutput))

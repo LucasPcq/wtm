@@ -124,6 +124,9 @@ type jobsMsg struct {
 	jobs    []domain.JobInfo
 	running map[string]int
 	config  domain.RunConfig
+	// configErr is why run.toml could not be read: a project whose file is
+	// broken is not one without a run module, and the menus say which.
+	configErr error
 	// known is false when the daemon could not be asked while its index still
 	// holds jobs: what runs is then unknown, which is not the same answer as
 	// nothing running, and the counts already on screen are kept.
@@ -198,9 +201,10 @@ type Model struct {
 	// running counts the jobs the run daemon holds per worktree path; jobs is
 	// what those counts were derived from, and runConfig what the project
 	// declares — the detail panel needs all three.
-	running   map[string]int
-	jobs      []domain.JobInfo
-	runConfig domain.RunConfig
+	running      map[string]int
+	jobs         []domain.JobInfo
+	runConfig    domain.RunConfig
+	runConfigErr error
 	// addresses is where each worktree's declared jobs answer, keyed
 	// branch → job. It follows the poll, like jobs: an address is a property of
 	// the worktree's port offset, and two sources for it would diverge.
@@ -328,7 +332,7 @@ func Run(params RunParams) error {
 	model := New(params)
 	defer model.Close()
 
-	if _, err := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion()).Run(); err != nil {
+	if _, err := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithReportFocus()).Run(); err != nil {
 		return fmt.Errorf("dashboard: %w", err)
 	}
 	return nil
@@ -493,6 +497,10 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// every clock — a tail nobody refreshes is a screenshot.
 		return m, tea.Batch(m.loadJobsCmd(false), m.tailLogsCmd(), pollCmd())
 
+	case tea.FocusMsg:
+		next, cmd := m.refreshRows()
+		return next, tea.Batch(cmd, next.loadJobsCmd(false))
+
 	case gitPollMsg:
 		if m.loading {
 			return m, gitPollCmd()
@@ -528,6 +536,9 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case logsTailMsg:
 		return m.applyLogsTail(msg), nil
+
+	case previewBoardMsg:
+		return m.applyPreviewBoard(msg)
 
 	case openURLMsg:
 		if msg.err == nil {
@@ -782,6 +793,14 @@ func (m Model) rowCount() int {
 func (m Model) scrollOutput(delta int) Model {
 	m.outputOffset = max(m.outputOffset+delta, 0)
 	return m.reflow()
+}
+
+// refreshRows re-reads the rows' local git state, without fetching. The git clock is slow on purpose, so the
+// moments a stale row would show are the ones it is re-read on — the terminal
+// coming back into focus, and an action ending.
+func (m Model) refreshRows() (Model, tea.Cmd) {
+	m.loading = true
+	return m, tea.Batch(m.loadWorktreesCmd(false), m.treeCmd())
 }
 
 func (m Model) refresh() (Model, tea.Cmd) {
@@ -1202,8 +1221,8 @@ func (m Model) loadJobsCmd(wake bool) tea.Cmd {
 	load, stateDir := m.jobsLoader(), m.params.StateDir
 	return func() tea.Msg {
 		jobs, known := load(wake)
-		cfg, _ := runconfig.Load(stateDir)
-		return jobsMsg{jobs: jobs, running: rules.RunningJobsByWorktree(jobs), config: cfg, known: known}
+		cfg, err := runconfig.Load(stateDir)
+		return jobsMsg{jobs: jobs, running: rules.RunningJobsByWorktree(jobs), config: cfg, configErr: err, known: known}
 	}
 }
 
@@ -1290,7 +1309,7 @@ func defaultJobsLoader(wake bool) ([]domain.JobInfo, bool) {
 // its RUN section for the rest of the session.
 func (m Model) applyJobs(msg jobsMsg) (Model, tea.Cmd) {
 	changed := !rules.SameRunJobs(m.runConfig, msg.config)
-	m.runConfig = msg.config
+	m.runConfig, m.runConfigErr = msg.config, msg.configErr
 	// What the ordinals, the traces and the tree's per-node counts are derived
 	// from is the running set, counts included: a job stopping beside another
 	// still up moves no branch in or out, and the tree would carry the old count
