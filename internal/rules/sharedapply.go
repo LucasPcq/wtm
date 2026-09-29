@@ -3,6 +3,7 @@ package rules
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 )
@@ -50,6 +51,12 @@ type applyFileSharingParams struct {
 func applyFileSharing(params applyFileSharingParams) domain.RunConfig {
 	cfg := params.Config
 	fileJob := ComposeJobName(ComposeJobNameParams{Config: cfg, File: params.File})
+	composeCmd := params.Params.ComposeCmd
+	if job, found := jobByName(cfg, fileJob); found {
+		if invoked := composeInvocation(job, params.File); invoked != "" {
+			composeCmd = invoked
+		}
+	}
 
 	wanted := map[string]domain.SharedComposeService{}
 	for _, shared := range params.Params.Shared {
@@ -66,6 +73,12 @@ func applyFileSharing(params applyFileSharingParams) domain.RunConfig {
 	if !params.Params.Asked && len(wanted) == 0 {
 		return cfg
 	}
+
+	// Nothing was shared and nothing is: the file's job starts the whole file,
+	// however the config spells it, and a re-init has no reason to overrule it.
+	// Once something is lifted the job is normalised, since a hand-written one
+	// starting the lifted service would raise it twice.
+	untouched := len(wanted) == 0 && !sharesAny(sharesAnyParams{Config: cfg, File: params.File, Services: params.Params.Scans[params.File].Services})
 
 	// Withdrawn first: a service that stops being shared has to give its name
 	// back before the file's job is recomputed around what is left.
@@ -87,7 +100,7 @@ func applyFileSharing(params applyFileSharingParams) domain.RunConfig {
 			continue
 		}
 		cfg = upsertSharedJob(upsertSharedJobParams{
-			Config: cfg, Shared: shared, ComposeCmd: params.Params.ComposeCmd,
+			Config: cfg, Shared: shared, ComposeCmd: composeCmd,
 		})
 	}
 
@@ -97,11 +110,42 @@ func applyFileSharing(params applyFileSharingParams) domain.RunConfig {
 		Bindings: params.Params.Bindings[params.File],
 	})
 
+	if untouched {
+		return cfg
+	}
 	return rewriteFileJob(rewriteFileJobParams{
 		Config: cfg, File: params.File, Job: fileJob,
 		Services: params.Params.Scans[params.File].Services,
-		Shared:   wanted, ComposeCmd: params.Params.ComposeCmd,
+		Shared:   wanted, ComposeCmd: composeCmd,
 	})
+}
+
+// composeInvocation is how a job already calls compose on a file — `docker
+// compose`, `docker-compose`, a wrapper — empty when its cmd does not.
+func composeInvocation(job domain.JobConfig, file string) string {
+	before, _, found := strings.Cut(job.Cmd, " "+DockerComposeFileFlag(file))
+	if !found {
+		return ""
+	}
+	return strings.TrimSpace(before)
+}
+
+type sharesAnyParams struct {
+	Config   domain.RunConfig
+	File     string
+	Services []domain.ComposeService
+}
+
+// sharesAny says the config already runs one of a file's services as a shared
+// job of its own.
+func sharesAny(params sharesAnyParams) bool {
+	needle := DockerComposeFileFlag(params.File)
+	for _, service := range params.Services {
+		if job, found := jobByName(params.Config, service.Name); found && IsShared(job) && jobRunsComposeFile(job, needle) {
+			return true
+		}
+	}
+	return false
 }
 
 type upsertSharedJobParams struct {
