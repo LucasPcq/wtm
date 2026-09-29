@@ -337,14 +337,40 @@ type RequireEnvParams struct {
 }
 
 // RequireEnv refuses a start before anything is started when one of its
-// worktrees has no environment to give its jobs.
+// worktrees has no environment to give its jobs, or has yet to choose its
+// isolation. The choice is checked first: resolving the environment allocates
+// the ordinal the choice is about.
 func RequireEnv(params RequireEnvParams) error {
 	for _, dir := range params.WorkDirs {
+		if err := requireIsolationChosen(requireChosenParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, WorkDir: dir}); err != nil {
+			return err
+		}
 		if _, err := JobEnv(JobEnvParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, WorkDir: dir}); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+type requireChosenParams struct {
+	ProjectDir string
+	StateDir   string
+	WorkDir    string
+}
+
+func requireIsolationChosen(params requireChosenParams) error {
+	branch := target.BranchOf(params.WorkDir)
+	if branch == "" {
+		return nil
+	}
+	plan, err := worktree.IsolationAdoptionFor(worktree.IsolationAdoptionParams{
+		Ref:          worktree.WorktreeRef{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: branch},
+		WorktreePath: params.WorkDir,
+	})
+	if err != nil || !plan.Pending {
+		return nil
+	}
+	return fmt.Errorf("%w: %s", domain.ErrIsolationAdoptionPending, fmt.Sprintf(domain.RunIsolationAdoptionPendingFmt, branch, branch))
 }
 
 // dialProber is this side of the runlogs.Prober seam: the run says which ports

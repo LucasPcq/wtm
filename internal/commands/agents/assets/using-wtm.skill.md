@@ -473,6 +473,11 @@ and **experimental**: the global `wtm init` does not configure it.
   `run stop` then takes `--job` as given. `run up` and `run start` refuse it, and also
   refuse a worktree whose environment cannot be resolved (a detached HEAD, an unreadable
   `meta.json`), naming the cause: a job is never started on the main checkout's ports.
+  They also refuse a worktree created before the isolation choice (no `isolation` in its
+  `meta.json`) while run.toml declares something to isolate: its `.env` still holds its
+  source's ports. The message names both ways out — `wtm env <wt> --isolation isolated`
+  (own ports and compose project) or `--isolation verbatim` (keep the source's); ask the
+  user which one, then run the command again.
   `run url` / `run open` refuse such a worktree the same way.
 - `run up [worktree] --profile <name>` / `run down [worktree]` — start / stop a profile.
   On `run up` **`--profile` is repeatable**: `--profile front --profile back` starts the

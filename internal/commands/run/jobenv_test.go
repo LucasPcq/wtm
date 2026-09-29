@@ -1,6 +1,7 @@
 package run
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
+	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
 
 // startEnv is the environment the commands asked the daemon to start the named
@@ -50,6 +52,14 @@ func addWorktree(t *testing.T, projectDir, branch string) string {
 	cmd.Dir = projectDir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git worktree add: %s: %v", out, err)
+	}
+	// Created the way `wtm create` creates one: with its isolation chosen. A
+	// worktree without one is refused a start until it chooses.
+	if err := worktree.SetIsolation(worktree.SetIsolationParams{
+		Ref:       worktree.WorktreeRef{ProjectDir: projectDir, StateDir: filepath.Join(projectDir, ".git", "wtm"), Branch: branch},
+		Isolation: domain.IsolationIsolated,
+	}); err != nil {
+		t.Fatalf("record isolation: %v", err)
 	}
 	return path
 }
@@ -210,5 +220,37 @@ func TestRunUpSendsDeclaredPortsWithTheOffset(t *testing.T) {
 	assertEnv(t, daemon.startEnv(t, "web"), map[string]string{domain.EnvPortOffset: "10"})
 	if got := daemon.startedJob(t, "web").Ports["PORT"]; got != 3000 {
 		t.Errorf("the daemon was sent base %d, want the declared 3000", got)
+	}
+}
+
+// A worktree created before the isolation choice still runs on its source's
+// ports. Starting it isolated would move its jobs off them behind the user's
+// back, so the start is refused until the choice is made — and resolving
+// nothing allocates it no ordinal.
+func TestRunStartRefusesAWorktreeThatNeverChoseItsIsolation(t *testing.T) {
+	daemon := setupUpProject(t, &fakeDaemon{})
+	fakeTTY(t, false)
+	projectDir := os.Getenv("WTM_PROJECT_DIR")
+	path := filepath.Join(t.TempDir(), "feat-old")
+	cmd := exec.Command("git", "worktree", "add", "-q", "-b", "feat/old", path, "HEAD")
+	cmd.Dir = projectDir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git worktree add: %s: %v", out, err)
+	}
+
+	_, _, err := runCmd(t, domain.CmdStart, "feat/old", "--"+domain.FlagJob, "api", "--"+domain.FlagDetach)
+	if !errors.Is(err, domain.ErrIsolationAdoptionPending) {
+		t.Fatalf("error = %v, want the isolation choice asked for", err)
+	}
+	for _, want := range []string{"wtm env feat/old --isolation isolated", "verbatim"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("message %q does not name %q", err, want)
+		}
+	}
+	if started := daemon.startedJobs(); len(started) != 0 {
+		t.Errorf("started %v", started)
+	}
+	if _, err := os.Stat(rules.WorktreeMetaDir(os.Getenv("WTM_STATE_DIR"), "feat/old")); !os.IsNotExist(err) {
+		t.Errorf("metadata written for the refused worktree (%v): an ordinal was allocated", err)
 	}
 }

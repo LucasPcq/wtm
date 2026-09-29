@@ -24,6 +24,9 @@ func setupTestProject(t *testing.T) string {
 	stateDir := filepath.Join(dir, ".git", "wtm")
 	t.Setenv("WTM_PROJECT_DIR", dir)
 	t.Setenv("WTM_STATE_DIR", stateDir)
+	// Standing in the project, not in whatever checkout runs the suite: a run
+	// command resolves its worktree from the current directory.
+	t.Chdir(dir)
 
 	if err := config.WriteProject(config.WriteProjectParams{
 		StateDir: stateDir,

@@ -2898,6 +2898,9 @@ const (
 	// EnvIsolationNotAdoptedFmt is what `wtm env` says of the run values it left
 	// alone on such a worktree, and how to adopt isolation later.
 	EnvIsolationNotAdoptedFmt = "%s predates isolation: its ports and compose project were left as they are — adopt it with `wtm env %s --isolation isolated`"
+	// RunIsolationAdoptionPendingFmt is `run up` / `run start` refusing such a
+	// worktree: both ways out are named, since keeping its source's values is one.
+	RunIsolationAdoptionPendingFmt = "%s predates isolation: its .env still holds its source's ports — choose with `wtm env %s --isolation isolated` (own ports and compose project) or `--isolation verbatim` (keep the source's), then run it again"
 
 	// RecapField* are the aligned labels of the create recap body.
 	RecapFieldBranch       = "Branch:  "
