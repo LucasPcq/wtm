@@ -195,15 +195,15 @@ func TestMainComposeProjectName(t *testing.T) {
 		envFiles [][]domain.EnvLine
 		want     string
 	}{
-		{"sans .env, le dépôt seul", nil, "kresus-v1"},
-		{".env sans le nom", [][]domain.EnvLine{pairs("DB_PORT=5432")}, "kresus-v1"},
-		{"le .env nomme le projet", [][]domain.EnvLine{pairs("COMPOSE_PROJECT_NAME=kresus")}, "kresus"},
+		{"sans .env, le dépôt seul", nil, "my-app"},
+		{".env sans le nom", [][]domain.EnvLine{pairs("DB_PORT=5432")}, "my-app"},
+		{"le .env nomme le projet", [][]domain.EnvLine{pairs("COMPOSE_PROJECT_NAME=stack")}, "stack"},
 		{"valeur vide ignorée", [][]domain.EnvLine{pairs("COMPOSE_PROJECT_NAME="), pairs("COMPOSE_PROJECT_NAME=infra")}, "infra"},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := MainComposeProjectName(MainComposeProjectNameParams{Project: "Kresus-V1", EnvFiles: c.envFiles})
+			got := MainComposeProjectName(MainComposeProjectNameParams{Project: "My-App", EnvFiles: c.envFiles})
 			if got != c.want {
 				t.Errorf("MainComposeProjectName = %q, want %q", got, c.want)
 			}

@@ -48,10 +48,10 @@ func TestBranchEnvReadsTheMainComposeProjectFromItsEnvFile(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(repo.dir, "infra"), 0o755); err != nil {
 		t.Fatalf("mkdir infra: %v", err)
 	}
-	writeEnv(t, filepath.Join(repo.dir, "infra"), "COMPOSE_PROJECT_NAME=kresus\n")
+	writeEnv(t, filepath.Join(repo.dir, "infra"), "COMPOSE_PROJECT_NAME=stack\n")
 
-	if got := branchEnv(t, repo, "main")[domain.EnvComposeProjectName]; got != "kresus" {
-		t.Errorf("%s = %q, want %q", domain.EnvComposeProjectName, got, "kresus")
+	if got := branchEnv(t, repo, "main")[domain.EnvComposeProjectName]; got != "stack" {
+		t.Errorf("%s = %q, want %q", domain.EnvComposeProjectName, got, "stack")
 	}
 }
 
