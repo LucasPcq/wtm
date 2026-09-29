@@ -78,11 +78,13 @@ func runImport(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf(domain.ImportNeedsYesFmt, domain.FlagYes)
 	}
 
+	// Declining is the module's one abort: the `=` register, and the exit every
+	// other backed-out run command gives.
 	if !confirmImport(confirmImportParams{Interactive: interactive, Incoming: incoming}) {
 		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-			output.Message(w, domain.ImportDeclined)
+			output.Unchanged(w, domain.ImportDeclined)
 		})
-		return nil
+		return domain.ErrAborted
 	}
 
 	if err := config.WriteRun(config.WriteRunParams{
