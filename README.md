@@ -374,7 +374,7 @@ default = true
 
 Jobs are scoped per worktree at runtime: starting `docker` from worktree A runs it with
 `cwd = A`; a separate process runs from worktree B. `wtm run down` only stops the current
-worktree's jobs unless you pass `--all`.
+worktree's jobs unless you pass `--all`, which stops every worktree of this repository — never another one.
 
 Every job — and every `on_create` / `on_clean` hook, under the condition given in
 [Project config](#project-config--configtoml) — also runs with the worktree's own identity in its environment, so two worktrees running the same services never share a

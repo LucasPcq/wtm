@@ -135,6 +135,18 @@ func (d *fakeDaemon) serve(conn net.Conn) {
 		_ = encoder.Encode(process.Response{Status: process.StatusOK, Jobs: jobs})
 		return
 	}
+	if req.Action == process.ActionStopAll {
+		d.mu.Lock()
+		var stopped []domain.JobInfo
+		for _, job := range d.Jobs {
+			if req.WorkDir == "" || job.WorkDir == req.WorkDir {
+				stopped = append(stopped, job)
+			}
+		}
+		d.mu.Unlock()
+		_ = encoder.Encode(process.Response{Status: process.StatusOK, Jobs: stopped})
+		return
+	}
 	if req.Action == process.ActionStop {
 		if message, refused := d.StopErrors[req.Name]; refused {
 			_ = encoder.Encode(process.Response{Status: process.StatusError, Message: message})

@@ -2,6 +2,7 @@ package rules
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -273,4 +274,29 @@ func JobUpIn(params JobUpInParams) bool {
 		}
 	}
 	return false
+}
+
+type WorkDirsWithJobsUpParams struct {
+	Jobs   []domain.JobInfo
+	Within []string
+}
+
+// WorkDirsWithJobsUp names, once each and in the daemon's order, the work dirs
+// among Within that hold a job up.
+func WorkDirsWithJobsUp(params WorkDirsWithJobsUpParams) []string {
+	within := make(map[string]bool, len(params.Within))
+	for _, dir := range params.Within {
+		within[filepath.Clean(dir)] = true
+	}
+	seen := map[string]bool{}
+	var dirs []string
+	for _, job := range params.Jobs {
+		dir := filepath.Clean(job.WorkDir)
+		if !IsJobUp(job.Status) || !within[dir] || seen[dir] {
+			continue
+		}
+		seen[dir] = true
+		dirs = append(dirs, job.WorkDir)
+	}
+	return dirs
 }

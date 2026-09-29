@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -156,5 +157,50 @@ func TestRunDownNamesTheWorktreeItEmptied(t *testing.T) {
 	}
 	if !strings.Contains(body, "api") {
 		t.Errorf("run down does not name the jobs it stopped:\n%s", body)
+	}
+}
+
+// The daemon is machine-wide: --all empties every worktree of this repository,
+// one by one, and never reaches into another one.
+func TestRunDownAllStaysInThisRepository(t *testing.T) {
+	daemon := setupStartProject(t, &fakeDaemon{})
+	stateDir := os.Getenv("WTM_STATE_DIR")
+	main := gitToplevel(t, projectDirOf(stateDir))
+	linked := gitToplevel(t, addWorktree(t, main, "feat/all"))
+	daemon.setJobs([]domain.JobInfo{
+		{Name: "api", Status: domain.JobStatusRunning, WorkDir: main},
+		{Name: "api", Status: domain.JobStatusDetached, WorkDir: linked},
+		{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/some/other/repo"},
+	})
+	fakeTTY(t, false)
+
+	stdout, _, err := runCmd(t, domain.CmdDown, "--"+domain.FlagAll, "--output", domain.OutputJSON)
+	if err != nil {
+		t.Fatalf("run down --all: %v", err)
+	}
+
+	daemon.mu.Lock()
+	var emptied []string
+	for _, req := range daemon.requests {
+		if req.Action == process.ActionStopAll {
+			emptied = append(emptied, req.WorkDir)
+		}
+	}
+	daemon.mu.Unlock()
+	if len(emptied) != 2 || emptied[0] == "" || emptied[1] == "" {
+		t.Fatalf("stop_all sent for %q, want this repository's two worktrees by name", emptied)
+	}
+	for _, dir := range emptied {
+		if dir == "/some/other/repo" {
+			t.Errorf("run down --all reached another repository")
+		}
+	}
+
+	var results []domain.WorktreeJobResults
+	if err := json.Unmarshal([]byte(stdout), &results); err != nil {
+		t.Fatalf("parse JSON: %v\noutput: %s", err, stdout)
+	}
+	if len(results) != 2 {
+		t.Errorf("results = %+v, want one per worktree emptied", results)
 	}
 }

@@ -478,6 +478,9 @@ and **experimental**: the global `wtm init` does not configure it.
   On `run up` **`--profile` is repeatable**: `--profile front --profile back` starts the
   union of both, in the order given, and a job several of them list starts once.
   `run down --profile` still takes one.
+  `run down --all` stops the jobs of **every worktree of the current repository** — never
+  another repository's, though the daemon is shared — without a prompt, and its JSON
+  holds one document per worktree it emptied.
   `run start [worktree] --job <name>` / `run stop [worktree] --job <name>` — one job.
   `--job` is **required** on `start`/`stop` on your paths: without a terminal there is no
   picker to fall back on, and the command errors naming the flag. A failing job aborts the rest and exits non-zero, leaving started
