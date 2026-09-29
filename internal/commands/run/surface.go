@@ -47,14 +47,15 @@ func openRunView(params viewParams) (runlogs.Outcomes, error) {
 	out := params.Cmd.OutOrStdout()
 	rest := &detachedRun{params: params}
 	result, err := runview.Run(runview.Params{
-		Board:     params.Board,
-		Job:       params.Job,
-		Profile:   params.Profile,
-		Worktrees: params.Worktrees,
-		Warnings:  params.Warnings,
-		Start:     params.Start,
-		Open:      integration.OpenURL,
-		Detach:    runview.Detach{Notice: rest.open, Sink: rest, Await: true},
+		Board:      params.Board,
+		Job:        params.Job,
+		Profile:    params.Profile,
+		Worktrees:  params.Worktrees,
+		Warnings:   params.Warnings,
+		Start:      params.Start,
+		Open:       integration.OpenURL,
+		Hyperlinks: true,
+		Detach:     runview.Detach{Notice: rest.open, Sink: rest, Await: true},
 	})
 	if err != nil {
 		return nil, err

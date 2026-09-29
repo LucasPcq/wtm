@@ -68,7 +68,11 @@ func (m Model) addressLines() []string {
 	worktrees := m.reachWorktrees(reachWorktreesParams{Keep: func(view runlogs.JobView) bool {
 		return started[viewKey(view)]
 	}})
-	return reachSectionLines(reachSectionLinesParams{Sections: rules.ReachBlock(rules.ReachBlockParams{Worktrees: worktrees})})
+	lines := reachSectionLines(reachSectionLinesParams{Sections: rules.ReachBlock(rules.ReachBlockParams{Worktrees: worktrees})})
+	for index, line := range lines {
+		lines[index] = m.link(line)
+	}
+	return lines
 }
 
 func crashedNames(exits []domain.JobExit) []string {

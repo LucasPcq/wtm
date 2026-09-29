@@ -8,6 +8,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/tui/components"
 )
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -69,6 +70,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if m.focused || m.filtering {
 		return m, nil
+	}
+	if isClick(msg) {
+		return m, m.openAt(msg)
 	}
 
 	up, ok := wheelDirection(msg)
@@ -160,6 +164,27 @@ func (m Model) focus() (tea.Model, tea.Cmd) {
 // coming.
 func (m Model) openSelectedURL() tea.Cmd {
 	url := m.sequence.urls[m.selected]
+	if view, found := m.selectedView(); url == "" && found {
+		url = view.Address.URL
+	}
+	return m.openURL(url)
+}
+
+func isClick(msg tea.MouseMsg) bool {
+	return msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionRelease
+}
+
+// openAt opens the address under a click. The view holds the mouse, so a click
+// on an address is the view's to act on: the terminal never sees it.
+func (m Model) openAt(msg tea.MouseMsg) tea.Cmd {
+	url, found := components.URLAt(components.URLAtParams{View: m.View(), X: msg.X, Y: msg.Y})
+	if !found {
+		return nil
+	}
+	return m.openURL(url)
+}
+
+func (m Model) openURL(url string) tea.Cmd {
 	if url == "" || m.open == nil {
 		return nil
 	}

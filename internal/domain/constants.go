@@ -2359,6 +2359,12 @@ const (
 	// HyperlinkFmt wraps text in an OSC-8 sequence, the escape a terminal turns
 	// into a clickable link: URL first, then the text it stands behind.
 	HyperlinkFmt = "\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\"
+	// HyperlinkOpen starts an OSC-8 sequence: text already carrying one is left
+	// as it is rather than nested.
+	HyperlinkOpen = "\x1b]8;"
+	// URLPattern finds an address in text a person reads. It stops at a space,
+	// an escape and an ellipsis: a truncated address is not one to follow.
+	URLPattern = `https?://[^\s\x1b\x{2026}]+`
 
 	// RunViewOpenFailedFmt reports a browser that never opened, so `o` does not
 	// read as a key that does nothing.

@@ -177,10 +177,7 @@ func (p *RunPrinter) jobLine(params jobLineParams) string {
 	line := p.qualify(params.Label, event.Worktree)
 	entry := reachEntryOf(event)
 	if summary := rules.ReachSummary(entry); summary != "" {
-		if len(entry.URLs) == 1 {
-			summary = Hyperlink(HyperlinkParams{Text: summary, URL: summary, Enabled: p.hyperlinks})
-		}
-		line += domain.ReachDetailSep + summary
+		line += domain.ReachDetailSep + p.link(summary)
 	}
 	if event.Namespace != "" {
 		line += domain.ReachDetailSep + fmt.Sprintf(domain.RunStreamNamespaceReadyFmt, event.Namespace)
@@ -276,6 +273,22 @@ func (p *RunPrinter) ready(outcome runlogs.Outcome) {
 	}
 }
 
+// link makes the addresses in text clickable, on a terminal only.
+func (p *RunPrinter) link(text string) string {
+	if !p.hyperlinks {
+		return text
+	}
+	return rules.LinkURLs(text)
+}
+
+func (p *RunPrinter) linkAll(lines []string) []string {
+	linked := make([]string, len(lines))
+	for i, line := range lines {
+		linked[i] = p.link(line)
+	}
+	return linked
+}
+
 // Conclude is the one place the run says where everything is reached: the
 // block, then a line for each worktree whose .env is out of step with it, then
 // what to do next. It follows every worktree's sequence, so a run over several
@@ -290,7 +303,7 @@ func (p *RunPrinter) Conclude(warnings []string) {
 	}
 	for _, section := range rules.ReachBlock(rules.ReachBlockParams{Worktrees: worktrees}) {
 		Blank(p.out)
-		Section(p.out, section.Title, section.Lines)
+		Section(p.out, section.Title, p.linkAll(section.Lines))
 	}
 	if len(warnings) > 0 {
 		Blank(p.out)

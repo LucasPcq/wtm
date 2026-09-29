@@ -1027,6 +1027,12 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return model, cmd
 	}
 
+	// Last, for the addresses no zone declares — a preview's title, a line the
+	// output panel keeps: any address drawn is one the reader expects to follow.
+	if url, found := components.URLAt(components.URLAtParams{View: m.View(), X: msg.X, Y: msg.Y}); found {
+		return m.openJobURL(url)
+	}
+
 	if model, hit := m.clickRow(msg); hit {
 		return model, nil
 	}

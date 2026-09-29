@@ -283,7 +283,7 @@ func (m Model) renderPaneTitle(params paneTitleParams) string {
 	if params.View.SharedIn != "" {
 		name = params.View.Name
 	}
-	left := styles.Bold.Render(name) + styles.Muted.Render(domain.RunViewSeparator+status)
+	left := styles.Bold.Render(name) + styles.Muted.Render(domain.RunViewSeparator+m.link(status))
 	return spread(spreadParams{Left: left, Right: styles.Muted.Render(m.paneOrigin(params.View)), Width: params.Width})
 }
 
@@ -411,10 +411,19 @@ func (m Model) reachBody(width int) []string {
 	lines := reachSectionLines(reachSectionLinesParams{Sections: sections, Untitled: domain.ReachTitle})
 	for index, line := range lines {
 		if line != "" {
-			lines[index] = pad + line
+			lines[index] = pad + m.link(line)
 		}
 	}
 	return lines
+}
+
+// link makes the addresses in text clickable with the terminal's own gesture.
+// A plain click reaches the view instead, which opens the address itself.
+func (m Model) link(text string) string {
+	if !m.hyperlinks {
+		return text
+	}
+	return rules.LinkURLs(text)
 }
 
 // paneOrigin says what the pane is showing: the job as it prints, the log file

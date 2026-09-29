@@ -57,7 +57,7 @@ func runPs(cmd *cobra.Command, _ []string) error {
 
 	out := cmd.OutOrStdout()
 	output.Frame(out, func(w io.Writer) {
-		fmt.Fprint(w, output.FormatRunningJobs(output.FormatRunningJobsParams{Jobs: jobs, Now: time.Now(), Branches: branchesOf(jobs)}))
+		fmt.Fprint(w, output.FormatRunningJobs(output.FormatRunningJobsParams{Jobs: jobs, Now: time.Now(), Branches: branchesOf(jobs), Hyperlinks: output.IsTerminal(out)}))
 	})
 	return nil
 }
