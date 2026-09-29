@@ -7,9 +7,9 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
-// kresusLike is the shape the step was written for: shared databases named
+// sharedDatabasesConfig is the shape the step was written for: shared databases named
 // after the app they serve, and tasks named after the same app.
-func kresusLike() domain.RunConfig {
+func sharedDatabasesConfig() domain.RunConfig {
 	shared := func(name string) domain.JobConfig {
 		return domain.JobConfig{Name: name, Kind: domain.JobKindService, Cmd: "docker compose up -d " + name, Scope: domain.JobScopeShared}
 	}
@@ -24,7 +24,7 @@ func kresusLike() domain.RunConfig {
 }
 
 func TestTouchChoicesProposeWhatTheNameSays(t *testing.T) {
-	choices := TouchChoices(TouchChoicesParams{Config: kresusLike()})
+	choices := TouchChoices(TouchChoicesParams{Config: sharedDatabasesConfig()})
 
 	got := map[string][]string{}
 	for _, choice := range choices {
@@ -50,7 +50,7 @@ func TestTouchChoicesProposeWhatTheNameSays(t *testing.T) {
 
 // What run.toml already says outranks what the name proposes.
 func TestTouchChoicesKeepWhatTheConfigSays(t *testing.T) {
-	cfg := kresusLike()
+	cfg := sharedDatabasesConfig()
 	cfg.Jobs[5].Touches = []string{"keycloak", "postgres-pay"}
 	for _, choice := range TouchChoices(TouchChoicesParams{Config: cfg, Existing: cfg}) {
 		if choice.Job == "orm:pay:reset" && !slices.Equal(choice.Touches, []string{"keycloak", "postgres-pay"}) {
@@ -78,7 +78,7 @@ func TestProposedTouchesStaysSilentWhenAmbiguous(t *testing.T) {
 }
 
 func TestApplyTouchChoices(t *testing.T) {
-	cfg := kresusLike()
+	cfg := sharedDatabasesConfig()
 	cfg.Jobs[4].Touches = []string{"keycloak"}
 	cfg.Jobs[6].Touches = []string{"postgres-purchase"}
 	out := ApplyTouchChoices(ApplyTouchChoicesParams{Config: cfg, Choices: []domain.JobTouchChoice{

@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -177,6 +178,36 @@ func TestWorktreeJobEnvQualifiesTheComposeProject(t *testing.T) {
 	env = WorktreeJobEnv(WorktreeJobEnvParams{Branch: "main", Project: "myproject", ComposeProject: "perso"})
 	if got := env[domain.EnvComposeProjectName]; got != "perso" {
 		t.Errorf("%s = %q, want %q", domain.EnvComposeProjectName, got, "perso")
+	}
+}
+
+func TestMainComposeProjectName(t *testing.T) {
+	pairs := func(entries ...string) []domain.EnvLine {
+		lines := make([]domain.EnvLine, 0, len(entries))
+		for _, entry := range entries {
+			key, value, _ := strings.Cut(entry, "=")
+			lines = append(lines, domain.EnvLine{Kind: domain.EnvLinePair, Key: key, Value: value})
+		}
+		return lines
+	}
+	cases := []struct {
+		name     string
+		envFiles [][]domain.EnvLine
+		want     string
+	}{
+		{"sans .env, le dépôt seul", nil, "my-app"},
+		{".env sans le nom", [][]domain.EnvLine{pairs("DB_PORT=5432")}, "my-app"},
+		{"le .env nomme le projet", [][]domain.EnvLine{pairs("COMPOSE_PROJECT_NAME=stack")}, "stack"},
+		{"valeur vide ignorée", [][]domain.EnvLine{pairs("COMPOSE_PROJECT_NAME="), pairs("COMPOSE_PROJECT_NAME=infra")}, "infra"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := MainComposeProjectName(MainComposeProjectNameParams{Project: "My-App", EnvFiles: c.envFiles})
+			if got != c.want {
+				t.Errorf("MainComposeProjectName = %q, want %q", got, c.want)
+			}
+		})
 	}
 }
 

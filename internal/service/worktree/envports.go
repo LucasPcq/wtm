@@ -50,18 +50,10 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 		return envsvc.EnvPortsParams{}, nil
 	}
 
-	// Resolved from the branch and the repository alone: this value is written to
-	// a file, so it must not inherit the COMPOSE_PROJECT_NAME the calling process
-	// happens to carry — a `wtm env` run from inside another worktree, or from a
-	// job, would stamp that worktree's name into this one's .env.
-	owned := rules.OwnedEnvWrites(rules.OwnedEnvWritesParams{
-		Config:   cfg,
-		EnvFiles: params.EnvFiles,
-		Values: map[string]string{domain.EnvComposeProjectName: rules.ComposeProjectName(rules.ComposeProjectNameParams{
-			Project:  filepath.Base(params.ProjectDir),
-			Worktree: rules.WorktreeSlug(params.Branch),
-		})},
-	})
+	owned, err := ownedEnvWrites(ownedEnvWritesParams{Resolve: params, Config: cfg})
+	if err != nil {
+		return envsvc.EnvPortsParams{}, err
+	}
 
 	// The identity needs neither an ordinal nor an offset, so a project with no
 	// link resolves without asking git anything — EnsureOrdinal writes, and this
@@ -139,6 +131,42 @@ func EnvPortPlanFor(params ResolveEnvPortsParams) (domain.EnvPortPlan, error) {
 		return domain.EnvPortPlan{}, err
 	}
 	return envsvc.ComputeEnvPorts(resolved)
+}
+
+type ownedEnvWritesParams struct {
+	Resolve ResolveEnvPortsParams
+	Config  domain.RunConfig
+}
+
+// ownedEnvWrites resolves the compose project name from the branch and the
+// repository alone: this value is written to a file, so it must not inherit the
+// COMPOSE_PROJECT_NAME the calling process happens to carry — a `wtm env` run
+// from inside another worktree, or from a job, would stamp that worktree's name
+// into this one's .env. The main checkout gets the name its jobs run under,
+// which never follows its branch.
+func ownedEnvWrites(params ownedEnvWritesParams) ([]domain.EnvOwnedEntry, error) {
+	targets := rules.OwnedEnvTargets(rules.OwnedEnvTargetsParams{Config: params.Config, EnvFiles: params.Resolve.EnvFiles})
+	if len(targets) == 0 {
+		return nil, nil
+	}
+
+	isMain, err := isMainBranch(WorktreeRef{ProjectDir: params.Resolve.ProjectDir, Branch: params.Resolve.Branch})
+	if err != nil {
+		return nil, err
+	}
+	name := rules.ComposeProjectName(rules.ComposeProjectNameParams{
+		Project:  filepath.Base(params.Resolve.ProjectDir),
+		Worktree: rules.WorktreeSlug(params.Resolve.Branch),
+	})
+	if isMain {
+		name = mainComposeProject(mainComposeProjectParams{ProjectDir: params.Resolve.ProjectDir, Config: params.Config})
+	}
+
+	return rules.OwnedEnvWrites(rules.OwnedEnvWritesParams{
+		Config:   params.Config,
+		EnvFiles: params.Resolve.EnvFiles,
+		Values:   map[string]string{domain.EnvComposeProjectName: name},
+	}), nil
 }
 
 func jobsByName(cfg domain.RunConfig) map[string]domain.JobConfig {

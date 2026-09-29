@@ -660,6 +660,10 @@ and **experimental**: the global `wtm init` does not configure it.
   `WTM_ISOLATION` (`isolated` or `verbatim`), and `COMPOSE_PROJECT_NAME`
   (= `<repo>-<WTM_WORKTREE>`, left alone if the environment already sets it, and **not set
   at all for a verbatim worktree**, whose copied `.env` or directory name decides).
+  **The main checkout's name never follows its branch**: it is the `COMPOSE_PROJECT_NAME`
+  of the main's own `.env` (the one in the directory its compose jobs run from), else the
+  repository's slug alone — the shell's environment is ignored there. That is where
+  `scope = "shared"` services run, so switching the main's branch keeps the same stack.
   `COMPOSE_PROJECT_NAME` is **also written into the `.env` of the directory each compose
   job runs from** of an isolated worktree, at `create` and at `wtm env`, because compose interpolates that file:
   a `docker compose up` typed by hand in a worktree therefore gets its own project, its own
