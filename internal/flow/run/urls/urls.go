@@ -5,7 +5,6 @@ package urls
 
 import (
 	"path/filepath"
-	"strconv"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
@@ -48,19 +47,17 @@ func (r Reader) In(dir string) ([]domain.JobURLEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	offset, _ := strconv.Atoi(env[domain.EnvPortOffset])
-	project := filepath.Base(r.ctx.ProjectDir)
-	proxyPort := r.proxyPort
+	addresses := rules.WorktreeJobAddresses(rules.WorktreeJobAddressesParams{
+		Config:     r.config,
+		PortOffset: rules.PortOffsetFromEnv(env),
+		Worktree:   env[domain.EnvWorktree],
+		Project:    filepath.Base(r.ctx.ProjectDir),
+		PublicPort: r.proxyPort,
+	})
 
 	var entries []domain.JobURLEntry
 	for _, job := range r.config.Jobs {
-		ports := rules.JobPorts(rules.JobPortsParams{Ports: job.Ports, PortOffset: offset})
-		url := rules.JobURL(rules.JobURLParams{
-			Job:        job,
-			Ports:      ports,
-			Host:       rules.RouteHost(rules.RouteHostParams{Job: job, Worktree: env[domain.EnvWorktree], Project: project}),
-			PublicPort: proxyPort,
-		})
+		url := addresses[job.Name].URL
 		if url == "" {
 			continue
 		}
