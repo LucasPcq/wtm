@@ -84,6 +84,10 @@ var (
 	// source every other .env is copied from, so there is nothing for it to copy.
 	ErrIsolationMain = errors.New("the main checkout is always isolated: it is the one the others copy from")
 
+	// ErrEnvIsolationWithCheck refuses to record a choice on a run that promised
+	// to write nothing.
+	ErrEnvIsolationWithCheck = errors.New("--isolation records a choice for the worktree, and --check writes nothing: pass one or the other")
+
 	// ErrGHNotInstalled is returned when the gh CLI is not found on PATH.
 	ErrGHNotInstalled = errors.New("gh CLI not found — install it from https://cli.github.com")
 

@@ -965,11 +965,14 @@ const (
 	EnvFileSourceFmt   = "strategy: %s  ·  source: %s"
 	EnvFieldWorktree   = "Worktree"
 	EnvFieldMode       = "Mode"
+	EnvFieldIsolation  = "Isolation"
 	EnvModeCheckSuffix = "  ·  read-only check"
 	// The two ways to apply on the `wtm env` recap. The second exists so the
-	// port pass is proposed, as `wtm create` proposes it, and never imposed.
-	EnvApplyActionLabel       = "Yes, apply"
-	EnvApplyWithoutPortsLabel = "Apply, but leave the port values alone"
+	// port pass is proposed, as `wtm create` proposes it, and never imposed —
+	// and declining it records the worktree verbatim, since a .env left on its
+	// source's ports is only coherent with jobs run on them too.
+	EnvApplyActionLabel   = "Yes, apply"
+	EnvApplyVerbatimLabel = "Apply, and keep this worktree's .env verbatim from now on"
 	// EnvPortsLeftAloneFmt is the pass the user declined.
 	EnvPortsLeftAloneFmt = "Env ports left alone — %d linked value(s) left as they were"
 	// EnvPortsWouldShiftFmt is what a --check preview says instead of listing

@@ -11,6 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/envports"
 	"github.com/LucasPcq/wtm/internal/service/runconfig"
+	"github.com/LucasPcq/wtm/internal/service/worktree"
 	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
@@ -120,6 +121,31 @@ func TestSwitchToNamesSettlesTheWorktreesButNotMain(t *testing.T) {
 	}
 	if len(presenter.outcomes) != 1 {
 		t.Errorf("concluded %d time(s), want once", len(presenter.outcomes))
+	}
+}
+
+// A verbatim worktree keeps the .env it was copied with, whichever way the
+// project spells its addresses: the switch does not count it, nor write it.
+func TestSwitchLeavesAVerbatimWorktreeAsCopied(t *testing.T) {
+	r := newRepo(t, portsConfig, portsEnv)
+	feature := r.withFeature(t)
+	if err := worktree.SetIsolation(worktree.SetIsolationParams{
+		Ref:       worktree.WorktreeRef{ProjectDir: r.dir, StateDir: r.stateDir, Branch: "feature"},
+		Isolation: domain.IsolationVerbatim,
+	}); err != nil {
+		t.Fatalf("SetIsolation: %v", err)
+	}
+	params, _ := r.switchParams(SwitchRequest{Mode: domain.AddressingNames}, flow.Unattended{})
+
+	outcome, err := Switch(params)
+	if err != nil {
+		t.Fatalf("Switch: %v", err)
+	}
+	if body := readFile(t, filepath.Join(feature, ".env")); body != portsEnv {
+		t.Errorf("feature .env = %q, want it as copied", body)
+	}
+	if len(outcome.Settled) != 0 || len(outcome.Pending) != 0 {
+		t.Errorf("outcome = %+v, want the verbatim worktree neither settled nor pending", outcome)
 	}
 }
 

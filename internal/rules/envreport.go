@@ -16,11 +16,17 @@ func EnvReportFields(result domain.EnvSyncResult) []domain.RecapField {
 		mode += domain.EnvModeCheckSuffix
 	}
 
-	fields := make([]domain.RecapField, 0, 2)
+	fields := make([]domain.RecapField, 0, 3)
 	if result.Branch != "" {
 		fields = append(fields, domain.RecapField{Label: domain.EnvFieldWorktree, Value: result.Branch})
 	}
-	return append(fields, domain.RecapField{Label: domain.EnvFieldMode, Value: mode})
+	fields = append(fields, domain.RecapField{Label: domain.EnvFieldMode, Value: mode})
+	// Only the exception is named: it is what explains a report in which no
+	// port, identity or slice was touched.
+	if IsVerbatim(result.Isolation) {
+		fields = append(fields, domain.RecapField{Label: domain.EnvFieldIsolation, Value: IsolationSummary(result.Isolation)})
+	}
+	return fields
 }
 
 type EnvKeyRowsParams struct {
