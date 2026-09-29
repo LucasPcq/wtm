@@ -227,9 +227,10 @@ flagged; everything else is what the name implies.
   `{branch,mode,check,files:[{target,strategy,source,applied,parent_branch,parent_fallback,diff:{mode,
   entries:[{key,status,current_value,resolved_value,placeholder,source,export}]}}],ports:{offset,
   applied,entries:[{file,key,port,base,resolved,status,current_value,new_value}]},isolation,
-  isolation_adoption,warnings}` where
+  isolation_adoption,isolation_changed,restored:[{file,key,from,to,removed}],warnings}` where
   `status` is `resolved` / `missing_unresolved` / `conflict` / `orphan`. Round-trip is
-  preserved: comments, ordering and formatting of the `.env` are kept; only decided keys change.
+  preserved: comments, ordering and formatting of the `.env` are kept; only decided keys change,
+  and a changed value keeps its line's quotes, inline comment, `export` and CRLF ending.
   The `ports` block is the `[[env_port]]` pass (below), empty when the project declares none;
   `ports.applied` says whether those rewrites were written, and the trailing summary counts
   them alongside the files (a run that only shifted a port still reports what it wrote).
@@ -239,10 +240,16 @@ flagged; everything else is what the name implies.
   `adopted` (this run recorded it — `--isolation` or the wizard — and settled its values).
   A `run.toml` that cannot be used never stops the key reconciliation: only the port pass
   is skipped, and a `warnings` array names why.
-  `--isolation isolated|verbatim` records a new isolation for the worktree **before**
-  reconciling, so the same run applies it: `--isolation isolated` on a verbatim worktree
-  writes every port, identity and slice its creation left alone. It is refused with
-  `--check` (a read-only run records nothing) and on the main checkout as `verbatim`.
+  `--isolation isolated|verbatim` settles the worktree's `.env` on that isolation and records
+  it in meta.json **only once that succeeded** — a failed or cancelled run leaves the recorded
+  isolation as it was. `--isolation isolated` on a verbatim worktree writes every port,
+  identity and namespace value its creation left alone. `--isolation verbatim` puts the
+  values wtm owns (linked ports, `[[env]]` values, `COMPOSE_PROJECT_NAME`) back to the
+  source's — a key the source lacks is removed — and leaves every other key alone; `restored`
+  lists them and `isolation_changed` says the record changed (the interactive recap shows
+  them first). Namespaces already created stay recorded, so `clean` still drops them. It is
+  refused with `--check` (a read-only run records nothing) and on the main checkout as
+  `verbatim`.
 - `wtm ui` — the full-screen dashboard (worktree state, divergence, PRs, plus create and
   delete). **Never invoke it** (see driving rule 2): it holds the terminal until a human
   quits it. Everything it shows is available to you as JSON via `wtm list` / `wtm tree`, and

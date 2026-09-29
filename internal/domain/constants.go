@@ -1021,6 +1021,19 @@ const (
 	EnvPortsShiftedFmt          = "Settled %d linked .env value(s)."
 	EnvReconciledAndShiftedFmt  = "Reconciled %d file(s) and settled %d linked value(s)."
 	EnvComposeProjectWrittenFmt = " %s is now %s."
+	// EnvSwitched* open the summary of a run that settled the worktree on a new
+	// isolation, or put the values wtm owns back to the source's.
+	EnvSwitchedFmt         = "Now %s."
+	EnvSwitchedRestoredFmt = "Now %s — %d value(s) wtm owns back to the source's."
+	EnvRestoredFmt         = "%d value(s) wtm owns back to the source's."
+	// EnvDetailRestored* are the file-block rows of those values.
+	EnvDetailRestoredFmt        = "back to the source's %s (was %s)"
+	EnvDetailRestoredRemovedFmt = "removed — the source has none (was %s)"
+	// EnvRestoreRecap* head the wizard recap's preview of what verbatim puts
+	// back: the switch asked for, or the one the verbatim action would make.
+	EnvRestoreRecapTitle       = "Back to the source's values"
+	EnvRestoreRecapIfKeptTitle = "Keeping it verbatim also puts back"
+	EnvIsolationNotSwitchedFmt = "%s was not switched to %s: %s — run `wtm env %s --isolation %s` once run.toml is fixed"
 
 	// The [[env_port]] detection of `wtm run init`.
 	// EnvPortLinkFmt is one link as the prompt and the recap both show it:

@@ -22,7 +22,12 @@ func PrintEnvReport(w io.Writer, result domain.EnvSyncResult) {
 		if i > 0 {
 			Blank(w)
 		}
-		printEnvFile(w, f, result.Check, rules.EnvPortsMoveIn(rules.EnvPortsMoveInParams{Result: result, Target: f.Target}))
+		printEnvFile(w, envFileBlock{
+			file:     f,
+			check:    result.Check,
+			hasPorts: rules.EnvPortsMoveIn(rules.EnvPortsMoveInParams{Result: result, Target: f.Target}),
+			restored: rules.EnvRestoredRows(result.Restored, f.Target),
+		})
 	}
 	EnvPortsReport(w, result.Ports, result.Check)
 	if len(result.Warnings) > 0 {
@@ -35,10 +40,18 @@ func PrintEnvReport(w io.Writer, result domain.EnvSyncResult) {
 	printEnvSummary(w, result)
 }
 
+type envFileBlock struct {
+	file     domain.EnvFileResult
+	check    bool
+	hasPorts bool
+	restored []string
+}
+
 // printEnvFile renders one file block: its header, then one aligned row per key.
 // The glyph is a single rune rendered without a badge — a badge carries its own
 // padding, which is what used to make the rows wander a column apart.
-func printEnvFile(w io.Writer, f domain.EnvFileResult, check bool, hasPorts bool) {
+func printEnvFile(w io.Writer, block envFileBlock) {
+	f, check := block.file, block.check
 	SectionTitle(w, fmt.Sprintf(domain.EnvFileHeaderFmt,
 		f.Target,
 		styles.Muted.Render(fmt.Sprintf(domain.EnvFileSourceFmt, f.Strategy, f.Source))))
@@ -49,8 +62,11 @@ func printEnvFile(w io.Writer, f domain.EnvFileResult, check bool, hasPorts bool
 	}
 
 	rows := rules.EnvKeyRows(rules.EnvKeyRowsParams{File: f, Check: check})
-	if len(rows) == 0 {
-		Success(w, styles.Muted.Render(rules.EnvFileVerdict(rules.EnvFileVerdictParams{PortsMove: hasPorts, Check: check})))
+	for _, row := range block.restored {
+		Update(w, row)
+	}
+	if len(rows) == 0 && len(block.restored) == 0 {
+		Success(w, styles.Muted.Render(rules.EnvFileVerdict(rules.EnvFileVerdictParams{PortsMove: block.hasPorts, Check: check})))
 		return
 	}
 	for _, row := range rows {

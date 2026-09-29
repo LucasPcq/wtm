@@ -37,6 +37,12 @@ func JobEnv(params JobEnvParams) (map[string]string, error) {
 // lifecycle hooks, which are handed one rather than a directory to ask git
 // about.
 func BranchEnv(params WorktreeRef) (map[string]string, error) {
+	return branchEnvAs(params, IsolationOf(params))
+}
+
+// branchEnvAs resolves the environment under a given isolation: `wtm env
+// --isolation` settles the .env for the choice before recording it.
+func branchEnvAs(params WorktreeRef, isolation domain.Isolation) (map[string]string, error) {
 	ordinal, err := EnsureOrdinal(params)
 	if err != nil {
 		return nil, err
@@ -49,7 +55,7 @@ func BranchEnv(params WorktreeRef) (map[string]string, error) {
 		Ordinal:         ordinal,
 		PortOffsetBlock: rules.EffectivePortOffsetBlock(cfg),
 		ComposeProject:  composeProjectOf(composeProjectParams{ProjectDir: params.ProjectDir, Config: cfg, Ordinal: ordinal}),
-		Isolation:       IsolationOf(params),
+		Isolation:       isolation,
 	})
 
 	// The offset is read back from the environment just resolved rather than

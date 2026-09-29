@@ -128,3 +128,13 @@ func IsolationAdoptOptionLabel(plan domain.IsolationAdoptionPlan) string {
 func IsolationNotAdoptedWarning(branch string) string {
 	return fmt.Sprintf(domain.EnvIsolationNotAdoptedFmt, branch, branch)
 }
+
+type IsolationNotSwitchedParams struct {
+	Branch    string
+	Isolation domain.Isolation
+	Cause     string
+}
+
+func IsolationNotSwitchedWarning(params IsolationNotSwitchedParams) string {
+	return fmt.Sprintf(domain.EnvIsolationNotSwitchedFmt, params.Branch, params.Isolation, params.Cause, params.Branch, params.Isolation)
+}

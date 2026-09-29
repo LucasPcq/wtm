@@ -7,6 +7,7 @@ package envwizard
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -38,6 +39,11 @@ type RunParams struct {
 	// existed. Adopting it is a question of its own, since it moves the worktree
 	// off the compose project whose volumes hold its data.
 	AdoptionByBranch map[string]domain.IsolationAdoptionPlan
+	// RestoreByBranch is what keeping each worktree verbatim puts back to the
+	// source's values. VerbatimSwitch says the run was asked to (--isolation
+	// verbatim); otherwise it is shown only beside the verbatim action.
+	RestoreByBranch map[string][]domain.EnvRestoredEntry
+	VerbatimSwitch  bool
 }
 
 // Result is the wizard outcome: the chosen worktree and its per-file decisions.
@@ -85,10 +91,12 @@ func Run(params RunParams) (Result, error) {
 
 	recapIdx := len(steps)
 	steps = append(steps, recapStep(recapStepParams{
-		BranchOf:      branchOf,
-		ResolveIdx:    resolveIdx,
-		AdoptIdx:      adoptIdx,
-		PortsByBranch: params.PortsByBranch,
+		BranchOf:        branchOf,
+		ResolveIdx:      resolveIdx,
+		AdoptIdx:        adoptIdx,
+		PortsByBranch:   params.PortsByBranch,
+		RestoreByBranch: params.RestoreByBranch,
+		VerbatimSwitch:  params.VerbatimSwitch,
 	}))
 
 	final, err := components.RunWizard(components.RunWizardParams{
@@ -200,10 +208,12 @@ func resolveModel(params RunParams, branch string) components.EnvResolveModel {
 }
 
 type recapStepParams struct {
-	BranchOf      func([]components.Step) string
-	ResolveIdx    int
-	AdoptIdx      int
-	PortsByBranch map[string]domain.EnvPortPlan
+	BranchOf        func([]components.Step) string
+	ResolveIdx      int
+	AdoptIdx        int
+	PortsByBranch   map[string]domain.EnvPortPlan
+	RestoreByBranch map[string][]domain.EnvRestoredEntry
+	VerbatimSwitch  bool
 }
 
 // recapStep restates the worktree, every decision (with values) and the port
@@ -225,9 +235,15 @@ func recapStep(params recapStepParams) components.Step {
 				lines = append(lines, "Only safe additions will be applied.")
 			}
 			lines = append(lines, portRecapLines(params.PortsByBranch[branch])...)
+			actions := recapActions(params.PortsByBranch[branch])
+			lines = append(lines, restoreRecapLines(restoreRecapParams{
+				Entries: params.RestoreByBranch[branch],
+				Switch:  params.VerbatimSwitch,
+				Offered: len(actions) > 1,
+			})...)
 			return components.RecapContent{
 				Description: strings.Join(lines, "\n"),
-				Actions:     recapActions(params.PortsByBranch[branch]),
+				Actions:     actions,
 			}
 		},
 	})
@@ -261,6 +277,40 @@ func portRecapLines(plan domain.EnvPortPlan) []string {
 		"",
 		styles.Bold.Render(rules.EnvPortOffsetLabel(plan.Offset)),
 	}, table...)
+}
+
+type restoreRecapParams struct {
+	Entries []domain.EnvRestoredEntry
+	Switch  bool
+	Offered bool
+}
+
+// restoreRecapLines previews what verbatim puts back, before it is written:
+// under --isolation verbatim it is the run itself, and otherwise it is what the
+// verbatim action would do on top of the apply.
+func restoreRecapLines(params restoreRecapParams) []string {
+	if len(params.Entries) == 0 || (!params.Switch && !params.Offered) {
+		return nil
+	}
+	title := domain.EnvRestoreRecapTitle
+	if !params.Switch {
+		title = domain.EnvRestoreRecapIfKeptTitle
+	}
+
+	lines := []string{"", styles.Bold.Render(title)}
+	var files []string
+	for _, entry := range params.Entries {
+		if !slices.Contains(files, entry.File) {
+			files = append(files, entry.File)
+		}
+	}
+	for _, file := range files {
+		lines = append(lines, styles.Muted.Render(file))
+		for _, row := range rules.EnvRestoredRows(params.Entries, file) {
+			lines = append(lines, domain.RecapRowIndent+row)
+		}
+	}
+	return lines
 }
 
 // recapTableWidth is what a table has inside the recap's frame, zero when there

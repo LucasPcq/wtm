@@ -44,10 +44,7 @@ func SetIsolation(params SetIsolationParams) error {
 		return err
 	}
 	if isMain {
-		if rules.IsVerbatim(params.Isolation) {
-			return domain.ErrIsolationMain
-		}
-		return nil
+		return mainIsolation(params.Isolation)
 	}
 
 	meta, err := loadMetadata(params.Ref.StateDir, params.Ref.Branch)
@@ -56,6 +53,23 @@ func SetIsolation(params SetIsolationParams) error {
 	}
 	meta.Isolation = rules.EffectiveIsolation(params.Isolation)
 	return writeMetadata(rules.WorktreeMetaDir(params.Ref.StateDir, params.Ref.Branch), meta)
+}
+
+// CheckIsolation refuses a choice SetIsolation would refuse, before anything is
+// written for it.
+func CheckIsolation(params SetIsolationParams) error {
+	isMain, err := isMainBranch(params.Ref)
+	if err != nil || !isMain {
+		return err
+	}
+	return mainIsolation(params.Isolation)
+}
+
+func mainIsolation(isolation domain.Isolation) error {
+	if rules.IsVerbatim(isolation) {
+		return domain.ErrIsolationMain
+	}
+	return nil
 }
 
 func isMainBranch(ref WorktreeRef) (bool, error) {

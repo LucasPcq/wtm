@@ -37,7 +37,11 @@ func newEnvCmd() *cobra.Command {
 			"meta.json) keeps its source's ports and COMPOSE_PROJECT_NAME: non-interactively\n" +
 			"only its keys are reconciled, and the report says so. The wizard offers to adopt\n" +
 			"isolation — a new compose project, so its current volumes are no longer used —\n" +
-			"and --isolation isolated adopts it explicitly.",
+			"and --isolation isolated adopts it explicitly.\n\n" +
+			"--isolation verbatim puts the values wtm owns (linked ports, [[env]] values,\n" +
+			"COMPOSE_PROJECT_NAME) back to the source's and leaves every other key alone; the\n" +
+			"wizard shows them first. Either isolation is recorded only once the .env is in\n" +
+			"line with it: a run that fails or is cancelled records nothing.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: runEnv,
 	}
@@ -47,7 +51,7 @@ func newEnvCmd() *cobra.Command {
 	cmd.Flags().Bool(domain.FlagPrune, false, "Remove orphan keys (present in the .env but in no source)")
 	cmd.Flags().String(domain.FlagFrom, "", "Override the value source strategy (example, main, parent)")
 	cmd.Flags().String(domain.FlagOnConflict, "", "Non-interactive conflict resolution: keep (default) or overwrite")
-	cmd.Flags().String(domain.FlagIsolation, "", "Switch the worktree's isolation before reconciling: isolated (wtm moves its ports, compose project and service slices, in the .env and at run time) or verbatim (wtm writes none of them and runs it on the ports its .env keeps)")
+	cmd.Flags().String(domain.FlagIsolation, "", "Settle the worktree on an isolation, recorded once its .env is in line: isolated (wtm moves its ports, compose project and namespaces, in the .env and at run time) or verbatim (the values wtm owns go back to the source's, and it runs on the ports its .env keeps)")
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; apply safe additions and flag-driven decisions only")
 	shared.AddOutputFlag(cmd)
 
@@ -118,8 +122,8 @@ type envFlags struct {
 	prune      bool
 	check      bool
 	format     string
-	// isolation is --isolation, recorded before anything is read so the whole
-	// run — drift, port pass, report — sees the worktree as it now stands.
+	// isolation is --isolation: the run settles the .env on it, and records it
+	// only once that is done.
 	isolation domain.Isolation
 }
 
@@ -136,16 +140,21 @@ func runEnvNonInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg strin
 	if err != nil {
 		return fmt.Errorf("worktree %q: %w", arg, err)
 	}
-	adoption, err := isolationAdoption(cfg, envTarget{branch: wt.Branch, path: wt.Path})
-	if err != nil {
+	target := envTarget{branch: wt.Branch, path: wt.Path}
+	if err := checkIsolation(cfg, target, f.isolation); err != nil {
 		return err
 	}
-	if err := recordIsolation(cfg, wt.Branch, f.isolation); err != nil {
+	adoption, err := isolationAdoption(cfg, target)
+	if err != nil {
 		return err
 	}
 
 	ctx := resolveEnvStrategyAndParent(cfg, wt.Branch, f.from)
-	pass := runPass(runPassParams{cfg: cfg, branch: wt.Branch, worktreePath: wt.Path, adoption: adoption, adopt: f.isolation != ""})
+	sw, err := planSwitch(planSwitchParams{cfg: cfg, target: target, ctx: ctx, isolation: f.isolation})
+	if err != nil {
+		return err
+	}
+	pass := runPass(runPassParams{cfg: cfg, target: target, adoption: adoption, isolation: f.isolation, reserved: sw.keys()})
 	result, err := envsvc.SyncEnv(envsvc.SyncEnvParams{
 		Branch:             wt.Branch,
 		MainPath:           cfg.ProjectDir,
@@ -164,7 +173,11 @@ func runEnvNonInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg strin
 	if err != nil {
 		return err
 	}
-	return writeEnvResult(cmd, pass.decorate(cfg, result), f.format)
+	applied, err := sw.apply()
+	if err != nil {
+		return err
+	}
+	return writeEnvResult(cmd, applied.decorate(pass.decorate(cfg, result)), f.format)
 }
 
 // runEnvInteractive drives the unified wizard (worktree selection → single-screen
@@ -176,6 +189,7 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 		diffByBranch     map[string][]domain.EnvFileResult
 		portsByBranch    map[string]domain.EnvPortPlan
 		adoptionByBranch map[string]domain.IsolationAdoptionPlan
+		restoreByBranch  map[string][]domain.EnvRestoredEntry
 		preset           string
 	)
 
@@ -199,6 +213,11 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 				return fmt.Errorf("worktree %q: %w", arg, domain.ErrWorktreeNotFound)
 			}
 			preset = arg
+			if preset != "" {
+				if err := checkIsolation(cfg, envTarget{branch: preset}, f.isolation); err != nil {
+					return err
+				}
+			}
 
 			// The drift is precomputed for every branch the wizard will surface, so
 			// the selection list can badge each one with it.
@@ -209,17 +228,22 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 			diffByBranch = make(map[string][]domain.EnvFileResult, len(branches))
 			portsByBranch = make(map[string]domain.EnvPortPlan, len(branches))
 			adoptionByBranch = make(map[string]domain.IsolationAdoptionPlan, len(branches))
+			restoreByBranch = make(map[string][]domain.EnvRestoredEntry, len(branches))
 			for _, b := range branches {
-				adoption, err := isolationAdoption(cfg, envTarget{branch: b, path: worktreePathForBranch(statuses, b)})
+				target := envTarget{branch: b, path: worktreePathForBranch(statuses, b)}
+				adoption, err := isolationAdoption(cfg, target)
 				if err != nil {
 					return err
 				}
 				adoptionByBranch[b] = adoption
-			}
-			if preset != "" {
-				if err := recordIsolation(cfg, preset, f.isolation); err != nil {
+
+				// Every branch gets the verbatim preview: the recap may offer to
+				// keep it verbatim, and says what that puts back before it does.
+				preview, err := planSwitch(planSwitchParams{cfg: cfg, target: target, ctx: resolveEnvStrategyAndParent(cfg, b, f.from), isolation: domain.IsolationVerbatim})
+				if err != nil {
 					return err
 				}
+				restoreByBranch[b] = preview.planned
 			}
 
 			for _, b := range branches {
@@ -227,8 +251,14 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 				// port pass: resolving one allocates an ordinal, and whether it
 				// gets one is the question the wizard is about to ask.
 				pending := adoptionByBranch[b].Pending
-				adoptedByFlag := b == preset && f.isolation != ""
-				scan := branchScan{cfg: cfg, statuses: statuses, branch: b, flags: f, pending: pending, skipRun: pending && !adoptedByFlag}
+				isolation := domain.Isolation("")
+				if b == preset {
+					isolation = f.isolation
+				}
+				scan := branchScan{cfg: cfg, statuses: statuses, branch: b, flags: f, pending: pending, skipRun: pending && isolation == "", isolation: isolation}
+				if rules.IsVerbatim(isolation) {
+					scan.restored = restoreByBranch[b]
+				}
 				files, err := computeBranchDiff(scan)
 				if err != nil {
 					return err
@@ -261,6 +291,8 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 		DiffByBranch:     diffByBranch,
 		PortsByBranch:    portsByBranch,
 		AdoptionByBranch: pending,
+		RestoreByBranch:  restoreByBranch,
+		VerbatimSwitch:   rules.IsVerbatim(f.isolation),
 	})
 	if errors.Is(err, domain.ErrUserAborted) {
 		return abortedEnv(cmd, f.format)
@@ -276,17 +308,18 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 	if res.Adopt {
 		isolation = domain.IsolationIsolated
 	}
-	if err := recordIsolation(cfg, res.Branch, isolation); err != nil {
-		return err
-	}
 
 	ctx := resolveEnvStrategyAndParent(cfg, res.Branch, f.from)
-	worktreePath := worktreePathForBranch(statuses, res.Branch)
-	pass := runPass(runPassParams{cfg: cfg, branch: res.Branch, worktreePath: worktreePath, adoption: adoptionByBranch[res.Branch], adopt: isolation != ""})
+	target := envTarget{branch: res.Branch, path: worktreePathForBranch(statuses, res.Branch)}
+	sw, err := planSwitch(planSwitchParams{cfg: cfg, target: target, ctx: ctx, isolation: isolation})
+	if err != nil {
+		return err
+	}
+	pass := runPass(runPassParams{cfg: cfg, target: target, adoption: adoptionByBranch[res.Branch], isolation: isolation, reserved: sw.keys()})
 	result, err := envsvc.ApplyEnvSync(envsvc.ApplyEnvSyncParams{
 		Branch:             res.Branch,
 		MainPath:           cfg.ProjectDir,
-		WorktreePath:       worktreePath,
+		WorktreePath:       target.path,
 		ParentWorktreePath: ctx.ParentPath,
 		ParentBranch:       ctx.ParentBranch,
 		Files:              cfg.Config.Project.Env.Files,
@@ -299,7 +332,11 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 	if err != nil {
 		return err
 	}
-	return writeEnvResult(cmd, pass.decorate(cfg, result), f.format)
+	applied, err := sw.apply()
+	if err != nil {
+		return err
+	}
+	return writeEnvResult(cmd, applied.decorate(pass.decorate(cfg, result)), f.format)
 }
 
 type branchScan struct {
@@ -309,22 +346,27 @@ type branchScan struct {
 	flags    envFlags
 	// pending is a worktree still to adopt its isolation: scanned without its
 	// port pass and without its identity keys, whatever the wizard answers.
-	pending bool
-	skipRun bool
+	pending   bool
+	skipRun   bool
+	isolation domain.Isolation
+	// restored are the values a switch to verbatim puts back: the reconciliation
+	// leaves them to it.
+	restored []domain.EnvRestoredEntry
 }
 
 func (s branchScan) reserved() []string {
-	if !s.pending {
-		return nil
+	keys := restoredKeys(s.restored)
+	if s.pending {
+		keys = append(keys, domain.WtmOwnedEnvKeys...)
 	}
-	return domain.WtmOwnedEnvKeys
+	return keys
 }
 
 func (s branchScan) ports() envsvc.EnvPortsParams {
 	if s.skipRun {
 		return envsvc.EnvPortsParams{}
 	}
-	ports, _ := resolveEnvPorts(s.cfg, s.branch, worktreePathForBranch(s.statuses, s.branch))
+	ports, _ := resolveEnvPorts(envPortsParams{cfg: s.cfg, target: envTarget{branch: s.branch, path: worktreePathForBranch(s.statuses, s.branch)}, isolation: s.isolation})
 	return ports
 }
 
@@ -356,13 +398,13 @@ func computeBranchPorts(scan branchScan) (domain.EnvPortPlan, error) {
 }
 
 type runPassParams struct {
-	cfg          shared.ConfigResult
-	branch       string
-	worktreePath string
-	adoption     domain.IsolationAdoptionPlan
-	// adopt says the worktree now has an isolation recorded — by --isolation or
-	// by the wizard — so a pending adoption is settled.
-	adopt bool
+	cfg      shared.ConfigResult
+	target   envTarget
+	adoption domain.IsolationAdoptionPlan
+	// isolation is the one this run settles the worktree on — by --isolation or
+	// by the wizard — empty to keep the recorded one.
+	isolation domain.Isolation
+	reserved  []string
 }
 
 // envRunPass is the run half of a `wtm env`: the port and owned-value pass, and
@@ -379,19 +421,22 @@ type envRunPass struct {
 // leaves a worktree that never did exactly as it is: no port moved, no compose
 // project written, no ordinal allocated — only the keys are reconciled.
 func runPass(params runPassParams) envRunPass {
-	pass := envRunPass{branch: params.branch}
+	pass := envRunPass{branch: params.target.branch, reserved: params.reserved}
 	if params.adoption.Pending {
-		pass.reserved = domain.WtmOwnedEnvKeys
+		pass.reserved = append(pass.reserved, domain.WtmOwnedEnvKeys...)
 	}
-	if params.adoption.Pending && !params.adopt {
-		pass.warnings = []string{rules.IsolationNotAdoptedWarning(params.branch)}
+	if params.adoption.Pending && params.isolation == "" {
+		pass.warnings = []string{rules.IsolationNotAdoptedWarning(params.target.branch)}
 		pass.adoption = domain.IsolationNotAdopted
 		return pass
 	}
 	if params.adoption.Pending {
 		pass.adoption = domain.IsolationAdopted
 	}
-	pass.ports, pass.warnings = resolveEnvPorts(params.cfg, params.branch, params.worktreePath)
+	if rules.IsVerbatim(params.isolation) {
+		return pass
+	}
+	pass.ports, pass.warnings = resolveEnvPorts(envPortsParams{cfg: params.cfg, target: params.target, isolation: params.isolation})
 	return pass
 }
 
@@ -399,10 +444,10 @@ func runPass(params runPassParams) envRunPass {
 // values has no isolation to report: calling it isolated would be the one
 // thing it is not.
 func (p envRunPass) decorate(cfg shared.ConfigResult, result domain.EnvSyncResult) domain.EnvSyncResult {
-	result.Warnings = p.warnings
+	result.Warnings = append(result.Warnings, p.warnings...)
 	result.IsolationAdoption = p.adoption
 	if p.adoption != domain.IsolationNotAdopted {
-		result.Isolation = isolationOf(cfg, p.branch)
+		result.Isolation = worktree.IsolationOf(worktreeRef(cfg, p.branch))
 	}
 	return result
 }
@@ -412,11 +457,21 @@ type envTarget struct {
 	path   string
 }
 
+func worktreeRef(cfg shared.ConfigResult, branch string) worktree.WorktreeRef {
+	return worktree.WorktreeRef{ProjectDir: cfg.ProjectDir, StateDir: cfg.StateDir, Branch: branch}
+}
+
 func isolationAdoption(cfg shared.ConfigResult, target envTarget) (domain.IsolationAdoptionPlan, error) {
 	return worktree.IsolationAdoptionFor(worktree.IsolationAdoptionParams{
-		Ref:          worktree.WorktreeRef{ProjectDir: cfg.ProjectDir, StateDir: cfg.StateDir, Branch: target.branch},
+		Ref:          worktreeRef(cfg, target.branch),
 		WorktreePath: target.path,
 	})
+}
+
+type envPortsParams struct {
+	cfg       shared.ConfigResult
+	target    envTarget
+	isolation domain.Isolation
 }
 
 // resolveEnvPorts gathers the [[env_port]] links and the offset this worktree
@@ -424,7 +479,8 @@ func isolationAdoption(cfg shared.ConfigResult, target envTarget) (domain.Isolat
 // the reconciliation runs exactly as it did before — and so does one whose
 // run.toml cannot be used: the keys never depend on it, only the port pass is
 // skipped, and the warning says why.
-func resolveEnvPorts(cfg shared.ConfigResult, branch string, worktreePath string) (envsvc.EnvPortsParams, []string) {
+func resolveEnvPorts(params envPortsParams) (envsvc.EnvPortsParams, []string) {
+	cfg, branch := params.cfg, params.target.branch
 	if err := runconfig.Check(runconfig.CheckParams{StateDir: cfg.StateDir, EnvFiles: cfg.Config.Project.Env.Files}); err != nil {
 		return envsvc.EnvPortsParams{}, []string{rules.PortsNotSettledWarning(rules.PortsNotSettledWarningParams{
 			Cause:                 err.Error(),
@@ -435,9 +491,10 @@ func resolveEnvPorts(cfg shared.ConfigResult, branch string, worktreePath string
 		ProjectDir:   cfg.ProjectDir,
 		StateDir:     cfg.StateDir,
 		Branch:       branch,
-		WorktreePath: worktreePath,
+		WorktreePath: params.target.path,
 		EnvFiles:     cfg.Config.Project.Env.Files,
 		Global:       cfg.Config.Global,
+		Isolation:    params.isolation,
 	})
 	if err != nil {
 		return envsvc.EnvPortsParams{}, []string{rules.PortsNotSettledWarning(rules.PortsNotSettledWarningParams{
@@ -446,22 +503,6 @@ func resolveEnvPorts(cfg shared.ConfigResult, branch string, worktreePath string
 		})}
 	}
 	return ports, nil
-}
-
-// recordIsolation writes --isolation, or the recap's verbatim answer, to the
-// worktree's record. Nothing given records nothing.
-func recordIsolation(cfg shared.ConfigResult, branch string, isolation domain.Isolation) error {
-	if isolation == "" {
-		return nil
-	}
-	return worktree.SetIsolation(worktree.SetIsolationParams{
-		Ref:       worktree.WorktreeRef{ProjectDir: cfg.ProjectDir, StateDir: cfg.StateDir, Branch: branch},
-		Isolation: isolation,
-	})
-}
-
-func isolationOf(cfg shared.ConfigResult, branch string) domain.Isolation {
-	return worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: cfg.ProjectDir, StateDir: cfg.StateDir, Branch: branch})
 }
 
 // mapDecisions converts the wizard's per-file decisions to service resolutions.

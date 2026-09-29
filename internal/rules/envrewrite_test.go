@@ -144,3 +144,23 @@ func TestApplyEnvDiffOverwriteKeepsTheChildLine(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
+
+func TestRestoreOwnedEnvPutsBackOnlyTheOwnedKeys(t *testing.T) {
+	child := rules.ParseEnv("WEB_PORT='3010' # web\r\nMINE=4012\r\nCOMPOSE_PROJECT_NAME=repo-feat\r\nREALM=main\r\n")
+	source := rules.ParseEnv("WEB_PORT=3000\nMINE=4002\nREALM=main\n")
+
+	lines, entries := rules.RestoreOwnedEnv(rules.RestoreOwnedEnvParams{
+		File: ".env", Child: child, Source: source,
+		Keys: []string{"WEB_PORT", "COMPOSE_PROJECT_NAME", "REALM", "ABSENT"},
+	})
+	if got, want := rules.RenderEnv(lines), "WEB_PORT='3000' # web\r\nMINE=4012\r\nREALM=main\r\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	want := []domain.EnvRestoredEntry{
+		{File: ".env", Key: "WEB_PORT", From: "3010", To: "3000"},
+		{File: ".env", Key: "COMPOSE_PROJECT_NAME", From: "repo-feat", Removed: true},
+	}
+	if len(entries) != len(want) || entries[0] != want[0] || entries[1] != want[1] {
+		t.Fatalf("entries = %+v, want %+v", entries, want)
+	}
+}

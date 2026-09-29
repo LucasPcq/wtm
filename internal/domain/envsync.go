@@ -43,4 +43,20 @@ type EnvSyncResult struct {
 	// Warnings name a port pass left undone, and why: the reconciliation of
 	// the keys never depends on run.toml.
 	Warnings []string `json:"warnings,omitempty"`
+	// IsolationChanged says this run recorded a new isolation, which it only
+	// does once the .env is in line with it.
+	IsolationChanged bool `json:"isolation_changed,omitempty"`
+	// Restored are the values wtm owns that a switch to verbatim put back to
+	// the source's.
+	Restored []EnvRestoredEntry `json:"restored,omitempty"`
+}
+
+// EnvRestoredEntry is one value wtm owns put back to its source's. Removed is
+// a key the source does not have, so its line was dropped.
+type EnvRestoredEntry struct {
+	File    string `json:"file"`
+	Key     string `json:"key"`
+	From    string `json:"from"`
+	To      string `json:"to,omitempty"`
+	Removed bool   `json:"removed,omitempty"`
 }
