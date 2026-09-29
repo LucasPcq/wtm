@@ -538,7 +538,11 @@ and **experimental**: the global `wtm init` does not configure it.
   there is no safe default it errors naming the flag — `run start --yes` and `run stop
   --yes` require `--job`. There is no `--force` in the run module: nothing here refuses for
   safety, so there is nothing to lift — except `run job rm --force`, which lets a job go
-  along with the profile references that name it.
+  along with every reference naming it (profiles, `runs`, `touches`, `[[env_port]]`,
+  `[[env]]`) and even while a worktree still holds data in it (a shared service's namespace:
+  clean will then no longer drop that data). Without `--force` the refusal names each kind of
+  reference and each worktree. `run job edit --name` refuses to rename a job worktrees hold
+  data in, and warns when the rename moves a published address (a job with no `url.host`).
 - `run up` and `run start --job <service>` **attach by default**: on a terminal they open the
   full-screen run view. Always pass **`-d`** (or `--output json`, which never opens it) —
   `-d` starts the jobs and returns immediately, which is the behaviour you want. A `task`

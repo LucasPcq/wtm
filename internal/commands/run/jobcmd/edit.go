@@ -16,19 +16,21 @@ func newEditCmd() *cobra.Command {
 		Short: "Edit an existing job",
 		Long: "Edit a job declared in <git-common-dir>/wtm/run.toml.\n\n" +
 			"Pass any of --name, --cmd, --kind, --stop, --cwd, --port, --port-clear,\n" +
-			"--url-port or --url-host to change those fields and nothing else: a flag left\n" +
+			"--url-port, --url-host, --runs, --binds-no-port or --touches to change those\n" +
+			"fields and nothing else: a flag left\n" +
 			"out keeps the field as it is, and passing an empty string clears it (--stop ''\n" +
 			"drops the stop command, --url-port '' withdraws the published name).\n\n" +
 			"--port merges into the ports the job already declares, so one entry can be\n" +
 			"changed without rewriting the others; --port-clear empties the table.\n" +
-			"--name also rewrites what names this job elsewhere in the file: the profiles\n" +
-			"that start it and the env_port links that follow its ports.\n\n" +
+			"--name also rewrites what names this job elsewhere in the file: the profiles,\n" +
+			"the runners' runs, the touches, and the [[env_port]] and [[env]] links. It is\n" +
+			"refused while a worktree holds data in the job, which clean finds by its name.\n\n" +
 			"With no such flag, the form opens pre-filled with the current values, and\n" +
 			"without an argument it prompts to pick from the existing jobs.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: runEdit,
 	}
-	cmd.Flags().String(domain.FlagName, "", "Rename the job, updating the profiles and env_port links that name it")
+	cmd.Flags().String(domain.FlagName, "", "Rename the job, updating the profiles, runs, touches, [[env_port]] and [[env]] links that name it")
 	cmd.Flags().String(domain.FlagCmd, "", "Command to run, as a /bin/sh line")
 	cmd.Flags().String(domain.FlagKind, "", "Job kind: service or task")
 	cmd.Flags().String(domain.FlagStop, "", "Stop command, as a /bin/sh line (pass '' to drop it)")

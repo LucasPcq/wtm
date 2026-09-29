@@ -1,6 +1,11 @@
 package rules
 
-import "github.com/LucasPcq/wtm/internal/domain"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/LucasPcq/wtm/internal/domain"
+)
 
 // RemoveJobEffect is what a removal touched beyond the job itself, so both
 // callers report the same thing.
@@ -132,4 +137,25 @@ func withoutName(names []string, name string) []string {
 		return nil
 	}
 	return kept
+}
+
+// JobReferenceParts names what a removal strips, one part per kind of
+// reference — the five places a job is named — empty when nothing names it.
+func JobReferenceParts(effect RemoveJobEffect) []string {
+	var parts []string
+	for _, kind := range []struct {
+		format string
+		names  []string
+	}{
+		{domain.RunJobRefProfilesFmt, effect.Profiles},
+		{domain.RunJobRefRunnersFmt, effect.Runners},
+		{domain.RunJobRefTouchersFmt, effect.Touchers},
+		{domain.RunJobRefEnvPortsFmt, effect.EnvPorts},
+		{domain.RunJobRefEnvFmt, effect.EnvValues},
+	} {
+		if len(kind.names) > 0 {
+			parts = append(parts, fmt.Sprintf(kind.format, strings.Join(kind.names, domain.RunURLListSep)))
+		}
+	}
+	return parts
 }

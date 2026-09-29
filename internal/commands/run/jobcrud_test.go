@@ -150,8 +150,9 @@ func TestRunJobRm_ReferencedForce(t *testing.T) {
 	}
 }
 
-// Un [[env_port]] qui nomme un job supprimé pointait dans le vide : le
-// chargeur le refuse, donc la fuite rendait le fichier illisible.
+// An [[env_port]] naming a removed job pointed at nothing, which the loader
+// refuses. It is a reference like any other: refused without --force, stripped
+// with it.
 func TestRunJobRm_DelieSesEnvPorts(t *testing.T) {
 	stateDir := setupTestProject(t)
 	writeRunTOML(t, stateDir, domain.RunConfig{
@@ -165,8 +166,11 @@ func TestRunJobRm_DelieSesEnvPorts(t *testing.T) {
 		},
 	})
 
-	if _, _, err := runCmd(t, domain.CmdJob, domain.CmdRm, "api"); err != nil {
-		t.Fatalf("run job rm: %v", err)
+	if _, _, err := runCmd(t, domain.CmdJob, domain.CmdRm, "api"); err == nil || !strings.Contains(err.Error(), "[[env_port]] PORT") {
+		t.Fatalf("run job rm = %v, want a refusal naming the link", err)
+	}
+	if _, _, err := runCmd(t, domain.CmdJob, domain.CmdRm, "api", "--"+domain.FlagForce); err != nil {
+		t.Fatalf("run job rm --force: %v", err)
 	}
 
 	cfg, err := config.LoadRun(stateDir)

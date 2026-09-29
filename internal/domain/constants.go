@@ -1871,19 +1871,38 @@ const (
 	RunJobCmdRequired   = "command is required"
 	RunJobExistsFmt     = "job %q already exists"
 	RunJobNotFoundFmt   = "job %q not found"
-	RunJobNothingToEdit = "edit has nothing to change — pass --%s, --%s, --%s, --%s, --%s, --%s, --%s, --%s, --%s, --%s or --%s"
+	RunJobNothingToEdit = "edit has nothing to change — pass --%s, --%s, --%s, --%s, --%s, --%s, --%s, --%s, --%s, --%s, --%s or --%s"
 	// RunJobReferenced* is the safety refusal of a removal that would drag other
 	// declarations with it. The flag lifts it up front; a run with someone to ask
 	// lifts it by answering, which is the only way `run job list` can remove such
 	// a job at all — it has no --force of its own.
-	RunJobReferencedFmt     = "job %q is referenced by profile(s): %s — pass --%s to strip those references"
+	RunJobReferencedFmt     = "job %q is %s — pass --%s to remove it anyway"
 	RunJobReferencedTitle   = "Remove a job other declarations name?"
-	RunJobReferencedDescFmt = "%q is named by: %s."
-	RunJobReferencedYes     = "Remove it and strip the references"
-	RunJobReferencedNo      = "Keep it"
-	RunJobAddedFmt          = "Added job %q"
-	RunJobUpdatedFmt        = "Updated job %q"
-	RunJobRemovedFmt        = "Removed job %q"
+	RunJobReferencedDescFmt = "%q is %s."
+	// RunJobRef* name each kind of reference a removal strips, as what it is:
+	// the refusal once called a runner a profile.
+	RunJobRefClauseFmt   = "referenced by %s"
+	RunJobRefProfilesFmt = "profiles %s"
+	RunJobRefRunnersFmt  = "runs of %s"
+	RunJobRefTouchersFmt = "touches of %s"
+	RunJobRefEnvPortsFmt = "[[env_port]] %s"
+	RunJobRefEnvFmt      = "[[env]] %s"
+	RunJobRefSep         = "; "
+	RunJobClauseSep      = ", and "
+	// RunJobHeld* is the other thing a removal or a rename loses: clean finds a
+	// worktree's namespace by the job's name, so the data would stay forever.
+	RunJobHeldClauseFmt  = "holding data for %s, which clean would no longer drop"
+	RunJobHeldPendingFmt = "%s (drop pending)"
+	RunJobHeldDroppedFmt = "%s keep their data in %s: clean will no longer drop it — drop it by hand"
+	RunJobRenameHeldFmt  = "job %q holds data for %s, and clean finds it by this name — clean those worktrees before renaming it"
+	// RunJobHostMovedFmt says a rename moved a published address: a job without
+	// url.host is published under its name.
+	RunJobHostMovedFmt  = "%s is published under its name: it now answers as %s, no longer as %s"
+	RunJobReferencedYes = "Remove it and strip the references"
+	RunJobReferencedNo  = "Keep it"
+	RunJobAddedFmt      = "Added job %q"
+	RunJobUpdatedFmt    = "Updated job %q"
+	RunJobRemovedFmt    = "Removed job %q"
 
 	// RunList* is `run list`'s two questions: an entry of run.toml, then what to
 	// do to it. The kind travels with the name because the two lists share one

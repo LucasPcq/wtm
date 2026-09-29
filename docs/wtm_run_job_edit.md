@@ -7,14 +7,16 @@ Edit an existing job
 Edit a job declared in <git-common-dir>/wtm/run.toml.
 
 Pass any of --name, --cmd, --kind, --stop, --cwd, --port, --port-clear,
---url-port or --url-host to change those fields and nothing else: a flag left
+--url-port, --url-host, --runs, --binds-no-port or --touches to change those
+fields and nothing else: a flag left
 out keeps the field as it is, and passing an empty string clears it (--stop ''
 drops the stop command, --url-port '' withdraws the published name).
 
 --port merges into the ports the job already declares, so one entry can be
 changed without rewriting the others; --port-clear empties the table.
---name also rewrites what names this job elsewhere in the file: the profiles
-that start it and the env_port links that follow its ports.
+--name also rewrites what names this job elsewhere in the file: the profiles,
+the runners' runs, the touches, and the [[env_port]] and [[env]] links. It is
+refused while a worktree holds data in the job, which clean finds by its name.
 
 With no such flag, the form opens pre-filled with the current values, and
 without an argument it prompts to pick from the existing jobs.
@@ -31,7 +33,7 @@ wtm run job edit [name] [flags]
       --cwd string            Working directory relative to project root (pass '' to drop it)
   -h, --help                  help for edit
       --kind string           Job kind: service or task
-      --name string           Rename the job, updating the profiles and env_port links that name it
+      --name string           Rename the job, updating the profiles, runs, touches, [[env_port]] and [[env]] links that name it
       --output string         Output format: text or json (default "text")
       --port stringArray      Base port as NAME=PORT, repeatable — merged into the declared ports
       --port-clear            Drop every port this job declares
