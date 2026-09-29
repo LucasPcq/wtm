@@ -14,9 +14,10 @@ wtm clean [branch] [flags]
 ### Options
 
 ```
+      --drop-data           drop the removed worktrees' data now, starting the shared services that are down to do it
       --force               Lift safety refusals (dirty/unpushed/open-PR); still asks to confirm unless --yes
   -h, --help                help for clean
-      --keep-data           keep the namespaces this worktree carved out of shared services
+      --keep-data           keep the namespaces the removed worktrees carved out of shared services
       --output string       Output format: text or json (default "text")
       --reparent-children   Reparent orphaned child worktrees onto the grandparent (no prompt)
   -y, --yes                 Skip all prompts; resolve every decision from flags and safe defaults (keeps safety checks unless --force)

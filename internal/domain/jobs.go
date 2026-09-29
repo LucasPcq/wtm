@@ -324,6 +324,25 @@ type NamespaceRef struct {
 	Ordinal  int    `toml:"ordinal"  json:"ordinal"`
 }
 
+// NamespaceHolding is what one worktree about to be removed carved out of the
+// shared services, read while it still exists: its remove commands run in its
+// directory, with its environment. Config holds only the jobs that have
+// something to give back.
+type NamespaceHolding struct {
+	Branch  string
+	WorkDir string
+	Env     map[string]string
+	Config  RunConfig
+}
+
+// HeldNamespace is one line of what a removal gives back: the namespace, the
+// shared service holding it, and whether that service is up to take it.
+type HeldNamespace struct {
+	Name string
+	Job  string
+	Up   bool
+}
+
 // NamespaceField is one editable line of the namespace step: which job it
 // belongs to, which of the three fields it is, and what has been typed. Vars are
 // the variables that field's command may read — the worktree's own plus the

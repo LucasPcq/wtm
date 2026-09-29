@@ -319,7 +319,12 @@ const (
 	// is to detach: clean is the destructive command, and destroying a worktree
 	// without its data would leave an orphan behind on every iteration.
 	FlagKeepData     = "keep-data"
-	FlagKeepDataDesc = "keep the namespaces this worktree carved out of shared services"
+	FlagKeepDataDesc = "keep the namespaces the removed worktrees carved out of shared services"
+	// FlagDropData answers the data step ahead: every namespace is dropped now,
+	// starting the shared services that are down to do it. It is how an
+	// unattended run asks for what --yes will not do by default.
+	FlagDropData     = "drop-data"
+	FlagDropDataDesc = "drop the removed worktrees' data now, starting the shared services that are down to do it"
 
 	// The three name the namespace itself — app_feat_x, not feat-x — because it
 	// is what was destroyed, and the service it was destroyed in.
@@ -334,13 +339,25 @@ const (
 	OwedOneFmt           = "%d namespace"
 	OwedManyFmt          = "%d namespaces"
 	OwedBringUpFailedFmt = "could not start %s: %s"
-	// The question a clean asks when a shared service is down: start it now to
-	// drop the namespace, or leave it owed until the service next starts.
-	OwedBringUpTitleFmt = "%s is down — start it to drop %s now?"
-	OwedBringUpDesc     = "Otherwise it is kept and dropped the next time the service starts, from any worktree."
-	OwedBringUpYesFmt   = "Start %s and drop it"
-	OwedBringUpNo       = "Keep it for its next start"
-	OwedBringUpStageFmt = "Starting %s"
+	OwedBringUpStageFmt  = "Starting %s"
+
+	// The data step clean and prune ask, before their recap, when a service
+	// holding the data of a worktree they remove is down: start it and drop the
+	// data, or leave it owed. A debt is only paid by a service wtm itself starts,
+	// so the description says so rather than promising a cleanup it cannot make.
+	DataStepLabel      = "Data"
+	DataStepTitle      = "Some shared services are down"
+	DataStepIntro      = "A service that is down cannot drop anything. It holds:"
+	DataStepLineFmt    = "  %s in %s"
+	DataStepOutro      = "Kept, it is dropped the next time wtm starts the service — not if it is started some other way."
+	DataStartOptionFmt = "Start %s and drop it now"
+	DataDeferOption    = "Keep it until the service next starts"
+	DataStartSummary   = "start and drop it now"
+	DataDeferSummary   = "keep until the next start"
+	DataRecapStartFmt  = "  data      %s in %s (starts %s)"
+	DataRecapDeferFmt  = "  data      %s kept until %s next starts"
+	DataDroppingFmt    = "Dropping %s's data from %s…"
+	OwedDroppingFmt    = "Dropping %s from %s…"
 
 	// ScopeStepName, Title and Desc introduce the question run init asks of each
 	// compose service.
@@ -2912,19 +2929,20 @@ const (
 	CleanBlockerUnpushed = "unpushed"
 	CleanBlockerOpenPR   = "open_pr"
 
-	CleanUnsafeDirty        = "has uncommitted changes"
-	CleanUnsafeUnpushedFmt  = "has %d unpushed commit(s)"
-	CleanUnsafeOpenPR       = "has an open pull request"
-	CleanCheckLoading       = "Checking worktree…"
-	CleanLoadingFmt         = "Removing worktree %s…"
-	CleanCannotCleanParent  = "Cannot clean the parent worktree."
-	CleanAlreadyAbsentFmt   = "Worktree %s already absent — nothing to clean"
-	CleanedFmt              = "Cleaned worktree and branch %s"
-	CleanReparentedFmt      = "Reparented %s onto %s"
-	CleanStillOrphanedFmt   = "%s still points at the removed parent %s — reparent it with `wtm reparent`"
-	CleanStoppedServicesFmt = "Stopped services on %s"
-	CleanRemovalFailedFmt   = "Removal failed: %s"
-	CleanWizardErrLabel     = "clean wizard"
+	CleanUnsafeDirty         = "has uncommitted changes"
+	CleanUnsafeUnpushedFmt   = "has %d unpushed commit(s)"
+	CleanUnsafeOpenPR        = "has an open pull request"
+	CleanCheckLoading        = "Checking worktree…"
+	CleanLoadingFmt          = "Removing worktree %s…"
+	CleanCannotCleanParent   = "Cannot clean the parent worktree."
+	CleanAlreadyAbsentFmt    = "Worktree %s already absent — nothing to clean"
+	CleanedFmt               = "Cleaned worktree and branch %s"
+	CleanReparentedFmt       = "Reparented %s onto %s"
+	CleanStillOrphanedFmt    = "%s still points at the removed parent %s — reparent it with `wtm reparent`"
+	CleanStoppedServicesFmt  = "Stopped services on %s"
+	CleanStoppingServicesFmt = "Stopping services on %s…"
+	CleanRemovalFailedFmt    = "Removal failed: %s"
+	CleanWizardErrLabel      = "clean wizard"
 	// CleanSudoConfirmFmt is the confirmation title for the privileged `sudo rm -rf`
 	// removal fallback (worktree path).
 	CleanSudoConfirmFmt = "Force-delete %s with `sudo rm -rf`? (you may be prompted for your password)"
@@ -3565,9 +3583,9 @@ const (
 	RunViewReachKey = "a"
 	// RunViewReachNothing stands in the reach pane when nothing up has an address.
 	RunViewReachNothing = "Nothing running here has an address."
-	// RunViewSharedRowFmt heads, in the job list, the shared services a worktree
-	// holds in another.
-	RunViewSharedRowFmt  = "shared · %s"
+	// RunViewSharedHeading heads, in the job list, the shared services: one
+	// stack whatever worktree hosts it, so the heading names none.
+	RunViewSharedHeading = "shared"
 	RunViewAttachedToFmt = "attached to %s"
 	// KeyRunLogs reads a job's logs in the detail panel. Upper case: "l" is the
 	// list's vim-right.

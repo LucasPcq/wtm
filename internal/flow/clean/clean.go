@@ -11,8 +11,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
-	"github.com/LucasPcq/wtm/internal/service/runconfig"
-	"github.com/LucasPcq/wtm/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/internal/service/shell"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
@@ -32,6 +30,8 @@ type Request struct {
 	// command, and removing a worktree without its data would leave an orphan
 	// database behind on every iteration.
 	KeepData bool
+	// DropData drops it now instead, starting the services that are down.
+	DropData bool
 }
 
 type Outcome struct {
@@ -84,6 +84,7 @@ type cleanFlow struct {
 	prompter  flow.Prompter
 	presenter Presenter
 	checks    map[string]checkResult
+	snapshots map[string]owed.Snapshot
 }
 
 func (f *cleanFlow) run() (Outcome, error) {
@@ -114,6 +115,7 @@ func (f *cleanFlow) run() (Outcome, error) {
 		Params:        f.cleanParams(branchName, force),
 		ReparentPlan:  plan,
 		ApplyReparent: len(plan.Children) > 0 && answers.Value(KeyReparent) == reparentYes,
+		StartDown:     answers.Value(KeyData) == owed.DataStart,
 	})
 }
 
@@ -136,6 +138,7 @@ type removeParams struct {
 	Params        domain.CleanParams
 	ReparentPlan  domain.CleanReparentPlan
 	ApplyReparent bool
+	StartDown     bool
 }
 
 func (f *cleanFlow) remove(p removeParams) (Outcome, error) {
@@ -153,7 +156,7 @@ func (f *cleanFlow) remove(p removeParams) (Outcome, error) {
 	insideRemoved := worktreePath != "" && cwd != "" &&
 		rules.IsPathWithin(flow.ResolveSymlinks(worktreePath), flow.ResolveSymlinks(cwd))
 
-	f.removeNamespaces(params.Branch)
+	f.removeNamespaces(params.Branch, p.StartDown)
 	f.stopServices(params.Branch)
 
 	// Hooks run as their own phase before the removal, so they don't fight the
@@ -222,179 +225,18 @@ func (f *cleanFlow) purgeJobLogs(branch string) {
 	}))
 }
 
-// removeNamespaces gives back what this worktree carved out of the shared
-// services, before stopServices releases its claims: a claim released may be
-// the last one, and a namespace cannot be given back to a service that is down.
-func (f *cleanFlow) removeNamespaces(branchName string) {
+// removeNamespaces reads the holdings afresh rather than from the wizard: a
+// service may have gone down, or come up, while the recap was on screen.
+func (f *cleanFlow) removeNamespaces(branchName string, startDown bool) {
 	if f.request.KeepData {
 		return
 	}
-	cfg, err := runconfig.Load(f.ctx.StateDir)
-	if err != nil || len(cfg.Jobs) == 0 {
-		return
-	}
-	wt, err := worktree.FindByBranch(worktree.FindByBranchParams{
-		ProjectDir: f.ctx.ProjectDir,
-		Branch:     branchName,
+	owed.Detach(owed.DetachParams{
+		Context:   f.ctx,
+		Presenter: f.presenter,
+		Snapshot:  owed.Read(owed.ReadParams{Context: f.ctx, Branches: []string{branchName}}),
+		StartDown: startDown,
 	})
-	if err != nil {
-		return
-	}
-	env, err := worktree.JobEnv(worktree.JobEnvParams{
-		ProjectDir: f.ctx.ProjectDir,
-		StateDir:   f.ctx.StateDir,
-		Dir:        wt.Path,
-	})
-	if err != nil {
-		return
-	}
-
-	// Only what this worktree actually carved out. A worktree created and thrown
-	// away without ever starting the stack owes nothing, and running its detach
-	// would be a DROP DATABASE on a database that never existed.
-	held := worktree.NamespacesOf(worktree.ParentBranchParams{StateDir: f.ctx.StateDir, Branch: branchName})
-	if len(held) == 0 {
-		return
-	}
-
-	up := rules.SharedJobsUp(rules.SharedJobsUpParams{Jobs: runjobs.Load(), Config: cfg})
-	result := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
-		Config:  rules.JobsHeld(cfg, held),
-		Env:     env,
-		WorkDir: wt.Path,
-		Up:      up,
-	})
-	result = f.offerToBringUp(bringUpOffer{Config: cfg, Env: env, WorkDir: wt.Path, Up: up, Result: result})
-	f.reportNamespaces(cfg, result)
-
-	if err := runjobs.QueueRemovals(runjobs.QueueRemovalsParams{StateDir: f.ctx.StateDir, Refs: result.Deferred}); err != nil {
-		f.presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: err.Error()})
-	}
-}
-
-type bringUpOffer struct {
-	Config  domain.RunConfig
-	Env     map[string]string
-	WorkDir string
-	Up      map[string]bool
-	Result  runjobs.RemoveNamespacesResult
-}
-
-// offerToBringUp asks, for each shared service that was down, whether to start
-// it now and drop the namespace rather than leave it owed. Only a run that can
-// ask does: starting a service nobody asked for is not a safe default, so an
-// unattended clean keeps deferring.
-func (f *cleanFlow) offerToBringUp(offer bringUpOffer) runjobs.RemoveNamespacesResult {
-	result := offer.Result
-	if !f.prompter.Interactive() {
-		return result
-	}
-	for _, job := range downJobs(offer) {
-		name := rules.NamespaceName(rules.NamespaceNameParams{Config: offer.Config, Ref: refOf(result.Deferred, job)})
-		start, err := f.prompter.Confirm(flow.ConfirmParams{
-			Title:       fmt.Sprintf(domain.OwedBringUpTitleFmt, job, name),
-			Description: domain.OwedBringUpDesc,
-			DefaultYes:  true,
-			YesLabel:    fmt.Sprintf(domain.OwedBringUpYesFmt, job),
-			NoLabel:     domain.OwedBringUpNo,
-		})
-		if err != nil || !start {
-			continue
-		}
-		result = f.dropWithServiceUp(dropParams{Offer: offer, Job: job, Result: result})
-	}
-	return result
-}
-
-type dropParams struct {
-	Offer  bringUpOffer
-	Job    string
-	Result runjobs.RemoveNamespacesResult
-}
-
-func (f *cleanFlow) dropWithServiceUp(params dropParams) runjobs.RemoveNamespacesResult {
-	result := params.Result
-	var release func()
-	err := f.presenter.Stage(flow.StageParams{
-		Message: fmt.Sprintf(domain.OwedBringUpStageFmt, params.Job),
-		Work: func() error {
-			var bringErr error
-			release, bringErr = owed.BringUp(owed.BringUpParams{Context: f.ctx, Config: params.Offer.Config, Job: params.Job})
-			return bringErr
-		},
-	})
-	if err != nil {
-		result.Errs = append(result.Errs, err)
-		return result
-	}
-	defer release()
-
-	retry := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
-		Config:  rules.JobsNamed(params.Offer.Config, params.Job),
-		Env:     params.Offer.Env,
-		WorkDir: params.Offer.WorkDir,
-		Up:      map[string]bool{params.Job: true},
-	})
-	result.Deferred = withoutJob(result.Deferred, params.Job)
-	result.Released = append(result.Released, retry.Released...)
-	result.Deferred = append(result.Deferred, retry.Deferred...)
-	result.Errs = append(result.Errs, retry.Errs...)
-	return result
-}
-
-// downJobs are the services a namespace was deferred for because they were
-// down — not because their remove command failed, which starting them again
-// would not fix.
-func downJobs(offer bringUpOffer) []string {
-	var jobs []string
-	seen := map[string]bool{}
-	for _, ref := range offer.Result.Deferred {
-		if offer.Up[ref.Job] || seen[ref.Job] {
-			continue
-		}
-		seen[ref.Job] = true
-		jobs = append(jobs, ref.Job)
-	}
-	return jobs
-}
-
-func refOf(refs []domain.NamespaceRef, job string) domain.NamespaceRef {
-	for _, ref := range refs {
-		if ref.Job == job {
-			return ref
-		}
-	}
-	return domain.NamespaceRef{Job: job}
-}
-
-func withoutJob(refs []domain.NamespaceRef, job string) []domain.NamespaceRef {
-	kept := make([]domain.NamespaceRef, 0, len(refs))
-	for _, ref := range refs {
-		if ref.Job != job {
-			kept = append(kept, ref)
-		}
-	}
-	return kept
-}
-
-func (f *cleanFlow) reportNamespaces(cfg domain.RunConfig, result runjobs.RemoveNamespacesResult) {
-	for _, ref := range result.Released {
-		name := rules.NamespaceName(rules.NamespaceNameParams{Config: cfg, Ref: ref})
-		f.presenter.Status(flow.Notice{
-			Kind: flow.NoticeSuccess,
-			Text: fmt.Sprintf(domain.CleanRemovedNamespaceFmt, name, ref.Job),
-		})
-	}
-	for _, ref := range result.Deferred {
-		name := rules.NamespaceName(rules.NamespaceNameParams{Config: cfg, Ref: ref})
-		f.presenter.Status(flow.Notice{
-			Kind: flow.NoticeWarning,
-			Text: fmt.Sprintf(domain.CleanDeferredNamespaceFmt, ref.Job, name),
-		})
-	}
-	for _, err := range result.Errs {
-		f.presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: err.Error()})
-	}
 }
 
 func (f *cleanFlow) stopServices(branchName string) {
@@ -406,19 +248,18 @@ func (f *cleanFlow) stopServices(branchName string) {
 		return
 	}
 
-	socket := process.SocketPath()
-	if !process.IsDaemonRunning(socket) {
-		// Nothing listening does not mean nothing running: a detached stack
-		// outlives its daemon. The index is what says whether waking one is
-		// worth a fork.
-		if !process.HasIndexedJobs(wt.Path) {
-			return
-		}
-		if err := process.EnsureDaemon(process.DaemonParams{SocketPath: socket}); err != nil {
-			return
-		}
+	if !process.WorktreeHasJobs(wt.Path) {
+		return
 	}
-	if process.StopWorktreeJobs(process.NewClient(socket), wt.Path) {
+	stopped := false
+	_ = f.presenter.Stage(flow.StageParams{
+		Message: fmt.Sprintf(domain.CleanStoppingServicesFmt, branchName),
+		Work: func() error {
+			stopped = process.StopWorktreeJobs(wt.Path)
+			return nil
+		},
+	})
+	if stopped {
 		f.presenter.Status(flow.Notice{
 			Kind: flow.NoticeSuccess,
 			Text: fmt.Sprintf(domain.CleanStoppedServicesFmt, branchName),

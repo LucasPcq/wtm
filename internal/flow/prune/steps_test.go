@@ -7,6 +7,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
 )
@@ -264,5 +265,16 @@ func TestReparentProposalListsEveryMove(t *testing.T) {
 	}
 	if lines := strings.Count(proposal, "\n"); lines != 2 {
 		t.Errorf("proposal has %d line breaks, want one line per move under the intro:\n%s", lines, proposal)
+	}
+}
+
+func TestDropDataAnswersTheDataStep(t *testing.T) {
+	f := flowWith(domain.PrunePlan{}, Request{DropData: true})
+	if got := f.session().Presets.Value(KeyData); got != owed.DataStart {
+		t.Errorf("preset = %q, want %q", got, owed.DataStart)
+	}
+	f = flowWith(domain.PrunePlan{}, Request{})
+	if got := f.session().Presets.Value(KeyData); got != "" {
+		t.Errorf("preset = %q, want the step left to be answered", got)
 	}
 }

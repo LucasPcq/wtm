@@ -39,7 +39,12 @@ func newPruneCmd() *cobra.Command {
 			"redirected to the base repo. Like clean, worktrees that are dirty, have unpushed\n" +
 			"commits, or have an open PR are unsafe and need --force. Use --yes to skip the\n" +
 			"prompts (required with --output json); non-interactively, children are left orphaned\n" +
-			"unless --reparent-children is passed. --dry-run previews without changing anything.",
+			"unless --reparent-children is passed. --dry-run previews without changing anything.\n" +
+			"\n" +
+			"Like clean, prune gives back the data the removed worktrees carved out of shared\n" +
+			"services (--keep-data withholds it); when such a service is down, the form asks whether\n" +
+			"to start it and drop the data now, or keep it until the service next starts. --yes keeps\n" +
+			"it; --drop-data drops it, starting the services that are down.",
 		Args: cobra.NoArgs,
 		RunE: runPrune,
 	}
@@ -52,6 +57,9 @@ func newPruneCmd() *cobra.Command {
 	cmd.Flags().Bool(domain.FlagReparentChildren, false, "Reparent orphaned child worktrees onto the grandparent (no prompt)")
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; keep every match without the selection picker (use --force for unsafe worktrees)")
 	cmd.Flags().Bool(domain.FlagDryRun, false, "Preview what would be pruned without removing anything")
+	cmd.Flags().Bool(domain.FlagKeepData, false, domain.FlagKeepDataDesc)
+	cmd.Flags().Bool(domain.FlagDropData, false, domain.FlagDropDataDesc)
+	cmd.MarkFlagsMutuallyExclusive(domain.FlagKeepData, domain.FlagDropData)
 	shared.AddOutputFlag(cmd)
 
 	return cmd
@@ -66,6 +74,8 @@ func runPrune(cmd *cobra.Command, _ []string) error {
 	reparentChildren, _ := cmd.Flags().GetBool(domain.FlagReparentChildren)
 	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
 	dryRun, _ := cmd.Flags().GetBool(domain.FlagDryRun)
+	keepData, _ := cmd.Flags().GetBool(domain.FlagKeepData)
+	dropData, _ := cmd.Flags().GetBool(domain.FlagDropData)
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 
 	// Default is broad: with no reason flag, consider every finished worktree
@@ -106,6 +116,8 @@ func runPrune(cmd *cobra.Command, _ []string) error {
 			ReparentChildren: reparentChildren,
 			DryRun:           dryRun,
 			BaseBranch:       resolveBase("", config),
+			KeepData:         keepData,
+			DropData:         dropData,
 		},
 		// The picker may be reached through the shell wrapper, which consumes stdout.
 		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),
