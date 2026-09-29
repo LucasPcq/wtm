@@ -72,6 +72,23 @@ const (
 	ConcurrencyExclusive Concurrency = "exclusive"
 )
 
+// Isolation is how a worktree stands against the checkout its .env was copied
+// from. It is one decision read by both halves of the run module — what is
+// written into the .env and what the daemon hands a job — because a worktree
+// whose file says one thing and whose processes are told another starts wired
+// to a neighbour without a word.
+type Isolation string
+
+const (
+	// IsolationIsolated gives the worktree its own ports, compose project and
+	// service slices, in its .env and at run time alike.
+	IsolationIsolated Isolation = "isolated"
+	// IsolationVerbatim keeps the .env exactly as it was copied: wtm writes
+	// nothing into it, and runs the worktree on the ports and data it names —
+	// its source's, so the two cannot run at the same time.
+	IsolationVerbatim Isolation = "verbatim"
+)
+
 // JobConfig defines a managed job from .wtm/run.toml.
 type JobConfig struct {
 	Name string  `toml:"name"           json:"name"`
@@ -99,6 +116,11 @@ type JobConfig struct {
 	// that fans out. wtm learns nothing about the runner from it: the relation
 	// is declared, never inferred from the command.
 	Runs []string `toml:"runs,omitempty" json:"runs,omitempty"`
+	// Touches names the declared services whose data this job changes — a
+	// migration, a reset, a seed. wtm cannot read that from a command, and it
+	// is what lets `run up` stop before a job rewrites data the worktree does
+	// not own: its source's, for a verbatim worktree.
+	Touches []string `toml:"touches,omitempty" json:"touches,omitempty"`
 	// A nil Namespace on a shared job means shared for good: one instance, one set
 	// of data.
 	Scope     JobScope            `toml:"scope,omitempty"     json:"scope,omitempty"`
@@ -203,6 +225,9 @@ type RunConfig struct {
 	// Empty means the question is still open: `run up` asks it once, and writes
 	// the answer here when the user asks it to be remembered.
 	Concurrency Concurrency `toml:"concurrency,omitempty" json:"concurrency,omitempty"`
+	// Isolation is what a new worktree gets when nobody is asked. Empty means
+	// IsolationIsolated.
+	Isolation Isolation `toml:"isolation,omitempty" json:"isolation,omitempty"`
 }
 
 // ExecSpec is a command ready for exec: the binary and the arguments it takes,
@@ -533,4 +558,49 @@ type JobRunnerChoice struct {
 	Label   string
 	Runners []string
 	Options []string
+}
+
+// JobTouchChoice is one row of the init step asking which services a task
+// changes the data of. Options holds "" first, for none.
+type JobTouchChoice struct {
+	Job     string
+	Label   string
+	Touches []string
+	Options []string
+}
+
+// DataOwner is whose data a job would change, when it is not the worktree's.
+type DataOwner string
+
+const (
+	// DataOwnerSource is a verbatim worktree's source: its .env names the
+	// source's databases and realms.
+	DataOwnerSource DataOwner = "source"
+	// DataOwnerEveryone is a shared service carving no namespace: one set of
+	// data for every worktree.
+	DataOwnerEveryone DataOwner = "everyone"
+)
+
+// DataRisk is a job this run would start that changes data the worktree does
+// not own.
+type DataRisk struct {
+	Job     string
+	Service string
+	Owner   DataOwner
+	WorkDir string
+}
+
+// PortClaim is one port a job binds in one worktree.
+type PortClaim struct {
+	Port    int
+	Job     string
+	WorkDir string
+}
+
+// PortClash is a port a job about to start would bind while another job
+// already holds it — in another worktree, or in the same run.
+type PortClash struct {
+	Port   int
+	Want   PortClaim
+	HeldBy PortClaim
 }

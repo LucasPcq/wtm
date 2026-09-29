@@ -25,6 +25,7 @@ wtm env [worktree] [flags]
       --check                Read-only drift report; write nothing
       --from string          Override the value source strategy (example, main, parent)
   -h, --help                 help for env
+      --isolation string     Switch the worktree's isolation before reconciling: isolated (wtm moves its ports, compose project and service slices, in the .env and at run time) or verbatim (wtm writes none of them and runs it on the ports its .env keeps)
       --mode string          Reconciliation mode: add (fill gaps) or refresh (also settle value conflicts) (default "add")
       --on-conflict string   Non-interactive conflict resolution: keep (default) or overwrite
       --output string        Output format: text or json (default "text")

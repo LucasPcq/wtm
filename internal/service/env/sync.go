@@ -113,9 +113,6 @@ type ApplyEnvSyncParams struct {
 	Mode               domain.EnvMode
 	Ports              EnvPortsParams
 	Resolutions        map[string]EnvResolution
-	// SkipPortRewrite is the user declining the port pass. The links stay in
-	// Ports: they still normalize the diff, they just do not get written.
-	SkipPortRewrite bool
 }
 
 // ApplyEnvSync recomputes each file's drift and writes the reconciled content,
@@ -148,7 +145,7 @@ func ApplyEnvSync(params ApplyEnvSyncParams) (domain.EnvSyncResult, error) {
 		files = append(files, fileResult(paths, c, applied))
 	}
 
-	ports, err := settleEnvPorts(settleEnvPortsParams{Ports: params.Ports, Write: !params.SkipPortRewrite, Owned: true})
+	ports, err := settleEnvPorts(settleEnvPortsParams{Ports: params.Ports, Write: true, Owned: true})
 	if err != nil {
 		return domain.EnvSyncResult{}, err
 	}

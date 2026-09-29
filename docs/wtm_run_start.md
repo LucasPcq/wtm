@@ -18,6 +18,7 @@ wtm run start [worktree] [flags]
 
 ```
   -d, --detach          Start the service and return immediately instead of opening its output
+      --force           Lift the refusal to start a job whose touches reach data this worktree does not own (its source's when verbatim, everyone's for a shared service with no namespace); other questions are still asked unless --yes
   -h, --help            help for start
       --job string      Job to start (required without a terminal or in --output json mode)
       --output string   Output format: text or json (default "text")

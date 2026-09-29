@@ -225,6 +225,10 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 		NewJobs:         outcome.Merge.Added,
 	})
 
+	if answers.TouchesAsked {
+		outcome.Config = rules.ApplyTouchChoices(rules.ApplyTouchChoicesParams{Config: outcome.Config, Choices: answers.Touches})
+	}
+
 	// After the profiles are settled: the step re-proposes them from the config
 	// on disk, so a lifted job inserted any earlier is discarded — and a profile
 	// that no longer starts the database leaves every worktree addressing one

@@ -17,10 +17,9 @@ import (
 
 const (
 	applyAction = "apply"
-	// applyWithoutPortsAction is the port pass declined. It is offered as a
-	// second way to apply rather than as its own screen: `wtm create` proposes
-	// the same pass and it would be incoherent for `wtm env` to impose it.
-	applyWithoutPortsAction = "apply-without-ports"
+	// applyVerbatimAction declines the port pass for good: the worktree is
+	// recorded verbatim, so its jobs run on the ports its .env keeps.
+	applyVerbatimAction = "apply-verbatim"
 )
 
 // RunParams holds the wizard inputs. DiffByBranch is the precomputed per-worktree
@@ -41,8 +40,9 @@ type RunParams struct {
 type Result struct {
 	Branch    string
 	Decisions []components.EnvFileDecision
-	// SkipPorts is the user choosing to apply without the [[env_port]] pass.
-	SkipPorts bool
+	// Verbatim is the user choosing to apply without the port pass, which
+	// records the worktree verbatim.
+	Verbatim bool
 }
 
 // Run drives the unified wizard and returns the branch + collected decisions.
@@ -88,7 +88,7 @@ func Run(params RunParams) (Result, error) {
 		return Result{}, domain.ErrUserAborted
 	}
 
-	res := Result{Branch: branchOf(done), SkipPorts: action == applyWithoutPortsAction}
+	res := Result{Branch: branchOf(done), Verbatim: action == applyVerbatimAction}
 	if m, ok := done[resolveIdx].Model.(components.EnvResolveModel); ok {
 		res.Decisions = m.Decisions()
 	}
@@ -182,7 +182,7 @@ func recapActions(plan domain.EnvPortPlan) []components.SelectItem {
 	}
 	return []components.SelectItem{
 		apply,
-		{Label: domain.EnvApplyWithoutPortsLabel, Value: applyWithoutPortsAction},
+		{Label: domain.EnvApplyVerbatimLabel, Value: applyVerbatimAction},
 	}
 }
 

@@ -6,6 +6,7 @@ package jobcmd
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -73,8 +74,9 @@ func removalLines(effect rules.RemoveJobEffect) []string {
 	}{
 		{domain.JobRemovedProfilesFmt, effect.Profiles},
 		{domain.JobRemovedEmptiedFmt, effect.EmptiedProfiles},
-		{domain.JobRemovedEnvPortsFmt, effect.EnvPorts},
+		{domain.JobRemovedEnvPortsFmt, append(slices.Clone(effect.EnvPorts), effect.EnvValues...)},
 		{domain.JobRemovedRunnersFmt, effect.Runners},
+		{domain.JobRemovedTouchersFmt, effect.Touchers},
 	} {
 		if len(part.names) == 0 {
 			continue

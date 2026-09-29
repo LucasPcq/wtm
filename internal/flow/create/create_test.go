@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/decide"
@@ -343,73 +344,113 @@ func TestFastForwardSubjectIsSharedWithTheOtherFlows(t *testing.T) {
 	}
 }
 
-// The .env values a worktree is provisioned with are a consequence of the run
-// that provisions it, so the question belongs to that run — not to a second
-// confirmation put after the worktree exists, where saying no leaves a .env
-// pointing at another worktree's services.
-func TestEnvPortsIsAskedBeforeTheWorktreeExists(t *testing.T) {
+// withRunConfig gives the flow a state dir holding this run.toml.
+func withRunConfig(t *testing.T, f *createFlow, cfg domain.RunConfig) *createFlow {
+	t.Helper()
+	stateDir := t.TempDir()
+	if err := config.WriteRun(config.WriteRunParams{StateDir: stateDir, Force: true, Config: cfg}); err != nil {
+		t.Fatalf("write run config: %v", err)
+	}
+	f.ctx.StateDir = stateDir
+	return f
+}
+
+func portedConfig(isolation domain.Isolation) domain.RunConfig {
+	return domain.RunConfig{
+		Isolation: isolation,
+		Jobs: []domain.JobConfig{{
+			Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev",
+			Ports: map[string]int{"PORT": 3000},
+		}},
+	}
+}
+
+// What the step decides is written into the .env this run provisions, so the
+// question belongs to that run — not to a second confirmation put after the
+// worktree exists.
+func TestIsolationIsAskedBeforeTheWorktreeExists(t *testing.T) {
 	f := newFlow(t, Request{}, nil)
 	session := f.session()
 
 	var found bool
 	for index, step := range session.Steps {
-		if step.Key != KeyEnvPorts {
+		if step.Key != KeyIsolation {
 			continue
 		}
 		found = true
 		if step.Key == session.Steps[len(session.Steps)-1].Key {
-			t.Error("the env-ports step is the recap, want it asked before it")
+			t.Error("the isolation step is the recap, want it asked before it")
 		}
 		if index == 0 {
-			t.Error("the env-ports step leads the session, want it after what it depends on")
+			t.Error("the isolation step leads the session, want it after what it depends on")
 		}
 	}
 	if !found {
-		t.Fatal("the session declares no env-ports step")
+		t.Fatal("the session declares no isolation step")
 	}
 }
 
-// Nothing follows a port in this project, so there is nothing to move and no
-// question to put.
-func TestEnvPortsIsNotAskedWithoutLinks(t *testing.T) {
-	step := newFlow(t, Request{}, nil).envPortsStep()
+// With nothing to isolate both answers do the same thing, so nobody is asked.
+func TestIsolationIsNotAskedWithNothingToIsolate(t *testing.T) {
+	step := newFlow(t, Request{}, nil).isolationStep()
 
 	skip, reason := step.Skip(flow.Answers{})
 	if !skip {
-		t.Fatal("the step was posed for a project that links no .env value to a port")
+		t.Fatal("the step was posed for a project that declares nothing to isolate")
 	}
-	if reason != domain.EnvPortsStepUnlinked {
-		t.Errorf("reason = %q, want %q", reason, domain.EnvPortsStepUnlinked)
-	}
-}
-
-// Leaving a .env pointing at another worktree's services does not make the run
-// safer, it makes it useless — which is why the unattended answer adjusts.
-func TestEnvPortsResolvesToAdjusting(t *testing.T) {
-	answer, err := newFlow(t, Request{}, nil).envPortsStep().Resolve(flow.Answers{})
-	if err != nil {
-		t.Fatalf("Resolve: %v", err)
-	}
-	if answer.Value != portsAdjust {
-		t.Errorf("Resolve = %q, want the values adjusted", answer.Value)
+	if reason != domain.IsolationStepIrrelevant {
+		t.Errorf("reason = %q, want %q", reason, domain.IsolationStepIrrelevant)
 	}
 }
 
-// A step that is asked and then absent from the recap is what the
-// recap-completeness rule forbids.
-func TestRecapNamesTheEnvPortsDecision(t *testing.T) {
-	f := newFlow(t, Request{}, nil)
+func TestIsolationIsAskedOnceAPortIsDeclared(t *testing.T) {
+	step := withRunConfig(t, newFlow(t, Request{}, nil), portedConfig("")).isolationStep()
+	if skip, reason := step.Skip(flow.Answers{}); skip {
+		t.Errorf("skipped (%s), want the question put for a project declaring a port", reason)
+	}
+}
 
-	recap := f.recap(answers(map[string]string{
-		KeyBranch: "feat/x", KeySource: "main", KeyEnvPorts: portsKeep,
-	}))
-	if !strings.Contains(recap, domain.EnvPortsSummaryKeep) {
-		t.Errorf("recap = %q, want the env-ports answer named", recap)
+// Nobody to ask: the project's standing answer decides, and a project that
+// never gave one gets what every worktree got before the question existed.
+func TestIsolationResolvesToTheProjectDefault(t *testing.T) {
+	cases := []struct {
+		name      string
+		isolation domain.Isolation
+		want      domain.Isolation
+	}{
+		{name: "unset", isolation: "", want: domain.IsolationIsolated},
+		{name: "verbatim", isolation: domain.IsolationVerbatim, want: domain.IsolationVerbatim},
+	}
+	for _, tc := range cases {
+		f := withRunConfig(t, newFlow(t, Request{}, nil), portedConfig(tc.isolation))
+		answer, err := f.isolationStep().Resolve(flow.Answers{})
+		if err != nil {
+			t.Fatalf("%s: Resolve: %v", tc.name, err)
+		}
+		if domain.Isolation(answer.Value) != tc.want {
+			t.Errorf("%s: Resolve = %q, want %q", tc.name, answer.Value, tc.want)
+		}
+		if first := f.isolationStep().Options[0].Value; domain.Isolation(first) != tc.want {
+			t.Errorf("%s: first option = %q, want the default %q first", tc.name, first, tc.want)
+		}
+	}
+}
+
+// --isolation answers the step, and the recap still names it.
+func TestRecapNamesTheIsolation(t *testing.T) {
+	f := newFlow(t, Request{Isolation: domain.IsolationVerbatim}, nil)
+
+	values := f.session().Presets
+	if got := domain.Isolation(values.Value(KeyIsolation)); got != domain.IsolationVerbatim {
+		t.Errorf("isolation = %q, want the flag's", got)
+	}
+	if recap := f.recap(values); !strings.Contains(recap, domain.IsolationSummaryVerbatim) {
+		t.Errorf("recap = %q, want the isolation named", recap)
 	}
 
-	// Not asked, not recapped: a project with no link never saw the question.
+	// Not asked, not recapped: a project with nothing to isolate never saw it.
 	silent := f.recap(answers(map[string]string{KeyBranch: "feat/x", KeySource: "main"}))
-	if strings.Contains(silent, domain.RecapFieldEnvPorts) {
+	if strings.Contains(silent, domain.RecapFieldIsolation) {
 		t.Errorf("recap = %q, want no line for a step that was never posed", silent)
 	}
 }

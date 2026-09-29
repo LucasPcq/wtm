@@ -124,9 +124,14 @@ type InitProjectAnswers struct {
 	EnvValues        []EnvValueLink
 	EnvValuesOffered map[EnvKeyRef]bool
 	EnvValuesAsked   bool
-	SkipEnv          bool
-	SkipHooks        bool
-	SkipClean        bool
+	// Touches is what the data-tasks step settled, one row per task; a run
+	// that never asked carries none, and the write side leaves every task's
+	// touches as run.toml holds them.
+	Touches      []JobTouchChoice
+	TouchesAsked bool
+	SkipEnv      bool
+	SkipHooks    bool
+	SkipClean    bool
 }
 
 // PortRoute is where a job learns the port it binds. The .env route isolates it

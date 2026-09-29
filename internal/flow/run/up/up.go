@@ -11,6 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/run/addressing"
+	"github.com/LucasPcq/wtm/internal/flow/run/foreigndata"
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/flow/run/seam"
 	"github.com/LucasPcq/wtm/internal/flow/run/target"
@@ -38,6 +39,9 @@ type Request struct {
 	Exclusive bool
 	Parallel  bool
 	NoProbe   bool
+	// Force starts jobs that change data the worktree does not own without
+	// asking: the safety axis, never implied by --yes.
+	Force bool
 	// Config is run.toml, already validated by the surface that read it.
 	Config domain.RunConfig
 }
@@ -97,6 +101,8 @@ type upFlow struct {
 	jobs    []domain.JobInfo
 	running map[string]int
 	service runlogs.Service
+	// offsets memoizes each worktree's port offset for the clash check.
+	offsets map[string]int
 }
 
 func (f *upFlow) run() (Outcome, error) {
@@ -127,6 +133,21 @@ func (f *upFlow) run() (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
+	if answers.Value(KeyConcurrency) == answerCancel {
+		f.presenter.Notice(flow.AbortedNotice)
+		return Outcome{Aborted: true}, nil
+	}
+	// Before anything is stopped: a selection that is its own conflict must not
+	// cost the other worktrees their jobs first.
+	if clashes := rules.SelfPortClashes(f.startingClaims(answers)); len(clashes) > 0 {
+		return Outcome{}, fmt.Errorf(domain.RunSelfPortClashFmt, strings.Join(rules.PortClashLines(clashes), "\n"))
+	}
+	if proceed, err := f.allowForeignData(answers); err != nil || !proceed {
+		if err == nil {
+			f.presenter.Notice(flow.AbortedNotice)
+		}
+		return Outcome{Aborted: err == nil}, err
+	}
 
 	if err := f.remember(answers); err != nil {
 		return Outcome{}, err
@@ -137,6 +158,23 @@ func (f *upFlow) run() (Outcome, error) {
 	}
 
 	return f.start(answers)
+}
+
+// allowForeignData stops before a job rewrites data the worktree does not own —
+// asked here, before any other worktree is stopped for this run's sake.
+func (f *upFlow) allowForeignData(answers flow.Answers) (bool, error) {
+	profile, err := f.resolveProfile(answers)
+	if err != nil {
+		return false, err
+	}
+	return foreigndata.Allow(foreigndata.Params{
+		Context:  f.ctx,
+		Config:   f.request.Config,
+		Jobs:     profile.Jobs,
+		WorkDirs: f.workDirs(answers),
+		Force:    f.request.Force,
+		Prompter: f.prompter,
+	})
 }
 
 // connect wakes the daemon and reads its index once. Both the worktree badges

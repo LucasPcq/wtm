@@ -27,6 +27,7 @@ wtm run up [worktree...] [flags]
 ```
   -d, --detach            Start the jobs and return immediately instead of opening their output
       --exclusive         Stop jobs on other worktrees before starting (one worktree only)
+      --force             Lift the refusal to start a job whose touches reach data this worktree does not own (its source's when verbatim, everyone's for a shared service with no namespace); other questions are still asked unless --yes
   -h, --help              help for up
       --no-probe          Skip the check that each declared port was actually bound
       --output string     Output format: text or json (default "text")

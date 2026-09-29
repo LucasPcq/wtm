@@ -26,20 +26,21 @@ wtm run job edit [name] [flags]
 ### Options
 
 ```
-      --binds-no-port      This service listens on nothing by design, so stop offering it a port
-      --cmd string         Command to run, as a /bin/sh line
-      --cwd string         Working directory relative to project root (pass '' to drop it)
-  -h, --help               help for edit
-      --kind string        Job kind: service or task
-      --name string        Rename the job, updating the profiles and env_port links that name it
-      --output string      Output format: text or json (default "text")
-      --port stringArray   Base port as NAME=PORT, repeatable — merged into the declared ports
-      --port-clear         Drop every port this job declares
-      --runs stringArray   Declared job this one starts itself, repeatable — replaces the list (pass '' to drop it)
-      --stop string        Stop command, as a /bin/sh line (pass '' to drop it)
-      --url-host string    Host segment to publish under (pass '' to fall back to the job's name)
-      --url-port string    Publish this declared port under a name (pass '' to withdraw the url)
-  -y, --yes                Skip all prompts; a field flag is then required
+      --binds-no-port         This service listens on nothing by design, so stop offering it a port
+      --cmd string            Command to run, as a /bin/sh line
+      --cwd string            Working directory relative to project root (pass '' to drop it)
+  -h, --help                  help for edit
+      --kind string           Job kind: service or task
+      --name string           Rename the job, updating the profiles and env_port links that name it
+      --output string         Output format: text or json (default "text")
+      --port stringArray      Base port as NAME=PORT, repeatable — merged into the declared ports
+      --port-clear            Drop every port this job declares
+      --runs stringArray      Declared job this one starts itself, repeatable — replaces the list (pass '' to drop it)
+      --stop string           Stop command, as a /bin/sh line (pass '' to drop it)
+      --touches stringArray   Declared service whose data this job changes (a migration, a reset, a seed), repeatable — replaces the list (pass '' to drop it)
+      --url-host string       Host segment to publish under (pass '' to fall back to the job's name)
+      --url-port string       Publish this declared port under a name (pass '' to withdraw the url)
+  -y, --yes                   Skip all prompts; a field flag is then required
 ```
 
 ### Options inherited from parent commands

@@ -46,6 +46,7 @@ func newExtractCmd() *cobra.Command {
 
 	cmd.Flags().StringSlice(domain.FlagFiles, nil, "Files to extract, or a directory to take everything below it (skips interactive selection)")
 	cmd.Flags().String(domain.FlagTo, "", "Target worktree branch; created if it does not exist")
+	shared.AddIsolationFlag(cmd)
 	cmd.Flags().String(domain.FlagFrom, "", "Parent branch when creating the target worktree")
 	cmd.Flags().Bool(domain.FlagFF, false, "Fast-forward the parent branch to origin before creating the target (non-interactive; skipped when it has diverged)")
 	cmd.Flags().Bool(domain.FlagKeep, false, "Copy instead of move (keep the changes in the source)")
@@ -68,6 +69,9 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	}
 
 	if err := validateOnConflict(cmd); err != nil {
+		return err
+	}
+	if _, err := shared.IsolationFlag(cmd); err != nil {
 		return err
 	}
 
@@ -537,7 +541,8 @@ func runWizard(params runWizardParams) (extracttui.RunResult, error) {
 
 	var create newpicker.WizardParams
 	if params.needTarget {
-		create = extractCreateParams(params.cfg, params.source.branch)
+		isolation, _ := shared.IsolationFlag(params.cmd)
+		create = extractCreateParams(extractCreateParamsInput{cfg: params.cfg, sourceBranch: params.source.branch, isolation: isolation})
 	}
 
 	return extracttui.Run(extracttui.RunParams{
@@ -562,7 +567,16 @@ func runWizard(params runWizardParams) (extracttui.RunResult, error) {
 // at the config default. The deciders guard against an empty source — the create
 // steps are auto-skipped (and their source is "") when the target is an existing
 // worktree.
-func extractCreateParams(cfg shared.ConfigResult, sourceBranch string) newpicker.WizardParams {
+type extractCreateParamsInput struct {
+	cfg          shared.ConfigResult
+	sourceBranch string
+	isolation    domain.Isolation
+}
+
+func extractCreateParams(input extractCreateParamsInput) newpicker.WizardParams {
+	cfg := input.cfg
+	sourceBranch := input.sourceBranch
+	ctx := shared.FlowContext(cfg)
 	// Cached per branch name for the run, like create's own wizard: the recap and
 	// the source-update step both classify the same branch repeatedly.
 	cachedTarget := memoizedTarget(cfg.ProjectDir)
@@ -578,10 +592,12 @@ func extractCreateParams(cfg shared.ConfigResult, sourceBranch string) newpicker
 		DefaultBranch:  defaultParent(defaultParentParams{cfg: cfg, sourceBranch: sourceBranch}),
 		ConfigStrategy: cfg.Config.Project.Env.Strategy,
 		IncludeBranch:  true,
-		// Asked only where something follows a port; the TUI is handed the answer,
-		// never the config it comes from.
-		IncludeEnvPorts: envports.Linked(shared.FlowContext(cfg)),
-		Target:          target,
+		// Asked only where something can be isolated; the TUI is handed the
+		// answer, never the config it comes from.
+		IsolationApplies:  envports.IsolationApplies(ctx),
+		IsolationOverride: input.isolation,
+		IsolationDefault:  envports.DefaultIsolation(ctx),
+		Target:            target,
 		SourceUpdate: func(up newpicker.SourceUpdateParams) newpicker.SourceUpdatePrompt {
 			if up.Source == "" {
 				return newpicker.SourceUpdatePrompt{}
@@ -659,16 +675,17 @@ func resolveTarget(params resolveTargetParams) (extractTarget, error) {
 		} else if ffFlag, _ := params.cmd.Flags().GetBool(domain.FlagFF); ffFlag {
 			_ = branch.FastForwardIfBehind(branch.BranchParams{ProjectDir: params.cfg.ProjectDir, Branch: ffSubjectBranch})
 		}
-		// --to fully resolves the target, so it poses no wizard and no env-ports
-		// step: the safe default answers for it.
+		// --to fully resolves the target, so it poses no wizard and no isolation
+		// step: --isolation answers it, else the project's default.
+		isolation, _ := shared.IsolationFlag(params.cmd)
 		return createTarget(createTargetParams{
-			cmd:            params.cmd,
-			showHeader:     params.human,
-			cfg:            params.cfg,
-			branch:         toFlag,
-			fromBranch:     fromBranch,
-			adjustEnvPorts: true,
-			interactive:    params.interactive,
+			cmd:         params.cmd,
+			showHeader:  params.human,
+			cfg:         params.cfg,
+			branch:      toFlag,
+			fromBranch:  fromBranch,
+			isolation:   rules.FirstIsolation(isolation, envports.DefaultIsolation(shared.FlowContext(params.cfg))),
+			interactive: params.interactive,
 		})
 	}
 
@@ -695,13 +712,13 @@ func resolveTarget(params resolveTargetParams) (extractTarget, error) {
 		return extractTarget{}, domain.ErrUserAborted
 	}
 	return createTarget(createTargetParams{
-		cmd:            params.cmd,
-		showHeader:     params.human,
-		cfg:            params.cfg,
-		branch:         params.create.BranchName,
-		fromBranch:     params.create.FromBranch,
-		adjustEnvPorts: params.create.AdjustEnvPorts,
-		interactive:    params.interactive,
+		cmd:         params.cmd,
+		showHeader:  params.human,
+		cfg:         params.cfg,
+		branch:      params.create.BranchName,
+		fromBranch:  params.create.FromBranch,
+		isolation:   params.create.Isolation,
+		interactive: params.interactive,
 	})
 }
 
@@ -728,16 +745,13 @@ func defaultParent(params defaultParentParams) string {
 }
 
 type createTargetParams struct {
-	cmd        *cobra.Command
-	showHeader bool
-	cfg        shared.ConfigResult
-	branch     string
-	fromBranch string
-	// adjustEnvPorts is the wizard's answer to the env-ports step, true wherever
-	// it was never posed — a .env left pointing at another worktree's services is
-	// not the safer outcome.
-	adjustEnvPorts bool
-	interactive    bool
+	cmd         *cobra.Command
+	showHeader  bool
+	cfg         shared.ConfigResult
+	branch      string
+	fromBranch  string
+	isolation   domain.Isolation
+	interactive bool
 }
 
 func createTarget(params createTargetParams) (extractTarget, error) {
@@ -748,6 +762,7 @@ func createTarget(params createTargetParams) (extractTarget, error) {
 		FromBranch: params.fromBranch,
 		Config:     params.cfg.Config,
 		SkipHooks:  true,
+		Isolation:  params.isolation,
 	})
 	if err != nil {
 		return extractTarget{}, err
@@ -760,7 +775,6 @@ func createTarget(params createTargetParams) (extractTarget, error) {
 		Context:      shared.FlowContext(params.cfg),
 		Branch:       res.Branch,
 		WorktreePath: res.Path,
-		Rewrite:      params.adjustEnvPorts,
 		Presenter:    shared.NewPresenter(params.cmd, format),
 	})
 	if err != nil {

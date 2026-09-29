@@ -183,7 +183,9 @@ func (s Seam) run(ctx context.Context, sink runlogs.Sink, params StartParams) (r
 	// Recorded after the run, from the jobs it actually started: it is the only
 	// durable trace that this worktree holds a namespace, and `clean` reads it to
 	// give back exactly what exists rather than everything run.toml declares.
-	if s.shared != nil {
+	// A verbatim worktree carves nothing — the daemon refused to — so there is
+	// nothing for a clean to give back.
+	if s.shared != nil && !rules.IsVerbatim(domain.Isolation(s.env[domain.EnvIsolation])) {
 		_ = worktree.RecordNamespaces(worktree.RecordNamespacesParams{
 			StateDir: s.stateDir,
 			Branch:   s.worktree,

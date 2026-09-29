@@ -24,6 +24,7 @@ func newStartCmd() *cobra.Command {
 	}
 	shared.AddJobFlag(cmd, "Job to start (required without a terminal or in --output json mode)")
 	cmd.Flags().BoolP(domain.FlagDetach, "d", false, "Start the service and return immediately instead of opening its output")
+	cmd.Flags().Bool(domain.FlagForce, false, "Lift the refusal to start a job whose touches reach data this worktree does not own (its source's when verbatim, everyone's for a shared service with no namespace); other questions are still asked unless --yes")
 	shared.AddYesFlag(cmd, "Skip all prompts; --job is then required")
 	shared.AddOutputFlag(cmd)
 	return cmd
@@ -40,6 +41,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 	detach, _ := cmd.Flags().GetBool(domain.FlagDetach)
 	job, _ := cmd.Flags().GetString(domain.FlagJob)
+	force, _ := cmd.Flags().GetBool(domain.FlagForce)
 
 	outcome, err := startflow.Run(startflow.Params{
 		Context: ctx.FlowContext(),
@@ -47,6 +49,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 			Worktree: runctx.FirstArg(args),
 			Cwd:      ctx.Dir,
 			Job:      job,
+			Force:    force,
 			Config:   ctx.Run,
 		},
 		Prompter:  ctx.Prompter(ctx.Interactive),

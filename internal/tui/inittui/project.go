@@ -37,6 +37,7 @@ const (
 	stepCmds           = "cmds"
 	stepPortRoute      = "port_route"
 	stepRuns           = "runs"
+	stepTouches        = "touches"
 	stepEnvLink        = "env_link"
 	stepAddressing     = "addressing"
 	stepRecap          = "recap"
@@ -996,6 +997,27 @@ func addPortsAndProfilesSteps(s *stepSet, params addServicesStepsParams) (steps 
 		return rules.ApplyRunnerChoices(rules.ApplyRunnerChoicesParams{Config: resolved(prev).Config, Choices: runnerChoicesOf(prev, runners)})
 	}
 
+	// Read off the configuration being built, so each row carries the name the
+	// task and the service will be written under.
+	touchChoices := func(prev []components.Step) []domain.JobTouchChoice {
+		return rules.TouchChoices(rules.TouchChoicesParams{Config: withRunners(prev), Existing: params.Existing})
+	}
+	s.add(stepTouches, components.Step{
+		Name: domain.TouchListStepName,
+		Build: func(prev []components.Step) any {
+			return components.NewRunnerList(components.NewRunnerListParams{
+				Title:       domain.TouchListStepTitle,
+				Description: domain.TouchListStepDesc,
+				Choices:     touchRows(touchChoices(prev)),
+				Help:        domain.HelpSetTouch,
+			})
+		},
+		AutoSkip:   func(w components.WizardModel) bool { return len(touchChoices(w.Steps())) == 0 },
+		SkipReason: func() string { return domain.SkipReasonNoTouchTasks },
+		Summary:    touchListSummary,
+		Callout:    true,
+	})
+
 	portsSkipReason := ""
 	s.add(stepPorts, components.Step{
 		Name: domain.PortListStepName,
@@ -1343,6 +1365,41 @@ func runnerChoicesOf(prev []components.Step, at int) []domain.JobRunnerChoice {
 		return nil
 	}
 	return rl.Choices()
+}
+
+// touchRows and touchChoicesFrom carry the data-tasks answers through the
+// runner list, which cycles one name per row exactly as that step needs.
+func touchRows(choices []domain.JobTouchChoice) []domain.JobRunnerChoice {
+	rows := make([]domain.JobRunnerChoice, 0, len(choices))
+	for _, choice := range choices {
+		rows = append(rows, domain.JobRunnerChoice{Job: choice.Job, Label: choice.Label, Runners: choice.Touches, Options: choice.Options})
+	}
+	return rows
+}
+
+func touchChoicesFrom(rows []domain.JobRunnerChoice) []domain.JobTouchChoice {
+	choices := make([]domain.JobTouchChoice, 0, len(rows))
+	for _, row := range rows {
+		choices = append(choices, domain.JobTouchChoice{Job: row.Job, Label: row.Label, Touches: row.Runners, Options: row.Options})
+	}
+	return choices
+}
+
+func touchListSummary(model any) string {
+	rl, ok := model.(components.RunnerListModel)
+	if !ok {
+		return ""
+	}
+	if len(rl.Choices()) == 0 {
+		return domain.RecapNotAsked
+	}
+	touching := 0
+	for _, row := range rl.Choices() {
+		if len(row.Runners) > 0 {
+			touching++
+		}
+	}
+	return fmt.Sprintf(domain.TouchListSummaryFmt, touching, len(rl.Choices()))
 }
 
 func runnerListSummary(model any) string {
@@ -1716,6 +1773,11 @@ func extractProjectAnswers(final components.WizardModel, detection domain.InitDe
 	if i := at(stepRuns); i >= 0 && !final.Skipped(i) {
 		if m, ok := steps[i].Model.(components.RunnerListModel); ok {
 			answers.Runners = m.Choices()
+		}
+	}
+	if i := at(stepTouches); i >= 0 && !final.Skipped(i) {
+		if m, ok := steps[i].Model.(components.RunnerListModel); ok {
+			answers.Touches, answers.TouchesAsked = touchChoicesFrom(m.Choices()), true
 		}
 	}
 	if i := at(stepAddressing); i >= 0 && !final.Skipped(i) {

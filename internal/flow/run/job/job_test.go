@@ -135,6 +135,43 @@ func TestEditKeepsWhatTheFormDoesNotAskAbout(t *testing.T) {
 	}
 }
 
+// A shared service's scope and namespace are not on the form either: an edit
+// that dropped them turned the database back into one per worktree, and left
+// every [[env]] link naming a namespace that no longer existed.
+func TestEditKeepsASharedServicesScopeAndNamespace(t *testing.T) {
+	ctx := context(t)
+	namespace := &domain.JobNamespaceConfig{Name: "app_{worktree}", Create: "true"}
+	cfg := domain.RunConfig{Jobs: []domain.JobConfig{
+		{Name: "pg", Kind: domain.JobKindService, Cmd: "docker compose up -d pg", Scope: domain.JobScopeShared, Namespace: namespace},
+		{Name: "reset", Kind: domain.JobKindTask, Cmd: "pnpm reset", Touches: []string{"pg"}},
+	}}
+
+	for _, edit := range []struct{ name, cmd, kind string }{
+		{"pg", "docker compose up -d --wait pg", string(domain.JobKindService)},
+		{"reset", "pnpm db:reset", string(domain.JobKindTask)},
+	} {
+		if _, err := jobflow.Edit(jobflow.EditParams{
+			Context: ctx,
+			Request: jobflow.EditRequest{Name: edit.name, Config: cfg},
+			Prompter: &flowtest.ScriptedPrompter{Answers: map[string]string{
+				"run.job.name": edit.name, "run.job.cmd": edit.cmd, "run.job.kind": edit.kind,
+				"run.job.stop": "", "run.job.cwd": "", "run.job.ports": "", "run.job.url": "",
+			}},
+			Presenter: &recorder{},
+		}); err != nil {
+			t.Fatalf("Edit %s: %v", edit.name, err)
+		}
+		cfg = loadConfig(t, ctx.StateDir)
+	}
+
+	if got := cfg.Jobs[0]; got.Scope != domain.JobScopeShared || got.Namespace == nil || got.Namespace.Name != "app_{worktree}" {
+		t.Errorf("pg = %+v, want its scope and namespace kept", got)
+	}
+	if got := cfg.Jobs[1].Touches; len(got) != 1 || got[0] != "pg" {
+		t.Errorf("reset touches = %v, want them kept", got)
+	}
+}
+
 // A patch is the non-interactive edit, and the form is the only other way to
 // change something. A run that can open neither is refused rather than writing
 // the job back untouched.

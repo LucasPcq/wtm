@@ -15,28 +15,35 @@ type Params struct {
 	Context      flow.Context
 	Branch       string
 	WorktreePath string
-	// Rewrite is the decision, made before the worktree existed: the surfaces ask
-	// it as a step of the run that creates it, and resolve it to true when nobody
-	// can be asked. False still writes the identity keys — a worktree whose
-	// COMPOSE_PROJECT_NAME is another's collides whatever its ports say.
-	Rewrite   bool
-	Presenter flow.Presenter
+	Presenter    flow.Presenter
 }
 
-// Linked says whether this project links any .env value to a port, which is what
-// makes the question worth asking at all. A surface reads it to skip its step —
-// before the worktree exists, so it cannot be derived from the plan.
-func Linked(ctx flow.Context) bool {
+// IsolationApplies says whether run.toml declares anything a worktree could
+// isolate, which is what makes the question worth asking at all. A surface
+// reads it before the worktree exists, so it cannot be derived from the plan.
+func IsolationApplies(ctx flow.Context) bool {
 	cfg, err := runconfig.Load(ctx.StateDir)
 	if err != nil {
 		return false
 	}
-	return len(cfg.EnvPorts) > 0
+	return rules.IsolationApplies(cfg)
+}
+
+// DefaultIsolation is what a new worktree gets when nobody is asked: run.toml's
+// answer, else isolated. An unreadable run.toml is refused by whatever reads it
+// next; here it falls back to what every worktree got before the choice.
+func DefaultIsolation(ctx flow.Context) domain.Isolation {
+	cfg, err := runconfig.Load(ctx.StateDir)
+	if err != nil {
+		return domain.IsolationIsolated
+	}
+	return rules.EffectiveIsolation(cfg.Isolation)
 }
 
 // Settle moves the host ports a freshly provisioned .env holds onto the ones
 // this worktree binds. The values were just copied from main or from a parent,
-// so they carry that worktree's ports and nothing else would fix them.
+// so they carry that worktree's ports and nothing else would fix them. A
+// verbatim worktree resolves to nothing to settle, and is left as copied.
 //
 // It never asks: the question belongs to the run that creates the worktree,
 // where it is one confirmation among the others rather than a second one, put
@@ -66,7 +73,7 @@ func Settle(params Params) (domain.EnvPortSettlement, error) {
 	}
 
 	settlement := domain.EnvPortSettlement{Shifted: len(rules.EnvPortRewrites(plan)), Offset: plan.Offset}
-	if !params.Rewrite || settlement.Shifted == 0 {
+	if settlement.Shifted == 0 {
 		return settlement, envsvc.ApplyOwnedEnv(resolved)
 	}
 

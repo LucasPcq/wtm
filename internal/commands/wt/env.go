@@ -41,6 +41,7 @@ func newEnvCmd() *cobra.Command {
 	cmd.Flags().Bool(domain.FlagPrune, false, "Remove orphan keys (present in the .env but in no source)")
 	cmd.Flags().String(domain.FlagFrom, "", "Override the value source strategy (example, main, parent)")
 	cmd.Flags().String(domain.FlagOnConflict, "", "Non-interactive conflict resolution: keep (default) or overwrite")
+	cmd.Flags().String(domain.FlagIsolation, "", "Switch the worktree's isolation before reconciling: isolated (wtm moves its ports, compose project and service slices, in the .env and at run time) or verbatim (wtm writes none of them and runs it on the ports its .env keeps)")
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; apply safe additions and flag-driven decisions only")
 	shared.AddOutputFlag(cmd)
 
@@ -70,6 +71,10 @@ func runEnv(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	isolation, err := shared.IsolationFlag(cmd)
+	if err != nil {
+		return err
+	}
 
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
@@ -80,12 +85,15 @@ func runEnv(cmd *cobra.Command, args []string) error {
 	if format == domain.OutputJSON && !yes && !check {
 		return domain.ErrEnvJSONNeedsYes
 	}
+	if check && isolation != "" {
+		return domain.ErrEnvIsolationWithCheck
+	}
 
 	if len(cfg.Config.Project.Env.Files) == 0 {
 		return domain.ErrEnvNoFiles
 	}
 
-	flags := envFlags{mode: mode, from: from, onConflict: onConflict, prune: prune, check: check, format: format}
+	flags := envFlags{mode: mode, from: from, onConflict: onConflict, prune: prune, check: check, format: format, isolation: isolation}
 
 	// The unified wizard runs only fully interactively (human output, a TTY, not
 	// --yes) and never for --check (read-only). Everything else is the
@@ -104,6 +112,9 @@ type envFlags struct {
 	prune      bool
 	check      bool
 	format     string
+	// isolation is --isolation, recorded before anything is read so the whole
+	// run — drift, port pass, report — sees the worktree as it now stands.
+	isolation domain.Isolation
 }
 
 // runEnvNonInteractive reconciles a single named worktree without prompting
@@ -118,6 +129,9 @@ func runEnvNonInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg strin
 	})
 	if err != nil {
 		return fmt.Errorf("worktree %q: %w", arg, err)
+	}
+	if err := recordIsolation(cfg, wt.Branch, f.isolation); err != nil {
+		return err
 	}
 
 	ctx := resolveEnvStrategyAndParent(cfg, wt.Branch, f.from)
@@ -142,6 +156,7 @@ func runEnvNonInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg strin
 	if err != nil {
 		return err
 	}
+	result.Isolation = isolationOf(cfg, wt.Branch)
 	return writeEnvResult(cmd, result, f.format)
 }
 
@@ -177,6 +192,9 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 					return fmt.Errorf("worktree %q: %w", arg, domain.ErrWorktreeNotFound)
 				}
 				preset = arg
+				if err := recordIsolation(cfg, arg, f.isolation); err != nil {
+					return err
+				}
 			}
 
 			// The drift is precomputed for every branch the wizard will surface, so
@@ -219,6 +237,14 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 		return err
 	}
 
+	isolation := f.isolation
+	if res.Verbatim {
+		isolation = domain.IsolationVerbatim
+	}
+	if err := recordIsolation(cfg, res.Branch, isolation); err != nil {
+		return err
+	}
+
 	ctx := resolveEnvStrategyAndParent(cfg, res.Branch, f.from)
 	worktreePath := worktreePathForBranch(statuses, res.Branch)
 	ports, err := resolveEnvPorts(cfg, res.Branch, worktreePath)
@@ -236,11 +262,11 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 		Mode:               f.mode,
 		Resolutions:        mapDecisions(res.Decisions),
 		Ports:              ports,
-		SkipPortRewrite:    res.SkipPorts,
 	})
 	if err != nil {
 		return err
 	}
+	result.Isolation = isolationOf(cfg, res.Branch)
 	return writeEnvResult(cmd, result, f.format)
 }
 
@@ -287,6 +313,22 @@ func resolveEnvPorts(cfg shared.ConfigResult, branch string, worktreePath string
 		EnvFiles:     cfg.Config.Project.Env.Files,
 		Global:       cfg.Config.Global,
 	})
+}
+
+// recordIsolation writes --isolation, or the recap's verbatim answer, to the
+// worktree's record. Nothing given records nothing.
+func recordIsolation(cfg shared.ConfigResult, branch string, isolation domain.Isolation) error {
+	if isolation == "" {
+		return nil
+	}
+	return worktree.SetIsolation(worktree.SetIsolationParams{
+		Ref:       worktree.WorktreeRef{ProjectDir: cfg.ProjectDir, StateDir: cfg.StateDir, Branch: branch},
+		Isolation: isolation,
+	})
+}
+
+func isolationOf(cfg shared.ConfigResult, branch string) domain.Isolation {
+	return worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: cfg.ProjectDir, StateDir: cfg.StateDir, Branch: branch})
 }
 
 // mapDecisions converts the wizard's per-file decisions to service resolutions.

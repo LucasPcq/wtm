@@ -35,4 +35,6 @@ type EnvSyncResult struct {
 	// Ports is the [[env_port]] rewrite that followed the reconciliation. It is
 	// reported even under Check, where nothing was written.
 	Ports EnvPortPlan `json:"ports,omitzero"`
+	// Isolation is the worktree's, which decides whether Ports can hold anything.
+	Isolation Isolation `json:"isolation,omitempty"`
 }

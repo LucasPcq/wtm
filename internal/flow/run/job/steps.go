@@ -192,10 +192,10 @@ func defaultKind(kind domain.JobKind) domain.JobKind {
 	return kind
 }
 
-// fromAnswers reads the form back. Every field the form does not show is
-// carried over from the declaration rather than rebuilt — dropping what it
-// never showed is how an edit used to silently unlink a runner from its
-// children, and would otherwise re-arm the port probe of a job that opted out.
+// fromAnswers reads the form back onto the declaration, so every field the form
+// does not show is kept by construction. Rebuilding the job field by field is
+// how an edit once unlinked a runner from its children, and later dropped a
+// shared service's scope and namespace — each new field was one more to forget.
 func fromAnswers(answers flow.Answers, initial domain.JobConfig) (domain.JobConfig, error) {
 	ports, err := rules.ParsePorts(strings.Fields(answers.Value(KeyPorts)))
 	if err != nil {
@@ -205,18 +205,15 @@ func fromAnswers(answers flow.Answers, initial domain.JobConfig) (domain.JobConf
 	if err != nil {
 		return domain.JobConfig{}, err
 	}
-	return domain.JobConfig{
-		Name:        strings.TrimSpace(answers.Value(KeyName)),
-		Cmd:         answers.Value(KeyCmd),
-		Kind:        defaultKind(domain.JobKind(answers.Value(KeyKind))),
-		Stop:        answers.Value(KeyStop),
-		Cwd:         answers.Value(KeyCwd),
-		Ports:       ports,
-		URL:         url,
-		Runs:        initial.Runs,
-		BindsNoPort: initial.BindsNoPort,
-		Probe:       initial.Probe,
-	}, nil
+	job := initial
+	job.Name = strings.TrimSpace(answers.Value(KeyName))
+	job.Cmd = answers.Value(KeyCmd)
+	job.Kind = defaultKind(domain.JobKind(answers.Value(KeyKind)))
+	job.Stop = answers.Value(KeyStop)
+	job.Cwd = answers.Value(KeyCwd)
+	job.Ports = ports
+	job.URL = url
+	return job, nil
 }
 
 // actionStep is what `run job list` asks once a job is picked: the picker is a

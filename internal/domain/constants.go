@@ -228,6 +228,10 @@ const (
 	EnvOrdinal            = "WTM_ORDINAL"
 	EnvPortOffset         = "WTM_PORT_OFFSET"
 	EnvComposeProjectName = "COMPOSE_PROJECT_NAME"
+	// EnvIsolation carries the worktree's Isolation to the daemon, which cannot
+	// read the metadata that records it and must not carve a slice out of a
+	// shared service for a worktree whose .env names its source's.
+	EnvIsolation = "WTM_ISOLATION"
 	// EnvProject is the repository's slug, as the hostname and the compose
 	// project name both derive from it.
 	EnvProject = "WTM_PROJECT"
@@ -961,11 +965,14 @@ const (
 	EnvFileSourceFmt   = "strategy: %s  ·  source: %s"
 	EnvFieldWorktree   = "Worktree"
 	EnvFieldMode       = "Mode"
+	EnvFieldIsolation  = "Isolation"
 	EnvModeCheckSuffix = "  ·  read-only check"
 	// The two ways to apply on the `wtm env` recap. The second exists so the
-	// port pass is proposed, as `wtm create` proposes it, and never imposed.
-	EnvApplyActionLabel       = "Yes, apply"
-	EnvApplyWithoutPortsLabel = "Apply, but leave the port values alone"
+	// port pass is proposed, as `wtm create` proposes it, and never imposed —
+	// and declining it records the worktree verbatim, since a .env left on its
+	// source's ports is only coherent with jobs run on them too.
+	EnvApplyActionLabel   = "Yes, apply"
+	EnvApplyVerbatimLabel = "Apply, and keep this worktree's .env verbatim from now on"
 	// EnvPortsLeftAloneFmt is the pass the user declined.
 	EnvPortsLeftAloneFmt = "Env ports left alone — %d linked value(s) left as they were"
 	// EnvPortsWouldShiftFmt is what a --check preview says instead of listing
@@ -1116,10 +1123,15 @@ const (
 
 	ComposeProjectFallback = "wtm"
 
+	// IsolationUnknownFmt refuses a value that is neither of the two, from
+	// run.toml and from --isolation alike.
+	IsolationUnknownFmt = "unknown isolation %q (expected %q or %q)"
+
 	// Flag names.
 	FlagFrom      = "from"
 	FlagFF        = "ff"
 	FlagEnvFrom   = "env-from"
+	FlagIsolation = "isolation"
 	FlagForce     = "force"
 	FlagBase      = "base"
 	FlagExclusive = "exclusive"
@@ -1204,6 +1216,7 @@ const (
 	FlagLinkEnv        = "link-env"
 	FlagWritePortKeys  = "write-port-keys"
 	FlagRuns           = "runs"
+	FlagTouches        = "touches"
 	FlagBindsNoPort    = "binds-no-port"
 	FlagShell          = "shell"
 	FlagBasePath       = "base-path"
@@ -1742,6 +1755,7 @@ const (
 	JobRemovedEmptiedFmt  = "Removed profile(s) left with no job: %s"
 	JobRemovedEnvPortsFmt = "Unlinked .env key(s): %s"
 	JobRemovedRunnersFmt  = "No longer started by: %s"
+	JobRemovedTouchersFmt = "Dropped from the touches of: %s"
 	// RunInitJobsRemovedFmt reports what the unchecking dropped, next to what
 	// the same run added.
 	JobActionUpdated = "updated"
@@ -2389,6 +2403,36 @@ const (
 	RunConcurrencySkipFlag    = "set by --exclusive or --parallel"
 	RunConcurrencySkipAlone   = "no other worktree is running jobs"
 
+	// RunPortClash* is the same question when it is no longer a preference: a
+	// port this run needs is bound by another worktree — which is what a
+	// verbatim worktree and its source always do. Running side by side is not
+	// on offer, so the two answers are to stop the other one, or not to start.
+	RunPortClashTitle   = "Ports another worktree already binds"
+	RunPortClashDescFmt = "%s\n\nThis worktree runs on the same ports as the one holding them — a verbatim worktree runs on its source's — so only one of them can be up at a time."
+	RunPortClashLineFmt = "%d — %s in %s, bound by %s in %s"
+	RunPortClashStopFmt = "Stop %s first"
+	RunPortClashCancel  = "Don't start"
+	// RunPortClashRefusedFmt is the refusal where nobody can be asked: --parallel
+	// or `concurrency = "parallel"` cannot be honoured, and stopping another
+	// worktree is not a default to take silently.
+	RunPortClashRefusedFmt = "ports already bound by another worktree:\n%s\nstop it first with --%s, or give this worktree its own ports: wtm env <branch> --%s %s"
+	// RunForeignData* is the stop before a job that changes data the worktree
+	// does not own — its source's when verbatim, everyone's for a shared
+	// service with no namespace. It is a safety refusal: --force lifts it.
+	RunForeignDataTitle       = "Jobs that change data this worktree does not own"
+	RunForeignDataDesc        = "They run against data another checkout uses too, and whatever they reset or migrate there is reset or migrated for it as well."
+	RunForeignDataLineFmt     = "%s changes %s — %s"
+	RunForeignDataInFmt       = "%s (in %s)"
+	RunForeignDataOwnerSource = "its source's data: this worktree is verbatim"
+	RunForeignDataOwnerShared = "every worktree's data: a shared service with no [job.namespace]"
+	RunForeignDataYes         = "Run them anyway"
+	RunForeignDataNo          = "Don't start"
+	RunForeignDataRefusedFmt  = "%s:\n%s\npass --%s to run them anyway, or give this worktree its own data: wtm env <branch> --%s %s"
+
+	// RunSelfPortClashFmt refuses a run that brings up two worktrees on the same
+	// ports: there is nothing to stop, the selection is the conflict.
+	RunSelfPortClashFmt = "these worktrees bind the same ports and cannot run at once:\n%s"
+
 	// RunConcurrencyContradiction* is the same question asked for the opposite
 	// reason: the project settled on one stack at a time and this run starts
 	// several. It is a guard rail rather than an ambush — the contradiction is one
@@ -2751,27 +2795,28 @@ const (
 	// recap line blank.
 	EnvSummaryConfigDefault = "config default"
 
-	// The env-ports step: asked while the worktree is still being described,
-	// because the values it settles are a consequence of the .env this very run
-	// provisions. It says what it will do rather than showing the table — which
-	// values change is only knowable once the files exist, and the run reports
-	// them then.
-	CreateEnvPortsStepName        = "Env ports"
-	CreateEnvPortsStepDescription = "The .env files are copied with the ports of the worktree they come from. wtm can move the values run.toml links to a port onto the ones this worktree binds."
-	EnvPortsOptionAdjust          = "Adjust them to this worktree"
-	EnvPortsOptionKeep            = "Leave the copied values as they are"
-	EnvPortsSummaryAdjust         = "adjusted to this worktree"
-	EnvPortsSummaryKeep           = "left as copied"
-	// EnvPortsStepUnlinked is why the step is not asked: with no [[env_port]]
-	// link, no value follows a port and there is nothing to move.
-	EnvPortsStepUnlinked = "no .env value is linked to a port"
+	// Isolation* is the question every create-like run asks when run.toml
+	// declares something a worktree can isolate. It is one choice for the .env
+	// and for the jobs `wtm run` starts, because the two disagreeing is what
+	// wires a worktree to its neighbour's services without a word.
+	IsolationStepName        = "Isolation"
+	IsolationStepDescription = "The .env files are copied from another checkout, with its ports and its service slices.\n" +
+		"Isolated: wtm moves them onto this worktree's — in the .env and when `wtm run` starts its jobs — so both can run side by side.\n" +
+		"Verbatim: wtm writes nothing into the .env and runs this worktree on the ports and data it was copied with, so it cannot run while its source does."
+	IsolationOptionIsolated  = "Isolate it — its own ports, compose project and service slices"
+	IsolationOptionVerbatim  = "Keep the .env verbatim — its source's ports and data, one of the two runs at a time"
+	IsolationSummaryIsolated = "isolated"
+	IsolationSummaryVerbatim = "verbatim — .env kept as copied"
+	// IsolationStepIrrelevant is why the step is not asked: with nothing to
+	// isolate, both answers do exactly the same thing.
+	IsolationStepIrrelevant = "run.toml declares nothing a worktree isolates"
 
 	// RecapField* are the aligned labels of the create recap body.
 	RecapFieldBranch       = "Branch:  "
 	RecapFieldSource       = "Source:  "
 	RecapFieldParent       = "Parent:  "
 	RecapFieldEnv          = "Env:     "
-	RecapFieldEnvPorts     = "Ports:   "
+	RecapFieldIsolation    = "Mode:    "
 	RecapFastForwardSuffix = " (fast-forward to origin)"
 	WarningPrefix          = "⚠ "
 	WizardErrLabel         = "wizard"
@@ -3557,6 +3602,7 @@ const (
 	HelpSetKind   = "←→ set type"
 	HelpSetScope  = "←→ set scope"
 	HelpSetRunner = "←→ set runner"
+	HelpSetTouch  = "←→ set service"
 
 	// The runner step: which root-level service starts each of the others. The
 	// relation is declared, never inferred — RunnerListNone is what a row says
@@ -3572,9 +3618,18 @@ const (
 	RunnerListGap               = 3
 	RunnerListSummaryFmt        = "%d of %d attached to a runner"
 	SkipReasonNoRunnerCandidate = "no root-level service that could start the others"
-	SkipReasonNoName            = "no job publishes a name, so nothing is addressed by one"
-	HelpSwitchRoute             = "space switch route"
-	HelpBindsNoPort             = "n binds no port"
+
+	// The touches step: which service's data each task changes. wtm proposes
+	// what a task's name says — a data verb and a word it shares with one
+	// service — and the reader confirms; nothing is written unasked.
+	TouchListStepName      = "Data tasks"
+	TouchListStepTitle     = "Which service's data does each task change?"
+	TouchListStepDesc      = "A migration, a reset or a seed changes a database. Saying which one lets `wtm run up` stop before running it against data the worktree does not own —\nits source's when the worktree is verbatim, every worktree's for a shared service with no namespace.\nLeave a row on — when the task changes no service's data."
+	TouchListSummaryFmt    = "%d of %d task(s) change a service's data"
+	SkipReasonNoTouchTasks = "no task, or no service holding data"
+	SkipReasonNoName       = "no job publishes a name, so nothing is addressed by one"
+	HelpSwitchRoute        = "space switch route"
+	HelpBindsNoPort        = "n binds no port"
 
 	// The addressing step. The mode was a silent default, and its consequence is
 	// the one a reader has to weigh before anything is written into a .env:
@@ -3810,6 +3865,10 @@ var EnvTemplateSuffixes = []string{
 // neither as drift nor as a conflict.
 var WtmOwnedEnvKeys = []string{EnvComposeProjectName}
 
+// TouchDataVerbs are the words that make a task's name read as a change to a
+// service's data. They only ever shape a proposal the reader confirms.
+var TouchDataVerbs = []string{"reset", "migrate", "migration", "migrations", "seed", "init", "drop", "truncate", "db", "orm", "prisma", "schema", "fixtures"}
+
 // EnvSliceKeySuffixes are the endings of a key that names a service's slice —
 // POSTGRES_DB, KEYCLOAK_REALM — as against its credentials or its address,
 // which POSTGRES_USER and POSTGRES_PASSWORD share the service's prefix with.
@@ -3841,6 +3900,7 @@ var WorktreeScopedEnv = []string{
 	EnvOrdinal,
 	EnvPortOffset,
 	EnvComposeProjectName,
+	EnvIsolation,
 }
 
 var DashboardWordmarkLines = [3]string{

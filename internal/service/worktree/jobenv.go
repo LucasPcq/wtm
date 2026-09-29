@@ -52,6 +52,7 @@ func BranchEnv(params WorktreeRef) (map[string]string, error) {
 		Ordinal:         ordinal,
 		PortOffsetBlock: rules.EffectivePortOffsetBlock(cfg),
 		ComposeProject:  os.Getenv(domain.EnvComposeProjectName),
+		Isolation:       IsolationOf(params),
 	})
 
 	// The offset is read back from the environment just resolved rather than

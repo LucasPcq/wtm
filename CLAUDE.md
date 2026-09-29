@@ -120,7 +120,9 @@ internal/
                                 the vocabulary (Step, Session, Prompter, Presenter)
     decide/                   ←   branch/env decisions shared by the create-like flows
     envports/                 ←   settling a fresh .env's host ports onto the ones the
-                                  worktree binds — shared by `create` and `extract`
+                                  worktree binds, per its isolation (isolated / verbatim,
+                                  recorded in meta.json and read by the daemon too) —
+                                  shared by `create`, `extract` and `checkout`
     create/                   ←   `wtm create`: the run (create.go) + its questions (steps.go)
     clean/                    ←   `wtm clean`: the run (clean.go) + its questions (steps.go)
     reparent/                 ←   `wtm reparent`: the run (reparent.go) + its questions (steps.go)
@@ -134,6 +136,8 @@ internal/
       urls/                   ←     where every address the module hands out is computed
       seam/                   ←     the daemon as a flow uses it: board, env, log dir,
                                     port prober, and the start sequence a surface drives
+      foreigndata/            ←     the stop before a job whose `touches` reach data the
+                                    worktree does not own, shared by `up` and `start`
       up/ down/ start/        ←     one package per command, as everywhere else
       stop/ logs/ open/ url/
       list/                   ←     `run list`: which entry was picked and what to do to it
@@ -221,7 +225,7 @@ Implementation rule: fold `--yes` into the command's `interactive` boolean (`int
 
 **Re-init completeness:** a re-init step always shows the **complete** list of candidates, pre-filled from the config on disk when that config speaks about them, and from detection otherwise — never a subset. Any step whose answer may legitimately be empty is read as a pair `(value, asked)`: empty-and-asked withdraws, empty-and-not-asked leaves the proposal standing. The pairs are `URLsAsked`, `ProfilesAsked`, `EnvLinksAsked` and `SelectionAsked` in `domain.InitProjectAnswers`. This is the write-side counterpart of the rule above: a flag must not erase a recap line, and a step must not reinstate what the user removed.
 
-Two corollaries a new step must respect. Its pre-fill reads the **existing config**, not the detection, wherever the config has an opinion (`rules.ProposedScriptKind`, `rules.URLCandidatesFor`). And a step that **removes** may only remove what it proposed itself: `rules.DeselectedJobs` never reaches a job written by `run job add`, because such a job matches no detected script or compose file. Removal goes through `rules.RemoveJob`, the one place that also strips profile entries and `[[env_port]]` links.
+Two corollaries a new step must respect. Its pre-fill reads the **existing config**, not the detection, wherever the config has an opinion (`rules.ProposedScriptKind`, `rules.URLCandidatesFor`). And a step that **removes** may only remove what it proposed itself: `rules.DeselectedJobs` never reaches a job written by `run job add`, because such a job matches no detected script or compose file. Removal goes through `rules.RemoveJob`, the one place that also strips profile entries, `[[env_port]]` and `[[env]]` links, and the `runs` and `touches` naming the job; a rename goes through `rules.RenameJobRefs`, which follows the same five.
 
 ## 10. Commit messages in English
 

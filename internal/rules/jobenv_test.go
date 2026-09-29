@@ -46,6 +46,7 @@ func TestWorktreeJobEnv(t *testing.T) {
 				domain.EnvPortOffset:         "0",
 				domain.EnvComposeProjectName: "main",
 				domain.EnvProject:            domain.HostLabelFallback,
+				domain.EnvIsolation:          string(domain.IsolationIsolated),
 			},
 		},
 		{
@@ -58,6 +59,7 @@ func TestWorktreeJobEnv(t *testing.T) {
 				domain.EnvPortOffset:         "30",
 				domain.EnvComposeProjectName: "feat-x",
 				domain.EnvProject:            domain.HostLabelFallback,
+				domain.EnvIsolation:          string(domain.IsolationIsolated),
 			},
 		},
 		{
@@ -70,6 +72,7 @@ func TestWorktreeJobEnv(t *testing.T) {
 				domain.EnvPortOffset:         "20",
 				domain.EnvComposeProjectName: "feat-x",
 				domain.EnvProject:            domain.HostLabelFallback,
+				domain.EnvIsolation:          string(domain.IsolationIsolated),
 			},
 		},
 		{
@@ -82,6 +85,7 @@ func TestWorktreeJobEnv(t *testing.T) {
 				domain.EnvPortOffset:         "10",
 				domain.EnvComposeProjectName: "perso",
 				domain.EnvProject:            domain.HostLabelFallback,
+				domain.EnvIsolation:          string(domain.IsolationIsolated),
 			},
 		},
 		{
@@ -94,6 +98,32 @@ func TestWorktreeJobEnv(t *testing.T) {
 				domain.EnvPortOffset:         "10",
 				domain.EnvComposeProjectName: "my-app-feat-x",
 				domain.EnvProject:            "my-app",
+				domain.EnvIsolation:          string(domain.IsolationIsolated),
+			},
+		},
+		{
+			name:   "verbatim tourne sur les ports de base, sans projet compose inventé",
+			params: WorktreeJobEnvParams{Branch: "feat/x", Ordinal: 3, PortOffsetBlock: 10, Isolation: domain.IsolationVerbatim},
+			want: map[string]string{
+				domain.EnvWorktree:   "feat-x",
+				domain.EnvBranch:     "feat/x",
+				domain.EnvOrdinal:    "3",
+				domain.EnvPortOffset: "0",
+				domain.EnvProject:    domain.HostLabelFallback,
+				domain.EnvIsolation:  string(domain.IsolationVerbatim),
+			},
+		},
+		{
+			name:   "verbatim garde le COMPOSE_PROJECT_NAME posé par l'utilisateur",
+			params: WorktreeJobEnvParams{Branch: "feat/x", Ordinal: 3, PortOffsetBlock: 10, ComposeProject: "perso", Isolation: domain.IsolationVerbatim},
+			want: map[string]string{
+				domain.EnvWorktree:           "feat-x",
+				domain.EnvBranch:             "feat/x",
+				domain.EnvOrdinal:            "3",
+				domain.EnvPortOffset:         "0",
+				domain.EnvComposeProjectName: "perso",
+				domain.EnvProject:            domain.HostLabelFallback,
+				domain.EnvIsolation:          string(domain.IsolationVerbatim),
 			},
 		},
 	}

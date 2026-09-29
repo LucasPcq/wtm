@@ -26,6 +26,8 @@ type JobPatch struct {
 	// runner's children are read as a set, never merged one at a time.
 	Runs        *[]string
 	BindsNoPort *bool
+	// Touches replaces the whole list, like Runs.
+	Touches *[]string
 }
 
 // Empty reports a patch that would change nothing, which is how a runner tells
@@ -33,7 +35,7 @@ type JobPatch struct {
 func (p JobPatch) Empty() bool {
 	return p.Name == nil && p.Cmd == nil && p.Kind == nil && p.Stop == nil &&
 		p.Cwd == nil && p.URLPort == nil && p.URLHost == nil &&
-		p.Runs == nil && p.BindsNoPort == nil &&
+		p.Runs == nil && p.BindsNoPort == nil && p.Touches == nil &&
 		len(p.Ports) == 0 && !p.ClearPorts
 }
 
@@ -80,6 +82,9 @@ func ApplyJobPatch(params ApplyJobPatchParams) (domain.JobConfig, error) {
 	}
 	if patch.BindsNoPort != nil {
 		job.BindsNoPort = *patch.BindsNoPort
+	}
+	if patch.Touches != nil {
+		job.Touches = trimmedNames(*patch.Touches)
 	}
 
 	ports, err := patchedPorts(job.Ports, patch)
@@ -172,6 +177,25 @@ func RenameJobRefs(cfg domain.RunConfig, from, to string) domain.RunConfig {
 		out.Profiles[i].Jobs = jobs
 	}
 
+	// A job is named by the runners that start it and the tasks that touch it
+	// too: renaming it without them leaves a config that refuses to load.
+	out.Jobs = make([]domain.JobConfig, len(cfg.Jobs))
+	copy(out.Jobs, cfg.Jobs)
+	for i, job := range out.Jobs {
+		out.Jobs[i].Runs = renamedIn(job.Runs, from, to)
+		out.Jobs[i].Touches = renamedIn(job.Touches, from, to)
+	}
+
+	if len(cfg.EnvValues) > 0 {
+		out.EnvValues = make([]domain.EnvValueLink, len(cfg.EnvValues))
+		copy(out.EnvValues, cfg.EnvValues)
+		for i, link := range out.EnvValues {
+			if link.Job == from {
+				out.EnvValues[i].Job = to
+			}
+		}
+	}
+
 	out.EnvPorts = make([]domain.EnvPortLink, len(cfg.EnvPorts))
 	copy(out.EnvPorts, cfg.EnvPorts)
 	for i, link := range out.EnvPorts {
@@ -180,5 +204,20 @@ func RenameJobRefs(cfg domain.RunConfig, from, to string) domain.RunConfig {
 		}
 	}
 
+	return out
+}
+
+// renamedIn copies names with one of them renamed, keeping nil as nil.
+func renamedIn(names []string, from, to string) []string {
+	if len(names) == 0 {
+		return names
+	}
+	out := make([]string, len(names))
+	for i, name := range names {
+		out[i] = name
+		if name == from {
+			out[i] = to
+		}
+	}
 	return out
 }

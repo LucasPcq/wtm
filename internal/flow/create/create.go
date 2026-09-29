@@ -20,6 +20,8 @@ type Request struct {
 	EnvFrom     string
 	FastForward bool
 	IfNotExists bool
+	// Isolation is --isolation, empty when it was not given.
+	Isolation domain.Isolation
 }
 
 type Outcome struct {
@@ -127,6 +129,7 @@ func (f *createFlow) run() (Outcome, error) {
 				EnvFromOverride: answers.Value(KeyEnv),
 				IfNotExists:     f.request.IfNotExists,
 				SkipHooks:       true,
+				Isolation:       f.isolation(answers),
 			})
 			return createErr
 		},
@@ -143,7 +146,6 @@ func (f *createFlow) run() (Outcome, error) {
 			Context:      f.ctx,
 			Branch:       branchName,
 			WorktreePath: result.Path,
-			Rewrite:      answers.Value(KeyEnvPorts) != portsKeep,
 			Presenter:    f.presenter,
 		})
 		if portErr != nil {
@@ -156,6 +158,15 @@ func (f *createFlow) run() (Outcome, error) {
 
 	outcome := Outcome{Result: result, Branch: branchName, FromBranch: fromBranch, EnvPorts: settlement}
 	return outcome, f.presenter.Created(outcome)
+}
+
+// isolation is the step's answer, else the project's default: a skipped step
+// has nothing to isolate, and records what a later run.toml would assume.
+func (f *createFlow) isolation(answers flow.Answers) domain.Isolation {
+	if value := answers.Value(KeyIsolation); value != "" {
+		return domain.Isolation(value)
+	}
+	return envports.DefaultIsolation(f.ctx)
 }
 
 func (f *createFlow) runHooks(worktreePath, branchName, fromBranch string) error {

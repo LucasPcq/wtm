@@ -303,7 +303,7 @@ type namespaceParams struct {
 // URLs included, which is what lets a keycloak realm's redirect URIs point at
 // the fronts of the worktree asking.
 func (m *Manager) runNamespace(params namespaceParams) (string, error) {
-	if !rules.HasNamespace(params.Job) {
+	if !rules.HasNamespace(params.Job) || rules.IsVerbatim(domain.Isolation(params.Env[domain.EnvIsolation])) {
 		return "", nil
 	}
 	line := params.Job.Namespace.Create

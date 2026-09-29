@@ -111,6 +111,14 @@ A few ideas explain how the commands fit together:
   [Ports hard-coded in a `.env`](#ports-hard-coded-in-a-env)) and writes
   `COMPOSE_PROJECT_NAME` into the file each compose stack reads, so a `docker compose up`
   or a `pnpm dev` typed in a worktree is isolated with no wtm process involved.
+- **Isolated or verbatim** — `create`, `extract` and `checkout` ask how the new worktree
+  stands against its source, and remember it. *Isolated* (the default): its own ports,
+  compose project and service slices, written into its `.env` and applied when `wtm run`
+  starts its jobs. *Verbatim*: the `.env` is kept exactly as copied, and `wtm run` runs the
+  worktree on the ports and data that file names — its source's, so only one of the two can
+  be up at a time, and `wtm run up` says so instead of letting a port bind fail. Set the
+  default with `isolation = "isolated" | "verbatim"` in `run.toml`, pick per worktree with
+  `--isolation`, switch later with `wtm env <worktree> --isolation`.
 - **Shell integration** — `go` changes your current directory, which a child process can't
   do for its parent shell. `eval "$(wtm shell-init)"` installs a shell function that makes
   it work. Without it, use [`resolve`](docs/wtm_resolve.md) to get a path.
@@ -123,9 +131,16 @@ A few ideas explain how the commands fit together:
 - **Shared services** *(experimental)* — a job declared `scope = "shared"` runs **once for
   the repository** instead of once per worktree, in the main checkout: a postgres, a
   keycloak. Each worktree still keeps its own data through a `[job.namespace]` block, whose
-  `attach` and `detach` commands you write — wtm names the namespace and hands them the
+  `create` and `remove` commands you write — wtm names the namespace and hands them the
   worktree's environment, and knows nothing else about them. It exists for the case that
-  makes isolation expensive: two worktrees of a monorepo with four databases and a JVM.
+  makes isolation expensive: two worktrees of a monorepo with four databases and a JVM. A
+  `create` that **clones** main's database (`CREATE DATABASE … TEMPLATE app`) starts each
+  worktree from main's data without sharing it — see
+  [Starting a slice from main's data](docs/dev/shared-services.md#starting-a-slice-from-mains-data).
+  A job that changes data declares it with `touches = ["postgres"]` — `wtm run init` asks it
+  task by task and pre-fills what the names make obvious — and `wtm run up` stops
+  before running it against data the worktree does not own — a verbatim worktree's source,
+  or a shared service with no namespace — unless you confirm or pass `--force`.
 
 ## Commands
 
@@ -312,7 +327,10 @@ independent of the others. The first time `wtm run up` finds another worktree's 
 running it asks what to do about the machine's load, and can write the answer as
 `concurrency = "parallel" | "exclusive"` at the top of the file so it never asks again.
 `--parallel` and `--exclusive` override it for a single run; `--exclusive` is refused on
-several worktrees, since it stops all but one.
+several worktrees, since it stops all but one. A worktree that shares its ports with one
+already running — a verbatim worktree and its source — is not a question of load: `run up`
+offers to stop the other one or not to start, and refuses under `--yes` unless
+`--exclusive` was given.
 
 ```toml
 [[job]]
@@ -354,8 +372,9 @@ resource:
 | `WTM_BRANCH` | the branch, verbatim |
 | `WTM_WORKTREE` | the branch as a slug safe for a Docker project, network or volume name |
 | `WTM_ORDINAL` | the worktree's stable number. The main checkout is always `0`; every other worktree gets the smallest number free, kept for its whole life and released when it is cleaned |
-| `WTM_PORT_OFFSET` | `WTM_ORDINAL` × the block (`port_offset_block`, 10 by default) — the main checkout keeps the project's default ports |
-| `COMPOSE_PROJECT_NAME` | `<repo>-<WTM_WORKTREE>`, unless your own environment already defines it. The Docker daemon is machine-wide, so the repository qualifies the name: two clones both sitting on `main` do not share a stack |
+| `WTM_PORT_OFFSET` | `WTM_ORDINAL` × the block (`port_offset_block`, 10 by default) — the main checkout keeps the project's default ports, and so does a verbatim worktree |
+| `WTM_ISOLATION` | `isolated` or `verbatim`, as chosen when the worktree was created |
+| `COMPOSE_PROJECT_NAME` | `<repo>-<WTM_WORKTREE>`, unless your own environment already defines it. The Docker daemon is machine-wide, so the repository qualifies the name: two clones both sitting on `main` do not share a stack. Not set for a verbatim worktree: its copied `.env` decides |
 
 `COMPOSE_PROJECT_NAME` is what keeps two worktrees' containers, networks and volumes
 apart — nothing to declare, it works as soon as your jobs use `docker compose`. It reaches
@@ -530,10 +549,11 @@ they were:
 
 `wtm run init` scans your configured `.env` targets and offers the keys whose value holds a
 declared base; `--link-env` writes them without asking. Nothing is ever inferred without one
-or the other. The rewrite then happens when a worktree is created — proposed interactively,
-applied under `--yes` — and whenever `wtm env` reconciles, whose recap offers "Apply, but
-leave the port values alone" beside the plain apply, so neither command imposes the pass
-(`--check` reports without writing, and counts a pending shift as drift). `wtm env --mode refresh` compares linked values **modulo the offset**, so a
+or the other. The rewrite then happens when an **isolated** worktree is created — never for
+a verbatim one, whose `.env` is kept as copied — and whenever `wtm env` reconciles, whose
+recap offers "Apply, and keep this worktree's .env verbatim from now on" beside the plain
+apply, so neither command imposes the pass (`--check` reports without writing, and counts a
+pending shift as drift). `wtm env --mode refresh` compares linked values **modulo the offset**, so a
 worktree holding `5442` against a `main` holding `5432` is not a conflict; a real difference
 in the same value still is.
 
