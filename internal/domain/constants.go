@@ -2045,6 +2045,11 @@ const (
 	// names the way out, because there is nothing the user can do from the
 	// command they just ran.
 	DaemonVersionMismatchFmt = "the daemon holding the socket is %s, this is wtm %s — run 'wtm run daemon restart' to hand your jobs over"
+	// DaemonSkewHoldsJobsFmt takes the daemon's version, the jobs it holds and
+	// the client's: a daemon holding nothing is replaced without a word.
+	DaemonSkewHoldsJobsFmt = "daemon %s running with %d job(s), this is wtm %s — run 'wtm run daemon restart' to hand them over"
+	// DaemonUnknownActionPrefix is how a daemon refuses a request it predates.
+	DaemonUnknownActionPrefix = "unknown action"
 
 	// DaemonMismatchWhyFmt and DaemonMismatchFixLine are the same refusal with
 	// room to explain, for the callout `run daemon status` renders. One line per
@@ -2521,6 +2526,10 @@ const (
 	RunJobsEmpty     = "No jobs defined in run.toml."
 	RunProfilesEmpty = "No profiles defined in run.toml."
 	RunStoppingJobs  = "Stopping jobs…"
+	RunLoadingJobs   = "Loading jobs…"
+	// RunDaemonDivergedFmt takes the daemon's version and the client's: an older
+	// daemon is still listed, but it runs the jobs its own way.
+	RunDaemonDivergedFmt = "the daemon is %s, this is wtm %s — run `wtm run daemon restart` to hand the jobs over"
 
 	// RunStoppingOthers and RunStoppedOtherFmt report the worktrees an exclusive
 	// run cleared before starting.

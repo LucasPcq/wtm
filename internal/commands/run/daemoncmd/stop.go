@@ -70,14 +70,7 @@ func confirmStop(cmd *cobra.Command, status domain.DaemonStatus) (bool, error) {
 }
 
 func shutdown() error {
-	resp, err := process.NewClient(process.SocketPath()).SendUnchecked(process.Request{Action: process.ActionShutdown})
-	if err != nil {
-		return fmt.Errorf("stop daemon: %w", err)
-	}
-	if resp.Status == process.StatusError {
-		return fmt.Errorf("stop daemon: %s", resp.Message)
-	}
-	return process.AwaitDaemonStopped(process.SocketPath())
+	return process.Shutdown(process.SocketPath())
 }
 
 type reportStoppedParams struct {

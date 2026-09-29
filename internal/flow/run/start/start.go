@@ -178,7 +178,7 @@ func (f *startFlow) connect() error {
 	return f.presenter.Stage(flow.StageParams{
 		Message: domain.RunDaemonConnecting,
 		Work: func() error {
-			if err := process.EnsureDaemon(process.DaemonParams{
+			if err := process.EnsureCurrentDaemon(process.DaemonParams{
 				SocketPath: process.SocketPath(),
 				ProxyPort:  rules.ProxyPort(f.ctx.Config.Global),
 			}); err != nil {

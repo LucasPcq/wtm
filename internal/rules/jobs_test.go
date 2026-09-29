@@ -365,3 +365,12 @@ func TestJobUptimeStaysSilentForAJobThatDiedUnwatched(t *testing.T) {
 		}
 	}
 }
+
+func TestDistinctValuesIgnoresTheUnknown(t *testing.T) {
+	if got := DistinctValues(map[string]string{"/a": "shop", "/b": "shop", "/c": ""}); got != 1 {
+		t.Errorf("DistinctValues = %d, want 1", got)
+	}
+	if got := DistinctValues(map[string]string{"/a": "shop", "/b": "blog"}); got != 2 {
+		t.Errorf("DistinctValues = %d, want 2", got)
+	}
+}

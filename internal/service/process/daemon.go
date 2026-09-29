@@ -233,7 +233,7 @@ func (d *daemonServer) handleConnection(conn net.Conn) {
 	case ActionShutdown:
 		d.handleShutdown(encoder)
 	default:
-		encoder.Encode(Response{Status: StatusError, Message: fmt.Sprintf("unknown action: %s", req.Action)})
+		encoder.Encode(Response{Status: StatusError, Message: fmt.Sprintf("%s: %s", domain.DaemonUnknownActionPrefix, req.Action)})
 	}
 }
 

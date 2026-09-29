@@ -57,6 +57,9 @@ func collectStatus() domain.DaemonStatus {
 	status.Running = true
 	status.DaemonVersion = resp.Version
 	status.PID = resp.DaemonPID
+	if status.PID == 0 {
+		status.PID, _ = process.DaemonPeerPID(status.SocketPath)
+	}
 	status.ProxyPort = resp.ProxyPort
 	for _, job := range resp.Jobs {
 		if !rules.IsJobUp(job.Status) {

@@ -4,53 +4,56 @@
 package runjobs
 
 import (
-	"errors"
-
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
 )
 
+// Listing is what the daemon holds, and which build answered: an older daemon
+// is still listed, and a surface says it runs the jobs its own way.
+type Listing struct {
+	Jobs          []domain.JobInfo
+	DaemonVersion string
+	Reached       bool
+}
+
+// Diverged says a daemon of another build answered.
+func (l Listing) Diverged() bool {
+	return l.Reached && l.DaemonVersion != domain.Version
+}
+
 // List fetches the daemon's jobs. A daemon exits once no foreground job is left,
 // so nobody listening says nothing about whether detached stacks are up: when
 // the index still holds some, one is started to read them back. When it holds
 // nothing there is nothing to report, and no daemon is forked for it.
-//
-// The error worth surfacing is a daemon of another build: reported as "no jobs",
-// it would be the exact silence the version handshake exists to break.
-func List() ([]domain.JobInfo, error) {
+func List() Listing {
 	socketPath := process.SocketPath()
 	if !process.IsDaemonRunning(socketPath) {
 		if !process.HasAnyIndexedJob() {
-			return nil, nil
+			return Listing{}
 		}
 		global, err := config.LoadGlobal()
 		if err != nil {
-			return nil, nil
+			return Listing{}
 		}
 		if err := process.EnsureDaemon(process.DaemonParams{
 			SocketPath: socketPath,
 			ProxyPort:  rules.ProxyPort(global),
 		}); err != nil {
-			return nil, nil
+			return Listing{}
 		}
 	}
 	resp, err := process.NewClient(socketPath).Send(process.Request{Action: process.ActionList})
 	if err != nil {
-		if errors.Is(err, domain.ErrDaemonVersionMismatch) {
-			return nil, err
-		}
-		return nil, nil
+		return Listing{}
 	}
-	return resp.Jobs, nil
+	return Listing{Jobs: resp.Jobs, DaemonVersion: resp.Version, Reached: true}
 }
 
-// Load is List for a caller whose answer to "no jobs" and to "could not ask" is
-// the same: nothing is running.
+// Load is List for a caller whose question is only what is running.
 func Load() []domain.JobInfo {
-	jobs, _ := List()
-	return jobs
+	return List().Jobs
 }
 
 // Peek is Load for a reader whose question does not justify waking anything —

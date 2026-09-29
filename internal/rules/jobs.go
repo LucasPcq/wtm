@@ -247,3 +247,14 @@ func JobsWithoutProfile(cfg domain.RunConfig) []domain.JobConfig {
 	copy(jobs, cfg.Jobs)
 	return jobs
 }
+
+// DistinctValues counts the different non-empty values of a map.
+func DistinctValues(values map[string]string) int {
+	seen := map[string]bool{}
+	for _, value := range values {
+		if value != "" {
+			seen[value] = true
+		}
+	}
+	return len(seen)
+}
