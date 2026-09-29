@@ -167,6 +167,9 @@ const (
 	PhaseCrashed
 	PhaseNotice
 	PhaseReady
+	// PhaseWarning is something the run could not do on the side of a job that
+	// did start — its Notice says what, and what it costs.
+	PhaseWarning
 )
 
 // Prober answers which of the given ports are listening. It is the seam over

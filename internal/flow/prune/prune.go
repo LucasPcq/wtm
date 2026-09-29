@@ -9,9 +9,9 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
+	"github.com/LucasPcq/wtm/internal/flow/teardown"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/github"
-	"github.com/LucasPcq/wtm/internal/service/process"
 	"github.com/LucasPcq/wtm/internal/service/shell"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
@@ -114,11 +114,12 @@ func (f *pruneFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 
+	force := f.request.Force || answers.Value(KeyConfirm) == confirmForce
 	f.plan = rules.FinalizePrunePlan(rules.FinalizePrunePlanParams{
 		Plan:       f.plan,
 		Chosen:     answers.Values(KeySelection),
 		BaseBranch: f.request.BaseBranch,
-		Force:      f.request.Force || answers.Value(KeyConfirm) == confirmForce,
+		Force:      force,
 	})
 	if len(f.plan.Selected) == 0 {
 		return f.conclude(Outcome{Empty: true})
@@ -127,6 +128,7 @@ func (f *pruneFlow) run() (Outcome, error) {
 	return f.remove(removeParams{
 		ReparentChildren: answers.Value(KeyReparent) == reparentYes,
 		StartDown:        answers.Value(KeyData) == owed.DataStart,
+		Force:            force,
 	})
 }
 
@@ -172,68 +174,122 @@ func (f *pruneFlow) scanMessage(needPRs bool) string {
 type removeParams struct {
 	ReparentChildren bool
 	StartDown        bool
+	Force            bool
 }
 
+// remove runs the whole teardown on one worktree before moving to the next, and
+// stops at the first that fails: the ones after it keep their worktree and
+// their data, and the ones before it are gone with theirs.
 func (f *pruneFlow) remove(params removeParams) (Outcome, error) {
-	orphaned := f.plan.Reparents
-	if params.ReparentChildren {
-		orphaned = nil
-	} else {
-		f.plan.Reparents = nil
-	}
-
-	// Decided before the removal, while the paths still resolve their symlinks.
-	insidePruned := f.insidePruned()
+	cwdTarget := f.cwdCandidate()
 
 	// Old debts first: their lines would otherwise repeat the ones this removal
 	// is about to print for the same services.
 	f.settleOwedNamespaces()
-	f.removeNamespaces(params.StartDown)
-	for _, candidate := range f.plan.Selected {
-		f.stopServices(candidate.Branch)
-	}
-	if err := f.runHooks(); err != nil {
-		return Outcome{}, err
-	}
 
-	var result domain.PruneResult
-	err := f.presenter.Stage(flow.StageParams{
-		Message: domain.PruneRemoving,
-		Work: func() error {
-			var pruneErr error
-			result, pruneErr = worktree.Prune(f.params(), f.plan)
-			return pruneErr
-		},
-	})
-	if err != nil {
-		return Outcome{}, err
-	}
-	result.Orphaned = orphaned
-
-	for _, pruned := range result.Pruned {
-		f.purgeJobLogs(pruned.Branch)
-	}
-
-	if insidePruned {
-		shell.RequestCd(f.ctx.ProjectDir)
-	}
-	outcome := Outcome{Result: result}
-	return outcome, f.presenter.Pruned(outcome)
-}
-
-// removeNamespaces gives back what the pruned worktrees carved out of the shared
-// services, before stopServices releases their claims. Read afresh: a service
-// may have changed state while the recap was on screen.
-func (f *pruneFlow) removeNamespaces(startDown bool) {
-	if f.request.KeepData {
-		return
-	}
-	owed.Detach(owed.DetachParams{
+	// Read before the first removal, while every worktree's environment exists.
+	dropper := owed.NewDropper(owed.DropperParams{
 		Context:   f.ctx,
 		Presenter: f.presenter,
 		Snapshot:  owed.Read(owed.ReadParams{Context: f.ctx, Branches: f.selectedBranches()}),
-		StartDown: startDown,
+		StartDown: params.StartDown,
+		KeepData:  f.request.KeepData,
 	})
+
+	result := domain.PruneResult{
+		Pruned:     []domain.PruneCandidate{},
+		Reparented: []domain.ReparentResult{},
+		Skipped:    f.plan.Skipped,
+		Namespaces: []domain.NamespaceOutcome{},
+	}
+	var removed []teardown.Target
+	var failure error
+	for _, candidate := range f.plan.Selected {
+		target := teardown.Target{Branch: candidate.Branch, Path: candidate.Path}
+		namespaces, err := f.removeOne(removeOneParams{Target: target, Dropper: dropper, Force: params.Force})
+		if err != nil {
+			failure = err
+			result.Failed = &domain.PruneFailure{Branch: candidate.Branch, Path: candidate.Path, Error: err.Error()}
+			break
+		}
+		removed = append(removed, target)
+		result.Pruned = append(result.Pruned, candidate)
+		result.Namespaces = append(result.Namespaces, namespaces...)
+	}
+
+	// Claims go last, all together: the one a pruned worktree released may be
+	// what kept a service up for the next one's drop.
+	for _, target := range removed {
+		teardown.Release(teardown.ReleaseParams{Presenter: f.presenter, Target: target})
+	}
+	dropper.Close()
+
+	reparents := reparentsOf(reparentsOfParams{Reparents: f.plan.Reparents, Pruned: result.Pruned})
+	if params.ReparentChildren {
+		applied, err := worktree.ApplyReparents(worktree.ApplyReparentsParams{Reparents: reparents, StateDir: f.ctx.StateDir})
+		if err != nil {
+			return Outcome{}, err
+		}
+		result.Reparented = append(result.Reparented, applied...)
+	} else {
+		result.Orphaned = reparents
+	}
+
+	if cwdTarget != "" && pruned(result.Pruned, cwdTarget) {
+		shell.RequestCd(f.ctx.ProjectDir)
+	}
+	outcome := Outcome{Result: result}
+	if err := f.presenter.Pruned(outcome); err != nil {
+		return outcome, err
+	}
+	if failure != nil {
+		return outcome, fmt.Errorf("%w: %w", domain.ErrAborted, failure)
+	}
+	return outcome, nil
+}
+
+type removeOneParams struct {
+	Target  teardown.Target
+	Dropper *owed.Dropper
+	Force   bool
+}
+
+func (f *pruneFlow) removeOne(params removeOneParams) ([]domain.NamespaceOutcome, error) {
+	target := params.Target
+	if err := teardown.Stop(teardown.StopParams{Context: f.ctx, Presenter: f.presenter, Target: target, Force: params.Force}); err != nil {
+		return nil, err
+	}
+	if err := teardown.Hooks(teardown.HooksParams{
+		Context:   f.ctx,
+		Presenter: f.presenter,
+		Target:    target,
+		Title:     fmt.Sprintf(domain.PruneHooksTitleFmt, target.Branch),
+	}); err != nil {
+		return nil, err
+	}
+
+	clean := domain.CleanParams{
+		ProjectDir: f.ctx.ProjectDir,
+		StateDir:   f.ctx.StateDir,
+		Branch:     target.Branch,
+		// Safety was decided during classification.
+		Force:      true,
+		BaseBranch: f.request.BaseBranch,
+		Config:     f.ctx.Config,
+		SkipHooks:  true,
+	}
+	err := f.presenter.Stage(flow.StageParams{
+		Message: fmt.Sprintf(domain.CleanLoadingFmt, target.Branch),
+		Work:    func() error { return worktree.Clean(clean) },
+	})
+	if errors.Is(err, domain.ErrWorktreeRemoveFailed) {
+		err = teardown.Salvage(teardown.SalvageParams{Presenter: f.presenter, Clean: clean, Path: target.Path, Cause: err})
+	}
+	// An absent worktree was already pruned, which keeps a re-run idempotent.
+	if err != nil && !errors.Is(err, domain.ErrWorktreeNotFound) {
+		return nil, err
+	}
+	return teardown.Reclaim(teardown.ReclaimParams{Context: f.ctx, Target: target, Dropper: params.Dropper}), nil
 }
 
 func (f *pruneFlow) selectedBranches() []string {
@@ -244,82 +300,38 @@ func (f *pruneFlow) selectedBranches() []string {
 	return branches
 }
 
-// runHooks hooks every selected worktree before the first removal, which is
-// observable behaviour: a hook failing at rank N aborts with nothing deleted, yet
-// 1..N-1 already had their teardown — hence the idempotence on_clean requires.
-func (f *pruneFlow) runHooks() error {
-	hooks := f.ctx.Config.Project.Hooks.OnClean
-	if len(hooks) == 0 {
-		return nil
-	}
-	return f.presenter.HookPhase(flow.HookPhaseParams{
-		Title:   domain.HooksTitleOnClean,
-		LogPath: rules.HooksLogPath(rules.HooksLogPathParams{StateDir: f.ctx.StateDir, Phase: domain.HookOnClean}),
-		Run: func(sink flow.HookSink) error {
-			for _, candidate := range f.plan.Selected {
-				if candidate.Path == "" {
-					continue
-				}
-				if err := worktree.RunCleanHooks(domain.CleanHooksParams{
-					ProjectDir:   f.ctx.ProjectDir,
-					StateDir:     f.ctx.StateDir,
-					WorktreePath: candidate.Path,
-					Branch:       candidate.Branch,
-					Hooks:        hooks,
-					Output:       sink.Output,
-					OnHook:       sink.OnHook,
-				}); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-	})
+type reparentsOfParams struct {
+	Reparents []domain.ReparentResult
+	Pruned    []domain.PruneCandidate
 }
 
-// purgeJobLogs drops a removed worktree's persisted job logs. Best effort:
-// leftover log files are not worth failing a removal that already happened.
-func (f *pruneFlow) purgeJobLogs(branch string) {
-	_ = process.PurgeWorktreeLogs(rules.WorktreeLogDir(rules.WorktreeLogDirParams{
-		StateDir: f.ctx.StateDir,
-		Branch:   branch,
-	}))
+// reparentsOf keeps the moves whose old parent is actually gone: a prune that
+// stopped short leaves the children of what it did not reach where they are.
+func reparentsOf(params reparentsOfParams) []domain.ReparentResult {
+	moves := []domain.ReparentResult{}
+	for _, move := range params.Reparents {
+		if pruned(params.Pruned, move.OldParent) {
+			moves = append(moves, move)
+		}
+	}
+	return moves
 }
 
-func (f *pruneFlow) stopServices(branchName string) {
-	wt, err := worktree.FindByBranch(worktree.FindByBranchParams{
-		ProjectDir: f.ctx.ProjectDir,
-		Branch:     branchName,
-	})
-	if err != nil {
-		return
+func pruned(candidates []domain.PruneCandidate, branch string) bool {
+	for _, candidate := range candidates {
+		if candidate.Branch == branch {
+			return true
+		}
 	}
-
-	if !process.WorktreeHasJobs(wt.Path) {
-		return
-	}
-	stopped := false
-	_ = f.presenter.Stage(flow.StageParams{
-		Message: fmt.Sprintf(domain.CleanStoppingServicesFmt, branchName),
-		Work: func() error {
-			stopped = process.StopWorktreeJobs(wt.Path)
-			return nil
-		},
-	})
-	if stopped {
-		f.presenter.Status(flow.Notice{
-			Kind: flow.NoticeSuccess,
-			Text: fmt.Sprintf(domain.CleanStoppedServicesFmt, branchName),
-		})
-	}
+	return false
 }
 
-// insidePruned must run before the removal: the paths have to still exist to
-// canonicalize their symlinks.
-func (f *pruneFlow) insidePruned() bool {
+// cwdCandidate is the selected worktree the shell stands in, if any. Decided
+// before the removal, while the paths still resolve their symlinks.
+func (f *pruneFlow) cwdCandidate() string {
 	cwd, err := os.Getwd()
 	if err != nil || cwd == "" {
-		return false
+		return ""
 	}
 	resolvedCwd := flow.ResolveSymlinks(cwd)
 	for _, candidate := range f.plan.Selected {
@@ -327,10 +339,10 @@ func (f *pruneFlow) insidePruned() bool {
 			continue
 		}
 		if rules.IsPathWithin(flow.ResolveSymlinks(candidate.Path), resolvedCwd) {
-			return true
+			return candidate.Branch
 		}
 	}
-	return false
+	return ""
 }
 
 func (f *pruneFlow) conclude(outcome Outcome) (Outcome, error) {

@@ -114,21 +114,14 @@ func TestIsSharedAndHasNamespace(t *testing.T) {
 	}
 }
 
-// A worktree created and thrown away without ever starting the stack holds no
-// namespace, so a clean owes nothing — running its detach would be a DROP DATABASE
-// on a database that never existed.
-func TestNamespaceJobsStartedOnlyRemembersWhatCameUp(t *testing.T) {
+func TestNamespaceJobsAreTheSharedJobsThatCarveOne(t *testing.T) {
 	jobs := []domain.JobConfig{
 		{Name: "db", Scope: domain.JobScopeShared, Namespace: &domain.JobNamespaceConfig{Name: "n", Create: "true"}},
 		{Name: "cache", Scope: domain.JobScopeShared},
 		{Name: "web"},
 	}
 
-	if got := rules.NamespaceJobsStarted(rules.NamespaceJobsStartedParams{Jobs: jobs}); len(got) != 0 {
-		t.Errorf("nothing started, got %v", got)
-	}
-
-	got := rules.NamespaceJobsStarted(rules.NamespaceJobsStartedParams{Jobs: jobs, Started: []string{"db", "cache", "web"}})
+	got := rules.NamespaceJobs(jobs)
 	if len(got) != 1 || got[0] != "db" {
 		t.Errorf("got %v, want db alone: cache carves nothing out and web is not shared", got)
 	}

@@ -350,10 +350,16 @@ type WriteWorktreeCleanJSONParams struct {
 	// OrphanedChildren lists children left dangling because reparenting was not
 	// authorized (no --reparent-children in non-interactive mode).
 	OrphanedChildren []domain.ReparentResult `json:"orphaned_children,omitempty"`
+	// Namespaces is what became of the data the worktree held in the shared
+	// services: dropped, deferred to the service's next start, or kept.
+	Namespaces []domain.NamespaceOutcome `json:"namespaces"`
 }
 
 // WriteWorktreeCleanJSON writes the JSON payload for `clean`.
 func WriteWorktreeCleanJSON(w io.Writer, params WriteWorktreeCleanJSONParams) error {
+	if params.Namespaces == nil {
+		params.Namespaces = []domain.NamespaceOutcome{}
+	}
 	return encodeJSON(w, params)
 }
 

@@ -39,14 +39,14 @@ func Settle(params Params) Result {
 		return result
 	}
 
-	live := liveWorktrees(params.Context.ProjectDir)
+	live := liveBranches(params.Context.ProjectDir)
 	up := rules.SharedJobsUp(rules.SharedJobsUpParams{Jobs: runjobs.Load(), Config: cfg})
 	var done []domain.NamespaceRef
 	for _, ref := range owed {
 		name := rules.NamespaceName(rules.NamespaceNameParams{Config: cfg, Ref: ref})
-		if live[ref.Worktree] {
+		if branches := live[ref.Worktree]; len(branches) > 0 {
 			done = append(done, ref)
-			params.Presenter.Status(flow.Notice{Kind: flow.NoticeNote, Text: fmt.Sprintf(domain.OwedRecreatedFmt, name, ref.Worktree)})
+			params.Presenter.Status(flow.Notice{Kind: flow.NoticeNote, Text: fmt.Sprintf(domain.OwedRecreatedFmt, name, branches[0])})
 			continue
 		}
 		if !up[ref.Job] {
@@ -66,8 +66,11 @@ func Settle(params Params) Result {
 				return nil
 			},
 		})
-		for _, err := range removed.Errs {
-			params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: err.Error()})
+		for _, failed := range removed.Failed {
+			params.Presenter.Status(flow.Notice{
+				Kind: flow.NoticeWarning,
+				Text: fmt.Sprintf(domain.CleanDropFailedFmt, name, ref.Job, failed.Err),
+			})
 		}
 		if len(removed.Released) == 0 {
 			result.Owed[ref.Job]++
@@ -84,17 +87,21 @@ func Settle(params Params) Result {
 	return result
 }
 
-// liveWorktrees are the worktrees that exist, by the slug a debt names them by.
-func liveWorktrees(projectDir string) map[string]bool {
-	live := map[string]bool{}
+// liveBranches are the worktrees that exist, by the slug a namespace names
+// them by. More than one under a slug is a collision that predates the refusal
+// at creation.
+func liveBranches(projectDir string) map[string][]string {
+	live := map[string][]string{}
 	all, err := worktree.ListAll(worktree.ListAllParams{ProjectDir: projectDir})
 	if err != nil {
 		return live
 	}
 	for _, wt := range all {
-		if wt.Branch != "" {
-			live[rules.WorktreeSlug(wt.Branch)] = true
+		if wt.Branch == "" {
+			continue
 		}
+		slug := rules.WorktreeSlug(wt.Branch)
+		live[slug] = append(live[slug], wt.Branch)
 	}
 	return live
 }

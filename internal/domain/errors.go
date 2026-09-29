@@ -73,6 +73,12 @@ var (
 	// user) instead of aborting.
 	ErrWorktreeRemoveFailed = errors.New("worktree removal failed")
 
+	// ErrWorktreeJobsRunning refuses to remove a worktree whose jobs could not be
+	// stopped: an API still connected to its database is the one thing a drop
+	// cannot go through, and a process left running in a deleted directory is
+	// nobody's to stop any more.
+	ErrWorktreeJobsRunning = errors.New("the worktree's jobs are still running")
+
 	// ErrOrdinalRefIncomplete is returned when an ordinal is asked for without
 	// naming the worktree it belongs to. Allocation writes to the state dir and
 	// keys on the branch, so an empty one would resolve relative to the current

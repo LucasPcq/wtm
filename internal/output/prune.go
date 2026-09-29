@@ -48,7 +48,7 @@ func FormatPrunePlan(w io.Writer, plan domain.PrunePlan) {
 // actionable — but the picker and the recap have already shown that list twice,
 // so it does not get a line each. Raw body — the command's frame owns the padding.
 func FormatPruneResult(w io.Writer, result domain.PruneResult) {
-	if len(result.Pruned) == 0 {
+	if len(result.Pruned) == 0 && result.Failed == nil {
 		Unchanged(w, domain.PruneNothingToPrune)
 	}
 	if len(result.Pruned) > 0 {
@@ -70,6 +70,9 @@ func FormatPruneResult(w io.Writer, result domain.PruneResult) {
 	for _, s := range result.Skipped {
 		Warning(w, fmt.Sprintf(domain.PruneSkippedFmt, s.Branch, rules.PruneReasonLabel(s.Reason)))
 	}
+	if result.Failed != nil {
+		Error(w, fmt.Sprintf(domain.PruneFailedFmt, result.Failed.Branch, result.Failed.Error))
+	}
 }
 
 // WritePruneResultJSON writes the prune outcome as JSON, ensuring the slices
@@ -86,6 +89,9 @@ func WritePruneResultJSON(w io.Writer, result domain.PruneResult) error {
 	}
 	if result.Skipped == nil {
 		result.Skipped = []domain.PruneSkip{}
+	}
+	if result.Namespaces == nil {
+		result.Namespaces = []domain.NamespaceOutcome{}
 	}
 	return encodeJSON(w, result)
 }

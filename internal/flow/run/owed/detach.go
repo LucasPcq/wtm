@@ -29,21 +29,31 @@ func (s Snapshot) Held() []domain.HeldNamespace {
 	return rules.HeldNamespaces(rules.HeldNamespacesParams{Holdings: s.Holdings, Up: s.Up})
 }
 
+func (s Snapshot) holding(branch string) (domain.NamespaceHolding, bool) {
+	for _, holding := range s.Holdings {
+		if holding.Branch == branch {
+			return holding, true
+		}
+	}
+	return domain.NamespaceHolding{}, false
+}
+
 type ReadParams struct {
 	Context  flow.Context
 	Branches []string
 }
 
 // Read must run before the removal: the holdings are read from each worktree's
-// own state, and its remove commands run in its directory.
+// own state and environment, both gone with it.
 func Read(params ReadParams) Snapshot {
 	cfg, err := runconfig.Load(params.Context.StateDir)
 	if err != nil || len(rules.Removable(cfg).Jobs) == 0 {
 		return Snapshot{}
 	}
+	live := liveBranches(params.Context.ProjectDir)
 	var holdings []domain.NamespaceHolding
 	for _, branch := range params.Branches {
-		holding, found := holdingOf(params.Context, cfg, branch)
+		holding, found := holdingOf(holdingParams{Context: params.Context, Config: cfg, Branch: branch, Live: live})
 		if found {
 			holdings = append(holdings, holding)
 		}
@@ -55,27 +65,53 @@ func Read(params ReadParams) Snapshot {
 	return Snapshot{Config: cfg, Holdings: holdings, Up: up}
 }
 
+type holdingParams struct {
+	Context flow.Context
+	Config  domain.RunConfig
+	Branch  string
+	Live    map[string][]string
+}
+
 // holdingOf keeps only what the worktree actually carved out: one created and
 // thrown away without ever starting the stack owes nothing, and running its
 // detach would be a DROP DATABASE on a database that never existed.
-func holdingOf(ctx flow.Context, cfg domain.RunConfig, branch string) (domain.NamespaceHolding, bool) {
-	held := worktree.NamespacesOf(worktree.ParentBranchParams{StateDir: ctx.StateDir, Branch: branch})
+func holdingOf(params holdingParams) (domain.NamespaceHolding, bool) {
+	held := worktree.NamespacesOf(worktree.ParentBranchParams{StateDir: params.Context.StateDir, Branch: params.Branch})
 	if len(held) == 0 {
 		return domain.NamespaceHolding{}, false
 	}
-	jobs := rules.Removable(rules.JobsHeld(cfg, held))
+	jobs := rules.Removable(rules.JobsHeld(params.Config, held))
 	if len(jobs.Jobs) == 0 {
 		return domain.NamespaceHolding{}, false
 	}
-	wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: ctx.ProjectDir, Branch: branch})
+	wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: params.Context.ProjectDir, Branch: params.Branch})
 	if err != nil {
 		return domain.NamespaceHolding{}, false
 	}
-	env, err := worktree.JobEnv(worktree.JobEnvParams{ProjectDir: ctx.ProjectDir, StateDir: ctx.StateDir, Dir: wt.Path})
+	env, err := worktree.JobEnv(worktree.JobEnvParams{ProjectDir: params.Context.ProjectDir, StateDir: params.Context.StateDir, Dir: wt.Path})
 	if err != nil {
 		return domain.NamespaceHolding{}, false
 	}
-	return domain.NamespaceHolding{Branch: branch, WorkDir: wt.Path, Env: env, Config: jobs}, true
+	holding := domain.NamespaceHolding{Branch: params.Branch, WorkDir: wt.Path, Env: env, Config: jobs}
+	holding.SharedWith = sharedWith(sharedWithParams{Holding: holding, Live: params.Live})
+	return holding, true
+}
+
+type sharedWithParams struct {
+	Holding domain.NamespaceHolding
+	Live    map[string][]string
+}
+
+// sharedWith names another live worktree reached under the same slug. A
+// namespace is named after the slug, so it is that worktree's too.
+func sharedWith(params sharedWithParams) string {
+	slug := rules.HoldingRef(params.Holding, "").Worktree
+	for _, branch := range params.Live[slug] {
+		if branch != params.Holding.Branch {
+			return branch
+		}
+	}
+	return ""
 }
 
 // DataPreset answers the data step from --drop-data, so it is not asked and the
@@ -142,85 +178,116 @@ func dataDescription(held []domain.HeldNamespace) string {
 	return strings.Join(append(lines, "", domain.DataStepOutro), "\n")
 }
 
-type DetachParams struct {
+type DropperParams struct {
 	Context   flow.Context
 	Presenter flow.Presenter
+	// Snapshot is read before the first removal, while the worktrees exist.
 	Snapshot  Snapshot
 	StartDown bool
+	KeepData  bool
 }
 
-// Detach gives back what the snapshot's worktrees hold, before their claims are
-// released: a claim released may be the last, and a namespace cannot be given
-// back to a service that is down. What is left is queued for the service's next
-// start, and every line says which way it went.
-func Detach(params DetachParams) {
-	if len(params.Snapshot.Holdings) == 0 {
-		return
-	}
-	up := params.Snapshot.Up
-	var errs []error
-	if params.StartDown {
-		release, started, startErrs := bringUpDown(params)
-		defer release()
-		up = started
-		errs = startErrs
-	}
-
-	var result runjobs.RemoveNamespacesResult
-	for _, holding := range params.Snapshot.Holdings {
-		removed := drop(dropParams{Presenter: params.Presenter, Holding: holding, Up: up})
-		result.Released = append(result.Released, removed.Released...)
-		result.Deferred = append(result.Deferred, removed.Deferred...)
-		result.Errs = append(result.Errs, removed.Errs...)
-	}
-	result.Errs = append(errs, result.Errs...)
-	report(reportParams{Presenter: params.Presenter, Config: params.Snapshot.Config, Result: result})
-
-	if err := runjobs.QueueRemovals(runjobs.QueueRemovalsParams{StateDir: params.Context.StateDir, Refs: result.Deferred}); err != nil {
-		params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: err.Error()})
-	}
+// Dropper gives back what removed worktrees held, one worktree at a time and
+// only once that worktree is gone: a failure anywhere before leaves its data
+// where it was. The services it started to do so run until Close.
+type Dropper struct {
+	params  DropperParams
+	up      map[string]bool
+	release func()
 }
 
-// bringUpDown starts every service the snapshot needs that is down, and hands
-// back how to let them all go once the data is dropped.
-func bringUpDown(params DetachParams) (release func(), up map[string]bool, errs []error) {
-	up = make(map[string]bool, len(params.Snapshot.Up))
-	for job, isUp := range params.Snapshot.Up {
+func NewDropper(params DropperParams) *Dropper {
+	d := &Dropper{params: params, up: params.Snapshot.Up, release: func() {}}
+	if params.StartDown && !params.KeepData && len(params.Snapshot.Holdings) > 0 {
+		d.bringUpDown()
+	}
+	return d
+}
+
+func (d *Dropper) Close() { d.release() }
+
+// Drop gives back what branch held, now that its worktree is gone, and says
+// which way each namespace went. What could not be dropped is owed to the
+// service's next start; what is dropped settles any older debt for it.
+func (d *Dropper) Drop(branch string) []domain.NamespaceOutcome {
+	holding, found := d.params.Snapshot.holding(branch)
+	if !found {
+		return nil
+	}
+	if d.params.KeepData {
+		return kept(keptParams{Snapshot: d.params.Snapshot, Holding: holding, Reason: domain.CleanKeptByFlag})
+	}
+	if holding.SharedWith != "" {
+		return d.keepShared(holding)
+	}
+
+	result := drop(dropParams{Context: d.params.Context, Presenter: d.params.Presenter, Holding: holding, Up: d.up})
+	d.report(result)
+	if err := runjobs.QueueRemovals(runjobs.QueueRemovalsParams{StateDir: d.params.Context.StateDir, Refs: result.Deferred()}); err != nil {
+		d.params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: err.Error()})
+	}
+	if err := runjobs.SettleRemovals(runjobs.SettleRemovalsParams{StateDir: d.params.Context.StateDir, Refs: result.Released}); err != nil {
+		d.params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: err.Error()})
+	}
+	return outcomesOf(outcomesParams{Config: d.params.Snapshot.Config, Branch: branch, Result: result})
+}
+
+func (d *Dropper) keepShared(holding domain.NamespaceHolding) []domain.NamespaceOutcome {
+	slug := rules.HoldingRef(holding, "").Worktree
+	reason := fmt.Sprintf(domain.CleanNamespaceSharedReasonFmt, holding.SharedWith, slug)
+	outcomes := kept(keptParams{Snapshot: d.params.Snapshot, Holding: holding, Reason: reason})
+	for _, outcome := range outcomes {
+		d.params.Presenter.Status(flow.Notice{
+			Kind: flow.NoticeWarning,
+			Text: fmt.Sprintf(domain.CleanNamespaceSharedFmt, outcome.Name, holding.SharedWith, slug),
+		})
+	}
+	return outcomes
+}
+
+// bringUpDown starts every service the snapshot needs that is down; Close lets
+// them all go once the data is dropped.
+func (d *Dropper) bringUpDown() {
+	up := make(map[string]bool, len(d.up))
+	for job, isUp := range d.up {
 		up[job] = isUp
 	}
 	var releases []func()
-	for _, job := range rules.DownServices(params.Snapshot.Held()) {
+	for _, job := range rules.DownServices(d.params.Snapshot.Held()) {
 		var jobRelease func()
-		err := params.Presenter.Stage(flow.StageParams{
+		err := d.params.Presenter.Stage(flow.StageParams{
 			Message: fmt.Sprintf(domain.OwedBringUpStageFmt, job),
 			Work: func() error {
 				var bringErr error
-				jobRelease, bringErr = BringUp(BringUpParams{Context: params.Context, Config: params.Snapshot.Config, Job: job})
+				jobRelease, bringErr = BringUp(BringUpParams{Context: d.params.Context, Config: d.params.Snapshot.Config, Job: job})
 				return bringErr
 			},
 		})
 		if err != nil {
-			errs = append(errs, err)
+			d.params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: err.Error()})
 			continue
 		}
 		up[job] = true
 		releases = append(releases, jobRelease)
 	}
-	return func() {
+	d.up = up
+	d.release = func() {
 		for _, jobRelease := range releases {
 			jobRelease()
 		}
-	}, up, errs
+	}
 }
 
 type dropParams struct {
+	Context   flow.Context
 	Presenter flow.Presenter
 	Holding   domain.NamespaceHolding
 	Up        map[string]bool
 }
 
 // drop runs the detach commands under a stage: a DROP DATABASE takes seconds,
-// and the line reporting it would otherwise follow a silent pause.
+// and the line reporting it would otherwise follow a silent pause. They run
+// from the project: the worktree's directory is gone by now.
 func drop(params dropParams) runjobs.RemoveNamespacesResult {
 	names := make([]string, 0, len(params.Holding.Config.Jobs))
 	for _, job := range params.Holding.Config.Jobs {
@@ -233,7 +300,7 @@ func drop(params dropParams) runjobs.RemoveNamespacesResult {
 			result = runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
 				Config:  params.Holding.Config,
 				Env:     params.Holding.Env,
-				WorkDir: params.Holding.WorkDir,
+				WorkDir: params.Context.ProjectDir,
 				Up:      params.Up,
 			})
 			return nil
@@ -242,26 +309,69 @@ func drop(params dropParams) runjobs.RemoveNamespacesResult {
 	return result
 }
 
-type reportParams struct {
-	Presenter flow.Presenter
-	Config    domain.RunConfig
-	Result    runjobs.RemoveNamespacesResult
+func (d *Dropper) report(result runjobs.RemoveNamespacesResult) {
+	name := func(ref domain.NamespaceRef) string {
+		return rules.NamespaceName(rules.NamespaceNameParams{Config: d.params.Snapshot.Config, Ref: ref})
+	}
+	for _, ref := range result.Released {
+		d.params.Presenter.Status(flow.Notice{Kind: flow.NoticeSuccess, Text: fmt.Sprintf(domain.CleanRemovedNamespaceFmt, name(ref), ref.Job)})
+	}
+	for _, ref := range result.Down {
+		d.params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: fmt.Sprintf(domain.CleanDeferredNamespaceFmt, ref.Job, name(ref))})
+	}
+	for _, failed := range result.Failed {
+		d.params.Presenter.Status(flow.Notice{
+			Kind: flow.NoticeWarning,
+			Text: fmt.Sprintf(domain.CleanDropFailedFmt, name(failed.Ref), failed.Ref.Job, failed.Err),
+		})
+	}
 }
 
-func report(params reportParams) {
+type outcomesParams struct {
+	Config domain.RunConfig
+	Branch string
+	Result runjobs.RemoveNamespacesResult
+}
+
+func outcomesOf(params outcomesParams) []domain.NamespaceOutcome {
+	outcome := func(ref domain.NamespaceRef, status domain.NamespaceStatus, reason string) domain.NamespaceOutcome {
+		return domain.NamespaceOutcome{
+			Branch: params.Branch,
+			Job:    ref.Job,
+			Name:   rules.NamespaceName(rules.NamespaceNameParams{Config: params.Config, Ref: ref}),
+			Status: status,
+			Reason: reason,
+		}
+	}
+	var outcomes []domain.NamespaceOutcome
 	for _, ref := range params.Result.Released {
-		params.Presenter.Status(flow.Notice{
-			Kind: flow.NoticeSuccess,
-			Text: fmt.Sprintf(domain.CleanRemovedNamespaceFmt, rules.NamespaceName(rules.NamespaceNameParams{Config: params.Config, Ref: ref}), ref.Job),
+		outcomes = append(outcomes, outcome(ref, domain.NamespaceDropped, ""))
+	}
+	for _, ref := range params.Result.Down {
+		outcomes = append(outcomes, outcome(ref, domain.NamespaceDeferred, fmt.Sprintf(domain.NamespaceServiceDownFmt, ref.Job)))
+	}
+	for _, failed := range params.Result.Failed {
+		outcomes = append(outcomes, outcome(failed.Ref, domain.NamespaceDeferred, failed.Err.Error()))
+	}
+	return outcomes
+}
+
+type keptParams struct {
+	Snapshot Snapshot
+	Holding  domain.NamespaceHolding
+	Reason   string
+}
+
+func kept(params keptParams) []domain.NamespaceOutcome {
+	outcomes := make([]domain.NamespaceOutcome, 0, len(params.Holding.Config.Jobs))
+	for _, job := range params.Holding.Config.Jobs {
+		outcomes = append(outcomes, domain.NamespaceOutcome{
+			Branch: params.Holding.Branch,
+			Job:    job.Name,
+			Name:   rules.NamespaceName(rules.NamespaceNameParams{Config: params.Snapshot.Config, Ref: rules.HoldingRef(params.Holding, job.Name)}),
+			Status: domain.NamespaceKept,
+			Reason: params.Reason,
 		})
 	}
-	for _, ref := range params.Result.Deferred {
-		params.Presenter.Status(flow.Notice{
-			Kind: flow.NoticeWarning,
-			Text: fmt.Sprintf(domain.CleanDeferredNamespaceFmt, ref.Job, rules.NamespaceName(rules.NamespaceNameParams{Config: params.Config, Ref: ref})),
-		})
-	}
-	for _, err := range params.Result.Errs {
-		params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: err.Error()})
-	}
+	return outcomes
 }
