@@ -297,7 +297,10 @@ on_clean = [
 `on_create` hooks run after a worktree is created; `on_clean` hooks run in the worktree
 just before it is removed by `clean`/`prune` (e.g. to tear down external resources). A
 non-zero hook aborts the operation unless the entry sets `continue_on_error`. Hooks
-interpolate `{{worktree}}`, `{{branch}}`, `{{root}}`, and (for `on_create`) `{{from_branch}}`.
+interpolate `{{worktree}}`, `{{branch}}`, `{{root}}`, and (for `on_create`) `{{from_branch}}`. A hook
+is a `/bin/sh` line and each value is quoted for the spot it lands in, so a path holding a
+`'` or a `$` reaches the command as it is spelled on disk — `cd {{worktree}}`, `cd "{{worktree}}"`
+and `cd '{{worktree}}'` all work.
 
 A hook also gets the worktree's run variables (`COMPOSE_PROJECT_NAME`, `WTM_*` and the
 declared ports, see [Run config](#run-config--runtoml)) **only when** `run.toml` declares
