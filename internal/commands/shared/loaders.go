@@ -65,4 +65,4 @@ func LoadJobsGraceful() []domain.JobInfo { return runjobs.Load() }
 
 // LoadJobs is LoadJobsGraceful for the callers whose whole output is that list,
 // and which therefore have to report a daemon of another build.
-func LoadJobs() ([]domain.JobInfo, error) { return runjobs.List() }
+func LoadJobs() runjobs.Listing { return runjobs.List() }

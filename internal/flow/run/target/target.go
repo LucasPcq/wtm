@@ -6,6 +6,7 @@ package target
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -68,6 +69,16 @@ func BranchOf(dir string) string {
 		return ""
 	}
 	return branch
+}
+
+// ProjectOf names the repository a worktree belongs to — its main checkout's
+// directory, as every run name spells the project — empty when git cannot say.
+func ProjectOf(dir string) string {
+	main, err := worktree.MainCheckout(worktree.MainCheckoutParams{ProjectDir: dir})
+	if err != nil {
+		return ""
+	}
+	return filepath.Base(main)
 }
 
 // RunningJobs counts what the daemon holds per worktree, and answers nothing

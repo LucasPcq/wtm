@@ -53,6 +53,11 @@ type daemonServer struct {
 	// what the command said.
 	inflight atomic.Int64
 	shutdown chan struct{}
+	stopOnce sync.Once
+	// stopped closes once stop has run to its end: RunDaemon returning is the
+	// process exiting, and a foreground job still in its grace period would die
+	// mid-cleanup with the index still naming it.
+	stopped chan struct{}
 }
 
 // RunDaemon starts the daemon, listens on the Unix socket, and blocks until shutdown.
@@ -77,6 +82,7 @@ func RunDaemon(params DaemonParams) error {
 		listener:   listener,
 		socketPath: params.SocketPath,
 		shutdown:   make(chan struct{}),
+		stopped:    make(chan struct{}),
 	}
 
 	if params.ProxyPort > 0 {
@@ -100,13 +106,17 @@ func RunDaemon(params DaemonParams) error {
 	// Handle signals
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
+	defer signal.Stop(sigCh)
 	go func() {
-		<-sigCh
-		d.stop()
+		select {
+		case <-sigCh:
+			d.stop()
+		case <-d.shutdown:
+		}
 	}()
 
 	// Idle timer for auto-exit
-	go d.idleWatcher()
+	go d.idleWatcher(daemonIdleTimeout)
 
 	// Accept loop
 	for {
@@ -114,6 +124,7 @@ func RunDaemon(params DaemonParams) error {
 		if acceptErr != nil {
 			select {
 			case <-d.shutdown:
+				<-d.stopped
 				return nil
 			default:
 				continue
@@ -144,15 +155,27 @@ func (d *daemonServer) publicPort() int {
 }
 
 func (d *daemonServer) stop() {
-	close(d.shutdown)
-	d.listener.Close()
-	d.manager.StopForeground()
-	os.Remove(d.socketPath)
-	d.clients.Wait()
+	d.stopOnce.Do(func() {
+		close(d.shutdown)
+		d.listener.Close()
+		d.manager.StopForeground()
+		d.clients.Wait()
+		close(d.stopped)
+	})
 }
 
-func (d *daemonServer) idleWatcher() {
-	ticker := time.NewTicker(daemonIdleTimeout)
+// idle is what lets the daemon exit on its own. A detached job serving a name
+// keeps it: the proxy lives in this process, and exiting would take the name
+// down while the stack behind it runs.
+func (d *daemonServer) idle() bool {
+	if d.manager.IsRunning() || d.inflight.Load() > 0 {
+		return false
+	}
+	return d.proxyPort == 0 || !d.manager.ServesRoutes()
+}
+
+func (d *daemonServer) idleWatcher(timeout time.Duration) {
+	ticker := time.NewTicker(timeout)
 	defer ticker.Stop()
 
 	for {
@@ -160,7 +183,7 @@ func (d *daemonServer) idleWatcher() {
 		case <-d.shutdown:
 			return
 		case <-ticker.C:
-			if !d.manager.IsRunning() && d.inflight.Load() == 0 {
+			if d.idle() {
 				d.stop()
 				return
 			}
@@ -209,7 +232,7 @@ func (d *daemonServer) handleConnection(conn net.Conn) {
 	case ActionShutdown:
 		d.handleShutdown(encoder)
 	default:
-		encoder.Encode(Response{Status: StatusError, Message: fmt.Sprintf("unknown action: %s", req.Action)})
+		encoder.Encode(Response{Status: StatusError, Message: fmt.Sprintf("%s: %s", domain.DaemonUnknownActionPrefix, req.Action)})
 	}
 }
 

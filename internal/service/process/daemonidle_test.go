@@ -20,7 +20,9 @@ type testDaemon struct {
 
 func idleDaemon(t *testing.T, idle, budget time.Duration) testDaemon {
 	t.Helper()
-	t.Setenv("HOME", t.TempDir())
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 
 	previousIdle, previousBudget := daemonIdleTimeout, daemonNamespaceBudget
 	daemonIdleTimeout, daemonNamespaceBudget = idle, budget

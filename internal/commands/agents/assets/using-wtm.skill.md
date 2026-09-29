@@ -352,7 +352,9 @@ and **experimental**: the global `wtm init` does not configure it.
   `run stop` in a worktree releases only that worktree's claim; the service itself stops when
   the last hold goes — **the main checkout's own start counts as one**, so a linked worktree
   letting go never takes down a service main asked for. A stop that let go without stopping
-  reports status **`released`** (human: `released — still up elsewhere`), not `stopped`. Main
+  reports status **`released`** (human: `released — still up elsewhere`), not `stopped`.
+  A `run stop` that found nothing up under that name in that worktree reports
+  **`not_running`** (human: `= api not running`, exit 0) — never `stopped`. Main
   starting a service another worktree already runs joins it (`attached`) and carves its own
   namespace.
 - **A shared job may carve out a namespace per worktree.** `[job.namespace]` names it (`name`,
@@ -377,8 +379,11 @@ and **experimental**: the global `wtm init` does not configure it.
   run.toml already gives touches keeps them. Outside the wizard, `run job edit <job> --touches
   <service>` sets it (repeatable, replaces the list, `''` drops it); nothing sets it unasked. `run up` and `run start`
   refuse to start such a job where the data is not the worktree's own — its source's for a
-  **verbatim** worktree, everyone's for a shared service with **no** namespace. On your paths
-  that is an error (exit 1) naming the jobs, `--force` and `wtm env <wt> --isolation isolated`;
+  **verbatim** worktree, everyone's for a shared service with **no** namespace. A task a
+  runner starts through its `runs` counts too (`migrate (run by dev)`). On your paths
+  that is an error (exit 1) naming the jobs, `--force` and the fix for each cause —
+  `wtm env <wt> --isolation isolated` for a verbatim worktree, a `[job.namespace]` on the
+  service for a shared one (isolating does nothing for it);
   **pass `--force` only when the user asked** for the reset to reach that data. The main
   checkout is never stopped, and a job without `touches` is never checked.
 - **`[[env]]` is how a slice reaches the app.** `[[env_port]]` rewrites the port *inside* a
@@ -498,11 +503,19 @@ and **experimental**: the global `wtm init` does not configure it.
   `run stop` then takes `--job` as given. `run up` and `run start` refuse it, and also
   refuse a worktree whose environment cannot be resolved (a detached HEAD, an unreadable
   `meta.json`), naming the cause: a job is never started on the main checkout's ports.
+  They also refuse a worktree created before the isolation choice (no `isolation` in its
+  `meta.json`) while run.toml declares something to isolate: its `.env` still holds its
+  source's ports. The message names both ways out — `wtm env <wt> --isolation isolated`
+  (own ports and compose project) or `--isolation verbatim` (keep the source's); ask the
+  user which one, then run the command again.
   `run url` / `run open` refuse such a worktree the same way.
 - `run up [worktree] --profile <name>` / `run down [worktree]` — start / stop a profile.
   On `run up` **`--profile` is repeatable**: `--profile front --profile back` starts the
   union of both, in the order given, and a job several of them list starts once.
   `run down --profile` still takes one.
+  `run down --all` stops the jobs of **every worktree of the current repository** — never
+  another repository's, though the daemon is shared — without a prompt, and its JSON
+  holds one document per worktree it emptied.
   `run start [worktree] --job <name>` / `run stop [worktree] --job <name>` — one job.
   `--job` is **required** on `start`/`stop` on your paths: without a terminal there is no
   picker to fall back on, and the command errors naming the flag. A failing job aborts the rest and exits non-zero, leaving started
@@ -617,7 +630,11 @@ and **experimental**: the global `wtm init` does not configure it.
 - **`status` has six values, and `detached` is not a weaker `running`.** A service with
   a `stop` command (a `docker compose up -d`) is reported `detached` from the moment its
   launcher exits: the real work runs outside wtm, and there is **nothing to attach to** —
-  `run logs` on it prints its persisted file and returns. A compose launcher is the one
+  `run logs` on it prints its persisted file and returns. **Declaring `stop` is what makes
+  a service detached**: its `cmd` must exit once the work is started, and `run up` waits
+  for it — a `cmd` that keeps running with a `stop` beside it blocks the run. `run up` /
+  `run start` warn when such a `cmd` has no `-d` / `--detach`; drop `stop` to run it in
+  the foreground. A compose launcher is the one
   wtm can check: when a daemon starts it asks `docker compose ps` about each such entry,
   and one whose containers are gone — a `docker compose down` run by hand, a
   `docker system prune` — is reported **`stopped`** instead. Any other launcher, a
@@ -660,10 +677,13 @@ and **experimental**: the global `wtm init` does not configure it.
   keep running — and `run daemon restart` hands its jobs to a daemon built from the
   current binary. Both only prompt when foreground services would be stopped; pass
   `--yes` (required without a terminal, and in JSON).
-- **A version mismatch is refused, never worked around.** The daemon is what runs the
-  jobs, so one built from another version of wtm keeps applying its own behavior. Every
-  command refuses with a message naming both versions; the way out is
-  `wtm run daemon restart`. Do not retry the command — it will refuse identically.
+- **A daemon of another version can always be listed, stopped and replaced.** `run ps`,
+  `run stop`, `run down`, `run daemon status|stop|restart` work against it (`run ps` warns
+  that it should be restarted). `run up` / `run start` replace an older daemon that holds
+  no job without asking; one that holds jobs is refused with `daemon <v> running with N
+  job(s)` and the way out, `wtm run daemon restart` — run it (it prompts only when
+  foreground services would stop) rather than retrying the start, which refuses
+  identically.
 - `run proxy status` reports what actually serves those names: the proxy's bind port, the
   public port announced in URLs, and whether the port-80 redirection is installed.
   `--output json` gives the whole thing as one object. `run proxy install` needs no

@@ -266,6 +266,9 @@ type FormatRunningJobsParams struct {
 	// Hyperlinks makes each address clickable. Off for a pipe: the escape would
 	// reach whatever reads the table.
 	Hyperlinks bool
+	// Projects names each work dir's repository. Nil drops the column: with one
+	// repository it says nothing.
+	Projects map[string]string
 }
 
 // FormatRunningJobs renders a table of running (or recently running) jobs. It
@@ -273,7 +276,7 @@ type FormatRunningJobsParams struct {
 // outer vertical padding.
 func FormatRunningJobs(params FormatRunningJobsParams) string {
 	if len(params.Jobs) == 0 {
-		return UnchangedLine(domain.RunNoJobsHere)
+		return UnchangedLine(domain.RunNoJobsRunning)
 	}
 
 	uptimes := make([]string, len(params.Jobs))
@@ -281,7 +284,10 @@ func FormatRunningJobs(params FormatRunningJobsParams) string {
 		uptimes[i] = rules.JobUptime(rules.JobUptimeParams{Job: j, Now: params.Now})
 	}
 
-	nameW, kindW, statusW, addrW, upW := len("NAME"), len("KIND"), len("STATUS"), len("ADDRESS"), len("UPTIME")
+	nameW, kindW, statusW, addrW, upW, projectW := len("NAME"), len("KIND"), len("STATUS"), len("ADDRESS"), len("UPTIME"), len("PROJECT")
+	for _, project := range params.Projects {
+		projectW = max(projectW, len(project))
+	}
 	for i, j := range params.Jobs {
 		if len(j.Name) > nameW {
 			nameW = len(j.Name)
@@ -304,13 +310,14 @@ func FormatRunningJobs(params FormatRunningJobsParams) string {
 	// Rendered without its line break: a style given a string ending in one sees
 	// two lines and pads the empty second to the width of the first, which lands
 	// as a run of spaces in front of the first job.
-	header := fmt.Sprintf("%s%-*s  %-*s  %-*s  %-*s  %-*s  %s",
+	header := fmt.Sprintf("%s%-*s  %-*s  %-*s  %-*s  %-*s  %s%s",
 		Indent,
 		nameW, "NAME",
 		kindW, "KIND",
 		statusW, "STATUS",
 		addrW, "ADDRESS",
 		upW, "UPTIME",
+		projectCell(projectCellParams{Params: params, Width: projectW, Value: "PROJECT"}),
 		"WORKTREE",
 	)
 	b.WriteString(styles.Muted.Render(header))
@@ -328,19 +335,33 @@ func FormatRunningJobs(params FormatRunningJobsParams) string {
 		if params.Hyperlinks {
 			address = rules.LinkURLs(address)
 		}
-		line := fmt.Sprintf("%s%-*s  %-*s  %-*s  %s  %-*s  %s\n",
+		line := fmt.Sprintf("%s%-*s  %-*s  %-*s  %s  %-*s  %s%s\n",
 			Indent,
 			nameW, j.Name,
 			kindW, string(j.Kind),
 			statusW+ansiOverhead(status), status,
 			address,
 			upW, uptimes[i],
+			projectCell(projectCellParams{Params: params, Width: projectW, Value: params.Projects[j.WorkDir]}),
 			worktree,
 		)
 		b.WriteString(line)
 	}
 
 	return b.String()
+}
+
+type projectCellParams struct {
+	Params FormatRunningJobsParams
+	Width  int
+	Value  string
+}
+
+func projectCell(params projectCellParams) string {
+	if params.Params.Projects == nil {
+		return ""
+	}
+	return fmt.Sprintf("%-*s  ", params.Width, params.Value)
 }
 
 func styleJobStatus(status domain.JobStatus) string {

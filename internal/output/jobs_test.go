@@ -167,6 +167,27 @@ func TestFormatRunningJobs_ShowsUptime(t *testing.T) {
 	}
 }
 
+// The daemon is machine-wide: with two repositories, "main" alone is ambiguous.
+func TestFormatRunningJobs_NamesTheProjectWhenGiven(t *testing.T) {
+	jobs := []domain.JobInfo{
+		{Name: "web", Kind: domain.JobKindService, Status: domain.JobStatusRunning, WorkDir: "/a"},
+		{Name: "web", Kind: domain.JobKindService, Status: domain.JobStatusRunning, WorkDir: "/b"},
+	}
+	out := FormatRunningJobs(FormatRunningJobsParams{
+		Jobs:     jobs,
+		Branches: map[string]string{"/a": "main", "/b": "main"},
+		Projects: map[string]string{"/a": "shop", "/b": "blog"},
+	})
+	for _, want := range []string{"PROJECT", "shop", "blog"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("table does not show %q:\n%s", want, out)
+		}
+	}
+	if plain := FormatRunningJobs(FormatRunningJobsParams{Jobs: jobs}); strings.Contains(plain, "PROJECT") {
+		t.Errorf("a single repository still gets a project column:\n%s", plain)
+	}
+}
+
 // TestFormatRunningJobs_NoUptimeWithoutARunningStart pins the two cases where
 // the column stays blank rather than counting: a job the daemon never spawned,
 // and one whose run is over.

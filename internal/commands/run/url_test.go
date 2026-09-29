@@ -3,6 +3,7 @@ package run
 import (
 	"encoding/json"
 	"errors"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -165,5 +166,24 @@ func TestRunURLJSONHonoursTheJobFlag(t *testing.T) {
 	}
 	if len(entries) != 1 || entries[0].Job != "web" {
 		t.Errorf("entries = %+v, want only web", entries)
+	}
+}
+
+// A shared job runs once, in the main checkout, on its declared port: the raw
+// address of a linked worktree must not shift it by the worktree's offset.
+func TestRunURLRawOfASharedJobKeepsItsDeclaredPort(t *testing.T) {
+	stateDir := setupTestProject(t)
+	db := published("db", 5432, "")
+	db.Scope = domain.JobScopeShared
+	writeRunTOML(t, stateDir, domain.RunConfig{Jobs: []domain.JobConfig{db}})
+	fakeTTY(t, false)
+	enterWorktree(t, addWorktree(t, os.Getenv("WTM_PROJECT_DIR"), "feat/x"))
+
+	stdout, _, err := runCmd(t, domain.CmdURL, "feat/x", "--"+domain.FlagRaw)
+	if err != nil {
+		t.Fatalf("run url --raw: %v", err)
+	}
+	if strings.TrimSpace(stdout) != "http://localhost:5432" {
+		t.Errorf("stdout = %q, want the shared job's declared port", stdout)
 	}
 }

@@ -175,23 +175,22 @@ func TestRunLogsOpensTheViewOnATerminal(t *testing.T) {
 }
 
 func TestRunLogsWithoutATerminalWritesPrefixedLines(t *testing.T) {
+	daemon := setupStartProject(t, &fakeDaemon{
+		Streams: map[string][]byte{"api": []byte("listening on 3000\nrequest handled\n")},
+	})
+	// The daemon keys a job on the worktree it was started from, never on the
+	// subdirectory or the spelling the caller happened to use, so the fake has to
+	// answer with the same key the command will ask for.
 	dir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
 	}
-	// The daemon keys a job on the worktree it was started from, never on the
-	// subdirectory or the spelling the caller happened to use, so the fake has to
-	// answer with the same key the command will ask for.
 	root, err := infra.Toplevel(dir)
 	if err != nil {
 		t.Fatalf("toplevel: %v", err)
 	}
-
-	setupStartProject(t, &fakeDaemon{
-		Jobs: []domain.JobInfo{
-			{Name: "api", Kind: domain.JobKindService, Status: domain.JobStatusRunning, WorkDir: root},
-		},
-		Streams: map[string][]byte{"api": []byte("listening on 3000\nrequest handled\n")},
+	daemon.setJobs([]domain.JobInfo{
+		{Name: "api", Kind: domain.JobKindService, Status: domain.JobStatusRunning, WorkDir: root},
 	})
 	view := captureRunView(t)
 	fakeTTY(t, false)

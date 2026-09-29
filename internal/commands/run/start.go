@@ -35,6 +35,9 @@ func runStart(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	if err := reportRunConfig(cmd, ctx.Run); err != nil {
+		return err
+	}
 
 	warnIndexFrozen(cmd)
 

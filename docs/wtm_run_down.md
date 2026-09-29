@@ -6,7 +6,7 @@ Stop a worktree's running jobs
 
 Stop the jobs running in [worktree] — the current one when omitted, picked interactively when there is a terminal.
 With --profile, stops only that profile's jobs.
-Jobs running in other worktrees are never touched.
+Jobs running in other worktrees are never touched, unless --all is given: it stops every worktree of this repository, without asking, and lists each one it emptied. Other repositories are never touched.
 
 ```
 wtm run down [worktree...] [flags]
@@ -15,7 +15,7 @@ wtm run down [worktree...] [flags]
 ### Options
 
 ```
-      --all              Stop jobs across every worktree (bypasses per-worktree scoping)
+      --all              Stop the jobs of every worktree of this repository
   -h, --help             help for down
       --output string    Output format: text or json (default "text")
       --profile string   Stop only this profile's jobs

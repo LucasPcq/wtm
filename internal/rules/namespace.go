@@ -316,10 +316,14 @@ func CarvedNamespace(params CarvedNamespaceParams) string {
 // only let go of is still up for another one, and "stopped" there read as a
 // service taken away from everyone.
 func StoppedFmt(status string) string {
-	if status == domain.JobActionReleased {
+	switch status {
+	case domain.JobActionReleased:
 		return domain.RunReleasedFmt
+	case domain.JobActionNotRunning:
+		return domain.RunNotRunningFmt
+	default:
+		return domain.RunStoppedFmt
 	}
-	return domain.RunStoppedFmt
 }
 
 // OwedLines say what a service that is down still owes, one line per service

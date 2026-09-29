@@ -1825,11 +1825,14 @@ const (
 	// it: another worktree still holds it, and saying "stopped" there read as a
 	// service taken away from everyone.
 	JobActionReleased = "released"
-	JobActionDone     = "done"
-	JobActionError    = "error"
-	JobActionCrashed  = "crashed"
-	JobActionAdded    = "added"
-	JobActionRemoved  = "removed"
+	// JobActionNotRunning is a stop that found nothing up under that name in
+	// that worktree: "stopped" there claimed an act that never happened.
+	JobActionNotRunning = "not_running"
+	JobActionDone       = "done"
+	JobActionError      = "error"
+	JobActionCrashed    = "crashed"
+	JobActionAdded      = "added"
+	JobActionRemoved    = "removed"
 	// JobRemovedProfilesFmt and JobRemovedEnvPortsFmt report what a removal
 	// dragged along with the job, each named so the reader can put it back.
 	JobRemovedProfilesFmt = "Stripped from profile(s): %s"
@@ -2082,6 +2085,35 @@ const (
 	// DaemonStartTimeoutSeconds is how long to wait for the daemon to start.
 	DaemonStartTimeoutSeconds = 5
 
+	// DaemonPollInterval paces the wait for a daemon's socket to answer, or to
+	// stop answering.
+	DaemonPollInterval = 50 * time.Millisecond
+	// DaemonStopTimeout bounds the wait for a daemon to exit once asked: it
+	// stops its foreground jobs one by one, each with JobStopGracePeriod.
+	DaemonStopTimeout = 30 * time.Second
+	// JobStopGracePeriod is how long a process group has between SIGTERM and
+	// SIGKILL: long enough for a dev server to flush its children, short enough
+	// not to read as a hang.
+	JobStopGracePeriod = 5 * time.Second
+	// JobDrainGracePeriod bounds the wait for a stopped job's last bytes to reach
+	// its log; the process is already reaped, so what is left is one read.
+	JobDrainGracePeriod = time.Second
+	// JobPTYDrainGracePeriod bounds the wait for a launcher's or a task's PTY to
+	// reach EOF before its master is closed: a descendant holding the slave open
+	// must never hang the daemon.
+	JobPTYDrainGracePeriod = 2 * time.Second
+	// StackProbeTimeout bounds one compose call made to verify a detached stack:
+	// Docker Desktop starting up may never answer.
+	StackProbeTimeout = 3 * time.Second
+	// OrphanStartSkew is how far a group member's start may sit from its record's
+	// StartedAt and still be the same process — nowhere near wide enough to accept
+	// a group id recycled hours later.
+	OrphanStartSkew = 90 * time.Second
+	// OrphanGracePeriod is shorter than JobStopGracePeriod: an orphan has nothing
+	// left to flush, and the wait is paid by the user's next `run up`.
+	OrphanGracePeriod  = 2 * time.Second
+	OrphanPollInterval = 50 * time.Millisecond
+
 	// DaemonStateFileName is the daemon's durable index, beside the socket under
 	// the global dir: the daemon is global, and an index it could only read from
 	// one repository would be an index of nothing.
@@ -2096,6 +2128,11 @@ const (
 	// names the way out, because there is nothing the user can do from the
 	// command they just ran.
 	DaemonVersionMismatchFmt = "the daemon holding the socket is %s, this is wtm %s — run 'wtm run daemon restart' to hand your jobs over"
+	// DaemonSkewHoldsJobsFmt takes the daemon's version, the jobs it holds and
+	// the client's: a daemon holding nothing is replaced without a word.
+	DaemonSkewHoldsJobsFmt = "daemon %s running with %d job(s), this is wtm %s — run 'wtm run daemon restart' to hand them over"
+	// DaemonUnknownActionPrefix is how a daemon refuses a request it predates.
+	DaemonUnknownActionPrefix = "unknown action"
 
 	// DaemonMismatchWhyFmt and DaemonMismatchFixLine are the same refusal with
 	// room to explain, for the callout `run daemon status` renders. One line per
@@ -2537,7 +2574,14 @@ const (
 	RunForeignDataOwnerShared = "every worktree's data: a shared service with no [job.namespace]"
 	RunForeignDataYes         = "Run them anyway"
 	RunForeignDataNo          = "Don't start"
-	RunForeignDataRefusedFmt  = "%s:\n%s\npass --%s to run them anyway, or give this worktree its own data: wtm env <branch> --%s %s"
+	RunForeignDataViaFmt      = "%s (run by %s)"
+	// RunForeignDataRefusedFmt takes the title, the risks, the --force flag and
+	// the hints: each cause has its own way out, and isolating a worktree does
+	// nothing for a shared service with no namespace.
+	RunForeignDataRefusedFmt       = "%s:\n%s\npass --%s to run them anyway, or %s"
+	RunForeignDataIsolateHintFmt   = "give this worktree its own data: wtm env <branch> --%s %s"
+	RunForeignDataNamespaceHintFmt = "give each worktree its own slice of %s: declare a [job.namespace] on it in run.toml"
+	RunForeignDataHintSep          = "; or "
 
 	// RunSelfPortClashFmt refuses a run that brings up two worktrees on the same
 	// ports: there is nothing to stop, the selection is the conflict.
@@ -2564,6 +2608,7 @@ const (
 	RunStoppedFmt    = "%s stopped"
 	RunStopFailedFmt = "%s: %s"
 	RunReleasedFmt   = "%s released — still up elsewhere"
+	RunNotRunningFmt = "%s not running"
 	RunNoJobsRunning = "No jobs running."
 	RunNoJobsHere    = "No jobs running in this worktree."
 	// NoWorktreesMessage is the empty worktree inventory, wherever it is drawn.
@@ -2574,6 +2619,15 @@ const (
 	RunJobsEmpty     = "No jobs defined in run.toml."
 	RunProfilesEmpty = "No profiles defined in run.toml."
 	RunStoppingJobs  = "Stopping jobs…"
+	RunLoadingJobs   = "Loading jobs…"
+	// RunLauncherMayBlockFmt warns of a service whose `stop` makes its cmd a
+	// launcher that must exit, while nothing in the cmd says it detaches.
+	RunLauncherMayBlockFmt = "job %q declares stop, so its cmd is a launcher wtm waits on until it exits (like `docker compose up -d`) — if it keeps running, drop stop to run it in the foreground"
+	DetachFlagShort        = "-d"
+	DetachFlagLong         = "--detach"
+	// RunDaemonDivergedFmt takes the daemon's version and the client's: an older
+	// daemon is still listed, but it runs the jobs its own way.
+	RunDaemonDivergedFmt = "the daemon is %s, this is wtm %s — run `wtm run daemon restart` to hand the jobs over"
 
 	// RunStoppingOthers and RunStoppedOtherFmt report the worktrees an exclusive
 	// run cleared before starting.
@@ -2938,6 +2992,9 @@ const (
 	// EnvIsolationNotAdoptedFmt is what `wtm env` says of the run values it left
 	// alone on such a worktree, and how to adopt isolation later.
 	EnvIsolationNotAdoptedFmt = "%s predates isolation: its ports and compose project were left as they are — adopt it with `wtm env %s --isolation isolated`"
+	// RunIsolationAdoptionPendingFmt is `run up` / `run start` refusing such a
+	// worktree: both ways out are named, since keeping its source's values is one.
+	RunIsolationAdoptionPendingFmt = "%s predates isolation: its .env still holds its source's ports — choose with `wtm env %s --isolation isolated` (own ports and compose project) or `--isolation verbatim` (keep the source's), then run it again"
 
 	// RecapField* are the aligned labels of the create recap body.
 	RecapFieldBranch       = "Branch:  "

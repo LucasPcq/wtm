@@ -11,6 +11,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow/run/target"
 	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/internal/tui/components"
 )
 
@@ -34,21 +36,16 @@ func runPs(cmd *cobra.Command, _ []string) error {
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 
 	if format == domain.OutputJSON {
-		jobs, err := shared.LoadJobs()
-		if err != nil {
-			return err
-		}
-		return output.WriteRunningJobsJSON(cmd.OutOrStdout(), jobs)
+		return output.WriteRunningJobsJSON(cmd.OutOrStdout(), shared.LoadJobs().Jobs)
 	}
 
-	var jobs []domain.JobInfo
+	var listing runjobs.Listing
 	loadErr := components.RunLoading(components.LoadingParams{
-		Message: "Loading jobs…",
+		Message: domain.RunLoadingJobs,
 		Animate: shared.Animate(cmd, true),
 		Work: func() error {
-			var e error
-			jobs, e = shared.LoadJobs()
-			return e
+			listing = shared.LoadJobs()
+			return nil
 		},
 	})
 	if loadErr != nil {
@@ -56,8 +53,19 @@ func runPs(cmd *cobra.Command, _ []string) error {
 	}
 
 	out := cmd.OutOrStdout()
+	jobs := listing.Jobs
 	output.Frame(out, func(w io.Writer) {
-		fmt.Fprint(w, output.FormatRunningJobs(output.FormatRunningJobsParams{Jobs: jobs, Now: time.Now(), Branches: branchesOf(jobs), Hyperlinks: output.IsTerminal(out)}))
+		fmt.Fprint(w, output.FormatRunningJobs(output.FormatRunningJobsParams{
+			Jobs:       jobs,
+			Now:        time.Now(),
+			Branches:   branchesOf(jobs),
+			Projects:   projectsOf(jobs),
+			Hyperlinks: output.IsTerminal(out),
+		}))
+		if listing.Diverged() {
+			output.Blank(w)
+			output.Warning(w, fmt.Sprintf(domain.RunDaemonDivergedFmt, rules.DaemonVersionLabel(listing.DaemonVersion), domain.Version))
+		}
 	})
 	return nil
 }
@@ -73,4 +81,20 @@ func branchesOf(jobs []domain.JobInfo) map[string]string {
 		branches[job.WorkDir] = target.BranchOf(job.WorkDir)
 	}
 	return branches
+}
+
+// projectsOf names each work dir's repository, nil when they all belong to one:
+// the daemon is machine-wide, and "main" alone is ambiguous across two repos.
+func projectsOf(jobs []domain.JobInfo) map[string]string {
+	projects := map[string]string{}
+	for _, job := range jobs {
+		if _, seen := projects[job.WorkDir]; seen {
+			continue
+		}
+		projects[job.WorkDir] = target.ProjectOf(job.WorkDir)
+	}
+	if rules.DistinctValues(projects) < 2 {
+		return nil
+	}
+	return projects
 }

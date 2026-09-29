@@ -39,7 +39,7 @@ func Allow(params Params) (bool, error) {
 	lines := rules.ForeignDataLines(rules.ForeignDataLinesParams{Risks: risks, Several: len(params.WorkDirs) > 1})
 	if !params.Prompter.Interactive() {
 		return false, fmt.Errorf(domain.RunForeignDataRefusedFmt, domain.RunForeignDataTitle,
-			strings.Join(lines, "\n"), domain.FlagForce, domain.FlagIsolation, domain.IsolationIsolated)
+			strings.Join(lines, "\n"), domain.FlagForce, strings.Join(rules.ForeignDataHints(risks), domain.RunForeignDataHintSep))
 	}
 	return params.Prompter.Confirm(flow.ConfirmParams{
 		Title:       domain.RunForeignDataTitle,
@@ -54,7 +54,7 @@ func Allow(params Params) (bool, error) {
 // Risks reads each worktree's isolation from the environment its jobs would
 // get, which is the same answer the daemon acts on.
 func Risks(params Params) ([]domain.DataRisk, error) {
-	if !declaresTouches(params.Jobs) {
+	if !rules.DeclaresTouches(params.Config, params.Jobs) {
 		return nil, nil
 	}
 	var risks []domain.DataRisk
@@ -72,13 +72,4 @@ func Risks(params Params) ([]domain.DataRisk, error) {
 		})...)
 	}
 	return risks, nil
-}
-
-func declaresTouches(jobs []domain.JobConfig) bool {
-	for _, job := range jobs {
-		if len(job.Touches) > 0 {
-			return true
-		}
-	}
-	return false
 }

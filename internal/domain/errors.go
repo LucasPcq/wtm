@@ -96,6 +96,11 @@ var (
 	// main checkout's.
 	ErrWorktreeEnvUnresolved = errors.New("cannot resolve the worktree's environment")
 
+	// ErrIsolationAdoptionPending refuses to start a job in a worktree created
+	// before the isolation choice: its .env still holds its source's ports, and
+	// starting it isolated would move the jobs off them behind the user's back.
+	ErrIsolationAdoptionPending = errors.New("worktree has not chosen its isolation")
+
 	// ErrIsolationMain refuses to make the main checkout verbatim: it is the
 	// source every other .env is copied from, so there is nothing for it to copy.
 	ErrIsolationMain = errors.New("the main checkout is always isolated: it is the one the others copy from")

@@ -9,6 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/run/target"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
 )
 
@@ -32,8 +33,8 @@ type Outcome struct {
 	// Results is one entry per worktree, each holding the single job this command
 	// acts on. It is what lets the surfaces follow the arity (LUC-198).
 	Results []domain.WorktreeJobResults
-	// NoDaemon says nothing was listening. The job is stopped either way, which
-	// is why it is an outcome and not an error.
+	// NoDaemon says nothing was listening and the index held nothing for these
+	// worktrees: every result is not_running.
 	NoDaemon bool
 	Aborted  bool
 }
@@ -105,18 +106,29 @@ func (f *stopFlow) run() (Outcome, error) {
 	}
 
 	socket := process.SocketPath()
+	if err := f.wake(outcome.WorkDirs); err != nil {
+		return Outcome{}, err
+	}
 	if !process.IsDaemonRunning(socket) {
 		outcome.NoDaemon = true
+		outcome.Results = f.notRunning(outcome)
 		return outcome, f.presenter.Stopped(outcome)
 	}
 
+	running, err := process.NewClient(socket).Send(process.Request{Action: process.ActionList})
+	if err != nil {
+		return Outcome{}, fmt.Errorf("stop %s: %w", outcome.Job, err)
+	}
 	// The same job is stopped in each worktree in turn. A worktree that refuses
 	// ends the run: unlike a start, there is nothing partial to leave standing —
 	// the caller asked for the job to be down and it is not.
 	for _, workDir := range outcome.WorkDirs {
-		status, err := f.stop(socket, outcome.Job, workDir)
-		if err != nil {
-			return Outcome{}, err
+		status := domain.JobActionNotRunning
+		if rules.JobUpIn(rules.JobUpInParams{Jobs: running.Jobs, Name: outcome.Job, WorkDir: workDir}) {
+			status, err = f.stop(stopParams{Socket: socket, Job: outcome.Job, WorkDir: workDir})
+			if err != nil {
+				return Outcome{}, err
+			}
 		}
 		outcome.Results = append(outcome.Results, domain.WorktreeJobResults{
 			Worktree: f.branchOf(workDir),
@@ -125,6 +137,43 @@ func (f *stopFlow) run() (Outcome, error) {
 		})
 	}
 	return outcome, f.presenter.Stopped(outcome)
+}
+
+// wake starts a daemon when the index still holds jobs for these worktrees: a
+// detached stack outlives the daemon that launched it, and `run stop` is one of
+// the commands that must reach it.
+func (f *stopFlow) wake(workDirs []string) error {
+	if process.IsDaemonRunning(process.SocketPath()) {
+		return nil
+	}
+	indexed := false
+	for _, workDir := range workDirs {
+		indexed = indexed || process.HasIndexedJobs(workDir)
+	}
+	if !indexed {
+		return nil
+	}
+	return f.presenter.Stage(flow.StageParams{
+		Message: domain.RunDaemonConnecting,
+		Work: func() error {
+			return process.EnsureDaemon(process.DaemonParams{
+				SocketPath: process.SocketPath(),
+				ProxyPort:  rules.ProxyPort(f.ctx.Config.Global),
+			})
+		},
+	})
+}
+
+func (f *stopFlow) notRunning(outcome Outcome) []domain.WorktreeJobResults {
+	results := make([]domain.WorktreeJobResults, 0, len(outcome.WorkDirs))
+	for _, workDir := range outcome.WorkDirs {
+		results = append(results, domain.WorktreeJobResults{
+			Worktree: f.branchOf(workDir),
+			Path:     workDir,
+			Jobs:     []domain.JobActionResult{{Name: outcome.Job, Status: domain.JobActionNotRunning}},
+		})
+	}
+	return results
 }
 
 func (f *stopFlow) job(answers flow.Answers) (string, error) {
@@ -147,8 +196,15 @@ func (f *stopFlow) branchOf(workDir string) string {
 	return target.BranchOf(workDir)
 }
 
-func (f *stopFlow) stop(socket, job, workDir string) (string, error) {
-	client := process.NewClient(socket)
+type stopParams struct {
+	Socket  string
+	Job     string
+	WorkDir string
+}
+
+func (f *stopFlow) stop(params stopParams) (string, error) {
+	client := process.NewClient(params.Socket)
+	job := params.Job
 	var resp process.Response
 	if err := f.presenter.Stage(flow.StageParams{
 		Message: fmt.Sprintf(domain.RunStoppingFmt, job),
@@ -157,7 +213,7 @@ func (f *stopFlow) stop(socket, job, workDir string) (string, error) {
 			resp, sendErr = client.Send(process.Request{
 				Action:  process.ActionStop,
 				Name:    job,
-				WorkDir: workDir,
+				WorkDir: params.WorkDir,
 			})
 			return sendErr
 		},
