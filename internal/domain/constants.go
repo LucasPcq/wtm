@@ -1116,10 +1116,15 @@ const (
 
 	ComposeProjectFallback = "wtm"
 
+	// IsolationUnknownFmt refuses a value that is neither of the two, from
+	// run.toml and from --isolation alike.
+	IsolationUnknownFmt = "unknown isolation %q (expected %q or %q)"
+
 	// Flag names.
 	FlagFrom      = "from"
 	FlagFF        = "ff"
 	FlagEnvFrom   = "env-from"
+	FlagIsolation = "isolation"
 	FlagForce     = "force"
 	FlagBase      = "base"
 	FlagExclusive = "exclusive"

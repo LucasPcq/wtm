@@ -80,6 +80,10 @@ var (
 	// the ordinal exists to prevent.
 	ErrOrdinalUnreadable = errors.New("cannot read a live worktree's ordinal")
 
+	// ErrIsolationMain refuses to make the main checkout verbatim: it is the
+	// source every other .env is copied from, so there is nothing for it to copy.
+	ErrIsolationMain = errors.New("the main checkout is always isolated: it is the one the others copy from")
+
 	// ErrGHNotInstalled is returned when the gh CLI is not found on PATH.
 	ErrGHNotInstalled = errors.New("gh CLI not found — install it from https://cli.github.com")
 

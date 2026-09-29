@@ -72,6 +72,23 @@ const (
 	ConcurrencyExclusive Concurrency = "exclusive"
 )
 
+// Isolation is how a worktree stands against the checkout its .env was copied
+// from. It is one decision read by both halves of the run module — what is
+// written into the .env and what the daemon hands a job — because a worktree
+// whose file says one thing and whose processes are told another starts wired
+// to a neighbour without a word.
+type Isolation string
+
+const (
+	// IsolationIsolated gives the worktree its own ports, compose project and
+	// service slices, in its .env and at run time alike.
+	IsolationIsolated Isolation = "isolated"
+	// IsolationVerbatim keeps the .env exactly as it was copied: wtm writes
+	// nothing into it, and runs the worktree on the ports and data it names —
+	// its source's, so the two cannot run at the same time.
+	IsolationVerbatim Isolation = "verbatim"
+)
+
 // JobConfig defines a managed job from .wtm/run.toml.
 type JobConfig struct {
 	Name string  `toml:"name"           json:"name"`
@@ -203,6 +220,9 @@ type RunConfig struct {
 	// Empty means the question is still open: `run up` asks it once, and writes
 	// the answer here when the user asks it to be remembered.
 	Concurrency Concurrency `toml:"concurrency,omitempty" json:"concurrency,omitempty"`
+	// Isolation is what a new worktree gets when nobody is asked. Empty means
+	// IsolationIsolated.
+	Isolation Isolation `toml:"isolation,omitempty" json:"isolation,omitempty"`
 }
 
 // ExecSpec is a command ready for exec: the binary and the arguments it takes,

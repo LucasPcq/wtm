@@ -28,6 +28,10 @@ type WorktreeMetadata struct {
 	// back a namespace that was never created or leak one that was. It lives here
 	// because the file is removed with the worktree it describes.
 	Namespaces []string `json:"namespaces,omitempty"`
+	// Isolation is the choice made when the worktree was created. Empty is a
+	// worktree that predates the choice, and reads as IsolationIsolated — what
+	// every worktree got until then.
+	Isolation Isolation `json:"isolation,omitempty"`
 }
 
 // WorktreeStatus holds the display state of a worktree for wtm ls.
@@ -113,6 +117,9 @@ type CreateParams struct {
 	// separate, titled phase (used by `create` for its phased output). Callers that
 	// want hooks to run inline (extract, checkout) leave it false.
 	SkipHooks bool
+	// Isolation is recorded before any hook runs: a hook reads the worktree's
+	// ports, and they depend on it.
+	Isolation Isolation
 }
 
 // CreateHooksParams holds inputs for running on_create hooks as a standalone phase,

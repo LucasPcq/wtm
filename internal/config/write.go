@@ -152,6 +152,7 @@ type runFile struct {
 	PortProbeTimeout *int               `toml:"port_probe_timeout,omitempty"`
 	Addressing       domain.Addressing  `toml:"addressing,omitempty"`
 	Concurrency      domain.Concurrency `toml:"concurrency,omitempty"`
+	Isolation        domain.Isolation   `toml:"isolation,omitempty"`
 
 	Jobs      []domain.JobConfig     `toml:"job"`
 	Profiles  []domain.ProfileConfig `toml:"profile,omitempty"`
@@ -163,6 +164,7 @@ func runFileOf(cfg domain.RunConfig) runFile {
 	file := runFile{
 		Addressing:  cfg.Addressing,
 		Concurrency: cfg.Concurrency,
+		Isolation:   cfg.Isolation,
 		Jobs:        cfg.Jobs,
 		Profiles:    cfg.Profiles,
 		EnvPorts:    cfg.EnvPorts,

@@ -103,6 +103,7 @@ func Create(params domain.CreateParams) (domain.CreateResult, error) {
 		CreatedAt:    time.Now().UTC().Format(time.RFC3339),
 		EnvStrategy:  strategy,
 		Ordinal:      ordinal,
+		Isolation:    rules.EffectiveIsolation(params.Isolation),
 	}
 
 	metaDir := rules.WorktreeMetaDir(params.StateDir, params.Branch)
