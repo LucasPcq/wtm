@@ -2005,6 +2005,32 @@ const (
 	// DaemonStartTimeoutSeconds is how long to wait for the daemon to start.
 	DaemonStartTimeoutSeconds = 5
 
+	// DaemonPollInterval paces the wait for a daemon's socket to answer, or to
+	// stop answering.
+	DaemonPollInterval = 50 * time.Millisecond
+	// JobStopGracePeriod is how long a process group has between SIGTERM and
+	// SIGKILL: long enough for a dev server to flush its children, short enough
+	// not to read as a hang.
+	JobStopGracePeriod = 5 * time.Second
+	// JobDrainGracePeriod bounds the wait for a stopped job's last bytes to reach
+	// its log; the process is already reaped, so what is left is one read.
+	JobDrainGracePeriod = time.Second
+	// JobPTYDrainGracePeriod bounds the wait for a launcher's or a task's PTY to
+	// reach EOF before its master is closed: a descendant holding the slave open
+	// must never hang the daemon.
+	JobPTYDrainGracePeriod = 2 * time.Second
+	// StackProbeTimeout bounds one compose call made to verify a detached stack:
+	// Docker Desktop starting up may never answer.
+	StackProbeTimeout = 3 * time.Second
+	// OrphanStartSkew is how far a group member's start may sit from its record's
+	// StartedAt and still be the same process — nowhere near wide enough to accept
+	// a group id recycled hours later.
+	OrphanStartSkew = 90 * time.Second
+	// OrphanGracePeriod is shorter than JobStopGracePeriod: an orphan has nothing
+	// left to flush, and the wait is paid by the user's next `run up`.
+	OrphanGracePeriod  = 2 * time.Second
+	OrphanPollInterval = 50 * time.Millisecond
+
 	// DaemonStateFileName is the daemon's durable index, beside the socket under
 	// the global dir: the daemon is global, and an index it could only read from
 	// one repository would be an index of nothing.
