@@ -596,7 +596,11 @@ and **experimental**: the global `wtm init` does not configure it.
 - **`status` has six values, and `detached` is not a weaker `running`.** A service with
   a `stop` command (a `docker compose up -d`) is reported `detached` from the moment its
   launcher exits: the real work runs outside wtm, and there is **nothing to attach to** —
-  `run logs` on it prints its persisted file and returns. A compose launcher is the one
+  `run logs` on it prints its persisted file and returns. **Declaring `stop` is what makes
+  a service detached**: its `cmd` must exit once the work is started, and `run up` waits
+  for it — a `cmd` that keeps running with a `stop` beside it blocks the run. `run up` /
+  `run start` warn when such a `cmd` has no `-d` / `--detach`; drop `stop` to run it in
+  the foreground. A compose launcher is the one
   wtm can check: when a daemon starts it asks `docker compose ps` about each such entry,
   and one whose containers are gone — a `docker compose down` run by hand, a
   `docker system prune` — is reported **`stopped`** instead. Any other launcher, a

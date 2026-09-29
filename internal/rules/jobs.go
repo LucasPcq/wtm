@@ -17,11 +17,27 @@ func IsRunInitialized(cfg domain.RunConfig) bool {
 	return len(cfg.Jobs) > 0 || len(cfg.Profiles) > 0
 }
 
-// IsDetached reports whether the job is a service with a stop command,
-// meaning the launcher process exits after starting detached work
-// (e.g. docker compose up -d).
+// IsDetached is the one definition of a detached service: a service that
+// declares `stop`. Its cmd is a launcher wtm waits on until it exits (`docker
+// compose up -d`); what it started runs on, and `stop` is what takes it down. A
+// service without `stop` runs in the foreground and is stopped by signal.
 func IsDetached(job domain.JobConfig) bool {
 	return job.Kind == domain.JobKindService && !IsBlankCommand(job.Stop)
+}
+
+// LauncherMayNotExit flags a detached service whose cmd shows no sign of
+// detaching: wtm waits for a launcher to exit, so a cmd that keeps running
+// holds `run up` for ever. Advice only — a script may well detach on its own.
+func LauncherMayNotExit(job domain.JobConfig) bool {
+	if !IsDetached(job) {
+		return false
+	}
+	for _, word := range strings.Fields(job.Cmd) {
+		if word == domain.DetachFlagShort || word == domain.DetachFlagLong || strings.HasPrefix(word, domain.DetachFlagLong+"=") {
+			return false
+		}
+	}
+	return true
 }
 
 // IsAlreadyRunning reads the daemon's refusal to start a job that is already

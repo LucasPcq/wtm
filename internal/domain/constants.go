@@ -2531,6 +2531,11 @@ const (
 	RunProfilesEmpty = "No profiles defined in run.toml."
 	RunStoppingJobs  = "Stopping jobs…"
 	RunLoadingJobs   = "Loading jobs…"
+	// RunLauncherMayBlockFmt warns of a service whose `stop` makes its cmd a
+	// launcher that must exit, while nothing in the cmd says it detaches.
+	RunLauncherMayBlockFmt = "job %q declares stop, so its cmd is a launcher wtm waits on until it exits (like `docker compose up -d`) — if it keeps running, drop stop to run it in the foreground"
+	DetachFlagShort        = "-d"
+	DetachFlagLong         = "--detach"
 	// RunDaemonDivergedFmt takes the daemon's version and the client's: an older
 	// daemon is still listed, but it runs the jobs its own way.
 	RunDaemonDivergedFmt = "the daemon is %s, this is wtm %s — run `wtm run daemon restart` to hand the jobs over"

@@ -374,3 +374,21 @@ func TestDistinctValuesIgnoresTheUnknown(t *testing.T) {
 		t.Errorf("DistinctValues = %d, want 2", got)
 	}
 }
+
+func TestLauncherMayNotExitSparesADetachingCommand(t *testing.T) {
+	cases := map[string]bool{
+		"docker compose up -d":                false,
+		"docker compose -f x.yml up --detach": false,
+		"docker run --detach=true nginx":      false,
+		"./serve.sh":                          true,
+	}
+	for cmd, want := range cases {
+		job := domain.JobConfig{Name: "j", Kind: domain.JobKindService, Cmd: cmd, Stop: "true"}
+		if got := LauncherMayNotExit(job); got != want {
+			t.Errorf("LauncherMayNotExit(%q) = %v, want %v", cmd, got, want)
+		}
+	}
+	if LauncherMayNotExit(domain.JobConfig{Name: "j", Kind: domain.JobKindService, Cmd: "./serve.sh"}) {
+		t.Error("a foreground service was flagged")
+	}
+}

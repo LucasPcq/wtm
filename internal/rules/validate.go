@@ -159,6 +159,10 @@ func ValidateRun(cfg domain.RunConfig) (warnings []string, errs []string) {
 			errs = append(errs, fmt.Sprintf("job %q: cmd is required", j.Name))
 		}
 
+		if LauncherMayNotExit(j) {
+			warnings = append(warnings, fmt.Sprintf(domain.RunLauncherMayBlockFmt, j.Name))
+		}
+
 		switch j.Kind {
 		case domain.JobKindService:
 		case domain.JobKindTask:
