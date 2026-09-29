@@ -243,6 +243,35 @@ func TestSharedNamespaceAttachesOncePerWorktree(t *testing.T) {
 	}
 }
 
+// A verbatim worktree's .env names its source's slice, so carving one of its
+// own would hand it a database nothing in it points at.
+func TestSharedNamespaceIsNotCarvedForAVerbatimWorktree(t *testing.T) {
+	f := newSharedFixture(t, &domain.JobNamespaceConfig{
+		Name:   "crm_{worktree}",
+		Create: "printf '%s\\n' \"$WTM_NAMESPACE\" >> " + "WITNESS",
+	})
+	f.job.Namespace.Create = strings.Replace(f.job.Namespace.Create, "WITNESS", f.witness, 1)
+
+	if err := f.manager.Start(StartParams{
+		Job:     f.job,
+		WorkDir: f.first,
+		Env: map[string]string{
+			domain.EnvWorktree: "feat_a", domain.EnvOrdinal: "1",
+			domain.EnvIsolation: string(domain.IsolationVerbatim),
+		},
+		Shared: &domain.SharedJobContext{WorkDir: f.main, Env: map[string]string{domain.EnvWorktree: "main", domain.EnvOrdinal: "0"}},
+	}); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if err := f.start(t, f.second, "feat_b"); err != nil {
+		t.Fatalf("second start: %v", err)
+	}
+
+	if got := f.witnessed(t); got != "crm_feat_b\n" {
+		t.Errorf("attach ran with %q, want only the isolated worktree carved", got)
+	}
+}
+
 // The create runs silently, so the service's log is where a reader sees each
 // worktree's slice being made.
 func TestSharedNamespaceIsRecordedInTheServicesLog(t *testing.T) {

@@ -20,6 +20,10 @@ type WorktreeJobEnvParams struct {
 	// already defines. Non-empty wins: a project name set on purpose is an
 	// answer, not a value to overwrite.
 	ComposeProject string
+	// Isolation verbatim runs the worktree as its copied .env describes it: on
+	// the base ports, and under whatever compose project that file or the
+	// directory names — never one wtm made up.
+	Isolation domain.Isolation
 }
 
 // WorktreeJobEnv is what every job and lifecycle hook learns about the worktree
@@ -32,19 +36,28 @@ func WorktreeJobEnv(params WorktreeJobEnvParams) map[string]string {
 	}
 
 	slug := WorktreeSlug(params.Branch)
+	isolation := EffectiveIsolation(params.Isolation)
+	offset := params.Ordinal * block
 	composeProject := params.ComposeProject
-	if composeProject == "" {
+	if composeProject == "" && isolation == domain.IsolationIsolated {
 		composeProject = ComposeProjectName(ComposeProjectNameParams{Project: params.Project, Worktree: slug})
 	}
-
-	return map[string]string{
-		domain.EnvWorktree:           slug,
-		domain.EnvBranch:             params.Branch,
-		domain.EnvOrdinal:            strconv.Itoa(params.Ordinal),
-		domain.EnvPortOffset:         strconv.Itoa(params.Ordinal * block),
-		domain.EnvComposeProjectName: composeProject,
-		domain.EnvProject:            HostLabel(params.Project),
+	if isolation == domain.IsolationVerbatim {
+		offset = 0
 	}
+
+	env := map[string]string{
+		domain.EnvWorktree:   slug,
+		domain.EnvBranch:     params.Branch,
+		domain.EnvOrdinal:    strconv.Itoa(params.Ordinal),
+		domain.EnvPortOffset: strconv.Itoa(offset),
+		domain.EnvProject:    HostLabel(params.Project),
+		domain.EnvIsolation:  string(isolation),
+	}
+	if composeProject != "" {
+		env[domain.EnvComposeProjectName] = composeProject
+	}
+	return env
 }
 
 type ComposeProjectNameParams struct {

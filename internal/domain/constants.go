@@ -228,6 +228,10 @@ const (
 	EnvOrdinal            = "WTM_ORDINAL"
 	EnvPortOffset         = "WTM_PORT_OFFSET"
 	EnvComposeProjectName = "COMPOSE_PROJECT_NAME"
+	// EnvIsolation carries the worktree's Isolation to the daemon, which cannot
+	// read the metadata that records it and must not carve a slice out of a
+	// shared service for a worktree whose .env names its source's.
+	EnvIsolation = "WTM_ISOLATION"
 	// EnvProject is the repository's slug, as the hostname and the compose
 	// project name both derive from it.
 	EnvProject = "WTM_PROJECT"
@@ -3847,6 +3851,7 @@ var WorktreeScopedEnv = []string{
 	EnvOrdinal,
 	EnvPortOffset,
 	EnvComposeProjectName,
+	EnvIsolation,
 }
 
 var DashboardWordmarkLines = [3]string{

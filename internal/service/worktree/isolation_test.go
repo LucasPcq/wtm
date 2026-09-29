@@ -71,3 +71,37 @@ func TestCreateRecordsTheIsolationChosen(t *testing.T) {
 		t.Errorf("recorded isolation = %q, want %q", got, domain.IsolationVerbatim)
 	}
 }
+
+// Jobs and hooks of a verbatim worktree are told what its copied .env says:
+// the base ports, and no compose project wtm made up.
+func TestBranchEnvOfAVerbatimWorktreeRunsOnTheBasePorts(t *testing.T) {
+	t.Setenv(domain.EnvComposeProjectName, "")
+	repo := newOrdinalRepo(t)
+	repo.addWorktree(t, "feat/x")
+	ref := WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "feat/x"}
+
+	isolated, err := BranchEnv(ref)
+	if err != nil {
+		t.Fatalf("BranchEnv: %v", err)
+	}
+	if isolated[domain.EnvPortOffset] == "0" || isolated[domain.EnvComposeProjectName] == "" {
+		t.Fatalf("isolated env = %v, want an offset and a compose project", isolated)
+	}
+
+	if err := SetIsolation(SetIsolationParams{Ref: ref, Isolation: domain.IsolationVerbatim}); err != nil {
+		t.Fatalf("SetIsolation: %v", err)
+	}
+	verbatim, err := BranchEnv(ref)
+	if err != nil {
+		t.Fatalf("BranchEnv: %v", err)
+	}
+	if verbatim[domain.EnvPortOffset] != "0" {
+		t.Errorf("offset = %q, want 0", verbatim[domain.EnvPortOffset])
+	}
+	if _, set := verbatim[domain.EnvComposeProjectName]; set {
+		t.Errorf("COMPOSE_PROJECT_NAME = %q, want it left to the .env", verbatim[domain.EnvComposeProjectName])
+	}
+	if verbatim[domain.EnvIsolation] != string(domain.IsolationVerbatim) {
+		t.Errorf("%s = %q, want verbatim for the daemon to read", domain.EnvIsolation, verbatim[domain.EnvIsolation])
+	}
+}
