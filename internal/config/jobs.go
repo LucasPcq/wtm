@@ -38,6 +38,7 @@ func LoadRun(stateDir string) (domain.RunConfig, error) {
 	// thing into a .env, with nothing pointing back at run.toml.
 	errs := append(rules.ValidateRunPorts(cfg), rules.ValidateAddressing(cfg)...)
 	errs = append(errs, rules.ValidateIsolation(cfg)...)
+	errs = append(errs, rules.UnknownJobKinds(cfg)...)
 	if errs = append(errs, rules.ValidateNamespaces(cfg)...); len(errs) > 0 {
 		return domain.RunConfig{}, fmt.Errorf("invalid run config: %s", strings.Join(errs, "; "))
 	}

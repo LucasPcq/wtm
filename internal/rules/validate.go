@@ -167,10 +167,9 @@ func ValidateRun(cfg domain.RunConfig) (warnings []string, errs []string) {
 			}
 		case "":
 			errs = append(errs, fmt.Sprintf("job %q: kind is required (service or task)", j.Name))
-		default:
-			errs = append(errs, fmt.Sprintf("job %q: unknown kind %q (expected service or task)", j.Name, j.Kind))
 		}
 	}
+	errs = append(errs, UnknownJobKinds(cfg)...)
 
 	errs = append(errs, validateJobRelations(cfg, jobNames)...)
 	errs = append(errs, ValidateRunPorts(cfg)...)
@@ -209,6 +208,20 @@ func ValidateRun(cfg domain.RunConfig) (warnings []string, errs []string) {
 	}
 
 	return warnings, errs
+}
+
+// UnknownJobKinds is checked on read as well as on write: a misspelt kind is
+// neither a service nor a task, and nothing else would point back at the line.
+func UnknownJobKinds(cfg domain.RunConfig) []string {
+	var errs []string
+	for _, job := range cfg.Jobs {
+		switch job.Kind {
+		case domain.JobKindService, domain.JobKindTask, "":
+		default:
+			errs = append(errs, fmt.Sprintf(domain.RunJobUnknownKindFmt, job.Name, job.Kind))
+		}
+	}
+	return errs
 }
 
 // validateJobRelations checks what a job says about the other jobs and about
@@ -520,6 +533,27 @@ func envPortLinkError(bases map[domain.PortRef]int, link domain.EnvPortLink) str
 	}
 	return fmt.Sprintf("env_port %s in %s references port %q of job %q, which does not declare it — %s does",
 		link.Key, link.File, link.Port, link.Job, strings.Join(jobs, ", "))
+}
+
+type ValidateEnvTargetsParams struct {
+	Config domain.RunConfig
+	Files  []domain.EnvFile
+}
+
+// ValidateEnvTargets holds every link run.toml declares, [[env_port]] and
+// [[env]] alike, to the .env files config.toml provisions.
+func ValidateEnvTargets(params ValidateEnvTargetsParams) []string {
+	errs := ValidateEnvPortTargets(params.Config.EnvPorts, params.Files)
+	targets := make(map[string]bool, len(params.Files))
+	for _, f := range params.Files {
+		targets[f.Target] = true
+	}
+	for _, link := range params.Config.EnvValues {
+		if !targets[link.File] {
+			errs = append(errs, fmt.Sprintf(domain.EnvValueLinkUnconfiguredFileFmt, link.Key, link.File, domain.ConfigFileName))
+		}
+	}
+	return errs
 }
 
 // ValidateEnvPortTargets is the half of the link check that needs both configs:

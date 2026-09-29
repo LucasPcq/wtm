@@ -33,7 +33,7 @@ func Check(params CheckParams) error {
 	if err != nil {
 		return err
 	}
-	if errs := rules.ValidateEnvPortTargets(cfg.EnvPorts, params.EnvFiles); len(errs) > 0 {
+	if errs := rules.ValidateEnvTargets(rules.ValidateEnvTargetsParams{Config: cfg, Files: params.EnvFiles}); len(errs) > 0 {
 		return fmt.Errorf("invalid run config: %s", strings.Join(errs, "; "))
 	}
 	return nil

@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -39,6 +40,16 @@ func RouteHost(params RouteHostParams) string {
 		HostLabel(params.Project),
 		domain.ProxyTLD,
 	}, ".")
+}
+
+// ValidateProxy refuses a [proxy] port outside what a socket can bind. It is
+// the run module's to check, never the core's: a proxy nobody starts must not
+// stand in the way of creating a worktree.
+func ValidateProxy(proxy domain.ProxyConfig) error {
+	if proxy.Port == 0 || (proxy.Port >= domain.PortMin && proxy.Port <= domain.PortMax) {
+		return nil
+	}
+	return fmt.Errorf(domain.ProxyPortOutOfRangeFmt, proxy.Port, domain.GlobalConfigFile, domain.PortMin, domain.PortMax, domain.ProxyDefaultPort)
 }
 
 // ProxyPort is the port the run proxy listens on, zero when it is switched off.

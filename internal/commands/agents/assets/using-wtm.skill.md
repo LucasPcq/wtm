@@ -135,8 +135,9 @@ flagged; everything else is what the name implies.
   "Isolation" under the run module below); without it, your paths take run.toml's
   `isolation`, else `isolated`. `extract` and `checkout` take the same flag.
   **The run module never fails a creation.** A `run.toml` that cannot be read or is
-  refused (an unknown key, an `[[env_port]]` on a file `config.toml` no longer provisions)
-  or a neighbour's unreadable `meta.json` only skips the port pass: the worktree is
+  refused (an unknown key, a job `kind` other than `service`/`task`, an `[[env_port]]` or
+  `[[env]]` on a file `config.toml` no longer provisions, a global `[proxy] port` outside
+  1-65535) or a neighbour's unreadable `meta.json` only skips the port pass: the worktree is
   created, the `.env` copied as is, the hooks run, and the JSON of `create` / `extract` /
   `checkout` carries a `warnings` array naming the cause and "ports not settled — run
   `wtm env <branch>` once run.toml is fixed". Fix the cause, then run that command.

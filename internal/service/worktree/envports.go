@@ -65,8 +65,11 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 		return envsvc.EnvPortsParams{WorktreePath: params.WorktreePath, Owned: owned}, nil
 	}
 
-	if errs := rules.ValidateEnvPortTargets(cfg.EnvPorts, params.EnvFiles); len(errs) > 0 {
+	if errs := rules.ValidateEnvTargets(rules.ValidateEnvTargetsParams{Config: cfg, Files: params.EnvFiles}); len(errs) > 0 {
 		return envsvc.EnvPortsParams{}, fmt.Errorf("invalid run config: %s", strings.Join(errs, "; "))
+	}
+	if err := rules.ValidateProxy(params.Global.Proxy); err != nil {
+		return envsvc.EnvPortsParams{}, err
 	}
 
 	// BranchEnv rather than EnsureOrdinal: it settles the offset and the worktree
