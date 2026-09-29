@@ -1,16 +1,17 @@
 package rules
 
 import (
+	"slices"
 	"unicode/utf8"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
 // HelpSections is the dashboard's key and mouse reference, in the order the
-// overlay lays it out: row-major, so a two-column layout pairs NAV with ACT and
-// MOUSE with VIEW.
-func HelpSections() []domain.HelpSection {
-	return []domain.HelpSection{
+// overlay lays it out (row-major). The RUN section is left out of a project that
+// runs no jobs, whose dashboard draws none of what those keys reach.
+func HelpSections(runModule bool) []domain.HelpSection {
+	sections := []domain.HelpSection{
 		{Title: domain.DashboardHelpSectionNav, Entries: []domain.HelpEntry{
 			{Keys: domain.DashboardHelpKeysSelect, Text: domain.DashboardHelpTextSelect},
 			{Keys: domain.DashboardHelpKeysEnds, Text: domain.DashboardHelpTextEnds},
@@ -26,11 +27,6 @@ func HelpSections() []domain.HelpSection {
 			{Keys: domain.KeyFastForward, Text: domain.DashboardHelpTextFastForward},
 			{Keys: domain.KeyOpenPR, Text: domain.DashboardHelpTextOpenPR},
 		}},
-		{Title: domain.DashboardHelpSectionRun, Entries: []domain.HelpEntry{
-			{Keys: domain.KeyRunLogs, Text: domain.DashboardHelpTextRunLogs},
-			{Keys: domain.DashboardHelpKeysJobSwitch, Text: domain.DashboardHelpTextJobSwitch},
-			{Keys: domain.KeyOpenAddress, Text: domain.DashboardHelpTextOpenAddress},
-		}},
 		{Title: domain.DashboardHelpSectionMouse, Entries: []domain.HelpEntry{
 			{Keys: domain.DashboardHelpKeysClick, Text: domain.DashboardHelpTextClick},
 			{Keys: domain.DashboardHelpKeysRightClick, Text: domain.DashboardHelpTextRightClick},
@@ -42,7 +38,19 @@ func HelpSections() []domain.HelpSection {
 			{Keys: domain.KeyRefresh, Text: domain.DashboardHelpTextRefresh},
 		}},
 	}
+	if !runModule {
+		return sections
+	}
+	run := domain.HelpSection{Title: domain.DashboardHelpSectionRun, Entries: []domain.HelpEntry{
+		{Keys: domain.KeyRunLogs, Text: domain.DashboardHelpTextRunLogs},
+		{Keys: domain.DashboardHelpKeysJobSwitch, Text: domain.DashboardHelpTextJobSwitch},
+		{Keys: domain.KeyOpenAddress, Text: domain.DashboardHelpTextOpenAddress},
+	}}
+	return slices.Insert(sections, runSectionAt, run)
 }
+
+// runSectionAt keeps RUN where it always sat, right after ACT.
+const runSectionAt = 2
 
 type HelpLayoutParams struct {
 	Sections     []domain.HelpSection

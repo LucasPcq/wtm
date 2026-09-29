@@ -8,7 +8,7 @@ import (
 )
 
 func TestHelpSectionsAreOrderedRowMajor(t *testing.T) {
-	sections := rules.HelpSections()
+	sections := rules.HelpSections(true)
 	titles := make([]string, 0, len(sections))
 	for _, section := range sections {
 		if len(section.Entries) == 0 {
@@ -36,7 +36,7 @@ func TestHelpSectionsAreOrderedRowMajor(t *testing.T) {
 
 func TestHelpSectionsDocumentEveryDashboardKey(t *testing.T) {
 	keys := ""
-	for _, section := range rules.HelpSections() {
+	for _, section := range rules.HelpSections(true) {
 		for _, entry := range section.Entries {
 			keys += entry.Keys + " "
 		}
@@ -82,12 +82,12 @@ func splitFields(s string) []string {
 
 func TestComputeHelpLayoutPairsSectionsWhenWide(t *testing.T) {
 	layout := rules.ComputeHelpLayout(rules.HelpLayoutParams{
-		Sections:     rules.HelpSections(),
+		Sections:     rules.HelpSections(true),
 		ScreenWidth:  120,
 		ScreenHeight: 40,
 	})
 
-	sections := len(rules.HelpSections())
+	sections := len(rules.HelpSections(true))
 	wantBands := (sections + 1) / 2
 	if len(layout.Bands) != wantBands {
 		t.Fatalf("got %d bands, want %d", len(layout.Bands), wantBands)
@@ -113,12 +113,12 @@ func TestComputeHelpLayoutPairsSectionsWhenWide(t *testing.T) {
 
 func TestComputeHelpLayoutStacksSectionsWhenNarrow(t *testing.T) {
 	layout := rules.ComputeHelpLayout(rules.HelpLayoutParams{
-		Sections:     rules.HelpSections(),
+		Sections:     rules.HelpSections(true),
 		ScreenWidth:  60,
 		ScreenHeight: 40,
 	})
 
-	if len(layout.Bands) != len(rules.HelpSections()) {
+	if len(layout.Bands) != len(rules.HelpSections(true)) {
 		t.Fatalf("got %d bands, want one per section", len(layout.Bands))
 	}
 	for index, band := range layout.Bands {
@@ -153,7 +153,7 @@ func TestComputeHelpLayoutSizesColumnsOnTheirOwnContent(t *testing.T) {
 func TestComputeHelpLayoutNeverExceedsTheScreen(t *testing.T) {
 	for _, screen := range [][2]int{{120, 40}, {100, 24}, {80, 20}, {60, 30}, {40, 12}, {20, 8}} {
 		layout := rules.ComputeHelpLayout(rules.HelpLayoutParams{
-			Sections:     rules.HelpSections(),
+			Sections:     rules.HelpSections(true),
 			ScreenWidth:  screen[0],
 			ScreenHeight: screen[1],
 		})
@@ -169,7 +169,7 @@ func TestComputeHelpLayoutNeverExceedsTheScreen(t *testing.T) {
 
 func TestComputeHelpLayoutScrollsWhenTheScreenIsShort(t *testing.T) {
 	layout := rules.ComputeHelpLayout(rules.HelpLayoutParams{
-		Sections:     rules.HelpSections(),
+		Sections:     rules.HelpSections(true),
 		ScreenWidth:  120,
 		ScreenHeight: 12,
 	})
@@ -184,11 +184,22 @@ func TestComputeHelpLayoutScrollsWhenTheScreenIsShort(t *testing.T) {
 
 func TestComputeHelpLayoutHandlesNoRoom(t *testing.T) {
 	layout := rules.ComputeHelpLayout(rules.HelpLayoutParams{
-		Sections:     rules.HelpSections(),
+		Sections:     rules.HelpSections(true),
 		ScreenWidth:  0,
 		ScreenHeight: 0,
 	})
 	if layout.Inner > 0 || layout.BodyRows > 0 {
 		t.Errorf("no screen leaves no box, got inner %d rows %d", layout.Inner, layout.BodyRows)
+	}
+}
+
+func TestHelpLeavesTheRunSectionOutWithoutARunModule(t *testing.T) {
+	for _, section := range rules.HelpSections(false) {
+		if section.Title == domain.DashboardHelpSectionRun {
+			t.Fatalf("the %s section is listed for a project that runs no jobs", section.Title)
+		}
+	}
+	if with, without := len(rules.HelpSections(true)), len(rules.HelpSections(false)); with != without+1 {
+		t.Errorf("sections with a run module = %d, without = %d, want exactly the run section apart", with, without)
 	}
 }
