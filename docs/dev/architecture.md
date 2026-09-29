@@ -169,7 +169,17 @@ Two consequences worth keeping:
 
 The cross-file check has to live outside `config.LoadRun`: that loader only ever sees `run.toml` and validates what `run.toml` can answer for alone. Whether a link names a configured env target needs `.wtm.toml` too, so `rules.ValidateEnvPortTargets` is called where both are in hand — `service/worktree.ResolveEnvPorts`.
 
-**Where the question is put, on a worktree being created.** `internal/flow/envports.Settle` runs after `worktree.Create` — it needs the files to exist — but it does not *decide* there. It used to: a confirmation raised once the worktree was already on disk, past the point where answering no leaves anything but a `.env` pointing at another worktree's services. The decision is now a step of the run that provisions those files (`create.KeyEnvPorts`, and its mirror in `tui/newwt` for `extract`), skipped whole when `envports.Linked` reports that nothing follows a port. The step says what it will do rather than showing what changes — which values move is only knowable once the files are there — and `Settle` reports the table then, applying or not according to `Params.Rewrite`. `wtm env` keeps its own question: there the values are the user's own, edited in a worktree that has been alive for a while, and rewriting them is a real decision rather than a consequence of what was just asked for.
+**Where the question is put, on a worktree being created.** `internal/flow/envports.Settle` runs after `worktree.Create` — it needs the files to exist — but it does not *decide* there. The decision is the worktree's **isolation**, a step of the run that provisions those files (`create.KeyIsolation`, `components.IsolationStep` for the wizards of `extract` and `checkout`), skipped whole when `rules.IsolationApplies` finds nothing in `run.toml` to isolate. `worktree.Create` records the answer in `meta.json` before any hook runs, since a hook reads the ports it decides.
+
+**One choice, read by both halves.** Isolation is not a port-pass option; it is what the worktree *is*, and two readers act on it:
+
+| Reader | Isolated | Verbatim |
+| -- | -- | -- |
+| `service/worktree.ResolveEnvPorts` — every `.env` writer (create, extract, checkout, `wtm env`, the addressing switch) | links, identity and `[[env]]` values resolved and written | resolves to nothing: the file stays as copied |
+| `service/worktree.BranchEnv` — every job and hook | `WTM_PORT_OFFSET = ordinal × block`, `COMPOSE_PROJECT_NAME` derived | offset 0, `COMPOSE_PROJECT_NAME` left to the `.env`, `WTM_ISOLATION=verbatim` |
+| `service/process.runNamespace` — the daemon | carves the worktree's slice | carves nothing (read from `WTM_ISOLATION`: the daemon never reads metadata) |
+
+They used to be separate: a "keep the ports" answer left the `.env` on its source's ports while the daemon still shifted the jobs, so a front read one port and its back bound another, and the worktree quietly talked to its source. Anything in between the two columns is incoherent by construction, which is why there is no third answer and no `Rewrite` flag any more. The cost of verbatim is that it shares its source's ports; `flow/run/up` measures that (`rules.PortClashes`) and turns the concurrency question into stop-the-other-or-don't-start rather than letting a bind fail. `wtm env --isolation` switches an existing worktree, and its recap's second action records the worktree verbatim rather than skipping the port pass once.
 
 ## What is migrated, and what is not
 

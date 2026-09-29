@@ -131,6 +131,9 @@ flagged; everything else is what the name implies.
   counts commits vs the **parent/base** branch. `state` is `up-to-date`/`behind`/`ahead`/`diverged`.
 - `wtm create <branch> --from <base>` — new worktree + env provisioning + `on_create`
   hooks. `--from` accepts a remote ref (`origin/x`). Add `--if-not-exists` for idempotency.
+  `--isolation isolated|verbatim` decides how the worktree stands against its source (see
+  "Isolation" under the run module below); without it, your paths take run.toml's
+  `isolation`, else `isolated`. `extract` and `checkout` take the same flag.
   Add `--ff` to fast-forward a behind-only `--from` branch to origin first (so the worktree
   starts up to date); a diverged branch is left as-is (no prompt in JSON mode). `extract`
   accepts the same `--ff` for the parent branch of a newly-created target.
@@ -214,12 +217,17 @@ flagged; everything else is what the name implies.
   interactively (else it errors — there is no picker under `--yes`/JSON). JSON shape:
   `{branch,mode,check,files:[{target,strategy,source,applied,parent_branch,parent_fallback,diff:{mode,
   entries:[{key,status,current_value,resolved_value,placeholder,source,export}]}}],ports:{offset,
-  applied,entries:[{file,key,port,base,resolved,status,current_value,new_value}]}}` where
+  applied,entries:[{file,key,port,base,resolved,status,current_value,new_value}]},isolation}` where
   `status` is `resolved` / `missing_unresolved` / `conflict` / `orphan`. Round-trip is
   preserved: comments, ordering and formatting of the `.env` are kept; only decided keys change.
   The `ports` block is the `[[env_port]]` pass (below), empty when the project declares none;
   `ports.applied` says whether those rewrites were written, and the trailing summary counts
   them alongside the files (a run that only shifted a port still reports what it wrote).
+  `isolation` is the worktree's; a `verbatim` one always has an empty `ports` block.
+  `--isolation isolated|verbatim` records a new isolation for the worktree **before**
+  reconciling, so the same run applies it: `--isolation isolated` on a verbatim worktree
+  writes every port, identity and slice its creation left alone. It is refused with
+  `--check` (a read-only run records nothing) and on the main checkout as `verbatim`.
 - `wtm ui` — the full-screen dashboard (worktree state, divergence, PRs, plus create and
   delete). **Never invoke it** (see driving rule 2): it holds the terminal until a human
   quits it. Everything it shows is available to you as JSON via `wtm list` / `wtm tree`, and
@@ -438,14 +446,37 @@ and **experimental**: the global `wtm init` does not configure it.
   job in declared order. The step counter (`[2/5]`) covers exactly those jobs, so a count
   smaller than the profile means the profile itself is short, never that wtm dropped
   something.
-- **Another worktree already running jobs is not a conflict.** Each worktree has its own
-  ports and resource names, so stacks cohabit; the question is about machine load, not
-  about ports. `run up` asks about it once, and only on a terminal; on your paths (no TTY,
+- **Isolation — decided once per worktree, at creation.** `create`, `extract` and `checkout`
+  ask it whenever run.toml declares something to isolate (a port, a namespace, a `.env`
+  link, a compose stack), and record the answer with the worktree. **`isolated`** (the
+  default): wtm writes the worktree's own ports, `COMPOSE_PROJECT_NAME` and `[[env]]` slices
+  into its `.env`, and the daemon runs its jobs on the same shifted ports and carves its
+  namespaces. **`verbatim`**: the `.env` stays **byte for byte** as copied — no port, no
+  identity, no `[[env]]` value — and the daemon runs the worktree as that file describes it:
+  offset 0 (its source's ports), no namespace carved, no `COMPOSE_PROJECT_NAME` imposed.
+  `WTM_ISOLATION` carries the value to every job and hook. The two halves never disagree,
+  which is the point: a `.env` on the source's ports with jobs on shifted ones wires the
+  worktree to its source without a word. The consequence of `verbatim` to expect: the
+  worktree **cannot run while its source does** (see the port clash below). A project sets
+  the default for unattended runs with `isolation = "isolated" | "verbatim"` in `run.toml`;
+  `wtm env <wt> --isolation …` switches an existing worktree; the main checkout is always
+  isolated.
+- **Another worktree already running jobs is not a conflict — unless it holds your ports.**
+  Isolated worktrees sit a block of ports apart, so stacks cohabit; the question is about
+  machine load, not about ports. `run up` asks about it once, and only on a terminal; on your paths (no TTY,
   `--output json`, or `--yes`) it resolves to leaving the others running and stops nothing.
   Force either way for one run with `--exclusive` (stop them first) or `--parallel`; the two
   are mutually exclusive. A project can settle it for good with
   `concurrency = "parallel" | "exclusive"` in `run.toml`, which is what the question's
   "always" answers write.
+  **A port clash overrides all of that.** When a job this run would start binds a port a job
+  already up in another worktree binds — a verbatim worktree and its source, always — running
+  side by side is not possible: a terminal is asked "stop <worktree> first" or "don't start",
+  and your paths **error** (exit 1) listing each port, unless `--exclusive` (or
+  `concurrency = "exclusive"`) was given, which stops the holder first. `--parallel` and
+  `concurrency = "parallel"` cannot be honoured there. The way out that keeps both running
+  is `wtm env <wt> --yes --isolation isolated`. `run up a b` where `a` and `b` share ports is
+  refused before anything is stopped.
 - **`--exclusive` and several worktrees contradict each other**, since it stops all but
   one: `run up a b --exclusive` errors. Where the project settled on `exclusive` and the run
   starts several anyway, your paths take the safe default — everything starts, nothing else
@@ -608,10 +639,12 @@ and **experimental**: the global `wtm init` does not configure it.
   `WTM_BRANCH` (the branch verbatim), `WTM_WORKTREE` (its slug, safe as a Docker project
   or network name), `WTM_ORDINAL` (`0` for the main checkout, then the smallest free
   number, stable for the worktree's life), `WTM_PORT_OFFSET` (`WTM_ORDINAL` times the
-  `port_offset_block` of run.toml, 10 by default), and `COMPOSE_PROJECT_NAME`
-  (= `<repo>-<WTM_WORKTREE>`, left alone if the environment already sets it).
+  `port_offset_block` of run.toml, 10 by default — **0 for a verbatim worktree**),
+  `WTM_ISOLATION` (`isolated` or `verbatim`), and `COMPOSE_PROJECT_NAME`
+  (= `<repo>-<WTM_WORKTREE>`, left alone if the environment already sets it, and **not set
+  at all for a verbatim worktree**, whose copied `.env` or directory name decides).
   `COMPOSE_PROJECT_NAME` is **also written into the `.env` of the directory each compose
-  job runs from**, at `create` and at `wtm env`, because compose interpolates that file:
+  job runs from** of an isolated worktree, at `create` and at `wtm env`, because compose interpolates that file:
   a `docker compose up` typed by hand in a worktree therefore gets its own project, its own
   containers and its own volumes, with no wtm process involved. It is a wtm-owned key —
   the reconciliation never reports it as drift or as a conflict, whatever main holds.
@@ -718,11 +751,12 @@ and **experimental**: the global `wtm init` does not configure it.
   A bare `DB_PORT=5432` is the same mechanism. `wtm run init` scans the project's configured
   `.env` targets, offers the keys whose value holds a declared base, and writes the confirmed
   links; `--link-env` writes them without asking (nothing is ever inferred without one or the
-  other). The rewrite then happens at `wtm create` (proposed interactively, **applied under
-  `--yes`/no TTY** — a `.env` still pointing at another worktree's services is useless, not
-  safe) and at `wtm env`, where the interactive recap offers "Apply, but leave the port values
-  alone" beside the plain apply, and `--yes`/JSON apply it like `create` does. `--check` reports
-  without writing, and counts a pending shift as drift.
+  other). The rewrite then happens at `wtm create`, `extract` and `checkout` for an
+  **isolated** worktree (never for a verbatim one — see Isolation above), and at `wtm env`,
+  where the interactive recap offers "Apply, and keep this worktree's .env verbatim from now
+  on" beside the plain apply (it records the worktree verbatim, so its jobs stop being
+  shifted too), and `--yes`/JSON apply it like `create` does. `--check` reports without
+  writing, and counts a pending shift as drift.
   Three refusals, reported and never guessed: the key is absent from the file, the base
   appears **more than once** in the value, or **neither the base nor any offset of it** is
   there. A link naming a port no job declares, an invalid key, or the same `(file, key)`
