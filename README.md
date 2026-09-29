@@ -374,7 +374,7 @@ resource:
 | `WTM_ORDINAL` | the worktree's stable number. The main checkout is always `0`; every other worktree gets the smallest number free, kept for its whole life and released when it is cleaned |
 | `WTM_PORT_OFFSET` | `WTM_ORDINAL` × the block (`port_offset_block`, 10 by default) — the main checkout keeps the project's default ports, and so does a verbatim worktree |
 | `WTM_ISOLATION` | `isolated` or `verbatim`, as chosen when the worktree was created |
-| `COMPOSE_PROJECT_NAME` | `<repo>-<WTM_WORKTREE>`, unless your own environment already defines it. The Docker daemon is machine-wide, so the repository qualifies the name: two clones both sitting on `main` do not share a stack. Not set for a verbatim worktree: its copied `.env` decides |
+| `COMPOSE_PROJECT_NAME` | `<repo>-<WTM_WORKTREE>`, unless your own environment already defines it. The Docker daemon is machine-wide, so the repository qualifies the name: two clones both sitting on `main` do not share a stack. Not set for a verbatim worktree: its copied `.env` decides. The main checkout is named without its branch — its own `.env`'s value, else `<repo>` — so the shared services it hosts stay one stack whatever it has checked out |
 
 `COMPOSE_PROJECT_NAME` is what keeps two worktrees' containers, networks and volumes
 apart — nothing to declare, it works as soon as your jobs use `docker compose`. It reaches

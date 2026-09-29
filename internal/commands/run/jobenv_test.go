@@ -95,13 +95,15 @@ func TestRunUpInjectsMainWorktreeEnv(t *testing.T) {
 		t.Fatalf("run up: %v", err)
 	}
 
-	// The main checkout keeps the project's default ports.
+	// The main checkout keeps the project's default ports, and a compose project
+	// named after the repository alone: it hosts the shared stack, which must not
+	// move with its branch.
 	assertEnv(t, daemon.startEnv(t, "docker"), map[string]string{
 		domain.EnvBranch:             "main",
 		domain.EnvWorktree:           "main",
 		domain.EnvOrdinal:            "0",
 		domain.EnvPortOffset:         "0",
-		domain.EnvComposeProjectName: composeProject(t, "main"),
+		domain.EnvComposeProjectName: rules.WorktreeSlug(filepath.Base(os.Getenv("WTM_PROJECT_DIR"))),
 	})
 }
 

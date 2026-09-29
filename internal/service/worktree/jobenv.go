@@ -21,9 +21,6 @@ type JobEnvParams struct {
 // JobEnv resolves what a worktree's jobs and hooks learn about it. Only a
 // client can build this: it takes git to name the branch, and the daemon must
 // never run git.
-//
-// A user-defined COMPOSE_PROJECT_NAME is read from this process's environment
-// and passed through untouched — a project name set on purpose is an answer.
 func JobEnv(params JobEnvParams) (map[string]string, error) {
 	branch, err := CurrentBranch(CurrentBranchParams{Dir: params.Dir})
 	if err != nil {
@@ -51,7 +48,7 @@ func BranchEnv(params WorktreeRef) (map[string]string, error) {
 		Project:         filepath.Base(params.ProjectDir),
 		Ordinal:         ordinal,
 		PortOffsetBlock: rules.EffectivePortOffsetBlock(cfg),
-		ComposeProject:  os.Getenv(domain.EnvComposeProjectName),
+		ComposeProject:  composeProjectOf(composeProjectParams{ProjectDir: params.ProjectDir, Config: cfg, Ordinal: ordinal}),
 		Isolation:       IsolationOf(params),
 	})
 
@@ -66,6 +63,51 @@ func BranchEnv(params WorktreeRef) (map[string]string, error) {
 		Config:     cfg,
 		PortOffset: offset,
 	})), nil
+}
+
+type composeProjectParams struct {
+	ProjectDir string
+	Config     domain.RunConfig
+	Ordinal    int
+}
+
+// composeProjectOf is the COMPOSE_PROJECT_NAME a worktree's jobs run under when
+// one is set on purpose, empty to let wtm derive it. A linked worktree takes it
+// from this process's environment. The main checkout never does: that
+// environment belongs to whichever worktree the command was launched from, and
+// the main's name is read from its own .env instead.
+func composeProjectOf(params composeProjectParams) string {
+	if params.Ordinal != domain.MainWorktreeOrdinal {
+		return os.Getenv(domain.EnvComposeProjectName)
+	}
+	return mainComposeProject(mainComposeProjectParams{ProjectDir: params.ProjectDir, Config: params.Config})
+}
+
+type mainComposeProjectParams struct {
+	ProjectDir string
+	Config     domain.RunConfig
+}
+
+// mainComposeProject is the compose project of the main checkout, where the
+// shared services run. A .env that cannot be read counts as one that names
+// nothing.
+func mainComposeProject(params mainComposeProjectParams) string {
+	dirs := rules.ComposeProjectDirs(params.Config)
+	if len(dirs) == 0 {
+		dirs = []string{"."}
+	}
+	files := make([][]domain.EnvLine, 0, len(dirs))
+	for _, dir := range dirs {
+		data, err := os.ReadFile(filepath.Join(params.ProjectDir, dir, domain.EnvFileName))
+		if err != nil {
+			continue
+		}
+		files = append(files, rules.ParseEnv(string(data)))
+	}
+	return rules.MainComposeProjectName(rules.MainComposeProjectNameParams{
+		Project:  filepath.Base(params.ProjectDir),
+		EnvFiles: files,
+	})
 }
 
 // runConfig reads what run.toml says about ports — the spacing between two

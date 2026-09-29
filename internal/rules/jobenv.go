@@ -16,9 +16,9 @@ type WorktreeJobEnvParams struct {
 	// PortOffsetBlock spaces two worktrees' ports apart. Zero falls back to the
 	// default block rather than collapsing every worktree onto offset 0.
 	PortOffsetBlock int
-	// ComposeProject is the COMPOSE_PROJECT_NAME the caller's own environment
-	// already defines. Non-empty wins: a project name set on purpose is an
-	// answer, not a value to overwrite.
+	// ComposeProject is a COMPOSE_PROJECT_NAME set on purpose — the caller's
+	// environment for a linked worktree, MainComposeProjectName for the main.
+	// Non-empty wins: it is an answer, not a value to overwrite.
 	ComposeProject string
 	// Isolation verbatim runs the worktree as its copied .env describes it: on
 	// the base ports, and under whatever compose project that file or the
@@ -73,4 +73,25 @@ func ComposeProjectName(params ComposeProjectNameParams) string {
 		return params.Worktree
 	}
 	return WorktreeSlug(params.Project) + "-" + params.Worktree
+}
+
+type MainComposeProjectNameParams struct {
+	Project string
+	// EnvFiles are the main checkout's .env files, one per directory a compose
+	// stack is started from, in run.toml's order.
+	EnvFiles [][]domain.EnvLine
+}
+
+// MainComposeProjectName names the main checkout's compose project after the
+// repository, never after its branch: the main hosts the shared services, and a
+// name that follows its checkout starts a second stack on every branch switch
+// and orphans the first. It is the name `docker compose` itself picks there when
+// the environment does not carry one.
+func MainComposeProjectName(params MainComposeProjectNameParams) string {
+	for _, lines := range params.EnvFiles {
+		if line, found := envPairByKey(lines, domain.EnvComposeProjectName); found && line.Value != "" {
+			return line.Value
+		}
+	}
+	return WorktreeSlug(params.Project)
 }
