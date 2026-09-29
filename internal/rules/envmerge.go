@@ -19,9 +19,10 @@ type EnvDiffParams struct {
 	// as a conflict between two spellings of the same setting.
 	PortValues map[string]EnvValueRef
 	PortBlock  int
-	// Owned are the keys an [[env]] link writes in full in this file. Like the
-	// identity keys, their value differs per worktree by construction, so they
-	// are neither drift nor a conflict.
+	// Owned are the keys the owned pass writes in full in this file: [[env]]
+	// links and the identity keys. Their value differs per worktree by
+	// construction, so they are neither drift nor a conflict — and absent from
+	// the child, they are the pass's to add, not a gap asking for a value.
 	Owned map[string]bool
 }
 
@@ -45,6 +46,9 @@ func DiffEnv(params EnvDiffParams) domain.EnvDiff {
 				continue
 			}
 			seen[l.Key] = true
+			if _, inChild := child[l.Key]; !inChild && params.Owned[l.Key] {
+				continue
+			}
 			entries = append(entries, classifyKey(classifyKeyParams{
 				Key:        l.Key,
 				Mode:       params.Mode,
@@ -119,8 +123,7 @@ func classifyKey(params classifyKeyParams) domain.EnvKeyDiff {
 	if inChild {
 		diff.CurrentValue = childLine.Value
 		// A key wtm derives from the worktree differs from every source by
-		// construction. Absent from the child it is missing like any other, and
-		// the owned pass writes it.
+		// construction.
 		if IsOwnedEnvKey(k) || params.Owned[k] {
 			diff.Status = domain.EnvKeyResolved
 			return diff

@@ -966,13 +966,10 @@ const (
 	EnvPortReasonSecureScheme   = "https — the run proxy serves plain HTTP"
 
 	// The trailing verdict of `wtm env`.
-	EnvCheckDriftMessage = "Read-only check — run `wtm env` to reconcile."
-	// EnvFileInSyncMessage closes a file block with nothing to do.
-	// EnvFileKeysInSyncMessage replaces it when the port pass still moves
-	// a value in that same file — "in sync" there would contradict the summary
-	// counting that very file's linked values as settled.
-	EnvFileInSyncMessage     = "in sync — nothing to reconcile"
-	EnvFileKeysInSyncMessage = "keys in sync — its linked port values still move"
+	EnvCheckDriftMessage        = "Read-only check — run `wtm env` to reconcile."
+	EnvFileInSyncMessage        = "in sync — nothing to reconcile"
+	EnvFileKeysInSyncMessage    = "keys in sync — its linked values would move"
+	EnvFileValuesSettledMessage = "no key to reconcile — its linked values were settled"
 
 	// The detail column of a file block's key rows.
 	EnvKeyRowGap         = "  "
@@ -1015,11 +1012,12 @@ const (
 	// EnvRecapNoteSeparator joins a recap value to the note qualifying it.
 	EnvRecapNoteSeparator = " · "
 
-	EnvCheckCleanMessage       = "No drift."
-	EnvNothingWrittenMessage   = "No changes written."
-	EnvReconciledFmt           = "Reconciled %d file(s)."
-	EnvPortsShiftedFmt         = "Settled %d linked .env value(s)."
-	EnvReconciledAndShiftedFmt = "Reconciled %d file(s) and settled %d linked value(s)."
+	EnvCheckCleanMessage        = "No drift."
+	EnvNothingWrittenMessage    = "No changes written."
+	EnvReconciledFmt            = "Reconciled %d file(s)."
+	EnvPortsShiftedFmt          = "Settled %d linked .env value(s)."
+	EnvReconciledAndShiftedFmt  = "Reconciled %d file(s) and settled %d linked value(s)."
+	EnvComposeProjectWrittenFmt = " %s is now %s."
 
 	// The [[env_port]] detection of `wtm run init`.
 	// EnvPortLinkFmt is one link as the prompt and the recap both show it:
@@ -2844,6 +2842,23 @@ const (
 	// IsolationStepIrrelevant is why the step is not asked: with nothing to
 	// isolate, both answers do exactly the same thing.
 	IsolationStepIrrelevant = "run.toml declares nothing a worktree isolates"
+
+	// IsolationAdopt* is the migration `wtm env` offers a worktree created
+	// before the choice existed. Keeping it as is comes first: adopting moves the
+	// worktree onto a compose project whose volumes are empty.
+	IsolationAdoptStepName    = "Isolation"
+	IsolationAdoptTitleFmt    = "Adopt isolation — %s"
+	IsolationAdoptDescription = "This worktree predates isolation: it still runs on its source's ports and compose project."
+	IsolationAdoptKeepLabel   = "Keep as is — ports and compose project untouched"
+	IsolationAdoptComposeFmt  = "Adopt isolation — new compose project %s, your current volumes (%s_*) will no longer be used"
+	IsolationAdoptPortsLabel  = "Adopt isolation — its ports move onto this worktree's own"
+	IsolationAdoptKeepValue   = "keep"
+	IsolationAdoptValue       = "adopt"
+	IsolationAdoptKeptSummary = "kept as is"
+	IsolationAdoptSummary     = "adopted"
+	// EnvIsolationNotAdoptedFmt is what `wtm env` says of the run values it left
+	// alone on such a worktree, and how to adopt isolation later.
+	EnvIsolationNotAdoptedFmt = "%s predates isolation: its ports and compose project were left as they are — adopt it with `wtm env %s --isolation isolated`"
 
 	// RecapField* are the aligned labels of the create recap body.
 	RecapFieldBranch       = "Branch:  "

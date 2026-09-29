@@ -32,7 +32,12 @@ func newEnvCmd() *cobra.Command {
 			"shown in the report; override it per run with --from.\n\n" +
 			"Pass a worktree branch, or omit it to pick interactively. --check prints a\n" +
 			"read-only drift report. Non-interactively (--yes / --output json) it applies only\n" +
-			"safe additions; conflicts need --on-conflict and orphans need --prune.",
+			"safe additions; conflicts need --on-conflict and orphans need --prune.\n\n" +
+			"A worktree created before the isolation choice existed (no isolation in its\n" +
+			"meta.json) keeps its source's ports and COMPOSE_PROJECT_NAME: non-interactively\n" +
+			"only its keys are reconciled, and the report says so. The wizard offers to adopt\n" +
+			"isolation — a new compose project, so its current volumes are no longer used —\n" +
+			"and --isolation isolated adopts it explicitly.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: runEnv,
 	}
@@ -131,12 +136,16 @@ func runEnvNonInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg strin
 	if err != nil {
 		return fmt.Errorf("worktree %q: %w", arg, err)
 	}
+	adoption, err := isolationAdoption(cfg, envTarget{branch: wt.Branch, path: wt.Path})
+	if err != nil {
+		return err
+	}
 	if err := recordIsolation(cfg, wt.Branch, f.isolation); err != nil {
 		return err
 	}
 
 	ctx := resolveEnvStrategyAndParent(cfg, wt.Branch, f.from)
-	ports, warnings := resolveEnvPorts(cfg, wt.Branch, wt.Path)
+	pass := runPass(runPassParams{cfg: cfg, branch: wt.Branch, worktreePath: wt.Path, adoption: adoption, adopt: f.isolation != ""})
 	result, err := envsvc.SyncEnv(envsvc.SyncEnvParams{
 		Branch:             wt.Branch,
 		MainPath:           cfg.ProjectDir,
@@ -149,14 +158,13 @@ func runEnvNonInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg strin
 		Prune:              f.prune,
 		Check:              f.check,
 		OnConflict:         f.onConflict,
-		Ports:              ports,
+		Ports:              pass.ports,
+		Reserved:           pass.reserved,
 	})
 	if err != nil {
 		return err
 	}
-	result.Isolation = isolationOf(cfg, wt.Branch)
-	result.Warnings = warnings
-	return writeEnvResult(cmd, result, f.format)
+	return writeEnvResult(cmd, pass.decorate(cfg, result), f.format)
 }
 
 // runEnvInteractive drives the unified wizard (worktree selection → single-screen
@@ -164,10 +172,11 @@ func runEnvNonInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg strin
 // given, the selection step is preset.
 func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, f envFlags) error {
 	var (
-		statuses      []domain.WorktreeStatus
-		diffByBranch  map[string][]domain.EnvFileResult
-		portsByBranch map[string]domain.EnvPortPlan
-		preset        string
+		statuses         []domain.WorktreeStatus
+		diffByBranch     map[string][]domain.EnvFileResult
+		portsByBranch    map[string]domain.EnvPortPlan
+		adoptionByBranch map[string]domain.IsolationAdoptionPlan
+		preset           string
 	)
 
 	// One box over the whole pre-scan rather than one per phase: it is a single
@@ -186,15 +195,10 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 				return fmt.Errorf("list worktrees: %w", err)
 			}
 
-			if arg != "" {
-				if worktreePathForBranch(statuses, arg) == "" {
-					return fmt.Errorf("worktree %q: %w", arg, domain.ErrWorktreeNotFound)
-				}
-				preset = arg
-				if err := recordIsolation(cfg, arg, f.isolation); err != nil {
-					return err
-				}
+			if arg != "" && worktreePathForBranch(statuses, arg) == "" {
+				return fmt.Errorf("worktree %q: %w", arg, domain.ErrWorktreeNotFound)
 			}
+			preset = arg
 
 			// The drift is precomputed for every branch the wizard will surface, so
 			// the selection list can badge each one with it.
@@ -204,14 +208,34 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 			}
 			diffByBranch = make(map[string][]domain.EnvFileResult, len(branches))
 			portsByBranch = make(map[string]domain.EnvPortPlan, len(branches))
+			adoptionByBranch = make(map[string]domain.IsolationAdoptionPlan, len(branches))
 			for _, b := range branches {
-				files, err := computeBranchDiff(cfg, statuses, b, f)
+				adoption, err := isolationAdoption(cfg, envTarget{branch: b, path: worktreePathForBranch(statuses, b)})
+				if err != nil {
+					return err
+				}
+				adoptionByBranch[b] = adoption
+			}
+			if preset != "" {
+				if err := recordIsolation(cfg, preset, f.isolation); err != nil {
+					return err
+				}
+			}
+
+			for _, b := range branches {
+				// A worktree still to adopt its isolation is scanned without its
+				// port pass: resolving one allocates an ordinal, and whether it
+				// gets one is the question the wizard is about to ask.
+				pending := adoptionByBranch[b].Pending
+				adoptedByFlag := b == preset && f.isolation != ""
+				scan := branchScan{cfg: cfg, statuses: statuses, branch: b, flags: f, pending: pending, skipRun: pending && !adoptedByFlag}
+				files, err := computeBranchDiff(scan)
 				if err != nil {
 					return err
 				}
 				diffByBranch[b] = files
 
-				plan, err := computeBranchPorts(cfg, statuses, b)
+				plan, err := computeBranchPorts(scan)
 				if err != nil {
 					return err
 				}
@@ -223,11 +247,20 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 		return err
 	}
 
+	pending := map[string]domain.IsolationAdoptionPlan{}
+	if f.isolation == "" {
+		for branch, adoption := range adoptionByBranch {
+			if adoption.Pending {
+				pending[branch] = adoption
+			}
+		}
+	}
 	res, err := envwizard.Run(envwizard.RunParams{
-		Candidates:    statuses,
-		PresetBranch:  preset,
-		DiffByBranch:  diffByBranch,
-		PortsByBranch: portsByBranch,
+		Candidates:       statuses,
+		PresetBranch:     preset,
+		DiffByBranch:     diffByBranch,
+		PortsByBranch:    portsByBranch,
+		AdoptionByBranch: pending,
 	})
 	if errors.Is(err, domain.ErrUserAborted) {
 		return abortedEnv(cmd, f.format)
@@ -240,13 +273,16 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 	if res.Verbatim {
 		isolation = domain.IsolationVerbatim
 	}
+	if res.Adopt {
+		isolation = domain.IsolationIsolated
+	}
 	if err := recordIsolation(cfg, res.Branch, isolation); err != nil {
 		return err
 	}
 
 	ctx := resolveEnvStrategyAndParent(cfg, res.Branch, f.from)
 	worktreePath := worktreePathForBranch(statuses, res.Branch)
-	ports, warnings := resolveEnvPorts(cfg, res.Branch, worktreePath)
+	pass := runPass(runPassParams{cfg: cfg, branch: res.Branch, worktreePath: worktreePath, adoption: adoptionByBranch[res.Branch], adopt: isolation != ""})
 	result, err := envsvc.ApplyEnvSync(envsvc.ApplyEnvSyncParams{
 		Branch:             res.Branch,
 		MainPath:           cfg.ProjectDir,
@@ -257,42 +293,130 @@ func runEnvInteractive(cmd *cobra.Command, cfg shared.ConfigResult, arg string, 
 		Strategy:           ctx.Strategy,
 		Mode:               f.mode,
 		Resolutions:        mapDecisions(res.Decisions),
-		Ports:              ports,
+		Ports:              pass.ports,
+		Reserved:           pass.reserved,
 	})
 	if err != nil {
 		return err
 	}
-	result.Isolation = isolationOf(cfg, res.Branch)
-	result.Warnings = warnings
-	return writeEnvResult(cmd, result, f.format)
+	return writeEnvResult(cmd, pass.decorate(cfg, result), f.format)
+}
+
+type branchScan struct {
+	cfg      shared.ConfigResult
+	statuses []domain.WorktreeStatus
+	branch   string
+	flags    envFlags
+	// pending is a worktree still to adopt its isolation: scanned without its
+	// port pass and without its identity keys, whatever the wizard answers.
+	pending bool
+	skipRun bool
+}
+
+func (s branchScan) reserved() []string {
+	if !s.pending {
+		return nil
+	}
+	return domain.WtmOwnedEnvKeys
+}
+
+func (s branchScan) ports() envsvc.EnvPortsParams {
+	if s.skipRun {
+		return envsvc.EnvPortsParams{}
+	}
+	ports, _ := resolveEnvPorts(s.cfg, s.branch, worktreePathForBranch(s.statuses, s.branch))
+	return ports
 }
 
 // computeBranchDiff computes one worktree's drift for the wizard (no write).
-func computeBranchDiff(cfg shared.ConfigResult, statuses []domain.WorktreeStatus, branch string, f envFlags) ([]domain.EnvFileResult, error) {
-	ctx := resolveEnvStrategyAndParent(cfg, branch, f.from)
-	worktreePath := worktreePathForBranch(statuses, branch)
-	ports, _ := resolveEnvPorts(cfg, branch, worktreePath)
+func computeBranchDiff(scan branchScan) ([]domain.EnvFileResult, error) {
+	ctx := resolveEnvStrategyAndParent(scan.cfg, scan.branch, scan.flags.from)
 	return envsvc.ComputeEnvDiff(envsvc.ComputeEnvParams{
-		Branch:             branch,
-		MainPath:           cfg.ProjectDir,
-		WorktreePath:       worktreePath,
+		Branch:             scan.branch,
+		MainPath:           scan.cfg.ProjectDir,
+		WorktreePath:       worktreePathForBranch(scan.statuses, scan.branch),
 		ParentWorktreePath: ctx.ParentPath,
 		ParentBranch:       ctx.ParentBranch,
-		Files:              cfg.Config.Project.Env.Files,
+		Files:              scan.cfg.Config.Project.Env.Files,
 		Strategy:           ctx.Strategy,
-		Mode:               f.mode,
-		Ports:              ports,
+		Mode:               scan.flags.mode,
+		Ports:              scan.ports(),
+		Reserved:           scan.reserved(),
 	})
 }
 
 // computeBranchPorts resolves one worktree's port pass for the wizard recap, so
 // the apply is announced before it happens rather than discovered after.
-func computeBranchPorts(cfg shared.ConfigResult, statuses []domain.WorktreeStatus, branch string) (domain.EnvPortPlan, error) {
-	ports, _ := resolveEnvPorts(cfg, branch, worktreePathForBranch(statuses, branch))
+func computeBranchPorts(scan branchScan) (domain.EnvPortPlan, error) {
+	ports := scan.ports()
 	if ports.Empty() {
 		return domain.EnvPortPlan{}, nil
 	}
 	return envsvc.ComputeEnvPorts(ports)
+}
+
+type runPassParams struct {
+	cfg          shared.ConfigResult
+	branch       string
+	worktreePath string
+	adoption     domain.IsolationAdoptionPlan
+	// adopt says the worktree now has an isolation recorded — by --isolation or
+	// by the wizard — so a pending adoption is settled.
+	adopt bool
+}
+
+// envRunPass is the run half of a `wtm env`: the port and owned-value pass, and
+// what it says about the worktree's isolation.
+type envRunPass struct {
+	ports    envsvc.EnvPortsParams
+	reserved []string
+	warnings []string
+	adoption domain.IsolationAdoption
+	branch   string
+}
+
+// runPass settles the run values of a worktree that chose its isolation, and
+// leaves a worktree that never did exactly as it is: no port moved, no compose
+// project written, no ordinal allocated — only the keys are reconciled.
+func runPass(params runPassParams) envRunPass {
+	pass := envRunPass{branch: params.branch}
+	if params.adoption.Pending {
+		pass.reserved = domain.WtmOwnedEnvKeys
+	}
+	if params.adoption.Pending && !params.adopt {
+		pass.warnings = []string{rules.IsolationNotAdoptedWarning(params.branch)}
+		pass.adoption = domain.IsolationNotAdopted
+		return pass
+	}
+	if params.adoption.Pending {
+		pass.adoption = domain.IsolationAdopted
+	}
+	pass.ports, pass.warnings = resolveEnvPorts(params.cfg, params.branch, params.worktreePath)
+	return pass
+}
+
+// decorate reports the pass on the result. A worktree left on its source's
+// values has no isolation to report: calling it isolated would be the one
+// thing it is not.
+func (p envRunPass) decorate(cfg shared.ConfigResult, result domain.EnvSyncResult) domain.EnvSyncResult {
+	result.Warnings = p.warnings
+	result.IsolationAdoption = p.adoption
+	if p.adoption != domain.IsolationNotAdopted {
+		result.Isolation = isolationOf(cfg, p.branch)
+	}
+	return result
+}
+
+type envTarget struct {
+	branch string
+	path   string
+}
+
+func isolationAdoption(cfg shared.ConfigResult, target envTarget) (domain.IsolationAdoptionPlan, error) {
+	return worktree.IsolationAdoptionFor(worktree.IsolationAdoptionParams{
+		Ref:          worktree.WorktreeRef{ProjectDir: cfg.ProjectDir, StateDir: cfg.StateDir, Branch: target.branch},
+		WorktreePath: target.path,
+	})
 }
 
 // resolveEnvPorts gathers the [[env_port]] links and the offset this worktree

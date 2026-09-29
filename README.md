@@ -118,7 +118,11 @@ A few ideas explain how the commands fit together:
   worktree on the ports and data that file names — its source's, so only one of the two can
   be up at a time, and `wtm run up` says so instead of letting a port bind fail. Set the
   default with `isolation = "isolated" | "verbatim"` in `run.toml`, pick per worktree with
-  `--isolation`, switch later with `wtm env <worktree> --isolation`.
+  `--isolation`, switch later with `wtm env <worktree> --isolation`. A worktree created
+  before the choice existed has none recorded and keeps its source's ports and compose
+  project: `wtm env --yes` leaves them alone and says so, the wizard offers to adopt
+  isolation (a new compose project — its current volumes are no longer used), and
+  `wtm env <worktree> --isolation isolated` adopts it explicitly.
 - **Shell integration** — `go` changes your current directory, which a child process can't
   do for its parent shell. `eval "$(wtm shell-init)"` installs a shell function that makes
   it work. Without it, use [`resolve`](docs/wtm_resolve.md) to get a path.

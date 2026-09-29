@@ -90,15 +90,25 @@ func addedDetailFmt(params EnvKeyRowsParams) string {
 	}
 }
 
+type EnvFileVerdictParams struct {
+	// PortsMove says the port pass rewrites a value in this very file.
+	PortsMove bool
+	Check     bool
+}
+
 // EnvFileVerdict is the single line a file block shows when no key needs
-// anything. It has to distinguish "nothing at all to do" from "no key to do, but
-// the port pass below still moves a value in this very file" — the second
-// claiming to be in sync contradicts the next section.
-func EnvFileVerdict(hasPorts bool) string {
-	if hasPorts {
+// anything. "In sync" alone would contradict a port pass that moves a value in
+// this very file, and a pass that already ran is told in the past tense, or the
+// block says its values still move under a summary counting them settled.
+func EnvFileVerdict(params EnvFileVerdictParams) string {
+	switch {
+	case !params.PortsMove:
+		return domain.EnvFileInSyncMessage
+	case params.Check:
 		return domain.EnvFileKeysInSyncMessage
+	default:
+		return domain.EnvFileValuesSettledMessage
 	}
-	return domain.EnvFileInSyncMessage
 }
 
 // resolvedEnvAdds returns the resolved entries that are additions (absent from

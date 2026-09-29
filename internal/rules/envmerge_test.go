@@ -365,3 +365,29 @@ func TestDiffEnvStillReportsAConflictBetweenTwoJobsRoutes(t *testing.T) {
 		t.Errorf("DiffEnv() hid a route pointing at another job: %+v", diff.Entries)
 	}
 }
+
+// A key the owned pass writes into this file is the pass's to add: offering
+// the template's placeholder for it announces a value that is never written.
+func TestDiffEnvLeavesAnAbsentOwnedKeyToTheOwnedPass(t *testing.T) {
+	diff := DiffEnv(EnvDiffParams{
+		Template: []domain.EnvLine{pair(domain.EnvComposeProjectName, "placeholder"), pair("PORT", "3000")},
+		Child:    []domain.EnvLine{pair("PORT", "3000")},
+		Mode:     domain.EnvModeAdd,
+		Owned:    map[string]bool{domain.EnvComposeProjectName: true},
+	})
+	for _, entry := range diff.Entries {
+		if entry.Key == domain.EnvComposeProjectName {
+			t.Fatalf("entry = %+v, want the key left to the owned pass", entry)
+		}
+	}
+}
+
+func TestDiffEnvStillReportsAnAbsentIdentityKeyNoPassWrites(t *testing.T) {
+	diff := DiffEnv(EnvDiffParams{
+		Template: []domain.EnvLine{pair(domain.EnvComposeProjectName, "placeholder")},
+		Mode:     domain.EnvModeAdd,
+	})
+	if len(diff.Entries) != 1 || diff.Entries[0].Status != domain.EnvKeyMissing {
+		t.Fatalf("entries = %+v, want the key missing like any other", diff.Entries)
+	}
+}

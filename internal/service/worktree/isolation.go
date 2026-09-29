@@ -2,6 +2,9 @@ package worktree
 
 import (
 	"fmt"
+	"path/filepath"
+
+	"github.com/LucasPcq/wtm/internal/config"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
@@ -66,4 +69,43 @@ func isMainBranch(ref WorktreeRef) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+type IsolationAdoptionParams struct {
+	Ref          WorktreeRef
+	WorktreePath string
+}
+
+// IsolationAdoptionFor says whether a worktree still has to adopt its isolation
+// and what adopting it changes. It resolves nothing and allocates nothing: the
+// answer is asked before the worktree is touched. A run.toml that cannot be
+// read leaves nothing to adopt — the port pass is skipped for that reason, and
+// says so itself.
+func IsolationAdoptionFor(params IsolationAdoptionParams) (domain.IsolationAdoptionPlan, error) {
+	cfg, err := config.LoadRun(params.Ref.StateDir)
+	if err != nil {
+		return domain.IsolationAdoptionPlan{}, nil
+	}
+	isMain, err := isMainBranch(params.Ref)
+	if err != nil {
+		return domain.IsolationAdoptionPlan{}, err
+	}
+	if !rules.IsolationAdoptionPending(rules.IsolationAdoptionPendingParams{IsMain: isMain, Recorded: RecordedIsolation(params.Ref), Config: cfg}) {
+		return domain.IsolationAdoptionPlan{}, nil
+	}
+
+	plan := domain.IsolationAdoptionPlan{Pending: true}
+	dirs := rules.ComposeProjectDirs(cfg)
+	if len(dirs) == 0 {
+		return plan, nil
+	}
+	plan.ComposeProject = rules.ComposeProjectName(rules.ComposeProjectNameParams{
+		Project:  filepath.Base(params.Ref.ProjectDir),
+		Worktree: rules.WorktreeSlug(params.Ref.Branch),
+	})
+	plan.CurrentComposeProject = rules.DeclaredComposeProject(composeEnvFiles(composeEnvFilesParams{Dir: params.WorktreePath, Config: cfg}))
+	if plan.CurrentComposeProject == "" {
+		plan.CurrentComposeProject = rules.DefaultComposeProjectName(filepath.Base(filepath.Join(params.WorktreePath, dirs[0])))
+	}
+	return plan, nil
 }

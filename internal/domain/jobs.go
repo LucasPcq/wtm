@@ -89,6 +89,28 @@ const (
 	IsolationVerbatim Isolation = "verbatim"
 )
 
+// IsolationAdoption is what `wtm env` did about a worktree created before the
+// isolation choice existed: such a worktree runs on its source's ports and
+// compose project until it adopts one.
+type IsolationAdoption string
+
+const (
+	IsolationAdopted    IsolationAdoption = "adopted"
+	IsolationNotAdopted IsolationAdoption = "not_adopted"
+)
+
+// IsolationAdoptionPlan says whether a worktree still has to adopt its
+// isolation, and what adopting it changes.
+type IsolationAdoptionPlan struct {
+	Pending bool
+	// ComposeProject is the project an isolated worktree runs under, empty when
+	// run.toml starts no compose stack.
+	ComposeProject string
+	// CurrentComposeProject is the one it runs under today, whose volumes it
+	// would stop using.
+	CurrentComposeProject string
+}
+
 // JobConfig defines a managed job from .wtm/run.toml.
 type JobConfig struct {
 	Name string  `toml:"name"           json:"name"`

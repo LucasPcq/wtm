@@ -226,13 +226,17 @@ flagged; everything else is what the name implies.
   interactively (else it errors — there is no picker under `--yes`/JSON). JSON shape:
   `{branch,mode,check,files:[{target,strategy,source,applied,parent_branch,parent_fallback,diff:{mode,
   entries:[{key,status,current_value,resolved_value,placeholder,source,export}]}}],ports:{offset,
-  applied,entries:[{file,key,port,base,resolved,status,current_value,new_value}]},isolation}` where
+  applied,entries:[{file,key,port,base,resolved,status,current_value,new_value}]},isolation,
+  isolation_adoption,warnings}` where
   `status` is `resolved` / `missing_unresolved` / `conflict` / `orphan`. Round-trip is
   preserved: comments, ordering and formatting of the `.env` are kept; only decided keys change.
   The `ports` block is the `[[env_port]]` pass (below), empty when the project declares none;
   `ports.applied` says whether those rewrites were written, and the trailing summary counts
   them alongside the files (a run that only shifted a port still reports what it wrote).
   `isolation` is the worktree's; a `verbatim` one always has an empty `ports` block.
+  `isolation_adoption` appears only for a worktree created before the isolation choice:
+  `not_adopted` (its run values were left alone, no `isolation` reported, empty `ports`) or
+  `adopted` (this run recorded it — `--isolation` or the wizard — and settled its values).
   A `run.toml` that cannot be used never stops the key reconciliation: only the port pass
   is skipped, and a `warnings` array names why.
   `--isolation isolated|verbatim` records a new isolation for the worktree **before**
@@ -494,7 +498,13 @@ and **experimental**: the global `wtm init` does not configure it.
   worktree **cannot run while its source does** (see the port clash below). A project sets
   the default for unattended runs with `isolation = "isolated" | "verbatim"` in `run.toml`;
   `wtm env <wt> --isolation …` switches an existing worktree; the main checkout is always
-  isolated.
+  isolated. **A worktree created before the choice existed** (no `isolation` in its
+  meta.json) has not adopted it: `wtm env <wt> --yes` reconciles its keys only — no port
+  moved, no `COMPOSE_PROJECT_NAME` written, no ordinal allocated — with a `!` warning, and its
+  JSON carries `"isolation_adoption": "not_adopted"` (and no `isolation`). Adopt it with
+  `wtm env <wt> --yes --isolation isolated` (`"isolation_adoption": "adopted"`): it then runs
+  under a new compose project, so its current volumes are no longer used — ask the user
+  first. When a run writes `COMPOSE_PROJECT_NAME`, the report names it.
 - **Another worktree already running jobs is not a conflict — unless it holds your ports.**
   Isolated worktrees sit a block of ports apart, so stacks cohabit; the question is about
   machine load, not about ports. `run up` asks about it once, and only on a terminal; on your paths (no TTY,

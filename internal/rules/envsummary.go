@@ -57,8 +57,20 @@ func EnvOutcomeSummary(result domain.EnvSyncResult) EnvSummary {
 	case ports == 0:
 		return EnvSummary{Text: fmt.Sprintf(domain.EnvReconciledFmt, files), Verdict: domain.EnvVerdictDone}
 	case files == 0:
-		return EnvSummary{Text: fmt.Sprintf(domain.EnvPortsShiftedFmt, ports), Verdict: domain.EnvVerdictDone}
+		return EnvSummary{Text: fmt.Sprintf(domain.EnvPortsShiftedFmt, ports) + composeProjectWritten(result.Ports), Verdict: domain.EnvVerdictDone}
 	default:
-		return EnvSummary{Text: fmt.Sprintf(domain.EnvReconciledAndShiftedFmt, files, ports), Verdict: domain.EnvVerdictDone}
+		return EnvSummary{Text: fmt.Sprintf(domain.EnvReconciledAndShiftedFmt, files, ports) + composeProjectWritten(result.Ports), Verdict: domain.EnvVerdictDone}
 	}
+}
+
+// composeProjectWritten names the compose project a run moved the worktree to:
+// its volumes are the ones a `docker compose` typed there now reaches, which is
+// not a detail to leave inside a count.
+func composeProjectWritten(plan domain.EnvPortPlan) string {
+	for _, entry := range OwnedEnvRewrites(plan) {
+		if entry.Key == domain.EnvComposeProjectName {
+			return fmt.Sprintf(domain.EnvComposeProjectWrittenFmt, domain.EnvComposeProjectName, entry.Value)
+		}
+	}
+	return ""
 }

@@ -2,6 +2,7 @@ package rules
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 )
@@ -86,4 +87,44 @@ func FirstIsolation(values ...domain.Isolation) domain.Isolation {
 		}
 	}
 	return ""
+}
+
+type IsolationAdoptionPendingParams struct {
+	IsMain   bool
+	Recorded domain.Isolation
+	Config   domain.RunConfig
+}
+
+// IsolationAdoptionPending says whether a worktree still runs on its source's
+// run values because it was created before the choice existed. The main
+// checkout has nothing to adopt, and neither has a project declaring nothing to
+// isolate.
+func IsolationAdoptionPending(params IsolationAdoptionPendingParams) bool {
+	return !params.IsMain && params.Recorded == "" && IsolationApplies(params.Config)
+}
+
+// DefaultComposeProjectName is the name `docker compose` gives a project whose
+// environment names none: its directory's, lowercased, keeping only the
+// characters a project name may hold.
+func DefaultComposeProjectName(dir string) string {
+	var name strings.Builder
+	for _, r := range strings.ToLower(dir) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
+			name.WriteRune(r)
+		}
+	}
+	return strings.TrimLeft(name.String(), "_-")
+}
+
+// IsolationAdoptOptionLabel is how the migration offers adopting isolation:
+// what the worktree gains, and the data it leaves behind.
+func IsolationAdoptOptionLabel(plan domain.IsolationAdoptionPlan) string {
+	if plan.ComposeProject == "" {
+		return domain.IsolationAdoptPortsLabel
+	}
+	return fmt.Sprintf(domain.IsolationAdoptComposeFmt, plan.ComposeProject, plan.CurrentComposeProject)
+}
+
+func IsolationNotAdoptedWarning(branch string) string {
+	return fmt.Sprintf(domain.EnvIsolationNotAdoptedFmt, branch, branch)
 }

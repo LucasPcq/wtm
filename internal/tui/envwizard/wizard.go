@@ -34,6 +34,10 @@ type RunParams struct {
 	// exactly why the recap has to name it: discovering it afterwards is a
 	// surprise, and a surprise about a file the user did not agree to touch.
 	PortsByBranch map[string]domain.EnvPortPlan
+	// AdoptionByBranch holds the worktrees created before the isolation choice
+	// existed. Adopting it is a question of its own, since it moves the worktree
+	// off the compose project whose volumes hold its data.
+	AdoptionByBranch map[string]domain.IsolationAdoptionPlan
 }
 
 // Result is the wizard outcome: the chosen worktree and its per-file decisions.
@@ -43,6 +47,7 @@ type Result struct {
 	// Verbatim is the user choosing to apply without the port pass, which
 	// records the worktree verbatim.
 	Verbatim bool
+	Adopt    bool
 }
 
 // Run drives the unified wizard and returns the branch + collected decisions.
@@ -63,11 +68,17 @@ func Run(params RunParams) (Result, error) {
 		return selectValue(prev, worktreeIdx)
 	}
 
+	adoptIdx := -1
+	if (params.PresetBranch == "" && len(params.AdoptionByBranch) > 0) || params.AdoptionByBranch[params.PresetBranch].Pending {
+		adoptIdx = len(steps)
+		steps = append(steps, adoptionStep(params, branchOf))
+	}
+
 	// The wizard never auto-skips its first step, which is where a preset branch
 	// puts the resolver: with nothing to decide it would sit there empty, so it is
 	// left out here instead.
 	resolveIdx := -1
-	if params.PresetBranch == "" || !resolveModel(params, params.PresetBranch).Empty() {
+	if len(steps) > 0 || !resolveModel(params, params.PresetBranch).Empty() {
 		resolveIdx = len(steps)
 		steps = append(steps, resolveStep(params, branchOf))
 	}
@@ -76,6 +87,7 @@ func Run(params RunParams) (Result, error) {
 	steps = append(steps, recapStep(recapStepParams{
 		BranchOf:      branchOf,
 		ResolveIdx:    resolveIdx,
+		AdoptIdx:      adoptIdx,
 		PortsByBranch: params.PortsByBranch,
 	}))
 
@@ -94,7 +106,11 @@ func Run(params RunParams) (Result, error) {
 		return Result{}, domain.ErrUserAborted
 	}
 
-	res := Result{Branch: branchOf(done), Verbatim: action == applyVerbatimAction}
+	res := Result{
+		Branch:   branchOf(done),
+		Verbatim: action == applyVerbatimAction,
+		Adopt:    adoptIdx >= 0 && selectValue(done, adoptIdx) == domain.IsolationAdoptValue,
+	}
 	if m, ok := stepModel(done, resolveIdx).(components.EnvResolveModel); ok {
 		res.Decisions = m.Decisions()
 	}
@@ -144,6 +160,37 @@ func resolveStep(params RunParams, branchOf func([]components.Step) string) comp
 	}
 }
 
+// adoptionStep asks a worktree created before the isolation choice whether to
+// adopt it. Keeping it as is opens under the cursor: adopting leaves its data
+// behind in the compose project it runs under today.
+func adoptionStep(params RunParams, branchOf func([]components.Step) string) components.Step {
+	return components.Step{
+		Name:  domain.IsolationAdoptStepName,
+		Model: components.NewSelectList(components.NewSelectListParams{}),
+		Build: func(prev []components.Step) any {
+			branch := branchOf(prev)
+			plan := params.AdoptionByBranch[branch]
+			return components.NewSelectList(components.NewSelectListParams{
+				Title:       fmt.Sprintf(domain.IsolationAdoptTitleFmt, branch),
+				Description: domain.IsolationAdoptDescription,
+				Items: []components.SelectItem{
+					{Label: domain.IsolationAdoptKeepLabel, Value: domain.IsolationAdoptKeepValue},
+					{Label: rules.IsolationAdoptOptionLabel(plan), Value: domain.IsolationAdoptValue, Danger: plan.ComposeProject != ""},
+				},
+			})
+		},
+		AutoSkip: func(w components.WizardModel) bool {
+			return !params.AdoptionByBranch[branchOf(w.Steps())].Pending
+		},
+		Summary: func(model any) string {
+			if components.SelectSummary(model) == domain.IsolationAdoptValue {
+				return domain.IsolationAdoptSummary
+			}
+			return domain.IsolationAdoptKeptSummary
+		},
+	}
+}
+
 func resolveModel(params RunParams, branch string) components.EnvResolveModel {
 	return components.NewEnvResolve(components.NewEnvResolveParams{
 		Title:       "Resolve drift — " + branch,
@@ -155,6 +202,7 @@ func resolveModel(params RunParams, branch string) components.EnvResolveModel {
 type recapStepParams struct {
 	BranchOf      func([]components.Step) string
 	ResolveIdx    int
+	AdoptIdx      int
 	PortsByBranch map[string]domain.EnvPortPlan
 }
 
@@ -165,7 +213,11 @@ func recapStep(params recapStepParams) components.Step {
 		Name: "Review & apply",
 		Build: func(prev []components.Step) components.RecapContent {
 			branch := params.BranchOf(prev)
-			lines := []string{styles.Muted.Render("Worktree:") + "  " + styles.Bold.Render(branch), ""}
+			lines := []string{styles.Muted.Render("Worktree:") + "  " + styles.Bold.Render(branch)}
+			if params.AdoptIdx >= 0 && selectValue(prev, params.AdoptIdx) == domain.IsolationAdoptValue {
+				lines = append(lines, styles.Muted.Render(domain.IsolationAdoptStepName+":")+" "+domain.IsolationAdoptSummary)
+			}
+			lines = append(lines, "")
 			m, ok := stepModel(prev, params.ResolveIdx).(components.EnvResolveModel)
 			if body := m.RecapLines(); ok && len(body) > 0 {
 				lines = append(lines, body...)

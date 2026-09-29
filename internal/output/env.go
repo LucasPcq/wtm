@@ -50,7 +50,7 @@ func printEnvFile(w io.Writer, f domain.EnvFileResult, check bool, hasPorts bool
 
 	rows := rules.EnvKeyRows(rules.EnvKeyRowsParams{File: f, Check: check})
 	if len(rows) == 0 {
-		Success(w, styles.Muted.Render(rules.EnvFileVerdict(hasPorts)))
+		Success(w, styles.Muted.Render(rules.EnvFileVerdict(rules.EnvFileVerdictParams{PortsMove: hasPorts, Check: check})))
 		return
 	}
 	for _, row := range rows {

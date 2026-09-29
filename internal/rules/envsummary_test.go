@@ -141,3 +141,13 @@ func TestEnvSummaryRefusesToCallAnUnresolvableFileClean(t *testing.T) {
 		t.Errorf("summary = %q, want it to count the unresolvable file", summary.Text)
 	}
 }
+
+func TestEnvOutcomeSummaryNamesTheComposeProjectWritten(t *testing.T) {
+	result := domain.EnvSyncResult{Ports: domain.EnvPortPlan{
+		Applied: true,
+		Owned:   []domain.EnvOwnedEntry{{File: ".env", Key: domain.EnvComposeProjectName, Value: "repo-feat-x", Changed: true}},
+	}}
+	if got := EnvOutcomeSummary(result).Text; !strings.Contains(got, domain.EnvComposeProjectName+" is now repo-feat-x") {
+		t.Errorf("summary = %q, want the compose project named", got)
+	}
+}

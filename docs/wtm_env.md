@@ -15,6 +15,12 @@ Pass a worktree branch, or omit it to pick interactively. --check prints a
 read-only drift report. Non-interactively (--yes / --output json) it applies only
 safe additions; conflicts need --on-conflict and orphans need --prune.
 
+A worktree created before the isolation choice existed (no isolation in its
+meta.json) keeps its source's ports and COMPOSE_PROJECT_NAME: non-interactively
+only its keys are reconciled, and the report says so. The wizard offers to adopt
+isolation — a new compose project, so its current volumes are no longer used —
+and --isolation isolated adopts it explicitly.
+
 ```
 wtm env [worktree] [flags]
 ```
