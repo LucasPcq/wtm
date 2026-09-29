@@ -8,6 +8,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/run/seam"
 	"github.com/LucasPcq/wtm/internal/flow/run/target"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
@@ -25,6 +26,9 @@ const (
 	answerParallelAlways  = answerParallel + alwaysSuffix
 	answerExclusiveAlways = answerExclusive + alwaysSuffix
 	alwaysSuffix          = "-always"
+	// answerCancel is the clash declined: not starting is the one answer that
+	// leaves the other worktree running.
+	answerCancel = "cancel"
 )
 
 func (f *upFlow) session() flow.Session {
@@ -65,7 +69,11 @@ func (f *upFlow) concurrencyStep() flow.Step {
 			return true, f.skipReason(answers)
 		},
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
-			if f.decideConcurrency(answers).Contradiction {
+			decision := f.decideConcurrency(answers)
+			if decision.Clash {
+				return f.clashContent(answers), nil
+			}
+			if decision.Contradiction {
 				return f.contradictionContent(answers), nil
 			}
 			return flow.StepContent{
@@ -83,7 +91,13 @@ func (f *upFlow) concurrencyStep() flow.Step {
 		// Leaving the others alone is the answer that stops nothing, which is what
 		// a safe default means here.
 		Resolve: func(answers flow.Answers) (flow.Answer, error) {
-			return flow.Answer{Value: string(f.decideConcurrency(answers).Value)}, nil
+			decision := f.decideConcurrency(answers)
+			if decision.Clash {
+				return flow.Answer{}, fmt.Errorf(domain.RunPortClashRefusedFmt,
+					strings.Join(rules.PortClashLines(f.clashes(answers)), "\n"),
+					domain.FlagExclusive, domain.FlagIsolation, domain.IsolationIsolated)
+			}
+			return flow.Answer{Value: string(decision.Value)}, nil
 		},
 		Summarize: func(answer flow.Answer) string { return string(concurrencyOf(answer.Value)) },
 	}
@@ -102,6 +116,24 @@ func (f *upFlow) contradictionContent(answers flow.Answers) flow.StepContent {
 		Options: []flow.Option{
 			{Label: domain.RunConcurrencyContradictionOnce, Value: answerParallel},
 			{Label: domain.RunConcurrencyContradictionAlways, Value: answerParallelAlways},
+		},
+	}
+}
+
+// clashContent is the question when running side by side is not possible: a
+// port this run needs is bound by another worktree.
+func (f *upFlow) clashContent(answers flow.Answers) flow.StepContent {
+	clashes := f.clashes(answers)
+	names := make([]string, 0, len(clashes))
+	for _, dir := range rules.ClashingWorktrees(clashes) {
+		names = append(names, filepath.Base(dir))
+	}
+	return flow.StepContent{
+		Title:       domain.RunPortClashTitle,
+		Description: fmt.Sprintf(domain.RunPortClashDescFmt, strings.Join(rules.PortClashLines(clashes), "\n")),
+		Options: []flow.Option{
+			{Label: fmt.Sprintf(domain.RunPortClashStopFmt, strings.Join(names, domain.RunURLListSep)), Value: answerExclusive},
+			{Label: domain.RunPortClashCancel, Value: answerCancel},
 		},
 	}
 }
@@ -153,7 +185,76 @@ func (f *upFlow) decideConcurrency(answers flow.Answers) rules.ConcurrencyDecisi
 		Config:        f.request.Config.Concurrency,
 		OthersRunning: f.othersRunning(answers),
 		Selection:     len(f.workDirs(answers)),
+		Clashes:       len(f.clashes(answers)) > 0,
 	})
+}
+
+// clashes are the ports this run would bind that a job in a worktree it leaves
+// alone already binds. Measured only when something runs elsewhere: it costs a
+// git lookup per worktree involved, and with nothing up there is nothing to hit.
+func (f *upFlow) clashes(answers flow.Answers) []domain.PortClash {
+	if !f.othersRunning(answers) {
+		return nil
+	}
+	return rules.PortClashes(rules.PortClashesParams{
+		Starting: f.startingClaims(answers),
+		Held:     f.heldClaims(answers),
+	})
+}
+
+// startingClaims are the ports each selected worktree's jobs would bind.
+func (f *upFlow) startingClaims(answers flow.Answers) []domain.PortClaim {
+	profile, err := f.resolveProfile(answers)
+	if err != nil {
+		return nil
+	}
+	jobs := rules.JobsWithEffectivePorts(f.request.Config, profile.Jobs)
+	var claims []domain.PortClaim
+	for _, dir := range f.workDirs(answers) {
+		claims = append(claims, rules.PortClaims(rules.PortClaimsParams{Jobs: jobs, WorkDir: dir, Offset: f.offsetOf(dir)})...)
+	}
+	return claims
+}
+
+// heldClaims are the ports the jobs up outside this run's selection bind, read
+// from their declarations: the daemon keeps no port per job.
+func (f *upFlow) heldClaims(answers flow.Answers) []domain.PortClaim {
+	selected := make(map[string]bool)
+	for _, dir := range f.workDirs(answers) {
+		selected[dir] = true
+	}
+	declared := make(map[string]domain.JobConfig, len(f.request.Config.Jobs))
+	for _, job := range rules.JobsWithEffectivePorts(f.request.Config, f.request.Config.Jobs) {
+		declared[job.Name] = job
+	}
+
+	var claims []domain.PortClaim
+	for _, info := range f.jobs {
+		job, known := declared[info.Name]
+		if !known || !rules.IsJobUp(info.Status) || selected[info.WorkDir] {
+			continue
+		}
+		claims = append(claims, rules.PortClaims(rules.PortClaimsParams{
+			Jobs:    []domain.JobConfig{job},
+			WorkDir: info.WorkDir,
+			Offset:  f.offsetOf(info.WorkDir),
+		})...)
+	}
+	return claims
+}
+
+// offsetOf is the offset a worktree runs on, read once per worktree: the steps
+// ask again every time the wizard moves.
+func (f *upFlow) offsetOf(dir string) int {
+	if offset, known := f.offsets[dir]; known {
+		return offset
+	}
+	offset := rules.PortOffsetFromEnv(seam.JobEnv(seam.JobEnvParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, WorkDir: dir}))
+	if f.offsets == nil {
+		f.offsets = map[string]int{}
+	}
+	f.offsets[dir] = offset
+	return offset
 }
 
 // othersRunning is measured against the worktree the run targets, never against

@@ -554,3 +554,18 @@ type JobRunnerChoice struct {
 	Runners []string
 	Options []string
 }
+
+// PortClaim is one port a job binds in one worktree.
+type PortClaim struct {
+	Port    int
+	Job     string
+	WorkDir string
+}
+
+// PortClash is a port a job about to start would bind while another job
+// already holds it — in another worktree, or in the same run.
+type PortClash struct {
+	Port   int
+	Want   PortClaim
+	HeldBy PortClaim
+}

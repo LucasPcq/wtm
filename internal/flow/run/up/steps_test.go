@@ -335,3 +335,68 @@ func TestAnAnsweredContradictionIsNotAnnounced(t *testing.T) {
 		t.Errorf("statuses = %v, want nothing said over an answer someone gave", recorder.Statuses)
 	}
 }
+
+// clashFlow runs `web` here while the same job is up in /wt/other, the two
+// worktrees on the offsets given — a verbatim worktree shares its source's.
+func clashFlow(request Request, otherOffset int) *upFlow {
+	request.Config.Jobs = []domain.JobConfig{{
+		Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev",
+		Ports: map[string]int{"PORT": 3000},
+	}}
+	f := flowWith(request, []domain.JobInfo{{Name: "web", WorkDir: "/wt/other", Status: domain.JobStatusRunning}})
+	f.offsets = map[string]int{here: 0, "/wt/other": otherOffset}
+	return f
+}
+
+// Running side by side is not an answer when the ports are the same: the
+// question becomes stop the other one, or don't start — whatever the project
+// settled as its preference.
+func TestAPortClashOverridesAParallelPreference(t *testing.T) {
+	f := clashFlow(Request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyParallel}}, 0)
+	step := concurrencyStepOf(f)
+
+	if skip, reason := step.Skip(flow.Answers{}); skip {
+		t.Fatalf("skipped (%s), want the clash put to the user", reason)
+	}
+	content, err := step.Build(flow.Answers{})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if content.Title != domain.RunPortClashTitle || !strings.Contains(content.Description, "3000") {
+		t.Errorf("content = %+v, want the clash named with its port", content)
+	}
+	if len(content.Options) != 2 || content.Options[1].Value != answerCancel {
+		t.Errorf("options = %+v, want stop-the-other or don't start", content.Options)
+	}
+}
+
+// Nobody to ask: stopping another worktree is not a default to take silently,
+// and running both is not possible — the run refuses, naming the way out.
+func TestAPortClashRefusesAnUnattendedRun(t *testing.T) {
+	_, err := concurrencyStepOf(clashFlow(Request{}, 0)).Resolve(flow.Answers{})
+	if err == nil || !strings.Contains(err.Error(), "--"+domain.FlagExclusive) {
+		t.Errorf("err = %v, want a refusal naming --%s", err, domain.FlagExclusive)
+	}
+}
+
+func TestAPortClashIsSettledByExclusive(t *testing.T) {
+	step := concurrencyStepOf(clashFlow(Request{Exclusive: true}, 0))
+	if skip, _ := step.Skip(flow.Answers{}); !skip {
+		t.Error("--exclusive answers the clash, want the step skipped")
+	}
+	answer, err := step.Resolve(flow.Answers{})
+	if err != nil || answer.Value != answerExclusive {
+		t.Errorf("Resolve = (%q, %v), want exclusive", answer.Value, err)
+	}
+}
+
+// Isolated worktrees sit a block apart: the same job up next door is not a clash.
+func TestIsolatedWorktreesDoNotClash(t *testing.T) {
+	f := clashFlow(Request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyParallel}}, 10)
+	if clashes := f.clashes(flow.Answers{}); len(clashes) != 0 {
+		t.Errorf("clashes = %+v, want none a block apart", clashes)
+	}
+	if skip, _ := concurrencyStepOf(f).Skip(flow.Answers{}); !skip {
+		t.Error("the settled preference applies when nothing clashes")
+	}
+}

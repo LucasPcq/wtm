@@ -97,6 +97,8 @@ type upFlow struct {
 	jobs    []domain.JobInfo
 	running map[string]int
 	service runlogs.Service
+	// offsets memoizes each worktree's port offset for the clash check.
+	offsets map[string]int
 }
 
 func (f *upFlow) run() (Outcome, error) {
@@ -126,6 +128,15 @@ func (f *upFlow) run() (Outcome, error) {
 	}
 	if err != nil {
 		return Outcome{}, err
+	}
+	if answers.Value(KeyConcurrency) == answerCancel {
+		f.presenter.Notice(flow.AbortedNotice)
+		return Outcome{Aborted: true}, nil
+	}
+	// Before anything is stopped: a selection that is its own conflict must not
+	// cost the other worktrees their jobs first.
+	if clashes := rules.SelfPortClashes(f.startingClaims(answers)); len(clashes) > 0 {
+		return Outcome{}, fmt.Errorf(domain.RunSelfPortClashFmt, strings.Join(rules.PortClashLines(clashes), "\n"))
 	}
 
 	if err := f.remember(answers); err != nil {

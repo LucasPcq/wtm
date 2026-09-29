@@ -2401,6 +2401,23 @@ const (
 	RunConcurrencySkipFlag    = "set by --exclusive or --parallel"
 	RunConcurrencySkipAlone   = "no other worktree is running jobs"
 
+	// RunPortClash* is the same question when it is no longer a preference: a
+	// port this run needs is bound by another worktree — which is what a
+	// verbatim worktree and its source always do. Running side by side is not
+	// on offer, so the two answers are to stop the other one, or not to start.
+	RunPortClashTitle   = "Ports another worktree already binds"
+	RunPortClashDescFmt = "%s\n\nThis worktree runs on the same ports as the one holding them — a verbatim worktree runs on its source's — so only one of them can be up at a time."
+	RunPortClashLineFmt = "%d — %s in %s, bound by %s in %s"
+	RunPortClashStopFmt = "Stop %s first"
+	RunPortClashCancel  = "Don't start"
+	// RunPortClashRefusedFmt is the refusal where nobody can be asked: --parallel
+	// or `concurrency = "parallel"` cannot be honoured, and stopping another
+	// worktree is not a default to take silently.
+	RunPortClashRefusedFmt = "ports already bound by another worktree:\n%s\nstop it first with --%s, or give this worktree its own ports: wtm env <branch> --%s %s"
+	// RunSelfPortClashFmt refuses a run that brings up two worktrees on the same
+	// ports: there is nothing to stop, the selection is the conflict.
+	RunSelfPortClashFmt = "these worktrees bind the same ports and cannot run at once:\n%s"
+
 	// RunConcurrencyContradiction* is the same question asked for the opposite
 	// reason: the project settled on one stack at a time and this run starts
 	// several. It is a guard rail rather than an ambush — the contradiction is one
