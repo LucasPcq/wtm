@@ -331,19 +331,6 @@ func boardAddresses(params boardAddressParams) map[string]domain.JobAddress {
 	})
 }
 
-type LogDirParams struct {
-	StateDir string
-	WorkDir  string
-}
-
-// LogDir resolves where the daemon persists this worktree's job logs. The
-// branch is looked up here rather than passed along by the daemon, which must
-// never run git; a worktree with no branch, or one git cannot name, persists
-// nothing rather than sharing another's directory.
-func LogDir(params LogDirParams) string {
-	return logDirOf(params.StateDir, target.BranchOf(params.WorkDir))
-}
-
 func logDirOf(stateDir, branch string) string {
 	if branch == "" {
 		return ""

@@ -386,3 +386,12 @@ func TestResolveDetectedPortsRetireLesJobsDecoches(t *testing.T) {
 		t.Errorf("Removed = %v, want [web]", got.Removed)
 	}
 }
+
+func jobNamed(cfg domain.RunConfig, name string) domain.JobConfig {
+	for _, job := range cfg.Jobs {
+		if job.Name == name {
+			return job
+		}
+	}
+	return domain.JobConfig{}
+}

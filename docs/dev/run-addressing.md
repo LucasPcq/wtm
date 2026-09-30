@@ -179,7 +179,7 @@ refused, and the line is what says so. `--raw` on `run url` / `run open` still g
 
 ## Where to reach it — one model for every surface
 
-A run says where each job is reached in **one** place, `rules.ReachLines` over
+A run says where each job is reached in **one** place, `rules.ReachBlock` over
 `domain.ReachEntry` (`internal/rules/reach.go`): the URLs first — a runner's by the apps it
 holds — then the jobs reached by port, their ports named (`REDIS_PORT` → `redis`) and wrapped in
 balanced columns, a shared job's namespace beside it. Every surface renders that block at its

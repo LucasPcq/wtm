@@ -1,7 +1,7 @@
 BINARY   := wtm
 BUILD_DIR := bin
 
-.PHONY: build test vet fmt lint arch dead dupl tidy docs release install clean
+.PHONY: build test vet fmt lint arch dead dead-strict dupl tidy docs release install clean
 
 build:
 	go build -o $(BUILD_DIR)/$(BINARY) .
@@ -31,6 +31,12 @@ arch:
 dead:
 	@go tool deadcode -test ./... | grep -v -E -f .deadcode-ignore > /tmp/wtm-deadcode || true
 	@test ! -s /tmp/wtm-deadcode || { echo "unreachable code:"; cat /tmp/wtm-deadcode; exit 1; }
+
+# dead-strict is dead without -test: what only a test still calls. Informative,
+# not part of lint — a helper built for tests (testutil/, processtest/) lives
+# there by design, so those packages are left out of the report.
+dead-strict:
+	@go tool deadcode ./... | grep -v -E -f .deadcode-ignore | grep -v -E '/(testutil|processtest)/' || true
 
 lint: fmt vet arch dead
 	go tool staticcheck ./...

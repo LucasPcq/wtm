@@ -1164,7 +1164,6 @@ const (
 	// The .env port report. Unlike a compose mapping, a declared port only
 	// isolates the job if its command actually reads the variable — which wtm
 	// does not know and does not guess, so the notice asks.
-	EnvPortDetectedLineFmt  = "%s · %s=%d (%s)"
 	PortIsolationTitle      = "These jobs will bind the same port in every worktree"
 	PortIsolationLineFmt    = "%s   %s"
 	PortIsolationNoPort     = "no port declared"
@@ -2478,11 +2477,8 @@ const (
 	RunStreamWorktreeFmt  = "%s · %s"
 	RunStreamWorktreesFmt = "%d worktrees"
 	RunStreamStartedFmt   = "%s started"
-	// RunPortsSuffixFmt qualifies a name with the ports behind it — the line
-	// announcing a started job, and the recap of what a job gained.
-	// RunPortEntryFmt is one of those ports.
-	RunPortsSuffixFmt = "%s · %s"
-	RunPortEntryFmt   = "%s=%d"
+	// RunPortEntryFmt is one port of a job, in the NAME=PORT form ParsePorts reads.
+	RunPortEntryFmt = "%s=%d"
 	// HyperlinkFmt wraps text in an OSC-8 sequence, the escape a terminal turns
 	// into a clickable link: URL first, then the text it stands behind.
 	HyperlinkFmt = "\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\"
