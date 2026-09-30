@@ -211,27 +211,26 @@ Before marking any task done, invoke the `build-validator` subagent.
 The real pattern used in this project — no dependency injection, uses helper functions:
 
 ```go
-// internal/commands/start.go
-func newRunStartCmd() *cobra.Command {
+// internal/commands/wt/list.go
+func newListCmd() *cobra.Command {
   cmd := &cobra.Command{
-    Use:   domain.CmdStart + " <job>",
-    Short: "Start a single job",
-    Args:  cobra.ExactArgs(1),
-    RunE:  runStart,
+    Use:   domain.CmdList,
+    Short: "List all worktrees",
+    RunE:  runList,
   }
   shared.AddOutputFlag(cmd)
   return cmd
 }
 
-func runStart(cmd *cobra.Command, args []string) error {
+func runList(cmd *cobra.Command, _ []string) error {
   dir, err := os.Getwd()
   if err != nil {
     return fmt.Errorf("get working directory: %w", err)
   }
 
-  result, ok := loadConfig(cmd, dir)
-  if !ok {
-    return nil
+  result, err := shared.LoadConfig(cmd, dir)
+  if err != nil {
+    return err
   }
 
   // ... delegate to service, format output
@@ -242,7 +241,8 @@ Key conventions:
 - `Use:` always uses `domain.CmdXxx` constants (+ literal arg placeholders)
 - `shared.AddOutputFlag(cmd)` instead of duplicating the output flag registration
 - `shared.LoadConfig(cmd, dir)` resolves the main worktree path **and** the state dir, then loads `<state-dir>/config.toml`. Returns `ConfigResult{Config, ProjectDir, StateDir}`.
-- Unexported constructor (`newRunStartCmd`), registered by the parent group
+- Unexported constructor (`newListCmd`), registered by the parent group
+- A `run` command opens its context with `runctx.Open(runctx.OpenParams{Cmd: cmd})` instead (config, run.toml, the opt-in guard and the interactive gate in one call), then hands `ctx.FlowContext()` to its flow — see `internal/commands/run/start.go`
 
 ### Mutation command — build a Request, call the flow
 
@@ -353,13 +353,13 @@ Two env-var overrides exist for tests / CI:
 
 ### Adding a new command
 
-1. Create `internal/commands/<name>.go` with unexported constructor
+1. Create `internal/commands/<group>/<name>.go` with unexported constructor
 2. Use `domain.CmdXxx` for the `Use:` field (add constant if new)
 3. Register in the parent group's `NewXxxCmd()` function
 4. Set the command's `GroupID` to the right root `--help` section
    (`domain.CmdGroup*` — Worktrees / Navigate / Stack / Jobs / GitHub / Setup). An
    unset `GroupID` renders under a stray "Additional Commands" heading.
-5. **Read-only command** → follow the `runStart` pattern: getwd → loadConfig → delegate
+5. **Read-only command** → follow the `runList` pattern: getwd → `shared.LoadConfig` → delegate
    to `service/` → format via `output/`.
    **Mutation command** (creates/removes/moves/rewrites worktree state) → it goes
    through `flow/`: declare `Request`/`Outcome`/`Presenter`/`Params`/`Run` in
