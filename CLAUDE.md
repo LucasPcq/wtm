@@ -110,8 +110,9 @@ Documenting a pattern or an architecture belongs in `docs/` or in this file, not
 cmd/                          ← entry points, cobra setup only
 internal/
   commands/                   ← flag wiring, delegates to flow/service (zero business logic)
-    run/crud/                 ←   the preamble `run job` and `run profile` share: config,
-                                  run.toml, the opt-in guard, and the two seams
+    run/runctx/               ←   what every `run` command opens on: its directory, the config,
+                                  run.toml, the opt-in guard and the prompt gate
+    daemon/                   ←   the hidden `daemon` command and the macOS port-80 relay launchd runs
     ui/                       ←   `wtm ui`: refuses JSON and a missing TTY, then hands off to tui/dashboard
   domain/                     ← types, errors, constants only (no methods, no functions)
   rules/                      ← pure functions (stdlib + domain only, no I/O)
@@ -132,6 +133,7 @@ internal/
     prune/                    ←   `wtm prune`: the run (prune.go) + its questions (steps.go)
     teardown/                 ←   the per-worktree removal clean and prune share: stop, hooks, remove, then drop
     sync/                     ←   `wtm sync`: the run (sync.go) + its questions (steps.go)
+    fastforward/              ←   `wtm fast-forward`: the run + its questions
     runlogs/                  ←   the jobs a surface shows (`Board`), their live streams,
                                   and the profile start sequence (reports events, not steps)
     run/                      ←   the `run` module's flows, mirroring its command tree:
@@ -142,6 +144,9 @@ internal/
                                     port prober, and the start sequence a surface drives
       foreigndata/            ←     the stop before a job whose `touches` reach data the
                                     worktree does not own, shared by `up` and `start`
+      owed/                   ←     paying the namespace drops a clean deferred, whenever a run
+                                    finds their shared service up
+      addressing/             ←     `run addressing`: switch the mode, settle the worktrees' .env
       concurrency/            ←     the question about the other worktrees' jobs (load or
                                     port clash, `--exclusive`/`--parallel`), shared by `up` and `start`
       up/ down/ start/        ←     one package per command, as everywhere else
@@ -154,13 +159,23 @@ internal/
   service/                    ← impure orchestration only (git exec, I/O, hooks):
     worktree/                 ←   git worktree operations (create, list, remove)
     env/                      ←   .env provisioning (create) + drift reconciliation (`wtm env`, sync.go)
-    hooks/                    ←   on_create hook execution
+    hooks/                    ←   on_create / on_clean hook execution (a /bin/sh line each)
     shell/                    ←   shell integration generation (zsh, bash, fish)
     integration/              ←   third-party adapters: handing a URL to the desktop's
                                   own opener (editor/agent detection lives in detect/)
     proxy/                    ←   the run proxy: the host→job routing table and the
                                   loopback server the daemon owns (`[proxy]`)
     detect/                   ←   auto-detection (base branch, env files, package manager)
+    branch/                   ←   branch candidates for the pickers (local + origin, divergence)
+    github/                   ←   pull requests through the `gh` CLI
+    selfupdate/               ←   how wtm was installed, and `wtm upgrade`
+    process/                  ←   the run daemon: jobs on PTYs, the durable index (jobs.json),
+                                  reaping orphans, the client the commands talk through
+    runconfig/                ←   load + validate + write run.toml (and its schema)
+    runjobs/                  ←   the daemon's jobs as a surface reads them (the dashboard too)
+    compose/                  ←   a compose file's `ports:` and absolute names, read and rewritten
+    portprobe/                ←   is anything listening on a port
+    shellcmd/                 ←   checks that a config command is a valid /bin/sh line
   output/                     ← format and print results (zero decision logic)
   styles/                     ← all Lipgloss styles (only package allowed to instantiate lipgloss.Style)
   tui/                        ← Bubbletea models (zero business logic, rendering only)
@@ -209,7 +224,7 @@ Steps are declared as `flow.Step` values (`Kind`, `Key`, `Label`, `Options`, `Sk
 
 **`flow.Operation`** (`Kind`, `Mode`, `TargetKey`) is what a flow declares about *how it is scheduled*, for a surface that runs several at once. `Mode` says how long it holds that surface — `ModeBlocking` (`clean`) keeps it until the run ends, `ModeBackground` (`create`) gives it back and locks its target instead — and `TargetKey` names the answer carrying the worktree it locks, known only once that step is answered. The CLI ignores it (one run, one terminal); `internal/tui/dashboard/ops.go` is where it is enforced, once, rather than at every action site.
 
-Adding a kind means teaching every surface to render it: `flowui` refuses an unknown kind rather than guessing. Test doubles for the two seams live in `internal/testutil/flowtest`. `create`, `clean`, `reparent`, `prune`, `sync` and the whole `run` module are migrated — `up`, `down`, `start`, `stop`, `logs`, `list`, `open`, `url`, `init` and the eight `run job` / `run profile` commands (`ps` asks nothing, so it is not a flow). **Four mutation commands are still out: `extract` (LUC-182), `checkout`, `relocate` and `env`**, each driving its service straight from its runner. They are listed in `.archlint-migrating`, which reports them on every `make lint` and may only shrink — `tui/newwt` stays until `extract` follows.
+Adding a kind means teaching every surface to render it: `flowui` refuses an unknown kind rather than guessing. Test doubles for the two seams live in `internal/testutil/flowtest`. `create`, `clean`, `reparent`, `prune`, `sync`, `fast-forward` and the whole `run` module are migrated — `up`, `down`, `start`, `stop`, `logs`, `list`, `open`, `url`, `init`, `addressing` and the eight `run job` / `run profile` commands (`ps` asks nothing, so it is not a flow). **Four mutation commands are still out: `extract` (LUC-182), `checkout`, `relocate` and `env`**, each driving its service straight from its runner. They are listed in `.archlint-migrating`, which reports them on every `make lint` and may only shrink — `tui/newwt` stays until `extract` follows.
 
 A **non-mutating mode** (`prune --dry-run`) belongs in the `Request`, not in the runner: it changes what the run does, not how it reads. The flow returns its `Outcome` before asking anything and before touching anything, and any rule that reads `Interactive()` must take the mode as an input too — a surface may install an interactive Prompter for a preview. See `rules.PruneClassifyForce` and `docs/dev/flow-layer.md`.
 
@@ -221,7 +236,7 @@ Omitting the positional resolves in one of two ways, and which one is not a matt
 
 Whatever answers, a resolved worktree is always **the worktree root as git spells it** (`infra.Toplevel`), never a raw `os.Getwd()`. The daemon keys a job on `name + WorkDir` by string equality *and* runs it there, resolving `run.toml`'s `cwd` against it: a subdirectory, or macOS's `/var` where git says `/private/var`, splits one worktree into two keys and mis-resolves every relative `cwd`.
 
-**Mutation commands — bypass flags (two orthogonal axes):** every worktree-mutating command (`create`, `clean`, `sync`, `prune`, `relocate`, `reparent`, `extract`, `checkout`, `env`) exposes bypass on two independent axes. This is the standardized model (aligned with `gcloud --quiet`, `terraform -input=false`, `apt -y` vs `--force-yes`, and [clig.dev](https://clig.dev)); every new or refactored mutation command MUST follow it.
+**Mutation commands — bypass flags (two orthogonal axes):** every worktree-mutating command (`create`, `clean`, `sync`, `fast-forward`, `prune`, `relocate`, `reparent`, `extract`, `checkout`, `env`) exposes bypass on two independent axes. This is the standardized model (aligned with `gcloud --quiet`, `terraform -input=false`, `apt -y` vs `--force-yes`, and [clig.dev](https://clig.dev)); every new or refactored mutation command MUST follow it.
 - **`--yes` / `-y` = the confirmation/decision axis — runs fully unattended, zero prompts.** Every input resolves in one of three ways, no interaction:
   1. **Decision / confirmation** (recap, reparent, push, on-conflict, fast-forward) → its flag value, else a documented **safe default** (never destructive: `sync --yes` does not push — use `--push`; `extract --yes` aborts on conflict; `clean`/`prune --yes` leave orphans unless `--reparent-children`).
   2. **Required selection with no safe default** (which files for `extract`, which worktrees for `sync`, source/branch args) → its flag/arg, else **error naming the missing flag**. Never fall back to an interactive picker under `--yes`.
