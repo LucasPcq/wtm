@@ -59,7 +59,9 @@ func TestRunInitGolden(t *testing.T) {
 func runInitGolden(t *testing.T, tc initGoldenCase) string {
 	t.Helper()
 	shortHome(t)
+	pinRedirection(t, domain.ProxyStatus{Supported: true})
 	dir := gittest.InitRepo(t)
+	pinComposePlugin(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
 	t.Setenv(domain.EnvProjectDir, dir)
 	t.Setenv(domain.EnvStateDir, stateDir)
@@ -353,3 +355,23 @@ name = "shop"
 jobs = ["shop-api-dev", "tunnel"]
 default = true
 `
+
+// pinRedirection fixes what the platform answers about the port-80 redirection,
+// which differs between macOS and the Linux CI.
+func pinRedirection(t *testing.T, status domain.ProxyStatus) {
+	t.Helper()
+	previous := inspectRedirection
+	t.Cleanup(func() { inspectRedirection = previous })
+	inspectRedirection = func() domain.ProxyStatus { return status }
+}
+
+// pinComposePlugin puts a docker answering `compose version` first on PATH, so
+// detection writes "docker compose" whatever the machine has installed.
+func pinComposePlugin(t *testing.T) {
+	t.Helper()
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, domain.DockerBin), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+}

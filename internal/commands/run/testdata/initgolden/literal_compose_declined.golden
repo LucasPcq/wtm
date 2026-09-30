@@ -45,8 +45,8 @@
 [[job]]
   name = "docker-compose"
   kind = "service"
-  cmd = "docker-compose -f docker-compose.yml up -d"
-  stop = "docker-compose -f docker-compose.yml down --remove-orphans"
+  cmd = "docker compose -f docker-compose.yml up -d"
+  stop = "docker compose -f docker-compose.yml down --remove-orphans"
   cwd = "."
 
 [[job]]

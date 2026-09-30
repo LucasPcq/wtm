@@ -34,7 +34,8 @@ type Daemon struct {
 }
 
 // Serve moves HOME to a directory short enough for the socket — macOS puts it
-// under Library/Application Support — and answers there with jobs.
+// under Library/Application Support — and answers there with jobs. Linux reads
+// XDG_CONFIG_HOME first, which CI runners set, so it moves too.
 func Serve(t *testing.T, jobs []domain.JobInfo) *Daemon {
 	t.Helper()
 	home, err := os.MkdirTemp("/tmp", "wtm")
@@ -43,6 +44,7 @@ func Serve(t *testing.T, jobs []domain.JobInfo) *Daemon {
 	}
 	t.Cleanup(func() { os.RemoveAll(home) })
 	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	socket := process.SocketPath()
 	if err := os.MkdirAll(filepath.Dir(socket), 0o755); err != nil {
 		t.Fatal(err)

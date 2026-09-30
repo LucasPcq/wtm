@@ -15,7 +15,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/service/compose"
 	"github.com/LucasPcq/wtm/internal/service/detect"
 	envsvc "github.com/LucasPcq/wtm/internal/service/env"
-	"github.com/LucasPcq/wtm/internal/service/proxy"
 	"github.com/LucasPcq/wtm/internal/service/runconfig"
 )
 
@@ -23,6 +22,9 @@ type Request struct {
 	PatchCompose  bool
 	LinkEnv       bool
 	WritePortKeys bool
+	// Redirection is the port-80 redirection as the surface found it: whether
+	// this platform has one, and whether it is installed.
+	Redirection domain.ProxyStatus
 }
 
 type Presenter interface {
@@ -297,6 +299,7 @@ func Run(params Params) (Outcome, error) {
 
 	result := Outcome{Report: report(reportParams{
 		Context:     ctx,
+		Redirection: params.Request.Redirection,
 		Detection:   detection,
 		Answers:     answers,
 		Outcome:     outcome,
@@ -415,6 +418,7 @@ type reportParams struct {
 	NamePlan    rules.ComposeNamePlan
 	Links       []domain.EnvPortLink
 	PortKeys    []domain.PortKeyWrite
+	Redirection domain.ProxyStatus
 }
 
 func report(params reportParams) Report {
@@ -462,7 +466,7 @@ func report(params reportParams) Report {
 		}), proxyPort),
 		ProxyInstallLines: rules.ProxyInstallHintLines(rules.ProxyInstallHintParams{
 			Config:     cfg,
-			Status:     proxy.NewRedirector(proxy.RedirectorParams{}).Inspect(),
+			Status:     params.Redirection,
 			ExampleURL: fmt.Sprintf(domain.ProxyURLFmt, domain.ProxyHostShape, proxyPort),
 		}),
 	}

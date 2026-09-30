@@ -2,6 +2,7 @@ package run
 
 import (
 	"fmt"
+	"github.com/LucasPcq/wtm/internal/service/proxy"
 	"io"
 	"os"
 
@@ -91,7 +92,7 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 
 	outcome, err := initrun.Run(initrun.Params{
 		Context:   shared.FlowContext(res),
-		Request:   initrun.Request{PatchCompose: patchCompose, LinkEnv: linkEnv, WritePortKeys: writePortKeys},
+		Request:   initrun.Request{PatchCompose: patchCompose, LinkEnv: linkEnv, WritePortKeys: writePortKeys, Redirection: inspectRedirection()},
 		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive}),
 		Wizard:    servicesWizard{},
 		Presenter: initPresenter{CLIPresenter: shared.NewPresenter(cmd, format), animate: shared.Animate(cmd, interactive)},
@@ -103,6 +104,12 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 		return domain.ErrAborted
 	}
 	return nil
+}
+
+// inspectRedirection is a seam: what a run reports about the redirection
+// depends on the platform, and a test pins it.
+var inspectRedirection = func() domain.ProxyStatus {
+	return proxy.NewRedirector(proxy.RedirectorParams{}).Inspect()
 }
 
 type servicesWizard struct{}
