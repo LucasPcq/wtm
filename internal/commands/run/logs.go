@@ -74,7 +74,7 @@ type logsPresenter struct {
 
 func (p logsPresenter) Show(show logsflow.ShowParams) error {
 	params := jobLinesParams{Cmd: p.Cmd, Board: show.Board, Job: show.Job, Worktrees: show.Worktrees}
-	switch rules.DecideRunSurface(rules.RunSurfaceParams{TTY: isTTY(), Format: p.Format}) {
+	switch rules.DecideRunSurface(rules.RunSurfaceParams{TTY: runctx.IsTTY(), Format: p.Format}) {
 	case domain.RunSurfaceView:
 		// `run logs` starts nothing, so the view has no outcome to conclude from:
 		// it only ever reports what was already running.

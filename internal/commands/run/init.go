@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
+	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -95,7 +95,7 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 	patchCompose, _ := cmd.Flags().GetBool(domain.FlagPatchCompose)
 	linkEnv, _ := cmd.Flags().GetBool(domain.FlagLinkEnv)
 	writePortKeys, _ := cmd.Flags().GetBool(domain.FlagWritePortKeys)
-	interactive := shared.Interactive(shared.UnattendedParams{TTY: term.IsTerminal(int(os.Stdin.Fd())), Format: format, Yes: yes})
+	interactive := shared.Interactive(shared.UnattendedParams{TTY: runctx.IsTTY(), Format: format, Yes: yes})
 
 	var detection domain.InitDetectionResult
 	var envScans map[string]domain.EnvPortScan

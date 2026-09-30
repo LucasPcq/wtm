@@ -91,14 +91,19 @@ func IsolationFlag(cmd *cobra.Command) (domain.Isolation, error) {
 // worktree is the positional subject there, as everywhere else in the CLI, so
 // the job or profile is named by a flag the way --to and --from are.
 func AddJobFlag(cmd *cobra.Command, usage string) {
-	cmd.Flags().String(domain.FlagJob, "", usage)
+	AddSingleFlag(cmd, domain.FlagJob, usage)
 }
 
 func AddProfileFlag(cmd *cobra.Command, usage string) {
-	cmd.Flags().Var(&singleValue{}, domain.FlagProfile, usage)
+	AddSingleFlag(cmd, domain.FlagProfile, usage)
 }
 
-// singleValue is a string flag that refuses to be given twice.
+// AddSingleFlag is a string flag that refuses to be given twice, where pflag
+// would keep the last value and act on it without a word.
+func AddSingleFlag(cmd *cobra.Command, name, usage string) {
+	cmd.Flags().Var(&singleValue{}, name, usage)
+}
+
 type singleValue struct {
 	value string
 	set   bool

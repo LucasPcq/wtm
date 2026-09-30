@@ -13,8 +13,8 @@ import (
 func newStopCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   domain.CmdStop + " [worktree...]",
-		Short: "Stop a single job",
-		Long:  "Stop one running job of [worktree] — the current one when omitted, picked interactively when there is a terminal.\nThe job is named with --job; without it, a fully interactive run offers a picker.",
+		Short: "Stop one job, in one or more worktrees",
+		Long:  "Stop one running job in each [worktree] — the current one when omitted, picked interactively when there is a terminal.\nThe job is named with --job; without it, a fully interactive run offers a picker.",
 		Args:  cobra.ArbitraryArgs,
 		RunE:  runStop,
 	}

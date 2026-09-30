@@ -229,12 +229,12 @@ var (
 
 	// ErrJobAmbiguous is returned when several jobs publish a URL and the caller
 	// named none — a picker needs a fully interactive run, so the flag is the answer.
-	ErrJobAmbiguous = errors.New("several jobs publish a URL: name one")
+	ErrJobAmbiguous = errors.New("several jobs publish a URL: name one with --" + FlagJob)
 
-	// ErrJobRequired is returned when `run start` / `run stop` cannot resolve
-	// which job to act on: a required selection with no safe default, so it names
-	// the flag rather than falling back to a picker.
-	ErrJobRequired = errors.New("specify --job (no interactive picker without a terminal or in --output json mode)")
+	// ErrJobRequired is the one refusal for a job nobody named and nobody can be
+	// asked for: a required selection with no safe default names the flag rather
+	// than falling back to a picker.
+	ErrJobRequired = errors.New("the job is required and cannot be asked in this mode: pass --" + FlagJob)
 
 	// ErrProfileRequired is `run up` over several profiles, none marked default,
 	// with nobody to ask: starting the first declared was a guess nobody saw.

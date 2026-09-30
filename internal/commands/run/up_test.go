@@ -190,3 +190,22 @@ func TestASecondProfileIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// Every single-valued job or profile flag of the module refuses a repeat: pflag
+// would otherwise keep the last one and act on it without a word.
+func TestASecondJobOrProfileIsRefused(t *testing.T) {
+	for _, args := range [][]string{
+		{domain.CmdStart, "--" + domain.FlagJob, "api", "--" + domain.FlagJob, "web"},
+		{domain.CmdStop, "--" + domain.FlagJob, "api", "--" + domain.FlagJob, "web"},
+		{domain.CmdOpen, "--" + domain.FlagJob, "api", "--" + domain.FlagJob, "web"},
+		{domain.CmdURL, "--" + domain.FlagJob, "api", "--" + domain.FlagJob, "web"},
+		{domain.CmdLogs, "--" + domain.FlagJob, "api", "--" + domain.FlagJob, "web"},
+		{domain.CmdExport, "--" + domain.FlagProfile, "front", "--" + domain.FlagProfile, "back"},
+		{domain.CmdProfile, domain.CmdEdit, "front", "--" + domain.FlagName, "a", "--" + domain.FlagName, "b"},
+	} {
+		_, _, err := runCmd(t, args...)
+		if err == nil || !strings.Contains(err.Error(), "it takes one value") {
+			t.Errorf("%v: err = %v, want the repeat refused", args, err)
+		}
+	}
+}

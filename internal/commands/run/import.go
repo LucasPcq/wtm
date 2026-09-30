@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -72,7 +73,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	// Replacing run.toml is destructive, so it is never the default of a run that
 	// cannot be asked — a piped payload included, where stdin carries the config
 	// and there is nothing left to prompt on.
-	interactive := shared.Interactive(shared.UnattendedParams{TTY: isTTY(), Format: format, Yes: yes}) &&
+	interactive := shared.Interactive(shared.UnattendedParams{TTY: runctx.IsTTY(), Format: format, Yes: yes}) &&
 		!readsStdin(args)
 	if !interactive && !yes {
 		return fmt.Errorf(domain.ImportNeedsYesFmt, domain.FlagYes)

@@ -83,6 +83,10 @@ func TestRunURLNamesTheJobWhenAmbiguous(t *testing.T) {
 	if !errors.Is(err, domain.ErrJobAmbiguous) {
 		t.Fatalf("err = %v, want ErrJobAmbiguous — a machine surface never falls back to a picker", err)
 	}
+	// The help promises an error naming --job: the refusal has to say how to answer it.
+	if !strings.Contains(err.Error(), "--"+domain.FlagJob) {
+		t.Errorf("err = %q, want it to name --%s", err, domain.FlagJob)
+	}
 }
 
 func TestRunURLNamedJobWins(t *testing.T) {

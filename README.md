@@ -188,7 +188,7 @@ no longer touches services). Until then, run commands stop with a hint pointing 
 |---|---|
 | [`run init`](docs/wtm_run_init.md) | Set up run.toml (detect docker-compose + scripts, pre-fill ports, publish URLs, write and link .env keys) |
 | [`run up`](docs/wtm_run_up.md) / [`down`](docs/wtm_run_down.md) | Start / stop a profile's jobs on one or more worktrees (`up` attaches, `-d` detaches) |
-| [`run start`](docs/wtm_run_start.md) / [`stop`](docs/wtm_run_stop.md) | Start / stop a single job (`start` attaches, `-d` detaches) |
+| [`run start`](docs/wtm_run_start.md) / [`stop`](docs/wtm_run_stop.md) | Start one job / stop one job, in one or more worktrees (`start` attaches, `-d` detaches) |
 | [`run ps`](docs/wtm_run_ps.md) / [`list`](docs/wtm_run_list.md) | Running jobs, every repository / declared jobs + profiles |
 | [`run logs`](docs/wtm_run_logs.md) | Reopen the run view on one or more worktrees' jobs |
 | [`run url`](docs/wtm_run_url.md) / [`open`](docs/wtm_run_open.md) | Print / open where a job answers in this worktree |
@@ -342,9 +342,10 @@ independent of the others. The first time `wtm run up` finds another worktree's 
 running it asks what to do about the machine's load, and can write the answer as
 `concurrency = "parallel" | "exclusive"` at the top of the file so it never asks again.
 `--parallel` and `--exclusive` override it for a single run; `--exclusive` is refused on
-several worktrees, since it stops all but one. A worktree that shares its ports with one
+several worktrees, since it stops all but one. `wtm run start` asks the same question and
+takes the same two flags. A worktree that shares its ports with one
 already running — a verbatim worktree and its source — is not a question of load: `run up`
-offers to stop the other one or not to start, and refuses under `--yes` unless
+and `run start` offer to stop the other one or not to start, and refuse under `--yes` unless
 `--exclusive` was given.
 
 ```toml
@@ -663,7 +664,7 @@ ports genuinely need more room than 10.
 `run up` and `run start` **attach**: a full-screen view opens with one pane per job, and
 `wtm run logs` reopens it later. Leaving the view (`q`, or Ctrl+C outside focus mode)
 detaches — the daemon keeps the jobs running. `-d` starts them and hands the prompt back
-instead. Without a terminal, or under `--output json`, no view opens: the run reports
+instead. Unless both stdin and stdout are a terminal (`wtm run up > run.log` included), or under `--output json`, no view opens: the run reports
 itself as lines, which is what a script or an agent gets. Each job's output is also
 journaled to `<git-common-dir>/wtm/logs/<url-escaped-branch>/<url-escaped-job>.log`
 (5 MB x 3 within one run), and `run logs` reads that back for a job that is no longer

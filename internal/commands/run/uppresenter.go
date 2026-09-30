@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow/run/seam"
@@ -23,7 +24,7 @@ type upPresenter struct {
 }
 
 func (p upPresenter) Sequence(params seam.SequenceParams) (runlogs.Outcomes, error) {
-	switch rules.DecideRunSurface(rules.RunSurfaceParams{Detach: p.detach, TTY: isTTY(), Format: p.Format}) {
+	switch rules.DecideRunSurface(rules.RunSurfaceParams{Detach: p.detach, TTY: runctx.IsTTY(), Format: p.Format}) {
 	case domain.RunSurfaceView:
 		return showRunView(viewParams{
 			Cmd:        p.Cmd,
@@ -32,7 +33,7 @@ func (p upPresenter) Sequence(params seam.SequenceParams) (runlogs.Outcomes, err
 			Worktrees:  params.Worktrees,
 			Warnings:   params.Warnings,
 			Start:      params.Start,
-			Hyperlinks: p.Human && isTTY(),
+			Hyperlinks: p.Human && runctx.IsTTY(),
 		})
 	case domain.RunSurfaceMachine:
 		return runForMachine(streamParams{Cmd: p.Cmd, Start: params.Start})
@@ -43,7 +44,7 @@ func (p upPresenter) Sequence(params seam.SequenceParams) (runlogs.Outcomes, err
 			Worktrees:  params.Worktrees,
 			Warnings:   params.Warnings,
 			Start:      params.Start,
-			Hyperlinks: p.Human && isTTY(),
+			Hyperlinks: p.Human && runctx.IsTTY(),
 		})
 	}
 }
@@ -71,7 +72,7 @@ func (p startPresenter) Sequence(params seam.SequenceParams) (runlogs.Outcomes, 
 	surface := rules.DecideRunSurface(rules.RunSurfaceParams{
 		Inline: params.Inline,
 		Detach: p.detach,
-		TTY:    isTTY(),
+		TTY:    runctx.IsTTY(),
 		Format: p.Format,
 	})
 	switch surface {
@@ -79,14 +80,14 @@ func (p startPresenter) Sequence(params seam.SequenceParams) (runlogs.Outcomes, 
 		return showRunView(viewParams{
 			Cmd: p.Cmd, Board: params.Board, Job: params.Job,
 			Warnings: params.Warnings, Start: params.Start,
-			Hyperlinks: p.Human && isTTY(),
+			Hyperlinks: p.Human && runctx.IsTTY(),
 		})
 	case domain.RunSurfaceMachine:
 		return p.machine(params)
 	default:
 		return runOnStream(streamParams{
 			Cmd: p.Cmd, Start: params.Start,
-			Warnings: params.Warnings, Hyperlinks: p.Human && isTTY(),
+			Warnings: params.Warnings, Hyperlinks: p.Human && runctx.IsTTY(),
 		})
 	}
 }

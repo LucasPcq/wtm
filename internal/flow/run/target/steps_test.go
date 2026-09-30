@@ -96,11 +96,12 @@ func TestJobStepRefusesInsteadOfPickingWhenNobodyCanBeAsked(t *testing.T) {
 		Flag: domain.FlagJob,
 	})
 
-	if step.Resolve != nil {
-		t.Error("the job step resolves, so an unattended run would answer it silently")
+	_, err := flow.Unattended{}.Ask(flow.Session{Steps: []flow.Step{step}})
+	if !errors.Is(err, domain.ErrJobRequired) {
+		t.Fatalf("err = %v, want the one sentinel for a missing --job", err)
 	}
-	if step.Flag != domain.FlagJob {
-		t.Errorf("Flag = %q, want the step to name --%s when it refuses", step.Flag, domain.FlagJob)
+	if !strings.Contains(err.Error(), "--"+domain.FlagJob) {
+		t.Errorf("err = %q, want it to name --%s", err, domain.FlagJob)
 	}
 }
 

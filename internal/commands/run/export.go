@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
+	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -15,10 +16,11 @@ func newExportCmd() *cobra.Command {
 		Use:         domain.CmdExport,
 		Annotations: map[string]string{domain.AnnotationMachineOutput: domain.AnnotationOn},
 		Short:       "Export run.toml as JSON on stdout",
-		Long:        "Emit the current run config as JSON. Pipe to a file and use with wtm run import to share configurations.",
+		Long:        "Emit the current run config as JSON on stdout, whatever --output says: like run url, this is machine output and is never framed. Pipe to a file and use with wtm run import to share configurations.",
 		RunE:        runExport,
 	}
-	cmd.Flags().String(domain.FlagProfile, "", "Export only this profile and its jobs")
+	shared.AddProfileFlag(cmd, "Export only this profile and its jobs")
+	shared.AddOutputFlag(cmd)
 	return cmd
 }
 

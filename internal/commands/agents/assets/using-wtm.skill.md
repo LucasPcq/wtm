@@ -36,7 +36,7 @@ self-documenting:
    run `wtm ui` to "look at" the worktrees; run `wtm list --output json` (or `wtm tree`)
    instead, and pass **`-d`** (or `--output json`) to every `run up` / `run start`. Suggest
    `wtm ui` to the *user* when they want to browse worktrees themselves. wtm defends itself
-   here — no view ever opens under `--output json` or without a TTY — but don't rely on that.
+   here — no view ever opens under `--output json` or unless both stdin and stdout are a terminal (the `run` module prompts under the same condition) — but don't rely on that.
 3. **Always add `--output json`** on data commands. JSON goes to stdout; human text and
    warnings go to stderr — ignore stderr unless the exit code is non-zero. wtm may also
    print a one-line update notice there (at most once a day, never under `--output json`,
@@ -544,7 +544,8 @@ the global `wtm init` does not configure it.
   another repository's, though the daemon is shared — without a prompt, and its JSON
   holds one document per worktree it emptied.
   `run start [worktree] --job <name>` / `run stop [worktree] --job <name>` — one job.
-  `--job` is **required** on `start`/`stop` on your paths: without a terminal there is no
+  `--job` takes one value everywhere in the module (a second `--job` is a usage error, as is a
+  second `--profile` on `run export`); it is **required** on `start`/`stop` on your paths: without a terminal there is no
   picker to fall back on, and the command errors naming the flag. A failing job aborts the rest and exits non-zero, leaving started
   services up (fix and re-run). `run up` starts **every job the profile lists**, tasks
   included, in the listed order; with no profile declared at all it starts every declared
@@ -574,7 +575,7 @@ the global `wtm init` does not configure it.
   first. When a run writes `COMPOSE_PROJECT_NAME`, the report names it.
 - **Another worktree already running jobs is not a conflict — unless it holds your ports.**
   Isolated worktrees sit a block of ports apart, so stacks cohabit; the question is about
-  machine load, not about ports. `run up` asks about it once, and only on a terminal; on your paths (no TTY,
+  machine load, not about ports. `run up` and `run start` ask about it once, and only on a terminal; on your paths (no TTY,
   `--output json`, or `--yes`) it resolves to leaving the others running and stops nothing.
   Force either way for one run with `--exclusive` (stop them first) or `--parallel`; the two
   are mutually exclusive. A project can settle it for good with
@@ -723,7 +724,10 @@ the global `wtm init` does not configure it.
 - `run init` accepts `--yes` / `-y` (`--non-interactive` is gone) — the run module's
   own bootstrap, which writes run.toml and may rewrite compose files and .env.
 - `run url --job <name> --output json` returns **that job alone**, not the whole array.
-- `run export` / `run import` — share a layout as JSON. **`run import` replaces the whole
+  Several jobs publishing a URL and no `--job` is an error naming `--job` and the jobs
+  (`run open` the same on your paths); a worktree publishing one needs no `--job`.
+- `run export` / `run import` — share a layout as JSON. `run export` always writes the JSON
+  document, and accepts `--output json` like every data command. **`run import` replaces the whole
   `run.toml`**: jobs, profiles, `[[env_port]]` links and project settings alike, so what
   the file held is lost. **It always needs `--yes` on your paths**: without a terminal to
   confirm on — a piped payload included — it refuses rather than replacing silently, and
