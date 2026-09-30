@@ -340,12 +340,12 @@ const (
 	// is to detach: clean is the destructive command, and destroying a worktree
 	// without its data would leave an orphan behind on every iteration.
 	FlagKeepData     = "keep-data"
-	FlagKeepDataDesc = "keep the namespaces the removed worktrees carved out of shared services"
+	FlagKeepDataDesc = "Keep the namespaces the removed worktrees carved out of shared services"
 	// FlagDropData answers the data step ahead: every namespace is dropped now,
 	// starting the shared services that are down to do it. It is how an
 	// unattended run asks for what --yes will not do by default.
 	FlagDropData     = "drop-data"
-	FlagDropDataDesc = "drop the removed worktrees' data now, starting the shared services that are down to do it"
+	FlagDropDataDesc = "Drop the removed worktrees' data now, starting the shared services that are down to do it"
 
 	// The three name the namespace itself — app_feat_x, not feat-x — because it
 	// is what was destroyed, and the service it was destroyed in.
@@ -397,7 +397,7 @@ const (
 	// compose service.
 	ScopeStepName  = "Shared services"
 	ScopeStepTitle = "Which services run once for the whole repository?"
-	ScopeStepDesc  = "A shared service runs once instead of once per worktree — a postgres, a keycloak. Each worktree still gets its own data through a namespace. Space toggles, enter confirms."
+	ScopeStepDesc  = "A shared service runs once instead of once per worktree — a postgres, a keycloak. Its data is then every worktree's, unless it declares a namespace — each worktree's own database or realm, asked next. Space toggles, enter confirms."
 
 	// ScopeReasonBuild is why a service built here can never be shared: it
 	// serves this worktree's own source, whatever its name suggests.
@@ -591,7 +591,7 @@ const (
 	ProxyUnknownHostFmt  = "wtm: no job is published under %s\n\n"
 	ProxyKnownRoutesHead = "Routes wtm is currently serving:\n"
 	ProxyRouteLineFmt    = "  %s  ->  %s (job %s, worktree %s of %s)\n"
-	ProxyNoRoutesLine    = "  (none — start a job that declares a url)\n"
+	ProxyNoRoutesLine    = "  (none — start a job that publishes a named URL)\n"
 	ProxySilentTargetFmt = "wtm: job %s is published under %s but nothing answers on %s\n"
 	// ProxyBindFailedFmt is what the daemon records when the port is taken, and
 	// ProxyUnavailableFmt what a client says instead of a name nothing serves.
@@ -683,7 +683,7 @@ const (
 	// every published job at once.
 	ProxyHostShape         = "<job>.<worktree>.<repo>.localhost"
 	ProxyInstallHintTitle  = "Named URLs carry a port"
-	ProxyInstallHintFmt    = "Jobs publishing a url answer on %s"
+	ProxyInstallHintFmt    = "Jobs publishing a named URL answer on %s"
 	ProxyInstallHintCmd    = "`wtm run proxy install` serves them on port 80 so the port disappears from the URL"
 	ProxyInstallHintNoPlat = "Dropping that port is not implemented on this platform yet"
 
@@ -701,7 +701,7 @@ const (
 	// FlagKeepEnv withholds the .env pass of `run addressing`, as --keep-data
 	// withholds the namespace removal of a clean.
 	FlagKeepEnv     = "keep-env"
-	FlagKeepEnvDesc = "switch run.toml only, leaving the worktrees' .env files as they are"
+	FlagKeepEnvDesc = "Switch run.toml only, leaving the worktrees' .env files as they are"
 
 	AddressingInvalidFmt      = "unknown addressing %q: expected %q or %q"
 	AddressingSwitchedFmt     = "addressing: %s " + MoveArrowGlyph + " %s"
@@ -1123,7 +1123,7 @@ const (
 	RecapBindsNoPort   = "binds no port"
 	RecapTask          = "task"
 	RecapDefaultSuffix = "   (default)"
-	RecapURLSuffix     = "   (url)"
+	RecapURLSuffix     = "   (URL)"
 	RecapJobsTitle     = "Jobs"
 	// RecapRemovedTitle heads the jobs the unchecking drops. They are absent
 	// from every other section, so this is the only place they can be read
@@ -1944,24 +1944,24 @@ const (
 	RunJobScopeSharedOption    = "shared — one instance for the whole repository"
 	RunJobScopeSkipTask        = "a task has no instance to share"
 	RunJobNamespaceNameLabel   = "Namespace"
-	RunJobNamespaceNameTitle   = "What is each worktree's slice of this service called?"
+	RunJobNamespaceNameTitle   = "What is each worktree's namespace in this service called?"
 	RunJobNamespaceNameDesc    = "e.g. app_{worktree} — {worktree} and {ordinal} are filled in by wtm, and commands read the result as $WTM_NAMESPACE. Leave blank to share the service outright, data included."
 	RunJobNamespaceNameNone    = "(none — shared outright)"
 	RunJobNamespaceSkip        = "the service is not shared"
 	RunJobNamespaceSkipUnnamed = "no namespace"
 	RunJobNamespaceCreateLabel = "Create"
-	RunJobNamespaceCreateTitle = "Command carving the slice out"
-	RunJobNamespaceCreateDesc  = "A /bin/sh line or a script path, run on every start of the service — so it must be safe to run again: carve the slice out if it is absent, do nothing if it is there."
+	RunJobNamespaceCreateTitle = "Command creating the namespace"
+	RunJobNamespaceCreateDesc  = "A /bin/sh line or a script path, run on every start of the service — so it must be safe to run again: create the namespace if it is absent, do nothing if it is there."
 	RunJobNamespaceCreateEmpty = "a namespace needs a create command"
 	RunJobNamespaceRemoveLabel = "Remove"
-	RunJobNamespaceRemoveTitle = "Command dropping the slice"
-	RunJobNamespaceRemoveDesc  = "Optional. Run by wtm clean when the worktree goes — never by run stop or run down. Leave blank to keep the slice."
+	RunJobNamespaceRemoveTitle = "Command dropping the namespace"
+	RunJobNamespaceRemoveDesc  = "Optional. Run by wtm clean when the worktree goes — never by run stop or run down. Leave blank to keep the namespace."
 	RunJobNamespaceEnvLabel    = "Namespace env"
 	RunJobNamespaceEnvTitle    = "Extra variables for these commands"
 	RunJobNamespaceEnvDesc     = "Optional. KEY=VALUE, space-separated; {worktree} and {ordinal} are filled in."
 
 	RunJobURLHostOrphan = "--%s names the host but nothing is published — add --%s"
-	RunJobURLNoneFmt    = "job %q publishes no url — these do: %s"
+	RunJobURLNoneFmt    = "job %q publishes no URL — these do: %s"
 
 	RunJobUnknownScopeFmt      = "--%s %q is neither %s nor %s"
 	RunJobNamespaceEnvFmt      = "--%s %q is not KEY=VALUE"
@@ -3926,7 +3926,7 @@ const (
 	// when nothing starts it but the reader.
 	RunnerListStepName  = "Runners"
 	RunnerListStepTitle = "Which service starts the others?"
-	RunnerListStepDesc  = "A root script often starts several apps at once — `turbo run dev`, `pnpm -r dev`.\nSaying so here gives it their ports, and stops wtm from starting an app twice.\nLeave a row on — when nothing but you starts it."
+	RunnerListStepDesc  = "A root script often starts several apps at once — `turbo run dev`, `pnpm -r dev`.\nSaying so here gives it their ports, and stops wtm from starting an app twice.\nLeave a row on — (none) when nothing but you starts it."
 	RunnerListCwdSep    = "  "
 	RunnerListNone      = "—"
 	// RunnerListSep joins the runners of a row that holds more than one, which
@@ -3941,7 +3941,7 @@ const (
 	// service — and the reader confirms; nothing is written unasked.
 	TouchListStepName      = "Data tasks"
 	TouchListStepTitle     = "Which service's data does each task change?"
-	TouchListStepDesc      = "A migration, a reset or a seed changes a database. Saying which one lets `wtm run up` stop before running it against data the worktree does not own —\nits source's when the worktree is verbatim, every worktree's for a shared service with no namespace.\nLeave a row on — when the task changes no service's data."
+	TouchListStepDesc      = "A migration, a reset or a seed changes a database. Saying which one lets `wtm run up` stop before running it against data the worktree does not own —\nits source's when the worktree is verbatim, every worktree's for a shared service with no namespace.\nLeave a row on — (none) when the task changes no service's data."
 	TouchListSummaryFmt    = "%d of %d task(s) change a service's data"
 	SkipReasonNoTouchTasks = "no task, or no service holding data"
 	SkipReasonNoName       = "no job publishes a name, so nothing is addressed by one"
@@ -3954,7 +3954,7 @@ const (
 	// job and not otherwise.
 	AddressingStepName  = "Addressing"
 	AddressingStepTitle = "How should the .env files spell an address?"
-	AddressingStepDesc  = "This is what wtm writes into a value pointing at another job — an API url, a CORS origin.\n" +
+	AddressingStepDesc  = "This is what wtm writes into a value pointing at another job — an API URL, a CORS origin.\n" +
 		"It changes nothing about the ports your jobs bind.\n\n" +
 		"  Named URLs    each worktree gets its own hostname, so two of them stop sharing a cookie\n" +
 		"                jar and a CORS origin. They are served by wtm's proxy, which lives in the\n" +

@@ -17,7 +17,7 @@ wtm run open [worktree] [flags]
       --job string      Job whose URL to open (required when several jobs publish one, outside a fully interactive run)
       --output string   Output format: text or json (default "text")
       --raw             Open the port URL (http://localhost:<port>) instead of the named URL
-  -y, --yes             Skip the pickers; --job is then required when several jobs publish a url
+  -y, --yes             Skip the pickers; --job is then required when several jobs publish a URL
 ```
 
 ### Options inherited from parent commands

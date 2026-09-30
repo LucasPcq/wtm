@@ -20,7 +20,7 @@ func newAddCmd() *cobra.Command {
 			"required, and every other field falls back to its documented default.\n\n" +
 			"--runs, --touches and --binds-no-port declare how the job relates to the others;\n" +
 			"--scope shared and the --namespace-* flags declare a service run once for the\n" +
-			"whole repository and each worktree's slice of it. The file is refused exactly\n" +
+			"whole repository and each worktree's namespace in it. The file is refused exactly\n" +
 			"as loading it would refuse it: a namespace only on a shared service, with both a\n" +
 			"name and a create command; --runs and --touches naming declared jobs.\n\n" +
 			"--cmd and --stop are /bin/sh lines: quotes, && and ${VAR} behave as in a terminal,\n" +

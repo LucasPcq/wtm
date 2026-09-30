@@ -19,10 +19,10 @@ var addDeclarationHelp = declarationHelp{
 	Runs:            "Declared job this one starts itself, repeatable (a turbo or compose runner)",
 	Touches:         "Declared service whose data this job changes (a migration, a reset, a seed), repeatable",
 	BindsNoPort:     "This service listens on nothing by design, so stop offering it a port",
-	Scope:           "shared runs one instance for the whole repository; worktree (the default) one per worktree",
-	NamespaceName:   "Name of each worktree's slice of a shared service, e.g. app_{worktree}",
-	NamespaceCreate: "Command carving the slice out, run on every start of the shared service (must be safe to rerun)",
-	NamespaceRemove: "Command dropping the slice, run by wtm clean",
+	Scope:           "Where the job runs: shared (one instance for the whole repository) or worktree (the default, one per worktree)",
+	NamespaceName:   "Name of each worktree's namespace in a shared service, e.g. app_{worktree}",
+	NamespaceCreate: "Command creating the namespace, run on every start of the shared service (must be safe to rerun)",
+	NamespaceRemove: "Command dropping the namespace, run by wtm clean",
 	NamespaceEnv:    "Extra variable for the namespace commands as KEY=VALUE, repeatable ({worktree} and {ordinal} are filled in)",
 }
 
@@ -30,10 +30,10 @@ var editDeclarationHelp = declarationHelp{
 	Runs:            "Declared job this one starts itself, repeatable — replaces the list (pass '' to drop it)",
 	Touches:         "Declared service whose data this job changes (a migration, a reset, a seed), repeatable — replaces the list (pass '' to drop it)",
 	BindsNoPort:     "This service listens on nothing by design, so stop offering it a port (--binds-no-port=false to undo)",
-	Scope:           "shared runs one instance for the whole repository; worktree one per worktree",
-	NamespaceName:   "Name of each worktree's slice of a shared service (pass '' to withdraw the whole [job.namespace])",
-	NamespaceCreate: "Command carving the slice out, run on every start of the shared service (must be safe to rerun)",
-	NamespaceRemove: "Command dropping the slice, run by wtm clean (pass '' to drop it)",
+	Scope:           "Where the job runs: shared (one instance for the whole repository) or worktree (one per worktree)",
+	NamespaceName:   "Name of each worktree's namespace in a shared service (pass '' to withdraw the whole [job.namespace])",
+	NamespaceCreate: "Command creating the namespace, run on every start of the shared service (must be safe to rerun)",
+	NamespaceRemove: "Command dropping the namespace, run by wtm clean (pass '' to drop it)",
 	NamespaceEnv:    "Extra variable for the namespace commands as KEY=VALUE, repeatable — replaces the table (pass '' to drop it)",
 }
 

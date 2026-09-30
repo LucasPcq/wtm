@@ -44,7 +44,7 @@ func newEditCmd() *cobra.Command {
 	cmd.Flags().String(domain.FlagCwd, "", "Working directory relative to project root (pass '' to drop it)")
 	cmd.Flags().StringArray(domain.FlagPort, nil, "Base port as NAME=PORT, repeatable — merged into the declared ports")
 	cmd.Flags().Bool(domain.FlagPortClear, false, "Drop every port this job declares")
-	cmd.Flags().String(domain.FlagURLPort, "", "Publish this declared port under a name (pass '' to withdraw the url)")
+	cmd.Flags().String(domain.FlagURLPort, "", "Publish this declared port under a name (pass '' to withdraw the named URL)")
 	cmd.Flags().String(domain.FlagURLHost, "", "Host segment to publish under (pass '' to fall back to the job's name)")
 	addDeclarationFlags(cmd, editDeclarationHelp)
 	shared.AddYesFlag(cmd, "Skip all prompts; a field flag is then required")

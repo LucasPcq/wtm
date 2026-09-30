@@ -204,8 +204,10 @@ func (p initPresenter) Initialized(outcome initrun.Outcome) error {
 			output.Callout(w, drift.Text, drift.Lines)
 		}
 		output.Blank(w)
-		output.NextStep(w, output.NextStepParams{Command: domain.RunInitNextUp, Note: domain.RunInitNextUpNote})
-		output.NextStep(w, output.NextStepParams{Command: domain.RunInitNextJobAdd, Note: domain.RunInitNextJobAddNote})
+		output.NextSteps(w, []output.NextStepParams{
+			{Command: domain.RunInitNextUp, Note: domain.RunInitNextUpNote},
+			{Command: domain.RunInitNextJobAdd, Note: domain.RunInitNextJobAddNote},
+		})
 	})
 	return nil
 }

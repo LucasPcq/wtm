@@ -1,6 +1,8 @@
 package styles
 
 import (
+	"fmt"
+
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -32,6 +34,8 @@ type NextStepParams struct {
 	// Note glosses the command. It is chrome — an annotation, never content — so
 	// it is the one part of the line that is muted.
 	Note string
+	// Width pads the command so the notes of a group of hints share a column.
+	Width int
 }
 
 // NextStepLine composes the one forward-pointing line of a conclusion: the
@@ -48,6 +52,7 @@ func NextStepLine(params NextStepParams) string {
 func NextStepText(params NextStepParams) string {
 	line := Bold.Render(params.Command)
 	if params.Note != "" {
+		line = Bold.Render(fmt.Sprintf("%-*s", params.Width, params.Command))
 		line += Muted.Render(domain.NextStepNoteSeparator + params.Note)
 	}
 	return Primary.Render(domain.NextStepGlyph) + " " + line

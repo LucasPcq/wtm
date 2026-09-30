@@ -12,7 +12,7 @@ required, and every other field falls back to its documented default.
 
 --runs, --touches and --binds-no-port declare how the job relates to the others;
 --scope shared and the --namespace-* flags declare a service run once for the
-whole repository and each worktree's slice of it. The file is refused exactly
+whole repository and each worktree's namespace in it. The file is refused exactly
 as loading it would refuse it: a namespace only on a shared service, with both a
 name and a create command; --runs and --touches naming declared jobs.
 
@@ -31,14 +31,14 @@ wtm run job add [name] [flags]
       --cwd string                  Working directory (relative to project root)
   -h, --help                        help for add
       --kind string                 Job kind: service or task (default "service")
-      --namespace-create string     Command carving the slice out, run on every start of the shared service (must be safe to rerun)
+      --namespace-create string     Command creating the namespace, run on every start of the shared service (must be safe to rerun)
       --namespace-env stringArray   Extra variable for the namespace commands as KEY=VALUE, repeatable ({worktree} and {ordinal} are filled in)
-      --namespace-name string       Name of each worktree's slice of a shared service, e.g. app_{worktree}
-      --namespace-remove string     Command dropping the slice, run by wtm clean
+      --namespace-name string       Name of each worktree's namespace in a shared service, e.g. app_{worktree}
+      --namespace-remove string     Command dropping the namespace, run by wtm clean
       --output string               Output format: text or json (default "text")
       --port stringArray            Base port as NAME=PORT, repeatable (e.g. --port PORT=3000)
       --runs stringArray            Declared job this one starts itself, repeatable (a turbo or compose runner)
-      --scope string                shared runs one instance for the whole repository; worktree (the default) one per worktree
+      --scope string                Where the job runs: shared (one instance for the whole repository) or worktree (the default, one per worktree)
       --stop string                 Stop command, as a /bin/sh line (services only)
       --touches stringArray         Declared service whose data this job changes (a migration, a reset, a seed), repeatable
       --url-host string             Host segment to publish under, defaulting to the job's name

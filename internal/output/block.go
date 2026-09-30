@@ -202,6 +202,7 @@ type NextStepParams struct {
 	// command alone does not.
 	Command string
 	Note    string
+	Width   int
 }
 
 // NextStep prints the one forward-pointing line of a conclusion: "→ wtm go x".
@@ -216,7 +217,27 @@ func NextStep(w io.Writer, params NextStepParams) {
 // to has given the terminal back. Those used to hand-roll their own hint, which
 // is how "what to do next" ended up with five renderings.
 func NextStepLine(params NextStepParams) string {
-	return styles.NextStepLine(styles.NextStepParams{Command: params.Command, Note: params.Note})
+	return styles.NextStepLine(styles.NextStepParams{Command: params.Command, Note: params.Note, Width: params.Width})
+}
+
+// NextSteps prints a group of hints with their notes on one column.
+func NextSteps(w io.Writer, steps []NextStepParams) {
+	for _, step := range AlignNextSteps(steps) {
+		NextStep(w, step)
+	}
+}
+
+func AlignNextSteps(steps []NextStepParams) []NextStepParams {
+	width := 0
+	for _, step := range steps {
+		width = max(width, len(step.Command))
+	}
+	aligned := make([]NextStepParams, len(steps))
+	for i, step := range steps {
+		step.Width = width
+		aligned[i] = step
+	}
+	return aligned
 }
 
 // Section prints a bold title above indented free lines, with no frame — a
