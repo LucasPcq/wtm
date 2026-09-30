@@ -340,24 +340,24 @@ func recapStep(params WizardParams, prLabel, prBranch func(prev []components.Ste
 func buildCheckoutRecap(prev []components.Step, params WizardParams, prLabel, prBranch func(prev []components.Step) string) string {
 	var lines []string
 	if pr := prLabel(prev); pr != "" {
-		lines = append(lines, "PR:      "+pr)
+		lines = append(lines, domain.RecapFieldPR+pr)
 	}
 	if params.Target != nil {
 		if b := prBranch(prev); b != "" && params.Target(b).State == domain.BranchTargetExisting {
-			lines = append(lines, "Branch:  "+b+domain.BranchReusedSuffix)
+			lines = append(lines, domain.RecapFieldBranch+b+domain.BranchReusedSuffix)
 		}
 	}
 	source := resolveSource(prev, params.FromOverride, params.Preselected)
 	if source != "" {
-		lines = append(lines, "Parent:  "+source)
+		lines = append(lines, domain.RecapFieldParent+source)
 	}
 	env := resolveEnv(prev, params.EnvOverride)
 	envLabel := env
 	if envLabel == "" {
 		envLabel = domain.SummaryConfigDefault
 	}
-	lines = append(lines, "Env:     "+envLabel)
-	if params.IsolationApplies {
+	lines = append(lines, domain.RecapFieldEnv+envLabel)
+	if rules.IsolationRecapShown(rules.IsolationRecapShownParams{Applies: params.IsolationApplies, Override: params.IsolationOverride}) {
 		lines = append(lines, domain.RecapFieldIsolation+rules.IsolationSummary(resolveIsolation(prev, params)))
 	}
 

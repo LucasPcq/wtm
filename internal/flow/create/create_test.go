@@ -52,7 +52,7 @@ func TestRecapKeepsEveryLineWhateverAnsweredIt(t *testing.T) {
 		KeyEnv:    "example",
 	}))
 
-	for _, want := range []string{"Branch:  feat/x", "Source:  main", "Env:     example"} {
+	for _, want := range []string{"Branch:    feat/x", "Source:    main", "Env:       example"} {
 		if !strings.Contains(recap, want) {
 			t.Errorf("recap %q should contain %q", recap, want)
 		}
@@ -61,7 +61,7 @@ func TestRecapKeepsEveryLineWhateverAnsweredIt(t *testing.T) {
 
 func TestRecapNamesTheConfigDefaultEnv(t *testing.T) {
 	recap := newFlow(t, Request{}, nil).recap(answers(map[string]string{KeyBranch: "feat/x", KeySource: "main"}))
-	if !strings.Contains(recap, "Env:     config default") {
+	if !strings.Contains(recap, "Env:       config default") {
 		t.Errorf("recap %q should name the empty env choice", recap)
 	}
 }
@@ -73,10 +73,10 @@ func TestRecapCallsTheSourceAParentForAReusedBranch(t *testing.T) {
 		KeyEnv:    "example",
 	}))
 
-	if !strings.Contains(recap, "Parent:  main") {
+	if !strings.Contains(recap, "Parent:    main") {
 		t.Errorf("recap %q should label the source as the recorded parent", recap)
 	}
-	if strings.Contains(recap, "Source:  ") {
+	if strings.Contains(recap, "Source:    ") {
 		t.Errorf("recap %q must not present the parent as a start-point", recap)
 	}
 	if !strings.Contains(recap, domain.BranchReusedSuffix) {
@@ -95,7 +95,7 @@ func TestRecapPutsTheFastForwardOnItsSubject(t *testing.T) {
 	})
 
 	onSource := newFlow(t, Request{}, nil).recap(given)
-	if !strings.Contains(onSource, "Source:  main (fast-forward to origin)") {
+	if !strings.Contains(onSource, "Source:    main (fast-forward to origin)") {
 		t.Errorf("recap %q should annotate the source line", onSource)
 	}
 
@@ -103,7 +103,7 @@ func TestRecapPutsTheFastForwardOnItsSubject(t *testing.T) {
 	if !strings.Contains(onBranch, "fast-forward feat/x to origin") {
 		t.Errorf("recap %q should carry its own update line for the reused branch", onBranch)
 	}
-	if strings.Contains(onBranch, "Parent:  main (fast-forward") {
+	if strings.Contains(onBranch, "Parent:    main (fast-forward") {
 		t.Errorf("recap %q must not annotate the parent it does not move", onBranch)
 	}
 }
@@ -227,7 +227,7 @@ func TestRunAsksEveryQuestionThenCreates(t *testing.T) {
 	}
 
 	recap := prompter.Content[KeyRecap].Description
-	for _, line := range []string{"Branch:  feat/w", "Source:  main", "Env:     config default"} {
+	for _, line := range []string{"Branch:    feat/w", "Source:    main", "Env:       config default"} {
 		if !strings.Contains(recap, line) {
 			t.Errorf("recap %q should contain %q", recap, line)
 		}
@@ -262,7 +262,7 @@ func TestRunSkipsTheQuestionsTheRequestAnswers(t *testing.T) {
 		t.Errorf("asked %q, want the recap alone", prompter.AskedKeys())
 	}
 	recap := prompter.Content[KeyRecap].Description
-	for _, line := range []string{"Branch:  feat/flagged", "Source:  main", "Env:     example"} {
+	for _, line := range []string{"Branch:    feat/flagged", "Source:    main", "Env:       example"} {
 		if !strings.Contains(recap, line) {
 			t.Errorf("recap %q should still contain %q", recap, line)
 		}
@@ -444,7 +444,7 @@ func TestRecapNamesTheIsolation(t *testing.T) {
 	if got := domain.Isolation(values.Value(KeyIsolation)); got != domain.IsolationVerbatim {
 		t.Errorf("isolation = %q, want the flag's", got)
 	}
-	if recap := f.recap(values); !strings.Contains(recap, domain.IsolationSummaryVerbatim) {
+	if recap := f.recap(values); !strings.Contains(recap, "Isolation: "+domain.IsolationSummaryVerbatim) {
 		t.Errorf("recap = %q, want the isolation named", recap)
 	}
 

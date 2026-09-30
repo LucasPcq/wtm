@@ -244,7 +244,7 @@ func TestBuildCreateRecapKeepsEveryLineFromFlags(t *testing.T) {
 		EnvOverride: "example",
 	})
 
-	for _, want := range []string{"Branch:  feat/x", "Source:  main", "Env:     example"} {
+	for _, want := range []string{"Branch:    feat/x", "Source:    main", "Env:       example"} {
 		if !strings.Contains(recap, want) {
 			t.Errorf("recap %q should contain %q", recap, want)
 		}
@@ -255,7 +255,7 @@ func TestBuildCreateRecapKeepsEveryLineFromFlags(t *testing.T) {
 // rather than blank.
 func TestBuildCreateRecapLabelsConfigDefaultEnv(t *testing.T) {
 	recap := buildCreateRecap(nil, WizardParams{BranchName: "feat/x", Source: "main"})
-	if !strings.Contains(recap, "Env:     config default") {
+	if !strings.Contains(recap, "Env:       config default") {
 		t.Errorf("recap %q should label the empty env choice", recap)
 	}
 }
@@ -270,10 +270,10 @@ func TestBuildCreateRecapNamesParentForReusedBranch(t *testing.T) {
 		Target:      existingTarget("feat/x"),
 	})
 
-	if !strings.Contains(recap, "Parent:  main") {
+	if !strings.Contains(recap, "Parent:    main") {
 		t.Errorf("recap %q should label the source as the recorded parent", recap)
 	}
-	if strings.Contains(recap, "Source:  ") {
+	if strings.Contains(recap, "Source:    ") {
 		t.Errorf("recap %q must not present the parent as a start-point", recap)
 	}
 	if !strings.Contains(recap, domain.BranchReusedSuffix) {
@@ -304,7 +304,7 @@ func TestBuildCreateRecapFastForwardFollowsItsSubject(t *testing.T) {
 		EnvOverride:  "example",
 		SourceUpdate: ffOffer("main"),
 	})
-	if !strings.Contains(onSource, "Source:  main (fast-forward to origin)") {
+	if !strings.Contains(onSource, "Source:    main (fast-forward to origin)") {
 		t.Errorf("recap %q should annotate the source line", onSource)
 	}
 
@@ -318,7 +318,7 @@ func TestBuildCreateRecapFastForwardFollowsItsSubject(t *testing.T) {
 	if !strings.Contains(onBranch, "fast-forward feat/x to origin") {
 		t.Errorf("recap %q should carry its own update line for the reused branch", onBranch)
 	}
-	if strings.Contains(onBranch, "Parent:  main (fast-forward") {
+	if strings.Contains(onBranch, "Parent:    main (fast-forward") {
 		t.Errorf("recap %q must not annotate the parent it does not move", onBranch)
 	}
 }

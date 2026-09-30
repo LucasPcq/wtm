@@ -97,3 +97,12 @@ func TestIsolationIgnoredWarningOnlyWhenTheFlagWasOverruled(t *testing.T) {
 		}
 	}
 }
+
+func TestIsolationRecapShownWhenAskedOrFlagged(t *testing.T) {
+	if IsolationRecapShown(IsolationRecapShownParams{}) {
+		t.Error("never posed, never flagged: no line")
+	}
+	if !IsolationRecapShown(IsolationRecapShownParams{Applies: true}) || !IsolationRecapShown(IsolationRecapShownParams{Override: domain.IsolationVerbatim}) {
+		t.Error("a posed step or a flag keeps its line")
+	}
+}

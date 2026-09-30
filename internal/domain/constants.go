@@ -3011,12 +3011,17 @@ const (
 	// worktree: both ways out are named, since keeping its source's values is one.
 	RunIsolationAdoptionPendingFmt = "%s predates isolation: its .env still holds its source's ports — choose with `wtm env %s --isolation isolated` (own ports and compose project) or `--isolation verbatim` (keep the source's), then run it again"
 
-	// RecapField* are the aligned labels of the create recap body.
-	RecapFieldBranch       = "Branch:  "
-	RecapFieldSource       = "Source:  "
-	RecapFieldParent       = "Parent:  "
-	RecapFieldEnv          = "Env:     "
-	RecapFieldIsolation    = "Mode:    "
+	// RecapField* are the aligned labels of the create-like recap bodies —
+	// create, extract and checkout — padded to the widest of them.
+	RecapFieldBranch       = "Branch:    "
+	RecapFieldSource       = "Source:    "
+	RecapFieldParent       = "Parent:    "
+	RecapFieldEnv          = "Env:       "
+	RecapFieldIsolation    = "Isolation: "
+	RecapFieldPR           = "PR:        "
+	RecapFieldFiles        = "Files:     "
+	RecapFieldTarget       = "Target:    "
+	RecapFieldMode         = "Mode:      "
 	RecapFastForwardSuffix = " (fast-forward to origin)"
 	WarningPrefix          = "⚠ "
 	WizardErrLabel         = "wizard"
