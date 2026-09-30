@@ -54,7 +54,7 @@ to that tool. It updates the CLI itself — for your worktrees, that's `wtm sync
 
 wtm also checks for new releases at most once a day and prints a notice on stderr.
 It stays silent in CI, without a TTY, and under `--output json`. Disable it with
-`WTM_NO_UPDATE_CHECK=1`, or in `~/.config/wtm/config.toml`:
+`WTM_NO_UPDATE_CHECK=1`, or in the [global config](#global-config):
 
 ```toml
 [update]
@@ -237,7 +237,7 @@ document, a resolved path, a shell script or a URL still comes through. It is th
 output axis only, so a fully unattended run pairs it with `--yes`.
 
 Non-interactive note: `--output json` never prompts, so destructive commands need an
-explicit flag — `clean`/`prune` need `--yes` (or `--force`), and `sync` needs branch
+explicit flag — `clean`/`prune` need `--yes` (and `--force` on top to remove an unsafe worktree), and `sync` needs branch
 args or `--all`. See each command's `--help`.
 
 ## Configuration
@@ -551,7 +551,8 @@ An `[[env_port]]` link says which key carries which port:
 [[env_port]]
 file = ".env"
 key  = "DATABASE_URL"
-port = "POSTGRES_PORT"      # a port declared by one of the jobs above
+job  = "docker"             # the job declaring the port — required
+port = "DB_PORT"            # a port that job declares
 ```
 
 The link names the key, never a position. wtm looks for the **declared base** inside the
@@ -673,7 +674,7 @@ replays never reaches back into an earlier one.
 The daemon itself is disposable. It exits ~30 s after the last **foreground** job, while
 detached services — those with a `stop` command, a `docker compose up -d` typically —
 keep running without it: the real work belongs to Docker, not to wtm. What wtm keeps is
-an index of what it started, in `~/.config/wtm/jobs.json`, which the next daemon reads
+an index of what it started, `jobs.json` next to the [global config](#global-config), which the next daemon reads
 back. That is what makes `wtm run ps` still list your stacks after a reboot, and
 `wtm run down` still stop them. Those stacks show as `detached` rather than `running`,
 because nothing about them was ever verified — wtm launched them and has not seen them
