@@ -278,6 +278,10 @@ var (
 // the one that applies, whatever the client's version fixed.
 var ErrDaemonVersionMismatch = errors.New("run daemon version mismatch")
 
+// ErrDaemonRunning is a daemon started while another one holds the lock —
+// serving, or still stopping its jobs.
+var ErrDaemonRunning = errors.New("another run daemon is running")
+
 var (
 	// ErrUpgradeFromSource is returned when wtm upgrade runs on a binary built
 	// from source, where no published release corresponds to what is installed.

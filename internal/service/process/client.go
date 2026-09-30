@@ -288,10 +288,11 @@ func EnsureDaemon(params DaemonParams) error {
 	if IsDaemonRunning(params.SocketPath) {
 		return nil
 	}
-
-	// Remove stale socket if present
-	if _, err := os.Stat(params.SocketPath); err == nil {
-		os.Remove(params.SocketPath)
+	if err := awaitDaemonGone(params.SocketPath); err != nil {
+		return err
+	}
+	if IsDaemonRunning(params.SocketPath) {
+		return nil
 	}
 
 	if err := spawnDaemon(params); err != nil {

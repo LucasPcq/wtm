@@ -66,7 +66,14 @@ func RunDaemon(params DaemonParams) error {
 		return fmt.Errorf("create socket dir: %w", err)
 	}
 
-	// Remove stale socket
+	lock, err := acquireDaemonLock(params.SocketPath)
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
+
+	// Only the lock holder may clear a stale socket: anyone else would be
+	// unlinking a live daemon's.
 	os.Remove(params.SocketPath)
 
 	listener, err := net.Listen("unix", params.SocketPath)
@@ -125,6 +132,9 @@ func RunDaemon(params DaemonParams) error {
 			select {
 			case <-d.shutdown:
 				<-d.stopped
+				// Waited here, on the only goroutine that calls Add: a Wait
+				// beside a connection still being accepted is a race.
+				d.clients.Wait()
 				return nil
 			default:
 				continue
@@ -159,7 +169,6 @@ func (d *daemonServer) stop() {
 		close(d.shutdown)
 		d.listener.Close()
 		d.manager.StopForeground()
-		d.clients.Wait()
 		close(d.stopped)
 	})
 }

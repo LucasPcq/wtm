@@ -2081,6 +2081,9 @@ const (
 
 	// DaemonSocketName is the Unix socket filename for the service daemon.
 	DaemonSocketName = "wtm.sock"
+	// DaemonLockName is the file a daemon holds locked for its whole life, beside
+	// the socket: the socket closes before the process exits, the lock does not.
+	DaemonLockName = "wtm.lock"
 
 	// DaemonIdleTimeoutSeconds is how long the daemon waits with no services before auto-exit.
 	DaemonIdleTimeoutSeconds = 30
