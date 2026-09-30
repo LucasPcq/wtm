@@ -156,32 +156,78 @@ func agentTargetLabel(t domain.AgentTarget) string {
 }
 
 func applyAgentTarget(t domain.AgentTarget) agentInstallResult {
-	return writeSkillFile(t)
+	return writeSkill(t)
 }
 
-func writeSkillFile(t domain.AgentTarget) agentInstallResult {
-	content := renderSkillMarkdown()
+// writeSkill installs the skill directory holding t.Path: every shipped file,
+// and the removal of a reference this wtm no longer ships. Nothing else in the
+// directory is touched: it may hold the user's own notes.
+func writeSkill(t domain.AgentTarget) agentInstallResult {
+	dir := filepath.Dir(t.Path)
+	_, statErr := os.Stat(t.Path)
+	existed := statErr == nil
+	if statErr != nil && !os.IsNotExist(statErr) {
+		return agentInstallResult{Kind: t.Kind, Path: t.Path, Action: agentActionSkipped, Reason: statErr.Error()}
+	}
 
-	existing, err := os.ReadFile(t.Path)
-	if err == nil {
-		if string(existing) == content {
-			return agentInstallResult{Kind: t.Kind, Path: t.Path, Action: agentActionUnchanged}
+	files := skillFiles()
+	changed := false
+	for name, content := range files {
+		wrote, err := writeIfDifferent(filepath.Join(dir, filepath.FromSlash(name)), content)
+		if err != nil {
+			return agentInstallResult{Kind: t.Kind, Path: t.Path, Action: agentActionSkipped, Reason: err.Error()}
 		}
-		if writeErr := os.WriteFile(t.Path, []byte(content), 0o644); writeErr != nil {
-			return agentInstallResult{Kind: t.Kind, Path: t.Path, Action: agentActionSkipped, Reason: writeErr.Error()}
-		}
+		changed = changed || wrote
+	}
+	removed, err := removeStaleReferences(dir, files)
+	if err != nil {
+		return agentInstallResult{Kind: t.Kind, Path: t.Path, Action: agentActionSkipped, Reason: err.Error()}
+	}
+
+	switch {
+	case !existed:
+		return agentInstallResult{Kind: t.Kind, Path: t.Path, Action: agentActionCreated}
+	case changed || removed:
 		return agentInstallResult{Kind: t.Kind, Path: t.Path, Action: agentActionUpdated}
+	default:
+		return agentInstallResult{Kind: t.Kind, Path: t.Path, Action: agentActionUnchanged}
 	}
-	if !os.IsNotExist(err) {
-		return agentInstallResult{Kind: t.Kind, Path: t.Path, Action: agentActionSkipped, Reason: err.Error()}
+}
+
+func writeIfDifferent(file, content string) (bool, error) {
+	existing, err := os.ReadFile(file)
+	if err == nil && string(existing) == content {
+		return false, nil
 	}
-	if err := os.MkdirAll(filepath.Dir(t.Path), 0o755); err != nil {
-		return agentInstallResult{Kind: t.Kind, Path: t.Path, Action: agentActionSkipped, Reason: err.Error()}
+	if err != nil && !os.IsNotExist(err) {
+		return false, err
 	}
-	if err := os.WriteFile(t.Path, []byte(content), 0o644); err != nil {
-		return agentInstallResult{Kind: t.Kind, Path: t.Path, Action: agentActionSkipped, Reason: err.Error()}
+	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+		return false, err
 	}
-	return agentInstallResult{Kind: t.Kind, Path: t.Path, Action: agentActionCreated}
+	return true, os.WriteFile(file, []byte(content), 0o644)
+}
+
+func removeStaleReferences(dir string, shipped map[string]string) (bool, error) {
+	entries, err := os.ReadDir(filepath.Join(dir, skillReferencesDir))
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	removed := false
+	for _, entry := range entries {
+		name := skillReferencesDir + "/" + entry.Name()
+		if _, ok := shipped[name]; ok || entry.IsDir() {
+			continue
+		}
+		if err := os.Remove(filepath.Join(dir, skillReferencesDir, entry.Name())); err != nil {
+			return removed, err
+		}
+		removed = true
+	}
+	return removed, nil
 }
 
 func runAgentsMultiSelect(items []components.MultiSelectItem) ([]string, error) {

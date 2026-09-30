@@ -5,6 +5,9 @@ set -euo pipefail
 
 root=${WTM_DEMO_ROOT:-/tmp/wtm-demo}
 bin=${WTM_DEMO_BIN:?WTM_DEMO_BIN must point at the wtm binary to record}
+web_port=${WTM_DEMO_WEB_PORT:-5173}
+api_port=${WTM_DEMO_API_PORT:-8787}
+proxy_port=${WTM_DEMO_PROXY_PORT:-11790}
 
 # A previous recording may have left its jobs up: stop them before the files go.
 if [[ -x "$root/bin/wtm" && -d "$root/acme" ]]; then
@@ -53,8 +56,8 @@ JSON
 cat > apps/api/package.json <<'JSON'
 { "name": "api", "scripts": { "dev": "python3 ../../scripts/dev.py api" } }
 JSON
-printf 'PORT=5173\nAPI_URL=http://localhost:8787\n' > apps/web/.env.example
-printf 'PORT=8787\n' > apps/api/.env.example
+printf 'PORT=%s\nAPI_URL=http://localhost:%s\n' "$web_port" "$api_port" > apps/web/.env.example
+printf 'PORT=%s\n' "$api_port" > apps/api/.env.example
 cp apps/web/.env.example apps/web/.env
 cp apps/api/.env.example apps/api/.env
 printf '.env\nnode_modules\n' > .gitignore
@@ -64,16 +67,16 @@ git add -A && git commit -qm "chore: bootstrap acme"
 wtm init --yes --base-path ../acme.trees </dev/null >/dev/null 2>&1
 
 global=$(dirname "$(find "$HOME" -name config.toml -path '*wtm*' | head -1)")/config.toml
-printf '\n[proxy]\nport = 11790\n' >> "$global"
+printf '\n[proxy]\nport = %s\n' "$proxy_port" >> "$global"
 
-cat > .git/wtm/run.toml <<'TOML'
+cat > .git/wtm/run.toml <<TOML
 [[job]]
   name = "web"
   kind = "service"
   cmd = "python3 ../../scripts/dev.py web"
   cwd = "apps/web"
   [job.ports]
-    PORT = 5173
+    PORT = $web_port
   [job.url]
     port = "PORT"
 
@@ -83,7 +86,7 @@ cat > .git/wtm/run.toml <<'TOML'
   cmd = "python3 ../../scripts/dev.py api"
   cwd = "apps/api"
   [job.ports]
-    PORT = 8787
+    PORT = $api_port
   [job.url]
     port = "PORT"
 
