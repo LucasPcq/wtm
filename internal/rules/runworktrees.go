@@ -137,3 +137,17 @@ func BranchForPath(params BranchForPathParams) string {
 	}
 	return params.Path
 }
+
+// JobsByWorktree orders jobs worktree by worktree, then by name: a listing reads
+// one worktree at a time, and the main checkout's directory sorts before the
+// ones beside it.
+func JobsByWorktree(jobs []domain.JobInfo) []domain.JobInfo {
+	sorted := append([]domain.JobInfo(nil), jobs...)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		if sorted[i].WorkDir != sorted[j].WorkDir {
+			return sorted[i].WorkDir < sorted[j].WorkDir
+		}
+		return sorted[i].Name < sorted[j].Name
+	})
+	return sorted
+}

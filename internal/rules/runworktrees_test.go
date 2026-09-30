@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -75,5 +76,30 @@ func TestBranchesForPathsNamesWhatTheStatusesKnow(t *testing.T) {
 	// release its lock instead of moving it.
 	if named[1] != "/wt/unknown" {
 		t.Errorf("named = %v, want the unknown path left as it is", named)
+	}
+}
+
+// `run ps` reads one worktree at a time: the daemon's order scattered a
+// worktree's jobs between another's.
+func TestJobsByWorktreeGroupsEachWorktreeAndOrdersItsJobs(t *testing.T) {
+	jobs := []domain.JobInfo{
+		{Name: "web", WorkDir: "/repo.trees/feat"},
+		{Name: "web", WorkDir: "/repo"},
+		{Name: "api", WorkDir: "/repo.trees/feat"},
+		{Name: "api", WorkDir: "/repo"},
+	}
+
+	sorted := JobsByWorktree(jobs)
+
+	var got []string
+	for _, job := range sorted {
+		got = append(got, job.WorkDir+" "+job.Name)
+	}
+	want := []string{"/repo api", "/repo web", "/repo.trees/feat api", "/repo.trees/feat web"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("order = %v, want %v", got, want)
+	}
+	if jobs[0].WorkDir != "/repo.trees/feat" {
+		t.Error("the caller's slice was reordered")
 	}
 }

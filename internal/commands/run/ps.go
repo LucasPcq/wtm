@@ -36,7 +36,7 @@ func runPs(cmd *cobra.Command, _ []string) error {
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 
 	if format == domain.OutputJSON {
-		jobs := shared.LoadJobs().Jobs
+		jobs := rules.JobsByWorktree(shared.LoadJobs().Jobs)
 		return output.WriteRunningJobsJSON(cmd.OutOrStdout(), runningJobs(runningJobsParams{Jobs: jobs, Held: runjobs.Held(jobs)}))
 	}
 
@@ -56,7 +56,7 @@ func runPs(cmd *cobra.Command, _ []string) error {
 	}
 
 	out := cmd.OutOrStdout()
-	jobs := listing.Jobs
+	jobs := rules.JobsByWorktree(listing.Jobs)
 	output.Frame(out, func(w io.Writer) {
 		fmt.Fprint(w, output.FormatRunningJobs(output.FormatRunningJobsParams{
 			Jobs:       jobs,

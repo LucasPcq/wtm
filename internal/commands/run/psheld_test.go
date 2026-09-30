@@ -63,3 +63,32 @@ func TestRunPsListsTheAppsUnderTheRunnerRow(t *testing.T) {
 	}
 	t.Errorf("no dev row:\n%s", stdout)
 }
+
+func TestRunPsListsOneWorktreeAtATime(t *testing.T) {
+	stateDir := setupTestProject(t)
+	writeRunTOML(t, stateDir, domain.RunConfig{Jobs: []domain.JobConfig{apiJob}})
+	daemon := startFakeDaemon(t, &fakeDaemon{})
+	daemon.setJobs([]domain.JobInfo{
+		{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/wt/b"},
+		{Name: "api", Status: domain.JobStatusRunning, WorkDir: "/wt/a"},
+		{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/wt/a"},
+		{Name: "api", Status: domain.JobStatusRunning, WorkDir: "/wt/b"},
+	})
+	fakeTTY(t, false)
+
+	stdout, _, err := runCmd(t, domain.CmdPs, "--"+domain.FlagOutput, domain.OutputJSON)
+	if err != nil {
+		t.Fatalf("run ps: %v", err)
+	}
+	var rows []domain.RunningJob
+	if err := json.Unmarshal([]byte(stdout), &rows); err != nil {
+		t.Fatalf("parse JSON: %v\noutput: %s", err, stdout)
+	}
+	var got []string
+	for _, row := range rows {
+		got = append(got, row.Path+" "+row.Name)
+	}
+	if strings.Join(got, ",") != "/wt/a api,/wt/a web,/wt/b api,/wt/b web" {
+		t.Errorf("rows in order %v, want worktree by worktree", got)
+	}
+}
