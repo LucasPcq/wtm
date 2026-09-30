@@ -304,16 +304,43 @@ func EnvPortOffsetLabel(offset int) string {
 	return domain.EnvPortsTitle + " " + domain.EnvPortOffsetPrefix + strconv.Itoa(offset)
 }
 
-// EnvPortSettlementNote is the port pass as a create-like recap carries it: a
-// count and an offset, never the values. Empty when the run moved nothing.
-func EnvPortSettlementNote(settlement domain.EnvPortSettlement) string {
-	if settlement.Shifted == 0 {
-		return ""
+// EnvPortSettlementNote is the port pass as a create-like recap carries it:
+// counts and the worktree's offset, never the values. Empty when the run wrote
+// nothing.
+func EnvPortSettlementNote(plan domain.EnvPortPlan) string {
+	var parts []string
+	if shifted := len(EnvPortRewrites(plan)); shifted > 0 {
+		noun := pluralNoun(pluralNounParams{Count: shifted, One: domain.EnvPortsRecapPort, Many: domain.EnvPortsRecapPorts})
+		parts = append(parts, fmt.Sprintf(domain.EnvPortsRecapSettledFmt, shifted, noun, plan.Offset))
 	}
-	if !settlement.Applied {
-		return fmt.Sprintf(domain.EnvPortsRecapKeptFmt, settlement.Shifted)
+	if written := ownedWritten(plan); written > 0 {
+		noun := pluralNoun(pluralNounParams{Count: written, One: domain.EnvPortsRecapOwnedValue, Many: domain.EnvPortsRecapOwnedValues})
+		parts = append(parts, fmt.Sprintf(domain.EnvPortsRecapOwnedFmt, written, noun))
 	}
-	return fmt.Sprintf(domain.EnvPortsRecapShiftedFmt, settlement.Shifted, settlement.Offset)
+	return strings.Join(parts, domain.EnvRecapNoteSeparator)
+}
+
+func ownedWritten(plan domain.EnvPortPlan) int {
+	count := 0
+	for _, entry := range plan.Owned {
+		if entry.Changed {
+			count++
+		}
+	}
+	return count
+}
+
+type pluralNounParams struct {
+	Count int
+	One   string
+	Many  string
+}
+
+func pluralNoun(params pluralNounParams) string {
+	if params.Count == 1 {
+		return params.One
+	}
+	return params.Many
 }
 
 type EnvPortOutcomeParams struct {

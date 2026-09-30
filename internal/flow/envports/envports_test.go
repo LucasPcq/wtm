@@ -10,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/envports"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
@@ -34,8 +35,8 @@ func TestSettleWithoutLinksReportsNothing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if settlement.Shifted != 0 {
-		t.Errorf("settled %d value(s), want none", settlement.Shifted)
+	if len(settlement.Entries) != 0 || settlement.Applied {
+		t.Errorf("settlement = %+v, want nothing", settlement)
 	}
 	if len(presenter.Statuses) != 0 {
 		t.Errorf("reported %+v, want nothing", presenter.Statuses)
@@ -101,8 +102,11 @@ func TestSettleMovesTheCopiedPortsWhenTheRunSaidSo(t *testing.T) {
 	}
 	// The pass reports a count to whoever concludes the run, and prints nothing
 	// itself: the values it moved are in the .env beside it.
-	if !settlement.Applied || settlement.Shifted != 1 {
+	if !settlement.Applied || len(settlement.Entries) != 1 || settlement.Entries[0].Status != domain.EnvPortStatusRewrite {
 		t.Errorf("settlement = %+v, want 1 value applied", settlement)
+	}
+	if note := rules.EnvPortSettlementNote(settlement); !strings.Contains(note, "1 port settled") || !strings.Contains(note, "owned value") {
+		t.Errorf("note = %q, want the port and the [[env]] value counted", note)
 	}
 	if len(presenter.Statuses) != 0 {
 		t.Errorf("reported %+v, want nothing to print", presenter.Statuses)
@@ -129,7 +133,7 @@ func TestSettleLeavesAVerbatimWorktreeAsCopied(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Settle: %v", err)
 	}
-	if settlement.Applied || settlement.Shifted != 0 {
+	if settlement.Applied || len(settlement.Entries) != 0 {
 		t.Errorf("settlement = %+v, want nothing settled", settlement)
 	}
 

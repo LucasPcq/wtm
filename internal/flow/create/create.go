@@ -28,7 +28,6 @@ type Outcome struct {
 	Result     domain.CreateResult
 	Branch     string
 	FromBranch string
-	EnvPorts   domain.EnvPortSettlement
 	Aborted    bool
 }
 
@@ -140,10 +139,11 @@ func (f *createFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	var settlement domain.EnvPortSettlement
-	if !result.AlreadyExists {
+	if result.AlreadyExists {
+		f.warnIgnoredIsolation(&result)
+	} else {
 		// Before the hooks: one of them may well read the .env this settles.
-		settlement, result.Warnings = envports.SettleFresh(envports.FreshParams{
+		result.EnvPorts, result.Warnings = envports.SettleFresh(envports.FreshParams{
 			Params: envports.Params{
 				Context:      f.ctx,
 				Branch:       branchName,
@@ -156,9 +156,23 @@ func (f *createFlow) run() (Outcome, error) {
 			return Outcome{}, hookErr
 		}
 	}
+	result.Isolation = worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: branchName})
 
-	outcome := Outcome{Result: result, Branch: branchName, FromBranch: fromBranch, EnvPorts: settlement}
+	outcome := Outcome{Result: result, Branch: branchName, FromBranch: fromBranch}
 	return outcome, f.presenter.Created(outcome)
+}
+
+func (f *createFlow) warnIgnoredIsolation(result *domain.CreateResult) {
+	warning := rules.IsolationIgnoredWarning(rules.IsolationIgnoredParams{
+		Branch:    result.Branch,
+		Requested: f.request.Isolation,
+		Current:   worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: result.Branch}),
+	})
+	if warning == "" {
+		return
+	}
+	f.presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: warning})
+	result.Warnings = append(result.Warnings, warning)
 }
 
 // isolation is the step's answer, else the project's default: a skipped step

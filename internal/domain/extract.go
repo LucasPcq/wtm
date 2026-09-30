@@ -60,6 +60,10 @@ type ExtractResult struct {
 	// Conflicts lists the files written with conflict markers in resolve mode.
 	// Empty on a clean extraction.
 	Conflicts []string `json:"conflicts"`
+	// Isolation is the target's; EnvPorts is the port pass of a target this
+	// extraction created, as CreateResult carries it.
+	Isolation Isolation   `json:"isolation,omitempty"`
+	EnvPorts  EnvPortPlan `json:"env_ports,omitzero"`
 	// Warnings are what the run module could not do for a target this
 	// extraction created, which never fails it.
 	Warnings []string `json:"warnings,omitempty"`

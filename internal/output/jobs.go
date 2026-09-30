@@ -32,6 +32,9 @@ type PRCheckoutJSON struct {
 	// OriginState is the reused branch's divergence from origin, using the same
 	// labels as `list` and `tree`. Empty when the branch was created.
 	OriginState string `json:"origin_state,omitempty"`
+	// Isolation and EnvPorts are what `create` reports under the same names.
+	Isolation domain.Isolation   `json:"isolation,omitempty"`
+	EnvPorts  domain.EnvPortPlan `json:"env_ports,omitzero"`
 	// Warnings are what the run module could not do for the new worktree.
 	Warnings []string `json:"warnings,omitempty"`
 }

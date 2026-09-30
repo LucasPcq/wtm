@@ -44,7 +44,7 @@ func (p createPresenter) Created(outcome createflow.Outcome) error {
 			AlreadyExists: outcome.Result.AlreadyExists,
 			From:          outcome.FromBranch,
 			EnvStrategy:   string(outcome.Result.Metadata.EnvStrategy),
-			EnvNote:       rules.EnvPortSettlementNote(outcome.EnvPorts),
+			EnvNote:       rules.EnvPortSettlementNote(outcome.Result.EnvPorts),
 			Path: createDisplayPath(displayPathParams{
 				Config:     p.config.Config,
 				ProjectDir: p.config.ProjectDir,
