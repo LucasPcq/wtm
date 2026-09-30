@@ -98,6 +98,12 @@ func runUninstall(cmd *cobra.Command, _ []string) error {
 	if !status.Supported {
 		return domain.ErrProxyRedirectUnsupported
 	}
+	if !status.Installed {
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			output.Unchanged(w, domain.ProxyUninstallNothing)
+		})
+		return nil
+	}
 
 	plan, err := redirector.Plan()
 	if err != nil {

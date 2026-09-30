@@ -38,7 +38,14 @@ func newInstallCmd() *cobra.Command {
 		Use:   "install",
 		Short: "Install the using-wtm skill into .claude / .cursor",
 		Long:  "Detects which skill destinations exist (project and home-level .claude and .cursor)\nand installs the using-wtm skill into the ones you pick.",
-		RunE:  runInstall,
+		Example: `  wtm agents install
+
+  # Every detected destination, no questions
+  wtm agents install --yes
+
+  # Also create the ones that don't exist yet, and report as JSON
+  wtm agents install --all --yes --output json`,
+		RunE: runInstall,
 	}
 	cmd.Flags().Bool(domain.FlagYes, false, "Non-interactive: install into every detected destination")
 	cmd.Flags().Bool(domain.FlagAll, false, "Include destinations that don't yet exist (creates skill dirs)")

@@ -11,6 +11,18 @@ and installs the using-wtm skill into the ones you pick.
 wtm agents install [flags]
 ```
 
+### Examples
+
+```
+  wtm agents install
+
+  # Every detected destination, no questions
+  wtm agents install --yes
+
+  # Also create the ones that don't exist yet, and report as JSON
+  wtm agents install --all --yes --output json
+```
+
 ### Options
 
 ```

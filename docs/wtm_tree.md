@@ -33,7 +33,7 @@ wtm tree [flags]
 
 ```
   -h, --help            help for tree
-      --output string   Output format: text or json (default "text")
+      --output string   Output format: text, json or mermaid (default "text")
       --with-prs        Include GitHub PR info (open/merged/closed; fetched eagerly)
 ```
 

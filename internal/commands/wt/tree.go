@@ -41,6 +41,7 @@ func newTreeCmd() *cobra.Command {
 	}
 
 	shared.AddOutputFlag(cmd)
+	cmd.Flags().Lookup(domain.FlagOutput).Usage = "Output format: text, json or mermaid"
 	cmd.Flags().Bool(domain.FlagWithPRs, false, "Include GitHub PR info (open/merged/closed; fetched eagerly)")
 
 	return cmd

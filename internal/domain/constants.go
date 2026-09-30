@@ -677,6 +677,7 @@ const (
 	ProxyUninstallConfirmDesc    = "Named URLs go back to carrying the proxy's port."
 	ProxyUninstallDone           = "Redirection removed — named URLs carry the proxy's port again"
 	ProxyUninstallChange         = "unloaded from launchd and deleted"
+	ProxyUninstallNothing        = "No redirection installed, nothing to remove"
 
 	// The one place wtm mentions the redirection outside its own commands.
 	// ProxyHostShape names the shape rather than one job: run init speaks about

@@ -4,7 +4,7 @@ Every worktree records the branch it came from (its parent). These commands read
 
 ## `tree`
 
-`wtm tree --output json` is the parent to child forest. Use it rather than `wtm list` when hierarchy or orchestration order matters.
+`wtm tree --output json` is the parent to child forest. Use it rather than `wtm list` when hierarchy or orchestration order matters. `--output mermaid` prints the same forest as a Mermaid flowchart, for a document or a PR description.
 
 - `needs_sync` is the key signal: that node's parent moved past it.
 - `origin` (`{ahead, behind, state}`, or `null` when the branch has no origin counterpart) describes divergence from `origin/<branch>`, with `state` one of `up-to-date`/`behind`/`ahead`/`diverged`. It is distinct from `commits_ahead`, which counts commits against the **parent/base** branch.

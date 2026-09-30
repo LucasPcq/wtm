@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -77,5 +79,19 @@ func TestStatusAnswersOutsideAWtmProject(t *testing.T) {
 	}
 	if status.Installed {
 		t.Error("home isolé : aucune redirection installée")
+	}
+}
+
+// Removing what was never installed says so instead of announcing a removal.
+func TestUninstallWithNothingInstalledSaysSo(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("the redirection exists on macOS only")
+	}
+	out, err := runCmd(t, domain.CmdUninstall, "--"+domain.FlagYes)
+	if err != nil {
+		t.Fatalf("uninstall: %v", err)
+	}
+	if strings.Contains(out, domain.ProxyUninstallDone) || !strings.Contains(out, domain.ProxyUninstallNothing) {
+		t.Errorf("uninstall with nothing installed printed:\n%s", out)
 	}
 }
