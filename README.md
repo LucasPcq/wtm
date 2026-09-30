@@ -183,6 +183,7 @@ Opt-in: `wtm run init` sets it up once per repository.
 - **[User guide](docs/guide/README.md):** [configuration](docs/guide/configuration.md), [isolation](docs/guide/isolation.md), [jobs and profiles](docs/guide/jobs-and-profiles.md), [how `wtm run` works](docs/guide/how-run-works.md), [shared services](docs/guide/shared-services.md), [named URLs](docs/guide/addressing.md), the [`run.toml` reference](docs/guide/run-toml.md), [where wtm keeps its state](docs/guide/state.md).
 - **[Command reference](docs/wtm.md)**, generated from `--help`.
 - **[Changelog](CHANGELOG.md)**, and [migrating to 0.28](docs/guide/migrating-to-0.28.md) if you come from 0.27.
+- **[`llms.txt`](llms.txt)**: the same pages as an index for LLMs and agents.
 
 ## Contributing
 
