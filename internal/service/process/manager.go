@@ -36,6 +36,10 @@ const outputSubscriberQueue = 256
 // defaultPTYRows and defaultPTYCols are the fallback PTY dimensions used when
 // a job is spawned before any client has attached. TUI apps read the PTY size
 // at startup — a 0x0 window makes them bail to plain log mode.
+// jobStopGrace is a variable so a test can stop a job deaf to SIGTERM without
+// waiting the full grace period.
+var jobStopGrace = domain.JobStopGracePeriod
+
 const (
 	defaultPTYRows = 40
 	defaultPTYCols = 120
@@ -985,25 +989,38 @@ func (m *Manager) StopAllInWorkDir(workDir string) error {
 
 func (m *Manager) stopAllMatching(keep func(*ManagedJob) bool) error {
 	m.mu.Lock()
-	keys := make([]string, 0, len(m.jobs))
+	var own, shared []string
 	for key, job := range m.jobs {
-		if !rules.IsJobUp(job.Status) {
+		if !rules.IsJobUp(job.Status) || !keep(job) {
 			continue
 		}
-		if !keep(job) {
+		if rules.IsShared(job.Config) {
+			shared = append(shared, key)
 			continue
 		}
-		keys = append(keys, key)
+		own = append(own, key)
 	}
 	m.mu.Unlock()
 
-	var firstErr error
-	for _, key := range keys {
-		if err := m.stopByKey(key); err != nil && firstErr == nil {
-			firstErr = err
+	// Each job gets its grace period at the same time: one after the other, N
+	// jobs deaf to SIGTERM outlast DaemonStopTimeout. A shared job is released
+	// in turn, since whether its service goes depends on the claims left.
+	errs := make([]error, len(own))
+	var wg sync.WaitGroup
+	for index, key := range own {
+		wg.Go(func() { errs[index] = m.stopByKey(key) })
+	}
+	wg.Wait()
+	for _, key := range shared {
+		errs = append(errs, m.stopByKey(key))
+	}
+
+	for _, err := range errs {
+		if err != nil {
+			return err
 		}
 	}
-	return firstErr
+	return nil
 }
 
 func (m *Manager) stopByKey(key string) error {
@@ -1258,7 +1275,7 @@ func (m *Manager) stopWithSignal(job *ManagedJob) error {
 	// the whole group if they overrun the grace period.
 	select {
 	case <-job.exited:
-	case <-time.After(domain.JobStopGracePeriod):
+	case <-time.After(jobStopGrace):
 		_ = syscall.Kill(-pid, syscall.SIGKILL)
 		<-job.exited
 	}

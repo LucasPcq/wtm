@@ -2095,7 +2095,7 @@ const (
 	// stop answering.
 	DaemonPollInterval = 50 * time.Millisecond
 	// DaemonStopTimeout bounds the wait for a daemon to exit once asked: it
-	// stops its foreground jobs one by one, each with JobStopGracePeriod.
+	// stops its foreground jobs together, each with JobStopGracePeriod.
 	DaemonStopTimeout = 30 * time.Second
 	// JobStopGracePeriod is how long a process group has between SIGTERM and
 	// SIGKILL: long enough for a dev server to flush its children, short enough
