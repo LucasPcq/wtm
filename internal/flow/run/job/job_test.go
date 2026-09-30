@@ -88,9 +88,8 @@ func TestAddResolvesEveryFieldFromWhatTheFlagsGave(t *testing.T) {
 	}
 }
 
-// The form does not ask about `runs` or `binds_no_port`, and what a form never
-// showed it must not drop: an edit used to unlink a runner from its children
-// without a word.
+// The form has no question for `probe`, and what a form never showed it must
+// not drop: an edit used to unlink a runner from its children without a word.
 func TestEditKeepsWhatTheFormDoesNotAskAbout(t *testing.T) {
 	ctx := context(t)
 	cfg := domain.RunConfig{Jobs: []domain.JobConfig{
@@ -104,15 +103,12 @@ func TestEditKeepsWhatTheFormDoesNotAskAbout(t *testing.T) {
 		Context: ctx,
 		Request: jobflow.EditRequest{Name: "dev", Config: cfg},
 		Prompter: &flowtest.ScriptedPrompter{
-			Answers: map[string]string{
-				"run.job.name":  "dev",
-				"run.job.cmd":   "turbo run dev --parallel",
-				"run.job.kind":  string(domain.JobKindService),
-				"run.job.stop":  "",
-				"run.job.cwd":   "",
-				"run.job.ports": "",
-				"run.job.url":   "",
-			},
+			Answers: formAnswers(map[string]string{
+				jobflow.KeyName:        "dev",
+				jobflow.KeyCmd:         "turbo run dev --parallel",
+				jobflow.KeyBindsNoPort: domain.RunJobBindsNoPortYes,
+			}),
+			Sets: map[string][]string{jobflow.KeyRuns: {"api", "web"}, jobflow.KeyTouches: nil},
 		},
 		Presenter: presenter,
 	})
@@ -125,7 +121,7 @@ func TestEditKeepsWhatTheFormDoesNotAskAbout(t *testing.T) {
 		t.Fatalf("saved %d jobs, want 3", len(saved.Jobs))
 	}
 	if got := saved.Jobs[0]; len(got.Runs) != 2 || !got.BindsNoPort {
-		t.Errorf("runs = %v, binds_no_port = %v — the form dropped what it never showed", got.Runs, got.BindsNoPort)
+		t.Errorf("runs = %v, binds_no_port = %v, want what the form answered", got.Runs, got.BindsNoPort)
 	}
 	if got := saved.Jobs[0].Probe; got == nil || *got {
 		t.Errorf("probe = %v — the form re-armed a probe its reader had turned off", got)
@@ -135,9 +131,10 @@ func TestEditKeepsWhatTheFormDoesNotAskAbout(t *testing.T) {
 	}
 }
 
-// A shared service's scope and namespace are not on the form either: an edit
-// that dropped them turned the database back into one per worktree, and left
-// every [[env]] link naming a namespace that no longer existed.
+// Answering the form as it opens writes the job back as it was: an edit that
+// dropped a shared service's scope and namespace turned the database back into
+// one per worktree, and left every [[env]] link naming a namespace that no
+// longer existed.
 func TestEditKeepsASharedServicesScopeAndNamespace(t *testing.T) {
 	ctx := context(t)
 	namespace := &domain.JobNamespaceConfig{Name: "app_{worktree}", Create: "true"}
@@ -146,17 +143,23 @@ func TestEditKeepsASharedServicesScopeAndNamespace(t *testing.T) {
 		{Name: "reset", Kind: domain.JobKindTask, Cmd: "pnpm reset", Touches: []string{"pg"}},
 	}}
 
-	for _, edit := range []struct{ name, cmd, kind string }{
-		{"pg", "docker compose up -d --wait pg", string(domain.JobKindService)},
-		{"reset", "pnpm db:reset", string(domain.JobKindTask)},
+	for _, edit := range []struct {
+		name, cmd, kind string
+		touches         []string
+	}{
+		{"pg", "docker compose up -d --wait pg", string(domain.JobKindService), nil},
+		{"reset", "pnpm db:reset", string(domain.JobKindTask), []string{"pg"}},
 	} {
 		if _, err := jobflow.Edit(jobflow.EditParams{
 			Context: ctx,
 			Request: jobflow.EditRequest{Name: edit.name, Config: cfg},
-			Prompter: &flowtest.ScriptedPrompter{Answers: map[string]string{
-				"run.job.name": edit.name, "run.job.cmd": edit.cmd, "run.job.kind": edit.kind,
-				"run.job.stop": "", "run.job.cwd": "", "run.job.ports": "", "run.job.url": "",
-			}},
+			Prompter: &flowtest.ScriptedPrompter{
+				Answers: formAnswers(map[string]string{
+					jobflow.KeyName: edit.name, jobflow.KeyCmd: edit.cmd, jobflow.KeyKind: edit.kind,
+					jobflow.KeyScope: domain.ScopeValueShared, jobflow.KeyNamespaceName: "app_{worktree}", jobflow.KeyNamespaceCreate: "true",
+				}),
+				Sets: map[string][]string{jobflow.KeyRuns: nil, jobflow.KeyTouches: edit.touches},
+			},
 			Presenter: &recorder{},
 		}); err != nil {
 			t.Fatalf("Edit %s: %v", edit.name, err)
@@ -169,6 +172,9 @@ func TestEditKeepsASharedServicesScopeAndNamespace(t *testing.T) {
 	}
 	if got := cfg.Jobs[1].Touches; len(got) != 1 || got[0] != "pg" {
 		t.Errorf("reset touches = %v, want them kept", got)
+	}
+	if got := cfg.Jobs[1]; got.Scope != domain.JobScopePerWorktree || got.Namespace != nil {
+		t.Errorf("reset = %+v, want a task left per worktree", got)
 	}
 }
 

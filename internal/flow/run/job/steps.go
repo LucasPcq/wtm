@@ -24,6 +24,15 @@ const (
 	KeyPorts  = "run.job.ports"
 	KeyURL    = "run.job.url"
 	KeyAction = "run.job.action"
+
+	KeyRuns            = "run.job.runs"
+	KeyBindsNoPort     = "run.job.binds_no_port"
+	KeyTouches         = "run.job.touches"
+	KeyScope           = "run.job.scope"
+	KeyNamespaceName   = "run.job.namespace.name"
+	KeyNamespaceCreate = "run.job.namespace.create"
+	KeyNamespaceRemove = "run.job.namespace.remove"
+	KeyNamespaceEnv    = "run.job.namespace.env"
 )
 
 type formParams struct {
@@ -43,6 +52,10 @@ type formParams struct {
 // pre-fill has no Resolve, so an unattended run is refused naming its flag
 // rather than writing a job nobody described.
 func formSteps(params formParams) []flow.Step {
+	return append(fieldSteps(params), declarationSteps(params)...)
+}
+
+func fieldSteps(params formParams) []flow.Step {
 	return []flow.Step{
 		{
 			Kind:        flow.StepText,
@@ -213,7 +226,7 @@ func fromAnswers(answers flow.Answers, initial domain.JobConfig) (domain.JobConf
 	job.Cwd = answers.Value(KeyCwd)
 	job.Ports = ports
 	job.URL = url
-	return job, nil
+	return withDeclaration(answers, job)
 }
 
 // actionStep is what `run job list` asks once a job is picked: the picker is a
