@@ -27,15 +27,15 @@ wtm run up [worktree...] [flags]
 ### Options
 
 ```
-  -d, --detach                 Start the jobs and return immediately instead of opening their output
-      --exclusive              Stop jobs on other worktrees before starting (one worktree only)
-      --force wtm run --help   Lift the refusal to start a job whose touches reach foreign data (see wtm run --help); other questions are still asked unless --yes
-  -h, --help                   help for up
-      --no-probe               Skip the check that each declared port was actually bound
-      --output string          Output format: text or json (default "text")
-      --parallel               Start without stopping other worktrees
-      --profile string         Start this profile's jobs (default: the profile marked default, or the only one declared)
-  -y, --yes                    Skip all prompts; leaves the other worktrees' jobs running unless --exclusive
+  -d, --detach           Start the jobs and return immediately instead of opening their output
+      --exclusive        Stop jobs on other worktrees before starting (one worktree only)
+      --force            Lift the refusal to start a job whose touches reach foreign data (see wtm run --help); other questions are still asked unless --yes
+  -h, --help             help for up
+      --no-probe         Skip the check that each declared port was actually bound
+      --output string    Output format: text or json (default "text")
+      --parallel         Start without stopping other worktrees
+      --profile string   Start this profile's jobs (default: the profile marked default, or the only one declared)
+  -y, --yes              Skip all prompts; leaves the other worktrees' jobs running unless --exclusive
 ```
 
 ### Options inherited from parent commands

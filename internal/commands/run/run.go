@@ -26,9 +26,13 @@ func NewCmd() *cobra.Command {
 			"  namespace       a worktree's own part of a shared service — a database, a realm\n" +
 			"  named URL       the address the run proxy serves (http://api.feat-x.myrepo.localhost)\n" +
 			"  port URL        the job's own port (http://localhost:4012), printed with --raw\n" +
+			"  isolation       isolated: the worktree gets its own ports, compose project and namespaces;\n" +
+			"                  verbatim: it keeps its source's values, and so shares its source's data\n" +
+			"  touches         the services whose data a task changes (a migration, a reset, a seed)\n" +
 			"  foreign data    data this worktree does not own: its source's when it is verbatim,\n" +
 			"                  every worktree's for a shared service with no namespace; a job whose\n" +
-			"                  touches reach it is refused unless --force",
+			"                  touches reach it is refused unless --force\n" +
+			"  [worktree]      a worktree's branch name, never a path; omitted, the current worktree",
 		GroupID: domain.CmdGroupJobs,
 	}
 

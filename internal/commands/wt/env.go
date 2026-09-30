@@ -27,21 +27,30 @@ func newEnvCmd() *cobra.Command {
 		Short: "Reconcile a worktree's .env against its template and value sources",
 		Long: "Detect and fix .env drift in a worktree: add expected-but-missing keys and\n" +
 			"(with --mode refresh) settle values that diverge from the source.\n\n" +
-			"Values come from the strategy the worktree was created with (example → template\n" +
-			"placeholders, main → the main checkout, parent → the parent worktree then main),\n" +
-			"shown in the report; override it per run with --from.\n\n" +
+			"Values come from the strategy the worktree was created with, shown in the report:\n" +
+			"example → the template's placeholders, main → the main checkout, parent → the\n" +
+			"parent worktree only (main is read only when the parent has no worktree or no such\n" +
+			"file). Override it per run with --from.\n\n" +
 			"Pass a worktree branch, or omit it to pick interactively. --check prints a\n" +
 			"read-only drift report. Non-interactively (--yes / --output json) it applies only\n" +
 			"safe additions; conflicts need --on-conflict and orphans need --prune.\n\n" +
+			"When run.toml declares ports, a second pass follows on the reconciled files of an\n" +
+			"isolated worktree: each [[env_port]] link and [[env]] value is settled on its own\n" +
+			"ports and namespaces, and COMPOSE_PROJECT_NAME is written for a compose job. An invalid\n" +
+			"run.toml skips that pass with a warning; the keys are still reconciled. The main\n" +
+			"checkout is a worktree like any other here: `wtm env main` settles it on run.toml's\n" +
+			"declared ports, which it never shifts.\n\n" +
 			"A worktree created before the isolation choice existed (no isolation in its\n" +
 			"meta.json) keeps its source's ports and COMPOSE_PROJECT_NAME: non-interactively\n" +
 			"only its keys are reconciled, and the report says so. The wizard offers to adopt\n" +
 			"isolation — a new compose project, so its current volumes are no longer used —\n" +
 			"and --isolation isolated adopts it explicitly.\n\n" +
 			"--isolation verbatim puts the values wtm owns (linked ports, [[env]] values,\n" +
-			"COMPOSE_PROJECT_NAME) back to the source's and leaves every other key alone; the\n" +
-			"wizard shows them first. Either isolation is recorded only once the .env is in\n" +
-			"line with it: a run that fails or is cancelled records nothing.",
+			"COMPOSE_PROJECT_NAME) back to the source's and leaves every other key alone: the\n" +
+			"worktree then shares its source's compose volumes and data. The wizard shows those\n" +
+			"values first, and its recap can also keep a worktree verbatim from then on. Either\n" +
+			"isolation is recorded only once the .env is in line with it: a run that fails or\n" +
+			"is cancelled records nothing.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: runEnv,
 	}

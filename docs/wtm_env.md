@@ -7,13 +7,21 @@ Reconcile a worktree's .env against its template and value sources
 Detect and fix .env drift in a worktree: add expected-but-missing keys and
 (with --mode refresh) settle values that diverge from the source.
 
-Values come from the strategy the worktree was created with (example → template
-placeholders, main → the main checkout, parent → the parent worktree then main),
-shown in the report; override it per run with --from.
+Values come from the strategy the worktree was created with, shown in the report:
+example → the template's placeholders, main → the main checkout, parent → the
+parent worktree only (main is read only when the parent has no worktree or no such
+file). Override it per run with --from.
 
 Pass a worktree branch, or omit it to pick interactively. --check prints a
 read-only drift report. Non-interactively (--yes / --output json) it applies only
 safe additions; conflicts need --on-conflict and orphans need --prune.
+
+When run.toml declares ports, a second pass follows on the reconciled files of an
+isolated worktree: each [[env_port]] link and [[env]] value is settled on its own
+ports and namespaces, and COMPOSE_PROJECT_NAME is written for a compose job. An invalid
+run.toml skips that pass with a warning; the keys are still reconciled. The main
+checkout is a worktree like any other here: `wtm env main` settles it on run.toml's
+declared ports, which it never shifts.
 
 A worktree created before the isolation choice existed (no isolation in its
 meta.json) keeps its source's ports and COMPOSE_PROJECT_NAME: non-interactively
@@ -22,9 +30,11 @@ isolation — a new compose project, so its current volumes are no longer used �
 and --isolation isolated adopts it explicitly.
 
 --isolation verbatim puts the values wtm owns (linked ports, [[env]] values,
-COMPOSE_PROJECT_NAME) back to the source's and leaves every other key alone; the
-wizard shows them first. Either isolation is recorded only once the .env is in
-line with it: a run that fails or is cancelled records nothing.
+COMPOSE_PROJECT_NAME) back to the source's and leaves every other key alone: the
+worktree then shares its source's compose volumes and data. The wizard shows those
+values first, and its recap can also keep a worktree verbatim from then on. Either
+isolation is recorded only once the .env is in line with it: a run that fails or
+is cancelled records nothing.
 
 ```
 wtm env [worktree] [flags]

@@ -15,9 +15,13 @@ Vocabulary:
   namespace       a worktree's own part of a shared service — a database, a realm
   named URL       the address the run proxy serves (http://api.feat-x.myrepo.localhost)
   port URL        the job's own port (http://localhost:4012), printed with --raw
+  isolation       isolated: the worktree gets its own ports, compose project and namespaces;
+                  verbatim: it keeps its source's values, and so shares its source's data
+  touches         the services whose data a task changes (a migration, a reset, a seed)
   foreign data    data this worktree does not own: its source's when it is verbatim,
                   every worktree's for a shared service with no namespace; a job whose
                   touches reach it is refused unless --force
+  [worktree]      a worktree's branch name, never a path; omitted, the current worktree
 
 ```
 wtm run [flags]

@@ -23,7 +23,7 @@ wtm run addressing [names|ports] [flags]
 
 ```
   -h, --help            help for addressing
-      --keep-env        switch run.toml only, leaving the worktrees' .env files as they are
+      --keep-env        Switch run.toml only, leaving the worktrees' .env files as they are
       --output string   Output format: text or json (default "text")
   -y, --yes             Skip the prompts; [names|ports] is then required
 ```

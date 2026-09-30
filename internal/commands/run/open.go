@@ -26,7 +26,7 @@ func newOpenCmd() *cobra.Command {
 	}
 	shared.AddJobFlag(cmd, "Job whose URL to open (required when several jobs publish one, outside a fully interactive run)")
 	cmd.Flags().Bool(domain.FlagRaw, false, "Open the port URL (http://localhost:<port>) instead of the named URL")
-	shared.AddYesFlag(cmd, "Skip the pickers; --job is then required when several jobs publish a url")
+	shared.AddYesFlag(cmd, "Skip the pickers; --job is then required when several jobs publish a URL")
 	shared.AddOutputFlag(cmd)
 	return cmd
 }

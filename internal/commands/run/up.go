@@ -44,7 +44,7 @@ func newUpCmd() *cobra.Command {
 	cmd.MarkFlagsMutuallyExclusive(domain.FlagExclusive, domain.FlagParallel)
 	cmd.Flags().BoolP(domain.FlagDetach, "d", false, "Start the jobs and return immediately instead of opening their output")
 	cmd.Flags().Bool(domain.FlagNoProbe, false, "Skip the check that each declared port was actually bound")
-	cmd.Flags().Bool(domain.FlagForce, false, "Lift the refusal to start a job whose touches reach foreign data (see `wtm run --help`); other questions are still asked unless --yes")
+	cmd.Flags().Bool(domain.FlagForce, false, "Lift the refusal to start a job whose touches reach foreign data (see wtm run --help); other questions are still asked unless --yes")
 	shared.AddYesFlag(cmd, "Skip all prompts; leaves the other worktrees' jobs running unless --exclusive")
 	shared.AddOutputFlag(cmd)
 

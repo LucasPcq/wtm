@@ -42,19 +42,19 @@ wtm run job edit [name] [flags]
   -h, --help                        help for edit
       --kind string                 Job kind: service or task
       --name string                 Rename the job, updating the profiles, runs, touches, [[env_port]] and [[env]] links that name it
-      --namespace-create string     Command carving the slice out, run on every start of the shared service (must be safe to rerun)
+      --namespace-create string     Command creating the namespace, run on every start of the shared service (must be safe to rerun)
       --namespace-env stringArray   Extra variable for the namespace commands as KEY=VALUE, repeatable — replaces the table (pass '' to drop it)
-      --namespace-name string       Name of each worktree's slice of a shared service (pass '' to withdraw the whole [job.namespace])
-      --namespace-remove string     Command dropping the slice, run by wtm clean (pass '' to drop it)
+      --namespace-name string       Name of each worktree's namespace in a shared service (pass '' to withdraw the whole [job.namespace])
+      --namespace-remove string     Command dropping the namespace, run by wtm clean (pass '' to drop it)
       --output string               Output format: text or json (default "text")
       --port stringArray            Base port as NAME=PORT, repeatable — merged into the declared ports
       --port-clear                  Drop every port this job declares
       --runs stringArray            Declared job this one starts itself, repeatable — replaces the list (pass '' to drop it)
-      --scope string                shared runs one instance for the whole repository; worktree one per worktree
+      --scope string                Where the job runs: shared (one instance for the whole repository) or worktree (one per worktree)
       --stop string                 Stop command, as a /bin/sh line (pass '' to drop it)
       --touches stringArray         Declared service whose data this job changes (a migration, a reset, a seed), repeatable — replaces the list (pass '' to drop it)
       --url-host string             Host segment to publish under (pass '' to fall back to the job's name)
-      --url-port string             Publish this declared port under a name (pass '' to withdraw the url)
+      --url-port string             Publish this declared port under a name (pass '' to withdraw the named URL)
   -y, --yes                         Skip all prompts; a field flag is then required
 ```
 
