@@ -1173,7 +1173,6 @@ const (
 	// The .env port report. Unlike a compose mapping, a declared port only
 	// isolates the job if its command actually reads the variable — which wtm
 	// does not know and does not guess, so the notice asks.
-	EnvPortDetectedLineFmt  = "%s · %s=%d (%s)"
 	PortIsolationTitle      = "These jobs will bind the same port in every worktree"
 	PortIsolationLineFmt    = "%s   %s"
 	PortIsolationNoPort     = "no port declared"
@@ -2145,6 +2144,9 @@ const (
 
 	// DaemonSocketName is the Unix socket filename for the service daemon.
 	DaemonSocketName = "wtm.sock"
+	// DaemonLockName is the file a daemon holds locked for its whole life, beside
+	// the socket: the socket closes before the process exits, the lock does not.
+	DaemonLockName = "wtm.lock"
 
 	// DaemonIdleTimeoutSeconds is how long the daemon waits with no services before auto-exit.
 	DaemonIdleTimeoutSeconds = 30
@@ -2156,7 +2158,7 @@ const (
 	// stop answering.
 	DaemonPollInterval = 50 * time.Millisecond
 	// DaemonStopTimeout bounds the wait for a daemon to exit once asked: it
-	// stops its foreground jobs one by one, each with JobStopGracePeriod.
+	// stops its foreground jobs together, each with JobStopGracePeriod.
 	DaemonStopTimeout = 30 * time.Second
 	// JobStopGracePeriod is how long a process group has between SIGTERM and
 	// SIGKILL: long enough for a dev server to flush its children, short enough
@@ -2502,6 +2504,9 @@ const (
 	RunViewAbortRunningFmt    = "left running: %s"
 	RunViewAbortNotStartedFmt = "not started: %s"
 	RunViewAbortDismiss       = "esc dismisses this report"
+	// RunViewWarningsTitle heads what the run could not do beside a job that
+	// did start — the stream's `!` lines.
+	RunViewWarningsTitle = "Needs attention"
 
 	// RunViewRecapTitle heads the recap printed once the screen is given back,
 	// and RunViewRecap*Fmt are its lines: what is running, what ran, what did
@@ -2541,11 +2546,8 @@ const (
 	RunStreamWorktreeFmt  = "%s · %s"
 	RunStreamWorktreesFmt = "%d worktrees"
 	RunStreamStartedFmt   = "%s started"
-	// RunPortsSuffixFmt qualifies a name with the ports behind it — the line
-	// announcing a started job, and the recap of what a job gained.
-	// RunPortEntryFmt is one of those ports.
-	RunPortsSuffixFmt = "%s · %s"
-	RunPortEntryFmt   = "%s=%d"
+	// RunPortEntryFmt is one port of a job, in the NAME=PORT form ParsePorts reads.
+	RunPortEntryFmt = "%s=%d"
 	// HyperlinkFmt wraps text in an OSC-8 sequence, the escape a terminal turns
 	// into a clickable link: URL first, then the text it stands behind.
 	HyperlinkFmt = "\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\"
@@ -3779,11 +3781,12 @@ const (
 	RunDetachedNamespaceFmt     = "%s: %s ready"
 	RunDetachedAlreadyFmt       = "%s was already up"
 	RunDetachedAlreadyJoinedFmt = "%s was already joined"
-	// RunDetached{Crashed,Probe*,Left*,Concluded,Aborted}* are the rest of what the
+	// RunDetached{Crashed,Probe*,Warning,Left*,Concluded,Aborted}* are the rest of what the
 	// CLI says about a run, in the panel's register: a line each, the glyph
 	// leading, detail indented under the line it belongs to.
 	RunDetachedCrashedFmt    = GlyphAttention + " " + RunStreamCrashedFmt
 	RunDetachedProbeTitle    = GlyphAttention + " " + PortProbeTitle
+	RunDetachedWarningFmt    = GlyphAttention + " %s"
 	RunDetachedDetailFmt     = "  %s"
 	RunDetachedLeftRunning   = "  left running: %s"
 	RunDetachedNotStarted    = "  not started: %s"

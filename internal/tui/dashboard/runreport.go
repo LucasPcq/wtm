@@ -21,6 +21,8 @@ func runEventLines(event runlogs.Event) []string {
 			reason = fmt.Sprintf(domain.RunStreamCrashedCodeFmt, reason, *event.ExitCode)
 		}
 		return []string{fmt.Sprintf(domain.RunDetachedCrashedFmt, event.Job, reason)}
+	case runlogs.PhaseWarning:
+		return []string{fmt.Sprintf(domain.RunDetachedWarningFmt, event.Notice)}
 	case runlogs.PhaseProbed:
 		probes := rules.PortProbeLines(event.Probes)
 		if len(probes) == 0 {

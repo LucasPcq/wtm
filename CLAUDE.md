@@ -226,7 +226,7 @@ Whatever answers, a resolved worktree is always **the worktree root as git spell
 
 Implementation rule: fold `--yes` into the command's `interactive` boolean (`interactive := isTTY && IsHumanFormat(format) && !yes`); every picker/prompt gates on `interactive`, and each required-selection guard returns a sentinel error when it is false. See `internal/commands/wt/extract.go`, and — for a migrated command — `internal/flow/sync/steps.go` (`selectionStep`'s `Resolve`, which names `--all` instead of falling back to a picker). Route decision defaults through a pure rule where one exists (`rules.DecidePush` takes a `Yes` field).
 
-**Recap completeness:** every recap builder reads the value from its wizard step, **else falls back to the flag/arg** that resolved it. A flag must never make a line disappear from the recap. A migrated command gets this from `Session.Presets` (a preset step is not asked but is still read back — see `internal/flow/create/steps.go` `createFlow.recap`); the others do it in their recap builder (e.g. `internal/tui/extract` `buildCombinedRecap`, `internal/tui/newwt` `buildCreateRecap`, `internal/tui/checkout` `buildCheckoutRecap`).
+**Recap completeness:** every recap builder reads the value from its wizard step, **else falls back to the flag/arg** that resolved it. A flag must never make a line disappear from the recap. A migrated command gets this from `Session.Presets` (a preset step is not asked but is still read back — see `internal/flow/create/steps.go` `createFlow.recap`); the others do it in their recap builder (e.g. `internal/tui/extract` `buildCombinedRecap`, `internal/tui/checkout` `buildCheckoutRecap`).
 
 **Re-init completeness:** a re-init step always shows the **complete** list of candidates, pre-filled from the config on disk when that config speaks about them, and from detection otherwise — never a subset. Any step whose answer may legitimately be empty is read as a pair `(value, asked)`: empty-and-asked withdraws, empty-and-not-asked leaves the proposal standing. The pairs are `URLsAsked`, `ProfilesAsked`, `EnvLinksAsked` and `SelectionAsked` in `domain.InitProjectAnswers`. This is the write-side counterpart of the rule above: a flag must not erase a recap line, and a step must not reinstate what the user removed.
 
@@ -246,6 +246,7 @@ Every commit message — subject and body — is written in **English**, whateve
 make lint     # fmt + vet + arch + dead + staticcheck — all gating
 make test     # go test ./... -race -count=1
 make dupl     # clone report, informative only
+make dead-strict  # deadcode without -test: code only a test still reaches, informative only
 ```
 
 | Check | Catches | Why staticcheck cannot |
@@ -269,7 +270,7 @@ make dupl     # clone report, informative only
 
 The exceptions to `dead` live in `.deadcode-ignore`, one regex per line **with its reason** — reachable by a route the analysis cannot follow (a method satisfying an interface asserted on an `any`, so far). Anything unlisted fails.
 
-`.archlint-migrating` is the same idea for what predates a rule: `<rule> <path regex>` lines that report as `(migrating)` without failing. **It may only shrink.** A new entry is a decision to take knowingly and belongs in a ticket, never a way to get a commit past the linter.
+`.archlint-migrating` is the same idea for what predates a rule: `<rule> <path regex> <sites>` lines that report as `(migrating)` without failing. **It may only shrink**, and that is checked: each entry — like each rune of `fontLegacy` — records how many sites it covers, one site more fails `make lint`, and a count higher than needed is reported as a note to lower it. A new entry is a decision to take knowingly and belongs in a ticket, never a way to get a commit past the linter.
 
 `make dupl` is deliberately outside `lint`: a clone is a judgement call. Two parallel families over unrelated types — `flow/run/job` and `flow/run/profile` — read better duplicated than behind a generic, so the report informs a review rather than gating one.
 

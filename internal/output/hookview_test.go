@@ -186,7 +186,7 @@ func TestHookViewMovesBackExactlyTheRowsItPrinted(t *testing.T) {
 // makes the cursor arithmetic above wrong.
 func TestHookViewMeasuresATabAsTheColumnsItTakes(t *testing.T) {
 	got := styles.ExpandTabs("a\tb")
-	if strings.Contains(got, "\t") || styles.VisibleWidth(got) != 2+domain.TabWidth {
+	if strings.Contains(got, "\t") || len(got) != 2+domain.TabWidth {
 		t.Errorf("ExpandTabs(%q) = %q, want the tab spelled out", "a\tb", got)
 	}
 }

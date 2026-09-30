@@ -8,13 +8,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
-// VisibleWidth is what a string occupies on screen: escape sequences count for
-// nothing, and a CJK glyph or an emoji for more than one column. A line measured
-// in runes and cut to the terminal's width still wraps.
-func VisibleWidth(s string) int {
-	return ansi.StringWidth(s)
-}
-
 type TruncateParams struct {
 	Value string
 	Width int

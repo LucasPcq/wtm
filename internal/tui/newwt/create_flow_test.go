@@ -235,94 +235,6 @@ func existingTarget(branch string) func(string) domain.BranchTarget {
 	}
 }
 
-// TestBuildCreateRecapKeepsEveryLineFromFlags is the CLAUDE.md recap-completeness
-// rule: a flag must never make a line disappear from the recap.
-func TestBuildCreateRecapKeepsEveryLineFromFlags(t *testing.T) {
-	recap := buildCreateRecap(nil, WizardParams{
-		BranchName:  "feat/x",
-		Source:      "main",
-		EnvOverride: "example",
-	})
-
-	for _, want := range []string{"Branch:    feat/x", "Source:    main", "Env:       example"} {
-		if !strings.Contains(recap, want) {
-			t.Errorf("recap %q should contain %q", recap, want)
-		}
-	}
-}
-
-// TestBuildCreateRecapLabelsConfigDefaultEnv keeps the empty env choice explicit
-// rather than blank.
-func TestBuildCreateRecapLabelsConfigDefaultEnv(t *testing.T) {
-	recap := buildCreateRecap(nil, WizardParams{BranchName: "feat/x", Source: "main"})
-	if !strings.Contains(recap, "Env:       config default") {
-		t.Errorf("recap %q should label the empty env choice", recap)
-	}
-}
-
-// TestBuildCreateRecapNamesParentForReusedBranch: a reused branch is checked out
-// as-is, so the source is only the recorded sync parent — the recap must say so.
-func TestBuildCreateRecapNamesParentForReusedBranch(t *testing.T) {
-	recap := buildCreateRecap(nil, WizardParams{
-		BranchName:  "feat/x",
-		Source:      "main",
-		EnvOverride: "example",
-		Target:      existingTarget("feat/x"),
-	})
-
-	if !strings.Contains(recap, "Parent:    main") {
-		t.Errorf("recap %q should label the source as the recorded parent", recap)
-	}
-	if strings.Contains(recap, "Source:    ") {
-		t.Errorf("recap %q must not present the parent as a start-point", recap)
-	}
-	if !strings.Contains(recap, domain.BranchReusedSuffix) {
-		t.Errorf("recap %q should mark the branch as reused", recap)
-	}
-}
-
-// chosenStep fabricates a completed select step holding value, so the recap
-// builders can be exercised without driving a whole wizard.
-func chosenStep(name, value string) components.Step {
-	return components.Step{
-		Name: name,
-		Model: components.NewSelectList(components.NewSelectListParams{
-			Items: []components.SelectItem{{Label: value, Value: value}},
-		}),
-	}
-}
-
-// TestBuildCreateRecapFastForwardFollowsItsSubject: the annotation sits on the
-// source line when the source is fast-forwarded, and becomes its own "Update:"
-// line when the subject is the reused branch instead.
-func TestBuildCreateRecapFastForwardFollowsItsSubject(t *testing.T) {
-	steps := []components.Step{chosenStep(stepSourceUpd, sourceFastForward)}
-
-	onSource := buildCreateRecap(steps, WizardParams{
-		BranchName:   "feat/x",
-		Source:       "main",
-		EnvOverride:  "example",
-		SourceUpdate: ffOffer("main"),
-	})
-	if !strings.Contains(onSource, "Source:    main (fast-forward to origin)") {
-		t.Errorf("recap %q should annotate the source line", onSource)
-	}
-
-	onBranch := buildCreateRecap(steps, WizardParams{
-		BranchName:   "feat/x",
-		Source:       "main",
-		EnvOverride:  "example",
-		Target:       existingTarget("feat/x"),
-		SourceUpdate: ffOffer("feat/x"),
-	})
-	if !strings.Contains(onBranch, "fast-forward feat/x to origin") {
-		t.Errorf("recap %q should carry its own update line for the reused branch", onBranch)
-	}
-	if strings.Contains(onBranch, "Parent:    main (fast-forward") {
-		t.Errorf("recap %q must not annotate the parent it does not move", onBranch)
-	}
-}
-
 // TestCreateWarningsSurfaceBothDeciders: a diverged source and the env fallback
 // are the two ⚠ lines the recap must carry — they are the only warning of a
 // consequence the user cannot see anywhere else.
@@ -346,9 +258,6 @@ func TestCreateWarningsSurfaceBothDeciders(t *testing.T) {
 			t.Errorf("warning %q should be marked with ⚠", w)
 		}
 	}
-	if !strings.Contains(buildCreateRecap(nil, params), warnings[0]) {
-		t.Error("the recap should embed the warnings")
-	}
 }
 
 // TestCreateWarningsSilentWhenNothingToWarnAbout guards the other direction: no
@@ -364,26 +273,5 @@ func TestCreateWarningsSilentWhenNothingToWarnAbout(t *testing.T) {
 	})
 	if len(warnings) != 0 {
 		t.Errorf("warnings = %v, want none", warnings)
-	}
-}
-
-// TestExtractResultMapsTheRecapCancel: the recap's "No, cancel" row is the wizard's
-// single cancellation point — the host turns it into ErrUserAborted, and every
-// other answer completes the run.
-func TestExtractResultMapsTheRecapCancel(t *testing.T) {
-	params := WizardParams{BranchName: "feat/x", Source: "main", EnvOverride: "example"}
-
-	cancelled := components.NewWizard([]components.Step{chosenStep(stepConfirm, domain.WizardCancelValue)})
-	if _, err := extractResult(cancelled, params); err != domain.ErrUserAborted {
-		t.Errorf("err = %v, want ErrUserAborted", err)
-	}
-
-	confirmed := components.NewWizard([]components.Step{chosenStep(stepConfirm, createConfirm)})
-	got, err := extractResult(confirmed, params)
-	if err != nil {
-		t.Fatalf("confirming the recap: %v", err)
-	}
-	if got.FromBranch != "main" {
-		t.Errorf("FromBranch = %q, want the confirmed answers", got.FromBranch)
 	}
 }

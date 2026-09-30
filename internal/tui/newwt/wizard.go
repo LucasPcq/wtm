@@ -407,58 +407,6 @@ func resolveIsolation(steps []components.Step, params WizardParams) domain.Isola
 	return components.IsolationAnswer(steps, params.IsolationDefault)
 }
 
-// buildCreateRecap recaps the selections with ⚠ lines for a diverged source and
-// the env fallback, using the same deciders the steps did.
-func buildCreateRecap(prev []components.Step, params WizardParams) string {
-	source := resolveSource(prev, params)
-	env := resolveEnv(prev, params)
-	envLabel := env
-	if envLabel == "" {
-		envLabel = "config default"
-	}
-
-	branchName := resolveBranchName(prev, params)
-	reused := reusesBranch(prev, params)
-	ffBranch := fastForwardBranch(prev, params)
-
-	branchLabel := branchName
-	if reused {
-		branchLabel += domain.BranchReusedSuffix
-	}
-
-	// The source line is a start-point for a new branch and only the recorded sync
-	// parent for a reused one; the fast-forward annotation follows its subject.
-	sourceField := domain.RecapFieldSource
-	if reused {
-		sourceField = domain.RecapFieldParent
-	}
-	sourceLabel := source
-	if ffBranch != "" && ffBranch == source {
-		sourceLabel += " (fast-forward to origin)"
-	}
-
-	var lines []string
-	if branchLabel != "" {
-		lines = append(lines, domain.RecapFieldBranch+branchLabel)
-	}
-	lines = append(lines,
-		sourceField+sourceLabel,
-		domain.RecapFieldEnv+envLabel,
-	)
-	if line, shown := IsolationRecapLine(prev, params); shown {
-		lines = append(lines, line)
-	}
-	if ffBranch != "" && ffBranch != source {
-		lines = append(lines, fmt.Sprintf(domain.RecapUpdateFastForward, ffBranch))
-	}
-
-	if warnings := CreateWarnings(prev, params); len(warnings) > 0 {
-		lines = append(lines, "")
-		lines = append(lines, warnings...)
-	}
-	return strings.Join(lines, "\n")
-}
-
 // CreateWarnings returns the ⚠ recap lines for the create sub-flow — a diverged
 // source and the env fallback — from the same deciders the steps used. Exposed so
 // a host wizard (extract) can fold them into its combined recap.
@@ -481,16 +429,6 @@ func CreateWarnings(steps []components.Step, params WizardParams) []string {
 		}
 	}
 	return warnings
-}
-
-// extractResult reads the wizard answers, translating the recap's "No, cancel"
-// into ErrUserAborted.
-func extractResult(final components.WizardModel, params WizardParams) (WizardResult, error) {
-	steps := final.Steps()
-	if stepValueByName(steps, stepConfirm) == domain.WizardCancelValue {
-		return WizardResult{}, domain.ErrUserAborted
-	}
-	return ReadCreateResult(steps, params), nil
 }
 
 func stepIndexByName(steps []components.Step, name string) int {

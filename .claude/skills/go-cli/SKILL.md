@@ -682,8 +682,7 @@ Reference: `internal/flow/create/steps.go` (`createFlow.recap`), pinned by
 
 **Non-migrated wizards** still do it by hand: each `build*Recap` / `recapStep` reads the
 value from its wizard step and **falls back to the flag/arg** when that step was skipped.
-References: `internal/tui/extract` `buildCombinedRecap` (`FixedFiles`/`FixedTarget`/`FixedKeep`),
-`internal/tui/newwt` `buildCreateRecap` (`BranchName`/`Source`/`EnvOverride`), `internal/tui/checkout`
+References: `internal/tui/extract` `buildCombinedRecap` (`FixedFiles`/`FixedTarget`/`FixedKeep`), `internal/tui/checkout`
 `buildCheckoutRecap` (`FromOverride`/`EnvOverride`). Add the fallback whenever you add a flag
 that pre-fills a step.
 

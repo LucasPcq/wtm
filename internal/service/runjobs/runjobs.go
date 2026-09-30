@@ -6,6 +6,7 @@ package runjobs
 import (
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
 )
@@ -48,7 +49,19 @@ func List() Listing {
 	if err != nil {
 		return Listing{}
 	}
-	return Listing{Jobs: resp.Jobs, DaemonVersion: resp.Version, Reached: true}
+	return Listing{Jobs: liveJobs(resp.Jobs), DaemonVersion: resp.Version, Reached: true}
+}
+
+// liveJobs asks the disk once per worktree: the daemon keeps a stopped job's
+// entry after its worktree was cleaned, and never runs git to find out.
+func liveJobs(jobs []domain.JobInfo) []domain.JobInfo {
+	exists := map[string]bool{}
+	for _, job := range jobs {
+		if _, seen := exists[job.WorkDir]; !seen {
+			exists[job.WorkDir] = infra.FileExists(job.WorkDir)
+		}
+	}
+	return rules.JobsOfLiveWorktrees(rules.JobsOfLiveWorktreesParams{Jobs: jobs, Exists: exists})
 }
 
 // Load is List for a caller whose question is only what is running.
@@ -72,5 +85,5 @@ func Peek() (jobs []domain.JobInfo, known bool) {
 	if err != nil {
 		return nil, false
 	}
-	return resp.Jobs, true
+	return liveJobs(resp.Jobs), true
 }

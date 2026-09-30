@@ -40,6 +40,15 @@ func TestTheDetachedSinkReportsACrash(t *testing.T) {
 	}
 }
 
+func TestTheDetachedSinkReportsAWarning(t *testing.T) {
+	body := sequenceLines(t, func(sink runlogs.Sink) {
+		sink.Emit(runlogs.Event{Phase: runlogs.PhaseWarning, Job: "postgres", Notice: "postgres: could not record"})
+	})
+	if !strings.Contains(body, domain.GlyphAttention+" postgres: could not record") {
+		t.Errorf("output = %q, want the warning in the attention register", body)
+	}
+}
+
 func TestTheDetachedSinkReportsPortsNobodyBound(t *testing.T) {
 	body := sequenceLines(t, func(sink runlogs.Sink) {
 		sink.Emit(runlogs.Event{Phase: runlogs.PhaseProbed, Job: "web", Probes: []domain.PortProbe{

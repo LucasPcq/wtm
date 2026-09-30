@@ -223,27 +223,6 @@ func TestBackfillScriptPortsDoesNotMutateTheInputConfig(t *testing.T) {
 	}
 }
 
-func TestEnvPortsWrittenLinesNamesTheSourceFile(t *testing.T) {
-	lines := EnvPortsWrittenLines(EnvPortsWrittenLinesParams{
-		Written: map[string]map[string]int{
-			"web-dev": {"PORT": 3000},
-			"api-dev": {"API_PORT": 4000},
-		},
-		Sources: map[string]map[string]string{
-			"web-dev": {"PORT": "apps/web/.env"},
-			"api-dev": {"API_PORT": "apps/api/.env.example"},
-		},
-	})
-
-	want := []string{
-		"api-dev · API_PORT=4000 (apps/api/.env.example)",
-		"web-dev · PORT=3000 (apps/web/.env)",
-	}
-	if !reflect.DeepEqual(lines, want) {
-		t.Errorf("lines = %v, want %v", lines, want)
-	}
-}
-
 // A root .env holds the compose stack's ports. Every script sharing that
 // directory used to claim them, and the collision resolver then kept whichever
 // copy it saw last — leaving `docker compose`, the job that actually binds

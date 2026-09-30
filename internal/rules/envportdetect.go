@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -162,23 +161,4 @@ func BackfillScriptPorts(params BackfillScriptPortsParams) BackfillScriptPortsRe
 	}
 
 	return result
-}
-
-type EnvPortsWrittenLinesParams struct {
-	Written map[string]map[string]int
-	Sources map[string]map[string]string
-}
-
-// EnvPortsWrittenLines renders the recap body: one line per declared port,
-// naming the file it was read from so the user can go check the value.
-func EnvPortsWrittenLines(params EnvPortsWrittenLinesParams) []string {
-	var lines []string
-	for _, job := range sortedKeys(params.Written) {
-		for _, name := range sortedPortNames(params.Written[job]) {
-			lines = append(lines, fmt.Sprintf(
-				domain.EnvPortDetectedLineFmt, job, name, params.Written[job][name], params.Sources[job][name],
-			))
-		}
-	}
-	return lines
 }

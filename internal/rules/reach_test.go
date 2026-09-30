@@ -42,15 +42,15 @@ func TestReachSummaryCarriesOneFragment(t *testing.T) {
 	}
 }
 
-func TestReachLinesPutURLsFirstAndNameARunnersApps(t *testing.T) {
-	lines := rules.ReachLines(rules.ReachLinesParams{Entries: []domain.ReachEntry{
+func TestReachBlockPutURLsFirstAndNameARunnersApps(t *testing.T) {
+	lines := soleWorktreeReach([]domain.ReachEntry{
 		{Job: "postgres", Ports: []domain.NamedPort{{Name: "POSTGRES_PORT", Port: 5432}}, Namespace: "app_main"},
 		{Job: "dev:shop", URLs: []domain.JobURLEntry{
 			{Job: "shop-web", URL: "http://shop-web.main.app.localhost"},
 			{Job: "shop-api", URL: "http://shop-api.main.app.localhost"},
 		}},
 		{Job: "migrate"},
-	}})
+	})
 
 	want := []string{
 		"shop-web  http://shop-web.main.app.localhost",
@@ -62,12 +62,10 @@ func TestReachLinesPutURLsFirstAndNameARunnersApps(t *testing.T) {
 	}
 }
 
-func TestReachLinesListManyPortsOnePerLine(t *testing.T) {
-	lines := rules.ReachLines(rules.ReachLinesParams{
-		Entries: []domain.ReachEntry{{Job: "compose", Ports: rules.NamedPorts(map[string]int{
-			"REDIS_PORT": 6379, "MINIO_PORT": 9000, "MINIO_CONSOLE_PORT": 9001, "ADMINER_PORT": 8080,
-		})}},
-	})
+func TestReachBlockListManyPortsOnePerLine(t *testing.T) {
+	lines := soleWorktreeReach([]domain.ReachEntry{{Job: "compose", Ports: rules.NamedPorts(map[string]int{
+		"REDIS_PORT": 6379, "MINIO_PORT": 9000, "MINIO_CONSOLE_PORT": 9001, "ADMINER_PORT": 8080,
+	})}})
 
 	want := []string{
 		"compose  adminer        :8080",
@@ -80,8 +78,8 @@ func TestReachLinesListManyPortsOnePerLine(t *testing.T) {
 	}
 }
 
-func TestReachLinesSayNothingWhenNothingIsReachable(t *testing.T) {
-	if lines := rules.ReachLines(rules.ReachLinesParams{Entries: []domain.ReachEntry{{Job: "migrate"}}}); lines != nil {
+func TestReachBlockSayNothingWhenNothingIsReachable(t *testing.T) {
+	if lines := soleWorktreeReach([]domain.ReachEntry{{Job: "migrate"}}); lines != nil {
 		t.Errorf("lines = %q, want none", lines)
 	}
 }
@@ -149,4 +147,12 @@ func TestReachBlockListsASharedServiceOnceAboveSeveralWorktrees(t *testing.T) {
 	if sections[1].Title != "main" || sections[2].Title != "feat" || sections[2].Worktree != "feat" {
 		t.Errorf("sections = %+v, want main then feat, titled by name", sections)
 	}
+}
+
+func soleWorktreeReach(entries []domain.ReachEntry) []string {
+	var lines []string
+	for _, section := range rules.ReachBlock(rules.ReachBlockParams{Worktrees: []rules.ReachWorktree{{Name: "main", Entries: entries}}}) {
+		lines = append(lines, section.Lines...)
+	}
+	return lines
 }

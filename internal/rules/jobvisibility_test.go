@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -112,5 +113,28 @@ func TestCountUpCountsOnlyWhatIsActuallyUp(t *testing.T) {
 
 	if up := CountUp(visible); up != 1 {
 		t.Errorf("up = %d, want only the running job counted", up)
+	}
+}
+
+// A cleaned worktree's stopped row named a path nothing lives at any more, for
+// as long as the daemon lived. A job still up there is real whatever the disk
+// says, and keeps its row.
+func TestJobsOfVanishedWorktreesKeepOnlyWhatIsUp(t *testing.T) {
+	jobs := []domain.JobInfo{
+		{Name: "api", WorkDir: "/wt/gone", Status: domain.JobStatusStopped},
+		{Name: "web", WorkDir: "/wt/gone", Status: domain.JobStatusRunning},
+		{Name: "db", WorkDir: "/wt/gone", Status: domain.JobStatusCrashed},
+		{Name: "api", WorkDir: "/wt/here", Status: domain.JobStatusStopped},
+	}
+
+	got := JobsOfLiveWorktrees(JobsOfLiveWorktreesParams{Jobs: jobs, Exists: map[string]bool{"/wt/here": true}})
+
+	var names []string
+	for _, info := range got {
+		names = append(names, info.Name+"@"+info.WorkDir)
+	}
+	want := []string{"web@/wt/gone", "api@/wt/here"}
+	if strings.Join(names, " ") != strings.Join(want, " ") {
+		t.Errorf("kept %v, want %v", names, want)
 	}
 }

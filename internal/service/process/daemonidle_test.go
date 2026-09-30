@@ -137,3 +137,28 @@ func TestDaemonIdleExitsWithNothingInFlight(t *testing.T) {
 		t.Errorf("socket still on disk, want it removed on exit")
 	}
 }
+
+// Idleness counts from the last request, not from whenever the watcher last
+// ticked: a command between two requests — a wizard open over `run up` — found
+// the socket gone and failed its next one.
+func TestDaemonIdleCountsFromTheLastRequest(t *testing.T) {
+	idle := 300 * time.Millisecond
+	daemon := idleDaemon(t, idle, time.Second)
+
+	until := time.Now().Add(3 * idle)
+	for time.Now().Before(until) {
+		select {
+		case err := <-daemon.exited:
+			t.Fatalf("daemon exited (%v) while a client was talking to it", err)
+		default:
+		}
+		daemon.answer(t, Request{Action: ActionList})
+		time.Sleep(idle / 3)
+	}
+
+	select {
+	case <-daemon.exited:
+	case <-time.After(4 * idle):
+		t.Fatal("daemon still running once the requests stopped, want it exited on idle")
+	}
+}

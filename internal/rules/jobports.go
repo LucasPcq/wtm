@@ -175,22 +175,6 @@ func sortedPortNames(ports map[string]int) []string {
 	return names
 }
 
-type LabelWithPortsParams struct {
-	Label string
-	Ports map[string]int
-}
-
-// LabelWithPorts appends the ports a job bound to the line naming it, so the
-// user reading it knows where to reach that worktree's copy. A job declaring
-// none reads exactly as it did before.
-func LabelWithPorts(params LabelWithPortsParams) string {
-	if len(params.Ports) == 0 {
-		return params.Label
-	}
-
-	return fmt.Sprintf(domain.RunPortsSuffixFmt, params.Label, strings.Join(PortEntries(params.Ports), " "))
-}
-
 // PortEntries writes ports back in the NAME=PORT form ParsePorts reads, sorted
 // so a rewritten declaration keeps a stable order.
 func PortEntries(ports map[string]int) []string {
