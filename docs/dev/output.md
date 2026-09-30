@@ -156,7 +156,7 @@ A **state readout** may not hide a non-event as a field value either. `not runni
 | `Section` | title + indented free lines | a script, a file's contents, a listing |
 | `Callout` | a bordered box | **only** something the reader still has to act on |
 
-`flow.Notice` carries that last distinction across the seam: `NoticeNote` is what the reader has nothing to do about — a property of the machine, or of the file that was just written — and takes `Section`; a warning carrying lines is what wtm declined to do, and keeps the border. The port pass is both at once: the links it left alone are bordered, `Addresses carry the proxy's port` is not.
+`flow.Notice` carries that last distinction across the seam: `NoticeNote` is what the reader has nothing to do about — a property of the machine, or of the file that was just written — and takes `Section`; a warning carrying lines is what wtm declined to do, and keeps the border. The port pass is both at once: the links it left alone are bordered, `Addresses carry the proxy's port` is not — and that one is said by `wtm env` and `wtm run addressing`, whose subject it is, never by a creation (`rules.EnvPortNoticesOnCreate`).
 
 The alignment belongs to `Announce`, never to the wording: a format string spelling `"State      %s"` hand-aligns one block against nothing, and its sibling three files away picks a different column.
 

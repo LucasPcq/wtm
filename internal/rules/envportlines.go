@@ -272,10 +272,7 @@ func EnvPortNotices(plan domain.EnvPortPlan) []EnvPortNotice {
 	}
 
 	if plan.PublicPort == 0 {
-		return []EnvPortNotice{{
-			Title: domain.EnvOriginProxyOffTitle,
-			Line:  domain.EnvOriginProxyOffLine,
-		}}
+		return EnvPortNoticesOnCreate(plan)
 	}
 	if plan.PublicPort == domain.ProxyPrivilegedPort || !writesAddresses(plan) {
 		return nil
@@ -283,6 +280,19 @@ func EnvPortNotices(plan domain.EnvPortPlan) []EnvPortNotice {
 	return []EnvPortNotice{{
 		Title: domain.EnvOriginPortedTitle,
 		Line:  fmt.Sprintf(domain.EnvOriginPortedFmt, plan.PublicPort),
+	}}
+}
+
+// EnvPortNoticesOnCreate is what a new worktree's pass says: only that named
+// addresses could not be written. The proxy's port is a property of the machine,
+// told by `wtm env` and `wtm run addressing` rather than by every creation.
+func EnvPortNoticesOnCreate(plan domain.EnvPortPlan) []EnvPortNotice {
+	if plan.Addressing != domain.AddressingNames || len(plan.Entries) == 0 || plan.PublicPort != 0 {
+		return nil
+	}
+	return []EnvPortNotice{{
+		Title: domain.EnvOriginProxyOffTitle,
+		Line:  domain.EnvOriginProxyOffLine,
 	}}
 }
 

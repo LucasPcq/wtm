@@ -49,6 +49,15 @@ func DefaultIsolation(ctx flow.Context) domain.Isolation {
 // where it is one confirmation among the others rather than a second one, put
 // after the point of no return. What is left here is a report of what happened.
 func Settle(params Params) (domain.EnvPortPlan, error) {
+	return settle(settleParams{Params: params, Notices: rules.EnvPortNotices})
+}
+
+type settleParams struct {
+	Params
+	Notices func(domain.EnvPortPlan) []rules.EnvPortNotice
+}
+
+func settle(params settleParams) (domain.EnvPortPlan, error) {
 	resolved, err := worktree.ResolveEnvPorts(worktree.ResolveEnvPortsParams{
 		ProjectDir:   params.Context.ProjectDir,
 		StateDir:     params.Context.StateDir,
@@ -68,7 +77,7 @@ func Settle(params Params) (domain.EnvPortPlan, error) {
 	if anomalies := rules.EnvPortAnomalyLines(plan); len(anomalies) > 0 {
 		params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: domain.EnvPortAnomaliesTitle, Lines: anomalies})
 	}
-	for _, notice := range rules.EnvPortNotices(plan) {
+	for _, notice := range params.Notices(plan) {
 		params.Presenter.Status(flow.Notice{Kind: flow.NoticeNote, Text: notice.Title, Lines: []string{notice.Line}})
 	}
 
@@ -103,7 +112,7 @@ func SettleFresh(params FreshParams) (domain.EnvPortPlan, []string) {
 	if params.Preflight != nil {
 		return domain.EnvPortPlan{}, notSettled(notSettledParams{Params: params.Params, Cause: params.Preflight, RunConfig: true})
 	}
-	plan, err := Settle(params.Params)
+	plan, err := settle(settleParams{Params: params.Params, Notices: rules.EnvPortNoticesOnCreate})
 	if err != nil {
 		return domain.EnvPortPlan{}, notSettled(notSettledParams{Params: params.Params, Cause: err})
 	}

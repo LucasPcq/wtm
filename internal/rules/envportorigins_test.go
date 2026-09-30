@@ -314,3 +314,15 @@ func TestPlanEnvPortsRewindsAParentWorktreesPorts(t *testing.T) {
 		}
 	}
 }
+
+// A creation says only what went wrong: the proxy's port is a property of the
+// machine, told by `wtm env` and `run addressing`, not by every new worktree.
+func TestEnvPortNoticesOnCreateKeepOnlyTheProxyOff(t *testing.T) {
+	if got := rules.EnvPortNoticesOnCreate(planFixture(domain.AddressingNames, 10080, portedValues)); len(got) != 0 {
+		t.Errorf("a ported address on create printed %+v, want nothing", got)
+	}
+	got := rules.EnvPortNoticesOnCreate(planFixture(domain.AddressingNames, 0, portedValues))
+	if len(got) != 1 || got[0].Title != domain.EnvOriginProxyOffTitle {
+		t.Errorf("proxy off on create = %+v, want its notice", got)
+	}
+}
