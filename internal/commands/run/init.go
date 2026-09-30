@@ -26,7 +26,7 @@ import (
 )
 
 // newInitCmd creates the wtm run init subcommand — the dedicated entry point
-// that configures the (experimental) run module, kept out of the global
+// that configures the run module, kept out of the global
 // `wtm init` wizard so users who never touch `run` aren't bothered by it.
 func newInitCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -68,8 +68,7 @@ func newInitCmd() *cobra.Command {
 			"Every service that declares the port it listens on is then offered a name of its\n" +
 			"own — <job>.<worktree>.<repo>.localhost, served by the proxy — so two worktrees\n" +
 			"stop sharing a cookie jar. A port a job only dials (DB_PORT, REDIS_PORT) is never\n" +
-			"offered: a name nothing answers under is worse than no name at all.\n\n" +
-			domain.ExperimentalRunNotice,
+			"offered: a name nothing answers under is worse than no name at all.",
 		Args: cobra.NoArgs,
 		RunE: runRunInit,
 	}
@@ -196,8 +195,6 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 			output.Blank(w)
 			output.NextStep(w, output.NextStepParams{Command: domain.RunInitByHandJob, Note: domain.RunInitByHandJobNote})
 			output.NextStep(w, output.NextStepParams{Command: domain.RunInitByHandProfile, Note: domain.RunInitByHandProfNote})
-			output.Blank(w)
-			output.Message(w, domain.ExperimentalRunNotice)
 		})
 		return nil
 	}
@@ -387,8 +384,6 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 		output.Blank(w)
 		output.NextStep(w, output.NextStepParams{Command: domain.RunInitNextUp, Note: domain.RunInitNextUpNote})
 		output.NextStep(w, output.NextStepParams{Command: domain.RunInitNextJobAdd, Note: domain.RunInitNextJobAddNote})
-		output.Blank(w)
-		output.Message(w, domain.ExperimentalRunNotice)
 	})
 	return nil
 }

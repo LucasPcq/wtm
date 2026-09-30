@@ -98,7 +98,7 @@ self-documenting:
 | `12` | config not found — repo not initialized (`wtm init`) |
 | `14` | service/job not declared in `run.toml` |
 | `15` | `extract`: selected changes conflict with the target worktree |
-| `16` | run module not initialized — run `wtm run init` first |
+| `16` | no run.toml (no job or profile declared) — run `wtm run init` |
 | `17` | `upgrade`: this install cannot be upgraded — built from source, or the binary is not writable |
 
 ## Discovery first — get names before you act
@@ -331,8 +331,8 @@ flagged; everything else is what the name implies.
 
 **Dev jobs (`wtm run`)** — jobs live in a per-clone `run.toml` (wtm-managed; never edit it
 directly). Each is a `service` (long-running) or `task` (one-shot, blocks the profile,
-non-zero exit aborts it); profiles are named, ordered job groups. The module is **opt-in**
-and **experimental**: the global `wtm init` does not configure it.
+non-zero exit aborts it); profiles are named, ordered job groups. The module is **opt-in**:
+the global `wtm init` does not configure it.
 - `run init` sets up `run.toml` from detection (docker-compose + package scripts). It is
   the only entry point that works before the module exists; every other run command exits
   `16` (run module not initialized) until at least one job/profile is declared. Non-TTY it

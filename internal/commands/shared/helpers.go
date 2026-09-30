@@ -126,15 +126,11 @@ func Interactive(params UnattendedParams) bool {
 }
 
 // RequireRunInitialized enforces the run-module opt-in guard: the module counts
-// as initialized once run.toml declares at least one job or profile. Blocked run
-// commands call this after loading run.toml; the creation paths (run init,
-// run job/profile add, run import) skip it. On failure it returns
-// ErrRunNotInitialized (wrapped, with the experimental notice on a second line)
-// so the top-level handler prints the pedagogical message and picks the
-// dedicated exit code; it does not print anything itself.
+// as initialized once run.toml declares at least one job or profile. The
+// creation paths (run init, run job/profile add, run import) skip it.
 func RequireRunInitialized(cfg domain.RunConfig) error {
 	if rules.IsRunInitialized(cfg) {
 		return nil
 	}
-	return fmt.Errorf("%w\n%s", domain.ErrRunNotInitialized, domain.ExperimentalRunNotice)
+	return domain.ErrRunNotInitialized
 }

@@ -126,13 +126,12 @@ A few ideas explain how the commands fit together:
 - **Shell integration** — `go` changes your current directory, which a child process can't
   do for its parent shell. `eval "$(wtm shell-init)"` installs a shell function that makes
   it work. Without it, use [`resolve`](docs/wtm_resolve.md) to get a path.
-- **Dev jobs** *(experimental)* — long-running **services** (dev servers, docker) and
+- **Dev jobs** — long-running **services** (dev servers, docker) and
   one-shot **tasks** (migrations, seeds) declared in `run.toml` and grouped into
   **profiles**, run per-worktree by a background daemon. Starting them **attaches**: the
   run view opens one pane per job, leaving it detaches without stopping anything, and
-  `-d` skips it. The flow is still stabilizing — `wtm go` is the recommended way to enter
-  a worktree today. See [`run`](docs/wtm_run.md) and [Run config](#run-config--runtoml).
-- **Shared services** *(experimental)* — a job declared `scope = "shared"` runs **once for
+  `-d` skips it. See [`run`](docs/wtm_run.md) and [Run config](#run-config--runtoml).
+- **Shared services** — a job declared `scope = "shared"` runs **once for
   the repository** instead of once per worktree, in the main checkout: a postgres, a
   keycloak. Each worktree still keeps its own data through a `[job.namespace]` block, whose
   `create` and `remove` commands you write — wtm names the namespace and hands them the
@@ -179,9 +178,9 @@ Full flags live in `wtm <command> --help` and [`docs/`](docs/wtm.md). Overview:
 | [`sync`](docs/wtm_sync.md) | Rebase selected worktrees onto their parent, in cascade |
 | [`reparent`](docs/wtm_reparent.md) | Change the parent a worktree is rebased onto |
 
-### Dev jobs *(experimental)*
+### Dev jobs
 
-Per-worktree services + tasks. Functional, but the flow is still stabilizing. The
+Per-worktree services + tasks. The
 run module is **opt-in**: run `wtm run init` once to set it up (the global `wtm init`
 no longer touches services). Until then, run commands stop with a hint pointing there.
 

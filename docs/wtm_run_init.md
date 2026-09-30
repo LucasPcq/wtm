@@ -50,8 +50,6 @@ own — <job>.<worktree>.<repo>.localhost, served by the proxy — so two worktr
 stop sharing a cookie jar. A port a job only dials (DB_PORT, REDIS_PORT) is never
 offered: a name nothing answers under is worse than no name at all.
 
-`wtm run` is experimental — the workflow is still stabilizing and commands may change.
-
 ```
 wtm run init [flags]
 ```

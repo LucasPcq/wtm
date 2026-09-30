@@ -1694,17 +1694,6 @@ const (
 	// RunFileName is the run config file name (inside <state-dir>/).
 	RunFileName = "run.toml"
 
-	// ExperimentalRunNotice is the single source of truth for the "run is
-	// experimental" wording. Reused by the run-init output, the not-initialized
-	// guard, and the mention printed at the end of `wtm init`, so the caveat
-	// stays consistent everywhere the run module surfaces.
-	ExperimentalRunNotice = "`wtm run` is experimental — the workflow is still stabilizing and commands may change."
-
-	// MsgRunInitHint points users at the dedicated command that configures the
-	// run module, printed at the end of `wtm init` (which no longer configures
-	// services itself).
-	MsgRunInitHint = "Run services per worktree ? Configure them with `wtm run init` (experimental)."
-
 	// MsgRelocateHint points users at `wtm relocate` to adopt/align worktrees that
 	// existed before wtm. Printed unconditionally at the end of `wtm init` — we do
 	// not probe for pre-existing worktrees, the hint is cheap and always relevant.
@@ -1801,7 +1790,7 @@ const (
 	InitNextStepRelocate     = "wtm relocate"
 	InitNextStepRelocateNote = "adopt & align pre-existing worktrees"
 	InitNextStepRunInit      = "wtm run init"
-	InitNextStepRunInitNote  = "(experimental) configure per-worktree services"
+	InitNextStepRunInitNote  = "configure per-worktree services"
 
 	// SchemasDirName is the directory (inside <state-dir>/ or under the global
 	// config dir) where `wtm schema dump` writes the JSON Schema files
@@ -2021,7 +2010,7 @@ const (
 	CmdGroupWorktreesTitle = "Worktrees:"
 	CmdGroupNavigateTitle  = "Navigate:"
 	CmdGroupStackTitle     = "Stacked branches:"
-	CmdGroupJobsTitle      = "Dev jobs (experimental):"
+	CmdGroupJobsTitle      = "Dev jobs:"
 	CmdGroupGitHubTitle    = "GitHub:"
 	CmdGroupSetupTitle     = "Setup:"
 
