@@ -14,8 +14,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/schemas"
 )
 
-// ErrRunFileExists is returned by WriteRun when the target file already
-// exists — callers decide whether to skip or surface the condition.
 var ErrRunFileExists = errors.New("run file already exists")
 
 // projectTemplateData is the unified view rendered by the config template.
@@ -33,20 +31,15 @@ type projectTemplateData struct {
 	OnClean     []domain.HookCommand
 }
 
-// WriteProjectParams holds the inputs for writing a project config file.
 type WriteProjectParams struct {
 	StateDir string
 	Answers  domain.InitProjectAnswers
 }
 
-// WriteProject renders the project config from init wizard answers and writes it
-// to <state-dir>/config.toml.
 func WriteProject(params WriteProjectParams) error {
 	return renderProjectConfig(params.StateDir, answersToTemplate(params.Answers))
 }
 
-// WriteProjectConfigParams holds the inputs for rewriting config.toml from a
-// full ProjectConfig (targeted re-init).
 type WriteProjectConfigParams struct {
 	StateDir string
 	Config   domain.ProjectConfig
@@ -58,7 +51,6 @@ func WriteProjectConfig(params WriteProjectConfigParams) error {
 	return renderProjectConfig(params.StateDir, configToTemplate(params.Config))
 }
 
-// renderProjectConfig renders the template data and writes config.toml.
 func renderProjectConfig(stateDir string, data projectTemplateData) error {
 	var buf bytes.Buffer
 	if err := parsedTemplate.Execute(&buf, data); err != nil {
@@ -93,7 +85,6 @@ func writeSchema(dir string, schema schemas.Schema) error {
 	return nil
 }
 
-// answersToTemplate converts init wizard answers to template data.
 func answersToTemplate(a domain.InitProjectAnswers) projectTemplateData {
 	return projectTemplateData{
 		BasePath:    a.BasePath,
@@ -108,9 +99,8 @@ func answersToTemplate(a domain.InitProjectAnswers) projectTemplateData {
 	}
 }
 
-// configToTemplate converts a full ProjectConfig to template data for re-init.
-// An empty env strategy is rendered as a commented (skipped) section so the file
-// stays valid.
+// configToTemplate renders an empty env strategy as a commented (skipped)
+// section so the file stays valid.
 func configToTemplate(c domain.ProjectConfig) projectTemplateData {
 	return projectTemplateData{
 		BasePath:    c.Worktrees.BasePath,
@@ -125,15 +115,12 @@ func configToTemplate(c domain.ProjectConfig) projectTemplateData {
 	}
 }
 
-// WriteRunParams holds the inputs for writing a run config file.
 type WriteRunParams struct {
 	StateDir string
 	Config   domain.RunConfig
 	Force    bool // overwrite run.toml if it already exists
 }
 
-// WriteRun encodes cfg as TOML and writes it to <state-dir>/run.toml.
-// Returns ErrRunFileExists if the file already exists and Force is false.
 func WriteRun(params WriteRunParams) error {
 	path := filepath.Join(params.StateDir, domain.RunFileName)
 
@@ -196,7 +183,6 @@ func runFileOf(cfg domain.RunConfig) runFile {
 	return file
 }
 
-// WriteGlobal creates the global config directory and writes config.toml.
 func WriteGlobal(answers domain.InitGlobalAnswers) error {
 	dir, err := infra.GlobalDir()
 	if err != nil {
