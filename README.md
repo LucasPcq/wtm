@@ -144,6 +144,11 @@ A few ideas explain how the commands fit together:
   task by task and pre-fills what the names make obvious — and `wtm run up` stops
   before running it against **foreign data** — data the worktree does not own: a verbatim
   worktree's source's, or a shared service's with no namespace — unless you confirm or pass `--force`.
+  When a worktree goes, [`clean`](docs/wtm_clean.md) and [`prune`](docs/wtm_prune.md)
+  **drop its namespaces** once git has removed it: `--keep-data` withholds the drop, and
+  `--drop-data` starts a service that is down to drop now instead of owing it.
+
+The [user guide](docs/guide/README.md) takes each of these further: [isolation](docs/guide/isolation.md), [jobs, profiles and runners](docs/guide/jobs-and-profiles.md), [shared services](docs/guide/shared-services.md), [named URLs and addressing](docs/guide/addressing.md), the [`run.toml` reference](docs/guide/run-toml.md) and [where wtm keeps its state](docs/guide/state.md).
 
 ## Commands
 
@@ -250,9 +255,14 @@ never commits anything inside `.git/`, so wtm is invisible to teammates and to
 ├── config.toml                    # project settings
 ├── run.toml                       # dev jobs + profiles
 ├── schemas/                       # JSON schemas for editor autocomplete
-└── worktrees/<encoded-branch>/
-    └── meta.json                  # per-worktree metadata (source branch, timestamp, env strategy)
+├── worktrees/<encoded-branch>/
+│   └── meta.json                  # source branch, timestamp, env strategy, ordinal, isolation, namespaces
+├── logs/<encoded-branch>/         # each job's output, one file per job
+├── hooks/                         # the raw output of the last on_create / on_clean run, per branch
+└── pending-removals.toml          # namespace drops a clean still owes
 ```
+
+Each file and each `meta.json` field is described in [Where wtm keeps its state](docs/guide/state.md).
 
 Everything is plain TOML, validated at load time (unknown keys are rejected, not
 silently ignored). Edit by hand, or use `wtm config show` / `wtm config edit` and the
@@ -430,7 +440,9 @@ its packages. wtm never edits those files; it tells you what it observed.
 
 It never fails the run, and a healthy stack costs nothing — the check stops as soon as
 every port answers. `--no-probe` skips it, and `port_probe_timeout` in run.toml sets the
-budget (default 15s, a negative value turns it off).
+budget (default 15s, a negative value turns it off). `probe = false` on a job skips it for
+that job, and `binds_no_port = true` marks a service that listens on nothing by design (a
+watcher, a worker), so it is no longer offered a port.
 
 A declaration overrides whatever the environment already sets for that variable, and the
 job's `stop` command runs with the same ports its `cmd` did. For Docker, template the host
@@ -578,6 +590,18 @@ wtm reports rather than guesses when it cannot be sure: the key is missing, the 
 more than once in the value, or neither the base nor any offset of it is there. Rewriting on
 a guess could corrupt a URL, so those lines are named and left alone.
 
+A value that is not a port — which database, which realm a worktree holds in a [shared service](docs/guide/shared-services.md) — is written whole by an `[[env]]` link, from a template over `{namespace}`, `{port.NAME}`, `{origin}`, `{worktree}` and `{ordinal}`:
+
+```toml
+[[env]]
+file  = "apps/api/.env"
+key   = "DATABASE_URL"
+job   = "postgres"
+value = "postgresql://app:app@localhost:{port.POSTGRES_PORT}/{namespace}"
+```
+
+A key is written by an `[[env]]` link or an `[[env_port]]` link, never both.
+
 #### Values that carry an address, not a port
 
 A port in a `.env` is enough for one app talking to itself. It is not enough the moment a
@@ -604,6 +628,7 @@ must still be a number. Without the redirection installed the address carries th
 port (`…localhost:11080`), which changes nothing for CORS and nothing for cookie isolation —
 a port is part of an origin, but never part of a *cookie's* origin.
 
+This is `addressing = "names"`, the default when `run.toml` does not say.
 `wtm run addressing ports` keeps port numbers everywhere, and `wtm run addressing names` goes
 back: it writes `addressing` in `run.toml`, then offers to settle the worktrees whose `.env`
 spells the other one. It is a real inverse, and `--keep-env` switches the setting alone. The
@@ -678,8 +703,10 @@ an index of what it started, `jobs.json` next to the [global config](#global-con
 back. That is what makes `wtm run ps` still list your stacks after a reboot, and
 `wtm run down` still stop them. Those stacks show as `detached` rather than `running`,
 because nothing about them was ever verified — wtm launched them and has not seen them
-since. `wtm run daemon status` reports what is up, and `stop` / `restart` are the way
-out when you want the process gone.
+since. The other statuses `run ps` shows are `running`, `joined` (a worktree's hold on a
+shared service), `stopped`, `crashed` and `reaped` — see
+[`run ps` statuses](docs/guide/jobs-and-profiles.md#run-ps-statuses). `wtm run daemon status`
+reports what is up, and `stop` / `restart` are the way out when you want the process gone.
 
 ### Global config
 
@@ -704,7 +731,8 @@ enabled = true         # false sends every URL back to http://localhost:<port>
 `[proxy]` serves each worktree's HTTP jobs under their own hostname
 (`http://<job>.<worktree>.<repo>.localhost:11080`), so two worktrees stop sharing one
 cookie jar — a job opts in with `url = { port = "PORT" }` in `run.toml`, which `wtm run
-init` writes for the services it detects. Both keys default
+init` writes for the services it detects; `url.host` replaces the job's name as the first
+label (`url = { port = "PORT", host = "api" }`). Both keys default
 to the values above; the proxy lives in the background daemon and dies with it, and a port
 it cannot bind costs the names, never the jobs.
 
