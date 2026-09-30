@@ -126,3 +126,42 @@ func HeldAddressLines(held []domain.JobURLEntry) []string {
 	}
 	return lines
 }
+
+// UpJobsByWorkDir names, per worktree directory, the jobs up in it — the only
+// ones whose held addresses are worth resolving.
+func UpJobsByWorkDir(jobs []domain.JobInfo) map[string][]string {
+	up := map[string][]string{}
+	for _, job := range jobs {
+		if IsJobUp(job.Status) {
+			up[job.WorkDir] = append(up[job.WorkDir], job.Name)
+		}
+	}
+	return up
+}
+
+// AnyRunner says whether one of names starts other jobs itself, so a reader
+// with none skips resolving the worktree's addresses altogether.
+func AnyRunner(cfg domain.RunConfig, names []string) bool {
+	for _, name := range names {
+		if len(RunnerChildren(cfg, name)) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+type HeldOfParams struct {
+	Addresses map[string]domain.JobAddress
+	Jobs      []string
+}
+
+// HeldOf keeps the held addresses of the named jobs that have any.
+func HeldOf(params HeldOfParams) map[string][]domain.JobURLEntry {
+	held := map[string][]domain.JobURLEntry{}
+	for _, name := range params.Jobs {
+		if entries := params.Addresses[name].Held; len(entries) > 0 {
+			held[name] = entries
+		}
+	}
+	return held
+}

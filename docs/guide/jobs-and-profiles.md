@@ -47,7 +47,7 @@ The first time `run up` or `run start` finds jobs running in another worktree, i
 
 ## `run ps` statuses
 
-`wtm run ps` lists what the daemon holds across every repository, from anywhere. A job's `status` is one of:
+`wtm run ps` lists what the daemon holds across every repository, from anywhere. A runner binds no port, so its ADDRESS is empty: the apps it started are listed under its row with their addresses (`held` in the JSON). A job's `status` is one of:
 
 | Status | Meaning |
 | --- | --- |

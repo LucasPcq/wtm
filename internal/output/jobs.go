@@ -260,6 +260,8 @@ type FormatRunningJobsParams struct {
 	// Projects names each work dir's repository. Nil drops the column: with one
 	// repository it says nothing.
 	Projects map[string]string
+	// Held lists, under a runner's row, the apps it started and where they answer.
+	Held domain.HeldAddresses
 }
 
 // FormatRunningJobs renders a table of running (or recently running) jobs. It
@@ -337,6 +339,12 @@ func FormatRunningJobs(params FormatRunningJobsParams) string {
 			worktree,
 		)
 		b.WriteString(line)
+		for _, held := range rules.HeldAddressLines(params.Held[j.WorkDir][j.Name]) {
+			if params.Hyperlinks {
+				held = rules.LinkURLs(held)
+			}
+			b.WriteString(Indent + domain.DetailHeldIndent + held + "\n")
+		}
 	}
 
 	return b.String()

@@ -70,7 +70,9 @@ self-documenting:
    `{name, status, …}` (the job it started), `run job add|edit|rm` and
    `run profile add|edit|rm` → `{name, status, message?}` with `status` one of `added`,
    `updated`, `unchanged` (an edit that changed nothing), `removed`. `run ps` →
-   `[{name, kind, status, pid, branch, path, project, started_at?, url?, exit_code?}]`.
+   `[{name, kind, status, pid, branch, path, project, started_at?, url?, exit_code?, held?}]` —
+   `held` (`[{job, url}]`) is set on a runner up: the apps it started and where they answer,
+   since a runner binds no port and has no `url` of its own.
    `run url` / `run open` → `[{job, url}]`. A job-result `status` is one of `started`,
    `already_running` (the service was already up in that worktree — nothing was started,
    the run goes on), `joined`, `done` (a task that ran to the end), `stopped`, `released` (a shared job let
@@ -117,7 +119,7 @@ self-documenting:
 | Worktree **forest** (parent→child + which need sync) | `wtm tree --output json` |
 | Open PRs | `gh pr list --json number,title,headRefName,state,isDraft,url` |
 | Declared jobs + profiles | `wtm run list --output json` |
-| Jobs running right now, every repo (+ `branch`, `path`, `project`, `started_at`, `exit_code`, `url`) | `wtm run ps --output json` |
+| Jobs running right now, every repo (+ `branch`, `path`, `project`, `started_at`, `exit_code`, `url`, a runner's `held`) | `wtm run ps --output json` |
 | Where a job answers in a worktree | `wtm run url [worktree] --output json` |
 | What serves the named URLs (bind port, public port, redirection) | `wtm run proxy status --output json` |
 | What a `run up` started, with each job's `url` (plus `held` for a runner) | `wtm run up -d --output json` |

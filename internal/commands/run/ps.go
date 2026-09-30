@@ -36,15 +36,18 @@ func runPs(cmd *cobra.Command, _ []string) error {
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 
 	if format == domain.OutputJSON {
-		return output.WriteRunningJobsJSON(cmd.OutOrStdout(), runningJobs(shared.LoadJobs().Jobs))
+		jobs := shared.LoadJobs().Jobs
+		return output.WriteRunningJobsJSON(cmd.OutOrStdout(), runningJobs(runningJobsParams{Jobs: jobs, Held: runjobs.Held(jobs)}))
 	}
 
 	var listing runjobs.Listing
+	var held domain.HeldAddresses
 	loadErr := components.RunLoading(components.LoadingParams{
 		Message: domain.RunLoadingJobs,
 		Animate: shared.Animate(cmd, true),
 		Work: func() error {
 			listing = shared.LoadJobs()
+			held = runjobs.Held(listing.Jobs)
 			return nil
 		},
 	})
@@ -60,6 +63,7 @@ func runPs(cmd *cobra.Command, _ []string) error {
 			Now:        time.Now(),
 			Branches:   branchesOf(jobs),
 			Projects:   projectsOf(jobs),
+			Held:       held,
 			Hyperlinks: output.IsTerminal(out),
 		}))
 		if listing.Diverged() {
@@ -101,7 +105,13 @@ func projectsOf(jobs []domain.JobInfo) map[string]string {
 
 // runningJobs is the document `run ps --output json` writes: every row names
 // its worktree by branch and path, and its project even when there is one.
-func runningJobs(jobs []domain.JobInfo) []domain.RunningJob {
+type runningJobsParams struct {
+	Jobs []domain.JobInfo
+	Held domain.HeldAddresses
+}
+
+func runningJobs(params runningJobsParams) []domain.RunningJob {
+	jobs := params.Jobs
 	branches := branchesOf(jobs)
 	projects := map[string]string{}
 	rows := make([]domain.RunningJob, 0, len(jobs))
@@ -122,6 +132,7 @@ func runningJobs(jobs []domain.JobInfo) []domain.RunningJob {
 			StartedAt: job.StartedAt,
 			URL:       job.URL,
 			ExitCode:  job.ExitCode,
+			Held:      params.Held[job.WorkDir][job.Name],
 		})
 	}
 	return rows

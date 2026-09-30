@@ -561,7 +561,14 @@ type RunningJob struct {
 	StartedAt time.Time `json:"started_at,omitzero"`
 	URL       string    `json:"url,omitempty"`
 	ExitCode  *int      `json:"exit_code,omitempty"`
+	// Held are the apps a runner started and where they answer: the runner binds
+	// nothing, so its own URL is empty and these are what a reader came for.
+	Held []JobURLEntry `json:"held,omitempty"`
 }
+
+// HeldAddresses is, per worktree directory and per runner up in it, where the
+// apps that runner started answer.
+type HeldAddresses map[string]map[string][]JobURLEntry
 
 // RunSurface names who shows a run's jobs: the full-screen view, a stream of
 // lines on the terminal the command was launched from, or a machine-readable
