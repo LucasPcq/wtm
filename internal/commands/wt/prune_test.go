@@ -48,8 +48,8 @@ func setupPrune(t *testing.T, setup pruneSetup) pruneRepo {
 	repo.dir = gittest.InitRepo(t)
 	repo.stateDir = filepath.Join(repo.dir, ".git", "wtm")
 	repo.treesDir = filepath.Join(filepath.Dir(repo.dir), ".trees")
-	t.Setenv("WTM_PROJECT_DIR", repo.dir)
-	t.Setenv("WTM_STATE_DIR", repo.stateDir)
+	t.Setenv(domain.EnvProjectDir, repo.dir)
+	t.Setenv(domain.EnvStateDir, repo.stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 
 	var onClean []string

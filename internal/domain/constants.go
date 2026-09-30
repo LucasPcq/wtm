@@ -899,10 +899,14 @@ const (
 	ImportEnvHint        = "wtm env"
 	ImportEnvHintNote    = "reconcile the .env files against this configuration"
 
-	ImportNeedsYesFmt    = "replacing run.toml is destructive: pass --%s to confirm it without a prompt"
-	ImportDeclined       = "run.toml left unchanged."
-	ImportConfirmTitle   = "Replace run.toml?"
-	ImportConfirmDescFmt = "The payload replaces the whole file: %d job(s), %d profile(s). What run.toml holds today is lost."
+	ImportJSONNeedsYesFmt = "--%s %s requires --%s"
+	ImportInvalidFmt      = "invalid run config:\n  %s"
+	ImportInvalidSep      = "\n  "
+	ImportStdinArg        = "-"
+	ImportNeedsYesFmt     = "replacing run.toml is destructive: pass --%s to confirm it without a prompt"
+	ImportDeclined        = "run.toml left unchanged."
+	ImportConfirmTitle    = "Replace run.toml?"
+	ImportConfirmDescFmt  = "The payload replaces the whole file: %d job(s), %d profile(s). What run.toml holds today is lost."
 
 	// RunStreamCrashedFmt corrects a job announced as started that the daemon
 	// found gone at the end of the sequence.

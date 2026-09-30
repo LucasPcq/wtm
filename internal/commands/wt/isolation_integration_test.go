@@ -21,8 +21,8 @@ func isolationRepo(t *testing.T) string {
 	t.Helper()
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 	t.Setenv(domain.EnvComposeProjectName, "")
 	if err := os.MkdirAll(stateDir, 0o755); err != nil {

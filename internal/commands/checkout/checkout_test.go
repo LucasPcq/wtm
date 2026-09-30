@@ -60,8 +60,8 @@ func repoWithRemote(t *testing.T) string {
 func loadResult(t *testing.T, projectDir string) shared.ConfigResult {
 	t.Helper()
 	stateDir := filepath.Join(projectDir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", projectDir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, projectDir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 
 	if err := os.MkdirAll(stateDir, 0o755); err != nil {

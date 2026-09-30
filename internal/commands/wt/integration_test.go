@@ -38,8 +38,8 @@ func runWtCmd(t *testing.T, args ...string) (stdout, stderr string, err error) {
 func TestWtCreateAndClean(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 
 	if err := setupMinimalConfig(t, stateDir); err != nil {
@@ -79,8 +79,8 @@ func TestWtCreateAndClean(t *testing.T) {
 func TestCleanAxesStrictlySeparated(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 	if err := setupMinimalConfig(t, stateDir); err != nil {
 		t.Fatalf("setup config: %v", err)
@@ -255,8 +255,8 @@ func TestCleanAbsentWorktreeIsIdempotent(t *testing.T) {
 func TestCleanYesWithoutBranchErrors(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 	if err := setupMinimalConfig(t, stateDir); err != nil {
 		t.Fatalf("setup config: %v", err)
@@ -270,8 +270,8 @@ func TestCleanYesWithoutBranchErrors(t *testing.T) {
 func TestCleanRedirectsToBaseWhenInsideWorktree(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 
 	goFile := filepath.Join(t.TempDir(), "go-file")
 	t.Setenv(domain.EnvGoFile, goFile)
@@ -306,8 +306,8 @@ func TestCleanRedirectsToBaseWhenInsideWorktree(t *testing.T) {
 func TestCleanDoesNotRedirectFromOtherWorktree(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 
 	goFile := filepath.Join(t.TempDir(), "go-file")
 	t.Setenv(domain.EnvGoFile, goFile)

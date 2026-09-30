@@ -54,7 +54,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
 	if format == domain.OutputJSON && !yes {
-		return fmt.Errorf("--%s %s requires --%s", domain.FlagOutput, domain.OutputJSON, domain.FlagYes)
+		return fmt.Errorf(domain.ImportJSONNeedsYesFmt, domain.FlagOutput, domain.OutputJSON, domain.FlagYes)
 	}
 
 	data, err := readImportSource(args)
@@ -67,7 +67,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("parse JSON: %w", err)
 	}
 	if _, errs := rules.ValidateRun(incoming); len(errs) > 0 {
-		return fmt.Errorf("invalid run config:\n  %s", strings.Join(errs, "\n  "))
+		return fmt.Errorf(domain.ImportInvalidFmt, strings.Join(errs, domain.ImportInvalidSep))
 	}
 
 	// Replacing run.toml is destructive, so it is never the default of a run that
@@ -127,8 +127,7 @@ func confirmImport(params confirmImportParams) bool {
 	return confirmed
 }
 
-// readsStdin says the payload comes from the same stream a prompt would read.
-func readsStdin(args []string) bool { return len(args) == 0 || args[0] == "-" }
+func readsStdin(args []string) bool { return len(args) == 0 || args[0] == domain.ImportStdinArg }
 
 func reportImport(cmd *cobra.Command, cfg domain.RunConfig, format string) error {
 	ir := output.ImportResult{EnvPorts: len(cfg.EnvPorts)}
@@ -149,7 +148,7 @@ func reportImport(cmd *cobra.Command, cfg domain.RunConfig, format string) error
 }
 
 func readImportSource(args []string) ([]byte, error) {
-	if len(args) == 0 || args[0] == "-" {
+	if readsStdin(args) {
 		return io.ReadAll(os.Stdin)
 	}
 	data, err := os.ReadFile(args[0])
