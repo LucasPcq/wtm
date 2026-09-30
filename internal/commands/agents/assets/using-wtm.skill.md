@@ -36,7 +36,7 @@ self-documenting:
    run `wtm ui` to "look at" the worktrees; run `wtm list --output json` (or `wtm tree`)
    instead, and pass **`-d`** (or `--output json`) to every `run up` / `run start`. Suggest
    `wtm ui` to the *user* when they want to browse worktrees themselves. wtm defends itself
-   here — no view ever opens under `--output json` or without a TTY — but don't rely on that.
+   here — no view ever opens under `--output json` or unless both stdin and stdout are a terminal (the `run` module prompts under the same condition) — but don't rely on that.
 3. **Always add `--output json`** on data commands. JSON goes to stdout; human text and
    warnings go to stderr — ignore stderr unless the exit code is non-zero. wtm may also
    print a one-line update notice there (at most once a day, never under `--output json`,

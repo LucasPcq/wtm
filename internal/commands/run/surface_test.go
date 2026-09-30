@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
 	"github.com/LucasPcq/wtm/internal/testutil/runlogstest"
 )
@@ -60,7 +61,7 @@ func (r *viewRecorder) only(t *testing.T) viewCall {
 func fakeTTY(t *testing.T, terminal bool) {
 	t.Helper()
 
-	original := isTTY
-	isTTY = func() bool { return terminal }
-	t.Cleanup(func() { isTTY = original })
+	original := runctx.IsTTY
+	runctx.IsTTY = func() bool { return terminal }
+	t.Cleanup(func() { runctx.IsTTY = original })
 }

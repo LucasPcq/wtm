@@ -81,8 +81,6 @@ func runUp(cmd *cobra.Command, args []string) error {
 			Force:     force,
 			Config:    ctx.Run,
 		},
-		// The run wizard may be reached through the shell wrapper, which
-		// consumes stdout.
 		Prompter:  ctx.Prompter(ctx.Interactive),
 		Presenter: upPresenter{CLIPresenter: shared.NewPresenter(cmd, format), detach: detach},
 	})

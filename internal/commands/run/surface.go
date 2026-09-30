@@ -3,10 +3,8 @@ package run
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
@@ -14,11 +12,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/service/integration"
 	"github.com/LucasPcq/wtm/internal/tui/runview"
 )
-
-// isTTY reports whether this command owns a terminal. It is a variable so a
-// test can answer yes: which surface a run gets hangs on it, and nothing else
-// makes a pipe look like a terminal.
-var isTTY = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
 
 // showRunView is the full-screen surface, a variable for the same reason: a
 // test can watch a command hand over to it without bubbletea taking over a

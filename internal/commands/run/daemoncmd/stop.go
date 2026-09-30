@@ -3,11 +3,10 @@ package daemoncmd
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
+	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/output"
@@ -59,7 +58,7 @@ func confirmStop(cmd *cobra.Command, status domain.DaemonStatus) (bool, error) {
 		return true, nil
 	}
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
-	if format == domain.OutputJSON || !term.IsTerminal(int(os.Stdin.Fd())) {
+	if format == domain.OutputJSON || !runctx.IsTTY() {
 		return false, fmt.Errorf("stopping the daemon would stop %d foreground service(s): pass --%s to confirm", status.Foreground, domain.FlagYes)
 	}
 

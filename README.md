@@ -665,7 +665,7 @@ ports genuinely need more room than 10.
 `run up` and `run start` **attach**: a full-screen view opens with one pane per job, and
 `wtm run logs` reopens it later. Leaving the view (`q`, or Ctrl+C outside focus mode)
 detaches — the daemon keeps the jobs running. `-d` starts them and hands the prompt back
-instead. Without a terminal, or under `--output json`, no view opens: the run reports
+instead. Unless both stdin and stdout are a terminal (`wtm run up > run.log` included), or under `--output json`, no view opens: the run reports
 itself as lines, which is what a script or an agent gets. Each job's output is also
 journaled to `<git-common-dir>/wtm/logs/<url-escaped-branch>/<url-escaped-job>.log`
 (5 MB x 3 within one run), and `run logs` reads that back for a job that is no longer

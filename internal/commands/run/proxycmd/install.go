@@ -2,11 +2,10 @@ package proxycmd
 
 import (
 	"io"
-	"os"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
+	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/output"
@@ -133,5 +132,5 @@ func canConfirm(cmd *cobra.Command) bool {
 		return true
 	}
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
-	return format != domain.OutputJSON && term.IsTerminal(int(os.Stdin.Fd()))
+	return format != domain.OutputJSON && runctx.IsTTY()
 }

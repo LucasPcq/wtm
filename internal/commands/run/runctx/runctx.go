@@ -21,9 +21,15 @@ import (
 	"github.com/LucasPcq/wtm/internal/service/runconfig"
 )
 
-// IsTTY reports whether the command owns a terminal. It is a variable so a test
+// IsTTY is the run module's one terminal gate, for its prompts and its
+// full-screen view alike: both ends must be a terminal, or `run up > log`
+// takes the screen over for output nobody is watching. A variable so a test
 // can answer yes without one.
-var IsTTY = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
+var IsTTY = func() bool { return ownsTerminal(os.Stdin, os.Stdout) }
+
+func ownsTerminal(in, out *os.File) bool {
+	return term.IsTerminal(int(in.Fd())) && term.IsTerminal(int(out.Fd()))
+}
 
 type Context struct {
 	// Dir is the directory the command was launched from, resolved once.
