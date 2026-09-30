@@ -87,7 +87,7 @@ func TestManagerRoutesWithdrawsAStoppedJob(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("start: %v", err)
 	}
-	if err := m.Stop("web", dir); err != nil {
+	if err := m.Stop(JobRef{Name: "web", WorkDir: dir}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 
@@ -187,7 +187,7 @@ func TestManagerRoutesWithdrawsEveryNameARunnerHeld(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("start: %v", err)
 	}
-	if err := m.Stop("dev", dir); err != nil {
+	if err := m.Stop(JobRef{Name: "dev", WorkDir: dir}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 

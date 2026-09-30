@@ -107,7 +107,7 @@ func TestManagerStop_RunsStopCommandWithJobEnv(t *testing.T) {
 		t.Fatalf("start detached service: %v", err)
 	}
 
-	if err := m.Stop(job.Name, dir); err != nil {
+	if err := m.Stop(JobRef{Name: job.Name, WorkDir: dir}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 

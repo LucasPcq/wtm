@@ -30,7 +30,7 @@ func TestManagerResize_SetsThePTYSize(t *testing.T) {
 	m := NewManager()
 	dir := startService(t, m, domain.JobConfig{Name: "dev", Kind: domain.JobKindService, Cmd: "sleep 30"})
 
-	session, err := m.Attach("dev", dir)
+	session, err := m.Attach(JobRef{Name: "dev", WorkDir: dir})
 	if err != nil {
 		t.Fatalf("attach: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestManagerResize_RefusesWhatHasNoPTY(t *testing.T) {
 	})
 
 	stoppedDir := startService(t, m, domain.JobConfig{Name: "old", Kind: domain.JobKindService, Cmd: "sleep 30"})
-	if err := m.Stop("old", stoppedDir); err != nil {
+	if err := m.Stop(JobRef{Name: "old", WorkDir: stoppedDir}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 
@@ -90,7 +90,7 @@ func TestManagerResize_RefusesWhatHasNoPTY(t *testing.T) {
 	}()
 	waitForJob(t, m, "migrate", func(ManagedJob) bool { return true })
 	t.Cleanup(func() {
-		_ = m.Stop("migrate", taskDir)
+		_ = m.Stop(JobRef{Name: "migrate", WorkDir: taskDir})
 		<-taskDone
 	})
 
@@ -125,7 +125,7 @@ func TestManagerResize_RefusesASizeAWinsizeCannotHold(t *testing.T) {
 	m := NewManager()
 	dir := startService(t, m, domain.JobConfig{Name: "dev", Kind: domain.JobKindService, Cmd: "sleep 30"})
 
-	session, err := m.Attach("dev", dir)
+	session, err := m.Attach(JobRef{Name: "dev", WorkDir: dir})
 	if err != nil {
 		t.Fatalf("attach: %v", err)
 	}

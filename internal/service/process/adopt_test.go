@@ -84,7 +84,7 @@ func TestStopOnAnAdoptedJobRunsItsStopCommandAndClearsTheIndex(t *testing.T) {
 	manager := NewManagerWith(ManagerParams{Index: index, Stacks: &unknownStacks{}})
 	manager.Adopt([]domain.JobRecord{record})
 
-	if err := manager.Stop("db", dir); err != nil {
+	if err := manager.Stop(JobRef{Name: "db", WorkDir: dir}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 	if _, err := os.Stat(marker); err != nil {

@@ -114,7 +114,7 @@ func TestStopDuringADetachedLauncherStaysStopped(t *testing.T) {
 	go func() { started <- m.Start(StartParams{Job: job, WorkDir: dir}) }()
 	waitForStatus(t, m, domain.JobStatusRunning)
 
-	if err := m.Stop("stack", dir); err != nil {
+	if err := m.Stop(JobRef{Name: "stack", WorkDir: dir}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 	<-started
@@ -153,7 +153,7 @@ func TestStopCommandRunsInTheJobsCwd(t *testing.T) {
 	if err := m.Start(StartParams{Job: job, WorkDir: dir}); err != nil {
 		t.Fatalf("start: %v", err)
 	}
-	if err := m.Stop("stack", dir); err != nil {
+	if err := m.Stop(JobRef{Name: "stack", WorkDir: dir}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 	data, err := os.ReadFile(filepath.Join(dir, "where"))
@@ -185,7 +185,7 @@ func TestFailedStopCommandKeepsTheRoute(t *testing.T) {
 	if err := m.Start(StartParams{Job: job, WorkDir: dir, Routes: stackRoutes()}); err != nil {
 		t.Fatalf("start: %v", err)
 	}
-	if err := m.Stop("stack", dir); err == nil {
+	if err := m.Stop(JobRef{Name: "stack", WorkDir: dir}); err == nil {
 		t.Fatal("stop succeeded, want the stop command's failure")
 	}
 	if !routes.live()["stack.b.p.localhost"] {
@@ -341,7 +341,7 @@ func TestDaemonIsNotIdleWhileItServesADetachedJob(t *testing.T) {
 	if d.idle() {
 		t.Error("idle with a detached job published, want the daemon kept for the proxy")
 	}
-	if err := m.Stop("stack", dir); err != nil {
+	if err := m.Stop(JobRef{Name: "stack", WorkDir: dir}); err != nil {
 		t.Fatal(err)
 	}
 	if !d.idle() {

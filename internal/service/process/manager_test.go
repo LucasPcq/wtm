@@ -364,7 +364,7 @@ func TestManagerService_ReportsSignalExitCodeOnStop(t *testing.T) {
 	if err := m.Start(StartParams{Job: job, WorkDir: dir}); err != nil {
 		t.Fatalf("start service: %v", err)
 	}
-	if err := m.Stop("server", dir); err != nil {
+	if err := m.Stop(JobRef{Name: "server", WorkDir: dir}); err != nil {
 		t.Fatalf("stop service: %v", err)
 	}
 
@@ -500,7 +500,7 @@ func TestStoppingAServiceWaitsForItsOutputToReachTheLog(t *testing.T) {
 		t.Fatal("a foreground service must carry the drain its Stop waits on")
 	}
 
-	if err := m.Stop("web", dir); err != nil {
+	if err := m.Stop(JobRef{Name: "web", WorkDir: dir}); err != nil {
 		t.Fatalf("stop service: %v", err)
 	}
 

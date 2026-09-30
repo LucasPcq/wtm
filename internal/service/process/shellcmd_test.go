@@ -81,7 +81,7 @@ func TestManagerStop_RunsStopThroughTheShell(t *testing.T) {
 	if err := m.Start(StartParams{Job: job, WorkDir: dir, Env: map[string]string{domain.EnvPortOffset: "10"}}); err != nil {
 		t.Fatalf("start detached: %v", err)
 	}
-	if err := m.Stop("compose", dir); err != nil {
+	if err := m.Stop(JobRef{Name: "compose", WorkDir: dir}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 
@@ -104,7 +104,7 @@ func TestManagerStop_BlankStopFallsBackToSignal(t *testing.T) {
 	if err := m.Start(StartParams{Job: job, WorkDir: dir}); err != nil {
 		t.Fatalf("start service: %v", err)
 	}
-	if err := m.Stop("server", dir); err != nil {
+	if err := m.Stop(JobRef{Name: "server", WorkDir: dir}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 

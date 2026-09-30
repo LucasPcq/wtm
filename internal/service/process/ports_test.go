@@ -110,7 +110,7 @@ func TestManagerStop_RunsStopCommandWithResolvedPorts(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("start service: %v", err)
 	}
-	if err := m.Stop(job.Name, dir); err != nil {
+	if err := m.Stop(JobRef{Name: job.Name, WorkDir: dir}); err != nil {
 		t.Fatalf("stop service: %v", err)
 	}
 
