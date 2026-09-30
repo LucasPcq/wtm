@@ -661,7 +661,7 @@ func checkYesFlag(fset *token.FileSet, path string, file *ast.File) []finding {
 	if !src["shared.Interactive"] && !src["interactiveRun"] {
 		return nil
 	}
-	if src["shared.AddYesFlag"] || src["shared.AddNoPromptFlags"] || src["AddYesFlag"] {
+	if src["shared.AddYesFlag"] || src["AddYesFlag"] {
 		return nil
 	}
 	return []finding{{
