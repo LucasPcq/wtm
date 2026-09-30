@@ -270,8 +270,9 @@ func (r *runner) run() Outcome {
 		}
 
 		// A repeat start of a service is what the caller asked for — the job is
-		// up — so it counts as started. A task is a step to run, not a state to
-		// reach: one the daemon refuses has not run.
+		// up — so the run goes on, reporting it as already running rather than
+		// started. A task is a step to run, not a state to reach: one the daemon
+		// refuses has not run.
 		if result.PublicPort > 0 {
 			r.servedPort = result.PublicPort
 		}
@@ -305,6 +306,9 @@ func (r *runner) run() Outcome {
 		status := r.startedStatus(job)
 		if result.Joined {
 			status = domain.JobActionJoined
+		}
+		if alreadyRunning && status == domain.JobActionStarted {
+			status = domain.JobActionAlreadyRunning
 		}
 		namespace := r.carved(job, alreadyRunning)
 		r.results = append(r.results, domain.JobActionResult{Name: job.Name, Status: status, URL: url, Held: held, Namespace: namespace})

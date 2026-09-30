@@ -71,7 +71,8 @@ self-documenting:
    `updated`, `unchanged` (an edit that changed nothing), `removed`. `run ps` →
    `[{name, kind, status, pid, branch, path, project, started_at?, url?, exit_code?}]`.
    `run url` / `run open` → `[{job, url}]`. A job-result `status` is one of `started`,
-   `joined`, `done` (a task that ran to the end), `stopped`, `released` (a shared job let
+   `already_running` (the service was already up in that worktree — nothing was started,
+   the run goes on), `joined`, `done` (a task that ran to the end), `stopped`, `released` (a shared job let
    go of, still up for other worktrees), `not_running` (nothing was up under that name —
    nothing was stopped), `error`. A command that got far enough to have per-job results
    writes its **whole** document and *then* exits non-zero (`run up`, `run down`: the
