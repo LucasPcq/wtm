@@ -101,7 +101,7 @@ type ClassifyInstallParams struct {
 // a `make install` build lands in GoBinDir and would otherwise be sent to fetch
 // a published release over the user's own build.
 func ClassifyInstall(params ClassifyInstallParams) domain.InstallMethod {
-	if NormalizeVersion(params.Version) == domain.Version {
+	if NormalizeVersion(params.Version) == domain.VersionDev {
 		return domain.InstallSource
 	}
 
@@ -199,7 +199,7 @@ var updateCheckExcluded = map[string]bool{
 // all. It is every suppression axis except the TTL, which gates the network
 // call rather than the display: a notice served from cached state is free.
 func UpdateNoticeAllowed(params ShouldCheckUpdateParams) bool {
-	if NormalizeVersion(params.Version) == domain.Version {
+	if NormalizeVersion(params.Version) == domain.VersionDev {
 		return false
 	}
 	if !IsHumanFormat(params.Format) {

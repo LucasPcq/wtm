@@ -1,23 +1,42 @@
 ## wtm run down
 
-Stop jobs running in the current worktree
+Stop a worktree's running jobs
 
 ### Synopsis
 
-Stop jobs running in the current worktree.
-With a profile argument, stops only that profile's jobs.
-Jobs running in other worktrees are never touched.
+Stop the jobs running in [worktree] — the current one when omitted, picked interactively when there is a terminal.
+With --profile, stops only that profile's jobs.
+Jobs running in other worktrees are never touched, unless --all is given: it stops every worktree of this repository, without asking, and lists each one it emptied. Other repositories are never touched.
 
 ```
-wtm run down [profile] [flags]
+wtm run down [worktree...] [flags]
+```
+
+### Examples
+
+```
+  wtm run down
+
+  wtm run down feat/login --profile backend
+
+  # Every worktree of this repository
+  wtm run down --all --yes
 ```
 
 ### Options
 
 ```
-      --all             Stop jobs across every worktree (bypasses per-worktree scoping)
-  -h, --help            help for down
-      --output string   Output format: text or json (default "text")
+      --all              Stop the jobs of every worktree of this repository
+  -h, --help             help for down
+      --output string    Output format: text or json (default "text")
+      --profile string   Stop only this profile's jobs (default: every job the worktree runs)
+  -y, --yes              Skip all prompts; stops what the worktree has running
+```
+
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
 ```
 
 ### SEE ALSO

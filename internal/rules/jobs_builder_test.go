@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -88,7 +89,7 @@ func TestBuildScriptJobsNameDedup(t *testing.T) {
 }
 
 func TestBuildDockerJobsKind(t *testing.T) {
-	cfg := BuildDockerJobs("docker compose", []string{"docker-compose.yml"})
+	cfg := BuildDockerJobs(BuildDockerJobsParams{ComposeCmd: "docker compose", Files: []string{"docker-compose.yml"}})
 	if len(cfg.Jobs) != 1 {
 		t.Fatalf("expected 1 job, got %d", len(cfg.Jobs))
 	}
@@ -101,5 +102,66 @@ func TestBuildDockerJobsKind(t *testing.T) {
 	}
 	if !IsDetached(j) {
 		t.Error("expected docker job to be detached")
+	}
+}
+
+func TestBuildScriptJobsHonoursAnExplicitKind(t *testing.T) {
+	cfg := BuildScriptJobs(BuildScriptJobsParams{
+		PackageManager: domain.PkgManagerPnpm,
+		Scripts: []domain.PackageScript{
+			// `preview` sert des requêtes : classé task par son nom, il bloquerait
+			// le profil pour toujours.
+			{Name: "preview", Workspace: "apps/web", PkgName: "web", Kind: domain.JobKindService},
+		},
+	})
+
+	if len(cfg.Jobs) != 1 {
+		t.Fatalf("expected 1 job, got %d", len(cfg.Jobs))
+	}
+	if cfg.Jobs[0].Kind != domain.JobKindService {
+		t.Errorf("kind = %s, want service", cfg.Jobs[0].Kind)
+	}
+}
+
+func TestBuildScriptJobsFallsBackToTheNameWhenKindIsUnset(t *testing.T) {
+	cfg := BuildScriptJobs(BuildScriptJobsParams{
+		PackageManager: domain.PkgManagerPnpm,
+		Scripts:        []domain.PackageScript{{Name: "dev", PkgName: "root"}},
+	})
+
+	if cfg.Jobs[0].Kind != domain.JobKindService {
+		t.Errorf("kind = %s, want service from the name", cfg.Jobs[0].Kind)
+	}
+}
+
+// Two products holding a package of the same name gave `admin-dev` and
+// `admin-dev-2`: a suffix that says nothing, on whichever happened to be
+// second. The directory above the package is what tells them apart.
+func TestScriptJobsNameCollisionsByTheirProduct(t *testing.T) {
+	cfg := BuildScriptJobs(BuildScriptJobsParams{
+		PackageManager: domain.PkgManagerPnpm,
+		Scripts: []domain.PackageScript{
+			{Name: "dev", PkgName: "admin", Workspace: "apps/crm/admin", Kind: domain.JobKindService},
+			{Name: "dev", PkgName: "admin", Workspace: "apps/shop/admin", Kind: domain.JobKindService},
+			{Name: "dev", PkgName: "api", Workspace: "apps/crm/api", Kind: domain.JobKindService},
+		},
+	})
+
+	var names []string
+	for _, job := range cfg.Jobs {
+		names = append(names, job.Name)
+	}
+
+	want := []string{"crm-admin-dev", "shop-admin-dev", "api-dev"}
+	for i, expected := range want {
+		if names[i] != expected {
+			t.Errorf("names = %v, want %v", names, want)
+			break
+		}
+	}
+	for _, name := range names {
+		if strings.HasSuffix(name, "-2") {
+			t.Errorf("names = %v, want no positional suffix left", names)
+		}
 	}
 }

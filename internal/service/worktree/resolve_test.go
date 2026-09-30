@@ -135,3 +135,20 @@ func TestMatchSyncBranchNotFound(t *testing.T) {
 		t.Fatalf("expected ErrBranchNotFound, got %v", err)
 	}
 }
+
+// The positional is a name, and only a name: a surface handing a path — a
+// dashboard row passing what it has closest to hand — resolves to nothing and
+// refuses the run it was meant to start.
+func TestResolveNeverMatchesAPath(t *testing.T) {
+	worktrees := []domain.GitWorktree{
+		{Path: "/wt/feature-auth", Branch: "feature/auth"},
+		{Path: "/wt/feature-login", Branch: "feature/login"},
+	}
+
+	if result := resolveWorktree(worktrees, "/wt/feature-auth"); result.Path != "" || result.Ambiguous {
+		t.Fatalf("result = %+v, want a path to match nothing", result)
+	}
+	if result := resolveWorktree(worktrees, "feature/auth"); result.Path != "/wt/feature-auth" {
+		t.Fatalf("result = %+v, want the branch to name its worktree", result)
+	}
+}

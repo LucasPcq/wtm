@@ -1,24 +1,220 @@
 package run
 
-import "testing"
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+	"testing"
 
-func TestJoinJobNames_Empty(t *testing.T) {
-	if got := joinJobNames(nil); got != "" {
-		t.Errorf("got %q, want empty", got)
+	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/service/process"
+)
+
+func exitCode(code int) *int { return &code }
+
+// failingMigration is the profile every abort test runs: a service that comes
+// up, then a task that writes a page of output before the daemon reports it
+// failed, then a service the run never reaches.
+func failingMigration() *fakeDaemon {
+	return &fakeDaemon{Answers: map[string][]process.Response{
+		"migrate": {
+			{Status: process.StatusOutput, Data: []byte("applying 001\n")},
+			{Status: process.StatusOutput, Data: []byte("ERROR: relation \"users\" does not exist\n")},
+			{Status: process.StatusError, Message: "task migrate failed: exit status 1", ExitCode: exitCode(1)},
+		},
+	}}
+}
+
+func setupUpProject(t *testing.T, daemon *fakeDaemon) *fakeDaemon {
+	t.Helper()
+
+	stateDir := setupTestProject(t)
+	writeRunTOML(t, stateDir, domain.RunConfig{
+		Jobs: []domain.JobConfig{
+			{Name: "docker", Kind: domain.JobKindService, Cmd: "docker compose up -d", Stop: "docker compose down"},
+			migrateJob,
+			apiJob,
+		},
+		Profiles: []domain.ProfileConfig{
+			{Name: "dev", Jobs: []string{"docker", "migrate", "api"}, Default: true},
+		},
+	})
+	return startFakeDaemon(t, daemon)
+}
+
+func TestRunUpOpensTheViewOnATerminal(t *testing.T) {
+	daemon := setupUpProject(t, &fakeDaemon{})
+	view := captureRunView(t)
+	fakeTTY(t, true)
+
+	if _, _, err := runCmd(t, domain.CmdUp); err != nil {
+		t.Fatalf("run up: %v", err)
+	}
+
+	call := view.only(t)
+	if !call.Attached {
+		t.Fatal("the view was opened without the start sequence to drive")
+	}
+	if call.Job != "" {
+		t.Errorf("the view opened focused on %q, want the profile's first job", call.Job)
+	}
+	if got := strings.Join(daemon.startedJobs(), ","); got != "docker,migrate,api" {
+		t.Errorf("the daemon started %q, want the profile in declared order", got)
 	}
 }
 
-func TestJoinJobNames_One(t *testing.T) {
-	got := joinJobNames([]string{"api"})
-	if got != "api" {
-		t.Errorf("got %q, want %q", got, "api")
+func TestRunUpDetachedNeverOpensTheView(t *testing.T) {
+	daemon := setupUpProject(t, &fakeDaemon{})
+	view := captureRunView(t)
+	fakeTTY(t, true)
+
+	stdout, _, err := runCmd(t, domain.CmdUp, "-d")
+	if err != nil {
+		t.Fatalf("run up -d: %v", err)
+	}
+
+	if len(view.calls) != 0 {
+		t.Fatalf("-d opened the view: %+v", view.calls)
+	}
+	for _, want := range []string{"docker started", "api started", domain.RunStreamAttachHint} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout is missing %q\n--- stdout ---\n%s", want, stdout)
+		}
+	}
+	if got := strings.Join(daemon.startedJobs(), ","); got != "docker,migrate,api" {
+		t.Errorf("the daemon started %q, want the profile in declared order", got)
 	}
 }
 
-func TestJoinJobNames_Multiple(t *testing.T) {
-	got := joinJobNames([]string{"api", "web", "worker"})
-	want := "api, web, worker"
-	if got != want {
-		t.Errorf("got %q, want %q", got, want)
+func TestRunUpJSONNeverOpensTheView(t *testing.T) {
+	setupUpProject(t, &fakeDaemon{})
+	view := captureRunView(t)
+	fakeTTY(t, true)
+
+	if _, _, err := runCmd(t, domain.CmdUp, "--output", domain.OutputJSON); err != nil {
+		t.Fatalf("run up --output json: %v", err)
 	}
+
+	if len(view.calls) != 0 {
+		t.Fatalf("--output json opened the view: %+v", view.calls)
+	}
+}
+
+// A machine consumer never saw the live stream, so the failing job's own output
+// is the only thing that says why the profile stopped.
+func TestRunUpJSONCarriesTheFailingJobsOutput(t *testing.T) {
+	setupUpProject(t, failingMigration())
+	captureRunView(t)
+	fakeTTY(t, false)
+
+	stdout, _, err := runCmd(t, domain.CmdUp, "--output", domain.OutputJSON)
+	if !errors.Is(err, domain.ErrAborted) {
+		t.Fatalf("err = %v, want ErrAborted", err)
+	}
+
+	results := decodeRunJobs(t, stdout)
+	if len(results) != 2 {
+		t.Fatalf("got %d results, want docker started and migrate failed:\n%s", len(results), stdout)
+	}
+
+	if results[0].Name != "docker" || results[0].Status != domain.JobActionStarted {
+		t.Errorf("first result = %+v, want docker started", results[0])
+	}
+
+	failed := results[1]
+	if failed.Name != "migrate" || failed.Status != domain.JobActionError {
+		t.Fatalf("second result = %+v, want migrate error", failed)
+	}
+	if failed.Message != "task migrate failed: exit status 1" {
+		t.Errorf("message = %q, want the daemon's reason on its own", failed.Message)
+	}
+	if !strings.Contains(failed.Output, "applying 001") || !strings.Contains(failed.Output, "does not exist") {
+		t.Errorf("output = %q, want everything the task wrote", failed.Output)
+	}
+	if failed.ExitCode == nil || *failed.ExitCode != 1 {
+		t.Errorf("exit_code = %v, want the 1 the daemon reported", failed.ExitCode)
+	}
+}
+
+// An aborted run exits non-zero like every other run command, and still writes
+// its whole document: the two were never in tension — an exit code has never
+// made a document unreadable (LUC-198).
+func TestRunUpJSONExitsNonZeroOnAnAbortWithACompleteDocument(t *testing.T) {
+	setupUpProject(t, failingMigration())
+	fakeTTY(t, false)
+
+	stdout, _, err := runCmd(t, domain.CmdUp, "--output", domain.OutputJSON)
+	if !errors.Is(err, domain.ErrAborted) {
+		t.Fatalf("err = %v, want ErrAborted", err)
+	}
+
+	results := decodeRunJobs(t, stdout)
+	if len(results) != 2 {
+		t.Fatalf("got %d results, want the whole run:\n%s", len(results), stdout)
+	}
+}
+
+func TestRunUpOnAStreamReportsTheAbortAndFails(t *testing.T) {
+	setupUpProject(t, failingMigration())
+	fakeTTY(t, false)
+
+	stdout, stderr, err := runCmd(t, domain.CmdUp)
+	if !errors.Is(err, domain.ErrAborted) {
+		t.Fatalf("err = %v, want ErrAborted", err)
+	}
+
+	if !strings.Contains(stdout, "does not exist") {
+		t.Errorf("the task's output never reached the scrollback:\n%s", stdout)
+	}
+	for _, want := range []string{"step 2/3", "Left running", "docker", "Not started", "api"} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("the abort report is missing %q\n--- stderr ---\n%s", want, stderr)
+		}
+	}
+}
+
+// run up starts one profile, like run down stops one: a second --profile used
+// to be the union of both on up and to overwrite the first on down.
+func TestASecondProfileIsRefused(t *testing.T) {
+	for _, command := range []string{domain.CmdUp, domain.CmdDown} {
+		_, _, err := runCmd(t, command, "--"+domain.FlagProfile, "front", "--"+domain.FlagProfile, "back")
+		if err == nil || !strings.Contains(err.Error(), fmt.Sprintf(domain.FlagGivenTwiceFmt, "front")) {
+			t.Errorf("%s: err = %v, want a second --profile refused", command, err)
+		}
+	}
+}
+
+// Every single-valued job or profile flag of the module refuses a repeat: pflag
+// would otherwise keep the last one and act on it without a word.
+func TestASecondJobOrProfileIsRefused(t *testing.T) {
+	for _, args := range [][]string{
+		{domain.CmdStart, "--" + domain.FlagJob, "api", "--" + domain.FlagJob, "web"},
+		{domain.CmdStop, "--" + domain.FlagJob, "api", "--" + domain.FlagJob, "web"},
+		{domain.CmdOpen, "--" + domain.FlagJob, "api", "--" + domain.FlagJob, "web"},
+		{domain.CmdURL, "--" + domain.FlagJob, "api", "--" + domain.FlagJob, "web"},
+		{domain.CmdLogs, "--" + domain.FlagJob, "api", "--" + domain.FlagJob, "web"},
+		{domain.CmdExport, "--" + domain.FlagProfile, "front", "--" + domain.FlagProfile, "back"},
+		{domain.CmdProfile, domain.CmdEdit, "front", "--" + domain.FlagName, "a", "--" + domain.FlagName, "b"},
+		{domain.CmdJob, domain.CmdEdit, "api", "--" + domain.FlagName, "a", "--" + domain.FlagName, "b"},
+	} {
+		_, _, err := runCmd(t, args...)
+		if err == nil || !strings.Contains(err.Error(), "it takes one value") {
+			t.Errorf("%v: err = %v, want the repeat refused", args, err)
+		}
+	}
+}
+
+// decodeRunJobs reads a `run up` document over one worktree and answers with
+// its jobs, after checking the worktree is named by branch and path.
+func decodeRunJobs(t *testing.T, stdout string) []domain.JobActionResult {
+	t.Helper()
+	var documents []domain.WorktreeRunResult
+	if err := json.Unmarshal([]byte(stdout), &documents); err != nil {
+		t.Fatalf("parse JSON: %v\noutput: %s", err, stdout)
+	}
+	if len(documents) != 1 || documents[0].Branch == "" || documents[0].Path == "" {
+		t.Fatalf("documents = %+v, want one worktree named by branch and path", documents)
+	}
+	return documents[0].Jobs
 }

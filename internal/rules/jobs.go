@@ -2,6 +2,9 @@ package rules
 
 import (
 	"fmt"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 )
@@ -14,21 +17,84 @@ func IsRunInitialized(cfg domain.RunConfig) bool {
 	return len(cfg.Jobs) > 0 || len(cfg.Profiles) > 0
 }
 
-// IsDetached reports whether the job is a service with a stop command,
-// meaning the launcher process exits after starting detached work
-// (e.g. docker compose up -d).
+// IsDetached is the one definition of a detached service: a service that
+// declares `stop`. Its cmd is a launcher wtm waits on until it exits (`docker
+// compose up -d`); what it started runs on, and `stop` is what takes it down. A
+// service without `stop` runs in the foreground and is stopped by signal.
 func IsDetached(job domain.JobConfig) bool {
-	return job.Kind == domain.JobKindService && job.Stop != ""
+	return job.Kind == domain.JobKindService && !IsBlankCommand(job.Stop)
 }
 
-// DefaultProfile returns the profile marked as default, or the first one.
+// LauncherMayNotExit flags a detached service whose cmd shows no sign of
+// detaching: wtm waits for a launcher to exit, so a cmd that keeps running
+// holds `run up` for ever. Advice only — a script may well detach on its own.
+func LauncherMayNotExit(job domain.JobConfig) bool {
+	if !IsDetached(job) {
+		return false
+	}
+	for _, word := range strings.Fields(job.Cmd) {
+		if word == domain.DetachFlagShort || word == domain.DetachFlagLong || strings.HasPrefix(word, domain.DetachFlagLong+"=") {
+			return false
+		}
+	}
+	return true
+}
+
+// IsAlreadyRunning reads the daemon's refusal to start a job that is already
+// up. A repeat start asks for a state the job is already in, so a caller
+// starting a profile treats it as a job that is running rather than a failure.
+func IsAlreadyRunning(message string) bool {
+	return strings.Contains(message, domain.JobAlreadyRunningSuffix)
+}
+
+type JobUptimeParams struct {
+	Job domain.JobInfo
+	Now time.Time
+}
+
+// JobUptime reads how long a job has been up, and only answers for one that
+// still is: on a job that stopped, StartedAt dates a run that is over, and
+// letting it keep counting would read as still running. A start in the future
+// (a clock stepped between the daemon and the reader) counts as zero rather
+// than counting backwards, and a caller that did not say when now is gets no
+// answer at all rather than a 0s reading as a job that just started.
+func JobUptime(params JobUptimeParams) string {
+	if params.Now.IsZero() || !livedUntilNow(params.Job.Status) || params.Job.StartedAt.IsZero() {
+		return ""
+	}
+
+	elapsed := max(params.Now.Sub(params.Job.StartedAt), 0)
+	switch {
+	case elapsed < time.Minute:
+		return fmt.Sprintf(domain.JobUptimeSecFmt, int(elapsed.Seconds()))
+	case elapsed < time.Hour:
+		return fmt.Sprintf(domain.JobUptimeMinFmt, int(elapsed.Minutes()))
+	case elapsed < 24*time.Hour:
+		return fmt.Sprintf(domain.JobUptimeHourFmt, int(elapsed.Hours()), int(elapsed.Minutes())%60)
+	default:
+		return fmt.Sprintf(domain.JobUptimeDayFmt, int(elapsed.Hours())/24, int(elapsed.Hours())%24)
+	}
+}
+
+// livedUntilNow is the condition an uptime needs, and it is not quite IsJobUp: a
+// reaped job was running right up to the instant it was reaped, so now minus its
+// start is its real lifetime — the twelve days being the whole point of the row.
+// A crashed or stopped job died at a moment nobody recorded, and counting to now
+// would report an age it never reached.
+func livedUntilNow(status domain.JobStatus) bool {
+	return IsJobUp(status) || status == domain.JobStatusReaped
+}
+
+// DefaultProfile is the profile `run up` starts unnamed: the one marked default,
+// else the only one declared. Several with none marked have no default — the
+// first declared was a guess nobody could see.
 func DefaultProfile(cfg domain.RunConfig) (domain.ProfileConfig, bool) {
 	for _, p := range cfg.Profiles {
 		if p.Default {
 			return p, true
 		}
 	}
-	if len(cfg.Profiles) > 0 {
+	if len(cfg.Profiles) == 1 {
 		return cfg.Profiles[0], true
 	}
 	return domain.ProfileConfig{}, false
@@ -71,12 +137,31 @@ func ProfileJobs(cfg domain.RunConfig, profile domain.ProfileConfig) []domain.Jo
 func FilterToProfile(cfg domain.RunConfig, name string) (domain.RunConfig, error) {
 	p, ok := FindProfile(cfg, name)
 	if !ok {
-		return domain.RunConfig{}, fmt.Errorf("profile %q not found", name)
+		return domain.RunConfig{}, fmt.Errorf(domain.RunProfileNotFoundFmt, domain.ErrProfileNotFound, name)
 	}
-	return domain.RunConfig{
-		Jobs:     ProfileJobs(cfg, p),
-		Profiles: []domain.ProfileConfig{p},
-	}, nil
+
+	// The config is copied whole before being narrowed: rebuilding it field by
+	// field silently dropped every project-wide setting, the [[env_port]] links
+	// included.
+	out := cfg
+	out.Jobs = ProfileJobs(cfg, p)
+	out.Profiles = []domain.ProfileConfig{p}
+
+	kept := make(map[string]bool, len(out.Jobs))
+	for _, job := range out.Jobs {
+		kept[job.Name] = true
+	}
+	// A link to a job the filter dropped would not survive ValidateRun on the
+	// other side of an import.
+	links := make([]domain.EnvPortLink, 0, len(cfg.EnvPorts))
+	for _, link := range cfg.EnvPorts {
+		if kept[link.Job] {
+			links = append(links, link)
+		}
+	}
+	out.EnvPorts = links
+
+	return out, nil
 }
 
 // FindExistingDefaultProfile returns the name of the profile currently marked
@@ -95,10 +180,12 @@ func FindExistingDefaultProfile(cfg domain.RunConfig, exclude string) string {
 // run when the user (re)confirmed a new default to prevent ValidateRun from
 // rejecting two defaults.
 func ApplyDefaultOverride(cfg domain.RunConfig, keepName string) domain.RunConfig {
-	out := domain.RunConfig{
-		Jobs:     cfg.Jobs,
-		Profiles: make([]domain.ProfileConfig, len(cfg.Profiles)),
-	}
+	// The copy is of the whole config, never a hand-listed subset: this result is
+	// written straight back to run.toml, and rebuilding it field by field silently
+	// dropped every setting the function does not care about — the [[env_port]]
+	// links included.
+	out := cfg
+	out.Profiles = make([]domain.ProfileConfig, len(cfg.Profiles))
 	copy(out.Profiles, cfg.Profiles)
 	for i, p := range out.Profiles {
 		if p.Default && p.Name != keepName {
@@ -118,9 +205,17 @@ type MergeResult struct {
 // name with an existing entry in dst are skipped (names go into Skipped); new
 // entries are appended (names go into Added). dst is never mutated.
 func MergeRunConfigs(dst, src domain.RunConfig) (domain.RunConfig, MergeResult) {
-	out := domain.RunConfig{
-		Jobs:     make([]domain.JobConfig, len(dst.Jobs)),
-		Profiles: make([]domain.ProfileConfig, len(dst.Profiles)),
+	// Everything dst settled is kept by copying it whole — the offset block a
+	// project chose to keep its ports apart, its addressing, its probe timeout.
+	// A re-run of `run init` is additive, and none of it is the detection's to
+	// discard.
+	out := dst
+	out.EnvPorts = make([]domain.EnvPortLink, len(dst.EnvPorts))
+	out.Jobs = make([]domain.JobConfig, len(dst.Jobs))
+	out.Profiles = make([]domain.ProfileConfig, len(dst.Profiles))
+	copy(out.EnvPorts, dst.EnvPorts)
+	if out.PortOffsetBlock == 0 {
+		out.PortOffsetBlock = src.PortOffsetBlock
 	}
 	copy(out.Jobs, dst.Jobs)
 	copy(out.Profiles, dst.Profiles)
@@ -157,4 +252,69 @@ func MergeRunConfigs(dst, src domain.RunConfig) (domain.RunConfig, MergeResult) 
 	}
 
 	return out, result
+}
+
+// JobsWithoutProfile is what `run up` starts when the config declares no
+// profile at all: every declared job, tasks included, in declared order.
+// Keeping only the services here silently dropped the migrations a service
+// needs and still reported the run complete — the step counter read [1/1] with
+// nothing to say a declared job had been skipped (LUC-208). A job the user does
+// not want in `run up` belongs outside the profile they start, not filtered out
+// of a run that claims to start everything.
+func JobsWithoutProfile(cfg domain.RunConfig) []domain.JobConfig {
+	jobs := make([]domain.JobConfig, len(cfg.Jobs))
+	copy(jobs, cfg.Jobs)
+	return jobs
+}
+
+// DistinctValues counts the different non-empty values of a map.
+func DistinctValues(values map[string]string) int {
+	seen := map[string]bool{}
+	for _, value := range values {
+		if value != "" {
+			seen[value] = true
+		}
+	}
+	return len(seen)
+}
+
+type JobUpInParams struct {
+	Jobs    []domain.JobInfo
+	Name    string
+	WorkDir string
+}
+
+// JobUpIn says the daemon holds this job up in this worktree.
+func JobUpIn(params JobUpInParams) bool {
+	for _, job := range params.Jobs {
+		if job.Name == params.Name && job.WorkDir == params.WorkDir && IsJobUp(job.Status) {
+			return true
+		}
+	}
+	return false
+}
+
+type WorkDirsWithJobsUpParams struct {
+	Jobs   []domain.JobInfo
+	Within []string
+}
+
+// WorkDirsWithJobsUp names, once each and in the daemon's order, the work dirs
+// among Within that hold a job up.
+func WorkDirsWithJobsUp(params WorkDirsWithJobsUpParams) []string {
+	within := make(map[string]bool, len(params.Within))
+	for _, dir := range params.Within {
+		within[filepath.Clean(dir)] = true
+	}
+	seen := map[string]bool{}
+	var dirs []string
+	for _, job := range params.Jobs {
+		dir := filepath.Clean(job.WorkDir)
+		if !IsJobUp(job.Status) || !within[dir] || seen[dir] {
+			continue
+		}
+		seen[dir] = true
+		dirs = append(dirs, job.WorkDir)
+	}
+	return dirs
 }

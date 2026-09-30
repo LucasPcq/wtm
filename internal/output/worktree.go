@@ -23,7 +23,7 @@ type FormatWorktreeListParams struct {
 // FormatWorktreeList renders a list of worktree statuses as an aligned table string.
 func FormatWorktreeList(params FormatWorktreeListParams) string {
 	if len(params.Statuses) == 0 {
-		return "No worktrees found."
+		return UnchangedLine(domain.NoWorktreesMessage)
 	}
 
 	rows := buildRows(params.Statuses, params.ActiveBranch, params.PRInfos, params.Services)
@@ -77,7 +77,7 @@ func formatPRTag(branch string, prs []domain.PRInfo) string {
 
 func formatServicesTag(worktreePath string, svcs []domain.JobInfo) string {
 	for _, svc := range svcs {
-		if svc.WorkDir == worktreePath && svc.Status == domain.JobStatusRunning {
+		if svc.WorkDir == worktreePath && rules.IsJobUp(svc.Status) {
 			return styles.Success.Render("services")
 		}
 	}
@@ -239,7 +239,7 @@ func matchPR(branch string, prs []domain.PRInfo) *domain.WorktreeListPR {
 func matchRunningServices(worktreePath string, services []domain.JobInfo) []string {
 	names := make([]string, 0)
 	for _, svc := range services {
-		if svc.WorkDir == worktreePath && svc.Status == domain.JobStatusRunning {
+		if svc.WorkDir == worktreePath && rules.IsJobUp(svc.Status) {
 			names = append(names, svc.Name)
 		}
 	}
@@ -257,7 +257,11 @@ type CreateResultParams struct {
 	AlreadyExists bool
 	From          string
 	EnvStrategy   string
-	Path          string
+	// EnvNote qualifies the env line with what the port pass did — a count and an
+	// offset, resolved by the caller (rules.EnvPortSettlementNote). Empty when the
+	// run moved no linked value.
+	EnvNote string
+	Path    string
 	// ExistingBranch reports that an existing local branch was checked out as-is,
 	// which retitles the headline and relabels From as the sync parent.
 	ExistingBranch bool
@@ -278,9 +282,9 @@ type CreateResultParams struct {
 // frame owns the outer padding.
 func FormatCreateResult(w io.Writer, p CreateResultParams) {
 	if p.AlreadyExists {
-		Success(w, fmt.Sprintf("Worktree %s already exists at %s", p.Branch, p.Path))
+		Unchanged(w, fmt.Sprintf("Worktree %s already exists at %s", p.Branch, p.Path))
 		Blank(w)
-		GoHint(w, p.GoCommand)
+		NextStep(w, NextStepParams{Command: p.GoCommand})
 		return
 	}
 
@@ -295,7 +299,7 @@ func FormatCreateResult(w io.Writer, p CreateResultParams) {
 	Blank(w)
 	writeAlignedFields(w, []domain.RecapField{
 		{Label: sourceLabel, Value: p.From},
-		{Label: domain.CreateRecapLabelEnv, Value: p.EnvStrategy},
+		{Label: domain.CreateRecapLabelEnv, Value: withNote(noteParams{Value: p.EnvStrategy, Note: p.EnvNote})},
 		{Label: domain.CreateRecapLabelPath, Value: p.Path},
 	})
 	if p.ReusedNote != "" {
@@ -307,13 +311,49 @@ func FormatCreateResult(w io.Writer, p CreateResultParams) {
 		}
 	}
 	Blank(w)
-	GoHint(w, p.GoCommand)
+	NextStep(w, NextStepParams{Command: p.GoCommand})
 }
 
-// GoHint prints the highlighted jump-in step shared by every worktree-creating
-// command (create, extract, checkout): a primary arrow + the bold `wtm go` command.
-func GoHint(w io.Writer, goCommand string) {
-	fmt.Fprintf(w, "%s%s  %s\n", Indent, styles.Primary.Render("→"), styles.Bold.Render(goCommand))
+type PRCheckoutResultParams struct {
+	Number            int
+	Branch            string
+	EnvNote           string
+	Path              string
+	ReusedNote        string
+	ReusedNoteWarning bool
+	GoCommand         string
+}
+
+func FormatPRCheckoutResult(w io.Writer, p PRCheckoutResultParams) {
+	Success(w, fmt.Sprintf(domain.PRCheckedOutFmt, p.Number, p.Branch))
+	Blank(w)
+	fields := []domain.RecapField{}
+	if p.EnvNote != "" {
+		fields = append(fields, domain.RecapField{Label: domain.CreateRecapLabelEnv, Value: p.EnvNote})
+	}
+	writeAlignedFields(w, append(fields, domain.RecapField{Label: domain.CreateRecapLabelPath, Value: p.Path}))
+	if p.ReusedNote != "" {
+		Blank(w)
+		if p.ReusedNoteWarning {
+			Warning(w, p.ReusedNote)
+		} else {
+			Message(w, p.ReusedNote)
+		}
+	}
+	Blank(w)
+	NextStep(w, NextStepParams{Command: p.GoCommand})
+}
+
+type noteParams struct {
+	Value string
+	Note  string
+}
+
+func withNote(params noteParams) string {
+	if params.Note == "" {
+		return params.Value
+	}
+	return params.Value + styles.Muted.Render(domain.EnvRecapNoteSeparator+params.Note)
 }
 
 // writeAlignedFields prints indented "label   value" rows with values aligned to a
@@ -340,10 +380,16 @@ type WriteWorktreeCleanJSONParams struct {
 	// OrphanedChildren lists children left dangling because reparenting was not
 	// authorized (no --reparent-children in non-interactive mode).
 	OrphanedChildren []domain.ReparentResult `json:"orphaned_children,omitempty"`
+	// Namespaces is what became of the data the worktree held in the shared
+	// services: dropped, deferred to the service's next start, or kept.
+	Namespaces []domain.NamespaceOutcome `json:"namespaces"`
 }
 
 // WriteWorktreeCleanJSON writes the JSON payload for `clean`.
 func WriteWorktreeCleanJSON(w io.Writer, params WriteWorktreeCleanJSONParams) error {
+	if params.Namespaces == nil {
+		params.Namespaces = []domain.NamespaceOutcome{}
+	}
 	return encodeJSON(w, params)
 }
 
@@ -357,23 +403,6 @@ type WriteReparentJSONParams struct {
 // WriteReparentJSON writes the JSON payload for `reparent`.
 func WriteReparentJSON(w io.Writer, results []domain.ReparentResult) error {
 	return encodeJSON(w, WriteReparentJSONParams{Reparented: results})
-}
-
-// FormatReparentProposal renders the proposed reparenting of a cleaned worktree's
-// orphaned children onto the grandparent: a leading blank separator (from the
-// preceding "Will delete" recap) followed by an announce block listing each
-// child's old → new parent. Raw body — the command's frame owns the outer padding.
-func FormatReparentProposal(w io.Writer, plan domain.CleanReparentPlan) {
-	Blank(w)
-
-	items := make([]AnnounceItem, 0, len(plan.Children))
-	for _, child := range plan.Children {
-		items = append(items, AnnounceItem{
-			Label: child.Branch,
-			Value: fmt.Sprintf("%s → %s", child.OldParent, child.NewParent),
-		})
-	}
-	Announce(w, fmt.Sprintf("Reparent orphaned children onto %s:", plan.Grandparent), items)
 }
 
 // encodeJSON writes v as indented JSON to w.

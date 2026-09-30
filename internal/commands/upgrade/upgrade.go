@@ -3,6 +3,7 @@ package upgrade
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"runtime"
 
@@ -36,6 +37,12 @@ func NewCmd(params NewCmdParams) *cobra.Command {
 			"--check reports what is available without changing anything. --yes skips the\n" +
 			"confirmation (required with --output json). --version pins an explicit release and\n" +
 			"applies to standalone installs only.",
+		Example: `  # Is there a newer release?
+  wtm upgrade --check
+
+  wtm upgrade
+
+  wtm upgrade --yes --output json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd, params.Version)
@@ -138,7 +145,7 @@ func apply(cmd *cobra.Command, install selfupdate.Install, release domain.Releas
 		}
 		if !ran {
 			w := cmd.ErrOrStderr()
-			output.Frame(w, func() {
+			output.Frame(w, func(w io.Writer) {
 				output.Warning(w, fmt.Sprintf("run `%s` to update", rules.UpgradeCommandFor(install.Method)))
 			})
 		}
@@ -162,7 +169,7 @@ func report(cmd *cobra.Command, format string, result domain.UpgradeResult) erro
 		return output.UpgradeResultJSON(w, result)
 	}
 
-	output.Frame(w, func() { output.UpgradeReport(w, result) })
+	output.Frame(w, func(w io.Writer) { output.UpgradeReport(w, result) })
 
 	return nil
 }

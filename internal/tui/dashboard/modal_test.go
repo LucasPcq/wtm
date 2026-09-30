@@ -533,3 +533,54 @@ func TestTheModalLoadsAStepThatComesFirst(t *testing.T) {
 		t.Errorf("the modal must draw the loaded content:\n%s", body)
 	}
 }
+
+func TestTheModalOpensASelectOnItsStartingValue(t *testing.T) {
+	content := flow.StepContent{
+		Options: []flow.Option{
+			{Label: "feature-a", Value: "/wt/a"},
+			{Label: "feature-b", Value: "/wt/b"},
+		},
+		Start: "/wt/b",
+	}
+
+	if got := newSelectList(content).Value(); got != "/wt/b" {
+		t.Errorf("cursor = %q, want the starting value", got)
+	}
+}
+
+// The two surfaces must agree on what a step's badges look like, so the modal
+// renders them like the wizard does rather than dropping them.
+func TestTheModalRendersTheBadgesAStepDeclares(t *testing.T) {
+	content := flow.StepContent{Options: []flow.Option{{
+		Label:  "feature-a",
+		Value:  "/wt/a",
+		Badges: []flow.Badge{{Text: "3 jobs", Tone: domain.ToneSuccess}, {Text: "current"}},
+	}}}
+
+	view := newSelectList(content).View()
+	for _, want := range []string{"3 jobs", "current"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("view is missing %q:\n%s", want, view)
+		}
+	}
+}
+
+func TestTheModalMultiSelectCarriesItsBadgesAndStart(t *testing.T) {
+	multi := newMultiSelect(flow.Step{Kind: flow.StepMultiSelect, Key: "w"}, flow.StepContent{
+		Options: []flow.Option{
+			{Label: "main", Value: "/wt/main", Badges: []flow.Badge{{Text: "2 running", Tone: domain.ToneSuccess}}},
+			{Label: "feat/x", Value: "/wt/x", Badges: []flow.Badge{{Text: "current"}}},
+		},
+		Start: "/wt/x",
+	})
+	view := multi.View()
+	for _, want := range []string{"2 running", "current"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("view = %q, want %q", view, want)
+		}
+	}
+	multi, _ = multi.Update(key(" "))
+	if got := strings.Join(multi.Values(), ","); got != "/wt/x" {
+		t.Errorf("space toggled %q, want the row the step starts on", got)
+	}
+}

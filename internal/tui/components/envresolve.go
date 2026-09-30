@@ -617,12 +617,15 @@ func (m EnvResolveModel) viewEdit() string {
 	return b.String()
 }
 
-// helpHint is the wizard help bar for this step.
-func (m EnvResolveModel) helpHint() string {
+func (m EnvResolveModel) helpActions() []string {
+	return []string{domain.HelpSetResolution, domain.HelpEditValue}
+}
+
+func (m EnvResolveModel) helpModal() string {
 	if m.editing {
-		return "  type value • enter save • esc cancel"
+		return domain.EnvResolveEditHelp
 	}
-	return "  ↑↓ move • ←→ action • e edit • enter continue • esc back"
+	return ""
 }
 
 // EnvResolveSummary is the breadcrumb summary for a completed resolve step.

@@ -1,7 +1,6 @@
 package worktree
 
 import (
-	"errors"
 	"sync"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -55,55 +54,6 @@ func PlanPrune(params domain.PruneParams, prs []domain.PRInfo) (domain.PrunePlan
 		BaseBranch: params.BaseBranch,
 		Force:      params.Force,
 	}), nil
-}
-
-// Prune removes the selected worktrees (reusing Clean, which deletes the local
-// branch) and reparents the surviving children onto their grandparent. An absent
-// worktree is tolerated so a re-run is idempotent. A dry run returns the plan as a
-// result without touching anything.
-func Prune(params domain.PruneParams, plan domain.PrunePlan) (domain.PruneResult, error) {
-	result := domain.PruneResult{
-		Pruned:     []domain.PruneCandidate{},
-		Reparented: []domain.ReparentResult{},
-		Skipped:    plan.Skipped,
-		DryRun:     params.DryRun,
-	}
-
-	if params.DryRun {
-		result.Pruned = plan.Selected
-		result.Reparented = plan.Reparents
-		return result, nil
-	}
-
-	for _, cand := range plan.Selected {
-		err := Clean(domain.CleanParams{
-			ProjectDir: params.ProjectDir,
-			StateDir:   params.StateDir,
-			Branch:     cand.Branch,
-			Force:      true, // safety was already decided during classification
-			BaseBranch: params.BaseBranch,
-			Config:     params.Config,
-			// on_clean hooks are run as a titled phase by the prune command before
-			// this removal loop (mirrors clean), so Clean skips them here.
-			SkipHooks: true,
-		})
-		if err != nil && !errors.Is(err, domain.ErrWorktreeNotFound) {
-			return result, err
-		}
-		result.Pruned = append(result.Pruned, cand)
-	}
-
-	reparented, err := ApplyReparents(ApplyReparentsParams{
-		Reparents: plan.Reparents,
-		StateDir:  params.StateDir,
-	})
-	if err != nil {
-		return result, err
-	}
-	if len(reparented) > 0 {
-		result.Reparented = reparented
-	}
-	return result, nil
 }
 
 // prStates maps each branch to its normalized PR state, keeping the first hit

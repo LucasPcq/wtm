@@ -244,3 +244,39 @@ func TestMultiSelectKeepsTheCheckboxesInOneColumn(t *testing.T) {
 		}
 	}
 }
+
+func badgedMultiSelect() MultiSelectModel {
+	m := NewMultiSelect(NewMultiSelectParams{
+		Items: []MultiSelectItem{
+			{Label: "main", Value: "/wt/main", Badges: []Badge{{Text: "2 running", Variant: BadgeSuccess}}},
+			{Label: "feat/x", Value: "/wt/x", Badges: []Badge{{Text: "current"}}},
+		},
+		Start: "/wt/x",
+	})
+	m.SetSize(SetSizeParams{Width: 60, Height: 10})
+	return m
+}
+
+// The flow declares "N running" and "current" on each worktree; a widget that
+// drops them leaves the picker blind to what it is about to start over.
+func TestMultiSelectDrawsEachRowsBadges(t *testing.T) {
+	view := ansi.Strip(badgedMultiSelect().View())
+	for _, want := range []string{"2 running", "current"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("view = %q, want the badge %q", view, want)
+		}
+	}
+	for _, line := range strings.Split(view, "\n") {
+		if w := ansi.StringWidth(line); w > 60 {
+			t.Errorf("line %q is %d wide, want the badges inside the row", line, w)
+		}
+	}
+}
+
+func TestMultiSelectOpensOnItsStart(t *testing.T) {
+	m := badgedMultiSelect()
+	m = pressKey(m, " ")
+	if got := strings.Join(m.Values(), ","); got != "/wt/x" {
+		t.Errorf("space toggled %q, want the start row", got)
+	}
+}

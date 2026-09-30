@@ -6,6 +6,7 @@ type Tone int
 
 const (
 	ToneNeutral Tone = iota
+	ToneSuccess
 	ToneWarning
 	ToneDanger
 )

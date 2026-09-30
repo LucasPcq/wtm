@@ -8,10 +8,24 @@ Reconcile every worktree with the configured base_path. Worktrees not under it a
 moved (git worktree move) and worktrees created outside wtm are adopted (their parent
 recorded so `wtm sync` works). Pass --to to change base_path and move existing worktrees
 to the new location. Dirty or locked worktrees are skipped unless --force; an occupied
-target path is never overwritten.
+target path is never overwritten, and a worktree whose jobs are running is never moved
+(stop them with `wtm run down <branch>` first). Adoption keeps what the worktree's
+meta.json already records (isolation, namespaces, ordinal).
 
 ```
 wtm relocate [flags]
+```
+
+### Examples
+
+```
+  # Show the plan first
+  wtm relocate --dry-run
+
+  wtm relocate
+
+  # Move every worktree under a new directory
+  wtm relocate --to ../acme.trees --yes
 ```
 
 ### Options
@@ -23,6 +37,12 @@ wtm relocate [flags]
       --output string   Output format: text or json (default "text")
       --to string       New base_path (relative to repo root); also moves existing worktrees there
   -y, --yes             Skip all prompts; resolve every decision from flags and safe defaults (parents default to the base branch)
+```
+
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
 ```
 
 ### SEE ALSO

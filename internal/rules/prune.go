@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"fmt"
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
@@ -339,4 +340,25 @@ func PruneReasonLabel(reason string) string {
 	default:
 		return reason
 	}
+}
+
+// PrunedBranches names what a prune removed, in the order it removed them. It is
+// the one list a destructive result keeps: what is gone is actionable, even when
+// the picker showed it twice already.
+func PrunedBranches(result domain.PruneResult) []string {
+	names := make([]string, 0, len(result.Pruned))
+	for _, c := range result.Pruned {
+		names = append(names, c.Branch)
+	}
+	return names
+}
+
+// ReparentedPairs names each moved child and the parent it now records, on one
+// line: the branch a later `wtm sync` will rebase onto is not a count.
+func ReparentedPairs(results []domain.ReparentResult) []string {
+	pairs := make([]string, 0, len(results))
+	for _, r := range results {
+		pairs = append(pairs, fmt.Sprintf(domain.ReparentedPairFmt, r.Branch, r.NewParent))
+	}
+	return pairs
 }

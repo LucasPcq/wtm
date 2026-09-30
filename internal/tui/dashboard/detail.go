@@ -15,12 +15,20 @@ import (
 )
 
 func (m Model) renderDetail(layout domain.DashboardLayout) string {
+	if !m.runModule() {
+		return m.renderPanel(panelParams{
+			Rect:       layout.Detail,
+			Title:      domain.DashboardDetailTitle,
+			TitleRight: m.detailFreshnessMarker(),
+			Body:       m.detailBody(layout),
+			Zone:       zoneDetail,
+		})
+	}
+	width := max(layout.Detail.Width-borderWidth-paddingWidth, 0)
 	return m.renderPanel(panelParams{
-		Rect:       layout.Detail,
-		Title:      domain.DashboardDetailTitle,
-		TitleRight: m.detailFreshnessMarker(),
-		Body:       m.detailBody(layout),
-		Zone:       zoneDetail,
+		Rect: layout.Detail,
+		Body: append(append(m.panelTabLines(width), ""), m.detailBody(layout)...),
+		Zone: zoneDetail,
 	})
 }
 
@@ -35,6 +43,9 @@ func (m Model) detailBody(layout domain.DashboardLayout) []string {
 	}
 	if width <= 0 {
 		return nil
+	}
+	if m.logsOpen() {
+		return m.logsBody(layout)
 	}
 
 	stale := m.detailIsStale()
@@ -58,7 +69,7 @@ func (m Model) detailBody(layout domain.DashboardLayout) []string {
 	}
 
 	pr := m.prFor(status.Branch)
-	budget := max(panelBodyHeight(layout.Detail)-len(lines), 0)
+	budget := max(tabbedPanelBodyHeight(layout.Detail)-len(lines), 0)
 	sections := m.detailSections(detailSectionsInput{
 		Status:        status,
 		Detail:        detail,
@@ -66,6 +77,11 @@ func (m Model) detailBody(layout domain.DashboardLayout) []string {
 		Parent:        m.parents[status.Branch],
 		PR:            pr,
 		PRUnavailable: m.prUnavailableReason(),
+		RunConfig:     m.runConfig,
+		Jobs:          m.jobs,
+		Addresses:     m.addresses[status.Branch],
+		Expanded:      m.runExpanded,
+		AddressNote:   m.addressNotes[status.Branch],
 		Height:        budget,
 	})
 	return m.appendSections(lines, sections, width, stale, pr)
@@ -170,7 +186,19 @@ type detailSectionsInput struct {
 	// authenticated), empty when it is fine. Set alongside PR so a broken tool
 	// never renders as "no PR" (§8 state 4).
 	PRUnavailable string
-	Height        int
+	// RunConfig is what the project declares it can run, Jobs what the daemon
+	// holds right now. They are read straight off the model rather than off the
+	// lazily loaded Detail: the jobs follow the poll, the addresses follow the
+	// worktree.
+	RunConfig domain.RunConfig
+	Jobs      []domain.JobInfo
+	Addresses map[string]domain.JobAddress
+	// Expanded keys the runners whose children are showing.
+	Expanded map[string]bool
+	// AddressNote is what has to be said about those addresses, empty when the
+	// worktree's .env answers on what its jobs publish.
+	AddressNote string
+	Height      int
 }
 
 // Which sections exist, their order and their placeholder lines are rules/'s
@@ -182,6 +210,11 @@ func (m Model) detailSections(input detailSectionsInput) []domain.DetailSection 
 		DetailLoaded:  input.HasDetail,
 		PR:            input.PR,
 		PRUnavailable: input.PRUnavailable,
+		RunConfig:     input.RunConfig,
+		Jobs:          input.Jobs,
+		Addresses:     input.Addresses,
+		Expanded:      input.Expanded,
+		AddressNote:   input.AddressNote,
 		Parent:        input.Parent,
 		Height:        input.Height,
 		Now:           time.Now(),
@@ -196,6 +229,10 @@ func (m Model) detailSections(input detailSectionsInput) []domain.DetailSection 
 func (m Model) appendSections(lines []string, sections []domain.DetailSection, width int, stale bool, pr *domain.PRInfo) []string {
 	for _, section := range sections {
 		lines = append(lines, "", sectionTitleLine(stale, section, width), "")
+		if section.Rows != nil {
+			lines = append(lines, m.runRowLines(section, width, stale)...)
+			continue
+		}
 		for index, line := range section.Lines {
 			rendered := styleText(stale, styles.DashboardValue, truncate(line, width))
 			if pr != nil && section.Key == domain.DetailSectionReview && index == 0 {
@@ -205,6 +242,168 @@ func (m Model) appendSections(lines []string, sections []domain.DetailSection, w
 		}
 	}
 	return lines
+}
+
+// Only an up row takes a zone: a stopped job answers nowhere, the same rule
+// REVIEW's first line follows when there is no PR to open.
+func (m Model) runRowLines(section domain.DetailSection, width int, stale bool) []string {
+	lines := sectionRowLines(sectionRowLinesParams{
+		Rows: section.Rows, Width: width, Stale: stale,
+		MarkAddress: func(row domain.DetailRow, cell string) string {
+			return m.marks().Mark(runURLZone(row.Key), cell)
+		},
+	})
+	for index, row := range section.Rows {
+		if index >= len(lines) {
+			continue
+		}
+		// A foldable row takes the fold zone: it is the outer one, so the address
+		// cell inside it keeps answering first.
+		if row.Fold {
+			lines[index] = m.marks().Mark(runFoldZone(row.Key), lines[index])
+			continue
+		}
+		if !row.Up {
+			continue
+		}
+		lines[index] = m.marks().Mark(runRowZone(row.Key), lines[index])
+	}
+	return lines
+}
+
+type sectionRowLinesParams struct {
+	Rows  []domain.DetailRow
+	Width int
+	Stale bool
+	// MarkAddress wraps the address cell in its own mouse zone, after it has
+	// been truncated and styled — never before, or spread could cut through the
+	// marker. Nil for a caller that marks nothing.
+	MarkAddress func(row domain.DetailRow, cell string) string
+	// NameWidth sizes the name column from outside, for a surface stacking
+	// several groups of rows that must read as one table. Zero sizes it on the
+	// rows given, which is what a single section wants.
+	NameWidth int
+}
+
+// sectionRowLines sizes the name column on its widest cell and lays the meta
+// flush right, the same way a panel's title row does: a table only reads down
+// its columns once every cell knows how wide its column ended up.
+func sectionRowLines(params sectionRowLinesParams) []string {
+	nameWidth := params.NameWidth
+	for _, row := range params.Rows {
+		nameWidth = max(nameWidth, len([]rune(cellText(row, domain.DetailCellName))))
+	}
+
+	lines := make([]string, 0, len(params.Rows))
+	for _, row := range params.Rows {
+		if note := cellText(row, domain.DetailCellNote); note != "" {
+			indent := domain.DetailListIndent
+			lines = append(lines, styleText(params.Stale, styles.DashboardRowMeta,
+				indent+truncate(note, max(params.Width-len(indent), 0))))
+			continue
+		}
+		if warn := cellText(row, domain.DetailCellWarn); warn != "" {
+			lines = append(lines, warnLine(warnLineParams{Text: warn, Width: params.Width, Stale: params.Stale}))
+			continue
+		}
+		if hasCell(row, domain.DetailCellGap) {
+			lines = append(lines, "")
+			continue
+		}
+		meta := rowMetaCell(row, params.Stale)
+		lines = append(lines, spread(rowLeft(rowLeftParams{
+			Row:         row,
+			NameWidth:   nameWidth,
+			Stale:       params.Stale,
+			Budget:      max(params.Width-lipgloss.Width(meta)-1, 0),
+			MarkAddress: params.MarkAddress,
+		}), meta, params.Width))
+	}
+	return lines
+}
+
+type warnLineParams struct {
+	Text  string
+	Width int
+	Stale bool
+}
+
+// warnLine is the one line a panel gives to something it has to be sure is
+// read: the glyph and the warning colour set it apart from the muted asides it
+// sits under, and the caller puts the blank line above it.
+func hasCell(row domain.DetailRow, kind domain.DetailCellKind) bool {
+	for _, cell := range row.Cells {
+		if cell.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func warnLine(params warnLineParams) string {
+	indent := domain.DetailListIndent + domain.AddressingDriftGlyph
+	return styleText(params.Stale, styles.Warning,
+		indent+truncate(params.Text, max(params.Width-lipgloss.Width(indent), 0)))
+}
+
+type rowLeftParams struct {
+	Row         domain.DetailRow
+	NameWidth   int
+	Stale       bool
+	MarkAddress func(row domain.DetailRow, cell string) string
+	// Budget is what the left side may occupy. The address is cut to it here,
+	// with an ellipsis: spread would clip it silently, and a clipped url reads
+	// as a whole one — on a row whose click opens the real address.
+	Budget int
+}
+
+func rowLeft(params rowLeftParams) string {
+	glyphStyle := styles.DashboardRowMeta
+	if params.Row.Up {
+		glyphStyle = styles.Success
+	}
+	// A child hangs under its runner rather than beside it: it has no state of
+	// its own to mark, so the glyph column becomes its indent.
+	head := domain.DetailListIndent + strings.Repeat(domain.DetailHeldIndent, params.Row.Depth) +
+		styleText(params.Stale, glyphStyle, cellText(params.Row, domain.DetailCellGlyph)) +
+		domain.DetailGlyphGap +
+		styleText(params.Stale, styles.DashboardRowMeta,
+			pad(cellText(params.Row, domain.DetailCellName), params.NameWidth))
+
+	address := truncate(cellText(params.Row, domain.DetailCellAddress),
+		max(params.Budget-lipgloss.Width(head)-lipgloss.Width(domain.DetailColumnGap), 0))
+	if address == "" {
+		return head
+	}
+	style := styles.DashboardRowMeta
+	if params.Row.URL != "" {
+		style = styles.DashboardURL
+	}
+	cell := styleText(params.Stale, style, address)
+	if params.MarkAddress != nil && params.Row.URL != "" {
+		cell = params.MarkAddress(params.Row, cell)
+	}
+	return head + domain.DetailColumnGap + cell
+}
+
+func rowMetaCell(row domain.DetailRow, stale bool) string {
+	meta := cellText(row, domain.DetailCellMeta)
+	if fold := cellText(row, domain.DetailCellFold); fold != "" {
+		meta = strings.TrimSpace(fold + domain.DetailGlyphGap + meta)
+	}
+	if meta == "" {
+		return ""
+	}
+	return styleText(stale, styles.DashboardRowMeta, meta)
+}
+
+func cellText(row domain.DetailRow, kind domain.DetailCellKind) string {
+	for _, cell := range row.Cells {
+		if cell.Kind == kind {
+			return cell.Text
+		}
+	}
+	return ""
 }
 
 // Off the UI goroutine: PROpener shells out to gh, and calling it inside Update

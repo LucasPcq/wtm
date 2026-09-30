@@ -10,24 +10,24 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
-// PackageJSONScripts returns all package.json scripts under projectDir,
-// including pnpm workspace packages when pnpm-workspace.yaml is present.
-// Results are ordered: root scripts first (alphabetically), then workspace
-// packages (alphabetically by dir, then by script name within each package).
-// Returns nil if no package.json is found at the project root.
+// PackageJSONScripts returns all package.json scripts under projectDir: the
+// root manifest's, then each workspace package's, ordered by directory and by
+// script name within a package.
+//
+// A missing root manifest is not an empty answer. A repo whose packages all sit
+// in subdirectories still declares its workspace, and bailing on the root left
+// it with nothing detected at all (LUC-208).
 func PackageJSONScripts(projectDir string) []domain.PackageScript {
-	root := readPackageScripts(projectDir, "")
-	if root == nil {
-		return nil
-	}
+	scripts := append([]domain.PackageScript{}, readPackageScripts(projectDir, "")...)
 
-	scripts := append([]domain.PackageScript{}, root...)
-
-	for _, wsDir := range PnpmWorkspacePackages(projectDir) {
+	for _, wsDir := range WorkspacePackages(projectDir) {
 		ws := readPackageScripts(filepath.Join(projectDir, wsDir), wsDir)
 		scripts = append(scripts, ws...)
 	}
 
+	if len(scripts) == 0 {
+		return nil
+	}
 	return scripts
 }
 

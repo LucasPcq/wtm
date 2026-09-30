@@ -19,7 +19,7 @@ func TestResolveVersionKeepsTheLinkedVersion(t *testing.T) {
 // covered end to end in the PR checklist, not here: it cannot be produced from
 // inside `go test`.
 func TestResolveVersionDeclinesADevelBuild(t *testing.T) {
-	if got := selfupdate.ResolveVersion(domain.Version); got != domain.Version {
+	if got := selfupdate.ResolveVersion(domain.VersionDev); got != domain.VersionDev {
 		t.Fatalf("ResolveVersion(dev) = %q, want %q for a source build", got, domain.Version)
 	}
 }

@@ -21,7 +21,9 @@ func TestExitCode(t *testing.T) {
 		{"worktree exists", domain.ErrWorktreeExists, domain.ExitCodeWorktreeExists},
 		{"branch not found", domain.ErrBranchNotFound, domain.ExitCodeBranchNotFound},
 		{"config not found", domain.ErrConfigNotFound, domain.ExitCodeConfigNotFound},
-		{"job not found", domain.ErrJobNotFound, domain.ExitCodeServiceNotFound},
+		{"job not found", domain.ErrJobNotFound, domain.ExitCodeNotDeclared},
+		{"profile not found", fmt.Errorf(domain.RunProfileNotFoundFmt, domain.ErrProfileNotFound, "dev"), domain.ExitCodeNotDeclared},
+		{"usage", fmt.Errorf("unknown flag: --bogus: %w", domain.ErrUsage), domain.ExitCodeUsage},
 		{"wrapped", fmt.Errorf("context: %w", domain.ErrBranchNotFound), domain.ExitCodeBranchNotFound},
 	}
 

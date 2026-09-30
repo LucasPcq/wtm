@@ -10,10 +10,24 @@ Launch the editor on <git-common-dir>/wtm/config.toml. After save, the file is r
 wtm config edit [flags]
 ```
 
+### Examples
+
+```
+  wtm config edit
+
+  EDITOR=vim wtm config edit
+```
+
 ### Options
 
 ```
   -h, --help   help for edit
+```
+
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
 ```
 
 ### SEE ALSO

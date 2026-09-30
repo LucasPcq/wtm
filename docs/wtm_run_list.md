@@ -11,11 +11,30 @@ In a TTY, offers an interactive picker with start/stop/logs actions.
 wtm run list [flags]
 ```
 
+### Examples
+
+```
+  # Pick a job or a profile, then start, stop or read it
+  wtm run list
+
+  # Print the table
+  wtm run list --yes
+
+  wtm run list --output json
+```
+
 ### Options
 
 ```
   -h, --help            help for list
       --output string   Output format: text or json (default "text")
+  -y, --yes             Skip the interactive picker; print the table instead
+```
+
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
 ```
 
 ### SEE ALSO

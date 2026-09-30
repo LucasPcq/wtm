@@ -1,7 +1,9 @@
 package worktree
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/service/process"
 )
 
 // RelocateParams holds inputs for planning and running a relocate.
@@ -91,6 +94,7 @@ func collectRelocateCandidates(params RelocateParams) ([]rules.RelocateCandidate
 		return nil, err
 	}
 
+	names := nameClashes(nameClashesParams{StateDir: params.StateDir, Worktrees: worktrees})
 	candidates := make([]rules.RelocateCandidate, 0, len(worktrees))
 	for _, w := range worktrees {
 		if w.IsMain {
@@ -109,14 +113,17 @@ func collectRelocateCandidates(params RelocateParams) ([]rules.RelocateCandidate
 			Branch:     w.Branch,
 		})
 
+		managed := isManaged(params.StateDir, w.Branch)
 		candidates = append(candidates, rules.RelocateCandidate{
 			Branch:       w.Branch,
 			FromPath:     w.Path,
-			IsManaged:    isManaged(params.StateDir, w.Branch),
+			IsManaged:    managed,
+			NameClash:    names.of(nameClashOfParams{Branch: w.Branch, Managed: managed}),
 			IsDirty:      dirty,
 			InspectErr:   dirtyErr != nil,
 			IsLocked:     w.Locked,
 			DestOccupied: !samePath(w.Path, to) && pathExists(to),
+			HasJobs:      !samePath(w.Path, to) && process.WorktreeHasJobs(w.Path),
 		})
 	}
 
@@ -150,6 +157,7 @@ func executeRelocateStep(p executeRelocateStepParams) domain.RelocateStepResult 
 	default:
 		// Noop and every skip/block status carry through unchanged.
 		res.Status = p.Step.Status
+		res.Detail = p.Step.Detail
 		return res
 	}
 }
@@ -175,7 +183,12 @@ func runMoveStep(p executeRelocateStepParams, res domain.RelocateStepResult) dom
 	}
 
 	if !p.Params.DryRun {
-		if err := adoptWorktree(p.Params.StateDir, res.Branch, res.Parent); err != nil {
+		if err := adoptWorktree(adoptWorktreeParams{
+			ProjectDir: p.Params.ProjectDir,
+			StateDir:   p.Params.StateDir,
+			Branch:     res.Branch,
+			Parent:     res.Parent,
+		}); err != nil {
 			return failStep(res, err)
 		}
 	}
@@ -185,7 +198,12 @@ func runMoveStep(p executeRelocateStepParams, res domain.RelocateStepResult) dom
 
 func runAdoptStep(p executeRelocateStepParams, res domain.RelocateStepResult) domain.RelocateStepResult {
 	if !p.Params.DryRun {
-		if err := adoptWorktree(p.Params.StateDir, res.Branch, res.Parent); err != nil {
+		if err := adoptWorktree(adoptWorktreeParams{
+			ProjectDir: p.Params.ProjectDir,
+			StateDir:   p.Params.StateDir,
+			Branch:     res.Branch,
+			Parent:     res.Parent,
+		}); err != nil {
 			return failStep(res, err)
 		}
 	}
@@ -199,12 +217,25 @@ func failStep(res domain.RelocateStepResult, err error) domain.RelocateStepResul
 	return res
 }
 
-func adoptWorktree(stateDir, branch, parent string) error {
-	metadata := domain.WorktreeMetadata{
-		SourceBranch: parent,
-		CreatedAt:    time.Now().UTC().Format(time.RFC3339),
+type adoptWorktreeParams struct {
+	ProjectDir string
+	StateDir   string
+	Branch     string
+	Parent     string
+}
+
+// adoptWorktree completes the record rather than writing a new one: a worktree
+// that already ran jobs holds its ordinal, its isolation and the namespaces
+// clean has to give back. The ordinal is left for the run module to allocate
+// on first use, as for a created worktree.
+func adoptWorktree(params adoptWorktreeParams) error {
+	metadata, err := loadMetadata(params.StateDir, params.Branch)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("read metadata for %s: %w", params.Branch, err)
 	}
-	return writeMetadata(rules.WorktreeMetaDir(stateDir, branch), metadata)
+	metadata.SourceBranch = params.Parent
+	metadata.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+	return writeMetadata(rules.WorktreeMetaDir(params.StateDir, params.Branch), metadata)
 }
 
 func resolveParent(params RelocateParams, step domain.RelocateStep) string {
@@ -220,10 +251,17 @@ func resolveParent(params RelocateParams, step domain.RelocateStep) string {
 	return params.BaseBranch
 }
 
+// isManaged reports whether wtm ever created or adopted this worktree, which is
+// what CreatedAt records. The file alone no longer answers it: a worktree that
+// merely ran a job has a meta.json holding its ordinal and nothing else, and it
+// is still external — relocate must keep offering to adopt it, and reparent must
+// keep refusing it a parent it never had.
 func isManaged(stateDir, branch string) bool {
-	metaPath := filepath.Join(rules.WorktreeMetaDir(stateDir, branch), domain.MetaFileName)
-	_, err := os.Stat(metaPath)
-	return err == nil
+	meta, err := loadMetadata(stateDir, branch)
+	if err != nil {
+		return false
+	}
+	return meta.CreatedAt != ""
 }
 
 func pathExists(path string) bool {

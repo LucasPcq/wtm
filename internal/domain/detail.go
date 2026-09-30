@@ -90,6 +90,50 @@ const (
 	ChipKindNeutral  ChipKind = "neutral"
 )
 
+type DetailCellKind string
+
+const (
+	DetailCellGlyph   DetailCellKind = "glyph"
+	DetailCellName    DetailCellKind = "name"
+	DetailCellAddress DetailCellKind = "address"
+	DetailCellMeta    DetailCellKind = "meta"
+	// DetailCellFold is the marker on a row that opens and closes, drawn where
+	// the eye already is — at the end of the row it belongs to.
+	DetailCellFold DetailCellKind = "fold"
+	// DetailCellNote is a standalone muted body line inside a rowed section —
+	// the "… N more" fold, which is not a job and has no columns to align on.
+	DetailCellNote DetailCellKind = "note"
+	// DetailCellGap is a row that draws a blank line. A section's height is its
+	// row count, so air inside one is a row like any other.
+	DetailCellGap DetailCellKind = "gap"
+	// DetailCellWarn is a note that has to be seen: it takes a blank line above
+	// it and the warning colour, where a plain note is a muted aside.
+	DetailCellWarn DetailCellKind = "warn"
+)
+
+type DetailCell struct {
+	Kind DetailCellKind
+	Text string
+}
+
+// DetailRow is one line of a rowed section before its columns are sized: only
+// the renderer can measure a cell once it is styled. Key names what the row
+// designates, URL what clicking it opens.
+type DetailRow struct {
+	Key   string
+	Cells []DetailCell
+	Up    bool
+	URL   string
+	// Depth indents a row under the one it belongs to. Only a runner's children
+	// use it: they are addresses of a job the daemon does not hold, so they hang
+	// off the row of the process that started them rather than standing beside it.
+	Depth int
+	// Fold marks a row that opens and closes. Its Key is what a surface toggles
+	// on, and Folded says which way it currently reads.
+	Fold   bool
+	Folded bool
+}
+
 // DetailSection is one block of the detail panel, already reduced to its plain
 // text lines. Rendering decides nothing: it styles and it stacks.
 type DetailSection struct {
@@ -100,12 +144,48 @@ type DetailSection struct {
 	// and dropped whole, never truncated, when the panel is too narrow for it.
 	TitleRight string
 	Lines      []string
+	// Rows is read instead of Lines when it is non-nil: a section whose body is
+	// a table cannot arrive pre-padded, since rules/ cannot measure a styled
+	// cell.
+	Rows []DetailRow
+}
+
+type ServicesRowKind string
+
+const (
+	ServicesRowHeader ServicesRowKind = "header"
+	ServicesRowJob    ServicesRowKind = "job"
+	ServicesRowGap    ServicesRowKind = "gap"
+	// ServicesRowNote closes a worktree's block with what has to be said about
+	// the addresses above it.
+	ServicesRowNote ServicesRowKind = "note"
+	// ServicesRowHeld is one address a runner answers for, shown under it once
+	// unfolded. It is drawn like a job row and is not one: the cursor skips it,
+	// and the job menu has nothing to act on there — the process belongs to the
+	// runner above.
+	ServicesRowHeld ServicesRowKind = "held"
+)
+
+// ServicesRow is one drawn line of the Services tab. The tab is a flat list
+// like the tree is: a cursor that walks jobs, an offset that scrolls lines and
+// a mouse zone per row all need one index, not a stack of blocks.
+type ServicesRow struct {
+	Kind   ServicesRowKind
+	Branch string
+	Path   string
+	// Up heads a block: how many of that worktree's jobs are running.
+	Up int
+	// Job is the row's own line, zero on a header and on a gap.
+	Job DetailRow
+	// Note closes a block; empty on every other kind.
+	Note string
 }
 
 // DetailSectionDropOrder is the order sections give up their place when the
 // panel runs out of height: the last one listed falls first. The vital strip
 // and the blockers line are not in it — they never fall.
 var DetailSectionDropOrder = []string{
+	DetailSectionRun,
 	DetailSectionReview,
 	DetailSectionChanges,
 	DetailSectionActivity,

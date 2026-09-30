@@ -15,6 +15,10 @@ type DashboardLayoutParams struct {
 	// DetailOpen only matters under DashboardNarrowWidth, where the detail takes
 	// the list's place instead of sitting beside it.
 	DetailOpen bool
+	// FullBody is asked by a tab whose content needs the width — the Running
+	// tab, whose whole point is that the addresses are readable. The detail
+	// then does not show: there is nothing beside the main panel.
+	FullBody bool
 }
 
 // minDashboardBody keeps the list readable when the terminal is short: the
@@ -72,6 +76,13 @@ func ComputeDashboardLayout(params DashboardLayoutParams) domain.DashboardLayout
 	}
 
 	body := domain.Rect{X: 0, Y: tabs.Height, Width: width, Height: bodyHeight}
+	if params.FullBody {
+		layout.List, layout.ListVisible = body, true
+		layout.ListRows = dashboardListRows(body.Height)
+		layout.TreeRows = dashboardTreeRows(body.Height)
+		layout.ServicesRows = dashboardServicesRows(body.Height)
+		return layout
+	}
 	if layout.Narrow {
 		if params.DetailOpen {
 			layout.Detail, layout.DetailVisible = body, true
@@ -80,6 +91,7 @@ func ComputeDashboardLayout(params DashboardLayoutParams) domain.DashboardLayout
 		layout.List, layout.ListVisible = body, true
 		layout.ListRows = dashboardListRows(body.Height)
 		layout.TreeRows = dashboardTreeRows(body.Height)
+		layout.ServicesRows = dashboardServicesRows(body.Height)
 		return layout
 	}
 
@@ -89,6 +101,7 @@ func ComputeDashboardLayout(params DashboardLayoutParams) domain.DashboardLayout
 	layout.ListVisible, layout.DetailVisible = true, true
 	layout.ListRows = dashboardListRows(body.Height)
 	layout.TreeRows = dashboardTreeRows(body.Height)
+	layout.ServicesRows = dashboardServicesRows(body.Height)
 	return layout
 }
 
@@ -106,6 +119,12 @@ func dashboardListRows(bodyHeight int) int {
 // with no gap, so the connector gutters line up down the panel.
 func dashboardTreeRows(bodyHeight int) int {
 	return max(bodyHeight-domain.DashboardChromeHeight-domain.DashboardTitleGap, 0) / domain.DashboardTreeRowHeight
+}
+
+// dashboardServicesRows is how many Services lines fit: one line each, unlike a
+// tree node, which carries the spacer under it.
+func dashboardServicesRows(bodyHeight int) int {
+	return max(bodyHeight-domain.DashboardChromeHeight-domain.DashboardTitleGap, 0)
 }
 
 func dashboardListWidth(width int) int {

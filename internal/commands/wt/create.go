@@ -27,7 +27,20 @@ func newCreateCmd() *cobra.Command {
 			"A branch that already exists locally is checked out as-is, keeping its commits.\n" +
 			"Its parent can't be inferred, so --from then names the branch recorded for\n" +
 			"`wtm sync` — asked in the wizard, required without it.\n" +
+			"When run.toml declares jobs, a branch whose derived name a live worktree already\n" +
+			"carries (feat.x next to feat/x: one compose project, one proxy host) is refused.\n" +
 			"Without arguments, prompts for the branch name interactively.",
+		Example: `  # Answer the wizard: branch, source, env strategy, isolation
+  wtm create
+
+  # A new branch from the base branch, no prompts
+  wtm create feat/login --yes
+
+  # A stacked branch on top of feat/login
+  wtm create feat/login-ui --from feat/login --yes
+
+  # For a script or an agent: idempotent, with a JSON result
+  wtm create feat/login --if-not-exists --yes --output json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runCreate,
 	}
@@ -37,6 +50,7 @@ func newCreateCmd() *cobra.Command {
 	cmd.Flags().String(domain.FlagFrom, "", "Source branch to start from — or, when the branch already exists locally, the parent to record for wtm sync (required there without the wizard)")
 	cmd.Flags().Bool(domain.FlagFF, false, "Fast-forward to origin before creating — the source branch, or the branch itself when it already exists locally (non-interactive; skipped when it has diverged)")
 	cmd.Flags().String(domain.FlagEnvFrom, "", "Override env strategy (example, main, parent)")
+	shared.AddIsolationFlag(cmd)
 	cmd.Flags().Bool(domain.FlagIfNotExists, false, "Succeed silently if the worktree already exists (idempotent)")
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (branch name required; source defaults to the base branch for a new branch, and --from is required for one that already exists)")
 	shared.AddOutputFlag(cmd)
@@ -55,6 +69,10 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	ifNotExists, _ := cmd.Flags().GetBool(domain.FlagIfNotExists)
 	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
+	isolation, err := shared.IsolationFlag(cmd)
+	if err != nil {
+		return err
+	}
 
 	if format == domain.OutputJSON && !yes {
 		return fmt.Errorf("--output json requires --%s (prompts cannot run in JSON mode)", domain.FlagYes)
@@ -75,16 +93,17 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	interactive := rules.IsHumanFormat(format) && !yes && term.IsTerminal(int(os.Stdin.Fd()))
 
 	_, err = createflow.Run(createflow.Params{
-		Context: flowContext(config),
+		Context: shared.FlowContext(config),
 		Request: createflow.Request{
 			Branch:      branchName,
 			From:        fromFlag,
 			EnvFrom:     envFromFlag,
 			FastForward: ffFlag,
 			IfNotExists: ifNotExists,
+			Isolation:   isolation,
 		},
-		Prompter:  flowPrompter(flowPrompterParams{Interactive: interactive}),
-		Presenter: createPresenter{cliPresenter: newPresenter(cmd, format), config: config},
+		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive}),
+		Presenter: createPresenter{CLIPresenter: shared.NewPresenter(cmd, format), config: config},
 	})
 	return err
 }
@@ -175,10 +194,17 @@ func envFallbackPrompt(projectDir string, config domain.Config, source, override
 
 // executeFastForwardSource returns false only when the post-failure recovery
 // ("create from the stale branch anyway?") is declined.
-func executeFastForwardSource(projectDir, source string) bool {
+type fastForwardSourceParams struct {
+	Cmd        *cobra.Command
+	ProjectDir string
+	Source     string
+}
+
+func executeFastForwardSource(params fastForwardSourceParams) bool {
+	projectDir, source := params.ProjectDir, params.Source
 	ffErr := components.RunLoading(components.LoadingParams{
 		Message: fmt.Sprintf(domain.SourceFastForwardLoadingFmt, source),
-		Animate: true,
+		Animate: shared.Animate(params.Cmd, true),
 		Work: func() error {
 			return branch.FastForwardToOrigin(branch.BranchParams{ProjectDir: projectDir, Branch: source})
 		},
@@ -197,7 +223,8 @@ func executeFastForwardSource(projectDir, source string) bool {
 
 // maybeFastForwardSource reconciles a --from source where no wizard hosts the
 // confirmation. Returns false only when the user cancels creation.
-func maybeFastForwardSource(projectDir, source string) bool {
+func maybeFastForwardSource(params fastForwardSourceParams) bool {
+	projectDir, source := params.ProjectDir, params.Source
 	prompt := sourceUpdatePrompt(sourceUpdatePromptParams{
 		ProjectDir: projectDir,
 		Target:     memoizedTarget(projectDir),
@@ -213,5 +240,5 @@ func maybeFastForwardSource(projectDir, source string) bool {
 	if !confirmed {
 		return true
 	}
-	return executeFastForwardSource(projectDir, source)
+	return executeFastForwardSource(params)
 }

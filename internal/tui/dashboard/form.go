@@ -45,17 +45,27 @@ type formReadyMsg struct {
 	err     error
 }
 
-func buildFormCmd(session flow.Session, chosen flow.Answers, generation int) tea.Cmd {
+type buildFormParams struct {
+	Session flow.Session
+	Chosen  flow.Answers
+	// Title is the modal's own, so a step whose title repeats it does not have it
+	// written twice.
+	Title      string
+	Generation int
+}
+
+func buildFormCmd(params buildFormParams) tea.Cmd {
 	return func() tea.Msg {
-		rows, answers, err := buildFormRows(session, chosen)
-		return formReadyMsg{generation: generation, rows: rows, answers: answers, err: err}
+		rows, answers, err := buildFormRows(params)
+		return formReadyMsg{generation: params.Generation, rows: rows, answers: answers, err: err}
 	}
 }
 
 // buildFormRows lays a whole session out at once. Each step is rendered against
 // the answers of the ones before it, so a choice the user changes is reflected by
 // what the later sections say.
-func buildFormRows(session flow.Session, chosen flow.Answers) ([]formRow, flow.Answers, error) {
+func buildFormRows(params buildFormParams) ([]formRow, flow.Answers, error) {
+	session, chosen := params.Session, params.Chosen
 	answers := session.Presets
 	var rows []formRow
 
@@ -74,6 +84,7 @@ func buildFormRows(session flow.Session, chosen flow.Answers) ([]formRow, flow.A
 			return nil, flow.Answers{}, err
 		}
 		section, answer := formSection(formSectionParams{
+			Title:   params.Title,
 			Step:    step,
 			Content: content,
 			Chosen:  chosen,
@@ -90,12 +101,14 @@ type formSectionParams struct {
 	Content flow.StepContent
 	Chosen  flow.Answers
 	Answers flow.Answers
+	// Title is the modal's own; a step heading that repeats it is left out.
+	Title string
 }
 
 // formSection renders one step and reports the answer the later steps must read.
 func formSection(params formSectionParams) ([]formRow, flow.Answer) {
 	if params.Step.Kind == flow.StepRecap {
-		rows := heading(withoutBlockerLines(params.Content))
+		rows := heading(headingParams{Content: withoutBlockerLines(params.Content), Title: params.Title})
 		rows = append(rows, blockerRows(params.Content)...)
 		buttons := confirmButtons(confirmButtonsParams{
 			StepKey: params.Step.Key,
@@ -106,7 +119,7 @@ func formSection(params formSectionParams) ([]formRow, flow.Answer) {
 		return append(rows, buttons...), flow.Answer{Value: buttons[0].value, Asked: true}
 	}
 
-	rows := heading(params.Content)
+	rows := heading(headingParams{Content: params.Content, Title: params.Title})
 
 	value := selectedValue(params)
 	for _, option := range params.Content.Options {
@@ -160,9 +173,18 @@ func withoutBlockerLines(content flow.StepContent) flow.StepContent {
 
 // heading gives a section's title the same blank line under it that a panel
 // title gets, so the question and what it entails are not one block of text.
-func heading(content flow.StepContent) []formRow {
+type headingParams struct {
+	Content flow.StepContent
+	// Title is the modal's own, which the box already draws above the body: a
+	// step whose title is the same question would otherwise write it twice, one
+	// blank line apart. modal.stepHeader leaves it out for the same reason.
+	Title string
+}
+
+func heading(params headingParams) []formRow {
+	content := params.Content
 	var rows []formRow
-	if content.Title != "" {
+	if content.Title != "" && content.Title != params.Title {
 		rows = append(rows, formRow{kind: formText, label: content.Title})
 		if content.Description != "" {
 			rows = append(rows, formRow{kind: formText})
@@ -310,7 +332,7 @@ func (mo modal) activate(index int) (modal, tea.Cmd) {
 	case formChoice:
 		mo.chosen = mo.chosen.With(row.stepKey, flow.Answer{Value: row.value, Asked: true})
 		mo.generation++
-		return mo, buildFormCmd(mo.session, mo.chosen, mo.generation)
+		return mo, buildFormCmd(buildFormParams{Session: mo.session, Chosen: mo.chosen, Title: mo.title, Generation: mo.generation})
 	case formBlocker:
 		return mo.lift(row.value), nil
 	case formButton:

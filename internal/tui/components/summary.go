@@ -18,21 +18,6 @@ func SelectSummary(model any) string {
 	return ""
 }
 
-// OptionalTextSummary returns the value of a TextInputModel step, falling back
-// to emptyLabel when the value is empty. Use as a Step.Summary.
-func OptionalTextSummary(emptyLabel string) func(any) string {
-	return func(model any) string {
-		c, ok := model.(TextInputModel)
-		if !ok {
-			return ""
-		}
-		if v := c.Value(); v != "" {
-			return v
-		}
-		return emptyLabel
-	}
-}
-
 // MultiSelectSummary returns the comma-joined values of a MultiSelectModel
 // step, falling back to emptyLabel when nothing is selected.
 func MultiSelectSummary(emptyLabel string) func(any) string {

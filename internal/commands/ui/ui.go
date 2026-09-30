@@ -13,6 +13,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
 	ghservice "github.com/LucasPcq/wtm/internal/service/github"
+	"github.com/LucasPcq/wtm/internal/service/integration"
+	"github.com/LucasPcq/wtm/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/internal/service/selfupdate"
 	"github.com/LucasPcq/wtm/internal/tui/dashboard"
 )
@@ -29,13 +31,18 @@ func NewCmd(params NewCmdParams) *cobra.Command {
 		Long: "Open a full-screen dashboard of the repository's worktrees.\n" +
 			"The Worktrees tab lists them with their git state against both the base branch and\n" +
 			"origin, and their pull requests; the Tree tab lays the same worktrees out as the\n" +
-			"parent-child forest `wtm tree` prints. `n` creates a worktree; right-click a row\n" +
-			"(or press `m`) to reparent, sync, or delete it; `a` opens the actions that run over\n" +
-			"several worktrees at once, syncing or reparenting a selection of them. The list's\n" +
-			"local git state refreshes on a short poll; the detail panel reloads when the\n" +
-			"selection changes or an operation touches it, and pull requests load once —\n" +
-			"both refresh on demand with `r`.\n" +
+			"parent-child forest `wtm tree` prints; the Services tab gathers every worktree the\n" +
+			"run daemon holds something up in, with the addresses its jobs answer on. `n`\n" +
+			"creates a worktree; right-click a row (or press `m`) to reparent, sync, or delete\n" +
+			"it; `a` opens the actions that run over several worktrees at once, syncing or\n" +
+			"reparenting a selection of them; `L` reads a job's logs in the detail panel.\n" +
+			fmt.Sprintf("The list's local git state is re-read every %d seconds, when the terminal\n", domain.DashboardGitPollSeconds) +
+			"regains focus and after each action; the detail panel reloads when the selection\n" +
+			"changes or an operation touches it, and pull requests load once. Nothing is\n" +
+			"fetched on its own: `r` fetches the remote and refreshes all of it.\n" +
 			"Press `?` for the key reference.",
+		Example: `  # Press ? inside for the key reference
+  wtm ui`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runUI(cmd, params.Version)
@@ -93,6 +100,32 @@ func buildRunParams(params buildParams) dashboard.RunParams {
 		PRLoader:      func() ([]domain.PRInfo, domain.GHConnection) { return shared.LoadPRsWithChecks(result.ProjectDir) },
 		PROpener: func(number int) error {
 			return ghservice.OpenPR(ghservice.OpenPRParams{ProjectDir: result.ProjectDir, Number: number})
+		},
+		URLOpener: integration.OpenURL,
+		LogsLoader: dashboard.DefaultLogsLoader(dashboard.LogsLoaderParams{
+			ProjectDir: result.ProjectDir,
+			StateDir:   result.StateDir,
+		}),
+		BoardLoader: dashboard.DefaultBoardLoader(dashboard.LogsLoaderParams{
+			ProjectDir: result.ProjectDir,
+			StateDir:   result.StateDir,
+			PublicPort: func() int {
+				return runjobs.PublicPort(runjobs.PublicPortParams{StateDir: result.StateDir, Global: result.Config.Global})
+			},
+		}),
+		JobsLoader: runjobs.Read,
+		TraceLoader: func(branches []string) map[string]map[string]bool {
+			return runjobs.Traces(runjobs.TracesParams{StateDir: result.StateDir, Branches: branches})
+		},
+		AddressLoader: func(request dashboard.AddressRequest) domain.RunAddresses {
+			return runjobs.Addresses(runjobs.AddressesParams{
+				ProjectDir: result.ProjectDir,
+				StateDir:   result.StateDir,
+				Config:     request.Config,
+				Branches:   request.Branches,
+				EnvFiles:   result.Config.Project.Env.Files,
+				Global:     result.Config.Global,
+			})
 		},
 	}
 }

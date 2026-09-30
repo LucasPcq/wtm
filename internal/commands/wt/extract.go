@@ -3,6 +3,7 @@ package wt
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/envports"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -38,12 +41,21 @@ func newExtractCmd() *cobra.Command {
 			"On conflict it aborts by default, leaving the source intact; --on-conflict resolve\n" +
 			"applies conflict markers in the target so you can resolve them like a rebase.\n" +
 			"A file that merely already exists in the target counts as a conflict too.",
+		Example: `  # Pick the source, the files and the target
+  wtm extract
+
+  # Move a directory's changes to a new branch
+  wtm extract feat/login --files apps/api --to feat/login-api --yes
+
+  # Copy one file instead, onto a branch stacked on the source
+  wtm extract feat/login --files apps/web/login.ts --to feat/login-web --from feat/login --keep --yes`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runExtract,
 	}
 
 	cmd.Flags().StringSlice(domain.FlagFiles, nil, "Files to extract, or a directory to take everything below it (skips interactive selection)")
 	cmd.Flags().String(domain.FlagTo, "", "Target worktree branch; created if it does not exist")
+	shared.AddIsolationFlag(cmd)
 	cmd.Flags().String(domain.FlagFrom, "", "Parent branch when creating the target worktree")
 	cmd.Flags().Bool(domain.FlagFF, false, "Fast-forward the parent branch to origin before creating the target (non-interactive; skipped when it has diverged)")
 	cmd.Flags().Bool(domain.FlagKeep, false, "Copy instead of move (keep the changes in the source)")
@@ -66,6 +78,9 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	}
 
 	if err := validateOnConflict(cmd); err != nil {
+		return err
+	}
+	if _, err := shared.IsolationFlag(cmd); err != nil {
 		return err
 	}
 
@@ -93,13 +108,26 @@ func runExtract(cmd *cobra.Command, args []string) error {
 		return domain.ErrExtractSourceRequired
 	}
 
-	statuses, err := worktree.List(domain.ListParams{
-		ProjectDir: cfg.ProjectDir,
-		StateDir:   cfg.StateDir,
-		Config:     cfg.Config,
-	})
-	if err != nil {
-		return fmt.Errorf("list worktrees: %w", err)
+	// worktree.List runs a git status per worktree, so on a large repo this is
+	// the wait the command used to spend saying nothing.
+	var statuses []domain.WorktreeStatus
+	if err := components.RunLoading(components.LoadingParams{
+		Message: domain.ExtractScanLoading,
+		Animate: shared.Animate(cmd, interactive),
+		Work: func() error {
+			var listErr error
+			statuses, listErr = worktree.List(domain.ListParams{
+				ProjectDir: cfg.ProjectDir,
+				StateDir:   cfg.StateDir,
+				Config:     cfg.Config,
+			})
+			if listErr != nil {
+				return fmt.Errorf("list worktrees: %w", listErr)
+			}
+			return nil
+		},
+	}); err != nil {
+		return err
 	}
 
 	source, err := resolveSource(resolveSourceParams{
@@ -109,8 +137,8 @@ func runExtract(cmd *cobra.Command, args []string) error {
 		statuses:   statuses,
 	})
 	if errors.Is(err, domain.ErrNoDirtyWorktrees) {
-		output.Frame(cmd.OutOrStdout(), func() {
-			output.Message(cmd.OutOrStdout(), domain.ErrNoDirtyWorktrees.Error())
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			output.Message(w, domain.ErrNoDirtyWorktrees.Error())
 		})
 		return nil
 	}
@@ -121,16 +149,23 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	// Fixed source (argument): its changes are known up front, so the empty-changes
 	// case short-circuits here. A picked source loads its changes lazily instead.
 	if !needSource {
-		source.available, err = listExtractFiles(source.path)
-		if err != nil {
+		if err := components.RunLoading(components.LoadingParams{
+			Message: domain.ExtractScanLoading,
+			Animate: shared.Animate(cmd, interactive),
+			Work: func() error {
+				var filesErr error
+				source.available, filesErr = listExtractFiles(source.path)
+				return filesErr
+			},
+		}); err != nil {
 			return err
 		}
 		if len(source.available) == 0 {
 			if format == domain.OutputJSON {
 				return output.WriteExtractJSON(cmd.OutOrStdout(), domain.ExtractResult{Files: []domain.ExtractFile{}})
 			}
-			output.Frame(cmd.OutOrStdout(), func() {
-				output.Message(cmd.OutOrStdout(), domain.ErrNoChangesToExtract.Error())
+			output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+				output.Message(w, domain.ErrNoChangesToExtract.Error())
 			})
 			return nil
 		}
@@ -149,8 +184,8 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	})
 	if errors.Is(err, domain.ErrUserAborted) {
 		if rules.IsHumanFormat(format) {
-			output.Frame(cmd.OutOrStdout(), func() {
-				output.Message(cmd.OutOrStdout(), "Aborted.")
+			output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+				output.Unchanged(w, domain.AbortedMessage)
 			})
 		}
 		return nil
@@ -168,8 +203,8 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	})
 	if errors.Is(err, domain.ErrUserAborted) {
 		if rules.IsHumanFormat(format) {
-			output.Frame(cmd.OutOrStdout(), func() {
-				output.Message(cmd.OutOrStdout(), "Cancelled — nothing was changed.")
+			output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+				output.Unchanged(w, domain.AbortedMessage)
 			})
 		}
 		return nil
@@ -190,18 +225,24 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	result.Warnings = sel.target.warnings
+	result.EnvPorts = sel.target.envPorts
+	result.Isolation = worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: cfg.ProjectDir, StateDir: cfg.StateDir, Branch: sel.target.branch})
 
 	if format == domain.OutputJSON {
 		return output.WriteExtractJSON(cmd.OutOrStdout(), result)
 	}
 	if len(result.Conflicts) > 0 {
-		output.Frame(cmd.OutOrStdout(), func() {
-			output.PrintExtractConflicts(cmd.OutOrStdout(), result)
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			output.PrintExtractConflicts(w, result)
 		})
 		return nil
 	}
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.PrintExtractResult(cmd.OutOrStdout(), result)
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.PrintExtractResult(w, output.ExtractResultParams{
+			Result:  result,
+			EnvNote: rules.EnvPortSettlementNote(sel.target.envPorts),
+		})
 	})
 	return nil
 }
@@ -512,7 +553,8 @@ func runWizard(params runWizardParams) (extracttui.RunResult, error) {
 
 	var create newpicker.WizardParams
 	if params.needTarget {
-		create = extractCreateParams(params.cfg, params.source.branch)
+		isolation, _ := shared.IsolationFlag(params.cmd)
+		create = extractCreateParams(extractCreateParamsInput{cfg: params.cfg, sourceBranch: params.source.branch, isolation: isolation})
 	}
 
 	return extracttui.Run(extracttui.RunParams{
@@ -537,7 +579,16 @@ func runWizard(params runWizardParams) (extracttui.RunResult, error) {
 // at the config default. The deciders guard against an empty source — the create
 // steps are auto-skipped (and their source is "") when the target is an existing
 // worktree.
-func extractCreateParams(cfg shared.ConfigResult, sourceBranch string) newpicker.WizardParams {
+type extractCreateParamsInput struct {
+	cfg          shared.ConfigResult
+	sourceBranch string
+	isolation    domain.Isolation
+}
+
+func extractCreateParams(input extractCreateParamsInput) newpicker.WizardParams {
+	cfg := input.cfg
+	sourceBranch := input.sourceBranch
+	ctx := shared.FlowContext(cfg)
 	// Cached per branch name for the run, like create's own wizard: the recap and
 	// the source-update step both classify the same branch repeatedly.
 	cachedTarget := memoizedTarget(cfg.ProjectDir)
@@ -553,7 +604,12 @@ func extractCreateParams(cfg shared.ConfigResult, sourceBranch string) newpicker
 		DefaultBranch:  defaultParent(defaultParentParams{cfg: cfg, sourceBranch: sourceBranch}),
 		ConfigStrategy: cfg.Config.Project.Env.Strategy,
 		IncludeBranch:  true,
-		Target:         target,
+		// Asked only where something can be isolated; the TUI is handed the
+		// answer, never the config it comes from.
+		IsolationApplies:  envports.IsolationApplies(ctx),
+		IsolationOverride: input.isolation,
+		IsolationDefault:  envports.DefaultIsolation(ctx),
+		Target:            target,
 		SourceUpdate: func(up newpicker.SourceUpdateParams) newpicker.SourceUpdatePrompt {
 			if up.Source == "" {
 				return newpicker.SourceUpdatePrompt{}
@@ -572,6 +628,10 @@ func extractCreateParams(cfg shared.ConfigResult, sourceBranch string) newpicker
 type extractTarget struct {
 	path   string
 	branch string
+	// envPorts is what the port pass did in a worktree this extraction created,
+	// zero for one that already existed and was never provisioned.
+	envPorts domain.EnvPortPlan
+	warnings []string
 }
 
 type resolveTargetParams struct {
@@ -598,7 +658,7 @@ func resolveTarget(params resolveTargetParams) (extractTarget, error) {
 			ProjectDir: params.cfg.ProjectDir,
 			Branch:     toFlag,
 		}); err == nil {
-			return extractTarget{path: wt.Path, branch: wt.Branch}, nil
+			return existingTarget(existingTargetParams{cmd: params.cmd, cfg: params.cfg, path: wt.Path, branch: wt.Branch}), nil
 		}
 		target := branch.Target(branch.BranchParams{ProjectDir: params.cfg.ProjectDir, Branch: toFlag})
 		fromFlag, _ := params.cmd.Flags().GetString(domain.FlagFrom)
@@ -618,18 +678,27 @@ func resolveTarget(params resolveTargetParams) (extractTarget, error) {
 		// ask. Under --yes / no TTY / JSON it is non-prompting — fast-forward only when
 		// --ff was passed, otherwise leave the branch as-is.
 		if params.interactive {
-			if !maybeFastForwardSource(params.cfg.ProjectDir, ffSubjectBranch) {
+			if !maybeFastForwardSource(fastForwardSourceParams{
+				Cmd:        params.cmd,
+				ProjectDir: params.cfg.ProjectDir,
+				Source:     ffSubjectBranch,
+			}) {
 				return extractTarget{}, domain.ErrUserAborted
 			}
 		} else if ffFlag, _ := params.cmd.Flags().GetBool(domain.FlagFF); ffFlag {
 			_ = branch.FastForwardIfBehind(branch.BranchParams{ProjectDir: params.cfg.ProjectDir, Branch: ffSubjectBranch})
 		}
+		// --to fully resolves the target, so it poses no wizard and no isolation
+		// step: --isolation answers it, else the project's default.
+		isolation, _ := shared.IsolationFlag(params.cmd)
 		return createTarget(createTargetParams{
-			cmd:        params.cmd,
-			showHeader: params.human,
-			cfg:        params.cfg,
-			branch:     toFlag,
-			fromBranch: fromBranch,
+			cmd:         params.cmd,
+			showHeader:  params.human,
+			cfg:         params.cfg,
+			branch:      toFlag,
+			fromBranch:  fromBranch,
+			isolation:   rules.FirstIsolation(isolation, envports.DefaultIsolation(shared.FlowContext(params.cfg))),
+			interactive: params.interactive,
 		})
 	}
 
@@ -641,23 +710,55 @@ func resolveTarget(params resolveTargetParams) (extractTarget, error) {
 		if findErr != nil {
 			return extractTarget{}, findErr
 		}
-		return extractTarget{path: wt.Path, branch: wt.Branch}, nil
+		return existingTarget(existingTargetParams{cmd: params.cmd, cfg: params.cfg, path: wt.Path, branch: wt.Branch}), nil
 	}
 
 	// "Create new" — the branch/source/fast-forward were collected in the combined
 	// wizard (already confirmed on its recap). Only the accepted fast-forward is
 	// executed here; its failure-recovery prompt is a legitimate post-exec standalone.
 	if params.create.FastForwardBranch != "" &&
-		!executeFastForwardSource(params.cfg.ProjectDir, params.create.FastForwardBranch) {
+		!executeFastForwardSource(fastForwardSourceParams{
+			Cmd:        params.cmd,
+			ProjectDir: params.cfg.ProjectDir,
+			Source:     params.create.FastForwardBranch,
+		}) {
 		return extractTarget{}, domain.ErrUserAborted
 	}
 	return createTarget(createTargetParams{
-		cmd:        params.cmd,
-		showHeader: params.human,
-		cfg:        params.cfg,
-		branch:     params.create.BranchName,
-		fromBranch: params.create.FromBranch,
+		cmd:         params.cmd,
+		showHeader:  params.human,
+		cfg:         params.cfg,
+		branch:      params.create.BranchName,
+		fromBranch:  params.create.FromBranch,
+		isolation:   params.create.Isolation,
+		interactive: params.interactive,
 	})
+}
+
+type existingTargetParams struct {
+	cmd    *cobra.Command
+	cfg    shared.ConfigResult
+	path   string
+	branch string
+}
+
+// existingTarget is a target the extraction did not create, so --isolation
+// had nothing to answer; saying so is all that is left to do with it.
+func existingTarget(params existingTargetParams) extractTarget {
+	target := extractTarget{path: params.path, branch: params.branch}
+	requested, _ := shared.IsolationFlag(params.cmd)
+	warning := rules.IsolationIgnoredWarning(rules.IsolationIgnoredParams{
+		Branch:    params.branch,
+		Requested: requested,
+		Current:   worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: params.cfg.ProjectDir, StateDir: params.cfg.StateDir, Branch: params.branch}),
+	})
+	if warning == "" {
+		return target
+	}
+	format, _ := params.cmd.Flags().GetString(domain.FlagOutput)
+	shared.NewPresenter(params.cmd, format).Status(flow.Notice{Kind: flow.NoticeWarning, Text: warning})
+	target.warnings = []string{warning}
+	return target
 }
 
 type defaultParentParams struct {
@@ -683,14 +784,18 @@ func defaultParent(params defaultParentParams) string {
 }
 
 type createTargetParams struct {
-	cmd        *cobra.Command
-	showHeader bool
-	cfg        shared.ConfigResult
-	branch     string
-	fromBranch string
+	cmd         *cobra.Command
+	showHeader  bool
+	cfg         shared.ConfigResult
+	branch      string
+	fromBranch  string
+	isolation   domain.Isolation
+	interactive bool
 }
 
 func createTarget(params createTargetParams) (extractTarget, error) {
+	ctx := shared.FlowContext(params.cfg)
+	preflight := envports.Preflight(ctx)
 	res, err := worktree.Create(domain.CreateParams{
 		ProjectDir: params.cfg.ProjectDir,
 		StateDir:   params.cfg.StateDir,
@@ -698,12 +803,28 @@ func createTarget(params createTargetParams) (extractTarget, error) {
 		FromBranch: params.fromBranch,
 		Config:     params.cfg.Config,
 		SkipHooks:  true,
+		Isolation:  params.isolation,
 	})
 	if err != nil {
 		return extractTarget{}, err
 	}
+
+	// Before the hooks: one of them may read the .env, and it has to read the
+	// ports this worktree binds rather than the ones it was copied from.
+	format, _ := params.cmd.Flags().GetString(domain.FlagOutput)
+	settlement, warnings := envports.SettleFresh(envports.FreshParams{
+		Params: envports.Params{
+			Context:      ctx,
+			Branch:       res.Branch,
+			WorktreePath: res.Path,
+			Presenter:    shared.NewPresenter(params.cmd, format),
+		},
+		Preflight: preflight,
+	})
+
 	// on_create hooks as a distinct, titled phase (shared with create/checkout).
 	if err := shared.RunCreateHooksPhase(shared.CreateHooksPhaseParams{
+		StateDir:     params.cfg.StateDir,
 		Cmd:          params.cmd,
 		ShowHeader:   params.showHeader,
 		ProjectDir:   params.cfg.ProjectDir,
@@ -714,5 +835,5 @@ func createTarget(params createTargetParams) (extractTarget, error) {
 	}); err != nil {
 		return extractTarget{}, err
 	}
-	return extractTarget{path: res.Path, branch: res.Branch}, nil
+	return extractTarget{path: res.Path, branch: res.Branch, envPorts: settlement, warnings: warnings}, nil
 }

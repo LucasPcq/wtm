@@ -15,6 +15,10 @@ type ConfirmStepParams struct {
 	// They default to "yes"/"no".
 	YesLabel string
 	NoLabel  string
+	// Callout renders the question's description as an emphasized intro, the way
+	// the list steps do. Without it a confirmation reads as muted aside next to
+	// its neighbours.
+	Callout bool
 }
 
 // ConfirmStep builds a wizard step that shows a yes/no confirmation only when it
@@ -51,5 +55,6 @@ func ConfirmStep(p ConfirmStepParams) Step {
 		AutoSkip:   func(WizardModel) bool { return !applies },
 		SkipReason: func() string { return reason },
 		Summary:    ConfirmSummary(yes, no),
+		Callout:    p.Callout,
 	}
 }

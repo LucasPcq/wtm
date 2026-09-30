@@ -97,10 +97,6 @@ func unsupportedKindErr(step flow.Step) error {
 	return fmt.Errorf("flowui: step %q has no renderer for kind %d", step.Key, step.Kind)
 }
 
-func conditionalKindErr(step flow.Step) error {
-	return fmt.Errorf("flowui: step %q has no conditional renderer for kind %d", step.Key, step.Kind)
-}
-
 type binding struct {
 	key  string
 	kind flow.StepKind
@@ -208,6 +204,10 @@ func answerOf(kind flow.StepKind, model any) flow.Answer {
 		}
 	case flow.StepMultiSelect:
 		if list, ok := model.(components.MultiSelectModel); ok {
+			return flow.Answer{Values: list.Values(), Asked: true}
+		}
+	case flow.StepReorder:
+		if list, ok := model.(components.ReorderListModel); ok {
 			return flow.Answer{Values: list.Values(), Asked: true}
 		}
 	}

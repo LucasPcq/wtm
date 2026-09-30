@@ -79,6 +79,22 @@ type DetailSectionsParams struct {
 	// shows, the caller only supplies why the read failed.
 	PRUnavailable string
 	Parent        string
+	// RunConfig is what the project declares it can run, and Jobs what the daemon
+	// currently holds. Together they are the RUN section: a declared job that is
+	// not in Jobs is down, which is an answer and not an absence.
+	RunConfig domain.RunConfig
+	Jobs      []domain.JobInfo
+	// Addresses is where each declared job answers in this worktree, keyed by
+	// job name. It follows the poll like Jobs does, not the lazily loaded
+	// Detail: an address is a property of the worktree's offset, and the two
+	// must not be able to disagree.
+	Addresses map[string]domain.JobAddress
+	// Expanded keys the runners whose children are unfolded; see
+	// runSectionParams.Expanded.
+	Expanded map[string]bool
+	// AddressNote is what has to be said about those addresses, empty when the
+	// worktree's .env answers on the names its jobs publish.
+	AddressNote string
 	// DetailLoaded is false on the very first render for a branch, before its
 	// WorktreeDetail has ever landed (§8 state 3). CHANGES and ACTIVITY — the
 	// two sections that depend on Detail — render a single "loading…"
@@ -122,7 +138,21 @@ func DetailSections(params DetailSectionsParams) []domain.DetailSection {
 
 	changesBudget, activityBudget := listBudgets(wantChanges, wantActivity)
 
-	sections := make([]domain.DetailSection, 0, 4)
+	run := runSectionParams{
+		Jobs:        params.RunConfig.Jobs,
+		Infos:       params.Jobs,
+		Expanded:    params.Expanded,
+		Addresses:   params.Addresses,
+		AddressNote: params.AddressNote,
+		WorkDir:     params.Status.Path,
+		Budget:      domain.DashboardDetailJobs,
+		Now:         params.Now,
+	}
+
+	sections := make([]domain.DetailSection, 0, 5)
+	if len(params.RunConfig.Jobs) > 0 {
+		sections = append(sections, runSection(run))
+	}
 	if review != nil {
 		sections = append(sections, *review)
 	}
@@ -137,7 +167,44 @@ func DetailSections(params DetailSectionsParams) []domain.DetailSection {
 			Diff: params.Detail.BranchDiff, DiffFailure: diffErr,
 		}))
 	}
-	return append(sections, links)
+	sections = append(sections, links)
+	if len(params.RunConfig.Jobs) == 0 {
+		return sections
+	}
+	return growRunSection(growRunParams{Sections: sections, Run: run, Height: params.Height})
+}
+
+type growRunParams struct {
+	Sections []domain.DetailSection
+	Run      runSectionParams
+	Height   int
+}
+
+// growRunSection spends the panel's leftover rows on RUN. The other lists keep
+// a fixed cap because what they could show is unbounded — a worktree has any
+// number of commits and changed files — but the jobs are a closed list the
+// panel exists to show, and folding one away under twenty blank rows hides the
+// address the reader came for. It only ever grows: a panel with no room left
+// keeps the section it already had.
+func growRunSection(params growRunParams) []domain.DetailSection {
+	slack := params.Height - sectionsHeight(params.Sections)
+	if slack <= 0 {
+		return params.Sections
+	}
+
+	grown := params.Run
+	grown.Budget = min(params.Run.Budget+slack, len(params.Run.Jobs))
+	if grown.Budget <= params.Run.Budget {
+		return params.Sections
+	}
+
+	for index, section := range params.Sections {
+		if section.Key == domain.DetailSectionRun {
+			params.Sections[index] = runSection(grown)
+			break
+		}
+	}
+	return params.Sections
 }
 
 // familyFailure reads a family's failure out of Failures without ever
@@ -485,7 +552,7 @@ func FitSections(params FitSectionsParams) []domain.DetailSection {
 func sectionsHeight(sections []domain.DetailSection) int {
 	total := 0
 	for _, section := range sections {
-		total += domain.DetailSectionChrome + len(section.Lines)
+		total += domain.DetailSectionChrome + len(section.Lines) + len(section.Rows)
 	}
 	return total
 }
@@ -500,4 +567,269 @@ func dropLowestPriority(sections []domain.DetailSection) []domain.DetailSection 
 		}
 	}
 	return nil
+}
+
+// jobsByBudgetPriority puts the jobs that are up first when the section cannot
+// show them all. A running job carries an address and an uptime; one that is
+// merely stopped carries neither, so folding it away costs the reader nothing —
+// while folding a running one buried the very URL the panel is read for.
+// Declared order is kept inside each group, and untouched when everything fits.
+type jobsByBudgetPriorityParams struct {
+	Jobs    []VisibleJob
+	Folding bool
+}
+
+func jobsByBudgetPriority(params jobsByBudgetPriorityParams) []VisibleJob {
+	if !params.Folding {
+		return params.Jobs
+	}
+
+	ordered := make([]VisibleJob, 0, len(params.Jobs))
+	for _, job := range params.Jobs {
+		if job.State == JobStateUp {
+			ordered = append(ordered, job)
+		}
+	}
+	for _, job := range params.Jobs {
+		if job.State != JobStateUp {
+			ordered = append(ordered, job)
+		}
+	}
+	return ordered
+}
+
+type runSectionParams struct {
+	Jobs  []domain.JobConfig
+	Infos []domain.JobInfo
+	// Logged names the jobs that left output in this worktree's log directory.
+	// It is the trace half of the visibility rule: without it a job the daemon
+	// has dropped — every task that ever finished — would vanish along with the
+	// only way to read what it wrote.
+	// Expanded keys the runners whose children are unfolded. Folded is the
+	// default: a runner holding six apps is one line until asked, which is what
+	// keeps the section readable on a project that nests them.
+	Expanded    map[string]bool
+	Addresses   map[string]domain.JobAddress
+	AddressNote string
+	WorkDir     string
+	Budget      int
+	Now         time.Time
+}
+
+// runSection is one row per job that lives or left a trace in this worktree,
+// never one per declaration: a project declaring fifteen jobs drew twelve rows
+// reading "down", four of them tasks that never run at all, and the three that
+// were actually up had to be found among them. What the project can run beyond
+// that is a catalogue, closed under a "+ N declared" line rather than laid
+// flat here. The count heads the section, so what it is worth is legible
+// before its body is.
+func runSection(params runSectionParams) domain.DetailSection {
+	indexed := IndexedJobsByName(params.Infos, params.WorkDir)
+	// A job a running runner holds has no row: its address is on the runner's,
+	// and six apps listed under the one process that started them is the noise
+	// this section exists to spare the reader.
+	declared := withoutHeldJobs(params.Jobs, upOnly(indexed))
+	// No Traces: this section is about the present. What ran here days ago is
+	// the logs view's subject, and reading it here turned the panel into the
+	// worktree's archaeology — fifteen rows of which two were about today.
+	visible, hidden := VisibleJobs(VisibleJobsParams{Jobs: declared, Up: indexed})
+
+	shown, folded := splitBudget(len(visible), params.Budget)
+	ordered := jobsByBudgetPriority(jobsByBudgetPriorityParams{Jobs: visible, Folding: folded > 0})
+
+	up := CountUp(visible)
+	rows := make([]domain.DetailRow, 0, shown)
+	for index, job := range ordered {
+		if index >= shown {
+			continue
+		}
+		address := params.Addresses[job.Job.Name]
+		rows = append(rows, jobRow(jobRowParams{
+			Visible:  job,
+			Address:  address,
+			Expanded: params.Expanded[job.Job.Name],
+			Now:      params.Now,
+		}))
+		if params.Expanded[job.Job.Name] {
+			rows = append(rows, heldRows(job.Job.Name, address)...)
+		}
+	}
+	if folded > 0 {
+		rows = append(rows, domain.DetailRow{Cells: []domain.DetailCell{{
+			Kind: domain.DetailCellNote, Text: fmt.Sprintf(domain.DetailMoreFmt, folded),
+		}}})
+	}
+	// The catalogue line closes the section rather than opening it: it is the
+	// least urgent thing here, and it must never push a running job down a row.
+	if hidden > 0 {
+		rows = append(rows, domain.DetailRow{Cells: []domain.DetailCell{{
+			Kind: domain.DetailCellNote, Text: fmt.Sprintf(domain.DetailDeclaredMoreFmt, hidden),
+		}}})
+	}
+	// Under the rows rather than beside one: it is the worktree that is
+	// unsettled, and repeating it on every address would drown the addresses.
+	if params.AddressNote != "" {
+		rows = append(rows,
+			domain.DetailRow{Cells: []domain.DetailCell{{Kind: domain.DetailCellGap}}},
+			domain.DetailRow{Cells: []domain.DetailCell{{Kind: domain.DetailCellWarn, Text: params.AddressNote}}},
+		)
+	}
+
+	return domain.DetailSection{
+		Key:        domain.DetailSectionRun,
+		Title:      domain.DetailSectionRun,
+		TitleRight: runCount(up),
+		Rows:       rows,
+	}
+}
+
+// withoutHeldJobs drops the published jobs a running runner already answers
+// for. Nothing is hidden while nothing holds it: a child whose runner is down
+// keeps its row, which is where its address is written.
+func withoutHeldJobs(jobs []domain.JobConfig, up map[string]domain.JobInfo) []domain.JobConfig {
+	running := make(map[string]bool, len(up))
+	for name := range up {
+		running[name] = true
+	}
+	held := HeldBy(domain.RunConfig{Jobs: jobs}, running)
+	if len(held) == 0 {
+		return jobs
+	}
+
+	kept := make([]domain.JobConfig, 0, len(jobs))
+	for _, job := range jobs {
+		if !held[job.Name] {
+			kept = append(kept, job)
+		}
+	}
+	return kept
+}
+
+type jobRowParams struct {
+	Visible VisibleJob
+	Address domain.JobAddress
+	// Expanded says the runner's children are showing under this row, which is
+	// only about which way its fold marker points.
+	Expanded bool
+	Now      time.Time
+}
+
+// heldRows are the addresses a runner answers for, one row each, hanging off
+// its own. Each carries its url, so each is a row a reader can click — which
+// the single joined-and-truncated cell they used to share never was.
+func heldRows(runner string, address domain.JobAddress) []domain.DetailRow {
+	rows := make([]domain.DetailRow, 0, len(address.Held))
+	for _, entry := range address.Held {
+		rows = append(rows, domain.DetailRow{
+			Key:   HeldRowKey(runner, entry.Job),
+			Depth: 1,
+			URL:   entry.URL,
+			Cells: []domain.DetailCell{
+				{Kind: domain.DetailCellName, Text: entry.Job},
+				{Kind: domain.DetailCellAddress, Text: entry.URL},
+			},
+		})
+	}
+	return rows
+}
+
+// HeldRowKey names a child's row under the runner holding it. Qualified by the
+// runner because the same app can be held by two of them, and a bare name would
+// give one row two meanings.
+func HeldRowKey(runner, child string) string { return runner + "/" + child }
+
+// jobRow is the one place a job's row is shaped, shared by the detail panel and
+// the run board. A job that is not up says nothing beyond its glyph and its
+// name: its address is where it would answer, not where it does, and an uptime
+// on it would date a run that is over.
+func jobRow(params jobRowParams) domain.DetailRow {
+	job, state := params.Visible.Job, params.Visible.State
+	cells := []domain.DetailCell{
+		{Kind: domain.DetailCellGlyph, Text: JobStateGlyph(state)},
+		{Kind: domain.DetailCellName, Text: job.Name},
+	}
+	if state != JobStateUp {
+		return domain.DetailRow{Key: job.Name, Cells: cells}
+	}
+
+	if address := JobAddressText(params.Address); address != "" {
+		cells = append(cells, domain.DetailCell{Kind: domain.DetailCellAddress, Text: address})
+	}
+	// A runner with children folds; anything else has nothing to open.
+	if len(params.Address.Held) > 0 {
+		return domain.DetailRow{
+			Key: job.Name, Cells: append(cells, foldCell(params.Expanded)),
+			Up: true, URL: params.Address.URL, Fold: true, Folded: !params.Expanded,
+		}
+	}
+	if uptime := VisibleJobUptime(params.Visible, params.Now); uptime != "" {
+		cells = append(cells, domain.DetailCell{Kind: domain.DetailCellMeta, Text: uptime})
+	}
+	return domain.DetailRow{Key: job.Name, Cells: cells, Up: true, URL: params.Address.URL}
+}
+
+func foldCell(expanded bool) domain.DetailCell {
+	glyph := domain.DetailHeldShutGlyph
+	if expanded {
+		glyph = domain.DetailHeldOpenGlyph
+	}
+	return domain.DetailCell{Kind: domain.DetailCellFold, Text: glyph}
+}
+
+// upOnly narrows the daemon's index for this worktree to what is actually up.
+// withoutHeldJobs asks about runners that are holding their children right now,
+// which a stopped one is not doing.
+func upOnly(indexed map[string]domain.JobInfo) map[string]domain.JobInfo {
+	up := make(map[string]domain.JobInfo, len(indexed))
+	for name, info := range indexed {
+		if IsJobUp(info.Status) {
+			up[name] = info
+		}
+	}
+	return up
+}
+
+// JobAddressText is the url when the job publishes one, its ports otherwise —
+// never both: a url already carries the port, and printing the two is the same
+// fact twice, which is what made the section read as columns of noise. Shared
+// with the run view, so a job reads the same in every surface.
+//
+// A runner publishing nothing of its own has no address of its own either. The
+// names it holds used to be joined onto its line, which was wrong everywhere it
+// was read: six urls behind a "," ran past the panel and were cut, taking four
+// of them with it, on a cell that could not even be clicked. They are rows of
+// their own now (HeldSummaryText and the runner's children), and one line each
+// where nothing folds (HeldAddressLines).
+func JobAddressText(address domain.JobAddress) string {
+	if address.URL != "" {
+		return address.URL
+	}
+	// Before the ports, not after: a runner is given its children's ports, so the
+	// numbers on it are theirs and reading them back would name the runner after
+	// jobs it is not.
+	if len(address.Held) > 0 {
+		return HeldSummaryText(len(address.Held))
+	}
+	names := make([]string, 0, len(address.Ports))
+	for _, port := range address.Ports {
+		names = append(names, fmt.Sprintf(domain.DetailJobPortFmt, port))
+	}
+	return strings.Join(names, domain.DetailListSep)
+}
+
+// HeldSummaryText stands for the addresses a runner answers for on the one line
+// it gets. It counts rather than lists: which of six urls to show first is a
+// choice run.toml does not express, so the count is the only honest summary.
+func HeldSummaryText(held int) string {
+	if held == 0 {
+		return ""
+	}
+	return fmt.Sprintf(domain.DetailHeldCountFmt, held)
+}
+
+func runCount(up int) string {
+	if up == 0 {
+		return domain.DetailRunNothing
+	}
+	return fmt.Sprintf(domain.DetailRunUpCountFmt, up)
 }

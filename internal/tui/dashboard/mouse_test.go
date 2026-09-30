@@ -2,12 +2,16 @@ package dashboard
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 )
 
 // The coordinates below are derived from the layout rules, not read back from
@@ -353,5 +357,256 @@ func TestNoPRZoneWhenThereIsNoPR(t *testing.T) {
 
 	if !model.zones.Get(zoneDetailPR).IsZero() {
 		t.Error("no PR line was drawn — no zone should exist for it")
+	}
+}
+
+// runningDetailModel is a dashboard whose selected worktree has jobs up, with
+// the detail panel showing: what a click on a RUN row is asserted against.
+func runningDetailModel(t *testing.T, params RunParams, addresses map[string]domain.JobAddress, jobs ...domain.JobConfig) Model {
+	t.Helper()
+	model := New(params)
+	t.Cleanup(model.Close)
+	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
+	model = update(model, worktreesMsg{statuses: statuses("a"), parents: map[string]string{}})
+	model.runConfig = domain.RunConfig{Jobs: jobs}
+	infos := make([]domain.JobInfo, 0, len(jobs))
+	for _, job := range jobs {
+		infos = append(infos, domain.JobInfo{Name: job.Name, Status: domain.JobStatusRunning, WorkDir: "/tmp/a"})
+	}
+	model.jobs = infos
+	model.details = map[string]domain.WorktreeDetail{"a": {Branch: "a"}}
+	model.addresses = map[string]map[string]domain.JobAddress{"a": addresses}
+	return model
+}
+
+func TestClickingTheAddressOpensItAndClickingTheRowOpensTheLogs(t *testing.T) {
+	opened := make(chan string, 1)
+	model := runningDetailModel(t,
+		RunParams{
+			URLOpener:  func(url string) error { opened <- url; return nil },
+			LogsLoader: func(logsRequest) ([]string, error) { return []string{"ready"}, nil },
+		},
+		map[string]domain.JobAddress{"web": {URL: "http://web.wtm"}},
+		domain.JobConfig{Name: "web"},
+	)
+	renderAndWait(t, model, runRowZone("web"), runURLZone("web"))
+
+	address := model.zones.Get(runURLZone("web"))
+	_, cmd := updateCmd(model, click(address.StartX, address.StartY))
+	if cmd == nil {
+		t.Fatal("clicking the address did nothing")
+	}
+	cmd()
+	select {
+	case got := <-opened:
+		if got != "http://web.wtm" {
+			t.Errorf("opened %q, want http://web.wtm", got)
+		}
+	default:
+		t.Fatal("the address was not opened")
+	}
+
+	// Away from the address, the row leads to what else the job has.
+	row := model.zones.Get(runRowZone("web"))
+	next, _ := updateCmd(model, click(row.EndX, row.StartY))
+	if next.logsJob != "web" {
+		t.Error("clicking the row away from its address did not open the logs")
+	}
+}
+
+func TestADownJobRowTakesNoZone(t *testing.T) {
+	model := New(RunParams{})
+	t.Cleanup(model.Close)
+	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
+	model = update(model, worktreesMsg{statuses: statuses("a"), parents: map[string]string{}})
+	model.runConfig = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "worker"}}}
+	model.details = map[string]domain.WorktreeDetail{"a": {Branch: "a"}}
+	model.addresses = map[string]map[string]domain.JobAddress{"a": {"worker": {URL: "http://worker.wtm"}}}
+
+	renderAndWait(t, model, zoneDetail)
+
+	if !model.zones.Get(runRowZone("worker")).IsZero() {
+		t.Error("a stopped job's row is clickable, want no zone: it answers nowhere")
+	}
+}
+
+// The DETAIL panel has no cursor, so it designates no job: u is silent there,
+// exactly as p is silent where no PR is designated.
+func TestTheAddressKeyIsSilentOnTheDetailPanel(t *testing.T) {
+	model := runningDetailModel(t, RunParams{
+		URLOpener: func(string) error { t.Error("u opened an address with no job designated"); return nil },
+	}, map[string]domain.JobAddress{"web": {URL: "http://web.wtm"}}, domain.JobConfig{Name: "web"})
+
+	if _, cmd := updateCmd(model, key(domain.KeyOpenAddress)); cmd != nil {
+		cmd()
+	}
+}
+
+// A zone that is marked but whose lookup sits in a function nothing calls is a
+// click that lands nowhere, and nothing else catches it. Checking only that a
+// lookup exists somewhere is not enough — that is how the logs view's job chips
+// shipped marked and inert, their lookup alive inside a helper handleMouse
+// never reached.
+func TestEveryZoneHelperIsMarkedAndReachableFromTheMouseHandler(t *testing.T) {
+	sources := dashboardSources(t)
+
+	helpers := regexp.MustCompile(`func ([a-z][A-Za-z]*Zone)\(`).FindAllStringSubmatch(sources["zones.go"], -1)
+	if len(helpers) == 0 {
+		t.Fatal("no zone helper found, this test is looking at the wrong file")
+	}
+	reachable := mouseHandlerCallees(t, sources)
+
+	for _, helper := range helpers {
+		name := helper[1]
+		marked, handledBy := false, ""
+		for path, body := range sources {
+			if path == "zones.go" {
+				continue
+			}
+			if strings.Contains(body, "Mark("+name+"(") {
+				marked = true
+			}
+			for _, fn := range functionsMentioning(body, "inZone("+name+"(") {
+				handledBy = fn
+			}
+		}
+		if !marked {
+			t.Errorf("%s is never marked: nothing draws it", name)
+			continue
+		}
+		if handledBy == "" {
+			t.Errorf("%s is marked but never looked up: a click on it lands nowhere", name)
+			continue
+		}
+		if !reachable[handledBy] {
+			t.Errorf("%s is looked up in %s, which handleMouse never calls: the zone is inert", name, handledBy)
+		}
+	}
+}
+
+func dashboardSources(t *testing.T) map[string]string {
+	t.Helper()
+	paths, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sources := make(map[string]string, len(paths))
+	for _, path := range paths {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		body, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sources[path] = string(body)
+	}
+	return sources
+}
+
+// functionsMentioning names the top-level functions of a file whose body holds
+// the needle.
+func functionsMentioning(body, needle string) []string {
+	var found []string
+	decls := regexp.MustCompile(`(?m)^func (?:\([^)]*\) )?([A-Za-z][A-Za-z0-9]*)\(`).FindAllStringSubmatchIndex(body, -1)
+	for index, decl := range decls {
+		end := len(body)
+		if index+1 < len(decls) {
+			end = decls[index+1][0]
+		}
+		if strings.Contains(body[decl[0]:end], needle) {
+			found = append(found, body[decl[2]:decl[3]])
+		}
+	}
+	return found
+}
+
+// mouseHandlerCallees is handleMouse itself plus every method it calls, one
+// level deep — enough to catch a helper that was written and never wired.
+// mouseHandlerCallees closes over what handleMouse can reach, not only what it
+// calls itself: a lookup one hop further down — the right button's own row
+// selection, say — is just as reachable, and a direct-callees-only walk would
+// call it inert.
+func mouseHandlerCallees(t *testing.T, sources map[string]string) map[string]bool {
+	t.Helper()
+	reachable := map[string]bool{"handleMouse": true}
+	for grew := true; grew; {
+		grew = false
+		for name := range reachable {
+			for _, called := range callsMadeBy(sources, name) {
+				if reachable[called] {
+					continue
+				}
+				reachable[called] = true
+				grew = true
+			}
+		}
+	}
+	if len(reachable) < 2 {
+		t.Fatal("handleMouse was not found, this test is checking nothing")
+	}
+	return reachable
+}
+
+func callsMadeBy(sources map[string]string, name string) []string {
+	var called []string
+	for _, body := range sources {
+		decls := regexp.MustCompile(`(?m)^func \([^)]*\) `+name+`\(`).FindAllStringSubmatchIndex(body, -1)
+		for _, decl := range decls {
+			end := len(body)
+			if next := strings.Index(body[decl[1]:], "\n}\n"); next >= 0 {
+				end = decl[1] + next
+			}
+			for _, call := range regexp.MustCompile(`m\.([a-z][A-Za-z0-9]*)\(`).FindAllStringSubmatch(body[decl[0]:end], -1) {
+				called = append(called, call[1])
+			}
+		}
+	}
+	return called
+}
+
+// A runner's addresses are folded until asked for, and unfolding one gives each
+// app it answers for a row that can be clicked — which the joined cell they used
+// to share never was, having no url of its own to carry.
+func TestUnfoldingARunnerGivesEachAddressItsOwnClickableRow(t *testing.T) {
+	opened := make(chan string, 1)
+	model := runningDetailModel(t,
+		RunParams{URLOpener: func(url string) error { opened <- url; return nil }},
+		map[string]domain.JobAddress{"dev": {Held: []domain.JobURLEntry{
+			{Job: "web", URL: "http://web.wtm"},
+			{Job: "api", URL: "http://api.wtm"},
+		}}},
+		domain.JobConfig{Name: "dev", Runs: []string{"web", "api"}},
+	)
+	renderAndWait(t, model, runFoldZone("dev"))
+
+	child := rules.HeldRowKey("dev", "web")
+	if !model.zones.Get(runURLZone(child)).IsZero() {
+		t.Fatal("a runner's children were on screen before anything unfolded them")
+	}
+
+	fold := model.zones.Get(runFoldZone("dev"))
+	model, _ = updateCmd(model, click(fold.EndX, fold.StartY))
+	if !model.runExpanded["dev"] {
+		t.Fatal("clicking the fold marker did not open the runner")
+	}
+	renderAndWait(t, model, runURLZone(child))
+
+	address := model.zones.Get(runURLZone(child))
+	if address.IsZero() {
+		t.Fatal("an unfolded child has no address zone of its own")
+	}
+	_, cmd := updateCmd(model, click(address.StartX, address.StartY))
+	if cmd == nil {
+		t.Fatal("clicking a child's address did nothing")
+	}
+	cmd()
+	select {
+	case got := <-opened:
+		if got != "http://web.wtm" {
+			t.Errorf("opened %q, want the child's own url", got)
+		}
+	default:
+		t.Fatal("the child's address was not opened")
 	}
 }

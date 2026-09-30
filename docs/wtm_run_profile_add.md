@@ -6,11 +6,24 @@ Add a profile to run.toml
 
 Append a profile to <git-common-dir>/wtm/run.toml.
 
-Pass --jobs (comma-separated existing job names) for non-interactive use.
-Without --jobs, prompts interactively (multiselect over existing jobs).
+Every flag pre-fills the corresponding question, so the form opens on what was
+already given. --yes skips the questions altogether: [name] and --jobs are then
+required, and the profile is not the default unless --default says so.
 
 ```
 wtm run profile add [name] [flags]
+```
+
+### Examples
+
+```
+  # Answer the form
+  wtm run profile add
+
+  wtm run profile add backend --jobs postgres,migrate,api --yes
+
+  # What run up starts without --profile
+  wtm run profile add full --jobs postgres,api,web --default --yes
 ```
 
 ### Options
@@ -18,8 +31,15 @@ wtm run profile add [name] [flags]
 ```
       --default         Mark this profile as the default
   -h, --help            help for add
-      --jobs strings    Comma-separated existing job names (skips wizard when set with name)
+      --jobs strings    Comma-separated existing job names, in start order
       --output string   Output format: text or json (default "text")
+  -y, --yes             Skip all prompts; [name] and --jobs are then required
+```
+
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
 ```
 
 ### SEE ALSO

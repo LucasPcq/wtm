@@ -16,55 +16,6 @@ func reparentNodes() []domain.WorktreeNode {
 	}
 }
 
-func TestValidateReparentValid(t *testing.T) {
-	err := ValidateReparent(ValidateReparentParams{
-		Nodes:      reparentNodes(),
-		Branch:     "dev/b",
-		NewParent:  "feat",
-		BaseBranch: "main",
-	})
-	if err != nil {
-		t.Fatalf("expected valid reparent, got %v", err)
-	}
-}
-
-func TestValidateReparentRejectsSelfParent(t *testing.T) {
-	err := ValidateReparent(ValidateReparentParams{
-		Nodes:      reparentNodes(),
-		Branch:     "dev/b",
-		NewParent:  "dev/b",
-		BaseBranch: "main",
-	})
-	if !errors.Is(err, domain.ErrReparentSelf) {
-		t.Fatalf("expected ErrReparentSelf, got %v", err)
-	}
-}
-
-func TestValidateReparentRejectsCycle(t *testing.T) {
-	// Making feat a child of dev/b closes the loop feat → dev/b → dev/a → feat.
-	err := ValidateReparent(ValidateReparentParams{
-		Nodes:      reparentNodes(),
-		Branch:     "feat",
-		NewParent:  "dev/b",
-		BaseBranch: "main",
-	})
-	if err == nil {
-		t.Fatalf("expected a cycle error, got nil")
-	}
-}
-
-func TestValidateReparentRejectsUnknownBranch(t *testing.T) {
-	err := ValidateReparent(ValidateReparentParams{
-		Nodes:      reparentNodes(),
-		Branch:     "ghost",
-		NewParent:  "feat",
-		BaseBranch: "main",
-	})
-	if !errors.Is(err, domain.ErrWorktreeNotFound) {
-		t.Fatalf("expected ErrWorktreeNotFound, got %v", err)
-	}
-}
-
 func TestValidateReparentBatchValid(t *testing.T) {
 	// Flatten the stack: both dev worktrees move onto main in one pass.
 	err := ValidateReparentBatch(ValidateReparentBatchParams{

@@ -3,17 +3,18 @@ package initcmd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
-	"github.com/LucasPcq/wtm/internal/schemas"
 	"github.com/LucasPcq/wtm/internal/service/detect"
 	"github.com/LucasPcq/wtm/internal/tui/components"
 	initwizard "github.com/LucasPcq/wtm/internal/tui/inittui"
@@ -25,13 +26,23 @@ func NewCmd() *cobra.Command {
 		Use:   "init",
 		Short: "Initialize wtm configuration",
 		Long: "Interactive wizard to set up global config and project config in <git-common-dir>/wtm/config.toml.\n" +
-			"Pass --non-interactive (or any config flag) to bootstrap from flags + auto-detection instead.\n" +
+			"Pass --yes (or any config flag) to bootstrap from flags + auto-detection instead; without a\n" +
+			"terminal, init does so on its own and never prompts.\n" +
 			"Use --only env|hooks|worktrees to re-run init for specific sections and regenerate them cleanly.\n" +
 			"Services & tasks are configured separately with `wtm run init`.",
+		Example: `  # The wizard
+  wtm init
+
+  # Unattended, from detection
+  wtm init --yes
+
+  wtm init --yes --base-path ../acme.trees --install-command "pnpm install"
+
+  # Regenerate the hooks section only
+  wtm init --only hooks`,
 		RunE: runInit,
 	}
 
-	cmd.Flags().Bool(domain.FlagNonInteractive, false, "Bootstrap from flags + auto-detection; never prompt")
 	cmd.Flags().String(domain.FlagShell, "", "Global shell: zsh, bash, or fish")
 	cmd.Flags().String(domain.FlagBasePath, "", "Worktree directory, relative to repo root")
 	cmd.Flags().String(domain.FlagBaseBranch, "", "Default base branch for new worktrees")
@@ -42,16 +53,25 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().Bool(domain.FlagSkipHooks, false, "Skip on_create hooks config")
 	cmd.Flags().Bool(domain.FlagSkipClean, false, "Skip on_clean hooks config")
 	cmd.Flags().StringSlice(domain.FlagOnly, nil, "Re-init only these sections (env, hooks, worktrees); regenerates them cleanly")
-	cmd.Flags().Bool(domain.FlagYes, false, "Skip the re-init confirmation prompt")
+	shared.AddYesFlag(cmd, "Run unattended: bootstrap (or re-init) from flags + auto-detection; never prompt")
 
 	return cmd
 }
 
-// initFlagged reports whether the user passed --non-interactive or any of the
-// value flags, which switches init into the non-interactive, flag-driven path.
+func interactive(cmd *cobra.Command) bool {
+	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
+	format, _ := cmd.Flags().GetString(domain.FlagOutput)
+	return shared.Interactive(shared.UnattendedParams{TTY: term.IsTerminal(int(os.Stdin.Fd())), Format: format, Yes: yes})
+}
+
+// initFlagged reports whether init takes the flag-driven path: nobody can be
+// asked, or a config flag already answered.
 func initFlagged(cmd *cobra.Command) bool {
+	if !interactive(cmd) {
+		return true
+	}
 	for _, name := range []string{
-		domain.FlagNonInteractive, domain.FlagShell,
+		domain.FlagShell,
 		domain.FlagBasePath, domain.FlagBaseBranch, domain.FlagEnvStrategy,
 		domain.FlagInstallCommand, domain.FlagCleanCommand,
 		domain.FlagSkipEnv, domain.FlagSkipHooks, domain.FlagSkipClean,
@@ -89,9 +109,14 @@ func runInit(cmd *cobra.Command, _ []string) error {
 	}
 
 	if detect.ProjectConfigExists(stateDir) {
-		output.Frame(cmd.OutOrStdout(), func() {
-			output.Message(cmd.OutOrStdout(), fmt.Sprintf("%s already exists.", filepath.Join(stateDir, domain.ConfigFileName)))
-			output.Message(cmd.OutOrStdout(), "Reconfigure a section with `wtm init --only env|hooks|worktrees`, or edit by hand with `wtm config edit`. Configure services with `wtm run init`.")
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			output.Unchanged(w, fmt.Sprintf(domain.InitAlreadyExistsFmt, filepath.Join(stateDir, domain.ConfigFileName)))
+			output.Blank(w)
+			output.NextSteps(w, []output.NextStepParams{
+				{Command: domain.InitReconfigureCmd, Note: domain.InitReconfigureNote},
+				{Command: domain.InitEditCmd, Note: domain.InitEditNote},
+				{Command: domain.InitRunInitCmd, Note: domain.InitRunInitNote},
+			})
 		})
 		return nil
 	}
@@ -115,22 +140,21 @@ func ensureGlobalConfig(cmd *cobra.Command, flagged bool) error {
 	if err := config.WriteGlobal(answers); err != nil {
 		return fmt.Errorf("write global config: %w", err)
 	}
-	if err := dumpGlobalSchema(); err != nil {
-		return err
-	}
 
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.InitGlobalRecap(cmd.OutOrStdout(), output.InitGlobalRecapParams{
-			Fields:    rules.InitGlobalRecapFields(answers),
-			NextSteps: []string{domain.InitNextStepShell},
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.InitGlobalRecap(w, output.InitGlobalRecapParams{
+			Fields: rules.InitGlobalRecapFields(answers),
+			NextSteps: []output.NextStepParams{
+				{Command: domain.InitNextStepShell, Note: domain.InitNextStepShellNote},
+			},
 		})
 	})
 
 	return nil
 }
 
-// resolveGlobalAnswers builds the global config either from flags (non-interactive)
-// or the interactive wizard.
+// resolveGlobalAnswers builds the global config either from flags or the
+// interactive wizard.
 func resolveGlobalAnswers(cmd *cobra.Command, flagged bool) (domain.InitGlobalAnswers, error) {
 	if flagged {
 		shell, _ := cmd.Flags().GetString(domain.FlagShell)
@@ -150,10 +174,9 @@ func resolveGlobalAnswers(cmd *cobra.Command, flagged bool) (domain.InitGlobalAn
 }
 
 // resolveProjectAnswers builds the project config either from flags + detection
-// (non-interactive) or the interactive wizard.
+// or the interactive wizard.
 func resolveProjectAnswers(cmd *cobra.Command, projectDir string, flagged bool, detection domain.InitDetectionResult) (domain.InitProjectAnswers, error) {
 	if flagged {
-		nonInteractive, _ := cmd.Flags().GetBool(domain.FlagNonInteractive)
 		basePath, _ := cmd.Flags().GetString(domain.FlagBasePath)
 		baseBranch, _ := cmd.Flags().GetString(domain.FlagBaseBranch)
 		envStrategy, _ := cmd.Flags().GetString(domain.FlagEnvStrategy)
@@ -168,7 +191,7 @@ func resolveProjectAnswers(cmd *cobra.Command, projectDir string, flagged bool, 
 			EnvStrategy:    envStrategy,
 			InstallCommand: installCommand,
 			CleanCommand:   cleanCommand,
-			NonInteractive: nonInteractive,
+			Unattended:     !interactive(cmd),
 			SkipEnv:        skipEnv,
 			SkipHooks:      skipHooks,
 			SkipClean:      skipClean,
@@ -189,7 +212,7 @@ func createProjectConfig(cmd *cobra.Command, dir, stateDir string, flagged bool)
 	var detection domain.InitDetectionResult
 	_ = components.RunLoading(components.LoadingParams{
 		Message: "Detecting project settings…",
-		Animate: !flagged,
+		Animate: shared.Animate(cmd, !flagged),
 		Work:    func() error { detection = detect.ProjectEnvironment(dir); return nil },
 	})
 
@@ -208,55 +231,16 @@ func createProjectConfig(cmd *cobra.Command, dir, stateDir string, flagged bool)
 		return fmt.Errorf("write project config: %w", err)
 	}
 
-	if err := dumpProjectSchemas(stateDir); err != nil {
-		return err
-	}
-
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.InitProjectRecap(cmd.OutOrStdout(), output.InitProjectRecapParams{
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.InitProjectRecap(w, output.InitProjectRecapParams{
 			ConfigPath: rules.DisplayPath(rules.DisplayPathParams{Base: dir, Target: filepath.Join(stateDir, domain.ConfigFileName)}),
 			Fields:     rules.InitProjectRecapFields(answers),
-			NextSteps: []string{
-				domain.InitNextStepCreate,
-				domain.InitNextStepRelocate,
-				domain.InitNextStepRunInit,
+			NextSteps: []output.NextStepParams{
+				{Command: domain.InitNextStepCreate, Note: domain.InitNextStepCreateNote},
+				{Command: domain.InitNextStepRelocate, Note: domain.InitNextStepRelocateNote},
+				{Command: domain.InitNextStepRunInit, Note: domain.InitNextStepRunInitNote},
 			},
 		})
 	})
-	return nil
-}
-
-// dumpGlobalSchema writes the global config schema next to ~/.config/wtm/
-// config.toml so editors can resolve its `#:schema` directive.
-func dumpGlobalSchema() error {
-	configDir, err := os.UserConfigDir()
-	if err != nil {
-		return nil // best effort — global schema dump isn't critical
-	}
-	dir := filepath.Join(configDir, domain.GlobalConfigDir, domain.SchemasDirName)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", dir, err)
-	}
-	path := filepath.Join(dir, schemas.Global.Filename())
-	if err := os.WriteFile(path, schemas.Global.Bytes(), 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", path, err)
-	}
-	return nil
-}
-
-// dumpProjectSchemas extracts the bundled JSON Schemas into <state-dir>/schemas/
-// alongside the project config files so editors (Taplo, etc.) can resolve
-// the `#:schema ./schemas/...json` directive at the top of each TOML.
-func dumpProjectSchemas(stateDir string) error {
-	schemaDir := filepath.Join(stateDir, domain.SchemasDirName)
-	if err := os.MkdirAll(schemaDir, 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", schemaDir, err)
-	}
-	for _, s := range []schemas.Schema{schemas.Project, schemas.Run} {
-		path := filepath.Join(schemaDir, s.Filename())
-		if err := os.WriteFile(path, s.Bytes(), 0o644); err != nil {
-			return fmt.Errorf("write %s: %w", path, err)
-		}
-	}
 	return nil
 }

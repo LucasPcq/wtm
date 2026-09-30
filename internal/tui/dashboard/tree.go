@@ -140,6 +140,8 @@ func (m Model) treeBadgeText(badge domain.TreeBadge, node domain.TreeNode) strin
 	switch badge {
 	case domain.TreeBadgeVirtual:
 		return domain.DashboardTreeVirtual
+	case domain.TreeBadgeRunning:
+		return fmt.Sprintf(domain.TreeBadgeRunningFmt, node.Status.RunningJobs)
 	case domain.TreeBadgePR:
 		return fmt.Sprintf(domain.DashboardTreePRFmt, node.Status.PR.Number)
 	case domain.TreeBadgeAhead:
@@ -162,6 +164,8 @@ func styleTreeBadge(badge domain.TreeBadge, text string) string {
 	switch badge {
 	case domain.TreeBadgeRebasing, domain.TreeBadgeDirty, domain.TreeBadgeNeedsSync, domain.TreeBadgeCycle:
 		return styles.DashboardTreeWarn.Render(text)
+	case domain.TreeBadgeRunning:
+		return styles.Success.Render(text)
 	}
 	return styles.DashboardRowMeta.Render(text)
 }

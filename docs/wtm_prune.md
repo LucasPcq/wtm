@@ -1,6 +1,6 @@
 ## wtm prune
 
-Remove finished worktrees (merged, closed PR, gone, or old) in one pass
+Remove finished worktrees (merged, closed PR or gone) in one pass
 
 ### Synopsis
 
@@ -19,30 +19,61 @@ gone-detection runs `git fetch --prune` first so deleted remote branches are see
 
 On a TTY, matches are shown for review (unsafe ones unchecked), then a prune
 confirmation, then — like clean — a dedicated confirmation to reparent surviving
-children onto their grandparent (or leave them orphaned). The main worktree and base
+children onto their grandparent (or leave them orphaned). The main checkout and base
 branch are always protected; the current worktree is removed and the shell
 redirected to the base repo. Like clean, worktrees that are dirty, have unpushed
 commits, or have an open PR are unsafe and need --force. Use --yes to skip the
 prompts (required with --output json); non-interactively, children are left orphaned
 unless --reparent-children is passed. --dry-run previews without changing anything.
 
+Like clean, prune gives back the data the removed worktrees carved out of shared
+services (--keep-data withholds it); when such a service is down, the form asks whether
+to start it and drop the data now, or keep it until the service next starts. --yes keeps
+it; --drop-data drops it, starting the services that are down.
+
+Each worktree goes through clean's whole sequence — jobs stopped, hooks, removal, then its
+data — before the next one starts. The first that fails stops the prune: the ones before
+it are gone with their data, it and the ones after keep theirs, and the report (and the
+`failed` field of --output json) names where it stopped.
+
 ```
 wtm prune [flags]
+```
+
+### Examples
+
+```
+  # Review every finished worktree, then confirm
+  wtm prune
+
+  # Only show what would go
+  wtm prune --dry-run
+
+  # Every worktree whose PR was merged, no prompts
+  wtm prune --merged --yes --reparent-children
 ```
 
 ### Options
 
 ```
       --closed              Restrict to worktrees whose PR was closed without merging (needs gh)
+      --drop-data           Drop the removed worktrees' data now, starting the shared services that are down to do it
       --dry-run             Preview what would be pruned without removing anything
       --force               Lift safety refusals (dirty/unpushed/open-PR): also remove unsafe worktrees; still asks to confirm unless --yes
       --gone                Restrict to worktrees whose upstream branch was deleted on the remote
   -h, --help                help for prune
+      --keep-data           Keep the namespaces the removed worktrees carved out of shared services
       --merged              Restrict to worktrees whose PR was merged on GitHub (needs gh)
       --no-fetch            Skip the git fetch --prune that gone-detection performs; use already-fetched state
       --output string       Output format: text or json (default "text")
       --reparent-children   Reparent orphaned child worktrees onto the grandparent (no prompt)
   -y, --yes                 Skip all prompts; keep every match without the selection picker (use --force for unsafe worktrees)
+```
+
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
 ```
 
 ### SEE ALSO

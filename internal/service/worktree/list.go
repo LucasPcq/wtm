@@ -143,3 +143,25 @@ type LastFetchAtParams struct {
 func LastFetchAt(params LastFetchAtParams) time.Time {
 	return infra.LastFetchAt(infra.LastFetchAtParams{ProjectDir: params.ProjectDir})
 }
+
+type MainCheckoutParams struct {
+	ProjectDir string
+}
+
+// MainCheckout is where a shared job runs: the one worktree guaranteed to live
+// as long as the repository does, and the one at ordinal 0 — so a shared job's
+// declared port is the port it binds. A bare clone has none, and a shared job
+// then has nowhere to run rather than silently taking a linked worktree that
+// `clean` may remove under it.
+func MainCheckout(params MainCheckoutParams) (string, error) {
+	worktrees, err := infra.ListWorktrees(infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
+	if err != nil {
+		return "", err
+	}
+	for _, candidate := range worktrees {
+		if candidate.IsMain {
+			return candidate.Path, nil
+		}
+	}
+	return "", domain.ErrNoMainCheckout
+}

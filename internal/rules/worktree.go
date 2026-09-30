@@ -28,6 +28,47 @@ func WorktreeMetaDir(stateDir, branch string) string {
 	return filepath.Join(stateDir, domain.WorktreesSubdir, EncodeBranchSegment(branch))
 }
 
+type PurgeableMetaDirParams struct {
+	StateDir string
+	Branch   string
+}
+
+// PurgeableMetaDir returns the same directory as WorktreeMetaDir, but refuses a
+// branch that would not survive as a single path segment. It is what a removal
+// resolves: WorktreeMetaDir only ever fed writes, while this path feeds a
+// recursive delete, where refusing beats guessing.
+func PurgeableMetaDir(params PurgeableMetaDirParams) string {
+	if params.StateDir == "" || params.Branch == "" {
+		return ""
+	}
+	if !isSinglePathSegment(EncodeBranchSegment(params.Branch)) {
+		return ""
+	}
+	return WorktreeMetaDir(params.StateDir, params.Branch)
+}
+
+// WorktreeSlug renders a branch as a name Docker and friends accept for a
+// project, a network or a volume: lowercase, [a-z0-9_-] only, starting on an
+// alphanumeric. SanitizeBranchName is not a substitute — it keeps the uppercase
+// letters that `docker compose` rejects in a project name.
+func WorktreeSlug(branch string) string {
+	lowered := strings.ToLower(branch)
+	mapped := strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '_', r == '-':
+			return r
+		default:
+			return '-'
+		}
+	}, lowered)
+
+	slug := strings.TrimLeft(mapped, "-_")
+	if slug == "" {
+		return domain.ComposeProjectFallback
+	}
+	return slug
+}
+
 // ResolveEnvStrategy returns override cast to EnvStrategy if non-empty, otherwise strategy.
 // The caller is responsible for ensuring override is a valid EnvStrategy value;
 // validation occurs at the config boundary before this function is called.

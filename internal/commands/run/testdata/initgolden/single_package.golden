@@ -1,0 +1,54 @@
+### args: --yes --link-env --write-port-keys
+### stdout
+
+  ✓ Configured run module → <repo>/.git/wtm/run.toml   1 added
+
+  ✓ 1 port(s) declared in run.toml
+
+  ✓ 2 .env value(s) now follow a port
+  ╭──────────────────────────────────────────────────────────────────────────────────────╮
+  │ Named URLs carry a port                                                              │
+  │ Jobs publishing a named URL answer on http://<job>.<worktree>.<repo>.localhost:11080 │
+  │ `wtm run proxy install` serves them on port 80 so the port disappears from the URL   │
+  ╰──────────────────────────────────────────────────────────────────────────────────────╯
+  ╭───────────────────────────────────────────────────────────╮
+  │ Published names, unsettled .env                           │
+  │ main's .env still spells ports — `wtm env main` aligns it │
+  ╰───────────────────────────────────────────────────────────╯
+
+  → wtm run up        start the jobs
+  → wtm run job add   declare another
+
+
+### stderr
+
+### file .git/wtm/run.toml
+#:schema ./schemas/run.schema.json
+
+[[job]]
+  name = "dev"
+  kind = "service"
+  cmd = "npm run dev"
+  cwd = "."
+  [job.ports]
+    PORT = 3000
+  [job.url]
+    port = "PORT"
+
+[[profile]]
+  name = "all"
+  jobs = ["dev"]
+  default = true
+
+[[env_port]]
+  file = ".env"
+  key = "PORT"
+  job = "dev"
+  port = "PORT"
+
+[[env_port]]
+  file = ".env"
+  key = "NEXT_PUBLIC_URL"
+  job = "dev"
+  port = "PORT"
+

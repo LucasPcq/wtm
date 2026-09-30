@@ -6,17 +6,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
-// InstallCommandFromHooks returns the first bare on_create hook (no cwd) — the
-// conventional install command that `wtm init` writes first. Returns "" if none.
-func InstallCommandFromHooks(onCreate []domain.HookCommand) string {
-	for _, h := range onCreate {
-		if h.Cwd == "" {
-			return h.Cmd
-		}
-	}
-	return ""
-}
-
 // DockerFilesConfigured returns the set of detected docker-compose files that
 // already back a job in run, matched on the "-f <file> " fragment that
 // BuildDockerJobs emits.

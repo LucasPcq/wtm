@@ -2,169 +2,135 @@ package run
 
 import (
 	"fmt"
-	"os"
+	"io"
 
 	"github.com/spf13/cobra"
 
+	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
 	"github.com/LucasPcq/wtm/internal/commands/shared"
-	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
+	downflow "github.com/LucasPcq/wtm/internal/flow/run/down"
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
-	"github.com/LucasPcq/wtm/internal/service/process"
-	"github.com/LucasPcq/wtm/internal/tui/components"
 )
 
 // newDownCmd creates the wtm run down subcommand.
 func newDownCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   domain.CmdDown + " [profile]",
-		Short: "Stop jobs running in the current worktree",
-		Long:  "Stop jobs running in the current worktree.\nWith a profile argument, stops only that profile's jobs.\nJobs running in other worktrees are never touched.",
-		Args:  cobra.MaximumNArgs(1),
-		RunE:  runDown,
+		Use:   domain.CmdDown + " [worktree...]",
+		Short: "Stop a worktree's running jobs",
+		Long:  "Stop the jobs running in [worktree] — the current one when omitted, picked interactively when there is a terminal.\nWith --profile, stops only that profile's jobs.\nJobs running in other worktrees are never touched, unless --all is given: it stops every worktree of this repository, without asking, and lists each one it emptied. Other repositories are never touched.",
+		Example: `  wtm run down
+
+  wtm run down feat/login --profile backend
+
+  # Every worktree of this repository
+  wtm run down --all --yes`,
+		Args: cobra.ArbitraryArgs,
+		RunE: runDown,
 	}
+	shared.AddProfileFlag(cmd, "Stop only this profile's jobs (default: every job the worktree runs)")
+	shared.AddYesFlag(cmd, "Skip all prompts; stops what the worktree has running")
 	shared.AddOutputFlag(cmd)
-	cmd.Flags().Bool(domain.FlagAll, false, "Stop jobs across every worktree (bypasses per-worktree scoping)")
+	cmd.Flags().Bool(domain.FlagAll, false, "Stop the jobs of every worktree of this repository")
 	return cmd
 }
 
 func runDown(cmd *cobra.Command, args []string) error {
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 	all, _ := cmd.Flags().GetBool(domain.FlagAll)
+	profile, _ := cmd.Flags().GetString(domain.FlagProfile)
 
-	if all && len(args) > 0 {
-		return fmt.Errorf("--%s cannot be combined with a profile argument", domain.FlagAll)
+	// --all is a different question, not a wider answer to this one: it takes
+	// neither a worktree nor a profile.
+	if all && (len(args) > 0 || profile != "") {
+		return fmt.Errorf("--%s cannot be combined with a worktree or --%s", domain.FlagAll, domain.FlagProfile)
 	}
 
-	dir, err := os.Getwd()
+	ctx, err := runctx.Open(runctx.OpenParams{Cmd: cmd, TolerateRunConfig: true})
 	if err != nil {
-		return fmt.Errorf("get working directory: %w", err)
-	}
-	if err := shared.GuardRunInitialized(dir); err != nil {
 		return err
 	}
+	warnRunConfig(cmd, ctx)
 
-	socketPath := process.SocketPath()
-
-	if !process.IsDaemonRunning(socketPath) {
-		if format == domain.OutputJSON {
-			return output.WriteJobResultsJSON(cmd.OutOrStdout(), nil)
-		}
-		output.Frame(cmd.OutOrStdout(), func() {
-			output.Message(cmd.OutOrStdout(), "No jobs running.")
-		})
-		return nil
-	}
-
-	client := process.NewClient(socketPath)
-
-	if len(args) > 0 {
-		stateDir, err := shared.StateDir(dir)
-		if err != nil {
-			return err
-		}
-
-		runCfg, err := config.LoadRun(stateDir)
-		if err != nil {
-			return fmt.Errorf("load run config: %w", err)
-		}
-
-		profile, ok := rules.FindProfile(runCfg, args[0])
-		if !ok {
-			return fmt.Errorf("profile %q not found in config", args[0])
-		}
-
-		jobs := rules.ProfileJobs(runCfg, profile)
-		results := make([]output.JobActionResult, 0, len(jobs))
-		if rules.IsHumanFormat(format) {
-			output.FrameStart(cmd.OutOrStdout())
-		}
-		for _, job := range jobs {
-			var resp process.Response
-			sendErr := components.RunLoading(components.LoadingParams{
-				Message: fmt.Sprintf("Stopping %s…", job.Name),
-				Animate: rules.IsHumanFormat(format),
-				Work: func() error {
-					var e error
-					resp, e = client.Send(process.Request{
-						Action:  process.ActionStop,
-						Name:    job.Name,
-						WorkDir: dir,
-					})
-					return e
-				},
-			})
-			if sendErr != nil {
-				results = append(results, output.JobActionResult{Name: job.Name, Status: domain.JobActionError, Message: sendErr.Error()})
-				if format != domain.OutputJSON {
-					output.Error(cmd.ErrOrStderr(), fmt.Sprintf("%s: %v", job.Name, sendErr))
-				}
-				continue
-			}
-			if resp.Status == process.StatusError {
-				results = append(results, output.JobActionResult{Name: job.Name, Status: domain.JobActionError, Message: resp.Message})
-				if format != domain.OutputJSON {
-					output.Error(cmd.ErrOrStderr(), fmt.Sprintf("%s: %s", job.Name, resp.Message))
-				}
-				continue
-			}
-			results = append(results, output.JobActionResult{Name: job.Name, Status: domain.JobActionStopped})
-			if format != domain.OutputJSON {
-				output.Success(cmd.OutOrStdout(), fmt.Sprintf("%s stopped", job.Name))
-			}
-		}
-		if format == domain.OutputJSON {
-			return output.WriteJobResultsJSON(cmd.OutOrStdout(), results)
-		}
-		output.FrameEnd(cmd.OutOrStdout())
-		return nil
-	}
-
-	req := process.Request{Action: process.ActionStopAll}
-	if !all {
-		req.WorkDir = dir
-	}
-
-	var resp process.Response
-	stopErr := components.RunLoading(components.LoadingParams{
-		Message: "Stopping jobs…",
-		Animate: rules.IsHumanFormat(format),
-		Work: func() error {
-			var e error
-			resp, e = client.Send(req)
-			return e
+	outcome, err := downflow.Run(downflow.Params{
+		Context: ctx.FlowContext(),
+		Request: downflow.Request{
+			Worktrees: args,
+			Cwd:       ctx.Dir,
+			Profile:   profile,
+			All:       all,
+			Config:    ctx.Run,
 		},
+		Prompter:  ctx.Prompter(!all && ctx.Interactive),
+		Presenter: downPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
 	})
-	if stopErr != nil {
-		return fmt.Errorf("stop all jobs: %w", stopErr)
+	if err != nil {
+		return err
 	}
-	if resp.Status == process.StatusError {
-		return fmt.Errorf("stop all: %s", resp.Message)
+	if outcome.Aborted || outcome.Failed() {
+		return domain.ErrAborted
+	}
+	return nil
+}
+
+// downPresenter reports what the worktree had running. A job left standing is
+// named on stderr and turned into a non-zero exit by the runner; both surfaces
+// have already listed the jobs, so the error carries nothing more (LUC-198).
+type downPresenter struct {
+	shared.CLIPresenter
+}
+
+func (p downPresenter) Downed(outcome downflow.Outcome) error {
+	if p.Format == domain.OutputJSON {
+		return output.WriteWorktreeJobResultsJSON(p.Cmd.OutOrStdout(), outcome.Results)
 	}
 
-	if format == domain.OutputJSON {
-		stopped := make([]output.JobActionResult, 0, len(resp.Jobs))
-		for _, job := range resp.Jobs {
-			stopped = append(stopped, output.JobActionResult{Name: job.Name, Status: domain.JobActionStopped})
-		}
-		return output.WriteJobResultsJSON(cmd.OutOrStdout(), stopped)
-	}
-
-	if len(resp.Jobs) == 0 {
-		output.Frame(cmd.OutOrStdout(), func() {
-			if all {
-				output.Message(cmd.OutOrStdout(), "No jobs running.")
-			} else {
-				output.Message(cmd.OutOrStdout(), "No jobs running in this worktree.")
-			}
-		})
+	out, errOut := p.Cmd.OutOrStdout(), p.Cmd.ErrOrStderr()
+	if outcome.NoDaemon || len(outcome.Stopped()) == 0 {
+		output.Frame(out, func(w io.Writer) { output.Unchanged(w, p.nothingRunning(outcome)) })
 		return nil
 	}
-	output.FrameStart(cmd.OutOrStdout())
-	for _, job := range resp.Jobs {
-		output.Success(cmd.OutOrStdout(), fmt.Sprintf("%s stopped", job.Name))
+
+	// A job left standing is named on stderr as it is refused, so the reason
+	// reaches a reader piping stdout; the recap then accounts for it alongside
+	// what did go down.
+	if rules.WorktreeJobsHaveErrors(outcome.Results) {
+		output.FrameStart(errOut)
+		barred := output.Barred(errOut)
+		for _, worktree := range outcome.Results {
+			for _, result := range worktree.Jobs {
+				if result.Status != domain.JobActionError {
+					continue
+				}
+				output.Error(barred, p.qualify(fmt.Sprintf("%s: %s", result.Name, result.Message), outcome, worktree))
+			}
+		}
+		output.FrameEnd(errOut)
 	}
-	output.FrameEnd(cmd.OutOrStdout())
+
+	output.Frame(out, func(w io.Writer) {
+		fmt.Fprint(w, output.FormatRunDownRecap(output.RunDownRecapParams{
+			Profile: outcome.Profile,
+			Results: outcome.Results,
+		}))
+	})
 	return nil
+}
+
+// qualify names the worktree at the end of the line, never inside it: `migrate
+// stopped · main` is the sentence `run up` writes, `migrate · main stopped` is
+// the same words in the wrong order.
+func (p downPresenter) qualify(line string, outcome downflow.Outcome, worktree domain.WorktreeJobResults) string {
+	if len(outcome.Results) <= 1 || worktree.Branch == "" {
+		return line
+	}
+	return fmt.Sprintf(domain.RunStreamWorktreeFmt, line, worktree.Branch)
+}
+
+func (p downPresenter) nothingRunning(outcome downflow.Outcome) string {
+	if outcome.All {
+		return domain.RunNoJobsRunning
+	}
+	return domain.RunNoJobsHere
 }

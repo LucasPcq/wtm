@@ -129,3 +129,31 @@ func MergeBranchCandidates(params MergeBranchCandidatesParams) []domain.BranchCa
 	}
 	return candidates
 }
+
+// FastForwardSplit sorts a run's branches by what the reader has to do about
+// them: moved is the work, notable is a state that needs a decision (diverged,
+// no upstream), failed is the errors. What is in none of them was already up to
+// date — the non-event a result counts rather than lists.
+func FastForwardSplit(results []domain.FastForwardResult) (moved, notable, failed []domain.FastForwardResult) {
+	for _, result := range results {
+		switch result.Status {
+		case domain.FFAdvanced:
+			moved = append(moved, result)
+		case domain.FFDiverged, domain.FFNoUpstream:
+			notable = append(notable, result)
+		case domain.FFFailed:
+			failed = append(failed, result)
+		}
+	}
+	return moved, notable, failed
+}
+
+// FastForwardBranches names the branches of a group, for a result that lists
+// them on one line rather than one line each.
+func FastForwardBranches(results []domain.FastForwardResult) []string {
+	names := make([]string, 0, len(results))
+	for _, result := range results {
+		names = append(names, result.Branch)
+	}
+	return names
+}

@@ -25,6 +25,13 @@ func newFastForwardCmd() *cobra.Command {
 			"`wtm sync` is the command that replays local commits onto it, and --force does not lift\n" +
 			"that refusal. A worktree with uncommitted changes is refused too; --force fast-forwards\n" +
 			"it anyway, and git still refuses if a modified file would be overwritten.",
+		Example: `  # Pick the worktrees to bring up to origin
+  wtm fast-forward
+
+  wtm ff feat/login
+
+  # Every worktree, no prompts
+  wtm fast-forward --all --yes --output json`,
 		Args: cobra.ArbitraryArgs,
 		RunE: runFastForward,
 	}
@@ -66,15 +73,15 @@ func runFastForward(cmd *cobra.Command, args []string) error {
 	interactive := rules.IsHumanFormat(format) && !yes && term.IsTerminal(int(os.Stdin.Fd()))
 
 	_, err = ffflow.Run(ffflow.Params{
-		Context: flowContext(config),
+		Context: shared.FlowContext(config),
 		Request: ffflow.Request{
 			Branches: args,
 			All:      all,
 			Force:    force,
 		},
 		// The picker may be reached through the shell wrapper, which consumes stdout.
-		Prompter:  flowPrompter(flowPrompterParams{Interactive: interactive, Stderr: true}),
-		Presenter: ffPresenter{cliPresenter: newPresenter(cmd, format)},
+		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),
+		Presenter: ffPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
 	})
 	return err
 }

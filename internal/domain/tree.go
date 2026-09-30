@@ -23,6 +23,10 @@ type TreeNodeStatus struct {
 	OriginBehind int             `json:"origin_behind"`
 	OriginState  DivergenceState `json:"origin_state"`
 	PR           *WorktreeListPR `json:"pr,omitempty"`
+	// RunningJobs is how many jobs the run daemon holds for this worktree. Only a
+	// surface that asked the daemon fills it; `wtm tree` does not, which is why it
+	// is omitted rather than reported as zero.
+	RunningJobs int `json:"running_jobs,omitempty"`
 }
 
 // TreeNode is one entry in the rendered worktree forest: a managed worktree or a
@@ -60,6 +64,7 @@ type TreeBadge int
 
 const (
 	TreeBadgeVirtual TreeBadge = iota
+	TreeBadgeRunning
 	TreeBadgePR
 	TreeBadgeAhead
 	TreeBadgeOrigin

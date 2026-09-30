@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
@@ -18,8 +19,8 @@ func extractTestRepo(t *testing.T) (dir, stateDir string) {
 	t.Helper()
 	dir = gittest.InitRepo(t)
 	stateDir = filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 	if err := setupMinimalConfig(t, stateDir); err != nil {
 		t.Fatalf("setup config: %v", err)
@@ -257,5 +258,112 @@ func writeWorktreeFile(t *testing.T, dir, rel, content string) {
 	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("write %s: %v", rel, err)
+	}
+}
+
+// TestExtractSettlesEnvPortsOnTheCreatedTarget guards the isolation of a
+// worktree extract creates: its .env has to carry the ports this worktree
+// binds, not the ones it was copied from. create has settled them since
+// LUC-99; extract never did.
+func TestExtractSettlesEnvPortsOnTheCreatedTarget(t *testing.T) {
+	dir := gittest.InitRepo(t)
+	stateDir := filepath.Join(dir, ".git", "wtm")
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
+	t.Setenv(domain.EnvGoFile, "")
+
+	if err := config.WriteProject(config.WriteProjectParams{
+		StateDir: stateDir,
+		Answers: domain.InitProjectAnswers{
+			BasePath:    "../.trees",
+			BaseBranch:  "main",
+			EnvStrategy: domain.EnvStrategyMain,
+			EnvFiles:    []domain.EnvFile{{Target: ".env", Template: ".env.example"}},
+		},
+	}); err != nil {
+		t.Fatalf("write project config: %v", err)
+	}
+	if err := config.WriteRun(config.WriteRunParams{
+		StateDir: stateDir,
+		Force:    true,
+		Config: domain.RunConfig{
+			Jobs: []domain.JobConfig{{
+				Name: "web", Kind: domain.JobKindService, Cmd: "true",
+				Ports: map[string]int{"PORT": 3000},
+			}},
+			EnvPorts: []domain.EnvPortLink{{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"}},
+		},
+	}); err != nil {
+		t.Fatalf("write run config: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(dir, ".env.example"), []byte("WEB_PORT=3000\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gittest.Git(t, dir, "add", ".env.example")
+	gittest.Git(t, dir, "commit", "-m", "env template")
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("WEB_PORT=3000\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "moved.txt"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, _, err := runWtCmd(t, domain.CmdExtract, "main",
+		"--"+domain.FlagTo, "feat/target",
+		"--"+domain.FlagFrom, "main",
+		"--"+domain.FlagFiles, "moved.txt",
+		"--"+domain.FlagYes,
+		"--output", domain.OutputJSON,
+	)
+	if err != nil {
+		t.Fatalf("extract: %v", err)
+	}
+
+	var res domain.ExtractResult
+	if err := json.Unmarshal([]byte(out), &res); err != nil {
+		t.Fatalf("decode extract result: %v\n%s", err, out)
+	}
+
+	body, err := os.ReadFile(filepath.Join(res.TargetPath, ".env"))
+	if err != nil {
+		t.Fatalf("read target .env: %v", err)
+	}
+	if strings.Contains(string(body), "WEB_PORT=3000") {
+		t.Errorf("target .env kept the base port, isolation is broken: %s", body)
+	}
+}
+
+// G1: extract creating its target goes ahead over a run.toml the port pass
+// refuses — hooks run, the .env stays as copied, and the JSON says why.
+func TestExtractCreatesItsTargetOverAnInvalidRunToml(t *testing.T) {
+	dir, stateDir := extractTestRepo(t)
+	if err := os.WriteFile(filepath.Join(stateDir, domain.RunFileName), []byte("bogus_key = 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "moved.txt"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, _, err := runWtCmd(t, domain.CmdExtract, "main",
+		"--"+domain.FlagTo, "feat/target",
+		"--"+domain.FlagFrom, "main",
+		"--"+domain.FlagFiles, "moved.txt",
+		"--"+domain.FlagYes,
+		"--output", domain.OutputJSON,
+	)
+	if err != nil {
+		t.Fatalf("extract must not fail over run.toml: %v", err)
+	}
+
+	var res domain.ExtractResult
+	if err := json.Unmarshal([]byte(out), &res); err != nil {
+		t.Fatalf("decode extract result: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(res.TargetPath, "moved.txt")); err != nil {
+		t.Errorf("the file was not extracted: %v", err)
+	}
+	if len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], "bogus_key") {
+		t.Errorf("warnings = %v, want the refused run.toml named", res.Warnings)
 	}
 }

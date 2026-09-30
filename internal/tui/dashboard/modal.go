@@ -68,6 +68,7 @@ type modal struct {
 	text    components.TextInputModel
 	list    components.SelectListModel
 	multi   components.MultiSelectModel
+	reorder components.ReorderListModel
 
 	rows   []formRow
 	focus  int
@@ -101,7 +102,7 @@ func newModal(params modalParams) (modal, tea.Cmd) {
 	}
 	if params.Shape == modalForm {
 		mo.loading = domain.DashboardModalPreparing
-		return mo, buildFormCmd(mo.session, mo.chosen, mo.generation)
+		return mo, buildFormCmd(buildFormParams{Session: mo.session, Chosen: mo.chosen, Title: mo.title, Generation: mo.generation})
 	}
 	return mo.advance()
 }
@@ -168,6 +169,7 @@ func (mo modal) show(step flow.Step, content flow.StepContent) (modal, tea.Cmd) 
 		mo.text = components.NewTextInput(components.NewTextInputParams{
 			Title:       content.Title,
 			Description: content.Description,
+			Default:     content.Default,
 			Validate:    step.Validate,
 		})
 		mo.text.SetWidth(mo.bodyWidth())
@@ -175,7 +177,7 @@ func (mo modal) show(step flow.Step, content flow.StepContent) (modal, tea.Cmd) 
 	case flow.StepRecap:
 		// A recap is a confirmation, so it is drawn with the buttons every other
 		// confirmation uses rather than as one more list to pick from.
-		mo.rows, _ = formSection(formSectionParams{Step: step, Content: content, Answers: mo.answers, Chosen: mo.answers})
+		mo.rows, _ = formSection(formSectionParams{Step: step, Content: content, Answers: mo.answers, Chosen: mo.answers, Title: mo.title})
 		mo.focus = clampFocus(mo.rows, 0)
 		return mo, nil
 	case flow.StepSelect:
@@ -190,6 +192,9 @@ func (mo modal) show(step flow.Step, content flow.StepContent) (modal, tea.Cmd) 
 		mo.multi = newMultiSelect(step, mo.reselect(step, content))
 		mo.multi.SetSize(components.SetSizeParams{Width: mo.bodyWidth(), Height: mo.bodyHeight()})
 		return mo, mo.multi.Init()
+	case flow.StepReorder:
+		mo.reorder = newReorderList(content)
+		return mo, mo.reorder.Init()
 	default:
 		return mo.fail(fmt.Errorf(domain.DashboardUnsupportedStepFmt, step.Key, step.Kind))
 	}
@@ -264,6 +269,18 @@ func (mo modal) updateStepper(msg tea.KeyMsg) (modal, tea.Cmd) {
 			return mo.back()
 		case mo.multi.Done():
 			return mo.answerValues(mo.multi.Values())
+		}
+		return mo, cmd
+	}
+
+	if mo.kind == flow.StepReorder {
+		var cmd tea.Cmd
+		mo.reorder, cmd = mo.reorder.Update(msg)
+		switch {
+		case mo.reorder.Aborted():
+			return mo.back()
+		case mo.reorder.Done():
+			return mo.answerValues(mo.reorder.Values())
 		}
 		return mo, cmd
 	}
@@ -343,6 +360,7 @@ func newMultiSelect(step flow.Step, content flow.StepContent) components.MultiSe
 			Selected: option.Selected,
 			Tag:      option.Tag,
 			Variant:  components.TagVariantOf(option.Tone),
+			Badges:   selectBadges(option.Badges),
 		})
 	}
 	return components.NewMultiSelect(components.NewMultiSelectParams{
@@ -350,6 +368,7 @@ func newMultiSelect(step flow.Step, content flow.StepContent) components.MultiSe
 		Description: content.Description,
 		Items:       items,
 		Validate:    step.ValidateSet,
+		Start:       content.Start,
 	})
 }
 
@@ -361,13 +380,29 @@ func newSelectList(content flow.StepContent) components.SelectListModel {
 			Value:     option.Value,
 			Separator: option.Separator,
 			Danger:    option.Danger,
+			Badges:    selectBadges(option.Badges),
 		})
 	}
 	return components.NewSelectList(components.NewSelectListParams{
 		Title:       content.Title,
 		Description: content.Description,
 		Items:       items,
+		Start:       content.Start,
 	})
+}
+
+func selectBadges(badges []flow.Badge) []components.Badge {
+	if len(badges) == 0 {
+		return nil
+	}
+	rendered := make([]components.Badge, 0, len(badges))
+	for _, badge := range badges {
+		rendered = append(rendered, components.Badge{
+			Text:    badge.Text,
+			Variant: components.BadgeVariantOf(badge.Tone),
+		})
+	}
+	return rendered
 }
 
 // branchItems applies the content's exclusions over the step's candidates, the
@@ -392,29 +427,18 @@ func branchItems(step flow.Step, content flow.StepContent) []components.SelectIt
 // stepContent merges what a step declares statically with what it derives from
 // the answers, so a Build only returns the parts that change.
 func stepContent(step flow.Step, answers flow.Answers) (flow.StepContent, error) {
-	content := flow.StepContent{Title: step.Title, Description: step.Description, Options: step.Options}
 	build := step.Build
 	if build == nil {
 		build = step.Load
 	}
 	if build == nil {
-		return content, nil
+		return flow.MergeContent(step, flow.StepContent{}), nil
 	}
 	built, err := build(answers)
 	if err != nil {
 		return flow.StepContent{}, err
 	}
-	if built.Title != "" {
-		content.Title = built.Title
-	}
-	if built.Description != "" {
-		content.Description = built.Description
-	}
-	if len(built.Options) > 0 {
-		content.Options = built.Options
-	}
-	content.Blockers = built.Blockers
-	return content, nil
+	return flow.MergeContent(step, built), nil
 }
 
 func loadingMessage(step flow.Step) string {
@@ -473,6 +497,9 @@ func (mo modal) body(zones marker) []string {
 	case mo.kind == flow.StepMultiSelect:
 		lines = append(lines, mo.stepHeader()...)
 		lines = append(lines, strings.Split(mo.multi.View(), "\n")...)
+	case mo.kind == flow.StepReorder:
+		lines = append(lines, mo.stepHeader()...)
+		lines = append(lines, strings.Split(mo.reorder.View(), "\n")...)
 	default:
 		lines = append(lines, mo.stepHeader()...)
 		lines = append(lines, strings.Split(mo.list.View(), "\n")...)
@@ -516,6 +543,25 @@ func (mo modal) hint() string {
 		return domain.DashboardStepperTextHint
 	case mo.kind == flow.StepMultiSelect:
 		return domain.DashboardStepperMultiHint
+	case mo.kind == flow.StepReorder:
+		return domain.DashboardStepperReorderHint
 	}
 	return domain.DashboardStepperHint
+}
+
+// newReorderList draws a step whose options are already the answer: what it
+// collects is the sequence they end up in.
+func newReorderList(content flow.StepContent) components.ReorderListModel {
+	items := make([]components.ReorderItem, 0, len(content.Options))
+	for _, option := range content.Options {
+		if option.Separator {
+			continue
+		}
+		items = append(items, components.ReorderItem{Label: option.Label, Value: option.Value})
+	}
+	return components.NewReorderList(components.NewReorderListParams{
+		Title:       content.Title,
+		Description: content.Description,
+		Items:       items,
+	})
 }

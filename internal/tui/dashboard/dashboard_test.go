@@ -179,15 +179,15 @@ func TestFailedLoadKeepsTheLastGoodListAndReportsIt(t *testing.T) {
 	}
 }
 
-func TestPollDoesNotStackLoadsButKeepsTicking(t *testing.T) {
+func TestTheGitPollDoesNotStackLoadsButKeepsTicking(t *testing.T) {
 	model := newTestModel(t, testWidth, testHeight, "a")
 
-	model, cmd := updateCmd(model, pollMsg{})
+	model, cmd := updateCmd(model, gitPollMsg{})
 	if !model.loading || cmd == nil {
 		t.Fatalf("first poll: loading=%v cmd=%v, want a load in flight and a next tick", model.loading, cmd != nil)
 	}
 
-	model, cmd = updateCmd(model, pollMsg{})
+	model, cmd = updateCmd(model, gitPollMsg{})
 	if !model.loading || cmd == nil {
 		t.Fatal("a poll landing while a load is in flight must still schedule the next tick")
 	}
@@ -195,6 +195,20 @@ func TestPollDoesNotStackLoadsButKeepsTicking(t *testing.T) {
 	model = update(model, worktreesMsg{statuses: statuses("a"), parents: map[string]string{}})
 	if model.loading {
 		t.Error("loading should clear when the result lands")
+	}
+}
+
+// Asking the daemon must never drag the repository along behind it.
+func TestTheDaemonPollDoesNotReadTheRepository(t *testing.T) {
+	model := newTestModel(t, testWidth, testHeight, "a")
+
+	model, cmd := updateCmd(model, pollMsg{})
+
+	if model.loading {
+		t.Error("the daemon poll started a git load; that is the git clock's job")
+	}
+	if cmd == nil {
+		t.Error("the daemon poll must schedule its next tick")
 	}
 }
 
@@ -542,5 +556,324 @@ func TestFoldingTheOutputPanelClampsItsScroll(t *testing.T) {
 
 	if model.outputOffset != 0 {
 		t.Errorf("offset = %d once folded, want it clamped back to 0", model.outputOffset)
+	}
+}
+
+// Every leaf runs on its own goroutine: a batch from Init holds listenCmd,
+// which blocks on the flow channel until the program ends.
+func fire(cmd tea.Cmd) {
+	if cmd == nil {
+		return
+	}
+	go func() {
+		if batch, ok := cmd().(tea.BatchMsg); ok {
+			for _, sub := range batch {
+				fire(sub)
+			}
+		}
+	}()
+}
+
+func TestJobsAreReadWithoutAnExplicitRefresh(t *testing.T) {
+	wakes := make(chan bool, 8)
+	model := New(RunParams{JobsLoader: func(wake bool) ([]domain.JobInfo, bool) {
+		wakes <- wake
+		return nil, true
+	}})
+	t.Cleanup(model.Close)
+	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
+	model = update(model, worktreesMsg{statuses: statuses("a"), parents: map[string]string{}})
+
+	fire(model.Init())
+	if wake := nextWake(t, wakes); !wake {
+		t.Error("the first read wakes a sleeping daemon: the opening frame must be true")
+	}
+
+	_, cmd := updateCmd(model, pollMsg{})
+	fire(cmd)
+	if wake := nextWake(t, wakes); wake {
+		t.Error("the poll must not wake a daemon: it reads what is there")
+	}
+}
+
+func nextWake(t *testing.T, wakes chan bool) bool {
+	t.Helper()
+	select {
+	case wake := <-wakes:
+		return wake
+	case <-time.After(5 * time.Second):
+		t.Fatal("the jobs were never read")
+		return false
+	}
+}
+
+func TestJobCountsAreDerivedFromTheDaemonIndex(t *testing.T) {
+	model := newTestModel(t, testWidth, testHeight, "a")
+
+	model = update(model, jobsMsg{
+		jobs:    []domain.JobInfo{{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/tmp/a"}},
+		running: map[string]int{"/tmp/a": 1},
+		known:   true,
+	})
+
+	if model.running["/tmp/a"] != 1 {
+		t.Fatalf("running = %v, want the count the daemon reported", model.running)
+	}
+	if len(model.jobs) != 1 {
+		t.Fatalf("jobs = %v, want the index kept for the detail panel", model.jobs)
+	}
+}
+
+// A daemon that has withdrawn while detached stacks are still indexed cannot
+// say what runs. Taking that silence for "nothing runs" blinked a running stack
+// out of the panel on every poll, and back in on every refresh.
+func TestAReadThatCouldNotTellKeepsTheCountsOnScreen(t *testing.T) {
+	model := newTestModel(t, testWidth, testHeight, "a")
+	model = update(model, jobsMsg{
+		jobs:    []domain.JobInfo{{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/tmp/a"}},
+		running: map[string]int{"/tmp/a": 1},
+		known:   true,
+	})
+
+	model = update(model, jobsMsg{known: false})
+
+	if model.running["/tmp/a"] != 1 || len(model.jobs) != 1 {
+		t.Fatalf("running = %v, jobs = %v, want the last reading kept", model.running, model.jobs)
+	}
+}
+
+func TestAReadThatTellsNothingIsUpClearsTheCounts(t *testing.T) {
+	model := newTestModel(t, testWidth, testHeight, "a")
+	model = update(model, jobsMsg{
+		jobs:    []domain.JobInfo{{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/tmp/a"}},
+		running: map[string]int{"/tmp/a": 1},
+		known:   true,
+	})
+
+	model = update(model, jobsMsg{known: true})
+
+	if len(model.running) != 0 || len(model.jobs) != 0 {
+		t.Fatalf("running = %v, jobs = %v, want them cleared by an answer", model.running, model.jobs)
+	}
+}
+
+func TestJobsPollOnlyAsksAddressesForWorktreesThatHaveSomethingUp(t *testing.T) {
+	asked := make(chan []string, 1)
+	model := New(RunParams{
+		JobsLoader: func(bool) ([]domain.JobInfo, bool) {
+			return []domain.JobInfo{
+				{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/tmp/a"},
+			}, true
+		},
+		AddressLoader: func(request AddressRequest) domain.RunAddresses {
+			asked <- request.Branches
+			return domain.RunAddresses{
+				ByBranch: map[string]map[string]domain.JobAddress{"a": {"web": {URL: "http://web.wtm"}}},
+			}
+		},
+	})
+	t.Cleanup(model.Close)
+	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
+	model = update(model, worktreesMsg{statuses: statuses("a", "idle"), parents: map[string]string{}})
+
+	jobs, _ := model.loadJobsCmd(false)().(jobsMsg)
+	jobs.config = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}}}
+	model, _ = model.applyJobs(jobs)
+
+	msg := model.resolveAddressesCmd()()
+
+	select {
+	case branches := <-asked:
+		if len(branches) != 1 || branches[0] != "a" {
+			t.Errorf("branches = %v, want only the one with a job up: BranchEnv writes an ordinal", branches)
+		}
+	default:
+		t.Fatal("addresses were never asked for")
+	}
+
+	got, ok := msg.(addressesMsg)
+	if !ok {
+		t.Fatalf("msg = %T, want addressesMsg", msg)
+	}
+	if got.addresses["a"]["web"].URL != "http://web.wtm" {
+		t.Errorf("addresses = %v, want them carried by the poll", got.addresses)
+	}
+}
+
+// The daemon is polled every few seconds; what it holds up changes far less
+// often, and re-deriving from a reading identical to the last one is where an
+// idle dashboard spent its git.
+func TestAJobsPollThatFindsTheSameThingsUpDerivesNothingAgain(t *testing.T) {
+	model := New(RunParams{
+		AddressLoader: func(AddressRequest) domain.RunAddresses { return domain.RunAddresses{} },
+		TraceLoader:   func([]string) map[string]map[string]bool { return nil },
+	})
+	t.Cleanup(model.Close)
+	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
+	model = update(model, worktreesMsg{statuses: statuses("a"), parents: map[string]string{}})
+
+	reading := jobsMsg{
+		jobs:    []domain.JobInfo{{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/tmp/a"}},
+		running: map[string]int{"/tmp/a": 1},
+		config:  domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}}},
+		known:   true,
+	}
+
+	model, cmd := model.applyJobs(reading)
+	if cmd == nil {
+		t.Fatal("the first reading of a job coming up must resolve what it implies")
+	}
+
+	model, cmd = model.applyJobs(reading)
+	if cmd != nil {
+		t.Error("a poll that found exactly the same jobs up re-derived them anyway")
+	}
+
+	down := reading
+	down.jobs, down.running = nil, nil
+	if _, cmd = model.applyJobs(down); cmd == nil {
+		t.Error("the job going down must re-derive: that is precisely when a trace appears")
+	}
+}
+
+// An address is not a function of the jobs alone: the loader dials the proxy
+// and reads the worktree's .env. A proxy that came up after the dashboard, or a
+// port that moved under a job that never stopped, is caught only by resolving
+// again — and the jobs poll cannot see either of them.
+func TestAddressesAreResolvedAgainOnTheGitPoll(t *testing.T) {
+	asked := make(chan []string, 8)
+	model := New(RunParams{
+		AddressLoader: func(request AddressRequest) domain.RunAddresses {
+			asked <- request.Branches
+			return domain.RunAddresses{
+				ByBranch: map[string]map[string]domain.JobAddress{"a": {"web": {URL: "http://web.wtm"}}},
+			}
+		},
+	})
+	t.Cleanup(model.Close)
+	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
+	model = update(model, worktreesMsg{statuses: statuses("a"), parents: map[string]string{}})
+	model, _ = model.applyJobs(jobsMsg{
+		jobs:    []domain.JobInfo{{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/tmp/a"}},
+		running: map[string]int{"/tmp/a": 1},
+		config:  domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}}},
+		known:   true,
+	})
+	model = update(model, addressesMsg{
+		addresses: map[string]map[string]domain.JobAddress{"a": {"web": {URL: "http://stale"}}},
+	})
+	forget(asked)
+
+	_, cmd := updateCmd(model, worktreesMsg{statuses: statuses("a"), parents: map[string]string{}})
+	fire(cmd)
+
+	select {
+	case <-asked:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the addresses on hand are never resolved again: a stale URL would outlive the session, KeyRefresh included")
+	}
+}
+
+// The running set is compared with its counts, not as a set of branches: a job
+// stopping beside another still up moves no branch, and the tree carries a
+// per-node count that would keep saying two.
+func TestAJobStoppingBesideAnotherStillUpRederives(t *testing.T) {
+	model := New(RunParams{
+		AddressLoader: func(AddressRequest) domain.RunAddresses { return domain.RunAddresses{} },
+		TraceLoader:   func([]string) map[string]map[string]bool { return nil },
+	})
+	t.Cleanup(model.Close)
+	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
+	model = update(model, worktreesMsg{statuses: statuses("a"), parents: map[string]string{}})
+
+	both := jobsMsg{
+		jobs: []domain.JobInfo{
+			{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/tmp/a"},
+			{Name: "api", Status: domain.JobStatusRunning, WorkDir: "/tmp/a"},
+		},
+		running: map[string]int{"/tmp/a": 2},
+		config:  domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}, {Name: "api"}}},
+		known:   true,
+	}
+	model, _ = model.applyJobs(both)
+
+	one := both
+	one.jobs = both.jobs[:1]
+	one.running = map[string]int{"/tmp/a": 1}
+	if _, cmd := model.applyJobs(one); cmd == nil {
+		t.Error("one of two jobs stopped and nothing was re-derived; the tree would keep its old count")
+	}
+}
+
+func forget(asked chan []string) {
+	for {
+		select {
+		case <-asked:
+		default:
+			return
+		}
+	}
+}
+
+func TestJobsPollAsksNoAddressWhenNothingIsUp(t *testing.T) {
+	called := false
+	model := New(RunParams{
+		JobsLoader: func(bool) ([]domain.JobInfo, bool) { return nil, true },
+		AddressLoader: func(AddressRequest) domain.RunAddresses {
+			called = true
+			return domain.RunAddresses{}
+		},
+	})
+	t.Cleanup(model.Close)
+	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
+	model = update(model, worktreesMsg{statuses: statuses("a"), parents: map[string]string{}})
+
+	if cmd := model.resolveAddressesCmd(); cmd != nil {
+		cmd()
+	}
+
+	if called {
+		t.Error("addresses were asked for with nothing up, want the ordinal left unallocated")
+	}
+}
+
+// Init loads worktrees and jobs in parallel, so the jobs command is built while
+// m.statuses is still empty. Capturing the statuses there asked for no address
+// at all, and the RUN section showed no url until the next poll.
+func TestAddressesLandEvenWhenTheJobsLoadRacesTheWorktrees(t *testing.T) {
+	model := New(RunParams{
+		JobsLoader: func(bool) ([]domain.JobInfo, bool) {
+			return []domain.JobInfo{{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/tmp/a"}}, true
+		},
+		AddressLoader: func(request AddressRequest) domain.RunAddresses {
+			if len(request.Branches) != 1 || request.Branches[0] != "a" {
+				t.Errorf("branches = %v, want the worktree that has a job up", request.Branches)
+			}
+			return domain.RunAddresses{
+				ByBranch: map[string]map[string]domain.JobAddress{"a": {"web": {URL: "http://web.wtm"}}},
+			}
+		},
+	})
+	t.Cleanup(model.Close)
+	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
+
+	jobs, ok := model.loadJobsCmd(true)().(jobsMsg)
+	if !ok {
+		t.Fatal("want a jobsMsg")
+	}
+	jobs.config = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}}}
+	model, _ = model.applyJobs(jobs)
+	model = update(model, worktreesMsg{statuses: statuses("a"), parents: map[string]string{}})
+
+	cmd := model.resolveAddressesCmd()
+	if cmd == nil {
+		t.Fatal("cmd = nil, want the addresses asked for once the worktrees are known")
+	}
+	got, ok := cmd().(addressesMsg)
+	if !ok {
+		t.Fatalf("msg = %T, want addressesMsg", cmd())
+	}
+	if got.addresses["a"]["web"].URL != "http://web.wtm" {
+		t.Errorf("addresses = %v, want them resolved on the first load", got.addresses)
 	}
 }

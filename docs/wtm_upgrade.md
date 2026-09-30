@@ -20,6 +20,17 @@ applies to standalone installs only.
 wtm upgrade [flags]
 ```
 
+### Examples
+
+```
+  # Is there a newer release?
+  wtm upgrade --check
+
+  wtm upgrade
+
+  wtm upgrade --yes --output json
+```
+
 ### Options
 
 ```
@@ -28,6 +39,12 @@ wtm upgrade [flags]
       --output string    Output format: text or json (default "text")
       --version string   Install a specific release instead of the latest (standalone installs only)
   -y, --yes              Skip the confirmation prompt
+```
+
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
 ```
 
 ### SEE ALSO

@@ -28,3 +28,6 @@ vendor/
 *.test
 *.out
 .worktrees/
+
+# Documents de travail (specs et plans de session) — locaux, jamais versionnés
+docs/superpowers/

@@ -12,6 +12,10 @@ import (
 	ffflow "github.com/LucasPcq/wtm/internal/flow/fastforward"
 	pruneflow "github.com/LucasPcq/wtm/internal/flow/prune"
 	reparentflow "github.com/LucasPcq/wtm/internal/flow/reparent"
+	downflow "github.com/LucasPcq/wtm/internal/flow/run/down"
+	logsflow "github.com/LucasPcq/wtm/internal/flow/run/logs"
+	"github.com/LucasPcq/wtm/internal/flow/run/seam"
+	stopflow "github.com/LucasPcq/wtm/internal/flow/run/stop"
 	syncflow "github.com/LucasPcq/wtm/internal/flow/sync"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
@@ -35,12 +39,19 @@ func (p presenter) Stage(params flow.StageParams) error {
 
 // HookPhase streams the hooks as they run: RunHooks writes from this goroutine,
 // so the sink turns its bytes into lines and posts each one as a message rather
-// than touching the model.
+// than touching the model. The panel scrolls and cannot repaint, so it keeps the
+// stream and takes the beats as two more lines around it.
 func (p presenter) HookPhase(params flow.HookPhaseParams) error {
 	p.line(params.Title)
 	p.send(opStageMsg{id: p.id, stage: params.Title})
 	sink := &flow.LineWriter{Emit: p.line}
-	err := params.Run(sink)
+	err := params.Run(flow.HookSink{
+		Output: sink,
+		OnHook: func(beat domain.HookBeat) {
+			sink.Flush()
+			p.line(rules.HookBeatLine(beat))
+		},
+	})
 	sink.Flush()
 	return err
 }
@@ -72,6 +83,9 @@ func (p createPresenter) Created(outcome createflow.Outcome) error {
 		return nil
 	}
 	p.line(fmt.Sprintf(domain.DashboardFinishedFmt, domain.OpKindCreate, outcome.Branch))
+	if note := rules.EnvPortSettlementNote(outcome.Result.EnvPorts); note != "" {
+		p.line(note)
+	}
 	p.send(createdMsg{branch: outcome.Branch})
 	return nil
 }
@@ -170,6 +184,71 @@ func (p syncPresenter) Synced(outcome syncflow.Outcome) error {
 	}
 	p.send(syncedMsg{})
 	return nil
+}
+
+// runPresenter reports a `run up` the dashboard started: the phases in the
+// output panel like any flow, and the start sequence through whichever watcher
+// the action installed — detached for a start, the terminal hand-over for
+// `View logs`, which takes the screen on purpose.
+type runPresenter struct {
+	presenter
+	seam.Watcher
+}
+
+// downPresenter reports a stop. It has no view to open — nothing is attached to
+// — so the jobs it stopped are named in the output panel.
+type downPresenter struct{ presenter }
+
+func (p downPresenter) Downed(outcome downflow.Outcome) error {
+	if outcome.NoDaemon || len(outcome.Stopped()) == 0 {
+		p.line(domain.RunNoJobsHere)
+		return nil
+	}
+	p.stopLines(outcome.Results)
+	return nil
+}
+
+// stopLines names the worktree at the end of each line once there are several,
+// as the CLI does: two worktrees each stopping `web` otherwise read as one line
+// said twice.
+func (p presenter) stopLines(results []domain.WorktreeJobResults) {
+	for _, worktree := range results {
+		for _, result := range worktree.Jobs {
+			line := fmt.Sprintf(rules.StoppedFmt(result.Status), result.Name)
+			if result.Status == domain.JobActionError {
+				line = fmt.Sprintf(domain.RunStopFailedFmt, result.Name, result.Message)
+			}
+			if len(results) > 1 && worktree.Branch != "" {
+				line = fmt.Sprintf(domain.RunStreamWorktreeFmt, line, worktree.Branch)
+			}
+			p.line(line)
+		}
+	}
+}
+
+// stopPresenter reports a single job stopped. Like downPresenter it has no view
+// to open, so what became of the job is named in the output panel.
+type stopPresenter struct{ presenter }
+
+func (p stopPresenter) Stopped(outcome stopflow.Outcome) error {
+	if outcome.NoDaemon {
+		p.line(domain.RunNoJobsHere)
+		return nil
+	}
+	p.stopLines(outcome.Results)
+	return nil
+}
+
+// logsPresenter opens the run view on what a worktree already has, starting
+// nothing: the same hand-over as a run up, with no start sequence to drive.
+type logsPresenter struct {
+	presenter
+	watcher
+}
+
+func (p logsPresenter) Show(show logsflow.ShowParams) error {
+	_, err := p.Sequence(seam.SequenceParams{Board: show.Board, Job: show.Job, Warnings: show.Warnings})
+	return err
 }
 
 type ffPresenter struct{ presenter }

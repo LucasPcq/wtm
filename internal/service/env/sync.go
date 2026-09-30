@@ -3,6 +3,7 @@ package env
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 
@@ -21,6 +22,14 @@ type envPaths struct {
 	ParentBranch       string // recorded parent branch (for display), "" if none
 	Strategy           domain.EnvStrategy
 	Mode               domain.EnvMode
+	// Ports are the [[env_port]] links of the project, empty when it declares
+	// none. They are never a value source: they normalize the comparison so a
+	// value differing only by the worktree's offset is not a conflict, and the
+	// rewrite itself happens after every file is reconciled.
+	Ports EnvPortsParams
+	// Reserved are keys the reconciliation never adds. A worktree that has not
+	// adopted its isolation must not be handed a compose project by it.
+	Reserved []string
 }
 
 // EnvResolution is the decision set for one file: how to settle each conflict, the
@@ -45,6 +54,11 @@ type computedFile struct {
 	parentFallback bool
 	child          []domain.EnvLine
 	diff           domain.EnvDiff
+	// unresolvable marks a configured file that exists nowhere: not in the
+	// worktree, in no value source, and with no template to scaffold from. A
+	// fresh project has no source either, but it does have a template — this is
+	// a config.toml entry pointing at nothing.
+	unresolvable bool
 }
 
 // ComputeEnvParams holds the inputs to compute a worktree's env drift, without any
@@ -58,6 +72,8 @@ type ComputeEnvParams struct {
 	Files              []domain.EnvFile
 	Strategy           domain.EnvStrategy
 	Mode               domain.EnvMode
+	Ports              EnvPortsParams
+	Reserved           []string
 }
 
 // ComputeEnvDiff reconciles every configured env file against its template and
@@ -74,6 +90,8 @@ func ComputeEnvDiff(params ComputeEnvParams) ([]domain.EnvFileResult, error) {
 		ParentBranch:       params.ParentBranch,
 		Strategy:           params.Strategy,
 		Mode:               params.Mode,
+		Ports:              params.Ports,
+		Reserved:           params.Reserved,
 	}
 
 	out := make([]domain.EnvFileResult, 0, len(params.Files))
@@ -99,6 +117,8 @@ type ApplyEnvSyncParams struct {
 	Files              []domain.EnvFile
 	Strategy           domain.EnvStrategy
 	Mode               domain.EnvMode
+	Ports              EnvPortsParams
+	Reserved           []string
 	Resolutions        map[string]EnvResolution
 }
 
@@ -116,6 +136,8 @@ func ApplyEnvSync(params ApplyEnvSyncParams) (domain.EnvSyncResult, error) {
 		ParentBranch:       params.ParentBranch,
 		Strategy:           params.Strategy,
 		Mode:               params.Mode,
+		Ports:              params.Ports,
+		Reserved:           params.Reserved,
 	}
 
 	files := make([]domain.EnvFileResult, 0, len(params.Files))
@@ -131,11 +153,17 @@ func ApplyEnvSync(params ApplyEnvSyncParams) (domain.EnvSyncResult, error) {
 		files = append(files, fileResult(paths, c, applied))
 	}
 
+	ports, err := settleEnvPorts(settleEnvPortsParams{Ports: params.Ports, Write: true, Owned: true})
+	if err != nil {
+		return domain.EnvSyncResult{}, err
+	}
+
 	return domain.EnvSyncResult{
 		Branch: params.Branch,
 		Mode:   params.Mode,
 		Check:  false,
 		Files:  files,
+		Ports:  ports,
 	}, nil
 }
 
@@ -151,6 +179,8 @@ type SyncEnvParams struct {
 	Files              []domain.EnvFile
 	Strategy           domain.EnvStrategy
 	Mode               domain.EnvMode
+	Ports              EnvPortsParams
+	Reserved           []string
 	Prune              bool
 	Check              bool
 	// OnConflict is the conflict decision applied to every conflict (keep — the safe
@@ -172,6 +202,8 @@ func SyncEnv(params SyncEnvParams) (domain.EnvSyncResult, error) {
 		ParentBranch:       params.ParentBranch,
 		Strategy:           params.Strategy,
 		Mode:               params.Mode,
+		Ports:              params.Ports,
+		Reserved:           params.Reserved,
 	}
 
 	files := make([]domain.EnvFileResult, 0, len(params.Files))
@@ -190,12 +222,51 @@ func SyncEnv(params SyncEnvParams) (domain.EnvSyncResult, error) {
 		files = append(files, fileResult(paths, c, applied))
 	}
 
+	// The ports come last, on files that are now reconciled: the value sources
+	// carry another worktree's port, so applying the offset before the merge
+	// would only see it overwritten.
+	ports, err := settleEnvPorts(settleEnvPortsParams{Ports: params.Ports, Write: !params.Check, Owned: !params.Check})
+	if err != nil {
+		return domain.EnvSyncResult{}, err
+	}
+
 	return domain.EnvSyncResult{
 		Branch: params.Branch,
 		Mode:   params.Mode,
 		Check:  params.Check,
 		Files:  files,
+		Ports:  ports,
 	}, nil
+}
+
+type settleEnvPortsParams struct {
+	Ports EnvPortsParams
+	// Write is the port pass itself. Owned says the worktree identity may still
+	// be written when that pass is not: declining the port rewrite is an answer
+	// about ports, and which worktree this is was never one of the questions.
+	// Both are false on a --check run, which writes nothing at all.
+	Write bool
+	Owned bool
+}
+
+// settleEnvPorts applies the worktree's offset to the linked values, or merely
+// resolves what it would do when the caller is reporting rather than writing —
+// a --check run, or one where the user declined the pass. Either way the links
+// still feed the diff's comparison, which is why they are never simply dropped.
+func settleEnvPorts(params settleEnvPortsParams) (domain.EnvPortPlan, error) {
+	if params.Ports.Empty() {
+		return domain.EnvPortPlan{}, nil
+	}
+	if !params.Write {
+		plan, err := ComputeEnvPorts(params.Ports)
+		if err != nil || !params.Owned {
+			return plan, err
+		}
+		return plan, ApplyOwnedEnv(params.Ports)
+	}
+	plan, err := ApplyEnvPorts(params.Ports)
+	plan.Applied = err == nil
+	return plan, err
 }
 
 // fileResult projects a computed file into its result form.
@@ -212,6 +283,7 @@ func fileResult(paths envPaths, c computedFile, applied bool) domain.EnvFileResu
 		Applied:        applied,
 		ParentBranch:   parentBranch,
 		ParentFallback: c.parentFallback,
+		Unresolvable:   c.unresolvable,
 	}
 }
 
@@ -233,11 +305,14 @@ func computeFile(paths envPaths, f domain.EnvFile) (computedFile, error) {
 	}
 
 	diff := rules.DiffEnv(rules.EnvDiffParams{
-		Template: template,
-		Parent:   parent,
-		Main:     main,
-		Child:    child,
-		Mode:     paths.Mode,
+		Template:   template,
+		Parent:     parent,
+		Main:       main,
+		Child:      child,
+		Mode:       paths.Mode,
+		PortValues: EnvValueRefsFor(paths.Ports, f.Target),
+		PortBlock:  paths.Ports.Block,
+		Owned:      ownedKeys(paths, f.Target),
 	})
 
 	return computedFile{
@@ -246,7 +321,24 @@ func computeFile(paths envPaths, f domain.EnvFile) (computedFile, error) {
 		parentFallback: fallback,
 		child:          child,
 		diff:           diff,
+		unresolvable:   child == nil && template == nil && parent == nil && main == nil,
 	}, nil
+}
+
+// ownedKeys are the keys the reconciliation leaves to others in one file: what
+// the owned pass writes there, and what it may never add.
+func ownedKeys(paths envPaths, target string) map[string]bool {
+	keys := map[string]bool{}
+	maps.Copy(keys, rules.EnvValueOwnedKeys(paths.Ports.ValueLinks, target))
+	for _, entry := range paths.Ports.Owned {
+		if entry.File == target {
+			keys[entry.Key] = true
+		}
+	}
+	for _, key := range paths.Reserved {
+		keys[key] = true
+	}
+	return keys
 }
 
 // valueSources feeds the value document per strategy — one source only, never a
@@ -337,7 +429,7 @@ func fileAbsentLabel(branch, target string) string {
 func flagResolution(params SyncEnvParams, diff domain.EnvDiff) EnvResolution {
 	decisions := make(map[string]domain.EnvConflictDecision)
 	if params.OnConflict == domain.EnvDecisionOverwrite {
-		for _, e := range diff.ByStatus(domain.EnvKeyConflict) {
+		for _, e := range rules.EnvKeysWithStatus(rules.EnvDiffFilter{Diff: diff, Status: domain.EnvKeyConflict}) {
 			decisions[e.Key] = domain.EnvDecisionOverwrite
 		}
 	}

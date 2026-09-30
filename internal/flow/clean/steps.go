@@ -8,6 +8,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
@@ -15,6 +16,7 @@ import (
 const (
 	KeyWorktree = "clean.worktree"
 	KeyReparent = "clean.reparent"
+	KeyData     = "clean.data"
 	KeyDelete   = "clean.delete"
 )
 
@@ -38,10 +40,16 @@ func (f *cleanFlow) session() flow.Session {
 		Presets: flow.NewAnswers(map[string]string{
 			KeyWorktree: f.request.Branch,
 			KeyReparent: f.presetReparent(),
+			KeyData:     owed.DataPreset(f.request.DropData),
 		}),
 		Steps: []flow.Step{
 			f.worktreeStep(),
 			f.reparentStep(),
+			owed.DataStep(owed.DataStepParams{
+				Key:      KeyData,
+				KeepData: f.request.KeepData,
+				Snapshot: func(answers flow.Answers) owed.Snapshot { return f.holdings(answers.Value(KeyWorktree)) },
+			}),
 			f.deleteStep(),
 		},
 	}
@@ -148,10 +156,18 @@ func (f *cleanFlow) deleteStep() flow.Step {
 	content := func(answers flow.Answers) (flow.StepContent, error) {
 		check, _ := f.checkCached(answers.Value(KeyWorktree))
 		return flow.StepContent{
-			Title:       domain.CleanDeleteTitle,
-			Description: deleteRecap(check, f.reparentLine(answers)),
-			Options:     deleteOptions(check),
-			Blockers:    blockersOf(check),
+			Title: domain.CleanDeleteTitle,
+			Description: deleteRecap(deleteRecapParams{
+				Check:    check,
+				Reparent: f.reparentLine(answers),
+				Namespaces: rules.DataRecapLines(rules.DataRecapLinesParams{
+					Held:      f.holdings(answers.Value(KeyWorktree)).Held(),
+					StartDown: answers.Value(KeyData) == owed.DataStart,
+					KeepData:  f.request.KeepData,
+				}),
+			}),
+			Options:  deleteOptions(check),
+			Blockers: blockersOf(check),
 		}, nil
 	}
 
@@ -212,7 +228,17 @@ func blockersOf(check domain.CleanCheckResult) []flow.Blocker {
 	return blockers
 }
 
-func deleteRecap(check domain.CleanCheckResult, reparentLine string) string {
+type deleteRecapParams struct {
+	Check    domain.CleanCheckResult
+	Reparent string
+	// Namespaces are the lines naming the data this clean gives back, or the one
+	// saying it is kept. A flag must never make a line disappear from a recap,
+	// and this one carries a DROP DATABASE.
+	Namespaces []string
+}
+
+func deleteRecap(params deleteRecapParams) string {
+	check := params.Check
 	var lines []string
 	for _, blocker := range rules.CleanBlockers(check) {
 		lines = append(lines, blocker.Label)
@@ -225,10 +251,28 @@ func deleteRecap(check domain.CleanCheckResult, reparentLine string) string {
 		domain.CleanWillDeleteWorktree+check.WorktreePath,
 		domain.CleanWillDeleteBranch+check.Branch,
 	)
-	if reparentLine != "" {
-		lines = append(lines, "", reparentLine)
+	lines = append(lines, params.Namespaces...)
+	if params.Reparent != "" {
+		lines = append(lines, "", params.Reparent)
 	}
 	return strings.Join(lines, "\n")
+}
+
+// holdings is read once per worktree: the data step and the recap both need it,
+// and it asks the daemon which services are up.
+func (f *cleanFlow) holdings(branchName string) owed.Snapshot {
+	if branchName == "" {
+		return owed.Snapshot{}
+	}
+	if snapshot, cached := f.snapshots[branchName]; cached {
+		return snapshot
+	}
+	if f.snapshots == nil {
+		f.snapshots = map[string]owed.Snapshot{}
+	}
+	snapshot := owed.Read(owed.ReadParams{Context: f.ctx, Branches: []string{branchName}})
+	f.snapshots[branchName] = snapshot
+	return snapshot
 }
 
 func (f *cleanFlow) reparentLine(answers flow.Answers) string {

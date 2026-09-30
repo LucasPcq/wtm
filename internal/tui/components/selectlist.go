@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/styles"
 )
 
@@ -48,6 +49,7 @@ func NewSelectList(params NewSelectListParams) SelectListModel {
 	}
 	m.refilter()
 	m.snapToSelectable()
+	m.startOn(params.Start)
 	return m
 }
 
@@ -56,6 +58,23 @@ type NewSelectListParams struct {
 	Title       string
 	Description string
 	Items       []SelectItem
+	// Start is the value the cursor opens on. An empty or unknown one leaves it
+	// on the first selectable item.
+	Start string
+}
+
+// startOn places the cursor on the named value, so a list with a standing answer
+// opens on it instead of making the reader find it.
+func (m *SelectListModel) startOn(value string) {
+	if value == "" {
+		return
+	}
+	for i, idx := range m.filtered {
+		if m.items[idx].Value == value && !m.items[idx].Separator {
+			m.cursor = i
+			return
+		}
+	}
 }
 
 // Chosen returns true after the user confirmed a selection.
@@ -423,9 +442,19 @@ func (m SelectListModel) visibleHeight() int {
 	return max(1, m.height-filterOverhead(m.filtering, m.filter))
 }
 
-// filterHelpHint returns the footer shown while the filter input is active.
+func (m SelectListModel) helpActions() []string { return []string{domain.HelpFilter} }
+
+func (m SelectListModel) helpModal() string {
+	if m.filtering {
+		return m.filterHelpHint()
+	}
+	return ""
+}
+
+// filterHelpHint is also read by the standalone list outside the wizard, which
+// has no help bar of its own to compose.
 func (m SelectListModel) filterHelpHint() string {
-	return "  type to filter • enter select • esc back"
+	return domain.FilterSelectHelp
 }
 
 func (m *SelectListModel) clampOffset() {

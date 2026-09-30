@@ -6,12 +6,14 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
 const (
 	KeySelection = "prune.selection"
 	KeyReparent  = "prune.reparent"
+	KeyData      = "prune.data"
 	KeyConfirm   = "prune.confirm"
 )
 
@@ -33,10 +35,18 @@ const (
 func (f *pruneFlow) session() flow.Session {
 	return flow.Session{
 		ErrLabel: domain.PruneWizardErrLabel,
-		Presets:  flow.NewAnswers(map[string]string{KeyReparent: f.presetReparent()}),
+		Presets: flow.NewAnswers(map[string]string{
+			KeyReparent: f.presetReparent(),
+			KeyData:     owed.DataPreset(f.request.DropData),
+		}),
 		Steps: []flow.Step{
 			f.selectionStep(),
 			f.reparentStep(),
+			owed.DataStep(owed.DataStepParams{
+				Key:      KeyData,
+				KeepData: f.request.KeepData,
+				Snapshot: func(answers flow.Answers) owed.Snapshot { return f.holdings(answers.Values(KeySelection)) },
+			}),
 			f.confirmStep(),
 		},
 	}
@@ -172,6 +182,24 @@ func reparentProposal(moves []domain.ReparentResult) string {
 	return strings.Join(lines, "\n")
 }
 
+// holdings is read once per selection: the data step and the recap both need
+// it, and it asks the daemon which services are up.
+func (f *pruneFlow) holdings(selected []string) owed.Snapshot {
+	if len(selected) == 0 {
+		return owed.Snapshot{}
+	}
+	key := strings.Join(selected, "\x00")
+	if snapshot, cached := f.snapshots[key]; cached {
+		return snapshot
+	}
+	if f.snapshots == nil {
+		f.snapshots = map[string]owed.Snapshot{}
+	}
+	snapshot := owed.Read(owed.ReadParams{Context: f.ctx, Branches: selected})
+	f.snapshots[key] = snapshot
+	return snapshot
+}
+
 func (f *pruneFlow) confirmStep() flow.Step {
 	return flow.Step{
 		Kind:  flow.StepRecap,
@@ -199,6 +227,14 @@ func (f *pruneFlow) recap(answers flow.Answers, selected []string) string {
 	description := domain.PruneNothingSelected
 	if len(selected) > 0 {
 		description = fmt.Sprintf(domain.PruneWillPruneFmt, len(selected), strings.Join(selected, ", "))
+	}
+	data := rules.DataRecapLines(rules.DataRecapLinesParams{
+		Held:      f.holdings(selected).Held(),
+		StartDown: answers.Value(KeyData) == owed.DataStart,
+		KeepData:  f.request.KeepData,
+	})
+	if len(data) > 0 {
+		description += "\n" + strings.Join(data, "\n")
 	}
 	moves := f.orphanPreview(answers)
 	if len(moves) == 0 {

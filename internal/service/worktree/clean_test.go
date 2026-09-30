@@ -8,6 +8,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
 
@@ -123,5 +124,35 @@ func TestPruneWorktreesClearsStaleMetadata(t *testing.T) {
 		Branch:     "feat",
 	}); !errors.Is(err, domain.ErrWorktreeNotFound) {
 		t.Errorf("expected worktree to be pruned, got %v", err)
+	}
+}
+
+func TestCleanPurgesWorktreeState(t *testing.T) {
+	source := gittest.InitRepo(t)
+	stateDir := t.TempDir()
+
+	featPath := filepath.Join(t.TempDir(), "feat")
+	gitRun(t, source, "worktree", "add", "-q", "-b", "feat/x", featPath, "HEAD")
+
+	ordinal, err := EnsureOrdinal(WorktreeRef{ProjectDir: source, StateDir: stateDir, Branch: "feat/x"})
+	if err != nil {
+		t.Fatalf("EnsureOrdinal: %v", err)
+	}
+	metaDir := rules.WorktreeMetaDir(stateDir, "feat/x")
+	if _, statErr := os.Stat(metaDir); statErr != nil {
+		t.Fatalf("fixture has no meta dir: %v", statErr)
+	}
+
+	if err := Clean(domain.CleanParams{
+		ProjectDir: source,
+		StateDir:   stateDir,
+		Branch:     "feat/x",
+		Config:     cleanConfig(nil),
+	}); err != nil {
+		t.Fatalf("Clean: %v", err)
+	}
+
+	if _, err := os.Stat(metaDir); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("meta dir survived the clean, its ordinal %d stays reserved: %v", ordinal, err)
 	}
 }

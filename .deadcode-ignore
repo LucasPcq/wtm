@@ -1,0 +1,7 @@
+# Functions `deadcode` cannot see a path to, with the reason each is reachable
+# anyway. One regex per line; anything not listed here fails `make dead`.
+#
+# A method satisfying an interface asserted on an `any` value: the reachability
+# analysis follows calls, and there is no call site to follow — the wizard holds
+# its step models as `any` and type-asserts `rowless` on them.
+TextInputModel\.helpRowless

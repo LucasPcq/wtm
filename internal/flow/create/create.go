@@ -4,11 +4,11 @@ package create
 import (
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/decide"
+	"github.com/LucasPcq/wtm/internal/flow/envports"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/branch"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
@@ -20,6 +20,8 @@ type Request struct {
 	EnvFrom     string
 	FastForward bool
 	IfNotExists bool
+	// Isolation is --isolation, empty when it was not given.
+	Isolation domain.Isolation
 }
 
 type Outcome struct {
@@ -111,6 +113,8 @@ func (f *createFlow) run() (Outcome, error) {
 		startPoint = ""
 	}
 
+	preflight := envports.Preflight(f.ctx)
+
 	var result domain.CreateResult
 	err = f.presenter.Stage(flow.StageParams{
 		Message: fmt.Sprintf(domain.CreateLoadingFmt, branchName),
@@ -126,6 +130,7 @@ func (f *createFlow) run() (Outcome, error) {
 				EnvFromOverride: answers.Value(KeyEnv),
 				IfNotExists:     f.request.IfNotExists,
 				SkipHooks:       true,
+				Isolation:       f.isolation(answers),
 			})
 			return createErr
 		},
@@ -134,14 +139,49 @@ func (f *createFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	if !result.AlreadyExists {
+	if result.AlreadyExists {
+		f.warnIgnoredIsolation(&result)
+	} else {
+		// Before the hooks: one of them may well read the .env this settles.
+		result.EnvPorts, result.Warnings = envports.SettleFresh(envports.FreshParams{
+			Params: envports.Params{
+				Context:      f.ctx,
+				Branch:       branchName,
+				WorktreePath: result.Path,
+				Presenter:    f.presenter,
+			},
+			Preflight: preflight,
+		})
 		if hookErr := f.runHooks(result.Path, branchName, fromBranch); hookErr != nil {
 			return Outcome{}, hookErr
 		}
 	}
+	result.Isolation = worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: branchName})
 
 	outcome := Outcome{Result: result, Branch: branchName, FromBranch: fromBranch}
 	return outcome, f.presenter.Created(outcome)
+}
+
+func (f *createFlow) warnIgnoredIsolation(result *domain.CreateResult) {
+	warning := rules.IsolationIgnoredWarning(rules.IsolationIgnoredParams{
+		Branch:    result.Branch,
+		Requested: f.request.Isolation,
+		Current:   worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: result.Branch}),
+	})
+	if warning == "" {
+		return
+	}
+	f.presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: warning})
+	result.Warnings = append(result.Warnings, warning)
+}
+
+// isolation is the step's answer, else the project's default: a skipped step
+// has nothing to isolate, and records what a later run.toml would assume.
+func (f *createFlow) isolation(answers flow.Answers) domain.Isolation {
+	if value := answers.Value(KeyIsolation); value != "" {
+		return domain.Isolation(value)
+	}
+	return envports.DefaultIsolation(f.ctx)
 }
 
 func (f *createFlow) runHooks(worktreePath, branchName, fromBranch string) error {
@@ -150,15 +190,18 @@ func (f *createFlow) runHooks(worktreePath, branchName, fromBranch string) error
 		return nil
 	}
 	return f.presenter.HookPhase(flow.HookPhaseParams{
-		Title: domain.HooksTitleOnCreate,
-		Run: func(sink io.Writer) error {
+		Title:   domain.HooksTitleOnCreate,
+		LogPath: rules.HooksLogPath(rules.HooksLogPathParams{StateDir: f.ctx.StateDir, Phase: domain.HookOnCreate, Branch: branchName}),
+		Run: func(sink flow.HookSink) error {
 			return worktree.RunCreateHooks(domain.CreateHooksParams{
 				ProjectDir:   f.ctx.ProjectDir,
+				StateDir:     f.ctx.StateDir,
 				WorktreePath: worktreePath,
 				Branch:       branchName,
 				FromBranch:   fromBranch,
 				Hooks:        hooks,
-				Output:       sink,
+				Output:       sink.Output,
+				OnHook:       sink.OnHook,
 			})
 		},
 	})

@@ -327,6 +327,16 @@ func (m Model) worktreeNodes() []domain.WorktreeNode {
 	return rules.WorktreeNodes(rules.WorktreeNodesParams{Statuses: m.statuses, Parents: m.parents})
 }
 
+// branchFor names a worktree the list would recognise. A run names the worktree
+// an event came from by its branch, and falls back to its path for one git
+// cannot name; empty stays empty — that is a run speaking of no worktree at all.
+func (m Model) branchFor(target string) string {
+	if target == "" {
+		return ""
+	}
+	return rules.BranchForPath(rules.BranchForPathParams{Path: target, Statuses: m.statuses})
+}
+
 // busyReason states why nothing may act on a worktree right now: a run already
 // holds it, or one holds the whole dashboard. This is where the mode a flow
 // declares is enforced — once, rather than at every action site.
@@ -366,11 +376,28 @@ type beginParams struct {
 	Target string
 }
 
+func targetsOf(target string) []string {
+	if target == "" {
+		return nil
+	}
+	return []string{target}
+}
+
+// firstTarget names the worktree an operation is reported against. A run over
+// several is still one line of output, and the first is the one the surface
+// selected.
+func (o operation) firstTarget() string {
+	if len(o.targets) == 0 {
+		return ""
+	}
+	return o.targets[0]
+}
+
 // beginOp records the run and opens the output panel: a run whose output is
 // folded away is one the user cannot follow.
 func (m Model) beginOp(params beginParams) (Model, int) {
 	declared := params.Operation
-	ops, id := m.ops.begin(operation{kind: declared.Kind, mode: declared.Mode, target: params.Target})
+	ops, id := m.ops.begin(operation{kind: declared.Kind, mode: declared.Mode, targets: targetsOf(params.Target)})
 	m.ops = ops
 	m.outputExpanded = true
 	return m.reflow(), id
@@ -382,7 +409,13 @@ func (m Model) beginOp(params beginParams) (Model, int) {
 func (m Model) finishOp(msg opDoneMsg) (Model, tea.Cmd) {
 	op, _ := m.ops.byID(msg.id)
 	m.ops = m.ops.end(msg.id)
-	m, detailCmd := m.invalidateDetail(op.target)
+	m, detailCmd := m.invalidateDetail(op.firstTarget())
+	// A run that just started or stopped jobs changes what the badges and the
+	// RUN section say, and waiting for the next poll to notice is what made a
+	// finished run look like nothing had happened.
+	detailCmd = tea.Batch(detailCmd, m.loadJobsCmd(true))
+	m, rowsCmd := m.refreshRows()
+	detailCmd = tea.Batch(detailCmd, rowsCmd)
 	// ErrAborted is a run that already reported its own failure — a cascade whose
 	// steps each said what became of them. A second, redundant line under them
 	// would name nothing the panel does not already hold.
@@ -397,7 +430,7 @@ func (m Model) finishOp(msg opDoneMsg) (Model, tea.Cmd) {
 	// The privileged removal prompts for a password on the terminal this surface
 	// is holding, so it is never offered here — the way to it is named instead.
 	if errors.Is(msg.err, domain.ErrWorktreeRemoveFailed) {
-		return m.appendOutput(OutputLineMsg{Text: fmt.Sprintf(domain.DashboardPrivilegedHintFmt, op.target)}), detailCmd
+		return m.appendOutput(OutputLineMsg{Text: fmt.Sprintf(domain.DashboardPrivilegedHintFmt, op.firstTarget())}), detailCmd
 	}
 	return m, detailCmd
 }
@@ -408,13 +441,21 @@ func (m Model) applyFlow(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case promptMsg:
 		return m.openModal(msg)
+	case handoffMsg:
+		return m, handoffCmd(msg, m.sender())
 	case OutputLineMsg:
 		return m.appendOutput(msg), nil
 	case opTargetMsg:
-		m.ops = m.ops.retarget(msg.id, msg.target)
+		// The run answers with paths — the daemon's half of a job's key — and the
+		// list, the refusals and the detail all speak branches. The translation
+		// happens here, where the paths enter, rather than at every reader.
+		m.ops = m.ops.retarget(msg.id, rules.BranchesForPaths(rules.BranchesForPathsParams{
+			Paths:    msg.targets,
+			Statuses: m.statuses,
+		}))
 		return m, nil
 	case opStageMsg:
-		m.ops = m.ops.stage(msg.id, msg.stage)
+		m.ops = m.ops.stage(stageParams{ID: msg.id, Target: m.branchFor(msg.target), Stage: msg.stage})
 		return m, nil
 	case createdMsg:
 		m.selectBranch = msg.branch

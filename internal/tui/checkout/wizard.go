@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/tui/branchrefresh"
 	"github.com/LucasPcq/wtm/internal/tui/components"
 	"github.com/LucasPcq/wtm/internal/tui/worktreepicker"
@@ -48,6 +49,12 @@ type WizardParams struct {
 	// their step is not shown.
 	FromOverride string
 	EnvOverride  string
+	// IsolationApplies says run.toml declares something a worktree isolates. The
+	// step is posed when it applies and --isolation did not answer it; the recap
+	// names the answer either way.
+	IsolationApplies  bool
+	IsolationOverride domain.Isolation
+	IsolationDefault  domain.Isolation
 	// EnvFallback, when set, adds a conditional confirmation after the env step:
 	// given the resolved source and env override it decides whether the "parent"
 	// strategy falls back to copying .env from main. Injected by the command layer.
@@ -65,6 +72,7 @@ type WizardResult struct {
 	PR              domain.PRInfo
 	FromBranch      string
 	EnvFromOverride string
+	Isolation       domain.Isolation
 }
 
 // RunWizard displays the interactive checkout wizard. Returns ErrUserAborted on
@@ -87,11 +95,14 @@ func runPreselected(params WizardParams) (WizardResult, error) {
 	if params.IncludeEnv {
 		steps = append(steps, envStep(params.ConfigStrategy))
 	}
+	if includesIsolation(params) {
+		steps = append(steps, components.IsolationStep(params.IsolationDefault))
+	}
 
 	if len(steps) == 0 {
 		// Everything is fixed by flags — nothing to review, so no wizard (and no
 		// recap): this is effectively a non-interactive checkout.
-		return WizardResult{PR: *params.Preselected}, nil
+		return WizardResult{PR: *params.Preselected, Isolation: resolveIsolation(nil, params)}, nil
 	}
 
 	preselected := *params.Preselected
@@ -113,7 +124,7 @@ func runPreselected(params WizardParams) (WizardResult, error) {
 		return WizardResult{}, domain.ErrUserAborted
 	}
 
-	res := extractStepValues(final.Steps())
+	res := extractStepValues(final.Steps(), params)
 	res.PR = *params.Preselected
 	return res, nil
 }
@@ -139,6 +150,9 @@ func runPicker(params WizardParams) (WizardResult, error) {
 	}
 	if params.IncludeEnv {
 		steps = append(steps, envStep(params.ConfigStrategy))
+	}
+	if includesIsolation(params) {
+		steps = append(steps, components.IsolationStep(params.IsolationDefault))
 	}
 	selectedPR := func(prev []components.Step) (domain.PRInfo, bool) {
 		sl, ok := stepModel(prev, stepPR)
@@ -198,7 +212,7 @@ func runPicker(params WizardParams) (WizardResult, error) {
 		return WizardResult{}, domain.ErrUserAborted
 	}
 
-	res := extractStepValues(final.Steps())
+	res := extractStepValues(final.Steps(), params)
 	if sl, ok := stepModel(final.Steps(), stepPR); ok {
 		num, _ := strconv.Atoi(sl.Value())
 		if pr, found := findPR(loadedPRs, num); found {
@@ -220,8 +234,8 @@ func runProgram(wiz components.WizardModel) (components.WizardModel, error) {
 	return final, nil
 }
 
-func extractStepValues(steps []components.Step) WizardResult {
-	r := WizardResult{}
+func extractStepValues(steps []components.Step, params WizardParams) WizardResult {
+	r := WizardResult{Isolation: resolveIsolation(steps, params)}
 	if sl, ok := stepModel(steps, stepParent); ok {
 		r.FromBranch = sl.Value()
 	}
@@ -326,23 +340,26 @@ func recapStep(params WizardParams, prLabel, prBranch func(prev []components.Ste
 func buildCheckoutRecap(prev []components.Step, params WizardParams, prLabel, prBranch func(prev []components.Step) string) string {
 	var lines []string
 	if pr := prLabel(prev); pr != "" {
-		lines = append(lines, "PR:      "+pr)
+		lines = append(lines, domain.RecapFieldPR+pr)
 	}
 	if params.Target != nil {
 		if b := prBranch(prev); b != "" && params.Target(b).State == domain.BranchTargetExisting {
-			lines = append(lines, "Branch:  "+b+domain.BranchReusedSuffix)
+			lines = append(lines, domain.RecapFieldBranch+b+domain.BranchReusedSuffix)
 		}
 	}
 	source := resolveSource(prev, params.FromOverride, params.Preselected)
 	if source != "" {
-		lines = append(lines, "Parent:  "+source)
+		lines = append(lines, domain.RecapFieldParent+source)
 	}
 	env := resolveEnv(prev, params.EnvOverride)
 	envLabel := env
 	if envLabel == "" {
 		envLabel = domain.SummaryConfigDefault
 	}
-	lines = append(lines, "Env:     "+envLabel)
+	lines = append(lines, domain.RecapFieldEnv+envLabel)
+	if rules.IsolationRecapShown(rules.IsolationRecapShownParams{Applies: params.IsolationApplies, Override: params.IsolationOverride}) {
+		lines = append(lines, domain.RecapFieldIsolation+rules.IsolationSummary(resolveIsolation(prev, params)))
+	}
 
 	if params.EnvFallback != nil {
 		if show, p := params.EnvFallback(source, env); show && p.Warning != "" {
@@ -350,6 +367,18 @@ func buildCheckoutRecap(prev []components.Step, params WizardParams, prLabel, pr
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+func includesIsolation(params WizardParams) bool {
+	return params.IsolationApplies && params.IsolationOverride == ""
+}
+
+// resolveIsolation is the step's answer, else the flag, else the project's.
+func resolveIsolation(steps []components.Step, params WizardParams) domain.Isolation {
+	if !includesIsolation(params) {
+		return rules.EffectiveIsolation(rules.FirstIsolation(params.IsolationOverride, params.IsolationDefault))
+	}
+	return components.IsolationAnswer(steps, params.IsolationDefault)
 }
 
 // prDisplay renders a PR as "#<number> <title>" for the recap.
@@ -473,7 +502,7 @@ func buildEnvItems(strategy domain.EnvStrategy) []components.SelectItem {
 	return []components.SelectItem{
 		{Label: "Use config default (" + string(strategy) + ")", Value: ""},
 		{Label: "example — copy .env.example → .env", Value: string(domain.EnvStrategyExample)},
-		{Label: "main — copy .env from main worktree", Value: string(domain.EnvStrategyMain)},
+		{Label: "main — copy .env from the main checkout", Value: string(domain.EnvStrategyMain)},
 		{Label: "parent — copy .env from source worktree", Value: string(domain.EnvStrategyParent)},
 	}
 }

@@ -17,13 +17,13 @@ const devBuildInfoVersion = "(devel)"
 // build info. Without this fallback every go-install user is classified as a
 // source build: refused by `wtm upgrade` and never notified.
 func ResolveVersion(linked string) string {
-	if rules.NormalizeVersion(linked) != domain.Version {
+	if rules.NormalizeVersion(linked) != domain.VersionDev {
 		return linked
 	}
 
 	info, ok := debug.ReadBuildInfo()
 	if !ok || info.Main.Version == "" || info.Main.Version == devBuildInfoVersion {
-		return domain.Version
+		return domain.VersionDev
 	}
 
 	return info.Main.Version

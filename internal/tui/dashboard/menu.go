@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"errors"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -15,7 +16,10 @@ import (
 type menuAction int
 
 const (
-	menuReparent menuAction = iota
+	// menuNone is the zero value, so a heading or a rule never reads as the first
+	// action declared here.
+	menuNone menuAction = iota
+	menuReparent
 	menuDelete
 	menuReparentBatch
 	menuPrune
@@ -23,6 +27,25 @@ const (
 	menuSyncAll
 	menuFastForward
 	menuFastForwardAll
+	menuRunUp
+	menuRunStart
+	menuRunDown
+	menuRunStop
+	menuRunLogs
+	menuRunUpAll
+	menuRunDownAll
+	menuRunLogsAll
+)
+
+// menuEntryKind separates what the menu offers from what it only says. A
+// heading and a rule are read; neither takes the cursor, a mouse zone or a
+// keypress.
+type menuEntryKind int
+
+const (
+	menuEntryAction menuEntryKind = iota
+	menuEntryHeading
+	menuEntrySeparator
 )
 
 // menuKind is which menu is open: the one hanging off a worktree row, or the
@@ -36,6 +59,7 @@ const (
 )
 
 type menuItem struct {
+	kind   menuEntryKind
 	label  string
 	action menuAction
 	// danger marks an entry that destroys something, so it reads as one before it
@@ -44,6 +68,8 @@ type menuItem struct {
 	// disabled states why the entry cannot be used right now, and shows it.
 	disabled string
 }
+
+func (i menuItem) activatable() bool { return i.kind == menuEntryAction && i.disabled == "" }
 
 // menuItems is what the open menu lists. An action that could never apply is not
 // listed at all; one that cannot apply right now is listed with what is in its
@@ -61,12 +87,28 @@ func (m Model) worktreeMenuItems() []menuItem {
 		return nil
 	}
 
-	items := worktreeActions(selected)
+	items := m.worktreeActions(selected)
+	// The Services tab does not speak of git, and it lists no worktree to
+	// destroy: its blocks answer for what runs, so only the run block applies.
+	// Its cursor is on a job, so the stop names that one rather than reopening a
+	// picker over it.
+	if m.tab == tabServices {
+		items = runActions(domain.DashboardMenuRunStopThis)[1:]
+	}
 	caption, busy := m.busyCaption(selected.Branch)
 	if !busy {
 		return items
 	}
+	return disableActions(items, caption)
+}
+
+// disableActions leaves the headings and the rules alone: a caption under a
+// title would read as a refusal to display it.
+func disableActions(items []menuItem, caption string) []menuItem {
 	for index := range items {
+		if items[index].kind != menuEntryAction {
+			continue
+		}
 		items[index].disabled = caption
 	}
 	return items
@@ -75,41 +117,144 @@ func (m Model) worktreeMenuItems() []menuItem {
 // worktreeActions is what a row offers. The base row hangs off nothing, so it
 // has neither a parent to be moved to nor a rebase to run: all it can do is
 // catch up with its own remote — the same entry every other row leads with.
-func worktreeActions(selected domain.WorktreeStatus) []menuItem {
-	// The fast-forward is never gated on the origin badges: those come from
-	// remote-tracking refs with no fetch, so "up to date" and "no counterpart"
-	// alike are what is known rather than what is true. The run fetches and
-	// reports the truth; disabled stays what it has always meant here, a run
-	// holding this worktree right now.
-	fastForward := menuItem{label: domain.DashboardMenuFastForward, action: menuFastForward}
+// Without a run block the menu is one block, and a heading or a rule over a
+// single block only adds lines: it is then v0.27.1's.
+func (m Model) worktreeActions(selected domain.WorktreeStatus) []menuItem {
+	run := m.runBlock(runBlockParams{
+		Actions: runActions(domain.DashboardMenuRunStop),
+		Stop:    menuItem{label: domain.DashboardMenuRunDown, action: menuRunDown},
+		Running: m.running[selected.Path] > 0,
+	})
+	items := append(gitActions(selected, len(run) > 0), run...)
 	if selected.IsParent {
-		return []menuItem{fastForward}
+		return items
 	}
+	remove := menuItem{label: domain.DashboardMenuDelete, action: menuDelete, danger: true}
+	if len(run) == 0 {
+		return append(items, remove)
+	}
+	return append(items, menuItem{kind: menuEntrySeparator}, remove)
+}
+
+type runBlockParams struct {
+	// Actions is the block of a project whose run.toml declares jobs.
+	Actions []menuItem
+	// Stop is what an unreadable run.toml still leaves on offer while Running:
+	// stopping is the one gesture that needs nothing from the file.
+	Stop    menuItem
+	Running bool
+}
+
+// runBlock is the run module's part of a menu: nothing for a project that
+// declares no job, and one inert entry naming the cause for a run.toml that
+// cannot be read.
+func (m Model) runBlock(params runBlockParams) []menuItem {
+	if m.runConfigErr != nil {
+		items := []menuItem{
+			{kind: menuEntrySeparator},
+			{kind: menuEntryHeading, label: domain.DashboardMenuSectionRun},
+			{label: domain.DashboardRunConfigInvalid, disabled: runConfigCause(m.runConfigErr)},
+		}
+		if !params.Running {
+			return items
+		}
+		return append(items, params.Stop)
+	}
+	if len(m.runConfig.Jobs) == 0 {
+		return nil
+	}
+	return params.Actions
+}
+
+// runConfigCause is the innermost error: the entry already says which file, and
+// the path the loader wraps it with would fill the whole caption.
+func runConfigCause(err error) string {
+	for inner := errors.Unwrap(err); inner != nil; inner = errors.Unwrap(err) {
+		err = inner
+	}
+	cause, _, _ := strings.Cut(err.Error(), "\n")
+	return truncate(cause, domain.DashboardMenuCaptionMax)
+}
+
+// gitActions is what a row offers on its own history. The base row hangs off
+// nothing, so it has neither a parent to be moved to nor a rebase to run: all
+// it can do is catch up with its own remote.
+//
+// The fast-forward is never gated on the origin badges: those come from
+// remote-tracking refs with no fetch, so "up to date" and "no counterpart"
+// alike are what is known rather than what is true. The run fetches and
+// reports the truth; disabled stays what it has always meant here, a run
+// holding this worktree right now.
+func gitActions(selected domain.WorktreeStatus, titled bool) []menuItem {
+	var items []menuItem
+	if titled {
+		items = append(items, menuItem{kind: menuEntryHeading, label: domain.DashboardMenuSectionGit})
+	}
+	items = append(items, menuItem{label: domain.DashboardMenuFastForward, action: menuFastForward})
+	if selected.IsParent {
+		return items
+	}
+	return append(items,
+		menuItem{label: domain.DashboardMenuSync, action: menuSync},
+		menuItem{label: domain.DashboardMenuReparent, action: menuReparent},
+	)
+}
+
+// runActions are the run module's, offered on every row including the base one:
+// the main checkout runs jobs like any other worktree. The block is ruled by
+// grain — what acts on the whole worktree, then what acts on one job, then the
+// view over both — because the flat order alternated between the two and read
+// as five unrelated verbs. stopJob is the label of the job stop, which the
+// Services tab words for the job its cursor already designates.
+func runActions(stopJob string) []menuItem {
 	return []menuItem{
-		fastForward,
-		{label: domain.DashboardMenuSync, action: menuSync},
-		{label: domain.DashboardMenuReparent, action: menuReparent},
-		{label: domain.DashboardMenuDelete, action: menuDelete, danger: true},
+		{kind: menuEntrySeparator},
+		{kind: menuEntryHeading, label: domain.DashboardMenuSectionRun},
+		{label: domain.DashboardMenuRunUp, action: menuRunUp},
+		{label: domain.DashboardMenuRunDown, action: menuRunDown},
+		{kind: menuEntrySeparator},
+		{label: domain.DashboardMenuRunStart, action: menuRunStart},
+		{label: stopJob, action: menuRunStop},
+		{kind: menuEntrySeparator},
+		{label: domain.DashboardMenuRunLogs, action: menuRunLogs},
 	}
 }
 
 // globalMenuItems act on worktrees the user picks inside the run, not on the
 // selected row, so nothing here is keyed off the selection.
 func (m Model) globalMenuItems() []menuItem {
-	items := []menuItem{
+	git := []menuItem{
 		{label: domain.DashboardMenuFastForwardAll, action: menuFastForwardAll},
 		{label: domain.DashboardMenuReparentBatch, action: menuReparentBatch},
 		{label: domain.DashboardMenuSyncAll, action: menuSyncAll},
-		{label: domain.DashboardMenuPrune, action: menuPrune, danger: true},
+	}
+	prune := menuItem{label: domain.DashboardMenuPrune, action: menuPrune, danger: true}
+	run := m.globalRunBlock()
+	items := append(git, prune)
+	if len(run) > 0 {
+		items = append(append([]menuItem{{kind: menuEntryHeading, label: domain.DashboardMenuSectionGit}}, git...), run...)
+		items = append(items, menuItem{kind: menuEntrySeparator}, prune)
 	}
 	caption, busy := m.busyCaption("")
 	if !busy {
 		return items
 	}
-	for index := range items {
-		items[index].disabled = caption
-	}
-	return items
+	return disableActions(items, caption)
+}
+
+func (m Model) globalRunBlock() []menuItem {
+	return m.runBlock(runBlockParams{
+		Actions: []menuItem{
+			{kind: menuEntrySeparator},
+			{kind: menuEntryHeading, label: domain.DashboardMenuSectionRun},
+			{label: domain.DashboardMenuRunUpAll, action: menuRunUpAll},
+			{label: domain.DashboardMenuRunDownAll, action: menuRunDownAll},
+			{kind: menuEntrySeparator},
+			{label: domain.DashboardMenuRunLogsAll, action: menuRunLogsAll},
+		},
+		Stop:    menuItem{label: domain.DashboardMenuRunDownAll, action: menuRunDownAll},
+		Running: len(m.running) > 0,
+	})
 }
 
 // openMenu hangs the worktree menu off a cell. The right button is not always
@@ -174,7 +319,7 @@ func (m Model) closeMenu() Model {
 func (m Model) moveMenu(delta int) Model {
 	items := m.menuItems()
 	for index := m.menuCursor + delta; index >= 0 && index < len(items); index += delta {
-		if items[index].disabled == "" {
+		if items[index].activatable() {
 			m.menuCursor = index
 			return m
 		}
@@ -185,7 +330,7 @@ func (m Model) moveMenu(delta int) Model {
 // firstEnabled is where the cursor lands when the menu opens.
 func firstEnabled(items []menuItem) int {
 	for index, item := range items {
-		if item.disabled == "" {
+		if item.activatable() {
 			return index
 		}
 	}
@@ -198,7 +343,7 @@ func (m Model) activateMenu(index int) (Model, tea.Cmd) {
 		return m, nil
 	}
 	item := items[index]
-	if item.disabled != "" {
+	if !item.activatable() {
 		return m, nil
 	}
 	m = m.closeMenu()
@@ -216,6 +361,12 @@ func (m Model) activateMenu(index int) (Model, tea.Cmd) {
 		return m.startSyncAll()
 	case menuFastForwardAll:
 		return m.startFastForwardAll()
+	case menuRunUpAll:
+		return m.startRunUpAll()
+	case menuRunDownAll:
+		return m.startRunDownAll()
+	case menuRunLogsAll:
+		return m.startRunLogsAll()
 	case menuReparent:
 		return m.startReparent(selected.Branch)
 	case menuDelete:
@@ -224,6 +375,16 @@ func (m Model) activateMenu(index int) (Model, tea.Cmd) {
 		return m.startSync(selected.Branch)
 	case menuFastForward:
 		return m.startFastForward(selected.Branch)
+	case menuRunUp:
+		return m.startRunUp(selected)
+	case menuRunStart:
+		return m.startRunJob(selected)
+	case menuRunStop:
+		return m.stopRunJob(selected)
+	case menuRunDown:
+		return m.startRunDown(selected)
+	case menuRunLogs:
+		return m.openLogsTab()
 	}
 	return m, nil
 }
@@ -254,7 +415,7 @@ func (m Model) menuBox() (string, domain.Rect) {
 		rendered := m.menuItemLines(menuItemParams{Item: item, Inner: inner, Focused: index == m.menuCursor})
 		// Only what can be activated is marked: a zone over an inert entry is a
 		// click that looks like it should do something.
-		if item.disabled == "" {
+		if item.activatable() {
 			rendered[0] = m.zones.Mark(menuZone(index), rendered[0])
 		}
 		lines = append(lines, rendered...)
@@ -295,7 +456,13 @@ type menuItemParams struct {
 // actions is the edge of the block the pointer is over rather than empty space —
 // the same accent bar and tint the worktree list uses for the row it is on.
 func (m Model) menuItemLines(params menuItemParams) []string {
+	if params.Item.kind == menuEntrySeparator {
+		return []string{styles.DashboardRule.Render(strings.Repeat(domain.DashboardRuleGlyph, params.Inner))}
+	}
 	inner := max(params.Inner-rowBarWidth, 0)
+	if params.Item.kind == menuEntryHeading {
+		return []string{rowIndent + styles.DashboardSectionTitle.Render(pad(truncate(params.Item.label, inner), inner))}
+	}
 	label := truncate(params.Item.label, inner)
 	if params.Item.disabled != "" {
 		// The caption hangs under its own entry: at the same indent it would read as
@@ -334,6 +501,9 @@ func menuInnerWidth(params menuInnerWidthParams) int {
 	for _, item := range params.Items {
 		// Every entry carries the focus gutter, whether or not it is the focused one.
 		inner = max(inner, lipgloss.Width(item.label)+rowBarWidth)
+		if item.kind != menuEntryAction {
+			continue
+		}
 		if item.disabled != "" {
 			inner = max(inner, lipgloss.Width(item.disabled)+2*rowBarWidth)
 		}

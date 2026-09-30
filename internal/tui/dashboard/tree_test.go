@@ -105,7 +105,7 @@ func TestTheTreeReportsAFailureInsteadOfDrawingNothing(t *testing.T) {
 // Each tab keeps its own cursor: coming back to a tab must not have moved what
 // was selected there.
 func TestEachTabKeepsItsOwnCursor(t *testing.T) {
-	model := treeModel(t, "main", "feat", "feat-ui")
+	model := withRunJobs(treeModel(t, "main", "feat", "feat-ui"))
 	model = update(model, key("j"))
 	model = update(model, key("j"))
 	if model.treeCursor != 2 {
@@ -115,6 +115,8 @@ func TestEachTabKeepsItsOwnCursor(t *testing.T) {
 		t.Fatalf("list cursor = %d, want it untouched", model.cursor)
 	}
 
+	// Tab cycles Worktrees → Tree → Running, so two presses come back to the list.
+	model = update(model, key(keyTab))
 	model = update(model, key(keyTab))
 	model = update(model, key("j"))
 
@@ -172,17 +174,22 @@ func TestTheMainWorktreeOffersOnlyTheBaseRefreshFromTheTree(t *testing.T) {
 	model, _ = model.selectTab(tabTree)
 	model = update(model, treeMsg{rows: rules.FlattenForest(sampleForest())})
 
-	items := model.menuItems()
-	if len(items) != 1 || items[0].action != menuFastForward {
-		t.Errorf("menu = %+v, want the fast-forward alone on the main worktree", items)
+	items := menuActions(model.menuItems())
+	if items[0].action != menuFastForward {
+		t.Errorf("menu = %+v, want the base fast-forward first on the main worktree", items)
 	}
 }
 
 func TestTheHeaderCountsWhatTheActiveTabLists(t *testing.T) {
-	model := treeModel(t, "main", "feat", "feat-ui")
+	model := withRunJobs(treeModel(t, "main", "feat", "feat-ui"))
 
 	if got := model.countLabel(); !strings.Contains(got, "4") {
 		t.Errorf("count = %q, want the four nodes of the forest", got)
+	}
+
+	model = update(model, key(keyTab))
+	if got := model.countLabel(); !strings.Contains(got, "0") {
+		t.Errorf("count = %q, want the Running tab to count what is up", got)
 	}
 
 	model = update(model, key(keyTab))

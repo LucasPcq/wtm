@@ -5,6 +5,7 @@ package dashboard
 
 import (
 	"fmt"
+	"maps"
 	"path/filepath"
 	"time"
 
@@ -14,9 +15,13 @@ import (
 	zone "github.com/lrstanley/bubblezone"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/flow/runlogs"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/service/runconfig"
+	"github.com/LucasPcq/wtm/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/tui/runview"
 	"github.com/LucasPcq/wtm/internal/tui/worktreepicker"
 )
 
@@ -35,6 +40,31 @@ type RunParams struct {
 	// wired with ProjectDir). Injected the same way PRLoader is, so a test can
 	// exercise the REVIEW section's click without shelling out to a real gh.
 	PROpener func(number int) error
+	// JobsLoader reads the run daemon's index. wake says whether waking a
+	// sleeping daemon is worth it: every explicit path reads with, the poll
+	// reads without, and known reports whether the index could be read at all.
+	// Injected like PRLoader, so a test never dials a real socket.
+	JobsLoader func(wake bool) (jobs []domain.JobInfo, known bool)
+	// URLOpener hands a job's address to the desktop's own opener. Injected like
+	// PROpener so a click on a RUN row is asserted without launching a browser.
+	URLOpener func(url string) error
+	// AddressLoader is where the named worktrees' jobs answer. It is only ever
+	// given worktrees that already have a job up: BranchEnv allocates an ordinal
+	// the first time it is asked for one. It takes the run.toml the poll already
+	// read, so the file is not read twice a poll.
+	AddressLoader func(request AddressRequest) domain.RunAddresses
+	// LogsLoader reads back a job's persisted output for the detail panel's
+	// logs view. Injected like JobsLoader, so a test never opens a real board.
+	LogsLoader func(logsRequest) ([]string, error)
+	// BoardLoader opens the board a live preview attaches through. Nil leaves the
+	// panel on LogsLoader's persisted tail, which is what a test installs.
+	BoardLoader func(logsRequest) runlogs.Board
+	// TraceLoader names, per branch, the jobs that left output in that worktree.
+	// It is asked about every worktree rather than only the ones with a job up:
+	// a job that left a trace is precisely one the daemon no longer holds, and
+	// asking only about live worktrees would hide every finished task and every
+	// crash — the two things one opens this panel for.
+	TraceLoader func(branches []string) map[string]map[string]bool
 	// Version is the running wtm version and UpgradeLatest the newer release the
 	// last passive check found, or "" when there is none. Both are resolved by
 	// the command layer: the dashboard renders them, it decides nothing.
@@ -51,11 +81,56 @@ type OutputLineMsg struct{ Text string }
 // the output panel unless the launch itself failed.
 type openPRMsg struct{ err error }
 
+// openURLMsg is openPRMsg for a job's address: the opened tab is its own
+// feedback, so only a failed launch reaches the output panel.
+type openURLMsg struct{ err error }
+
 type worktreesMsg struct {
 	statuses  []domain.WorktreeStatus
 	parents   map[string]string
 	fetchedAt time.Time
 	err       error
+}
+
+// jobsMsg carries the run daemon's index and the run.toml it is read against:
+// what each worktree has up, and what the project declares it could run. It
+// never fails the dashboard — a daemon that is not listening simply means
+// nothing is running, which is the answer.
+type AddressRequest struct {
+	Branches []string
+	Config   domain.RunConfig
+}
+
+// addressesMsg lands the addresses the poll asked for. It is its own message
+// rather than a field of jobsMsg because the two reads cannot be ordered: Init
+// loads the worktrees and the jobs in parallel, and whichever answers last is
+// the one that knows enough to ask.
+// tracesMsg lands what each worktree has left on disk. Its own message, like
+// addressesMsg and for the same reason: it is read off the worktrees, which may
+// land after the jobs.
+type tracesMsg struct {
+	logged map[string]map[string]bool
+}
+
+type addressesMsg struct {
+	addresses map[string]map[string]domain.JobAddress
+	// notes is what has to be said about an address, keyed by branch: a
+	// worktree served its ports because its .env was never settled on the names
+	// it publishes says so, or the reader wonders why it alone has no name.
+	notes map[string]string
+}
+
+type jobsMsg struct {
+	jobs    []domain.JobInfo
+	running map[string]int
+	config  domain.RunConfig
+	// configErr is why run.toml could not be read: a project whose file is
+	// broken is not one without a run module, and the menus say which.
+	configErr error
+	// known is false when the daemon could not be asked while its index still
+	// holds jobs: what runs is then unknown, which is not the same answer as
+	// nothing running, and the counts already on screen are kept.
+	known bool
 }
 
 type prsMsg struct {
@@ -64,6 +139,8 @@ type prsMsg struct {
 }
 
 type pollMsg struct{}
+
+type gitPollMsg struct{}
 
 // tabSlideTickMsg redraws while the tab rule is sliding. The handler is where
 // the sequence ends: it re-arms only while the slide is still short of its
@@ -79,13 +156,14 @@ type treeMsg struct {
 	err  error
 }
 
-var tabs = []string{domain.DashboardTabWorktrees, domain.DashboardTabTree}
+var tabs = []string{domain.DashboardTabWorktrees, domain.DashboardTabTree, domain.DashboardTabServices}
 
-// tabTree is the index of the Tree tab in tabs; the renderer and the loader both
-// key off it rather than off its title.
+// The tab indices; the renderer and the loaders key off them rather than off
+// the titles.
 const (
 	tabWorktrees = iota
 	tabTree
+	tabServices
 )
 
 // Model is the dashboard's root Bubbletea model. It owns its own zone manager
@@ -120,9 +198,45 @@ type Model struct {
 	ghConn    domain.GHConnection
 	prsLoaded bool
 
+	// running counts the jobs the run daemon holds per worktree path; jobs is
+	// what those counts were derived from, and runConfig what the project
+	// declares — the detail panel needs all three.
+	running      map[string]int
+	jobs         []domain.JobInfo
+	runConfig    domain.RunConfig
+	runConfigErr error
+	// addresses is where each worktree's declared jobs answer, keyed
+	// branch → job. It follows the poll, like jobs: an address is a property of
+	// the worktree's port offset, and two sources for it would diverge.
+	addresses map[string]map[string]domain.JobAddress
+	// addressNotes is one line per worktree whose .env is unsettled; see
+	// addressesMsg.
+	addressNotes map[string]string
+	// logged names the jobs that left output in each worktree, by branch. With
+	// the daemon's index it decides what every surface here shows; see
+	// rules.VisibleJobs.
+	logged map[string]map[string]bool
+	// runExpanded keys the runners whose held addresses are unfolded, by job
+	// name. Folded is the default and the state lives here rather than on disk:
+	// it is how the panel is being read right now, not a preference — but it
+	// outlives moving between worktrees, which is what makes comparing two of
+	// them bearable.
+	runExpanded map[string]bool
+	// board is what the daemon holds up, per worktree. Rebuilt when the jobs,
+	// the worktrees or the addresses land — never in the renderer, which asked
+	// for it six times a frame with a different time.Now() each time.
+	board []rules.RunWorktreeBlock
+
 	outputLines    []string
 	outputOffset   int
 	outputExpanded bool
+
+	// services is the Services tab flattened into drawn lines, servicesCursor the
+	// job row it points at — headers and gaps are drawn, never selected — and
+	// servicesOffset the window's first line.
+	services       []domain.ServicesRow
+	servicesCursor int
+	servicesOffset int
 
 	treeRows    []domain.TreeRow
 	treeCursor  int
@@ -136,6 +250,23 @@ type Model struct {
 	// helpScroll is the first visible body row of the reference overlay. It only
 	// ever leaves zero on a screen too short to hold the whole reference.
 	helpScroll int
+
+	// panelTab is which of the right-hand panel's two tabs is showing.
+	panelTab int
+
+	// logsBranch and logsJob name the job whose tail replaces the detail's
+	// sections; both empty means the panel is closed.
+	logsBranch string
+	logsJob    string
+	logsLines  []string
+	logsErr    error
+	// preview is the run view hosted inside the panel: the same renderer and the
+	// same live stream `run logs` uses, at a panel's size. It reads no key — the
+	// panel owns the navigation, and everything one could act on belongs to the
+	// full view, which is what enter opens. previewOn says one is held, since a
+	// zero Model is indistinguishable from a live one.
+	preview   runview.Model
+	previewOn bool
 
 	// details caches the last detail loaded per branch, invalidated (never
 	// emptied) by the poll and by a finished operation, so the panel keeps
@@ -201,7 +332,7 @@ func Run(params RunParams) error {
 	model := New(params)
 	defer model.Close()
 
-	if _, err := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion()).Run(); err != nil {
+	if _, err := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithReportFocus()).Run(); err != nil {
 		return fmt.Errorf("dashboard: %w", err)
 	}
 	return nil
@@ -211,11 +342,15 @@ func (m Model) Init() tea.Cmd {
 	// The spinner is started on demand, at the point a detail load actually
 	// begins (fireDetailTick, reloadDetailCmd) — not here, or it would tick for
 	// the life of the program whether or not anything is loading.
-	return tea.Batch(m.loadWorktreesCmd(false), m.loadPRsCmd(), pollCmd(), listenCmd(m.msgs))
+	return tea.Batch(m.loadWorktreesCmd(false), m.loadPRsCmd(), m.loadJobsCmd(true), pollCmd(), gitPollCmd(), listenCmd(m.msgs))
 }
 
 func pollCmd() tea.Cmd {
 	return tea.Tick(domain.DashboardPollSeconds*time.Second, func(time.Time) tea.Msg { return pollMsg{} })
+}
+
+func gitPollCmd() tea.Cmd {
+	return tea.Tick(domain.DashboardGitPollSeconds*time.Second, func(time.Time) tea.Msg { return gitPollMsg{} })
 }
 
 func tabSlideTickCmd() tea.Cmd {
@@ -255,7 +390,7 @@ func (m Model) loadWorktreesCmd(fetch bool) tea.Cmd {
 // loadTreeCmd builds the forest off the UI thread. It costs a rev-list per node,
 // which is why it is only ever asked for once the Tree tab has been opened.
 func (m Model) loadTreeCmd() tea.Cmd {
-	listParams := m.listParams
+	listParams, running := m.listParams, m.running
 	return func() tea.Msg {
 		forest, err := worktree.BuildTree(worktree.BuildTreeParams{
 			ProjectDir: listParams.ProjectDir,
@@ -265,7 +400,7 @@ func (m Model) loadTreeCmd() tea.Cmd {
 		if err != nil {
 			return treeMsg{err: err}
 		}
-		return treeMsg{rows: rules.FlattenForest(forest)}
+		return treeMsg{rows: rules.FlattenForest(rules.ForestWithRunningJobs(forest, running))}
 	}
 }
 
@@ -295,10 +430,26 @@ func (m Model) layout() domain.DashboardLayout {
 		Height:         m.height,
 		OutputExpanded: m.outputExpanded,
 		DetailOpen:     m.detailOpen,
+		FullBody:       m.tab == tabServices,
 	})
 }
 
+// Update answers a message, then sizes the hosted preview to whatever layout
+// that left behind. The sizing is done here, once, rather than at each place a
+// panel opens or a tab changes: the output panel alone is toggled from a key, a
+// click and the start of an operation, and a preview sized at one geometry while
+// drawn at another shows the wrong rows.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd := m.update(msg)
+	model, ok := next.(Model)
+	if !ok {
+		return next, cmd
+	}
+	sized, sizeCmd := model.sizePreview(model.layout())
+	return sized, tea.Batch(cmd, sizeCmd)
+}
+
+func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
@@ -318,16 +469,41 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case worktreesMsg:
 		before := m.selectedBranch()
 		next, animCmd := m.applyWorktrees(msg)
+		next = next.withBoard()
 		model, detailCmd := next.triggerDetailReload(before)
-		return model, tea.Batch(animCmd, detailCmd)
+		// An address is not a function of the jobs alone: the loader dials the
+		// proxy and reads the worktree's .env, so a proxy that came up late or a
+		// port that moved under a job still running is only ever caught here.
+		// This is the git clock, and KeyRefresh comes through it too.
+		return model, tea.Batch(animCmd, detailCmd, next.resolveAddressesCmd(), next.resolveTracesCmd())
+
+	case tracesMsg:
+		m.logged = msg.logged
+		return m.withBoard(), nil
+
+	case addressesMsg:
+		m.addresses, m.addressNotes = msg.addresses, msg.notes
+		return m.withBoard(), nil
 
 	case prsMsg:
 		m.prs, m.ghConn, m.prsLoaded = msg.prs, msg.conn, true
 		return m, nil
 
+	case jobsMsg:
+		return m.applyJobs(msg)
+
 	case pollMsg:
+		// The logs tail is the detail panel's one exception to being absent from
+		// every clock — a tail nobody refreshes is a screenshot.
+		return m, tea.Batch(m.loadJobsCmd(false), m.tailLogsCmd(), pollCmd())
+
+	case tea.FocusMsg:
+		next, cmd := m.refreshRows()
+		return next, tea.Batch(cmd, next.loadJobsCmd(false))
+
+	case gitPollMsg:
 		if m.loading {
-			return m, pollCmd()
+			return m, gitPollCmd()
 		}
 		m.loading = true
 		// The tree only refreshes on the poll while it is on screen; rebuilding a
@@ -340,7 +516,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// few seconds mutes the whole panel behind a "refreshing" marker while
 		// the user is reading it. It reloads when the selection changes, when an
 		// operation touches its branch, and on KeyRefresh — never on a timer.
-		return m, tea.Batch(m.loadWorktreesCmd(false), tree, pollCmd())
+		return m, tea.Batch(m.loadWorktreesCmd(false), tree, gitPollCmd())
 
 	case treeMsg:
 		before := m.selectedBranch()
@@ -358,9 +534,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			Text: fmt.Sprintf(domain.DashboardFailedFmt, domain.DashboardOpenPRLabel, msg.err),
 		}), nil
 
+	case logsTailMsg:
+		return m.applyLogsTail(msg), nil
+
+	case previewBoardMsg:
+		return m.applyPreviewBoard(msg)
+
+	case openURLMsg:
+		if msg.err == nil {
+			return m, nil
+		}
+		return m.appendOutput(OutputLineMsg{
+			Text: fmt.Sprintf(domain.DashboardFailedFmt, domain.DashboardOpenURLLabel, msg.err),
+		}), nil
+
 	case flowMsg:
 		model, cmd := m.applyFlow(msg.inner)
 		return model, tea.Batch(cmd, listenCmd(m.msgs))
+
+	case handoffDoneMsg:
+		return m.finishHandoff(msg)
 
 	case opDoneMsg:
 		return m.finishOp(msg)
@@ -406,7 +599,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateModal(msg)
 	}
 
-	return m, nil
+	// Anything left belongs to the hosted preview: its own chunks, its redraw
+	// clock, its board refreshes. It is the only sub-model with commands of its
+	// own, and it never sees a key or a mouse event — those are handled above,
+	// and acting on a job is what the full view is for.
+	return m.updatePreview(msg)
+}
+
+func (m Model) updatePreview(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if !m.previewOn {
+		return m, nil
+	}
+	preview, cmd := m.preview.Update(msg)
+	next, ok := preview.(runview.Model)
+	if !ok {
+		return m, cmd
+	}
+	m.preview = next
+	return m, cmd
 }
 
 // withDetailTrigger folds a detail-reload check onto whatever a key or mouse
@@ -501,6 +711,12 @@ func (m Model) reflow() Model {
 		Visible: layout.TreeRows,
 		Offset:  m.treeOffset,
 	})
+	m.servicesOffset = rules.DashboardScrollOffset(rules.DashboardScrollParams{
+		Cursor:  m.servicesCursor,
+		Total:   len(m.services),
+		Visible: layout.ServicesRows,
+		Offset:  m.servicesOffset,
+	})
 	m.outputOffset = rules.DashboardClampOffset(rules.DashboardOffsetParams{
 		Offset:  m.outputOffset,
 		Total:   len(m.outputLines),
@@ -516,6 +732,13 @@ func (m Model) reflow() Model {
 func (m Model) selected() (domain.WorktreeStatus, bool) {
 	if m.tab == tabTree {
 		return m.selectedTreeWorktree()
+	}
+	if m.tab == tabServices {
+		row, ok := m.selectedService()
+		if !ok {
+			return domain.WorktreeStatus{}, false
+		}
+		return m.statusFor(row.Branch), true
 	}
 	if m.cursor < 0 || m.cursor >= len(m.statuses) {
 		return domain.WorktreeStatus{}, false
@@ -548,6 +771,9 @@ func (m Model) moveCursor(delta int) Model {
 		m.treeCursor = rules.ClampIndex(m.treeCursor+delta, len(m.treeRows))
 		return m.reflow()
 	}
+	if m.tab == tabServices {
+		return m.stepServices(delta).reflow()
+	}
 	m.cursor = rules.ClampIndex(m.cursor+delta, len(m.statuses))
 	return m.reflow()
 }
@@ -558,6 +784,9 @@ func (m Model) rowCount() int {
 	if m.tab == tabTree {
 		return len(m.treeRows)
 	}
+	if m.tab == tabServices {
+		return len(m.services)
+	}
 	return len(m.statuses)
 }
 
@@ -566,11 +795,19 @@ func (m Model) scrollOutput(delta int) Model {
 	return m.reflow()
 }
 
+// refreshRows re-reads the rows' local git state, without fetching. The git clock is slow on purpose, so the
+// moments a stale row would show are the ones it is re-read on — the terminal
+// coming back into focus, and an action ending.
+func (m Model) refreshRows() (Model, tea.Cmd) {
+	m.loading = true
+	return m, tea.Batch(m.loadWorktreesCmd(false), m.treeCmd())
+}
+
 func (m Model) refresh() (Model, tea.Cmd) {
 	m.loading, m.prsLoaded = true, false
 	m.treeLoading = m.treeLoaded || m.tab == tabTree
 	next, detailCmd := m.reloadDetailCmd()
-	return next, tea.Batch(next.loadWorktreesCmd(true), next.loadPRsCmd(), next.treeCmd(), detailCmd)
+	return next, tea.Batch(next.loadWorktreesCmd(true), next.loadPRsCmd(), next.loadJobsCmd(true), next.treeCmd(), detailCmd)
 }
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -607,6 +844,25 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	layout := m.layout()
 
+	// The logs panel owns esc and enter while it is up: esc gives the detail
+	// back, enter hands the terminal to runview for the session this is only a
+	// glance at.
+	if m.logsOpen() {
+		switch key {
+		case keyEscape:
+			return m.closePanelLogs().reflow(), nil
+		// The jobs list down the side, so up and down walk it. The arrows it
+		// answered when it was a row still work: a reader who learnt them there
+		// does not have to learn them again.
+		case keyUp, keyVimUp, keyLeft, keyVimLeft:
+			return m.stepLogsJob(-1).retailAndPreview()
+		case keyDown, keyVimDown, keyRight, keyVimRight:
+			return m.stepLogsJob(1).retailAndPreview()
+		case keyEnter:
+			return m.watchLogs()
+		}
+	}
+
 	switch key {
 	case keyInterrupt, keyQuit:
 		return m, tea.Quit
@@ -622,6 +878,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.openActionsMenu(m.actionsAnchorPoint()), nil
 	case keyOpenPR:
 		return m.openPR()
+	case keyRunLogs:
+		return m.openLogsTab()
+	case keyOpenAddress:
+		return m.openSelectedAddress()
 	case keyFastForward:
 		selected, ok := m.selected()
 		if !ok {
@@ -633,9 +893,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.outputExpanded = !m.outputExpanded
 		return m.reflow(), nil
 	case keyTab:
-		return m.selectTab((m.tab + 1) % len(tabs))
+		return m.selectTab(m.stepTab(1))
 	case keyShiftTab:
-		return m.selectTab((m.tab + len(tabs) - 1) % len(tabs))
+		return m.selectTab(m.stepTab(-1))
 	case keyUp, keyVimUp:
 		return m.moveCursor(-1), nil
 	case keyDown, keyVimDown:
@@ -653,6 +913,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case keyOutputDown:
 		return m.scrollOutput(1), nil
 	case keyEnter, keyRight, keyVimRight:
+		if m.tab == tabServices && key == keyEnter {
+			return m.watchServiceLogs()
+		}
 		if layout.Narrow {
 			m.detailOpen = true
 			return m.reflow(), nil
@@ -667,18 +930,56 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// runModule is whether the project has a run module to show: run.toml declares
+// jobs, or cannot be read — which is said in the run tabs rather than hidden.
+// Without one the dashboard is v0.27.1's: no Services tab, no LOGS tab.
+func (m Model) runModule() bool {
+	return len(m.runConfig.Jobs) > 0 || m.runConfigErr != nil
+}
+
+func (m Model) shownTabs() []int {
+	if m.runModule() {
+		return []int{tabWorktrees, tabTree, tabServices}
+	}
+	return []int{tabWorktrees, tabTree}
+}
+
+// stepTab is the tab delta positions away among those drawn, wrapping.
+func (m Model) stepTab(delta int) int {
+	shown := m.shownTabs()
+	position := 0
+	for index, tab := range shown {
+		if tab == m.tab {
+			position = index
+		}
+	}
+	return shown[(position+delta+len(shown))%len(shown)]
+}
+
+// withoutRunTabs leaves the run tabs once run.toml stops declaring anything: a
+// view left open on a tab that is no longer drawn kept the keyboard.
+func (m Model) withoutRunTabs() Model {
+	if m.tab == tabServices {
+		m.tab = tabWorktrees
+	}
+	return m.closePanelLogs()
+}
+
 // selectTab moves to a tab and, the first time the Tree tab is opened, asks for
 // the forest it has never built. It also starts the tab rule's slide toward
 // its new position, when ui.animations has not turned that off and the rule
 // actually moves — switching to the tab already active is a no-op either way.
 func (m Model) selectTab(index int) (Model, tea.Cmd) {
+	// The logs view belongs to the tab it is drawn in: left open across a tab
+	// change it kept esc and enter while showing nothing.
+	m = m.closePanelLogs()
 	width := m.layout().Tabs.Width
-	from := tabStart(width, m.tab)
+	from := m.tabStart(width, m.tab)
 	m.tab = index
 
 	var slideCmd tea.Cmd
 	if rules.AnimationsEnabled(m.params.Config) {
-		if to := tabStart(width, index); to != from {
+		if to := m.tabStart(width, index); to != from {
 			m.tabSlideFrom, m.tabSlideSince = from, time.Now()
 			slideCmd = tabSlideTickCmd()
 		}
@@ -692,8 +993,11 @@ func (m Model) selectTab(index int) (Model, tea.Cmd) {
 }
 
 func (m Model) pageRows(layout domain.DashboardLayout) int {
-	if m.tab == tabTree {
+	switch m.tab {
+	case tabTree:
 		return layout.TreeRows
+	case tabServices:
+		return layout.ServicesRows
 	}
 	return layout.ListRows
 }
@@ -730,7 +1034,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	for index := range tabs {
+	for _, index := range m.shownTabs() {
 		if m.inZone(tabZone(index), msg) {
 			return m.selectTab(index)
 		}
@@ -750,8 +1054,37 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m.openActionsMenu(domain.Rect{X: zone.StartX, Y: zone.EndY}), nil
 	}
 
+	if m.inZone(zonePanelTabDtl, msg) {
+		return m.closePanelLogs().reflow(), nil
+	}
+	if m.inZone(zonePanelTabLogs, msg) {
+		return m.openLogsTab()
+	}
+
 	if m.inZone(zoneDetailPR, msg) {
 		return m.openPR()
+	}
+
+	if model, cmd, hit := m.clickLogsAddress(msg); hit {
+		return model, cmd
+	}
+
+	if model, cmd, hit := m.clickLogsJob(msg); hit {
+		return model, cmd
+	}
+
+	if model, cmd, hit := m.clickRunRow(msg); hit {
+		return model, cmd
+	}
+
+	if model, cmd, hit := m.clickServiceRow(msg); hit {
+		return model, cmd
+	}
+
+	// Last, for the addresses no zone declares — a preview's title, a line the
+	// output panel keeps: any address drawn is one the reader expects to follow.
+	if url, found := components.URLAt(components.URLAtParams{View: m.View(), X: msg.X, Y: msg.Y}); found {
+		return m.openJobURL(url)
 	}
 
 	if model, hit := m.clickRow(msg); hit {
@@ -763,6 +1096,11 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 // clickRow selects the row under the pointer on whichever tab is showing.
 func (m Model) clickRow(msg tea.MouseMsg) (Model, bool) {
+	if m.tab == tabServices {
+		// clickServiceRow owns those rows: it selects and then opens, which a
+		// bare selection here would pre-empt.
+		return m, false
+	}
 	if m.tab == tabTree {
 		for index := range m.treeRows {
 			if !m.inZone(treeRowZone(index), msg) {
@@ -806,11 +1144,22 @@ func (m Model) menuMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 // rightClick opens the context menu on the row it lands on, selecting it first:
 // a menu that acted on another row than the one under the pointer would be a trap.
 func (m Model) rightClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	model, hit := m.clickRow(msg)
+	model, hit := m.selectRow(msg)
 	if !hit {
 		return m, nil
 	}
 	return model.openMenu(domain.Rect{X: msg.X, Y: msg.Y}), nil
+}
+
+// selectRow puts the cursor on the row under the pointer, whichever tab is
+// showing. The Services tab reaches it here rather than through clickRow, which
+// leaves those rows to clickServiceRow: the left button selects and then opens,
+// and a bare selection there would pre-empt the opening.
+func (m Model) selectRow(msg tea.MouseMsg) (Model, bool) {
+	if m.tab == tabServices {
+		return m.selectServiceRow(msg)
+	}
+	return m.clickRow(msg)
 }
 
 // modalMouse only ever resolves the modal's own rows: the frame behind it is
@@ -834,7 +1183,7 @@ func (m Model) wheel(msg tea.MouseMsg, delta int) Model {
 	if m.outputExpanded && m.inZone(zoneOutput, msg) {
 		return m.scrollOutput(delta)
 	}
-	if m.inZone(zoneList, msg) || m.inZone(zoneTree, msg) {
+	if m.inZone(zoneList, msg) || m.inZone(zoneTree, msg) || m.inZone(zoneServices, msg) {
 		return m.moveCursor(delta)
 	}
 	return m
@@ -872,8 +1221,11 @@ func (m Model) View() string {
 // list's place rather than the whole body, so the detail stays beside it and a
 // node keeps leading somewhere.
 func (m Model) renderMain(layout domain.DashboardLayout) string {
-	if m.tab == tabTree {
+	switch m.tab {
+	case tabTree:
 		return m.renderTree(layout)
+	case tabServices:
+		return m.renderServices(layout)
 	}
 	return m.renderList(layout)
 }
@@ -894,4 +1246,118 @@ func (m Model) withOverlays(frame string) string {
 		return overlay(overlayParams{Base: frame, Box: box, At: rect})
 	}
 	return frame
+}
+
+// loadJobsCmd reads the run daemon's index off the UI thread, with the run.toml
+// those jobs are declared in. It is graceful by design: no daemon means nothing
+// is running, which is an answer and not an error, so it never reaches the
+// output panel.
+func (m Model) loadJobsCmd(wake bool) tea.Cmd {
+	load, stateDir := m.jobsLoader(), m.params.StateDir
+	return func() tea.Msg {
+		jobs, known := load(wake)
+		cfg, err := runconfig.Load(stateDir)
+		return jobsMsg{jobs: jobs, running: rules.RunningJobsByWorktree(jobs), config: cfg, configErr: err, known: known}
+	}
+}
+
+// withBoard rebuilds what the daemon holds up and the lines the Services tab
+// draws from it, then re-seats that tab's cursor and offset on the new list.
+func (m Model) withBoard() Model {
+	m.board = rules.RunBoard(rules.RunBoardParams{
+		Config:    m.runConfig,
+		Jobs:      m.jobs,
+		Addresses: m.addresses,
+		Notes:     m.addressNotes,
+		Expanded:  m.runExpanded,
+		Statuses:  m.statuses,
+		Now:       time.Now(),
+	})
+	m.services = rules.ServicesRows(m.board)
+	// Re-bound here, not only when an arrow is pressed: a job stopping shrinks
+	// the list under a cursor nobody moved, and selected() then answered
+	// "nothing" — no menu, no selection, until the user pressed a key.
+	m.servicesCursor = m.nearestServiceJob(nearestJobParams{Index: m.servicesCursor, Direction: 1})
+	// The offset with it: a board that shrinks under an offset nobody moved
+	// leaves servicesVisible past the end, and the tab draws nothing at all.
+	return m.reflow()
+}
+
+// resolveTracesCmd asks what each worktree has left on disk. Unlike the
+// addresses it covers every worktree the list holds, running or not: a trace is
+// what a job leaves once the daemon has dropped it, so the worktrees with
+// nothing up are exactly the ones with something to report.
+func (m Model) resolveTracesCmd() tea.Cmd {
+	if m.params.TraceLoader == nil || len(m.runConfig.Jobs) == 0 || len(m.statuses) == 0 {
+		return nil
+	}
+	branches := make([]string, 0, len(m.statuses))
+	for _, status := range m.statuses {
+		branches = append(branches, status.Branch)
+	}
+	load := m.params.TraceLoader
+	return func() tea.Msg { return tracesMsg{logged: load(branches)} }
+}
+
+// resolveAddressesCmd asks where the running worktrees' jobs answer. It is
+// built from the model the jobs have already been applied to, never captured by
+// the command that read them: Init loads the worktrees and the jobs in
+// parallel, so that model's statuses may still be empty — which asked for no
+// address at all and left the RUN section without one until the next poll.
+//
+// Only the worktrees that already have a job up are named: BranchEnv allocates
+// an ordinal to whichever branch it is handed, and an idle worktree must not be
+// given one just because a poll swept past it.
+func (m Model) resolveAddressesCmd() tea.Cmd {
+	if m.params.AddressLoader == nil || len(m.runConfig.Jobs) == 0 {
+		return nil
+	}
+	branches := rules.BranchesWithJobsUp(rules.BranchesWithJobsUpParams{Jobs: m.jobs, Statuses: m.statuses})
+	if len(branches) == 0 {
+		return nil
+	}
+	load, request := m.params.AddressLoader, AddressRequest{Branches: branches, Config: m.runConfig}
+	return func() tea.Msg {
+		answer := load(request)
+		return addressesMsg{addresses: answer.ByBranch, notes: answer.Notes}
+	}
+}
+
+func (m Model) jobsLoader() func(bool) ([]domain.JobInfo, bool) {
+	if m.params.JobsLoader != nil {
+		return m.params.JobsLoader
+	}
+	return runjobs.Read
+}
+
+// applyJobs also reloads the detail on screen when the project's declared jobs
+// changed: a panel built before run.toml was read would otherwise stay without
+// its RUN section for the rest of the session.
+func (m Model) applyJobs(msg jobsMsg) (Model, tea.Cmd) {
+	changed := !rules.SameRunJobs(m.runConfig, msg.config)
+	m.runConfig, m.runConfigErr = msg.config, msg.configErr
+	if !m.runModule() {
+		m = m.withoutRunTabs()
+	}
+	// What the ordinals, the traces and the tree's per-node counts are derived
+	// from is the running set, counts included: a job stopping beside another
+	// still up moves no branch in or out, and the tree would carry the old count
+	// until the git clock came round. A poll that finds it unmoved — the
+	// overwhelming majority of them — re-derives nothing.
+	moved := changed
+	if msg.known {
+		moved = moved || !maps.Equal(m.running, msg.running)
+		m.jobs, m.running = msg.jobs, msg.running
+	}
+	// The tree carries the count on its nodes, so the rows already drawn hold a
+	// stale one until they are rebuilt.
+	m = m.withBoard()
+	if !moved {
+		return m, nil
+	}
+	if !changed {
+		return m, tea.Batch(m.treeCmd(), m.resolveAddressesCmd(), m.resolveTracesCmd())
+	}
+	next, detailCmd := m.invalidateDetail(m.selectedBranch())
+	return next, tea.Batch(next.treeCmd(), detailCmd, next.resolveAddressesCmd(), next.resolveTracesCmd())
 }

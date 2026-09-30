@@ -10,10 +10,28 @@ Navigate to a worktree directory. Requires shell integration to work.
 wtm go [branch] [flags]
 ```
 
+### Examples
+
+```
+  # Pick a worktree
+  wtm go
+
+  wtm go feat/login
+
+  # Back to the main checkout
+  wtm go main
+```
+
 ### Options
 
 ```
   -h, --help   help for go
+```
+
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
 ```
 
 ### SEE ALSO

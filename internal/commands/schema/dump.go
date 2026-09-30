@@ -2,6 +2,7 @@ package schema
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/schemas"
 )
@@ -16,9 +18,14 @@ import (
 func newDumpCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dump",
-		Short: "Write embedded schemas to <state-dir>/schemas/ (or ~/.config/wtm/schemas with --global)",
-		Long:  "Extract every JSON Schema bundled with this wtm binary so editors can resolve the `#:schema` directives in your TOML files.\nProject schemas land in <git-common-dir>/wtm/schemas/. Use --global to write the global schema next to ~/.config/wtm/config.toml.",
-		RunE:  runDump,
+		Short: "Write embedded schemas to <state-dir>/schemas/ (or the global config's schemas/ with --global)",
+		Long:  "Extract every JSON Schema bundled with this wtm binary so editors can resolve the `#:schema` directives in your TOML files.\nProject schemas land in <git-common-dir>/wtm/schemas/. Use --global to write the global schema next to the global wtm config, whose path `wtm run proxy status` prints.",
+		Example: `  # The project schemas, beside config.toml and run.toml
+  wtm schema dump
+
+  # The global config's schema
+  wtm schema dump --global`,
+		RunE: runDump,
 	}
 	cmd.Flags().Bool(domain.FlagGlobal, false, "Write the global config schema instead of the project ones")
 	return cmd
@@ -28,18 +35,18 @@ func runDump(cmd *cobra.Command, _ []string) error {
 	global, _ := cmd.Flags().GetBool(domain.FlagGlobal)
 
 	if global {
-		dir, err := os.UserConfigDir()
+		dir, err := infra.GlobalDir()
 		if err != nil {
-			return fmt.Errorf("locate user config dir: %w", err)
+			return err
 		}
-		schemaDir := filepath.Join(dir, domain.GlobalConfigDir, domain.SchemasDirName)
+		schemaDir := filepath.Join(dir, domain.SchemasDirName)
 		written, err := writeSchemas(schemaDir, []schemas.Schema{schemas.Global})
 		if err != nil {
 			return err
 		}
-		output.Frame(cmd.OutOrStdout(), func() {
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
 			for _, p := range written {
-				output.Success(cmd.OutOrStdout(), fmt.Sprintf("Wrote %s", p))
+				output.Success(w, fmt.Sprintf("Wrote %s", p))
 			}
 		})
 		return nil
@@ -58,9 +65,9 @@ func runDump(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	output.Frame(cmd.OutOrStdout(), func() {
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
 		for _, p := range written {
-			output.Success(cmd.OutOrStdout(), fmt.Sprintf("Wrote %s", p))
+			output.Success(w, fmt.Sprintf("Wrote %s", p))
 		}
 	})
 	return nil

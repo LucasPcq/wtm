@@ -26,7 +26,6 @@ func NewTextInput(params NewTextInputParams) TextInputModel {
 	ti := textinput.New()
 	ti.Focus()
 	ti.Prompt = styles.InputPrompt.Render("❯ ")
-	ti.CharLimit = 256
 	ti.Width = 76
 
 	if params.Placeholder != "" {
@@ -74,9 +73,6 @@ func (m *TextInputModel) SetWidth(w int) {
 	m.input.Width = max(10, w-4)
 }
 
-// SetHeight is a no-op (satisfies Sizable).
-func (m *TextInputModel) SetHeight(_ int) {}
-
 // Init starts the cursor blink.
 func (m TextInputModel) Init() tea.Cmd {
 	return textinput.Blink
@@ -116,6 +112,15 @@ func (m TextInputModel) Update(msg tea.Msg) (TextInputModel, tea.Cmd) {
 }
 
 // View renders the prompt-style input.
+// A text input has no rows, so the bar must not offer to move between them.
+func (m TextInputModel) helpActions() []string { return nil }
+
+func (m TextInputModel) helpModal() string { return "" }
+
+// helpRowless answers the `rowless` interface of the wizard's help bar: a text
+// input has no rows, so it must not offer to move between them.
+func (m TextInputModel) helpRowless() bool { return true }
+
 func (m TextInputModel) View() string {
 	var b strings.Builder
 

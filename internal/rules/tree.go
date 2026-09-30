@@ -231,9 +231,12 @@ func appendTreeRows(params appendTreeRowsParams) []domain.TreeRow {
 // order; the ASCII tree, the Mermaid export and the dashboard differ only in how
 // they style each one, so they cannot drift apart.
 func TreeBadges(node domain.TreeNode) []domain.TreeBadge {
-	badges := make([]domain.TreeBadge, 0, 7)
+	badges := make([]domain.TreeBadge, 0, 8)
 	if node.IsVirtual {
 		badges = append(badges, domain.TreeBadgeVirtual)
+	}
+	if node.Status.RunningJobs > 0 {
+		badges = append(badges, domain.TreeBadgeRunning)
 	}
 	if node.Status.PR != nil {
 		badges = append(badges, domain.TreeBadgePR)
@@ -280,4 +283,28 @@ func TreeSpacerPrefix(nextPrefix string) string {
 		}
 	}
 	return ""
+}
+
+// ForestWithRunningJobs stamps each node with what the run daemon holds for its
+// worktree. The count travels on the node rather than beside it so every
+// renderer of a forest draws the badge from the same place.
+func ForestWithRunningJobs(forest domain.Forest, running map[string]int) domain.Forest {
+	if len(running) == 0 {
+		return forest
+	}
+	roots := make([]domain.TreeNode, 0, len(forest.Roots))
+	for _, root := range forest.Roots {
+		roots = append(roots, nodeWithRunningJobs(root, running))
+	}
+	return domain.Forest{Roots: roots}
+}
+
+func nodeWithRunningJobs(node domain.TreeNode, running map[string]int) domain.TreeNode {
+	node.Status.RunningJobs = running[node.Path]
+	children := make([]domain.TreeNode, 0, len(node.Children))
+	for _, child := range node.Children {
+		children = append(children, nodeWithRunningJobs(child, running))
+	}
+	node.Children = children
+	return node
 }

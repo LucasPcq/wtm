@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -67,8 +68,11 @@ func (m Model) renderRow(index, width int) []string {
 	metaPlain, metaColored := m.rowMeta(status, false), m.rowMeta(status, true)
 	if op, locked := m.ops.holding(status.Branch); locked {
 		pillText, pillRendered = m.spinner.View(), m.spinner.View()
-		metaPlain, metaColored = op.stage, op.stage
+		stage := op.stageFor(status.Branch)
+		metaPlain, metaColored = stage, stage
 	}
+
+	badge := m.runningBadge(status)
 
 	if index == m.cursor {
 		bar := styles.DashboardRowBar.Render(rowBar + " ")
@@ -81,7 +85,7 @@ func (m Model) renderRow(index, width int) []string {
 		}
 		return []string{
 			bar + rowStyle.Width(inner).Bold(true).Render(line),
-			bar + rowStyle.Width(inner).Render(truncate(metaPlain, inner)),
+			bar + rowStyle.Width(inner).Render(metaLine(metaLineParams{Meta: metaPlain, Badge: badge, Inner: inner})),
 		}
 	}
 
@@ -90,8 +94,44 @@ func (m Model) renderRow(index, width int) []string {
 	// a short second line would cut its zone short.
 	return []string{
 		rowIndent + line,
-		rowIndent + pad(truncateRendered(metaColored, inner), inner),
+		rowIndent + metaLine(metaLineParams{
+			Meta:    metaColored,
+			Badge:   badge,
+			Colored: true,
+			Inner:   inner,
+		}),
 	}
+}
+
+// runningBadge is what the worktree has up. It hangs at the end of the meta
+// line, under the state pill, rather than taking its rank among the tags: a
+// worktree with no parent would otherwise carry it first, and the eye would
+// have to look for it row by row.
+func (m Model) runningBadge(status domain.WorktreeStatus) string {
+	count := m.running[status.Path]
+	if count == 0 {
+		return ""
+	}
+	return fmt.Sprintf(domain.TreeBadgeRunningFmt, count)
+}
+
+type metaLineParams struct {
+	Meta    string
+	Badge   string
+	Colored bool
+	Inner   int
+}
+
+// metaLine pads to the full width either way: the row is one clickable block,
+// and a badge is never allowed to push the meta out of the line it shares. The
+// badge is styled here, never before: an empty string rendered through a style
+// comes back as a pair of escapes — zero columns wide, but not empty, which
+// would cost the meta a column on every row that runs nothing.
+func metaLine(params metaLineParams) string {
+	if params.Badge == "" {
+		return pad(truncateRendered(params.Meta, params.Inner), params.Inner)
+	}
+	return spread(params.Meta, styleMeta(params.Badge, params.Colored, styles.Success), params.Inner)
 }
 
 // rowBarWidth is the gutter the accent bar and its space take, kept off the

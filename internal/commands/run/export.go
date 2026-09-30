@@ -1,13 +1,10 @@
 package run
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
 
+	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
 	"github.com/LucasPcq/wtm/internal/commands/shared"
-	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -16,42 +13,37 @@ import (
 // newExportCmd creates the wtm run export subcommand.
 func newExportCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   domain.CmdExport,
-		Short: "Export run.toml as JSON on stdout",
-		Long:  "Emit the current run config as JSON. Pipe to a file and use with wtm run import to share configurations.",
-		RunE:  runExport,
+		Use:         domain.CmdExport,
+		Annotations: map[string]string{domain.AnnotationMachineOutput: domain.AnnotationOn},
+		Short:       "Export run.toml as JSON on stdout",
+		Long:        "Emit the current run config as JSON on stdout, whatever --output says: like run url, this is machine output and is never framed. Pipe to a file and use with wtm run import to share configurations.",
+		Example: `  wtm run export > run.json
+
+  # One profile and its jobs
+  wtm run export --profile backend > backend.json
+
+  # Copy the layout into another clone
+  wtm run export | (cd ../other-clone && wtm run import - --yes)`,
+		RunE: runExport,
 	}
-	cmd.Flags().String(domain.FlagProfile, "", "Export only this profile and its jobs")
+	shared.AddProfileFlag(cmd, "Export only this profile and its jobs")
+	shared.AddOutputFlag(cmd)
 	return cmd
 }
 
 func runExport(cmd *cobra.Command, _ []string) error {
-	dir, err := os.Getwd()
+	ctx, err := runctx.Open(runctx.OpenParams{Cmd: cmd})
 	if err != nil {
-		return fmt.Errorf("get working directory: %w", err)
-	}
-
-	result, err := shared.LoadConfig(cmd, dir)
-	if err != nil {
-		return err
-	}
-
-	runCfg, err := config.LoadRun(result.StateDir)
-	if err != nil {
-		return fmt.Errorf("load run config: %w", err)
-	}
-
-	if err := shared.RequireRunInitialized(runCfg); err != nil {
 		return err
 	}
 
 	profile, _ := cmd.Flags().GetString(domain.FlagProfile)
 	if profile != "" {
-		runCfg, err = rules.FilterToProfile(runCfg, profile)
+		ctx.Run, err = rules.FilterToProfile(ctx.Run, profile)
 		if err != nil {
 			return err
 		}
 	}
 
-	return output.WriteRunConfigJSON(cmd.OutOrStdout(), runCfg)
+	return output.WriteRunConfigJSON(cmd.OutOrStdout(), ctx.Run)
 }

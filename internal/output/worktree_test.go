@@ -1,9 +1,12 @@
 package output
 
 import (
+	"bytes"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/x/ansi"
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -14,8 +17,8 @@ func init() {
 }
 
 func TestFormatWorktreeListEmpty(t *testing.T) {
-	got := FormatWorktreeList(FormatWorktreeListParams{})
-	if got != "No worktrees found." {
+	got := ansi.Strip(FormatWorktreeList(FormatWorktreeListParams{}))
+	if got != UnchangedLine(domain.NoWorktreesMessage) {
 		t.Errorf("unexpected output: %q", got)
 	}
 }
@@ -185,5 +188,51 @@ func TestPrintableLenEmpty(t *testing.T) {
 func TestAnsiOverheadPlainString(t *testing.T) {
 	if ansiOverhead("hello world") != 0 {
 		t.Error("expected ansiOverhead of plain string to be 0")
+	}
+}
+
+// The port pass rides on the env line as a count. It is the whole of what create
+// says about it: the values are in the .env the run just wrote, and `wtm env` is
+// the command they belong to.
+func TestFormatCreateResultCarriesThePortPassAsANote(t *testing.T) {
+	render := func(note string) string {
+		var buf bytes.Buffer
+		FormatCreateResult(&buf, CreateResultParams{
+			Branch:      "feat/x",
+			From:        "main",
+			EnvStrategy: "main",
+			EnvNote:     note,
+			Path:        ".worktrees/feat-x",
+			GoCommand:   "wtm go feat/x",
+		})
+		return buf.String()
+	}
+
+	with := render("4 port(s) shifted (+10)")
+	if !strings.Contains(with, "main") || !strings.Contains(with, "4 port(s) shifted (+10)") {
+		t.Errorf("the env line dropped its note:\n%s", with)
+	}
+	if strings.Count(with, "\n") != strings.Count(render(""), "\n") {
+		t.Errorf("the note cost the recap a line:\n%s", with)
+	}
+	if strings.Contains(render(""), domain.EnvRecapNoteSeparator) {
+		t.Errorf("a run that moved nothing still printed a separator:\n%s", render(""))
+	}
+}
+
+// checkout concludes like create: the port pass rides on a labelled env row
+// instead of a bare line under the headline.
+func TestFormatPRCheckoutResultLabelsTheEnvNote(t *testing.T) {
+	var buf bytes.Buffer
+	FormatPRCheckoutResult(&buf, PRCheckoutResultParams{
+		Number: 42, Branch: "feat/x", EnvNote: "4 ports settled (offset +10)",
+		Path: ".worktrees/feat-x", GoCommand: "wtm go feat/x",
+	})
+
+	out := buf.String()
+	for _, want := range []string{"Checked out PR #42 (feat/x)", domain.CreateRecapLabelEnv, "4 ports settled (offset +10)", domain.CreateRecapLabelPath, ".worktrees/feat-x"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q:\n%s", want, out)
+		}
 	}
 }

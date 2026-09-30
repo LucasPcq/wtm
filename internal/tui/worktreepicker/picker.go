@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/styles"
 	"github.com/LucasPcq/wtm/internal/tui/components"
 	"github.com/LucasPcq/wtm/internal/tui/worktreerefresh"
@@ -214,7 +215,7 @@ func BuildTags(params BuildTagsParams) []components.Badge {
 		}
 	}
 	for _, svc := range params.Services {
-		if svc.WorkDir == s.Path && svc.Status == domain.JobStatusRunning {
+		if svc.WorkDir == s.Path && rules.IsJobUp(svc.Status) {
 			tags = append(tags, components.Badge{Text: "services", Variant: components.BadgeSuccess})
 			break
 		}

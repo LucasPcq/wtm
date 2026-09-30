@@ -18,14 +18,9 @@ const (
 	// Project is the schema for .wtm/config.toml (per-project settings).
 	Project Schema = "project.schema.json"
 
-	// Global is the schema for ~/.config/wtm/config.toml (per-user defaults).
+	// Global is the schema for the global wtm config (per-user defaults).
 	Global Schema = "global.schema.json"
 )
-
-// All returns the list of every schema this binary ships.
-func All() []Schema {
-	return []Schema{Run, Project, Global}
-}
 
 // Filename returns the basename of the schema file (e.g. "run.schema.json").
 func (s Schema) Filename() string { return string(s) }

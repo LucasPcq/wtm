@@ -24,7 +24,6 @@ func NewCmds() []*cobra.Command {
 		grouped(newEnvCmd(), domain.CmdGroupWorktrees),
 		grouped(newRelocateCmd(), domain.CmdGroupWorktrees),
 		grouped(newGoCmd(), domain.CmdGroupNavigate),
-		grouped(newSwitchCmd(), domain.CmdGroupNavigate),
 		grouped(newSyncCmd(), domain.CmdGroupStack),
 		grouped(newReparentCmd(), domain.CmdGroupStack),
 		grouped(newFastForwardCmd(), domain.CmdGroupStack),

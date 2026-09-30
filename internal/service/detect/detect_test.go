@@ -259,31 +259,76 @@ func TestDockerComposeFilesMultiple(t *testing.T) {
 	}
 }
 
-func TestPnpmWorkspacePackagesNone(t *testing.T) {
+func TestWorkspacePackagesNone(t *testing.T) {
 	dir := t.TempDir()
-	pkgs := PnpmWorkspacePackages(dir)
+	pkgs := WorkspacePackages(dir)
 	if pkgs != nil {
 		t.Errorf("expected nil, got %v", pkgs)
 	}
 }
 
-func TestPnpmWorkspacePackages(t *testing.T) {
+func TestWorkspacePackages(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create pnpm-workspace.yaml
 	ws := "packages:\n  - \"apps/*\"\n  - \"packages/*\"\n"
 	if err := os.WriteFile(filepath.Join(dir, "pnpm-workspace.yaml"), []byte(ws), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	// Create matching directories
-	os.MkdirAll(filepath.Join(dir, "apps", "web"), 0o755)
-	os.MkdirAll(filepath.Join(dir, "apps", "api"), 0o755)
-	os.MkdirAll(filepath.Join(dir, "packages", "shared"), 0o755)
+	for _, pkg := range []string{"apps/web", "apps/api", "packages/shared"} {
+		writeManifest(t, dir, pkg, `{"name":"`+filepath.Base(pkg)+`"}`)
+	}
 
-	pkgs := PnpmWorkspacePackages(dir)
+	pkgs := WorkspacePackages(dir)
 	if len(pkgs) != 3 {
 		t.Fatalf("expected 3 packages, got %d: %v", len(pkgs), pkgs)
+	}
+}
+
+// A globstar selects any depth: Go's filepath.Glob stopped at the first level,
+// which hid apps/app-1/back from detection entirely (LUC-208).
+func TestWorkspacePackagesGlobstarReachesDeepPackages(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "pnpm-workspace.yaml"), []byte("packages:\n  - \"apps/**\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeManifest(t, dir, "apps/app-1/back", `{"name":"back"}`)
+	writeManifest(t, dir, "apps/app-1/front", `{"name":"front"}`)
+	writeManifest(t, dir, "node_modules/junk", `{"name":"junk"}`)
+
+	pkgs := WorkspacePackages(dir)
+	want := []string{"apps/app-1/back", "apps/app-1/front"}
+	if len(pkgs) != len(want) {
+		t.Fatalf("expected %v, got %v", want, pkgs)
+	}
+	for i, pkg := range want {
+		if pkgs[i] != pkg {
+			t.Errorf("expected %s at %d, got %s", pkg, i, pkgs[i])
+		}
+	}
+}
+
+// npm, yarn and bun declare their workspaces in the root manifest instead.
+func TestWorkspacePackagesFromRootManifest(t *testing.T) {
+	dir := t.TempDir()
+	writeManifest(t, dir, ".", `{"name":"root","workspaces":["apps/*/*","!apps/app-1/front"]}`)
+	writeManifest(t, dir, "apps/app-1/back", `{"name":"back"}`)
+	writeManifest(t, dir, "apps/app-1/front", `{"name":"front"}`)
+
+	pkgs := WorkspacePackages(dir)
+	if len(pkgs) != 1 || pkgs[0] != "apps/app-1/back" {
+		t.Fatalf("expected [apps/app-1/back], got %v", pkgs)
+	}
+}
+
+func writeManifest(t *testing.T, dir, rel, content string) {
+	t.Helper()
+	target := filepath.Join(dir, filepath.FromSlash(rel))
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(target, "package.json"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -291,8 +336,10 @@ func TestParsePnpmWorkspace(t *testing.T) {
 	content := "packages:\n  - 'apps/*'\n  - \"packages/*\"\n  - '!tests'\n"
 	patterns := parsePnpmWorkspace(content)
 
-	if len(patterns) != 2 {
-		t.Fatalf("expected 2 patterns (excluding negation), got %d: %v", len(patterns), patterns)
+	// Negations are kept and applied by rules.SelectsWorkspace: dropping them
+	// here would widen the selection they exist to narrow.
+	if len(patterns) != 3 {
+		t.Fatalf("expected 3 patterns, got %d: %v", len(patterns), patterns)
 	}
 	if patterns[0] != "apps/*" {
 		t.Errorf("expected apps/*, got %s", patterns[0])

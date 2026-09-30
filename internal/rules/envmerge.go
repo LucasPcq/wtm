@@ -1,6 +1,8 @@
 package rules
 
 import (
+	"strings"
+
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
@@ -13,6 +15,17 @@ type EnvDiffParams struct {
 	Main     []domain.EnvLine
 	Child    []domain.EnvLine
 	Mode     domain.EnvMode
+	// PortBases is the declared base of every key an [[env_port]] link follows,
+	// and PortBlock the spacing between two worktrees. They exist so a value that
+	// differs from its source only by the worktree's port offset is not reported
+	// as a conflict between two spellings of the same setting.
+	PortValues map[string]EnvValueRef
+	PortBlock  int
+	// Owned are the keys the owned pass writes in full in this file: [[env]]
+	// links and the identity keys. Their value differs per worktree by
+	// construction, so they are neither drift nor a conflict — and absent from
+	// the child, they are the pass's to add, not a gap asking for a value.
+	Owned map[string]bool
 }
 
 // DiffEnv classifies every key of the child .env against its schema and value
@@ -35,13 +48,19 @@ func DiffEnv(params EnvDiffParams) domain.EnvDiff {
 				continue
 			}
 			seen[l.Key] = true
+			if _, inChild := child[l.Key]; !inChild && params.Owned[l.Key] {
+				continue
+			}
 			entries = append(entries, classifyKey(classifyKeyParams{
-				Key:      l.Key,
-				Mode:     params.Mode,
-				Child:    child,
-				Template: template,
-				Parent:   parent,
-				Main:     main,
+				Key:        l.Key,
+				Mode:       params.Mode,
+				Child:      child,
+				Template:   template,
+				Parent:     parent,
+				Main:       main,
+				PortValues: params.PortValues,
+				PortBlock:  params.PortBlock,
+				Owned:      params.Owned,
 			}))
 		}
 	}
@@ -55,12 +74,35 @@ func DiffEnv(params EnvDiffParams) domain.EnvDiff {
 
 // classifyKeyParams holds one key and the indexed sources needed to classify it.
 type classifyKeyParams struct {
-	Key      string
-	Mode     domain.EnvMode
-	Child    map[string]domain.EnvLine
-	Template map[string]domain.EnvLine
-	Parent   map[string]domain.EnvLine
-	Main     map[string]domain.EnvLine
+	Key        string
+	Mode       domain.EnvMode
+	Child      map[string]domain.EnvLine
+	Template   map[string]domain.EnvLine
+	Parent     map[string]domain.EnvLine
+	Main       map[string]domain.EnvLine
+	PortValues map[string]EnvValueRef
+	PortBlock  int
+	Owned      map[string]bool
+}
+
+// differ compares a source value with the child's, ignoring the port offset that
+// separates two worktrees' copies of the same setting. A key no link follows is
+// compared verbatim.
+func (p classifyKeyParams) differ(source, child string) bool {
+	ref, linked := p.PortValues[p.Key]
+	if !linked {
+		return source != child
+	}
+	reduce := func(value string) string {
+		return ReduceEnvPortValue(ReduceEnvPortParams{
+			Value:    value,
+			Base:     ref.Base,
+			Block:    p.PortBlock,
+			JobLabel: ref.JobLabel,
+			Project:  ref.Project,
+		})
+	}
+	return reduce(source) != reduce(child)
 }
 
 // classifyKey applies the reconciliation table for a single key.
@@ -72,21 +114,28 @@ func classifyKey(params classifyKeyParams) domain.EnvKeyDiff {
 	_, inMain := params.Main[k]
 	expected := inTemplate || inParent || inMain
 
-	srcVal, srcLabel, srcExport, hasSrc := resolveSource(resolveSourceParams{
+	srcLine, srcLabel, hasSrc := resolveSource(resolveSourceParams{
 		Key:    k,
 		Parent: params.Parent,
 		Main:   params.Main,
 	})
+	srcVal := srcLine.Value
 
 	diff := domain.EnvKeyDiff{Key: k}
 
 	if inChild {
 		diff.CurrentValue = childLine.Value
+		// A key wtm derives from the worktree differs from every source by
+		// construction.
+		if IsOwnedEnvKey(k) || params.Owned[k] {
+			diff.Status = domain.EnvKeyResolved
+			return diff
+		}
 		if !expected {
 			diff.Status = domain.EnvKeyOrphan
 			return diff
 		}
-		if params.Mode == domain.EnvModeRefresh && hasSrc && srcVal != childLine.Value {
+		if params.Mode == domain.EnvModeRefresh && hasSrc && params.differ(srcVal, childLine.Value) {
 			diff.Status = domain.EnvKeyConflict
 			diff.ResolvedValue = srcVal
 			diff.Source = srcLabel
@@ -100,7 +149,8 @@ func classifyKey(params classifyKeyParams) domain.EnvKeyDiff {
 		diff.Status = domain.EnvKeyResolved
 		diff.ResolvedValue = srcVal
 		diff.Source = srcLabel
-		diff.Export = srcExport
+		diff.Export = srcLine.Export
+		diff.SourceLine = srcLine
 		return diff
 	}
 
@@ -108,6 +158,7 @@ func classifyKey(params classifyKeyParams) domain.EnvKeyDiff {
 	if tmpl, ok := params.Template[k]; ok {
 		diff.Placeholder = tmpl.Value
 		diff.Export = tmpl.Export
+		diff.SourceLine = tmpl
 	}
 	return diff
 }
@@ -119,16 +170,16 @@ type resolveSourceParams struct {
 	Main   map[string]domain.EnvLine
 }
 
-// resolveSource returns the first non-empty value in the parent -> main cascade,
-// its source label and export flag. ok is false when neither source resolves.
-func resolveSource(params resolveSourceParams) (value, source string, export, ok bool) {
+// resolveSource returns the first line with a non-empty value in the parent ->
+// main cascade and its source label. ok is false when neither source resolves.
+func resolveSource(params resolveSourceParams) (line domain.EnvLine, source string, ok bool) {
 	if l, present := params.Parent[params.Key]; present && l.Value != "" {
-		return l.Value, domain.EnvSourceParent, l.Export, true
+		return l, domain.EnvSourceParent, true
 	}
 	if l, present := params.Main[params.Key]; present && l.Value != "" {
-		return l.Value, domain.EnvSourceMain, l.Export, true
+		return l, domain.EnvSourceMain, true
 	}
-	return "", "", false, false
+	return domain.EnvLine{}, "", false
 }
 
 // ApplyEnvDiffParams holds the inputs to materialize a resolved diff. Child is the
@@ -189,19 +240,33 @@ func ApplyEnvDiff(params ApplyEnvDiffParams) []domain.EnvLine {
 		}
 	}
 
+	var added []domain.EnvLine
 	for _, e := range params.Diff.Entries {
-		if childKeys[e.Key] {
-			continue
-		}
-		if params.SkipKeys[e.Key] {
+		if childKeys[e.Key] || params.SkipKeys[e.Key] {
 			continue
 		}
 		if line, ok := addedLine(e, params.FilledValues); ok {
-			out = append(out, line)
+			added = append(added, line)
 		}
 	}
+	return insertBeforeTrailingBlanks(out, added)
+}
 
-	return out
+// insertBeforeTrailingBlanks lands new lines after the last one holding
+// something: a parsed document keeps its final newline as a trailing blank line,
+// and appending past it would drop that newline and open a gap instead.
+func insertBeforeTrailingBlanks(lines, added []domain.EnvLine) []domain.EnvLine {
+	if len(added) == 0 {
+		return lines
+	}
+	at := len(lines)
+	for at > 0 && lines[at-1].Kind == domain.EnvLineBlank && lines[at-1].Raw == "" {
+		at--
+	}
+	out := make([]domain.EnvLine, 0, len(lines)+len(added))
+	out = append(out, lines[:at]...)
+	out = append(out, added...)
+	return append(out, lines[at:]...)
 }
 
 // resolveConflict returns the child line settled per FilledValues (edit) or the
@@ -222,12 +287,12 @@ func addedLine(entry domain.EnvKeyDiff, filled map[string]string) (domain.EnvLin
 	switch entry.Status {
 	case domain.EnvKeyResolved:
 		if v, ok := filled[entry.Key]; ok {
-			return newPair(entry.Key, v, entry.Export), true
+			return newPair(entry, v), true
 		}
-		return newPair(entry.Key, entry.ResolvedValue, entry.Export), true
+		return newPair(entry, entry.ResolvedValue), true
 	case domain.EnvKeyMissing:
 		if v, ok := filled[entry.Key]; ok {
-			return newPair(entry.Key, v, entry.Export), true
+			return newPair(entry, v), true
 		}
 		return domain.EnvLine{}, false
 	default:
@@ -235,16 +300,19 @@ func addedLine(entry domain.EnvKeyDiff, filled map[string]string) (domain.EnvLin
 	}
 }
 
-// mutatedPair returns line with a new value and Raw cleared so RenderEnv re-emits it.
 func mutatedPair(line domain.EnvLine, value string) domain.EnvLine {
-	line.Value = value
-	line.Raw = ""
-	return line
+	return WithEnvValue(line, value)
 }
 
-// newPair builds a fresh pair with no Raw, to be rendered canonically.
-func newPair(key, value string, export bool) domain.EnvLine {
-	return domain.EnvLine{Kind: domain.EnvLinePair, Key: key, Value: value, Export: export}
+// newPair copies the line the key comes from, its line ending left to the file
+// it lands in, and renders a fresh one when there is none.
+func newPair(entry domain.EnvKeyDiff, value string) domain.EnvLine {
+	source := entry.SourceLine
+	if source.Kind != domain.EnvLinePair || source.Raw == "" {
+		return domain.EnvLine{Kind: domain.EnvLinePair, Key: entry.Key, Value: value, Export: entry.Export}
+	}
+	source.Raw = strings.TrimSuffix(source.Raw, domain.EnvCR)
+	return WithEnvValue(source, value)
 }
 
 // pairsByKey indexes the pair lines by key, last occurrence winning.

@@ -40,6 +40,18 @@ type PruneResult struct {
 	Orphaned []ReparentResult `json:"orphaned"`
 	Skipped  []PruneSkip      `json:"skipped"`
 	DryRun   bool             `json:"dry_run"`
+	// Namespaces is what became of the data each pruned worktree held in the
+	// shared services.
+	Namespaces []NamespaceOutcome `json:"namespaces"`
+	// Failed is the worktree the run stopped on. The ones after it were not
+	// touched, and neither was its data.
+	Failed *PruneFailure `json:"failed,omitempty"`
+}
+
+type PruneFailure struct {
+	Branch string `json:"branch"`
+	Path   string `json:"path"`
+	Error  string `json:"error"`
 }
 
 // PruneParams holds inputs for planning and executing a prune.

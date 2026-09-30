@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/LucasPcq/wtm/internal/domain"
 )
 
 func TestSuccess_ContainsCheckmarkAndMessage(t *testing.T) {
@@ -118,5 +120,36 @@ func TestBlank_EmitsNewline(t *testing.T) {
 
 	if buf.String() != "\n" {
 		t.Errorf("expected single newline, got %q", buf.String())
+	}
+}
+
+// A conclusion counts what happened, never what did not: a zero count would put
+// "0 blocked" on every clean run and teach the reader to skip the line.
+func TestTallyDropsZeroCounts(t *testing.T) {
+	got := Tally(
+		TallyPart{Count: 3, Label: domain.TallyApplied},
+		TallyPart{Count: 0, Label: domain.TallySkipped},
+		TallyPart{Count: 1, Label: domain.TallyBlocked},
+	)
+	if got != "3 applied · 1 blocked" {
+		t.Errorf("Tally = %q, want %q", got, "3 applied · 1 blocked")
+	}
+	if empty := Tally(TallyPart{Count: 0, Label: domain.TallyApplied}); empty != "" {
+		t.Errorf("a run that did nothing tallied %q, want nothing", empty)
+	}
+}
+
+// Every hint in the CLI is one arrow and one bold command, so a reader learns
+// once where to look for what to do next.
+func TestNextStepIsOneArrowAndOneCommand(t *testing.T) {
+	var buf bytes.Buffer
+	NextStep(&buf, NextStepParams{Command: "wtm go feat/x"})
+
+	line := strings.TrimSuffix(buf.String(), "\n")
+	if strings.Count(line, domain.NextStepGlyph) != 1 || !strings.Contains(line, "wtm go feat/x") {
+		t.Errorf("NextStep = %q, want one arrow and the command", line)
+	}
+	if strings.Contains(line, domain.NextStepGlyph+"  ") {
+		t.Errorf("NextStep = %q, want a single space after the arrow", line)
 	}
 }

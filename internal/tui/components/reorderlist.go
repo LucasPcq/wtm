@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/styles"
 )
 
@@ -101,6 +102,10 @@ func (m ReorderListModel) Update(msg tea.Msg) (ReorderListModel, tea.Cmd) {
 }
 
 // View renders the numbered, reorderable list.
+func (m ReorderListModel) helpActions() []string { return []string{domain.HelpReorder} }
+
+func (m ReorderListModel) helpModal() string { return "" }
+
 func (m ReorderListModel) View() string {
 	if len(m.items) == 0 {
 		return styles.Muted.Render("  No items")

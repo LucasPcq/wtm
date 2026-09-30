@@ -8,6 +8,8 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	pruneflow "github.com/LucasPcq/wtm/internal/flow/prune"
+	downflow "github.com/LucasPcq/wtm/internal/flow/run/down"
+	stopflow "github.com/LucasPcq/wtm/internal/flow/run/stop"
 	syncflow "github.com/LucasPcq/wtm/internal/flow/sync"
 )
 
@@ -165,5 +167,37 @@ func TestSyncPresenterNamesWhyAStepFailed(t *testing.T) {
 	// from going to look for a half-rebased worktree.
 	if !strings.Contains(body, domain.SyncLabelConflictAborted) {
 		t.Errorf("an aborted conflict must say the worktree was left clean:\n%s", body)
+	}
+}
+
+// Two worktrees each stopping a `web` read as the same line twice: above one
+// worktree the name would only repeat the row, above several it is the subject.
+func TestAStopOverSeveralWorktreesNamesEach(t *testing.T) {
+	results := []domain.WorktreeJobResults{
+		{Branch: "feat/a", Path: "/wt/a", Jobs: []domain.JobActionResult{{Name: "web", Status: domain.JobActionStopped}}},
+		{Branch: "feat/b", Path: "/wt/b", Jobs: []domain.JobActionResult{{Name: "web", Status: domain.JobActionError, Message: "refused"}}},
+	}
+	down := collect(t, func(send func(tea.Msg)) {
+		if err := (downPresenter{presenter{send: send}}).Downed(downflow.Outcome{Results: results}); err != nil {
+			t.Fatalf("Downed: %v", err)
+		}
+	})
+	stop := collect(t, func(send func(tea.Msg)) {
+		if err := (stopPresenter{presenter{send: send}}).Stopped(stopflow.Outcome{Results: results}); err != nil {
+			t.Fatalf("Stopped: %v", err)
+		}
+	})
+	for name, lines := range map[string][]string{"down": down, "stop": stop} {
+		body := strings.Join(lines, "\n")
+		if !strings.Contains(body, "web stopped · feat/a") || !strings.Contains(body, "web: refused · feat/b") {
+			t.Errorf("%s = %q, want each line attributed to its worktree", name, body)
+		}
+	}
+
+	one := collect(t, func(send func(tea.Msg)) {
+		_ = (downPresenter{presenter{send: send}}).Downed(downflow.Outcome{Results: results[:1]})
+	})
+	if body := strings.Join(one, "\n"); strings.Contains(body, "feat/a") {
+		t.Errorf("down = %q, want a single worktree left unnamed", body)
 	}
 }

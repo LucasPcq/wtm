@@ -16,14 +16,6 @@ import (
 // .sample, .template, .tmpl); multi-environment files (.env.production, …) are
 // ignored. Excludes node_modules, .trees, .git, vendor, and dist directories.
 func EnvFiles(projectDir string) []domain.EnvFile {
-	skipDirs := map[string]bool{
-		"node_modules": true,
-		".trees":       true,
-		".git":         true,
-		"vendor":       true,
-		"dist":         true,
-	}
-
 	var paths []string
 	_ = filepath.Walk(projectDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -31,7 +23,7 @@ func EnvFiles(projectDir string) []domain.EnvFile {
 		}
 
 		if info.IsDir() {
-			if skipDirs[info.Name()] {
+			if rules.IsScanIgnoredDir(info.Name()) {
 				return filepath.SkipDir
 			}
 			return nil

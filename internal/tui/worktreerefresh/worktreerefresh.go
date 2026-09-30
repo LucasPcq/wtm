@@ -38,15 +38,6 @@ type HandleParams struct {
 	Holder *[]domain.WorktreeStatus
 }
 
-// Handler returns a wizard message handler wiring the refresh key/message for a
-// picker whose worktree step reads from holder. Pickers that also handle async
-// messages chain it first — it returns handled=false for messages it does not own.
-func Handler(listParams domain.ListParams, holder *[]domain.WorktreeStatus) components.WizardMsgHandler {
-	return func(w *components.WizardModel, msg tea.Msg) (tea.Cmd, bool) {
-		return Handle(HandleParams{Wizard: w, Msg: msg, ListParams: listParams, Holder: holder})
-	}
-}
-
 // Handle processes the refresh key and RefreshedMsg for a worktree picker. Call
 // it first from a picker's OnMsg: it returns handled=false for messages it does
 // not own (the refresh key on a non-worktree/filtering step, or any unrelated

@@ -1,7 +1,7 @@
 BINARY   := wtm
 BUILD_DIR := bin
 
-.PHONY: build test vet lint tidy docs release install clean
+.PHONY: build test vet fmt lint arch dead dead-strict dupl tidy docs demos release install clean
 
 build:
 	go build -o $(BUILD_DIR)/$(BINARY) .
@@ -12,14 +12,53 @@ test:
 vet:
 	go vet ./...
 
-lint:
-	staticcheck ./...
+# fmt fails rather than rewrites: a formatting fix belongs in the commit that
+# caused it, not in the one that ran the linter.
+fmt:
+	@test -z "$$(gofmt -l cmd internal tools *.go)" || \
+		{ echo "gofmt needed:"; gofmt -l cmd internal tools *.go; exit 1; }
+
+# arch checks the rules of CLAUDE.md section 9 that no general-purpose linter
+# knows about: the layer graph, the styles monopoly, comma-ok assertions, the
+# confirmation axis. See tools/archlint.
+arch:
+	go run ./tools/archlint
+
+# dead finds what no path reaches, tests included. staticcheck reports the
+# unused *within* a package and cannot see this class at all. The exceptions —
+# code reachable by a route the analysis cannot follow — are listed with their
+# reason in .deadcode-ignore; everything else fails.
+dead:
+	@go tool deadcode -test ./... | grep -v -E -f .deadcode-ignore > /tmp/wtm-deadcode || true
+	@test ! -s /tmp/wtm-deadcode || { echo "unreachable code:"; cat /tmp/wtm-deadcode; exit 1; }
+
+# dead-strict is dead without -test: what only a test still calls. Informative,
+# not part of lint — a helper built for tests (testutil/, processtest/) lives
+# there by design, so those packages are left out of the report.
+dead-strict:
+	@go tool deadcode ./... | grep -v -E -f .deadcode-ignore | grep -v -E '/(testutil|processtest)/' || true
+
+lint: fmt vet arch dead
+	go tool staticcheck ./...
+
+# dupl reports token-level clones. It is not part of `lint`: a clone is a
+# judgement call — two parallel families over unrelated types read better
+# duplicated than behind a generic — so it informs a review rather than gating
+# one. Raise the threshold to see only the large ones.
+DUPL_THRESHOLD ?= 75
+dupl:
+	@find cmd internal -name '*.go' ! -name '*_test.go' > /tmp/wtm-dupl-files
+	@go tool dupl -t $(DUPL_THRESHOLD) -files < /tmp/wtm-dupl-files
 
 tidy:
 	go mod tidy
 
 docs:
 	go run ./tools/gendocs
+
+# Re-records the README GIFs from docs/demos/*.tape (needs vhs).
+demos:
+	docs/demos/record.sh
 
 release: docs
 	goreleaser release --snapshot --clean

@@ -23,79 +23,77 @@ type (
 
 func (p *plan) componentStep(step flow.Step, conditional bool) (components.Step, error) {
 	if conditional {
-		// A recap owns its model — its cancel row, and the plan its Load fills in —
-		// so its Skip gates the step instead of replacing it with a choice list.
-		if step.Kind == flow.StepRecap {
-			return p.gated(step, p.recapStep(step)), nil
+		// A select is the one kind whose whole model can be rebuilt from its
+		// answer, so its Skip is folded into the list it draws. Every other kind
+		// owns its model — a recap owns its cancel row and the plan its Load
+		// fills in, a multi-select owns its checked set — so its Skip gates the
+		// step instead of replacing it.
+		if step.Kind == flow.StepSelect {
+			return p.choiceStep(step), nil
 		}
-		// Every other conditional step is drawn as a choice list, so one of another
-		// kind would be silently downgraded to a picker rather than refused.
-		if step.Kind != flow.StepSelect {
-			return components.Step{}, conditionalKindErr(step)
+		built, err := p.componentStep(step, false)
+		if err != nil {
+			return components.Step{}, err
 		}
-		return p.choiceStep(step), nil
+		return p.gated(step, built), nil
 	}
 	switch step.Kind {
 	case flow.StepText:
-		return p.textStep(step), nil
+		return p.contentStep(step, func(content flow.StepContent) any { return textInput(step, content) })
 	case flow.StepSelect:
-		return p.selectStep(step)
+		return p.contentStep(step, func(content flow.StepContent) any { return selectList(content) })
 	case flow.StepBranchSelect:
 		return p.branchStep(step)
 	case flow.StepMultiSelect:
-		return p.multiSelectStep(step)
+		return p.contentStep(step, func(content flow.StepContent) any { return multiSelect(step, content) })
+	case flow.StepReorder:
+		return p.contentStep(step, func(content flow.StepContent) any { return reorderList(content) })
 	case flow.StepRecap:
 		return p.recapStep(step), nil
 	}
 	return components.Step{}, unsupportedKindErr(step)
 }
 
-func (p *plan) textStep(step flow.Step) components.Step {
-	return components.Step{
-		Name: step.Label,
-		Model: components.NewTextInput(components.NewTextInputParams{
-			Title:       step.Title,
-			Description: step.Description,
-			Validate:    step.Validate,
-		}),
-		Summary: summaryFor(step),
-	}
-}
-
-func (p *plan) selectStep(step flow.Step) (components.Step, error) {
+// contentStep is every kind whose whole model is rebuilt from its content: the
+// four differ only in which widget they hand that content to.
+func (p *plan) contentStep(step flow.Step, model func(flow.StepContent) any) (components.Step, error) {
 	content, err := p.content(step, p.known())
 	if err != nil {
 		return components.Step{}, err
 	}
 	built := components.Step{
 		Name:    step.Label,
-		Model:   selectList(content),
+		Model:   model(content),
 		Summary: summaryFor(step),
 	}
 	if step.Build != nil {
-		built.Build = func(prev []components.Step) any {
-			return selectList(p.rebuild(step, prev))
-		}
+		built.Build = func(prev []components.Step) any { return model(p.rebuild(step, prev)) }
 	}
 	return built, nil
 }
 
-func (p *plan) multiSelectStep(step flow.Step) (components.Step, error) {
-	content, err := p.content(step, p.known())
-	if err != nil {
-		return components.Step{}, err
-	}
-	built := components.Step{
-		Name:    step.Label,
-		Model:   multiSelect(step, content),
-		Summary: summaryFor(step),
-	}
-	if step.Build != nil {
-		built.Build = func(prev []components.Step) any {
-			return multiSelect(step, p.rebuild(step, prev))
+func textInput(step flow.Step, content flow.StepContent) components.TextInputModel {
+	return components.NewTextInput(components.NewTextInputParams{
+		Title:       content.Title,
+		Description: content.Description,
+		Default:     content.Default,
+		Validate:    step.Validate,
+	})
+}
+
+func reorderList(content flow.StepContent) components.ReorderListModel {
+	items := make([]components.ReorderItem, 0, len(content.Options))
+	for _, option := range content.Options {
+		if option.Separator {
+			continue
 		}
+		items = append(items, components.ReorderItem{Label: option.Label, Value: option.Value})
 	}
-	return built, nil
+	return components.NewReorderList(components.NewReorderListParams{
+		Title:       content.Title,
+		Description: content.Description,
+		Items:       items,
+	})
 }
 
 func multiSelect(step flow.Step, content flow.StepContent) components.MultiSelectModel {
@@ -110,6 +108,7 @@ func multiSelect(step flow.Step, content flow.StepContent) components.MultiSelec
 			Selected: option.Selected,
 			Tag:      option.Tag,
 			Variant:  components.TagVariantOf(option.Tone),
+			Badges:   toBadges(option.Badges),
 		})
 	}
 	return components.NewMultiSelect(components.NewMultiSelectParams{
@@ -117,6 +116,7 @@ func multiSelect(step flow.Step, content flow.StepContent) components.MultiSelec
 		Description: content.Description,
 		Items:       items,
 		Validate:    step.ValidateSet,
+		Start:       content.Start,
 	})
 }
 
@@ -215,6 +215,7 @@ func (p *plan) choiceStep(step flow.Step) components.Step {
 				Title:       content.Title,
 				Description: content.Description,
 				Items:       toItems(content.Options),
+				Start:       content.Start,
 			}
 		},
 	})
@@ -335,24 +336,14 @@ func combine(handlers ...components.WizardMsgHandler) components.WizardMsgHandle
 // content merges what a step declares statically with what it derives from the
 // answers, so a Build only returns the parts that change.
 func (p *plan) content(step flow.Step, answers flow.Answers) (flow.StepContent, error) {
-	content := flow.StepContent{Title: step.Title, Description: step.Description, Options: step.Options}
 	if step.Build == nil {
-		return content, nil
+		return flow.MergeContent(step, flow.StepContent{}), nil
 	}
 	built, err := step.Build(answers)
 	if err != nil {
 		return flow.StepContent{}, err
 	}
-	if built.Title != "" {
-		content.Title = built.Title
-	}
-	if built.Description != "" {
-		content.Description = built.Description
-	}
-	if len(built.Options) > 0 {
-		content.Options = built.Options
-	}
-	return content, nil
+	return flow.MergeContent(step, built), nil
 }
 
 func (p *plan) rebuild(step flow.Step, prev []components.Step) flow.StepContent {
@@ -369,6 +360,7 @@ func selectList(content flow.StepContent) components.SelectListModel {
 		Title:       content.Title,
 		Description: content.Description,
 		Items:       toItems(content.Options),
+		Start:       content.Start,
 	})
 }
 
@@ -396,9 +388,24 @@ func toItems(options []flow.Option) []components.SelectItem {
 			Value:     option.Value,
 			Separator: option.Separator,
 			Danger:    option.Danger,
+			Badges:    toBadges(option.Badges),
 		})
 	}
 	return items
+}
+
+func toBadges(badges []flow.Badge) []components.Badge {
+	if len(badges) == 0 {
+		return nil
+	}
+	rendered := make([]components.Badge, 0, len(badges))
+	for _, badge := range badges {
+		rendered = append(rendered, components.Badge{
+			Text:    badge.Text,
+			Variant: components.BadgeVariantOf(badge.Tone),
+		})
+	}
+	return rendered
 }
 
 func summaryFor(step flow.Step) func(any) string {
@@ -408,6 +415,8 @@ func summaryFor(step flow.Step) func(any) string {
 			return components.TextSummary
 		case flow.StepMultiSelect:
 			return components.MultiSelectSummary(domain.SummaryNone)
+		case flow.StepReorder:
+			return components.ReorderSummary
 		}
 		return components.SelectSummary
 	}

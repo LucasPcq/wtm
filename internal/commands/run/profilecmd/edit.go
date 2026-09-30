@@ -1,124 +1,84 @@
 package profilecmd
 
 import (
-	"errors"
-	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
 
+	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
+	profileflow "github.com/LucasPcq/wtm/internal/flow/run/profile"
 	"github.com/LucasPcq/wtm/internal/rules"
-	"github.com/LucasPcq/wtm/internal/service/runconfig"
-	"github.com/LucasPcq/wtm/internal/tui/runpicker"
-	"github.com/LucasPcq/wtm/internal/tui/runwizard"
 )
 
 func newEditCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   domain.CmdEdit + " [name]",
-		Short: "Edit an existing profile via wizard",
+		Short: "Edit an existing profile",
 		Long: "Edit a profile declared in <git-common-dir>/wtm/run.toml.\n\n" +
-			"Without an argument, prompts to pick from the existing profiles. The wizard\n" +
-			"is pre-filled with the current values; renaming is allowed and configuration\n" +
-			"is re-validated on save.",
+			"Pass --name, --jobs or --default to change those fields and nothing else: a\n" +
+			"flag left out keeps the field as it is. --jobs replaces the whole list — its\n" +
+			"order is the start order, so it is given in full — and --default=false takes\n" +
+			"the default away without handing it to another profile.\n\n" +
+			"With no such flag, the form opens pre-filled with the current values, and\n" +
+			"without an argument it prompts to pick from the existing profiles.",
+		Example: `  # The form, pre-filled
+  wtm run profile edit backend
+
+  # --jobs replaces the list, in start order
+  wtm run profile edit backend --jobs postgres,api --yes
+
+  wtm run profile edit backend --default --yes`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runEdit,
 	}
+	shared.AddSingleFlag(cmd, domain.FlagName, "Rename the profile")
+	cmd.Flags().StringSlice(domain.FlagJobs, nil, "Comma-separated existing job names, in start order (replaces the list)")
+	cmd.Flags().Bool(domain.FlagDefault, false, "Mark this profile as the default (--default=false takes it away)")
+	shared.AddYesFlag(cmd, "Skip all prompts; a field flag is then required")
 	shared.AddOutputFlag(cmd)
 	return cmd
 }
 
+// profilePatchFromFlags reads the edit flags as a patch: only what the user
+// actually passed, so an absent flag can be told from an explicit value.
+func profilePatchFromFlags(cmd *cobra.Command) rules.ProfilePatch {
+	var patch rules.ProfilePatch
+	if cmd.Flags().Changed(domain.FlagName) {
+		name, _ := cmd.Flags().GetString(domain.FlagName)
+		patch.Name = &name
+	}
+	if cmd.Flags().Changed(domain.FlagJobs) {
+		jobs, _ := cmd.Flags().GetStringSlice(domain.FlagJobs)
+		patch.Jobs = jobs
+	}
+	if cmd.Flags().Changed(domain.FlagDefault) {
+		isDefault, _ := cmd.Flags().GetBool(domain.FlagDefault)
+		patch.Default = &isDefault
+	}
+	return patch
+}
+
 func runEdit(cmd *cobra.Command, args []string) error {
-	wd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("get working directory: %w", err)
-	}
-	res, err := shared.LoadConfig(cmd, wd)
+	ctx, err := runctx.Open(runctx.OpenParams{Cmd: cmd})
 	if err != nil {
 		return err
 	}
-	cfg, err := runconfig.Load(res.StateDir)
-	if err != nil {
-		return fmt.Errorf("load run.toml: %w", err)
-	}
 
-	if err := shared.RequireRunInitialized(cfg); err != nil {
-		return err
-	}
-
-	var name string
-	if len(args) > 0 {
-		name = args[0]
-	} else {
-		picked, pickErr := runpicker.PickProfile(runpicker.PickProfileParams{Config: cfg, Title: "Edit which profile?"})
-		if errors.Is(pickErr, domain.ErrUserAborted) {
-			return nil
-		}
-		if pickErr != nil {
-			return pickErr
-		}
-		name = picked
-	}
-
-	return runEditByName(editByNameParams{Cmd: cmd, Res: res, Config: cfg, Name: name})
-}
-
-// editByNameParams groups inputs for runEditByName.
-type editByNameParams struct {
-	Cmd    *cobra.Command
-	Res    shared.ConfigResult
-	Config domain.RunConfig
-	Name   string
-}
-
-// runEditByName runs the edit wizard on the named profile, persists the
-// change, and emits the result.
-func runEditByName(params editByNameParams) error {
-	current, exists := rules.FindProfile(params.Config, params.Name)
-	if !exists {
-		return fmt.Errorf("profile %q not found", params.Name)
-	}
-
-	updated, wizErr := runwizard.RunProfileWizard(runwizard.ProfileWizardParams{
-		Existing:    params.Config,
-		Initial:     current,
-		ExcludeName: current.Name,
+	outcome, err := profileflow.Edit(profileflow.EditParams{
+		Context: ctx.FlowContext(),
+		Request: profileflow.EditRequest{
+			Name:   runctx.FirstArg(args),
+			Patch:  profilePatchFromFlags(cmd),
+			Config: ctx.Run,
+		},
+		Prompter:  ctx.Prompter(ctx.Interactive),
+		Presenter: presenter{CLIPresenter: ctx.CLI(cmd)},
 	})
-	if errors.Is(wizErr, domain.ErrUserAborted) {
-		return nil
-	}
-	if wizErr != nil {
-		return wizErr
-	}
-
-	cfg := params.Config
-	for i, p := range cfg.Profiles {
-		if p.Name == current.Name {
-			cfg.Profiles[i] = updated
-			break
-		}
-	}
-	if updated.Default {
-		cfg = rules.ApplyDefaultOverride(cfg, updated.Name)
-	}
-
-	if err := runconfig.Save(runconfig.SaveParams{StateDir: params.Res.StateDir, Config: cfg}); err != nil {
+	if err != nil {
 		return err
 	}
-
-	format, _ := params.Cmd.Flags().GetString(domain.FlagOutput)
-	if format == domain.OutputJSON {
-		return output.WriteProfileResultJSON(params.Cmd.OutOrStdout(), output.ProfileActionResult{
-			Name:   updated.Name,
-			Status: domain.JobActionUpdated,
-		})
+	if outcome.Aborted {
+		return domain.ErrAborted
 	}
-
-	output.Frame(params.Cmd.OutOrStdout(), func() {
-		output.Update(params.Cmd.OutOrStdout(), fmt.Sprintf("Updated profile %q", updated.Name))
-	})
 	return nil
 }

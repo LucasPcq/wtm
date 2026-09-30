@@ -2,6 +2,7 @@ package shell
 
 import (
 	"fmt"
+	"github.com/LucasPcq/wtm/internal/domain"
 
 	"github.com/spf13/cobra"
 
@@ -12,10 +13,16 @@ import (
 // NewCmd creates the wtm shell-init command.
 func NewCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "shell-init",
-		Short: "Generate shell integration function",
-		Long:  "Output a shell function to eval in your rc file.\nUsage: eval \"$(wtm shell-init)\"",
-		RunE:  runShellInit,
+		Use:         "shell-init",
+		Annotations: map[string]string{domain.AnnotationMachineOutput: domain.AnnotationOn},
+		Short:       "Generate shell integration function",
+		Long:        "Output a shell function to eval in your rc file.\nUsage: eval \"$(wtm shell-init)\"",
+		Example: `  # zsh or bash: add this line to ~/.zshrc or ~/.bashrc
+  eval "$(wtm shell-init)"
+
+  # fish: add this line to config.fish
+  wtm shell-init | source`,
+		RunE: runShellInit,
 	}
 }
 

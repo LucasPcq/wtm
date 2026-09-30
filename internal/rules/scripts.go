@@ -26,6 +26,42 @@ func StripScope(name string) string {
 	return name
 }
 
+type PreselectScriptParams struct {
+	Script domain.PackageScript
+	// All is every script detected in the repo. A root script is only judged
+	// against its neighbours: the same name in a workspace package is what tells
+	// an orchestrator apart from a job.
+	All []domain.PackageScript
+}
+
+// PreselectScript says whether `run init` checks a script by default. It is not
+// ClassifyScriptKind: that one decides whether a job blocks its profile, this
+// one decides whether the job is created at all.
+//
+// A root script whose name a workspace package also declares is an orchestrator
+// — `turbo run dev`, `pnpm -r dev` — and checking it alongside the packages it
+// fans out to would start every one of them twice, fighting over the same
+// ports. It stays proposed, unchecked: nothing here knows what turbo is, only
+// that the repo declares the same script at two levels.
+func PreselectScript(params PreselectScriptParams) bool {
+	if !strings.Contains(strings.ToLower(params.Script.Name), domain.ScriptPreselectKey) {
+		return false
+	}
+	return !isOrchestrator(params)
+}
+
+func isOrchestrator(params PreselectScriptParams) bool {
+	if params.Script.Workspace != "" {
+		return false
+	}
+	for _, other := range params.All {
+		if other.Workspace != "" && other.Name == params.Script.Name {
+			return true
+		}
+	}
+	return false
+}
+
 // ClassifyScriptKind returns JobKindService for long-running dev scripts and
 // JobKindTask for everything else.
 //

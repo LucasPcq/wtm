@@ -31,9 +31,13 @@ type DashboardLayout struct {
 	// ListRows is how many worktree rows fit in the list body, TreeRows how many
 	// tree nodes fit in the same space (one line each), OutputLines how many lines
 	// fit in the output body (0 when it is folded).
-	ListRows    int
-	TreeRows    int
-	OutputLines int
+	ListRows int
+	TreeRows int
+	// ServicesRows is how many lines the Services tab draws. One per row, and
+	// therefore not TreeRows: a tree node takes two lines, the spacer under it
+	// included.
+	ServicesRows int
+	OutputLines  int
 }
 
 // HelpEntry is one row of the key and mouse reference: what to press, and what

@@ -31,8 +31,10 @@ type InitDetectionResult struct {
 	InstallCommand     string
 	DockerComposeFiles []string
 	DockerComposeCmd   string
-	MonorepoPackages   []string
-	PackageScripts     []PackageScript
+	// ComposeScans holds each detected file's port mappings, keyed by the same
+	// relative path as DockerComposeFiles.
+	ComposeScans   map[string]ComposeScan
+	PackageScripts []PackageScript
 }
 
 // InitGlobalAnswers holds the wizard answers for global config setup.
@@ -52,16 +54,103 @@ type RecapField struct {
 // key or the --skip-* flags); they drive whether each section is written as
 // active config or left commented as a template.
 type InitProjectAnswers struct {
-	BasePath               string
-	BaseBranch             string
-	EnvFiles               []EnvFile
-	EnvStrategy            EnvStrategy
-	OnCreate               []HookCommand
-	OnClean                []HookCommand
-	DockerComposeFiles     []string
-	DockerComposeCmd       string
+	BasePath           string
+	BaseBranch         string
+	EnvFiles           []EnvFile
+	EnvStrategy        EnvStrategy
+	OnCreate           []HookCommand
+	OnClean            []HookCommand
+	DockerComposeFiles []string
+	DockerComposeCmd   string
+	// PatchCompose authorizes rewriting the selected compose files so their
+	// frozen host ports and the names they pin absolutely read a variable. One
+	// axis, not two: accepting half of them still leaves two worktrees unable to
+	// run at once. Never inferred — it is the wizard's answer, or the
+	// --patch-compose flag.
+	PatchCompose           bool
 	SelectedPackageScripts []PackageScript
-	SkipEnv                bool
-	SkipHooks              bool
-	SkipClean              bool
+	// SelectionAsked says the docker/scripts steps were displayed, so what they
+	// leave unchecked is a refusal. A run that never asked selects only what it
+	// would have pre-checked, and reading that as a refusal would delete the
+	// jobs an earlier run configured.
+	SelectionAsked bool
+	// SharedServices are the compose services to run once for the repository,
+	// each lifted out of its file's job into one of its own. ScopesAsked says
+	// the step ran at all: emptying the list withdraws every sharing, where a
+	// run that never asked leaves what run.toml already declares standing.
+	SharedServices []SharedComposeService
+	ScopesAsked    bool
+	// ComposeScans is what each selected file declares, needed to name the
+	// services that stay behind when one is lifted out.
+	Scans map[string]ComposeScan
+	// Ports is what the wizard settled for the detected ports, and Profiles the
+	// split `run up` will offer. ProfilesAsked says the step ran at all:
+	// emptying the list withdraws every profile, where a run that never asked
+	// leaves the proposal standing — a profile is what makes `run up` start
+	// something rather than everything.
+	Ports         []PortEntry
+	Profiles      []ProfileConfig
+	ProfilesAsked bool
+	// Cmds is the commands the wizard amended so they read the port wtm injects.
+	Cmds []JobCmdFix
+	// PortRoutes says, job by job, where it reads the port wtm declares for it:
+	// from its own .env, or from the command wtm plays. PortRoutesAsked says the
+	// step ran at all, so a run that never asked writes nothing on its own.
+	PortRoutes      map[PortRef]PortRoute
+	PortRoutesAsked bool
+	// Runners is which root-level service starts each of the others. A run that
+	// never asked carries none, and the write side leaves the relation alone.
+	Runners []JobRunnerChoice
+	// Addressing is what an [[env_port]] link writes, and AddressingAsked says
+	// the question was put: a run that never asked leaves run.toml's own value
+	// standing rather than writing the default over it.
+	Addressing      Addressing
+	AddressingAsked bool
+	// URLs names the jobs the wizard left checked in the URLs step, and
+	// URLsAsked says the step ran at all: unchecking every job withdraws every
+	// url, where a run that never asked leaves the proposal standing.
+	URLs      []string
+	URLsAsked bool
+	// LinkEnv is what the wizard settled for the .env keys holding a declared
+	// port; EnvLinksAsked says the question was put at all, so a run that asked
+	// and got "no" is not mistaken for one that never asked.
+	LinkEnv       bool
+	EnvLinksAsked bool
+	// EnvValues is what the [[env]] step settled: the .env keys wtm writes in
+	// full from a template. EnvValuesOffered are the keys it showed, which is
+	// the only set it may withdraw a link from, and EnvValuesAsked says the
+	// question was put at all.
+	EnvValues        []EnvValueLink
+	EnvValuesOffered map[EnvKeyRef]bool
+	EnvValuesAsked   bool
+	// Touches is what the data-tasks step settled, one row per task; a run
+	// that never asked carries none, and the write side leaves every task's
+	// touches as run.toml holds them.
+	Touches      []JobTouchChoice
+	TouchesAsked bool
+	SkipEnv      bool
+	SkipHooks    bool
+	SkipClean    bool
+}
+
+// PortRoute is where a job learns the port it binds. The .env route isolates it
+// under `wtm run` and when its reader launches it themselves; the command route
+// only works while wtm plays the command.
+type PortRoute string
+
+const (
+	PortRouteEnv     PortRoute = "env"
+	PortRouteCommand PortRoute = "command"
+)
+
+// PortRouteRow is one service the route step lists: the port it declares, and
+// the file the .env route would write it into. AddTarget says nothing
+// provisions that file yet, so accepting the route declares it too.
+type PortRouteRow struct {
+	Job       string
+	Port      string
+	Base      int
+	File      string
+	AddTarget bool
+	Route     PortRoute
 }

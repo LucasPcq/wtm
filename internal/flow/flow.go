@@ -27,6 +27,10 @@ const (
 	// StepMultiSelect asks for a set rather than a value; its answer is carried by
 	// Answer.Values.
 	StepMultiSelect
+	// StepReorder asks for an order rather than a selection: its options are
+	// already the answer, and what the step collects is the sequence they end up
+	// in. Its answer is carried by Answer.Values, like a multi-select's.
+	StepReorder
 )
 
 type Option struct {
@@ -37,8 +41,19 @@ type Option struct {
 	// Selected pre-checks the option in a StepMultiSelect, so a step can offer a
 	// set it already narrowed rather than an empty one.
 	Selected bool
-	// Tag is a short status word shown before the label, coloured by Tone.
+	// Tag is a short status word shown before the label, coloured by Tone. It is
+	// the leading tag of a StepMultiSelect row; Badges are the trailing ones of a
+	// StepSelect row, and a step declares whichever its kind renders.
 	Tag  string
+	Tone domain.Tone
+	// Badges are short words shown after the label, aligned across rows.
+	Badges []Badge
+}
+
+// Badge is one trailing word on a select row — a count, a state, "current" —
+// declared by the flow and coloured by the surface.
+type Badge struct {
+	Text string
 	Tone domain.Tone
 }
 
@@ -46,9 +61,17 @@ type StepContent struct {
 	Title       string
 	Description string
 	Options     []Option
+	// Start is the option the cursor opens on. A step whose answer has a standing
+	// default names it here rather than reordering its options: acting where you
+	// already stand must cost one keystroke without moving the entry that says so.
+	Start string
 	// Blockers are the refusals the step folds into its Description, named one by
 	// one for a surface that can have each of them lifted separately.
 	Blockers []Blocker
+	// Default pre-fills a StepText. It is content rather than a static field
+	// because what a step opens on can depend on the answers before it — the job
+	// picked one step earlier is what an edit form is filled from.
+	Default string
 	// ExcludeBranches drops candidates from a StepBranchSelect by name. A step
 	// narrows this way rather than by handing over a list, so the background
 	// refresh stays authoritative on what exists — the exclusion is applied on top
@@ -71,6 +94,7 @@ type Step struct {
 	Description string
 	Options     []Option
 
+	Default  string
 	Branches []domain.BranchCandidate
 	Pinned   string
 	Refresh  func() []domain.BranchCandidate
@@ -89,7 +113,10 @@ type Step struct {
 	Resolve func(Answers) (Answer, error)
 
 	Summarize func(Answer) string
-	Flag      string
+	// Flag names what an unattended run should pass instead. Arg says the same
+	// thing for a step answered by a positional, which has no flag to name.
+	Flag string
+	Arg  bool
 }
 
 // Mode is how long a flow holds the surface that runs it. A background flow gives
@@ -118,8 +145,8 @@ type Session struct {
 
 type Answer struct {
 	Value string
-	// Values is the answer of a StepMultiSelect step; every other kind leaves it
-	// nil and answers with Value.
+	// Values is the answer of a StepMultiSelect or StepReorder step; every other
+	// kind leaves it nil and answers with Value.
 	Values     []string
 	Skipped    bool
 	SkipReason string
@@ -225,9 +252,22 @@ type StageParams struct {
 	Work    func() error
 }
 
+// HookSink is where a hook phase reports: the raw output as it is produced, and
+// the beat of each hook starting and finishing. The two are separate because a
+// surface may keep one without the other — a terminal that can repaint replaces
+// the stream with the beats, a scrolling panel keeps both.
+type HookSink struct {
+	Output io.Writer
+	OnHook func(domain.HookBeat)
+}
+
 type HookPhaseParams struct {
 	Title string
-	Run   func(sink io.Writer) error
+	// LogPath is where the phase's whole output belongs whatever the surface
+	// shows of it: a stream a surface collapsed still has to be readable after
+	// the hook that failed.
+	LogPath string
+	Run     func(sink HookSink) error
 }
 
 type NoticeKind int
@@ -236,6 +276,10 @@ const (
 	NoticeMessage NoticeKind = iota
 	NoticeWarning
 	NoticeSuccess
+	// NoticeNote is what the reader has nothing to do about: a property of the
+	// machine or of the file that was just written, said once. It is the register
+	// that keeps the bordered box for what still has to be acted on.
+	NoticeNote
 )
 
 type Notice struct {
@@ -263,10 +307,13 @@ func (n Notice) IsAbort() bool {
 }
 
 func requiredErr(step Step) error {
-	if step.Flag == "" {
-		return fmt.Errorf(domain.FlowStepRequiredFmt, step.Label)
+	switch {
+	case step.Flag != "":
+		return fmt.Errorf(domain.FlowStepRequiredFlagFmt, step.Label, step.Flag)
+	case step.Arg:
+		return fmt.Errorf(domain.FlowStepRequiredArgFmt, step.Label)
 	}
-	return fmt.Errorf(domain.FlowStepRequiredFlagFmt, step.Label, step.Flag)
+	return fmt.Errorf(domain.FlowStepRequiredFmt, step.Label)
 }
 
 // ResolveSymlinks canonicalizes a path when it still exists, and hands it back
@@ -299,6 +346,30 @@ func KeepBranches(candidates []domain.BranchCandidate, exclude []string) []domai
 		kept = append(kept, candidate)
 	}
 	return kept
+}
+
+// MergeContent lays what a step builds over what it declares statically, so a
+// Build only returns the parts that change. Both surfaces rendering a step read
+// it through here: two copies of this merge had drifted apart, and each had
+// dropped the cursor a picker opens on.
+func MergeContent(step Step, built StepContent) StepContent {
+	content := StepContent{Title: step.Title, Description: step.Description, Options: step.Options, Default: step.Default}
+	if built.Title != "" {
+		content.Title = built.Title
+	}
+	if built.Description != "" {
+		content.Description = built.Description
+	}
+	if len(built.Options) > 0 {
+		content.Options = built.Options
+	}
+	if built.Default != "" {
+		content.Default = built.Default
+	}
+	content.Start = built.Start
+	content.Blockers = built.Blockers
+	content.ExcludeBranches = built.ExcludeBranches
+	return content
 }
 
 // SummarizeSet renders a set answer for a breadcrumb: the names, capped so a

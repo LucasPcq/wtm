@@ -1,15 +1,37 @@
 package agents
 
-import _ "embed"
+import (
+	"embed"
+	"io/fs"
+	"strings"
+)
 
-// usingWtmSkill is the canonical using-wtm skill file shipped with wtm. It is
-// copied verbatim to every .claude / .cursor skills/ destination selected by
-// `wtm agents install`.
+const (
+	skillEntryFile     = "SKILL.md"
+	skillReferencesDir = "references"
+	skillAssetRoot     = "assets/using-wtm"
+)
+
+// skillFS is the using-wtm skill shipped with wtm: SKILL.md, loaded whenever
+// the skill triggers, and the reference files it points at, read on demand.
 //
-//go:embed assets/using-wtm.skill.md
-var usingWtmSkill string
+//go:embed assets/using-wtm
+var skillFS embed.FS
 
-// renderSkillMarkdown returns the bytes we drop at the skill destination.
-func renderSkillMarkdown() string {
-	return usingWtmSkill
+// skillFiles maps each file of the skill, by its path inside the skill
+// directory (slash-separated), to its content.
+func skillFiles() map[string]string {
+	files := map[string]string{}
+	_ = fs.WalkDir(skillFS, skillAssetRoot, func(name string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return err
+		}
+		content, readErr := skillFS.ReadFile(name)
+		if readErr != nil {
+			return readErr
+		}
+		files[strings.TrimPrefix(name, skillAssetRoot+"/")] = string(content)
+		return nil
+	})
+	return files
 }

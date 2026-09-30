@@ -3,9 +3,11 @@ package dashboard
 import (
 	"github.com/charmbracelet/bubbles/spinner"
 
-	"github.com/LucasPcq/wtm/internal/flow"
+	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/LucasPcq/wtm/internal/flow"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 )
@@ -20,7 +22,7 @@ func lockOperation(t *testing.T, model Model, branch, stage string) Model {
 		t.Fatal("the create run did not start")
 	}
 	id := model.ops.running[0].id
-	model, _ = model.applyFlow(opTargetMsg{id: id, target: branch})
+	model, _ = model.applyFlow(opTargetMsg{id: id, targets: []string{branch}})
 	model, _ = model.applyFlow(opStageMsg{id: id, stage: stage})
 	if _, held := model.ops.holding(branch); !held {
 		t.Fatalf("the run does not hold %q", branch)
@@ -118,5 +120,60 @@ func TestSpinnerKeepsTickingWhileAnOperationRuns(t *testing.T) {
 	model, _ = model.beginOp(beginParams{Operation: flow.Operation{Kind: "create", Mode: flow.ModeBackground}, Target: "feat/a"})
 	if _, cmd := updateCmd(model, spinner.TickMsg{}); cmd == nil {
 		t.Error("a tick while a run is in flight must re-arm, or the locked row's spinner freezes")
+	}
+}
+
+// The dashboard's whole promise here is telling you what is running where, so
+// the count belongs on the row rather than one keystroke away.
+func TestRowNamesTheJobsAWorktreeIsRunning(t *testing.T) {
+	m := Model{running: map[string]int{"/wt/feature": 2}}
+	status := domain.WorktreeStatus{Branch: "feature", Path: "/wt/feature"}
+
+	if got := m.runningBadge(status); !strings.Contains(got, "2 running") {
+		t.Errorf("badge = %q, want it to name the running jobs", got)
+	}
+}
+
+func TestARowSaysNothingAboutAnotherWorktreesJobs(t *testing.T) {
+	m := Model{running: map[string]int{"/wt/other": 2}}
+	status := domain.WorktreeStatus{Branch: "feature", Path: "/wt/feature"}
+
+	if got := m.runningBadge(status); got != "" {
+		t.Errorf("badge = %q, want no mention of another worktree's jobs", got)
+	}
+}
+
+// The base row has no parent, so a badge taking its rank among the tags landed
+// first there and second everywhere else. Its place must not depend on what the
+// meta happens to hold.
+func TestTheRunningBadgeSitsAtTheSamePlaceOnEveryRow(t *testing.T) {
+	model := newTestModel(t, testWidth, testHeight, "main", "feat")
+	model.statuses[0].IsParent = true
+	model.parents = map[string]string{"feat": "main"}
+	model.running = map[string]int{"/tmp/main": 1, "/tmp/feat": 2}
+
+	width := model.layout().List.Width - borderWidth - paddingWidth
+	base := stripANSI(model.renderRow(0, width)[1])
+	child := stripANSI(model.renderRow(1, width)[1])
+
+	if want := fmt.Sprintf(domain.TreeBadgeRunningFmt, 1); !strings.HasSuffix(strings.TrimRight(base, " "), want) {
+		t.Errorf("base meta = %q, want %q flush right", base, want)
+	}
+	if want := fmt.Sprintf(domain.TreeBadgeRunningFmt, 2); !strings.HasSuffix(strings.TrimRight(child, " "), want) {
+		t.Errorf("child meta = %q, want %q flush right", child, want)
+	}
+	if !strings.Contains(child, domain.DashboardMetaFromPrefix+"main") {
+		t.Errorf("child meta = %q, want the badge to leave the tags in place", child)
+	}
+}
+
+func TestARowWithNothingUpCarriesNoBadge(t *testing.T) {
+	model := newTestModel(t, testWidth, testHeight, "feat")
+
+	width := model.layout().List.Width - borderWidth - paddingWidth
+	meta := stripANSI(model.renderRow(0, width)[1])
+
+	if strings.Contains(meta, "running") {
+		t.Errorf("meta = %q, want no badge at all when nothing is up", meta)
 	}
 }

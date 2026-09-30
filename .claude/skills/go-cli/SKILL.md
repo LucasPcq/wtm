@@ -211,27 +211,26 @@ Before marking any task done, invoke the `build-validator` subagent.
 The real pattern used in this project — no dependency injection, uses helper functions:
 
 ```go
-// internal/commands/start.go
-func newRunStartCmd() *cobra.Command {
+// internal/commands/wt/list.go
+func newListCmd() *cobra.Command {
   cmd := &cobra.Command{
-    Use:   domain.CmdStart + " <job>",
-    Short: "Start a single job",
-    Args:  cobra.ExactArgs(1),
-    RunE:  runStart,
+    Use:   domain.CmdList,
+    Short: "List all worktrees",
+    RunE:  runList,
   }
   shared.AddOutputFlag(cmd)
   return cmd
 }
 
-func runStart(cmd *cobra.Command, args []string) error {
+func runList(cmd *cobra.Command, _ []string) error {
   dir, err := os.Getwd()
   if err != nil {
     return fmt.Errorf("get working directory: %w", err)
   }
 
-  result, ok := loadConfig(cmd, dir)
-  if !ok {
-    return nil
+  result, err := shared.LoadConfig(cmd, dir)
+  if err != nil {
+    return err
   }
 
   // ... delegate to service, format output
@@ -242,7 +241,8 @@ Key conventions:
 - `Use:` always uses `domain.CmdXxx` constants (+ literal arg placeholders)
 - `shared.AddOutputFlag(cmd)` instead of duplicating the output flag registration
 - `shared.LoadConfig(cmd, dir)` resolves the main worktree path **and** the state dir, then loads `<state-dir>/config.toml`. Returns `ConfigResult{Config, ProjectDir, StateDir}`.
-- Unexported constructor (`newRunStartCmd`), registered by the parent group
+- Unexported constructor (`newListCmd`), registered by the parent group
+- A `run` command opens its context with `runctx.Open(runctx.OpenParams{Cmd: cmd})` instead (config, run.toml, the opt-in guard and the interactive gate in one call), then hands `ctx.FlowContext()` to its flow — see `internal/commands/run/start.go`
 
 ### Mutation command — build a Request, call the flow
 
@@ -353,13 +353,13 @@ Two env-var overrides exist for tests / CI:
 
 ### Adding a new command
 
-1. Create `internal/commands/<name>.go` with unexported constructor
+1. Create `internal/commands/<group>/<name>.go` with unexported constructor
 2. Use `domain.CmdXxx` for the `Use:` field (add constant if new)
 3. Register in the parent group's `NewXxxCmd()` function
 4. Set the command's `GroupID` to the right root `--help` section
    (`domain.CmdGroup*` — Worktrees / Navigate / Stack / Jobs / GitHub / Setup). An
    unset `GroupID` renders under a stray "Additional Commands" heading.
-5. **Read-only command** → follow the `runStart` pattern: getwd → loadConfig → delegate
+5. **Read-only command** → follow the `runList` pattern: getwd → `shared.LoadConfig` → delegate
    to `service/` → format via `output/`.
    **Mutation command** (creates/removes/moves/rewrites worktree state) → it goes
    through `flow/`: declare `Request`/`Outcome`/`Presenter`/`Params`/`Run` in
@@ -682,8 +682,7 @@ Reference: `internal/flow/create/steps.go` (`createFlow.recap`), pinned by
 
 **Non-migrated wizards** still do it by hand: each `build*Recap` / `recapStep` reads the
 value from its wizard step and **falls back to the flag/arg** when that step was skipped.
-References: `internal/tui/extract` `buildCombinedRecap` (`FixedFiles`/`FixedTarget`/`FixedKeep`),
-`internal/tui/newwt` `buildCreateRecap` (`BranchName`/`Source`/`EnvOverride`), `internal/tui/checkout`
+References: `internal/tui/extract` `buildCombinedRecap` (`FixedFiles`/`FixedTarget`/`FixedKeep`), `internal/tui/checkout`
 `buildCheckoutRecap` (`FromOverride`/`EnvOverride`). Add the fallback whenever you add a flag
 that pre-fills a step.
 
@@ -787,6 +786,9 @@ Never write a literal `"  "` for padding — always use the constant.
 
 ```go
 output.Blank(w)                    // empty line — use ONLY as an inter-section separator
+output.Unchanged(w, "…")           // = already in the desired state — EVERY no-op, no exception
+output.NextStep(w, output.NextStepParams{Command: "wtm go x", Note: "jump in"})  // → the only hint shape
+output.Tally(output.TallyPart{Count: 3, Label: domain.TallyApplied}, …)          // "3 applied · 1 skipped"
 output.Success(w, "Done")          // ✓ Done
 output.Warning(w, "Be careful")    // ! Be careful
 output.Error(w, "Failed")          // ✗ Failed
@@ -807,13 +809,15 @@ only the top/bottom.
 
 ```go
 // Simple buffered output — one leading + one trailing blank line:
-output.Frame(w, func() {
+output.Frame(w, func(w io.Writer) {
+    // Write to the writer the frame HANDS you, never to the one it was given:
+    // that is what puts the accent bar on every line of the block.
     output.Success(w, "Created worktree feature-x")
 })
 
 // Streaming / split-stream (plan on stderr, result on stdout) — explicit pair:
 output.FrameStart(cmd.ErrOrStderr())
-output.FormatSyncPlan(cmd.ErrOrStderr(), plan)   // raw
+output.FormatSyncPlan(output.Barred(cmd.ErrOrStderr()), plan)   // raw, barred by the caller
 // … spinner, work …
 output.FormatSyncResult(cmd.OutOrStdout(), result) // raw
 output.FrameEnd(cmd.OutOrStdout())
@@ -828,6 +832,12 @@ Rules:
   `output.Blank` is allowed only as a genuine *inter-section* separator inside a body.
 - **No stacked blanks** (`\n\n\n`+). Spinners do not self-pad — the frame owns the
   leading blank, so open the frame before starting a spinner.
+- **The full reference is [`docs/dev/output.md`](../../../docs/dev/output.md)** — the four levels, the two shapes of a conclusion, the glyph vocabulary, the two-stream split, `--quiet`. Read it before adding a command or changing what one prints.
+- **The glyph carries the only colour on its line**; the message stays in the default foreground. `=` and `›` are the exception and mute the whole line, because there the line is the non-event. Every glyph is one column — badges are a TUI widget, not a line of CLI output. Two failure registers, `!` and `✗`; there is no `output.Danger`.
+- **`Muted` has two jobs and no third**: chrome (labels, table headers, tree connectors) and a non-event line. Secondary detail — a branch list under a count, a failure's captured output — is **indented, not muted**.
+- **A conclusion is not optional**, an empty inventory is `=` (`output.UnchangedLine` for a formatter returning a body), an abort is `=` with one wording (`domain.AbortedMessage`), and a hint is always `output.NextStep`.
+- **A block has to earn its place**: it prints when it changes what the reader does next. Success contracts to a count, anomalies are named one by one; detail belongs to the command whose subject it is (ports → `wtm env`, not `create`); a successful run has a fixed shape whatever happened. See CLAUDE.md, "What a block of output has to earn".
+- **A hook phase is shown, not kept**: `output.HookView` draws a bounded tail and replaces it with one result line per hook. Terminals only (`output.IsTerminal`) — a pipe or `--output json` gets the raw stream. Every path goes through `commands/shared.DrawHookPhase`, which opens `<state-dir>/hooks/<phase>-<branch>.log` and tees the raw stream into it whatever it draws, and which always hands the sink the command's own writer (a nil sink falls back to `os.Stderr` and escapes `--quiet`). The phase reports through `flow.HookSink` (output + `domain.HookBeat`); `service/hooks` renders only its no-reporter fallback.
 - **TUI views own their single top/bottom blank** (`WizardModel`/`standaloneModel`
   both open with one leading `\n`); don't add a manual blank before launching a wizard.
 

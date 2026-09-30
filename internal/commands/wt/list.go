@@ -3,6 +3,7 @@ package wt
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -31,7 +32,11 @@ func newListCmd() *cobra.Command {
 		Use:   domain.CmdList,
 		Short: "List all worktrees",
 		Long:  "List all git worktrees with their status, PR info, and running services.",
-		RunE:  runList,
+		Example: `  wtm list
+
+  # With each worktree's pull request, as JSON
+  wtm list --with-prs --output json`,
+		RunE: runList,
 	}
 	shared.AddOutputFlag(cmd)
 	cmd.Flags().Bool(domain.FlagWithPRs, false, "Include GitHub PR info in non-interactive output (fetched eagerly)")
@@ -65,7 +70,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 
 	err = components.RunLoading(components.LoadingParams{
 		Message: "Loading worktrees…",
-		Animate: rules.IsHumanFormat(format),
+		Animate: shared.Animate(cmd, rules.IsHumanFormat(format)),
 		Work: func() error {
 			wg.Add(2)
 			go func() {
@@ -104,8 +109,8 @@ func runList(cmd *cobra.Command, _ []string) error {
 				Services: services,
 			})
 		}
-		output.Frame(cmd.OutOrStdout(), func() {
-			fmt.Fprintln(cmd.OutOrStdout(), strings.TrimRight(output.FormatWorktreeList(output.FormatWorktreeListParams{
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			fmt.Fprintln(w, strings.TrimRight(output.FormatWorktreeList(output.FormatWorktreeListParams{
 				Statuses:     statuses,
 				ActiveBranch: activeBranch,
 				PRInfos:      prs,
@@ -116,8 +121,8 @@ func runList(cmd *cobra.Command, _ []string) error {
 	}
 
 	if len(statuses) == 0 {
-		output.Frame(cmd.OutOrStdout(), func() {
-			output.Message(cmd.OutOrStdout(), "No worktrees found.")
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			output.Unchanged(w, domain.NoWorktreesMessage)
 		})
 		return nil
 	}
@@ -142,7 +147,6 @@ func runList(cmd *cobra.Command, _ []string) error {
 
 const (
 	lsActionGo           = "go"
-	lsActionSwitch       = "switch"
 	lsActionOpenPR       = "open-pr"
 	lsActionServicesUp   = "services-up"
 	lsActionServicesDown = "services-down"
@@ -362,7 +366,6 @@ func buildActionItems(params buildActionItemsParams) []components.SelectItem {
 
 	return []components.SelectItem{
 		{Label: "Go (cd to worktree)", Value: lsActionGo},
-		{Label: "Switch (go + start services)", Value: lsActionSwitch},
 		{Label: "Open PR", Value: lsActionOpenPR, Disabled: openPRDisabled},
 		{Separator: true},
 		{Label: "Start profile", Value: lsActionServicesUp},
@@ -387,20 +390,6 @@ func executeWorktreeAction(cmd *cobra.Command, action string, selected domain.Wo
 		}
 		fmt.Println(selected.Path)
 		return nil
-
-	case lsActionSwitch:
-		goFile := os.Getenv(domain.EnvGoFile)
-		if goFile != "" {
-			if err := os.WriteFile(goFile, []byte(selected.Path), 0o644); err != nil {
-				return err
-			}
-		}
-		c := exec.Command(bin, domain.CmdRun, domain.CmdUp)
-		c.Dir = selected.Path
-		c.Stdin = os.Stdin
-		c.Stdout = os.Stdout
-		c.Stderr = os.Stderr
-		return c.Run()
 
 	case lsActionOpenPR:
 		if pr, ok := findPRForBranch(prs, selected.Branch); ok {

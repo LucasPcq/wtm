@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -117,21 +118,30 @@ type rawEnvFile struct {
 	Local    bool   `toml:"local"`
 }
 
-// LoadGlobal reads the user-level config on its own, for callers that run
-// outside a wtm project (the update notifier).
+// GlobalPath is where the machine-level config lives, empty when the OS gives
+// no config directory at all.
+func GlobalPath() string {
+	dir, err := infra.GlobalDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(dir, domain.GlobalConfigFile)
+}
+
+// LoadGlobal reads the global config on its own, for the settings that belong to
+// the machine rather than to a repository — a command about them must answer
+// outside any wtm project.
 func LoadGlobal() (domain.GlobalConfig, error) {
 	return loadGlobalConfig()
 }
 
-// loadGlobalConfig reads ~/.config/wtm/config.toml. Returns zero-value GlobalConfig
-// if the file does not exist (global config is optional).
+// loadGlobalConfig returns a zero-value GlobalConfig when the file does not
+// exist: the global config is optional.
 func loadGlobalConfig() (domain.GlobalConfig, error) {
-	configDir, err := os.UserConfigDir()
-	if err != nil {
+	path := GlobalPath()
+	if path == "" {
 		return domain.GlobalConfig{}, nil
 	}
-
-	path := filepath.Join(configDir, domain.GlobalConfigDir, domain.GlobalConfigFile)
 
 	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
 		return domain.GlobalConfig{}, nil

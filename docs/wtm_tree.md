@@ -17,12 +17,30 @@ paste into a PR or Notion.
 wtm tree [flags]
 ```
 
+### Examples
+
+```
+  wtm tree
+
+  # With PR numbers and merged/closed markers
+  wtm tree --with-prs
+
+  # A flowchart to paste into a PR description
+  wtm tree --output mermaid
+```
+
 ### Options
 
 ```
   -h, --help            help for tree
-      --output string   Output format: text or json (default "text")
+      --output string   Output format: text, json or mermaid (default "text")
       --with-prs        Include GitHub PR info (open/merged/closed; fetched eagerly)
+```
+
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
 ```
 
 ### SEE ALSO

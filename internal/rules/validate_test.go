@@ -260,3 +260,144 @@ func TestValidateRunMultipleDefaults(t *testing.T) {
 		t.Errorf("unexpected error: %v", errs)
 	}
 }
+
+func TestValidateRunPortsAccepted(t *testing.T) {
+	cfg := domain.RunConfig{
+		Jobs: []domain.JobConfig{
+			{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}},
+			{Name: "db", Kind: domain.JobKindService, Cmd: "docker compose up -d", Ports: map[string]int{"DB_PORT": 5432}},
+		},
+	}
+	if _, errs := ValidateRun(cfg); len(errs) != 0 {
+		t.Fatalf("expected a clean config, got %v", errs)
+	}
+}
+
+func TestValidateRunPortInvalidName(t *testing.T) {
+	cfg := domain.RunConfig{
+		Jobs: []domain.JobConfig{
+			{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev", Ports: map[string]int{"DB-PORT": 5432}},
+		},
+	}
+	_, errs := ValidateRun(cfg)
+	if !strings.Contains(strings.Join(errs, " "), "not a valid environment variable name") {
+		t.Errorf("unexpected errors: %v", errs)
+	}
+}
+
+func TestValidateRunPortOutOfRange(t *testing.T) {
+	for _, base := range []int{0, -1, 70000} {
+		cfg := domain.RunConfig{
+			Jobs: []domain.JobConfig{
+				{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev", Ports: map[string]int{"PORT": base}},
+			},
+		}
+		_, errs := ValidateRun(cfg)
+		if !strings.Contains(strings.Join(errs, " "), "outside") {
+			t.Errorf("base %d: unexpected errors: %v", base, errs)
+		}
+	}
+}
+
+func TestValidateRunNegativeBlock(t *testing.T) {
+	cfg := domain.RunConfig{
+		PortOffsetBlock: -10,
+		Jobs:            []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev"}},
+	}
+	_, errs := ValidateRun(cfg)
+	if !strings.Contains(strings.Join(errs, " "), "port_offset_block") {
+		t.Errorf("unexpected errors: %v", errs)
+	}
+}
+
+// The error has to say what to change: at runtime the user only sees an
+// EADDRINUSE with nothing pointing back at run.toml.
+func TestValidateRunPortCollisionIsActionable(t *testing.T) {
+	cfg := domain.RunConfig{
+		Jobs: []domain.JobConfig{
+			{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}},
+			{Name: "api", Kind: domain.JobKindService, Cmd: "pnpm api", Ports: map[string]int{"ADMIN": 3010}},
+		},
+	}
+	_, errs := ValidateRun(cfg)
+	joined := strings.Join(errs, " ")
+	for _, want := range []string{"PORT", "ADMIN", "web", "api", "3000", "3010", "port_offset_block"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("error should mention %q, got %v", want, errs)
+		}
+	}
+}
+
+func TestValidateRunNeighbouringBasesAccepted(t *testing.T) {
+	cfg := domain.RunConfig{
+		Jobs: []domain.JobConfig{
+			{Name: "db", Kind: domain.JobKindService, Cmd: "docker compose up -d", Ports: map[string]int{
+				"PG_A": 5434, "PG_B": 5435, "PG_C": 5436,
+			}},
+		},
+	}
+	if _, errs := ValidateRun(cfg); len(errs) != 0 {
+		t.Fatalf("bases a single unit apart never collide under a uniform offset, got %v", errs)
+	}
+}
+
+func runnerConfig(runs ...string) domain.RunConfig {
+	return domain.RunConfig{Jobs: []domain.JobConfig{
+		{Name: "dev:crm", Kind: domain.JobKindService, Cmd: "pnpm run dev:crm", Runs: runs},
+		{Name: "crm-web-dev", Kind: domain.JobKindService, Cmd: "pnpm run dev", Ports: map[string]int{"VITE_PORT": 5175}},
+	}}
+}
+
+func TestValidateRunAcceptsARunnerNamingItsChildren(t *testing.T) {
+	if _, errs := ValidateRun(runnerConfig("crm-web-dev")); len(errs) != 0 {
+		t.Fatalf("got %v", errs)
+	}
+}
+
+func TestValidateRunRefusesARunnerNamingAnUnknownJob(t *testing.T) {
+	_, errs := ValidateRun(runnerConfig("nope"))
+
+	if len(errs) != 1 || !strings.Contains(errs[0], "runs unknown job") {
+		t.Fatalf("got %v", errs)
+	}
+}
+
+func TestValidateRunRefusesARunnerNamingItself(t *testing.T) {
+	_, errs := ValidateRun(runnerConfig("dev:crm"))
+
+	if len(errs) != 1 || !strings.Contains(errs[0], "runs itself") {
+		t.Fatalf("got %v", errs)
+	}
+}
+
+func TestValidateRunRefusesACycleOfRunners(t *testing.T) {
+	cfg := domain.RunConfig{Jobs: []domain.JobConfig{
+		{Name: "a", Kind: domain.JobKindService, Cmd: "x", Runs: []string{"b"}},
+		{Name: "b", Kind: domain.JobKindService, Cmd: "y", Runs: []string{"a"}},
+	}}
+
+	if _, errs := ValidateRun(cfg); len(errs) == 0 {
+		t.Fatal("a runner reachable from itself makes every walk of the relation recurse forever")
+	}
+}
+
+func TestValidateRunRefusesBindsNoPortOnAJobDeclaringOne(t *testing.T) {
+	cfg := domain.RunConfig{Jobs: []domain.JobConfig{
+		{Name: "web", Kind: domain.JobKindService, Cmd: "x", Ports: map[string]int{"PORT": 3000}, BindsNoPort: true},
+	}}
+
+	_, errs := ValidateRun(cfg)
+	if len(errs) != 1 || !strings.Contains(errs[0], "contradicts") {
+		t.Fatalf("got %v", errs)
+	}
+}
+
+func TestValidateRunRefusesBindsNoPortOnATask(t *testing.T) {
+	cfg := domain.RunConfig{Jobs: []domain.JobConfig{
+		{Name: "migrate", Kind: domain.JobKindTask, Cmd: "x", BindsNoPort: true},
+	}}
+
+	if _, errs := ValidateRun(cfg); len(errs) != 1 {
+		t.Fatalf("got %v", errs)
+	}
+}

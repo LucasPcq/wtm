@@ -153,9 +153,9 @@ func readEnvDrift(params DetailParams) (domain.EnvDriftSummary, error) {
 
 	drift := domain.EnvDriftSummary{Configured: true}
 	for _, result := range results {
-		drift.Missing += len(result.Diff.ByStatus(domain.EnvKeyMissing))
-		drift.Conflicting += len(result.Diff.ByStatus(domain.EnvKeyConflict))
-		drift.Orphan += len(result.Diff.ByStatus(domain.EnvKeyOrphan))
+		drift.Missing += len(rules.EnvKeysWithStatus(rules.EnvDiffFilter{Diff: result.Diff, Status: domain.EnvKeyMissing}))
+		drift.Conflicting += len(rules.EnvKeysWithStatus(rules.EnvDiffFilter{Diff: result.Diff, Status: domain.EnvKeyConflict}))
+		drift.Orphan += len(rules.EnvKeysWithStatus(rules.EnvDiffFilter{Diff: result.Diff, Status: domain.EnvKeyOrphan}))
 	}
 	return drift, nil
 }

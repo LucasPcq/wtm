@@ -347,3 +347,41 @@ func TestASectionTitleIsFollowedByABlankLine(t *testing.T) {
 		t.Error("one blank line, not two: the section's body follows it")
 	}
 }
+
+// The box already draws the modal's title above the body. A one-question
+// confirmation whose step carries that same question wrote it twice, one blank
+// line apart — modal.stepHeader has always left it out, heading did not.
+func TestAFormDoesNotRepeatTheModalTitle(t *testing.T) {
+	question := "Update these .env values to this worktree's ports?"
+	rows, _ := formSection(formSectionParams{
+		Step:    flow.Step{Kind: flow.StepRecap, Key: "k"},
+		Content: flow.StepContent{Title: question, Description: "This worktree's offset is +10."},
+		Title:   question,
+	})
+
+	for _, row := range rows {
+		if row.label == question {
+			t.Fatalf("rows = %+v, want the step title left out: the box draws it already", rows)
+		}
+	}
+}
+
+// A step whose title is its own is still a heading: what the guard drops is the
+// repetition, never the section header of a form holding several steps.
+func TestAFormKeepsAStepTitleOfItsOwn(t *testing.T) {
+	rows, _ := formSection(formSectionParams{
+		Step:    flow.Step{Kind: flow.StepSelect, Key: "k"},
+		Content: flow.StepContent{Title: "Env strategy", Options: []flow.Option{{Label: "example", Value: "example"}}},
+		Title:   "New worktree",
+	})
+
+	var found bool
+	for _, row := range rows {
+		if row.label == "Env strategy" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("rows = %+v, want the step's own title kept", rows)
+	}
+}

@@ -5,14 +5,8 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	ghservice "github.com/LucasPcq/wtm/internal/service/github"
-	"github.com/LucasPcq/wtm/internal/service/process"
+	"github.com/LucasPcq/wtm/internal/service/runjobs"
 )
-
-// LoadPRsGraceful fetches open PRs for the project, returning nil on error.
-func LoadPRsGraceful(projectDir string) []domain.PRInfo {
-	prs, _ := LoadPRs(projectDir)
-	return prs
-}
 
 // LoadPRs fetches open PRs for the project and reports the GitHub CLI
 // connection status, distinguishing "no PRs" from "gh unavailable" so callers
@@ -65,16 +59,10 @@ func LoadPRsAllStatesGraceful(projectDir string) []domain.PRInfo {
 	return prs
 }
 
-// LoadJobsGraceful fetches the daemon's running jobs, returning nil when the daemon is not running.
-func LoadJobsGraceful() []domain.JobInfo {
-	socketPath := process.SocketPath()
-	if !process.IsDaemonRunning(socketPath) {
-		return nil
-	}
-	client := process.NewClient(socketPath)
-	resp, err := client.Send(process.Request{Action: process.ActionList})
-	if err != nil {
-		return nil
-	}
-	return resp.Jobs
-}
+// LoadJobsGraceful fetches the daemon's jobs, returning nil when there are none
+// to fetch.
+func LoadJobsGraceful() []domain.JobInfo { return runjobs.Load() }
+
+// LoadJobs is LoadJobsGraceful for the callers whose whole output is that list,
+// and which therefore have to report a daemon of another build.
+func LoadJobs() runjobs.Listing { return runjobs.List() }

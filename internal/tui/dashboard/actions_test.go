@@ -69,8 +69,8 @@ func TestHooksStreamIntoTheOutputPanelLineByLine(t *testing.T) {
 
 	err := p.HookPhase(flow.HookPhaseParams{
 		Title: domain.HooksTitleOnCreate,
-		Run: func(sink io.Writer) error {
-			if _, writeErr := io.WriteString(sink, "installing\npar"); writeErr != nil {
+		Run: func(sink flow.HookSink) error {
+			if _, writeErr := io.WriteString(sink.Output, "installing\npar"); writeErr != nil {
 				return writeErr
 			}
 			// Title line + its opStageMsg (the locked row's progress) + the
@@ -78,7 +78,7 @@ func TestHooksStreamIntoTheOutputPanelLineByLine(t *testing.T) {
 			if len(msgs) != 3 {
 				t.Errorf("%d messages posted mid-run, want the title, its stage and the first line already out", len(msgs))
 			}
-			_, writeErr := io.WriteString(sink, "tial tail")
+			_, writeErr := io.WriteString(sink.Output, "tial tail")
 			return writeErr
 		},
 	})
@@ -214,14 +214,14 @@ func TestReparentHoldsTheSurfaceAndItsWorktree(t *testing.T) {
 	if got.kind != domain.OpKindReparent || got.mode != flow.ModeBlocking {
 		t.Errorf("operation = %+v, want the mode reparent declares", got)
 	}
-	if got.target != "b" {
-		t.Errorf("target = %q, want the worktree the menu named", got.target)
+	if got.firstTarget() != "b" {
+		t.Errorf("target = %q, want the worktree the menu named", got.firstTarget())
 	}
 }
 
 func TestReparentIsRefusedWhileSomethingHoldsTheWorktree(t *testing.T) {
 	model := newTestModel(t, testWidth, testHeight, "a", "b")
-	model.ops, _ = model.ops.begin(operation{kind: domain.OpKindCreate, target: "b"})
+	model.ops, _ = model.ops.begin(operation{kind: domain.OpKindCreate, targets: []string{"b"}})
 
 	refused, cmd := model.startReparent("b")
 
@@ -287,8 +287,8 @@ func TestBatchReparentBlocksTheSurfaceAndPresetsNothing(t *testing.T) {
 	if got.kind != domain.OpKindReparent || got.mode != flow.ModeBlocking {
 		t.Errorf("operation = %+v, want the mode reparent declares", got)
 	}
-	if got.target != "" {
-		t.Errorf("target = %q, want none: the worktrees are chosen inside the run", got.target)
+	if got.firstTarget() != "" {
+		t.Errorf("target = %q, want none: the worktrees are chosen inside the run", got.firstTarget())
 	}
 }
 
@@ -389,8 +389,8 @@ func TestSyncBlocksTheSurfaceAndLocksNoWorktree(t *testing.T) {
 	if got.kind != domain.OpKindSync || got.mode != flow.ModeBlocking {
 		t.Errorf("operation = %+v, want the mode sync declares", got)
 	}
-	if got.target != "" {
-		t.Errorf("target = %q, want none: the cascade covers several worktrees", got.target)
+	if got.firstTarget() != "" {
+		t.Errorf("target = %q, want none: the cascade covers several worktrees", got.firstTarget())
 	}
 	if !model.outputExpanded {
 		t.Error("a run the user cannot watch is a run they cannot trust: the output panel must open")
@@ -399,7 +399,7 @@ func TestSyncBlocksTheSurfaceAndLocksNoWorktree(t *testing.T) {
 
 func TestSyncIsRefusedWhileSomethingHoldsTheWorktree(t *testing.T) {
 	model := newTestModel(t, testWidth, testHeight, "a", "b")
-	model.ops, _ = model.ops.begin(operation{kind: domain.OpKindCreate, target: "b"})
+	model.ops, _ = model.ops.begin(operation{kind: domain.OpKindCreate, targets: []string{"b"}})
 
 	refused, cmd := model.startSync("b")
 
@@ -447,7 +447,7 @@ func TestTheRowFastForwardActsOnTheRowItWasOpenedFrom(t *testing.T) {
 		statuses: []domain.WorktreeStatus{{Branch: "trunk", IsParent: true}},
 		parents:  map[string]string{},
 	})
-	model.ops, _ = model.ops.begin(operation{kind: domain.OpKindCreate, target: "trunk"})
+	model.ops, _ = model.ops.begin(operation{kind: domain.OpKindCreate, targets: []string{"trunk"}})
 
 	refused, cmd := model.startFastForward("trunk")
 
@@ -497,7 +497,7 @@ func TestBatchFastForwardBlocksTheSurfaceAndPrechecksTheBehindOnes(t *testing.T)
 	if cmd == nil {
 		t.Fatal("the batch entry must start the run")
 	}
-	if len(started.ops.running) != 1 || started.ops.running[0].target != "" {
+	if len(started.ops.running) != 1 || len(started.ops.running[0].targets) != 0 {
 		t.Fatalf("running = %+v, want a run holding the surface and no worktree", started.ops.running)
 	}
 	precheck := rules.FastForwardReadyBranches(model.statuses)

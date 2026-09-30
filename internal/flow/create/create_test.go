@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/decide"
@@ -51,7 +52,7 @@ func TestRecapKeepsEveryLineWhateverAnsweredIt(t *testing.T) {
 		KeyEnv:    "example",
 	}))
 
-	for _, want := range []string{"Branch:  feat/x", "Source:  main", "Env:     example"} {
+	for _, want := range []string{"Branch:    feat/x", "Source:    main", "Env:       example"} {
 		if !strings.Contains(recap, want) {
 			t.Errorf("recap %q should contain %q", recap, want)
 		}
@@ -60,7 +61,7 @@ func TestRecapKeepsEveryLineWhateverAnsweredIt(t *testing.T) {
 
 func TestRecapNamesTheConfigDefaultEnv(t *testing.T) {
 	recap := newFlow(t, Request{}, nil).recap(answers(map[string]string{KeyBranch: "feat/x", KeySource: "main"}))
-	if !strings.Contains(recap, "Env:     config default") {
+	if !strings.Contains(recap, "Env:       config default") {
 		t.Errorf("recap %q should name the empty env choice", recap)
 	}
 }
@@ -72,10 +73,10 @@ func TestRecapCallsTheSourceAParentForAReusedBranch(t *testing.T) {
 		KeyEnv:    "example",
 	}))
 
-	if !strings.Contains(recap, "Parent:  main") {
+	if !strings.Contains(recap, "Parent:    main") {
 		t.Errorf("recap %q should label the source as the recorded parent", recap)
 	}
-	if strings.Contains(recap, "Source:  ") {
+	if strings.Contains(recap, "Source:    ") {
 		t.Errorf("recap %q must not present the parent as a start-point", recap)
 	}
 	if !strings.Contains(recap, domain.BranchReusedSuffix) {
@@ -94,7 +95,7 @@ func TestRecapPutsTheFastForwardOnItsSubject(t *testing.T) {
 	})
 
 	onSource := newFlow(t, Request{}, nil).recap(given)
-	if !strings.Contains(onSource, "Source:  main (fast-forward to origin)") {
+	if !strings.Contains(onSource, "Source:    main (fast-forward to origin)") {
 		t.Errorf("recap %q should annotate the source line", onSource)
 	}
 
@@ -102,7 +103,7 @@ func TestRecapPutsTheFastForwardOnItsSubject(t *testing.T) {
 	if !strings.Contains(onBranch, "fast-forward feat/x to origin") {
 		t.Errorf("recap %q should carry its own update line for the reused branch", onBranch)
 	}
-	if strings.Contains(onBranch, "Parent:  main (fast-forward") {
+	if strings.Contains(onBranch, "Parent:    main (fast-forward") {
 		t.Errorf("recap %q must not annotate the parent it does not move", onBranch)
 	}
 }
@@ -121,8 +122,8 @@ func TestSessionAsksOnlyWhatIsMissing(t *testing.T) {
 			t.Errorf("step %q should be left to be asked", key)
 		}
 	}
-	if len(bare.Steps) != 5 {
-		t.Errorf("declared %d steps, want branch, source, env, source update and recap", len(bare.Steps))
+	if len(bare.Steps) != 6 {
+		t.Errorf("declared %d steps, want branch, source, env, env ports, source update and recap", len(bare.Steps))
 	}
 }
 
@@ -226,7 +227,7 @@ func TestRunAsksEveryQuestionThenCreates(t *testing.T) {
 	}
 
 	recap := prompter.Content[KeyRecap].Description
-	for _, line := range []string{"Branch:  feat/w", "Source:  main", "Env:     config default"} {
+	for _, line := range []string{"Branch:    feat/w", "Source:    main", "Env:       config default"} {
 		if !strings.Contains(recap, line) {
 			t.Errorf("recap %q should contain %q", recap, line)
 		}
@@ -261,7 +262,7 @@ func TestRunSkipsTheQuestionsTheRequestAnswers(t *testing.T) {
 		t.Errorf("asked %q, want the recap alone", prompter.AskedKeys())
 	}
 	recap := prompter.Content[KeyRecap].Description
-	for _, line := range []string{"Branch:  feat/flagged", "Source:  main", "Env:     example"} {
+	for _, line := range []string{"Branch:    feat/flagged", "Source:    main", "Env:       example"} {
 		if !strings.Contains(recap, line) {
 			t.Errorf("recap %q should still contain %q", recap, line)
 		}
@@ -340,5 +341,116 @@ func TestFastForwardSubjectIsSharedWithTheOtherFlows(t *testing.T) {
 		Branch:     "feat/x",
 	}); got != "feat/x" {
 		t.Errorf("subject = %q, want the reused branch", got)
+	}
+}
+
+// withRunConfig gives the flow a state dir holding this run.toml.
+func withRunConfig(t *testing.T, f *createFlow, cfg domain.RunConfig) *createFlow {
+	t.Helper()
+	stateDir := t.TempDir()
+	if err := config.WriteRun(config.WriteRunParams{StateDir: stateDir, Force: true, Config: cfg}); err != nil {
+		t.Fatalf("write run config: %v", err)
+	}
+	f.ctx.StateDir = stateDir
+	return f
+}
+
+func portedConfig(isolation domain.Isolation) domain.RunConfig {
+	return domain.RunConfig{
+		Isolation: isolation,
+		Jobs: []domain.JobConfig{{
+			Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev",
+			Ports: map[string]int{"PORT": 3000},
+		}},
+	}
+}
+
+// What the step decides is written into the .env this run provisions, so the
+// question belongs to that run — not to a second confirmation put after the
+// worktree exists.
+func TestIsolationIsAskedBeforeTheWorktreeExists(t *testing.T) {
+	f := newFlow(t, Request{}, nil)
+	session := f.session()
+
+	var found bool
+	for index, step := range session.Steps {
+		if step.Key != KeyIsolation {
+			continue
+		}
+		found = true
+		if step.Key == session.Steps[len(session.Steps)-1].Key {
+			t.Error("the isolation step is the recap, want it asked before it")
+		}
+		if index == 0 {
+			t.Error("the isolation step leads the session, want it after what it depends on")
+		}
+	}
+	if !found {
+		t.Fatal("the session declares no isolation step")
+	}
+}
+
+// With nothing to isolate both answers do the same thing, so nobody is asked.
+func TestIsolationIsNotAskedWithNothingToIsolate(t *testing.T) {
+	step := newFlow(t, Request{}, nil).isolationStep()
+
+	skip, reason := step.Skip(flow.Answers{})
+	if !skip {
+		t.Fatal("the step was posed for a project that declares nothing to isolate")
+	}
+	if reason != domain.IsolationStepIrrelevant {
+		t.Errorf("reason = %q, want %q", reason, domain.IsolationStepIrrelevant)
+	}
+}
+
+func TestIsolationIsAskedOnceAPortIsDeclared(t *testing.T) {
+	step := withRunConfig(t, newFlow(t, Request{}, nil), portedConfig("")).isolationStep()
+	if skip, reason := step.Skip(flow.Answers{}); skip {
+		t.Errorf("skipped (%s), want the question put for a project declaring a port", reason)
+	}
+}
+
+// Nobody to ask: the project's standing answer decides, and a project that
+// never gave one gets what every worktree got before the question existed.
+func TestIsolationResolvesToTheProjectDefault(t *testing.T) {
+	cases := []struct {
+		name      string
+		isolation domain.Isolation
+		want      domain.Isolation
+	}{
+		{name: "unset", isolation: "", want: domain.IsolationIsolated},
+		{name: "verbatim", isolation: domain.IsolationVerbatim, want: domain.IsolationVerbatim},
+	}
+	for _, tc := range cases {
+		f := withRunConfig(t, newFlow(t, Request{}, nil), portedConfig(tc.isolation))
+		answer, err := f.isolationStep().Resolve(flow.Answers{})
+		if err != nil {
+			t.Fatalf("%s: Resolve: %v", tc.name, err)
+		}
+		if domain.Isolation(answer.Value) != tc.want {
+			t.Errorf("%s: Resolve = %q, want %q", tc.name, answer.Value, tc.want)
+		}
+		if first := f.isolationStep().Options[0].Value; domain.Isolation(first) != tc.want {
+			t.Errorf("%s: first option = %q, want the default %q first", tc.name, first, tc.want)
+		}
+	}
+}
+
+// --isolation answers the step, and the recap still names it.
+func TestRecapNamesTheIsolation(t *testing.T) {
+	f := newFlow(t, Request{Isolation: domain.IsolationVerbatim}, nil)
+
+	values := f.session().Presets
+	if got := domain.Isolation(values.Value(KeyIsolation)); got != domain.IsolationVerbatim {
+		t.Errorf("isolation = %q, want the flag's", got)
+	}
+	if recap := f.recap(values); !strings.Contains(recap, "Isolation: "+domain.IsolationSummaryVerbatim) {
+		t.Errorf("recap = %q, want the isolation named", recap)
+	}
+
+	// Not asked, not recapped: a project with nothing to isolate never saw it.
+	silent := f.recap(answers(map[string]string{KeyBranch: "feat/x", KeySource: "main"}))
+	if strings.Contains(silent, domain.RecapFieldIsolation) {
+		t.Errorf("recap = %q, want no line for a step that was never posed", silent)
 	}
 }

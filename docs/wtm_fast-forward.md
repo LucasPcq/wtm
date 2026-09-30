@@ -15,6 +15,18 @@ it anyway, and git still refuses if a modified file would be overwritten.
 wtm fast-forward [branch...] [flags]
 ```
 
+### Examples
+
+```
+  # Pick the worktrees to bring up to origin
+  wtm fast-forward
+
+  wtm ff feat/login
+
+  # Every worktree, no prompts
+  wtm fast-forward --all --yes --output json
+```
+
 ### Options
 
 ```
@@ -23,6 +35,12 @@ wtm fast-forward [branch...] [flags]
   -h, --help            help for fast-forward
       --output string   Output format: text or json (default "text")
   -y, --yes             Skip all prompts; resolve every decision from flags and safe defaults (requires branch args or --all)
+```
+
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
 ```
 
 ### SEE ALSO

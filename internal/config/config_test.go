@@ -136,6 +136,29 @@ func TestGlobalConfigLeavesUIAnimationsNilWhenAbsent(t *testing.T) {
 	}
 }
 
+func TestGlobalConfigDecodesProxy(t *testing.T) {
+	var cfg domain.GlobalConfig
+	if err := decodeStrictBytes("config.toml", []byte("shell = \"zsh\"\n\n[proxy]\nport = 5000\n"), &cfg); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Proxy.Port != 5000 {
+		t.Errorf("Proxy.Port = %d, want 5000", cfg.Proxy.Port)
+	}
+	if cfg.Proxy.Enabled != nil {
+		t.Errorf("Proxy.Enabled = %v, want nil: an absent key must not read as an explicit answer", cfg.Proxy.Enabled)
+	}
+}
+
+func TestGlobalConfigDecodesProxyDisabled(t *testing.T) {
+	var cfg domain.GlobalConfig
+	if err := decodeStrictBytes("config.toml", []byte("[proxy]\nenabled = false\n"), &cfg); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Proxy.Enabled == nil || *cfg.Proxy.Enabled {
+		t.Errorf("Proxy.Enabled = %v, want a pointer to false", cfg.Proxy.Enabled)
+	}
+}
+
 func TestLoadMissingProjectConfigReturnsError(t *testing.T) {
 	dir := t.TempDir()
 

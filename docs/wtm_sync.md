@@ -20,6 +20,22 @@ cascade; when it is behind its remote you are offered to fast-forward it first
 wtm sync [branch...] [flags]
 ```
 
+### Examples
+
+```
+  # Pick the worktrees to rebase
+  wtm sync
+
+  # Preview the whole cascade
+  wtm sync --all --dry-run
+
+  # Rebase a stack, then force-push it (with lease)
+  wtm sync feat/login feat/login-ui --yes --push
+
+  # Every worktree, locally only
+  wtm sync --all --yes --no-push --output json
+```
+
 ### Options
 
 ```
@@ -34,6 +50,12 @@ wtm sync [branch...] [flags]
       --output string   Output format: text or json (default "text")
       --push            Force-push (with lease) rebased branches without prompting
   -y, --yes             Skip all prompts; resolve every decision from flags and safe defaults (requires branch args or --all; use --push to push)
+```
+
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
 ```
 
 ### SEE ALSO

@@ -1,9 +1,11 @@
 package checkout
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/tui/components"
 )
 
 func TestTruncate(t *testing.T) {
@@ -119,5 +121,47 @@ func TestBuildBranchItems_RemoteAfterSeparator(t *testing.T) {
 	}
 	if items[2].Value != "origin/release" || len(items[2].Badges) == 0 || items[2].Badges[0].Text != domain.BadgeTextRemote {
 		t.Errorf("expected remote item with remote badge, got %+v", items[2])
+	}
+}
+
+// A PR checked out with every flag given runs no wizard at all, and must still
+// land on the isolation the flag, else the project, asked for.
+func TestPreselectedWithEverythingFixedKeepsTheIsolation(t *testing.T) {
+	pr := domain.PRInfo{Number: 7, Branch: "feat/x", BaseBranch: "main"}
+	res, err := RunWizard(WizardParams{
+		Preselected:      &pr,
+		IsolationApplies: true,
+		IsolationDefault: domain.IsolationIsolated,
+		// The flag answered it: nothing is left to ask.
+		IsolationOverride: domain.IsolationVerbatim,
+	})
+	if err != nil {
+		t.Fatalf("RunWizard: %v", err)
+	}
+	if res.Isolation != domain.IsolationVerbatim {
+		t.Errorf("isolation = %q, want the flag's", res.Isolation)
+	}
+}
+
+func TestCheckoutRecapNamesTheIsolation(t *testing.T) {
+	pr := domain.PRInfo{Number: 7, Title: "t", Branch: "feat/x", BaseBranch: "main"}
+	params := WizardParams{Preselected: &pr, IsolationApplies: true, IsolationOverride: domain.IsolationVerbatim}
+	label := func([]components.Step) string { return prDisplay(pr) }
+	recap := buildCheckoutRecap(nil, params, label, label)
+	if !strings.Contains(recap, domain.IsolationSummaryVerbatim) {
+		t.Errorf("recap = %q, want the isolation named", recap)
+	}
+}
+
+func TestCheckoutRecapIsolationLineFollowsTheCreateFlow(t *testing.T) {
+	pr := domain.PRInfo{Number: 7, Title: "t", Branch: "feat/x", BaseBranch: "main"}
+	label := func([]components.Step) string { return prDisplay(pr) }
+
+	flagged := buildCheckoutRecap(nil, WizardParams{Preselected: &pr, IsolationOverride: domain.IsolationVerbatim}, label, label)
+	if !strings.Contains(flagged, "Isolation: "+domain.IsolationSummaryVerbatim) {
+		t.Errorf("recap = %q, want the flag's isolation named", flagged)
+	}
+	if silent := buildCheckoutRecap(nil, WizardParams{Preselected: &pr}, label, label); strings.Contains(silent, "Isolation:") {
+		t.Errorf("recap = %q, want no line for a step never posed", silent)
 	}
 }

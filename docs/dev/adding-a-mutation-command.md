@@ -213,7 +213,7 @@ and machine output are never framed.
 1. `make docs` — regenerates `docs/`, never hand-edited.
 2. Add the command to the `README.md` overview table, in the same group as the root
    `--help`.
-3. Update `internal/commands/agents/assets/using-wtm.skill.md` if the agent-facing
+3. Update the agent skill (`internal/commands/agents/assets/using-wtm/`, the reference file of the command's topic) if the agent-facing
    surface changed (a new command, a new flag, a changed JSON shape, changed
    failure/abort semantics).
 4. Run the `build-validator` subagent. Step 6 fails the run if `internal/flow/` gained

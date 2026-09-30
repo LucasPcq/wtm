@@ -249,43 +249,6 @@ func TestWriteProjectRoundTripOnClean(t *testing.T) {
 	}
 }
 
-func TestWriteRunTemplateCreatesCommentedFile(t *testing.T) {
-	dir := t.TempDir()
-
-	if err := WriteRunTemplate(WriteRunParams{StateDir: dir}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	data, err := os.ReadFile(filepath.Join(dir, domain.RunFileName))
-	if err != nil {
-		t.Fatalf("file not created: %v", err)
-	}
-	content := string(data)
-
-	if !strings.Contains(content, "# [[job]]") {
-		t.Error("expected commented job example in template")
-	}
-
-	// A fully-commented template must parse as valid (empty) TOML.
-	var cfg domain.RunConfig
-	if _, err := toml.Decode(content, &cfg); err != nil {
-		t.Fatalf("template is not valid TOML: %v", err)
-	}
-	if len(cfg.Jobs) != 0 {
-		t.Errorf("expected no active jobs in template, got %d", len(cfg.Jobs))
-	}
-}
-
-func TestWriteRunTemplateRefusesOverwrite(t *testing.T) {
-	dir := t.TempDir()
-	if err := WriteRunTemplate(WriteRunParams{StateDir: dir}); err != nil {
-		t.Fatalf("first write failed: %v", err)
-	}
-	if err := WriteRunTemplate(WriteRunParams{StateDir: dir}); !errors.Is(err, ErrRunFileExists) {
-		t.Errorf("expected ErrRunFileExists, got %v", err)
-	}
-}
-
 func TestWriteProjectConfigPreservesAllSections(t *testing.T) {
 	dir := t.TempDir()
 
@@ -395,11 +358,11 @@ func TestWriteRunForceOverwrites(t *testing.T) {
 	}
 }
 
-func TestWriteGlobalTo(t *testing.T) {
+func TestWriteGlobalAt(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "wtm", "config.toml")
 
-	err := WriteGlobalTo(path, domain.InitGlobalAnswers{
+	err := writeGlobalAt(path, domain.InitGlobalAnswers{
 		Shell: domain.ShellZsh,
 	})
 	if err != nil {
@@ -468,5 +431,64 @@ func TestWriteProjectRoundTrip(t *testing.T) {
 	}
 	if len(cfg.Hooks.OnCreate) != 1 || cfg.Hooks.OnCreate[0].Cmd != "yarn install" {
 		t.Errorf("round-trip on_create: got %v", cfg.Hooks.OnCreate)
+	}
+}
+
+// The TOML encoder does not honour `omitempty` on a scalar int, so a plain
+// encode wrote `port_offset_block = 0` into every generated file — a value the
+// loader ignores and the file's own schema rejects.
+func TestWriteRunOmitsTheSettingsThatAreUnset(t *testing.T) {
+	dir := t.TempDir()
+	if err := WriteRun(WriteRunParams{
+		StateDir: dir,
+		Force:    true,
+		Config: domain.RunConfig{
+			Jobs: []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "true"}},
+		},
+	}); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(dir, domain.RunFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, unwanted := range []string{"port_offset_block", "port_probe_timeout", "addressing", "concurrency"} {
+		if strings.Contains(string(body), unwanted) {
+			t.Errorf("file carries an unset %s:\n%s", unwanted, body)
+		}
+	}
+}
+
+// A value the project did set has to survive the write and come back.
+func TestWriteRunKeepsTheSettingsThatAreSet(t *testing.T) {
+	dir := t.TempDir()
+	if err := WriteRun(WriteRunParams{
+		StateDir: dir,
+		Force:    true,
+		Config: domain.RunConfig{
+			PortOffsetBlock:  25,
+			PortProbeTimeout: 42,
+			Addressing:       domain.AddressingPorts,
+			Concurrency:      domain.ConcurrencyExclusive,
+			Jobs:             []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "true", Ports: map[string]int{"PORT": 3000}}},
+			EnvPorts:         []domain.EnvPortLink{{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"}},
+		},
+	}); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	got, err := LoadRun(dir)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got.PortOffsetBlock != 25 || got.PortProbeTimeout != 42 {
+		t.Errorf("scalars lost: %+v", got)
+	}
+	if got.Addressing != domain.AddressingPorts || got.Concurrency != domain.ConcurrencyExclusive {
+		t.Errorf("settings lost: %+v", got)
+	}
+	if len(got.EnvPorts) != 1 || len(got.Jobs) != 1 {
+		t.Errorf("tables lost: %+v", got)
 	}
 }

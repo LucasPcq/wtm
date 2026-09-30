@@ -50,6 +50,10 @@ func Create(params domain.CreateParams) (domain.CreateResult, error) {
 			domain.ErrWorktreeExists, params.Branch, target.WorktreePath, params.Branch)
 	}
 
+	if err := checkNameFree(checkNameFreeParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: params.Branch}); err != nil {
+		return domain.CreateResult{}, err
+	}
+
 	reuseBranch := target.State == domain.BranchTargetExisting
 	if err := infra.CreateWorktree(infra.CreateWorktreeParams{
 		ProjectDir:  params.ProjectDir,
@@ -67,7 +71,7 @@ func Create(params domain.CreateParams) (domain.CreateResult, error) {
 		ProjectDir: params.ProjectDir,
 	})
 	if err != nil {
-		return domain.CreateResult{}, fmt.Errorf("find main worktree: %w", err)
+		return domain.CreateResult{}, fmt.Errorf("find main checkout: %w", err)
 	}
 
 	sourceBranch := params.SourceBranch
@@ -89,10 +93,14 @@ func Create(params domain.CreateParams) (domain.CreateResult, error) {
 		}
 	}
 
+	// No ordinal: it is the run module's, allocated the first time something
+	// asks for the worktree's ports, so a neighbour's unreadable record can
+	// never fail a creation.
 	metadata := domain.WorktreeMetadata{
 		SourceBranch: sourceBranch,
 		CreatedAt:    time.Now().UTC().Format(time.RFC3339),
 		EnvStrategy:  strategy,
+		Isolation:    rules.EffectiveIsolation(params.Isolation),
 	}
 
 	metaDir := rules.WorktreeMetaDir(params.StateDir, params.Branch)
@@ -105,6 +113,7 @@ func Create(params domain.CreateParams) (domain.CreateResult, error) {
 	if !params.SkipHooks {
 		if err := RunCreateHooks(domain.CreateHooksParams{
 			ProjectDir:   params.ProjectDir,
+			StateDir:     params.StateDir,
 			WorktreePath: worktreePath,
 			Branch:       params.Branch,
 			FromBranch:   params.FromBranch,
@@ -137,7 +146,7 @@ func RunCreateHooks(params domain.CreateHooksParams) error {
 	}
 	mainPath, err := infra.FindMainWorktreePath(infra.FindMainWorktreeParams{ProjectDir: params.ProjectDir})
 	if err != nil {
-		return fmt.Errorf("find main worktree: %w", err)
+		return fmt.Errorf("find main checkout: %w", err)
 	}
 	if err := hooks.RunHooks(hooks.RunHooksParams{
 		Hooks:   params.Hooks,
@@ -148,9 +157,14 @@ func RunCreateHooks(params domain.CreateHooksParams) error {
 			Root:       mainPath,
 			FromBranch: params.FromBranch,
 		},
+		Env: hookEnv(hookEnvParams{
+			Ref:          WorktreeRef{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: params.Branch},
+			WorktreePath: params.WorktreePath,
+		}),
 		Output: params.Output,
+		OnHook: params.OnHook,
 	}); err != nil {
-		return fmt.Errorf("on_create hooks: %w", err)
+		return fmt.Errorf("%s: %w", domain.HookOnCreate, err)
 	}
 	return nil
 }
@@ -202,8 +216,27 @@ func writeMetadata(metaDir string, metadata domain.WorktreeMetadata) error {
 		return fmt.Errorf("marshal metadata: %w", err)
 	}
 
+	// Written aside and renamed over: several commands read-modify-write this
+	// file, and a reader landing on a half-written one would see a worktree that
+	// holds no ordinal rather than one whose ordinal it could not read.
 	metaPath := filepath.Join(metaDir, domain.MetaFileName)
-	if err := os.WriteFile(metaPath, data, 0o644); err != nil {
+	tmp, err := os.CreateTemp(metaDir, domain.MetaFileName+".*")
+	if err != nil {
+		return fmt.Errorf("write %s: %w", metaPath, err)
+	}
+	defer os.Remove(tmp.Name())
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return fmt.Errorf("write %s: %w", metaPath, err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("write %s: %w", metaPath, err)
+	}
+	if err := os.Chmod(tmp.Name(), 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", metaPath, err)
+	}
+	if err := os.Rename(tmp.Name(), metaPath); err != nil {
 		return fmt.Errorf("write %s: %w", metaPath, err)
 	}
 

@@ -6,25 +6,72 @@ Manage dev jobs (services + tasks)
 
 Run commands and profiles declared in <git-common-dir>/wtm/run.toml — long-running services and one-shot tasks.
 
+Vocabulary:
+  job             the unit wtm runs; its kind is service (long-running) or task (one-shot)
+  profile         a named, ordered group of jobs
+  compose stack   a job that runs `docker compose`; an isolated worktree gets its own compose project
+  shared service  a job with scope = "shared": one instance for the repository, run in
+                  the main checkout; a worktree holding it reports it as joined
+  namespace       a worktree's own part of a shared service — a database, a realm
+  named URL       the address the run proxy serves (http://api.feat-x.myrepo.localhost)
+  port URL        the job's own port (http://localhost:4012), printed with --raw
+  isolation       isolated: the worktree gets its own ports, compose project and namespaces;
+                  verbatim: it keeps its source's values, and so shares its source's data
+  touches         the services whose data a task changes (a migration, a reset, a seed)
+  foreign data    data this worktree does not own: its source's when it is verbatim,
+                  every worktree's for a shared service with no namespace; a job whose
+                  touches reach it is refused unless --force
+  [worktree]      a worktree's branch name, never a path; omitted, the current worktree
+
+```
+wtm run [flags]
+```
+
+### Examples
+
+```
+  # Once per repository: detect compose files and package scripts
+  wtm run init
+
+  # Start the default profile in this worktree
+  wtm run up
+
+  # What runs, across every repository
+  wtm run ps
+
+  wtm run down
+```
+
 ### Options
 
 ```
   -h, --help   help for run
 ```
 
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+```
+
 ### SEE ALSO
 
 * [wtm](wtm.md)	 - Orchestrate git worktrees and team dev workflows from the terminal
-* [wtm run down](wtm_run_down.md)	 - Stop jobs running in the current worktree
+* [wtm run addressing](wtm_run_addressing.md)	 - Switch how the .env files spell a job's address
+* [wtm run daemon](wtm_run_daemon.md)	 - Inspect, stop or restart the process that runs the jobs
+* [wtm run down](wtm_run_down.md)	 - Stop a worktree's running jobs
 * [wtm run export](wtm_run_export.md)	 - Export run.toml as JSON on stdout
-* [wtm run import](wtm_run_import.md)	 - Import a JSON run config into run.toml
+* [wtm run import](wtm_run_import.md)	 - Replace run.toml with a JSON run config
 * [wtm run init](wtm_run_init.md)	 - Configure the run module (services & tasks) for this repo
 * [wtm run job](wtm_run_job.md)	 - Add, remove, or edit jobs in run.toml
 * [wtm run list](wtm_run_list.md)	 - List jobs and profiles declared in run.toml
 * [wtm run logs](wtm_run_logs.md)	 - Attach to a job's output
+* [wtm run open](wtm_run_open.md)	 - Open a job's URL in the browser
 * [wtm run profile](wtm_run_profile.md)	 - Add, remove, or edit profiles in run.toml
+* [wtm run proxy](wtm_run_proxy.md)	 - Inspect and install the redirection that serves named URLs on port 80
 * [wtm run ps](wtm_run_ps.md)	 - List currently running jobs
 * [wtm run start](wtm_run_start.md)	 - Start a single job
-* [wtm run stop](wtm_run_stop.md)	 - Stop a single job
+* [wtm run stop](wtm_run_stop.md)	 - Stop one job, in one or more worktrees
 * [wtm run up](wtm_run_up.md)	 - Start a profile's jobs
+* [wtm run url](wtm_run_url.md)	 - Print where a job is reachable in a worktree
 

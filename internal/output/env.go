@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/styles"
 )
 
@@ -14,112 +15,92 @@ import (
 // blank lines; the caller's frame owns the outer vertical padding. The blank
 // between file blocks and before the summary is a genuine separator.
 func PrintEnvReport(w io.Writer, result domain.EnvSyncResult) {
+	writeAlignedFields(w, rules.EnvReportFields(result))
+	Blank(w)
+
 	for i, f := range result.Files {
 		if i > 0 {
 			Blank(w)
 		}
-		printEnvFile(w, f, result.Check)
+		printEnvFile(w, envFileBlock{
+			file:     f,
+			check:    result.Check,
+			hasPorts: rules.EnvPortsMoveIn(rules.EnvPortsMoveInParams{Result: result, Target: f.Target}),
+			restored: rules.EnvRestoredRows(result.Restored, f.Target),
+		})
+	}
+	EnvPortsReport(w, result.Ports, result.Check)
+	if len(result.Warnings) > 0 {
+		Blank(w)
+	}
+	for _, warning := range result.Warnings {
+		Warning(w, warning)
 	}
 	Blank(w)
 	printEnvSummary(w, result)
 }
 
-// printEnvFile renders one file block. In --check mode adds are described as
-// "would add"; otherwise an applied add reads as done.
-func printEnvFile(w io.Writer, f domain.EnvFileResult, check bool) {
-	SectionTitle(w, fmt.Sprintf("%s   %s",
+type envFileBlock struct {
+	file     domain.EnvFileResult
+	check    bool
+	hasPorts bool
+	restored []string
+}
+
+// printEnvFile renders one file block: its header, then one aligned row per key.
+// The glyph is a single rune rendered without a badge — a badge carries its own
+// padding, which is what used to make the rows wander a column apart.
+func printEnvFile(w io.Writer, block envFileBlock) {
+	f, check := block.file, block.check
+	SectionTitle(w, fmt.Sprintf(domain.EnvFileHeaderFmt,
 		f.Target,
-		styles.Muted.Render(fmt.Sprintf("strategy: %s  ·  source: %s", f.Strategy, f.Source))))
+		styles.Muted.Render(fmt.Sprintf(domain.EnvFileSourceFmt, f.Strategy, f.Source))))
 
-	added := resolvedAdds(f.Diff)
-	conflicts := f.Diff.ByStatus(domain.EnvKeyConflict)
-	missing := f.Diff.ByStatus(domain.EnvKeyMissing)
-	orphans := f.Diff.ByStatus(domain.EnvKeyOrphan)
-
-	if len(added)+len(conflicts)+len(missing)+len(orphans) == 0 {
-		Success(w, styles.Muted.Render("in sync — nothing to reconcile"))
+	if f.Unresolvable {
+		Warning(w, fmt.Sprintf(domain.EnvFileUnresolvableFmt, f.Target))
 		return
 	}
 
-	for _, e := range added {
-		from := envSourceName(e.Source, f.ParentBranch)
-		switch {
-		case check:
-			Message(w, fmt.Sprintf("%s %s  %s", styles.Success.Render("+"), e.Key,
-				styles.Muted.Render(fmt.Sprintf("would add from %s", from))))
-		case f.Applied:
-			Success(w, fmt.Sprintf("%s  %s", e.Key, styles.Muted.Render(fmt.Sprintf("added from %s", from))))
-		default:
-			Message(w, fmt.Sprintf("%s %s  %s", styles.Success.Render("+"), e.Key,
-				styles.Muted.Render(fmt.Sprintf("from %s", from))))
-		}
+	rows := rules.EnvKeyRows(rules.EnvKeyRowsParams{File: f, Check: check})
+	for _, row := range block.restored {
+		Update(w, row)
 	}
-	for _, e := range conflicts {
-		Warning(w, fmt.Sprintf("%s  conflict — local %s vs %s %s",
-			e.Key, quote(e.CurrentValue), envSourceName(e.Source, f.ParentBranch), quote(e.ResolvedValue)))
+	if len(rows) == 0 && len(block.restored) == 0 {
+		Success(w, styles.Muted.Render(rules.EnvFileVerdict(rules.EnvFileVerdictParams{PortsMove: block.hasPorts, Check: check})))
+		return
 	}
-	for _, e := range missing {
-		Warning(w, fmt.Sprintf("%s  missing — needs a value %s",
-			e.Key, styles.Muted.Render(fmt.Sprintf("(placeholder %s)", quote(e.Placeholder)))))
-	}
-	for _, e := range orphans {
-		Message(w, fmt.Sprintf("%s %s  %s", styles.Muted.Render("−"), e.Key,
-			styles.Muted.Render("orphan — not in any source")))
+	for _, row := range rows {
+		printEnvKeyRow(w, row)
 	}
 }
 
-// printEnvSummary prints the trailing one-line verdict.
+// printEnvKeyRow prints one row of a file block. The glyphs are diff vocabulary
+// — added, needs attention, left over — and never a tick: a tick states an
+// outcome, and outcomes belong to the file verdict and the closing line.
+func printEnvKeyRow(w io.Writer, row domain.EnvKeyRow) {
+	glyph, text := styles.Success.Render(domain.EnvKeyGlyphAdd), row.Text
+	switch row.Status {
+	case domain.EnvKeyConflict, domain.EnvKeyMissing:
+		glyph = styles.Warning.Render(domain.EnvKeyGlyphAttention)
+	case domain.EnvKeyOrphan:
+		glyph, text = styles.Muted.Render(domain.EnvKeyGlyphOrphan), styles.Muted.Render(text)
+	}
+	fmt.Fprintf(w, "%s%s %s\n", Indent, glyph, text)
+}
+
+// printEnvSummary prints the trailing one-line verdict in the register the rule
+// gave it: `=` is what a run that had nothing to do says, and saying it over
+// drift a --check run just found calls an open question a settled one.
 func printEnvSummary(w io.Writer, result domain.EnvSyncResult) {
-	if result.Check {
-		if result.HasDrift() {
-			Message(w, styles.Muted.Render("Read-only check — run `wtm env` to reconcile."))
-			return
-		}
-		Success(w, "No drift.")
-		return
+	summary := rules.EnvOutcomeSummary(result)
+	switch summary.Verdict {
+	case domain.EnvVerdictDone:
+		Success(w, summary.Text)
+	case domain.EnvVerdictAttention:
+		Warning(w, summary.Text)
+	default:
+		Unchanged(w, summary.Text)
 	}
-
-	applied := 0
-	for _, f := range result.Files {
-		if f.Applied {
-			applied++
-		}
-	}
-	if applied == 0 {
-		Message(w, styles.Muted.Render("No changes written."))
-		return
-	}
-	Success(w, fmt.Sprintf("Reconciled %d file(s).", applied))
-}
-
-// resolvedAdds returns the resolved entries that are additions (absent from the
-// child but backed by a real source value), the only resolved keys worth showing.
-func resolvedAdds(d domain.EnvDiff) []domain.EnvKeyDiff {
-	out := make([]domain.EnvKeyDiff, 0)
-	for _, e := range d.ByStatus(domain.EnvKeyResolved) {
-		if e.CurrentValue == "" && e.ResolvedValue != "" {
-			out = append(out, e)
-		}
-	}
-	return out
-}
-
-// envSourceName names the per-key cascade level: the actual parent branch when the
-// value came from the parent worktree, else the level itself ("parent" / "main").
-func envSourceName(level, parentBranch string) string {
-	if level == domain.EnvSourceParent && parentBranch != "" {
-		return parentBranch
-	}
-	return level
-}
-
-// quote renders a value for the report, using «empty» for the empty string so a
-// blank value is visible rather than invisible.
-func quote(v string) string {
-	if v == "" {
-		return styles.Muted.Render("(empty)")
-	}
-	return fmt.Sprintf("%q", v)
 }
 
 // WriteEnvJSON writes the reconciliation result as pretty-printed JSON. The

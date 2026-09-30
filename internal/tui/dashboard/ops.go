@@ -2,16 +2,17 @@ package dashboard
 
 import "github.com/LucasPcq/wtm/internal/flow"
 
-// operation is a flow the dashboard started and has not seen finish. Its target
-// is the worktree it works on, known only once the session naming it is
-// answered. stage is the presenter's latest Stage/HookPhase message — what the
-// list shows in place of a locked row's state pill.
+// operation is a flow the dashboard started and has not seen finish. Its
+// targets are the worktrees it works on, known only once the session naming
+// them is answered — several since the run flows became cumulative. stages are
+// the latest Stage/HookPhase message per worktree — what the list shows in place
+// of a locked row's state pill.
 type operation struct {
-	id     int
-	kind   string
-	mode   flow.Mode
-	target string
-	stage  string
+	id      int
+	kind    string
+	mode    flow.Mode
+	targets []string
+	stages  map[string]string
 }
 
 // operations is what the dashboard has in flight. A run declares how it holds the
@@ -29,28 +30,53 @@ func (o operations) begin(op operation) (operations, int) {
 	return o, op.id
 }
 
-func (o operations) retarget(id int, target string) operations {
+func (o operations) retarget(id int, targets []string) operations {
 	running := append([]operation(nil), o.running...)
 	for index := range running {
 		if running[index].id == id {
-			running[index].target = target
+			running[index].targets = targets
 		}
 	}
 	o.running = running
 	return o
 }
 
-// stage records the run's latest Stage/HookPhase message — the text a locked
-// row shows in place of its state pill while the operation holding it works.
-func (o operations) stage(id int, text string) operations {
+type stageParams struct {
+	ID int
+	// Target is the worktree the message came from. Empty means the run said
+	// nothing about which one — a flow acting on a single worktree never has to —
+	// and every row the run holds then shows it.
+	Target string
+	Stage  string
+}
+
+// stage records a run's latest Stage/HookPhase message. A run over several
+// worktrees posts one per worktree: a single string would show the last event
+// received on every row it holds, whichever worktree it came from.
+func (o operations) stage(params stageParams) operations {
 	running := append([]operation(nil), o.running...)
 	for index := range running {
-		if running[index].id == id {
-			running[index].stage = text
+		if running[index].id != params.ID {
+			continue
 		}
+		stages := make(map[string]string, len(running[index].stages)+1)
+		for target, text := range running[index].stages {
+			stages[target] = text
+		}
+		stages[params.Target] = params.Stage
+		running[index].stages = stages
 	}
 	o.running = running
 	return o
+}
+
+// stageFor is what a locked row shows: what the run said about this worktree,
+// else what it said about none.
+func (o operation) stageFor(target string) string {
+	if stage, said := o.stages[target]; said {
+		return stage
+	}
+	return o.stages[""]
 }
 
 // holding reports the run that owns a worktree. A background run keeps its
@@ -60,8 +86,10 @@ func (o operations) holding(target string) (operation, bool) {
 		return operation{}, false
 	}
 	for _, op := range o.running {
-		if op.target == target {
-			return op, true
+		for _, held := range op.targets {
+			if held == target {
+				return op, true
+			}
 		}
 	}
 	return operation{}, false

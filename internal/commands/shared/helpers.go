@@ -3,6 +3,7 @@ package shared
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -22,11 +23,9 @@ type ConfigResult struct {
 	StateDir   string
 }
 
-// ProjectRoot returns the main worktree path. Works from any worktree —
-// resolves back to the parent repo. WTM_PROJECT_DIR overrides git resolution;
-// useful in tests and CI.
+// ProjectRoot returns the main checkout path from any worktree.
 func ProjectRoot(dir string) (string, error) {
-	if override := os.Getenv("WTM_PROJECT_DIR"); override != "" {
+	if override := os.Getenv(domain.EnvProjectDir); override != "" {
 		return override, nil
 	}
 	mainPath, err := infra.FindMainWorktreePath(infra.FindMainWorktreeParams{
@@ -65,35 +64,89 @@ func LoadConfig(cmd *cobra.Command, dir string) (ConfigResult, error) {
 }
 
 // AddOutputFlag registers the standard --output flag on cmd.
+// Animate answers whether a spinner may draw: a run whose writers were replaced
+// by io.Discard asked for silence, and a spinner is progress like any other.
+// It reads the writer rather than the flag because that is what --quiet actually
+// did, and a surface handed a discarded stream is silent whoever silenced it.
+func Animate(cmd *cobra.Command, want bool) bool {
+	return want && cmd.ErrOrStderr() != io.Discard
+}
+
 func AddOutputFlag(cmd *cobra.Command) {
 	cmd.Flags().String(domain.FlagOutput, domain.OutputText, "Output format: text or json")
 }
 
+// AddIsolationFlag registers --isolation on a command that creates a worktree.
+func AddIsolationFlag(cmd *cobra.Command) {
+	cmd.Flags().String(domain.FlagIsolation, "", "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated")
+}
+
+// IsolationFlag reads --isolation, refusing a value that is neither answer.
+func IsolationFlag(cmd *cobra.Command) (domain.Isolation, error) {
+	value, _ := cmd.Flags().GetString(domain.FlagIsolation)
+	return rules.ParseIsolation(value)
+}
+
+// AddJobFlag and AddProfileFlag register the run module's second axis. The
+// worktree is the positional subject there, as everywhere else in the CLI, so
+// the job or profile is named by a flag the way --to and --from are.
+func AddJobFlag(cmd *cobra.Command, usage string) {
+	AddSingleFlag(cmd, domain.FlagJob, usage)
+}
+
+func AddProfileFlag(cmd *cobra.Command, usage string) {
+	AddSingleFlag(cmd, domain.FlagProfile, usage)
+}
+
+// AddSingleFlag is a string flag that refuses to be given twice, where pflag
+// would keep the last value and act on it without a word.
+func AddSingleFlag(cmd *cobra.Command, name, usage string) {
+	cmd.Flags().Var(&singleValue{}, name, usage)
+}
+
+type singleValue struct {
+	value string
+	set   bool
+}
+
+func (v *singleValue) String() string { return v.value }
+
+// Type is "string" so GetString reads it like any other string flag.
+func (v *singleValue) Type() string { return "string" }
+
+func (v *singleValue) Set(value string) error {
+	if v.set {
+		return fmt.Errorf(domain.FlagGivenTwiceFmt, v.value)
+	}
+	v.value, v.set = value, true
+	return nil
+}
+
+// AddYesFlag adds the confirmation axis. It is the only thing that turns prompts
+// off; --force, where a command has one, is the safety axis and implies nothing
+// here.
+func AddYesFlag(cmd *cobra.Command, usage string) {
+	cmd.Flags().BoolP(domain.FlagYes, "y", false, usage)
+}
+
+// Unattended folds --yes into the prompt-capability gate: a human format, on a
+// terminal, and not bypassed.
+type UnattendedParams struct {
+	TTY    bool
+	Format string
+	Yes    bool
+}
+
+func Interactive(params UnattendedParams) bool {
+	return params.TTY && rules.IsHumanFormat(params.Format) && !params.Yes
+}
+
 // RequireRunInitialized enforces the run-module opt-in guard: the module counts
-// as initialized once run.toml declares at least one job or profile. Blocked run
-// commands call this after loading run.toml; the creation paths (run init,
-// run job/profile add, run import) skip it. On failure it returns
-// ErrRunNotInitialized (wrapped, with the experimental notice on a second line)
-// so the top-level handler prints the pedagogical message and picks the
-// dedicated exit code; it does not print anything itself.
+// as initialized once run.toml declares at least one job or profile. The
+// creation paths (run init, run job/profile add, run import) skip it.
 func RequireRunInitialized(cfg domain.RunConfig) error {
 	if rules.IsRunInitialized(cfg) {
 		return nil
 	}
-	return fmt.Errorf("%w\n%s", domain.ErrRunNotInitialized, domain.ExperimentalRunNotice)
-}
-
-// GuardRunInitialized resolves the state dir, loads run.toml, and enforces the
-// run-module guard in a single call — for commands that don't otherwise need the
-// loaded config in hand (ps, down, logs).
-func GuardRunInitialized(dir string) error {
-	stateDir, err := StateDir(dir)
-	if err != nil {
-		return err
-	}
-	cfg, err := config.LoadRun(stateDir)
-	if err != nil {
-		return fmt.Errorf("load run config: %w", err)
-	}
-	return RequireRunInitialized(cfg)
+	return domain.ErrRunNotInitialized
 }

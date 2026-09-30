@@ -1,6 +1,7 @@
 package clean
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -8,6 +9,9 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/run/owed"
+	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/service/process"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
@@ -16,14 +20,14 @@ import (
 func answers(values map[string]string) flow.Answers { return flow.NewAnswers(values) }
 
 func TestDeleteRecapStatesWarningsAndTarget(t *testing.T) {
-	recap := deleteRecap(domain.CleanCheckResult{
+	recap := deleteRecap(deleteRecapParams{Check: domain.CleanCheckResult{
 		Branch:          "feat",
 		WorktreePath:    "/w/feat",
 		IsDirty:         true,
 		UnpushedCommits: 2,
 		HasOpenPR:       true,
 		PRUrl:           "http://pr",
-	}, "")
+	}})
 
 	for _, want := range []string{"uncommitted changes", "2 commit(s)", "http://pr", "Will delete:", "/w/feat", "feat"} {
 		if !strings.Contains(recap, want) {
@@ -33,8 +37,10 @@ func TestDeleteRecapStatesWarningsAndTarget(t *testing.T) {
 }
 
 func TestDeleteRecapCarriesTheReparentDecision(t *testing.T) {
-	recap := deleteRecap(domain.CleanCheckResult{Branch: "feat", WorktreePath: "/w/feat"},
-		"Then leave 2 child worktree(s) orphaned.")
+	recap := deleteRecap(deleteRecapParams{
+		Check:    domain.CleanCheckResult{Branch: "feat", WorktreePath: "/w/feat"},
+		Reparent: "Then leave 2 child worktree(s) orphaned.",
+	})
 	if !strings.Contains(recap, "orphaned") {
 		t.Errorf("recap should state what happens to the children:\n%s", recap)
 	}
@@ -130,6 +136,26 @@ func TestPresetReparentAnswersTheStep(t *testing.T) {
 	}
 	if got := (&cleanFlow{}).presetReparent(); got != "" {
 		t.Errorf("preset = %q, want the step left to be answered", got)
+	}
+}
+
+// --drop-data is how an unattended clean asks for what --yes will not do by
+// default: start the services that are down and drop the data now.
+func TestDropDataAnswersTheDataStep(t *testing.T) {
+	cases := map[string]struct {
+		request Request
+		want    string
+	}{
+		"--drop-data": {request: Request{Branch: "feat", DropData: true}, want: owed.DataStart},
+		"--yes alone": {request: Request{Branch: "feat"}, want: ""},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := &cleanFlow{request: c.request}
+			if got := f.session().Presets.Value(KeyData); got != c.want {
+				t.Errorf("preset = %q, want %q", got, c.want)
+			}
+		})
 	}
 }
 
@@ -231,6 +257,70 @@ func TestRunConfirmsThenRemoves(t *testing.T) {
 	}
 }
 
+func TestRunPurgesTheWorktreeJobLogs(t *testing.T) {
+	ctx := testContext(t)
+	makeWorktree(t, ctx, "feat/logged")
+
+	logs := writeJobLog(t, ctx, "feat/logged")
+	kept := writeJobLog(t, ctx, "feat/kept")
+
+	if _, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Branch: "feat/logged", BaseBranch: "main"},
+		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}},
+		Presenter: newRecorder(),
+	}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	if _, err := os.Stat(logs); !os.IsNotExist(err) {
+		t.Errorf("the removed worktree kept its job logs: %v", err)
+	}
+	if _, err := os.Stat(kept); err != nil {
+		t.Errorf("another worktree's job logs were purged: %v", err)
+	}
+}
+
+func TestRunSucceedsWhenTheJobLogPurgeFails(t *testing.T) {
+	ctx := testContext(t)
+	path := makeWorktree(t, ctx, "feat/logged")
+
+	// A regular file where the logs/ directory belongs: every purge under it
+	// fails with ENOTDIR, which the removal must not notice.
+	if err := os.WriteFile(filepath.Join(ctx.StateDir, "logs"), []byte("not a directory\n"), 0o644); err != nil {
+		t.Fatalf("plant the blocking file: %v", err)
+	}
+	blocked := rules.WorktreeLogDir(rules.WorktreeLogDirParams{StateDir: ctx.StateDir, Branch: "feat/logged"})
+	if err := process.PurgeWorktreeLogs(blocked); err == nil {
+		t.Fatalf("the fixture does not make the purge fail, so it proves nothing")
+	}
+
+	if _, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Branch: "feat/logged", BaseBranch: "main"},
+		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}},
+		Presenter: newRecorder(),
+	}); err != nil {
+		t.Fatalf("a purge that cannot happen must not fail the removal: %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Errorf("worktree still on disk: %v", err)
+	}
+}
+
+// writeJobLog plants a job log for a branch's worktree and returns its directory.
+func writeJobLog(t *testing.T, ctx flow.Context, branch string) string {
+	t.Helper()
+	dir := rules.WorktreeLogDir(rules.WorktreeLogDirParams{StateDir: ctx.StateDir, Branch: branch})
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("create log dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "web.log"), []byte("listening\n"), 0o644); err != nil {
+		t.Fatalf("write log: %v", err)
+	}
+	return dir
+}
+
 func TestRunOffersForceOnlyWhenUnsafe(t *testing.T) {
 	ctx := testContext(t)
 	path := makeWorktree(t, ctx, "feat/dirty")
@@ -308,5 +398,39 @@ func TestRunAbortedRemovesNothing(t *testing.T) {
 	}
 	if _, statErr := os.Stat(path); statErr != nil {
 		t.Errorf("the worktree must survive a cancelled clean: %v", statErr)
+	}
+}
+
+// The default drops the worktree's databases, so the recap has to say so: a
+// flag must never make a line disappear from it, and silence here would have a
+// reader confirm a DROP DATABASE they were never shown.
+func TestDeleteRecapNamesTheDataItGivesBack(t *testing.T) {
+	recap := deleteRecap(deleteRecapParams{
+		Check:      domain.CleanCheckResult{Branch: "feat", WorktreePath: "/w/feat"},
+		Namespaces: []string{fmt.Sprintf(domain.CleanWillDeleteNamespaceFmt, "crm_feat", "db")},
+	})
+	for _, want := range []string{"crm_feat", "db"} {
+		if !strings.Contains(recap, want) {
+			t.Errorf("recap missing %q:\n%s", want, recap)
+		}
+	}
+}
+
+func TestDeleteRecapSaysWhenTheDataIsKept(t *testing.T) {
+	recap := deleteRecap(deleteRecapParams{
+		Check:      domain.CleanCheckResult{Branch: "feat", WorktreePath: "/w/feat"},
+		Namespaces: []string{domain.CleanKeepDataLine},
+	})
+	if !strings.Contains(recap, "--keep-data") {
+		t.Errorf("recap does not say the data is kept:\n%s", recap)
+	}
+}
+
+// The line is built from run.toml, so a project with no shared service adds
+// nothing and the recap reads exactly as it did before.
+func TestHoldingsEmptyWithoutASharedService(t *testing.T) {
+	flow := &cleanFlow{ctx: flow.Context{StateDir: t.TempDir()}}
+	if got := flow.holdings("feat").Held(); len(got) != 0 {
+		t.Errorf("held = %v, want none", got)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/decide"
+	"github.com/LucasPcq/wtm/internal/flow/envports"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/branch"
 )
@@ -16,6 +17,7 @@ const (
 	KeyBranch       = "create.branch"
 	KeySource       = "create.source"
 	KeyEnv          = "create.env"
+	KeyIsolation    = "create.isolation"
 	KeySourceUpdate = "create.source_update"
 	KeyRecap        = "create.recap"
 )
@@ -42,14 +44,16 @@ func (f *createFlow) session() flow.Session {
 	return flow.Session{
 		ErrLabel: domain.WizardErrLabel,
 		Presets: flow.NewAnswers(map[string]string{
-			KeyBranch: f.request.Branch,
-			KeySource: f.request.From,
-			KeyEnv:    f.request.EnvFrom,
+			KeyBranch:    f.request.Branch,
+			KeySource:    f.request.From,
+			KeyEnv:       f.request.EnvFrom,
+			KeyIsolation: string(f.request.Isolation),
 		}),
 		Steps: []flow.Step{
 			f.branchStep(),
 			f.sourceStep(),
 			f.envStep(),
+			f.isolationStep(),
 			f.sourceUpdateStep(),
 			f.recapStep(),
 		},
@@ -142,6 +146,46 @@ func envSummary(answer flow.Answer) string {
 		return answer.Value
 	}
 	return domain.EnvSummaryConfigDefault
+}
+
+// isolationStep is asked here rather than after the worktree exists: what it
+// decides is written into the .env this very run provisions, so it is one
+// confirmation among the others instead of a second one past the point of no
+// return.
+func (f *createFlow) isolationStep() flow.Step {
+	// Read once, as the session is built: Skip is called again on every step the
+	// wizard advances through or steps back over, and run.toml does not change
+	// under a run that is being answered.
+	applies := envports.IsolationApplies(f.ctx)
+	fallback := envports.DefaultIsolation(f.ctx)
+	return flow.Step{
+		Kind:        flow.StepSelect,
+		Key:         KeyIsolation,
+		Label:       domain.IsolationStepName,
+		Title:       domain.IsolationStepName,
+		Description: domain.IsolationStepDescription,
+		Skip: func(flow.Answers) (bool, string) {
+			if applies {
+				return false, ""
+			}
+			return true, domain.IsolationStepIrrelevant
+		},
+		Options: isolationOptions(fallback),
+		Resolve: func(flow.Answers) (flow.Answer, error) {
+			return flow.Answer{Value: string(fallback)}, nil
+		},
+		Summarize: func(answer flow.Answer) string { return rules.IsolationSummary(domain.Isolation(answer.Value)) },
+		Flag:      domain.FlagIsolation,
+	}
+}
+
+func isolationOptions(first domain.Isolation) []flow.Option {
+	choices := rules.IsolationChoices(first)
+	options := make([]flow.Option, 0, len(choices))
+	for _, choice := range choices {
+		options = append(options, flow.Option{Label: rules.IsolationOptionLabel(choice), Value: string(choice)})
+	}
+	return options
 }
 
 // sourceUpdateStep applies only to a behind-only branch; a diverged one is not a
@@ -249,6 +293,9 @@ func (f *createFlow) recap(answers flow.Answers) string {
 		lines = append(lines, domain.RecapFieldBranch+branchLabel)
 	}
 	lines = append(lines, sourceField+sourceLabel, domain.RecapFieldEnv+envLabel)
+	if isolation := answers.Value(KeyIsolation); isolation != "" {
+		lines = append(lines, domain.RecapFieldIsolation+rules.IsolationSummary(domain.Isolation(isolation)))
+	}
 	if ffBranch != "" && ffBranch != source {
 		lines = append(lines, fmt.Sprintf(domain.RecapUpdateFastForward, ffBranch))
 	}

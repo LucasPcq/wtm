@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/tui/branchrefresh"
 	"github.com/LucasPcq/wtm/internal/tui/components"
 )
@@ -77,6 +78,14 @@ type WizardParams struct {
 	// which case EnvOverride carries the chosen strategy.
 	IncludeEnv  bool
 	EnvOverride string
+	// IsolationApplies says run.toml declares something a worktree isolates; the
+	// command layer reads it, so the TUI stays free of config loading. The step
+	// is posed when it applies and --isolation did not answer it.
+	IsolationApplies  bool
+	IsolationOverride domain.Isolation
+	// IsolationDefault is the project's answer, offered first and used wherever
+	// nobody was asked.
+	IsolationDefault domain.Isolation
 	// SourceUpdate, when set, decides the source-update step: given the worktree's
 	// branch and its source it offers a fast-forward (behind-only) or reports a
 	// diverged branch as a ⚠ recap line. Injected by the command layer so the TUI
@@ -104,7 +113,8 @@ type WizardResult struct {
 	// Reused reports whether BranchName is an existing local branch that will be
 	// checked out as-is rather than created — the host recap uses it to say so
 	// instead of a misleading "from <source>".
-	Reused bool
+	Reused    bool
+	Isolation domain.Isolation
 }
 
 // CreateFlow is the create sub-flow (branch/source/source-update steps) ready to
@@ -140,6 +150,9 @@ func CreateSteps(params WizardParams, enabled func(steps []components.Step) bool
 	}
 	if params.IncludeEnv {
 		steps = append(steps, gateStep(envStep(params.ConfigStrategy), enabled))
+	}
+	if includesIsolation(params) {
+		steps = append(steps, gateStep(components.IsolationStep(params.IsolationDefault), enabled))
 	}
 	// The source-update fast-forward: a ChoiceStep whenever a step precedes it (it
 	// cannot be a first step), else — source fixed by --from and branch fixed by
@@ -196,6 +209,7 @@ func ReadCreateResult(steps []components.Step, params WizardParams) WizardResult
 		EnvFromOverride:   resolveEnv(steps, params),
 		FastForwardBranch: fastForwardBranch(steps, params),
 		Reused:            reusesBranch(steps, params),
+		Isolation:         resolveIsolation(steps, params),
 	}
 	if child, ok := stepModelByName(steps, stepBranchName).(components.TextInputModel); ok {
 		result.BranchName = child.Value()
@@ -260,47 +274,6 @@ func envStep(strategy domain.EnvStrategy) components.Step {
 		}),
 		Summary: envStrategySummary,
 	}
-}
-
-// RunWizard displays the interactive wizard for wtm new.
-// When IncludeBranch is true, the first step prompts for a branch name.
-// Returns ErrUserAborted on Ctrl+C or Esc at the first step, or when the user
-// declines a hard confirmation (diverged source, or the env fallback).
-func RunWizard(params WizardParams) (WizardResult, error) {
-	flow := CreateSteps(params, nil)
-
-	// The final recap: always last, recaps the selections with ⚠ lines for a
-	// diverged source and the env fallback, and offers "Yes, create worktree" then
-	// the constant "No, cancel" — the single cancellation point.
-	steps := append(flow.Steps, components.RecapStep(components.RecapStepParams{
-		Name: stepConfirm,
-		Build: func(prev []components.Step) components.RecapContent {
-			return components.RecapContent{
-				Description: buildCreateRecap(prev, params),
-				Actions: []components.SelectItem{
-					{Label: "Yes, create worktree", Value: createConfirm},
-				},
-			}
-		},
-	}))
-
-	wp := components.WizardParams{
-		Steps:       steps,
-		InitCmd:     flow.InitCmd,
-		OnMsg:       flow.OnMsg,
-		LoadingText: flow.LoadingText,
-		Loading:     flow.InitCmd != nil,
-	}
-	finalModel, err := tea.NewProgram(components.NewWizardWithParams(wp)).Run()
-	if err != nil {
-		return WizardResult{}, fmt.Errorf("wizard: %w", err)
-	}
-
-	final, ok := finalModel.(components.WizardModel)
-	if !ok || final.Aborted() {
-		return WizardResult{}, domain.ErrUserAborted
-	}
-	return extractResult(final, params)
 }
 
 // sourceUpdateItems are the fast-forward-vs-keep options, shared by the ChoiceStep
@@ -412,53 +385,26 @@ func resolveEnv(steps []components.Step, params WizardParams) string {
 	return stepValueByName(steps, stepEnvName)
 }
 
-// buildCreateRecap recaps the selections with ⚠ lines for a diverged source and
-// the env fallback, using the same deciders the steps did.
-func buildCreateRecap(prev []components.Step, params WizardParams) string {
-	source := resolveSource(prev, params)
-	env := resolveEnv(prev, params)
-	envLabel := env
-	if envLabel == "" {
-		envLabel = "config default"
+// IsolationRecapLine is the isolation line a host wizard adds to its own recap,
+// and false for a project with nothing to isolate. A flag that answered the
+// step keeps its line: a flag must never make a recap line disappear.
+func IsolationRecapLine(steps []components.Step, params WizardParams) (string, bool) {
+	if !rules.IsolationRecapShown(rules.IsolationRecapShownParams{Applies: params.IsolationApplies, Override: params.IsolationOverride}) {
+		return "", false
 	}
+	return domain.RecapFieldIsolation + rules.IsolationSummary(resolveIsolation(steps, params)), true
+}
 
-	branchName := resolveBranchName(prev, params)
-	reused := reusesBranch(prev, params)
-	ffBranch := fastForwardBranch(prev, params)
+func includesIsolation(params WizardParams) bool {
+	return params.IsolationApplies && params.IsolationOverride == ""
+}
 
-	branchLabel := branchName
-	if reused {
-		branchLabel += domain.BranchReusedSuffix
+// resolveIsolation is the step's answer, else the flag, else the project's.
+func resolveIsolation(steps []components.Step, params WizardParams) domain.Isolation {
+	if !includesIsolation(params) {
+		return rules.EffectiveIsolation(rules.FirstIsolation(params.IsolationOverride, params.IsolationDefault))
 	}
-
-	// The source line is a start-point for a new branch and only the recorded sync
-	// parent for a reused one; the fast-forward annotation follows its subject.
-	sourceField := "Source:  "
-	if reused {
-		sourceField = "Parent:  "
-	}
-	sourceLabel := source
-	if ffBranch != "" && ffBranch == source {
-		sourceLabel += " (fast-forward to origin)"
-	}
-
-	var lines []string
-	if branchLabel != "" {
-		lines = append(lines, "Branch:  "+branchLabel)
-	}
-	lines = append(lines,
-		sourceField+sourceLabel,
-		"Env:     "+envLabel,
-	)
-	if ffBranch != "" && ffBranch != source {
-		lines = append(lines, fmt.Sprintf(domain.RecapUpdateFastForward, ffBranch))
-	}
-
-	if warnings := CreateWarnings(prev, params); len(warnings) > 0 {
-		lines = append(lines, "")
-		lines = append(lines, warnings...)
-	}
-	return strings.Join(lines, "\n")
+	return components.IsolationAnswer(steps, params.IsolationDefault)
 }
 
 // CreateWarnings returns the ⚠ recap lines for the create sub-flow — a diverged
@@ -483,16 +429,6 @@ func CreateWarnings(steps []components.Step, params WizardParams) []string {
 		}
 	}
 	return warnings
-}
-
-// extractResult reads the wizard answers, translating the recap's "No, cancel"
-// into ErrUserAborted.
-func extractResult(final components.WizardModel, params WizardParams) (WizardResult, error) {
-	steps := final.Steps()
-	if stepValueByName(steps, stepConfirm) == domain.WizardCancelValue {
-		return WizardResult{}, domain.ErrUserAborted
-	}
-	return ReadCreateResult(steps, params), nil
 }
 
 func stepIndexByName(steps []components.Step, name string) int {
@@ -557,7 +493,7 @@ func buildEnvItems(strategy domain.EnvStrategy) []components.SelectItem {
 	return []components.SelectItem{
 		{Label: "Use config default (" + string(strategy) + ")", Value: ""},
 		{Label: "example — copy .env.example → .env", Value: string(domain.EnvStrategyExample)},
-		{Label: "main — copy .env from main worktree", Value: string(domain.EnvStrategyMain)},
+		{Label: "main — copy .env from the main checkout", Value: string(domain.EnvStrategyMain)},
 		{Label: "parent — copy .env from source worktree", Value: string(domain.EnvStrategyParent)},
 	}
 }

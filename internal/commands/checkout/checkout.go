@@ -5,6 +5,7 @@ package checkout
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 
@@ -13,6 +14,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/flow/envports"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -32,6 +34,16 @@ func NewCmd() *cobra.Command {
 			"A local branch of the PR's name is checked out as-is, keeping commits you never\n" +
 			"pushed; interactive runs offer to fast-forward it when it is behind origin.\n" +
 			"Without arguments, shows an interactive picker of open PRs.",
+		Example: `  # Pick among the open pull requests
+  wtm checkout
+
+  # Only the ones waiting for your review
+  wtm checkout --review
+
+  wtm checkout 42
+
+  # No prompts, with a JSON result
+  wtm checkout 42 --yes --output json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runCheckout,
 	}
@@ -40,6 +52,7 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().Bool(domain.FlagMine, false, "Show only your PRs")
 	cmd.Flags().String(domain.FlagFrom, "", "Parent branch for sync (defaults to the PR base branch)")
 	cmd.Flags().String(domain.FlagEnvFrom, "", "Override env strategy (example, main, parent)")
+	shared.AddIsolationFlag(cmd)
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (PR number required)")
 	shared.AddOutputFlag(cmd)
 
@@ -61,6 +74,10 @@ func runCheckout(cmd *cobra.Command, args []string) error {
 	fromOverride, _ := cmd.Flags().GetString(domain.FlagFrom)
 	envOverride, _ := cmd.Flags().GetString(domain.FlagEnvFrom)
 	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
+	isolation, err := shared.IsolationFlag(cmd)
+	if err != nil {
+		return err
+	}
 
 	if format == domain.OutputJSON && !yes {
 		return fmt.Errorf("--output json requires --%s (prompts cannot run in JSON mode)", domain.FlagYes)
@@ -74,6 +91,7 @@ func runCheckout(cmd *cobra.Command, args []string) error {
 		interactive:  rules.IsHumanFormat(format) && term.IsTerminal(int(os.Stdin.Fd())) && !yes,
 		fromOverride: fromOverride,
 		envOverride:  envOverride,
+		isolation:    isolation,
 	}
 
 	if len(args) == 1 {
@@ -93,6 +111,8 @@ type checkoutOptions struct {
 	interactive  bool
 	fromOverride string
 	envOverride  string
+	// isolation is --isolation, empty when it was not given.
+	isolation domain.Isolation
 }
 
 // checkoutByNumber handles `wtm checkout <number>`. The loading box owns its own
@@ -101,7 +121,7 @@ func checkoutByNumber(cmd *cobra.Command, result shared.ConfigResult, number int
 	var p domain.PRInfo
 	err := components.RunLoading(components.LoadingParams{
 		Message: "Fetching PR…",
-		Animate: !opts.jsonMode,
+		Animate: shared.Animate(cmd, !opts.jsonMode),
 		Work: func() error {
 			var e error
 			p, e = ghservice.GetPRDetail(ghservice.GetPRDetailParams{
@@ -120,20 +140,20 @@ func checkoutByNumber(cmd *cobra.Command, result shared.ConfigResult, number int
 	}
 	parentBranches := parentBranchCandidates(result.ProjectDir)
 
-	parent, env, aborted, wizardRan, err := resolveParentAndEnv(resolveParams{
+	resolved, err := resolveParentAndEnv(resolveParams{
 		result:         result,
 		pr:             p,
 		parentBranches: parentBranches,
 		opts:           opts,
 	})
-	if err != nil || aborted {
+	if err != nil || resolved.aborted {
 		return err
 	}
 
 	// When the wizard ran it already hosted the env-fallback confirmation; only
 	// the no-wizard interactive path (both --from and --env-from given) still needs
 	// the standalone confirm.
-	return createFromPR(cmd, result, createFromPRParams{pr: p, parent: parent, env: env, jsonMode: opts.jsonMode, interactive: opts.interactive, envConfirmed: wizardRan})
+	return createFromPR(cmd, result, createFromPRParams{pr: p, parent: resolved.parent, env: resolved.env, isolation: resolved.isolation, jsonMode: opts.jsonMode, interactive: opts.interactive, envConfirmed: resolved.wizardRan})
 }
 
 // checkoutInteractive handles `wtm checkout` with no number: it renders the
@@ -151,16 +171,19 @@ func checkoutInteractive(cmd *cobra.Command, result shared.ConfigResult, opts ch
 	filter := rules.PRFilterFor(rules.PRFilterParams{Review: review, Mine: mine})
 
 	res, err := checkoutwizard.RunWizard(checkoutwizard.WizardParams{
-		ProjectDir:       dir,
-		PRLoader:         func() ([]domain.PRInfo, domain.GHConnection) { return shared.LoadPRsFiltered(dir, filter) },
-		WorktreeBranches: worktreeBranches(dir),
-		ParentBranches:   parentBranches,
-		ConfigStrategy:   result.Config.Project.Env.Strategy,
-		IncludeParent:    opts.fromOverride == "",
-		IncludeEnv:       opts.envOverride == "",
-		FromOverride:     opts.fromOverride,
-		EnvOverride:      opts.envOverride,
-		EnvFallback:      shared.EnvFallbackDecider(dir, result.Config),
+		ProjectDir:        dir,
+		PRLoader:          func() ([]domain.PRInfo, domain.GHConnection) { return shared.LoadPRsFiltered(dir, filter) },
+		WorktreeBranches:  worktreeBranches(dir),
+		ParentBranches:    parentBranches,
+		ConfigStrategy:    result.Config.Project.Env.Strategy,
+		IncludeParent:     opts.fromOverride == "",
+		IncludeEnv:        opts.envOverride == "",
+		FromOverride:      opts.fromOverride,
+		EnvOverride:       opts.envOverride,
+		IsolationApplies:  envports.IsolationApplies(shared.FlowContext(result)),
+		IsolationOverride: opts.isolation,
+		IsolationDefault:  envports.DefaultIsolation(shared.FlowContext(result)),
+		EnvFallback:       shared.EnvFallbackDecider(dir, result.Config),
 		Target: func(b string) domain.BranchTarget {
 			return branch.Target(branch.BranchParams{ProjectDir: dir, Branch: b})
 		},
@@ -184,7 +207,7 @@ func checkoutInteractive(cmd *cobra.Command, result shared.ConfigResult, opts ch
 	env := rules.FirstNonEmpty(opts.envOverride, res.EnvFromOverride)
 
 	// The env-fallback confirmation ran inside the wizard.
-	return createFromPR(cmd, result, createFromPRParams{pr: p, parent: parent, env: env, jsonMode: opts.jsonMode, interactive: opts.interactive, envConfirmed: true})
+	return createFromPR(cmd, result, createFromPRParams{pr: p, parent: parent, env: env, isolation: res.Isolation, jsonMode: opts.jsonMode, interactive: opts.interactive, envConfirmed: true})
 }
 
 // resolveParams holds inputs for resolving parent/env for a known PR.
@@ -195,52 +218,71 @@ type resolveParams struct {
 	opts           checkoutOptions
 }
 
-// resolveParentAndEnv determines the parent branch and env strategy for a known
-// PR, running the wizard for whatever the flags left unset (interactive only).
-// wizardRan reports whether the wizard ran — and thus already hosted the
-// env-fallback confirmation.
-func resolveParentAndEnv(params resolveParams) (parent, env string, aborted, wizardRan bool, err error) {
-	parent = params.opts.fromOverride
-	env = params.opts.envOverride
+type resolvedCheckout struct {
+	parent    string
+	env       string
+	isolation domain.Isolation
+	aborted   bool
+	// wizardRan says the wizard already hosted the env-fallback confirmation.
+	wizardRan bool
+}
 
-	needParent := parent == ""
-	needEnv := env == ""
+// resolveParentAndEnv determines the parent branch, the env strategy and the
+// isolation for a known PR, running the wizard for whatever the flags left
+// unset (interactive only).
+func resolveParentAndEnv(params resolveParams) (resolvedCheckout, error) {
+	ctx := shared.FlowContext(params.result)
+	applies := envports.IsolationApplies(ctx)
+	fallback := envports.DefaultIsolation(ctx)
+	resolved := resolvedCheckout{
+		parent:    params.opts.fromOverride,
+		env:       params.opts.envOverride,
+		isolation: rules.FirstIsolation(params.opts.isolation, fallback),
+	}
 
-	if params.opts.interactive && (needParent || needEnv) {
-		wizardRan = true
+	needParent := resolved.parent == ""
+	needEnv := resolved.env == ""
+	needIsolation := applies && params.opts.isolation == ""
+
+	if params.opts.interactive && (needParent || needEnv || needIsolation) {
+		resolved.wizardRan = true
 		pr := params.pr
 		res, runErr := checkoutwizard.RunWizard(checkoutwizard.WizardParams{
-			ProjectDir:     params.result.ProjectDir,
-			Preselected:    &pr,
-			ParentBranches: params.parentBranches,
-			ConfigStrategy: params.result.Config.Project.Env.Strategy,
-			IncludeParent:  needParent,
-			IncludeEnv:     needEnv,
-			FromOverride:   params.opts.fromOverride,
-			EnvOverride:    params.opts.envOverride,
-			EnvFallback:    shared.EnvFallbackDecider(params.result.ProjectDir, params.result.Config),
+			ProjectDir:        params.result.ProjectDir,
+			Preselected:       &pr,
+			ParentBranches:    params.parentBranches,
+			ConfigStrategy:    params.result.Config.Project.Env.Strategy,
+			IncludeParent:     needParent,
+			IncludeEnv:        needEnv,
+			FromOverride:      params.opts.fromOverride,
+			EnvOverride:       params.opts.envOverride,
+			IsolationApplies:  applies,
+			IsolationOverride: params.opts.isolation,
+			IsolationDefault:  fallback,
+			EnvFallback:       shared.EnvFallbackDecider(params.result.ProjectDir, params.result.Config),
 			Target: func(b string) domain.BranchTarget {
 				return branch.Target(branch.BranchParams{ProjectDir: params.result.ProjectDir, Branch: b})
 			},
 		})
 		if runErr != nil {
 			if errors.Is(runErr, domain.ErrUserAborted) {
-				return "", "", true, wizardRan, nil
+				return resolvedCheckout{aborted: true, wizardRan: true}, nil
 			}
-			return "", "", false, wizardRan, runErr
+			return resolvedCheckout{wizardRan: true}, runErr
 		}
 		if needParent {
-			parent = res.FromBranch
+			resolved.parent = res.FromBranch
 		}
 		if needEnv {
-			env = res.EnvFromOverride
+			resolved.env = res.EnvFromOverride
 		}
+		resolved.isolation = res.Isolation
 	}
 
-	if parent == "" {
-		parent = params.pr.BaseBranch
+	if resolved.parent == "" {
+		resolved.parent = params.pr.BaseBranch
 	}
-	return parent, env, false, wizardRan, nil
+	return resolved, nil
 }
 
 // createFromPRParams holds inputs for the final worktree creation step.
@@ -248,6 +290,7 @@ type createFromPRParams struct {
 	pr          domain.PRInfo
 	parent      string
 	env         string
+	isolation   domain.Isolation
 	jsonMode    bool
 	interactive bool
 	// envConfirmed is true when the env-fallback confirmation already ran inside
@@ -268,7 +311,7 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 
 	fetchErr := components.RunLoading(components.LoadingParams{
 		Message: "Fetching branch from origin…",
-		Animate: !params.jsonMode,
+		Animate: shared.Animate(cmd, !params.jsonMode),
 		Work: func() error {
 			return infra.FetchBranch(infra.FetchBranchParams{
 				ProjectDir: result.ProjectDir,
@@ -293,7 +336,7 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 	if reused {
 		startPoint = ""
 		if params.interactive {
-			updated, ok := reconcileReusedBranch(reconcileReusedBranchParams{ProjectDir: result.ProjectDir, Target: target})
+			updated, ok := reconcileReusedBranch(reconcileReusedBranchParams{Cmd: cmd, ProjectDir: result.ProjectDir, Target: target})
 			if !ok {
 				return nil
 			}
@@ -301,26 +344,47 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 		}
 	}
 
-	if !params.jsonMode {
-		output.Loading(cmd.ErrOrStderr(), fmt.Sprintf("Creating worktree %s…", p.Branch))
+	preflight := envports.Preflight(shared.FlowContext(result))
+	var createResult domain.CreateResult
+	var err error
+	if loadErr := components.RunLoading(components.LoadingParams{
+		Message: fmt.Sprintf("Creating worktree %s…", p.Branch),
+		Animate: shared.Animate(cmd, !params.jsonMode),
+		Work: func() error {
+			createResult, err = worktree.Create(domain.CreateParams{
+				ProjectDir:      result.ProjectDir,
+				StateDir:        result.StateDir,
+				Branch:          p.Branch,
+				FromBranch:      startPoint,
+				SourceBranch:    params.parent,
+				Config:          result.Config,
+				EnvFromOverride: params.env,
+				SkipHooks:       true,
+				Isolation:       params.isolation,
+			})
+			return err
+		},
+	}); loadErr != nil {
+		return loadErr
 	}
-	createResult, err := worktree.Create(domain.CreateParams{
-		ProjectDir:      result.ProjectDir,
-		StateDir:        result.StateDir,
-		Branch:          p.Branch,
-		FromBranch:      startPoint,
-		SourceBranch:    params.parent,
-		Config:          result.Config,
-		EnvFromOverride: params.env,
-		SkipHooks:       true,
+
+	// Before the hooks: one of them may read the .env, and it has to read what
+	// this worktree binds rather than what it was copied with.
+	format, _ := cmd.Flags().GetString(domain.FlagOutput)
+	settlement, warnings := envports.SettleFresh(envports.FreshParams{
+		Params: envports.Params{
+			Context:      shared.FlowContext(result),
+			Branch:       createResult.Branch,
+			WorktreePath: createResult.Path,
+			Presenter:    shared.NewPresenter(cmd, format),
+		},
+		Preflight: preflight,
 	})
-	if err != nil {
-		return err
-	}
 
 	// on_create hooks as a distinct, titled phase (shared with create/extract).
 	// A reused branch has no start-point, so the hooks see its recorded parent.
 	if hookErr := shared.RunCreateHooksPhase(shared.CreateHooksPhaseParams{
+		StateDir:     result.StateDir,
 		Cmd:          cmd,
 		ShowHeader:   !params.jsonMode,
 		ProjectDir:   result.ProjectDir,
@@ -342,30 +406,37 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 			Draft:          p.Draft,
 			ExistingBranch: createResult.ExistingBranch,
 			OriginState:    createResult.OriginState,
+			Isolation:      worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: result.ProjectDir, StateDir: result.StateDir, Branch: createResult.Branch}),
+			EnvPorts:       settlement,
+			Warnings:       warnings,
 		})
 	}
 
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.Success(cmd.OutOrStdout(), fmt.Sprintf("Checked out PR #%d (%s) at %s", p.Number, p.Branch, createResult.Path))
-		if createResult.ExistingBranch {
-			note := shared.ReusedBranchNote(shared.ReusedBranchNoteParams{
-				Branch: target.Branch,
-				Ahead:  target.AheadBehind.Ahead,
-				Behind: target.AheadBehind.Behind,
-			})
-			if note.Warning {
-				output.Warning(cmd.OutOrStdout(), note.Text)
-			} else {
-				output.Message(cmd.OutOrStdout(), note.Text)
-			}
-		}
-		output.GoHint(cmd.OutOrStdout(), fmt.Sprintf(domain.GoCommandFmt, p.Branch))
+	reusedNote := shared.ReusedBranchNoteResult{}
+	if createResult.ExistingBranch {
+		reusedNote = shared.ReusedBranchNote(shared.ReusedBranchNoteParams{
+			Branch: target.Branch,
+			Ahead:  target.AheadBehind.Ahead,
+			Behind: target.AheadBehind.Behind,
+		})
+	}
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		output.FormatPRCheckoutResult(w, output.PRCheckoutResultParams{
+			Number:            p.Number,
+			Branch:            p.Branch,
+			EnvNote:           rules.EnvPortSettlementNote(settlement),
+			Path:              createResult.Path,
+			ReusedNote:        reusedNote.Text,
+			ReusedNoteWarning: reusedNote.Warning,
+			GoCommand:         fmt.Sprintf(domain.GoCommandFmt, p.Branch),
+		})
 	})
 	return nil
 }
 
 // reconcileReusedBranchParams holds inputs for reconcileReusedBranch.
 type reconcileReusedBranchParams struct {
+	Cmd        *cobra.Command
 	ProjectDir string
 	Target     domain.BranchTarget
 }
@@ -393,7 +464,7 @@ func reconcileReusedBranch(p reconcileReusedBranchParams) (updated domain.Branch
 
 	ffErr := components.RunLoading(components.LoadingParams{
 		Message: fmt.Sprintf(domain.SourceFastForwardLoadingFmt, target.Branch),
-		Animate: true,
+		Animate: shared.Animate(p.Cmd, true),
 		Work: func() error {
 			return branch.FastForwardToOrigin(branch.BranchParams{ProjectDir: p.ProjectDir, Branch: target.Branch})
 		},

@@ -268,6 +268,27 @@ func TestRowFlashDisabledWhenAnimationsOff(t *testing.T) {
 	}
 }
 
+func TestSpreadNeverExceedsItsWidth(t *testing.T) {
+	// A right segment that leaves no room for the left one used to fall through
+	// truncateRendered(left, 0), which returns the text whole.
+	line := spread("a-very-long-left-segment", "1h12m", 6)
+
+	if got := lipgloss.Width(stripANSI(line)); got > 6 {
+		t.Errorf("width = %d, want at most 6: a line wider than its panel wraps and breaks the frame", got)
+	}
+}
+
+func TestSpreadKeepsTheRightSegmentWhole(t *testing.T) {
+	line := stripANSI(spread("left", "1h12m", 20))
+
+	if !strings.HasSuffix(line, "1h12m") {
+		t.Errorf("line = %q, want the right segment whole and flush right", line)
+	}
+	if lipgloss.Width(line) != 20 {
+		t.Errorf("width = %d, want 20", lipgloss.Width(line))
+	}
+}
+
 // The version is permanent context; the call to action only exists when the
 // cached check found something newer. Both ride the header's count row.
 func TestHeaderShowsTheVersionAndCallsToActionWhenOutdated(t *testing.T) {

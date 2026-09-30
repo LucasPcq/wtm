@@ -16,10 +16,17 @@ import (
 
 func setupTestProject(t *testing.T) string {
 	t.Helper()
+	// Without this the tests read the developer's own daemon and LaunchAgents,
+	// so what `run url` prints depends on whether they happen to have `run up`
+	// running — which is how a green suite hid a real bug once.
+	shortHome(t)
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
+	// Standing in the project, not in whatever checkout runs the suite: a run
+	// command resolves its worktree from the current directory.
+	t.Chdir(dir)
 
 	if err := config.WriteProject(config.WriteProjectParams{
 		StateDir: stateDir,
@@ -49,6 +56,11 @@ func writeRunTOML(t *testing.T, stateDir string, cfg domain.RunConfig) {
 func runCmd(t *testing.T, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
 	cmd := NewCmd()
+	// The root command sets both, and a subcommand built on its own does not
+	// inherit them: without this cobra writes its usage onto the same stream as
+	// the command's output every time a test exercises a failure.
+	cmd.SilenceUsage = true
+	cmd.SilenceErrors = true
 	var outBuf, errBuf bytes.Buffer
 	cmd.SetOut(&outBuf)
 	cmd.SetErr(&errBuf)
@@ -150,7 +162,7 @@ func TestRunExportProfileNotFound(t *testing.T) {
 	}
 }
 
-func TestRunImportMerge(t *testing.T) {
+func TestRunImportKeepsNothingFromTheExistingConfig(t *testing.T) {
 	dir := setupTestProject(t)
 	writeRunTOML(t, dir, domain.RunConfig{
 		Jobs: []domain.JobConfig{
@@ -162,64 +174,20 @@ func TestRunImportMerge(t *testing.T) {
 	payloadPath := filepath.Join(t.TempDir(), "layout.json")
 	os.WriteFile(payloadPath, []byte(payload), 0o644)
 
-	stdout, _, err := runCmd(t, domain.CmdImport, payloadPath, "--output", domain.OutputJSON)
+	stdout, _, err := runCmd(t, domain.CmdImport, payloadPath, "--output", domain.OutputJSON, "--"+domain.FlagYes)
 	if err != nil {
 		t.Fatalf("run import: %v", err)
 	}
-
 	if !strings.Contains(stdout, `"build"`) {
-		t.Errorf("expected 'build' in added, got: %s", stdout)
+		t.Errorf("expected 'build' in the reported jobs, got: %s", stdout)
 	}
 
 	cfg, err := config.LoadRun(dir)
 	if err != nil {
 		t.Fatalf("load run: %v", err)
 	}
-	if len(cfg.Jobs) != 2 {
-		t.Errorf("expected 2 jobs after merge, got %d: %+v", len(cfg.Jobs), cfg.Jobs)
-	}
-}
-
-func TestRunImportMergeSkipsDuplicate(t *testing.T) {
-	dir := setupTestProject(t)
-	writeRunTOML(t, dir, domain.RunConfig{
-		Jobs: []domain.JobConfig{
-			{Name: "dev", Kind: domain.JobKindService, Cmd: "pnpm dev"},
-		},
-	})
-
-	payload := `{"job":[{"name":"dev","kind":"service","cmd":"pnpm dev"}],"profile":[]}`
-	payloadPath := filepath.Join(t.TempDir(), "layout.json")
-	os.WriteFile(payloadPath, []byte(payload), 0o644)
-
-	stdout, _, err := runCmd(t, domain.CmdImport, payloadPath, "--output", domain.OutputJSON)
-	if err != nil {
-		t.Fatalf("run import: %v", err)
-	}
-
-	if !strings.Contains(stdout, `"dev"`) {
-		t.Errorf("expected 'dev' in skipped, got: %s", stdout)
-	}
-}
-
-func TestRunImportReplaceRequiresForce(t *testing.T) {
-	dir := setupTestProject(t)
-	writeRunTOML(t, dir, domain.RunConfig{
-		Jobs: []domain.JobConfig{
-			{Name: "dev", Kind: domain.JobKindService, Cmd: "pnpm dev"},
-		},
-	})
-
-	payload := `{"job":[{"name":"new","kind":"task","cmd":"echo hi"}],"profile":[]}`
-	payloadPath := filepath.Join(t.TempDir(), "layout.json")
-	os.WriteFile(payloadPath, []byte(payload), 0o644)
-
-	_, _, err := runCmd(t, domain.CmdImport, payloadPath, "--replace")
-	if err == nil {
-		t.Fatal("expected error for --replace without --force")
-	}
-	if !strings.Contains(err.Error(), "--force") {
-		t.Errorf("expected error to mention --force, got %v", err)
+	if len(cfg.Jobs) != 1 || cfg.Jobs[0].Name != "build" {
+		t.Errorf("import must replace, not merge: %+v", cfg.Jobs)
 	}
 }
 
@@ -248,7 +216,7 @@ func TestRunExportImportRoundtrip(t *testing.T) {
 
 	os.Remove(filepath.Join(dir, domain.RunFileName))
 
-	_, _, err = runCmd(t, domain.CmdImport, layoutPath)
+	_, _, err = runCmd(t, domain.CmdImport, layoutPath, "--"+domain.FlagYes)
 	if err != nil {
 		t.Fatalf("import: %v", err)
 	}
@@ -295,5 +263,26 @@ func TestRunImportInvalidConfig(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "tasks cannot declare a stop command") {
 		t.Errorf("expected validation message, got %v", err)
+	}
+}
+
+// run export is machine output, like run url: it takes --output as its sibling
+// does, and answers with the same document whatever the format, never framed.
+func TestRunExportAcceptsOutputLikeRunURL(t *testing.T) {
+	dir := setupTestProject(t)
+	writeRunTOML(t, dir, domain.RunConfig{Jobs: []domain.JobConfig{{Name: "dev", Kind: domain.JobKindService, Cmd: "pnpm dev"}}})
+
+	plain, _, err := runCmd(t, domain.CmdExport)
+	if err != nil {
+		t.Fatalf("run export: %v", err)
+	}
+	for _, format := range []string{domain.OutputJSON, domain.OutputText} {
+		stdout, _, err := runCmd(t, domain.CmdExport, "--"+domain.FlagOutput, format)
+		if err != nil {
+			t.Fatalf("run export --output %s: %v", format, err)
+		}
+		if stdout != plain {
+			t.Errorf("--output %s = %q, want the same document as without it", format, stdout)
+		}
 	}
 }

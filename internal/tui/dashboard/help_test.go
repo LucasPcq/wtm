@@ -38,11 +38,11 @@ func TestHelpOverlayNeverOutgrowsTheScreen(t *testing.T) {
 }
 
 func TestHelpOverlayPairsSectionsSideBySideWhenWide(t *testing.T) {
-	box, _ := Model{width: 120, height: 40}.helpBox()
+	box, _ := Model{width: 120, height: 40, runConfig: runningJobs}.helpBox()
 
 	for _, band := range [][2]string{
 		{domain.DashboardHelpSectionNav, domain.DashboardHelpSectionAct},
-		{domain.DashboardHelpSectionMouse, domain.DashboardHelpSectionView},
+		{domain.DashboardHelpSectionRun, domain.DashboardHelpSectionMouse},
 	} {
 		if !hasLineWith(box, band[0], band[1]) {
 			t.Errorf("%s and %s must head the same band", band[0], band[1])
@@ -51,14 +51,15 @@ func TestHelpOverlayPairsSectionsSideBySideWhenWide(t *testing.T) {
 }
 
 func TestHelpOverlayStacksSectionsWhenNarrow(t *testing.T) {
-	box, _ := Model{width: 60, height: 60}.helpBox()
+	box, _ := Model{width: 60, height: 60, runConfig: runningJobs}.helpBox()
 
 	if hasLineWith(box, domain.DashboardHelpSectionNav, domain.DashboardHelpSectionAct) {
 		t.Error("a narrow screen holds one column, not two")
 	}
 	for _, title := range []string{
 		domain.DashboardHelpSectionNav, domain.DashboardHelpSectionAct,
-		domain.DashboardHelpSectionMouse, domain.DashboardHelpSectionView,
+		domain.DashboardHelpSectionRun, domain.DashboardHelpSectionMouse,
+		domain.DashboardHelpSectionView,
 	} {
 		if !strings.Contains(box, title) {
 			t.Errorf("section %s dropped from the narrow layout", title)
@@ -168,3 +169,17 @@ func hasLineWith(box string, parts ...string) bool {
 	}
 	return false
 }
+
+func TestHelpOverlayListsRunKeysOnlyWhenTheProjectRunsJobs(t *testing.T) {
+	without := newTestModel(t, 160, 60, "a", "b")
+	if box, _ := update(without, key(domain.KeyHelp)).helpBox(); strings.Contains(box, domain.DashboardHelpTextRunLogs) {
+		t.Errorf("help lists %q for a project without run.toml:\n%s", domain.DashboardHelpTextRunLogs, box)
+	}
+
+	with := withRunJobs(newTestModel(t, 160, 60, "a", "b"))
+	if box, _ := update(with, key(domain.KeyHelp)).helpBox(); !strings.Contains(box, domain.DashboardHelpTextRunLogs) {
+		t.Errorf("help misses %q for a project that runs jobs:\n%s", domain.DashboardHelpTextRunLogs, box)
+	}
+}
+
+var runningJobs = domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web"}}}

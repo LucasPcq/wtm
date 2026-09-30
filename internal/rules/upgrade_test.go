@@ -242,8 +242,6 @@ func TestShouldCheckUpdate(t *testing.T) {
 	}
 }
 
-func boolPtr(b bool) *bool { return &b }
-
 func goBin(dir string) func() string { return func() string { return dir } }
 
 func TestDashboardVersionSegments(t *testing.T) {

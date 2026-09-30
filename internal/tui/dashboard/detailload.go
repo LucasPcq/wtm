@@ -30,7 +30,12 @@ func (m Model) selectedBranch() string {
 // never counted against the grace delay.
 func (m Model) triggerDetailReload(before string) (Model, tea.Cmd) {
 	branch := m.selectedBranch()
-	if branch == "" || branch == before {
+	if branch == before {
+		return m, nil
+	}
+	// The logs panel speaks of one worktree's job: moving off it closes it.
+	m = m.closePanelLogs()
+	if branch == "" {
 		return m, nil
 	}
 	m.detailLoading, m.detailSince = branch, time.Time{}

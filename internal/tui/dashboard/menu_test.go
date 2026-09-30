@@ -1,6 +1,8 @@
 package dashboard
 
 import (
+	"strconv"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -115,7 +117,8 @@ func TestTheMenuFloatsUnderTheCellItWasOpenedFrom(t *testing.T) {
 	model := newTestModel(t, testWidth, testHeight, "a", "b", "c")
 	model = update(model, key("j"))
 	model = update(model, key(domain.KeyMenu))
-	renderAndWait(t, model, menuZone(0))
+	lead := firstMenuAction(t, model)
+	renderAndWait(t, model, menuZone(lead))
 
 	_, rect := model.menuBox()
 	if rect.Y != model.menuAnchor.Y+1 {
@@ -126,10 +129,10 @@ func TestTheMenuFloatsUnderTheCellItWasOpenedFrom(t *testing.T) {
 			model.menuAnchor.Y, want)
 	}
 
-	entry := model.zones.Get(menuZone(0))
-	wantX, wantY := menuEntryPoint(t, model, 0)
+	entry := model.zones.Get(menuZone(lead))
+	wantX, wantY := menuEntryPoint(t, model, lead)
 	if entry.StartY != wantY || entry.StartX != wantX {
-		t.Errorf("entry 0 starts at (%d,%d), want (%d,%d) — inside the box the rule placed",
+		t.Errorf("the first action starts at (%d,%d), want (%d,%d) — inside the box the rule placed",
 			entry.StartX, entry.StartY, wantX, wantY)
 	}
 }
@@ -145,6 +148,31 @@ func TestTheMenuFlipsAboveTheAnchorRatherThanRunningOffTheBottom(t *testing.T) {
 	if rect.Y >= testHeight-1 {
 		t.Errorf("the menu sits at y=%d, want it above an anchor on the last row", rect.Y)
 	}
+}
+
+// firstMenuAction is where the cursor opens: the menu leads with a heading, so
+// index 0 is read, never used.
+func firstMenuAction(t *testing.T, model Model) int {
+	t.Helper()
+	for index, item := range model.menuItems() {
+		if item.kind == menuEntryAction {
+			return index
+		}
+	}
+	t.Fatal("the menu offers no action at all")
+	return -1
+}
+
+// menuActions is what a test asserting on availability iterates: a heading and
+// a rule are never usable and never disabled.
+func menuActions(items []menuItem) []menuItem {
+	actions := make([]menuItem, 0, len(items))
+	for _, item := range items {
+		if item.kind == menuEntryAction {
+			actions = append(actions, item)
+		}
+	}
+	return actions
 }
 
 // menuIndexOf locates an entry by what it does, so a test does not break when
@@ -214,7 +242,7 @@ func TestTheMenuStartsAReparentOnTheSelectedWorktree(t *testing.T) {
 	if len(started.ops.running) != 1 || started.ops.running[0].kind != domain.OpKindReparent {
 		t.Fatalf("running = %+v, want the reparent run recorded", started.ops.running)
 	}
-	if got := started.ops.running[0].target; got != "b" {
+	if got := started.ops.running[0].firstTarget(); got != "b" {
 		t.Errorf("target = %q, want the worktree the menu was opened on", got)
 	}
 }
@@ -232,9 +260,9 @@ func TestTheReparentEntryIsNotMarkedDangerous(t *testing.T) {
 // Every entry acts on the same worktree, so one run holding it disables them all.
 func TestARunHoldingTheWorktreeDisablesEveryEntry(t *testing.T) {
 	model := newTestModel(t, testWidth, testHeight, "a", "b")
-	model.ops, _ = model.ops.begin(operation{kind: domain.OpKindCreate, target: "a"})
+	model.ops, _ = model.ops.begin(operation{kind: domain.OpKindCreate, targets: []string{"a"}})
 
-	for _, item := range model.menuItems() {
+	for _, item := range menuActions(model.menuItems()) {
 		if item.disabled == "" {
 			t.Errorf("entry %q stays usable while a run holds its worktree", item.label)
 		}
@@ -247,7 +275,7 @@ func TestClickingOffTheMenuOnlyClosesIt(t *testing.T) {
 	model := newTestModel(t, testWidth, testHeight, "a", "b", "c")
 	renderAndWait(t, model, rowZone(2))
 	model = update(model, key(domain.KeyMenu))
-	renderAndWait(t, model, menuZone(0))
+	renderAndWait(t, model, menuZone(firstMenuAction(t, model)))
 
 	// Right on a row of the frame, whose zone the last unobstructed frame left
 	// behind: the menu still swallows it.
@@ -282,16 +310,24 @@ func TestEveryMenuEntryIsClickableAcrossTheWholeBox(t *testing.T) {
 	model := newTestModel(t, testWidth, testHeight, "a", "b")
 	renderAndWait(t, model, rowZone(0))
 	model = update(model, key(domain.KeyMenu))
-	// Every entry, not just the first two: the zones are scanned asynchronously,
-	// so reading one that was never waited for hands back a nil zone.
-	ids := make([]string, 0, len(model.menuItems()))
-	for index := range model.menuItems() {
-		ids = append(ids, menuZone(index))
+
+	// Every zone the loop reads is waited for, not just the first: the manager
+	// stores a frame's zones one at a time, so one settling proves nothing
+	// about the next.
+	items := model.menuItems()
+	ids := make([]string, 0, len(items))
+	for index, item := range items {
+		if item.kind == menuEntryAction {
+			ids = append(ids, menuZone(index))
+		}
 	}
 	renderAndWait(t, model, ids...)
 
 	_, rect := model.menuBox()
-	for index := range model.menuItems() {
+	for index, item := range items {
+		if item.kind != menuEntryAction {
+			continue
+		}
 		zone := model.zones.Get(menuZone(index))
 		width := zone.EndX - zone.StartX + 1
 		if want := rect.Width - 2*menuBorder - 2*menuPadding; width < want {
@@ -315,8 +351,8 @@ func TestTheActionsMenuListsGlobalActionsWithNoSelection(t *testing.T) {
 	if len(items) == 0 {
 		t.Fatal("the global menu must offer something with no worktree selected")
 	}
-	if items[0].action != menuFastForwardAll {
-		t.Errorf("first entry = %v, want the batch fast-forward", items[0].action)
+	if actions := menuActions(items); actions[0].action != menuFastForwardAll {
+		t.Errorf("first entry = %v, want the batch fast-forward", actions[0].action)
 	}
 	if title, ok := model.menuTitle(); !ok || title != domain.DashboardActionsTitle {
 		t.Errorf("title = %q, want the menu to name itself rather than a worktree", title)
@@ -344,7 +380,7 @@ func TestTheActionsMenuGoesInertWhileARunHoldsTheSurface(t *testing.T) {
 	model.ops, _ = model.ops.begin(operation{kind: domain.OpKindClean, mode: flow.ModeBlocking})
 	model = update(model, key(domain.KeyActions))
 
-	for _, item := range model.menuItems() {
+	for _, item := range menuActions(model.menuItems()) {
 		if item.disabled == "" {
 			t.Errorf("entry %q stays usable while a run holds the dashboard", item.label)
 		}
@@ -377,7 +413,7 @@ func TestTheActionsMenuStartsThePruneRun(t *testing.T) {
 	}
 	// It holds the whole surface and names no target: several worktrees go, so
 	// there is no single one to lock.
-	if got := started.ops.running[0]; got.mode != flow.ModeBlocking || got.target != "" {
+	if got := started.ops.running[0]; got.mode != flow.ModeBlocking || got.firstTarget() != "" {
 		t.Errorf("operation = %+v, want a blocking run with no target", got)
 	}
 }
@@ -387,7 +423,7 @@ func TestTheActionsMenuStartsThePruneRun(t *testing.T) {
 func TestTheRowMenuLeadsWithFastForwardThenSync(t *testing.T) {
 	model := newTestModel(t, testWidth, testHeight, "a", "b")
 
-	items := model.worktreeMenuItems()
+	items := menuActions(model.worktreeMenuItems())
 
 	if len(items) < 2 || items[0].action != menuFastForward || items[1].action != menuSync {
 		t.Fatalf("items = %+v, want the fast-forward then the sync", items)
@@ -403,19 +439,25 @@ func TestTheRowMenuLeadsWithFastForwardThenSync(t *testing.T) {
 // The base row had no menu at all: it hangs off nothing, so there is nothing to
 // rebase it onto — only its own refresh.
 func TestTheBaseRowOffersTheBaseRefreshAlone(t *testing.T) {
-	model := newTestModel(t, testWidth, testHeight)
+	model := withRunJobs(newTestModel(t, testWidth, testHeight))
 	model = update(model, worktreesMsg{
 		statuses: []domain.WorktreeStatus{{Branch: "main", IsParent: true}},
 		parents:  map[string]string{},
 	})
 
-	items := model.worktreeMenuItems()
+	items := menuActions(model.worktreeMenuItems())
 
-	if len(items) != 1 || items[0].action != menuFastForward {
-		t.Fatalf("items = %+v, want exactly the fast-forward", items)
+	// The base has no parent to move to and cannot be deleted, so the only graph
+	// action it offers is catching up with its own remote. The run module does
+	// apply to it: the main checkout runs jobs like any other worktree.
+	if items[0].action != menuFastForward {
+		t.Fatalf("items = %+v, want the base fast-forward first", items)
 	}
 	if items[0].label != domain.DashboardMenuFastForward {
 		t.Errorf("label = %q, want the fast-forward named", items[0].label)
+	}
+	if got := actionsOf(items); got != "7,9,11,10,12,13" {
+		t.Errorf("actions = %s, want the fast-forward followed by the run entries", got)
 	}
 }
 
@@ -480,11 +522,11 @@ func TestTheBaseRowStartsItsOwnFastForward(t *testing.T) {
 }
 
 func TestWorktreeMenuLeadsWithFastForward(t *testing.T) {
-	items := worktreeActions(domain.WorktreeStatus{
+	items := menuActions(Model{}.worktreeActions(domain.WorktreeStatus{
 		Branch:       "feat",
 		OriginState:  domain.DivergenceBehind,
 		OriginBehind: 2,
-	})
+	}))
 	if len(items) == 0 || items[0].action != menuFastForward {
 		t.Fatalf("first entry = %+v, want menuFastForward", items)
 	}
@@ -494,13 +536,13 @@ func TestWorktreeMenuLeadsWithFastForward(t *testing.T) {
 }
 
 func TestBaseRowOffersTheSameFastForwardEntry(t *testing.T) {
-	items := worktreeActions(domain.WorktreeStatus{
+	items := menuActions(Model{}.worktreeActions(domain.WorktreeStatus{
 		Branch:      "main",
 		IsParent:    true,
 		OriginState: domain.DivergenceBehind,
-	})
-	if len(items) != 1 || items[0].action != menuFastForward {
-		t.Fatalf("base row entries = %+v, want one menuFastForward", items)
+	}))
+	if len(items) == 0 || items[0].action != menuFastForward {
+		t.Fatalf("base row entries = %+v, want the fast-forward first", items)
 	}
 }
 
@@ -518,7 +560,7 @@ func TestFastForwardIsNeverGatedOnTheCachedOriginBadges(t *testing.T) {
 		domain.DivergenceUnknown,
 	}
 	for _, state := range states {
-		items := worktreeActions(domain.WorktreeStatus{Branch: "feat", OriginState: state})
+		items := menuActions(Model{}.worktreeActions(domain.WorktreeStatus{Branch: "feat", OriginState: state}))
 		if items[0].disabled != "" {
 			t.Errorf("state %v: disabled = %q, want it enabled", state, items[0].disabled)
 		}
@@ -529,9 +571,9 @@ func TestFastForwardIsNeverGatedOnTheCachedOriginBadges(t *testing.T) {
 // one meaning disabled has ever carried on this menu.
 func TestOnlyARunningOperationDisablesTheFastForward(t *testing.T) {
 	model := newTestModel(t, testWidth, testHeight, "a")
-	model.ops, _ = model.ops.begin(operation{kind: domain.OpKindCreate, target: "a"})
+	model.ops, _ = model.ops.begin(operation{kind: domain.OpKindCreate, targets: []string{"a"}})
 
-	items := model.worktreeMenuItems()
+	items := menuActions(model.worktreeMenuItems())
 	if items[0].disabled == "" {
 		t.Fatal("a worktree another run is holding must disable its entries")
 	}
@@ -555,5 +597,132 @@ func TestGlobalMenuOffersTheBatchFastForward(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("global menu has no menuFastForwardAll entry")
+	}
+}
+
+func actionsOf(items []menuItem) string {
+	parts := make([]string, 0, len(items))
+	for _, item := range items {
+		parts = append(parts, strconv.Itoa(int(item.action)))
+	}
+	return strings.Join(parts, ",")
+}
+
+// "Start jobs" named neither a profile nor a job. The two are different
+// requests, so the menu names them apart and groups them under a heading.
+func TestTheWorktreeMenuIsReadInSections(t *testing.T) {
+	model := withRunJobs(newTestModel(t, testWidth, testHeight, "a", "b"))
+	model = update(model, key(domain.KeyMenu))
+
+	items := model.menuItems()
+	if items[0].kind != menuEntryHeading || items[0].label != domain.DashboardMenuSectionGit {
+		t.Fatalf("first entry = %+v, want the GIT heading", items[0])
+	}
+	if !hasMenuEntry(items, menuEntryHeading, domain.DashboardMenuSectionRun) {
+		t.Error("the run actions must sit under their own heading")
+	}
+	if !hasMenuEntry(items, menuEntryAction, domain.DashboardMenuRunUp) {
+		t.Error("what starts a profile must be named as such")
+	}
+	if !hasMenuEntry(items, menuEntryAction, domain.DashboardMenuRunStart) {
+		t.Error("starting a single job is its own entry")
+	}
+	if model.menuCursor == 0 {
+		t.Error("the cursor opens on an action, never on a heading")
+	}
+}
+
+func TestTheMenuCursorWalksOverHeadingsAndRules(t *testing.T) {
+	model := newTestModel(t, testWidth, testHeight, "a", "b")
+	model = update(model, key(domain.KeyMenu))
+
+	for range model.menuItems() {
+		model = model.moveMenu(1)
+		if item := model.menuItems()[model.menuCursor]; !item.activatable() {
+			t.Fatalf("cursor parked on %+v, want an action", item)
+		}
+	}
+}
+
+// A heading answers no keypress and no click: activating one would fire the
+// action its zero value happens to name.
+func TestActivatingAHeadingDoesNothing(t *testing.T) {
+	model := withRunJobs(newTestModel(t, testWidth, testHeight, "a", "b"))
+	model = update(model, key(domain.KeyMenu))
+
+	started, cmd := model.activateMenu(0)
+
+	if cmd != nil || started.ops.active() {
+		t.Fatal("a heading is read, never used")
+	}
+}
+
+func hasMenuEntry(items []menuItem, kind menuEntryKind, label string) bool {
+	for _, item := range items {
+		if item.kind == kind && item.label == label {
+			return true
+		}
+	}
+	return false
+}
+
+func TestRunMenuLabelsCarryNoEllipsis(t *testing.T) {
+	for _, label := range []string{
+		domain.DashboardMenuRunUp,
+		domain.DashboardMenuRunStart,
+		domain.DashboardMenuRunDown,
+		domain.DashboardMenuRunStop,
+		domain.DashboardMenuRunLogs,
+	} {
+		if strings.Contains(label, "…") {
+			t.Errorf("label %q keeps an ellipsis", label)
+		}
+	}
+}
+
+// The run module's batch gestures sit where the git ones already do: a context
+// menu hangs off one worktree, and these act on worktrees picked inside the run.
+func TestTheActionsMenuOffersTheBatchRunGestures(t *testing.T) {
+	model := withRunJobs(newTestModel(t, testWidth, testHeight, "a", "b"))
+	model = update(model, key(domain.KeyActions))
+
+	for action, label := range map[menuAction]string{
+		menuRunUpAll:   domain.DashboardMenuRunUpAll,
+		menuRunDownAll: domain.DashboardMenuRunDownAll,
+		menuRunLogsAll: domain.DashboardMenuRunLogsAll,
+	} {
+		item := model.menuItems()[menuIndexOf(t, model, action)]
+		if item.label != label {
+			t.Errorf("label = %q, want %q", item.label, label)
+		}
+		if item.danger {
+			t.Errorf("%q is marked dangerous, want not: starting and stopping services destroys nothing", label)
+		}
+	}
+}
+
+// The block reads by grain: what acts on the whole worktree, then what acts on
+// one job, then the view over both. The flat order alternated between the two.
+func TestTheRunBlockIsRuledByGrain(t *testing.T) {
+	items := runActions(domain.DashboardMenuRunStop)
+
+	var order []menuAction
+	rules := 0
+	for _, item := range items {
+		if item.kind == menuEntrySeparator {
+			rules++
+		}
+		if item.kind == menuEntryAction {
+			order = append(order, item.action)
+		}
+	}
+	if rules != 3 {
+		t.Errorf("rules = %d, want the leading one plus the two the grains are split on", rules)
+	}
+	want := []menuAction{menuRunUp, menuRunDown, menuRunStart, menuRunStop, menuRunLogs}
+	for index, action := range want {
+		if order[index] != action {
+			t.Fatalf("order = %v, want the worktree grain before the job grain: %v", order, want)
+		}
 	}
 }

@@ -1,0 +1,88 @@
+### args: --yes --patch-compose --link-env --write-port-keys
+### stdout
+
+  ✓ Configured run module → <repo>/.git/wtm/run.toml   1 added
+
+  ✓ 1 port(s) declared in run.toml
+
+  ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  │ Ports withdrawn — they could not coexist                                                                         │
+  │ POSTGRES_PORT (job "postgres", base 5432) is dropped — it meets DB_PORT (job "dev", base 5432) in every worktree │
+  │ DB_PORT (job "dev", base 5432) is dropped — it meets POSTGRES_PORT (job "postgres", base 5432) in every worktree │
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+  ✓ 1 compose name(s) scoped to the worktree
+  ! a volume that pinned its name gains one per worktree, each starting empty — the
+data already written stays in the volume under the old name
+
+  ✓ 1 .env value(s) now follow a port
+
+  ╭──────────────────────────────────────────────────────────────────────────╮
+  │ These jobs will bind the same port in every worktree                     │
+  │ postgres   no port declared                                              │
+  │                                                                          │
+  │ Declare a port, or reference it in the command: `wtm run job edit <job>` │
+  ╰──────────────────────────────────────────────────────────────────────────╯
+  ╭──────────────────────────────────────────────────────────────────────────────────────╮
+  │ Named URLs carry a port                                                              │
+  │ Jobs publishing a named URL answer on http://<job>.<worktree>.<repo>.localhost:11080 │
+  │ `wtm run proxy install` serves them on port 80 so the port disappears from the URL   │
+  ╰──────────────────────────────────────────────────────────────────────────────────────╯
+
+  → wtm run up        start the jobs
+  → wtm run job add   declare another
+
+
+### stderr
+
+### file .git/wtm/run.toml
+#:schema ./schemas/run.schema.json
+
+[[job]]
+  name = "postgres"
+  kind = "service"
+  cmd = "docker compose -f docker-compose.yml up postgres"
+  scope = "shared"
+  [job.namespace]
+    name = "app_{worktree}"
+    create = "createdb -h localhost -p $DB_PORT $WTM_NAMESPACE"
+    remove = "dropdb -h localhost -p $DB_PORT $WTM_NAMESPACE"
+
+[[job]]
+  name = "dev"
+  kind = "service"
+  cmd = "pnpm run dev"
+  cwd = "."
+  [job.ports]
+    PORT = 4000
+  [job.url]
+    port = "PORT"
+
+[[profile]]
+  name = "all"
+  jobs = ["postgres", "dev"]
+  default = true
+
+[[env_port]]
+  file = ".env"
+  key = "PORT"
+  job = "dev"
+  port = "PORT"
+
+### file docker-compose.yml
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: "${COMPOSE_PROJECT_NAME:-001}-app-postgres"
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  cache:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+volumes:
+  pgdata:
+    name: "${COMPOSE_PROJECT_NAME:-001}-app-pgdata"
+

@@ -301,3 +301,36 @@ func TestTreeSpacerPrefixKeepsTheGutterRunning(t *testing.T) {
 		})
 	}
 }
+
+func TestForestWithRunningJobsStampsEveryNode(t *testing.T) {
+	forest := domain.Forest{Roots: []domain.TreeNode{{
+		Branch:   "main",
+		Path:     "/wt/main",
+		Children: []domain.TreeNode{{Branch: "feature", Path: "/wt/feature"}},
+	}}}
+
+	stamped := ForestWithRunningJobs(forest, map[string]int{"/wt/feature": 3})
+
+	if got := stamped.Roots[0].Status.RunningJobs; got != 0 {
+		t.Errorf("main carries %d running jobs, want none", got)
+	}
+	child := stamped.Roots[0].Children[0]
+	if child.Status.RunningJobs != 3 {
+		t.Errorf("feature carries %d running jobs, want 3", child.Status.RunningJobs)
+	}
+	if badges := TreeBadges(child); !hasBadge(badges, domain.TreeBadgeRunning) {
+		t.Errorf("badges = %v, want the running one", badges)
+	}
+	if badges := TreeBadges(stamped.Roots[0]); hasBadge(badges, domain.TreeBadgeRunning) {
+		t.Error("a worktree running nothing was badged as running")
+	}
+}
+
+func hasBadge(badges []domain.TreeBadge, want domain.TreeBadge) bool {
+	for _, badge := range badges {
+		if badge == want {
+			return true
+		}
+	}
+	return false
+}

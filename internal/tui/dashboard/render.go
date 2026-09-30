@@ -19,15 +19,13 @@ const (
 	borderWidth   = 2
 	paddingWidth  = 2
 	buttonPadding = 4
-	// panelChromeRows is what renderPanel prepends to Body before drawing it:
-	// the title row and the blank row under it.
-	panelChromeRows = 2
 )
 
-// panelBodyHeight is the row budget renderPanel leaves for Body once its own
-// border and chrome rows are accounted for.
-func panelBodyHeight(rect domain.Rect) int {
-	return max(rect.Height-borderWidth-panelChromeRows, 0)
+// tabbedPanelBodyHeight is the row budget renderPanel leaves for the Body of a
+// panel that heads itself: it passes no Title, so renderPanel prepends nothing,
+// and what its own head costs is the tab bar rather than the title row.
+func tabbedPanelBodyHeight(rect domain.Rect) int {
+	return max(rect.Height-borderWidth-domain.DashboardPanelTabsChrome, 0)
 }
 
 type panelParams struct {
@@ -51,6 +49,19 @@ func (m Model) renderPanel(params panelParams) string {
 	contentHeight := params.Rect.Height - borderWidth
 	if textWidth <= 0 || contentHeight <= 0 {
 		return ""
+	}
+
+	// A panel whose head is its own first body line — the detail's tab bar —
+	// passes no title, and no empty row is drawn in its place. It must not carry
+	// title decorations either: there is no title row to hang them on, and
+	// dropping them silently is how a zone goes missing without an error.
+	if params.Title == "" && params.TitleRight == "" && params.TitleZone == "" {
+		lines := clipRenderedLines(params.Body, contentHeight)
+		box := styles.DashboardPanel.
+			Width(params.Rect.Width - borderWidth).
+			Height(contentHeight).
+			Render(strings.Join(lines, "\n"))
+		return m.marks().Mark(params.Zone, box)
 	}
 
 	title := styles.DashboardPanelTitle.Render(pad(truncate(params.Title, textWidth), textWidth))
@@ -264,7 +275,8 @@ func (m Model) countLineVariant(params countLineParams) string {
 func (m Model) renderTabBar(width int, right func(room int) string) (bar string, activeStart, activeWidth int) {
 	rendered := make([]string, 0, len(tabs))
 	used := 0
-	for index, title := range tabs {
+	for _, index := range m.shownTabs() {
+		title := tabs[index]
 		style := styles.DashboardTabInactive
 		if index == m.tab {
 			style = styles.DashboardTabActive
@@ -463,6 +475,13 @@ func joinHeader(segments ...string) string {
 // countText counts what the active tab lists, in plain text: worktrees, or
 // the nodes of the forest — which includes the parents that have none.
 func (m Model) countText() string {
+	if m.tab == tabServices {
+		up := 0
+		for _, block := range m.servicesBlocks() {
+			up += block.Up
+		}
+		return fmt.Sprintf(domain.DashboardServicesCountFmt, up)
+	}
 	if m.tab == tabTree {
 		if !m.treeLoaded {
 			return ""
@@ -495,10 +514,10 @@ func (m Model) countLabel() string {
 
 // Both tab styles share the same padding, so the column does not depend on which
 // tab is active — which is what lets the slide animation measure from and to it.
-func tabStart(width, index int) int {
+func (m Model) tabStart(width, index int) int {
 	used := 0
-	for i, title := range tabs {
-		w := lipgloss.Width(styles.DashboardTabInactive.Render(title))
+	for _, i := range m.shownTabs() {
+		w := lipgloss.Width(styles.DashboardTabInactive.Render(tabs[i]))
 		if used+w > width {
 			break
 		}
@@ -554,8 +573,12 @@ func (m Model) renderHelpBar(layout domain.DashboardLayout) string {
 	switch {
 	case m.loadErr != nil:
 		hint = m.loadErr.Error()
+	case m.logsOpen():
+		hint = domain.DashboardLogsHint
 	case m.tab == tabTree:
 		hint = domain.DashboardHelpTree
+	case m.tab == tabServices:
+		hint = domain.DashboardHelpServices
 	case layout.Narrow && m.detailOpen:
 		hint = domain.DashboardHelpDetail
 	case layout.Narrow:
@@ -627,13 +650,20 @@ func pad(text string, width int) string {
 }
 
 // spread lays a left and a right segment on one row of the given width, keeping
-// the right one whole and clipping the left when they collide.
+// the right one whole and clipping the left when they collide. A width leaving
+// the left segment no room at all drops it rather than letting it through:
+// truncateRendered(left, 0) returns the text whole, and a line wider than its
+// panel is re-wrapped by lipgloss and breaks the frame.
 func spread(left, right string, width int) string {
 	rightWidth := lipgloss.Width(right)
 	if rightWidth >= width {
 		return truncateRendered(right, width)
 	}
-	left = truncateRendered(left, width-rightWidth-1)
+	budget := width - rightWidth - 1
+	if budget <= 0 {
+		return pad(truncateRendered(right, width), width)
+	}
+	left = truncateRendered(left, budget)
 	gap := width - lipgloss.Width(left) - rightWidth
 	return left + strings.Repeat(" ", max(gap, 0)) + right
 }

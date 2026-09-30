@@ -19,6 +19,9 @@ type ScriptedPrompter struct {
 
 	Asked   []string
 	Content map[string]flow.StepContent
+	// Confirms counts the standalone confirmations asked, so a test can assert
+	// that a step said nothing rather than only what it answered.
+	Confirms int
 }
 
 // Ask walks the session like a real host does — honoring Skip, Build and Load — and
@@ -85,7 +88,10 @@ func stepContent(step flow.Step, answers flow.Answers) (flow.StepContent, error)
 	return flow.StepContent{Title: step.Title, Description: step.Description, Options: step.Options}, nil
 }
 
-func (p *ScriptedPrompter) Confirm(flow.ConfirmParams) (bool, error) { return p.Confirmed, nil }
+func (p *ScriptedPrompter) Confirm(flow.ConfirmParams) (bool, error) {
+	p.Confirms++
+	return p.Confirmed, nil
+}
 
 func (p *ScriptedPrompter) Interactive() bool { return true }
 
@@ -95,6 +101,7 @@ func (p *ScriptedPrompter) AskedKeys() string { return strings.Join(p.Asked, ","
 type Recorder struct {
 	Stages   []string
 	Hooks    []string
+	Beats    []domain.HookBeat
 	Notices  []flow.Notice
 	Statuses []flow.Notice
 }
@@ -107,7 +114,9 @@ func (r *Recorder) Stage(params flow.StageParams) error {
 func (r *Recorder) HookPhase(params flow.HookPhaseParams) error {
 	r.Hooks = append(r.Hooks, params.Title)
 	var sink strings.Builder
-	return params.Run(&sink)
+	return params.Run(flow.HookSink{Output: &sink, OnHook: func(beat domain.HookBeat) {
+		r.Beats = append(r.Beats, beat)
+	}})
 }
 
 func (r *Recorder) Notice(notice flow.Notice) { r.Notices = append(r.Notices, notice) }

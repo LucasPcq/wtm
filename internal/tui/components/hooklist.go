@@ -308,9 +308,13 @@ func hookLabel(h domain.HookCommand) string {
 }
 
 // helpHint returns the mode-appropriate help bar text.
-func (m HookListModel) helpHint() string {
+func (m HookListModel) helpActions() []string {
+	return []string{domain.HelpDelete, domain.HelpReorder}
+}
+
+func (m HookListModel) helpModal() string {
 	if m.editing {
-		return "  tab next field • space toggle • enter save • esc cancel"
+		return domain.HookListEditHelp
 	}
-	return "  ↑↓ navigate • enter select • d delete • shift+↑/↓ reorder • esc back"
+	return ""
 }

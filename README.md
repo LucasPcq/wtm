@@ -1,123 +1,117 @@
-# wtm — Worktree Manager
+<h1 align="center">wtm</h1>
 
-Orchestrate git worktrees and team dev workflows from the terminal.
+<p align="center">
+  <strong>One branch, one worktree, one isolated dev stack.</strong><br>
+  A worktree manager for teams that work on several branches at once, and let their agents do too.
+</p>
 
-`wtm` manages the full lifecycle of git worktrees — creation, environment
-provisioning, hooks, stacked-branch syncing, per-worktree dev services, navigation,
-and cleanup — replacing manual `git worktree` juggling with one streamlined workflow.
+<p align="center">
+  <a href="https://github.com/LucasPcq/wtm/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/LucasPcq/wtm?sort=semver"></a>
+  <a href="https://github.com/LucasPcq/wtm/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/LucasPcq/wtm/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
+</p>
 
-> **This README is a guide, not a reference.** Every command is self-documenting:
-> run `wtm <command> --help` for its full flags, or browse the generated reference in
-> [`docs/`](docs/wtm.md). The tables below are just a map.
+<p align="center">
+  <img alt="wtm create walks through its wizard, wtm go jumps in, wtm run up opens the run view" src="docs/assets/hero.gif" width="800">
+</p>
 
-## Dependencies
+## Why wtm
 
-| Tool | Required | Purpose |
-|---|---|---|
-| `git` | ✅ Required | Worktree management |
-| `gh` | ⭐ Recommended | PR listing, creation, checkout, and prune (merged/closed detection) |
+`git worktree` gives each branch its own directory. Everything around it is still yours to do: copy the `.env`, install dependencies, remember which directory holds which branch, rebase a stack of branches in the right order and, the hard part, run two branches' dev servers without them fighting over the same ports, containers and databases.
 
-`gh` is optional — worktree creation, navigation, hooks, and services all work without
-it. Install and authenticate it to unlock GitHub features: [cli.github.com](https://cli.github.com).
+wtm does that part:
 
-## Installation
+- **A worktree is ready when it is created:** `.env` copied, hooks run, ports shifted so it never collides with another one.
+- **Each worktree runs its own stack:** dev servers and `docker compose`, on their own ports and under their own name, side by side.
+- **Stacked branches stay in order:** every worktree knows its parent; `wtm sync` rebases the whole chain.
+- **It speaks JSON:** data commands take `--output json`, changes take `--yes`, and `wtm agents install` teaches Claude Code or Cursor to drive it.
 
-**Homebrew (macOS / Linux)**
+## Install
 
 ```bash
 brew install LucasPcq/tap/wtm
+echo 'eval "$(wtm shell-init)"' >> ~/.zshrc   # lets `wtm go` change directory
 ```
 
-**Download binary** — grab the latest [release](https://github.com/LucasPcq/wtm/releases), extract, and move it onto your `PATH`:
+<details>
+<summary>Other ways to install</summary>
+
+**Binary:** download the latest [release](https://github.com/LucasPcq/wtm/releases), extract it, and move `wtm` onto your `PATH`:
 
 ```bash
 tar -xzf wtm_*_darwin_arm64.tar.gz   # or _darwin_amd64 / _linux_amd64
 sudo mv wtm /usr/local/bin/
 ```
 
-**Go install**
+**Go**
 
 ```bash
 go install github.com/LucasPcq/wtm@latest
 ```
 
-### Updating
+**Shell integration:** `bash` and `fish` work the same way: `eval "$(wtm shell-init)"` in `~/.bashrc`, `wtm shell-init | source` in `config.fish`.
+
+**Updating:** `wtm upgrade` updates wtm the way it was installed (Homebrew, `go install` or a standalone binary). wtm checks for a new release at most once a day; `WTM_NO_UPDATE_CHECK=1` turns that off.
+
+</details>
+
+wtm needs `git`. [`gh`](https://cli.github.com) is optional and unlocks the GitHub features (`checkout` a PR, PR status, `prune` of merged branches).
+
+## Quick start
 
 ```bash
-wtm upgrade          # update to the latest release
-wtm upgrade --check  # see what's available without installing
+cd your-repo
+wtm init                      # once per repository
+
+wtm create feat/login         # a new worktree, provisioned
+wtm go feat/login             # jump into it
+wtm list                      # every worktree and its state
+wtm clean feat/login          # remove it once the PR is merged
 ```
 
-`wtm upgrade` detects how wtm was installed: a standalone binary is replaced in
-place after its checksum is verified, a Homebrew or `go install` binary is handed
-to that tool. It updates the CLI itself — for your worktrees, that's `wtm sync`.
+To run your dev stack per worktree, `wtm run init` detects your `docker-compose` files and package scripts and writes the config once; `wtm run up` starts it.
 
-wtm also checks for new releases at most once a day and prints a notice on stderr.
-It stays silent in CI, without a TTY, and under `--output json`. Disable it with
-`WTM_NO_UPDATE_CHECK=1`, or in `~/.config/wtm/config.toml`:
+## Features
 
-```toml
-[update]
-check = false
+### Worktrees, provisioned
+
+`wtm create` makes the worktree, copies the `.env` files from their template, the main checkout or the parent, and runs your `on_create` hooks (`pnpm install`, …). `wtm clean` and `wtm prune` remove them, one at a time or every branch whose PR is merged, and refuse a worktree with uncommitted or unpushed work unless you say `--force`.
+
+### An isolated stack per worktree
+
+Each worktree gets its own ports (`3000` on the main checkout, `3010` on the next, …), its own `COMPOSE_PROJECT_NAME`, and its own address: `http://web.feat-login.acme.localhost:11080` (on port 80 once `wtm run proxy install` redirects it, on macOS). Run as many branches as you like at the same time; a shared postgres can hold one database per worktree.
+
+<p align="center">
+  <img alt="wtm run up on two worktrees at once: each runs its own api and web on its own named URLs" src="docs/assets/isolation.gif" width="800">
+</p>
+
+### A dashboard for all of it
+
+`wtm ui` shows every worktree, the branch tree, PR status and the running services, and lets you create, clean and start things from one screen.
+
+<p align="center">
+  <img alt="The wtm ui dashboard: worktrees, a new one created from the dashboard, the branch tree" src="docs/assets/dashboard.gif" width="800">
+</p>
+
+### Stacked branches
+
+Every worktree records the branch it came from. `wtm tree` draws the forest, `wtm sync` rebases a branch and its descendants onto their parents, and `wtm reparent` rewires the chain when a middle branch merges.
+
+```console
+$ wtm tree
+  main
+  ├─ feat/login
+  │  └─ feat/login-ui
+  └─ fix/typo
 ```
 
-## Quick Start
+### Built for scripts and agents
 
-```bash
-# 1. Shell integration — required so `go`/`switch` can cd for you
-echo 'eval "$(wtm shell-init)"' >> ~/.zshrc && source ~/.zshrc
-
-# 2. Initialize wtm in your repo
-cd your-repo && wtm init
-
-# 3. Everyday flow
-wtm create feature/login     # create a worktree (env + hooks provisioned)
-wtm go feature/login         # cd into it
-wtm list                     # see all worktrees
-wtm sync --all               # rebase the stack onto its parents
-wtm clean feature/login      # remove it when the PR merges
-```
-
-## Teach your LLM to use wtm
-
-Working with Claude Code or Cursor? Run:
-
-```bash
-wtm agents install
-```
-
-It detects `.claude/` and `.cursor/` (project and home) and installs a `using-wtm`
-skill so your agent can drive every command via the [`--output json`](#machine-readable-output) contract — without being told how each session.
-
-## Concepts
-
-A few ideas explain how the commands fit together:
-
-- **Worktree** — a checked-out branch in its own directory. wtm creates them under
-  `base_path` (from `wtm init`) and records per-worktree metadata under
-  `<git-common-dir>/wtm/`. A branch that already exists locally is checked out as-is
-  (`create` and `checkout` both keep its commits — nothing to clean up first); only a
-  branch another worktree already holds is refused. See [`create`](docs/wtm_create.md), [`list`](docs/wtm_list.md), [`clean`](docs/wtm_clean.md).
-- **Stacking** — every worktree records the parent branch it was created from
-  (`source_branch`) — the branch it was created from, or the parent you pick when reusing
-  an existing branch. [`sync`](docs/wtm_sync.md) rebases a worktree (and its descendants,
-  in cascade) onto its parent; [`tree`](docs/wtm_tree.md) shows the parent→child forest and
-  which branches need syncing; [`reparent`](docs/wtm_reparent.md) rewires the parent after a
-  middle branch merges.
-- **Env provisioning** — on `create`, wtm copies `.env` files into the new worktree using
-  a **strategy** (`example` / `main` / `parent`). See [Env strategies](#env-strategies).
-- **Shell integration** — `go` changes your current directory, which a child process can't
-  do for its parent shell. `eval "$(wtm shell-init)"` installs a shell function that makes
-  it work. Without it, use [`resolve`](docs/wtm_resolve.md) to get a path.
-- **Dev jobs** *(experimental)* — long-running **services** (dev servers, docker) and
-  one-shot **tasks** (migrations, seeds) declared in `run.toml` and grouped into
-  **profiles**, run per-worktree by a background daemon. The flow is still stabilizing —
-  `wtm go` is the recommended way to enter a worktree today. See [`run`](docs/wtm_run.md)
-  and [Run config](#run-config--runtoml).
+Data commands take `--output json` (the document is the schema), every change takes `--yes` so nothing prompts, and every command takes `--quiet`. `wtm agents install` adds a skill to Claude Code and Cursor so your agent drives wtm without being told how.
 
 ## Commands
 
-Full flags live in `wtm <command> --help` and [`docs/`](docs/wtm.md). Overview:
+Every command documents itself: `wtm <command> --help`, or the generated [reference](docs/wtm.md).
 
 ### Worktrees
 
@@ -127,7 +121,7 @@ Full flags live in `wtm <command> --help` and [`docs/`](docs/wtm.md). Overview:
 | [`list`](docs/wtm_list.md) | List all worktrees |
 | [`tree`](docs/wtm_tree.md) | Show the worktree forest (parent → child) |
 | [`clean`](docs/wtm_clean.md) | Remove a worktree and its local branch |
-| [`prune`](docs/wtm_prune.md) | Remove finished worktrees (merged / closed PR / gone) in one pass — merged/closed need `gh` |
+| [`prune`](docs/wtm_prune.md) | Remove finished worktrees (merged / closed PR / gone) in one pass (merged/closed need `gh`) |
 | [`extract`](docs/wtm_extract.md) | Move uncommitted changes to another worktree (split an oversized PR) |
 | [`env`](docs/wtm_env.md) | Detect and fix a worktree's `.env` drift against its template + value source |
 | [`relocate`](docs/wtm_relocate.md) | Move worktrees to align with `base_path` and adopt external ones |
@@ -138,32 +132,33 @@ Full flags live in `wtm <command> --help` and [`docs/`](docs/wtm.md). Overview:
 | Command | Purpose |
 |---|---|
 | [`go`](docs/wtm_go.md) | cd into a worktree |
-| [`switch`](docs/wtm_switch.md) | cd into a worktree and start its dev services *(experimental)* |
 | [`resolve`](docs/wtm_resolve.md) | Print a branch's worktree path (for scripts / agents) |
 
 ### Stacked branches
 
 | Command | Purpose |
 |---|---|
-| [`fast-forward`](docs/wtm_fast-forward.md) | Advance worktree branches to `origin/<branch>` — no rebase, no merge |
+| [`fast-forward`](docs/wtm_fast-forward.md) | Advance worktree branches to `origin/<branch>`, with no rebase and no merge |
 | [`sync`](docs/wtm_sync.md) | Rebase selected worktrees onto their parent, in cascade |
 | [`reparent`](docs/wtm_reparent.md) | Change the parent a worktree is rebased onto |
 
-### Dev jobs *(experimental)*
+### Dev jobs
 
-Per-worktree services + tasks. Functional, but the flow is still stabilizing. The
-run module is **opt-in**: run `wtm run init` once to set it up (the global `wtm init`
-no longer touches services). Until then, run commands stop with a hint pointing there.
+Opt-in: `wtm run init` sets it up once per repository.
 
 | Command | Purpose |
 |---|---|
-| [`run init`](docs/wtm_run_init.md) | Set up run.toml (detect docker-compose + scripts) |
-| [`run up`](docs/wtm_run_up.md) / [`down`](docs/wtm_run_down.md) | Start / stop a profile's jobs |
-| [`run start`](docs/wtm_run_start.md) / [`stop`](docs/wtm_run_stop.md) | Start / stop a single job |
-| [`run ps`](docs/wtm_run_ps.md) / [`list`](docs/wtm_run_list.md) | Running jobs / declared jobs + profiles |
-| [`run logs`](docs/wtm_run_logs.md) | Stream a job's output |
+| [`run init`](docs/wtm_run_init.md) | Set up run.toml (detect docker-compose + scripts, pre-fill ports, publish URLs, write and link .env keys) |
+| [`run up`](docs/wtm_run_up.md) / [`down`](docs/wtm_run_down.md) | Start / stop a profile's jobs on one or more worktrees (`up` attaches, `-d` detaches) |
+| [`run start`](docs/wtm_run_start.md) / [`stop`](docs/wtm_run_stop.md) | Start one job / stop one job, in one or more worktrees (`start` attaches, `-d` detaches) |
+| [`run ps`](docs/wtm_run_ps.md) / [`list`](docs/wtm_run_list.md) | Running jobs, every repository / declared jobs + profiles |
+| [`run logs`](docs/wtm_run_logs.md) | Reopen the run view on one or more worktrees' jobs |
+| [`run url`](docs/wtm_run_url.md) / [`open`](docs/wtm_run_open.md) | Print / open where a job answers in this worktree |
 | [`run export`](docs/wtm_run_export.md) / [`import`](docs/wtm_run_import.md) | Share a job layout between machines |
 | [`run job`](docs/wtm_run_job.md) / [`profile`](docs/wtm_run_profile.md) | Add / remove / edit jobs and profiles |
+| [`run addressing`](docs/wtm_run_addressing.md) | Switch the `.env` files between named URLs and port URLs, and settle the worktrees on it |
+| [`run proxy`](docs/wtm_run_proxy.md) | Report, install or remove the redirection that serves named URLs on port 80 |
+| [`run daemon`](docs/wtm_run_daemon.md) | Inspect, stop or restart the process that runs the jobs |
 
 ### GitHub
 
@@ -182,163 +177,18 @@ no longer touches services). Until then, run commands stop with a hint pointing 
 | [`schema`](docs/wtm_schema.md) | Extract the bundled JSON Schemas |
 | [`upgrade`](docs/wtm_upgrade.md) | Update wtm itself to the latest release |
 
-## Machine-readable output
+## Documentation
 
-Every data command supports `--output json` for scripting and LLM agents. JSON is
-pretty-printed on stdout with `snake_case` fields; human messages stay on stderr; exit
-codes are unchanged.
+- **[Getting started](docs/guide/getting-started.md):** from install to two branches running side by side, in ten minutes. Then [recipes](docs/guide/recipes.md) for common setups and [troubleshooting](docs/guide/troubleshooting.md).
+- **[User guide](docs/guide/README.md):** [configuration](docs/guide/configuration.md), [isolation](docs/guide/isolation.md), [jobs and profiles](docs/guide/jobs-and-profiles.md), [how `wtm run` works](docs/guide/how-run-works.md), [shared services](docs/guide/shared-services.md), [named URLs](docs/guide/addressing.md), the [`run.toml` reference](docs/guide/run-toml.md), [where wtm keeps its state](docs/guide/state.md).
+- **[Command reference](docs/wtm.md)**, generated from `--help`.
+- **[Changelog](CHANGELOG.md)**, and [migrating to 0.28](docs/guide/migrating-to-0.28.md) if you come from 0.27.
+- **[`llms.txt`](llms.txt)**: the same pages as an index for LLMs and agents.
 
-**The payload *is* the schema** — its shape mirrors the command's Go type and stays
-stable. Discover the exact fields by running the command once:
+## Contributing
 
-```bash
-wtm list --output json | jq '.[] | select(.is_dirty).branch'
-wtm checkout 42 --output json | jq '.path'
-wtm run ps --output json | jq '.[] | select(.status=="running").name'
-```
-
-Non-interactive note: `--output json` never prompts, so destructive commands need an
-explicit flag — `clean`/`prune` need `--yes` (or `--force`), and `sync` needs branch
-args or `--all`. See each command's `--help`.
-
-## Configuration
-
-All wtm files live under `<git-common-dir>/wtm/` (`.git/wtm/` for a normal clone). Git
-never commits anything inside `.git/`, so wtm is invisible to teammates and to
-`git status` — worktree usage stays personal.
-
-```
-<git-common-dir>/wtm/
-├── config.toml                    # project settings
-├── run.toml                       # dev jobs + profiles
-├── schemas/                       # JSON schemas for editor autocomplete
-└── worktrees/<encoded-branch>/
-    └── meta.json                  # per-worktree metadata (source branch, timestamp, env strategy)
-```
-
-Everything is plain TOML, validated at load time (unknown keys are rejected, not
-silently ignored). Edit by hand, or use `wtm config show` / `wtm config edit` and the
-`wtm run import` flow.
-
-### Project config — `config.toml`
-
-Generated by `wtm init`, per-clone, never committed.
-
-```toml
-[worktrees]
-base_path   = "../.trees"   # where worktrees are created (relative to repo root)
-base_branch = "main"        # default base for new worktrees
-
-[env]
-strategy = "example"        # example | main | parent (see below)
-
-# Each detected value file and its committed template (schema). wtm distinguishes
-# templates (.env.example / .dist / .sample / .template / .tmpl, committed) from
-# value files (.env, gitignored). .env.local is detected and flagged local but
-# stays syncable.
-[[env.file]]
-target   = ".env"
-template = ".env.example"
-
-[[env.file]]
-target = ".env.local"
-local  = true
-
-[hooks]
-on_create = [
-  "pnpm install",                                             # string: runs from worktree root
-  { cmd = "pnpm install", cwd = "apps/api" },                 # object: runs from a subdir
-  { cmd = "pnpm install", cwd = "apps/web", continue_on_error = true },  # non-fatal
-]
-on_clean = [
-  "docker compose down",                                      # runs right before a worktree is removed
-]
-```
-
-`on_create` hooks run after a worktree is created; `on_clean` hooks run in the worktree
-just before it is removed by `clean`/`prune` (e.g. to tear down external resources). A
-non-zero hook aborts the operation unless the entry sets `continue_on_error`. Hooks
-interpolate `{{worktree}}`, `{{branch}}`, `{{root}}`, and (for `on_create`) `{{from_branch}}`.
-
-### Env strategies
-
-| Strategy | Behavior |
-|---|---|
-| `example` | Copies `file.example` from the main worktree, renamed to `file`. Warns if `.example` is missing. |
-| `main` | Copies the actual file from the main worktree. |
-| `parent` | Copies from the source worktree (`--from`), falling back to `main`. |
-
-The strategy is recorded per worktree. Later, [`wtm env`](docs/wtm_env.md) reconciles a
-worktree's `.env` against its **template** (the committed schema) plus the **same value
-source** — adding missing keys, and (with `--mode refresh`) settling values that drifted.
-Override the source for a single run with `--from`; the report always shows which source
-was used.
-
-### Run config — `run.toml`
-
-Optional and opt-in — created by `wtm run init` (which detects docker-compose files
-and package scripts), not by the global `wtm init`. Declares dev **jobs** and groups
-them into **profiles**. Per-clone, never committed — share layouts with
-`wtm run export | wtm run import -`.
-
-```toml
-[[job]]
-name = "docker"
-kind = "service"            # long-running; with `stop` it's detached
-cmd  = "docker compose up -d"
-stop = "docker compose down"
-
-[[job]]
-name = "migrate"
-kind = "task"               # one-shot; blocks the profile, streams output, non-zero aborts
-cmd  = "pnpm migrate"
-
-[[profile]]
-name    = "full"
-jobs    = ["docker", "migrate"]
-default = true
-```
-
-Jobs are scoped per worktree at runtime: starting `docker` from worktree A runs it with
-`cwd = A`; a separate process runs from worktree B. `wtm run down` only stops the current
-worktree's jobs unless you pass `--all`.
-
-### Global config — `~/.config/wtm/config.toml`
-
-Created by `wtm init`, personal to each developer.
-
-```toml
-shell = "zsh"          # zsh | bash | fish
-
-[ui]
-animations = true      # false disables every wtm ui animation (tab rule, new-row flash)
-```
-
-`ui.animations` defaults to on when absent — set it to `false` to turn off every
-`wtm ui` animation at once, useful over a slow or laggy connection.
-
-## IDE autocomplete + validation
-
-Every TOML file `wtm init` writes starts with a `#:schema ./schemas/...json` directive.
-Pair it with [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml)
-(or the bundled JetBrains TOML plugin) for autocomplete, hover docs, and real-time
-validation. Schemas ship with the binary and are written locally by `wtm init` — no
-internet required. Re-extract them after upgrading:
-
-```bash
-wtm schema dump            # <git-common-dir>/wtm/schemas/{run,project}.schema.json
-wtm schema dump --global   # ~/.config/wtm/schemas/global.schema.json
-```
-
-## Contributing to the docs
-
-The [`docs/`](docs/wtm.md) reference is generated from the Cobra command tree — never
-edit it by hand. After changing any command or flag, regenerate:
-
-```bash
-make docs
-```
+`make lint` and `make test` must pass. The command reference under `docs/` is generated: change a command, then run `make docs`. The GIFs above are recorded from `docs/demos/*.tape` with [VHS](https://github.com/charmbracelet/vhs): `make demos` re-records them.
 
 ## License
 
-MIT
+[MIT](LICENSE)

@@ -31,6 +31,17 @@ func newSyncCmd() *cobra.Command {
 			"cascade; when it is behind its remote you are offered to fast-forward it first\n" +
 			"(--ff-parents / --no-ff-parents). After a successful cascade, optionally force-push\n" +
 			"(with lease) the rebased branches.",
+		Example: `  # Pick the worktrees to rebase
+  wtm sync
+
+  # Preview the whole cascade
+  wtm sync --all --dry-run
+
+  # Rebase a stack, then force-push it (with lease)
+  wtm sync feat/login feat/login-ui --yes --push
+
+  # Every worktree, locally only
+  wtm sync --all --yes --no-push --output json`,
 		Args: cobra.ArbitraryArgs,
 		RunE: runSync,
 	}
@@ -94,7 +105,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 	}
 
 	_, err = syncflow.Run(syncflow.Params{
-		Context: flowContext(config),
+		Context: shared.FlowContext(config),
 		Request: syncflow.Request{
 			Branches:     args,
 			All:          all,
@@ -107,8 +118,8 @@ func runSync(cmd *cobra.Command, args []string) error {
 			BaseBranch:   resolveBase(baseOverride, config),
 		},
 		// The picker may be reached through the shell wrapper, which consumes stdout.
-		Prompter:  flowPrompter(flowPrompterParams{Interactive: interactive, Stderr: true}),
-		Presenter: syncPresenter{cliPresenter: newPresenter(cmd, format)},
+		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),
+		Presenter: syncPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
 	})
 	return err
 }

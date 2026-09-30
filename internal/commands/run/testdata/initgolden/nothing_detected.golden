@@ -1,0 +1,11 @@
+### args: --yes
+### stdout
+
+  = No docker-compose files or package scripts detected — nothing to configure automatically.
+
+  → wtm run job add   declare a job by hand
+  → wtm run profile add   group jobs into a profile
+
+
+### stderr
+

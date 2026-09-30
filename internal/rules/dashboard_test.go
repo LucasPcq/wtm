@@ -399,3 +399,29 @@ func TestFlashLitFadesWithinItsDuration(t *testing.T) {
 		t.Error("no flash in progress (zero Since) must never read as lit")
 	}
 }
+
+func TestFullBodyGivesTheWholeWidthToTheMainPanel(t *testing.T) {
+	layout := ComputeDashboardLayout(DashboardLayoutParams{Width: 160, Height: 40, FullBody: true})
+
+	if layout.DetailVisible {
+		t.Error("DetailVisible = true, want the main panel alone")
+	}
+	if layout.List.Width != 160 {
+		t.Errorf("List.Width = %d, want the full 160: a url does not read in 48 columns", layout.List.Width)
+	}
+	if !layout.ListVisible {
+		t.Error("ListVisible = false, want the main panel drawn")
+	}
+}
+
+func TestFullBodyStillReservesTheOutputPanelAndHelpBar(t *testing.T) {
+	full := ComputeDashboardLayout(DashboardLayoutParams{Width: 160, Height: 40, FullBody: true})
+	split := ComputeDashboardLayout(DashboardLayoutParams{Width: 160, Height: 40})
+
+	if full.Output != split.Output {
+		t.Errorf("Output = %+v, want it unchanged: only the body's split differs", full.Output)
+	}
+	if full.Help != split.Help {
+		t.Errorf("Help = %+v, want it unchanged", full.Help)
+	}
+}

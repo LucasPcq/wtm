@@ -7,14 +7,21 @@ package envwizard
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/styles"
 	"github.com/LucasPcq/wtm/internal/tui/components"
 )
 
-const applyAction = "apply"
+const (
+	applyAction = "apply"
+	// applyVerbatimAction declines the port pass for good: the worktree is
+	// recorded verbatim, so its jobs run on the ports its .env keeps.
+	applyVerbatimAction = "apply-verbatim"
+)
 
 // RunParams holds the wizard inputs. DiffByBranch is the precomputed per-worktree
 // drift (keyed by branch); Candidates are the worktrees offered when no PresetBranch
@@ -23,12 +30,30 @@ type RunParams struct {
 	Candidates   []domain.WorktreeStatus
 	PresetBranch string
 	DiffByBranch map[string][]domain.EnvFileResult
+	// PortsByBranch is the [[env_port]] pass each worktree would get. It is not a
+	// decision the wizard offers — it rides along with the apply — which is
+	// exactly why the recap has to name it: discovering it afterwards is a
+	// surprise, and a surprise about a file the user did not agree to touch.
+	PortsByBranch map[string]domain.EnvPortPlan
+	// AdoptionByBranch holds the worktrees created before the isolation choice
+	// existed. Adopting it is a question of its own, since it moves the worktree
+	// off the compose project whose volumes hold its data.
+	AdoptionByBranch map[string]domain.IsolationAdoptionPlan
+	// RestoreByBranch is what keeping each worktree verbatim puts back to the
+	// source's values. VerbatimSwitch says the run was asked to (--isolation
+	// verbatim); otherwise it is shown only beside the verbatim action.
+	RestoreByBranch map[string][]domain.EnvRestoredEntry
+	VerbatimSwitch  bool
 }
 
 // Result is the wizard outcome: the chosen worktree and its per-file decisions.
 type Result struct {
 	Branch    string
 	Decisions []components.EnvFileDecision
+	// Verbatim is the user choosing to apply without the port pass, which
+	// records the worktree verbatim.
+	Verbatim bool
+	Adopt    bool
 }
 
 // Run drives the unified wizard and returns the branch + collected decisions.
@@ -49,11 +74,30 @@ func Run(params RunParams) (Result, error) {
 		return selectValue(prev, worktreeIdx)
 	}
 
-	resolveIdx := len(steps)
-	steps = append(steps, resolveStep(params, branchOf))
+	adoptIdx := -1
+	if (params.PresetBranch == "" && len(params.AdoptionByBranch) > 0) || params.AdoptionByBranch[params.PresetBranch].Pending {
+		adoptIdx = len(steps)
+		steps = append(steps, adoptionStep(params, branchOf))
+	}
+
+	// The wizard never auto-skips its first step, which is where a preset branch
+	// puts the resolver: with nothing to decide it would sit there empty, so it is
+	// left out here instead.
+	resolveIdx := -1
+	if len(steps) > 0 || !resolveModel(params, params.PresetBranch).Empty() {
+		resolveIdx = len(steps)
+		steps = append(steps, resolveStep(params, branchOf))
+	}
 
 	recapIdx := len(steps)
-	steps = append(steps, recapStep(branchOf, resolveIdx))
+	steps = append(steps, recapStep(recapStepParams{
+		BranchOf:        branchOf,
+		ResolveIdx:      resolveIdx,
+		AdoptIdx:        adoptIdx,
+		PortsByBranch:   params.PortsByBranch,
+		RestoreByBranch: params.RestoreByBranch,
+		VerbatimSwitch:  params.VerbatimSwitch,
+	}))
 
 	final, err := components.RunWizard(components.RunWizardParams{
 		Steps:    steps,
@@ -65,12 +109,17 @@ func Run(params RunParams) (Result, error) {
 	}
 
 	done := final.Steps()
-	if selectValue(done, recapIdx) == domain.WizardCancelValue {
+	action := selectValue(done, recapIdx)
+	if action == domain.WizardCancelValue {
 		return Result{}, domain.ErrUserAborted
 	}
 
-	res := Result{Branch: branchOf(done)}
-	if m, ok := done[resolveIdx].Model.(components.EnvResolveModel); ok {
+	res := Result{
+		Branch:   branchOf(done),
+		Verbatim: action == applyVerbatimAction,
+		Adopt:    adoptIdx >= 0 && selectValue(done, adoptIdx) == domain.IsolationAdoptValue,
+	}
+	if m, ok := stepModel(done, resolveIdx).(components.EnvResolveModel); ok {
 		res.Decisions = m.Decisions()
 	}
 	return res, nil
@@ -108,12 +157,7 @@ func resolveStep(params RunParams, branchOf func([]components.Step) string) comp
 		Model:   components.NewEnvResolve(components.NewEnvResolveParams{}),
 		Callout: true, // renders the glossary (the model's desc) as a legend callout
 		Build: func(prev []components.Step) any {
-			branch := branchOf(prev)
-			return components.NewEnvResolve(components.NewEnvResolveParams{
-				Title:       "Resolve drift — " + branch,
-				Description: components.EnvResolveGlossary(),
-				Files:       params.DiffByBranch[branch],
-			})
+			return resolveModel(params, branchOf(prev))
 		},
 		AutoSkip: func(w components.WizardModel) bool {
 			m, ok := w.CurrentStepModel().(components.EnvResolveModel)
@@ -124,26 +168,159 @@ func resolveStep(params RunParams, branchOf func([]components.Step) string) comp
 	}
 }
 
-// recapStep restates the worktree and every decision (with values), then offers
-// "Yes, apply" / "No, cancel".
-func recapStep(branchOf func([]components.Step) string, resolveIdx int) components.Step {
+// adoptionStep asks a worktree created before the isolation choice whether to
+// adopt it. Keeping it as is opens under the cursor: adopting leaves its data
+// behind in the compose project it runs under today.
+func adoptionStep(params RunParams, branchOf func([]components.Step) string) components.Step {
+	return components.Step{
+		Name:  domain.IsolationAdoptStepName,
+		Model: components.NewSelectList(components.NewSelectListParams{}),
+		Build: func(prev []components.Step) any {
+			branch := branchOf(prev)
+			plan := params.AdoptionByBranch[branch]
+			return components.NewSelectList(components.NewSelectListParams{
+				Title:       fmt.Sprintf(domain.IsolationAdoptTitleFmt, branch),
+				Description: domain.IsolationAdoptDescription,
+				Items: []components.SelectItem{
+					{Label: domain.IsolationAdoptKeepLabel, Value: domain.IsolationAdoptKeepValue},
+					{Label: rules.IsolationAdoptOptionLabel(plan), Value: domain.IsolationAdoptValue, Danger: plan.ComposeProject != ""},
+				},
+			})
+		},
+		AutoSkip: func(w components.WizardModel) bool {
+			return !params.AdoptionByBranch[branchOf(w.Steps())].Pending
+		},
+		Summary: func(model any) string {
+			if components.SelectSummary(model) == domain.IsolationAdoptValue {
+				return domain.IsolationAdoptSummary
+			}
+			return domain.IsolationAdoptKeptSummary
+		},
+	}
+}
+
+func resolveModel(params RunParams, branch string) components.EnvResolveModel {
+	return components.NewEnvResolve(components.NewEnvResolveParams{
+		Title:       "Resolve drift — " + branch,
+		Description: components.EnvResolveGlossary(),
+		Files:       params.DiffByBranch[branch],
+	})
+}
+
+type recapStepParams struct {
+	BranchOf        func([]components.Step) string
+	ResolveIdx      int
+	AdoptIdx        int
+	PortsByBranch   map[string]domain.EnvPortPlan
+	RestoreByBranch map[string][]domain.EnvRestoredEntry
+	VerbatimSwitch  bool
+}
+
+// recapStep restates the worktree, every decision (with values) and the port
+// values the apply will shift, then offers "Yes, apply" / "No, cancel".
+func recapStep(params recapStepParams) components.Step {
 	return components.RecapStep(components.RecapStepParams{
 		Name: "Review & apply",
 		Build: func(prev []components.Step) components.RecapContent {
-			lines := []string{styles.Muted.Render("Worktree:") + "  " + styles.Bold.Render(branchOf(prev)), ""}
-			if m, ok := stepModel(prev, resolveIdx).(components.EnvResolveModel); ok {
-				if body := m.RecapLines(); len(body) > 0 {
-					lines = append(lines, body...)
-				} else {
-					lines = append(lines, "Only safe additions will be applied.")
-				}
+			branch := params.BranchOf(prev)
+			lines := []string{styles.Muted.Render("Worktree:") + "  " + styles.Bold.Render(branch)}
+			if params.AdoptIdx >= 0 && selectValue(prev, params.AdoptIdx) == domain.IsolationAdoptValue {
+				lines = append(lines, styles.Muted.Render(domain.IsolationAdoptStepName+":")+" "+domain.IsolationAdoptSummary)
 			}
+			lines = append(lines, "")
+			m, ok := stepModel(prev, params.ResolveIdx).(components.EnvResolveModel)
+			if body := m.RecapLines(); ok && len(body) > 0 {
+				lines = append(lines, body...)
+			} else {
+				lines = append(lines, "Only safe additions will be applied.")
+			}
+			lines = append(lines, portRecapLines(params.PortsByBranch[branch])...)
+			actions := recapActions(params.PortsByBranch[branch])
+			lines = append(lines, restoreRecapLines(restoreRecapParams{
+				Entries: params.RestoreByBranch[branch],
+				Switch:  params.VerbatimSwitch,
+				Offered: len(actions) > 1,
+			})...)
 			return components.RecapContent{
 				Description: strings.Join(lines, "\n"),
-				Actions:     []components.SelectItem{{Label: "Yes, apply", Value: applyAction}},
+				Actions:     actions,
 			}
 		},
 	})
+}
+
+// recapActions offers the port pass as a choice rather than a fait accompli. A
+// worktree with no port to move keeps the single plain confirmation.
+func recapActions(plan domain.EnvPortPlan) []components.SelectItem {
+	apply := components.SelectItem{Label: domain.EnvApplyActionLabel, Value: applyAction}
+	if len(rules.EnvPortRewrites(plan)) == 0 {
+		return []components.SelectItem{apply}
+	}
+	return []components.SelectItem{
+		apply,
+		{Label: domain.EnvApplyVerbatimLabel, Value: applyVerbatimAction},
+	}
+}
+
+// portRecapLines announces the [[env_port]] pass that rides along with the apply.
+func portRecapLines(plan domain.EnvPortPlan) []string {
+	// The recap draws inside the wizard's frame, so the table gets the terminal
+	// less what the frame spends on either side of it.
+	table := rules.EnvPortTableLines(rules.EnvPortTableParams{
+		Plan:  plan,
+		Width: recapTableWidth(),
+	})
+	if len(table) == 0 {
+		return nil
+	}
+	return append([]string{
+		"",
+		styles.Bold.Render(rules.EnvPortOffsetLabel(plan.Offset)),
+	}, table...)
+}
+
+type restoreRecapParams struct {
+	Entries []domain.EnvRestoredEntry
+	Switch  bool
+	Offered bool
+}
+
+// restoreRecapLines previews what verbatim puts back, before it is written:
+// under --isolation verbatim it is the run itself, and otherwise it is what the
+// verbatim action would do on top of the apply.
+func restoreRecapLines(params restoreRecapParams) []string {
+	if len(params.Entries) == 0 || (!params.Switch && !params.Offered) {
+		return nil
+	}
+	title := domain.EnvRestoreRecapTitle
+	if !params.Switch {
+		title = domain.EnvRestoreRecapIfKeptTitle
+	}
+
+	lines := []string{"", styles.Bold.Render(title)}
+	var files []string
+	for _, entry := range params.Entries {
+		if !slices.Contains(files, entry.File) {
+			files = append(files, entry.File)
+		}
+	}
+	for _, file := range files {
+		lines = append(lines, styles.Muted.Render(file))
+		for _, row := range rules.EnvRestoredRows(params.Entries, file) {
+			lines = append(lines, domain.RecapRowIndent+row)
+		}
+	}
+	return lines
+}
+
+// recapTableWidth is what a table has inside the recap's frame, zero when there
+// is no terminal to measure — where the table falls back to its own defaults.
+func recapTableWidth() int {
+	cols := components.TerminalWidth()
+	if cols <= 0 {
+		return 0
+	}
+	return cols - domain.RecapFrameChrome
 }
 
 // driftBadge renders the per-worktree env-drift pill for the selection list.
@@ -159,9 +336,9 @@ func driftBadge(files []domain.EnvFileResult) components.Badge {
 func actionableCount(files []domain.EnvFileResult) int {
 	n := 0
 	for _, f := range files {
-		n += len(f.Diff.ByStatus(domain.EnvKeyConflict)) +
-			len(f.Diff.ByStatus(domain.EnvKeyMissing)) +
-			len(f.Diff.ByStatus(domain.EnvKeyOrphan))
+		n += len(rules.EnvKeysWithStatus(rules.EnvDiffFilter{Diff: f.Diff, Status: domain.EnvKeyConflict})) +
+			len(rules.EnvKeysWithStatus(rules.EnvDiffFilter{Diff: f.Diff, Status: domain.EnvKeyMissing})) +
+			len(rules.EnvKeysWithStatus(rules.EnvDiffFilter{Diff: f.Diff, Status: domain.EnvKeyOrphan}))
 	}
 	return n
 }

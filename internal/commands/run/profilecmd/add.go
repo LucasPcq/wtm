@@ -1,18 +1,12 @@
 package profilecmd
 
 import (
-	"errors"
-	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
 
+	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
-	"github.com/LucasPcq/wtm/internal/rules"
-	"github.com/LucasPcq/wtm/internal/service/runconfig"
-	"github.com/LucasPcq/wtm/internal/tui/runwizard"
+	profileflow "github.com/LucasPcq/wtm/internal/flow/run/profile"
 )
 
 func newAddCmd() *cobra.Command {
@@ -20,79 +14,51 @@ func newAddCmd() *cobra.Command {
 		Use:   domain.CmdAdd + " [name]",
 		Short: "Add a profile to run.toml",
 		Long: "Append a profile to <git-common-dir>/wtm/run.toml.\n\n" +
-			"Pass --jobs (comma-separated existing job names) for non-interactive use.\n" +
-			"Without --jobs, prompts interactively (multiselect over existing jobs).",
+			"Every flag pre-fills the corresponding question, so the form opens on what was\n" +
+			"already given. --yes skips the questions altogether: [name] and --jobs are then\n" +
+			"required, and the profile is not the default unless --default says so.",
+		Example: `  # Answer the form
+  wtm run profile add
+
+  wtm run profile add backend --jobs postgres,migrate,api --yes
+
+  # What run up starts without --profile
+  wtm run profile add full --jobs postgres,api,web --default --yes`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runAdd,
 	}
-	cmd.Flags().StringSlice(domain.FlagJobs, nil, "Comma-separated existing job names (skips wizard when set with name)")
+	cmd.Flags().StringSlice(domain.FlagJobs, nil, "Comma-separated existing job names, in start order")
 	cmd.Flags().Bool(domain.FlagDefault, false, "Mark this profile as the default")
+	shared.AddYesFlag(cmd, "Skip all prompts; [name] and --jobs are then required")
 	shared.AddOutputFlag(cmd)
 	return cmd
 }
 
 func runAdd(cmd *cobra.Command, args []string) error {
-	wd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("get working directory: %w", err)
-	}
-	res, err := shared.LoadConfig(cmd, wd)
+	// The creation path, like `run job add`: a run.toml declaring nothing yet is
+	// what this command is for.
+	ctx, err := runctx.Open(runctx.OpenParams{Cmd: cmd, SkipGuard: true})
 	if err != nil {
 		return err
 	}
-	cfg, err := runconfig.Load(res.StateDir)
-	if err != nil {
-		return fmt.Errorf("load run.toml: %w", err)
-	}
 
-	jobsFlag, _ := cmd.Flags().GetStringSlice(domain.FlagJobs)
-	defaultFlag, _ := cmd.Flags().GetBool(domain.FlagDefault)
+	jobs, _ := cmd.Flags().GetStringSlice(domain.FlagJobs)
+	isDefault, _ := cmd.Flags().GetBool(domain.FlagDefault)
 
-	var name string
-	if len(args) > 0 {
-		name = args[0]
-	}
-
-	var newProfile domain.ProfileConfig
-
-	if name == "" || len(jobsFlag) == 0 {
-		result, wizErr := runwizard.RunProfileWizard(runwizard.ProfileWizardParams{
-			Existing: cfg,
-			Initial:  domain.ProfileConfig{Name: name, Default: defaultFlag},
-		})
-		if errors.Is(wizErr, domain.ErrUserAborted) {
-			return nil
-		}
-		if wizErr != nil {
-			return wizErr
-		}
-		newProfile = result
-	} else {
-		newProfile = domain.ProfileConfig{
-			Name:    name,
-			Jobs:    jobsFlag,
-			Default: defaultFlag,
-		}
-	}
-
-	cfg.Profiles = append(cfg.Profiles, newProfile)
-	if newProfile.Default {
-		cfg = rules.ApplyDefaultOverride(cfg, newProfile.Name)
-	}
-	if err := runconfig.Save(runconfig.SaveParams{StateDir: res.StateDir, Config: cfg}); err != nil {
-		return err
-	}
-
-	format, _ := cmd.Flags().GetString(domain.FlagOutput)
-	if format == domain.OutputJSON {
-		return output.WriteProfileResultJSON(cmd.OutOrStdout(), output.ProfileActionResult{
-			Name:   newProfile.Name,
-			Status: domain.JobActionAdded,
-		})
-	}
-
-	output.Frame(cmd.OutOrStdout(), func() {
-		output.Success(cmd.OutOrStdout(), fmt.Sprintf("Added profile %q", newProfile.Name))
+	outcome, err := profileflow.Add(profileflow.AddParams{
+		Context: ctx.FlowContext(),
+		Request: profileflow.AddRequest{
+			Initial: domain.ProfileConfig{Name: runctx.FirstArg(args), Jobs: jobs, Default: isDefault},
+			Config:  ctx.Run,
+		},
+		Prompter:  ctx.Prompter(ctx.Interactive),
+		Presenter: presenter{CLIPresenter: ctx.CLI(cmd)},
 	})
+	if err != nil {
+		return err
+	}
+	if outcome.Aborted {
+		return domain.ErrAborted
+	}
 	return nil
 }

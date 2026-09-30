@@ -18,6 +18,27 @@ type WorktreeMetadata struct {
 	SourceBranch string      `json:"source_branch"`
 	CreatedAt    string      `json:"created_at"`
 	EnvStrategy  EnvStrategy `json:"env_strategy"`
+	// Ordinal is the worktree's stable number, what every port and resource name
+	// is derived from. Zero means unallocated: the main worktree is ordinal 0 by
+	// definition and never gets a meta.json of its own.
+	Ordinal int `json:"ordinal,omitempty"`
+	// Namespaces names the shared services this worktree has carved a namespace out
+	// of. It is the only durable record that one exists: a claim on a shared
+	// service goes with a `run stop`, and without this a clean would either give
+	// back a namespace that was never created or leak one that was. It lives here
+	// because the file is removed with the worktree it describes.
+	Namespaces []string `json:"namespaces,omitempty"`
+	// Isolation is the choice made when the worktree was created. Empty is a
+	// worktree that predates the choice, and reads as IsolationIsolated — what
+	// every worktree got until then.
+	Isolation Isolation `json:"isolation,omitempty"`
+}
+
+// WorktreeNameClash names the live worktree whose derived name a branch would
+// share, and that name.
+type WorktreeNameClash struct {
+	Branch string
+	Name   string
 }
 
 // WorktreeStatus holds the display state of a worktree for wtm ls.
@@ -103,18 +124,39 @@ type CreateParams struct {
 	// separate, titled phase (used by `create` for its phased output). Callers that
 	// want hooks to run inline (extract, checkout) leave it false.
 	SkipHooks bool
+	// Isolation is recorded before any hook runs: a hook reads the worktree's
+	// ports, and they depend on it.
+	Isolation Isolation
 }
 
 // CreateHooksParams holds inputs for running on_create hooks as a standalone phase,
 // after the worktree exists.
 type CreateHooksParams struct {
 	ProjectDir   string
+	StateDir     string
 	WorktreePath string
 	Branch       string
 	FromBranch   string
 	Hooks        []HookCommand
 	// Output receives the hook output as it is produced; nil keeps stderr.
 	Output io.Writer
+	// OnHook receives each hook starting and finishing. A surface that reports
+	// the beats itself sets it; nil leaves the runner to write them to Output.
+	OnHook func(HookBeat)
+}
+
+// HookBeat is one beat of a lifecycle-hook phase: the same hook is reported
+// starting, then finished. It carries facts and no rendering — whether a
+// finished hook reads as a line, a glyph or nothing at all is the surface's.
+type HookBeat struct {
+	Cmd string
+	Cwd string
+	// Started distinguishes the two beats; a finished hook carries the rest.
+	Started  bool
+	Duration time.Duration
+	// Err is empty on success, and Stderr what a failing hook wrote there.
+	Err    string
+	Stderr string
 }
 
 // CreateResult holds the output of a successful worktree creation.
@@ -135,6 +177,16 @@ type CreateResult struct {
 	// created (OriginState empty) or up to date.
 	OriginAhead  int `json:"origin_ahead,omitempty"`
 	OriginBehind int `json:"origin_behind,omitempty"`
+	// Isolation is the worktree's, recorded or, for one that predates the
+	// choice, what it reads as.
+	Isolation Isolation `json:"isolation,omitempty"`
+	// EnvPorts is the port pass this run settled the fresh .env with — the
+	// shape `wtm env` reports as ports. Absent when there was nothing to settle
+	// or the pass could not run, and then Warnings says why.
+	EnvPorts EnvPortPlan `json:"env_ports,omitzero"`
+	// Warnings are what the run module could not do for the worktree, which
+	// never fails its creation (a port pass left undone, and why).
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // CleanParams holds inputs for cleaning a worktree.
@@ -156,11 +208,15 @@ type CleanParams struct {
 // before the worktree directory is removed.
 type CleanHooksParams struct {
 	ProjectDir   string
+	StateDir     string
 	WorktreePath string
 	Branch       string
 	Hooks        []HookCommand
 	// Output receives the hook output as it is produced; nil keeps stderr.
 	Output io.Writer
+	// OnHook receives each hook starting and finishing. A surface that reports
+	// the beats itself sets it; nil leaves the runner to write them to Output.
+	OnHook func(HookBeat)
 }
 
 // ForceCleanParams holds inputs for the forced worktree recovery: delete the
@@ -168,6 +224,7 @@ type CleanHooksParams struct {
 // local branch. Used when `git worktree remove` failed on undeletable files.
 type ForceCleanParams struct {
 	ProjectDir string
+	StateDir   string
 	Path       string
 	Branch     string
 	Force      bool

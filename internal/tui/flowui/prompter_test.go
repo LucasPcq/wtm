@@ -421,6 +421,47 @@ func TestALoadedStepLoadsEvenWhenItComesFirst(t *testing.T) {
 	}
 }
 
+func TestSelectOpensOnTheStepsStartingValue(t *testing.T) {
+	content := flow.StepContent{
+		Options: []flow.Option{
+			{Label: "feature-a", Value: "/wt/a"},
+			{Label: "feature-b", Value: "/wt/b"},
+			{Label: "feature-c", Value: "/wt/c"},
+		},
+		Start: "/wt/c",
+	}
+
+	if got := selectList(content).Value(); got != "/wt/c" {
+		t.Errorf("cursor = %q, want the starting value", got)
+	}
+}
+
+func TestSelectWithoutAStartOpensOnTheFirstOption(t *testing.T) {
+	content := flow.StepContent{Options: []flow.Option{
+		{Label: "feature-a", Value: "/wt/a"},
+		{Label: "feature-b", Value: "/wt/b"},
+	}}
+
+	if got := selectList(content).Value(); got != "/wt/a" {
+		t.Errorf("cursor = %q, want the first option", got)
+	}
+}
+
+func TestSelectRendersTheBadgesAStepDeclares(t *testing.T) {
+	content := flow.StepContent{Options: []flow.Option{{
+		Label:  "feature-a",
+		Value:  "/wt/a",
+		Badges: []flow.Badge{{Text: "3 jobs", Tone: domain.ToneSuccess}, {Text: "current"}},
+	}}}
+
+	view := selectList(content).View()
+	for _, want := range []string{"3 jobs", "current"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("view is missing %q:\n%s", want, view)
+		}
+	}
+}
+
 // A conditional step used to be replaced by a plain choice list whatever its
 // kind, which left sync's `--dry-run`-gated recap with no options at all: the
 // wizard showed "No matches" instead of the cascade it was about to run.
@@ -488,24 +529,35 @@ func TestAConditionalRecapIsStillSkipped(t *testing.T) {
 	}
 }
 
-// A conditional step is drawn by choiceStep, which only knows how to draw a
-// select. Any other kind would be silently downgraded to a picker — the shape
-// the recap bug had — so it is refused instead.
-func TestBuildRefusesAConditionalStepItCannotGate(t *testing.T) {
+// A conditional multi-select keeps its own model and is gated, exactly as a
+// conditional recap is: only a select is folded into the list choiceStep draws,
+// because only a select's whole model can be rebuilt from its answer. Drawing
+// the others as a picker was the shape the recap bug had; refusing them
+// outright left `run up --profile` unable to ask on a terminal.
+func TestAConditionalMultiSelectIsGatedNotRedrawn(t *testing.T) {
 	step := multiSelectStep("b", "one")
-	step.Skip = func(flow.Answers) (bool, string) { return false, "" }
+	step.Skip = func(flow.Answers) (bool, string) { return true, "only one profile" }
 
-	_, err := build(flow.Session{Steps: []flow.Step{selectStep("a", "one"), step}})
-	if err == nil {
-		t.Fatal("a conditional multi-select must be refused rather than drawn as a picker")
+	plan, err := build(flow.Session{Steps: []flow.Step{selectStep("a", "one"), step}})
+	if err != nil {
+		t.Fatalf("build: %v", err)
 	}
-	if !strings.Contains(err.Error(), "b") {
-		t.Errorf("error %q should name the step", err)
+
+	gated := plan.steps[1]
+	if _, ok := gated.Model.(components.MultiSelectModel); !ok {
+		t.Errorf("model = %T, want a MultiSelectModel", gated.Model)
+	}
+	gated.Build(plan.steps[:1])
+	if !gated.AutoSkip(components.WizardModel{}) {
+		t.Fatal("a step its flow skips must not be shown")
+	}
+	if got := gated.SkipReason(); got != "only one profile" {
+		t.Errorf("reason = %q, want the flow's own", got)
 	}
 }
 
-// The refusal is about what choiceStep can draw, so a conditional step landing
-// first — decided up front, then rendered by its own kind — stays fine.
+// A conditional step landing first is decided up front, then rendered by its
+// own kind.
 func TestAConditionalFirstStepKeepsItsOwnKind(t *testing.T) {
 	step := multiSelectStep("a", "one")
 	step.Skip = func(flow.Answers) (bool, string) { return false, "" }
@@ -516,5 +568,123 @@ func TestAConditionalFirstStepKeepsItsOwnKind(t *testing.T) {
 	}
 	if _, ok := plan.steps[0].Model.(components.MultiSelectModel); !ok {
 		t.Errorf("model = %T, want a MultiSelectModel", plan.steps[0].Model)
+	}
+}
+
+// Every step kind the wizard can draw must be readable back. A kind rendered
+// but not read answers empty, and the flow writes the absence as if it were the
+// answer — which is how a profile came out with no jobs.
+func TestEveryDrawableKindIsReadBack(t *testing.T) {
+	kinds := []struct {
+		kind  flow.StepKind
+		model any
+		want  func(flow.Answer) bool
+	}{
+		{flow.StepText, components.NewTextInput(components.NewTextInputParams{Default: "x"}), func(a flow.Answer) bool { return a.Value == "x" }},
+		{flow.StepSelect, components.NewSelectList(components.NewSelectListParams{
+			Items: []components.SelectItem{{Label: "a", Value: "a"}},
+		}), func(a flow.Answer) bool { return a.Value == "a" }},
+		{flow.StepMultiSelect, components.NewMultiSelect(components.NewMultiSelectParams{
+			Items: []components.MultiSelectItem{{Label: "a", Value: "a", Selected: true}},
+		}), func(a flow.Answer) bool { return len(a.Values) == 1 }},
+		{flow.StepReorder, components.NewReorderList(components.NewReorderListParams{
+			Items: []components.ReorderItem{{Label: "a", Value: "a"}},
+		}), func(a flow.Answer) bool { return len(a.Values) == 1 }},
+	}
+
+	for _, tc := range kinds {
+		answer := answerOf(tc.kind, tc.model)
+		if !answer.Asked {
+			t.Errorf("kind %d is drawn but never read back: the flow would take the empty answer for a real one", tc.kind)
+			continue
+		}
+		if !tc.want(answer) {
+			t.Errorf("kind %d read back as %+v", tc.kind, answer)
+		}
+	}
+}
+
+// A step that builds its content — the worktree picker of every run command —
+// sets its cursor there too. The merge kept the options and dropped the start,
+// so the picker opened on main whatever worktree the command was typed in.
+func TestABuiltStepKeepsItsStartingValue(t *testing.T) {
+	step := flow.Step{
+		Kind: flow.StepSelect, Key: "worktree", Label: "Worktree",
+		Build: func(flow.Answers) (flow.StepContent, error) {
+			return flow.StepContent{
+				Options: []flow.Option{{Label: "main", Value: "/wt/main"}, {Label: "feat", Value: "/wt/feat"}},
+				Start:   "/wt/feat",
+			}, nil
+		},
+	}
+
+	content, err := (&plan{}).content(step, flow.Answers{})
+	if err != nil {
+		t.Fatalf("content: %v", err)
+	}
+	if got := selectList(content).Value(); got != "/wt/feat" {
+		t.Errorf("cursor = %q, want the start the step built", got)
+	}
+}
+
+// The worktree step declares "N running" and "current" and where the cursor
+// opens; the wizard drew neither.
+func TestAMultiSelectCarriesItsBadgesAndStart(t *testing.T) {
+	step := flow.Step{Kind: flow.StepMultiSelect, Key: "w"}
+	model := multiSelect(step, flow.StepContent{
+		Options: []flow.Option{
+			{Label: "main", Value: "/wt/main", Badges: []flow.Badge{{Text: "2 running", Tone: domain.ToneSuccess}}},
+			{Label: "feat/x", Value: "/wt/x", Badges: []flow.Badge{{Text: "current"}}},
+		},
+		Start: "/wt/x",
+	})
+	view := model.View()
+	for _, want := range []string{"2 running", "current"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("view = %q, want %q", view, want)
+		}
+	}
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")})
+	if got := strings.Join(model.Values(), ","); got != "/wt/x" {
+		t.Errorf("space toggled %q, want the row the step starts on", got)
+	}
+}
+
+// A conditional step whose Build fails must fail with its own cause: "has no
+// conditional renderer" sent the reader after the wizard over a git error.
+func TestAConditionalStepsBuildErrorIsItsOwn(t *testing.T) {
+	step := multiSelectStep("b")
+	step.Options = nil
+	step.Skip = func(flow.Answers) (bool, string) { return false, "" }
+	step.Build = func(flow.Answers) (flow.StepContent, error) {
+		return flow.StepContent{}, errors.New("list worktrees: boom")
+	}
+
+	_, err := build(flow.Session{Steps: []flow.Step{selectStep("a", "one"), step}})
+	if err == nil || !strings.Contains(err.Error(), "list worktrees: boom") {
+		t.Fatalf("err = %v, want the step's own cause", err)
+	}
+}
+
+// A select with a Skip is drawn through ChoiceStep; it dropped the start, so
+// `run job edit` on a shared service opened its scope on "per worktree" and
+// a plain enter un-shared it.
+func TestAConditionalSelectKeepsItsStartingValue(t *testing.T) {
+	step := flow.Step{
+		Kind: flow.StepSelect, Key: "scope", Label: "Scope",
+		Options: []flow.Option{{Label: "per worktree", Value: "worktree"}, {Label: "shared", Value: "shared"}},
+		Skip:    func(flow.Answers) (bool, string) { return false, "" },
+		Build: func(flow.Answers) (flow.StepContent, error) {
+			return flow.StepContent{Start: "shared"}, nil
+		},
+	}
+
+	built := (&plan{}).choiceStep(step)
+	list, ok := built.Build(nil).(components.SelectListModel)
+	if !ok {
+		t.Fatalf("choice step built %T, want a select list", built.Build(nil))
+	}
+	if got := list.Value(); got != "shared" {
+		t.Errorf("cursor = %q, want the start the step built", got)
 	}
 }

@@ -14,6 +14,17 @@ resulting parent chain must stay acyclic.
 wtm reparent [branch...] [flags]
 ```
 
+### Examples
+
+```
+  # Pick the worktrees and their new parent
+  wtm reparent
+
+  # feat/login was merged: stack its child on main, then rebase it
+  wtm reparent feat/login-ui --to main --yes
+  wtm sync feat/login-ui
+```
+
 ### Options
 
 ```
@@ -21,6 +32,12 @@ wtm reparent [branch...] [flags]
       --output string   Output format: text or json (default "text")
       --to string       New parent branch to rebase onto
   -y, --yes             Skip all prompts; resolve every decision from flags and safe defaults (needs at least one worktree and --to)
+```
+
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
 ```
 
 ### SEE ALSO

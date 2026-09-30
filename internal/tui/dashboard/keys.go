@@ -30,6 +30,8 @@ const (
 	keyMenu         = domain.KeyMenu
 	keyActions      = domain.KeyActions
 	keyOpenPR       = domain.KeyOpenPR
+	keyRunLogs      = domain.KeyRunLogs
+	keyOpenAddress  = domain.KeyOpenAddress
 	keyFastForward  = domain.KeyFastForward
 	keySpace        = " "
 	keyOutputUp     = "shift+up"

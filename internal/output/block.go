@@ -1,10 +1,15 @@
 package output
 
 import (
+	"os"
+
 	"fmt"
 	"io"
 	"strings"
 
+	"golang.org/x/term"
+
+	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/styles"
 )
 
@@ -13,16 +18,12 @@ import (
 // The canonical definition lives in styles.Indent; this alias keeps callers unchanged.
 const Indent = styles.Indent
 
-// Warning prints a styled warning line: "  ! message".
+// Warning prints the attention line: "  ! message". The glyph is a plain rune
+// like every other: it used to be a filled chip, which carried its own padding
+// and made an attention line two columns wider — and therefore louder — than
+// the failure line under it.
 func Warning(w io.Writer, msg string) {
-	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.BadgeWarning.Render("!"), styles.Warning.Render(msg))
-}
-
-// Danger prints a styled failure line in the danger theme: "  ! message"
-// (red badge + red text) — the red counterpart of Warning, for failures that
-// should read like a skip rather than a hard crash.
-func Danger(w io.Writer, msg string) {
-	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.BadgeDanger.Render("!"), styles.DangerText.Render(msg))
+	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Warning.Render(domain.GlyphAttention), msg)
 }
 
 // InfoLine prints a styled key-value pair: "  label  value".
@@ -37,37 +38,46 @@ func SectionTitle(w io.Writer, title string) {
 
 // Success prints a styled success line: "  ✓ message".
 func Success(w io.Writer, msg string) {
-	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Success.Render("✓"), msg)
+	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Success.Render(domain.GlyphSuccess), msg)
 }
 
-// Update prints a styled update line: "  ↻ message".
+// Update prints a styled update line: "  ~ message".
 // Mirrors Success but signals that an existing artifact was refreshed.
 func Update(w io.Writer, msg string) {
-	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Primary.Render("↻"), msg)
+	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Primary.Render(domain.GlyphUpdate), msg)
 }
 
-// Unchanged prints a muted no-op line: "  = message".
-// Use it when an artifact already matched the desired state and nothing was written.
+// Unchanged prints the no-op line: "  = message", muted whole. Use it when an
+// artifact already matched the desired state and nothing was written — and for
+// an inventory that came back empty, which is the same non-event.
 func Unchanged(w io.Writer, msg string) {
-	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Muted.Render("="), styles.Muted.Render(msg))
+	fmt.Fprint(w, UnchangedLine(msg))
 }
 
-// Error prints a styled error line: "  ✗ message".
-// If msg contains newlines (e.g. captured subprocess output), only the first
-// line rides next to the cross; the rest is indented underneath so terminal
-// rendering stays readable.
+// UnchangedLine is Unchanged for a formatter that returns a body instead of
+// writing one. Those formatters used to answer an empty inventory with a bare
+// sentence, which is how one state ended up with five renderings across the
+// tree.
+func UnchangedLine(msg string) string {
+	return fmt.Sprintf("%s%s %s\n", Indent, styles.Muted.Render(domain.GlyphUnchanged), styles.Muted.Render(msg))
+}
+
+// Error prints the failure line: "  ✗ message". A msg carrying newlines — a
+// subprocess's own output — puts its first line next to the cross and indents
+// the rest under it. Those lines are not muted: indentation is what makes them
+// subordinate, and muting the detail of a failure hides the half a reader came
+// for.
 func Error(w io.Writer, msg string) {
-	cross := styles.DangerText.Render("✗")
 	lines := strings.Split(strings.TrimRight(msg, "\n"), "\n")
-	fmt.Fprintf(w, "%s%s %s\n", Indent, cross, lines[0])
+	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.DangerText.Render(domain.GlyphFailure), lines[0])
 	for _, line := range lines[1:] {
-		fmt.Fprintf(w, "%s  %s\n", Indent, styles.Muted.Render(line))
+		fmt.Fprintf(w, "%s  %s\n", Indent, line)
 	}
 }
 
 // Loading prints a styled loading/status line: "  › message".
 func Loading(w io.Writer, msg string) {
-	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Muted.Render("›"), styles.Muted.Render(msg))
+	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Muted.Render(domain.GlyphProgress), styles.Muted.Render(msg))
 }
 
 // Message prints a plain indented message.
@@ -80,22 +90,166 @@ func Blank(w io.Writer) {
 	fmt.Fprintln(w)
 }
 
-// HooksSection prints a leading blank and a bold title above a phase of streamed
-// hook output (e.g. "Running on_create hooks"), so lifecycle hooks read as a
-// distinct, labelled phase instead of loose lines in the middle of the command.
-func HooksSection(w io.Writer, title string) {
-	Blank(w)
-	SectionTitle(w, title)
-}
-
 // Callout prints a bordered notice box with a bold title followed by body lines.
 // Use it to surface an optional, non-blocking hint above an interactive flow.
 // It emits a raw box with no surrounding blank lines; the caller's frame owns
 // the outer vertical padding.
 func Callout(w io.Writer, title string, lines []string) {
 	rows := append([]string{styles.CalloutTitle.Render(title)}, lines...)
-	box := styles.Callout.Render(strings.Join(rows, "\n"))
+	// Bounded to the terminal: a box grows to its longest line, and one line
+	// naming eight jobs made a 178-column frame that wrapped into mush on any
+	// normal window.
+	box := styles.Callout.Width(calloutWidth(w, lines)).Render(strings.Join(rows, "\n"))
 	fmt.Fprintf(w, "%s\n", box)
+}
+
+// calloutWidth is what a callout's body may fill: the terminal less the box's
+// own margin, border and padding. Zero when there is no terminal to measure —
+// a pipe or a test — which leaves the box at its content's width, as before.
+//
+// The cap is on the empty space, never on the content: a short notice is not
+// stretched across a very wide window, but a body already wider than the cap
+// takes the room it needs rather than being wrapped into mush. A table is the
+// case that made the difference — its lines are columns, and a wrapped column
+// is not a narrower table but an unreadable one.
+func calloutWidth(w io.Writer, lines []string) int {
+	cols := TerminalWidthOf(w)
+	if cols <= 0 {
+		return 0
+	}
+	return min(cols-domain.CalloutChrome, max(domain.CalloutMaxWidth, widestRow(lines)))
+}
+
+// widestRow measures the body, never the title: the title is styled, and the
+// escape sequences in it would be counted as room the box does not need.
+func widestRow(lines []string) int {
+	widest := 0
+	for _, line := range lines {
+		widest = max(widest, len([]rune(line)))
+	}
+	return widest
+}
+
+// TerminalWidthOf is what a surface has to draw in, zero when the stream is no
+// terminal. It measures the stream actually written to: a surface that draws on
+// stderr and measures stdout gets 0 the moment stdout is redirected,
+// which is the common `wtm create > out.txt`; every line it then draws too wide
+// wraps, and a block redrawn in place cannot count the rows it took.
+func TerminalWidthOf(w io.Writer) int {
+	stream, bars := unwrapStream(w)
+	file, ok := stream.(*os.File)
+	if !ok {
+		return 0
+	}
+	cols, _, err := term.GetSize(int(file.Fd()))
+	if err != nil || cols <= 0 {
+		return 0
+	}
+	return max(cols-bars*domain.AccentBarWidth, 0)
+}
+
+// unwrapStream reads through the accent bar to the stream underneath, and counts
+// the bars it went through: a barred writer is the terminal it wraps, less a
+// column per bar. Counting rather than flagging is what keeps a doubly wrapped
+// writer from over-reporting by a column — enough to wrap a hook's tail and
+// desynchronise the rows it moves back over.
+func unwrapStream(w io.Writer) (io.Writer, int) {
+	bars := 0
+	for {
+		unwrapper, ok := w.(interface{ Unwrap() io.Writer })
+		if !ok {
+			return w, bars
+		}
+		w, bars = unwrapper.Unwrap(), bars+1
+	}
+}
+
+// IsTerminal reports whether w is a terminal this process may repaint. A pipe, a
+// buffer or a file is not: a surface that moves the cursor there writes escape
+// sequences into someone's log.
+func IsTerminal(w io.Writer) bool {
+	stream, _ := unwrapStream(w)
+	file, ok := stream.(*os.File)
+	if !ok {
+		return false
+	}
+	return term.IsTerminal(int(file.Fd()))
+}
+
+// TallyPart is one count of a result summary. A zero count is dropped: a
+// conclusion counts what happened, never what did not.
+type TallyPart struct {
+	Count int
+	Label string
+}
+
+// Tally renders the counted half of a multi-item conclusion — "3 applied ·
+// 1 skipped". It is what replaces one line per success: the reader checks the
+// count, and only the exceptions are worth a line of their own.
+func Tally(parts ...TallyPart) string {
+	kept := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part.Count == 0 {
+			continue
+		}
+		kept = append(kept, fmt.Sprintf(domain.TallyPartFmt, part.Count, part.Label))
+	}
+	return strings.Join(kept, domain.TallySeparator)
+}
+
+type NextStepParams struct {
+	// Command is ready to run as printed; Note says what it does, when the
+	// command alone does not.
+	Command string
+	Note    string
+	Width   int
+}
+
+// NextStep prints the one forward-pointing line of a conclusion: "→ wtm go x".
+// It is the only shape a hint takes anywhere in the CLI — a command in bold
+// after an arrow — so a reader learns once where to look for what to do next.
+func NextStep(w io.Writer, params NextStepParams) {
+	fmt.Fprintln(w, NextStepLine(params))
+}
+
+// NextStepLine is NextStep for a caller composing a body rather than writing
+// one — a recap built as a single string, printed once the surface it belongs
+// to has given the terminal back. Those used to hand-roll their own hint, which
+// is how "what to do next" ended up with five renderings.
+func NextStepLine(params NextStepParams) string {
+	return styles.NextStepLine(styles.NextStepParams{Command: params.Command, Note: params.Note, Width: params.Width})
+}
+
+// NextSteps prints a group of hints with their notes on one column.
+func NextSteps(w io.Writer, steps []NextStepParams) {
+	for _, step := range AlignNextSteps(steps) {
+		NextStep(w, step)
+	}
+}
+
+func AlignNextSteps(steps []NextStepParams) []NextStepParams {
+	width := 0
+	for _, step := range steps {
+		width = max(width, len(step.Command))
+	}
+	aligned := make([]NextStepParams, len(steps))
+	for i, step := range steps {
+		step.Width = width
+		aligned[i] = step
+	}
+	return aligned
+}
+
+// Section prints a bold title above indented free lines, with no frame — a
+// script, a file's contents, a listing. Rows of `label  value` belong in
+// Announce instead, and Callout's bordered frame is reserved for what the reader
+// still has to act on. Mixing the two made every outcome look equally urgent,
+// which is the same as flagging none of them.
+func Section(w io.Writer, title string, lines []string) {
+	SectionTitle(w, title)
+	for _, line := range lines {
+		fmt.Fprintf(w, "%s%s%s\n", Indent, Indent, line)
+	}
 }
 
 // AnnounceItem is a label-value pair displayed inside an Announce block.
@@ -104,13 +258,25 @@ type AnnounceItem struct {
 	Value string
 }
 
-// Announce prints a raw block with a bold section title followed by indented
-// key-value rows. Use it before an interactive picker to describe what is about
-// to happen. It emits no surrounding blank lines; the caller's frame owns the
-// outer vertical padding.
+// Announce prints a titled block of `label  value` rows, its labels aligned to
+// a common column. It is the shape of anything a reader looks *up* — a plan
+// before a picker, a state readout — as against Section, which is a titled
+// block of free lines. Blocks that hand-aligned their labels with spaces inside
+// a format string belong here: the alignment is the block's business, not the
+// wording's.
+//
+// It emits no surrounding blank lines; the caller's frame owns the outer
+// vertical padding.
 func Announce(w io.Writer, title string, items []AnnounceItem) {
 	SectionTitle(w, title)
+	width := 0
 	for _, item := range items {
-		InfoLine(w, item.Label, item.Value)
+		width = max(width, len(item.Label))
+	}
+	for _, item := range items {
+		// Labels are plain ASCII, so byte length is printable width; the padding is
+		// computed before rendering because the style adds bytes that take no room.
+		pad := strings.Repeat(" ", width-len(item.Label))
+		fmt.Fprintf(w, "%s%s%s  %s\n", Indent, styles.Muted.Render(item.Label), pad, item.Value)
 	}
 }

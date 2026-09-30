@@ -11,10 +11,26 @@ Usage: eval "$(wtm shell-init)"
 wtm shell-init [flags]
 ```
 
+### Examples
+
+```
+  # zsh or bash: add this line to ~/.zshrc or ~/.bashrc
+  eval "$(wtm shell-init)"
+
+  # fish: add this line to config.fish
+  wtm shell-init | source
+```
+
 ### Options
 
 ```
   -h, --help   help for shell-init
+```
+
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
 ```
 
 ### SEE ALSO

@@ -64,6 +64,9 @@ type EnvKeyDiff struct {
 	Placeholder   string       `json:"placeholder,omitempty"`
 	Source        string       `json:"source,omitempty"`
 	Export        bool         `json:"export,omitempty"`
+	// SourceLine is the line an added key is copied from, so it lands quoted
+	// and commented the way its source wrote it.
+	SourceLine EnvLine `json:"-"`
 }
 
 // EnvDiff is the full per-key reconciliation of a child .env against its template
@@ -74,23 +77,9 @@ type EnvDiff struct {
 	Entries []EnvKeyDiff `json:"entries"`
 }
 
-// ByStatus returns the entries whose Status equals s, preserving Entries order.
-func (d EnvDiff) ByStatus(s EnvKeyStatus) []EnvKeyDiff {
-	out := make([]EnvKeyDiff, 0, len(d.Entries))
-	for _, e := range d.Entries {
-		if e.Status == s {
-			out = append(out, e)
-		}
-	}
-	return out
-}
-
-// HasStatus reports whether any entry has status s.
-func (d EnvDiff) HasStatus(s EnvKeyStatus) bool {
-	for _, e := range d.Entries {
-		if e.Status == s {
-			return true
-		}
-	}
-	return false
+// EnvKeyRow is one key of a file block, ready to render: Status picks the glyph
+// and the colour, Text is the already-aligned "KEY  detail".
+type EnvKeyRow struct {
+	Status EnvKeyStatus
+	Text   string
 }

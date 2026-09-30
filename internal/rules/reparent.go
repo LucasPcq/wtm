@@ -14,17 +14,6 @@ type ValidateReparentParams struct {
 	BaseBranch string
 }
 
-// ValidateReparent checks that pointing Branch's parent at NewParent is legal. It is
-// the single-worktree case of ValidateReparentBatch.
-func ValidateReparent(params ValidateReparentParams) error {
-	return ValidateReparentBatch(ValidateReparentBatchParams{
-		Nodes:      params.Nodes,
-		Branches:   []string{params.Branch},
-		NewParent:  params.NewParent,
-		BaseBranch: params.BaseBranch,
-	})
-}
-
 // ValidateReparentBatchParams holds inputs for validating a batch parent change.
 type ValidateReparentBatchParams struct {
 	Nodes      []domain.WorktreeNode

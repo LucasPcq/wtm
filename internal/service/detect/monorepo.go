@@ -1,43 +1,118 @@
 package detect
 
 import (
+	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 )
 
-// PnpmWorkspacePackages parses pnpm-workspace.yaml and resolves the package patterns
-// to actual directories. Returns nil if pnpm-workspace.yaml doesn't exist.
-func PnpmWorkspacePackages(projectDir string) []string {
-	wsPath := filepath.Join(projectDir, "pnpm-workspace.yaml")
-	data, err := os.ReadFile(wsPath)
-	if err != nil {
+// WorkspacePackages resolves a monorepo's workspace declaration to the package
+// directories it actually selects, relative to projectDir and slash-separated.
+// Both declarations are read: pnpm-workspace.yaml, and the `workspaces` field
+// npm, yarn and bun put in the root manifest. Returns nil when the project
+// declares no workspace.
+func WorkspacePackages(projectDir string) []string {
+	patterns := rules.ParseWorkspacePatterns(workspaceDeclaration(projectDir))
+	if len(patterns.Include) == 0 {
 		return nil
 	}
 
-	patterns := parsePnpmWorkspace(string(data))
 	var packages []string
-
-	for _, pattern := range patterns {
-		matches, err := filepath.Glob(filepath.Join(projectDir, pattern))
-		if err != nil {
-			continue
-		}
-		for _, m := range matches {
-			info, statErr := os.Stat(m)
-			if statErr != nil || !info.IsDir() {
-				continue
-			}
-			rel, relErr := filepath.Rel(projectDir, m)
-			if relErr == nil {
-				packages = append(packages, rel)
-			}
+	for _, dir := range packageDirs(projectDir) {
+		if rules.SelectsWorkspace(patterns, dir) {
+			packages = append(packages, dir)
 		}
 	}
 
 	sort.Strings(packages)
 	return packages
+}
+
+// workspaceDeclaration reads the patterns both ecosystems declare. A repo
+// carrying pnpm-workspace.yaml *and* a `workspaces` field is not a conflict to
+// arbitrate: whichever tool it was written for, both name real packages.
+func workspaceDeclaration(projectDir string) []string {
+	patterns := pnpmWorkspacePatterns(projectDir)
+	return append(patterns, manifestWorkspacePatterns(projectDir)...)
+}
+
+func pnpmWorkspacePatterns(projectDir string) []string {
+	data, err := os.ReadFile(filepath.Join(projectDir, domain.PnpmWorkspaceName))
+	if err != nil {
+		return nil
+	}
+	return parsePnpmWorkspace(string(data))
+}
+
+// manifestWorkspaces covers both shapes npm accepts: a bare array, and the
+// object yarn adds `nohoist` to.
+type manifestWorkspaces struct {
+	Workspaces json.RawMessage `json:"workspaces"`
+}
+
+func manifestWorkspacePatterns(projectDir string) []string {
+	data, err := os.ReadFile(filepath.Join(projectDir, domain.PackageJSONName))
+	if err != nil {
+		return nil
+	}
+
+	var manifest manifestWorkspaces
+	if unmarshalErr := json.Unmarshal(data, &manifest); unmarshalErr != nil || len(manifest.Workspaces) == 0 {
+		return nil
+	}
+
+	var list []string
+	if json.Unmarshal(manifest.Workspaces, &list) == nil {
+		return list
+	}
+
+	var object struct {
+		Packages []string `json:"packages"`
+	}
+	if json.Unmarshal(manifest.Workspaces, &object) == nil {
+		return object.Packages
+	}
+	return nil
+}
+
+// packageDirs walks the project for every directory holding a manifest, bounded
+// by domain.WorkspaceScanMaxDepth. A pattern is matched against what is on disk
+// rather than expanded into paths: "**" selects any depth, which no expansion
+// of a glob can enumerate ahead of the walk.
+func packageDirs(projectDir string) []string {
+	var dirs []string
+	_ = filepath.WalkDir(projectDir, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil || !entry.IsDir() {
+			return nil
+		}
+
+		rel, relErr := filepath.Rel(projectDir, path)
+		if relErr != nil {
+			return filepath.SkipDir
+		}
+		if rel == "." {
+			return nil
+		}
+		if rules.IsScanIgnoredDir(entry.Name()) {
+			return filepath.SkipDir
+		}
+
+		slashed := filepath.ToSlash(rel)
+		if strings.Count(slashed, "/")+1 >= domain.WorkspaceScanMaxDepth {
+			return filepath.SkipDir
+		}
+		if _, statErr := os.Stat(filepath.Join(path, domain.PackageJSONName)); statErr == nil {
+			dirs = append(dirs, slashed)
+		}
+		return nil
+	})
+	return dirs
 }
 
 // parsePnpmWorkspace extracts package patterns from pnpm-workspace.yaml content.
@@ -60,7 +135,7 @@ func parsePnpmWorkspace(content string) []string {
 			}
 			pattern := strings.TrimPrefix(trimmed, "- ")
 			pattern = strings.Trim(pattern, "\"'")
-			if pattern != "" && !strings.HasPrefix(pattern, "!") {
+			if pattern != "" {
 				patterns = append(patterns, pattern)
 			}
 		}

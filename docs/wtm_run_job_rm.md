@@ -6,20 +6,43 @@ Remove a job from run.toml
 
 Remove a job from <git-common-dir>/wtm/run.toml.
 
-Without an argument, prompts to pick from the existing jobs.
-Fails if the job is referenced by any profile, unless --force is given
-(in which case the references are stripped from those profiles too).
+Without an argument, prompts to pick from the existing jobs; under --yes the
+argument is required.
+Fails if anything names the job — a profile, a runner's runs, a job's touches,
+an [[env_port]] or an [[env]] link — or if a worktree still holds data in it
+(a shared service's namespace, which clean finds by the job's name), unless
+--force is given: the references are then stripped, and that data is left
+for you to drop by hand.
 
 ```
 wtm run job rm [name] [flags]
 ```
 
+### Examples
+
+```
+  # Pick the job
+  wtm run job rm
+
+  wtm run job rm worker --yes
+
+  # Also strip the profiles and links that name it
+  wtm run job rm postgres --force --yes
+```
+
 ### Options
 
 ```
-      --force           Also strip references from profiles that use this job
+      --force           Remove it anyway: strip the profiles, runs, touches, [[env_port]] and [[env]] links naming it
   -h, --help            help for rm
       --output string   Output format: text or json (default "text")
+  -y, --yes             Skip the picker; [name] is then required
+```
+
+### Options inherited from parent commands
+
+```
+  -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
 ```
 
 ### SEE ALSO

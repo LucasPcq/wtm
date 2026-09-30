@@ -1,18 +1,16 @@
 package jobcmd
 
 import (
-	"errors"
 	"fmt"
-	"os"
+	"io"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
+	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
+	jobflow "github.com/LucasPcq/wtm/internal/flow/run/job"
 	"github.com/LucasPcq/wtm/internal/output"
-	"github.com/LucasPcq/wtm/internal/service/runconfig"
-	"github.com/LucasPcq/wtm/internal/tui/runpicker"
 )
 
 func newListCmd() *cobra.Command {
@@ -21,56 +19,40 @@ func newListCmd() *cobra.Command {
 		Short: "List jobs from run.toml",
 		Long: "List jobs declared in <git-common-dir>/wtm/run.toml.\n\n" +
 			"In a TTY, opens an interactive picker. Selecting a job offers Edit or Remove.\n" +
-			"Use --output json (or pipe stdout) for a non-interactive listing.",
+			"Use --output json, --yes (or pipe stdout) for a non-interactive listing.",
+		Example: `  wtm run job list
+
+  wtm run job list --output json`,
 		RunE: runList,
 	}
+	shared.AddYesFlag(cmd, "Skip the picker; print the table instead")
 	shared.AddOutputFlag(cmd)
 	return cmd
 }
 
 func runList(cmd *cobra.Command, _ []string) error {
-	wd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("get working directory: %w", err)
-	}
-	res, err := shared.LoadConfig(cmd, wd)
-	if err != nil {
-		return err
-	}
-	cfg, err := runconfig.Load(res.StateDir)
-	if err != nil {
-		return fmt.Errorf("load run.toml: %w", err)
-	}
-
-	if err := shared.RequireRunInitialized(cfg); err != nil {
-		return err
-	}
-
-	format, _ := cmd.Flags().GetString(domain.FlagOutput)
-	if format == domain.OutputJSON {
-		return output.WriteJobsJSON(cmd.OutOrStdout(), cfg.Jobs)
-	}
-
-	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		output.Frame(cmd.OutOrStdout(), func() {
-			fmt.Fprint(cmd.OutOrStdout(), output.FormatRunConfig(domain.RunConfig{Jobs: cfg.Jobs}))
-		})
-		return nil
-	}
-
-	pick, err := runpicker.PickJobThenAction(cfg)
-	if errors.Is(err, domain.ErrUserAborted) {
-		return nil
-	}
+	ctx, err := runctx.Open(runctx.OpenParams{Cmd: cmd})
 	if err != nil {
 		return err
 	}
 
-	switch pick.Action {
-	case runpicker.ActionEdit:
-		return runEditByName(editByNameParams{Cmd: cmd, Res: res, Config: cfg, Name: pick.Name})
-	case runpicker.ActionRm:
-		return runRmByName(rmByNameParams{Cmd: cmd, Res: res, Config: cfg, Name: pick.Name, Force: false})
+	answered, err := ctx.Listing(runctx.ListingParams{
+		Cmd:  cmd,
+		JSON: func(w io.Writer) error { return output.WriteJobsJSON(w, ctx.Run.Jobs) },
+		Table: func(w io.Writer) {
+			fmt.Fprint(w, output.FormatRunConfig(output.FormatRunConfigParams{Config: domain.RunConfig{Jobs: ctx.Run.Jobs}, Empty: domain.RunJobsEmpty}))
+		},
+	})
+	if answered || err != nil {
+		return err
 	}
-	return nil
+
+	// Backing out of a listing is not a failure: nothing was asked for.
+	_, err = jobflow.List(jobflow.ListParams{
+		Context:   ctx.FlowContext(),
+		Request:   jobflow.ListRequest{Config: ctx.Run},
+		Prompter:  ctx.Prompter(ctx.Interactive),
+		Presenter: presenter{CLIPresenter: ctx.CLI(cmd)},
+	})
+	return err
 }

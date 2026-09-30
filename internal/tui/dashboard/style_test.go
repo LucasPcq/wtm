@@ -1,6 +1,9 @@
 package dashboard
 
 import (
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -343,15 +346,16 @@ func lineIndex(lines []string, needle string) int {
 	return -1
 }
 
-// The base has no parent to be moved to and cannot be deleted, so the only thing
-// its row offers is catching up with its own remote.
+// The base has no parent to be moved to and cannot be deleted, so the only graph
+// action its row offers is catching up with its own remote — the run entries
+// apply to it like to any other worktree.
 func TestTheParentWorktreeIsOfferedOnlyItsOwnFastForward(t *testing.T) {
 	model := newTestModel(t, testWidth, testHeight, "main", "feature/x")
 	model.statuses[0] = domain.WorktreeStatus{Branch: "main", Path: "/tmp/main", IsParent: true}
 
-	items := model.menuItems()
-	if len(items) != 1 || items[0].action != menuFastForward {
-		t.Fatalf("items = %+v, want the fast-forward alone: nothing else could ever apply", items)
+	items := menuActions(model.menuItems())
+	if items[0].action != menuFastForward {
+		t.Fatalf("items = %+v, want the base fast-forward first: no other graph action could apply", items)
 	}
 
 	model = update(model, key(domain.KeyMenu))
@@ -381,7 +385,7 @@ func TestAHeldWorktreeKeepsAnInertEntryThatSaysWhy(t *testing.T) {
 	model = creating(t, model, "feat")
 	model = selectBranch(t, model, "feat")
 
-	item := model.menuItems()[0]
+	item := menuActions(model.menuItems())[0]
 	if item.disabled == "" {
 		t.Fatal("the entry must say it cannot be used")
 	}
@@ -398,5 +402,26 @@ func TestAHeldWorktreeKeepsAnInertEntryThatSaysWhy(t *testing.T) {
 	model.View()
 	if !model.zones.Get(menuZone(0)).IsZero() {
 		t.Error("an inert entry must not be clickable at all")
+	}
+}
+
+// styles/ owns every visual attribute. A .Width()/.MaxWidth() chained in tui/ is
+// a dimension and stays allowed; a .Bold()/.Foreground()/.Underline() is a
+// choice and belongs in a named style.
+func TestNoStyleAttributeIsChosenOutsideStyles(t *testing.T) {
+	forbidden := regexp.MustCompile(`styles\.[A-Za-z]+\.(Bold|Foreground|Background|Underline|Italic|Faint)\(`)
+
+	paths, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range paths {
+		body, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if loc := forbidden.FindIndex(body); loc != nil {
+			t.Errorf("%s chooses a style attribute: %q", path, body[loc[0]:loc[1]])
+		}
 	}
 }

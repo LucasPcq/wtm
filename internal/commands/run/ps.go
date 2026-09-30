@@ -1,19 +1,19 @@
 package run
 
 import (
-	"errors"
 	"fmt"
-	"os"
-	"os/exec"
+	"io"
+	"time"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/flow/run/target"
 	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/internal/tui/components"
-	runpicker "github.com/LucasPcq/wtm/internal/tui/runpicker"
 )
 
 // newPsCmd creates the wtm run ps subcommand.
@@ -21,83 +21,122 @@ func newPsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   domain.CmdPs,
 		Short: "List currently running jobs",
-		Long:  "Show the jobs managed by the background daemon (name, kind, status, PID, worktree).\nIn a TTY, offers an interactive picker with stop/logs/restart actions.",
-		RunE:  runPs,
+		Long: "Show the jobs managed by the background daemon (name, kind, status, address, uptime, worktree).\n" +
+			"It lists every repository the daemon knows, so it works from anywhere — inside a\n" +
+			"run-initialized repository or not.\n" +
+			"To act on those jobs, open the run view with `wtm run logs`, which covers as many\n" +
+			"worktrees as you select.",
+		Example: `  wtm run ps
+
+  wtm run ps --output json`,
+		RunE: runPs,
 	}
 	shared.AddOutputFlag(cmd)
 	return cmd
 }
 
 func runPs(cmd *cobra.Command, _ []string) error {
-	dir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("get working directory: %w", err)
-	}
-	if err := shared.GuardRunInitialized(dir); err != nil {
-		return err
-	}
-
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 
 	if format == domain.OutputJSON {
-		return output.WriteRunningJobsJSON(cmd.OutOrStdout(), shared.LoadJobsGraceful())
+		jobs := rules.JobsByWorktree(shared.LoadJobs().Jobs)
+		return output.WriteRunningJobsJSON(cmd.OutOrStdout(), runningJobs(runningJobsParams{Jobs: jobs, Held: runjobs.Held(jobs)}))
 	}
 
-	var jobs []domain.JobInfo
-	_ = components.RunLoading(components.LoadingParams{
-		Message: "Loading jobs…",
-		Animate: true,
-		Work:    func() error { jobs = shared.LoadJobsGraceful(); return nil },
+	var listing runjobs.Listing
+	var held domain.HeldAddresses
+	loadErr := components.RunLoading(components.LoadingParams{
+		Message: domain.RunLoadingJobs,
+		Animate: shared.Animate(cmd, true),
+		Work: func() error {
+			listing = shared.LoadJobs()
+			held = runjobs.Held(listing.Jobs)
+			return nil
+		},
 	})
-
-	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		output.Frame(cmd.OutOrStdout(), func() {
-			fmt.Fprint(cmd.OutOrStdout(), output.FormatRunningJobs(jobs))
-		})
-		return nil
+	if loadErr != nil {
+		return loadErr
 	}
 
-	if len(jobs) == 0 {
-		output.Frame(cmd.OutOrStdout(), func() {
-			output.Message(cmd.OutOrStdout(), "No jobs running.")
-		})
-		return nil
-	}
-
-	pick, err := runpicker.RunPsPicker(jobs)
-	if errors.Is(err, domain.ErrUserAborted) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-
-	return execPsAction(cmd, pick)
+	out := cmd.OutOrStdout()
+	jobs := rules.JobsByWorktree(listing.Jobs)
+	output.Frame(out, func(w io.Writer) {
+		fmt.Fprint(w, output.FormatRunningJobs(output.FormatRunningJobsParams{
+			Jobs:       jobs,
+			Now:        time.Now(),
+			Branches:   branchesOf(jobs),
+			Projects:   projectsOf(jobs),
+			Held:       held,
+			Hyperlinks: output.IsTerminal(out),
+		}))
+		if listing.Diverged() {
+			output.Blank(w)
+			output.Warning(w, fmt.Sprintf(domain.RunDaemonDivergedFmt, rules.DaemonVersionLabel(listing.DaemonVersion), domain.Version))
+		}
+	})
+	return nil
 }
 
-func execPsAction(cmd *cobra.Command, pick runpicker.PsPickerResult) error {
-	bin, err := os.Executable()
-	if err != nil {
-		return err
+// branchesOf names each work dir once: a table of eight jobs in two worktrees
+// asks git twice, not eight times.
+func branchesOf(jobs []domain.JobInfo) map[string]string {
+	branches := map[string]string{}
+	for _, job := range jobs {
+		if _, seen := branches[job.WorkDir]; seen {
+			continue
+		}
+		branches[job.WorkDir] = target.BranchOf(job.WorkDir)
 	}
+	return branches
+}
 
-	var args []string
-	switch pick.Action {
-	case runpicker.ActionPsStop:
-		args = []string{domain.CmdRun, domain.CmdStop, pick.Name}
-	case runpicker.ActionPsLogs:
-		args = []string{domain.CmdRun, domain.CmdLogs, pick.Name}
-	case runpicker.ActionPsRestart:
-		args = []string{domain.CmdRun, domain.CmdStart, pick.Name}
-	case runpicker.ActionPsStopAll:
-		args = []string{domain.CmdRun, domain.CmdDown, "--all"}
-	default:
+// projectsOf names each work dir's repository, nil when they all belong to one:
+// the daemon is machine-wide, and "main" alone is ambiguous across two repos.
+func projectsOf(jobs []domain.JobInfo) map[string]string {
+	projects := map[string]string{}
+	for _, job := range jobs {
+		if _, seen := projects[job.WorkDir]; seen {
+			continue
+		}
+		projects[job.WorkDir] = target.ProjectOf(job.WorkDir)
+	}
+	if rules.DistinctValues(projects) < 2 {
 		return nil
 	}
+	return projects
+}
 
-	c := exec.Command(bin, args...)
-	c.Stdin = os.Stdin
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	return c.Run()
+// runningJobs is the document `run ps --output json` writes: every row names
+// its worktree by branch and path, and its project even when there is one.
+type runningJobsParams struct {
+	Jobs []domain.JobInfo
+	Held domain.HeldAddresses
+}
+
+func runningJobs(params runningJobsParams) []domain.RunningJob {
+	jobs := params.Jobs
+	branches := branchesOf(jobs)
+	projects := map[string]string{}
+	rows := make([]domain.RunningJob, 0, len(jobs))
+	for _, job := range jobs {
+		project, seen := projects[job.WorkDir]
+		if !seen {
+			project = target.ProjectOf(job.WorkDir)
+			projects[job.WorkDir] = project
+		}
+		rows = append(rows, domain.RunningJob{
+			Name:      job.Name,
+			Kind:      job.Kind,
+			Status:    job.Status,
+			PID:       job.PID,
+			Branch:    branches[job.WorkDir],
+			Path:      job.WorkDir,
+			Project:   project,
+			StartedAt: job.StartedAt,
+			URL:       job.URL,
+			ExitCode:  job.ExitCode,
+			Held:      params.Held[job.WorkDir][job.Name],
+		})
+	}
+	return rows
 }
