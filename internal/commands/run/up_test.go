@@ -113,10 +113,7 @@ func TestRunUpJSONCarriesTheFailingJobsOutput(t *testing.T) {
 		t.Fatalf("err = %v, want ErrAborted", err)
 	}
 
-	var results []domain.JobActionResult
-	if err := json.Unmarshal([]byte(stdout), &results); err != nil {
-		t.Fatalf("parse JSON: %v\noutput: %s", err, stdout)
-	}
+	results := decodeRunJobs(t, stdout)
 	if len(results) != 2 {
 		t.Fatalf("got %d results, want docker started and migrate failed:\n%s", len(results), stdout)
 	}
@@ -152,10 +149,7 @@ func TestRunUpJSONExitsNonZeroOnAnAbortWithACompleteDocument(t *testing.T) {
 		t.Fatalf("err = %v, want ErrAborted", err)
 	}
 
-	var results []domain.JobActionResult
-	if err := json.Unmarshal([]byte(stdout), &results); err != nil {
-		t.Fatalf("parse JSON: %v\noutput: %s", err, stdout)
-	}
+	results := decodeRunJobs(t, stdout)
 	if len(results) != 2 {
 		t.Fatalf("got %d results, want the whole run:\n%s", len(results), stdout)
 	}
@@ -189,4 +183,18 @@ func TestASecondProfileIsRefused(t *testing.T) {
 			t.Errorf("%s: err = %v, want a second --profile refused", command, err)
 		}
 	}
+}
+
+// decodeRunJobs reads a `run up` document over one worktree and answers with
+// its jobs, after checking the worktree is named by branch and path.
+func decodeRunJobs(t *testing.T, stdout string) []domain.JobActionResult {
+	t.Helper()
+	var documents []domain.WorktreeRunResult
+	if err := json.Unmarshal([]byte(stdout), &documents); err != nil {
+		t.Fatalf("parse JSON: %v\noutput: %s", err, stdout)
+	}
+	if len(documents) != 1 || documents[0].Branch == "" || documents[0].Path == "" {
+		t.Fatalf("documents = %+v, want one worktree named by branch and path", documents)
+	}
+	return documents[0].Jobs
 }

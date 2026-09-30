@@ -104,7 +104,7 @@ func Edit(params EditParams) (Outcome, error) {
 func editNamed(params EditParams, name string) (Outcome, error) {
 	current, exists := rules.FindProfile(params.Request.Config, name)
 	if !exists {
-		return Outcome{}, fmt.Errorf(domain.RunProfileNotFoundFmt, name)
+		return Outcome{}, fmt.Errorf(domain.RunProfileNotFoundFmt, domain.ErrProfileNotFound, name)
 	}
 
 	updated, err := editedProfile(params, current)
@@ -193,7 +193,7 @@ func Remove(params RemoveParams) (Outcome, error) {
 func removeNamed(params RemoveParams, name string) (Outcome, error) {
 	removed, exists := rules.FindProfile(params.Request.Config, name)
 	if !exists {
-		return Outcome{}, fmt.Errorf(domain.RunProfileNotFoundFmt, name)
+		return Outcome{}, fmt.Errorf(domain.RunProfileNotFoundFmt, domain.ErrProfileNotFound, name)
 	}
 
 	cfg := params.Request.Config

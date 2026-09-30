@@ -218,8 +218,8 @@ func (p presenter) stopLines(results []domain.WorktreeJobResults) {
 			if result.Status == domain.JobActionError {
 				line = fmt.Sprintf(domain.RunStopFailedFmt, result.Name, result.Message)
 			}
-			if len(results) > 1 && worktree.Worktree != "" {
-				line = fmt.Sprintf(domain.RunStreamWorktreeFmt, line, worktree.Worktree)
+			if len(results) > 1 && worktree.Branch != "" {
+				line = fmt.Sprintf(domain.RunStreamWorktreeFmt, line, worktree.Branch)
 			}
 			p.line(line)
 		}

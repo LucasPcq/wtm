@@ -116,10 +116,10 @@ func (p downPresenter) Downed(outcome downflow.Outcome) error {
 // stopped · main` is the sentence `run up` writes, `migrate · main stopped` is
 // the same words in the wrong order.
 func (p downPresenter) qualify(line string, outcome downflow.Outcome, worktree domain.WorktreeJobResults) string {
-	if len(outcome.Results) <= 1 || worktree.Worktree == "" {
+	if len(outcome.Results) <= 1 || worktree.Branch == "" {
 		return line
 	}
-	return fmt.Sprintf(domain.RunStreamWorktreeFmt, line, worktree.Worktree)
+	return fmt.Sprintf(domain.RunStreamWorktreeFmt, line, worktree.Branch)
 }
 
 func (p downPresenter) nothingRunning(outcome downflow.Outcome) string {

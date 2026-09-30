@@ -43,6 +43,9 @@ type Params struct {
 }
 
 func Run(params Params) (Outcome, error) {
+	if err := target.RequireDeclared(target.DeclaredParams{Config: params.Request.Config, Job: params.Request.Job}); err != nil {
+		return Outcome{}, err
+	}
 	f := &openFlow{
 		ctx:       params.Context,
 		request:   params.Request,

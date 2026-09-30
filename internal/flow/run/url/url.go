@@ -42,6 +42,9 @@ type Params struct {
 // Run needs neither Prompter nor Presenter: it asks nothing and shows nothing,
 // which is the whole contract of a substitution surface.
 func Run(params Params) (Outcome, error) {
+	if err := target.RequireDeclared(target.DeclaredParams{Config: params.Request.Config, Job: params.Request.Job}); err != nil {
+		return Outcome{}, err
+	}
 	named, err := target.Named(target.ResolveParams{
 		ProjectDir: params.Context.ProjectDir,
 		Query:      params.Request.Worktree,

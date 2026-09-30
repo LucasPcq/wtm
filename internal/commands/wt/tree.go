@@ -19,8 +19,9 @@ import (
 // newTreeCmd creates the wtm tree subcommand.
 func newTreeCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   domain.CmdTree,
-		Short: "Show the worktree forest (parent → child)",
+		Use:         domain.CmdTree,
+		Annotations: map[string]string{domain.AnnotationOutputFormats: domain.OutputMermaid},
+		Short:       "Show the worktree forest (parent → child)",
 		Long: "Render the forest of managed worktrees, parents above their children, with the\n" +
 			"orchestration signals that matter for a stacked-branch workflow: commits ahead\n" +
 			"(↑N), uncommitted changes (⚠ dirty), and \"needs sync\" when a parent has moved and\n" +

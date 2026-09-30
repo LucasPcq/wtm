@@ -56,22 +56,28 @@ self-documenting:
    needs `--from` when the branch already exists locally (its parent can't be inferred).
    Read-only data commands (`list`, `tree`, `resolve`, `config show`, `run list`/`ps`/`logs`)
    take `--output json` with no `--yes`. Check `--help` when unsure.
-   Across the `run` module the machine surface follows one rule: **the shape follows the
-   arity, the exit code follows the success.** A command acting on N jobs (`run up`,
-   `run down`, `run logs`) gives an array, one acting on a single job (`run start`,
-   `run stop`, `run job *`) gives an object — always that shape, whatever branch the
-   command took — and any of them exits non-zero when what it attempted failed.
-   The worktree axis obeys the same rule: `run up` and `run down` on **one** worktree keep
-   the flat array of job results they have always given, `run stop` its single object; on
-   **several** all three give one document per worktree,
-   `{worktree, path, profile?, aborted?, jobs: [...]}`, in the order you named them. So
-   branch on the shape only if you passed several worktrees. `run logs` keeps its flat array
-   of lines either way and adds a `worktree` field to each above one. A command
-   that got far enough to have per-job results writes its **whole** document and *then*
-   exits non-zero (`run up`, `run down`: read the array, the `status: "error"` entries say
-   which job); one that failed before that (no such job, daemon refused, config invalid)
-   writes **nothing** on stdout and puts the reason on stderr. So: check the exit code,
-   and parse stdout only if it is non-empty.
+   Across the `run` module the machine surface follows one contract: **each command has
+   one fixed shape, and the exit code follows the success.** A job object is keyed
+   `name`; anything else pointing at a job calls it `job`. A worktree is always named by
+   **`branch` and `path`** together — never `worktree` or `work_dir`. The commands that
+   act on worktrees always answer with **an array of per-worktree documents**, even for
+   one worktree, in the order you named them:
+   - `run up`: `[{branch, path, profile?, aborted, jobs: [{name, status, …}]}]`
+   - `run down` / `run stop`: `[{branch, path, jobs: [{name, status, message?}]}]`
+   - `run logs`: `[{branch, path, lines: [{job, at, text}]}]`
+   The single-subject commands answer with one object: `run start` →
+   `{name, status, …}` (the job it started), `run job add|edit|rm` and
+   `run profile add|edit|rm` → `{name, status, message?}` with `status` one of `added`,
+   `updated`, `unchanged` (an edit that changed nothing), `removed`. `run ps` →
+   `[{name, kind, status, pid, branch, path, project, started_at?, url?, exit_code?}]`.
+   `run url` / `run open` → `[{job, url}]`. A job-result `status` is one of `started`,
+   `joined`, `done` (a task that ran to the end), `stopped`, `released` (a shared job let
+   go of, still up for other worktrees), `not_running` (nothing was up under that name —
+   nothing was stopped), `error`. A command that got far enough to have per-job results
+   writes its **whole** document and *then* exits non-zero (`run up`, `run down`: the
+   `status: "error"` entries say which job); one that failed before that (no such job,
+   daemon refused, config invalid) writes **nothing** on stdout and puts the reason on
+   stderr. So: check the exit code, and parse stdout only if it is non-empty.
 6. **Operations are idempotent — safe to retry.** `create --if-not-exists` no-ops on an
    existing worktree (including one holding the branch outside `base_path`, whose path it
    returns — even the **main** worktree's own path, if that's where the branch is checked
@@ -92,11 +98,11 @@ self-documenting:
 |---|---|
 | `0` | success |
 | `1` | generic error |
-| `2` | bad usage / invalid flags |
+| `2` | bad usage: an unknown flag or command, a flag value that does not parse, an unknown `--output` format, too many arguments |
 | `10` | worktree (or its path) already exists — or the branch is checked out in another worktree, or (with run jobs declared) its derived name is taken |
 | `11` | branch not found |
 | `12` | config not found — repo not initialized (`wtm init`) |
-| `14` | service/job not declared in `run.toml` |
+| `14` | the job or profile named (`--job`, `--profile`, `run job|profile edit|rm <name>`) is not declared in `run.toml` — checked before anything is asked of the daemon, so nothing was started or stopped |
 | `15` | `extract`: selected changes conflict with the target worktree |
 | `16` | no run.toml (no job or profile declared) — run `wtm run init` |
 | `17` | `upgrade`: this install cannot be upgraded — built from source, or the binary is not writable |
@@ -109,11 +115,11 @@ self-documenting:
 | Worktree **forest** (parent→child + which need sync) | `wtm tree --output json` |
 | Open PRs | `gh pr list --json number,title,headRefName,state,isDraft,url` |
 | Declared jobs + profiles | `wtm run list --output json` |
-| Jobs running right now, every repo (+ `started_at`, `exit_code`, `url`, `work_dir`) | `wtm run ps --output json` |
+| Jobs running right now, every repo (+ `branch`, `path`, `project`, `started_at`, `exit_code`, `url`) | `wtm run ps --output json` |
 | Where a job answers in a worktree | `wtm run url [worktree] --output json` |
 | What serves the named URLs (bind port, public port, redirection) | `wtm run proxy status --output json` |
 | What a `run up` started, with each job's `url` (plus `held` for a runner) | `wtm run up -d --output json` |
-| What a job printed | `wtm run logs [worktree] --job <name> --output json` → `[{job, at, text}]` |
+| What a job printed | `wtm run logs [worktree] --job <name> --output json` → `[{branch, path, lines: [{job, at, text}]}]` |
 | Resolved project config | `wtm config show --output json` |
 | A branch's worktree path | `wtm resolve <branch> --output json` |
 
@@ -355,8 +361,8 @@ the global `wtm init` does not configure it.
   the last hold goes — **the main checkout's own start counts as one**, so a linked worktree
   letting go never takes down a service main asked for. A stop that let go without stopping
   reports status **`released`** (human: `released — still up elsewhere`), not `stopped`.
-  A `run stop` that found nothing up under that name in that worktree reports
-  **`not_running`** (human: `= api not running`, exit 0) — never `stopped`. Main
+  A `run stop` (or a `run down --profile`) that found nothing up under that name in that
+  worktree reports **`not_running`** (human: `= api not running`, exit 0) — never `stopped`. Main
   starting a service another worktree already runs joins it (`joined`) and carves its own
   namespace.
 - **A shared job may carve out a namespace per worktree.** `[job.namespace]` names it (`name`,
@@ -508,8 +514,8 @@ the global `wtm init` does not configure it.
 - **`run up`, `run down`, `run stop` and `run logs` take several worktrees**:
   `run up feat-a feat-b -d`. They start concurrently and independently — one that aborts
   leaves the others running, and the command exits non-zero if any did. `run start` stays
-  single-worktree. Above one worktree the JSON changes shape (see the arity rule below) and
-  every human line names the worktree it came from.
+  single-worktree. The JSON is one document per worktree whatever their number (driving
+  rule 5), and every human line names the worktree it came from.
 - **Stopping never depends on `run.toml`.** `run down`, `run stop` and `run ps` still work
   when it cannot be read: they warn on stderr and stop (or list) what the daemon runs —
   `run stop` then takes `--job` as given. `run up` and `run start` refuse it, and also
@@ -628,21 +634,20 @@ the global `wtm init` does not configure it.
 - `run logs [worktree] --job <name>` opens that same view on a terminal. Without one it writes every running
   job's output as `[job] line` on stdout and only ends when the jobs do — do not call it
   expecting it to return. **`--output json` is the agent's form**: it replays each job's
-  last **1000** lines as `[{job, at, text}]` (`at` is RFC3339 UTC) and **never attaches**,
-  so it returns even on a job that is still running. Entries are **grouped by job** and
-  chronological within a job, so `at` goes backwards where one job ends and the next
-  begins — never read the array as a single merged timeline. `--job` narrows it without
-  changing its shape. What it replays is the job's **last start only**: starting a job
+  last **1000** lines as `[{branch, path, lines: [{job, at, text}]}]` — one document per
+  worktree, `at` in RFC3339 UTC — and **never attaches**, so it returns even on a job that
+  is still running. Within a worktree the lines are **grouped by job** and chronological
+  within a job, so `at` goes backwards where one job ends and the next begins — never read
+  `lines` as a single merged timeline. `--job` narrows it without changing its shape. What it replays is the job's **last start only**: starting a job
   clears its log, so one file is one run and a tail can never reach back into a previous
   one — including the log of a crash you just restarted past. The file itself is
   `<git-common-dir>/wtm/logs/<url-escaped-branch>/<url-escaped-job>.log` (rotated 5 MB x 3
   *within* a run) if you need more than the last 1000 lines.
-- **It covers the jobs that live or have run in that worktree, not everything `run.toml`
-  declares.** A job the worktree has never started has no log and no entries, and is left
-  out entirely rather than replayed as an empty group — so an absent job means "never
-  started here", not "started and silent". Its log file is created the moment it starts,
-  so a job that ran and printed nothing *is* present, with no entries. Do not read the
-  array as a roster of the project's jobs: `wtm run job list --output json` is that.
+- **It covers the lines the worktree's jobs wrote, not everything `run.toml` declares.**
+  Every worktree you named has its document, with `lines: []` when nothing was recorded.
+  A job with no line in it either never started there or printed nothing — the document
+  cannot tell the two apart. Do not read it as a roster of the project's jobs:
+  `wtm run job list --output json` is that.
 - **`status` has six values, and `detached` is not a weaker `running`.** A service with
   a `stop` command (a `docker compose up -d`) is reported `detached` from the moment its
   launcher exits: the real work runs outside wtm, and there is **nothing to attach to** —

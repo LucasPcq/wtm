@@ -498,30 +498,30 @@ type JobActionResult struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
-// WorktreeRunResult is one worktree's half of a run over several of them. A run
-// over a single worktree does not use it: the shape follows the arity, so one
-// worktree still answers with the bare array of job results every run command
-// emits (LUC-198).
+// WorktreeRef names a worktree in a JSON document: the branch a reader knows it
+// by, and the path the daemon keys it on.
+type WorktreeRef struct {
+	Branch string `json:"branch"`
+	Path   string `json:"path"`
+}
+
+// WorktreeRunResult is one worktree's part of `run up`. The document is an
+// array of them whatever the number of worktrees, so a caller parses one shape.
 type WorktreeRunResult struct {
-	// Worktree is the branch, Path where it is — the daemon's key, and what a
-	// caller needs to act on that worktree afterwards.
-	Worktree string `json:"worktree"`
-	Path     string `json:"path"`
-	Profile  string `json:"profile,omitempty"`
+	Branch  string `json:"branch"`
+	Path    string `json:"path"`
+	Profile string `json:"profile,omitempty"`
 	// Aborted says this worktree stopped short. The others carry on regardless,
 	// so it is read per worktree and never for the run as a whole.
 	Aborted bool              `json:"aborted"`
 	Jobs    []JobActionResult `json:"jobs"`
 }
 
-// WorktreeJobResults is one worktree's answer to a command that acted on
-// several. Like WorktreeRunResult it only exists above one worktree: a command
-// acting on a single one answers with the bare array of job results it always
-// has (LUC-198).
+// WorktreeJobResults is one worktree's part of `run down` and `run stop`.
 type WorktreeJobResults struct {
-	Worktree string            `json:"worktree"`
-	Path     string            `json:"path"`
-	Jobs     []JobActionResult `json:"jobs"`
+	Branch string            `json:"branch"`
+	Path   string            `json:"path"`
+	Jobs   []JobActionResult `json:"jobs"`
 }
 
 // LogRecord is one sanitized line of a job's output, as persisted in that job's
@@ -535,13 +535,32 @@ type LogRecord struct {
 // is absent on a line written before this format, or by a sink that could not
 // stamp it: the text is still worth handing over.
 type JobLogEntry struct {
-	Job string `json:"job"`
-	// Worktree names where the line came from, and is absent above a single
-	// worktree — where the caller already knows. Without it the lines of two jobs
-	// called `web` are one indistinguishable stream (LUC-216).
-	Worktree string `json:"worktree,omitempty"`
-	At       string `json:"at,omitempty"`
-	Text     string `json:"text"`
+	Job  string `json:"job"`
+	At   string `json:"at,omitempty"`
+	Text string `json:"text"`
+}
+
+// WorktreeLogs is one worktree's part of `run logs --output json`: the lines
+// of two jobs called `web` are told apart by the worktree holding them.
+type WorktreeLogs struct {
+	Branch string        `json:"branch"`
+	Path   string        `json:"path"`
+	Lines  []JobLogEntry `json:"lines"`
+}
+
+// RunningJob is one row of `run ps --output json`. It is not JobInfo, which is
+// the daemon's protocol: a rename here must never need a daemon restart.
+type RunningJob struct {
+	Name      string    `json:"name"`
+	Kind      JobKind   `json:"kind"`
+	Status    JobStatus `json:"status"`
+	PID       int       `json:"pid"`
+	Branch    string    `json:"branch"`
+	Path      string    `json:"path"`
+	Project   string    `json:"project"`
+	StartedAt time.Time `json:"started_at,omitzero"`
+	URL       string    `json:"url,omitempty"`
+	ExitCode  *int      `json:"exit_code,omitempty"`
 }
 
 // RunSurface names who shows a run's jobs: the full-screen view, a stream of

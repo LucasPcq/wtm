@@ -91,11 +91,9 @@ func (p startPresenter) Sequence(params seam.SequenceParams) (runlogs.Outcomes, 
 	}
 }
 
-// machine answers with the one job's result, whether or not it worked: the
-// module's rule is that the shape follows the arity and the exit code follows
-// the success (LUC-198). A failed job writing nothing at all left a machine
-// reader with an exit code and no cause, which is exactly what the `output`
-// field of `run up`'s array exists to avoid.
+// machine answers with the one job's result, whether or not it worked: a failed
+// job writing nothing at all left a machine reader with an exit code and no
+// cause, which is exactly what the `output` field exists to avoid.
 func (p startPresenter) machine(params seam.SequenceParams) (runlogs.Outcomes, error) {
 	outcomes, err := params.Start(p.Cmd.Context(), nil)
 	if err != nil {
@@ -155,28 +153,15 @@ func (p stopPresenter) Stopped(outcome stopflow.Outcome) error {
 	return nil
 }
 
-// machine answers with an object for the one job the command names, and with a
-// document per worktree once it names the same job in several: the shape
-// follows the arity, never the branch the command happened to take (LUC-198).
-// Nothing running is a status of its own, never "stopped".
 func (p stopPresenter) machine(outcome stopflow.Outcome) error {
-	if len(outcome.Results) > 1 {
-		return output.WriteWorktreeJobResultsJSON(p.Cmd.OutOrStdout(), outcome.Results)
-	}
-	if len(outcome.Results) == 1 && len(outcome.Results[0].Jobs) == 1 {
-		return output.WriteJobResultJSON(p.Cmd.OutOrStdout(), outcome.Results[0].Jobs[0])
-	}
-	return output.WriteJobResultJSON(p.Cmd.OutOrStdout(), domain.JobActionResult{
-		Name:   outcome.Job,
-		Status: domain.JobActionNotRunning,
-	})
+	return output.WriteWorktreeJobResultsJSON(p.Cmd.OutOrStdout(), outcome.Results)
 }
 
 // qualify names the worktree at the end of the line, the way every other run
 // surface does.
 func (p stopPresenter) qualify(line string, outcome stopflow.Outcome, worktree domain.WorktreeJobResults) string {
-	if len(outcome.Results) <= 1 || worktree.Worktree == "" {
+	if len(outcome.Results) <= 1 || worktree.Branch == "" {
 		return line
 	}
-	return fmt.Sprintf(domain.RunStreamWorktreeFmt, line, worktree.Worktree)
+	return fmt.Sprintf(domain.RunStreamWorktreeFmt, line, worktree.Branch)
 }

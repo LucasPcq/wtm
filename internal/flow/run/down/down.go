@@ -57,12 +57,16 @@ func (o Outcome) Failed() bool {
 	return false
 }
 
-// Stopped is every job this run stopped, across the worktrees. A surface above
-// one worktree reads it as the flat list it has always been.
+// Stopped is every job this run acted on, across the worktrees: a job it found
+// not running is not one of them.
 func (o Outcome) Stopped() []domain.JobActionResult {
 	var jobs []domain.JobActionResult
 	for _, worktree := range o.Results {
-		jobs = append(jobs, worktree.Jobs...)
+		for _, job := range worktree.Jobs {
+			if job.Status != domain.JobActionNotRunning {
+				jobs = append(jobs, job)
+			}
+		}
 	}
 	return jobs
 }
@@ -109,6 +113,9 @@ type downFlow struct {
 }
 
 func (f *downFlow) run() (Outcome, error) {
+	if err := target.RequireDeclared(target.DeclaredParams{Config: f.request.Config, Profile: f.request.Profile}); err != nil {
+		return Outcome{}, err
+	}
 	named, err := target.NamedAll(target.ResolveAllParams{ProjectDir: f.ctx.ProjectDir, Queries: f.request.Worktrees})
 	if err != nil {
 		return Outcome{}, err
@@ -193,9 +200,9 @@ func (f *downFlow) stop(outcome Outcome) ([]domain.WorktreeJobResults, error) {
 			return nil, err
 		}
 		results = append(results, domain.WorktreeJobResults{
-			Worktree: f.branchOf(workDir),
-			Path:     workDir,
-			Jobs:     jobs,
+			Branch: f.branchOf(workDir),
+			Path:   workDir,
+			Jobs:   jobs,
 		})
 	}
 	return results, nil
@@ -224,13 +231,21 @@ func (f *downFlow) branchOf(workDir string) string {
 func (f *downFlow) stopProfile(outcome Outcome, workDir string) ([]domain.JobActionResult, error) {
 	profile, ok := rules.FindProfile(f.request.Config, outcome.Profile)
 	if !ok {
-		return nil, fmt.Errorf("profile %q not found in config", outcome.Profile)
+		return nil, fmt.Errorf(domain.RunProfileNotFoundFmt, domain.ErrProfileNotFound, outcome.Profile)
 	}
 
 	client := process.NewClient(process.SocketPath())
+	running, err := client.Send(process.Request{Action: process.ActionList})
+	if err != nil {
+		return nil, fmt.Errorf("stop profile %s: %w", outcome.Profile, err)
+	}
 	jobs := rules.ProfileJobs(f.request.Config, profile)
 	results := make([]domain.JobActionResult, 0, len(jobs))
 	for _, job := range jobs {
+		if !rules.JobUpIn(rules.JobUpInParams{Jobs: running.Jobs, Name: job.Name, WorkDir: workDir}) {
+			results = append(results, domain.JobActionResult{Name: job.Name, Status: domain.JobActionNotRunning})
+			continue
+		}
 		var resp process.Response
 		err := f.presenter.Stage(flow.StageParams{
 			Message: fmt.Sprintf(domain.RunStoppingFmt, job.Name),
@@ -280,9 +295,9 @@ func (f *downFlow) stopEverywhere() ([]domain.WorktreeJobResults, error) {
 			return nil, err
 		}
 		results = append(results, domain.WorktreeJobResults{
-			Worktree: f.branchOf(workDir),
-			Path:     workDir,
-			Jobs:     jobs,
+			Branch: f.branchOf(workDir),
+			Path:   workDir,
+			Jobs:   jobs,
 		})
 	}
 	return results, nil

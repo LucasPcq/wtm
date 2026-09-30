@@ -15,14 +15,17 @@ import (
 func decodeResults(t *testing.T, outcome runlogs.Outcome) []domain.JobActionResult {
 	t.Helper()
 	var buf bytes.Buffer
-	if err := output.WriteRunOutcomeJSON(&buf, outcome); err != nil {
+	if err := output.WriteRunOutcomesJSON(&buf, runlogs.Outcomes{outcome}); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	var results []domain.JobActionResult
-	if err := json.Unmarshal(buf.Bytes(), &results); err != nil {
+	var documents []domain.WorktreeRunResult
+	if err := json.Unmarshal(buf.Bytes(), &documents); err != nil {
 		t.Fatalf("decode %s: %v", buf.String(), err)
 	}
-	return results
+	if len(documents) != 1 {
+		t.Fatalf("documents = %d, want the one worktree", len(documents))
+	}
+	return documents[0].Jobs
 }
 
 func TestRunOutcomeJSONCarriesThePortVerdicts(t *testing.T) {
@@ -65,9 +68,9 @@ func TestRunOutcomeJSONPutsEachProbeOnItsOwnJob(t *testing.T) {
 
 func TestRunOutcomeJSONOmitsPortsWhenNothingWasProbed(t *testing.T) {
 	var buf bytes.Buffer
-	if err := output.WriteRunOutcomeJSON(&buf, runlogs.Outcome{
+	if err := output.WriteRunOutcomesJSON(&buf, runlogs.Outcomes{{
 		Results: []domain.JobActionResult{{Name: "seed", Status: domain.JobActionDone}},
-	}); err != nil {
+	}}); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 
@@ -76,23 +79,36 @@ func TestRunOutcomeJSONOmitsPortsWhenNothingWasProbed(t *testing.T) {
 	}
 }
 
-// The shape follows the arity (LUC-198): one worktree keeps the bare array of
-// job results an agent already parses, byte for byte.
-func TestRunOutcomesJSONOfOneWorktreeIsTheArrayItAlwaysWas(t *testing.T) {
-	outcome := runlogs.Outcome{
-		WorkDir: "/work/main",
+// One worktree is an array of one document, never the bare job array: the
+// shape does not depend on how many worktrees the run reached.
+func TestRunOutcomesJSONOfOneWorktreeIsStillAnArrayOfDocuments(t *testing.T) {
+	var buf bytes.Buffer
+	err := output.WriteRunOutcomesJSON(&buf, runlogs.Outcomes{{
+		WorkDir: "/work/main", Worktree: "main", Profile: "dev",
 		Results: []domain.JobActionResult{{Name: "web", Status: domain.JobActionStarted}},
+	}})
+	if err != nil {
+		t.Fatalf("write: %v", err)
 	}
+	var documents []map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &documents); err != nil {
+		t.Fatalf("decode %s: %v", buf.String(), err)
+	}
+	if len(documents) != 1 || documents[0]["branch"] != "main" || documents[0]["path"] != "/work/main" {
+		t.Errorf("documents = %v, want one naming main by branch and path", documents)
+	}
+	if _, stale := documents[0]["worktree"]; stale {
+		t.Errorf("document still carries a worktree key: %v", documents[0])
+	}
+}
 
-	var one, many bytes.Buffer
-	if err := output.WriteRunOutcomeJSON(&one, outcome); err != nil {
+func TestRunOutcomesJSONOfNothingIsAnEmptyArray(t *testing.T) {
+	var buf bytes.Buffer
+	if err := output.WriteRunOutcomesJSON(&buf, nil); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	if err := output.WriteRunOutcomesJSON(&many, runlogs.Outcomes{outcome}); err != nil {
-		t.Fatalf("write: %v", err)
-	}
-	if one.String() != many.String() {
-		t.Errorf("a run over one worktree changed shape:\n%s\nwant\n%s", many.String(), one.String())
+	if strings.TrimSpace(buf.String()) != "[]" {
+		t.Errorf("got %q, want []", buf.String())
 	}
 }
 
@@ -120,10 +136,10 @@ func TestRunOutcomesJSONOfSeveralWorktreesNamesEachOne(t *testing.T) {
 	if len(documents) != 2 {
 		t.Fatalf("documents = %d, want one per worktree", len(documents))
 	}
-	if documents[0].Worktree != "main" || documents[0].Path != "/work/main" || documents[0].Aborted {
+	if documents[0].Branch != "main" || documents[0].Path != "/work/main" || documents[0].Aborted {
 		t.Errorf("first document = %+v", documents[0])
 	}
-	if documents[1].Worktree != "feature" || !documents[1].Aborted {
+	if documents[1].Branch != "feature" || !documents[1].Aborted {
 		t.Errorf("second document = %+v, want the aborted worktree named as such", documents[1])
 	}
 	if len(documents[1].Jobs) != 1 || documents[1].Jobs[0].Name != "web" {
@@ -131,48 +147,39 @@ func TestRunOutcomesJSONOfSeveralWorktreesNamesEachOne(t *testing.T) {
 	}
 }
 
-func TestWorktreeJobResultsJSONFollowsTheArity(t *testing.T) {
+func TestWorktreeJobResultsJSONIsAnArrayOfDocumentsWhateverTheArity(t *testing.T) {
 	jobs := []domain.JobActionResult{{Name: "web", Status: domain.JobActionStopped}}
 
-	var flat, one bytes.Buffer
-	if err := output.WriteJobResultsJSON(&flat, jobs); err != nil {
-		t.Fatalf("write: %v", err)
-	}
-	err := output.WriteWorktreeJobResultsJSON(&one, []domain.WorktreeJobResults{
-		{Worktree: "main", Path: "/work/main", Jobs: jobs},
-	})
-	if err != nil {
-		t.Fatalf("write: %v", err)
-	}
-	if flat.String() != one.String() {
-		t.Errorf("one worktree changed shape:\n%s\nwant\n%s", one.String(), flat.String())
-	}
-
-	var many bytes.Buffer
-	err = output.WriteWorktreeJobResultsJSON(&many, []domain.WorktreeJobResults{
-		{Worktree: "main", Path: "/work/main", Jobs: jobs},
-		{Worktree: "feature", Path: "/work/feature"},
-	})
-	if err != nil {
-		t.Fatalf("write: %v", err)
-	}
-	var documents []domain.WorktreeJobResults
-	if err := json.Unmarshal(many.Bytes(), &documents); err != nil {
-		t.Fatalf("decode %s: %v", many.String(), err)
-	}
-	if len(documents) != 2 || documents[1].Worktree != "feature" {
-		t.Fatalf("documents = %+v, want one per worktree", documents)
-	}
-	if documents[1].Jobs == nil {
-		t.Error("a worktree that stopped nothing came back without a job array")
+	for _, results := range [][]domain.WorktreeJobResults{
+		{{Branch: "main", Path: "/work/main", Jobs: jobs}},
+		{{Branch: "main", Path: "/work/main", Jobs: jobs}, {Branch: "feature", Path: "/work/feature"}},
+	} {
+		var buf bytes.Buffer
+		if err := output.WriteWorktreeJobResultsJSON(&buf, results); err != nil {
+			t.Fatalf("write: %v", err)
+		}
+		var documents []map[string]any
+		if err := json.Unmarshal(buf.Bytes(), &documents); err != nil {
+			t.Fatalf("decode %s: %v", buf.String(), err)
+		}
+		if len(documents) != len(results) {
+			t.Fatalf("documents = %d, want %d", len(documents), len(results))
+		}
+		last := documents[len(documents)-1]
+		if last["branch"] != results[len(results)-1].Branch || last["path"] != results[len(results)-1].Path {
+			t.Errorf("document = %v, want branch and path", last)
+		}
+		if jobs, ok := last["jobs"].([]any); !ok || jobs == nil {
+			t.Errorf("document = %v, want a job array even when empty", last)
+		}
 	}
 }
 
 // A writer does not patch what it was handed.
 func TestWorktreeJobResultsJSONDoesNotTouchItsInput(t *testing.T) {
 	results := []domain.WorktreeJobResults{
-		{Worktree: "main", Path: "/work/main"},
-		{Worktree: "feature", Path: "/work/feature"},
+		{Branch: "main", Path: "/work/main"},
+		{Branch: "feature", Path: "/work/feature"},
 	}
 
 	if err := output.WriteWorktreeJobResultsJSON(&bytes.Buffer{}, results); err != nil {
@@ -180,7 +187,7 @@ func TestWorktreeJobResultsJSONDoesNotTouchItsInput(t *testing.T) {
 	}
 	for _, result := range results {
 		if result.Jobs != nil {
-			t.Errorf("%q came back with a job slice the writer filled in", result.Worktree)
+			t.Errorf("%q came back with a job slice the writer filled in", result.Branch)
 		}
 	}
 }
@@ -191,7 +198,7 @@ func TestRunDownRecapEndsOnItsOwnLineBreak(t *testing.T) {
 	recap := output.FormatRunDownRecap(output.RunDownRecapParams{
 		Profile: "dev",
 		Results: []domain.WorktreeJobResults{
-			{Worktree: "main", Path: "/work/main", Jobs: []domain.JobActionResult{
+			{Branch: "main", Path: "/work/main", Jobs: []domain.JobActionResult{
 				{Name: "web", Status: domain.JobActionStopped},
 			}},
 		},
@@ -210,7 +217,7 @@ func TestRunDownRecapEndsOnItsOwnLineBreak(t *testing.T) {
 func TestRunDownRecapTellsAReleasedJobApart(t *testing.T) {
 	recap := ansi.Strip(output.FormatRunDownRecap(output.RunDownRecapParams{
 		Results: []domain.WorktreeJobResults{
-			{Worktree: "feat/x", Path: "/work/x", Jobs: []domain.JobActionResult{
+			{Branch: "feat/x", Path: "/work/x", Jobs: []domain.JobActionResult{
 				{Name: "web", Status: domain.JobActionStopped},
 				{Name: "postgres", Status: domain.JobActionReleased},
 			}},

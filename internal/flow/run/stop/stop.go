@@ -31,7 +31,7 @@ type Outcome struct {
 	WorkDirs []string
 	Job      string
 	// Results is one entry per worktree, each holding the single job this command
-	// acts on. It is what lets the surfaces follow the arity (LUC-198).
+	// acts on.
 	Results []domain.WorktreeJobResults
 	// NoDaemon says nothing was listening and the index held nothing for these
 	// worktrees: every result is not_running.
@@ -81,6 +81,11 @@ type stopFlow struct {
 }
 
 func (f *stopFlow) run() (Outcome, error) {
+	if !f.request.ByName {
+		if err := target.RequireDeclared(target.DeclaredParams{Config: f.request.Config, Job: f.request.Job}); err != nil {
+			return Outcome{}, err
+		}
+	}
 	named, err := target.NamedAll(target.ResolveAllParams{ProjectDir: f.ctx.ProjectDir, Queries: f.request.Worktrees})
 	if err != nil {
 		return Outcome{}, err
@@ -131,9 +136,9 @@ func (f *stopFlow) run() (Outcome, error) {
 			}
 		}
 		outcome.Results = append(outcome.Results, domain.WorktreeJobResults{
-			Worktree: f.branchOf(workDir),
-			Path:     workDir,
-			Jobs:     []domain.JobActionResult{{Name: outcome.Job, Status: status}},
+			Branch: f.branchOf(workDir),
+			Path:   workDir,
+			Jobs:   []domain.JobActionResult{{Name: outcome.Job, Status: status}},
 		})
 	}
 	return outcome, f.presenter.Stopped(outcome)
@@ -168,9 +173,9 @@ func (f *stopFlow) notRunning(outcome Outcome) []domain.WorktreeJobResults {
 	results := make([]domain.WorktreeJobResults, 0, len(outcome.WorkDirs))
 	for _, workDir := range outcome.WorkDirs {
 		results = append(results, domain.WorktreeJobResults{
-			Worktree: f.branchOf(workDir),
-			Path:     workDir,
-			Jobs:     []domain.JobActionResult{{Name: outcome.Job, Status: domain.JobActionNotRunning}},
+			Branch: f.branchOf(workDir),
+			Path:   workDir,
+			Jobs:   []domain.JobActionResult{{Name: outcome.Job, Status: domain.JobActionNotRunning}},
 		})
 	}
 	return results

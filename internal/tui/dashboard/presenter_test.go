@@ -174,8 +174,8 @@ func TestSyncPresenterNamesWhyAStepFailed(t *testing.T) {
 // worktree the name would only repeat the row, above several it is the subject.
 func TestAStopOverSeveralWorktreesNamesEach(t *testing.T) {
 	results := []domain.WorktreeJobResults{
-		{Worktree: "feat/a", Path: "/wt/a", Jobs: []domain.JobActionResult{{Name: "web", Status: domain.JobActionStopped}}},
-		{Worktree: "feat/b", Path: "/wt/b", Jobs: []domain.JobActionResult{{Name: "web", Status: domain.JobActionError, Message: "refused"}}},
+		{Branch: "feat/a", Path: "/wt/a", Jobs: []domain.JobActionResult{{Name: "web", Status: domain.JobActionStopped}}},
+		{Branch: "feat/b", Path: "/wt/b", Jobs: []domain.JobActionResult{{Name: "web", Status: domain.JobActionError, Message: "refused"}}},
 	}
 	down := collect(t, func(send func(tea.Msg)) {
 		if err := (downPresenter{presenter{send: send}}).Downed(downflow.Outcome{Results: results}); err != nil {

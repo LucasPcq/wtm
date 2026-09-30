@@ -36,26 +36,9 @@ type PRCheckoutJSON struct {
 	Warnings []string `json:"warnings,omitempty"`
 }
 
-// WriteJobResultsJSON writes the JSON array describing each job outcome.
-func WriteJobResultsJSON(w io.Writer, results []domain.JobActionResult) error {
-	if results == nil {
-		results = []domain.JobActionResult{}
-	}
-	return encodeJSON(w, results)
-}
-
-// WriteWorktreeJobResultsJSON writes what a command did across worktrees. The
-// shape follows the arity (LUC-198): one worktree answers with the bare array
-// of job results, several with one document each — the only way two jobs called
-// `web` can be told apart.
+// WriteWorktreeJobResultsJSON writes one document per worktree, whatever their
+// number: a caller parses one shape.
 func WriteWorktreeJobResultsJSON(w io.Writer, results []domain.WorktreeJobResults) error {
-	if len(results) <= 1 {
-		var jobs []domain.JobActionResult
-		if len(results) == 1 {
-			jobs = results[0].Jobs
-		}
-		return WriteJobResultsJSON(w, jobs)
-	}
 	documents := make([]domain.WorktreeJobResults, len(results))
 	for index, result := range results {
 		if result.Jobs == nil {
@@ -66,12 +49,17 @@ func WriteWorktreeJobResultsJSON(w io.Writer, results []domain.WorktreeJobResult
 	return encodeJSON(w, documents)
 }
 
-// WriteJobLogsJSON writes the lines `run logs` read back.
-func WriteJobLogsJSON(w io.Writer, entries []domain.JobLogEntry) error {
-	if entries == nil {
-		entries = []domain.JobLogEntry{}
+// WriteJobLogsJSON writes the lines `run logs` read back, one document per
+// worktree.
+func WriteJobLogsJSON(w io.Writer, logs []domain.WorktreeLogs) error {
+	documents := make([]domain.WorktreeLogs, len(logs))
+	for index, worktree := range logs {
+		if worktree.Lines == nil {
+			worktree.Lines = []domain.JobLogEntry{}
+		}
+		documents[index] = worktree
 	}
-	return encodeJSON(w, entries)
+	return encodeJSON(w, documents)
 }
 
 // WriteJobResultJSON writes a single job outcome (start/stop single job).
@@ -155,9 +143,9 @@ func WriteProfilesJSON(w io.Writer, profiles []domain.ProfileConfig) error {
 }
 
 // WriteRunningJobsJSON writes the JSON payload for `run ps`.
-func WriteRunningJobsJSON(w io.Writer, jobs []domain.JobInfo) error {
+func WriteRunningJobsJSON(w io.Writer, jobs []domain.RunningJob) error {
 	if jobs == nil {
-		jobs = []domain.JobInfo{}
+		jobs = []domain.RunningJob{}
 	}
 	return encodeJSON(w, jobs)
 }

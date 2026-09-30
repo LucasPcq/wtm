@@ -226,7 +226,7 @@ func TestWriteRunningJobsJSON_ExposesStartAndExit(t *testing.T) {
 	code := 3
 
 	var buf bytes.Buffer
-	err := WriteRunningJobsJSON(&buf, []domain.JobInfo{
+	err := WriteRunningJobsJSON(&buf, []domain.RunningJob{
 		{Name: "dev", Status: domain.JobStatusCrashed, StartedAt: startedAt, ExitCode: &code},
 		{Name: "ghost", Status: domain.JobStatusStopped},
 	})
@@ -234,7 +234,7 @@ func TestWriteRunningJobsJSON_ExposesStartAndExit(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var got []domain.JobInfo
+	var got []domain.RunningJob
 	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -262,7 +262,7 @@ func TestWriteRunningJobsJSON_ExposesStartAndExit(t *testing.T) {
 
 func TestWriteRunningJobsJSON_OmitsURLForAJobThatPublishesNone(t *testing.T) {
 	var buf bytes.Buffer
-	if err := WriteRunningJobsJSON(&buf, []domain.JobInfo{
+	if err := WriteRunningJobsJSON(&buf, []domain.RunningJob{
 		{Name: "web", Status: domain.JobStatusRunning, URL: "http://localhost:3010"},
 		{Name: "db", Status: domain.JobStatusRunning},
 	}); err != nil {
