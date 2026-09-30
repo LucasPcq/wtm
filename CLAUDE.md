@@ -221,6 +221,7 @@ Whatever answers, a resolved worktree is always **the worktree root as git spell
   1. **Decision / confirmation** (recap, reparent, push, on-conflict, fast-forward) → its flag value, else a documented **safe default** (never destructive: `sync --yes` does not push — use `--push`; `extract --yes` aborts on conflict; `clean`/`prune --yes` leave orphans unless `--reparent-children`).
   2. **Required selection with no safe default** (which files for `extract`, which worktrees for `sync`, source/branch args) → its flag/arg, else **error naming the missing flag**. Never fall back to an interactive picker under `--yes`.
   3. A picker only ever runs in a **fully interactive** run (no `--yes`, TTY, human output).
+- **`--yes` is the only spelling of that axis.** There is no `--non-interactive` (removed from `init` and `run init`, with no alias): a second flag for the same axis is how `wtm init --yes` came to answer only the re-init confirmation and still open a wizard. `init` and `run init` follow the model too — `--yes`, or no terminal, bootstraps from flags + detection and never prompts.
 - **`--force` = the safety axis, strictly separate.** It only lifts safety refusals (dirty / unpushed / open-PR / locked). It does **not** imply `--yes`: `--force` alone still runs the wizard and asks to confirm (thread `--force` into the wizard as a preset so refusals are lifted without re-asking). JSON mode requires `--yes`.
 
 Implementation rule: fold `--yes` into the command's `interactive` boolean (`interactive := isTTY && IsHumanFormat(format) && !yes`); every picker/prompt gates on `interactive`, and each required-selection guard returns a sentinel error when it is false. See `internal/commands/wt/extract.go`, and — for a migrated command — `internal/flow/sync/steps.go` (`selectionStep`'s `Resolve`, which names `--all` instead of falling back to a picker). Route decision defaults through a pure rule where one exists (`rules.DecidePush` takes a `Yes` field).
@@ -234,6 +235,8 @@ Two corollaries a new step must respect. Its pre-fill reads the **existing confi
 ## 10. Commit messages in English
 
 Every commit message — subject and body — is written in **English**, whatever language the conversation that produced the change was held in. The repository, its code, its comments and its docs are in English; the history is read alongside them.
+
+**One exception: `CHANGELOG.md` is written in French.** It is addressed to the project's users rather than read alongside the code, and it has always been French; keep new entries in French, and keep commit messages in English even when they touch it.
 
 ## 11. Validate before commit
 
