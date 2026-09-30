@@ -1794,6 +1794,8 @@ const (
 	CreateRecapLabelEnv    = "env"
 	CreateRecapLabelPath   = "path"
 
+	PRCheckedOutFmt = "Checked out PR #%d (%s)"
+
 	// GoCommandFmt builds the jump-in command shown by every worktree-creating
 	// command (create, extract, checkout): `wtm go <branch>`.
 	GoCommandFmt = "wtm go %s"

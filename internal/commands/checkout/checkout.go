@@ -402,24 +402,24 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 		})
 	}
 
+	reusedNote := shared.ReusedBranchNoteResult{}
+	if createResult.ExistingBranch {
+		reusedNote = shared.ReusedBranchNote(shared.ReusedBranchNoteParams{
+			Branch: target.Branch,
+			Ahead:  target.AheadBehind.Ahead,
+			Behind: target.AheadBehind.Behind,
+		})
+	}
 	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-		output.Success(w, fmt.Sprintf("Checked out PR #%d (%s) at %s", p.Number, p.Branch, createResult.Path))
-		if note := rules.EnvPortSettlementNote(settlement); note != "" {
-			output.Message(w, note)
-		}
-		if createResult.ExistingBranch {
-			note := shared.ReusedBranchNote(shared.ReusedBranchNoteParams{
-				Branch: target.Branch,
-				Ahead:  target.AheadBehind.Ahead,
-				Behind: target.AheadBehind.Behind,
-			})
-			if note.Warning {
-				output.Warning(w, note.Text)
-			} else {
-				output.Message(w, note.Text)
-			}
-		}
-		output.NextStep(w, output.NextStepParams{Command: fmt.Sprintf(domain.GoCommandFmt, p.Branch)})
+		output.FormatPRCheckoutResult(w, output.PRCheckoutResultParams{
+			Number:            p.Number,
+			Branch:            p.Branch,
+			EnvNote:           rules.EnvPortSettlementNote(settlement),
+			Path:              createResult.Path,
+			ReusedNote:        reusedNote.Text,
+			ReusedNoteWarning: reusedNote.Warning,
+			GoCommand:         fmt.Sprintf(domain.GoCommandFmt, p.Branch),
+		})
 	})
 	return nil
 }

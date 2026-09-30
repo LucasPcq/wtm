@@ -314,6 +314,36 @@ func FormatCreateResult(w io.Writer, p CreateResultParams) {
 	NextStep(w, NextStepParams{Command: p.GoCommand})
 }
 
+type PRCheckoutResultParams struct {
+	Number            int
+	Branch            string
+	EnvNote           string
+	Path              string
+	ReusedNote        string
+	ReusedNoteWarning bool
+	GoCommand         string
+}
+
+func FormatPRCheckoutResult(w io.Writer, p PRCheckoutResultParams) {
+	Success(w, fmt.Sprintf(domain.PRCheckedOutFmt, p.Number, p.Branch))
+	Blank(w)
+	fields := []domain.RecapField{}
+	if p.EnvNote != "" {
+		fields = append(fields, domain.RecapField{Label: domain.CreateRecapLabelEnv, Value: p.EnvNote})
+	}
+	writeAlignedFields(w, append(fields, domain.RecapField{Label: domain.CreateRecapLabelPath, Value: p.Path}))
+	if p.ReusedNote != "" {
+		Blank(w)
+		if p.ReusedNoteWarning {
+			Warning(w, p.ReusedNote)
+		} else {
+			Message(w, p.ReusedNote)
+		}
+	}
+	Blank(w)
+	NextStep(w, NextStepParams{Command: p.GoCommand})
+}
+
 type noteParams struct {
 	Value string
 	Note  string
