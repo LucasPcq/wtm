@@ -56,7 +56,7 @@ func TestWithJobPortsLeavesADeclarationlessJobAlone(t *testing.T) {
 }
 
 func TestManagerStartTask_InjectsResolvedPorts(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 
 	var buf bytes.Buffer
@@ -84,7 +84,7 @@ func TestManagerStartTask_InjectsResolvedPorts(t *testing.T) {
 // The ports a detached service bound must survive to its stop command, or a
 // templated `docker compose down` tears down a stack it never brought up.
 func TestManagerStop_RunsStopCommandWithResolvedPorts(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "stopped-port")
 
@@ -110,7 +110,7 @@ func TestManagerStop_RunsStopCommandWithResolvedPorts(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("start service: %v", err)
 	}
-	if err := m.Stop(job.Name, dir); err != nil {
+	if err := m.Stop(JobRef{Name: job.Name, WorkDir: dir}); err != nil {
 		t.Fatalf("stop service: %v", err)
 	}
 

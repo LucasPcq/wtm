@@ -15,8 +15,8 @@ import (
 func TestPsListsFromARepositoryWithNoRunModule(t *testing.T) {
 	shortHome(t)
 	dir := gittest.InitRepo(t)
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", dir+"/.git/wtm")
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, dir+"/.git/wtm")
 	fakeTTY(t, true)
 
 	if _, _, err := runCmd(t, domain.CmdPs); err != nil {

@@ -28,8 +28,8 @@ func createRepo(t *testing.T) string {
 func prepareRepo(t *testing.T, dir string) {
 	t.Helper()
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 	if err := setupMinimalConfig(t, stateDir); err != nil {
 		t.Fatalf("setup config: %v", err)
@@ -69,8 +69,8 @@ func TestWtCreateJSONRequiresYes(t *testing.T) {
 func TestWtCreateMissingBaseBranchErrors(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 	if err := os.MkdirAll(stateDir, 0o755); err != nil {
 		t.Fatalf("mkdir state dir: %v", err)

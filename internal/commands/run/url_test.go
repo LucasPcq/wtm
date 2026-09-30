@@ -181,7 +181,7 @@ func TestRunURLRawOfASharedJobKeepsItsDeclaredPort(t *testing.T) {
 	db.Scope = domain.JobScopeShared
 	writeRunTOML(t, stateDir, domain.RunConfig{Jobs: []domain.JobConfig{db}})
 	fakeTTY(t, false)
-	enterWorktree(t, addWorktree(t, os.Getenv("WTM_PROJECT_DIR"), "feat/x"))
+	enterWorktree(t, addWorktree(t, os.Getenv(domain.EnvProjectDir), "feat/x"))
 
 	stdout, _, err := runCmd(t, domain.CmdURL, "feat/x", "--"+domain.FlagRaw)
 	if err != nil {

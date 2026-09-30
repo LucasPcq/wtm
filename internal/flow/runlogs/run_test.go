@@ -591,6 +591,41 @@ func TestRunReportsWhereTheAppsARunnerStartedAnswer(t *testing.T) {
 	}
 }
 
+// Without the proxy — addressing = "ports", or no proxy at all — the apps a
+// runner started still answer, on their own ports: that is the address to give.
+func TestRunReportsTheAppsARunnerStartedOnTheirPortsWithoutAProxy(t *testing.T) {
+	runner := domain.JobConfig{
+		Name: "dev", Kind: domain.JobKindService, Cmd: "turbo run dev",
+		Ports: map[string]int{"PORT": 3000},
+		Runs:  []string{"web"},
+	}
+	web := domain.JobConfig{
+		Name: "web", Kind: domain.JobKindService, Cwd: "apps/web",
+		Ports: map[string]int{"PORT": 3000}, URL: &domain.JobURLConfig{Port: "PORT"},
+	}
+	service := &runlogstest.Service{Ports: map[string]map[string]int{"dev": {"PORT": 3010}}}
+
+	outcome, err := runlogs.Run(context.Background(), runlogs.RunParams{
+		Service:  service,
+		Jobs:     []domain.JobConfig{runner},
+		Declared: []domain.JobConfig{runner, web},
+		WorkDir:  "/w",
+		Env:      map[string]string{domain.EnvWorktree: "feat-auth"},
+		Project:  "myapp",
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	held := outcome.Results[0].Held
+	if len(held) != 1 || held[0].Job != "web" || held[0].URL != "http://localhost:3010" {
+		t.Errorf("held = %+v, want web on the port the runner bound for it", held)
+	}
+	if routes := service.Started[0].Routes; len(routes) != 0 {
+		t.Errorf("Routes = %+v, want none registered without a proxy", routes)
+	}
+}
+
 // A job refused as already running comes back with nothing about the proxy.
 // Reading that silence as "the proxy is off" told a run whose jobs were all up
 // that its port was taken.

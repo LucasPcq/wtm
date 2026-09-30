@@ -249,43 +249,6 @@ func TestWriteProjectRoundTripOnClean(t *testing.T) {
 	}
 }
 
-func TestWriteRunTemplateCreatesCommentedFile(t *testing.T) {
-	dir := t.TempDir()
-
-	if err := WriteRunTemplate(WriteRunParams{StateDir: dir}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	data, err := os.ReadFile(filepath.Join(dir, domain.RunFileName))
-	if err != nil {
-		t.Fatalf("file not created: %v", err)
-	}
-	content := string(data)
-
-	if !strings.Contains(content, "# [[job]]") {
-		t.Error("expected commented job example in template")
-	}
-
-	// A fully-commented template must parse as valid (empty) TOML.
-	var cfg domain.RunConfig
-	if _, err := toml.Decode(content, &cfg); err != nil {
-		t.Fatalf("template is not valid TOML: %v", err)
-	}
-	if len(cfg.Jobs) != 0 {
-		t.Errorf("expected no active jobs in template, got %d", len(cfg.Jobs))
-	}
-}
-
-func TestWriteRunTemplateRefusesOverwrite(t *testing.T) {
-	dir := t.TempDir()
-	if err := WriteRunTemplate(WriteRunParams{StateDir: dir}); err != nil {
-		t.Fatalf("first write failed: %v", err)
-	}
-	if err := WriteRunTemplate(WriteRunParams{StateDir: dir}); !errors.Is(err, ErrRunFileExists) {
-		t.Errorf("expected ErrRunFileExists, got %v", err)
-	}
-}
-
 func TestWriteProjectConfigPreservesAllSections(t *testing.T) {
 	dir := t.TempDir()
 
@@ -395,11 +358,11 @@ func TestWriteRunForceOverwrites(t *testing.T) {
 	}
 }
 
-func TestWriteGlobalTo(t *testing.T) {
+func TestWriteGlobalAt(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "wtm", "config.toml")
 
-	err := WriteGlobalTo(path, domain.InitGlobalAnswers{
+	err := writeGlobalAt(path, domain.InitGlobalAnswers{
 		Shell: domain.ShellZsh,
 	})
 	if err != nil {

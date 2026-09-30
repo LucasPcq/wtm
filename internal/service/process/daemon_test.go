@@ -59,7 +59,7 @@ func assertStartedAt(t *testing.T, payload map[string]any, want time.Time) {
 // bridge between a ManagedJob and the JobInfo a client renders: a field the
 // daemon forgets to copy there is a column `run ps` shows empty for ever.
 func TestDaemonHandleList_ReportsWhenAJobStartedAndHowItEnded(t *testing.T) {
-	d := &daemonServer{manager: NewManager()}
+	d := &daemonServer{manager: newManager()}
 	dir := t.TempDir()
 
 	script := filepath.Join(dir, "boom.sh")
@@ -112,7 +112,7 @@ func TestDaemonHandleList_ReportsWhenAJobStartedAndHowItEnded(t *testing.T) {
 // `run down` prints back is taken before the jobs are signalled: it describes
 // what was running, uptime included.
 func TestDaemonHandleStopAll_SnapshotsTheJobsItStopped(t *testing.T) {
-	d := &daemonServer{manager: NewManager()}
+	d := &daemonServer{manager: newManager()}
 	dir := t.TempDir()
 
 	job := domain.JobConfig{Name: "dev", Kind: domain.JobKindService, Cmd: "sleep 30"}
@@ -143,7 +143,7 @@ func TestDaemonHandleStopAll_SnapshotsTheJobsItStopped(t *testing.T) {
 // A detached launcher's PID exited long before the row is drawn, so it must stay
 // out of every state that entry can reach — not just `detached`.
 func TestJobInfoReportsNoPIDForALauncherWhateverBecameOfIt(t *testing.T) {
-	server := &daemonServer{manager: NewManager()}
+	server := &daemonServer{manager: newManager()}
 	launcher := domain.JobConfig{Name: "db", Kind: domain.JobKindService, Cmd: "docker compose up -d", Stop: "docker compose down"}
 
 	for _, status := range []domain.JobStatus{domain.JobStatusDetached, domain.JobStatusStopped} {
@@ -155,7 +155,7 @@ func TestJobInfoReportsNoPIDForALauncherWhateverBecameOfIt(t *testing.T) {
 }
 
 func TestJobInfoKeepsThePIDOfAReapedForegroundService(t *testing.T) {
-	server := &daemonServer{manager: NewManager()}
+	server := &daemonServer{manager: newManager()}
 	service := domain.JobConfig{Name: "dev", Kind: domain.JobKindService, Cmd: "pnpm dev"}
 
 	info := server.jobInfoOf(ManagedJob{Name: "dev", Config: service, Status: domain.JobStatusReaped, PID: 70382})

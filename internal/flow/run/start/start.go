@@ -12,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow/run/concurrency"
 	"github.com/LucasPcq/wtm/internal/flow/run/foreigndata"
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
+	"github.com/LucasPcq/wtm/internal/flow/run/probes"
 	"github.com/LucasPcq/wtm/internal/flow/run/seam"
 	"github.com/LucasPcq/wtm/internal/flow/run/target"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
@@ -170,6 +171,17 @@ func (f *startFlow) run() (Outcome, error) {
 		Warnings: warnings,
 		Start:    runSeam.Starter(seam.StartParams{Jobs: rules.JobsWithEffectivePorts(f.request.Config, []domain.JobConfig{job})}),
 	})
+	if err != nil {
+		return Outcome{}, err
+	}
+	cfg, err = probes.OfferToSilence(probes.Params{
+		Context:   f.ctx,
+		Prompter:  f.prompter,
+		Presenter: f.presenter,
+		Config:    f.request.Config,
+		Results:   result,
+	})
+	f.request.Config = cfg
 	if err != nil {
 		return Outcome{}, err
 	}

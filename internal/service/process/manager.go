@@ -124,19 +124,6 @@ type Manager struct {
 	saved      uint64
 }
 
-func NewManager() *Manager {
-	return NewManagerWithRoutes(nil)
-}
-
-func NewManagerWithRoutes(routes RouteSink) *Manager {
-	return &Manager{
-		jobs:    make(map[string]*ManagedJob),
-		routes:  routes,
-		orphans: systemOrphans{},
-		stacks:  systemStacks{},
-	}
-}
-
 type ManagerParams struct {
 	Routes RouteSink
 	// Index is the durable record of what is up. Nil keeps the manager entirely
@@ -959,8 +946,8 @@ func closeSink(sink *LogSink) {
 	}
 }
 
-func (m *Manager) Stop(name string, workDir string) error {
-	return m.stopByKey(jobKey(name, workDir))
+func (m *Manager) Stop(ref JobRef) error {
+	return m.stopByKey(jobKey(ref.Name, ref.WorkDir))
 }
 
 // StopAll spans every worktree and every kind, detached stacks included: it
@@ -1098,7 +1085,7 @@ type AttachSession struct {
 	Writable bool
 }
 
-type jobRef struct {
+type JobRef struct {
 	Name    string
 	WorkDir string
 }
@@ -1106,7 +1093,7 @@ type jobRef struct {
 // attachableJob is the gate both Attach and Resize pass: a job a pane can bind
 // to is registered, still running, and streaming through a hub — which a
 // detached launcher never does, its output having ended with its launcher.
-func (m *Manager) attachableJob(ref jobRef) (*ManagedJob, error) {
+func (m *Manager) attachableJob(ref JobRef) (*ManagedJob, error) {
 	m.mu.Lock()
 	job, ok := m.jobs[jobKey(ref.Name, ref.WorkDir)]
 	// A claim owns no stream; the service it holds does.
@@ -1136,8 +1123,8 @@ func (m *Manager) attachableJob(ref jobRef) (*ManagedJob, error) {
 	return job, nil
 }
 
-func (m *Manager) Attach(name string, workDir string) (*AttachSession, error) {
-	job, err := m.attachableJob(jobRef{Name: name, WorkDir: workDir})
+func (m *Manager) Attach(ref JobRef) (*AttachSession, error) {
+	job, err := m.attachableJob(ref)
 	if err != nil {
 		return nil, err
 	}
@@ -1167,7 +1154,7 @@ type ResizeParams struct {
 // has already been sent. Each attached pane resizes for itself, so the last one
 // to speak wins — a job shown twice at two sizes is drawn for the latest.
 func (m *Manager) Resize(params ResizeParams) error {
-	job, err := m.attachableJob(jobRef{Name: params.Name, WorkDir: params.WorkDir})
+	job, err := m.attachableJob(JobRef{Name: params.Name, WorkDir: params.WorkDir})
 	if err != nil {
 		return err
 	}

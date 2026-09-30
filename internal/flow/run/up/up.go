@@ -12,12 +12,12 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow/run/concurrency"
 	"github.com/LucasPcq/wtm/internal/flow/run/foreigndata"
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
+	"github.com/LucasPcq/wtm/internal/flow/run/probes"
 	"github.com/LucasPcq/wtm/internal/flow/run/seam"
 	"github.com/LucasPcq/wtm/internal/flow/run/target"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
-	"github.com/LucasPcq/wtm/internal/service/runconfig"
 )
 
 type Request struct {
@@ -252,7 +252,15 @@ func (f *upFlow) start(answers flow.Answers) (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	if err := f.offerToSilenceProbes(results); err != nil {
+	cfg, err := probes.OfferToSilence(probes.Params{
+		Context:   f.ctx,
+		Prompter:  f.prompter,
+		Presenter: f.presenter,
+		Config:    f.request.Config,
+		Results:   results,
+	})
+	f.request.Config = cfg
+	if err != nil {
 		return Outcome{}, err
 	}
 	// A shared service this run brought up is the moment to pay what a clean
@@ -265,47 +273,6 @@ func (f *upFlow) start(answers flow.Answers) (Outcome, error) {
 		Results:  results,
 		Aborted:  results.Aborted(),
 	}, nil
-}
-
-// offerToSilenceProbes asks once about the warnings that will otherwise come
-// back identical at every run: a job binding the base port because its command
-// never reads the variable. A warning about a port another worktree holds is
-// not offered — there is nothing to acknowledge, the run said whose it is.
-func (f *upFlow) offerToSilenceProbes(results runlogs.Outcomes) error {
-	// Never after an abort: the reader stopped the run or a job failed, and the
-	// question to answer then is why — not whether to hear less about it.
-	if !f.prompter.Interactive() || results.Aborted() {
-		return nil
-	}
-
-	var probes []domain.PortProbe
-	for _, outcome := range results {
-		probes = append(probes, outcome.Probes...)
-	}
-	names := rules.JobsToSilence(rules.JobsToSilenceParams{Probes: probes, Jobs: f.request.Config.Jobs})
-	if len(names) == 0 {
-		return nil
-	}
-
-	proceed, err := f.prompter.Confirm(flow.ConfirmParams{
-		Title:       domain.ProbeSilenceTitle,
-		Description: fmt.Sprintf(domain.ProbeSilenceDescFmt, strings.Join(names, domain.CmdListVarSep)),
-		DefaultYes:  false,
-	})
-	if err != nil || !proceed {
-		return nil
-	}
-
-	cfg := rules.SilenceProbes(rules.SilenceProbesParams{Config: f.request.Config, Jobs: names})
-	if err := runconfig.Save(runconfig.SaveParams{StateDir: f.ctx.StateDir, Config: cfg}); err != nil {
-		return fmt.Errorf("silence port probes: %w", err)
-	}
-	f.request.Config = cfg
-	f.presenter.Status(flow.Notice{
-		Kind: flow.NoticeMessage,
-		Text: fmt.Sprintf(domain.ProbeSilencedFmt, strings.Join(names, domain.CmdListVarSep)),
-	})
-	return nil
 }
 
 // resolvedProfile is what this run settled on: a name for it and the jobs it

@@ -82,7 +82,7 @@ func enterWorktree(t *testing.T, path string) {
 func composeProject(t *testing.T, worktreeSlug string) string {
 	t.Helper()
 	return rules.ComposeProjectName(rules.ComposeProjectNameParams{
-		Project:  filepath.Base(os.Getenv("WTM_PROJECT_DIR")),
+		Project:  filepath.Base(os.Getenv(domain.EnvProjectDir)),
 		Worktree: worktreeSlug,
 	})
 }
@@ -99,7 +99,7 @@ func assertEnv(t *testing.T, env map[string]string, want map[string]string) {
 func TestRunUpInjectsMainWorktreeEnv(t *testing.T) {
 	daemon := setupUpProject(t, &fakeDaemon{})
 	fakeTTY(t, false)
-	enterWorktree(t, os.Getenv("WTM_PROJECT_DIR"))
+	enterWorktree(t, os.Getenv(domain.EnvProjectDir))
 
 	if _, _, err := runCmd(t, domain.CmdUp, "--"+domain.FlagDetach); err != nil {
 		t.Fatalf("run up: %v", err)
@@ -113,14 +113,14 @@ func TestRunUpInjectsMainWorktreeEnv(t *testing.T) {
 		domain.EnvWorktree:           "main",
 		domain.EnvOrdinal:            "0",
 		domain.EnvPortOffset:         "0",
-		domain.EnvComposeProjectName: rules.WorktreeSlug(filepath.Base(os.Getenv("WTM_PROJECT_DIR"))),
+		domain.EnvComposeProjectName: rules.WorktreeSlug(filepath.Base(os.Getenv(domain.EnvProjectDir))),
 	})
 }
 
 func TestRunUpInjectsLinkedWorktreeEnv(t *testing.T) {
 	daemon := setupUpProject(t, &fakeDaemon{})
 	fakeTTY(t, false)
-	enterWorktree(t, addWorktree(t, os.Getenv("WTM_PROJECT_DIR"), "feat/x"))
+	enterWorktree(t, addWorktree(t, os.Getenv(domain.EnvProjectDir), "feat/x"))
 
 	if _, _, err := runCmd(t, domain.CmdUp, "--"+domain.FlagDetach); err != nil {
 		t.Fatalf("run up: %v", err)
@@ -139,7 +139,7 @@ func TestRunUpInjectsLinkedWorktreeEnv(t *testing.T) {
 func TestRunStartInjectsWorktreeEnv(t *testing.T) {
 	daemon := setupUpProject(t, &fakeDaemon{})
 	fakeTTY(t, false)
-	enterWorktree(t, addWorktree(t, os.Getenv("WTM_PROJECT_DIR"), "feat/y"))
+	enterWorktree(t, addWorktree(t, os.Getenv(domain.EnvProjectDir), "feat/y"))
 
 	if _, _, err := runCmd(t, domain.CmdStart, "--"+domain.FlagJob, "api", "--"+domain.FlagDetach); err != nil {
 		t.Fatalf("run start: %v", err)
@@ -158,7 +158,7 @@ func TestRunStartInjectsWorktreeEnv(t *testing.T) {
 func TestRunUpIgnoresTheCallersComposeProjectName(t *testing.T) {
 	daemon := setupUpProject(t, &fakeDaemon{})
 	fakeTTY(t, false)
-	enterWorktree(t, addWorktree(t, os.Getenv("WTM_PROJECT_DIR"), "feat/z"))
+	enterWorktree(t, addWorktree(t, os.Getenv(domain.EnvProjectDir), "feat/z"))
 	t.Setenv(domain.EnvComposeProjectName, "launched-from-another-worktree")
 
 	if _, _, err := runCmd(t, domain.CmdUp, "--"+domain.FlagDetach); err != nil {
@@ -183,7 +183,7 @@ func TestRunUpHonoursDeclaredPortOffsetBlock(t *testing.T) {
 	})
 	daemon := startFakeDaemon(t, &fakeDaemon{})
 	fakeTTY(t, false)
-	enterWorktree(t, addWorktree(t, os.Getenv("WTM_PROJECT_DIR"), "feat/block"))
+	enterWorktree(t, addWorktree(t, os.Getenv(domain.EnvProjectDir), "feat/block"))
 
 	if _, _, err := runCmd(t, domain.CmdUp, "--"+domain.FlagDetach); err != nil {
 		t.Fatalf("run up: %v", err)
@@ -211,7 +211,7 @@ func TestRunUpSendsDeclaredPortsWithTheOffset(t *testing.T) {
 	})
 	daemon := startFakeDaemon(t, &fakeDaemon{})
 	fakeTTY(t, false)
-	enterWorktree(t, addWorktree(t, os.Getenv("WTM_PROJECT_DIR"), "feat/ports"))
+	enterWorktree(t, addWorktree(t, os.Getenv(domain.EnvProjectDir), "feat/ports"))
 
 	if _, _, err := runCmd(t, domain.CmdUp, "--"+domain.FlagDetach); err != nil {
 		t.Fatalf("run up: %v", err)
@@ -230,7 +230,7 @@ func TestRunUpSendsDeclaredPortsWithTheOffset(t *testing.T) {
 func TestRunStartRefusesAWorktreeThatNeverChoseItsIsolation(t *testing.T) {
 	daemon := setupUpProject(t, &fakeDaemon{})
 	fakeTTY(t, false)
-	projectDir := os.Getenv("WTM_PROJECT_DIR")
+	projectDir := os.Getenv(domain.EnvProjectDir)
 	path := filepath.Join(t.TempDir(), "feat-old")
 	cmd := exec.Command("git", "worktree", "add", "-q", "-b", "feat/old", path, "HEAD")
 	cmd.Dir = projectDir
@@ -250,7 +250,7 @@ func TestRunStartRefusesAWorktreeThatNeverChoseItsIsolation(t *testing.T) {
 	if started := daemon.startedJobs(); len(started) != 0 {
 		t.Errorf("started %v", started)
 	}
-	if _, err := os.Stat(rules.WorktreeMetaDir(os.Getenv("WTM_STATE_DIR"), "feat/old")); !os.IsNotExist(err) {
+	if _, err := os.Stat(rules.WorktreeMetaDir(os.Getenv(domain.EnvStateDir), "feat/old")); !os.IsNotExist(err) {
 		t.Errorf("metadata written for the refused worktree (%v): an ordinal was allocated", err)
 	}
 }

@@ -589,9 +589,9 @@ the global `wtm init` does not configure it.
   "always" answers write.
   **A port clash overrides all of that.** When a job this run would start binds a port a job
   already up in another worktree binds — a verbatim worktree and its source, always — running
-  side by side is not possible: a terminal is asked "stop <worktree> first" or "don't start",
+  side by side is not possible: a terminal is asked "stop <every other worktree> first" or "don't start",
   and your paths **error** (exit 1) listing each port, unless `--exclusive` (or
-  `concurrency = "exclusive"`) was given, which stops the holder first. `--parallel` and
+  `concurrency = "exclusive"`) was given, which stops every other worktree's jobs first, the holder's included. `--parallel` and
   `concurrency = "parallel"` cannot be honoured there. The way out that keeps both running
   is `wtm env <wt> --yes --isolation isolated`. `run up a b` where `a` and `b` share ports is
   refused before anything is stopped.

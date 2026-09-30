@@ -417,3 +417,25 @@ func TestIsolatedWorktreesDoNotClash(t *testing.T) {
 		t.Error("the settled preference applies when nothing clashes")
 	}
 }
+
+// The clash's stop answer is the exclusive one, which stops every other
+// worktree: the option names each of them, not only the one holding the port.
+func TestAPortClashNamesEveryWorktreeItsAnswerStops(t *testing.T) {
+	f := clashFlow(request{}, 0)
+	f.params.Running = append(f.params.Running, domain.JobInfo{Name: "db", WorkDir: "/wt/bystander", Status: domain.JobStatusRunning})
+	f.offsets["/wt/bystander"] = 20
+
+	content, err := f.Step().Build(flow.Answers{})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	stop := content.Options[0]
+	if stop.Value != answerExclusive {
+		t.Fatalf("first option = %+v, want the exclusive answer", stop)
+	}
+	for _, name := range []string{"other", "bystander"} {
+		if !strings.Contains(stop.Label, name) {
+			t.Errorf("stop option %q does not name %s, which it stops", stop.Label, name)
+		}
+	}
+}

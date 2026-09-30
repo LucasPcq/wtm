@@ -46,7 +46,7 @@ func (d *fakeDaemon) actions() []string {
 // warned about and the worktree emptied anyway.
 func TestRunDownStopsOverAnInvalidRunToml(t *testing.T) {
 	daemon := setupStartProject(t, &fakeDaemon{Jobs: []domain.JobInfo{{Name: "api", Status: domain.JobStatusRunning}}})
-	stateDir := os.Getenv("WTM_STATE_DIR")
+	stateDir := os.Getenv(domain.EnvStateDir)
 	breakRunTOML(t, stateDir)
 	t.Chdir(projectDirOf(stateDir))
 	fakeTTY(t, false)
@@ -65,7 +65,7 @@ func TestRunDownStopsOverAnInvalidRunToml(t *testing.T) {
 
 func TestRunStopStopsByNameOverAnInvalidRunToml(t *testing.T) {
 	daemon := setupStartProject(t, &fakeDaemon{})
-	stateDir := os.Getenv("WTM_STATE_DIR")
+	stateDir := os.Getenv(domain.EnvStateDir)
 	breakRunTOML(t, stateDir)
 	t.Chdir(projectDirOf(stateDir))
 	fakeTTY(t, false)
@@ -85,7 +85,7 @@ func TestRunStopStopsByNameOverAnInvalidRunToml(t *testing.T) {
 
 func TestRunPsListsOverAnInvalidRunToml(t *testing.T) {
 	setupStartProject(t, &fakeDaemon{})
-	stateDir := os.Getenv("WTM_STATE_DIR")
+	stateDir := os.Getenv(domain.EnvStateDir)
 	breakRunTOML(t, stateDir)
 	t.Chdir(projectDirOf(stateDir))
 
@@ -97,7 +97,7 @@ func TestRunPsListsOverAnInvalidRunToml(t *testing.T) {
 // Starting remains refused: run.toml is what `up` and `start` are about.
 func TestRunStartStillRefusesAnInvalidRunToml(t *testing.T) {
 	daemon := setupStartProject(t, &fakeDaemon{})
-	stateDir := os.Getenv("WTM_STATE_DIR")
+	stateDir := os.Getenv(domain.EnvStateDir)
 	breakRunTOML(t, stateDir)
 	t.Chdir(projectDirOf(stateDir))
 	fakeTTY(t, false)
@@ -120,7 +120,7 @@ func TestRunRefusesAWorktreeWhoseEnvCannotBeResolved(t *testing.T) {
 		t.Run(args[0], func(t *testing.T) {
 			daemon := setupStartProject(t, &fakeDaemon{})
 			detached := filepath.Join(t.TempDir(), "detached")
-			gittest.Git(t, projectDirOf(os.Getenv("WTM_STATE_DIR")), "worktree", "add", "--detach", detached)
+			gittest.Git(t, projectDirOf(os.Getenv(domain.EnvStateDir)), "worktree", "add", "--detach", detached)
 			t.Chdir(detached)
 			fakeTTY(t, false)
 
@@ -140,7 +140,7 @@ func TestRunRefusesAWorktreeWhoseEnvCannotBeResolved(t *testing.T) {
 // silently serves no name.
 func TestRunUpRefusesAProxyPortOutOfRange(t *testing.T) {
 	setupStartProject(t, &fakeDaemon{})
-	stateDir := os.Getenv("WTM_STATE_DIR")
+	stateDir := os.Getenv(domain.EnvStateDir)
 	t.Chdir(projectDirOf(stateDir))
 	fakeTTY(t, false)
 

@@ -24,20 +24,26 @@ type RunAddressesForParams struct {
 	ProxyPort int
 }
 
+type planForParams struct {
+	Addresses RunAddressesForParams
+	Branch    string
+	Path      string
+}
+
 // planFor is the worktree's [[env_port]] pass, computed and not applied. Empty
 // when it cannot be read, which reads as settled: an address is a poor place to
 // report that a config could not be loaded.
-func planFor(params RunAddressesForParams, branch, path string) domain.EnvPortPlan {
-	if path == "" {
+func planFor(params planForParams) domain.EnvPortPlan {
+	if params.Path == "" {
 		return domain.EnvPortPlan{}
 	}
 	plan, err := EnvPortPlanFor(ResolveEnvPortsParams{
-		ProjectDir:   params.ProjectDir,
-		StateDir:     params.StateDir,
-		Branch:       branch,
-		WorktreePath: path,
-		EnvFiles:     params.EnvFiles,
-		Global:       params.Global,
+		ProjectDir:   params.Addresses.ProjectDir,
+		StateDir:     params.Addresses.StateDir,
+		Branch:       params.Branch,
+		WorktreePath: params.Path,
+		EnvFiles:     params.Addresses.EnvFiles,
+		Global:       params.Addresses.Global,
 	})
 	if err != nil {
 		return domain.EnvPortPlan{}
@@ -85,7 +91,7 @@ func RunAddressesFor(params RunAddressesForParams) domain.RunAddresses {
 		if err != nil {
 			continue
 		}
-		plan := planFor(params, branch, paths[branch])
+		plan := planFor(planForParams{Addresses: params, Branch: branch, Path: paths[branch]})
 		if note := rules.AddressingDriftLine(rules.AddressingDriftParams{Worktree: branch, Plan: plan}); note != "" {
 			answer.Notes[branch] = note
 		}

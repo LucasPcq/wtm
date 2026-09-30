@@ -71,6 +71,22 @@ func BranchOf(dir string) string {
 	return branch
 }
 
+type NamedBranchParams struct {
+	Named []Resolved
+	Dir   string
+}
+
+// NamedBranch is the branch the positional named at dir, else the one git
+// reports there.
+func NamedBranch(params NamedBranchParams) string {
+	for _, named := range params.Named {
+		if named.Dir == params.Dir && named.Branch != "" {
+			return named.Branch
+		}
+	}
+	return BranchOf(params.Dir)
+}
+
 // ProjectOf names the repository a worktree belongs to — its main checkout's
 // directory, as every run name spells the project — empty when git cannot say.
 func ProjectOf(dir string) string {

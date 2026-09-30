@@ -292,7 +292,7 @@ func (r *runner) run() Outcome {
 			ports = r.declaredPorts(job)
 		}
 		url := r.jobURL(jobURLParams{Job: job, Ports: ports, Host: host, Public: public})
-		held := r.heldURLs(heldURLsParams{Job: job, Routes: routes, Ports: ports, Public: public})
+		held := r.heldURLs(heldURLsParams{Job: job, Routes: r.heldRoutes(job, routes), Ports: ports, Public: public})
 
 		if job.Kind == domain.JobKindTask {
 			r.completed = append(r.completed, job.Name)
@@ -494,6 +494,24 @@ func (r *runner) routes(job domain.JobConfig) []domain.JobRoute {
 	if r.proxyPort == 0 {
 		return nil
 	}
+	return r.declaredRoutes(job)
+}
+
+// heldRoutes are the children heldURLs reports. Without a proxy nothing serves
+// their names, so they are the same children with no host, and each answers on
+// its port — still the only line a runner's apps can appear on.
+func (r *runner) heldRoutes(job domain.JobConfig, routes []domain.JobRoute) []domain.JobRoute {
+	if r.proxyPort != 0 {
+		return routes
+	}
+	direct := r.declaredRoutes(job)
+	for i := range direct {
+		direct[i].Host = ""
+	}
+	return direct
+}
+
+func (r *runner) declaredRoutes(job domain.JobConfig) []domain.JobRoute {
 	return rules.JobRoutes(rules.JobRoutesParams{
 		Config:   domain.RunConfig{Jobs: r.declaredJobs()},
 		Job:      job,

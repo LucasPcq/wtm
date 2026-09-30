@@ -216,15 +216,8 @@ func (f *downFlow) stopIn(outcome Outcome, workDir string) ([]domain.JobActionRe
 	return f.stopAll(workDir)
 }
 
-// branchOf names a worktree the way a reader recognises it, falling back to the
-// path git could not name.
 func (f *downFlow) branchOf(workDir string) string {
-	for _, named := range f.named {
-		if named.Dir == workDir && named.Branch != "" {
-			return named.Branch
-		}
-	}
-	return target.BranchOf(workDir)
+	return target.NamedBranch(target.NamedBranchParams{Named: f.named, Dir: workDir})
 }
 
 // stopProfile stops the profile's jobs one by one, so a job that refuses is

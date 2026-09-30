@@ -95,19 +95,3 @@ func PortClashLines(clashes []domain.PortClash) []string {
 	}
 	return lines
 }
-
-// ClashingWorktrees are the worktrees holding the ports, which is what stopping
-// them first would free.
-func ClashingWorktrees(clashes []domain.PortClash) []string {
-	seen := map[string]bool{}
-	var dirs []string
-	for _, clash := range clashes {
-		if seen[clash.HeldBy.WorkDir] {
-			continue
-		}
-		seen[clash.HeldBy.WorkDir] = true
-		dirs = append(dirs, clash.HeldBy.WorkDir)
-	}
-	sort.Strings(dirs)
-	return dirs
-}

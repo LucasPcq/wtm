@@ -206,7 +206,7 @@ func TestRunDownNamesTheWorktreeItEmptied(t *testing.T) {
 // one by one, and never reaches into another one.
 func TestRunDownAllStaysInThisRepository(t *testing.T) {
 	daemon := setupStartProject(t, &fakeDaemon{})
-	stateDir := os.Getenv("WTM_STATE_DIR")
+	stateDir := os.Getenv(domain.EnvStateDir)
 	main := gitToplevel(t, projectDirOf(stateDir))
 	linked := gitToplevel(t, addWorktree(t, main, "feat/all"))
 	daemon.setJobs([]domain.JobInfo{

@@ -354,6 +354,12 @@ func TestTheLogsKeyOnServicesOpensTheFullView(t *testing.T) {
 	}
 }
 
+// panelBodyHeight is what renderPanel leaves for Body under a titled panel: its
+// border, the title row and the blank row under it.
+func panelBodyHeight(rect domain.Rect) int {
+	return max(rect.Height-borderWidth-2, 0)
+}
+
 func TestServicesRowsFillTheWholePanel(t *testing.T) {
 	branches := make([]string, 0, 12)
 	for index := range 12 {

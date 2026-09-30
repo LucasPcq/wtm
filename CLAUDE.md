@@ -142,6 +142,8 @@ internal/
                                     port prober, and the start sequence a surface drives
       foreigndata/            ←     the stop before a job whose `touches` reach data the
                                     worktree does not own, shared by `up` and `start`
+      probes/                 ←     the offer to write `probe = false` for a job bound to its
+                                    base port, made after `up` and `start` alike
       concurrency/            ←     the question about the other worktrees' jobs (load or
                                     port clash, `--exclusive`/`--parallel`), shared by `up` and `start`
       up/ down/ start/        ←     one package per command, as everywhere else

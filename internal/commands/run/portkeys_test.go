@@ -34,7 +34,7 @@ func portedProject(t *testing.T) string {
 
 func projectFile(t *testing.T, rel string) string {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(os.Getenv("WTM_PROJECT_DIR"), rel))
+	data, err := os.ReadFile(filepath.Join(os.Getenv(domain.EnvProjectDir), rel))
 	if err != nil {
 		t.Fatalf("read %s: %v", rel, err)
 	}
@@ -109,7 +109,7 @@ func TestRunInitLeavesTheTemplateItDidNotFind(t *testing.T) {
 		t.Fatalf("run init: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(os.Getenv("WTM_PROJECT_DIR"), "apps/web/.env.example")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(os.Getenv(domain.EnvProjectDir), "apps/web/.env.example")); !os.IsNotExist(err) {
 		t.Fatal("wtm must not create a committed template nobody asked for")
 	}
 }

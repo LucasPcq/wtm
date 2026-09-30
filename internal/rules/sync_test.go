@@ -89,19 +89,6 @@ func TestDecidePush(t *testing.T) {
 	}
 }
 
-func TestStaleParents(t *testing.T) {
-	updates := []domain.ParentUpdate{
-		{Branch: "a", Status: domain.ParentBehind},
-		{Branch: "b", Status: domain.ParentDiverged},
-		{Branch: "c", Status: domain.ParentFastForwarded},
-		{Branch: "d", Status: domain.ParentBehind},
-	}
-	stale := StaleParents(updates)
-	if len(stale) != 2 || stale[0].Branch != "a" || stale[1].Branch != "d" {
-		t.Fatalf("StaleParents = %+v, want the two behind parents", stale)
-	}
-}
-
 func TestCommitCountLabel(t *testing.T) {
 	tests := []struct {
 		n    int

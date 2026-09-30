@@ -4,6 +4,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -147,26 +149,28 @@ func TestAdoptDropsTheClaimsOfAServiceItReaped(t *testing.T) {
 }
 
 // startOrphanGroup reproduces the shape found on the machine: a `sh -c` leader
-// that is already dead while the child it spawned holds the group open.
+// that is already dead while the child it spawned holds the group open. The
+// leader prints the child's PID before exiting, so the child exists by the time
+// Wait returns — nothing is left to a timing the machine may not honour.
 func startOrphanGroup(t *testing.T) int {
 	t.Helper()
-	cmd := exec.Command("sh", "-c", "sleep 300 & exit 0")
+	cmd := exec.Command("sh", "-c", "sleep 300 >/dev/null 2>&1 & echo $!; exit 0")
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	if err := cmd.Start(); err != nil {
+	out, err := cmd.Output()
+	if err != nil {
 		t.Fatalf("start: %v", err)
 	}
-	pgid := cmd.Process.Pid
-	_ = cmd.Wait()
-
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if groupAlive(pgid) {
-			return pgid
-		}
-		time.Sleep(10 * time.Millisecond)
+	child, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil {
+		t.Fatalf("child pid %q: %v", out, err)
 	}
-	t.Skip("could not observe an orphan group on this machine")
-	return 0
+	pgid := cmd.Process.Pid
+	t.Cleanup(func() { _ = syscall.Kill(child, syscall.SIGKILL) })
+
+	if !groupAlive(pgid) {
+		t.Fatalf("group %d is gone although its child %d was spawned into it", pgid, child)
+	}
+	return pgid
 }
 
 func TestReapGroupKillsAGroupWhoseLeaderIsAlreadyGone(t *testing.T) {

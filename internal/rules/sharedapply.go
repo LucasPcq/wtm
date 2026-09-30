@@ -376,15 +376,26 @@ func JoinSharedProfiles(params JoinSharedProfilesParams) domain.RunConfig {
 		if lifted == "" {
 			continue
 		}
-		cfg = joinProfilesOf(cfg, ComposeJobName(ComposeJobNameParams{Config: cfg, File: shared.File}), lifted)
+		cfg = joinProfilesOf(joinProfilesParams{
+			Config: cfg,
+			Host:   ComposeJobName(ComposeJobNameParams{Config: cfg, File: shared.File}),
+			Lifted: lifted,
+		})
 	}
 	return cfg
 }
 
-// joinProfilesOf puts one lifted job in every profile that starts the job it was
-// taken out of, right after it.
-func joinProfilesOf(cfg domain.RunConfig, host, name string) domain.RunConfig {
-	if host == "" {
+type joinProfilesParams struct {
+	Config domain.RunConfig
+	Host   string
+	Lifted string
+}
+
+// joinProfilesOf puts the lifted job in every profile that starts its host,
+// right after it.
+func joinProfilesOf(params joinProfilesParams) domain.RunConfig {
+	cfg := params.Config
+	if params.Host == "" {
 		return cfg
 	}
 	profiles := make([]domain.ProfileConfig, len(cfg.Profiles))
@@ -393,11 +404,11 @@ func joinProfilesOf(cfg domain.RunConfig, host, name string) domain.RunConfig {
 	for i, profile := range profiles {
 		position := -1
 		for j, job := range profile.Jobs {
-			if job == name {
+			if job == params.Lifted {
 				position = -2
 				break
 			}
-			if job == host {
+			if job == params.Host {
 				position = j
 			}
 		}
@@ -405,7 +416,7 @@ func joinProfilesOf(cfg domain.RunConfig, host, name string) domain.RunConfig {
 			continue
 		}
 		jobs := append([]string{}, profile.Jobs...)
-		profiles[i].Jobs = append(jobs[:position+1], append([]string{name}, jobs[position+1:]...)...)
+		profiles[i].Jobs = append(jobs[:position+1], append([]string{params.Lifted}, jobs[position+1:]...)...)
 	}
 	cfg.Profiles = profiles
 	return cfg

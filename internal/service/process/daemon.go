@@ -338,7 +338,7 @@ func (d *daemonServer) handleShutdown(encoder replyEncoder) {
 
 func (d *daemonServer) handleStop(encoder replyEncoder, req Request) {
 	ref := d.manager.sharedRefOf(jobKey(req.Name, req.WorkDir))
-	if err := d.manager.Stop(req.Name, req.WorkDir); err != nil {
+	if err := d.manager.Stop(JobRef{Name: req.Name, WorkDir: req.WorkDir}); err != nil {
 		encoder.Encode(Response{Status: StatusError, Message: err.Error()})
 		return
 	}
@@ -445,7 +445,7 @@ func (d *daemonServer) handleResize(encoder replyEncoder, req Request) {
 }
 
 func (d *daemonServer) handleAttach(conn net.Conn, encoder replyEncoder, req Request) {
-	session, err := d.manager.Attach(req.Name, req.WorkDir)
+	session, err := d.manager.Attach(JobRef{Name: req.Name, WorkDir: req.WorkDir})
 	if err != nil {
 		encoder.Encode(Response{Status: StatusError, Message: err.Error()})
 		return

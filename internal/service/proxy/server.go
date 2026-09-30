@@ -76,15 +76,6 @@ func (s *Server) Port() int {
 	return s.port
 }
 
-// Addr is the address the listener actually took, which a port of 0 only knows
-// once it is bound.
-func (s *Server) Addr() string {
-	if s.listener == nil {
-		return ""
-	}
-	return s.listener.Addr().String()
-}
-
 func (s *Server) Close() error {
 	if s.http == nil {
 		return nil
