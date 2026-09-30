@@ -1255,6 +1255,17 @@ const (
 	// FlagPortClear empties a job's whole port table on `run job edit`, the one
 	// thing --port cannot say: it merges, so it can never remove.
 	FlagPortClear = "port-clear"
+	// FlagScope and the FlagNamespace* flags declare a shared service and its
+	// [job.namespace] on `run job add|edit`, the fields run init otherwise asks.
+	FlagScope           = "scope"
+	FlagNamespaceName   = "namespace-name"
+	FlagNamespaceCreate = "namespace-create"
+	FlagNamespaceRemove = "namespace-remove"
+	FlagNamespaceEnv    = "namespace-env"
+	// ScopeValue* are what --scope takes: the per-worktree scope is empty in
+	// run.toml, which a flag cannot spell legibly.
+	ScopeValueShared      = "shared"
+	ScopeValuePerWorktree = "worktree"
 	// FlagRaw asks for a job's own port rather than the name the proxy serves it
 	// under: an address every OS resolves and no proxy has to be up for.
 	FlagRaw = "raw"
@@ -1901,8 +1912,55 @@ const (
 	RunJobPortsSummaryNone = "(none)"
 	RunJobURLSummaryNone   = "(not published)"
 
+	RunJobRunsLabel    = "Runs"
+	RunJobRunsTitle    = "Which jobs does this one start itself?"
+	RunJobRunsDesc     = "Optional. A runner — turbo run dev, a compose stack — starts these itself, so wtm never starts them a second time. Space toggles, enter confirms."
+	RunJobRunsSkip     = "no other job declared"
+	RunJobTouchesLabel = "Touches"
+	RunJobTouchesTitle = "Whose data does this job change?"
+	RunJobTouchesDesc  = "Optional. A migration, a reset, a seed: run up stops before such a job rewrites data this worktree does not own. Space toggles, enter confirms."
+	RunJobTouchesSkip  = "no service declared"
+
+	RunJobBindsNoPortLabel      = "Binds no port"
+	RunJobBindsNoPortTitle      = "Does this service listen on a port?"
+	RunJobBindsNoPortDesc       = "A build in watch mode, a worker, or a runner whose children hold the ports listens on nothing — saying so stops wtm offering it one."
+	RunJobBindsNoPortListens    = "it listens, or its port is not settled yet"
+	RunJobBindsNoPortNone       = "it binds no port by design"
+	RunJobBindsNoPortYes        = "yes"
+	RunJobBindsNoPortNo         = "no"
+	RunJobBindsNoPortSkipTask   = "a task binds nothing"
+	RunJobBindsNoPortSkipsPorts = "it declares ports"
+
+	RunJobScopeLabel           = "Scope"
+	RunJobScopeTitle           = "One instance per worktree, or one for the repository?"
+	RunJobScopeDesc            = "A shared service — a postgres, a keycloak — runs once, in the main checkout, and binds its declared port in every worktree."
+	RunJobScopeWorktreeOption  = "per worktree — each worktree runs its own"
+	RunJobScopeSharedOption    = "shared — one instance for the whole repository"
+	RunJobScopeSkipTask        = "a task has no instance to share"
+	RunJobNamespaceNameLabel   = "Namespace"
+	RunJobNamespaceNameTitle   = "What is each worktree's slice of this service called?"
+	RunJobNamespaceNameDesc    = "e.g. app_{worktree} — {worktree} and {ordinal} are filled in by wtm, and commands read the result as $WTM_NAMESPACE. Leave blank to share the service outright, data included."
+	RunJobNamespaceNameNone    = "(none — shared outright)"
+	RunJobNamespaceSkip        = "the service is not shared"
+	RunJobNamespaceSkipUnnamed = "no namespace"
+	RunJobNamespaceCreateLabel = "Create"
+	RunJobNamespaceCreateTitle = "Command carving the slice out"
+	RunJobNamespaceCreateDesc  = "A /bin/sh line or a script path, run on every start of the service — so it must be safe to run again: carve the slice out if it is absent, do nothing if it is there."
+	RunJobNamespaceCreateEmpty = "a namespace needs a create command"
+	RunJobNamespaceRemoveLabel = "Remove"
+	RunJobNamespaceRemoveTitle = "Command dropping the slice"
+	RunJobNamespaceRemoveDesc  = "Optional. Run by wtm clean when the worktree goes — never by run stop or run down. Leave blank to keep the slice."
+	RunJobNamespaceEnvLabel    = "Namespace env"
+	RunJobNamespaceEnvTitle    = "Extra variables for these commands"
+	RunJobNamespaceEnvDesc     = "Optional. KEY=VALUE, space-separated; {worktree} and {ordinal} are filled in."
+
 	RunJobURLHostOrphan = "--%s names the host but nothing is published — add --%s"
 	RunJobURLNoneFmt    = "job %q publishes no url — these do: %s"
+
+	RunJobUnknownScopeFmt      = "--%s %q is neither %s nor %s"
+	RunJobNamespaceEnvFmt      = "--%s %q is not KEY=VALUE"
+	RunJobNamespaceWithdrawFmt = "--%s '' withdraws the [job.namespace] block, so it cannot be combined with --%s, --%s or --%s"
+	RunJobBindsNoPortTaskFmt   = "--%s says nothing about a task, which binds nothing by nature"
 
 	RunJobUnknownKindFmt = "job %q: unknown kind %q (expected service or task)"
 
@@ -1914,7 +1972,7 @@ const (
 	RunJobCmdRequired   = "command is required"
 	RunJobExistsFmt     = "job %q already exists"
 	RunJobNotFoundFmt   = "job %q not found"
-	RunJobNothingToEdit = "edit has nothing to change — pass --%s, --%s, --%s, --%s, --%s, --%s, --%s, --%s, --%s, --%s, --%s or --%s"
+	RunJobNothingToEdit = "edit has nothing to change — pass one of %s"
 	// RunJobReferenced* is the safety refusal of a removal that would drag other
 	// declarations with it. The flag lifts it up front; a run with someone to ask
 	// lifts it by answering, which is the only way `run job list` can remove such

@@ -163,10 +163,7 @@ func editedJob(params EditParams, current domain.JobConfig) (domain.JobConfig, e
 	// would otherwise resolve to the value it was pre-filled with, and the edit
 	// would write the job back unchanged without a word.
 	if !params.Prompter.Interactive() {
-		return domain.JobConfig{}, fmt.Errorf(domain.RunJobNothingToEdit,
-			domain.FlagName, domain.FlagCmd, domain.FlagKind, domain.FlagStop, domain.FlagCwd,
-			domain.FlagPort, domain.FlagPortClear, domain.FlagURLPort, domain.FlagURLHost,
-			domain.FlagRuns, domain.FlagBindsNoPort, domain.FlagTouches)
+		return domain.JobConfig{}, fmt.Errorf(domain.RunJobNothingToEdit, editFlagList())
 	}
 
 	answers, err := params.Prompter.Ask(flow.Session{
@@ -181,6 +178,21 @@ func editedJob(params EditParams, current domain.JobConfig) (domain.JobConfig, e
 		return domain.JobConfig{}, err
 	}
 	return fromAnswers(answers, current)
+}
+
+var editFlags = []string{
+	domain.FlagName, domain.FlagCmd, domain.FlagKind, domain.FlagStop, domain.FlagCwd,
+	domain.FlagPort, domain.FlagPortClear, domain.FlagURLPort, domain.FlagURLHost,
+	domain.FlagRuns, domain.FlagBindsNoPort, domain.FlagTouches, domain.FlagScope,
+	domain.FlagNamespaceName, domain.FlagNamespaceCreate, domain.FlagNamespaceRemove, domain.FlagNamespaceEnv,
+}
+
+func editFlagList() string {
+	named := make([]string, len(editFlags))
+	for i, flag := range editFlags {
+		named[i] = "--" + flag
+	}
+	return strings.Join(named, domain.RunURLListSep)
 }
 
 type RemoveRequest struct {

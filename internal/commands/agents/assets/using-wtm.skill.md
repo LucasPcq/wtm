@@ -329,8 +329,10 @@ flagged; everything else is what the name implies.
   path yourself, use `wtm resolve <branch> --output json` → `{path, branch}`. You rarely
   need to move at all: every `run` command takes the worktree as its first argument.
 
-**Dev jobs (`wtm run`)** — jobs live in a per-clone `run.toml` (wtm-managed; never edit it
-directly). Each is a `service` (long-running) or `task` (one-shot, blocks the profile,
+**Dev jobs (`wtm run`)** — jobs live in a per-clone `run.toml` (wtm-managed: change it
+through `run init`, `run job` and `run profile`, never by hand — every field a job declares
+has a flag on `run job add` / `run job edit`, and a write is refused exactly as loading the
+file would refuse it). Each is a `service` (long-running) or `task` (one-shot, blocks the profile,
 non-zero exit aborts it); profiles are named, ordered job groups. The module is **opt-in**
 and **experimental**: the global `wtm init` does not configure it.
 - `run init` sets up `run.toml` from detection (docker-compose + package scripts). It is
@@ -366,6 +368,13 @@ and **experimental**: the global `wtm init` does not configure it.
   fails the run.
   Configuration values use `{worktree}` / `{ordinal}`; commands use the `$WTM_*` variables.
   A shared job with **no** `[job.namespace]` is valid and means one instance with one set of data.
+  Outside `run init`, declare both with flags on `run job add` or `run job edit`:
+  `--scope shared` (`--scope worktree` puts it back to one per worktree), then
+  `--namespace-name 'app_{worktree}' --namespace-create '<cmd>'` (both required together),
+  optionally `--namespace-remove '<cmd>'` and `--namespace-env KEY=VALUE` (repeatable,
+  replaces the table). On `edit`, `--namespace-name ''` withdraws the whole block and
+  `''` drops any other field. A namespace on a job that is not shared is refused, as the
+  loader refuses it — unsharing one is `--scope worktree --namespace-name ''`.
   When a user finds isolation expensive (an empty database to migrate and seed, a realm to
   rebuild), the answer is a `create` that **clones** the data main uses rather than an empty
   slice — e.g. `CREATE DATABASE "$WTM_NAMESPACE" TEMPLATE app`, guarded by an existence check
@@ -376,8 +385,11 @@ and **experimental**: the global `wtm init` does not configure it.
   "Data tasks" step — one row per task, cycling through the shared and compose services,
   pre-set when the task's name carries a data verb (`reset`, `migrate`, `seed`, `init`, `orm`…)
   and shares a word with exactly one service (`orm:pay:reset` → `postgres-pay`); a task
-  run.toml already gives touches keeps them. Outside the wizard, `run job edit <job> --touches
-  <service>` sets it (repeatable, replaces the list, `''` drops it); nothing sets it unasked. `run up` and `run start`
+  run.toml already gives touches keeps them. Outside the wizard, `run job add <job> --touches
+  <service>` declares it with the job and `run job edit <job> --touches <service>` sets it
+  (repeatable, replaces the list, `''` drops it); a name that is not a declared job is
+  refused. **Whenever you add a job that migrates, resets or seeds data, pass `--touches`**
+  — nothing sets it unasked, and without it the job escapes the check below. `run up` and `run start`
   refuse to start such a job where the data is not the worktree's own — its source's for a
   **verbatim** worktree, everyone's for a shared service with **no** namespace. A task a
   runner starts through its `runs` counts too (`migrate (run by dev)`). On your paths
@@ -725,8 +737,9 @@ and **experimental**: the global `wtm init` does not configure it.
   that follow its ports. With no such flag it opens the form, so **always pass
   at least one flag**; under `--yes` or without a TTY it errors naming the flags it
   could have taken, and a missing job argument errors rather than opening a picker.
-  The form never touches `runs`, `binds_no_port` or `probe` — the first two are
-  flag-only, the third has no flag at all — and all three are kept as they are.
+  `--runs`, `--touches`, `--binds-no-port`, `--scope` and the `--namespace-*` flags patch
+  the same way (a list flag replaces the list, `''` drops it). The form asks every field,
+  pre-filled from the file; only `probe` has neither a flag nor a question, and is kept.
 - `run profile edit <name>` patches the same way: `--name` renames, `--jobs` replaces
   the list (its order is the start order, so give it in full), `--default` /
   `--default=false` hands the default over or takes it away. Same rules as above: a flag
@@ -759,7 +772,7 @@ and **experimental**: the global `wtm init` does not configure it.
   Docker isolation is automatic for everything compose names itself; a `container_name` or a
   volume/network pinned by `name` escapes it — see `run init --patch-compose` above.
 - **A service can say it binds nothing, and which jobs it runs.** Two declarative
-  keys on a `[[job]]`, both editable with `run job edit`:
+  keys on a `[[job]]`, both set by flags on `run job add` and `run job edit`:
   - `binds_no_port = true` (`--binds-no-port`) — this service listens on nothing by
     design: a build in watch mode, a worker, a runner whose children hold the ports.
     Without it wtm reads the silence as an oversight and keeps naming the job under
