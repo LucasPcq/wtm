@@ -18,7 +18,7 @@ import (
 // main worktree, the one every command under test runs from.
 func runningHere(t *testing.T, daemon *fakeDaemon, names ...string) string {
 	t.Helper()
-	main := gitToplevel(t, projectDirOf(os.Getenv("WTM_STATE_DIR")))
+	main := gitToplevel(t, projectDirOf(os.Getenv(domain.EnvStateDir)))
 	jobs := make([]domain.JobInfo, 0, len(names))
 	for _, name := range names {
 		jobs = append(jobs, domain.JobInfo{Name: name, Status: domain.JobStatusRunning, WorkDir: main})

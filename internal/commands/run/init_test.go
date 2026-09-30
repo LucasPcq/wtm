@@ -29,7 +29,7 @@ func TestRunUp_NotInitialized(t *testing.T) {
 // turns a detected docker-compose file into a run.toml job without prompting.
 func TestRunInit_YesAutoGenerates(t *testing.T) {
 	stateDir := setupTestProject(t)
-	projectDir := os.Getenv("WTM_PROJECT_DIR")
+	projectDir := os.Getenv(domain.EnvProjectDir)
 	if err := os.WriteFile(filepath.Join(projectDir, "docker-compose.yml"), []byte("services: {}\n"), 0o644); err != nil {
 		t.Fatalf("write docker-compose: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestRunInit_ReRunMergesAndPreservesProfiles(t *testing.T) {
 		},
 	})
 
-	projectDir := os.Getenv("WTM_PROJECT_DIR")
+	projectDir := os.Getenv(domain.EnvProjectDir)
 	if err := os.WriteFile(filepath.Join(projectDir, "docker-compose.yml"), []byte("services: {}\n"), 0o644); err != nil {
 		t.Fatalf("write docker-compose: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestRunInit_YesNeSupprimeAucunJob(t *testing.T) {
 
 func writeCompose(t *testing.T, name, content string) string {
 	t.Helper()
-	projectDir := os.Getenv("WTM_PROJECT_DIR")
+	projectDir := os.Getenv(domain.EnvProjectDir)
 	if err := os.WriteFile(filepath.Join(projectDir, name), []byte(content), 0o644); err != nil {
 		t.Fatalf("write %s: %v", name, err)
 	}
@@ -399,7 +399,7 @@ func TestRunInit_PatchComposeIsIdempotent(t *testing.T) {
 // writeProjectFile writes a file under the project dir, creating parents.
 func writeProjectFile(t *testing.T, rel, content string) {
 	t.Helper()
-	path := filepath.Join(os.Getenv("WTM_PROJECT_DIR"), rel)
+	path := filepath.Join(os.Getenv(domain.EnvProjectDir), rel)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatalf("mkdir %s: %v", rel, err)
 	}
@@ -528,7 +528,7 @@ func TestRunInit_HandWrittenPortSurvivesDetection(t *testing.T) {
 // and the production server alongside the dev one.
 func TestRunInit_ProducesAStartableConfig(t *testing.T) {
 	stateDir := setupTestProject(t)
-	projectDir := os.Getenv("WTM_PROJECT_DIR")
+	projectDir := os.Getenv(domain.EnvProjectDir)
 
 	writeCompose(t, "docker-compose.yml", "services:\n  db:\n    image: alpine\n    ports:\n      - \"5432:5432\"\n")
 	pkg := `{"name":"demo","scripts":{"dev":"vite","build":"tsc","lint":"eslint .","start":"node dist/i.js"}}`
@@ -581,7 +581,7 @@ func hasProfileJob(profile domain.ProfileConfig, name string) bool {
 // éditer run.toml après coup.
 func TestRunInitPublishesTheServiceItPorts(t *testing.T) {
 	stateDir := setupTestProject(t)
-	projectDir := os.Getenv("WTM_PROJECT_DIR")
+	projectDir := os.Getenv(domain.EnvProjectDir)
 	pkg := `{"name":"app","scripts":{"dev":"vite --port ${PORT}"}}`
 	if err := os.WriteFile(filepath.Join(projectDir, "package.json"), []byte(pkg), 0o644); err != nil {
 		t.Fatalf("write package.json: %v", err)
@@ -652,7 +652,7 @@ func TestRunInit_NoLongerAcceptsNonInteractive(t *testing.T) {
 
 func TestRunInit_YShorthandRunsUnattended(t *testing.T) {
 	stateDir := setupTestProject(t)
-	projectDir := os.Getenv("WTM_PROJECT_DIR")
+	projectDir := os.Getenv(domain.EnvProjectDir)
 	if err := os.WriteFile(filepath.Join(projectDir, "docker-compose.yml"), []byte("services: {}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
