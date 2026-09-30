@@ -82,7 +82,7 @@ type detachedRun struct {
 func (d *detachedRun) open() {
 	out, errOut := d.params.Cmd.OutOrStdout(), d.params.Cmd.ErrOrStderr()
 	output.FrameStart(out)
-	output.Message(out, domain.RunDetachedNotice)
+	output.Message(output.Barred(out), domain.RunDetachedNotice)
 	d.printer = output.NewRunPrinter(output.RunPrinterParams{
 		Out:        out,
 		Err:        errOut,

@@ -53,3 +53,17 @@ func TestPsAnswersWithADocumentForAMachine(t *testing.T) {
 		t.Fatalf("parse JSON: %v\noutput: %s", err, stdout)
 	}
 }
+
+// The listing is machine-wide, so its empty state says nothing about a worktree.
+func TestPsEmptyStateIsNotAboutThisWorktree(t *testing.T) {
+	setupStartProject(t, &fakeDaemon{})
+	fakeTTY(t, false)
+
+	stdout, _, err := runCmd(t, domain.CmdPs)
+	if err != nil {
+		t.Fatalf("run ps: %v", err)
+	}
+	if !strings.Contains(stdout, domain.RunNoJobsRunning) || strings.Contains(stdout, domain.RunNoJobsHere) {
+		t.Errorf("stdout = %q, want %q", stdout, domain.RunNoJobsRunning)
+	}
+}
