@@ -2438,6 +2438,9 @@ const (
 	RunViewAbortRunningFmt    = "left running: %s"
 	RunViewAbortNotStartedFmt = "not started: %s"
 	RunViewAbortDismiss       = "esc dismisses this report"
+	// RunViewWarningsTitle heads what the run could not do beside a job that
+	// did start — the stream's `!` lines.
+	RunViewWarningsTitle = "Needs attention"
 
 	// RunViewRecapTitle heads the recap printed once the screen is given back,
 	// and RunViewRecap*Fmt are its lines: what is running, what ran, what did
@@ -3708,11 +3711,12 @@ const (
 	RunDetachedNamespaceFmt       = "%s: %s ready"
 	RunDetachedAlreadyFmt         = "%s was already up"
 	RunDetachedAlreadyAttachedFmt = "%s was already attached"
-	// RunDetached{Crashed,Probe*,Left*,Concluded,Aborted}* are the rest of what the
+	// RunDetached{Crashed,Probe*,Warning,Left*,Concluded,Aborted}* are the rest of what the
 	// CLI says about a run, in the panel's register: a line each, the glyph
 	// leading, detail indented under the line it belongs to.
 	RunDetachedCrashedFmt    = GlyphAttention + " " + RunStreamCrashedFmt
 	RunDetachedProbeTitle    = GlyphAttention + " " + PortProbeTitle
+	RunDetachedWarningFmt    = GlyphAttention + " %s"
 	RunDetachedDetailFmt     = "  %s"
 	RunDetachedLeftRunning   = "  left running: %s"
 	RunDetachedNotStarted    = "  not started: %s"

@@ -45,6 +45,8 @@ type sequence struct {
 	// notices are the facts the run reported about itself rather than about one
 	// of its jobs — a proxy that could not bind, so far.
 	notices []string
+	// warnings are what the run could not do beside a job that did start.
+	warnings []string
 	// reasons are what the daemon answered for the job that ended each worktree's
 	// sequence, keyed by worktree: N of them abort independently, and one
 	// reason for the lot would name the last failure for every one.
@@ -173,6 +175,8 @@ func (m Model) applyEvent(msg eventMsg) (Model, tea.Cmd) {
 		m.sequence.reasons[event.WorkDir] = event.Reason
 	case runlogs.PhaseNotice:
 		m.sequence.notices = append(m.sequence.notices, event.Notice)
+	case runlogs.PhaseWarning:
+		m.sequence.warnings = append(m.sequence.warnings, event.Notice)
 	case runlogs.PhaseAborted, runlogs.PhaseReady:
 		// One worktree ending says nothing about the others: the sequence is over
 		// when every one of them has reported.
@@ -294,9 +298,17 @@ func (m Model) devOriginsReport() []string {
 // has to say about itself once no job has anything more urgent.
 func (m Model) noticeReport() []string {
 	if len(m.sequence.notices) == 0 {
-		return m.addressingReport()
+		return m.warningReport()
 	}
 	lines := append([]string{domain.ProxyUnavailableTitle}, m.sequence.notices...)
+	return append(lines, domain.RunViewAbortDismiss)
+}
+
+func (m Model) warningReport() []string {
+	if len(m.sequence.warnings) == 0 {
+		return m.addressingReport()
+	}
+	lines := append([]string{domain.RunViewWarningsTitle}, m.sequence.warnings...)
 	return append(lines, domain.RunViewAbortDismiss)
 }
 
