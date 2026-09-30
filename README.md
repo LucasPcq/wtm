@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Create a worktree, jump into it, start its stack" src="docs/assets/hero.gif" width="800">
+  <img alt="wtm create walks through its wizard, wtm go jumps in, wtm run up opens the run view" src="docs/assets/hero.gif" width="800">
 </p>
 
 ## Why wtm
@@ -81,7 +81,7 @@ To run your dev stack per worktree, `wtm run init` detects your `docker-compose`
 Each worktree gets its own ports (`3000` on the main checkout, `3010` on the next, …), its own `COMPOSE_PROJECT_NAME`, and its own address: `http://web.feat-login.acme.localhost:11080` (on port 80 once `wtm run proxy install` redirects it, on macOS). Run as many branches as you like at the same time; a shared postgres can hold one database per worktree.
 
 <p align="center">
-  <img alt="Two worktrees running side by side, each on its own named URLs" src="docs/assets/isolation.gif" width="800">
+  <img alt="wtm run up on two worktrees at once: each runs its own api and web on its own named URLs" src="docs/assets/isolation.gif" width="800">
 </p>
 
 ### A dashboard for all of it
@@ -89,7 +89,7 @@ Each worktree gets its own ports (`3000` on the main checkout, `3010` on the nex
 `wtm ui` shows every worktree, the branch tree, PR status and the running services, and lets you create, clean and start things from one screen.
 
 <p align="center">
-  <img alt="The wtm ui dashboard" src="docs/assets/dashboard.gif" width="800">
+  <img alt="The wtm ui dashboard: worktrees, a new one created from the dashboard, the branch tree" src="docs/assets/dashboard.gif" width="800">
 </p>
 
 ### Stacked branches

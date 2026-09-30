@@ -22,11 +22,36 @@ git config user.email demo@acme.dev
 git config user.name "Acme Dev"
 
 mkdir -p apps/web apps/api
+mkdir -p scripts
+cat > scripts/dev.py <<'PY'
+#!/usr/bin/env python3
+# A stand-in dev server: it listens on $PORT and talks like one.
+import http.server, itertools, os, sys, threading, time
+
+name, port = sys.argv[1], int(os.environ["PORT"])
+lines = {
+    "web": ["hmr update /src/App.tsx", "GET / 200 in 12ms", "hmr update /src/Login.tsx", "GET /assets/app.js 200 in 4ms"],
+    "api": ["GET /health 200 2ms", "POST /session 201 18ms", "GET /users/me 200 6ms", "GET /health 200 1ms"],
+}[name]
+
+class Quiet(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+server = http.server.ThreadingHTTPServer(("", port), Quiet)
+threading.Thread(target=server.serve_forever, daemon=True).start()
+print(f"  {name} v1.4.2  ready in 312 ms", flush=True)
+print(f"  ➜  Local:   http://localhost:{port}/", flush=True)
+print("", flush=True)
+for line in itertools.cycle(lines):
+    time.sleep(1.3)
+    print(time.strftime("%H:%M:%S ") + line, flush=True)
+PY
 cat > apps/web/package.json <<'JSON'
-{ "name": "web", "scripts": { "dev": "python3 -m http.server $PORT" } }
+{ "name": "web", "scripts": { "dev": "python3 ../../scripts/dev.py web" } }
 JSON
 cat > apps/api/package.json <<'JSON'
-{ "name": "api", "scripts": { "dev": "python3 -m http.server $PORT" } }
+{ "name": "api", "scripts": { "dev": "python3 ../../scripts/dev.py api" } }
 JSON
 printf 'PORT=5173\nAPI_URL=http://localhost:8787\n' > apps/web/.env.example
 printf 'PORT=8787\n' > apps/api/.env.example
@@ -42,12 +67,10 @@ global=$(dirname "$(find "$HOME" -name config.toml -path '*wtm*' | head -1)")/co
 printf '\n[proxy]\nport = 11790\n' >> "$global"
 
 cat > .git/wtm/run.toml <<'TOML'
-addressing = "ports"
-
 [[job]]
   name = "web"
   kind = "service"
-  cmd = "python3 -m http.server $PORT"
+  cmd = "python3 ../../scripts/dev.py web"
   cwd = "apps/web"
   [job.ports]
     PORT = 5173
@@ -57,7 +80,7 @@ addressing = "ports"
 [[job]]
   name = "api"
   kind = "service"
-  cmd = "python3 -m http.server $PORT"
+  cmd = "python3 ../../scripts/dev.py api"
   cwd = "apps/api"
   [job.ports]
     PORT = 8787
