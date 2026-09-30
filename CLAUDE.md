@@ -146,6 +146,9 @@ internal/
       stop/ logs/ open/ url/
       list/                   ←     `run list`: which entry was picked and what to do to it
       job/ profile/           ←     CRUD on run.toml's declarations, one package per group
+      initrun/                ←     `run init`: detect, ask (the services wizard is its own
+                                    `Wizard` seam, not a flow.Session), write run.toml,
+                                    compose and .env files
   service/                    ← impure orchestration only (git exec, I/O, hooks):
     worktree/                 ←   git worktree operations (create, list, remove)
     env/                      ←   .env provisioning (create) + drift reconciliation (`wtm env`, sync.go)
@@ -204,7 +207,7 @@ Steps are declared as `flow.Step` values (`Kind`, `Key`, `Label`, `Options`, `Sk
 
 **`flow.Operation`** (`Kind`, `Mode`, `TargetKey`) is what a flow declares about *how it is scheduled*, for a surface that runs several at once. `Mode` says how long it holds that surface — `ModeBlocking` (`clean`) keeps it until the run ends, `ModeBackground` (`create`) gives it back and locks its target instead — and `TargetKey` names the answer carrying the worktree it locks, known only once that step is answered. The CLI ignores it (one run, one terminal); `internal/tui/dashboard/ops.go` is where it is enforced, once, rather than at every action site.
 
-Adding a kind means teaching every surface to render it: `flowui` refuses an unknown kind rather than guessing. Test doubles for the two seams live in `internal/testutil/flowtest`. `create`, `clean`, `reparent`, `prune`, `sync` and the whole `run` module are migrated — `up`, `down`, `start`, `stop`, `logs`, `list`, `open`, `url` and the eight `run job` / `run profile` commands (`ps` asks nothing, so it is not a flow). **Four mutation commands are still out: `extract` (LUC-182), `checkout`, `relocate` and `env`**, each driving its service straight from its runner. They are listed in `.archlint-migrating`, which reports them on every `make lint` and may only shrink — `tui/newwt` stays until `extract` follows.
+Adding a kind means teaching every surface to render it: `flowui` refuses an unknown kind rather than guessing. Test doubles for the two seams live in `internal/testutil/flowtest`. `create`, `clean`, `reparent`, `prune`, `sync` and the whole `run` module are migrated — `up`, `down`, `start`, `stop`, `logs`, `list`, `open`, `url`, `init` and the eight `run job` / `run profile` commands (`ps` asks nothing, so it is not a flow). **Four mutation commands are still out: `extract` (LUC-182), `checkout`, `relocate` and `env`**, each driving its service straight from its runner. They are listed in `.archlint-migrating`, which reports them on every `make lint` and may only shrink — `tui/newwt` stays until `extract` follows.
 
 A **non-mutating mode** (`prune --dry-run`) belongs in the `Request`, not in the runner: it changes what the run does, not how it reads. The flow returns its `Outcome` before asking anything and before touching anything, and any rule that reads `Interactive()` must take the mode as an input too — a surface may install an interactive Prompter for a preview. See `rules.PruneClassifyForce` and `docs/dev/flow-layer.md`.
 

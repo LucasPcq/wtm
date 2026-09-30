@@ -558,8 +558,10 @@ func declaresCommand(file *ast.File) bool {
 // for one directly has put its flow in the runner: what it does can then only
 // be replayed by a cobra command, which is what internal/flow exists to undo.
 var mutations = map[string][]string{
-	"worktree": {"Create", "Clean", "ForceClean", "Sync", "Relocate", "Extract", "Reparent", "Remove", "Move"},
-	"envsvc":   {"ApplyEnvSync", "ApplyEnvPorts"},
+	"worktree":  {"Create", "Clean", "ForceClean", "Sync", "Relocate", "Extract", "Reparent", "Remove", "Move"},
+	"envsvc":    {"ApplyEnvSync", "ApplyEnvPorts", "WritePortKeys", "AddEnvTargets"},
+	"compose":   {"PatchAll"},
+	"runconfig": {"Save"},
 }
 
 // checkMutation enforces "every worktree-mutating command goes through flow/".

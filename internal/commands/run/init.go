@@ -1,26 +1,18 @@
 package run
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
-	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/run/initrun"
 	"github.com/LucasPcq/wtm/internal/output"
-	"github.com/LucasPcq/wtm/internal/rules"
-	"github.com/LucasPcq/wtm/internal/service/compose"
-	"github.com/LucasPcq/wtm/internal/service/detect"
-	envsvc "github.com/LucasPcq/wtm/internal/service/env"
-	"github.com/LucasPcq/wtm/internal/service/proxy"
-	"github.com/LucasPcq/wtm/internal/service/runconfig"
 	"github.com/LucasPcq/wtm/internal/tui/components"
 	initwizard "github.com/LucasPcq/wtm/internal/tui/inittui"
 )
@@ -97,100 +89,57 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 	writePortKeys, _ := cmd.Flags().GetBool(domain.FlagWritePortKeys)
 	interactive := shared.Interactive(shared.UnattendedParams{TTY: term.IsTerminal(int(os.Stdin.Fd())), Format: format, Yes: yes})
 
-	var detection domain.InitDetectionResult
-	var envScans map[string]domain.EnvPortScan
-	_ = components.RunLoading(components.LoadingParams{
-		Message: "Detecting services…",
-		Animate: shared.Animate(cmd, interactive),
-		Work: func() error {
-			detection = detect.ProjectEnvironment(res.ProjectDir)
-			detection.ComposeScans = compose.ScanAll(compose.ScanAllParams{
-				ProjectDir: res.ProjectDir,
-				Files:      detection.DockerComposeFiles,
-				Project:    filepath.Base(res.ProjectDir),
-			})
-			envScans = detect.ScanEnvPorts(detect.ScanEnvPortsParams{
-				ProjectDir: res.ProjectDir,
-				Files:      detection.EnvFiles,
-			})
-			return nil
-		},
+	_, err = initrun.Run(initrun.Params{
+		Context:   shared.FlowContext(res),
+		Request:   initrun.Request{PatchCompose: patchCompose, LinkEnv: linkEnv, WritePortKeys: writePortKeys},
+		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive}),
+		Wizard:    servicesWizard{},
+		Presenter: initPresenter{CLIPresenter: shared.NewPresenter(cmd, format), animate: shared.Animate(cmd, interactive)},
 	})
+	return err
+}
 
-	existing, err := runconfig.Load(res.StateDir)
-	if err != nil {
-		return fmt.Errorf("load run.toml: %w", err)
+type servicesWizard struct{}
+
+func (servicesWizard) AskServices(question initrun.Question) (domain.InitProjectAnswers, error) {
+	var prefill *initwizard.SectionPrefill
+	if question.Prefill != nil {
+		prefill = &initwizard.SectionPrefill{
+			DockerFiles:   question.Prefill.DockerFiles,
+			ScriptIndices: question.Prefill.ScriptIndices,
+		}
 	}
+	return initwizard.RunServicesWizard(initwizard.ServicesWizardParams{
+		ProjectDir:   question.ProjectDir,
+		Detection:    question.Detection,
+		Existing:     question.Existing,
+		Prefill:      prefill,
+		PatchCompose: question.PatchCompose,
+		EnvScans:     question.EnvScans,
+		EnvLines:     question.EnvLines,
+		EnvFiles:     question.EnvFiles,
+	})
+}
 
-	answers, err := resolveServicesAnswers(resolveServicesParams{
-		Interactive:  interactive,
-		ProjectDir:   res.ProjectDir,
-		Detection:    detection,
-		Existing:     existing,
-		PatchCompose: patchCompose,
-		EnvScans:     envScans,
-		EnvLines: detect.EnvLines(detect.EnvPortCandidatesParams{
-			ProjectDir: res.ProjectDir,
-			Files:      res.Config.Project.Env.Files,
-		}),
-		EnvFiles: res.Config.Project.Env.Files,
-	})
-	if errors.Is(err, domain.ErrUserAborted) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
+// initPresenter animates detection only where a wizard follows: `--yes` on a
+// terminal has always run its detection without a spinner.
+type initPresenter struct {
+	shared.CLIPresenter
+	animate bool
+}
 
-	// A run that never put the scope question leaves what run.toml declares
-	// standing: the pair (value, asked) again — emptied-and-asked withdraws,
-	// not-asked keeps. Scans travel with the answers because naming the services
-	// that stay in a file's job needs them.
-	answers.Scans = detection.ComposeScans
-	if !answers.ScopesAsked {
-		answers.SharedServices = rules.SharedFromConfig(rules.SharedFromConfigParams{
-			Existing: existing,
-			Scans:    detection.ComposeScans,
-			Files:    answers.DockerComposeFiles,
-		})
-	}
+func (p initPresenter) Stage(params flow.StageParams) error {
+	return components.RunLoading(components.LoadingParams{
+		Message: params.Message,
+		Animate: p.animate,
+		Work:    params.Work,
+	})
+}
 
-	plan := rules.PlanComposePorts(rules.PlanComposePortsParams{
-		Scans: detection.ComposeScans,
-		Files: answers.DockerComposeFiles,
-		Patch: answers.PatchCompose,
-	})
-	namePlan := rules.PlanComposeNames(rules.PlanComposeNamesParams{
-		Scans: detection.ComposeScans,
-		Files: answers.DockerComposeFiles,
-		Patch: answers.PatchCompose,
-	})
-	unverifiable := compose.VerifyAll(compose.VerifyAllParams{
-		ProjectDir:  res.ProjectDir,
-		ByFile:      plan.Patches,
-		NamesByFile: namePlan.Patches,
-	})
-	namePatches := rules.ComposeNamesWithoutFiles(namePlan.Patches, rules.SortedComposeFiles(unverifiable))
-	outcome := rules.ResolveDetectedPorts(rules.ResolveDetectedPortsParams{
-		Answers:        answers,
-		PackageManager: detection.PackageManager,
-		Existing:       existing,
-		Deselected: rules.DeselectedJobs(rules.DeselectedJobsParams{
-			Existing:             existing,
-			PackageManager:       detection.PackageManager,
-			DetectedScripts:      detection.PackageScripts,
-			SelectedScripts:      answers.SelectedPackageScripts,
-			DetectedComposeFiles: detection.DockerComposeFiles,
-			SelectedComposeFiles: answers.DockerComposeFiles,
-			Asked:                answers.SelectionAsked,
-		}),
-		Plan:          plan,
-		Unverifiable:  unverifiable,
-		EnvScansByDir: envScans,
-	})
-
-	if !rules.IsRunInitialized(outcome.Config) {
-		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+func (p initPresenter) Initialized(outcome initrun.Outcome) error {
+	w := p.Cmd.OutOrStdout()
+	if outcome.NothingDetected {
+		output.Frame(w, func(w io.Writer) {
 			output.Unchanged(w, domain.RunInitNothingDetected)
 			output.Blank(w)
 			output.NextStep(w, output.NextStepParams{Command: domain.RunInitByHandJob, Note: domain.RunInitByHandJobNote})
@@ -199,296 +148,58 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	// The wizard's two composition steps outrank detection. A step that never
-	// ran leaves the proposal standing — a profile is what makes `run up` start
-	// something rather than everything — but one that ran and was emptied is an
-	// answer, and reinstating it would undo the user's own gesture.
-	if !answers.ProfilesAsked && len(answers.Profiles) == 0 {
-		answers.Profiles = rules.ProposeProfiles(rules.ProposeProfilesParams{
-			Config:   outcome.Config,
-			Existing: existing.Profiles,
-		})
-	}
-	outcome.Config = rules.ApplyInitAnswers(rules.ApplyInitAnswersParams{
-		Config:          outcome.Config,
-		Runners:         answers.Runners,
-		Addressing:      answers.Addressing,
-		AddressingAsked: answers.AddressingAsked,
-		Ports:           answers.Ports,
-		Profiles:        answers.Profiles,
-		ProfilesAsked:   answers.ProfilesAsked,
-		Cmds:            answers.Cmds,
-		URLs:            answers.URLs,
-		URLsAsked:       answers.URLsAsked,
-		NewJobs:         outcome.Merge.Added,
-	})
-
-	if answers.TouchesAsked {
-		outcome.Config = rules.ApplyTouchChoices(rules.ApplyTouchChoicesParams{Config: outcome.Config, Choices: answers.Touches})
-	}
-
-	// After the profiles are settled: the step re-proposes them from the config
-	// on disk, so a lifted job inserted any earlier is discarded — and a profile
-	// that no longer starts the database leaves every worktree addressing one
-	// that was never created.
-	outcome.Config = rules.JoinSharedProfiles(rules.JoinSharedProfilesParams{
-		Config: outcome.Config,
-		Shared: answers.SharedServices,
-	})
-
-	links := resolveEnvPortLinks(resolveEnvPortLinksParams{
-		// The wizard already put the question as a step; asking again outside it
-		// is the orphaned prompt this flow used to end on.
-		Interactive: interactive && !answers.EnvLinksAsked,
-		LinkEnv:     linkEnv || (answers.EnvLinksAsked && answers.LinkEnv),
-		Declined:    answers.EnvLinksAsked && !answers.LinkEnv,
-		ProjectDir:  res.ProjectDir,
-		EnvFiles:    res.Config.Project.Env.Files,
-		Config:      outcome.Config,
-	})
-	outcome.Config.EnvPorts = append(outcome.Config.EnvPorts, links...)
-
-	// Writing a committed template is never inferred, exactly as the compose
-	// patching is not: it takes the flag, or the wizard's route answer.
-	var portKeys []domain.PortKeyWrite
-	if writePortKeys || answers.PortRoutesAsked {
-		portKeys = rules.PortKeyWrites(rules.PortKeyWritesParams{
-			Config:     outcome.Config,
-			Ports:      rules.PortRouteEnvPorts(answers),
-			ScansByDir: envScans,
-			EnvFiles:   res.Config.Project.Env.Files,
-		})
-	}
-	writtenKeys, err := envsvc.WritePortKeys(envsvc.WritePortKeysParams{ProjectDir: res.ProjectDir, Writes: portKeys})
-	if err != nil {
-		return err
-	}
-	outcome.Config.EnvPorts = append(outcome.Config.EnvPorts, rules.PortKeyLinks(rules.PortKeyLinksParams{
-		Writes:   portKeys,
-		Existing: outcome.Config.EnvPorts,
-	})...)
-
-	// Last, once both tables are complete: a key an [[env]] link writes in full
-	// has no port link, and the two are refused together at load — so a run that
-	// only added the value link would write a config wtm then refuses to read.
-	outcome.Config = rules.PruneEnvPortClashes(outcome.Config)
-
-	// The rewrites come first: a compose templatized without run.toml behind it
-	// keeps binding its defaults, while a run.toml declaring ports the compose
-	// does not read would announce an isolation that is not there.
-	if err := compose.PatchAll(compose.PatchAllParams{
-		ProjectDir:  res.ProjectDir,
-		ByFile:      outcome.Patches,
-		NamesByFile: namePatches,
-	}); err != nil {
-		return err
-	}
-	if err := runconfig.Save(runconfig.SaveParams{StateDir: res.StateDir, Config: outcome.Config}); err != nil {
-		return err
-	}
-
-	// Last of the writes: a provisioning target with no link behind it would
-	// have wtm copying a file nothing in run.toml speaks about.
-	addedTargets := rules.PortKeyTargets(rules.PortKeyTargetsParams{
-		Writes:   portKeys,
-		Existing: res.Config.Project.Env.Files,
-	})
-	if len(addedTargets) > 0 {
-		project := res.Config.Project
-		project.Env.Files = append(project.Env.Files, addedTargets...)
-		if err := config.WriteProjectConfig(config.WriteProjectConfigParams{StateDir: res.StateDir, Config: project}); err != nil {
-			return fmt.Errorf("add env targets: %w", err)
-		}
-	}
-	reportedKeys := rules.PortKeysReported(rules.PortKeysReportedParams{
-		Applied: writtenKeys,
-		Writes:  portKeys,
-		Targets: addedTargets,
-	})
-
-	// Re-read after the writes: the two reports below say what is still missing,
-	// and the scan they were computed from predates the keys this run just wrote.
-	envScans = detect.ScanEnvPorts(detect.ScanEnvPortsParams{
-		ProjectDir: res.ProjectDir,
-		Files:      detection.EnvFiles,
-	})
-
-	runPath := filepath.Join(res.StateDir, domain.RunFileName)
-	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+	report := outcome.Report
+	output.Frame(w, func(w io.Writer) {
 		// The jobs are counted, not named: the reader ticked them one by one in the
 		// wizard, and run.toml is where they live now.
-		output.Success(w, fmt.Sprintf(domain.RunInitConfiguredFmt, runPath, output.Tally(
-			output.TallyPart{Count: len(outcome.Merge.Added), Label: domain.TallyAdded},
-			output.TallyPart{Count: len(outcome.Removed), Label: domain.TallyRemoved},
-			output.TallyPart{Count: len(outcome.Merge.Skipped), Label: domain.TallyKept},
+		output.Success(w, fmt.Sprintf(domain.RunInitConfiguredFmt, report.RunPath, output.Tally(
+			output.TallyPart{Count: report.Added, Label: domain.TallyAdded},
+			output.TallyPart{Count: report.Removed, Label: domain.TallyRemoved},
+			output.TallyPart{Count: report.Kept, Label: domain.TallyKept},
 		)))
+		detected := report.Detected
 		output.DetectedPortsReport(w, output.DetectedPortsReportParams{
-			Patched:       outcome.Patches,
-			Written:       outcome.Written,
-			Withheld:      outcome.Withheld,
-			JobsByFile:    composeJobsByFile(outcome.Config, answers.DockerComposeFiles),
-			Dropped:       outcome.Dropped,
-			Unreadable:    outcome.Unreadable,
-			Changed:       outcome.Changed,
-			Orphaned:      outcome.Orphaned,
-			EnvWritten:    outcome.EnvWritten,
-			EnvSources:    outcome.EnvSources,
-			EnvUnreadable: outcome.EnvUnreadable,
+			Patched:       detected.Patches,
+			Written:       detected.Written,
+			Withheld:      detected.Withheld,
+			JobsByFile:    report.JobsByFile,
+			Dropped:       detected.Dropped,
+			Unreadable:    detected.Unreadable,
+			Changed:       detected.Changed,
+			Orphaned:      detected.Orphaned,
+			EnvWritten:    detected.EnvWritten,
+			EnvSources:    detected.EnvSources,
+			EnvUnreadable: detected.EnvUnreadable,
 		})
-		if lines := rules.ComposeSharingLines(rules.ComposeSharingLinesParams{
-			Renamed:  outcome.Renamed,
-			Unlinked: outcome.Unlinked,
-		}); len(lines) > 0 {
+		if len(report.SharingLines) > 0 {
 			output.Blank(w)
-			output.Callout(w, domain.ComposeSharingTitle, lines)
+			output.Callout(w, domain.ComposeSharingTitle, report.SharingLines)
 		}
 		output.ComposeNamesReport(w, output.ComposeNamesReportParams{
-			Patched:  namePatches,
-			Withheld: namePlan.Withheld,
+			Patched:  report.NamePatches,
+			Withheld: report.NamesWithheld,
 		})
-		output.EnvPortLinksReport(w, links, rules.EnvPortBases(outcome.Config))
-		output.PortKeysReport(w, reportedKeys)
+		output.EnvPortLinksReport(w, report.Links, report.LinkBases)
+		output.PortKeysReport(w, report.PortKeys)
 		// Last, and alone in a frame: everything above is what the run did, this
 		// is what it could not do without the reader.
-		composeJobs := rules.ComposeJobsFor(rules.ComposeJobsParams{Config: outcome.Config, Files: answers.DockerComposeFiles})
 		output.PortIsolationReport(w, output.PortIsolationReportParams{
-			Unported: rules.ServicesWithoutPorts(outcome.Config),
-			Ignoring: rules.JobsMissingPortRef(rules.JobsMissingPortRefParams{
-				Config: outcome.Config,
-				Exempt: append(composeJobs,
-					rules.JobsReadingTheirEnv(rules.JobsReadingTheirEnvParams{Config: outcome.Config, ScansByDir: envScans})...),
-			}),
+			Unported: report.Unported,
+			Ignoring: report.Ignoring,
 		})
-		output.PortCommandOnlyReport(w, rules.JobsIsolatedByCommand(rules.JobsIsolatedByCommandParams{
-			Config:     outcome.Config,
-			Exempt:     composeJobs,
-			ScansByDir: envScans,
-		}))
-		proxyPort := rules.ProxyPort(res.Config.Global)
-		if lines := rules.ProxyPortCollisionLines(rules.ProxyPortCollisions(rules.ProxyPortCollisionsParams{
-			Config:    outcome.Config,
-			ProxyPort: proxyPort,
-		}), proxyPort); len(lines) > 0 {
-			output.Callout(w, domain.ProxyPortCollisionTitle, lines)
+		output.PortCommandOnlyReport(w, report.CommandOnly)
+		if len(report.ProxyCollisionLines) > 0 {
+			output.Callout(w, domain.ProxyPortCollisionTitle, report.ProxyCollisionLines)
 		}
-		if lines := rules.ProxyInstallHintLines(rules.ProxyInstallHintParams{
-			Config:     outcome.Config,
-			Status:     proxy.NewRedirector(proxy.RedirectorParams{}).Inspect(),
-			ExampleURL: fmt.Sprintf(domain.ProxyURLFmt, domain.ProxyHostShape, proxyPort),
-		}); len(lines) > 0 {
-			output.Callout(w, domain.ProxyInstallHintTitle, lines)
+		if len(report.ProxyInstallLines) > 0 {
+			output.Callout(w, domain.ProxyInstallHintTitle, report.ProxyInstallLines)
 		}
-		// The main checkout is the one no command ever provisions, so it is the
-		// one the addressing just chosen leaves behind.
-		noticeAddressingDrift(w, res, res.ProjectDir)
+		if drift := report.AddressingDrift; drift != nil {
+			output.Callout(w, drift.Text, drift.Lines)
+		}
 		output.Blank(w)
 		output.NextStep(w, output.NextStepParams{Command: domain.RunInitNextUp, Note: domain.RunInitNextUpNote})
 		output.NextStep(w, output.NextStepParams{Command: domain.RunInitNextJobAdd, Note: domain.RunInitNextJobAddNote})
 	})
 	return nil
-}
-
-type resolveServicesParams struct {
-	Interactive  bool
-	ProjectDir   string
-	Detection    domain.InitDetectionResult
-	Existing     domain.RunConfig
-	PatchCompose bool
-	EnvScans     map[string]domain.EnvPortScan
-	EnvLines     map[string][]domain.EnvLine
-	EnvFiles     []domain.EnvFile
-}
-
-// resolveServicesAnswers gathers the services selection either from the wizard
-// (interactive) or straight from detection (unattended). On a re-run the
-// wizard is pre-filled with what run.toml already declares so the subsequent
-// merge is additive rather than a fresh overwrite.
-func resolveServicesAnswers(params resolveServicesParams) (domain.InitProjectAnswers, error) {
-	if !params.Interactive {
-		return rules.AutoServicesAnswers(rules.AutoServicesAnswersParams{
-			Detection:    params.Detection,
-			PatchCompose: params.PatchCompose,
-		}), nil
-	}
-
-	var prefill *initwizard.SectionPrefill
-	if rules.IsRunInitialized(params.Existing) {
-		prefill = &initwizard.SectionPrefill{
-			DockerFiles:   rules.DockerFilesConfigured(params.Existing, params.Detection.DockerComposeFiles),
-			ScriptIndices: rules.ScriptsConfigured(params.Existing, params.Detection.PackageScripts, params.Detection.PackageManager),
-		}
-	}
-
-	return initwizard.RunServicesWizard(initwizard.ServicesWizardParams{
-		ProjectDir:   params.ProjectDir,
-		Detection:    params.Detection,
-		Existing:     params.Existing,
-		Prefill:      prefill,
-		PatchCompose: params.PatchCompose,
-		EnvScans:     params.EnvScans,
-		EnvLines:     params.EnvLines,
-		EnvFiles:     params.EnvFiles,
-	})
-}
-
-// composeJobsByFile turns a withheld port's fix into a command to paste rather
-// than a placeholder.
-func composeJobsByFile(cfg domain.RunConfig, files []string) map[string]string {
-	jobs := make(map[string]string, len(files))
-	for _, file := range files {
-		if job := rules.ComposeJobName(rules.ComposeJobNameParams{Config: cfg, File: file}); job != "" {
-			jobs[file] = job
-		}
-	}
-	return jobs
-}
-
-type resolveEnvPortLinksParams struct {
-	Interactive bool
-	// LinkEnv is --link-env already given on the command line, or the wizard's
-	// own answer: the links are authorized, so nothing is asked.
-	LinkEnv bool
-	// Declined is the wizard's refusal, which outranks everything: the question
-	// was put and answered no.
-	Declined   bool
-	ProjectDir string
-	EnvFiles   []domain.EnvFile
-	Config     domain.RunConfig
-}
-
-// resolveEnvPortLinks offers the .env keys whose value holds one of the ports
-// this run just settled. Nothing is inferred: a link is written from --link-env
-// or from an explicit confirmation, never because the detection found a match.
-func resolveEnvPortLinks(params resolveEnvPortLinksParams) []domain.EnvPortLink {
-	candidates := detect.EnvPortCandidates(detect.EnvPortCandidatesParams{
-		ProjectDir: params.ProjectDir,
-		Files:      params.EnvFiles,
-		Bases:      rules.EnvPortBases(params.Config),
-		Existing:   params.Config.EnvPorts,
-		JobsByDir:  rules.JobsByCwd(params.Config),
-	})
-	if len(candidates) == 0 || params.Declined {
-		return nil
-	}
-	if params.LinkEnv {
-		return candidates
-	}
-	if !params.Interactive {
-		return nil
-	}
-
-	// The candidates go in the prompt's own description rather than a block
-	// printed before it: the prompt renders on stderr inside its own frame, and a
-	// command frames its stdout exactly once.
-	confirmed, err := components.RunStandaloneConfirm(components.NewConfirm(components.NewConfirmParams{
-		Title: domain.EnvPortLinkConfirm,
-		Description: strings.Join(append(
-			[]string{domain.EnvPortLinkDescription, ""},
-			rules.EnvPortLinkLines(candidates, rules.EnvPortBases(params.Config))...), "\n"),
-		DefaultYes: true,
-	}))
-	if err != nil || !confirmed {
-		return nil
-	}
-	return candidates
 }
