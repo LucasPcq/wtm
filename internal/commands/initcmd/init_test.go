@@ -98,3 +98,27 @@ func TestInitOnlyWithYesRegeneratesTheSectionWithoutPrompting(t *testing.T) {
 		t.Errorf("env strategy = %q, want %q", cfg.Env.Strategy, domain.EnvStrategyMain)
 	}
 }
+
+// The hints a second init prints share one column for their notes.
+func TestInitOnAnInitialisedProjectAlignsItsNextSteps(t *testing.T) {
+	freshProject(t)
+	if out, err := runInitCmd(t, "--"+domain.FlagYes); err != nil {
+		t.Fatalf("first init: %v\n%s", err, out)
+	}
+
+	out, err := runInitCmd(t, "--"+domain.FlagYes)
+	if err != nil {
+		t.Fatalf("second init: %v\n%s", err, out)
+	}
+	columns := map[int]bool{}
+	for _, note := range []string{domain.InitReconfigureNote, domain.InitEditNote, domain.InitRunInitNote} {
+		for _, line := range strings.Split(out, "\n") {
+			if i := strings.Index(line, note); i >= 0 {
+				columns[i] = true
+			}
+		}
+	}
+	if len(columns) != 1 {
+		t.Errorf("notes start on %d different columns:\n%s", len(columns), out)
+	}
+}

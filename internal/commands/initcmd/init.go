@@ -102,9 +102,11 @@ func runInit(cmd *cobra.Command, _ []string) error {
 		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
 			output.Unchanged(w, fmt.Sprintf(domain.InitAlreadyExistsFmt, filepath.Join(stateDir, domain.ConfigFileName)))
 			output.Blank(w)
-			output.NextStep(w, output.NextStepParams{Command: domain.InitReconfigureCmd, Note: domain.InitReconfigureNote})
-			output.NextStep(w, output.NextStepParams{Command: domain.InitEditCmd, Note: domain.InitEditNote})
-			output.NextStep(w, output.NextStepParams{Command: domain.InitRunInitCmd, Note: domain.InitRunInitNote})
+			output.NextSteps(w, []output.NextStepParams{
+				{Command: domain.InitReconfigureCmd, Note: domain.InitReconfigureNote},
+				{Command: domain.InitEditCmd, Note: domain.InitEditNote},
+				{Command: domain.InitRunInitCmd, Note: domain.InitRunInitNote},
+			})
 		})
 		return nil
 	}

@@ -79,9 +79,10 @@ func ProxyPlanReport(w io.Writer, params ProxyPlanReportParams) {
 		Blank(w)
 	}
 	if params.Reversible {
-		NextStep(w, NextStepParams{Command: domain.ProxyInstallRecapReverse, Note: domain.ProxyInstallRecapReverseNote})
+		steps := []NextStepParams{{Command: domain.ProxyInstallRecapReverse, Note: domain.ProxyInstallRecapReverseNote}}
 		if !params.Full {
-			NextStep(w, NextStepParams{Command: domain.ProxyInstallRecapFull, Note: domain.ProxyInstallRecapFullNote})
+			steps = append(steps, NextStepParams{Command: domain.ProxyInstallRecapFull, Note: domain.ProxyInstallRecapFullNote})
 		}
+		NextSteps(w, steps)
 	}
 }
