@@ -24,7 +24,7 @@ func TestRunInitKeepsAProjectWideSetting(t *testing.T) {
 		}},
 	})
 
-	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive); err != nil {
+	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes); err != nil {
 		t.Fatalf("run init: %v", err)
 	}
 
@@ -75,7 +75,7 @@ func TestRunInitKeepsAHandEditedCommand(t *testing.T) {
 	writeProjectFile(t, "pnpm-workspace.yaml", "packages:\n  - \"apps/*\"\n")
 	writeProjectFile(t, "apps/web/package.json", `{"name":"web","scripts":{"dev":"vite"}}`)
 
-	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive); err != nil {
+	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes); err != nil {
 		t.Fatalf("run init: %v", err)
 	}
 
@@ -84,7 +84,7 @@ func TestRunInitKeepsAHandEditedCommand(t *testing.T) {
 		t.Fatalf("run job edit: %v", err)
 	}
 
-	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive); err != nil {
+	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes); err != nil {
 		t.Fatalf("second run init: %v", err)
 	}
 

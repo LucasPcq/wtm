@@ -113,24 +113,6 @@ func AddYesFlag(cmd *cobra.Command, usage string) {
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, usage)
 }
 
-// AddNoPromptFlags registers the two spellings `run init` accepts for one axis:
-// --yes, which every other mutation command uses, and the older
-// --non-interactive it shipped with. NoPrompt reads whichever was passed.
-//
-// `wtm init` is deliberately not on this: there --yes is already the
-// confirmation of a re-init, a different question from whether to prompt at
-// all, and folding the two would answer one with the other.
-func AddNoPromptFlags(cmd *cobra.Command, usage string) {
-	AddYesFlag(cmd, usage)
-	cmd.Flags().Bool(domain.FlagNonInteractive, false, usage)
-}
-
-func NoPrompt(cmd *cobra.Command) bool {
-	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
-	nonInteractive, _ := cmd.Flags().GetBool(domain.FlagNonInteractive)
-	return yes || nonInteractive
-}
-
 // Unattended folds --yes into the prompt-capability gate: a human format, on a
 // terminal, and not bypassed.
 type UnattendedParams struct {

@@ -1286,9 +1286,8 @@ const (
 	// XY status field plus its trailing space.
 	PorcelainPathOffset = 3
 
-	// init flags (non-interactive bootstrap).
+	// init flags (flag-driven bootstrap).
 	FlagIfNotExists    = "if-not-exists"
-	FlagNonInteractive = "non-interactive"
 	FlagPatchCompose   = "patch-compose"
 	FlagLinkEnv        = "link-env"
 	FlagWritePortKeys  = "write-port-keys"

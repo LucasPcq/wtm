@@ -406,7 +406,7 @@ and **experimental**: the global `wtm init` does not configure it.
   Only jobs the wizard itself proposed can be removed: one added with `run job add` appears
   in no detected list, so it is never touched. The same symmetry holds for the URLs step (a
   job you unpublish stays unpublished) and the profiles step (deleting them all keeps them
-  deleted). This only applies to interactive runs — `--non-interactive` never removes.
+  deleted). This only applies to interactive runs — `--yes` never removes.
 - **`run init` composes a startable configuration.** It proposes every compose file and
   package script but checks only scripts whose name contains `dev` — and not a root `dev`
   a workspace package also declares, which is an orchestrator (`turbo run dev`) that would
@@ -690,7 +690,7 @@ and **experimental**: the global `wtm init` does not configure it.
   privilege — launchd binds port 80 and hands the socket to wtm — but it installs a
   LaunchAgent in the user's home, so **do not run it on your own initiative**: propose it,
   and let the user decide. Without a terminal it refuses unless you pass `--yes`.
-- `run init` accepts `--yes` (its older `--non-interactive` still works) — the run module's
+- `run init` accepts `--yes` / `-y` (`--non-interactive` is gone) — the run module's
   own bootstrap, which writes run.toml and may rewrite compose files and .env.
 - `run url --job <name> --output json` returns **that job alone**, not the whole array.
 - `run export` / `run import` — share a layout as JSON. **`run import` replaces the whole
@@ -933,9 +933,11 @@ and **experimental**: the global `wtm init` does not configure it.
 
 **Setup**
 - `wtm config show` inspects config; `wtm config edit` and the `wtm init` wizard are
-  interactive. Bootstrap non-interactively with
-  `wtm init --non-interactive [--base-branch … --env-strategy … --install-command … --clean-command …]`, and
-  reconfigure one section later with `wtm init --only env|hooks|worktrees --non-interactive --yes`.
+  interactive. Bootstrap unattended with
+  `wtm init --yes [--base-branch … --env-strategy … --install-command … --clean-command …]` —
+  global config included, never a prompt (`--non-interactive` is gone) — and reconfigure one
+  section later with `wtm init --only env|hooks|worktrees --yes`. Without a terminal `wtm init`
+  behaves the same even without `--yes`; an undetectable base branch errors naming `--base-branch`.
   Services are **not** part of `wtm init` — configure them with `wtm run init`.
   See their `--help` for the full flag set.
 - `wtm upgrade` updates **the CLI itself**, never worktrees — that is `wtm sync`. **Do not
@@ -953,7 +955,7 @@ and **experimental**: the global `wtm init` does not configure it.
 
 On non-zero exit, read stderr, then:
 
-- `12` (config not found) → repo not initialized. Run `wtm init --non-interactive` with
+- `12` (config not found) → repo not initialized. Run `wtm init --yes` with
   flags, or ask the user to run interactive `wtm init`.
 - `17` (`upgrade` unsupported) → nothing to retry. Report the message: a source build updates
   with `git pull && make install`, an unwritable binary needs the user to re-run with sudo.
@@ -967,7 +969,7 @@ On non-zero exit, read stderr, then:
   different `--to`. Covers both a file modified on both sides and one that merely already
   exists in the target. Exception: an untracked **binary** file already in the target cannot
   take conflict markers — `resolve` won't help, pick a different `--to`.
-- `16` (run module not initialized) → run `wtm run init` (or `wtm run init --non-interactive`)
+- `16` (run module not initialized) → run `wtm run init` (or `wtm run init --yes`)
   to create `run.toml`, then re-run the command.
 - `gh: …` → `gh` isn't authenticated; tell the user to run `gh auth login`.
 - A `run up` job failed → its entry in the JSON array is `{"name", "status": "error",
@@ -992,4 +994,4 @@ On non-zero exit, read stderr, then:
 - `wtm config edit` is the natural answer — ask the user to run it, or read with `wtm
   config show` and write the change to the printed path if you have a file-edit tool and
   the user authorized it.
-- You can't supply a value that non-interactive `wtm init` requires.
+- You can't supply a value that `wtm init --yes` requires.

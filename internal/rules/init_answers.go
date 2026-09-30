@@ -27,13 +27,13 @@ func DisplayPath(p DisplayPathParams) string {
 	return rel
 }
 
-// InitGlobalFlags holds the raw --shell input for non-interactive init.
+// InitGlobalFlags holds the raw --shell input for flag-driven init.
 type InitGlobalFlags struct {
 	Shell string
 }
 
-// InitProjectFlags holds the raw project-config inputs for non-interactive init.
-// NonInteractive makes unresolved required values fail rather than silently
+// InitProjectFlags holds the raw project-config inputs for flag-driven init.
+// Unattended makes unresolved required values fail rather than silently
 // falling back to a constant default. The Skip* flags opt out of optional
 // sections, mirroring the wizard skip key. Services are no longer part of the
 // global init — they are configured by the dedicated `wtm run init` command.
@@ -43,7 +43,7 @@ type InitProjectFlags struct {
 	EnvStrategy    string
 	InstallCommand string
 	CleanCommand   string
-	NonInteractive bool
+	Unattended     bool
 	SkipEnv        bool
 	SkipHooks      bool
 	SkipClean      bool
@@ -79,7 +79,7 @@ func BuildProjectAnswers(flags InitProjectFlags, detection domain.InitDetectionR
 		baseBranch = detection.BaseBranch
 	}
 	if baseBranch == "" {
-		if flags.NonInteractive {
+		if flags.Unattended {
 			return domain.InitProjectAnswers{}, fmt.Errorf("base branch could not be detected — pass --%s", domain.FlagBaseBranch)
 		}
 		baseBranch = domain.DefaultBaseBranch
@@ -185,7 +185,7 @@ type AutoServicesAnswersParams struct {
 
 // AutoServicesAnswers builds the services portion of InitProjectAnswers from
 // detection alone — every detected docker-compose file and package script — for
-// the non-interactive `wtm run init` path. The base config fields are left
+// the unattended `wtm run init` path. The base config fields are left
 // zero-valued: only the services fields feed BuildInitRunConfig.
 func AutoServicesAnswers(params AutoServicesAnswersParams) domain.InitProjectAnswers {
 	detection := params.Detection

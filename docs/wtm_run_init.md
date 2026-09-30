@@ -7,12 +7,12 @@ Configure the run module (services & tasks) for this repo
 Set up run.toml by detecting docker-compose files and package.json scripts and turning
 the selected ones into jobs.
 
-In a TTY, opens a wizard to pick which ones to include; non-interactively (or piped),
+In a TTY, opens a wizard to pick which ones to include; with --yes (or piped),
 auto-generates from detection. Re-running pre-fills every step from the existing
 run.toml: what stays checked is kept, what you uncheck is removed along with the
 profile entries and .env links naming it. Only jobs this wizard proposed are ever
 removed — one added with `wtm run job add` is never listed, so never touched.
-A non-interactive run asks nothing and removes nothing.
+An unattended run asks nothing and removes nothing.
 
 Ports declared in the selected compose files become per-worktree ports. A literal
 host port ("5432:5432") binds the same port everywhere, so wtm offers to rewrite it
@@ -61,10 +61,9 @@ wtm run init [flags]
 ```
   -h, --help              help for init
       --link-env          Link the .env keys holding a declared port, so each worktree gets its own
-      --non-interactive   Auto-generate from detection; never prompt
       --patch-compose     Rewrite the selected compose files' literal host ports and absolute names to read a variable
       --write-port-keys   Write each declared port into the job's .env and its template, so an app launched by hand reads the worktree's port
-  -y, --yes               Auto-generate from detection; never prompt
+  -y, --yes               Run unattended: auto-generate from detection; never prompt
 ```
 
 ### Options inherited from parent commands
