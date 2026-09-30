@@ -1851,11 +1851,14 @@ const (
 	// JobActionNotRunning is a stop that found nothing up under that name in
 	// that worktree: "stopped" there claimed an act that never happened.
 	JobActionNotRunning = "not_running"
-	JobActionDone       = "done"
-	JobActionError      = "error"
-	JobActionCrashed    = "crashed"
-	JobActionAdded      = "added"
-	JobActionRemoved    = "removed"
+	// JobActionAlreadyRunning is a start that found the service already up in
+	// that worktree: nothing was started, and "started" claimed it was.
+	JobActionAlreadyRunning = "already_running"
+	JobActionDone           = "done"
+	JobActionError          = "error"
+	JobActionCrashed        = "crashed"
+	JobActionAdded          = "added"
+	JobActionRemoved        = "removed"
 	// JobRemovedProfilesFmt and JobRemovedEnvPortsFmt report what a removal
 	// dragged along with the job, each named so the reader can put it back.
 	JobRemovedProfilesFmt = "Stripped from profile(s): %s"
