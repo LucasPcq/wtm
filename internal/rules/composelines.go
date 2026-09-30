@@ -67,7 +67,14 @@ func ComposeDroppedLine(d DroppedPort) string {
 	return fmt.Sprintf(domain.ComposeDroppedLineFmt,
 		d.Port.Name, d.Port.Job, d.Port.Base,
 		d.Against.Name, d.Against.Job, d.Against.Base,
-		d.Worktrees)
+		whereTheyMeet(d.Worktrees))
+}
+
+func whereTheyMeet(worktrees int) string {
+	if worktrees == 0 {
+		return domain.ComposeMeetsEverywhere
+	}
+	return fmt.Sprintf(domain.ComposeMeetsApartFmt, worktrees)
 }
 
 func ComposeUnreadableLine(scan domain.ComposeScan) string {

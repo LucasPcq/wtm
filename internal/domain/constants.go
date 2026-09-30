@@ -846,13 +846,15 @@ const (
 	// ComposeFrozenLineFmt names a host port left literal, and ComposeFixLineFmt
 	// the mapping to write instead. ComposeFixCmdFmt is the declaration that
 	// follows once the file reads a variable.
-	ComposeFrozenLineFmt  = "%s · %s   %s binds the same port in every worktree"
-	ComposeUnsupportedFmt = "%s · %s   %s"
-	ComposeFixLineFmt     = "write %s"
-	ComposeFixCmdFmt      = "then: wtm run job edit %s --port %s=%d"
-	ComposeFixNoJobFmt    = "then declare it with `wtm run job edit <job> --port %s=%d`"
-	ComposeDroppedLineFmt = "%s (job %q, base %d) is dropped — it meets %s (job %q, base %d) %d worktree(s) on"
-	ComposeUnreadableFmt  = "%s could not be read: %s"
+	ComposeFrozenLineFmt   = "%s · %s   %s binds the same port in every worktree"
+	ComposeUnsupportedFmt  = "%s · %s   %s"
+	ComposeFixLineFmt      = "write %s"
+	ComposeFixCmdFmt       = "then: wtm run job edit %s --port %s=%d"
+	ComposeFixNoJobFmt     = "then declare it with `wtm run job edit <job> --port %s=%d`"
+	ComposeDroppedLineFmt  = "%s (job %q, base %d) is dropped — it meets %s (job %q, base %d) %s"
+	ComposeMeetsEverywhere = "in every worktree"
+	ComposeMeetsApartFmt   = "%d worktree(s) apart"
+	ComposeUnreadableFmt   = "%s could not be read: %s"
 
 	// ComposePatchMovedFmt aborts a patch whose target token is no longer where
 	// the scan found it.

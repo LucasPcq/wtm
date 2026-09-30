@@ -5,11 +5,11 @@
 
   ✓ 1 port(s) declared in run.toml
 
-  ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-  │ Ports withdrawn — they could not coexist                                                                        │
-  │ POSTGRES_PORT (job "postgres", base 5432) is dropped — it meets DB_PORT (job "dev", base 5432) 0 worktree(s) on │
-  │ DB_PORT (job "dev", base 5432) is dropped — it meets POSTGRES_PORT (job "postgres", base 5432) 0 worktree(s) on │
-  ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  │ Ports withdrawn — they could not coexist                                                                         │
+  │ POSTGRES_PORT (job "postgres", base 5432) is dropped — it meets DB_PORT (job "dev", base 5432) in every worktree │
+  │ DB_PORT (job "dev", base 5432) is dropped — it meets POSTGRES_PORT (job "postgres", base 5432) in every worktree │
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
   ✓ 1 compose name(s) scoped to the worktree
   ! a volume that pinned its name gains one per worktree, each starting empty — the
