@@ -18,7 +18,7 @@ func newInstallCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   domain.CmdInstall,
 		Short: "Serve named URLs on port 80 so they drop their port",
-		Long:  "Install a per-user LaunchAgent: launchd binds port 80 on the loopback and hands the socket to wtm, which relays it to the run proxy. No sudo, no system file — everything lives in ~/Library/LaunchAgents and `wtm run proxy uninstall` removes it.",
+		Long:  "macOS only. Install a per-user LaunchAgent: launchd binds port 80 on the loopback and hands the socket to wtm, which relays it to the run proxy. No sudo, no system file — everything lives in ~/Library/LaunchAgents and `wtm run proxy uninstall` removes it.",
 		RunE:  runInstall,
 	}
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip the confirmation")

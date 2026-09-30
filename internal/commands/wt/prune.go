@@ -18,7 +18,7 @@ import (
 func newPruneCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   domain.CmdPrune,
-		Short: "Remove finished worktrees (merged, closed PR, gone, or old) in one pass",
+		Short: "Remove finished worktrees (merged, closed PR or gone) in one pass",
 		Long: "Batch-remove worktrees whose work is done, reparenting any surviving children onto\n" +
 			"their grandparent (like `clean --reparent-children`). Whether work is \"done\" is read\n" +
 			"from GitHub via the `gh` CLI — never guessed from local commits — so squash- and\n" +

@@ -1,6 +1,6 @@
 ## wtm prune
 
-Remove finished worktrees (merged, closed PR, gone, or old) in one pass
+Remove finished worktrees (merged, closed PR or gone) in one pass
 
 ### Synopsis
 
