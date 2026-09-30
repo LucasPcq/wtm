@@ -22,7 +22,7 @@ How to start, stop and inspect the jobs a repository declares in `run.toml`. To 
 
 ## Before anything
 
-- The module is **opt-in**. Until `run.toml` declares at least one job or profile, every run command exits `16` except `run init`, `run job add` and `run profile add` (see `run-config.md`), and `run ps`, which works from anywhere.
+- The module is **opt-in**. Until `run.toml` declares at least one job or profile, every run command exits `16` except `run init`, `run import`, `run job add` and `run profile add` (which create the first declaration), plus `run ps`, `run daemon …` and `run proxy …`, which never read `run.toml` (see `run-config.md`).
 - **Never let a run view open.** `run up` and `run start --job <service>` **attach by default** on a terminal, and `run logs` opens the same full-screen view. Always pass `-d` (or `--output json`, which never attaches): `-d` starts the jobs and returns immediately. A `task` runs inline and blocks until it exits whatever you pass, so `run start --job <task>` needs no `-d`.
 - `wtm run list --output json` lists the declared jobs and profiles; `wtm run job list --output json` is the roster of the project's jobs.
 

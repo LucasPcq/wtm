@@ -24,7 +24,7 @@ How a repository declares its dev jobs and how wtm isolates them per worktree. T
 
 - Jobs live in a per-clone `run.toml`, **managed by wtm**: change it through `run init`, `run job`, `run profile` and `run addressing`, never by hand. Every field a job declares has a flag on `run job add` / `run job edit` (only `probe` has none), and a write is refused exactly as loading the file would refuse it.
 - A job is a `service` (long-running) or a `task` (one-shot; it blocks its profile until it exits, and a non-zero exit aborts the profile). Profiles are named, ordered job groups; `run up` starts one.
-- The module is **opt-in**: `wtm init` does not configure it. Until a job or profile is declared, every run command exits `16` except `run init`, `run job add` and `run profile add` (which create the first one).
+- The module is **opt-in**: `wtm init` does not configure it. Until a job or profile is declared, every run command exits `16` except `run init`, `run import`, `run job add` and `run profile add` (which create the first declaration), plus `run ps`, `run daemon …` and `run proxy …`, which never read `run.toml`. A `run.toml` that exists but cannot be read is a different error, not `16`.
 - Project-wide keys at the top of `run.toml`: `isolation` (default for unattended creations), `concurrency` (`parallel` / `exclusive`, see `run.md`), `addressing` (`names` / `ports`), `port_offset_block` (default 10), `port_probe_timeout` (default 15s, negative disables).
 
 ## `run init`
