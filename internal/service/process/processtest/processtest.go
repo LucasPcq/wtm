@@ -23,7 +23,9 @@ type Daemon struct {
 	Survive bool
 	// StartError is what every start is refused with, empty to accept them.
 	StartError string
-	requests   []process.Request
+	// Release answers every stop as a shared job let go of, still up elsewhere.
+	Release  bool
+	requests []process.Request
 }
 
 // Serve moves HOME to a directory short enough for the socket — macOS puts it
@@ -80,11 +82,28 @@ func (d *Daemon) answer(req process.Request) process.Response {
 		if d.StopError != "" {
 			return process.Response{Status: process.StatusError, Version: domain.Version, Message: d.StopError}
 		}
+		resp := process.Response{Status: process.StatusOK, Version: domain.Version, Released: d.Release}
+		if req.Action == process.ActionStopAll {
+			resp.Jobs = d.in(req.WorkDir)
+		}
 		if !d.Survive {
 			d.stop(req)
 		}
+		return resp
 	}
 	return process.Response{Status: process.StatusOK, Version: domain.Version}
+}
+
+// in is what a stop_all answers with, as the real daemon does: the jobs it
+// found up there.
+func (d *Daemon) in(workDir string) []domain.JobInfo {
+	var jobs []domain.JobInfo
+	for _, job := range d.jobs {
+		if job.WorkDir == workDir {
+			jobs = append(jobs, job)
+		}
+	}
+	return jobs
 }
 
 func (d *Daemon) stop(req process.Request) {
