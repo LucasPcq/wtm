@@ -11,6 +11,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/envports"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/output"
@@ -217,6 +218,8 @@ func runExtract(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	result.Warnings = sel.target.warnings
+	result.EnvPorts = sel.target.envPorts
+	result.Isolation = worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: cfg.ProjectDir, StateDir: cfg.StateDir, Branch: sel.target.branch})
 
 	if format == domain.OutputJSON {
 		return output.WriteExtractJSON(cmd.OutOrStdout(), result)
@@ -619,7 +622,7 @@ type extractTarget struct {
 	branch string
 	// envPorts is what the port pass did in a worktree this extraction created,
 	// zero for one that already existed and was never provisioned.
-	envPorts domain.EnvPortSettlement
+	envPorts domain.EnvPortPlan
 	warnings []string
 }
 
@@ -647,7 +650,7 @@ func resolveTarget(params resolveTargetParams) (extractTarget, error) {
 			ProjectDir: params.cfg.ProjectDir,
 			Branch:     toFlag,
 		}); err == nil {
-			return extractTarget{path: wt.Path, branch: wt.Branch}, nil
+			return existingTarget(existingTargetParams{cmd: params.cmd, cfg: params.cfg, path: wt.Path, branch: wt.Branch}), nil
 		}
 		target := branch.Target(branch.BranchParams{ProjectDir: params.cfg.ProjectDir, Branch: toFlag})
 		fromFlag, _ := params.cmd.Flags().GetString(domain.FlagFrom)
@@ -699,7 +702,7 @@ func resolveTarget(params resolveTargetParams) (extractTarget, error) {
 		if findErr != nil {
 			return extractTarget{}, findErr
 		}
-		return extractTarget{path: wt.Path, branch: wt.Branch}, nil
+		return existingTarget(existingTargetParams{cmd: params.cmd, cfg: params.cfg, path: wt.Path, branch: wt.Branch}), nil
 	}
 
 	// "Create new" — the branch/source/fast-forward were collected in the combined
@@ -722,6 +725,32 @@ func resolveTarget(params resolveTargetParams) (extractTarget, error) {
 		isolation:   params.create.Isolation,
 		interactive: params.interactive,
 	})
+}
+
+type existingTargetParams struct {
+	cmd    *cobra.Command
+	cfg    shared.ConfigResult
+	path   string
+	branch string
+}
+
+// existingTarget is a target the extraction did not create, so --isolation
+// had nothing to answer; saying so is all that is left to do with it.
+func existingTarget(params existingTargetParams) extractTarget {
+	target := extractTarget{path: params.path, branch: params.branch}
+	requested, _ := shared.IsolationFlag(params.cmd)
+	warning := rules.IsolationIgnoredWarning(rules.IsolationIgnoredParams{
+		Branch:    params.branch,
+		Requested: requested,
+		Current:   worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: params.cfg.ProjectDir, StateDir: params.cfg.StateDir, Branch: params.branch}),
+	})
+	if warning == "" {
+		return target
+	}
+	format, _ := params.cmd.Flags().GetString(domain.FlagOutput)
+	shared.NewPresenter(params.cmd, format).Status(flow.Notice{Kind: flow.NoticeWarning, Text: warning})
+	target.warnings = []string{warning}
+	return target
 }
 
 type defaultParentParams struct {

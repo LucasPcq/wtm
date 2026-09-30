@@ -141,6 +141,18 @@ flagged; everything else is what the name implies.
   created, the `.env` copied as is, the hooks run, and the JSON of `create` / `extract` /
   `checkout` carries a `warnings` array naming the cause and "ports not settled — run
   `wtm env <branch>` once run.toml is fixed". Fix the cause, then run that command.
+  The JSON of `create`, `extract` (for its target) and `checkout` also carries `isolation`
+  (the worktree's: `isolated` / `verbatim`) and, when the port pass ran and the project links
+  anything, `env_ports` — the shape of `wtm env`'s `ports` block: `{offset,addressing,
+  public_port,entries:[{file,key,port,base,resolved,moves,addressing,status,current_value,
+  new_value,foreign_host}],owned:[{file,key,value,changed}],applied}`. An entry whose `status`
+  is neither `rewrite` nor `unchanged` (`missing_key`, `base_not_found`, `ambiguous`,
+  `foreign_host`, `secure_scheme`) is a value wtm left alone; `owned` are the values wtm
+  writes whole (`COMPOSE_PROJECT_NAME`, `[[env]]`). `env_ports` is absent for a verbatim
+  worktree, a project linking nothing, or a pass that could not run (`warnings` says why).
+  `--isolation` only answers a creation: on a worktree `--if-not-exists` found already there,
+  or an existing `extract --to` target, it is ignored — and when it differs from the
+  worktree's, a `warnings` entry says so and names `wtm env <branch> --isolation …`.
   **A name two worktrees would share is refused** (exit `10`, before anything is created)
   when `run.toml` declares a job: `feat.x` next to a live `feat/x` would get the same compose
   project, namespaces and proxy host (`feat-x`), and `feat/a_b` next to `feat/a-b` the same

@@ -1040,11 +1040,16 @@ const (
 	// every value: the count and the offset are the whole of the decision, and
 	// the values are in the files the report already names.
 	EnvPortsWouldShiftFmt = "%d linked .env value(s) would be shifted (offset +%d)"
-	// EnvPortsRecapShiftedFmt and EnvPortsRecapKeptFmt qualify the env line of a
-	// create-like recap, where the port pass is a side effect rather than the
-	// subject.
-	EnvPortsRecapShiftedFmt = "%d port(s) shifted (+%d)"
-	EnvPortsRecapKeptFmt    = "%d linked value(s) left as they were"
+	// EnvPortsRecap* qualify the env line of a create-like recap, where the
+	// port pass is a side effect rather than the subject. The offset is the
+	// worktree's own, counted from the declared ports — not a distance from the
+	// checkout the .env was copied from.
+	EnvPortsRecapSettledFmt  = "%d %s settled (offset +%d)"
+	EnvPortsRecapOwnedFmt    = "%d owned %s written"
+	EnvPortsRecapPort        = "port"
+	EnvPortsRecapPorts       = "ports"
+	EnvPortsRecapOwnedValue  = "value"
+	EnvPortsRecapOwnedValues = "values"
 	// EnvRecapNoteSeparator joins a recap value to the note qualifying it.
 	EnvRecapNoteSeparator = " · "
 
@@ -3031,6 +3036,9 @@ const (
 	// IsolationStepIrrelevant is why the step is not asked: with nothing to
 	// isolate, both answers do exactly the same thing.
 	IsolationStepIrrelevant = "run.toml declares nothing a worktree isolates"
+	// IsolationIgnoredFmt is --isolation given to a run whose worktree already
+	// existed, so nothing was created for it to answer.
+	IsolationIgnoredFmt = "--%s %s ignored: %s already exists and stays %s — switch it with `wtm env %s --%s %s`"
 
 	// IsolationAdopt* is the migration `wtm env` offers a worktree created
 	// before the choice existed. Keeping it as is comes first: adopting moves the
@@ -3052,12 +3060,17 @@ const (
 	// worktree: both ways out are named, since keeping its source's values is one.
 	RunIsolationAdoptionPendingFmt = "%s predates isolation: its .env still holds its source's ports — choose with `wtm env %s --isolation isolated` (own ports and compose project) or `--isolation verbatim` (keep the source's), then run it again"
 
-	// RecapField* are the aligned labels of the create recap body.
-	RecapFieldBranch       = "Branch:  "
-	RecapFieldSource       = "Source:  "
-	RecapFieldParent       = "Parent:  "
-	RecapFieldEnv          = "Env:     "
-	RecapFieldIsolation    = "Mode:    "
+	// RecapField* are the aligned labels of the create-like recap bodies —
+	// create, extract and checkout — padded to the widest of them.
+	RecapFieldBranch       = "Branch:    "
+	RecapFieldSource       = "Source:    "
+	RecapFieldParent       = "Parent:    "
+	RecapFieldEnv          = "Env:       "
+	RecapFieldIsolation    = "Isolation: "
+	RecapFieldPR           = "PR:        "
+	RecapFieldFiles        = "Files:     "
+	RecapFieldTarget       = "Target:    "
+	RecapFieldMode         = "Mode:      "
 	RecapFastForwardSuffix = " (fast-forward to origin)"
 	WarningPrefix          = "⚠ "
 	WizardErrLabel         = "wizard"

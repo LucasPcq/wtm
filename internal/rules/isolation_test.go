@@ -82,3 +82,27 @@ func TestIsolationAdoptOptionLabelNamesBothProjects(t *testing.T) {
 		t.Errorf("label = %q, want the new project and the volumes left behind", label)
 	}
 }
+
+func TestIsolationIgnoredWarningOnlyWhenTheFlagWasOverruled(t *testing.T) {
+	if got := IsolationIgnoredWarning(IsolationIgnoredParams{Branch: "feat/x", Current: domain.IsolationIsolated}); got != "" {
+		t.Errorf("no flag: warning = %q, want none", got)
+	}
+	if got := IsolationIgnoredWarning(IsolationIgnoredParams{Branch: "feat/x", Requested: domain.IsolationIsolated, Current: domain.IsolationIsolated}); got != "" {
+		t.Errorf("flag matching the worktree: warning = %q, want none", got)
+	}
+	got := IsolationIgnoredWarning(IsolationIgnoredParams{Branch: "feat/x", Requested: domain.IsolationVerbatim, Current: domain.IsolationIsolated})
+	for _, want := range []string{"--isolation verbatim", "feat/x already exists", "isolated", "wtm env feat/x --isolation verbatim"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("warning = %q, want it to contain %q", got, want)
+		}
+	}
+}
+
+func TestIsolationRecapShownWhenAskedOrFlagged(t *testing.T) {
+	if IsolationRecapShown(IsolationRecapShownParams{}) {
+		t.Error("never posed, never flagged: no line")
+	}
+	if !IsolationRecapShown(IsolationRecapShownParams{Applies: true}) || !IsolationRecapShown(IsolationRecapShownParams{Override: domain.IsolationVerbatim}) {
+		t.Error("a posed step or a flag keeps its line")
+	}
+}

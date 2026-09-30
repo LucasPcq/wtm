@@ -138,3 +138,30 @@ type IsolationNotSwitchedParams struct {
 func IsolationNotSwitchedWarning(params IsolationNotSwitchedParams) string {
 	return fmt.Sprintf(domain.EnvIsolationNotSwitchedFmt, params.Branch, params.Isolation, params.Cause, params.Branch, params.Isolation)
 }
+
+type IsolationIgnoredParams struct {
+	Branch    string
+	Requested domain.Isolation
+	Current   domain.Isolation
+}
+
+// IsolationIgnoredWarning is --isolation met by a worktree that already
+// exists: the flag only ever answers a creation. Empty when it was not given,
+// or asked for what the worktree already is.
+func IsolationIgnoredWarning(params IsolationIgnoredParams) string {
+	if params.Requested == "" || params.Requested == params.Current {
+		return ""
+	}
+	return fmt.Sprintf(domain.IsolationIgnoredFmt, domain.FlagIsolation, params.Requested, params.Branch, params.Current, params.Branch, domain.FlagIsolation, params.Requested)
+}
+
+type IsolationRecapShownParams struct {
+	Applies  bool
+	Override domain.Isolation
+}
+
+// IsolationRecapShown is when a create-like recap names the isolation: the
+// step was posed, or a flag answered it — a flag never loses its line.
+func IsolationRecapShown(params IsolationRecapShownParams) bool {
+	return params.Applies || params.Override != ""
+}

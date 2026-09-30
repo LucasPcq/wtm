@@ -83,7 +83,7 @@ func (p createPresenter) Created(outcome createflow.Outcome) error {
 		return nil
 	}
 	p.line(fmt.Sprintf(domain.DashboardFinishedFmt, domain.OpKindCreate, outcome.Branch))
-	if note := rules.EnvPortSettlementNote(outcome.EnvPorts); note != "" {
+	if note := rules.EnvPortSettlementNote(outcome.Result.EnvPorts); note != "" {
 		p.line(note)
 	}
 	p.send(createdMsg{branch: outcome.Branch})

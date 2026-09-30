@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
+	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
@@ -211,5 +212,47 @@ func TestCreateFromPRGoesAheadOverAnInvalidRunToml(t *testing.T) {
 	}
 	if len(got.Warnings) != 1 || !strings.Contains(got.Warnings[0], "bogus_key") {
 		t.Errorf("warnings = %v, want the refused run.toml named", got.Warnings)
+	}
+}
+
+func TestCreateFromPRJSONReportsIsolationAndEnvPorts(t *testing.T) {
+	work := repoWithRemote(t)
+	result := loadResult(t, work)
+	result.Config.Project.Env.Strategy = domain.EnvStrategyMain
+	result.Config.Project.Env.Files = []domain.EnvFile{{Target: ".env"}}
+	if err := config.WriteRun(config.WriteRunParams{StateDir: result.StateDir, Force: true, Config: domain.RunConfig{
+		Jobs:     []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "true", Ports: map[string]int{"PORT": 3000}}},
+		EnvPorts: []domain.EnvPortLink{{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(work, ".env"), []byte("WEB_PORT=3000\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	branch := "feat/pr-ports"
+	git(t, work, "branch", branch)
+	git(t, work, "push", "origin", branch)
+	git(t, work, "branch", "-D", branch)
+
+	cmd, out := runCmd()
+	if err := createFromPR(cmd, result, createFromPRParams{
+		pr:           domain.PRInfo{Number: 4, Branch: branch, BaseBranch: "main"},
+		parent:       "main",
+		isolation:    domain.IsolationIsolated,
+		jsonMode:     true,
+		envConfirmed: true,
+	}); err != nil {
+		t.Fatalf("createFromPR: %v", err)
+	}
+
+	var got output.PRCheckoutJSON
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatalf("decode checkout JSON: %v", err)
+	}
+	if got.Isolation != domain.IsolationIsolated {
+		t.Errorf("isolation = %q, want isolated", got.Isolation)
+	}
+	if len(got.EnvPorts.Entries) != 1 || got.EnvPorts.Entries[0].Status != domain.EnvPortStatusRewrite {
+		t.Errorf("env_ports = %+v, want WEB_PORT settled", got.EnvPorts)
 	}
 }

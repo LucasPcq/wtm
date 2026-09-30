@@ -155,3 +155,70 @@ func recordedWarning(notices []flow.Notice, cause string) bool {
 	}
 	return false
 }
+
+func portContext(t *testing.T) flow.Context {
+	t.Helper()
+	ctx := testContext(t)
+	ctx.Config.Project.Env.Strategy = domain.EnvStrategyMain
+	ctx.Config.Project.Env.Files = []domain.EnvFile{{Target: ".env"}}
+	linkedRunConfig(t, ctx, ".env")
+	if err := os.WriteFile(filepath.Join(ctx.ProjectDir, ".env"), []byte("WEB_PORT=3000\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return ctx
+}
+
+// The outcome carries what the JSON reports: the worktree's isolation and the
+// port pass in `wtm env`'s shape.
+func TestRunReportsTheIsolationAndThePortPass(t *testing.T) {
+	outcome, err := Run(Params{
+		Context:   portContext(t),
+		Request:   Request{Branch: "feat/ports", From: "main", EnvFrom: "main"},
+		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyIsolation: string(domain.IsolationIsolated), KeyRecap: confirmCreate}},
+		Presenter: newRecorder(),
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if outcome.Result.Isolation != domain.IsolationIsolated {
+		t.Errorf("isolation = %q, want isolated", outcome.Result.Isolation)
+	}
+	ports := outcome.Result.EnvPorts
+	if !ports.Applied || len(ports.Entries) != 1 || ports.Entries[0].Status != domain.EnvPortStatusRewrite {
+		t.Errorf("env_ports = %+v, want the one link settled", ports)
+	}
+}
+
+// --isolation answers a creation. A worktree --if-not-exists found already
+// there keeps what it is, and the flag is not dropped without a word.
+func TestRunWarnsAnIsolationTheExistingWorktreeIgnores(t *testing.T) {
+	ctx := portContext(t)
+	if _, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Branch: "feat/there", From: "main", EnvFrom: "main"},
+		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyIsolation: string(domain.IsolationIsolated), KeyRecap: confirmCreate}},
+		Presenter: newRecorder(),
+	}); err != nil {
+		t.Fatalf("first create: %v", err)
+	}
+
+	presenter := newRecorder()
+	outcome, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Branch: "feat/there", From: "main", IfNotExists: true, Isolation: domain.IsolationVerbatim},
+		Prompter:  flow.Unattended{},
+		Presenter: presenter,
+	})
+	if err != nil {
+		t.Fatalf("second create: %v", err)
+	}
+	if !outcome.Result.AlreadyExists || outcome.Result.Isolation != domain.IsolationIsolated {
+		t.Fatalf("result = %+v, want the existing isolated worktree", outcome.Result)
+	}
+	if len(outcome.Result.Warnings) != 1 || !strings.Contains(outcome.Result.Warnings[0], "--isolation verbatim ignored") {
+		t.Errorf("warnings = %v, want the ignored flag named", outcome.Result.Warnings)
+	}
+	if !recordedWarning(presenter.Statuses, "ignored") {
+		t.Errorf("statuses = %+v, want the warning shown", presenter.Statuses)
+	}
+}

@@ -389,7 +389,7 @@ func resolveEnv(steps []components.Step, params WizardParams) string {
 // and false for a project with nothing to isolate. A flag that answered the
 // step keeps its line: a flag must never make a recap line disappear.
 func IsolationRecapLine(steps []components.Step, params WizardParams) (string, bool) {
-	if !params.IsolationApplies {
+	if !rules.IsolationRecapShown(rules.IsolationRecapShownParams{Applies: params.IsolationApplies, Override: params.IsolationOverride}) {
 		return "", false
 	}
 	return domain.RecapFieldIsolation + rules.IsolationSummary(resolveIsolation(steps, params)), true
@@ -428,9 +428,9 @@ func buildCreateRecap(prev []components.Step, params WizardParams) string {
 
 	// The source line is a start-point for a new branch and only the recorded sync
 	// parent for a reused one; the fast-forward annotation follows its subject.
-	sourceField := "Source:  "
+	sourceField := domain.RecapFieldSource
 	if reused {
-		sourceField = "Parent:  "
+		sourceField = domain.RecapFieldParent
 	}
 	sourceLabel := source
 	if ffBranch != "" && ffBranch == source {
@@ -439,11 +439,11 @@ func buildCreateRecap(prev []components.Step, params WizardParams) string {
 
 	var lines []string
 	if branchLabel != "" {
-		lines = append(lines, "Branch:  "+branchLabel)
+		lines = append(lines, domain.RecapFieldBranch+branchLabel)
 	}
 	lines = append(lines,
 		sourceField+sourceLabel,
-		"Env:     "+envLabel,
+		domain.RecapFieldEnv+envLabel,
 	)
 	if line, shown := IsolationRecapLine(prev, params); shown {
 		lines = append(lines, line)

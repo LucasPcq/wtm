@@ -77,7 +77,7 @@ The pill is the contrast element and stays rare. A one-line conclusion in a box 
 ┃  ✓ Created worktree feat/x
 ┃
 ┃  from  main
-┃  env   main · 4 port(s) shifted (+10)
+┃  env   main · 4 ports settled (offset +10)
 ┃  path  .worktrees/feat-x
 ┃
 ┃  → wtm go feat/x

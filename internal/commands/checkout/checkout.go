@@ -396,6 +396,8 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 			Draft:          p.Draft,
 			ExistingBranch: createResult.ExistingBranch,
 			OriginState:    createResult.OriginState,
+			Isolation:      worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: result.ProjectDir, StateDir: result.StateDir, Branch: createResult.Branch}),
+			EnvPorts:       settlement,
 			Warnings:       warnings,
 		})
 	}
