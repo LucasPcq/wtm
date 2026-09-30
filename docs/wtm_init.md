@@ -14,6 +14,21 @@ Services & tasks are configured separately with `wtm run init`.
 wtm init [flags]
 ```
 
+### Examples
+
+```
+  # The wizard
+  wtm init
+
+  # Unattended, from detection
+  wtm init --yes
+
+  wtm init --yes --base-path ../acme.trees --install-command "pnpm install"
+
+  # Regenerate the hooks section only
+  wtm init --only hooks
+```
+
 ### Options
 
 ```

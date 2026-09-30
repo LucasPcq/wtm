@@ -15,6 +15,18 @@ it anyway, and git still refuses if a modified file would be overwritten.
 wtm fast-forward [branch...] [flags]
 ```
 
+### Examples
+
+```
+  # Pick the worktrees to bring up to origin
+  wtm fast-forward
+
+  wtm ff feat/login
+
+  # Every worktree, no prompts
+  wtm fast-forward --all --yes --output json
+```
+
 ### Options
 
 ```

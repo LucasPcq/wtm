@@ -11,6 +11,13 @@ It exits on its own once no foreground job is left; detached services keep runni
 wtm run daemon [flags]
 ```
 
+### Examples
+
+```
+  wtm run daemon status
+  wtm run daemon restart
+```
+
 ### Options
 
 ```

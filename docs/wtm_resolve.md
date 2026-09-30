@@ -6,6 +6,17 @@ Resolve a branch to its worktree path
 wtm resolve [branch] [flags]
 ```
 
+### Examples
+
+```
+  wtm resolve feat/login
+
+  # Use it in a script
+  cd "$(wtm resolve feat/login)"
+
+  wtm resolve feat/login --output json
+```
+
 ### Options
 
 ```

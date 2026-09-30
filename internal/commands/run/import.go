@@ -32,6 +32,13 @@ project settings alike. The run is confirmed before anything is written; pass
 
 Nothing is reconciled after the write: run wtm env to settle the .env files
 against the new configuration.`,
+		Example: `  wtm run import run.json
+
+  # No confirmation, from stdin
+  cat run.json | wtm run import - --yes
+
+  # Then settle a worktree's .env files on it
+  wtm env feat/login --yes`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runImport,
 	}

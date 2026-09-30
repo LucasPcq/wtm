@@ -6,6 +6,17 @@ Print the project config.toml
 wtm config show [flags]
 ```
 
+### Examples
+
+```
+  wtm config show
+
+  # Check the file, print nothing else
+  wtm config show --validate
+
+  wtm config show --output json
+```
+
 ### Options
 
 ```

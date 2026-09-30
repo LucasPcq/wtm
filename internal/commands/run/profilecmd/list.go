@@ -20,6 +20,9 @@ func newListCmd() *cobra.Command {
 		Long: "List profiles declared in <git-common-dir>/wtm/run.toml.\n\n" +
 			"In a TTY, opens an interactive picker. Selecting a profile offers Edit or Remove.\n" +
 			"Use --output json, --yes (or pipe stdout) for a non-interactive listing.",
+		Example: `  wtm run profile list
+
+  wtm run profile list --output json`,
 		RunE: runList,
 	}
 	shared.AddYesFlag(cmd, "Skip the picker; print the table instead")

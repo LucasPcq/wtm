@@ -22,6 +22,13 @@ Press `?` for the key reference.
 wtm ui [flags]
 ```
 
+### Examples
+
+```
+  # Press ? inside for the key reference
+  wtm ui
+```
+
 ### Options
 
 ```

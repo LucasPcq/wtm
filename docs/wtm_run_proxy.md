@@ -10,6 +10,13 @@ Named job URLs carry the run proxy's port unless port 80 is redirected to it. Th
 wtm run proxy [flags]
 ```
 
+### Examples
+
+```
+  wtm run proxy status
+  wtm run proxy install
+```
+
 ### Options
 
 ```

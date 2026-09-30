@@ -14,7 +14,14 @@ func newGoCmd() *cobra.Command {
 		Use:   domain.CmdGo + " [branch]",
 		Short: "Switch to a worktree",
 		Long:  "Navigate to a worktree directory. Requires shell integration to work.",
-		RunE:  runGo,
+		Example: `  # Pick a worktree
+  wtm go
+
+  wtm go feat/login
+
+  # Back to the main checkout
+  wtm go main`,
+		RunE: runGo,
 	}
 }
 

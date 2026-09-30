@@ -10,6 +10,17 @@ macOS only. Install a per-user LaunchAgent: launchd binds port 80 on the loopbac
 wtm run proxy install [flags]
 ```
 
+### Examples
+
+```
+  # See every file it would write
+  wtm run proxy install --dry-run
+
+  wtm run proxy install
+
+  wtm run proxy install --yes
+```
+
 ### Options
 
 ```

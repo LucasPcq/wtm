@@ -28,6 +28,13 @@ func newLogsCmd() *cobra.Command {
 			"Leaving the view detaches; the jobs keep running.\n" +
 			"Without a terminal, every job's output is written as prefixed lines instead.\n" +
 			fmt.Sprintf("--output json replays each job's last %d lines as [{branch, path, lines: [{job, at, text}]}], one entry per worktree, and never attaches.", domain.JobLogTailLines),
+		Example: `  # Reopen the run view on this worktree's jobs
+  wtm run logs
+
+  wtm run logs feat/login --job api
+
+  # The last 1000 lines of each job, as JSON
+  wtm run logs feat/login --output json`,
 		Args: cobra.ArbitraryArgs,
 		RunE: runLogs,
 	}

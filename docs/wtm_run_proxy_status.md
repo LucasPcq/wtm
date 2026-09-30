@@ -6,6 +6,14 @@ Report what actually serves named URLs on this machine
 wtm run proxy status [flags]
 ```
 
+### Examples
+
+```
+  wtm run proxy status
+
+  wtm run proxy status --output json
+```
+
 ### Options
 
 ```

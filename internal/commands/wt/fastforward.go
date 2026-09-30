@@ -25,6 +25,13 @@ func newFastForwardCmd() *cobra.Command {
 			"`wtm sync` is the command that replays local commits onto it, and --force does not lift\n" +
 			"that refusal. A worktree with uncommitted changes is refused too; --force fast-forwards\n" +
 			"it anyway, and git still refuses if a modified file would be overwritten.",
+		Example: `  # Pick the worktrees to bring up to origin
+  wtm fast-forward
+
+  wtm ff feat/login
+
+  # Every worktree, no prompts
+  wtm fast-forward --all --yes --output json`,
 		Args: cobra.ArbitraryArgs,
 		RunE: runFastForward,
 	}

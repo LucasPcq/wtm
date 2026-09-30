@@ -14,6 +14,18 @@ Without a terminal, every job's output is written as prefixed lines instead.
 wtm run logs [worktree...] [flags]
 ```
 
+### Examples
+
+```
+  # Reopen the run view on this worktree's jobs
+  wtm run logs
+
+  wtm run logs feat/login --job api
+
+  # The last 1000 lines of each job, as JSON
+  wtm run logs feat/login --output json
+```
+
 ### Options
 
 ```

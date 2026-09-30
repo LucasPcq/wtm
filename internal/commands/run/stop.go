@@ -15,8 +15,11 @@ func newStopCmd() *cobra.Command {
 		Use:   domain.CmdStop + " [worktree...]",
 		Short: "Stop one job, in one or more worktrees",
 		Long:  "Stop one running job in each [worktree] — the current one when omitted, picked interactively when there is a terminal.\nThe job is named with --job; without it, a fully interactive run offers a picker.",
-		Args:  cobra.ArbitraryArgs,
-		RunE:  runStop,
+		Example: `  wtm run stop --job api
+
+  wtm run stop feat/login fix/typo --job web --yes`,
+		Args: cobra.ArbitraryArgs,
+		RunE: runStop,
 	}
 	shared.AddJobFlag(cmd, "Job to stop (required without a terminal or in --output json mode)")
 	shared.AddYesFlag(cmd, "Skip all prompts; --job is then required")

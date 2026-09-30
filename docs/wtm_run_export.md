@@ -10,6 +10,18 @@ Emit the current run config as JSON on stdout, whatever --output says: like run 
 wtm run export [flags]
 ```
 
+### Examples
+
+```
+  wtm run export > run.json
+
+  # One profile and its jobs
+  wtm run export --profile backend > backend.json
+
+  # Copy the layout into another clone
+  wtm run export | (cd ../other-clone && wtm run import - --yes)
+```
+
 ### Options
 
 ```

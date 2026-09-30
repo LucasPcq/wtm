@@ -41,6 +41,8 @@ func NewCmd(params NewCmdParams) *cobra.Command {
 			"changes or an operation touches it, and pull requests load once. Nothing is\n" +
 			"fetched on its own: `r` fetches the remote and refreshes all of it.\n" +
 			"Press `?` for the key reference.",
+		Example: `  # Press ? inside for the key reference
+  wtm ui`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runUI(cmd, params.Version)

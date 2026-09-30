@@ -21,6 +21,10 @@ func NewCmd() *cobra.Command {
 		Use:   domain.CmdProfile,
 		Short: "Add, remove, or edit profiles in run.toml",
 		Long:  "Manage profiles declared in <git-common-dir>/wtm/run.toml.",
+		Example: `  wtm run profile list
+  wtm run profile add backend --jobs postgres,migrate,api --yes
+  wtm run profile edit backend --default --yes
+  wtm run profile rm backend`,
 	}
 
 	cmd.AddCommand(newAddCmd())

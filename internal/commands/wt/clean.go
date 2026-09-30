@@ -32,6 +32,16 @@ func newCleanCmd() *cobra.Command {
 			"service that is down cannot take its data back: the form asks whether to start it now or\n" +
 			"keep the data until wtm next starts it; --yes keeps it, --drop-data starts it. A namespace\n" +
 			"another worktree reaches under the same name is never dropped.",
+		Example: `  # Pick the worktree to remove
+  wtm clean
+
+  wtm clean feat/login
+
+  # No prompts; its children move onto its parent
+  wtm clean feat/login --yes --reparent-children
+
+  # Keep the databases it holds in shared services
+  wtm clean feat/login --yes --keep-data --output json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runClean,
 	}

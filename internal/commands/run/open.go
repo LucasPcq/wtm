@@ -21,8 +21,14 @@ func newOpenCmd() *cobra.Command {
 		Use:   domain.CmdOpen + " [worktree]",
 		Short: "Open a job's URL in the browser",
 		Long:  "Hand a job's URL to the desktop's own opener. [worktree] defaults to the current one, and is picked interactively when there is a terminal. A worktree publishing one URL opens it; when several jobs publish one, --job names it, and is required outside a fully interactive run — a picker never runs under a pipe, under --yes or in --output json mode.",
-		Args:  cobra.MaximumNArgs(1),
-		RunE:  runOpen,
+		Example: `  wtm run open
+
+  wtm run open feat/login --job web
+
+  # The port URL instead of the named one
+  wtm run open feat/login --job web --raw`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: runOpen,
 	}
 	shared.AddJobFlag(cmd, "Job whose URL to open (required when several jobs publish one, outside a fully interactive run)")
 	cmd.Flags().Bool(domain.FlagRaw, false, "Open the port URL (http://localhost:<port>) instead of the named URL")

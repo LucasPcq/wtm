@@ -10,6 +10,18 @@ Navigate to a worktree directory. Requires shell integration to work.
 wtm go [branch] [flags]
 ```
 
+### Examples
+
+```
+  # Pick a worktree
+  wtm go
+
+  wtm go feat/login
+
+  # Back to the main checkout
+  wtm go main
+```
+
 ### Options
 
 ```

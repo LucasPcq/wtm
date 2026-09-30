@@ -14,6 +14,8 @@ func NewCmd() *cobra.Command {
 		Use:   domain.CmdProxy,
 		Short: "Inspect and install the redirection that serves named URLs on port 80",
 		Long:  "Named job URLs carry the run proxy's port unless port 80 is redirected to it. These commands report that redirection and install or remove it.",
+		Example: `  wtm run proxy status
+  wtm run proxy install`,
 	}
 
 	cmd.AddCommand(newStatusCmd())

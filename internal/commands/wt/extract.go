@@ -41,6 +41,14 @@ func newExtractCmd() *cobra.Command {
 			"On conflict it aborts by default, leaving the source intact; --on-conflict resolve\n" +
 			"applies conflict markers in the target so you can resolve them like a rebase.\n" +
 			"A file that merely already exists in the target counts as a conflict too.",
+		Example: `  # Pick the source, the files and the target
+  wtm extract
+
+  # Move a directory's changes to a new branch
+  wtm extract feat/login --files apps/api --to feat/login-api --yes
+
+  # Copy one file instead, onto a branch stacked on the source
+  wtm extract feat/login --files apps/web/login.ts --to feat/login-web --from feat/login --keep --yes`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runExtract,
 	}

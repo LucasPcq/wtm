@@ -34,6 +34,16 @@ func NewCmd() *cobra.Command {
 			"A local branch of the PR's name is checked out as-is, keeping commits you never\n" +
 			"pushed; interactive runs offer to fast-forward it when it is behind origin.\n" +
 			"Without arguments, shows an interactive picker of open PRs.",
+		Example: `  # Pick among the open pull requests
+  wtm checkout
+
+  # Only the ones waiting for your review
+  wtm checkout --review
+
+  wtm checkout 42
+
+  # No prompts, with a JSON result
+  wtm checkout 42 --yes --output json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runCheckout,
 	}

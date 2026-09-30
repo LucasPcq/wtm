@@ -20,6 +20,9 @@ func newListCmd() *cobra.Command {
 		Long: "List jobs declared in <git-common-dir>/wtm/run.toml.\n\n" +
 			"In a TTY, opens an interactive picker. Selecting a job offers Edit or Remove.\n" +
 			"Use --output json, --yes (or pipe stdout) for a non-interactive listing.",
+		Example: `  wtm run job list
+
+  wtm run job list --output json`,
 		RunE: runList,
 	}
 	shared.AddYesFlag(cmd, "Skip the picker; print the table instead")

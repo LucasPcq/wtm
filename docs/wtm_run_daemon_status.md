@@ -6,6 +6,14 @@ Report whether a daemon is running, and which build it is
 wtm run daemon status [flags]
 ```
 
+### Examples
+
+```
+  wtm run daemon status
+
+  wtm run daemon status --output json
+```
+
 ### Options
 
 ```

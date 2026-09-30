@@ -18,7 +18,13 @@ func newInstallCmd() *cobra.Command {
 		Use:   domain.CmdInstall,
 		Short: "Serve named URLs on port 80 so they drop their port",
 		Long:  "macOS only. Install a per-user LaunchAgent: launchd binds port 80 on the loopback and hands the socket to wtm, which relays it to the run proxy. No sudo, no system file — everything lives in ~/Library/LaunchAgents and `wtm run proxy uninstall` removes it.",
-		RunE:  runInstall,
+		Example: `  # See every file it would write
+  wtm run proxy install --dry-run
+
+  wtm run proxy install
+
+  wtm run proxy install --yes`,
+		RunE: runInstall,
 	}
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip the confirmation")
 	cmd.Flags().Bool(domain.FlagDryRun, false, "Print every file in full and write nothing")
@@ -30,7 +36,10 @@ func newUninstallCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   domain.CmdUninstall,
 		Short: "Remove the redirection and give named URLs their port back",
-		RunE:  runUninstall,
+		Example: `  wtm run proxy uninstall
+
+  wtm run proxy uninstall --yes`,
+		RunE: runUninstall,
 	}
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip the confirmation")
 	shared.AddOutputFlag(cmd)

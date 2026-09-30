@@ -10,6 +10,17 @@ Hand a job's URL to the desktop's own opener. [worktree] defaults to the current
 wtm run open [worktree] [flags]
 ```
 
+### Examples
+
+```
+  wtm run open
+
+  wtm run open feat/login --job web
+
+  # The port URL instead of the named one
+  wtm run open feat/login --job web --raw
+```
+
 ### Options
 
 ```

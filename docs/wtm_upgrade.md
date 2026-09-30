@@ -20,6 +20,17 @@ applies to standalone installs only.
 wtm upgrade [flags]
 ```
 
+### Examples
+
+```
+  # Is there a newer release?
+  wtm upgrade --check
+
+  wtm upgrade
+
+  wtm upgrade --yes --output json
+```
+
 ### Options
 
 ```

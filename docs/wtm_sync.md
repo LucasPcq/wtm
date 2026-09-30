@@ -20,6 +20,22 @@ cascade; when it is behind its remote you are offered to fast-forward it first
 wtm sync [branch...] [flags]
 ```
 
+### Examples
+
+```
+  # Pick the worktrees to rebase
+  wtm sync
+
+  # Preview the whole cascade
+  wtm sync --all --dry-run
+
+  # Rebase a stack, then force-push it (with lease)
+  wtm sync feat/login feat/login-ui --yes --push
+
+  # Every worktree, locally only
+  wtm sync --all --yes --no-push --output json
+```
+
 ### Options
 
 ```

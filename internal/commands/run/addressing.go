@@ -24,6 +24,13 @@ func newAddressingCmd() *cobra.Command {
 			"that works without wtm, and `wtm env main` is how it is moved onto names.\n\n" +
 			"Without an argument, prompts for the mode; under --yes the argument is required\n" +
 			"and the worktrees are settled unless --keep-env is passed.",
+		Example: `  # Pick the mode
+  wtm run addressing
+
+  wtm run addressing ports --yes
+
+  # Switch run.toml only, leaving the .env files as they are
+  wtm run addressing names --yes --keep-env`,
 		Args:      cobra.MaximumNArgs(1),
 		ValidArgs: []string{string(domain.AddressingNames), string(domain.AddressingPorts)},
 		RunE:      runAddressing,

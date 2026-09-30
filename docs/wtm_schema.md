@@ -11,6 +11,13 @@ Use `wtm schema dump` to write them to <git-common-dir>/wtm/schemas/ so editors 
 wtm schema [flags]
 ```
 
+### Examples
+
+```
+  wtm schema dump
+  wtm schema dump --global
+```
+
 ### Options
 
 ```

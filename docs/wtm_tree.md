@@ -17,6 +17,18 @@ paste into a PR or Notion.
 wtm tree [flags]
 ```
 
+### Examples
+
+```
+  wtm tree
+
+  # With PR numbers and merged/closed markers
+  wtm tree --with-prs
+
+  # A flowchart to paste into a PR description
+  wtm tree --output mermaid
+```
+
 ### Options
 
 ```

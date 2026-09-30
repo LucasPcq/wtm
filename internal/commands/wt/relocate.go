@@ -29,6 +29,13 @@ func newRelocateCmd() *cobra.Command {
 			"target path is never overwritten, and a worktree whose jobs are running is never moved\n" +
 			"(stop them with `wtm run down <branch>` first). Adoption keeps what the worktree's\n" +
 			"meta.json already records (isolation, namespaces, ordinal).",
+		Example: `  # Show the plan first
+  wtm relocate --dry-run
+
+  wtm relocate
+
+  # Move every worktree under a new directory
+  wtm relocate --to ../acme.trees --yes`,
 		Args: cobra.NoArgs,
 		RunE: runRelocate,
 	}

@@ -14,6 +14,15 @@ Jobs referenced by the profile are left untouched.
 wtm run profile rm [name] [flags]
 ```
 
+### Examples
+
+```
+  # Pick the profile
+  wtm run profile rm
+
+  wtm run profile rm backend --yes
+```
+
 ### Options
 
 ```
