@@ -90,7 +90,7 @@ func composeStackUp(query StackQuery, probe rules.ComposeProbe) (up bool, known 
 func stackQueriesOf(records []domain.JobRecord) []StackQuery {
 	queries := make([]StackQuery, 0, len(records))
 	for _, record := range records {
-		if record.Attached || record.Config.Kind != domain.JobKindService || !rules.IsDetached(record.Config) {
+		if record.Joined || record.Config.Kind != domain.JobKindService || !rules.IsDetached(record.Config) {
 			continue
 		}
 		queries = append(queries, StackQuery{

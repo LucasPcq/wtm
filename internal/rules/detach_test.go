@@ -31,7 +31,7 @@ func TestRemovableKeepsOnlySharedJobsWithARemoveCommand(t *testing.T) {
 	}
 }
 
-func TestHeldNamespacesNamesEachSliceFromTheWorktreesEnv(t *testing.T) {
+func TestHeldNamespacesNamesEachFromTheWorktreesEnv(t *testing.T) {
 	holdings := []domain.NamespaceHolding{{
 		Branch: "feat/x",
 		Env:    map[string]string{domain.EnvWorktree: "feat-x"},

@@ -21,7 +21,7 @@ type EnvPortLink struct {
 }
 
 // EnvValueLink is a .env key whose whole value wtm writes, from a template over
-// what only wtm knows: the slice of a shared service this worktree holds, the
+// what only wtm knows: the namespace of a shared service this worktree holds, the
 // ports it binds, the address it answers on. It is the counterpart of
 // EnvPortLink and not a wider spelling of it — a port link substitutes the port
 // inside a value it otherwise leaves alone, which is what lets a password never
@@ -46,7 +46,7 @@ type EnvKeyRef struct {
 }
 
 // EnvValueField is one candidate row of the [[env]] step: a .env key that could
-// follow a shared service's slice. wtm cannot detect which key is a realm or a
+// follow a shared service's namespace. wtm cannot detect which key is a realm or a
 // database name — the value is opaque, with none of the three signs that make a
 // port recognizable — so every managed key is offered and the reader points.
 type EnvValueField struct {

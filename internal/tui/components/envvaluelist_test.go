@@ -40,7 +40,7 @@ func evType(m EnvValueListModel, text string) EnvValueListModel {
 }
 
 // Space is the whole gesture the step exists for: it is what says "this key
-// names my slice".
+// names my namespace".
 func TestEnvValueListTogglesAKeyWithSpace(t *testing.T) {
 	m := evSpace(envValueList())
 
@@ -100,7 +100,7 @@ func TestEnvValueListRefusesAnEmptyTemplate(t *testing.T) {
 }
 
 // The composite case the vocabulary exists for: an issuer built from where the
-// service answers and which slice this worktree holds.
+// service answers and which namespace this worktree holds.
 func TestEnvValueListKeepsAnEditedTemplate(t *testing.T) {
 	m := evKey(envValueList(), tea.KeyDown)
 	m = evKey(m, tea.KeyEnter)

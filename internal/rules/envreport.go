@@ -22,7 +22,7 @@ func EnvReportFields(result domain.EnvSyncResult) []domain.RecapField {
 	}
 	fields = append(fields, domain.RecapField{Label: domain.EnvFieldMode, Value: mode})
 	// Only the exception is named: it is what explains a report in which no
-	// port, identity or slice was touched.
+	// port, identity or namespace was touched.
 	if IsVerbatim(result.Isolation) {
 		fields = append(fields, domain.RecapField{Label: domain.EnvFieldIsolation, Value: IsolationSummary(result.Isolation)})
 	}

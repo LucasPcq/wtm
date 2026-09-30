@@ -26,7 +26,7 @@ const (
 	JobScopeShared      JobScope = "shared"
 )
 
-// JobNamespaceConfig is the worktree's slice of a shared service. It names one
+// JobNamespaceConfig is the worktree's namespace of a shared service. It names one
 // namespace and never a list: four keycloak realms are one namespace, whose internal
 // shape belongs to the create script rather than to wtm.
 type JobNamespaceConfig struct {
@@ -81,7 +81,7 @@ type Isolation string
 
 const (
 	// IsolationIsolated gives the worktree its own ports, compose project and
-	// service slices, in its .env and at run time alike.
+	// namespaces, in its .env and at run time alike.
 	IsolationIsolated Isolation = "isolated"
 	// IsolationVerbatim keeps the .env exactly as it was copied: wtm writes
 	// nothing into it, and runs the worktree on the ports and data it names —
@@ -271,10 +271,13 @@ const (
 	// a weaker "running": nothing was ever verified, before or after a daemon
 	// restart, and there is no stream to attach to.
 	JobStatusDetached JobStatus = "detached"
-	// JobStatusAttached is a worktree's claim on a shared service running under
+	// JobStatusJoined is a worktree's claim on a shared service running under
 	// the main checkout's key. It owns no process: it is the pointer that keeps
 	// the real job alive, which is what makes the job table the reference count.
-	JobStatusAttached JobStatus = "attached"
+	JobStatusJoined JobStatus = "joined"
+	// JobStatusLegacyAttached is JobStatusJoined as a daemon built before the
+	// rename reports it; clients read it as joined.
+	JobStatusLegacyAttached JobStatus = "attached"
 	// JobStatusReaped is a foreground service that outlived the daemon which
 	// owned it and was killed by the next one. Distinct from Crashed because the
 	// two say opposite things about who acted: crashed is a process that died on
@@ -322,11 +325,14 @@ type JobRecord struct {
 	// reads as "not reapable" rather than as a group to guess at.
 	PID  int `json:"pid,omitempty"`
 	PGID int `json:"pgid,omitempty"`
-	// Attached says this entry is a worktree's claim on a shared service rather
+	// Joined says this entry is a worktree's claim on a shared service rather
 	// than a process of its own. It is a fact about what the entry is, not a
 	// process state: without it a claim would come back from the index as a
 	// foreground service the daemon had lost, and be reported crashed.
-	Attached bool `json:"attached,omitempty"`
+	Joined bool `json:"joined,omitempty"`
+	// LegacyAttached is Joined as an index written before the rename spelled
+	// it; the store folds it into Joined on load and never writes it.
+	LegacyAttached bool `json:"attached,omitempty"`
 	// SharedDir is the main checkout a shared job runs in, carried by the real
 	// job and by every claim on it. Without it the two would have to be paired
 	// by name, and the daemon is machine-wide: two repositories declaring a job
@@ -337,7 +343,7 @@ type JobRecord struct {
 	MainHolds bool `json:"main_holds,omitempty"`
 }
 
-// NamespaceRef is one worktree's slice of one shared service, named by what it
+// NamespaceRef is one worktree's namespace of one shared service, named by what it
 // takes to recompute it: run.toml still holds the template, so an entry keeps
 // only what the worktree itself contributed.
 type NamespaceRef struct {

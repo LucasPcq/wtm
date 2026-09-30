@@ -27,7 +27,7 @@
         "strategy": {
           "type": "string",
           "enum": ["example", "main", "parent"],
-          "description": "How .env files are provisioned in new worktrees. example = copy .env.example as .env; main = copy from main worktree; parent = copy from the source worktree (--from), fall back to main."
+          "description": "How .env files are provisioned in new worktrees. example = copy .env.example as .env; main = copy from the main checkout; parent = copy from the source worktree (--from), fall back to main."
         },
         "file": {
           "type": "array",

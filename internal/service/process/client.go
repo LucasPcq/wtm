@@ -151,6 +151,7 @@ func (c *Client) send(ctx context.Context, req Request, onOutput func([]byte)) (
 			}
 			continue
 		}
+		resp.Jobs = rules.CurrentJobInfos(resp.Jobs)
 		return resp, nil
 	}
 }

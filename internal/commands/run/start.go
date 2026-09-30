@@ -24,7 +24,7 @@ func newStartCmd() *cobra.Command {
 	}
 	shared.AddJobFlag(cmd, "Job to start (required without a terminal or in --output json mode)")
 	cmd.Flags().BoolP(domain.FlagDetach, "d", false, "Start the service and return immediately instead of opening its output")
-	cmd.Flags().Bool(domain.FlagForce, false, "Lift the refusal to start a job whose touches reach data this worktree does not own (its source's when verbatim, everyone's for a shared service with no namespace); other questions are still asked unless --yes")
+	cmd.Flags().Bool(domain.FlagForce, false, "Lift the refusal to start a job whose touches reach foreign data (see `wtm run --help`); other questions are still asked unless --yes")
 	shared.AddYesFlag(cmd, "Skip all prompts; --job is then required")
 	shared.AddOutputFlag(cmd)
 	return cmd

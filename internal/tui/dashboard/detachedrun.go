@@ -43,14 +43,14 @@ func detachedLine(event runlogs.Event) string {
 	case runlogs.PhaseStarting:
 		return fmt.Sprintf(domain.RunStreamStepFmt, event.Step, event.Steps, event.Job)
 	case runlogs.PhaseStarted:
-		if event.AlreadyRunning && event.Attached {
-			return fmt.Sprintf(domain.RunStreamAlreadyAttachedFmt, event.Job)
+		if event.AlreadyRunning && event.Joined {
+			return fmt.Sprintf(domain.RunStreamAlreadyJoinedFmt, event.Job)
 		}
 		if event.AlreadyRunning {
 			return fmt.Sprintf(domain.RunStreamAlreadyFmt, event.Job)
 		}
-		if event.Attached {
-			return fmt.Sprintf(domain.RunStreamAttachedFmt, event.Job)
+		if event.Joined {
+			return fmt.Sprintf(domain.RunStreamJoinedFmt, event.Job)
 		}
 		return fmt.Sprintf(domain.RunStreamStartedFmt, event.Job)
 	case runlogs.PhaseDone:

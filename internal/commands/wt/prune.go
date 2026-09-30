@@ -34,7 +34,7 @@ func newPruneCmd() *cobra.Command {
 			"\n" +
 			"On a TTY, matches are shown for review (unsafe ones unchecked), then a prune\n" +
 			"confirmation, then — like clean — a dedicated confirmation to reparent surviving\n" +
-			"children onto their grandparent (or leave them orphaned). The main worktree and base\n" +
+			"children onto their grandparent (or leave them orphaned). The main checkout and base\n" +
 			"branch are always protected; the current worktree is removed and the shell\n" +
 			"redirected to the base repo. Like clean, worktrees that are dirty, have unpushed\n" +
 			"commits, or have an open PR are unsafe and need --force. Use --yes to skip the\n" +

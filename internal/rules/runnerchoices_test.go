@@ -217,7 +217,7 @@ func TestAddressingChoicesOpenOnTheModeTheProjectIsOn(t *testing.T) {
 
 func TestAddressingStepSaysWhatNamedUrlsCost(t *testing.T) {
 	if !strings.Contains(domain.AddressingStepDesc, "`wtm run`") {
-		t.Fatal("the step must say that named urls answer only while wtm runs the job")
+		t.Fatal("the step must say that named URLs answer only while wtm runs the job")
 	}
 }
 

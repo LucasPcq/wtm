@@ -4,8 +4,8 @@ Switch how the .env files spell a job's address
 
 ### Synopsis
 
-Set run.toml's addressing — named urls (http://api.feat-x.myrepo.localhost) or
-ports (http://localhost:4012) — then settle the .env of the worktrees that spell
+Set run.toml's addressing — named URLs (http://api.feat-x.myrepo.localhost) or
+port URLs (http://localhost:4012) — then settle the .env of the worktrees that spell
 the other one. Settling runs even when the mode is already the one given, for a
 worktree an earlier switch left out of step.
 

@@ -78,7 +78,7 @@ func AddOutputFlag(cmd *cobra.Command) {
 
 // AddIsolationFlag registers --isolation on a command that creates a worktree.
 func AddIsolationFlag(cmd *cobra.Command) {
-	cmd.Flags().String(domain.FlagIsolation, "", "How the new worktree stands against its source: isolated (its own ports, compose project and service slices, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated")
+	cmd.Flags().String(domain.FlagIsolation, "", "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated")
 }
 
 // IsolationFlag reads --isolation, refusing a value that is neither answer.
@@ -124,24 +124,6 @@ func AddYesFlag(cmd *cobra.Command, usage string) {
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, usage)
 }
 
-// AddNoPromptFlags registers the two spellings `run init` accepts for one axis:
-// --yes, which every other mutation command uses, and the older
-// --non-interactive it shipped with. NoPrompt reads whichever was passed.
-//
-// `wtm init` is deliberately not on this: there --yes is already the
-// confirmation of a re-init, a different question from whether to prompt at
-// all, and folding the two would answer one with the other.
-func AddNoPromptFlags(cmd *cobra.Command, usage string) {
-	AddYesFlag(cmd, usage)
-	cmd.Flags().Bool(domain.FlagNonInteractive, false, usage)
-}
-
-func NoPrompt(cmd *cobra.Command) bool {
-	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
-	nonInteractive, _ := cmd.Flags().GetBool(domain.FlagNonInteractive)
-	return yes || nonInteractive
-}
-
 // Unattended folds --yes into the prompt-capability gate: a human format, on a
 // terminal, and not bypassed.
 type UnattendedParams struct {
@@ -155,15 +137,11 @@ func Interactive(params UnattendedParams) bool {
 }
 
 // RequireRunInitialized enforces the run-module opt-in guard: the module counts
-// as initialized once run.toml declares at least one job or profile. Blocked run
-// commands call this after loading run.toml; the creation paths (run init,
-// run job/profile add, run import) skip it. On failure it returns
-// ErrRunNotInitialized (wrapped, with the experimental notice on a second line)
-// so the top-level handler prints the pedagogical message and picks the
-// dedicated exit code; it does not print anything itself.
+// as initialized once run.toml declares at least one job or profile. The
+// creation paths (run init, run job/profile add, run import) skip it.
 func RequireRunInitialized(cfg domain.RunConfig) error {
 	if rules.IsRunInitialized(cfg) {
 		return nil
 	}
-	return fmt.Errorf("%w\n%s", domain.ErrRunNotInitialized, domain.ExperimentalRunNotice)
+	return domain.ErrRunNotInitialized
 }

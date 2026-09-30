@@ -113,7 +113,7 @@ A few ideas explain how the commands fit together:
   or a `pnpm dev` typed in a worktree is isolated with no wtm process involved.
 - **Isolated or verbatim** — `create`, `extract` and `checkout` ask how the new worktree
   stands against its source, and remember it. *Isolated* (the default): its own ports,
-  compose project and service slices, written into its `.env` and applied when `wtm run`
+  compose project and namespaces in shared services, written into its `.env` and applied when `wtm run`
   starts its jobs. *Verbatim*: the `.env` is kept exactly as copied, and `wtm run` runs the
   worktree on the ports and data that file names — its source's, so only one of the two can
   be up at a time, and `wtm run up` says so instead of letting a port bind fail. Set the
@@ -126,13 +126,12 @@ A few ideas explain how the commands fit together:
 - **Shell integration** — `go` changes your current directory, which a child process can't
   do for its parent shell. `eval "$(wtm shell-init)"` installs a shell function that makes
   it work. Without it, use [`resolve`](docs/wtm_resolve.md) to get a path.
-- **Dev jobs** *(experimental)* — long-running **services** (dev servers, docker) and
+- **Dev jobs** — long-running **services** (dev servers, docker) and
   one-shot **tasks** (migrations, seeds) declared in `run.toml` and grouped into
   **profiles**, run per-worktree by a background daemon. Starting them **attaches**: the
   run view opens one pane per job, leaving it detaches without stopping anything, and
-  `-d` skips it. The flow is still stabilizing — `wtm go` is the recommended way to enter
-  a worktree today. See [`run`](docs/wtm_run.md) and [Run config](#run-config--runtoml).
-- **Shared services** *(experimental)* — a job declared `scope = "shared"` runs **once for
+  `-d` skips it. See [`run`](docs/wtm_run.md) and [Run config](#run-config--runtoml).
+- **Shared services** — a job declared `scope = "shared"` runs **once for
   the repository** instead of once per worktree, in the main checkout: a postgres, a
   keycloak. Each worktree still keeps its own data through a `[job.namespace]` block, whose
   `create` and `remove` commands you write — wtm names the namespace and hands them the
@@ -140,11 +139,11 @@ A few ideas explain how the commands fit together:
   makes isolation expensive: two worktrees of a monorepo with four databases and a JVM. A
   `create` that **clones** main's database (`CREATE DATABASE … TEMPLATE app`) starts each
   worktree from main's data without sharing it — see
-  [Starting a slice from main's data](docs/dev/shared-services.md#starting-a-slice-from-mains-data).
+  [Starting a namespace from main's data](docs/dev/shared-services.md#starting-a-namespace-from-mains-data).
   A job that changes data declares it with `touches = ["postgres"]` — `wtm run init` asks it
   task by task and pre-fills what the names make obvious — and `wtm run up` stops
-  before running it against data the worktree does not own — a verbatim worktree's source,
-  or a shared service with no namespace — unless you confirm or pass `--force`.
+  before running it against **foreign data** — data the worktree does not own: a verbatim
+  worktree's source's, or a shared service's with no namespace — unless you confirm or pass `--force`.
 
 ## Commands
 
@@ -179,9 +178,9 @@ Full flags live in `wtm <command> --help` and [`docs/`](docs/wtm.md). Overview:
 | [`sync`](docs/wtm_sync.md) | Rebase selected worktrees onto their parent, in cascade |
 | [`reparent`](docs/wtm_reparent.md) | Change the parent a worktree is rebased onto |
 
-### Dev jobs *(experimental)*
+### Dev jobs
 
-Per-worktree services + tasks. Functional, but the flow is still stabilizing. The
+Per-worktree services + tasks. The
 run module is **opt-in**: run `wtm run init` once to set it up (the global `wtm init`
 no longer touches services). Until then, run commands stop with a hint pointing there.
 
@@ -195,7 +194,7 @@ no longer touches services). Until then, run commands stop with a hint pointing 
 | [`run url`](docs/wtm_run_url.md) / [`open`](docs/wtm_run_open.md) | Print / open where a job answers in this worktree |
 | [`run export`](docs/wtm_run_export.md) / [`import`](docs/wtm_run_import.md) | Share a job layout between machines |
 | [`run job`](docs/wtm_run_job.md) / [`profile`](docs/wtm_run_profile.md) | Add / remove / edit jobs and profiles |
-| [`run addressing`](docs/wtm_run_addressing.md) | Switch the `.env` files between named URLs and ports, and settle the worktrees on it |
+| [`run addressing`](docs/wtm_run_addressing.md) | Switch the `.env` files between named URLs and port URLs, and settle the worktrees on it |
 | [`run proxy`](docs/wtm_run_proxy.md) | Report, install or remove the redirection that serves named URLs on port 80 |
 | [`run daemon`](docs/wtm_run_daemon.md) | Inspect, stop or restart the process that runs the jobs |
 
@@ -315,8 +314,8 @@ hook gets.
 
 | Strategy | Behavior |
 |---|---|
-| `example` | Copies `file.example` from the main worktree, renamed to `file`. Warns if `.example` is missing. |
-| `main` | Copies the actual file from the main worktree. |
+| `example` | Copies `file.example` from the main checkout, renamed to `file`. Warns if `.example` is missing. |
+| `main` | Copies the actual file from the main checkout. |
 | `parent` | Copies from the source worktree (`--from`), falling back to `main`. |
 
 The strategy is recorded per worktree. Later, [`wtm env`](docs/wtm_env.md) reconciles a
@@ -620,7 +619,7 @@ So under `names` its values still hold ports — and then **the working entrance
 not the name: the browser on `localhost:5175` sends an `Origin` the API's `CORS_ORIGIN`
 recognises, while the named URL sends one it does not. wtm still hands out the name everywhere
 — `run up`, `run url`, `run open`, the run view, the `wtm ui` panel — and adds one line saying
-the `.env` is out of step and which command aligns it (`--raw` gives the port). The route is
+the `.env` is out of step and which command aligns it (`--raw` gives the port URL). The route is
 registered either way, so nothing has to restart:
 
 ```bash

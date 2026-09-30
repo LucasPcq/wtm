@@ -33,7 +33,7 @@ wtm extract [source] [flags]
       --files strings        Files to extract, or a directory to take everything below it (skips interactive selection)
       --from string          Parent branch when creating the target worktree
   -h, --help                 help for extract
-      --isolation string     How the new worktree stands against its source: isolated (its own ports, compose project and service slices, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated
+      --isolation string     How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated
       --keep                 Copy instead of move (keep the changes in the source)
       --on-conflict string   On conflict: abort (default) or resolve (write conflict markers in the target)
       --output string        Output format: text or json (default "text")

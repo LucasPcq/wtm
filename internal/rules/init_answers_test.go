@@ -83,10 +83,10 @@ func TestBuildProjectAnswers_FallsBackToDetectionThenDefaults(t *testing.T) {
 	}
 }
 
-func TestBuildProjectAnswers_NonInteractiveRequiresBaseBranch(t *testing.T) {
-	_, err := rules.BuildProjectAnswers(rules.InitProjectFlags{NonInteractive: true}, domain.InitDetectionResult{})
+func TestBuildProjectAnswers_UnattendedRequiresBaseBranch(t *testing.T) {
+	_, err := rules.BuildProjectAnswers(rules.InitProjectFlags{Unattended: true}, domain.InitDetectionResult{})
 	if err == nil {
-		t.Fatal("expected error when base branch is unresolved in non-interactive mode")
+		t.Fatal("expected error when base branch is unresolved in an unattended run")
 	}
 }
 

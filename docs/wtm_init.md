@@ -5,7 +5,8 @@ Initialize wtm configuration
 ### Synopsis
 
 Interactive wizard to set up global config and project config in <git-common-dir>/wtm/config.toml.
-Pass --non-interactive (or any config flag) to bootstrap from flags + auto-detection instead.
+Pass --yes (or any config flag) to bootstrap from flags + auto-detection instead; without a
+terminal, init does so on its own and never prompts.
 Use --only env|hooks|worktrees to re-run init for specific sections and regenerate them cleanly.
 Services & tasks are configured separately with `wtm run init`.
 
@@ -22,13 +23,12 @@ wtm init [flags]
       --env-strategy string      Env provisioning strategy: example, main, or parent
   -h, --help                     help for init
       --install-command string   Command to run after creating a worktree
-      --non-interactive          Bootstrap from flags + auto-detection; never prompt
       --only strings             Re-init only these sections (env, hooks, worktrees); regenerates them cleanly
       --shell string             Global shell: zsh, bash, or fish
       --skip-clean               Skip on_clean hooks config
       --skip-env                 Skip .env provisioning config
       --skip-hooks               Skip on_create hooks config
-      --yes                      Skip the re-init confirmation prompt
+  -y, --yes                      Run unattended: bootstrap (or re-init) from flags + auto-detection; never prompt
 ```
 
 ### Options inherited from parent commands

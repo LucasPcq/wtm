@@ -288,7 +288,7 @@ func NamespaceName(params NamespaceNameParams) string {
 
 type CarvedNamespaceParams struct {
 	Job domain.JobConfig
-	// Env is the worktree's: its WTM_WORKTREE and WTM_ORDINAL name the slice.
+	// Env is the worktree's: its WTM_WORKTREE and WTM_ORDINAL name the namespace.
 	Env map[string]string
 }
 

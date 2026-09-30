@@ -124,7 +124,7 @@ func ResolveDetectedPorts(params ResolveDetectedPortsParams) DetectedPortsOutcom
 	outcome.Renamed = sharing.Renamed
 
 	// After the namespaces are settled and before the ports are backfilled: a
-	// link reads the slice the step above just named, and may take an
+	// link reads the namespace the step above just named, and may take an
 	// [[env_port]] off a key it now writes in full.
 	merged = ApplyEnvValues(ApplyEnvValuesParams{
 		Config:  merged,

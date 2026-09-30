@@ -125,7 +125,7 @@ func TestTheJobsStopFirstAndTheClaimsGoLast(t *testing.T) {
 	d.daemon = processtest.Serve(t, []domain.JobInfo{
 		{Name: "postgres", Status: domain.JobStatusRunning, WorkDir: d.ctx.ProjectDir},
 		{Name: "api", Status: domain.JobStatusRunning, WorkDir: d.path},
-		{Name: "postgres", Status: domain.JobStatusAttached, WorkDir: d.path},
+		{Name: "postgres", Status: domain.JobStatusJoined, WorkDir: d.path},
 	})
 
 	if _, _, err := d.run(t, Request{}); err != nil {

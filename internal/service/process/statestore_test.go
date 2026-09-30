@@ -114,3 +114,34 @@ func TestStateStoreReplacesAnIndexFromAnOlderFormat(t *testing.T) {
 		t.Fatalf("reloaded %d records, want the one just saved over the stale file", len(got))
 	}
 }
+
+func TestStateStoreReadsAClaimIndexedBeforeTheRenameAsJoined(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "jobs.json")
+	legacy := `{"version":2,"jobs":[{"name":"postgres","work_dir":"/w/feat","attached":true}]}`
+	if err := os.WriteFile(path, []byte(legacy), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	records := NewStateStore(path).Load()
+	if len(records) != 1 || !records[0].Joined {
+		t.Fatalf("records = %+v, want the claim read as joined", records)
+	}
+
+	if err := NewStateStore(path).Save(records); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var written struct {
+		Jobs []map[string]any `json:"jobs"`
+	}
+	if err := json.Unmarshal(data, &written); err != nil {
+		t.Fatal(err)
+	}
+	job := written.Jobs[0]
+	if job["joined"] != true || job["attached"] != nil {
+		t.Fatalf("written = %v, want joined and no attached key", job)
+	}
+}

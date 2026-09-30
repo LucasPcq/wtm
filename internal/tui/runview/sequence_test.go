@@ -509,7 +509,7 @@ func TestRecapNamesTheNamespaceASharedJobCarved(t *testing.T) {
 	h := startedHarness(t, harnessParams{
 		Views: []runlogs.JobView{running("postgres")},
 	}, func(emitter runlogs.Sink) runlogs.Outcome {
-		emitter.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "postgres", Step: 1, Steps: 1, Attached: true, Namespace: "app_feat_x"})
+		emitter.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "postgres", Step: 1, Steps: 1, Joined: true, Namespace: "app_feat_x"})
 		outcome := runlogs.Outcome{Started: []string{"postgres"}, Steps: 1}
 		emitter.Emit(runlogs.Event{Phase: runlogs.PhaseReady, Outcome: outcome})
 		return outcome

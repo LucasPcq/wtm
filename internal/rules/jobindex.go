@@ -1,5 +1,7 @@
 package rules
 
+import "github.com/LucasPcq/wtm/internal/domain"
+
 // IndexVersionParams compares the format of the index on disk against the one
 // this binary writes. Two ints of the same type, so they are named rather than
 // ordered: swapping them silently inverts the verdict.
@@ -35,4 +37,38 @@ func ClassifyIndexVersion(params IndexVersionParams) IndexAccess {
 		return IndexAccess{Freeze: true}
 	}
 	return IndexAccess{}
+}
+
+// CurrentJobStatus reads a status a daemon built before the attached → joined
+// rename may still report.
+func CurrentJobStatus(status domain.JobStatus) domain.JobStatus {
+	if status == domain.JobStatusLegacyAttached {
+		return domain.JobStatusJoined
+	}
+	return status
+}
+
+func CurrentJobInfos(jobs []domain.JobInfo) []domain.JobInfo {
+	if jobs == nil {
+		return nil
+	}
+	current := make([]domain.JobInfo, len(jobs))
+	for i, job := range jobs {
+		job.Status = CurrentJobStatus(job.Status)
+		current[i] = job
+	}
+	return current
+}
+
+func CurrentJobRecords(records []domain.JobRecord) []domain.JobRecord {
+	if records == nil {
+		return nil
+	}
+	current := make([]domain.JobRecord, len(records))
+	for i, record := range records {
+		record.Joined = record.Joined || record.LegacyAttached
+		record.LegacyAttached = false
+		current[i] = record
+	}
+	return current
 }

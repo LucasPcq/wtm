@@ -98,7 +98,7 @@ self-documenting:
 | `12` | config not found — repo not initialized (`wtm init`) |
 | `14` | service/job not declared in `run.toml` |
 | `15` | `extract`: selected changes conflict with the target worktree |
-| `16` | run module not initialized — run `wtm run init` first |
+| `16` | no run.toml (no job or profile declared) — run `wtm run init` |
 | `17` | `upgrade`: this install cannot be upgraded — built from source, or the binary is not writable |
 
 ## Discovery first — get names before you act
@@ -221,7 +221,7 @@ flagged; everything else is what the name implies.
 - `wtm env [worktree]` — detect and fix a worktree's `.env` drift: reconcile it against its
   committed **template** (the expected keys, read from the worktree itself) plus a single
   **value source** chosen by the worktree's recorded strategy — never a silent mix:
-  `example` → template placeholders only; `main` → the main worktree; `parent` → the parent
+  `example` → template placeholders only; `main` → the main checkout; `parent` → the parent
   worktree **only** (a key the parent lacks stays `missing_unresolved`, it is NOT pulled from
   main). The one exception (mirroring `wtm create`): when there is no readable parent file at
   all — the parent has no worktree, or that file isn't in it — it falls back to main for that
@@ -333,8 +333,8 @@ flagged; everything else is what the name implies.
 through `run init`, `run job` and `run profile`, never by hand — every field a job declares
 has a flag on `run job add` / `run job edit`, and a write is refused exactly as loading the
 file would refuse it). Each is a `service` (long-running) or `task` (one-shot, blocks the profile,
-non-zero exit aborts it); profiles are named, ordered job groups. The module is **opt-in**
-and **experimental**: the global `wtm init` does not configure it.
+non-zero exit aborts it); profiles are named, ordered job groups. The module is **opt-in**:
+the global `wtm init` does not configure it.
 - `run init` sets up `run.toml` from detection (docker-compose + package scripts). It is
   the only entry point that works before the module exists; every other run command exits
   `16` (run module not initialized) until at least one job/profile is declared. Non-TTY it
@@ -346,9 +346,9 @@ and **experimental**: the global `wtm init` does not configure it.
   declared port is the port it binds, in every worktree), its published URL carries **no
   worktree segment** (`db.projet.localhost`, not `db.feat-x.projet.localhost`), and its logs
   are the same stream whichever worktree you read them from. In `run ps` / `--output json`
-  the worktrees holding it report status **`attached`** with `pid: 0`: that is a claim on the
+  the worktrees holding it report status **`joined`** with `pid: 0`: that is a claim on the
   one running instance, not a second process — never count one service per worktree from it.
-  Starting one from a worktree other than the main checkout reports `attached`, not `started`.
+  Starting one from a worktree other than the main checkout reports `joined`, not `started`.
   When the start carved out this worktree's namespace, the job's result carries it as
   `namespace` (`app_feat-x`) — absent on a start refused as already running, which ran no create.
   `run stop` in a worktree releases only that worktree's claim; the service itself stops when
@@ -357,14 +357,14 @@ and **experimental**: the global `wtm init` does not configure it.
   reports status **`released`** (human: `released — still up elsewhere`), not `stopped`.
   A `run stop` that found nothing up under that name in that worktree reports
   **`not_running`** (human: `= api not running`, exit 0) — never `stopped`. Main
-  starting a service another worktree already runs joins it (`attached`) and carves its own
+  starting a service another worktree already runs joins it (`joined`) and carves its own
   namespace.
 - **A shared job may carve out a namespace per worktree.** `[job.namespace]` names it (`name`,
   `create`, `remove`, `env`) so each worktree keeps its own data — a database, a set of
   keycloak realms. wtm runs the declared commands and knows nothing else about them; they get
   the worktree's whole environment plus `$WTM_NAMESPACE`, `$WTM_WORKTREE`, `$WTM_ORDINAL`.
   `create` runs on **every** start of the shared service, so it must be safe to run again —
-  wtm keeps no record of having run it. A `create` that fails when the slice already exists
+  wtm keeps no record of having run it. A `create` that fails when the namespace already exists
   fails the run.
   Configuration values use `{worktree}` / `{ordinal}`; commands use the `$WTM_*` variables.
   A shared job with **no** `[job.namespace]` is valid and means one instance with one set of data.
@@ -377,7 +377,7 @@ and **experimental**: the global `wtm init` does not configure it.
   loader refuses it — unsharing one is `--scope worktree --namespace-name ''`.
   When a user finds isolation expensive (an empty database to migrate and seed, a realm to
   rebuild), the answer is a `create` that **clones** the data main uses rather than an empty
-  slice — e.g. `CREATE DATABASE "$WTM_NAMESPACE" TEMPLATE app`, guarded by an existence check
+  namespace — e.g. `CREATE DATABASE "$WTM_NAMESPACE" TEMPLATE app`, guarded by an existence check
   since `create` runs at every start. Suggest it; do not suggest sharing main's database,
   which lets one branch's migration break the other.
 - **`touches` marks a job that changes data** (a migration, a reset, a seed):
@@ -390,15 +390,15 @@ and **experimental**: the global `wtm init` does not configure it.
   (repeatable, replaces the list, `''` drops it); a name that is not a declared job is
   refused. **Whenever you add a job that migrates, resets or seeds data, pass `--touches`**
   — nothing sets it unasked, and without it the job escapes the check below. `run up` and `run start`
-  refuse to start such a job where the data is not the worktree's own — its source's for a
-  **verbatim** worktree, everyone's for a shared service with **no** namespace. A task a
+  refuse to start such a job on **foreign data** — data this worktree does not own: its
+  source's for a **verbatim** worktree, everyone's for a shared service with **no** namespace. A task a
   runner starts through its `runs` counts too (`migrate (run by dev)`). On your paths
   that is an error (exit 1) naming the jobs, `--force` and the fix for each cause —
   `wtm env <wt> --isolation isolated` for a verbatim worktree, a `[job.namespace]` on the
   service for a shared one (isolating does nothing for it);
   **pass `--force` only when the user asked** for the reset to reach that data. The main
   checkout is never stopped, and a job without `touches` is never checked.
-- **`[[env]]` is how a slice reaches the app.** `[[env_port]]` rewrites the port *inside* a
+- **`[[env]]` is how a namespace reaches the app.** `[[env_port]]` rewrites the port *inside* a
   value and leaves the rest alone — it says where a service answers. `[[env]]` writes a key's
   **whole** value from a template, which is the only way to express something opaque like a
   realm or a database name: `file`, `key`, `job`, `value`, where value draws on `{namespace}`,
@@ -418,7 +418,7 @@ and **experimental**: the global `wtm init` does not configure it.
   Only jobs the wizard itself proposed can be removed: one added with `run job add` appears
   in no detected list, so it is never touched. The same symmetry holds for the URLs step (a
   job you unpublish stays unpublished) and the profiles step (deleting them all keeps them
-  deleted). This only applies to interactive runs — `--non-interactive` never removes.
+  deleted). This only applies to interactive runs — `--yes` never removes.
 - **`run init` composes a startable configuration.** It proposes every compose file and
   package script but checks only scripts whose name contains `dev` — and not a root `dev`
   a workspace package also declares, which is an orchestrator (`turbo run dev`) that would
@@ -542,7 +542,7 @@ and **experimental**: the global `wtm init` does not configure it.
 - **Isolation — decided once per worktree, at creation.** `create`, `extract` and `checkout`
   ask it whenever run.toml declares something to isolate (a port, a namespace, a `.env`
   link, a compose stack), and record the answer with the worktree. **`isolated`** (the
-  default): wtm writes the worktree's own ports, `COMPOSE_PROJECT_NAME` and `[[env]]` slices
+  default): wtm writes the worktree's own ports, `COMPOSE_PROJECT_NAME` and `[[env]]` namespaces
   into its `.env`, and the daemon runs its jobs on the same shifted ports and carves its
   namespaces. **`verbatim`**: the `.env` stays **byte for byte** as copied — no port, no
   identity, no `[[env]]` value — and the daemon runs the worktree as that file describes it:
@@ -612,14 +612,15 @@ and **experimental**: the global `wtm init` does not configure it.
   `run open [worktree] --job <name>` opens the same URL in a
   browser; it may offer a picker, but only in a fully interactive run, so **always name
   the job**.
-- **The URL is a name, not a port.** With the proxy on (the default), a published job
-  answers at `http://<job>.<worktree>.<repo>.localhost:11080` — that order on purpose, so a
+- **The URL is a name, not a port.** Two words for the two forms: the **named URL**, served
+  by the proxy, and the **port URL** (`--raw`, `http://localhost:<port>`). With the proxy on
+  (the default), a published job answers at `http://<job>.<worktree>.<repo>.localhost:11080` — that order on purpose, so a
   cookie set on `.<worktree>.<repo>.localhost` stays inside that worktree. **That URL may
   carry no port at all**: `wtm run proxy install` redirects port 80 to the proxy, after
   which `run url` prints `http://<job>.<worktree>.<repo>.localhost`. Never assume a `:port`
   suffix is present — read the whole line `run url` gives you. The proxy runs
-  inside the background daemon and dies with it. **`--raw` prints `http://localhost:<port>`
-  instead** — no proxy has to be up, and every OS resolves it, so **prefer `--raw` for
+  inside the background daemon and dies with it. **`--raw` prints the port URL
+  (`http://localhost:<port>`) instead** — no proxy has to be up, and every OS resolves it, so **prefer `--raw` for
   anything you dial yourself** (curl, a health check, a test runner). Two limits worth
   knowing: only HTTP jobs get a name (postgres and redis stay on their ports, by design),
   and outside a browser `*.localhost` is not guaranteed to resolve on Linux — one more
@@ -661,7 +662,7 @@ and **experimental**: the global `wtm init` does not configure it.
   `wtm run up` on it simply relaunches the launcher rather than refusing "already
   running". Of the rest, `running` is a foreground service the daemon holds a terminal
   for, `crashed` one whose process died on its own, `stopped` one that was stopped —
-  by `run stop`, or by whoever took a verified compose stack down — and `attached` a
+  by `run stop`, or by whoever took a verified compose stack down — and `joined` a
   worktree's claim on a shared service (see the shared-services section: `pid` is 0 on
   a claim, and on a launcher whatever became of it).
 - **`reaped` is the sixth, and it says wtm killed something.** A daemon killed without
@@ -705,7 +706,7 @@ and **experimental**: the global `wtm init` does not configure it.
   privilege — launchd binds port 80 and hands the socket to wtm — but it installs a
   LaunchAgent in the user's home, so **do not run it on your own initiative**: propose it,
   and let the user decide. Without a terminal it refuses unless you pass `--yes`.
-- `run init` accepts `--yes` (its older `--non-interactive` still works) — the run module's
+- `run init` accepts `--yes` / `-y` (`--non-interactive` is gone) — the run module's
   own bootstrap, which writes run.toml and may rewrite compose files and .env.
 - `run url --job <name> --output json` returns **that job alone**, not the whole array.
 - `run export` / `run import` — share a layout as JSON. **`run import` replaces the whole
@@ -798,7 +799,7 @@ and **experimental**: the global `wtm init` does not configure it.
 - **The addressing mode decides what a `.env` value pointing at another job holds.**
   `addressing` in run.toml, `"names"` (the default when absent) or `"ports"`, asked by
   `run init` whenever any job publishes a url. It is the one setting with a consequence
-  outside wtm: **named urls are served by the run proxy, which lives in the run daemon**,
+  outside wtm: **named URLs are served by the run proxy, which lives in the run daemon**,
   so a value like `VITE_API_URL=http://api.feat-x.repo.localhost:11080` answers while
   `wtm run` is running that job and **not** when the developer starts it themselves —
   the routing table is a projection of what the daemon started. A project whose author
@@ -916,7 +917,7 @@ and **experimental**: the global `wtm init` does not configure it.
   Running it with the mode already in place settles what an earlier `--keep-env` left behind.
   Setting `ports` is a real inverse — port numbers go back into values wtm wrote as addresses. On a machine where the proxy is off (`[proxy] enabled = false`),
   ports are written whatever the project asked for, and the pass says so in one notice.
-  **Under `names`, the named URL is the only working entrance** — the raw `localhost:<port>`
+  **Under `names`, the named URL is the only working entrance** — the port URL (`localhost:<port>`)
   sends an `Origin` the API no longer accepts, so always read the address from `run url`.
 - **The main checkout is never provisioned, so under `names` its `.env` still holds ports.**
   wtm writes a worktree's `.env` at creation and on `wtm env`; nothing moves main's onto names
@@ -927,7 +928,7 @@ and **experimental**: the global `wtm init` does not configure it.
   is out of step gets one warning line naming the command that aligns it (`wtm env <worktree>`)
   — a `!` line in the stream, a band in the run view, a note under the RUN rows in `wtm ui`.
   Until it runs, a cross-origin call through the name is refused; `run url --raw` gives the
-  port that works meanwhile. The route is registered either way, so nothing restarts. Only keys declared as `[[env_port]]` links are seen,
+  port URL that works meanwhile. The route is registered either way, so nothing restarts. Only keys declared as `[[env_port]]` links are seen,
   so silence means nothing **linked** is out of step. A `.env` already on names whose port
   went stale keeps its names and is told they are out of step. Aligning main is a **choice**: it stops behaving as a
   checkout without wtm, and going back means `wtm run addressing ports` (which brings main back
@@ -950,9 +951,11 @@ and **experimental**: the global `wtm init` does not configure it.
 
 **Setup**
 - `wtm config show` inspects config; `wtm config edit` and the `wtm init` wizard are
-  interactive. Bootstrap non-interactively with
-  `wtm init --non-interactive [--base-branch … --env-strategy … --install-command … --clean-command …]`, and
-  reconfigure one section later with `wtm init --only env|hooks|worktrees --non-interactive --yes`.
+  interactive. Bootstrap unattended with
+  `wtm init --yes [--base-branch … --env-strategy … --install-command … --clean-command …]` —
+  global config included, never a prompt (`--non-interactive` is gone) — and reconfigure one
+  section later with `wtm init --only env|hooks|worktrees --yes`. Without a terminal `wtm init`
+  behaves the same even without `--yes`; an undetectable base branch errors naming `--base-branch`.
   Services are **not** part of `wtm init` — configure them with `wtm run init`.
   See their `--help` for the full flag set.
 - `wtm upgrade` updates **the CLI itself**, never worktrees — that is `wtm sync`. **Do not
@@ -970,7 +973,7 @@ and **experimental**: the global `wtm init` does not configure it.
 
 On non-zero exit, read stderr, then:
 
-- `12` (config not found) → repo not initialized. Run `wtm init --non-interactive` with
+- `12` (config not found) → repo not initialized. Run `wtm init --yes` with
   flags, or ask the user to run interactive `wtm init`.
 - `17` (`upgrade` unsupported) → nothing to retry. Report the message: a source build updates
   with `git pull && make install`, an unwritable binary needs the user to re-run with sudo.
@@ -984,7 +987,7 @@ On non-zero exit, read stderr, then:
   different `--to`. Covers both a file modified on both sides and one that merely already
   exists in the target. Exception: an untracked **binary** file already in the target cannot
   take conflict markers — `resolve` won't help, pick a different `--to`.
-- `16` (run module not initialized) → run `wtm run init` (or `wtm run init --non-interactive`)
+- `16` (run module not initialized) → run `wtm run init` (or `wtm run init --yes`)
   to create `run.toml`, then re-run the command.
 - `gh: …` → `gh` isn't authenticated; tell the user to run `gh auth login`.
 - A `run up` job failed → its entry in the JSON array is `{"name", "status": "error",
@@ -1009,4 +1012,4 @@ On non-zero exit, read stderr, then:
 - `wtm config edit` is the natural answer — ask the user to run it, or read with `wtm
   config show` and write the change to the printed path if you have a file-edit tool and
   the user authorized it.
-- You can't supply a value that non-interactive `wtm init` requires.
+- You can't supply a value that `wtm init --yes` requires.

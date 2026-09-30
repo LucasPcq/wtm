@@ -6,6 +6,19 @@ Manage dev jobs (services + tasks)
 
 Run commands and profiles declared in <git-common-dir>/wtm/run.toml — long-running services and one-shot tasks.
 
+Vocabulary:
+  job             the unit wtm runs; its kind is service (long-running) or task (one-shot)
+  profile         a named, ordered group of jobs
+  compose stack   a job that runs `docker compose`; an isolated worktree gets its own compose project
+  shared service  a job with scope = "shared": one instance for the repository, run in
+                  the main checkout; a worktree holding it reports it as joined
+  namespace       a worktree's own part of a shared service — a database, a realm
+  named URL       the address the run proxy serves (http://api.feat-x.myrepo.localhost)
+  port URL        the job's own port (http://localhost:4012), printed with --raw
+  foreign data    data this worktree does not own: its source's when it is verbatim,
+                  every worktree's for a shared service with no namespace; a job whose
+                  touches reach it is refused unless --force
+
 ### Options
 
 ```

@@ -366,7 +366,7 @@ func projectCell(params projectCellParams) string {
 
 func styleJobStatus(status domain.JobStatus) string {
 	switch status {
-	case domain.JobStatusRunning, domain.JobStatusDetached, domain.JobStatusAttached:
+	case domain.JobStatusRunning, domain.JobStatusDetached, domain.JobStatusJoined:
 		return styles.Success.Render(string(status))
 	case domain.JobStatusCrashed, domain.JobStatusReaped:
 		return styles.Warning.Render(string(status))

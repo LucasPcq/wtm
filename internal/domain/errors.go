@@ -135,7 +135,7 @@ var (
 	// ErrRunNotInitialized is returned when a run command runs before the run
 	// module is initialized — run.toml is absent or declares no job/profile. The
 	// message points at the dedicated setup command.
-	ErrRunNotInitialized = errors.New("run module not initialized — run `wtm run init` first")
+	ErrRunNotInitialized = errors.New("no run.toml — run `wtm run init`")
 
 	// ErrExtractConflict is returned when the selected changes do not apply
 	// cleanly onto the target worktree. The extraction is aborted and the source

@@ -211,8 +211,8 @@ func TestSharedServiceCrashReleasesItsClaims(t *testing.T) {
 	waitForStatus(t, m, domain.JobStatusCrashed)
 
 	for _, j := range m.List() {
-		if j.Status == domain.JobStatusAttached {
-			t.Errorf("claim of %s still attached to a crashed service", j.WorkDir)
+		if j.Status == domain.JobStatusJoined {
+			t.Errorf("claim of %s still joined to a crashed service", j.WorkDir)
 		}
 	}
 

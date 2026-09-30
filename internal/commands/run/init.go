@@ -26,7 +26,7 @@ import (
 )
 
 // newInitCmd creates the wtm run init subcommand — the dedicated entry point
-// that configures the (experimental) run module, kept out of the global
+// that configures the run module, kept out of the global
 // `wtm init` wizard so users who never touch `run` aren't bothered by it.
 func newInitCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -34,12 +34,12 @@ func newInitCmd() *cobra.Command {
 		Short: "Configure the run module (services & tasks) for this repo",
 		Long: "Set up run.toml by detecting docker-compose files and package.json scripts and turning\n" +
 			"the selected ones into jobs.\n\n" +
-			"In a TTY, opens a wizard to pick which ones to include; non-interactively (or piped),\n" +
+			"In a TTY, opens a wizard to pick which ones to include; with --yes (or piped),\n" +
 			"auto-generates from detection. Re-running pre-fills every step from the existing\n" +
 			"run.toml: what stays checked is kept, what you uncheck is removed along with the\n" +
 			"profile entries and .env links naming it. Only jobs this wizard proposed are ever\n" +
 			"removed — one added with `wtm run job add` is never listed, so never touched.\n" +
-			"A non-interactive run asks nothing and removes nothing.\n\n" +
+			"An unattended run asks nothing and removes nothing.\n\n" +
 			"Ports declared in the selected compose files become per-worktree ports. A literal\n" +
 			"host port (\"5432:5432\") binds the same port everywhere, so wtm offers to rewrite it\n" +
 			"as \"${DB_PORT:-5432}:5432\" — the default keeps `docker compose up` working on its\n" +
@@ -62,18 +62,17 @@ func newInitCmd() *cobra.Command {
 			"mentions the port it is given, the wizard offers it for editing on the spot\n" +
 			"(`pnpm dev --port ${PORT}`) rather than reporting it once it is too late.\n\n" +
 			"The mode those names are written in is asked too, because it is the one choice\n" +
-			"with a consequence outside wtm: named urls are served by the run proxy, so they\n" +
+			"with a consequence outside wtm: named URLs are served by the run proxy, so they\n" +
 			"answer while `wtm run` runs the job and not when you start it yourself. A project\n" +
 			"whose author launches their own dev servers wants ports.\n\n" +
 			"Every service that declares the port it listens on is then offered a name of its\n" +
 			"own — <job>.<worktree>.<repo>.localhost, served by the proxy — so two worktrees\n" +
 			"stop sharing a cookie jar. A port a job only dials (DB_PORT, REDIS_PORT) is never\n" +
-			"offered: a name nothing answers under is worse than no name at all.\n\n" +
-			domain.ExperimentalRunNotice,
+			"offered: a name nothing answers under is worse than no name at all.",
 		Args: cobra.NoArgs,
 		RunE: runRunInit,
 	}
-	shared.AddNoPromptFlags(cmd, "Auto-generate from detection; never prompt")
+	shared.AddYesFlag(cmd, "Run unattended: auto-generate from detection; never prompt")
 	cmd.Flags().Bool(domain.FlagPatchCompose, false, "Rewrite the selected compose files' literal host ports and absolute names to read a variable")
 	cmd.Flags().Bool(domain.FlagLinkEnv, false, "Link the .env keys holding a declared port, so each worktree gets its own")
 	cmd.Flags().Bool(domain.FlagWritePortKeys, false, "Write each declared port into the job's .env and its template, so an app launched by hand reads the worktree's port")
@@ -91,11 +90,12 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	nonInteractive := shared.NoPrompt(cmd)
+	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
+	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 	patchCompose, _ := cmd.Flags().GetBool(domain.FlagPatchCompose)
 	linkEnv, _ := cmd.Flags().GetBool(domain.FlagLinkEnv)
 	writePortKeys, _ := cmd.Flags().GetBool(domain.FlagWritePortKeys)
-	interactive := !nonInteractive && term.IsTerminal(int(os.Stdin.Fd()))
+	interactive := shared.Interactive(shared.UnattendedParams{TTY: term.IsTerminal(int(os.Stdin.Fd())), Format: format, Yes: yes})
 
 	var detection domain.InitDetectionResult
 	var envScans map[string]domain.EnvPortScan
@@ -195,8 +195,6 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 			output.Blank(w)
 			output.NextStep(w, output.NextStepParams{Command: domain.RunInitByHandJob, Note: domain.RunInitByHandJobNote})
 			output.NextStep(w, output.NextStepParams{Command: domain.RunInitByHandProfile, Note: domain.RunInitByHandProfNote})
-			output.Blank(w)
-			output.Message(w, domain.ExperimentalRunNotice)
 		})
 		return nil
 	}
@@ -386,8 +384,6 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 		output.Blank(w)
 		output.NextStep(w, output.NextStepParams{Command: domain.RunInitNextUp, Note: domain.RunInitNextUpNote})
 		output.NextStep(w, output.NextStepParams{Command: domain.RunInitNextJobAdd, Note: domain.RunInitNextJobAddNote})
-		output.Blank(w)
-		output.Message(w, domain.ExperimentalRunNotice)
 	})
 	return nil
 }
@@ -404,7 +400,7 @@ type resolveServicesParams struct {
 }
 
 // resolveServicesAnswers gathers the services selection either from the wizard
-// (interactive) or straight from detection (non-interactive). On a re-run the
+// (interactive) or straight from detection (unattended). On a re-run the
 // wizard is pre-filled with what run.toml already declares so the subsequent
 // merge is additive rather than a fresh overwrite.
 func resolveServicesAnswers(params resolveServicesParams) (domain.InitProjectAnswers, error) {
