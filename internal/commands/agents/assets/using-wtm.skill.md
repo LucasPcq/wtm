@@ -44,8 +44,9 @@ self-documenting:
 4. **Trust exit codes.** `0` = success. Beyond generic `1`, wtm returns granular codes
    (table below) so you can branch precisely. On failure, surface the stderr text.
 5. **JSON mode requires `--yes` on every mutating command.** JSON is non-interactive, so any
-   command that changes state (`create`, `clean`, `prune`, `sync`, `relocate`, `reparent`,
-   `extract`, `checkout`) needs `--yes` — it errors otherwise. Two orthogonal axes: **`--yes`**
+   command that changes state (`create`, `clean`, `prune`, `sync`, `fast-forward`, `relocate`,
+   `reparent`, `extract`, `checkout`, `env`) needs `--yes` — it errors otherwise (`env --check`,
+   which writes nothing, is the one exception). Two orthogonal axes: **`--yes`**
    resolves confirmations/decisions from flags and safe defaults; **`--force`** only lifts
    safety refusals and does *not* imply `--yes` (`--force` alone is rejected in JSON). Required
    selections must still be passed explicitly: `clean` needs a branch (add `--force` to also
@@ -263,12 +264,19 @@ flagged; everything else is what the name implies.
   interactively (else it errors — there is no picker under `--yes`/JSON). JSON shape:
   `{branch,mode,check,files:[{target,strategy,source,applied,parent_branch,parent_fallback,diff:{mode,
   entries:[{key,status,current_value,resolved_value,placeholder,source,export}]}}],ports:{offset,
-  applied,entries:[{file,key,port,base,resolved,status,current_value,new_value}]},isolation,
+  addressing,public_port,entries:[{file,key,port,base,resolved,moves:[{port,job,base,resolved}],
+  addressing,status,current_value,new_value,foreign_host}],owned:[{file,key,value,changed}],
+  applied},isolation,
   isolation_adoption,isolation_changed,restored:[{file,key,from,to,removed}],warnings}` where
   `status` is `resolved` / `missing_unresolved` / `conflict` / `orphan`. Round-trip is
   preserved: comments, ordering and formatting of the `.env` are kept; only decided keys change,
   and a changed value keeps its line's quotes, inline comment, `export` and CRLF ending.
   The `ports` block is the `[[env_port]]` pass (below), empty when the project declares none;
+  `ports.addressing` is what the project asked for (`names` / `ports`) while each entry's
+  `addressing` is how that one value was written; `public_port` is the port a named URL
+  announces (absent when nothing serves names); `moves` lists every port a value holding
+  several origins follows; `foreign_host` is where a value pointed that the proxy does not
+  serve; `owned` are the values wtm writes whole (`COMPOSE_PROJECT_NAME`, `[[env]]`).
   `ports.applied` says whether those rewrites were written, and the trailing summary counts
   them alongside the files (a run that only shifted a port still reports what it wrote).
   `isolation` is the worktree's; a `verbatim` one always has an empty `ports` block.
@@ -599,12 +607,14 @@ the global `wtm init` does not configure it.
   one: `run up a b --exclusive` errors. Where the project settled on `exclusive` and the run
   starts several anyway, your paths take the safe default — everything starts, nothing else
   is stopped — and a notice says the setting was set aside.
-- **`--yes` is on every `run` command**, `run job`/`run profile`/`run list`/`run open`
-  included (`run url` alone has none — it asks nothing), and is the confirmation axis: it runs unattended,
+- **`--yes` is on every `run` command that can ask something**, `run job`/`run profile`/`run list`/`run open`
+  included; the read-only ones that never ask — `run url`, `run ps`, `run export`, `run daemon status`,
+  `run proxy status` — have none. It is the confirmation axis: it runs unattended,
   never opens a picker, and resolves each question to its documented safe default. Where
   there is no safe default it errors naming the flag — `run start --yes` and `run stop
-  --yes` require `--job`. There is no `--force` in the run module: nothing here refuses for
-  safety, so there is nothing to lift — except `run job rm --force`, which lets a job go
+  --yes` require `--job`. `--force` is the safety axis here too, on three commands only:
+  `run up --force` / `run start --force` lift the refusal to start a job whose `touches` reach
+  foreign data (see "Isolation"), and `run job rm --force` lets a job go
   along with every reference naming it (profiles, `runs`, `touches`, `[[env_port]]`,
   `[[env]]`) and even while a worktree still holds data in it (a shared service's namespace:
   clean will then no longer drop that data). Without `--force` the refusal names each kind of
@@ -700,7 +710,8 @@ the global `wtm init` does not configure it.
   there is listed.
 - **The daemon survives nothing, and that is by design.** It exits ~30 s after the last
   *foreground* job, and detached services keep running without it. It records what it
-  started in `~/.config/wtm/jobs.json`, so the next daemon picks those back up: after a
+  started in `jobs.json`, beside the global config (`~/.config/wtm/` on Linux,
+  `~/Library/Application Support/wtm/` on macOS), so the next daemon picks those back up: after a
   reboot, `wtm run ps` still lists the detached stacks and `wtm run down` still stops
   them. `run down`, `clean` and `prune` start a daemon by themselves when that index
   holds something for the worktree they act on.
@@ -827,7 +838,7 @@ the global `wtm init` does not configure it.
   `wtm run` is running that job and **not** when the developer starts it themselves —
   the routing table is a projection of what the daemon started. A project whose author
   launches dev servers by hand wants `"ports"`. When the proxy is disabled on the machine
-  (`[proxy] port = 0`), wtm writes ports whatever the mode says, and reports it. Only the
+  (`[proxy] enabled = false` in the global config — `port = 0` only means the default port), wtm writes ports whatever the mode says, and reports it. Only the
   values of jobs that publish a url are affected: a `DATABASE_URL` or a bare `*_PORT`
   stays a port either way. The mode also decides **what the run surfaces announce**: under
   `"ports"`, `run up` / `run start` / `run ps` / `run url` / `run open` and the run view hand
@@ -915,7 +926,7 @@ the global `wtm init` does not configure it.
   two apps may each declare a `PORT`, and the name alone would not say which base the key
   follows. The error names the jobs that do declare the port, so the fix is the line to
   write. A link naming a `.env` that is not a configured
-  `[env]` target of `.wtm.toml` is refused too. `wtm env --mode refresh` compares linked
+  `[env]` target of `config.toml` is refused too. `wtm env --mode refresh` compares linked
   values **modulo the offset**, so a worktree holding `5442` against a source holding `5432`
   is not a conflict — but a genuine difference in the same value still is.
 - **A linked value that is a URL gets the job's whole address, not its port**, when the job

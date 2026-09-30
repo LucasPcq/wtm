@@ -92,7 +92,7 @@ The one proposal wtm makes for a template is `{namespace}` — the same decision
 
 The step **migrates rather than stacks**. Marking a key that an `[[env_port]]` link already writes takes that link off, since the two are refused together at load — a wizard that wrote both would produce a config wtm then refuses to read, which is the worst outcome a wizard can have. The pruning happens once both tables are complete: the init pipeline settles the values and then appends more port links, so the last word is taken after that append.
 
-Re-init is symmetric like every other step (`EnvValuesAsked`, the same `(value, asked)` pair): unchecking every row withdraws every link the step offered, a run that never asked leaves run.toml standing, and a link on a file the step never showed — one `.wtm.toml` no longer configures — survives untouched. A step may only remove what it proposed.
+Re-init is symmetric like every other step (`EnvValuesAsked`, the same `(value, asked)` pair): unchecking every row withdraws every link the step offered, a run that never asked leaves run.toml standing, and a link on a file the step never showed — one `config.toml` no longer configures — survives untouched. A step may only remove what it proposed.
 
 ### Knowing a namespace exists
 
