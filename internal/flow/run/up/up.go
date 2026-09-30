@@ -4,13 +4,12 @@ package up
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/run/addressing"
+	"github.com/LucasPcq/wtm/internal/flow/run/concurrency"
 	"github.com/LucasPcq/wtm/internal/flow/run/foreigndata"
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/flow/run/seam"
@@ -98,11 +97,10 @@ type upFlow struct {
 	named []target.Resolved
 	// jobs and running are one reading of the daemon's index: what runs where,
 	// for the worktree badges and for the concurrency question.
-	jobs    []domain.JobInfo
-	running map[string]int
-	service runlogs.Service
-	// offsets memoizes each worktree's port offset for the clash check.
-	offsets map[string]int
+	jobs        []domain.JobInfo
+	running     map[string]int
+	service     runlogs.Service
+	concurrency *concurrency.Question
 }
 
 func (f *upFlow) run() (Outcome, error) {
@@ -124,6 +122,7 @@ func (f *upFlow) run() (Outcome, error) {
 	if err := f.connect(); err != nil {
 		return Outcome{}, err
 	}
+	f.concurrency = f.question()
 
 	answers, err := f.prompter.Ask(f.session())
 	if errors.Is(err, domain.ErrUserAborted) {
@@ -133,7 +132,7 @@ func (f *upFlow) run() (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	if answers.Value(KeyConcurrency) == answerCancel {
+	if f.concurrency.Cancelled(answers) {
 		f.presenter.Notice(flow.AbortedNotice)
 		return Outcome{Aborted: true}, nil
 	}
@@ -142,7 +141,7 @@ func (f *upFlow) run() (Outcome, error) {
 	}
 	// Before anything is stopped: a selection that is its own conflict must not
 	// cost the other worktrees their jobs first.
-	if clashes := rules.SelfPortClashes(f.startingClaims(answers)); len(clashes) > 0 {
+	if clashes := rules.SelfPortClashes(f.concurrency.StartingClaims(answers)); len(clashes) > 0 {
 		return Outcome{}, fmt.Errorf(domain.RunSelfPortClashFmt, strings.Join(rules.PortClashLines(clashes), "\n"))
 	}
 	if proceed, err := f.allowForeignData(answers); err != nil || !proceed {
@@ -152,11 +151,9 @@ func (f *upFlow) run() (Outcome, error) {
 		return Outcome{Aborted: err == nil}, err
 	}
 
-	if err := f.remember(answers); err != nil {
-		return Outcome{}, err
-	}
-	f.noticeOverridden(answers)
-	if err := f.clearOthers(answers); err != nil {
+	cfg, err := f.concurrency.Apply(answers)
+	f.request.Config = cfg
+	if err != nil {
 		return Outcome{}, err
 	}
 
@@ -202,99 +199,6 @@ func (f *upFlow) connect() error {
 			return nil
 		},
 	})
-}
-
-// remember writes the answer to run.toml when the user asked for it to stand.
-// It is never silent: a file changed without a word is a file nobody knows to
-// change back.
-func (f *upFlow) remember(answers flow.Answers) error {
-	answer := answers.Value(KeyConcurrency)
-	if !remembers(answer) {
-		return nil
-	}
-
-	cfg := f.request.Config
-	cfg.Concurrency = concurrencyOf(answer)
-	if err := runconfig.Save(runconfig.SaveParams{StateDir: f.ctx.StateDir, Config: cfg}); err != nil {
-		return fmt.Errorf("remember concurrency: %w", err)
-	}
-	f.request.Config = cfg
-	f.presenter.Status(flow.Notice{
-		Kind: flow.NoticeMessage,
-		Text: fmt.Sprintf(domain.RunConcurrencyRememberedFmt, cfg.Concurrency),
-	})
-	return nil
-}
-
-// noticeOverridden says the project's settled answer could not be applied to
-// this run. It is only ever reached where nobody could be asked: the safe
-// default destroys nothing, and a default that goes unsaid is a default nobody
-// can correct.
-func (f *upFlow) noticeOverridden(answers flow.Answers) {
-	if answers.Answered(KeyConcurrency) || !f.decideConcurrency(answers).Contradiction {
-		return
-	}
-	f.presenter.Status(warning(fmt.Sprintf(domain.RunConcurrencyOverriddenFmt,
-		f.request.Config.Concurrency, len(f.workDirs(answers)))))
-}
-
-// clearOthers stops the other worktrees' jobs when that is what was decided.
-// A worktree that refuses to stop is reported and the run carries on: the
-// answer was about this machine's load, not about a dependency.
-func (f *upFlow) clearOthers(answers flow.Answers) error {
-	if f.concurrency(answers) != domain.ConcurrencyExclusive {
-		return nil
-	}
-	others := f.otherWorktrees(answers)
-	if len(others) == 0 {
-		return nil
-	}
-
-	dirs := make([]string, 0, len(others))
-	for dir := range others {
-		dirs = append(dirs, dir)
-	}
-	sort.Strings(dirs)
-
-	client := process.NewClient(process.SocketPath())
-	// Reported after the stage, never inside it: a spinner owns the stream while
-	// it runs, so a line written under it is repainted over — and the block it
-	// opened is then marked open with nothing on screen to show for it.
-	var reports []flow.Notice
-	err := f.presenter.Stage(flow.StageParams{
-		Message: domain.RunStoppingOthers,
-		Work: func() error {
-			for _, dir := range dirs {
-				reports = append(reports, stopReport(client, dir))
-			}
-			return nil
-		},
-	})
-	if err != nil {
-		return err
-	}
-	for _, report := range reports {
-		f.presenter.Status(report)
-	}
-	return nil
-}
-
-func stopReport(client *process.Client, dir string) flow.Notice {
-	resp, err := client.Send(process.Request{Action: process.ActionStopAll, WorkDir: dir})
-	if err != nil {
-		return warning(fmt.Sprintf(domain.RunStopOtherFailFmt, filepath.Base(dir), err))
-	}
-	if resp.Status == process.StatusError {
-		return warning(fmt.Sprintf(domain.RunStopOtherFailFmt, filepath.Base(dir), resp.Message))
-	}
-	return flow.Notice{
-		Kind: flow.NoticeSuccess,
-		Text: fmt.Sprintf(domain.RunStoppedOtherFmt, filepath.Base(dir)),
-	}
-}
-
-func warning(text string) flow.Notice {
-	return flow.Notice{Kind: flow.NoticeWarning, Text: text}
 }
 
 func (f *upFlow) start(answers flow.Answers) (Outcome, error) {

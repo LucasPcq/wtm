@@ -7,7 +7,9 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/run/seam"
 	"github.com/LucasPcq/wtm/internal/flow/run/target"
+	"github.com/LucasPcq/wtm/internal/flow/runlogs"
 	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
@@ -97,4 +99,12 @@ func TestAnUnattendedRunRefusesSeveralProfilesWithNoDefault(t *testing.T) {
 	if !errors.Is(err, domain.ErrProfileRequired) {
 		t.Fatalf("err = %v, want the run refused naming --profile", err)
 	}
+}
+
+// presenterOnly lends the up flow's Presenter the parts a flow test needs; the
+// hand-over to a surface belongs to the run, not to a question.
+type presenterOnly struct{ *flowtest.Recorder }
+
+func (presenterOnly) Sequence(seam.SequenceParams) (runlogs.Outcomes, error) {
+	return runlogs.Outcomes{{}}, nil
 }

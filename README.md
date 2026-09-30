@@ -343,9 +343,10 @@ independent of the others. The first time `wtm run up` finds another worktree's 
 running it asks what to do about the machine's load, and can write the answer as
 `concurrency = "parallel" | "exclusive"` at the top of the file so it never asks again.
 `--parallel` and `--exclusive` override it for a single run; `--exclusive` is refused on
-several worktrees, since it stops all but one. A worktree that shares its ports with one
+several worktrees, since it stops all but one. `wtm run start` asks the same question and
+takes the same two flags. A worktree that shares its ports with one
 already running — a verbatim worktree and its source — is not a question of load: `run up`
-offers to stop the other one or not to start, and refuses under `--yes` unless
+and `run start` offer to stop the other one or not to start, and refuse under `--yes` unless
 `--exclusive` was given.
 
 ```toml

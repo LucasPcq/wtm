@@ -550,7 +550,7 @@ and **experimental**: the global `wtm init` does not configure it.
   first. When a run writes `COMPOSE_PROJECT_NAME`, the report names it.
 - **Another worktree already running jobs is not a conflict — unless it holds your ports.**
   Isolated worktrees sit a block of ports apart, so stacks cohabit; the question is about
-  machine load, not about ports. `run up` asks about it once, and only on a terminal; on your paths (no TTY,
+  machine load, not about ports. `run up` and `run start` ask about it once, and only on a terminal; on your paths (no TTY,
   `--output json`, or `--yes`) it resolves to leaving the others running and stops nothing.
   Force either way for one run with `--exclusive` (stop them first) or `--parallel`; the two
   are mutually exclusive. A project can settle it for good with
