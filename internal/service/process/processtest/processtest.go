@@ -24,8 +24,10 @@ type Daemon struct {
 	// StartError is what every start is refused with, empty to accept them.
 	StartError string
 	// Release answers every stop as a shared job let go of, still up elsewhere.
-	Release  bool
-	requests []process.Request
+	Release bool
+	// ProxyPublicPort is where the daemon says its proxy answers, zero for off.
+	ProxyPublicPort int
+	requests        []process.Request
 }
 
 // Serve moves HOME to a directory short enough for the socket — macOS puts it
@@ -73,7 +75,7 @@ func (d *Daemon) answer(req process.Request) process.Response {
 	d.requests = append(d.requests, req)
 	switch req.Action {
 	case process.ActionList:
-		return process.Response{Status: process.StatusOK, Version: domain.Version, Jobs: append([]domain.JobInfo{}, d.jobs...)}
+		return process.Response{Status: process.StatusOK, Version: domain.Version, Jobs: append([]domain.JobInfo{}, d.jobs...), ProxyPublicPort: d.ProxyPublicPort}
 	case process.ActionStart:
 		if d.StartError != "" {
 			return process.Response{Status: process.StatusError, Version: domain.Version, Message: d.StartError}
