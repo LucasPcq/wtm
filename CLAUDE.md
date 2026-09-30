@@ -267,7 +267,7 @@ make dead-strict  # deadcode without -test: code only a test still reaches, info
 
 The exceptions to `dead` live in `.deadcode-ignore`, one regex per line **with its reason** — reachable by a route the analysis cannot follow (a method satisfying an interface asserted on an `any`, so far). Anything unlisted fails.
 
-`.archlint-migrating` is the same idea for what predates a rule: `<rule> <path regex>` lines that report as `(migrating)` without failing. **It may only shrink.** A new entry is a decision to take knowingly and belongs in a ticket, never a way to get a commit past the linter.
+`.archlint-migrating` is the same idea for what predates a rule: `<rule> <path regex> <sites>` lines that report as `(migrating)` without failing. **It may only shrink**, and that is checked: each entry — like each rune of `fontLegacy` — records how many sites it covers, one site more fails `make lint`, and a count higher than needed is reported as a note to lower it. A new entry is a decision to take knowingly and belongs in a ticket, never a way to get a commit past the linter.
 
 `make dupl` is deliberately outside `lint`: a clone is a judgement call. Two parallel families over unrelated types — `flow/run/job` and `flow/run/profile` — read better duplicated than behind a generic, so the report informs a review rather than gating one.
 
