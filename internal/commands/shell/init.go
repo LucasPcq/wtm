@@ -17,7 +17,12 @@ func NewCmd() *cobra.Command {
 		Annotations: map[string]string{domain.AnnotationMachineOutput: domain.AnnotationOn},
 		Short:       "Generate shell integration function",
 		Long:        "Output a shell function to eval in your rc file.\nUsage: eval \"$(wtm shell-init)\"",
-		RunE:        runShellInit,
+		Example: `  # zsh or bash: add this line to ~/.zshrc or ~/.bashrc
+  eval "$(wtm shell-init)"
+
+  # fish: add this line to config.fish
+  wtm shell-init | source`,
+		RunE: runShellInit,
 	}
 }
 

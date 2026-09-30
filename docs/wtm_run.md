@@ -27,6 +27,21 @@ Vocabulary:
 wtm run [flags]
 ```
 
+### Examples
+
+```
+  # Once per repository: detect compose files and package scripts
+  wtm run init
+
+  # Start the default profile in this worktree
+  wtm run up
+
+  # What runs, across every repository
+  wtm run ps
+
+  wtm run down
+```
+
 ### Options
 
 ```

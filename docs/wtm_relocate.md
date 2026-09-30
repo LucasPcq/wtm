@@ -16,6 +16,18 @@ meta.json already records (isolation, namespaces, ordinal).
 wtm relocate [flags]
 ```
 
+### Examples
+
+```
+  # Show the plan first
+  wtm relocate --dry-run
+
+  wtm relocate
+
+  # Move every worktree under a new directory
+  wtm relocate --to ../acme.trees --yes
+```
+
 ### Options
 
 ```

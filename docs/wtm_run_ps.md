@@ -14,6 +14,14 @@ worktrees as you select.
 wtm run ps [flags]
 ```
 
+### Examples
+
+```
+  wtm run ps
+
+  wtm run ps --output json
+```
+
 ### Options
 
 ```

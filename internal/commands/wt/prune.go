@@ -50,6 +50,14 @@ func newPruneCmd() *cobra.Command {
 			"data — before the next one starts. The first that fails stops the prune: the ones before\n" +
 			"it are gone with their data, it and the ones after keep theirs, and the report (and the\n" +
 			"`failed` field of --output json) names where it stopped.",
+		Example: `  # Review every finished worktree, then confirm
+  wtm prune
+
+  # Only show what would go
+  wtm prune --dry-run
+
+  # Every worktree whose PR was merged, no prompts
+  wtm prune --merged --yes --reparent-children`,
 		Args: cobra.NoArgs,
 		RunE: runPrune,
 	}

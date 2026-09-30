@@ -37,6 +37,12 @@ func NewCmd(params NewCmdParams) *cobra.Command {
 			"--check reports what is available without changing anything. --yes skips the\n" +
 			"confirmation (required with --output json). --version pins an explicit release and\n" +
 			"applies to standalone installs only.",
+		Example: `  # Is there a newer release?
+  wtm upgrade --check
+
+  wtm upgrade
+
+  wtm upgrade --yes --output json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd, params.Version)

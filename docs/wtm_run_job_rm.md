@@ -18,6 +18,18 @@ for you to drop by hand.
 wtm run job rm [name] [flags]
 ```
 
+### Examples
+
+```
+  # Pick the job
+  wtm run job rm
+
+  wtm run job rm worker --yes
+
+  # Also strip the profiles and links that name it
+  wtm run job rm postgres --force --yes
+```
+
 ### Options
 
 ```

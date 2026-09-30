@@ -23,6 +23,12 @@ func newReparentCmd() *cobra.Command {
 			"and --to <parent>, or run with no arguments to multi-select interactively. The new\n" +
 			"parent must exist as a local or origin remote-tracking branch (origin/x), and the\n" +
 			"resulting parent chain must stay acyclic.",
+		Example: `  # Pick the worktrees and their new parent
+  wtm reparent
+
+  # feat/login was merged: stack its child on main, then rebase it
+  wtm reparent feat/login-ui --to main --yes
+  wtm sync feat/login-ui`,
 		Args: cobra.ArbitraryArgs,
 		RunE: runReparent,
 	}

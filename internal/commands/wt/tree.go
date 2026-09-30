@@ -30,6 +30,13 @@ func newTreeCmd() *cobra.Command {
 			"--with-prs adds PR numbers and merged/closed markers (fetched eagerly). --output\n" +
 			"json emits the structured tree for agents; --output mermaid emits a flowchart to\n" +
 			"paste into a PR or Notion.",
+		Example: `  wtm tree
+
+  # With PR numbers and merged/closed markers
+  wtm tree --with-prs
+
+  # A flowchart to paste into a PR description
+  wtm tree --output mermaid`,
 		RunE: runTree,
 	}
 

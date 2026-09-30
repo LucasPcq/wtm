@@ -24,6 +24,22 @@ the rest of the profile keeps starting, reported line by line — and -d skips t
 wtm run up [worktree...] [flags]
 ```
 
+### Examples
+
+```
+  # The default profile, in this worktree, in the run view
+  wtm run up
+
+  # Two worktrees side by side, back to the prompt
+  wtm run up feat/login fix/typo -d
+
+  # Another profile, no prompts
+  wtm run up feat/login --profile backend -d --yes
+
+  # For a script or an agent
+  wtm run up feat/login -d --yes --output json
+```
+
 ### Options
 
 ```

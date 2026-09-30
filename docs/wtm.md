@@ -6,6 +6,20 @@ Orchestrate git worktrees and team dev workflows from the terminal
 wtm [flags]
 ```
 
+### Examples
+
+```
+  # Once per repository
+  wtm init
+
+  # A worktree per branch, then jump into it
+  wtm create feat/login
+  wtm go feat/login
+
+  # Every worktree, its PR and its services, on one screen
+  wtm ui
+```
+
 ### Options
 
 ```

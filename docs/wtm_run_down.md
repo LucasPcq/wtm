@@ -12,6 +12,17 @@ Jobs running in other worktrees are never touched, unless --all is given: it sto
 wtm run down [worktree...] [flags]
 ```
 
+### Examples
+
+```
+  wtm run down
+
+  wtm run down feat/login --profile backend
+
+  # Every worktree of this repository
+  wtm run down --all --yes
+```
+
 ### Options
 
 ```

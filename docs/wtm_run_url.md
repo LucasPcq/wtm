@@ -10,6 +10,17 @@ Write a job's URL on stdout and nothing else, for $(…). [worktree] defaults to
 wtm run url [worktree] [flags]
 ```
 
+### Examples
+
+```
+  wtm run url --job api
+
+  curl "$(wtm run url feat/login --job api)/health"
+
+  # The port URL, which needs no proxy
+  wtm run url feat/login --job api --raw
+```
+
 ### Options
 
 ```

@@ -51,6 +51,17 @@ func newEnvCmd() *cobra.Command {
 			"values first, and its recap can also keep a worktree verbatim from then on. Either\n" +
 			"isolation is recorded only once the .env is in line with it: a run that fails or\n" +
 			"is cancelled records nothing.",
+		Example: `  # Pick a worktree and reconcile its .env files
+  wtm env
+
+  # Read-only drift report
+  wtm env feat/login --check
+
+  # Also settle the values that diverge from the source
+  wtm env feat/login --mode refresh --on-conflict overwrite --yes
+
+  # Give a worktree created before 0.28 its own ports and compose project
+  wtm env feat/login --isolation isolated --yes`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runEnv,
 	}

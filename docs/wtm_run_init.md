@@ -54,6 +54,19 @@ offered: a name nothing answers under is worse than no name at all.
 wtm run init [flags]
 ```
 
+### Examples
+
+```
+  # The wizard
+  wtm run init
+
+  # Unattended, from detection
+  wtm run init --yes
+
+  # Also rewrite compose host ports and link the .env port keys
+  wtm run init --yes --patch-compose --link-env
+```
+
 ### Options
 
 ```

@@ -11,6 +11,13 @@ The file lives under <git-common-dir>/wtm/config.toml and is never committed.
 wtm config [flags]
 ```
 
+### Examples
+
+```
+  wtm config show
+  wtm config edit
+```
+
 ### Options
 
 ```

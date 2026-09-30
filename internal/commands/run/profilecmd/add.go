@@ -17,6 +17,13 @@ func newAddCmd() *cobra.Command {
 			"Every flag pre-fills the corresponding question, so the form opens on what was\n" +
 			"already given. --yes skips the questions altogether: [name] and --jobs are then\n" +
 			"required, and the profile is not the default unless --default says so.",
+		Example: `  # Answer the form
+  wtm run profile add
+
+  wtm run profile add backend --jobs postgres,migrate,api --yes
+
+  # What run up starts without --profile
+  wtm run profile add full --jobs postgres,api,web --default --yes`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runAdd,
 	}

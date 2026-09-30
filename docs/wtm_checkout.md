@@ -13,6 +13,21 @@ Without arguments, shows an interactive picker of open PRs.
 wtm checkout [number] [flags]
 ```
 
+### Examples
+
+```
+  # Pick among the open pull requests
+  wtm checkout
+
+  # Only the ones waiting for your review
+  wtm checkout --review
+
+  wtm checkout 42
+
+  # No prompts, with a JSON result
+  wtm checkout 42 --yes --output json
+```
+
 ### Options
 
 ```

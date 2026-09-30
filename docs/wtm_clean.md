@@ -23,6 +23,21 @@ another worktree reaches under the same name is never dropped.
 wtm clean [branch] [flags]
 ```
 
+### Examples
+
+```
+  # Pick the worktree to remove
+  wtm clean
+
+  wtm clean feat/login
+
+  # No prompts; its children move onto its parent
+  wtm clean feat/login --yes --reparent-children
+
+  # Keep the databases it holds in shared services
+  wtm clean feat/login --yes --keep-data --output json
+```
+
 ### Options
 
 ```

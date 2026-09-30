@@ -40,6 +40,19 @@ it are gone with their data, it and the ones after keep theirs, and the report (
 wtm prune [flags]
 ```
 
+### Examples
+
+```
+  # Review every finished worktree, then confirm
+  wtm prune
+
+  # Only show what would go
+  wtm prune --dry-run
+
+  # Every worktree whose PR was merged, no prompts
+  wtm prune --merged --yes --reparent-children
+```
+
 ### Options
 
 ```

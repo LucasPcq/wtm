@@ -31,6 +31,17 @@ func newSyncCmd() *cobra.Command {
 			"cascade; when it is behind its remote you are offered to fast-forward it first\n" +
 			"(--ff-parents / --no-ff-parents). After a successful cascade, optionally force-push\n" +
 			"(with lease) the rebased branches.",
+		Example: `  # Pick the worktrees to rebase
+  wtm sync
+
+  # Preview the whole cascade
+  wtm sync --all --dry-run
+
+  # Rebase a stack, then force-push it (with lease)
+  wtm sync feat/login feat/login-ui --yes --push
+
+  # Every worktree, locally only
+  wtm sync --all --yes --no-push --output json`,
 		Args: cobra.ArbitraryArgs,
 		RunE: runSync,
 	}

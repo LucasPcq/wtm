@@ -34,6 +34,17 @@ func newUpCmd() *cobra.Command {
 			"for one run. --exclusive is refused on several worktrees, since it stops all but one.\n" +
 			"The run view opens on the jobs as they start; leaving it detaches without stopping them —\n" +
 			"the rest of the profile keeps starting, reported line by line — and -d skips the view.",
+		Example: `  # The default profile, in this worktree, in the run view
+  wtm run up
+
+  # Two worktrees side by side, back to the prompt
+  wtm run up feat/login fix/typo -d
+
+  # Another profile, no prompts
+  wtm run up feat/login --profile backend -d --yes
+
+  # For a script or an agent
+  wtm run up feat/login -d --yes --output json`,
 		Args: cobra.ArbitraryArgs,
 		RunE: runUp,
 	}

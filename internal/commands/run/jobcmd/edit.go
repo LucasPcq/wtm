@@ -34,6 +34,16 @@ func newEditCmd() *cobra.Command {
 			"refused while a worktree holds data in the job, which clean finds by its name.\n\n" +
 			"With no such flag, the form opens pre-filled with the current values, and\n" +
 			"without an argument it prompts to pick from the existing jobs.",
+		Example: `  # The form, pre-filled
+  wtm run job edit web
+
+  wtm run job edit web --cmd 'pnpm dev --port ${PORT}' --yes
+
+  # Change one port, keep the others
+  wtm run job edit web --port PORT=3001 --yes
+
+  # Rename it everywhere run.toml names it
+  wtm run job edit web --name frontend --yes`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runEdit,
 	}

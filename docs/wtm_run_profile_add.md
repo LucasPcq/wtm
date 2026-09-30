@@ -14,6 +14,18 @@ required, and the profile is not the default unless --default says so.
 wtm run profile add [name] [flags]
 ```
 
+### Examples
+
+```
+  # Answer the form
+  wtm run profile add
+
+  wtm run profile add backend --jobs postgres,migrate,api --yes
+
+  # What run up starts without --profile
+  wtm run profile add full --jobs postgres,api,web --default --yes
+```
+
 ### Options
 
 ```

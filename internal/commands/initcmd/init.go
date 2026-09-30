@@ -30,6 +30,16 @@ func NewCmd() *cobra.Command {
 			"terminal, init does so on its own and never prompts.\n" +
 			"Use --only env|hooks|worktrees to re-run init for specific sections and regenerate them cleanly.\n" +
 			"Services & tasks are configured separately with `wtm run init`.",
+		Example: `  # The wizard
+  wtm init
+
+  # Unattended, from detection
+  wtm init --yes
+
+  wtm init --yes --base-path ../acme.trees --install-command "pnpm install"
+
+  # Regenerate the hooks section only
+  wtm init --only hooks`,
 		RunE: runInit,
 	}
 

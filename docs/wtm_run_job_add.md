@@ -23,6 +23,24 @@ so a declared port can be passed as a flag — --cmd 'pnpm dev --port ${PORT}'.
 wtm run job add [name] [flags]
 ```
 
+### Examples
+
+```
+  # Answer the form
+  wtm run job add
+
+  # A dev server with its own port per worktree and a named URL
+  wtm run job add web --cmd 'pnpm dev --port ${PORT}' --cwd apps/web --port PORT=3000 --url-port PORT --yes
+
+  # A migration, which changes the data of the postgres job
+  wtm run job add migrate --kind task --cmd 'pnpm db:migrate' --touches postgres --yes
+
+  # One postgres for the repository, a database per worktree
+  wtm run job add postgres --cmd 'docker compose up -d postgres' --stop 'docker compose stop postgres' \
+    --scope shared --port POSTGRES_PORT=5432 --namespace-name 'app_{worktree}' \
+    --namespace-create scripts/db-add.sh --namespace-remove scripts/db-drop.sh --yes
+```
+
 ### Options
 
 ```

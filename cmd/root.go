@@ -143,7 +143,16 @@ var rootCmd = &cobra.Command{
 	Use:     domain.AppName,
 	Short:   "Orchestrate git worktrees and team dev workflows from the terminal",
 	Version: version,
-	RunE:    rootRunE,
+	Example: `  # Once per repository
+  wtm init
+
+  # A worktree per branch, then jump into it
+  wtm create feat/login
+  wtm go feat/login
+
+  # Every worktree, its PR and its services, on one screen
+  wtm ui`,
+	RunE: rootRunE,
 	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 		if err := validateOutputFormat(cmd); err != nil {
 			return err

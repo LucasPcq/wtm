@@ -19,7 +19,13 @@ func newShowCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "show",
 		Short: "Print the project config.toml",
-		RunE:  runShow,
+		Example: `  wtm config show
+
+  # Check the file, print nothing else
+  wtm config show --validate
+
+  wtm config show --output json`,
+		RunE: runShow,
 	}
 	shared.AddOutputFlag(cmd)
 	cmd.Flags().Bool(domain.FlagValidate, false, "Validate the config instead of printing it")

@@ -33,6 +33,16 @@ func NewCmd() *cobra.Command {
 			"                  every worktree's for a shared service with no namespace; a job whose\n" +
 			"                  touches reach it is refused unless --force\n" +
 			"  [worktree]      a worktree's branch name, never a path; omitted, the current worktree",
+		Example: `  # Once per repository: detect compose files and package scripts
+  wtm run init
+
+  # Start the default profile in this worktree
+  wtm run up
+
+  # What runs, across every repository
+  wtm run ps
+
+  wtm run down`,
 		GroupID: domain.CmdGroupJobs,
 	}
 

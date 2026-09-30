@@ -22,6 +22,15 @@ func newStartCmd() *cobra.Command {
 			"Like `run up`, it reports what run.toml gets wrong before starting, checks the job's declared ports\n" +
 			"once it is up (see --no-probe and run.toml's port_probe_timeout), and asks once what to do about\n" +
 			"the jobs other worktrees are running; --exclusive and --parallel answer for one run.",
+		Example: `  # Pick the job to start in this worktree
+  wtm run start
+
+  wtm run start --job api
+
+  # A task runs inline, to the end
+  wtm run start feat/login --job migrate --yes
+
+  wtm run start feat/login --job api -d --yes --output json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runStart,
 	}

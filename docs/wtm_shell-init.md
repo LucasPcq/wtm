@@ -11,6 +11,16 @@ Usage: eval "$(wtm shell-init)"
 wtm shell-init [flags]
 ```
 
+### Examples
+
+```
+  # zsh or bash: add this line to ~/.zshrc or ~/.bashrc
+  eval "$(wtm shell-init)"
+
+  # fish: add this line to config.fish
+  wtm shell-init | source
+```
+
 ### Options
 
 ```

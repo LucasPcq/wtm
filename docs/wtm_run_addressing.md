@@ -19,6 +19,18 @@ and the worktrees are settled unless --keep-env is passed.
 wtm run addressing [names|ports] [flags]
 ```
 
+### Examples
+
+```
+  # Pick the mode
+  wtm run addressing
+
+  wtm run addressing ports --yes
+
+  # Switch run.toml only, leaving the .env files as they are
+  wtm run addressing names --yes --keep-env
+```
+
 ### Options
 
 ```

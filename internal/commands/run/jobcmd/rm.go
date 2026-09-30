@@ -21,6 +21,13 @@ func newRmCmd() *cobra.Command {
 			"(a shared service's namespace, which clean finds by the job's name), unless\n" +
 			"--force is given: the references are then stripped, and that data is left\n" +
 			"for you to drop by hand.",
+		Example: `  # Pick the job
+  wtm run job rm
+
+  wtm run job rm worker --yes
+
+  # Also strip the profiles and links that name it
+  wtm run job rm postgres --force --yes`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runRm,
 	}

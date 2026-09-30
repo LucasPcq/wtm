@@ -19,7 +19,10 @@ func newStopCmd() *cobra.Command {
 		Use:   domain.CmdStop,
 		Short: "Stop the daemon, leaving detached services running",
 		Long:  "Stop the background daemon.\nForeground services die with it — they are drained through a terminal it owns.\nDetached services (those with a stop command) keep running, and the next daemon picks them back up.",
-		RunE:  runStop,
+		Example: `  wtm run daemon stop
+
+  wtm run daemon stop --yes`,
+		RunE: runStop,
 	}
 	shared.AddOutputFlag(cmd)
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip the confirmation")

@@ -13,6 +13,14 @@ Use --output json, --yes (or pipe stdout) for a non-interactive listing.
 wtm run profile list [flags]
 ```
 
+### Examples
+
+```
+  wtm run profile list
+
+  wtm run profile list --output json
+```
+
 ### Options
 
 ```

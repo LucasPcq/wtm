@@ -16,6 +16,22 @@ Without arguments, prompts for the branch name interactively.
 wtm create [branch] [flags]
 ```
 
+### Examples
+
+```
+  # Answer the wizard: branch, source, env strategy, isolation
+  wtm create
+
+  # A new branch from the base branch, no prompts
+  wtm create feat/login --yes
+
+  # A stacked branch on top of feat/login
+  wtm create feat/login-ui --from feat/login --yes
+
+  # For a script or an agent: idempotent, with a JSON result
+  wtm create feat/login --if-not-exists --yes --output json
+```
+
 ### Options
 
 ```

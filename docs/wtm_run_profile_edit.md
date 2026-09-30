@@ -18,6 +18,18 @@ without an argument it prompts to pick from the existing profiles.
 wtm run profile edit [name] [flags]
 ```
 
+### Examples
+
+```
+  # The form, pre-filled
+  wtm run profile edit backend
+
+  # --jobs replaces the list, in start order
+  wtm run profile edit backend --jobs postgres,api --yes
+
+  wtm run profile edit backend --default --yes
+```
+
 ### Options
 
 ```

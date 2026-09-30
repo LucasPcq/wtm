@@ -17,6 +17,20 @@ the jobs other worktrees are running; --exclusive and --parallel answer for one 
 wtm run start [worktree] [flags]
 ```
 
+### Examples
+
+```
+  # Pick the job to start in this worktree
+  wtm run start
+
+  wtm run start --job api
+
+  # A task runs inline, to the end
+  wtm run start feat/login --job migrate --yes
+
+  wtm run start feat/login --job api -d --yes --output json
+```
+
 ### Options
 
 ```

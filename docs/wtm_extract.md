@@ -26,6 +26,19 @@ A file that merely already exists in the target counts as a conflict too.
 wtm extract [source] [flags]
 ```
 
+### Examples
+
+```
+  # Pick the source, the files and the target
+  wtm extract
+
+  # Move a directory's changes to a new branch
+  wtm extract feat/login --files apps/api --to feat/login-api --yes
+
+  # Copy one file instead, onto a branch stacked on the source
+  wtm extract feat/login --files apps/web/login.ts --to feat/login-web --from feat/login --keep --yes
+```
+
 ### Options
 
 ```

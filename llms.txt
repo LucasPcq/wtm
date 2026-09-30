@@ -1,0 +1,34 @@
+# wtm
+
+> wtm is a git worktree manager written in Go: one branch, one worktree, one isolated dev stack. It creates provisioned worktrees (`.env` copied, hooks run, ports shifted), runs each worktree's dev servers and `docker compose` stacks side by side on their own ports and named URLs, and keeps stacked branches rebased in order. Every data command takes `--output json` and every change takes `--yes`, so scripts and AI agents can drive it without prompts.
+
+For an agent working in a repository that uses wtm, `wtm agents install` adds the `using-wtm` skill to Claude Code (`.claude/`) or Cursor (`.cursor/`), which teaches it the commands and their unattended forms. `wtm <command> --help` shows every flag with examples.
+
+## Start here
+
+- [README](README.md): what wtm does, how to install it, and an overview of every command
+- [Getting started](docs/guide/getting-started.md): a ten-minute tutorial from install to two worktrees running side by side
+- [Recipes](docs/guide/recipes.md): complete setups for a pnpm/turbo monorepo, a docker compose app, a shared postgres, AI agents in parallel and stacked PRs
+- [Troubleshooting](docs/guide/troubleshooting.md): fixes for a port in use, a crashed job, the daemon's version, `wtm go`, exit 16, named URLs and `.env` drift
+
+## User guide
+
+- [Guide index](docs/guide/README.md): how the pieces fit together
+- [Configuration](docs/guide/configuration.md): `config.toml`, env strategies, hooks, the global config
+- [Isolation](docs/guide/isolation.md): isolated or verbatim worktrees, `COMPOSE_PROJECT_NAME`, foreign data and `touches`
+- [Jobs, profiles and runners](docs/guide/jobs-and-profiles.md): what `wtm run up` starts, the run view, port checks, `run ps` statuses
+- [How `wtm run` works](docs/guide/how-run-works.md): the job environment, ports, compose names, what `run init` proposes
+- [Shared services](docs/guide/shared-services.md): one instance for the repository, a namespace per worktree
+- [Named URLs and addressing](docs/guide/addressing.md): the run proxy, named and port URLs, port 80 on macOS
+- [`run.toml` reference](docs/guide/run-toml.md): every key of the file, with its default
+- [State](docs/guide/state.md): the files wtm keeps under `<git-common-dir>/wtm/` and beside the global config
+
+## Reference
+
+- [Command reference](docs/wtm.md): every command and flag, generated from `--help`
+- [Migrating to 0.28](docs/guide/migrating-to-0.28.md): breaking changes for 0.27 users, the JSON contract of `wtm run`, exit codes
+- [Changelog](CHANGELOG.md): what changed in each release
+
+## Optional
+
+- [Developer documentation](docs/dev/): the architecture and conventions of the codebase, for contributors

@@ -11,6 +11,16 @@ Project schemas land in <git-common-dir>/wtm/schemas/. Use --global to write the
 wtm schema dump [flags]
 ```
 
+### Examples
+
+```
+  # The project schemas, beside config.toml and run.toml
+  wtm schema dump
+
+  # The global config's schema
+  wtm schema dump --global
+```
+
 ### Options
 
 ```

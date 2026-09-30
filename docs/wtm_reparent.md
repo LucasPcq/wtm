@@ -14,6 +14,17 @@ resulting parent chain must stay acyclic.
 wtm reparent [branch...] [flags]
 ```
 
+### Examples
+
+```
+  # Pick the worktrees and their new parent
+  wtm reparent
+
+  # feat/login was merged: stack its child on main, then rebase it
+  wtm reparent feat/login-ui --to main --yes
+  wtm sync feat/login-ui
+```
+
 ### Options
 
 ```

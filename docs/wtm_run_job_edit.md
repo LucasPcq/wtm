@@ -33,6 +33,21 @@ without an argument it prompts to pick from the existing jobs.
 wtm run job edit [name] [flags]
 ```
 
+### Examples
+
+```
+  # The form, pre-filled
+  wtm run job edit web
+
+  wtm run job edit web --cmd 'pnpm dev --port ${PORT}' --yes
+
+  # Change one port, keep the others
+  wtm run job edit web --port PORT=3001 --yes
+
+  # Rename it everywhere run.toml names it
+  wtm run job edit web --name frontend --yes
+```
+
 ### Options
 
 ```

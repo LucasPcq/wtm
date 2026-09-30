@@ -15,7 +15,10 @@ func newStatusCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   domain.CmdStatus,
 		Short: "Report whether a daemon is running, and which build it is",
-		RunE:  runStatus,
+		Example: `  wtm run daemon status
+
+  wtm run daemon status --output json`,
+		RunE: runStatus,
 	}
 	shared.AddOutputFlag(cmd)
 	return cmd

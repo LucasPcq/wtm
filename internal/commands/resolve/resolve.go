@@ -27,7 +27,13 @@ func NewCmd() *cobra.Command {
 		Use:         "resolve [branch]",
 		Annotations: map[string]string{domain.AnnotationMachineOutput: domain.AnnotationOn},
 		Short:       "Resolve a branch to its worktree path",
-		RunE:        runResolve,
+		Example: `  wtm resolve feat/login
+
+  # Use it in a script
+  cd "$(wtm resolve feat/login)"
+
+  wtm resolve feat/login --output json`,
+		RunE: runResolve,
 	}
 	shared.AddOutputFlag(cmd)
 	return cmd

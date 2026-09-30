@@ -26,6 +26,9 @@ func newPsCmd() *cobra.Command {
 			"run-initialized repository or not.\n" +
 			"To act on those jobs, open the run view with `wtm run logs`, which covers as many\n" +
 			"worktrees as you select.",
+		Example: `  wtm run ps
+
+  wtm run ps --output json`,
 		RunE: runPs,
 	}
 	shared.AddOutputFlag(cmd)

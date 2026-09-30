@@ -10,6 +10,14 @@ Launch the editor on <git-common-dir>/wtm/config.toml. After save, the file is r
 wtm config edit [flags]
 ```
 
+### Examples
+
+```
+  wtm config edit
+
+  EDITOR=vim wtm config edit
+```
+
 ### Options
 
 ```

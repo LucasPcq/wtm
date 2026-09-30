@@ -40,6 +40,22 @@ is cancelled records nothing.
 wtm env [worktree] [flags]
 ```
 
+### Examples
+
+```
+  # Pick a worktree and reconcile its .env files
+  wtm env
+
+  # Read-only drift report
+  wtm env feat/login --check
+
+  # Also settle the values that diverge from the source
+  wtm env feat/login --mode refresh --on-conflict overwrite --yes
+
+  # Give a worktree created before 0.28 its own ports and compose project
+  wtm env feat/login --isolation isolated --yes
+```
+
 ### Options
 
 ```

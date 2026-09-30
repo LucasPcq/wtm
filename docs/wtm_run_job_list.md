@@ -13,6 +13,14 @@ Use --output json, --yes (or pipe stdout) for a non-interactive listing.
 wtm run job list [flags]
 ```
 
+### Examples
+
+```
+  wtm run job list
+
+  wtm run job list --output json
+```
+
 ### Options
 
 ```

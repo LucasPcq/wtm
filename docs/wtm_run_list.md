@@ -11,6 +11,18 @@ In a TTY, offers an interactive picker with start/stop/logs actions.
 wtm run list [flags]
 ```
 
+### Examples
+
+```
+  # Pick a job or a profile, then start, stop or read it
+  wtm run list
+
+  # Print the table
+  wtm run list --yes
+
+  wtm run list --output json
+```
+
 ### Options
 
 ```

@@ -20,8 +20,14 @@ func newDownCmd() *cobra.Command {
 		Use:   domain.CmdDown + " [worktree...]",
 		Short: "Stop a worktree's running jobs",
 		Long:  "Stop the jobs running in [worktree] — the current one when omitted, picked interactively when there is a terminal.\nWith --profile, stops only that profile's jobs.\nJobs running in other worktrees are never touched, unless --all is given: it stops every worktree of this repository, without asking, and lists each one it emptied. Other repositories are never touched.",
-		Args:  cobra.ArbitraryArgs,
-		RunE:  runDown,
+		Example: `  wtm run down
+
+  wtm run down feat/login --profile backend
+
+  # Every worktree of this repository
+  wtm run down --all --yes`,
+		Args: cobra.ArbitraryArgs,
+		RunE: runDown,
 	}
 	shared.AddProfileFlag(cmd, "Stop only this profile's jobs (default: every job the worktree runs)")
 	shared.AddYesFlag(cmd, "Skip all prompts; stops what the worktree has running")
