@@ -67,3 +67,27 @@ func TestRunPsJSONNamesTheWorktreeAndItsProject(t *testing.T) {
 		t.Errorf("row still carries work_dir: %v", row)
 	}
 }
+
+// With no daemon to ask, `run down` still names the worktree it targeted: the
+// document has the same shape as when something was stopped.
+func TestRunDownJSONWithNoDaemonNamesTheWorktree(t *testing.T) {
+	stateDir := setupTestProject(t)
+	writeRunTOML(t, stateDir, domain.RunConfig{
+		Jobs:     []domain.JobConfig{apiJob},
+		Profiles: []domain.ProfileConfig{{Name: "dev", Jobs: []string{"api"}}},
+	})
+	shortHome(t)
+	fakeTTY(t, false)
+
+	stdout, _, err := runCmd(t, domain.CmdDown, "--"+domain.FlagProfile, "dev", "--"+domain.FlagOutput, domain.OutputJSON)
+	if err != nil {
+		t.Fatalf("run down: %v", err)
+	}
+	results := decodeWorktreeResults(t, stdout)
+	if len(results) != 1 || results[0].Branch != "main" || results[0].Path == "" {
+		t.Fatalf("results = %+v, want main by branch and path", results)
+	}
+	if len(results[0].Jobs) != 1 || results[0].Jobs[0].Status != domain.JobActionNotRunning {
+		t.Errorf("jobs = %+v, want api not_running", results[0].Jobs)
+	}
+}

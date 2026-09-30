@@ -44,13 +44,14 @@ func TestViewsTakesEveryWorktreesCopyOfTheNamedJob(t *testing.T) {
 	}
 }
 
-func TestViewsRefusesAJobNoWorktreeHolds(t *testing.T) {
-	_, err := logsflow.Views(logsflow.ViewsParams{
+// A declared job with no log in these worktrees has nothing to show, which is
+// not a refusal: whether run.toml declares it is checked before the board.
+func TestViewsOfAJobNoWorktreeHoldsIsEmpty(t *testing.T) {
+	views, err := logsflow.Views(logsflow.ViewsParams{
 		Board: board(attachable("web", "/work/main", "main")),
-		Job:   "nope",
+		Job:   "seed",
 	})
-
-	if err == nil {
-		t.Fatal("a job no worktree holds was accepted")
+	if err != nil || len(views) != 0 {
+		t.Fatalf("views = %+v, err = %v, want nothing and no error", views, err)
 	}
 }

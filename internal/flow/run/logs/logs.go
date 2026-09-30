@@ -182,15 +182,14 @@ func Views(params ViewsParams) ([]runlogs.JobView, error) {
 	jobs := params.Board.Jobs()
 	if params.Job != "" {
 		// Every worktree's copy of the job, not the first: --job names a job, and
-		// a board covering three worktrees holds three of them.
+		// a board covering three worktrees holds three of them. None is not an
+		// error: the flow already refused a name run.toml does not declare, and a
+		// declared job with no log here simply has nothing to show.
 		named := make([]runlogs.JobView, 0, len(jobs))
 		for _, view := range jobs {
 			if view.Name == params.Job {
 				named = append(named, view)
 			}
-		}
-		if len(named) == 0 {
-			return nil, fmt.Errorf("%w: %s", domain.ErrJobNotFound, params.Job)
 		}
 		return named, nil
 	}

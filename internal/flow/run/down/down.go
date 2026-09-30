@@ -144,6 +144,7 @@ func (f *downFlow) run() (Outcome, error) {
 	}
 	if !process.IsDaemonRunning(process.SocketPath()) {
 		outcome.NoDaemon = true
+		outcome.Results = f.nothingRunning(outcome)
 		return outcome, f.presenter.Downed(outcome)
 	}
 
@@ -335,6 +336,27 @@ func (f *downFlow) stoppedJobs(workDir string) ([]domain.JobInfo, error) {
 		return nil, fmt.Errorf("stop all: %s", resp.Message)
 	}
 	return resp.Jobs, nil
+}
+
+// nothingRunning is what a down reports with no daemon to ask: every worktree
+// it targeted, holding nothing — or, under --profile, each of its jobs
+// not_running.
+func (f *downFlow) nothingRunning(outcome Outcome) []domain.WorktreeJobResults {
+	var jobs []domain.JobActionResult
+	if profile, ok := rules.FindProfile(f.request.Config, outcome.Profile); ok {
+		for _, job := range rules.ProfileJobs(f.request.Config, profile) {
+			jobs = append(jobs, domain.JobActionResult{Name: job.Name, Status: domain.JobActionNotRunning})
+		}
+	}
+	results := make([]domain.WorktreeJobResults, 0, len(outcome.WorkDirs))
+	for _, workDir := range outcome.WorkDirs {
+		results = append(results, domain.WorktreeJobResults{
+			Branch: f.branchOf(workDir),
+			Path:   workDir,
+			Jobs:   append([]domain.JobActionResult{}, jobs...),
+		})
+	}
+	return results
 }
 
 func client() *process.Client { return process.NewClient(process.SocketPath()) }

@@ -127,15 +127,17 @@ func TestWriteJobLinesNarrowsToTheNamedJob(t *testing.T) {
 	}
 }
 
-func TestWriteJobLinesRefusesAJobTheWorktreeDoesNotHave(t *testing.T) {
+func TestWriteJobLinesSaysSoForAJobTheWorktreeHasNoLogOf(t *testing.T) {
 	board := runlogstest.NewBoard(runlogstest.BoardParams{
 		Views: []runlogs.JobView{{Name: "api", Status: domain.JobStatusRunning, Attachable: true}},
 	})
 
-	cmd, _, _ := linesCmd()
-	err := writeJobLines(jobLinesParams{Cmd: cmd, Board: board, Job: "ghost"})
-	if err == nil || !strings.Contains(err.Error(), "ghost") {
-		t.Fatalf("err = %v, want one naming the unknown job", err)
+	cmd, out, _ := linesCmd()
+	if err := writeJobLines(jobLinesParams{Cmd: cmd, Board: board, Job: "seed"}); err != nil {
+		t.Fatalf("writeJobLines: %v", err)
+	}
+	if !strings.Contains(out.String(), domain.RunLogsNoJobs) {
+		t.Errorf("stdout does not say there is nothing to show:\n%s", out.String())
 	}
 }
 
