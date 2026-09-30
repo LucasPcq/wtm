@@ -661,7 +661,9 @@ and **experimental**: the global `wtm init` does not configure it.
 - **`run ps` is the one global listing**, and the only `run` command that works from
   anywhere: it lists what the daemon holds across every repository, so it needs neither a
   run-initialized repo nor a worktree. It only ever lists — to act on those jobs, open the
-  run view with `run logs`, which covers as many worktrees as you name.
+  run view with `run logs`, which covers as many worktrees as you name. A stopped or
+  crashed job of a worktree that no longer exists on disk is left out; a job still up
+  there is listed.
 - **The daemon survives nothing, and that is by design.** It exits ~30 s after the last
   *foreground* job, and detached services keep running without it. It records what it
   started in `~/.config/wtm/jobs.json`, so the next daemon picks those back up: after a
