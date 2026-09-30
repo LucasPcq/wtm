@@ -2620,7 +2620,8 @@ const (
 	// RunPortClash* is the same question when it is no longer a preference: a
 	// port this run needs is bound by another worktree — which is what a
 	// verbatim worktree and its source always do. Running side by side is not
-	// on offer, so the two answers are to stop the other one, or not to start.
+	// on offer, so the two answers are to stop the other worktrees — the
+	// exclusive answer — or not to start.
 	RunPortClashTitle   = "Ports another worktree already binds"
 	RunPortClashDescFmt = "%s\n\nThis worktree runs on the same ports as the one holding them — a verbatim worktree runs on its source's — so only one of them can be up at a time."
 	RunPortClashLineFmt = "%d — %s in %s, bound by %s in %s"
@@ -2629,7 +2630,7 @@ const (
 	// RunPortClashRefusedFmt is the refusal where nobody can be asked: --parallel
 	// or `concurrency = "parallel"` cannot be honoured, and stopping another
 	// worktree is not a default to take silently.
-	RunPortClashRefusedFmt = "ports already bound by another worktree:\n%s\nstop it first with --%s, or give this worktree its own ports: wtm env <branch> --%s %s"
+	RunPortClashRefusedFmt = "ports already bound by another worktree:\n%s\nstop the other worktrees' jobs first with --%s, or give this worktree its own ports: wtm env <branch> --%s %s"
 	// RunForeignData* is the stop before a job that changes data the worktree
 	// does not own — its source's when verbatim, everyone's for a shared
 	// service with no namespace. It is a safety refusal: --force lifts it.

@@ -174,16 +174,10 @@ func (q *Question) clearOthers(answers flow.Answers) error {
 	if q.Decided(answers) != domain.ConcurrencyExclusive {
 		return nil
 	}
-	others := q.otherWorktrees(answers)
-	if len(others) == 0 {
+	dirs := q.otherDirs(answers)
+	if len(dirs) == 0 {
 		return nil
 	}
-
-	dirs := make([]string, 0, len(others))
-	for dir := range others {
-		dirs = append(dirs, dir)
-	}
-	sort.Strings(dirs)
 
 	client := process.NewClient(process.SocketPath())
 	// Reported after the stage, never inside it: a spinner owns the stream while
@@ -242,8 +236,11 @@ func (q *Question) contradictionContent(answers flow.Answers) flow.StepContent {
 
 func (q *Question) clashContent(answers flow.Answers) flow.StepContent {
 	clashes := q.clashes(answers)
-	names := make([]string, 0, len(clashes))
-	for _, dir := range rules.ClashingWorktrees(clashes) {
+	// The answer is the exclusive one, so it names every worktree it stops, not
+	// only the ones holding a port: the description already says which those are.
+	others := q.otherDirs(answers)
+	names := make([]string, 0, len(others))
+	for _, dir := range others {
 		names = append(names, filepath.Base(dir))
 	}
 	return flow.StepContent{
@@ -378,6 +375,16 @@ func (q *Question) otherWorktrees(answers flow.Answers) map[string][]string {
 	return others
 }
 
+func (q *Question) otherDirs(answers flow.Answers) []string {
+	others := q.otherWorktrees(answers)
+	dirs := make([]string, 0, len(others))
+	for dir := range others {
+		dirs = append(dirs, dir)
+	}
+	sort.Strings(dirs)
+	return dirs
+}
+
 func selectedSet(dirs []string) map[string]bool {
 	selected := make(map[string]bool, len(dirs))
 	for _, dir := range dirs {
@@ -388,12 +395,7 @@ func selectedSet(dirs []string) map[string]bool {
 
 func (q *Question) othersSummary(answers flow.Answers) string {
 	others := q.otherWorktrees(answers)
-	dirs := make([]string, 0, len(others))
-	for dir := range others {
-		dirs = append(dirs, dir)
-	}
-	sort.Strings(dirs)
-
+	dirs := q.otherDirs(answers)
 	lines := make([]string, 0, len(dirs))
 	for _, dir := range dirs {
 		lines = append(lines, fmt.Sprintf("%s (%s)", filepath.Base(dir), strings.Join(others[dir], domain.RunURLListSep)))
