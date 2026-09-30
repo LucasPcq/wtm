@@ -20,8 +20,10 @@ type Daemon struct {
 	// StopError is what every stop is refused with, empty to accept them.
 	StopError string
 	// Survive leaves the jobs up after a stop the daemon said it made.
-	Survive  bool
-	requests []process.Request
+	Survive bool
+	// StartError is what every start is refused with, empty to accept them.
+	StartError string
+	requests   []process.Request
 }
 
 // Serve moves HOME to a directory short enough for the socket — macOS puts it
@@ -70,6 +72,10 @@ func (d *Daemon) answer(req process.Request) process.Response {
 	switch req.Action {
 	case process.ActionList:
 		return process.Response{Status: process.StatusOK, Version: domain.Version, Jobs: append([]domain.JobInfo{}, d.jobs...)}
+	case process.ActionStart:
+		if d.StartError != "" {
+			return process.Response{Status: process.StatusError, Version: domain.Version, Message: d.StartError}
+		}
 	case process.ActionStop, process.ActionStopAll:
 		if d.StopError != "" {
 			return process.Response{Status: process.StatusError, Version: domain.Version, Message: d.StopError}
