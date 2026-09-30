@@ -316,29 +316,16 @@ type PresetParams struct {
 	// set form of Named, and the two are never both set.
 	Worktrees []string
 	Job       string
-	// Profiles are the profile names a flag already named. Empty leaves the step
-	// to ask, or to answer with the config's default.
-	Profiles []string
-}
-
-// OneProfile is the set form of a single-profile flag, for the commands whose
-// profile axis takes one — the preset is read back on the recap either way.
-func OneProfile(name string) []string {
-	if name == "" {
-		return nil
-	}
-	return []string{name}
+	Profile   string
 }
 
 // Presets carry what the flags and the positional already answered. A preset
 // step is not asked but is still read back, which is what keeps a flag from
 // erasing a line from the recap.
 func Presets(params PresetParams) flow.Answers {
-	values := map[string]string{KeyJob: params.Job}
+	values := map[string]string{KeyJob: params.Job, KeyProfile: params.Profile}
 	if params.Named != nil {
 		values[KeyWorktree] = params.Named.Dir
 	}
-	return flow.NewAnswers(values).
-		WithValues(KeyWorktree, params.Worktrees).
-		WithValues(KeyProfile, params.Profiles)
+	return flow.NewAnswers(values).WithValues(KeyWorktree, params.Worktrees)
 }

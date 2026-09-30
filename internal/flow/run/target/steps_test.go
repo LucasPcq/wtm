@@ -133,7 +133,6 @@ func TestJobStepSaysSoWhenThereIsNothingToPick(t *testing.T) {
 func TestProfileStepIsNotAskedWithoutAChoice(t *testing.T) {
 	step := target.ProfileStep(target.ProfileParams{
 		Profiles: []domain.ProfileConfig{{Name: "default"}},
-		Default:  "default",
 	})
 
 	skip, reason := step.Skip(flow.Answers{})
@@ -142,55 +141,53 @@ func TestProfileStepIsNotAskedWithoutAChoice(t *testing.T) {
 	}
 }
 
-func TestProfileStepResolvesToTheDefaultProfile(t *testing.T) {
+func TestProfileStepPicksExactlyOneProfile(t *testing.T) {
 	step := target.ProfileStep(target.ProfileParams{
-		Profiles: []domain.ProfileConfig{{Name: "default"}, {Name: "full"}},
-		Default:  "default",
+		Profiles: []domain.ProfileConfig{{Name: "front"}, {Name: "back", Default: true}},
 	})
 
+	if step.Kind != flow.StepSelect {
+		t.Errorf("Kind = %v, want a single select: run up starts one profile", step.Kind)
+	}
 	if skip, _ := step.Skip(flow.Answers{}); skip {
 		t.Fatal("the step was skipped although two profiles exist")
 	}
+	content, err := step.Build(flow.Answers{})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if content.Start != "back" {
+		t.Errorf("Start = %q, want the cursor on the default profile", content.Start)
+	}
+}
+
+func TestProfileStepResolvesToTheDefaultProfile(t *testing.T) {
+	step := target.ProfileStep(target.ProfileParams{
+		Profiles: []domain.ProfileConfig{{Name: "default", Default: true}, {Name: "full"}},
+	})
 
 	answer, err := step.Resolve(flow.Answers{})
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
-	if len(answer.Values) != 1 || answer.Values[0] != "default" {
-		t.Errorf("Resolve = %v, want the default profile alone", answer.Values)
-	}
-
-	content, err := step.Build(flow.Answers{})
-	if err != nil {
-		t.Fatalf("Build: %v", err)
-	}
-	if !content.Options[0].Selected {
-		t.Error("the default profile must come pre-checked")
-	}
-	if !strings.Contains(content.Options[0].Label, "default") {
-		t.Errorf("first option = %q, want it to name the profile", content.Options[0].Label)
+	if answer.Value != "default" {
+		t.Errorf("Resolve = %q, want the default profile", answer.Value)
 	}
 }
 
-func TestProfileOptionsCountJobsInsteadOfListingThem(t *testing.T) {
+// Several profiles and none marked default is a required selection with no
+// safe default: starting the first declared was a guess nobody could see.
+func TestProfileStepRefusesAnUnattendedRunWithNoDefault(t *testing.T) {
 	step := target.ProfileStep(target.ProfileParams{
-		Profiles: []domain.ProfileConfig{
-			{Name: "front", Jobs: []string{"web", "api", "db", "cache", "worker", "mailer", "search", "queue"}},
-			{Name: "back"},
-		},
-		Default: "front",
+		Profiles: []domain.ProfileConfig{{Name: "front"}, {Name: "back"}},
 	})
 
-	content, err := step.Build(flow.Answers{})
-	if err != nil {
-		t.Fatalf("Build: %v", err)
+	_, err := step.Resolve(flow.Answers{})
+	if !errors.Is(err, domain.ErrProfileRequired) {
+		t.Fatalf("err = %v, want ErrProfileRequired", err)
 	}
-	label := content.Options[0].Label
-	if strings.Contains(label, "mailer") {
-		t.Errorf("option = %q, want a count rather than eight job names", label)
-	}
-	if !strings.Contains(label, "8") {
-		t.Errorf("option = %q, want it to count the jobs", label)
+	if !strings.Contains(err.Error(), "front") || !strings.Contains(err.Error(), "back") {
+		t.Errorf("err = %v, want it to name the profiles to choose from", err)
 	}
 }
 

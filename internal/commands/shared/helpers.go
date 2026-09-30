@@ -97,13 +97,26 @@ func AddJobFlag(cmd *cobra.Command, usage string) {
 }
 
 func AddProfileFlag(cmd *cobra.Command, usage string) {
-	cmd.Flags().String(domain.FlagProfile, "", usage)
+	cmd.Flags().Var(&singleValue{}, domain.FlagProfile, usage)
 }
 
-// AddProfilesFlag is the same axis where several profiles make sense at once —
-// `run up` starting two products' stacks in one go.
-func AddProfilesFlag(cmd *cobra.Command, usage string) {
-	cmd.Flags().StringSlice(domain.FlagProfile, nil, usage)
+// singleValue is a string flag that refuses to be given twice.
+type singleValue struct {
+	value string
+	set   bool
+}
+
+func (v *singleValue) String() string { return v.value }
+
+// Type is "string" so GetString reads it like any other string flag.
+func (v *singleValue) Type() string { return "string" }
+
+func (v *singleValue) Set(value string) error {
+	if v.set {
+		return fmt.Errorf(domain.FlagGivenTwiceFmt, v.value)
+	}
+	v.value, v.set = value, true
+	return nil
 }
 
 // AddYesFlag adds the confirmation axis. It is the only thing that turns prompts

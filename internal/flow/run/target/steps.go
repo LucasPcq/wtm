@@ -303,9 +303,8 @@ type ProfilePickParams struct {
 	Title    string
 }
 
-// ProfilePickStep asks which profile to act on — the single-valued form of
-// ProfileStep, for the commands that edit one declaration rather than start a
-// set of them. Like JobStep it has no Resolve: naming it is the whole request.
+// ProfilePickStep asks which profile to act on. Like JobStep it has no Resolve:
+// naming it is the whole request.
 func ProfilePickStep(params ProfilePickParams) flow.Step {
 	return flow.Step{
 		Kind:  flow.StepSelect,
@@ -342,59 +341,40 @@ func profilePickOptions(profiles []domain.ProfileConfig) []flow.Option {
 
 type ProfileParams struct {
 	Profiles []domain.ProfileConfig
-	// Default is the profile a run takes when it is not asked, empty for a config
-	// declaring none.
-	Default string
 }
 
-// ProfileStep asks which profiles to start. Unlike the job, it has a safe
-// default — the config's default profile — so it resolves rather than refuses,
-// and a config with one profile or none is never asked at all. It takes a set:
-// starting two products' stacks at once is one run, not two.
+// ProfileStep asks which profile `run up` starts — one, never several. A config
+// with one profile or none is never asked, and a run that cannot ask takes the
+// default profile or is refused naming --profile: with several and none marked
+// default there is no safe answer.
 func ProfileStep(params ProfileParams) flow.Step {
-	return flow.Step{
-		Kind:  flow.StepMultiSelect,
-		Key:   KeyProfile,
-		Label: domain.RunProfileStepName,
-		Skip: func(flow.Answers) (bool, string) {
-			if len(params.Profiles) <= 1 {
-				return true, domain.RunProfileNoChoice
-			}
-			return false, ""
-		},
-		Build: func(flow.Answers) (flow.StepContent, error) {
-			return flow.StepContent{
-				Title:       domain.RunProfilePickerTitle,
-				Description: domain.RunProfilePickerDesc,
-				Options:     profileOptions(params),
-			}, nil
-		},
-		// Without this an emptied selection reads as unanswered, and the run
-		// started the default profile the reader had just unchecked.
-		ValidateSet: func(values []string) error {
-			if len(values) == 0 {
-				return errors.New(domain.RunProfileSelectAtLeastOne)
-			}
-			return nil
-		},
-		Resolve: func(flow.Answers) (flow.Answer, error) {
-			if params.Default == "" {
-				return flow.Answer{}, nil
-			}
-			return flow.Answer{Values: []string{params.Default}}, nil
-		},
-		Summarize: flow.SummarizeSet,
+	step := ProfilePickStep(ProfilePickParams{Profiles: params.Profiles, Flag: domain.FlagProfile})
+	step.Skip = func(flow.Answers) (bool, string) {
+		if len(params.Profiles) <= 1 {
+			return true, domain.RunProfileNoChoice
+		}
+		return false, ""
 	}
+	pick := step.Build
+	step.Build = func(answers flow.Answers) (flow.StepContent, error) {
+		content, err := pick(answers)
+		content.Start = rules.FindExistingDefaultProfile(domain.RunConfig{Profiles: params.Profiles}, "")
+		return content, err
+	}
+	step.Resolve = func(flow.Answers) (flow.Answer, error) {
+		profile, ok := rules.DefaultProfile(domain.RunConfig{Profiles: params.Profiles})
+		if !ok {
+			return flow.Answer{}, fmt.Errorf("%w — %s", domain.ErrProfileRequired, profileNames(params.Profiles))
+		}
+		return flow.Answer{Value: profile.Name}, nil
+	}
+	return step
 }
 
-func profileOptions(params ProfileParams) []flow.Option {
-	options := make([]flow.Option, 0, len(params.Profiles))
-	for _, profile := range params.Profiles {
-		options = append(options, flow.Option{
-			Label:    fmt.Sprintf(domain.RunProfileOptionFmt, profile.Name, len(profile.Jobs)),
-			Value:    profile.Name,
-			Selected: profile.Name == params.Default,
-		})
+func profileNames(profiles []domain.ProfileConfig) string {
+	names := make([]string, 0, len(profiles))
+	for _, profile := range profiles {
+		names = append(names, profile.Name)
 	}
-	return options
+	return strings.Join(names, domain.RunURLListSep)
 }

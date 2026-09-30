@@ -510,9 +510,12 @@ and **experimental**: the global `wtm init` does not configure it.
   user which one, then run the command again.
   `run url` / `run open` refuse such a worktree the same way.
 - `run up [worktree] --profile <name>` / `run down [worktree]` — start / stop a profile.
-  On `run up` **`--profile` is repeatable**: `--profile front --profile back` starts the
-  union of both, in the order given, and a job several of them list starts once.
-  `run down --profile` still takes one.
+  **`run up` starts exactly one profile**, and `--profile` takes one value on both
+  commands (a second `--profile` is a usage error). Without it, `run up` takes the profile
+  marked default, else the only one declared; with several and none marked default it
+  **fails naming `--profile`** and the profiles to choose from on your paths (no picker
+  without a terminal) — pass `--profile`, or run `run list --output json` to see them.
+  A run.toml declaring no profile starts every declared job.
   `run down --all` stops the jobs of **every worktree of the current repository** — never
   another repository's, though the daemon is shared — without a prompt, and its JSON
   holds one document per worktree it emptied.
@@ -730,7 +733,8 @@ and **experimental**: the global `wtm init` does not configure it.
   left out keeps the field, no flag opens the form, and `--yes` or no TTY means an error
   rather than a picker. Taking the default from another profile (`add`/`edit --default`)
   or removing the default profile prints a `!` warning on stderr naming what `run up`
-  now starts — the first declared profile when none is marked default.
+  now starts — the only profile left, or nothing: with several left and none marked
+  default, `run up` needs `--profile`.
 - Every job runs with the worktree's identity in its environment (an `on_create` /
   `on_clean` hook too, but **only** when run.toml declares a `docker compose` job **and**
   the worktree recorded its isolation in meta.json — otherwise a hook's environment is

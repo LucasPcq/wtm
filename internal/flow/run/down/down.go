@@ -334,7 +334,7 @@ func (f *downFlow) session() flow.Session {
 	}
 	return flow.Session{
 		ErrLabel: domain.CmdDown,
-		Presets:  target.Presets(target.PresetParams{Worktrees: target.Dirs(f.named), Profiles: target.OneProfile(f.request.Profile)}),
+		Presets:  target.Presets(target.PresetParams{Worktrees: target.Dirs(f.named), Profile: f.request.Profile}),
 		Steps: []flow.Step{
 			target.WorktreesStep(target.WorktreesParams{
 				ProjectDir: f.ctx.ProjectDir,

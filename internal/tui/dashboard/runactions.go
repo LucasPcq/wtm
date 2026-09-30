@@ -74,7 +74,7 @@ type runUpParams struct {
 	Precheck  []string
 }
 
-// startRunUp brings a worktree's default profile up, detached: the surface is
+// startRunUp brings one profile up in a worktree, detached: the surface is
 // given back and the progress goes to the output panel and to the held row's
 // stage. Starting three worktrees in a row is the case this serves, and each
 // one used to cost an open and an exit of the run view. Watching is what the

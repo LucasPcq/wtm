@@ -201,12 +201,7 @@ func removeNamed(params RemoveParams, name string) (Outcome, error) {
 	if err := save(params.Context, cfg); err != nil {
 		return Outcome{}, err
 	}
-	if fallback, any := rules.DefaultProfile(cfg); removed.Default && any {
-		params.Presenter.Notice(flow.Notice{
-			Kind: flow.NoticeWarning,
-			Text: fmt.Sprintf(domain.RunProfileDefaultRemovedFmt, name, fallback.Name),
-		})
-	}
+	sayDefaultRemoved(defaultRemovedParams{Presenter: params.Presenter, Removed: removed, Config: cfg})
 	return conclude(params.Presenter, Outcome{Name: name, Status: domain.JobActionRemoved})
 }
 
@@ -288,6 +283,23 @@ func sayDefaultReplaced(params defaultReplacedParams) {
 		Kind: flow.NoticeWarning,
 		Text: fmt.Sprintf(domain.RunProfileDefaultReplacedFmt, params.Previous, params.Current),
 	})
+}
+
+type defaultRemovedParams struct {
+	Presenter Presenter
+	Removed   domain.ProfileConfig
+	Config    domain.RunConfig
+}
+
+func sayDefaultRemoved(params defaultRemovedParams) {
+	if !params.Removed.Default || len(params.Config.Profiles) == 0 {
+		return
+	}
+	text := fmt.Sprintf(domain.RunProfileNoDefaultLeftFmt, params.Removed.Name)
+	if fallback, ok := rules.DefaultProfile(params.Config); ok {
+		text = fmt.Sprintf(domain.RunProfileDefaultRemovedFmt, params.Removed.Name, fallback.Name)
+	}
+	params.Presenter.Notice(flow.Notice{Kind: flow.NoticeWarning, Text: text})
 }
 
 func pickStep(cfg domain.RunConfig, title string) flow.Step {

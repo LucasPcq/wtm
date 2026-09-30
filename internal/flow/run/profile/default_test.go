@@ -95,6 +95,28 @@ func TestRemovingTheDefaultSaysWhatRunUpStartsNow(t *testing.T) {
 	}
 }
 
+func TestRemovingTheDefaultAmongSeveralSaysRunUpNeedsAProfile(t *testing.T) {
+	ctx, cfg := withProfiles(t,
+		domain.ProfileConfig{Name: "api-only", Jobs: []string{"api"}},
+		domain.ProfileConfig{Name: "web-only", Jobs: []string{"web"}},
+		domain.ProfileConfig{Name: "full", Jobs: []string{"api", "web"}, Default: true},
+	)
+	rec := &recorder{}
+
+	_, err := profileflow.Remove(profileflow.RemoveParams{
+		Context:   ctx,
+		Request:   profileflow.RemoveRequest{Name: "full", Config: cfg},
+		Prompter:  flow.Unattended{},
+		Presenter: rec,
+	})
+	if err != nil {
+		t.Fatalf("Remove: %v", err)
+	}
+	if !warned(rec, "full", "--"+domain.FlagProfile) {
+		t.Errorf("notices = %+v, want a warning saying run up now needs --profile", rec.Notices)
+	}
+}
+
 func TestRemovingTheLastProfileSaysNothingAboutADefault(t *testing.T) {
 	ctx, cfg := withProfiles(t, domain.ProfileConfig{Name: "full", Jobs: []string{"api"}, Default: true})
 	rec := &recorder{}

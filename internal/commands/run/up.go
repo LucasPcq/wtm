@@ -22,7 +22,9 @@ func newUpCmd() *cobra.Command {
 		Long: "Start every job in a profile, in declared order, in each [worktree] — the current one when omitted, picked interactively when there is a terminal.\n" +
 			"Several worktrees start concurrently and independently: one that aborts leaves the others running,\n" +
 			"and the run exits non-zero if any of them did.\n" +
-			"Without --profile, uses the default profile (or shows a picker if multiple exist).\n" +
+			"It starts one profile: --profile, else the default profile, else the only one declared.\n" +
+			"With several and none marked default it asks which, and fails naming --profile when it cannot ask.\n" +
+			"A run.toml declaring no profile starts every job.\n" +
 			"Once the jobs are up, each declared port is checked: a port nothing answers on is\n" +
 			"reported rather than announced as bound. It never fails the run — see --no-probe\n" +
 			"and run.toml's port_probe_timeout.\n" +
@@ -36,7 +38,7 @@ func newUpCmd() *cobra.Command {
 		RunE: runUp,
 	}
 
-	shared.AddProfilesFlag(cmd, "Profiles to start; repeatable. A job several of them name starts once. Defaults to the default profile, or a picker when several exist")
+	shared.AddProfileFlag(cmd, "Start this profile's jobs (default: the profile marked default, or the only one declared)")
 	cmd.Flags().Bool(domain.FlagExclusive, false, "Stop jobs on other worktrees before starting (one worktree only)")
 	cmd.Flags().Bool(domain.FlagParallel, false, "Start without stopping other worktrees")
 	cmd.MarkFlagsMutuallyExclusive(domain.FlagExclusive, domain.FlagParallel)
@@ -65,14 +67,14 @@ func runUp(cmd *cobra.Command, args []string) error {
 	parallel, _ := cmd.Flags().GetBool(domain.FlagParallel)
 	noProbe, _ := cmd.Flags().GetBool(domain.FlagNoProbe)
 	force, _ := cmd.Flags().GetBool(domain.FlagForce)
-	profiles, _ := cmd.Flags().GetStringSlice(domain.FlagProfile)
+	profile, _ := cmd.Flags().GetString(domain.FlagProfile)
 
 	outcome, err := upflow.Run(upflow.Params{
 		Context: ctx.FlowContext(),
 		Request: upflow.Request{
 			Worktrees: args,
 			Cwd:       ctx.Dir,
-			Profiles:  profiles,
+			Profile:   profile,
 			Exclusive: exclusive,
 			Parallel:  parallel,
 			NoProbe:   noProbe,

@@ -18,7 +18,7 @@ wtm run down [worktree...] [flags]
       --all              Stop the jobs of every worktree of this repository
   -h, --help             help for down
       --output string    Output format: text or json (default "text")
-      --profile string   Stop only this profile's jobs
+      --profile string   Stop only this profile's jobs (default: every job the worktree runs)
   -y, --yes              Skip all prompts; stops what the worktree has running
 ```
 

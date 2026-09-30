@@ -23,7 +23,7 @@ func newDownCmd() *cobra.Command {
 		Args:  cobra.ArbitraryArgs,
 		RunE:  runDown,
 	}
-	shared.AddProfileFlag(cmd, "Stop only this profile's jobs")
+	shared.AddProfileFlag(cmd, "Stop only this profile's jobs (default: every job the worktree runs)")
 	shared.AddYesFlag(cmd, "Skip all prompts; stops what the worktree has running")
 	shared.AddOutputFlag(cmd)
 	cmd.Flags().Bool(domain.FlagAll, false, "Stop the jobs of every worktree of this repository")
