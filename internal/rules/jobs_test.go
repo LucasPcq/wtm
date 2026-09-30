@@ -90,7 +90,16 @@ func TestRunConfigDefaultProfileFallback(t *testing.T) {
 	}
 	p, ok := DefaultProfile(cfg)
 	if !ok || p.Name != "only" {
-		t.Errorf("expected fallback to first profile, got %q (ok=%v)", p.Name, ok)
+		t.Errorf("expected fallback to the only profile, got %q (ok=%v)", p.Name, ok)
+	}
+}
+
+func TestRunConfigDefaultProfileIsNotTheFirstOfSeveral(t *testing.T) {
+	cfg := domain.RunConfig{
+		Profiles: []domain.ProfileConfig{{Name: "front"}, {Name: "back"}},
+	}
+	if p, ok := DefaultProfile(cfg); ok {
+		t.Errorf("DefaultProfile = %q, want none: several profiles and none marked default", p.Name)
 	}
 }
 

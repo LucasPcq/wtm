@@ -31,9 +31,9 @@ type Request struct {
 	// worktree roots git spells them. A surface that already knows a likely
 	// answer offers it; the selection stays exact.
 	Precheck []string
-	// Profiles are the profiles to start, in the order they were named. A job
-	// several of them list starts once.
-	Profiles []string
+	// Profile is the profile to start; empty leaves the step to ask, or to take
+	// the default one.
+	Profile string
 	// Exclusive and Parallel override the project's standing preference for one
 	// run. They are the concurrency step's Resolve, not a second axis.
 	Exclusive bool
@@ -404,56 +404,29 @@ func (f *upFlow) offerToSilenceProbes(results runlogs.Outcomes) error {
 // resolvedProfile is what this run settled on: a name for it and the jobs it
 // starts. The name is empty for a config declaring no profile at all — dropping
 // it left `run up` unable to say which of several it had brought up (LUC-208).
-// Over several profiles it names them all, which is what the recap reads back.
 type resolvedProfile struct {
 	Name string
 	Jobs []domain.JobConfig
 }
 
 func (f *upFlow) resolveProfile(answers flow.Answers) (resolvedProfile, error) {
-	names := answers.Values(target.KeyProfile)
-	if len(names) == 0 {
+	name := answers.Value(target.KeyProfile)
+	if name == "" {
+		if len(f.request.Config.Profiles) == 0 {
+			return resolvedProfile{Jobs: rules.JobsWithoutProfile(f.request.Config)}, nil
+		}
 		profile, ok := rules.DefaultProfile(f.request.Config)
 		if !ok {
-			return resolvedProfile{Jobs: rules.JobsWithoutProfile(f.request.Config)}, nil
+			return resolvedProfile{}, domain.ErrProfileRequired
 		}
 		return f.profileRun(profile), nil
 	}
 
-	profiles := make([]domain.ProfileConfig, 0, len(names))
-	for _, name := range names {
-		profile, ok := rules.FindProfile(f.request.Config, name)
-		if !ok {
-			return resolvedProfile{}, fmt.Errorf("profile %q not found in config", name)
-		}
-		profiles = append(profiles, profile)
+	profile, ok := rules.FindProfile(f.request.Config, name)
+	if !ok {
+		return resolvedProfile{}, fmt.Errorf("profile %q not found in config", name)
 	}
-	return f.profilesRun(profiles), nil
-}
-
-// profilesRun is the union of what the chosen profiles name, in the order they
-// were chosen. A job two of them list is started once: the second mention is
-// the same process, and starting it twice would be the collision the whole
-// module exists to prevent.
-func (f *upFlow) profilesRun(profiles []domain.ProfileConfig) resolvedProfile {
-	if len(profiles) == 1 {
-		return f.profileRun(profiles[0])
-	}
-
-	names := make([]string, 0, len(profiles))
-	seen := map[string]bool{}
-	var jobs []domain.JobConfig
-	for _, profile := range profiles {
-		names = append(names, profile.Name)
-		for _, job := range rules.ProfileJobs(f.request.Config, profile) {
-			if seen[job.Name] {
-				continue
-			}
-			seen[job.Name] = true
-			jobs = append(jobs, job)
-		}
-	}
-	return resolvedProfile{Name: strings.Join(names, domain.CmdListVarSep), Jobs: jobs}
+	return f.profileRun(profile), nil
 }
 
 func (f *upFlow) profileRun(profile domain.ProfileConfig) resolvedProfile {

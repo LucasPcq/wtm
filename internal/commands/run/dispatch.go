@@ -11,7 +11,6 @@ import (
 	logsflow "github.com/LucasPcq/wtm/internal/flow/run/logs"
 	startflow "github.com/LucasPcq/wtm/internal/flow/run/start"
 	stopflow "github.com/LucasPcq/wtm/internal/flow/run/stop"
-	"github.com/LucasPcq/wtm/internal/flow/run/target"
 	upflow "github.com/LucasPcq/wtm/internal/flow/run/up"
 )
 
@@ -95,7 +94,7 @@ func (p dispatchParams) dispatchUp() error {
 	}
 	outcome, err := upflow.Run(upflow.Params{
 		Context: t.FlowContext(),
-		Request: upflow.Request{Cwd: p.WorkDir, Profiles: target.OneProfile(p.Profile), Config: t.Run},
+		Request: upflow.Request{Cwd: p.WorkDir, Profile: p.Profile, Config: t.Run},
 		// The picker asked its question already; the concurrency one it did not,
 		// so it resolves to leaving the other worktrees alone.
 		Prompter:  confirming(t),

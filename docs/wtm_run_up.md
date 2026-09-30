@@ -7,7 +7,9 @@ Start a profile's jobs
 Start every job in a profile, in declared order, in each [worktree] — the current one when omitted, picked interactively when there is a terminal.
 Several worktrees start concurrently and independently: one that aborts leaves the others running,
 and the run exits non-zero if any of them did.
-Without --profile, uses the default profile (or shows a picker if multiple exist).
+It starts one profile: --profile, else the default profile, else the only one declared.
+With several and none marked default it asks which, and fails naming --profile when it cannot ask.
+A run.toml declaring no profile starts every job.
 Once the jobs are up, each declared port is checked: a port nothing answers on is
 reported rather than announced as bound. It never fails the run — see --no-probe
 and run.toml's port_probe_timeout.
@@ -25,15 +27,15 @@ wtm run up [worktree...] [flags]
 ### Options
 
 ```
-  -d, --detach            Start the jobs and return immediately instead of opening their output
-      --exclusive         Stop jobs on other worktrees before starting (one worktree only)
-      --force             Lift the refusal to start a job whose touches reach data this worktree does not own (its source's when verbatim, everyone's for a shared service with no namespace); other questions are still asked unless --yes
-  -h, --help              help for up
-      --no-probe          Skip the check that each declared port was actually bound
-      --output string     Output format: text or json (default "text")
-      --parallel          Start without stopping other worktrees
-      --profile strings   Profiles to start; repeatable. A job several of them name starts once. Defaults to the default profile, or a picker when several exist
-  -y, --yes               Skip all prompts; leaves the other worktrees' jobs running unless --exclusive
+  -d, --detach           Start the jobs and return immediately instead of opening their output
+      --exclusive        Stop jobs on other worktrees before starting (one worktree only)
+      --force            Lift the refusal to start a job whose touches reach data this worktree does not own (its source's when verbatim, everyone's for a shared service with no namespace); other questions are still asked unless --yes
+  -h, --help             help for up
+      --no-probe         Skip the check that each declared port was actually bound
+      --output string    Output format: text or json (default "text")
+      --parallel         Start without stopping other worktrees
+      --profile string   Start this profile's jobs (default: the profile marked default, or the only one declared)
+  -y, --yes              Skip all prompts; leaves the other worktrees' jobs running unless --exclusive
 ```
 
 ### Options inherited from parent commands

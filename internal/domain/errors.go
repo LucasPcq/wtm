@@ -236,6 +236,10 @@ var (
 	// the flag rather than falling back to a picker.
 	ErrJobRequired = errors.New("specify --job (no interactive picker without a terminal or in --output json mode)")
 
+	// ErrProfileRequired is `run up` over several profiles, none marked default,
+	// with nobody to ask: starting the first declared was a guess nobody saw.
+	ErrProfileRequired = errors.New("several profiles and none is the default: specify --profile (no interactive picker under --yes, without a terminal, or in --output json mode)")
+
 	// ErrExclusiveMultiWorktree refuses a flag that contradicts itself: exclusive
 	// means one stack at a time, and the run was told to bring up several. Unlike
 	// the setting, a flag leaves nothing to put to anyone — it was typed for this

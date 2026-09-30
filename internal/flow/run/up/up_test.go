@@ -31,52 +31,70 @@ func TestExclusiveIsRefusedOnSeveralWorktrees(t *testing.T) {
 	}
 }
 
-func TestSeveralProfilesStartTheirUnionOnce(t *testing.T) {
+func TestTheNamedProfileIsTheOneStarted(t *testing.T) {
 	cfg := domain.RunConfig{
 		Jobs: []domain.JobConfig{
 			{Name: "db", Kind: domain.JobKindService},
 			{Name: "web", Kind: domain.JobKindService},
-			{Name: "api", Kind: domain.JobKindService},
 		},
 		Profiles: []domain.ProfileConfig{
-			{Name: "front", Jobs: []string{"db", "web"}},
-			{Name: "back", Jobs: []string{"db", "api"}},
+			{Name: "front", Jobs: []string{"db", "web"}, Default: true},
+			{Name: "back", Jobs: []string{"db"}},
 		},
 	}
 	f := &upFlow{request: Request{Config: cfg}}
 
-	got, err := f.resolveProfile(flow.NewAnswers(nil).WithValues(target.KeyProfile, []string{"front", "back"}))
+	got, err := f.resolveProfile(flow.NewAnswers(map[string]string{target.KeyProfile: "back"}))
 	if err != nil {
 		t.Fatalf("resolveProfile: %v", err)
 	}
-
-	var names []string
-	for _, job := range got.Jobs {
-		names = append(names, job.Name)
-	}
-	if len(names) != 3 {
-		t.Fatalf("jobs = %v, want db started once and web, api after it", names)
-	}
-	if names[0] != "db" || names[1] != "web" || names[2] != "api" {
-		t.Errorf("jobs = %v, want the profiles' order preserved", names)
-	}
-	if got.Name != "front, back" {
-		t.Errorf("Name = %q, want both profiles named", got.Name)
+	if got.Name != "back" || len(got.Jobs) != 1 {
+		t.Errorf("got %+v, want back alone", got)
 	}
 }
 
-func TestOneProfileIsUnchangedBySeveralProfileSupport(t *testing.T) {
+func TestTheOnlyProfileIsStartedWithoutBeingNamed(t *testing.T) {
 	cfg := domain.RunConfig{
 		Jobs:     []domain.JobConfig{{Name: "web", Kind: domain.JobKindService}},
 		Profiles: []domain.ProfileConfig{{Name: "front", Jobs: []string{"web"}}},
 	}
 	f := &upFlow{request: Request{Config: cfg}}
 
-	got, err := f.resolveProfile(flow.NewAnswers(nil).WithValues(target.KeyProfile, []string{"front"}))
+	got, err := f.resolveProfile(flow.Answers{})
 	if err != nil {
 		t.Fatalf("resolveProfile: %v", err)
 	}
 	if got.Name != "front" || len(got.Jobs) != 1 {
-		t.Errorf("got %+v, want the single-profile shape untouched", got)
+		t.Errorf("got %+v, want the only profile", got)
+	}
+}
+
+func TestNoProfileDeclaredStartsEveryJob(t *testing.T) {
+	cfg := domain.RunConfig{
+		Jobs: []domain.JobConfig{{Name: "migrate", Kind: domain.JobKindTask}, {Name: "web", Kind: domain.JobKindService}},
+	}
+	f := &upFlow{request: Request{Config: cfg}}
+
+	got, err := f.resolveProfile(flow.Answers{})
+	if err != nil {
+		t.Fatalf("resolveProfile: %v", err)
+	}
+	if got.Name != "" || len(got.Jobs) != 2 {
+		t.Errorf("got %+v, want every declared job under no profile name", got)
+	}
+}
+
+func TestAnUnattendedRunRefusesSeveralProfilesWithNoDefault(t *testing.T) {
+	repo := gittest.InitRepo(t)
+	cfg := domain.RunConfig{
+		Jobs:     []domain.JobConfig{{Name: "web", Kind: domain.JobKindService}},
+		Profiles: []domain.ProfileConfig{{Name: "front", Jobs: []string{"web"}}, {Name: "back", Jobs: []string{"web"}}},
+	}
+	f := &upFlow{ctx: flow.Context{ProjectDir: repo}, request: Request{Cwd: repo, Config: cfg}}
+
+	_, err := flow.Unattended{}.Ask(f.session())
+
+	if !errors.Is(err, domain.ErrProfileRequired) {
+		t.Fatalf("err = %v, want the run refused naming --profile", err)
 	}
 }

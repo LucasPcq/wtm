@@ -34,7 +34,7 @@ const (
 func (f *upFlow) session() flow.Session {
 	return flow.Session{
 		ErrLabel: domain.CmdUp,
-		Presets:  target.Presets(target.PresetParams{Worktrees: target.Dirs(f.named), Profiles: f.request.Profiles}),
+		Presets:  target.Presets(target.PresetParams{Worktrees: target.Dirs(f.named), Profile: f.request.Profile}),
 		Steps: []flow.Step{
 			target.WorktreesStep(target.WorktreesParams{
 				ProjectDir: f.ctx.ProjectDir,
@@ -45,10 +45,7 @@ func (f *upFlow) session() flow.Session {
 				// selection. Refused as the box is ticked rather than after the recap.
 				Single: f.request.Exclusive,
 			}),
-			target.ProfileStep(target.ProfileParams{
-				Profiles: f.request.Config.Profiles,
-				Default:  f.defaultProfile(),
-			}),
+			target.ProfileStep(target.ProfileParams{Profiles: f.request.Config.Profiles}),
 			f.concurrencyStep(),
 		},
 	}
@@ -316,12 +313,4 @@ func (f *upFlow) othersSummary(answers flow.Answers) string {
 // daemon's keys for every job it is about to start.
 func (f *upFlow) workDirs(answers flow.Answers) []string {
 	return target.WorkDirs(target.WorkDirsParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})
-}
-
-func (f *upFlow) defaultProfile() string {
-	profile, ok := rules.DefaultProfile(f.request.Config)
-	if !ok {
-		return ""
-	}
-	return profile.Name
 }

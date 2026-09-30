@@ -85,14 +85,16 @@ func livedUntilNow(status domain.JobStatus) bool {
 	return IsJobUp(status) || status == domain.JobStatusReaped
 }
 
-// DefaultProfile returns the profile marked as default, or the first one.
+// DefaultProfile is the profile `run up` starts unnamed: the one marked default,
+// else the only one declared. Several with none marked have no default — the
+// first declared was a guess nobody could see.
 func DefaultProfile(cfg domain.RunConfig) (domain.ProfileConfig, bool) {
 	for _, p := range cfg.Profiles {
 		if p.Default {
 			return p, true
 		}
 	}
-	if len(cfg.Profiles) > 0 {
+	if len(cfg.Profiles) == 1 {
 		return cfg.Profiles[0], true
 	}
 	return domain.ProfileConfig{}, false

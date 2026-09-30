@@ -3,6 +3,7 @@ package run
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -175,6 +176,17 @@ func TestRunUpOnAStreamReportsTheAbortAndFails(t *testing.T) {
 	for _, want := range []string{"step 2/3", "Left running", "docker", "Not started", "api"} {
 		if !strings.Contains(stderr, want) {
 			t.Errorf("the abort report is missing %q\n--- stderr ---\n%s", want, stderr)
+		}
+	}
+}
+
+// run up starts one profile, like run down stops one: a second --profile used
+// to be the union of both on up and to overwrite the first on down.
+func TestASecondProfileIsRefused(t *testing.T) {
+	for _, command := range []string{domain.CmdUp, domain.CmdDown} {
+		_, _, err := runCmd(t, command, "--"+domain.FlagProfile, "front", "--"+domain.FlagProfile, "back")
+		if err == nil || !strings.Contains(err.Error(), fmt.Sprintf(domain.FlagGivenTwiceFmt, "front")) {
+			t.Errorf("%s: err = %v, want a second --profile refused", command, err)
 		}
 	}
 }

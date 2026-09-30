@@ -2007,7 +2007,10 @@ const (
 	// RunProfileDefaultReplacedFmt and RunProfileDefaultRemovedFmt say what a
 	// change to the default did to `run up`, which starts the default profile.
 	RunProfileDefaultReplacedFmt = "%s is no longer the default profile: %s is"
-	RunProfileDefaultRemovedFmt  = "%s was the default profile: run up now starts %s, the first declared — choose another with `wtm run profile edit <name> --default`"
+	RunProfileDefaultRemovedFmt  = "%s was the default profile: run up now starts %s, the only one left"
+	// RunProfileNoDefaultLeftFmt is the same removal leaving several profiles:
+	// run up then asks, and cannot run unattended without being told which.
+	RunProfileNoDefaultLeftFmt = "%s was the default profile: run up now asks which profile to start, and needs --" + FlagProfile + " without a terminal — mark one with `wtm run profile edit <name> --default`"
 
 	// MetaFileName is the metadata file created per worktree inside
 	// <state-dir>/worktrees/<branch>/.
@@ -2527,17 +2530,11 @@ const (
 	// naming the job is required on every other path.
 	RunJobPickerTitle = "Select job"
 
-	// RunProfilePicker* head the profile step, and the Run*StepName label each
-	// question in the wizard's breadcrumb.
-	RunProfilePickerTitle = "Select profiles"
-	RunProfilePickerDesc  = "Which profiles to start? A job named by several starts once."
-	// RunProfileOptionFmt keeps a profile's row to its name and a count: spelling
-	// out eight job names made the list unreadable in the repos that have them.
-	RunProfileOptionFmt  = "%s · %d jobs"
-	RunWorktreeStepName  = "Worktree"
-	RunWorktreesStepName = "Worktrees"
-	RunJobStepName       = "Job"
-	RunProfileStepName   = "Profile"
+	RunProfilePickerTitle = "Start which profile?"
+	RunWorktreeStepName   = "Worktree"
+	RunWorktreesStepName  = "Worktrees"
+	RunJobStepName        = "Job"
+	RunProfileStepName    = "Profile"
 
 	// Run*Skip reasons say why a target step was never asked. A step that cannot
 	// list the worktrees is skipped rather than failed: acting where you stand is
@@ -2639,12 +2636,11 @@ const (
 
 	// RunStoppingOthers and RunStoppedOtherFmt report the worktrees an exclusive
 	// run cleared before starting.
-	RunStoppingOthers          = "Stopping the other worktrees' jobs…"
-	RunStoppedOtherFmt         = "Stopped jobs in %s"
-	RunStopOtherFailFmt        = "stop jobs in %s: %s"
-	RunWorktreeUnreadable      = "worktrees could not be listed"
-	RunProfileNoChoice         = "no other profile to choose from"
-	RunProfileSelectAtLeastOne = "select at least one profile"
+	RunStoppingOthers     = "Stopping the other worktrees' jobs…"
+	RunStoppedOtherFmt    = "Stopped jobs in %s"
+	RunStopOtherFailFmt   = "stop jobs in %s: %s"
+	RunWorktreeUnreadable = "worktrees could not be listed"
+	RunProfileNoChoice    = "no other profile to choose from"
 	// RunURLNoChoice covers both ends of the same absence: no job publishes a
 	// url, or a single one does and is therefore the answer rather than a
 	// question. Which of the two it was is said by the error that follows when
@@ -2949,6 +2945,9 @@ const (
 	// positional: naming a flag that does not exist would send the reader looking
 	// for it.
 	FlowStepRequiredArgFmt = "%s is required and cannot be asked in this mode: pass it as an argument"
+	// FlagGivenTwiceFmt refuses a repeated single-valued flag, which pflag would
+	// otherwise let the last one win without a word (the value already held).
+	FlagGivenTwiceFmt = "already given as %q: it takes one value"
 
 	// The create flow (internal/flow/create): step prose, option labels, recap
 	// fields and refusals. Format verbs: %s branch, %s env strategy, %s flag name.
