@@ -2,7 +2,7 @@
 
 <p align="center">
   <strong>One branch, one worktree, one isolated dev stack.</strong><br>
-  A worktree manager for teams that work on several branches at once — and let their agents do too.
+  A worktree manager for teams that work on several branches at once, and let their agents do too.
 </p>
 
 <p align="center">
@@ -17,14 +17,14 @@
 
 ## Why wtm
 
-`git worktree` gives each branch its own directory. Everything around it is still yours to do: copy the `.env`, install dependencies, remember which directory holds which branch, rebase a stack of branches in the right order, and — the hard part — run two branches' dev servers without them fighting over the same ports, containers and databases.
+`git worktree` gives each branch its own directory. Everything around it is still yours to do: copy the `.env`, install dependencies, remember which directory holds which branch, rebase a stack of branches in the right order and, the hard part, run two branches' dev servers without them fighting over the same ports, containers and databases.
 
 wtm does that part:
 
-- **A worktree is ready when it is created** — `.env` copied, hooks run, ports shifted so it never collides with another one.
-- **Each worktree runs its own stack** — dev servers and `docker compose`, on their own ports and under their own name, side by side.
-- **Stacked branches stay in order** — every worktree knows its parent; `wtm sync` rebases the whole chain.
-- **It speaks JSON** — data commands take `--output json`, changes take `--yes`, and `wtm agents install` teaches Claude Code or Cursor to drive it.
+- **A worktree is ready when it is created:** `.env` copied, hooks run, ports shifted so it never collides with another one.
+- **Each worktree runs its own stack:** dev servers and `docker compose`, on their own ports and under their own name, side by side.
+- **Stacked branches stay in order:** every worktree knows its parent; `wtm sync` rebases the whole chain.
+- **It speaks JSON:** data commands take `--output json`, changes take `--yes`, and `wtm agents install` teaches Claude Code or Cursor to drive it.
 
 ## Install
 
@@ -36,7 +36,7 @@ echo 'eval "$(wtm shell-init)"' >> ~/.zshrc   # lets `wtm go` change directory
 <details>
 <summary>Other ways to install</summary>
 
-**Binary** — download the latest [release](https://github.com/LucasPcq/wtm/releases), extract it, and move `wtm` onto your `PATH`:
+**Binary:** download the latest [release](https://github.com/LucasPcq/wtm/releases), extract it, and move `wtm` onto your `PATH`:
 
 ```bash
 tar -xzf wtm_*_darwin_arm64.tar.gz   # or _darwin_amd64 / _linux_amd64
@@ -49,9 +49,9 @@ sudo mv wtm /usr/local/bin/
 go install github.com/LucasPcq/wtm@latest
 ```
 
-**Shell integration** — `bash` and `fish` work the same way: `eval "$(wtm shell-init)"` in `~/.bashrc`, `wtm shell-init | source` in `config.fish`.
+**Shell integration:** `bash` and `fish` work the same way: `eval "$(wtm shell-init)"` in `~/.bashrc`, `wtm shell-init | source` in `config.fish`.
 
-**Updating** — `wtm upgrade` updates wtm the way it was installed (Homebrew, `go install` or a standalone binary). wtm checks for a new release at most once a day; `WTM_NO_UPDATE_CHECK=1` turns that off.
+**Updating:** `wtm upgrade` updates wtm the way it was installed (Homebrew, `go install` or a standalone binary). wtm checks for a new release at most once a day; `WTM_NO_UPDATE_CHECK=1` turns that off.
 
 </details>
 
@@ -75,7 +75,7 @@ To run your dev stack per worktree, `wtm run init` detects your `docker-compose`
 
 ### Worktrees, provisioned
 
-`wtm create` makes the worktree, copies the `.env` files from their template, the main checkout or the parent, and runs your `on_create` hooks (`pnpm install`, …). `wtm clean` and `wtm prune` remove them — one at a time, or every branch whose PR is merged — and refuse a worktree with uncommitted or unpushed work unless you say `--force`.
+`wtm create` makes the worktree, copies the `.env` files from their template, the main checkout or the parent, and runs your `on_create` hooks (`pnpm install`, …). `wtm clean` and `wtm prune` remove them, one at a time or every branch whose PR is merged, and refuse a worktree with uncommitted or unpushed work unless you say `--force`.
 
 ### An isolated stack per worktree
 
@@ -121,7 +121,7 @@ Every command documents itself: `wtm <command> --help`, or the generated [refere
 | [`list`](docs/wtm_list.md) | List all worktrees |
 | [`tree`](docs/wtm_tree.md) | Show the worktree forest (parent → child) |
 | [`clean`](docs/wtm_clean.md) | Remove a worktree and its local branch |
-| [`prune`](docs/wtm_prune.md) | Remove finished worktrees (merged / closed PR / gone) in one pass — merged/closed need `gh` |
+| [`prune`](docs/wtm_prune.md) | Remove finished worktrees (merged / closed PR / gone) in one pass (merged/closed need `gh`) |
 | [`extract`](docs/wtm_extract.md) | Move uncommitted changes to another worktree (split an oversized PR) |
 | [`env`](docs/wtm_env.md) | Detect and fix a worktree's `.env` drift against its template + value source |
 | [`relocate`](docs/wtm_relocate.md) | Move worktrees to align with `base_path` and adopt external ones |
@@ -138,7 +138,7 @@ Every command documents itself: `wtm <command> --help`, or the generated [refere
 
 | Command | Purpose |
 |---|---|
-| [`fast-forward`](docs/wtm_fast-forward.md) | Advance worktree branches to `origin/<branch>` — no rebase, no merge |
+| [`fast-forward`](docs/wtm_fast-forward.md) | Advance worktree branches to `origin/<branch>`, with no rebase and no merge |
 | [`sync`](docs/wtm_sync.md) | Rebase selected worktrees onto their parent, in cascade |
 | [`reparent`](docs/wtm_reparent.md) | Change the parent a worktree is rebased onto |
 
@@ -179,13 +179,13 @@ Opt-in: `wtm run init` sets it up once per repository.
 
 ## Documentation
 
-- **[User guide](docs/guide/README.md)** — [configuration](docs/guide/configuration.md), [isolation](docs/guide/isolation.md), [jobs and profiles](docs/guide/jobs-and-profiles.md), [how `wtm run` works](docs/guide/how-run-works.md), [shared services](docs/guide/shared-services.md), [named URLs](docs/guide/addressing.md), the [`run.toml` reference](docs/guide/run-toml.md), [where wtm keeps its state](docs/guide/state.md).
-- **[Command reference](docs/wtm.md)** — generated from `--help`.
-- **[Changelog](CHANGELOG.md)** — and [migrating to 0.28](docs/guide/migrating-to-0.28.md) if you come from 0.27.
+- **[User guide](docs/guide/README.md):** [configuration](docs/guide/configuration.md), [isolation](docs/guide/isolation.md), [jobs and profiles](docs/guide/jobs-and-profiles.md), [how `wtm run` works](docs/guide/how-run-works.md), [shared services](docs/guide/shared-services.md), [named URLs](docs/guide/addressing.md), the [`run.toml` reference](docs/guide/run-toml.md), [where wtm keeps its state](docs/guide/state.md).
+- **[Command reference](docs/wtm.md)**, generated from `--help`.
+- **[Changelog](CHANGELOG.md)**, and [migrating to 0.28](docs/guide/migrating-to-0.28.md) if you come from 0.27.
 
 ## Contributing
 
-`make lint` and `make test` must pass. The command reference under `docs/` is generated — change a command, then run `make docs`. The GIFs above are recorded from `docs/demos/*.tape` with [VHS](https://github.com/charmbracelet/vhs): `make demos` re-records them.
+`make lint` and `make test` must pass. The command reference under `docs/` is generated: change a command, then run `make docs`. The GIFs above are recorded from `docs/demos/*.tape` with [VHS](https://github.com/charmbracelet/vhs): `make demos` re-records them.
 
 ## License
 
