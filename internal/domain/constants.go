@@ -1251,6 +1251,17 @@ const (
 	// FlagPortClear empties a job's whole port table on `run job edit`, the one
 	// thing --port cannot say: it merges, so it can never remove.
 	FlagPortClear = "port-clear"
+	// FlagScope and the FlagNamespace* flags declare a shared service and its
+	// [job.namespace] on `run job add|edit`, the fields run init otherwise asks.
+	FlagScope           = "scope"
+	FlagNamespaceName   = "namespace-name"
+	FlagNamespaceCreate = "namespace-create"
+	FlagNamespaceRemove = "namespace-remove"
+	FlagNamespaceEnv    = "namespace-env"
+	// ScopeValue* are what --scope takes: the per-worktree scope is empty in
+	// run.toml, which a flag cannot spell legibly.
+	ScopeValueShared      = "shared"
+	ScopeValuePerWorktree = "worktree"
 	// FlagRaw asks for a job's own port rather than the name the proxy serves it
 	// under: an address every OS resolves and no proxy has to be up for.
 	FlagRaw = "raw"
@@ -1900,6 +1911,11 @@ const (
 	RunJobURLHostOrphan = "--%s names the host but nothing is published — add --%s"
 	RunJobURLNoneFmt    = "job %q publishes no url — these do: %s"
 
+	RunJobUnknownScopeFmt      = "--%s %q is neither %s nor %s"
+	RunJobNamespaceEnvFmt      = "--%s %q is not KEY=VALUE"
+	RunJobNamespaceWithdrawFmt = "--%s '' withdraws the [job.namespace] block, so it cannot be combined with --%s, --%s or --%s"
+	RunJobBindsNoPortTaskFmt   = "--%s says nothing about a task, which binds nothing by nature"
+
 	RunJobUnknownKindFmt = "job %q: unknown kind %q (expected service or task)"
 
 	// RunJobNameSpacesFmt refuses whitespace in a name that is also the daemon's
@@ -1910,7 +1926,7 @@ const (
 	RunJobCmdRequired   = "command is required"
 	RunJobExistsFmt     = "job %q already exists"
 	RunJobNotFoundFmt   = "job %q not found"
-	RunJobNothingToEdit = "edit has nothing to change — pass --%s, --%s, --%s, --%s, --%s, --%s, --%s, --%s, --%s, --%s, --%s or --%s"
+	RunJobNothingToEdit = "edit has nothing to change — pass one of %s"
 	// RunJobReferenced* is the safety refusal of a removal that would drag other
 	// declarations with it. The flag lifts it up front; a run with someone to ask
 	// lifts it by answering, which is the only way `run job list` can remove such
