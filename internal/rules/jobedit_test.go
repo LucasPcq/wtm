@@ -225,3 +225,16 @@ func TestRenameJobRefsRewritesEnvPortLinks(t *testing.T) {
 		t.Errorf("the input config was mutated: %+v", cfg.EnvPorts[0])
 	}
 }
+
+func TestSameJobReadsNilAndEmptyAlike(t *testing.T) {
+	a := domain.JobConfig{Name: "api", Cmd: "pnpm dev"}
+	b := domain.JobConfig{Name: "api", Cmd: "pnpm dev", Runs: []string{}, Ports: map[string]int{}}
+
+	if !rules.SameJob(a, b) {
+		t.Error("an empty list reads as a change")
+	}
+	b.Touches = []string{"db"}
+	if rules.SameJob(a, b) {
+		t.Error("a new touches list reads as no change")
+	}
+}

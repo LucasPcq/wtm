@@ -1,6 +1,8 @@
 package rules
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"slices"
@@ -354,4 +356,12 @@ func redirectedIn(params redirectedInParams) []string {
 		}
 	}
 	return out
+}
+
+// SameJob compares two declarations as run.toml would write them: a nil list
+// and an empty one are the same file.
+func SameJob(a, b domain.JobConfig) bool {
+	left, errA := json.Marshal(a)
+	right, errB := json.Marshal(b)
+	return errA == nil && errB == nil && bytes.Equal(left, right)
 }

@@ -130,6 +130,9 @@ func editNamed(params EditParams, name string) (Outcome, error) {
 		return Outcome{}, err
 	}
 
+	if rules.SameJob(updated, current) {
+		return conclude(params.Presenter, Outcome{Name: current.Name, Status: domain.JobActionUnchanged})
+	}
 	renamed := updated.Name != current.Name
 	if held := heldBy(params.Context, current.Name); renamed && len(held) > 0 {
 		return Outcome{}, fmt.Errorf(domain.RunJobRenameHeldFmt, current.Name, strings.Join(held, domain.RunURLListSep))

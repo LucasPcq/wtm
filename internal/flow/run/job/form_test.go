@@ -277,3 +277,24 @@ func TestAddUnattendedKeepsWhatTheFlagsDeclared(t *testing.T) {
 		t.Errorf("namespace = %+v, want it kept", pg.Namespace)
 	}
 }
+
+// Walking the form with enter on every field changes nothing, and must say so
+// rather than report an update.
+func TestEditAnsweringEveryPreFillIsUnchanged(t *testing.T) {
+	cfg := dataConfig()
+	prompter := &flowtest.ScriptedPrompter{
+		Answers: formAnswers(map[string]string{jobflow.KeyName: "api", jobflow.KeyCmd: "pnpm dev"}),
+		Sets:    map[string][]string{jobflow.KeyRuns: nil, jobflow.KeyTouches: nil},
+	}
+	presenter := &recorder{}
+
+	if _, err := jobflow.Edit(jobflow.EditParams{
+		Context: context(t), Request: jobflow.EditRequest{Name: "api", Config: cfg}, Prompter: prompter, Presenter: presenter,
+	}); err != nil {
+		t.Fatalf("Edit: %v", err)
+	}
+
+	if len(presenter.changed) != 1 || presenter.changed[0].Status != domain.JobActionUnchanged {
+		t.Errorf("outcome = %+v, want the job reported unchanged", presenter.changed)
+	}
+}

@@ -53,6 +53,8 @@ func (p presenter) Changed(outcome jobflow.Outcome) error {
 		switch outcome.Status {
 		case domain.JobActionUpdated:
 			output.Update(w, fmt.Sprintf(domain.RunJobUpdatedFmt, outcome.Name))
+		case domain.JobActionUnchanged:
+			output.Unchanged(w, fmt.Sprintf(domain.RunJobUnchangedFmt, outcome.Name))
 		case domain.JobActionRemoved:
 			output.Success(w, fmt.Sprintf(domain.RunJobRemovedFmt, outcome.Name))
 		default:

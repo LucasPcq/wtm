@@ -1845,7 +1845,8 @@ const (
 	JobRemovedTouchersFmt = "Dropped from the touches of: %s"
 	// RunInitJobsRemovedFmt reports what the unchecking dropped, next to what
 	// the same run added.
-	JobActionUpdated = "updated"
+	JobActionUpdated   = "updated"
+	JobActionUnchanged = "unchanged"
 
 	// RunCRUD* is the vocabulary of `run job` and `run profile` — the questions
 	// they ask and the wording of their answers. They live here rather than
@@ -1992,6 +1993,7 @@ const (
 	RunJobReferencedNo  = "Keep it"
 	RunJobAddedFmt      = "Added job %q"
 	RunJobUpdatedFmt    = "Updated job %q"
+	RunJobUnchangedFmt  = "Job %q unchanged"
 	RunJobRemovedFmt    = "Removed job %q"
 
 	// RunList* is `run list`'s two questions: an entry of run.toml, then what to
