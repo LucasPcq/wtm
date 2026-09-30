@@ -25,7 +25,7 @@ The host is `<host>.<worktree>.<repo>.localhost`: `<worktree>` is the branch as 
 
 ## The proxy's port
 
-The proxy listens on the loopback only, on port `11080` by default — set in the [global config](../../README.md#global-config):
+The proxy listens on the loopback only, on port `11080` by default — set in the [global config](configuration.md#global-config):
 
 ```toml
 [proxy]

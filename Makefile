@@ -1,7 +1,7 @@
 BINARY   := wtm
 BUILD_DIR := bin
 
-.PHONY: build test vet fmt lint arch dead dead-strict dupl tidy docs release install clean
+.PHONY: build test vet fmt lint arch dead dead-strict dupl tidy docs demos release install clean
 
 build:
 	go build -o $(BUILD_DIR)/$(BINARY) .
@@ -55,6 +55,10 @@ tidy:
 
 docs:
 	go run ./tools/gendocs
+
+# Re-records the README GIFs from docs/demos/*.tape (needs vhs).
+demos:
+	docs/demos/record.sh
 
 release: docs
 	goreleaser release --snapshot --clean
