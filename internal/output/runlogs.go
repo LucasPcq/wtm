@@ -75,6 +75,10 @@ func (p *RunPrinter) Emit(event runlogs.Event) {
 	}
 	switch event.Phase {
 	case runlogs.PhaseStarting:
+		if p.multi {
+			p.heads()
+			return
+		}
 		if p.printed {
 			Blank(p.out)
 		}
@@ -121,6 +125,19 @@ func (p *RunPrinter) Emit(event runlogs.Event) {
 	case runlogs.PhaseReady:
 		p.ready(event.Outcome)
 	}
+}
+
+// heads titles a run over several worktrees once. Its sequences interleave on
+// one stream, so it prints no progress line: one would sit above another
+// worktree's result.
+func (p *RunPrinter) heads() {
+	if p.printed || p.profile == "" {
+		p.printed = true
+		return
+	}
+	SectionTitle(p.out, p.heading())
+	Blank(p.out)
+	p.printed = true
 }
 
 // breakJobLine closes a row a job left open. Its bytes are not barred, so a

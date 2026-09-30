@@ -158,7 +158,8 @@ func TestWriteRunOutcomeJSONLeavesASuccessfulRunAlone(t *testing.T) {
 }
 
 // N sequences interleave on one stream, so every line has to say where it came
-// from — two jobs called `web` are otherwise the same line twice.
+// from — two jobs called `web` are otherwise the same line twice — and a
+// progress line would sit above another worktree's result: only results print.
 func TestRunPrinterNamesTheWorktreeAboveSeveralOfThem(t *testing.T) {
 	var out, errOut bytes.Buffer
 	printer := NewRunPrinter(RunPrinterParams{
@@ -168,15 +169,18 @@ func TestRunPrinterNamesTheWorktreeAboveSeveralOfThem(t *testing.T) {
 	})
 
 	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarting, Job: "web", Worktree: "main", Step: 1, Steps: 1})
-	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "web", Worktree: "main", Step: 1, Steps: 1})
 	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarting, Job: "web", Worktree: "feature", Step: 1, Steps: 1})
 	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "web", Worktree: "feature", Step: 1, Steps: 1})
+	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "web", Worktree: "main", Step: 1, Steps: 1})
 
 	stdout := out.String()
-	for _, want := range []string{"2 worktrees", "[1/1] web · main", "web started · main", "[1/1] web · feature", "web started · feature"} {
+	for _, want := range []string{"2 worktrees", "web started · main", "web started · feature"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("stdout is missing %q\n--- stdout ---\n%s", want, stdout)
 		}
+	}
+	if strings.Contains(stdout, "[1/1]") {
+		t.Errorf("a progress line was printed between interleaved sequences:\n%s", stdout)
 	}
 }
 
