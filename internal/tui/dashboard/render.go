@@ -19,20 +19,11 @@ const (
 	borderWidth   = 2
 	paddingWidth  = 2
 	buttonPadding = 4
-	// panelChromeRows is what renderPanel prepends to Body before drawing it:
-	// the title row and the blank row under it.
-	panelChromeRows = 2
 )
 
-// panelBodyHeight is the row budget renderPanel leaves for Body once its own
-// border and chrome rows are accounted for.
-func panelBodyHeight(rect domain.Rect) int {
-	return max(rect.Height-borderWidth-panelChromeRows, 0)
-}
-
-// tabbedPanelBodyHeight is panelBodyHeight for a panel that heads itself: it
-// passes no Title, so renderPanel prepends nothing, and what its own head costs
-// is the tab bar rather than the title row.
+// tabbedPanelBodyHeight is the row budget renderPanel leaves for the Body of a
+// panel that heads itself: it passes no Title, so renderPanel prepends nothing,
+// and what its own head costs is the tab bar rather than the title row.
 func tabbedPanelBodyHeight(rect domain.Rect) int {
 	return max(rect.Height-borderWidth-domain.DashboardPanelTabsChrome, 0)
 }

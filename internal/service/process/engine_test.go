@@ -66,7 +66,7 @@ func TestRelaunchOfADetachedStackThatFailsKeepsTheStack(t *testing.T) {
 		t.Fatal(err)
 	}
 	routes := newLiveRoutes()
-	m := NewManagerWithRoutes(routes)
+	m := newManagerWithRoutes(routes)
 	job := detachedStack("test -f " + marker)
 	logDir := filepath.Join(dir, "logs")
 
@@ -90,7 +90,7 @@ func TestRelaunchOfADetachedStackThatFailsKeepsTheStack(t *testing.T) {
 func TestFailedFirstLaunchWithdrawsItsRoute(t *testing.T) {
 	dir := t.TempDir()
 	routes := newLiveRoutes()
-	m := NewManagerWithRoutes(routes)
+	m := newManagerWithRoutes(routes)
 
 	if err := m.Start(StartParams{Job: detachedStack("exit 3"), WorkDir: dir, Routes: stackRoutes()}); err == nil {
 		t.Fatal("start succeeded, want the launcher's failure")
@@ -107,7 +107,7 @@ func TestFailedFirstLaunchWithdrawsItsRoute(t *testing.T) {
 // exiting afterwards must not bring the entry back as detached.
 func TestStopDuringADetachedLauncherStaysStopped(t *testing.T) {
 	dir := t.TempDir()
-	m := NewManager()
+	m := newManager()
 	job := detachedStack("sleep 0.5")
 
 	started := make(chan error, 1)
@@ -148,7 +148,7 @@ func TestStopCommandRunsInTheJobsCwd(t *testing.T) {
 	if err := os.MkdirAll(sub, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	m := NewManager()
+	m := newManager()
 	job := domain.JobConfig{Name: "stack", Kind: domain.JobKindService, Cmd: "true", Cwd: "infra", Stop: "pwd > " + filepath.Join(dir, "where")}
 	if err := m.Start(StartParams{Job: job, WorkDir: dir}); err != nil {
 		t.Fatalf("start: %v", err)
@@ -178,7 +178,7 @@ func mustEval(t *testing.T, path string) string {
 func TestFailedStopCommandKeepsTheRoute(t *testing.T) {
 	dir := t.TempDir()
 	routes := newLiveRoutes()
-	m := NewManagerWithRoutes(routes)
+	m := newManagerWithRoutes(routes)
 	job := detachedStack("true")
 	job.Stop = "exit 4"
 
@@ -201,7 +201,7 @@ func TestFailedStopCommandKeepsTheRoute(t *testing.T) {
 func TestSharedServiceCrashReleasesItsClaims(t *testing.T) {
 	main := t.TempDir()
 	linked := t.TempDir()
-	m := NewManager()
+	m := newManager()
 	job := domain.JobConfig{Name: "db", Kind: domain.JobKindService, Cmd: "sleep 0.2; exit 1", Scope: domain.JobScopeShared}
 	shared := &domain.SharedJobContext{WorkDir: main}
 
@@ -332,7 +332,7 @@ func TestDaemonStopTwiceDoesNotPanic(t *testing.T) {
 // A detached job with a name to serve keeps the proxy needed: idling the daemon
 // off takes the proxy with it, and the name stops answering while the stack runs.
 func TestDaemonIsNotIdleWhileItServesADetachedJob(t *testing.T) {
-	m := NewManagerWithRoutes(newLiveRoutes())
+	m := newManagerWithRoutes(newLiveRoutes())
 	d := &daemonServer{manager: m, proxyPort: 11999}
 	dir := t.TempDir()
 	if err := m.Start(StartParams{Job: detachedStack("true"), WorkDir: dir, Routes: stackRoutes()}); err != nil {

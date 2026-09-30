@@ -61,7 +61,7 @@ func (g *stressGroup) runFor(d time.Duration) {
 // whichever goroutine reaps or stops it, concurrently with the panes still
 // sizing it, and the fields a lister reads are written by those same reapers.
 func TestManagerUnderConcurrentUse_HasNoRace(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 
 	crash := filepath.Join(dir, "crash.sh")

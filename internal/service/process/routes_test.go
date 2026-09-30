@@ -45,7 +45,7 @@ func publishedJob() domain.JobConfig {
 
 func TestManagerRoutesPublishesAStartedJob(t *testing.T) {
 	routes := &routeRecorder{}
-	m := NewManagerWithRoutes(routes)
+	m := newManagerWithRoutes(routes)
 	dir := t.TempDir()
 
 	err := m.Start(StartParams{
@@ -76,7 +76,7 @@ func TestManagerRoutesPublishesAStartedJob(t *testing.T) {
 
 func TestManagerRoutesWithdrawsAStoppedJob(t *testing.T) {
 	routes := &routeRecorder{}
-	m := NewManagerWithRoutes(routes)
+	m := newManagerWithRoutes(routes)
 	dir := t.TempDir()
 
 	if err := m.Start(StartParams{
@@ -106,7 +106,7 @@ func TestManagerRoutesWithdrawsAStoppedJob(t *testing.T) {
 
 func TestManagerRoutesIgnoresAJobThatPublishesNothing(t *testing.T) {
 	routes := &routeRecorder{}
-	m := NewManagerWithRoutes(routes)
+	m := newManagerWithRoutes(routes)
 	dir := t.TempDir()
 
 	job := domain.JobConfig{Name: "db", Kind: domain.JobKindService, Cmd: "sleep 30", Ports: map[string]int{"PG_PORT": 5432}}
@@ -142,7 +142,7 @@ func runnerRoutes() []domain.JobRoute {
 
 func TestManagerRoutesPublishesTheChildrenOfARunner(t *testing.T) {
 	routes := &routeRecorder{}
-	m := NewManagerWithRoutes(routes)
+	m := newManagerWithRoutes(routes)
 	dir := t.TempDir()
 
 	err := m.Start(StartParams{
@@ -176,7 +176,7 @@ func TestManagerRoutesPublishesTheChildrenOfARunner(t *testing.T) {
 
 func TestManagerRoutesWithdrawsEveryNameARunnerHeld(t *testing.T) {
 	routes := &routeRecorder{}
-	m := NewManagerWithRoutes(routes)
+	m := newManagerWithRoutes(routes)
 	dir := t.TempDir()
 
 	if err := m.Start(StartParams{

@@ -29,7 +29,7 @@ func serve(t *testing.T, routes ...domain.ProxyRoute) string {
 		t.Fatalf("start: %v", err)
 	}
 	t.Cleanup(func() { _ = server.Close() })
-	return server.Addr()
+	return server.listener.Addr().String()
 }
 
 // get dials addr but asks for host, which is what a browser resolving

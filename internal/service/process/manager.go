@@ -124,19 +124,6 @@ type Manager struct {
 	saved      uint64
 }
 
-func NewManager() *Manager {
-	return NewManagerWithRoutes(nil)
-}
-
-func NewManagerWithRoutes(routes RouteSink) *Manager {
-	return &Manager{
-		jobs:    make(map[string]*ManagedJob),
-		routes:  routes,
-		orphans: systemOrphans{},
-		stacks:  systemStacks{},
-	}
-}
-
 type ManagerParams struct {
 	Routes RouteSink
 	// Index is the durable record of what is up. Nil keeps the manager entirely

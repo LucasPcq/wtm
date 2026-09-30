@@ -27,7 +27,7 @@ func startService(t *testing.T, m *Manager, job domain.JobConfig) string {
 }
 
 func TestManagerResize_SetsThePTYSize(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := startService(t, m, domain.JobConfig{Name: "dev", Kind: domain.JobKindService, Cmd: "sleep 30"})
 
 	session, err := m.Attach(JobRef{Name: "dev", WorkDir: dir})
@@ -63,7 +63,7 @@ func TestManagerResize_SetsThePTYSize(t *testing.T) {
 // and must be told about instead: each answers with an error naming the job,
 // never a panic on a nil or closed file.
 func TestManagerResize_RefusesWhatHasNoPTY(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 
 	serviceDir := startService(t, m, domain.JobConfig{Name: "dev", Kind: domain.JobKindService, Cmd: "sleep 30"})
 	launcherDir := startService(t, m, domain.JobConfig{
@@ -122,7 +122,7 @@ func TestManagerResize_RefusesWhatHasNoPTY(t *testing.T) {
 // the truncation point: 65536 columns fit an int and wrap to a zero-width
 // window, which is how a job ends up permanently in plain log mode.
 func TestManagerResize_RefusesASizeAWinsizeCannotHold(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := startService(t, m, domain.JobConfig{Name: "dev", Kind: domain.JobKindService, Cmd: "sleep 30"})
 
 	session, err := m.Attach(JobRef{Name: "dev", WorkDir: dir})
@@ -167,7 +167,7 @@ func TestManagerResize_RefusesASizeAWinsizeCannotHold(t *testing.T) {
 }
 
 func TestDaemonHandleResize_ReportsTheManagerVerdict(t *testing.T) {
-	d := &daemonServer{manager: NewManager()}
+	d := &daemonServer{manager: newManager()}
 	dir := startService(t, d.manager, domain.JobConfig{Name: "dev", Kind: domain.JobKindService, Cmd: "sleep 30"})
 
 	var ok bytes.Buffer

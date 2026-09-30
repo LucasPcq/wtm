@@ -45,14 +45,6 @@ func TestWritingAConfigRefreshesItsSchema(t *testing.T) {
 		}
 		assertSchema(t, path, schemas.Run)
 	})
-	t.Run("run.toml template", func(t *testing.T) {
-		dir := t.TempDir()
-		path := staleSchema(t, dir, schemas.Run)
-		if err := WriteRunTemplate(WriteRunParams{StateDir: dir}); err != nil {
-			t.Fatal(err)
-		}
-		assertSchema(t, path, schemas.Run)
-	})
 	t.Run("config.toml", func(t *testing.T) {
 		dir := t.TempDir()
 		path := staleSchema(t, dir, schemas.Project)
@@ -64,7 +56,7 @@ func TestWritingAConfigRefreshesItsSchema(t *testing.T) {
 	t.Run("global config.toml", func(t *testing.T) {
 		dir := t.TempDir()
 		path := staleSchema(t, dir, schemas.Global)
-		if err := WriteGlobalTo(filepath.Join(dir, domain.GlobalConfigFile), domain.InitGlobalAnswers{Shell: domain.ShellZsh}); err != nil {
+		if err := writeGlobalAt(filepath.Join(dir, domain.GlobalConfigFile), domain.InitGlobalAnswers{Shell: domain.ShellZsh}); err != nil {
 			t.Fatal(err)
 		}
 		assertSchema(t, path, schemas.Global)

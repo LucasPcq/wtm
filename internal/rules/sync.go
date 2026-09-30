@@ -165,18 +165,6 @@ func ParentFlagsDecision(params DecideParentFastForwardParams) ParentDecision {
 	return ParentAsk
 }
 
-// StaleParents keeps the parents a fast-forward would actually advance: a
-// diverged one is reported but never actionable.
-func StaleParents(updates []domain.ParentUpdate) []domain.ParentUpdate {
-	stale := make([]domain.ParentUpdate, 0, len(updates))
-	for _, update := range updates {
-		if update.Status == domain.ParentBehind {
-			stale = append(stale, update)
-		}
-	}
-	return stale
-}
-
 // CommitCountLabel renders a commit distance for prose ("1 commit" / "3 commits").
 // It lives here because output/ and tui/ both need it and cannot import each other.
 func CommitCountLabel(n int) string {

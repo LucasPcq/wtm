@@ -262,29 +262,6 @@ func AheadBehind(params AheadBehindParams) (domain.AheadBehind, error) {
 	return domain.AheadBehind{Ahead: ahead, Behind: behind}, nil
 }
 
-// UpdateLocalBranchToRemoteParams holds inputs for advancing a local branch ref.
-type UpdateLocalBranchToRemoteParams struct {
-	ProjectDir string
-	Branch     string
-}
-
-// UpdateLocalBranchToRemote advances a local branch ref to its origin counterpart
-// via `git branch -f <branch> origin/<branch>`. git refuses this when the branch
-// is checked out in a worktree, so callers must only use it for branches that are
-// not checked out (and after verifying the move is a fast-forward).
-//
-// It force-moves the ref, so the fast-forward is the caller's responsibility.
-// New callers should use FastForwardRef, which makes git enforce it.
-func UpdateLocalBranchToRemote(params UpdateLocalBranchToRemoteParams) error {
-	cmd := exec.Command("git", "branch", "-f", params.Branch, domain.RemoteBranchPrefix+params.Branch)
-	cmd.Dir = params.ProjectDir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git branch -f %s: %s", params.Branch, strings.TrimSpace(string(out)))
-	}
-	return nil
-}
-
 // FetchParams holds inputs for fetching all branches from origin.
 type FetchParams struct {
 	ProjectDir string

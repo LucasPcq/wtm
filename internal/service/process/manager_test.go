@@ -17,7 +17,7 @@ import (
 // output to the provided streamer, returns no error on a clean exit, and is
 // removed from the manager afterwards.
 func TestManagerStartTask_StreamsOutput(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 
 	var buf bytes.Buffer
@@ -40,7 +40,7 @@ func TestManagerStartTask_StreamsOutput(t *testing.T) {
 // message ends with domain.JobAlreadyRunningSuffix, so `run up` can treat a
 // repeat start as a benign no-op instead of aborting the profile.
 func TestManagerStartService_AlreadyRunning(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 
 	job := domain.JobConfig{Name: "server", Kind: domain.JobKindService, Cmd: "sleep 30"}
@@ -63,7 +63,7 @@ func TestManagerStartService_AlreadyRunning(t *testing.T) {
 // startup output to the provided streamer live, and stays registered as
 // running after the launcher process exits.
 func TestManagerStartDetached_StreamsOutput(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 
 	var buf bytes.Buffer
@@ -87,7 +87,7 @@ func TestManagerStartDetached_StreamsOutput(t *testing.T) {
 // detached launcher streams its output live and returns a CONCISE error (the
 // capture is not re-embedded, since the client already saw it), and is removed.
 func TestManagerStartDetached_FailureConciseWhenStreamed(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 
 	script := filepath.Join(dir, "up.sh")
@@ -117,7 +117,7 @@ func TestManagerStartDetached_FailureConciseWhenStreamed(t *testing.T) {
 // without a streamer (e.g. JSON mode) the captured output is embedded in the
 // error so the failure reason still reaches the caller.
 func TestManagerStartDetached_FailureEmbedsOutputWhenNotStreamed(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 
 	script := filepath.Join(dir, "up.sh")
@@ -140,7 +140,7 @@ func TestManagerStartDetached_FailureEmbedsOutputWhenNotStreamed(t *testing.T) {
 // output AND returns a concise error carrying the real exit code (the captured
 // block is omitted because the streamer already saw it live).
 func TestManagerStartTask_FailureExitCode(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 
 	script := filepath.Join(dir, "boom.sh")
@@ -190,7 +190,7 @@ func waitForLogLine(t *testing.T, path string, want string) {
 // TestManagerStartTask_PersistsLog verifies that a task's output lands in its
 // log file, sanitized and timestamped, on top of being streamed.
 func TestManagerStartTask_PersistsLog(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 	logDir := logDirFor(t)
 
@@ -208,7 +208,7 @@ func TestManagerStartTask_PersistsLog(t *testing.T) {
 // was: opening a log clears it, and `run up` on a partly-started profile asks
 // the daemon to start jobs that are already up (LUC-198).
 func TestManagerStartRefused_LeavesTheRunningJobsLogIntact(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 	logDir := logDirFor(t)
 	path := filepath.Join(logDir, "server.log")
@@ -239,7 +239,7 @@ func TestManagerStartRefused_LeavesTheRunningJobsLogIntact(t *testing.T) {
 // TestManagerStartService_PersistsLog verifies that a foreground service — the
 // only kind whose output is drained in the background — persists it too.
 func TestManagerStartService_PersistsLog(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 	logDir := logDirFor(t)
 
@@ -256,7 +256,7 @@ func TestManagerStartService_PersistsLog(t *testing.T) {
 // launcher, which has no output hub at all, still gets its startup output on
 // disk — that log is all the user will ever have of it.
 func TestManagerStartDetached_PersistsLauncherLog(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 	logDir := logDirFor(t)
 
@@ -272,7 +272,7 @@ func TestManagerStartDetached_PersistsLauncherLog(t *testing.T) {
 // TestManagerStartWithoutLogDir_PersistsNothing pins the opt-in: a client that
 // resolved no log dir gets the previous behaviour, no file written.
 func TestManagerStartWithoutLogDir_PersistsNothing(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 
 	job := domain.JobConfig{Name: "greet", Kind: domain.JobKindTask, Cmd: "echo hello"}
@@ -309,7 +309,7 @@ func waitForJob(t *testing.T, m *Manager, name string, until func(ManagedJob) bo
 // from: the instant the daemon spawned the process, not the instant a client
 // asked for the list.
 func TestManagerStartService_RecordsStartedAt(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 
 	before := time.Now()
@@ -332,7 +332,7 @@ func TestManagerStartService_RecordsStartedAt(t *testing.T) {
 // its own carries the code it died with, which is what tells a crash apart
 // from a clean shutdown once the process is gone.
 func TestManagerService_ReportsExitCodeOnCrash(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 
 	script := filepath.Join(dir, "boom.sh")
@@ -357,7 +357,7 @@ func TestManagerService_ReportsExitCodeOnCrash(t *testing.T) {
 // TestManagerService_ReportsSignalExitCodeOnStop pins the -1 the JobInfo doc
 // promises: a stopped job was killed, it did not choose an exit code.
 func TestManagerService_ReportsSignalExitCodeOnStop(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 
 	job := domain.JobConfig{Name: "server", Kind: domain.JobKindService, Cmd: "sleep 30"}
@@ -381,7 +381,7 @@ func TestManagerService_ReportsSignalExitCodeOnStop(t *testing.T) {
 // launcher exiting cleanly says nothing about the service it left running, so
 // the job reports no exit code at all rather than a 0 that would read as done.
 func TestManagerStartDetached_KeepsNoExitCode(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 
 	job := domain.JobConfig{Name: "compose", Kind: domain.JobKindService, Cmd: "echo up", Stop: "echo down"}
@@ -479,7 +479,7 @@ func TestTheOutputWindowNeverGrows(t *testing.T) {
 // returns before the drain is done lets the daemon exit on top of the shutdown
 // lines the log is opened for.
 func TestStoppingAServiceWaitsForItsOutputToReachTheLog(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 	logDir := filepath.Join(dir, "logs")
 

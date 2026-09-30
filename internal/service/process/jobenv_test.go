@@ -62,7 +62,7 @@ func TestJobEnvDropsInheritedWorktreeIdentity(t *testing.T) {
 }
 
 func TestManagerStartTask_InjectsWorktreeEnv(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 
 	var buf bytes.Buffer
@@ -86,7 +86,7 @@ func TestManagerStartTask_InjectsWorktreeEnv(t *testing.T) {
 // did: a `docker compose down` that lost COMPOSE_PROJECT_NAME tears down the
 // wrong project, or nothing at all.
 func TestManagerStop_RunsStopCommandWithJobEnv(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "stopped-project")
 

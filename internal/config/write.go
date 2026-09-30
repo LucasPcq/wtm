@@ -196,104 +196,16 @@ func runFileOf(cfg domain.RunConfig) runFile {
 	return file
 }
 
-// runTemplateContent is a fully-commented run.toml written when init detects or
-// configures no services, so the user has a documented starting point to add
-// jobs and profiles by hand later.
-const runTemplateContent = `#:schema ./schemas/run.schema.json
-
-# wtm — service & task definitions
-# No services were configured during init. Uncomment and adapt the examples
-# below, then manage them with ` + "`wtm run`" + `.
-#
-# Every cmd and stop below is a /bin/sh line: quotes, &&, pipes and globs work,
-# and ${VAR} expands from the job's environment.
-
-# Spacing between two worktrees' ports. Each worktree holds an ordinal (0 for
-# the main checkout) and every base port below is shifted by ordinal x this
-# block. Two base ports must not differ by a multiple of it: 3000 and 3010
-# collide on the second worktree, while 5434/5435/5436 never do.
-# port_offset_block = 10
-
-# A long-running service (started detached, stopped via its stop command).
-# The port below is templated into docker-compose.yml as "${DB_PORT}:5432":
-# the container keeps 5432, only the host binding moves per worktree.
-# [[job]]
-# name = "db"
-# kind = "service"
-# cmd  = "docker compose up -d"
-# stop = "docker compose down --remove-orphans"
-# cwd  = "."
-#   [job.ports]
-#   DB_PORT = 5432
-
-# A dev server reading its port from the environment. On the main checkout it
-# gets PORT=3000; the next worktree gets PORT=3010, with no script to write.
-# A server that ignores PORT and only takes a CLI flag (vite) reads it back
-# from the same variable: cmd = "pnpm dev --port ${PORT}".
-# [[job]]
-# name = "web"
-# kind = "service"
-# cmd  = "pnpm dev"
-#   [job.ports]
-#   PORT = 3000
-
-# A one-shot task (must exit 0; output streamed live):
-# [[job]]
-# name = "migrate"
-# kind = "task"
-# cmd  = "pnpm run migrate"
-# cwd  = "."
-
-# A named group of jobs started together:
-# [[profile]]
-# name    = "default"
-# jobs    = ["db", "web"]
-# default = true
-`
-
-// WriteRunTemplate writes a commented run.toml template to <state-dir>/run.toml.
-// Returns ErrRunFileExists if the file already exists and Force is false.
-func WriteRunTemplate(params WriteRunParams) error {
-	path := filepath.Join(params.StateDir, domain.RunFileName)
-
-	if _, err := os.Stat(path); err == nil && !params.Force {
-		return ErrRunFileExists
-	}
-
-	if err := os.MkdirAll(params.StateDir, 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", params.StateDir, err)
-	}
-
-	if err := os.WriteFile(path, []byte(runTemplateContent), 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", path, err)
-	}
-
-	return writeSchema(params.StateDir, schemas.Run)
-}
-
 // WriteGlobal creates the global config directory and writes config.toml.
 func WriteGlobal(answers domain.InitGlobalAnswers) error {
 	dir, err := infra.GlobalDir()
 	if err != nil {
 		return err
 	}
-
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("create config dir: %w", err)
-	}
-
-	content := fmt.Sprintf("#:schema ./schemas/global.schema.json\n\nshell = %q\n", answers.Shell)
-
-	path := filepath.Join(dir, domain.GlobalConfigFile)
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", path, err)
-	}
-
-	return writeSchema(dir, schemas.Global)
+	return writeGlobalAt(filepath.Join(dir, domain.GlobalConfigFile), answers)
 }
 
-// WriteGlobalTo writes the global config to a specific path (for testing).
-func WriteGlobalTo(path string, answers domain.InitGlobalAnswers) error {
+func writeGlobalAt(path string, answers domain.InitGlobalAnswers) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
