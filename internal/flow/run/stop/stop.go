@@ -185,15 +185,8 @@ func (f *stopFlow) job(answers flow.Answers) (string, error) {
 	return job.Name, err
 }
 
-// branchOf names a worktree the way a reader recognises it, falling back to the
-// path git could not name.
 func (f *stopFlow) branchOf(workDir string) string {
-	for _, named := range f.named {
-		if named.Dir == workDir && named.Branch != "" {
-			return named.Branch
-		}
-	}
-	return target.BranchOf(workDir)
+	return target.NamedBranch(target.NamedBranchParams{Named: f.named, Dir: workDir})
 }
 
 type stopParams struct {

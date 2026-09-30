@@ -58,7 +58,7 @@ func Add(params AddParams) (Outcome, error) {
 	}
 
 	added := fromAnswers(answers)
-	previous := explicitDefault(params.Request.Config)
+	previous := rules.FindExistingDefaultProfile(params.Request.Config, "")
 	cfg := params.Request.Config
 	cfg.Profiles = append(cfg.Profiles, added)
 	if added.Default {
@@ -115,7 +115,7 @@ func editNamed(params EditParams, name string) (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	previous := explicitDefault(params.Request.Config)
+	previous := rules.FindExistingDefaultProfile(params.Request.Config, "")
 	if previous == current.Name {
 		previous = ""
 	}
@@ -249,17 +249,6 @@ func List(params ListParams) (Outcome, error) {
 		}, name)
 	}
 	return Outcome{Aborted: true}, nil
-}
-
-// explicitDefault is the profile run.toml marks as default, never the first-one
-// fallback: replacing a fallback takes nothing away from anyone.
-func explicitDefault(cfg domain.RunConfig) string {
-	for _, p := range cfg.Profiles {
-		if p.Default {
-			return p.Name
-		}
-	}
-	return ""
 }
 
 func defaultName(profile domain.ProfileConfig) string {
