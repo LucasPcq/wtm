@@ -520,7 +520,8 @@ and **experimental**: the global `wtm init` does not configure it.
   another repository's, though the daemon is shared — without a prompt, and its JSON
   holds one document per worktree it emptied.
   `run start [worktree] --job <name>` / `run stop [worktree] --job <name>` — one job.
-  `--job` is **required** on `start`/`stop` on your paths: without a terminal there is no
+  `--job` takes one value everywhere in the module (a second `--job` is a usage error, as is a
+  second `--profile` on `run export`); it is **required** on `start`/`stop` on your paths: without a terminal there is no
   picker to fall back on, and the command errors naming the flag. A failing job aborts the rest and exits non-zero, leaving started
   services up (fix and re-run). `run up` starts **every job the profile lists**, tasks
   included, in the listed order; with no profile declared at all it starts every declared
