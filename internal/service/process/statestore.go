@@ -70,7 +70,7 @@ func (s *StateStore) Load() []domain.JobRecord {
 	if !access.Read {
 		return nil
 	}
-	return state.Jobs
+	return rules.CurrentJobRecords(state.Jobs)
 }
 
 // Frozen reports whether this store has gone read-only, which is a fact about

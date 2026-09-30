@@ -84,7 +84,7 @@ func worktreeJobs() []domain.JobInfo {
 	return []domain.JobInfo{
 		{Name: "api", Status: domain.JobStatusRunning, WorkDir: "/w/feat"},
 		{Name: "stack", Status: domain.JobStatusDetached, WorkDir: "/w/feat"},
-		{Name: "db", Status: domain.JobStatusAttached, WorkDir: "/w/feat"},
+		{Name: "db", Status: domain.JobStatusJoined, WorkDir: "/w/feat"},
 		{Name: "api", Status: domain.JobStatusRunning, WorkDir: "/w/other"},
 	}
 }
@@ -110,7 +110,7 @@ func TestStopWorktreeJobsStopsItsOwnJobsAndKeepsItsClaims(t *testing.T) {
 func TestStopWorktreeJobsWithNothingUpSendsNoStop(t *testing.T) {
 	daemon := &fakeDaemon{version: domain.Version, jobs: []domain.JobInfo{
 		{Name: "api", Status: domain.JobStatusStopped, WorkDir: "/w/feat"},
-		{Name: "db", Status: domain.JobStatusAttached, WorkDir: "/w/feat"},
+		{Name: "db", Status: domain.JobStatusJoined, WorkDir: "/w/feat"},
 	}}
 	socket := serveFake(t, daemon)
 

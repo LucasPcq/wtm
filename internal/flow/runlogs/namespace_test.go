@@ -45,7 +45,7 @@ func TestRunNamesTheNamespaceASharedStartCarved(t *testing.T) {
 	if !found {
 		t.Fatal("no started event")
 	}
-	if !started.Attached || started.Namespace != "app_feat_x" {
+	if !started.Joined || started.Namespace != "app_feat_x" {
 		t.Errorf("started = %+v, want postgres attached with app_feat_x carved", started)
 	}
 }

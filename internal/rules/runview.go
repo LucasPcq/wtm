@@ -144,7 +144,7 @@ func statusMark(status domain.JobStatus) domain.JobMark {
 		return domain.JobMarkRunning
 	case domain.JobStatusDetached:
 		return domain.JobMarkDetached
-	case domain.JobStatusAttached:
+	case domain.JobStatusJoined:
 		return domain.JobMarkShared
 	case domain.JobStatusCrashed, domain.JobStatusReaped:
 		return domain.JobMarkCrashed

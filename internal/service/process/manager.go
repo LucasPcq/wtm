@@ -257,7 +257,7 @@ func orphanQueries(records []domain.JobRecord) []GroupQuery {
 // have the next worktree told its service is already running.
 func (m *Manager) dropDanglingClaimsLocked() {
 	for key, job := range m.jobs {
-		if job.Status != domain.JobStatusAttached {
+		if job.Status != domain.JobStatusJoined {
 			continue
 		}
 		service, found := m.realSharedLocked(sharedRef{Name: job.Name, Dir: job.SharedDir})
@@ -290,7 +290,7 @@ func (m *Manager) upRecordsLocked() []domain.JobRecord {
 			Routes:    job.Routes,
 			LogDir:    job.LogDir,
 			StartedAt: job.StartedAt,
-			Attached:  job.Status == domain.JobStatusAttached,
+			Joined:    job.Status == domain.JobStatusJoined,
 			SharedDir: job.SharedDir,
 			MainHolds: job.MainHolds,
 			PID:       job.PID,
@@ -1093,7 +1093,7 @@ func (m *Manager) attachableJob(ref jobRef) (*ManagedJob, error) {
 	m.mu.Lock()
 	job, ok := m.jobs[jobKey(ref.Name, ref.WorkDir)]
 	// A claim owns no stream; the service it holds does.
-	if ok && job.Status == domain.JobStatusAttached {
+	if ok && job.Status == domain.JobStatusJoined {
 		job, ok = m.realSharedLocked(sharedRef{Name: ref.Name, Dir: job.SharedDir})
 	}
 	// Snapshotted, never re-read: Status is written by whichever goroutine reaps

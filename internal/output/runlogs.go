@@ -93,8 +93,8 @@ func (p *RunPrinter) Emit(event runlogs.Event) {
 	case runlogs.PhaseStarted:
 		if event.AlreadyRunning {
 			already := domain.RunStreamAlreadyFmt
-			if event.Attached {
-				already = domain.RunStreamAlreadyAttachedFmt
+			if event.Joined {
+				already = domain.RunStreamAlreadyJoinedFmt
 			}
 			p.remember(event)
 			Success(p.out, p.jobLine(jobLineParams{Label: fmt.Sprintf(already, event.Job), Event: event}))
@@ -163,10 +163,10 @@ type jobLineParams struct {
 // leaves it up.
 func startedLabel(event runlogs.Event) string {
 	switch {
-	case event.Attached && event.SharedIn != "" && event.SharedIn != event.Worktree:
-		return fmt.Sprintf(domain.RunStreamAttachedToFmt, event.Job, event.SharedIn)
-	case event.Attached:
-		return fmt.Sprintf(domain.RunStreamAttachedFmt, event.Job)
+	case event.Joined && event.SharedIn != "" && event.SharedIn != event.Worktree:
+		return fmt.Sprintf(domain.RunStreamJoinedInFmt, event.Job, event.SharedIn)
+	case event.Joined:
+		return fmt.Sprintf(domain.RunStreamJoinedFmt, event.Job)
 	}
 	return fmt.Sprintf(domain.RunStreamStartedFmt, event.Job)
 }

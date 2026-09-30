@@ -271,10 +271,13 @@ const (
 	// a weaker "running": nothing was ever verified, before or after a daemon
 	// restart, and there is no stream to attach to.
 	JobStatusDetached JobStatus = "detached"
-	// JobStatusAttached is a worktree's claim on a shared service running under
+	// JobStatusJoined is a worktree's claim on a shared service running under
 	// the main checkout's key. It owns no process: it is the pointer that keeps
 	// the real job alive, which is what makes the job table the reference count.
-	JobStatusAttached JobStatus = "attached"
+	JobStatusJoined JobStatus = "joined"
+	// JobStatusLegacyAttached is JobStatusJoined as a daemon built before the
+	// rename reports it; clients read it as joined.
+	JobStatusLegacyAttached JobStatus = "attached"
 	// JobStatusReaped is a foreground service that outlived the daemon which
 	// owned it and was killed by the next one. Distinct from Crashed because the
 	// two say opposite things about who acted: crashed is a process that died on
@@ -322,11 +325,14 @@ type JobRecord struct {
 	// reads as "not reapable" rather than as a group to guess at.
 	PID  int `json:"pid,omitempty"`
 	PGID int `json:"pgid,omitempty"`
-	// Attached says this entry is a worktree's claim on a shared service rather
+	// Joined says this entry is a worktree's claim on a shared service rather
 	// than a process of its own. It is a fact about what the entry is, not a
 	// process state: without it a claim would come back from the index as a
 	// foreground service the daemon had lost, and be reported crashed.
-	Attached bool `json:"attached,omitempty"`
+	Joined bool `json:"joined,omitempty"`
+	// LegacyAttached is Joined as an index written before the rename spelled
+	// it; the store folds it into Joined on load and never writes it.
+	LegacyAttached bool `json:"attached,omitempty"`
 	// SharedDir is the main checkout a shared job runs in, carried by the real
 	// job and by every claim on it. Without it the two would have to be paired
 	// by name, and the daemon is machine-wide: two repositories declaring a job

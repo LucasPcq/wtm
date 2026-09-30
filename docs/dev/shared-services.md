@@ -16,9 +16,9 @@ Any question this document leaves open is settled with that sentence. If the ans
 
 The real service runs in the **main checkout** — the worktree `domain.GitWorktree.IsMain` designates — registered under `<main checkout>:<name>`: a real PTY, real ports, a real output hub. It is the only directory guaranteed to live as long as the repository, and being at ordinal 0 it takes **no port offset**, so a declared `5432` is the `5432` it binds. That stability is what lets a namespace's `env` write its URL literally.
 
-Every other worktree posts an attachment under `<its worktree>:<name>`, with status `domain.JobStatusAttached`: no PID, no PTY, no hub, no log file. It is a pointer, and it is the reference count. **The job table is the count**, so there is no second registry to keep in step, and the statestore already persists it — a claim carries `Attached` in its record so it comes back from the index as what it is rather than as a foreground service the daemon had lost.
+Every other worktree posts a claim under `<its worktree>:<name>`, with status `domain.JobStatusJoined` (`joined`; a daemon or index from before the rename says `attached`, read as `joined`): no PID, no PTY, no hub, no log file. It is a pointer, and it is the reference count. **The job table is the count**, so there is no second registry to keep in step, and the statestore already persists it — a claim carries `Joined` in its record so it comes back from the index as what it is rather than as a foreground service the daemon had lost.
 
-A claim owns no stream: attaching to one from any worktree reaches the one output there is.
+A claim owns no stream: attaching the run view to one from any worktree reaches the one output there is.
 
 A claim is dropped when its service is no longer up, and `Manager.Adopt` is where that is enforced: a daemon killed without running a handler may leave a shared foreground service to be reaped at the next start-up, and a claim outliving it would be a reference count on nothing — the next worktree would be told its service is already running. The pass runs on every adoption, not only after a reap, because the same hole opens whenever the real job's record is gone and the claims' are not (a deleted main checkout, for one). See LUC-227.
 

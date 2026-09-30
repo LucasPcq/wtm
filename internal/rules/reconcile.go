@@ -49,8 +49,8 @@ func ReconcileJob(params ReconcileJobParams) ReconcileDecision {
 	// A claim on a shared service owns no process, so nothing about it can have
 	// died with the daemon: it comes back exactly as it was, which is what keeps
 	// the job table a usable reference count across a restart.
-	if params.Record.Attached {
-		return ReconcileDecision{Status: domain.JobStatusAttached, Adopt: true}
+	if params.Record.Joined {
+		return ReconcileDecision{Status: domain.JobStatusJoined, Adopt: true}
 	}
 	if params.Record.Config.Kind != domain.JobKindService {
 		return ReconcileDecision{}
@@ -71,7 +71,7 @@ func ReconcileJob(params ReconcileJobParams) ReconcileDecision {
 // claim owns nothing and a detached stack belongs to Docker, so neither is ever
 // probed or reaped.
 func IsForegroundService(record domain.JobRecord) bool {
-	return !record.Attached &&
+	return !record.Joined &&
 		record.Config.Kind == domain.JobKindService &&
 		!IsDetached(record.Config)
 }
@@ -104,5 +104,5 @@ func reconcileForeground(params ReconcileJobParams) ReconcileDecision {
 func IsJobUp(status domain.JobStatus) bool {
 	return status == domain.JobStatusRunning ||
 		status == domain.JobStatusDetached ||
-		status == domain.JobStatusAttached
+		status == domain.JobStatusJoined
 }

@@ -304,14 +304,14 @@ func (r *runner) run() Outcome {
 		r.started = append(r.started, job.Name)
 		status := r.startedStatus(job)
 		if result.Joined {
-			status = domain.JobActionAttached
+			status = domain.JobActionJoined
 		}
 		namespace := r.carved(job, alreadyRunning)
 		r.results = append(r.results, domain.JobActionResult{Name: job.Name, Status: status, URL: url, Held: held, Namespace: namespace})
 		if rules.ShouldProbeJob(rules.ShouldProbeJobParams{Kind: job.Kind, Ports: result.Ports, Probe: job.Probe}) {
 			r.probeTargets = append(r.probeTargets, probeTarget{job: job.Name, resolved: result.Ports})
 		}
-		r.emit(Event{Phase: PhaseStarted, Job: job.Name, Step: i + 1, AlreadyRunning: alreadyRunning, Attached: status == domain.JobActionAttached, SharedIn: r.heldIn(heldInParams{Job: job, Status: status}), Namespace: namespace, Ports: ports, URL: url, Held: held, DevOrigins: r.devOrigins(job, host)})
+		r.emit(Event{Phase: PhaseStarted, Job: job.Name, Step: i + 1, AlreadyRunning: alreadyRunning, Joined: status == domain.JobActionJoined, SharedIn: r.heldIn(heldInParams{Job: job, Status: status}), Namespace: namespace, Ports: ports, URL: url, Held: held, DevOrigins: r.devOrigins(job, host)})
 	}
 
 	// The probe dials first because its wait is also the time a job needs to die:
@@ -723,7 +723,7 @@ type heldInParams struct {
 // heldIn is where a shared job runs: main's branch from a linked worktree, and
 // main itself when main started or joined it. A per-worktree job has none.
 func (r *runner) heldIn(params heldInParams) string {
-	if params.Status != domain.JobActionAttached && !rules.IsShared(params.Job) {
+	if params.Status != domain.JobActionJoined && !rules.IsShared(params.Job) {
 		return ""
 	}
 	if r.sharedIn != "" {
@@ -746,7 +746,7 @@ func (r *runner) carved(job domain.JobConfig, alreadyRunning bool) string {
 // and saying "started" in each of them read as one service per worktree.
 func (r *runner) startedStatus(job domain.JobConfig) string {
 	if rules.IsShared(job) && r.shared != nil && r.workDir != r.shared.WorkDir {
-		return domain.JobActionAttached
+		return domain.JobActionJoined
 	}
 	return domain.JobActionStarted
 }

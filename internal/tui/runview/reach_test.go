@@ -53,7 +53,7 @@ func TestTheReachKeyShowsTheBlockAndEscGoesBack(t *testing.T) {
 }
 
 func sharedIn(view runlogs.JobView, worktree string) runlogs.JobView {
-	view.Status = domain.JobStatusAttached
+	view.Status = domain.JobStatusJoined
 	view.SharedIn = worktree
 	return view
 }
@@ -76,7 +76,7 @@ func TestASharedServiceIsSetApartAndNamedByWhereItRuns(t *testing.T) {
 		t.Fatalf("frame = %q, want the shared line and postgres above the worktree and its jobs", frame)
 	}
 
-	if !strings.Contains(frame, "postgres · attached to main") || strings.Contains(frame, "postgres · feat/x") {
+	if !strings.Contains(frame, "postgres · joined, running in main") || strings.Contains(frame, "postgres · feat/x") {
 		t.Errorf("frame = %q, want the title to say where postgres runs", frame)
 	}
 }

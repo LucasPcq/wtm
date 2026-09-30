@@ -206,13 +206,13 @@ func TestRunPrinterClosesTheRunOnce(t *testing.T) {
 	}
 }
 
-func TestRunPrinterSaysASharedJobWasAttachedAndWhatItCarved(t *testing.T) {
-	stdout, _ := emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "postgres", Attached: true, Namespace: "app_feat_x"})
+func TestRunPrinterSaysASharedJobWasJoinedAndWhatItCarved(t *testing.T) {
+	stdout, _ := emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "postgres", Joined: true, Namespace: "app_feat_x"})
 
-	if !strings.Contains(stdout, "postgres attached") || strings.Contains(stdout, "postgres started") {
-		t.Errorf("stdout = %q, want the job attached, not started", stdout)
+	if !strings.Contains(stdout, "postgres joined") || strings.Contains(stdout, "postgres started") {
+		t.Errorf("stdout = %q, want the job joined, not started", stdout)
 	}
-	if !strings.Contains(stdout, "postgres attached · app_feat_x ready") {
+	if !strings.Contains(stdout, "postgres joined · app_feat_x ready") {
 		t.Errorf("stdout = %q, want the namespace on the job's own line", stdout)
 	}
 }
@@ -258,12 +258,12 @@ func TestRunPrinterSetsAServiceHeldInMainApart(t *testing.T) {
 	printer := NewRunPrinter(RunPrinterParams{Out: &out, Err: &errOut})
 
 	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "compose", Worktree: "feat/x", Ports: map[string]int{"REDIS_PORT": 6389, "MINIO_PORT": 9010}})
-	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "postgres", Worktree: "feat/x", Attached: true, SharedIn: "main", Ports: map[string]int{"POSTGRES_PORT": 5432}})
+	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "postgres", Worktree: "feat/x", Joined: true, SharedIn: "main", Ports: map[string]int{"POSTGRES_PORT": 5432}})
 	printer.Emit(runlogs.Event{Phase: runlogs.PhaseReady, Outcome: runlogs.Outcome{Started: []string{"compose", "postgres"}}})
 	printer.Conclude(nil)
 
 	stdout := out.String()
-	if !strings.Contains(stdout, "postgres attached to main · :5432") {
+	if !strings.Contains(stdout, "postgres joined, running in main · :5432") {
 		t.Errorf("stdout = %q, want the line to say where postgres runs", stdout)
 	}
 	own, shared := strings.Index(stdout, domain.ReachTitle), strings.Index(stdout, "Shared, running in main")

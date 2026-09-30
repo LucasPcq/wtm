@@ -344,9 +344,9 @@ and **experimental**: the global `wtm init` does not configure it.
   declared port is the port it binds, in every worktree), its published URL carries **no
   worktree segment** (`db.projet.localhost`, not `db.feat-x.projet.localhost`), and its logs
   are the same stream whichever worktree you read them from. In `run ps` / `--output json`
-  the worktrees holding it report status **`attached`** with `pid: 0`: that is a claim on the
+  the worktrees holding it report status **`joined`** with `pid: 0`: that is a claim on the
   one running instance, not a second process — never count one service per worktree from it.
-  Starting one from a worktree other than the main checkout reports `attached`, not `started`.
+  Starting one from a worktree other than the main checkout reports `joined`, not `started`.
   When the start carved out this worktree's namespace, the job's result carries it as
   `namespace` (`app_feat-x`) — absent on a start refused as already running, which ran no create.
   `run stop` in a worktree releases only that worktree's claim; the service itself stops when
@@ -355,7 +355,7 @@ and **experimental**: the global `wtm init` does not configure it.
   reports status **`released`** (human: `released — still up elsewhere`), not `stopped`.
   A `run stop` that found nothing up under that name in that worktree reports
   **`not_running`** (human: `= api not running`, exit 0) — never `stopped`. Main
-  starting a service another worktree already runs joins it (`attached`) and carves its own
+  starting a service another worktree already runs joins it (`joined`) and carves its own
   namespace.
 - **A shared job may carve out a namespace per worktree.** `[job.namespace]` names it (`name`,
   `create`, `remove`, `env`) so each worktree keeps its own data — a database, a set of
@@ -646,7 +646,7 @@ and **experimental**: the global `wtm init` does not configure it.
   `wtm run up` on it simply relaunches the launcher rather than refusing "already
   running". Of the rest, `running` is a foreground service the daemon holds a terminal
   for, `crashed` one whose process died on its own, `stopped` one that was stopped —
-  by `run stop`, or by whoever took a verified compose stack down — and `attached` a
+  by `run stop`, or by whoever took a verified compose stack down — and `joined` a
   worktree's claim on a shared service (see the shared-services section: `pid` is 0 on
   a claim, and on a launcher whatever became of it).
 - **`reaped` is the sixth, and it says wtm killed something.** A daemon killed without

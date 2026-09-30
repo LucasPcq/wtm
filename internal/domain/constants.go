@@ -305,7 +305,7 @@ const (
 
 	// NamespaceCreateFailedFmt names the namespace, the job and the last error a
 	// budget's worth of retries ended on.
-	NamespaceCreateFailedFmt = "job %s: could not attach namespace %s: %w (the attach runs on every start, so it must be safe to run again)"
+	NamespaceCreateFailedFmt = "job %s: could not create namespace %s: %w (the create runs on every start, so it must be safe to run again)"
 	// NamespaceReadyLogFmt is the line a shared service's log gains when a
 	// worktree's slice of it is made: namespace, then worktree.
 	NamespaceReadyLogFmt     = "[wtm] namespace %s ready for %s"
@@ -1811,10 +1811,10 @@ const (
 
 	// Job action result statuses emitted by `run *` JSON output.
 	JobActionStarted = "started"
-	// JobActionAttached is a worktree joining a shared service rather than
+	// JobActionJoined is a worktree joining a shared service rather than
 	// starting one. Reporting "started" in three worktrees read as three
 	// services, which is the misreading this whole feature has to avoid.
-	JobActionAttached = "attached"
+	JobActionJoined = "joined"
 	// SharedJobTag marks a job that runs once for the repository wherever jobs
 	// are listed. Rendered like any other, it read as one service per worktree —
 	// and the declared ports beside it would be read as shifting, which they do
@@ -2657,10 +2657,10 @@ const (
 	// RunViewRecapHeldIndent hangs a runner's addresses under its own line in the
 	// recap, where nothing folds.
 	RunViewRecapHeldIndent = "  "
-	// RunStreamAttachedFmt is a worktree joining a shared service another one
+	// RunStreamJoinedFmt is a worktree joining a shared service another one
 	// runs: "started" there read as one service per worktree.
-	RunStreamAttachedFmt   = "%s attached"
-	RunStreamAttachedToFmt = "%s attached to %s"
+	RunStreamJoinedFmt   = "%s joined"
+	RunStreamJoinedInFmt = "%s joined, running in %s"
 	// The compose verbs a stop is read by. ComposeStopWarningFmt names a file
 	// job whose `down` would remove a shared service's container in main, and
 	// the stop to put instead.
@@ -2671,11 +2671,11 @@ const (
 	ComposeStopWarningFmt = "job %s: its stop removes the shared %s in main — set stop = %q in run.toml"
 	// RunStreamNamespaceFmt is the slice a shared job's create made sure exists,
 	// on its own line so the one thing a clean will drop is seen being made.
-	RunStreamNamespaceFmt       = "%s ready in %s"
-	RunStreamNamespaceReadyFmt  = "%s ready"
-	RunStreamAlreadyFmt         = "%s already running"
-	RunStreamAlreadyAttachedFmt = "%s already attached"
-	RunStreamDoneFmt            = "%s done"
+	RunStreamNamespaceFmt      = "%s ready in %s"
+	RunStreamNamespaceReadyFmt = "%s ready"
+	RunStreamAlreadyFmt        = "%s already running"
+	RunStreamAlreadyJoinedFmt  = "%s already joined"
+	RunStreamDoneFmt           = "%s done"
 	// The three commands a run points at, and one gloss each. They are shared by
 	// every surface the module concludes on — the live stream, the view's recap
 	// once it gives the terminal back, `run down`'s — because one command telling
@@ -3703,15 +3703,15 @@ const (
 
 	// RunDetached* report a start nobody is watching: the surface gave the
 	// terminal back, so each step says what it did instead of showing it.
-	RunDetachedStartingFmt        = "starting %s (%d/%d)"
-	RunDetachedStartedFmt         = "%s is up"
-	RunDetachedDoneFmt            = "%s finished"
-	RunDetachedAddressFmt         = "%s → %s"
-	RunDetachedFailedFmt          = "%s failed: %s"
-	RunDetachedAttachedFmt        = "%s attached"
-	RunDetachedNamespaceFmt       = "%s: %s ready"
-	RunDetachedAlreadyFmt         = "%s was already up"
-	RunDetachedAlreadyAttachedFmt = "%s was already attached"
+	RunDetachedStartingFmt      = "starting %s (%d/%d)"
+	RunDetachedStartedFmt       = "%s is up"
+	RunDetachedDoneFmt          = "%s finished"
+	RunDetachedAddressFmt       = "%s → %s"
+	RunDetachedFailedFmt        = "%s failed: %s"
+	RunDetachedJoinedFmt        = "%s joined"
+	RunDetachedNamespaceFmt     = "%s: %s ready"
+	RunDetachedAlreadyFmt       = "%s was already up"
+	RunDetachedAlreadyJoinedFmt = "%s was already joined"
 	// RunDetached{Crashed,Probe*,Left*,Concluded,Aborted}* are the rest of what the
 	// CLI says about a run, in the panel's register: a line each, the glyph
 	// leading, detail indented under the line it belongs to.
@@ -3805,7 +3805,7 @@ const (
 	// RunViewSharedHeading heads, in the job list, the shared services: one
 	// stack whatever worktree hosts it, so the heading names none.
 	RunViewSharedHeading = "shared"
-	RunViewAttachedToFmt = "attached to %s"
+	RunViewJoinedInFmt   = "joined, running in %s"
 	// KeyRunLogs reads a job's logs in the detail panel. Upper case: "l" is the
 	// list's vim-right.
 	KeyRunLogs = "L"

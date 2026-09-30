@@ -294,7 +294,7 @@ func (m Model) renderPaneTitle(params paneTitleParams) string {
 func (m Model) statusWithAddress(view runlogs.JobView) string {
 	label := string(view.Status)
 	if view.SharedIn != "" {
-		label = fmt.Sprintf(domain.RunViewAttachedToFmt, view.SharedIn)
+		label = fmt.Sprintf(domain.RunViewJoinedInFmt, view.SharedIn)
 	}
 	if summary := rules.ReachSummary(m.reachOf(view)); summary != "" {
 		return label + domain.RunViewSeparator + summary

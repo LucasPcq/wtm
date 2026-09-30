@@ -96,7 +96,7 @@ func ownJobsUp(client *Client, workDir string) ([]string, error) {
 	}
 	var own []string
 	for _, info := range resp.Jobs {
-		if info.WorkDir != workDir || !rules.IsJobUp(info.Status) || info.Status == domain.JobStatusAttached {
+		if info.WorkDir != workDir || !rules.IsJobUp(info.Status) || info.Status == domain.JobStatusJoined {
 			continue
 		}
 		own = append(own, info.Name)

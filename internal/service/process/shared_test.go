@@ -105,8 +105,8 @@ func TestStartSharedRunsUnderMainCheckout(t *testing.T) {
 	if status, ok := f.statusIn(f.main); !ok || status != domain.JobStatusRunning {
 		t.Errorf("main checkout status = %q (found %v), want running", status, ok)
 	}
-	if status, ok := f.statusIn(f.first); !ok || status != domain.JobStatusAttached {
-		t.Errorf("worktree status = %q (found %v), want attached", status, ok)
+	if status, ok := f.statusIn(f.first); !ok || status != domain.JobStatusJoined {
+		t.Errorf("worktree status = %q (found %v), want joined", status, ok)
 	}
 	if got := f.processes(); got != 1 {
 		t.Errorf("processes = %d, want 1", got)
@@ -126,8 +126,8 @@ func TestStartSharedSecondWorktreeSpawnsNothing(t *testing.T) {
 	if got := f.processes(); got != 1 {
 		t.Errorf("processes = %d, want 1: a shared service runs once", got)
 	}
-	if status, _ := f.statusIn(f.second); status != domain.JobStatusAttached {
-		t.Errorf("second worktree status = %q, want attached", status)
+	if status, _ := f.statusIn(f.second); status != domain.JobStatusJoined {
+		t.Errorf("second worktree status = %q, want joined", status)
 	}
 }
 
@@ -430,8 +430,8 @@ func TestStartSharedRestartsAfterAStop(t *testing.T) {
 	if status, _ := f.statusIn(f.main); status != domain.JobStatusRunning {
 		t.Errorf("service status = %q, want running again", status)
 	}
-	if status, _ := f.statusIn(f.first); status != domain.JobStatusAttached {
-		t.Errorf("claim status = %q, want attached", status)
+	if status, _ := f.statusIn(f.first); status != domain.JobStatusJoined {
+		t.Errorf("claim status = %q, want joined", status)
 	}
 }
 

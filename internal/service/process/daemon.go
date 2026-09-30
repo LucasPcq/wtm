@@ -391,7 +391,7 @@ func (d *daemonServer) jobInfoOf(job ManagedJob) domain.JobInfo {
 // stranger. A foreground service keeps its PID in every state, reaped included,
 // where it is the most useful thing on the row.
 func detachedAwarePID(job ManagedJob) int {
-	if job.Status == domain.JobStatusAttached || rules.IsDetached(job.Config) {
+	if job.Status == domain.JobStatusJoined || rules.IsDetached(job.Config) {
 		return 0
 	}
 	return job.PID

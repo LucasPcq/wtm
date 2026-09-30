@@ -53,15 +53,15 @@ func (s detachedSink) Emit(event runlogs.Event) {
 	case runlogs.PhaseStarted:
 		if event.AlreadyRunning {
 			already := domain.RunDetachedAlreadyFmt
-			if event.Attached {
-				already = domain.RunDetachedAlreadyAttachedFmt
+			if event.Joined {
+				already = domain.RunDetachedAlreadyJoinedFmt
 			}
 			s.emit(fmt.Sprintf(already, event.Job), event)
 			return
 		}
 		started := domain.RunDetachedStartedFmt
-		if event.Attached {
-			started = domain.RunDetachedAttachedFmt
+		if event.Joined {
+			started = domain.RunDetachedJoinedFmt
 		}
 		s.emit(fmt.Sprintf(started, event.Job), event)
 		if event.Namespace != "" {

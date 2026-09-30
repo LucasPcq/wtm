@@ -202,3 +202,16 @@ func TestEnsureCurrentDaemonRefusesAnOlderDaemonHoldingJobs(t *testing.T) {
 		t.Error("a daemon holding jobs was replaced")
 	}
 }
+
+func TestAClaimFromADaemonBeforeTheRenameReadsAsJoined(t *testing.T) {
+	socket := skewSocket(t)
+	serveOld(t, socket, []domain.JobInfo{{Name: "postgres", WorkDir: "/w/feat", Status: domain.JobStatusLegacyAttached}})
+
+	resp, err := NewClient(socket).Send(Request{Action: ActionList})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(resp.Jobs) != 1 || resp.Jobs[0].Status != domain.JobStatusJoined {
+		t.Fatalf("jobs = %+v, want the claim read as joined", resp.Jobs)
+	}
+}
