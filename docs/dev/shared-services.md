@@ -116,6 +116,8 @@ The first row is the same everywhere; the second is the ports **this job** decla
 
 An empty `create` is an answer, not an omission: the service is then shared outright, data included.
 
+Outside `run init`, `run job add` and `run job edit` declare the same thing: `--scope shared|worktree`, `--namespace-name`, `--namespace-create`, `--namespace-remove` and `--namespace-env KEY=VALUE`, and their form asks the same fields — the namespace ones only once the scope is shared. There an empty *name* is the "shared outright" answer, so a named namespace must have a `create`: the loader refuses a block with one and not the other (`rules.HasNamespace`), and every write goes through the same validation (`runconfig.Save`).
+
 ### Starting a slice from main's data
 
 What makes isolation feel expensive is rarely the slice itself — it is an empty database to migrate and seed, a realm to rebuild by hand. That cost belongs in `create`, not in wtm: **clone the data main uses instead of creating an empty slice.** The worktree then starts where main is, and still owns its copy — nothing it migrates or resets reaches main, which is exactly what sharing main's data outright could not promise.
