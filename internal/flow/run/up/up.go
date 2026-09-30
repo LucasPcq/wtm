@@ -104,6 +104,9 @@ type upFlow struct {
 }
 
 func (f *upFlow) run() (Outcome, error) {
+	if err := target.RequireDeclared(target.DeclaredParams{Config: f.request.Config, Profile: f.request.Profile}); err != nil {
+		return Outcome{}, err
+	}
 	named, err := target.NamedAll(target.ResolveAllParams{ProjectDir: f.ctx.ProjectDir, Queries: f.request.Worktrees})
 	if err != nil {
 		return Outcome{}, err
@@ -328,7 +331,7 @@ func (f *upFlow) resolveProfile(answers flow.Answers) (resolvedProfile, error) {
 
 	profile, ok := rules.FindProfile(f.request.Config, name)
 	if !ok {
-		return resolvedProfile{}, fmt.Errorf("profile %q not found in config", name)
+		return resolvedProfile{}, fmt.Errorf(domain.RunProfileNotFoundFmt, domain.ErrProfileNotFound, name)
 	}
 	return f.profileRun(profile), nil
 }

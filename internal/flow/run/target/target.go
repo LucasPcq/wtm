@@ -94,6 +94,28 @@ func RunningJobs(service runlogs.Service) map[string]int {
 	return rules.RunningJobsByWorktree(jobs)
 }
 
+type DeclaredParams struct {
+	Config  domain.RunConfig
+	Job     string
+	Profile string
+}
+
+// RequireDeclared refuses a job or profile run.toml does not declare, before a
+// run asks anything or wakes a daemon. An empty name is left to the steps.
+func RequireDeclared(params DeclaredParams) error {
+	if params.Job != "" {
+		if _, ok := rules.FindJob(params.Config, params.Job); !ok {
+			return fmt.Errorf(domain.RunJobNotFoundFmt, domain.ErrJobNotFound, params.Job)
+		}
+	}
+	if params.Profile != "" {
+		if _, ok := rules.FindProfile(params.Config, params.Profile); !ok {
+			return fmt.Errorf(domain.RunProfileNotFoundFmt, domain.ErrProfileNotFound, params.Profile)
+		}
+	}
+	return nil
+}
+
 // DeclaredJob turns an answered job name into its declaration, so a name
 // matching nothing in run.toml fails precisely instead of at the daemon.
 func DeclaredJob(cfg domain.RunConfig, name string) (domain.JobConfig, error) {

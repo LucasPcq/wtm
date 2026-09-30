@@ -180,6 +180,17 @@ The corollary is easy to lose. `domain.ErrAborted` means *the command already pr
 
 It is orthogonal to `--yes`, like the two bypass axes: `--quiet` still asks, `--yes` still reports, and a script that wants neither passes both.
 
+## The machine contract
+
+`--output json` is read by programs, so its shape is decided once and never follows what happened. Four rules hold for the `run` module, and a new document follows them rather than its neighbour:
+
+- **One shape per command.** A command that acts on worktrees answers with an array of per-worktree documents even for one worktree (`run up`, `run down`, `run stop`, `run logs`); a single-subject command answers with one object (`run start`, `run job|profile add|edit|rm`). A shape that changed with the arity made every caller branch on how many worktrees it had named.
+- **A worktree is `branch` + `path`**, both, always — never `worktree` or `work_dir`. `domain.WorktreeRef` is the type when nothing else rides along. A job object is keyed `name`; anything pointing at a job from another object calls it `job`.
+- **`status` never claims an act that did not happen.** A stop that found nothing up is `not_running`, never `stopped`; a shared job let go of is `released`.
+- **Exit codes are part of the document.** `rules.ExitCode` maps the sentinels: `2` for a command line cobra refused (`cmd/usage.go` wraps its flag and argument errors, and an unknown `--output`, in `domain.ErrUsage`), `14` for a job or profile run.toml does not declare (`ErrJobNotFound`, `ErrProfileNotFound`), checked by `target.RequireDeclared` before a flow asks anything or wakes the daemon.
+
+A document that is a protocol elsewhere is not reused for output: `domain.JobInfo` is what the daemon speaks, so `run ps` writes `domain.RunningJob`, and renaming a key there never needs a daemon restart. `run list`, `run export` and `run import` are the exception to the naming rule on purpose — they are run.toml as JSON, and keep its keys (`job`, `profile`, `env_port`).
+
 ## Showing without keeping
 
 A hook that runs for forty seconds has to be visible while it runs — silence reads as a hang — and must not survive in a scrollback nobody rereads. `output.HookView` is the shape: a bounded tail redrawn in place, erased and replaced by one `✓ <hook> (12.4s)` line, and the tail kept on screen when the hook failed.

@@ -115,8 +115,12 @@ var (
 	// ErrGHNotAuthenticated is returned when gh is not logged in to GitHub.
 	ErrGHNotAuthenticated = errors.New("not logged in to GitHub — run 'gh auth login'")
 
-	// ErrJobNotFound is returned when a referenced job is not declared in run.toml.
-	ErrJobNotFound = errors.New("job not found")
+	ErrJobNotFound     = errors.New("job not found")
+	ErrProfileNotFound = errors.New("profile not found")
+
+	// ErrUsage marks a command line refused before the command ran; it maps to
+	// exit code 2.
+	ErrUsage = errors.New("usage error")
 
 	// ErrJobNotAttachable is returned for a job with no live output to subscribe
 	// to: a detached launcher, whose stream ended with the launcher, or a job

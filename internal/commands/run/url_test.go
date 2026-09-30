@@ -126,14 +126,14 @@ func portOf(t *testing.T, url string) int {
 	return n
 }
 
-func TestRunURLUnknownJobNamesTheOnesThatPublish(t *testing.T) {
+func TestRunURLUnknownJobIsNotDeclared(t *testing.T) {
 	stateDir := setupTestProject(t)
 	writeRunTOML(t, stateDir, domain.RunConfig{Jobs: []domain.JobConfig{published("web", 3000, "")}})
 	fakeTTY(t, false)
 
 	_, _, err := runCmd(t, domain.CmdURL, "--"+domain.FlagJob, "nope")
-	if err == nil || !strings.Contains(err.Error(), "web") {
-		t.Fatalf("err = %v, want one naming the jobs that do publish", err)
+	if !errors.Is(err, domain.ErrJobNotFound) {
+		t.Fatalf("err = %v, want ErrJobNotFound", err)
 	}
 }
 

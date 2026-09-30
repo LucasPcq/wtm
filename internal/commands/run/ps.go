@@ -36,7 +36,7 @@ func runPs(cmd *cobra.Command, _ []string) error {
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 
 	if format == domain.OutputJSON {
-		return output.WriteRunningJobsJSON(cmd.OutOrStdout(), shared.LoadJobs().Jobs)
+		return output.WriteRunningJobsJSON(cmd.OutOrStdout(), runningJobs(shared.LoadJobs().Jobs))
 	}
 
 	var listing runjobs.Listing
@@ -97,4 +97,32 @@ func projectsOf(jobs []domain.JobInfo) map[string]string {
 		return nil
 	}
 	return projects
+}
+
+// runningJobs is the document `run ps --output json` writes: every row names
+// its worktree by branch and path, and its project even when there is one.
+func runningJobs(jobs []domain.JobInfo) []domain.RunningJob {
+	branches := branchesOf(jobs)
+	projects := map[string]string{}
+	rows := make([]domain.RunningJob, 0, len(jobs))
+	for _, job := range jobs {
+		project, seen := projects[job.WorkDir]
+		if !seen {
+			project = target.ProjectOf(job.WorkDir)
+			projects[job.WorkDir] = project
+		}
+		rows = append(rows, domain.RunningJob{
+			Name:      job.Name,
+			Kind:      job.Kind,
+			Status:    job.Status,
+			PID:       job.PID,
+			Branch:    branches[job.WorkDir],
+			Path:      job.WorkDir,
+			Project:   project,
+			StartedAt: job.StartedAt,
+			URL:       job.URL,
+			ExitCode:  job.ExitCode,
+		})
+	}
+	return rows
 }

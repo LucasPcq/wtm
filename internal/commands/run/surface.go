@@ -138,9 +138,8 @@ func runOnStream(params streamParams) (runlogs.Outcomes, error) {
 }
 
 // runForMachine emits the run's outcome as a JSON document, then fails when the
-// profile aborted. The document is complete either way: the module's rule is
-// that the shape follows the arity and the exit code follows the success, and
-// an exit code has never made a document unreadable (LUC-198).
+// profile aborted. The document is complete either way: an exit code has never
+// made a document unreadable (LUC-198).
 func runForMachine(params streamParams) (runlogs.Outcomes, error) {
 	outcomes, err := params.Start(params.Cmd.Context(), nil)
 	if err != nil {

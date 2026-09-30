@@ -111,14 +111,15 @@ func TestWriteRunOutcomeJSONCarriesTheFailedJobsOutput(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := WriteRunOutcomeJSON(&buf, outcome); err != nil {
-		t.Fatalf("WriteRunOutcomeJSON: %v", err)
+	if err := WriteRunOutcomesJSON(&buf, runlogs.Outcomes{outcome}); err != nil {
+		t.Fatalf("WriteRunOutcomesJSON: %v", err)
 	}
 
-	var results []domain.JobActionResult
-	if err := json.Unmarshal(buf.Bytes(), &results); err != nil {
+	var documents []domain.WorktreeRunResult
+	if err := json.Unmarshal(buf.Bytes(), &documents); err != nil || len(documents) != 1 {
 		t.Fatalf("parse JSON: %v\n%s", err, buf.String())
 	}
+	results := documents[0].Jobs
 	if len(results) != 2 {
 		t.Fatalf("got %d results, want the two the run produced", len(results))
 	}
@@ -148,8 +149,8 @@ func TestWriteRunOutcomeJSONLeavesASuccessfulRunAlone(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := WriteRunOutcomeJSON(&buf, outcome); err != nil {
-		t.Fatalf("WriteRunOutcomeJSON: %v", err)
+	if err := WriteRunOutcomesJSON(&buf, runlogs.Outcomes{outcome}); err != nil {
+		t.Fatalf("WriteRunOutcomesJSON: %v", err)
 	}
 	if strings.Contains(buf.String(), "output") || strings.Contains(buf.String(), "exit_code") {
 		t.Errorf("a successful run carries failure fields:\n%s", buf.String())

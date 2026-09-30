@@ -92,6 +92,9 @@ type startFlow struct {
 }
 
 func (f *startFlow) run() (Outcome, error) {
+	if err := target.RequireDeclared(target.DeclaredParams{Config: f.request.Config, Job: f.request.Job}); err != nil {
+		return Outcome{}, err
+	}
 	named, err := target.Named(target.ResolveParams{ProjectDir: f.ctx.ProjectDir, Query: f.request.Worktree})
 	if err != nil {
 		return Outcome{}, err

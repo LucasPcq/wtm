@@ -14,13 +14,36 @@ import (
 	"github.com/LucasPcq/wtm/internal/service/process"
 )
 
+// runningHere makes the fake daemon report the jobs as up in the project's
+// main worktree, the one every command under test runs from.
+func runningHere(t *testing.T, daemon *fakeDaemon, names ...string) string {
+	t.Helper()
+	main := gitToplevel(t, projectDirOf(os.Getenv("WTM_STATE_DIR")))
+	jobs := make([]domain.JobInfo, 0, len(names))
+	for _, name := range names {
+		jobs = append(jobs, domain.JobInfo{Name: name, Status: domain.JobStatusRunning, WorkDir: main})
+	}
+	daemon.setJobs(jobs)
+	return main
+}
+
+func decodeWorktreeResults(t *testing.T, stdout string) []domain.WorktreeJobResults {
+	t.Helper()
+	var results []domain.WorktreeJobResults
+	if err := json.Unmarshal([]byte(stdout), &results); err != nil {
+		t.Fatalf("parse JSON: %v\noutput: %s", err, stdout)
+	}
+	return results
+}
+
 // A job the daemon could not stop is a failure of the command, on either
-// surface: the array still lists every job, and the exit code says the run did
-// not do what it was asked (LUC-198).
+// surface: the document still lists every job, and the exit code says the run
+// did not do what it was asked (LUC-198).
 func TestRunDownJSONExitsNonZeroWhenAJobIsLeftStanding(t *testing.T) {
-	setupStartProject(t, &fakeDaemon{
-		StopErrors: map[string]string{"api": "job api is not running"},
+	daemon := setupStartProject(t, &fakeDaemon{
+		StopErrors: map[string]string{"api": "job api refused to stop"},
 	})
+	runningHere(t, daemon, "api", "migrate")
 	fakeTTY(t, false)
 
 	stdout, _, err := runCmd(t, domain.CmdDown, "--"+domain.FlagProfile, "dev", "--output", domain.OutputJSON)
@@ -28,17 +51,14 @@ func TestRunDownJSONExitsNonZeroWhenAJobIsLeftStanding(t *testing.T) {
 		t.Fatalf("err = %v, want ErrAborted", err)
 	}
 
-	var results []domain.JobActionResult
-	if err := json.Unmarshal([]byte(stdout), &results); err != nil {
-		t.Fatalf("parse JSON: %v\noutput: %s", err, stdout)
-	}
-	if len(results) != 2 {
-		t.Fatalf("got %d results, want the whole profile:\n%s", len(results), stdout)
+	results := decodeWorktreeResults(t, stdout)
+	if len(results) != 1 || len(results[0].Jobs) != 2 {
+		t.Fatalf("got %+v, want one worktree holding the whole profile", results)
 	}
 	var failed *domain.JobActionResult
-	for i := range results {
-		if results[i].Name == "api" {
-			failed = &results[i]
+	for i := range results[0].Jobs {
+		if results[0].Jobs[i].Name == "api" {
+			failed = &results[0].Jobs[i]
 		}
 	}
 	if failed == nil || failed.Status != domain.JobActionError {
@@ -55,10 +75,36 @@ func TestRunDownExitsZeroWhenEverythingStopped(t *testing.T) {
 	}
 }
 
-// The shape follows the arity of the command, never the branch it took: `run
-// stop` names one job, so it answers with one object even when there is no
-// daemon to ask.
-func TestRunStopJSONStaysAnObjectWithNoDaemon(t *testing.T) {
+// A profile job that was not up was not stopped: saying so claimed an act that
+// never happened, and the daemon is not asked to stop it.
+func TestRunDownProfileReportsAJobThatWasNotUpAsNotRunning(t *testing.T) {
+	daemon := setupStartProject(t, &fakeDaemon{})
+	main := runningHere(t, daemon, "api")
+	fakeTTY(t, false)
+
+	stdout, _, err := runCmd(t, domain.CmdDown, "--"+domain.FlagProfile, "dev", "--output", domain.OutputJSON)
+	if err != nil {
+		t.Fatalf("run down: %v", err)
+	}
+	results := decodeWorktreeResults(t, stdout)
+	if len(results) != 1 || results[0].Branch != "main" || results[0].Path != main {
+		t.Fatalf("results = %+v, want main by branch and path", results)
+	}
+	statuses := map[string]string{}
+	for _, job := range results[0].Jobs {
+		statuses[job.Name] = job.Status
+	}
+	if statuses["api"] != domain.JobActionStopped || statuses["migrate"] != domain.JobActionNotRunning {
+		t.Errorf("statuses = %v, want api stopped and migrate not_running", statuses)
+	}
+	if strings.Contains(strings.Join(daemon.actions(), ","), string(process.ActionStop)+" migrate") {
+		t.Errorf("daemon was asked to stop a job that was not up: %v", daemon.actions())
+	}
+}
+
+// One shape whatever the arity: a stop over one worktree is an array of one
+// document, even when there is no daemon to ask.
+func TestRunStopJSONIsAnArrayOfWorktreesWithNoDaemon(t *testing.T) {
 	stateDir := setupTestProject(t)
 	writeRunTOML(t, stateDir, domain.RunConfig{Jobs: []domain.JobConfig{apiJob}})
 	shortHome(t)
@@ -69,15 +115,12 @@ func TestRunStopJSONStaysAnObjectWithNoDaemon(t *testing.T) {
 		t.Fatalf("run stop: %v", err)
 	}
 
-	if strings.HasPrefix(strings.TrimSpace(stdout), "[") {
-		t.Fatalf("run stop answered with an array:\n%s", stdout)
+	results := decodeWorktreeResults(t, stdout)
+	if len(results) != 1 || results[0].Branch != "main" || results[0].Path == "" {
+		t.Fatalf("results = %+v, want main by branch and path", results)
 	}
-	var result domain.JobActionResult
-	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
-		t.Fatalf("parse JSON: %v\noutput: %s", err, stdout)
-	}
-	if result.Name != "api" || result.Status != domain.JobActionNotRunning {
-		t.Errorf("result = %+v, want api not_running", result)
+	if len(results[0].Jobs) != 1 || results[0].Jobs[0].Name != "api" || results[0].Jobs[0].Status != domain.JobActionNotRunning {
+		t.Errorf("jobs = %+v, want api not_running", results[0].Jobs)
 	}
 }
 
@@ -91,12 +134,9 @@ func TestRunStopReportsAJobTheDaemonDoesNotHoldAsNotRunning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run stop: %v", err)
 	}
-	var result domain.JobActionResult
-	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
-		t.Fatalf("parse JSON: %v\noutput: %s", err, stdout)
-	}
-	if result.Status != domain.JobActionNotRunning {
-		t.Errorf("status = %q, want not_running", result.Status)
+	results := decodeWorktreeResults(t, stdout)
+	if len(results) != 1 || len(results[0].Jobs) != 1 || results[0].Jobs[0].Status != domain.JobActionNotRunning {
+		t.Errorf("results = %+v, want api not_running", results)
 	}
 	if strings.Contains(strings.Join(daemon.actions(), ","), string(process.ActionStop)+" api") {
 		t.Errorf("daemon was asked to stop a job it does not hold here: %v", daemon.actions())
@@ -114,12 +154,13 @@ func TestRunStopReportsAJobTheDaemonDoesNotHoldAsNotRunning(t *testing.T) {
 // Stopping a profile and starting it are two halves of one command, and read as
 // two different programs when only one of them has a shape.
 func TestRunDownConcludesInTheSameBoxRunUpDoes(t *testing.T) {
-	setupStartProject(t, &fakeDaemon{})
+	daemon := setupStartProject(t, &fakeDaemon{})
 	fakeTTY(t, false)
 
 	if _, _, err := runCmd(t, domain.CmdUp, "--"+domain.FlagProfile, "dev", "-d"); err != nil {
 		t.Fatalf("run up: %v", err)
 	}
+	runningHere(t, daemon, "api")
 	stdout, _, err := runCmd(t, domain.CmdDown, "--"+domain.FlagProfile, "dev")
 	if err != nil {
 		t.Fatalf("run down: %v", err)
@@ -140,12 +181,13 @@ func TestRunDownConcludesInTheSameBoxRunUpDoes(t *testing.T) {
 // The worktree is named whatever the arity: the run they do most is exactly the
 // one that must not leave them guessing which worktree it emptied.
 func TestRunDownNamesTheWorktreeItEmptied(t *testing.T) {
-	setupStartProject(t, &fakeDaemon{})
+	daemon := setupStartProject(t, &fakeDaemon{})
 	fakeTTY(t, false)
 
 	if _, _, err := runCmd(t, domain.CmdUp, "--"+domain.FlagProfile, "dev", "-d"); err != nil {
 		t.Fatalf("run up: %v", err)
 	}
+	runningHere(t, daemon, "api")
 	stdout, _, err := runCmd(t, domain.CmdDown, "--"+domain.FlagProfile, "dev")
 	if err != nil {
 		t.Fatalf("run down: %v", err)

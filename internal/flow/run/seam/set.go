@@ -64,6 +64,14 @@ func (s Set) Board() runlogs.Board {
 	return runlogs.NewMergedBoard(entries)
 }
 
+func (s Set) WorkDirs() []string {
+	dirs := make([]string, 0, len(s.seams))
+	for _, seam := range s.seams {
+		dirs = append(dirs, seam.workDir)
+	}
+	return dirs
+}
+
 func (s Set) Worktrees() []string {
 	names := make([]string, 0, len(s.seams))
 	for _, seam := range s.seams {

@@ -87,6 +87,8 @@ func init() {
 
 	rootCmd.AddCommand(daemon.NewCmd())
 	rootCmd.AddCommand(daemon.NewProxyForwardCmd())
+
+	markUsageErrors(rootCmd)
 }
 
 // version reads the one symbol goreleaser stamps, domain.Version — the same one
@@ -142,9 +144,13 @@ var rootCmd = &cobra.Command{
 	Short:   "Orchestrate git worktrees and team dev workflows from the terminal",
 	Version: version,
 	RunE:    rootRunE,
-	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
+	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+		if err := validateOutputFormat(cmd); err != nil {
+			return err
+		}
 		startUpdateCheck(cmd)
 		silenceHumanOutput(cmd)
+		return nil
 	},
 	SilenceErrors: true,
 	SilenceUsage:  true,

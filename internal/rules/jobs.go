@@ -137,7 +137,7 @@ func ProfileJobs(cfg domain.RunConfig, profile domain.ProfileConfig) []domain.Jo
 func FilterToProfile(cfg domain.RunConfig, name string) (domain.RunConfig, error) {
 	p, ok := FindProfile(cfg, name)
 	if !ok {
-		return domain.RunConfig{}, fmt.Errorf("profile %q not found", name)
+		return domain.RunConfig{}, fmt.Errorf(domain.RunProfileNotFoundFmt, domain.ErrProfileNotFound, name)
 	}
 
 	// The config is copied whole before being narrowed: rebuilding it field by

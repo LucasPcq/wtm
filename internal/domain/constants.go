@@ -26,14 +26,15 @@ const (
 	// ExitCodeError indicates a generic runtime error.
 	ExitCodeError = 1
 
-	// ExitCodeUsage indicates invalid usage or bad input.
+	// ExitCodeUsage is a command line cobra refused: an unknown flag, a flag
+	// value it cannot parse, an --output it does not know, too many arguments.
 	ExitCodeUsage = 2
 
 	// Granular exit codes let LLM agents branch precisely on failure cause.
 	ExitCodeWorktreeExists    = 10 // a worktree or its path already exists
 	ExitCodeBranchNotFound    = 11 // the requested branch does not exist locally
 	ExitCodeConfigNotFound    = 12 // the repo has no wtm config (run `wtm init`)
-	ExitCodeServiceNotFound   = 14 // the referenced job is not declared in run.toml
+	ExitCodeNotDeclared       = 14 // the job or profile named is not declared in run.toml
 	ExitCodeExtractConflict   = 15 // selected changes do not apply cleanly onto the target worktree
 	ExitCodeRunNotInitialized = 16 // the run module is not initialized (run `wtm run init`)
 
@@ -1236,24 +1237,30 @@ const (
 	// asking for less noise did not ask for less answer.
 	AnnotationMachineOutput = "wtm.machine-output"
 	AnnotationOn            = "true"
-	FlagYes                 = "yes"
-	FlagAll                 = "all"
-	FlagGlobal              = "global"
-	FlagMine                = "mine"
-	FlagReview              = "review"
-	FlagCmd                 = "cmd"
-	FlagKind                = "kind"
-	FlagStop                = "stop"
-	FlagCwd                 = "cwd"
-	FlagPort                = "port"
-	FlagName                = "name"
-	FlagJob                 = "job"
-	FlagJobs                = "jobs"
-	FlagDefault             = "default"
-	FlagTo                  = "to"
-	FlagKeep                = "keep"
-	FlagFiles               = "files"
-	FlagOnConflict          = "on-conflict"
+	// AnnotationOutputFormats lists, comma-separated, the --output values a
+	// command accepts besides text and json.
+	AnnotationOutputFormats  = "wtm.output-formats"
+	OutputFormatInvalidFmt   = "invalid --%s %q: expected one of %s"
+	UnknownCommandFmt        = "unknown command %q for %q"
+	UnknownCommandSuggestFmt = "\n\nDid you mean this?\n\t%s"
+	FlagYes                  = "yes"
+	FlagAll                  = "all"
+	FlagGlobal               = "global"
+	FlagMine                 = "mine"
+	FlagReview               = "review"
+	FlagCmd                  = "cmd"
+	FlagKind                 = "kind"
+	FlagStop                 = "stop"
+	FlagCwd                  = "cwd"
+	FlagPort                 = "port"
+	FlagName                 = "name"
+	FlagJob                  = "job"
+	FlagJobs                 = "jobs"
+	FlagDefault              = "default"
+	FlagTo                   = "to"
+	FlagKeep                 = "keep"
+	FlagFiles                = "files"
+	FlagOnConflict           = "on-conflict"
 	// FlagProxyPort tells the forked daemon where to serve the named URLs.
 	FlagProxyPort = "proxy-port"
 	// FlagURLPort and FlagURLHost declare a job's [[job]].url without a wizard.
@@ -1970,7 +1977,7 @@ const (
 	RunJobNameRequired  = "job name is required"
 	RunJobCmdRequired   = "command is required"
 	RunJobExistsFmt     = "job %q already exists"
-	RunJobNotFoundFmt   = "job %q not found"
+	RunJobNotFoundFmt   = "%w: %s"
 	RunJobNothingToEdit = "edit has nothing to change — pass one of %s"
 	// RunJobReferenced* is the safety refusal of a removal that would drag other
 	// declarations with it. The flag lifts it up front; a run with someone to ask
@@ -2056,7 +2063,7 @@ const (
 	RunProfileNameSpaces    = "a profile name cannot contain whitespace"
 	RunProfileNameRequired  = "profile name is required"
 	RunProfileExistsFmt     = "profile %q already exists"
-	RunProfileNotFoundFmt   = "profile %q not found"
+	RunProfileNotFoundFmt   = "%w: %s"
 	RunProfileNoJobsYet     = "cannot define a profile: no jobs declared yet — add a job first"
 	RunProfileNothingToEdit = "edit has nothing to change — pass --%s, --%s or --%s"
 	RunProfileAddedFmt      = "Added profile %q"

@@ -9,12 +9,12 @@ import (
 )
 
 type AddressingResult struct {
-	Addressing domain.Addressing `json:"addressing"`
-	Previous   domain.Addressing `json:"previous"`
-	Changed    bool              `json:"changed"`
-	Settled    []string          `json:"settled"`
-	Pending    []string          `json:"pending"`
-	MainLeft   string            `json:"main_left,omitempty"`
+	Addressing domain.Addressing    `json:"addressing"`
+	Previous   domain.Addressing    `json:"previous"`
+	Changed    bool                 `json:"changed"`
+	Settled    []domain.WorktreeRef `json:"settled"`
+	Pending    []domain.WorktreeRef `json:"pending"`
+	MainLeft   *domain.WorktreeRef  `json:"main_left,omitempty"`
 }
 
 // AddressingSwitched is the counted readout of `run addressing`: the mode, then
@@ -32,17 +32,17 @@ func AddressingSwitched(w io.Writer, result AddressingResult) {
 	if len(result.Pending) > 0 {
 		Warning(w, fmt.Sprintf(domain.AddressingPendingFmt, rules.WorktreeCountLabel(len(result.Pending))))
 	}
-	if result.MainLeft != "" {
-		Warning(w, fmt.Sprintf(domain.AddressingMainLeftFmt, result.MainLeft, result.MainLeft))
+	if result.MainLeft != nil {
+		Warning(w, fmt.Sprintf(domain.AddressingMainLeftFmt, result.MainLeft.Branch, result.MainLeft.Branch))
 	}
 }
 
 func WriteAddressingResultJSON(w io.Writer, result AddressingResult) error {
 	if result.Settled == nil {
-		result.Settled = []string{}
+		result.Settled = []domain.WorktreeRef{}
 	}
 	if result.Pending == nil {
-		result.Pending = []string{}
+		result.Pending = []domain.WorktreeRef{}
 	}
 	return encodeJSON(w, result)
 }
