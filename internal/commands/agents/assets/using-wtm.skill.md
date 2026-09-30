@@ -697,7 +697,10 @@ and **experimental**: the global `wtm init` does not configure it.
 - `run init` accepts `--yes` (its older `--non-interactive` still works) — the run module's
   own bootstrap, which writes run.toml and may rewrite compose files and .env.
 - `run url --job <name> --output json` returns **that job alone**, not the whole array.
-- `run export` / `run import` — share a layout as JSON. **`run import` replaces the whole
+  Several jobs publishing a URL and no `--job` is an error naming `--job` and the jobs
+  (`run open` the same on your paths); a worktree publishing one needs no `--job`.
+- `run export` / `run import` — share a layout as JSON. `run export` always writes the JSON
+  document, and accepts `--output json` like every data command. **`run import` replaces the whole
   `run.toml`**: jobs, profiles, `[[env_port]]` links and project settings alike, so what
   the file held is lost. **It always needs `--yes` on your paths**: without a terminal to
   confirm on — a piped payload included — it refuses rather than replacing silently, and

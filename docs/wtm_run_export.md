@@ -4,7 +4,7 @@ Export run.toml as JSON on stdout
 
 ### Synopsis
 
-Emit the current run config as JSON. Pipe to a file and use with wtm run import to share configurations.
+Emit the current run config as JSON on stdout, whatever --output says: like run url, this is machine output and is never framed. Pipe to a file and use with wtm run import to share configurations.
 
 ```
 wtm run export [flags]
@@ -14,6 +14,7 @@ wtm run export [flags]
 
 ```
   -h, --help             help for export
+      --output string    Output format: text or json (default "text")
       --profile string   Export only this profile and its jobs
 ```
 

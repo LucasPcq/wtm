@@ -265,3 +265,24 @@ func TestRunImportInvalidConfig(t *testing.T) {
 		t.Errorf("expected validation message, got %v", err)
 	}
 }
+
+// run export is machine output, like run url: it takes --output as its sibling
+// does, and answers with the same document whatever the format, never framed.
+func TestRunExportAcceptsOutputLikeRunURL(t *testing.T) {
+	dir := setupTestProject(t)
+	writeRunTOML(t, dir, domain.RunConfig{Jobs: []domain.JobConfig{{Name: "dev", Kind: domain.JobKindService, Cmd: "pnpm dev"}}})
+
+	plain, _, err := runCmd(t, domain.CmdExport)
+	if err != nil {
+		t.Fatalf("run export: %v", err)
+	}
+	for _, format := range []string{domain.OutputJSON, domain.OutputText} {
+		stdout, _, err := runCmd(t, domain.CmdExport, "--"+domain.FlagOutput, format)
+		if err != nil {
+			t.Fatalf("run export --output %s: %v", format, err)
+		}
+		if stdout != plain {
+			t.Errorf("--output %s = %q, want the same document as without it", format, stdout)
+		}
+	}
+}

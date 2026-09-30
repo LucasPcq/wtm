@@ -198,10 +198,10 @@ type JobParams struct {
 	Detail bool
 }
 
-// JobStep asks which job to act on. It has no Resolve: a run that cannot ask is
-// refused naming the flag rather than falling back to a picker.
+// JobStep asks which job to act on. A run that cannot ask is refused naming the
+// flag rather than falling back to a picker.
 func JobStep(params JobParams) flow.Step {
-	return flow.Step{
+	step := flow.Step{
 		Kind:  flow.StepSelect,
 		Key:   KeyJob,
 		Label: domain.RunJobStepName,
@@ -216,6 +216,10 @@ func JobStep(params JobParams) flow.Step {
 			}, nil
 		},
 	}
+	if params.Flag == domain.FlagJob {
+		step.Resolve = func(flow.Answers) (flow.Answer, error) { return flow.Answer{}, domain.ErrJobRequired }
+	}
+	return step
 }
 
 func pickerTitle(title, fallback string) string {

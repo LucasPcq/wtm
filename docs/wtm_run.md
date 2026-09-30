@@ -35,7 +35,7 @@ Run commands and profiles declared in <git-common-dir>/wtm/run.toml — long-run
 * [wtm run proxy](wtm_run_proxy.md)	 - Inspect and install the redirection that serves named URLs on port 80
 * [wtm run ps](wtm_run_ps.md)	 - List currently running jobs
 * [wtm run start](wtm_run_start.md)	 - Start a single job
-* [wtm run stop](wtm_run_stop.md)	 - Stop a single job
+* [wtm run stop](wtm_run_stop.md)	 - Stop one job, in one or more worktrees
 * [wtm run up](wtm_run_up.md)	 - Start a profile's jobs
 * [wtm run url](wtm_run_url.md)	 - Print where a job is reachable in a worktree
 
