@@ -19,6 +19,10 @@ Vocabulary:
                   every worktree's for a shared service with no namespace; a job whose
                   touches reach it is refused unless --force
 
+```
+wtm run [flags]
+```
+
 ### Options
 
 ```

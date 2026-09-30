@@ -6,6 +6,10 @@ Add, remove, or edit profiles in run.toml
 
 Manage profiles declared in <git-common-dir>/wtm/run.toml.
 
+```
+wtm run profile [flags]
+```
+
 ### Options
 
 ```

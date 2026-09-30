@@ -14,6 +14,7 @@ func TestCobraRefusalsExitWithTheUsageCode(t *testing.T) {
 		args []string
 	}{
 		{"unknown command", []string{"bogus"}},
+		{"unknown subcommand", []string{domain.CmdRun, "bogus"}},
 		{"unknown flag", []string{domain.CmdRun, domain.CmdUp, "--bogus"}},
 		{"too many arguments", []string{domain.CmdRun, domain.CmdStart, "a", "b"}},
 		{"unparsable value", []string{domain.CmdRun, domain.CmdUp, "--detach=maybe"}},
@@ -44,5 +45,19 @@ func TestOutputFormatAcceptsWhatTheCommandDeclares(t *testing.T) {
 	t.Cleanup(func() { _ = tree.Flags().Set(domain.FlagOutput, domain.OutputText) })
 	if err := validateOutputFormat(tree); err != nil {
 		t.Errorf("tree --output mermaid refused: %v", err)
+	}
+}
+
+// A group run bare still shows its help, and exits 0.
+func TestABareGroupShowsItsHelp(t *testing.T) {
+	var out bytes.Buffer
+	rootCmd.SetArgs([]string{domain.CmdRun})
+	rootCmd.SetOut(&out)
+	rootCmd.SetErr(&bytes.Buffer{})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("wtm run: %v", err)
+	}
+	if out.Len() == 0 {
+		t.Error("wtm run printed no help")
 	}
 }

@@ -6,6 +6,10 @@ Add, remove, or edit jobs in run.toml
 
 Manage jobs declared in <git-common-dir>/wtm/run.toml.
 
+```
+wtm run job [flags]
+```
+
 ### Options
 
 ```

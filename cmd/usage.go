@@ -38,6 +38,12 @@ func markUsageErrors(root *cobra.Command) {
 }
 
 func wrapArgs(cmd *cobra.Command) {
+	// cobra answers a group that cannot run with its help before it reads the
+	// arguments, so `wtm run bogus` exited 0. A group runs its help itself.
+	if cmd.HasParent() && cmd.HasSubCommands() && !cmd.Runnable() {
+		cmd.Args = unknownCommand
+		cmd.RunE = func(c *cobra.Command, _ []string) error { return c.Help() }
+	}
 	if validate := cmd.Args; validate != nil {
 		cmd.Args = func(c *cobra.Command, args []string) error { return asUsage(validate(c, args)) }
 	}

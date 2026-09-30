@@ -2,6 +2,10 @@
 
 Manage LLM agent integrations for wtm
 
+```
+wtm agents [flags]
+```
+
 ### Options
 
 ```

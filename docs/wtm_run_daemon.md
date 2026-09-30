@@ -7,6 +7,10 @@ Inspect, stop or restart the process that runs the jobs
 Jobs are started by a background daemon shared by every repository.
 It exits on its own once no foreground job is left; detached services keep running without it and are picked back up by the next one.
 
+```
+wtm run daemon [flags]
+```
+
 ### Options
 
 ```

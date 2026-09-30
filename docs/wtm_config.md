@@ -7,6 +7,10 @@ Inspect or edit the project wtm config
 View the resolved config or open the project config.toml in $EDITOR.
 The file lives under <git-common-dir>/wtm/config.toml and is never committed.
 
+```
+wtm config [flags]
+```
+
 ### Options
 
 ```
