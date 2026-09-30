@@ -80,7 +80,7 @@ func AddOutputFlag(cmd *cobra.Command) {
 
 // AddIsolationFlag registers --isolation on a command that creates a worktree.
 func AddIsolationFlag(cmd *cobra.Command) {
-	cmd.Flags().String(domain.FlagIsolation, "", "How the new worktree stands against its source: isolated (its own ports, compose project and service slices, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated")
+	cmd.Flags().String(domain.FlagIsolation, "", "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated")
 }
 
 // IsolationFlag reads --isolation, refusing a value that is neither answer.

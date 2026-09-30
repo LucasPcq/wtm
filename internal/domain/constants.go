@@ -232,7 +232,7 @@ const (
 	EnvPortOffset         = "WTM_PORT_OFFSET"
 	EnvComposeProjectName = "COMPOSE_PROJECT_NAME"
 	// EnvIsolation carries the worktree's Isolation to the daemon, which cannot
-	// read the metadata that records it and must not carve a slice out of a
+	// read the metadata that records it and must not create a namespace in a
 	// shared service for a worktree whose .env names its source's.
 	EnvIsolation = "WTM_ISOLATION"
 	// EnvProject is the repository's slug, as the hostname and the compose
@@ -276,7 +276,7 @@ const (
 	EnvValueLinkNoNamespaceFmt  = "env %s in %s: job %q declares no [job.namespace], so {namespace} means nothing"
 	EnvValueLinkNoPortFmt       = "env %s in %s: job %q declares no port named %q"
 	EnvValueLinkTwiceFmt        = "env %s in %s is declared twice"
-	EnvValueLinkConstantFmt     = "env %s in %s: the value holds no placeholder, so every worktree would get the same one — put {namespace} where the slice belongs, or drop the link"
+	EnvValueLinkConstantFmt     = "env %s in %s: the value holds no placeholder, so every worktree would get the same one — put {namespace} where the namespace belongs, or drop the link"
 	EnvValueLinkNoOriginFmt     = "env %s in %s: job %q publishes no address, so {origin} has no answer — publish a [job.url] for it, or write the host yourself"
 	EnvValueLinkBadNamespaceFmt = "env %s in %s: %v"
 	EnvValueUnclosedTokenFmt    = "env %s in %s: a {port.…} placeholder is never closed"
@@ -307,7 +307,7 @@ const (
 	// budget's worth of retries ended on.
 	NamespaceCreateFailedFmt = "job %s: could not create namespace %s: %w (the create runs on every start, so it must be safe to run again)"
 	// NamespaceReadyLogFmt is the line a shared service's log gains when a
-	// worktree's slice of it is made: namespace, then worktree.
+	// worktree's namespace in it is made: namespace, then worktree.
 	NamespaceReadyLogFmt     = "[wtm] namespace %s ready for %s"
 	NamespaceRemoveFailedFmt = "job %s: could not detach namespace %s: %w"
 	// NamespaceRecordFailedFmt is a namespace created but not written down in
@@ -415,13 +415,13 @@ const (
 	// The namespace step: what it asks, and what it says is available. The list
 	// of variables is built from the job's own declaration rather than written
 	// here — wtm knows the ports it injects, and nothing else.
-	NamespaceStepName  = "Shared service data"
+	NamespaceStepName  = "Shared service namespaces"
 	NamespaceStepTitle = "What does each worktree get of these shared services?"
-	NamespaceStepDesc  = "A shared service runs once, so each worktree needs its own slice of it —\n" +
-		"a database, a set of realms. wtm names the slice and runs your commands;\n" +
+	NamespaceStepDesc  = "A shared service runs once, so each worktree needs its own namespace in\n" +
+		"it — a database, a set of realms. wtm names it and runs your commands;\n" +
 		"it never guesses them.\n" +
 		"\n" +
-		"  ● name      what this worktree's slice is called\n" +
+		"  ● name      what this worktree's namespace is called\n" +
 		"              for a postgres, the database name — e.g. app_{worktree}\n" +
 		"              {worktree} and {ordinal} are filled in by wtm, here and\n" +
 		"              nowhere else: a name is data, no shell ever sees it\n" +
@@ -429,7 +429,7 @@ const (
 		"                it is what `wtm clean` names before destroying it\n" +
 		"\n" +
 		"  ● create    run every time this worktree starts the service, so it\n" +
-		"              must be safe to run again: carve the slice out if it is\n" +
+		"              must be safe to run again: create the namespace if it is\n" +
 		"              absent, do nothing if it is already there\n" +
 		"              an inline command or the path to a script — both are a\n" +
 		"              /bin/sh line run in the worktree\n" +
@@ -437,17 +437,17 @@ const (
 		"\n" +
 		"  ● remove    run by `wtm clean` when the worktree goes — never by\n" +
 		"              `run stop` or `run down`: stopping is not destroying\n" +
-		"              → leave empty to keep the slice once the worktree is gone"
+		"              → leave empty to keep it once the worktree is gone"
 
 	EnvValueStepName  = "Shared service keys"
-	EnvValueStepTitle = "Which .env keys name each worktree's slice?"
-	EnvValueStepDesc  = "What differs per worktree is the slice a shared service carves out — a\n" +
+	EnvValueStepTitle = "Which .env keys name each worktree's namespace?"
+	EnvValueStepDesc  = "What differs per worktree is its namespace in a shared service — a\n" +
 		"database, a realm. wtm cannot recognize one, so it lists every key it manages.\n" +
 		"\n" +
 		"  space     link a key, so wtm writes its whole value per worktree\n" +
-		"  enter     edit the template — {namespace} is this worktree's slice\n" +
+		"  enter     edit the template — {namespace} is this worktree's namespace\n" +
 		"\n" +
-		"Keys already checked name the service's slice — POSTGRES_DB,\n" +
+		"Keys already checked name the service's namespace — POSTGRES_DB,\n" +
 		"KEYCLOAK_REALM — or are linked by run.toml."
 	EnvValueRowFmt       = "%s %-*s  %s"
 	EnvValueGroupFmt     = "%s · %s"
@@ -456,13 +456,13 @@ const (
 	EnvValueMarkOff      = "[ ]"
 	EnvValueEmptyValue   = "—"
 	EnvValueSummaryFmt   = "%d key(s) linked"
-	EnvValueSkipNoShared = "no shared service carves out a slice"
+	EnvValueSkipNoShared = "no shared service declares a namespace"
 	EnvValueSkipNoKeys   = "no managed .env key to link"
 	EnvValueEmptyErr     = "a linked key needs a template; {namespace} is the usual one"
 	// EnvValueConstantErr refuses a template that never varies. The field is
 	// pre-filled with the value on disk so a long URL is edited rather than
 	// retyped, which makes "accepted unchanged" the easy mistake to make.
-	EnvValueConstantErr = "this template never changes, so every worktree would get the same value — put {namespace} where the slice belongs, or press space to unlink the key"
+	EnvValueConstantErr = "this template never changes, so every worktree would get the same value — put {namespace} where the namespace belongs, or press space to unlink the key"
 	EnvValueNowFmt      = "now  %s"
 	EnvValueEditHelp    = "enter save · esc cancel"
 	EnvValueHelpLink    = "space link"
@@ -486,7 +486,7 @@ const (
 	NamespaceNameEmptyErr = "a namespace needs a name; it is what clean says it is about to destroy"
 	NamespaceEditHelp     = "enter save · esc cancel"
 	NamespaceSummaryFmt   = "%d of %d configured"
-	NamespaceSkipNoShared = "no shared service to carve up"
+	NamespaceSkipNoShared = "no shared service to give namespaces"
 
 	// MainWorktreeOrdinal is never persisted: the main worktree has no meta.json,
 	// so 0 in a linked worktree's metadata means "not allocated yet".
@@ -2558,7 +2558,7 @@ const (
 	// RunForeignData* is the stop before a job that changes data the worktree
 	// does not own — its source's when verbatim, everyone's for a shared
 	// service with no namespace. It is a safety refusal: --force lifts it.
-	RunForeignDataTitle       = "Jobs that change data this worktree does not own"
+	RunForeignDataTitle       = "Jobs that change foreign data — data this worktree does not own"
 	RunForeignDataDesc        = "They run against data another checkout uses too, and whatever they reset or migrate there is reset or migrated for it as well."
 	RunForeignDataLineFmt     = "%s changes %s — %s"
 	RunForeignDataInFmt       = "%s (in %s)"
@@ -2572,7 +2572,7 @@ const (
 	// nothing for a shared service with no namespace.
 	RunForeignDataRefusedFmt       = "%s:\n%s\npass --%s to run them anyway, or %s"
 	RunForeignDataIsolateHintFmt   = "give this worktree its own data: wtm env <branch> --%s %s"
-	RunForeignDataNamespaceHintFmt = "give each worktree its own slice of %s: declare a [job.namespace] on it in run.toml"
+	RunForeignDataNamespaceHintFmt = "give each worktree its own namespace in %s: declare a [job.namespace] on it in run.toml"
 	RunForeignDataHintSep          = "; or "
 
 	// RunSelfPortClashFmt refuses a run that brings up two worktrees on the same
@@ -2657,7 +2657,7 @@ const (
 	ComposeDownVerb       = "down"
 	ComposeRmStopVerb     = "rm -s -f"
 	ComposeStopWarningFmt = "job %s: its stop removes the shared %s in main — set stop = %q in run.toml"
-	// RunStreamNamespaceFmt is the slice a shared job's create made sure exists,
+	// RunStreamNamespaceFmt is the namespace a shared job's create made sure exists,
 	// on its own line so the one thing a clean will drop is seen being made.
 	RunStreamNamespaceFmt      = "%s ready in %s"
 	RunStreamNamespaceReadyFmt = "%s ready"
@@ -2946,7 +2946,7 @@ const (
 	CreateRecapConfirmOption       = "Yes, create worktree"
 	EnvOptionConfigDefaultFmt      = "Use config default (%s)"
 	EnvOptionExample               = "example — copy .env.example → .env"
-	EnvOptionMain                  = "main — copy .env from main worktree"
+	EnvOptionMain                  = "main — copy .env from the main checkout"
 	EnvOptionParent                = "parent — copy .env from source worktree"
 	// EnvSummaryConfigDefault names the empty env choice rather than leaving a
 	// recap line blank.
@@ -2957,10 +2957,10 @@ const (
 	// and for the jobs `wtm run` starts, because the two disagreeing is what
 	// wires a worktree to its neighbour's services without a word.
 	IsolationStepName        = "Isolation"
-	IsolationStepDescription = "The .env files are copied from another checkout, with its ports and its service slices.\n" +
+	IsolationStepDescription = "The .env files are copied from another checkout, with its ports and its namespaces in shared services.\n" +
 		"Isolated: wtm moves them onto this worktree's — in the .env and when `wtm run` starts its jobs — so both can run side by side.\n" +
 		"Verbatim: wtm writes nothing into the .env and runs this worktree on the ports and data it was copied with, so it cannot run while its source does."
-	IsolationOptionIsolated  = "Isolate it — its own ports, compose project and service slices"
+	IsolationOptionIsolated  = "Isolate it — its own ports, compose project and namespaces"
 	IsolationOptionVerbatim  = "Keep the .env verbatim — its source's ports and data, one of the two runs at a time"
 	IsolationSummaryIsolated = "isolated"
 	IsolationSummaryVerbatim = "verbatim — .env kept as copied"
@@ -3040,7 +3040,7 @@ const (
 	// EnvParentFallbackPrompt warns, before creating, that the "parent" env
 	// strategy will source .env from main because the source has no local worktree
 	// (source).
-	EnvParentFallbackPrompt = "%s has no local worktree — copy .env from the main worktree instead of the parent?"
+	EnvParentFallbackPrompt = "%s has no local worktree — copy .env from the main checkout instead of the parent?"
 	// EnvParentFallbackWarning explains why the fallback happens.
 	EnvParentFallbackWarning = "The \"parent\" env strategy needs the source branch checked out to copy its .env; " +
 		"without a worktree it comes from main."
@@ -3134,7 +3134,7 @@ const (
 	PruneLabelPRClosed  = "PR closed"
 	PruneLabelGone      = "remote branch gone"
 	PruneLabelBase      = "base branch"
-	PruneLabelMain      = "main worktree"
+	PruneLabelMain      = "main checkout"
 	PruneLabelDirty     = "dirty — pass --force"
 	PruneLabelUnpushed  = "unpushed commits — pass --force"
 	PruneLabelOpenPR    = "open PR — pass --force"
@@ -3864,14 +3864,14 @@ const (
 	AddressingStepTitle = "How should the .env files spell an address?"
 	AddressingStepDesc  = "This is what wtm writes into a value pointing at another job — an API url, a CORS origin.\n" +
 		"It changes nothing about the ports your jobs bind.\n\n" +
-		"  Named urls    each worktree gets its own hostname, so two of them stop sharing a cookie\n" +
+		"  Named URLs    each worktree gets its own hostname, so two of them stop sharing a cookie\n" +
 		"                jar and a CORS origin. They are served by wtm's proxy, which lives in the\n" +
 		"                run daemon: they answer while `wtm run` runs the job, and not when you\n" +
 		"                start it yourself.\n" +
-		"  Ports         answer whatever started the process, `wtm run` or your own terminal. Two\n" +
+		"  Port URLs     answer whatever started the process, `wtm run` or your own terminal. Two\n" +
 		"                worktrees share one hostname, so their cookies and origins are the same."
-	AddressingNamesLabel = "Named urls — http://api.feat-x.myrepo.localhost"
-	AddressingPortsLabel = "Ports — http://localhost:4012"
+	AddressingNamesLabel = "Named URLs — http://api.feat-x.myrepo.localhost"
+	AddressingPortsLabel = "Port URLs — http://localhost:4012"
 
 	// MonorepoRootHint warns where the trap is sprung: checking only the root
 	// scripts of a monorepo leaves the apps they start with no port and no url,
@@ -4094,10 +4094,10 @@ var WtmOwnedEnvKeys = []string{EnvComposeProjectName}
 // service's data. They only ever shape a proposal the reader confirms.
 var TouchDataVerbs = []string{"reset", "migrate", "migration", "migrations", "seed", "init", "drop", "truncate", "db", "orm", "prisma", "schema", "fixtures"}
 
-// EnvSliceKeySuffixes are the endings of a key that names a service's slice —
+// EnvNamespaceKeySuffixes are the endings of a key that names a service's namespace —
 // POSTGRES_DB, KEYCLOAK_REALM — as against its credentials or its address,
 // which POSTGRES_USER and POSTGRES_PASSWORD share the service's prefix with.
-var EnvSliceKeySuffixes = []string{
+var EnvNamespaceKeySuffixes = []string{
 	"_DB", "_DATABASE", "_DB_NAME", "_DATABASE_NAME", "_SCHEMA",
 	"_REALM", "_TENANT", "_NAMESPACE", "_BUCKET", "_INDEX", "_PREFIX", "_VHOST",
 }

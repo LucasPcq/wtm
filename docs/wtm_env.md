@@ -8,7 +8,7 @@ Detect and fix .env drift in a worktree: add expected-but-missing keys and
 (with --mode refresh) settle values that diverge from the source.
 
 Values come from the strategy the worktree was created with (example → template
-placeholders, main → the main worktree, parent → the parent worktree then main),
+placeholders, main → the main checkout, parent → the parent worktree then main),
 shown in the report; override it per run with --from.
 
 Pass a worktree branch, or omit it to pick interactively. --check prints a

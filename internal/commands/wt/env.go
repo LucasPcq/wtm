@@ -28,7 +28,7 @@ func newEnvCmd() *cobra.Command {
 		Long: "Detect and fix .env drift in a worktree: add expected-but-missing keys and\n" +
 			"(with --mode refresh) settle values that diverge from the source.\n\n" +
 			"Values come from the strategy the worktree was created with (example → template\n" +
-			"placeholders, main → the main worktree, parent → the parent worktree then main),\n" +
+			"placeholders, main → the main checkout, parent → the parent worktree then main),\n" +
 			"shown in the report; override it per run with --from.\n\n" +
 			"Pass a worktree branch, or omit it to pick interactively. --check prints a\n" +
 			"read-only drift report. Non-interactively (--yes / --output json) it applies only\n" +

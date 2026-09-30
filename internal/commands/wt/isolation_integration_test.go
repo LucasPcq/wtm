@@ -68,7 +68,7 @@ func TestCreateVerbatimCopiesTheEnvExactly(t *testing.T) {
 	}
 }
 
-func TestCreateIsolatedMovesPortsAndSlices(t *testing.T) {
+func TestCreateIsolatedMovesPortsAndNamespaces(t *testing.T) {
 	dir := isolationRepo(t)
 
 	if _, _, err := runWtCmd(t, domain.CmdCreate, "feat/i", "--from", "main", "--yes"); err != nil {

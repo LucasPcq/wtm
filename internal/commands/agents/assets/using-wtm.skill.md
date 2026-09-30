@@ -221,7 +221,7 @@ flagged; everything else is what the name implies.
 - `wtm env [worktree]` — detect and fix a worktree's `.env` drift: reconcile it against its
   committed **template** (the expected keys, read from the worktree itself) plus a single
   **value source** chosen by the worktree's recorded strategy — never a silent mix:
-  `example` → template placeholders only; `main` → the main worktree; `parent` → the parent
+  `example` → template placeholders only; `main` → the main checkout; `parent` → the parent
   worktree **only** (a key the parent lacks stays `missing_unresolved`, it is NOT pulled from
   main). The one exception (mirroring `wtm create`): when there is no readable parent file at
   all — the parent has no worktree, or that file isn't in it — it falls back to main for that
@@ -362,13 +362,13 @@ the global `wtm init` does not configure it.
   keycloak realms. wtm runs the declared commands and knows nothing else about them; they get
   the worktree's whole environment plus `$WTM_NAMESPACE`, `$WTM_WORKTREE`, `$WTM_ORDINAL`.
   `create` runs on **every** start of the shared service, so it must be safe to run again —
-  wtm keeps no record of having run it. A `create` that fails when the slice already exists
+  wtm keeps no record of having run it. A `create` that fails when the namespace already exists
   fails the run.
   Configuration values use `{worktree}` / `{ordinal}`; commands use the `$WTM_*` variables.
   A shared job with **no** `[job.namespace]` is valid and means one instance with one set of data.
   When a user finds isolation expensive (an empty database to migrate and seed, a realm to
   rebuild), the answer is a `create` that **clones** the data main uses rather than an empty
-  slice — e.g. `CREATE DATABASE "$WTM_NAMESPACE" TEMPLATE app`, guarded by an existence check
+  namespace — e.g. `CREATE DATABASE "$WTM_NAMESPACE" TEMPLATE app`, guarded by an existence check
   since `create` runs at every start. Suggest it; do not suggest sharing main's database,
   which lets one branch's migration break the other.
 - **`touches` marks a job that changes data** (a migration, a reset, a seed):
@@ -378,15 +378,15 @@ the global `wtm init` does not configure it.
   and shares a word with exactly one service (`orm:pay:reset` → `postgres-pay`); a task
   run.toml already gives touches keeps them. Outside the wizard, `run job edit <job> --touches
   <service>` sets it (repeatable, replaces the list, `''` drops it); nothing sets it unasked. `run up` and `run start`
-  refuse to start such a job where the data is not the worktree's own — its source's for a
-  **verbatim** worktree, everyone's for a shared service with **no** namespace. A task a
+  refuse to start such a job on **foreign data** — data this worktree does not own: its
+  source's for a **verbatim** worktree, everyone's for a shared service with **no** namespace. A task a
   runner starts through its `runs` counts too (`migrate (run by dev)`). On your paths
   that is an error (exit 1) naming the jobs, `--force` and the fix for each cause —
   `wtm env <wt> --isolation isolated` for a verbatim worktree, a `[job.namespace]` on the
   service for a shared one (isolating does nothing for it);
   **pass `--force` only when the user asked** for the reset to reach that data. The main
   checkout is never stopped, and a job without `touches` is never checked.
-- **`[[env]]` is how a slice reaches the app.** `[[env_port]]` rewrites the port *inside* a
+- **`[[env]]` is how a namespace reaches the app.** `[[env_port]]` rewrites the port *inside* a
   value and leaves the rest alone — it says where a service answers. `[[env]]` writes a key's
   **whole** value from a template, which is the only way to express something opaque like a
   realm or a database name: `file`, `key`, `job`, `value`, where value draws on `{namespace}`,
@@ -527,7 +527,7 @@ the global `wtm init` does not configure it.
 - **Isolation — decided once per worktree, at creation.** `create`, `extract` and `checkout`
   ask it whenever run.toml declares something to isolate (a port, a namespace, a `.env`
   link, a compose stack), and record the answer with the worktree. **`isolated`** (the
-  default): wtm writes the worktree's own ports, `COMPOSE_PROJECT_NAME` and `[[env]]` slices
+  default): wtm writes the worktree's own ports, `COMPOSE_PROJECT_NAME` and `[[env]]` namespaces
   into its `.env`, and the daemon runs its jobs on the same shifted ports and carves its
   namespaces. **`verbatim`**: the `.env` stays **byte for byte** as copied — no port, no
   identity, no `[[env]]` value — and the daemon runs the worktree as that file describes it:
@@ -597,14 +597,15 @@ the global `wtm init` does not configure it.
   `run open [worktree] --job <name>` opens the same URL in a
   browser; it may offer a picker, but only in a fully interactive run, so **always name
   the job**.
-- **The URL is a name, not a port.** With the proxy on (the default), a published job
-  answers at `http://<job>.<worktree>.<repo>.localhost:11080` — that order on purpose, so a
+- **The URL is a name, not a port.** Two words for the two forms: the **named URL**, served
+  by the proxy, and the **port URL** (`--raw`, `http://localhost:<port>`). With the proxy on
+  (the default), a published job answers at `http://<job>.<worktree>.<repo>.localhost:11080` — that order on purpose, so a
   cookie set on `.<worktree>.<repo>.localhost` stays inside that worktree. **That URL may
   carry no port at all**: `wtm run proxy install` redirects port 80 to the proxy, after
   which `run url` prints `http://<job>.<worktree>.<repo>.localhost`. Never assume a `:port`
   suffix is present — read the whole line `run url` gives you. The proxy runs
-  inside the background daemon and dies with it. **`--raw` prints `http://localhost:<port>`
-  instead** — no proxy has to be up, and every OS resolves it, so **prefer `--raw` for
+  inside the background daemon and dies with it. **`--raw` prints the port URL
+  (`http://localhost:<port>`) instead** — no proxy has to be up, and every OS resolves it, so **prefer `--raw` for
   anything you dial yourself** (curl, a health check, a test runner). Two limits worth
   knowing: only HTTP jobs get a name (postgres and redis stay on their ports, by design),
   and outside a browser `*.localhost` is not guaranteed to resolve on Linux — one more
@@ -781,7 +782,7 @@ the global `wtm init` does not configure it.
 - **The addressing mode decides what a `.env` value pointing at another job holds.**
   `addressing` in run.toml, `"names"` (the default when absent) or `"ports"`, asked by
   `run init` whenever any job publishes a url. It is the one setting with a consequence
-  outside wtm: **named urls are served by the run proxy, which lives in the run daemon**,
+  outside wtm: **named URLs are served by the run proxy, which lives in the run daemon**,
   so a value like `VITE_API_URL=http://api.feat-x.repo.localhost:11080` answers while
   `wtm run` is running that job and **not** when the developer starts it themselves —
   the routing table is a projection of what the daemon started. A project whose author
@@ -899,7 +900,7 @@ the global `wtm init` does not configure it.
   Running it with the mode already in place settles what an earlier `--keep-env` left behind.
   Setting `ports` is a real inverse — port numbers go back into values wtm wrote as addresses. On a machine where the proxy is off (`[proxy] enabled = false`),
   ports are written whatever the project asked for, and the pass says so in one notice.
-  **Under `names`, the named URL is the only working entrance** — the raw `localhost:<port>`
+  **Under `names`, the named URL is the only working entrance** — the port URL (`localhost:<port>`)
   sends an `Origin` the API no longer accepts, so always read the address from `run url`.
 - **The main checkout is never provisioned, so under `names` its `.env` still holds ports.**
   wtm writes a worktree's `.env` at creation and on `wtm env`; nothing moves main's onto names
@@ -910,7 +911,7 @@ the global `wtm init` does not configure it.
   is out of step gets one warning line naming the command that aligns it (`wtm env <worktree>`)
   — a `!` line in the stream, a band in the run view, a note under the RUN rows in `wtm ui`.
   Until it runs, a cross-origin call through the name is refused; `run url --raw` gives the
-  port that works meanwhile. The route is registered either way, so nothing restarts. Only keys declared as `[[env_port]]` links are seen,
+  port URL that works meanwhile. The route is registered either way, so nothing restarts. Only keys declared as `[[env_port]]` links are seen,
   so silence means nothing **linked** is out of step. A `.env` already on names whose port
   went stale keeps its names and is told they are out of step. Aligning main is a **choice**: it stops behaving as a
   checkout without wtm, and going back means `wtm run addressing ports` (which brings main back

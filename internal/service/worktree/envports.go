@@ -47,7 +47,7 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 	}
 
 	// A verbatim worktree keeps its .env exactly as it was copied: no identity,
-	// no port, no slice. Resolving to nothing here is what makes every writer —
+	// no port, no namespace. Resolving to nothing here is what makes every writer —
 	// create, `wtm env`, an addressing switch — leave it alone alike.
 	ref := WorktreeRef{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: params.Branch}
 	isolation := params.Isolation

@@ -19,7 +19,7 @@ gone-detection runs `git fetch --prune` first so deleted remote branches are see
 
 On a TTY, matches are shown for review (unsafe ones unchecked), then a prune
 confirmation, then — like clean — a dedicated confirmation to reparent surviving
-children onto their grandparent (or leave them orphaned). The main worktree and base
+children onto their grandparent (or leave them orphaned). The main checkout and base
 branch are always protected; the current worktree is removed and the shell
 redirected to the base repo. Like clean, worktrees that are dirty, have unpushed
 commits, or have an open PR are unsafe and need --force. Use --yes to skip the

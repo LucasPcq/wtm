@@ -41,7 +41,7 @@ mentions the port it is given, the wizard offers it for editing on the spot
 (`pnpm dev --port ${PORT}`) rather than reporting it once it is too late.
 
 The mode those names are written in is asked too, because it is the one choice
-with a consequence outside wtm: named urls are served by the run proxy, so they
+with a consequence outside wtm: named URLs are served by the run proxy, so they
 answer while `wtm run` runs the job and not when you start it yourself. A project
 whose author launches their own dev servers wants ports.
 

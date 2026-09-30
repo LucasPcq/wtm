@@ -64,7 +64,7 @@ func ExpandEnvValue(params ExpandEnvValueParams) (string, error) {
 	return value, nil
 }
 
-// linkNamespace is the job's slice for this worktree, expanded by the one rule
+// linkNamespace is the job's namespace for this worktree, expanded by the one rule
 // that answers it — the same value the attach command reads as $WTM_NAMESPACE.
 func linkNamespace(params ExpandEnvValueParams) (string, error) {
 	if params.Job.Namespace == nil {

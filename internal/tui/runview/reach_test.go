@@ -82,7 +82,7 @@ func TestASharedServiceIsSetApartAndNamedByWhereItRuns(t *testing.T) {
 }
 
 // Held by two worktrees, a shared service is still one process: one row in the
-// list, and one entry in the block, each worktree's slice under it.
+// list, and one entry in the block, each worktree's namespace under it.
 func TestASharedServiceHeldByTwoWorktreesIsListedOnce(t *testing.T) {
 	main := inWorktree(running("postgres"), "/work/main", "main")
 	main.Shared, main.Namespace = true, "app_main"

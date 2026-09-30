@@ -118,17 +118,17 @@
               "name",
               "create"
             ],
-            "description": "The slice of a shared service this worktree gets, so each keeps its own data \u2014 a database, a set of keycloak realms. Only valid on a job with scope = \"shared\"; a shared job without one means one instance with one set of data. wtm names the slice and runs the commands below, and knows nothing else about them.",
+            "description": "The namespace this worktree gets in a shared service, so each keeps its own data \u2014 a database, a set of keycloak realms. Only valid on a job with scope = \"shared\"; a shared job without one means one instance with one set of data. wtm names the namespace and runs the commands below, and knows nothing else about them.",
             "properties": {
               "name": {
                 "type": "string",
                 "minLength": 1,
-                "description": "The slice's name, which wtm substitutes {worktree} and {ordinal} into and hands to the commands as $WTM_NAMESPACE. For a postgres it is the database name \u2014 e.g. \"app_{worktree}\". wtm never interprets it; it only names what a clean is about to destroy."
+                "description": "The namespace's name, which wtm substitutes {worktree} and {ordinal} into and hands to the commands as $WTM_NAMESPACE. For a postgres it is the database name \u2014 e.g. \"app_{worktree}\". wtm never interprets it; it only names what a clean is about to destroy."
               },
               "create": {
                 "type": "string",
                 "minLength": 1,
-                "description": "Command run every time a worktree starts the shared service, to carve its namespace out \u2014 a CREATE DATABASE, a kcadm create realms, a script of your own. Runs as a /bin/sh line in the worktree, with its whole environment (its ports and URLs) plus $WTM_NAMESPACE, $WTM_WORKTREE and $WTM_ORDINAL. It must be safe to run again \u2014 wtm runs it on every start and never remembers having run it, so carve the slice out if it is absent and do nothing if it is already there. Retried for a while: the service was started moments earlier and may not be accepting connections yet, which is what the retries are for; a command that fails the same way every time simply fails."
+                "description": "Command run every time a worktree starts the shared service, to carve its namespace out \u2014 a CREATE DATABASE, a kcadm create realms, a script of your own. Runs as a /bin/sh line in the worktree, with its whole environment (its ports and URLs) plus $WTM_NAMESPACE, $WTM_WORKTREE and $WTM_ORDINAL. It must be safe to run again \u2014 wtm runs it on every start and never remembers having run it, so create the namespace if it is absent and do nothing if it is already there. Retried for a while: the service was started moments earlier and may not be accepting connections yet, which is what the retries are for; a command that fails the same way every time simply fails."
               },
               "remove": {
                 "type": "string",
@@ -233,7 +233,7 @@
     },
     "env": {
       "type": "array",
-      "description": "Links a .env key to a value wtm writes in full, from a template over what only wtm knows: the slice of a shared service this worktree holds, the ports it binds, the address it answers on. Use it where [[env_port]] cannot reach \u2014 a keycloak realm name, a database name \u2014 since a port link only ever rewrites a port inside a value it otherwise leaves alone. A key may not be written by both tables.",
+      "description": "Links a .env key to a value wtm writes in full, from a template over what only wtm knows: the namespace this worktree holds in a shared service, the ports it binds, the address it answers on. Use it where [[env_port]] cannot reach \u2014 a keycloak realm name, a database name \u2014 since a port link only ever rewrites a port inside a value it otherwise leaves alone. A key may not be written by both tables.",
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -260,7 +260,7 @@
           "value": {
             "type": "string",
             "minLength": 1,
-            "description": "The template. Placeholders: {namespace} the job's slice for this worktree (needs a [job.namespace]); {port.NAME} one of the job's declared ports, shifted by the worktree's offset unless the job is shared; {origin} where the job answers by name (needs a [job.url] and a proxy); {worktree} and {ordinal}. Anything else is refused when run.toml is read, rather than written to a file as literal braces. E.g. \"{origin}/realms/{namespace}\" or \"postgresql://app:app@localhost:{port.POSTGRES_PORT}/{namespace}\"."
+            "description": "The template. Placeholders: {namespace} the job's namespace for this worktree (needs a [job.namespace]); {port.NAME} one of the job's declared ports, shifted by the worktree's offset unless the job is shared; {origin} where the job answers by name (needs a [job.url] and a proxy); {worktree} and {ordinal}. Anything else is refused when run.toml is read, rather than written to a file as literal braces. E.g. \"{origin}/realms/{namespace}\" or \"postgresql://app:app@localhost:{port.POSTGRES_PORT}/{namespace}\"."
           }
         }
       }

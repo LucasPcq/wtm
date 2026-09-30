@@ -71,7 +71,7 @@ func Create(params domain.CreateParams) (domain.CreateResult, error) {
 		ProjectDir: params.ProjectDir,
 	})
 	if err != nil {
-		return domain.CreateResult{}, fmt.Errorf("find main worktree: %w", err)
+		return domain.CreateResult{}, fmt.Errorf("find main checkout: %w", err)
 	}
 
 	sourceBranch := params.SourceBranch
@@ -146,7 +146,7 @@ func RunCreateHooks(params domain.CreateHooksParams) error {
 	}
 	mainPath, err := infra.FindMainWorktreePath(infra.FindMainWorktreeParams{ProjectDir: params.ProjectDir})
 	if err != nil {
-		return fmt.Errorf("find main worktree: %w", err)
+		return fmt.Errorf("find main checkout: %w", err)
 	}
 	if err := hooks.RunHooks(hooks.RunHooksParams{
 		Hooks:   params.Hooks,

@@ -24,7 +24,7 @@ wtm create [branch] [flags]
       --from string        Source branch to start from — or, when the branch already exists locally, the parent to record for wtm sync (required there without the wizard)
   -h, --help               help for create
       --if-not-exists      Succeed silently if the worktree already exists (idempotent)
-      --isolation string   How the new worktree stands against its source: isolated (its own ports, compose project and service slices, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated
+      --isolation string   How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated
       --output string      Output format: text or json (default "text")
   -y, --yes                Skip all prompts; resolve every decision from flags and safe defaults (branch name required; source defaults to the base branch for a new branch, and --from is required for one that already exists)
 ```

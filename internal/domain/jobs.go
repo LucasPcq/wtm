@@ -26,7 +26,7 @@ const (
 	JobScopeShared      JobScope = "shared"
 )
 
-// JobNamespaceConfig is the worktree's slice of a shared service. It names one
+// JobNamespaceConfig is the worktree's namespace of a shared service. It names one
 // namespace and never a list: four keycloak realms are one namespace, whose internal
 // shape belongs to the create script rather than to wtm.
 type JobNamespaceConfig struct {
@@ -81,7 +81,7 @@ type Isolation string
 
 const (
 	// IsolationIsolated gives the worktree its own ports, compose project and
-	// service slices, in its .env and at run time alike.
+	// namespaces, in its .env and at run time alike.
 	IsolationIsolated Isolation = "isolated"
 	// IsolationVerbatim keeps the .env exactly as it was copied: wtm writes
 	// nothing into it, and runs the worktree on the ports and data it names —
@@ -343,7 +343,7 @@ type JobRecord struct {
 	MainHolds bool `json:"main_holds,omitempty"`
 }
 
-// NamespaceRef is one worktree's slice of one shared service, named by what it
+// NamespaceRef is one worktree's namespace of one shared service, named by what it
 // takes to recompute it: run.toml still holds the template, so an entry keeps
 // only what the worktree itself contributed.
 type NamespaceRef struct {

@@ -62,7 +62,7 @@ func newInitCmd() *cobra.Command {
 			"mentions the port it is given, the wizard offers it for editing on the spot\n" +
 			"(`pnpm dev --port ${PORT}`) rather than reporting it once it is too late.\n\n" +
 			"The mode those names are written in is asked too, because it is the one choice\n" +
-			"with a consequence outside wtm: named urls are served by the run proxy, so they\n" +
+			"with a consequence outside wtm: named URLs are served by the run proxy, so they\n" +
 			"answer while `wtm run` runs the job and not when you start it yourself. A project\n" +
 			"whose author launches their own dev servers wants ports.\n\n" +
 			"Every service that declares the port it listens on is then offered a name of its\n" +

@@ -144,7 +144,7 @@ type sharedService struct {
 
 // rows lays a shared service out. Held by one worktree, its namespace rides the
 // port line as it always has; above several, each holder gets a line of its
-// own, since whose slice is whose is the whole question.
+// own, since whose namespace is whose is the whole question.
 func (s sharedService) rows(multi bool) []reachRow {
 	entry := s.entry
 	if !multi {

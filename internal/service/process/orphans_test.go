@@ -127,10 +127,10 @@ func TestAdoptAsksNothingAboutARecordWithNoFingerprint(t *testing.T) {
 }
 
 func TestAdoptDropsTheClaimsOfAServiceItReaped(t *testing.T) {
-	mainDir, tenantDir := t.TempDir(), t.TempDir()
+	mainDir, linkedDir := t.TempDir(), t.TempDir()
 	service := foregroundRecord(t, mainDir)
 	service.SharedDir = mainDir
-	claim := foregroundRecord(t, tenantDir)
+	claim := foregroundRecord(t, linkedDir)
 	claim.SharedDir = mainDir
 	claim.Joined = true
 	claim.PID, claim.PGID = 0, 0
