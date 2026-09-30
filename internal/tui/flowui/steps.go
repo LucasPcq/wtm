@@ -33,7 +33,7 @@ func (p *plan) componentStep(step flow.Step, conditional bool) (components.Step,
 		}
 		built, err := p.componentStep(step, false)
 		if err != nil {
-			return components.Step{}, conditionalKindErr(step)
+			return components.Step{}, err
 		}
 		return p.gated(step, built), nil
 	}
@@ -108,6 +108,7 @@ func multiSelect(step flow.Step, content flow.StepContent) components.MultiSelec
 			Selected: option.Selected,
 			Tag:      option.Tag,
 			Variant:  components.TagVariantOf(option.Tone),
+			Badges:   toBadges(option.Badges),
 		})
 	}
 	return components.NewMultiSelect(components.NewMultiSelectParams{
@@ -115,6 +116,7 @@ func multiSelect(step flow.Step, content flow.StepContent) components.MultiSelec
 		Description: content.Description,
 		Items:       items,
 		Validate:    step.ValidateSet,
+		Start:       content.Start,
 	})
 }
 
@@ -213,6 +215,7 @@ func (p *plan) choiceStep(step flow.Step) components.Step {
 				Title:       content.Title,
 				Description: content.Description,
 				Items:       toItems(content.Options),
+				Start:       content.Start,
 			}
 		},
 	})

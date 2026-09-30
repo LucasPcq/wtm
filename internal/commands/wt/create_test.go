@@ -17,8 +17,8 @@ import (
 func TestWtCreateFromRemoteBranch(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 
 	if err := setupMinimalConfig(t, stateDir); err != nil {
@@ -45,8 +45,8 @@ func TestWtCreateFromRemoteBranch(t *testing.T) {
 func TestWtCreateFromUnknownBranchFails(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 
 	if err := setupMinimalConfig(t, stateDir); err != nil {
@@ -63,8 +63,8 @@ func TestWtCreateFromUnknownBranchFails(t *testing.T) {
 func TestWtCreateReusesExistingLocalBranch(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 
 	if err := setupMinimalConfig(t, stateDir); err != nil {
@@ -103,8 +103,8 @@ func TestWtCreateReusesExistingLocalBranch(t *testing.T) {
 func TestWtCreateBranchCheckedOutElsewhereFails(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 
 	if err := setupMinimalConfig(t, stateDir); err != nil {
@@ -135,8 +135,8 @@ func TestWtCreateBranchCheckedOutElsewhereFails(t *testing.T) {
 func TestWtCreateIfNotExistsWithBranchCheckedOutElsewhere(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 
 	if err := setupMinimalConfig(t, stateDir); err != nil {
@@ -177,8 +177,8 @@ func TestWtCreateIfNotExistsWithBranchCheckedOutElsewhere(t *testing.T) {
 func TestWtCreateIfNotExistsWithFreeExistingBranchCreates(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 
 	if err := setupMinimalConfig(t, stateDir); err != nil {
@@ -213,8 +213,8 @@ func TestWtCreateIfNotExistsWithFreeExistingBranchCreates(t *testing.T) {
 func TestWtCreateExistingBranchRequiresFrom(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 
 	if err := setupMinimalConfig(t, stateDir); err != nil {
@@ -244,8 +244,8 @@ func TestWtCreateExistingBranchRequiresFrom(t *testing.T) {
 func TestWtCreateYesDoesNotFastForwardBehindBranch(t *testing.T) {
 	work := repoWithRemote(t)
 	stateDir := filepath.Join(work, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", work)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, work)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 
 	if err := setupMinimalConfig(t, stateDir); err != nil {
@@ -283,8 +283,8 @@ func TestWtCreateYesDoesNotFastForwardBehindBranch(t *testing.T) {
 func TestWtCreateFFRetargetsReusedBranch(t *testing.T) {
 	work := repoWithRemote(t)
 	stateDir := filepath.Join(work, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", work)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, work)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 
 	if err := setupMinimalConfig(t, stateDir); err != nil {

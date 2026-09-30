@@ -26,7 +26,7 @@ const (
 	JobScopeShared      JobScope = "shared"
 )
 
-// JobNamespaceConfig is the worktree's slice of a shared service. It names one
+// JobNamespaceConfig is the worktree's namespace of a shared service. It names one
 // namespace and never a list: four keycloak realms are one namespace, whose internal
 // shape belongs to the create script rather than to wtm.
 type JobNamespaceConfig struct {
@@ -81,13 +81,35 @@ type Isolation string
 
 const (
 	// IsolationIsolated gives the worktree its own ports, compose project and
-	// service slices, in its .env and at run time alike.
+	// namespaces, in its .env and at run time alike.
 	IsolationIsolated Isolation = "isolated"
 	// IsolationVerbatim keeps the .env exactly as it was copied: wtm writes
 	// nothing into it, and runs the worktree on the ports and data it names —
 	// its source's, so the two cannot run at the same time.
 	IsolationVerbatim Isolation = "verbatim"
 )
+
+// IsolationAdoption is what `wtm env` did about a worktree created before the
+// isolation choice existed: such a worktree runs on its source's ports and
+// compose project until it adopts one.
+type IsolationAdoption string
+
+const (
+	IsolationAdopted    IsolationAdoption = "adopted"
+	IsolationNotAdopted IsolationAdoption = "not_adopted"
+)
+
+// IsolationAdoptionPlan says whether a worktree still has to adopt its
+// isolation, and what adopting it changes.
+type IsolationAdoptionPlan struct {
+	Pending bool
+	// ComposeProject is the project an isolated worktree runs under, empty when
+	// run.toml starts no compose stack.
+	ComposeProject string
+	// CurrentComposeProject is the one it runs under today, whose volumes it
+	// would stop using.
+	CurrentComposeProject string
+}
 
 // JobConfig defines a managed job from .wtm/run.toml.
 type JobConfig struct {
@@ -249,10 +271,13 @@ const (
 	// a weaker "running": nothing was ever verified, before or after a daemon
 	// restart, and there is no stream to attach to.
 	JobStatusDetached JobStatus = "detached"
-	// JobStatusAttached is a worktree's claim on a shared service running under
+	// JobStatusJoined is a worktree's claim on a shared service running under
 	// the main checkout's key. It owns no process: it is the pointer that keeps
 	// the real job alive, which is what makes the job table the reference count.
-	JobStatusAttached JobStatus = "attached"
+	JobStatusJoined JobStatus = "joined"
+	// JobStatusLegacyAttached is JobStatusJoined as a daemon built before the
+	// rename reports it; clients read it as joined.
+	JobStatusLegacyAttached JobStatus = "attached"
 	// JobStatusReaped is a foreground service that outlived the daemon which
 	// owned it and was killed by the next one. Distinct from Crashed because the
 	// two say opposite things about who acted: crashed is a process that died on
@@ -300,11 +325,14 @@ type JobRecord struct {
 	// reads as "not reapable" rather than as a group to guess at.
 	PID  int `json:"pid,omitempty"`
 	PGID int `json:"pgid,omitempty"`
-	// Attached says this entry is a worktree's claim on a shared service rather
+	// Joined says this entry is a worktree's claim on a shared service rather
 	// than a process of its own. It is a fact about what the entry is, not a
 	// process state: without it a claim would come back from the index as a
 	// foreground service the daemon had lost, and be reported crashed.
-	Attached bool `json:"attached,omitempty"`
+	Joined bool `json:"joined,omitempty"`
+	// LegacyAttached is Joined as an index written before the rename spelled
+	// it; the store folds it into Joined on load and never writes it.
+	LegacyAttached bool `json:"attached,omitempty"`
 	// SharedDir is the main checkout a shared job runs in, carried by the real
 	// job and by every claim on it. Without it the two would have to be paired
 	// by name, and the daemon is machine-wide: two repositories declaring a job
@@ -315,7 +343,7 @@ type JobRecord struct {
 	MainHolds bool `json:"main_holds,omitempty"`
 }
 
-// NamespaceRef is one worktree's slice of one shared service, named by what it
+// NamespaceRef is one worktree's namespace of one shared service, named by what it
 // takes to recompute it: run.toml still holds the template, so an entry keeps
 // only what the worktree itself contributed.
 type NamespaceRef struct {
@@ -333,14 +361,36 @@ type NamespaceHolding struct {
 	WorkDir string
 	Env     map[string]string
 	Config  RunConfig
+	// SharedWith is another live worktree whose name reduces to the same slug:
+	// the namespace is its as much as this one's, so nothing is dropped.
+	SharedWith string
 }
 
 // HeldNamespace is one line of what a removal gives back: the namespace, the
 // shared service holding it, and whether that service is up to take it.
 type HeldNamespace struct {
-	Name string
-	Job  string
-	Up   bool
+	Name       string
+	Job        string
+	Up         bool
+	SharedWith string
+}
+
+type NamespaceStatus string
+
+const (
+	NamespaceDropped  NamespaceStatus = "dropped"
+	NamespaceDeferred NamespaceStatus = "deferred"
+	NamespaceKept     NamespaceStatus = "kept"
+)
+
+// NamespaceOutcome is what a clean or a prune did with one namespace a removed
+// worktree held: dropped, deferred to the service's next start, or kept.
+type NamespaceOutcome struct {
+	Branch string          `json:"branch"`
+	Job    string          `json:"job"`
+	Name   string          `json:"name"`
+	Status NamespaceStatus `json:"status"`
+	Reason string          `json:"reason,omitempty"`
 }
 
 // NamespaceField is one editable line of the namespace step: which job it
@@ -448,30 +498,30 @@ type JobActionResult struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
-// WorktreeRunResult is one worktree's half of a run over several of them. A run
-// over a single worktree does not use it: the shape follows the arity, so one
-// worktree still answers with the bare array of job results every run command
-// emits (LUC-198).
+// WorktreeRef names a worktree in a JSON document: the branch a reader knows it
+// by, and the path the daemon keys it on.
+type WorktreeRef struct {
+	Branch string `json:"branch"`
+	Path   string `json:"path"`
+}
+
+// WorktreeRunResult is one worktree's part of `run up`. The document is an
+// array of them whatever the number of worktrees, so a caller parses one shape.
 type WorktreeRunResult struct {
-	// Worktree is the branch, Path where it is — the daemon's key, and what a
-	// caller needs to act on that worktree afterwards.
-	Worktree string `json:"worktree"`
-	Path     string `json:"path"`
-	Profile  string `json:"profile,omitempty"`
+	Branch  string `json:"branch"`
+	Path    string `json:"path"`
+	Profile string `json:"profile,omitempty"`
 	// Aborted says this worktree stopped short. The others carry on regardless,
 	// so it is read per worktree and never for the run as a whole.
 	Aborted bool              `json:"aborted"`
 	Jobs    []JobActionResult `json:"jobs"`
 }
 
-// WorktreeJobResults is one worktree's answer to a command that acted on
-// several. Like WorktreeRunResult it only exists above one worktree: a command
-// acting on a single one answers with the bare array of job results it always
-// has (LUC-198).
+// WorktreeJobResults is one worktree's part of `run down` and `run stop`.
 type WorktreeJobResults struct {
-	Worktree string            `json:"worktree"`
-	Path     string            `json:"path"`
-	Jobs     []JobActionResult `json:"jobs"`
+	Branch string            `json:"branch"`
+	Path   string            `json:"path"`
+	Jobs   []JobActionResult `json:"jobs"`
 }
 
 // LogRecord is one sanitized line of a job's output, as persisted in that job's
@@ -485,14 +535,40 @@ type LogRecord struct {
 // is absent on a line written before this format, or by a sink that could not
 // stamp it: the text is still worth handing over.
 type JobLogEntry struct {
-	Job string `json:"job"`
-	// Worktree names where the line came from, and is absent above a single
-	// worktree — where the caller already knows. Without it the lines of two jobs
-	// called `web` are one indistinguishable stream (LUC-216).
-	Worktree string `json:"worktree,omitempty"`
-	At       string `json:"at,omitempty"`
-	Text     string `json:"text"`
+	Job  string `json:"job"`
+	At   string `json:"at,omitempty"`
+	Text string `json:"text"`
 }
+
+// WorktreeLogs is one worktree's part of `run logs --output json`: the lines
+// of two jobs called `web` are told apart by the worktree holding them.
+type WorktreeLogs struct {
+	Branch string        `json:"branch"`
+	Path   string        `json:"path"`
+	Lines  []JobLogEntry `json:"lines"`
+}
+
+// RunningJob is one row of `run ps --output json`. It is not JobInfo, which is
+// the daemon's protocol: a rename here must never need a daemon restart.
+type RunningJob struct {
+	Name      string    `json:"name"`
+	Kind      JobKind   `json:"kind"`
+	Status    JobStatus `json:"status"`
+	PID       int       `json:"pid"`
+	Branch    string    `json:"branch"`
+	Path      string    `json:"path"`
+	Project   string    `json:"project"`
+	StartedAt time.Time `json:"started_at,omitzero"`
+	URL       string    `json:"url,omitempty"`
+	ExitCode  *int      `json:"exit_code,omitempty"`
+	// Held are the apps a runner started and where they answer: the runner binds
+	// nothing, so its own URL is empty and these are what a reader came for.
+	Held []JobURLEntry `json:"held,omitempty"`
+}
+
+// HeldAddresses is, per worktree directory and per runner up in it, where the
+// apps that runner started answer.
+type HeldAddresses map[string]map[string][]JobURLEntry
 
 // RunSurface names who shows a run's jobs: the full-screen view, a stream of
 // lines on the terminal the command was launched from, or a machine-readable
@@ -607,6 +683,9 @@ type DataRisk struct {
 	Service string
 	Owner   DataOwner
 	WorkDir string
+	// Via is the runner that starts Job as one of its `runs`, empty when the run
+	// starts Job itself.
+	Via string
 }
 
 // PortClaim is one port a job binds in one worktree.

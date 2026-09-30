@@ -44,7 +44,7 @@ var layers = map[string]layer{
 		why:      "I/O, git exec, filesystem wrappers",
 	},
 	"config": {
-		internal: []string{"domain", "infra", "rules"},
+		internal: []string{"domain", "infra", "rules", "schemas"},
 		external: []string{"github.com/BurntSushi/toml"},
 		why:      "load and validate the config files",
 	},
@@ -99,6 +99,10 @@ type finding struct {
 	// legacy marks what predates its rule and is tracked in the code rather than
 	// in .archlint-migrating, keyed so its sites collapse to one line.
 	legacy string
+	// overBudget is a legacy key with more sites than its recorded count.
+	overBudget bool
+	// note reports without being a site: a count that can be lowered.
+	note bool
 }
 
 func main() {
@@ -129,20 +133,14 @@ func main() {
 		os.Exit(2)
 	}
 
-	failed := false
-	for _, f := range findings {
-		tag := ""
-		switch {
-		case warned[f.rule]:
-			tag = " (warning)"
-		case f.legacy != "" || migrating.covers(f):
-			tag = " (migrating)"
-		default:
-			failed = true
-		}
-		fmt.Printf("%s:%d:%d: [%s]%s %s\n", f.pos.Filename, f.pos.Line, f.pos.Column, f.rule, tag, f.msg)
+	verdict := judge(judgeParams{Findings: findings, Migrating: migrating, Warned: warned})
+	for _, line := range verdict.lines {
+		fmt.Println(line)
 	}
-	if failed {
+	for _, note := range verdict.notes {
+		fmt.Println("archlint: note:", note)
+	}
+	if verdict.failed {
 		fmt.Fprintf(os.Stderr, "\narchlint: %d finding(s) — see CLAUDE.md section 9\n", len(findings))
 		os.Exit(1)
 	}
@@ -150,46 +148,134 @@ func main() {
 }
 
 // migrating is what predates a rule and is tracked out rather than fixed on the
-// spot. It reports without failing, and the list may only ever shrink: a new
-// entry is a decision, not a workaround.
+// spot. It reports without failing, and the list may only ever shrink: each
+// entry records how many sites it covers, a site beyond that count fails, and a
+// count higher than needed is reported to be lowered.
 type migratingList struct {
-	rules map[string][]*regexp.Regexp
+	entries []migratingEntry
 }
 
-func (m migratingList) covers(f finding) bool {
-	for _, pattern := range m.rules[f.rule] {
-		if pattern.MatchString(filepath.ToSlash(f.pos.Filename)) {
-			return true
+type migratingEntry struct {
+	line    string
+	rule    string
+	pattern *regexp.Regexp
+	budget  int
+}
+
+func (m migratingList) match(f finding) int {
+	for index, entry := range m.entries {
+		if entry.rule == f.rule && entry.pattern.MatchString(filepath.ToSlash(f.pos.Filename)) {
+			return index
 		}
 	}
-	return false
+	return -1
 }
 
 func loadMigrating() (migratingList, error) {
-	list := migratingList{rules: map[string][]*regexp.Regexp{}}
 	data, err := os.ReadFile(".archlint-migrating")
 	if os.IsNotExist(err) {
-		return list, nil
+		return migratingList{}, nil
 	}
 	if err != nil {
-		return list, err
+		return migratingList{}, err
 	}
-	for _, line := range strings.Split(string(data), "\n") {
+	return parseMigrating(string(data))
+}
+
+func parseMigrating(data string) (migratingList, error) {
+	var list migratingList
+	for _, line := range strings.Split(data, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		rule, pattern, ok := strings.Cut(line, " ")
-		if !ok {
-			return list, fmt.Errorf(".archlint-migrating: %q is not `<rule> <path regex>`", line)
+		fields := strings.Fields(line)
+		if len(fields) != 3 {
+			return list, fmt.Errorf(".archlint-migrating: %q is not `<rule> <path regex> <sites>`", line)
 		}
-		compiled, err := regexp.Compile(strings.TrimSpace(pattern))
+		budget, err := strconv.Atoi(fields[2])
+		if err != nil || budget < 1 {
+			return list, fmt.Errorf(".archlint-migrating: %q: the site count must be a positive number", line)
+		}
+		compiled, err := regexp.Compile(fields[1])
 		if err != nil {
 			return list, fmt.Errorf(".archlint-migrating: %w", err)
 		}
-		list.rules[rule] = append(list.rules[rule], compiled)
+		list.entries = append(list.entries, migratingEntry{line: line, rule: fields[0], pattern: compiled, budget: budget})
 	}
 	return list, nil
+}
+
+type judgeParams struct {
+	Findings  []finding
+	Migrating migratingList
+	Warned    map[string]bool
+}
+
+type verdict struct {
+	lines  []string
+	notes  []string
+	failed bool
+}
+
+func judge(params judgeParams) verdict {
+	var result verdict
+	used := make([]int, len(params.Migrating.entries))
+	for _, f := range params.Findings {
+		if f.note {
+			result.notes = append(result.notes, fmt.Sprintf("[%s] %s", f.rule, f.msg))
+			continue
+		}
+		tag := tagOf(tagParams{Finding: f, Migrating: params.Migrating, Used: used, Warned: params.Warned})
+		if tag == "" || tag == tagOverBudget {
+			result.failed = true
+		}
+		result.lines = append(result.lines, fmt.Sprintf("%s:%d:%d: [%s]%s %s", f.pos.Filename, f.pos.Line, f.pos.Column, f.rule, tag, f.msg))
+	}
+	for index, entry := range params.Migrating.entries {
+		switch {
+		case used[index] == 0:
+			result.notes = append(result.notes, fmt.Sprintf(".archlint-migrating: %q covers nothing any more — remove it", entry.line))
+		case used[index] < entry.budget:
+			result.notes = append(result.notes, fmt.Sprintf(".archlint-migrating: %q covers %d site(s) — lower it to %d", entry.line, used[index], used[index]))
+		}
+	}
+	return result
+}
+
+const (
+	tagWarning    = " (warning)"
+	tagMigrating  = " (migrating)"
+	tagOverBudget = " (over its recorded count — the list may only shrink)"
+)
+
+type tagParams struct {
+	Finding   finding
+	Migrating migratingList
+	Used      []int
+	Warned    map[string]bool
+}
+
+func tagOf(params tagParams) string {
+	f := params.Finding
+	if params.Warned[f.rule] {
+		return tagWarning
+	}
+	if f.overBudget {
+		return tagOverBudget
+	}
+	if f.legacy != "" {
+		return tagMigrating
+	}
+	index := params.Migrating.match(f)
+	if index < 0 {
+		return ""
+	}
+	params.Used[index]++
+	if params.Used[index] > params.Migrating.entries[index].budget {
+		return tagOverBudget
+	}
+	return tagMigrating
 }
 
 func check(root string) ([]finding, error) {
@@ -214,7 +300,7 @@ func check(root string) ([]finding, error) {
 		return nil, err
 	}
 
-	findings = collapseLegacy(findings)
+	findings = collapseLegacy(collapseLegacyParams{Findings: findings, Budgets: legacyBudgets()})
 	sort.Slice(findings, func(i, j int) bool {
 		if findings[i].rule != findings[j].rule {
 			return findings[i].rule < findings[j].rule
@@ -371,11 +457,21 @@ var fontSafe = map[rune]string{
 	'↓': "missing only from Roboto/Ubuntu Mono",
 }
 
-// fontLegacy predates the rule. Each reports once as migrating; the list may
-// only shrink, towards a rune of fontSafe.
-var fontLegacy = map[rune]bool{
-	'↗': true, '⊘': true, '⋯': true, '▸': true, '▾': true, '▶': true, '◆': true,
-	'◈': true, '◉': true, '○': true, '◌': true, '●': true, '⚠': true, '❯': true,
+// fontLegacy predates the rule, each rune with the number of sites it had. Each
+// reports once as migrating; a site beyond its count fails, and a count higher
+// than needed is reported to be lowered — the list may only shrink, towards a
+// rune of fontSafe.
+var fontLegacy = map[rune]int{
+	'↗': 1, '⊘': 1, '⋯': 2, '▸': 21, '▾': 2, '▶': 1, '◆': 1,
+	'◈': 1, '◉': 1, '○': 5, '◌': 1, '●': 12, '⚠': 20, '❯': 2,
+}
+
+func legacyBudgets() map[string]int {
+	budgets := make(map[string]int, len(fontLegacy))
+	for r, sites := range fontLegacy {
+		budgets[string(r)] = sites
+	}
+	return budgets
 }
 
 // isTerminalDrawn is box drawing and block elements, which terminals render as
@@ -409,7 +505,7 @@ func checkFontCoverage(fset *token.FileSet, file *ast.File) []finding {
 				rule: "fontcover",
 				msg:  fmt.Sprintf("%q (U+%04X) is missing from common monospace fonts: the terminal draws it from a wider fallback face — use a rune of fontSafe, see docs/dev/output.md", r, r),
 			}
-			if fontLegacy[r] {
+			if _, legacy := fontLegacy[r]; legacy {
 				f.legacy = string(r)
 			}
 			findings = append(findings, f)
@@ -419,9 +515,16 @@ func checkFontCoverage(fset *token.FileSet, file *ast.File) []finding {
 	return findings
 }
 
+type collapseLegacyParams struct {
+	Findings []finding
+	// Budgets is the recorded site count of each legacy key.
+	Budgets map[string]int
+}
+
 // collapseLegacy keeps the first site of each legacy key and counts the rest,
 // so a tracked debt is one line of the report rather than a page of it.
-func collapseLegacy(findings []finding) []finding {
+func collapseLegacy(params collapseLegacyParams) []finding {
+	findings := params.Findings
 	sort.SliceStable(findings, func(i, j int) bool {
 		return findings[i].pos.String() < findings[j].pos.String()
 	})
@@ -444,9 +547,37 @@ func collapseLegacy(findings []finding) []finding {
 		}
 		done[key] = true
 		f.msg = fmt.Sprintf("%s (%d sites)", f.msg, counts[key])
+		budget := params.Budgets[f.legacy]
+		f.overBudget = counts[key] > budget
+		if counts[key] < budget {
+			f.msg = fmt.Sprintf("%s — its recorded count is %d, lower it to %d", f.msg, budget, counts[key])
+		}
 		kept = append(kept, f)
 	}
+	for _, legacy := range sortedKeys(params.Budgets) {
+		if !seenLegacy(kept, legacy) {
+			kept = append(kept, finding{rule: "fontcover", note: true, msg: fmt.Sprintf("%q has no site left — remove it from fontLegacy", legacy)})
+		}
+	}
 	return kept
+}
+
+func seenLegacy(findings []finding, legacy string) bool {
+	for _, f := range findings {
+		if f.legacy == legacy {
+			return true
+		}
+	}
+	return false
+}
+
+func sortedKeys(m map[string]int) []string {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func isMessageCall(fun ast.Expr) bool {
@@ -530,7 +661,7 @@ func checkYesFlag(fset *token.FileSet, path string, file *ast.File) []finding {
 	if !src["shared.Interactive"] && !src["interactiveRun"] {
 		return nil
 	}
-	if src["shared.AddYesFlag"] || src["shared.AddNoPromptFlags"] || src["AddYesFlag"] {
+	if src["shared.AddYesFlag"] || src["AddYesFlag"] {
 		return nil
 	}
 	return []finding{{
@@ -558,8 +689,10 @@ func declaresCommand(file *ast.File) bool {
 // for one directly has put its flow in the runner: what it does can then only
 // be replayed by a cobra command, which is what internal/flow exists to undo.
 var mutations = map[string][]string{
-	"worktree": {"Create", "Clean", "ForceClean", "Sync", "Relocate", "Extract", "Reparent", "Remove", "Move"},
-	"envsvc":   {"ApplyEnvSync", "ApplyEnvPorts"},
+	"worktree":  {"Create", "Clean", "ForceClean", "Sync", "Relocate", "Extract", "Reparent", "Remove", "Move"},
+	"envsvc":    {"ApplyEnvSync", "ApplyEnvPorts", "WritePortKeys", "AddEnvTargets"},
+	"compose":   {"PatchAll"},
+	"runconfig": {"Save"},
 }
 
 // checkMutation enforces "every worktree-mutating command goes through flow/".

@@ -129,3 +129,19 @@ func TestEnvReportFields(t *testing.T) {
 		t.Errorf("EnvReportFields() = %+v, want the mode alone", got)
 	}
 }
+
+func TestEnvFileVerdictTellsASettledPassInThePast(t *testing.T) {
+	cases := []struct {
+		params   EnvFileVerdictParams
+		expected string
+	}{
+		{EnvFileVerdictParams{}, domain.EnvFileInSyncMessage},
+		{EnvFileVerdictParams{PortsMove: true, Check: true}, domain.EnvFileKeysInSyncMessage},
+		{EnvFileVerdictParams{PortsMove: true}, domain.EnvFileValuesSettledMessage},
+	}
+	for _, tc := range cases {
+		if got := EnvFileVerdict(tc.params); got != tc.expected {
+			t.Errorf("EnvFileVerdict(%+v) = %q, want %q", tc.params, got, tc.expected)
+		}
+	}
+}

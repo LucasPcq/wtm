@@ -7,12 +7,12 @@ Configure the run module (services & tasks) for this repo
 Set up run.toml by detecting docker-compose files and package.json scripts and turning
 the selected ones into jobs.
 
-In a TTY, opens a wizard to pick which ones to include; non-interactively (or piped),
+In a TTY, opens a wizard to pick which ones to include; with --yes (or piped),
 auto-generates from detection. Re-running pre-fills every step from the existing
 run.toml: what stays checked is kept, what you uncheck is removed along with the
 profile entries and .env links naming it. Only jobs this wizard proposed are ever
 removed — one added with `wtm run job add` is never listed, so never touched.
-A non-interactive run asks nothing and removes nothing.
+An unattended run asks nothing and removes nothing.
 
 Ports declared in the selected compose files become per-worktree ports. A literal
 host port ("5432:5432") binds the same port everywhere, so wtm offers to rewrite it
@@ -41,7 +41,7 @@ mentions the port it is given, the wizard offers it for editing on the spot
 (`pnpm dev --port ${PORT}`) rather than reporting it once it is too late.
 
 The mode those names are written in is asked too, because it is the one choice
-with a consequence outside wtm: named urls are served by the run proxy, so they
+with a consequence outside wtm: named URLs are served by the run proxy, so they
 answer while `wtm run` runs the job and not when you start it yourself. A project
 whose author launches their own dev servers wants ports.
 
@@ -50,10 +50,21 @@ own — <job>.<worktree>.<repo>.localhost, served by the proxy — so two worktr
 stop sharing a cookie jar. A port a job only dials (DB_PORT, REDIS_PORT) is never
 offered: a name nothing answers under is worse than no name at all.
 
-`wtm run` is experimental — the workflow is still stabilizing and commands may change.
-
 ```
 wtm run init [flags]
+```
+
+### Examples
+
+```
+  # The wizard
+  wtm run init
+
+  # Unattended, from detection
+  wtm run init --yes
+
+  # Also rewrite compose host ports and link the .env port keys
+  wtm run init --yes --patch-compose --link-env
 ```
 
 ### Options
@@ -61,10 +72,9 @@ wtm run init [flags]
 ```
   -h, --help              help for init
       --link-env          Link the .env keys holding a declared port, so each worktree gets its own
-      --non-interactive   Auto-generate from detection; never prompt
       --patch-compose     Rewrite the selected compose files' literal host ports and absolute names to read a variable
       --write-port-keys   Write each declared port into the job's .env and its template, so an app launched by hand reads the worktree's port
-  -y, --yes               Auto-generate from detection; never prompt
+  -y, --yes               Run unattended: auto-generate from detection; never prompt
 ```
 
 ### Options inherited from parent commands

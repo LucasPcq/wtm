@@ -219,3 +219,20 @@ func TestFormatCreateResultCarriesThePortPassAsANote(t *testing.T) {
 		t.Errorf("a run that moved nothing still printed a separator:\n%s", render(""))
 	}
 }
+
+// checkout concludes like create: the port pass rides on a labelled env row
+// instead of a bare line under the headline.
+func TestFormatPRCheckoutResultLabelsTheEnvNote(t *testing.T) {
+	var buf bytes.Buffer
+	FormatPRCheckoutResult(&buf, PRCheckoutResultParams{
+		Number: 42, Branch: "feat/x", EnvNote: "4 ports settled (offset +10)",
+		Path: ".worktrees/feat-x", GoCommand: "wtm go feat/x",
+	})
+
+	out := buf.String()
+	for _, want := range []string{"Checked out PR #42 (feat/x)", domain.CreateRecapLabelEnv, "4 ports settled (offset +10)", domain.CreateRecapLabelPath, ".worktrees/feat-x"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q:\n%s", want, out)
+		}
+	}
+}

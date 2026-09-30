@@ -40,6 +40,12 @@ type DetectedPortsOutcome struct {
 	// Removed are the jobs the unchecking dropped, so a surface can name them
 	// before the config is written.
 	Removed []string
+	// Unlinked are the [[env]] keys that read the namespace of a service the run
+	// stopped sharing: there is no namespace left for them to follow.
+	Unlinked []string
+	// Renamed says which compose services were lifted under another name,
+	// because a job already answered to theirs.
+	Renamed []string
 
 	// EnvWritten is what the .env detection gave each job, and EnvSources the
 	// file each of those ports was read from. Kept apart from Written: the two
@@ -104,7 +110,7 @@ func ResolveDetectedPorts(params ResolveDetectedPortsParams) DetectedPortsOutcom
 	// Applied to the merged config, not only to the jobs just built: a re-init
 	// never rebuilds a compose file that already has a job, so the scope answers
 	// would otherwise reach nothing at all.
-	merged = ApplySharedServices(ApplySharedServicesParams{
+	sharing := ApplySharedServices(ApplySharedServicesParams{
 		Config:     merged,
 		Shared:     params.Answers.SharedServices,
 		Asked:      params.Answers.ScopesAsked,
@@ -112,9 +118,13 @@ func ResolveDetectedPorts(params ResolveDetectedPortsParams) DetectedPortsOutcom
 		Bindings:   params.Plan.Declared,
 		ComposeCmd: params.Answers.DockerComposeCmd,
 	})
+	merged = sharing.Config
+	outcome.Removed = append(outcome.Removed, sharing.Withdrawn...)
+	outcome.Unlinked = sharing.Unlinked
+	outcome.Renamed = sharing.Renamed
 
 	// After the namespaces are settled and before the ports are backfilled: a
-	// link reads the slice the step above just named, and may take an
+	// link reads the namespace the step above just named, and may take an
 	// [[env_port]] off a key it now writes in full.
 	merged = ApplyEnvValues(ApplyEnvValuesParams{
 		Config:  merged,
@@ -333,13 +343,4 @@ func withoutFiles(plan ComposePortPlan, files []string) (map[string]map[string]i
 		}
 	}
 	return ports, patches
-}
-
-func jobNamed(cfg domain.RunConfig, name string) domain.JobConfig {
-	for _, job := range cfg.Jobs {
-		if job.Name == name {
-			return job
-		}
-	}
-	return domain.JobConfig{}
 }

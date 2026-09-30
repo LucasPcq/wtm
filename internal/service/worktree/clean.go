@@ -112,7 +112,7 @@ func RunCleanHooks(params domain.CleanHooksParams) error {
 		ProjectDir: params.ProjectDir,
 	})
 	if err != nil {
-		return fmt.Errorf("find main worktree: %w", err)
+		return fmt.Errorf("find main checkout: %w", err)
 	}
 
 	if err := hooks.RunHooks(hooks.RunHooksParams{
@@ -123,10 +123,9 @@ func RunCleanHooks(params domain.CleanHooksParams) error {
 			Branch:   params.Branch,
 			Root:     mainPath,
 		},
-		Env: hookEnv(WorktreeRef{
-			ProjectDir: params.ProjectDir,
-			StateDir:   params.StateDir,
-			Branch:     params.Branch,
+		Env: hookEnv(hookEnvParams{
+			Ref:          WorktreeRef{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: params.Branch},
+			WorktreePath: params.WorktreePath,
 		}),
 		Output: params.Output,
 		OnHook: params.OnHook,

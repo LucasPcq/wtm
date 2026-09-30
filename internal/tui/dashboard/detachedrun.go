@@ -30,6 +30,12 @@ func (d detachedRun) Emit(event runlogs.Event) {
 	if event.Phase == runlogs.PhaseStarted && event.Namespace != "" {
 		d.send(OutputLineMsg{Text: fmt.Sprintf(domain.RunStreamNamespaceFmt, event.Namespace, event.Job)})
 	}
+	if event.Phase == runlogs.PhaseCrashed {
+		return
+	}
+	for _, line := range runEventLines(event) {
+		d.send(OutputLineMsg{Text: line})
+	}
 }
 
 func detachedLine(event runlogs.Event) string {
@@ -37,14 +43,14 @@ func detachedLine(event runlogs.Event) string {
 	case runlogs.PhaseStarting:
 		return fmt.Sprintf(domain.RunStreamStepFmt, event.Step, event.Steps, event.Job)
 	case runlogs.PhaseStarted:
-		if event.AlreadyRunning && event.Attached {
-			return fmt.Sprintf(domain.RunStreamAlreadyAttachedFmt, event.Job)
+		if event.AlreadyRunning && event.Joined {
+			return fmt.Sprintf(domain.RunStreamAlreadyJoinedFmt, event.Job)
 		}
 		if event.AlreadyRunning {
 			return fmt.Sprintf(domain.RunStreamAlreadyFmt, event.Job)
 		}
-		if event.Attached {
-			return fmt.Sprintf(domain.RunStreamAttachedFmt, event.Job)
+		if event.Joined {
+			return fmt.Sprintf(domain.RunStreamJoinedFmt, event.Job)
 		}
 		return fmt.Sprintf(domain.RunStreamStartedFmt, event.Job)
 	case runlogs.PhaseDone:

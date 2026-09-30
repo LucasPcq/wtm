@@ -80,7 +80,7 @@ func (c *Client) SendStreamContext(ctx context.Context, req Request, onOutput fu
 // to believe its answer. A listing costs one round-trip on a unix socket and
 // changes nothing, which is what makes it safe to ask first.
 func (c *Client) preflight(req Request) error {
-	if c.skipVersionCheck || c.versionChecked || !mutates(req.Action) {
+	if c.skipVersionCheck || c.versionChecked || !mutates(req.Action) || versionTolerant(req.Action) {
 		return nil
 	}
 	c.versionChecked = true
@@ -90,6 +90,18 @@ func (c *Client) preflight(req Request) error {
 		return err
 	}
 	return checkVersion(resp)
+}
+
+// versionTolerant names the requests every build has answered the same way since
+// the first daemon: listing, stopping and shutting down. An older daemon must
+// always be listable and stoppable — it is the way out of the mismatch itself.
+func versionTolerant(action RequestAction) bool {
+	switch action {
+	case ActionList, ActionStop, ActionStopAll, ActionShutdown:
+		return true
+	default:
+		return false
+	}
 }
 
 // mutates says whether the daemon does something irreversible on decoding this
@@ -128,7 +140,7 @@ func (c *Client) send(ctx context.Context, req Request, onOutput func([]byte)) (
 			}
 			return Response{}, fmt.Errorf("read response: %w", err)
 		}
-		if !c.skipVersionCheck {
+		if !c.skipVersionCheck && !versionTolerant(req.Action) {
 			if err := checkVersion(resp); err != nil {
 				return Response{}, err
 			}
@@ -139,6 +151,7 @@ func (c *Client) send(ctx context.Context, req Request, onOutput func([]byte)) (
 			}
 			continue
 		}
+		resp.Jobs = rules.CurrentJobInfos(resp.Jobs)
 		return resp, nil
 	}
 }
@@ -149,10 +162,6 @@ func (c *Client) send(ctx context.Context, req Request, onOutput func([]byte)) (
 // binding it. Refusing beats warning: the user is told which two versions are in
 // play and how to get out, once, instead of being handed an outcome that looks
 // right.
-//
-// Never restarts on its own. The only daemon still alive on a mismatch is one
-// holding a foreground service — restarting it would kill the dev server the
-// user is working in.
 func checkVersion(resp Response) error {
 	if resp.Version == domain.Version {
 		return nil
@@ -272,18 +281,22 @@ func IsDaemonRunning(socketPath string) bool {
 	return true
 }
 
+// spawnDaemon is StartDaemon, a variable so a test never forks its own binary.
+var spawnDaemon = StartDaemon
+
 // EnsureDaemon checks if the daemon is running; if not, starts it and waits.
 func EnsureDaemon(params DaemonParams) error {
 	if IsDaemonRunning(params.SocketPath) {
 		return nil
 	}
-
-	// Remove stale socket if present
-	if _, err := os.Stat(params.SocketPath); err == nil {
-		os.Remove(params.SocketPath)
+	if err := awaitDaemonGone(params.SocketPath); err != nil {
+		return err
+	}
+	if IsDaemonRunning(params.SocketPath) {
+		return nil
 	}
 
-	if err := StartDaemon(params); err != nil {
+	if err := spawnDaemon(params); err != nil {
 		return err
 	}
 
@@ -293,7 +306,7 @@ func EnsureDaemon(params DaemonParams) error {
 		if IsDaemonRunning(params.SocketPath) {
 			return nil
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(domain.DaemonPollInterval)
 	}
 
 	return fmt.Errorf("daemon did not start within %v", daemonStartTimeout)
@@ -307,7 +320,7 @@ func AwaitDaemonStopped(socketPath string) error {
 		if !IsDaemonRunning(socketPath) {
 			return nil
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(domain.DaemonPollInterval)
 	}
 	return fmt.Errorf("daemon did not stop within %v", daemonStartTimeout)
 }

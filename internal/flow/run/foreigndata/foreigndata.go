@@ -28,7 +28,10 @@ func Allow(params Params) (bool, error) {
 	if params.Force {
 		return true, nil
 	}
-	risks := Risks(params)
+	risks, err := Risks(params)
+	if err != nil {
+		return false, err
+	}
 	if len(risks) == 0 {
 		return true, nil
 	}
@@ -36,7 +39,7 @@ func Allow(params Params) (bool, error) {
 	lines := rules.ForeignDataLines(rules.ForeignDataLinesParams{Risks: risks, Several: len(params.WorkDirs) > 1})
 	if !params.Prompter.Interactive() {
 		return false, fmt.Errorf(domain.RunForeignDataRefusedFmt, domain.RunForeignDataTitle,
-			strings.Join(lines, "\n"), domain.FlagForce, domain.FlagIsolation, domain.IsolationIsolated)
+			strings.Join(lines, "\n"), domain.FlagForce, strings.Join(rules.ForeignDataHints(risks), domain.RunForeignDataHintSep))
 	}
 	return params.Prompter.Confirm(flow.ConfirmParams{
 		Title:       domain.RunForeignDataTitle,
@@ -50,13 +53,16 @@ func Allow(params Params) (bool, error) {
 
 // Risks reads each worktree's isolation from the environment its jobs would
 // get, which is the same answer the daemon acts on.
-func Risks(params Params) []domain.DataRisk {
-	if !declaresTouches(params.Jobs) {
-		return nil
+func Risks(params Params) ([]domain.DataRisk, error) {
+	if !rules.DeclaresTouches(params.Config, params.Jobs) {
+		return nil, nil
 	}
 	var risks []domain.DataRisk
 	for _, dir := range params.WorkDirs {
-		env := seam.JobEnv(seam.JobEnvParams{ProjectDir: params.Context.ProjectDir, StateDir: params.Context.StateDir, WorkDir: dir})
+		env, err := seam.JobEnv(seam.JobEnvParams{ProjectDir: params.Context.ProjectDir, StateDir: params.Context.StateDir, WorkDir: dir})
+		if err != nil {
+			return nil, err
+		}
 		risks = append(risks, rules.ForeignDataRisks(rules.ForeignDataParams{
 			Config:    params.Config,
 			Jobs:      params.Jobs,
@@ -65,14 +71,5 @@ func Risks(params Params) []domain.DataRisk {
 			Main:      env[domain.EnvOrdinal] == fmt.Sprint(domain.MainWorktreeOrdinal),
 		})...)
 	}
-	return risks
-}
-
-func declaresTouches(jobs []domain.JobConfig) bool {
-	for _, job := range jobs {
-		if len(job.Touches) > 0 {
-			return true
-		}
-	}
-	return false
+	return risks, nil
 }

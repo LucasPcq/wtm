@@ -509,7 +509,7 @@ func TestRecapNamesTheNamespaceASharedJobCarved(t *testing.T) {
 	h := startedHarness(t, harnessParams{
 		Views: []runlogs.JobView{running("postgres")},
 	}, func(emitter runlogs.Sink) runlogs.Outcome {
-		emitter.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "postgres", Step: 1, Steps: 1, Attached: true, Namespace: "app_feat_x"})
+		emitter.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "postgres", Step: 1, Steps: 1, Joined: true, Namespace: "app_feat_x"})
 		outcome := runlogs.Outcome{Started: []string{"postgres"}, Steps: 1}
 		emitter.Emit(runlogs.Event{Phase: runlogs.PhaseReady, Outcome: outcome})
 		return outcome
@@ -518,5 +518,31 @@ func TestRecapNamesTheNamespaceASharedJobCarved(t *testing.T) {
 	recap := ansi.Strip(h.model.result().Recap)
 	if !strings.Contains(recap, "app_feat_x") {
 		t.Fatalf("recap = %q, want the namespace carved", recap)
+	}
+}
+
+// A namespace the run carved but could not write down is one `wtm clean` will
+// never drop: the stream says so, and the view has to as well — on screen while
+// it runs, and in what stays once it is gone.
+func TestAWarningReachesTheBandAndTheRecap(t *testing.T) {
+	notice := "postgres: could not record this worktree's namespace (read-only) — `wtm clean` will not know to drop it"
+	h := startedHarness(t, harnessParams{
+		Views: []runlogs.JobView{running("postgres")},
+	}, func(emitter runlogs.Sink) runlogs.Outcome {
+		emitter.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "postgres", Step: 1, Steps: 1})
+		emitter.Emit(runlogs.Event{Phase: runlogs.PhaseWarning, Job: "postgres", Notice: notice})
+		outcome := runlogs.Outcome{Started: []string{"postgres"}, Steps: 1}
+		emitter.Emit(runlogs.Event{Phase: runlogs.PhaseReady, Outcome: outcome})
+		return outcome
+	})
+
+	band := ansi.Strip(strings.Join(h.model.report(), "\n"))
+	if !strings.Contains(band, domain.RunViewWarningsTitle) || !strings.Contains(band, "could not record") {
+		t.Errorf("band = %q, want the warning under its title", band)
+	}
+
+	recap := ansi.Strip(h.model.result().Recap)
+	if !strings.Contains(recap, domain.GlyphAttention+" postgres: could not record") {
+		t.Errorf("recap = %q, want the warning in the attention register", recap)
 	}
 }

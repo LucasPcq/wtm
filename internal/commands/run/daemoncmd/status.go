@@ -15,7 +15,10 @@ func newStatusCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   domain.CmdStatus,
 		Short: "Report whether a daemon is running, and which build it is",
-		RunE:  runStatus,
+		Example: `  wtm run daemon status
+
+  wtm run daemon status --output json`,
+		RunE: runStatus,
 	}
 	shared.AddOutputFlag(cmd)
 	return cmd
@@ -57,6 +60,9 @@ func collectStatus() domain.DaemonStatus {
 	status.Running = true
 	status.DaemonVersion = resp.Version
 	status.PID = resp.DaemonPID
+	if status.PID == 0 {
+		status.PID, _ = process.DaemonPeerPID(status.SocketPath)
+	}
 	status.ProxyPort = resp.ProxyPort
 	for _, job := range resp.Jobs {
 		if !rules.IsJobUp(job.Status) {

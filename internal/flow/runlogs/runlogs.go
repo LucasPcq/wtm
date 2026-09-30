@@ -167,6 +167,9 @@ const (
 	PhaseCrashed
 	PhaseNotice
 	PhaseReady
+	// PhaseWarning is something the run could not do on the side of a job that
+	// did start — its Notice says what, and what it costs.
+	PhaseWarning
 )
 
 // Prober answers which of the given ports are listening. It is the seam over
@@ -224,9 +227,9 @@ type Event struct {
 	// DevOrigins are the config lines a PhaseStarted job needs before it will
 	// answer under the name the proxy serves it under.
 	DevOrigins []domain.DevOriginFix
-	// Attached marks a PhaseStarted shared job this worktree joined rather than
+	// Joined marks a PhaseStarted shared job this worktree joined rather than
 	// started: the process is the main checkout's.
-	Attached bool
+	Joined bool
 	// Namespace is what a PhaseStarted shared job carved out for this worktree,
 	// empty when it carves none or was already running here.
 	Namespace string

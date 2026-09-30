@@ -201,3 +201,57 @@ func TestRunStartJSONReportsAFailingJob(t *testing.T) {
 		t.Errorf("exit_code = %v, want the code the daemon reported", result.ExitCode)
 	}
 }
+
+// stoppedWorktrees names the worktrees the commands asked the daemon to clear.
+func (d *fakeDaemon) stoppedWorktrees() []string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	var dirs []string
+	for _, req := range d.requests {
+		if req.Action == process.ActionStopAll {
+			dirs = append(dirs, req.WorkDir)
+		}
+	}
+	return dirs
+}
+
+var elsewhere = []domain.JobInfo{{Name: "api", WorkDir: "/wt/elsewhere", Status: domain.JobStatusRunning}}
+
+// run start asks run up's question about the other worktrees, and answers it
+// the same way from the same flags.
+func TestRunStartExclusiveStopsTheOtherWorktrees(t *testing.T) {
+	daemon := setupStartProject(t, &fakeDaemon{Jobs: elsewhere})
+	fakeTTY(t, false)
+
+	if _, _, err := runCmd(t, domain.CmdStart, "--"+domain.FlagJob, "api", "--"+domain.FlagExclusive, "-y"); err != nil {
+		t.Fatalf("run start --exclusive: %v", err)
+	}
+
+	if got := daemon.stoppedWorktrees(); len(got) != 1 || got[0] != "/wt/elsewhere" {
+		t.Errorf("stopped %v, want the other worktree cleared first", got)
+	}
+}
+
+// The safe default stops nothing.
+func TestRunStartUnattendedLeavesTheOtherWorktreesRunning(t *testing.T) {
+	daemon := setupStartProject(t, &fakeDaemon{Jobs: elsewhere})
+	fakeTTY(t, false)
+
+	if _, _, err := runCmd(t, domain.CmdStart, "--"+domain.FlagJob, "api", "-y", "--"+domain.FlagNoProbe); err != nil {
+		t.Fatalf("run start -y --no-probe: %v", err)
+	}
+
+	if got := daemon.stoppedWorktrees(); len(got) != 0 {
+		t.Errorf("stopped %v, want nothing stopped without --exclusive", got)
+	}
+}
+
+func TestRunStartRefusesExclusiveWithParallel(t *testing.T) {
+	setupStartProject(t, &fakeDaemon{})
+
+	_, _, err := runCmd(t, domain.CmdStart, "--"+domain.FlagJob, "api", "--"+domain.FlagExclusive, "--"+domain.FlagParallel)
+	if err == nil {
+		t.Fatal("--exclusive and --parallel were both accepted")
+	}
+}

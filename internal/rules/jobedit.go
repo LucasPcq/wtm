@@ -1,8 +1,11 @@
 package rules
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -28,6 +31,14 @@ type JobPatch struct {
 	BindsNoPort *bool
 	// Touches replaces the whole list, like Runs.
 	Touches *[]string
+	Scope   *string
+	// NamespaceName set to "" withdraws the whole [job.namespace] block; the
+	// other namespace fields change one field of it and keep the rest.
+	NamespaceName   *string
+	NamespaceCreate *string
+	NamespaceRemove *string
+	// NamespaceEnv holds raw KEY=VALUE entries and replaces the whole table.
+	NamespaceEnv *[]string
 }
 
 // Empty reports a patch that would change nothing, which is how a runner tells
@@ -36,7 +47,12 @@ func (p JobPatch) Empty() bool {
 	return p.Name == nil && p.Cmd == nil && p.Kind == nil && p.Stop == nil &&
 		p.Cwd == nil && p.URLPort == nil && p.URLHost == nil &&
 		p.Runs == nil && p.BindsNoPort == nil && p.Touches == nil &&
+		p.Scope == nil && !p.touchesNamespace() &&
 		len(p.Ports) == 0 && !p.ClearPorts
+}
+
+func (p JobPatch) touchesNamespace() bool {
+	return p.NamespaceName != nil || p.NamespaceCreate != nil || p.NamespaceRemove != nil || p.NamespaceEnv != nil
 }
 
 type ApplyJobPatchParams struct {
@@ -81,11 +97,27 @@ func ApplyJobPatch(params ApplyJobPatchParams) (domain.JobConfig, error) {
 		job.Runs = trimmedNames(*patch.Runs)
 	}
 	if patch.BindsNoPort != nil {
+		if *patch.BindsNoPort && job.Kind == domain.JobKindTask {
+			return domain.JobConfig{}, fmt.Errorf(domain.RunJobBindsNoPortTaskFmt, domain.FlagBindsNoPort)
+		}
 		job.BindsNoPort = *patch.BindsNoPort
 	}
 	if patch.Touches != nil {
 		job.Touches = trimmedNames(*patch.Touches)
 	}
+
+	if patch.Scope != nil {
+		scope, err := parseScope(*patch.Scope)
+		if err != nil {
+			return domain.JobConfig{}, err
+		}
+		job.Scope = scope
+	}
+	namespace, err := patchedNamespace(job.Namespace, patch)
+	if err != nil {
+		return domain.JobConfig{}, err
+	}
+	job.Namespace = namespace
 
 	ports, err := patchedPorts(job.Ports, patch)
 	if err != nil {
@@ -100,6 +132,79 @@ func ApplyJobPatch(params ApplyJobPatchParams) (domain.JobConfig, error) {
 	job.URL = url
 
 	return job, nil
+}
+
+func parseScope(value string) (domain.JobScope, error) {
+	switch strings.TrimSpace(value) {
+	case domain.ScopeValueShared:
+		return domain.JobScopeShared, nil
+	case domain.ScopeValuePerWorktree, "":
+		return domain.JobScopePerWorktree, nil
+	}
+	return "", fmt.Errorf(domain.RunJobUnknownScopeFmt, domain.FlagScope, value, domain.ScopeValueShared, domain.ScopeValuePerWorktree)
+}
+
+// patchedNamespace never edits the block it was given: the job it hangs off is
+// a copy, but the pointer is shared with the config the edit started from.
+func patchedNamespace(current *domain.JobNamespaceConfig, patch JobPatch) (*domain.JobNamespaceConfig, error) {
+	if !patch.touchesNamespace() {
+		return current, nil
+	}
+	if patch.NamespaceName != nil && strings.TrimSpace(*patch.NamespaceName) == "" {
+		if patch.NamespaceCreate != nil || patch.NamespaceRemove != nil || patch.NamespaceEnv != nil {
+			return nil, fmt.Errorf(domain.RunJobNamespaceWithdrawFmt, domain.FlagNamespaceName,
+				domain.FlagNamespaceCreate, domain.FlagNamespaceRemove, domain.FlagNamespaceEnv)
+		}
+		return nil, nil
+	}
+
+	var namespace domain.JobNamespaceConfig
+	if current != nil {
+		namespace = *current
+		namespace.Env = maps.Clone(current.Env)
+	}
+	if patch.NamespaceName != nil {
+		namespace.Name = strings.TrimSpace(*patch.NamespaceName)
+	}
+	if patch.NamespaceCreate != nil {
+		namespace.Create = *patch.NamespaceCreate
+	}
+	if patch.NamespaceRemove != nil {
+		namespace.Remove = *patch.NamespaceRemove
+	}
+	if patch.NamespaceEnv != nil {
+		env, err := ParseNamespaceEnv(*patch.NamespaceEnv)
+		if err != nil {
+			return nil, err
+		}
+		namespace.Env = env
+	}
+	if namespace.Name == "" && namespace.Create == "" && namespace.Remove == "" && len(namespace.Env) == 0 {
+		return nil, nil
+	}
+	return &namespace, nil
+}
+
+// ParseNamespaceEnv reads KEY=VALUE entries, splitting each on its first = so a
+// value may carry its own. Empty entries are skipped, which is how `”` drops
+// the table.
+func ParseNamespaceEnv(entries []string) (map[string]string, error) {
+	var env map[string]string
+	for _, entry := range entries {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		key, value, found := strings.Cut(entry, "=")
+		if !found || strings.TrimSpace(key) == "" {
+			return nil, fmt.Errorf(domain.RunJobNamespaceEnvFmt, domain.FlagNamespaceEnv, entry)
+		}
+		if env == nil {
+			env = map[string]string{}
+		}
+		env[strings.TrimSpace(key)] = value
+	}
+	return env, nil
 }
 
 // trimmedNames drops the empty entries a shell splits out of `--runs ""`, which
@@ -154,44 +259,31 @@ func patchedURL(current *domain.JobURLConfig, patch JobPatch) (*domain.JobURLCon
 	return ParseJobURL(strings.TrimSpace(port + " " + host))
 }
 
-// RenameJobRefs rewrites everything that names a renamed job — the profiles
-// that start it and the env_port links that follow its ports — so the rename
-// does not leave a reference to a name the file no longer declares, which
-// ValidateRun refuses to save.
-func RenameJobRefs(cfg domain.RunConfig, from, to string) domain.RunConfig {
-	if from == to {
+type RenameJobRefsParams struct {
+	Config domain.RunConfig
+	From   string
+	To     string
+}
+
+// RenameJobRefs points everything that names From at To: the profiles, the
+// runners' `runs`, the `touches`, and both .env link tables — the five places
+// ValidateRun checks, so a rename never leaves one naming nothing. It doubles as
+// a redirect onto a job that already exists, which is why a list that ends up
+// naming To twice keeps it once.
+func RenameJobRefs(params RenameJobRefsParams) domain.RunConfig {
+	cfg := params.Config
+	if params.From == params.To {
 		return cfg
 	}
 
-	out := cfg
-	out.Profiles = make([]domain.ProfileConfig, len(cfg.Profiles))
-	copy(out.Profiles, cfg.Profiles)
-	for i, p := range out.Profiles {
-		jobs := make([]string, len(p.Jobs))
-		copy(jobs, p.Jobs)
-		for j, ref := range jobs {
-			if ref == from {
-				jobs[j] = to
-			}
-		}
-		out.Profiles[i].Jobs = jobs
-	}
-
-	// A job is named by the runners that start it and the tasks that touch it
-	// too: renaming it without them leaves a config that refuses to load.
-	out.Jobs = make([]domain.JobConfig, len(cfg.Jobs))
-	copy(out.Jobs, cfg.Jobs)
-	for i, job := range out.Jobs {
-		out.Jobs[i].Runs = renamedIn(job.Runs, from, to)
-		out.Jobs[i].Touches = renamedIn(job.Touches, from, to)
-	}
+	out := redirectJobRefs(redirectJobRefsParams{Config: cfg, From: params.From, To: []string{params.To}})
 
 	if len(cfg.EnvValues) > 0 {
 		out.EnvValues = make([]domain.EnvValueLink, len(cfg.EnvValues))
 		copy(out.EnvValues, cfg.EnvValues)
 		for i, link := range out.EnvValues {
-			if link.Job == from {
-				out.EnvValues[i].Job = to
+			if link.Job == params.From {
+				out.EnvValues[i].Job = params.To
 			}
 		}
 	}
@@ -199,25 +291,77 @@ func RenameJobRefs(cfg domain.RunConfig, from, to string) domain.RunConfig {
 	out.EnvPorts = make([]domain.EnvPortLink, len(cfg.EnvPorts))
 	copy(out.EnvPorts, cfg.EnvPorts)
 	for i, link := range out.EnvPorts {
-		if link.Job == from {
-			out.EnvPorts[i].Job = to
+		if link.Job == params.From {
+			out.EnvPorts[i].Job = params.To
 		}
 	}
 
 	return out
 }
 
-// renamedIn copies names with one of them renamed, keeping nil as nil.
-func renamedIn(names []string, from, to string) []string {
-	if len(names) == 0 {
-		return names
+type redirectJobRefsParams struct {
+	Config domain.RunConfig
+	From   string
+	To     []string
+}
+
+// redirectJobRefs replaces From by To in the three lists that name jobs — the
+// profiles, `runs` and `touches` — in place and without duplicates. A job never
+// ends up naming itself: a redirect onto the job that held the reference drops
+// it instead.
+func redirectJobRefs(params redirectJobRefsParams) domain.RunConfig {
+	cfg := params.Config
+	out := cfg
+	out.Profiles = make([]domain.ProfileConfig, len(cfg.Profiles))
+	copy(out.Profiles, cfg.Profiles)
+	for i, profile := range out.Profiles {
+		out.Profiles[i].Jobs = redirectedIn(redirectedInParams{Names: profile.Jobs, From: params.From, To: params.To})
 	}
-	out := make([]string, len(names))
-	for i, name := range names {
-		out[i] = name
-		if name == from {
-			out[i] = to
+
+	out.Jobs = make([]domain.JobConfig, len(cfg.Jobs))
+	copy(out.Jobs, cfg.Jobs)
+	for i, job := range out.Jobs {
+		out.Jobs[i].Runs = redirectedIn(redirectedInParams{Names: job.Runs, From: params.From, To: params.To, Self: job.Name})
+		out.Jobs[i].Touches = redirectedIn(redirectedInParams{Names: job.Touches, From: params.From, To: params.To, Self: job.Name})
+	}
+	return out
+}
+
+type redirectedInParams struct {
+	Names []string
+	From  string
+	To    []string
+	Self  string
+}
+
+// redirectedIn copies Names with From replaced by To, keeping nil as nil and
+// each name once.
+func redirectedIn(params redirectedInParams) []string {
+	if !slices.Contains(params.Names, params.From) {
+		return params.Names
+	}
+	var out []string
+	add := func(name string) {
+		if name != params.Self && !slices.Contains(out, name) {
+			out = append(out, name)
+		}
+	}
+	for _, name := range params.Names {
+		if name != params.From {
+			add(name)
+			continue
+		}
+		for _, to := range params.To {
+			add(to)
 		}
 	}
 	return out
+}
+
+// SameJob compares two declarations as run.toml would write them: a nil list
+// and an empty one are the same file.
+func SameJob(a, b domain.JobConfig) bool {
+	left, errA := json.Marshal(a)
+	right, errB := json.Marshal(b)
+	return errA == nil && errB == nil && bytes.Equal(left, right)
 }

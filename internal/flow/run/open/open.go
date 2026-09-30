@@ -43,6 +43,9 @@ type Params struct {
 }
 
 func Run(params Params) (Outcome, error) {
+	if err := target.RequireDeclared(target.DeclaredParams{Config: params.Request.Config, Job: params.Request.Job}); err != nil {
+		return Outcome{}, err
+	}
 	f := &openFlow{
 		ctx:       params.Context,
 		request:   params.Request,
@@ -86,7 +89,11 @@ func (f *openFlow) run() (Outcome, error) {
 	}
 
 	workDir := target.WorkDir(target.WorkDirParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})
-	entry, err := rules.PickPublishedURL(f.reader.In(workDir), answers.Value(target.KeyJob))
+	published, err := f.reader.In(workDir)
+	if err != nil {
+		return Outcome{}, err
+	}
+	entry, err := rules.PickPublishedURL(published, answers.Value(target.KeyJob))
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -105,6 +112,13 @@ func (f *openFlow) run() (Outcome, error) {
 	return Outcome{WorkDir: workDir, Entry: entry}, nil
 }
 
+// published feeds the picker. A worktree whose addresses cannot be resolved
+// offers none, and the run then refuses it by name.
+func (f *openFlow) published(workDir string) []domain.JobURLEntry {
+	entries, _ := f.reader.In(workDir)
+	return entries
+}
+
 func (f *openFlow) session() flow.Session {
 	return flow.Session{
 		ErrLabel: domain.CmdOpen,
@@ -119,7 +133,7 @@ func (f *openFlow) session() flow.Session {
 				Running: rules.RunningJobsByWorktree(runjobs.Load()),
 			}),
 			target.URLStep(target.URLParams{
-				Published: f.reader.In,
+				Published: f.published,
 				Named:     f.named,
 				Cwd:       f.request.Cwd,
 				Flag:      domain.FlagJob,

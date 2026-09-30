@@ -300,3 +300,21 @@ func TestPlanComposePortsDeclaresAVariableSharedWithTheSameBase(t *testing.T) {
 		t.Errorf("nothing to withhold, got %+v", plan.Withheld)
 	}
 }
+
+func TestComposeDroppedLineSaysWhereTheTwoMeet(t *testing.T) {
+	same := ComposeDroppedLine(DroppedPort{
+		Port:    PortDeclaration{Name: "POSTGRES_PORT", Job: "postgres", Base: 5432},
+		Against: PortDeclaration{Name: "DB_PORT", Job: "dev", Base: 5432},
+	})
+	if !strings.HasSuffix(same, "in every worktree") {
+		t.Errorf("equal bases: %q, want them said to meet in every worktree", same)
+	}
+	apart := ComposeDroppedLine(DroppedPort{
+		Port:      PortDeclaration{Name: "A", Job: "a", Base: 3000},
+		Against:   PortDeclaration{Name: "B", Job: "b", Base: 3020},
+		Worktrees: 2,
+	})
+	if !strings.HasSuffix(apart, "2 worktree(s) apart") {
+		t.Errorf("gap of two blocks: %q, want 2 worktree(s) apart", apart)
+	}
+}

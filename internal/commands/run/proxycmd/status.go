@@ -17,7 +17,10 @@ func newStatusCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   domain.CmdStatus,
 		Short: "Report what actually serves named URLs on this machine",
-		RunE:  runStatus,
+		Example: `  wtm run proxy status
+
+  wtm run proxy status --output json`,
+		RunE: runStatus,
 	}
 	shared.AddOutputFlag(cmd)
 	return cmd

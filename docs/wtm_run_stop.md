@@ -1,14 +1,22 @@
 ## wtm run stop
 
-Stop a single job
+Stop one job, in one or more worktrees
 
 ### Synopsis
 
-Stop one running job of [worktree] — the current one when omitted, picked interactively when there is a terminal.
+Stop one running job in each [worktree] — the current one when omitted, picked interactively when there is a terminal.
 The job is named with --job; without it, a fully interactive run offers a picker.
 
 ```
 wtm run stop [worktree...] [flags]
+```
+
+### Examples
+
+```
+  wtm run stop --job api
+
+  wtm run stop feat/login fix/typo --job web --yes
 ```
 
 ### Options

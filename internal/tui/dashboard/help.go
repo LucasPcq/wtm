@@ -48,7 +48,7 @@ func (m Model) helpBox() (string, domain.Rect) {
 
 func (m Model) helpLayout() domain.HelpLayout {
 	return rules.ComputeHelpLayout(rules.HelpLayoutParams{
-		Sections:     rules.HelpSections(),
+		Sections:     rules.HelpSections(m.runModule()),
 		ScreenWidth:  m.width,
 		ScreenHeight: m.height,
 	})

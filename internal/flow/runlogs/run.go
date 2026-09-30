@@ -270,8 +270,9 @@ func (r *runner) run() Outcome {
 		}
 
 		// A repeat start of a service is what the caller asked for — the job is
-		// up — so it counts as started. A task is a step to run, not a state to
-		// reach: one the daemon refuses has not run.
+		// up — so the run goes on, reporting it as already running rather than
+		// started. A task is a step to run, not a state to reach: one the daemon
+		// refuses has not run.
 		if result.PublicPort > 0 {
 			r.servedPort = result.PublicPort
 		}
@@ -292,7 +293,7 @@ func (r *runner) run() Outcome {
 			ports = r.declaredPorts(job)
 		}
 		url := r.jobURL(jobURLParams{Job: job, Ports: ports, Host: host, Public: public})
-		held := r.heldURLs(heldURLsParams{Job: job, Routes: routes, Ports: ports, Public: public})
+		held := r.heldURLs(heldURLsParams{Job: job, Routes: r.heldRoutes(job, routes), Ports: ports, Public: public})
 
 		if job.Kind == domain.JobKindTask {
 			r.completed = append(r.completed, job.Name)
@@ -304,14 +305,17 @@ func (r *runner) run() Outcome {
 		r.started = append(r.started, job.Name)
 		status := r.startedStatus(job)
 		if result.Joined {
-			status = domain.JobActionAttached
+			status = domain.JobActionJoined
+		}
+		if alreadyRunning && status == domain.JobActionStarted {
+			status = domain.JobActionAlreadyRunning
 		}
 		namespace := r.carved(job, alreadyRunning)
 		r.results = append(r.results, domain.JobActionResult{Name: job.Name, Status: status, URL: url, Held: held, Namespace: namespace})
 		if rules.ShouldProbeJob(rules.ShouldProbeJobParams{Kind: job.Kind, Ports: result.Ports, Probe: job.Probe}) {
 			r.probeTargets = append(r.probeTargets, probeTarget{job: job.Name, resolved: result.Ports})
 		}
-		r.emit(Event{Phase: PhaseStarted, Job: job.Name, Step: i + 1, AlreadyRunning: alreadyRunning, Attached: status == domain.JobActionAttached, SharedIn: r.heldIn(heldInParams{Job: job, Status: status}), Namespace: namespace, Ports: ports, URL: url, Held: held, DevOrigins: r.devOrigins(job, host)})
+		r.emit(Event{Phase: PhaseStarted, Job: job.Name, Step: i + 1, AlreadyRunning: alreadyRunning, Joined: status == domain.JobActionJoined, SharedIn: r.heldIn(heldInParams{Job: job, Status: status}), Namespace: namespace, Ports: ports, URL: url, Held: held, DevOrigins: r.devOrigins(job, host)})
 	}
 
 	// The probe dials first because its wait is also the time a job needs to die:
@@ -494,6 +498,24 @@ func (r *runner) routes(job domain.JobConfig) []domain.JobRoute {
 	if r.proxyPort == 0 {
 		return nil
 	}
+	return r.declaredRoutes(job)
+}
+
+// heldRoutes are the children heldURLs reports. Without a proxy nothing serves
+// their names, so they are the same children with no host, and each answers on
+// its port — still the only line a runner's apps can appear on.
+func (r *runner) heldRoutes(job domain.JobConfig, routes []domain.JobRoute) []domain.JobRoute {
+	if r.proxyPort != 0 {
+		return routes
+	}
+	direct := r.declaredRoutes(job)
+	for i := range direct {
+		direct[i].Host = ""
+	}
+	return direct
+}
+
+func (r *runner) declaredRoutes(job domain.JobConfig) []domain.JobRoute {
 	return rules.JobRoutes(rules.JobRoutesParams{
 		Config:   domain.RunConfig{Jobs: r.declaredJobs()},
 		Job:      job,
@@ -723,7 +745,7 @@ type heldInParams struct {
 // heldIn is where a shared job runs: main's branch from a linked worktree, and
 // main itself when main started or joined it. A per-worktree job has none.
 func (r *runner) heldIn(params heldInParams) string {
-	if params.Status != domain.JobActionAttached && !rules.IsShared(params.Job) {
+	if params.Status != domain.JobActionJoined && !rules.IsShared(params.Job) {
 		return ""
 	}
 	if r.sharedIn != "" {
@@ -746,7 +768,7 @@ func (r *runner) carved(job domain.JobConfig, alreadyRunning bool) string {
 // and saying "started" in each of them read as one service per worktree.
 func (r *runner) startedStatus(job domain.JobConfig) string {
 	if rules.IsShared(job) && r.shared != nil && r.workDir != r.shared.WorkDir {
-		return domain.JobActionAttached
+		return domain.JobActionJoined
 	}
 	return domain.JobActionStarted
 }

@@ -75,6 +75,10 @@ func (p *RunPrinter) Emit(event runlogs.Event) {
 	}
 	switch event.Phase {
 	case runlogs.PhaseStarting:
+		if p.multi {
+			p.heads()
+			return
+		}
 		if p.printed {
 			Blank(p.out)
 		}
@@ -93,8 +97,8 @@ func (p *RunPrinter) Emit(event runlogs.Event) {
 	case runlogs.PhaseStarted:
 		if event.AlreadyRunning {
 			already := domain.RunStreamAlreadyFmt
-			if event.Attached {
-				already = domain.RunStreamAlreadyAttachedFmt
+			if event.Joined {
+				already = domain.RunStreamAlreadyJoinedFmt
 			}
 			p.remember(event)
 			Success(p.out, p.jobLine(jobLineParams{Label: fmt.Sprintf(already, event.Job), Event: event}))
@@ -110,6 +114,8 @@ func (p *RunPrinter) Emit(event runlogs.Event) {
 	case runlogs.PhaseNotice:
 		Blank(p.err)
 		Callout(p.err, domain.ProxyUnavailableTitle, []string{event.Notice})
+	case runlogs.PhaseWarning:
+		Warning(p.err, event.Notice)
 	case runlogs.PhaseProbed:
 		p.probed(event.Probes)
 	case runlogs.PhaseCrashed:
@@ -119,6 +125,19 @@ func (p *RunPrinter) Emit(event runlogs.Event) {
 	case runlogs.PhaseReady:
 		p.ready(event.Outcome)
 	}
+}
+
+// heads titles a run over several worktrees once. Its sequences interleave on
+// one stream, so it prints no progress line: one would sit above another
+// worktree's result.
+func (p *RunPrinter) heads() {
+	if p.printed || p.profile == "" {
+		p.printed = true
+		return
+	}
+	SectionTitle(p.out, p.heading())
+	Blank(p.out)
+	p.printed = true
 }
 
 // breakJobLine closes a row a job left open. Its bytes are not barred, so a
@@ -161,10 +180,10 @@ type jobLineParams struct {
 // leaves it up.
 func startedLabel(event runlogs.Event) string {
 	switch {
-	case event.Attached && event.SharedIn != "" && event.SharedIn != event.Worktree:
-		return fmt.Sprintf(domain.RunStreamAttachedToFmt, event.Job, event.SharedIn)
-	case event.Attached:
-		return fmt.Sprintf(domain.RunStreamAttachedFmt, event.Job)
+	case event.Joined && event.SharedIn != "" && event.SharedIn != event.Worktree:
+		return fmt.Sprintf(domain.RunStreamJoinedInFmt, event.Job, event.SharedIn)
+	case event.Joined:
+		return fmt.Sprintf(domain.RunStreamJoinedFmt, event.Job)
 	}
 	return fmt.Sprintf(domain.RunStreamStartedFmt, event.Job)
 }
@@ -316,24 +335,9 @@ func (p *RunPrinter) Conclude(warnings []string) {
 	NextStep(p.out, NextStepParams{Command: domain.RunStreamStopHint, Note: domain.RunStreamStopNote})
 }
 
-// WriteRunOutcomeJSON writes what a run did as the array of job results every
-// `run` command emits, with one addition on the job that ended it: the output it
-// had written and the code it exited with. A caller reading JSON never saw the
-// live stream, and the daemon's message alone ("task migrate failed: exit status
-// 1") does not say why.
-func WriteRunOutcomeJSON(w io.Writer, outcome runlogs.Outcome) error {
-	return WriteJobResultsJSON(w, RunOutcomeResults(outcome))
-}
-
-// WriteRunOutcomesJSON writes what a run over one or more worktrees did. The
-// shape follows the arity (LUC-198): one worktree answers with the bare array
-// of job results, exactly as it always has, and several answer with one
-// document each — the only way two jobs called `web` can be told apart.
+// WriteRunOutcomesJSON writes one document per worktree the run reached,
+// whatever their number: a caller parses one shape.
 func WriteRunOutcomesJSON(w io.Writer, outcomes runlogs.Outcomes) error {
-	if len(outcomes) <= 1 {
-		return WriteRunOutcomeJSON(w, outcomes.One())
-	}
-
 	documents := make([]domain.WorktreeRunResult, 0, len(outcomes))
 	for _, outcome := range outcomes {
 		results := RunOutcomeResults(outcome)
@@ -341,11 +345,11 @@ func WriteRunOutcomesJSON(w io.Writer, outcomes runlogs.Outcomes) error {
 			results = []domain.JobActionResult{}
 		}
 		documents = append(documents, domain.WorktreeRunResult{
-			Worktree: outcome.Worktree,
-			Path:     outcome.WorkDir,
-			Profile:  outcome.Profile,
-			Aborted:  outcome.Aborted(),
-			Jobs:     results,
+			Branch:  outcome.Worktree,
+			Path:    outcome.WorkDir,
+			Profile: outcome.Profile,
+			Aborted: outcome.Aborted(),
+			Jobs:    results,
 		})
 	}
 	return encodeJSON(w, documents)
@@ -427,14 +431,15 @@ func downRecapBlock(worktree domain.WorktreeJobResults) []string {
 			failed = append(failed, result.Name)
 		case domain.JobActionReleased:
 			released = append(released, result.Name)
+		case domain.JobActionNotRunning:
 		default:
 			stopped = append(stopped, result.Name)
 		}
 	}
 
 	var lines []string
-	if worktree.Worktree != "" {
-		lines = append(lines, styles.Bold.Render(worktree.Worktree))
+	if worktree.Branch != "" {
+		lines = append(lines, styles.Bold.Render(worktree.Branch))
 	}
 	if len(stopped) > 0 {
 		lines = append(lines, fmt.Sprintf(domain.RunDownRecapStoppedFmt, joinJobNames(stopped)))

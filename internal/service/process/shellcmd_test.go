@@ -33,7 +33,7 @@ func TestManagerStartTask_RunsCmdThroughTheShell(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			m := NewManager()
+			m := newManager()
 			var buf bytes.Buffer
 			job := domain.JobConfig{
 				Name:  "probe",
@@ -53,7 +53,7 @@ func TestManagerStartTask_RunsCmdThroughTheShell(t *testing.T) {
 }
 
 func TestManagerStartTask_BlankCmdRejected(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	job := domain.JobConfig{Name: "empty", Kind: domain.JobKindTask, Cmd: "   "}
 
 	err := m.Start(StartParams{Job: job, WorkDir: t.TempDir()})
@@ -67,7 +67,7 @@ func TestManagerStartTask_BlankCmdRejected(t *testing.T) {
 
 // A stop command is a shell line too, and runs with the ports its cmd ran with.
 func TestManagerStop_RunsStopThroughTheShell(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 	out := filepath.Join(dir, "stopped")
 
@@ -81,7 +81,7 @@ func TestManagerStop_RunsStopThroughTheShell(t *testing.T) {
 	if err := m.Start(StartParams{Job: job, WorkDir: dir, Env: map[string]string{domain.EnvPortOffset: "10"}}); err != nil {
 		t.Fatalf("start detached: %v", err)
 	}
-	if err := m.Stop("compose", dir); err != nil {
+	if err := m.Stop(JobRef{Name: "compose", WorkDir: dir}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 
@@ -97,14 +97,14 @@ func TestManagerStop_RunsStopThroughTheShell(t *testing.T) {
 // A stop command that is only whitespace is not a command: the service must
 // still be signalled, not silently marked stopped.
 func TestManagerStop_BlankStopFallsBackToSignal(t *testing.T) {
-	m := NewManager()
+	m := newManager()
 	dir := t.TempDir()
 
 	job := domain.JobConfig{Name: "server", Kind: domain.JobKindService, Cmd: "sleep 30", Stop: "   "}
 	if err := m.Start(StartParams{Job: job, WorkDir: dir}); err != nil {
 		t.Fatalf("start service: %v", err)
 	}
-	if err := m.Stop("server", dir); err != nil {
+	if err := m.Stop(JobRef{Name: "server", WorkDir: dir}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 

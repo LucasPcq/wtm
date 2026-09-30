@@ -5,15 +5,28 @@ import (
 	"testing"
 )
 
-func TestRenderSkillMarkdown_HasFrontmatter(t *testing.T) {
-	got := renderSkillMarkdown()
-	if !strings.HasPrefix(got, "---\nname: using-wtm\n") {
-		t.Errorf("missing or wrong frontmatter:\n%s", got[:120])
+func TestTheSkillShipsItsEntryPointAndReferences(t *testing.T) {
+	files := skillFiles()
+	entry, ok := files[skillEntryFile]
+	if !ok {
+		t.Fatalf("no %s in %v", skillEntryFile, files)
 	}
-	if !strings.Contains(got, "# Using wtm") {
-		t.Error("expected H1 heading in skill body")
+	if !strings.HasPrefix(entry, "---\nname: using-wtm\n") {
+		t.Errorf("missing or wrong frontmatter:\n%s", entry[:120])
 	}
-	if !strings.Contains(got, "--output json") {
-		t.Error("skill body should mention --output json")
+	if !strings.Contains(entry, "--output json") {
+		t.Error("SKILL.md should mention --output json")
+	}
+	references := 0
+	for name := range files {
+		if strings.HasPrefix(name, skillReferencesDir+"/") {
+			references++
+			if !strings.Contains(entry, name) {
+				t.Errorf("SKILL.md never points at %s", name)
+			}
+		}
+	}
+	if references == 0 {
+		t.Error("the skill ships no reference file")
 	}
 }

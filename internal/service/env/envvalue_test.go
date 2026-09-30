@@ -41,7 +41,7 @@ func keycloakConfig() domain.RunConfig {
 // The case the table was added for: one keycloak for the repository, one realm
 // per worktree. The realm key is opaque — no port, no URL — so nothing but an
 // [[env]] link could ever have written it.
-func TestEnvValueLinkWritesTheWorktreesSliceIntoItsEnv(t *testing.T) {
+func TestEnvValueLinkWritesTheWorktreesNamespaceIntoItsEnv(t *testing.T) {
 	dir := envValueFixture(t, "KEYCLOAK_URL=http://localhost:8080\nKEYCLOAK_REALM=realm_main\n")
 
 	owned, err := rules.EnvValueWrites(rules.EnvValueWritesParams{

@@ -15,6 +15,8 @@ func NewCmd() *cobra.Command {
 		Use:   domain.CmdDaemon,
 		Short: "Inspect, stop or restart the process that runs the jobs",
 		Long:  "Jobs are started by a background daemon shared by every repository.\nIt exits on its own once no foreground job is left; detached services keep running without it and are picked back up by the next one.",
+		Example: `  wtm run daemon status
+  wtm run daemon restart`,
 	}
 
 	cmd.AddCommand(newStatusCmd())

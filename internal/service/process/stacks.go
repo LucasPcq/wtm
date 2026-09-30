@@ -6,17 +6,10 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
-
-// stackProbeTimeout bounds one compose call. Docker Desktop starting up answers
-// slowly or not at all, and a daemon start-up that hangs on it costs the user the
-// command they actually ran. A probe that times out is a probe that could not
-// tell, which changes nothing about the entry.
-const stackProbeTimeout = 3 * time.Second
 
 // StackQuery is one detached entry as the prober needs it: keyed so the answer
 // can be matched back, and carrying the environment the launcher ran with —
@@ -73,7 +66,7 @@ func (systemStacks) Probe(queries []StackQuery) map[string]StackState {
 }
 
 func composeStackUp(query StackQuery, probe rules.ComposeProbe) (up bool, known bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), stackProbeTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), domain.StackProbeTimeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, domain.DockerBin, probe.Args...)
@@ -97,7 +90,7 @@ func composeStackUp(query StackQuery, probe rules.ComposeProbe) (up bool, known 
 func stackQueriesOf(records []domain.JobRecord) []StackQuery {
 	queries := make([]StackQuery, 0, len(records))
 	for _, record := range records {
-		if record.Attached || record.Config.Kind != domain.JobKindService || !rules.IsDetached(record.Config) {
+		if record.Joined || record.Config.Kind != domain.JobKindService || !rules.IsDetached(record.Config) {
 			continue
 		}
 		queries = append(queries, StackQuery{

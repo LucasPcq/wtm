@@ -19,14 +19,20 @@ func newDownCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   domain.CmdDown + " [worktree...]",
 		Short: "Stop a worktree's running jobs",
-		Long:  "Stop the jobs running in [worktree] — the current one when omitted, picked interactively when there is a terminal.\nWith --profile, stops only that profile's jobs.\nJobs running in other worktrees are never touched.",
-		Args:  cobra.ArbitraryArgs,
-		RunE:  runDown,
+		Long:  "Stop the jobs running in [worktree] — the current one when omitted, picked interactively when there is a terminal.\nWith --profile, stops only that profile's jobs.\nJobs running in other worktrees are never touched, unless --all is given: it stops every worktree of this repository, without asking, and lists each one it emptied. Other repositories are never touched.",
+		Example: `  wtm run down
+
+  wtm run down feat/login --profile backend
+
+  # Every worktree of this repository
+  wtm run down --all --yes`,
+		Args: cobra.ArbitraryArgs,
+		RunE: runDown,
 	}
-	shared.AddProfileFlag(cmd, "Stop only this profile's jobs")
+	shared.AddProfileFlag(cmd, "Stop only this profile's jobs (default: every job the worktree runs)")
 	shared.AddYesFlag(cmd, "Skip all prompts; stops what the worktree has running")
 	shared.AddOutputFlag(cmd)
-	cmd.Flags().Bool(domain.FlagAll, false, "Stop jobs across every worktree (bypasses per-worktree scoping)")
+	cmd.Flags().Bool(domain.FlagAll, false, "Stop the jobs of every worktree of this repository")
 	return cmd
 }
 
@@ -41,13 +47,11 @@ func runDown(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("--%s cannot be combined with a worktree or --%s", domain.FlagAll, domain.FlagProfile)
 	}
 
-	ctx, err := runctx.Open(runctx.OpenParams{Cmd: cmd})
+	ctx, err := runctx.Open(runctx.OpenParams{Cmd: cmd, TolerateRunConfig: true})
 	if err != nil {
 		return err
 	}
-	if err := reportRunConfig(cmd, ctx.Run); err != nil {
-		return err
-	}
+	warnRunConfig(cmd, ctx)
 
 	outcome, err := downflow.Run(downflow.Params{
 		Context: ctx.FlowContext(),
@@ -118,10 +122,10 @@ func (p downPresenter) Downed(outcome downflow.Outcome) error {
 // stopped · main` is the sentence `run up` writes, `migrate · main stopped` is
 // the same words in the wrong order.
 func (p downPresenter) qualify(line string, outcome downflow.Outcome, worktree domain.WorktreeJobResults) string {
-	if len(outcome.Results) <= 1 || worktree.Worktree == "" {
+	if len(outcome.Results) <= 1 || worktree.Branch == "" {
 		return line
 	}
-	return fmt.Sprintf(domain.RunStreamWorktreeFmt, line, worktree.Worktree)
+	return fmt.Sprintf(domain.RunStreamWorktreeFmt, line, worktree.Branch)
 }
 
 func (p downPresenter) nothingRunning(outcome downflow.Outcome) string {

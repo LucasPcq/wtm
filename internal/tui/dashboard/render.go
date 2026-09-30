@@ -19,20 +19,11 @@ const (
 	borderWidth   = 2
 	paddingWidth  = 2
 	buttonPadding = 4
-	// panelChromeRows is what renderPanel prepends to Body before drawing it:
-	// the title row and the blank row under it.
-	panelChromeRows = 2
 )
 
-// panelBodyHeight is the row budget renderPanel leaves for Body once its own
-// border and chrome rows are accounted for.
-func panelBodyHeight(rect domain.Rect) int {
-	return max(rect.Height-borderWidth-panelChromeRows, 0)
-}
-
-// tabbedPanelBodyHeight is panelBodyHeight for a panel that heads itself: it
-// passes no Title, so renderPanel prepends nothing, and what its own head costs
-// is the tab bar rather than the title row.
+// tabbedPanelBodyHeight is the row budget renderPanel leaves for the Body of a
+// panel that heads itself: it passes no Title, so renderPanel prepends nothing,
+// and what its own head costs is the tab bar rather than the title row.
 func tabbedPanelBodyHeight(rect domain.Rect) int {
 	return max(rect.Height-borderWidth-domain.DashboardPanelTabsChrome, 0)
 }
@@ -284,7 +275,8 @@ func (m Model) countLineVariant(params countLineParams) string {
 func (m Model) renderTabBar(width int, right func(room int) string) (bar string, activeStart, activeWidth int) {
 	rendered := make([]string, 0, len(tabs))
 	used := 0
-	for index, title := range tabs {
+	for _, index := range m.shownTabs() {
+		title := tabs[index]
 		style := styles.DashboardTabInactive
 		if index == m.tab {
 			style = styles.DashboardTabActive
@@ -522,10 +514,10 @@ func (m Model) countLabel() string {
 
 // Both tab styles share the same padding, so the column does not depend on which
 // tab is active — which is what lets the slide animation measure from and to it.
-func tabStart(width, index int) int {
+func (m Model) tabStart(width, index int) int {
 	used := 0
-	for i, title := range tabs {
-		w := lipgloss.Width(styles.DashboardTabInactive.Render(title))
+	for _, i := range m.shownTabs() {
+		w := lipgloss.Width(styles.DashboardTabInactive.Render(tabs[i]))
 		if used+w > width {
 			break
 		}

@@ -12,6 +12,14 @@ Detached services (those with a stop command) keep running, and the next daemon 
 wtm run daemon stop [flags]
 ```
 
+### Examples
+
+```
+  wtm run daemon stop
+
+  wtm run daemon stop --yes
+```
+
 ### Options
 
 ```

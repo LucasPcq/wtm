@@ -90,7 +90,16 @@ func TestRunConfigDefaultProfileFallback(t *testing.T) {
 	}
 	p, ok := DefaultProfile(cfg)
 	if !ok || p.Name != "only" {
-		t.Errorf("expected fallback to first profile, got %q (ok=%v)", p.Name, ok)
+		t.Errorf("expected fallback to the only profile, got %q (ok=%v)", p.Name, ok)
+	}
+}
+
+func TestRunConfigDefaultProfileIsNotTheFirstOfSeveral(t *testing.T) {
+	cfg := domain.RunConfig{
+		Profiles: []domain.ProfileConfig{{Name: "front"}, {Name: "back"}},
+	}
+	if p, ok := DefaultProfile(cfg); ok {
+		t.Errorf("DefaultProfile = %q, want none: several profiles and none marked default", p.Name)
 	}
 }
 
@@ -363,5 +372,32 @@ func TestJobUptimeStaysSilentForAJobThatDiedUnwatched(t *testing.T) {
 		if got != "" {
 			t.Errorf("uptime for %q = %q, want none: it died at a moment nobody recorded", status, got)
 		}
+	}
+}
+
+func TestDistinctValuesIgnoresTheUnknown(t *testing.T) {
+	if got := DistinctValues(map[string]string{"/a": "shop", "/b": "shop", "/c": ""}); got != 1 {
+		t.Errorf("DistinctValues = %d, want 1", got)
+	}
+	if got := DistinctValues(map[string]string{"/a": "shop", "/b": "blog"}); got != 2 {
+		t.Errorf("DistinctValues = %d, want 2", got)
+	}
+}
+
+func TestLauncherMayNotExitSparesADetachingCommand(t *testing.T) {
+	cases := map[string]bool{
+		"docker compose up -d":                false,
+		"docker compose -f x.yml up --detach": false,
+		"docker run --detach=true nginx":      false,
+		"./serve.sh":                          true,
+	}
+	for cmd, want := range cases {
+		job := domain.JobConfig{Name: "j", Kind: domain.JobKindService, Cmd: cmd, Stop: "true"}
+		if got := LauncherMayNotExit(job); got != want {
+			t.Errorf("LauncherMayNotExit(%q) = %v, want %v", cmd, got, want)
+		}
+	}
+	if LauncherMayNotExit(domain.JobConfig{Name: "j", Kind: domain.JobKindService, Cmd: "./serve.sh"}) {
+		t.Error("a foreground service was flagged")
 	}
 }

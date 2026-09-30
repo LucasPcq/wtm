@@ -11,6 +11,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow/run/target"
 	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/internal/tui/components"
 )
 
@@ -24,6 +26,9 @@ func newPsCmd() *cobra.Command {
 			"run-initialized repository or not.\n" +
 			"To act on those jobs, open the run view with `wtm run logs`, which covers as many\n" +
 			"worktrees as you select.",
+		Example: `  wtm run ps
+
+  wtm run ps --output json`,
 		RunE: runPs,
 	}
 	shared.AddOutputFlag(cmd)
@@ -34,21 +39,19 @@ func runPs(cmd *cobra.Command, _ []string) error {
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 
 	if format == domain.OutputJSON {
-		jobs, err := shared.LoadJobs()
-		if err != nil {
-			return err
-		}
-		return output.WriteRunningJobsJSON(cmd.OutOrStdout(), jobs)
+		jobs := rules.JobsByWorktree(shared.LoadJobs().Jobs)
+		return output.WriteRunningJobsJSON(cmd.OutOrStdout(), runningJobs(runningJobsParams{Jobs: jobs, Held: runjobs.Held(jobs)}))
 	}
 
-	var jobs []domain.JobInfo
+	var listing runjobs.Listing
+	var held domain.HeldAddresses
 	loadErr := components.RunLoading(components.LoadingParams{
-		Message: "Loading jobs…",
+		Message: domain.RunLoadingJobs,
 		Animate: shared.Animate(cmd, true),
 		Work: func() error {
-			var e error
-			jobs, e = shared.LoadJobs()
-			return e
+			listing = shared.LoadJobs()
+			held = runjobs.Held(listing.Jobs)
+			return nil
 		},
 	})
 	if loadErr != nil {
@@ -56,8 +59,20 @@ func runPs(cmd *cobra.Command, _ []string) error {
 	}
 
 	out := cmd.OutOrStdout()
+	jobs := rules.JobsByWorktree(listing.Jobs)
 	output.Frame(out, func(w io.Writer) {
-		fmt.Fprint(w, output.FormatRunningJobs(output.FormatRunningJobsParams{Jobs: jobs, Now: time.Now(), Branches: branchesOf(jobs), Hyperlinks: output.IsTerminal(out)}))
+		fmt.Fprint(w, output.FormatRunningJobs(output.FormatRunningJobsParams{
+			Jobs:       jobs,
+			Now:        time.Now(),
+			Branches:   branchesOf(jobs),
+			Projects:   projectsOf(jobs),
+			Held:       held,
+			Hyperlinks: output.IsTerminal(out),
+		}))
+		if listing.Diverged() {
+			output.Blank(w)
+			output.Warning(w, fmt.Sprintf(domain.RunDaemonDivergedFmt, rules.DaemonVersionLabel(listing.DaemonVersion), domain.Version))
+		}
 	})
 	return nil
 }
@@ -73,4 +88,55 @@ func branchesOf(jobs []domain.JobInfo) map[string]string {
 		branches[job.WorkDir] = target.BranchOf(job.WorkDir)
 	}
 	return branches
+}
+
+// projectsOf names each work dir's repository, nil when they all belong to one:
+// the daemon is machine-wide, and "main" alone is ambiguous across two repos.
+func projectsOf(jobs []domain.JobInfo) map[string]string {
+	projects := map[string]string{}
+	for _, job := range jobs {
+		if _, seen := projects[job.WorkDir]; seen {
+			continue
+		}
+		projects[job.WorkDir] = target.ProjectOf(job.WorkDir)
+	}
+	if rules.DistinctValues(projects) < 2 {
+		return nil
+	}
+	return projects
+}
+
+// runningJobs is the document `run ps --output json` writes: every row names
+// its worktree by branch and path, and its project even when there is one.
+type runningJobsParams struct {
+	Jobs []domain.JobInfo
+	Held domain.HeldAddresses
+}
+
+func runningJobs(params runningJobsParams) []domain.RunningJob {
+	jobs := params.Jobs
+	branches := branchesOf(jobs)
+	projects := map[string]string{}
+	rows := make([]domain.RunningJob, 0, len(jobs))
+	for _, job := range jobs {
+		project, seen := projects[job.WorkDir]
+		if !seen {
+			project = target.ProjectOf(job.WorkDir)
+			projects[job.WorkDir] = project
+		}
+		rows = append(rows, domain.RunningJob{
+			Name:      job.Name,
+			Kind:      job.Kind,
+			Status:    job.Status,
+			PID:       job.PID,
+			Branch:    branches[job.WorkDir],
+			Path:      job.WorkDir,
+			Project:   project,
+			StartedAt: job.StartedAt,
+			URL:       job.URL,
+			ExitCode:  job.ExitCode,
+			Held:      params.Held[job.WorkDir][job.Name],
+		})
+	}
+	return rows
 }

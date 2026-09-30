@@ -7,22 +7,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
-func TestInstallCommandFromHooks(t *testing.T) {
-	hooks := []domain.HookCommand{
-		{Cmd: "pnpm install"},
-		{Cmd: "pnpm install", Cwd: "packages/api"},
-	}
-	if got := rules.InstallCommandFromHooks(hooks); got != "pnpm install" {
-		t.Errorf("got %q, want pnpm install", got)
-	}
-	if got := rules.InstallCommandFromHooks(nil); got != "" {
-		t.Errorf("got %q, want empty", got)
-	}
-	if got := rules.InstallCommandFromHooks([]domain.HookCommand{{Cmd: "x", Cwd: "a"}}); got != "" {
-		t.Errorf("got %q, want empty when only cwd hooks", got)
-	}
-}
-
 func TestDockerFilesConfigured(t *testing.T) {
 	run := domain.RunConfig{Jobs: []domain.JobConfig{
 		{Name: "docker-compose", Cmd: "docker compose -f docker-compose.yml up -d"},

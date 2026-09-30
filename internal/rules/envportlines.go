@@ -272,10 +272,7 @@ func EnvPortNotices(plan domain.EnvPortPlan) []EnvPortNotice {
 	}
 
 	if plan.PublicPort == 0 {
-		return []EnvPortNotice{{
-			Title: domain.EnvOriginProxyOffTitle,
-			Line:  domain.EnvOriginProxyOffLine,
-		}}
+		return EnvPortNoticesOnCreate(plan)
 	}
 	if plan.PublicPort == domain.ProxyPrivilegedPort || !writesAddresses(plan) {
 		return nil
@@ -283,6 +280,19 @@ func EnvPortNotices(plan domain.EnvPortPlan) []EnvPortNotice {
 	return []EnvPortNotice{{
 		Title: domain.EnvOriginPortedTitle,
 		Line:  fmt.Sprintf(domain.EnvOriginPortedFmt, plan.PublicPort),
+	}}
+}
+
+// EnvPortNoticesOnCreate is what a new worktree's pass says: only that named
+// addresses could not be written. The proxy's port is a property of the machine,
+// told by `wtm env` and `wtm run addressing` rather than by every creation.
+func EnvPortNoticesOnCreate(plan domain.EnvPortPlan) []EnvPortNotice {
+	if plan.Addressing != domain.AddressingNames || len(plan.Entries) == 0 || plan.PublicPort != 0 {
+		return nil
+	}
+	return []EnvPortNotice{{
+		Title: domain.EnvOriginProxyOffTitle,
+		Line:  domain.EnvOriginProxyOffLine,
 	}}
 }
 
@@ -304,16 +314,43 @@ func EnvPortOffsetLabel(offset int) string {
 	return domain.EnvPortsTitle + " " + domain.EnvPortOffsetPrefix + strconv.Itoa(offset)
 }
 
-// EnvPortSettlementNote is the port pass as a create-like recap carries it: a
-// count and an offset, never the values. Empty when the run moved nothing.
-func EnvPortSettlementNote(settlement domain.EnvPortSettlement) string {
-	if settlement.Shifted == 0 {
-		return ""
+// EnvPortSettlementNote is the port pass as a create-like recap carries it:
+// counts and the worktree's offset, never the values. Empty when the run wrote
+// nothing.
+func EnvPortSettlementNote(plan domain.EnvPortPlan) string {
+	var parts []string
+	if shifted := len(EnvPortRewrites(plan)); shifted > 0 {
+		noun := pluralNoun(pluralNounParams{Count: shifted, One: domain.EnvPortsRecapPort, Many: domain.EnvPortsRecapPorts})
+		parts = append(parts, fmt.Sprintf(domain.EnvPortsRecapSettledFmt, shifted, noun, plan.Offset))
 	}
-	if !settlement.Applied {
-		return fmt.Sprintf(domain.EnvPortsRecapKeptFmt, settlement.Shifted)
+	if written := ownedWritten(plan); written > 0 {
+		noun := pluralNoun(pluralNounParams{Count: written, One: domain.EnvPortsRecapOwnedValue, Many: domain.EnvPortsRecapOwnedValues})
+		parts = append(parts, fmt.Sprintf(domain.EnvPortsRecapOwnedFmt, written, noun))
 	}
-	return fmt.Sprintf(domain.EnvPortsRecapShiftedFmt, settlement.Shifted, settlement.Offset)
+	return strings.Join(parts, domain.EnvRecapNoteSeparator)
+}
+
+func ownedWritten(plan domain.EnvPortPlan) int {
+	count := 0
+	for _, entry := range plan.Owned {
+		if entry.Changed {
+			count++
+		}
+	}
+	return count
+}
+
+type pluralNounParams struct {
+	Count int
+	One   string
+	Many  string
+}
+
+func pluralNoun(params pluralNounParams) string {
+	if params.Count == 1 {
+		return params.One
+	}
+	return params.Many
 }
 
 type EnvPortOutcomeParams struct {
@@ -336,4 +373,30 @@ func EnvPortOutcomeLine(params EnvPortOutcomeParams) string {
 		return fmt.Sprintf(domain.EnvPortsLeftAloneFmt, rewrites)
 	}
 	return ""
+}
+
+type PortsNotSettledParams struct {
+	Branch string
+	// RunConfig says run.toml is what stood in the way, rather than a record
+	// the pass needed from elsewhere (a neighbour's ordinal).
+	RunConfig bool
+}
+
+// portsNotSettledHint is what a core command says of a port pass it left
+// undone: the ports stay as copied, and how to settle them later.
+func portsNotSettledHint(params PortsNotSettledParams) string {
+	if params.RunConfig {
+		return fmt.Sprintf(domain.EnvPortsNotSettledRunFmt, params.Branch)
+	}
+	return fmt.Sprintf(domain.EnvPortsNotSettledOtherFmt, params.Branch)
+}
+
+type PortsNotSettledWarningParams struct {
+	Cause string
+	PortsNotSettledParams
+}
+
+// PortsNotSettledWarning is the cause and what it left undone, in one line.
+func PortsNotSettledWarning(params PortsNotSettledWarningParams) string {
+	return fmt.Sprintf(domain.RunWarningFmt, params.Cause, portsNotSettledHint(params.PortsNotSettledParams))
 }

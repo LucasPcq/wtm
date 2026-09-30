@@ -12,34 +12,44 @@ func newTarget(path string) domain.AgentTarget {
 	return domain.AgentTarget{Kind: domain.AgentKindClaudeProject, Path: path}
 }
 
-func TestWriteSkillFile_CreatesWhenMissing(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "skills", "using-wtm", "SKILL.md")
+func skillPath(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(t.TempDir(), "skills", "using-wtm", "SKILL.md")
+}
 
-	res := writeSkillFile(newTarget(path))
+func assertInstalled(t *testing.T, dir string) {
+	t.Helper()
+	for name, content := range skillFiles() {
+		got, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(name)))
+		if err != nil {
+			t.Fatalf("%s not written: %v", name, err)
+		}
+		if string(got) != content {
+			t.Fatalf("%s does not match the embedded skill", name)
+		}
+	}
+}
+
+func TestWriteSkill_CreatesEveryFile(t *testing.T) {
+	path := skillPath(t)
+
+	res := writeSkill(newTarget(path))
 
 	if res.Action != agentActionCreated {
 		t.Fatalf("action = %q, want %q", res.Action, agentActionCreated)
 	}
-	got, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read written file: %v", err)
-	}
-	if string(got) != renderSkillMarkdown() {
-		t.Fatalf("written content does not match embedded skill")
-	}
+	assertInstalled(t, filepath.Dir(path))
 }
 
-func TestWriteSkillFile_UnchangedWhenIdentical(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "SKILL.md")
-	if err := os.WriteFile(path, []byte(renderSkillMarkdown()), 0o644); err != nil {
-		t.Fatalf("seed file: %v", err)
-	}
+func TestWriteSkill_UnchangedWhenIdentical(t *testing.T) {
+	path := skillPath(t)
+	writeSkill(newTarget(path))
 	before, err := os.Stat(path)
 	if err != nil {
 		t.Fatalf("stat before: %v", err)
 	}
 
-	res := writeSkillFile(newTarget(path))
+	res := writeSkill(newTarget(path))
 
 	if res.Action != agentActionUnchanged {
 		t.Fatalf("action = %q, want %q", res.Action, agentActionUnchanged)
@@ -49,45 +59,66 @@ func TestWriteSkillFile_UnchangedWhenIdentical(t *testing.T) {
 		t.Fatalf("stat after: %v", err)
 	}
 	if !after.ModTime().Equal(before.ModTime()) {
-		t.Fatalf("file was rewritten (mtime changed) for identical content")
+		t.Fatalf("SKILL.md was rewritten for identical content")
 	}
 }
 
-func TestWriteSkillFile_UpdatesWhenDifferent(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "SKILL.md")
+// A skill installed by an older wtm is a single SKILL.md: updating it writes
+// the references beside it.
+func TestWriteSkill_UpdatesASingleFileSkill(t *testing.T) {
+	path := skillPath(t)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(path, []byte("stale skill content"), 0o644); err != nil {
-		t.Fatalf("seed file: %v", err)
+		t.Fatal(err)
 	}
 
-	res := writeSkillFile(newTarget(path))
+	res := writeSkill(newTarget(path))
 
 	if res.Action != agentActionUpdated {
 		t.Fatalf("action = %q, want %q", res.Action, agentActionUpdated)
 	}
-	got, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read updated file: %v", err)
+	assertInstalled(t, filepath.Dir(path))
+}
+
+// A reference file this wtm no longer ships is removed, but nothing the user
+// put beside the skill is touched.
+func TestWriteSkill_RemovesOnlyItsOwnStaleReferences(t *testing.T) {
+	path := skillPath(t)
+	writeSkill(newTarget(path))
+	dir := filepath.Dir(path)
+	stale := filepath.Join(dir, skillReferencesDir, "retired.md")
+	mine := filepath.Join(dir, "notes.md")
+	for _, file := range []string{stale, mine} {
+		if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if string(got) != renderSkillMarkdown() {
-		t.Fatalf("content not refreshed to embedded skill")
+
+	res := writeSkill(newTarget(path))
+
+	if res.Action != agentActionUpdated {
+		t.Fatalf("action = %q, want %q", res.Action, agentActionUpdated)
+	}
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Errorf("a retired reference file was left behind")
+	}
+	if _, err := os.Stat(mine); err != nil {
+		t.Errorf("a file of the user's was removed: %v", err)
 	}
 }
 
-func TestWriteSkillFile_SkipsOnWriteError(t *testing.T) {
+func TestWriteSkill_SkipsOnWriteError(t *testing.T) {
 	dir := t.TempDir()
-	// A read-only parent directory makes MkdirAll of a nested path fail.
 	if err := os.Chmod(dir, 0o500); err != nil {
 		t.Fatalf("chmod: %v", err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
 
-	path := filepath.Join(dir, "nested", "SKILL.md")
-	res := writeSkillFile(newTarget(path))
+	res := writeSkill(newTarget(filepath.Join(dir, "nested", "SKILL.md")))
 
-	if res.Action != agentActionSkipped {
-		t.Fatalf("action = %q, want %q", res.Action, agentActionSkipped)
-	}
-	if res.Reason == "" {
-		t.Fatalf("expected a non-empty reason on skip")
+	if res.Action != agentActionSkipped || res.Reason == "" {
+		t.Fatalf("result = %+v, want skipped with a reason", res)
 	}
 }

@@ -3,10 +3,8 @@ package run
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
@@ -14,11 +12,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/service/integration"
 	"github.com/LucasPcq/wtm/internal/tui/runview"
 )
-
-// isTTY reports whether this command owns a terminal. It is a variable so a
-// test can answer yes: which surface a run gets hangs on it, and nothing else
-// makes a pipe look like a terminal.
-var isTTY = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
 
 // showRunView is the full-screen surface, a variable for the same reason: a
 // test can watch a command hand over to it without bubbletea taking over a
@@ -89,7 +82,7 @@ type detachedRun struct {
 func (d *detachedRun) open() {
 	out, errOut := d.params.Cmd.OutOrStdout(), d.params.Cmd.ErrOrStderr()
 	output.FrameStart(out)
-	output.Message(out, domain.RunDetachedNotice)
+	output.Message(output.Barred(out), domain.RunDetachedNotice)
 	d.printer = output.NewRunPrinter(output.RunPrinterParams{
 		Out:        out,
 		Err:        errOut,
@@ -145,9 +138,8 @@ func runOnStream(params streamParams) (runlogs.Outcomes, error) {
 }
 
 // runForMachine emits the run's outcome as a JSON document, then fails when the
-// profile aborted. The document is complete either way: the module's rule is
-// that the shape follows the arity and the exit code follows the success, and
-// an exit code has never made a document unreadable (LUC-198).
+// profile aborted. The document is complete either way: an exit code has never
+// made a document unreadable (LUC-198).
 func runForMachine(params streamParams) (runlogs.Outcomes, error) {
 	outcomes, err := params.Start(params.Cmd.Context(), nil)
 	if err != nil {

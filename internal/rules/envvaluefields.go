@@ -10,7 +10,7 @@ import (
 type EnvValueFieldsParams struct {
 	// Shared are the services the scope step marked, carrying the namespace the
 	// step before this one settled. A service that carves nothing out is not
-	// offered: there would be no slice for a key to name.
+	// offered: there would be no namespace for a key to name.
 	Shared []domain.SharedComposeService
 	// Lines are the parsed .env files wtm manages, keyed by target path.
 	Lines map[string][]domain.EnvLine
@@ -23,7 +23,7 @@ type EnvValueFieldsParams struct {
 	// of the vocabulary while a template is edited.
 	Ports map[string][]string
 	// Bases are the host ports each shared service declares. A key whose value
-	// carries one is where the service answers, not which slice this worktree
+	// carries one is where the service answers, not which namespace this worktree
 	// holds — the [[env_port]] table already speaks for it — so it is offered
 	// like every other key but never pre-checked.
 	Bases map[string][]int
@@ -66,7 +66,7 @@ type envValueFieldParams struct {
 	Linked  map[domain.EnvKeyRef]domain.EnvValueLink
 	Vars    []domain.NamespaceVarGroup
 	// Addressed says the key is where the service answers rather than which
-	// slice this worktree holds, so the name affinity must not claim it.
+	// namespace this worktree holds, so the name affinity must not claim it.
 	Addressed bool
 }
 
@@ -89,7 +89,7 @@ func envValueField(params envValueFieldParams) domain.EnvValueField {
 	}
 	// A guess is proposed whole: the value on disk never varies, and a checked
 	// row the reader did not touch must not be one Done refuses.
-	if !params.Addressed && namesSlice(params.Key, params.Job) {
+	if !params.Addressed && namesNamespace(params.Key, params.Job) {
 		field.Linked, field.Value = true, domain.EnvValueTokenNamespace
 	}
 	return field
@@ -129,17 +129,17 @@ func envValueTemplate(current string) string {
 	return current
 }
 
-// namesSlice is the whole of wtm's guess: KEYCLOAK_REALM beside a job called
+// namesNamespace is the whole of wtm's guess: KEYCLOAK_REALM beside a job called
 // keycloak. The prefix alone also claimed POSTGRES_USER and POSTGRES_PASSWORD,
 // which are the same for every worktree. It never reaches a key run.toml
 // already speaks about.
-func namesSlice(key, job string) bool {
+func namesNamespace(key, job string) bool {
 	prefix := strings.ToUpper(strings.NewReplacer("-", "_", ".", "_", ":", "_").Replace(job))
 	upper := strings.ToUpper(key)
 	if prefix == "" || !strings.HasPrefix(upper, prefix+"_") {
 		return false
 	}
-	for _, suffix := range domain.EnvSliceKeySuffixes {
+	for _, suffix := range domain.EnvNamespaceKeySuffixes {
 		if strings.HasSuffix(upper, suffix) {
 			return true
 		}

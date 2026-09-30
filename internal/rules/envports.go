@@ -368,9 +368,7 @@ func alreadyResolvedStatus(value string, entry domain.EnvPortEntry) domain.EnvPo
 	}
 }
 
-// ApplyEnvPorts writes the planned rewrites into the lines of one file. Raw is
-// cleared on every mutated pair, which is what makes RenderEnv re-emit the line
-// from Key/Value instead of reproducing the stale original.
+// ApplyEnvPorts writes the planned rewrites into the lines of one file.
 func ApplyEnvPorts(lines []domain.EnvLine, entries []domain.EnvPortEntry) []domain.EnvLine {
 	byKey := map[string]string{}
 	for _, e := range entries {
@@ -389,8 +387,7 @@ func ApplyEnvPorts(lines []domain.EnvLine, entries []domain.EnvPortEntry) []doma
 		if line.Kind != domain.EnvLinePair || !rewritten {
 			continue
 		}
-		out[i].Value = value
-		out[i].Raw = ""
+		out[i] = WithEnvValue(line, value)
 	}
 	return out
 }

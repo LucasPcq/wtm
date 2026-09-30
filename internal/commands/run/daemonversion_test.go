@@ -15,7 +15,7 @@ import (
 func TestClientRefusesADaemonOfAnotherBuild(t *testing.T) {
 	startFakeDaemon(t, &fakeDaemon{Version: "0.27.0"})
 
-	_, err := process.NewClient(process.SocketPath()).Send(process.Request{Action: process.ActionList})
+	_, err := process.NewClient(process.SocketPath()).Send(process.Request{Action: process.ActionStart, Job: &apiJob})
 
 	if !errors.Is(err, domain.ErrDaemonVersionMismatch) {
 		t.Fatalf("error = %v, want a version mismatch", err)
@@ -33,7 +33,7 @@ func TestClientRefusesADaemonOfAnotherBuild(t *testing.T) {
 func TestClientReadsAnUnstampedAnswerAsOlder(t *testing.T) {
 	startFakeDaemon(t, &fakeDaemon{Version: "none"})
 
-	_, err := process.NewClient(process.SocketPath()).Send(process.Request{Action: process.ActionList})
+	_, err := process.NewClient(process.SocketPath()).Send(process.Request{Action: process.ActionStart, Job: &apiJob})
 
 	if !errors.Is(err, domain.ErrDaemonVersionMismatch) {
 		t.Fatalf("error = %v, want a version mismatch", err)
@@ -48,5 +48,43 @@ func TestClientAcceptsADaemonOfTheSameBuild(t *testing.T) {
 
 	if _, err := process.NewClient(process.SocketPath()).Send(process.Request{Action: process.ActionList}); err != nil {
 		t.Fatalf("the nominal path must cost nothing: %v", err)
+	}
+}
+
+// An older daemon is still the one holding the jobs: listing it is how the user
+// learns what a restart would cost, so `run ps` shows them and says why they
+// may behave differently.
+func TestPsListsAnOlderDaemonAndSaysSo(t *testing.T) {
+	setupStartProject(t, &fakeDaemon{Version: "none", Jobs: []domain.JobInfo{{Name: "api", Status: domain.JobStatusRunning, WorkDir: "/w"}}})
+	fakeTTY(t, false)
+
+	stdout, _, err := runCmd(t, domain.CmdPs)
+	if err != nil {
+		t.Fatalf("run ps: %v", err)
+	}
+	for _, want := range []string{"api", domain.DaemonVersionUnknown, "wtm run daemon restart"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("run ps does not say %q:\n%s", want, stdout)
+		}
+	}
+}
+
+// Replacing a daemon that holds jobs would stop the foreground ones: a start is
+// refused, naming how many and the way out.
+func TestRunStartRefusesAnOlderDaemonHoldingJobs(t *testing.T) {
+	daemon := setupStartProject(t, &fakeDaemon{Version: "0.27.1", Jobs: []domain.JobInfo{{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/elsewhere"}}})
+	fakeTTY(t, false)
+
+	_, _, err := runCmd(t, domain.CmdStart, "--"+domain.FlagJob, "api", "--"+domain.FlagDetach)
+	if !errors.Is(err, domain.ErrDaemonVersionMismatch) {
+		t.Fatalf("error = %v, want a version mismatch", err)
+	}
+	for _, want := range []string{"0.27.1", "1 job", "wtm run daemon restart"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("message %q does not say %q", err, want)
+		}
+	}
+	if started := daemon.startedJobs(); len(started) != 0 {
+		t.Errorf("started %v on an older daemon", started)
 	}
 }

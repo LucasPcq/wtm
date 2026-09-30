@@ -28,6 +28,9 @@ type ResolveEnvPortsParams struct {
 	// Addressing overrides run.toml's when set: a plan read before a switch is
 	// written, to know what the switch would move.
 	Addressing domain.Addressing
+	// Isolation overrides the recorded one when set, for the same reason: the
+	// choice is recorded only once the .env is in line with it.
+	Isolation domain.Isolation
 }
 
 // ResolveEnvPorts gathers what a worktree needs to reconcile the ports written
@@ -44,9 +47,14 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 	}
 
 	// A verbatim worktree keeps its .env exactly as it was copied: no identity,
-	// no port, no slice. Resolving to nothing here is what makes every writer —
+	// no port, no namespace. Resolving to nothing here is what makes every writer —
 	// create, `wtm env`, an addressing switch — leave it alone alike.
-	if rules.IsVerbatim(IsolationOf(WorktreeRef{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: params.Branch})) {
+	ref := WorktreeRef{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: params.Branch}
+	isolation := params.Isolation
+	if isolation == "" {
+		isolation = IsolationOf(ref)
+	}
+	if rules.IsVerbatim(isolation) {
 		return envsvc.EnvPortsParams{}, nil
 	}
 
@@ -65,18 +73,17 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 		return envsvc.EnvPortsParams{WorktreePath: params.WorktreePath, Owned: owned}, nil
 	}
 
-	if errs := rules.ValidateEnvPortTargets(cfg.EnvPorts, params.EnvFiles); len(errs) > 0 {
+	if errs := rules.ValidateEnvTargets(rules.ValidateEnvTargetsParams{Config: cfg, Files: params.EnvFiles}); len(errs) > 0 {
 		return envsvc.EnvPortsParams{}, fmt.Errorf("invalid run config: %s", strings.Join(errs, "; "))
+	}
+	if err := rules.ValidateProxy(params.Global.Proxy); err != nil {
+		return envsvc.EnvPortsParams{}, err
 	}
 
 	// BranchEnv rather than EnsureOrdinal: it settles the offset and the worktree
 	// label in one place, so a .env and the route a job answers under can never
 	// disagree on which worktree they belong to.
-	env, err := BranchEnv(WorktreeRef{
-		ProjectDir: params.ProjectDir,
-		StateDir:   params.StateDir,
-		Branch:     params.Branch,
-	})
+	env, err := branchEnvAs(ref, isolation)
 	if err != nil {
 		return envsvc.EnvPortsParams{}, err
 	}
@@ -175,4 +182,19 @@ func jobsByName(cfg domain.RunConfig) map[string]domain.JobConfig {
 		byName[job.Name] = job
 	}
 	return byName
+}
+
+type OwnedEnvKeysParams struct {
+	StateDir string
+	EnvFiles []domain.EnvFile
+}
+
+// OwnedEnvKeys are the .env keys wtm writes into an isolated worktree, whatever
+// this one's isolation: they are what a switch to verbatim puts back.
+func OwnedEnvKeys(params OwnedEnvKeysParams) ([]domain.EnvKeyRef, error) {
+	cfg, err := config.LoadRun(params.StateDir)
+	if err != nil {
+		return nil, err
+	}
+	return rules.OwnedEnvKeyRefs(rules.OwnedEnvTargetsParams{Config: cfg, EnvFiles: params.EnvFiles}), nil
 }

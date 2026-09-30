@@ -6,6 +6,19 @@ Add, remove, or edit jobs in run.toml
 
 Manage jobs declared in <git-common-dir>/wtm/run.toml.
 
+```
+wtm run job [flags]
+```
+
+### Examples
+
+```
+  wtm run job list
+  wtm run job add web --cmd 'pnpm dev --port ${PORT}' --cwd apps/web --port PORT=3000 --url-port PORT --yes
+  wtm run job edit web
+  wtm run job rm web
+```
+
 ### Options
 
 ```

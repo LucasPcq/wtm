@@ -179,7 +179,7 @@ refused, and the line is what says so. `--raw` on `run url` / `run open` still g
 
 ## Where to reach it — one model for every surface
 
-A run says where each job is reached in **one** place, `rules.ReachLines` over
+A run says where each job is reached in **one** place, `rules.ReachBlock` over
 `domain.ReachEntry` (`internal/rules/reach.go`): the URLs first — a runner's by the apps it
 holds — then the jobs reached by port, their ports named (`REDIS_PORT` → `redis`) and wrapped in
 balanced columns, a shared job's namespace beside it. Every surface renders that block at its
@@ -192,7 +192,7 @@ own density, so none of them decides on its own what to show:
 | `run ps` | `ADDRESS` column, `WORKTREE` as the branch | — |
 
 A shared service a linked worktree only holds runs in main, and every surface says so the same
-way: `postgres attached to main` on its line, a **Shared, running in main** section in the block
+way: `postgres joined, running in main` on its line, a **Shared, running in main** section in the block
 (`rules.ReachSections`), a `shared` line above it in the run view's job list, and a pane
 title naming where it runs rather than the worktree holding it. Stopping the worktree leaves
 those running — which is the one thing the reader has to be able to see.

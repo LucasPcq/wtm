@@ -3,6 +3,7 @@ package run
 import (
 	"encoding/json"
 	"errors"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -82,6 +83,10 @@ func TestRunURLNamesTheJobWhenAmbiguous(t *testing.T) {
 	if !errors.Is(err, domain.ErrJobAmbiguous) {
 		t.Fatalf("err = %v, want ErrJobAmbiguous — a machine surface never falls back to a picker", err)
 	}
+	// The help promises an error naming --job: the refusal has to say how to answer it.
+	if !strings.Contains(err.Error(), "--"+domain.FlagJob) {
+		t.Errorf("err = %q, want it to name --%s", err, domain.FlagJob)
+	}
 }
 
 func TestRunURLNamedJobWins(t *testing.T) {
@@ -121,14 +126,14 @@ func portOf(t *testing.T, url string) int {
 	return n
 }
 
-func TestRunURLUnknownJobNamesTheOnesThatPublish(t *testing.T) {
+func TestRunURLUnknownJobIsNotDeclared(t *testing.T) {
 	stateDir := setupTestProject(t)
 	writeRunTOML(t, stateDir, domain.RunConfig{Jobs: []domain.JobConfig{published("web", 3000, "")}})
 	fakeTTY(t, false)
 
 	_, _, err := runCmd(t, domain.CmdURL, "--"+domain.FlagJob, "nope")
-	if err == nil || !strings.Contains(err.Error(), "web") {
-		t.Fatalf("err = %v, want one naming the jobs that do publish", err)
+	if !errors.Is(err, domain.ErrJobNotFound) {
+		t.Fatalf("err = %v, want ErrJobNotFound", err)
 	}
 }
 
@@ -165,5 +170,24 @@ func TestRunURLJSONHonoursTheJobFlag(t *testing.T) {
 	}
 	if len(entries) != 1 || entries[0].Job != "web" {
 		t.Errorf("entries = %+v, want only web", entries)
+	}
+}
+
+// A shared job runs once, in the main checkout, on its declared port: the raw
+// address of a linked worktree must not shift it by the worktree's offset.
+func TestRunURLRawOfASharedJobKeepsItsDeclaredPort(t *testing.T) {
+	stateDir := setupTestProject(t)
+	db := published("db", 5432, "")
+	db.Scope = domain.JobScopeShared
+	writeRunTOML(t, stateDir, domain.RunConfig{Jobs: []domain.JobConfig{db}})
+	fakeTTY(t, false)
+	enterWorktree(t, addWorktree(t, os.Getenv(domain.EnvProjectDir), "feat/x"))
+
+	stdout, _, err := runCmd(t, domain.CmdURL, "feat/x", "--"+domain.FlagRaw)
+	if err != nil {
+		t.Fatalf("run url --raw: %v", err)
+	}
+	if strings.TrimSpace(stdout) != "http://localhost:5432" {
+		t.Errorf("stdout = %q, want the shared job's declared port", stdout)
 	}
 }

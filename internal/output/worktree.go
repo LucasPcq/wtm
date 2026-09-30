@@ -314,6 +314,36 @@ func FormatCreateResult(w io.Writer, p CreateResultParams) {
 	NextStep(w, NextStepParams{Command: p.GoCommand})
 }
 
+type PRCheckoutResultParams struct {
+	Number            int
+	Branch            string
+	EnvNote           string
+	Path              string
+	ReusedNote        string
+	ReusedNoteWarning bool
+	GoCommand         string
+}
+
+func FormatPRCheckoutResult(w io.Writer, p PRCheckoutResultParams) {
+	Success(w, fmt.Sprintf(domain.PRCheckedOutFmt, p.Number, p.Branch))
+	Blank(w)
+	fields := []domain.RecapField{}
+	if p.EnvNote != "" {
+		fields = append(fields, domain.RecapField{Label: domain.CreateRecapLabelEnv, Value: p.EnvNote})
+	}
+	writeAlignedFields(w, append(fields, domain.RecapField{Label: domain.CreateRecapLabelPath, Value: p.Path}))
+	if p.ReusedNote != "" {
+		Blank(w)
+		if p.ReusedNoteWarning {
+			Warning(w, p.ReusedNote)
+		} else {
+			Message(w, p.ReusedNote)
+		}
+	}
+	Blank(w)
+	NextStep(w, NextStepParams{Command: p.GoCommand})
+}
+
 type noteParams struct {
 	Value string
 	Note  string
@@ -350,10 +380,16 @@ type WriteWorktreeCleanJSONParams struct {
 	// OrphanedChildren lists children left dangling because reparenting was not
 	// authorized (no --reparent-children in non-interactive mode).
 	OrphanedChildren []domain.ReparentResult `json:"orphaned_children,omitempty"`
+	// Namespaces is what became of the data the worktree held in the shared
+	// services: dropped, deferred to the service's next start, or kept.
+	Namespaces []domain.NamespaceOutcome `json:"namespaces"`
 }
 
 // WriteWorktreeCleanJSON writes the JSON payload for `clean`.
 func WriteWorktreeCleanJSON(w io.Writer, params WriteWorktreeCleanJSONParams) error {
+	if params.Namespaces == nil {
+		params.Namespaces = []domain.NamespaceOutcome{}
+	}
 	return encodeJSON(w, params)
 }
 

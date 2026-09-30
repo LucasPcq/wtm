@@ -26,7 +26,16 @@ func newRelocateCmd() *cobra.Command {
 			"moved (git worktree move) and worktrees created outside wtm are adopted (their parent\n" +
 			"recorded so `wtm sync` works). Pass --to to change base_path and move existing worktrees\n" +
 			"to the new location. Dirty or locked worktrees are skipped unless --force; an occupied\n" +
-			"target path is never overwritten.",
+			"target path is never overwritten, and a worktree whose jobs are running is never moved\n" +
+			"(stop them with `wtm run down <branch>` first). Adoption keeps what the worktree's\n" +
+			"meta.json already records (isolation, namespaces, ordinal).",
+		Example: `  # Show the plan first
+  wtm relocate --dry-run
+
+  wtm relocate
+
+  # Move every worktree under a new directory
+  wtm relocate --to ../acme.trees --yes`,
 		Args: cobra.NoArgs,
 		RunE: runRelocate,
 	}

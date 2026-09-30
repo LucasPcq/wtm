@@ -24,6 +24,10 @@ func NewCmd() *cobra.Command {
 		Use:   domain.CmdJob,
 		Short: "Add, remove, or edit jobs in run.toml",
 		Long:  "Manage jobs declared in <git-common-dir>/wtm/run.toml.",
+		Example: `  wtm run job list
+  wtm run job add web --cmd 'pnpm dev --port ${PORT}' --cwd apps/web --port PORT=3000 --url-port PORT --yes
+  wtm run job edit web
+  wtm run job rm web`,
 	}
 
 	cmd.AddCommand(newAddCmd())
@@ -53,6 +57,8 @@ func (p presenter) Changed(outcome jobflow.Outcome) error {
 		switch outcome.Status {
 		case domain.JobActionUpdated:
 			output.Update(w, fmt.Sprintf(domain.RunJobUpdatedFmt, outcome.Name))
+		case domain.JobActionUnchanged:
+			output.Unchanged(w, fmt.Sprintf(domain.RunJobUnchangedFmt, outcome.Name))
 		case domain.JobActionRemoved:
 			output.Success(w, fmt.Sprintf(domain.RunJobRemovedFmt, outcome.Name))
 		default:

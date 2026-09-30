@@ -6,7 +6,9 @@ package seam
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -56,6 +58,7 @@ type Seam struct {
 	worktree   string
 	logDir     string
 	env        map[string]string
+	envErr     error
 	prober     runlogs.Prober
 	project    string
 	proxyPort  int
@@ -71,7 +74,7 @@ func Open(params Params) Seam {
 	branch := target.BranchOf(params.WorkDir)
 	logDir := logDirOf(params.StateDir, branch)
 	service := runlogs.NewService(runlogs.ServiceParams{SocketPath: process.SocketPath()})
-	env := JobEnv(JobEnvParams{
+	env, envErr := JobEnv(JobEnvParams{
 		ProjectDir: params.ProjectDir,
 		StateDir:   params.StateDir,
 		WorkDir:    params.WorkDir,
@@ -101,6 +104,7 @@ func Open(params Params) Seam {
 		worktree:   branch,
 		logDir:     logDir,
 		env:        env,
+		envErr:     envErr,
 		jobs:       params.Jobs,
 		declared:   declaredOf(params),
 		prober:     newProber(params.ProbeBudget, params.NoProbe),
@@ -136,14 +140,14 @@ func sharedContext(params Params) *domain.SharedJobContext {
 	if err != nil {
 		return nil
 	}
+	env, err := JobEnv(JobEnvParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, WorkDir: main})
+	if err != nil {
+		return nil
+	}
 	return &domain.SharedJobContext{
 		WorkDir: main,
-		Env: JobEnv(JobEnvParams{
-			ProjectDir: params.ProjectDir,
-			StateDir:   params.StateDir,
-			WorkDir:    main,
-		}),
-		LogDir: logDirOf(params.StateDir, target.BranchOf(main)),
+		Env:     env,
+		LogDir:  logDirOf(params.StateDir, target.BranchOf(main)),
 	}
 }
 
@@ -179,23 +183,67 @@ func (s Seam) Starter(params StartParams) runlogs.StartFunc {
 }
 
 func (s Seam) run(ctx context.Context, sink runlogs.Sink, params StartParams) (runlogs.Outcome, error) {
-	outcome, err := s.start(ctx, sink, params)
-	// Recorded after the run, from the jobs it actually started: it is the only
-	// durable trace that this worktree holds a namespace, and `clean` reads it to
-	// give back exactly what exists rather than everything run.toml declares.
-	// A verbatim worktree carves nothing — the daemon refused to — so there is
-	// nothing for a clean to give back.
-	if s.shared != nil && !rules.IsVerbatim(domain.Isolation(s.env[domain.EnvIsolation])) {
-		_ = worktree.RecordNamespaces(worktree.RecordNamespacesParams{
-			StateDir: s.stateDir,
-			Branch:   s.worktree,
-			Jobs:     rules.NamespaceJobsStarted(rules.NamespaceJobsStartedParams{Jobs: params.Jobs, Started: outcome.Started}),
-		})
+	return s.start(ctx, s.recording(recordingParams{Sink: sink, Jobs: params.Jobs}), params)
+}
+
+type recordingParams struct {
+	Sink runlogs.Sink
+	Jobs []domain.JobConfig
+}
+
+// recording remembers each namespace the moment its service reports started,
+// not once the whole sequence is over: it is the only durable trace that this
+// worktree holds one, `clean` reads it to give back exactly what exists, and a
+// run interrupted after the create would otherwise leave a database nothing
+// will ever drop. A verbatim worktree carves nothing — the daemon refused to.
+func (s Seam) recording(params recordingParams) runlogs.Sink {
+	sink := params.Sink
+	if sink == nil {
+		sink = discard{}
 	}
-	return outcome, err
+	if s.shared == nil || rules.IsVerbatim(domain.Isolation(s.env[domain.EnvIsolation])) {
+		return sink
+	}
+	carving := rules.NamespaceJobs(params.Jobs)
+	if len(carving) == 0 {
+		return sink
+	}
+	return namespaceRecorder{inner: sink, jobs: carving, stateDir: s.stateDir, worktree: s.worktree}
+}
+
+type discard struct{}
+
+func (discard) Emit(runlogs.Event) {}
+
+type namespaceRecorder struct {
+	inner    runlogs.Sink
+	jobs     []string
+	stateDir string
+	worktree string
+}
+
+func (r namespaceRecorder) Emit(event runlogs.Event) {
+	r.inner.Emit(event)
+	if event.Phase != runlogs.PhaseStarted || !slices.Contains(r.jobs, event.Job) {
+		return
+	}
+	err := worktree.RecordNamespaces(worktree.RecordNamespacesParams{StateDir: r.stateDir, Branch: r.worktree, Jobs: []string{event.Job}})
+	if err == nil {
+		return
+	}
+	r.inner.Emit(runlogs.Event{
+		Phase:    runlogs.PhaseWarning,
+		Job:      event.Job,
+		WorkDir:  event.WorkDir,
+		Worktree: event.Worktree,
+		Notice:   fmt.Sprintf(domain.NamespaceRecordFailedFmt, event.Job, err),
+	})
 }
 
 func (s Seam) start(ctx context.Context, sink runlogs.Sink, params StartParams) (runlogs.Outcome, error) {
+	if s.envErr != nil {
+		return runlogs.Outcome{}, s.envErr
+	}
 	return runlogs.Run(ctx, runlogs.RunParams{
 		BaseOwners:     s.baseOwners(),
 		Service:        s.service,
@@ -283,19 +331,6 @@ func boardAddresses(params boardAddressParams) map[string]domain.JobAddress {
 	})
 }
 
-type LogDirParams struct {
-	StateDir string
-	WorkDir  string
-}
-
-// LogDir resolves where the daemon persists this worktree's job logs. The
-// branch is looked up here rather than passed along by the daemon, which must
-// never run git; a worktree with no branch, or one git cannot name, persists
-// nothing rather than sharing another's directory.
-func LogDir(params LogDirParams) string {
-	return logDirOf(params.StateDir, target.BranchOf(params.WorkDir))
-}
-
 func logDirOf(stateDir, branch string) string {
 	if branch == "" {
 		return ""
@@ -310,19 +345,61 @@ type JobEnvParams struct {
 }
 
 // JobEnv resolves the worktree-scoped environment handed to every job of this
-// run. Like LogDir it degrades to nothing rather than to another worktree's
-// values: a run whose worktree cannot be named injects no isolation instead of
-// the wrong one.
-func JobEnv(params JobEnvParams) map[string]string {
+// run. It fails rather than degrade: a worktree with no offset and no name is
+// one whose jobs would bind the main checkout's ports.
+func JobEnv(params JobEnvParams) (map[string]string, error) {
 	env, err := worktree.JobEnv(worktree.JobEnvParams{
 		ProjectDir: params.ProjectDir,
 		StateDir:   params.StateDir,
 		Dir:        params.WorkDir,
 	})
 	if err != nil {
+		return nil, fmt.Errorf("%w: %s: %w", domain.ErrWorktreeEnvUnresolved, params.WorkDir, err)
+	}
+	return env, nil
+}
+
+type RequireEnvParams struct {
+	ProjectDir string
+	StateDir   string
+	WorkDirs   []string
+}
+
+// RequireEnv refuses a start before anything is started when one of its
+// worktrees has no environment to give its jobs, or has yet to choose its
+// isolation. The choice is checked first: resolving the environment allocates
+// the ordinal the choice is about.
+func RequireEnv(params RequireEnvParams) error {
+	for _, dir := range params.WorkDirs {
+		if err := requireIsolationChosen(requireChosenParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, WorkDir: dir}); err != nil {
+			return err
+		}
+		if _, err := JobEnv(JobEnvParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, WorkDir: dir}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type requireChosenParams struct {
+	ProjectDir string
+	StateDir   string
+	WorkDir    string
+}
+
+func requireIsolationChosen(params requireChosenParams) error {
+	branch := target.BranchOf(params.WorkDir)
+	if branch == "" {
 		return nil
 	}
-	return env
+	plan, err := worktree.IsolationAdoptionFor(worktree.IsolationAdoptionParams{
+		Ref:          worktree.WorktreeRef{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: branch},
+		WorktreePath: params.WorkDir,
+	})
+	if err != nil || !plan.Pending {
+		return nil
+	}
+	return fmt.Errorf("%w: %s", domain.ErrIsolationAdoptionPending, fmt.Sprintf(domain.RunIsolationAdoptionPendingFmt, branch, branch))
 }
 
 // dialProber is this side of the runlogs.Prober seam: the run says which ports

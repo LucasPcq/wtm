@@ -100,6 +100,9 @@ func (m Model) servicesBody(layout domain.DashboardLayout) []string {
 		return nil
 	}
 
+	if len(m.services) == 0 && m.runConfigErr != nil {
+		return m.logsNotice(width, domain.DashboardRunConfigInvalid, runConfigCause(m.runConfigErr))
+	}
 	if len(m.services) == 0 {
 		return m.servicesEmptyLines(width)
 	}

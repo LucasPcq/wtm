@@ -6,6 +6,19 @@ Add, remove, or edit profiles in run.toml
 
 Manage profiles declared in <git-common-dir>/wtm/run.toml.
 
+```
+wtm run profile [flags]
+```
+
+### Examples
+
+```
+  wtm run profile list
+  wtm run profile add backend --jobs postgres,migrate,api --yes
+  wtm run profile edit backend --default --yes
+  wtm run profile rm backend
+```
+
 ### Options
 
 ```

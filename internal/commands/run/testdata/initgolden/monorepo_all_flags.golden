@@ -1,0 +1,317 @@
+### args: --yes --patch-compose --link-env --write-port-keys
+### stdout
+
+  ✓ Configured run module → <repo>/.git/wtm/run.toml   9 added
+
+  ✓ 13 port(s) declared in run.toml
+
+  ✓ 25 .env value(s) now follow a port
+
+  ╭──────────────────────────────────────────────────────────────────────────╮
+  │ These jobs will bind the same port in every worktree                     │
+  │ dev:crm    no port declared                                              │
+  │ dev:shop   no port declared                                              │
+  │                                                                          │
+  │ Declare a port, or reference it in the command: `wtm run job edit <job>` │
+  ╰──────────────────────────────────────────────────────────────────────────╯
+  ╭──────────────────────────────────────────────────────────────────────────────────────╮
+  │ Named URLs carry a port                                                              │
+  │ Jobs publishing a named URL answer on http://<job>.<worktree>.<repo>.localhost:11080 │
+  │ `wtm run proxy install` serves them on port 80 so the port disappears from the URL   │
+  ╰──────────────────────────────────────────────────────────────────────────────────────╯
+  ╭───────────────────────────────────────────────────────────╮
+  │ Published names, unsettled .env                           │
+  │ main's .env still spells ports — `wtm env main` aligns it │
+  ╰───────────────────────────────────────────────────────────╯
+
+  → wtm run up        start the jobs
+  → wtm run job add   declare another
+
+
+### stderr
+
+### file .git/wtm/run.toml
+#:schema ./schemas/run.schema.json
+
+[[job]]
+  name = "docker-compose"
+  kind = "service"
+  cmd = "docker compose -f docker-compose.yml up -d"
+  stop = "docker compose -f docker-compose.yml down --remove-orphans"
+  cwd = "."
+  [job.ports]
+    ADMINER_PORT = 8080
+    MAILPIT_SMTP_PORT = 1025
+    MAILPIT_UI_PORT = 8025
+    MINIO_CONSOLE_PORT = 9001
+    MINIO_PORT = 9000
+    POSTGRES_PORT = 5432
+    REDIS_PORT = 6379
+
+[[job]]
+  name = "dev:crm"
+  kind = "service"
+  cmd = "pnpm run dev:crm"
+  cwd = "."
+
+[[job]]
+  name = "dev:shop"
+  kind = "service"
+  cmd = "pnpm run dev:shop"
+  cwd = "."
+
+[[job]]
+  name = "crm-admin-dev"
+  kind = "service"
+  cmd = "pnpm run dev"
+  cwd = "apps/crm/admin"
+  [job.ports]
+    VITE_PORT = 5176
+  [job.url]
+    port = "VITE_PORT"
+
+[[job]]
+  name = "crm-api-dev"
+  kind = "service"
+  cmd = "pnpm run dev"
+  cwd = "apps/crm/api"
+  [job.ports]
+    PORT = 4002
+  [job.url]
+    port = "PORT"
+
+[[job]]
+  name = "crm-web-dev"
+  kind = "service"
+  cmd = "pnpm run dev"
+  cwd = "apps/crm/web"
+  [job.ports]
+    VITE_PORT = 5175
+  [job.url]
+    port = "VITE_PORT"
+
+[[job]]
+  name = "shop-admin-dev"
+  kind = "service"
+  cmd = "pnpm run dev"
+  cwd = "apps/shop/admin"
+  [job.ports]
+    VITE_PORT = 5174
+  [job.url]
+    port = "VITE_PORT"
+
+[[job]]
+  name = "shop-api-dev"
+  kind = "service"
+  cmd = "pnpm run dev"
+  cwd = "apps/shop/api"
+  [job.ports]
+    PORT = 4001
+  [job.url]
+    port = "PORT"
+
+[[job]]
+  name = "shop-web-dev"
+  kind = "service"
+  cmd = "pnpm run dev"
+  cwd = "apps/shop/web"
+  [job.ports]
+    VITE_PORT = 5173
+  [job.url]
+    port = "VITE_PORT"
+
+[[profile]]
+  name = "crm-admin"
+  jobs = ["docker-compose", "crm-admin-dev"]
+  default = false
+
+[[profile]]
+  name = "crm-api"
+  jobs = ["docker-compose", "crm-api-dev"]
+  default = false
+
+[[profile]]
+  name = "crm-web"
+  jobs = ["docker-compose", "crm-web-dev"]
+  default = false
+
+[[profile]]
+  name = "shop-admin"
+  jobs = ["docker-compose", "shop-admin-dev"]
+  default = false
+
+[[profile]]
+  name = "shop-api"
+  jobs = ["docker-compose", "shop-api-dev"]
+  default = false
+
+[[profile]]
+  name = "shop-web"
+  jobs = ["docker-compose", "shop-web-dev"]
+  default = false
+
+[[profile]]
+  name = "dev:crm"
+  jobs = ["docker-compose", "dev:crm"]
+  default = false
+
+[[profile]]
+  name = "dev:shop"
+  jobs = ["docker-compose", "dev:shop"]
+  default = false
+
+[[profile]]
+  name = "all"
+  jobs = ["docker-compose", "crm-admin-dev", "crm-api-dev", "crm-web-dev", "shop-admin-dev", "shop-api-dev", "shop-web-dev"]
+  default = true
+
+[[env_port]]
+  file = ".env"
+  key = "POSTGRES_PORT"
+  job = "docker-compose"
+  port = "POSTGRES_PORT"
+
+[[env_port]]
+  file = ".env"
+  key = "REDIS_PORT"
+  job = "docker-compose"
+  port = "REDIS_PORT"
+
+[[env_port]]
+  file = ".env"
+  key = "MAILPIT_SMTP_PORT"
+  job = "docker-compose"
+  port = "MAILPIT_SMTP_PORT"
+
+[[env_port]]
+  file = ".env"
+  key = "MAILPIT_UI_PORT"
+  job = "docker-compose"
+  port = "MAILPIT_UI_PORT"
+
+[[env_port]]
+  file = ".env"
+  key = "MINIO_PORT"
+  job = "docker-compose"
+  port = "MINIO_PORT"
+
+[[env_port]]
+  file = ".env"
+  key = "MINIO_CONSOLE_PORT"
+  job = "docker-compose"
+  port = "MINIO_CONSOLE_PORT"
+
+[[env_port]]
+  file = ".env"
+  key = "ADMINER_PORT"
+  job = "docker-compose"
+  port = "ADMINER_PORT"
+
+[[env_port]]
+  file = "apps/crm/admin/.env"
+  key = "VITE_PORT"
+  job = "crm-admin-dev"
+  port = "VITE_PORT"
+
+[[env_port]]
+  file = "apps/crm/admin/.env"
+  key = "VITE_API_URL"
+  job = "crm-api-dev"
+  port = "PORT"
+
+[[env_port]]
+  file = "apps/crm/api/.env"
+  key = "PORT"
+  job = "crm-api-dev"
+  port = "PORT"
+
+[[env_port]]
+  file = "apps/crm/api/.env"
+  key = "CORS_ORIGIN"
+  job = "crm-admin-dev"
+  port = "VITE_PORT"
+
+[[env_port]]
+  file = "apps/crm/api/.env"
+  key = "CORS_ORIGIN"
+  job = "crm-web-dev"
+  port = "VITE_PORT"
+
+[[env_port]]
+  file = "apps/crm/api/.env"
+  key = "DATABASE_URL"
+  job = "docker-compose"
+  port = "POSTGRES_PORT"
+
+[[env_port]]
+  file = "apps/crm/api/.env"
+  key = "BETTER_AUTH_URL"
+  job = "crm-api-dev"
+  port = "PORT"
+
+[[env_port]]
+  file = "apps/crm/web/.env"
+  key = "VITE_PORT"
+  job = "crm-web-dev"
+  port = "VITE_PORT"
+
+[[env_port]]
+  file = "apps/crm/web/.env"
+  key = "VITE_API_URL"
+  job = "crm-api-dev"
+  port = "PORT"
+
+[[env_port]]
+  file = "apps/shop/admin/.env"
+  key = "VITE_PORT"
+  job = "shop-admin-dev"
+  port = "VITE_PORT"
+
+[[env_port]]
+  file = "apps/shop/admin/.env"
+  key = "VITE_API_URL"
+  job = "shop-api-dev"
+  port = "PORT"
+
+[[env_port]]
+  file = "apps/shop/api/.env"
+  key = "PORT"
+  job = "shop-api-dev"
+  port = "PORT"
+
+[[env_port]]
+  file = "apps/shop/api/.env"
+  key = "CORS_ORIGIN"
+  job = "shop-admin-dev"
+  port = "VITE_PORT"
+
+[[env_port]]
+  file = "apps/shop/api/.env"
+  key = "CORS_ORIGIN"
+  job = "shop-web-dev"
+  port = "VITE_PORT"
+
+[[env_port]]
+  file = "apps/shop/api/.env"
+  key = "DATABASE_URL"
+  job = "docker-compose"
+  port = "POSTGRES_PORT"
+
+[[env_port]]
+  file = "apps/shop/api/.env"
+  key = "BETTER_AUTH_URL"
+  job = "shop-api-dev"
+  port = "PORT"
+
+[[env_port]]
+  file = "apps/shop/web/.env"
+  key = "VITE_PORT"
+  job = "shop-web-dev"
+  port = "VITE_PORT"
+
+[[env_port]]
+  file = "apps/shop/web/.env"
+  key = "VITE_API_URL"
+  job = "shop-api-dev"
+  port = "PORT"
+

@@ -564,3 +564,23 @@ func TestTheModalRendersTheBadgesAStepDeclares(t *testing.T) {
 		}
 	}
 }
+
+func TestTheModalMultiSelectCarriesItsBadgesAndStart(t *testing.T) {
+	multi := newMultiSelect(flow.Step{Kind: flow.StepMultiSelect, Key: "w"}, flow.StepContent{
+		Options: []flow.Option{
+			{Label: "main", Value: "/wt/main", Badges: []flow.Badge{{Text: "2 running", Tone: domain.ToneSuccess}}},
+			{Label: "feat/x", Value: "/wt/x", Badges: []flow.Badge{{Text: "current"}}},
+		},
+		Start: "/wt/x",
+	})
+	view := multi.View()
+	for _, want := range []string{"2 running", "current"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("view = %q, want %q", view, want)
+		}
+	}
+	multi, _ = multi.Update(key(" "))
+	if got := strings.Join(multi.Values(), ","); got != "/wt/x" {
+		t.Errorf("space toggled %q, want the row the step starts on", got)
+	}
+}

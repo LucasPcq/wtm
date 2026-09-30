@@ -87,6 +87,8 @@ func init() {
 
 	rootCmd.AddCommand(daemon.NewCmd())
 	rootCmd.AddCommand(daemon.NewProxyForwardCmd())
+
+	markUsageErrors(rootCmd)
 }
 
 // version reads the one symbol goreleaser stamps, domain.Version — the same one
@@ -141,10 +143,23 @@ var rootCmd = &cobra.Command{
 	Use:     domain.AppName,
 	Short:   "Orchestrate git worktrees and team dev workflows from the terminal",
 	Version: version,
-	RunE:    rootRunE,
-	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
+	Example: `  # Once per repository
+  wtm init
+
+  # A worktree per branch, then jump into it
+  wtm create feat/login
+  wtm go feat/login
+
+  # Every worktree, its PR and its services, on one screen
+  wtm ui`,
+	RunE: rootRunE,
+	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+		if err := validateOutputFormat(cmd); err != nil {
+			return err
+		}
 		startUpdateCheck(cmd)
 		silenceHumanOutput(cmd)
+		return nil
 	},
 	SilenceErrors: true,
 	SilenceUsage:  true,

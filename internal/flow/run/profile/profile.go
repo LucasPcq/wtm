@@ -58,6 +58,7 @@ func Add(params AddParams) (Outcome, error) {
 	}
 
 	added := fromAnswers(answers)
+	previous := rules.FindExistingDefaultProfile(params.Request.Config, "")
 	cfg := params.Request.Config
 	cfg.Profiles = append(cfg.Profiles, added)
 	if added.Default {
@@ -66,6 +67,7 @@ func Add(params AddParams) (Outcome, error) {
 	if err := save(params.Context, cfg); err != nil {
 		return Outcome{}, err
 	}
+	sayDefaultReplaced(defaultReplacedParams{Presenter: params.Presenter, Previous: previous, Current: defaultName(added)})
 	return conclude(params.Presenter, Outcome{Name: added.Name, Status: domain.JobActionAdded})
 }
 
@@ -102,7 +104,7 @@ func Edit(params EditParams) (Outcome, error) {
 func editNamed(params EditParams, name string) (Outcome, error) {
 	current, exists := rules.FindProfile(params.Request.Config, name)
 	if !exists {
-		return Outcome{}, fmt.Errorf(domain.RunProfileNotFoundFmt, name)
+		return Outcome{}, fmt.Errorf(domain.RunProfileNotFoundFmt, domain.ErrProfileNotFound, name)
 	}
 
 	updated, err := editedProfile(params, current)
@@ -113,6 +115,10 @@ func editNamed(params EditParams, name string) (Outcome, error) {
 		return Outcome{}, err
 	}
 
+	previous := rules.FindExistingDefaultProfile(params.Request.Config, "")
+	if previous == current.Name {
+		previous = ""
+	}
 	cfg := params.Request.Config
 	for i, profile := range cfg.Profiles {
 		if profile.Name == current.Name {
@@ -126,6 +132,7 @@ func editNamed(params EditParams, name string) (Outcome, error) {
 	if err := save(params.Context, cfg); err != nil {
 		return Outcome{}, err
 	}
+	sayDefaultReplaced(defaultReplacedParams{Presenter: params.Presenter, Previous: previous, Current: defaultName(updated)})
 	return conclude(params.Presenter, Outcome{Name: updated.Name, Status: domain.JobActionUpdated})
 }
 
@@ -184,8 +191,9 @@ func Remove(params RemoveParams) (Outcome, error) {
 // removeNamed leaves the jobs the profile started untouched: a profile is a way
 // of naming them together, not what they belong to.
 func removeNamed(params RemoveParams, name string) (Outcome, error) {
-	if _, exists := rules.FindProfile(params.Request.Config, name); !exists {
-		return Outcome{}, fmt.Errorf(domain.RunProfileNotFoundFmt, name)
+	removed, exists := rules.FindProfile(params.Request.Config, name)
+	if !exists {
+		return Outcome{}, fmt.Errorf(domain.RunProfileNotFoundFmt, domain.ErrProfileNotFound, name)
 	}
 
 	cfg := params.Request.Config
@@ -193,6 +201,7 @@ func removeNamed(params RemoveParams, name string) (Outcome, error) {
 	if err := save(params.Context, cfg); err != nil {
 		return Outcome{}, err
 	}
+	sayDefaultRemoved(defaultRemovedParams{Presenter: params.Presenter, Removed: removed, Config: cfg})
 	return conclude(params.Presenter, Outcome{Name: name, Status: domain.JobActionRemoved})
 }
 
@@ -240,6 +249,46 @@ func List(params ListParams) (Outcome, error) {
 		}, name)
 	}
 	return Outcome{Aborted: true}, nil
+}
+
+func defaultName(profile domain.ProfileConfig) string {
+	if !profile.Default {
+		return ""
+	}
+	return profile.Name
+}
+
+type defaultReplacedParams struct {
+	Presenter Presenter
+	Previous  string
+	Current   string
+}
+
+func sayDefaultReplaced(params defaultReplacedParams) {
+	if params.Previous == "" || params.Current == "" || params.Previous == params.Current {
+		return
+	}
+	params.Presenter.Notice(flow.Notice{
+		Kind: flow.NoticeWarning,
+		Text: fmt.Sprintf(domain.RunProfileDefaultReplacedFmt, params.Previous, params.Current),
+	})
+}
+
+type defaultRemovedParams struct {
+	Presenter Presenter
+	Removed   domain.ProfileConfig
+	Config    domain.RunConfig
+}
+
+func sayDefaultRemoved(params defaultRemovedParams) {
+	if !params.Removed.Default || len(params.Config.Profiles) == 0 {
+		return
+	}
+	text := fmt.Sprintf(domain.RunProfileNoDefaultLeftFmt, params.Removed.Name)
+	if fallback, ok := rules.DefaultProfile(params.Config); ok {
+		text = fmt.Sprintf(domain.RunProfileDefaultRemovedFmt, params.Removed.Name, fallback.Name)
+	}
+	params.Presenter.Notice(flow.Notice{Kind: flow.NoticeWarning, Text: text})
 }
 
 func pickStep(cfg domain.RunConfig, title string) flow.Step {

@@ -7,6 +7,17 @@ Inspect or extract bundled JSON Schemas
 JSON Schemas describe the structure of wtm's TOML config files.
 Use `wtm schema dump` to write them to <git-common-dir>/wtm/schemas/ so editors can pick them up via the `#:schema` directive.
 
+```
+wtm schema [flags]
+```
+
+### Examples
+
+```
+  wtm schema dump
+  wtm schema dump --global
+```
+
 ### Options
 
 ```

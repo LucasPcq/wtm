@@ -149,6 +149,31 @@ func TestLogSinkStartsAnEmptyLogOnEveryRun(t *testing.T) {
 	}
 }
 
+// A detached stack relaunched is still the same run: its launcher's second
+// output joins the first rather than erasing it.
+func TestLogSinkAppendKeepsTheRunAlreadyLogged(t *testing.T) {
+	dir := t.TempDir()
+
+	first, err := OpenLogSink(LogSinkParams{LogDir: dir, Job: "web"})
+	if err != nil {
+		t.Fatalf("open first sink: %v", err)
+	}
+	first.Write([]byte("run one\n"))
+	first.Close()
+
+	second, err := OpenLogSink(LogSinkParams{LogDir: dir, Job: "web", Append: true})
+	if err != nil {
+		t.Fatalf("open second sink: %v", err)
+	}
+	second.Write([]byte("run two\n"))
+	second.Close()
+
+	content := readLog(t, filepath.Join(dir, "web.log"))
+	if !strings.Contains(content, "run one") || !strings.Contains(content, "run two") {
+		t.Errorf("log = %q, want both launches", content)
+	}
+}
+
 // The backups matter as much as the active file: TailJobLog reaches into them
 // whenever the current run is shorter than the tail it was asked for, which is
 // how a job that just restarted read back a days-old run (LUC-198).

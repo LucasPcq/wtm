@@ -1,7 +1,9 @@
 package worktree
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/service/process"
 )
 
 // RelocateParams holds inputs for planning and running a relocate.
@@ -91,6 +94,7 @@ func collectRelocateCandidates(params RelocateParams) ([]rules.RelocateCandidate
 		return nil, err
 	}
 
+	names := nameClashes(nameClashesParams{StateDir: params.StateDir, Worktrees: worktrees})
 	candidates := make([]rules.RelocateCandidate, 0, len(worktrees))
 	for _, w := range worktrees {
 		if w.IsMain {
@@ -109,14 +113,17 @@ func collectRelocateCandidates(params RelocateParams) ([]rules.RelocateCandidate
 			Branch:     w.Branch,
 		})
 
+		managed := isManaged(params.StateDir, w.Branch)
 		candidates = append(candidates, rules.RelocateCandidate{
 			Branch:       w.Branch,
 			FromPath:     w.Path,
-			IsManaged:    isManaged(params.StateDir, w.Branch),
+			IsManaged:    managed,
+			NameClash:    names.of(nameClashOfParams{Branch: w.Branch, Managed: managed}),
 			IsDirty:      dirty,
 			InspectErr:   dirtyErr != nil,
 			IsLocked:     w.Locked,
 			DestOccupied: !samePath(w.Path, to) && pathExists(to),
+			HasJobs:      !samePath(w.Path, to) && process.WorktreeHasJobs(w.Path),
 		})
 	}
 
@@ -150,6 +157,7 @@ func executeRelocateStep(p executeRelocateStepParams) domain.RelocateStepResult 
 	default:
 		// Noop and every skip/block status carry through unchanged.
 		res.Status = p.Step.Status
+		res.Detail = p.Step.Detail
 		return res
 	}
 }
@@ -216,21 +224,17 @@ type adoptWorktreeParams struct {
 	Parent     string
 }
 
+// adoptWorktree completes the record rather than writing a new one: a worktree
+// that already ran jobs holds its ordinal, its isolation and the namespaces
+// clean has to give back. The ordinal is left for the run module to allocate
+// on first use, as for a created worktree.
 func adoptWorktree(params adoptWorktreeParams) error {
-	ordinal, err := EnsureOrdinal(WorktreeRef{
-		ProjectDir: params.ProjectDir,
-		StateDir:   params.StateDir,
-		Branch:     params.Branch,
-	})
-	if err != nil {
-		return fmt.Errorf("allocate ordinal: %w", err)
+	metadata, err := loadMetadata(params.StateDir, params.Branch)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("read metadata for %s: %w", params.Branch, err)
 	}
-
-	metadata := domain.WorktreeMetadata{
-		SourceBranch: params.Parent,
-		CreatedAt:    time.Now().UTC().Format(time.RFC3339),
-		Ordinal:      ordinal,
-	}
+	metadata.SourceBranch = params.Parent
+	metadata.CreatedAt = time.Now().UTC().Format(time.RFC3339)
 	return writeMetadata(rules.WorktreeMetaDir(params.StateDir, params.Branch), metadata)
 }
 

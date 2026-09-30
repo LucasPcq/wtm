@@ -13,7 +13,7 @@ base_branch = "{{ .BaseBranch }}"
 [env]
 # Strategy for provisioning .env files in new worktrees:
 #   example — copy .env.example and rename to .env
-#   main    — copy .env from the main worktree
+#   main    — copy .env from the main checkout
 #   parent  — copy .env from the source worktree
 {{- if .SkipEnv }}
 # Skipped during init. Uncomment to enable .env provisioning.

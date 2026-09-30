@@ -9,8 +9,10 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/run/addressing"
+	"github.com/LucasPcq/wtm/internal/flow/run/concurrency"
 	"github.com/LucasPcq/wtm/internal/flow/run/foreigndata"
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
+	"github.com/LucasPcq/wtm/internal/flow/run/probes"
 	"github.com/LucasPcq/wtm/internal/flow/run/seam"
 	"github.com/LucasPcq/wtm/internal/flow/run/target"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
@@ -24,6 +26,11 @@ type Request struct {
 	Worktree string
 	Cwd      string
 	Job      string
+	// Exclusive and Parallel override the project's standing preference for one
+	// run, as they do for `run up`.
+	Exclusive bool
+	Parallel  bool
+	NoProbe   bool
 	// Force starts a job that changes data the worktree does not own without
 	// asking.
 	Force bool
@@ -80,11 +87,15 @@ type startFlow struct {
 	named *target.Resolved
 	// jobs is one reading of the daemon's index; running is its per-worktree
 	// tally, which the picker shows.
-	jobs    []domain.JobInfo
-	running map[string]int
+	jobs        []domain.JobInfo
+	running     map[string]int
+	concurrency *concurrency.Question
 }
 
 func (f *startFlow) run() (Outcome, error) {
+	if err := target.RequireDeclared(target.DeclaredParams{Config: f.request.Config, Job: f.request.Job}); err != nil {
+		return Outcome{}, err
+	}
 	named, err := target.Named(target.ResolveParams{ProjectDir: f.ctx.ProjectDir, Query: f.request.Worktree})
 	if err != nil {
 		return Outcome{}, err
@@ -94,6 +105,7 @@ func (f *startFlow) run() (Outcome, error) {
 	if err := f.connect(); err != nil {
 		return Outcome{}, err
 	}
+	f.concurrency = f.question()
 
 	answers, err := f.prompter.Ask(f.session())
 	if errors.Is(err, domain.ErrUserAborted) {
@@ -103,17 +115,20 @@ func (f *startFlow) run() (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
+	if f.concurrency.Cancelled(answers) {
+		f.presenter.Notice(flow.AbortedNotice)
+		return Outcome{Aborted: true}, nil
+	}
 
 	job, err := target.DeclaredJob(f.request.Config, answers.Value(target.KeyJob))
 	if err != nil {
 		return Outcome{}, err
 	}
 
-	workDir := target.WorkDir(target.WorkDirParams{
-		Answers: answers,
-		Named:   f.named,
-		Cwd:     f.request.Cwd,
-	})
+	workDir := f.workDirs(answers)[0]
+	if err := seam.RequireEnv(seam.RequireEnvParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, WorkDirs: []string{workDir}}); err != nil {
+		return Outcome{}, err
+	}
 	// Refused rather than started: a runner and one of its own children are the
 	// same process twice on the same port, whether the other one was asked for
 	// in this gesture or is already up.
@@ -140,18 +155,14 @@ func (f *startFlow) run() (Outcome, error) {
 		return Outcome{Aborted: true}, nil
 	}
 
+	cfg, err := f.concurrency.Apply(answers)
+	f.request.Config = cfg
+	if err != nil {
+		return Outcome{}, err
+	}
+
 	warnings := addressing.Lines(addressing.Params{Context: f.ctx, WorkDirs: []string{workDir}})
-	proxy := seam.ProxyPortsFor(seam.ProxyPortsParams{Global: f.ctx.Config.Global, Run: f.request.Config})
-	runSeam := seam.Open(seam.Params{
-		ProjectDir: f.ctx.ProjectDir,
-		StateDir:   f.ctx.StateDir,
-		WorkDir:    workDir,
-		// The board lists every declared job, not just this one: starting a job is
-		// no reason to hide the ones already up beside it.
-		Jobs:       f.request.Config.Jobs,
-		ProxyPort:  proxy.Bind,
-		PublicPort: proxy.Public,
-	})
+	runSeam := seam.Open(f.seamParams(workDir))
 
 	result, err := f.presenter.Sequence(seam.SequenceParams{
 		Board:    runSeam.Board(),
@@ -160,6 +171,17 @@ func (f *startFlow) run() (Outcome, error) {
 		Warnings: warnings,
 		Start:    runSeam.Starter(seam.StartParams{Jobs: rules.JobsWithEffectivePorts(f.request.Config, []domain.JobConfig{job})}),
 	})
+	if err != nil {
+		return Outcome{}, err
+	}
+	cfg, err = probes.OfferToSilence(probes.Params{
+		Context:   f.ctx,
+		Prompter:  f.prompter,
+		Presenter: f.presenter,
+		Config:    f.request.Config,
+		Results:   result,
+	})
+	f.request.Config = cfg
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -175,7 +197,7 @@ func (f *startFlow) connect() error {
 	return f.presenter.Stage(flow.StageParams{
 		Message: domain.RunDaemonConnecting,
 		Work: func() error {
-			if err := process.EnsureDaemon(process.DaemonParams{
+			if err := process.EnsureCurrentDaemon(process.DaemonParams{
 				SocketPath: process.SocketPath(),
 				ProxyPort:  rules.ProxyPort(f.ctx.Config.Global),
 			}); err != nil {
@@ -191,6 +213,48 @@ func (f *startFlow) connect() error {
 	})
 }
 
+// seamParams lists every declared job on the board, not just this one: starting
+// a job is no reason to hide the ones already up beside it.
+func (f *startFlow) seamParams(workDir string) seam.Params {
+	proxy := seam.ProxyPortsFor(seam.ProxyPortsParams{Global: f.ctx.Config.Global, Run: f.request.Config})
+	return seam.Params{
+		ProjectDir:  f.ctx.ProjectDir,
+		StateDir:    f.ctx.StateDir,
+		WorkDir:     workDir,
+		Jobs:        f.request.Config.Jobs,
+		ProxyPort:   proxy.Bind,
+		PublicPort:  proxy.Public,
+		ProbeBudget: rules.PortProbeBudget(f.request.Config),
+		NoProbe:     f.request.NoProbe,
+	}
+}
+
+func (f *startFlow) question() *concurrency.Question {
+	return concurrency.New(concurrency.Params{
+		Context:   f.ctx,
+		Presenter: f.presenter,
+		Exclusive: f.request.Exclusive,
+		Parallel:  f.request.Parallel,
+		Config:    f.request.Config,
+		Running:   f.jobs,
+		WorkDirs:  f.workDirs,
+		Starting:  f.startingJobs,
+	})
+}
+
+func (f *startFlow) workDirs(answers flow.Answers) []string {
+	return []string{target.WorkDir(target.WorkDirParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})}
+}
+
+// startingJobs is empty while the job is unknown: the run refuses it later.
+func (f *startFlow) startingJobs(answers flow.Answers) []domain.JobConfig {
+	job, err := target.DeclaredJob(f.request.Config, answers.Value(target.KeyJob))
+	if err != nil {
+		return nil
+	}
+	return rules.JobsWithEffectivePorts(f.request.Config, []domain.JobConfig{job})
+}
+
 func (f *startFlow) session() flow.Session {
 	return flow.Session{
 		ErrLabel: domain.CmdStart,
@@ -202,6 +266,7 @@ func (f *startFlow) session() flow.Session {
 				Running:    f.running,
 			}),
 			target.JobStep(target.JobParams{Jobs: f.request.Config.Jobs, Flag: domain.FlagJob}),
+			f.concurrency.Step(),
 		},
 	}
 }

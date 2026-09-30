@@ -17,7 +17,11 @@ func newRestartCmd() *cobra.Command {
 		Use:   domain.CmdRestart,
 		Short: "Hand the jobs over to a daemon built from this binary",
 		Long:  "Stop the running daemon and start one from this binary.\nThis is the way out of a version mismatch: the daemon is what runs the jobs, so an older one keeps serving its own behavior until it is replaced.\nDetached services keep running across the restart and are picked back up; foreground ones are stopped.",
-		RunE:  runRestart,
+		Example: `  # After an upgrade, when a run command reports the daemon's version
+  wtm run daemon restart
+
+  wtm run daemon restart --yes`,
+		RunE: runRestart,
 	}
 	shared.AddOutputFlag(cmd)
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip the confirmation")

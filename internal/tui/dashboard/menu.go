@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"errors"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -86,7 +87,7 @@ func (m Model) worktreeMenuItems() []menuItem {
 		return nil
 	}
 
-	items := worktreeActions(selected)
+	items := m.worktreeActions(selected)
 	// The Services tab does not speak of git, and it lists no worktree to
 	// destroy: its blocks answer for what runs, so only the run block applies.
 	// Its cursor is on a job, so the stop names that one rather than reopening a
@@ -116,15 +117,63 @@ func disableActions(items []menuItem, caption string) []menuItem {
 // worktreeActions is what a row offers. The base row hangs off nothing, so it
 // has neither a parent to be moved to nor a rebase to run: all it can do is
 // catch up with its own remote — the same entry every other row leads with.
-func worktreeActions(selected domain.WorktreeStatus) []menuItem {
-	items := append(gitActions(selected), runActions(domain.DashboardMenuRunStop)...)
+// Without a run block the menu is one block, and a heading or a rule over a
+// single block only adds lines: it is then v0.27.1's.
+func (m Model) worktreeActions(selected domain.WorktreeStatus) []menuItem {
+	run := m.runBlock(runBlockParams{
+		Actions: runActions(domain.DashboardMenuRunStop),
+		Stop:    menuItem{label: domain.DashboardMenuRunDown, action: menuRunDown},
+		Running: m.running[selected.Path] > 0,
+	})
+	items := append(gitActions(selected, len(run) > 0), run...)
 	if selected.IsParent {
 		return items
 	}
-	return append(items,
-		menuItem{kind: menuEntrySeparator},
-		menuItem{label: domain.DashboardMenuDelete, action: menuDelete, danger: true},
-	)
+	remove := menuItem{label: domain.DashboardMenuDelete, action: menuDelete, danger: true}
+	if len(run) == 0 {
+		return append(items, remove)
+	}
+	return append(items, menuItem{kind: menuEntrySeparator}, remove)
+}
+
+type runBlockParams struct {
+	// Actions is the block of a project whose run.toml declares jobs.
+	Actions []menuItem
+	// Stop is what an unreadable run.toml still leaves on offer while Running:
+	// stopping is the one gesture that needs nothing from the file.
+	Stop    menuItem
+	Running bool
+}
+
+// runBlock is the run module's part of a menu: nothing for a project that
+// declares no job, and one inert entry naming the cause for a run.toml that
+// cannot be read.
+func (m Model) runBlock(params runBlockParams) []menuItem {
+	if m.runConfigErr != nil {
+		items := []menuItem{
+			{kind: menuEntrySeparator},
+			{kind: menuEntryHeading, label: domain.DashboardMenuSectionRun},
+			{label: domain.DashboardRunConfigInvalid, disabled: runConfigCause(m.runConfigErr)},
+		}
+		if !params.Running {
+			return items
+		}
+		return append(items, params.Stop)
+	}
+	if len(m.runConfig.Jobs) == 0 {
+		return nil
+	}
+	return params.Actions
+}
+
+// runConfigCause is the innermost error: the entry already says which file, and
+// the path the loader wraps it with would fill the whole caption.
+func runConfigCause(err error) string {
+	for inner := errors.Unwrap(err); inner != nil; inner = errors.Unwrap(err) {
+		err = inner
+	}
+	cause, _, _ := strings.Cut(err.Error(), "\n")
+	return truncate(cause, domain.DashboardMenuCaptionMax)
 }
 
 // gitActions is what a row offers on its own history. The base row hangs off
@@ -136,18 +185,19 @@ func worktreeActions(selected domain.WorktreeStatus) []menuItem {
 // alike are what is known rather than what is true. The run fetches and
 // reports the truth; disabled stays what it has always meant here, a run
 // holding this worktree right now.
-func gitActions(selected domain.WorktreeStatus) []menuItem {
-	heading := menuItem{kind: menuEntryHeading, label: domain.DashboardMenuSectionGit}
-	fastForward := menuItem{label: domain.DashboardMenuFastForward, action: menuFastForward}
+func gitActions(selected domain.WorktreeStatus, titled bool) []menuItem {
+	var items []menuItem
+	if titled {
+		items = append(items, menuItem{kind: menuEntryHeading, label: domain.DashboardMenuSectionGit})
+	}
+	items = append(items, menuItem{label: domain.DashboardMenuFastForward, action: menuFastForward})
 	if selected.IsParent {
-		return []menuItem{heading, fastForward}
+		return items
 	}
-	return []menuItem{
-		heading,
-		fastForward,
-		{label: domain.DashboardMenuSync, action: menuSync},
-		{label: domain.DashboardMenuReparent, action: menuReparent},
-	}
+	return append(items,
+		menuItem{label: domain.DashboardMenuSync, action: menuSync},
+		menuItem{label: domain.DashboardMenuReparent, action: menuReparent},
+	)
 }
 
 // runActions are the run module's, offered on every row including the base one:
@@ -173,25 +223,38 @@ func runActions(stopJob string) []menuItem {
 // globalMenuItems act on worktrees the user picks inside the run, not on the
 // selected row, so nothing here is keyed off the selection.
 func (m Model) globalMenuItems() []menuItem {
-	items := []menuItem{
-		{kind: menuEntryHeading, label: domain.DashboardMenuSectionGit},
+	git := []menuItem{
 		{label: domain.DashboardMenuFastForwardAll, action: menuFastForwardAll},
 		{label: domain.DashboardMenuReparentBatch, action: menuReparentBatch},
 		{label: domain.DashboardMenuSyncAll, action: menuSyncAll},
-		{kind: menuEntrySeparator},
-		{kind: menuEntryHeading, label: domain.DashboardMenuSectionRun},
-		{label: domain.DashboardMenuRunUpAll, action: menuRunUpAll},
-		{label: domain.DashboardMenuRunDownAll, action: menuRunDownAll},
-		{kind: menuEntrySeparator},
-		{label: domain.DashboardMenuRunLogsAll, action: menuRunLogsAll},
-		{kind: menuEntrySeparator},
-		{label: domain.DashboardMenuPrune, action: menuPrune, danger: true},
+	}
+	prune := menuItem{label: domain.DashboardMenuPrune, action: menuPrune, danger: true}
+	run := m.globalRunBlock()
+	items := append(git, prune)
+	if len(run) > 0 {
+		items = append(append([]menuItem{{kind: menuEntryHeading, label: domain.DashboardMenuSectionGit}}, git...), run...)
+		items = append(items, menuItem{kind: menuEntrySeparator}, prune)
 	}
 	caption, busy := m.busyCaption("")
 	if !busy {
 		return items
 	}
 	return disableActions(items, caption)
+}
+
+func (m Model) globalRunBlock() []menuItem {
+	return m.runBlock(runBlockParams{
+		Actions: []menuItem{
+			{kind: menuEntrySeparator},
+			{kind: menuEntryHeading, label: domain.DashboardMenuSectionRun},
+			{label: domain.DashboardMenuRunUpAll, action: menuRunUpAll},
+			{label: domain.DashboardMenuRunDownAll, action: menuRunDownAll},
+			{kind: menuEntrySeparator},
+			{label: domain.DashboardMenuRunLogsAll, action: menuRunLogsAll},
+		},
+		Stop:    menuItem{label: domain.DashboardMenuRunDownAll, action: menuRunDownAll},
+		Running: len(m.running) > 0,
+	})
 }
 
 // openMenu hangs the worktree menu off a cell. The right button is not always

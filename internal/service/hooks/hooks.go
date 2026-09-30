@@ -155,11 +155,12 @@ func runSingleHook(params runSingleHookParams) error {
 }
 
 // hookEnv layers the worktree's variables over this process's environment. Nil
-// leaves it as it is: unlike the run daemon, this process is the user's own
-// command, so what it inherited is the user's and not another worktree's.
+// leaves it as it is: this process is the user's own command, so what it
+// inherited is the user's. Given variables replace every inherited worktree one,
+// so a name the worktree leaves unset is not filled by the launching shell's.
 func hookEnv(overrides map[string]string) []string {
 	if len(overrides) == 0 {
 		return nil
 	}
-	return rules.MergeEnv(rules.MergeEnvParams{Env: os.Environ(), Overrides: overrides})
+	return rules.MergeEnv(rules.MergeEnvParams{Env: os.Environ(), Clear: domain.WorktreeScopedEnv, Overrides: overrides})
 }

@@ -37,8 +37,8 @@ func setupSync(t *testing.T, setup syncSetup) syncRepo {
 	repo := syncRepo{paths: map[string]string{}}
 	repo.dir = gittest.InitRepo(t)
 	repo.stateDir = filepath.Join(repo.dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", repo.dir)
-	t.Setenv("WTM_STATE_DIR", repo.stateDir)
+	t.Setenv(domain.EnvProjectDir, repo.dir)
+	t.Setenv(domain.EnvStateDir, repo.stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 
 	if err := writeSyncConfig(repo.stateDir); err != nil {

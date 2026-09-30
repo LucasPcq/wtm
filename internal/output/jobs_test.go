@@ -167,6 +167,27 @@ func TestFormatRunningJobs_ShowsUptime(t *testing.T) {
 	}
 }
 
+// The daemon is machine-wide: with two repositories, "main" alone is ambiguous.
+func TestFormatRunningJobs_NamesTheProjectWhenGiven(t *testing.T) {
+	jobs := []domain.JobInfo{
+		{Name: "web", Kind: domain.JobKindService, Status: domain.JobStatusRunning, WorkDir: "/a"},
+		{Name: "web", Kind: domain.JobKindService, Status: domain.JobStatusRunning, WorkDir: "/b"},
+	}
+	out := FormatRunningJobs(FormatRunningJobsParams{
+		Jobs:     jobs,
+		Branches: map[string]string{"/a": "main", "/b": "main"},
+		Projects: map[string]string{"/a": "shop", "/b": "blog"},
+	})
+	for _, want := range []string{"PROJECT", "shop", "blog"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("table does not show %q:\n%s", want, out)
+		}
+	}
+	if plain := FormatRunningJobs(FormatRunningJobsParams{Jobs: jobs}); strings.Contains(plain, "PROJECT") {
+		t.Errorf("a single repository still gets a project column:\n%s", plain)
+	}
+}
+
 // TestFormatRunningJobs_NoUptimeWithoutARunningStart pins the two cases where
 // the column stays blank rather than counting: a job the daemon never spawned,
 // and one whose run is over.
@@ -205,7 +226,7 @@ func TestWriteRunningJobsJSON_ExposesStartAndExit(t *testing.T) {
 	code := 3
 
 	var buf bytes.Buffer
-	err := WriteRunningJobsJSON(&buf, []domain.JobInfo{
+	err := WriteRunningJobsJSON(&buf, []domain.RunningJob{
 		{Name: "dev", Status: domain.JobStatusCrashed, StartedAt: startedAt, ExitCode: &code},
 		{Name: "ghost", Status: domain.JobStatusStopped},
 	})
@@ -213,7 +234,7 @@ func TestWriteRunningJobsJSON_ExposesStartAndExit(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var got []domain.JobInfo
+	var got []domain.RunningJob
 	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -241,7 +262,7 @@ func TestWriteRunningJobsJSON_ExposesStartAndExit(t *testing.T) {
 
 func TestWriteRunningJobsJSON_OmitsURLForAJobThatPublishesNone(t *testing.T) {
 	var buf bytes.Buffer
-	if err := WriteRunningJobsJSON(&buf, []domain.JobInfo{
+	if err := WriteRunningJobsJSON(&buf, []domain.RunningJob{
 		{Name: "web", Status: domain.JobStatusRunning, URL: "http://localhost:3010"},
 		{Name: "db", Status: domain.JobStatusRunning},
 	}); err != nil {

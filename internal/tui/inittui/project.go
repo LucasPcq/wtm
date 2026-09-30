@@ -513,7 +513,7 @@ func envGate(detection domain.InitDetectionResult) components.Step {
 func addEnvSteps(s *stepSet, detection domain.InitDetectionResult, autoSkip func(components.WizardModel) bool, prefill *SectionPrefill) {
 	strategyItems := []components.SelectItem{
 		{Label: "example — copy .env.example → .env", Value: string(domain.EnvStrategyExample)},
-		{Label: "main — copy .env from main worktree", Value: string(domain.EnvStrategyMain)},
+		{Label: "main — copy .env from the main checkout", Value: string(domain.EnvStrategyMain)},
 		{Label: "parent — copy .env from source worktree", Value: string(domain.EnvStrategyParent)},
 	}
 	if prefill != nil {
@@ -523,7 +523,7 @@ func addEnvSteps(s *stepSet, detection domain.InitDetectionResult, autoSkip func
 		Name: "Env strategy",
 		Model: components.NewSelectList(components.NewSelectListParams{
 			Title:       "Env strategy",
-			Description: "How wtm provisions .env files in a new worktree: copy .env.example, copy from your main worktree, or from the worktree you branched from.",
+			Description: "How wtm provisions .env files in a new worktree: copy .env.example, copy from your main checkout, or from the worktree you branched from.",
 			Items:       strategyItems,
 		}),
 		Summary:  selectListSummary,
@@ -569,9 +569,6 @@ func addHooksSteps(s *stepSet, detection domain.InitDetectionResult, autoSkip fu
 		hooks = prefill.OnCreate
 	} else if detection.InstallCommand != "" {
 		hooks = append(hooks, domain.HookCommand{Cmd: detection.InstallCommand})
-		for _, pkg := range detection.MonorepoPackages {
-			hooks = append(hooks, domain.HookCommand{Cmd: detection.InstallCommand, Cwd: pkg})
-		}
 	}
 
 	s.add(stepHooks, components.Step{
@@ -719,8 +716,8 @@ func addNamespaceStep(s *stepSet, params addServicesStepsParams) {
 	})
 }
 
-// addEnvValueStep asks which .env keys name each worktree's slice. It is the
-// write-side counterpart of the namespace step: carving a slice out is half the
+// addEnvValueStep asks which .env keys name each worktree's namespace. It is the
+// write-side counterpart of the namespace step: carving a namespace out is half the
 // work, and the app has to be told which one is its own. wtm cannot detect it —
 // a realm name is an opaque word — so every managed key is offered.
 func addEnvValueStep(s *stepSet, params addServicesStepsParams) {
@@ -759,7 +756,7 @@ type envValueStepRefs struct {
 }
 
 // envValueFields reads the namespace step rather than the scope step alone: a
-// shared service that carves nothing out has no slice for a key to name, and
+// shared service that carves nothing out has no namespace for a key to name, and
 // that is only known once the namespaces are answered.
 func envValueFields(prev []components.Step, refs envValueStepRefs, params addServicesStepsParams) []domain.EnvValueField {
 	shared := sharedWithNamespaces(prev, refs)
@@ -1609,8 +1606,8 @@ func addServicesSteps(s *stepSet, params addServicesStepsParams) (steps services
 	// After the scope step and reading it: which services are shared is what
 	// decides whether this one has anything to ask at all.
 	addNamespaceStep(s, params)
-	// After the namespace step and reading it: a key can only follow a slice
-	// once that slice has a name.
+	// After the namespace step and reading it: a key can only follow a namespace
+	// once that namespace has a name.
 	addEnvValueStep(s, params)
 
 	// Declared last on purpose: the step resolves the ports of both selections,

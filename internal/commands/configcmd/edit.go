@@ -23,7 +23,10 @@ func newEditCmd() *cobra.Command {
 		Use:   "edit",
 		Short: "Open the project config.toml in $EDITOR",
 		Long:  "Launch the editor on <git-common-dir>/wtm/config.toml. After save, the file is re-validated and any error is reported.",
-		RunE:  runEdit,
+		Example: `  wtm config edit
+
+  EDITOR=vim wtm config edit`,
+		RunE: runEdit,
 	}
 }
 

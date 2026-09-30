@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/service/runjobs"
@@ -33,8 +34,8 @@ func TestDetachWorktreeRunsTheCommandWithTheNamespaceName(t *testing.T) {
 		Up:      map[string]bool{"db": true},
 	})
 
-	if len(got.Errs) != 0 {
-		t.Fatalf("errs = %v", got.Errs)
+	if len(got.Failed) != 0 {
+		t.Fatalf("failed = %v", got.Failed)
 	}
 	if len(got.Released) != 1 || got.Released[0].Job != "db" {
 		t.Errorf("released = %v, want one entry for db", got.Released)
@@ -63,8 +64,11 @@ func TestDetachWorktreeDefersWhenTheServiceIsDown(t *testing.T) {
 	if len(got.Released) != 0 {
 		t.Errorf("released = %v, want none", got.Released)
 	}
-	if len(got.Deferred) != 1 || got.Deferred[0].Worktree != "feat_a" {
-		t.Errorf("deferred = %v, want one entry for feat_a", got.Deferred)
+	if len(got.Down) != 1 || got.Down[0].Worktree != "feat_a" {
+		t.Errorf("down = %v, want one entry for feat_a", got.Down)
+	}
+	if len(got.Failed) != 0 {
+		t.Errorf("failed = %v: a service down is not a failed drop", got.Failed)
 	}
 	if _, err := os.Stat(witness); !os.IsNotExist(err) {
 		t.Error("the removal ran against a service that is down")
@@ -79,11 +83,36 @@ func TestDetachWorktreeDefersAFailedCommand(t *testing.T) {
 		Up:      map[string]bool{"db": true},
 	})
 
-	if len(got.Errs) != 1 {
-		t.Errorf("errs = %v, want one", got.Errs)
+	if len(got.Failed) != 1 || got.Failed[0].Ref.Job != "db" {
+		t.Errorf("failed = %v, want db's drop named with its cause", got.Failed)
 	}
-	if len(got.Deferred) != 1 {
-		t.Errorf("deferred = %v, want the failed namespace owed rather than lost", got.Deferred)
+	if len(got.Down) != 0 {
+		t.Errorf("down = %v: the service was up, and saying otherwise is the wrong cause", got.Down)
+	}
+	if len(got.Deferred()) != 1 {
+		t.Errorf("deferred = %v, want the failed namespace owed rather than lost", got.Deferred())
+	}
+}
+
+// A drop blocked on a lock nobody releases must not hold the clean for ever.
+func TestRemoveGivesUpOnACommandThatNeverReturns(t *testing.T) {
+	started := time.Now()
+	got := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
+		Config:  namespaceConfig("sleep 600; true"),
+		Env:     worktreeEnv(),
+		WorkDir: t.TempDir(),
+		Up:      map[string]bool{"db": true},
+		Timeout: 200 * time.Millisecond,
+	})
+
+	if elapsed := time.Since(started); elapsed > 5*time.Second {
+		t.Fatalf("the removal took %s, want it cut off at its timeout", elapsed)
+	}
+	if len(got.Failed) != 1 || !strings.Contains(got.Failed[0].Err.Error(), "timed out") {
+		t.Errorf("failed = %v, want the timeout named", got.Failed)
+	}
+	if len(got.Deferred()) != 1 {
+		t.Errorf("deferred = %v, want the namespace owed", got.Deferred())
 	}
 }
 

@@ -43,13 +43,13 @@ type SwitchOutcome struct {
 	Previous domain.Addressing
 	Current  domain.Addressing
 	Changed  bool
-	// Settled and Pending are branches: the worktrees whose .env this run moved
-	// onto the addressing, and the ones it left out of step.
-	Settled []string
-	Pending []string
-	// MainLeft is the main checkout's branch when it is out of step and the mode
-	// is one no bulk pass moves it onto: `wtm env main` is then its own decision.
-	MainLeft string
+	// Settled and Pending are the worktrees whose .env this run moved onto the
+	// addressing, and the ones it left out of step.
+	Settled []domain.WorktreeRef
+	Pending []domain.WorktreeRef
+	// MainLeft is the main checkout when it is out of step and the mode is one no
+	// bulk pass moves it onto: `wtm env main` is then its own decision.
+	MainLeft *domain.WorktreeRef
 	Aborted  bool
 }
 
@@ -89,7 +89,7 @@ func Switch(params SwitchParams) (SwitchOutcome, error) {
 	found := pending.of(string(outcome.Current))
 	outcome.MainLeft = found.MainLeft
 	if answers.Value(stepSettle) != settleYes {
-		outcome.Pending = branchesOf(found.Settle)
+		outcome.Pending = refsOf(found.Settle)
 		return outcome, params.Presenter.Switched(outcome)
 	}
 	outcome = settle(params, outcome, found.Settle)
@@ -151,8 +151,8 @@ func settleStep(pending *pendingByMode) flow.Step {
 			found := pending.of(answers.Value(stepMode))
 			count := rules.WorktreeCountLabel(len(found.Settle))
 			description := fmt.Sprintf(domain.AddressingSettleDescFmt, count, strings.Join(branchesOf(found.Settle), ", "))
-			if found.MainLeft != "" {
-				description += fmt.Sprintf(domain.AddressingMainLeftDescFmt, found.MainLeft)
+			if found.MainLeft != nil {
+				description += fmt.Sprintf(domain.AddressingMainLeftDescFmt, found.MainLeft.Branch)
 			}
 			return flow.StepContent{
 				Title:       fmt.Sprintf(domain.AddressingSettleTitleFmt, count),
@@ -184,10 +184,10 @@ func settle(params SwitchParams, outcome SwitchOutcome, worktrees []domain.GitWo
 				Kind: flow.NoticeWarning,
 				Text: fmt.Sprintf(domain.AddressingSettleFailedFmt, wt.Branch, err),
 			})
-			outcome.Pending = append(outcome.Pending, wt.Branch)
+			outcome.Pending = append(outcome.Pending, refOf(wt))
 			continue
 		}
-		outcome.Settled = append(outcome.Settled, wt.Branch)
+		outcome.Settled = append(outcome.Settled, refOf(wt))
 	}
 	return outcome
 }
@@ -221,7 +221,7 @@ type pendingByMode struct {
 // settles and the main checkout, when rules.BulkSettlesMain keeps it out.
 type outOfStep struct {
 	Settle   []domain.GitWorktree
-	MainLeft string
+	MainLeft *domain.WorktreeRef
 }
 
 func (p *pendingByMode) of(mode string) outOfStep {
@@ -258,12 +258,25 @@ func readOutOfStep(ctx flow.Context, mode domain.Addressing) outOfStep {
 			continue
 		}
 		if wt.IsMain && !rules.BulkSettlesMain(mode) {
-			found.MainLeft = wt.Branch
+			main := refOf(wt)
+			found.MainLeft = &main
 			continue
 		}
 		found.Settle = append(found.Settle, wt)
 	}
 	return found
+}
+
+func refOf(wt domain.GitWorktree) domain.WorktreeRef {
+	return domain.WorktreeRef{Branch: wt.Branch, Path: wt.Path}
+}
+
+func refsOf(worktrees []domain.GitWorktree) []domain.WorktreeRef {
+	refs := make([]domain.WorktreeRef, 0, len(worktrees))
+	for _, wt := range worktrees {
+		refs = append(refs, refOf(wt))
+	}
+	return refs
 }
 
 func branchesOf(worktrees []domain.GitWorktree) []string {

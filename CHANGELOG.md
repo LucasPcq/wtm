@@ -1,5 +1,46 @@
 # Changelog
 
+## v0.28.0 : Un worktree, une stack isolée
+
+Chaque worktree peut désormais faire tourner ses propres services (serveurs de dev, stack `docker compose`) sur ses propres ports, sous son propre nom, à côté des autres. `wtm run init` détecte vos fichiers compose et vos scripts et écrit la configuration une fois ; `wtm run up` démarre la stack du worktree où vous êtes. Le module reste optionnel : sans `run.toml`, rien ne change.
+
+Cette version casse plusieurs choses pour qui utilisait `wtm run` ou `wtm switch` en 0.27, ou scripte wtm : lisez le [guide de migration](docs/guide/migrating-to-0.28.md) avant de mettre à jour.
+
+### Nouveautés
+
+- **Le module `run`** : des services et des tâches par worktree, groupés en profils, lancés par un daemon en tâche de fond. `wtm run init` les détecte. → [Jobs et profils](docs/guide/jobs-and-profiles.md)
+- **Isolation par worktree** : ports décalés (`3000` → `3010`), `COMPOSE_PROJECT_NAME` propre, et le choix *isolated* ou *verbatim* à la création. → [Isolation](docs/guide/isolation.md)
+- **Les ports vivent dans le `.env`** : wtm réécrit le port dans les valeurs qui le portent (`DATABASE_URL`…) sans toucher au reste de la ligne. → [Comment marche `wtm run`](docs/guide/how-run-works.md)
+- **Des URLs nommées** : `http://web.feat-login.acme.localhost:11080` par job et par worktree, servies par un proxy local ; port 80 sur macOS avec `wtm run proxy install`. → [Adressage](docs/guide/addressing.md)
+- **Services partagés** : un postgres pour tout le dépôt, une base par worktree, supprimée au `clean`. → [Services partagés](docs/guide/shared-services.md)
+- **Un garde-fou sur les données** : `run up` s'arrête avant qu'une migration ne touche des données que le worktree ne possède pas.
+- **Plusieurs worktrees à la fois** : `wtm run up feat-a feat-b`, une vue plein écran par run (`-d` pour rendre la main), et `wtm ui` qui affiche et pilote les services.
+- **`--quiet` sur toutes les commandes**, et `--output json` sur `create`, `extract` et `checkout` rapporte l'isolation et les ports.
+- **Un [guide utilisateur](docs/guide/README.md)** et un README repensé.
+
+### Améliorations
+
+- Une sortie plus lisible et cohérente : une barre `┃` marque les blocs de wtm, les hooks s'affichent pendant qu'ils tournent puis se résument en une ligne.
+- `wtm env` règle aussi les ports et l'isolation d'un worktree.
+- Deux worktrees ne peuvent plus porter le même nom dérivé (`feat.x` et `feat/x`).
+
+### Ruptures
+
+Le détail et la marche à suivre sont dans le [guide de migration](docs/guide/migrating-to-0.28.md).
+
+- `wtm switch` est supprimé → `wtm go` puis `wtm run up`.
+- `--non-interactive` est supprimé → `--yes`, qui fait désormais tourner `init` et `run init` sans aucune question.
+- Les hooks passent par `/bin/sh -c` et reçoivent leurs placeholders déjà entre guillemets.
+- Les commandes `run` prennent le worktree en argument, le job ou le profil en flag, et `run up` démarre un seul profil.
+- Le JSON du module `run` change de forme (`branch` + `path`, un tableau par worktree), et les codes de sortie `2` (usage) et `14` (job ou profil inconnu) s'appliquent partout.
+- `run down --all` ne sort plus du dépôt courant ; `run import` remplace `run.toml` ; `run.toml` est validé plus strictement.
+
+### Corrections
+
+- La fonction shell `wtm` rend enfin le code de sortie de la commande (ouvrez un nouveau shell après la mise à jour).
+- `wtm init` n'installe plus chaque package d'un workspace séparément.
+- Réécrire une valeur de `.env` conserve ses guillemets, son commentaire et ses fins de ligne.
+
 ## v0.27.1 — Un worktree enfant ne pousse plus sur la branche de son parent
 
 ### Bug fixes

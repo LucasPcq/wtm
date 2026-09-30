@@ -24,6 +24,15 @@ const (
 	KeyPorts  = "run.job.ports"
 	KeyURL    = "run.job.url"
 	KeyAction = "run.job.action"
+
+	KeyRuns            = "run.job.runs"
+	KeyBindsNoPort     = "run.job.binds_no_port"
+	KeyTouches         = "run.job.touches"
+	KeyScope           = "run.job.scope"
+	KeyNamespaceName   = "run.job.namespace.name"
+	KeyNamespaceCreate = "run.job.namespace.create"
+	KeyNamespaceRemove = "run.job.namespace.remove"
+	KeyNamespaceEnv    = "run.job.namespace.env"
 )
 
 type formParams struct {
@@ -43,6 +52,10 @@ type formParams struct {
 // pre-fill has no Resolve, so an unattended run is refused naming its flag
 // rather than writing a job nobody described.
 func formSteps(params formParams) []flow.Step {
+	return append(fieldSteps(params), declarationSteps(params)...)
+}
+
+func fieldSteps(params formParams) []flow.Step {
 	return []flow.Step{
 		{
 			Kind:        flow.StepText,
@@ -92,6 +105,9 @@ func formSteps(params formParams) []flow.Step {
 			Key: KeyStop, Label: domain.RunJobStopLabel,
 			Title: domain.RunJobStopTitle, Description: domain.RunJobStopDesc,
 			Initial: params.Initial.Stop, None: domain.RunJobStopSummaryNone,
+			Skip: func(answers flow.Answers) (bool, string) {
+				return isTask(answers) && params.Initial.Stop == "", domain.RunJobStopSkipTask
+			},
 		}),
 		optionalText(optionalParams{
 			Key: KeyCwd, Label: domain.RunJobCwdLabel,
@@ -131,6 +147,7 @@ type optionalParams struct {
 	// silently empty.
 	None     string
 	Validate func(string) error
+	Skip     func(flow.Answers) (bool, string)
 }
 
 func optionalText(params optionalParams) flow.Step {
@@ -142,6 +159,7 @@ func optionalText(params optionalParams) flow.Step {
 		Description: params.Description,
 		Default:     params.Initial,
 		Validate:    params.Validate,
+		Skip:        params.Skip,
 		Resolve: func(flow.Answers) (flow.Answer, error) {
 			return flow.Answer{Value: params.Initial}, nil
 		},
@@ -213,7 +231,7 @@ func fromAnswers(answers flow.Answers, initial domain.JobConfig) (domain.JobConf
 	job.Cwd = answers.Value(KeyCwd)
 	job.Ports = ports
 	job.URL = url
-	return job, nil
+	return withDeclaration(answers, job)
 }
 
 // actionStep is what `run job list` asks once a job is picked: the picker is a

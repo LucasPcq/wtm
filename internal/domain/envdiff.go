@@ -64,6 +64,9 @@ type EnvKeyDiff struct {
 	Placeholder   string       `json:"placeholder,omitempty"`
 	Source        string       `json:"source,omitempty"`
 	Export        bool         `json:"export,omitempty"`
+	// SourceLine is the line an added key is copied from, so it lands quoted
+	// and commented the way its source wrote it.
+	SourceLine EnvLine `json:"-"`
 }
 
 // EnvDiff is the full per-key reconciliation of a child .env against its template

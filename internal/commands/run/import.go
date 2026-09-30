@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -31,6 +32,13 @@ project settings alike. The run is confirmed before anything is written; pass
 
 Nothing is reconciled after the write: run wtm env to settle the .env files
 against the new configuration.`,
+		Example: `  wtm run import run.json
+
+  # No confirmation, from stdin
+  cat run.json | wtm run import - --yes
+
+  # Then settle a worktree's .env files on it
+  wtm env feat/login --yes`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runImport,
 	}
@@ -53,7 +61,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
 	if format == domain.OutputJSON && !yes {
-		return fmt.Errorf("--%s %s requires --%s", domain.FlagOutput, domain.OutputJSON, domain.FlagYes)
+		return fmt.Errorf(domain.ImportJSONNeedsYesFmt, domain.FlagOutput, domain.OutputJSON, domain.FlagYes)
 	}
 
 	data, err := readImportSource(args)
@@ -66,23 +74,25 @@ func runImport(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("parse JSON: %w", err)
 	}
 	if _, errs := rules.ValidateRun(incoming); len(errs) > 0 {
-		return fmt.Errorf("invalid run config:\n  %s", strings.Join(errs, "\n  "))
+		return fmt.Errorf(domain.ImportInvalidFmt, strings.Join(errs, domain.ImportInvalidSep))
 	}
 
 	// Replacing run.toml is destructive, so it is never the default of a run that
 	// cannot be asked — a piped payload included, where stdin carries the config
 	// and there is nothing left to prompt on.
-	interactive := shared.Interactive(shared.UnattendedParams{TTY: isTTY(), Format: format, Yes: yes}) &&
+	interactive := shared.Interactive(shared.UnattendedParams{TTY: runctx.IsTTY(), Format: format, Yes: yes}) &&
 		!readsStdin(args)
 	if !interactive && !yes {
 		return fmt.Errorf(domain.ImportNeedsYesFmt, domain.FlagYes)
 	}
 
+	// Declining is the module's one abort: the `=` register, and the exit every
+	// other backed-out run command gives.
 	if !confirmImport(confirmImportParams{Interactive: interactive, Incoming: incoming}) {
 		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-			output.Message(w, domain.ImportDeclined)
+			output.Unchanged(w, domain.ImportDeclined)
 		})
-		return nil
+		return domain.ErrAborted
 	}
 
 	if err := config.WriteRun(config.WriteRunParams{
@@ -124,8 +134,7 @@ func confirmImport(params confirmImportParams) bool {
 	return confirmed
 }
 
-// readsStdin says the payload comes from the same stream a prompt would read.
-func readsStdin(args []string) bool { return len(args) == 0 || args[0] == "-" }
+func readsStdin(args []string) bool { return len(args) == 0 || args[0] == domain.ImportStdinArg }
 
 func reportImport(cmd *cobra.Command, cfg domain.RunConfig, format string) error {
 	ir := output.ImportResult{EnvPorts: len(cfg.EnvPorts)}
@@ -146,7 +155,7 @@ func reportImport(cmd *cobra.Command, cfg domain.RunConfig, format string) error
 }
 
 func readImportSource(args []string) ([]byte, error) {
-	if len(args) == 0 || args[0] == "-" {
+	if readsStdin(args) {
 		return io.ReadAll(os.Stdin)
 	}
 	data, err := os.ReadFile(args[0])

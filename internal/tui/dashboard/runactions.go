@@ -1,6 +1,8 @@
 package dashboard
 
 import (
+	"fmt"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -10,6 +12,7 @@ import (
 	startflow "github.com/LucasPcq/wtm/internal/flow/run/start"
 	stopflow "github.com/LucasPcq/wtm/internal/flow/run/stop"
 	upflow "github.com/LucasPcq/wtm/internal/flow/run/up"
+	"github.com/LucasPcq/wtm/internal/flow/runlogs"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/integration"
 	"github.com/LucasPcq/wtm/internal/service/runconfig"
@@ -17,25 +20,29 @@ import (
 
 // runRequest is what every run action needs and the dashboard has to fetch:
 // run.toml, which the flows take as a business input rather than reading
-// themselves.
-func (m Model) runRequest(selected domain.WorktreeStatus) (domain.RunConfig, bool) {
-	if selected.Path == "" {
-		return domain.RunConfig{}, false
+// themselves. refusal is what to say when there is none to act on.
+func (m Model) runRequest(params runConfigParams) (cfg domain.RunConfig, refusal string, ok bool) {
+	if params.Row.Path == "" && !params.Global {
+		return domain.RunConfig{}, domain.DashboardRunNotConfigured, false
 	}
-	return m.loadRunConfig()
+	return m.loadRunConfig(params.Tolerate)
 }
 
-// loadRunConfig is the same, for a run the user aims at worktrees it has yet to
-// pick: there is no row to read, only a project that has a run module or has not.
-func (m Model) loadRunConfig() (domain.RunConfig, bool) {
+// loadRunConfig reads run.toml afresh: the file may have been fixed or broken
+// since the poll last read it. A stop tolerates a file it cannot read, as `run
+// down` does — what runs must always be stoppable.
+func (m Model) loadRunConfig(tolerate bool) (domain.RunConfig, string, bool) {
 	cfg, err := runconfig.Load(m.params.StateDir)
+	if err != nil && tolerate {
+		return domain.RunConfig{}, "", true
+	}
 	if err != nil {
-		return domain.RunConfig{}, false
+		return domain.RunConfig{}, fmt.Sprintf(domain.DashboardRunConfigInvalidFmt, err), false
 	}
 	if len(cfg.Jobs) == 0 {
-		return domain.RunConfig{}, false
+		return domain.RunConfig{}, domain.DashboardRunNotConfigured, false
 	}
-	return cfg, true
+	return cfg, "", true
 }
 
 // runWorktree is what a run started from a row is told to act on. A row already
@@ -67,7 +74,7 @@ type runUpParams struct {
 	Precheck  []string
 }
 
-// startRunUp brings a worktree's default profile up, detached: the surface is
+// startRunUp brings one profile up in a worktree, detached: the surface is
 // given back and the progress goes to the output panel and to the held row's
 // stage. Starting three worktrees in a row is the case this serves, and each
 // one used to cost an open and an exit of the run view. Watching is what the
@@ -92,9 +99,9 @@ func (m Model) runUp(params runUpParams) (Model, tea.Cmd) {
 	if reason, refused := m.busyReason(params.Row.Branch); refused {
 		return m.refuse(reason), nil
 	}
-	cfg, ok := m.runConfigFor(runConfigParams{Row: params.Row, Global: params.Global})
+	cfg, refusal, ok := m.runRequest(runConfigParams{Row: params.Row, Global: params.Global})
 	if !ok {
-		return m.refuse(domain.DashboardRunNotConfigured), nil
+		return m.refuse(refusal), nil
 	}
 
 	declared := upflow.Operation()
@@ -120,9 +127,25 @@ func (m Model) runUp(params runUpParams) (Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-		_, err := upflow.Run(flowParams)
+		outcome, err := upflow.Run(flowParams)
+		conclude(concludeParams{Send: send, Kind: declared.Kind, Outcomes: outcome.Results})
 		return opDoneMsg{id: id, err: err}
 	})
+}
+
+type concludeParams struct {
+	Send     func(tea.Msg)
+	Kind     string
+	Outcomes runlogs.Outcomes
+}
+
+// conclude ends a start the way the CLI's recap does, one line per worktree:
+// the panel otherwise held the steps and nothing after them, and a run that had
+// ended read the same as one still going.
+func conclude(params concludeParams) {
+	for _, line := range runConclusion(runConclusionParams{Kind: params.Kind, Outcomes: params.Outcomes}) {
+		params.Send(OutputLineMsg{Text: line})
+	}
 }
 
 // startRunJob starts one job the user names, detached like startRunUp: a job is
@@ -132,9 +155,9 @@ func (m Model) startRunJob(selected domain.WorktreeStatus) (Model, tea.Cmd) {
 	if reason, refused := m.busyReason(selected.Branch); refused {
 		return m.refuse(reason), nil
 	}
-	cfg, ok := m.runRequest(selected)
+	cfg, refusal, ok := m.runRequest(runConfigParams{Row: selected})
 	if !ok {
-		return m.refuse(domain.DashboardRunNotConfigured), nil
+		return m.refuse(refusal), nil
 	}
 
 	declared := startflow.Operation()
@@ -155,7 +178,8 @@ func (m Model) startRunJob(selected domain.WorktreeStatus) (Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-		_, err := startflow.Run(params)
+		outcome, err := startflow.Run(params)
+		conclude(concludeParams{Send: send, Kind: declared.Kind, Outcomes: runlogs.Outcomes{outcome.Result}})
 		return opDoneMsg{id: id, err: err}
 	})
 }
@@ -168,9 +192,9 @@ func (m Model) stopRunJob(selected domain.WorktreeStatus) (Model, tea.Cmd) {
 	if reason, refused := m.busyReason(selected.Branch); refused {
 		return m.refuse(reason), nil
 	}
-	cfg, ok := m.runRequest(selected)
+	cfg, refusal, ok := m.runRequest(runConfigParams{Row: selected, Tolerate: true})
 	if !ok {
-		return m.refuse(domain.DashboardRunNotConfigured), nil
+		return m.refuse(refusal), nil
 	}
 
 	declared := stopflow.Operation()
@@ -256,9 +280,9 @@ func (m Model) runDown(params runDownParams) (Model, tea.Cmd) {
 	if reason, refused := m.busyReason(params.Row.Branch); refused {
 		return m.refuse(reason), nil
 	}
-	cfg, ok := m.runConfigFor(runConfigParams{Row: params.Row, Global: params.Ask})
+	cfg, refusal, ok := m.runRequest(runConfigParams{Row: params.Row, Global: params.Ask, Tolerate: true})
 	if !ok {
-		return m.refuse(domain.DashboardRunNotConfigured), nil
+		return m.refuse(refusal), nil
 	}
 
 	declared := downflow.Operation()
@@ -318,15 +342,8 @@ type runConfigParams struct {
 	// Global marks a gesture made on no row: there is no worktree to read, only
 	// a project that has a run module or has not. A row gesture keeps refusing a
 	// row that designates no worktree.
-	Global bool
-}
-
-// runConfigFor reads run.toml for a gesture made on a row, or made on none.
-func (m Model) runConfigFor(params runConfigParams) (domain.RunConfig, bool) {
-	if params.Global {
-		return m.loadRunConfig()
-	}
-	return m.runRequest(params.Row)
+	Global   bool
+	Tolerate bool
 }
 
 // cwdFor is the worktree step's safe default: the row the gesture was made on,
@@ -372,9 +389,9 @@ func (m Model) runLogs(params runLogsParams) (Model, tea.Cmd) {
 	if reason, refused := m.busyReason(params.Row.Branch); refused {
 		return m.refuse(reason), nil
 	}
-	cfg, ok := m.runConfigFor(runConfigParams{Row: params.Row, Global: params.Ask})
+	cfg, refusal, ok := m.runRequest(runConfigParams{Row: params.Row, Global: params.Ask})
 	if !ok {
-		return m.refuse(domain.DashboardRunNotConfigured), nil
+		return m.refuse(refusal), nil
 	}
 
 	request := params.Request

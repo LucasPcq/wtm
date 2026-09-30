@@ -205,3 +205,42 @@ func TestEnvPortTableLinesKeepsTheValueRecognisableOnANarrowSurface(t *testing.T
 		}
 	}
 }
+
+func TestPortsNotSettledNamesWhatToFix(t *testing.T) {
+	run := PortsNotSettledWarning(PortsNotSettledWarningParams{
+		Cause:                 "unknown keys in run.toml: bogus",
+		PortsNotSettledParams: PortsNotSettledParams{Branch: "feat/x", RunConfig: true},
+	})
+	if run != "unknown keys in run.toml: bogus — ports not settled — run `wtm env feat/x` once run.toml is fixed" {
+		t.Errorf("warning = %q", run)
+	}
+	if other := portsNotSettledHint(PortsNotSettledParams{Branch: "feat/x"}); strings.Contains(other, "run.toml") {
+		t.Errorf("hint = %q, must not blame run.toml for another cause", other)
+	}
+}
+
+func TestEnvPortSettlementNoteCountsPortsAndOwnedValues(t *testing.T) {
+	rewrite := domain.EnvPortEntry{Status: domain.EnvPortStatusRewrite}
+	unchanged := domain.EnvPortEntry{Status: domain.EnvPortStatusUnchanged}
+	written := domain.EnvOwnedEntry{Key: "REALM", Changed: true}
+	kept := domain.EnvOwnedEntry{Key: "COMPOSE_PROJECT_NAME"}
+
+	cases := []struct {
+		name string
+		plan domain.EnvPortPlan
+		want string
+	}{
+		{name: "nothing moved", plan: domain.EnvPortPlan{Offset: 20, Entries: []domain.EnvPortEntry{unchanged}, Owned: []domain.EnvOwnedEntry{kept}}, want: ""},
+		{name: "one port", plan: domain.EnvPortPlan{Offset: 20, Entries: []domain.EnvPortEntry{rewrite, unchanged}}, want: "1 port settled (offset +20)"},
+		{name: "several ports", plan: domain.EnvPortPlan{Offset: 10, Entries: []domain.EnvPortEntry{rewrite, rewrite}}, want: "2 ports settled (offset +10)"},
+		{name: "owned values only", plan: domain.EnvPortPlan{Owned: []domain.EnvOwnedEntry{written, kept, written}}, want: "2 owned values written"},
+		{name: "both", plan: domain.EnvPortPlan{Offset: 10, Entries: []domain.EnvPortEntry{rewrite}, Owned: []domain.EnvOwnedEntry{written}}, want: "1 port settled (offset +10) · 1 owned value written"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := EnvPortSettlementNote(tc.plan); got != tc.want {
+				t.Errorf("note = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

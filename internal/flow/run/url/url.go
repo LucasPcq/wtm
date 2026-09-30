@@ -42,6 +42,9 @@ type Params struct {
 // Run needs neither Prompter nor Presenter: it asks nothing and shows nothing,
 // which is the whole contract of a substitution surface.
 func Run(params Params) (Outcome, error) {
+	if err := target.RequireDeclared(target.DeclaredParams{Config: params.Request.Config, Job: params.Request.Job}); err != nil {
+		return Outcome{}, err
+	}
 	named, err := target.Named(target.ResolveParams{
 		ProjectDir: params.Context.ProjectDir,
 		Query:      params.Request.Worktree,
@@ -51,11 +54,14 @@ func Run(params Params) (Outcome, error) {
 	}
 
 	workDir := target.WorkDir(target.WorkDirParams{Named: named, Cwd: params.Request.Cwd})
-	entries := urls.Open(urls.Params{
+	entries, err := urls.Open(urls.Params{
 		Context: params.Context,
 		Config:  params.Request.Config,
 		Raw:     params.Request.Raw,
 	}).In(workDir)
+	if err != nil {
+		return Outcome{}, err
+	}
 
 	if params.Request.Job != "" {
 		entry, err := rules.PickPublishedURL(entries, params.Request.Job)

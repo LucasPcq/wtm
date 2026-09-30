@@ -17,6 +17,10 @@ func newRmCmd() *cobra.Command {
 			"Without an argument, prompts to pick from the existing profiles; under --yes\n" +
 			"the argument is required.\n" +
 			"Jobs referenced by the profile are left untouched.",
+		Example: `  # Pick the profile
+  wtm run profile rm
+
+  wtm run profile rm backend --yes`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runRm,
 	}

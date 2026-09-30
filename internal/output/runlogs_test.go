@@ -111,14 +111,15 @@ func TestWriteRunOutcomeJSONCarriesTheFailedJobsOutput(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := WriteRunOutcomeJSON(&buf, outcome); err != nil {
-		t.Fatalf("WriteRunOutcomeJSON: %v", err)
+	if err := WriteRunOutcomesJSON(&buf, runlogs.Outcomes{outcome}); err != nil {
+		t.Fatalf("WriteRunOutcomesJSON: %v", err)
 	}
 
-	var results []domain.JobActionResult
-	if err := json.Unmarshal(buf.Bytes(), &results); err != nil {
+	var documents []domain.WorktreeRunResult
+	if err := json.Unmarshal(buf.Bytes(), &documents); err != nil || len(documents) != 1 {
 		t.Fatalf("parse JSON: %v\n%s", err, buf.String())
 	}
+	results := documents[0].Jobs
 	if len(results) != 2 {
 		t.Fatalf("got %d results, want the two the run produced", len(results))
 	}
@@ -148,8 +149,8 @@ func TestWriteRunOutcomeJSONLeavesASuccessfulRunAlone(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := WriteRunOutcomeJSON(&buf, outcome); err != nil {
-		t.Fatalf("WriteRunOutcomeJSON: %v", err)
+	if err := WriteRunOutcomesJSON(&buf, runlogs.Outcomes{outcome}); err != nil {
+		t.Fatalf("WriteRunOutcomesJSON: %v", err)
 	}
 	if strings.Contains(buf.String(), "output") || strings.Contains(buf.String(), "exit_code") {
 		t.Errorf("a successful run carries failure fields:\n%s", buf.String())
@@ -157,7 +158,8 @@ func TestWriteRunOutcomeJSONLeavesASuccessfulRunAlone(t *testing.T) {
 }
 
 // N sequences interleave on one stream, so every line has to say where it came
-// from — two jobs called `web` are otherwise the same line twice.
+// from — two jobs called `web` are otherwise the same line twice — and a
+// progress line would sit above another worktree's result: only results print.
 func TestRunPrinterNamesTheWorktreeAboveSeveralOfThem(t *testing.T) {
 	var out, errOut bytes.Buffer
 	printer := NewRunPrinter(RunPrinterParams{
@@ -167,15 +169,18 @@ func TestRunPrinterNamesTheWorktreeAboveSeveralOfThem(t *testing.T) {
 	})
 
 	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarting, Job: "web", Worktree: "main", Step: 1, Steps: 1})
-	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "web", Worktree: "main", Step: 1, Steps: 1})
 	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarting, Job: "web", Worktree: "feature", Step: 1, Steps: 1})
 	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "web", Worktree: "feature", Step: 1, Steps: 1})
+	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "web", Worktree: "main", Step: 1, Steps: 1})
 
 	stdout := out.String()
-	for _, want := range []string{"2 worktrees", "[1/1] web · main", "web started · main", "[1/1] web · feature", "web started · feature"} {
+	for _, want := range []string{"2 worktrees", "web started · main", "web started · feature"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("stdout is missing %q\n--- stdout ---\n%s", want, stdout)
 		}
+	}
+	if strings.Contains(stdout, "[1/1]") {
+		t.Errorf("a progress line was printed between interleaved sequences:\n%s", stdout)
 	}
 }
 
@@ -206,13 +211,13 @@ func TestRunPrinterClosesTheRunOnce(t *testing.T) {
 	}
 }
 
-func TestRunPrinterSaysASharedJobWasAttachedAndWhatItCarved(t *testing.T) {
-	stdout, _ := emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "postgres", Attached: true, Namespace: "app_feat_x"})
+func TestRunPrinterSaysASharedJobWasJoinedAndWhatItCarved(t *testing.T) {
+	stdout, _ := emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "postgres", Joined: true, Namespace: "app_feat_x"})
 
-	if !strings.Contains(stdout, "postgres attached") || strings.Contains(stdout, "postgres started") {
-		t.Errorf("stdout = %q, want the job attached, not started", stdout)
+	if !strings.Contains(stdout, "postgres joined") || strings.Contains(stdout, "postgres started") {
+		t.Errorf("stdout = %q, want the job joined, not started", stdout)
 	}
-	if !strings.Contains(stdout, "postgres attached · app_feat_x ready") {
+	if !strings.Contains(stdout, "postgres joined · app_feat_x ready") {
 		t.Errorf("stdout = %q, want the namespace on the job's own line", stdout)
 	}
 }
@@ -258,12 +263,12 @@ func TestRunPrinterSetsAServiceHeldInMainApart(t *testing.T) {
 	printer := NewRunPrinter(RunPrinterParams{Out: &out, Err: &errOut})
 
 	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "compose", Worktree: "feat/x", Ports: map[string]int{"REDIS_PORT": 6389, "MINIO_PORT": 9010}})
-	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "postgres", Worktree: "feat/x", Attached: true, SharedIn: "main", Ports: map[string]int{"POSTGRES_PORT": 5432}})
+	printer.Emit(runlogs.Event{Phase: runlogs.PhaseStarted, Job: "postgres", Worktree: "feat/x", Joined: true, SharedIn: "main", Ports: map[string]int{"POSTGRES_PORT": 5432}})
 	printer.Emit(runlogs.Event{Phase: runlogs.PhaseReady, Outcome: runlogs.Outcome{Started: []string{"compose", "postgres"}}})
 	printer.Conclude(nil)
 
 	stdout := out.String()
-	if !strings.Contains(stdout, "postgres attached to main · :5432") {
+	if !strings.Contains(stdout, "postgres joined, running in main · :5432") {
 		t.Errorf("stdout = %q, want the line to say where postgres runs", stdout)
 	}
 	own, shared := strings.Index(stdout, domain.ReachTitle), strings.Index(stdout, "Shared, running in main")

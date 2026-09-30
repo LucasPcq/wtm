@@ -52,6 +52,11 @@ var (
 	// not exist as a local branch or an origin remote-tracking branch.
 	ErrBranchNotFound = errors.New("branch not found")
 
+	// ErrWorktreeNameTaken refuses a worktree whose derived name another live
+	// worktree carries: the two would share a compose project, a namespace and
+	// a proxy host.
+	ErrWorktreeNameTaken = errors.New("worktree name already taken")
+
 	// ErrWorktreePathExists is returned when the target worktree directory already exists.
 	ErrWorktreePathExists = errors.New("worktree path already exists")
 
@@ -68,6 +73,12 @@ var (
 	// user) instead of aborting.
 	ErrWorktreeRemoveFailed = errors.New("worktree removal failed")
 
+	// ErrWorktreeJobsRunning refuses to remove a worktree whose jobs could not be
+	// stopped: an API still connected to its database is the one thing a drop
+	// cannot go through, and a process left running in a deleted directory is
+	// nobody's to stop any more.
+	ErrWorktreeJobsRunning = errors.New("the worktree's jobs are still running")
+
 	// ErrOrdinalRefIncomplete is returned when an ordinal is asked for without
 	// naming the worktree it belongs to. Allocation writes to the state dir and
 	// keys on the branch, so an empty one would resolve relative to the current
@@ -79,6 +90,16 @@ var (
 	// nothing" would hand its number to another worktree, which is the collision
 	// the ordinal exists to prevent.
 	ErrOrdinalUnreadable = errors.New("cannot read a live worktree's ordinal")
+
+	// ErrWorktreeEnvUnresolved refuses to start a job in a worktree whose ports
+	// and names cannot be resolved: falling back to none is running it on the
+	// main checkout's.
+	ErrWorktreeEnvUnresolved = errors.New("cannot resolve the worktree's environment")
+
+	// ErrIsolationAdoptionPending refuses to start a job in a worktree created
+	// before the isolation choice: its .env still holds its source's ports, and
+	// starting it isolated would move the jobs off them behind the user's back.
+	ErrIsolationAdoptionPending = errors.New("worktree has not chosen its isolation")
 
 	// ErrIsolationMain refuses to make the main checkout verbatim: it is the
 	// source every other .env is copied from, so there is nothing for it to copy.
@@ -94,8 +115,12 @@ var (
 	// ErrGHNotAuthenticated is returned when gh is not logged in to GitHub.
 	ErrGHNotAuthenticated = errors.New("not logged in to GitHub — run 'gh auth login'")
 
-	// ErrJobNotFound is returned when a referenced job is not declared in run.toml.
-	ErrJobNotFound = errors.New("job not found")
+	ErrJobNotFound     = errors.New("job not found")
+	ErrProfileNotFound = errors.New("profile not found")
+
+	// ErrUsage marks a command line refused before the command ran; it maps to
+	// exit code 2.
+	ErrUsage = errors.New("usage error")
 
 	// ErrJobNotAttachable is returned for a job with no live output to subscribe
 	// to: a detached launcher, whose stream ended with the launcher, or a job
@@ -114,7 +139,7 @@ var (
 	// ErrRunNotInitialized is returned when a run command runs before the run
 	// module is initialized — run.toml is absent or declares no job/profile. The
 	// message points at the dedicated setup command.
-	ErrRunNotInitialized = errors.New("run module not initialized — run `wtm run init` first")
+	ErrRunNotInitialized = errors.New("no run.toml — run `wtm run init`")
 
 	// ErrExtractConflict is returned when the selected changes do not apply
 	// cleanly onto the target worktree. The extraction is aborted and the source
@@ -208,12 +233,16 @@ var (
 
 	// ErrJobAmbiguous is returned when several jobs publish a URL and the caller
 	// named none — a picker needs a fully interactive run, so the flag is the answer.
-	ErrJobAmbiguous = errors.New("several jobs publish a URL: name one")
+	ErrJobAmbiguous = errors.New("several jobs publish a URL: name one with --" + FlagJob)
 
-	// ErrJobRequired is returned when `run start` / `run stop` cannot resolve
-	// which job to act on: a required selection with no safe default, so it names
-	// the flag rather than falling back to a picker.
-	ErrJobRequired = errors.New("specify --job (no interactive picker without a terminal or in --output json mode)")
+	// ErrJobRequired is the one refusal for a job nobody named and nobody can be
+	// asked for: a required selection with no safe default names the flag rather
+	// than falling back to a picker.
+	ErrJobRequired = errors.New("the job is required and cannot be asked in this mode: pass --" + FlagJob)
+
+	// ErrProfileRequired is `run up` over several profiles, none marked default,
+	// with nobody to ask: starting the first declared was a guess nobody saw.
+	ErrProfileRequired = errors.New("several profiles and none is the default: specify --profile (no interactive picker under --yes, without a terminal, or in --output json mode)")
 
 	// ErrExclusiveMultiWorktree refuses a flag that contradicts itself: exclusive
 	// means one stack at a time, and the run was told to bring up several. Unlike
@@ -256,6 +285,10 @@ var (
 // holding the socket. It is the daemon that runs the jobs, so its behaviour is
 // the one that applies, whatever the client's version fixed.
 var ErrDaemonVersionMismatch = errors.New("run daemon version mismatch")
+
+// ErrDaemonRunning is a daemon started while another one holds the lock —
+// serving, or still stopping its jobs.
+var ErrDaemonRunning = errors.New("another run daemon is running")
 
 var (
 	// ErrUpgradeFromSource is returned when wtm upgrade runs on a binary built

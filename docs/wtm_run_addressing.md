@@ -4,8 +4,8 @@ Switch how the .env files spell a job's address
 
 ### Synopsis
 
-Set run.toml's addressing — named urls (http://api.feat-x.myrepo.localhost) or
-ports (http://localhost:4012) — then settle the .env of the worktrees that spell
+Set run.toml's addressing — named URLs (http://api.feat-x.myrepo.localhost) or
+port URLs (http://localhost:4012) — then settle the .env of the worktrees that spell
 the other one. Settling runs even when the mode is already the one given, for a
 worktree an earlier switch left out of step.
 
@@ -19,11 +19,23 @@ and the worktrees are settled unless --keep-env is passed.
 wtm run addressing [names|ports] [flags]
 ```
 
+### Examples
+
+```
+  # Pick the mode
+  wtm run addressing
+
+  wtm run addressing ports --yes
+
+  # Switch run.toml only, leaving the .env files as they are
+  wtm run addressing names --yes --keep-env
+```
+
 ### Options
 
 ```
   -h, --help            help for addressing
-      --keep-env        switch run.toml only, leaving the worktrees' .env files as they are
+      --keep-env        Switch run.toml only, leaving the worktrees' .env files as they are
       --output string   Output format: text or json (default "text")
   -y, --yes             Skip the prompts; [names|ports] is then required
 ```

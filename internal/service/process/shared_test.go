@@ -105,8 +105,8 @@ func TestStartSharedRunsUnderMainCheckout(t *testing.T) {
 	if status, ok := f.statusIn(f.main); !ok || status != domain.JobStatusRunning {
 		t.Errorf("main checkout status = %q (found %v), want running", status, ok)
 	}
-	if status, ok := f.statusIn(f.first); !ok || status != domain.JobStatusAttached {
-		t.Errorf("worktree status = %q (found %v), want attached", status, ok)
+	if status, ok := f.statusIn(f.first); !ok || status != domain.JobStatusJoined {
+		t.Errorf("worktree status = %q (found %v), want joined", status, ok)
 	}
 	if got := f.processes(); got != 1 {
 		t.Errorf("processes = %d, want 1", got)
@@ -126,8 +126,8 @@ func TestStartSharedSecondWorktreeSpawnsNothing(t *testing.T) {
 	if got := f.processes(); got != 1 {
 		t.Errorf("processes = %d, want 1: a shared service runs once", got)
 	}
-	if status, _ := f.statusIn(f.second); status != domain.JobStatusAttached {
-		t.Errorf("second worktree status = %q, want attached", status)
+	if status, _ := f.statusIn(f.second); status != domain.JobStatusJoined {
+		t.Errorf("second worktree status = %q, want joined", status)
 	}
 }
 
@@ -169,7 +169,7 @@ func TestStopSharedKeepsTheServiceWhileAnotherWorktreeHoldsIt(t *testing.T) {
 		t.Fatalf("second start: %v", err)
 	}
 
-	if err := f.manager.Stop("db", f.first); err != nil {
+	if err := f.manager.Stop(JobRef{Name: "db", WorkDir: f.first}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 
@@ -190,10 +190,10 @@ func TestStopSharedStopsTheServiceWithTheLastClaim(t *testing.T) {
 	if err := f.start(t, f.second, "feat_b"); err != nil {
 		t.Fatalf("second start: %v", err)
 	}
-	if err := f.manager.Stop("db", f.first); err != nil {
+	if err := f.manager.Stop(JobRef{Name: "db", WorkDir: f.first}); err != nil {
 		t.Fatalf("stop first: %v", err)
 	}
-	if err := f.manager.Stop("db", f.second); err != nil {
+	if err := f.manager.Stop(JobRef{Name: "db", WorkDir: f.second}); err != nil {
 		t.Fatalf("stop second: %v", err)
 	}
 
@@ -214,7 +214,7 @@ func TestStopSharedFromTheMainCheckoutSpareTheServiceWhileHeld(t *testing.T) {
 		t.Fatalf("worktree start: %v", err)
 	}
 
-	if err := f.manager.Stop("db", f.main); err != nil {
+	if err := f.manager.Stop(JobRef{Name: "db", WorkDir: f.main}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 
@@ -320,7 +320,7 @@ func TestSharedStopNeverDetaches(t *testing.T) {
 	if err := f.start(t, f.first, "feat_a"); err != nil {
 		t.Fatalf("start: %v", err)
 	}
-	if err := f.manager.Stop("db", f.first); err != nil {
+	if err := f.manager.Stop(JobRef{Name: "db", WorkDir: f.first}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 
@@ -389,7 +389,7 @@ func TestAttachOnAClaimReachesTheRealService(t *testing.T) {
 		t.Fatalf("start: %v", err)
 	}
 
-	session, err := f.manager.Attach("db", f.first)
+	session, err := f.manager.Attach(JobRef{Name: "db", WorkDir: f.first})
 	if err != nil {
 		t.Fatalf("attach through a claim: %v", err)
 	}
@@ -417,7 +417,7 @@ func TestStartSharedRestartsAfterAStop(t *testing.T) {
 	if err := f.start(t, f.first, "feat_a"); err != nil {
 		t.Fatalf("start: %v", err)
 	}
-	if err := f.manager.Stop("db", f.first); err != nil {
+	if err := f.manager.Stop(JobRef{Name: "db", WorkDir: f.first}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 	if status, _ := f.statusIn(f.main); status != domain.JobStatusStopped {
@@ -430,8 +430,8 @@ func TestStartSharedRestartsAfterAStop(t *testing.T) {
 	if status, _ := f.statusIn(f.main); status != domain.JobStatusRunning {
 		t.Errorf("service status = %q, want running again", status)
 	}
-	if status, _ := f.statusIn(f.first); status != domain.JobStatusAttached {
-		t.Errorf("claim status = %q, want attached", status)
+	if status, _ := f.statusIn(f.first); status != domain.JobStatusJoined {
+		t.Errorf("claim status = %q, want joined", status)
 	}
 }
 
@@ -441,7 +441,7 @@ func TestStartSharedRestartsFromTheMainCheckoutAfterAStop(t *testing.T) {
 	if err := f.start(t, f.main, "main"); err != nil {
 		t.Fatalf("start: %v", err)
 	}
-	if err := f.manager.Stop("db", f.main); err != nil {
+	if err := f.manager.Stop(JobRef{Name: "db", WorkDir: f.main}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 	if err := f.start(t, f.main, "main"); err != nil {
@@ -469,7 +469,7 @@ func TestStopSharedNeverTouchesAnotherRepositorysJobOfTheSameName(t *testing.T) 
 		t.Fatalf("start foreign: %v", err)
 	}
 
-	if err := f.manager.Stop("db", f.first); err != nil {
+	if err := f.manager.Stop(JobRef{Name: "db", WorkDir: f.first}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 
@@ -499,7 +499,7 @@ func TestStopSharedIgnoresAForeignRepositorysClaims(t *testing.T) {
 		t.Fatalf("start foreign shared: %v", err)
 	}
 
-	if err := f.manager.Stop("db", f.first); err != nil {
+	if err := f.manager.Stop(JobRef{Name: "db", WorkDir: f.first}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 	if status, _ := f.statusIn(f.main); status != domain.JobStatusStopped {
@@ -537,7 +537,7 @@ func TestStopSharedSparesTheServiceMainHolds(t *testing.T) {
 	}
 	ref := f.manager.sharedRefOf(jobKey("db", f.first))
 
-	if err := f.manager.Stop("db", f.first); err != nil {
+	if err := f.manager.Stop(JobRef{Name: "db", WorkDir: f.first}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 
@@ -579,7 +579,7 @@ func TestStartSharedFromMainJoinsAServiceAWorktreeStarted(t *testing.T) {
 		t.Errorf("err = %v, want main's second ask refused as already running", err)
 	}
 
-	if err := f.manager.Stop("db", f.first); err != nil {
+	if err := f.manager.Stop(JobRef{Name: "db", WorkDir: f.first}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 	if status, _ := f.statusIn(f.main); status != domain.JobStatusRunning {
@@ -598,10 +598,10 @@ func TestStopSharedFromMainDropsItsHold(t *testing.T) {
 	if err := f.start(t, f.first, "feat_a"); err != nil {
 		t.Fatalf("worktree start: %v", err)
 	}
-	if err := f.manager.Stop("db", f.main); err != nil {
+	if err := f.manager.Stop(JobRef{Name: "db", WorkDir: f.main}); err != nil {
 		t.Fatalf("main stop: %v", err)
 	}
-	if err := f.manager.Stop("db", f.first); err != nil {
+	if err := f.manager.Stop(JobRef{Name: "db", WorkDir: f.first}); err != nil {
 		t.Fatalf("worktree stop: %v", err)
 	}
 

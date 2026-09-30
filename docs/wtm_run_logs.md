@@ -8,10 +8,22 @@ Open the run view on [worktree]'s jobs — the current worktree when omitted, pi
 --job focuses one of them; without it, every job is shown.
 Leaving the view detaches; the jobs keep running.
 Without a terminal, every job's output is written as prefixed lines instead.
---output json replays each job's last 1000 lines as [{job, at, text}], grouped by job, and never attaches.
+--output json replays each job's last 1000 lines as [{branch, path, lines: [{job, at, text}]}], one entry per worktree, and never attaches.
 
 ```
 wtm run logs [worktree...] [flags]
+```
+
+### Examples
+
+```
+  # Reopen the run view on this worktree's jobs
+  wtm run logs
+
+  wtm run logs feat/login --job api
+
+  # The last 1000 lines of each job, as JSON
+  wtm run logs feat/login --output json
 ```
 
 ### Options

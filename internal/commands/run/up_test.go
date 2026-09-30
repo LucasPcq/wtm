@@ -3,6 +3,7 @@ package run
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -112,10 +113,7 @@ func TestRunUpJSONCarriesTheFailingJobsOutput(t *testing.T) {
 		t.Fatalf("err = %v, want ErrAborted", err)
 	}
 
-	var results []domain.JobActionResult
-	if err := json.Unmarshal([]byte(stdout), &results); err != nil {
-		t.Fatalf("parse JSON: %v\noutput: %s", err, stdout)
-	}
+	results := decodeRunJobs(t, stdout)
 	if len(results) != 2 {
 		t.Fatalf("got %d results, want docker started and migrate failed:\n%s", len(results), stdout)
 	}
@@ -151,10 +149,7 @@ func TestRunUpJSONExitsNonZeroOnAnAbortWithACompleteDocument(t *testing.T) {
 		t.Fatalf("err = %v, want ErrAborted", err)
 	}
 
-	var results []domain.JobActionResult
-	if err := json.Unmarshal([]byte(stdout), &results); err != nil {
-		t.Fatalf("parse JSON: %v\noutput: %s", err, stdout)
-	}
+	results := decodeRunJobs(t, stdout)
 	if len(results) != 2 {
 		t.Fatalf("got %d results, want the whole run:\n%s", len(results), stdout)
 	}
@@ -177,4 +172,49 @@ func TestRunUpOnAStreamReportsTheAbortAndFails(t *testing.T) {
 			t.Errorf("the abort report is missing %q\n--- stderr ---\n%s", want, stderr)
 		}
 	}
+}
+
+// run up starts one profile, like run down stops one: a second --profile used
+// to be the union of both on up and to overwrite the first on down.
+func TestASecondProfileIsRefused(t *testing.T) {
+	for _, command := range []string{domain.CmdUp, domain.CmdDown} {
+		_, _, err := runCmd(t, command, "--"+domain.FlagProfile, "front", "--"+domain.FlagProfile, "back")
+		if err == nil || !strings.Contains(err.Error(), fmt.Sprintf(domain.FlagGivenTwiceFmt, "front")) {
+			t.Errorf("%s: err = %v, want a second --profile refused", command, err)
+		}
+	}
+}
+
+// Every single-valued job or profile flag of the module refuses a repeat: pflag
+// would otherwise keep the last one and act on it without a word.
+func TestASecondJobOrProfileIsRefused(t *testing.T) {
+	for _, args := range [][]string{
+		{domain.CmdStart, "--" + domain.FlagJob, "api", "--" + domain.FlagJob, "web"},
+		{domain.CmdStop, "--" + domain.FlagJob, "api", "--" + domain.FlagJob, "web"},
+		{domain.CmdOpen, "--" + domain.FlagJob, "api", "--" + domain.FlagJob, "web"},
+		{domain.CmdURL, "--" + domain.FlagJob, "api", "--" + domain.FlagJob, "web"},
+		{domain.CmdLogs, "--" + domain.FlagJob, "api", "--" + domain.FlagJob, "web"},
+		{domain.CmdExport, "--" + domain.FlagProfile, "front", "--" + domain.FlagProfile, "back"},
+		{domain.CmdProfile, domain.CmdEdit, "front", "--" + domain.FlagName, "a", "--" + domain.FlagName, "b"},
+		{domain.CmdJob, domain.CmdEdit, "api", "--" + domain.FlagName, "a", "--" + domain.FlagName, "b"},
+	} {
+		_, _, err := runCmd(t, args...)
+		if err == nil || !strings.Contains(err.Error(), "it takes one value") {
+			t.Errorf("%v: err = %v, want the repeat refused", args, err)
+		}
+	}
+}
+
+// decodeRunJobs reads a `run up` document over one worktree and answers with
+// its jobs, after checking the worktree is named by branch and path.
+func decodeRunJobs(t *testing.T, stdout string) []domain.JobActionResult {
+	t.Helper()
+	var documents []domain.WorktreeRunResult
+	if err := json.Unmarshal([]byte(stdout), &documents); err != nil {
+		t.Fatalf("parse JSON: %v\noutput: %s", err, stdout)
+	}
+	if len(documents) != 1 || documents[0].Branch == "" || documents[0].Path == "" {
+		t.Fatalf("documents = %+v, want one worktree named by branch and path", documents)
+	}
+	return documents[0].Jobs
 }

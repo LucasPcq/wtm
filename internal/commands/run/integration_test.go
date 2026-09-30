@@ -22,8 +22,11 @@ func setupTestProject(t *testing.T) string {
 	shortHome(t)
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
+	// Standing in the project, not in whatever checkout runs the suite: a run
+	// command resolves its worktree from the current directory.
+	t.Chdir(dir)
 
 	if err := config.WriteProject(config.WriteProjectParams{
 		StateDir: stateDir,
@@ -260,5 +263,26 @@ func TestRunImportInvalidConfig(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "tasks cannot declare a stop command") {
 		t.Errorf("expected validation message, got %v", err)
+	}
+}
+
+// run export is machine output, like run url: it takes --output as its sibling
+// does, and answers with the same document whatever the format, never framed.
+func TestRunExportAcceptsOutputLikeRunURL(t *testing.T) {
+	dir := setupTestProject(t)
+	writeRunTOML(t, dir, domain.RunConfig{Jobs: []domain.JobConfig{{Name: "dev", Kind: domain.JobKindService, Cmd: "pnpm dev"}}})
+
+	plain, _, err := runCmd(t, domain.CmdExport)
+	if err != nil {
+		t.Fatalf("run export: %v", err)
+	}
+	for _, format := range []string{domain.OutputJSON, domain.OutputText} {
+		stdout, _, err := runCmd(t, domain.CmdExport, "--"+domain.FlagOutput, format)
+		if err != nil {
+			t.Fatalf("run export --output %s: %v", format, err)
+		}
+		if stdout != plain {
+			t.Errorf("--output %s = %q, want the same document as without it", format, stdout)
+		}
 	}
 }

@@ -34,7 +34,7 @@ func parseSections(raw []string) ([]string, error) {
 				continue
 			}
 			if name == domain.SectionServices {
-				return nil, fmt.Errorf("services moved to a dedicated command — run `wtm run init` (experimental) to configure them")
+				return nil, fmt.Errorf("services moved to a dedicated command — run `wtm run init` to configure them")
 			}
 			if !valid[name] {
 				return nil, fmt.Errorf("unknown section %q for --%s (valid: %s, %s, %s)",
@@ -59,10 +59,8 @@ func runReinit(cmd *cobra.Command, dir, stateDir string, sections []string) erro
 
 	detection := detect.ProjectEnvironment(dir)
 
-	nonInteractive, _ := cmd.Flags().GetBool(domain.FlagNonInteractive)
-
 	var answers domain.InitProjectAnswers
-	if nonInteractive {
+	if !interactive(cmd) {
 		built, err := buildReinitAnswers(cmd, stateDir, detection)
 		if err != nil {
 			return err
@@ -73,16 +71,12 @@ func runReinit(cmd *cobra.Command, dir, stateDir string, sections []string) erro
 		if err != nil {
 			return err
 		}
-		// The re-init confirmation is the wizard's final step (unless --yes), so Esc
-		// on it returns to the section steps instead of aborting the whole flow.
-		yes, _ := cmd.Flags().GetBool(domain.FlagYes)
-		var confirm *components.NewConfirmParams
-		if !yes {
-			confirm = &components.NewConfirmParams{
-				Title:       "Re-initialize " + strings.Join(sections, ", "),
-				Description: "This regenerates the selected section(s) cleanly.",
-				Warning:     reinitWarning(sections),
-			}
+		// The re-init confirmation is the wizard's final step, so Esc on it returns
+		// to the section steps instead of aborting the whole flow.
+		confirm := &components.NewConfirmParams{
+			Title:       "Re-initialize " + strings.Join(sections, ", "),
+			Description: "This regenerates the selected section(s) cleanly.",
+			Warning:     reinitWarning(sections),
 		}
 		wizardAnswers, err := initwizard.RunSectionWizard(initwizard.SectionWizardParams{
 			ProjectDir: dir,
@@ -143,11 +137,11 @@ func toSet(values []string) map[string]bool {
 	return set
 }
 
-// buildReinitAnswers resolves answers for the non-interactive path. Scalar
-// values (base branch, env strategy, install command) keep their current config
-// value unless a flag overrides them; the detected lists (env files, docker,
-// scripts, monorepo) are regenerated from detection. NonInteractive is left
-// false so an unresolved base branch falls back to a default rather than erroring.
+// buildReinitAnswers resolves answers for the unattended path. Scalar values
+// (base branch, env strategy, install command) keep their current config value
+// unless a flag overrides them; the detected lists (env files, docker, scripts,
+// monorepo) are regenerated from detection. Unattended is left false: the
+// config already holds a base branch, so there is nothing left to refuse on.
 func buildReinitAnswers(cmd *cobra.Command, stateDir string, detection domain.InitDetectionResult) (domain.InitProjectAnswers, error) {
 	cfg, err := config.LoadProjectRaw(stateDir)
 	if err != nil {
@@ -163,9 +157,6 @@ func buildReinitAnswers(cmd *cobra.Command, stateDir string, detection domain.In
 		envStrategy = string(cfg.Env.Strategy)
 	}
 	installCommand, _ := cmd.Flags().GetString(domain.FlagInstallCommand)
-	if installCommand == "" {
-		installCommand = rules.InstallCommandFromHooks(cfg.Hooks.OnCreate)
-	}
 	cleanCommand, _ := cmd.Flags().GetString(domain.FlagCleanCommand)
 
 	answers, err := rules.BuildProjectAnswers(rules.InitProjectFlags{
@@ -178,8 +169,11 @@ func buildReinitAnswers(cmd *cobra.Command, stateDir string, detection domain.In
 		return domain.InitProjectAnswers{}, err
 	}
 
-	// on_clean has no single-command reverse like the install command, so preserve
-	// the existing list when --clean-command was not provided.
+	// The config speaks for its hooks: the first of them is not an install
+	// command to rebuild the list from.
+	if installCommand == "" && len(cfg.Hooks.OnCreate) > 0 {
+		answers.OnCreate = cfg.Hooks.OnCreate
+	}
 	if cleanCommand == "" {
 		answers.OnClean = cfg.Hooks.OnClean
 	}

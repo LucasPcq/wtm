@@ -6,11 +6,11 @@ import (
 	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/flow"
 	downflow "github.com/LucasPcq/wtm/internal/flow/run/down"
 	logsflow "github.com/LucasPcq/wtm/internal/flow/run/logs"
 	startflow "github.com/LucasPcq/wtm/internal/flow/run/start"
 	stopflow "github.com/LucasPcq/wtm/internal/flow/run/stop"
-	"github.com/LucasPcq/wtm/internal/flow/run/target"
 	upflow "github.com/LucasPcq/wtm/internal/flow/run/up"
 )
 
@@ -29,7 +29,9 @@ type dispatchParams struct {
 }
 
 // Every dispatch installs a prompter that answers nothing: the picker already
-// chose, so re-asking would let the reader undo the action they just picked.
+// chose, so re-asking would let the reader undo the action they just picked. A
+// start still puts its safety question (foreign data) to the reader, who is at
+// a terminal — refusing it for want of one would be false.
 //
 // target is the configuration of the repository the picked entry belongs to.
 // The guard is not re-run: the listing this came from already passed it.
@@ -59,7 +61,7 @@ func (p dispatchParams) dispatchStart() error {
 	outcome, err := startflow.Run(startflow.Params{
 		Context:   t.FlowContext(),
 		Request:   startflow.Request{Cwd: p.WorkDir, Job: p.Job, Config: t.Run},
-		Prompter:  t.Prompter(false),
+		Prompter:  confirming(t),
 		Presenter: startPresenter{CLIPresenter: shared.NewPresenter(p.Cmd, p.Format)},
 	})
 	if err != nil {
@@ -92,10 +94,10 @@ func (p dispatchParams) dispatchUp() error {
 	}
 	outcome, err := upflow.Run(upflow.Params{
 		Context: t.FlowContext(),
-		Request: upflow.Request{Cwd: p.WorkDir, Profiles: target.OneProfile(p.Profile), Config: t.Run},
+		Request: upflow.Request{Cwd: p.WorkDir, Profile: p.Profile, Config: t.Run},
 		// The picker asked its question already; the concurrency one it did not,
 		// so it resolves to leaving the other worktrees alone.
-		Prompter:  t.Prompter(false),
+		Prompter:  confirming(t),
 		Presenter: upPresenter{CLIPresenter: shared.NewPresenter(p.Cmd, p.Format)},
 	})
 	if err != nil {
@@ -123,3 +125,23 @@ func (p dispatchParams) dispatchDown(all bool) error {
 	}
 	return nil
 }
+
+// confirmingPrompter answers every step unattended and asks every confirmation.
+type confirmingPrompter struct {
+	answers  flow.Prompter
+	confirms flow.Prompter
+}
+
+func confirming(t runctx.Context) flow.Prompter {
+	return confirmingPrompter{answers: t.Prompter(false), confirms: t.Prompter(true)}
+}
+
+func (p confirmingPrompter) Ask(session flow.Session) (flow.Answers, error) {
+	return p.answers.Ask(session)
+}
+
+func (p confirmingPrompter) Confirm(params flow.ConfirmParams) (bool, error) {
+	return p.confirms.Confirm(params)
+}
+
+func (p confirmingPrompter) Interactive() bool { return true }

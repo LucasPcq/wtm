@@ -42,8 +42,10 @@ type ShowParams struct {
 	Board runlogs.Board
 	Job   string
 	// Worktrees names what the board covers, in selection order: a surface reads
-	// its length to know whether to say where a line came from at all.
+	// its length to know whether to say where a line came from at all. WorkDirs
+	// are their paths, in the same order.
 	Worktrees []string
+	WorkDirs  []string
 	// Warnings are what the board has to say about the addresses it lists; see
 	// seam.SequenceParams.
 	Warnings []string
@@ -84,6 +86,9 @@ type logsFlow struct {
 }
 
 func (f *logsFlow) run() (Outcome, error) {
+	if err := target.RequireDeclared(target.DeclaredParams{Config: f.request.Config, Job: f.request.Job}); err != nil {
+		return Outcome{}, err
+	}
 	named, err := target.NamedAll(target.ResolveAllParams{ProjectDir: f.ctx.ProjectDir, Queries: f.request.Worktrees})
 	if err != nil {
 		return Outcome{}, err
@@ -119,6 +124,7 @@ func (f *logsFlow) run() (Outcome, error) {
 		Board:     set.Board(),
 		Job:       f.request.Job,
 		Worktrees: set.Worktrees(),
+		WorkDirs:  set.WorkDirs(),
 		Warnings:  warnings,
 	})
 }
@@ -176,15 +182,14 @@ func Views(params ViewsParams) ([]runlogs.JobView, error) {
 	jobs := params.Board.Jobs()
 	if params.Job != "" {
 		// Every worktree's copy of the job, not the first: --job names a job, and
-		// a board covering three worktrees holds three of them.
+		// a board covering three worktrees holds three of them. None is not an
+		// error: the flow already refused a name run.toml does not declare, and a
+		// declared job with no log here simply has nothing to show.
 		named := make([]runlogs.JobView, 0, len(jobs))
 		for _, view := range jobs {
 			if view.Name == params.Job {
 				named = append(named, view)
 			}
-		}
-		if len(named) == 0 {
-			return nil, fmt.Errorf("%w: %s", domain.ErrJobNotFound, params.Job)
 		}
 		return named, nil
 	}

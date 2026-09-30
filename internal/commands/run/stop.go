@@ -13,10 +13,13 @@ import (
 func newStopCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   domain.CmdStop + " [worktree...]",
-		Short: "Stop a single job",
-		Long:  "Stop one running job of [worktree] — the current one when omitted, picked interactively when there is a terminal.\nThe job is named with --job; without it, a fully interactive run offers a picker.",
-		Args:  cobra.ArbitraryArgs,
-		RunE:  runStop,
+		Short: "Stop one job, in one or more worktrees",
+		Long:  "Stop one running job in each [worktree] — the current one when omitted, picked interactively when there is a terminal.\nThe job is named with --job; without it, a fully interactive run offers a picker.",
+		Example: `  wtm run stop --job api
+
+  wtm run stop feat/login fix/typo --job web --yes`,
+		Args: cobra.ArbitraryArgs,
+		RunE: runStop,
 	}
 	shared.AddJobFlag(cmd, "Job to stop (required without a terminal or in --output json mode)")
 	shared.AddYesFlag(cmd, "Skip all prompts; --job is then required")
@@ -25,13 +28,11 @@ func newStopCmd() *cobra.Command {
 }
 
 func runStop(cmd *cobra.Command, args []string) error {
-	ctx, err := runctx.Open(runctx.OpenParams{Cmd: cmd})
+	ctx, err := runctx.Open(runctx.OpenParams{Cmd: cmd, TolerateRunConfig: true})
 	if err != nil {
 		return err
 	}
-	if err := reportRunConfig(cmd, ctx.Run); err != nil {
-		return err
-	}
+	warnRunConfig(cmd, ctx)
 
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 	job, _ := cmd.Flags().GetString(domain.FlagJob)
@@ -43,6 +44,7 @@ func runStop(cmd *cobra.Command, args []string) error {
 			Cwd:       ctx.Dir,
 			Job:       job,
 			Config:    ctx.Run,
+			ByName:    ctx.RunErr != nil,
 		},
 		Prompter:  ctx.Prompter(ctx.Interactive),
 		Presenter: stopPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},

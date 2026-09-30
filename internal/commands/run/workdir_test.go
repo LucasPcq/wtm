@@ -32,7 +32,7 @@ func (d *fakeDaemon) startWorkDir(t *testing.T, job string) string {
 func TestRunStartOnANamedWorktreeUsesItsEnv(t *testing.T) {
 	daemon := setupUpProject(t, &fakeDaemon{})
 	fakeTTY(t, false)
-	other := addWorktree(t, os.Getenv("WTM_PROJECT_DIR"), "feat/elsewhere")
+	other := addWorktree(t, os.Getenv(domain.EnvProjectDir), "feat/elsewhere")
 
 	if _, _, err := runCmd(t, domain.CmdStart, "feat/elsewhere", "--"+domain.FlagJob, "api", "--"+domain.FlagDetach); err != nil {
 		t.Fatalf("run start feat/elsewhere: %v", err)
@@ -56,7 +56,7 @@ func TestRunStartFromASubdirectoryKeysOnTheWorktree(t *testing.T) {
 	daemon := setupUpProject(t, &fakeDaemon{})
 	fakeTTY(t, false)
 
-	worktreePath := addWorktree(t, os.Getenv("WTM_PROJECT_DIR"), "feat/deep")
+	worktreePath := addWorktree(t, os.Getenv(domain.EnvProjectDir), "feat/deep")
 	nested := filepath.Join(worktreePath, "packages", "api")
 	if err := os.MkdirAll(nested, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -80,8 +80,8 @@ func TestNamedAndCurrentWorktreeAgreeOnTheKey(t *testing.T) {
 	setupUpProject(t, &fakeDaemon{})
 	fakeTTY(t, false)
 
-	worktreePath := addWorktree(t, os.Getenv("WTM_PROJECT_DIR"), "feat/same")
-	projectDir := os.Getenv("WTM_PROJECT_DIR")
+	worktreePath := addWorktree(t, os.Getenv(domain.EnvProjectDir), "feat/same")
+	projectDir := os.Getenv(domain.EnvProjectDir)
 
 	resolved, err := target.Named(target.ResolveParams{ProjectDir: projectDir, Query: "feat/same"})
 	if err != nil {

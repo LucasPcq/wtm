@@ -15,7 +15,7 @@ import (
 // startShared runs a shared job once for the repository and records the asking
 // worktree's claim on it. The real job lives under the main checkout's key —
 // jobKey is untouched, the sharing is entirely in the choice of work dir — and
-// every other worktree posts an attachment beside it. That makes the job table
+// every other worktree posts a claim beside it. That makes the job table
 // itself the reference count, with no second registry to keep in step.
 func (m *Manager) startShared(params StartParams) error {
 	shared := params.Shared
@@ -117,7 +117,7 @@ type holdParams struct {
 func (m *Manager) holdByMain(params holdParams) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if real, ok := m.jobs[params.Key]; ok && real.Status != domain.JobStatusAttached {
+	if real, ok := m.jobs[params.Key]; ok && real.Status != domain.JobStatusJoined {
 		real.MainHolds = params.Holds
 	}
 }
@@ -134,10 +134,10 @@ type releaseParams struct {
 func (m *Manager) releaseClaim(params releaseParams) {
 	m.mu.Lock()
 	claim, held := m.jobs[params.Key]
-	if held && claim.Status == domain.JobStatusAttached {
+	if held && claim.Status == domain.JobStatusJoined {
 		delete(m.jobs, params.Key)
 	}
-	remaining := m.attachmentsLocked(sharedRef{Name: params.Name, Dir: params.Dir})
+	remaining := m.claimsLocked(sharedRef{Name: params.Name, Dir: params.Dir})
 	real, found := m.realSharedLocked(sharedRef{Name: params.Name, Dir: params.Dir})
 	realRunning := found && real.Status == domain.JobStatusRunning
 	m.mu.Unlock()
@@ -168,7 +168,7 @@ func (m *Manager) claim(params claimParams) {
 	m.jobs[params.Key] = &ManagedJob{
 		Name:      params.Params.Job.Name,
 		Config:    params.Params.Job,
-		Status:    domain.JobStatusAttached,
+		Status:    domain.JobStatusJoined,
 		WorkDir:   params.Params.WorkDir,
 		StartedAt: time.Now(),
 		Env:       params.Params.Env,
@@ -187,12 +187,12 @@ func (m *Manager) claim(params claimParams) {
 func (m *Manager) stopShared(job *ManagedJob) error {
 	m.mu.Lock()
 	ref := sharedRef{Name: job.Name, Dir: job.SharedDir}
-	if job.Status == domain.JobStatusAttached {
+	if job.Status == domain.JobStatusJoined {
 		delete(m.jobs, jobKey(job.Name, job.WorkDir))
 	} else {
 		job.MainHolds = false
 	}
-	remaining := m.attachmentsLocked(ref)
+	remaining := m.claimsLocked(ref)
 	real, found := m.realSharedLocked(ref)
 	// Snapshotted under the lock, like stopByKey does: Status is written by the
 	// goroutine that reaps the process, and reading it outside is a race.
@@ -255,13 +255,13 @@ type sharedRef struct {
 	Dir  string
 }
 
-// attachmentsLocked counts the claims standing on a shared job, the real job
+// claimsLocked counts the claims standing on a shared job, the real job
 // excluded: it is the main checkout's own claim, and the whole point is that it
 // stops once nobody else holds it.
-func (m *Manager) attachmentsLocked(ref sharedRef) int {
+func (m *Manager) claimsLocked(ref sharedRef) int {
 	count := 0
 	for _, job := range m.jobs {
-		if job.Name == ref.Name && job.SharedDir == ref.Dir && job.Status == domain.JobStatusAttached {
+		if job.Name == ref.Name && job.SharedDir == ref.Dir && job.Status == domain.JobStatusJoined {
 			count++
 		}
 	}
@@ -275,7 +275,7 @@ func (m *Manager) realSharedLocked(ref sharedRef) (*ManagedJob, bool) {
 		return nil, false
 	}
 	job, found := m.jobs[jobKey(ref.Name, ref.Dir)]
-	if !found || job.Status == domain.JobStatusAttached {
+	if !found || job.Status == domain.JobStatusJoined {
 		return nil, false
 	}
 	return job, true

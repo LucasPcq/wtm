@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/flow/run/seam"
+	"github.com/LucasPcq/wtm/internal/flow/run/target"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -127,15 +127,17 @@ func TestWriteJobLinesNarrowsToTheNamedJob(t *testing.T) {
 	}
 }
 
-func TestWriteJobLinesRefusesAJobTheWorktreeDoesNotHave(t *testing.T) {
+func TestWriteJobLinesSaysSoForAJobTheWorktreeHasNoLogOf(t *testing.T) {
 	board := runlogstest.NewBoard(runlogstest.BoardParams{
 		Views: []runlogs.JobView{{Name: "api", Status: domain.JobStatusRunning, Attachable: true}},
 	})
 
-	cmd, _, _ := linesCmd()
-	err := writeJobLines(jobLinesParams{Cmd: cmd, Board: board, Job: "ghost"})
-	if err == nil || !strings.Contains(err.Error(), "ghost") {
-		t.Fatalf("err = %v, want one naming the unknown job", err)
+	cmd, out, _ := linesCmd()
+	if err := writeJobLines(jobLinesParams{Cmd: cmd, Board: board, Job: "seed"}); err != nil {
+		t.Fatalf("writeJobLines: %v", err)
+	}
+	if !strings.Contains(out.String(), domain.RunLogsNoJobs) {
+		t.Errorf("stdout does not say there is nothing to show:\n%s", out.String())
 	}
 }
 
@@ -175,23 +177,22 @@ func TestRunLogsOpensTheViewOnATerminal(t *testing.T) {
 }
 
 func TestRunLogsWithoutATerminalWritesPrefixedLines(t *testing.T) {
+	daemon := setupStartProject(t, &fakeDaemon{
+		Streams: map[string][]byte{"api": []byte("listening on 3000\nrequest handled\n")},
+	})
+	// The daemon keys a job on the worktree it was started from, never on the
+	// subdirectory or the spelling the caller happened to use, so the fake has to
+	// answer with the same key the command will ask for.
 	dir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
 	}
-	// The daemon keys a job on the worktree it was started from, never on the
-	// subdirectory or the spelling the caller happened to use, so the fake has to
-	// answer with the same key the command will ask for.
 	root, err := infra.Toplevel(dir)
 	if err != nil {
 		t.Fatalf("toplevel: %v", err)
 	}
-
-	setupStartProject(t, &fakeDaemon{
-		Jobs: []domain.JobInfo{
-			{Name: "api", Kind: domain.JobKindService, Status: domain.JobStatusRunning, WorkDir: root},
-		},
-		Streams: map[string][]byte{"api": []byte("listening on 3000\nrequest handled\n")},
+	daemon.setJobs([]domain.JobInfo{
+		{Name: "api", Kind: domain.JobKindService, Status: domain.JobStatusRunning, WorkDir: root},
 	})
 	view := captureRunView(t)
 	fakeTTY(t, false)
@@ -211,11 +212,25 @@ func TestRunLogsWithoutATerminalWritesPrefixedLines(t *testing.T) {
 	}
 }
 
+// decodeLogLines reads a `run logs` document over one worktree and answers
+// with its lines.
+func decodeLogLines(t *testing.T, document []byte) []domain.JobLogEntry {
+	t.Helper()
+	var logs []domain.WorktreeLogs
+	if err := json.Unmarshal(document, &logs); err != nil {
+		t.Fatalf("parse JSON: %v\noutput: %s", err, document)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("documents = %d, want the one worktree:\n%s", len(logs), document)
+	}
+	return logs[0].Lines
+}
+
 func TestWriteJobLogsJSONReplaysEveryJobsHistory(t *testing.T) {
 	board := runlogstest.NewBoard(runlogstest.BoardParams{
 		Views: []runlogs.JobView{
-			{Name: "api", Kind: domain.JobKindService, Status: domain.JobStatusRunning, Attachable: true},
-			{Name: "migrate", Kind: domain.JobKindTask, Status: domain.JobStatusStopped},
+			{Name: "api", WorkDir: "/wt/main", Kind: domain.JobKindService, Status: domain.JobStatusRunning, Attachable: true},
+			{Name: "migrate", WorkDir: "/wt/main", Kind: domain.JobKindTask, Status: domain.JobStatusStopped},
 		},
 		Lines: map[string][]string{
 			"api":     {"2026-09-02T10:04:11Z  listening on 3000"},
@@ -224,14 +239,11 @@ func TestWriteJobLogsJSONReplaysEveryJobsHistory(t *testing.T) {
 	})
 
 	cmd, out, _ := linesCmd()
-	if err := writeJobLogsJSON(jobLinesParams{Cmd: cmd, Board: board}); err != nil {
+	if err := writeJobLogsJSON(jobLinesParams{Cmd: cmd, Board: board, Worktrees: []string{"main"}, WorkDirs: []string{"/wt/main"}}); err != nil {
 		t.Fatalf("writeJobLogsJSON: %v", err)
 	}
 
-	var entries []domain.JobLogEntry
-	if err := json.Unmarshal(out.Bytes(), &entries); err != nil {
-		t.Fatalf("parse JSON: %v\noutput: %s", err, out.String())
-	}
+	entries := decodeLogLines(t, out.Bytes())
 	want := []domain.JobLogEntry{
 		{Job: "api", At: "2026-09-02T10:04:11Z", Text: "listening on 3000"},
 		{Job: "migrate", At: "2026-09-02T10:03:58Z", Text: "applying 001"},
@@ -255,7 +267,7 @@ func TestWriteJobLogsJSONNeverAttaches(t *testing.T) {
 	})
 
 	cmd, out, _ := linesCmd()
-	if err := writeJobLogsJSON(jobLinesParams{Cmd: cmd, Board: board}); err != nil {
+	if err := writeJobLogsJSON(jobLinesParams{Cmd: cmd, Board: board, Worktrees: []string{"main"}, WorkDirs: []string{"/wt/main"}}); err != nil {
 		t.Fatalf("writeJobLogsJSON: %v", err)
 	}
 
@@ -271,8 +283,8 @@ func TestWriteJobLogsJSONNeverAttaches(t *testing.T) {
 func TestWriteJobLogsJSONStaysAnArrayForOneJob(t *testing.T) {
 	board := runlogstest.NewBoard(runlogstest.BoardParams{
 		Views: []runlogs.JobView{
-			{Name: "api", Status: domain.JobStatusRunning, Attachable: true},
-			{Name: "web", Status: domain.JobStatusRunning, Attachable: true},
+			{Name: "api", WorkDir: "/wt/main", Status: domain.JobStatusRunning, Attachable: true},
+			{Name: "web", WorkDir: "/wt/main", Status: domain.JobStatusRunning, Attachable: true},
 		},
 		Lines: map[string][]string{
 			"api": {"2026-09-02T10:04:11Z  listening on 3000"},
@@ -281,31 +293,32 @@ func TestWriteJobLogsJSONStaysAnArrayForOneJob(t *testing.T) {
 	})
 
 	cmd, out, _ := linesCmd()
-	if err := writeJobLogsJSON(jobLinesParams{Cmd: cmd, Board: board, Job: "api"}); err != nil {
+	if err := writeJobLogsJSON(jobLinesParams{Cmd: cmd, Board: board, Job: "api", Worktrees: []string{"main"}, WorkDirs: []string{"/wt/main"}}); err != nil {
 		t.Fatalf("writeJobLogsJSON: %v", err)
 	}
 
-	var entries []domain.JobLogEntry
-	if err := json.Unmarshal(out.Bytes(), &entries); err != nil {
-		t.Fatalf("parse JSON: %v\noutput: %s", err, out.String())
-	}
+	entries := decodeLogLines(t, out.Bytes())
 	if len(entries) != 1 || entries[0].Job != "api" {
 		t.Errorf("entries = %+v, want api's single line", entries)
 	}
 }
 
-func TestWriteJobLogsJSONOnAWorktreeWithNothingRecordedIsAnEmptyArray(t *testing.T) {
+func TestWriteJobLogsJSONOnAWorktreeWithNothingRecordedHasNoLines(t *testing.T) {
 	board := runlogstest.NewBoard(runlogstest.BoardParams{
-		Views: []runlogs.JobView{{Name: "api", Status: domain.JobStatusStopped}},
+		Views: []runlogs.JobView{{Name: "api", WorkDir: "/wt/main", Status: domain.JobStatusStopped}},
 	})
 
 	cmd, out, _ := linesCmd()
-	if err := writeJobLogsJSON(jobLinesParams{Cmd: cmd, Board: board}); err != nil {
+	if err := writeJobLogsJSON(jobLinesParams{Cmd: cmd, Board: board, Worktrees: []string{"main"}, WorkDirs: []string{"/wt/main"}}); err != nil {
 		t.Fatalf("writeJobLogsJSON: %v", err)
 	}
 
-	if got := strings.TrimSpace(out.String()); got != "[]" {
-		t.Errorf("stdout = %q, want an empty array", got)
+	var logs []domain.WorktreeLogs
+	if err := json.Unmarshal(out.Bytes(), &logs); err != nil {
+		t.Fatalf("parse JSON: %v\noutput: %s", err, out.String())
+	}
+	if len(logs) != 1 || logs[0].Branch != "main" || logs[0].Lines == nil || len(logs[0].Lines) != 0 {
+		t.Errorf("stdout = %s, want main with an empty lines array", out.String())
 	}
 }
 
@@ -335,7 +348,7 @@ func TestRunLogsJSONNeverOpensTheView(t *testing.T) {
 
 	// Tail reads the file itself rather than asking the daemon, so the history
 	// this replays has to be on disk where the command will look for it.
-	logDir := seam.LogDir(seam.LogDirParams{StateDir: stateDir, WorkDir: root})
+	logDir := rules.WorktreeLogDir(rules.WorktreeLogDirParams{StateDir: stateDir, Branch: target.BranchOf(root)})
 	if logDir == "" {
 		t.Fatal("the test worktree resolved to no log dir")
 	}
@@ -358,10 +371,14 @@ func TestRunLogsJSONNeverOpensTheView(t *testing.T) {
 	if len(view.calls) != 0 {
 		t.Fatalf("--output json opened the view: %+v", view.calls)
 	}
-	var entries []domain.JobLogEntry
-	if err := json.Unmarshal([]byte(stdout), &entries); err != nil {
+	var logs []domain.WorktreeLogs
+	if err := json.Unmarshal([]byte(stdout), &logs); err != nil {
 		t.Fatalf("parse JSON: %v\noutput: %s", err, stdout)
 	}
+	if len(logs) != 1 || logs[0].Branch == "" || logs[0].Path != root {
+		t.Fatalf("documents = %+v, want this worktree by branch and path", logs)
+	}
+	entries := logs[0].Lines
 	want := []domain.JobLogEntry{{Job: "api", At: "2026-09-02T10:04:11Z", Text: "listening on 3000"}}
 	if !reflect.DeepEqual(entries, want) {
 		t.Errorf("entries = %+v, want %+v", entries, want)

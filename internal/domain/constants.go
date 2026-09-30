@@ -26,14 +26,15 @@ const (
 	// ExitCodeError indicates a generic runtime error.
 	ExitCodeError = 1
 
-	// ExitCodeUsage indicates invalid usage or bad input.
+	// ExitCodeUsage is a command line cobra refused: an unknown flag, a flag
+	// value it cannot parse, an --output it does not know, too many arguments.
 	ExitCodeUsage = 2
 
 	// Granular exit codes let LLM agents branch precisely on failure cause.
 	ExitCodeWorktreeExists    = 10 // a worktree or its path already exists
 	ExitCodeBranchNotFound    = 11 // the requested branch does not exist locally
 	ExitCodeConfigNotFound    = 12 // the repo has no wtm config (run `wtm init`)
-	ExitCodeServiceNotFound   = 14 // the referenced job is not declared in run.toml
+	ExitCodeNotDeclared       = 14 // the job or profile named is not declared in run.toml
 	ExitCodeExtractConflict   = 15 // selected changes do not apply cleanly onto the target worktree
 	ExitCodeRunNotInitialized = 16 // the run module is not initialized (run `wtm run init`)
 
@@ -110,6 +111,9 @@ const (
 	EnvAssign        = "="
 	EnvQuoteDouble   = '"'
 	EnvQuoteSingle   = '\''
+	EnvCR            = "\r"
+	// EnvInterpolation is what a dotenv reader expands outside single quotes.
+	EnvInterpolation = "$"
 
 	// EnvCredentialsSeparator ends the userinfo part of a URL. A value is elided
 	// there before display: what precedes it is a password, what follows is the
@@ -221,6 +225,10 @@ const (
 	// EnvGoFile is the environment variable used by the shell wrapper to pass the go-file path.
 	EnvGoFile = "WTM_GO_FILE"
 
+	// Override git resolution of the main checkout and of the state directory, for tests and CI.
+	EnvProjectDir = "WTM_PROJECT_DIR"
+	EnvStateDir   = "WTM_STATE_DIR"
+
 	// Worktree-scoped variables injected into every job and lifecycle hook, so
 	// two worktrees running the same services never share a resource.
 	EnvWorktree           = "WTM_WORKTREE"
@@ -229,7 +237,7 @@ const (
 	EnvPortOffset         = "WTM_PORT_OFFSET"
 	EnvComposeProjectName = "COMPOSE_PROJECT_NAME"
 	// EnvIsolation carries the worktree's Isolation to the daemon, which cannot
-	// read the metadata that records it and must not carve a slice out of a
+	// read the metadata that records it and must not create a namespace in a
 	// shared service for a worktree whose .env names its source's.
 	EnvIsolation = "WTM_ISOLATION"
 	// EnvProject is the repository's slug, as the hostname and the compose
@@ -273,7 +281,7 @@ const (
 	EnvValueLinkNoNamespaceFmt  = "env %s in %s: job %q declares no [job.namespace], so {namespace} means nothing"
 	EnvValueLinkNoPortFmt       = "env %s in %s: job %q declares no port named %q"
 	EnvValueLinkTwiceFmt        = "env %s in %s is declared twice"
-	EnvValueLinkConstantFmt     = "env %s in %s: the value holds no placeholder, so every worktree would get the same one — put {namespace} where the slice belongs, or drop the link"
+	EnvValueLinkConstantFmt     = "env %s in %s: the value holds no placeholder, so every worktree would get the same one — put {namespace} where the namespace belongs, or drop the link"
 	EnvValueLinkNoOriginFmt     = "env %s in %s: job %q publishes no address, so {origin} has no answer — publish a [job.url] for it, or write the host yourself"
 	EnvValueLinkBadNamespaceFmt = "env %s in %s: %v"
 	EnvValueUnclosedTokenFmt    = "env %s in %s: a {port.…} placeholder is never closed"
@@ -281,6 +289,8 @@ const (
 	// not complementary: an [[env]] value writes the port itself when it needs
 	// one, so a key holding both is a line to delete, not a merge to define.
 	EnvValueLinkClashesPortFmt = "%s in %s is written by both an [[env]] link and an [[env_port]] link — an [[env]] value writes its own port, so drop the [[env_port]] line"
+
+	EnvValueLinkUnconfiguredFileFmt = "env %s references %s, which is not a configured env file — add it to [env] in %s or drop the link"
 	// EnvValueUnknownTokenFmt names the placeholder rather than the value, since
 	// a long URL makes the offending braces hard to find.
 	EnvValueUnknownTokenFmt = "env %s in %s: unknown placeholder %s"
@@ -300,11 +310,22 @@ const (
 
 	// NamespaceCreateFailedFmt names the namespace, the job and the last error a
 	// budget's worth of retries ended on.
-	NamespaceCreateFailedFmt = "job %s: could not attach namespace %s: %w (the attach runs on every start, so it must be safe to run again)"
+	NamespaceCreateFailedFmt = "job %s: could not create namespace %s: %w (the create runs on every start, so it must be safe to run again)"
 	// NamespaceReadyLogFmt is the line a shared service's log gains when a
-	// worktree's slice of it is made: namespace, then worktree.
+	// worktree's namespace in it is made: namespace, then worktree.
 	NamespaceReadyLogFmt     = "[wtm] namespace %s ready for %s"
 	NamespaceRemoveFailedFmt = "job %s: could not detach namespace %s: %w"
+	// NamespaceRecordFailedFmt is a namespace created but not written down in
+	// meta.json: no clean will know to drop it.
+	NamespaceRecordFailedFmt = "%s: could not record this worktree's namespace (%s) — `wtm clean` will not know to drop it"
+	// NamespaceRemoveTimeout bounds a namespace's remove command: a DROP waiting
+	// on a lock held by a connection nobody closed would otherwise hold the clean
+	// for ever. Past it, the namespace is owed like one whose service is down.
+	NamespaceRemoveTimeout     = 30 * time.Second
+	NamespaceRemoveTimedOutFmt = "timed out after %s"
+	// NamespaceRemoveKillGrace is how long the remove command's own children get
+	// to let go of its output once it is killed.
+	NamespaceRemoveKillGrace = time.Second
 	// SharedNoContextFmt is a shared job whose main checkout the client could
 	// not resolve — a bare clone, typically.
 	SharedNoContextFmt = "job %s: %w"
@@ -319,18 +340,31 @@ const (
 	// is to detach: clean is the destructive command, and destroying a worktree
 	// without its data would leave an orphan behind on every iteration.
 	FlagKeepData     = "keep-data"
-	FlagKeepDataDesc = "keep the namespaces the removed worktrees carved out of shared services"
+	FlagKeepDataDesc = "Keep the namespaces the removed worktrees carved out of shared services"
 	// FlagDropData answers the data step ahead: every namespace is dropped now,
 	// starting the shared services that are down to do it. It is how an
 	// unattended run asks for what --yes will not do by default.
 	FlagDropData     = "drop-data"
-	FlagDropDataDesc = "drop the removed worktrees' data now, starting the shared services that are down to do it"
+	FlagDropDataDesc = "Drop the removed worktrees' data now, starting the shared services that are down to do it"
 
 	// The three name the namespace itself — app_feat_x, not feat-x — because it
 	// is what was destroyed, and the service it was destroyed in.
 	CleanRemovedNamespaceFmt  = "dropped %s from %s"
 	CleanDeferredNamespaceFmt = "%s is down: %s kept, dropped on its next start"
-	PruneSettledNamespaceFmt  = "dropped %s from %s, left over from removed worktree %s"
+	// CleanDropFailedFmt is a drop the service refused while it was up: the
+	// namespace, the service, the cause.
+	CleanDropFailedFmt = "could not drop %s from %s: %s — kept, dropped the next time wtm finds it up"
+	// CleanNamespaceSharedFmt keeps a namespace another live worktree reaches
+	// under the same name: namespace, that worktree's branch, the shared slug.
+	CleanNamespaceSharedFmt       = "%s kept: %s is named %s too, so the namespace is also its own"
+	CleanNamespaceSharedReasonFmt = "%s is named %s too"
+	// NamespaceServiceDownFmt is why a namespace was deferred rather than dropped.
+	NamespaceServiceDownFmt = "%s is down"
+	// CleanDataSharedRecapFmt is the recap line of a namespace kept for that reason.
+	CleanDataSharedRecapFmt = "  data      %s kept: %s shares its name"
+	// CleanKeptByFlag is the JSON reason of a namespace --keep-data withheld.
+	CleanKeptByFlag          = "--keep-data"
+	PruneSettledNamespaceFmt = "dropped %s from %s, left over from removed worktree %s"
 	// OwedRecreatedFmt withdraws a debt whose worktree exists again: the
 	// namespace is the new worktree's now. OwedStillFmt counts what a service
 	// that is down still owes, and when it will be paid.
@@ -363,7 +397,7 @@ const (
 	// compose service.
 	ScopeStepName  = "Shared services"
 	ScopeStepTitle = "Which services run once for the whole repository?"
-	ScopeStepDesc  = "A shared service runs once instead of once per worktree — a postgres, a keycloak. Each worktree still gets its own data through a namespace. Space toggles, enter confirms."
+	ScopeStepDesc  = "A shared service runs once instead of once per worktree — a postgres, a keycloak. Its data is then every worktree's, unless it declares a namespace — each worktree's own database or realm, asked next. Space toggles, enter confirms."
 
 	// ScopeReasonBuild is why a service built here can never be shared: it
 	// serves this worktree's own source, whatever its name suggests.
@@ -386,13 +420,13 @@ const (
 	// The namespace step: what it asks, and what it says is available. The list
 	// of variables is built from the job's own declaration rather than written
 	// here — wtm knows the ports it injects, and nothing else.
-	NamespaceStepName  = "Shared service data"
+	NamespaceStepName  = "Shared service namespaces"
 	NamespaceStepTitle = "What does each worktree get of these shared services?"
-	NamespaceStepDesc  = "A shared service runs once, so each worktree needs its own slice of it —\n" +
-		"a database, a set of realms. wtm names the slice and runs your commands;\n" +
+	NamespaceStepDesc  = "A shared service runs once, so each worktree needs its own namespace in\n" +
+		"it — a database, a set of realms. wtm names it and runs your commands;\n" +
 		"it never guesses them.\n" +
 		"\n" +
-		"  ● name      what this worktree's slice is called\n" +
+		"  ● name      what this worktree's namespace is called\n" +
 		"              for a postgres, the database name — e.g. app_{worktree}\n" +
 		"              {worktree} and {ordinal} are filled in by wtm, here and\n" +
 		"              nowhere else: a name is data, no shell ever sees it\n" +
@@ -400,7 +434,7 @@ const (
 		"                it is what `wtm clean` names before destroying it\n" +
 		"\n" +
 		"  ● create    run every time this worktree starts the service, so it\n" +
-		"              must be safe to run again: carve the slice out if it is\n" +
+		"              must be safe to run again: create the namespace if it is\n" +
 		"              absent, do nothing if it is already there\n" +
 		"              an inline command or the path to a script — both are a\n" +
 		"              /bin/sh line run in the worktree\n" +
@@ -408,17 +442,17 @@ const (
 		"\n" +
 		"  ● remove    run by `wtm clean` when the worktree goes — never by\n" +
 		"              `run stop` or `run down`: stopping is not destroying\n" +
-		"              → leave empty to keep the slice once the worktree is gone"
+		"              → leave empty to keep it once the worktree is gone"
 
 	EnvValueStepName  = "Shared service keys"
-	EnvValueStepTitle = "Which .env keys name each worktree's slice?"
-	EnvValueStepDesc  = "What differs per worktree is the slice a shared service carves out — a\n" +
+	EnvValueStepTitle = "Which .env keys name each worktree's namespace?"
+	EnvValueStepDesc  = "What differs per worktree is its namespace in a shared service — a\n" +
 		"database, a realm. wtm cannot recognize one, so it lists every key it manages.\n" +
 		"\n" +
 		"  space     link a key, so wtm writes its whole value per worktree\n" +
-		"  enter     edit the template — {namespace} is this worktree's slice\n" +
+		"  enter     edit the template — {namespace} is this worktree's namespace\n" +
 		"\n" +
-		"Keys already checked name the service's slice — POSTGRES_DB,\n" +
+		"Keys already checked name the service's namespace — POSTGRES_DB,\n" +
 		"KEYCLOAK_REALM — or are linked by run.toml."
 	EnvValueRowFmt       = "%s %-*s  %s"
 	EnvValueGroupFmt     = "%s · %s"
@@ -427,13 +461,13 @@ const (
 	EnvValueMarkOff      = "[ ]"
 	EnvValueEmptyValue   = "—"
 	EnvValueSummaryFmt   = "%d key(s) linked"
-	EnvValueSkipNoShared = "no shared service carves out a slice"
+	EnvValueSkipNoShared = "no shared service declares a namespace"
 	EnvValueSkipNoKeys   = "no managed .env key to link"
 	EnvValueEmptyErr     = "a linked key needs a template; {namespace} is the usual one"
 	// EnvValueConstantErr refuses a template that never varies. The field is
 	// pre-filled with the value on disk so a long URL is edited rather than
 	// retyped, which makes "accepted unchanged" the easy mistake to make.
-	EnvValueConstantErr = "this template never changes, so every worktree would get the same value — put {namespace} where the slice belongs, or press space to unlink the key"
+	EnvValueConstantErr = "this template never changes, so every worktree would get the same value — put {namespace} where the namespace belongs, or press space to unlink the key"
 	EnvValueNowFmt      = "now  %s"
 	EnvValueEditHelp    = "enter save · esc cancel"
 	EnvValueHelpLink    = "space link"
@@ -457,7 +491,7 @@ const (
 	NamespaceNameEmptyErr = "a namespace needs a name; it is what clean says it is about to destroy"
 	NamespaceEditHelp     = "enter save · esc cancel"
 	NamespaceSummaryFmt   = "%d of %d configured"
-	NamespaceSkipNoShared = "no shared service to carve up"
+	NamespaceSkipNoShared = "no shared service to give namespaces"
 
 	// MainWorktreeOrdinal is never persisted: the main worktree has no meta.json,
 	// so 0 in a linked worktree's metadata means "not allocated yet".
@@ -505,6 +539,9 @@ const (
 	// Gecko's `amanda` port: every named URL answered ERR_UNSAFE_PORT while the
 	// proxy itself was serving perfectly. See rules.IsBrowserBlockedPort.
 	ProxyDefaultPort = 11080
+	// ProxyPortOutOfRangeFmt refuses a [proxy] port no socket can bind. Zero is
+	// not refused: it is what an absent key reads as, the default.
+	ProxyPortOutOfRangeFmt = "invalid [proxy] port %d in %s — use %d-%d, or leave it out for %d"
 	// ProxyPortScanSpan is how many ports past the configured one the proxy
 	// tries before giving up. A name answering on an unexpected port beats a
 	// name answering nowhere, but a port far from the one asked for is no
@@ -554,7 +591,7 @@ const (
 	ProxyUnknownHostFmt  = "wtm: no job is published under %s\n\n"
 	ProxyKnownRoutesHead = "Routes wtm is currently serving:\n"
 	ProxyRouteLineFmt    = "  %s  ->  %s (job %s, worktree %s of %s)\n"
-	ProxyNoRoutesLine    = "  (none — start a job that declares a url)\n"
+	ProxyNoRoutesLine    = "  (none — start a job that publishes a named URL)\n"
 	ProxySilentTargetFmt = "wtm: job %s is published under %s but nothing answers on %s\n"
 	// ProxyBindFailedFmt is what the daemon records when the port is taken, and
 	// ProxyUnavailableFmt what a client says instead of a name nothing serves.
@@ -640,13 +677,14 @@ const (
 	ProxyUninstallConfirmDesc    = "Named URLs go back to carrying the proxy's port."
 	ProxyUninstallDone           = "Redirection removed — named URLs carry the proxy's port again"
 	ProxyUninstallChange         = "unloaded from launchd and deleted"
+	ProxyUninstallNothing        = "No redirection installed, nothing to remove"
 
 	// The one place wtm mentions the redirection outside its own commands.
 	// ProxyHostShape names the shape rather than one job: run init speaks about
 	// every published job at once.
 	ProxyHostShape         = "<job>.<worktree>.<repo>.localhost"
 	ProxyInstallHintTitle  = "Named URLs carry a port"
-	ProxyInstallHintFmt    = "Jobs publishing a url answer on %s"
+	ProxyInstallHintFmt    = "Jobs publishing a named URL answer on %s"
 	ProxyInstallHintCmd    = "`wtm run proxy install` serves them on port 80 so the port disappears from the URL"
 	ProxyInstallHintNoPlat = "Dropping that port is not implemented on this platform yet"
 
@@ -664,7 +702,7 @@ const (
 	// FlagKeepEnv withholds the .env pass of `run addressing`, as --keep-data
 	// withholds the namespace removal of a clean.
 	FlagKeepEnv     = "keep-env"
-	FlagKeepEnvDesc = "switch run.toml only, leaving the worktrees' .env files as they are"
+	FlagKeepEnvDesc = "Switch run.toml only, leaving the worktrees' .env files as they are"
 
 	AddressingInvalidFmt      = "unknown addressing %q: expected %q or %q"
 	AddressingSwitchedFmt     = "addressing: %s " + MoveArrowGlyph + " %s"
@@ -810,13 +848,15 @@ const (
 	// ComposeFrozenLineFmt names a host port left literal, and ComposeFixLineFmt
 	// the mapping to write instead. ComposeFixCmdFmt is the declaration that
 	// follows once the file reads a variable.
-	ComposeFrozenLineFmt  = "%s · %s   %s binds the same port in every worktree"
-	ComposeUnsupportedFmt = "%s · %s   %s"
-	ComposeFixLineFmt     = "write %s"
-	ComposeFixCmdFmt      = "then: wtm run job edit %s --port %s=%d"
-	ComposeFixNoJobFmt    = "then declare it with `wtm run job edit <job> --port %s=%d`"
-	ComposeDroppedLineFmt = "%s (job %q, base %d) is dropped — it meets %s (job %q, base %d) %d worktree(s) on"
-	ComposeUnreadableFmt  = "%s could not be read: %s"
+	ComposeFrozenLineFmt   = "%s · %s   %s binds the same port in every worktree"
+	ComposeUnsupportedFmt  = "%s · %s   %s"
+	ComposeFixLineFmt      = "write %s"
+	ComposeFixCmdFmt       = "then: wtm run job edit %s --port %s=%d"
+	ComposeFixNoJobFmt     = "then declare it with `wtm run job edit <job> --port %s=%d`"
+	ComposeDroppedLineFmt  = "%s (job %q, base %d) is dropped — it meets %s (job %q, base %d) %s"
+	ComposeMeetsEverywhere = "in every worktree"
+	ComposeMeetsApartFmt   = "%d worktree(s) apart"
+	ComposeUnreadableFmt   = "%s could not be read: %s"
 
 	// ComposePatchMovedFmt aborts a patch whose target token is no longer where
 	// the scan found it.
@@ -844,11 +884,12 @@ const (
 	ImportEmptyMessage = "run.toml replaced by an empty configuration."
 	// The empty-detection branch of `run init`: nothing was configured, so it is
 	// a non-event, and what to do about it is two commands like anywhere else.
-	RunInitNothingDetected = "No docker-compose files or package scripts detected — nothing to configure automatically."
-	RunInitByHandJob       = "wtm run job add"
-	RunInitByHandJobNote   = "declare a job by hand"
-	RunInitByHandProfile   = "wtm run profile add"
-	RunInitByHandProfNote  = "group jobs into a profile"
+	RunInitDetectingMessage = "Detecting services…"
+	RunInitNothingDetected  = "No docker-compose files or package scripts detected — nothing to configure automatically."
+	RunInitByHandJob        = "wtm run job add"
+	RunInitByHandJobNote    = "declare a job by hand"
+	RunInitByHandProfile    = "wtm run profile add"
+	RunInitByHandProfNote   = "group jobs into a profile"
 	// The already-configured branch of `wtm init`.
 	InitAlreadyExistsFmt = "%s already exists."
 	InitReconfigureCmd   = "wtm init --only env|hooks|worktrees"
@@ -863,10 +904,14 @@ const (
 	ImportEnvHint        = "wtm env"
 	ImportEnvHintNote    = "reconcile the .env files against this configuration"
 
-	ImportNeedsYesFmt    = "replacing run.toml is destructive: pass --%s to confirm it without a prompt"
-	ImportDeclined       = "run.toml left unchanged."
-	ImportConfirmTitle   = "Replace run.toml?"
-	ImportConfirmDescFmt = "The payload replaces the whole file: %d job(s), %d profile(s). What run.toml holds today is lost."
+	ImportJSONNeedsYesFmt = "--%s %s requires --%s"
+	ImportInvalidFmt      = "invalid run config:\n  %s"
+	ImportInvalidSep      = "\n  "
+	ImportStdinArg        = "-"
+	ImportNeedsYesFmt     = "replacing run.toml is destructive: pass --%s to confirm it without a prompt"
+	ImportDeclined        = "run.toml left unchanged."
+	ImportConfirmTitle    = "Replace run.toml?"
+	ImportConfirmDescFmt  = "The payload replaces the whole file: %d job(s), %d profile(s). What run.toml holds today is lost."
 
 	// RunStreamCrashedFmt corrects a job announced as started that the daemon
 	// found gone at the end of the sequence.
@@ -940,6 +985,17 @@ const (
 	// command the reader can run is a better address than one they must locate.
 	EnvOriginProxyOffLine = "The run proxy is off on this machine, so ports were written instead — `wtm run proxy status` reports what serves names"
 
+	// RunConfigIgnoredFmt is what a stopping command says of a run.toml it
+	// cannot read: it stops what runs regardless.
+	RunConfigIgnoredFmt = "%v — run.toml ignored, stopping what runs anyway"
+
+	// A port pass a core command could not do. The cause heads the warning;
+	// this line says what was left undone and how to finish it (G1).
+	EnvPortsNotSettledRunFmt   = "ports not settled — run `wtm env %s` once run.toml is fixed"
+	EnvPortsNotSettledOtherFmt = "ports not settled — run `wtm env %s` once this is fixed"
+	// RunWarningFmt joins a warning's cause and what it left undone in one line.
+	RunWarningFmt = "%s — %s"
+
 	// EnvPortAnomaliesTitle heads the links wtm reports instead of applying.
 	EnvPortAnomaliesTitle = "Env ports left alone"
 	EnvPortAnomalyRowFmt  = "%s  %s  %s"
@@ -955,13 +1011,10 @@ const (
 	EnvPortReasonSecureScheme   = "https — the run proxy serves plain HTTP"
 
 	// The trailing verdict of `wtm env`.
-	EnvCheckDriftMessage = "Read-only check — run `wtm env` to reconcile."
-	// EnvFileInSyncMessage closes a file block with nothing to do.
-	// EnvFileKeysInSyncMessage replaces it when the port pass still moves
-	// a value in that same file — "in sync" there would contradict the summary
-	// counting that very file's linked values as settled.
-	EnvFileInSyncMessage     = "in sync — nothing to reconcile"
-	EnvFileKeysInSyncMessage = "keys in sync — its linked port values still move"
+	EnvCheckDriftMessage        = "Read-only check — run `wtm env` to reconcile."
+	EnvFileInSyncMessage        = "in sync — nothing to reconcile"
+	EnvFileKeysInSyncMessage    = "keys in sync — its linked values would move"
+	EnvFileValuesSettledMessage = "no key to reconcile — its linked values were settled"
 
 	// The detail column of a file block's key rows.
 	EnvKeyRowGap         = "  "
@@ -996,19 +1049,38 @@ const (
 	// every value: the count and the offset are the whole of the decision, and
 	// the values are in the files the report already names.
 	EnvPortsWouldShiftFmt = "%d linked .env value(s) would be shifted (offset +%d)"
-	// EnvPortsRecapShiftedFmt and EnvPortsRecapKeptFmt qualify the env line of a
-	// create-like recap, where the port pass is a side effect rather than the
-	// subject.
-	EnvPortsRecapShiftedFmt = "%d port(s) shifted (+%d)"
-	EnvPortsRecapKeptFmt    = "%d linked value(s) left as they were"
+	// EnvPortsRecap* qualify the env line of a create-like recap, where the
+	// port pass is a side effect rather than the subject. The offset is the
+	// worktree's own, counted from the declared ports — not a distance from the
+	// checkout the .env was copied from.
+	EnvPortsRecapSettledFmt  = "%d %s settled (offset +%d)"
+	EnvPortsRecapOwnedFmt    = "%d owned %s written"
+	EnvPortsRecapPort        = "port"
+	EnvPortsRecapPorts       = "ports"
+	EnvPortsRecapOwnedValue  = "value"
+	EnvPortsRecapOwnedValues = "values"
 	// EnvRecapNoteSeparator joins a recap value to the note qualifying it.
 	EnvRecapNoteSeparator = " · "
 
-	EnvCheckCleanMessage       = "No drift."
-	EnvNothingWrittenMessage   = "No changes written."
-	EnvReconciledFmt           = "Reconciled %d file(s)."
-	EnvPortsShiftedFmt         = "Settled %d linked .env value(s)."
-	EnvReconciledAndShiftedFmt = "Reconciled %d file(s) and settled %d linked value(s)."
+	EnvCheckCleanMessage        = "No drift."
+	EnvNothingWrittenMessage    = "No changes written."
+	EnvReconciledFmt            = "Reconciled %d file(s)."
+	EnvPortsShiftedFmt          = "Settled %d linked .env value(s)."
+	EnvReconciledAndShiftedFmt  = "Reconciled %d file(s) and settled %d linked value(s)."
+	EnvComposeProjectWrittenFmt = " %s is now %s."
+	// EnvSwitched* open the summary of a run that settled the worktree on a new
+	// isolation, or put the values wtm owns back to the source's.
+	EnvSwitchedFmt         = "Now %s."
+	EnvSwitchedRestoredFmt = "Now %s — %d value(s) wtm owns back to the source's."
+	EnvRestoredFmt         = "%d value(s) wtm owns back to the source's."
+	// EnvDetailRestored* are the file-block rows of those values.
+	EnvDetailRestoredFmt        = "back to the source's %s (was %s)"
+	EnvDetailRestoredRemovedFmt = "removed — the source has none (was %s)"
+	// EnvRestoreRecap* head the wizard recap's preview of what verbatim puts
+	// back: the switch asked for, or the one the verbatim action would make.
+	EnvRestoreRecapTitle       = "Back to the source's values"
+	EnvRestoreRecapIfKeptTitle = "Keeping it verbatim also puts back"
+	EnvIsolationNotSwitchedFmt = "%s was not switched to %s: %s — run `wtm env %s --isolation %s` once run.toml is fixed"
 
 	// The [[env_port]] detection of `wtm run init`.
 	// EnvPortLinkFmt is one link as the prompt and the recap both show it:
@@ -1056,7 +1128,7 @@ const (
 	RecapBindsNoPort   = "binds no port"
 	RecapTask          = "task"
 	RecapDefaultSuffix = "   (default)"
-	RecapURLSuffix     = "   (url)"
+	RecapURLSuffix     = "   (URL)"
 	RecapJobsTitle     = "Jobs"
 	// RecapRemovedTitle heads the jobs the unchecking drops. They are absent
 	// from every other section, so this is the only place they can be read
@@ -1095,6 +1167,12 @@ const (
 	ComposeChangedTitle = "Compose files skipped — they changed while wtm was reading them"
 	ComposeOrphanTitle  = "Compose files with no job to carry their ports"
 	ComposeOrphanFmt    = "%s · no job in run.toml runs this file, so its ports were not declared"
+	// ComposeSharedRenamedFmt names a service lifted under another name because a
+	// job already answers to its own, and ComposeUnlinkedFmt an [[env]] key that
+	// read the namespace of a service no longer shared.
+	ComposeSharingTitle     = "Shared services — check run.toml"
+	ComposeSharedRenamedFmt = "%s · service %s shared as job %s — job %s already exists"
+	ComposeUnlinkedFmt      = "%s · no longer linked: it read the namespace of a service that is no longer shared"
 
 	// EnvPortKeyName and EnvPortKeySuffix are the whole convention wtm reads a
 	// dev server's port by: a key named PORT, or one ending in _PORT.
@@ -1104,7 +1182,6 @@ const (
 	// The .env port report. Unlike a compose mapping, a declared port only
 	// isolates the job if its command actually reads the variable — which wtm
 	// does not know and does not guess, so the notice asks.
-	EnvPortDetectedLineFmt  = "%s · %s=%d (%s)"
 	PortIsolationTitle      = "These jobs will bind the same port in every worktree"
 	PortIsolationLineFmt    = "%s   %s"
 	PortIsolationNoPort     = "no port declared"
@@ -1165,24 +1242,30 @@ const (
 	// asking for less noise did not ask for less answer.
 	AnnotationMachineOutput = "wtm.machine-output"
 	AnnotationOn            = "true"
-	FlagYes                 = "yes"
-	FlagAll                 = "all"
-	FlagGlobal              = "global"
-	FlagMine                = "mine"
-	FlagReview              = "review"
-	FlagCmd                 = "cmd"
-	FlagKind                = "kind"
-	FlagStop                = "stop"
-	FlagCwd                 = "cwd"
-	FlagPort                = "port"
-	FlagName                = "name"
-	FlagJob                 = "job"
-	FlagJobs                = "jobs"
-	FlagDefault             = "default"
-	FlagTo                  = "to"
-	FlagKeep                = "keep"
-	FlagFiles               = "files"
-	FlagOnConflict          = "on-conflict"
+	// AnnotationOutputFormats lists, comma-separated, the --output values a
+	// command accepts besides text and json.
+	AnnotationOutputFormats  = "wtm.output-formats"
+	OutputFormatInvalidFmt   = "invalid --%s %q: expected one of %s"
+	UnknownCommandFmt        = "unknown command %q for %q"
+	UnknownCommandSuggestFmt = "\n\nDid you mean this?\n\t%s"
+	FlagYes                  = "yes"
+	FlagAll                  = "all"
+	FlagGlobal               = "global"
+	FlagMine                 = "mine"
+	FlagReview               = "review"
+	FlagCmd                  = "cmd"
+	FlagKind                 = "kind"
+	FlagStop                 = "stop"
+	FlagCwd                  = "cwd"
+	FlagPort                 = "port"
+	FlagName                 = "name"
+	FlagJob                  = "job"
+	FlagJobs                 = "jobs"
+	FlagDefault              = "default"
+	FlagTo                   = "to"
+	FlagKeep                 = "keep"
+	FlagFiles                = "files"
+	FlagOnConflict           = "on-conflict"
 	// FlagProxyPort tells the forked daemon where to serve the named URLs.
 	FlagProxyPort = "proxy-port"
 	// FlagURLPort and FlagURLHost declare a job's [[job]].url without a wizard.
@@ -1191,6 +1274,17 @@ const (
 	// FlagPortClear empties a job's whole port table on `run job edit`, the one
 	// thing --port cannot say: it merges, so it can never remove.
 	FlagPortClear = "port-clear"
+	// FlagScope and the FlagNamespace* flags declare a shared service and its
+	// [job.namespace] on `run job add|edit`, the fields run init otherwise asks.
+	FlagScope           = "scope"
+	FlagNamespaceName   = "namespace-name"
+	FlagNamespaceCreate = "namespace-create"
+	FlagNamespaceRemove = "namespace-remove"
+	FlagNamespaceEnv    = "namespace-env"
+	// ScopeValue* are what --scope takes: the per-worktree scope is empty in
+	// run.toml, which a flag cannot spell legibly.
+	ScopeValueShared      = "shared"
+	ScopeValuePerWorktree = "worktree"
 	// FlagRaw asks for a job's own port rather than the name the proxy serves it
 	// under: an address every OS resolves and no proxy has to be up for.
 	FlagRaw = "raw"
@@ -1226,9 +1320,8 @@ const (
 	// XY status field plus its trailing space.
 	PorcelainPathOffset = 3
 
-	// init flags (non-interactive bootstrap).
+	// init flags (flag-driven bootstrap).
 	FlagIfNotExists    = "if-not-exists"
-	FlagNonInteractive = "non-interactive"
 	FlagPatchCompose   = "patch-compose"
 	FlagLinkEnv        = "link-env"
 	FlagWritePortKeys  = "write-port-keys"
@@ -1635,21 +1728,14 @@ const (
 	// RunFileName is the run config file name (inside <state-dir>/).
 	RunFileName = "run.toml"
 
-	// ExperimentalRunNotice is the single source of truth for the "run is
-	// experimental" wording. Reused by the run-init output, the not-initialized
-	// guard, and the mention printed at the end of `wtm init`, so the caveat
-	// stays consistent everywhere the run module surfaces.
-	ExperimentalRunNotice = "`wtm run` is experimental — the workflow is still stabilizing and commands may change."
-
-	// MsgRunInitHint points users at the dedicated command that configures the
-	// run module, printed at the end of `wtm init` (which no longer configures
-	// services itself).
-	MsgRunInitHint = "Run services per worktree ? Configure them with `wtm run init` (experimental)."
-
 	// MsgRelocateHint points users at `wtm relocate` to adopt/align worktrees that
 	// existed before wtm. Printed unconditionally at the end of `wtm init` — we do
 	// not probe for pre-existing worktrees, the hint is cheap and always relevant.
 	MsgRelocateHint = "Worktrees created before wtm ? Adopt and align them with `wtm relocate`."
+
+	// RelocateBlockedJobsFmt is the move refused because jobs run in the
+	// worktree, naming the command that frees it (branch, branch).
+	RelocateBlockedJobsFmt = "%s — jobs are running in it: run `wtm run down %s` first"
 
 	// Init recap (LUC-125): labels and copy for the framed end-of-init recap
 	// (accent-bar box + pill title) that summarizes the written config and lists
@@ -1722,6 +1808,8 @@ const (
 	CreateRecapLabelEnv    = "env"
 	CreateRecapLabelPath   = "path"
 
+	PRCheckedOutFmt = "Checked out PR #%d (%s)"
+
 	// GoCommandFmt builds the jump-in command shown by every worktree-creating
 	// command (create, extract, checkout): `wtm go <branch>`.
 	GoCommandFmt = "wtm go %s"
@@ -1738,7 +1826,7 @@ const (
 	InitNextStepRelocate     = "wtm relocate"
 	InitNextStepRelocateNote = "adopt & align pre-existing worktrees"
 	InitNextStepRunInit      = "wtm run init"
-	InitNextStepRunInitNote  = "(experimental) configure per-worktree services"
+	InitNextStepRunInitNote  = "configure per-worktree services"
 
 	// SchemasDirName is the directory (inside <state-dir>/ or under the global
 	// config dir) where `wtm schema dump` writes the JSON Schema files
@@ -1747,10 +1835,10 @@ const (
 
 	// Job action result statuses emitted by `run *` JSON output.
 	JobActionStarted = "started"
-	// JobActionAttached is a worktree joining a shared service rather than
+	// JobActionJoined is a worktree joining a shared service rather than
 	// starting one. Reporting "started" in three worktrees read as three
 	// services, which is the misreading this whole feature has to avoid.
-	JobActionAttached = "attached"
+	JobActionJoined = "joined"
 	// SharedJobTag marks a job that runs once for the repository wherever jobs
 	// are listed. Rendered like any other, it read as one service per worktree —
 	// and the declared ports beside it would be read as shifting, which they do
@@ -1761,11 +1849,17 @@ const (
 	// it: another worktree still holds it, and saying "stopped" there read as a
 	// service taken away from everyone.
 	JobActionReleased = "released"
-	JobActionDone     = "done"
-	JobActionError    = "error"
-	JobActionCrashed  = "crashed"
-	JobActionAdded    = "added"
-	JobActionRemoved  = "removed"
+	// JobActionNotRunning is a stop that found nothing up under that name in
+	// that worktree: "stopped" there claimed an act that never happened.
+	JobActionNotRunning = "not_running"
+	// JobActionAlreadyRunning is a start that found the service already up in
+	// that worktree: nothing was started, and "started" claimed it was.
+	JobActionAlreadyRunning = "already_running"
+	JobActionDone           = "done"
+	JobActionError          = "error"
+	JobActionCrashed        = "crashed"
+	JobActionAdded          = "added"
+	JobActionRemoved        = "removed"
 	// JobRemovedProfilesFmt and JobRemovedEnvPortsFmt report what a removal
 	// dragged along with the job, each named so the reader can put it back.
 	JobRemovedProfilesFmt = "Stripped from profile(s): %s"
@@ -1775,7 +1869,8 @@ const (
 	JobRemovedTouchersFmt = "Dropped from the touches of: %s"
 	// RunInitJobsRemovedFmt reports what the unchecking dropped, next to what
 	// the same run added.
-	JobActionUpdated = "updated"
+	JobActionUpdated   = "updated"
+	JobActionUnchanged = "unchanged"
 
 	// RunCRUD* is the vocabulary of `run job` and `run profile` — the questions
 	// they ask and the wording of their answers. They live here rather than
@@ -1830,8 +1925,59 @@ const (
 	RunJobPortsSummaryNone = "(none)"
 	RunJobURLSummaryNone   = "(not published)"
 
+	RunJobRunsLabel    = "Runs"
+	RunJobRunsTitle    = "Which jobs does this one start itself?"
+	RunJobRunsDesc     = "Optional. A runner — turbo run dev, a compose stack — starts these itself, so wtm never starts them a second time. Space toggles, enter confirms."
+	RunJobRunsSkip     = "no other job declared"
+	RunJobTouchesLabel = "Touches"
+	RunJobTouchesTitle = "Whose data does this job change?"
+	RunJobTouchesDesc  = "Optional. A migration, a reset, a seed: run up stops before such a job rewrites data this worktree does not own. Space toggles, enter confirms."
+	RunJobTouchesSkip  = "no service declared"
+
+	RunJobBindsNoPortLabel      = "Binds no port"
+	RunJobBindsNoPortTitle      = "Does this service listen on a port?"
+	RunJobBindsNoPortDesc       = "A build in watch mode, a worker, or a runner whose children hold the ports listens on nothing — saying so stops wtm offering it one."
+	RunJobBindsNoPortListens    = "it listens, or its port is not settled yet"
+	RunJobBindsNoPortNone       = "it binds no port by design"
+	RunJobBindsNoPortYes        = "yes"
+	RunJobBindsNoPortNo         = "no"
+	RunJobBindsNoPortSkipTask   = "a task binds nothing"
+	RunJobStopSkipTask          = "a task stops by exiting"
+	RunJobBindsNoPortSkipsPorts = "it declares ports"
+
+	RunJobScopeLabel           = "Scope"
+	RunJobScopeTitle           = "One instance per worktree, or one for the repository?"
+	RunJobScopeDesc            = "A shared service — a postgres, a keycloak — runs once, in the main checkout, and binds its declared port in every worktree."
+	RunJobScopeWorktreeOption  = "per worktree — each worktree runs its own"
+	RunJobScopeSharedOption    = "shared — one instance for the whole repository"
+	RunJobScopeSkipTask        = "a task has no instance to share"
+	RunJobNamespaceNameLabel   = "Namespace"
+	RunJobNamespaceNameTitle   = "What is each worktree's namespace in this service called?"
+	RunJobNamespaceNameDesc    = "e.g. app_{worktree} — {worktree} and {ordinal} are filled in by wtm, and commands read the result as $WTM_NAMESPACE. Leave blank to share the service outright, data included."
+	RunJobNamespaceNameNone    = "(none — shared outright)"
+	RunJobNamespaceSkip        = "the service is not shared"
+	RunJobNamespaceSkipUnnamed = "no namespace"
+	RunJobNamespaceCreateLabel = "Create"
+	RunJobNamespaceCreateTitle = "Command creating the namespace"
+	RunJobNamespaceCreateDesc  = "A /bin/sh line or a script path, run on every start of the service — so it must be safe to run again: create the namespace if it is absent, do nothing if it is there."
+	RunJobNamespaceCreateEmpty = "a namespace needs a create command"
+	RunJobNamespaceRemoveLabel = "Remove"
+	RunJobNamespaceRemoveTitle = "Command dropping the namespace"
+	RunJobNamespaceRemoveDesc  = "Optional. Run by wtm clean when the worktree goes — never by run stop or run down. Leave blank to keep the namespace."
+	RunJobNamespaceEnvLabel    = "Namespace env"
+	RunJobNamespaceEnvTitle    = "Extra variables for these commands"
+	RunJobNamespaceEnvDesc     = "Optional. KEY=VALUE, space-separated; {worktree} and {ordinal} are filled in."
+
 	RunJobURLHostOrphan = "--%s names the host but nothing is published — add --%s"
-	RunJobURLNoneFmt    = "job %q publishes no url — these do: %s"
+	RunJobURLNoneFmt    = "job %q publishes no URL — these do: %s"
+
+	RunJobUnknownScopeFmt      = "--%s %q is neither %s nor %s"
+	RunJobNamespaceEnvFmt      = "--%s %q is not KEY=VALUE"
+	RunJobNamespaceWithdrawFmt = "--%s '' withdraws the [job.namespace] block, so it cannot be combined with --%s, --%s or --%s"
+	RunJobBindsNoPortTaskFmt   = "--%s says nothing about a task, which binds nothing by nature"
+
+	RunJobUnknownKindFmt = "job %q: unknown kind %q (expected service or task)"
+
 	// RunJobNameSpacesFmt refuses whitespace in a name that is also the daemon's
 	// key for the job, the value of --job, and the identity of a TOML table.
 	RunJobNameSpacesFmt = "job %q: a job name cannot contain whitespace — it is what --job takes and what the daemon keys on"
@@ -1839,20 +1985,40 @@ const (
 	RunJobNameRequired  = "job name is required"
 	RunJobCmdRequired   = "command is required"
 	RunJobExistsFmt     = "job %q already exists"
-	RunJobNotFoundFmt   = "job %q not found"
-	RunJobNothingToEdit = "edit has nothing to change — pass --%s, --%s, --%s, --%s, --%s, --%s, --%s, --%s, --%s, --%s or --%s"
+	RunJobNotFoundFmt   = "%w: %s"
+	RunJobNothingToEdit = "edit has nothing to change — pass one of %s"
 	// RunJobReferenced* is the safety refusal of a removal that would drag other
 	// declarations with it. The flag lifts it up front; a run with someone to ask
 	// lifts it by answering, which is the only way `run job list` can remove such
 	// a job at all — it has no --force of its own.
-	RunJobReferencedFmt     = "job %q is referenced by profile(s): %s — pass --%s to strip those references"
+	RunJobReferencedFmt     = "job %q is %s — pass --%s to remove it anyway"
 	RunJobReferencedTitle   = "Remove a job other declarations name?"
-	RunJobReferencedDescFmt = "%q is named by: %s."
-	RunJobReferencedYes     = "Remove it and strip the references"
-	RunJobReferencedNo      = "Keep it"
-	RunJobAddedFmt          = "Added job %q"
-	RunJobUpdatedFmt        = "Updated job %q"
-	RunJobRemovedFmt        = "Removed job %q"
+	RunJobReferencedDescFmt = "%q is %s."
+	// RunJobRef* name each kind of reference a removal strips, as what it is:
+	// the refusal once called a runner a profile.
+	RunJobRefClauseFmt   = "referenced by %s"
+	RunJobRefProfilesFmt = "profiles %s"
+	RunJobRefRunnersFmt  = "runs of %s"
+	RunJobRefTouchersFmt = "touches of %s"
+	RunJobRefEnvPortsFmt = "[[env_port]] %s"
+	RunJobRefEnvFmt      = "[[env]] %s"
+	RunJobRefSep         = "; "
+	RunJobClauseSep      = ", and "
+	// RunJobHeld* is the other thing a removal or a rename loses: clean finds a
+	// worktree's namespace by the job's name, so the data would stay forever.
+	RunJobHeldClauseFmt  = "holding data for %s, which clean would no longer drop"
+	RunJobHeldPendingFmt = "%s (drop pending)"
+	RunJobHeldDroppedFmt = "%s keep their data in %s: clean will no longer drop it — drop it by hand"
+	RunJobRenameHeldFmt  = "job %q holds data for %s, and clean finds it by this name — clean those worktrees before renaming it"
+	// RunJobHostMovedFmt says a rename moved a published address: a job without
+	// url.host is published under its name.
+	RunJobHostMovedFmt  = "%s is published under its name: it now answers as %s, no longer as %s"
+	RunJobReferencedYes = "Remove it and strip the references"
+	RunJobReferencedNo  = "Keep it"
+	RunJobAddedFmt      = "Added job %q"
+	RunJobUpdatedFmt    = "Updated job %q"
+	RunJobUnchangedFmt  = "Job %q unchanged"
+	RunJobRemovedFmt    = "Removed job %q"
 
 	// RunList* is `run list`'s two questions: an entry of run.toml, then what to
 	// do to it. The kind travels with the name because the two lists share one
@@ -1905,12 +2071,19 @@ const (
 	RunProfileNameSpaces    = "a profile name cannot contain whitespace"
 	RunProfileNameRequired  = "profile name is required"
 	RunProfileExistsFmt     = "profile %q already exists"
-	RunProfileNotFoundFmt   = "profile %q not found"
+	RunProfileNotFoundFmt   = "%w: %s"
 	RunProfileNoJobsYet     = "cannot define a profile: no jobs declared yet — add a job first"
 	RunProfileNothingToEdit = "edit has nothing to change — pass --%s, --%s or --%s"
 	RunProfileAddedFmt      = "Added profile %q"
 	RunProfileUpdatedFmt    = "Updated profile %q"
 	RunProfileRemovedFmt    = "Removed profile %q"
+	// RunProfileDefaultReplacedFmt and RunProfileDefaultRemovedFmt say what a
+	// change to the default did to `run up`, which starts the default profile.
+	RunProfileDefaultReplacedFmt = "%s is no longer the default profile: %s is"
+	RunProfileDefaultRemovedFmt  = "%s was the default profile: run up now starts %s, the only one left"
+	// RunProfileNoDefaultLeftFmt is the same removal leaving several profiles:
+	// run up then asks, and cannot run unattended without being told which.
+	RunProfileNoDefaultLeftFmt = "%s was the default profile: run up now asks which profile to start, and needs --" + FlagProfile + " without a terminal — mark one with `wtm run profile edit <name> --default`"
 
 	// MetaFileName is the metadata file created per worktree inside
 	// <state-dir>/worktrees/<branch>/.
@@ -1929,7 +2102,7 @@ const (
 	CmdGroupWorktreesTitle = "Worktrees:"
 	CmdGroupNavigateTitle  = "Navigate:"
 	CmdGroupStackTitle     = "Stacked branches:"
-	CmdGroupJobsTitle      = "Dev jobs (experimental):"
+	CmdGroupJobsTitle      = "Dev jobs:"
 	CmdGroupGitHubTitle    = "GitHub:"
 	CmdGroupSetupTitle     = "Setup:"
 
@@ -1989,12 +2162,44 @@ const (
 
 	// DaemonSocketName is the Unix socket filename for the service daemon.
 	DaemonSocketName = "wtm.sock"
+	// DaemonLockName is the file a daemon holds locked for its whole life, beside
+	// the socket: the socket closes before the process exits, the lock does not.
+	DaemonLockName = "wtm.lock"
 
 	// DaemonIdleTimeoutSeconds is how long the daemon waits with no services before auto-exit.
 	DaemonIdleTimeoutSeconds = 30
 
 	// DaemonStartTimeoutSeconds is how long to wait for the daemon to start.
 	DaemonStartTimeoutSeconds = 5
+
+	// DaemonPollInterval paces the wait for a daemon's socket to answer, or to
+	// stop answering.
+	DaemonPollInterval = 50 * time.Millisecond
+	// DaemonStopTimeout bounds the wait for a daemon to exit once asked: it
+	// stops its foreground jobs together, each with JobStopGracePeriod.
+	DaemonStopTimeout = 30 * time.Second
+	// JobStopGracePeriod is how long a process group has between SIGTERM and
+	// SIGKILL: long enough for a dev server to flush its children, short enough
+	// not to read as a hang.
+	JobStopGracePeriod = 5 * time.Second
+	// JobDrainGracePeriod bounds the wait for a stopped job's last bytes to reach
+	// its log; the process is already reaped, so what is left is one read.
+	JobDrainGracePeriod = time.Second
+	// JobPTYDrainGracePeriod bounds the wait for a launcher's or a task's PTY to
+	// reach EOF before its master is closed: a descendant holding the slave open
+	// must never hang the daemon.
+	JobPTYDrainGracePeriod = 2 * time.Second
+	// StackProbeTimeout bounds one compose call made to verify a detached stack:
+	// Docker Desktop starting up may never answer.
+	StackProbeTimeout = 3 * time.Second
+	// OrphanStartSkew is how far a group member's start may sit from its record's
+	// StartedAt and still be the same process — nowhere near wide enough to accept
+	// a group id recycled hours later.
+	OrphanStartSkew = 90 * time.Second
+	// OrphanGracePeriod is shorter than JobStopGracePeriod: an orphan has nothing
+	// left to flush, and the wait is paid by the user's next `run up`.
+	OrphanGracePeriod  = 2 * time.Second
+	OrphanPollInterval = 50 * time.Millisecond
 
 	// DaemonStateFileName is the daemon's durable index, beside the socket under
 	// the global dir: the daemon is global, and an index it could only read from
@@ -2010,6 +2215,11 @@ const (
 	// names the way out, because there is nothing the user can do from the
 	// command they just ran.
 	DaemonVersionMismatchFmt = "the daemon holding the socket is %s, this is wtm %s — run 'wtm run daemon restart' to hand your jobs over"
+	// DaemonSkewHoldsJobsFmt takes the daemon's version, the jobs it holds and
+	// the client's: a daemon holding nothing is replaced without a word.
+	DaemonSkewHoldsJobsFmt = "daemon %s running with %d job(s), this is wtm %s — run 'wtm run daemon restart' to hand them over"
+	// DaemonUnknownActionPrefix is how a daemon refuses a request it predates.
+	DaemonUnknownActionPrefix = "unknown action"
 
 	// DaemonMismatchWhyFmt and DaemonMismatchFixLine are the same refusal with
 	// room to explain, for the callout `run daemon status` renders. One line per
@@ -2312,6 +2522,9 @@ const (
 	RunViewAbortRunningFmt    = "left running: %s"
 	RunViewAbortNotStartedFmt = "not started: %s"
 	RunViewAbortDismiss       = "esc dismisses this report"
+	// RunViewWarningsTitle heads what the run could not do beside a job that
+	// did start — the stream's `!` lines.
+	RunViewWarningsTitle = "Needs attention"
 
 	// RunViewRecapTitle heads the recap printed once the screen is given back,
 	// and RunViewRecap*Fmt are its lines: what is running, what ran, what did
@@ -2351,11 +2564,8 @@ const (
 	RunStreamWorktreeFmt  = "%s · %s"
 	RunStreamWorktreesFmt = "%d worktrees"
 	RunStreamStartedFmt   = "%s started"
-	// RunPortsSuffixFmt qualifies a name with the ports behind it — the line
-	// announcing a started job, and the recap of what a job gained.
-	// RunPortEntryFmt is one of those ports.
-	RunPortsSuffixFmt = "%s · %s"
-	RunPortEntryFmt   = "%s=%d"
+	// RunPortEntryFmt is one port of a job, in the NAME=PORT form ParsePorts reads.
+	RunPortEntryFmt = "%s=%d"
 	// HyperlinkFmt wraps text in an OSC-8 sequence, the escape a terminal turns
 	// into a clickable link: URL first, then the text it stands behind.
 	HyperlinkFmt = "\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\"
@@ -2396,16 +2606,11 @@ const (
 	// naming the job is required on every other path.
 	RunJobPickerTitle = "Select job"
 
-	// RunProfilePicker* head the profile step, and the Run*StepName label each
-	// question in the wizard's breadcrumb.
-	RunProfilePickerTitle = "Select profiles"
-	RunProfilePickerDesc  = "Which profiles to start? A job named by several starts once."
-	// RunProfileOptionFmt keeps a profile's row to its name and a count: spelling
-	// out eight job names made the list unreadable in the repos that have them.
-	RunProfileOptionFmt = "%s · %d jobs"
-	RunWorktreeStepName = "Worktree"
-	RunJobStepName      = "Job"
-	RunProfileStepName  = "Profile"
+	RunProfilePickerTitle = "Start which profile?"
+	RunWorktreeStepName   = "Worktree"
+	RunWorktreesStepName  = "Worktrees"
+	RunJobStepName        = "Job"
+	RunProfileStepName    = "Profile"
 
 	// Run*Skip reasons say why a target step was never asked. A step that cannot
 	// list the worktrees is skipped rather than failed: acting where you stand is
@@ -2429,7 +2634,8 @@ const (
 	// RunPortClash* is the same question when it is no longer a preference: a
 	// port this run needs is bound by another worktree — which is what a
 	// verbatim worktree and its source always do. Running side by side is not
-	// on offer, so the two answers are to stop the other one, or not to start.
+	// on offer, so the two answers are to stop the other worktrees — the
+	// exclusive answer — or not to start.
 	RunPortClashTitle   = "Ports another worktree already binds"
 	RunPortClashDescFmt = "%s\n\nThis worktree runs on the same ports as the one holding them — a verbatim worktree runs on its source's — so only one of them can be up at a time."
 	RunPortClashLineFmt = "%d — %s in %s, bound by %s in %s"
@@ -2438,11 +2644,11 @@ const (
 	// RunPortClashRefusedFmt is the refusal where nobody can be asked: --parallel
 	// or `concurrency = "parallel"` cannot be honoured, and stopping another
 	// worktree is not a default to take silently.
-	RunPortClashRefusedFmt = "ports already bound by another worktree:\n%s\nstop it first with --%s, or give this worktree its own ports: wtm env <branch> --%s %s"
+	RunPortClashRefusedFmt = "ports already bound by another worktree:\n%s\nstop the other worktrees' jobs first with --%s, or give this worktree its own ports: wtm env <branch> --%s %s"
 	// RunForeignData* is the stop before a job that changes data the worktree
 	// does not own — its source's when verbatim, everyone's for a shared
 	// service with no namespace. It is a safety refusal: --force lifts it.
-	RunForeignDataTitle       = "Jobs that change data this worktree does not own"
+	RunForeignDataTitle       = "Jobs that change foreign data — data this worktree does not own"
 	RunForeignDataDesc        = "They run against data another checkout uses too, and whatever they reset or migrate there is reset or migrated for it as well."
 	RunForeignDataLineFmt     = "%s changes %s — %s"
 	RunForeignDataInFmt       = "%s (in %s)"
@@ -2450,7 +2656,14 @@ const (
 	RunForeignDataOwnerShared = "every worktree's data: a shared service with no [job.namespace]"
 	RunForeignDataYes         = "Run them anyway"
 	RunForeignDataNo          = "Don't start"
-	RunForeignDataRefusedFmt  = "%s:\n%s\npass --%s to run them anyway, or give this worktree its own data: wtm env <branch> --%s %s"
+	RunForeignDataViaFmt      = "%s (run by %s)"
+	// RunForeignDataRefusedFmt takes the title, the risks, the --force flag and
+	// the hints: each cause has its own way out, and isolating a worktree does
+	// nothing for a shared service with no namespace.
+	RunForeignDataRefusedFmt       = "%s:\n%s\npass --%s to run them anyway, or %s"
+	RunForeignDataIsolateHintFmt   = "give this worktree its own data: wtm env <branch> --%s %s"
+	RunForeignDataNamespaceHintFmt = "give each worktree its own namespace in %s: declare a [job.namespace] on it in run.toml"
+	RunForeignDataHintSep          = "; or "
 
 	// RunSelfPortClashFmt refuses a run that brings up two worktrees on the same
 	// ports: there is nothing to stop, the selection is the conflict.
@@ -2475,7 +2688,9 @@ const (
 	// as `run stop` and `run down` report it.
 	RunStoppingFmt   = "Stopping %s…"
 	RunStoppedFmt    = "%s stopped"
+	RunStopFailedFmt = "%s: %s"
 	RunReleasedFmt   = "%s released — still up elsewhere"
+	RunNotRunningFmt = "%s not running"
 	RunNoJobsRunning = "No jobs running."
 	RunNoJobsHere    = "No jobs running in this worktree."
 	// NoWorktreesMessage is the empty worktree inventory, wherever it is drawn.
@@ -2486,15 +2701,23 @@ const (
 	RunJobsEmpty     = "No jobs defined in run.toml."
 	RunProfilesEmpty = "No profiles defined in run.toml."
 	RunStoppingJobs  = "Stopping jobs…"
+	RunLoadingJobs   = "Loading jobs…"
+	// RunLauncherMayBlockFmt warns of a service whose `stop` makes its cmd a
+	// launcher that must exit, while nothing in the cmd says it detaches.
+	RunLauncherMayBlockFmt = "job %q declares stop, so its cmd is a launcher wtm waits on until it exits (like `docker compose up -d`) — if it keeps running, drop stop to run it in the foreground"
+	DetachFlagShort        = "-d"
+	DetachFlagLong         = "--detach"
+	// RunDaemonDivergedFmt takes the daemon's version and the client's: an older
+	// daemon is still listed, but it runs the jobs its own way.
+	RunDaemonDivergedFmt = "the daemon is %s, this is wtm %s — run `wtm run daemon restart` to hand the jobs over"
 
 	// RunStoppingOthers and RunStoppedOtherFmt report the worktrees an exclusive
 	// run cleared before starting.
-	RunStoppingOthers          = "Stopping the other worktrees' jobs…"
-	RunStoppedOtherFmt         = "Stopped jobs in %s"
-	RunStopOtherFailFmt        = "stop jobs in %s: %s"
-	RunWorktreeUnreadable      = "worktrees could not be listed"
-	RunProfileNoChoice         = "no other profile to choose from"
-	RunProfileSelectAtLeastOne = "select at least one profile"
+	RunStoppingOthers     = "Stopping the other worktrees' jobs…"
+	RunStoppedOtherFmt    = "Stopped jobs in %s"
+	RunStopOtherFailFmt   = "stop jobs in %s: %s"
+	RunWorktreeUnreadable = "worktrees could not be listed"
+	RunProfileNoChoice    = "no other profile to choose from"
 	// RunURLNoChoice covers both ends of the same absence: no job publishes a
 	// url, or a single one does and is therefore the answer rather than a
 	// question. Which of the two it was is said by the error that follows when
@@ -2511,10 +2734,10 @@ const (
 	// RunViewRecapHeldIndent hangs a runner's addresses under its own line in the
 	// recap, where nothing folds.
 	RunViewRecapHeldIndent = "  "
-	// RunStreamAttachedFmt is a worktree joining a shared service another one
+	// RunStreamJoinedFmt is a worktree joining a shared service another one
 	// runs: "started" there read as one service per worktree.
-	RunStreamAttachedFmt   = "%s attached"
-	RunStreamAttachedToFmt = "%s attached to %s"
+	RunStreamJoinedFmt   = "%s joined"
+	RunStreamJoinedInFmt = "%s joined, running in %s"
 	// The compose verbs a stop is read by. ComposeStopWarningFmt names a file
 	// job whose `down` would remove a shared service's container in main, and
 	// the stop to put instead.
@@ -2523,13 +2746,13 @@ const (
 	ComposeDownVerb       = "down"
 	ComposeRmStopVerb     = "rm -s -f"
 	ComposeStopWarningFmt = "job %s: its stop removes the shared %s in main — set stop = %q in run.toml"
-	// RunStreamNamespaceFmt is the slice a shared job's create made sure exists,
+	// RunStreamNamespaceFmt is the namespace a shared job's create made sure exists,
 	// on its own line so the one thing a clean will drop is seen being made.
-	RunStreamNamespaceFmt       = "%s ready in %s"
-	RunStreamNamespaceReadyFmt  = "%s ready"
-	RunStreamAlreadyFmt         = "%s already running"
-	RunStreamAlreadyAttachedFmt = "%s already attached"
-	RunStreamDoneFmt            = "%s done"
+	RunStreamNamespaceFmt      = "%s ready in %s"
+	RunStreamNamespaceReadyFmt = "%s ready"
+	RunStreamAlreadyFmt        = "%s already running"
+	RunStreamAlreadyJoinedFmt  = "%s already joined"
+	RunStreamDoneFmt           = "%s done"
 	// The three commands a run points at, and one gloss each. They are shared by
 	// every surface the module concludes on — the live stream, the view's recap
 	// once it gives the terminal back, `run down`'s — because one command telling
@@ -2799,6 +3022,9 @@ const (
 	// positional: naming a flag that does not exist would send the reader looking
 	// for it.
 	FlowStepRequiredArgFmt = "%s is required and cannot be asked in this mode: pass it as an argument"
+	// FlagGivenTwiceFmt refuses a repeated single-valued flag, which pflag would
+	// otherwise let the last one win without a word (the value already held).
+	FlagGivenTwiceFmt = "already given as %q: it takes one value"
 
 	// The create flow (internal/flow/create): step prose, option labels, recap
 	// fields and refusals. Format verbs: %s branch, %s env strategy, %s flag name.
@@ -2812,7 +3038,7 @@ const (
 	CreateRecapConfirmOption       = "Yes, create worktree"
 	EnvOptionConfigDefaultFmt      = "Use config default (%s)"
 	EnvOptionExample               = "example — copy .env.example → .env"
-	EnvOptionMain                  = "main — copy .env from main worktree"
+	EnvOptionMain                  = "main — copy .env from the main checkout"
 	EnvOptionParent                = "parent — copy .env from source worktree"
 	// EnvSummaryConfigDefault names the empty env choice rather than leaving a
 	// recap line blank.
@@ -2823,23 +3049,51 @@ const (
 	// and for the jobs `wtm run` starts, because the two disagreeing is what
 	// wires a worktree to its neighbour's services without a word.
 	IsolationStepName        = "Isolation"
-	IsolationStepDescription = "The .env files are copied from another checkout, with its ports and its service slices.\n" +
+	IsolationStepDescription = "The .env files are copied from another checkout, with its ports and its namespaces in shared services.\n" +
 		"Isolated: wtm moves them onto this worktree's — in the .env and when `wtm run` starts its jobs — so both can run side by side.\n" +
 		"Verbatim: wtm writes nothing into the .env and runs this worktree on the ports and data it was copied with, so it cannot run while its source does."
-	IsolationOptionIsolated  = "Isolate it — its own ports, compose project and service slices"
+	IsolationOptionIsolated  = "Isolate it — its own ports, compose project and namespaces"
 	IsolationOptionVerbatim  = "Keep the .env verbatim — its source's ports and data, one of the two runs at a time"
 	IsolationSummaryIsolated = "isolated"
 	IsolationSummaryVerbatim = "verbatim — .env kept as copied"
 	// IsolationStepIrrelevant is why the step is not asked: with nothing to
 	// isolate, both answers do exactly the same thing.
 	IsolationStepIrrelevant = "run.toml declares nothing a worktree isolates"
+	// IsolationIgnoredFmt is --isolation given to a run whose worktree already
+	// existed, so nothing was created for it to answer.
+	IsolationIgnoredFmt = "--%s %s ignored: %s already exists and stays %s — switch it with `wtm env %s --%s %s`"
 
-	// RecapField* are the aligned labels of the create recap body.
-	RecapFieldBranch       = "Branch:  "
-	RecapFieldSource       = "Source:  "
-	RecapFieldParent       = "Parent:  "
-	RecapFieldEnv          = "Env:     "
-	RecapFieldIsolation    = "Mode:    "
+	// IsolationAdopt* is the migration `wtm env` offers a worktree created
+	// before the choice existed. Keeping it as is comes first: adopting moves the
+	// worktree onto a compose project whose volumes are empty.
+	IsolationAdoptStepName    = "Isolation"
+	IsolationAdoptTitleFmt    = "Adopt isolation — %s"
+	IsolationAdoptDescription = "This worktree predates isolation: it still runs on its source's ports and compose project."
+	IsolationAdoptKeepLabel   = "Keep as is — ports and compose project untouched"
+	IsolationAdoptComposeFmt  = "Adopt isolation — new compose project %s, your current volumes (%s_*) will no longer be used"
+	IsolationAdoptPortsLabel  = "Adopt isolation — its ports move onto this worktree's own"
+	IsolationAdoptKeepValue   = "keep"
+	IsolationAdoptValue       = "adopt"
+	IsolationAdoptKeptSummary = "kept as is"
+	IsolationAdoptSummary     = "adopted"
+	// EnvIsolationNotAdoptedFmt is what `wtm env` says of the run values it left
+	// alone on such a worktree, and how to adopt isolation later.
+	EnvIsolationNotAdoptedFmt = "%s predates isolation: its ports and compose project were left as they are — adopt it with `wtm env %s --isolation isolated`"
+	// RunIsolationAdoptionPendingFmt is `run up` / `run start` refusing such a
+	// worktree: both ways out are named, since keeping its source's values is one.
+	RunIsolationAdoptionPendingFmt = "%s predates isolation: its .env still holds its source's ports — choose with `wtm env %s --isolation isolated` (own ports and compose project) or `--isolation verbatim` (keep the source's), then run it again"
+
+	// RecapField* are the aligned labels of the create-like recap bodies —
+	// create, extract and checkout — padded to the widest of them.
+	RecapFieldBranch       = "Branch:    "
+	RecapFieldSource       = "Source:    "
+	RecapFieldParent       = "Parent:    "
+	RecapFieldEnv          = "Env:       "
+	RecapFieldIsolation    = "Isolation: "
+	RecapFieldPR           = "PR:        "
+	RecapFieldFiles        = "Files:     "
+	RecapFieldTarget       = "Target:    "
+	RecapFieldMode         = "Mode:      "
 	RecapFastForwardSuffix = " (fast-forward to origin)"
 	WarningPrefix          = "⚠ "
 	WizardErrLabel         = "wizard"
@@ -2853,6 +3107,14 @@ const (
 	// because another worktree already holds it (branch, path, branch). Phrased to
 	// read on from the ErrWorktreeExists sentinel it is wrapped in.
 	BranchCheckedOutElsewhereFmt = "%s is checked out at %s — run `wtm go %s` to jump in"
+
+	// WorktreeNameClashFmt refuses a worktree whose derived name — compose
+	// project, namespace, proxy host — another live worktree already carries
+	// (new branch, live branch, shared name).
+	WorktreeNameClashFmt = "%s would share its name with %s (%s) — pick another name"
+	// RelocateNameClashFmt is the same clash met by an adoption, where the
+	// worktree already exists (branch, live branch, shared name).
+	RelocateNameClashFmt = "%s shares its name with %s (%s) — rename one of the two branches to adopt it"
 	// BranchReusedSuffix marks the branch line of a recap when the worktree checks
 	// out an existing local branch instead of creating one.
 	BranchReusedSuffix = " (existing local branch — reused)"
@@ -2878,7 +3140,7 @@ const (
 	// EnvParentFallbackPrompt warns, before creating, that the "parent" env
 	// strategy will source .env from main because the source has no local worktree
 	// (source).
-	EnvParentFallbackPrompt = "%s has no local worktree — copy .env from the main worktree instead of the parent?"
+	EnvParentFallbackPrompt = "%s has no local worktree — copy .env from the main checkout instead of the parent?"
 	// EnvParentFallbackWarning explains why the fallback happens.
 	EnvParentFallbackWarning = "The \"parent\" env strategy needs the source branch checked out to copy its .env; " +
 		"without a worktree it comes from main."
@@ -2925,7 +3187,7 @@ const (
 	// CleanWillDeleteNamespaceFmt names the data a clean gives back, one line per
 	// shared service. A recap that stayed silent about a DROP DATABASE told the
 	// reader they were removing a worktree and nothing else.
-	CleanWillDeleteNamespaceFmt = "  data      %s in %s"
+	CleanWillDeleteNamespaceFmt = "  data      %s, dropped from %s"
 	CleanKeepDataLine           = "  data      kept (--keep-data)"
 	CleanRecapReparentFmt       = "Then reparent %d child worktree(s) onto %s."
 	CleanRecapOrphanFmt         = "Then leave %d child worktree(s) orphaned."
@@ -2947,6 +3209,19 @@ const (
 	CleanStillOrphanedFmt    = "%s still points at the removed parent %s — reparent it with `wtm reparent`"
 	CleanStoppedServicesFmt  = "Stopped services on %s"
 	CleanStoppingServicesFmt = "Stopping services on %s…"
+	// CleanStopRefusedFmt refuses a removal whose jobs would not stop: the
+	// branch, the cause, then the branch again for the way out.
+	CleanStopRefusedFmt = "could not stop the jobs of %s, so nothing was removed: %s — stop them with `wtm run down %s`, or pass --force to remove it anyway"
+	// CleanStopForcedFmt is the same failure let through by --force.
+	CleanStopForcedFmt = "removing %s with jobs that would not stop (--force): %s"
+	// CleanReleaseFailedFmt is a claim on a shared service the daemon would not
+	// let go of once the worktree was gone.
+	CleanReleaseFailedFmt = "could not release %s's hold on its shared services: %s"
+	// CleanLeftOnDiskFmt is a removal git completed while leaving files it could
+	// not delete: branch, path, cause, path.
+	CleanLeftOnDiskFmt = "%s is removed, but %s is still on disk (%s) — delete what is left with `sudo rm -rf %s`"
+	// StopWorktreeSurvivorsFmt names the jobs still up after their stop.
+	StopWorktreeSurvivorsFmt = "still running after the stop: %s"
 	CleanRemovalFailedFmt    = "Removal failed: %s"
 	CleanWizardErrLabel      = "clean wizard"
 	// CleanSudoConfirmFmt is the confirmation title for the privileged `sudo rm -rf`
@@ -2959,7 +3234,7 @@ const (
 	PruneLabelPRClosed  = "PR closed"
 	PruneLabelGone      = "remote branch gone"
 	PruneLabelBase      = "base branch"
-	PruneLabelMain      = "main worktree"
+	PruneLabelMain      = "main checkout"
 	PruneLabelDirty     = "dirty — pass --force"
 	PruneLabelUnpushed  = "unpushed commits — pass --force"
 	PruneLabelOpenPR    = "open PR — pass --force"
@@ -2970,9 +3245,13 @@ const (
 	// PruneScanning and PruneFetchAndScanning distinguish the two costs of the
 	// planning phase: the second one also hits the network (gh, and the fetch
 	// gone-detection runs first).
-	PruneScanning          = "Scanning worktrees…"
-	PruneFetchAndScanning  = "Fetching remotes and scanning worktrees…"
-	PruneRemoving          = "Pruning worktrees…"
+	PruneScanning         = "Scanning worktrees…"
+	PruneFetchAndScanning = "Fetching remotes and scanning worktrees…"
+	// PruneHooksTitleFmt titles one pruned worktree's on_clean phase.
+	PruneHooksTitleFmt = "Hooks · On Clean · %s"
+	// PruneFailedFmt is where a prune stopped: the branch, the cause. The
+	// worktrees after it are untouched, and so is its data.
+	PruneFailedFmt         = "stopped at %s: %s — it and the worktrees after it were left as they were"
 	PruneNothingToPrune    = "Nothing to prune."
 	PruneConfirmOption     = "Yes, prune"
 	PruneForceOption       = "Yes, force prune (bypass safety checks)"
@@ -3384,9 +3663,9 @@ const (
 	// profile and a job are two different requests, so they are two different
 	// entries, and the block groups them by grain rather than by verb — what an
 	// entry acts on is what a reader picks it by.
-	DashboardMenuRunUp    = "Start profile"
+	DashboardMenuRunUp    = "Start a profile"
 	DashboardMenuRunStart = "Start a job"
-	DashboardMenuRunDown  = "Stop this worktree"
+	DashboardMenuRunDown  = "Stop this worktree's jobs"
 	DashboardMenuRunStop  = "Stop a job"
 	DashboardMenuRunLogs  = "View logs"
 	// DashboardMenuRunStopThis stops the job a surface already designates — the
@@ -3395,11 +3674,13 @@ const (
 	DashboardMenuRunStopThis = "Stop this job"
 	// DashboardMenuRun*All are the same gestures over a selection the user makes
 	// inside the run, which is why they live in the global menu: a context menu
-	// hangs off one worktree. The plural is the whole difference, as it already
-	// is between DashboardMenuSync and DashboardMenuSyncAll.
-	DashboardMenuRunUpAll   = "Start profiles"
+	// hangs off one worktree. They name worktrees, as DashboardMenuSyncAll does:
+	// the row entries name a profile, a job or this worktree, and "View logs"
+	// twice read as one entry offered in two menus. The global one opens the full
+	// run view, the row one the panel's LOGS tab.
+	DashboardMenuRunUpAll   = "Start worktrees"
 	DashboardMenuRunDownAll = "Stop worktrees"
-	DashboardMenuRunLogsAll = "View logs"
+	DashboardMenuRunLogsAll = "Watch worktree logs"
 	// DashboardMenuSection* head the blocks of a context menu. A block is what
 	// tells "move this worktree" and "start its services" apart at a glance.
 	DashboardMenuSectionGit = "GIT"
@@ -3407,6 +3688,15 @@ const (
 	// DashboardRunNotConfigured is what a row offers when the project has no run
 	// module: the answer is `wtm run init`, not a picker with nothing in it.
 	DashboardRunNotConfigured = "No run jobs are configured for this project"
+	// DashboardRunConfigInvalid stands in for the whole RUN block when run.toml
+	// cannot be read, its cause hanging under it; DashboardRunConfigInvalidFmt is
+	// the refusal a run gesture meets then. "Not configured" would send the reader
+	// to `wtm run init` over a file that only needs fixing.
+	DashboardRunConfigInvalid    = "run.toml invalid"
+	DashboardRunConfigInvalidFmt = "run.toml invalid: %v"
+	// DashboardMenuCaptionMax bounds the caption under an inert entry: a parse
+	// error is a sentence, and the menu is sized on its longest line.
+	DashboardMenuCaptionMax = 48
 	// DashboardMenuEmpty stands in for the actions of a worktree that has none.
 	DashboardMenuEmpty = "No actions available"
 	// DashboardMenuChrome is what the menu box spends on its borders and padding.
@@ -3428,7 +3718,7 @@ const (
 	// DashboardRun*AllTitle head the batch runs started from the global menu. A
 	// modal renaming the entry the user just picked reads as a different action,
 	// so each title is its entry.
-	DashboardRunUpAllTitle   = "Start profiles"
+	DashboardRunUpAllTitle   = "Start worktrees"
 	DashboardRunDownAllTitle = "Stop worktrees"
 	// DashboardSync*Fmt report a finished cascade in the output panel, one line per
 	// branch it touched. Verbs: branch, then what became of it.
@@ -3501,15 +3791,27 @@ const (
 
 	// RunDetached* report a start nobody is watching: the surface gave the
 	// terminal back, so each step says what it did instead of showing it.
-	RunDetachedStartingFmt        = "starting %s (%d/%d)"
-	RunDetachedStartedFmt         = "%s is up"
-	RunDetachedDoneFmt            = "%s finished"
-	RunDetachedAddressFmt         = "%s → %s"
-	RunDetachedFailedFmt          = "%s failed: %s"
-	RunDetachedAttachedFmt        = "%s attached"
-	RunDetachedNamespaceFmt       = "%s: %s ready"
-	RunDetachedAlreadyFmt         = "%s was already up"
-	RunDetachedAlreadyAttachedFmt = "%s was already attached"
+	RunDetachedStartingFmt      = "starting %s (%d/%d)"
+	RunDetachedStartedFmt       = "%s is up"
+	RunDetachedDoneFmt          = "%s finished"
+	RunDetachedAddressFmt       = "%s → %s"
+	RunDetachedFailedFmt        = "%s failed: %s"
+	RunDetachedJoinedFmt        = "%s joined"
+	RunDetachedNamespaceFmt     = "%s: %s ready"
+	RunDetachedAlreadyFmt       = "%s was already up"
+	RunDetachedAlreadyJoinedFmt = "%s was already joined"
+	// RunDetached{Crashed,Probe*,Warning,Left*,Concluded,Aborted}* are the rest of what the
+	// CLI says about a run, in the panel's register: a line each, the glyph
+	// leading, detail indented under the line it belongs to.
+	RunDetachedCrashedFmt    = GlyphAttention + " " + RunStreamCrashedFmt
+	RunDetachedProbeTitle    = GlyphAttention + " " + PortProbeTitle
+	RunDetachedWarningFmt    = GlyphAttention + " %s"
+	RunDetachedDetailFmt     = "  %s"
+	RunDetachedLeftRunning   = "  left running: %s"
+	RunDetachedNotStarted    = "  not started: %s"
+	RunDetachedConcludedFmt  = GlyphSuccess + " %s %s"
+	RunDetachedCrashedEndFmt = GlyphAttention + " %s %s: %s exited after starting"
+	RunDetachedAbortedFmt    = GlyphFailure + " %s %s: aborted at step %d/%d (%s)"
 
 	// DashboardLogsLines is how far back the detail panel's logs view reads. It
 	// is a glance, not a session: runview is what scrolls.
@@ -3592,7 +3894,7 @@ const (
 	// RunViewSharedHeading heads, in the job list, the shared services: one
 	// stack whatever worktree hosts it, so the heading names none.
 	RunViewSharedHeading = "shared"
-	RunViewAttachedToFmt = "attached to %s"
+	RunViewJoinedInFmt   = "joined, running in %s"
 	// KeyRunLogs reads a job's logs in the detail panel. Upper case: "l" is the
 	// list's vim-right.
 	KeyRunLogs = "L"
@@ -3633,7 +3935,7 @@ const (
 	// when nothing starts it but the reader.
 	RunnerListStepName  = "Runners"
 	RunnerListStepTitle = "Which service starts the others?"
-	RunnerListStepDesc  = "A root script often starts several apps at once — `turbo run dev`, `pnpm -r dev`.\nSaying so here gives it their ports, and stops wtm from starting an app twice.\nLeave a row on — when nothing but you starts it."
+	RunnerListStepDesc  = "A root script often starts several apps at once — `turbo run dev`, `pnpm -r dev`.\nSaying so here gives it their ports, and stops wtm from starting an app twice.\nLeave a row on — (none) when nothing but you starts it."
 	RunnerListCwdSep    = "  "
 	RunnerListNone      = "—"
 	// RunnerListSep joins the runners of a row that holds more than one, which
@@ -3648,7 +3950,7 @@ const (
 	// service — and the reader confirms; nothing is written unasked.
 	TouchListStepName      = "Data tasks"
 	TouchListStepTitle     = "Which service's data does each task change?"
-	TouchListStepDesc      = "A migration, a reset or a seed changes a database. Saying which one lets `wtm run up` stop before running it against data the worktree does not own —\nits source's when the worktree is verbatim, every worktree's for a shared service with no namespace.\nLeave a row on — when the task changes no service's data."
+	TouchListStepDesc      = "A migration, a reset or a seed changes a database. Saying which one lets `wtm run up` stop before running it against data the worktree does not own —\nits source's when the worktree is verbatim, every worktree's for a shared service with no namespace.\nLeave a row on — (none) when the task changes no service's data."
 	TouchListSummaryFmt    = "%d of %d task(s) change a service's data"
 	SkipReasonNoTouchTasks = "no task, or no service holding data"
 	SkipReasonNoName       = "no job publishes a name, so nothing is addressed by one"
@@ -3661,16 +3963,16 @@ const (
 	// job and not otherwise.
 	AddressingStepName  = "Addressing"
 	AddressingStepTitle = "How should the .env files spell an address?"
-	AddressingStepDesc  = "This is what wtm writes into a value pointing at another job — an API url, a CORS origin.\n" +
+	AddressingStepDesc  = "This is what wtm writes into a value pointing at another job — an API URL, a CORS origin.\n" +
 		"It changes nothing about the ports your jobs bind.\n\n" +
-		"  Named urls    each worktree gets its own hostname, so two of them stop sharing a cookie\n" +
+		"  Named URLs    each worktree gets its own hostname, so two of them stop sharing a cookie\n" +
 		"                jar and a CORS origin. They are served by wtm's proxy, which lives in the\n" +
 		"                run daemon: they answer while `wtm run` runs the job, and not when you\n" +
 		"                start it yourself.\n" +
-		"  Ports         answer whatever started the process, `wtm run` or your own terminal. Two\n" +
+		"  Port URLs     answer whatever started the process, `wtm run` or your own terminal. Two\n" +
 		"                worktrees share one hostname, so their cookies and origins are the same."
-	AddressingNamesLabel = "Named urls — http://api.feat-x.myrepo.localhost"
-	AddressingPortsLabel = "Ports — http://localhost:4012"
+	AddressingNamesLabel = "Named URLs — http://api.feat-x.myrepo.localhost"
+	AddressingPortsLabel = "Port URLs — http://localhost:4012"
 
 	// MonorepoRootHint warns where the trap is sprung: checking only the root
 	// scripts of a monorepo leaves the apps they start with no port and no url,
@@ -3893,10 +4195,10 @@ var WtmOwnedEnvKeys = []string{EnvComposeProjectName}
 // service's data. They only ever shape a proposal the reader confirms.
 var TouchDataVerbs = []string{"reset", "migrate", "migration", "migrations", "seed", "init", "drop", "truncate", "db", "orm", "prisma", "schema", "fixtures"}
 
-// EnvSliceKeySuffixes are the endings of a key that names a service's slice —
+// EnvNamespaceKeySuffixes are the endings of a key that names a service's namespace —
 // POSTGRES_DB, KEYCLOAK_REALM — as against its credentials or its address,
 // which POSTGRES_USER and POSTGRES_PASSWORD share the service's prefix with.
-var EnvSliceKeySuffixes = []string{
+var EnvNamespaceKeySuffixes = []string{
 	"_DB", "_DATABASE", "_DB_NAME", "_DATABASE_NAME", "_SCHEMA",
 	"_REALM", "_TENANT", "_NAMESPACE", "_BUCKET", "_INDEX", "_PREFIX", "_VHOST",
 }

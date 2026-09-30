@@ -129,7 +129,22 @@ func (d *fakeDaemon) serve(conn net.Conn) {
 
 	encoder := stampedEncoder{enc: json.NewEncoder(conn), version: d.version()}
 	if req.Action == process.ActionList {
-		_ = encoder.Encode(process.Response{Status: process.StatusOK, Jobs: d.Jobs})
+		d.mu.Lock()
+		jobs := d.Jobs
+		d.mu.Unlock()
+		_ = encoder.Encode(process.Response{Status: process.StatusOK, Jobs: jobs})
+		return
+	}
+	if req.Action == process.ActionStopAll {
+		d.mu.Lock()
+		var stopped []domain.JobInfo
+		for _, job := range d.Jobs {
+			if req.WorkDir == "" || job.WorkDir == req.WorkDir {
+				stopped = append(stopped, job)
+			}
+		}
+		d.mu.Unlock()
+		_ = encoder.Encode(process.Response{Status: process.StatusOK, Jobs: stopped})
 		return
 	}
 	if req.Action == process.ActionStop {
@@ -160,6 +175,13 @@ func (d *fakeDaemon) serve(conn net.Conn) {
 			return
 		}
 	}
+}
+
+// setJobs changes what ActionList reports once the daemon is serving.
+func (d *fakeDaemon) setJobs(jobs []domain.JobInfo) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.Jobs = jobs
 }
 
 // startedJobs names the jobs the commands asked the daemon to start, in order.

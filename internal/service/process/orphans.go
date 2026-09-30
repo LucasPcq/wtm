@@ -9,23 +9,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
-
-// orphanStartSkew is how far a group member's start may sit from the StartedAt
-// its record holds and still be the same process. The two are taken
-// milliseconds apart — StartedAt just before the spawn, etime by the reaping
-// daemon — so this only absorbs a loaded machine and the one-second resolution
-// of the ps field. It is nowhere near wide enough to accept a group id recycled
-// hours or days later, which is the whole point of measuring it.
-const orphanStartSkew = 90 * time.Second
-
-// orphanGracePeriod is shorter than stopGracePeriod on purpose: a foreground
-// service whose reader died has nothing left to flush, and this wait is paid at
-// daemon start-up — which means it is paid by the user's next `run up`.
-const orphanGracePeriod = 2 * time.Second
-
-const reapPollInterval = 50 * time.Millisecond
 
 // GroupQuery is one indexed job's fingerprint, as the prober reads it.
 type GroupQuery struct {
@@ -125,7 +111,7 @@ func withinSkew(observed time.Time, recorded time.Time) bool {
 	if gap < 0 {
 		gap = -gap
 	}
-	return gap <= orphanStartSkew
+	return gap <= domain.OrphanStartSkew
 }
 
 type reapParams struct {
@@ -151,7 +137,7 @@ func reapGroup(params reapParams) {
 		if !groupAlive(params.PGID) {
 			return
 		}
-		time.Sleep(reapPollInterval)
+		time.Sleep(domain.OrphanPollInterval)
 	}
 	_ = syscall.Kill(-params.PGID, syscall.SIGKILL)
 }
@@ -164,7 +150,7 @@ func (systemOrphans) Reap(pgids []int) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			reapGroup(reapParams{PGID: pgid, Grace: orphanGracePeriod})
+			reapGroup(reapParams{PGID: pgid, Grace: domain.OrphanGracePeriod})
 		}()
 	}
 	wg.Wait()

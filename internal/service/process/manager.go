@@ -36,29 +36,14 @@ const outputSubscriberQueue = 256
 // defaultPTYRows and defaultPTYCols are the fallback PTY dimensions used when
 // a job is spawned before any client has attached. TUI apps read the PTY size
 // at startup — a 0x0 window makes them bail to plain log mode.
+// jobStopGrace is a variable so a test can stop a job deaf to SIGTERM without
+// waiting the full grace period.
+var jobStopGrace = domain.JobStopGracePeriod
+
 const (
 	defaultPTYRows = 40
 	defaultPTYCols = 120
 )
-
-// stopGracePeriod is how long Stop waits for a process group to exit on
-// SIGTERM before escalating to SIGKILL. Long enough for well-behaved dev
-// servers (next, vite, turbo) to flush and shut down their children, short
-// enough that the user doesn't notice a hang.
-const stopGracePeriod = 5 * time.Second
-
-// drainGracePeriod bounds the wait for a stopped job's last bytes to reach its
-// log. It is short because the process is already reaped: what is left is a
-// read of what the PTY still holds.
-const drainGracePeriod = time.Second
-
-// detachedDrainGracePeriod bounds how long the PTY drain goroutine is awaited
-// to reach natural EOF after the process exits, before force-closing the master
-// to unblock it. It backstops both waitDetached (detached launchers) and runTask
-// (foreground tasks). The happy path hits EOF within milliseconds; this only
-// bites if a descendant keeps the slave open, so the daemon can never hang on a
-// misbehaving launcher.
-const detachedDrainGracePeriod = 2 * time.Second
 
 type ManagedJob struct {
 	Name   string
@@ -130,19 +115,13 @@ type Manager struct {
 	orphans         Orphans
 	stacks          Stacks
 	mu              sync.Mutex
-}
-
-func NewManager() *Manager {
-	return NewManagerWithRoutes(nil)
-}
-
-func NewManagerWithRoutes(routes RouteSink) *Manager {
-	return &Manager{
-		jobs:    make(map[string]*ManagedJob),
-		routes:  routes,
-		orphans: systemOrphans{},
-		stacks:  systemStacks{},
-	}
+	// generation numbers each snapshot of the index, under mu. Writes are
+	// serialized under saveMu and a snapshot older than the one already written
+	// is dropped: two persists racing each other must never leave the older
+	// state on disk.
+	generation uint64
+	saveMu     sync.Mutex
+	saved      uint64
 }
 
 type ManagerParams struct {
@@ -237,7 +216,6 @@ func (m *Manager) Adopt(records []domain.JobRecord) {
 		}
 	}
 	m.dropDanglingClaimsLocked()
-	adopted := m.upRecordsLocked()
 	m.mu.Unlock()
 
 	m.orphans.Reap(reap)
@@ -247,7 +225,7 @@ func (m *Manager) Adopt(records []domain.JobRecord) {
 			m.publishRoute(&job)
 		}
 	}
-	m.saveIndex(adopted)
+	m.persist()
 }
 
 // orphanQueries asks about the only entries wtm owns a process for. A claim owns
@@ -270,7 +248,7 @@ func orphanQueries(records []domain.JobRecord) []GroupQuery {
 // have the next worktree told its service is already running.
 func (m *Manager) dropDanglingClaimsLocked() {
 	for key, job := range m.jobs {
-		if job.Status != domain.JobStatusAttached {
+		if job.Status != domain.JobStatusJoined {
 			continue
 		}
 		service, found := m.realSharedLocked(sharedRef{Name: job.Name, Dir: job.SharedDir})
@@ -303,7 +281,7 @@ func (m *Manager) upRecordsLocked() []domain.JobRecord {
 			Routes:    job.Routes,
 			LogDir:    job.LogDir,
 			StartedAt: job.StartedAt,
-			Attached:  job.Status == domain.JobStatusAttached,
+			Joined:    job.Status == domain.JobStatusJoined,
 			SharedDir: job.SharedDir,
 			MainHolds: job.MainHolds,
 			PID:       job.PID,
@@ -313,13 +291,6 @@ func (m *Manager) upRecordsLocked() []domain.JobRecord {
 	return records
 }
 
-func (m *Manager) saveIndex(records []domain.JobRecord) {
-	if m.index == nil {
-		return
-	}
-	_ = m.index.Save(records)
-}
-
 // persist rewrites the index from the current state. Never called with the lock
 // held: it takes it to snapshot, then writes outside it.
 func (m *Manager) persist() {
@@ -327,9 +298,18 @@ func (m *Manager) persist() {
 		return
 	}
 	m.mu.Lock()
+	m.generation++
+	generation := m.generation
 	records := m.upRecordsLocked()
 	m.mu.Unlock()
-	m.saveIndex(records)
+
+	m.saveMu.Lock()
+	defer m.saveMu.Unlock()
+	if generation < m.saved {
+		return
+	}
+	m.saved = generation
+	_ = m.index.Save(records)
 }
 
 func jobKey(name string, workDir string) string {
@@ -379,15 +359,22 @@ func (m *Manager) Start(params StartParams) error {
 	hub := newJobHub(job)
 
 	m.mu.Lock()
-	if existing, ok := m.jobs[key]; ok && existing.Status == domain.JobStatusRunning {
+	existing, exists := m.jobs[key]
+	if exists && existing.Status == domain.JobStatusRunning {
 		m.mu.Unlock()
 		return fmt.Errorf("job %s %s", job.Name, domain.JobAlreadyRunningSuffix)
+	}
+	// A detached stack is still up while its launcher runs again: a relaunch that
+	// fails must hand the entry back rather than forget the stack.
+	var previous *ManagedJob
+	if exists && existing.Status == domain.JobStatusDetached {
+		previous = existing
 	}
 
 	// Opened only past the refusal, and under the lock that decides it: opening
 	// a log empties it, so doing it any earlier would let a start the manager is
 	// about to refuse wipe the log of the job already running under that name.
-	logs := openJobLog(params)
+	logs := openJobLog(openJobLogParams{Start: params, Append: previous != nil})
 
 	spec := rules.ShellCommand(job.Cmd)
 	cmd := exec.Command(spec.Name, spec.Args...)
@@ -443,15 +430,16 @@ func (m *Manager) Start(params StartParams) error {
 		return m.runTask(managed, params.Streamer)
 	case rules.IsDetached(job):
 		if err := m.waitDetached(managed, params.Streamer); err != nil {
-			m.mu.Lock()
-			delete(m.jobs, key)
-			m.mu.Unlock()
+			m.launchFailed(launchFailedParams{Key: key, Launched: managed, Previous: previous})
 			return err
 		}
 		// The launcher is gone and the work it started is not ours. Indexed only
-		// now: a launcher that failed left nothing behind.
+		// now: a launcher that failed left nothing behind. A stop that reached the
+		// launcher first has had the last word.
 		m.mu.Lock()
-		managed.Status = domain.JobStatusDetached
+		if managed.Status == domain.JobStatusRunning {
+			managed.Status = domain.JobStatusDetached
+		}
 		m.mu.Unlock()
 		m.persist()
 		return nil
@@ -460,6 +448,35 @@ func (m *Manager) Start(params StartParams) error {
 		go m.waitForExit(managed)
 		m.persist()
 		return nil
+	}
+}
+
+type launchFailedParams struct {
+	Key      string
+	Launched *ManagedJob
+	Previous *ManagedJob
+}
+
+// launchFailed undoes a launch that failed, unless a stop got there first: the
+// entry goes, or the stack a previous launch left up is registered and served
+// again.
+func (m *Manager) launchFailed(params launchFailedParams) {
+	m.mu.Lock()
+	current, ok := m.jobs[params.Key]
+	owned := ok && current == params.Launched && current.Status == domain.JobStatusRunning
+	if owned && params.Previous != nil {
+		m.jobs[params.Key] = params.Previous
+	}
+	if owned && params.Previous == nil {
+		delete(m.jobs, params.Key)
+	}
+	m.mu.Unlock()
+	if !owned {
+		return
+	}
+	m.withdrawRoute(params.Launched)
+	if params.Previous != nil {
+		m.publishRoute(params.Previous)
 	}
 }
 
@@ -474,12 +491,17 @@ func newJobHub(job domain.JobConfig) *outputHub {
 	return newOutputHub(outputHistoryBytes)
 }
 
+type openJobLogParams struct {
+	Start  StartParams
+	Append bool
+}
+
 // openJobLog: a job still starts when its log cannot be opened.
-func openJobLog(params StartParams) *LogSink {
-	if params.LogDir == "" {
+func openJobLog(params openJobLogParams) *LogSink {
+	if params.Start.LogDir == "" {
 		return nil
 	}
-	sink, err := OpenLogSink(LogSinkParams{LogDir: params.LogDir, Job: params.Job.Name})
+	sink, err := OpenLogSink(LogSinkParams{LogDir: params.Start.LogDir, Job: params.Start.Job.Name, Append: params.Append})
 	if err != nil {
 		return nil
 	}
@@ -633,7 +655,7 @@ func (m *Manager) runTask(job *ManagedJob, streamer io.Writer) error {
 	// slave open.
 	select {
 	case <-drained:
-	case <-time.After(detachedDrainGracePeriod):
+	case <-time.After(domain.JobPTYDrainGracePeriod):
 	}
 	_ = job.PTY.Close()
 	<-drained
@@ -733,7 +755,7 @@ func (m *Manager) waitDetached(job *ManagedJob, streamer io.Writer) error {
 	// drain goroutine reaches EOF truncated the output on slow CI runners.
 	select {
 	case <-drained:
-	case <-time.After(detachedDrainGracePeriod):
+	case <-time.After(domain.JobPTYDrainGracePeriod):
 	}
 	_ = job.PTY.Close()
 	<-drained
@@ -924,8 +946,8 @@ func closeSink(sink *LogSink) {
 	}
 }
 
-func (m *Manager) Stop(name string, workDir string) error {
-	return m.stopByKey(jobKey(name, workDir))
+func (m *Manager) Stop(ref JobRef) error {
+	return m.stopByKey(jobKey(ref.Name, ref.WorkDir))
 }
 
 // StopAll spans every worktree and every kind, detached stacks included: it
@@ -954,25 +976,38 @@ func (m *Manager) StopAllInWorkDir(workDir string) error {
 
 func (m *Manager) stopAllMatching(keep func(*ManagedJob) bool) error {
 	m.mu.Lock()
-	keys := make([]string, 0, len(m.jobs))
+	var own, shared []string
 	for key, job := range m.jobs {
-		if !rules.IsJobUp(job.Status) {
+		if !rules.IsJobUp(job.Status) || !keep(job) {
 			continue
 		}
-		if !keep(job) {
+		if rules.IsShared(job.Config) {
+			shared = append(shared, key)
 			continue
 		}
-		keys = append(keys, key)
+		own = append(own, key)
 	}
 	m.mu.Unlock()
 
-	var firstErr error
-	for _, key := range keys {
-		if err := m.stopByKey(key); err != nil && firstErr == nil {
-			firstErr = err
+	// Each job gets its grace period at the same time: one after the other, N
+	// jobs deaf to SIGTERM outlast DaemonStopTimeout. A shared job is released
+	// in turn, since whether its service goes depends on the claims left.
+	errs := make([]error, len(own))
+	var wg sync.WaitGroup
+	for index, key := range own {
+		wg.Go(func() { errs[index] = m.stopByKey(key) })
+	}
+	wg.Wait()
+	for _, key := range shared {
+		errs = append(errs, m.stopByKey(key))
+	}
+
+	for _, err := range errs {
+		if err != nil {
+			return err
 		}
 	}
-	return firstErr
+	return nil
 }
 
 func (m *Manager) stopByKey(key string) error {
@@ -1006,20 +1041,27 @@ type stopProcessParams struct {
 
 // stopProcess is the tear-down itself, reached either directly or, for a shared
 // job, once stopShared has established that no worktree holds it any more.
+// The route goes only once the job is down: a stop command that fails leaves the
+// stack up, and it must stay reachable under its name.
 func (m *Manager) stopProcess(params stopProcessParams) error {
+	err := m.tearDown(params)
+	if err != nil {
+		return err
+	}
 	m.withdrawRoute(params.Job)
+	return nil
+}
 
+func (m *Manager) tearDown(params stopProcessParams) error {
 	// Always run the stop command if configured — handles detached processes
 	// like "docker compose up -d" where the launcher exits but services keep
 	// running.
 	if params.Job.Config.Stop != "" {
 		return m.stopWithCommand(params.Job)
 	}
-
 	if !params.Running {
 		return nil
 	}
-
 	return m.stopWithSignal(params.Job)
 }
 
@@ -1043,7 +1085,7 @@ type AttachSession struct {
 	Writable bool
 }
 
-type jobRef struct {
+type JobRef struct {
 	Name    string
 	WorkDir string
 }
@@ -1051,11 +1093,11 @@ type jobRef struct {
 // attachableJob is the gate both Attach and Resize pass: a job a pane can bind
 // to is registered, still running, and streaming through a hub — which a
 // detached launcher never does, its output having ended with its launcher.
-func (m *Manager) attachableJob(ref jobRef) (*ManagedJob, error) {
+func (m *Manager) attachableJob(ref JobRef) (*ManagedJob, error) {
 	m.mu.Lock()
 	job, ok := m.jobs[jobKey(ref.Name, ref.WorkDir)]
 	// A claim owns no stream; the service it holds does.
-	if ok && job.Status == domain.JobStatusAttached {
+	if ok && job.Status == domain.JobStatusJoined {
 		job, ok = m.realSharedLocked(sharedRef{Name: ref.Name, Dir: job.SharedDir})
 	}
 	// Snapshotted, never re-read: Status is written by whichever goroutine reaps
@@ -1081,8 +1123,8 @@ func (m *Manager) attachableJob(ref jobRef) (*ManagedJob, error) {
 	return job, nil
 }
 
-func (m *Manager) Attach(name string, workDir string) (*AttachSession, error) {
-	job, err := m.attachableJob(jobRef{Name: name, WorkDir: workDir})
+func (m *Manager) Attach(ref JobRef) (*AttachSession, error) {
+	job, err := m.attachableJob(ref)
 	if err != nil {
 		return nil, err
 	}
@@ -1112,7 +1154,7 @@ type ResizeParams struct {
 // has already been sent. Each attached pane resizes for itself, so the last one
 // to speak wins — a job shown twice at two sizes is drawn for the latest.
 func (m *Manager) Resize(params ResizeParams) error {
-	job, err := m.attachableJob(jobRef{Name: params.Name, WorkDir: params.WorkDir})
+	job, err := m.attachableJob(JobRef{Name: params.Name, WorkDir: params.WorkDir})
 	if err != nil {
 		return err
 	}
@@ -1149,6 +1191,19 @@ func (m *Manager) IsRunning() bool {
 	return false
 }
 
+// ServesRoutes says a job that is up still has a name published.
+func (m *Manager) ServesRoutes() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, job := range m.jobs {
+		if rules.IsJobUp(job.Status) && len(job.Routes) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func (m *Manager) markStopped(job *ManagedJob) {
 	// An adopted job has no PTY: the daemon that owned it is gone, and this one
 	// only ever knew how to stop it.
@@ -1170,7 +1225,7 @@ func (m *Manager) stopWithCommand(job *ManagedJob) error {
 
 	spec := rules.ShellCommand(job.Config.Stop)
 	cmd := exec.Command(spec.Name, spec.Args...)
-	cmd.Dir = job.WorkDir
+	cmd.Dir = rules.JobDir(rules.JobDirParams{WorkDir: job.WorkDir, Cwd: job.Config.Cwd})
 	cmd.Env = rules.MergeEnv(rules.MergeEnvParams{
 		Env:       os.Environ(),
 		Clear:     domain.WorktreeScopedEnv,
@@ -1207,7 +1262,7 @@ func (m *Manager) stopWithSignal(job *ManagedJob) error {
 	// the whole group if they overrun the grace period.
 	select {
 	case <-job.exited:
-	case <-time.After(stopGracePeriod):
+	case <-time.After(jobStopGrace):
 		_ = syscall.Kill(-pid, syscall.SIGKILL)
 		<-job.exited
 	}
@@ -1228,7 +1283,7 @@ func waitDrained(job *ManagedJob) {
 	}
 	select {
 	case <-job.drained:
-	case <-time.After(drainGracePeriod):
+	case <-time.After(domain.JobDrainGracePeriod):
 	}
 }
 
@@ -1242,6 +1297,9 @@ func (m *Manager) waitForExit(job *ManagedJob) {
 	crashed := job.Status == domain.JobStatusRunning && job.Config.Stop == ""
 	if crashed {
 		job.Status = domain.JobStatusCrashed
+	}
+	if crashed {
+		m.dropDanglingClaimsLocked()
 	}
 	m.mu.Unlock()
 

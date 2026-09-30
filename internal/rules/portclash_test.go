@@ -33,9 +33,6 @@ func TestPortClashes(t *testing.T) {
 	if len(clashes) != 1 || clashes[0].Port != 3000 || clashes[0].HeldBy.WorkDir != "/wt/main" {
 		t.Fatalf("clashes = %+v, want 3000 held by main", clashes)
 	}
-	if dirs := ClashingWorktrees(clashes); len(dirs) != 1 || dirs[0] != "/wt/main" {
-		t.Errorf("ClashingWorktrees = %v, want main", dirs)
-	}
 	if lines := PortClashLines(clashes); len(lines) != 1 {
 		t.Errorf("lines = %v, want one", lines)
 	}

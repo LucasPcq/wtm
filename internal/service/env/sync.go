@@ -3,6 +3,7 @@ package env
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 
@@ -26,6 +27,9 @@ type envPaths struct {
 	// value differing only by the worktree's offset is not a conflict, and the
 	// rewrite itself happens after every file is reconciled.
 	Ports EnvPortsParams
+	// Reserved are keys the reconciliation never adds. A worktree that has not
+	// adopted its isolation must not be handed a compose project by it.
+	Reserved []string
 }
 
 // EnvResolution is the decision set for one file: how to settle each conflict, the
@@ -69,6 +73,7 @@ type ComputeEnvParams struct {
 	Strategy           domain.EnvStrategy
 	Mode               domain.EnvMode
 	Ports              EnvPortsParams
+	Reserved           []string
 }
 
 // ComputeEnvDiff reconciles every configured env file against its template and
@@ -86,6 +91,7 @@ func ComputeEnvDiff(params ComputeEnvParams) ([]domain.EnvFileResult, error) {
 		Strategy:           params.Strategy,
 		Mode:               params.Mode,
 		Ports:              params.Ports,
+		Reserved:           params.Reserved,
 	}
 
 	out := make([]domain.EnvFileResult, 0, len(params.Files))
@@ -112,6 +118,7 @@ type ApplyEnvSyncParams struct {
 	Strategy           domain.EnvStrategy
 	Mode               domain.EnvMode
 	Ports              EnvPortsParams
+	Reserved           []string
 	Resolutions        map[string]EnvResolution
 }
 
@@ -130,6 +137,7 @@ func ApplyEnvSync(params ApplyEnvSyncParams) (domain.EnvSyncResult, error) {
 		Strategy:           params.Strategy,
 		Mode:               params.Mode,
 		Ports:              params.Ports,
+		Reserved:           params.Reserved,
 	}
 
 	files := make([]domain.EnvFileResult, 0, len(params.Files))
@@ -172,6 +180,7 @@ type SyncEnvParams struct {
 	Strategy           domain.EnvStrategy
 	Mode               domain.EnvMode
 	Ports              EnvPortsParams
+	Reserved           []string
 	Prune              bool
 	Check              bool
 	// OnConflict is the conflict decision applied to every conflict (keep — the safe
@@ -194,6 +203,7 @@ func SyncEnv(params SyncEnvParams) (domain.EnvSyncResult, error) {
 		Strategy:           params.Strategy,
 		Mode:               params.Mode,
 		Ports:              params.Ports,
+		Reserved:           params.Reserved,
 	}
 
 	files := make([]domain.EnvFileResult, 0, len(params.Files))
@@ -302,7 +312,7 @@ func computeFile(paths envPaths, f domain.EnvFile) (computedFile, error) {
 		Mode:       paths.Mode,
 		PortValues: EnvValueRefsFor(paths.Ports, f.Target),
 		PortBlock:  paths.Ports.Block,
-		Owned:      rules.EnvValueOwnedKeys(paths.Ports.ValueLinks, f.Target),
+		Owned:      ownedKeys(paths, f.Target),
 	})
 
 	return computedFile{
@@ -313,6 +323,22 @@ func computeFile(paths envPaths, f domain.EnvFile) (computedFile, error) {
 		diff:           diff,
 		unresolvable:   child == nil && template == nil && parent == nil && main == nil,
 	}, nil
+}
+
+// ownedKeys are the keys the reconciliation leaves to others in one file: what
+// the owned pass writes there, and what it may never add.
+func ownedKeys(paths envPaths, target string) map[string]bool {
+	keys := map[string]bool{}
+	maps.Copy(keys, rules.EnvValueOwnedKeys(paths.Ports.ValueLinks, target))
+	for _, entry := range paths.Ports.Owned {
+		if entry.File == target {
+			keys[entry.Key] = true
+		}
+	}
+	for _, key := range paths.Reserved {
+		keys[key] = true
+	}
+	return keys
 }
 
 // valueSources feeds the value document per strategy — one source only, never a

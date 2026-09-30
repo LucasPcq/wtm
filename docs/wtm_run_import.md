@@ -19,6 +19,18 @@ against the new configuration.
 wtm run import [file] [flags]
 ```
 
+### Examples
+
+```
+  wtm run import run.json
+
+  # No confirmation, from stdin
+  cat run.json | wtm run import - --yes
+
+  # Then settle a worktree's .env files on it
+  wtm env feat/login --yes
+```
+
 ### Options
 
 ```

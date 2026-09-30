@@ -116,7 +116,7 @@ func TestSwitchToNamesSettlesTheWorktreesButNotMain(t *testing.T) {
 	if r.env(t) != portsEnv {
 		t.Errorf("main .env = %q, want it untouched: only `wtm env main` moves it onto names", r.env(t))
 	}
-	if !outcome.Changed || !slices.Equal(outcome.Settled, []string{"feature"}) || outcome.MainLeft != "main" {
+	if !outcome.Changed || !slices.Equal(branchesIn(outcome.Settled), []string{"feature"}) || mainLeft(outcome) != "main" {
 		t.Errorf("outcome = %+v, want feature settled and main left as is", outcome)
 	}
 	if len(presenter.outcomes) != 1 {
@@ -164,7 +164,7 @@ func TestSwitchToPortsBringsMainBack(t *testing.T) {
 	if r.env(t) != portsEnv {
 		t.Errorf("main .env = %q, want its port back", r.env(t))
 	}
-	if !slices.Equal(outcome.Settled, []string{"main"}) || outcome.MainLeft != "" {
+	if !slices.Equal(branchesIn(outcome.Settled), []string{"main"}) || outcome.MainLeft != nil {
 		t.Errorf("outcome = %+v, want main settled", outcome)
 	}
 }
@@ -185,7 +185,7 @@ func TestSwitchKeepEnvLeavesTheFilesOutOfStep(t *testing.T) {
 	if body := readFile(t, filepath.Join(feature, ".env")); body != portsEnv {
 		t.Errorf("feature .env = %q, want it untouched", body)
 	}
-	if len(outcome.Settled) != 0 || !slices.Equal(outcome.Pending, []string{"feature"}) {
+	if len(outcome.Settled) != 0 || !slices.Equal(branchesIn(outcome.Pending), []string{"feature"}) {
 		t.Errorf("outcome = %+v, want feature left pending", outcome)
 	}
 }
@@ -205,7 +205,7 @@ func TestSwitchToTheCurrentModeStillSettlesTheDrift(t *testing.T) {
 	if outcome.Changed {
 		t.Error("run.toml already said names, nothing to write")
 	}
-	if !slices.Equal(outcome.Settled, []string{"feature"}) {
+	if !slices.Equal(branchesIn(outcome.Settled), []string{"feature"}) {
 		t.Errorf("settled = %v, want feature", outcome.Settled)
 	}
 }
@@ -234,7 +234,7 @@ func TestSwitchDeclinedLeavesTheFilesPending(t *testing.T) {
 	if body := readFile(t, filepath.Join(feature, ".env")); body != portsEnv {
 		t.Errorf("feature .env = %q, want it untouched", body)
 	}
-	if !outcome.Changed || !slices.Equal(outcome.Pending, []string{"feature"}) {
+	if !outcome.Changed || !slices.Equal(branchesIn(outcome.Pending), []string{"feature"}) {
 		t.Errorf("outcome = %+v, want the switch written and feature pending", outcome)
 	}
 }
@@ -275,7 +275,25 @@ func TestSwitchSkipsTheSettleStepWhenOnlyMainIsOutOfStep(t *testing.T) {
 	if prompter.AskedKeys() != stepMode {
 		t.Errorf("asked %q, want only the mode", prompter.AskedKeys())
 	}
-	if len(outcome.Settled)+len(outcome.Pending) != 0 || outcome.MainLeft != "main" {
+	if len(outcome.Settled)+len(outcome.Pending) != 0 || mainLeft(outcome) != "main" {
 		t.Errorf("outcome = %+v, want nothing settled and main left", outcome)
 	}
+}
+
+func branchesIn(refs []domain.WorktreeRef) []string {
+	branches := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		if ref.Path == "" {
+			continue
+		}
+		branches = append(branches, ref.Branch)
+	}
+	return branches
+}
+
+func mainLeft(outcome SwitchOutcome) string {
+	if outcome.MainLeft == nil || outcome.MainLeft.Path == "" {
+		return ""
+	}
+	return outcome.MainLeft.Branch
 }

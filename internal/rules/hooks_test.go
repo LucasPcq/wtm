@@ -124,3 +124,27 @@ func TestResolveTemplateVars(t *testing.T) {
 		})
 	}
 }
+
+func TestInterpolateShellQuotesForItsSpot(t *testing.T) {
+	vars := rules.TemplateVars{Worktree: "/t/it's $HOME", Branch: "feat/x", Root: "/repo"}
+
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: "a plain value stays bare", input: "cd {{root}} && git log {{branch}}", want: "cd /repo && git log feat/x"},
+		{name: "unquoted", input: "cd {{worktree}}", want: `cd '/t/it'\''s $HOME'`},
+		{name: "inside double quotes", input: `cd "{{worktree}}/sub"`, want: `cd "/t/it's \$HOME/sub"`},
+		{name: "inside single quotes", input: "cd '{{worktree}}'", want: `cd '/t/it'\''s $HOME'`},
+		{name: "an escaped quote opens nothing", input: `echo \" {{worktree}}`, want: `echo \" '/t/it'\''s $HOME'`},
+		{name: "a double quote inside single quotes opens nothing", input: `echo '"' {{worktree}}`, want: `echo '"' '/t/it'\''s $HOME'`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := rules.InterpolateShell(tt.input, vars); got != tt.want {
+				t.Errorf("InterpolateShell(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}

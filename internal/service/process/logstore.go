@@ -36,6 +36,9 @@ type LogSinkParams struct {
 	Job    string
 	// MaxBytes overrides the rotation threshold; zero means domain.JobLogMaxBytes.
 	MaxBytes int64
+	// Append continues the run already in the file rather than starting one: a
+	// detached stack relaunched is the same run, still up.
+	Append bool
 }
 
 // LogSink persists a job's raw output as sanitized, timestamped lines, rotating
@@ -72,10 +75,18 @@ func OpenLogSink(params LogSinkParams) (*LogSink, error) {
 	if path == "" {
 		return nil, fmt.Errorf("job %q cannot be named as a log file", params.Job)
 	}
-	removeBackups(path)
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND
+	if !params.Append {
+		removeBackups(path)
+		flags = os.O_CREATE | os.O_WRONLY | os.O_TRUNC
+	}
+	file, err := os.OpenFile(path, flags, 0o644)
 	if err != nil {
 		return nil, fmt.Errorf("open job log: %w", err)
+	}
+	var size int64
+	if info, statErr := file.Stat(); statErr == nil {
+		size = info.Size()
 	}
 
 	return &LogSink{
@@ -83,6 +94,7 @@ func OpenLogSink(params LogSinkParams) (*LogSink, error) {
 		maxBytes: resolveMaxBytes(params.MaxBytes),
 		file:     file,
 		buf:      bufio.NewWriterSize(file, domain.JobLogBufferBytes),
+		size:     size,
 	}, nil
 }
 

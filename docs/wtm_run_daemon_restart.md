@@ -12,6 +12,15 @@ Detached services keep running across the restart and are picked back up; foregr
 wtm run daemon restart [flags]
 ```
 
+### Examples
+
+```
+  # After an upgrade, when a run command reports the daemon's version
+  wtm run daemon restart
+
+  wtm run daemon restart --yes
+```
+
 ### Options
 
 ```

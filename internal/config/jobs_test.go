@@ -3,7 +3,6 @@ package config
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -121,47 +120,6 @@ cmd = "echo dup"
 	}
 }
 
-var tomlAssignment = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*\s*=`)
-
-// The template is the documentation most users read first. Uncommenting it must
-// produce a config wtm accepts — including the port recipes it now carries.
-func TestRunTemplateUncommentsIntoAValidConfig(t *testing.T) {
-	var body strings.Builder
-	for _, line := range strings.Split(runTemplateContent, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if !strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		uncommented := strings.TrimSpace(strings.TrimPrefix(trimmed, "#"))
-		// The template is mostly prose. Only a table header or a `key = value`
-		// is a declaration — a sentence merely mentioning PORT=3000 is not.
-		if !strings.HasPrefix(uncommented, "[") && !tomlAssignment.MatchString(uncommented) {
-			continue
-		}
-		body.WriteString(uncommented + "\n")
-	}
-
-	dir := writeRunFile(t, body.String())
-	cfg, err := LoadRun(dir)
-	if err != nil {
-		t.Fatalf("the uncommented template must load: %v\n---\n%s", err, body.String())
-	}
-	if len(cfg.Jobs) != 3 {
-		t.Fatalf("got %d jobs, want the 3 the template shows", len(cfg.Jobs))
-	}
-
-	byName := map[string]domain.JobConfig{}
-	for _, job := range cfg.Jobs {
-		byName[job.Name] = job
-	}
-	if byName["db"].Ports["DB_PORT"] != 5432 {
-		t.Errorf("the compose recipe lost its port: %v", byName["db"].Ports)
-	}
-	if byName["web"].Ports["PORT"] != 3000 {
-		t.Errorf("the dev server recipe lost its port: %v", byName["web"].Ports)
-	}
-}
-
 func TestLoadRunRejectsNegativeBlock(t *testing.T) {
 	dir := writeRunFile(t, `
 port_offset_block = -10
@@ -243,5 +201,23 @@ ports = { PG_PORT = 5432 }
 	}
 	if cfg.Jobs[2].URL != nil {
 		t.Errorf("db must carry no url, got %+v", cfg.Jobs[2].URL)
+	}
+}
+
+// A misspelt kind read as neither a service nor a task would run the job under
+// rules nobody chose; it is refused where the file is read, naming the job.
+func TestLoadRunRejectsAnUnknownKind(t *testing.T) {
+	dir := writeRunFile(t, `
+[[job]]
+name = "api"
+kind = "servce"
+cmd = "pnpm dev"
+`)
+	_, err := LoadRun(dir)
+	if err == nil {
+		t.Fatal("expected kind = \"servce\" to be refused")
+	}
+	if !strings.Contains(err.Error(), `"api"`) || !strings.Contains(err.Error(), `"servce"`) {
+		t.Errorf("error should name the job and the kind, got: %v", err)
 	}
 }

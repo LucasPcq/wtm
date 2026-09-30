@@ -16,8 +16,8 @@ import (
 func TestWtExtractExistingBranchRequiresFrom(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 
 	if err := setupMinimalConfig(t, stateDir); err != nil {
@@ -50,8 +50,8 @@ func TestWtExtractExistingBranchRequiresFrom(t *testing.T) {
 func TestWtExtractNewBranchDoesNotRequireFrom(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 
 	if err := setupMinimalConfig(t, stateDir); err != nil {

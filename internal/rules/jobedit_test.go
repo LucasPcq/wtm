@@ -188,7 +188,7 @@ func TestRenameJobRefs(t *testing.T) {
 		},
 	}
 
-	got := rules.RenameJobRefs(cfg, "api", "backend")
+	got := rules.RenameJobRefs(rules.RenameJobRefsParams{Config: cfg, From: "api", To: "backend"})
 
 	if got.Profiles[0].Jobs[0] != "backend" || got.Profiles[0].Jobs[1] != "web" {
 		t.Errorf("dev jobs = %v, want [backend web]", got.Profiles[0].Jobs)
@@ -213,7 +213,7 @@ func TestRenameJobRefsRewritesEnvPortLinks(t *testing.T) {
 		},
 	}
 
-	got := rules.RenameJobRefs(cfg, "api", "api-server")
+	got := rules.RenameJobRefs(rules.RenameJobRefsParams{Config: cfg, From: "api", To: "api-server"})
 
 	if got.EnvPorts[0].Job != "api-server" || got.EnvPorts[1].Job != "api-server" {
 		t.Errorf("env_port jobs = %q/%q, want both renamed", got.EnvPorts[0].Job, got.EnvPorts[1].Job)
@@ -223,5 +223,18 @@ func TestRenameJobRefsRewritesEnvPortLinks(t *testing.T) {
 	}
 	if cfg.EnvPorts[0].Job != "api" {
 		t.Errorf("the input config was mutated: %+v", cfg.EnvPorts[0])
+	}
+}
+
+func TestSameJobReadsNilAndEmptyAlike(t *testing.T) {
+	a := domain.JobConfig{Name: "api", Cmd: "pnpm dev"}
+	b := domain.JobConfig{Name: "api", Cmd: "pnpm dev", Runs: []string{}, Ports: map[string]int{}}
+
+	if !rules.SameJob(a, b) {
+		t.Error("an empty list reads as a change")
+	}
+	b.Touches = []string{"db"}
+	if rules.SameJob(a, b) {
+		t.Error("a new touches list reads as no change")
 	}
 }

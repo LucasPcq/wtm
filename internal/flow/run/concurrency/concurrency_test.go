@@ -1,4 +1,4 @@
-package up
+package concurrency
 
 import (
 	"strings"
@@ -6,8 +6,8 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
-	"github.com/LucasPcq/wtm/internal/flow/run/seam"
-	"github.com/LucasPcq/wtm/internal/flow/runlogs"
+	"github.com/LucasPcq/wtm/internal/flow/run/target"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/runconfig"
 	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
 )
@@ -26,19 +26,44 @@ func running(dirs ...string) []domain.JobInfo {
 	return jobs
 }
 
-func flowWith(request Request, jobs []domain.JobInfo) *upFlow {
-	if request.Cwd == "" {
-		request.Cwd = here
-	}
-	return &upFlow{request: request, jobs: jobs}
+// request is what a run hands the question, reduced to what these tests vary.
+type request struct {
+	Exclusive bool
+	Parallel  bool
+	Config    domain.RunConfig
 }
 
-func concurrencyStepOf(f *upFlow) flow.Step { return f.concurrencyStep() }
+func questionWith(req request, jobs []domain.JobInfo) *Question {
+	return questionFor(questionParams{Request: req, Running: jobs, Presenter: &flowtest.Recorder{}})
+}
+
+type questionParams struct {
+	Request   request
+	Running   []domain.JobInfo
+	Presenter flow.Presenter
+	StateDir  string
+}
+
+func questionFor(params questionParams) *Question {
+	cfg := params.Request.Config
+	return New(Params{
+		Context:   flow.Context{StateDir: params.StateDir},
+		Presenter: params.Presenter,
+		Exclusive: params.Request.Exclusive,
+		Parallel:  params.Request.Parallel,
+		Config:    cfg,
+		Running:   params.Running,
+		WorkDirs: func(answers flow.Answers) []string {
+			return target.WorkDirs(target.WorkDirsParams{Answers: answers, Cwd: here})
+		},
+		Starting: func(flow.Answers) []domain.JobConfig { return rules.JobsWithEffectivePorts(cfg, cfg.Jobs) },
+	})
+}
 
 func TestConcurrencyIsNotAskedWhenNothingRunsElsewhere(t *testing.T) {
-	f := flowWith(Request{}, running(here))
+	f := questionWith(request{}, running(here))
 
-	skip, reason := concurrencyStepOf(f).Skip(flow.Answers{})
+	skip, reason := f.Step().Skip(flow.Answers{})
 	if !skip || reason != domain.RunConcurrencySkipAlone {
 		t.Errorf("Skip = (%v, %q), want the step skipped for want of a neighbour", skip, reason)
 	}
@@ -47,22 +72,22 @@ func TestConcurrencyIsNotAskedWhenNothingRunsElsewhere(t *testing.T) {
 // A worktree's own jobs are never a reason to ask: `run up X` must not offer to
 // stop X's own services.
 func TestConcurrencyMeasuresAgainstTheTargetNotTheCurrentDirectory(t *testing.T) {
-	f := flowWith(Request{Cwd: here}, running("/wt/other"))
+	f := questionWith(request{}, running("/wt/other"))
 	answers := flow.NewAnswers(map[string]string{"run.worktree": "/wt/other"})
 
-	if skip, _ := concurrencyStepOf(f).Skip(answers); !skip {
+	if skip, _ := f.Step().Skip(answers); !skip {
 		t.Error("the step was asked about the very worktree the run targets")
 	}
 }
 
 func TestConcurrencyIsAskedOnceThenNeverAgain(t *testing.T) {
-	asked := flowWith(Request{}, running(here, "/wt/other"))
-	if skip, _ := concurrencyStepOf(asked).Skip(flow.Answers{}); skip {
+	asked := questionWith(request{}, running(here, "/wt/other"))
+	if skip, _ := asked.Step().Skip(flow.Answers{}); skip {
 		t.Fatal("the step was skipped although another worktree is running jobs")
 	}
 
-	settled := flowWith(Request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyExclusive}}, running(here, "/wt/other"))
-	skip, reason := concurrencyStepOf(settled).Skip(flow.Answers{})
+	settled := questionWith(request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyExclusive}}, running(here, "/wt/other"))
+	skip, reason := settled.Step().Skip(flow.Answers{})
 	if !skip || reason != domain.RunConcurrencySkipSettled {
 		t.Errorf("Skip = (%v, %q), want the config to have settled it", skip, reason)
 	}
@@ -71,15 +96,15 @@ func TestConcurrencyIsAskedOnceThenNeverAgain(t *testing.T) {
 func TestConcurrencyFlagsAnswerWithoutAsking(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
-		request Request
+		request request
 		want    domain.Concurrency
 	}{
-		{"--exclusive", Request{Exclusive: true}, domain.ConcurrencyExclusive},
-		{"--parallel", Request{Parallel: true}, domain.ConcurrencyParallel},
+		{"--exclusive", request{Exclusive: true}, domain.ConcurrencyExclusive},
+		{"--parallel", request{Parallel: true}, domain.ConcurrencyParallel},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			f := flowWith(tc.request, running(here, "/wt/other"))
-			step := concurrencyStepOf(f)
+			f := questionWith(tc.request, running(here, "/wt/other"))
+			step := f.Step()
 
 			if skip, _ := step.Skip(flow.Answers{}); !skip {
 				t.Error("the step was asked although a flag answered it")
@@ -98,9 +123,9 @@ func TestConcurrencyFlagsAnswerWithoutAsking(t *testing.T) {
 // The safe default stops nothing: an unattended run must never tear down
 // another worktree's services on its own initiative.
 func TestConcurrencyResolvesToLeavingTheOthersAlone(t *testing.T) {
-	f := flowWith(Request{}, running(here, "/wt/other"))
+	f := questionWith(request{}, running(here, "/wt/other"))
 
-	answer, err := concurrencyStepOf(f).Resolve(flow.Answers{})
+	answer, err := f.Step().Resolve(flow.Answers{})
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
@@ -110,9 +135,9 @@ func TestConcurrencyResolvesToLeavingTheOthersAlone(t *testing.T) {
 }
 
 func TestConcurrencyOffersFourAnswersAndNamesTheNeighbours(t *testing.T) {
-	f := flowWith(Request{}, running(here, "/wt/other"))
+	f := questionWith(request{}, running(here, "/wt/other"))
 
-	content, err := concurrencyStepOf(f).Build(flow.Answers{})
+	content, err := f.Step().Build(flow.Answers{})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
@@ -136,14 +161,14 @@ func TestConcurrencyOffersFourAnswersAndNamesTheNeighbours(t *testing.T) {
 func TestRememberWritesTheAnswerToRunTomlAndSaysSo(t *testing.T) {
 	stateDir := t.TempDir()
 	recorder := &flowtest.Recorder{}
-	f := &upFlow{
-		ctx:       flow.Context{StateDir: stateDir},
-		request:   Request{Config: domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev"}}}},
-		presenter: presenterOnly{recorder},
-	}
+	f := questionFor(questionParams{
+		StateDir:  stateDir,
+		Request:   request{Config: domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev"}}}},
+		Presenter: recorder,
+	})
 
-	answers := flow.NewAnswers(map[string]string{KeyConcurrency: answerExclusiveAlways})
-	if err := f.remember(answers); err != nil {
+	answers := flow.NewAnswers(map[string]string{Key: answerExclusiveAlways})
+	if _, err := f.remember(answers); err != nil {
 		t.Fatalf("remember: %v", err)
 	}
 
@@ -162,9 +187,9 @@ func TestRememberWritesTheAnswerToRunTomlAndSaysSo(t *testing.T) {
 // A one-off answer changes nothing on disk: only the two "always" options do.
 func TestAOneOffAnswerIsNotRemembered(t *testing.T) {
 	stateDir := t.TempDir()
-	f := &upFlow{ctx: flow.Context{StateDir: stateDir}, presenter: presenterOnly{&flowtest.Recorder{}}}
+	f := questionFor(questionParams{StateDir: stateDir, Presenter: &flowtest.Recorder{}})
 
-	if err := f.remember(flow.NewAnswers(map[string]string{KeyConcurrency: answerExclusive})); err != nil {
+	if _, err := f.remember(flow.NewAnswers(map[string]string{Key: answerExclusive})); err != nil {
 		t.Fatalf("remember: %v", err)
 	}
 
@@ -177,14 +202,6 @@ func TestAOneOffAnswerIsNotRemembered(t *testing.T) {
 	}
 }
 
-// presenterOnly lends the up flow's Presenter the parts a step test needs; the
-// hand-over to a surface belongs to the run, not to a question.
-type presenterOnly struct{ *flowtest.Recorder }
-
-func (presenterOnly) Sequence(seam.SequenceParams) (runlogs.Outcomes, error) {
-	return runlogs.Outcomes{{}}, nil
-}
-
 // The regression that shipped: Skip short-circuits Resolve, so a settled step
 // carries no value at all. Reading the answer alone turned every
 // non-interactive --exclusive — and every project that had written
@@ -192,31 +209,31 @@ func (presenterOnly) Sequence(seam.SequenceParams) (runlogs.Outcomes, error) {
 func TestASettledConcurrencyIsStillActedOn(t *testing.T) {
 	cases := []struct {
 		name    string
-		request Request
+		request request
 		want    domain.Concurrency
 	}{
-		{"--exclusive", Request{Exclusive: true}, domain.ConcurrencyExclusive},
-		{"--parallel", Request{Parallel: true}, domain.ConcurrencyParallel},
-		{"config says exclusive", Request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyExclusive}}, domain.ConcurrencyExclusive},
-		{"config says parallel", Request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyParallel}}, domain.ConcurrencyParallel},
-		{"nobody answered", Request{}, domain.ConcurrencyParallel},
+		{"--exclusive", request{Exclusive: true}, domain.ConcurrencyExclusive},
+		{"--parallel", request{Parallel: true}, domain.ConcurrencyParallel},
+		{"config says exclusive", request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyExclusive}}, domain.ConcurrencyExclusive},
+		{"config says parallel", request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyParallel}}, domain.ConcurrencyParallel},
+		{"nobody answered", request{}, domain.ConcurrencyParallel},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			f := flowWith(tc.request, running(here, "/wt/other"))
+			f := questionWith(tc.request, running(here, "/wt/other"))
 
 			// What an unattended run produces: Skip wins, and the step is recorded
 			// as skipped with no value.
-			answers, err := flow.Unattended{}.Ask(f.session())
+			answers, err := flow.Unattended{}.Ask(flow.Session{Steps: []flow.Step{f.Step()}})
 			if err != nil {
 				t.Fatalf("Ask: %v", err)
 			}
-			if answers.Answered(KeyConcurrency) {
+			if answers.Answered(Key) {
 				t.Fatal("the step was answered, so this test no longer covers the skipped path")
 			}
 
-			if got := f.concurrency(answers); got != tc.want {
+			if got := f.Decided(answers); got != tc.want {
 				t.Errorf("concurrency = %q, want %q", got, tc.want)
 			}
 		})
@@ -225,10 +242,10 @@ func TestASettledConcurrencyIsStillActedOn(t *testing.T) {
 
 // A picker's answer outranks what the flags and the config would have resolved.
 func TestAnAnsweredConcurrencyOutranksTheFallback(t *testing.T) {
-	f := flowWith(Request{Parallel: true}, running(here, "/wt/other"))
-	answers := flow.Answers{}.With(KeyConcurrency, flow.Answer{Value: answerExclusiveAlways, Asked: true})
+	f := questionWith(request{Parallel: true}, running(here, "/wt/other"))
+	answers := flow.Answers{}.With(Key, flow.Answer{Value: answerExclusiveAlways, Asked: true})
 
-	if got := f.concurrency(answers); got != domain.ConcurrencyExclusive {
+	if got := f.Decided(answers); got != domain.ConcurrencyExclusive {
 		t.Errorf("concurrency = %q, want the answer that was actually given", got)
 	}
 }
@@ -236,10 +253,10 @@ func TestAnAnsweredConcurrencyOutranksTheFallback(t *testing.T) {
 // The setting says one stack at a time and the run brings up three. It is a
 // guard rail, not an ambush: the contradiction is one the user just created.
 func TestASettledExclusiveIsPutBackToTheUserOnAMultiWorktreeRun(t *testing.T) {
-	f := flowWith(Request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyExclusive}}, nil)
+	f := questionWith(request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyExclusive}}, nil)
 	answers := flow.Answers{}.WithValues("run.worktree", []string{here, "/wt/other"})
 
-	step := concurrencyStepOf(f)
+	step := f.Step()
 	if skip, reason := step.Skip(answers); skip {
 		t.Fatalf("the step was skipped (%q) although the run contradicts the setting", reason)
 	}
@@ -264,23 +281,23 @@ func TestASettledExclusiveIsPutBackToTheUserOnAMultiWorktreeRun(t *testing.T) {
 // A single-worktree run against the same setting is not a contradiction: it is
 // exactly what the setting asked for.
 func TestASettledExclusiveStandsOnASingleWorktreeRun(t *testing.T) {
-	f := flowWith(Request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyExclusive}}, running(here, "/wt/other"))
+	f := questionWith(request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyExclusive}}, running(here, "/wt/other"))
 	answers := flow.Answers{}.WithValues("run.worktree", []string{here})
 
-	if skip, reason := concurrencyStepOf(f).Skip(answers); !skip || reason != domain.RunConcurrencySkipSettled {
+	if skip, reason := f.Step().Skip(answers); !skip || reason != domain.RunConcurrencySkipSettled {
 		t.Errorf("Skip = (%v, %q), want the settled answer to stand", skip, reason)
 	}
-	if got := f.concurrency(answers); got != domain.ConcurrencyExclusive {
+	if got := f.Decided(answers); got != domain.ConcurrencyExclusive {
 		t.Errorf("concurrency = %q, want the setting applied", got)
 	}
 }
 
 // Where nobody can be asked, the safe default destroys nothing.
 func TestAnUnattendedContradictionStopsNothing(t *testing.T) {
-	f := flowWith(Request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyExclusive}}, running("/wt/other"))
+	f := questionWith(request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyExclusive}}, running("/wt/other"))
 	answers := flow.Answers{}.WithValues("run.worktree", []string{here, "/wt/second"})
 
-	answer, err := concurrencyStepOf(f).Resolve(answers)
+	answer, err := f.Step().Resolve(answers)
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
@@ -291,7 +308,7 @@ func TestAnUnattendedContradictionStopsNothing(t *testing.T) {
 
 // `run up A B` must not offer to stop B's own jobs on A's behalf.
 func TestTheOtherWorktreesAreMeasuredAgainstTheWholeSelection(t *testing.T) {
-	f := flowWith(Request{}, running(here, "/wt/second"))
+	f := questionWith(request{}, running(here, "/wt/second"))
 	answers := flow.Answers{}.WithValues("run.worktree", []string{here, "/wt/second"})
 
 	if others := f.otherWorktrees(answers); len(others) != 0 {
@@ -302,10 +319,10 @@ func TestTheOtherWorktreesAreMeasuredAgainstTheWholeSelection(t *testing.T) {
 // A default that goes unsaid is a default nobody can correct.
 func TestTheUnattendedContradictionIsAnnounced(t *testing.T) {
 	recorder := &flowtest.Recorder{}
-	f := &upFlow{
-		request:   Request{Cwd: here, Config: domain.RunConfig{Concurrency: domain.ConcurrencyExclusive}},
-		presenter: presenterOnly{recorder},
-	}
+	f := questionFor(questionParams{
+		Request:   request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyExclusive}},
+		Presenter: recorder,
+	})
 	answers := flow.Answers{}.WithValues("run.worktree", []string{here, "/wt/second"})
 
 	f.noticeOverridden(answers)
@@ -321,13 +338,13 @@ func TestTheUnattendedContradictionIsAnnounced(t *testing.T) {
 // Someone answered, so there is nothing to announce in their place.
 func TestAnAnsweredContradictionIsNotAnnounced(t *testing.T) {
 	recorder := &flowtest.Recorder{}
-	f := &upFlow{
-		request:   Request{Cwd: here, Config: domain.RunConfig{Concurrency: domain.ConcurrencyExclusive}},
-		presenter: presenterOnly{recorder},
-	}
+	f := questionFor(questionParams{
+		Request:   request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyExclusive}},
+		Presenter: recorder,
+	})
 	answers := flow.Answers{}.
 		WithValues("run.worktree", []string{here, "/wt/second"}).
-		With(KeyConcurrency, flow.Answer{Value: answerParallel, Asked: true})
+		With(Key, flow.Answer{Value: answerParallel, Asked: true})
 
 	f.noticeOverridden(answers)
 
@@ -338,12 +355,12 @@ func TestAnAnsweredContradictionIsNotAnnounced(t *testing.T) {
 
 // clashFlow runs `web` here while the same job is up in /wt/other, the two
 // worktrees on the offsets given — a verbatim worktree shares its source's.
-func clashFlow(request Request, otherOffset int) *upFlow {
-	request.Config.Jobs = []domain.JobConfig{{
+func clashFlow(req request, otherOffset int) *Question {
+	req.Config.Jobs = []domain.JobConfig{{
 		Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev",
 		Ports: map[string]int{"PORT": 3000},
 	}}
-	f := flowWith(request, []domain.JobInfo{{Name: "web", WorkDir: "/wt/other", Status: domain.JobStatusRunning}})
+	f := questionWith(req, []domain.JobInfo{{Name: "web", WorkDir: "/wt/other", Status: domain.JobStatusRunning}})
 	f.offsets = map[string]int{here: 0, "/wt/other": otherOffset}
 	return f
 }
@@ -352,8 +369,8 @@ func clashFlow(request Request, otherOffset int) *upFlow {
 // question becomes stop the other one, or don't start — whatever the project
 // settled as its preference.
 func TestAPortClashOverridesAParallelPreference(t *testing.T) {
-	f := clashFlow(Request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyParallel}}, 0)
-	step := concurrencyStepOf(f)
+	f := clashFlow(request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyParallel}}, 0)
+	step := f.Step()
 
 	if skip, reason := step.Skip(flow.Answers{}); skip {
 		t.Fatalf("skipped (%s), want the clash put to the user", reason)
@@ -373,14 +390,14 @@ func TestAPortClashOverridesAParallelPreference(t *testing.T) {
 // Nobody to ask: stopping another worktree is not a default to take silently,
 // and running both is not possible — the run refuses, naming the way out.
 func TestAPortClashRefusesAnUnattendedRun(t *testing.T) {
-	_, err := concurrencyStepOf(clashFlow(Request{}, 0)).Resolve(flow.Answers{})
+	_, err := clashFlow(request{}, 0).Step().Resolve(flow.Answers{})
 	if err == nil || !strings.Contains(err.Error(), "--"+domain.FlagExclusive) {
 		t.Errorf("err = %v, want a refusal naming --%s", err, domain.FlagExclusive)
 	}
 }
 
 func TestAPortClashIsSettledByExclusive(t *testing.T) {
-	step := concurrencyStepOf(clashFlow(Request{Exclusive: true}, 0))
+	step := clashFlow(request{Exclusive: true}, 0).Step()
 	if skip, _ := step.Skip(flow.Answers{}); !skip {
 		t.Error("--exclusive answers the clash, want the step skipped")
 	}
@@ -392,11 +409,33 @@ func TestAPortClashIsSettledByExclusive(t *testing.T) {
 
 // Isolated worktrees sit a block apart: the same job up next door is not a clash.
 func TestIsolatedWorktreesDoNotClash(t *testing.T) {
-	f := clashFlow(Request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyParallel}}, 10)
+	f := clashFlow(request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyParallel}}, 10)
 	if clashes := f.clashes(flow.Answers{}); len(clashes) != 0 {
 		t.Errorf("clashes = %+v, want none a block apart", clashes)
 	}
-	if skip, _ := concurrencyStepOf(f).Skip(flow.Answers{}); !skip {
+	if skip, _ := f.Step().Skip(flow.Answers{}); !skip {
 		t.Error("the settled preference applies when nothing clashes")
+	}
+}
+
+// The clash's stop answer is the exclusive one, which stops every other
+// worktree: the option names each of them, not only the one holding the port.
+func TestAPortClashNamesEveryWorktreeItsAnswerStops(t *testing.T) {
+	f := clashFlow(request{}, 0)
+	f.params.Running = append(f.params.Running, domain.JobInfo{Name: "db", WorkDir: "/wt/bystander", Status: domain.JobStatusRunning})
+	f.offsets["/wt/bystander"] = 20
+
+	content, err := f.Step().Build(flow.Answers{})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	stop := content.Options[0]
+	if stop.Value != answerExclusive {
+		t.Fatalf("first option = %+v, want the exclusive answer", stop)
+	}
+	for _, name := range []string{"other", "bystander"} {
+		if !strings.Contains(stop.Label, name) {
+			t.Errorf("stop option %q does not name %s, which it stops", stop.Label, name)
+		}
 	}
 }

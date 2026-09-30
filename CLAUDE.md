@@ -4,11 +4,11 @@ This file defines the mandatory coding standards for this project. All contribut
 
 **Self-maintaining docs:** When a structural or architectural decision changes (new package, renamed layer, new dependency, new convention), update this file and/or the relevant skills (`go-cli`, `build-validator`) in the same session. Standards must always reflect the actual codebase.
 
-**User-facing agent skill:** `internal/commands/agents/assets/using-wtm.skill.md` is the skill shipped to end users so their LLM can drive the `wtm` CLI. Whenever a change alters the user-facing command surface or agent-relevant behavior (new/renamed command or flag, changed `--output json` shape, new failure/abort semantics, changed interactive-vs-non-interactive behavior), update this skill in the same session so it stays aligned with the released CLI. Skip purely internal refactors and TUI-only changes that don't affect how an agent invokes wtm.
+**User-facing agent skill:** `internal/commands/agents/assets/using-wtm/` is the skill shipped to end users so their LLM can drive the `wtm` CLI: a short `SKILL.md` (loaded whenever the skill triggers: driving rules, exit codes, which reference to read when) and `references/*.md` (worktrees, stacks, run, run-config, json), read on demand. Put a new fact in the reference whose topic it is, never in `SKILL.md` unless every task needs it. Whenever a change alters the user-facing command surface or agent-relevant behavior (new/renamed command or flag, changed `--output json` shape, new failure/abort semantics, changed interactive-vs-non-interactive behavior), update this skill in the same session so it stays aligned with the released CLI. Skip purely internal refactors and TUI-only changes that don't affect how an agent invokes wtm.
 
-**Docs & README:** the full command reference under `docs/` is **generated** from the Cobra command tree by `tools/gendocs` — never hand-edit it. The one exception is `docs/dev/`, hand-written developer documentation (architecture, the `flow/` layer, how to add a mutation command): gendocs only writes `wtm_*.md` at the root of `docs/`, so that subdirectory survives a regeneration. Keep it in step with the code the same way this file is. `README.md` is a lean guide (concepts + a grouped command-overview table linking into `docs/`), not a flag reference. Whenever a command or flag is **added, modified, or removed**:
+**Docs & README:** the full command reference under `docs/` is **generated** from the Cobra command tree by `tools/gendocs` — never hand-edit it. The one exception is `docs/dev/`, hand-written developer documentation (architecture, the `flow/` layer, how to add a mutation command): gendocs only writes `wtm_*.md` at the root of `docs/`, so that subdirectory survives a regeneration. Keep it in step with the code the same way this file is. The same holds for `docs/guide/`, the hand-written **user guide** (configuration, isolation, jobs and profiles, how `wtm run` works, shared services, addressing, the `run.toml` reference, the state files, migration notes): a concept a user needs and no `--help` can carry goes there, linked from the README, never into a generated page. Update it in the same change as the behaviour it describes. `README.md` is the product page, not a reference: a pitch, one short section per feature with its GIF, install, quick start and the grouped command-overview table linking into `docs/` — anything longer belongs in `docs/guide/`. Its GIFs are recorded from `docs/demos/*.tape` with VHS against a throwaway project (`docs/demos/setup.sh`); when a change alters what a recorded command prints, run `make demos`. The CHANGELOG follows the same line: a few one-line bullets per release linking into the guide, the migration detail in `docs/guide/migrating-to-<version>.md`. Whenever a command or flag is **added, modified, or removed**:
 1. run `make docs` to regenerate `docs/` (also runs automatically before `make release`);
-2. if a command was added/renamed/removed, update the `README.md` overview table (grouped by the same sections as the root `--help`) and, if relevant, the Concepts or Configuration sections. Do **not** re-add per-command flag tables to the README — `wtm <cmd> --help` and `docs/` are the source of truth. This is mandatory alongside the agent skill above.
+2. if a command was added/renamed/removed, update the `README.md` overview table (grouped by the same sections as the root `--help`) and, if relevant, its Features section or the guide page the feature belongs to. Do **not** re-add per-command flag tables to the README — `wtm <cmd> --help` and `docs/` are the source of truth. This is mandatory alongside the agent skill above.
 
 Use the fff MCP tools for all file search operations instead of default tools.
 
@@ -110,24 +110,30 @@ Documenting a pattern or an architecture belongs in `docs/` or in this file, not
 cmd/                          ← entry points, cobra setup only
 internal/
   commands/                   ← flag wiring, delegates to flow/service (zero business logic)
-    run/crud/                 ←   the preamble `run job` and `run profile` share: config,
-                                  run.toml, the opt-in guard, and the two seams
+    run/runctx/               ←   what every `run` command opens on: its directory, the config,
+                                  run.toml, the opt-in guard and the prompt gate
+    daemon/                   ←   the hidden `daemon` command and the macOS port-80 relay launchd runs
     ui/                       ←   `wtm ui`: refuses JSON and a missing TTY, then hands off to tui/dashboard
   domain/                     ← types, errors, constants only (no methods, no functions)
   rules/                      ← pure functions (stdlib + domain only, no I/O)
-  config/                     ← load & validate config.toml + run.toml from <git-common-dir>/wtm/, plus the global config (config.GlobalPath)
+  config/                     ← load & validate config.toml + run.toml from <git-common-dir>/wtm/, plus the global config (config.GlobalPath);
+                                every write puts the file's JSON schema (schemas/) beside it
   flow/                       ← the flow of each command, surface-independent (see below):
                                 the vocabulary (Step, Session, Prompter, Presenter)
     decide/                   ←   branch/env decisions shared by the create-like flows
     envports/                 ←   settling a fresh .env's host ports onto the ones the
                                   worktree binds, per its isolation (isolated / verbatim,
                                   recorded in meta.json and read by the daemon too) —
-                                  shared by `create`, `extract` and `checkout`
+                                  shared by `create`, `extract` and `checkout`, which it
+                                  never fails: a refused run.toml or an unreadable ordinal
+                                  is a warning (`SettleFresh`), the run part left undone
     create/                   ←   `wtm create`: the run (create.go) + its questions (steps.go)
     clean/                    ←   `wtm clean`: the run (clean.go) + its questions (steps.go)
     reparent/                 ←   `wtm reparent`: the run (reparent.go) + its questions (steps.go)
     prune/                    ←   `wtm prune`: the run (prune.go) + its questions (steps.go)
+    teardown/                 ←   the per-worktree removal clean and prune share: stop, hooks, remove, then drop
     sync/                     ←   `wtm sync`: the run (sync.go) + its questions (steps.go)
+    fastforward/              ←   `wtm fast-forward`: the run + its questions
     runlogs/                  ←   the jobs a surface shows (`Board`), their live streams,
                                   and the profile start sequence (reports events, not steps)
     run/                      ←   the `run` module's flows, mirroring its command tree:
@@ -138,20 +144,40 @@ internal/
                                     port prober, and the start sequence a surface drives
       foreigndata/            ←     the stop before a job whose `touches` reach data the
                                     worktree does not own, shared by `up` and `start`
+      probes/                 ←     the offer to write `probe = false` for a job bound to its
+                                    base port, made after `up` and `start` alike
+      owed/                   ←     paying the namespace drops a clean deferred, whenever a run
+                                    finds their shared service up
+      addressing/             ←     `run addressing`: switch the mode, settle the worktrees' .env
+      concurrency/            ←     the question about the other worktrees' jobs (load or
+                                    port clash, `--exclusive`/`--parallel`), shared by `up` and `start`
       up/ down/ start/        ←     one package per command, as everywhere else
       stop/ logs/ open/ url/
       list/                   ←     `run list`: which entry was picked and what to do to it
       job/ profile/           ←     CRUD on run.toml's declarations, one package per group
+      initrun/                ←     `run init`: detect, ask (the services wizard is its own
+                                    `Wizard` seam, not a flow.Session), write run.toml,
+                                    compose and .env files
   service/                    ← impure orchestration only (git exec, I/O, hooks):
     worktree/                 ←   git worktree operations (create, list, remove)
     env/                      ←   .env provisioning (create) + drift reconciliation (`wtm env`, sync.go)
-    hooks/                    ←   on_create hook execution
+    hooks/                    ←   on_create / on_clean hook execution (a /bin/sh line each)
     shell/                    ←   shell integration generation (zsh, bash, fish)
     integration/              ←   third-party adapters: handing a URL to the desktop's
                                   own opener (editor/agent detection lives in detect/)
     proxy/                    ←   the run proxy: the host→job routing table and the
                                   loopback server the daemon owns (`[proxy]`)
     detect/                   ←   auto-detection (base branch, env files, package manager)
+    branch/                   ←   branch candidates for the pickers (local + origin, divergence)
+    github/                   ←   pull requests through the `gh` CLI
+    selfupdate/               ←   how wtm was installed, and `wtm upgrade`
+    process/                  ←   the run daemon: jobs on PTYs, the durable index (jobs.json),
+                                  reaping orphans, the client the commands talk through
+    runconfig/                ←   load + validate + write run.toml (and its schema)
+    runjobs/                  ←   the daemon's jobs as a surface reads them (the dashboard too)
+    compose/                  ←   a compose file's `ports:` and absolute names, read and rewritten
+    portprobe/                ←   is anything listening on a port
+    shellcmd/                 ←   checks that a config command is a valid /bin/sh line
   output/                     ← format and print results (zero decision logic)
   styles/                     ← all Lipgloss styles (only package allowed to instantiate lipgloss.Style)
   tui/                        ← Bubbletea models (zero business logic, rendering only)
@@ -181,7 +207,7 @@ internal/
 
 **Three rules hold the glyph vocabulary together**, and they are the half that was missing when the table alone let sixty commands diverge. The glyph carries the **only colour on its line** — the message stays in the terminal's own foreground, so a block reads as text with a margin of signals; `=` and `›` are the exception and mute their line whole, because there the line *is* the non-event. Every glyph is **one column** — no badges outside the TUI. And `Muted` has **exactly two jobs**: chrome (a field's label, a table's header, a tree's connectors) and a non-event line; **secondary detail is indented, never muted**. Two failure registers only — `!` for something left to do, `✗` for a failure — so `output.Danger` is gone. The runes live in `domain` (`GlyphSuccess`, `GlyphAttention`, …), never as literals in `output/`. The four block helpers are arbitrated by shape: `SectionTitle` for a caller drawing its own body, **`Announce` for `label  value` rows** (it owns the alignment — never hand-space a label inside a format string), `Section` for free lines, `Callout` — the only bordered one — for what the reader still has to act on. And "each command frames its human output exactly once" counts *uninterrupted blocks*: a prompt between two blocks makes two frames, as does a split across the two streams.
 
-- **Success contracts, anomaly expands.** A pass that did exactly what was asked is a count; a refusal, a conflict or a link matching nothing is named one by one. The port pass is the reference: `rules.EnvPortAnomalyLines` still lists every link wtm declined to act on, while the twelve values it settled are `4 ports shifted (+10)` on the recap's env line. Giving the nominal path as much room as the actionable one is what makes a CLI read as noise.
+- **Success contracts, anomaly expands.** A pass that did exactly what was asked is a count; a refusal, a conflict or a link matching nothing is named one by one. The port pass is the reference: `rules.EnvPortAnomalyLines` still lists every link wtm declined to act on, while the twelve values it settled are `4 ports settled (offset +10)` on the recap's env line. Giving the nominal path as much room as the actionable one is what makes a CLI read as noise.
 - **Detail belongs to the command whose subject it is.** Ports are the subject of `wtm env` and `run init`; in `create` and `extract` they are a side effect, so they collapse to one line there. A reader who wants the values runs the command that is about them — or opens the file the run just wrote.
 - **A successful run has a fixed shape.** What makes output feel bloated is that its size varies with what happened, so it can never be recognised at a glance. `wtm create` is six lines whether it settled three ports or thirty.
 
@@ -200,7 +226,7 @@ Steps are declared as `flow.Step` values (`Kind`, `Key`, `Label`, `Options`, `Sk
 
 **`flow.Operation`** (`Kind`, `Mode`, `TargetKey`) is what a flow declares about *how it is scheduled*, for a surface that runs several at once. `Mode` says how long it holds that surface — `ModeBlocking` (`clean`) keeps it until the run ends, `ModeBackground` (`create`) gives it back and locks its target instead — and `TargetKey` names the answer carrying the worktree it locks, known only once that step is answered. The CLI ignores it (one run, one terminal); `internal/tui/dashboard/ops.go` is where it is enforced, once, rather than at every action site.
 
-Adding a kind means teaching every surface to render it: `flowui` refuses an unknown kind rather than guessing. Test doubles for the two seams live in `internal/testutil/flowtest`. `create`, `clean`, `reparent`, `prune`, `sync` and the whole `run` module are migrated — `up`, `down`, `start`, `stop`, `logs`, `list`, `open`, `url` and the eight `run job` / `run profile` commands (`ps` asks nothing, so it is not a flow). **Four mutation commands are still out: `extract` (LUC-182), `checkout`, `relocate` and `env`**, each driving its service straight from its runner. They are listed in `.archlint-migrating`, which reports them on every `make lint` and may only shrink — `tui/newwt` stays until `extract` follows.
+Adding a kind means teaching every surface to render it: `flowui` refuses an unknown kind rather than guessing. Test doubles for the two seams live in `internal/testutil/flowtest`. `create`, `clean`, `reparent`, `prune`, `sync`, `fast-forward` and the whole `run` module are migrated — `up`, `down`, `start`, `stop`, `logs`, `list`, `open`, `url`, `init`, `addressing` and the eight `run job` / `run profile` commands (`ps` asks nothing, so it is not a flow). **Four mutation commands are still out: `extract` (LUC-182), `checkout`, `relocate` and `env`**, each driving its service straight from its runner. They are listed in `.archlint-migrating`, which reports them on every `make lint` and may only shrink — `tui/newwt` stays until `extract` follows.
 
 A **non-mutating mode** (`prune --dry-run`) belongs in the `Request`, not in the runner: it changes what the run does, not how it reads. The flow returns its `Outcome` before asking anything and before touching anything, and any rule that reads `Interactive()` must take the mode as an input too — a surface may install an interactive Prompter for a preview. See `rules.PruneClassifyForce` and `docs/dev/flow-layer.md`.
 
@@ -212,16 +238,17 @@ Omitting the positional resolves in one of two ways, and which one is not a matt
 
 Whatever answers, a resolved worktree is always **the worktree root as git spells it** (`infra.Toplevel`), never a raw `os.Getwd()`. The daemon keys a job on `name + WorkDir` by string equality *and* runs it there, resolving `run.toml`'s `cwd` against it: a subdirectory, or macOS's `/var` where git says `/private/var`, splits one worktree into two keys and mis-resolves every relative `cwd`.
 
-**Mutation commands — bypass flags (two orthogonal axes):** every worktree-mutating command (`create`, `clean`, `sync`, `prune`, `relocate`, `reparent`, `extract`, `checkout`, `env`) exposes bypass on two independent axes. This is the standardized model (aligned with `gcloud --quiet`, `terraform -input=false`, `apt -y` vs `--force-yes`, and [clig.dev](https://clig.dev)); every new or refactored mutation command MUST follow it.
+**Mutation commands — bypass flags (two orthogonal axes):** every worktree-mutating command (`create`, `clean`, `sync`, `fast-forward`, `prune`, `relocate`, `reparent`, `extract`, `checkout`, `env`) exposes bypass on two independent axes. This is the standardized model (aligned with `gcloud --quiet`, `terraform -input=false`, `apt -y` vs `--force-yes`, and [clig.dev](https://clig.dev)); every new or refactored mutation command MUST follow it.
 - **`--yes` / `-y` = the confirmation/decision axis — runs fully unattended, zero prompts.** Every input resolves in one of three ways, no interaction:
   1. **Decision / confirmation** (recap, reparent, push, on-conflict, fast-forward) → its flag value, else a documented **safe default** (never destructive: `sync --yes` does not push — use `--push`; `extract --yes` aborts on conflict; `clean`/`prune --yes` leave orphans unless `--reparent-children`).
   2. **Required selection with no safe default** (which files for `extract`, which worktrees for `sync`, source/branch args) → its flag/arg, else **error naming the missing flag**. Never fall back to an interactive picker under `--yes`.
   3. A picker only ever runs in a **fully interactive** run (no `--yes`, TTY, human output).
+- **`--yes` is the only spelling of that axis.** There is no `--non-interactive` (removed from `init` and `run init`, with no alias): a second flag for the same axis is how `wtm init --yes` came to answer only the re-init confirmation and still open a wizard. `init` and `run init` follow the model too — `--yes`, or no terminal, bootstraps from flags + detection and never prompts.
 - **`--force` = the safety axis, strictly separate.** It only lifts safety refusals (dirty / unpushed / open-PR / locked). It does **not** imply `--yes`: `--force` alone still runs the wizard and asks to confirm (thread `--force` into the wizard as a preset so refusals are lifted without re-asking). JSON mode requires `--yes`.
 
 Implementation rule: fold `--yes` into the command's `interactive` boolean (`interactive := isTTY && IsHumanFormat(format) && !yes`); every picker/prompt gates on `interactive`, and each required-selection guard returns a sentinel error when it is false. See `internal/commands/wt/extract.go`, and — for a migrated command — `internal/flow/sync/steps.go` (`selectionStep`'s `Resolve`, which names `--all` instead of falling back to a picker). Route decision defaults through a pure rule where one exists (`rules.DecidePush` takes a `Yes` field).
 
-**Recap completeness:** every recap builder reads the value from its wizard step, **else falls back to the flag/arg** that resolved it. A flag must never make a line disappear from the recap. A migrated command gets this from `Session.Presets` (a preset step is not asked but is still read back — see `internal/flow/create/steps.go` `createFlow.recap`); the others do it in their recap builder (e.g. `internal/tui/extract` `buildCombinedRecap`, `internal/tui/newwt` `buildCreateRecap`, `internal/tui/checkout` `buildCheckoutRecap`).
+**Recap completeness:** every recap builder reads the value from its wizard step, **else falls back to the flag/arg** that resolved it. A flag must never make a line disappear from the recap. A migrated command gets this from `Session.Presets` (a preset step is not asked but is still read back — see `internal/flow/create/steps.go` `createFlow.recap`); the others do it in their recap builder (e.g. `internal/tui/extract` `buildCombinedRecap`, `internal/tui/checkout` `buildCheckoutRecap`).
 
 **Re-init completeness:** a re-init step always shows the **complete** list of candidates, pre-filled from the config on disk when that config speaks about them, and from detection otherwise — never a subset. Any step whose answer may legitimately be empty is read as a pair `(value, asked)`: empty-and-asked withdraws, empty-and-not-asked leaves the proposal standing. The pairs are `URLsAsked`, `ProfilesAsked`, `EnvLinksAsked` and `SelectionAsked` in `domain.InitProjectAnswers`. This is the write-side counterpart of the rule above: a flag must not erase a recap line, and a step must not reinstate what the user removed.
 
@@ -231,6 +258,8 @@ Two corollaries a new step must respect. Its pre-fill reads the **existing confi
 
 Every commit message — subject and body — is written in **English**, whatever language the conversation that produced the change was held in. The repository, its code, its comments and its docs are in English; the history is read alongside them.
 
+**One exception: `CHANGELOG.md` is written in French.** It is addressed to the project's users rather than read alongside the code, and it has always been French; keep new entries in French, and keep commit messages in English even when they touch it.
+
 ## 11. Validate before commit
 
 `make lint` is the mechanical half of this file. It is not a formality: every rule in it exists because a reviewer would otherwise have to hold section 9 in their head on every PR, and the ones nobody holds are the ones that drift.
@@ -239,6 +268,7 @@ Every commit message — subject and body — is written in **English**, whateve
 make lint     # fmt + vet + arch + dead + staticcheck — all gating
 make test     # go test ./... -race -count=1
 make dupl     # clone report, informative only
+make dead-strict  # deadcode without -test: code only a test still reaches, informative only
 ```
 
 | Check | Catches | Why staticcheck cannot |
@@ -262,7 +292,7 @@ make dupl     # clone report, informative only
 
 The exceptions to `dead` live in `.deadcode-ignore`, one regex per line **with its reason** — reachable by a route the analysis cannot follow (a method satisfying an interface asserted on an `any`, so far). Anything unlisted fails.
 
-`.archlint-migrating` is the same idea for what predates a rule: `<rule> <path regex>` lines that report as `(migrating)` without failing. **It may only shrink.** A new entry is a decision to take knowingly and belongs in a ticket, never a way to get a commit past the linter.
+`.archlint-migrating` is the same idea for what predates a rule: `<rule> <path regex> <sites>` lines that report as `(migrating)` without failing. **It may only shrink**, and that is checked: each entry — like each rune of `fontLegacy` — records how many sites it covers, one site more fails `make lint`, and a count higher than needed is reported as a note to lower it. A new entry is a decision to take knowingly and belongs in a ticket, never a way to get a commit past the linter.
 
 `make dupl` is deliberately outside `lint`: a clone is a judgement call. Two parallel families over unrelated types — `flow/run/job` and `flow/run/profile` — read better duplicated than behind a generic, so the report informs a review rather than gating one.
 

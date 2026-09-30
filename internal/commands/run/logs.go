@@ -27,7 +27,14 @@ func newLogsCmd() *cobra.Command {
 			"--job focuses one of them; without it, every job is shown.\n" +
 			"Leaving the view detaches; the jobs keep running.\n" +
 			"Without a terminal, every job's output is written as prefixed lines instead.\n" +
-			fmt.Sprintf("--output json replays each job's last %d lines as [{job, at, text}], grouped by job, and never attaches.", domain.JobLogTailLines),
+			fmt.Sprintf("--output json replays each job's last %d lines as [{branch, path, lines: [{job, at, text}]}], one entry per worktree, and never attaches.", domain.JobLogTailLines),
+		Example: `  # Reopen the run view on this worktree's jobs
+  wtm run logs
+
+  wtm run logs feat/login --job api
+
+  # The last 1000 lines of each job, as JSON
+  wtm run logs feat/login --output json`,
 		Args: cobra.ArbitraryArgs,
 		RunE: runLogs,
 	}
@@ -73,8 +80,8 @@ type logsPresenter struct {
 }
 
 func (p logsPresenter) Show(show logsflow.ShowParams) error {
-	params := jobLinesParams{Cmd: p.Cmd, Board: show.Board, Job: show.Job, Worktrees: show.Worktrees}
-	switch rules.DecideRunSurface(rules.RunSurfaceParams{TTY: isTTY(), Format: p.Format}) {
+	params := jobLinesParams{Cmd: p.Cmd, Board: show.Board, Job: show.Job, Worktrees: show.Worktrees, WorkDirs: show.WorkDirs}
+	switch rules.DecideRunSurface(rules.RunSurfaceParams{TTY: runctx.IsTTY(), Format: p.Format}) {
 	case domain.RunSurfaceView:
 		// `run logs` starts nothing, so the view has no outcome to conclude from:
 		// it only ever reports what was already running.
@@ -96,8 +103,16 @@ type jobLinesParams struct {
 	// Job narrows the output to one job; empty takes every job the worktree has.
 	Job string
 	// Worktrees are what the board covers: more than one makes each prefix name
-	// where its lines came from.
+	// where its lines came from. WorkDirs are the same worktrees' paths.
 	Worktrees []string
+	WorkDirs  []string
+}
+
+func (p jobLinesParams) branchAt(index int) string {
+	if index < len(p.Worktrees) {
+		return p.Worktrees[index]
+	}
+	return ""
 }
 
 // prefixOf labels a job's lines, naming its worktree only above several of
@@ -126,7 +141,12 @@ func writeJobLogsJSON(params jobLinesParams) error {
 		return err
 	}
 
-	entries := []domain.JobLogEntry{}
+	logs := make([]domain.WorktreeLogs, 0, len(params.WorkDirs))
+	index := map[string]int{}
+	for i, workDir := range params.WorkDirs {
+		index[workDir] = i
+		logs = append(logs, domain.WorktreeLogs{Branch: params.branchAt(i), Path: workDir})
+	}
 	for _, view := range views {
 		lines, historyErr := params.Board.History(runlogs.HistoryParams{Job: view.Name, WorkDir: view.WorkDir})
 		if historyErr != nil {
@@ -136,15 +156,17 @@ func writeJobLogsJSON(params jobLinesParams) error {
 			output.Error(output.Barred(params.Cmd.ErrOrStderr()), fmt.Sprintf("%s: %v", view.Name, historyErr))
 			continue
 		}
+		i, ok := index[view.WorkDir]
+		if !ok {
+			i = len(logs)
+			index[view.WorkDir] = i
+			logs = append(logs, domain.WorktreeLogs{Branch: view.Worktree, Path: view.WorkDir})
+		}
 		for _, line := range lines {
-			entry := rules.ParseLogLine(rules.ParseLogLineParams{Job: view.Name, Line: line})
-			if len(params.Worktrees) > 1 {
-				entry.Worktree = view.Worktree
-			}
-			entries = append(entries, entry)
+			logs[i].Lines = append(logs[i].Lines, rules.ParseLogLine(rules.ParseLogLineParams{Job: view.Name, Line: line}))
 		}
 	}
-	return output.WriteJobLogsJSON(params.Cmd.OutOrStdout(), entries)
+	return output.WriteJobLogsJSON(params.Cmd.OutOrStdout(), logs)
 }
 
 // writeJobLines is `run logs` with no terminal to draw on: one prefixed line per

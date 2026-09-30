@@ -414,6 +414,8 @@ func (m Model) finishOp(msg opDoneMsg) (Model, tea.Cmd) {
 	// RUN section say, and waiting for the next poll to notice is what made a
 	// finished run look like nothing had happened.
 	detailCmd = tea.Batch(detailCmd, m.loadJobsCmd(true))
+	m, rowsCmd := m.refreshRows()
+	detailCmd = tea.Batch(detailCmd, rowsCmd)
 	// ErrAborted is a run that already reported its own failure — a cascade whose
 	// steps each said what became of them. A second, redundant line under them
 	// would name nothing the panel does not already hold.

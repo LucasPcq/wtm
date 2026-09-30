@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -45,5 +46,63 @@ func TestIsolationApplies(t *testing.T) {
 		if got := IsolationApplies(tc.cfg); got != tc.want {
 			t.Errorf("%s: IsolationApplies = %v, want %v", tc.name, got, tc.want)
 		}
+	}
+}
+
+func TestIsolationAdoptionPending(t *testing.T) {
+	compose := domain.RunConfig{Jobs: []domain.JobConfig{{Name: "db", Cmd: "docker compose up -d"}}}
+	cases := []struct {
+		name     string
+		params   IsolationAdoptionPendingParams
+		expected bool
+	}{
+		{"a worktree that never chose", IsolationAdoptionPendingParams{Config: compose}, true},
+		{"a worktree that chose", IsolationAdoptionPendingParams{Config: compose, Recorded: domain.IsolationIsolated}, false},
+		{"the main checkout", IsolationAdoptionPendingParams{Config: compose, IsMain: true}, false},
+		{"nothing to isolate", IsolationAdoptionPendingParams{}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsolationAdoptionPending(tc.params); got != tc.expected {
+				t.Errorf("IsolationAdoptionPending = %v, want %v", got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestDefaultComposeProjectNameFollowsDocker(t *testing.T) {
+	if got := DefaultComposeProjectName("Feat.Old_1-x"); got != "featold_1-x" {
+		t.Errorf("DefaultComposeProjectName = %q, want %q", got, "featold_1-x")
+	}
+}
+
+func TestIsolationAdoptOptionLabelNamesBothProjects(t *testing.T) {
+	label := IsolationAdoptOptionLabel(domain.IsolationAdoptionPlan{Pending: true, ComposeProject: "repo-feat-x", CurrentComposeProject: "repo"})
+	if !strings.Contains(label, "repo-feat-x") || !strings.Contains(label, "(repo_*)") {
+		t.Errorf("label = %q, want the new project and the volumes left behind", label)
+	}
+}
+
+func TestIsolationIgnoredWarningOnlyWhenTheFlagWasOverruled(t *testing.T) {
+	if got := IsolationIgnoredWarning(IsolationIgnoredParams{Branch: "feat/x", Current: domain.IsolationIsolated}); got != "" {
+		t.Errorf("no flag: warning = %q, want none", got)
+	}
+	if got := IsolationIgnoredWarning(IsolationIgnoredParams{Branch: "feat/x", Requested: domain.IsolationIsolated, Current: domain.IsolationIsolated}); got != "" {
+		t.Errorf("flag matching the worktree: warning = %q, want none", got)
+	}
+	got := IsolationIgnoredWarning(IsolationIgnoredParams{Branch: "feat/x", Requested: domain.IsolationVerbatim, Current: domain.IsolationIsolated})
+	for _, want := range []string{"--isolation verbatim", "feat/x already exists", "isolated", "wtm env feat/x --isolation verbatim"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("warning = %q, want it to contain %q", got, want)
+		}
+	}
+}
+
+func TestIsolationRecapShownWhenAskedOrFlagged(t *testing.T) {
+	if IsolationRecapShown(IsolationRecapShownParams{}) {
+		t.Error("never posed, never flagged: no line")
+	}
+	if !IsolationRecapShown(IsolationRecapShownParams{Applies: true}) || !IsolationRecapShown(IsolationRecapShownParams{Override: domain.IsolationVerbatim}) {
+		t.Error("a posed step or a flag keeps its line")
 	}
 }

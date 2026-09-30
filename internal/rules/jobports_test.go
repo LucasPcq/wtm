@@ -175,26 +175,6 @@ func TestPortDeclarationsAreStable(t *testing.T) {
 	}
 }
 
-func TestLabelWithPorts(t *testing.T) {
-	tests := []struct {
-		name  string
-		ports map[string]int
-		want  string
-	}{
-		{"no declaration leaves the line alone", nil, "web started"},
-		{"one port", map[string]int{"PORT": 3010}, "web started · PORT=3010"},
-		{"several are sorted", map[string]int{"PORT": 3010, "ADMIN": 9010}, "web started · ADMIN=9010 PORT=3010"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := LabelWithPorts(LabelWithPortsParams{Label: "web started", Ports: tt.ports})
-			if got != tt.want {
-				t.Errorf("got %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestParsePorts(t *testing.T) {
 	ports, err := ParsePorts([]string{"PORT=3000", " DB_PORT = 5432 "})
 	if err != nil {

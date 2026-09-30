@@ -201,28 +201,6 @@ func TestAheadBehind(t *testing.T) {
 	}
 }
 
-func TestUpdateLocalBranchToRemote(t *testing.T) {
-	dir := gittest.InitRepo(t)
-
-	// local "feat" at the base commit, not checked out (HEAD stays on main).
-	runGit(t, dir, "branch", "feat")
-
-	// origin/feat = base + 1 commit, so feat is behind by 1.
-	runGit(t, dir, "checkout", "-b", "tmp")
-	runGit(t, dir, "commit", "--allow-empty", "-m", "remote-only")
-	runGit(t, dir, "update-ref", "refs/remotes/origin/feat", "HEAD")
-	runGit(t, dir, "checkout", "-")
-	runGit(t, dir, "branch", "-D", "tmp")
-
-	if err := UpdateLocalBranchToRemote(UpdateLocalBranchToRemoteParams{ProjectDir: dir, Branch: "feat"}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if got, want := revParse(t, dir, "feat"), revParse(t, dir, "origin/feat"); got != want {
-		t.Errorf("feat = %s, want origin/feat = %s", got, want)
-	}
-}
-
 func runGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
 	cmd := exec.Command("git", args...)

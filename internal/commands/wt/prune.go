@@ -18,7 +18,7 @@ import (
 func newPruneCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   domain.CmdPrune,
-		Short: "Remove finished worktrees (merged, closed PR, gone, or old) in one pass",
+		Short: "Remove finished worktrees (merged, closed PR or gone) in one pass",
 		Long: "Batch-remove worktrees whose work is done, reparenting any surviving children onto\n" +
 			"their grandparent (like `clean --reparent-children`). Whether work is \"done\" is read\n" +
 			"from GitHub via the `gh` CLI — never guessed from local commits — so squash- and\n" +
@@ -34,7 +34,7 @@ func newPruneCmd() *cobra.Command {
 			"\n" +
 			"On a TTY, matches are shown for review (unsafe ones unchecked), then a prune\n" +
 			"confirmation, then — like clean — a dedicated confirmation to reparent surviving\n" +
-			"children onto their grandparent (or leave them orphaned). The main worktree and base\n" +
+			"children onto their grandparent (or leave them orphaned). The main checkout and base\n" +
 			"branch are always protected; the current worktree is removed and the shell\n" +
 			"redirected to the base repo. Like clean, worktrees that are dirty, have unpushed\n" +
 			"commits, or have an open PR are unsafe and need --force. Use --yes to skip the\n" +
@@ -44,7 +44,20 @@ func newPruneCmd() *cobra.Command {
 			"Like clean, prune gives back the data the removed worktrees carved out of shared\n" +
 			"services (--keep-data withholds it); when such a service is down, the form asks whether\n" +
 			"to start it and drop the data now, or keep it until the service next starts. --yes keeps\n" +
-			"it; --drop-data drops it, starting the services that are down.",
+			"it; --drop-data drops it, starting the services that are down.\n" +
+			"\n" +
+			"Each worktree goes through clean's whole sequence — jobs stopped, hooks, removal, then its\n" +
+			"data — before the next one starts. The first that fails stops the prune: the ones before\n" +
+			"it are gone with their data, it and the ones after keep theirs, and the report (and the\n" +
+			"`failed` field of --output json) names where it stopped.",
+		Example: `  # Review every finished worktree, then confirm
+  wtm prune
+
+  # Only show what would go
+  wtm prune --dry-run
+
+  # Every worktree whose PR was merged, no prompts
+  wtm prune --merged --yes --reparent-children`,
 		Args: cobra.NoArgs,
 		RunE: runPrune,
 	}

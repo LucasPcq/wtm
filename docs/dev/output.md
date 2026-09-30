@@ -77,7 +77,7 @@ The pill is the contrast element and stays rare. A one-line conclusion in a box 
 ┃  ✓ Created worktree feat/x
 ┃
 ┃  from  main
-┃  env   main · 4 port(s) shifted (+10)
+┃  env   main · 4 ports settled (offset +10)
 ┃  path  .worktrees/feat-x
 ┃
 ┃  → wtm go feat/x
@@ -100,7 +100,7 @@ One nuance that is not a matter of taste: a **destructive** run names what it de
 
 ### A run's addresses
 
-A run is the one conclusion that lists addresses, and it does it once: each job line carries a single fragment (`rules.ReachSummary` — the URL, `:5432`, `3 urls`, `6 ports`), and the full list is the **Where to reach it** block (`rules.ReachLines`) the run ends on, the run view shows behind `a`, and its recap keeps. A port list on a job line is how `docker-compose` came to take 160 columns; see [run-addressing.md](run-addressing.md#where-to-reach-it--one-model-for-every-surface).
+A run is the one conclusion that lists addresses, and it does it once: each job line carries a single fragment (`rules.ReachSummary` — the URL, `:5432`, `3 urls`, `6 ports`), and the full list is the **Where to reach it** block (`rules.ReachBlock`) the run ends on, the run view shows behind `a`, and its recap keeps. A port list on a job line is how `docker-compose` came to take 160 columns; see [run-addressing.md](run-addressing.md#where-to-reach-it--one-model-for-every-surface).
 
 ## The glyph vocabulary
 
@@ -156,7 +156,7 @@ A **state readout** may not hide a non-event as a field value either. `not runni
 | `Section` | title + indented free lines | a script, a file's contents, a listing |
 | `Callout` | a bordered box | **only** something the reader still has to act on |
 
-`flow.Notice` carries that last distinction across the seam: `NoticeNote` is what the reader has nothing to do about — a property of the machine, or of the file that was just written — and takes `Section`; a warning carrying lines is what wtm declined to do, and keeps the border. The port pass is both at once: the links it left alone are bordered, `Addresses carry the proxy's port` is not.
+`flow.Notice` carries that last distinction across the seam: `NoticeNote` is what the reader has nothing to do about — a property of the machine, or of the file that was just written — and takes `Section`; a warning carrying lines is what wtm declined to do, and keeps the border. The port pass is both at once: the links it left alone are bordered, `Addresses carry the proxy's port` is not — and that one is said by `wtm env` and `wtm run addressing`, whose subject it is, never by a creation (`rules.EnvPortNoticesOnCreate`).
 
 The alignment belongs to `Announce`, never to the wording: a format string spelling `"State      %s"` hand-aligns one block against nothing, and its sibling three files away picks a different column.
 
@@ -179,6 +179,17 @@ It never touches a machine contract: `--output json` still emits its document, a
 The corollary is easy to lose. `domain.ErrAborted` means *the command already printed its own report*, and that stops being true the moment the report went to `io.Discard`: a run that exits non-zero having written nothing to either stream cannot be told from one that hung. So `--quiet` records that it silenced the writers, `Execute` prints the error even for `ErrAborted` when it did, and a site returning that sentinel over a refusal wraps its cause (`fmt.Errorf("%w: %s", domain.ErrAborted, …)`) so there is something to print. The same rule reaches the hook runner: with no reporter installed nobody has drawn the hook's result line, so `service/hooks` names the failing command in the error rather than leaving it anonymous.
 
 It is orthogonal to `--yes`, like the two bypass axes: `--quiet` still asks, `--yes` still reports, and a script that wants neither passes both.
+
+## The machine contract
+
+`--output json` is read by programs, so its shape is decided once and never follows what happened. Four rules hold for the `run` module, and a new document follows them rather than its neighbour:
+
+- **One shape per command.** A command that acts on worktrees answers with an array of per-worktree documents even for one worktree (`run up`, `run down`, `run stop`, `run logs`); a single-subject command answers with one object (`run start`, `run job|profile add|edit|rm`). A shape that changed with the arity made every caller branch on how many worktrees it had named.
+- **A worktree is `branch` + `path`**, both, always — never `worktree` or `work_dir`. `domain.WorktreeRef` is the type when nothing else rides along. A job object is keyed `name`; anything pointing at a job from another object calls it `job`.
+- **`status` never claims an act that did not happen.** A stop that found nothing up is `not_running`, never `stopped`; a start that found the service already up is `already_running`, never `started`; a shared job let go of is `released`.
+- **Exit codes are part of the document.** `rules.ExitCode` maps the sentinels: `2` for a command line cobra refused (`cmd/usage.go` wraps its flag and argument errors, and an unknown `--output`, in `domain.ErrUsage`), `14` for a job or profile run.toml does not declare (`ErrJobNotFound`, `ErrProfileNotFound`), checked by `target.RequireDeclared` before a flow asks anything or wakes the daemon.
+
+A document that is a protocol elsewhere is not reused for output: `domain.JobInfo` is what the daemon speaks, so `run ps` writes `domain.RunningJob`, and renaming a key there never needs a daemon restart. `run list`, `run export` and `run import` are the exception to the naming rule on purpose — they are run.toml as JSON, and keep its keys (`job`, `profile`, `env_port`).
 
 ## Showing without keeping
 

@@ -34,7 +34,7 @@ func portedProject(t *testing.T) string {
 
 func projectFile(t *testing.T, rel string) string {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(os.Getenv("WTM_PROJECT_DIR"), rel))
+	data, err := os.ReadFile(filepath.Join(os.Getenv(domain.EnvProjectDir), rel))
 	if err != nil {
 		t.Fatalf("read %s: %v", rel, err)
 	}
@@ -44,7 +44,7 @@ func projectFile(t *testing.T, rel string) string {
 func TestRunInitWritesThePortKeyUnderTheFlag(t *testing.T) {
 	stateDir := portedProject(t)
 
-	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive, "--"+domain.FlagWritePortKeys); err != nil {
+	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes, "--"+domain.FlagWritePortKeys); err != nil {
 		t.Fatalf("run init: %v", err)
 	}
 
@@ -74,7 +74,7 @@ func TestRunInitWritesThePortKeyUnderTheFlag(t *testing.T) {
 func TestRunInitWritesNoPortKeyWithoutTheFlag(t *testing.T) {
 	portedProject(t)
 
-	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive); err != nil {
+	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes); err != nil {
 		t.Fatalf("run init: %v", err)
 	}
 
@@ -86,7 +86,7 @@ func TestRunInitWritesNoPortKeyWithoutTheFlag(t *testing.T) {
 func TestRunInitAddsTheEnvTargetItNeeds(t *testing.T) {
 	stateDir := portedProject(t)
 
-	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive, "--"+domain.FlagWritePortKeys); err != nil {
+	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes, "--"+domain.FlagWritePortKeys); err != nil {
 		t.Fatalf("run init: %v", err)
 	}
 
@@ -105,11 +105,11 @@ func TestRunInitAddsTheEnvTargetItNeeds(t *testing.T) {
 func TestRunInitLeavesTheTemplateItDidNotFind(t *testing.T) {
 	portedProject(t)
 
-	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive, "--"+domain.FlagWritePortKeys); err != nil {
+	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes, "--"+domain.FlagWritePortKeys); err != nil {
 		t.Fatalf("run init: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(os.Getenv("WTM_PROJECT_DIR"), "apps/web/.env.example")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(os.Getenv(domain.EnvProjectDir), "apps/web/.env.example")); !os.IsNotExist(err) {
 		t.Fatal("wtm must not create a committed template nobody asked for")
 	}
 }
@@ -118,7 +118,7 @@ func TestRunInitPortKeysAreIdempotent(t *testing.T) {
 	stateDir := portedProject(t)
 
 	for i := 0; i < 2; i++ {
-		if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive, "--"+domain.FlagWritePortKeys); err != nil {
+		if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes, "--"+domain.FlagWritePortKeys); err != nil {
 			t.Fatalf("run init #%d: %v", i+1, err)
 		}
 	}
@@ -181,7 +181,7 @@ func commandRoutedProject(t *testing.T) string {
 func TestRunInitNotesTheCommandRouteWhenItWroteNothing(t *testing.T) {
 	commandRoutedProject(t)
 
-	stdout, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive)
+	stdout, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes)
 	if err != nil {
 		t.Fatalf("run init: %v", err)
 	}
@@ -194,7 +194,7 @@ func TestRunInitNotesTheCommandRouteWhenItWroteNothing(t *testing.T) {
 func TestRunInitDropsTheNoteAboutAJobItJustFixed(t *testing.T) {
 	commandRoutedProject(t)
 
-	stdout, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive, "--"+domain.FlagWritePortKeys)
+	stdout, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes, "--"+domain.FlagWritePortKeys)
 	if err != nil {
 		t.Fatalf("run init: %v", err)
 	}

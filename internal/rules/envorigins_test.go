@@ -172,6 +172,18 @@ func TestRewriteOrigin(t *testing.T) {
 			status: domain.EnvPortStatusRewrite,
 		},
 		{
+			name:   "credentials in the url survive the authority swap",
+			value:  "http://u:pw@localhost:4001/api",
+			want:   "http://u:pw@api-dev.feat-x.monorepo.localhost:10080/api",
+			status: domain.EnvPortStatusRewrite,
+		},
+		{
+			name:   "the IPv6 loopback anchors too",
+			value:  "http://[::1]:4001",
+			want:   "http://api-dev.feat-x.monorepo.localhost:10080",
+			status: domain.EnvPortStatusRewrite,
+		},
+		{
 			name:   "https on our own port is refused, never downgraded",
 			value:  "https://localhost:4001",
 			status: domain.EnvPortStatusSecureScheme,
@@ -275,6 +287,11 @@ func TestReduceOriginValue(t *testing.T) {
 			want:  "http://localhost:4001,https://app.example.com",
 		},
 		{
+			name:  "credentials survive the rewind",
+			value: "http://u:pw@api-dev.feat-x.monorepo.localhost:10080/api",
+			want:  "http://u:pw@localhost:4001/api",
+		},
+		{
 			name:  "a bare number is untouched",
 			value: "4011",
 			want:  "4011",
@@ -306,5 +323,12 @@ func TestReduceOriginValueCanonicalizes(t *testing.T) {
 
 	if main != named || main != ported {
 		t.Fatalf("three spellings of one setting must reduce equal: main=%q named=%q ported=%q", main, named, ported)
+	}
+}
+
+func TestRewriteOriginNamesAForeignHostWithoutItsCredentials(t *testing.T) {
+	got := rules.RewriteOrigin(rewriteParams("https://u:pw@api.staging.example.com/v1"))
+	if got.Status != domain.EnvPortStatusForeignHost || got.ForeignHost != "api.staging.example.com" {
+		t.Fatalf("got %+v, want foreign host api.staging.example.com", got)
 	}
 }

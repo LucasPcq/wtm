@@ -85,7 +85,7 @@ func TestRemovingAJobDropsItFromTouches(t *testing.T) {
 
 func TestRenamingAJobFollowsItsTouches(t *testing.T) {
 	cfg := touchingConfig()
-	out := RenameJobRefs(cfg, "pg", "postgres")
+	out := RenameJobRefs(RenameJobRefsParams{Config: cfg, From: "pg", To: "postgres"})
 	for _, job := range out.Jobs {
 		if job.Name == "reset" && (len(job.Touches) != 1 || job.Touches[0] != "postgres") {
 			t.Errorf("reset touches %v, want the new name", job.Touches)
@@ -133,7 +133,7 @@ func TestRenamingAJobFollowsItsRunnersAndEnvValues(t *testing.T) {
 	)
 	cfg.EnvValues = []domain.EnvValueLink{{File: ".env", Key: "DATABASE", Job: "pg", Value: "{namespace}"}}
 
-	out := RenameJobRefs(RenameJobRefs(cfg, "web", "front"), "pg", "postgres")
+	out := RenameJobRefs(RenameJobRefsParams{Config: RenameJobRefs(RenameJobRefsParams{Config: cfg, From: "web", To: "front"}), From: "pg", To: "postgres"})
 	for i := range out.Jobs {
 		switch out.Jobs[i].Name {
 		case "web":
@@ -153,5 +153,37 @@ func TestRenamingAJobFollowsItsRunnersAndEnvValues(t *testing.T) {
 	}
 	if cfg.Jobs[len(cfg.Jobs)-1].Runs[0] != "web" || cfg.EnvValues[0].Job != "pg" {
 		t.Error("the rename wrote through to the config it was given")
+	}
+}
+
+// A task a runner starts through `runs` changes the same data as one started by
+// hand: the guard reaches it through the runner the run names.
+func TestForeignDataRisksReachTheJobsARunnerStarts(t *testing.T) {
+	cfg := touchingConfig()
+	cfg.Jobs = append(cfg.Jobs, domain.JobConfig{Name: "dev", Kind: domain.JobKindService, Cmd: "turbo dev", Runs: []string{"wipe"}})
+	runner := cfg.Jobs[len(cfg.Jobs)-1]
+
+	if !DeclaresTouches(cfg, []domain.JobConfig{runner}) {
+		t.Fatal("DeclaresTouches missed the runner's child")
+	}
+	risks := ForeignDataRisks(ForeignDataParams{Config: cfg, Jobs: []domain.JobConfig{runner}, WorkDir: "/wt/x", Isolation: domain.IsolationIsolated})
+	if len(risks) != 1 || risks[0].Job != "wipe" || risks[0].Via != "dev" {
+		t.Fatalf("risks = %+v, want wipe reached through dev", risks)
+	}
+	if line := ForeignDataLines(ForeignDataLinesParams{Risks: risks})[0]; !strings.Contains(line, "run by dev") {
+		t.Errorf("line = %q, want the runner named", line)
+	}
+}
+
+// Isolating a worktree gives it its own copy of what its source owns, and
+// nothing of a shared service: the hint names the fix for the cause at hand.
+func TestForeignDataHintsFollowTheCause(t *testing.T) {
+	shared := ForeignDataHints([]domain.DataRisk{{Job: "wipe", Service: "minio", Owner: domain.DataOwnerEveryone}})
+	if len(shared) != 1 || strings.Contains(shared[0], "--isolation") || !strings.Contains(shared[0], "minio") {
+		t.Errorf("hints = %q, want a namespace on minio and no isolation", shared)
+	}
+	source := ForeignDataHints([]domain.DataRisk{{Job: "reset", Service: "pg", Owner: domain.DataOwnerSource}})
+	if len(source) != 1 || !strings.Contains(source[0], "--isolation isolated") {
+		t.Errorf("hints = %q, want the isolation named", source)
 	}
 }

@@ -23,11 +23,9 @@ type ConfigResult struct {
 	StateDir   string
 }
 
-// ProjectRoot returns the main worktree path. Works from any worktree —
-// resolves back to the parent repo. WTM_PROJECT_DIR overrides git resolution;
-// useful in tests and CI.
+// ProjectRoot returns the main checkout path from any worktree.
 func ProjectRoot(dir string) (string, error) {
-	if override := os.Getenv("WTM_PROJECT_DIR"); override != "" {
+	if override := os.Getenv(domain.EnvProjectDir); override != "" {
 		return override, nil
 	}
 	mainPath, err := infra.FindMainWorktreePath(infra.FindMainWorktreeParams{
@@ -80,7 +78,7 @@ func AddOutputFlag(cmd *cobra.Command) {
 
 // AddIsolationFlag registers --isolation on a command that creates a worktree.
 func AddIsolationFlag(cmd *cobra.Command) {
-	cmd.Flags().String(domain.FlagIsolation, "", "How the new worktree stands against its source: isolated (its own ports, compose project and service slices, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated")
+	cmd.Flags().String(domain.FlagIsolation, "", "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated")
 }
 
 // IsolationFlag reads --isolation, refusing a value that is neither answer.
@@ -93,17 +91,35 @@ func IsolationFlag(cmd *cobra.Command) (domain.Isolation, error) {
 // worktree is the positional subject there, as everywhere else in the CLI, so
 // the job or profile is named by a flag the way --to and --from are.
 func AddJobFlag(cmd *cobra.Command, usage string) {
-	cmd.Flags().String(domain.FlagJob, "", usage)
+	AddSingleFlag(cmd, domain.FlagJob, usage)
 }
 
 func AddProfileFlag(cmd *cobra.Command, usage string) {
-	cmd.Flags().String(domain.FlagProfile, "", usage)
+	AddSingleFlag(cmd, domain.FlagProfile, usage)
 }
 
-// AddProfilesFlag is the same axis where several profiles make sense at once —
-// `run up` starting two products' stacks in one go.
-func AddProfilesFlag(cmd *cobra.Command, usage string) {
-	cmd.Flags().StringSlice(domain.FlagProfile, nil, usage)
+// AddSingleFlag is a string flag that refuses to be given twice, where pflag
+// would keep the last value and act on it without a word.
+func AddSingleFlag(cmd *cobra.Command, name, usage string) {
+	cmd.Flags().Var(&singleValue{}, name, usage)
+}
+
+type singleValue struct {
+	value string
+	set   bool
+}
+
+func (v *singleValue) String() string { return v.value }
+
+// Type is "string" so GetString reads it like any other string flag.
+func (v *singleValue) Type() string { return "string" }
+
+func (v *singleValue) Set(value string) error {
+	if v.set {
+		return fmt.Errorf(domain.FlagGivenTwiceFmt, v.value)
+	}
+	v.value, v.set = value, true
+	return nil
 }
 
 // AddYesFlag adds the confirmation axis. It is the only thing that turns prompts
@@ -111,24 +127,6 @@ func AddProfilesFlag(cmd *cobra.Command, usage string) {
 // here.
 func AddYesFlag(cmd *cobra.Command, usage string) {
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, usage)
-}
-
-// AddNoPromptFlags registers the two spellings `run init` accepts for one axis:
-// --yes, which every other mutation command uses, and the older
-// --non-interactive it shipped with. NoPrompt reads whichever was passed.
-//
-// `wtm init` is deliberately not on this: there --yes is already the
-// confirmation of a re-init, a different question from whether to prompt at
-// all, and folding the two would answer one with the other.
-func AddNoPromptFlags(cmd *cobra.Command, usage string) {
-	AddYesFlag(cmd, usage)
-	cmd.Flags().Bool(domain.FlagNonInteractive, false, usage)
-}
-
-func NoPrompt(cmd *cobra.Command) bool {
-	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
-	nonInteractive, _ := cmd.Flags().GetBool(domain.FlagNonInteractive)
-	return yes || nonInteractive
 }
 
 // Unattended folds --yes into the prompt-capability gate: a human format, on a
@@ -144,15 +142,11 @@ func Interactive(params UnattendedParams) bool {
 }
 
 // RequireRunInitialized enforces the run-module opt-in guard: the module counts
-// as initialized once run.toml declares at least one job or profile. Blocked run
-// commands call this after loading run.toml; the creation paths (run init,
-// run job/profile add, run import) skip it. On failure it returns
-// ErrRunNotInitialized (wrapped, with the experimental notice on a second line)
-// so the top-level handler prints the pedagogical message and picks the
-// dedicated exit code; it does not print anything itself.
+// as initialized once run.toml declares at least one job or profile. The
+// creation paths (run init, run job/profile add, run import) skip it.
 func RequireRunInitialized(cfg domain.RunConfig) error {
 	if rules.IsRunInitialized(cfg) {
 		return nil
 	}
-	return fmt.Errorf("%w\n%s", domain.ErrRunNotInitialized, domain.ExperimentalRunNotice)
+	return domain.ErrRunNotInitialized
 }

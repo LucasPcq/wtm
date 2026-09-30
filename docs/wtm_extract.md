@@ -26,6 +26,19 @@ A file that merely already exists in the target counts as a conflict too.
 wtm extract [source] [flags]
 ```
 
+### Examples
+
+```
+  # Pick the source, the files and the target
+  wtm extract
+
+  # Move a directory's changes to a new branch
+  wtm extract feat/login --files apps/api --to feat/login-api --yes
+
+  # Copy one file instead, onto a branch stacked on the source
+  wtm extract feat/login --files apps/web/login.ts --to feat/login-web --from feat/login --keep --yes
+```
+
 ### Options
 
 ```
@@ -33,7 +46,7 @@ wtm extract [source] [flags]
       --files strings        Files to extract, or a directory to take everything below it (skips interactive selection)
       --from string          Parent branch when creating the target worktree
   -h, --help                 help for extract
-      --isolation string     How the new worktree stands against its source: isolated (its own ports, compose project and service slices, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated
+      --isolation string     How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated
       --keep                 Copy instead of move (keep the changes in the source)
       --on-conflict string   On conflict: abort (default) or resolve (write conflict markers in the target)
       --output string        Output format: text or json (default "text")

@@ -16,7 +16,9 @@
 
 set -uo pipefail
 
-command=$(jq -r '.tool_input.command // ""' 2>/dev/null)
+input=$(cat)
+command=$(jq -r '.tool_input.command // ""' <<<"$input" 2>/dev/null)
+hook_cwd=$(jq -r '.cwd // ""' <<<"$input" 2>/dev/null)
 
 # Anchored so `git log --grep=commit` and a message that merely says "git
 # commit" do not pay for a lint run. A commit is the first word of the command
@@ -29,7 +31,19 @@ if [[ "${WTM_SKIP_GATES:-}" == "1" ]]; then
   exit 0
 fi
 
-root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+# The worktree being committed, not the one this session started in: a
+# subagent commits from its own worktree with `git -C <dir>` or `cd <dir> &&`.
+target=$(grep -Eo 'git[[:space:]]+-C[[:space:]]+[^[:space:];&|]+' <<<"$command" | head -1 | awk '{print $3}')
+if [[ -z "$target" ]]; then
+  target=$(grep -Eo '(^|[;&|])[[:space:]]*cd[[:space:]]+[^[:space:];&|]+' <<<"$command" | tail -1 | awk '{print $NF}')
+fi
+target=${target/#\~/$HOME}
+target=${target//\"/}
+target=${target//\'/}
+[[ -n "$target" ]] || target=${hook_cwd:-$PWD}
+[[ "$target" = /* ]] || target="${hook_cwd:-$PWD}/$target"
+
+root=$(git -C "$target" rev-parse --show-toplevel 2>/dev/null) || exit 0
 cd "$root" || exit 0
 [[ -f Makefile && -f go.mod ]] || exit 0
 

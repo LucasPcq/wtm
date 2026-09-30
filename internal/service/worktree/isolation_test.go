@@ -2,9 +2,12 @@ package worktree
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 )
 
 func TestIsolationOfAWorktreeWithNoRecordIsIsolated(t *testing.T) {
@@ -103,5 +106,35 @@ func TestBranchEnvOfAVerbatimWorktreeRunsOnTheBasePorts(t *testing.T) {
 	}
 	if verbatim[domain.EnvIsolation] != string(domain.IsolationVerbatim) {
 		t.Errorf("%s = %q, want verbatim for the daemon to read", domain.EnvIsolation, verbatim[domain.EnvIsolation])
+	}
+}
+
+func TestIsolationAdoptionForALegacyWorktreeAllocatesNothing(t *testing.T) {
+	repo := newOrdinalRepo(t)
+	writeRunConfig(t, repo.stateDir, composeJobConfig)
+	path := repo.addWorktree(t, "feat/x")
+	ref := WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "feat/x"}
+
+	plan, err := IsolationAdoptionFor(IsolationAdoptionParams{Ref: ref, WorktreePath: path})
+	if err != nil {
+		t.Fatalf("IsolationAdoptionFor: %v", err)
+	}
+
+	want := rules.ComposeProjectName(rules.ComposeProjectNameParams{Project: filepath.Base(repo.dir), Worktree: "feat-x"})
+	if !plan.Pending || plan.ComposeProject != want || plan.CurrentComposeProject != rules.DefaultComposeProjectName(filepath.Base(path)) {
+		t.Errorf("plan = %+v, want pending, %q, and the directory's own project", plan, want)
+	}
+	if _, err := os.Stat(filepath.Join(rules.WorktreeMetaDir(repo.stateDir, "feat/x"), domain.MetaFileName)); !os.IsNotExist(err) {
+		t.Errorf("asking whether to adopt wrote a record (stat err = %v)", err)
+	}
+
+	writeEnv(t, path, "COMPOSE_PROJECT_NAME=kept\n")
+	if plan, _ := IsolationAdoptionFor(IsolationAdoptionParams{Ref: ref, WorktreePath: path}); plan.CurrentComposeProject != "kept" {
+		t.Errorf("current project = %q, want the .env's", plan.CurrentComposeProject)
+	}
+
+	recordIsolation(t, repo, "feat/x", domain.IsolationIsolated)
+	if plan, _ := IsolationAdoptionFor(IsolationAdoptionParams{Ref: ref, WorktreePath: path}); plan.Pending {
+		t.Error("a worktree that chose has nothing to adopt")
 	}
 }

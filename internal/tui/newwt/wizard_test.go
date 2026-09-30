@@ -96,3 +96,12 @@ func TestIsolationRecapLine(t *testing.T) {
 		t.Errorf("unasked isolation = %q, want the project's default", got)
 	}
 }
+
+// Aligned on create: a flag keeps its line even where run.toml declares
+// nothing, and the line is labelled after the step that asks it.
+func TestIsolationRecapLineFollowsTheCreateFlow(t *testing.T) {
+	line, shown := IsolationRecapLine(nil, WizardParams{IsolationOverride: domain.IsolationVerbatim})
+	if !shown || !strings.HasPrefix(line, "Isolation: ") {
+		t.Errorf("recap line = %q (shown=%v), want the flag's answer under Isolation:", line, shown)
+	}
+}

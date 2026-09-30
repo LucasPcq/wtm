@@ -111,8 +111,8 @@ func TestBranchEnvKeepsIdentityWhenRunConfigIsUnreadable(t *testing.T) {
 	}
 }
 
-// End to end: what run.toml declares reaches the on_clean that tears the stack
-// down, so a templated compose file no longer resolves ${DB_PORT} to nothing.
+// End to end: what run.toml declares reaches the on_clean of an isolated
+// worktree, so a templated compose file no longer resolves ${DB_PORT} to nothing.
 func TestRunCleanHooksSeesResolvedPorts(t *testing.T) {
 	repo := newOrdinalRepo(t)
 	writeRunConfig(t, repo.stateDir, `
@@ -123,6 +123,7 @@ cmd = "docker compose up"
 ports = { DB_PORT = 5432 }
 `)
 	path := repo.addWorktree(t, "feat/x")
+	recordIsolation(t, repo, "feat/x", domain.IsolationIsolated)
 	marker := filepath.Join(t.TempDir(), "seen")
 
 	var out bytes.Buffer

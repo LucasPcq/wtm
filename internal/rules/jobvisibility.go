@@ -154,3 +154,20 @@ func VisibleJobUptime(job VisibleJob, now time.Time) string {
 	}
 	return JobUptime(JobUptimeParams{Job: job.Info, Now: now})
 }
+
+type JobsOfLiveWorktreesParams struct {
+	Jobs   []domain.JobInfo
+	Exists map[string]bool
+}
+
+// JobsOfLiveWorktrees drops what the daemon still indexes for a worktree that
+// is gone, unless it is up: a stopped row there names a path nothing lives at.
+func JobsOfLiveWorktrees(params JobsOfLiveWorktreesParams) []domain.JobInfo {
+	kept := make([]domain.JobInfo, 0, len(params.Jobs))
+	for _, info := range params.Jobs {
+		if IsJobUp(info.Status) || params.Exists[info.WorkDir] {
+			kept = append(kept, info)
+		}
+	}
+	return kept
+}

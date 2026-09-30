@@ -227,9 +227,10 @@ func isLoopbackHost(host string) bool {
 	}
 }
 
-// splitOrigin cuts an element into its scheme and its authority, reporting
-// false for anything the proxy could not serve — a bare number, or a scheme it
-// does not speak, both of which belong to the port substitution instead.
+// splitOrigin cuts an element into its scheme and its host:port, credentials
+// left out, reporting false for anything the proxy could not serve — a bare
+// number, or a scheme it does not speak, both of which belong to the port
+// substitution instead.
 func splitOrigin(element string) (scheme, authority string, ok bool) {
 	at := strings.Index(element, domain.OriginSchemeSeparator)
 	if at < 0 {
@@ -239,26 +240,36 @@ func splitOrigin(element string) (scheme, authority string, ok bool) {
 	if scheme != domain.OriginSchemeHTTP && scheme != domain.OriginSchemeHTTPS {
 		return "", "", false
 	}
-	rest := element[at+len(domain.OriginSchemeSeparator):]
-	if end := strings.IndexAny(rest, "/?#"); end >= 0 {
-		rest = rest[:end]
-	}
-	if rest == "" {
+	_, hostPort, _ := splitAuthority(element[at+len(domain.OriginSchemeSeparator):])
+	if hostPort == "" {
 		return "", "", false
 	}
-	return scheme, rest, true
+	return scheme, hostPort, true
 }
 
-// replaceAuthority swaps everything up to the end of the authority for origin,
-// keeping path, query and fragment byte for byte — a redirect URL carrying a
+// splitAuthority cuts what follows the scheme into its credentials (with their
+// `@`), its host:port, and the path, query and fragment after them.
+func splitAuthority(rest string) (userinfo, hostPort, tail string) {
+	if end := strings.IndexAny(rest, "/?#"); end >= 0 {
+		rest, tail = rest[:end], rest[end:]
+	}
+	if at := strings.LastIndex(rest, domain.EnvCredentialsSeparator); at >= 0 {
+		return rest[:at+1], rest[at+1:], tail
+	}
+	return "", rest, tail
+}
+
+// replaceAuthority swaps the host and port for origin's, keeping credentials,
+// path, query and fragment byte for byte — a redirect URL carrying a
 // percent-encoded address must survive untouched.
 func replaceAuthority(element, origin string) string {
 	at := strings.Index(element, domain.OriginSchemeSeparator)
-	rest := element[at+len(domain.OriginSchemeSeparator):]
-	if end := strings.IndexAny(rest, "/?#"); end >= 0 {
-		return origin + rest[end:]
+	userinfo, _, tail := splitAuthority(element[at+len(domain.OriginSchemeSeparator):])
+	if userinfo == "" {
+		return origin + tail
 	}
-	return origin
+	cut := strings.Index(origin, domain.OriginSchemeSeparator) + len(domain.OriginSchemeSeparator)
+	return origin[:cut] + userinfo + origin[cut:] + tail
 }
 
 func splitHostPort(authority string) (host string, port int) {

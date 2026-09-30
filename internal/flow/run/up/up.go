@@ -4,21 +4,20 @@ package up
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/run/addressing"
+	"github.com/LucasPcq/wtm/internal/flow/run/concurrency"
 	"github.com/LucasPcq/wtm/internal/flow/run/foreigndata"
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
+	"github.com/LucasPcq/wtm/internal/flow/run/probes"
 	"github.com/LucasPcq/wtm/internal/flow/run/seam"
 	"github.com/LucasPcq/wtm/internal/flow/run/target"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
-	"github.com/LucasPcq/wtm/internal/service/runconfig"
 )
 
 type Request struct {
@@ -31,9 +30,9 @@ type Request struct {
 	// worktree roots git spells them. A surface that already knows a likely
 	// answer offers it; the selection stays exact.
 	Precheck []string
-	// Profiles are the profiles to start, in the order they were named. A job
-	// several of them list starts once.
-	Profiles []string
+	// Profile is the profile to start; empty leaves the step to ask, or to take
+	// the default one.
+	Profile string
 	// Exclusive and Parallel override the project's standing preference for one
 	// run. They are the concurrency step's Resolve, not a second axis.
 	Exclusive bool
@@ -98,14 +97,16 @@ type upFlow struct {
 	named []target.Resolved
 	// jobs and running are one reading of the daemon's index: what runs where,
 	// for the worktree badges and for the concurrency question.
-	jobs    []domain.JobInfo
-	running map[string]int
-	service runlogs.Service
-	// offsets memoizes each worktree's port offset for the clash check.
-	offsets map[string]int
+	jobs        []domain.JobInfo
+	running     map[string]int
+	service     runlogs.Service
+	concurrency *concurrency.Question
 }
 
 func (f *upFlow) run() (Outcome, error) {
+	if err := target.RequireDeclared(target.DeclaredParams{Config: f.request.Config, Profile: f.request.Profile}); err != nil {
+		return Outcome{}, err
+	}
 	named, err := target.NamedAll(target.ResolveAllParams{ProjectDir: f.ctx.ProjectDir, Queries: f.request.Worktrees})
 	if err != nil {
 		return Outcome{}, err
@@ -124,6 +125,7 @@ func (f *upFlow) run() (Outcome, error) {
 	if err := f.connect(); err != nil {
 		return Outcome{}, err
 	}
+	f.concurrency = f.question()
 
 	answers, err := f.prompter.Ask(f.session())
 	if errors.Is(err, domain.ErrUserAborted) {
@@ -133,13 +135,16 @@ func (f *upFlow) run() (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	if answers.Value(KeyConcurrency) == answerCancel {
+	if f.concurrency.Cancelled(answers) {
 		f.presenter.Notice(flow.AbortedNotice)
 		return Outcome{Aborted: true}, nil
 	}
+	if err := seam.RequireEnv(seam.RequireEnvParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, WorkDirs: f.workDirs(answers)}); err != nil {
+		return Outcome{}, err
+	}
 	// Before anything is stopped: a selection that is its own conflict must not
 	// cost the other worktrees their jobs first.
-	if clashes := rules.SelfPortClashes(f.startingClaims(answers)); len(clashes) > 0 {
+	if clashes := rules.SelfPortClashes(f.concurrency.StartingClaims(answers)); len(clashes) > 0 {
 		return Outcome{}, fmt.Errorf(domain.RunSelfPortClashFmt, strings.Join(rules.PortClashLines(clashes), "\n"))
 	}
 	if proceed, err := f.allowForeignData(answers); err != nil || !proceed {
@@ -149,11 +154,9 @@ func (f *upFlow) run() (Outcome, error) {
 		return Outcome{Aborted: err == nil}, err
 	}
 
-	if err := f.remember(answers); err != nil {
-		return Outcome{}, err
-	}
-	f.noticeOverridden(answers)
-	if err := f.clearOthers(answers); err != nil {
+	cfg, err := f.concurrency.Apply(answers)
+	f.request.Config = cfg
+	if err != nil {
 		return Outcome{}, err
 	}
 
@@ -184,7 +187,7 @@ func (f *upFlow) connect() error {
 	return f.presenter.Stage(flow.StageParams{
 		Message: domain.RunDaemonConnecting,
 		Work: func() error {
-			if err := process.EnsureDaemon(process.DaemonParams{
+			if err := process.EnsureCurrentDaemon(process.DaemonParams{
 				SocketPath: process.SocketPath(),
 				ProxyPort:  rules.ProxyPort(f.ctx.Config.Global),
 			}); err != nil {
@@ -199,99 +202,6 @@ func (f *upFlow) connect() error {
 			return nil
 		},
 	})
-}
-
-// remember writes the answer to run.toml when the user asked for it to stand.
-// It is never silent: a file changed without a word is a file nobody knows to
-// change back.
-func (f *upFlow) remember(answers flow.Answers) error {
-	answer := answers.Value(KeyConcurrency)
-	if !remembers(answer) {
-		return nil
-	}
-
-	cfg := f.request.Config
-	cfg.Concurrency = concurrencyOf(answer)
-	if err := runconfig.Save(runconfig.SaveParams{StateDir: f.ctx.StateDir, Config: cfg}); err != nil {
-		return fmt.Errorf("remember concurrency: %w", err)
-	}
-	f.request.Config = cfg
-	f.presenter.Status(flow.Notice{
-		Kind: flow.NoticeMessage,
-		Text: fmt.Sprintf(domain.RunConcurrencyRememberedFmt, cfg.Concurrency),
-	})
-	return nil
-}
-
-// noticeOverridden says the project's settled answer could not be applied to
-// this run. It is only ever reached where nobody could be asked: the safe
-// default destroys nothing, and a default that goes unsaid is a default nobody
-// can correct.
-func (f *upFlow) noticeOverridden(answers flow.Answers) {
-	if answers.Answered(KeyConcurrency) || !f.decideConcurrency(answers).Contradiction {
-		return
-	}
-	f.presenter.Status(warning(fmt.Sprintf(domain.RunConcurrencyOverriddenFmt,
-		f.request.Config.Concurrency, len(f.workDirs(answers)))))
-}
-
-// clearOthers stops the other worktrees' jobs when that is what was decided.
-// A worktree that refuses to stop is reported and the run carries on: the
-// answer was about this machine's load, not about a dependency.
-func (f *upFlow) clearOthers(answers flow.Answers) error {
-	if f.concurrency(answers) != domain.ConcurrencyExclusive {
-		return nil
-	}
-	others := f.otherWorktrees(answers)
-	if len(others) == 0 {
-		return nil
-	}
-
-	dirs := make([]string, 0, len(others))
-	for dir := range others {
-		dirs = append(dirs, dir)
-	}
-	sort.Strings(dirs)
-
-	client := process.NewClient(process.SocketPath())
-	// Reported after the stage, never inside it: a spinner owns the stream while
-	// it runs, so a line written under it is repainted over — and the block it
-	// opened is then marked open with nothing on screen to show for it.
-	var reports []flow.Notice
-	err := f.presenter.Stage(flow.StageParams{
-		Message: domain.RunStoppingOthers,
-		Work: func() error {
-			for _, dir := range dirs {
-				reports = append(reports, stopReport(client, dir))
-			}
-			return nil
-		},
-	})
-	if err != nil {
-		return err
-	}
-	for _, report := range reports {
-		f.presenter.Status(report)
-	}
-	return nil
-}
-
-func stopReport(client *process.Client, dir string) flow.Notice {
-	resp, err := client.Send(process.Request{Action: process.ActionStopAll, WorkDir: dir})
-	if err != nil {
-		return warning(fmt.Sprintf(domain.RunStopOtherFailFmt, filepath.Base(dir), err))
-	}
-	if resp.Status == process.StatusError {
-		return warning(fmt.Sprintf(domain.RunStopOtherFailFmt, filepath.Base(dir), resp.Message))
-	}
-	return flow.Notice{
-		Kind: flow.NoticeSuccess,
-		Text: fmt.Sprintf(domain.RunStoppedOtherFmt, filepath.Base(dir)),
-	}
-}
-
-func warning(text string) flow.Notice {
-	return flow.Notice{Kind: flow.NoticeWarning, Text: text}
 }
 
 func (f *upFlow) start(answers flow.Answers) (Outcome, error) {
@@ -342,7 +252,15 @@ func (f *upFlow) start(answers flow.Answers) (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	if err := f.offerToSilenceProbes(results); err != nil {
+	cfg, err := probes.OfferToSilence(probes.Params{
+		Context:   f.ctx,
+		Prompter:  f.prompter,
+		Presenter: f.presenter,
+		Config:    f.request.Config,
+		Results:   results,
+	})
+	f.request.Config = cfg
+	if err != nil {
 		return Outcome{}, err
 	}
 	// A shared service this run brought up is the moment to pay what a clean
@@ -357,100 +275,32 @@ func (f *upFlow) start(answers flow.Answers) (Outcome, error) {
 	}, nil
 }
 
-// offerToSilenceProbes asks once about the warnings that will otherwise come
-// back identical at every run: a job binding the base port because its command
-// never reads the variable. A warning about a port another worktree holds is
-// not offered — there is nothing to acknowledge, the run said whose it is.
-func (f *upFlow) offerToSilenceProbes(results runlogs.Outcomes) error {
-	// Never after an abort: the reader stopped the run or a job failed, and the
-	// question to answer then is why — not whether to hear less about it.
-	if !f.prompter.Interactive() || results.Aborted() {
-		return nil
-	}
-
-	var probes []domain.PortProbe
-	for _, outcome := range results {
-		probes = append(probes, outcome.Probes...)
-	}
-	names := rules.JobsToSilence(rules.JobsToSilenceParams{Probes: probes, Jobs: f.request.Config.Jobs})
-	if len(names) == 0 {
-		return nil
-	}
-
-	proceed, err := f.prompter.Confirm(flow.ConfirmParams{
-		Title:       domain.ProbeSilenceTitle,
-		Description: fmt.Sprintf(domain.ProbeSilenceDescFmt, strings.Join(names, domain.CmdListVarSep)),
-		DefaultYes:  false,
-	})
-	if err != nil || !proceed {
-		return nil
-	}
-
-	cfg := rules.SilenceProbes(rules.SilenceProbesParams{Config: f.request.Config, Jobs: names})
-	if err := runconfig.Save(runconfig.SaveParams{StateDir: f.ctx.StateDir, Config: cfg}); err != nil {
-		return fmt.Errorf("silence port probes: %w", err)
-	}
-	f.request.Config = cfg
-	f.presenter.Status(flow.Notice{
-		Kind: flow.NoticeMessage,
-		Text: fmt.Sprintf(domain.ProbeSilencedFmt, strings.Join(names, domain.CmdListVarSep)),
-	})
-	return nil
-}
-
 // resolvedProfile is what this run settled on: a name for it and the jobs it
 // starts. The name is empty for a config declaring no profile at all — dropping
 // it left `run up` unable to say which of several it had brought up (LUC-208).
-// Over several profiles it names them all, which is what the recap reads back.
 type resolvedProfile struct {
 	Name string
 	Jobs []domain.JobConfig
 }
 
 func (f *upFlow) resolveProfile(answers flow.Answers) (resolvedProfile, error) {
-	names := answers.Values(target.KeyProfile)
-	if len(names) == 0 {
+	name := answers.Value(target.KeyProfile)
+	if name == "" {
+		if len(f.request.Config.Profiles) == 0 {
+			return resolvedProfile{Jobs: rules.JobsWithoutProfile(f.request.Config)}, nil
+		}
 		profile, ok := rules.DefaultProfile(f.request.Config)
 		if !ok {
-			return resolvedProfile{Jobs: rules.JobsWithoutProfile(f.request.Config)}, nil
+			return resolvedProfile{}, domain.ErrProfileRequired
 		}
 		return f.profileRun(profile), nil
 	}
 
-	profiles := make([]domain.ProfileConfig, 0, len(names))
-	for _, name := range names {
-		profile, ok := rules.FindProfile(f.request.Config, name)
-		if !ok {
-			return resolvedProfile{}, fmt.Errorf("profile %q not found in config", name)
-		}
-		profiles = append(profiles, profile)
+	profile, ok := rules.FindProfile(f.request.Config, name)
+	if !ok {
+		return resolvedProfile{}, fmt.Errorf(domain.RunProfileNotFoundFmt, domain.ErrProfileNotFound, name)
 	}
-	return f.profilesRun(profiles), nil
-}
-
-// profilesRun is the union of what the chosen profiles name, in the order they
-// were chosen. A job two of them list is started once: the second mention is
-// the same process, and starting it twice would be the collision the whole
-// module exists to prevent.
-func (f *upFlow) profilesRun(profiles []domain.ProfileConfig) resolvedProfile {
-	if len(profiles) == 1 {
-		return f.profileRun(profiles[0])
-	}
-
-	names := make([]string, 0, len(profiles))
-	seen := map[string]bool{}
-	var jobs []domain.JobConfig
-	for _, profile := range profiles {
-		names = append(names, profile.Name)
-		for _, job := range rules.ProfileJobs(f.request.Config, profile) {
-			if seen[job.Name] {
-				continue
-			}
-			seen[job.Name] = true
-			jobs = append(jobs, job)
-		}
-	}
-	return resolvedProfile{Name: strings.Join(names, domain.CmdListVarSep), Jobs: jobs}
+	return f.profileRun(profile), nil
 }
 
 func (f *upFlow) profileRun(profile domain.ProfileConfig) resolvedProfile {

@@ -35,8 +35,8 @@ func gitWorktreeLock(t *testing.T, repo, path string) {
 func TestRelocateForceMovesLockedWorktree(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 
 	if err := setupMinimalConfig(t, stateDir); err != nil {
 		t.Fatalf("setup config: %v", err)
@@ -80,8 +80,8 @@ func TestRelocateForceMovesLockedWorktree(t *testing.T) {
 func TestRelocateBlocksOnOccupiedDestination(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 
 	if err := setupMinimalConfig(t, stateDir); err != nil {
 		t.Fatalf("setup config: %v", err)
@@ -110,8 +110,8 @@ func TestRelocateBlocksOnOccupiedDestination(t *testing.T) {
 func TestRelocateMovesAndAdoptsExternalWorktree(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 
 	if err := setupMinimalConfig(t, stateDir); err != nil {
 		t.Fatalf("setup config: %v", err)
@@ -166,8 +166,8 @@ func TestRelocateMovesAndAdoptsExternalWorktree(t *testing.T) {
 func TestRelocateToChangesBasePathAndUpdatesConfig(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 
 	if err := setupMinimalConfig(t, stateDir); err != nil {
 		t.Fatalf("setup config: %v", err)
@@ -208,8 +208,8 @@ func TestRelocateToChangesBasePathAndUpdatesConfig(t *testing.T) {
 func TestRelocateToDryRunDoesNotUpdateBasePath(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 
 	if err := setupMinimalConfig(t, stateDir); err != nil {
 		t.Fatalf("setup config: %v", err)
@@ -245,8 +245,8 @@ func TestRelocateToDryRunDoesNotUpdateBasePath(t *testing.T) {
 func TestRelocateRejectsInvalidTo(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 
 	if err := setupMinimalConfig(t, stateDir); err != nil {
 		t.Fatalf("setup config: %v", err)

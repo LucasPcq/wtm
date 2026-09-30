@@ -31,9 +31,10 @@ func HeldNamespaces(params HeldNamespacesParams) []domain.HeldNamespace {
 	for _, holding := range params.Holdings {
 		for _, job := range holding.Config.Jobs {
 			held = append(held, domain.HeldNamespace{
-				Name: NamespaceName(NamespaceNameParams{Config: holding.Config, Ref: HoldingRef(holding, job.Name)}),
-				Job:  job.Name,
-				Up:   params.Up[job.Name],
+				Name:       NamespaceName(NamespaceNameParams{Config: holding.Config, Ref: HoldingRef(holding, job.Name)}),
+				Job:        job.Name,
+				Up:         params.Up[job.Name],
+				SharedWith: holding.SharedWith,
 			})
 		}
 	}
@@ -57,7 +58,7 @@ func DownServices(held []domain.HeldNamespace) []string {
 	var jobs []string
 	seen := map[string]bool{}
 	for _, namespace := range held {
-		if namespace.Up || seen[namespace.Job] {
+		if namespace.Up || namespace.SharedWith != "" || seen[namespace.Job] {
 			continue
 		}
 		seen[namespace.Job] = true
@@ -87,6 +88,8 @@ func DataRecapLines(params DataRecapLinesParams) []string {
 	lines := make([]string, 0, len(params.Held))
 	for _, namespace := range params.Held {
 		switch {
+		case namespace.SharedWith != "":
+			lines = append(lines, fmt.Sprintf(domain.CleanDataSharedRecapFmt, namespace.Name, namespace.SharedWith))
 		case namespace.Up:
 			lines = append(lines, fmt.Sprintf(domain.CleanWillDeleteNamespaceFmt, namespace.Name, namespace.Job))
 		case params.StartDown:

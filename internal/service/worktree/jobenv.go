@@ -37,6 +37,12 @@ func JobEnv(params JobEnvParams) (map[string]string, error) {
 // lifecycle hooks, which are handed one rather than a directory to ask git
 // about.
 func BranchEnv(params WorktreeRef) (map[string]string, error) {
+	return branchEnvAs(params, IsolationOf(params))
+}
+
+// branchEnvAs resolves the environment under a given isolation: `wtm env
+// --isolation` settles the .env for the choice before recording it.
+func branchEnvAs(params WorktreeRef, isolation domain.Isolation) (map[string]string, error) {
 	ordinal, err := EnsureOrdinal(params)
 	if err != nil {
 		return nil, err
@@ -49,7 +55,7 @@ func BranchEnv(params WorktreeRef) (map[string]string, error) {
 		Ordinal:         ordinal,
 		PortOffsetBlock: rules.EffectivePortOffsetBlock(cfg),
 		ComposeProject:  composeProjectOf(composeProjectParams{ProjectDir: params.ProjectDir, Config: cfg, Ordinal: ordinal}),
-		Isolation:       IsolationOf(params),
+		Isolation:       isolation,
 	})
 
 	// The offset is read back from the environment just resolved rather than
@@ -72,13 +78,12 @@ type composeProjectParams struct {
 }
 
 // composeProjectOf is the COMPOSE_PROJECT_NAME a worktree's jobs run under when
-// one is set on purpose, empty to let wtm derive it. A linked worktree takes it
-// from this process's environment. The main checkout never does: that
-// environment belongs to whichever worktree the command was launched from, and
-// the main's name is read from its own .env instead.
+// one is set on purpose, empty to let wtm derive it from the branch. Only the
+// main checkout sets one, read from its own .env: the environment of this
+// process belongs to whichever worktree the command was launched from.
 func composeProjectOf(params composeProjectParams) string {
 	if params.Ordinal != domain.MainWorktreeOrdinal {
-		return os.Getenv(domain.EnvComposeProjectName)
+		return ""
 	}
 	return mainComposeProject(mainComposeProjectParams{ProjectDir: params.ProjectDir, Config: params.Config})
 }
@@ -88,26 +93,34 @@ type mainComposeProjectParams struct {
 	Config     domain.RunConfig
 }
 
-// mainComposeProject is the compose project of the main checkout, where the
-// shared services run. A .env that cannot be read counts as one that names
-// nothing.
 func mainComposeProject(params mainComposeProjectParams) string {
+	return rules.MainComposeProjectName(rules.MainComposeProjectNameParams{
+		Project:  filepath.Base(params.ProjectDir),
+		EnvFiles: composeEnvFiles(composeEnvFilesParams{Dir: params.ProjectDir, Config: params.Config}),
+	})
+}
+
+type composeEnvFilesParams struct {
+	Dir    string
+	Config domain.RunConfig
+}
+
+// composeEnvFiles reads the .env of each directory a compose stack starts from.
+// A .env that cannot be read counts as one that names nothing.
+func composeEnvFiles(params composeEnvFilesParams) [][]domain.EnvLine {
 	dirs := rules.ComposeProjectDirs(params.Config)
 	if len(dirs) == 0 {
 		dirs = []string{"."}
 	}
 	files := make([][]domain.EnvLine, 0, len(dirs))
 	for _, dir := range dirs {
-		data, err := os.ReadFile(filepath.Join(params.ProjectDir, dir, domain.EnvFileName))
+		data, err := os.ReadFile(filepath.Join(params.Dir, dir, domain.EnvFileName))
 		if err != nil {
 			continue
 		}
 		files = append(files, rules.ParseEnv(string(data)))
 	}
-	return rules.MainComposeProjectName(rules.MainComposeProjectNameParams{
-		Project:  filepath.Base(params.ProjectDir),
-		EnvFiles: files,
-	})
+	return files
 }
 
 // runConfig reads what run.toml says about ports — the spacing between two
@@ -120,12 +133,27 @@ func runConfig(stateDir string) domain.RunConfig {
 	return cfg
 }
 
-// hookEnv resolves the worktree variables a lifecycle hook runs with, degrading
-// to nothing rather than to another worktree's values.
-func hookEnv(params WorktreeRef) map[string]string {
-	env, err := BranchEnv(params)
+type hookEnvParams struct {
+	Ref          WorktreeRef
+	WorktreePath string
+}
+
+// hookEnv resolves the run variables a lifecycle hook gets, nil when they do not
+// apply — and then nothing is resolved, so no ordinal is allocated either. A
+// COMPOSE_PROJECT_NAME the worktree's own .env sets wins: it is the stack a
+// `docker compose` typed there reaches. Resolving nothing degrades to the
+// hook's own environment rather than to another worktree's values.
+func hookEnv(params hookEnvParams) map[string]string {
+	cfg := runConfig(params.Ref.StateDir)
+	if !rules.RunEnvReachesHooks(rules.RunEnvReachesHooksParams{Config: cfg, Recorded: RecordedIsolation(params.Ref)}) {
+		return nil
+	}
+	env, err := BranchEnv(params.Ref)
 	if err != nil {
 		return nil
+	}
+	if name := rules.DeclaredComposeProject(composeEnvFiles(composeEnvFilesParams{Dir: params.WorktreePath, Config: cfg})); name != "" {
+		env[domain.EnvComposeProjectName] = name
 	}
 	return env
 }

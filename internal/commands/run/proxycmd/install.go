@@ -2,11 +2,10 @@ package proxycmd
 
 import (
 	"io"
-	"os"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
+	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/output"
@@ -18,8 +17,14 @@ func newInstallCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   domain.CmdInstall,
 		Short: "Serve named URLs on port 80 so they drop their port",
-		Long:  "Install a per-user LaunchAgent: launchd binds port 80 on the loopback and hands the socket to wtm, which relays it to the run proxy. No sudo, no system file — everything lives in ~/Library/LaunchAgents and `wtm run proxy uninstall` removes it.",
-		RunE:  runInstall,
+		Long:  "macOS only. Install a per-user LaunchAgent: launchd binds port 80 on the loopback and hands the socket to wtm, which relays it to the run proxy. No sudo, no system file — everything lives in ~/Library/LaunchAgents and `wtm run proxy uninstall` removes it.",
+		Example: `  # See every file it would write
+  wtm run proxy install --dry-run
+
+  wtm run proxy install
+
+  wtm run proxy install --yes`,
+		RunE: runInstall,
 	}
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip the confirmation")
 	cmd.Flags().Bool(domain.FlagDryRun, false, "Print every file in full and write nothing")
@@ -31,7 +36,10 @@ func newUninstallCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   domain.CmdUninstall,
 		Short: "Remove the redirection and give named URLs their port back",
-		RunE:  runUninstall,
+		Example: `  wtm run proxy uninstall
+
+  wtm run proxy uninstall --yes`,
+		RunE: runUninstall,
 	}
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip the confirmation")
 	shared.AddOutputFlag(cmd)
@@ -90,6 +98,12 @@ func runUninstall(cmd *cobra.Command, _ []string) error {
 	if !status.Supported {
 		return domain.ErrProxyRedirectUnsupported
 	}
+	if !status.Installed {
+		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			output.Unchanged(w, domain.ProxyUninstallNothing)
+		})
+		return nil
+	}
 
 	plan, err := redirector.Plan()
 	if err != nil {
@@ -133,5 +147,5 @@ func canConfirm(cmd *cobra.Command) bool {
 		return true
 	}
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
-	return format != domain.OutputJSON && term.IsTerminal(int(os.Stdin.Fd()))
+	return format != domain.OutputJSON && runctx.IsTTY()
 }

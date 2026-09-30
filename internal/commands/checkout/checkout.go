@@ -34,6 +34,16 @@ func NewCmd() *cobra.Command {
 			"A local branch of the PR's name is checked out as-is, keeping commits you never\n" +
 			"pushed; interactive runs offer to fast-forward it when it is behind origin.\n" +
 			"Without arguments, shows an interactive picker of open PRs.",
+		Example: `  # Pick among the open pull requests
+  wtm checkout
+
+  # Only the ones waiting for your review
+  wtm checkout --review
+
+  wtm checkout 42
+
+  # No prompts, with a JSON result
+  wtm checkout 42 --yes --output json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runCheckout,
 	}
@@ -334,6 +344,7 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 		}
 	}
 
+	preflight := envports.Preflight(shared.FlowContext(result))
 	var createResult domain.CreateResult
 	var err error
 	if loadErr := components.RunLoading(components.LoadingParams{
@@ -360,15 +371,15 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 	// Before the hooks: one of them may read the .env, and it has to read what
 	// this worktree binds rather than what it was copied with.
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
-	settlement, err := envports.Settle(envports.Params{
-		Context:      shared.FlowContext(result),
-		Branch:       createResult.Branch,
-		WorktreePath: createResult.Path,
-		Presenter:    shared.NewPresenter(cmd, format),
+	settlement, warnings := envports.SettleFresh(envports.FreshParams{
+		Params: envports.Params{
+			Context:      shared.FlowContext(result),
+			Branch:       createResult.Branch,
+			WorktreePath: createResult.Path,
+			Presenter:    shared.NewPresenter(cmd, format),
+		},
+		Preflight: preflight,
 	})
-	if err != nil {
-		return err
-	}
 
 	// on_create hooks as a distinct, titled phase (shared with create/extract).
 	// A reused branch has no start-point, so the hooks see its recorded parent.
@@ -395,27 +406,30 @@ func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createF
 			Draft:          p.Draft,
 			ExistingBranch: createResult.ExistingBranch,
 			OriginState:    createResult.OriginState,
+			Isolation:      worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: result.ProjectDir, StateDir: result.StateDir, Branch: createResult.Branch}),
+			EnvPorts:       settlement,
+			Warnings:       warnings,
 		})
 	}
 
+	reusedNote := shared.ReusedBranchNoteResult{}
+	if createResult.ExistingBranch {
+		reusedNote = shared.ReusedBranchNote(shared.ReusedBranchNoteParams{
+			Branch: target.Branch,
+			Ahead:  target.AheadBehind.Ahead,
+			Behind: target.AheadBehind.Behind,
+		})
+	}
 	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-		output.Success(w, fmt.Sprintf("Checked out PR #%d (%s) at %s", p.Number, p.Branch, createResult.Path))
-		if note := rules.EnvPortSettlementNote(settlement); note != "" {
-			output.Message(w, note)
-		}
-		if createResult.ExistingBranch {
-			note := shared.ReusedBranchNote(shared.ReusedBranchNoteParams{
-				Branch: target.Branch,
-				Ahead:  target.AheadBehind.Ahead,
-				Behind: target.AheadBehind.Behind,
-			})
-			if note.Warning {
-				output.Warning(w, note.Text)
-			} else {
-				output.Message(w, note.Text)
-			}
-		}
-		output.NextStep(w, output.NextStepParams{Command: fmt.Sprintf(domain.GoCommandFmt, p.Branch)})
+		output.FormatPRCheckoutResult(w, output.PRCheckoutResultParams{
+			Number:            p.Number,
+			Branch:            p.Branch,
+			EnvNote:           rules.EnvPortSettlementNote(settlement),
+			Path:              createResult.Path,
+			ReusedNote:        reusedNote.Text,
+			ReusedNoteWarning: reusedNote.Warning,
+			GoCommand:         fmt.Sprintf(domain.GoCommandFmt, p.Branch),
+		})
 	})
 	return nil
 }

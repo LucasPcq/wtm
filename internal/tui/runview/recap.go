@@ -2,6 +2,7 @@ package runview
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -116,9 +117,9 @@ func (m Model) recap() string {
 		lines = append(append(lines, ""), addresses...)
 	}
 
-	if len(m.warnings) > 0 {
+	if warnings := append(slices.Clone(m.sequence.warnings), m.warnings...); len(warnings) > 0 {
 		lines = append(lines, "")
-		for _, warning := range m.warnings {
+		for _, warning := range warnings {
 			lines = append(lines, styles.Warning.Render(domain.GlyphAttention)+" "+warning)
 		}
 	}

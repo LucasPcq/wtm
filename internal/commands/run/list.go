@@ -19,7 +19,14 @@ func newListCmd() *cobra.Command {
 		Use:   domain.CmdList,
 		Short: "List jobs and profiles declared in run.toml",
 		Long:  "Show the jobs and profiles configured for the project.\nIn a TTY, offers an interactive picker with start/stop/logs actions.",
-		RunE:  runList,
+		Example: `  # Pick a job or a profile, then start, stop or read it
+  wtm run list
+
+  # Print the table
+  wtm run list --yes
+
+  wtm run list --output json`,
+		RunE: runList,
 	}
 	shared.AddYesFlag(cmd, "Skip the interactive picker; print the table instead")
 	shared.AddOutputFlag(cmd)

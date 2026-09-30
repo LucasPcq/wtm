@@ -21,10 +21,17 @@ func newEditCmd() *cobra.Command {
 			"the default away without handing it to another profile.\n\n" +
 			"With no such flag, the form opens pre-filled with the current values, and\n" +
 			"without an argument it prompts to pick from the existing profiles.",
+		Example: `  # The form, pre-filled
+  wtm run profile edit backend
+
+  # --jobs replaces the list, in start order
+  wtm run profile edit backend --jobs postgres,api --yes
+
+  wtm run profile edit backend --default --yes`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runEdit,
 	}
-	cmd.Flags().String(domain.FlagName, "", "Rename the profile")
+	shared.AddSingleFlag(cmd, domain.FlagName, "Rename the profile")
 	cmd.Flags().StringSlice(domain.FlagJobs, nil, "Comma-separated existing job names, in start order (replaces the list)")
 	cmd.Flags().Bool(domain.FlagDefault, false, "Mark this profile as the default (--default=false takes it away)")
 	shared.AddYesFlag(cmd, "Skip all prompts; a field flag is then required")

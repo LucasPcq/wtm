@@ -122,7 +122,7 @@ func (b *board) Jobs() []JobView {
 			Info:    live[job.Job.Name],
 			Address: b.addresses[job.Job.Name],
 		})
-		if view.Status == domain.JobStatusAttached {
+		if view.Status == domain.JobStatusJoined {
 			view.SharedIn = b.sharedIn
 		}
 		view.Shared = rules.IsShared(job.Job)
@@ -198,7 +198,7 @@ func declaredView(params declaredViewParams) JobView {
 	// A claim on a shared service is attachable too: it owns no stream of its
 	// own, and the daemon resolves it to the one there is. Refusing it here left
 	// every worktree but the main checkout unable to read a shared job's output.
-	up := view.Status == domain.JobStatusRunning || view.Status == domain.JobStatusAttached
+	up := view.Status == domain.JobStatusRunning || view.Status == domain.JobStatusJoined
 	view.Attachable = up && !rules.IsDetached(params.Job)
 	return view
 }
@@ -213,7 +213,7 @@ func undeclaredView(info domain.JobInfo) JobView {
 		Status:     info.Status,
 		StartedAt:  info.StartedAt,
 		ExitCode:   info.ExitCode,
-		Attachable: info.Status == domain.JobStatusRunning || info.Status == domain.JobStatusAttached,
+		Attachable: info.Status == domain.JobStatusRunning || info.Status == domain.JobStatusJoined,
 	}
 }
 

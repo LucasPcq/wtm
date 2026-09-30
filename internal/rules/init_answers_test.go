@@ -83,10 +83,10 @@ func TestBuildProjectAnswers_FallsBackToDetectionThenDefaults(t *testing.T) {
 	}
 }
 
-func TestBuildProjectAnswers_NonInteractiveRequiresBaseBranch(t *testing.T) {
-	_, err := rules.BuildProjectAnswers(rules.InitProjectFlags{NonInteractive: true}, domain.InitDetectionResult{})
+func TestBuildProjectAnswers_UnattendedRequiresBaseBranch(t *testing.T) {
+	_, err := rules.BuildProjectAnswers(rules.InitProjectFlags{Unattended: true}, domain.InitDetectionResult{})
 	if err == nil {
-		t.Fatal("expected error when base branch is unresolved in non-interactive mode")
+		t.Fatal("expected error when base branch is unresolved in an unattended run")
 	}
 }
 
@@ -133,9 +133,8 @@ func TestBuildProjectAnswers_SkipEnvIgnoresInvalidStrategy(t *testing.T) {
 
 func TestBuildProjectAnswers_SkipHooks(t *testing.T) {
 	detection := domain.InitDetectionResult{
-		BaseBranch:       "main",
-		InstallCommand:   "pnpm install",
-		MonorepoPackages: []string{"packages/a"},
+		BaseBranch:     "main",
+		InstallCommand: "pnpm install",
 	}
 	got, err := rules.BuildProjectAnswers(rules.InitProjectFlags{SkipHooks: true}, detection)
 	if err != nil {
@@ -277,27 +276,5 @@ func TestDisplayPath(t *testing.T) {
 	// A target outside base keeps the absolute path rather than an ugly ../.. climb.
 	if got := rules.DisplayPath(rules.DisplayPathParams{Base: "/repo", Target: "/elsewhere/wtm/config.toml"}); got != "/elsewhere/wtm/config.toml" {
 		t.Errorf("DisplayPath outside base = %q, want unchanged absolute", got)
-	}
-}
-
-func TestBuildProjectAnswers_MonorepoToHooks(t *testing.T) {
-	detection := domain.InitDetectionResult{
-		BaseBranch:       "main",
-		InstallCommand:   "pnpm install",
-		MonorepoPackages: []string{"packages/a", "packages/b"},
-	}
-	got, err := rules.BuildProjectAnswers(rules.InitProjectFlags{}, detection)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	// on_create = bare install + one hook per monorepo package.
-	if len(got.OnCreate) != 3 {
-		t.Fatalf("expected 3 on_create hooks, got %d", len(got.OnCreate))
-	}
-	if got.OnCreate[0].Cmd != "pnpm install" || got.OnCreate[0].Cwd != "" {
-		t.Errorf("first hook should be the bare install command: %+v", got.OnCreate[0])
-	}
-	if got.OnCreate[1].Cwd != "packages/a" || got.OnCreate[2].Cwd != "packages/b" {
-		t.Errorf("monorepo hooks missing: %+v", got.OnCreate)
 	}
 }

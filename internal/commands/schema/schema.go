@@ -11,9 +11,11 @@ import (
 // autocomplete and validation on TOML config files.
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "schema",
-		Short:   "Inspect or extract bundled JSON Schemas",
-		Long:    "JSON Schemas describe the structure of wtm's TOML config files.\nUse `wtm schema dump` to write them to <git-common-dir>/wtm/schemas/ so editors can pick them up via the `#:schema` directive.",
+		Use:   "schema",
+		Short: "Inspect or extract bundled JSON Schemas",
+		Long:  "JSON Schemas describe the structure of wtm's TOML config files.\nUse `wtm schema dump` to write them to <git-common-dir>/wtm/schemas/ so editors can pick them up via the `#:schema` directive.",
+		Example: `  wtm schema dump
+  wtm schema dump --global`,
 		GroupID: domain.CmdGroupSetup,
 	}
 	cmd.AddCommand(newDumpCmd())

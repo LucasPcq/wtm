@@ -22,6 +22,12 @@ const (
 	// RelocateStatusBlockedDest means the target path is already occupied by an
 	// unrelated directory; the move is blocked and --force does not override it.
 	RelocateStatusBlockedDest RelocateStatus = "blocked_dest"
+	// RelocateStatusBlockedJobs means jobs run in the worktree: they are keyed
+	// on its path, so moving it would orphan them. --force does not lift it.
+	RelocateStatusBlockedJobs RelocateStatus = "blocked_jobs"
+	// RelocateStatusBlockedName means an external worktree was not adopted: a
+	// live worktree already carries its derived name. --force does not lift it.
+	RelocateStatusBlockedName RelocateStatus = "blocked_name"
 	// RelocateStatusMoved means the worktree was moved to its target path.
 	RelocateStatusMoved RelocateStatus = "moved"
 	// RelocateStatusAdopted means a meta.json was created for the worktree in place.
@@ -43,6 +49,8 @@ type RelocateStep struct {
 	Adopt bool `json:"adopt"`
 	// Parent is the source branch recorded when adopting (defaults to the base branch).
 	Parent string `json:"parent,omitempty"`
+	// Detail says why a blocked step is blocked when the status alone cannot.
+	Detail string `json:"detail,omitempty"`
 }
 
 // RelocatePlan is the full set of planned relocations for a repo.

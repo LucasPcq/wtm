@@ -15,8 +15,8 @@ import (
 func TestPsListsFromARepositoryWithNoRunModule(t *testing.T) {
 	shortHome(t)
 	dir := gittest.InitRepo(t)
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", dir+"/.git/wtm")
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, dir+"/.git/wtm")
 	fakeTTY(t, true)
 
 	if _, _, err := runCmd(t, domain.CmdPs); err != nil {
@@ -51,5 +51,19 @@ func TestPsAnswersWithADocumentForAMachine(t *testing.T) {
 	var jobs []domain.JobInfo
 	if err := json.Unmarshal([]byte(stdout), &jobs); err != nil {
 		t.Fatalf("parse JSON: %v\noutput: %s", err, stdout)
+	}
+}
+
+// The listing is machine-wide, so its empty state says nothing about a worktree.
+func TestPsEmptyStateIsNotAboutThisWorktree(t *testing.T) {
+	setupStartProject(t, &fakeDaemon{})
+	fakeTTY(t, false)
+
+	stdout, _, err := runCmd(t, domain.CmdPs)
+	if err != nil {
+		t.Fatalf("run ps: %v", err)
+	}
+	if !strings.Contains(stdout, domain.RunNoJobsRunning) || strings.Contains(stdout, domain.RunNoJobsHere) {
+		t.Errorf("stdout = %q, want %q", stdout, domain.RunNoJobsRunning)
 	}
 }

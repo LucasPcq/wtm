@@ -129,7 +129,7 @@ func (m NamespaceListModel) updateEdit(msg tea.Msg) (NamespaceListModel, tea.Cmd
 
 // saveEdit refuses only an empty name. A create left blank is an answer — the
 // service is shared outright, data included — and a remove left blank means the
-// slice is never given back, which clean reports rather than refuses.
+// namespace is never given back, which clean reports rather than refuses.
 func (m NamespaceListModel) saveEdit() NamespaceListModel {
 	value := strings.TrimSpace(m.input.Value())
 	if value == "" && m.fields[m.cursor].Field == domain.NamespaceFieldName {

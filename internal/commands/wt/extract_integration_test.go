@@ -19,8 +19,8 @@ func extractTestRepo(t *testing.T) (dir, stateDir string) {
 	t.Helper()
 	dir = gittest.InitRepo(t)
 	stateDir = filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 	if err := setupMinimalConfig(t, stateDir); err != nil {
 		t.Fatalf("setup config: %v", err)
@@ -268,8 +268,8 @@ func writeWorktreeFile(t *testing.T, dir, rel, content string) {
 func TestExtractSettlesEnvPortsOnTheCreatedTarget(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	t.Setenv("WTM_PROJECT_DIR", dir)
-	t.Setenv("WTM_STATE_DIR", stateDir)
+	t.Setenv(domain.EnvProjectDir, dir)
+	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 
 	if err := config.WriteProject(config.WriteProjectParams{
@@ -331,5 +331,39 @@ func TestExtractSettlesEnvPortsOnTheCreatedTarget(t *testing.T) {
 	}
 	if strings.Contains(string(body), "WEB_PORT=3000") {
 		t.Errorf("target .env kept the base port, isolation is broken: %s", body)
+	}
+}
+
+// G1: extract creating its target goes ahead over a run.toml the port pass
+// refuses — hooks run, the .env stays as copied, and the JSON says why.
+func TestExtractCreatesItsTargetOverAnInvalidRunToml(t *testing.T) {
+	dir, stateDir := extractTestRepo(t)
+	if err := os.WriteFile(filepath.Join(stateDir, domain.RunFileName), []byte("bogus_key = 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "moved.txt"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, _, err := runWtCmd(t, domain.CmdExtract, "main",
+		"--"+domain.FlagTo, "feat/target",
+		"--"+domain.FlagFrom, "main",
+		"--"+domain.FlagFiles, "moved.txt",
+		"--"+domain.FlagYes,
+		"--output", domain.OutputJSON,
+	)
+	if err != nil {
+		t.Fatalf("extract must not fail over run.toml: %v", err)
+	}
+
+	var res domain.ExtractResult
+	if err := json.Unmarshal([]byte(out), &res); err != nil {
+		t.Fatalf("decode extract result: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(res.TargetPath, "moved.txt")); err != nil {
+		t.Errorf("the file was not extracted: %v", err)
+	}
+	if len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], "bogus_key") {
+		t.Errorf("warnings = %v, want the refused run.toml named", res.Warnings)
 	}
 }

@@ -32,7 +32,11 @@ func newListCmd() *cobra.Command {
 		Use:   domain.CmdList,
 		Short: "List all worktrees",
 		Long:  "List all git worktrees with their status, PR info, and running services.",
-		RunE:  runList,
+		Example: `  wtm list
+
+  # With each worktree's pull request, as JSON
+  wtm list --with-prs --output json`,
+		RunE: runList,
 	}
 	shared.AddOutputFlag(cmd)
 	cmd.Flags().Bool(domain.FlagWithPRs, false, "Include GitHub PR info in non-interactive output (fetched eagerly)")

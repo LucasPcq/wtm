@@ -119,7 +119,7 @@ func Edit(params EditParams) (Outcome, error) {
 func editNamed(params EditParams, name string) (Outcome, error) {
 	current, exists := rules.FindJob(params.Request.Config, name)
 	if !exists {
-		return Outcome{}, fmt.Errorf(domain.RunJobNotFoundFmt, name)
+		return Outcome{}, fmt.Errorf(domain.RunJobNotFoundFmt, domain.ErrJobNotFound, name)
 	}
 
 	updated, err := editedJob(params, current)
@@ -130,7 +130,15 @@ func editNamed(params EditParams, name string) (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	cfg := rules.RenameJobRefs(params.Request.Config, current.Name, updated.Name)
+	if rules.SameJob(updated, current) {
+		return conclude(params.Presenter, Outcome{Name: current.Name, Status: domain.JobActionUnchanged})
+	}
+	renamed := updated.Name != current.Name
+	if held := heldBy(params.Context, current.Name); renamed && len(held) > 0 {
+		return Outcome{}, fmt.Errorf(domain.RunJobRenameHeldFmt, current.Name, strings.Join(held, domain.RunURLListSep))
+	}
+
+	cfg := rules.RenameJobRefs(rules.RenameJobRefsParams{Config: params.Request.Config, From: current.Name, To: updated.Name})
 	for i, job := range cfg.Jobs {
 		if job.Name == current.Name {
 			cfg.Jobs[i] = updated
@@ -139,6 +147,12 @@ func editNamed(params EditParams, name string) (Outcome, error) {
 	}
 	if err := save(params.Context, cfg); err != nil {
 		return Outcome{}, err
+	}
+	if renamed && publishedUnderName(current) && publishedUnderName(updated) {
+		params.Presenter.Notice(flow.Notice{
+			Kind: flow.NoticeWarning,
+			Text: fmt.Sprintf(domain.RunJobHostMovedFmt, current.Name, updated.Name, current.Name),
+		})
 	}
 	return conclude(params.Presenter, Outcome{Name: updated.Name, Status: domain.JobActionUpdated})
 }
@@ -152,10 +166,7 @@ func editedJob(params EditParams, current domain.JobConfig) (domain.JobConfig, e
 	// would otherwise resolve to the value it was pre-filled with, and the edit
 	// would write the job back unchanged without a word.
 	if !params.Prompter.Interactive() {
-		return domain.JobConfig{}, fmt.Errorf(domain.RunJobNothingToEdit,
-			domain.FlagName, domain.FlagCmd, domain.FlagKind, domain.FlagStop, domain.FlagCwd,
-			domain.FlagPort, domain.FlagPortClear, domain.FlagURLPort, domain.FlagURLHost,
-			domain.FlagRuns, domain.FlagBindsNoPort)
+		return domain.JobConfig{}, fmt.Errorf(domain.RunJobNothingToEdit, editFlagList())
 	}
 
 	answers, err := params.Prompter.Ask(flow.Session{
@@ -170,6 +181,21 @@ func editedJob(params EditParams, current domain.JobConfig) (domain.JobConfig, e
 		return domain.JobConfig{}, err
 	}
 	return fromAnswers(answers, current)
+}
+
+var editFlags = []string{
+	domain.FlagName, domain.FlagCmd, domain.FlagKind, domain.FlagStop, domain.FlagCwd,
+	domain.FlagPort, domain.FlagPortClear, domain.FlagURLPort, domain.FlagURLHost,
+	domain.FlagRuns, domain.FlagBindsNoPort, domain.FlagTouches, domain.FlagScope,
+	domain.FlagNamespaceName, domain.FlagNamespaceCreate, domain.FlagNamespaceRemove, domain.FlagNamespaceEnv,
+}
+
+func editFlagList() string {
+	named := make([]string, len(editFlags))
+	for i, flag := range editFlags {
+		named[i] = "--" + flag
+	}
+	return strings.Join(named, domain.RunURLListSep)
 }
 
 type RemoveRequest struct {
@@ -208,12 +234,13 @@ func Remove(params RemoveParams) (Outcome, error) {
 
 func removeNamed(params RemoveParams, name string) (Outcome, error) {
 	if _, exists := rules.FindJob(params.Request.Config, name); !exists {
-		return Outcome{}, fmt.Errorf(domain.RunJobNotFoundFmt, name)
+		return Outcome{}, fmt.Errorf(domain.RunJobNotFoundFmt, domain.ErrJobNotFound, name)
 	}
 
 	cfg, effect := rules.RemoveJob(params.Request.Config, name)
-	if named := namedBy(effect); len(named) > 0 && !params.Request.Force {
-		lifted, err := liftReference(params.Prompter, name, named)
+	held := heldBy(params.Context, name)
+	if clauses := refusalClauses(effect, held); len(clauses) > 0 && !params.Request.Force {
+		lifted, err := liftReference(params.Prompter, name, strings.Join(clauses, domain.RunJobClauseSep))
 		if err != nil {
 			return Outcome{}, err
 		}
@@ -224,29 +251,38 @@ func removeNamed(params RemoveParams, name string) (Outcome, error) {
 	if err := save(params.Context, cfg); err != nil {
 		return Outcome{}, err
 	}
+	if len(held) > 0 {
+		params.Presenter.Notice(flow.Notice{
+			Kind: flow.NoticeWarning,
+			Text: fmt.Sprintf(domain.RunJobHeldDroppedFmt, strings.Join(held, domain.RunURLListSep), name),
+		})
+	}
 	return conclude(params.Presenter, Outcome{Name: name, Status: domain.JobActionRemoved, Effect: effect})
 }
 
-// namedBy is everything a removal would drag along, which is what the refusal
+// refusalClauses is everything a removal would lose, which is what the refusal
 // has to name: a reader deciding whether to lift it needs to know what goes.
-func namedBy(effect rules.RemoveJobEffect) []string {
-	named := make([]string, 0, len(effect.Profiles)+len(effect.Runners)+len(effect.Touchers))
-	named = append(named, effect.Profiles...)
-	named = append(named, effect.Runners...)
-	return append(named, effect.Touchers...)
+func refusalClauses(effect rules.RemoveJobEffect, held []string) []string {
+	var clauses []string
+	if parts := rules.JobReferenceParts(effect); len(parts) > 0 {
+		clauses = append(clauses, fmt.Sprintf(domain.RunJobRefClauseFmt, strings.Join(parts, domain.RunJobRefSep)))
+	}
+	if len(held) > 0 {
+		clauses = append(clauses, fmt.Sprintf(domain.RunJobHeldClauseFmt, strings.Join(held, domain.RunURLListSep)))
+	}
+	return clauses
 }
 
 // liftReference asks to lift the safety refusal, and refuses naming --force
 // when there is nobody to ask. Both routes converge on one value, the way
 // clean's blockers do.
-func liftReference(prompter flow.Prompter, name string, named []string) (bool, error) {
-	joined := strings.Join(named, domain.RunURLListSep)
+func liftReference(prompter flow.Prompter, name, reason string) (bool, error) {
 	if !prompter.Interactive() {
-		return false, fmt.Errorf(domain.RunJobReferencedFmt, name, joined, domain.FlagForce)
+		return false, fmt.Errorf(domain.RunJobReferencedFmt, name, reason, domain.FlagForce)
 	}
 	return prompter.Confirm(flow.ConfirmParams{
 		Title:       domain.RunJobReferencedTitle,
-		Description: fmt.Sprintf(domain.RunJobReferencedDescFmt, name, joined),
+		Description: fmt.Sprintf(domain.RunJobReferencedDescFmt, name, reason),
 		YesLabel:    domain.RunJobReferencedYes,
 		NoLabel:     domain.RunJobReferencedNo,
 	})

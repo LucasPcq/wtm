@@ -3,11 +3,10 @@ package daemoncmd
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
+	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/output"
@@ -20,7 +19,10 @@ func newStopCmd() *cobra.Command {
 		Use:   domain.CmdStop,
 		Short: "Stop the daemon, leaving detached services running",
 		Long:  "Stop the background daemon.\nForeground services die with it — they are drained through a terminal it owns.\nDetached services (those with a stop command) keep running, and the next daemon picks them back up.",
-		RunE:  runStop,
+		Example: `  wtm run daemon stop
+
+  wtm run daemon stop --yes`,
+		RunE: runStop,
 	}
 	shared.AddOutputFlag(cmd)
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip the confirmation")
@@ -59,7 +61,7 @@ func confirmStop(cmd *cobra.Command, status domain.DaemonStatus) (bool, error) {
 		return true, nil
 	}
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
-	if format == domain.OutputJSON || !term.IsTerminal(int(os.Stdin.Fd())) {
+	if format == domain.OutputJSON || !runctx.IsTTY() {
 		return false, fmt.Errorf("stopping the daemon would stop %d foreground service(s): pass --%s to confirm", status.Foreground, domain.FlagYes)
 	}
 
@@ -70,14 +72,7 @@ func confirmStop(cmd *cobra.Command, status domain.DaemonStatus) (bool, error) {
 }
 
 func shutdown() error {
-	resp, err := process.NewClient(process.SocketPath()).SendUnchecked(process.Request{Action: process.ActionShutdown})
-	if err != nil {
-		return fmt.Errorf("stop daemon: %w", err)
-	}
-	if resp.Status == process.StatusError {
-		return fmt.Errorf("stop daemon: %s", resp.Message)
-	}
-	return process.AwaitDaemonStopped(process.SocketPath())
+	return process.Shutdown(process.SocketPath())
 }
 
 type reportStoppedParams struct {

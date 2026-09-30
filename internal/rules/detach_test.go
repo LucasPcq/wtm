@@ -31,7 +31,7 @@ func TestRemovableKeepsOnlySharedJobsWithARemoveCommand(t *testing.T) {
 	}
 }
 
-func TestHeldNamespacesNamesEachSliceFromTheWorktreesEnv(t *testing.T) {
+func TestHeldNamespacesNamesEachFromTheWorktreesEnv(t *testing.T) {
 	holdings := []domain.NamespaceHolding{{
 		Branch: "feat/x",
 		Env:    map[string]string{domain.EnvWorktree: "feat-x"},
@@ -71,7 +71,7 @@ func TestDataRecapLinesFollowTheAnswer(t *testing.T) {
 	if !strings.Contains(deferred, "realm_a kept until keycloak next starts") {
 		t.Errorf("recap does not say realm_a is kept:\n%s", deferred)
 	}
-	if !strings.Contains(deferred, "app_a in postgres") {
+	if !strings.Contains(deferred, "app_a, dropped from postgres") {
 		t.Errorf("recap lost the namespace dropped from a service up:\n%s", deferred)
 	}
 }
@@ -87,5 +87,19 @@ func TestDataRecapLinesSayOnceThatTheDataIsKept(t *testing.T) {
 func TestDataRecapLinesEmptyWhenNothingIsHeld(t *testing.T) {
 	if got := DataRecapLines(DataRecapLinesParams{KeepData: true}); len(got) != 0 {
 		t.Errorf("lines = %v, want none", got)
+	}
+}
+
+// A namespace another live worktree reaches under the same slug is its too:
+// the recap says it is kept, and no service is started to drop it.
+func TestDataRecapLinesKeepANamespaceSharedByASlugCollision(t *testing.T) {
+	held := []domain.HeldNamespace{{Name: "app_feat-x", Job: "postgres", SharedWith: "feat/x"}}
+
+	lines := strings.Join(DataRecapLines(DataRecapLinesParams{Held: held, StartDown: true}), "\n")
+	if !strings.Contains(lines, "app_feat-x kept: feat/x shares its name") {
+		t.Errorf("recap = %q, want the collision said", lines)
+	}
+	if got := DownServices(held); len(got) != 0 {
+		t.Errorf("down = %v, want nothing to start for a namespace that is kept", got)
 	}
 }

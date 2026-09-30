@@ -32,28 +32,16 @@ type PRCheckoutJSON struct {
 	// OriginState is the reused branch's divergence from origin, using the same
 	// labels as `list` and `tree`. Empty when the branch was created.
 	OriginState string `json:"origin_state,omitempty"`
+	// Isolation and EnvPorts are what `create` reports under the same names.
+	Isolation domain.Isolation   `json:"isolation,omitempty"`
+	EnvPorts  domain.EnvPortPlan `json:"env_ports,omitzero"`
+	// Warnings are what the run module could not do for the new worktree.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
-// WriteJobResultsJSON writes the JSON array describing each job outcome.
-func WriteJobResultsJSON(w io.Writer, results []domain.JobActionResult) error {
-	if results == nil {
-		results = []domain.JobActionResult{}
-	}
-	return encodeJSON(w, results)
-}
-
-// WriteWorktreeJobResultsJSON writes what a command did across worktrees. The
-// shape follows the arity (LUC-198): one worktree answers with the bare array
-// of job results, several with one document each — the only way two jobs called
-// `web` can be told apart.
+// WriteWorktreeJobResultsJSON writes one document per worktree, whatever their
+// number: a caller parses one shape.
 func WriteWorktreeJobResultsJSON(w io.Writer, results []domain.WorktreeJobResults) error {
-	if len(results) <= 1 {
-		var jobs []domain.JobActionResult
-		if len(results) == 1 {
-			jobs = results[0].Jobs
-		}
-		return WriteJobResultsJSON(w, jobs)
-	}
 	documents := make([]domain.WorktreeJobResults, len(results))
 	for index, result := range results {
 		if result.Jobs == nil {
@@ -64,12 +52,17 @@ func WriteWorktreeJobResultsJSON(w io.Writer, results []domain.WorktreeJobResult
 	return encodeJSON(w, documents)
 }
 
-// WriteJobLogsJSON writes the lines `run logs` read back.
-func WriteJobLogsJSON(w io.Writer, entries []domain.JobLogEntry) error {
-	if entries == nil {
-		entries = []domain.JobLogEntry{}
+// WriteJobLogsJSON writes the lines `run logs` read back, one document per
+// worktree.
+func WriteJobLogsJSON(w io.Writer, logs []domain.WorktreeLogs) error {
+	documents := make([]domain.WorktreeLogs, len(logs))
+	for index, worktree := range logs {
+		if worktree.Lines == nil {
+			worktree.Lines = []domain.JobLogEntry{}
+		}
+		documents[index] = worktree
 	}
-	return encodeJSON(w, entries)
+	return encodeJSON(w, documents)
 }
 
 // WriteJobResultJSON writes a single job outcome (start/stop single job).
@@ -153,9 +146,9 @@ func WriteProfilesJSON(w io.Writer, profiles []domain.ProfileConfig) error {
 }
 
 // WriteRunningJobsJSON writes the JSON payload for `run ps`.
-func WriteRunningJobsJSON(w io.Writer, jobs []domain.JobInfo) error {
+func WriteRunningJobsJSON(w io.Writer, jobs []domain.RunningJob) error {
 	if jobs == nil {
-		jobs = []domain.JobInfo{}
+		jobs = []domain.RunningJob{}
 	}
 	return encodeJSON(w, jobs)
 }
@@ -264,6 +257,11 @@ type FormatRunningJobsParams struct {
 	// Hyperlinks makes each address clickable. Off for a pipe: the escape would
 	// reach whatever reads the table.
 	Hyperlinks bool
+	// Projects names each work dir's repository. Nil drops the column: with one
+	// repository it says nothing.
+	Projects map[string]string
+	// Held lists, under a runner's row, the apps it started and where they answer.
+	Held domain.HeldAddresses
 }
 
 // FormatRunningJobs renders a table of running (or recently running) jobs. It
@@ -271,7 +269,7 @@ type FormatRunningJobsParams struct {
 // outer vertical padding.
 func FormatRunningJobs(params FormatRunningJobsParams) string {
 	if len(params.Jobs) == 0 {
-		return UnchangedLine(domain.RunNoJobsHere)
+		return UnchangedLine(domain.RunNoJobsRunning)
 	}
 
 	uptimes := make([]string, len(params.Jobs))
@@ -279,7 +277,10 @@ func FormatRunningJobs(params FormatRunningJobsParams) string {
 		uptimes[i] = rules.JobUptime(rules.JobUptimeParams{Job: j, Now: params.Now})
 	}
 
-	nameW, kindW, statusW, addrW, upW := len("NAME"), len("KIND"), len("STATUS"), len("ADDRESS"), len("UPTIME")
+	nameW, kindW, statusW, addrW, upW, projectW := len("NAME"), len("KIND"), len("STATUS"), len("ADDRESS"), len("UPTIME"), len("PROJECT")
+	for _, project := range params.Projects {
+		projectW = max(projectW, len(project))
+	}
 	for i, j := range params.Jobs {
 		if len(j.Name) > nameW {
 			nameW = len(j.Name)
@@ -302,13 +303,14 @@ func FormatRunningJobs(params FormatRunningJobsParams) string {
 	// Rendered without its line break: a style given a string ending in one sees
 	// two lines and pads the empty second to the width of the first, which lands
 	// as a run of spaces in front of the first job.
-	header := fmt.Sprintf("%s%-*s  %-*s  %-*s  %-*s  %-*s  %s",
+	header := fmt.Sprintf("%s%-*s  %-*s  %-*s  %-*s  %-*s  %s%s",
 		Indent,
 		nameW, "NAME",
 		kindW, "KIND",
 		statusW, "STATUS",
 		addrW, "ADDRESS",
 		upW, "UPTIME",
+		projectCell(projectCellParams{Params: params, Width: projectW, Value: "PROJECT"}),
 		"WORKTREE",
 	)
 	b.WriteString(styles.Muted.Render(header))
@@ -326,24 +328,44 @@ func FormatRunningJobs(params FormatRunningJobsParams) string {
 		if params.Hyperlinks {
 			address = rules.LinkURLs(address)
 		}
-		line := fmt.Sprintf("%s%-*s  %-*s  %-*s  %s  %-*s  %s\n",
+		line := fmt.Sprintf("%s%-*s  %-*s  %-*s  %s  %-*s  %s%s\n",
 			Indent,
 			nameW, j.Name,
 			kindW, string(j.Kind),
 			statusW+ansiOverhead(status), status,
 			address,
 			upW, uptimes[i],
+			projectCell(projectCellParams{Params: params, Width: projectW, Value: params.Projects[j.WorkDir]}),
 			worktree,
 		)
 		b.WriteString(line)
+		for _, held := range rules.HeldAddressLines(params.Held[j.WorkDir][j.Name]) {
+			if params.Hyperlinks {
+				held = rules.LinkURLs(held)
+			}
+			b.WriteString(Indent + domain.DetailHeldIndent + held + "\n")
+		}
 	}
 
 	return b.String()
 }
 
+type projectCellParams struct {
+	Params FormatRunningJobsParams
+	Width  int
+	Value  string
+}
+
+func projectCell(params projectCellParams) string {
+	if params.Params.Projects == nil {
+		return ""
+	}
+	return fmt.Sprintf("%-*s  ", params.Width, params.Value)
+}
+
 func styleJobStatus(status domain.JobStatus) string {
 	switch status {
-	case domain.JobStatusRunning, domain.JobStatusDetached, domain.JobStatusAttached:
+	case domain.JobStatusRunning, domain.JobStatusDetached, domain.JobStatusJoined:
 		return styles.Success.Render(string(status))
 	case domain.JobStatusCrashed, domain.JobStatusReaped:
 		return styles.Warning.Render(string(status))

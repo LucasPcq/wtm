@@ -10,6 +10,15 @@ List all git worktrees with their status, PR info, and running services.
 wtm list [flags]
 ```
 
+### Examples
+
+```
+  wtm list
+
+  # With each worktree's pull request, as JSON
+  wtm list --with-prs --output json
+```
+
 ### Options
 
 ```

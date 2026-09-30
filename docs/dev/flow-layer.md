@@ -34,6 +34,7 @@ is implemented yet.
 | `wtm run list` | migrated — `internal/flow/run/list` answers which entry was picked and what to do to it; `internal/commands/run/dispatch.go` runs that action through the flow it already has for it (LUC-217) |
 | `wtm run job add\|edit\|rm\|list` | migrated — `internal/flow/run/job` (LUC-217) |
 | `wtm run profile add\|edit\|rm\|list` | migrated — `internal/flow/run/profile` (LUC-217) |
+| `wtm run init` | migrated — `internal/flow/run/initrun`. Its questions are **not** a `flow.Session`: the services wizard edits structured rows (ports, runners, scopes, namespaces, routes, commands, profiles) that no `StepKind` renders, so it is a seam of its own, `initrun.Wizard`, answered on the CLI by `internal/tui/inittui` and, unattended, by `rules.AutoServicesAnswers`. The one standalone question left, linking the `.env` keys, goes through `Prompter.Confirm`. Its writes (`runconfig.Save`, `compose.PatchAll`, `envsvc.WritePortKeys`, `envsvc.AddEnvTargets`) are in archlint's `mutations` table. Golden files in `internal/commands/run/testdata/initgolden` pin its output |
 | `wtm run open`, `wtm run url` | migrated — `internal/flow/run/open` and `internal/flow/run/url`, over `target.URLStep` and the address reader in `internal/flow/run/urls` (LUC-217) |
 | CLI wizard surface | `internal/tui/flowui` |
 | Unattended surface | `flow.Unattended` (in `internal/flow`) |
@@ -762,7 +763,7 @@ removes it instead of asking about it. Descendants are left out: dragging them i
 makes the same entry mean one worktree from a leaf and four from a root, an asymmetry
 no label lets you predict.
 
-The run module's batch entries (`Start profiles`, `Stop worktrees`, `View logs`) split
+The run module's batch entries (`Start worktrees`, `Stop worktrees`, `Watch worktree logs`) split
 it the same way: a **start** is about where you are, so it passes no precheck at all —
 `target.WorktreesStep` already opens with the current worktree ticked — while a
 **stop** and a **view** are about what is standing, and pass the worktrees the board

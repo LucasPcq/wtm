@@ -95,3 +95,33 @@ func TestJobAddressTextReadsAsTheNamesARunnerHolds(t *testing.T) {
 		t.Errorf("text = %q, want the count of what the runner answers for", got)
 	}
 }
+
+func TestHeldOfKeepsTheRunnersUpThatHoldApps(t *testing.T) {
+	jobs := []domain.JobInfo{
+		{Name: "dev", WorkDir: "/wt/a", Status: domain.JobStatusRunning},
+		{Name: "api", WorkDir: "/wt/a", Status: domain.JobStatusStopped},
+		{Name: "db", WorkDir: "/wt/b", Status: domain.JobStatusDetached},
+	}
+	up := UpJobsByWorkDir(jobs)
+	if len(up["/wt/a"]) != 1 || up["/wt/a"][0] != "dev" || len(up["/wt/b"]) != 1 {
+		t.Fatalf("up = %v, want dev in a and db in b", up)
+	}
+
+	cfg := domain.RunConfig{Jobs: []domain.JobConfig{
+		{Name: "dev", Runs: []string{"web"}}, {Name: "web"}, {Name: "db"},
+	}}
+	if !AnyRunner(cfg, []string{"db", "dev"}) || AnyRunner(cfg, []string{"db"}) {
+		t.Error("AnyRunner misread which job starts others")
+	}
+
+	held := HeldOf(HeldOfParams{
+		Addresses: map[string]domain.JobAddress{
+			"dev": {Held: []domain.JobURLEntry{{Job: "web", URL: "http://localhost:3000"}}},
+			"db":  {URL: "http://localhost:5432"},
+		},
+		Jobs: []string{"dev", "db"},
+	})
+	if len(held) != 1 || len(held["dev"]) != 1 {
+		t.Errorf("held = %v, want only dev's web", held)
+	}
+}

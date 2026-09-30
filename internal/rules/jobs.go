@@ -2,6 +2,7 @@ package rules
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -16,11 +17,27 @@ func IsRunInitialized(cfg domain.RunConfig) bool {
 	return len(cfg.Jobs) > 0 || len(cfg.Profiles) > 0
 }
 
-// IsDetached reports whether the job is a service with a stop command,
-// meaning the launcher process exits after starting detached work
-// (e.g. docker compose up -d).
+// IsDetached is the one definition of a detached service: a service that
+// declares `stop`. Its cmd is a launcher wtm waits on until it exits (`docker
+// compose up -d`); what it started runs on, and `stop` is what takes it down. A
+// service without `stop` runs in the foreground and is stopped by signal.
 func IsDetached(job domain.JobConfig) bool {
 	return job.Kind == domain.JobKindService && !IsBlankCommand(job.Stop)
+}
+
+// LauncherMayNotExit flags a detached service whose cmd shows no sign of
+// detaching: wtm waits for a launcher to exit, so a cmd that keeps running
+// holds `run up` for ever. Advice only — a script may well detach on its own.
+func LauncherMayNotExit(job domain.JobConfig) bool {
+	if !IsDetached(job) {
+		return false
+	}
+	for _, word := range strings.Fields(job.Cmd) {
+		if word == domain.DetachFlagShort || word == domain.DetachFlagLong || strings.HasPrefix(word, domain.DetachFlagLong+"=") {
+			return false
+		}
+	}
+	return true
 }
 
 // IsAlreadyRunning reads the daemon's refusal to start a job that is already
@@ -68,14 +85,16 @@ func livedUntilNow(status domain.JobStatus) bool {
 	return IsJobUp(status) || status == domain.JobStatusReaped
 }
 
-// DefaultProfile returns the profile marked as default, or the first one.
+// DefaultProfile is the profile `run up` starts unnamed: the one marked default,
+// else the only one declared. Several with none marked have no default — the
+// first declared was a guess nobody could see.
 func DefaultProfile(cfg domain.RunConfig) (domain.ProfileConfig, bool) {
 	for _, p := range cfg.Profiles {
 		if p.Default {
 			return p, true
 		}
 	}
-	if len(cfg.Profiles) > 0 {
+	if len(cfg.Profiles) == 1 {
 		return cfg.Profiles[0], true
 	}
 	return domain.ProfileConfig{}, false
@@ -118,7 +137,7 @@ func ProfileJobs(cfg domain.RunConfig, profile domain.ProfileConfig) []domain.Jo
 func FilterToProfile(cfg domain.RunConfig, name string) (domain.RunConfig, error) {
 	p, ok := FindProfile(cfg, name)
 	if !ok {
-		return domain.RunConfig{}, fmt.Errorf("profile %q not found", name)
+		return domain.RunConfig{}, fmt.Errorf(domain.RunProfileNotFoundFmt, domain.ErrProfileNotFound, name)
 	}
 
 	// The config is copied whole before being narrowed: rebuilding it field by
@@ -246,4 +265,56 @@ func JobsWithoutProfile(cfg domain.RunConfig) []domain.JobConfig {
 	jobs := make([]domain.JobConfig, len(cfg.Jobs))
 	copy(jobs, cfg.Jobs)
 	return jobs
+}
+
+// DistinctValues counts the different non-empty values of a map.
+func DistinctValues(values map[string]string) int {
+	seen := map[string]bool{}
+	for _, value := range values {
+		if value != "" {
+			seen[value] = true
+		}
+	}
+	return len(seen)
+}
+
+type JobUpInParams struct {
+	Jobs    []domain.JobInfo
+	Name    string
+	WorkDir string
+}
+
+// JobUpIn says the daemon holds this job up in this worktree.
+func JobUpIn(params JobUpInParams) bool {
+	for _, job := range params.Jobs {
+		if job.Name == params.Name && job.WorkDir == params.WorkDir && IsJobUp(job.Status) {
+			return true
+		}
+	}
+	return false
+}
+
+type WorkDirsWithJobsUpParams struct {
+	Jobs   []domain.JobInfo
+	Within []string
+}
+
+// WorkDirsWithJobsUp names, once each and in the daemon's order, the work dirs
+// among Within that hold a job up.
+func WorkDirsWithJobsUp(params WorkDirsWithJobsUpParams) []string {
+	within := make(map[string]bool, len(params.Within))
+	for _, dir := range params.Within {
+		within[filepath.Clean(dir)] = true
+	}
+	seen := map[string]bool{}
+	var dirs []string
+	for _, job := range params.Jobs {
+		dir := filepath.Clean(job.WorkDir)
+		if !IsJobUp(job.Status) || !within[dir] || seen[dir] {
+			continue
+		}
+		seen[dir] = true
+		dirs = append(dirs, job.WorkDir)
+	}
+	return dirs
 }

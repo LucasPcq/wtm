@@ -52,5 +52,6 @@ brews:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: "https://github.com/LucasPcq/wtm"
     description: "Worktree Manager — orchestrate git worktrees, AI agents, and team workflows"
+    license: "MIT"
     install: |
       bin.install "wtm"

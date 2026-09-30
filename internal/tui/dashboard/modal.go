@@ -360,6 +360,7 @@ func newMultiSelect(step flow.Step, content flow.StepContent) components.MultiSe
 			Selected: option.Selected,
 			Tag:      option.Tag,
 			Variant:  components.TagVariantOf(option.Tone),
+			Badges:   selectBadges(option.Badges),
 		})
 	}
 	return components.NewMultiSelect(components.NewMultiSelectParams{
@@ -367,6 +368,7 @@ func newMultiSelect(step flow.Step, content flow.StepContent) components.MultiSe
 		Description: content.Description,
 		Items:       items,
 		Validate:    step.ValidateSet,
+		Start:       content.Start,
 	})
 }
 

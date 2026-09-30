@@ -65,7 +65,7 @@ func printInitRecap(w io.Writer, r initRecap) {
 	if len(r.NextSteps) > 0 {
 		b.WriteString("\n\n")
 		b.WriteString(styles.Bold.Render(domain.InitRecapNextSteps))
-		for _, step := range r.NextSteps {
+		for _, step := range AlignNextSteps(r.NextSteps) {
 			b.WriteString("\n" + NextStepLine(step))
 		}
 	}

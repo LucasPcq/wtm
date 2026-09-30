@@ -19,8 +19,9 @@ import (
 // newTreeCmd creates the wtm tree subcommand.
 func newTreeCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   domain.CmdTree,
-		Short: "Show the worktree forest (parent → child)",
+		Use:         domain.CmdTree,
+		Annotations: map[string]string{domain.AnnotationOutputFormats: domain.OutputMermaid},
+		Short:       "Show the worktree forest (parent → child)",
 		Long: "Render the forest of managed worktrees, parents above their children, with the\n" +
 			"orchestration signals that matter for a stacked-branch workflow: commits ahead\n" +
 			"(↑N), uncommitted changes (⚠ dirty), and \"needs sync\" when a parent has moved and\n" +
@@ -29,10 +30,18 @@ func newTreeCmd() *cobra.Command {
 			"--with-prs adds PR numbers and merged/closed markers (fetched eagerly). --output\n" +
 			"json emits the structured tree for agents; --output mermaid emits a flowchart to\n" +
 			"paste into a PR or Notion.",
+		Example: `  wtm tree
+
+  # With PR numbers and merged/closed markers
+  wtm tree --with-prs
+
+  # A flowchart to paste into a PR description
+  wtm tree --output mermaid`,
 		RunE: runTree,
 	}
 
 	shared.AddOutputFlag(cmd)
+	cmd.Flags().Lookup(domain.FlagOutput).Usage = "Output format: text, json or mermaid"
 	cmd.Flags().Bool(domain.FlagWithPRs, false, "Include GitHub PR info (open/merged/closed; fetched eagerly)")
 
 	return cmd

@@ -43,23 +43,9 @@ func ReachSummary(entry domain.ReachEntry) string {
 	return ""
 }
 
-type ReachLinesParams struct {
-	Entries []domain.ReachEntry
-}
-
 type reachRow struct {
 	label  string
 	values []string
-}
-
-// ReachLines is the body of the block that says where every job of a run is
-// reached. URLs come first, one row each and labelled by the job that answers
-// them — a runner's apps by their own names. Then the jobs reached by port, one
-// port per line. A job with nothing to reach — a task, a launcher that binds
-// nothing — has no row.
-func ReachLines(params ReachLinesParams) []string {
-	rows := reachRows(params.Entries)
-	return renderReachRows(renderReachParams{Rows: rows, LabelWidth: labelWidthOf(rows)})
 }
 
 // ReachWorktree is one worktree's part of the block: the jobs up there, the
@@ -144,7 +130,7 @@ type sharedService struct {
 
 // rows lays a shared service out. Held by one worktree, its namespace rides the
 // port line as it always has; above several, each holder gets a line of its
-// own, since whose slice is whose is the whole question.
+// own, since whose namespace is whose is the whole question.
 func (s sharedService) rows(multi bool) []reachRow {
 	entry := s.entry
 	if !multi {

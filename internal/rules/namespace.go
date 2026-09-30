@@ -236,31 +236,16 @@ func AnySharedJob(jobs []domain.JobConfig) bool {
 	return false
 }
 
-type NamespaceJobsStartedParams struct {
-	Jobs []domain.JobConfig
-	// Started names the jobs the run left running.
-	Started []string
-}
-
-// NamespaceJobsStarted narrows a run to the shared jobs that actually came up and
-// carve a namespace out. Only those leave anything behind to give back, so only
-// those are worth remembering — a job the run never reached created nothing.
-func NamespaceJobsStarted(params NamespaceJobsStartedParams) []string {
-	if len(params.Started) == 0 {
-		return nil
-	}
-	started := make(map[string]bool, len(params.Started))
-	for _, name := range params.Started {
-		started[name] = true
-	}
-
-	var jobs []string
-	for _, job := range params.Jobs {
-		if started[job.Name] && IsShared(job) && HasNamespace(job) {
-			jobs = append(jobs, job.Name)
+// NamespaceJobs are the shared jobs that carve a namespace out when they start:
+// the only ones that leave anything behind for a clean to give back.
+func NamespaceJobs(jobs []domain.JobConfig) []string {
+	var names []string
+	for _, job := range jobs {
+		if IsShared(job) && HasNamespace(job) {
+			names = append(names, job.Name)
 		}
 	}
-	return jobs
+	return names
 }
 
 // NamespaceJobWidth aligns the field column across every row, so the three
@@ -303,7 +288,7 @@ func NamespaceName(params NamespaceNameParams) string {
 
 type CarvedNamespaceParams struct {
 	Job domain.JobConfig
-	// Env is the worktree's: its WTM_WORKTREE and WTM_ORDINAL name the slice.
+	// Env is the worktree's: its WTM_WORKTREE and WTM_ORDINAL name the namespace.
 	Env map[string]string
 }
 
@@ -331,10 +316,14 @@ func CarvedNamespace(params CarvedNamespaceParams) string {
 // only let go of is still up for another one, and "stopped" there read as a
 // service taken away from everyone.
 func StoppedFmt(status string) string {
-	if status == domain.JobActionReleased {
+	switch status {
+	case domain.JobActionReleased:
 		return domain.RunReleasedFmt
+	case domain.JobActionNotRunning:
+		return domain.RunNotRunningFmt
+	default:
+		return domain.RunStoppedFmt
 	}
-	return domain.RunStoppedFmt
 }
 
 // OwedLines say what a service that is down still owes, one line per service

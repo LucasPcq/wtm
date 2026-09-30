@@ -328,7 +328,11 @@ func portOwners(params portOwnersParams) map[string]string {
 		if !lifted[binding.Service] {
 			continue
 		}
-		owners[binding.Var] = binding.Service
+		owner := LiftedJobName(LiftedJobNameParams{Config: params.Params.Config, File: params.File, Service: binding.Service})
+		if owner == "" {
+			owner = binding.Service
+		}
+		owners[binding.Var] = owner
 	}
 	return owners
 }

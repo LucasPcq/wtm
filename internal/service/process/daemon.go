@@ -52,7 +52,16 @@ type daemonServer struct {
 	// auto-exited under, and the caller would read a closed socket instead of
 	// what the command said.
 	inflight atomic.Int64
-	shutdown chan struct{}
+	// lastActivity is when a connection last opened or closed, in Unix nanos:
+	// idleness counts from there, so a command between two of its requests
+	// never finds the socket gone.
+	lastActivity atomic.Int64
+	shutdown     chan struct{}
+	stopOnce     sync.Once
+	// stopped closes once stop has run to its end: RunDaemon returning is the
+	// process exiting, and a foreground job still in its grace period would die
+	// mid-cleanup with the index still naming it.
+	stopped chan struct{}
 }
 
 // RunDaemon starts the daemon, listens on the Unix socket, and blocks until shutdown.
@@ -61,7 +70,14 @@ func RunDaemon(params DaemonParams) error {
 		return fmt.Errorf("create socket dir: %w", err)
 	}
 
-	// Remove stale socket
+	lock, err := acquireDaemonLock(params.SocketPath)
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
+
+	// Only the lock holder may clear a stale socket: anyone else would be
+	// unlinking a live daemon's.
 	os.Remove(params.SocketPath)
 
 	listener, err := net.Listen("unix", params.SocketPath)
@@ -77,6 +93,7 @@ func RunDaemon(params DaemonParams) error {
 		listener:   listener,
 		socketPath: params.SocketPath,
 		shutdown:   make(chan struct{}),
+		stopped:    make(chan struct{}),
 	}
 
 	if params.ProxyPort > 0 {
@@ -100,13 +117,17 @@ func RunDaemon(params DaemonParams) error {
 	// Handle signals
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
+	defer signal.Stop(sigCh)
 	go func() {
-		<-sigCh
-		d.stop()
+		select {
+		case <-sigCh:
+			d.stop()
+		case <-d.shutdown:
+		}
 	}()
 
-	// Idle timer for auto-exit
-	go d.idleWatcher()
+	d.touch()
+	go d.idleWatcher(daemonIdleTimeout)
 
 	// Accept loop
 	for {
@@ -114,6 +135,10 @@ func RunDaemon(params DaemonParams) error {
 		if acceptErr != nil {
 			select {
 			case <-d.shutdown:
+				<-d.stopped
+				// Waited here, on the only goroutine that calls Add: a Wait
+				// beside a connection still being accepted is a race.
+				d.clients.Wait()
 				return nil
 			default:
 				continue
@@ -121,9 +146,11 @@ func RunDaemon(params DaemonParams) error {
 		}
 		d.clients.Add(1)
 		d.inflight.Add(1)
+		d.touch()
 		go func() {
 			defer d.clients.Done()
 			defer d.inflight.Add(-1)
+			defer d.touch()
 			d.handleConnection(conn)
 		}()
 	}
@@ -144,26 +171,51 @@ func (d *daemonServer) publicPort() int {
 }
 
 func (d *daemonServer) stop() {
-	close(d.shutdown)
-	d.listener.Close()
-	d.manager.StopForeground()
-	os.Remove(d.socketPath)
-	d.clients.Wait()
+	d.stopOnce.Do(func() {
+		close(d.shutdown)
+		d.listener.Close()
+		d.manager.StopForeground()
+		close(d.stopped)
+	})
 }
 
-func (d *daemonServer) idleWatcher() {
-	ticker := time.NewTicker(daemonIdleTimeout)
-	defer ticker.Stop()
+// idle is what lets the daemon exit on its own. A detached job serving a name
+// keeps it: the proxy lives in this process, and exiting would take the name
+// down while the stack behind it runs.
+func (d *daemonServer) idle() bool {
+	if d.manager.IsRunning() || d.inflight.Load() > 0 {
+		return false
+	}
+	return d.proxyPort == 0 || !d.manager.ServesRoutes()
+}
+
+func (d *daemonServer) touch() {
+	d.lastActivity.Store(time.Now().UnixNano())
+}
+
+func (d *daemonServer) quietFor() time.Duration {
+	return time.Since(time.Unix(0, d.lastActivity.Load()))
+}
+
+func (d *daemonServer) idleWatcher(timeout time.Duration) {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 
 	for {
 		select {
 		case <-d.shutdown:
 			return
-		case <-ticker.C:
-			if !d.manager.IsRunning() && d.inflight.Load() == 0 {
+		case <-timer.C:
+			quiet := d.quietFor()
+			if quiet < timeout {
+				timer.Reset(timeout - quiet)
+				continue
+			}
+			if d.idle() {
 				d.stop()
 				return
 			}
+			timer.Reset(timeout)
 		}
 	}
 }
@@ -209,7 +261,7 @@ func (d *daemonServer) handleConnection(conn net.Conn) {
 	case ActionShutdown:
 		d.handleShutdown(encoder)
 	default:
-		encoder.Encode(Response{Status: StatusError, Message: fmt.Sprintf("unknown action: %s", req.Action)})
+		encoder.Encode(Response{Status: StatusError, Message: fmt.Sprintf("%s: %s", domain.DaemonUnknownActionPrefix, req.Action)})
 	}
 }
 
@@ -286,7 +338,7 @@ func (d *daemonServer) handleShutdown(encoder replyEncoder) {
 
 func (d *daemonServer) handleStop(encoder replyEncoder, req Request) {
 	ref := d.manager.sharedRefOf(jobKey(req.Name, req.WorkDir))
-	if err := d.manager.Stop(req.Name, req.WorkDir); err != nil {
+	if err := d.manager.Stop(JobRef{Name: req.Name, WorkDir: req.WorkDir}); err != nil {
 		encoder.Encode(Response{Status: StatusError, Message: err.Error()})
 		return
 	}
@@ -368,7 +420,7 @@ func (d *daemonServer) jobInfoOf(job ManagedJob) domain.JobInfo {
 // stranger. A foreground service keeps its PID in every state, reaped included,
 // where it is the most useful thing on the row.
 func detachedAwarePID(job ManagedJob) int {
-	if job.Status == domain.JobStatusAttached || rules.IsDetached(job.Config) {
+	if job.Status == domain.JobStatusJoined || rules.IsDetached(job.Config) {
 		return 0
 	}
 	return job.PID
@@ -393,7 +445,7 @@ func (d *daemonServer) handleResize(encoder replyEncoder, req Request) {
 }
 
 func (d *daemonServer) handleAttach(conn net.Conn, encoder replyEncoder, req Request) {
-	session, err := d.manager.Attach(req.Name, req.WorkDir)
+	session, err := d.manager.Attach(JobRef{Name: req.Name, WorkDir: req.WorkDir})
 	if err != nil {
 		encoder.Encode(Response{Status: StatusError, Message: err.Error()})
 		return

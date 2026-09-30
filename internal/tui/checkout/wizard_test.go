@@ -152,3 +152,16 @@ func TestCheckoutRecapNamesTheIsolation(t *testing.T) {
 		t.Errorf("recap = %q, want the isolation named", recap)
 	}
 }
+
+func TestCheckoutRecapIsolationLineFollowsTheCreateFlow(t *testing.T) {
+	pr := domain.PRInfo{Number: 7, Title: "t", Branch: "feat/x", BaseBranch: "main"}
+	label := func([]components.Step) string { return prDisplay(pr) }
+
+	flagged := buildCheckoutRecap(nil, WizardParams{Preselected: &pr, IsolationOverride: domain.IsolationVerbatim}, label, label)
+	if !strings.Contains(flagged, "Isolation: "+domain.IsolationSummaryVerbatim) {
+		t.Errorf("recap = %q, want the flag's isolation named", flagged)
+	}
+	if silent := buildCheckoutRecap(nil, WizardParams{Preselected: &pr}, label, label); strings.Contains(silent, "Isolation:") {
+		t.Errorf("recap = %q, want no line for a step never posed", silent)
+	}
+}

@@ -48,8 +48,8 @@ func setupPrune(t *testing.T, setup pruneSetup) pruneRepo {
 	repo.dir = gittest.InitRepo(t)
 	repo.stateDir = filepath.Join(repo.dir, ".git", "wtm")
 	repo.treesDir = filepath.Join(filepath.Dir(repo.dir), ".trees")
-	t.Setenv("WTM_PROJECT_DIR", repo.dir)
-	t.Setenv("WTM_STATE_DIR", repo.stateDir)
+	t.Setenv(domain.EnvProjectDir, repo.dir)
+	t.Setenv(domain.EnvStateDir, repo.stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 
 	var onClean []string
@@ -482,11 +482,11 @@ func TestPruneNothingToPrune(t *testing.T) {
 
 // --- Hooks against removals -----------------------------------------------
 
-// TestPruneRunsEveryHookBeforeAnyRemoval: the on_clean hooks of every selected
-// worktree run as one phase before the first removal. The count each hook
-// records is what proves it — both worktrees are still on disk when the second
-// hook runs.
-func TestPruneRunsEveryHookBeforeAnyRemoval(t *testing.T) {
+// TestPruneTearsEachWorktreeDownBeforeTheNext: each worktree goes through its
+// whole sequence — hook, removal, data — before the next one's hook runs. The
+// count each hook records is what proves it: the second hook sees the first
+// worktree already gone.
+func TestPruneTearsEachWorktreeDownBeforeTheNext(t *testing.T) {
 	repo := setupPrune(t, pruneSetup{
 		Worktrees: []string{"first-wt", "second-wt"},
 		CleanHook: true,
@@ -499,39 +499,43 @@ func TestPruneRunsEveryHookBeforeAnyRemoval(t *testing.T) {
 	result, _ := runPruneJSON(t, "--"+domain.FlagYes)
 
 	assertSameBranches(t, prunedBranches(result), []string{"first-wt", "second-wt"})
-	for _, run := range repo.hookRuns(t) {
-		if !strings.HasSuffix(run, ":2") {
-			t.Errorf("hook run %q ran after a removal; every hook must see both worktrees", run)
-		}
-	}
-	if len(repo.hookRuns(t)) != 2 {
-		t.Errorf("hook runs = %v, want one per selected worktree", repo.hookRuns(t))
+	if runs := strings.Join(repo.hookRuns(t), " "); runs != "first-wt:2 second-wt:1" {
+		t.Errorf("hook runs = %q, want each hook run just before its own removal", runs)
 	}
 }
 
-// TestPruneFailingHookRemovesNothing: a hook that fails aborts the run before
-// any removal — the teardown of the worktrees already hooked has run, which is
-// why on_clean hooks must be idempotent, but nothing is deleted.
-func TestPruneFailingHookRemovesNothing(t *testing.T) {
+// TestPruneFailingHookStopsAtThatWorktree: a hook that fails stops the prune
+// there. The worktree before it is gone, the failing one and the ones after are
+// left as they were, and the JSON says where it stopped.
+func TestPruneFailingHookStopsAtThatWorktree(t *testing.T) {
 	repo := setupPrune(t, pruneSetup{
 		Worktrees:  []string{"first-wt", "second-wt"},
 		CleanHook:  true,
-		FailHookOn: "second-wt",
+		FailHookOn: "first-wt",
 	})
 	ghtest.Stub(t, ghtest.StubParams{PRs: []ghtest.PR{
 		{Number: 1, Branch: "first-wt", State: domain.PRStateMerged},
 		{Number: 2, Branch: "second-wt", State: domain.PRStateMerged},
 	}})
 
-	_, _, err := runWtCmd(t, domain.CmdPrune, "--output", domain.OutputJSON, "--"+domain.FlagYes)
+	stdout, _, err := runWtCmd(t, domain.CmdPrune, "--output", domain.OutputJSON, "--"+domain.FlagYes)
 	if err == nil {
-		t.Fatal("expected a failing on_clean hook to abort the prune")
+		t.Fatal("expected a failing on_clean hook to fail the prune")
 	}
 
 	repo.assertWorktreeExists(t, "first-wt", true)
 	repo.assertWorktreeExists(t, "second-wt", true)
-	if runs := repo.hookRuns(t); len(runs) != 2 {
+	if runs := repo.hookRuns(t); len(runs) != 1 {
 		t.Errorf("hook runs = %v, want the run to stop at the failing hook", runs)
+	}
+	// The harness appends cobra's usage after a failing run; the document is
+	// the first value on stdout.
+	var result domain.PruneResult
+	if jsonErr := json.NewDecoder(strings.NewReader(stdout)).Decode(&result); jsonErr != nil {
+		t.Fatalf("stdout is not JSON: %v\n%s", jsonErr, stdout)
+	}
+	if result.Failed == nil || result.Failed.Branch != "first-wt" || len(result.Pruned) != 0 {
+		t.Errorf("result = %+v, want first-wt named as where it stopped", result)
 	}
 }
 

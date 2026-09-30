@@ -11,6 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
+	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
 
 type Request struct {
@@ -23,15 +24,16 @@ type Request struct {
 	// Profile narrows the stop to one profile's jobs. Empty means everything the
 	// worktree has up, which is the command's safe default — so it is never asked.
 	Profile string
-	// All reaches across every worktree, which is why it takes no worktree and no
-	// profile: it is a different question, not a wider answer to this one.
+	// All reaches across every worktree of this project — never another
+	// repository — which is why it takes no worktree and no profile: it is a
+	// different question, not a wider answer to this one.
 	All    bool
 	Config domain.RunConfig
 }
 
 type Outcome struct {
 	// WorkDirs are the worktrees this run emptied, in selection order. Empty
-	// with --all, which is about every repository the daemon knows.
+	// with --all, whose worktrees are those Results names.
 	WorkDirs []string
 	Profile  string
 	All      bool
@@ -55,12 +57,16 @@ func (o Outcome) Failed() bool {
 	return false
 }
 
-// Stopped is every job this run stopped, across the worktrees. A surface above
-// one worktree reads it as the flat list it has always been.
+// Stopped is every job this run acted on, across the worktrees: a job it found
+// not running is not one of them.
 func (o Outcome) Stopped() []domain.JobActionResult {
 	var jobs []domain.JobActionResult
 	for _, worktree := range o.Results {
-		jobs = append(jobs, worktree.Jobs...)
+		for _, job := range worktree.Jobs {
+			if job.Status != domain.JobActionNotRunning {
+				jobs = append(jobs, job)
+			}
+		}
 	}
 	return jobs
 }
@@ -107,6 +113,9 @@ type downFlow struct {
 }
 
 func (f *downFlow) run() (Outcome, error) {
+	if err := target.RequireDeclared(target.DeclaredParams{Config: f.request.Config, Profile: f.request.Profile}); err != nil {
+		return Outcome{}, err
+	}
 	named, err := target.NamedAll(target.ResolveAllParams{ProjectDir: f.ctx.ProjectDir, Queries: f.request.Worktrees})
 	if err != nil {
 		return Outcome{}, err
@@ -135,6 +144,7 @@ func (f *downFlow) run() (Outcome, error) {
 	}
 	if !process.IsDaemonRunning(process.SocketPath()) {
 		outcome.NoDaemon = true
+		outcome.Results = f.nothingRunning(outcome)
 		return outcome, f.presenter.Downed(outcome)
 	}
 
@@ -181,11 +191,7 @@ func (f *downFlow) wake(workDirs []string) error {
 // stages a surface shows.
 func (f *downFlow) stop(outcome Outcome) ([]domain.WorktreeJobResults, error) {
 	if outcome.All {
-		stopped, err := f.stopEverywhere(outcome)
-		if err != nil {
-			return nil, err
-		}
-		return stopped, nil
+		return f.stopEverywhere()
 	}
 
 	results := make([]domain.WorktreeJobResults, 0, len(outcome.WorkDirs))
@@ -195,9 +201,9 @@ func (f *downFlow) stop(outcome Outcome) ([]domain.WorktreeJobResults, error) {
 			return nil, err
 		}
 		results = append(results, domain.WorktreeJobResults{
-			Worktree: f.branchOf(workDir),
-			Path:     workDir,
-			Jobs:     jobs,
+			Branch: f.branchOf(workDir),
+			Path:   workDir,
+			Jobs:   jobs,
 		})
 	}
 	return results, nil
@@ -207,18 +213,11 @@ func (f *downFlow) stopIn(outcome Outcome, workDir string) ([]domain.JobActionRe
 	if outcome.Profile != "" {
 		return f.stopProfile(outcome, workDir)
 	}
-	return f.stopAll(outcome, workDir)
+	return f.stopAll(workDir)
 }
 
-// branchOf names a worktree the way a reader recognises it, falling back to the
-// path git could not name.
 func (f *downFlow) branchOf(workDir string) string {
-	for _, named := range f.named {
-		if named.Dir == workDir && named.Branch != "" {
-			return named.Branch
-		}
-	}
-	return target.BranchOf(workDir)
+	return target.NamedBranch(target.NamedBranchParams{Named: f.named, Dir: workDir})
 }
 
 // stopProfile stops the profile's jobs one by one, so a job that refuses is
@@ -226,13 +225,21 @@ func (f *downFlow) branchOf(workDir string) string {
 func (f *downFlow) stopProfile(outcome Outcome, workDir string) ([]domain.JobActionResult, error) {
 	profile, ok := rules.FindProfile(f.request.Config, outcome.Profile)
 	if !ok {
-		return nil, fmt.Errorf("profile %q not found in config", outcome.Profile)
+		return nil, fmt.Errorf(domain.RunProfileNotFoundFmt, domain.ErrProfileNotFound, outcome.Profile)
 	}
 
 	client := process.NewClient(process.SocketPath())
+	running, err := client.Send(process.Request{Action: process.ActionList})
+	if err != nil {
+		return nil, fmt.Errorf("stop profile %s: %w", outcome.Profile, err)
+	}
 	jobs := rules.ProfileJobs(f.request.Config, profile)
 	results := make([]domain.JobActionResult, 0, len(jobs))
 	for _, job := range jobs {
+		if !rules.JobUpIn(rules.JobUpInParams{Jobs: running.Jobs, Name: job.Name, WorkDir: workDir}) {
+			results = append(results, domain.JobActionResult{Name: job.Name, Status: domain.JobActionNotRunning})
+			continue
+		}
 		var resp process.Response
 		err := f.presenter.Stage(flow.StageParams{
 			Message: fmt.Sprintf(domain.RunStoppingFmt, job.Name),
@@ -258,39 +265,40 @@ func (f *downFlow) stopProfile(outcome Outcome, workDir string) ([]domain.JobAct
 	return results, nil
 }
 
-// stopEverywhere groups what --all took down by the worktree it came from,
-// like the per-worktree path already did. Flattened, a machine holding the same
-// profile up in three worktrees answered with each job name three times over
-// and no way to tell them apart.
-func (f *downFlow) stopEverywhere(outcome Outcome) ([]domain.WorktreeJobResults, error) {
-	jobs, err := f.stoppedJobs(outcome, "")
+// stopEverywhere empties every worktree of this project the daemon holds jobs
+// in, one worktree at a time: the daemon is machine-wide, and --all never
+// reaches into another repository.
+func (f *downFlow) stopEverywhere() ([]domain.WorktreeJobResults, error) {
+	worktrees, err := worktree.ListAll(worktree.ListAllParams{ProjectDir: f.ctx.ProjectDir})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("stop all jobs: %w", err)
+	}
+	running, err := client().Send(process.Request{Action: process.ActionList})
+	if err != nil {
+		return nil, fmt.Errorf("stop all jobs: %w", err)
+	}
+	dirs := make([]string, 0, len(worktrees))
+	for _, wt := range worktrees {
+		dirs = append(dirs, wt.Path)
 	}
 
-	var order []string
-	byDir := map[string][]domain.JobActionResult{}
-	for _, job := range jobs {
-		if _, seen := byDir[job.WorkDir]; !seen {
-			order = append(order, job.WorkDir)
+	var results []domain.WorktreeJobResults
+	for _, workDir := range rules.WorkDirsWithJobsUp(rules.WorkDirsWithJobsUpParams{Jobs: running.Jobs, Within: dirs}) {
+		jobs, err := f.stopAll(workDir)
+		if err != nil {
+			return nil, err
 		}
-		byDir[job.WorkDir] = append(byDir[job.WorkDir],
-			domain.JobActionResult{Name: job.Name, Status: stoppedStatus(job.Released)})
-	}
-
-	results := make([]domain.WorktreeJobResults, 0, len(order))
-	for _, workDir := range order {
 		results = append(results, domain.WorktreeJobResults{
-			Worktree: f.branchOf(workDir),
-			Path:     workDir,
-			Jobs:     byDir[workDir],
+			Branch: f.branchOf(workDir),
+			Path:   workDir,
+			Jobs:   jobs,
 		})
 	}
 	return results, nil
 }
 
-func (f *downFlow) stopAll(outcome Outcome, workDir string) ([]domain.JobActionResult, error) {
-	jobs, err := f.stoppedJobs(outcome, workDir)
+func (f *downFlow) stopAll(workDir string) ([]domain.JobActionResult, error) {
+	jobs, err := f.stoppedJobs(workDir)
 	if err != nil {
 		return nil, err
 	}
@@ -301,13 +309,10 @@ func (f *downFlow) stopAll(outcome Outcome, workDir string) ([]domain.JobActionR
 	return stopped, nil
 }
 
-// stoppedJobs asks the daemon to stop, and answers with what it reported —
-// each job still carrying the worktree it belonged to.
-func (f *downFlow) stoppedJobs(outcome Outcome, workDir string) ([]domain.JobInfo, error) {
-	request := process.Request{Action: process.ActionStopAll}
-	if !outcome.All {
-		request.WorkDir = workDir
-	}
+// stoppedJobs asks the daemon to empty one worktree, and answers with what it
+// reported.
+func (f *downFlow) stoppedJobs(workDir string) ([]domain.JobInfo, error) {
+	request := process.Request{Action: process.ActionStopAll, WorkDir: workDir}
 
 	var resp process.Response
 	if err := f.presenter.Stage(flow.StageParams{
@@ -326,6 +331,27 @@ func (f *downFlow) stoppedJobs(outcome Outcome, workDir string) ([]domain.JobInf
 	return resp.Jobs, nil
 }
 
+// nothingRunning is what a down reports with no daemon to ask: every worktree
+// it targeted, holding nothing — or, under --profile, each of its jobs
+// not_running.
+func (f *downFlow) nothingRunning(outcome Outcome) []domain.WorktreeJobResults {
+	var jobs []domain.JobActionResult
+	if profile, ok := rules.FindProfile(f.request.Config, outcome.Profile); ok {
+		for _, job := range rules.ProfileJobs(f.request.Config, profile) {
+			jobs = append(jobs, domain.JobActionResult{Name: job.Name, Status: domain.JobActionNotRunning})
+		}
+	}
+	results := make([]domain.WorktreeJobResults, 0, len(outcome.WorkDirs))
+	for _, workDir := range outcome.WorkDirs {
+		results = append(results, domain.WorktreeJobResults{
+			Branch: f.branchOf(workDir),
+			Path:   workDir,
+			Jobs:   append([]domain.JobActionResult{}, jobs...),
+		})
+	}
+	return results
+}
+
 func client() *process.Client { return process.NewClient(process.SocketPath()) }
 
 // session asks for the worktree and nothing else. `run down` with no --profile
@@ -338,7 +364,7 @@ func (f *downFlow) session() flow.Session {
 	}
 	return flow.Session{
 		ErrLabel: domain.CmdDown,
-		Presets:  target.Presets(target.PresetParams{Worktrees: target.Dirs(f.named), Profiles: target.OneProfile(f.request.Profile)}),
+		Presets:  target.Presets(target.PresetParams{Worktrees: target.Dirs(f.named), Profile: f.request.Profile}),
 		Steps: []flow.Step{
 			target.WorktreesStep(target.WorktreesParams{
 				ProjectDir: f.ctx.ProjectDir,

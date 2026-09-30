@@ -337,12 +337,12 @@ func isNewTarget(steps []components.Step) bool {
 func buildCombinedRecap(prev []components.Step, params RunParams) components.RecapContent {
 	var lines []string
 	if source := sourceBranchFromPrev(prev, params.SourceBranch); source != "" {
-		lines = append(lines, "Source:  "+source)
+		lines = append(lines, domain.RecapFieldSource+source)
 	}
 	if ms, ok := stepModelByName(prev, stepFiles).(components.MultiSelectModel); ok {
-		lines = append(lines, "Files:   "+strings.Join(ms.Values(), ", "))
+		lines = append(lines, domain.RecapFieldFiles+strings.Join(ms.Values(), ", "))
 	} else if len(params.FixedFiles) > 0 {
-		lines = append(lines, "Files:   "+strings.Join(params.FixedFiles, ", "))
+		lines = append(lines, domain.RecapFieldFiles+strings.Join(params.FixedFiles, ", "))
 	}
 
 	action := "extract"
@@ -352,19 +352,19 @@ func buildCombinedRecap(prev []components.Step, params RunParams) components.Rec
 			// A reused branch is checked out as-is, not created from a start-point —
 			// the recap says so instead of the misleading "new worktree ... from ...".
 			if cr.Reused {
-				lines = append(lines, "Target:  "+cr.BranchName+domain.BranchReusedSuffix)
+				lines = append(lines, domain.RecapFieldTarget+cr.BranchName+domain.BranchReusedSuffix)
 				if parent := cr.FromBranch; parent != "" {
 					if cr.FastForwardBranch == parent {
 						parent += " (fast-forward to origin)"
 					}
-					lines = append(lines, "Parent:  "+parent)
+					lines = append(lines, domain.RecapFieldParent+parent)
 				}
 			} else {
 				source := cr.FromBranch
 				if cr.FastForwardBranch == cr.FromBranch && cr.FastForwardBranch != "" {
 					source += " (fast-forward to origin)"
 				}
-				lines = append(lines, "Target:  new worktree "+cr.BranchName+" from "+source)
+				lines = append(lines, domain.RecapFieldTarget+"new worktree "+cr.BranchName+" from "+source)
 			}
 			if cr.FastForwardBranch != "" && cr.FastForwardBranch != cr.FromBranch {
 				lines = append(lines, fmt.Sprintf(domain.RecapUpdateFastForward, cr.FastForwardBranch))
@@ -374,16 +374,16 @@ func buildCombinedRecap(prev []components.Step, params RunParams) components.Rec
 			}
 			action = "create & extract"
 		} else {
-			lines = append(lines, "Target:  "+targetSummary(sl))
+			lines = append(lines, domain.RecapFieldTarget+targetSummary(sl))
 		}
 	} else if params.FixedTarget != "" {
-		lines = append(lines, "Target:  "+params.FixedTarget)
+		lines = append(lines, domain.RecapFieldTarget+params.FixedTarget)
 	}
 
 	if sl, ok := stepModelByName(prev, stepMode).(components.SelectListModel); ok {
-		lines = append(lines, "Mode:    "+modeSummary(sl))
+		lines = append(lines, domain.RecapFieldMode+modeSummary(sl))
 	} else if !params.NeedMode {
-		lines = append(lines, "Mode:    "+fixedModeLabel(params.FixedKeep))
+		lines = append(lines, domain.RecapFieldMode+fixedModeLabel(params.FixedKeep))
 	}
 
 	if isNewTarget(prev) {

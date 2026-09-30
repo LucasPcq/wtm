@@ -6,6 +6,17 @@ Inspect and install the redirection that serves named URLs on port 80
 
 Named job URLs carry the run proxy's port unless port 80 is redirected to it. These commands report that redirection and install or remove it.
 
+```
+wtm run proxy [flags]
+```
+
+### Examples
+
+```
+  wtm run proxy status
+  wtm run proxy install
+```
+
 ### Options
 
 ```

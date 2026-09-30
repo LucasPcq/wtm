@@ -6,6 +6,42 @@ Manage dev jobs (services + tasks)
 
 Run commands and profiles declared in <git-common-dir>/wtm/run.toml — long-running services and one-shot tasks.
 
+Vocabulary:
+  job             the unit wtm runs; its kind is service (long-running) or task (one-shot)
+  profile         a named, ordered group of jobs
+  compose stack   a job that runs `docker compose`; an isolated worktree gets its own compose project
+  shared service  a job with scope = "shared": one instance for the repository, run in
+                  the main checkout; a worktree holding it reports it as joined
+  namespace       a worktree's own part of a shared service — a database, a realm
+  named URL       the address the run proxy serves (http://api.feat-x.myrepo.localhost)
+  port URL        the job's own port (http://localhost:4012), printed with --raw
+  isolation       isolated: the worktree gets its own ports, compose project and namespaces;
+                  verbatim: it keeps its source's values, and so shares its source's data
+  touches         the services whose data a task changes (a migration, a reset, a seed)
+  foreign data    data this worktree does not own: its source's when it is verbatim,
+                  every worktree's for a shared service with no namespace; a job whose
+                  touches reach it is refused unless --force
+  [worktree]      a worktree's branch name, never a path; omitted, the current worktree
+
+```
+wtm run [flags]
+```
+
+### Examples
+
+```
+  # Once per repository: detect compose files and package scripts
+  wtm run init
+
+  # Start the default profile in this worktree
+  wtm run up
+
+  # What runs, across every repository
+  wtm run ps
+
+  wtm run down
+```
+
 ### Options
 
 ```
@@ -35,7 +71,7 @@ Run commands and profiles declared in <git-common-dir>/wtm/run.toml — long-run
 * [wtm run proxy](wtm_run_proxy.md)	 - Inspect and install the redirection that serves named URLs on port 80
 * [wtm run ps](wtm_run_ps.md)	 - List currently running jobs
 * [wtm run start](wtm_run_start.md)	 - Start a single job
-* [wtm run stop](wtm_run_stop.md)	 - Stop a single job
+* [wtm run stop](wtm_run_stop.md)	 - Stop one job, in one or more worktrees
 * [wtm run up](wtm_run_up.md)	 - Start a profile's jobs
 * [wtm run url](wtm_run_url.md)	 - Print where a job is reachable in a worktree
 

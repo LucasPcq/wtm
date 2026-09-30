@@ -25,16 +25,16 @@ func TestRunUp_NotInitialized(t *testing.T) {
 	}
 }
 
-// TestRunInit_NonInteractiveAutoGenerates verifies `wtm run init --non-interactive`
+// TestRunInit_YesAutoGenerates verifies `wtm run init --yes`
 // turns a detected docker-compose file into a run.toml job without prompting.
-func TestRunInit_NonInteractiveAutoGenerates(t *testing.T) {
+func TestRunInit_YesAutoGenerates(t *testing.T) {
 	stateDir := setupTestProject(t)
-	projectDir := os.Getenv("WTM_PROJECT_DIR")
+	projectDir := os.Getenv(domain.EnvProjectDir)
 	if err := os.WriteFile(filepath.Join(projectDir, "docker-compose.yml"), []byte("services: {}\n"), 0o644); err != nil {
 		t.Fatalf("write docker-compose: %v", err)
 	}
 
-	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive); err != nil {
+	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes); err != nil {
 		t.Fatalf("run init: %v", err)
 	}
 
@@ -61,12 +61,12 @@ func TestRunInit_ReRunMergesAndPreservesProfiles(t *testing.T) {
 		},
 	})
 
-	projectDir := os.Getenv("WTM_PROJECT_DIR")
+	projectDir := os.Getenv(domain.EnvProjectDir)
 	if err := os.WriteFile(filepath.Join(projectDir, "docker-compose.yml"), []byte("services: {}\n"), 0o644); err != nil {
 		t.Fatalf("write docker-compose: %v", err)
 	}
 
-	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive); err != nil {
+	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes); err != nil {
 		t.Fatalf("run init: %v", err)
 	}
 
@@ -107,10 +107,10 @@ const composeWithPorts = `services:
       - "3000-3005:3000-3005"
 `
 
-// `run init --non-interactive` ne coche que les scripts qu'il aurait
+// `run init --yes` ne coche que les scripts qu'il aurait
 // pré-cochés. Lire cette absence comme un décochage supprimerait les jobs
 // qu'un run précédent avait configurés — une perte silencieuse.
-func TestRunInit_NonInteractiveNeSupprimeAucunJob(t *testing.T) {
+func TestRunInit_YesNeSupprimeAucunJob(t *testing.T) {
 	stateDir := setupTestProject(t)
 	writeRunTOML(t, stateDir, domain.RunConfig{
 		Jobs: []domain.JobConfig{
@@ -121,7 +121,7 @@ func TestRunInit_NonInteractiveNeSupprimeAucunJob(t *testing.T) {
 	})
 	writeProjectFile(t, "package.json", `{"scripts":{"dev":"vite","build":"vite build"}}`)
 
-	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive); err != nil {
+	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes); err != nil {
 		t.Fatalf("run init: %v", err)
 	}
 
@@ -138,7 +138,7 @@ func TestRunInit_NonInteractiveNeSupprimeAucunJob(t *testing.T) {
 
 func writeCompose(t *testing.T, name, content string) string {
 	t.Helper()
-	projectDir := os.Getenv("WTM_PROJECT_DIR")
+	projectDir := os.Getenv(domain.EnvProjectDir)
 	if err := os.WriteFile(filepath.Join(projectDir, name), []byte(content), 0o644); err != nil {
 		t.Fatalf("write %s: %v", name, err)
 	}
@@ -164,7 +164,7 @@ func TestRunInit_DeclaresTemplatedPortsAndWithholdsFrozenOnes(t *testing.T) {
 	stateDir := setupTestProject(t)
 	composePath := writeCompose(t, "docker-compose.yml", composeWithPorts)
 
-	stdout, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive)
+	stdout, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes)
 	if err != nil {
 		t.Fatalf("run init: %v", err)
 	}
@@ -200,7 +200,7 @@ func TestRunInit_PatchComposeTemplatizesAndDeclares(t *testing.T) {
 	stateDir := setupTestProject(t)
 	composePath := writeCompose(t, "docker-compose.yml", composeWithPorts)
 
-	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive, "--"+domain.FlagPatchCompose); err != nil {
+	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes, "--"+domain.FlagPatchCompose); err != nil {
 		t.Fatalf("run init: %v", err)
 	}
 
@@ -244,7 +244,7 @@ func TestRunInit_BackfillsAJobConfiguredBeforePortsExisted(t *testing.T) {
 		}},
 	})
 
-	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive); err != nil {
+	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes); err != nil {
 		t.Fatalf("run init: %v", err)
 	}
 
@@ -272,7 +272,7 @@ func TestRunInit_NeverWritesAConfigItsOwnLoaderRefuses(t *testing.T) {
 	writeCompose(t, "docker-compose.yml", "services:\n  a:\n    ports:\n      - \"${A_PORT:-5432}:5432\"\n")
 	writeCompose(t, "docker-compose.other.yml", "services:\n  b:\n    ports:\n      - \"${B_PORT:-5442}:5432\"\n")
 
-	stdout, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive)
+	stdout, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes)
 	if err != nil {
 		t.Fatalf("run init: %v", err)
 	}
@@ -315,7 +315,7 @@ func TestRunInit_BackfillsAJobWhoseNameWasChanged(t *testing.T) {
 		}},
 	})
 
-	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive); err != nil {
+	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes); err != nil {
 		t.Fatalf("run init: %v", err)
 	}
 
@@ -338,7 +338,7 @@ func TestRunInit_TwoComposeFilesOnTheSameBase(t *testing.T) {
 	writeCompose(t, "docker-compose.yml", "services:\n  a:\n    ports:\n      - \"${A_PORT:-5432}:5432\"\n")
 	writeCompose(t, "docker-compose.other.yml", "services:\n  b:\n    ports:\n      - \"${B_PORT:-5432}:5432\"\n")
 
-	stdout, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive)
+	stdout, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes)
 	if err != nil {
 		t.Fatalf("run init: %v", err)
 	}
@@ -363,7 +363,7 @@ func TestRunInit_PatchComposeIsIdempotent(t *testing.T) {
 	stateDir := setupTestProject(t)
 	composePath := writeCompose(t, "docker-compose.yml", composeWithPorts)
 
-	flags := []string{domain.CmdInit, "--" + domain.FlagNonInteractive, "--" + domain.FlagPatchCompose}
+	flags := []string{domain.CmdInit, "--" + domain.FlagYes, "--" + domain.FlagPatchCompose}
 	if _, _, err := runCmd(t, flags...); err != nil {
 		t.Fatalf("first run: %v", err)
 	}
@@ -399,7 +399,7 @@ func TestRunInit_PatchComposeIsIdempotent(t *testing.T) {
 // writeProjectFile writes a file under the project dir, creating parents.
 func writeProjectFile(t *testing.T, rel, content string) {
 	t.Helper()
-	path := filepath.Join(os.Getenv("WTM_PROJECT_DIR"), rel)
+	path := filepath.Join(os.Getenv(domain.EnvProjectDir), rel)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatalf("mkdir %s: %v", rel, err)
 	}
@@ -433,7 +433,7 @@ func TestRunInit_DeclaresPortsFromEnvFiles(t *testing.T) {
 	writeProjectFile(t, "apps/api/package.json", `{"name":"api","scripts":{"dev":"node server.js","build":"tsc"}}`)
 	writeProjectFile(t, "apps/api/.env.example", "API_PORT=4000\n")
 
-	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive); err != nil {
+	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes); err != nil {
 		t.Fatalf("run init: %v", err)
 	}
 
@@ -478,7 +478,7 @@ func TestRunInit_EnvPortsAreIdempotent(t *testing.T) {
 	writeProjectFile(t, ".env", "PORT=3000\n")
 
 	for i := 0; i < 2; i++ {
-		if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive); err != nil {
+		if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes); err != nil {
 			t.Fatalf("run init #%d: %v", i+1, err)
 		}
 	}
@@ -508,7 +508,7 @@ func TestRunInit_HandWrittenPortSurvivesDetection(t *testing.T) {
 	writeProjectFile(t, "package.json", `{"name":"root","scripts":{"dev":"next dev"}}`)
 	writeProjectFile(t, ".env", "PORT=3000\n")
 
-	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive); err != nil {
+	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes); err != nil {
 		t.Fatalf("run init: %v", err)
 	}
 
@@ -528,7 +528,7 @@ func TestRunInit_HandWrittenPortSurvivesDetection(t *testing.T) {
 // and the production server alongside the dev one.
 func TestRunInit_ProducesAStartableConfig(t *testing.T) {
 	stateDir := setupTestProject(t)
-	projectDir := os.Getenv("WTM_PROJECT_DIR")
+	projectDir := os.Getenv(domain.EnvProjectDir)
 
 	writeCompose(t, "docker-compose.yml", "services:\n  db:\n    image: alpine\n    ports:\n      - \"5432:5432\"\n")
 	pkg := `{"name":"demo","scripts":{"dev":"vite","build":"tsc","lint":"eslint .","start":"node dist/i.js"}}`
@@ -536,7 +536,7 @@ func TestRunInit_ProducesAStartableConfig(t *testing.T) {
 		t.Fatalf("write package.json: %v", err)
 	}
 
-	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive); err != nil {
+	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes); err != nil {
 		t.Fatalf("run init: %v", err)
 	}
 
@@ -581,7 +581,7 @@ func hasProfileJob(profile domain.ProfileConfig, name string) bool {
 // éditer run.toml après coup.
 func TestRunInitPublishesTheServiceItPorts(t *testing.T) {
 	stateDir := setupTestProject(t)
-	projectDir := os.Getenv("WTM_PROJECT_DIR")
+	projectDir := os.Getenv(domain.EnvProjectDir)
 	pkg := `{"name":"app","scripts":{"dev":"vite --port ${PORT}"}}`
 	if err := os.WriteFile(filepath.Join(projectDir, "package.json"), []byte(pkg), 0o644); err != nil {
 		t.Fatalf("write package.json: %v", err)
@@ -590,7 +590,7 @@ func TestRunInitPublishesTheServiceItPorts(t *testing.T) {
 		t.Fatalf("write .env: %v", err)
 	}
 
-	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive); err != nil {
+	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes); err != nil {
 		t.Fatalf("run init: %v", err)
 	}
 
@@ -617,7 +617,7 @@ func TestRunInitLeavesADialledPortUnpublished(t *testing.T) {
 		},
 	})
 
-	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagNonInteractive); err != nil {
+	if _, _, err := runCmd(t, domain.CmdInit, "--"+domain.FlagYes); err != nil {
 		t.Fatalf("run init: %v", err)
 	}
 
@@ -639,4 +639,32 @@ func findJob(t *testing.T, cfg domain.RunConfig, name string) domain.JobConfig {
 	}
 	t.Fatalf("job %q absent de %+v", name, cfg.Jobs)
 	return domain.JobConfig{}
+}
+
+func TestRunInit_NoLongerAcceptsNonInteractive(t *testing.T) {
+	setupTestProject(t)
+
+	_, _, err := runCmd(t, domain.CmdInit, "--non-interactive")
+	if err == nil || !strings.Contains(err.Error(), "unknown flag") {
+		t.Fatalf("err = %v, want an unknown flag", err)
+	}
+}
+
+func TestRunInit_YShorthandRunsUnattended(t *testing.T) {
+	stateDir := setupTestProject(t)
+	projectDir := os.Getenv(domain.EnvProjectDir)
+	if err := os.WriteFile(filepath.Join(projectDir, "docker-compose.yml"), []byte("services: {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := runCmd(t, domain.CmdInit, "-y"); err != nil {
+		t.Fatalf("run init -y: %v", err)
+	}
+	cfg, err := config.LoadRun(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Jobs) != 1 {
+		t.Fatalf("jobs = %+v, want the detected compose file", cfg.Jobs)
+	}
 }

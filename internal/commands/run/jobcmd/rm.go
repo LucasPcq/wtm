@@ -16,12 +16,22 @@ func newRmCmd() *cobra.Command {
 		Long: "Remove a job from <git-common-dir>/wtm/run.toml.\n\n" +
 			"Without an argument, prompts to pick from the existing jobs; under --yes the\n" +
 			"argument is required.\n" +
-			"Fails if the job is referenced by any profile, unless --force is given\n" +
-			"(in which case the references are stripped from those profiles too).",
+			"Fails if anything names the job — a profile, a runner's runs, a job's touches,\n" +
+			"an [[env_port]] or an [[env]] link — or if a worktree still holds data in it\n" +
+			"(a shared service's namespace, which clean finds by the job's name), unless\n" +
+			"--force is given: the references are then stripped, and that data is left\n" +
+			"for you to drop by hand.",
+		Example: `  # Pick the job
+  wtm run job rm
+
+  wtm run job rm worker --yes
+
+  # Also strip the profiles and links that name it
+  wtm run job rm postgres --force --yes`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runRm,
 	}
-	cmd.Flags().Bool(domain.FlagForce, false, "Also strip references from profiles that use this job")
+	cmd.Flags().Bool(domain.FlagForce, false, "Remove it anyway: strip the profiles, runs, touches, [[env_port]] and [[env]] links naming it")
 	shared.AddYesFlag(cmd, "Skip the picker; [name] is then required")
 	shared.AddOutputFlag(cmd)
 	return cmd

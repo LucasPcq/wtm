@@ -6,6 +6,14 @@ Remove the redirection and give named URLs their port back
 wtm run proxy uninstall [flags]
 ```
 
+### Examples
+
+```
+  wtm run proxy uninstall
+
+  wtm run proxy uninstall --yes
+```
+
 ### Options
 
 ```

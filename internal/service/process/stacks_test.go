@@ -83,7 +83,7 @@ func TestAdoptAsksTheProbeWhereTheLauncherActuallyRan(t *testing.T) {
 func TestAdoptAsksNothingAboutAForegroundServiceOrAClaim(t *testing.T) {
 	dir := t.TempDir()
 	claim := detachedRecord(t, dir)
-	claim.Attached = true
+	claim.Joined = true
 	claim.SharedDir = dir
 	foreground := detachedRecord(t, dir)
 	foreground.Name = "dev"

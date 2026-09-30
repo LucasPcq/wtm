@@ -50,6 +50,10 @@ func Create(params domain.CreateParams) (domain.CreateResult, error) {
 			domain.ErrWorktreeExists, params.Branch, target.WorktreePath, params.Branch)
 	}
 
+	if err := checkNameFree(checkNameFreeParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: params.Branch}); err != nil {
+		return domain.CreateResult{}, err
+	}
+
 	reuseBranch := target.State == domain.BranchTargetExisting
 	if err := infra.CreateWorktree(infra.CreateWorktreeParams{
 		ProjectDir:  params.ProjectDir,
@@ -67,7 +71,7 @@ func Create(params domain.CreateParams) (domain.CreateResult, error) {
 		ProjectDir: params.ProjectDir,
 	})
 	if err != nil {
-		return domain.CreateResult{}, fmt.Errorf("find main worktree: %w", err)
+		return domain.CreateResult{}, fmt.Errorf("find main checkout: %w", err)
 	}
 
 	sourceBranch := params.SourceBranch
@@ -89,20 +93,13 @@ func Create(params domain.CreateParams) (domain.CreateResult, error) {
 		}
 	}
 
-	ordinal, err := EnsureOrdinal(WorktreeRef{
-		ProjectDir: params.ProjectDir,
-		StateDir:   params.StateDir,
-		Branch:     params.Branch,
-	})
-	if err != nil {
-		return domain.CreateResult{}, fmt.Errorf("allocate ordinal: %w", err)
-	}
-
+	// No ordinal: it is the run module's, allocated the first time something
+	// asks for the worktree's ports, so a neighbour's unreadable record can
+	// never fail a creation.
 	metadata := domain.WorktreeMetadata{
 		SourceBranch: sourceBranch,
 		CreatedAt:    time.Now().UTC().Format(time.RFC3339),
 		EnvStrategy:  strategy,
-		Ordinal:      ordinal,
 		Isolation:    rules.EffectiveIsolation(params.Isolation),
 	}
 
@@ -149,7 +146,7 @@ func RunCreateHooks(params domain.CreateHooksParams) error {
 	}
 	mainPath, err := infra.FindMainWorktreePath(infra.FindMainWorktreeParams{ProjectDir: params.ProjectDir})
 	if err != nil {
-		return fmt.Errorf("find main worktree: %w", err)
+		return fmt.Errorf("find main checkout: %w", err)
 	}
 	if err := hooks.RunHooks(hooks.RunHooksParams{
 		Hooks:   params.Hooks,
@@ -160,10 +157,9 @@ func RunCreateHooks(params domain.CreateHooksParams) error {
 			Root:       mainPath,
 			FromBranch: params.FromBranch,
 		},
-		Env: hookEnv(WorktreeRef{
-			ProjectDir: params.ProjectDir,
-			StateDir:   params.StateDir,
-			Branch:     params.Branch,
+		Env: hookEnv(hookEnvParams{
+			Ref:          WorktreeRef{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: params.Branch},
+			WorktreePath: params.WorktreePath,
 		}),
 		Output: params.Output,
 		OnHook: params.OnHook,

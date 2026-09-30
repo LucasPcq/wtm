@@ -34,6 +34,13 @@ type WorktreeMetadata struct {
 	Isolation Isolation `json:"isolation,omitempty"`
 }
 
+// WorktreeNameClash names the live worktree whose derived name a branch would
+// share, and that name.
+type WorktreeNameClash struct {
+	Branch string
+	Name   string
+}
+
 // WorktreeStatus holds the display state of a worktree for wtm ls.
 type WorktreeStatus struct {
 	Branch       string
@@ -170,6 +177,16 @@ type CreateResult struct {
 	// created (OriginState empty) or up to date.
 	OriginAhead  int `json:"origin_ahead,omitempty"`
 	OriginBehind int `json:"origin_behind,omitempty"`
+	// Isolation is the worktree's, recorded or, for one that predates the
+	// choice, what it reads as.
+	Isolation Isolation `json:"isolation,omitempty"`
+	// EnvPorts is the port pass this run settled the fresh .env with — the
+	// shape `wtm env` reports as ports. Absent when there was nothing to settle
+	// or the pass could not run, and then Warnings says why.
+	EnvPorts EnvPortPlan `json:"env_ports,omitzero"`
+	// Warnings are what the run module could not do for the worktree, which
+	// never fails its creation (a port pass left undone, and why).
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // CleanParams holds inputs for cleaning a worktree.

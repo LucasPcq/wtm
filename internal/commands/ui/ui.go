@@ -14,10 +14,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules"
 	ghservice "github.com/LucasPcq/wtm/internal/service/github"
 	"github.com/LucasPcq/wtm/internal/service/integration"
-	"github.com/LucasPcq/wtm/internal/service/process"
-	"github.com/LucasPcq/wtm/internal/service/runconfig"
+	"github.com/LucasPcq/wtm/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/internal/service/selfupdate"
-	"github.com/LucasPcq/wtm/internal/service/worktree"
 	"github.com/LucasPcq/wtm/internal/tui/dashboard"
 )
 
@@ -38,10 +36,13 @@ func NewCmd(params NewCmdParams) *cobra.Command {
 			"creates a worktree; right-click a row (or press `m`) to reparent, sync, or delete\n" +
 			"it; `a` opens the actions that run over several worktrees at once, syncing or\n" +
 			"reparenting a selection of them; `L` reads a job's logs in the detail panel.\n" +
-			"The list's local git state refreshes on a short poll; the detail panel reloads\n" +
-			"when the selection changes or an operation touches it, and pull requests load\n" +
-			"once — both refresh on demand with `r`.\n" +
+			fmt.Sprintf("The list's local git state is re-read every %d seconds, when the terminal\n", domain.DashboardGitPollSeconds) +
+			"regains focus and after each action; the detail panel reloads when the selection\n" +
+			"changes or an operation touches it, and pull requests load once. Nothing is\n" +
+			"fetched on its own: `r` fetches the remote and refreshes all of it.\n" +
 			"Press `?` for the key reference.",
+		Example: `  # Press ? inside for the key reference
+  wtm ui`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runUI(cmd, params.Version)
@@ -108,37 +109,22 @@ func buildRunParams(params buildParams) dashboard.RunParams {
 		BoardLoader: dashboard.DefaultBoardLoader(dashboard.LogsLoaderParams{
 			ProjectDir: result.ProjectDir,
 			StateDir:   result.StateDir,
-			// run.toml is read on each call, like the port: `wtm run addressing`
-			// may switch the project while the dashboard is open.
 			PublicPort: func() int {
-				run, _ := runconfig.Load(result.StateDir)
-				return process.PublicProxyPort(rules.RunProxyPort(rules.RunProxyPortParams{Run: run, Global: result.Config.Global}))
+				return runjobs.PublicPort(runjobs.PublicPortParams{StateDir: result.StateDir, Global: result.Config.Global})
 			},
 		}),
-		// One directory listing per worktree, off the UI goroutine like the rest:
-		// this is the only read that says what a worktree ran and no longer runs.
+		JobsLoader: runjobs.Read,
 		TraceLoader: func(branches []string) map[string]map[string]bool {
-			logged := make(map[string]map[string]bool, len(branches))
-			for _, branch := range branches {
-				logged[branch] = process.LoggedJobs(rules.WorktreeLogDir(rules.WorktreeLogDirParams{
-					StateDir: result.StateDir,
-					Branch:   branch,
-				}))
-			}
-			return logged
+			return runjobs.Traces(runjobs.TracesParams{StateDir: result.StateDir, Branches: branches})
 		},
-		// The public port is dialed here rather than once at startup: the loader
-		// already runs off the UI goroutine, and a daemon started after the
-		// dashboard was opened must not leave every address unpublished.
 		AddressLoader: func(request dashboard.AddressRequest) domain.RunAddresses {
-			return worktree.RunAddressesFor(worktree.RunAddressesForParams{
+			return runjobs.Addresses(runjobs.AddressesParams{
 				ProjectDir: result.ProjectDir,
 				StateDir:   result.StateDir,
-				RunConfig:  request.Config,
+				Config:     request.Config,
 				Branches:   request.Branches,
 				EnvFiles:   result.Config.Project.Env.Files,
 				Global:     result.Config.Global,
-				ProxyPort:  process.PublicProxyPort(rules.RunProxyPort(rules.RunProxyPortParams{Run: request.Config, Global: result.Config.Global})),
 			})
 		},
 	}
