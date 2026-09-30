@@ -154,11 +154,11 @@ func TestBackingOutOfTheWizardWritesNothing(t *testing.T) {
 	outcome, presenter := run(t, Params{Context: ctx, Prompter: &flowtest.ScriptedPrompter{}, Wizard: wizard})
 
 	if !outcome.Aborted || runTOMLExists(ctx) || len(presenter.outcomes) != 0 {
-		t.Errorf("aborted = %v, run.toml = %v, conclusions = %d, want an abort that writes and reports nothing",
+		t.Errorf("aborted = %v, run.toml = %v, conclusions = %d, want an abort that writes and concludes nothing",
 			outcome.Aborted, runTOMLExists(ctx), len(presenter.outcomes))
 	}
-	if len(presenter.Notices) != 0 {
-		t.Errorf("notices = %+v, want none: the wizard was the last thing drawn", presenter.Notices)
+	if len(presenter.Notices) != 1 || !presenter.Notices[0].IsAbort() {
+		t.Errorf("notices = %+v, want the abort said like every other flow's", presenter.Notices)
 	}
 }
 

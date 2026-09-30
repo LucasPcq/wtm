@@ -89,14 +89,20 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 	writePortKeys, _ := cmd.Flags().GetBool(domain.FlagWritePortKeys)
 	interactive := shared.Interactive(shared.UnattendedParams{TTY: runctx.IsTTY(), Format: format, Yes: yes})
 
-	_, err = initrun.Run(initrun.Params{
+	outcome, err := initrun.Run(initrun.Params{
 		Context:   shared.FlowContext(res),
 		Request:   initrun.Request{PatchCompose: patchCompose, LinkEnv: linkEnv, WritePortKeys: writePortKeys},
 		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive}),
 		Wizard:    servicesWizard{},
 		Presenter: initPresenter{CLIPresenter: shared.NewPresenter(cmd, format), animate: shared.Animate(cmd, interactive)},
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	if outcome.Aborted {
+		return domain.ErrAborted
+	}
+	return nil
 }
 
 type servicesWizard struct{}

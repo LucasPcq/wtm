@@ -130,9 +130,8 @@ func Run(params Params) (Outcome, error) {
 			Files:      envFiles,
 		}),
 	})
-	// A user backing out changed nothing and says nothing: the wizard's own
-	// screen was the last thing drawn.
 	if errors.Is(err, domain.ErrUserAborted) {
+		params.Presenter.Notice(flow.AbortedNotice)
 		return Outcome{Aborted: true}, nil
 	}
 	if err != nil {
