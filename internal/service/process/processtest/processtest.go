@@ -27,7 +27,10 @@ type Daemon struct {
 	Release bool
 	// ProxyPublicPort is where the daemon says its proxy answers, zero for off.
 	ProxyPublicPort int
-	requests        []process.Request
+	// Version is the build the daemon stamps its answers with, empty for this
+	// one's: a test about a version mismatch sets it.
+	Version  string
+	requests []process.Request
 }
 
 // Serve moves HOME to a directory short enough for the socket — macOS puts it
@@ -66,6 +69,12 @@ func (d *Daemon) serve(listener net.Listener) {
 			_ = json.NewEncoder(conn).Encode(d.answer(req))
 		}
 		conn.Close()
+		// A shutdown is the one request that ends the daemon: the socket stops
+		// answering, which is what a client waits for.
+		if req.Action == process.ActionShutdown {
+			listener.Close()
+			return
+		}
 	}
 }
 
@@ -73,18 +82,27 @@ func (d *Daemon) answer(req process.Request) process.Response {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.requests = append(d.requests, req)
+	resp := d.respond(req)
+	resp.Version = domain.Version
+	if d.Version != "" {
+		resp.Version = d.Version
+	}
+	return resp
+}
+
+func (d *Daemon) respond(req process.Request) process.Response {
 	switch req.Action {
 	case process.ActionList:
-		return process.Response{Status: process.StatusOK, Version: domain.Version, Jobs: append([]domain.JobInfo{}, d.jobs...), ProxyPublicPort: d.ProxyPublicPort}
+		return process.Response{Status: process.StatusOK, Jobs: append([]domain.JobInfo{}, d.jobs...), ProxyPublicPort: d.ProxyPublicPort}
 	case process.ActionStart:
 		if d.StartError != "" {
-			return process.Response{Status: process.StatusError, Version: domain.Version, Message: d.StartError}
+			return process.Response{Status: process.StatusError, Message: d.StartError}
 		}
 	case process.ActionStop, process.ActionStopAll:
 		if d.StopError != "" {
-			return process.Response{Status: process.StatusError, Version: domain.Version, Message: d.StopError}
+			return process.Response{Status: process.StatusError, Message: d.StopError}
 		}
-		resp := process.Response{Status: process.StatusOK, Version: domain.Version, Released: d.Release}
+		resp := process.Response{Status: process.StatusOK, Released: d.Release}
 		if req.Action == process.ActionStopAll {
 			resp.Jobs = d.in(req.WorkDir)
 		}
@@ -93,7 +111,7 @@ func (d *Daemon) answer(req process.Request) process.Response {
 		}
 		return resp
 	}
-	return process.Response{Status: process.StatusOK, Version: domain.Version}
+	return process.Response{Status: process.StatusOK}
 }
 
 // in is what a stop_all answers with, as the real daemon does: the jobs it
