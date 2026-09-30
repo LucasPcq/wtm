@@ -105,6 +105,9 @@ func fieldSteps(params formParams) []flow.Step {
 			Key: KeyStop, Label: domain.RunJobStopLabel,
 			Title: domain.RunJobStopTitle, Description: domain.RunJobStopDesc,
 			Initial: params.Initial.Stop, None: domain.RunJobStopSummaryNone,
+			Skip: func(answers flow.Answers) (bool, string) {
+				return isTask(answers) && params.Initial.Stop == "", domain.RunJobStopSkipTask
+			},
 		}),
 		optionalText(optionalParams{
 			Key: KeyCwd, Label: domain.RunJobCwdLabel,
@@ -144,6 +147,7 @@ type optionalParams struct {
 	// silently empty.
 	None     string
 	Validate func(string) error
+	Skip     func(flow.Answers) (bool, string)
 }
 
 func optionalText(params optionalParams) flow.Step {
@@ -155,6 +159,7 @@ func optionalText(params optionalParams) flow.Step {
 		Description: params.Description,
 		Default:     params.Initial,
 		Validate:    params.Validate,
+		Skip:        params.Skip,
 		Resolve: func(flow.Answers) (flow.Answer, error) {
 			return flow.Answer{Value: params.Initial}, nil
 		},

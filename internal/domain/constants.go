@@ -1929,6 +1929,7 @@ const (
 	RunJobBindsNoPortYes        = "yes"
 	RunJobBindsNoPortNo         = "no"
 	RunJobBindsNoPortSkipTask   = "a task binds nothing"
+	RunJobStopSkipTask          = "a task stops by exiting"
 	RunJobBindsNoPortSkipsPorts = "it declares ports"
 
 	RunJobScopeLabel           = "Scope"

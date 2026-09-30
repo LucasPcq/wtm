@@ -54,9 +54,9 @@ func TestAddAsksRunsTouchesAndScope(t *testing.T) {
 			t.Errorf("asked %s, want %s asked", prompter.AskedKeys(), key)
 		}
 	}
-	for _, key := range []string{jobflow.KeyBindsNoPort, jobflow.KeyScope, jobflow.KeyNamespaceName} {
+	for _, key := range []string{jobflow.KeyStop, jobflow.KeyBindsNoPort, jobflow.KeyScope, jobflow.KeyNamespaceName} {
 		if slices.Contains(prompter.Asked, key) {
-			t.Errorf("asked %s of a task, which has no port and no instance to share", key)
+			t.Errorf("asked %s of a task, which has no stop, no port and no instance to share", key)
 		}
 	}
 	saved := loadConfig(t, ctx.StateDir).Jobs[3]
