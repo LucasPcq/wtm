@@ -26,7 +26,6 @@ func NewTextInput(params NewTextInputParams) TextInputModel {
 	ti := textinput.New()
 	ti.Focus()
 	ti.Prompt = styles.InputPrompt.Render("❯ ")
-	ti.CharLimit = 256
 	ti.Width = 76
 
 	if params.Placeholder != "" {

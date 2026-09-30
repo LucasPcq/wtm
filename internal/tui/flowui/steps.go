@@ -215,6 +215,7 @@ func (p *plan) choiceStep(step flow.Step) components.Step {
 				Title:       content.Title,
 				Description: content.Description,
 				Items:       toItems(content.Options),
+				Start:       content.Start,
 			}
 		},
 	})

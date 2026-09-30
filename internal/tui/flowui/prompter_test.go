@@ -665,3 +665,26 @@ func TestAConditionalStepsBuildErrorIsItsOwn(t *testing.T) {
 		t.Fatalf("err = %v, want the step's own cause", err)
 	}
 }
+
+// A select with a Skip is drawn through ChoiceStep; it dropped the start, so
+// `run job edit` on a shared service opened its scope on "per worktree" and
+// a plain enter un-shared it.
+func TestAConditionalSelectKeepsItsStartingValue(t *testing.T) {
+	step := flow.Step{
+		Kind: flow.StepSelect, Key: "scope", Label: "Scope",
+		Options: []flow.Option{{Label: "per worktree", Value: "worktree"}, {Label: "shared", Value: "shared"}},
+		Skip:    func(flow.Answers) (bool, string) { return false, "" },
+		Build: func(flow.Answers) (flow.StepContent, error) {
+			return flow.StepContent{Start: "shared"}, nil
+		},
+	}
+
+	built := (&plan{}).choiceStep(step)
+	list, ok := built.Build(nil).(components.SelectListModel)
+	if !ok {
+		t.Fatalf("choice step built %T, want a select list", built.Build(nil))
+	}
+	if got := list.Value(); got != "shared" {
+		t.Errorf("cursor = %q, want the start the step built", got)
+	}
+}
