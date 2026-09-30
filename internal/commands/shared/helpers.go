@@ -23,11 +23,9 @@ type ConfigResult struct {
 	StateDir   string
 }
 
-// ProjectRoot returns the main worktree path. Works from any worktree —
-// resolves back to the parent repo. WTM_PROJECT_DIR overrides git resolution;
-// useful in tests and CI.
+// ProjectRoot returns the main checkout path from any worktree.
 func ProjectRoot(dir string) (string, error) {
-	if override := os.Getenv("WTM_PROJECT_DIR"); override != "" {
+	if override := os.Getenv(domain.EnvProjectDir); override != "" {
 		return override, nil
 	}
 	mainPath, err := infra.FindMainWorktreePath(infra.FindMainWorktreeParams{

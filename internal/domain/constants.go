@@ -224,6 +224,10 @@ const (
 	// EnvGoFile is the environment variable used by the shell wrapper to pass the go-file path.
 	EnvGoFile = "WTM_GO_FILE"
 
+	// Override git resolution of the main checkout and of the state directory, for tests and CI.
+	EnvProjectDir = "WTM_PROJECT_DIR"
+	EnvStateDir   = "WTM_STATE_DIR"
+
 	// Worktree-scoped variables injected into every job and lifecycle hook, so
 	// two worktrees running the same services never share a resource.
 	EnvWorktree           = "WTM_WORKTREE"
