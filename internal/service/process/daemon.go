@@ -52,8 +52,12 @@ type daemonServer struct {
 	// auto-exited under, and the caller would read a closed socket instead of
 	// what the command said.
 	inflight atomic.Int64
-	shutdown chan struct{}
-	stopOnce sync.Once
+	// lastActivity is when a connection last opened or closed, in Unix nanos:
+	// idleness counts from there, so a command between two of its requests
+	// never finds the socket gone.
+	lastActivity atomic.Int64
+	shutdown     chan struct{}
+	stopOnce     sync.Once
 	// stopped closes once stop has run to its end: RunDaemon returning is the
 	// process exiting, and a foreground job still in its grace period would die
 	// mid-cleanup with the index still naming it.
@@ -122,7 +126,7 @@ func RunDaemon(params DaemonParams) error {
 		}
 	}()
 
-	// Idle timer for auto-exit
+	d.touch()
 	go d.idleWatcher(daemonIdleTimeout)
 
 	// Accept loop
@@ -142,9 +146,11 @@ func RunDaemon(params DaemonParams) error {
 		}
 		d.clients.Add(1)
 		d.inflight.Add(1)
+		d.touch()
 		go func() {
 			defer d.clients.Done()
 			defer d.inflight.Add(-1)
+			defer d.touch()
 			d.handleConnection(conn)
 		}()
 	}
@@ -183,19 +189,33 @@ func (d *daemonServer) idle() bool {
 	return d.proxyPort == 0 || !d.manager.ServesRoutes()
 }
 
+func (d *daemonServer) touch() {
+	d.lastActivity.Store(time.Now().UnixNano())
+}
+
+func (d *daemonServer) quietFor() time.Duration {
+	return time.Since(time.Unix(0, d.lastActivity.Load()))
+}
+
 func (d *daemonServer) idleWatcher(timeout time.Duration) {
-	ticker := time.NewTicker(timeout)
-	defer ticker.Stop()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 
 	for {
 		select {
 		case <-d.shutdown:
 			return
-		case <-ticker.C:
+		case <-timer.C:
+			quiet := d.quietFor()
+			if quiet < timeout {
+				timer.Reset(timeout - quiet)
+				continue
+			}
 			if d.idle() {
 				d.stop()
 				return
 			}
+			timer.Reset(timeout)
 		}
 	}
 }
