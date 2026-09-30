@@ -880,11 +880,12 @@ const (
 	ImportEmptyMessage = "run.toml replaced by an empty configuration."
 	// The empty-detection branch of `run init`: nothing was configured, so it is
 	// a non-event, and what to do about it is two commands like anywhere else.
-	RunInitNothingDetected = "No docker-compose files or package scripts detected — nothing to configure automatically."
-	RunInitByHandJob       = "wtm run job add"
-	RunInitByHandJobNote   = "declare a job by hand"
-	RunInitByHandProfile   = "wtm run profile add"
-	RunInitByHandProfNote  = "group jobs into a profile"
+	RunInitDetectingMessage = "Detecting services…"
+	RunInitNothingDetected  = "No docker-compose files or package scripts detected — nothing to configure automatically."
+	RunInitByHandJob        = "wtm run job add"
+	RunInitByHandJobNote    = "declare a job by hand"
+	RunInitByHandProfile    = "wtm run profile add"
+	RunInitByHandProfNote   = "group jobs into a profile"
 	// The already-configured branch of `wtm init`.
 	InitAlreadyExistsFmt = "%s already exists."
 	InitReconfigureCmd   = "wtm init --only env|hooks|worktrees"

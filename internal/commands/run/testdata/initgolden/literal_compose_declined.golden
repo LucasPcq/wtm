@@ -1,0 +1,67 @@
+### args: --yes
+### stdout
+
+  ✓ Configured run module → <repo>/.git/wtm/run.toml   2 added
+
+  ✓ 2 port(s) declared in run.toml
+
+  ╭───────────────────────────────────────────────────────────────────────────────────╮
+  │ Ports left alone                                                                  │
+  │ docker-compose.yml · postgres   "5432:5432" binds the same port in every worktree │
+  │   write "${POSTGRES_PORT:-5432}:5432"                                             │
+  │   then: wtm run job edit docker-compose --port POSTGRES_PORT=5432                 │
+  │ docker-compose.yml · cache   "6379:6379" binds the same port in every worktree    │
+  │   write "${CACHE_PORT:-6379}:6379"                                                │
+  │   then: wtm run job edit docker-compose --port CACHE_PORT=6379                    │
+  ╰───────────────────────────────────────────────────────────────────────────────────╯
+
+  ╭───────────────────────────────────────────────────────────────────────────────────────────╮
+  │ Names left alone                                                                          │
+  │ docker-compose.yml · container postgres   app-postgres is the same name in every worktree │
+  │ docker-compose.yml · volume pgdata   app-pgdata is the same name in every worktree        │
+  ╰───────────────────────────────────────────────────────────────────────────────────────────╯
+
+  ╭──────────────────────────────────────────────────────────────────────────╮
+  │ These jobs will bind the same port in every worktree                     │
+  │ docker-compose   no port declared                                        │
+  │                                                                          │
+  │ Declare a port, or reference it in the command: `wtm run job edit <job>` │
+  ╰──────────────────────────────────────────────────────────────────────────╯
+  ╭────────────────────────────────────────────────────────────────────────────────────╮
+  │ Named URLs carry a port                                                            │
+  │ Jobs publishing a url answer on http://<job>.<worktree>.<repo>.localhost:11080     │
+  │ `wtm run proxy install` serves them on port 80 so the port disappears from the URL │
+  ╰────────────────────────────────────────────────────────────────────────────────────╯
+
+  → wtm run up   start the jobs
+  → wtm run job add   declare another
+
+
+### stderr
+
+### file .git/wtm/run.toml
+#:schema ./schemas/run.schema.json
+
+[[job]]
+  name = "docker-compose"
+  kind = "service"
+  cmd = "docker-compose -f docker-compose.yml up -d"
+  stop = "docker-compose -f docker-compose.yml down --remove-orphans"
+  cwd = "."
+
+[[job]]
+  name = "dev"
+  kind = "service"
+  cmd = "pnpm run dev"
+  cwd = "."
+  [job.ports]
+    DB_PORT = 5432
+    PORT = 4000
+  [job.url]
+    port = "PORT"
+
+[[profile]]
+  name = "all"
+  jobs = ["docker-compose", "dev"]
+  default = true
+

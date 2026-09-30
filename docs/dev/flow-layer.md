@@ -34,6 +34,7 @@ is implemented yet.
 | `wtm run list` | migrated — `internal/flow/run/list` answers which entry was picked and what to do to it; `internal/commands/run/dispatch.go` runs that action through the flow it already has for it (LUC-217) |
 | `wtm run job add\|edit\|rm\|list` | migrated — `internal/flow/run/job` (LUC-217) |
 | `wtm run profile add\|edit\|rm\|list` | migrated — `internal/flow/run/profile` (LUC-217) |
+| `wtm run init` | migrated — `internal/flow/run/initrun`. Its questions are **not** a `flow.Session`: the services wizard edits structured rows (ports, runners, scopes, namespaces, routes, commands, profiles) that no `StepKind` renders, so it is a seam of its own, `initrun.Wizard`, answered on the CLI by `internal/tui/inittui` and, unattended, by `rules.AutoServicesAnswers`. The one standalone question left, linking the `.env` keys, goes through `Prompter.Confirm`. Its writes (`runconfig.Save`, `compose.PatchAll`, `envsvc.WritePortKeys`, `envsvc.AddEnvTargets`) are in archlint's `mutations` table. Golden files in `internal/commands/run/testdata/initgolden` pin its output |
 | `wtm run open`, `wtm run url` | migrated — `internal/flow/run/open` and `internal/flow/run/url`, over `target.URLStep` and the address reader in `internal/flow/run/urls` (LUC-217) |
 | CLI wizard surface | `internal/tui/flowui` |
 | Unattended surface | `flow.Unattended` (in `internal/flow`) |
