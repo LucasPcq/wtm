@@ -37,7 +37,7 @@ func newEditCmd() *cobra.Command {
 		Args: cobra.MaximumNArgs(1),
 		RunE: runEdit,
 	}
-	cmd.Flags().String(domain.FlagName, "", "Rename the job, updating the profiles, runs, touches, [[env_port]] and [[env]] links that name it")
+	shared.AddSingleFlag(cmd, domain.FlagName, "Rename the job, updating the profiles, runs, touches, [[env_port]] and [[env]] links that name it")
 	cmd.Flags().String(domain.FlagCmd, "", "Command to run, as a /bin/sh line")
 	cmd.Flags().String(domain.FlagKind, "", "Job kind: service or task")
 	cmd.Flags().String(domain.FlagStop, "", "Stop command, as a /bin/sh line (pass '' to drop it)")

@@ -202,6 +202,7 @@ func TestASecondJobOrProfileIsRefused(t *testing.T) {
 		{domain.CmdLogs, "--" + domain.FlagJob, "api", "--" + domain.FlagJob, "web"},
 		{domain.CmdExport, "--" + domain.FlagProfile, "front", "--" + domain.FlagProfile, "back"},
 		{domain.CmdProfile, domain.CmdEdit, "front", "--" + domain.FlagName, "a", "--" + domain.FlagName, "b"},
+		{domain.CmdJob, domain.CmdEdit, "api", "--" + domain.FlagName, "a", "--" + domain.FlagName, "b"},
 	} {
 		_, _, err := runCmd(t, args...)
 		if err == nil || !strings.Contains(err.Error(), "it takes one value") {
