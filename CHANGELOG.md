@@ -1,20 +1,20 @@
 # Changelog
 
-## v0.28.0 — Un worktree, une stack isolée
+## v0.28.0 : Un worktree, une stack isolée
 
-Chaque worktree peut désormais faire tourner ses propres services — serveurs de dev, stack `docker compose` — sur ses propres ports, sous son propre nom, à côté des autres. `wtm run init` détecte vos fichiers compose et vos scripts et écrit la configuration une fois ; `wtm run up` démarre la stack du worktree où vous êtes. Le module reste optionnel : sans `run.toml`, rien ne change.
+Chaque worktree peut désormais faire tourner ses propres services (serveurs de dev, stack `docker compose`) sur ses propres ports, sous son propre nom, à côté des autres. `wtm run init` détecte vos fichiers compose et vos scripts et écrit la configuration une fois ; `wtm run up` démarre la stack du worktree où vous êtes. Le module reste optionnel : sans `run.toml`, rien ne change.
 
 Cette version casse plusieurs choses pour qui utilisait `wtm run` ou `wtm switch` en 0.27, ou scripte wtm : lisez le [guide de migration](docs/guide/migrating-to-0.28.md) avant de mettre à jour.
 
 ### Nouveautés
 
-- **Le module `run`** — des services et des tâches par worktree, groupés en profils, lancés par un daemon en tâche de fond. `wtm run init` les détecte. → [Jobs et profils](docs/guide/jobs-and-profiles.md)
-- **Isolation par worktree** — ports décalés (`3000` → `3010`), `COMPOSE_PROJECT_NAME` propre, et le choix *isolated* ou *verbatim* à la création. → [Isolation](docs/guide/isolation.md)
-- **Les ports vivent dans le `.env`** — wtm réécrit le port dans les valeurs qui le portent (`DATABASE_URL`…) sans toucher au reste de la ligne. → [Comment marche `wtm run`](docs/guide/how-run-works.md)
-- **Des URLs nommées** — `http://web.feat-login.acme.localhost:11080` par job et par worktree, servies par un proxy local ; port 80 sur macOS avec `wtm run proxy install`. → [Adressage](docs/guide/addressing.md)
-- **Services partagés** — un postgres pour tout le dépôt, une base par worktree, supprimée au `clean`. → [Services partagés](docs/guide/shared-services.md)
-- **Un garde-fou sur les données** — `run up` s'arrête avant qu'une migration ne touche des données que le worktree ne possède pas.
-- **Plusieurs worktrees à la fois** — `wtm run up feat-a feat-b`, une vue plein écran par run (`-d` pour rendre la main), et `wtm ui` qui affiche et pilote les services.
+- **Le module `run`** : des services et des tâches par worktree, groupés en profils, lancés par un daemon en tâche de fond. `wtm run init` les détecte. → [Jobs et profils](docs/guide/jobs-and-profiles.md)
+- **Isolation par worktree** : ports décalés (`3000` → `3010`), `COMPOSE_PROJECT_NAME` propre, et le choix *isolated* ou *verbatim* à la création. → [Isolation](docs/guide/isolation.md)
+- **Les ports vivent dans le `.env`** : wtm réécrit le port dans les valeurs qui le portent (`DATABASE_URL`…) sans toucher au reste de la ligne. → [Comment marche `wtm run`](docs/guide/how-run-works.md)
+- **Des URLs nommées** : `http://web.feat-login.acme.localhost:11080` par job et par worktree, servies par un proxy local ; port 80 sur macOS avec `wtm run proxy install`. → [Adressage](docs/guide/addressing.md)
+- **Services partagés** : un postgres pour tout le dépôt, une base par worktree, supprimée au `clean`. → [Services partagés](docs/guide/shared-services.md)
+- **Un garde-fou sur les données** : `run up` s'arrête avant qu'une migration ne touche des données que le worktree ne possède pas.
+- **Plusieurs worktrees à la fois** : `wtm run up feat-a feat-b`, une vue plein écran par run (`-d` pour rendre la main), et `wtm ui` qui affiche et pilote les services.
 - **`--quiet` sur toutes les commandes**, et `--output json` sur `create`, `extract` et `checkout` rapporte l'isolation et les ports.
 - **Un [guide utilisateur](docs/guide/README.md)** et un README repensé.
 

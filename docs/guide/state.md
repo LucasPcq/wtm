@@ -28,15 +28,15 @@ Everything wtm knows about a repository lives under its git common directory (`.
 | `env_strategy` | how its `.env` files were provisioned: `example`, `main` or `parent` |
 | `ordinal` | its stable number, from which its ports are derived (`base + ordinal × port_offset_block`). Allocated on first need and released when the worktree is cleaned; the main checkout is `0` and has no `meta.json` |
 | `isolation` | `isolated` or `verbatim`. Absent on a worktree created before v0.28, whose [adoption](isolation.md#worktrees-created-before-v028) is pending |
-| `namespaces` | the shared services it created a namespace in — what `clean` and `prune` drop |
+| `namespaces` | the shared services it created a namespace in, which `clean` and `prune` drop |
 
 ### `pending-removals.toml`
 
-A `clean` or `prune` that could not drop a namespace — its shared service was down, the drop timed out, or was kept under `--yes` — records the debt here. It is paid the next time wtm starts that service or runs `prune`, and withdrawn if a worktree of the same name is created again first. See [Shared services](shared-services.md#what-clean-and-prune-do-with-the-data).
+A `clean` or `prune` that could not drop a namespace (its shared service was down, the drop timed out, or was kept under `--yes`) records the debt here. It is paid the next time wtm starts that service or runs `prune`, and withdrawn if a worktree of the same name is created again first. See [Shared services](shared-services.md#what-clean-and-prune-do-with-the-data).
 
 ## Per machine: beside the global config
 
-The global config lives in the OS config directory — `~/.config/wtm/` on Linux, `~/Library/Application Support/wtm/` on macOS — and the run daemon keeps its files next to it:
+The global config lives in the OS config directory (`~/.config/wtm/` on Linux, `~/Library/Application Support/wtm/` on macOS), and the run daemon keeps its files next to it:
 
 ```
 <config dir>/wtm/
@@ -47,6 +47,6 @@ The global config lives in the OS config directory — `~/.config/wtm/` on Linux
 └── jobs.json     # the daemon's index of what it started
 ```
 
-`jobs.json` is what makes the daemon disposable: it exits about 30 s after its last foreground job, detached services keep running without it, and the next daemon reads the index back — so `wtm run ps` still lists a compose stack after a reboot and `wtm run down` still stops it. `wtm run daemon status` reports what is up; `wtm run daemon restart` replaces a daemon of another wtm build.
+`jobs.json` is what makes the daemon disposable: it exits about 30 s after its last foreground job, detached services keep running without it, and the next daemon reads the index back, so `wtm run ps` still lists a compose stack after a reboot and `wtm run down` still stops it. `wtm run daemon status` reports what is up; `wtm run daemon restart` replaces a daemon of another wtm build.
 
 On macOS, `wtm run proxy install` adds one file of its own: a LaunchAgent under `~/Library/LaunchAgents`, removed by `wtm run proxy uninstall`.

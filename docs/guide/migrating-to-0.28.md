@@ -5,7 +5,7 @@
 ## Checklist
 
 1. **Open a new shell** after upgrading (or re-run `eval "$(wtm shell-init)"`). The `wtm` shell function now returns the command's exit code; the old one always returned `0`.
-2. **Decide the isolation of each worktree created with 0.27** — see [below](#worktrees-created-with-027).
+2. **Decide the isolation of each worktree created with 0.27**: see [below](#worktrees-created-with-027).
 3. **Stop stacks started by 0.27** once, with `docker compose -p <old-name> down`: they ran under another compose project name, and a new `run up` will not find them.
 4. **Re-read your hooks**: they now run through `/bin/sh -c`.
 5. **Update scripts and agents**: `--non-interactive` → `--yes`, `wtm switch` → `wtm go` + `wtm run up`, the new [JSON contract](#the-json-contract-of-wtm-run) and [exit codes](#exit-codes). Re-run `wtm agents install` so your agent's skill describes 0.28.
@@ -14,7 +14,7 @@
 
 A worktree created before 0.28 recorded no isolation (its `meta.json` has no `isolation` field). It keeps running on its source's ports and compose project:
 
-- `wtm env <branch> --yes` reconciles its `.env` keys and **touches nothing run-related** — no port shift, no `COMPOSE_PROJECT_NAME` — and says so;
+- `wtm env <branch> --yes` reconciles its `.env` keys and **touches nothing run-related** (no port shift, no `COMPOSE_PROJECT_NAME`) and says so;
 - `wtm run up` and `wtm run start` refuse it, naming the command to run.
 
 Decide once per worktree:
@@ -59,9 +59,9 @@ Two refusals are new. When `run.toml` declares a job, a worktree whose derived n
 
 ## Exit codes
 
-- **2** — a usage error: unknown flag or subcommand (including `wtm run <unknown>`), unreadable flag value, unknown `--output` format, extra argument. It was `1`.
-- **14** — a job or profile `run.toml` does not declare, now also for `run job|profile edit|rm` and `run export --profile`. It is checked before the daemon is contacted: nothing was started or stopped.
-- **16** — no `run.toml`; the message says to run `wtm run init`.
+- **2**: a usage error: unknown flag or subcommand (including `wtm run <unknown>`), unreadable flag value, unknown `--output` format, extra argument. It was `1`.
+- **14**: a job or profile `run.toml` does not declare, now also for `run job|profile edit|rm` and `run export --profile`. It is checked before the daemon is contacted: nothing was started or stopped.
+- **16**: no `run.toml`; the message says to run `wtm run init`.
 
 ## The daemon
 

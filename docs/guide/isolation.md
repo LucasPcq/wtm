@@ -1,15 +1,15 @@
 # Isolation: isolated or verbatim
 
-Two worktrees of the same repository run the same services. Isolation is what keeps them from colliding on a port, a Docker container or a database — and wtm lets each worktree decide, once, whether it wants that.
+Two worktrees of the same repository run the same services. Isolation is what keeps them from colliding on a port, a Docker container or a database, and wtm lets each worktree decide, once, whether it wants that.
 
 ## The two answers
 
 `create`, `extract` and `checkout` record how the new worktree stands against its **source** (the worktree or branch it was created from), in the worktree's `meta.json`:
 
 - **Isolated** (the default). The worktree gets its own ports (`base + WTM_PORT_OFFSET`), its own compose project (`COMPOSE_PROJECT_NAME=<repo>-<worktree>`, so its own containers, networks and volumes) and its own namespace in each shared service. These values are written into its `.env` files when it is created, and applied when `wtm run` starts its jobs, so a `docker compose up` or a `pnpm dev` typed by hand is isolated too.
-- **Verbatim**. The `.env` is kept as it was copied, and `wtm run` runs the worktree on the ports and the data that file names — its source's. `COMPOSE_PROJECT_NAME` is not set by wtm: the copied `.env` decides, so the worktree **shares its source's compose volumes and data**. Only one of the two can be up at a time: `run up` and `run start` say so and offer to stop the other one, rather than letting a port bind fail.
+- **Verbatim**. The `.env` is kept as it was copied, and `wtm run` runs the worktree on the ports and the data that file names: its source's. `COMPOSE_PROJECT_NAME` is not set by wtm: the copied `.env` decides, so the worktree **shares its source's compose volumes and data**. Only one of the two can be up at a time: `run up` and `run start` say so and offer to stop the other one, rather than letting a port bind fail.
 
-The question is only asked when `run.toml` declares something a worktree could isolate — a port, a namespace, an `[[env_port]]` or `[[env]]` link, a compose stack. Without any, both answers do the same thing.
+The question is only asked when `run.toml` declares something a worktree could isolate: a port, a namespace, an `[[env_port]]` or `[[env]]` link, a compose stack. Without any, both answers do the same thing.
 
 Pick per worktree with `--isolation isolated|verbatim`; set the project's default with `isolation = "verbatim"` at the top of `run.toml`. Under `--yes`, a creation takes the flag, else the project default, else `isolated`.
 
@@ -18,7 +18,7 @@ Pick per worktree with `--isolation isolated|verbatim`; set the project's defaul
 `wtm env <branch> --isolation isolated|verbatim` settles an existing worktree on the other answer:
 
 - `--isolation isolated` writes every port, compose project and namespace value the worktree was left without.
-- `--isolation verbatim` puts the values wtm owns — linked ports, `[[env]]` values and `COMPOSE_PROJECT_NAME` — back to the source's, removes the ones the source lacks, and leaves every other key alone. The worktree then shares its source's compose volumes again. Namespaces the worktree already created stay recorded, so `wtm clean` still drops them.
+- `--isolation verbatim` puts the values wtm owns (linked ports, `[[env]]` values and `COMPOSE_PROJECT_NAME`) back to the source's, removes the ones the source lacks, and leaves every other key alone. The worktree then shares its source's compose volumes again. Namespaces the worktree already created stay recorded, so `wtm clean` still drops them.
 
 The new isolation is recorded only once the `.env` is in line with it: a run that fails or is cancelled records nothing. The interactive `wtm env` shows the values it will put back before it does, and its recap can keep a worktree verbatim from then on.
 
@@ -45,4 +45,4 @@ Some tasks change data: a migration, a reset, a seed. Run against data the workt
 
 wtm cannot read that from a command, so a job declares it: `touches = ["postgres"]` names the services whose data it changes. `wtm run init` asks it task by task and pre-fills what the names make obvious; `wtm run job add|edit --touches` sets it by hand.
 
-Before starting a job whose `touches` reach foreign data — including a job started by a runner through `runs` — `run up` and `run start` stop and ask. Under `--yes` they refuse, and name the way out: `--force` runs it anyway; `wtm env <branch> --isolation isolated` gives a verbatim worktree its own data; a `[job.namespace]` gives each worktree its own part of a shared service.
+Before starting a job whose `touches` reach foreign data (including a job started by a runner through `runs`), `run up` and `run start` stop and ask. Under `--yes` they refuse, and name the way out: `--force` runs it anyway; `wtm env <branch> --isolation isolated` gives a verbatim worktree its own data; a `[job.namespace]` gives each worktree its own part of a shared service.

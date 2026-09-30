@@ -8,8 +8,8 @@
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `isolation` | `"isolated"` | what a new worktree gets when nobody is asked: `"isolated"` or `"verbatim"` — see [Isolation](isolation.md) |
-| `addressing` | `"names"` | what an `[[env_port]]` link writes into a value pointing at a job that publishes a URL: its named origin (`"names"`) or its port (`"ports"`) — see [Addressing](addressing.md) |
+| `isolation` | `"isolated"` | what a new worktree gets when nobody is asked: `"isolated"` or `"verbatim"`, see [Isolation](isolation.md) |
+| `addressing` | `"names"` | what an `[[env_port]]` link writes into a value pointing at a job that publishes a URL: its named origin (`"names"`) or its port (`"ports"`), see [Addressing](addressing.md) |
 | `concurrency` | unset (asked once) | the standing answer when another worktree runs jobs: `"parallel"` keeps them, `"exclusive"` stops them first |
 | `port_offset_block` | `10` | the spacing between two worktrees' ports: worktree `n` binds `base + n × block` |
 | `port_probe_timeout` | `15` | seconds `run up` / `run start` wait for a declared port to answer; a negative value turns the check off |
@@ -28,8 +28,8 @@
 | `probe` | no | `false` skips the port check for this job |
 | `binds_no_port` | no | `true` for a service that listens on nothing by design (a watcher, a worker, a runner) |
 | `runs` | no | the declared jobs this one starts itself (`turbo run dev`); no cycles |
-| `touches` | no | the declared services whose data this job changes — see [foreign data](isolation.md#foreign-data-and-touches) |
-| `scope` | no | `"shared"`: one instance for the repository, run in the main checkout — see [Shared services](shared-services.md). Absent means one per worktree |
+| `touches` | no | the declared services whose data this job changes, see [foreign data](isolation.md#foreign-data-and-touches) |
+| `scope` | no | `"shared"`: one instance for the repository, run in the main checkout, see [Shared services](shared-services.md). Absent means one per worktree |
 | `namespace` | no | shared services only: `{ name, create, remove, env }`, the worktree's own part of the service. `name` and `create` are required together |
 
 A job runs with the worktree's identity in its environment: `WTM_BRANCH`, `WTM_WORKTREE` (the branch as a slug), `WTM_ORDINAL` (the main checkout is `0`), `WTM_PORT_OFFSET`, `WTM_ISOLATION`, `COMPOSE_PROJECT_NAME` (isolated worktrees and the main checkout) and its declared ports. Two base ports a multiple of `port_offset_block` apart are refused, since two worktrees would meet on the same port.
@@ -50,14 +50,14 @@ Links a `.env` key to a declared port, so the port inside its value follows the 
 | --- | --- |
 | `file` | a `.env` target configured in `config.toml` |
 | `key` | the key whose value carries the port |
-| `job` | the job declaring the port — required, since two jobs may both declare a `PORT` |
+| `job` | the job declaring the port, required since two jobs may both declare a `PORT` |
 | `port` | the declared port name |
 
-wtm finds the declared base inside the value and shifts only that number — or, under `addressing = "names"`, writes the job's whole named origin when the value is a URL and the job publishes one. A value where the base is missing or appears twice is reported and left alone.
+wtm finds the declared base inside the value and shifts only that number or, under `addressing = "names"`, writes the job's whole named origin when the value is a URL and the job publishes one. A value where the base is missing or appears twice is reported and left alone.
 
 ## `[[env]]`
 
-Writes a `.env` key's whole value from a template — what a worktree holds of a shared service, which no port can say:
+Writes a `.env` key's whole value from a template: what a worktree holds of a shared service, which no port can say:
 
 | Key | Meaning |
 | --- | --- |
