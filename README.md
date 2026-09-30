@@ -8,6 +8,7 @@
 <p align="center">
   <a href="https://github.com/LucasPcq/wtm/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/LucasPcq/wtm?sort=semver"></a>
   <a href="https://github.com/LucasPcq/wtm/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/LucasPcq/wtm/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
 </p>
 
 <p align="center">
@@ -188,4 +189,4 @@ Opt-in: `wtm run init` sets it up once per repository.
 
 ## License
 
-MIT
+[MIT](LICENSE)
