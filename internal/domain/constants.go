@@ -3017,6 +3017,7 @@ const (
 	// FlowStepRequired*Fmt refuse a step that has no safe default and cannot be
 	// asked (step label, flag name).
 	FlowStepRequiredFmt     = "%s is required and cannot be asked in this mode"
+	FlowEntryRequired       = "a name is required"
 	FlowStepRequiredFlagFmt = "%s is required and cannot be asked in this mode: pass --%s"
 	// FlowStepRequiredArgFmt is the same refusal for a step whose answer is a
 	// positional: naming a flag that does not exist would send the reader looking
