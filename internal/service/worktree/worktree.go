@@ -50,7 +50,7 @@ func Create(params domain.CreateParams) (domain.CreateResult, error) {
 			domain.ErrWorktreeExists, params.Branch, target.WorktreePath, params.Branch)
 	}
 
-	if err := checkNameFree(checkNameFreeParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: params.Branch}); err != nil {
+	if err := CheckNameFree(NameCheckParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: params.Branch}); err != nil {
 		return domain.CreateResult{}, err
 	}
 

@@ -9,19 +9,17 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
-type checkNameFreeParams struct {
+type NameCheckParams struct {
 	ProjectDir string
 	StateDir   string
 	Branch     string
 }
 
-// checkNameFree refuses a branch whose derived name a live worktree carries.
+// CheckNameFree refuses a branch whose derived name a live worktree carries.
 // The names only exist for the run module, so a project declaring no job is
-// never refused: the core creates what it always created. A run.toml that
-// cannot be read still counts as declaring some — it says nothing about what it
-// will run once fixed.
-func checkNameFree(params checkNameFreeParams) error {
-	if !runDeclaresJobs(params.StateDir) {
+// never refused: the core creates what it always created.
+func CheckNameFree(params NameCheckParams) error {
+	if !DerivedNamesMatter(params.StateDir) {
 		return nil
 	}
 	worktrees, err := infra.ListWorktrees(infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
@@ -35,7 +33,10 @@ func checkNameFree(params checkNameFreeParams) error {
 	return fmt.Errorf("%w: "+domain.WorktreeNameClashFmt, domain.ErrWorktreeNameTaken, params.Branch, clash.Branch, clash.Name)
 }
 
-func runDeclaresJobs(stateDir string) bool {
+// DerivedNamesMatter is whether run.toml declares jobs, the only thing the
+// derived names exist for. A run.toml that cannot be read counts as declaring
+// some: it says nothing about what it will run once fixed.
+func DerivedNamesMatter(stateDir string) bool {
 	cfg, err := config.LoadRun(stateDir)
 	if err != nil {
 		return true
@@ -64,7 +65,7 @@ type liveNames struct {
 }
 
 func nameClashes(params nameClashesParams) liveNames {
-	if !runDeclaresJobs(params.StateDir) {
+	if !DerivedNamesMatter(params.StateDir) {
 		return liveNames{}
 	}
 	return liveNames{checked: true, branches: branchesOf(params.Worktrees)}

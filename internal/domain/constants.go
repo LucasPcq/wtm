@@ -3032,6 +3032,7 @@ const (
 	CreateLoadingFmt               = "Creating worktree %s…"
 	CreateBranchStepDescription    = "Name for the new worktree branch"
 	CreateBranchRequired           = "branch name is required"
+	CreateBranchListedTwiceFmt     = "%s is already in the list"
 	CreateBranchRequiredUnattended = "branch name is required without the interactive wizard (pass it as an argument)"
 	CreateSourceStepDescription    = "Branch to base the new worktree on"
 	CreateEnvStepDescription       = "How to provision .env files in the new worktree"
