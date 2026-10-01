@@ -10,6 +10,14 @@ func TextSummary(model any) string {
 	return ""
 }
 
+// TextListSummary joins the entries of a TextListModel step. Use as a Step.Summary.
+func TextListSummary(model any) string {
+	if c, ok := model.(TextListModel); ok {
+		return strings.Join(c.Values(), ", ")
+	}
+	return ""
+}
+
 // SelectSummary returns the value of a SelectListModel step. Use as a Step.Summary.
 func SelectSummary(model any) string {
 	if c, ok := model.(SelectListModel); ok {

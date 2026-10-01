@@ -13,7 +13,7 @@ import (
 
 // Step defines one step in a wizard.
 // Model must be a SelectListModel, TextInputModel, ConfirmModel, MultiSelectModel,
-// ReorderListModel, HookListModel, EnvResolveModel, PortListModel, RouteListModel,
+// TextListModel, ReorderListModel, HookListModel, EnvResolveModel, PortListModel, RouteListModel,
 // ProfileListModel, KindListModel, ScopeListModel, NamespaceListModel, EnvValueListModel,
 // or CmdListModel. Adding one means teaching every switch below about it —
 // TestWizardRendersEveryStepModel and its neighbours are what enforce that.
@@ -280,6 +280,10 @@ func (m WizardModel) updateStep(step *Step, msg tea.Msg) (advanced bool, back bo
 		step.Model = updated
 		return updated.Chosen(), updated.Aborted(), c
 	case TextInputModel:
+		updated, c := child.Update(msg)
+		step.Model = updated
+		return updated.Done(), updated.Aborted(), c
+	case TextListModel:
 		updated, c := child.Update(msg)
 		step.Model = updated
 		return updated.Done(), updated.Aborted(), c
@@ -571,6 +575,7 @@ func (m WizardModel) helpLine() string {
 type rowless interface{ helpRowless() bool }
 
 var _ rowless = TextInputModel{}
+var _ rowless = TextListModel{}
 
 // doneRower is a step whose last row confirms it. The word for enter follows:
 // on such a step enter acts on the row under the cursor, everywhere else it
@@ -616,6 +621,10 @@ func (m *WizardModel) propagateSize(stepIdx int) {
 		child.height = h
 		m.steps[stepIdx].Model = child
 	case TextInputModel:
+		child.width = m.width
+		child.input.Width = max(10, m.width-4)
+		m.steps[stepIdx].Model = child
+	case TextListModel:
 		child.width = m.width
 		child.input.Width = max(10, m.width-4)
 		m.steps[stepIdx].Model = child
@@ -749,6 +758,8 @@ func (m WizardModel) initStep(stepIdx int) tea.Cmd {
 		return child.Init()
 	case TextInputModel:
 		return child.Init()
+	case TextListModel:
+		return child.Init()
 	case ConfirmModel:
 		return child.Init()
 	case MultiSelectModel:
@@ -786,6 +797,8 @@ func (m WizardModel) viewStep(stepIdx int) string {
 	case SelectListModel:
 		return child.View()
 	case TextInputModel:
+		return child.View()
+	case TextListModel:
 		return child.View()
 	case ConfirmModel:
 		return child.View()
@@ -829,6 +842,10 @@ func (m *WizardModel) resetStep(stepIdx int) {
 		child.aborted = false
 		m.steps[stepIdx].Model = child
 	case TextInputModel:
+		child.done = false
+		child.aborted = false
+		m.steps[stepIdx].Model = child
+	case TextListModel:
 		child.done = false
 		child.aborted = false
 		m.steps[stepIdx].Model = child
@@ -912,6 +929,8 @@ func (m WizardModel) stepDescription(step Step) string {
 	case SelectListModel:
 		return child.desc
 	case TextInputModel:
+		return child.desc
+	case TextListModel:
 		return child.desc
 	case ConfirmModel:
 		return child.desc

@@ -21,6 +21,7 @@ func everyStepModel() []Step {
 	return []Step{
 		{Name: "select", Model: NewSelectList(NewSelectListParams{Title: "t", Description: desc, Items: []SelectItem{{Label: "a"}}})},
 		{Name: "text", Model: NewTextInput(NewTextInputParams{Title: "t", Description: desc})},
+		{Name: "textlist", Model: NewTextList(NewTextListParams{Title: "t", Description: desc, Entries: []string{"a"}})},
 		{Name: "confirm", Model: NewConfirm(NewConfirmParams{Title: "t", Description: desc})},
 		{Name: "multiselect", Model: NewMultiSelect(NewMultiSelectParams{Title: "t", Description: desc, Items: []MultiSelectItem{{Label: "a"}}})},
 		{Name: "reorder", Model: NewReorderList(NewReorderListParams{Title: "t", Description: desc, Items: []ReorderItem{{Label: "a"}}})},
