@@ -64,22 +64,27 @@ func (m TextListModel) Values() []string { return append([]string(nil), m.entrie
 func (m TextListModel) Init() tea.Cmd { return textinput.Blink }
 
 func (m TextListModel) Update(msg tea.Msg) (TextListModel, tea.Cmd) {
-	if keyMsg, ok := msg.(tea.KeyMsg); ok {
-		switch keyMsg.String() {
-		case "tab":
-			m.addTyped()
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if !ok {
+		// The cursor blinks through here too: only a keystroke dismisses a refusal.
+		var cmd tea.Cmd
+		m.input, cmd = m.input.Update(msg)
+		return m, cmd
+	}
+	switch keyMsg.String() {
+	case "tab":
+		m.addTyped()
+		return m, nil
+	case "enter":
+		return m.confirm(), nil
+	case "esc":
+		m.aborted = true
+		return m, nil
+	case "backspace":
+		if m.input.Value() == "" && len(m.entries) > 0 {
+			m.entries = m.entries[:len(m.entries)-1]
+			m.err = nil
 			return m, nil
-		case "enter":
-			return m.confirm(), nil
-		case "esc":
-			m.aborted = true
-			return m, nil
-		case "backspace":
-			if m.input.Value() == "" && len(m.entries) > 0 {
-				m.entries = m.entries[:len(m.entries)-1]
-				m.err = nil
-				return m, nil
-			}
 		}
 	}
 	var cmd tea.Cmd

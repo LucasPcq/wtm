@@ -132,3 +132,11 @@ func TestTextListShowsBadges(t *testing.T) {
 		t.Errorf("view %q should carry the entry's badge", m.View())
 	}
 }
+
+func TestTextListRefusalSurvivesTheCursorBlink(t *testing.T) {
+	m := pressList(typeInList(newTestTextList("feat/a"), "feat/a"), tea.KeyEnter)
+	m, _ = m.Update(m.input.Cursor.BlinkCmd()())
+	if !strings.Contains(strings.ToLower(m.View()), "twice") {
+		t.Errorf("view %q lost the refusal on a non-key message", m.View())
+	}
+}
