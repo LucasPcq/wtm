@@ -48,6 +48,8 @@ type SourceUpdateParams struct {
 	Target     func(string) domain.BranchTarget
 	Branch     string
 	Source     string
+	// Many is a source several new worktrees start from, which the prose says.
+	Many bool
 }
 
 // SourceUpdate classifies the divergence from origin of whichever branch the
@@ -72,7 +74,7 @@ func SourceUpdate(params SourceUpdateParams) SourceUpdatePrompt {
 			Branch:      subject,
 			Show:        true,
 			Title:       fmt.Sprintf(domain.SourceFastForwardPrompt, subject, ab.Behind),
-			Description: domain.SourceFastForwardDescription,
+			Description: Pick(PickParams{Many: params.Many, One: domain.SourceFastForwardDescription, Several: domain.SourceFastForwardDescriptionMany}),
 		}
 	}
 	if state == domain.DivergenceDiverged {
@@ -80,7 +82,7 @@ func SourceUpdate(params SourceUpdateParams) SourceUpdatePrompt {
 			Branch:         subject,
 			Show:           true,
 			Title:          fmt.Sprintf(domain.SourceDivergedPrompt, subject, ab.Ahead, ab.Behind),
-			Warning:        domain.SourceDivergedWarning,
+			Warning:        Pick(PickParams{Many: params.Many, One: domain.SourceDivergedWarning, Several: domain.SourceDivergedWarningMany}),
 			AbortOnDecline: true,
 			SkipReason:     domain.SourceUpdateSkipDiverged,
 		}
@@ -126,4 +128,18 @@ func EnvParentFallback(params EnvFallbackParams) (bool, string) {
 		return false, ""
 	}
 	return true, domain.EnvParentFallbackWarning
+}
+
+type PickParams struct {
+	Many    bool
+	One     string
+	Several string
+}
+
+// Pick is the wording for one new worktree or for several.
+func Pick(params PickParams) string {
+	if params.Many {
+		return params.Several
+	}
+	return params.One
 }

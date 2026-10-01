@@ -6,10 +6,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/muesli/termenv"
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/styles"
 )
 
 func init() {
@@ -248,5 +251,19 @@ func TestFormatCreateBatchCountsAndNamesFailures(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("readout %q should contain %q", out, want)
 		}
+	}
+}
+
+func TestBranchHeaderMutesOnlyItsGlyph(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.ANSI256)
+	t.Cleanup(func() { lipgloss.SetColorProfile(termenv.Ascii) })
+	var b strings.Builder
+	BranchHeader(&b, "feat/a (1/2)")
+	out := b.String()
+	if !strings.Contains(out, "feat/a (1/2)\n") || strings.Contains(out, styles.Muted.Render("feat/a (1/2)")) {
+		t.Errorf("header %q must keep its text in the terminal's own colour", out)
+	}
+	if !strings.Contains(ansi.Strip(out), domain.GlyphProgress+" feat/a (1/2)") {
+		t.Errorf("header %q should lead with the progress glyph", out)
 	}
 }

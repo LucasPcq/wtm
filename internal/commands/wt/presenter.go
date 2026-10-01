@@ -25,7 +25,7 @@ func (p createPresenter) BranchStarted(progress createflow.BranchProgress) {
 	if !p.Human {
 		return
 	}
-	output.Loading(shared.OpenBlock(p.Cmd.ErrOrStderr(), true),
+	output.BranchHeader(shared.OpenBlock(p.Cmd.ErrOrStderr(), true),
 		fmt.Sprintf(domain.CreateBranchProgressFmt, progress.Branch, progress.Position, progress.Total))
 }
 

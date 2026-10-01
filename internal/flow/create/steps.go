@@ -132,6 +132,8 @@ func (f *createFlow) entryBadge(entry string) flow.Badge {
 
 func (f *createFlow) branches(answers flow.Answers) []string { return answers.Values(KeyBranch) }
 
+func (f *createFlow) many(answers flow.Answers) bool { return len(f.branches(answers)) > 1 }
+
 func (f *createFlow) existingBranches(answers flow.Answers) []string {
 	var found []string
 	for _, name := range f.branches(answers) {
@@ -175,6 +177,9 @@ func (f *createFlow) sourceStep() flow.Step {
 		},
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
 			description := domain.CreateSourceStepDescription
+			if f.many(answers) {
+				description = domain.CreateSourceStepDescriptionMany
+			}
 			switch {
 			case f.reusesBranch(answers) && len(f.branches(answers)) > 1:
 				description = domain.RecapParentRecordedForExisting
@@ -221,6 +226,13 @@ func (f *createFlow) envStep() flow.Step {
 			{Label: domain.EnvOptionMain, Value: string(domain.EnvStrategyMain)},
 			{Label: domain.EnvOptionParent, Value: string(domain.EnvStrategyParent)},
 		},
+		Build: func(answers flow.Answers) (flow.StepContent, error) {
+			return flow.StepContent{Description: decide.Pick(decide.PickParams{
+				Many:    f.many(answers),
+				One:     domain.CreateEnvStepDescription,
+				Several: domain.CreateEnvStepDescriptionMany,
+			})}, nil
+		},
 		Resolve:   func(flow.Answers) (flow.Answer, error) { return flow.Answer{Value: ""}, nil },
 		Summarize: envSummary,
 		Flag:      domain.FlagEnvFrom,
@@ -256,7 +268,14 @@ func (f *createFlow) isolationStep() flow.Step {
 			}
 			return true, domain.IsolationStepIrrelevant
 		},
-		Options: isolationOptions(fallback),
+		Options: isolationOptions(isolationOptionsParams{First: fallback}),
+		Build: func(answers flow.Answers) (flow.StepContent, error) {
+			many := f.many(answers)
+			return flow.StepContent{
+				Description: decide.Pick(decide.PickParams{Many: many, One: domain.IsolationStepDescription, Several: domain.IsolationStepDescriptionMany}),
+				Options:     isolationOptions(isolationOptionsParams{First: fallback, Many: many}),
+			}, nil
+		},
 		Resolve: func(flow.Answers) (flow.Answer, error) {
 			return flow.Answer{Value: string(fallback)}, nil
 		},
@@ -265,11 +284,20 @@ func (f *createFlow) isolationStep() flow.Step {
 	}
 }
 
-func isolationOptions(first domain.Isolation) []flow.Option {
-	choices := rules.IsolationChoices(first)
+type isolationOptionsParams struct {
+	First domain.Isolation
+	Many  bool
+}
+
+func isolationOptions(params isolationOptionsParams) []flow.Option {
+	label := rules.IsolationOptionLabel
+	if params.Many {
+		label = rules.IsolationOptionLabelMany
+	}
+	choices := rules.IsolationChoices(params.First)
 	options := make([]flow.Option, 0, len(choices))
 	for _, choice := range choices {
-		options = append(options, flow.Option{Label: rules.IsolationOptionLabel(choice), Value: string(choice)})
+		options = append(options, flow.Option{Label: label(choice), Value: string(choice)})
 	}
 	return options
 }
@@ -323,7 +351,7 @@ func (f *createFlow) recapStep() flow.Step {
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
 			return flow.StepContent{
 				Description: f.recap(answers),
-				Options:     []flow.Option{{Label: domain.CreateRecapConfirmOption, Value: confirmCreate}},
+				Options:     []flow.Option{{Label: confirmLabel(len(f.branches(answers))), Value: confirmCreate}},
 			}, nil
 		},
 		Resolve: func(flow.Answers) (flow.Answer, error) {
@@ -344,6 +372,7 @@ func (f *createFlow) sourceUpdate(answers flow.Answers) decide.SourceUpdatePromp
 		Target:     f.target,
 		Branch:     single,
 		Source:     answers.Value(KeySource),
+		Many:       f.many(answers),
 	})
 }
 
@@ -435,4 +464,11 @@ func (f *createFlow) warnings(answers flow.Answers) []string {
 		warnings = append(warnings, domain.WarningPrefix+warning)
 	}
 	return warnings
+}
+
+func confirmLabel(count int) string {
+	if count > 1 {
+		return fmt.Sprintf(domain.CreateRecapConfirmManyFmt, count)
+	}
+	return domain.CreateRecapConfirmOption
 }

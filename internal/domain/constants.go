@@ -2982,15 +2982,20 @@ const (
 	// keeps the source as-is rather than aborting.
 	SourceFastForwardDescription = "Updates your local branch to origin so the new worktree starts up to date. " +
 		"Skipped if its worktree has uncommitted changes."
+	SourceFastForwardDescriptionMany = "Updates your local branch to origin so the new worktrees start up to date. " +
+		"Skipped if its worktree has uncommitted changes."
 	// SourceDivergedPrompt warns that a diverged source can't be fast-forwarded and
 	// asks whether to create from it anyway (source, ahead, behind).
 	SourceDivergedPrompt = "%s has diverged from origin (%d ahead, %d behind) — create the worktree from it anyway?"
 	// SourceDivergedWarning explains the consequence of a diverged source.
 	SourceDivergedWarning = "It can't be fast-forwarded. The worktree starts from your local branch, missing commits " +
 		"that are on origin — you may have to rebase or resolve conflicts later."
+	SourceDivergedWarningMany = "It can't be fast-forwarded. The worktrees start from your local branch, missing commits " +
+		"that are on origin — you may have to rebase or resolve conflicts later."
 	// SourceProceedStalePrompt asks whether to create from a stale local source
 	// after a fast-forward failed (source, behind).
-	SourceProceedStalePrompt = "Create the worktree from local %s anyway? (behind origin by %d)"
+	SourceProceedStalePrompt     = "Create the worktree from local %s anyway? (behind origin by %d)"
+	SourceProceedStalePromptMany = "Create the worktrees from local %s anyway? (behind origin by %d)"
 	// SourceProceedStaleWarning reports why the fast-forward failed (cause).
 	SourceProceedStaleWarning = "Couldn't fast-forward: %v"
 	// SourceUpdateSkip* explain why a run offers no source reconciliation.
@@ -3032,27 +3037,31 @@ const (
 
 	// The create flow (internal/flow/create): step prose, option labels, recap
 	// fields and refusals. Format verbs: %s branch, %s env strategy, %s flag name.
-	CreateLoadingFmt               = "Creating worktree %s…"
-	CreateBranchStepDescription    = "Name for the new worktree branch"
-	CreateBranchesLabel            = "Branches"
-	CreateBranchesStepDescription  = "Names of the new worktree branches, one at a time"
-	BranchEntryNew                 = "new"
-	BranchEntryExisting            = "existing"
-	BranchEntryWorktreeExists      = "worktree exists"
-	CreateBranchRequired           = "branch name is required"
-	CreateBranchProgressFmt        = "%s (%d/%d)"
-	CreateBranchFailedFmt          = "%s — %s"
-	CreateBatchExistsFmt           = "%s already exists"
-	CreateBranchListedTwiceFmt     = "%s is already in the list"
-	CreateBranchRequiredUnattended = "branch name is required without the interactive wizard (pass it as an argument)"
-	CreateSourceStepDescription    = "Branch to base the new worktree on"
-	CreateEnvStepDescription       = "How to provision .env files in the new worktree"
-	CreateNoSourceFmt              = "no source branch: pass --%s (no base branch configured)"
-	CreateRecapConfirmOption       = "Yes, create worktree"
-	EnvOptionConfigDefaultFmt      = "Use config default (%s)"
-	EnvOptionExample               = "example — copy .env.example → .env"
-	EnvOptionMain                  = "main — copy .env from the main checkout"
-	EnvOptionParent                = "parent — copy .env from source worktree"
+	CreateLoadingFmt                = "Creating worktree %s…"
+	CreateBranchStepDescription     = "Name for the new worktree branch"
+	CreateBranchesLabel             = "Branches"
+	CreateBranchesStepDescription   = "Names of the new worktree branches, one at a time"
+	BranchEntryNew                  = "new"
+	BranchEntryExisting             = "existing"
+	BranchEntryWorktreeExists       = "worktree exists"
+	CreateBranchRequired            = "branch name is required"
+	CreateBranchProgressFmt         = "%s (%d/%d)"
+	CreateBranchFailedFmt           = "%s — %s"
+	CreateBatchExistsFmt            = "%s already exists"
+	CreateBranchListedTwiceFmt      = "%s is already in the list"
+	CreateBranchGivenTwiceFmt       = "%s is given twice"
+	CreateBranchRequiredUnattended  = "branch name is required without the interactive wizard (pass it as an argument)"
+	CreateSourceStepDescription     = "Branch to base the new worktree on"
+	CreateSourceStepDescriptionMany = "Branch to base the new worktrees on"
+	CreateEnvStepDescription        = "How to provision .env files in the new worktree"
+	CreateEnvStepDescriptionMany    = "How to provision .env files in the new worktrees"
+	CreateNoSourceFmt               = "no source branch: pass --%s (no base branch configured)"
+	CreateRecapConfirmOption        = "Yes, create worktree"
+	CreateRecapConfirmManyFmt       = "Yes, create %d worktrees"
+	EnvOptionConfigDefaultFmt       = "Use config default (%s)"
+	EnvOptionExample                = "example — copy .env.example → .env"
+	EnvOptionMain                   = "main — copy .env from the main checkout"
+	EnvOptionParent                 = "parent — copy .env from source worktree"
 	// EnvSummaryConfigDefault names the empty env choice rather than leaving a
 	// recap line blank.
 	EnvSummaryConfigDefault = "config default"
@@ -3065,10 +3074,15 @@ const (
 	IsolationStepDescription = "The .env files are copied from another checkout, with its ports and its namespaces in shared services.\n" +
 		"Isolated: wtm moves them onto this worktree's — in the .env and when `wtm run` starts its jobs — so both can run side by side.\n" +
 		"Verbatim: wtm writes nothing into the .env and runs this worktree on the ports and data it was copied with, so it cannot run while its source does."
-	IsolationOptionIsolated  = "Isolate it — its own ports, compose project and namespaces"
-	IsolationOptionVerbatim  = "Keep the .env verbatim — its source's ports and data, one of the two runs at a time"
-	IsolationSummaryIsolated = "isolated"
-	IsolationSummaryVerbatim = "verbatim — .env kept as copied"
+	IsolationStepDescriptionMany = "The .env files are copied from another checkout, with its ports and its namespaces in shared services.\n" +
+		"Isolated: wtm moves them onto each worktree's — in the .env and when `wtm run` starts its jobs — so all of them can run side by side.\n" +
+		"Verbatim: wtm writes nothing into the .env and runs every worktree on the ports and data they were copied with, so only one of them, or their source, runs at a time."
+	IsolationOptionIsolated     = "Isolate it — its own ports, compose project and namespaces"
+	IsolationOptionVerbatim     = "Keep the .env verbatim — its source's ports and data, one of the two runs at a time"
+	IsolationOptionIsolatedMany = "Isolate them — each its own ports, compose project and namespaces"
+	IsolationOptionVerbatimMany = "Keep the .env verbatim — their source's ports and data, one of them runs at a time"
+	IsolationSummaryIsolated    = "isolated"
+	IsolationSummaryVerbatim    = "verbatim — .env kept as copied"
 	// IsolationStepIrrelevant is why the step is not asked: with nothing to
 	// isolate, both answers do exactly the same thing.
 	IsolationStepIrrelevant = "run.toml declares nothing a worktree isolates"

@@ -70,6 +70,14 @@ func IsolationOptionLabel(isolation domain.Isolation) string {
 	return domain.IsolationOptionIsolated
 }
 
+// IsolationOptionLabelMany offers the answer for several worktrees at once.
+func IsolationOptionLabelMany(isolation domain.Isolation) string {
+	if IsVerbatim(isolation) {
+		return domain.IsolationOptionVerbatimMany
+	}
+	return domain.IsolationOptionIsolatedMany
+}
+
 // IsolationSummary is how a recap reads the answer back.
 func IsolationSummary(isolation domain.Isolation) string {
 	if IsVerbatim(isolation) {

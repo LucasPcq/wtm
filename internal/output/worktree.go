@@ -274,12 +274,6 @@ type CreateResultParams struct {
 	GoCommand string
 }
 
-// FormatCreateResult prints the create conclusion: a ✓ headline, an aligned
-// summary (from / env / path), then a highlighted `wtm go` step to jump straight
-// into the new worktree. A reused branch says so in the headline and labels its
-// source "parent", since it was not a start-point. The idempotent already-exists
-// case collapses to a single line + the jump-in step. Raw body — the caller's
-// frame owns the outer padding.
 type CreateBatchRow struct {
 	Branch        string
 	Path          string
@@ -316,6 +310,12 @@ func FormatCreateBatch(w io.Writer, p CreateBatchParams) {
 	))
 }
 
+// FormatCreateResult prints the create conclusion: a ✓ headline, an aligned
+// summary (from / env / path), then a highlighted `wtm go` step to jump straight
+// into the new worktree. A reused branch says so in the headline and labels its
+// source "parent", since it was not a start-point. The idempotent already-exists
+// case collapses to a single line + the jump-in step. Raw body — the caller's
+// frame owns the outer padding.
 func FormatCreateResult(w io.Writer, p CreateResultParams) {
 	if p.AlreadyExists {
 		Unchanged(w, fmt.Sprintf("Worktree %s already exists at %s", p.Branch, p.Path))

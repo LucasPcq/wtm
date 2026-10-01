@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
@@ -93,9 +94,11 @@ func (f *createFlow) run() (Outcome, error) {
 
 	// Failing here saves the user a full interactive run that could only ever end in
 	// refusal; worktree.Create's guard is the chokepoint for the other callers.
-	if err := f.refuseRequested(); err != nil {
+	requested, err := f.acceptRequested()
+	if err != nil {
 		return Outcome{}, err
 	}
+	f.request.Branches = requested
 
 	answers, err := f.prompter.Ask(f.session())
 	if errors.Is(err, domain.ErrUserAborted) {
@@ -110,7 +113,7 @@ func (f *createFlow) run() (Outcome, error) {
 	fromBranch := answers.Value(KeySource)
 
 	if answers.Value(KeySourceUpdate) == updateFastForward {
-		proceed, ffErr := f.applyFastForward(f.sourceUpdate(answers).Branch)
+		proceed, ffErr := f.applyFastForward(fastForwardParams{Subject: f.sourceUpdate(answers).Branch, Many: f.many(answers)})
 		if ffErr != nil {
 			return Outcome{}, ffErr
 		}
@@ -173,20 +176,25 @@ func runErr(params runErrParams) error {
 	return fmt.Errorf("%w: %w", domain.ErrAborted, params.First)
 }
 
-func (f *createFlow) refuseRequested() error {
-	var seen []string
-	for _, name := range f.request.Branches {
-		// On the command line a repeated name is a malformed invocation, not a
-		// refusal of the branch: exit 2, where the wizard only says it inline.
-		if slices.Contains(seen, name) {
-			return fmt.Errorf("%w: "+domain.CreateBranchListedTwiceFmt, domain.ErrUsage, name)
+// acceptRequested holds the arguments to what the wizard accepts as typed:
+// trimmed, and refused when blank or repeated — on the command line those are a
+// malformed invocation (exit 2), where the wizard only says it inline.
+func (f *createFlow) acceptRequested() ([]string, error) {
+	accepted := make([]string, 0, len(f.request.Branches))
+	for _, raw := range f.request.Branches {
+		name := strings.TrimSpace(raw)
+		if name == "" {
+			return nil, fmt.Errorf("%w: %s", domain.ErrUsage, domain.CreateBranchRequired)
 		}
-		if err := f.validateEntry(flow.EntryCheck{Entry: name, Entries: seen}); err != nil {
-			return err
+		if slices.Contains(accepted, name) {
+			return nil, fmt.Errorf("%w: "+domain.CreateBranchGivenTwiceFmt, domain.ErrUsage, name)
 		}
-		seen = append(seen, name)
+		if err := f.validateEntry(flow.EntryCheck{Entry: name, Entries: accepted}); err != nil {
+			return nil, err
+		}
+		accepted = append(accepted, name)
 	}
-	return nil
+	return accepted, nil
 }
 
 type provisionParams struct {
@@ -302,7 +310,13 @@ func (f *createFlow) runHooks(worktreePath, branchName, fromBranch string) error
 	})
 }
 
-func (f *createFlow) applyFastForward(subject string) (bool, error) {
+type fastForwardParams struct {
+	Subject string
+	Many    bool
+}
+
+func (f *createFlow) applyFastForward(ff fastForwardParams) (bool, error) {
+	subject := ff.Subject
 	params := branch.BranchParams{ProjectDir: f.ctx.ProjectDir, Branch: subject}
 
 	// --ff is best effort: a branch that cannot be cleanly fast-forwarded is left
@@ -322,7 +336,7 @@ func (f *createFlow) applyFastForward(subject string) (bool, error) {
 
 	_, ab := branch.Divergence(params)
 	proceed, confirmErr := f.prompter.Confirm(flow.ConfirmParams{
-		Title:      fmt.Sprintf(domain.SourceProceedStalePrompt, subject, ab.Behind),
+		Title:      fmt.Sprintf(decide.Pick(decide.PickParams{Many: ff.Many, One: domain.SourceProceedStalePrompt, Several: domain.SourceProceedStalePromptMany}), subject, ab.Behind),
 		Warning:    fmt.Sprintf(domain.SourceProceedStaleWarning, ffErr),
 		DefaultYes: false,
 	})

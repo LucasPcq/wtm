@@ -700,3 +700,101 @@ func revParse(t *testing.T, dir, ref string) string {
 	}
 	return strings.TrimSpace(string(out))
 }
+
+func TestRecapConfirmNamesHowManyWorktrees(t *testing.T) {
+	_, prompter, err := multiRun(t, Request{}, []string{"feat/a", "feat/b"})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := prompter.Content[KeyRecap].Options[0].Label; got != "Yes, create 2 worktrees" {
+		t.Errorf("confirm = %q, want the count", got)
+	}
+}
+
+func TestPositionalArgumentsAreTrimmed(t *testing.T) {
+	outcome, err := Run(Params{
+		Context:   testContext(t),
+		Request:   Request{Branches: []string{" feat/a ", "feat/b"}, Multi: true},
+		Prompter:  flow.Unattended{},
+		Presenter: newRecorder(),
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if outcome.Results[0].Branch != "feat/a" {
+		t.Errorf("branch = %q, want the argument trimmed as the wizard would", outcome.Results[0].Branch)
+	}
+}
+
+func TestABlankArgumentIsAUsageError(t *testing.T) {
+	presenter := newRecorder()
+	_, err := Run(Params{
+		Context:   testContext(t),
+		Request:   Request{Branches: []string{"feat/a", "  "}, Multi: true},
+		Prompter:  flow.Unattended{},
+		Presenter: presenter,
+	})
+	if code := rules.ExitCode(err); code != domain.ExitCodeUsage {
+		t.Errorf("err = %v (exit %d), want a usage error", err, code)
+	}
+	if len(presenter.Stages) != 0 {
+		t.Errorf("stages = %v, nothing must be created", presenter.Stages)
+	}
+}
+
+func TestARepeatedArgumentIsWordedForTheCommandLine(t *testing.T) {
+	_, err := Run(Params{
+		Context:   testContext(t),
+		Request:   Request{Branches: []string{"feat/a", "feat/a"}, Multi: true},
+		Prompter:  flow.Unattended{},
+		Presenter: newRecorder(),
+	})
+	if err == nil || !strings.Contains(err.Error(), "feat/a is given twice") {
+		t.Errorf("err = %v, want it worded for arguments", err)
+	}
+}
+
+func TestTheWizardSpeaksInThePluralForSeveralBranches(t *testing.T) {
+	ctx := testContext(t)
+	linkedRunConfig(t, ctx, ".env")
+	gittest.AddOrigin(t, ctx.ProjectDir)
+	gittest.Git(t, ctx.ProjectDir, "commit", "--allow-empty", "-m", "on origin only")
+	gittest.Git(t, ctx.ProjectDir, "push", "origin", "main")
+	gittest.Git(t, ctx.ProjectDir, "reset", "--hard", "HEAD~1")
+
+	prompter := &flowtest.ScriptedPrompter{
+		Answers: map[string]string{KeySource: "main", KeyEnv: "", KeyIsolation: string(domain.IsolationIsolated), KeySourceUpdate: updateKeep, KeyRecap: confirmCreate},
+		Sets:    map[string][]string{KeyBranch: {"feat/a", "feat/b"}},
+	}
+	if _, err := Run(Params{Context: ctx, Request: Request{Multi: true}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	for key, want := range map[string]string{
+		KeySource:       domain.CreateSourceStepDescriptionMany,
+		KeyEnv:          domain.CreateEnvStepDescriptionMany,
+		KeyIsolation:    domain.IsolationStepDescriptionMany,
+		KeySourceUpdate: domain.SourceFastForwardDescriptionMany,
+	} {
+		if got := prompter.Content[key].Description; got != want {
+			t.Errorf("%s description = %q, want %q", key, got, want)
+		}
+	}
+	options := prompter.Content[KeyIsolation].Options
+	if len(options) != 2 || options[0].Label != domain.IsolationOptionIsolatedMany || options[1].Label != domain.IsolationOptionVerbatimMany {
+		t.Errorf("isolation options = %+v, want the plural labels", options)
+	}
+}
+
+func TestTheWizardKeepsTheSingularForOneBranch(t *testing.T) {
+	_, prompter, err := multiRun(t, Request{}, []string{"feat/a"})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := prompter.Content[KeySource].Description; got != domain.CreateSourceStepDescription {
+		t.Errorf("source description = %q, want the singular", got)
+	}
+	if got := prompter.Content[KeyEnv].Description; got != domain.CreateEnvStepDescription {
+		t.Errorf("env description = %q, want the singular", got)
+	}
+}
