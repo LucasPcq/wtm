@@ -3,6 +3,7 @@ package create
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -653,4 +654,49 @@ func TestASingleBranchFailsAsBefore(t *testing.T) {
 	if len(presenter.started) != 0 || len(presenter.failed) != 0 {
 		t.Error("a single branch gets no per-branch header or failure line")
 	}
+}
+
+func TestFastForwardReachesAnExistingBranchWhenTheSourceIsUpToDate(t *testing.T) {
+	ctx := testContext(t)
+	gittest.AddOrigin(t, ctx.ProjectDir)
+	gittest.Git(t, ctx.ProjectDir, "checkout", "-b", "feat/old")
+	gittest.Git(t, ctx.ProjectDir, "commit", "--allow-empty", "-m", "on origin only")
+	gittest.PushBranch(t, ctx.ProjectDir, "feat/old")
+	gittest.Git(t, ctx.ProjectDir, "checkout", "main")
+	gittest.Git(t, ctx.ProjectDir, "branch", "-f", "feat/old", "main")
+
+	_, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Branches: []string{"feat/new", "feat/old"}, Multi: true, From: "main", FastForward: true},
+		Prompter:  flow.Unattended{},
+		Presenter: newRecorder(),
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	local, remote := revParse(t, ctx.ProjectDir, "feat/old"), revParse(t, ctx.ProjectDir, "origin/feat/old")
+	if local != remote {
+		t.Errorf("feat/old = %s, want it fast-forwarded to origin %s: --ff promises it for every existing branch", local, remote)
+	}
+}
+
+func TestADuplicateArgumentIsAUsageError(t *testing.T) {
+	_, err := Run(Params{
+		Context:   testContext(t),
+		Request:   Request{Branches: []string{"feat/a", "feat/a"}, Multi: true},
+		Prompter:  flow.Unattended{},
+		Presenter: newRecorder(),
+	})
+	if code := rules.ExitCode(err); code != domain.ExitCodeUsage {
+		t.Errorf("exit code = %d, want %d for a malformed command line", code, domain.ExitCodeUsage)
+	}
+}
+
+func revParse(t *testing.T, dir, ref string) string {
+	t.Helper()
+	out, err := exec.Command("git", "-C", dir, "rev-parse", ref).Output()
+	if err != nil {
+		t.Fatalf("rev-parse %s: %v", ref, err)
+	}
+	return strings.TrimSpace(string(out))
 }

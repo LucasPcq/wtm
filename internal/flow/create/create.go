@@ -4,6 +4,7 @@ package create
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
@@ -147,6 +148,17 @@ func (f *createFlow) run() (Outcome, error) {
 	return outcome, runErr(runErrParams{First: firstErr, Batch: batch})
 }
 
+// fastForwardsEach reads --ff for the existing branches of a list too when the
+// source-update step had nothing to offer: a source already up to date skips it,
+// and must not swallow the flag.
+func (f *createFlow) fastForwardsEach(answers flow.Answers) bool {
+	answer, _ := answers.Get(KeySourceUpdate)
+	if answer.Skipped {
+		return f.request.FastForward
+	}
+	return answer.Value == updateFastForward
+}
+
 type runErrParams struct {
 	First error
 	Batch bool
@@ -164,6 +176,11 @@ func runErr(params runErrParams) error {
 func (f *createFlow) refuseRequested() error {
 	var seen []string
 	for _, name := range f.request.Branches {
+		// On the command line a repeated name is a malformed invocation, not a
+		// refusal of the branch: exit 2, where the wizard only says it inline.
+		if slices.Contains(seen, name) {
+			return fmt.Errorf("%w: "+domain.CreateBranchListedTwiceFmt, domain.ErrUsage, name)
+		}
 		if err := f.validateEntry(flow.EntryCheck{Entry: name, Entries: seen}); err != nil {
 			return err
 		}
@@ -187,7 +204,7 @@ func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, 
 	target := f.target(branchName)
 	// The source-update step only moved the shared source: an existing branch of
 	// a list is brought up to origin on its own, best effort.
-	if params.Batch && target.State == domain.BranchTargetExisting && answers.Value(KeySourceUpdate) == updateFastForward {
+	if params.Batch && target.State == domain.BranchTargetExisting && f.fastForwardsEach(answers) {
 		_ = branch.FastForwardIfBehind(branch.BranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branchName})
 	}
 	startPoint := fromBranch
