@@ -11,6 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/decide"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
@@ -193,6 +194,10 @@ func (r *recorder) Created(outcome Outcome) error {
 	r.created = &outcome
 	return nil
 }
+
+func (r *recorder) BranchStarted(BranchProgress) {}
+
+func (r *recorder) BranchFailed(domain.CreateFailure) {}
 
 func testContext(t *testing.T) flow.Context {
 	t.Helper()
@@ -575,5 +580,77 @@ func TestEntryBadgeNamesNewAndExisting(t *testing.T) {
 	}
 	if got := f.entryBadge("feat/new").Text; got != domain.BranchEntryNew {
 		t.Errorf("badge = %q, want new", got)
+	}
+}
+
+type batchRecorder struct {
+	*recorder
+	started []BranchProgress
+	failed  []domain.CreateFailure
+}
+
+func (r *batchRecorder) BranchStarted(p BranchProgress) { r.started = append(r.started, p) }
+
+func (r *batchRecorder) BranchFailed(f domain.CreateFailure) { r.failed = append(r.failed, f) }
+
+func occupy(t *testing.T, ctx flow.Context, branchName string) {
+	t.Helper()
+	dir := filepath.Join(ctx.ProjectDir, ctx.Config.Project.Worktrees.BasePath, rules.SanitizeBranchName(branchName))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAFailureInTheMiddleDoesNotStopTheRest(t *testing.T) {
+	ctx := testContext(t)
+	occupy(t, ctx, "feat/b")
+	presenter := &batchRecorder{recorder: newRecorder()}
+
+	outcome, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Branches: []string{"feat/a", "feat/b", "feat/c"}, Multi: true, From: "main"},
+		Prompter:  flow.Unattended{},
+		Presenter: presenter,
+	})
+
+	if len(outcome.Results) != 2 || len(outcome.Failed) != 1 || outcome.Failed[0].Branch != "feat/b" {
+		t.Fatalf("outcome = %+v, want feat/a and feat/c created, feat/b failed", outcome)
+	}
+	if !errors.Is(err, domain.ErrAborted) {
+		t.Errorf("err = %v, want ErrAborted: the readout already reported the failure", err)
+	}
+	if !errors.Is(err, domain.ErrWorktreePathExists) {
+		t.Errorf("err = %v, want the first cause kept for the exit code", err)
+	}
+	if outcome.Failed[0].ExitCode != domain.ExitCodeWorktreeExists {
+		t.Errorf("exit_code = %d", outcome.Failed[0].ExitCode)
+	}
+	if len(presenter.started) != 3 || presenter.started[1].Position != 2 || presenter.started[1].Total != 3 {
+		t.Errorf("started = %+v, want one header per branch", presenter.started)
+	}
+	if len(presenter.failed) != 1 {
+		t.Errorf("failed = %+v", presenter.failed)
+	}
+	if presenter.created == nil {
+		t.Error("the conclusion must be presented even with a failure")
+	}
+}
+
+func TestASingleBranchFailsAsBefore(t *testing.T) {
+	ctx := testContext(t)
+	occupy(t, ctx, "feat/b")
+	presenter := &batchRecorder{recorder: newRecorder()}
+
+	_, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Branches: []string{"feat/b"}, Multi: true, From: "main"},
+		Prompter:  flow.Unattended{},
+		Presenter: presenter,
+	})
+	if errors.Is(err, domain.ErrAborted) || !errors.Is(err, domain.ErrWorktreePathExists) {
+		t.Errorf("err = %v, want the raw cause so the root prints it as today", err)
+	}
+	if len(presenter.started) != 0 || len(presenter.failed) != 0 {
+		t.Error("a single branch gets no per-branch header or failure line")
 	}
 }

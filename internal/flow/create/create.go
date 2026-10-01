@@ -29,12 +29,23 @@ type Request struct {
 
 type Outcome struct {
 	Results    []domain.CreateResult
+	Failed     []domain.CreateFailure
 	FromBranch string
 	Aborted    bool
 }
 
+type BranchProgress struct {
+	Branch   string
+	Position int
+	Total    int
+}
+
+// Presenter hears about each branch only when the run holds several: a single
+// one reads exactly as it always did.
 type Presenter interface {
 	flow.Presenter
+	BranchStarted(BranchProgress)
+	BranchFailed(domain.CreateFailure)
 	Created(Outcome) error
 }
 
@@ -110,14 +121,44 @@ func (f *createFlow) run() (Outcome, error) {
 	preflight := envports.Preflight(f.ctx)
 
 	outcome := Outcome{FromBranch: fromBranch}
-	for _, name := range branches {
-		result, err := f.provisionOne(provisionParams{Branch: name, Source: fromBranch, Answers: answers, Preflight: preflight})
-		if err != nil {
-			return Outcome{}, err
+	batch := len(branches) > 1
+	var firstErr error
+	for i, name := range branches {
+		if batch {
+			f.presenter.BranchStarted(BranchProgress{Branch: name, Position: i + 1, Total: len(branches)})
 		}
-		outcome.Results = append(outcome.Results, result)
+		result, err := f.provisionOne(provisionParams{Branch: name, Source: fromBranch, Answers: answers, Preflight: preflight, Batch: batch})
+		if err == nil {
+			outcome.Results = append(outcome.Results, result)
+			continue
+		}
+		failure := domain.CreateFailure{Branch: name, Path: result.Path, Error: err.Error(), ExitCode: rules.ExitCode(err)}
+		outcome.Failed = append(outcome.Failed, failure)
+		if firstErr == nil {
+			firstErr = err
+		}
+		if batch {
+			f.presenter.BranchFailed(failure)
+		}
 	}
-	return outcome, f.presenter.Created(outcome)
+	if err := f.presenter.Created(outcome); err != nil {
+		return outcome, err
+	}
+	return outcome, runErr(runErrParams{First: firstErr, Batch: batch})
+}
+
+type runErrParams struct {
+	First error
+	Batch bool
+}
+
+// runErr keeps a single branch failing exactly as it always did, and marks a
+// batch's failure as already reported: its readout named every one.
+func runErr(params runErrParams) error {
+	if params.First == nil || !params.Batch {
+		return params.First
+	}
+	return fmt.Errorf("%w: %w", domain.ErrAborted, params.First)
 }
 
 func (f *createFlow) refuseRequested() error {
@@ -136,6 +177,7 @@ type provisionParams struct {
 	Source    string
 	Answers   flow.Answers
 	Preflight error
+	Batch     bool
 }
 
 func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, error) {
@@ -143,6 +185,11 @@ func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, 
 
 	// A reused branch is checked out as-is: the source is only its recorded sync parent.
 	target := f.target(branchName)
+	// The source-update step only moved the shared source: an existing branch of
+	// a list is brought up to origin on its own, best effort.
+	if params.Batch && target.State == domain.BranchTargetExisting && answers.Value(KeySourceUpdate) == updateFastForward {
+		_ = branch.FastForwardIfBehind(branch.BranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branchName})
+	}
 	startPoint := fromBranch
 	if !rules.SourceIsStartPoint(target.State) {
 		startPoint = ""

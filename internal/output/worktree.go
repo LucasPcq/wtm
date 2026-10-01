@@ -280,6 +280,42 @@ type CreateResultParams struct {
 // source "parent", since it was not a start-point. The idempotent already-exists
 // case collapses to a single line + the jump-in step. Raw body — the caller's
 // frame owns the outer padding.
+type CreateBatchRow struct {
+	Branch        string
+	Path          string
+	AlreadyExists bool
+}
+
+type CreateBatchParams struct {
+	Created []CreateBatchRow
+	Failed  []domain.CreateFailure
+}
+
+// FormatCreateBatch is the conclusion of a run over several branches: one line
+// per worktree, its path indented under it, every failure named, then the count.
+func FormatCreateBatch(w io.Writer, p CreateBatchParams) {
+	created, existed := 0, 0
+	for _, row := range p.Created {
+		if row.AlreadyExists {
+			existed++
+			Unchanged(w, fmt.Sprintf(domain.CreateBatchExistsFmt, row.Branch))
+		} else {
+			created++
+			Success(w, row.Branch)
+		}
+		Message(w, Indent+row.Path)
+	}
+	for _, failure := range p.Failed {
+		Error(w, fmt.Sprintf(domain.CreateBranchFailedFmt, failure.Branch, failure.Error))
+	}
+	Blank(w)
+	Message(w, Tally(
+		TallyPart{Count: created, Label: domain.TallyCreated},
+		TallyPart{Count: existed, Label: domain.TallyAlreadyExisted},
+		TallyPart{Count: len(p.Failed), Label: domain.TallyFailed},
+	))
+}
+
 func FormatCreateResult(w io.Writer, p CreateResultParams) {
 	if p.AlreadyExists {
 		Unchanged(w, fmt.Sprintf("Worktree %s already exists at %s", p.Branch, p.Path))

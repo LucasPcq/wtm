@@ -78,6 +78,12 @@ func (p presenter) Status(notice flow.Notice) {
 
 type createPresenter struct{ presenter }
 
+// The dashboard runs one branch at a time until it can render a list, so the
+// flow never reports per branch here.
+func (p createPresenter) BranchStarted(createflow.BranchProgress) {}
+
+func (p createPresenter) BranchFailed(domain.CreateFailure) {}
+
 func (p createPresenter) Created(outcome createflow.Outcome) error {
 	if outcome.Aborted || len(outcome.Results) == 0 {
 		return nil

@@ -78,10 +78,8 @@ func (r *pruneRepo) create(t *testing.T, branch, from string) {
 	if err != nil {
 		t.Fatalf("create %s: %v", branch, err)
 	}
-	var created struct {
-		Path string `json:"path"`
-	}
-	if jsonErr := json.Unmarshal([]byte(stdout), &created); jsonErr != nil || created.Path == "" {
+	created := decodeCreated(t, stdout)
+	if created.Path == "" {
 		t.Fatalf("create %s: cannot read the worktree path from %q", branch, stdout)
 	}
 	r.paths[branch] = created.Path

@@ -236,3 +236,17 @@ func TestFormatPRCheckoutResultLabelsTheEnvNote(t *testing.T) {
 		}
 	}
 }
+
+func TestFormatCreateBatchCountsAndNamesFailures(t *testing.T) {
+	var b strings.Builder
+	FormatCreateBatch(&b, CreateBatchParams{
+		Created: []CreateBatchRow{{Branch: "feat/a", Path: ".worktrees/feat-a"}, {Branch: "feat/c", Path: ".worktrees/feat-c", AlreadyExists: true}},
+		Failed:  []domain.CreateFailure{{Branch: "feat/b", Error: "path exists"}},
+	})
+	out := ansi.Strip(b.String())
+	for _, want := range []string{"feat/a", ".worktrees/feat-a", "feat/c already exists", "feat/b — path exists", "1 created", "1 already existed", "1 failed"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("readout %q should contain %q", out, want)
+		}
+	}
+}
