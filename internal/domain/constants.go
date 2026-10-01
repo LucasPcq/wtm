@@ -3009,6 +3009,7 @@ const (
 	// RecapParentRecordedForSync explains, on the source-update step, that a
 	// reused branch's source is recorded for `wtm sync` rather than being a
 	// git start-point.
+	RecapParentRecordedForExisting = "Parent recorded for `wtm sync` for the existing branches — the new ones start from it"
 	RecapParentRecordedForSync     = "Parent recorded for `wtm sync` — the branch already exists and keeps its commits"
 	SourceKeepAsIsOption           = "Keep it as-is"
 	SourceUpdateSummaryFastForward = "fast-forward to origin"
@@ -3031,6 +3032,11 @@ const (
 	// fields and refusals. Format verbs: %s branch, %s env strategy, %s flag name.
 	CreateLoadingFmt               = "Creating worktree %s…"
 	CreateBranchStepDescription    = "Name for the new worktree branch"
+	CreateBranchesLabel            = "Branches"
+	CreateBranchesStepDescription  = "Names of the new worktree branches, one at a time"
+	BranchEntryNew                 = "new"
+	BranchEntryExisting            = "existing"
+	BranchEntryWorktreeExists      = "worktree exists"
 	CreateBranchRequired           = "branch name is required"
 	CreateBranchListedTwiceFmt     = "%s is already in the list"
 	CreateBranchRequiredUnattended = "branch name is required without the interactive wizard (pass it as an argument)"
@@ -3088,6 +3094,7 @@ const (
 	// RecapField* are the aligned labels of the create-like recap bodies —
 	// create, extract and checkout — padded to the widest of them.
 	RecapFieldBranch       = "Branch:    "
+	RecapFieldBranches     = "Branches:  "
 	RecapFieldSource       = "Source:    "
 	RecapFieldParent       = "Parent:    "
 	RecapFieldEnv          = "Env:       "
@@ -3120,6 +3127,8 @@ const (
 	// BranchReusedSuffix marks the branch line of a recap when the worktree checks
 	// out an existing local branch instead of creating one.
 	BranchReusedSuffix = " (existing local branch — reused)"
+	// BranchListExistingSuffix is BranchReusedSuffix for one name among several.
+	BranchListExistingSuffix = " (existing)"
 	// BranchReusedHeadline is the create conclusion for a reused branch (branch).
 	BranchReusedHeadline = "Created worktree %s on existing branch"
 	// BranchReusedNote states that the worktree checked out an existing local

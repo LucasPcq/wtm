@@ -15,7 +15,10 @@ import (
 )
 
 type Request struct {
-	Branch      string
+	Branches []string
+	// Multi asks for the branches as a list; a surface that cannot render one
+	// keeps the single-name step.
+	Multi       bool
 	From        string
 	EnvFrom     string
 	FastForward bool
@@ -25,8 +28,7 @@ type Request struct {
 }
 
 type Outcome struct {
-	Result     domain.CreateResult
-	Branch     string
+	Results    []domain.CreateResult
 	FromBranch string
 	Aborted    bool
 }
@@ -51,23 +53,25 @@ func Operation() flow.Operation {
 
 func Run(params Params) (Outcome, error) {
 	f := &createFlow{
-		ctx:        params.Context,
-		request:    params.Request,
-		prompter:   params.Prompter,
-		presenter:  params.Presenter,
-		candidates: decide.BranchCandidates(params.Context.ProjectDir),
-		target:     decide.MemoizedTarget(params.Context.ProjectDir),
+		ctx:          params.Context,
+		request:      params.Request,
+		prompter:     params.Prompter,
+		presenter:    params.Presenter,
+		candidates:   decide.BranchCandidates(params.Context.ProjectDir),
+		target:       decide.MemoizedTarget(params.Context.ProjectDir),
+		derivedNames: worktree.DerivedNamesMatter(params.Context.StateDir),
 	}
 	return f.run()
 }
 
 type createFlow struct {
-	ctx        flow.Context
-	request    Request
-	prompter   flow.Prompter
-	presenter  Presenter
-	candidates []domain.BranchCandidate
-	target     func(string) domain.BranchTarget
+	ctx          flow.Context
+	request      Request
+	prompter     flow.Prompter
+	presenter    Presenter
+	candidates   []domain.BranchCandidate
+	target       func(string) domain.BranchTarget
+	derivedNames bool
 }
 
 func (f *createFlow) run() (Outcome, error) {
@@ -77,11 +81,8 @@ func (f *createFlow) run() (Outcome, error) {
 
 	// Failing here saves the user a full interactive run that could only ever end in
 	// refusal; worktree.Create's guard is the chokepoint for the other callers.
-	if f.request.Branch != "" {
-		if target := f.target(f.request.Branch); target.State == domain.BranchTargetCheckedOut && !f.request.IfNotExists {
-			return Outcome{}, fmt.Errorf("%w: "+domain.BranchCheckedOutElsewhereFmt,
-				domain.ErrWorktreeExists, f.request.Branch, target.WorktreePath, f.request.Branch)
-		}
+	if err := f.refuseRequested(); err != nil {
+		return Outcome{}, err
 	}
 
 	answers, err := f.prompter.Ask(f.session())
@@ -93,7 +94,7 @@ func (f *createFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	branchName := answers.Value(KeyBranch)
+	branches := f.branches(answers)
 	fromBranch := answers.Value(KeySource)
 
 	if answers.Value(KeySourceUpdate) == updateFastForward {
@@ -106,6 +107,40 @@ func (f *createFlow) run() (Outcome, error) {
 		}
 	}
 
+	preflight := envports.Preflight(f.ctx)
+
+	outcome := Outcome{FromBranch: fromBranch}
+	for _, name := range branches {
+		result, err := f.provisionOne(provisionParams{Branch: name, Source: fromBranch, Answers: answers, Preflight: preflight})
+		if err != nil {
+			return Outcome{}, err
+		}
+		outcome.Results = append(outcome.Results, result)
+	}
+	return outcome, f.presenter.Created(outcome)
+}
+
+func (f *createFlow) refuseRequested() error {
+	var seen []string
+	for _, name := range f.request.Branches {
+		if err := f.validateEntry(flow.EntryCheck{Entry: name, Entries: seen}); err != nil {
+			return err
+		}
+		seen = append(seen, name)
+	}
+	return nil
+}
+
+type provisionParams struct {
+	Branch    string
+	Source    string
+	Answers   flow.Answers
+	Preflight error
+}
+
+func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, error) {
+	branchName, fromBranch, answers := params.Branch, params.Source, params.Answers
+
 	// A reused branch is checked out as-is: the source is only its recorded sync parent.
 	target := f.target(branchName)
 	startPoint := fromBranch
@@ -113,10 +148,8 @@ func (f *createFlow) run() (Outcome, error) {
 		startPoint = ""
 	}
 
-	preflight := envports.Preflight(f.ctx)
-
 	var result domain.CreateResult
-	err = f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(flow.StageParams{
 		Message: fmt.Sprintf(domain.CreateLoadingFmt, branchName),
 		Work: func() error {
 			var createErr error
@@ -136,7 +169,7 @@ func (f *createFlow) run() (Outcome, error) {
 		},
 	})
 	if err != nil {
-		return Outcome{}, err
+		return result, err
 	}
 
 	if result.AlreadyExists {
@@ -150,16 +183,14 @@ func (f *createFlow) run() (Outcome, error) {
 				WorktreePath: result.Path,
 				Presenter:    f.presenter,
 			},
-			Preflight: preflight,
+			Preflight: params.Preflight,
 		})
 		if hookErr := f.runHooks(result.Path, branchName, fromBranch); hookErr != nil {
-			return Outcome{}, hookErr
+			return result, hookErr
 		}
 	}
 	result.Isolation = worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: branchName})
-
-	outcome := Outcome{Result: result, Branch: branchName, FromBranch: fromBranch}
-	return outcome, f.presenter.Created(outcome)
+	return result, nil
 }
 
 func (f *createFlow) warnIgnoredIsolation(result *domain.CreateResult) {

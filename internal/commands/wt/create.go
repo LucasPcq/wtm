@@ -21,7 +21,7 @@ import (
 // newCreateCmd creates the wtm create subcommand.
 func newCreateCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   domain.CmdCreate + " [branch]",
+		Use:   domain.CmdCreate + " [branch...]",
 		Short: "Create a new worktree",
 		Long: "Create a git worktree with env provisioning, metadata, and hooks.\n" +
 			"A branch that already exists locally is checked out as-is, keeping its commits.\n" +
@@ -41,7 +41,7 @@ func newCreateCmd() *cobra.Command {
 
   # For a script or an agent: idempotent, with a JSON result
   wtm create feat/login --if-not-exists --yes --output json`,
-		Args: cobra.MaximumNArgs(1),
+		Args: cobra.ArbitraryArgs,
 		RunE: runCreate,
 	}
 
@@ -59,10 +59,6 @@ func newCreateCmd() *cobra.Command {
 }
 
 func runCreate(cmd *cobra.Command, args []string) error {
-	branchName := ""
-	if len(args) > 0 {
-		branchName = args[0]
-	}
 	fromFlag, _ := cmd.Flags().GetString(domain.FlagFrom)
 	ffFlag, _ := cmd.Flags().GetBool(domain.FlagFF)
 	envFromFlag, _ := cmd.Flags().GetString(domain.FlagEnvFrom)
@@ -95,7 +91,8 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	_, err = createflow.Run(createflow.Params{
 		Context: shared.FlowContext(config),
 		Request: createflow.Request{
-			Branch:      branchName,
+			Branches:    args,
+			Multi:       true,
 			From:        fromFlag,
 			EnvFrom:     envFromFlag,
 			FastForward: ffFlag,

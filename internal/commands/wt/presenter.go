@@ -22,38 +22,42 @@ type createPresenter struct {
 }
 
 func (p createPresenter) Created(outcome createflow.Outcome) error {
+	if len(outcome.Results) == 0 {
+		return nil
+	}
+	result := outcome.Results[0]
 	if p.Format == domain.OutputJSON {
-		return output.WriteWorktreeCreateJSON(p.Cmd.OutOrStdout(), outcome.Result)
+		return output.WriteWorktreeCreateJSON(p.Cmd.OutOrStdout(), result)
 	}
 
 	// A reused branch's divergence from origin is the one thing "Created worktree x
 	// on existing branch" would leave out, and a prompt-free run has no wizard to
 	// have shown it.
 	var reusedNote shared.ReusedBranchNoteResult
-	if outcome.Result.ExistingBranch {
+	if result.ExistingBranch {
 		reusedNote = shared.ReusedBranchNote(shared.ReusedBranchNoteParams{
-			Branch: outcome.Branch,
-			Ahead:  outcome.Result.OriginAhead,
-			Behind: outcome.Result.OriginBehind,
+			Branch: result.Branch,
+			Ahead:  result.OriginAhead,
+			Behind: result.OriginBehind,
 		})
 	}
 
 	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
 		output.FormatCreateResult(w, output.CreateResultParams{
-			Branch:        outcome.Branch,
-			AlreadyExists: outcome.Result.AlreadyExists,
+			Branch:        result.Branch,
+			AlreadyExists: result.AlreadyExists,
 			From:          outcome.FromBranch,
-			EnvStrategy:   string(outcome.Result.Metadata.EnvStrategy),
-			EnvNote:       rules.EnvPortSettlementNote(outcome.Result.EnvPorts),
+			EnvStrategy:   string(result.Metadata.EnvStrategy),
+			EnvNote:       rules.EnvPortSettlementNote(result.EnvPorts),
 			Path: createDisplayPath(displayPathParams{
 				Config:     p.config.Config,
 				ProjectDir: p.config.ProjectDir,
-				Path:       outcome.Result.Path,
+				Path:       result.Path,
 			}),
-			ExistingBranch:    outcome.Result.ExistingBranch,
+			ExistingBranch:    result.ExistingBranch,
 			ReusedNote:        reusedNote.Text,
 			ReusedNoteWarning: reusedNote.Warning,
-			GoCommand:         fmt.Sprintf(domain.GoCommandFmt, outcome.Branch),
+			GoCommand:         fmt.Sprintf(domain.GoCommandFmt, result.Branch),
 		})
 	})
 	return nil
