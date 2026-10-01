@@ -33,7 +33,7 @@ wtm [flags]
 * [wtm checkout](wtm_checkout.md)	 - Create a worktree from an existing pull request
 * [wtm clean](wtm_clean.md)	 - Remove a worktree and its local branch
 * [wtm config](wtm_config.md)	 - Inspect or edit the project wtm config
-* [wtm create](wtm_create.md)	 - Create a new worktree
+* [wtm create](wtm_create.md)	 - Create one or more worktrees
 * [wtm env](wtm_env.md)	 - Reconcile a worktree's .env against its template and value sources
 * [wtm extract](wtm_extract.md)	 - Move uncommitted changes to another worktree
 * [wtm fast-forward](wtm_fast-forward.md)	 - Advance worktree branches to their origin counterpart

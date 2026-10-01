@@ -18,5 +18,6 @@ New to wtm? Start with [Getting started](getting-started.md), then pick a setup 
 | [`run.toml` reference](run-toml.md) | every key of the file, with its default |
 | [Where wtm keeps its state](state.md) | the files under `<git-common-dir>/wtm/` and beside the global config |
 | [Migrating to 0.28](migrating-to-0.28.md) | what changed for a v0.27 user, and what to do about it |
+| [Migrating to 0.29](migrating-to-0.29.md) | the `wtm create --output json` envelope |
 
 The module is opt-in: nothing here applies until `wtm run init` writes `run.toml`. Until then, the `run` commands that need it refuse (exit `16`) and point at `wtm run init`.

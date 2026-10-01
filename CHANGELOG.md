@@ -1,5 +1,10 @@
 # Changelog
 
+## Non publié
+
+- **`wtm create` crée plusieurs worktrees d'un coup** : `wtm create feat/a feat/b fix/c`, ou dans le wizard (tab pour en ajouter un autre, entrée pour continuer). Les questions communes sont posées une seule fois, et un échec n'arrête pas les autres.
+- **Rupture** : `wtm create --output json` répond toujours avec une enveloppe `{"results": [...], "failed": [...]}`. → [Migration vers 0.29](docs/guide/migrating-to-0.29.md)
+
 ## v0.28.0 : Un worktree, une stack isolée
 
 Chaque worktree peut désormais faire tourner ses propres services (serveurs de dev, stack `docker compose`) sur ses propres ports, sous son propre nom, à côté des autres. `wtm run init` détecte vos fichiers compose et vos scripts et écrit la configuration une fois ; `wtm run up` démarre la stack du worktree où vous êtes. Le module reste optionnel : sans `run.toml`, rien ne change.
