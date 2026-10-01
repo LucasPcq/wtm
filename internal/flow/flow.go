@@ -81,8 +81,7 @@ type StepContent struct {
 	// refresh stays authoritative on what exists — the exclusion is applied on top
 	// of whatever it last returned.
 	ExcludeBranches []string
-	// Entries pre-fill a StepTextList.
-	Entries []string
+	Entries         []string
 }
 
 // EntryCheck is one entry of a StepTextList as it is added, with the entries

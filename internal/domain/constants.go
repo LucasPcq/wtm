@@ -3145,8 +3145,7 @@ const (
 	RelocateNameClashFmt = "%s shares its name with %s (%s) — rename one of the two branches to adopt it"
 	// BranchReusedSuffix marks the branch line of a recap when the worktree checks
 	// out an existing local branch instead of creating one.
-	BranchReusedSuffix = " (existing local branch — reused)"
-	// BranchListExistingSuffix is BranchReusedSuffix for one name among several.
+	BranchReusedSuffix       = " (existing local branch — reused)"
 	BranchListExistingSuffix = " (existing)"
 	// BranchReusedHeadline is the create conclusion for a reused branch (branch).
 	BranchReusedHeadline = "Created worktree %s on existing branch"

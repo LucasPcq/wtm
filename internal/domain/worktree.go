@@ -189,8 +189,7 @@ type CreateResult struct {
 	Warnings []string `json:"warnings,omitempty"`
 }
 
-// CreateFailure is a branch a create run did not provision. Path is set when
-// the worktree exists but its hooks failed.
+// Path is set when the worktree exists but its hooks failed.
 type CreateFailure struct {
 	Branch   string `json:"branch"`
 	Path     string `json:"path,omitempty"`

@@ -48,8 +48,7 @@ type SourceUpdateParams struct {
 	Target     func(string) domain.BranchTarget
 	Branch     string
 	Source     string
-	// Many is a source several new worktrees start from, which the prose says.
-	Many bool
+	Many       bool
 }
 
 // SourceUpdate classifies the divergence from origin of whichever branch the
@@ -136,7 +135,6 @@ type PickParams struct {
 	Several string
 }
 
-// Pick is the wording for one new worktree or for several.
 func Pick(params PickParams) string {
 	if params.Many {
 		return params.Several

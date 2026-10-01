@@ -285,8 +285,6 @@ type CreateBatchParams struct {
 	Failed  []domain.CreateFailure
 }
 
-// FormatCreateBatch is the conclusion of a run over several branches: one line
-// per worktree, its path indented under it, every failure named, then the count.
 func FormatCreateBatch(w io.Writer, p CreateBatchParams) {
 	created, existed := 0, 0
 	for _, row := range p.Created {

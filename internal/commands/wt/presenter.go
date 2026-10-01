@@ -53,8 +53,6 @@ func (p createPresenter) Created(outcome createflow.Outcome) error {
 	return nil
 }
 
-// nonNil keeps an empty list a JSON array: a consumer iterating over `failed`
-// must never meet null.
 func nonNil[T any](items []T) []T {
 	if items == nil {
 		return []T{}

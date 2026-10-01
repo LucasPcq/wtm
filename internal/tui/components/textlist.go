@@ -26,8 +26,6 @@ type NewTextListParams struct {
 	Required string
 }
 
-// TextListModel collects names one by one: tab adds the one typed, enter adds
-// it and ends the step, backspace on an empty field takes the last one back.
 type TextListModel struct {
 	input    textinput.Model
 	entries  []string
@@ -93,9 +91,8 @@ func (m TextListModel) Update(msg tea.Msg) (TextListModel, tea.Cmd) {
 	return m, cmd
 }
 
-// addTyped reports whether the field is clear afterwards: a refused entry stays
-// in the field, with its reason under it.
-func (m *TextListModel) addTyped() bool {
+// A refused entry stays in the field, with its reason under it.
+func (m *TextListModel) addTyped() (cleared bool) {
 	typed := m.input.Value()
 	if strings.TrimSpace(typed) == "" {
 		return true

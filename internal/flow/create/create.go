@@ -151,9 +151,8 @@ func (f *createFlow) run() (Outcome, error) {
 	return outcome, runErr(runErrParams{First: firstErr, Batch: batch})
 }
 
-// fastForwardsEach reads --ff for the existing branches of a list too when the
-// source-update step had nothing to offer: a source already up to date skips it,
-// and must not swallow the flag.
+// A source already up to date skips the source-update step, which must not
+// swallow --ff for the existing branches of a list.
 func (f *createFlow) fastForwardsEach(answers flow.Answers) bool {
 	answer, _ := answers.Get(KeySourceUpdate)
 	if answer.Skipped {
@@ -176,9 +175,8 @@ func runErr(params runErrParams) error {
 	return fmt.Errorf("%w: %w", domain.ErrAborted, params.First)
 }
 
-// acceptRequested holds the arguments to what the wizard accepts as typed:
-// trimmed, and refused when blank or repeated — on the command line those are a
-// malformed invocation (exit 2), where the wizard only says it inline.
+// A blank or repeated argument is a malformed invocation (exit 2), where the
+// wizard only says it inline.
 func (f *createFlow) acceptRequested() ([]string, error) {
 	accepted := make([]string, 0, len(f.request.Branches))
 	for _, raw := range f.request.Branches {
@@ -210,8 +208,6 @@ func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, 
 
 	// A reused branch is checked out as-is: the source is only its recorded sync parent.
 	target := f.target(branchName)
-	// The source-update step only moved the shared source: an existing branch of
-	// a list is brought up to origin on its own, best effort.
 	if params.Batch && target.State == domain.BranchTargetExisting && f.fastForwardsEach(answers) {
 		_ = branch.FastForwardIfBehind(branch.BranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branchName})
 	}

@@ -75,8 +75,7 @@ func Error(w io.Writer, msg string) {
 	}
 }
 
-// BranchHeader opens the part of a run that belongs to one item: "  › feat/a (1/2)".
-// Unlike Loading it is not a non-event, so only its glyph is muted.
+// Unlike Loading, a header is not a non-event: only its glyph is muted.
 func BranchHeader(w io.Writer, msg string) {
 	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Muted.Render(domain.GlyphProgress), msg)
 }
