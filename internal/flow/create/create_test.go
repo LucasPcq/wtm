@@ -136,11 +136,14 @@ func TestBranchStepRefusesWithoutABranchName(t *testing.T) {
 	if _, err := step.Resolve(flow.Answers{}); err == nil {
 		t.Fatal("expected a refusal without a branch name")
 	}
-	if err := step.Validate("   "); err == nil {
+	if _, err := flow.CheckEntry(step, flow.EntryCheck{Entry: "   "}); err == nil {
 		t.Error("a blank branch name should be rejected as it is typed")
 	}
-	if err := step.Validate("feat/x"); err != nil {
+	if _, err := flow.CheckEntry(step, flow.EntryCheck{Entry: "feat/x"}); err != nil {
 		t.Errorf("a real branch name should validate: %v", err)
+	}
+	if err := step.ValidateSet(nil); err == nil {
+		t.Error("an empty list should be refused")
 	}
 }
 
@@ -466,7 +469,6 @@ func TestRecapNamesTheIsolation(t *testing.T) {
 
 func multiRun(t *testing.T, request Request, sets []string) (Outcome, *flowtest.ScriptedPrompter, error) {
 	t.Helper()
-	request.Multi = true
 	prompter := &flowtest.ScriptedPrompter{
 		Answers: map[string]string{KeySource: "main", KeyEnv: "", KeyRecap: confirmCreate},
 		Sets:    map[string][]string{KeyBranch: sets},
@@ -515,7 +517,7 @@ func TestMultiWithOneArgumentSkipsTheListStep(t *testing.T) {
 func TestMultiUnattendedTakesTheArguments(t *testing.T) {
 	outcome, err := Run(Params{
 		Context:   testContext(t),
-		Request:   Request{Branches: []string{"feat/a", "feat/b"}, Multi: true},
+		Request:   Request{Branches: []string{"feat/a", "feat/b"}},
 		Prompter:  flow.Unattended{},
 		Presenter: newRecorder(),
 	})
@@ -531,7 +533,7 @@ func TestRunRefusesADuplicateArgument(t *testing.T) {
 	presenter := newRecorder()
 	_, err := Run(Params{
 		Context:   testContext(t),
-		Request:   Request{Branches: []string{"feat/a", "feat/a"}, Multi: true},
+		Request:   Request{Branches: []string{"feat/a", "feat/a"}},
 		Prompter:  flow.Unattended{},
 		Presenter: presenter,
 	})
@@ -550,7 +552,7 @@ func TestRunRefusesAClashInsideTheListBeforeCreatingAnything(t *testing.T) {
 
 	_, err := Run(Params{
 		Context:   ctx,
-		Request:   Request{Branches: []string{"feat/x", "feat.x"}, Multi: true},
+		Request:   Request{Branches: []string{"feat/x", "feat.x"}},
 		Prompter:  flow.Unattended{},
 		Presenter: presenter,
 	})
@@ -568,7 +570,7 @@ func TestMixedListWithoutFromIsRefusedUnattended(t *testing.T) {
 
 	_, err := Run(Params{
 		Context:   ctx,
-		Request:   Request{Branches: []string{"feat/new", "feat/old"}, Multi: true},
+		Request:   Request{Branches: []string{"feat/new", "feat/old"}},
 		Prompter:  flow.Unattended{},
 		Presenter: newRecorder(),
 	})
@@ -578,7 +580,7 @@ func TestMixedListWithoutFromIsRefusedUnattended(t *testing.T) {
 }
 
 func TestEntryBadgeNamesNewAndExisting(t *testing.T) {
-	f := newFlow(t, Request{Multi: true}, existing("feat/old"))
+	f := newFlow(t, Request{}, existing("feat/old"))
 	if got := f.entryBadge("feat/old").Text; got != domain.BranchEntryExisting {
 		t.Errorf("badge = %q, want existing", got)
 	}
@@ -617,7 +619,7 @@ func TestAFailureInTheMiddleDoesNotStopTheRest(t *testing.T) {
 
 	outcome, err := Run(Params{
 		Context:   ctx,
-		Request:   Request{Branches: []string{"feat/a", "feat/b", "feat/c"}, Multi: true, From: "main"},
+		Request:   Request{Branches: []string{"feat/a", "feat/b", "feat/c"}, From: "main"},
 		Prompter:  flow.Unattended{},
 		Presenter: presenter,
 	})
@@ -655,7 +657,7 @@ func TestASingleBranchFailsAsBefore(t *testing.T) {
 
 	_, err := Run(Params{
 		Context:   ctx,
-		Request:   Request{Branches: []string{"feat/b"}, Multi: true, From: "main"},
+		Request:   Request{Branches: []string{"feat/b"}, From: "main"},
 		Prompter:  flow.Unattended{},
 		Presenter: presenter,
 	})
@@ -678,7 +680,7 @@ func TestFastForwardReachesAnExistingBranchWhenTheSourceIsUpToDate(t *testing.T)
 
 	_, err := Run(Params{
 		Context:   ctx,
-		Request:   Request{Branches: []string{"feat/new", "feat/old"}, Multi: true, From: "main", FastForward: true},
+		Request:   Request{Branches: []string{"feat/new", "feat/old"}, From: "main", FastForward: true},
 		Prompter:  flow.Unattended{},
 		Presenter: newRecorder(),
 	})
@@ -694,7 +696,7 @@ func TestFastForwardReachesAnExistingBranchWhenTheSourceIsUpToDate(t *testing.T)
 func TestADuplicateArgumentIsAUsageError(t *testing.T) {
 	_, err := Run(Params{
 		Context:   testContext(t),
-		Request:   Request{Branches: []string{"feat/a", "feat/a"}, Multi: true},
+		Request:   Request{Branches: []string{"feat/a", "feat/a"}},
 		Prompter:  flow.Unattended{},
 		Presenter: newRecorder(),
 	})
@@ -725,7 +727,7 @@ func TestRecapConfirmNamesHowManyWorktrees(t *testing.T) {
 func TestPositionalArgumentsAreTrimmed(t *testing.T) {
 	outcome, err := Run(Params{
 		Context:   testContext(t),
-		Request:   Request{Branches: []string{" feat/a ", "feat/b"}, Multi: true},
+		Request:   Request{Branches: []string{" feat/a ", "feat/b"}},
 		Prompter:  flow.Unattended{},
 		Presenter: newRecorder(),
 	})
@@ -741,7 +743,7 @@ func TestABlankArgumentIsAUsageError(t *testing.T) {
 	presenter := newRecorder()
 	_, err := Run(Params{
 		Context:   testContext(t),
-		Request:   Request{Branches: []string{"feat/a", "  "}, Multi: true},
+		Request:   Request{Branches: []string{"feat/a", "  "}},
 		Prompter:  flow.Unattended{},
 		Presenter: presenter,
 	})
@@ -756,7 +758,7 @@ func TestABlankArgumentIsAUsageError(t *testing.T) {
 func TestARepeatedArgumentIsWordedForTheCommandLine(t *testing.T) {
 	_, err := Run(Params{
 		Context:   testContext(t),
-		Request:   Request{Branches: []string{"feat/a", "feat/a"}, Multi: true},
+		Request:   Request{Branches: []string{"feat/a", "feat/a"}},
 		Prompter:  flow.Unattended{},
 		Presenter: newRecorder(),
 	})
@@ -777,7 +779,7 @@ func TestTheWizardSpeaksInThePluralForSeveralBranches(t *testing.T) {
 		Answers: map[string]string{KeySource: "main", KeyEnv: "", KeyIsolation: string(domain.IsolationIsolated), KeySourceUpdate: updateKeep, KeyRecap: confirmCreate},
 		Sets:    map[string][]string{KeyBranch: {"feat/a", "feat/b"}},
 	}
-	if _, err := Run(Params{Context: ctx, Request: Request{Multi: true}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+	if _, err := Run(Params{Context: ctx, Request: Request{}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 

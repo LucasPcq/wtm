@@ -94,7 +94,6 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		Context: shared.FlowContext(config),
 		Request: createflow.Request{
 			Branches:    args,
-			Multi:       true,
 			From:        fromFlag,
 			EnvFrom:     envFromFlag,
 			FastForward: ffFlag,

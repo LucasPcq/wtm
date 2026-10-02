@@ -30,7 +30,6 @@ const (
 )
 
 const (
-	labelBranch       = "Branch name"
 	labelSource       = "Source branch"
 	labelEnv          = "Env strategy"
 	labelSourceUpdate = "Source update"
@@ -71,9 +70,6 @@ func (f *createFlow) presets() map[string]string {
 }
 
 func (f *createFlow) branchStep() flow.Step {
-	if !f.request.Multi {
-		return f.singleBranchStep()
-	}
 	return flow.Step{
 		Kind:        flow.StepTextList,
 		Key:         KeyBranch,
@@ -142,25 +138,6 @@ func (f *createFlow) existingBranches(answers flow.Answers) []string {
 		}
 	}
 	return found
-}
-
-func (f *createFlow) singleBranchStep() flow.Step {
-	return flow.Step{
-		Kind:        flow.StepText,
-		Key:         KeyBranch,
-		Label:       labelBranch,
-		Title:       labelBranch,
-		Description: domain.CreateBranchStepDescription,
-		Validate: func(value string) error {
-			if strings.TrimSpace(value) == "" {
-				return errors.New(domain.CreateBranchRequired)
-			}
-			return nil
-		},
-		Resolve: func(flow.Answers) (flow.Answer, error) {
-			return flow.Answer{}, errors.New(domain.CreateBranchRequiredUnattended)
-		},
-	}
 }
 
 func (f *createFlow) sourceStep() flow.Step {

@@ -3038,7 +3038,6 @@ const (
 	// The create flow (internal/flow/create): step prose, option labels, recap
 	// fields and refusals. Format verbs: %s branch, %s env strategy, %s flag name.
 	CreateLoadingFmt                = "Creating worktree %s…"
-	CreateBranchStepDescription     = "Name for the new worktree branch"
 	CreateBranchesLabel             = "Branches"
 	CreateBranchesStepDescription   = "Names of the new worktree branches, one at a time"
 	BranchEntryNew                  = "new"

@@ -45,7 +45,6 @@ func (m Model) startCreate() (Model, tea.Cmd) {
 
 	params := createflow.Params{
 		Context: m.flowContext(),
-		Request: createflow.Request{Multi: true},
 		Prompter: prompter{
 			send:      send,
 			title:     domain.DashboardCreateTitle,

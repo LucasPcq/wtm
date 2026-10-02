@@ -17,10 +17,7 @@ import (
 )
 
 type Request struct {
-	Branches []string
-	// Multi asks for the branches as a list; a surface that cannot render one
-	// keeps the single-name step.
-	Multi       bool
+	Branches    []string
 	From        string
 	EnvFrom     string
 	FastForward bool
