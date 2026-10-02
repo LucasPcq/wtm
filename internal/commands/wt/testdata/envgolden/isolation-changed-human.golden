@@ -1,0 +1,19 @@
+args: feat/v --yes --isolation isolated
+err: 
+exit: 0
+--- stdout ---
+
+  ✓ Now isolated. Settled 2 linked .env value(s).
+
+  Worktree  feat/v
+  Mode      add
+
+  .env   strategy: main  ·  source: main
+  ✓ no key to reconcile — its linked values were settled
+
+--- stderr ---
+--- .env ---
+WEB_PORT=3010
+REALM=app-feat-v
+--- isolation ---
+isolated

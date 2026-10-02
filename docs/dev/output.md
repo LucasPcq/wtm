@@ -164,7 +164,7 @@ The alignment belongs to `Announce`, never to the wording: a format string spell
 
 **"Exactly once" counts uninterrupted blocks, not frames.** A command frames each block of human output once; a prompt between two blocks makes two, because there are two blocks. So does a split across streams — `run down`'s failures on stderr and its recap on stdout. What the rule forbids is a second frame around the same block, or a helper emitting its own padding inside one.
 
-**A diff is not a register.** `wtm env` prints `+` / `!` / `−` per key, and that is deliberate: those runes describe a *change to a line of a file*, not the state of a run, and they read as a column down the left of a file block rather than as the head of a conclusion. It is the one vocabulary outside the table, it is confined to `output/env.go`, and adding a second one is a decision to argue for here first.
+**A diff is not a register.** `wtm env` prints `+` / `!` / `−` per key — every key under `--check`, and under an apply only what it left for the reader, what it did being one counted line per file (`rules.EnvFileTally`) — and that is deliberate: those runes describe a *change to a line of a file*, not the state of a run, and they read as a column down the left of a file block rather than as the head of a conclusion. It is the one vocabulary outside the table, it is confined to `output/env.go`, and adding a second one is a decision to argue for here first.
 
 **The status palette names states, never identities.** `run logs` used to cycle green and yellow across job prefixes, so in the one command whose body is job output, yellow meant "job 3". A label saying where a line came from is chrome.
 

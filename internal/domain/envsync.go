@@ -29,6 +29,7 @@ type EnvFileResult struct {
 // written).
 type EnvSyncResult struct {
 	Branch string          `json:"branch"`
+	Path   string          `json:"path"`
 	Mode   EnvMode         `json:"mode"`
 	Check  bool            `json:"check"`
 	Files  []EnvFileResult `json:"files"`
@@ -59,4 +60,22 @@ type EnvRestoredEntry struct {
 	From    string `json:"from"`
 	To      string `json:"to,omitempty"`
 	Removed bool   `json:"removed,omitempty"`
+}
+
+// EnvFileDecision is what a reader decided for one file's drift. A key absent
+// from every field takes the reconciliation's default: an addition is added, a
+// missing key left out, a conflict and an orphan kept.
+type EnvFileDecision struct {
+	Target       string
+	Decisions    map[string]EnvConflictDecision
+	FilledValues map[string]string
+	PruneKeys    []string
+	SkipKeys     []string
+}
+
+// EnvResolveDefaults is what the flags already decided, for the resolver to
+// open on: a conflict on its overwrite, an orphan on its removal.
+type EnvResolveDefaults struct {
+	Overwrite bool
+	Prune     bool
 }

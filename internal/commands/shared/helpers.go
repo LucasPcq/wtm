@@ -84,8 +84,19 @@ func AddIsolationFlag(cmd *cobra.Command) {
 // IsolationFlag reads --isolation, refusing a value that is neither answer.
 func IsolationFlag(cmd *cobra.Command) (domain.Isolation, error) {
 	value, _ := cmd.Flags().GetString(domain.FlagIsolation)
-	return rules.ParseIsolation(value)
+	isolation, err := rules.ParseIsolation(value)
+	if err != nil {
+		return "", rules.InvalidFlagValue(rules.InvalidFlagValueParams{Flag: domain.FlagIsolation, Value: value, Allowed: IsolationValues})
+	}
+	return isolation, nil
 }
+
+// IsolationValues and EnvStrategyValues are what the two flags accept, as an
+// error names them.
+var (
+	IsolationValues   = []string{string(domain.IsolationIsolated), string(domain.IsolationVerbatim)}
+	EnvStrategyValues = []string{string(domain.EnvStrategyExample), string(domain.EnvStrategyMain), string(domain.EnvStrategyParent)}
+)
 
 // EnvFromFlag is --env-from, refused here rather than after the worktree it
 // would have provisioned exists.
@@ -95,7 +106,7 @@ func EnvFromFlag(cmd *cobra.Command) (string, error) {
 		return "", nil
 	}
 	if err := rules.ValidateEnvStrategy(domain.EnvStrategy(value)); err != nil {
-		return "", fmt.Errorf("invalid --%s value %q: %w", domain.FlagEnvFrom, value, err)
+		return "", rules.InvalidFlagValue(rules.InvalidFlagValueParams{Flag: domain.FlagEnvFrom, Value: value, Allowed: EnvStrategyValues})
 	}
 	return value, nil
 }

@@ -99,8 +99,8 @@ func TestEnvOutcomeSummaryCountsThePortPass(t *testing.T) {
 
 func TestEnvOutcomeSummaryCheckMode(t *testing.T) {
 	clean := domain.EnvSyncResult{Check: true, Files: []domain.EnvFileResult{{Target: ".env"}}}
-	if got := EnvOutcomeSummary(clean); got.Text != "No drift." || got.Verdict != domain.EnvVerdictDone {
-		t.Errorf("EnvOutcomeSummary() = %+v, want a clean verdict", got)
+	if got := EnvOutcomeSummary(clean); got.Text != "No drift." || got.Verdict != domain.EnvVerdictNeutral {
+		t.Errorf("EnvOutcomeSummary() = %+v, want the non-event register", got)
 	}
 
 	// --check must not answer "no drift" about a worktree whose .env still points

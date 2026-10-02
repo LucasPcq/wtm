@@ -35,6 +35,10 @@ const (
 	// StepTextList collects names typed one by one; its answer is carried by
 	// Answer.Values, in the order they were added.
 	StepTextList
+	// StepEnvResolve asks for a decision on every drifting key of a worktree's
+	// .env files (StepContent.EnvFiles); its answer is carried by
+	// Answer.EnvDecisions.
+	StepEnvResolve
 )
 
 type Option struct {
@@ -89,6 +93,10 @@ type StepContent struct {
 	Pinned string
 	// Banner is what a loaded step has to say about what it could not load.
 	Banner Banner
+	// EnvFiles is the drift a StepEnvResolve asks about, EnvDefaults what its
+	// rows open on.
+	EnvFiles    []domain.EnvFileResult
+	EnvDefaults domain.EnvResolveDefaults
 }
 
 type Banner struct {
@@ -177,10 +185,12 @@ type Answer struct {
 	Value string
 	// Values is the answer of a StepMultiSelect or StepReorder step; every other
 	// kind leaves it nil and answers with Value.
-	Values     []string
-	Skipped    bool
-	SkipReason string
-	Asked      bool
+	Values []string
+	// EnvDecisions is the answer of a StepEnvResolve step.
+	EnvDecisions []domain.EnvFileDecision
+	Skipped      bool
+	SkipReason   string
+	Asked        bool
 }
 
 type Answers struct {
@@ -405,6 +415,8 @@ func MergeContent(step Step, built StepContent) StepContent {
 		content.Pinned = built.Pinned
 	}
 	content.Banner = built.Banner
+	content.EnvFiles = built.EnvFiles
+	content.EnvDefaults = built.EnvDefaults
 	return content
 }
 

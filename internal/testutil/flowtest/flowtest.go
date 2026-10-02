@@ -13,9 +13,11 @@ import (
 type ScriptedPrompter struct {
 	Answers map[string]string
 	// Sets answers a StepMultiSelect, StepReorder or StepTextList step, whose answer is a set.
-	Sets      map[string][]string
-	Abort     bool
-	Confirmed bool
+	Sets map[string][]string
+	// EnvDecisions answers a StepEnvResolve step.
+	EnvDecisions map[string][]domain.EnvFileDecision
+	Abort        bool
+	Confirmed    bool
 
 	Asked   []string
 	Content map[string]flow.StepContent
@@ -68,6 +70,11 @@ func (p *ScriptedPrompter) Ask(session flow.Session) (flow.Answers, error) {
 			}
 			p.Asked = append(p.Asked, step.Key)
 			answers = answers.With(step.Key, flow.Answer{Values: values, Asked: true})
+			continue
+		}
+		if decisions, scripted := p.EnvDecisions[step.Key]; scripted {
+			p.Asked = append(p.Asked, step.Key)
+			answers = answers.With(step.Key, flow.Answer{EnvDecisions: decisions, Asked: true})
 			continue
 		}
 		value, scripted := p.Answers[step.Key]

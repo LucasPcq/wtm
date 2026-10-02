@@ -107,12 +107,12 @@ func TestEnvYesLeavesALegacyWorktreesRunValuesAlone(t *testing.T) {
 		t.Errorf("warnings = %v, want the command adopting isolation", result.Warnings)
 	}
 
-	human, _, err := runWtCmd(t, domain.CmdEnv, "feat/old", "--yes")
+	human, stderr, err := runWtCmd(t, domain.CmdEnv, "feat/old", "--yes")
 	if err != nil {
 		t.Fatalf("env: %v", err)
 	}
-	if !strings.Contains(human, "--isolation isolated") || strings.Contains(human, "Settled") {
-		t.Errorf("report = %q, want the adoption hint and no settled value", human)
+	if !strings.Contains(stderr, "--isolation isolated") || strings.Contains(human, "Settled") {
+		t.Errorf("report = %q, stderr = %q, want the adoption hint on stderr and no settled value", human, stderr)
 	}
 }
 

@@ -67,16 +67,16 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 ## `env`
 
 ```
-{branch, mode, check,
+{branch, path, mode, check,
  files: [{target, strategy, source, applied, parent_branch, parent_fallback, unresolvable?,
-          diff: {mode, entries: [{key, status, current_value, resolved_value, placeholder, source, export}]}}],
+          diff: {mode, entries: [{key, status, current_value, resolved_value, placeholder, source, export, action?}]}}],
  ports: {…see above…},
  isolation, isolation_adoption, isolation_changed,
  restored: [{file, key, from, to, removed}],
  warnings}
 ```
 
-- Key `status`: `resolved` / `missing_unresolved` / `conflict` / `orphan`.
+- Key `status`: `resolved` / `missing_unresolved` / `conflict` / `orphan` — the drift the run found. Key `action` is what an apply did to it: `added`, `filled`, `overwritten`, `kept`, `pruned` or `skipped`; absent under `--check` and for a key left as it was (an unanswered `missing_unresolved` stays without one).
 - `source` names the value source (`template (no .env to sync from)` on a fresh project). `parent_fallback: true` means main was used because the parent had no readable file; `parent_branch` names the parent. `unresolvable: true` flags a configured file that exists nowhere.
 - `ports` is empty when the project declares no link, and always empty for a `verbatim` worktree.
 - `isolation`: the worktree's. `isolation_adoption` appears only for a worktree created before the isolation choice: `not_adopted` (run values left alone, no `isolation` reported, empty `ports`) or `adopted` (this run recorded it and settled its values).

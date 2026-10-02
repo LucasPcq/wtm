@@ -1,0 +1,19 @@
+args: feat/a --yes
+err: 
+exit: 0
+--- stdout ---
+
+  = No changes written.
+
+  Worktree  feat/a
+  Mode      add
+
+  .env   strategy: main  ·  source: main
+  = in sync — nothing to reconcile
+
+--- stderr ---
+--- .env ---
+WEB_PORT=3010
+REALM=app-feat-a
+--- isolation ---
+isolated

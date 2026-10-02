@@ -55,6 +55,11 @@ func (p *plan) componentStep(step flow.Step, conditional bool) (components.Step,
 		return p.contentStep(step, func(content flow.StepContent) any { return reorderList(content) })
 	case flow.StepRecap:
 		return p.recapStep(step), nil
+	case flow.StepEnvResolve:
+		built, err := p.contentStep(step, func(content flow.StepContent) any { return envResolve(content) })
+		// The glossary the model carries as its description reads as a legend.
+		built.Callout = true
+		return built, err
 	}
 	return components.Step{}, unsupportedKindErr(step)
 }
@@ -104,6 +109,15 @@ func TextList(step flow.Step, content flow.StepContent) components.TextListModel
 		}
 	}
 	return components.NewTextList(params)
+}
+
+func envResolve(content flow.StepContent) components.EnvResolveModel {
+	return components.NewEnvResolve(components.NewEnvResolveParams{
+		Title:       content.Title,
+		Description: components.EnvResolveGlossary(),
+		Files:       content.EnvFiles,
+		Defaults:    content.EnvDefaults,
+	})
 }
 
 func reorderList(content flow.StepContent) components.ReorderListModel {
@@ -465,6 +479,8 @@ func summaryFor(step flow.Step) func(any) string {
 			return components.MultiSelectSummary(domain.SummaryNone)
 		case flow.StepReorder:
 			return components.ReorderSummary
+		case flow.StepEnvResolve:
+			return components.EnvResolveSummary
 		}
 		return components.SelectSummary
 	}

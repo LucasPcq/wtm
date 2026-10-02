@@ -1,0 +1,20 @@
+args: feat/b --yes --from parent
+err: 
+exit: 0
+--- stdout ---
+
+  ✓ Reconciled 1 file(s).
+
+  Worktree  feat/b
+  Mode      add
+
+  .env   strategy: parent  ·  source: feat/a
+  ✓ 1 added
+
+--- stderr ---
+--- .env ---
+WEB_PORT=3020
+REALM=app-feat-b
+FROM_A=1
+--- isolation ---
+isolated

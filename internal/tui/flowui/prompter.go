@@ -214,6 +214,10 @@ func answerOf(kind flow.StepKind, model any) flow.Answer {
 		if list, ok := model.(components.ReorderListModel); ok {
 			return flow.Answer{Values: list.Values(), Asked: true}
 		}
+	case flow.StepEnvResolve:
+		if resolve, ok := model.(components.EnvResolveModel); ok {
+			return flow.Answer{EnvDecisions: resolve.Decisions(), Asked: true}
+		}
 	}
 	return flow.Answer{}
 }

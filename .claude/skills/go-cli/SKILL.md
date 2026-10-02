@@ -192,9 +192,9 @@ Steps are `flow.Step` values (`Kind`, `Key`, `Label`, `Title`, `Description`, `O
 (`Kind`, `Mode`, `TargetKey`) is what a flow declares about how a surface must schedule
 it; the CLI ignores it, `tui/dashboard/ops.go` enforces it.
 
-`create`, `checkout`, `clean`, `reparent`, `prune`, `relocate`, `sync` and `fast-forward` are
-migrated. `extract` and `env` still drive their `internal/tui/*` wizard packages directly — the
-`components.Step` sections below still describe them. **Any new mutation command goes
+`create`, `checkout`, `clean`, `reparent`, `prune`, `relocate`, `sync`, `fast-forward` and `env` are
+migrated. `extract` still drives its `internal/tui/*` wizard packages directly — the
+`components.Step` sections below still describe it. **Any new mutation command goes
 through `flow/`.** Full reference: [`docs/dev/flow-layer.md`](../../../docs/dev/flow-layer.md)
 and [`docs/dev/adding-a-mutation-command.md`](../../../docs/dev/adding-a-mutation-command.md).
 
@@ -448,7 +448,7 @@ refuses an unknown `StepKind` rather than guessing, so adding a kind means teach
 surface to render it.
 
 The `components.Step` API below remains the model for the wizards **not yet migrated**
-(`extract`, `sync`, `prune`, `reparent`, `checkout`, `env`) and for
+(`extract`) and for
 non-mutation pickers (`run`, `init`). Do not start a new mutation wizard here.
 
 A flow with **2+ sequential decisions** (e.g. pick worktree → pick new parent) MUST be a
@@ -565,6 +565,8 @@ then a single **recap** as the last step. The rules:
   Do not add a new one; migrate instead.
 - The breadcrumb denominator is **fixed** (`len(steps)`); an auto-skipped step makes the position
   **jump** (3/5 → 5/5), so the recap reliably reads `n/n`.
+- The breadcrumb names the step by its model's **title** when it has one (`Step 3/4 • Resolve
+  drift — feat/a`), else by its `Name`; the summaries of completed steps keep the `Name`.
 - **One wizard for every interactive entry path.** A command with several entry forms (a picker,
   positional args, `--all`) routes them all through the *same* wizard, skipping the steps a form
   already fixes (e.g. `sync <branches>`/`--all` skip the multi-select but keep the on-conflict

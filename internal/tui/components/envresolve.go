@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/styles"
 )
 
@@ -56,15 +57,6 @@ type envRow struct {
 	edited  string
 }
 
-// EnvFileDecision is the collected resolution for one file, returned by the model.
-type EnvFileDecision struct {
-	Target       string
-	Decisions    map[string]domain.EnvConflictDecision
-	FilledValues map[string]string
-	PruneKeys    []string
-	SkipKeys     []string
-}
-
 // EnvResolveModel is the single-screen interactive resolver for `wtm env`: it lists
 // every drifting key grouped by file (conflicts, missing, orphans, and additions)
 // and collects a per-key decision. It is a wizard step model in the same shape as
@@ -88,6 +80,7 @@ type NewEnvResolveParams struct {
 	Title       string
 	Description string
 	Files       []domain.EnvFileResult
+	Defaults    domain.EnvResolveDefaults
 }
 
 // NewEnvResolve builds the model from computed per-file drift.
@@ -96,19 +89,19 @@ func NewEnvResolve(params NewEnvResolveParams) EnvResolveModel {
 		title: params.Title,
 		desc:  params.Description,
 		width: 80,
-		rows:  buildEnvRows(params.Files),
+		rows:  buildEnvRows(params.Files, params.Defaults),
 	}
 	m.cursor = m.firstNavigable()
 	return m
 }
 
 // buildEnvRows flattens the files into header + entry rows, dropping in-sync keys.
-func buildEnvRows(files []domain.EnvFileResult) []envRow {
+func buildEnvRows(files []domain.EnvFileResult, defaults domain.EnvResolveDefaults) []envRow {
 	var rows []envRow
 	for _, f := range files {
 		var entries []envRow
 		for _, e := range f.Diff.Entries {
-			row, keep := entryRow(f, e)
+			row, keep := entryRow(f, e, defaults)
 			if keep {
 				entries = append(entries, row)
 			}
@@ -127,7 +120,7 @@ func buildEnvRows(files []domain.EnvFileResult) []envRow {
 }
 
 // entryRow maps one diff entry to a row, or keep=false when the key is in sync.
-func entryRow(f domain.EnvFileResult, e domain.EnvKeyDiff) (envRow, bool) {
+func entryRow(f domain.EnvFileResult, e domain.EnvKeyDiff, defaults domain.EnvResolveDefaults) (envRow, bool) {
 	row := envRow{
 		key:         e.Key,
 		status:      e.Status,
@@ -138,20 +131,26 @@ func entryRow(f domain.EnvFileResult, e domain.EnvKeyDiff) (envRow, bool) {
 	}
 	switch e.Status {
 	case domain.EnvKeyConflict:
-		row.options = []envOption{{"keep", optKeep}, {"use " + sourceName(e.Source, f.ParentBranch), optOverwrite}}
+		row.options = []envOption{{domain.EnvRecapActionKeep, optKeep}, {fmt.Sprintf(domain.EnvResolveUseFmt, sourceName(e.Source, f.ParentBranch)), optOverwrite}}
 		row.canEdit = true
+		if defaults.Overwrite {
+			row.sel = 1
+		}
 		return row, true
 	case domain.EnvKeyMissing:
-		row.options = []envOption{{"accept", optAccept}, {"skip", optSkip}}
+		row.options = []envOption{{domain.EnvRecapActionFill, optAccept}, {domain.EnvRecapActionSkip, optSkip}}
 		row.canEdit = true
 		return row, true
 	case domain.EnvKeyOrphan:
-		row.options = []envOption{{"keep", optKeep}, {"remove", optRemove}}
+		row.options = []envOption{{domain.EnvRecapActionKeep, optKeep}, {domain.EnvRecapActionPrune, optRemove}}
+		if defaults.Prune {
+			row.sel = 1
+		}
 		return row, true
 	case domain.EnvKeyResolved:
 		if e.CurrentValue == "" && e.ResolvedValue != "" {
 			row.isAdd = true
-			row.options = []envOption{{"add", optAdd}, {"skip", optSkip}}
+			row.options = []envOption{{domain.EnvRecapActionAdd, optAdd}, {domain.EnvRecapActionSkip, optSkip}}
 			row.canEdit = true
 			return row, true
 		}
@@ -183,52 +182,6 @@ func (m EnvResolveModel) Empty() bool {
 	return true
 }
 
-// RecapLines renders the pending decisions grouped by file, styled to separate the
-// key (bold), the action (semantic color), and the value (quoted).
-func (m EnvResolveModel) RecapLines() []string {
-	var lines []string
-	for _, r := range m.rows {
-		if r.header {
-			if len(lines) > 0 {
-				lines = append(lines, "")
-			}
-			lines = append(lines, styles.Bold.Render(r.target)+":")
-			continue
-		}
-		lines = append(lines, "  "+recapLineFor(r))
-	}
-	return lines
-}
-
-// recapLineFor renders one row's decision: bold key, colored action verb, quoted
-// value. Every line shows the value involved, consistently across actions.
-func recapLineFor(r envRow) string {
-	key := styles.Bold.Render(r.key)
-	if r.useEdit {
-		return recapLine(key, styles.Primary.Render("set"), plainVal(r.edited))
-	}
-	code := r.options[r.sel].code
-	st := actionStyle(code)
-	switch code {
-	case optOverwrite:
-		return recapLine(key, st.Render("overwrite →"), plainVal(r.resolved))
-	case optAdd:
-		return recapLine(key, st.Render("add"), plainVal(r.resolved))
-	case optAccept:
-		return recapLine(key, st.Render("set"), plainVal(r.placeholder))
-	case optSkip:
-		val := r.placeholder
-		if r.isAdd {
-			val = r.resolved
-		}
-		return recapLine(key, st.Render("skip"), st.Render(fmt.Sprintf("(%s not added)", plainVal(val))))
-	case optRemove:
-		return recapLine(key, st.Render("remove"), plainVal(r.current))
-	default: // optKeep (conflict or orphan)
-		return recapLine(key, st.Render("keep"), plainVal(r.current))
-	}
-}
-
 // actionStyle maps an action to its semantic color, shared by the live list, the
 // recap, and the glossary so a color means the same thing everywhere: accent =
 // writes a value, muted = leaves as-is, danger = removes.
@@ -252,29 +205,17 @@ func actionStyleFor(r envRow) lipgloss.Style {
 	return actionStyle(r.options[r.sel].code)
 }
 
-// recapLine assembles "key  action value".
-func recapLine(key, action, value string) string {
-	return fmt.Sprintf("%s  %s %s", key, action, value)
-}
-
 // EnvResolveGlossary is the short legend shown as a callout above the resolve list:
 // what each case keyword means, colored to match the list's status column.
 func EnvResolveGlossary() string {
 	warn, mut := styles.Warning, styles.Muted
-	caseCol := func(s lipgloss.Style, w string) string { return s.Render(fmt.Sprintf("%-9s", w)) }
+	caseCol := func(s lipgloss.Style, w string) string { return s.Render(fmt.Sprintf("%-10s", w)) }
 	return strings.Join([]string{
 		caseCol(warn, "conflict") + mut.Render("your value differs from the source"),
 		caseCol(warn, "missing") + mut.Render("expected, but has no value yet"),
 		caseCol(mut, "orphan") + mut.Render("present here, but in no source"),
 		caseCol(mut, "add") + mut.Render("the source has a value you don't"),
 	}, "\n")
-}
-
-func plainVal(v string) string {
-	if v == "" {
-		return "(empty)"
-	}
-	return fmt.Sprintf("%q", v)
 }
 
 // Done reports the user pressed Enter to proceed.
@@ -287,15 +228,15 @@ func (m EnvResolveModel) Aborted() bool { return m.aborted }
 func (m EnvResolveModel) Init() tea.Cmd { return nil }
 
 // Decisions returns the collected per-file resolutions.
-func (m EnvResolveModel) Decisions() []EnvFileDecision {
-	byTarget := map[string]*EnvFileDecision{}
+func (m EnvResolveModel) Decisions() []domain.EnvFileDecision {
+	byTarget := map[string]*domain.EnvFileDecision{}
 	var order []string
 	current := ""
 	for _, r := range m.rows {
 		if r.header {
 			current = r.target
 			if _, ok := byTarget[current]; !ok {
-				byTarget[current] = &EnvFileDecision{
+				byTarget[current] = &domain.EnvFileDecision{
 					Target:       current,
 					Decisions:    map[string]domain.EnvConflictDecision{},
 					FilledValues: map[string]string{},
@@ -307,7 +248,7 @@ func (m EnvResolveModel) Decisions() []EnvFileDecision {
 		applyRowDecision(byTarget[current], r)
 	}
 
-	out := make([]EnvFileDecision, 0, len(order))
+	out := make([]domain.EnvFileDecision, 0, len(order))
 	for _, t := range order {
 		out = append(out, *byTarget[t])
 	}
@@ -315,7 +256,7 @@ func (m EnvResolveModel) Decisions() []EnvFileDecision {
 }
 
 // applyRowDecision folds one row's chosen action into its file decision.
-func applyRowDecision(d *EnvFileDecision, r envRow) {
+func applyRowDecision(d *domain.EnvFileDecision, r envRow) {
 	if r.useEdit {
 		d.FilledValues[r.key] = r.edited
 		return
@@ -515,7 +456,7 @@ const envRowPrefixWidth = 2
 // (normal rows) or plain (the selected row).
 func (m EnvResolveModel) entryText(r envRow, styled bool) string {
 	key := fmt.Sprintf("%-20s", r.key)
-	status := fmt.Sprintf("%-9s", statusWord(r))
+	status := fmt.Sprintf("%-10s", statusWord(r))
 	action, proposed := rowActionValue(r, styled)
 
 	mid := proposed
@@ -571,27 +512,27 @@ func statusStyle(s domain.EnvKeyStatus) lipgloss.Style {
 // rowActionValue returns the action label and the proposed value for a row.
 func rowActionValue(r envRow, styled bool) (action, proposed string) {
 	if r.useEdit {
-		return "edit", valText(r.edited, styled)
+		return domain.EnvResolveEdit, valText(r.edited, styled)
 	}
 	switch r.options[r.sel].code {
 	case optOverwrite:
 		return r.options[r.sel].label, valText(r.resolved, styled)
 	case optAdd:
-		return "add", valText(r.resolved, styled)
+		return domain.EnvRecapActionAdd, valText(r.resolved, styled)
 	case optAccept:
-		return "accept", valText(r.placeholder, styled)
+		return domain.EnvRecapActionFill, valText(r.placeholder, styled)
 	case optSkip:
 		if r.isAdd {
-			return "skip", muted("(not added)", styled)
+			return domain.EnvRecapActionSkip, muted("(not added)", styled)
 		}
-		return "skip", muted("(left missing)", styled)
+		return domain.EnvRecapActionSkip, muted("(left missing)", styled)
 	case optRemove:
-		return "remove", ""
+		return domain.EnvRecapActionPrune, ""
 	default: // optKeep
 		if r.status == domain.EnvKeyOrphan {
-			return "keep", ""
+			return domain.EnvRecapActionKeep, ""
 		}
-		return "keep", valText(r.current, styled)
+		return domain.EnvRecapActionKeep, valText(r.current, styled)
 	}
 }
 
@@ -634,41 +575,26 @@ func EnvResolveSummary(model any) string {
 	if !ok {
 		return ""
 	}
-	over, filled, pruned, skipped := 0, 0, 0, 0
+	counts := map[optCode]int{}
 	for _, r := range m.rows {
 		if r.header {
 			continue
 		}
 		if r.useEdit {
-			filled++
+			counts[optAccept]++
 			continue
 		}
-		switch r.options[r.sel].code {
-		case optOverwrite:
-			over++
-		case optAccept:
-			filled++
-		case optRemove:
-			pruned++
-		case optSkip:
-			skipped++
-		}
+		counts[r.options[r.sel].code]++
 	}
-	parts := make([]string, 0, 4)
-	if over > 0 {
-		parts = append(parts, fmt.Sprintf("%d overwritten", over))
+	summary := rules.Tally(
+		domain.TallyPart{Count: counts[optAdd], Label: domain.EnvTallyAdded},
+		domain.TallyPart{Count: counts[optAccept], Label: domain.EnvTallyFilled},
+		domain.TallyPart{Count: counts[optOverwrite], Label: domain.EnvTallyOverwritten},
+		domain.TallyPart{Count: counts[optRemove], Label: domain.EnvTallyPruned},
+		domain.TallyPart{Count: counts[optSkip], Label: domain.EnvTallySkipped},
+	)
+	if summary == "" {
+		return domain.EnvResolveSummaryNone
 	}
-	if filled > 0 {
-		parts = append(parts, fmt.Sprintf("%d filled", filled))
-	}
-	if pruned > 0 {
-		parts = append(parts, fmt.Sprintf("%d pruned", pruned))
-	}
-	if skipped > 0 {
-		parts = append(parts, fmt.Sprintf("%d skipped", skipped))
-	}
-	if len(parts) == 0 {
-		return "reviewed"
-	}
-	return strings.Join(parts, ", ")
+	return summary
 }

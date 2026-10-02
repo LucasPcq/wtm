@@ -40,6 +40,7 @@ You drive wtm without a terminal a human is watching, so everything below exists
 | `15` | `extract`: selected changes conflict with the target worktree |
 | `16` | no run.toml (no job or profile declared): run `wtm run init` |
 | `17` | `upgrade`: this install cannot be upgraded (built from source, or the binary is not writable) |
+| `18` | `env --check`: the `.env` has drifted (the report or JSON is still written) |
 
 ## Discover names before you act
 

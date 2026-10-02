@@ -529,7 +529,11 @@ func (m WizardModel) renderStatusBanner() string {
 func (m WizardModel) renderBreadcrumb() string {
 	counter := styles.Breadcrumb.Render(fmt.Sprintf("  Step %d/%d", m.visiblePosition(), m.visibleCount()))
 	sep := styles.Breadcrumb.Render(" • ")
-	name := styles.BreadcrumbActive.Render(m.steps[m.current].Name)
+	label := m.steps[m.current].Name
+	if title := m.stepTitle(m.steps[m.current]); title != "" {
+		label = title
+	}
+	name := styles.BreadcrumbActive.Render(label)
 	return counter + sep + name
 }
 
@@ -970,6 +974,48 @@ func (m WizardModel) stepDescription(step Step) string {
 		return child.desc
 	case CmdListModel:
 		return child.desc
+	}
+	return ""
+}
+
+// stepTitle is what the step's model says it asks: the breadcrumb shows it, so
+// a title naming the worktree it is about is on screen wherever the question is.
+func (m WizardModel) stepTitle(step Step) string {
+	switch child := step.Model.(type) {
+	case SelectListModel:
+		return child.title
+	case TextInputModel:
+		return child.title
+	case TextListModel:
+		return child.title
+	case ConfirmModel:
+		return child.title
+	case MultiSelectModel:
+		return child.title
+	case ReorderListModel:
+		return child.title
+	case HookListModel:
+		return child.title
+	case EnvResolveModel:
+		return child.title
+	case PortListModel:
+		return child.title
+	case RouteListModel:
+		return child.title
+	case RunnerListModel:
+		return child.title
+	case ProfileListModel:
+		return child.title
+	case KindListModel:
+		return child.title
+	case ScopeListModel:
+		return child.title
+	case NamespaceListModel:
+		return child.title
+	case EnvValueListModel:
+		return child.title
+	case CmdListModel:
+		return child.title
 	}
 	return ""
 }

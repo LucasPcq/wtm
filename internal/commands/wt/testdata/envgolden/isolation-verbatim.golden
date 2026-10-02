@@ -1,0 +1,21 @@
+args: feat/i --yes --isolation verbatim
+err: 
+exit: 0
+--- stdout ---
+
+  ✓ Now verbatim — 2 value(s) wtm owns back to the source's.
+
+  Worktree   feat/i
+  Mode       add
+  Isolation  verbatim — .env kept as copied
+
+  .env   strategy: main  ·  source: main
+  ~ WEB_PORT  back to the source's "3000" (was "3010")
+  ~ REALM     back to the source's "main-realm" (was "app-feat-i")
+
+--- stderr ---
+--- .env ---
+WEB_PORT=3000
+REALM=main-realm
+--- isolation ---
+verbatim

@@ -1,0 +1,98 @@
+args: feat/a --yes --mode refresh --output json
+err: 
+exit: 0
+--- stdout ---
+{
+  "branch": "feat/a",
+  "path": "<trees>/feat-a",
+  "mode": "refresh",
+  "check": false,
+  "files": [
+    {
+      "target": ".env",
+      "strategy": "main",
+      "source": "main",
+      "diff": {
+        "mode": "refresh",
+        "entries": [
+          {
+            "key": "WEB_PORT",
+            "status": "resolved",
+            "current_value": "3010"
+          },
+          {
+            "key": "REALM",
+            "status": "resolved",
+            "current_value": "app-feat-a"
+          },
+          {
+            "key": "SHARED",
+            "status": "conflict",
+            "current_value": "from-worktree",
+            "resolved_value": "from-main",
+            "source": "main",
+            "action": "kept"
+          },
+          {
+            "key": "ORPHAN",
+            "status": "orphan",
+            "current_value": "1",
+            "action": "kept"
+          },
+          {
+            "key": "NEW_KEY",
+            "status": "resolved",
+            "resolved_value": "1",
+            "source": "main",
+            "action": "added"
+          }
+        ]
+      },
+      "applied": true
+    }
+  ],
+  "ports": {
+    "offset": 10,
+    "entries": [
+      {
+        "file": ".env",
+        "key": "WEB_PORT",
+        "port": "PORT",
+        "base": 3000,
+        "resolved": 3010,
+        "moves": [
+          {
+            "port": "PORT",
+            "job": "web",
+            "base": 3000,
+            "resolved": 3010
+          }
+        ],
+        "addressing": "ports",
+        "status": "unchanged",
+        "current_value": "3010"
+      }
+    ],
+    "addressing": "names",
+    "public_port": 11080,
+    "owned": [
+      {
+        "file": ".env",
+        "key": "REALM",
+        "value": "app-feat-a",
+        "changed": false
+      }
+    ],
+    "applied": true
+  },
+  "isolation": "isolated"
+}
+--- stderr ---
+--- .env ---
+WEB_PORT=3010
+REALM=app-feat-a
+SHARED=from-worktree
+ORPHAN=1
+NEW_KEY=1
+--- isolation ---
+isolated

@@ -35,19 +35,31 @@ type EnvKeyRowsParams struct {
 }
 
 // EnvKeyRows renders one file's keys as aligned rows, in the order a reader
-// works through them: what was added, what is contested, what is unanswered,
-// what is left over. The key column is padded across all four groups so the
-// details line up — a block whose columns wander reads as noise next to the port
-// table it sits beside.
+// works through them: what is added, what is contested, what is unanswered,
+// what is left over. A read-only check lists every key it would touch, since
+// that list is what it was asked for; an apply lists only what it left for the
+// reader — what it did is counted by EnvFileTally.
 //
 // The glyph and the colour are the surface's to choose; a row only carries the
 // status they derive from.
 func EnvKeyRows(params EnvKeyRowsParams) []domain.EnvKeyRow {
 	f := params.File
-	added := resolvedEnvAdds(f.Diff)
-	conflicts := EnvKeysWithStatus(EnvDiffFilter{Diff: f.Diff, Status: domain.EnvKeyConflict})
-	missing := EnvKeysWithStatus(EnvDiffFilter{Diff: f.Diff, Status: domain.EnvKeyMissing})
-	orphans := EnvKeysWithStatus(EnvDiffFilter{Diff: f.Diff, Status: domain.EnvKeyOrphan})
+	var added, conflicts, missing, orphans []domain.EnvKeyDiff
+	for _, e := range f.Diff.Entries {
+		if !params.Check && e.Action != domain.EnvActionKept && e.Action != "" {
+			continue
+		}
+		switch {
+		case e.Status == domain.EnvKeyResolved && envAddition(e) && params.Check:
+			added = append(added, e)
+		case e.Status == domain.EnvKeyConflict:
+			conflicts = append(conflicts, e)
+		case e.Status == domain.EnvKeyMissing:
+			missing = append(missing, e)
+		case e.Status == domain.EnvKeyOrphan:
+			orphans = append(orphans, e)
+		}
+	}
 
 	width := 0
 	for _, group := range [][]domain.EnvKeyDiff{added, conflicts, missing, orphans} {
@@ -62,10 +74,14 @@ func EnvKeyRows(params EnvKeyRowsParams) []domain.EnvKeyRow {
 	}
 
 	for _, e := range added {
-		rows = append(rows, row(e, fmt.Sprintf(addedDetailFmt(params), EnvSourceName(e.Source, f.ParentBranch))))
+		rows = append(rows, row(e, fmt.Sprintf(domain.EnvDetailWouldAddFmt, EnvSourceName(e.Source, f.ParentBranch))))
+	}
+	conflictFmt := domain.EnvDetailConflictFmt
+	if !params.Check {
+		conflictFmt = domain.EnvDetailConflictKeptFmt
 	}
 	for _, e := range conflicts {
-		rows = append(rows, row(e, fmt.Sprintf(domain.EnvDetailConflictFmt,
+		rows = append(rows, row(e, fmt.Sprintf(conflictFmt,
 			EnvQuote(e.CurrentValue), EnvSourceName(e.Source, f.ParentBranch), EnvQuote(e.ResolvedValue))))
 	}
 	for _, e := range missing {
@@ -77,17 +93,20 @@ func EnvKeyRows(params EnvKeyRowsParams) []domain.EnvKeyRow {
 	return rows
 }
 
-// addedDetailFmt tells apart the three moments an addition is reported: a
-// read-only check, a write that happened, and a write still to come.
-func addedDetailFmt(params EnvKeyRowsParams) string {
-	switch {
-	case params.Check:
-		return domain.EnvDetailWouldAddFmt
-	case params.File.Applied:
-		return domain.EnvDetailAddedFmt
-	default:
-		return domain.EnvDetailToAddFmt
+// EnvFileTally counts what an apply did to a file's keys — "2 added · 1
+// removed" — empty when it did nothing.
+func EnvFileTally(file domain.EnvFileResult) string {
+	counts := map[domain.EnvKeyAction]int{}
+	for _, e := range file.Diff.Entries {
+		counts[e.Action]++
 	}
+	return Tally(
+		domain.TallyPart{Count: counts[domain.EnvActionAdded], Label: domain.EnvTallyAdded},
+		domain.TallyPart{Count: counts[domain.EnvActionFilled], Label: domain.EnvTallyFilled},
+		domain.TallyPart{Count: counts[domain.EnvActionOverwritten], Label: domain.EnvTallyOverwritten},
+		domain.TallyPart{Count: counts[domain.EnvActionPruned], Label: domain.EnvTallyPruned},
+		domain.TallyPart{Count: counts[domain.EnvActionSkipped], Label: domain.EnvTallySkipped},
+	)
 }
 
 type EnvFileVerdictParams struct {
@@ -109,19 +128,6 @@ func EnvFileVerdict(params EnvFileVerdictParams) string {
 	default:
 		return domain.EnvFileValuesSettledMessage
 	}
-}
-
-// resolvedEnvAdds returns the resolved entries that are additions (absent from
-// the child but backed by a real source value), the only resolved keys worth
-// showing.
-func resolvedEnvAdds(d domain.EnvDiff) []domain.EnvKeyDiff {
-	out := make([]domain.EnvKeyDiff, 0)
-	for _, e := range EnvKeysWithStatus(EnvDiffFilter{Diff: d, Status: domain.EnvKeyResolved}) {
-		if e.CurrentValue == "" && e.ResolvedValue != "" {
-			out = append(out, e)
-		}
-	}
-	return out
 }
 
 // EnvSourceName names the per-key cascade level: the actual parent branch when

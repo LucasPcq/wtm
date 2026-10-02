@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 )
 
 func conflictModel(t *testing.T) EnvResolveModel {
@@ -67,7 +68,7 @@ func TestEnvResolveEditPrefillsSelectedAction(t *testing.T) {
 }
 
 // TestEnvResolveRecapShowsOrphanValue: the recap always shows the value, including
-// an orphan whether kept or removed.
+// an orphan whether kept or pruned.
 func TestEnvResolveRecapShowsOrphanValue(t *testing.T) {
 	files := []domain.EnvFileResult{{
 		Target:   ".env",
@@ -78,17 +79,19 @@ func TestEnvResolveRecapShowsOrphanValue(t *testing.T) {
 		}},
 	}}
 	m := NewEnvResolve(NewEnvResolveParams{Files: files})
+	recap := func(m EnvResolveModel) string {
+		return strings.Join(rules.EnvResolveRecapLines(rules.EnvResolveRecapParams{Files: files, Decisions: m.Decisions()}), "\n")
+	}
 
-	lines := m.RecapLines()
-	joined := strings.Join(lines, "\n")
+	joined := recap(m)
 	if !strings.Contains(joined, `OLD_KEY  keep "stale"`) {
 		t.Fatalf("recap should show the orphan value on keep, got:\n%s", joined)
 	}
 
-	m = sendEnv(m, tea.KeyMsg{Type: tea.KeyRight}) // keep -> remove
-	joined = strings.Join(m.RecapLines(), "\n")
-	if !strings.Contains(joined, `OLD_KEY  remove "stale"`) {
-		t.Fatalf("recap should show the orphan value on remove, got:\n%s", joined)
+	m = sendEnv(m, tea.KeyMsg{Type: tea.KeyRight}) // keep -> prune
+	joined = recap(m)
+	if !strings.Contains(joined, `OLD_KEY  prune "stale"`) {
+		t.Fatalf("recap should show the orphan value on prune, got:\n%s", joined)
 	}
 }
 
@@ -112,5 +115,18 @@ func TestEnvResolveCycleDiscardsEdit(t *testing.T) {
 	}
 	if d.Decisions["DB_HOST"] != domain.EnvDecisionKeep {
 		t.Fatalf("decision = %v, want keep", d.Decisions)
+	}
+}
+
+func TestEnvResolveOpensOnTheFlagDefaults(t *testing.T) {
+	files := []domain.EnvFileResult{{Target: ".env", Diff: domain.EnvDiff{Entries: []domain.EnvKeyDiff{
+		{Key: "DB_HOST", Status: domain.EnvKeyConflict, CurrentValue: "cur", ResolvedValue: "res", Source: "main"},
+		{Key: "OLD", Status: domain.EnvKeyOrphan, CurrentValue: "1"},
+	}}}}
+	m := NewEnvResolve(NewEnvResolveParams{Files: files, Defaults: domain.EnvResolveDefaults{Overwrite: true, Prune: true}})
+
+	d := m.Decisions()[0]
+	if d.Decisions["DB_HOST"] != domain.EnvDecisionOverwrite || len(d.PruneKeys) != 1 {
+		t.Errorf("decisions = %+v, want the conflict overwritten and the orphan pruned", d)
 	}
 }

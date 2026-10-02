@@ -146,7 +146,7 @@ func ApplyEnvSync(params ApplyEnvSyncParams) (domain.EnvSyncResult, error) {
 		if err != nil {
 			return domain.EnvSyncResult{}, err
 		}
-		applied, err := applyFile(paths, c, params.Resolutions[f.Target])
+		applied, err := applyFile(paths, &c, params.Resolutions[f.Target])
 		if err != nil {
 			return domain.EnvSyncResult{}, err
 		}
@@ -214,7 +214,7 @@ func SyncEnv(params SyncEnvParams) (domain.EnvSyncResult, error) {
 		}
 		applied := false
 		if !params.Check {
-			applied, err = applyFile(paths, c, flagResolution(params, c.diff))
+			applied, err = applyFile(paths, &c, flagResolution(params, c.diff))
 			if err != nil {
 				return domain.EnvSyncResult{}, err
 			}
@@ -437,9 +437,10 @@ func flagResolution(params SyncEnvParams, diff domain.EnvDiff) EnvResolution {
 }
 
 // applyFile reconciles one file and writes it back when the result differs from the
-// current content. Returns whether it wrote.
-func applyFile(paths envPaths, c computedFile, res EnvResolution) (bool, error) {
-	reconciled := rules.ApplyEnvDiff(rules.ApplyEnvDiffParams{
+// current content, recording on c's diff what it did to each key. Returns
+// whether it wrote.
+func applyFile(paths envPaths, c *computedFile, res EnvResolution) (bool, error) {
+	diff := rules.ApplyEnvDiffParams{
 		Child:        c.child,
 		Diff:         c.diff,
 		Decisions:    res.Decisions,
@@ -447,7 +448,9 @@ func applyFile(paths envPaths, c computedFile, res EnvResolution) (bool, error) 
 		Prune:        res.Prune,
 		PruneKeys:    res.PruneKeys,
 		SkipKeys:     res.SkipKeys,
-	})
+	}
+	reconciled := rules.ApplyEnvDiff(diff)
+	c.diff = rules.EnvDiffActions(diff)
 
 	rendered := rules.RenderEnv(reconciled)
 	if rendered == rules.RenderEnv(c.child) {

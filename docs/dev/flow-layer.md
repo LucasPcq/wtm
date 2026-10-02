@@ -43,11 +43,12 @@ is implemented yet.
 | Dashboard surface | `internal/tui/dashboard` (`prompter.go`, `presenter.go`, `ops.go`) |
 | Test doubles | `internal/testutil/flowtest` |
 | `extract` | **not migrated** — still driven by `internal/commands/wt` plus its wizard package (`internal/tui/extract`). The model was validated on paper against it; that is not the same as delivered. Tracked as LUC-182. |
-| `env` | **not migrated** either, which nothing said until `archlint`'s `chokepoint` rule counted it: it calls its service straight from `internal/commands/`, so no second surface can run it. Listed in `.archlint-migrating`, reported on every `make lint`. |
+| `wtm env` | migrated — `internal/flow/env` (LUC-239). Its per-key resolver is the one screen no generic kind could draw, so it is a kind of its own, `StepEnvResolve`: `StepContent.EnvFiles` in, `Answer.EnvDecisions` out, rendered by `flowui` over `components.EnvResolve` and refused by the dashboard, which runs no `env`. `--check` returns before asking. A run that asks scans every worktree once, in a `Stage`, for the picker's drift badges; an unattended run scans nothing. `settleIsolation` is the one point the worktree's isolation changes — where `worktree.updated` will be published (LUC-233) — and `Outcome.IsolationChanged` says whether it did |
 | `Load` on a `StepSelect`, `Option.Disabled`, `StepContent.Banner`, `StepContent.Pinned` | since `checkout` (LUC-237). A select may load its options; until they arrive `flowui` draws its description over an empty list. A disabled option is drawn but never picked, its badges saying why. `Banner` is what a load has to say about what it could not list (`gh` missing, no pull request). `Pinned` lets a branch step pin what an earlier answer decides — the base of the pull request just picked — with `Step.PinnedSuffix` naming it and `Step.PinAbsent` keeping it when no candidate carries it; `flow.PinnedAmong` is the one rule both surfaces apply. The dashboard renders `Disabled` and `Pinned`, and ignores `Banner` until a dashboard flow loads one. |
 | `StepMultiSelect` | exists since `reparent`, which needed it to keep its no-argument picker. Rendered by both surfaces: `flowui`, and the dashboard's modal since its Actions menu runs the batch reparent. Since `prune`, an `Option` can also arrive pre-checked and tagged (`Selected`, `Tag`, `Tone`). `Tone` is a `domain` enum, not a `flow` one, so `components.TagVariantOf` can hold the one mapping onto the palette without the widget library learning about `flow`. |
 | `StepContent.Start` and `Option.Badges` | exist since the run module's worktree step (LUC-193), which opens its cursor on the worktree you are standing in and marks each row with what it is running. Both surfaces render them; `Badges` are the trailing words of a `StepSelect` row, where `Tag` is the leading one of a `StepMultiSelect` row. |
 | `StepText` pre-fill | `StepContent.Default`, since the CRUD forms of `run job` and `run profile` (LUC-217). It is content rather than a static field because what a form opens on can depend on the answers before it. |
+| `StepEnvResolve` | a decision on every drifting key of a worktree's `.env` files, since `env` (LUC-239). Rendered by `flowui` only; the recap reads the decisions back through `rules.EnvResolveRecapLines`. |
 | `StepReorder` | asks for an order rather than a selection, since a profile's job list is its start order (LUC-217). Rendered by `flowui` and by the dashboard's modal. |
 | `StepTextList` | a list of names typed one by one (tab adds, enter continues, backspace on an empty field removes the last), since `create` takes several branches. Each entry goes through `flow.CheckEntry` — trimmed, then the step's `ValidateEntry` against the entries already added — so the wizard and `flowtest` refuse the same things; `EntryBadge` names an entry's state beside it and `StepContent.Entries` pre-fills the list. Both surfaces build the widget through `flowui.TextList`, so an entry is refused and badged the same way; the dashboard's modal also puts the typed list back when the user steps back to it, since `Build` only knows the entries the request carried. |
 | `seam.Watcher` | the run flows' extra Presenter half. A start sequence cannot be reported through `Stage`: the surface has to be drawing before the first job is asked for, so the surface calls the sequence and hands back its `Outcome`. |
@@ -208,8 +209,8 @@ terminal in alt-screen, so it sets `false` and names the way out instead.
 type Step struct {
 	Kind        StepKind // StepText | StepSelect | StepBranchSelect | StepRecap
 	Key         string   // identifies the answer in Answers
-	Label       string   // the step's name in the breadcrumb / summaries
-	Title       string
+	Label       string   // the step's name in the summaries, and in the breadcrumb when it has no Title
+	Title       string   // what it asks; the CLI breadcrumb and the dashboard modal show it
 	Description string
 	Options     []Option
 
