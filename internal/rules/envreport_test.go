@@ -24,7 +24,7 @@ func TestEnvKeyRowsAlignTheDetailColumn(t *testing.T) {
 		domain.EnvKeyDiff{Key: "JWT_SECRET", Status: domain.EnvKeyResolved, ResolvedValue: "x", Source: domain.EnvSourceMain},
 		domain.EnvKeyDiff{Key: "A", Status: domain.EnvKeyMissing, Placeholder: "p"},
 		domain.EnvKeyDiff{Key: "OLD", Status: domain.EnvKeyOrphan, CurrentValue: "z"},
-	)})
+	), Check: true})
 
 	if len(rows) != 3 {
 		t.Fatalf("EnvKeyRows() returned %d rows, want 3", len(rows))
@@ -51,7 +51,7 @@ func TestEnvKeyRowsOrderAndStatuses(t *testing.T) {
 		domain.EnvKeyDiff{Key: "CONFLICT", Status: domain.EnvKeyConflict, CurrentValue: "a", ResolvedValue: "b", Source: domain.EnvSourceMain},
 		domain.EnvKeyDiff{Key: "ADDED", Status: domain.EnvKeyResolved, ResolvedValue: "x", Source: domain.EnvSourceMain},
 		domain.EnvKeyDiff{Key: "MISSING", Status: domain.EnvKeyMissing, Placeholder: "p"},
-	)})
+	), Check: true})
 
 	want := []domain.EnvKeyStatus{domain.EnvKeyResolved, domain.EnvKeyConflict, domain.EnvKeyMissing, domain.EnvKeyOrphan}
 	for i, status := range want {
@@ -61,28 +61,28 @@ func TestEnvKeyRowsOrderAndStatuses(t *testing.T) {
 	}
 }
 
-func TestEnvKeyRowsWordsAnAdditionByMoment(t *testing.T) {
-	entry := domain.EnvKeyDiff{Key: "K", Status: domain.EnvKeyResolved, ResolvedValue: "x", Source: domain.EnvSourceMain}
+// An apply counts what it did and names only what it left for the reader; a
+// check lists every key it would touch, since that list is what it was asked for.
+func TestEnvKeyRowsOfAnApplyNameOnlyWhatIsLeft(t *testing.T) {
+	file := fileWith(
+		domain.EnvKeyDiff{Key: "ADDED", Status: domain.EnvKeyResolved, ResolvedValue: "x", Source: domain.EnvSourceMain, Action: domain.EnvActionAdded},
+		domain.EnvKeyDiff{Key: "OVER", Status: domain.EnvKeyConflict, CurrentValue: "a", ResolvedValue: "b", Source: domain.EnvSourceMain, Action: domain.EnvActionOverwritten},
+		domain.EnvKeyDiff{Key: "KEPT", Status: domain.EnvKeyConflict, CurrentValue: "a", ResolvedValue: "b", Source: domain.EnvSourceMain, Action: domain.EnvActionKept},
+		domain.EnvKeyDiff{Key: "GONE", Status: domain.EnvKeyOrphan, CurrentValue: "z", Action: domain.EnvActionPruned},
+		domain.EnvKeyDiff{Key: "MISSING", Status: domain.EnvKeyMissing, Placeholder: "p"},
+	)
 
-	applied := domain.EnvFileResult{Target: ".env", Applied: true, Diff: domain.EnvDiff{Entries: []domain.EnvKeyDiff{entry}}}
-	pending := domain.EnvFileResult{Target: ".env", Diff: domain.EnvDiff{Entries: []domain.EnvKeyDiff{entry}}}
-
-	cases := []struct {
-		name   string
-		params EnvKeyRowsParams
-		want   string
-	}{
-		{"a read-only check", EnvKeyRowsParams{File: pending, Check: true}, "would be added from main"},
-		{"a write that happened", EnvKeyRowsParams{File: applied}, "added from main"},
-		{"a write still to come", EnvKeyRowsParams{File: pending}, "to add from main"},
+	rows := EnvKeyRows(EnvKeyRowsParams{File: file})
+	if len(rows) != 2 || !strings.HasPrefix(rows[0].Text, "KEPT") || !strings.Contains(rows[0].Text, "conflict kept") || !strings.HasPrefix(rows[1].Text, "MISSING") {
+		t.Errorf("rows = %+v, want the kept conflict and the unanswered key alone", rows)
+	}
+	if got := EnvFileTally(file); got != "1 added · 1 overwritten · 1 removed" {
+		t.Errorf("tally = %q", got)
 	}
 
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			if got := EnvKeyRows(c.params)[0].Text; !strings.HasSuffix(got, c.want) {
-				t.Errorf("row = %q, want it to end with %q", got, c.want)
-			}
-		})
+	check := EnvKeyRows(EnvKeyRowsParams{File: fileWith(file.Diff.Entries[0]), Check: true})
+	if len(check) != 1 || !strings.HasSuffix(check[0].Text, "would be added from main") {
+		t.Errorf("check rows = %+v, want the addition listed", check)
 	}
 }
 
@@ -100,7 +100,7 @@ func TestEnvKeyRowsCarryNoOutcome(t *testing.T) {
 		domain.EnvKeyDiff{Key: "ADDED", Status: domain.EnvKeyResolved, ResolvedValue: "x", Source: domain.EnvSourceMain},
 		domain.EnvKeyDiff{Key: "MISSING", Status: domain.EnvKeyMissing, Placeholder: "p"},
 		domain.EnvKeyDiff{Key: "ORPHAN", Status: domain.EnvKeyOrphan, CurrentValue: "z"},
-	)})
+	), Check: true})
 
 	for _, r := range rows {
 		if strings.Contains(r.Text, domain.EnvKeyGlyphAdd) && r.Status != domain.EnvKeyResolved {

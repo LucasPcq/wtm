@@ -1034,12 +1034,17 @@ const (
 	// The detail column of a file block's key rows.
 	EnvKeyRowGap         = "  "
 	EnvDetailWouldAddFmt = "would be added from %s"
-	EnvDetailAddedFmt    = "added from %s"
-	EnvDetailToAddFmt    = "to add from %s"
 	EnvDetailConflictFmt = "conflict — local %s vs %s %s"
-	EnvDetailMissingFmt  = "needs a value — placeholder %s"
-	EnvDetailOrphan      = "orphan — in no source"
-	EnvEmptyValueLabel   = "(empty)"
+	// EnvDetailConflictKeptFmt is a conflict an apply left as it was.
+	EnvDetailConflictKeptFmt = "conflict kept — local %s vs %s %s"
+	EnvTallyAdded            = "added"
+	EnvTallyFilled           = "filled"
+	EnvTallyOverwritten      = "overwritten"
+	EnvTallyRemoved          = "removed"
+	EnvTallySkipped          = "skipped"
+	EnvDetailMissingFmt      = "needs a value — placeholder %s"
+	EnvDetailOrphan          = "orphan — in no source"
+	EnvEmptyValueLabel       = "(empty)"
 	// The glyphs a file block's rows are marked with. One rune each, so the
 	// key column stays aligned whatever a row's status is.
 	EnvKeyGlyphAdd       = "+"

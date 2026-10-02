@@ -2,13 +2,13 @@ args: feat/a --yes
 err: 
 --- stdout ---
 
+  = No changes written.
+
   Worktree  feat/a
   Mode      add
 
   .env   strategy: main  ·  source: main
-  ✓ in sync — nothing to reconcile
-
-  = No changes written.
+  = in sync — nothing to reconcile
 
 --- stderr ---
 --- .env ---

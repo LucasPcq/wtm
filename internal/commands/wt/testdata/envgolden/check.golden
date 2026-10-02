@@ -2,14 +2,14 @@ args: feat/a --check
 err: 
 --- stdout ---
 
+  ! Read-only check — run `wtm env` to reconcile.
+
   Worktree  feat/a
   Mode      add  ·  read-only check
 
   .env   strategy: main  ·  source: main
   + NEW_KEY  would be added from main
   − ORPHAN   orphan — in no source
-
-  ! Read-only check — run `wtm env` to reconcile.
 
 --- stderr ---
 --- .env ---

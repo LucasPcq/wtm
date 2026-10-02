@@ -2,14 +2,14 @@ args: feat/a --yes
 err: 
 --- stdout ---
 
+  ✓ Reconciled 1 file(s).
+
   Worktree  feat/a
   Mode      add
 
   .env   strategy: main  ·  source: main
-  + NEW_KEY  added from main
-  − ORPHAN   orphan — in no source
-
-  ✓ Reconciled 1 file(s).
+  ✓ 1 added
+  − ORPHAN  orphan — in no source
 
 --- stderr ---
 --- .env ---

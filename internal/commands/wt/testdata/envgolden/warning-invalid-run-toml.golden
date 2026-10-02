@@ -1,4 +1,4 @@
-args: feat/a --yes --prune
+args: feat/a --yes
 err: 
 --- stdout ---
 
@@ -8,13 +8,17 @@ err:
   Mode      add
 
   .env   strategy: main  ·  source: main
-  ✓ 1 added · 1 removed
+  ✓ 1 added
+  − ORPHAN  orphan — in no source
 
 --- stderr ---
+
+  ! unknown keys in <repo>/.git/wtm/run.toml: bogus_key — ports not settled — run `wtm env feat/a` once run.toml is fixed
 --- .env ---
 WEB_PORT=3010
 REALM=app-feat-a
 SHARED=from-worktree
+ORPHAN=1
 NEW_KEY=1
 --- isolation ---
 isolated

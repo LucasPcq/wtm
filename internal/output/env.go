@@ -9,19 +9,18 @@ import (
 	"github.com/LucasPcq/wtm/internal/styles"
 )
 
-// PrintEnvReport renders the per-file drift report of `wtm env`: one block per
-// configured env file (its value source and the keys added / missing / in
-// conflict / orphaned), then a trailing summary. It emits a raw body with no outer
-// blank lines; the caller's frame owns the outer vertical padding. The blank
-// between file blocks and before the summary is a genuine separator.
+// PrintEnvReport renders the report of `wtm env` in the shape of an act: the
+// verdict first, the worktree and the mode, then one block per configured env
+// file — what the run did to it counted, what it left for the reader named key
+// by key — and the port pass. It emits a raw body with no outer blank lines;
+// the caller's frame owns the outer padding.
 func PrintEnvReport(w io.Writer, result domain.EnvSyncResult) {
-	writeAlignedFields(w, rules.EnvReportFields(result))
+	printEnvSummary(w, result)
 	Blank(w)
+	writeAlignedFields(w, rules.EnvReportFields(result))
 
-	for i, f := range result.Files {
-		if i > 0 {
-			Blank(w)
-		}
+	for _, f := range result.Files {
+		Blank(w)
 		printEnvFile(w, envFileBlock{
 			file:     f,
 			check:    result.Check,
@@ -30,14 +29,6 @@ func PrintEnvReport(w io.Writer, result domain.EnvSyncResult) {
 		})
 	}
 	EnvPortsReport(w, result.Ports, result.Check)
-	if len(result.Warnings) > 0 {
-		Blank(w)
-	}
-	for _, warning := range result.Warnings {
-		Warning(w, warning)
-	}
-	Blank(w)
-	printEnvSummary(w, result)
 }
 
 type envFileBlock struct {
@@ -47,9 +38,8 @@ type envFileBlock struct {
 	restored []string
 }
 
-// printEnvFile renders one file block: its header, then one aligned row per key.
-// The glyph is a single rune rendered without a badge — a badge carries its own
-// padding, which is what used to make the rows wander a column apart.
+// printEnvFile renders one file block: its header, what the run did as one
+// counted line, then one aligned row per key it left for the reader.
 func printEnvFile(w io.Writer, block envFileBlock) {
 	f, check := block.file, block.check
 	SectionTitle(w, fmt.Sprintf(domain.EnvFileHeaderFmt,
@@ -61,36 +51,52 @@ func printEnvFile(w io.Writer, block envFileBlock) {
 		return
 	}
 
-	rows := rules.EnvKeyRows(rules.EnvKeyRowsParams{File: f, Check: check})
+	tally := ""
+	if !check {
+		tally = rules.EnvFileTally(f)
+	}
+	if tally != "" {
+		Success(w, tally)
+	}
 	for _, row := range block.restored {
 		Update(w, row)
 	}
-	if len(rows) == 0 && len(block.restored) == 0 {
-		Success(w, styles.Muted.Render(rules.EnvFileVerdict(rules.EnvFileVerdictParams{PortsMove: block.hasPorts, Check: check})))
-		return
-	}
+	rows := rules.EnvKeyRows(rules.EnvKeyRowsParams{File: f, Check: check})
 	for _, row := range rows {
 		printEnvKeyRow(w, row)
+	}
+	if tally != "" || len(rows) > 0 || len(block.restored) > 0 {
+		return
+	}
+
+	verdict := rules.EnvFileVerdict(rules.EnvFileVerdictParams{PortsMove: block.hasPorts, Check: check})
+	switch {
+	case !block.hasPorts:
+		Unchanged(w, verdict)
+	case check:
+		Warning(w, verdict)
+	default:
+		Success(w, verdict)
 	}
 }
 
 // printEnvKeyRow prints one row of a file block. The glyphs are diff vocabulary
-// — added, needs attention, left over — and never a tick: a tick states an
-// outcome, and outcomes belong to the file verdict and the closing line.
+// — to add, needs attention, left over — and never a tick: a tick states an
+// outcome, and outcomes belong to the counted line and the verdict.
 func printEnvKeyRow(w io.Writer, row domain.EnvKeyRow) {
-	glyph, text := styles.Success.Render(domain.EnvKeyGlyphAdd), row.Text
+	glyph := styles.Success.Render(domain.EnvKeyGlyphAdd)
 	switch row.Status {
 	case domain.EnvKeyConflict, domain.EnvKeyMissing:
 		glyph = styles.Warning.Render(domain.EnvKeyGlyphAttention)
 	case domain.EnvKeyOrphan:
-		glyph, text = styles.Muted.Render(domain.EnvKeyGlyphOrphan), styles.Muted.Render(text)
+		glyph = styles.Muted.Render(domain.EnvKeyGlyphOrphan)
 	}
-	fmt.Fprintf(w, "%s%s %s\n", Indent, glyph, text)
+	fmt.Fprintf(w, "%s%s %s\n", Indent, glyph, row.Text)
 }
 
-// printEnvSummary prints the trailing one-line verdict in the register the rule
-// gave it: `=` is what a run that had nothing to do says, and saying it over
-// drift a --check run just found calls an open question a settled one.
+// printEnvSummary prints the verdict in the register the rule gave it: `=` is
+// what a run that had nothing to do says, and saying it over drift a --check
+// run just found calls an open question a settled one.
 func printEnvSummary(w io.Writer, result domain.EnvSyncResult) {
 	summary := rules.EnvOutcomeSummary(result)
 	switch summary.Verdict {

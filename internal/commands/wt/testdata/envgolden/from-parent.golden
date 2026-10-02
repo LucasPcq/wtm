@@ -2,13 +2,13 @@ args: feat/b --yes --from parent
 err: 
 --- stdout ---
 
+  ✓ Reconciled 1 file(s).
+
   Worktree  feat/b
   Mode      add
 
   .env   strategy: parent  ·  source: feat/a
-  + FROM_A  added from feat/a
-
-  ✓ Reconciled 1 file(s).
+  ✓ 1 added
 
 --- stderr ---
 --- .env ---

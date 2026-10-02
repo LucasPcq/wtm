@@ -3,6 +3,7 @@ err:
 --- stdout ---
 {
   "branch": "feat/a",
+  "path": "<trees>/feat-a",
   "mode": "add",
   "check": false,
   "files": [
@@ -31,13 +32,15 @@ err:
           {
             "key": "ORPHAN",
             "status": "orphan",
-            "current_value": "1"
+            "current_value": "1",
+            "action": "kept"
           },
           {
             "key": "NEW_KEY",
             "status": "resolved",
             "resolved_value": "1",
-            "source": "main"
+            "source": "main",
+            "action": "added"
           }
         ]
       },

@@ -200,6 +200,12 @@ func (f *envFlow) apply(params applyParams) (Outcome, error) {
 		return Outcome{}, err
 	}
 	result = settled.decorate(pass.decorate(f.ctx, result))
+	result.Path = params.Target.path
+	// A warning names a pass left undone and why: it is a diagnostic, beside the
+	// result rather than inside it.
+	for _, warning := range result.Warnings {
+		f.presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: warning})
+	}
 	outcome := Outcome{Result: result, IsolationChanged: settled.changed}
 	return outcome, f.presenter.Reconciled(outcome)
 }

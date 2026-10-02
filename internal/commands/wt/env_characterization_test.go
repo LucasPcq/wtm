@@ -94,10 +94,11 @@ func readEnvOf(t *testing.T, dir, branch string) string {
 }
 
 func normalizeEnvGolden(dir, text string) string {
-	paths := []string{dir}
+	var paths []string
 	if resolved, err := filepath.EvalSymlinks(dir); err == nil {
 		paths = append(paths, resolved)
 	}
+	paths = append(paths, dir)
 	for _, p := range paths {
 		text = strings.ReplaceAll(text, filepath.Dir(p)+"/.trees", "<trees>")
 		text = strings.ReplaceAll(text, p, "<repo>")
@@ -159,6 +160,10 @@ func envGoldenCases() []envGoldenCase {
 			envCreate("feat/b", "--from", "feat/a", "--yes")(t, dir)
 			writeEnvFile(t, filepath.Join(dir, ".env"), mainEnv+"FROM_MAIN=1\n")
 		}, args: []string{"feat/b", yes, "--" + domain.FlagFrom, "parent"}, branch: "feat/b"},
+		{name: "warning-invalid-run-toml", setup: func(t *testing.T, dir string) {
+			driftSetup(t, dir)
+			writeEnvFile(t, filepath.Join(dir, ".git", "wtm", domain.RunFileName), "bogus_key = 1\n")
+		}, args: []string{"feat/a", yes}, branch: "feat/a"},
 		{name: "main", setup: func(t *testing.T, dir string) {
 			writeEnvFile(t, filepath.Join(dir, ".env"), "WEB_PORT=9999\nREALM=other\n")
 		}, args: []string{"main", yes}, branch: "main"},

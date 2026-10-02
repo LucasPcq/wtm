@@ -252,6 +252,56 @@ func ApplyEnvDiff(params ApplyEnvDiffParams) []domain.EnvLine {
 	return insertBeforeTrailingBlanks(out, added)
 }
 
+// EnvDiffActions records on each entry what ApplyEnvDiff does to it under the
+// same params, so a report can count what was done instead of restating the
+// diff it started from.
+func EnvDiffActions(params ApplyEnvDiffParams) domain.EnvDiff {
+	out := domain.EnvDiff{Mode: params.Diff.Mode, Entries: make([]domain.EnvKeyDiff, 0, len(params.Diff.Entries))}
+	for _, entry := range params.Diff.Entries {
+		entry.Action = envKeyAction(entry, params)
+		out.Entries = append(out.Entries, entry)
+	}
+	return out
+}
+
+func envKeyAction(entry domain.EnvKeyDiff, params ApplyEnvDiffParams) domain.EnvKeyAction {
+	_, filled := params.FilledValues[entry.Key]
+	switch entry.Status {
+	case domain.EnvKeyOrphan:
+		if params.Prune || params.PruneKeys[entry.Key] {
+			return domain.EnvActionPruned
+		}
+		return domain.EnvActionKept
+	case domain.EnvKeyConflict:
+		switch {
+		case filled:
+			return domain.EnvActionFilled
+		case params.Decisions[entry.Key] == domain.EnvDecisionOverwrite:
+			return domain.EnvActionOverwritten
+		}
+		return domain.EnvActionKept
+	case domain.EnvKeyMissing:
+		switch {
+		case params.SkipKeys[entry.Key]:
+			return domain.EnvActionSkipped
+		case filled:
+			return domain.EnvActionFilled
+		}
+	case domain.EnvKeyResolved:
+		if !envAddition(entry) {
+			return ""
+		}
+		switch {
+		case params.SkipKeys[entry.Key]:
+			return domain.EnvActionSkipped
+		case filled:
+			return domain.EnvActionFilled
+		}
+		return domain.EnvActionAdded
+	}
+	return ""
+}
+
 // insertBeforeTrailingBlanks lands new lines after the last one holding
 // something: a parsed document keeps its final newline as a trailing blank line,
 // and appending past it would drop that newline and open a gap instead.

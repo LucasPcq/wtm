@@ -2,15 +2,14 @@ args: feat/a --yes --mode refresh --on-conflict overwrite
 err: 
 --- stdout ---
 
+  ✓ Reconciled 1 file(s).
+
   Worktree  feat/a
   Mode      refresh
 
   .env   strategy: main  ·  source: main
-  + NEW_KEY  added from main
-  ! SHARED   conflict — local "from-worktree" vs main "from-main"
-  − ORPHAN   orphan — in no source
-
-  ✓ Reconciled 1 file(s).
+  ✓ 1 added · 1 overwritten
+  − ORPHAN  orphan — in no source
 
 --- stderr ---
 --- .env ---

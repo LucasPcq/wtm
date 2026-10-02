@@ -2,17 +2,19 @@ args: main --yes
 err: 
 --- stdout ---
 
+  ✓ Settled 1 linked .env value(s).
+
   Worktree  main
   Mode      add
 
   .env   strategy: main  ·  source: main
-  ✓ in sync — nothing to reconcile
+  = in sync — nothing to reconcile
 
-  ! Env ports left alone
-  ── .env ─────────────────────────────────────
-  WEB_PORT  PORT  no 3000 to shift in the value
-
-  ✓ Settled 1 linked .env value(s).
+  ╭───────────────────────────────────────────────╮
+  │ Env ports left alone                          │
+  │ ── .env ───────────────────────────────────── │
+  │ WEB_PORT  PORT  no 3000 to shift in the value │
+  ╰───────────────────────────────────────────────╯
 
 --- stderr ---
 --- .env ---

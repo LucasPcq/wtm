@@ -3,6 +3,7 @@ err:
 --- stdout ---
 {
   "branch": "feat/a",
+  "path": "<trees>/feat-a",
   "mode": "refresh",
   "check": false,
   "files": [
@@ -28,18 +29,21 @@ err:
             "status": "conflict",
             "current_value": "from-worktree",
             "resolved_value": "from-main",
-            "source": "main"
+            "source": "main",
+            "action": "kept"
           },
           {
             "key": "ORPHAN",
             "status": "orphan",
-            "current_value": "1"
+            "current_value": "1",
+            "action": "kept"
           },
           {
             "key": "NEW_KEY",
             "status": "resolved",
             "resolved_value": "1",
-            "source": "main"
+            "source": "main",
+            "action": "added"
           }
         ]
       },

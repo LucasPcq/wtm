@@ -148,12 +148,12 @@ func TestEnvReconcilesKeysOverAnInvalidRunToml(t *testing.T) {
 		t.Errorf("warnings = %v, want the skipped port pass named", result.Warnings)
 	}
 
-	human, _, err := runWtCmd(t, domain.CmdEnv, "feat/e", "--yes")
+	_, stderr, err := runWtCmd(t, domain.CmdEnv, "feat/e", "--yes")
 	if err != nil {
 		t.Fatalf("env: %v", err)
 	}
-	if !strings.Contains(human, "bogus_key") {
-		t.Errorf("report = %q, want the skipped port pass named", human)
+	if !strings.Contains(stderr, "bogus_key") {
+		t.Errorf("stderr = %q, want the skipped port pass named", stderr)
 	}
 }
 

@@ -3,6 +3,7 @@ err:
 --- stdout ---
 {
   "branch": "feat/i",
+  "path": "<trees>/feat-i",
   "mode": "add",
   "check": false,
   "files": [

@@ -2,13 +2,13 @@ args: feat/v --yes --isolation isolated
 err: 
 --- stdout ---
 
+  ✓ Now isolated. Settled 2 linked .env value(s).
+
   Worktree  feat/v
   Mode      add
 
   .env   strategy: main  ·  source: main
   ✓ no key to reconcile — its linked values were settled
-
-  ✓ Now isolated. Settled 2 linked .env value(s).
 
 --- stderr ---
 --- .env ---

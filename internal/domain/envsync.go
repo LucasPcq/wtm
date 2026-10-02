@@ -29,6 +29,7 @@ type EnvFileResult struct {
 // written).
 type EnvSyncResult struct {
 	Branch string          `json:"branch"`
+	Path   string          `json:"path"`
 	Mode   EnvMode         `json:"mode"`
 	Check  bool            `json:"check"`
 	Files  []EnvFileResult `json:"files"`
