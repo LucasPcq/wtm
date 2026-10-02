@@ -144,6 +144,12 @@ func FormatRelocateResult(w io.Writer, result domain.RelocateResult) {
 	}
 
 	hasIssue := len(blocked) > 0 || len(errored) > 0 || len(refused) > 0
+	if len(done)+len(skipped) == 0 && !hasIssue {
+		if result.BasePathUpdated {
+			Success(w, fmt.Sprintf("config base_path updated to %q", result.BasePath))
+		}
+		return
+	}
 	headline := rules.Tally(
 		domain.TallyPart{Count: len(done), Label: domain.TallyApplied},
 		domain.TallyPart{Count: len(skipped), Label: domain.TallySkipped},
