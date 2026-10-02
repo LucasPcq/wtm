@@ -21,27 +21,29 @@ import (
 // newCreateCmd creates the wtm create subcommand.
 func newCreateCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   domain.CmdCreate + " [branch]",
-		Short: "Create a new worktree",
-		Long: "Create a git worktree with env provisioning, metadata, and hooks.\n" +
+		Use:   domain.CmdCreate + " [branch...]",
+		Short: "Create one or more worktrees",
+		Long: "Create one or more git worktrees with env provisioning, metadata, and hooks.\n" +
+			"Several branches are created one after the other from the same source; a failure\n" +
+			"does not stop the others, and the run ends with what was created and what failed.\n" +
 			"A branch that already exists locally is checked out as-is, keeping its commits.\n" +
 			"Its parent can't be inferred, so --from then names the branch recorded for\n" +
 			"`wtm sync` — asked in the wizard, required without it.\n" +
-			"When run.toml declares jobs, a branch whose derived name a live worktree already\n" +
-			"carries (feat.x next to feat/x: one compose project, one proxy host) is refused.\n" +
-			"Without arguments, prompts for the branch name interactively.",
-		Example: `  # Answer the wizard: branch, source, env strategy, isolation
+			"When run.toml declares jobs, a branch whose derived name a live worktree or another\n" +
+			"branch of the run already carries (feat.x next to feat/x) is refused.\n" +
+			"Without arguments, the wizard asks for the branches: tab adds another, enter continues.",
+		Example: `  # Answer the wizard: branches, source, env strategy, isolation
   wtm create
 
-  # A new branch from the base branch, no prompts
-  wtm create feat/login --yes
+  # Three worktrees from the base branch, no prompts
+  wtm create feat/login feat/billing fix/header --yes
 
   # A stacked branch on top of feat/login
   wtm create feat/login-ui --from feat/login --yes
 
-  # For a script or an agent: idempotent, with a JSON result
+  # For a script or an agent: idempotent, with a JSON envelope
   wtm create feat/login --if-not-exists --yes --output json`,
-		Args: cobra.MaximumNArgs(1),
+		Args: cobra.ArbitraryArgs,
 		RunE: runCreate,
 	}
 
@@ -52,17 +54,13 @@ func newCreateCmd() *cobra.Command {
 	cmd.Flags().String(domain.FlagEnvFrom, "", "Override env strategy (example, main, parent)")
 	shared.AddIsolationFlag(cmd)
 	cmd.Flags().Bool(domain.FlagIfNotExists, false, "Succeed silently if the worktree already exists (idempotent)")
-	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (branch name required; source defaults to the base branch for a new branch, and --from is required for one that already exists)")
+	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (branch names required; source defaults to the base branch for a new branch, and --from is required for one that already exists)")
 	shared.AddOutputFlag(cmd)
 
 	return cmd
 }
 
 func runCreate(cmd *cobra.Command, args []string) error {
-	branchName := ""
-	if len(args) > 0 {
-		branchName = args[0]
-	}
 	fromFlag, _ := cmd.Flags().GetString(domain.FlagFrom)
 	ffFlag, _ := cmd.Flags().GetBool(domain.FlagFF)
 	envFromFlag, _ := cmd.Flags().GetString(domain.FlagEnvFrom)
@@ -95,7 +93,8 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	_, err = createflow.Run(createflow.Params{
 		Context: shared.FlowContext(config),
 		Request: createflow.Request{
-			Branch:      branchName,
+			Branches:    args,
+			Multi:       true,
 			From:        fromFlag,
 			EnvFrom:     envFromFlag,
 			FastForward: ffFlag,

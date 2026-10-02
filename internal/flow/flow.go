@@ -3,6 +3,7 @@
 package flow
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -31,6 +32,9 @@ const (
 	// already the answer, and what the step collects is the sequence they end up
 	// in. Its answer is carried by Answer.Values, like a multi-select's.
 	StepReorder
+	// StepTextList collects names typed one by one; its answer is carried by
+	// Answer.Values, in the order they were added.
+	StepTextList
 )
 
 type Option struct {
@@ -77,6 +81,14 @@ type StepContent struct {
 	// refresh stays authoritative on what exists — the exclusion is applied on top
 	// of whatever it last returned.
 	ExcludeBranches []string
+	Entries         []string
+}
+
+// EntryCheck is one entry of a StepTextList as it is added, with the entries
+// already in the list: a duplicate or a clash is only visible against them.
+type EntryCheck struct {
+	Entry   string
+	Entries []string
 }
 
 // Blocker is one safety refusal standing in the way of the step's dangerous
@@ -101,9 +113,11 @@ type Step struct {
 
 	Validate func(value string) error
 	// ValidateSet is Validate for a StepMultiSelect step.
-	ValidateSet func(values []string) error
-	Skip        func(Answers) (skip bool, reason string)
-	Build       func(Answers) (StepContent, error)
+	ValidateSet   func(values []string) error
+	ValidateEntry func(EntryCheck) error
+	EntryBadge    func(entry string) Badge
+	Skip          func(Answers) (skip bool, reason string)
+	Build         func(Answers) (StepContent, error)
 
 	Load           func(Answers) (StepContent, error)
 	LoadingMessage string
@@ -369,6 +383,7 @@ func MergeContent(step Step, built StepContent) StepContent {
 	content.Start = built.Start
 	content.Blockers = built.Blockers
 	content.ExcludeBranches = built.ExcludeBranches
+	content.Entries = built.Entries
 	return content
 }
 
@@ -384,4 +399,20 @@ func SummarizeSet(answer Answer) string {
 		return strings.Join(values, ", ")
 	}
 	return strings.Join(values[:maxNames], ", ") + fmt.Sprintf(" +%d", len(values)-maxNames)
+}
+
+// CheckEntry is the one place an entry of a StepTextList is accepted, so the
+// wizard and the test double cannot disagree on what a blank or a clash is.
+func CheckEntry(step Step, check EntryCheck) (string, error) {
+	entry := strings.TrimSpace(check.Entry)
+	if entry == "" {
+		return "", errors.New(domain.FlowEntryRequired)
+	}
+	if step.ValidateEntry == nil {
+		return entry, nil
+	}
+	if err := step.ValidateEntry(EntryCheck{Entry: entry, Entries: check.Entries}); err != nil {
+		return "", err
+	}
+	return entry, nil
 }

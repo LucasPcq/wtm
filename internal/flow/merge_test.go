@@ -21,3 +21,10 @@ func TestMergeContentKeepsWhatTheBuildDecides(t *testing.T) {
 		t.Errorf("content = %+v, want the static title and everything the build decided", got)
 	}
 }
+
+func TestMergeContentCarriesEntries(t *testing.T) {
+	merged := flow.MergeContent(flow.Step{Title: "t"}, flow.StepContent{Entries: []string{"a", "b"}})
+	if len(merged.Entries) != 2 || merged.Entries[0] != "a" || merged.Entries[1] != "b" {
+		t.Errorf("entries = %v, want the built pre-fill", merged.Entries)
+	}
+}

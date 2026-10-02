@@ -274,6 +274,40 @@ type CreateResultParams struct {
 	GoCommand string
 }
 
+type CreateBatchRow struct {
+	Branch        string
+	Path          string
+	AlreadyExists bool
+}
+
+type CreateBatchParams struct {
+	Created []CreateBatchRow
+	Failed  []domain.CreateFailure
+}
+
+func FormatCreateBatch(w io.Writer, p CreateBatchParams) {
+	created, existed := 0, 0
+	for _, row := range p.Created {
+		if row.AlreadyExists {
+			existed++
+			Unchanged(w, fmt.Sprintf(domain.CreateBatchExistsFmt, row.Branch))
+		} else {
+			created++
+			Success(w, row.Branch)
+		}
+		Message(w, Indent+row.Path)
+	}
+	for _, failure := range p.Failed {
+		Error(w, fmt.Sprintf(domain.CreateBranchFailedFmt, failure.Branch, failure.Error))
+	}
+	Blank(w)
+	Message(w, Tally(
+		TallyPart{Count: created, Label: domain.TallyCreated},
+		TallyPart{Count: existed, Label: domain.TallyAlreadyExisted},
+		TallyPart{Count: len(p.Failed), Label: domain.TallyFailed},
+	))
+}
+
 // FormatCreateResult prints the create conclusion: a ✓ headline, an aligned
 // summary (from / env / path), then a highlighted `wtm go` step to jump straight
 // into the new worktree. A reused branch says so in the headline and labels its

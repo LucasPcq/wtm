@@ -11,6 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow/envports"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/branch"
+	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
 
 const (
@@ -43,12 +44,7 @@ const (
 func (f *createFlow) session() flow.Session {
 	return flow.Session{
 		ErrLabel: domain.WizardErrLabel,
-		Presets: flow.NewAnswers(map[string]string{
-			KeyBranch:    f.request.Branch,
-			KeySource:    f.request.From,
-			KeyEnv:       f.request.EnvFrom,
-			KeyIsolation: string(f.request.Isolation),
-		}),
+		Presets:  flow.NewAnswers(f.presets()),
 		Steps: []flow.Step{
 			f.branchStep(),
 			f.sourceStep(),
@@ -60,7 +56,95 @@ func (f *createFlow) session() flow.Session {
 	}
 }
 
+func (f *createFlow) presets() map[string]string {
+	presets := map[string]string{
+		KeySource:    f.request.From,
+		KeyEnv:       f.request.EnvFrom,
+		KeyIsolation: string(f.request.Isolation),
+	}
+	// One argument answers the step, as it always did; several pre-fill the list
+	// so the wizard can still edit them.
+	if len(f.request.Branches) == 1 {
+		presets[KeyBranch] = f.request.Branches[0]
+	}
+	return presets
+}
+
 func (f *createFlow) branchStep() flow.Step {
+	if !f.request.Multi {
+		return f.singleBranchStep()
+	}
+	return flow.Step{
+		Kind:        flow.StepTextList,
+		Key:         KeyBranch,
+		Label:       domain.CreateBranchesLabel,
+		Title:       domain.CreateBranchesLabel,
+		Description: domain.CreateBranchesStepDescription,
+		Build: func(flow.Answers) (flow.StepContent, error) {
+			return flow.StepContent{Entries: f.request.Branches}, nil
+		},
+		ValidateEntry: f.validateEntry,
+		EntryBadge:    f.entryBadge,
+		ValidateSet: func(values []string) error {
+			if len(values) == 0 {
+				return errors.New(domain.CreateBranchRequired)
+			}
+			return nil
+		},
+		Resolve: func(flow.Answers) (flow.Answer, error) {
+			if len(f.request.Branches) == 0 {
+				return flow.Answer{}, errors.New(domain.CreateBranchRequiredUnattended)
+			}
+			return flow.Answer{Values: f.request.Branches}, nil
+		},
+		Summarize: flow.SummarizeSet,
+		Arg:       true,
+	}
+}
+
+func (f *createFlow) validateEntry(check flow.EntryCheck) error {
+	if err := rules.BranchEntryProblem(rules.BranchEntryParams{
+		Entry:        check.Entry,
+		Entries:      check.Entries,
+		DerivedNames: f.derivedNames,
+	}); err != nil {
+		return err
+	}
+	if target := f.target(check.Entry); target.State == domain.BranchTargetCheckedOut && !f.request.IfNotExists {
+		return fmt.Errorf("%w: "+domain.BranchCheckedOutElsewhereFmt,
+			domain.ErrWorktreeExists, check.Entry, target.WorktreePath, check.Entry)
+	}
+	if !f.derivedNames {
+		return nil
+	}
+	return worktree.CheckNameFree(worktree.NameCheckParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: check.Entry})
+}
+
+func (f *createFlow) entryBadge(entry string) flow.Badge {
+	switch f.target(entry).State {
+	case domain.BranchTargetExisting:
+		return flow.Badge{Text: domain.BranchEntryExisting, Tone: domain.ToneWarning}
+	case domain.BranchTargetCheckedOut:
+		return flow.Badge{Text: domain.BranchEntryWorktreeExists, Tone: domain.ToneNeutral}
+	}
+	return flow.Badge{Text: domain.BranchEntryNew, Tone: domain.ToneSuccess}
+}
+
+func (f *createFlow) branches(answers flow.Answers) []string { return answers.Values(KeyBranch) }
+
+func (f *createFlow) many(answers flow.Answers) bool { return len(f.branches(answers)) > 1 }
+
+func (f *createFlow) existingBranches(answers flow.Answers) []string {
+	var found []string
+	for _, name := range f.branches(answers) {
+		if f.target(name).State == domain.BranchTargetExisting {
+			found = append(found, name)
+		}
+	}
+	return found
+}
+
+func (f *createFlow) singleBranchStep() flow.Step {
 	return flow.Step{
 		Kind:        flow.StepText,
 		Key:         KeyBranch,
@@ -93,7 +177,13 @@ func (f *createFlow) sourceStep() flow.Step {
 		},
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
 			description := domain.CreateSourceStepDescription
-			if f.reusesBranch(answers) {
+			if f.many(answers) {
+				description = domain.CreateSourceStepDescriptionMany
+			}
+			switch {
+			case f.reusesBranch(answers) && len(f.branches(answers)) > 1:
+				description = domain.RecapParentRecordedForExisting
+			case f.reusesBranch(answers):
 				description = domain.RecapParentRecordedForSync
 			}
 			return flow.StepContent{Title: labelSource, Description: description}, nil
@@ -107,9 +197,10 @@ func (f *createFlow) sourceStep() flow.Step {
 // created outside wtm, so defaulting would record a guess that `sync` and `tree`
 // then treat as fact.
 func (f *createFlow) resolveSource(answers flow.Answers) (flow.Answer, error) {
-	branchName := answers.Value(KeyBranch)
-	if rules.ParentMustBeExplicit(f.target(branchName).State) {
-		return flow.Answer{}, fmt.Errorf(domain.ParentRequiredFmt, branchName, domain.FlagFrom)
+	for _, name := range f.branches(answers) {
+		if rules.ParentMustBeExplicit(f.target(name).State) {
+			return flow.Answer{}, fmt.Errorf(domain.ParentRequiredFmt, name, domain.FlagFrom)
+		}
 	}
 	base := f.ctx.Config.Project.Worktrees.BaseBranch
 	if base == "" {
@@ -134,6 +225,13 @@ func (f *createFlow) envStep() flow.Step {
 			{Label: domain.EnvOptionExample, Value: string(domain.EnvStrategyExample)},
 			{Label: domain.EnvOptionMain, Value: string(domain.EnvStrategyMain)},
 			{Label: domain.EnvOptionParent, Value: string(domain.EnvStrategyParent)},
+		},
+		Build: func(answers flow.Answers) (flow.StepContent, error) {
+			return flow.StepContent{Description: decide.Pick(decide.PickParams{
+				Many:    f.many(answers),
+				One:     domain.CreateEnvStepDescription,
+				Several: domain.CreateEnvStepDescriptionMany,
+			})}, nil
 		},
 		Resolve:   func(flow.Answers) (flow.Answer, error) { return flow.Answer{Value: ""}, nil },
 		Summarize: envSummary,
@@ -170,7 +268,14 @@ func (f *createFlow) isolationStep() flow.Step {
 			}
 			return true, domain.IsolationStepIrrelevant
 		},
-		Options: isolationOptions(fallback),
+		Options: isolationOptions(isolationOptionsParams{First: fallback}),
+		Build: func(answers flow.Answers) (flow.StepContent, error) {
+			many := f.many(answers)
+			return flow.StepContent{
+				Description: decide.Pick(decide.PickParams{Many: many, One: domain.IsolationStepDescription, Several: domain.IsolationStepDescriptionMany}),
+				Options:     isolationOptions(isolationOptionsParams{First: fallback, Many: many}),
+			}, nil
+		},
 		Resolve: func(flow.Answers) (flow.Answer, error) {
 			return flow.Answer{Value: string(fallback)}, nil
 		},
@@ -179,11 +284,20 @@ func (f *createFlow) isolationStep() flow.Step {
 	}
 }
 
-func isolationOptions(first domain.Isolation) []flow.Option {
-	choices := rules.IsolationChoices(first)
+type isolationOptionsParams struct {
+	First domain.Isolation
+	Many  bool
+}
+
+func isolationOptions(params isolationOptionsParams) []flow.Option {
+	label := rules.IsolationOptionLabel
+	if params.Many {
+		label = rules.IsolationOptionLabelMany
+	}
+	choices := rules.IsolationChoices(params.First)
 	options := make([]flow.Option, 0, len(choices))
 	for _, choice := range choices {
-		options = append(options, flow.Option{Label: rules.IsolationOptionLabel(choice), Value: string(choice)})
+		options = append(options, flow.Option{Label: label(choice), Value: string(choice)})
 	}
 	return options
 }
@@ -237,7 +351,7 @@ func (f *createFlow) recapStep() flow.Step {
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
 			return flow.StepContent{
 				Description: f.recap(answers),
-				Options:     []flow.Option{{Label: domain.CreateRecapConfirmOption, Value: confirmCreate}},
+				Options:     []flow.Option{{Label: confirmLabel(len(f.branches(answers))), Value: confirmCreate}},
 			}, nil
 		},
 		Resolve: func(flow.Answers) (flow.Answer, error) {
@@ -246,36 +360,63 @@ func (f *createFlow) recapStep() flow.Step {
 	}
 }
 
+// sourceUpdate moves the branch itself only when it is the one being created: a
+// list shares its source, and that is what gets fast-forwarded.
 func (f *createFlow) sourceUpdate(answers flow.Answers) decide.SourceUpdatePrompt {
+	single := ""
+	if names := f.branches(answers); len(names) == 1 {
+		single = names[0]
+	}
 	return decide.SourceUpdate(decide.SourceUpdateParams{
 		ProjectDir: f.ctx.ProjectDir,
 		Target:     f.target,
-		Branch:     answers.Value(KeyBranch),
+		Branch:     single,
 		Source:     answers.Value(KeySource),
+		Many:       f.many(answers),
 	})
 }
 
 func (f *createFlow) reusesBranch(answers flow.Answers) bool {
-	return f.target(answers.Value(KeyBranch)).State == domain.BranchTargetExisting
+	return len(f.existingBranches(answers)) > 0
+}
+
+func (f *createFlow) allReused(answers flow.Answers) bool {
+	names := f.branches(answers)
+	return len(names) > 0 && len(f.existingBranches(answers)) == len(names)
+}
+
+func (f *createFlow) branchLine(answers flow.Answers) string {
+	names := f.branches(answers)
+	switch {
+	case len(names) == 1:
+		label := names[0]
+		if f.reusesBranch(answers) {
+			label += domain.BranchReusedSuffix
+		}
+		return domain.RecapFieldBranch + label
+	case len(names) > 1:
+		labels := make([]string, 0, len(names))
+		for _, name := range names {
+			if f.target(name).State == domain.BranchTargetExisting {
+				name += domain.BranchListExistingSuffix
+			}
+			labels = append(labels, name)
+		}
+		return domain.RecapFieldBranches + strings.Join(labels, ", ")
+	}
+	return ""
 }
 
 func (f *createFlow) recap(answers flow.Answers) string {
 	source := answers.Value(KeySource)
-	branchName := answers.Value(KeyBranch)
-	reused := f.reusesBranch(answers)
 
 	envLabel := answers.Value(KeyEnv)
 	if envLabel == "" {
 		envLabel = domain.EnvSummaryConfigDefault
 	}
 
-	branchLabel := branchName
-	if reused {
-		branchLabel += domain.BranchReusedSuffix
-	}
-
 	sourceField := domain.RecapFieldSource
-	if reused {
+	if f.allReused(answers) {
 		sourceField = domain.RecapFieldParent
 	}
 
@@ -289,8 +430,8 @@ func (f *createFlow) recap(answers flow.Answers) string {
 	}
 
 	var lines []string
-	if branchLabel != "" {
-		lines = append(lines, domain.RecapFieldBranch+branchLabel)
+	if line := f.branchLine(answers); line != "" {
+		lines = append(lines, line)
 	}
 	lines = append(lines, sourceField+sourceLabel, domain.RecapFieldEnv+envLabel)
 	if isolation := answers.Value(KeyIsolation); isolation != "" {
@@ -323,4 +464,11 @@ func (f *createFlow) warnings(answers flow.Answers) []string {
 		warnings = append(warnings, domain.WarningPrefix+warning)
 	}
 	return warnings
+}
+
+func confirmLabel(count int) string {
+	if count > 1 {
+		return fmt.Sprintf(domain.CreateRecapConfirmManyFmt, count)
+	}
+	return domain.CreateRecapConfirmOption
 }

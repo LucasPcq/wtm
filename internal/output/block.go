@@ -75,6 +75,11 @@ func Error(w io.Writer, msg string) {
 	}
 }
 
+// Unlike Loading, a header is not a non-event: only its glyph is muted.
+func BranchHeader(w io.Writer, msg string) {
+	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Muted.Render(domain.GlyphProgress), msg)
+}
+
 // Loading prints a styled loading/status line: "  › message".
 func Loading(w io.Writer, msg string) {
 	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Muted.Render(domain.GlyphProgress), styles.Muted.Render(msg))

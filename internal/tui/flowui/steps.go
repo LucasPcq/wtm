@@ -44,6 +44,8 @@ func (p *plan) componentStep(step flow.Step, conditional bool) (components.Step,
 		return p.contentStep(step, func(content flow.StepContent) any { return selectList(content) })
 	case flow.StepBranchSelect:
 		return p.branchStep(step)
+	case flow.StepTextList:
+		return p.contentStep(step, func(content flow.StepContent) any { return textList(step, content) })
 	case flow.StepMultiSelect:
 		return p.contentStep(step, func(content flow.StepContent) any { return multiSelect(step, content) })
 	case flow.StepReorder:
@@ -79,6 +81,24 @@ func textInput(step flow.Step, content flow.StepContent) components.TextInputMod
 		Default:     content.Default,
 		Validate:    step.Validate,
 	})
+}
+
+func textList(step flow.Step, content flow.StepContent) components.TextListModel {
+	params := components.NewTextListParams{
+		Title:       content.Title,
+		Description: content.Description,
+		Entries:     content.Entries,
+		Required:    domain.FlowEntryRequired,
+		Check: func(entry components.TextListEntry) (string, error) {
+			return flow.CheckEntry(step, flow.EntryCheck{Entry: entry.Entry, Entries: entry.Entries})
+		},
+	}
+	if step.EntryBadge != nil {
+		params.Badge = func(entry string) components.Badge {
+			return toBadges([]flow.Badge{step.EntryBadge(entry)})[0]
+		}
+	}
+	return components.NewTextList(params)
 }
 
 func reorderList(content flow.StepContent) components.ReorderListModel {
@@ -413,6 +433,8 @@ func summaryFor(step flow.Step) func(any) string {
 		switch step.Kind {
 		case flow.StepText:
 			return components.TextSummary
+		case flow.StepTextList:
+			return components.TextListSummary
 		case flow.StepMultiSelect:
 			return components.MultiSelectSummary(domain.SummaryNone)
 		case flow.StepReorder:

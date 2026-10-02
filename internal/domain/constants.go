@@ -129,20 +129,22 @@ const (
 	// indentation on either side and the border between them.
 	RecapFrameChrome = 8
 	// A conclusion's counted summary: "3 applied · 1 skipped", zero counts dropped.
-	TallyPartFmt       = "%d %s"
-	TallyApplied       = "applied"
-	TallyFastForwarded = "fast-forwarded"
-	TallyUpToDate      = "already up to date"
-	TallyFailed        = "failed"
-	TallyAdded         = "added"
-	TallyRemoved       = "removed"
-	TallyKept          = "kept"
-	TallySkipped       = "skipped"
-	TallyBlocked       = "blocked"
-	TallyPruned        = "pruned"
-	ReparentedPairFmt  = "%s → %s"
-	TallyReparented    = "reparented"
-	TallySeparator     = " · "
+	TallyPartFmt        = "%d %s"
+	TallyApplied        = "applied"
+	TallyFastForwarded  = "fast-forwarded"
+	TallyUpToDate       = "already up to date"
+	TallyFailed         = "failed"
+	TallyCreated        = "created"
+	TallyAlreadyExisted = "already existed"
+	TallyAdded          = "added"
+	TallyRemoved        = "removed"
+	TallyKept           = "kept"
+	TallySkipped        = "skipped"
+	TallyBlocked        = "blocked"
+	TallyPruned         = "pruned"
+	ReparentedPairFmt   = "%s → %s"
+	TallyReparented     = "reparented"
+	TallySeparator      = " · "
 	// The glyph vocabulary. Six runes, one register each, and no seventh: a line
 	// that fits none of them is not a line that needs a new glyph, it is a line
 	// that has not decided what it says. Each is one column wide and carries the
@@ -2980,15 +2982,20 @@ const (
 	// keeps the source as-is rather than aborting.
 	SourceFastForwardDescription = "Updates your local branch to origin so the new worktree starts up to date. " +
 		"Skipped if its worktree has uncommitted changes."
+	SourceFastForwardDescriptionMany = "Updates your local branch to origin so the new worktrees start up to date. " +
+		"Skipped if its worktree has uncommitted changes."
 	// SourceDivergedPrompt warns that a diverged source can't be fast-forwarded and
 	// asks whether to create from it anyway (source, ahead, behind).
 	SourceDivergedPrompt = "%s has diverged from origin (%d ahead, %d behind) — create the worktree from it anyway?"
 	// SourceDivergedWarning explains the consequence of a diverged source.
 	SourceDivergedWarning = "It can't be fast-forwarded. The worktree starts from your local branch, missing commits " +
 		"that are on origin — you may have to rebase or resolve conflicts later."
+	SourceDivergedWarningMany = "It can't be fast-forwarded. The worktrees start from your local branch, missing commits " +
+		"that are on origin — you may have to rebase or resolve conflicts later."
 	// SourceProceedStalePrompt asks whether to create from a stale local source
 	// after a fast-forward failed (source, behind).
-	SourceProceedStalePrompt = "Create the worktree from local %s anyway? (behind origin by %d)"
+	SourceProceedStalePrompt     = "Create the worktree from local %s anyway? (behind origin by %d)"
+	SourceProceedStalePromptMany = "Create the worktrees from local %s anyway? (behind origin by %d)"
 	// SourceProceedStaleWarning reports why the fast-forward failed (cause).
 	SourceProceedStaleWarning = "Couldn't fast-forward: %v"
 	// SourceUpdateSkip* explain why a run offers no source reconciliation.
@@ -3009,6 +3016,7 @@ const (
 	// RecapParentRecordedForSync explains, on the source-update step, that a
 	// reused branch's source is recorded for `wtm sync` rather than being a
 	// git start-point.
+	RecapParentRecordedForExisting = "Parent recorded for `wtm sync` for the existing branches — the new ones start from it"
 	RecapParentRecordedForSync     = "Parent recorded for `wtm sync` — the branch already exists and keeps its commits"
 	SourceKeepAsIsOption           = "Keep it as-is"
 	SourceUpdateSummaryFastForward = "fast-forward to origin"
@@ -3017,6 +3025,7 @@ const (
 	// FlowStepRequired*Fmt refuse a step that has no safe default and cannot be
 	// asked (step label, flag name).
 	FlowStepRequiredFmt     = "%s is required and cannot be asked in this mode"
+	FlowEntryRequired       = "a name is required"
 	FlowStepRequiredFlagFmt = "%s is required and cannot be asked in this mode: pass --%s"
 	// FlowStepRequiredArgFmt is the same refusal for a step whose answer is a
 	// positional: naming a flag that does not exist would send the reader looking
@@ -3028,18 +3037,31 @@ const (
 
 	// The create flow (internal/flow/create): step prose, option labels, recap
 	// fields and refusals. Format verbs: %s branch, %s env strategy, %s flag name.
-	CreateLoadingFmt               = "Creating worktree %s…"
-	CreateBranchStepDescription    = "Name for the new worktree branch"
-	CreateBranchRequired           = "branch name is required"
-	CreateBranchRequiredUnattended = "branch name is required without the interactive wizard (pass it as an argument)"
-	CreateSourceStepDescription    = "Branch to base the new worktree on"
-	CreateEnvStepDescription       = "How to provision .env files in the new worktree"
-	CreateNoSourceFmt              = "no source branch: pass --%s (no base branch configured)"
-	CreateRecapConfirmOption       = "Yes, create worktree"
-	EnvOptionConfigDefaultFmt      = "Use config default (%s)"
-	EnvOptionExample               = "example — copy .env.example → .env"
-	EnvOptionMain                  = "main — copy .env from the main checkout"
-	EnvOptionParent                = "parent — copy .env from source worktree"
+	CreateLoadingFmt                = "Creating worktree %s…"
+	CreateBranchStepDescription     = "Name for the new worktree branch"
+	CreateBranchesLabel             = "Branches"
+	CreateBranchesStepDescription   = "Names of the new worktree branches, one at a time"
+	BranchEntryNew                  = "new"
+	BranchEntryExisting             = "existing"
+	BranchEntryWorktreeExists       = "worktree exists"
+	CreateBranchRequired            = "branch name is required"
+	CreateBranchProgressFmt         = "%s (%d/%d)"
+	CreateBranchFailedFmt           = "%s — %s"
+	CreateBatchExistsFmt            = "%s already exists"
+	CreateBranchListedTwiceFmt      = "%s is already in the list"
+	CreateBranchGivenTwiceFmt       = "%s is given twice"
+	CreateBranchRequiredUnattended  = "branch name is required without the interactive wizard (pass it as an argument)"
+	CreateSourceStepDescription     = "Branch to base the new worktree on"
+	CreateSourceStepDescriptionMany = "Branch to base the new worktrees on"
+	CreateEnvStepDescription        = "How to provision .env files in the new worktree"
+	CreateEnvStepDescriptionMany    = "How to provision .env files in the new worktrees"
+	CreateNoSourceFmt               = "no source branch: pass --%s (no base branch configured)"
+	CreateRecapConfirmOption        = "Yes, create worktree"
+	CreateRecapConfirmManyFmt       = "Yes, create %d worktrees"
+	EnvOptionConfigDefaultFmt       = "Use config default (%s)"
+	EnvOptionExample                = "example — copy .env.example → .env"
+	EnvOptionMain                   = "main — copy .env from the main checkout"
+	EnvOptionParent                 = "parent — copy .env from source worktree"
 	// EnvSummaryConfigDefault names the empty env choice rather than leaving a
 	// recap line blank.
 	EnvSummaryConfigDefault = "config default"
@@ -3052,10 +3074,15 @@ const (
 	IsolationStepDescription = "The .env files are copied from another checkout, with its ports and its namespaces in shared services.\n" +
 		"Isolated: wtm moves them onto this worktree's — in the .env and when `wtm run` starts its jobs — so both can run side by side.\n" +
 		"Verbatim: wtm writes nothing into the .env and runs this worktree on the ports and data it was copied with, so it cannot run while its source does."
-	IsolationOptionIsolated  = "Isolate it — its own ports, compose project and namespaces"
-	IsolationOptionVerbatim  = "Keep the .env verbatim — its source's ports and data, one of the two runs at a time"
-	IsolationSummaryIsolated = "isolated"
-	IsolationSummaryVerbatim = "verbatim — .env kept as copied"
+	IsolationStepDescriptionMany = "The .env files are copied from another checkout, with its ports and its namespaces in shared services.\n" +
+		"Isolated: wtm moves them onto each worktree's — in the .env and when `wtm run` starts its jobs — so all of them can run side by side.\n" +
+		"Verbatim: wtm writes nothing into the .env and runs every worktree on the ports and data they were copied with, so only one of them, or their source, runs at a time."
+	IsolationOptionIsolated     = "Isolate it — its own ports, compose project and namespaces"
+	IsolationOptionVerbatim     = "Keep the .env verbatim — its source's ports and data, one of the two runs at a time"
+	IsolationOptionIsolatedMany = "Isolate them — each its own ports, compose project and namespaces"
+	IsolationOptionVerbatimMany = "Keep the .env verbatim — their source's ports and data, one of them runs at a time"
+	IsolationSummaryIsolated    = "isolated"
+	IsolationSummaryVerbatim    = "verbatim — .env kept as copied"
 	// IsolationStepIrrelevant is why the step is not asked: with nothing to
 	// isolate, both answers do exactly the same thing.
 	IsolationStepIrrelevant = "run.toml declares nothing a worktree isolates"
@@ -3086,6 +3113,7 @@ const (
 	// RecapField* are the aligned labels of the create-like recap bodies —
 	// create, extract and checkout — padded to the widest of them.
 	RecapFieldBranch       = "Branch:    "
+	RecapFieldBranches     = "Branches:  "
 	RecapFieldSource       = "Source:    "
 	RecapFieldParent       = "Parent:    "
 	RecapFieldEnv          = "Env:       "
@@ -3117,7 +3145,8 @@ const (
 	RelocateNameClashFmt = "%s shares its name with %s (%s) — rename one of the two branches to adopt it"
 	// BranchReusedSuffix marks the branch line of a recap when the worktree checks
 	// out an existing local branch instead of creating one.
-	BranchReusedSuffix = " (existing local branch — reused)"
+	BranchReusedSuffix       = " (existing local branch — reused)"
+	BranchListExistingSuffix = " (existing)"
 	// BranchReusedHeadline is the create conclusion for a reused branch (branch).
 	BranchReusedHeadline = "Created worktree %s on existing branch"
 	// BranchReusedNote states that the worktree checked out an existing local
@@ -3913,22 +3942,24 @@ const (
 	HelpConfirm   = "enter confirm"
 	HelpSelect    = "enter select"
 	// WizardDoneRow is the last row of every step that confirms on one.
-	WizardDoneRow = "✓ Done"
-	HelpBack      = "esc back"
-	HelpCancel    = "esc cancel"
-	HelpToggle    = "space toggle"
-	HelpAll       = "a all"
-	HelpFilter    = "/ filter"
-	HelpRefresh   = "r refresh"
-	HelpReorder   = "shift+↑/↓ reorder"
-	HelpDelete    = "d delete"
-	HelpRename    = "r rename"
-	HelpMerge     = "f merge"
-	HelpNew       = "n new"
-	HelpSetKind   = "←→ set type"
-	HelpSetScope  = "←→ set scope"
-	HelpSetRunner = "←→ set runner"
-	HelpSetTouch  = "←→ set service"
+	WizardDoneRow  = "✓ Done"
+	HelpBack       = "esc back"
+	HelpCancel     = "esc cancel"
+	HelpToggle     = "space toggle"
+	HelpAll        = "a all"
+	HelpFilter     = "/ filter"
+	HelpRefresh    = "r refresh"
+	HelpReorder    = "shift+↑/↓ reorder"
+	HelpAddAnother = "tab add another"
+	HelpRemoveLast = "backspace remove last"
+	HelpDelete     = "d delete"
+	HelpRename     = "r rename"
+	HelpMerge      = "f merge"
+	HelpNew        = "n new"
+	HelpSetKind    = "←→ set type"
+	HelpSetScope   = "←→ set scope"
+	HelpSetRunner  = "←→ set runner"
+	HelpSetTouch   = "←→ set service"
 
 	// The runner step: which root-level service starts each of the others. The
 	// relation is declared, never inferred — RunnerListNone is what a row says

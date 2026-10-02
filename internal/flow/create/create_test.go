@@ -3,6 +3,7 @@ package create
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/decide"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
@@ -109,7 +111,7 @@ func TestRecapPutsTheFastForwardOnItsSubject(t *testing.T) {
 }
 
 func TestSessionAsksOnlyWhatIsMissing(t *testing.T) {
-	full := newFlow(t, Request{Branch: "feat/x", From: "main", EnvFrom: "example"}, nil).session()
+	full := newFlow(t, Request{Branches: []string{"feat/x"}, From: "main", EnvFrom: "example"}, nil).session()
 	for _, key := range []string{KeyBranch, KeySource, KeyEnv} {
 		if _, preset := full.Presets.Get(key); !preset {
 			t.Errorf("step %q should be answered by the request", key)
@@ -194,6 +196,10 @@ func (r *recorder) Created(outcome Outcome) error {
 	return nil
 }
 
+func (r *recorder) BranchStarted(BranchProgress) {}
+
+func (r *recorder) BranchFailed(domain.CreateFailure) {}
+
 func testContext(t *testing.T) flow.Context {
 	t.Helper()
 	dir := gittest.InitRepo(t)
@@ -232,13 +238,13 @@ func TestRunAsksEveryQuestionThenCreates(t *testing.T) {
 			t.Errorf("recap %q should contain %q", recap, line)
 		}
 	}
-	if presenter.created == nil || presenter.created.Branch != "feat/w" {
+	if presenter.created == nil || len(presenter.created.Results) != 1 || presenter.created.Results[0].Branch != "feat/w" {
 		t.Fatalf("created = %+v, want the new worktree reported", presenter.created)
 	}
-	if outcome.Result.Metadata.SourceBranch != "main" {
-		t.Errorf("source_branch = %q, want the answered source recorded", outcome.Result.Metadata.SourceBranch)
+	if outcome.Results[0].Metadata.SourceBranch != "main" {
+		t.Errorf("source_branch = %q, want the answered source recorded", outcome.Results[0].Metadata.SourceBranch)
 	}
-	if _, statErr := os.Stat(outcome.Result.Path); statErr != nil {
+	if _, statErr := os.Stat(outcome.Results[0].Path); statErr != nil {
 		t.Errorf("worktree not on disk: %v", statErr)
 	}
 	if len(presenter.Stages) != 1 {
@@ -251,7 +257,7 @@ func TestRunSkipsTheQuestionsTheRequestAnswers(t *testing.T) {
 
 	if _, err := Run(Params{
 		Context:   testContext(t),
-		Request:   Request{Branch: "feat/flagged", From: "main", EnvFrom: "example"},
+		Request:   Request{Branches: []string{"feat/flagged"}, From: "main", EnvFrom: "example"},
 		Prompter:  prompter,
 		Presenter: newRecorder(),
 	}); err != nil {
@@ -274,7 +280,7 @@ func TestRunAbortedCreatesNothing(t *testing.T) {
 
 	outcome, err := Run(Params{
 		Context:   testContext(t),
-		Request:   Request{Branch: "feat/nope", From: "main"},
+		Request:   Request{Branches: []string{"feat/nope"}, From: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Abort: true},
 		Presenter: presenter,
 	})
@@ -299,7 +305,7 @@ func TestRunRunsHooksAsTheirOwnPhase(t *testing.T) {
 
 	if _, err := Run(Params{
 		Context: ctx,
-		Request: Request{Branch: "feat/hooked", From: "main"},
+		Request: Request{Branches: []string{"feat/hooked"}, From: "main"},
 		Prompter: &flowtest.ScriptedPrompter{Answers: map[string]string{
 			KeyEnv:   "",
 			KeyRecap: confirmCreate,
@@ -322,7 +328,7 @@ func TestRunRefusesABranchHeldElsewhereBeforeAsking(t *testing.T) {
 	prompter := &flowtest.ScriptedPrompter{}
 	_, err := Run(Params{
 		Context:   ctx,
-		Request:   Request{Branch: "feat/taken", From: "main"},
+		Request:   Request{Branches: []string{"feat/taken"}, From: "main"},
 		Prompter:  prompter,
 		Presenter: newRecorder(),
 	})
@@ -452,5 +458,343 @@ func TestRecapNamesTheIsolation(t *testing.T) {
 	silent := f.recap(answers(map[string]string{KeyBranch: "feat/x", KeySource: "main"}))
 	if strings.Contains(silent, domain.RecapFieldIsolation) {
 		t.Errorf("recap = %q, want no line for a step that was never posed", silent)
+	}
+}
+
+func multiRun(t *testing.T, request Request, sets []string) (Outcome, *flowtest.ScriptedPrompter, error) {
+	t.Helper()
+	request.Multi = true
+	prompter := &flowtest.ScriptedPrompter{
+		Answers: map[string]string{KeySource: "main", KeyEnv: "", KeyRecap: confirmCreate},
+		Sets:    map[string][]string{KeyBranch: sets},
+	}
+	outcome, err := Run(Params{Context: testContext(t), Request: request, Prompter: prompter, Presenter: newRecorder()})
+	return outcome, prompter, err
+}
+
+func TestMultiAsksTheListThenTheSharedQuestionsOnce(t *testing.T) {
+	outcome, prompter, err := multiRun(t, Request{}, []string{"feat/a", "feat/b"})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	want := strings.Join([]string{KeyBranch, KeySource, KeyEnv, KeyRecap}, ",")
+	if prompter.AskedKeys() != want {
+		t.Errorf("asked %q, want %q", prompter.AskedKeys(), want)
+	}
+	if !strings.Contains(prompter.Content[KeyRecap].Description, "Branches:  feat/a, feat/b") {
+		t.Errorf("recap %q should list both branches", prompter.Content[KeyRecap].Description)
+	}
+	if len(outcome.Results) != 2 {
+		t.Errorf("results = %d, want both created", len(outcome.Results))
+	}
+}
+
+func TestMultiPrefillsTheListFromSeveralArguments(t *testing.T) {
+	_, prompter, err := multiRun(t, Request{Branches: []string{"feat/a", "feat/b"}}, []string{"feat/a", "feat/b", "feat/c"})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := strings.Join(prompter.Content[KeyBranch].Entries, ","); got != "feat/a,feat/b" {
+		t.Errorf("pre-fill = %q, want the arguments", got)
+	}
+}
+
+func TestMultiWithOneArgumentSkipsTheListStep(t *testing.T) {
+	_, prompter, err := multiRun(t, Request{Branches: []string{"feat/a"}}, nil)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if _, asked := prompter.Content[KeyBranch]; asked {
+		t.Error("a single argument answers the step, as it always did")
+	}
+}
+
+func TestMultiUnattendedTakesTheArguments(t *testing.T) {
+	outcome, err := Run(Params{
+		Context:   testContext(t),
+		Request:   Request{Branches: []string{"feat/a", "feat/b"}, Multi: true},
+		Prompter:  flow.Unattended{},
+		Presenter: newRecorder(),
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(outcome.Results) != 2 {
+		t.Errorf("results = %d, want both created", len(outcome.Results))
+	}
+}
+
+func TestRunRefusesADuplicateArgument(t *testing.T) {
+	presenter := newRecorder()
+	_, err := Run(Params{
+		Context:   testContext(t),
+		Request:   Request{Branches: []string{"feat/a", "feat/a"}, Multi: true},
+		Prompter:  flow.Unattended{},
+		Presenter: presenter,
+	})
+	if err == nil || !strings.Contains(err.Error(), "feat/a") {
+		t.Fatalf("err = %v, want the duplicate named", err)
+	}
+	if len(presenter.Stages) != 0 {
+		t.Errorf("stages = %v, nothing must be created", presenter.Stages)
+	}
+}
+
+func TestRunRefusesAClashInsideTheListBeforeCreatingAnything(t *testing.T) {
+	ctx := testContext(t)
+	linkedRunConfig(t, ctx, ".env")
+	presenter := newRecorder()
+
+	_, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Branches: []string{"feat/x", "feat.x"}, Multi: true},
+		Prompter:  flow.Unattended{},
+		Presenter: presenter,
+	})
+	if !errors.Is(err, domain.ErrWorktreeNameTaken) {
+		t.Fatalf("err = %v, want ErrWorktreeNameTaken", err)
+	}
+	if len(presenter.Stages) != 0 {
+		t.Errorf("stages = %v, nothing must be created", presenter.Stages)
+	}
+}
+
+func TestMixedListWithoutFromIsRefusedUnattended(t *testing.T) {
+	ctx := testContext(t)
+	gittest.CreateBranch(t, ctx.ProjectDir, "feat/old")
+
+	_, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Branches: []string{"feat/new", "feat/old"}, Multi: true},
+		Prompter:  flow.Unattended{},
+		Presenter: newRecorder(),
+	})
+	if err == nil || !strings.Contains(err.Error(), "feat/old") || !strings.Contains(err.Error(), "--"+domain.FlagFrom) {
+		t.Fatalf("err = %v, want a refusal naming feat/old and --%s", err, domain.FlagFrom)
+	}
+}
+
+func TestEntryBadgeNamesNewAndExisting(t *testing.T) {
+	f := newFlow(t, Request{Multi: true}, existing("feat/old"))
+	if got := f.entryBadge("feat/old").Text; got != domain.BranchEntryExisting {
+		t.Errorf("badge = %q, want existing", got)
+	}
+	if got := f.entryBadge("feat/new").Text; got != domain.BranchEntryNew {
+		t.Errorf("badge = %q, want new", got)
+	}
+}
+
+type batchRecorder struct {
+	*recorder
+	started []BranchProgress
+	failed  []domain.CreateFailure
+}
+
+func (r *batchRecorder) BranchStarted(p BranchProgress) { r.started = append(r.started, p) }
+
+func (r *batchRecorder) BranchFailed(f domain.CreateFailure) { r.failed = append(r.failed, f) }
+
+func occupy(t *testing.T, ctx flow.Context, branchName string) {
+	t.Helper()
+	dir := filepath.Join(ctx.ProjectDir, ctx.Config.Project.Worktrees.BasePath, rules.SanitizeBranchName(branchName))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAFailureInTheMiddleDoesNotStopTheRest(t *testing.T) {
+	ctx := testContext(t)
+	occupy(t, ctx, "feat/b")
+	presenter := &batchRecorder{recorder: newRecorder()}
+
+	outcome, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Branches: []string{"feat/a", "feat/b", "feat/c"}, Multi: true, From: "main"},
+		Prompter:  flow.Unattended{},
+		Presenter: presenter,
+	})
+
+	if len(outcome.Results) != 2 || len(outcome.Failed) != 1 || outcome.Failed[0].Branch != "feat/b" {
+		t.Fatalf("outcome = %+v, want feat/a and feat/c created, feat/b failed", outcome)
+	}
+	if !errors.Is(err, domain.ErrAborted) {
+		t.Errorf("err = %v, want ErrAborted: the readout already reported the failure", err)
+	}
+	if !errors.Is(err, domain.ErrWorktreePathExists) {
+		t.Errorf("err = %v, want the first cause kept for the exit code", err)
+	}
+	if outcome.Failed[0].ExitCode != domain.ExitCodeWorktreeExists {
+		t.Errorf("exit_code = %d", outcome.Failed[0].ExitCode)
+	}
+	if len(presenter.started) != 3 || presenter.started[1].Position != 2 || presenter.started[1].Total != 3 {
+		t.Errorf("started = %+v, want one header per branch", presenter.started)
+	}
+	if len(presenter.failed) != 1 {
+		t.Errorf("failed = %+v", presenter.failed)
+	}
+	if presenter.created == nil {
+		t.Error("the conclusion must be presented even with a failure")
+	}
+}
+
+func TestASingleBranchFailsAsBefore(t *testing.T) {
+	ctx := testContext(t)
+	occupy(t, ctx, "feat/b")
+	presenter := &batchRecorder{recorder: newRecorder()}
+
+	_, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Branches: []string{"feat/b"}, Multi: true, From: "main"},
+		Prompter:  flow.Unattended{},
+		Presenter: presenter,
+	})
+	if errors.Is(err, domain.ErrAborted) || !errors.Is(err, domain.ErrWorktreePathExists) {
+		t.Errorf("err = %v, want the raw cause so the root prints it as today", err)
+	}
+	if len(presenter.started) != 0 || len(presenter.failed) != 0 {
+		t.Error("a single branch gets no per-branch header or failure line")
+	}
+}
+
+func TestFastForwardReachesAnExistingBranchWhenTheSourceIsUpToDate(t *testing.T) {
+	ctx := testContext(t)
+	gittest.AddOrigin(t, ctx.ProjectDir)
+	gittest.Git(t, ctx.ProjectDir, "checkout", "-b", "feat/old")
+	gittest.Git(t, ctx.ProjectDir, "commit", "--allow-empty", "-m", "on origin only")
+	gittest.PushBranch(t, ctx.ProjectDir, "feat/old")
+	gittest.Git(t, ctx.ProjectDir, "checkout", "main")
+	gittest.Git(t, ctx.ProjectDir, "branch", "-f", "feat/old", "main")
+
+	_, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Branches: []string{"feat/new", "feat/old"}, Multi: true, From: "main", FastForward: true},
+		Prompter:  flow.Unattended{},
+		Presenter: newRecorder(),
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	local, remote := revParse(t, ctx.ProjectDir, "feat/old"), revParse(t, ctx.ProjectDir, "origin/feat/old")
+	if local != remote {
+		t.Errorf("feat/old = %s, want it fast-forwarded to origin %s: --ff promises it for every existing branch", local, remote)
+	}
+}
+
+func TestADuplicateArgumentIsAUsageError(t *testing.T) {
+	_, err := Run(Params{
+		Context:   testContext(t),
+		Request:   Request{Branches: []string{"feat/a", "feat/a"}, Multi: true},
+		Prompter:  flow.Unattended{},
+		Presenter: newRecorder(),
+	})
+	if code := rules.ExitCode(err); code != domain.ExitCodeUsage {
+		t.Errorf("exit code = %d, want %d for a malformed command line", code, domain.ExitCodeUsage)
+	}
+}
+
+func revParse(t *testing.T, dir, ref string) string {
+	t.Helper()
+	out, err := exec.Command("git", "-C", dir, "rev-parse", ref).Output()
+	if err != nil {
+		t.Fatalf("rev-parse %s: %v", ref, err)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func TestRecapConfirmNamesHowManyWorktrees(t *testing.T) {
+	_, prompter, err := multiRun(t, Request{}, []string{"feat/a", "feat/b"})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := prompter.Content[KeyRecap].Options[0].Label; got != "Yes, create 2 worktrees" {
+		t.Errorf("confirm = %q, want the count", got)
+	}
+}
+
+func TestPositionalArgumentsAreTrimmed(t *testing.T) {
+	outcome, err := Run(Params{
+		Context:   testContext(t),
+		Request:   Request{Branches: []string{" feat/a ", "feat/b"}, Multi: true},
+		Prompter:  flow.Unattended{},
+		Presenter: newRecorder(),
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if outcome.Results[0].Branch != "feat/a" {
+		t.Errorf("branch = %q, want the argument trimmed as the wizard would", outcome.Results[0].Branch)
+	}
+}
+
+func TestABlankArgumentIsAUsageError(t *testing.T) {
+	presenter := newRecorder()
+	_, err := Run(Params{
+		Context:   testContext(t),
+		Request:   Request{Branches: []string{"feat/a", "  "}, Multi: true},
+		Prompter:  flow.Unattended{},
+		Presenter: presenter,
+	})
+	if code := rules.ExitCode(err); code != domain.ExitCodeUsage {
+		t.Errorf("err = %v (exit %d), want a usage error", err, code)
+	}
+	if len(presenter.Stages) != 0 {
+		t.Errorf("stages = %v, nothing must be created", presenter.Stages)
+	}
+}
+
+func TestARepeatedArgumentIsWordedForTheCommandLine(t *testing.T) {
+	_, err := Run(Params{
+		Context:   testContext(t),
+		Request:   Request{Branches: []string{"feat/a", "feat/a"}, Multi: true},
+		Prompter:  flow.Unattended{},
+		Presenter: newRecorder(),
+	})
+	if err == nil || !strings.Contains(err.Error(), "feat/a is given twice") {
+		t.Errorf("err = %v, want it worded for arguments", err)
+	}
+}
+
+func TestTheWizardSpeaksInThePluralForSeveralBranches(t *testing.T) {
+	ctx := testContext(t)
+	linkedRunConfig(t, ctx, ".env")
+	gittest.AddOrigin(t, ctx.ProjectDir)
+	gittest.Git(t, ctx.ProjectDir, "commit", "--allow-empty", "-m", "on origin only")
+	gittest.Git(t, ctx.ProjectDir, "push", "origin", "main")
+	gittest.Git(t, ctx.ProjectDir, "reset", "--hard", "HEAD~1")
+
+	prompter := &flowtest.ScriptedPrompter{
+		Answers: map[string]string{KeySource: "main", KeyEnv: "", KeyIsolation: string(domain.IsolationIsolated), KeySourceUpdate: updateKeep, KeyRecap: confirmCreate},
+		Sets:    map[string][]string{KeyBranch: {"feat/a", "feat/b"}},
+	}
+	if _, err := Run(Params{Context: ctx, Request: Request{Multi: true}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	for key, want := range map[string]string{
+		KeySource:       domain.CreateSourceStepDescriptionMany,
+		KeyEnv:          domain.CreateEnvStepDescriptionMany,
+		KeyIsolation:    domain.IsolationStepDescriptionMany,
+		KeySourceUpdate: domain.SourceFastForwardDescriptionMany,
+	} {
+		if got := prompter.Content[key].Description; got != want {
+			t.Errorf("%s description = %q, want %q", key, got, want)
+		}
+	}
+	options := prompter.Content[KeyIsolation].Options
+	if len(options) != 2 || options[0].Label != domain.IsolationOptionIsolatedMany || options[1].Label != domain.IsolationOptionVerbatimMany {
+		t.Errorf("isolation options = %+v, want the plural labels", options)
+	}
+}
+
+func TestTheWizardKeepsTheSingularForOneBranch(t *testing.T) {
+	_, prompter, err := multiRun(t, Request{}, []string{"feat/a"})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := prompter.Content[KeySource].Description; got != domain.CreateSourceStepDescription {
+		t.Errorf("source description = %q, want the singular", got)
+	}
+	if got := prompter.Content[KeyEnv].Description; got != domain.CreateEnvStepDescription {
+		t.Errorf("env description = %q, want the singular", got)
 	}
 }

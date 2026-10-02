@@ -22,19 +22,21 @@ Everything here assumes the driving rules of `SKILL.md`: `--output json` on data
 
 ## `create`
 
-`wtm create <branch> --from <base> --yes --output json` makes a new worktree, provisions its `.env` and runs the `on_create` hooks.
+`wtm create <branch>... --from <base> --yes --output json` makes one worktree per branch, one after the other, provisions each `.env` and runs the `on_create` hooks. Once the run starts, the JSON is always an envelope, even for one branch: `{"results": [<create result>...], "failed": [{"branch", "path"?, "error", "exit_code"}...]}`. Every field named below lives on a branch's entry in `results`; read `.results[0]` for a single branch.
+
+- **Several branches in one call** share `--from`, `--env-from`, `--isolation` and `--ff`. A failing branch does not stop the others: it lands in `failed` (with `path` when the worktree exists but a hook failed), the others in `results`, and the exit code is the first failure's. A branch listed twice is refused before anything is created (exit `2`), as are two branches reducing to the same name when `run.toml` declares jobs (exit `10`). Either refusal writes no envelope, only the error on stderr. Under `--ff`, the shared source is fast-forwarded once, and each existing branch of the list on its own (best effort, even when the source was already up to date).
 
 - `--from` accepts a remote ref (`origin/x`).
-- `--if-not-exists` makes it idempotent. It is about the **worktree**, not the branch: an existing branch with no worktree is still created. It also no-ops on a worktree holding the branch outside `base_path` and returns that path, even the **main** worktree's own path if the branch is checked out there (still `already_exists: true`, just not a directory under `base_path`).
+- `--if-not-exists` makes it idempotent. It is about the **worktree**, not the branch: an existing branch with no worktree is still created. It also no-ops on a worktree holding the branch outside `base_path` and returns that path, even the **main** worktree's own path if the branch is checked out there (still `already_exists: true` in its `results` entry, just not a directory under `base_path`).
 - `--ff` fast-forwards a behind-only `--from` branch to origin first, so the worktree starts up to date. A diverged branch is left as is (no prompt in JSON mode).
 - `--isolation isolated|verbatim`: see [Isolation at creation](#isolation-at-creation).
 - **A name two worktrees would share is refused** (exit `10`, before anything is created) when `run.toml` declares a job: `feat.x` next to a live `feat/x` would get the same compose project, namespaces and proxy host (`feat-x`), and `feat/a_b` next to `feat/a-b` the same host. The error names both branches and the shared name: pick another branch name. The same holds for `extract --to` and `checkout`.
 - **The run module never fails a creation.** A `run.toml` that cannot be read or is refused (an unknown key, a job `kind` other than `service`/`task`, an `[[env_port]]` or `[[env]]` on a file `config.toml` no longer provisions, a global `[proxy] port` outside 1-65535), or a neighbour's unreadable `meta.json`, only skips the port pass: the worktree is created, the `.env` copied as is, the hooks run, and the JSON carries a `warnings` array naming the cause and "ports not settled, run `wtm env <branch>` once run.toml is fixed". Fix the cause, then run that command.
-- On an isolated worktree, `create` settles the `.env` port values onto the ports the worktree binds (the `[[env_port]]` pass, see `run-config.md`), and reports it as `env_ports` in the JSON.
+- On an isolated worktree, `create` settles the `.env` port values onto the ports the worktree binds (the `[[env_port]]` pass, see `run-config.md`), and reports it as `env_ports` in the branch's `results` entry.
 
 ## An existing local branch
 
-An existing local branch is not an obstacle, and there is no `wtm clean` to run first. `create <branch>` checks out a same-named local branch **as is**, keeping commits that were never pushed; it never deletes or resets it. The response sets `existing_branch: true` and `origin_state` (`up-to-date`/`behind`/`ahead`/`diverged`) so you can tell reuse from creation.
+An existing local branch is not an obstacle, and there is no `wtm clean` to run first. `create <branch>` checks out a same-named local branch **as is**, keeping commits that were never pushed; it never deletes or resets it. The branch's `results` entry sets `existing_branch: true` and `origin_state` (`up-to-date`/`behind`/`ahead`/`diverged`) so you can tell reuse from creation.
 
 What wtm will not do is **guess its parent**. The branch was created outside wtm, so `--from` stops being a start point and names the **parent to record for `wtm sync`**, and it is **required**: the command errors instead of guessing, because `sync` and `tree` would treat the guess as fact. Ask the user which branch it stacks on if you do not know. `--ff` then updates `<branch>` itself rather than the source.
 

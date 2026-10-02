@@ -78,15 +78,22 @@ func (p presenter) Status(notice flow.Notice) {
 
 type createPresenter struct{ presenter }
 
+// The dashboard runs one branch at a time until it can render a list, so the
+// flow never reports per branch here.
+func (p createPresenter) BranchStarted(createflow.BranchProgress) {}
+
+func (p createPresenter) BranchFailed(domain.CreateFailure) {}
+
 func (p createPresenter) Created(outcome createflow.Outcome) error {
-	if outcome.Aborted {
+	if outcome.Aborted || len(outcome.Results) == 0 {
 		return nil
 	}
-	p.line(fmt.Sprintf(domain.DashboardFinishedFmt, domain.OpKindCreate, outcome.Branch))
-	if note := rules.EnvPortSettlementNote(outcome.Result.EnvPorts); note != "" {
+	result := outcome.Results[0]
+	p.line(fmt.Sprintf(domain.DashboardFinishedFmt, domain.OpKindCreate, result.Branch))
+	if note := rules.EnvPortSettlementNote(result.EnvPorts); note != "" {
 		p.line(note)
 	}
-	p.send(createdMsg{branch: outcome.Branch})
+	p.send(createdMsg{branch: result.Branch})
 	return nil
 }
 

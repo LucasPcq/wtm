@@ -6,10 +6,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/muesli/termenv"
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/styles"
 )
 
 func init() {
@@ -234,5 +237,33 @@ func TestFormatPRCheckoutResultLabelsTheEnvNote(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q:\n%s", want, out)
 		}
+	}
+}
+
+func TestFormatCreateBatchCountsAndNamesFailures(t *testing.T) {
+	var b strings.Builder
+	FormatCreateBatch(&b, CreateBatchParams{
+		Created: []CreateBatchRow{{Branch: "feat/a", Path: ".worktrees/feat-a"}, {Branch: "feat/c", Path: ".worktrees/feat-c", AlreadyExists: true}},
+		Failed:  []domain.CreateFailure{{Branch: "feat/b", Error: "path exists"}},
+	})
+	out := ansi.Strip(b.String())
+	for _, want := range []string{"feat/a", ".worktrees/feat-a", "feat/c already exists", "feat/b — path exists", "1 created", "1 already existed", "1 failed"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("readout %q should contain %q", out, want)
+		}
+	}
+}
+
+func TestBranchHeaderMutesOnlyItsGlyph(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.ANSI256)
+	t.Cleanup(func() { lipgloss.SetColorProfile(termenv.Ascii) })
+	var b strings.Builder
+	BranchHeader(&b, "feat/a (1/2)")
+	out := b.String()
+	if !strings.Contains(out, "feat/a (1/2)\n") || strings.Contains(out, styles.Muted.Render("feat/a (1/2)")) {
+		t.Errorf("header %q must keep its text in the terminal's own colour", out)
+	}
+	if !strings.Contains(ansi.Strip(out), domain.GlyphProgress+" feat/a (1/2)") {
+		t.Errorf("header %q should lead with the progress glyph", out)
 	}
 }

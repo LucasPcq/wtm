@@ -23,10 +23,7 @@ type TextInputModel struct {
 
 // NewTextInput creates a TextInputModel with a title and description.
 func NewTextInput(params NewTextInputParams) TextInputModel {
-	ti := textinput.New()
-	ti.Focus()
-	ti.Prompt = styles.InputPrompt.Render("❯ ")
-	ti.Width = 76
+	ti := newPromptInput()
 
 	if params.Placeholder != "" {
 		ti.Placeholder = params.Placeholder
@@ -44,6 +41,14 @@ func NewTextInput(params NewTextInputParams) TextInputModel {
 	}
 
 	return m
+}
+
+func newPromptInput() textinput.Model {
+	ti := textinput.New()
+	ti.Focus()
+	ti.Prompt = styles.InputPrompt.Render("❯ ")
+	ti.Width = 76
+	return ti
 }
 
 // NewTextInputParams holds inputs for NewTextInput.

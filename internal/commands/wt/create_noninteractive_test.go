@@ -1,7 +1,6 @@
 package wt
 
 import (
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -125,10 +124,7 @@ func TestWtCreateEnvFromOverridesTheConfigStrategy(t *testing.T) {
 			if err != nil {
 				t.Fatalf("wt create: %v", err)
 			}
-			var got domain.CreateResult
-			if err := json.Unmarshal([]byte(stdout), &got); err != nil {
-				t.Fatalf("decode create JSON: %v (payload %q)", err, stdout)
-			}
+			got := decodeCreated(t, stdout)
 			if got.Metadata.EnvStrategy != tt.want {
 				t.Errorf("env_strategy = %q, want %q", got.Metadata.EnvStrategy, tt.want)
 			}

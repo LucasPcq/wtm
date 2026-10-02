@@ -688,3 +688,33 @@ func TestAConditionalSelectKeepsItsStartingValue(t *testing.T) {
 		t.Errorf("cursor = %q, want the start the step built", got)
 	}
 }
+
+func TestBuildRendersATextListPrefilledFromItsContent(t *testing.T) {
+	step := flow.Step{
+		Kind:  flow.StepTextList,
+		Key:   "branches",
+		Label: "Branches",
+		Build: func(flow.Answers) (flow.StepContent, error) {
+			return flow.StepContent{Entries: []string{"feat/a"}}, nil
+		},
+	}
+	plan, err := build(flow.Session{Steps: []flow.Step{step, recapStep("r")}})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	model, ok := plan.steps[0].Model.(components.TextListModel)
+	if !ok {
+		t.Fatalf("model = %T, want a TextListModel", plan.steps[0].Model)
+	}
+	if got := strings.Join(model.Values(), ","); got != "feat/a" {
+		t.Errorf("values = %q, want the pre-fill", got)
+	}
+}
+
+func TestAnswerOfReadsATextListAsASet(t *testing.T) {
+	model := components.NewTextList(components.NewTextListParams{Entries: []string{"feat/a", "feat/b"}})
+	answer := answerOf(flow.StepTextList, model)
+	if strings.Join(answer.Values, ",") != "feat/a,feat/b" || !answer.Asked {
+		t.Errorf("answer = %+v, want both entries, asked", answer)
+	}
+}

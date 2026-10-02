@@ -34,10 +34,7 @@ func createWorktree(t *testing.T, branch string) domain.CreateResult {
 	if err != nil {
 		t.Fatalf("create %s: %v", branch, err)
 	}
-	var res domain.CreateResult
-	if err := json.Unmarshal([]byte(out), &res); err != nil {
-		t.Fatalf("decode create result: %v\n%s", err, out)
-	}
+	res := decodeCreated(t, out)
 	return res
 }
 

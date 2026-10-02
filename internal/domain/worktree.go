@@ -189,6 +189,19 @@ type CreateResult struct {
 	Warnings []string `json:"warnings,omitempty"`
 }
 
+// Path is set when the worktree exists but its hooks failed.
+type CreateFailure struct {
+	Branch   string `json:"branch"`
+	Path     string `json:"path,omitempty"`
+	Error    string `json:"error"`
+	ExitCode int    `json:"exit_code"`
+}
+
+type CreateBatchResult struct {
+	Results []CreateResult  `json:"results"`
+	Failed  []CreateFailure `json:"failed"`
+}
+
 // CleanParams holds inputs for cleaning a worktree.
 type CleanParams struct {
 	ProjectDir string

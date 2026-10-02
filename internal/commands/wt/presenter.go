@@ -21,42 +21,90 @@ type createPresenter struct {
 	config shared.ConfigResult
 }
 
+func (p createPresenter) BranchStarted(progress createflow.BranchProgress) {
+	if !p.Human {
+		return
+	}
+	output.BranchHeader(shared.OpenBlock(p.Cmd.ErrOrStderr(), true),
+		fmt.Sprintf(domain.CreateBranchProgressFmt, progress.Branch, progress.Position, progress.Total))
+}
+
+func (p createPresenter) BranchFailed(failure domain.CreateFailure) {
+	if !p.Human {
+		return
+	}
+	output.Error(shared.OpenBlock(p.Cmd.ErrOrStderr(), false),
+		fmt.Sprintf(domain.CreateBranchFailedFmt, failure.Branch, failure.Error))
+}
+
 func (p createPresenter) Created(outcome createflow.Outcome) error {
 	if p.Format == domain.OutputJSON {
-		return output.WriteWorktreeCreateJSON(p.Cmd.OutOrStdout(), outcome.Result)
+		return output.WriteWorktreeCreateJSON(p.Cmd.OutOrStdout(), domain.CreateBatchResult{
+			Results: nonNil(outcome.Results),
+			Failed:  nonNil(outcome.Failed),
+		})
 	}
+	switch {
+	case len(outcome.Results)+len(outcome.Failed) > 1:
+		p.batch(outcome)
+	case len(outcome.Results) == 1:
+		p.single(outcome.Results[0], outcome.FromBranch)
+	}
+	return nil
+}
 
+func nonNil[T any](items []T) []T {
+	if items == nil {
+		return []T{}
+	}
+	return items
+}
+
+func (p createPresenter) batch(outcome createflow.Outcome) {
+	rows := make([]output.CreateBatchRow, 0, len(outcome.Results))
+	for _, result := range outcome.Results {
+		rows = append(rows, output.CreateBatchRow{
+			Branch:        result.Branch,
+			Path:          createDisplayPath(displayPathParams{Config: p.config.Config, ProjectDir: p.config.ProjectDir, Path: result.Path}),
+			AlreadyExists: result.AlreadyExists,
+		})
+	}
+	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		output.FormatCreateBatch(w, output.CreateBatchParams{Created: rows, Failed: outcome.Failed})
+	})
+}
+
+func (p createPresenter) single(result domain.CreateResult, from string) {
 	// A reused branch's divergence from origin is the one thing "Created worktree x
 	// on existing branch" would leave out, and a prompt-free run has no wizard to
 	// have shown it.
 	var reusedNote shared.ReusedBranchNoteResult
-	if outcome.Result.ExistingBranch {
+	if result.ExistingBranch {
 		reusedNote = shared.ReusedBranchNote(shared.ReusedBranchNoteParams{
-			Branch: outcome.Branch,
-			Ahead:  outcome.Result.OriginAhead,
-			Behind: outcome.Result.OriginBehind,
+			Branch: result.Branch,
+			Ahead:  result.OriginAhead,
+			Behind: result.OriginBehind,
 		})
 	}
 
 	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
 		output.FormatCreateResult(w, output.CreateResultParams{
-			Branch:        outcome.Branch,
-			AlreadyExists: outcome.Result.AlreadyExists,
-			From:          outcome.FromBranch,
-			EnvStrategy:   string(outcome.Result.Metadata.EnvStrategy),
-			EnvNote:       rules.EnvPortSettlementNote(outcome.Result.EnvPorts),
+			Branch:        result.Branch,
+			AlreadyExists: result.AlreadyExists,
+			From:          from,
+			EnvStrategy:   string(result.Metadata.EnvStrategy),
+			EnvNote:       rules.EnvPortSettlementNote(result.EnvPorts),
 			Path: createDisplayPath(displayPathParams{
 				Config:     p.config.Config,
 				ProjectDir: p.config.ProjectDir,
-				Path:       outcome.Result.Path,
+				Path:       result.Path,
 			}),
-			ExistingBranch:    outcome.Result.ExistingBranch,
+			ExistingBranch:    result.ExistingBranch,
 			ReusedNote:        reusedNote.Text,
 			ReusedNoteWarning: reusedNote.Warning,
-			GoCommand:         fmt.Sprintf(domain.GoCommandFmt, outcome.Branch),
+			GoCommand:         fmt.Sprintf(domain.GoCommandFmt, result.Branch),
 		})
 	})
-	return nil
 }
 
 type cleanPresenter struct {

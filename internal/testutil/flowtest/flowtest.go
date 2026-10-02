@@ -12,7 +12,7 @@ import (
 
 type ScriptedPrompter struct {
 	Answers map[string]string
-	// Sets answers a StepMultiSelect step, whose answer is a set rather than a value.
+	// Sets answers a StepMultiSelect, StepReorder or StepTextList step, whose answer is a set.
 	Sets      map[string][]string
 	Abort     bool
 	Confirmed bool
@@ -52,6 +52,13 @@ func (p *ScriptedPrompter) Ask(session flow.Session) (flow.Answers, error) {
 		p.Content[step.Key] = content
 
 		if values, scripted := p.Sets[step.Key]; scripted {
+			if step.Kind == flow.StepTextList {
+				accepted, err := acceptEntries(step, values)
+				if err != nil {
+					return flow.Answers{}, err
+				}
+				values = accepted
+			}
 			// A real host refuses to advance on a failed validation; a double that
 			// skipped it would let a flow ship a rule nothing ever runs.
 			if step.ValidateSet != nil {
@@ -122,3 +129,15 @@ func (r *Recorder) HookPhase(params flow.HookPhaseParams) error {
 func (r *Recorder) Notice(notice flow.Notice) { r.Notices = append(r.Notices, notice) }
 
 func (r *Recorder) Status(notice flow.Notice) { r.Statuses = append(r.Statuses, notice) }
+
+func acceptEntries(step flow.Step, values []string) ([]string, error) {
+	var accepted []string
+	for _, value := range values {
+		entry, err := flow.CheckEntry(step, flow.EntryCheck{Entry: value, Entries: accepted})
+		if err != nil {
+			return nil, err
+		}
+		accepted = append(accepted, entry)
+	}
+	return accepted, nil
+}

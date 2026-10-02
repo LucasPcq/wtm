@@ -5,3 +5,4 @@
 # analysis follows calls, and there is no call site to follow — the wizard holds
 # its step models as `any` and type-asserts `rowless` on them.
 TextInputModel\.helpRowless
+TextListModel\.helpRowless

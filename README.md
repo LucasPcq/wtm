@@ -64,6 +64,7 @@ cd your-repo
 wtm init                      # once per repository
 
 wtm create feat/login         # a new worktree, provisioned
+wtm create feat/a feat/b      # several at once, from the same source
 wtm go feat/login             # jump into it
 wtm list                      # every worktree and its state
 wtm clean feat/login          # remove it once the PR is merged

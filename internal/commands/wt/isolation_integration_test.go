@@ -165,10 +165,7 @@ func TestCreateJSONReportsIsolationAndEnvPorts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	var res domain.CreateResult
-	if err := json.Unmarshal([]byte(out), &res); err != nil {
-		t.Fatalf("decode create result: %v\n%s", err, out)
-	}
+	res := decodeCreated(t, out)
 	if res.Isolation != domain.IsolationIsolated {
 		t.Errorf("isolation = %q, want isolated", res.Isolation)
 	}
@@ -203,10 +200,7 @@ func TestCreateWarnsAnIsolationTheExistingWorktreeIgnores(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create --if-not-exists: %v", err)
 	}
-	var res domain.CreateResult
-	if err := json.Unmarshal([]byte(out), &res); err != nil {
-		t.Fatalf("decode create result: %v\n%s", err, out)
-	}
+	res := decodeCreated(t, out)
 	if !res.AlreadyExists || res.Isolation != domain.IsolationIsolated {
 		t.Errorf("result = %+v, want the existing isolated worktree", res)
 	}

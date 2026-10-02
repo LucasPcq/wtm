@@ -197,7 +197,7 @@ Give each agent a branch, a directory and a running stack of its own. Every comm
 wtm agents install                                       # once: the using-wtm skill for Claude Code / Cursor
 
 branch=agent/fix-checkout
-wtm create "$branch" --if-not-exists --yes --output json  # {"branch", "path", "isolation", ...}
+wtm create "$branch" --if-not-exists --yes --output json  # {"results": [{"branch", "path", "isolation", ...}], "failed": []}
 cd "$(wtm resolve "$branch")"
 
 wtm run up "$branch" -d --yes --output json              # per-job status, ports and URLs

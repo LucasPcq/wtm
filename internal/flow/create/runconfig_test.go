@@ -98,21 +98,21 @@ func TestRunCreatesWhateverStateRunTomlIsIn(t *testing.T) {
 
 			outcome, err := Run(Params{
 				Context:   ctx,
-				Request:   Request{Branch: "feat/broken", From: "main", EnvFrom: "example"},
+				Request:   Request{Branches: []string{"feat/broken"}, From: "main", EnvFrom: "example"},
 				Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyIsolation: string(domain.IsolationIsolated), KeyRecap: confirmCreate}},
 				Presenter: presenter,
 			})
 			if err != nil {
 				t.Fatalf("create must not fail over the run module: %v", err)
 			}
-			if _, statErr := os.Stat(filepath.Join(outcome.Result.Path, "hook-ran")); statErr != nil {
+			if _, statErr := os.Stat(filepath.Join(outcome.Results[0].Path, "hook-ran")); statErr != nil {
 				t.Errorf("on_create hooks did not run: %v", statErr)
 			}
 			if presenter.created == nil {
 				t.Fatal("the run must conclude like any create")
 			}
 
-			warnings := outcome.Result.Warnings
+			warnings := outcome.Results[0].Warnings
 			if tc.cause == "" {
 				if len(warnings) != 0 {
 					t.Errorf("warnings = %v, want none", warnings)
@@ -135,15 +135,15 @@ func TestRunAllocatesNoOrdinalAtCreate(t *testing.T) {
 	ctx := testContext(t)
 	outcome, err := Run(Params{
 		Context:   ctx,
-		Request:   Request{Branch: "feat/lazy", From: "main", EnvFrom: "example"},
+		Request:   Request{Branches: []string{"feat/lazy"}, From: "main", EnvFrom: "example"},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyRecap: confirmCreate}},
 		Presenter: newRecorder(),
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if outcome.Result.Metadata.Ordinal != 0 {
-		t.Errorf("ordinal = %d, want none allocated before the run module asks", outcome.Result.Metadata.Ordinal)
+	if outcome.Results[0].Metadata.Ordinal != 0 {
+		t.Errorf("ordinal = %d, want none allocated before the run module asks", outcome.Results[0].Metadata.Ordinal)
 	}
 }
 
@@ -173,17 +173,17 @@ func portContext(t *testing.T) flow.Context {
 func TestRunReportsTheIsolationAndThePortPass(t *testing.T) {
 	outcome, err := Run(Params{
 		Context:   portContext(t),
-		Request:   Request{Branch: "feat/ports", From: "main", EnvFrom: "main"},
+		Request:   Request{Branches: []string{"feat/ports"}, From: "main", EnvFrom: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyIsolation: string(domain.IsolationIsolated), KeyRecap: confirmCreate}},
 		Presenter: newRecorder(),
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if outcome.Result.Isolation != domain.IsolationIsolated {
-		t.Errorf("isolation = %q, want isolated", outcome.Result.Isolation)
+	if outcome.Results[0].Isolation != domain.IsolationIsolated {
+		t.Errorf("isolation = %q, want isolated", outcome.Results[0].Isolation)
 	}
-	ports := outcome.Result.EnvPorts
+	ports := outcome.Results[0].EnvPorts
 	if !ports.Applied || len(ports.Entries) != 1 || ports.Entries[0].Status != domain.EnvPortStatusRewrite {
 		t.Errorf("env_ports = %+v, want the one link settled", ports)
 	}
@@ -195,7 +195,7 @@ func TestRunWarnsAnIsolationTheExistingWorktreeIgnores(t *testing.T) {
 	ctx := portContext(t)
 	if _, err := Run(Params{
 		Context:   ctx,
-		Request:   Request{Branch: "feat/there", From: "main", EnvFrom: "main"},
+		Request:   Request{Branches: []string{"feat/there"}, From: "main", EnvFrom: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyIsolation: string(domain.IsolationIsolated), KeyRecap: confirmCreate}},
 		Presenter: newRecorder(),
 	}); err != nil {
@@ -205,18 +205,18 @@ func TestRunWarnsAnIsolationTheExistingWorktreeIgnores(t *testing.T) {
 	presenter := newRecorder()
 	outcome, err := Run(Params{
 		Context:   ctx,
-		Request:   Request{Branch: "feat/there", From: "main", IfNotExists: true, Isolation: domain.IsolationVerbatim},
+		Request:   Request{Branches: []string{"feat/there"}, From: "main", IfNotExists: true, Isolation: domain.IsolationVerbatim},
 		Prompter:  flow.Unattended{},
 		Presenter: presenter,
 	})
 	if err != nil {
 		t.Fatalf("second create: %v", err)
 	}
-	if !outcome.Result.AlreadyExists || outcome.Result.Isolation != domain.IsolationIsolated {
-		t.Fatalf("result = %+v, want the existing isolated worktree", outcome.Result)
+	if !outcome.Results[0].AlreadyExists || outcome.Results[0].Isolation != domain.IsolationIsolated {
+		t.Fatalf("result = %+v, want the existing isolated worktree", outcome.Results[0])
 	}
-	if len(outcome.Result.Warnings) != 1 || !strings.Contains(outcome.Result.Warnings[0], "--isolation verbatim ignored") {
-		t.Errorf("warnings = %v, want the ignored flag named", outcome.Result.Warnings)
+	if len(outcome.Results[0].Warnings) != 1 || !strings.Contains(outcome.Results[0].Warnings[0], "--isolation verbatim ignored") {
+		t.Errorf("warnings = %v, want the ignored flag named", outcome.Results[0].Warnings)
 	}
 	if !recordedWarning(presenter.Statuses, "ignored") {
 		t.Errorf("statuses = %+v, want the warning shown", presenter.Statuses)
