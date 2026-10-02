@@ -143,6 +143,10 @@ var (
 	// message points at the dedicated setup command.
 	ErrRunNotInitialized = errors.New("no run.toml — run `wtm run init`")
 
+	// ErrJSONNeedsYes refuses --output json on a command that could ask
+	// something: JSON mode is non-interactive, so the decisions need --yes.
+	ErrJSONNeedsYes = errors.New("--output json requires --yes (prompts cannot run in JSON mode)")
+
 	// ErrExtractConflict is returned when the selected changes do not apply
 	// cleanly onto the target worktree. The extraction is aborted and the source
 	// worktree is left untouched.

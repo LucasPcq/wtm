@@ -75,7 +75,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("%w: --%s cannot be negative", domain.ErrUsage, domain.FlagJobs)
 	}
 	if format == domain.OutputJSON && !yes {
-		return fmt.Errorf("--output json requires --%s (prompts cannot run in JSON mode)", domain.FlagYes)
+		return domain.ErrJSONNeedsYes
 	}
 	if err := checkExecLine(split.Command); err != nil {
 		return err

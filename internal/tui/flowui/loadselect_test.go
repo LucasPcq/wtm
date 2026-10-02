@@ -160,3 +160,54 @@ func TestALoadedSelectKeepsTheTerminalSize(t *testing.T) {
 		t.Errorf("the description scrolled off:\n%s", view)
 	}
 }
+
+func loadedMultiSelect(content flow.StepContent) flow.Step {
+	return flow.Step{
+		Kind: flow.StepMultiSelect, Key: "files", Label: "Files",
+		Title: "Select files", LoadingMessage: "Loading changes…",
+		ValidateSet: func(values []string) error {
+			if len(values) == 0 {
+				return fmt.Errorf("select at least one")
+			}
+			return nil
+		},
+		Load: func(flow.Answers) (flow.StepContent, error) { return content, nil },
+	}
+}
+
+func TestALoadedMultiSelectFillsItsOptions(t *testing.T) {
+	step := loadedMultiSelect(flow.StepContent{Options: []flow.Option{
+		{Label: "a.txt", Value: "a.txt", Tag: "mod"},
+		{Label: "b.txt", Value: "b.txt", Tag: "new"},
+	}})
+	plan, err := build(flow.Session{Steps: []flow.Step{step}})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	wizard := runFirstLoad(t, plan)
+	list, ok := wizard.Steps()[0].Model.(components.MultiSelectModel)
+	if !ok {
+		t.Fatalf("model = %T, want a multi-select", wizard.Steps()[0].Model)
+	}
+	view := list.View()
+	for _, want := range []string{"a.txt", "b.txt", "mod", "new"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("loaded list is missing %q:\n%s", want, view)
+		}
+	}
+}
+
+func TestALoadedMultiSelectCannotBeAnsweredBeforeItLoads(t *testing.T) {
+	plan, err := build(flow.Session{Steps: []flow.Step{loadedMultiSelect(flow.StepContent{})}})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	placeholder, ok := plan.steps[0].Model.(components.MultiSelectModel)
+	if !ok {
+		t.Fatalf("placeholder = %T, want a multi-select", plan.steps[0].Model)
+	}
+	updated, _ := placeholder.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if updated.Done() {
+		t.Error("Enter on the placeholder must not answer the step")
+	}
+}

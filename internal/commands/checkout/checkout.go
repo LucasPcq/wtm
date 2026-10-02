@@ -79,7 +79,7 @@ func runCheckout(cmd *cobra.Command, args []string) error {
 	}
 
 	if format == domain.OutputJSON && !yes {
-		return fmt.Errorf("--output json requires --%s (prompts cannot run in JSON mode)", domain.FlagYes)
+		return domain.ErrJSONNeedsYes
 	}
 
 	number := 0

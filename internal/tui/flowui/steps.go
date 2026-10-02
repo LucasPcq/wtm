@@ -50,6 +50,9 @@ func (p *plan) componentStep(step flow.Step, conditional bool) (components.Step,
 	case flow.StepTextList:
 		return p.contentStep(step, func(content flow.StepContent) any { return TextList(step, content) })
 	case flow.StepMultiSelect:
+		if step.Load != nil {
+			return p.loadedMultiSelectStep(step), nil
+		}
 		return p.contentStep(step, func(content flow.StepContent) any { return multiSelect(step, content) })
 	case flow.StepReorder:
 		return p.contentStep(step, func(content flow.StepContent) any { return reorderList(content) })
@@ -296,9 +299,21 @@ func (p *plan) loadedSelectStep(step flow.Step) components.Step {
 	})
 }
 
+// loadedMultiSelectStep holds an empty set until the options arrive: the step's
+// ValidateSet refuses it, so Enter cannot answer a list nobody has seen yet.
+func (p *plan) loadedMultiSelectStep(step flow.Step) components.Step {
+	return p.loadedStep(loadedStep{
+		step:        step,
+		placeholder: multiSelect(step, flow.MergeContent(step, flow.StepContent{})),
+		model: func(content flow.StepContent) any {
+			return multiSelect(step, flow.MergeContent(step, content))
+		},
+	})
+}
+
 type loadedStep struct {
 	step        flow.Step
-	placeholder components.SelectListModel
+	placeholder any
 	model       func(flow.StepContent) any
 }
 

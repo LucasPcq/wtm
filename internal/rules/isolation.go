@@ -85,17 +85,6 @@ func IsolationSummary(isolation domain.Isolation) string {
 	return domain.IsolationSummaryIsolated
 }
 
-// FirstIsolation is the first answer given, in the order the caller trusts
-// them: a flag before a default.
-func FirstIsolation(values ...domain.Isolation) domain.Isolation {
-	for _, value := range values {
-		if value != "" {
-			return value
-		}
-	}
-	return ""
-}
-
 type IsolationAdoptionPendingParams struct {
 	IsMain   bool
 	Recorded domain.Isolation

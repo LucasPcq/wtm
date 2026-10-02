@@ -32,7 +32,7 @@ func PrintExtractResult(w io.Writer, params ExtractResultParams) {
 		verb = "Copied"
 	}
 
-	Success(w, fmt.Sprintf("%s %s to %s", verb, pluralizeFiles(len(result.Files)), styles.Bold.Render(result.TargetBranch)))
+	Success(w, fmt.Sprintf("%s %s to %s", verb, rules.FileCount(len(result.Files)), styles.Bold.Render(result.TargetBranch)))
 	Blank(w)
 	for _, f := range result.Files {
 		fmt.Fprintf(w, "%s%s  %s  %s\n", Indent, Indent, extractTag(f.Status), f.Path)
@@ -92,11 +92,4 @@ func extractTag(status domain.ExtractFileStatus) string {
 	default:
 		return styles.Warning.Render(label)
 	}
-}
-
-func pluralizeFiles(n int) string {
-	if n == 1 {
-		return "1 file"
-	}
-	return fmt.Sprintf("%d files", n)
 }

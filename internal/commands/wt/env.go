@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -154,4 +155,8 @@ func envOnConflict(cmd *cobra.Command) (domain.EnvConflictDecision, error) {
 		return domain.EnvConflictDecision(v), nil
 	}
 	return "", rules.InvalidFlagValue(rules.InvalidFlagValueParams{Flag: domain.FlagOnConflict, Value: v, Allowed: []string{string(domain.EnvDecisionKeep), string(domain.EnvDecisionOverwrite)}})
+}
+
+func isInteractive() bool {
+	return term.IsTerminal(int(os.Stdin.Fd()))
 }

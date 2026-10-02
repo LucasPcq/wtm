@@ -1,0 +1,325 @@
+// Package extract runs the `wtm extract` flow.
+package extract
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+
+	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/create"
+	"github.com/LucasPcq/wtm/internal/flow/decide"
+	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/service/worktree"
+)
+
+type Request struct {
+	Source string
+	Files  []string
+	To     string
+	From   string
+	// Keep is --keep; KeepSet says the flag was given, so the mode is not asked.
+	Keep        bool
+	KeepSet     bool
+	FastForward bool
+	// OnConflict is --on-conflict, empty when it was not given.
+	OnConflict string
+	Isolation  domain.Isolation
+}
+
+// Outcome is Nothing when there was nothing to extract — no worktree with
+// changes, or a source without any — and Result otherwise.
+type Outcome struct {
+	Result  domain.ExtractResult
+	Nothing error
+	Aborted bool
+}
+
+type Presenter interface {
+	flow.Presenter
+	Extracted(Outcome) error
+}
+
+type Params struct {
+	Context   flow.Context
+	Request   Request
+	Prompter  flow.Prompter
+	Presenter Presenter
+}
+
+func Run(params Params) (Outcome, error) {
+	f := &extractFlow{
+		ctx:       params.Context,
+		request:   params.Request,
+		prompter:  params.Prompter,
+		presenter: params.Presenter,
+		changes:   map[string][]domain.ExtractFile{},
+		paths:     map[string]string{},
+	}
+	return f.run()
+}
+
+type extractFlow struct {
+	ctx       flow.Context
+	request   Request
+	prompter  flow.Prompter
+	presenter Presenter
+	// statuses back the pickers, listed only when one is shown.
+	statuses []domain.WorktreeStatus
+	// changes and paths are per source branch, filled as each is looked at.
+	changes map[string][]domain.ExtractFile
+	paths   map[string]string
+	// creates is the target the flags name when no worktree holds it yet.
+	creates bool
+	create  create.Embedded
+	// update replaces the divergence lookup of the create steps, for a test.
+	update func(flow.Answers) decide.SourceUpdatePrompt
+	target func(string) domain.BranchTarget
+}
+
+func (f *extractFlow) run() (Outcome, error) {
+	if f.request.Source == "" && !f.prompter.Interactive() {
+		return Outcome{}, domain.ErrExtractSourceRequired
+	}
+	if f.request.Source == "" || f.request.To == "" {
+		if err := f.listWorktrees(); err != nil {
+			return Outcome{}, err
+		}
+	}
+
+	if f.request.Source == "" {
+		if len(f.dirty()) == 0 {
+			return f.conclude(Outcome{Nothing: domain.ErrNoDirtyWorktrees})
+		}
+	} else {
+		files, err := f.sourceChanges(f.request.Source)
+		if err != nil {
+			return Outcome{}, err
+		}
+		if len(files) == 0 {
+			return f.conclude(Outcome{Nothing: domain.ErrNoChangesToExtract})
+		}
+	}
+
+	if f.request.To != "" {
+		_, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: f.request.To})
+		f.creates = err != nil
+	}
+	f.create = f.embed()
+
+	answers, err := f.prompter.Ask(f.session())
+	if errors.Is(err, domain.ErrUserAborted) {
+		return f.abort()
+	}
+	if err != nil {
+		return Outcome{}, err
+	}
+	return f.extract(answers)
+}
+
+func (f *extractFlow) listWorktrees() error {
+	return f.presenter.Stage(flow.StageParams{
+		Message: domain.ExtractScanLoading,
+		Work: func() error {
+			statuses, err := worktree.List(domain.ListParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Config: f.ctx.Config})
+			if err != nil {
+				return fmt.Errorf("list worktrees: %w", err)
+			}
+			f.statuses = statuses
+			return nil
+		},
+	})
+}
+
+// dirty are the worktrees with uncommitted changes, the only valid sources.
+func (f *extractFlow) dirty() []domain.WorktreeStatus {
+	dirty := make([]domain.WorktreeStatus, 0, len(f.statuses))
+	for _, status := range f.statuses {
+		if status.IsDirty {
+			dirty = append(dirty, status)
+		}
+	}
+	return dirty
+}
+
+// sourceChanges resolves a source given by name, as --to is: an exact branch.
+func (f *extractFlow) sourceChanges(branch string) ([]domain.ExtractFile, error) {
+	wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branch})
+	if err != nil {
+		return nil, fmt.Errorf(domain.ExtractSourceNotFoundFmt, branch, err)
+	}
+	f.paths[branch] = wt.Path
+	var files []domain.ExtractFile
+	err = f.presenter.Stage(flow.StageParams{
+		Message: domain.ExtractScanLoading,
+		Work: func() error {
+			var listErr error
+			files, listErr = worktree.ListChanges(worktree.ListChangesParams{WorktreePath: wt.Path})
+			return listErr
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	f.changes[branch] = files
+	return files, nil
+}
+
+// pickedChanges lists a source picked in the wizard, once.
+func (f *extractFlow) pickedChanges(branch string) ([]domain.ExtractFile, error) {
+	if files, ok := f.changes[branch]; ok {
+		return files, nil
+	}
+	path := f.statusPath(branch)
+	if path == "" {
+		return nil, nil
+	}
+	files, err := worktree.ListChanges(worktree.ListChangesParams{WorktreePath: path})
+	if err != nil {
+		return nil, err
+	}
+	f.paths[branch] = path
+	f.changes[branch] = files
+	return files, nil
+}
+
+func (f *extractFlow) statusPath(branch string) string {
+	for _, status := range f.statuses {
+		if status.Branch == branch {
+			return status.Path
+		}
+	}
+	return ""
+}
+
+func (f *extractFlow) abort() (Outcome, error) {
+	f.presenter.Notice(flow.AbortedNotice)
+	return Outcome{Aborted: true}, nil
+}
+
+func (f *extractFlow) conclude(outcome Outcome) (Outcome, error) {
+	return outcome, f.presenter.Extracted(outcome)
+}
+
+type target struct {
+	path     string
+	branch   string
+	envPorts domain.EnvPortPlan
+	warnings []string
+}
+
+func (f *extractFlow) extract(answers flow.Answers) (Outcome, error) {
+	source := answers.Value(KeySource)
+	available, err := f.pickedChanges(source)
+	if err != nil {
+		return Outcome{}, err
+	}
+	selected, err := rules.SelectExtractFiles(rules.SelectExtractFilesParams{Available: available, Paths: answers.Values(KeyFiles)})
+	if err != nil {
+		return Outcome{}, err
+	}
+
+	dest, proceed, err := f.resolveTarget(answers)
+	if err != nil {
+		return Outcome{}, err
+	}
+	if !proceed {
+		return Outcome{Aborted: true}, nil
+	}
+
+	mode, proceed := f.conflictMode(conflictModeParams{SourcePath: f.paths[source], Target: dest, Selected: selected})
+	if !proceed {
+		return f.abort()
+	}
+
+	result, err := worktree.Extract(domain.ExtractParams{
+		SourcePath:   f.paths[source],
+		SourceBranch: source,
+		TargetPath:   dest.path,
+		TargetBranch: dest.branch,
+		Files:        selected,
+		Keep:         answers.Value(KeyMode) == modeKeep,
+		ConflictMode: mode,
+	})
+	if err != nil {
+		return Outcome{}, err
+	}
+	result.Warnings = dest.warnings
+	result.EnvPorts = dest.envPorts
+	result.Isolation = worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: dest.branch})
+	return f.conclude(Outcome{Result: result})
+}
+
+// resolveTarget is the one point a worktree comes into existence in this flow,
+// before its hooks run — where worktree.created will be published (LUC-233).
+func (f *extractFlow) resolveTarget(answers flow.Answers) (target, bool, error) {
+	if !f.createsTarget(answers) {
+		return f.existingTarget(answers.Value(KeyTarget))
+	}
+	created, proceed, err := f.create.Provision(create.ProvisionParams{Answers: answers, Prompter: f.prompter, Presenter: f.presenter})
+	if err != nil || !proceed {
+		return target{}, proceed, err
+	}
+	return target{path: created.Path, branch: created.Branch, envPorts: created.EnvPorts, warnings: created.Warnings}, true, nil
+}
+
+// existingTarget is a worktree the extraction did not create, so --isolation had
+// nothing to answer; saying so is all that is left to do with it.
+func (f *extractFlow) existingTarget(branch string) (target, bool, error) {
+	wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branch})
+	if err != nil {
+		return target{}, false, err
+	}
+	dest := target{path: wt.Path, branch: wt.Branch}
+	warning := rules.IsolationIgnoredWarning(rules.IsolationIgnoredParams{
+		Branch:    wt.Branch,
+		Requested: f.request.Isolation,
+		Current:   worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: wt.Branch}),
+	})
+	if warning != "" {
+		f.presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: warning})
+		dest.warnings = []string{warning}
+	}
+	return dest, true, nil
+}
+
+type conflictModeParams struct {
+	SourcePath string
+	Target     target
+	Selected   []domain.ExtractFile
+}
+
+// conflictMode is asked after the recap on purpose: the conflicts depend on the
+// selection and on the disk, a target created a moment ago included. proceed is
+// false when the user declined to write conflict markers.
+func (f *extractFlow) conflictMode(params conflictModeParams) (mode string, proceed bool) {
+	conflicts := worktree.ConflictingFiles(domain.ConflictCheckParams{
+		SourcePath: params.SourcePath,
+		TargetPath: params.Target.path,
+		Files:      params.Selected,
+	})
+	switch {
+	case len(conflicts) == 0:
+		return domain.OnConflictAbort, true
+	case f.request.OnConflict != "":
+		return f.request.OnConflict, true
+	case !f.prompter.Interactive():
+		return domain.OnConflictAbort, true
+	}
+	resolve, err := f.prompter.Confirm(flow.ConfirmParams{
+		Title:       fmt.Sprintf(domain.ExtractConflictTitleFmt, params.Target.branch),
+		Description: fmt.Sprintf(domain.ExtractConflictDescriptionFmt, joinConflicts(conflicts), params.Target.branch, params.Target.branch, params.Target.branch),
+	})
+	if err != nil || !resolve {
+		return "", false
+	}
+	return domain.OnConflictResolve, true
+}
+
+func joinConflicts(files []string) string {
+	if len(files) == 1 {
+		return files[0] + " was"
+	}
+	return strings.Join(files, ", ") + " were"
+}

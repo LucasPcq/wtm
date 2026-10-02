@@ -75,6 +75,11 @@ type createFlow struct {
 	candidates   []domain.BranchCandidate
 	target       func(string) domain.BranchTarget
 	derivedNames bool
+	// parent, update and branchFlag are set only for a host embedding these
+	// steps (Embed): the parent it offers, and its test's divergence.
+	parent     func(flow.Answers) string
+	update     func(flow.Answers) decide.SourceUpdatePrompt
+	branchFlag string
 }
 
 func (f *createFlow) run() (Outcome, error) {

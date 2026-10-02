@@ -35,10 +35,6 @@ const (
 	labelRecap  = "Confirm & create"
 )
 
-// TEMPORARY DUPLICATION: these steps are also declared, in Bubbletea terms, by
-// internal/tui/newwt. `wtm extract` embeds that version as a sub-flow of its own
-// combined wizard, so it cannot go until extract migrates here too (LUC-173, lot 4).
-// Until then both must change together: same steps, same prose, same recap.
 func (f *createFlow) session() flow.Session {
 	return flow.Session{
 		ErrLabel: domain.WizardErrLabel,
@@ -147,7 +143,7 @@ func (f *createFlow) sourceStep() flow.Step {
 		Title:       labelSource,
 		Description: domain.CreateSourceStepDescription,
 		Branches:    f.candidates,
-		Pinned:      f.ctx.Config.Project.Worktrees.BaseBranch,
+		Pinned:      f.pinnedParent(flow.Answers{}),
 		Refresh: func() []domain.BranchCandidate {
 			return branch.Refresh(branch.ListParams{ProjectDir: f.ctx.ProjectDir})
 		},
@@ -162,7 +158,7 @@ func (f *createFlow) sourceStep() flow.Step {
 			case f.reusesBranch(answers):
 				description = domain.RecapParentRecordedForSync
 			}
-			return flow.StepContent{Title: labelSource, Description: description}, nil
+			return flow.StepContent{Title: labelSource, Description: description, Pinned: f.pinnedParent(answers)}, nil
 		},
 		Resolve: f.resolveSource,
 		Flag:    domain.FlagFrom,
@@ -178,7 +174,7 @@ func (f *createFlow) resolveSource(answers flow.Answers) (flow.Answer, error) {
 			return flow.Answer{}, fmt.Errorf(domain.ParentRequiredFmt, name, domain.FlagFrom)
 		}
 	}
-	base := f.ctx.Config.Project.Worktrees.BaseBranch
+	base := f.pinnedParent(answers)
 	if base == "" {
 		return flow.Answer{}, fmt.Errorf(domain.CreateNoSourceFmt, domain.FlagFrom)
 	}
@@ -281,7 +277,19 @@ func (f *createFlow) recapStep() flow.Step {
 
 // sourceUpdate moves the branch itself only when it is the one being created: a
 // list shares its source, and that is what gets fast-forwarded.
+func (f *createFlow) pinnedParent(answers flow.Answers) string {
+	if f.parent != nil {
+		if parent := f.parent(answers); parent != "" {
+			return parent
+		}
+	}
+	return f.ctx.Config.Project.Worktrees.BaseBranch
+}
+
 func (f *createFlow) sourceUpdate(answers flow.Answers) decide.SourceUpdatePrompt {
+	if f.update != nil {
+		return f.update(answers)
+	}
 	single := ""
 	if names := f.branches(answers); len(names) == 1 {
 		single = names[0]

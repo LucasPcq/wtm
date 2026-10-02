@@ -11,6 +11,7 @@ import (
 	createflow "github.com/LucasPcq/wtm/internal/flow/create"
 	envflow "github.com/LucasPcq/wtm/internal/flow/env"
 	execflow "github.com/LucasPcq/wtm/internal/flow/exec"
+	extractflow "github.com/LucasPcq/wtm/internal/flow/extract"
 	ffflow "github.com/LucasPcq/wtm/internal/flow/fastforward"
 	pruneflow "github.com/LucasPcq/wtm/internal/flow/prune"
 	relocateflow "github.com/LucasPcq/wtm/internal/flow/relocate"
@@ -404,6 +405,37 @@ func (p envPresenter) Reconciled(outcome envflow.Outcome) error {
 	}
 	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
 		output.PrintEnvReport(w, outcome.Result)
+	})
+	return nil
+}
+
+type extractPresenter struct {
+	shared.CLIPresenter
+}
+
+func (p extractPresenter) Extracted(outcome extractflow.Outcome) error {
+	if outcome.Nothing != nil {
+		if p.Format == domain.OutputJSON {
+			return output.WriteExtractJSON(p.Cmd.OutOrStdout(), domain.ExtractResult{Files: []domain.ExtractFile{}})
+		}
+		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			output.Message(w, outcome.Nothing.Error())
+		})
+		return nil
+	}
+	result := outcome.Result
+	if p.Format == domain.OutputJSON {
+		return output.WriteExtractJSON(p.Cmd.OutOrStdout(), result)
+	}
+	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		if len(result.Conflicts) > 0 {
+			output.PrintExtractConflicts(w, result)
+			return
+		}
+		output.PrintExtractResult(w, output.ExtractResultParams{
+			Result:  result,
+			EnvNote: rules.EnvPortSettlementNote(result.EnvPorts),
+		})
 	})
 	return nil
 }
