@@ -267,3 +267,19 @@ func TestBranchHeaderMutesOnlyItsGlyph(t *testing.T) {
 		t.Errorf("header %q should lead with the progress glyph", out)
 	}
 }
+
+func TestFormatCleanBatchCountsAndNamesAnomalies(t *testing.T) {
+	var b strings.Builder
+	FormatCleanBatch(&b, domain.CleanBatchResult{
+		Results:          []domain.CleanResult{{Branch: "feat/a"}, {Branch: "feat/c"}, {Branch: "feat/gone", AlreadyAbsent: true}},
+		Failed:           []domain.CleanFailure{{Branch: "feat/b", Error: "locked"}},
+		Skipped:          []domain.PruneSkip{{Branch: "feat/d", Reason: domain.PruneSkipDirty}},
+		OrphanedChildren: []domain.ReparentResult{{Branch: "leaf", OldParent: "feat/a"}},
+	})
+	out := b.String()
+	for _, want := range []string{"2 removed", "1 already absent", "1 skipped", "1 failed", "feat/a, feat/c", "feat/b — locked", "feat/d", "leaf"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("readout missing %q:\n%s", want, out)
+		}
+	}
+}

@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
 
@@ -201,7 +200,7 @@ func TestCleanYesReportsTheReparentDecisionInJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("wt clean: %v", err)
 	}
-	var got output.WriteWorktreeCleanJSONParams
+	var got domain.CleanBatchResult
 	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
 		t.Fatalf("decode clean JSON: %v (payload %q)", err, stdout)
 	}
@@ -219,7 +218,7 @@ func TestCleanYesReportsTheReparentDecisionInJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("wt clean --%s: %v", domain.FlagReparentChildren, err)
 	}
-	got = output.WriteWorktreeCleanJSONParams{}
+	got = domain.CleanBatchResult{}
 	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
 		t.Fatalf("decode clean JSON: %v (payload %q)", err, stdout)
 	}
@@ -240,11 +239,11 @@ func TestCleanAbsentWorktreeIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cleaning an absent worktree must succeed: %v", err)
 	}
-	var got output.WriteWorktreeCleanJSONParams
+	var got domain.CleanBatchResult
 	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
 		t.Fatalf("decode clean JSON: %v (payload %q)", err, stdout)
 	}
-	if !got.AlreadyAbsent {
+	if len(got.Results) != 1 || !got.Results[0].AlreadyAbsent {
 		t.Errorf("already_absent = false, want true (payload %q)", stdout)
 	}
 }
