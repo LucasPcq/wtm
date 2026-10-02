@@ -8,7 +8,7 @@ var analyzers = []*analysis.Analyzer{
 	stylesAnalyzer,
 	typeassertAnalyzer,
 	yesflagAnalyzer,
-	mutationAnalyzer,
+	chokepointAnalyzer,
 	glyphAnalyzer,
 	tuistyleAnalyzer,
 	mutedlineAnalyzer,

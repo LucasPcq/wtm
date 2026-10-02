@@ -49,3 +49,11 @@ func packageLevel(obj types.Object) bool {
 func refers(obj types.Object, ref objectRef) bool {
 	return obj != nil && obj.Pkg() != nil && obj.Pkg().Path() == ref.Path && obj.Name() == ref.Name && packageLevel(obj)
 }
+
+// dir is a package directory under internal/, holding itself and its subpackages.
+type dir string
+
+func (d dir) holds(pkgPath string) bool {
+	rel := internalPath(pkgPath)
+	return rel == string(d) || strings.HasPrefix(rel, string(d)+"/")
+}
