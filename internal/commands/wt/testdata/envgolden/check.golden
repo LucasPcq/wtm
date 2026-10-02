@@ -1,0 +1,21 @@
+args: feat/a --check
+err: 
+--- stdout ---
+
+  Worktree  feat/a
+  Mode      add  ·  read-only check
+
+  .env   strategy: main  ·  source: main
+  + NEW_KEY  would be added from main
+  − ORPHAN   orphan — in no source
+
+  ! Read-only check — run `wtm env` to reconcile.
+
+--- stderr ---
+--- .env ---
+WEB_PORT=3010
+REALM=app-feat-a
+SHARED=from-worktree
+ORPHAN=1
+--- isolation ---
+isolated

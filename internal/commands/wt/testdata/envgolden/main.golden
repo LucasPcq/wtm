@@ -1,0 +1,22 @@
+args: main --yes
+err: 
+--- stdout ---
+
+  Worktree  main
+  Mode      add
+
+  .env   strategy: main  ·  source: main
+  ✓ in sync — nothing to reconcile
+
+  ! Env ports left alone
+  ── .env ─────────────────────────────────────
+  WEB_PORT  PORT  no 3000 to shift in the value
+
+  ✓ Settled 1 linked .env value(s).
+
+--- stderr ---
+--- .env ---
+WEB_PORT=9999
+REALM=app-main
+--- isolation ---
+

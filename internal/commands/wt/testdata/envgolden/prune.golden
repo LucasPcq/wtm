@@ -1,0 +1,21 @@
+args: feat/a --yes --prune
+err: 
+--- stdout ---
+
+  Worktree  feat/a
+  Mode      add
+
+  .env   strategy: main  ·  source: main
+  + NEW_KEY  added from main
+  − ORPHAN   orphan — in no source
+
+  ✓ Reconciled 1 file(s).
+
+--- stderr ---
+--- .env ---
+WEB_PORT=3010
+REALM=app-feat-a
+SHARED=from-worktree
+NEW_KEY=1
+--- isolation ---
+isolated

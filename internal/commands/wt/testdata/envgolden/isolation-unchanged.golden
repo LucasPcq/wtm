@@ -1,0 +1,72 @@
+args: feat/i --yes --isolation isolated --output json
+err: 
+--- stdout ---
+{
+  "branch": "feat/i",
+  "mode": "add",
+  "check": false,
+  "files": [
+    {
+      "target": ".env",
+      "strategy": "main",
+      "source": "main",
+      "diff": {
+        "mode": "add",
+        "entries": [
+          {
+            "key": "WEB_PORT",
+            "status": "resolved",
+            "current_value": "3010"
+          },
+          {
+            "key": "REALM",
+            "status": "resolved",
+            "current_value": "app-feat-i"
+          }
+        ]
+      },
+      "applied": false
+    }
+  ],
+  "ports": {
+    "offset": 10,
+    "entries": [
+      {
+        "file": ".env",
+        "key": "WEB_PORT",
+        "port": "PORT",
+        "base": 3000,
+        "resolved": 3010,
+        "moves": [
+          {
+            "port": "PORT",
+            "job": "web",
+            "base": 3000,
+            "resolved": 3010
+          }
+        ],
+        "addressing": "ports",
+        "status": "unchanged",
+        "current_value": "3010"
+      }
+    ],
+    "addressing": "names",
+    "public_port": 11080,
+    "owned": [
+      {
+        "file": ".env",
+        "key": "REALM",
+        "value": "app-feat-i",
+        "changed": false
+      }
+    ],
+    "applied": true
+  },
+  "isolation": "isolated"
+}
+--- stderr ---
+--- .env ---
+WEB_PORT=3010
+REALM=app-feat-i
+--- isolation ---
+isolated

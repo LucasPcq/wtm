@@ -1,0 +1,32 @@
+args: --check
+err: specify a worktree (no interactive picker under --yes, without a terminal, or in --output json mode)
+--- stdout ---
+Usage:
+  wtm env [worktree] [flags]
+
+Examples:
+  # Pick a worktree and reconcile its .env files
+  wtm env
+
+  # Read-only drift report
+  wtm env feat/login --check
+
+  # Also settle the values that diverge from the source
+  wtm env feat/login --mode refresh --on-conflict overwrite --yes
+
+  # Give a worktree created before 0.28 its own ports and compose project
+  wtm env feat/login --isolation isolated --yes
+
+Flags:
+      --check                Read-only drift report; write nothing
+      --from string          Override the value source strategy (example, main, parent)
+  -h, --help                 help for env
+      --isolation string     Settle the worktree on an isolation, recorded once its .env is in line: isolated (wtm moves its ports, compose project and namespaces, in the .env and at run time) or verbatim (the values wtm owns go back to the source's, and it runs on the ports its .env keeps)
+      --mode string          Reconciliation mode: add (fill gaps) or refresh (also settle value conflicts) (default "add")
+      --on-conflict string   Non-interactive conflict resolution: keep (default) or overwrite
+      --output string        Output format: text or json (default "text")
+      --prune                Remove orphan keys (present in the .env but in no source)
+  -y, --yes                  Skip all prompts; apply safe additions and flag-driven decisions only
+
+--- stderr ---
+Error: specify a worktree (no interactive picker under --yes, without a terminal, or in --output json mode)
