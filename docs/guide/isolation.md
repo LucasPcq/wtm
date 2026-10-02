@@ -26,7 +26,7 @@ The new isolation is recorded only once the `.env` is in line with it: a run tha
 
 A worktree created by an earlier wtm has no `isolation` in its `meta.json`. It keeps running on its source's ports and compose project until you decide:
 
-- `wtm env <branch> --yes` reconciles its keys and **touches nothing run-related**: no port shift, no `COMPOSE_PROJECT_NAME`. The report says the adoption is pending.
+- `wtm env <branch> --yes` reconciles its keys and **touches nothing run-related**: no port shift, no `COMPOSE_PROJECT_NAME`. A warning says the adoption is pending.
 - The interactive `wtm env <branch>` offers to adopt isolation, naming what changes: a new compose project, so the volumes it uses today (`<old project>_*`) are no longer used.
 - `wtm env <branch> --isolation isolated` adopts it explicitly; `--isolation verbatim` records that it stays on its source's values.
 
