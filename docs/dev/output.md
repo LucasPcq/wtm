@@ -139,7 +139,7 @@ These three are checked by `make lint` (`tools/archlint`, rules `glyph`, `tuisty
 
 ### What follows from the three rules
 
-**"Nothing to do" is `=`, everywhere** — and "everywhere" includes the places that are not a conclusion. An **empty inventory** is a non-event: `output.UnchangedLine` is `Unchanged` for a formatter that returns a body, so an empty table takes the same glyph as a command that found nothing to do. So does **backing out**: an abort changed nothing, and it is `=` with one wording (`domain.AbortedMessage`) rather than a bare sentence in four.
+**"Nothing to do" is `=`, everywhere** — and "everywhere" includes the places that are not a conclusion. An **empty inventory** is a non-event: `output.UnchangedLine` is `Unchanged` for a formatter that returns a body, so an empty table takes the same glyph as a command that found nothing to do. So does **backing out**: an abort changed nothing, and it is `=` with one wording (`domain.AbortedMessage`) rather than a bare sentence in four. It still exits `19` (`ExitCodeCancelled`): `CLIPresenter.Notice` marks the command when it draws that line, and the root ends the process on the mark, so a shell chaining `wtm create x && wtm go x` stops there while the dashboard, which never reads an exit code, is left alone.
 
 A **state readout** may not hide a non-event as a field value either. `not running` and `not installed` are the `=` register; a `Section` line is where the detail goes, under a conclusion, never instead of one.
 
@@ -197,7 +197,7 @@ A hook that runs for forty seconds has to be visible while it runs — silence r
 
 It applies to a terminal this process may repaint. A pipe, a CI log or `--output json` gets the raw stream, unconditionally.
 
-Both paths go through one function, `commands/shared.DrawHookPhase`, and it is one function on purpose: the two callers — the migrated commands through `CLIPresenter`, `extract` through `RunCreateHooksPhase` — drifted apart once, and a hook has to read the same whichever command ran it. It owns the log rather than the view, opening `<state-dir>/hooks/<phase>-<branch>.log` and teeing the raw stream into it on **every** path: the run whose output the reader could not watch is exactly the one whose record has to survive. And it always hands the sink a real writer — the command's own — because a sink left nil falls back to `os.Stderr` in the runner, which is how a hook finds its way onto a terminal that asked for `--quiet`.
+Both paths go through one function, `commands/shared.DrawHookPhase`, and it is one function on purpose: two paths to it — the migrated commands through `CLIPresenter`, `extract` and `checkout` through a helper of their own, since gone — drifted apart once, and a hook has to read the same whichever command ran it. It owns the log rather than the view, opening `<state-dir>/hooks/<phase>-<branch>.log` and teeing the raw stream into it on **every** path: the run whose output the reader could not watch is exactly the one whose record has to survive. And it always hands the sink a real writer — the command's own — because a sink left nil falls back to `os.Stderr` in the runner, which is how a hook finds its way onto a terminal that asked for `--quiet`.
 
 A hook's own bytes are never barred, for the same reason progress is not: `barWriter` re-marks the row after every carriage return, so a bar drawn over a redrawing progress line lands on top of its content. The rule reaches the run module too — `output.RunPrinter` bars the lines it composes and writes a job's chunks through untouched.
 

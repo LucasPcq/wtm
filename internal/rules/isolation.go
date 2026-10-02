@@ -85,17 +85,6 @@ func IsolationSummary(isolation domain.Isolation) string {
 	return domain.IsolationSummaryIsolated
 }
 
-// FirstIsolation is the first answer given, in the order the caller trusts
-// them: a flag before a default.
-func FirstIsolation(values ...domain.Isolation) domain.Isolation {
-	for _, value := range values {
-		if value != "" {
-			return value
-		}
-	}
-	return ""
-}
-
 type IsolationAdoptionPendingParams struct {
 	IsMain   bool
 	Recorded domain.Isolation
@@ -160,6 +149,22 @@ func IsolationIgnoredWarning(params IsolationIgnoredParams) string {
 		return ""
 	}
 	return fmt.Sprintf(domain.IsolationIgnoredFmt, domain.FlagIsolation, params.Requested, params.Branch, params.Current, params.Branch, domain.FlagIsolation, params.Requested)
+}
+
+type CreationFlagsIgnoredParams struct {
+	Branch string
+	// Given are the creation flags the run was passed, by name.
+	Given []string
+}
+
+// CreationFlagsIgnoredWarnings names each flag that only shapes a worktree being
+// created, on a run whose target was already there: said, rather than dropped.
+func CreationFlagsIgnoredWarnings(params CreationFlagsIgnoredParams) []string {
+	warnings := make([]string, 0, len(params.Given))
+	for _, flag := range params.Given {
+		warnings = append(warnings, fmt.Sprintf(domain.CreationFlagIgnoredFmt, flag, params.Branch))
+	}
+	return warnings
 }
 
 type IsolationRecapShownParams struct {

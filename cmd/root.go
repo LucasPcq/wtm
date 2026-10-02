@@ -3,6 +3,7 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/commands/resolve"
 	"github.com/LucasPcq/wtm/internal/commands/run"
 	"github.com/LucasPcq/wtm/internal/commands/schema"
+	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/commands/shell"
 	"github.com/LucasPcq/wtm/internal/commands/ui"
 	"github.com/LucasPcq/wtm/internal/commands/upgrade"
@@ -159,6 +161,13 @@ var rootCmd = &cobra.Command{
 		}
 		startUpdateCheck(cmd)
 		silenceHumanOutput(cmd)
+		shared.ClearCancelled(cmd)
+		return nil
+	},
+	PersistentPostRunE: func(cmd *cobra.Command, _ []string) error {
+		if shared.Cancelled(cmd) {
+			return fmt.Errorf("%w: %w", domain.ErrAborted, domain.ErrCancelled)
+		}
 		return nil
 	},
 	SilenceErrors: true,
@@ -205,6 +214,9 @@ var humanOutputSilenced bool
 // printed as it is; the bare sentinel has no text worth reading, so it points at
 // the flag that took the report away rather than pretending to explain.
 func abortLine(err error) string {
+	if errors.Is(err, domain.ErrCancelled) {
+		return domain.AbortedMessage
+	}
 	if errors.Is(err, domain.ErrAborted) && err.Error() == domain.ErrAborted.Error() {
 		return domain.QuietAbortedMessage
 	}

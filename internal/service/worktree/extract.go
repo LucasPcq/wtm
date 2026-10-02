@@ -8,7 +8,31 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/rules"
 )
+
+type ListChangesParams struct {
+	WorktreePath string
+}
+
+// ListChanges returns the uncommitted files of a worktree classified for
+// extraction.
+func ListChanges(params ListChangesParams) ([]domain.ExtractFile, error) {
+	modified, err := infra.ListModifiedFiles(infra.ListModifiedFilesParams{WorktreePath: params.WorktreePath})
+	if err != nil {
+		return nil, fmt.Errorf("list modified files: %w", err)
+	}
+
+	files := make([]domain.ExtractFile, 0, len(modified))
+	for _, m := range modified {
+		files = append(files, domain.ExtractFile{
+			Path:     m.Path,
+			OrigPath: m.OrigPath,
+			Status:   rules.ClassifyExtractStatus(m.Status),
+		})
+	}
+	return files, nil
+}
 
 // Extract moves the selected uncommitted files from the source worktree to the
 // target worktree. It is transactional: the changes are applied to the target

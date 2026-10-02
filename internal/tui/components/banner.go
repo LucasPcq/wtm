@@ -10,6 +10,18 @@ import (
 
 // errorBanner renders an inline error line "  ✗ Message" matching output.Error.
 // The first rune of msg is capitalized so wizard errors read like sentences.
+// wrappedErrorBanner is errorBanner for a step that knows its width, its
+// continuation lines hung under the message rather than under the glyph.
+func wrappedErrorBanner(msg string, width int) string {
+	hang := styles.Indent + "  "
+	lines := strings.Split(styles.Wrap(styles.WrapParams{Value: capitalizeFirst(msg), Width: width - len(hang) - 1}), "\n")
+	for i := 1; i < len(lines); i++ {
+		lines[i] = hang + styles.DangerText.Render(lines[i])
+	}
+	lines[0] = errorBanner(lines[0])
+	return strings.Join(lines, "\n")
+}
+
 func errorBanner(msg string) string {
 	var b strings.Builder
 	b.WriteString(styles.Indent)

@@ -19,6 +19,14 @@
 - **Les wizards affichent le titre de l'étape** dans le fil d'Ariane (« Step 3/4 • Resolve drift — feat/a »), comme le dashboard : le worktree concerné est à l'écran à chaque question.
 - **Une valeur de flag invalide sort en `2`** avec un seul message, `invalid --<flag> value "x": use …`, pour `--isolation` et `--env-from` partout et pour les flags de `wtm env`.
 - **`wtm env` refuse ce qu'il ignorait** : `--prune` ou `--on-conflict` avec `--check`, et `--on-conflict` en `--mode add`, avant de charger quoi que ce soit.
+- **`wtm extract` suit les conventions de `wtm create`** : le récapitulatif s'affiche toujours, même quand tous les flags sont donnés ; une cible `--to` nouvelle passe par les mêmes questions que `create` (parent, isolation, mise à jour depuis origin) au lieu d'une question à part après le wizard ; `--from` et `--ff` ne sont plus ignorés quand la cible est choisie dans le wizard ; une source choisie propose son propre parent plutôt que la branche de base ; une branche déjà tenue par un autre worktree est refusée dès qu'on la tape. Sous `--yes`, le repli `parent` → main est signalé comme pour `create`.
+- **La conclusion de `wtm extract` s'aligne sur celle de `create`** : champs `source` et `path` alignés, chemin relatif à `base_path`, couleur sur le seul glyphe, prochaine étape en `→` après un conflit ; « rien à extraire » s'affiche en `=` et nomme la source.
+- Dans les récapitulatifs de `create`, `checkout` et `extract`, la ligne `Update:` est alignée sur les autres champs.
+- **Une annulation interactive sort en `19`** (Échap, Ctrl-C, « No, cancel », une confirmation refusée), toutes commandes confondues : `wtm create x && wtm go x` s'arrête là au lieu de continuer. Un refus de fast-forward après échec affiche désormais `= Aborted.` comme les autres annulations.
+- **Un nom de branche que git refuserait est refusé d'emblée** (`bad..name`, `a b`, `x.lock`…), en code `2`, dans le wizard comme en argument, au lieu d'échouer une fois le worktree en cours de création.
+- **Les descriptions des étapes et les erreurs du wizard passent à la ligne** à la largeur du terminal au lieu d'être coupées.
+- **`wtm extract` signale `--from` et `--ff` ignorés** quand la cible existe déjà, comme il le faisait pour `--isolation`.
+- **Une branche ne peut plus être son propre parent** : `create <b> --from <b>` et `extract --to <b> --from <b>` sont refusés, et le picker du parent ne propose plus la branche en cours de création. Ctrl-C annule aussi une confirmation isolée (celle des conflits d'`extract`).
 - **Rupture** : `wtm create --output json` et `wtm clean --output json` répondent toujours avec une enveloppe `{"results": [...], "failed": [...]}`. → [Migration vers 0.29](docs/guide/migrating-to-0.29.md)
 
 ## v0.28.0 : Un worktree, une stack isolée

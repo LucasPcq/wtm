@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/output"
@@ -89,6 +90,7 @@ func runReinit(cmd *cobra.Command, dir, stateDir string, sections []string) erro
 			output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
 				output.Unchanged(w, domain.AbortedMessage)
 			})
+			shared.MarkCancelled(cmd)
 			return nil
 		}
 		if err != nil {

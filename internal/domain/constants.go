@@ -893,6 +893,61 @@ const (
 	EnvScanLoading     = "Scanning worktrees for .env drift…"
 	ExtractScanLoading = "Scanning worktrees for changes…"
 
+	// Extract* are the questions `wtm extract` asks, and its recap.
+	ExtractSourceLabel            = "Source worktree"
+	ExtractSourceDescription      = "Which worktree to extract changes from"
+	ExtractFilesLabel             = "Files"
+	ExtractFilesTitle             = "Select files to extract"
+	ExtractFilesNoneFmt           = "No changes to extract in %s — press esc to pick another worktree."
+	ExtractFilesRequired          = "select at least one file"
+	ExtractFilesLoading           = "Loading changes…"
+	ExtractTargetLabel            = "Target worktree"
+	ExtractTargetDescription      = "Where to move the selected files"
+	ExtractTargetCreateOption     = "+ Create a new worktree…"
+	ExtractTargetCreateSummary    = "new worktree"
+	ExtractModeLabel              = "Mode"
+	ExtractModeDescription        = "Move removes the files from the source; copy keeps them."
+	ExtractModeMoveFmt            = "Move — remove the files from %s"
+	ExtractModeCopyFmt            = "Copy — keep the files in %s"
+	ExtractModeMoveSummary        = "move"
+	ExtractModeCopySummary        = "copy"
+	ExtractRecapLabel             = "Confirm"
+	ExtractRecapConfirmOption     = "Yes, extract"
+	ExtractRecapCreateOption      = "Yes, create & extract"
+	ExtractRecapNewTargetFmt      = "new worktree %s from %s"
+	ExtractConflictTitleFmt       = "Apply conflict markers in %s?"
+	ExtractConflictDescriptionFmt = "%s already present in %q.\n\n" +
+		"Applying writes conflict markers there to resolve.\n" +
+		"Nothing is removed from the source.\n" +
+		"Resolve in %q then discard there, or discard in %q to undo."
+	ExtractSourceNotFoundFmt = "source worktree %q: %w"
+	// BranchName* say why git would refuse a branch name, checked before
+	// anything is created.
+	BranchNameInvalidFmt   = "%q is not a valid branch name: %s"
+	BranchNameReserved     = "it is reserved by git"
+	BranchNameLeadingDash  = "it cannot start with -"
+	BranchNameBadSlash     = "a / cannot start or end it, or follow another"
+	BranchNameBadDot       = "it cannot hold .. or end with ."
+	BranchNameAtBrace      = "it cannot hold @{"
+	BranchNameBadChar      = "it cannot hold a space, a control character or any of ~ ^ : ? * [ \\"
+	BranchNameBadComponent = "no part between slashes may start with . or end with .lock"
+	// BranchOwnParentFmt refuses a --from naming the branch being created.
+	BranchOwnParentFmt = "%s cannot be its own parent: pass another branch to --%s"
+
+	// The conclusion of an extraction.
+	ExtractMovedFmt               = "Moved %s to %s"
+	ExtractCopiedFmt              = "Copied %s to %s"
+	ExtractLabelSource            = "source"
+	ExtractSourceCleaned          = "files removed"
+	ExtractSourceKept             = "files kept"
+	ExtractNothingInSourceFmt     = "No uncommitted changes to extract in %s"
+	ExtractNothingAnywhere        = "No worktree has changes to extract"
+	ExtractConflictsFmt           = "Applied to %s with conflicts"
+	ExtractConflictsTitle         = "Conflicts to resolve"
+	ExtractConflictsOthersApplied = "The other files were applied cleanly."
+	ExtractConflictsSourceSafeFmt = "Nothing was removed from %s: discard the applied changes in %s to undo."
+	ExtractConflictsNextFmt       = "resolve the conflicts, then discard the same files in %s"
+
 	// Import* are what `run import` says once run.toml has been replaced. The
 	// .env hint is there because the write reconciles nothing: the values a job
 	// reads still hold whatever the previous config left them at.
@@ -1294,7 +1349,10 @@ const (
 	// path, a script, a URL, a document. --quiet never silences one: a caller
 	// asking for less noise did not ask for less answer.
 	AnnotationMachineOutput = "wtm.machine-output"
-	AnnotationOn            = "true"
+	// AnnotationCancelled is set on the command a user backed out of, for the
+	// root to end the process on ExitCodeCancelled.
+	AnnotationCancelled = "wtm.cancelled"
+	AnnotationOn        = "true"
 	// AnnotationOutputFormats lists, comma-separated, the --output values a
 	// command accepts besides text and json.
 	AnnotationOutputFormats  = "wtm.output-formats"
@@ -3106,7 +3164,7 @@ const (
 	SourceFastForwardLoadingFmt = "Updating %s from origin…"
 	// RecapUpdateFastForward is the recap line naming an accepted fast-forward,
 	// shared by create's and extract's combined recaps (subject).
-	RecapUpdateFastForward = "Update:  fast-forward %s to origin"
+	RecapUpdateFastForward = "Update:    fast-forward %s to origin"
 	// RecapParentRecordedForSync explains, on the source-update step, that a
 	// reused branch's source is recorded for `wtm sync` rather than being a
 	// git start-point.
@@ -3158,6 +3216,8 @@ const (
 	// fields and refusals. Format verbs: %s branch, %s env strategy, %s flag name.
 	CreateLoadingFmt                = "Creating worktree %s…"
 	CreateBranchesLabel             = "Branches"
+	CreateBranchLabel               = "Branch name"
+	CreateBranchStepDescription     = "Name for the new worktree branch"
 	CreateBranchesStepDescription   = "Names of the new worktree branches, one at a time"
 	BranchEntryNew                  = "new"
 	BranchEntryExisting             = "existing"
@@ -3203,7 +3263,10 @@ const (
 	IsolationStepIrrelevant = "run.toml declares nothing a worktree isolates"
 	// IsolationIgnoredFmt is --isolation given to a run whose worktree already
 	// existed, so nothing was created for it to answer.
-	IsolationIgnoredFmt = "--%s %s ignored: %s already exists and stays %s — switch it with `wtm env %s --%s %s`"
+	// CreationFlagIgnoredFmt is a flag only a creation reads, given to a run whose
+	// target already exists (flag, branch).
+	CreationFlagIgnoredFmt = "--%s ignored: %s already exists, so nothing is created"
+	IsolationIgnoredFmt    = "--%s %s ignored: %s already exists and stays %s — switch it with `wtm env %s --%s %s`"
 
 	// IsolationAdopt* is the migration `wtm env` offers a worktree created
 	// before the choice existed. Keeping it as is comes first: adopting moves the
@@ -3281,10 +3344,6 @@ const (
 	ParentRequiredFmt = "%s already exists locally: pass --%s to record its parent branch " +
 		"(it can't be inferred, and `wtm sync` needs it)"
 
-	// EnvParentFallbackPrompt warns, before creating, that the "parent" env
-	// strategy will source .env from main because the source has no local worktree
-	// (source).
-	EnvParentFallbackPrompt = "%s has no local worktree — copy .env from the main checkout instead of the parent?"
 	// EnvParentFallbackWarning explains why the fallback happens.
 	EnvParentFallbackWarning = "The \"parent\" env strategy needs the source branch checked out to copy its .env; " +
 		"without a worktree it comes from main."
@@ -4431,6 +4490,9 @@ const (
 	// ExitCodeEnvDrift is a `wtm env --check` that found drift, so a CI step can
 	// fail on it without parsing the report.
 	ExitCodeEnvDrift = 18
+	// ExitCodeCancelled is a run the user backed out of interactively, so that
+	// `wtm create x && wtm go x` stops there.
+	ExitCodeCancelled = 19
 
 	// FlagValueInvalidFmt is every flag value that does not parse.
 	FlagValueInvalidFmt = "invalid --%s value %q: use %s"

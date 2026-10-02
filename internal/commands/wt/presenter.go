@@ -1,6 +1,7 @@
 package wt
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -11,6 +12,7 @@ import (
 	createflow "github.com/LucasPcq/wtm/internal/flow/create"
 	envflow "github.com/LucasPcq/wtm/internal/flow/env"
 	execflow "github.com/LucasPcq/wtm/internal/flow/exec"
+	extractflow "github.com/LucasPcq/wtm/internal/flow/extract"
 	ffflow "github.com/LucasPcq/wtm/internal/flow/fastforward"
 	pruneflow "github.com/LucasPcq/wtm/internal/flow/prune"
 	relocateflow "github.com/LucasPcq/wtm/internal/flow/relocate"
@@ -404,6 +406,39 @@ func (p envPresenter) Reconciled(outcome envflow.Outcome) error {
 	}
 	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
 		output.PrintEnvReport(w, outcome.Result)
+	})
+	return nil
+}
+
+type extractPresenter struct {
+	shared.CLIPresenter
+	config shared.ConfigResult
+}
+
+func (p extractPresenter) Extracted(outcome extractflow.Outcome) error {
+	result := outcome.Result
+	if p.Format == domain.OutputJSON {
+		if outcome.Nothing != nil {
+			result = domain.ExtractResult{Files: []domain.ExtractFile{}}
+		}
+		return output.WriteExtractJSON(p.Cmd.OutOrStdout(), result)
+	}
+	path := createDisplayPath(displayPathParams{Config: p.config.Config, ProjectDir: p.config.ProjectDir, Path: result.TargetPath})
+	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		switch {
+		case errors.Is(outcome.Nothing, domain.ErrNoDirtyWorktrees):
+			output.Unchanged(w, domain.ExtractNothingAnywhere)
+		case outcome.Nothing != nil:
+			output.Unchanged(w, fmt.Sprintf(domain.ExtractNothingInSourceFmt, result.SourceBranch))
+		case len(result.Conflicts) > 0:
+			output.PrintExtractConflicts(w, output.ExtractConflictsParams{Result: result, Path: path})
+		default:
+			output.PrintExtractResult(w, output.ExtractResultParams{
+				Result:  result,
+				Path:    path,
+				EnvNote: rules.EnvPortSettlementNote(result.EnvPorts),
+			})
+		}
 	})
 	return nil
 }

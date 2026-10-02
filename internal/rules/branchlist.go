@@ -16,6 +16,9 @@ type BranchEntryParams struct {
 }
 
 func BranchEntryProblem(params BranchEntryParams) error {
+	if err := BranchNameProblem(params.Entry); err != nil {
+		return err
+	}
 	if slices.Contains(params.Entries, params.Entry) {
 		return fmt.Errorf(domain.CreateBranchListedTwiceFmt, params.Entry)
 	}

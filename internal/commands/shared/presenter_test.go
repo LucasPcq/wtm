@@ -170,9 +170,8 @@ func TestStatus_ReadsTheSameWhicheverRanBefore(t *testing.T) {
 	}
 }
 
-// extract reaches a hook phase through RunCreateHooksPhase while holding a
-// presenter of its own, which may already have opened the block for the port
-// pass. The phase joins that block instead of drawing a second, unbarred one
+// The port pass may already have opened the run's block when the hook phase
+// starts. The phase joins that block instead of drawing a second, unbarred one
 // beside it.
 func TestDrawHookPhase_JoinsAnAlreadyOpenBlock(t *testing.T) {
 	var stderr bytes.Buffer
@@ -196,5 +195,17 @@ func TestDrawHookPhase_JoinsAnAlreadyOpenBlock(t *testing.T) {
 	}
 	if !strings.Contains(got, domain.HooksTitleOnCreate) {
 		t.Errorf("the phase lost its title: %q", got)
+	}
+}
+
+func TestAnAbortNoticeMarksTheCommandCancelled(t *testing.T) {
+	presenter, _ := testPresenter(t)
+	presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: "a warning"})
+	if Cancelled(presenter.Cmd) {
+		t.Fatal("a warning marked the command cancelled")
+	}
+	presenter.Notice(flow.AbortedNotice)
+	if !Cancelled(presenter.Cmd) {
+		t.Error("an abort did not mark the command cancelled")
 	}
 }

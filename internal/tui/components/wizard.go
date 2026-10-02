@@ -473,7 +473,7 @@ func (m WizardModel) renderDescription() string {
 			Note:  step.CalloutNote,
 		})
 	}
-	return styles.Muted.Render(indentLines(desc))
+	return styles.Muted.Render(indentLines(styles.Wrap(styles.WrapParams{Value: desc, Width: m.width - len(styles.Indent) - 1})))
 }
 
 // chromeHeight is the number of newlines around the current step's list (head +

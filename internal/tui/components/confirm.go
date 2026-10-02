@@ -76,7 +76,7 @@ func (m ConfirmModel) Update(msg tea.Msg) (ConfirmModel, tea.Cmd) {
 	case "enter":
 		m.done = true
 		m.confirmed = m.cursor == 0
-	case "esc":
+	case "esc", "ctrl+c":
 		m.aborted = true
 	}
 

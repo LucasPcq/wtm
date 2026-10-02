@@ -98,3 +98,39 @@ func TestWizardListKeepsMinHeight(t *testing.T) {
 		t.Errorf("list height = %d, want >= %d", sl.height, domain.MinWizardListHeight)
 	}
 }
+
+// A description longer than the pane is wrapped, not cut off at its edge.
+func TestADescriptionWrapsAtThePaneWidth(t *testing.T) {
+	const width = 40
+	long := "Fast-forward this branch to origin before creating the worktree so it starts from the commits the remote already has."
+	wizard := NewWizardWithParams(WizardParams{Steps: []Step{{
+		Name:  "Source update",
+		Model: NewSelectList(NewSelectListParams{Description: long, Items: []SelectItem{{Label: "keep", Value: "keep"}}}),
+	}}})
+	updated, _ := wizard.Update(tea.WindowSizeMsg{Width: width, Height: 30})
+	view := updated.(WizardModel).View()
+	for _, line := range strings.Split(view, "\n") {
+		if strings.Contains(line, "navigate") {
+			continue
+		}
+		if w := PrintableWidth(line); w > width {
+			t.Errorf("line is %d columns wide on a %d-column pane: %q", w, width, line)
+		}
+	}
+	if !strings.Contains(view, "remote") {
+		t.Errorf("the end of the description was lost:\n%s", view)
+	}
+}
+
+func TestAValidationErrorWrapsAtThePaneWidth(t *testing.T) {
+	const width = 40
+	banner := wrappedErrorBanner("worktree already exists: dst is checked out at /a/very/long/path/to/the/trees/dst", width)
+	for _, line := range strings.Split(banner, "\n") {
+		if w := PrintableWidth(line); w > width {
+			t.Errorf("line is %d columns wide: %q", w, line)
+		}
+	}
+	if strings.Count(banner, "\n") == 0 {
+		t.Error("a long error did not wrap")
+	}
+}

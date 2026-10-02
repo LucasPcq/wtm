@@ -107,10 +107,9 @@ The closures went with their command's migration: `checkout`'s `EnvFallback` and
 `Target` are now read by its recap step directly. `prune`'s `ReparentPreview` and `sync`'s
 `PlanPreview` both went with their migration — a flow calls `rules.FinalizePrunePlan`
 and `rules.SprintSyncPlan` directly, and `internal/tui/syncpicker` (the package
-`PlanPreview` was injected into) no longer exists. And `internal/commands/wt/create.go` still holds `sourceUpdatePrompt`,
-`envFallbackPrompt` and `memoizedTarget` as thin adapters over `internal/flow/decide` —
-not for `create`, which no longer uses them, but for `wtm extract`, which embeds
-create's Bubbletea wizard as a sub-flow. They go with its migration (LUC-182).
+`PlanPreview` was injected into) no longer exists. `extract`'s three went with its migration (LUC-241), along with
+`LoadFiles`: its files step loads them itself, and the create sub-flow it embedded
+in Bubbletea terms is now create's own steps, through `create.Embed`.
 
 ## The run module — a flow that asks nothing
 
@@ -201,7 +200,7 @@ They used to be separate: a "keep the ports" answer left the `.env` on its sourc
 | `relocate` | `internal/flow/relocate` | CLI wizard, unattended |
 | `checkout` | `internal/flow/checkout` | CLI wizard, unattended |
 | `env` | `internal/flow/env` | CLI wizard, unattended |
-| `extract` | `internal/commands/wt/extract.go` + its `internal/tui/*` wizard packages | CLI only |
+| `extract` | `internal/flow/extract`, create's steps embedded | CLI wizard, unattended |
 
 Unmigrated commands still follow the old model, and the parts of the `go-cli` skill
 that describe `components.Step` wizards still apply to them. A **new** mutation

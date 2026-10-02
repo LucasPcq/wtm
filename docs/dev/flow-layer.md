@@ -42,8 +42,9 @@ is implemented yet.
 | Unattended surface | `flow.Unattended` (in `internal/flow`) |
 | Dashboard surface | `internal/tui/dashboard` (`prompter.go`, `presenter.go`, `ops.go`) |
 | Test doubles | `internal/testutil/flowtest` |
-| `extract` | **not migrated** — still driven by `internal/commands/wt` plus its wizard package (`internal/tui/extract`). The model was validated on paper against it; that is not the same as delivered. Tracked as LUC-182. |
+| `extract` | migrated — `internal/flow/extract`, the one flow that embeds another's steps: create's, through `create.Embed` (LUC-241). |
 | `wtm env` | migrated — `internal/flow/env` (LUC-239). Its per-key resolver is the one screen no generic kind could draw, so it is a kind of its own, `StepEnvResolve`: `StepContent.EnvFiles` in, `Answer.EnvDecisions` out, rendered by `flowui` over `components.EnvResolve` and refused by the dashboard, which runs no `env`. `--check` returns before asking. A run that asks scans every worktree once, in a `Stage`, for the picker's drift badges; an unattended run scans nothing. `settleIsolation` is the one point the worktree's isolation changes — where `worktree.updated` will be published (LUC-233) — and `Outcome.IsolationChanged` says whether it did |
+| `Load` on a `StepMultiSelect` | since `extract` (LUC-241): a picked source's changes are listed as the files step opens, over an empty set its `ValidateSet` refuses, so Enter cannot answer a list nobody has seen. |
 | `Load` on a `StepSelect`, `Option.Disabled`, `StepContent.Banner`, `StepContent.Pinned` | since `checkout` (LUC-237). A select may load its options; until they arrive `flowui` draws its description over an empty list. A disabled option is drawn but never picked, its badges saying why. `Banner` is what a load has to say about what it could not list (`gh` missing, no pull request). `Pinned` lets a branch step pin what an earlier answer decides — the base of the pull request just picked — with `Step.PinnedSuffix` naming it and `Step.PinAbsent` keeping it when no candidate carries it; `flow.PinnedAmong` is the one rule both surfaces apply. The dashboard renders `Disabled` and `Pinned`, and ignores `Banner` until a dashboard flow loads one. |
 | `StepMultiSelect` | exists since `reparent`, which needed it to keep its no-argument picker. Rendered by both surfaces: `flowui`, and the dashboard's modal since its Actions menu runs the batch reparent. Since `prune`, an `Option` can also arrive pre-checked and tagged (`Selected`, `Tag`, `Tone`). `Tone` is a `domain` enum, not a `flow` one, so `components.TagVariantOf` can hold the one mapping onto the palette without the widget library learning about `flow`. |
 | `StepContent.Start` and `Option.Badges` | exist since the run module's worktree step (LUC-193), which opens its cursor on the worktree you are standing in and marks each row with what it is running. Both surfaces render them; `Badges` are the trailing words of a `StepSelect` row, where `Tag` is the leading one of a `StepMultiSelect` row. |
@@ -415,25 +416,27 @@ never reaches the recap at all — `Planned` is what prints the plan on those tw
 reproducing the pre-migration double output path (recap vs. `FrameStart` on stderr)
 without a branch anywhere reading "am I unattended".
 
-### `wtm extract` — projected, not delivered
+### `wtm extract` — a flow that embeds another
 
-`extract` does not run on `flow/` yet; it still drives `internal/tui/extract` from
-`internal/commands/wt`. The model was validated on paper against it before the layer
-was written, and the diagram below is that validation — what the migration is expected
-to look like, not what runs. It is tracked by **LUC-182**, and it is the migration that
-removes the temporary duplication of create's step declarations (they exist twice
-today: as `flow.Step` for `wtm create`, and as `components.Step` in
-`internal/tui/newwt` for the sub-flow `extract` embeds).
+`extract` creates its target when it does not exist, and asks what `create` asks to do
+it. It does not redeclare those questions: `create.Embed` hands back create's own steps
+for one branch, each gated on the host's answers (`Applies`), and `Provision` runs what
+`create` runs for that branch — the accepted fast-forward, `worktree.Create`, the port
+pass, the hooks. The session stays flat, so one recap covers the worktree created and
+what moves into it.
 
 ```mermaid
 flowchart TD
-  A["extract.Run — projected"] --> B["Ask: source worktree — StepSelect"]
+  A["extract.Run"] --> B["Ask: source worktree — StepSelect"]
   B --> C["Ask: files — StepMultiSelect, Load from the chosen source"]
   C --> D["Ask: target worktree — StepSelect, plus a create-new row"]
-  D --> E["Ask: the create sub-flow steps, gated on create-new"]
+  D --> E["Ask: create's steps, gated on create-new — branch, parent, isolation, source update"]
   E --> F["Ask: move or copy — StepSelect"]
   F --> G["Ask: recap — StepRecap"]
-  G --> H["service: conflicting files for this selection"]
+  G --> P{"create-new?"}
+  P -- yes --> Q["create.Embedded.Provision — fast-forward, worktree.Create, ports, hooks"]
+  P -- no --> H
+  Q --> H["service: conflicting files for this selection"]
   H --> I{"conflicts?"}
   I -- none --> J["on-conflict = abort"]
   I -- "yes, --on-conflict set" --> K["use the flag value"]
@@ -445,8 +448,13 @@ flowchart TD
 ```
 
 The on-conflict decision stays *outside* the session on purpose: the conflict list
-depends on the selection **and** on the state of the disk, so it can only be asked
-after the recap — a post-execution `Confirm`, like create's failed fast-forward.
+depends on the selection **and** on the state of the disk — a target created a moment
+ago included — so it can only be asked after the recap, a post-execution `Confirm` like
+create's failed fast-forward.
+
+A `--to` that names no worktree presets the target to create-new and create's branch
+step to its value, so the flags answer create's questions exactly as `wtm create`'s
+own flags do, and the recap still reads every line back.
 
 ## One flow, three surfaces
 
@@ -675,7 +683,6 @@ directly is how the resolution taxonomy is tested (`internal/flow/unattended_tes
 
 **Characterization tests.** Before `create` and `clean` were migrated, their observable
 CLI behavior was pinned by tests written against the *old* code:
-`internal/tui/newwt/create_flow_test.go`, `internal/commands/wt/create_wizard_test.go`,
 `create_noninteractive_test.go` and `integration_test.go` (the `--yes` / `--force` axes,
 the JSON reparent default, idempotence on an absent worktree). `prune` got the same
 treatment in `internal/commands/wt/prune_test.go`, which needed two new fixtures to
@@ -823,7 +830,6 @@ Deliberately open, tracked, and not to be fixed opportunistically:
 | -- | -- |
 | LUC-179 | `clean --force` alone without a TTY skips the safety check — pre-existing, made visible by this design |
 | LUC-180 | `flow.Context` duplicates `shared.ConfigResult` (the latter imports cobra, so it cannot be reused as is) |
-| LUC-182 | `extract` is not migrated; create's step declaration therefore exists twice |
 | — | `internal/flow/run/job` and `internal/flow/run/profile` are the same four entry points over two unrelated config types, so their `Add`/`Edit`/`Remove`/`List` shells read as clones. Sharing them would mean generics over `JobConfig`/`ProfileConfig` for no reader's benefit |
 | LUC-183 | `flow.Step` carries kind-specific fields (`Branches`, `Pinned`, `Refresh`, `Validate`/`ValidateSet`) on every kind. It also means a `StepBranchSelect` reads its candidates from `Step.Branches`, before any answer exists, so it cannot narrow them from an earlier step — `reparent` narrows from what its request already names instead |
 | LUC-184 | Locked worktrees are only taken into account by `relocate`, so "locked" is not among clean's blockers |

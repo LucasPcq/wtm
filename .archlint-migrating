@@ -5,9 +5,3 @@
 #
 # THIS LIST MAY ONLY SHRINK. A new entry is a decision to take knowingly, and it
 # belongs in a ticket — not a way to get a commit past the linter.
-
-# chokepoint — the worktree-mutating commands still driving their services
-# from commands/. Each needs a Request/Outcome/Presenter in internal/flow/<cmd>
-# before a second surface can run it, or an event can report what it did.
-#   LUC-241  extract
-chokepoint internal/commands/wt/extract\.go 2
