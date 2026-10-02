@@ -81,11 +81,15 @@ type RelocatePreviewParams struct {
 // FormatRelocatePreview is a dry run's body: the plan, or the base_path rewrite
 // alone when no worktree has to move.
 func FormatRelocatePreview(w io.Writer, params RelocatePreviewParams) {
-	if rules.PlanHasWork(params.Plan) {
-		FormatRelocatePlan(w, params.Plan)
+	if !rules.PlanHasWork(params.Plan) {
+		Message(w, fmt.Sprintf(domain.RelocateBasePathOnlyFmt, params.FromBasePath, params.Plan.BasePath))
 		return
 	}
-	Message(w, fmt.Sprintf(domain.RelocateBasePathOnlyFmt, params.FromBasePath, params.Plan.BasePath))
+	if params.FromBasePath != params.Plan.BasePath {
+		Message(w, fmt.Sprintf(domain.RelocateBasePathChangeFmt, params.FromBasePath, params.Plan.BasePath))
+		Blank(w)
+	}
+	FormatRelocatePlan(w, params.Plan)
 }
 
 // newSectionWriter returns a function that renders a section, inserting a blank
@@ -155,9 +159,13 @@ func FormatRelocateResult(w io.Writer, result domain.RelocateResult) {
 		domain.TallyPart{Count: len(skipped), Label: domain.TallySkipped},
 		domain.TallyPart{Count: len(blocked) + len(errored) + len(refused), Label: domain.TallyBlocked},
 	)
-	if hasIssue {
+	switch {
+	case hasIssue:
 		Warning(w, "Relocation finished with issues  "+headline)
-	} else {
+	case len(done) == 0:
+		// Only skips: nothing moved, and each one waits on --force.
+		Warning(w, domain.RelocateNothingAppliedPrefix+headline)
+	default:
 		Success(w, "Relocation complete  "+headline)
 	}
 	Blank(w)

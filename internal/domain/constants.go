@@ -1786,6 +1786,12 @@ const (
 	// RelocateBasePathOnlyFmt previews a relocate that only rewrites base_path
 	// (from, to): no worktree has to move.
 	RelocateBasePathOnlyFmt = "base_path: %s → %s (no worktree to move)"
+	// RelocateBasePathChangeFmt heads a preview whose plan moves worktrees to a
+	// new base_path (from, to).
+	RelocateBasePathChangeFmt = "base_path: %s → %s"
+	// RelocateNothingAppliedPrefix heads a result where every worktree to move
+	// was skipped, followed by the tally.
+	RelocateNothingAppliedPrefix = "Nothing relocated  "
 
 	// Init recap (LUC-125): labels and copy for the framed end-of-init recap
 	// (accent-bar box + pill title) that summarizes the written config and lists

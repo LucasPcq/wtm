@@ -151,7 +151,7 @@ func TestRelocateCharacterizeNothingToDo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("relocate: %v", err)
 	}
-	if want := "\n  All worktrees are already aligned with base_path.\n\n"; stdout != want {
+	if want := "\n  = All worktrees are already aligned with base_path.\n\n"; stdout != want {
 		t.Errorf("stdout = %q, want %q", stdout, want)
 	}
 
@@ -276,7 +276,7 @@ func TestRelocateCharacterizeDirtySkippedUnlessForce(t *testing.T) {
 		t.Fatalf("relocate: %v", err)
 	}
 	want := "\n" +
-		"  ✓ Relocation complete  1 skipped\n" +
+		"  ! Nothing relocated  1 skipped\n" +
 		"\n" +
 		"  ! Skipped: feat/dirty (re-run with --force)\n" +
 		"\n" +
@@ -331,6 +331,8 @@ func TestRelocateCharacterizeDryRunText(t *testing.T) {
 		t.Fatalf("relocate --dry-run: %v", err)
 	}
 	want := "\n" +
+		"  base_path: ../.trees → ../.worktrees\n" +
+		"\n" +
 		"  To apply (2)\n" +
 		"  • feat/a → ../.worktrees/feat-a\n" +
 		"  • feat/manual → ../.worktrees/feat-manual (+ adopt)\n" +
