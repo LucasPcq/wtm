@@ -23,8 +23,8 @@ func NewCmd() *cobra.Command {
 		Short: "Create a worktree from an existing pull request",
 		Long: "Create a worktree from a pull request.\n" +
 			"A local branch of the PR's name is checked out as-is, keeping commits you never\n" +
-			"pushed; interactive runs offer to fast-forward it when it is behind origin (--ff\n" +
-			"does it without asking).\n" +
+			"pushed; it is fast-forwarded when it is behind origin if you accept, or with\n" +
+			"--ff under --yes.\n" +
 			"Without arguments, shows an interactive picker of open PRs.",
 		Example: `  # Pick among the open pull requests
   wtm checkout

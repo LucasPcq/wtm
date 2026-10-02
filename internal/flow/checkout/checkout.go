@@ -68,6 +68,7 @@ type checkoutFlow struct {
 	candidates []domain.BranchCandidate
 	target     func(string) domain.BranchTarget
 	applies    bool
+	fetched    bool
 
 	// prs is written by the picker's load, off the surface's own goroutine.
 	mu  sync.Mutex
@@ -84,6 +85,11 @@ func (f *checkoutFlow) run() (Outcome, error) {
 			return Outcome{}, err
 		}
 		f.setPRs([]domain.PRInfo{pr})
+		// Before the questions: whether the branch is behind origin decides one of
+		// them, and --ff answers it from what origin holds now, not from the last fetch.
+		if err := f.fetchBranch(pr); err != nil {
+			return Outcome{}, err
+		}
 	}
 
 	answers, err := f.prompter.Ask(f.session())
@@ -139,13 +145,24 @@ type checkoutParams struct {
 	Answers flow.Answers
 }
 
+func (f *checkoutFlow) fetchBranch(pr domain.PRInfo) error {
+	if f.fetched {
+		return nil
+	}
+	err := f.presenter.Stage(flow.StageParams{
+		Message: domain.CheckoutFetchingBranch,
+		Work: func() error {
+			return branch.FetchFromOrigin(branch.BranchParams{ProjectDir: f.ctx.ProjectDir, Branch: pr.Branch})
+		},
+	})
+	f.fetched = err == nil
+	return err
+}
+
 func (f *checkoutFlow) checkout(params checkoutParams) (Outcome, error) {
 	pr := params.PR
 	branchParams := branch.BranchParams{ProjectDir: f.ctx.ProjectDir, Branch: pr.Branch}
-	if err := f.presenter.Stage(flow.StageParams{
-		Message: domain.CheckoutFetchingBranch,
-		Work:    func() error { return branch.FetchFromOrigin(branchParams) },
-	}); err != nil {
+	if err := f.fetchBranch(pr); err != nil {
 		return Outcome{}, err
 	}
 

@@ -328,3 +328,44 @@ var errWrite = errors.New("write failed")
 type failingPresenter struct{ *recorder }
 
 func (failingPresenter) CheckedOut(Outcome) error { return errWrite }
+
+// staleBehind leaves feat/thing here level with what this clone last fetched,
+// while origin has moved on: only a fetch can tell the branch is behind.
+func staleBehind(t *testing.T, ctx flow.Context) {
+	t.Helper()
+	git(t, ctx.ProjectDir, "branch", "feat/thing", "origin/feat/thing")
+	seen := revParse(t, ctx.ProjectDir, "origin/feat/thing")
+	git(t, ctx.ProjectDir, "commit", "--allow-empty", "-m", "server-commit")
+	git(t, ctx.ProjectDir, "push", "origin", "main:feat/thing")
+	git(t, ctx.ProjectDir, "update-ref", "refs/remotes/origin/feat/thing", seen)
+}
+
+func TestFFReadsOriginAsItIsNow(t *testing.T) {
+	ctx := testContext(t)
+	staleBehind(t, ctx)
+
+	if _, err := Run(Params{Context: ctx, Request: Request{Number: 42, FastForward: true}, Prompter: flow.Unattended{}, Presenter: newRecorder()}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if local, origin := revParse(t, ctx.ProjectDir, "feat/thing"), revParse(t, ctx.ProjectDir, "origin/feat/thing"); local != origin {
+		t.Errorf("feat/thing = %s, want fast-forwarded to origin's %s", local, origin)
+	}
+}
+
+func TestAStaleRefStillOffersTheFastForward(t *testing.T) {
+	ctx := testContext(t)
+	staleBehind(t, ctx)
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeySourceUpdate: decide.UpdateKeep, KeyRecap: confirmCheckout}}
+
+	if _, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Number: 42, From: "main", EnvFrom: "example"},
+		Prompter:  prompter,
+		Presenter: newRecorder(),
+	}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if _, asked := prompter.Content[KeySourceUpdate]; !asked {
+		t.Error("a branch behind origin must be offered its fast-forward, whatever the last fetch saw")
+	}
+}
