@@ -1,0 +1,8 @@
+-- go.mod --
+module broken
+
+go 1.26.1
+-- broken/broken.go --
+package broken
+
+var count int = "three"

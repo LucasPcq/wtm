@@ -19,8 +19,9 @@ fmt:
 		{ echo "gofmt needed:"; gofmt -l cmd internal tools *.go; exit 1; }
 
 # arch checks the rules of CLAUDE.md section 9 that no general-purpose linter
-# knows about: the layer graph, the styles monopoly, comma-ok assertions, the
-# confirmation axis. See tools/archlint.
+# knows about: layers and service edges, the styles monopoly, comma-ok
+# assertions, the confirmation axis, mutators reached outside flow/. See
+# tools/archlint.
 arch:
 	go run ./tools/archlint
 

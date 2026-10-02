@@ -1,0 +1,51 @@
+-- github.com/LucasPcq/wtm/internal/output/badge/badge.go --
+package badge
+
+import st "github.com/LucasPcq/wtm/internal/styles"
+
+var chip = st.BadgeOK // want `internal/output must not use styles\.BadgeOK`
+
+var title = st.DashboardTitle // want `internal/output must not use styles\.DashboardTitle`
+
+var fine = st.Accent
+-- github.com/LucasPcq/wtm/internal/output/output.go --
+package output
+
+import (
+	"io"
+
+	"github.com/LucasPcq/wtm/internal/styles"
+)
+
+func Message(w io.Writer, line string) { _, _ = io.WriteString(w, line) }
+
+func render(w io.Writer) {
+	Message(w, styles.Muted.Render("nothing to do")) // want `a bare line muted whole is the .=. register without its glyph`
+	Message(w, styles.Muted.Render("label")+" value")
+	Message(w, styles.Accent.Render("x"))
+}
+-- github.com/LucasPcq/wtm/internal/rules/plain/plain.go --
+package plain
+
+var assign = "="
+
+var bang = "!"
+-- github.com/LucasPcq/wtm/internal/styles/styles.go --
+package styles
+
+type Style struct{ faint bool }
+
+func (s Style) Render(text ...string) string { return "" }
+
+var (
+	Muted          = Style{faint: true}
+	Accent         = Style{}
+	BadgeOK        = Style{}
+	DashboardTitle = Style{}
+)
+-- github.com/LucasPcq/wtm/internal/tui/glyphs/glyphs.go --
+package glyphs
+
+var done = "✓" // want `the glyph "✓" is domain\.GlyphSuccess`
+
+var sentence = "a = b"

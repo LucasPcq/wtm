@@ -1,0 +1,71 @@
+-- github.com/LucasPcq/wtm/internal/commands/wt/wt.go --
+package wt
+
+import (
+	envsvc "github.com/LucasPcq/wtm/internal/service/env"
+	"github.com/LucasPcq/wtm/internal/service/worktree"
+)
+
+func run() error {
+	_ = worktree.List()
+	if err := worktree.SetIsolation(); err != nil { // want `worktree\.SetIsolation is called from commands/: a worktree-mutating command goes through internal/flow/<cmd>`
+		return err
+	}
+	return envsvc.ApplyEnvSync() // want `envsvc\.ApplyEnvSync is called from commands/`
+}
+-- github.com/LucasPcq/wtm/internal/flow/create/create.go --
+package create
+
+import "github.com/LucasPcq/wtm/internal/service/worktree"
+
+func Run() error { return worktree.Create() }
+-- github.com/LucasPcq/wtm/internal/flow/run/seam/seam.go --
+package seam
+
+import wt "github.com/LucasPcq/wtm/internal/service/worktree"
+
+func Ordinal() (int, error) { return wt.EnsureOrdinal() }
+-- github.com/LucasPcq/wtm/internal/service/env/env.go --
+package env
+
+func ApplyEnvSync() error { return nil }
+
+func ApplyEnvPorts() error { return nil }
+
+func sync() error { return ApplyEnvPorts() }
+-- github.com/LucasPcq/wtm/internal/service/runjobs/runjobs.go --
+package runjobs
+
+import "github.com/LucasPcq/wtm/internal/service/worktree"
+
+type index struct{}
+
+func (index) Create() error { return nil }
+
+func start() error {
+	if err := (index{}).Create(); err != nil {
+		return err
+	}
+	_, err := worktree.EnsureOrdinal() // want `worktree\.EnsureOrdinal is called from service/`
+	return err
+}
+-- github.com/LucasPcq/wtm/internal/service/worktree/worktree.go --
+package worktree
+
+func Create() error { return nil }
+
+func SetIsolation() error { return nil }
+
+func EnsureOrdinal() (int, error) { return 0, nil }
+
+func List() error { return nil }
+
+func BranchEnv() (int, error) { return EnsureOrdinal() }
+-- github.com/LucasPcq/wtm/internal/tui/dash/dash.go --
+package dash
+
+import w "github.com/LucasPcq/wtm/internal/service/worktree"
+
+var create = w.Create // want `w\.Create is called from tui/`
+
+func run() error { return w.Create() } // want `w\.Create is called from tui/`

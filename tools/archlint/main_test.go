@@ -1,105 +1,69 @@
 package main
 
 import (
-	"go/parser"
 	"go/token"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"golang.org/x/tools/go/packages"
 )
 
-func at(file string) token.Position { return token.Position{Filename: file, Line: 1, Column: 1} }
-
-func TestAMigratingEntryWithoutItsCountIsRefused(t *testing.T) {
-	if _, err := parseMigrating("mutation internal/commands/wt/env\\.go\n"); err == nil {
-		t.Error("an entry with no site count was accepted: the list could grow without anyone noticing")
+func TestAPackageThatDoesNotTypeCheckIsAnError(t *testing.T) {
+	dir := t.TempDir()
+	extract(t, dir, "broken")
+	t.Chdir(dir)
+	if _, err := analyze(analyzeParams{Root: "broken", Systems: []string{"linux"}}); err == nil {
+		t.Error("a package with a type error was analysed: archlint would print `clean` over code it never understood")
 	}
 }
 
-func TestAMigratingEntryFailsTheSiteBeyondItsCount(t *testing.T) {
-	list, err := parseMigrating("# comment\nmutation internal/commands/wt/env\\.go 1\n")
+func TestFindingsFromTwoSystemsAreMergedOnce(t *testing.T) {
+	shared := finding{pos: token.Position{Filename: "internal/a.go", Line: 3, Column: 2}, rule: "typeassert", msg: "m"}
+	linuxOnly := finding{pos: token.Position{Filename: "internal/a_linux.go", Line: 1, Column: 1}, rule: "typeassert", msg: "m"}
+	got := mergeFindings([][]finding{{shared}, {shared, linuxOnly}})
+	if len(got) != 2 {
+		t.Errorf("merged = %v, want the shared finding once and the linux-only one kept", got)
+	}
+}
+
+// A file no target system compiles is a file no rule ever reads: archlint would
+// say `clean` about code it never saw.
+func TestEveryFileOfTheTreeIsCompiledByATargetSystem(t *testing.T) {
+	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := judge(judgeParams{Migrating: list, Findings: []finding{
-		{pos: at("internal/commands/wt/env.go"), rule: "mutation", msg: "a"},
-		{pos: at("internal/commands/wt/env.go"), rule: "mutation", msg: "b"},
-	}})
-	if !got.failed {
-		t.Errorf("two sites under a count of one passed:\n%s", strings.Join(got.lines, "\n"))
+	compiled := map[string]bool{}
+	for _, goos := range targetSystems {
+		config := &packages.Config{Mode: packages.NeedFiles | packages.NeedCompiledGoFiles, Dir: root, Env: append(os.Environ(), "GOOS="+goos, "CGO_ENABLED=0")}
+		pkgs, err := packages.Load(config, "./internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, pkg := range pkgs {
+			for _, file := range pkg.CompiledGoFiles {
+				compiled[file] = true
+			}
+		}
 	}
-}
-
-func TestAMigratingEntryCoveringFewerSitesSaysItCanShrink(t *testing.T) {
-	list, err := parseMigrating("mutation internal/commands/wt/env\\.go 3\nmutation internal/commands/checkout/ 1\n")
+	err = filepath.WalkDir(filepath.Join(root, "internal"), func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() && entry.Name() == "testdata" {
+			return filepath.SkipDir
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		if !compiled[path] {
+			t.Errorf("%s is compiled by none of %v", path, targetSystems)
+		}
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
-	}
-	got := judge(judgeParams{Migrating: list, Findings: []finding{
-		{pos: at("internal/commands/wt/env.go"), rule: "mutation", msg: "a"},
-	}})
-	if got.failed {
-		t.Errorf("a site within its count failed:\n%s", strings.Join(got.lines, "\n"))
-	}
-	notes := strings.Join(got.notes, "\n")
-	if !strings.Contains(notes, "lower it to 1") || !strings.Contains(notes, "remove it") {
-		t.Errorf("notes = %q, want one entry to lower and one to remove", notes)
-	}
-}
-
-func TestALegacyRuneFailsBeyondItsCount(t *testing.T) {
-	findings := []finding{
-		{pos: at("a.go"), rule: "fontcover", msg: "m", legacy: "▸"},
-		{pos: at("b.go"), rule: "fontcover", msg: "m", legacy: "▸"},
-	}
-	got := judge(judgeParams{Findings: collapseLegacy(collapseLegacyParams{Findings: findings, Budgets: map[string]int{"▸": 1}})})
-	if !got.failed {
-		t.Errorf("two sites of a rune allowed once passed:\n%s", strings.Join(got.lines, "\n"))
-	}
-}
-
-func TestALegacyRuneUnderItsCountSaysItCanShrink(t *testing.T) {
-	findings := []finding{{pos: at("a.go"), rule: "fontcover", msg: "m", legacy: "▸"}}
-	got := judge(judgeParams{Findings: collapseLegacy(collapseLegacyParams{Findings: findings, Budgets: map[string]int{"▸": 4, "⚠": 2}})})
-	if got.failed {
-		t.Errorf("a rune within its count failed:\n%s", strings.Join(got.lines, "\n"))
-	}
-	all := strings.Join(append(got.lines, got.notes...), "\n")
-	if !strings.Contains(all, "lower it to 1") || !strings.Contains(all, `"⚠" has no site left`) {
-		t.Errorf("report = %q, want ▸ lowered to 1 and ⚠ named as gone", all)
-	}
-}
-
-func yesFlagFindings(t *testing.T, register string) []finding {
-	t.Helper()
-	src := `package cmd
-
-func newCmd() *cobra.Command {
-	cmd := &cobra.Command{}
-	` + register + `
-	return cmd
-}
-
-func run() { _ = shared.Interactive(nil) }
-`
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, "cmd.go", src, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return checkYesFlag(fset, "cmd.go", file)
-}
-
-// --yes is the one spelling of the confirmation axis: the helper that also
-// registered --non-interactive is gone, and must not satisfy the rule if it
-// ever comes back.
-func TestACommandReadingTheGateRegistersYes(t *testing.T) {
-	if got := yesFlagFindings(t, `shared.AddYesFlag(cmd, "")`); len(got) != 0 {
-		t.Errorf("findings = %v, want none for a command registering --yes", got)
-	}
-	if got := yesFlagFindings(t, `shared.AddNoPromptFlags(cmd, "")`); len(got) != 1 {
-		t.Errorf("findings = %v, want the retired helper refused", got)
-	}
-	if got := yesFlagFindings(t, ``); len(got) != 1 {
-		t.Errorf("findings = %v, want a command with no --yes refused", got)
 	}
 }
