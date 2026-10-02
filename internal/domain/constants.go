@@ -3781,6 +3781,7 @@ const (
 	DashboardStepperTextHint = "enter confirm · esc back"
 	// DashboardStepperMultiHint is the multi-select footer, worded like the CLI
 	// wizard's so the same controls read the same on both surfaces.
+	DashboardStepperListHint  = "tab add · backspace remove last · enter confirm · esc back"
 	DashboardStepperMultiHint = "↑↓ move · space toggle · a all · / filter · enter confirm · esc back"
 	// DashboardStepperReorderHint is the same footer for a step whose options are
 	// already the answer and whose question is the order they end up in.
