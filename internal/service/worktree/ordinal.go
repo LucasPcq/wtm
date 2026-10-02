@@ -19,6 +19,13 @@ type WorktreeRef struct {
 	Branch     string
 }
 
+// OrdinalClaim is a worktree's number, and whether this call is the one that
+// gave it: only an allocation is a change to publish.
+type OrdinalClaim struct {
+	Ordinal   int
+	Allocated bool
+}
+
 // EnsureOrdinal returns the worktree's stable number, allocating and persisting
 // one the first time it is asked for. The main checkout is ordinal 0 and is
 // never written: it has no meta.json, so 0 in a linked worktree's metadata can
@@ -26,20 +33,20 @@ type WorktreeRef struct {
 //
 // Allocation reads the ordinals of the worktrees git still lists, not every
 // meta.json in the state dir — a removed worktree must give its number back.
-func EnsureOrdinal(params WorktreeRef) (int, error) {
+func EnsureOrdinal(params WorktreeRef) (OrdinalClaim, error) {
 	if params.ProjectDir == "" || params.StateDir == "" || params.Branch == "" {
-		return 0, domain.ErrOrdinalRefIncomplete
+		return OrdinalClaim{}, domain.ErrOrdinalRefIncomplete
 	}
 
 	claim, err := readClaim(params)
 	if err != nil {
-		return 0, err
+		return OrdinalClaim{}, err
 	}
 	if claim.settled {
-		return claim.ordinal, nil
+		return OrdinalClaim{Ordinal: claim.ordinal}, nil
 	}
 
-	allocated := 0
+	result := OrdinalClaim{}
 	lockErr := infra.WithFileLock(infra.WithFileLockParams{
 		Path: filepath.Join(params.StateDir, domain.OrdinalLockFileName),
 		Do: func() error {
@@ -51,17 +58,18 @@ func EnsureOrdinal(params WorktreeRef) (int, error) {
 				return err
 			}
 			if fresh.settled {
-				allocated = fresh.ordinal
+				result = OrdinalClaim{Ordinal: fresh.ordinal}
 				return nil
 			}
-			allocated, err = persistOrdinal(params, rules.AllocateOrdinal(rules.TakenOrdinals(fresh.others)))
+			ordinal, err := persistOrdinal(params, rules.AllocateOrdinal(rules.TakenOrdinals(fresh.others)))
+			result = OrdinalClaim{Ordinal: ordinal, Allocated: err == nil}
 			return err
 		},
 	})
 	if lockErr != nil {
-		return 0, lockErr
+		return OrdinalClaim{}, lockErr
 	}
-	return allocated, nil
+	return result, nil
 }
 
 // claim is what one look at the repository says about a worktree's number:

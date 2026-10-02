@@ -10,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/decide"
 	"github.com/LucasPcq/wtm/internal/flow/envports"
+	"github.com/LucasPcq/wtm/internal/flow/ordinal"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/branch"
 	ghservice "github.com/LucasPcq/wtm/internal/service/github"
@@ -267,6 +268,7 @@ func (f *checkoutFlow) runHooks(params hooksParams) error {
 	if len(hooks) == 0 {
 		return nil
 	}
+	ordinal.BeforeHooks(f.ctx, params.Branch)
 	return f.presenter.HookPhase(flow.HookPhaseParams{
 		Title:   domain.HooksTitleOnCreate,
 		LogPath: rules.HooksLogPath(rules.HooksLogPathParams{StateDir: f.ctx.StateDir, Phase: domain.HookOnCreate, Branch: params.Branch}),

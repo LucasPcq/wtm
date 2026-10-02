@@ -32,7 +32,7 @@ func (r ordinalRepo) addWorktree(t *testing.T, branch string) string {
 
 func (r ordinalRepo) ensure(t *testing.T, branch string) int {
 	t.Helper()
-	ordinal, err := EnsureOrdinal(WorktreeRef{
+	claim, err := EnsureOrdinal(WorktreeRef{
 		ProjectDir: r.dir,
 		StateDir:   r.stateDir,
 		Branch:     branch,
@@ -40,7 +40,7 @@ func (r ordinalRepo) ensure(t *testing.T, branch string) int {
 	if err != nil {
 		t.Fatalf("EnsureOrdinal(%s): %v", branch, err)
 	}
-	return ordinal
+	return claim.Ordinal
 }
 
 func (r ordinalRepo) meta(t *testing.T, branch string) domain.WorktreeMetadata {
@@ -265,7 +265,7 @@ func TestEnsureOrdinalNeverCollidesUnderConcurrency(t *testing.T) {
 				t.Errorf("EnsureOrdinal(%s): %v", branch, err)
 				return
 			}
-			got[i] = ordinal
+			got[i] = ordinal.Ordinal
 		}()
 	}
 	wg.Wait()

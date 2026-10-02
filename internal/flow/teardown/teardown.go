@@ -12,6 +12,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/ordinal"
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
@@ -78,6 +79,7 @@ func Hooks(params HooksParams) error {
 	if len(hooks) == 0 || params.Target.Path == "" {
 		return nil
 	}
+	ordinal.BeforeHooks(params.Context, params.Target.Branch)
 	return params.Presenter.HookPhase(flow.HookPhaseParams{
 		Title: params.Title,
 		LogPath: rules.HooksLogPath(rules.HooksLogPathParams{

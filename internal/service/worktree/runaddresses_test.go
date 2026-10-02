@@ -16,6 +16,8 @@ func TestRunAddressesForAnswersPerBranch(t *testing.T) {
 	repo := newOrdinalRepo(t)
 	repo.addWorktree(t, "feat/a")
 	repo.addWorktree(t, "feat/b")
+	repo.ensure(t, "feat/a")
+	repo.ensure(t, "feat/b")
 
 	answer := RunAddressesFor(RunAddressesForParams{
 		ProjectDir: repo.dir,
@@ -39,6 +41,7 @@ func TestRunAddressesForAnswersPerBranch(t *testing.T) {
 func TestRunAddressesForSkipsABranchItCannotRead(t *testing.T) {
 	repo := newOrdinalRepo(t)
 	repo.addWorktree(t, "feat/a")
+	repo.ensure(t, "feat/a")
 
 	answer := RunAddressesFor(RunAddressesForParams{
 		ProjectDir: repo.dir,
@@ -63,5 +66,26 @@ func TestRunAddressesForIsEmptyWithoutJobs(t *testing.T) {
 		ProjectDir: repo.dir, StateDir: repo.stateDir, Branches: []string{"feat/a"},
 	}); len(got.ByBranch) != 0 {
 		t.Errorf("addresses = %v, want none: a project with no run module computes none", got)
+	}
+}
+
+// The dashboard reads addresses on a timer: it must never be what numbers a
+// worktree, or the change would happen outside any flow and go unpublished.
+func TestRunAddressesForLeavesAnUnnumberedWorktreeOutAndUnnumbered(t *testing.T) {
+	repo := newOrdinalRepo(t)
+	repo.addWorktree(t, "feat/a")
+
+	answer := RunAddressesFor(RunAddressesForParams{
+		ProjectDir: repo.dir,
+		StateDir:   repo.stateDir,
+		RunConfig:  runAddressConfig(),
+		Branches:   []string{"feat/a"},
+	})
+
+	if _, present := answer.ByBranch["feat/a"]; present {
+		t.Error("an unnumbered worktree got addresses")
+	}
+	if _, err := Ordinal(WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "feat/a"}); err == nil {
+		t.Error("reading addresses numbered the worktree")
 	}
 }

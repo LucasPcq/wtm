@@ -6,6 +6,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/run/seam"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/runconfig"
 	"github.com/LucasPcq/wtm/internal/service/runjobs"
@@ -88,7 +89,7 @@ func holdingOf(params holdingParams) (domain.NamespaceHolding, bool) {
 	if err != nil {
 		return domain.NamespaceHolding{}, false
 	}
-	env, err := worktree.JobEnv(worktree.JobEnvParams{ProjectDir: params.Context.ProjectDir, StateDir: params.Context.StateDir, Dir: wt.Path})
+	env, err := seam.JobEnv(seam.JobEnvParams{ProjectDir: params.Context.ProjectDir, StateDir: params.Context.StateDir, WorkDir: wt.Path, Publisher: params.Context.Publisher})
 	if err != nil {
 		return domain.NamespaceHolding{}, false
 	}

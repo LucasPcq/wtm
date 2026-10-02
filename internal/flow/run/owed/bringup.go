@@ -43,6 +43,7 @@ func BringUp(params BringUpParams) (release func(), err error) {
 		Jobs:       []domain.JobConfig{job},
 		Declared:   params.Config.Jobs,
 		NoProbe:    true,
+		Publisher:  params.Context.Publisher,
 	})
 	outcomes, err := mainSeam.Starter(seam.StartParams{Jobs: rules.JobsWithEffectivePorts(params.Config, []domain.JobConfig{job})})(context.Background(), nil)
 	if err != nil {

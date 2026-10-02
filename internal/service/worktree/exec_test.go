@@ -56,6 +56,7 @@ func TestExecEnvCarriesTheTargetsRunVariables(t *testing.T) {
 	writeRunConfig(t, repo.stateDir, composeJobConfig)
 	path := repo.addWorktree(t, "feat/x")
 	recordIsolation(t, repo, "feat/x", domain.IsolationIsolated)
+	repo.ensure(t, "feat/x")
 
 	env := ExecEnv(ExecEnvParams{Ref: WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "feat/x"}, WorktreePath: path})
 

@@ -347,7 +347,7 @@ func (q *Question) offsetOf(dir string) (int, bool) {
 	if offset, known := q.offsets[dir]; known {
 		return offset, true
 	}
-	env, err := seam.JobEnv(seam.JobEnvParams{ProjectDir: q.params.Context.ProjectDir, StateDir: q.params.Context.StateDir, WorkDir: dir})
+	env, err := seam.JobEnv(seam.JobEnvParams{ProjectDir: q.params.Context.ProjectDir, StateDir: q.params.Context.StateDir, WorkDir: dir, Publisher: q.params.Context.Publisher})
 	if err != nil {
 		return 0, false
 	}

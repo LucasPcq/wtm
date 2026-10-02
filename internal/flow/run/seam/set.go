@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
@@ -29,6 +30,7 @@ type SetParams struct {
 	PublicPort  int
 	ProbeBudget time.Duration
 	NoProbe     bool
+	Publisher   flow.Publisher
 }
 
 // Set is the seam over several worktrees at once. It holds one Seam each and
@@ -51,6 +53,7 @@ func OpenSet(params SetParams) Set {
 			PublicPort:  params.PublicPort,
 			ProbeBudget: params.ProbeBudget,
 			NoProbe:     params.NoProbe,
+			Publisher:   params.Publisher,
 		}))
 	}
 	return Set{seams: seams}

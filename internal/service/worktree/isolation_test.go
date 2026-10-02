@@ -81,6 +81,7 @@ func TestBranchEnvOfAVerbatimWorktreeRunsOnTheBasePorts(t *testing.T) {
 	t.Setenv(domain.EnvComposeProjectName, "")
 	repo := newOrdinalRepo(t)
 	repo.addWorktree(t, "feat/x")
+	repo.ensure(t, "feat/x")
 	ref := WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "feat/x"}
 
 	isolated, err := BranchEnv(ref)

@@ -3,6 +3,7 @@ package env
 import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/ordinal"
 	"github.com/LucasPcq/wtm/internal/rules"
 	envsvc "github.com/LucasPcq/wtm/internal/service/env"
 	"github.com/LucasPcq/wtm/internal/service/runconfig"
@@ -79,14 +80,23 @@ func (f *envFlow) resolvePorts(params resolvePortsParams) (envsvc.EnvPortsParams
 			PortsNotSettledParams: rules.PortsNotSettledParams{Branch: branch, RunConfig: true},
 		})}
 	}
-	ports, err := worktree.ResolveEnvPorts(worktree.ResolveEnvPortsParams{
-		ProjectDir:   f.ctx.ProjectDir,
-		StateDir:     f.ctx.StateDir,
-		Branch:       branch,
-		WorktreePath: params.Target.path,
-		EnvFiles:     f.ctx.Config.Project.Env.Files,
-		Global:       f.ctx.Config.Global,
-		Isolation:    params.Isolation,
+	var ports envsvc.EnvPortsParams
+	err := ordinal.Retry(ordinal.RetryParams{
+		Context: f.ctx,
+		Branch:  branch,
+		Do: func() error {
+			resolved, resolveErr := worktree.ResolveEnvPorts(worktree.ResolveEnvPortsParams{
+				ProjectDir:   f.ctx.ProjectDir,
+				StateDir:     f.ctx.StateDir,
+				Branch:       branch,
+				WorktreePath: params.Target.path,
+				EnvFiles:     f.ctx.Config.Project.Env.Files,
+				Global:       f.ctx.Config.Global,
+				Isolation:    params.Isolation,
+			})
+			ports = resolved
+			return resolveErr
+		},
 	})
 	if err != nil {
 		return envsvc.EnvPortsParams{}, []string{rules.PortsNotSettledWarning(rules.PortsNotSettledWarningParams{
