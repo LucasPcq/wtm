@@ -12,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/service/events"
 	ghservice "github.com/LucasPcq/wtm/internal/service/github"
 	"github.com/LucasPcq/wtm/internal/service/integration"
 	"github.com/LucasPcq/wtm/internal/service/runjobs"
@@ -87,12 +88,14 @@ type buildParams struct {
 
 func buildRunParams(params buildParams) dashboard.RunParams {
 	result := params.Result
+	publisher := events.NewPublisher(events.PublisherParams{ProjectDir: result.ProjectDir})
 
 	return dashboard.RunParams{
 		ProjectDir: result.ProjectDir,
 		StateDir:   result.StateDir,
 		Cwd:        infra.ResolvePath(params.Dir),
 		Config:     result.Config,
+		Publisher:  publisher,
 		Version:    params.Version,
 		// Read from the cached state only: the dashboard must not pay a network
 		// round-trip to draw its header.
@@ -105,10 +108,12 @@ func buildRunParams(params buildParams) dashboard.RunParams {
 		LogsLoader: dashboard.DefaultLogsLoader(dashboard.LogsLoaderParams{
 			ProjectDir: result.ProjectDir,
 			StateDir:   result.StateDir,
+			Publisher:  publisher,
 		}),
 		BoardLoader: dashboard.DefaultBoardLoader(dashboard.LogsLoaderParams{
 			ProjectDir: result.ProjectDir,
 			StateDir:   result.StateDir,
+			Publisher:  publisher,
 			PublicPort: func() int {
 				return runjobs.PublicPort(runjobs.PublicPortParams{StateDir: result.StateDir, Global: result.Config.Global})
 			},

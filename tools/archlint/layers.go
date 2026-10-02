@@ -75,6 +75,7 @@ var layers = map[string]layer{
 // table rather than an import nobody saw.
 var serviceEdges = map[string][]string{
 	"detect":    {"branch"},
+	"events":    {"process", "worktree"},
 	"process":   {"proxy"},
 	"runconfig": {"shellcmd"},
 	"runjobs":   {"process", "runconfig", "worktree"},

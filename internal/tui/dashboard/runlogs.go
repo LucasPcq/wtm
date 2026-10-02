@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/flow"
 	logsflow "github.com/LucasPcq/wtm/internal/flow/run/logs"
 	"github.com/LucasPcq/wtm/internal/flow/run/seam"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
@@ -40,6 +41,7 @@ type LogsLoaderParams struct {
 	// have been started after the dashboard was opened, and a port read once at
 	// startup would leave every preview address unpublished for the session.
 	PublicPort func() int
+	Publisher  flow.Publisher
 }
 
 // DefaultBoardLoader opens the worktree's board, which is what a live preview
@@ -54,6 +56,7 @@ func DefaultBoardLoader(params LogsLoaderParams) func(logsRequest) runlogs.Board
 			Jobs:       req.Jobs,
 			PublicPort: publicPortOf(params),
 			NoProbe:    true,
+			Publisher:  params.Publisher,
 		}).Board()
 	}
 }
@@ -77,6 +80,7 @@ func DefaultLogsLoader(params LogsLoaderParams) func(logsRequest) ([]string, err
 			WorkDir:    req.WorkDir,
 			Jobs:       req.Jobs,
 			NoProbe:    true,
+			Publisher:  params.Publisher,
 		}).Board()
 		// No Refresh: History tails the job's log file, and asking the daemon
 		// first made a dead daemon look like an unreadable log — in the very

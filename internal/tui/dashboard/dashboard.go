@@ -16,6 +16,7 @@ import (
 	zone "github.com/lrstanley/bubblezone"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/runconfig"
@@ -34,9 +35,11 @@ type RunParams struct {
 	// Cwd is the directory the shell was in when it launched `wtm ui` — not
 	// necessarily ProjectDir, which LoadConfig may have resolved upward. It is
 	// what the active-worktree match is run against.
-	Cwd      string
-	Config   domain.Config
-	PRLoader worktreepicker.PRLoaderFunc
+	Cwd    string
+	Config domain.Config
+	// Publisher reports what the dashboard's own runs change, like any command.
+	Publisher flow.Publisher
+	PRLoader  worktreepicker.PRLoaderFunc
 	// PROpener launches the given PR number in the browser (ghservice.OpenPR,
 	// wired with ProjectDir). Injected the same way PRLoader is, so a test can
 	// exercise the REVIEW section's click without shelling out to a real gh.
@@ -50,9 +53,9 @@ type RunParams struct {
 	// PROpener so a click on a RUN row is asserted without launching a browser.
 	URLOpener func(url string) error
 	// AddressLoader is where the named worktrees' jobs answer. It is only ever
-	// given worktrees that already have a job up: BranchEnv allocates an ordinal
-	// the first time it is asked for one. It takes the run.toml the poll already
-	// read, so the file is not read twice a poll.
+	// given worktrees that already have a job up, and a worktree with no ordinal
+	// yet answers nothing. It takes the run.toml the poll already read, so the
+	// file is not read twice a poll.
 	AddressLoader func(request AddressRequest) domain.RunAddresses
 	// LogsLoader reads back a job's persisted output for the detail panel's
 	// logs view. Injected like JobsLoader, so a test never opens a real board.

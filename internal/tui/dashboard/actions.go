@@ -23,6 +23,7 @@ func (m Model) flowContext() flow.Context {
 		ProjectDir: m.params.ProjectDir,
 		StateDir:   m.params.StateDir,
 		Config:     m.params.Config,
+		Publisher:  m.params.Publisher,
 	}
 }
 
