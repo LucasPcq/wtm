@@ -76,7 +76,7 @@ To run your dev stack per worktree, `wtm run init` detects your `docker-compose`
 
 ### Worktrees, provisioned
 
-`wtm create` makes the worktree, copies the `.env` files from their template, the main checkout or the parent, and runs your `on_create` hooks (`pnpm install`, …). `wtm clean` and `wtm prune` remove them, one at a time or every branch whose PR is merged, and refuse a worktree with uncommitted or unpushed work unless you say `--force`.
+`wtm create` makes the worktree, copies the `.env` files from their template, the main checkout or the parent, and runs your `on_create` hooks (`pnpm install`, …). `wtm clean` and `wtm prune` remove them, one or several at a time or every branch whose PR is merged, and refuse a worktree with uncommitted or unpushed work unless you say `--force`.
 
 ### An isolated stack per worktree
 
@@ -121,7 +121,7 @@ Every command documents itself: `wtm <command> --help`, or the generated [refere
 | [`create`](docs/wtm_create.md) | Create a new worktree (runs env provisioning + `on_create` hooks) |
 | [`list`](docs/wtm_list.md) | List all worktrees |
 | [`tree`](docs/wtm_tree.md) | Show the worktree forest (parent → child) |
-| [`clean`](docs/wtm_clean.md) | Remove a worktree and its local branch |
+| [`clean`](docs/wtm_clean.md) | Remove worktrees and their local branches |
 | [`prune`](docs/wtm_prune.md) | Remove finished worktrees (merged / closed PR / gone) in one pass (merged/closed need `gh`) |
 | [`extract`](docs/wtm_extract.md) | Move uncommitted changes to another worktree (split an oversized PR) |
 | [`env`](docs/wtm_env.md) | Detect and fix a worktree's `.env` drift against its template + value source |

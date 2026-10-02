@@ -53,13 +53,13 @@ Only a branch **another worktree already holds** is refused (exit `10`).
 
 ## `clean` and `prune`
 
-`wtm clean <branch> --yes --output json` removes one worktree and its local branch (it no-ops on an absent one). `wtm prune [filters] --yes --output json` batch-removes finished worktrees.
+`wtm clean <branch>... --yes --output json` removes one or more worktrees and their local branches (an absent one is reported `already_absent`, not failed). A failure on one does not stop the others. `wtm prune [filters] --yes --output json` batch-removes finished worktrees.
 
 **Which worktrees `prune` finds finished.** It reads **GitHub PR state via the `gh` CLI**, not local commits: `--merged` (PR merged), `--closed` (PR closed without merging), `--gone` (remote branch deleted); no filter means all three. `--merged` and `--closed` need `gh` installed and authenticated: without it they match nothing and prune prints a notice on stderr. Only `--gone` works offline. JSON `reason` values are `pr_merged` / `pr_closed` / `gone` (there is no plain `merged`).
 
-**Unsafe worktrees are refused** (dirty, unpushed commits, or an open PR) unless `--force`. Under `--yes`/JSON they are reported under `skipped` (reason `dirty`/`unpushed`/`open_pr`) instead of being removed, so committed work is never silently lost. For `prune`, when **every** match is unsafe, nothing survives the selection and the JSON is empty (`pruned: []` and `skipped: []`): read an empty result as "nothing was removed", not "nothing matched".
+**Unsafe worktrees are refused** (dirty, unpushed commits, or an open PR) unless `--force`. For `clean` under `--yes`, one unsafe worktree refuses the **whole** run before anything is removed: pass `--force`, or name only the safe ones. For `prune` they are reported under `skipped` (reason `dirty`/`unpushed`/`open_pr`) instead of being removed, so committed work is never silently lost. For `prune`, when **every** match is unsafe, nothing survives the selection and the JSON is empty (`pruned: []` and `skipped: []`): read an empty result as "nothing was removed", not "nothing matched".
 
-**Children.** Under `--yes`/JSON, surviving children are left orphaned unless you pass `--reparent-children` (they reparent onto the grandparent).
+**Children.** Under `--yes`/JSON, surviving children are left orphaned unless you pass `--reparent-children` (they reparent onto their nearest ancestor that is not removed, the base when none is left).
 
 **Each removal runs in a fixed order**: the worktree's jobs are stopped and checked gone, its `on_clean` hooks run (e.g. `docker compose down`), git removes the worktree, and **only then** is its data dropped and its hold on the shared services released. Any failure before the removal leaves the data intact.
 
