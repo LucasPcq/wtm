@@ -22,8 +22,10 @@ import (
 
 // targetSystems are loaded in turn because go/packages keeps only the files a
 // build would compile: peerpid_linux.go and the proxy's *_other.go would drop
-// out on a Mac, which the parse-everything walk this replaced never let happen.
-var targetSystems = []string{"darwin", "linux"}
+// out on a Mac, and peerpid_other.go (!darwin && !linux) on both, which the
+// parse-everything walk this replaced never let happen. A test checks that
+// together they compile every file of the tree.
+var targetSystems = []string{"darwin", "linux", "freebsd"}
 
 const loadMode = packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
 	packages.NeedImports | packages.NeedTypes | packages.NeedTypesSizes |
