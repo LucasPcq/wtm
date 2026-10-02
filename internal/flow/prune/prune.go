@@ -188,11 +188,12 @@ func (f *pruneFlow) remove(params removeParams) (Outcome, error) {
 		Targets:   f.targets(),
 		Force:     params.Force,
 		// Safety was decided during classification.
-		ForceRemoval:  true,
-		BaseBranch:    f.request.BaseBranch,
-		StartDown:     params.StartDown,
-		KeepData:      f.request.KeepData,
-		StopOnFailure: true,
+		ForceRemoval:   true,
+		BaseBranch:     f.request.BaseBranch,
+		StartDown:      params.StartDown,
+		KeepData:       f.request.KeepData,
+		StopOnFailure:  true,
+		NameHookPhases: true,
 	})
 
 	result := domain.PruneResult{

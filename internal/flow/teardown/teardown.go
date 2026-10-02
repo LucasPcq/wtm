@@ -191,6 +191,10 @@ type BatchParams struct {
 	KeepData     bool
 	// StopOnFailure leaves every target after a failed one untouched, data included.
 	StopOnFailure bool
+	// NameHookPhases titles every hook phase after its worktree. A batch always
+	// does; prune does for a single one too, since its candidates were never named
+	// on the command line.
+	NameHookPhases bool
 	// Recover settles a removal git reported as failed; nil settles it as Salvage does.
 	Recover func(SalvageParams) error
 	OnStart func(BatchProgress)
@@ -256,7 +260,7 @@ func removeOne(params removeOneParams) Removal {
 		Context:   batch.Context,
 		Presenter: batch.Presenter,
 		Target:    target,
-		Title:     hooksTitle(hooksTitleParams{Target: target, Total: len(batch.Targets)}),
+		Title:     hooksTitle(hooksTitleParams{Target: target, Named: batch.NameHookPhases || len(batch.Targets) > 1}),
 	}); err != nil {
 		removal.Err = err
 		return removal
@@ -299,11 +303,11 @@ func recoverer(batch BatchParams) func(SalvageParams) error {
 
 type hooksTitleParams struct {
 	Target Target
-	Total  int
+	Named  bool
 }
 
 func hooksTitle(params hooksTitleParams) string {
-	if params.Total > 1 {
+	if params.Named {
 		return fmt.Sprintf(domain.HooksTitleOnCleanFmt, params.Target.Branch)
 	}
 	return domain.HooksTitleOnClean

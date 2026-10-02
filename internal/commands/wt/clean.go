@@ -52,7 +52,7 @@ func newCleanCmd() *cobra.Command {
 
 	cmd.Flags().Bool(domain.FlagForce, false, "Lift safety refusals (dirty/unpushed/open-PR); still asks to confirm unless --yes")
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (keeps safety checks unless --force)")
-	cmd.Flags().Bool(domain.FlagReparentChildren, false, "Reparent orphaned child worktrees onto the grandparent (no prompt)")
+	cmd.Flags().Bool(domain.FlagReparentChildren, false, domain.FlagReparentChildrenDesc)
 	cmd.Flags().Bool(domain.FlagKeepData, false, domain.FlagKeepDataDesc)
 	cmd.Flags().Bool(domain.FlagDropData, false, domain.FlagDropDataDesc)
 	cmd.MarkFlagsMutuallyExclusive(domain.FlagKeepData, domain.FlagDropData)

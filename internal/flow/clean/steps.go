@@ -178,7 +178,10 @@ func soleParent(moves []domain.ReparentResult) (string, bool) {
 func (f *cleanFlow) deleteStep() flow.Step {
 	content := func(answers flow.Answers) (flow.StepContent, error) {
 		selected := answers.Values(KeyWorktree)
-		checks := f.checksOf(selected)
+		checks, err := f.checksOf(selected)
+		if err != nil {
+			return flow.StepContent{}, err
+		}
 		return flow.StepContent{
 			Title: domain.CleanDeleteTitle,
 			Description: deleteRecap(deleteRecapParams{
@@ -225,7 +228,9 @@ func (f *cleanFlow) resolveDelete(answers flow.Answers) (flow.Answer, error) {
 	if err := f.checkAll(selected); err != nil {
 		return flow.Answer{}, err
 	}
-	if refusal, unsafe := rules.CleanUnsafeRefusal(f.checksOf(selected)); unsafe {
+	// Unreadable is left to the removal, which reports it per worktree.
+	checks, _ := f.checksOf(selected)
+	if refusal, unsafe := rules.CleanUnsafeRefusal(checks); unsafe {
 		return flow.Answer{}, errors.New(refusal)
 	}
 	return flow.Answer{Value: deleteYes}, nil

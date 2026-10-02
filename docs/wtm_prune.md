@@ -66,7 +66,7 @@ wtm prune [flags]
       --merged              Restrict to worktrees whose PR was merged on GitHub (needs gh)
       --no-fetch            Skip the git fetch --prune that gone-detection performs; use already-fetched state
       --output string       Output format: text or json (default "text")
-      --reparent-children   Reparent orphaned child worktrees onto the grandparent (no prompt)
+      --reparent-children   Reparent orphaned child worktrees onto their nearest surviving ancestor (no prompt)
   -y, --yes                 Skip all prompts; keep every match without the selection picker (use --force for unsafe worktrees)
 ```
 

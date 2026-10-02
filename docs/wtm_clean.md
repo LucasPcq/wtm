@@ -50,7 +50,7 @@ wtm clean [branch...] [flags]
   -h, --help                help for clean
       --keep-data           Keep the namespaces the removed worktrees carved out of shared services
       --output string       Output format: text or json (default "text")
-      --reparent-children   Reparent orphaned child worktrees onto the grandparent (no prompt)
+      --reparent-children   Reparent orphaned child worktrees onto their nearest surviving ancestor (no prompt)
   -y, --yes                 Skip all prompts; resolve every decision from flags and safe defaults (keeps safety checks unless --force)
 ```
 

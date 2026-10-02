@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
@@ -100,5 +102,13 @@ func TestWtCleanBatchFromInsideOneOfThemCdsOnce(t *testing.T) {
 	}
 	if string(got) != dir {
 		t.Errorf("go-file = %q, want the base repo %q, once", string(got), dir)
+	}
+}
+
+func TestReparentChildrenHelpNamesTheNearestSurvivor(t *testing.T) {
+	for name, cmd := range map[string]*cobra.Command{"clean": newCleanCmd(), "prune": newPruneCmd()} {
+		if usage := cmd.Flags().Lookup(domain.FlagReparentChildren).Usage; !strings.Contains(usage, "nearest surviving ancestor") {
+			t.Errorf("%s --%s help = %q, want it to name the nearest surviving ancestor", name, domain.FlagReparentChildren, usage)
+		}
 	}
 }

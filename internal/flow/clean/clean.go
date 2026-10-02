@@ -202,10 +202,11 @@ func resultOf(removal teardown.Removal) domain.CleanResult {
 
 func failureOf(removal teardown.Removal) domain.CleanFailure {
 	return domain.CleanFailure{
-		Branch:   removal.Target.Branch,
-		Path:     removal.Target.Path,
-		Error:    removal.Err.Error(),
-		ExitCode: rules.ExitCode(removal.Err),
+		Branch:     removal.Target.Branch,
+		Path:       removal.Target.Path,
+		Error:      removal.Err.Error(),
+		ExitCode:   rules.ExitCode(removal.Err),
+		Privileged: errors.Is(removal.Err, domain.ErrWorktreeRemoveFailed),
 	}
 }
 
@@ -240,6 +241,10 @@ func (f *cleanFlow) acceptRequested() (requestedWorktrees, error) {
 	if len(f.request.Branches) == 0 {
 		return requested, nil
 	}
+	names, err := f.wellFormedNames()
+	if err != nil {
+		return requested, err
+	}
 	worktrees, err := worktree.ListAll(worktree.ListAllParams{ProjectDir: f.ctx.ProjectDir})
 	if err != nil {
 		return requested, fmt.Errorf("list worktrees: %w", err)
@@ -249,17 +254,7 @@ func (f *cleanFlow) acceptRequested() (requestedWorktrees, error) {
 		byBranch[wt.Branch] = wt
 	}
 
-	seen := make(map[string]bool, len(f.request.Branches))
-	for _, raw := range f.request.Branches {
-		name := strings.TrimSpace(raw)
-		if name == "" {
-			return requestedWorktrees{}, fmt.Errorf("%w: %s", domain.ErrUsage, domain.CleanBranchBlank)
-		}
-		if seen[name] {
-			return requestedWorktrees{}, fmt.Errorf("%w: "+domain.CleanBranchGivenTwiceFmt, domain.ErrUsage, name)
-		}
-		seen[name] = true
-
+	for _, name := range names {
 		wt, exists := byBranch[name]
 		switch {
 		case !exists:
@@ -271,6 +266,25 @@ func (f *cleanFlow) acceptRequested() (requestedWorktrees, error) {
 		}
 	}
 	return requested, nil
+}
+
+// wellFormedNames refuses the command line as a whole before anything is said
+// about the worktrees it names.
+func (f *cleanFlow) wellFormedNames() ([]string, error) {
+	names := make([]string, 0, len(f.request.Branches))
+	seen := make(map[string]bool, len(f.request.Branches))
+	for _, raw := range f.request.Branches {
+		name := strings.TrimSpace(raw)
+		if name == "" {
+			return nil, fmt.Errorf("%w: %s", domain.ErrUsage, domain.CleanBranchBlank)
+		}
+		if seen[name] {
+			return nil, fmt.Errorf("%w: "+domain.CleanBranchGivenTwiceFmt, domain.ErrUsage, name)
+		}
+		seen[name] = true
+		names = append(names, name)
+	}
+	return names, nil
 }
 
 func (f *cleanFlow) targets(selected []string) []teardown.Target {
@@ -379,17 +393,25 @@ func (f *cleanFlow) checkAll(branches []string) error {
 	})
 }
 
-// checksOf leaves out what could not be checked — absent, parent, unreadable —
-// which the removal then reports on its own.
-func (f *cleanFlow) checksOf(branches []string) []domain.CleanCheckResult {
+// checksOf leaves out a worktree gone or turned parent since git listed it,
+// which the removal reports on its own. Any other failure comes back beside the
+// checks that did read: a recap that folded a worktree out would confirm a
+// removal it never showed, and a refusal must still see the others.
+func (f *cleanFlow) checksOf(branches []string) ([]domain.CleanCheckResult, error) {
 	f.fetchChecks(f.unchecked(branches))
 	checks := make([]domain.CleanCheckResult, 0, len(branches))
+	var unreadable error
 	for _, branch := range branches {
-		if entry := f.checks[branch]; entry.Err == nil {
+		entry := f.checks[branch]
+		switch {
+		case entry.Err == nil:
 			checks = append(checks, entry.Check)
+		case errors.Is(entry.Err, domain.ErrWorktreeNotFound), errors.Is(entry.Err, domain.ErrCannotCleanParent):
+		case unreadable == nil:
+			unreadable = fmt.Errorf(domain.CleanCheckFailedFmt, branch, entry.Err)
 		}
 	}
-	return checks
+	return checks, unreadable
 }
 
 func (f *cleanFlow) unchecked(branches []string) []string {

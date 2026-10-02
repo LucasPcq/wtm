@@ -342,8 +342,9 @@ const (
 	// FlagKeepData withholds the removal a clean would otherwise run. The default
 	// is to detach: clean is the destructive command, and destroying a worktree
 	// without its data would leave an orphan behind on every iteration.
-	FlagKeepData     = "keep-data"
-	FlagKeepDataDesc = "Keep the namespaces the removed worktrees carved out of shared services"
+	FlagKeepData             = "keep-data"
+	FlagReparentChildrenDesc = "Reparent orphaned child worktrees onto their nearest surviving ancestor (no prompt)"
+	FlagKeepDataDesc         = "Keep the namespaces the removed worktrees carved out of shared services"
 	// FlagDropData answers the data step ahead: every namespace is dropped now,
 	// starting the shared services that are down to do it. It is how an
 	// unattended run asks for what --yes will not do by default.
@@ -3255,6 +3256,7 @@ const (
 	CleanWizardErrLabel        = "clean wizard"
 	CleanSelectionRequired     = "select at least one worktree to clean"
 	CleanBranchBlank           = "a worktree branch cannot be blank"
+	CleanCheckFailedFmt        = "check %s: %w"
 	CleanBranchGivenTwiceFmt   = "%s is given twice"
 	CleanBranchProgressFmt     = "%s (%d/%d)"
 	CleanBranchFailedFmt       = "%s — %s"

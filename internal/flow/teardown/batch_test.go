@@ -104,3 +104,23 @@ func TestBatchTitlesEachHookPhaseByWorktreeOnlyWhenSeveral(t *testing.T) {
 		t.Errorf("hook titles = %v, want the plain title for one worktree", single.Hooks)
 	}
 }
+
+func TestBatchNamesEveryHookPhaseWhenAskedTo(t *testing.T) {
+	globaldir.Isolate(t)
+	processtest.Serve(t, nil)
+	ctx := repoContext(t)
+	ctx.Config.Project.Hooks.OnClean = []domain.HookCommand{{Cmd: "true"}}
+	presenter := &flowtest.Recorder{}
+
+	teardown.Batch(teardown.BatchParams{
+		Context:        ctx,
+		Presenter:      presenter,
+		Targets:        []teardown.Target{makeTarget(t, ctx, "feat/only")},
+		ForceRemoval:   true,
+		NameHookPhases: true,
+	})
+
+	if len(presenter.Hooks) != 1 || !strings.Contains(presenter.Hooks[0], "feat/only") {
+		t.Errorf("hook titles = %v, want the phase named after its worktree", presenter.Hooks)
+	}
+}

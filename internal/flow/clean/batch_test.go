@@ -319,3 +319,79 @@ func TestNamingOnlyTheParentStillConcludes(t *testing.T) {
 		t.Errorf("cleaned = %+v, want an empty conclusion", presenter.cleaned)
 	}
 }
+
+// A malformed command line is refused as such, before anything about the
+// worktrees it names is said.
+func TestAMalformedListIsRefusedBeforeAnyWarning(t *testing.T) {
+	presenter := newRecorder()
+
+	_, err := Run(Params{
+		Context:   testContext(t),
+		Request:   Request{Branches: []string{"main", "main"}, BaseBranch: "main"},
+		Prompter:  &flowtest.ScriptedPrompter{},
+		Presenter: presenter,
+	})
+
+	if !errors.Is(err, domain.ErrUsage) {
+		t.Fatalf("err = %v, want ErrUsage", err)
+	}
+	if len(presenter.Notices) != 0 {
+		t.Errorf("notices = %+v, want nothing said before the usage error", presenter.Notices)
+	}
+}
+
+// A worktree that could not be checked is never folded out of the recap: the
+// removal would still reach it.
+func TestAnUnreadableCheckRefusesTheRecap(t *testing.T) {
+	boom := errors.New("cannot read worktree")
+	f := &cleanFlow{
+		request: Request{Branches: []string{"feat/a", "feat/b"}},
+		checks: map[string]domain.CleanCheckEntry{
+			"feat/a": {Check: domain.CleanCheckResult{Branch: "feat/a", WorktreePath: "/w/a"}},
+			"feat/b": {Err: boom},
+		},
+	}
+
+	_, err := f.deleteStep().Build(flow.NewAnswers(nil).WithValues(KeyWorktree, []string{"feat/a", "feat/b"}))
+
+	if !errors.Is(err, boom) {
+		t.Errorf("err = %v, want the check's failure", err)
+	}
+}
+
+// The reparent answer is a policy over every child the run orphans, the one a
+// kept worktree turns into included.
+func TestDeletingTheSafeOnesReparentsTheChildItKeeps(t *testing.T) {
+	ctx := testContext(t)
+	makeWorktree(t, ctx, "top")
+	dirty(t, makeWorktreeFrom(t, ctx, "mid", "top"))
+
+	outcome, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Branches: []string{"top", "mid"}, BaseBranch: "main", ReparentChildren: true},
+		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteSafe}},
+		Presenter: newRecorder(),
+	})
+
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(outcome.Reparented) != 1 || outcome.Reparented[0] != (domain.ReparentResult{Branch: "mid", OldParent: "top", NewParent: "main"}) {
+		t.Errorf("reparented = %+v, want the kept mid moved off the removed top", outcome.Reparented)
+	}
+}
+
+func TestAnUnreadableCheckDoesNotHideAnotherRefusal(t *testing.T) {
+	f := &cleanFlow{
+		checks: map[string]domain.CleanCheckEntry{
+			"feat/a": {Err: errors.New("cannot read worktree")},
+			"feat/b": {Check: domain.CleanCheckResult{Branch: "feat/b", IsDirty: true}},
+		},
+	}
+
+	_, err := f.resolveDelete(flow.NewAnswers(nil).WithValues(KeyWorktree, []string{"feat/a", "feat/b"}))
+
+	if err == nil || !strings.Contains(err.Error(), "feat/b") {
+		t.Errorf("err = %v, want feat/b's refusal to stand", err)
+	}
+}
