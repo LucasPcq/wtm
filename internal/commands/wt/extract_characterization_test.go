@@ -161,12 +161,12 @@ func TestCharacterizeExtractMoveToAnExistingWorktree(t *testing.T) {
 	want := "\n" +
 		"  ✓ Moved 3 files to dst\n" +
 		"\n" +
-		"      mod  a.txt\n" +
-		"      new  b.txt\n" +
-		"      del  gone.txt\n" +
+		"    mod  a.txt\n" +
+		"    new  b.txt\n" +
+		"    del  gone.txt\n" +
 		"\n" +
 		"  source  src · clean\n" +
-		"  worktree  <trees>/dst\n" +
+		"  path    ../.trees/dst\n" +
 		"\n" +
 		"  → wtm go dst\n" +
 		"\n"
@@ -207,10 +207,10 @@ func TestCharacterizeExtractCopyKeepsTheSource(t *testing.T) {
 	want := "\n" +
 		"  ✓ Copied 1 file to dst\n" +
 		"\n" +
-		"      mod  a.txt\n" +
+		"    mod  a.txt\n" +
 		"\n" +
 		"  source  src · kept\n" +
-		"  worktree  <trees>/dst\n" +
+		"  path    ../.trees/dst\n" +
 		"\n" +
 		"  → wtm go dst\n" +
 		"\n"
@@ -335,16 +335,15 @@ func TestCharacterizeExtractResolveWritesMarkers(t *testing.T) {
 	want := "\n" +
 		"  ! Applied to dst with conflicts\n" +
 		"\n" +
-		"  Conflicts to resolve in dst\n" +
+		"  Conflicts to resolve\n" +
 		"    b.txt\n" +
 		"\n" +
 		"  The other files were applied cleanly.\n" +
+		"  Nothing was removed from src: discard the applied changes in dst to undo.\n" +
 		"\n" +
-		"  Nothing was removed from src — your changes are safe there.\n" +
-		"  • Finish the split: resolve the conflicts in dst, then discard the same files in src.\n" +
-		"  • Undo: discard the applied changes in dst — src stays untouched.\n" +
+		"  path  ../.trees/dst\n" +
 		"\n" +
-		"  worktree  <trees>/dst\n" +
+		"  → wtm go dst   resolve the conflicts, then discard the same files in src\n" +
 		"\n"
 	if got := fx.repo.normalize(stdout); got != want {
 		t.Errorf("stdout:\n%q\nwant:\n%q", got, want)
@@ -367,7 +366,7 @@ func TestCharacterizeExtractASourceWithoutChanges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
-	if want := "\n  no uncommitted changes to extract\n\n"; stdout != want {
+	if want := "\n  = No uncommitted changes to extract in src\n\n"; stdout != want {
 		t.Errorf("stdout = %q, want %q", stdout, want)
 	}
 
@@ -394,10 +393,10 @@ func TestCharacterizeExtractCreatesItsTarget(t *testing.T) {
 	want := "\n" +
 		"  ✓ Moved 1 file to feat/new\n" +
 		"\n" +
-		"      new  b.txt\n" +
+		"    new  b.txt\n" +
 		"\n" +
 		"  source  src · clean\n" +
-		"  worktree  <trees>/feat-new\n" +
+		"  path    ../.trees/feat-new\n" +
 		"\n" +
 		"  → wtm go feat/new\n" +
 		"\n"

@@ -98,7 +98,7 @@ func (f *extractFlow) run() (Outcome, error) {
 			return Outcome{}, err
 		}
 		if len(files) == 0 {
-			return f.conclude(Outcome{Nothing: domain.ErrNoChangesToExtract})
+			return f.conclude(Outcome{Nothing: domain.ErrNoChangesToExtract, Result: domain.ExtractResult{SourceBranch: f.request.Source}})
 		}
 	}
 

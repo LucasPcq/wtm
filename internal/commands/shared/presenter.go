@@ -85,10 +85,6 @@ type DrawHookPhaseParams struct {
 // writer the command was given and the log is written: a hook must never find
 // its own way to the terminal, and its record must not depend on who was
 // watching.
-//
-// It is one function because the two callers — the migrated commands through
-// CLIPresenter, extract and checkout through RunCreateHooksPhase — drifted apart
-// once already, and a hook has to read the same whichever command ran it.
 func DrawHookPhase(params DrawHookPhaseParams) error {
 	log := output.HookLog(params.LogPath)
 	if log != nil {
@@ -104,10 +100,7 @@ func DrawHookPhase(params DrawHookPhaseParams) error {
 		return params.Run(flow.HookSink{Output: stream})
 	}
 
-	// The phase joins the run's block rather than opening one beside it, and it
-	// does so here rather than in each caller: extract and checkout reach this
-	// through RunCreateHooksPhase, and they used to draw a phase the migrated
-	// commands' presenter had already put a bar on.
+	// The phase joins the run's block rather than opening one beside it.
 	output.SectionTitle(OpenBlock(params.Stderr, true), params.Title)
 	if !output.IsTerminal(params.Stderr) {
 		return params.Run(flow.HookSink{Output: stream})

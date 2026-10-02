@@ -107,7 +107,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 			Isolation:   isolation,
 		},
 		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive}),
-		Presenter: extractPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
+		Presenter: extractPresenter{CLIPresenter: shared.NewPresenter(cmd, format), config: config},
 	})
 	return err
 }

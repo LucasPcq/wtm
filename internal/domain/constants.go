@@ -922,6 +922,20 @@ const (
 		"Resolve in %q then discard there, or discard in %q to undo."
 	ExtractSourceNotFoundFmt = "source worktree %q: %w"
 
+	// The conclusion of an extraction.
+	ExtractMovedFmt               = "Moved %s to %s"
+	ExtractCopiedFmt              = "Copied %s to %s"
+	ExtractLabelSource            = "source"
+	ExtractSourceCleaned          = "clean"
+	ExtractSourceKept             = "kept"
+	ExtractNothingInSourceFmt     = "No uncommitted changes to extract in %s"
+	ExtractNothingAnywhere        = "No worktree has changes to extract"
+	ExtractConflictsFmt           = "Applied to %s with conflicts"
+	ExtractConflictsTitle         = "Conflicts to resolve"
+	ExtractConflictsOthersApplied = "The other files were applied cleanly."
+	ExtractConflictsSourceSafeFmt = "Nothing was removed from %s: discard the applied changes in %s to undo."
+	ExtractConflictsNextFmt       = "resolve the conflicts, then discard the same files in %s"
+
 	// Import* are what `run import` says once run.toml has been replaced. The
 	// .env hint is there because the write reconciles nothing: the values a job
 	// reads still hold whatever the previous config left them at.
@@ -3135,7 +3149,7 @@ const (
 	SourceFastForwardLoadingFmt = "Updating %s from origin…"
 	// RecapUpdateFastForward is the recap line naming an accepted fast-forward,
 	// shared by create's and extract's combined recaps (subject).
-	RecapUpdateFastForward = "Update:  fast-forward %s to origin"
+	RecapUpdateFastForward = "Update:    fast-forward %s to origin"
 	// RecapParentRecordedForSync explains, on the source-update step, that a
 	// reused branch's source is recorded for `wtm sync` rather than being a
 	// git start-point.

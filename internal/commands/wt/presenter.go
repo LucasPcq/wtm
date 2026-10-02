@@ -1,6 +1,7 @@
 package wt
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -411,31 +412,33 @@ func (p envPresenter) Reconciled(outcome envflow.Outcome) error {
 
 type extractPresenter struct {
 	shared.CLIPresenter
+	config shared.ConfigResult
 }
 
 func (p extractPresenter) Extracted(outcome extractflow.Outcome) error {
-	if outcome.Nothing != nil {
-		if p.Format == domain.OutputJSON {
-			return output.WriteExtractJSON(p.Cmd.OutOrStdout(), domain.ExtractResult{Files: []domain.ExtractFile{}})
-		}
-		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-			output.Message(w, outcome.Nothing.Error())
-		})
-		return nil
-	}
 	result := outcome.Result
 	if p.Format == domain.OutputJSON {
+		if outcome.Nothing != nil {
+			result = domain.ExtractResult{Files: []domain.ExtractFile{}}
+		}
 		return output.WriteExtractJSON(p.Cmd.OutOrStdout(), result)
 	}
+	path := createDisplayPath(displayPathParams{Config: p.config.Config, ProjectDir: p.config.ProjectDir, Path: result.TargetPath})
 	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-		if len(result.Conflicts) > 0 {
-			output.PrintExtractConflicts(w, result)
-			return
+		switch {
+		case errors.Is(outcome.Nothing, domain.ErrNoDirtyWorktrees):
+			output.Unchanged(w, domain.ExtractNothingAnywhere)
+		case outcome.Nothing != nil:
+			output.Unchanged(w, fmt.Sprintf(domain.ExtractNothingInSourceFmt, result.SourceBranch))
+		case len(result.Conflicts) > 0:
+			output.PrintExtractConflicts(w, output.ExtractConflictsParams{Result: result, Path: path})
+		default:
+			output.PrintExtractResult(w, output.ExtractResultParams{
+				Result:  result,
+				Path:    path,
+				EnvNote: rules.EnvPortSettlementNote(result.EnvPorts),
+			})
 		}
-		output.PrintExtractResult(w, output.ExtractResultParams{
-			Result:  result,
-			EnvNote: rules.EnvPortSettlementNote(result.EnvPorts),
-		})
 	})
 	return nil
 }

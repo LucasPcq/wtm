@@ -148,7 +148,7 @@
       "fast_forward": true,
       "mode_asked": true
     },
-    "recap": "Source:    feat/src\nFiles:     a.txt\nTarget:    feat/old (existing local branch — reused)\nParent:    main\nUpdate:  fast-forward feat/old to origin\nMode:      move",
+    "recap": "Source:    feat/src\nFiles:     a.txt\nTarget:    feat/old (existing local branch — reused)\nParent:    main\nUpdate:    fast-forward feat/old to origin\nMode:      move",
     "action": "Yes, create \u0026 extract"
   },
   {

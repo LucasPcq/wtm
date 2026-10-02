@@ -6,90 +6,78 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
-	"github.com/LucasPcq/wtm/internal/styles"
 )
 
-// WriteExtractJSON writes the JSON payload for `extract`.
 func WriteExtractJSON(w io.Writer, result domain.ExtractResult) error {
 	return encodeJSON(w, result)
 }
 
 type ExtractResultParams struct {
 	Result domain.ExtractResult
+	// Path is the target as the reader knows it, base_path/<name> when it lives
+	// there.
+	Path string
 	// EnvNote is what the port pass did in a worktree the extraction created —
 	// a count and an offset (rules.EnvPortSettlementNote), empty otherwise.
 	EnvNote string
 }
 
-// PrintExtractResult renders the human-facing summary of an extraction: a
-// headline, the moved files with colored status tags, and the target worktree.
-// It emits a raw body with no outer blank lines; the caller's frame owns the
-// outer vertical padding.
+// PrintExtractResult lists every file it moved: a move takes them out of the
+// source, and knowing what left is what the reader acts on next. Raw body.
 func PrintExtractResult(w io.Writer, params ExtractResultParams) {
 	result := params.Result
-	verb := "Moved"
+	headline, state := domain.ExtractMovedFmt, domain.ExtractSourceCleaned
 	if result.Kept {
-		verb = "Copied"
+		headline, state = domain.ExtractCopiedFmt, domain.ExtractSourceKept
 	}
 
-	Success(w, fmt.Sprintf("%s %s to %s", verb, rules.FileCount(len(result.Files)), styles.Bold.Render(result.TargetBranch)))
+	Success(w, fmt.Sprintf(headline, rules.FileCount(len(result.Files)), result.TargetBranch))
 	Blank(w)
-	for _, f := range result.Files {
-		fmt.Fprintf(w, "%s%s  %s  %s\n", Indent, Indent, extractTag(f.Status), f.Path)
+	writeExtractFiles(w, result.Files)
+	Blank(w)
+	fields := []domain.RecapField{
+		{Label: domain.ExtractLabelSource, Value: result.SourceBranch + " · " + state},
+		{Label: domain.CreateRecapLabelPath, Value: params.Path},
 	}
-	Blank(w)
-	InfoLine(w, "source", result.SourceBranch+" · "+sourceState(result.Kept))
-	InfoLine(w, "worktree", result.TargetPath)
 	if params.EnvNote != "" {
-		InfoLine(w, "env", params.EnvNote)
+		fields = append(fields, domain.RecapField{Label: domain.CreateRecapLabelEnv, Value: params.EnvNote})
 	}
+	writeAlignedFields(w, fields)
 	Blank(w)
 	NextStep(w, NextStepParams{Command: fmt.Sprintf(domain.GoCommandFmt, result.TargetBranch)})
 }
 
-// sourceState describes what happened to the source worktree after a clean
-// extraction: cleaned (move) or kept (copy).
-func sourceState(kept bool) string {
-	if kept {
-		return styles.Warning.Render("kept")
+func writeExtractFiles(w io.Writer, files []domain.ExtractFile) {
+	for _, file := range files {
+		fmt.Fprintf(w, "%s%s%s  %s\n", Indent, Indent, rules.ExtractStatusLabel(file.Status), file.Path)
 	}
-	return styles.Success.Render("clean")
 }
 
-// PrintExtractConflicts renders the rebase-style summary when changes were
-// applied to the target with conflict markers, with both next-step paths. It
-// emits a raw body with no outer blank lines; the caller's frame owns the outer
-// vertical padding.
-func PrintExtractConflicts(w io.Writer, result domain.ExtractResult) {
-	Warning(w, fmt.Sprintf("Applied to %s with conflicts", styles.Bold.Render(result.TargetBranch)))
+type ExtractConflictsParams struct {
+	Result domain.ExtractResult
+	Path   string
+}
+
+// PrintExtractConflicts is the rebase-style stop: what is left to resolve, and
+// that the source still holds everything. Raw body.
+func PrintExtractConflicts(w io.Writer, params ExtractConflictsParams) {
+	result := params.Result
+	Warning(w, fmt.Sprintf(domain.ExtractConflictsFmt, result.TargetBranch))
 	Blank(w)
-	SectionTitle(w, "Conflicts to resolve in "+result.TargetBranch)
-	for _, f := range result.Conflicts {
-		fmt.Fprintf(w, "%s%s%s\n", Indent, Indent, styles.Warning.Render(f))
+	SectionTitle(w, domain.ExtractConflictsTitle)
+	for _, file := range result.Conflicts {
+		fmt.Fprintf(w, "%s%s%s\n", Indent, Indent, file)
 	}
+	Blank(w)
 	if len(result.Files) > len(result.Conflicts) {
-		Blank(w)
-		Message(w, "The other files were applied cleanly.")
+		Message(w, domain.ExtractConflictsOthersApplied)
 	}
+	Message(w, fmt.Sprintf(domain.ExtractConflictsSourceSafeFmt, result.SourceBranch, result.TargetBranch))
 	Blank(w)
-	Message(w, fmt.Sprintf("Nothing was removed from %s — your changes are safe there.", result.SourceBranch))
-	Message(w, fmt.Sprintf("• Finish the split: resolve the conflicts in %s, then discard the same files in %s.", result.TargetBranch, result.SourceBranch))
-	Message(w, fmt.Sprintf("• Undo: discard the applied changes in %s — %s stays untouched.", result.TargetBranch, result.SourceBranch))
+	writeAlignedFields(w, []domain.RecapField{{Label: domain.CreateRecapLabelPath, Value: params.Path}})
 	Blank(w)
-	InfoLine(w, "worktree", result.TargetPath)
-}
-
-// extractTag renders the aligned, colored status tag for a file, reusing the
-// shared label text and deciding only the color: green "new", red "del",
-// yellow "mod".
-func extractTag(status domain.ExtractFileStatus) string {
-	label := rules.ExtractStatusLabel(status)
-	switch status {
-	case domain.ExtractStatusUntracked:
-		return styles.Success.Render(label)
-	case domain.ExtractStatusDeleted:
-		return styles.DangerText.Render(label)
-	default:
-		return styles.Warning.Render(label)
-	}
+	NextStep(w, NextStepParams{
+		Command: fmt.Sprintf(domain.GoCommandFmt, result.TargetBranch),
+		Note:    fmt.Sprintf(domain.ExtractConflictsNextFmt, result.SourceBranch),
+	})
 }
