@@ -1,5 +1,6 @@
 args: feat/v --yes --isolation isolated --output json
 err: 
+exit: 0
 --- stdout ---
 {
   "branch": "feat/v",

@@ -1,5 +1,6 @@
 args: main --yes --on-conflict bogus
 err: invalid --on-conflict value "bogus": use keep or overwrite
+exit: 2
 --- stdout ---
 Usage:
   wtm env [worktree] [flags]

@@ -1,5 +1,6 @@
 args: feat/i --yes --isolation verbatim
 err: 
+exit: 0
 --- stdout ---
 
   ✓ Now verbatim — 2 value(s) wtm owns back to the source's.

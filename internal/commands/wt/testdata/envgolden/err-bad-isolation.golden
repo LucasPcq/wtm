@@ -1,5 +1,6 @@
 args: main --yes --isolation bogus
-err: unknown isolation "bogus" (expected "isolated" or "verbatim")
+err: invalid --isolation value "bogus": use isolated or verbatim
+exit: 2
 --- stdout ---
 Usage:
   wtm env [worktree] [flags]
@@ -29,4 +30,4 @@ Flags:
   -y, --yes                  Skip all prompts; resolve every decision from flags and safe defaults (additions only)
 
 --- stderr ---
-Error: unknown isolation "bogus" (expected "isolated" or "verbatim")
+Error: invalid --isolation value "bogus": use isolated or verbatim

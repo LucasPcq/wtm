@@ -1,5 +1,6 @@
 args: --yes
 err: specify a worktree (no interactive picker under --yes or --check, without a terminal, or in --output json mode)
+exit: 1
 --- stdout ---
 Usage:
   wtm env [worktree] [flags]

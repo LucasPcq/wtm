@@ -1,5 +1,6 @@
 args: main --yes --on-conflict overwrite
 err: --on-conflict settles conflicts, and --mode add reports none: pass --mode refresh
+exit: 1
 --- stdout ---
 Usage:
   wtm env [worktree] [flags]

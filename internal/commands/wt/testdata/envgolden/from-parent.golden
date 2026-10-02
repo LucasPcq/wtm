@@ -1,5 +1,6 @@
 args: feat/b --yes --from parent
 err: 
+exit: 0
 --- stdout ---
 
   ✓ Reconciled 1 file(s).

@@ -1040,7 +1040,7 @@ const (
 	EnvTallyAdded            = "added"
 	EnvTallyFilled           = "filled"
 	EnvTallyOverwritten      = "overwritten"
-	EnvTallyRemoved          = "removed"
+	EnvTallyPruned           = "pruned"
 	EnvTallySkipped          = "skipped"
 	EnvDetailMissingFmt      = "needs a value — placeholder %s"
 	EnvDetailOrphan          = "orphan — in no source"
@@ -1081,16 +1081,21 @@ const (
 	EnvBadgeInSync          = "in sync"
 	EnvBadgeRefusesFmt      = "refuses %s"
 	EnvBadgeChangesFmt      = "%d change(s)"
-	EnvRecapActionSet       = "set"
+	EnvRecapActionFill      = "fill"
 	EnvRecapActionOverwrite = "overwrite →"
 	EnvRecapActionAdd       = "add"
 	EnvRecapActionSkip      = "skip"
-	EnvRecapActionRemove    = "remove"
-	EnvRecapActionKeep      = "keep"
-	EnvRecapNotAddedFmt     = "(%s not added)"
-	EnvRecapEmptyValue      = "(empty)"
-	EnvRecapLineFmt         = "%s  %s %s"
-	EnvRecapFileFmt         = "%s:"
+	EnvRecapActionPrune     = "prune"
+	// The resolver offers the same verbs the recap restates and the report and
+	// the JSON put in the past tense: added, filled, overwritten, kept, pruned.
+	EnvResolveUseFmt      = "use %s"
+	EnvResolveEdit        = "edit"
+	EnvResolveSummaryNone = "reviewed"
+	EnvRecapActionKeep    = "keep"
+	EnvRecapNotAddedFmt   = "(%s not added)"
+	EnvRecapEmptyValue    = "(empty)"
+	EnvRecapLineFmt       = "%s  %s %s"
+	EnvRecapFileFmt       = "%s:"
 	// EnvPortsLeftAloneFmt is the pass the user declined.
 	EnvPortsLeftAloneFmt = "Env ports left alone — %d linked value(s) left as they were"
 	// EnvPortsWouldShiftFmt is what a --check preview says instead of listing
@@ -4422,6 +4427,17 @@ const (
 	// ExitCodeUpgradeUnsupported marks an upgrade that cannot proceed on this
 	// install: built from source, or the binary is not writable.
 	ExitCodeUpgradeUnsupported = 17
+
+	// ExitCodeEnvDrift is a `wtm env --check` that found drift, so a CI step can
+	// fail on it without parsing the report.
+	ExitCodeEnvDrift = 18
+
+	// FlagValueInvalidFmt is every flag value that does not parse.
+	FlagValueInvalidFmt = "invalid --%s value %q: use %s"
+	// EnvDecisionWithCheckFmt names the decision flag a --check would ignore.
+	EnvDecisionWithCheckFmt = "--%s decides what to write, and %w: pass one or the other"
+	FlagValueListSep        = ", "
+	FlagValueLastSep        = " or "
 
 	// UpgradeConfirmPrompt keeps a space before the question mark, unlike every
 	// other prompt here: it ends on a version number, and "0.26.1?" reads as part

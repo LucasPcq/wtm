@@ -1,5 +1,6 @@
 args: main --yes
 err: 
+exit: 0
 --- stdout ---
 
   ✓ Settled 1 linked .env value(s).

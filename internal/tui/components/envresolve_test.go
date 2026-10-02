@@ -68,7 +68,7 @@ func TestEnvResolveEditPrefillsSelectedAction(t *testing.T) {
 }
 
 // TestEnvResolveRecapShowsOrphanValue: the recap always shows the value, including
-// an orphan whether kept or removed.
+// an orphan whether kept or pruned.
 func TestEnvResolveRecapShowsOrphanValue(t *testing.T) {
 	files := []domain.EnvFileResult{{
 		Target:   ".env",
@@ -88,10 +88,10 @@ func TestEnvResolveRecapShowsOrphanValue(t *testing.T) {
 		t.Fatalf("recap should show the orphan value on keep, got:\n%s", joined)
 	}
 
-	m = sendEnv(m, tea.KeyMsg{Type: tea.KeyRight}) // keep -> remove
+	m = sendEnv(m, tea.KeyMsg{Type: tea.KeyRight}) // keep -> prune
 	joined = recap(m)
-	if !strings.Contains(joined, `OLD_KEY  remove "stale"`) {
-		t.Fatalf("recap should show the orphan value on remove, got:\n%s", joined)
+	if !strings.Contains(joined, `OLD_KEY  prune "stale"`) {
+		t.Fatalf("recap should show the orphan value on prune, got:\n%s", joined)
 	}
 }
 

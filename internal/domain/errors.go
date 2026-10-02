@@ -200,9 +200,13 @@ var (
 	ErrEnvJSONNeedsYes     = errors.New("--output json requires --yes or --check (interactive resolution cannot run in JSON mode)")
 	// ErrEnvDecisionWithCheck and ErrEnvOnConflictNeedsRefresh refuse a flag
 	// the run would silently ignore.
-	ErrEnvDecisionWithCheck      = errors.New("--prune and --on-conflict decide what to write, and --check writes nothing: pass one or the other")
+	ErrEnvDecisionWithCheck      = errors.New("--check writes nothing")
 	ErrEnvOnConflictNeedsRefresh = errors.New("--on-conflict settles conflicts, and --mode add reports none: pass --mode refresh")
 
+	// ErrEnvDrift is a --check that found drift. It travels with ErrAborted: the
+	// report naming the drift is already on screen, so only the exit code is
+	// left to say it.
+	ErrEnvDrift   = errors.New("the .env has drifted from its sources")
 	ErrEnvNoFiles = errors.New("no env files configured — run `wtm init --only env` to detect them")
 
 	// ErrEnvFileNoTarget is returned when an env.file entry has an empty target.

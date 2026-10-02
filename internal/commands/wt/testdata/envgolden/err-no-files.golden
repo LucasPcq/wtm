@@ -1,5 +1,6 @@
 args: main --yes
 err: no env files configured — run `wtm init --only env` to detect them
+exit: 1
 --- stdout ---
 Usage:
   wtm env [worktree] [flags]

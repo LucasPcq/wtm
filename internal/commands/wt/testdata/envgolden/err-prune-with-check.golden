@@ -1,5 +1,6 @@
 args: main --check --prune
-err: --prune and --on-conflict decide what to write, and --check writes nothing: pass one or the other
+err: --prune decides what to write, and --check writes nothing: pass one or the other
+exit: 1
 --- stdout ---
 Usage:
   wtm env [worktree] [flags]
@@ -29,4 +30,4 @@ Flags:
   -y, --yes                  Skip all prompts; resolve every decision from flags and safe defaults (additions only)
 
 --- stderr ---
-Error: --prune and --on-conflict decide what to write, and --check writes nothing: pass one or the other
+Error: --prune decides what to write, and --check writes nothing: pass one or the other

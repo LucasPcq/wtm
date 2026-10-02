@@ -147,7 +147,7 @@ func TestRunAppliesTheWizardsDecisions(t *testing.T) {
 	}
 
 	recap := prompter.Content[KeyRecap].Description
-	for _, want := range []string{"Worktree:  feat/a", "Mode:      refresh", "Env:       main", `SHARED  overwrite → "main"`, `ORPHAN  remove "1"`} {
+	for _, want := range []string{"Worktree:  feat/a", "Mode:      refresh", "Env:       main", `SHARED  overwrite → "main"`, `ORPHAN  prune "1"`} {
 		if !strings.Contains(recap, want) {
 			t.Errorf("recap lacks %q:\n%s", want, recap)
 		}
@@ -258,9 +258,9 @@ func TestRunCheckAsksNothingAndWritesNothing(t *testing.T) {
 	write(t, filepath.Join(ctx.ProjectDir, ".env"), "SHARED=main\nNEW=1\n")
 
 	prompter := &flowtest.ScriptedPrompter{}
-	outcome, _, err := run(ctx, Request{Worktree: "feat/a", Check: true}, prompter)
-	if err != nil {
-		t.Fatalf("Run: %v", err)
+	outcome, presenter, err := run(ctx, Request{Worktree: "feat/a", Check: true}, prompter)
+	if !errors.Is(err, domain.ErrEnvDrift) || !errors.Is(err, domain.ErrAborted) || !presenter.reconciled {
+		t.Fatalf("err = %v, reconciled = %v; want the report, then the drift exit", err, presenter.reconciled)
 	}
 	if len(prompter.Asked) != 0 || !outcome.Result.Check {
 		t.Errorf("asked %v, result %+v", prompter.Asked, outcome.Result)
@@ -309,5 +309,13 @@ func TestPickerBadgesPendingAdditionsAndDisablesARefusedIsolation(t *testing.T) 
 	}
 	if badges := options["feat/a"].Badges; len(badges) == 0 || badges[len(badges)-1].Text != "1 change(s)" {
 		t.Errorf("feat/a badges = %+v, want the pending addition counted", badges)
+	}
+}
+
+func TestRunCheckOfAWorktreeInSyncSucceeds(t *testing.T) {
+	ctx := testContext(t)
+	makeWorktree(t, ctx, "feat/a")
+	if _, _, err := run(ctx, Request{Worktree: "feat/a", Check: true}, flow.Unattended{}); err != nil {
+		t.Errorf("err = %v, want a clean check to exit 0", err)
 	}
 }

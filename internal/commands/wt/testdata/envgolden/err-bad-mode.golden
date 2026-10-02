@@ -1,5 +1,6 @@
 args: main --yes --mode bogus
 err: invalid --mode value "bogus": use add or refresh
+exit: 2
 --- stdout ---
 Usage:
   wtm env [worktree] [flags]

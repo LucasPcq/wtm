@@ -104,7 +104,7 @@ func EnvFileTally(file domain.EnvFileResult) string {
 		domain.TallyPart{Count: counts[domain.EnvActionAdded], Label: domain.EnvTallyAdded},
 		domain.TallyPart{Count: counts[domain.EnvActionFilled], Label: domain.EnvTallyFilled},
 		domain.TallyPart{Count: counts[domain.EnvActionOverwritten], Label: domain.EnvTallyOverwritten},
-		domain.TallyPart{Count: counts[domain.EnvActionPruned], Label: domain.EnvTallyRemoved},
+		domain.TallyPart{Count: counts[domain.EnvActionPruned], Label: domain.EnvTallyPruned},
 		domain.TallyPart{Count: counts[domain.EnvActionSkipped], Label: domain.EnvTallySkipped},
 	)
 }

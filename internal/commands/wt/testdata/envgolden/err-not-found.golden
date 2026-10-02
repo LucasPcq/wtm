@@ -1,5 +1,6 @@
 args: nope --yes
 err: worktree not found: nope
+exit: 1
 --- stdout ---
 Usage:
   wtm env [worktree] [flags]

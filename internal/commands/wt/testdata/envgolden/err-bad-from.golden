@@ -1,5 +1,6 @@
 args: main --yes --from bogus
-err: invalid --from value "bogus": invalid env strategy: must be example, main, or parent
+err: invalid --from value "bogus": use example, main or parent
+exit: 2
 --- stdout ---
 Usage:
   wtm env [worktree] [flags]
@@ -29,4 +30,4 @@ Flags:
   -y, --yes                  Skip all prompts; resolve every decision from flags and safe defaults (additions only)
 
 --- stderr ---
-Error: invalid --from value "bogus": invalid env strategy: must be example, main, or parent
+Error: invalid --from value "bogus": use example, main or parent

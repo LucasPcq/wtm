@@ -1,5 +1,6 @@
 args: feat/a --yes --mode refresh --on-conflict overwrite
 err: 
+exit: 0
 --- stdout ---
 
   ✓ Reconciled 1 file(s).

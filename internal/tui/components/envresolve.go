@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/styles"
 )
 
@@ -130,18 +131,18 @@ func entryRow(f domain.EnvFileResult, e domain.EnvKeyDiff, defaults domain.EnvRe
 	}
 	switch e.Status {
 	case domain.EnvKeyConflict:
-		row.options = []envOption{{"keep", optKeep}, {"use " + sourceName(e.Source, f.ParentBranch), optOverwrite}}
+		row.options = []envOption{{domain.EnvRecapActionKeep, optKeep}, {fmt.Sprintf(domain.EnvResolveUseFmt, sourceName(e.Source, f.ParentBranch)), optOverwrite}}
 		row.canEdit = true
 		if defaults.Overwrite {
 			row.sel = 1
 		}
 		return row, true
 	case domain.EnvKeyMissing:
-		row.options = []envOption{{"accept", optAccept}, {"skip", optSkip}}
+		row.options = []envOption{{domain.EnvRecapActionFill, optAccept}, {domain.EnvRecapActionSkip, optSkip}}
 		row.canEdit = true
 		return row, true
 	case domain.EnvKeyOrphan:
-		row.options = []envOption{{"keep", optKeep}, {"remove", optRemove}}
+		row.options = []envOption{{domain.EnvRecapActionKeep, optKeep}, {domain.EnvRecapActionPrune, optRemove}}
 		if defaults.Prune {
 			row.sel = 1
 		}
@@ -149,7 +150,7 @@ func entryRow(f domain.EnvFileResult, e domain.EnvKeyDiff, defaults domain.EnvRe
 	case domain.EnvKeyResolved:
 		if e.CurrentValue == "" && e.ResolvedValue != "" {
 			row.isAdd = true
-			row.options = []envOption{{"add", optAdd}, {"skip", optSkip}}
+			row.options = []envOption{{domain.EnvRecapActionAdd, optAdd}, {domain.EnvRecapActionSkip, optSkip}}
 			row.canEdit = true
 			return row, true
 		}
@@ -511,27 +512,27 @@ func statusStyle(s domain.EnvKeyStatus) lipgloss.Style {
 // rowActionValue returns the action label and the proposed value for a row.
 func rowActionValue(r envRow, styled bool) (action, proposed string) {
 	if r.useEdit {
-		return "edit", valText(r.edited, styled)
+		return domain.EnvResolveEdit, valText(r.edited, styled)
 	}
 	switch r.options[r.sel].code {
 	case optOverwrite:
 		return r.options[r.sel].label, valText(r.resolved, styled)
 	case optAdd:
-		return "add", valText(r.resolved, styled)
+		return domain.EnvRecapActionAdd, valText(r.resolved, styled)
 	case optAccept:
-		return "accept", valText(r.placeholder, styled)
+		return domain.EnvRecapActionFill, valText(r.placeholder, styled)
 	case optSkip:
 		if r.isAdd {
-			return "skip", muted("(not added)", styled)
+			return domain.EnvRecapActionSkip, muted("(not added)", styled)
 		}
-		return "skip", muted("(left missing)", styled)
+		return domain.EnvRecapActionSkip, muted("(left missing)", styled)
 	case optRemove:
-		return "remove", ""
+		return domain.EnvRecapActionPrune, ""
 	default: // optKeep
 		if r.status == domain.EnvKeyOrphan {
-			return "keep", ""
+			return domain.EnvRecapActionKeep, ""
 		}
-		return "keep", valText(r.current, styled)
+		return domain.EnvRecapActionKeep, valText(r.current, styled)
 	}
 }
 
@@ -574,41 +575,26 @@ func EnvResolveSummary(model any) string {
 	if !ok {
 		return ""
 	}
-	over, filled, pruned, skipped := 0, 0, 0, 0
+	counts := map[optCode]int{}
 	for _, r := range m.rows {
 		if r.header {
 			continue
 		}
 		if r.useEdit {
-			filled++
+			counts[optAccept]++
 			continue
 		}
-		switch r.options[r.sel].code {
-		case optOverwrite:
-			over++
-		case optAccept:
-			filled++
-		case optRemove:
-			pruned++
-		case optSkip:
-			skipped++
-		}
+		counts[r.options[r.sel].code]++
 	}
-	parts := make([]string, 0, 4)
-	if over > 0 {
-		parts = append(parts, fmt.Sprintf("%d overwritten", over))
+	summary := rules.Tally(
+		domain.TallyPart{Count: counts[optAdd], Label: domain.EnvTallyAdded},
+		domain.TallyPart{Count: counts[optAccept], Label: domain.EnvTallyFilled},
+		domain.TallyPart{Count: counts[optOverwrite], Label: domain.EnvTallyOverwritten},
+		domain.TallyPart{Count: counts[optRemove], Label: domain.EnvTallyPruned},
+		domain.TallyPart{Count: counts[optSkip], Label: domain.EnvTallySkipped},
+	)
+	if summary == "" {
+		return domain.EnvResolveSummaryNone
 	}
-	if filled > 0 {
-		parts = append(parts, fmt.Sprintf("%d filled", filled))
-	}
-	if pruned > 0 {
-		parts = append(parts, fmt.Sprintf("%d pruned", pruned))
-	}
-	if skipped > 0 {
-		parts = append(parts, fmt.Sprintf("%d skipped", skipped))
-	}
-	if len(parts) == 0 {
-		return "reviewed"
-	}
-	return strings.Join(parts, ", ")
+	return summary
 }

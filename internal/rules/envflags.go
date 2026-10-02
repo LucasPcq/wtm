@@ -1,6 +1,10 @@
 package rules
 
-import "github.com/LucasPcq/wtm/internal/domain"
+import (
+	"fmt"
+
+	"github.com/LucasPcq/wtm/internal/domain"
+)
 
 type EnvFlagsParams struct {
 	Format        string
@@ -21,8 +25,10 @@ func ValidateEnvFlags(params EnvFlagsParams) error {
 		return domain.ErrEnvJSONNeedsYes
 	case params.Check && params.Isolation != "":
 		return domain.ErrEnvIsolationWithCheck
-	case params.Check && (params.Prune || params.OnConflictSet):
-		return domain.ErrEnvDecisionWithCheck
+	case params.Check && params.Prune:
+		return fmt.Errorf(domain.EnvDecisionWithCheckFmt, domain.FlagPrune, domain.ErrEnvDecisionWithCheck)
+	case params.Check && params.OnConflictSet:
+		return fmt.Errorf(domain.EnvDecisionWithCheckFmt, domain.FlagOnConflict, domain.ErrEnvDecisionWithCheck)
 	case params.OnConflictSet && params.Mode == domain.EnvModeAdd:
 		return domain.ErrEnvOnConflictNeedsRefresh
 	}

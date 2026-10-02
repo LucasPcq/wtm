@@ -1,5 +1,6 @@
 args: main --check --isolation verbatim
 err: --isolation records a choice for the worktree, and --check writes nothing: pass one or the other
+exit: 1
 --- stdout ---
 Usage:
   wtm env [worktree] [flags]

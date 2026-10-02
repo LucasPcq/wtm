@@ -76,7 +76,7 @@ func TestEnvKeyRowsOfAnApplyNameOnlyWhatIsLeft(t *testing.T) {
 	if len(rows) != 2 || !strings.HasPrefix(rows[0].Text, "KEPT") || !strings.Contains(rows[0].Text, "conflict kept") || !strings.HasPrefix(rows[1].Text, "MISSING") {
 		t.Errorf("rows = %+v, want the kept conflict and the unanswered key alone", rows)
 	}
-	if got := EnvFileTally(file); got != "1 added · 1 overwritten · 1 removed" {
+	if got := EnvFileTally(file); got != "1 added · 1 overwritten · 1 pruned" {
 		t.Errorf("tally = %q", got)
 	}
 

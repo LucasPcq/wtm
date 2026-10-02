@@ -1,5 +1,6 @@
 args: feat/a --yes --output json
 err: 
+exit: 0
 --- stdout ---
 {
   "branch": "feat/a",

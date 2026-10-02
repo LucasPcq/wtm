@@ -2,12 +2,14 @@ package wt
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/testutil/globaldir"
 )
 
@@ -71,6 +73,7 @@ func runEnvGolden(t *testing.T, tc envGoldenCase) string {
 	if err != nil {
 		b.WriteString(err.Error())
 	}
+	b.WriteString(fmt.Sprintf("\nexit: %d", rules.ExitCode(err)))
 	b.WriteString("\n--- stdout ---\n" + stdout)
 	b.WriteString("--- stderr ---\n" + stderr)
 	if tc.branch != "" {
@@ -150,6 +153,7 @@ func envGoldenCases() []envGoldenCase {
 		{name: "drift-add", setup: driftSetup, args: []string{"feat/a", yes}, branch: "feat/a"},
 		{name: "drift-add-json", setup: driftSetup, args: append([]string{"feat/a", yes}, json...), branch: "feat/a"},
 		{name: "check", setup: driftSetup, args: []string{"feat/a", "--" + domain.FlagCheck}, branch: "feat/a"},
+		{name: "check-clean", setup: envCreate("feat/a", "--from", "main", "--yes"), args: []string{"feat/a", "--" + domain.FlagCheck}, branch: "feat/a"},
 		{name: "check-json", setup: driftSetup, args: append([]string{"feat/a", "--" + domain.FlagCheck}, json...), branch: "feat/a"},
 		{name: "prune", setup: driftSetup, args: []string{"feat/a", yes, "--" + domain.FlagPrune}, branch: "feat/a"},
 		{name: "refresh-overwrite", setup: driftSetup, args: []string{"feat/a", yes, "--" + domain.FlagMode, "refresh", "--" + domain.FlagOnConflict, "overwrite"}, branch: "feat/a"},

@@ -1,5 +1,6 @@
 args: feat/a --yes --prune
 err: 
+exit: 0
 --- stdout ---
 
   ✓ Reconciled 1 file(s).
@@ -8,7 +9,7 @@ err:
   Mode      add
 
   .env   strategy: main  ·  source: main
-  ✓ 1 added · 1 removed
+  ✓ 1 added · 1 pruned
 
 --- stderr ---
 --- .env ---

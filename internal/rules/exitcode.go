@@ -19,6 +19,8 @@ func ExitCode(err error) int {
 		return domain.ExitCodeBranchNotFound
 	case errors.Is(err, domain.ErrConfigNotFound):
 		return domain.ExitCodeConfigNotFound
+	case errors.Is(err, domain.ErrEnvDrift):
+		return domain.ExitCodeEnvDrift
 	case errors.Is(err, domain.ErrUsage):
 		return domain.ExitCodeUsage
 	case errors.Is(err, domain.ErrJobNotFound), errors.Is(err, domain.ErrProfileNotFound):

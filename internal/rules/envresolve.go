@@ -108,7 +108,7 @@ func envRecapLine(params envRecapLineParams) string {
 		return fmt.Sprintf(domain.EnvRecapLineFmt, pad(entry.Key, params.Width), action, value)
 	}
 	if value, ok := decision.FilledValues[entry.Key]; ok {
-		return line(domain.EnvRecapActionSet, envRecapValue(value))
+		return line(domain.EnvRecapActionFill, envRecapValue(value))
 	}
 	switch entry.Status {
 	case domain.EnvKeyConflict:
@@ -119,7 +119,7 @@ func envRecapLine(params envRecapLineParams) string {
 		return line(domain.EnvRecapActionSkip, fmt.Sprintf(domain.EnvRecapNotAddedFmt, envRecapValue(entry.Placeholder)))
 	case domain.EnvKeyOrphan:
 		if slices.Contains(decision.PruneKeys, entry.Key) {
-			return line(domain.EnvRecapActionRemove, envRecapValue(entry.CurrentValue))
+			return line(domain.EnvRecapActionPrune, envRecapValue(entry.CurrentValue))
 		}
 	case domain.EnvKeyResolved:
 		if slices.Contains(decision.SkipKeys, entry.Key) {

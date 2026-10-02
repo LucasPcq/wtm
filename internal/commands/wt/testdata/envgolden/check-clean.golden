@@ -1,12 +1,12 @@
-args: feat/a --yes
+args: feat/a --check
 err: 
 exit: 0
 --- stdout ---
 
-  = No changes written.
+  = No drift.
 
   Worktree  feat/a
-  Mode      add
+  Mode      add  ·  read-only check
 
   .env   strategy: main  ·  source: main
   = in sync — nothing to reconcile

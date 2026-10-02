@@ -127,8 +127,7 @@ func envMode(cmd *cobra.Command) (domain.EnvMode, error) {
 	case domain.EnvModeAdd, domain.EnvModeRefresh:
 		return domain.EnvMode(v), nil
 	}
-	return "", fmt.Errorf("invalid --%s value %q: use %s or %s",
-		domain.FlagMode, v, domain.EnvModeAdd, domain.EnvModeRefresh)
+	return "", rules.InvalidFlagValue(rules.InvalidFlagValueParams{Flag: domain.FlagMode, Value: v, Allowed: []string{string(domain.EnvModeAdd), string(domain.EnvModeRefresh)}})
 }
 
 // envFrom validates and returns the --from override, "" when unset.
@@ -138,7 +137,7 @@ func envFrom(cmd *cobra.Command) (string, error) {
 	}
 	v, _ := cmd.Flags().GetString(domain.FlagFrom)
 	if err := rules.ValidateEnvStrategy(domain.EnvStrategy(v)); err != nil {
-		return "", fmt.Errorf("invalid --%s value %q: %w", domain.FlagFrom, v, err)
+		return "", rules.InvalidFlagValue(rules.InvalidFlagValueParams{Flag: domain.FlagFrom, Value: v, Allowed: shared.EnvStrategyValues})
 	}
 	return v, nil
 }
@@ -154,6 +153,5 @@ func envOnConflict(cmd *cobra.Command) (domain.EnvConflictDecision, error) {
 	case domain.EnvDecisionKeep, domain.EnvDecisionOverwrite:
 		return domain.EnvConflictDecision(v), nil
 	}
-	return "", fmt.Errorf("invalid --%s value %q: use %s or %s",
-		domain.FlagOnConflict, v, domain.EnvDecisionKeep, domain.EnvDecisionOverwrite)
+	return "", rules.InvalidFlagValue(rules.InvalidFlagValueParams{Flag: domain.FlagOnConflict, Value: v, Allowed: []string{string(domain.EnvDecisionKeep), string(domain.EnvDecisionOverwrite)}})
 }

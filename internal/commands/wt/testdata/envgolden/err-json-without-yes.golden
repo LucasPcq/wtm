@@ -1,5 +1,6 @@
 args: feat/a --output json
 err: --output json requires --yes or --check (interactive resolution cannot run in JSON mode)
+exit: 1
 --- stdout ---
 Usage:
   wtm env [worktree] [flags]

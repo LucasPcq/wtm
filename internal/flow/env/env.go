@@ -207,7 +207,13 @@ func (f *envFlow) apply(params applyParams) (Outcome, error) {
 		f.presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: warning})
 	}
 	outcome := Outcome{Result: result, IsolationChanged: settled.changed}
-	return outcome, f.presenter.Reconciled(outcome)
+	if err := f.presenter.Reconciled(outcome); err != nil {
+		return outcome, err
+	}
+	if f.request.Check && rules.EnvHasDrift(result) {
+		return outcome, driftError{}
+	}
+	return outcome, nil
 }
 
 type reconcileParams struct {
@@ -340,3 +346,10 @@ func (f *envFlow) envContext(branch string) envContext {
 		parentPath:   parentPath,
 	}
 }
+
+// driftError is a --check that found drift: ErrEnvDrift for its exit code, and
+// ErrAborted because the report naming the drift is already on screen.
+type driftError struct{}
+
+func (driftError) Error() string   { return domain.ErrEnvDrift.Error() }
+func (driftError) Unwrap() []error { return []error{domain.ErrEnvDrift, domain.ErrAborted} }
