@@ -87,22 +87,38 @@ func (p presenter) Status(notice flow.Notice) {
 	}
 }
 
-// createPresenter is called from the flow's one goroutine, so the batch state it
-// shares between its copies needs no lock.
+// tracking makes a presenter follow the worktree a batch is on, so each stage
+// lands on its own row. Every call comes from the flow's one goroutine, so the
+// state its copies share needs no lock.
+func (p presenter) tracking() presenter {
+	p.subject = new(string)
+	return p
+}
+
+func (p presenter) itemStarted(progress flow.Progress) {
+	*p.subject = progress.Branch
+	p.line(fmt.Sprintf(domain.BatchProgressFmt, progress.Branch, progress.Position, progress.Total))
+}
+
+// itemFailed names the way out of a removal only sudo can finish: the dashboard
+// cannot hand its terminal over to the password prompt.
+func (p presenter) itemFailed(failure domain.BatchFailure) {
+	p.line(fmt.Sprintf(domain.DashboardFailedFmt, failure.Branch, failure.Error))
+	if failure.Privileged {
+		p.line(fmt.Sprintf(domain.DashboardPrivilegedHintFmt, failure.Branch))
+	}
+}
+
 type createPresenter struct {
 	presenter
 	selected *bool
 }
 
 func newCreatePresenter(base presenter) createPresenter {
-	base.subject = new(string)
-	return createPresenter{presenter: base, selected: new(bool)}
+	return createPresenter{presenter: base.tracking(), selected: new(bool)}
 }
 
-func (p createPresenter) BranchStarted(progress flow.Progress) {
-	*p.subject = progress.Branch
-	p.line(fmt.Sprintf(domain.BatchProgressFmt, progress.Branch, progress.Position, progress.Total))
-}
+func (p createPresenter) BranchStarted(progress flow.Progress) { p.itemStarted(progress) }
 
 // BranchCreated shows each worktree the moment it exists rather than when the
 // whole batch is over, and moves the cursor only once: a selection that hops on
@@ -113,9 +129,7 @@ func (p createPresenter) BranchCreated(result domain.CreateResult) {
 	*p.selected = true
 }
 
-func (p createPresenter) BranchFailed(failure domain.BatchFailure) {
-	p.line(fmt.Sprintf(domain.DashboardFailedFmt, failure.Branch, failure.Error))
-}
+func (p createPresenter) BranchFailed(failure domain.BatchFailure) { p.itemFailed(failure) }
 
 func (p createPresenter) Created(outcome createflow.Outcome) error {
 	if outcome.Aborted {
@@ -157,19 +171,13 @@ func createTally(outcome createflow.Outcome) string {
 	)
 }
 
-// cleanPresenter is called from the flow's one goroutine, so the subject it
-// shares between its copies needs no lock.
 type cleanPresenter struct{ presenter }
 
 func newCleanPresenter(base presenter) cleanPresenter {
-	base.subject = new(string)
-	return cleanPresenter{presenter: base}
+	return cleanPresenter{presenter: base.tracking()}
 }
 
-func (p cleanPresenter) WorktreeStarted(progress flow.Progress) {
-	*p.subject = progress.Branch
-	p.line(fmt.Sprintf(domain.BatchProgressFmt, progress.Branch, progress.Position, progress.Total))
-}
+func (p cleanPresenter) WorktreeStarted(progress flow.Progress) { p.itemStarted(progress) }
 
 // WorktreeCleaned drops each row the moment its worktree is gone rather than
 // when the whole batch is over.
@@ -178,12 +186,7 @@ func (p cleanPresenter) WorktreeCleaned(result domain.CleanResult) {
 	p.send(cleanedMsg{})
 }
 
-func (p cleanPresenter) WorktreeFailed(failure domain.BatchFailure) {
-	p.line(fmt.Sprintf(domain.DashboardFailedFmt, failure.Branch, failure.Error))
-	if failure.Privileged {
-		p.line(fmt.Sprintf(domain.DashboardPrivilegedHintFmt, failure.Branch))
-	}
-}
+func (p cleanPresenter) WorktreeFailed(failure domain.BatchFailure) { p.itemFailed(failure) }
 
 func (p cleanPresenter) Cleaned(outcome cleanflow.Outcome) error {
 	batch := len(outcome.Results)+len(outcome.Failed)+len(outcome.Skipped) > 1

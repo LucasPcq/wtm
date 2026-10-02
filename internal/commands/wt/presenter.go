@@ -17,12 +17,9 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
-type createPresenter struct {
-	shared.CLIPresenter
-	config shared.ConfigResult
-}
-
-func (p createPresenter) BranchStarted(progress flow.Progress) {
+// A batch's per-item lines go on stderr with the progress; the readout that
+// names every item at the end is each command's own.
+func batchStarted(p shared.CLIPresenter, progress flow.Progress) {
 	if !p.Human {
 		return
 	}
@@ -30,15 +27,28 @@ func (p createPresenter) BranchStarted(progress flow.Progress) {
 		fmt.Sprintf(domain.BatchProgressFmt, progress.Branch, progress.Position, progress.Total))
 }
 
-// The batch's readout names every created branch at the end, where the CLI reads it.
-func (p createPresenter) BranchCreated(domain.CreateResult) {}
-
-func (p createPresenter) BranchFailed(failure domain.BatchFailure) {
+func batchFailed(p shared.CLIPresenter, failure domain.BatchFailure) {
 	if !p.Human {
 		return
 	}
 	output.Error(shared.OpenBlock(p.Cmd.ErrOrStderr(), false),
 		fmt.Sprintf(domain.BatchFailedFmt, failure.Branch, failure.Error))
+}
+
+type createPresenter struct {
+	shared.CLIPresenter
+	config shared.ConfigResult
+}
+
+func (p createPresenter) BranchStarted(progress flow.Progress) {
+	batchStarted(p.CLIPresenter, progress)
+}
+
+// The batch's readout names every created branch at the end, where the CLI reads it.
+func (p createPresenter) BranchCreated(domain.CreateResult) {}
+
+func (p createPresenter) BranchFailed(failure domain.BatchFailure) {
+	batchFailed(p.CLIPresenter, failure)
 }
 
 func (p createPresenter) Created(outcome createflow.Outcome) error {
@@ -116,22 +126,14 @@ type cleanPresenter struct {
 }
 
 func (p cleanPresenter) WorktreeStarted(progress flow.Progress) {
-	if !p.Human {
-		return
-	}
-	output.BranchHeader(shared.OpenBlock(p.Cmd.ErrOrStderr(), true),
-		fmt.Sprintf(domain.BatchProgressFmt, progress.Branch, progress.Position, progress.Total))
+	batchStarted(p.CLIPresenter, progress)
 }
 
 // The batch's readout names every removed worktree at the end, where the CLI reads it.
 func (p cleanPresenter) WorktreeCleaned(domain.CleanResult) {}
 
 func (p cleanPresenter) WorktreeFailed(failure domain.BatchFailure) {
-	if !p.Human {
-		return
-	}
-	output.Error(shared.OpenBlock(p.Cmd.ErrOrStderr(), false),
-		fmt.Sprintf(domain.BatchFailedFmt, failure.Branch, failure.Error))
+	batchFailed(p.CLIPresenter, failure)
 }
 
 func (p cleanPresenter) Cleaned(outcome cleanflow.Outcome) error {
