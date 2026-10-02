@@ -3,12 +3,10 @@ package dashboard
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/styles"
 	"github.com/LucasPcq/wtm/internal/tui/worktreepicker"
 )
@@ -78,14 +76,19 @@ func (m Model) renderRow(index, width int) []string {
 		bar := styles.DashboardRowBar.Render(rowBar + " ")
 		line := spread(name, pillText, inner)
 		rowStyle := styles.DashboardRowSelected
-		if status.Branch == m.flashBranch && rules.FlashLit(rules.FlashParams{
-			Since: m.flashSince, Now: time.Now(), Duration: domain.DashboardRowFlash,
-		}) {
+		if m.flashLit(status.Branch) {
 			rowStyle = styles.DashboardRowFlashBright
 		}
 		return []string{
 			bar + rowStyle.Width(inner).Bold(true).Render(line),
 			bar + rowStyle.Width(inner).Render(metaLine(metaLineParams{Meta: metaPlain, Badge: badge, Inner: inner})),
+		}
+	}
+
+	if m.flashLit(status.Branch) {
+		return []string{
+			rowIndent + styles.DashboardRowFlashBright.Width(inner).Bold(true).Render(spread(name, pillText, inner)),
+			rowIndent + styles.DashboardRowFlashBright.Width(inner).Render(metaLine(metaLineParams{Meta: metaPlain, Badge: badge, Inner: inner})),
 		}
 	}
 

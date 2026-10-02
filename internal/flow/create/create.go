@@ -47,6 +47,7 @@ type BranchProgress struct {
 type Presenter interface {
 	flow.Presenter
 	BranchStarted(BranchProgress)
+	BranchCreated(domain.CreateResult)
 	BranchFailed(domain.CreateFailure)
 	Created(Outcome) error
 }
@@ -134,6 +135,9 @@ func (f *createFlow) run() (Outcome, error) {
 		result, err := f.provisionOne(provisionParams{Branch: name, Source: fromBranch, Answers: answers, Preflight: preflight, Batch: batch})
 		if err == nil {
 			outcome.Results = append(outcome.Results, result)
+			if batch {
+				f.presenter.BranchCreated(result)
+			}
 			continue
 		}
 		failure := domain.CreateFailure{Branch: name, Path: result.Path, Error: err.Error(), ExitCode: rules.ExitCode(err)}

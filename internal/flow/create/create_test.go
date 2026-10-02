@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -197,6 +198,8 @@ func (r *recorder) Created(outcome Outcome) error {
 }
 
 func (r *recorder) BranchStarted(BranchProgress) {}
+
+func (r *recorder) BranchCreated(domain.CreateResult) {}
 
 func (r *recorder) BranchFailed(domain.CreateFailure) {}
 
@@ -586,11 +589,16 @@ func TestEntryBadgeNamesNewAndExisting(t *testing.T) {
 
 type batchRecorder struct {
 	*recorder
-	started []BranchProgress
-	failed  []domain.CreateFailure
+	started   []BranchProgress
+	announced []string
+	failed    []domain.CreateFailure
 }
 
 func (r *batchRecorder) BranchStarted(p BranchProgress) { r.started = append(r.started, p) }
+
+func (r *batchRecorder) BranchCreated(c domain.CreateResult) {
+	r.announced = append(r.announced, c.Branch)
+}
 
 func (r *batchRecorder) BranchFailed(f domain.CreateFailure) { r.failed = append(r.failed, f) }
 
@@ -632,6 +640,9 @@ func TestAFailureInTheMiddleDoesNotStopTheRest(t *testing.T) {
 	if len(presenter.failed) != 1 {
 		t.Errorf("failed = %+v", presenter.failed)
 	}
+	if !slices.Equal(presenter.announced, []string{"feat/a", "feat/c"}) {
+		t.Errorf("announced = %v, want each branch announced as soon as it exists", presenter.announced)
+	}
 	if presenter.created == nil {
 		t.Error("the conclusion must be presented even with a failure")
 	}
@@ -651,7 +662,7 @@ func TestASingleBranchFailsAsBefore(t *testing.T) {
 	if errors.Is(err, domain.ErrAborted) || !errors.Is(err, domain.ErrWorktreePathExists) {
 		t.Errorf("err = %v, want the raw cause so the root prints it as today", err)
 	}
-	if len(presenter.started) != 0 || len(presenter.failed) != 0 {
+	if len(presenter.started) != 0 || len(presenter.failed) != 0 || len(presenter.announced) != 0 {
 		t.Error("a single branch gets no per-branch header or failure line")
 	}
 }
