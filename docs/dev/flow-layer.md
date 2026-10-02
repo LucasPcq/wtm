@@ -46,7 +46,7 @@ is implemented yet.
 | `StepContent.Start` and `Option.Badges` | exist since the run module's worktree step (LUC-193), which opens its cursor on the worktree you are standing in and marks each row with what it is running. Both surfaces render them; `Badges` are the trailing words of a `StepSelect` row, where `Tag` is the leading one of a `StepMultiSelect` row. |
 | `StepText` pre-fill | `StepContent.Default`, since the CRUD forms of `run job` and `run profile` (LUC-217). It is content rather than a static field because what a form opens on can depend on the answers before it. |
 | `StepReorder` | asks for an order rather than a selection, since a profile's job list is its start order (LUC-217). Rendered by `flowui` and by the dashboard's modal. |
-| `StepTextList` | a list of names typed one by one (tab adds, enter continues, backspace on an empty field removes the last), since `create` takes several branches. Each entry goes through `flow.CheckEntry` — trimmed, then the step's `ValidateEntry` against the entries already added — so the wizard and `flowtest` refuse the same things; `EntryBadge` names an entry's state beside it and `StepContent.Entries` pre-fills the list. Rendered by `flowui` only: the dashboard runs `create` with `Request.Multi` false and keeps the single-name `StepText` until it can render one. |
+| `StepTextList` | a list of names typed one by one (tab adds, enter continues, backspace on an empty field removes the last), since `create` takes several branches. Each entry goes through `flow.CheckEntry` — trimmed, then the step's `ValidateEntry` against the entries already added — so the wizard and `flowtest` refuse the same things; `EntryBadge` names an entry's state beside it and `StepContent.Entries` pre-fills the list. Both surfaces build the widget through `flowui.TextList`, so an entry is refused and badged the same way; the dashboard's modal also puts the typed list back when the user steps back to it, since `Build` only knows the entries the request carried. |
 | `seam.Watcher` | the run flows' extra Presenter half. A start sequence cannot be reported through `Stage`: the surface has to be drawing before the first job is asked for, so the surface calls the sequence and hands back its `Outcome`. |
 
 ## The shape of a flow
@@ -319,7 +319,7 @@ flowchart TD
   B -- yes --> C{"branch already checked out elsewhere?"}
   C -- "yes, without --if-not-exists" --> ERR2["error: worktree exists"]
   C -- no --> D["Prompter.Ask(session)"]
-  D --> D1["branches — StepTextList (CLI, preset by one argument) or StepText (dashboard)"]
+  D --> D1["branches — StepTextList (preset by one argument)"]
   D1 --> D2["source branch — StepBranchSelect"]
   D2 --> D3["env strategy — StepSelect"]
   D3 --> D4["source update — StepSelect, skipped unless behind"]

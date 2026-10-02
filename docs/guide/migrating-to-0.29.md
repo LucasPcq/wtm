@@ -20,4 +20,4 @@ A script reading `.path` reads `.results[0].path`. A branch that could not be cr
 
 ## The wizard asks for a list of branches
 
-`wtm create` without arguments now asks for one or more branches: type a name, press tab to add another, enter to continue. `wtm create <branch>` with a single argument skips that step as before; with several arguments the list opens pre-filled.
+`wtm create` without arguments now asks for one or more branches: type a name, press tab to add another, enter to continue. `wtm create <branch>` with a single argument skips that step as before; with several arguments the list opens pre-filled. The dashboard's create (`wtm ui`) asks the same list; each worktree appears in the list as soon as it exists, and the cursor lands on the first.
