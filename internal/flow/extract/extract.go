@@ -265,7 +265,7 @@ func (f *extractFlow) extract(answers flow.Answers) (Outcome, error) {
 }
 
 // resolveTarget is the one point a worktree comes into existence in this flow,
-// before its hooks run — where worktree.created will be published (LUC-233).
+// before its hooks run — and where provisionOne publishes worktree.created.
 func (f *extractFlow) resolveTarget(answers flow.Answers) (target, bool, error) {
 	if !f.createsTarget(answers) {
 		return f.existingTarget(answers.Value(KeyTarget))

@@ -8,6 +8,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/orphans"
+	"github.com/LucasPcq/wtm/internal/flow/publish"
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/flow/teardown"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -218,6 +219,7 @@ func (f *pruneFlow) remove(params removeParams) (Outcome, error) {
 	reparents := reparentsOf(reparentsOfParams{Reparents: f.plan.Reparents, Pruned: result.Pruned})
 	if params.ReparentChildren {
 		applied, err := worktree.ApplyReparents(worktree.ApplyReparentsParams{Reparents: reparents, StateDir: f.ctx.StateDir})
+		publish.ReparentedAll(f.ctx, applied)
 		if err != nil {
 			return Outcome{}, err
 		}

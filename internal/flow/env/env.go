@@ -6,6 +6,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/publish"
 	"github.com/LucasPcq/wtm/internal/rules"
 	envsvc "github.com/LucasPcq/wtm/internal/service/env"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
@@ -278,6 +279,9 @@ func (f *envFlow) settleIsolation(sw envSwitch) (switchOutcome, error) {
 		return switchOutcome{}, err
 	}
 	outcome.changed = worktree.RecordedIsolation(sw.ref) != before
+	if outcome.changed {
+		publish.Updated(publish.UpdatedParams{Context: f.ctx, Branch: sw.ref.Branch, Changed: []domain.IdentityField{domain.IdentityIsolation}})
+	}
 	return outcome, nil
 }
 

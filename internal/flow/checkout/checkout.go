@@ -11,6 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow/decide"
 	"github.com/LucasPcq/wtm/internal/flow/envports"
 	"github.com/LucasPcq/wtm/internal/flow/ordinal"
+	"github.com/LucasPcq/wtm/internal/flow/publish"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/branch"
 	ghservice "github.com/LucasPcq/wtm/internal/service/github"
@@ -197,6 +198,7 @@ func (f *checkoutFlow) checkout(params checkoutParams) (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
+	publish.Created(f.ctx, result.Branch)
 
 	// Before the hooks: one of them may read the .env, and it has to read what
 	// this worktree binds rather than what it was copied with.
@@ -233,7 +235,8 @@ type createParams struct {
 }
 
 // create is the one point where the worktree comes into existence: a checkout
-// never reuses a worktree, so whatever it returns without an error is new.
+// never reuses a worktree, so whatever it returns without an error is new, and
+// is published before its hooks run.
 func (f *checkoutFlow) create(params createParams) (domain.CreateResult, error) {
 	var result domain.CreateResult
 	err := f.presenter.Stage(flow.StageParams{

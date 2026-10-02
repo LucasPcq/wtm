@@ -44,6 +44,14 @@ func Reparented(params ReparentedParams) {
 	emit(emitParams{Context: params.Context, Branch: params.Branch, Event: domain.Event{Type: domain.EventWorktreeReparented, FromParent: params.FromParent}})
 }
 
+// ReparentedAll reports each move that was written, including the ones a
+// failing batch got through before it stopped: they are not rolled back.
+func ReparentedAll(ctx flow.Context, results []domain.ReparentResult) {
+	for _, result := range results {
+		Reparented(ReparentedParams{Context: ctx, Branch: result.Branch, FromParent: result.OldParent})
+	}
+}
+
 // Capture reads the identity a removal is about to erase: removed carries the
 // last state a consumer saw, and once git forgot the worktree there is nothing
 // left to read.

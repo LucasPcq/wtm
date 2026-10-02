@@ -362,3 +362,24 @@ func TestTheWorktreeStepRefusesAnEmptySelection(t *testing.T) {
 		t.Errorf("err = %v, want it to say a worktree must be selected", err)
 	}
 }
+
+func TestEachMovedWorktreeIsPublished(t *testing.T) {
+	ctx := testContext(t)
+	stack(t, ctx)
+	presenter := &recorder{}
+	ctx.Publisher = &presenter.Recorder
+
+	if _, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Branches: []string{"dev-a"}, To: "main"},
+		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyRecap: confirmReparent}},
+		Presenter: presenter,
+	}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	got := presenter.Published
+	if len(got) != 1 || got[0].Type != domain.EventWorktreeReparented || got[0].FromParent != "feat" || got[0].Worktree.Parent != "main" {
+		t.Fatalf("published %+v, want dev-a reparented from feat to main", got)
+	}
+}

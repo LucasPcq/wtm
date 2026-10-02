@@ -408,3 +408,32 @@ func TestCreationFlagsOnAnExistingTargetAreSaidToBeIgnored(t *testing.T) {
 		t.Errorf("statuses = %v, want each said as it happens", presenter.Statuses)
 	}
 }
+
+func TestOnlyANewTargetIsPublished(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		answers map[string]string
+		want    int
+	}{
+		{"new", map[string]string{KeyTarget: targetCreate, create.KeyBranch: "feat/split", create.KeySource: "main", KeyMode: modeMove, KeyRecap: confirmExtract}, 1},
+		{"existing", map[string]string{KeyTarget: "dst", KeyMode: modeMove, KeyRecap: confirmExtract}, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newRepo(t)
+			presenter := newRecorder()
+			r.ctx.Publisher = presenter.Recorder
+			prompter := &flowtest.ScriptedPrompter{Answers: tc.answers, Sets: map[string][]string{KeyFiles: {"a.txt"}}}
+
+			if _, err := Run(Params{Context: r.ctx, Request: Request{Source: "src"}, Prompter: prompter, Presenter: presenter}); err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+
+			if len(presenter.Published) != tc.want {
+				t.Fatalf("published %v, want %d worktree.created", presenter.PublishedTypes(), tc.want)
+			}
+			if tc.want == 1 && (presenter.Published[0].Type != domain.EventWorktreeCreated || presenter.Published[0].Worktree.Branch != "feat/split") {
+				t.Fatalf("published %+v", presenter.Published[0])
+			}
+		})
+	}
+}

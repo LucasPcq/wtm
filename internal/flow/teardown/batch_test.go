@@ -115,3 +115,52 @@ func TestBatchNamesEveryHookPhaseWhenAskedTo(t *testing.T) {
 		t.Errorf("hook titles = %v, want the phase named after its worktree", presenter.Hooks)
 	}
 }
+
+func TestEveryRemovalIsPublishedWithItsLastState(t *testing.T) {
+	globaldir.Isolate(t)
+	processtest.Serve(t, nil)
+	ctx := repoContext(t)
+	targets := []teardown.Target{makeTarget(t, ctx, "feat/a"), makeTarget(t, ctx, "feat/b")}
+	recorder := &flowtest.Recorder{}
+	ctx.Publisher = recorder
+
+	teardown.Batch(teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: targets, ForceRemoval: true})
+
+	if len(recorder.Published) != 2 {
+		t.Fatalf("published %v, want two removals", recorder.PublishedTypes())
+	}
+	for i, event := range recorder.Published {
+		if event.Type != domain.EventWorktreeRemoved || event.Worktree.Branch != targets[i].Branch || event.Worktree.Parent != "main" {
+			t.Errorf("event %d = %+v", i, event)
+		}
+	}
+}
+
+func TestAHalfRemovedWorktreeIsPublishedOnce(t *testing.T) {
+	globaldir.Isolate(t)
+	processtest.Serve(t, nil)
+	ctx := repoContext(t)
+	target := makeTarget(t, ctx, "feat/a")
+	locked := filepath.Join(target.Path, "root-owned")
+	if err := os.MkdirAll(locked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(locked, "pgdata"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(locked, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+	recorder := &flowtest.Recorder{}
+	ctx.Publisher = recorder
+
+	removals := teardown.Batch(teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: []teardown.Target{target}, ForceRemoval: true})
+
+	if removals[0].Err != nil {
+		t.Fatalf("removal: %v", removals[0].Err)
+	}
+	if got := recorder.PublishedTypes(); len(got) != 1 || got[0] != domain.EventWorktreeRemoved {
+		t.Fatalf("published %v, want one worktree.removed", got)
+	}
+}
