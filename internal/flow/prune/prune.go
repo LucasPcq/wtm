@@ -263,7 +263,7 @@ func (f *pruneFlow) removeOne(params removeOneParams) ([]domain.NamespaceOutcome
 		Context:   f.ctx,
 		Presenter: f.presenter,
 		Target:    target,
-		Title:     fmt.Sprintf(domain.PruneHooksTitleFmt, target.Branch),
+		Title:     fmt.Sprintf(domain.HooksTitleOnCleanFmt, target.Branch),
 	}); err != nil {
 		return nil, err
 	}

@@ -61,7 +61,7 @@ func (f *cleanFlow) worktreeStep() flow.Step {
 		Key:         KeyWorktree,
 		Label:       labelWorktree,
 		Title:       domain.CleanPickerTitle,
-		Description: domain.CleanPickerDescription,
+		Description: domain.MultiSelectHint,
 		Build: func(flow.Answers) (flow.StepContent, error) {
 			options, err := f.cleanableOptions()
 			if err != nil {
@@ -69,7 +69,7 @@ func (f *cleanFlow) worktreeStep() flow.Step {
 			}
 			return flow.StepContent{
 				Title:       domain.CleanPickerTitle,
-				Description: domain.CleanPickerDescription,
+				Description: domain.MultiSelectHint,
 				Options:     options,
 			}, nil
 		},

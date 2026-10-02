@@ -275,13 +275,33 @@ type CleanReparentPlan struct {
 	Children    []ReparentResult
 }
 
-// CleanResult is the outcome of a clean, including any children reparented onto
-// the grandparent.
 type CleanResult struct {
-	Branch        string           `json:"branch"`
-	Path          string           `json:"path"`
-	AlreadyAbsent bool             `json:"already_absent"`
-	Reparented    []ReparentResult `json:"reparented,omitempty"`
+	Branch        string `json:"branch"`
+	Path          string `json:"path"`
+	AlreadyAbsent bool   `json:"already_absent"`
+}
+
+type CleanFailure struct {
+	Branch   string `json:"branch"`
+	Path     string `json:"path,omitempty"`
+	Error    string `json:"error"`
+	ExitCode int    `json:"exit_code"`
+}
+
+// CleanBatchResult is the clean payload, an envelope even for one worktree.
+// Skipped reuses prune's reasons: dirty, unpushed, open_pr.
+type CleanBatchResult struct {
+	Results          []CleanResult      `json:"results"`
+	Failed           []CleanFailure     `json:"failed"`
+	Skipped          []PruneSkip        `json:"skipped"`
+	Reparented       []ReparentResult   `json:"reparented"`
+	OrphanedChildren []ReparentResult   `json:"orphaned_children"`
+	Namespaces       []NamespaceOutcome `json:"namespaces"`
+}
+
+type CleanCheckEntry struct {
+	Check CleanCheckResult
+	Err   error
 }
 
 // CleanCheckResult holds the pre-deletion check results.

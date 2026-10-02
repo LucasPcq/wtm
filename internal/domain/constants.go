@@ -136,6 +136,7 @@ const (
 	TallyFailed         = "failed"
 	TallyCreated        = "created"
 	TallyAlreadyExisted = "already existed"
+	TallyAlreadyAbsent  = "already absent"
 	TallyAdded          = "added"
 	TallyRemoved        = "removed"
 	TallyKept           = "kept"
@@ -1799,8 +1800,9 @@ const (
 	AnsiReset       = "\x1b[0m"
 	// Hook phase titles: a bold section header above the phase, so create and
 	// clean read as distinct phases instead of loose lines.
-	HooksTitleOnCreate = "Hooks · On Create"
-	HooksTitleOnClean  = "Hooks · On Clean"
+	HooksTitleOnCreate   = "Hooks · On Create"
+	HooksTitleOnClean    = "Hooks · On Clean"
+	HooksTitleOnCleanFmt = "Hooks · On Clean · %s"
 
 	// create result recap labels (aligned "label   value" rows). "from" names the
 	// start-point of a newly created branch; "parent" replaces it when an existing
@@ -3194,8 +3196,7 @@ const (
 	CleanForceHintFmt = "worktree %s %s; pass --force to remove it anyway"
 	// The clean flow (internal/flow/clean): step prose, option labels, recap body,
 	// refusals and progress messages. Format verbs: %s branch, %s path, %d counts.
-	CleanPickerTitle        = "Select worktree to clean"
-	CleanPickerDescription  = "The parent worktree cannot be cleaned"
+	CleanPickerTitle        = "Select worktrees to clean"
 	CleanNothingToClean     = "no worktrees to clean (only the parent worktree exists)"
 	CleanNoOrphanedChildren = "no orphaned children"
 	CleanReparentOptionFmt  = "Reparent onto %s (%d)"
@@ -3249,9 +3250,24 @@ const (
 	// not delete: branch, path, cause, path.
 	CleanLeftOnDiskFmt = "%s is removed, but %s is still on disk (%s) — delete what is left with `sudo rm -rf %s`"
 	// StopWorktreeSurvivorsFmt names the jobs still up after their stop.
-	StopWorktreeSurvivorsFmt = "still running after the stop: %s"
-	CleanRemovalFailedFmt    = "Removal failed: %s"
-	CleanWizardErrLabel      = "clean wizard"
+	StopWorktreeSurvivorsFmt   = "still running after the stop: %s"
+	CleanRemovalFailedFmt      = "Removal failed: %s"
+	CleanWizardErrLabel        = "clean wizard"
+	CleanSelectionRequired     = "select at least one worktree to clean"
+	CleanBranchBlank           = "a worktree branch cannot be blank"
+	CleanBranchGivenTwiceFmt   = "%s is given twice"
+	CleanBranchProgressFmt     = "%s (%d/%d)"
+	CleanBranchFailedFmt       = "%s — %s"
+	CleanWillDeleteManyFmt     = "Will delete %d worktrees and their branches:"
+	CleanWillDeleteRowFmt      = "  %s  %s"
+	CleanBlockerKeyFmt         = "%s:%s"
+	CleanBlockerLabelFmt       = "%s — %s"
+	CleanDeleteSafeOptionFmt   = "Yes, delete the %d safe one(s), keep the others"
+	CleanForceDeleteManyOption = "Yes, force delete all (bypass all checks)"
+	CleanUnsafeManyFmt         = "%d worktree(s) cannot be removed safely, so nothing was removed:\n%s\npass --force to remove them anyway"
+	CleanUnsafeLineFmt         = "  %s %s"
+	CleanReparentManyOptionFmt = "Reparent onto their nearest surviving ancestor (%d)"
+	CleanRecapReparentManyFmt  = "Then reparent %d child worktree(s) onto their nearest surviving ancestor."
 	// CleanSudoConfirmFmt is the confirmation title for the privileged `sudo rm -rf`
 	// removal fallback (worktree path).
 	CleanSudoConfirmFmt = "Force-delete %s with `sudo rm -rf`? (you may be prompted for your password)"
@@ -3275,8 +3291,6 @@ const (
 	// gone-detection runs first).
 	PruneScanning         = "Scanning worktrees…"
 	PruneFetchAndScanning = "Fetching remotes and scanning worktrees…"
-	// PruneHooksTitleFmt titles one pruned worktree's on_clean phase.
-	PruneHooksTitleFmt = "Hooks · On Clean · %s"
 	// PruneFailedFmt is where a prune stopped: the branch, the cause. The
 	// worktrees after it are untouched, and so is its data.
 	PruneFailedFmt         = "stopped at %s: %s — it and the worktrees after it were left as they were"
@@ -3669,8 +3683,11 @@ const (
 	// DashboardMenuPrune removes every finished worktree at once. There is no
 	// preview entry beside it: the recap lists what goes, and closing the modal
 	// removes nothing.
-	DashboardMenuPrune  = "Prune finished worktrees"
-	DashboardMenuDelete = "Delete worktree"
+	DashboardMenuPrune = "Prune finished worktrees"
+	// DashboardMenuDeleteMany removes the worktrees the user checks inside the run,
+	// which is why it lives in the global menu: a context menu hangs off one row.
+	DashboardMenuDeleteMany = "Delete worktrees"
+	DashboardMenuDelete     = "Delete worktree"
 	// DashboardMenuSync leads the row menu: the Tree tab is where a worktree whose
 	// parent moved is flagged, so it is where the rebase has to be reachable from.
 	// It arrives with the row and its descendants checked; the selection stays the
@@ -3735,6 +3752,7 @@ const (
 	DashboardReparentTitle      = "Change parent"
 	DashboardReparentBatchTitle = "Reparent worktrees"
 	DashboardPruneTitle         = "Prune finished worktrees"
+	DashboardDeleteManyTitle    = "Delete worktrees"
 	DashboardSyncTitle          = "Sync worktrees"
 	// DashboardSyncRowTitle heads the same run started from a row: a modal that
 	// renamed the entry the user just picked reads as a different action.
