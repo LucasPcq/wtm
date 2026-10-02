@@ -20,7 +20,7 @@ func newPruneCmd() *cobra.Command {
 		Use:   domain.CmdPrune,
 		Short: "Remove finished worktrees (merged, closed PR or gone) in one pass",
 		Long: "Batch-remove worktrees whose work is done, reparenting any surviving children onto\n" +
-			"their grandparent (like `clean --reparent-children`). Whether work is \"done\" is read\n" +
+			"their nearest surviving ancestor (like `clean --reparent-children`). Whether work is \"done\" is read\n" +
 			"from GitHub via the `gh` CLI — never guessed from local commits — so squash- and\n" +
 			"rebase-merges are detected correctly. By default prune considers every finished\n" +
 			"worktree: merged PR, closed PR, or upstream branch gone. The reason flags restrict to\n" +
@@ -34,7 +34,7 @@ func newPruneCmd() *cobra.Command {
 			"\n" +
 			"On a TTY, matches are shown for review (unsafe ones unchecked), then a prune\n" +
 			"confirmation, then — like clean — a dedicated confirmation to reparent surviving\n" +
-			"children onto their grandparent (or leave them orphaned). The main checkout and base\n" +
+			"children onto their nearest surviving ancestor (or leave them orphaned). The main checkout and base\n" +
 			"branch are always protected; the current worktree is removed and the shell\n" +
 			"redirected to the base repo. Like clean, worktrees that are dirty, have unpushed\n" +
 			"commits, or have an open PR are unsafe and need --force. Use --yes to skip the\n" +

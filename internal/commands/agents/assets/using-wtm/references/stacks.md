@@ -41,7 +41,7 @@ The recorded parent of a worktree comes from `create --from`, `checkout` (the PR
 
 JSON: `{"reparented": [{branch, old_parent, new_parent}, …]}`.
 
-When `clean` or `prune` removes a parent, pass `--reparent-children` there to reparent its surviving children onto the grandparent (otherwise they are left orphaned under `--yes`).
+When `clean` or `prune` removes a parent, pass `--reparent-children` there to reparent its surviving children onto their nearest surviving ancestor, the base when none is left (otherwise they are left orphaned under `--yes`).
 
 ## `fast-forward`
 
