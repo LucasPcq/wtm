@@ -46,13 +46,16 @@ func HasOpenPR(params HasOpenPRParams) (bool, int, string) {
 	return true, items[0].Number, items[0].URL
 }
 
+const openPRsLimit = 200
+
 // OpenPRsByBranch maps each branch with an open pull request to its URL, in one
 // call however many worktrees ask. It answers an empty map wherever HasOpenPR
-// would answer false.
-func OpenPRsByBranch(projectDir string) map[string]string {
-	open := map[string]string{}
+// would answer false. complete is false when the list hit its limit: a branch
+// missing from it may then still have an open pull request.
+func OpenPRsByBranch(projectDir string) (open map[string]string, complete bool) {
+	open = map[string]string{}
 	if err := ensureAuth(); err != nil {
-		return open
+		return open, true
 	}
 
 	type prItem struct {
@@ -63,21 +66,21 @@ func OpenPRsByBranch(projectDir string) map[string]string {
 	data, err := runGH(projectDir, "pr", "list",
 		"--state", "open",
 		"--json", "headRefName,url",
-		"--limit", "200",
+		"--limit", strconv.Itoa(openPRsLimit),
 	)
 	if err != nil {
-		return open
+		return open, true
 	}
 	items, err := parseJSON[[]prItem](data)
 	if err != nil {
-		return open
+		return open, true
 	}
 	for _, item := range items {
 		if _, seen := open[item.Branch]; !seen {
 			open[item.Branch] = item.URL
 		}
 	}
-	return open
+	return open, len(items) < openPRsLimit
 }
 
 // ListPRsParams holds inputs for listing pull requests.

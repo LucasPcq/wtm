@@ -103,9 +103,6 @@ func (f *cleanFlow) run() (Outcome, error) {
 	}
 	f.request.Branches = requested.Present
 	if named && len(requested.Present) == 0 {
-		if len(requested.Absent) == 0 {
-			return Outcome{}, nil
-		}
 		return f.conclude(concludeParams{Outcome: Outcome{Results: requested.Absent}})
 	}
 
@@ -132,7 +129,8 @@ func (f *cleanFlow) run() (Outcome, error) {
 	if answers.Value(KeyDelete) == deleteSafe {
 		selected, skipped = f.splitUnsafe(selected)
 	}
-	moves := f.reparents(selected)
+	// Read before the first removal, while every worktree still names its parent.
+	nodes, nodesErr := worktree.Nodes(worktree.NodesParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir})
 
 	batch := len(selected) > 1
 	removals := teardown.Batch(teardown.BatchParams{
@@ -176,7 +174,16 @@ func (f *cleanFlow) run() (Outcome, error) {
 		outcome.Namespaces = append(outcome.Namespaces, removal.Namespaces...)
 	}
 
-	moved := movesOfRemoved(movesOfRemovedParams{Moves: moves, Results: outcome.Results})
+	// What actually went, not what was asked: a parent that failed to go is still
+	// there for its children, and a child that failed to go is orphaned in turn.
+	var moved []domain.ReparentResult
+	if nodesErr == nil {
+		moved = rules.ReparentsAfterRemoval(rules.ReparentsAfterRemovalParams{
+			Nodes:      nodes,
+			Removed:    removedBranches(removals),
+			BaseBranch: f.request.BaseBranch,
+		})
+	}
 	if answers.Value(KeyReparent) == reparentYes && len(moved) > 0 {
 		applied, err := worktree.ApplyReparents(worktree.ApplyReparentsParams{Reparents: moved, StateDir: f.ctx.StateDir})
 		if err != nil {
@@ -315,25 +322,14 @@ func (f *cleanFlow) reparents(selected []string) []domain.ReparentResult {
 	return moves
 }
 
-type movesOfRemovedParams struct {
-	Moves   []domain.ReparentResult
-	Results []domain.CleanResult
-}
-
-// movesOfRemoved keeps the moves whose old parent is actually gone: a run that
-// failed on a parent leaves its children where they are.
-func movesOfRemoved(params movesOfRemovedParams) []domain.ReparentResult {
-	gone := make(map[string]bool, len(params.Results))
-	for _, result := range params.Results {
-		gone[result.Branch] = true
-	}
-	var kept []domain.ReparentResult
-	for _, move := range params.Moves {
-		if gone[move.OldParent] {
-			kept = append(kept, move)
+func removedBranches(removals []teardown.Removal) []string {
+	var removed []string
+	for _, removal := range removals {
+		if removal.Err == nil {
+			removed = append(removed, removal.Target.Branch)
 		}
 	}
-	return kept
+	return removed
 }
 
 // recoverRemoveFailure offers the privileged removal when `git worktree remove`

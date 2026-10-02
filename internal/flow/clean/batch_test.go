@@ -159,8 +159,8 @@ func TestTheParentWorktreeIsLeftOutWithAWarning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the parent is refused with a warning, not an error: %v", err)
 	}
-	if len(prompter.Asked) != 0 || presenter.cleaned != nil {
-		t.Errorf("asked %v, cleaned %+v, want nothing asked and nothing concluded", prompter.Asked, presenter.cleaned)
+	if len(prompter.Asked) != 0 || presenter.cleaned == nil || len(presenter.cleaned.Results) != 0 {
+		t.Errorf("asked %v, cleaned %+v, want nothing asked and an empty conclusion", prompter.Asked, presenter.cleaned)
 	}
 	if len(presenter.Notices) != 1 || presenter.Notices[0].Kind != flow.NoticeWarning {
 		t.Errorf("notices = %+v, want one warning", presenter.Notices)
@@ -263,5 +263,59 @@ func TestABatchDropsTheDataOfEveryWorktreeItRemoves(t *testing.T) {
 		if line == "present" {
 			t.Errorf("a namespace was dropped while its worktree was still there: %q", d.dropped(t))
 		}
+	}
+}
+
+// The moves follow what was removed, not what was asked: a parent that failed
+// to go is still there for its children.
+func TestReparentingFollowsWhatTheRunActuallyRemoved(t *testing.T) {
+	cases := map[string]struct {
+		locked string
+		want   []domain.ReparentResult
+	}{
+		"the top failed": {locked: "top", want: []domain.ReparentResult{{Branch: "leaf", OldParent: "mid", NewParent: "top"}}},
+		"the mid failed": {locked: "mid", want: []domain.ReparentResult{{Branch: "mid", OldParent: "top", NewParent: "main"}}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx := testContext(t)
+			paths := map[string]string{
+				"top": makeWorktree(t, ctx, "top"),
+				"mid": makeWorktreeFrom(t, ctx, "mid", "top"),
+			}
+			makeWorktreeFrom(t, ctx, "leaf", "mid")
+			lockWorktree(t, ctx, paths[c.locked])
+
+			outcome, _ := Run(Params{
+				Context:   ctx,
+				Request:   Request{Branches: []string{"top", "mid"}, BaseBranch: "main", ReparentChildren: true, Force: true},
+				Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}},
+				Presenter: newRecorder(),
+			})
+
+			if len(outcome.Reparented) != len(c.want) || (len(c.want) > 0 && outcome.Reparented[0] != c.want[0]) {
+				t.Errorf("reparented = %+v, want %+v", outcome.Reparented, c.want)
+			}
+		})
+	}
+}
+
+// An agent pipes clean's stdout into a JSON parser: naming only the parent
+// worktree still answers with an envelope, empty.
+func TestNamingOnlyTheParentStillConcludes(t *testing.T) {
+	presenter := newRecorder()
+
+	_, err := Run(Params{
+		Context:   testContext(t),
+		Request:   Request{Branches: []string{"main"}, BaseBranch: "main"},
+		Prompter:  flow.Unattended{},
+		Presenter: presenter,
+	})
+
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if presenter.cleaned == nil || len(presenter.cleaned.Results) != 0 {
+		t.Errorf("cleaned = %+v, want an empty conclusion", presenter.cleaned)
 	}
 }

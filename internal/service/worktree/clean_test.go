@@ -2,6 +2,7 @@ package worktree
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/testutil/ghtest"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
 
@@ -175,5 +177,35 @@ func TestCheckAllChecksEachBranchOnItsOwn(t *testing.T) {
 	}
 	if !errors.Is(entries["main"].Err, domain.ErrCannotCleanParent) {
 		t.Errorf("main err = %v, want ErrCannotCleanParent", entries["main"].Err)
+	}
+}
+
+// A truncated list cannot prove a branch has no open pull request, so each
+// branch is then asked on its own. The stub answers every `gh pr list` with the
+// same payload, which is what makes the per-branch question visible here.
+func TestCheckAllAsksEachBranchWhenThePRListIsTruncated(t *testing.T) {
+	cases := map[string]struct {
+		prs        int
+		wantOpenPR bool
+	}{
+		"complete list":  {prs: 199, wantOpenPR: false},
+		"truncated list": {prs: 200, wantOpenPR: true},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			source := gittest.InitRepo(t)
+			gitRun(t, source, "worktree", "add", "-q", "-b", "feat/x", filepath.Join(t.TempDir(), "x"), "HEAD")
+			prs := make([]ghtest.PR, 0, c.prs)
+			for i := 0; i < c.prs; i++ {
+				prs = append(prs, ghtest.PR{Number: i + 1, Branch: fmt.Sprintf("other/%d", i), State: "open"})
+			}
+			ghtest.Stub(t, ghtest.StubParams{PRs: prs})
+
+			entry := CheckAll(CheckAllParams{ProjectDir: source, Branches: []string{"feat/x"}})["feat/x"]
+
+			if entry.Err != nil || entry.Check.HasOpenPR != c.wantOpenPR {
+				t.Errorf("entry = %+v, want HasOpenPR %v", entry, c.wantOpenPR)
+			}
+		})
 	}
 }
