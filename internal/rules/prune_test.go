@@ -380,3 +380,22 @@ func TestPruneClassifyForce(t *testing.T) {
 		})
 	}
 }
+
+func TestClassifyPruneReparentsPastAPrunedGrandparent(t *testing.T) {
+	plan := ClassifyPrune(ClassifyPruneParams{
+		Statuses: []domain.WorktreeStatus{status("feat", nil), status("dev", nil), status("child", nil)},
+		PRStates: map[string]string{"feat": domain.PRStateMerged, "dev": domain.PRStateMerged},
+		Nodes: []domain.WorktreeNode{
+			node("release", "main"),
+			node("dev", "release"),
+			node("feat", "dev"),
+			node("child", "feat"),
+		},
+		Merged:     true,
+		BaseBranch: "main",
+	})
+
+	if len(plan.Reparents) != 1 || plan.Reparents[0].NewParent != "release" {
+		t.Fatalf("reparents = %+v, want child onto release, not straight onto the base", plan.Reparents)
+	}
+}
