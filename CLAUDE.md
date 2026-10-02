@@ -132,6 +132,10 @@ internal/
     clean/                    ←   `wtm clean`: the run (clean.go) + its questions (steps.go)
     reparent/                 ←   `wtm reparent`: the run (reparent.go) + its questions (steps.go)
     prune/                    ←   `wtm prune`: the run (prune.go) + its questions (steps.go)
+    env/                      ←   `wtm env`: the run (env.go) + its questions (steps.go), the
+                                  pre-scan the wizard reads (scan.go) and the port pass and
+                                  isolation switch (pass.go); its per-key resolver is its own
+                                  kind, `flow.StepEnvResolve`
     relocate/                 ←   `wtm relocate`: the run (relocate.go) + its questions (steps.go);
                                   the move, the adoption and the base_path rewrite are three
                                   separate service calls (`worktree.Move`/`Adopt`/`SetBasePath`)
@@ -237,7 +241,7 @@ Steps are declared as `flow.Step` values (`Kind`, `Key`, `Label`, `Options`, `Sk
 
 **`flow.Operation`** (`Kind`, `Mode`, `TargetKey`) is what a flow declares about *how it is scheduled*, for a surface that runs several at once. `Mode` says how long it holds that surface — `ModeBlocking` (`clean`) keeps it until the run ends, `ModeBackground` (`create`) gives it back and locks its target instead — and `TargetKey` names the answer carrying the worktree it locks, known only once that step is answered. The CLI ignores it (one run, one terminal); `internal/tui/dashboard/ops.go` is where it is enforced, once, rather than at every action site.
 
-Adding a kind means teaching every surface to render it: `flowui` refuses an unknown kind rather than guessing. Test doubles for the two seams live in `internal/testutil/flowtest`. `create`, `checkout`, `clean`, `reparent`, `prune`, `relocate`, `sync`, `fast-forward` and the whole `run` module are migrated — `up`, `down`, `start`, `stop`, `logs`, `list`, `open`, `url`, `init`, `addressing` and the eight `run job` / `run profile` commands (`ps` asks nothing, so it is not a flow). **Two mutation commands are still out: `extract` (LUC-241) and `env` (LUC-239)**, each driving its service straight from its runner. They are listed in `.archlint-migrating`, which reports them on every `make lint` and may only shrink — `tui/newwt` stays until `extract` follows.
+Adding a kind means teaching every surface to render it: `flowui` refuses an unknown kind rather than guessing. Test doubles for the two seams live in `internal/testutil/flowtest`. `create`, `checkout`, `clean`, `reparent`, `prune`, `relocate`, `sync`, `fast-forward`, `env` and the whole `run` module are migrated — `up`, `down`, `start`, `stop`, `logs`, `list`, `open`, `url`, `init`, `addressing` and the eight `run job` / `run profile` commands (`ps` asks nothing, so it is not a flow). **One mutation command is still out: `extract` (LUC-241)**, driving its service straight from its runner. It is listed in `.archlint-migrating`, which reports it on every `make lint` and may only shrink — `tui/newwt` stays until `extract` follows.
 
 A **non-mutating mode** (`prune --dry-run`) belongs in the `Request`, not in the runner: it changes what the run does, not how it reads. The flow returns its `Outcome` before asking anything and before touching anything, and any rule that reads `Interactive()` must take the mode as an input too — a surface may install an interactive Prompter for a preview. See `rules.PruneClassifyForce` and `docs/dev/flow-layer.md`.
 

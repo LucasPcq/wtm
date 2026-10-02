@@ -60,3 +60,14 @@ type EnvRestoredEntry struct {
 	To      string `json:"to,omitempty"`
 	Removed bool   `json:"removed,omitempty"`
 }
+
+// EnvFileDecision is what a reader decided for one file's drift. A key absent
+// from every field takes the reconciliation's default: an addition is added, a
+// missing key left out, a conflict and an orphan kept.
+type EnvFileDecision struct {
+	Target       string
+	Decisions    map[string]EnvConflictDecision
+	FilledValues map[string]string
+	PruneKeys    []string
+	SkipKeys     []string
+}

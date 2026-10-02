@@ -200,7 +200,8 @@ They used to be separate: a "keep the ports" answer left the `.env` on its sourc
 | `sync` | `internal/flow/sync` | CLI wizard, unattended, dashboard |
 | `relocate` | `internal/flow/relocate` | CLI wizard, unattended |
 | `checkout` | `internal/flow/checkout` | CLI wizard, unattended |
-| `extract`, `env` | `internal/commands/wt/*.go` + their `internal/tui/*` wizard packages | CLI only |
+| `env` | `internal/flow/env` | CLI wizard, unattended |
+| `extract` | `internal/commands/wt/extract.go` + its `internal/tui/*` wizard packages | CLI only |
 
 Unmigrated commands still follow the old model, and the parts of the `go-cli` skill
 that describe `components.Step` wizards still apply to them. A **new** mutation

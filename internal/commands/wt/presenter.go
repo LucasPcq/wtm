@@ -9,6 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow"
 	cleanflow "github.com/LucasPcq/wtm/internal/flow/clean"
 	createflow "github.com/LucasPcq/wtm/internal/flow/create"
+	envflow "github.com/LucasPcq/wtm/internal/flow/env"
 	execflow "github.com/LucasPcq/wtm/internal/flow/exec"
 	ffflow "github.com/LucasPcq/wtm/internal/flow/fastforward"
 	pruneflow "github.com/LucasPcq/wtm/internal/flow/prune"
@@ -389,6 +390,20 @@ func (p relocatePresenter) Relocated(outcome relocateflow.Outcome) error {
 
 	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
 		output.FormatRelocateResult(w, outcome.Result)
+	})
+	return nil
+}
+
+type envPresenter struct {
+	shared.CLIPresenter
+}
+
+func (p envPresenter) Reconciled(outcome envflow.Outcome) error {
+	if p.Format == domain.OutputJSON {
+		return output.WriteEnvJSON(p.Cmd.OutOrStdout(), outcome.Result)
+	}
+	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		output.PrintEnvReport(w, outcome.Result)
 	})
 	return nil
 }

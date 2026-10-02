@@ -125,9 +125,6 @@ const (
 	// a wrapped line says more than an elided one that says nothing.
 	EnvValueDisplayWidth = 44
 	EnvValueMinWidth     = 24
-	// RecapFrameChrome is what a wizard recap spends around its body: the
-	// indentation on either side and the border between them.
-	RecapFrameChrome = 8
 	// A conclusion's counted summary: "3 applied · 1 skipped", zero counts dropped.
 	BatchProgressFmt      = "%s (%d/%d)"
 	BatchFailedFmt        = "%s — %s"
@@ -1061,6 +1058,33 @@ const (
 	// source's ports is only coherent with jobs run on them too.
 	EnvApplyActionLabel   = "Yes, apply"
 	EnvApplyVerbatimLabel = "Apply, and keep this worktree's .env verbatim from now on"
+	EnvApplyValue         = "apply"
+	EnvApplyVerbatimValue = "apply-verbatim"
+
+	// The `wtm env` wizard: its steps, and the recap of what the apply writes.
+	EnvWizardErrLabel       = "env wizard"
+	EnvWorktreeLookupFmt    = "worktree %q: %w"
+	EnvWorktreeStepLabel    = "Select worktree"
+	EnvWorktreeStepTitle    = "Select a worktree to reconcile"
+	EnvResolveStepLabel     = "Resolve"
+	EnvResolveTitleFmt      = "Resolve drift — %s"
+	EnvResolveSkipReason    = "only safe additions"
+	EnvRecapStepLabel       = "Review & apply"
+	EnvRecapSafeOnly        = "Only safe additions will be applied."
+	EnvRecapFieldWorktree   = "Worktree:  "
+	EnvBadgeParent          = "parent"
+	EnvBadgeInSync          = "in sync"
+	EnvBadgeChangesFmt      = "%d change(s)"
+	EnvRecapActionSet       = "set"
+	EnvRecapActionOverwrite = "overwrite →"
+	EnvRecapActionAdd       = "add"
+	EnvRecapActionSkip      = "skip"
+	EnvRecapActionRemove    = "remove"
+	EnvRecapActionKeep      = "keep"
+	EnvRecapNotAddedFmt     = "(%s not added)"
+	EnvRecapEmptyValue      = "(empty)"
+	EnvRecapLineFmt         = "%s  %s %s"
+	EnvRecapFileFmt         = "%s:"
 	// EnvPortsLeftAloneFmt is the pass the user declined.
 	EnvPortsLeftAloneFmt = "Env ports left alone — %d linked value(s) left as they were"
 	// EnvPortsWouldShiftFmt is what a --check preview says instead of listing

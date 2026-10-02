@@ -56,15 +56,6 @@ type envRow struct {
 	edited  string
 }
 
-// EnvFileDecision is the collected resolution for one file, returned by the model.
-type EnvFileDecision struct {
-	Target       string
-	Decisions    map[string]domain.EnvConflictDecision
-	FilledValues map[string]string
-	PruneKeys    []string
-	SkipKeys     []string
-}
-
 // EnvResolveModel is the single-screen interactive resolver for `wtm env`: it lists
 // every drifting key grouped by file (conflicts, missing, orphans, and additions)
 // and collects a per-key decision. It is a wizard step model in the same shape as
@@ -183,52 +174,6 @@ func (m EnvResolveModel) Empty() bool {
 	return true
 }
 
-// RecapLines renders the pending decisions grouped by file, styled to separate the
-// key (bold), the action (semantic color), and the value (quoted).
-func (m EnvResolveModel) RecapLines() []string {
-	var lines []string
-	for _, r := range m.rows {
-		if r.header {
-			if len(lines) > 0 {
-				lines = append(lines, "")
-			}
-			lines = append(lines, styles.Bold.Render(r.target)+":")
-			continue
-		}
-		lines = append(lines, "  "+recapLineFor(r))
-	}
-	return lines
-}
-
-// recapLineFor renders one row's decision: bold key, colored action verb, quoted
-// value. Every line shows the value involved, consistently across actions.
-func recapLineFor(r envRow) string {
-	key := styles.Bold.Render(r.key)
-	if r.useEdit {
-		return recapLine(key, styles.Primary.Render("set"), plainVal(r.edited))
-	}
-	code := r.options[r.sel].code
-	st := actionStyle(code)
-	switch code {
-	case optOverwrite:
-		return recapLine(key, st.Render("overwrite →"), plainVal(r.resolved))
-	case optAdd:
-		return recapLine(key, st.Render("add"), plainVal(r.resolved))
-	case optAccept:
-		return recapLine(key, st.Render("set"), plainVal(r.placeholder))
-	case optSkip:
-		val := r.placeholder
-		if r.isAdd {
-			val = r.resolved
-		}
-		return recapLine(key, st.Render("skip"), st.Render(fmt.Sprintf("(%s not added)", plainVal(val))))
-	case optRemove:
-		return recapLine(key, st.Render("remove"), plainVal(r.current))
-	default: // optKeep (conflict or orphan)
-		return recapLine(key, st.Render("keep"), plainVal(r.current))
-	}
-}
-
 // actionStyle maps an action to its semantic color, shared by the live list, the
 // recap, and the glossary so a color means the same thing everywhere: accent =
 // writes a value, muted = leaves as-is, danger = removes.
@@ -252,11 +197,6 @@ func actionStyleFor(r envRow) lipgloss.Style {
 	return actionStyle(r.options[r.sel].code)
 }
 
-// recapLine assembles "key  action value".
-func recapLine(key, action, value string) string {
-	return fmt.Sprintf("%s  %s %s", key, action, value)
-}
-
 // EnvResolveGlossary is the short legend shown as a callout above the resolve list:
 // what each case keyword means, colored to match the list's status column.
 func EnvResolveGlossary() string {
@@ -270,13 +210,6 @@ func EnvResolveGlossary() string {
 	}, "\n")
 }
 
-func plainVal(v string) string {
-	if v == "" {
-		return "(empty)"
-	}
-	return fmt.Sprintf("%q", v)
-}
-
 // Done reports the user pressed Enter to proceed.
 func (m EnvResolveModel) Done() bool { return m.done }
 
@@ -287,15 +220,15 @@ func (m EnvResolveModel) Aborted() bool { return m.aborted }
 func (m EnvResolveModel) Init() tea.Cmd { return nil }
 
 // Decisions returns the collected per-file resolutions.
-func (m EnvResolveModel) Decisions() []EnvFileDecision {
-	byTarget := map[string]*EnvFileDecision{}
+func (m EnvResolveModel) Decisions() []domain.EnvFileDecision {
+	byTarget := map[string]*domain.EnvFileDecision{}
 	var order []string
 	current := ""
 	for _, r := range m.rows {
 		if r.header {
 			current = r.target
 			if _, ok := byTarget[current]; !ok {
-				byTarget[current] = &EnvFileDecision{
+				byTarget[current] = &domain.EnvFileDecision{
 					Target:       current,
 					Decisions:    map[string]domain.EnvConflictDecision{},
 					FilledValues: map[string]string{},
@@ -307,7 +240,7 @@ func (m EnvResolveModel) Decisions() []EnvFileDecision {
 		applyRowDecision(byTarget[current], r)
 	}
 
-	out := make([]EnvFileDecision, 0, len(order))
+	out := make([]domain.EnvFileDecision, 0, len(order))
 	for _, t := range order {
 		out = append(out, *byTarget[t])
 	}
@@ -315,7 +248,7 @@ func (m EnvResolveModel) Decisions() []EnvFileDecision {
 }
 
 // applyRowDecision folds one row's chosen action into its file decision.
-func applyRowDecision(d *EnvFileDecision, r envRow) {
+func applyRowDecision(d *domain.EnvFileDecision, r envRow) {
 	if r.useEdit {
 		d.FilledValues[r.key] = r.edited
 		return

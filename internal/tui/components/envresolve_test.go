@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 )
 
 func conflictModel(t *testing.T) EnvResolveModel {
@@ -78,15 +79,17 @@ func TestEnvResolveRecapShowsOrphanValue(t *testing.T) {
 		}},
 	}}
 	m := NewEnvResolve(NewEnvResolveParams{Files: files})
+	recap := func(m EnvResolveModel) string {
+		return strings.Join(rules.EnvResolveRecapLines(rules.EnvResolveRecapParams{Files: files, Decisions: m.Decisions()}), "\n")
+	}
 
-	lines := m.RecapLines()
-	joined := strings.Join(lines, "\n")
+	joined := recap(m)
 	if !strings.Contains(joined, `OLD_KEY  keep "stale"`) {
 		t.Fatalf("recap should show the orphan value on keep, got:\n%s", joined)
 	}
 
 	m = sendEnv(m, tea.KeyMsg{Type: tea.KeyRight}) // keep -> remove
-	joined = strings.Join(m.RecapLines(), "\n")
+	joined = recap(m)
 	if !strings.Contains(joined, `OLD_KEY  remove "stale"`) {
 		t.Fatalf("recap should show the orphan value on remove, got:\n%s", joined)
 	}
