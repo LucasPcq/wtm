@@ -21,7 +21,7 @@ func sampleForest() domain.Forest {
 						Status: domain.TreeNodeStatus{CommitsAhead: 3, PR: &domain.WorktreeListPR{Number: 123, State: domain.PRStateOpen}},
 						Children: []domain.TreeNode{
 							{Branch: "feat-auth-ui", Status: domain.TreeNodeStatus{CommitsAhead: 1, NeedsSync: true}},
-							{Branch: "feat-auth-api", Status: domain.TreeNodeStatus{IsDirty: true}},
+							{Branch: "feat-auth-api", Status: domain.TreeNodeStatus{IsDirty: true, IsLocked: true}},
 						},
 					},
 					{Branch: "feat-billing", Status: domain.TreeNodeStatus{CommitsAhead: 5}},
@@ -52,6 +52,7 @@ func TestFormatTreeConnectorsAndAnnotations(t *testing.T) {
 		"feat-auth", "PR #123", "↑3",
 		"⚠ needs sync",
 		"⚠ dirty",
+		domain.TreeBadgeLockedText,
 		"(no worktree)",
 		"↑2",
 	} {

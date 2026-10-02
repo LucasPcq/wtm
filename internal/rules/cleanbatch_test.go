@@ -46,6 +46,11 @@ func TestCleanUnsafeRefusal(t *testing.T) {
 		t.Errorf("single refusal = %q, want the sentence it always had", single)
 	}
 
+	locked, _ := CleanUnsafeRefusal([]domain.CleanCheckResult{{Branch: "feat", IsLocked: true, IsDirty: true}})
+	if locked != fmt.Sprintf(domain.CleanForceHintFmt, "feat", domain.CleanUnsafeLocked) {
+		t.Errorf("locked refusal = %q, want the lock named first: it is an intent someone set", locked)
+	}
+
 	many, unsafe := CleanUnsafeRefusal([]domain.CleanCheckResult{{Branch: "a"}, {Branch: "b", IsDirty: true}, {Branch: "c", HasOpenPR: true}})
 	if !unsafe {
 		t.Fatal("one unsafe worktree refuses the batch")
@@ -59,6 +64,7 @@ func TestCleanUnsafeRefusal(t *testing.T) {
 
 func TestCleanSkipReasonSpeaksPrunesVocabulary(t *testing.T) {
 	cases := map[domain.CleanCheckResult]string{
+		{IsLocked: true, IsDirty: true}:     domain.PruneSkipLocked,
 		{IsDirty: true, UnpushedCommits: 1}: domain.PruneSkipDirty,
 		{UnpushedCommits: 1}:                domain.PruneSkipUnpushed,
 		{HasOpenPR: true}:                   domain.PruneSkipOpenPR,

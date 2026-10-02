@@ -28,6 +28,7 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 - `list` and `tree`: per worktree, branch, path, PR, services, dirty state, plus:
   - `origin`: `{ahead, behind, state}` against `origin/<branch>`, or `null` when the branch has no origin counterpart. `state` is `up-to-date` / `behind` / `ahead` / `diverged`.
   - `commits_ahead`: commits against the **parent/base** branch (not origin).
+  - `is_locked`: the worktree is locked (`git worktree lock`); `clean` and `prune` refuse it unless `--force`.
   - `tree` only: the parent to child nesting and `needs_sync` (the parent moved past this node).
 - `resolve <branch>`: `{path, branch}`.
 
@@ -84,7 +85,7 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 
 - `clean`: `{results: [{branch, path, already_absent}], failed: [{branch, path?, error, exit_code}], skipped, reparented, orphaned_children, namespaces}`, an envelope even for one worktree.
 - `prune`: `pruned` lists the removed worktrees, with `reason` values: `pr_merged` / `pr_closed` / `gone`.
-- `skipped` (both): unsafe worktrees left alone without `--force` (for `clean`, only when the user chose to delete the safe ones; under `--yes` it refuses instead), reason `dirty` / `unpushed` / `open_pr`. When every match is unsafe, `prune` returns `pruned: []` and `skipped: []`: nothing was removed, not nothing matched.
+- `skipped` (both): unsafe worktrees left alone without `--force` (for `clean`, only when the user chose to delete the safe ones; under `--yes` it refuses instead), reason `locked` / `dirty` / `unpushed` / `open_pr`. When every match is unsafe, `prune` returns `pruned: []` and `skipped: []`: nothing was removed, not nothing matched.
 - `failed`: `prune` stops at the first failure and reports it as one object `{branch, path, error}`; `clean` keeps going and reports an array. Exit non-zero either way.
 - `namespaces` (both): one entry per namespace a removed worktree held: `{branch, job, name, status, reason?}`, `name` like `app_feat-x`, `status` one of:
   - `dropped`;

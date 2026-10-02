@@ -22,8 +22,8 @@ func newCleanCmd() *cobra.Command {
 			"Without arguments, shows an interactive picker where several can be checked.\n" +
 			"\n" +
 			"Several worktrees are removed one after the other: a failure does not stop the others, and\n" +
-			"the run exits with the first failure's code. Under --yes, one unsafe worktree (dirty,\n" +
-			"unpushed, open PR) refuses the whole run before anything is removed, unless --force.\n" +
+			"the run exits with the first failure's code. Under --yes, one unsafe worktree (locked,\n" +
+			"dirty, unpushed, open PR) refuses the whole run before anything is removed, unless --force.\n" +
 			"\n" +
 			"The removal runs in a fixed order: the worktree's jobs are stopped and checked gone (a job\n" +
 			"that will not stop refuses the removal unless --force), the on_clean hooks run, git removes\n" +
@@ -50,7 +50,7 @@ func newCleanCmd() *cobra.Command {
 		RunE: runClean,
 	}
 
-	cmd.Flags().Bool(domain.FlagForce, false, "Lift safety refusals (dirty/unpushed/open-PR); still asks to confirm unless --yes")
+	cmd.Flags().Bool(domain.FlagForce, false, "Lift safety refusals (locked/dirty/unpushed/open-PR); still asks to confirm unless --yes")
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (keeps safety checks unless --force)")
 	cmd.Flags().Bool(domain.FlagReparentChildren, false, domain.FlagReparentChildrenDesc)
 	cmd.Flags().Bool(domain.FlagKeepData, false, domain.FlagKeepDataDesc)

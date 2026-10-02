@@ -180,6 +180,49 @@ func TestCheckAllChecksEachBranchOnItsOwn(t *testing.T) {
 	}
 }
 
+func TestCheckAllReportsALockedWorktree(t *testing.T) {
+	source := gittest.InitRepo(t)
+	lockedPath := filepath.Join(t.TempDir(), "locked")
+	gitRun(t, source, "worktree", "add", "-q", "-b", "feat/locked", lockedPath, "HEAD")
+	gitRun(t, source, "worktree", "lock", lockedPath)
+
+	entry := CheckAll(CheckAllParams{ProjectDir: source, Branches: []string{"feat/locked"}})["feat/locked"]
+	if entry.Err != nil || !entry.Check.IsLocked {
+		t.Errorf("feat/locked = %+v, want a locked worktree", entry)
+	}
+}
+
+func TestListMarksALockedWorktree(t *testing.T) {
+	source := gittest.InitRepo(t)
+	lockedPath := filepath.Join(t.TempDir(), "locked")
+	gitRun(t, source, "worktree", "add", "-q", "-b", "feat/locked", lockedPath, "HEAD")
+	gitRun(t, source, "worktree", "lock", lockedPath)
+
+	statuses, err := List(domain.ListParams{ProjectDir: source, StateDir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, status := range statuses {
+		if status.IsLocked != (status.Branch == "feat/locked") {
+			t.Errorf("%s IsLocked = %v", status.Branch, status.IsLocked)
+		}
+	}
+}
+
+func TestCleanForcedRemovesALockedWorktree(t *testing.T) {
+	source := gittest.InitRepo(t)
+	lockedPath := filepath.Join(t.TempDir(), "locked")
+	gitRun(t, source, "worktree", "add", "-q", "-b", "feat/locked", lockedPath, "HEAD")
+	gitRun(t, source, "worktree", "lock", lockedPath)
+
+	if err := Clean(domain.CleanParams{ProjectDir: source, StateDir: t.TempDir(), Branch: "feat/locked", Force: true}); err != nil {
+		t.Fatalf("Clean --force: %v", err)
+	}
+	if _, err := os.Stat(lockedPath); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("locked worktree still present after a forced Clean: %v", err)
+	}
+}
+
 // A truncated list cannot prove a branch has no open pull request, so each
 // branch is then asked on its own. The stub answers every `gh pr list` with the
 // same payload, which is what makes the per-branch question visible here.

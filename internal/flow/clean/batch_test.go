@@ -3,7 +3,6 @@ package clean
 import (
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,15 +11,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
+	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
-
-// A locked worktree is one git refuses to remove even with --force.
-func lockWorktree(t *testing.T, ctx flow.Context, path string) {
-	t.Helper()
-	if out, err := exec.Command("git", "-C", ctx.ProjectDir, "worktree", "lock", path).CombinedOutput(); err != nil {
-		t.Fatalf("lock %s: %v: %s", path, err, out)
-	}
-}
 
 func hasOption(options []flow.Option, value string) bool {
 	for _, option := range options {
@@ -41,9 +33,9 @@ func dirty(t *testing.T, path string) {
 func TestRunCleansSeveralAndKeepsGoingPastAFailure(t *testing.T) {
 	ctx := testContext(t)
 	first := makeWorktree(t, ctx, "feat/a")
-	locked := makeWorktree(t, ctx, "feat/b")
+	jammed := makeWorktree(t, ctx, "feat/b")
 	last := makeWorktree(t, ctx, "feat/c")
-	lockWorktree(t, ctx, locked)
+	gittest.JamWorktree(t, jammed)
 	presenter := newRecorder()
 
 	outcome, err := Run(Params{
@@ -64,7 +56,7 @@ func TestRunCleansSeveralAndKeepsGoingPastAFailure(t *testing.T) {
 			t.Errorf("%s still on disk: %v", path, statErr)
 		}
 	}
-	if _, statErr := os.Stat(locked); statErr != nil {
+	if _, statErr := os.Stat(jammed); statErr != nil {
 		t.Errorf("the failed worktree must survive: %v", statErr)
 	}
 	if len(presenter.started) != 3 || len(presenter.done) != 2 || len(presenter.failed) != 1 {
@@ -89,6 +81,31 @@ func TestUnattendedRefusesTheWholeBatchWhenOneIsUnsafe(t *testing.T) {
 	}
 	if _, statErr := os.Stat(safe); statErr != nil {
 		t.Errorf("nothing may be removed when the batch is refused: %v", statErr)
+	}
+}
+
+func TestALockedWorktreeIsRefusedUntilForced(t *testing.T) {
+	ctx := testContext(t)
+	locked := makeWorktree(t, ctx, "feat/locked")
+	gittest.Git(t, ctx.ProjectDir, "worktree", "lock", locked)
+	run := func(force bool) error {
+		_, err := Run(Params{
+			Context:   ctx,
+			Request:   Request{Branches: []string{"feat/locked"}, BaseBranch: "main", Force: force},
+			Prompter:  flow.Unattended{},
+			Presenter: newRecorder(),
+		})
+		return err
+	}
+
+	if err := run(false); err == nil || !strings.Contains(err.Error(), domain.CleanUnsafeLocked) || !strings.Contains(err.Error(), "--force") {
+		t.Fatalf("err = %v, want wtm's own refusal naming the lock and --force", err)
+	}
+	if err := run(true); err != nil {
+		t.Fatalf("forced clean of a locked worktree: %v", err)
+	}
+	if _, statErr := os.Stat(locked); !os.IsNotExist(statErr) {
+		t.Errorf("locked worktree still on disk after --force: %v", statErr)
 	}
 }
 
@@ -270,11 +287,11 @@ func TestABatchDropsTheDataOfEveryWorktreeItRemoves(t *testing.T) {
 // to go is still there for its children.
 func TestReparentingFollowsWhatTheRunActuallyRemoved(t *testing.T) {
 	cases := map[string]struct {
-		locked string
+		jammed string
 		want   []domain.ReparentResult
 	}{
-		"the top failed": {locked: "top", want: []domain.ReparentResult{{Branch: "leaf", OldParent: "mid", NewParent: "top"}}},
-		"the mid failed": {locked: "mid", want: []domain.ReparentResult{{Branch: "mid", OldParent: "top", NewParent: "main"}}},
+		"the top failed": {jammed: "top", want: []domain.ReparentResult{{Branch: "leaf", OldParent: "mid", NewParent: "top"}}},
+		"the mid failed": {jammed: "mid", want: []domain.ReparentResult{{Branch: "mid", OldParent: "top", NewParent: "main"}}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -284,7 +301,7 @@ func TestReparentingFollowsWhatTheRunActuallyRemoved(t *testing.T) {
 				"mid": makeWorktreeFrom(t, ctx, "mid", "top"),
 			}
 			makeWorktreeFrom(t, ctx, "leaf", "mid")
-			lockWorktree(t, ctx, paths[c.locked])
+			gittest.JamWorktree(t, paths[c.jammed])
 
 			outcome, _ := Run(Params{
 				Context:   ctx,

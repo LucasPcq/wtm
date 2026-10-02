@@ -57,7 +57,7 @@ Only a branch **another worktree already holds** is refused (exit `10`).
 
 **Which worktrees `prune` finds finished.** It reads **GitHub PR state via the `gh` CLI**, not local commits: `--merged` (PR merged), `--closed` (PR closed without merging), `--gone` (remote branch deleted); no filter means all three. `--merged` and `--closed` need `gh` installed and authenticated: without it they match nothing and prune prints a notice on stderr. Only `--gone` works offline. JSON `reason` values are `pr_merged` / `pr_closed` / `gone` (there is no plain `merged`).
 
-**Unsafe worktrees are refused** (dirty, unpushed commits, or an open PR) unless `--force`. For `clean` under `--yes`, one unsafe worktree refuses the **whole** run before anything is removed: pass `--force`, or name only the safe ones. For `prune` they are reported under `skipped` (reason `dirty`/`unpushed`/`open_pr`) instead of being removed, so committed work is never silently lost. For `prune`, when **every** match is unsafe, nothing survives the selection and the JSON is empty (`pruned: []` and `skipped: []`): read an empty result as "nothing was removed", not "nothing matched".
+**Unsafe worktrees are refused** (locked, dirty, unpushed commits, or an open PR) unless `--force`. For `clean` under `--yes`, one unsafe worktree refuses the **whole** run before anything is removed: pass `--force`, or name only the safe ones. For `prune` they are reported under `skipped` (reason `locked`/`dirty`/`unpushed`/`open_pr`) instead of being removed, so committed work is never silently lost. For `prune`, when **every** match is unsafe, nothing survives the selection and the JSON is empty (`pruned: []` and `skipped: []`): read an empty result as "nothing was removed", not "nothing matched".
 
 **Children.** Under `--yes`/JSON, surviving children are left orphaned unless you pass `--reparent-children` (they reparent onto their nearest ancestor that is not removed, the base when none is left).
 
@@ -67,7 +67,7 @@ Only a branch **another worktree already holds** is refused (exit `10`).
 - A hook that exits non-zero aborts it unless its entry sets `continue_on_error`.
 - `prune` runs the whole sequence on one worktree before the next and **stops at the first that fails**: the ones before are gone with their data, it and the ones after keep theirs, the JSON names it under `failed`, and the exit code is non-zero.
 - If `git worktree remove` fails on undeletable files (e.g. root-owned Docker files), interactive runs offer a `sudo rm -rf` fallback; otherwise, since git has already forgotten the worktree, the removal is completed (branch deleted, data dropped) and a warning names the leftover directory to delete.
-- A removal git refused outright (a locked worktree) is an error with nothing touched.
+- A locked worktree (`git worktree lock`, often guarding a network mount or removable drive) is refused like the others, and `--force` lifts the lock to remove it: never pass `--force` on one without the user's explicit go-ahead.
 - `clean`, `prune` and `run down` start a daemon by themselves when its index holds something for the worktree they act on.
 
 **Shared-service data.** Both commands also give back the namespaces the removed worktrees carved out of shared services (they drop their databases). Only worktrees that actually started the shared job owe anything; one created and thrown away owes nothing.

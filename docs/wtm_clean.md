@@ -8,8 +8,8 @@ Remove git worktrees and delete their local branches. The remote branch is never
 Without arguments, shows an interactive picker where several can be checked.
 
 Several worktrees are removed one after the other: a failure does not stop the others, and
-the run exits with the first failure's code. Under --yes, one unsafe worktree (dirty,
-unpushed, open PR) refuses the whole run before anything is removed, unless --force.
+the run exits with the first failure's code. Under --yes, one unsafe worktree (locked,
+dirty, unpushed, open PR) refuses the whole run before anything is removed, unless --force.
 
 The removal runs in a fixed order: the worktree's jobs are stopped and checked gone (a job
 that will not stop refuses the removal unless --force), the on_clean hooks run, git removes
@@ -46,7 +46,7 @@ wtm clean [branch...] [flags]
 
 ```
       --drop-data           Drop the removed worktrees' data now, starting the shared services that are down to do it
-      --force               Lift safety refusals (dirty/unpushed/open-PR); still asks to confirm unless --yes
+      --force               Lift safety refusals (locked/dirty/unpushed/open-PR); still asks to confirm unless --yes
   -h, --help                help for clean
       --keep-data           Keep the namespaces the removed worktrees carved out of shared services
       --output string       Output format: text or json (default "text")

@@ -54,7 +54,7 @@ func buildRows(statuses []domain.WorktreeStatus, activeBranch string, prs []doma
 	for _, s := range statuses {
 		r := row{
 			branch:   styles.Bold.Render(s.Branch),
-			tag:      formatTag(s.IsParent, s.Branch == activeBranch),
+			tag:      formatTag(s, s.Branch == activeBranch),
 			pr:       formatPRTag(s.Branch, prs),
 			services: formatServicesTag(s.Path, svcs),
 			ahead:    formatAhead(s.CommitsAhead),
@@ -84,20 +84,18 @@ func formatServicesTag(worktreePath string, svcs []domain.JobInfo) string {
 	return ""
 }
 
-func formatTag(isParent bool, isActive bool) string {
-	tags := ""
-	if isParent {
-		tags = styles.Muted.Render("(parent)")
+func formatTag(s domain.WorktreeStatus, isActive bool) string {
+	var tags []string
+	if s.IsParent {
+		tags = append(tags, styles.Muted.Render("(parent)"))
 	}
 	if isActive {
-		active := styles.Success.Render(domain.WorktreeActiveTag)
-		if tags != "" {
-			tags += "  " + active
-		} else {
-			tags = active
-		}
+		tags = append(tags, styles.Success.Render(domain.WorktreeActiveTag))
 	}
-	return tags
+	if s.IsLocked {
+		tags = append(tags, styles.Warning.Render(domain.TreeBadgeLockedText))
+	}
+	return strings.Join(tags, "  ")
 }
 
 // formatWorktreeState renders the status column. A paused rebase takes
@@ -203,6 +201,7 @@ func WriteWorktreeListJSON(w io.Writer, params WriteWorktreeListJSONParams) erro
 			Path:             s.Path,
 			IsParent:         s.IsParent,
 			IsDirty:          s.IsDirty,
+			IsLocked:         s.IsLocked,
 			RebaseInProgress: s.RebaseInProgress,
 			CommitsAhead:     s.CommitsAhead,
 			CreatedAt:        s.CreatedAt,

@@ -74,6 +74,7 @@ func checkLocal(params checkLocalParams) (domain.CleanCheckResult, error) {
 		Branch:          params.Branch,
 		UnpushedCommits: unpushed,
 		IsDirty:         dirty,
+		IsLocked:        wt.Locked,
 	}, nil
 }
 
@@ -109,6 +110,7 @@ func Clean(params domain.CleanParams) error {
 		ProjectDir: params.ProjectDir,
 		Path:       wt.Path,
 		Force:      params.Force,
+		Locked:     wt.Locked,
 	}); err != nil {
 		return fmt.Errorf("%w: %w", domain.ErrWorktreeRemoveFailed, err)
 	}

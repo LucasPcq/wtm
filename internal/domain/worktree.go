@@ -47,6 +47,7 @@ type WorktreeStatus struct {
 	Path         string
 	IsParent     bool
 	IsDirty      bool
+	IsLocked     bool
 	CommitsAhead int
 	CreatedAt    time.Time
 	// RebaseInProgress is true when the worktree has a rebase paused mid-way (e.g.
@@ -70,6 +71,7 @@ type WorktreeListEntry struct {
 	Path             string              `json:"path"`
 	IsParent         bool                `json:"is_parent"`
 	IsDirty          bool                `json:"is_dirty"`
+	IsLocked         bool                `json:"is_locked"`
 	RebaseInProgress bool                `json:"rebase_in_progress"`
 	CommitsAhead     int                 `json:"commits_ahead"`
 	CreatedAt        time.Time           `json:"created_at"`
@@ -297,6 +299,7 @@ type CleanCheckResult struct {
 	HasOpenPR       bool
 	PRUrl           string
 	IsDirty         bool
+	IsLocked        bool
 	IsParent        bool
 }
 

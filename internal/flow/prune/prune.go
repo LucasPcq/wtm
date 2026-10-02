@@ -22,7 +22,7 @@ type Request struct {
 	Closed  bool
 	Gone    bool
 	NoFetch bool
-	// Force is the safety axis: it lifts the dirty/unpushed/open-PR refusals.
+	// Force is the safety axis: it lifts the locked/dirty/unpushed/open-PR refusals.
 	Force            bool
 	ReparentChildren bool
 	// DryRun previews the plan and mutates nothing. It is a business input, not

@@ -86,6 +86,8 @@ func formatTreeAnnotations(node *domain.TreeNode) string {
 			parts = append(parts, styles.Warning.Render(domain.TreeBadgeRebasingText))
 		case domain.TreeBadgeDirty:
 			parts = append(parts, styles.Warning.Render(domain.TreeBadgeDirtyText))
+		case domain.TreeBadgeLocked:
+			parts = append(parts, styles.Warning.Render(domain.TreeBadgeLockedText))
 		case domain.TreeBadgeNeedsSync:
 			parts = append(parts, styles.Warning.Render(domain.TreeBadgeNeedsSyncText))
 		case domain.TreeBadgeCycle:
@@ -204,6 +206,8 @@ func mermaidLabel(node *domain.TreeNode) string {
 			parts = append(parts, domain.TreeBadgeRebasingText)
 		case domain.TreeBadgeDirty:
 			parts = append(parts, domain.TreeBadgeDirtyText)
+		case domain.TreeBadgeLocked:
+			parts = append(parts, domain.TreeBadgeLockedText)
 		case domain.TreeBadgeNeedsSync:
 			parts = append(parts, domain.TreeBadgeNeedsSyncText)
 		case domain.TreeBadgeCycle:
