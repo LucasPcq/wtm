@@ -295,24 +295,6 @@ func checkFile(fset *token.FileSet, path string, file *ast.File) []finding {
 	return findings
 }
 
-// glyphVocabulary is docs/dev/output.md's table, as runes. A seventh glyph is a
-// decision; typing one is not.
-var glyphVocabulary = map[string]string{
-	"✓": "GlyphSuccess",
-	"!": "GlyphAttention",
-	"✗": "GlyphFailure",
-	"=": "GlyphUnchanged",
-	"›": "GlyphProgress",
-	"→": "NextStepGlyph (a line head) or MoveArrowGlyph (punctuation inside a value)",
-	"~": "GlyphUpdate",
-}
-
-// drawingLayers are the ones that put glyphs on a screen. rules/ and service/
-// are left out on purpose: `=` and `!` are ordinary bytes to an env parser or a
-// pnpm workspace pattern, and a rule that cannot tell those apart is a rule
-// people work around.
-var drawingLayers = map[string]bool{"output": true, "styles": true, "tui": true}
-
 // checkOutputVocabulary is docs/dev/output.md made mechanical. The three rules
 // it enforces are the ones the surface actually drifted on once the glyph table
 // alone proved not to be enough:
@@ -372,45 +354,6 @@ func checkOutputVocabulary(fset *token.FileSet, own string, file *ast.File) []fi
 		return true
 	})
 	return findings
-}
-
-// fontSafe is every non-letter rune a string may put on a screen. It was
-// measured, not chosen: present in all of Cascadia Code, DejaVu Sans Mono, Fira
-// Code, Hack, IBM Plex Mono, Inconsolata, JetBrains Mono, Roboto Mono, Source
-// Code Pro, Ubuntu Mono, Menlo, Monaco and SF Mono. A rune a font lacks is drawn
-// from a fallback face, often wider than the cell, and eats the space after it —
-// which is how `↻ Updated profile` lost its space in Ghostty.
-var fontSafe = map[rune]string{
-	'§': "", '·': "", '×': "", '—': "", '•': "", '…': "", '‹': "", '›': "", '−': "",
-	'✓': "missing from Hack, Monaco and Roboto/Ubuntu Mono, kept as the success glyph every CLI uses",
-	'✗': "missing from 8 of the 13, kept as the failure glyph every CLI uses",
-	'←': "missing only from Monaco and Roboto/Ubuntu Mono",
-	'↑': "missing only from Monaco and Roboto/Ubuntu Mono",
-	'→': "missing only from Roboto/Ubuntu Mono",
-	'↓': "missing only from Roboto/Ubuntu Mono",
-}
-
-// fontLegacy predates the rule, each rune with the number of sites it had. Each
-// reports once as migrating; a site beyond its count fails, and a count higher
-// than needed is reported to be lowered — the list may only shrink, towards a
-// rune of fontSafe.
-var fontLegacy = map[rune]int{
-	'↗': 1, '⊘': 1, '⋯': 2, '▸': 21, '▾': 2, '▶': 1, '◆': 1,
-	'◈': 1, '◉': 1, '○': 5, '◌': 1, '●': 12, '⚠': 20, '❯': 2,
-}
-
-func legacyBudgets() map[string]int {
-	budgets := make(map[string]int, len(fontLegacy))
-	for r, sites := range fontLegacy {
-		budgets[string(r)] = sites
-	}
-	return budgets
-}
-
-// isTerminalDrawn is box drawing and block elements, which terminals render as
-// their own sprites rather than from the font.
-func isTerminalDrawn(r rune) bool {
-	return r >= 0x2500 && r <= 0x259F
 }
 
 func checkFontCoverage(fset *token.FileSet, file *ast.File) []finding {
