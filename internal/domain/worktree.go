@@ -275,6 +275,9 @@ type CleanFailure struct {
 	Path     string `json:"path,omitempty"`
 	Error    string `json:"error"`
 	ExitCode int    `json:"exit_code"`
+	// Privileged is a removal git refused on files only sudo can delete, which a
+	// surface that cannot hand over its terminal has to name the way out of.
+	Privileged bool `json:"-"`
 }
 
 // CleanBatchResult is the clean payload, an envelope even for one worktree.

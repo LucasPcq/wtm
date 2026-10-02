@@ -81,3 +81,14 @@ func TestTheGlobalMenuOffersToDeleteSeveralWorktrees(t *testing.T) {
 	}
 	t.Error("the global menu should offer to delete several worktrees")
 }
+
+// The dashboard cannot hand its terminal to sudo, so a batch member git could
+// not remove names the way out, as a single clean does.
+func TestABatchFailureThatNeedsSudoNamesTheWayOut(t *testing.T) {
+	msgs := posted(func(send func(tea.Msg)) {
+		newCleanPresenter(presenter{send: send, id: 1}).WorktreeFailed(domain.CleanFailure{Branch: "feat/b", Error: "permission denied", Privileged: true})
+	})
+	if text := outputText(msgs); !strings.Contains(text, "wtm clean feat/b --force") {
+		t.Errorf("output %q should name the privileged removal", text)
+	}
+}

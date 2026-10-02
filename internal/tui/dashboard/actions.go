@@ -433,13 +433,13 @@ func (m Model) beginOp(params beginParams) (Model, int) {
 	return m.reflow(), id
 }
 
-// finishOp also invalidates the finished operation's target: its detail, if
-// currently on screen, just went stale under it and is reloaded — the cache is
-// refreshed, never emptied.
+// finishOp also reloads the detail on screen, whatever the run targeted: a
+// removal or a reparent changes the children listed on rows it never held — the
+// cache is refreshed, never emptied.
 func (m Model) finishOp(msg opDoneMsg) (Model, tea.Cmd) {
 	op, _ := m.ops.byID(msg.id)
 	m.ops = m.ops.end(msg.id)
-	m, detailCmd := m.invalidateDetail(op.firstTarget())
+	m, detailCmd := m.invalidateDetail(m.selectedBranch())
 	// A run that just started or stopped jobs changes what the badges and the
 	// RUN section say, and waiting for the next poll to notice is what made a
 	// finished run look like nothing had happened.

@@ -238,3 +238,18 @@ func TestMarkerWaitsForTheGraceDelay(t *testing.T) {
 		t.Error("sous le délai d'apparition, aucun marqueur : ce serait du flash déguisé en feedback")
 	}
 }
+
+// A removal changes rows it never targeted: the parent on screen loses a
+// child, so its detail is reloaded whatever the run held.
+func TestFinishingARunReloadsTheDetailOnScreen(t *testing.T) {
+	model := newTestModel(t, testWidth, testHeight, "main", "feat/a", "feat/b")
+	model.detailLoading = ""
+	ops, id := model.ops.begin(operation{kind: domain.OpKindClean, targets: []string{"feat/b"}})
+	model.ops = ops
+
+	model, _ = model.finishOp(opDoneMsg{id: id})
+
+	if model.detailLoading != model.selectedBranch() {
+		t.Errorf("detailLoading = %q, want the detail on screen (%q) reloaded", model.detailLoading, model.selectedBranch())
+	}
+}

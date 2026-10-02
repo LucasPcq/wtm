@@ -196,6 +196,9 @@ func (p cleanPresenter) WorktreeCleaned(result domain.CleanResult) {
 
 func (p cleanPresenter) WorktreeFailed(failure domain.CleanFailure) {
 	p.line(fmt.Sprintf(domain.DashboardFailedFmt, failure.Branch, failure.Error))
+	if failure.Privileged {
+		p.line(fmt.Sprintf(domain.DashboardPrivilegedHintFmt, failure.Branch))
+	}
 }
 
 func (p cleanPresenter) Cleaned(outcome cleanflow.Outcome) error {
