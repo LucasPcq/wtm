@@ -3,7 +3,6 @@ package env
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
@@ -125,7 +124,7 @@ func (f *envFlow) answeredTarget(branch string) (target, error) {
 func (f *envFlow) lookup(branch string) (target, error) {
 	wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branch})
 	if err != nil {
-		return target{}, fmt.Errorf(domain.EnvWorktreeLookupFmt, branch, err)
+		return target{}, err
 	}
 	return target{branch: wt.Branch, path: wt.Path}, nil
 }

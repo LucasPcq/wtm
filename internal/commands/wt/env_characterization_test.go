@@ -176,5 +176,7 @@ func envGoldenCases() []envGoldenCase {
 		{name: "err-bad-on-conflict", args: []string{"main", yes, "--" + domain.FlagOnConflict, "bogus"}},
 		{name: "err-bad-isolation", args: []string{"main", yes, isolation, "bogus"}},
 		{name: "err-isolation-with-check", args: []string{"main", "--" + domain.FlagCheck, isolation, "verbatim"}},
+		{name: "err-prune-with-check", args: []string{"main", "--" + domain.FlagCheck, "--" + domain.FlagPrune}},
+		{name: "err-on-conflict-in-add", args: []string{"main", yes, "--" + domain.FlagOnConflict, "overwrite"}},
 	}
 }

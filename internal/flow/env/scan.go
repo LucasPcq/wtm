@@ -36,7 +36,7 @@ func (f *envFlow) scan() error {
 	branches := branchNames(statuses)
 	if preset != "" {
 		if pathOf(statuses, preset) == "" {
-			return fmt.Errorf(domain.EnvWorktreeLookupFmt, preset, domain.ErrWorktreeNotFound)
+			return fmt.Errorf("%w: %s", domain.ErrWorktreeNotFound, preset)
 		}
 		if err := f.checkIsolation(target{branch: preset}, f.request.Isolation); err != nil {
 			return err

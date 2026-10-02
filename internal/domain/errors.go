@@ -109,8 +109,6 @@ var (
 	// source every other .env is copied from, so there is nothing for it to copy.
 	ErrIsolationMain = errors.New("the main checkout is always isolated: it is the one the others copy from")
 
-	// ErrEnvIsolationWithCheck refuses to record a choice on a run that promised
-	// to write nothing.
 	ErrEnvIsolationWithCheck = errors.New("--isolation records a choice for the worktree, and --check writes nothing: pass one or the other")
 
 	// ErrGHNotInstalled is returned when the gh CLI is not found on PATH.
@@ -198,17 +196,13 @@ var (
 	ErrReparentBranchesRequired = errors.New("specify at least one worktree (no interactive picker under --yes, without a terminal, or in --output json mode)")
 	ErrReparentParentRequired   = errors.New("specify the new parent with --to (no interactive picker under --yes, without a terminal, or in --output json mode)")
 
-	// ErrEnvWorktreeRequired is returned when `wtm env` is invoked without a worktree
-	// argument and cannot fall back to the interactive picker (--yes, no terminal, or
-	// --output json).
-	ErrEnvWorktreeRequired = errors.New("specify a worktree (no interactive picker under --yes, without a terminal, or in --output json mode)")
+	ErrEnvWorktreeRequired = errors.New("specify a worktree (no interactive picker under --yes or --check, without a terminal, or in --output json mode)")
+	ErrEnvJSONNeedsYes     = errors.New("--output json requires --yes or --check (interactive resolution cannot run in JSON mode)")
+	// ErrEnvDecisionWithCheck and ErrEnvOnConflictNeedsRefresh refuse a flag
+	// the run would silently ignore.
+	ErrEnvDecisionWithCheck      = errors.New("--prune and --on-conflict decide what to write, and --check writes nothing: pass one or the other")
+	ErrEnvOnConflictNeedsRefresh = errors.New("--on-conflict settles conflicts, and --mode add reports none: pass --mode refresh")
 
-	// ErrEnvJSONNeedsYes is returned when `wtm env` runs in --output json without
-	// --yes: interactive resolution cannot run in JSON mode.
-	ErrEnvJSONNeedsYes = errors.New("--output json requires --yes (interactive resolution cannot run in JSON mode)")
-
-	// ErrEnvNoFiles is returned when `wtm env` runs on a project whose config
-	// declares no env files to reconcile.
 	ErrEnvNoFiles = errors.New("no env files configured — run `wtm init --only env` to detect them")
 
 	// ErrEnvFileNoTarget is returned when an env.file entry has an empty target.

@@ -1,5 +1,5 @@
-args: feat/a --output json
-err: --output json requires --yes or --check (interactive resolution cannot run in JSON mode)
+args: main --yes --on-conflict overwrite
+err: --on-conflict settles conflicts, and --mode add reports none: pass --mode refresh
 --- stdout ---
 Usage:
   wtm env [worktree] [flags]
@@ -29,4 +29,4 @@ Flags:
   -y, --yes                  Skip all prompts; resolve every decision from flags and safe defaults (additions only)
 
 --- stderr ---
-Error: --output json requires --yes or --check (interactive resolution cannot run in JSON mode)
+Error: --on-conflict settles conflicts, and --mode add reports none: pass --mode refresh

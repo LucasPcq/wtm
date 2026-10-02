@@ -1063,7 +1063,6 @@ const (
 
 	// The `wtm env` wizard: its steps, and the recap of what the apply writes.
 	EnvWizardErrLabel       = "env wizard"
-	EnvWorktreeLookupFmt    = "worktree %q: %w"
 	EnvWorktreeStepLabel    = "Select worktree"
 	EnvWorktreeStepTitle    = "Select a worktree to reconcile"
 	EnvResolveStepLabel     = "Resolve"
