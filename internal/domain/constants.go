@@ -129,12 +129,9 @@ const (
 	// indentation on either side and the border between them.
 	RecapFrameChrome = 8
 	// A conclusion's counted summary: "3 applied · 1 skipped", zero counts dropped.
-	// BatchProgressFmt heads one item of a run over several worktrees, and
-	// BatchFailedFmt names the one that did not go through.
-	BatchProgressFmt    = "%s (%d/%d)"
-	BatchFailedFmt      = "%s — %s"
-	BranchGivenTwiceFmt = "%s is given twice"
-	// The question clean and prune ask about the children a removal orphans.
+	BatchProgressFmt      = "%s (%d/%d)"
+	BatchFailedFmt        = "%s — %s"
+	BranchGivenTwiceFmt   = "%s is given twice"
 	ReparentIntro         = "These children would otherwise be left orphaned:"
 	ReparentChildFmt      = "  • %s will rebase onto %s instead of %s"
 	ReparentOptionFmt     = "Reparent onto %s (%d)"

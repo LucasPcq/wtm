@@ -279,8 +279,7 @@ func (f *cleanFlow) splitUnsafe(selected []string) ([]string, []domain.PruneSkip
 	return safe, skipped
 }
 
-// reparents previews the moves for the steps, which rebuild on every move
-// through the wizard. Force plays no part in it.
+// Force plays no part in the moves a removal makes necessary.
 func (f *cleanFlow) reparents(selected []string) []domain.ReparentResult {
 	return f.moves.Get(selected, func() []domain.ReparentResult {
 		nodes, err := worktree.Nodes(worktree.NodesParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir})

@@ -123,8 +123,8 @@ func TestBlank_EmitsNewline(t *testing.T) {
 	}
 }
 
-// A conclusion counts what happened, never what did not: a zero count would put
-// "0 blocked" on every clean run and teach the reader to skip the line.
+// Every hint in the CLI is one arrow and one bold command, so a reader learns
+// once where to look for what to do next.
 func TestNextStepIsOneArrowAndOneCommand(t *testing.T) {
 	var buf bytes.Buffer
 	NextStep(&buf, NextStepParams{Command: "wtm go feat/x"})

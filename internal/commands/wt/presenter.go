@@ -44,7 +44,6 @@ func (p createPresenter) BranchStarted(progress flow.Progress) {
 	batchStarted(p.CLIPresenter, progress)
 }
 
-// The batch's readout names every created branch at the end, where the CLI reads it.
 func (p createPresenter) BranchCreated(domain.CreateResult) {}
 
 func (p createPresenter) BranchFailed(failure domain.BatchFailure) {
@@ -129,7 +128,6 @@ func (p cleanPresenter) WorktreeStarted(progress flow.Progress) {
 	batchStarted(p.CLIPresenter, progress)
 }
 
-// The batch's readout names every removed worktree at the end, where the CLI reads it.
 func (p cleanPresenter) WorktreeCleaned(domain.CleanResult) {}
 
 func (p cleanPresenter) WorktreeFailed(failure domain.BatchFailure) {

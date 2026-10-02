@@ -6,6 +6,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
+// A conclusion counts what happened, never what did not: a zero count would put
+// "0 blocked" on every clean run and teach the reader to skip the line.
 func TestTallyDropsZeroCounts(t *testing.T) {
 	got := Tally(
 		domain.TallyPart{Count: 3, Label: domain.TallyApplied},
@@ -19,6 +21,3 @@ func TestTallyDropsZeroCounts(t *testing.T) {
 		t.Errorf("a run that did nothing tallied %q, want nothing", empty)
 	}
 }
-
-// Every hint in the CLI is one arrow and one bold command, so a reader learns
-// once where to look for what to do next.

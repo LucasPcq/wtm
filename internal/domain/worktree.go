@@ -190,8 +190,6 @@ type CreateResult struct {
 }
 
 // Path is set when the worktree exists but its hooks failed.
-// BatchFailure is one item of a run over several worktrees that did not go
-// through, while the others did.
 type BatchFailure struct {
 	Branch   string `json:"branch"`
 	Path     string `json:"path,omitempty"`
