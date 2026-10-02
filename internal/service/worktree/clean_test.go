@@ -156,3 +156,24 @@ func TestCleanPurgesWorktreeState(t *testing.T) {
 		t.Errorf("meta dir survived the clean, its ordinal %d stays reserved: %v", ordinal, err)
 	}
 }
+
+func TestCheckAllChecksEachBranchOnItsOwn(t *testing.T) {
+	source := gittest.InitRepo(t)
+	dirtyPath := filepath.Join(t.TempDir(), "dirty")
+	gitRun(t, source, "worktree", "add", "-q", "-b", "feat/dirty", dirtyPath, "HEAD")
+	if err := os.WriteFile(filepath.Join(dirtyPath, "wip.txt"), []byte("wip\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	entries := CheckAll(CheckAllParams{ProjectDir: source, Branches: []string{"feat/dirty", "feat/ghost", "main"}})
+
+	if entry := entries["feat/dirty"]; entry.Err != nil || !entry.Check.IsDirty || entry.Check.Branch != "feat/dirty" {
+		t.Errorf("feat/dirty = %+v, want a dirty worktree", entry)
+	}
+	if !errors.Is(entries["feat/ghost"].Err, domain.ErrWorktreeNotFound) {
+		t.Errorf("feat/ghost err = %v, want ErrWorktreeNotFound", entries["feat/ghost"].Err)
+	}
+	if !errors.Is(entries["main"].Err, domain.ErrCannotCleanParent) {
+		t.Errorf("main err = %v, want ErrCannotCleanParent", entries["main"].Err)
+	}
+}

@@ -13,6 +13,40 @@ import (
 
 // Check performs pre-deletion checks without deleting anything.
 func Check(params domain.CleanParams) (domain.CleanCheckResult, error) {
+	check, err := checkLocal(checkLocalParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
+	if err != nil {
+		return check, err
+	}
+	check.HasOpenPR, _, check.PRUrl = ghservice.HasOpenPR(ghservice.HasOpenPRParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
+	return check, nil
+}
+
+type CheckAllParams struct {
+	ProjectDir string
+	Branches   []string
+}
+
+// CheckAll performs the pre-deletion checks of several worktrees, asking GitHub
+// once for all of them rather than once each.
+func CheckAll(params CheckAllParams) map[string]domain.CleanCheckEntry {
+	open := ghservice.OpenPRsByBranch(params.ProjectDir)
+	entries := make(map[string]domain.CleanCheckEntry, len(params.Branches))
+	for _, branch := range params.Branches {
+		check, err := checkLocal(checkLocalParams{ProjectDir: params.ProjectDir, Branch: branch})
+		if url, found := open[branch]; found && err == nil {
+			check.HasOpenPR, check.PRUrl = true, url
+		}
+		entries[branch] = domain.CleanCheckEntry{Check: check, Err: err}
+	}
+	return entries
+}
+
+type checkLocalParams struct {
+	ProjectDir string
+	Branch     string
+}
+
+func checkLocal(params checkLocalParams) (domain.CleanCheckResult, error) {
 	wt, err := infra.FindWorktreeByBranch(infra.FindWorktreeByBranchParams{
 		ProjectDir: params.ProjectDir,
 		Branch:     params.Branch,
@@ -20,31 +54,16 @@ func Check(params domain.CleanParams) (domain.CleanCheckResult, error) {
 	if err != nil {
 		return domain.CleanCheckResult{}, err
 	}
-
 	if wt.IsMain {
 		return domain.CleanCheckResult{}, domain.ErrCannotCleanParent
 	}
-
-	unpushed, _ := infra.UnpushedCommits(infra.UnpushedCommitsParams{
-		ProjectDir: params.ProjectDir,
-		Branch:     params.Branch,
-	})
-
-	haspr, _, prurl := ghservice.HasOpenPR(ghservice.HasOpenPRParams{
-		ProjectDir: params.ProjectDir,
-		Branch:     params.Branch,
-	})
-
+	unpushed, _ := infra.UnpushedCommits(infra.UnpushedCommitsParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
 	dirty, _ := infra.IsDirty(infra.IsDirtyParams{WorktreePath: wt.Path})
-
 	return domain.CleanCheckResult{
 		WorktreePath:    wt.Path,
 		Branch:          params.Branch,
 		UnpushedCommits: unpushed,
-		HasOpenPR:       haspr,
-		PRUrl:           prurl,
 		IsDirty:         dirty,
-		IsParent:        wt.IsMain,
 	}, nil
 }
 

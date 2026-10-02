@@ -46,6 +46,40 @@ func HasOpenPR(params HasOpenPRParams) (bool, int, string) {
 	return true, items[0].Number, items[0].URL
 }
 
+// OpenPRsByBranch maps each branch with an open pull request to its URL, in one
+// call however many worktrees ask. It answers an empty map wherever HasOpenPR
+// would answer false.
+func OpenPRsByBranch(projectDir string) map[string]string {
+	open := map[string]string{}
+	if err := ensureAuth(); err != nil {
+		return open
+	}
+
+	type prItem struct {
+		Branch string `json:"headRefName"`
+		URL    string `json:"url"`
+	}
+
+	data, err := runGH(projectDir, "pr", "list",
+		"--state", "open",
+		"--json", "headRefName,url",
+		"--limit", "200",
+	)
+	if err != nil {
+		return open
+	}
+	items, err := parseJSON[[]prItem](data)
+	if err != nil {
+		return open
+	}
+	for _, item := range items {
+		if _, seen := open[item.Branch]; !seen {
+			open[item.Branch] = item.URL
+		}
+	}
+	return open
+}
+
 // ListPRsParams holds inputs for listing pull requests.
 type ListPRsParams struct {
 	ProjectDir string
