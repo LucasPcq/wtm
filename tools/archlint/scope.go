@@ -40,6 +40,12 @@ func objectOf(info *types.Info, expr ast.Expr) types.Object {
 	return nil
 }
 
+// packageLevel tells shared.Interactive from a field of the same name in a
+// shared params struct, which a command sets without reading any gate.
+func packageLevel(obj types.Object) bool {
+	return obj.Pkg().Scope().Lookup(obj.Name()) == obj
+}
+
 func refers(obj types.Object, ref objectRef) bool {
-	return obj != nil && obj.Pkg() != nil && obj.Pkg().Path() == ref.Path && obj.Name() == ref.Name
+	return obj != nil && obj.Pkg() != nil && obj.Pkg().Path() == ref.Path && obj.Name() == ref.Name && packageLevel(obj)
 }

@@ -46,7 +46,7 @@ func referencedIn(info *types.Info, file *ast.File) map[objectRef]bool {
 			return true
 		}
 		obj := info.Uses[ident]
-		if obj == nil || obj.Pkg() == nil {
+		if obj == nil || obj.Pkg() == nil || !packageLevel(obj) {
 			return true
 		}
 		seen[objectRef{Path: obj.Pkg().Path(), Name: obj.Name()}] = true

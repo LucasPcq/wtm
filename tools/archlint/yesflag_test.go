@@ -14,5 +14,6 @@ func TestACommandReadingTheGateRegistersYes(t *testing.T) {
 		internalPrefix+"commands/aliased",
 		internalPrefix+"commands/retired",
 		internalPrefix+"commands/helper",
+		internalPrefix+"commands/field",
 	)
 }
