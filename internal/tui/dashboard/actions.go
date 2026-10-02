@@ -75,7 +75,7 @@ func (m Model) startClean(branch string) (Model, tea.Cmd) {
 	params := cleanflow.Params{
 		Context: m.flowContext(),
 		Request: cleanflow.Request{
-			Branch:     branch,
+			Branches:   []string{branch},
 			BaseBranch: m.baseBranch(),
 		},
 		Prompter: prompter{

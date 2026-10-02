@@ -24,11 +24,12 @@ const (
 	reparentYes = "reparent"
 	reparentNo  = "orphan"
 	deleteYes   = "yes"
+	deleteSafe  = "safe"
 	deleteForce = "force"
 )
 
 const (
-	labelWorktree = "Worktree"
+	labelWorktree = "Worktrees"
 	labelReparent = "Reparent children"
 	labelDelete   = "Delete"
 )
@@ -38,17 +39,16 @@ func (f *cleanFlow) session() flow.Session {
 	return flow.Session{
 		ErrLabel: domain.CleanWizardErrLabel,
 		Presets: flow.NewAnswers(map[string]string{
-			KeyWorktree: f.request.Branch,
 			KeyReparent: f.presetReparent(),
 			KeyData:     owed.DataPreset(f.request.DropData),
-		}),
+		}).WithValues(KeyWorktree, f.request.Branches),
 		Steps: []flow.Step{
 			f.worktreeStep(),
 			f.reparentStep(),
 			owed.DataStep(owed.DataStepParams{
 				Key:      KeyData,
 				KeepData: f.request.KeepData,
-				Snapshot: func(answers flow.Answers) owed.Snapshot { return f.holdings(answers.Value(KeyWorktree)) },
+				Snapshot: func(answers flow.Answers) owed.Snapshot { return f.holdings(answers.Values(KeyWorktree)) },
 			}),
 			f.deleteStep(),
 		},
@@ -57,7 +57,7 @@ func (f *cleanFlow) session() flow.Session {
 
 func (f *cleanFlow) worktreeStep() flow.Step {
 	return flow.Step{
-		Kind:        flow.StepSelect,
+		Kind:        flow.StepMultiSelect,
 		Key:         KeyWorktree,
 		Label:       labelWorktree,
 		Title:       domain.CleanPickerTitle,
@@ -67,15 +67,19 @@ func (f *cleanFlow) worktreeStep() flow.Step {
 			if err != nil {
 				return flow.StepContent{}, err
 			}
-			return flow.StepContent{
-				Title:       domain.CleanPickerTitle,
-				Description: domain.MultiSelectHint,
-				Options:     options,
-			}, nil
+			return flow.StepContent{Title: domain.CleanPickerTitle, Description: domain.MultiSelectHint, Options: options}, nil
+		},
+		ValidateSet: func(values []string) error {
+			if len(values) == 0 {
+				return errors.New(domain.CleanSelectionRequired)
+			}
+			return nil
 		},
 		Resolve: func(flow.Answers) (flow.Answer, error) {
 			return flow.Answer{}, domain.ErrCleanBranchRequired
 		},
+		Summarize: flow.SummarizeSet,
+		Arg:       true,
 	}
 }
 
@@ -104,17 +108,17 @@ func (f *cleanFlow) reparentStep() flow.Step {
 		Key:   KeyReparent,
 		Label: labelReparent,
 		Skip: func(answers flow.Answers) (bool, string) {
-			if len(f.reparentPlan(answers.Value(KeyWorktree)).Children) == 0 {
+			if len(f.reparents(answers.Values(KeyWorktree))) == 0 {
 				return true, domain.CleanNoOrphanedChildren
 			}
 			return false, ""
 		},
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
-			plan := f.reparentPlan(answers.Value(KeyWorktree))
+			moves := f.reparents(answers.Values(KeyWorktree))
 			return flow.StepContent{
-				Description: reparentProposal(plan),
+				Description: reparentProposal(moves),
 				Options: []flow.Option{
-					{Label: fmt.Sprintf(domain.CleanReparentOptionFmt, plan.Grandparent, len(plan.Children)), Value: reparentYes},
+					{Label: reparentOptionLabel(moves), Value: reparentYes},
 					{Separator: true},
 					{Label: domain.CleanOrphanOption, Value: reparentNo},
 				},
@@ -134,8 +138,6 @@ func (f *cleanFlow) reparentStep() flow.Step {
 	}
 }
 
-// presetReparent answers the step from --reparent-children, so the decision is not
-// asked and every reader sees the same answer.
 func (f *cleanFlow) presetReparent() string {
 	if f.request.ReparentChildren {
 		return reparentYes
@@ -143,31 +145,53 @@ func (f *cleanFlow) presetReparent() string {
 	return ""
 }
 
-func reparentProposal(plan domain.CleanReparentPlan) string {
-	lines := make([]string, 0, len(plan.Children)+1)
+func reparentProposal(moves []domain.ReparentResult) string {
+	lines := make([]string, 0, len(moves)+1)
 	lines = append(lines, domain.CleanReparentIntro)
-	for _, child := range plan.Children {
-		lines = append(lines, fmt.Sprintf(domain.CleanReparentChildFmt, child.Branch, child.NewParent, child.OldParent))
+	for _, move := range moves {
+		lines = append(lines, fmt.Sprintf(domain.CleanReparentChildFmt, move.Branch, move.NewParent, move.OldParent))
 	}
 	return strings.Join(lines, "\n")
 }
 
+// One destination reads as it always did; several are named one by one in the
+// proposal above the options.
+func reparentOptionLabel(moves []domain.ReparentResult) string {
+	if parent, single := soleParent(moves); single {
+		return fmt.Sprintf(domain.CleanReparentOptionFmt, parent, len(moves))
+	}
+	return fmt.Sprintf(domain.CleanReparentManyOptionFmt, len(moves))
+}
+
+func soleParent(moves []domain.ReparentResult) (string, bool) {
+	if len(moves) == 0 {
+		return "", false
+	}
+	for _, move := range moves[1:] {
+		if move.NewParent != moves[0].NewParent {
+			return "", false
+		}
+	}
+	return moves[0].NewParent, true
+}
+
 func (f *cleanFlow) deleteStep() flow.Step {
 	content := func(answers flow.Answers) (flow.StepContent, error) {
-		check, _ := f.checkCached(answers.Value(KeyWorktree))
+		selected := answers.Values(KeyWorktree)
+		checks := f.checksOf(selected)
 		return flow.StepContent{
 			Title: domain.CleanDeleteTitle,
 			Description: deleteRecap(deleteRecapParams{
-				Check:    check,
+				Checks:   checks,
 				Reparent: f.reparentLine(answers),
 				Namespaces: rules.DataRecapLines(rules.DataRecapLinesParams{
-					Held:      f.holdings(answers.Value(KeyWorktree)).Held(),
+					Held:      f.holdings(selected).Held(),
 					StartDown: answers.Value(KeyData) == owed.DataStart,
 					KeepData:  f.request.KeepData,
 				}),
 			}),
-			Options:  deleteOptions(check),
-			Blockers: blockersOf(check),
+			Options:  deleteOptions(checks),
+			Blockers: blockersOf(checks),
 		}, nil
 	}
 
@@ -179,9 +203,9 @@ func (f *cleanFlow) deleteStep() flow.Step {
 		LoadingMessage: domain.CleanCheckLoading,
 		Resolve:        f.resolveDelete,
 	}
-	// A branch given up front was already checked, so its recap needs no I/O. A
-	// picked one is checked then and there, over the network.
-	if f.request.Branch != "" {
+	// Named worktrees were already checked, so their recap needs no I/O. Picked
+	// ones are checked then and there, over the network.
+	if len(f.request.Branches) > 0 {
 		step.Build = content
 		return step
 	}
@@ -189,38 +213,52 @@ func (f *cleanFlow) deleteStep() flow.Step {
 	return step
 }
 
-// resolveDelete keeps the safety check while answering: --yes is the confirmation
-// axis, not a licence to remove something unsafe. Only --force lifts the refusal.
+// resolveDelete keeps the safety check while answering: --yes is the
+// confirmation axis, not a licence to remove something unsafe, and the user
+// named every worktree, so none is left out behind their back. Only --force
+// lifts the refusal.
 func (f *cleanFlow) resolveDelete(answers flow.Answers) (flow.Answer, error) {
 	if f.request.Force {
 		return flow.Answer{Value: deleteYes}, nil
 	}
-	check, err := f.checkStaged(answers.Value(KeyWorktree))
-	if err != nil {
-		// Absent, parent or unreadable: the removal reports all three idempotently.
-		return flow.Answer{Value: deleteYes}, nil
+	selected := answers.Values(KeyWorktree)
+	if err := f.checkAll(selected); err != nil {
+		return flow.Answer{}, err
 	}
-	if reason, unsafe := rules.CleanUnsafeReason(check); unsafe {
-		return flow.Answer{}, fmt.Errorf(domain.CleanForceHintFmt, check.Branch, reason)
+	if refusal, unsafe := rules.CleanUnsafeRefusal(f.checksOf(selected)); unsafe {
+		return flow.Answer{}, errors.New(refusal)
 	}
 	return flow.Answer{Value: deleteYes}, nil
 }
 
-func deleteOptions(check domain.CleanCheckResult) []flow.Option {
-	options := []flow.Option{{Label: domain.CleanDeleteOption, Value: deleteYes}}
-	if rules.HasWarnings(check) {
-		options = append(options,
-			flow.Option{Separator: true},
-			flow.Option{Label: domain.CleanForceDeleteOption, Value: deleteForce, Danger: true},
-		)
+// deleteOptions never offers a plain removal of an unsafe batch: git would
+// refuse some halfway, after their worktree was gone. One worktree keeps the
+// options it always had.
+func deleteOptions(checks []domain.CleanCheckResult) []flow.Option {
+	unsafe := 0
+	for _, check := range checks {
+		if rules.HasWarnings(check) {
+			unsafe++
+		}
 	}
-	return options
+	plain := flow.Option{Label: domain.CleanDeleteOption, Value: deleteYes}
+	if unsafe == 0 {
+		return []flow.Option{plain}
+	}
+	force := flow.Option{Label: domain.CleanForceDeleteOption, Value: deleteForce, Danger: true}
+	if len(checks) == 1 {
+		return []flow.Option{plain, {Separator: true}, force}
+	}
+	force.Label = domain.CleanForceDeleteManyOption
+	if unsafe == len(checks) {
+		return []flow.Option{force}
+	}
+	safe := flow.Option{Label: fmt.Sprintf(domain.CleanDeleteSafeOptionFmt, len(checks)-unsafe), Value: deleteSafe}
+	return []flow.Option{safe, {Separator: true}, force}
 }
 
-// blockersOf carries the refusals to the surface, which decides whether to print
-// them or to ask for each one to be lifted.
-func blockersOf(check domain.CleanCheckResult) []flow.Blocker {
-	refusals := rules.CleanBlockers(check)
+func blockersOf(checks []domain.CleanCheckResult) []flow.Blocker {
+	refusals := rules.CleanBatchBlockers(checks)
 	blockers := make([]flow.Blocker, 0, len(refusals))
 	for _, refusal := range refusals {
 		blockers = append(blockers, flow.Blocker{Key: refusal.Key, Label: refusal.Label})
@@ -229,7 +267,7 @@ func blockersOf(check domain.CleanCheckResult) []flow.Blocker {
 }
 
 type deleteRecapParams struct {
-	Check    domain.CleanCheckResult
+	Checks   []domain.CleanCheckResult
 	Reparent string
 	// Namespaces are the lines naming the data this clean gives back, or the one
 	// saying it is kept. A flag must never make a line disappear from a recap,
@@ -238,19 +276,14 @@ type deleteRecapParams struct {
 }
 
 func deleteRecap(params deleteRecapParams) string {
-	check := params.Check
 	var lines []string
-	for _, blocker := range rules.CleanBlockers(check) {
+	for _, blocker := range rules.CleanBatchBlockers(params.Checks) {
 		lines = append(lines, blocker.Label)
 	}
 	if len(lines) > 0 {
 		lines = append(lines, "")
 	}
-	lines = append(lines,
-		domain.CleanWillDelete,
-		domain.CleanWillDeleteWorktree+check.WorktreePath,
-		domain.CleanWillDeleteBranch+check.Branch,
-	)
+	lines = append(lines, targetLines(params.Checks)...)
 	lines = append(lines, params.Namespaces...)
 	if params.Reparent != "" {
 		lines = append(lines, "", params.Reparent)
@@ -258,34 +291,53 @@ func deleteRecap(params deleteRecapParams) string {
 	return strings.Join(lines, "\n")
 }
 
-// holdings is read once per worktree: the data step and the recap both need it,
-// and it asks the daemon which services are up.
-func (f *cleanFlow) holdings(branchName string) owed.Snapshot {
-	if branchName == "" {
+func targetLines(checks []domain.CleanCheckResult) []string {
+	if len(checks) <= 1 {
+		var check domain.CleanCheckResult
+		if len(checks) == 1 {
+			check = checks[0]
+		}
+		return []string{
+			domain.CleanWillDelete,
+			domain.CleanWillDeleteWorktree + check.WorktreePath,
+			domain.CleanWillDeleteBranch + check.Branch,
+		}
+	}
+	lines := []string{fmt.Sprintf(domain.CleanWillDeleteManyFmt, len(checks))}
+	for _, check := range checks {
+		lines = append(lines, fmt.Sprintf(domain.CleanWillDeleteRowFmt, check.Branch, check.WorktreePath))
+	}
+	return lines
+}
+
+// holdings is read once per selection: the data step and the recap both need
+// it, and it asks the daemon which services are up.
+func (f *cleanFlow) holdings(selected []string) owed.Snapshot {
+	if len(selected) == 0 {
 		return owed.Snapshot{}
 	}
-	if snapshot, cached := f.snapshots[branchName]; cached {
+	key := strings.Join(selected, "\x00")
+	if snapshot, cached := f.snapshots[key]; cached {
 		return snapshot
 	}
 	if f.snapshots == nil {
 		f.snapshots = map[string]owed.Snapshot{}
 	}
-	snapshot := owed.Read(owed.ReadParams{Context: f.ctx, Branches: []string{branchName}})
-	f.snapshots[branchName] = snapshot
+	snapshot := owed.Read(owed.ReadParams{Context: f.ctx, Branches: selected})
+	f.snapshots[key] = snapshot
 	return snapshot
 }
 
 func (f *cleanFlow) reparentLine(answers flow.Answers) string {
-	branchName := answers.Value(KeyWorktree)
-	if branchName == "" {
+	moves := f.reparents(answers.Values(KeyWorktree))
+	if len(moves) == 0 {
 		return ""
 	}
-	plan := f.reparentPlan(branchName)
-	if len(plan.Children) == 0 {
-		return ""
+	if answers.Value(KeyReparent) != reparentYes {
+		return fmt.Sprintf(domain.CleanRecapOrphanFmt, len(moves))
 	}
-	if answers.Value(KeyReparent) == reparentYes {
-		return fmt.Sprintf(domain.CleanRecapReparentFmt, len(plan.Children), plan.Grandparent)
+	if parent, single := soleParent(moves); single {
+		return fmt.Sprintf(domain.CleanRecapReparentFmt, len(moves), parent)
 	}
-	return fmt.Sprintf(domain.CleanRecapOrphanFmt, len(plan.Children))
+	return fmt.Sprintf(domain.CleanRecapReparentManyFmt, len(moves))
 }

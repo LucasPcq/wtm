@@ -12,9 +12,9 @@ import (
 // that can only print, and as blockers for one that can have each of them lifted.
 func TestDeleteStepStatesEachRefusalOnItsOwn(t *testing.T) {
 	f := &cleanFlow{
-		request: Request{Branch: "feat"},
-		checks: map[string]checkResult{
-			"feat": {check: domain.CleanCheckResult{
+		request: Request{Branches: []string{"feat"}},
+		checks: map[string]domain.CleanCheckEntry{
+			"feat": {Check: domain.CleanCheckResult{
 				Branch:          "feat",
 				WorktreePath:    "/w/feat",
 				IsDirty:         true,
@@ -45,9 +45,9 @@ func TestDeleteStepStatesEachRefusalOnItsOwn(t *testing.T) {
 
 func TestDeleteStepOfBlockedNothingHasNoBlockers(t *testing.T) {
 	f := &cleanFlow{
-		request: Request{Branch: "feat"},
-		checks: map[string]checkResult{
-			"feat": {check: domain.CleanCheckResult{Branch: "feat", WorktreePath: "/w/feat"}},
+		request: Request{Branches: []string{"feat"}},
+		checks: map[string]domain.CleanCheckEntry{
+			"feat": {Check: domain.CleanCheckResult{Branch: "feat", WorktreePath: "/w/feat"}},
 		},
 	}
 

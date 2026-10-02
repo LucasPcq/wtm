@@ -48,7 +48,7 @@ type createdMsg struct {
 	selects bool
 }
 
-type cleanedMsg struct{ branch string }
+type cleanedMsg struct{}
 
 // reparentedMsg says the parent metadata changed, so the rows showing "from <x>"
 // have to be re-read.

@@ -79,11 +79,6 @@ func runClean(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	branchName := ""
-	if len(args) > 0 {
-		branchName = args[0]
-	}
-
 	// --force is the safety axis, not a confirmation bypass: it still runs the wizard,
 	// with the refusals lifted.
 	interactive := rules.IsHumanFormat(format) && term.IsTerminal(int(os.Stdin.Fd())) && !yes
@@ -91,7 +86,7 @@ func runClean(cmd *cobra.Command, args []string) error {
 	_, err = cleanflow.Run(cleanflow.Params{
 		Context: shared.FlowContext(config),
 		Request: cleanflow.Request{
-			Branch:           branchName,
+			Branches:         args,
 			Force:            force,
 			ReparentChildren: reparentFlag,
 			KeepData:         keepData,

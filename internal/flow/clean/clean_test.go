@@ -20,14 +20,14 @@ import (
 func answers(values map[string]string) flow.Answers { return flow.NewAnswers(values) }
 
 func TestDeleteRecapStatesWarningsAndTarget(t *testing.T) {
-	recap := deleteRecap(deleteRecapParams{Check: domain.CleanCheckResult{
+	recap := deleteRecap(deleteRecapParams{Checks: []domain.CleanCheckResult{{
 		Branch:          "feat",
 		WorktreePath:    "/w/feat",
 		IsDirty:         true,
 		UnpushedCommits: 2,
 		HasOpenPR:       true,
 		PRUrl:           "http://pr",
-	}})
+	}}})
 
 	for _, want := range []string{"uncommitted changes", "2 commit(s)", "http://pr", "Will delete:", "/w/feat", "feat"} {
 		if !strings.Contains(recap, want) {
@@ -38,7 +38,7 @@ func TestDeleteRecapStatesWarningsAndTarget(t *testing.T) {
 
 func TestDeleteRecapCarriesTheReparentDecision(t *testing.T) {
 	recap := deleteRecap(deleteRecapParams{
-		Check:    domain.CleanCheckResult{Branch: "feat", WorktreePath: "/w/feat"},
+		Checks:   []domain.CleanCheckResult{{Branch: "feat", WorktreePath: "/w/feat"}},
 		Reparent: "Then leave 2 child worktree(s) orphaned.",
 	})
 	if !strings.Contains(recap, "orphaned") {
@@ -47,12 +47,12 @@ func TestDeleteRecapCarriesTheReparentDecision(t *testing.T) {
 }
 
 func TestDeleteOptionsOfferForceOnlyWhenUnsafe(t *testing.T) {
-	safe := deleteOptions(domain.CleanCheckResult{Branch: "b", WorktreePath: "/b"})
+	safe := deleteOptions([]domain.CleanCheckResult{domain.CleanCheckResult{Branch: "b", WorktreePath: "/b"}})
 	if len(safe) != 1 || safe[0].Value != deleteYes {
 		t.Fatalf("options = %+v, want the plain removal only", safe)
 	}
 
-	unsafe := deleteOptions(domain.CleanCheckResult{Branch: "b", WorktreePath: "/b", IsDirty: true})
+	unsafe := deleteOptions([]domain.CleanCheckResult{domain.CleanCheckResult{Branch: "b", WorktreePath: "/b", IsDirty: true}})
 	var forced *flow.Option
 	for i := range unsafe {
 		if unsafe[i].Value == deleteForce {
@@ -68,12 +68,9 @@ func TestDeleteOptionsOfferForceOnlyWhenUnsafe(t *testing.T) {
 }
 
 func TestReparentProposalListsEveryMove(t *testing.T) {
-	text := reparentProposal(domain.CleanReparentPlan{
-		Grandparent: "gp",
-		Children: []domain.ReparentResult{
-			{Branch: "child", OldParent: "old", NewParent: "gp"},
-			{Branch: "other", OldParent: "old", NewParent: "gp"},
-		},
+	text := reparentProposal([]domain.ReparentResult{
+		{Branch: "child", OldParent: "old", NewParent: "gp"},
+		{Branch: "other", OldParent: "old", NewParent: "gp"},
 	})
 	for _, want := range []string{"child", "other", "old", "gp"} {
 		if !strings.Contains(text, want) {
@@ -87,7 +84,7 @@ func TestReparentProposalListsEveryMove(t *testing.T) {
 func TestResolveDeleteForceSkipsTheCheck(t *testing.T) {
 	f := &cleanFlow{
 		request:   Request{Force: true},
-		checks:    map[string]checkResult{},
+		checks:    map[string]domain.CleanCheckEntry{},
 		presenter: failingPresenter{t: t},
 	}
 
@@ -101,8 +98,8 @@ func TestResolveDeleteForceSkipsTheCheck(t *testing.T) {
 }
 
 func TestResolveDeleteKeepsSafetyWithoutForce(t *testing.T) {
-	f := &cleanFlow{checks: map[string]checkResult{
-		"feat": {check: domain.CleanCheckResult{Branch: "feat", IsDirty: true}},
+	f := &cleanFlow{checks: map[string]domain.CleanCheckEntry{
+		"feat": {Check: domain.CleanCheckResult{Branch: "feat", IsDirty: true}},
 	}}
 
 	_, err := f.resolveDelete(answers(map[string]string{KeyWorktree: "feat"}))
@@ -115,8 +112,8 @@ func TestResolveDeleteKeepsSafetyWithoutForce(t *testing.T) {
 }
 
 func TestResolveDeleteAllowsASafeWorktree(t *testing.T) {
-	f := &cleanFlow{checks: map[string]checkResult{
-		"feat": {check: domain.CleanCheckResult{Branch: "feat"}},
+	f := &cleanFlow{checks: map[string]domain.CleanCheckEntry{
+		"feat": {Check: domain.CleanCheckResult{Branch: "feat"}},
 	}}
 
 	answer, err := f.resolveDelete(answers(map[string]string{KeyWorktree: "feat"}))
@@ -146,8 +143,8 @@ func TestDropDataAnswersTheDataStep(t *testing.T) {
 		request Request
 		want    string
 	}{
-		"--drop-data": {request: Request{Branch: "feat", DropData: true}, want: owed.DataStart},
-		"--yes alone": {request: Request{Branch: "feat"}, want: ""},
+		"--drop-data": {request: Request{Branches: []string{"feat"}, DropData: true}, want: owed.DataStart},
+		"--yes alone": {request: Request{Branches: []string{"feat"}}, want: ""},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -162,7 +159,16 @@ func TestDropDataAnswersTheDataStep(t *testing.T) {
 type recorder struct {
 	*flowtest.Recorder
 	cleaned *Outcome
+	started []WorktreeProgress
+	done    []domain.CleanResult
+	failed  []domain.CleanFailure
 }
+
+func (r *recorder) WorktreeStarted(progress WorktreeProgress) {
+	r.started = append(r.started, progress)
+}
+func (r *recorder) WorktreeCleaned(result domain.CleanResult)  { r.done = append(r.done, result) }
+func (r *recorder) WorktreeFailed(failure domain.CleanFailure) { r.failed = append(r.failed, failure) }
 
 func newRecorder() *recorder { return &recorder{Recorder: &flowtest.Recorder{}} }
 
@@ -189,6 +195,18 @@ func (p failingPresenter) Notice(flow.Notice) { p.t.Error("no notice should be s
 
 func (p failingPresenter) Status(flow.Notice) { p.t.Error("no status should be shown") }
 
+func (p failingPresenter) WorktreeStarted(WorktreeProgress) {
+	p.t.Error("nothing should be reported")
+}
+
+func (p failingPresenter) WorktreeCleaned(domain.CleanResult) {
+	p.t.Error("nothing should be reported")
+}
+
+func (p failingPresenter) WorktreeFailed(domain.CleanFailure) {
+	p.t.Error("nothing should be reported")
+}
+
 func (p failingPresenter) Cleaned(Outcome) error {
 	p.t.Error("nothing should be concluded")
 	return nil
@@ -208,12 +226,17 @@ func testContext(t *testing.T) flow.Context {
 // depend on the create flow.
 func makeWorktree(t *testing.T, ctx flow.Context, branchName string) string {
 	t.Helper()
+	return makeWorktreeFrom(t, ctx, branchName, "main")
+}
+
+func makeWorktreeFrom(t *testing.T, ctx flow.Context, branchName, from string) string {
+	t.Helper()
 	result, err := worktree.Create(domain.CreateParams{
 		ProjectDir:   ctx.ProjectDir,
 		StateDir:     ctx.StateDir,
 		Branch:       branchName,
-		FromBranch:   "main",
-		SourceBranch: "main",
+		FromBranch:   from,
+		SourceBranch: from,
 		Config:       ctx.Config,
 		SkipHooks:    true,
 	})
@@ -232,7 +255,7 @@ func TestRunConfirmsThenRemoves(t *testing.T) {
 
 	outcome, err := Run(Params{
 		Context:   ctx,
-		Request:   Request{Branch: "feat/gone", BaseBranch: "main"},
+		Request:   Request{Branches: []string{"feat/gone"}, BaseBranch: "main"},
 		Prompter:  prompter,
 		Presenter: presenter,
 	})
@@ -246,10 +269,10 @@ func TestRunConfirmsThenRemoves(t *testing.T) {
 			t.Errorf("confirmation %q should contain %q", recap, line)
 		}
 	}
-	if outcome.AlreadyAbsent {
+	if len(outcome.Results) != 1 || outcome.Results[0].AlreadyAbsent {
 		t.Error("the worktree existed, so this is a removal, not a no-op")
 	}
-	if presenter.cleaned == nil || presenter.cleaned.Branch != "feat/gone" {
+	if presenter.cleaned == nil || len(presenter.cleaned.Results) != 1 || presenter.cleaned.Results[0].Branch != "feat/gone" {
 		t.Fatalf("cleaned = %+v, want the removal reported", presenter.cleaned)
 	}
 	if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
@@ -266,7 +289,7 @@ func TestRunPurgesTheWorktreeJobLogs(t *testing.T) {
 
 	if _, err := Run(Params{
 		Context:   ctx,
-		Request:   Request{Branch: "feat/logged", BaseBranch: "main"},
+		Request:   Request{Branches: []string{"feat/logged"}, BaseBranch: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}},
 		Presenter: newRecorder(),
 	}); err != nil {
@@ -297,7 +320,7 @@ func TestRunSucceedsWhenTheJobLogPurgeFails(t *testing.T) {
 
 	if _, err := Run(Params{
 		Context:   ctx,
-		Request:   Request{Branch: "feat/logged", BaseBranch: "main"},
+		Request:   Request{Branches: []string{"feat/logged"}, BaseBranch: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}},
 		Presenter: newRecorder(),
 	}); err != nil {
@@ -331,7 +354,7 @@ func TestRunOffersForceOnlyWhenUnsafe(t *testing.T) {
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteForce}}
 	if _, err := Run(Params{
 		Context:   ctx,
-		Request:   Request{Branch: "feat/dirty", BaseBranch: "main"},
+		Request:   Request{Branches: []string{"feat/dirty"}, BaseBranch: "main"},
 		Prompter:  prompter,
 		Presenter: newRecorder(),
 	}); err != nil {
@@ -362,20 +385,20 @@ func TestRunOnAbsentWorktreeConcludesWithoutAsking(t *testing.T) {
 
 	outcome, err := Run(Params{
 		Context:   testContext(t),
-		Request:   Request{Branch: "feat/ghost", BaseBranch: "main"},
+		Request:   Request{Branches: []string{"feat/ghost"}, BaseBranch: "main"},
 		Prompter:  prompter,
 		Presenter: presenter,
 	})
 	if err != nil {
 		t.Fatalf("cleaning an absent worktree must succeed: %v", err)
 	}
-	if !outcome.AlreadyAbsent {
+	if len(outcome.Results) != 1 || !outcome.Results[0].AlreadyAbsent {
 		t.Error("outcome should report the no-op")
 	}
 	if len(prompter.Asked) != 0 {
 		t.Errorf("asked %v, want nothing asked", prompter.Asked)
 	}
-	if presenter.cleaned == nil || !presenter.cleaned.AlreadyAbsent {
+	if presenter.cleaned == nil || len(presenter.cleaned.Results) != 1 || !presenter.cleaned.Results[0].AlreadyAbsent {
 		t.Errorf("cleaned = %+v, want the no-op reported", presenter.cleaned)
 	}
 }
@@ -386,7 +409,7 @@ func TestRunAbortedRemovesNothing(t *testing.T) {
 
 	outcome, err := Run(Params{
 		Context:   ctx,
-		Request:   Request{Branch: "feat/keep", BaseBranch: "main"},
+		Request:   Request{Branches: []string{"feat/keep"}, BaseBranch: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Abort: true},
 		Presenter: newRecorder(),
 	})
@@ -406,7 +429,7 @@ func TestRunAbortedRemovesNothing(t *testing.T) {
 // reader confirm a DROP DATABASE they were never shown.
 func TestDeleteRecapNamesTheDataItGivesBack(t *testing.T) {
 	recap := deleteRecap(deleteRecapParams{
-		Check:      domain.CleanCheckResult{Branch: "feat", WorktreePath: "/w/feat"},
+		Checks:     []domain.CleanCheckResult{{Branch: "feat", WorktreePath: "/w/feat"}},
 		Namespaces: []string{fmt.Sprintf(domain.CleanWillDeleteNamespaceFmt, "crm_feat", "db")},
 	})
 	for _, want := range []string{"crm_feat", "db"} {
@@ -418,7 +441,7 @@ func TestDeleteRecapNamesTheDataItGivesBack(t *testing.T) {
 
 func TestDeleteRecapSaysWhenTheDataIsKept(t *testing.T) {
 	recap := deleteRecap(deleteRecapParams{
-		Check:      domain.CleanCheckResult{Branch: "feat", WorktreePath: "/w/feat"},
+		Checks:     []domain.CleanCheckResult{{Branch: "feat", WorktreePath: "/w/feat"}},
 		Namespaces: []string{domain.CleanKeepDataLine},
 	})
 	if !strings.Contains(recap, "--keep-data") {
@@ -430,7 +453,7 @@ func TestDeleteRecapSaysWhenTheDataIsKept(t *testing.T) {
 // nothing and the recap reads exactly as it did before.
 func TestHoldingsEmptyWithoutASharedService(t *testing.T) {
 	flow := &cleanFlow{ctx: flow.Context{StateDir: t.TempDir()}}
-	if got := flow.holdings("feat").Held(); len(got) != 0 {
+	if got := flow.holdings([]string{"feat"}).Held(); len(got) != 0 {
 		t.Errorf("held = %v, want none", got)
 	}
 }

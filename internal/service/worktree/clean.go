@@ -11,16 +11,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/service/hooks"
 )
 
-// Check performs pre-deletion checks without deleting anything.
-func Check(params domain.CleanParams) (domain.CleanCheckResult, error) {
-	check, err := checkLocal(checkLocalParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
-	if err != nil {
-		return check, err
-	}
-	check.HasOpenPR, _, check.PRUrl = ghservice.HasOpenPR(ghservice.HasOpenPRParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
-	return check, nil
-}
-
 type CheckAllParams struct {
 	ProjectDir string
 	Branches   []string

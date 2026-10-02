@@ -166,19 +166,25 @@ func createTally(outcome createflow.Outcome) string {
 
 type cleanPresenter struct{ presenter }
 
+func (p cleanPresenter) WorktreeStarted(cleanflow.WorktreeProgress) {}
+func (p cleanPresenter) WorktreeCleaned(domain.CleanResult)         {}
+func (p cleanPresenter) WorktreeFailed(domain.CleanFailure)         {}
+
 func (p cleanPresenter) Cleaned(outcome cleanflow.Outcome) error {
-	if outcome.AlreadyAbsent {
-		p.line(fmt.Sprintf(domain.CleanAlreadyAbsentFmt, outcome.Branch))
-	} else {
-		p.line(fmt.Sprintf(domain.DashboardFinishedFmt, domain.OpKindClean, outcome.Branch))
+	for _, result := range outcome.Results {
+		if result.AlreadyAbsent {
+			p.line(fmt.Sprintf(domain.CleanAlreadyAbsentFmt, result.Branch))
+			continue
+		}
+		p.line(fmt.Sprintf(domain.DashboardFinishedFmt, domain.OpKindClean, result.Branch))
 	}
 	for _, child := range outcome.Reparented {
 		p.line(fmt.Sprintf(domain.CleanReparentedFmt, child.Branch, child.NewParent))
 	}
-	for _, child := range outcome.OrphanedChildren {
+	for _, child := range outcome.Orphaned {
 		p.line(fmt.Sprintf(domain.CleanStillOrphanedFmt, child.Branch, child.OldParent))
 	}
-	p.send(cleanedMsg{branch: outcome.Branch})
+	p.send(cleanedMsg{})
 	return nil
 }
 

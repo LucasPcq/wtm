@@ -114,36 +114,44 @@ type cleanPresenter struct {
 	shared.CLIPresenter
 }
 
+func (p cleanPresenter) WorktreeStarted(cleanflow.WorktreeProgress) {}
+func (p cleanPresenter) WorktreeCleaned(domain.CleanResult)         {}
+func (p cleanPresenter) WorktreeFailed(domain.CleanFailure)         {}
+
 func (p cleanPresenter) Cleaned(outcome cleanflow.Outcome) error {
-	if outcome.AlreadyAbsent {
+	if len(outcome.Results) != 1 {
+		return nil
+	}
+	result := outcome.Results[0]
+	if result.AlreadyAbsent {
 		if p.Format == domain.OutputJSON {
 			return output.WriteWorktreeCleanJSON(p.Cmd.OutOrStdout(), output.WriteWorktreeCleanJSONParams{
-				Branch:        outcome.Branch,
+				Branch:        result.Branch,
 				AlreadyAbsent: true,
 			})
 		}
 		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-			output.Unchanged(w, fmt.Sprintf(domain.CleanAlreadyAbsentFmt, outcome.Branch))
+			output.Unchanged(w, fmt.Sprintf(domain.CleanAlreadyAbsentFmt, result.Branch))
 		})
 		return nil
 	}
 
 	if p.Format == domain.OutputJSON {
 		return output.WriteWorktreeCleanJSON(p.Cmd.OutOrStdout(), output.WriteWorktreeCleanJSONParams{
-			Branch:           outcome.Branch,
-			Path:             outcome.Path,
+			Branch:           result.Branch,
+			Path:             result.Path,
 			Reparented:       outcome.Reparented,
-			OrphanedChildren: outcome.OrphanedChildren,
+			OrphanedChildren: outcome.Orphaned,
 			Namespaces:       outcome.Namespaces,
 		})
 	}
 
 	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-		output.Success(w, fmt.Sprintf(domain.CleanedFmt, outcome.Branch))
+		output.Success(w, fmt.Sprintf(domain.CleanedFmt, result.Branch))
 		for _, child := range outcome.Reparented {
 			output.Success(w, fmt.Sprintf(domain.CleanReparentedFmt, child.Branch, child.NewParent))
 		}
-		for _, child := range outcome.OrphanedChildren {
+		for _, child := range outcome.Orphaned {
 			output.Warning(w, fmt.Sprintf(domain.CleanStillOrphanedFmt, child.Branch, child.OldParent))
 		}
 	})

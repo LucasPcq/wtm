@@ -264,17 +264,6 @@ type ReparentResult struct {
 	NewParent string `json:"new_parent"`
 }
 
-// CleanReparentPlan lists the reparenting proposed when cleaning a worktree that
-// is the parent of others: each child would move from the cleaned branch to the
-// grandparent. It is computed before deletion so the command can show a recap.
-type CleanReparentPlan struct {
-	// Branch is the worktree about to be cleaned.
-	Branch string
-	// Grandparent is the parent the children would be reparented onto.
-	Grandparent string
-	Children    []ReparentResult
-}
-
 type CleanResult struct {
 	Branch        string `json:"branch"`
 	Path          string `json:"path"`
