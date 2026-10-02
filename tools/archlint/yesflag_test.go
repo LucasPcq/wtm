@@ -1,14 +1,9 @@
 package main
 
-import (
-	"path/filepath"
-	"testing"
-
-	"golang.org/x/tools/go/analysis/analysistest"
-)
+import "testing"
 
 func TestACommandReadingTheGateRegistersYes(t *testing.T) {
-	analysistest.Run(t, filepath.Join(analysistest.TestData(), "yesflag"), yesflagAnalyzer,
+	runTxtar(t, yesflagAnalyzer, "yesflag",
 		internalPrefix+"commands/missing",
 		internalPrefix+"commands/registered",
 		internalPrefix+"commands/aliased",

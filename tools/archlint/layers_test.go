@@ -1,19 +1,14 @@
 package main
 
-import (
-	"path/filepath"
-	"testing"
-
-	"golang.org/x/tools/go/analysis/analysistest"
-)
+import "testing"
 
 func TestALayerImportsOnlyWhatItsRowAllows(t *testing.T) {
-	analysistest.Run(t, filepath.Join(analysistest.TestData(), "layers"), layersAnalyzer,
+	runTxtar(t, layersAnalyzer, "layers",
 		internalPrefix+"rules/bad",
 		internalPrefix+"flow/ok",
 	)
 }
 
 func TestTheDomainDeclaresNoFunction(t *testing.T) {
-	analysistest.Run(t, filepath.Join(analysistest.TestData(), "domain"), domainAnalyzer, internalPrefix+"domain")
+	runTxtar(t, domainAnalyzer, "domain", internalPrefix+"domain")
 }

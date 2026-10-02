@@ -11,7 +11,10 @@ import (
 )
 
 func TestAPackageThatDoesNotTypeCheckIsAnError(t *testing.T) {
-	if _, err := analyze(analyzeParams{Root: "testdata/broken", Systems: []string{"linux"}}); err == nil {
+	dir := t.TempDir()
+	extract(t, dir, "broken")
+	t.Chdir(dir)
+	if _, err := analyze(analyzeParams{Root: "broken", Systems: []string{"linux"}}); err == nil {
 		t.Error("a package with a type error was analysed: archlint would print `clean` over code it never understood")
 	}
 }

@@ -1,0 +1,52 @@
+-- github.com/LucasPcq/wtm/internal/flow/caller/caller.go --
+package caller
+
+import (
+	"github.com/LucasPcq/wtm/internal/service/branch"
+	"github.com/LucasPcq/wtm/internal/service/worktree"
+)
+
+var _, _ = branch.List, worktree.Create
+-- github.com/LucasPcq/wtm/internal/service/branch/branch.go --
+package branch
+
+func List() error { return nil }
+-- github.com/LucasPcq/wtm/internal/service/detect/detect.go --
+package detect
+
+import "github.com/LucasPcq/wtm/internal/service/branch"
+
+var _ = branch.List
+-- github.com/LucasPcq/wtm/internal/service/fresh/fresh.go --
+package fresh
+
+import "github.com/LucasPcq/wtm/internal/service/branch" // want `internal/service/fresh must not import .* undeclared service edge`
+
+var _ = branch.List
+-- github.com/LucasPcq/wtm/internal/service/process/process.go --
+package process
+
+import (
+	"github.com/LucasPcq/wtm/internal/service/proxy"
+	"github.com/LucasPcq/wtm/internal/service/worktree" // want `internal/service/process must not import "github.com/LucasPcq/wtm/internal/service/worktree" — undeclared service edge`
+)
+
+var Placeholder = 0
+
+var _ = proxy.Route
+
+var _ = worktree.Create
+-- github.com/LucasPcq/wtm/internal/service/process/processtest/processtest.go --
+package processtest
+
+import "github.com/LucasPcq/wtm/internal/service/process"
+
+var _ = process.Placeholder
+-- github.com/LucasPcq/wtm/internal/service/proxy/proxy.go --
+package proxy
+
+func Route() error { return nil }
+-- github.com/LucasPcq/wtm/internal/service/worktree/worktree.go --
+package worktree
+
+func Create() error { return nil }

@@ -2,15 +2,13 @@ package main
 
 import (
 	"go/types"
-	"path/filepath"
 	"testing"
 
-	"golang.org/x/tools/go/analysis/analysistest"
 	"golang.org/x/tools/go/packages"
 )
 
 func TestAMutatorIsReachedOnlyFromFlow(t *testing.T) {
-	analysistest.Run(t, filepath.Join(analysistest.TestData(), "chokepoint"), chokepointAnalyzer,
+	runTxtar(t, chokepointAnalyzer, "chokepoint",
 		internalPrefix+"service/worktree",
 		internalPrefix+"service/env",
 		internalPrefix+"service/runjobs",

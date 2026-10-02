@@ -1,0 +1,70 @@
+-- github.com/LucasPcq/wtm/internal/config/config.go --
+package config
+
+func Load() error { return nil }
+-- github.com/LucasPcq/wtm/internal/infra/infra.go --
+package infra
+
+type Paths struct{ Root string }
+
+func GlobalDir() (string, error) { return "", nil }
+
+func Toplevel(dir string) (string, error) { return dir, nil }
+-- github.com/LucasPcq/wtm/internal/service/process/process.go --
+package process
+
+import (
+	"github.com/LucasPcq/wtm/internal/config" // want `the daemon must not import "github.com/LucasPcq/wtm/internal/config"`
+	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/service/proxy"
+	"github.com/LucasPcq/wtm/internal/service/worktree" // want `the daemon must not import "github.com/LucasPcq/wtm/internal/service/worktree"`
+)
+
+var _ = proxy.Route
+
+var _ = config.Load
+
+var _ = worktree.Create
+
+func dirs() (string, error) {
+	global, err := infra.GlobalDir()
+	if err != nil {
+		return "", err
+	}
+	return infra.Toplevel(global) // want `the daemon calls infra\.Toplevel: only GlobalDir is allow-listed`
+}
+
+var _ infra.Paths // want `the daemon calls infra\.Paths`
+-- github.com/LucasPcq/wtm/internal/service/proxy/proxy.go --
+package proxy
+
+import (
+	"github.com/LucasPcq/wtm/internal/config" // want `the daemon must not import "github.com/LucasPcq/wtm/internal/config"`
+	"github.com/LucasPcq/wtm/internal/infra"
+)
+
+var _ = config.Load
+
+func Route() error {
+	_, err := infra.GlobalDir()
+	return err
+}
+
+func root() (string, error) {
+	return infra.Toplevel("") // want `the daemon calls infra\.Toplevel`
+}
+-- github.com/LucasPcq/wtm/internal/service/runjobs/runjobs.go --
+package runjobs
+
+import (
+	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/service/worktree"
+)
+
+var _ = worktree.Create
+
+var _ = infra.Toplevel
+-- github.com/LucasPcq/wtm/internal/service/worktree/worktree.go --
+package worktree
+
+func Create() error { return nil }

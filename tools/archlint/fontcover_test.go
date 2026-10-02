@@ -1,15 +1,12 @@
 package main
 
 import (
-	"path/filepath"
 	"testing"
 	"unicode/utf8"
-
-	"golang.org/x/tools/go/analysis/analysistest"
 )
 
 func TestARuneMissingFromCommonFontsIsReported(t *testing.T) {
-	results := analysistest.Run(t, filepath.Join(analysistest.TestData(), "fontcover"), fontcoverAnalyzer, internalPrefix+"rules/fc")
+	results := runTxtar(t, fontcoverAnalyzer, "fontcover", internalPrefix+"rules/fc")
 	categories := map[string]string{}
 	for _, result := range results {
 		for _, d := range result.Diagnostics {

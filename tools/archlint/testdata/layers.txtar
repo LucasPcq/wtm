@@ -1,0 +1,36 @@
+-- github.com/LucasPcq/wtm/internal/domain/domain.go --
+package domain
+
+type Worktree struct{ Branch string }
+-- github.com/LucasPcq/wtm/internal/flow/ok/ok.go --
+package ok
+
+import (
+	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/service/worktree"
+)
+
+var _ = worktree.Create
+
+var _ domain.Worktree
+-- github.com/LucasPcq/wtm/internal/infra/infra.go --
+package infra
+
+func GlobalDir() (string, error) { return "", nil }
+-- github.com/LucasPcq/wtm/internal/rules/bad/bad.go --
+package bad
+
+import (
+	"strings"
+
+	_ "github.com/LucasPcq/wtm/internal/domain"
+	in "github.com/LucasPcq/wtm/internal/infra" // want `internal/rules must not import "github.com/LucasPcq/wtm/internal/infra" — pure functions`
+)
+
+var _ = strings.TrimSpace
+
+var _ = in.GlobalDir
+-- github.com/LucasPcq/wtm/internal/service/worktree/worktree.go --
+package worktree
+
+func Create() error { return nil }

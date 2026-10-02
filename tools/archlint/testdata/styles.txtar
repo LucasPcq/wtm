@@ -1,0 +1,22 @@
+-- github.com/LucasPcq/wtm/internal/styles/styles.go --
+package styles
+
+import "github.com/charmbracelet/lipgloss"
+
+var Muted = lipgloss.NewStyle()
+-- github.com/LucasPcq/wtm/internal/tui/bad/bad.go --
+package bad
+
+import lg "github.com/charmbracelet/lipgloss"
+
+var plain = lg.NewStyle() // want `only internal/styles may instantiate a lipgloss.Style`
+
+var literal = lg.Style{} // want `only internal/styles may instantiate a lipgloss.Style`
+
+var typed lg.Style
+-- github.com/charmbracelet/lipgloss/lipgloss.go --
+package lipgloss
+
+type Style struct{ bold bool }
+
+func NewStyle() Style { return Style{} }

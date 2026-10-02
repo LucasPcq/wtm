@@ -1,0 +1,89 @@
+-- github.com/LucasPcq/wtm/internal/commands/aliased/cmd.go --
+package aliased // want `cmd.go reads the interactive gate but registers no --yes`
+
+import (
+	sh "github.com/LucasPcq/wtm/internal/commands/shared"
+	cb "github.com/spf13/cobra"
+)
+
+func newCmd() *cb.Command { return &cb.Command{} }
+
+func run() bool { return sh.Interactive() }
+-- github.com/LucasPcq/wtm/internal/commands/field/cmd.go --
+package field
+
+import (
+	"github.com/LucasPcq/wtm/internal/commands/shared"
+	"github.com/spf13/cobra"
+)
+
+func newCmd() *cobra.Command { return &cobra.Command{} }
+
+func run(interactive bool) bool {
+	return shared.Prompter(shared.PrompterParams{Interactive: interactive})
+}
+-- github.com/LucasPcq/wtm/internal/commands/helper/helper.go --
+package helper
+
+import "github.com/LucasPcq/wtm/internal/commands/shared"
+
+func Ask() bool { return shared.Interactive() }
+-- github.com/LucasPcq/wtm/internal/commands/missing/cmd.go --
+package missing // want `cmd.go reads the interactive gate but registers no --yes`
+
+import (
+	"github.com/LucasPcq/wtm/internal/commands/shared"
+	"github.com/spf13/cobra"
+)
+
+func newCmd() *cobra.Command { return &cobra.Command{} }
+
+func run() bool { return shared.Interactive() }
+-- github.com/LucasPcq/wtm/internal/commands/registered/cmd.go --
+package registered
+
+import (
+	"github.com/LucasPcq/wtm/internal/commands/shared"
+	"github.com/spf13/cobra"
+)
+
+func newCmd() *cobra.Command {
+	cmd := &cobra.Command{}
+	shared.AddYesFlag(cmd)
+	return cmd
+}
+
+func run() bool { return shared.Interactive() }
+-- github.com/LucasPcq/wtm/internal/commands/retired/cmd.go --
+package retired // want `cmd.go reads the interactive gate but registers no --yes`
+
+import (
+	"github.com/LucasPcq/wtm/internal/commands/shared"
+	"github.com/spf13/cobra"
+)
+
+func newCmd() *cobra.Command {
+	cmd := &cobra.Command{}
+	shared.AddNoPromptFlags(cmd)
+	return cmd
+}
+
+func run() bool { return shared.Interactive() }
+-- github.com/LucasPcq/wtm/internal/commands/shared/shared.go --
+package shared
+
+import "github.com/spf13/cobra"
+
+func Interactive() bool { return true }
+
+func AddYesFlag(cmd *cobra.Command) {}
+
+func AddNoPromptFlags(cmd *cobra.Command) {}
+
+type PrompterParams struct{ Interactive bool }
+
+func Prompter(params PrompterParams) bool { return params.Interactive }
+-- github.com/spf13/cobra/cobra.go --
+package cobra
+
+type Command struct{ Use string }

@@ -1,14 +1,9 @@
 package main
 
-import (
-	"path/filepath"
-	"testing"
-
-	"golang.org/x/tools/go/analysis/analysistest"
-)
+import "testing"
 
 func TestOnlyStylesInstantiatesAStyleEvenThroughAnAlias(t *testing.T) {
-	analysistest.Run(t, filepath.Join(analysistest.TestData(), "styles"), stylesAnalyzer,
+	runTxtar(t, stylesAnalyzer, "styles",
 		internalPrefix+"tui/bad",
 		internalPrefix+"styles",
 	)
