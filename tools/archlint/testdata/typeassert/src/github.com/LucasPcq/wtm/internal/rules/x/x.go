@@ -1,0 +1,23 @@
+package x
+
+func bare(v any) string {
+	return v.(string) // want `type assertion without the comma-ok form`
+}
+
+func commaOK(v any) string {
+	s, ok := v.(string)
+	if !ok {
+		return ""
+	}
+	return s
+}
+
+func switched(v any) string {
+	switch x := v.(type) {
+	case string:
+		return x
+	}
+	return ""
+}
+
+var _, _ = any(1).(int)

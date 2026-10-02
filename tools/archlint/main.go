@@ -535,53 +535,6 @@ func isMutedRender(expr ast.Expr) bool {
 	return isSelector(render.X, "styles", "Muted") || isSelector(render.X, "", "Muted")
 }
 
-// unguardedAssertions is every `x.(T)` a wrong type would panic on. The two
-// checked forms are subtracted rather than special-cased on the way down: a
-// type switch owns its assertion, and a comma-ok one is only recognisable from
-// the assignment above it.
-func unguardedAssertions(file *ast.File) []token.Pos {
-	guarded := map[token.Pos]bool{}
-	ast.Inspect(file, func(node ast.Node) bool {
-		var values []ast.Expr
-		var targets int
-		switch n := node.(type) {
-		case *ast.AssignStmt:
-			values, targets = n.Rhs, len(n.Lhs)
-		case *ast.ValueSpec:
-			values, targets = n.Values, len(n.Names)
-		case *ast.TypeSwitchStmt:
-			ast.Inspect(n.Assign, func(inner ast.Node) bool {
-				if assert, ok := inner.(*ast.TypeAssertExpr); ok {
-					guarded[assert.Pos()] = true
-				}
-				return true
-			})
-			return true
-		default:
-			return true
-		}
-		if targets != 2 || len(values) != 1 {
-			return true
-		}
-		if assert, ok := values[0].(*ast.TypeAssertExpr); ok {
-			guarded[assert.Pos()] = true
-		}
-		return true
-	})
-
-	var unguarded []token.Pos
-	ast.Inspect(file, func(node ast.Node) bool {
-		assert, ok := node.(*ast.TypeAssertExpr)
-		// A nil Type is the `x.(type)` of a type switch, which has no wrong-type
-		// case to guard.
-		if ok && assert.Type != nil && !guarded[assert.Pos()] {
-			unguarded = append(unguarded, assert.Pos())
-		}
-		return true
-	})
-	return unguarded
-}
-
 // checkYesFlag enforces the confirmation axis: a file that declares a command
 // and reads the prompt-capability gate must register --yes on it. Reading the
 // gate without offering the flag is a command that decides whether to ask
