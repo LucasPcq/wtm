@@ -7,6 +7,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/orphans"
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/flow/teardown"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -80,8 +81,8 @@ type pruneFlow struct {
 	prompter  flow.Prompter
 	presenter Presenter
 
-	plan      domain.PrunePlan
-	snapshots map[string]owed.Snapshot
+	plan     domain.PrunePlan
+	holdings owed.Holdings
 }
 
 func (f *pruneFlow) run() (Outcome, error) {
@@ -124,7 +125,7 @@ func (f *pruneFlow) run() (Outcome, error) {
 	}
 
 	return f.remove(removeParams{
-		ReparentChildren: answers.Value(KeyReparent) == reparentYes,
+		ReparentChildren: answers.Value(KeyReparent) == orphans.Reparent,
 		StartDown:        answers.Value(KeyData) == owed.DataStart,
 		Force:            force,
 	})

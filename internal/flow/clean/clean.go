@@ -4,10 +4,10 @@ package clean
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/orphans"
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/flow/teardown"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -84,9 +84,9 @@ type cleanFlow struct {
 	prompter  flow.Prompter
 	presenter Presenter
 	// checks query the PR state over the network, so each is made once.
-	checks    map[string]domain.CleanCheckEntry
-	snapshots map[string]owed.Snapshot
-	moves     map[string][]domain.ReparentResult
+	checks   map[string]domain.CleanCheckEntry
+	holdings owed.Holdings
+	moves    flow.SetMemo[[]domain.ReparentResult]
 }
 
 func (f *cleanFlow) run() (Outcome, error) {
@@ -178,7 +178,7 @@ func (f *cleanFlow) run() (Outcome, error) {
 			BaseBranch: f.request.BaseBranch,
 		})
 	}
-	if answers.Value(KeyReparent) == reparentYes && len(moved) > 0 {
+	if answers.Value(KeyReparent) == orphans.Reparent && len(moved) > 0 {
 		applied, err := worktree.ApplyReparents(worktree.ApplyReparentsParams{Reparents: moved, StateDir: f.ctx.StateDir})
 		if err != nil {
 			return Outcome{}, err
@@ -279,28 +279,20 @@ func (f *cleanFlow) splitUnsafe(selected []string) ([]string, []domain.PruneSkip
 	return safe, skipped
 }
 
-// reparents is read before any removal, while every worktree's metadata still
-// names its parent, and once per selection: the steps ask for it repeatedly.
-// Force plays no part in it.
+// reparents previews the moves for the steps, which rebuild on every move
+// through the wizard. Force plays no part in it.
 func (f *cleanFlow) reparents(selected []string) []domain.ReparentResult {
-	key := strings.Join(selected, "\x00")
-	if moves, cached := f.moves[key]; cached {
-		return moves
-	}
-	if f.moves == nil {
-		f.moves = map[string][]domain.ReparentResult{}
-	}
-	nodes, err := worktree.Nodes(worktree.NodesParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir})
-	var moves []domain.ReparentResult
-	if err == nil {
-		moves = rules.ReparentsAfterRemoval(rules.ReparentsAfterRemovalParams{
+	return f.moves.Get(selected, func() []domain.ReparentResult {
+		nodes, err := worktree.Nodes(worktree.NodesParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir})
+		if err != nil {
+			return nil
+		}
+		return rules.ReparentsAfterRemoval(rules.ReparentsAfterRemovalParams{
 			Nodes:      nodes,
 			Removed:    selected,
 			BaseBranch: f.request.BaseBranch,
 		})
-	}
-	f.moves[key] = moves
-	return moves
+	})
 }
 
 func removedBranches(removals []teardown.Removal) []string {

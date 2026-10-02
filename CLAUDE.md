@@ -134,6 +134,8 @@ internal/
     teardown/                 ←   the removal clean and prune share, one worktree or a
                                   batch (`Batch`): stop, hooks, remove, drop — then
                                   release every claim, all together
+    orphans/                  ←   the question clean and prune ask about the children a
+                                  removal orphans: the step, its preset, its recap line
     sync/                     ←   `wtm sync`: the run (sync.go) + its questions (steps.go)
     fastforward/              ←   `wtm fast-forward`: the run + its questions
     runlogs/                  ←   the jobs a surface shows (`Board`), their live streams,

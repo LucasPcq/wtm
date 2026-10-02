@@ -9,6 +9,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/orphans"
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
@@ -67,18 +68,6 @@ func TestDeleteOptionsOfferForceOnlyWhenUnsafe(t *testing.T) {
 	}
 }
 
-func TestReparentProposalListsEveryMove(t *testing.T) {
-	text := reparentProposal([]domain.ReparentResult{
-		{Branch: "child", OldParent: "old", NewParent: "gp"},
-		{Branch: "other", OldParent: "old", NewParent: "gp"},
-	})
-	for _, want := range []string{"child", "other", "old", "gp"} {
-		if !strings.Contains(text, want) {
-			t.Errorf("proposal missing %q:\n%s", want, text)
-		}
-	}
-}
-
 // --force lifts the refusal without even running the check, which is what keeps a
 // --yes --force run from touching the network.
 func TestResolveDeleteForceSkipsTheCheck(t *testing.T) {
@@ -128,10 +117,10 @@ func TestResolveDeleteAllowsASafeWorktree(t *testing.T) {
 // --reparent-children answers through the presets, so the recap line and the
 // execution read the same answer.
 func TestPresetReparentAnswersTheStep(t *testing.T) {
-	if got := (&cleanFlow{request: Request{ReparentChildren: true}}).presetReparent(); got != reparentYes {
+	if got := (&cleanFlow{request: Request{ReparentChildren: true}}).session().Presets.Value(KeyReparent); got != orphans.Reparent {
 		t.Errorf("preset = %q, want the reparent authorized", got)
 	}
-	if got := (&cleanFlow{}).presetReparent(); got != "" {
+	if got := (&cleanFlow{}).session().Presets.Value(KeyReparent); got != "" {
 		t.Errorf("preset = %q, want the step left to be answered", got)
 	}
 }
@@ -446,14 +435,5 @@ func TestDeleteRecapSaysWhenTheDataIsKept(t *testing.T) {
 	})
 	if !strings.Contains(recap, "--keep-data") {
 		t.Errorf("recap does not say the data is kept:\n%s", recap)
-	}
-}
-
-// The line is built from run.toml, so a project with no shared service adds
-// nothing and the recap reads exactly as it did before.
-func TestHoldingsEmptyWithoutASharedService(t *testing.T) {
-	flow := &cleanFlow{ctx: flow.Context{StateDir: t.TempDir()}}
-	if got := flow.holdings([]string{"feat"}).Held(); len(got) != 0 {
-		t.Errorf("held = %v, want none", got)
 	}
 }

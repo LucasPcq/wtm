@@ -8,6 +8,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/orphans"
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
@@ -21,8 +22,6 @@ const (
 )
 
 const (
-	reparentYes = "reparent"
-	reparentNo  = "orphan"
 	deleteYes   = "yes"
 	deleteSafe  = "safe"
 	deleteForce = "force"
@@ -30,7 +29,6 @@ const (
 
 const (
 	labelWorktree = "Worktrees"
-	labelReparent = "Reparent children"
 	labelDelete   = "Delete"
 )
 
@@ -39,16 +37,19 @@ func (f *cleanFlow) session() flow.Session {
 	return flow.Session{
 		ErrLabel: domain.CleanWizardErrLabel,
 		Presets: flow.NewAnswers(map[string]string{
-			KeyReparent: f.presetReparent(),
+			KeyReparent: orphans.Preset(f.request.ReparentChildren),
 			KeyData:     owed.DataPreset(f.request.DropData),
 		}).WithValues(KeyWorktree, f.request.Branches),
 		Steps: []flow.Step{
 			f.worktreeStep(),
-			f.reparentStep(),
+			orphans.Step(orphans.StepParams{
+				Key:   KeyReparent,
+				Moves: func(answers flow.Answers) []domain.ReparentResult { return f.reparents(answers.Values(KeyWorktree)) },
+			}),
 			owed.DataStep(owed.DataStepParams{
 				Key:      KeyData,
 				KeepData: f.request.KeepData,
-				Snapshot: func(answers flow.Answers) owed.Snapshot { return f.holdings(answers.Values(KeyWorktree)) },
+				Snapshot: func(answers flow.Answers) owed.Snapshot { return f.holdings.Of(f.ctx, answers.Values(KeyWorktree)) },
 			}),
 			f.deleteStep(),
 		},
@@ -102,79 +103,6 @@ func (f *cleanFlow) cleanableOptions() ([]flow.Option, error) {
 	return options, nil
 }
 
-func (f *cleanFlow) reparentStep() flow.Step {
-	return flow.Step{
-		Kind:  flow.StepSelect,
-		Key:   KeyReparent,
-		Label: labelReparent,
-		Skip: func(answers flow.Answers) (bool, string) {
-			if len(f.reparents(answers.Values(KeyWorktree))) == 0 {
-				return true, domain.CleanNoOrphanedChildren
-			}
-			return false, ""
-		},
-		Build: func(answers flow.Answers) (flow.StepContent, error) {
-			moves := f.reparents(answers.Values(KeyWorktree))
-			return flow.StepContent{
-				Description: reparentProposal(moves),
-				Options: []flow.Option{
-					{Label: reparentOptionLabel(moves), Value: reparentYes},
-					{Separator: true},
-					{Label: domain.CleanOrphanOption, Value: reparentNo},
-				},
-			}, nil
-		},
-		// Reparenting is opt-in: `wtm reparent` can still move the children afterwards.
-		Resolve: func(flow.Answers) (flow.Answer, error) {
-			return flow.Answer{Value: reparentNo}, nil
-		},
-		Summarize: func(answer flow.Answer) string {
-			if answer.Value == reparentYes {
-				return domain.CleanReparentSummary
-			}
-			return domain.CleanOrphanSummary
-		},
-		Flag: domain.FlagReparentChildren,
-	}
-}
-
-func (f *cleanFlow) presetReparent() string {
-	if f.request.ReparentChildren {
-		return reparentYes
-	}
-	return ""
-}
-
-func reparentProposal(moves []domain.ReparentResult) string {
-	lines := make([]string, 0, len(moves)+1)
-	lines = append(lines, domain.CleanReparentIntro)
-	for _, move := range moves {
-		lines = append(lines, fmt.Sprintf(domain.CleanReparentChildFmt, move.Branch, move.NewParent, move.OldParent))
-	}
-	return strings.Join(lines, "\n")
-}
-
-// One destination reads as it always did; several are named one by one in the
-// proposal above the options.
-func reparentOptionLabel(moves []domain.ReparentResult) string {
-	if parent, single := soleParent(moves); single {
-		return fmt.Sprintf(domain.CleanReparentOptionFmt, parent, len(moves))
-	}
-	return fmt.Sprintf(domain.CleanReparentManyOptionFmt, len(moves))
-}
-
-func soleParent(moves []domain.ReparentResult) (string, bool) {
-	if len(moves) == 0 {
-		return "", false
-	}
-	for _, move := range moves[1:] {
-		if move.NewParent != moves[0].NewParent {
-			return "", false
-		}
-	}
-	return moves[0].NewParent, true
-}
-
 func (f *cleanFlow) deleteStep() flow.Step {
 	content := func(answers flow.Answers) (flow.StepContent, error) {
 		selected := answers.Values(KeyWorktree)
@@ -188,7 +116,7 @@ func (f *cleanFlow) deleteStep() flow.Step {
 				Checks:   checks,
 				Reparent: f.reparentLine(answers),
 				Namespaces: rules.DataRecapLines(rules.DataRecapLinesParams{
-					Held:      f.holdings(selected).Held(),
+					Held:      f.holdings.Of(f.ctx, selected).Held(),
 					StartDown: answers.Value(KeyData) == owed.DataStart,
 					KeepData:  f.request.KeepData,
 				}),
@@ -315,34 +243,9 @@ func targetLines(checks []domain.CleanCheckResult) []string {
 	return lines
 }
 
-// holdings is read once per selection: the data step and the recap both need
-// it, and it asks the daemon which services are up.
-func (f *cleanFlow) holdings(selected []string) owed.Snapshot {
-	if len(selected) == 0 {
-		return owed.Snapshot{}
-	}
-	key := strings.Join(selected, "\x00")
-	if snapshot, cached := f.snapshots[key]; cached {
-		return snapshot
-	}
-	if f.snapshots == nil {
-		f.snapshots = map[string]owed.Snapshot{}
-	}
-	snapshot := owed.Read(owed.ReadParams{Context: f.ctx, Branches: selected})
-	f.snapshots[key] = snapshot
-	return snapshot
-}
-
 func (f *cleanFlow) reparentLine(answers flow.Answers) string {
-	moves := f.reparents(answers.Values(KeyWorktree))
-	if len(moves) == 0 {
-		return ""
-	}
-	if answers.Value(KeyReparent) != reparentYes {
-		return fmt.Sprintf(domain.CleanRecapOrphanFmt, len(moves))
-	}
-	if parent, single := soleParent(moves); single {
-		return fmt.Sprintf(domain.CleanRecapReparentFmt, len(moves), parent)
-	}
-	return fmt.Sprintf(domain.CleanRecapReparentManyFmt, len(moves))
+	return orphans.RecapLine(orphans.RecapLineParams{
+		Moves:    f.reparents(answers.Values(KeyWorktree)),
+		Reparent: answers.Value(KeyReparent) == orphans.Reparent,
+	})
 }
