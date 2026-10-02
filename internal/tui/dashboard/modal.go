@@ -9,6 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/styles"
 	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/tui/flowui"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -62,13 +63,14 @@ type modal struct {
 	width  int
 	height int
 
-	index   int
-	kind    flow.StepKind
-	content flow.StepContent
-	text    components.TextInputModel
-	list    components.SelectListModel
-	multi   components.MultiSelectModel
-	reorder components.ReorderListModel
+	index    int
+	kind     flow.StepKind
+	content  flow.StepContent
+	text     components.TextInputModel
+	list     components.SelectListModel
+	multi    components.MultiSelectModel
+	textList components.TextListModel
+	reorder  components.ReorderListModel
 
 	rows   []formRow
 	focus  int
@@ -112,6 +114,7 @@ func (mo modal) resize(width, height int) modal {
 	mo.list.SetSize(components.SetSizeParams{Width: mo.bodyWidth(), Height: mo.bodyHeight()})
 	mo.multi.SetSize(components.SetSizeParams{Width: mo.bodyWidth(), Height: mo.bodyHeight()})
 	mo.text.SetWidth(mo.bodyWidth())
+	mo.textList.SetWidth(mo.bodyWidth())
 	return mo
 }
 
@@ -188,6 +191,10 @@ func (mo modal) show(step flow.Step, content flow.StepContent) (modal, tea.Cmd) 
 			Description: content.Description,
 			Items:       branchItems(step, content),
 		})
+	case flow.StepTextList:
+		mo.textList = flowui.TextList(step, mo.reentries(step, content))
+		mo.textList.SetWidth(mo.bodyWidth())
+		return mo, mo.textList.Init()
 	case flow.StepMultiSelect:
 		mo.multi = newMultiSelect(step, mo.reselect(step, content))
 		mo.multi.SetSize(components.SetSizeParams{Width: mo.bodyWidth(), Height: mo.bodyHeight()})
@@ -273,6 +280,18 @@ func (mo modal) updateStepper(msg tea.KeyMsg) (modal, tea.Cmd) {
 		return mo, cmd
 	}
 
+	if mo.kind == flow.StepTextList {
+		var cmd tea.Cmd
+		mo.textList, cmd = mo.textList.Update(msg)
+		switch {
+		case mo.textList.Aborted():
+			return mo.back()
+		case mo.textList.Done():
+			return mo.answerValues(mo.textList.Values())
+		}
+		return mo, cmd
+	}
+
 	if mo.kind == flow.StepReorder {
 		var cmd tea.Cmd
 		mo.reorder, cmd = mo.reorder.Update(msg)
@@ -345,6 +364,15 @@ func (mo modal) reselect(step flow.Step, content flow.StepContent) flow.StepCont
 		options[index].Selected = checked[options[index].Value]
 	}
 	content.Options = options
+	return content
+}
+
+// reentries puts back the list the user typed before stepping forward: Build
+// only knows the entries the request carried.
+func (mo modal) reentries(step flow.Step, content flow.StepContent) flow.StepContent {
+	if answer, known := mo.answers.Get(step.Key); known && answer.Asked {
+		content.Entries = answer.Values
+	}
 	return content
 }
 
@@ -494,6 +522,9 @@ func (mo modal) body(zones marker) []string {
 	case mo.kind == flow.StepText:
 		lines = append(lines, mo.stepHeader()...)
 		lines = append(lines, strings.Split(mo.text.View(), "\n")...)
+	case mo.kind == flow.StepTextList:
+		lines = append(lines, mo.stepHeader()...)
+		lines = append(lines, strings.Split(mo.textList.View(), "\n")...)
 	case mo.kind == flow.StepMultiSelect:
 		lines = append(lines, mo.stepHeader()...)
 		lines = append(lines, strings.Split(mo.multi.View(), "\n")...)
@@ -541,6 +572,8 @@ func (mo modal) hint() string {
 		return domain.DashboardConfirmHint
 	case mo.kind == flow.StepText:
 		return domain.DashboardStepperTextHint
+	case mo.kind == flow.StepTextList:
+		return domain.DashboardStepperListHint
 	case mo.kind == flow.StepMultiSelect:
 		return domain.DashboardStepperMultiHint
 	case mo.kind == flow.StepReorder:

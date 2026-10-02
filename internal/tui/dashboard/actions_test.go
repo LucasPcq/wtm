@@ -114,7 +114,7 @@ func TestHooksStreamIntoTheOutputPanelLineByLine(t *testing.T) {
 func TestASuccessfulCreateSelectsTheNewWorktree(t *testing.T) {
 	model := newTestModel(t, testWidth, testHeight, "a", "b")
 
-	model, cmd := model.applyFlow(createdMsg{branch: "c"})
+	model, cmd := model.applyFlow(createdMsg{branch: "c", selects: true})
 	if cmd == nil {
 		t.Fatal("a finished create must refresh the list")
 	}

@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -27,13 +28,24 @@ import (
 type presenter struct {
 	send func(tea.Msg)
 	id   int
+	// subject is the worktree a run over several is working on right now, nil for
+	// a run that never says: its stages then land on every row it holds.
+	subject *string
 }
 
 func (p presenter) line(text string) { p.send(OutputLineMsg{Text: text}) }
 
+func (p presenter) stage(text string) {
+	target := ""
+	if p.subject != nil {
+		target = *p.subject
+	}
+	p.send(opStageMsg{id: p.id, target: target, stage: text})
+}
+
 func (p presenter) Stage(params flow.StageParams) error {
 	p.line(params.Message)
-	p.send(opStageMsg{id: p.id, stage: params.Message})
+	p.stage(params.Message)
 	return params.Work()
 }
 
@@ -43,7 +55,7 @@ func (p presenter) Stage(params flow.StageParams) error {
 // stream and takes the beats as two more lines around it.
 func (p presenter) HookPhase(params flow.HookPhaseParams) error {
 	p.line(params.Title)
-	p.send(opStageMsg{id: p.id, stage: params.Title})
+	p.stage(params.Title)
 	sink := &flow.LineWriter{Emit: p.line}
 	err := params.Run(flow.HookSink{
 		Output: sink,
@@ -76,25 +88,80 @@ func (p presenter) Status(notice flow.Notice) {
 	}
 }
 
-type createPresenter struct{ presenter }
+// createPresenter is called from the flow's one goroutine, so the batch state it
+// shares between its copies needs no lock.
+type createPresenter struct {
+	presenter
+	selected *bool
+}
 
-// The dashboard runs one branch at a time until it can render a list, so the
-// flow never reports per branch here.
-func (p createPresenter) BranchStarted(createflow.BranchProgress) {}
+func newCreatePresenter(base presenter) createPresenter {
+	base.subject = new(string)
+	return createPresenter{presenter: base, selected: new(bool)}
+}
 
-func (p createPresenter) BranchFailed(domain.CreateFailure) {}
+func (p createPresenter) BranchStarted(progress createflow.BranchProgress) {
+	*p.subject = progress.Branch
+	p.line(fmt.Sprintf(domain.CreateBranchProgressFmt, progress.Branch, progress.Position, progress.Total))
+}
+
+// BranchCreated shows each worktree the moment it exists rather than when the
+// whole batch is over, and moves the cursor only once: a selection that hops on
+// every branch would yank the row the user is reading.
+func (p createPresenter) BranchCreated(result domain.CreateResult) {
+	p.finished(result)
+	p.send(createdMsg{branch: result.Branch, selects: !*p.selected})
+	*p.selected = true
+}
+
+func (p createPresenter) BranchFailed(failure domain.CreateFailure) {
+	p.line(fmt.Sprintf(domain.DashboardFailedFmt, failure.Branch, failure.Error))
+}
 
 func (p createPresenter) Created(outcome createflow.Outcome) error {
-	if outcome.Aborted || len(outcome.Results) == 0 {
+	if outcome.Aborted {
+		return nil
+	}
+	if len(outcome.Results)+len(outcome.Failed) > 1 {
+		p.line(createTally(outcome))
+		return nil
+	}
+	if len(outcome.Results) == 0 {
 		return nil
 	}
 	result := outcome.Results[0]
+	p.finished(result)
+	p.send(createdMsg{branch: result.Branch, selects: true})
+	return nil
+}
+
+func (p createPresenter) finished(result domain.CreateResult) {
 	p.line(fmt.Sprintf(domain.DashboardFinishedFmt, domain.OpKindCreate, result.Branch))
 	if note := rules.EnvPortSettlementNote(result.EnvPorts); note != "" {
 		p.line(note)
 	}
-	p.send(createdMsg{branch: result.Branch})
-	return nil
+}
+
+func createTally(outcome createflow.Outcome) string {
+	created, existed := 0, 0
+	for _, result := range outcome.Results {
+		if result.AlreadyExists {
+			existed++
+			continue
+		}
+		created++
+	}
+	parts := []struct {
+		count int
+		label string
+	}{{created, domain.TallyCreated}, {existed, domain.TallyAlreadyExisted}, {len(outcome.Failed), domain.TallyFailed}}
+	kept := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part.count > 0 {
+			kept = append(kept, fmt.Sprintf(domain.TallyPartFmt, part.count, part.label))
+		}
+	}
+	return strings.Join(kept, domain.TallySeparator)
 }
 
 type cleanPresenter struct{ presenter }

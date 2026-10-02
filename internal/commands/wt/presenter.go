@@ -29,6 +29,9 @@ func (p createPresenter) BranchStarted(progress createflow.BranchProgress) {
 		fmt.Sprintf(domain.CreateBranchProgressFmt, progress.Branch, progress.Position, progress.Total))
 }
 
+// The batch's readout names every created branch at the end, where the CLI reads it.
+func (p createPresenter) BranchCreated(domain.CreateResult) {}
+
 func (p createPresenter) BranchFailed(failure domain.CreateFailure) {
 	if !p.Human {
 		return

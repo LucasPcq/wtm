@@ -45,7 +45,7 @@ func (p *plan) componentStep(step flow.Step, conditional bool) (components.Step,
 	case flow.StepBranchSelect:
 		return p.branchStep(step)
 	case flow.StepTextList:
-		return p.contentStep(step, func(content flow.StepContent) any { return textList(step, content) })
+		return p.contentStep(step, func(content flow.StepContent) any { return TextList(step, content) })
 	case flow.StepMultiSelect:
 		return p.contentStep(step, func(content flow.StepContent) any { return multiSelect(step, content) })
 	case flow.StepReorder:
@@ -83,7 +83,9 @@ func textInput(step flow.Step, content flow.StepContent) components.TextInputMod
 	})
 }
 
-func textList(step flow.Step, content flow.StepContent) components.TextListModel {
+// TextList is shared with the dashboard, so an entry is refused and badged the
+// same way on both surfaces.
+func TextList(step flow.Step, content flow.StepContent) components.TextListModel {
 	params := components.NewTextListParams{
 		Title:       content.Title,
 		Description: content.Description,

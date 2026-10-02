@@ -52,7 +52,7 @@ func (m Model) startCreate() (Model, tea.Cmd) {
 			opID:      id,
 			targetKey: declared.TargetKey,
 		},
-		Presenter: createPresenter{presenter{send: send, id: id}},
+		Presenter: newCreatePresenter(presenter{send: send, id: id}),
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
@@ -458,7 +458,10 @@ func (m Model) applyFlow(msg tea.Msg) (Model, tea.Cmd) {
 		m.ops = m.ops.stage(stageParams{ID: msg.id, Target: m.branchFor(msg.target), Stage: msg.stage})
 		return m, nil
 	case createdMsg:
-		m.selectBranch = msg.branch
+		if msg.selects {
+			m.selectBranch = msg.branch
+		}
+		m.flashPending = append(append([]string(nil), m.flashPending...), msg.branch)
 		return m, m.reload()
 	case cleanedMsg:
 		return m, m.reload()

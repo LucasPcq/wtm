@@ -59,6 +59,11 @@ func (m TextListModel) Aborted() bool { return m.aborted }
 
 func (m TextListModel) Values() []string { return append([]string(nil), m.entries...) }
 
+func (m *TextListModel) SetWidth(w int) {
+	m.width = w
+	m.input.Width = max(10, w-4)
+}
+
 func (m TextListModel) Init() tea.Cmd { return textinput.Blink }
 
 func (m TextListModel) Update(msg tea.Msg) (TextListModel, tea.Cmd) {

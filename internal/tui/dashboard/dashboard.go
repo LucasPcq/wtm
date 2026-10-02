@@ -297,11 +297,10 @@ type Model struct {
 	// reports the target outright.
 	tabSlideFrom  int
 	tabSlideSince time.Time
-	// flashBranch and flashSince drive a just-created row's opening beat: the
-	// branch selectRequested last landed the cursor on, and when that
-	// happened. A zero flashSince means nothing is flashing.
-	flashBranch string
-	flashSince  time.Time
+	// flashPending holds the worktrees a run created that the list has not shown
+	// yet; flashes the rows lit since they appeared, each from when it did.
+	flashPending []string
+	flashes      map[string]time.Time
 }
 
 // New builds the dashboard model. Callers outside a program must Close the
@@ -587,10 +586,10 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tabSlideTickCmd()
 
 	case flashTickMsg:
-		// Same bounded shape as tabSlideTickMsg: it stops re-arming, and clears
-		// flashBranch, the moment the flash's duration has elapsed.
-		if m.flashBranch == "" || time.Since(m.flashSince) >= domain.DashboardRowFlash {
-			m.flashBranch = ""
+		// Same bounded shape as tabSlideTickMsg: it stops re-arming once every
+		// flash's duration has elapsed.
+		m = m.settleFlashes()
+		if len(m.flashes) == 0 {
 			return m, nil
 		}
 		return m, flashTickCmd()
@@ -660,8 +659,7 @@ func (m Model) applyWorktrees(msg worktreesMsg) (Model, tea.Cmd) {
 	})
 	m.cursor = rules.ClampIndex(m.cursor, len(m.statuses))
 
-	animate := rules.AnimationsEnabled(m.params.Config)
-	next, flashed := m.selectRequested(animate)
+	next, flashed := m.selectRequested().lightCreated(rules.AnimationsEnabled(m.params.Config))
 	next = next.reflow()
 	if !flashed {
 		return next, nil
@@ -670,25 +668,64 @@ func (m Model) applyWorktrees(msg worktreesMsg) (Model, tea.Cmd) {
 }
 
 // selectRequested lands the cursor on the worktree a finished run created, the
-// one time the list comes back holding it. animate arms its opening flash,
-// gated by ui.animations rather than deciding whether the branch itself
-// should flash — a row still gets found and selected either way.
-func (m Model) selectRequested(animate bool) (Model, bool) {
+// one time the list comes back holding it.
+func (m Model) selectRequested() Model {
 	if m.selectBranch == "" {
-		return m, false
+		return m
 	}
 	for index, status := range m.statuses {
-		if status.Branch != m.selectBranch {
-			continue
+		if status.Branch == m.selectBranch {
+			m.cursor, m.selectBranch = index, ""
+			return m
 		}
-		m.cursor, m.selectBranch = index, ""
-		if !animate {
-			return m, false
-		}
-		m.flashBranch, m.flashSince = status.Branch, time.Now()
-		return m, true
 	}
-	return m, false
+	return m
+}
+
+// lightCreated starts the opening flash of every created row the list now
+// holds. animate is ui.animations: it cuts the flash, never the bookkeeping, so
+// a pending row is dropped once it appears either way.
+func (m Model) lightCreated(animate bool) (Model, bool) {
+	if len(m.flashPending) == 0 {
+		return m, false
+	}
+	shown := make(map[string]bool, len(m.statuses))
+	for _, status := range m.statuses {
+		shown[status.Branch] = true
+	}
+	flashes := make(map[string]time.Time, len(m.flashes)+len(m.flashPending))
+	for branch, since := range m.flashes {
+		flashes[branch] = since
+	}
+	var pending []string
+	lit, now := false, time.Now()
+	for _, branch := range m.flashPending {
+		switch {
+		case !shown[branch]:
+			pending = append(pending, branch)
+		case animate:
+			flashes[branch], lit = now, true
+		}
+	}
+	m.flashPending, m.flashes = pending, flashes
+	return m, lit
+}
+
+func (m Model) settleFlashes() Model {
+	flashes := make(map[string]time.Time, len(m.flashes))
+	for branch, since := range m.flashes {
+		if time.Since(since) < domain.DashboardRowFlash {
+			flashes[branch] = since
+		}
+	}
+	m.flashes = flashes
+	return m
+}
+
+// flashLit reports whether a row is in its opening beat.
+func (m Model) flashLit(branch string) bool {
+	since, lit := m.flashes[branch]
+	return lit && rules.FlashLit(rules.FlashParams{Since: since, Now: time.Now(), Duration: domain.DashboardRowFlash})
 }
 
 func (m Model) updateModal(msg tea.Msg) (Model, tea.Cmd) {
