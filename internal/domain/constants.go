@@ -4493,6 +4493,9 @@ const (
 	// ExitCodeCancelled is a run the user backed out of interactively, so that
 	// `wtm create x && wtm go x` stops there.
 	ExitCodeCancelled = 19
+	// ExitCodeEventsSchemaNewer is a `wtm events` that received an event of a
+	// schema newer than its own: the consumer has to upgrade wtm.
+	ExitCodeEventsSchemaNewer = 20
 
 	// FlagValueInvalidFmt is every flag value that does not parse.
 	FlagValueInvalidFmt = "invalid --%s value %q: use %s"
@@ -4569,4 +4572,19 @@ const (
 
 	AnsiEscByte = 0x1b
 	AnsiBelByte = 0x07
+)
+
+// `wtm events` and the bus behind it.
+const (
+	CmdEvents = "events"
+	FlagRepo  = "repo"
+
+	// EventsPublishTimeout bounds a whole publish, dial included: a mutation
+	// never waits on a daemon nobody may be listening to.
+	EventsPublishTimeout = 250 * time.Millisecond
+	// EventsSubscriberQueue is how far a subscriber may fall behind before it
+	// is cut off rather than waited for.
+	EventsSubscriberQueue = 256
+	EventsReconnectMin    = 200 * time.Millisecond
+	EventsReconnectMax    = 5 * time.Second
 )
