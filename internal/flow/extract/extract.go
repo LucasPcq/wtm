@@ -117,6 +117,9 @@ func (f *extractFlow) run() (Outcome, error) {
 		return Outcome{}, fmt.Errorf(domain.BranchOwnParentFmt, f.request.To, domain.FlagFrom)
 	}
 	f.create = f.embed()
+	if err := f.create.CheckBranch(); err != nil {
+		return Outcome{}, err
+	}
 
 	answers, err := f.prompter.Ask(f.session())
 	if errors.Is(err, domain.ErrUserAborted) {
@@ -235,7 +238,7 @@ func (f *extractFlow) extract(answers flow.Answers) (Outcome, error) {
 		return Outcome{}, err
 	}
 	if !proceed {
-		return Outcome{Aborted: true}, nil
+		return f.abort()
 	}
 
 	mode, proceed := f.conflictMode(conflictModeParams{SourcePath: f.paths[source], Target: dest, Selected: selected})
@@ -287,11 +290,26 @@ func (f *extractFlow) existingTarget(branch string) (target, bool, error) {
 		Requested: f.request.Isolation,
 		Current:   worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: wt.Branch}),
 	})
+	warnings := rules.CreationFlagsIgnoredWarnings(rules.CreationFlagsIgnoredParams{Branch: wt.Branch, Given: f.creationFlags()})
 	if warning != "" {
-		f.presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: warning})
-		dest.warnings = []string{warning}
+		warnings = append(warnings, warning)
 	}
+	for _, text := range warnings {
+		f.presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: text})
+	}
+	dest.warnings = warnings
 	return dest, true, nil
+}
+
+func (f *extractFlow) creationFlags() []string {
+	var given []string
+	if f.request.From != "" {
+		given = append(given, domain.FlagFrom)
+	}
+	if f.request.FastForward {
+		given = append(given, domain.FlagFF)
+	}
+	return given
 }
 
 type conflictModeParams struct {

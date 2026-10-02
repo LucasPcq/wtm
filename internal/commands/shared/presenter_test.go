@@ -197,3 +197,15 @@ func TestDrawHookPhase_JoinsAnAlreadyOpenBlock(t *testing.T) {
 		t.Errorf("the phase lost its title: %q", got)
 	}
 }
+
+func TestAnAbortNoticeMarksTheCommandCancelled(t *testing.T) {
+	presenter, _ := testPresenter(t)
+	presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: "a warning"})
+	if Cancelled(presenter.Cmd) {
+		t.Fatal("a warning marked the command cancelled")
+	}
+	presenter.Notice(flow.AbortedNotice)
+	if !Cancelled(presenter.Cmd) {
+		t.Error("an abort did not mark the command cancelled")
+	}
+}

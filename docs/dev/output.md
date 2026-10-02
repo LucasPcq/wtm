@@ -139,7 +139,7 @@ These three are checked by `make lint` (`tools/archlint`, rules `glyph`, `tuisty
 
 ### What follows from the three rules
 
-**"Nothing to do" is `=`, everywhere** — and "everywhere" includes the places that are not a conclusion. An **empty inventory** is a non-event: `output.UnchangedLine` is `Unchanged` for a formatter that returns a body, so an empty table takes the same glyph as a command that found nothing to do. So does **backing out**: an abort changed nothing, and it is `=` with one wording (`domain.AbortedMessage`) rather than a bare sentence in four.
+**"Nothing to do" is `=`, everywhere** — and "everywhere" includes the places that are not a conclusion. An **empty inventory** is a non-event: `output.UnchangedLine` is `Unchanged` for a formatter that returns a body, so an empty table takes the same glyph as a command that found nothing to do. So does **backing out**: an abort changed nothing, and it is `=` with one wording (`domain.AbortedMessage`) rather than a bare sentence in four. It still exits `19` (`ExitCodeCancelled`): `CLIPresenter.Notice` marks the command when it draws that line, and the root ends the process on the mark, so a shell chaining `wtm create x && wtm go x` stops there while the dashboard, which never reads an exit code, is left alone.
 
 A **state readout** may not hide a non-event as a field value either. `not running` and `not installed` are the `=` register; a `Section` line is where the detail goes, under a conclusion, never instead of one.
 

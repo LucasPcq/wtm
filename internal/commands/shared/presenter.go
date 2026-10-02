@@ -119,6 +119,7 @@ func (p CLIPresenter) Notice(notice flow.Notice) {
 		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
 			output.Unchanged(w, notice.Text)
 		})
+		MarkCancelled(p.Cmd)
 		return
 	}
 	if notice.Kind == flow.NoticeWarning {

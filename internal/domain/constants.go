@@ -921,6 +921,16 @@ const (
 		"Nothing is removed from the source.\n" +
 		"Resolve in %q then discard there, or discard in %q to undo."
 	ExtractSourceNotFoundFmt = "source worktree %q: %w"
+	// BranchName* say why git would refuse a branch name, checked before
+	// anything is created.
+	BranchNameInvalidFmt   = "%q is not a valid branch name: %s"
+	BranchNameReserved     = "it is reserved by git"
+	BranchNameLeadingDash  = "it cannot start with -"
+	BranchNameBadSlash     = "a / cannot start or end it, or follow another"
+	BranchNameBadDot       = "it cannot hold .. or end with ."
+	BranchNameAtBrace      = "it cannot hold @{"
+	BranchNameBadChar      = "it cannot hold a space, a control character or any of ~ ^ : ? * [ \\"
+	BranchNameBadComponent = "no part between slashes may start with . or end with .lock"
 	// BranchOwnParentFmt refuses a --from naming the branch being created.
 	BranchOwnParentFmt = "%s cannot be its own parent: pass another branch to --%s"
 
@@ -1339,7 +1349,10 @@ const (
 	// path, a script, a URL, a document. --quiet never silences one: a caller
 	// asking for less noise did not ask for less answer.
 	AnnotationMachineOutput = "wtm.machine-output"
-	AnnotationOn            = "true"
+	// AnnotationCancelled is set on the command a user backed out of, for the
+	// root to end the process on ExitCodeCancelled.
+	AnnotationCancelled = "wtm.cancelled"
+	AnnotationOn        = "true"
 	// AnnotationOutputFormats lists, comma-separated, the --output values a
 	// command accepts besides text and json.
 	AnnotationOutputFormats  = "wtm.output-formats"
@@ -3250,7 +3263,10 @@ const (
 	IsolationStepIrrelevant = "run.toml declares nothing a worktree isolates"
 	// IsolationIgnoredFmt is --isolation given to a run whose worktree already
 	// existed, so nothing was created for it to answer.
-	IsolationIgnoredFmt = "--%s %s ignored: %s already exists and stays %s — switch it with `wtm env %s --%s %s`"
+	// CreationFlagIgnoredFmt is a flag only a creation reads, given to a run whose
+	// target already exists (flag, branch).
+	CreationFlagIgnoredFmt = "--%s ignored: %s already exists, so nothing is created"
+	IsolationIgnoredFmt    = "--%s %s ignored: %s already exists and stays %s — switch it with `wtm env %s --%s %s`"
 
 	// IsolationAdopt* is the migration `wtm env` offers a worktree created
 	// before the choice existed. Keeping it as is comes first: adopting moves the
@@ -4474,6 +4490,9 @@ const (
 	// ExitCodeEnvDrift is a `wtm env --check` that found drift, so a CI step can
 	// fail on it without parsing the report.
 	ExitCodeEnvDrift = 18
+	// ExitCodeCancelled is a run the user backed out of interactively, so that
+	// `wtm create x && wtm go x` stops there.
+	ExitCodeCancelled = 19
 
 	// FlagValueInvalidFmt is every flag value that does not parse.
 	FlagValueInvalidFmt = "invalid --%s value %q: use %s"

@@ -116,6 +116,7 @@ func (f *createFlow) run() (Outcome, error) {
 			return Outcome{}, ffErr
 		}
 		if !proceed {
+			f.presenter.Notice(flow.AbortedNotice)
 			return Outcome{Aborted: true}, nil
 		}
 	}

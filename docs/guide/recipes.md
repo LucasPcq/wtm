@@ -211,7 +211,7 @@ wtm clean "$branch" --yes                                # add --force once the 
 
 - `run up --yes` leaves the other worktrees' jobs running, so agents starting at the same time do not stop each other. Setting `concurrency = "parallel"` in `run.toml` makes that the answer for people too.
 - Under `--yes` a missing choice is an error naming its flag, never a picker: `run start` needs `--job`, `create` needs the branch.
-- Exit codes are stable: `10` the worktree already exists, `11` the branch does not exist, `14` a job or profile `run.toml` does not declare, `16` no `run.toml`, `18` a `wtm env --check` that found drift, `2` a usage error.
+- Exit codes are stable: `10` the worktree already exists, `11` the branch does not exist, `14` a job or profile `run.toml` does not declare, `16` no `run.toml`, `18` a `wtm env --check` that found drift, `19` an interactive run you backed out of (so `wtm create x && wtm go x` stops there), `2` a usage error.
 - `wtm run ps --output json` lists everything running, across repositories, and `wtm list --output json` every worktree with its state.
 - `clean --yes` still refuses a worktree with uncommitted or unpushed work; that refusal is lifted only by `--force`.
 

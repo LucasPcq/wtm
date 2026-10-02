@@ -125,6 +125,7 @@ func (f *checkoutFlow) run() (Outcome, error) {
 			Presenter:  f.presenter,
 		})
 		if !proceed {
+			f.presenter.Notice(flow.AbortedNotice)
 			return Outcome{Aborted: true}, nil
 		}
 	}

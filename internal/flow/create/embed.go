@@ -56,6 +56,17 @@ func Embed(params EmbedParams) Embedded {
 	return Embedded{flow: f, applies: params.Applies}
 }
 
+// CheckBranch refuses the branch the flags named, as the step would have had
+// anyone been asked: a preset is never validated by its step.
+func (e Embedded) CheckBranch() error {
+	for _, name := range e.flow.request.Branches {
+		if err := e.flow.validateEntry(flow.EntryCheck{Entry: name}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Presets are the answers the flags already gave, for the host's session.
 func (e Embedded) Presets() map[string]string { return e.flow.presets() }
 

@@ -383,3 +383,28 @@ func TestTheRecapNamesTheFilesADirectoryStandsFor(t *testing.T) {
 		t.Errorf("recap:\n%s", recap)
 	}
 }
+
+func TestATargetGitWouldRefuseIsRefusedFirst(t *testing.T) {
+	r := newRepo(t)
+	request := Request{Source: "src", Files: []string{"a.txt"}, To: "bad..name"}
+	_, err := Run(Params{Context: r.ctx, Request: request, Prompter: flow.Unattended{}, Presenter: newRecorder()})
+	if !errors.Is(err, domain.ErrUsage) {
+		t.Errorf("err = %v, want the branch name refused as a usage error", err)
+	}
+}
+
+func TestCreationFlagsOnAnExistingTargetAreSaidToBeIgnored(t *testing.T) {
+	r := newRepo(t)
+	presenter := newRecorder()
+	request := Request{Source: "src", Files: []string{"a.txt"}, To: "dst", From: "main", FastForward: true}
+	if _, err := Run(Params{Context: r.ctx, Request: request, Prompter: flow.Unattended{}, Presenter: presenter}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	warnings := presenter.extracted.Result.Warnings
+	if len(warnings) != 2 || !strings.HasPrefix(warnings[0], "--from ignored: dst") || !strings.HasPrefix(warnings[1], "--ff ignored: dst") {
+		t.Errorf("warnings = %v, want --from and --ff named", warnings)
+	}
+	if len(presenter.Statuses) != 2 {
+		t.Errorf("statuses = %v, want each said as it happens", presenter.Statuses)
+	}
+}

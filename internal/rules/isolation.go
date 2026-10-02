@@ -151,6 +151,22 @@ func IsolationIgnoredWarning(params IsolationIgnoredParams) string {
 	return fmt.Sprintf(domain.IsolationIgnoredFmt, domain.FlagIsolation, params.Requested, params.Branch, params.Current, params.Branch, domain.FlagIsolation, params.Requested)
 }
 
+type CreationFlagsIgnoredParams struct {
+	Branch string
+	// Given are the creation flags the run was passed, by name.
+	Given []string
+}
+
+// CreationFlagsIgnoredWarnings names each flag that only shapes a worktree being
+// created, on a run whose target was already there: said, rather than dropped.
+func CreationFlagsIgnoredWarnings(params CreationFlagsIgnoredParams) []string {
+	warnings := make([]string, 0, len(params.Given))
+	for _, flag := range params.Given {
+		warnings = append(warnings, fmt.Sprintf(domain.CreationFlagIgnoredFmt, flag, params.Branch))
+	}
+	return warnings
+}
+
 type IsolationRecapShownParams struct {
 	Applies  bool
 	Override domain.Isolation
