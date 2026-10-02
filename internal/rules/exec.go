@@ -201,3 +201,27 @@ func ExecShortfall(counts domain.ExecCounts) string {
 	}
 	return strings.Join(parts, domain.ExecCountSeparator)
 }
+
+type SplitExecArgsParams struct {
+	Args []string
+	// Dash is cobra's ArgsLenAtDash: -1 when no -- was typed.
+	Dash int
+}
+
+type ExecArgs struct {
+	Names   []string
+	Command string
+}
+
+// SplitExecArgs leaves the command empty without a --, for the wizard to ask.
+// A -- with nothing after it is a mistake, never a question.
+func SplitExecArgs(params SplitExecArgsParams) (ExecArgs, error) {
+	if params.Dash < 0 {
+		return ExecArgs{Names: params.Args}, nil
+	}
+	line, err := ExecCommandLine(params.Args[params.Dash:])
+	if err != nil {
+		return ExecArgs{}, err
+	}
+	return ExecArgs{Names: params.Args[:params.Dash], Command: line}, nil
+}

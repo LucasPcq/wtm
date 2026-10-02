@@ -177,3 +177,76 @@ func TestTheCurrentWorktreeIsFoundThroughASymlinkedPath(t *testing.T) {
 		}
 	}
 }
+
+func TestWithoutACommandTheWizardAsksForItBetweenWorktreesAndConfirm(t *testing.T) {
+	fx := newFixture(t, "a")
+	prompter := &flowtest.ScriptedPrompter{
+		Sets:    map[string][]string{KeySelection: {"a"}},
+		Answers: map[string]string{KeyCommand: "echo hi", KeyConfirm: domain.ExecConfirmValue},
+	}
+	outcome, _, err := run(t, fx, Request{Jobs: 1}, prompter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := prompter.AskedKeys(); got != KeySelection+","+KeyCommand+","+KeyConfirm {
+		t.Errorf("asked %q", got)
+	}
+	if outcome.Command != "echo hi" || len(outcome.Results) != 1 || outcome.Results[0].Tail[0] != "hi" {
+		t.Fatalf("outcome = %+v", outcome)
+	}
+	if recap := prompter.Content[KeyConfirm].Description; !strings.Contains(recap, "echo hi") {
+		t.Errorf("recap %q misses the typed command", recap)
+	}
+}
+
+func TestUnattendedWithoutACommandIsAUsageErrorNamingTheDash(t *testing.T) {
+	fx := newFixture(t, "a")
+	_, rec, err := run(t, fx, Request{Branches: []string{"a"}, Jobs: 1}, flow.Unattended{})
+	if !errors.Is(err, domain.ErrUsage) || !errors.Is(err, domain.ErrExecNoCommand) || !strings.Contains(err.Error(), "--") {
+		t.Fatalf("err = %v", err)
+	}
+	if len(rec.progress) != 0 {
+		t.Fatal("nothing may run without a command")
+	}
+}
+
+func TestTheCommandStepRefusesWhatTheShellCannotRun(t *testing.T) {
+	step := (&execFlow{}).commandStep()
+	for _, bad := range []string{"", "   ", "if then"} {
+		if step.Validate(bad) == nil {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+	if err := step.Validate(""); strings.Contains(err.Error(), "--") {
+		t.Errorf("the wizard is asking for the command; pointing at -- reads as a CLI error: %v", err)
+	}
+	if err := step.Validate("pnpm test && pnpm lint"); err != nil {
+		t.Errorf("valid line refused: %v", err)
+	}
+}
+
+func TestTheStepsReadLikeCreate(t *testing.T) {
+	fx := newFixture(t, "a", "b")
+	f := &execFlow{params: Params{Context: flow.Context{ProjectDir: fx.dir}, Request: Request{Jobs: 1}}}
+	var labels []string
+	for _, step := range f.session().Steps {
+		labels = append(labels, step.Label)
+	}
+	if got := strings.Join(labels, " > "); got != "Worktrees > Command > Confirm & run" {
+		t.Errorf("breadcrumb = %q", got)
+	}
+
+	confirm := func(branches ...string) string {
+		content, err := f.confirmStep().Build(flow.NewAnswers(nil).WithValues(KeySelection, branches))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return content.Options[0].Label
+	}
+	if got := confirm("a", "b"); got != "Yes, run in 2 worktrees" {
+		t.Errorf("many = %q", got)
+	}
+	if got := confirm("a"); got != "Yes, run in a" {
+		t.Errorf("one = %q", got)
+	}
+}

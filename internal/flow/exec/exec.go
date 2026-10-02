@@ -80,7 +80,7 @@ func (f *execFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	outcome := f.execute(targets)
+	outcome := f.execute(executeParams{Targets: targets, Command: answers.Value(KeyCommand)})
 	if err := f.params.Presenter.Executed(outcome); err != nil {
 		return outcome, err
 	}
@@ -117,7 +117,13 @@ func resolvedPaths(candidates []domain.GitWorktree) []domain.GitWorktree {
 	return resolved
 }
 
-func (f *execFlow) execute(targets []domain.GitWorktree) Outcome {
+type executeParams struct {
+	Targets []domain.GitWorktree
+	Command string
+}
+
+func (f *execFlow) execute(params executeParams) Outcome {
+	targets := params.Targets
 	branches := make([]string, len(targets))
 	execTargets := make([]execsvc.Target, len(targets))
 	for i, target := range targets {
@@ -135,7 +141,7 @@ func (f *execFlow) execute(targets []domain.GitWorktree) Outcome {
 
 	begin := time.Now()
 	results := execsvc.Run(f.params.Ctx, execsvc.RunParams{
-		Command:    f.params.Request.Command,
+		Command:    params.Command,
 		Targets:    execTargets,
 		Jobs:       f.params.Request.Jobs,
 		KeepOutput: f.params.Request.Print,
@@ -143,5 +149,5 @@ func (f *execFlow) execute(targets []domain.GitWorktree) Outcome {
 			f.params.Presenter.Progress(ExecProgress{Branches: branches, Beat: beat})
 		},
 	})
-	return Outcome{Command: f.params.Request.Command, Results: results, Elapsed: time.Since(begin)}
+	return Outcome{Command: params.Command, Results: results, Elapsed: time.Since(begin)}
 }

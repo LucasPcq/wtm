@@ -10,16 +10,20 @@ worktree's environment: the variables describing the worktree you stand in are
 removed, and the target's run variables (compose project, shifted ports) are added
 when it has them — the same ones its hooks get. stdin is closed. Each worktree's whole
 output is kept in a log under the state directory; failures show its tail.
-Pass worktree names (branches), --all, or nothing to pick interactively. The run
+Pass worktree names (branches), --all, or nothing to pick interactively; without --
+the wizard asks for the command too, and a run that cannot ask refuses. The run
 exits 1 when any command failed; each worktree's own exit code is in the report.
 
 ```
-wtm exec [worktree...] -- <command> [flags]
+wtm exec [worktree...] [-- <command>] [flags]
 ```
 
 ### Examples
 
 ```
+  # Pick the worktrees and type the command in the wizard
+  wtm exec
+
   # Run the tests on two branches
   wtm exec feat/login feat/signup -- pnpm test
 
@@ -41,7 +45,7 @@ wtm exec [worktree...] -- <command> [flags]
       --jobs int        How many commands run at once (0: one per CPU)
       --output string   Output format: text or json (default "text")
       --print           Also show the full output of every worktree, successes included
-  -y, --yes             Skip all prompts (requires worktree names or --all)
+  -y, --yes             Skip all prompts (requires worktree names or --all, and the command after --)
 ```
 
 ### Options inherited from parent commands

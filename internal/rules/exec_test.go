@@ -3,6 +3,7 @@ package rules
 import (
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -139,5 +140,19 @@ func TestTerminalLineKeepsWhatATerminalWouldShow(t *testing.T) {
 		if got := TerminalLine(in); got != want {
 			t.Errorf("TerminalLine(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestSplitExecArgsLeavesTheCommandToTheWizardWithoutADash(t *testing.T) {
+	got, err := SplitExecArgs(SplitExecArgsParams{Args: []string{"a", "b"}, Dash: -1})
+	if err != nil || strings.Join(got.Names, ",") != "a,b" || got.Command != "" {
+		t.Fatalf("got %+v, %v", got, err)
+	}
+	got, err = SplitExecArgs(SplitExecArgsParams{Args: []string{"a", "pnpm", "test"}, Dash: 1})
+	if err != nil || strings.Join(got.Names, ",") != "a" || got.Command != "pnpm test" {
+		t.Fatalf("got %+v, %v", got, err)
+	}
+	if _, err := SplitExecArgs(SplitExecArgsParams{Args: []string{"a"}, Dash: 1}); !errors.Is(err, domain.ErrExecNoCommand) {
+		t.Fatalf("a dash with nothing after it is a mistake, not a question: %v", err)
 	}
 }

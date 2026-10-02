@@ -124,7 +124,7 @@ Modes and flags:
 `wtm exec <branch>... --yes --output json -- <command>` (or `--all` instead of names) runs a `/bin/sh -c` line in each worktree, in parallel (`--jobs N`, default CPU count), from the worktree root, with that worktree's run variables (the ones your shell carries about the current worktree are removed).
 
 - stdin is closed: never pass an interactive command.
-- Without names or `--all` it refuses under `--yes`. A name that matches no worktree exits `11` before anything runs; a name given twice runs once.
+- Without names or `--all` it refuses under `--yes`; without `--` and a command it refuses too (exit `2`), since only the interactive wizard can ask for one. A name that matches no worktree exits `11` before anything runs; a name given twice runs once.
 - Exit code: `0` when every command passed, `1` when any did not. Read each worktree's `status` and `exit_code` in the JSON to know which one failed and how; the process exit code never carries the child's.
 - `--print` puts the full output in `output` instead of the 20-line `tail`.
 
