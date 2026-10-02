@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/styles"
 )
 
@@ -146,10 +147,10 @@ func FormatRelocateResult(w io.Writer, result domain.RelocateResult) {
 	}
 
 	hasIssue := len(blocked) > 0 || len(errored) > 0 || len(refused) > 0
-	headline := Tally(
-		TallyPart{Count: len(done), Label: domain.TallyApplied},
-		TallyPart{Count: len(skipped), Label: domain.TallySkipped},
-		TallyPart{Count: len(blocked) + len(errored) + len(refused), Label: domain.TallyBlocked},
+	headline := rules.Tally(
+		domain.TallyPart{Count: len(done), Label: domain.TallyApplied},
+		domain.TallyPart{Count: len(skipped), Label: domain.TallySkipped},
+		domain.TallyPart{Count: len(blocked) + len(errored) + len(refused), Label: domain.TallyBlocked},
 	)
 	if hasIssue {
 		Warning(w, "Relocation finished with issues  "+headline)

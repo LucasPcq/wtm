@@ -301,10 +301,10 @@ func FormatCreateBatch(w io.Writer, p CreateBatchParams) {
 		Error(w, fmt.Sprintf(domain.CreateBranchFailedFmt, failure.Branch, failure.Error))
 	}
 	Blank(w)
-	Message(w, Tally(
-		TallyPart{Count: created, Label: domain.TallyCreated},
-		TallyPart{Count: existed, Label: domain.TallyAlreadyExisted},
-		TallyPart{Count: len(p.Failed), Label: domain.TallyFailed},
+	Message(w, rules.Tally(
+		domain.TallyPart{Count: created, Label: domain.TallyCreated},
+		domain.TallyPart{Count: existed, Label: domain.TallyAlreadyExisted},
+		domain.TallyPart{Count: len(p.Failed), Label: domain.TallyFailed},
 	))
 }
 
@@ -413,12 +413,12 @@ func WriteCleanJSON(w io.Writer, result domain.CleanBatchResult) error {
 // the reader still has to deal with. Raw body — the caller's frame owns the padding.
 func FormatCleanBatch(w io.Writer, result domain.CleanBatchResult) {
 	removed, absent := rules.CleanedBranches(result.Results)
-	tally := Tally(
-		TallyPart{Count: len(removed), Label: domain.TallyRemoved},
-		TallyPart{Count: len(absent), Label: domain.TallyAlreadyAbsent},
-		TallyPart{Count: len(result.Reparented), Label: domain.TallyReparented},
-		TallyPart{Count: len(result.Skipped), Label: domain.TallySkipped},
-		TallyPart{Count: len(result.Failed), Label: domain.TallyFailed},
+	tally := rules.Tally(
+		domain.TallyPart{Count: len(removed), Label: domain.TallyRemoved},
+		domain.TallyPart{Count: len(absent), Label: domain.TallyAlreadyAbsent},
+		domain.TallyPart{Count: len(result.Reparented), Label: domain.TallyReparented},
+		domain.TallyPart{Count: len(result.Skipped), Label: domain.TallySkipped},
+		domain.TallyPart{Count: len(result.Failed), Label: domain.TallyFailed},
 	)
 	if len(removed) == 0 {
 		Unchanged(w, tally)

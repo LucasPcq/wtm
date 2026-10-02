@@ -337,3 +337,10 @@ type CleanBlocker struct {
 	Key   string
 	Label string
 }
+
+// TallyPart is one count of a result summary. A zero count is dropped: a
+// conclusion counts what happened, never what did not.
+type TallyPart struct {
+	Count int
+	Label string
+}

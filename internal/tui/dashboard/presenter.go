@@ -2,7 +2,6 @@ package dashboard
 
 import (
 	"fmt"
-	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -151,26 +150,11 @@ func createTally(outcome createflow.Outcome) string {
 		}
 		created++
 	}
-	return joinTally([]tallyPart{
-		{count: created, label: domain.TallyCreated},
-		{count: existed, label: domain.TallyAlreadyExisted},
-		{count: len(outcome.Failed), label: domain.TallyFailed},
-	})
-}
-
-type tallyPart struct {
-	count int
-	label string
-}
-
-func joinTally(parts []tallyPart) string {
-	kept := make([]string, 0, len(parts))
-	for _, part := range parts {
-		if part.count > 0 {
-			kept = append(kept, fmt.Sprintf(domain.TallyPartFmt, part.count, part.label))
-		}
-	}
-	return strings.Join(kept, domain.TallySeparator)
+	return rules.Tally(
+		domain.TallyPart{Count: created, Label: domain.TallyCreated},
+		domain.TallyPart{Count: existed, Label: domain.TallyAlreadyExisted},
+		domain.TallyPart{Count: len(outcome.Failed), Label: domain.TallyFailed},
+	)
 }
 
 // cleanPresenter is called from the flow's one goroutine, so the subject it
@@ -219,12 +203,12 @@ func (p cleanPresenter) Cleaned(outcome cleanflow.Outcome) error {
 	}
 	if batch {
 		removed, absent := rules.CleanedBranches(outcome.Results)
-		p.line(joinTally([]tallyPart{
-			{count: len(removed), label: domain.TallyRemoved},
-			{count: len(absent), label: domain.TallyAlreadyAbsent},
-			{count: len(outcome.Skipped), label: domain.TallySkipped},
-			{count: len(outcome.Failed), label: domain.TallyFailed},
-		}))
+		p.line(rules.Tally(
+			domain.TallyPart{Count: len(removed), Label: domain.TallyRemoved},
+			domain.TallyPart{Count: len(absent), Label: domain.TallyAlreadyAbsent},
+			domain.TallyPart{Count: len(outcome.Skipped), Label: domain.TallySkipped},
+			domain.TallyPart{Count: len(outcome.Failed), Label: domain.TallyFailed},
+		))
 	}
 	p.send(cleanedMsg{})
 	return nil
