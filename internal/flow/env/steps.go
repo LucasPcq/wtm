@@ -34,7 +34,7 @@ func (f *envFlow) worktreeStep() flow.Step {
 			badges = append(badges, flow.Badge{Text: domain.EnvBadgeParent})
 		}
 		scan := f.scans[status.Branch]
-		badges = append(badges, driftBadge(scan.files))
+		badges = append(badges, driftBadge(scan))
 		if scan.refused {
 			badges = append(badges, flow.Badge{Text: fmt.Sprintf(domain.EnvBadgeRefusesFmt, f.request.Isolation), Tone: domain.ToneDanger})
 		}
@@ -53,8 +53,10 @@ func (f *envFlow) worktreeStep() flow.Step {
 	}
 }
 
-func driftBadge(files []domain.EnvFileResult) flow.Badge {
-	count := rules.EnvDriftCount(files)
+// driftBadge counts the port pass with the keys: a worktree whose only drift is
+// a port to move is not in sync.
+func driftBadge(scan branchScan) flow.Badge {
+	count := rules.EnvDriftCount(scan.files) + len(rules.EnvPortRewrites(scan.ports)) + len(rules.OwnedEnvRewrites(scan.ports))
 	if count == 0 {
 		return flow.Badge{Text: domain.EnvBadgeInSync, Tone: domain.ToneSuccess}
 	}
@@ -95,8 +97,8 @@ func (f *envFlow) adoptStep() flow.Step {
 	}
 }
 
-// resolveStep is skipped when there is nothing to decide: only safe additions,
-// or a worktree in sync.
+// resolveStep is skipped when no key is left to decide: an addition is one, since
+// it can be skipped.
 func (f *envFlow) resolveStep() flow.Step {
 	return flow.Step{
 		Kind:  flow.StepEnvResolve,
@@ -129,6 +131,10 @@ func (f *envFlow) recapStep() flow.Step {
 		Kind:  flow.StepRecap,
 		Key:   KeyRecap,
 		Label: domain.EnvRecapStepLabel,
+		// Nobody is asked to confirm a run that would write nothing.
+		Skip: func(answers flow.Answers) (bool, string) {
+			return !f.applies(answers), ""
+		},
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
 			options := f.applyOptions(answers)
 			return flow.StepContent{
@@ -181,12 +187,27 @@ func (f *envFlow) recap(params recapParams) string {
 		lines = append(lines, domain.EnvRecapSafeOnly)
 	}
 	lines = append(lines, rules.EnvPortRecapLines(scan.ports)...)
+	// An adopting worktree was scanned without its port pass, which would have
+	// allocated its ordinal before the question was answered.
+	if answers.Value(KeyAdopt) == domain.IsolationAdoptValue {
+		lines = append(lines, "", domain.EnvRecapAdoptPorts)
+	}
 	lines = append(lines, rules.EnvRestoreRecapLines(rules.EnvRestoreRecapParams{
 		Entries: scan.restore,
 		Switch:  rules.IsVerbatim(f.request.Isolation),
 		Offered: params.VerbatimOffered,
 	})...)
 	return strings.Join(lines, "\n")
+}
+
+// applies reports whether confirming would write anything: a key, a port, an
+// owned value, or an isolation to record.
+func (f *envFlow) applies(answers flow.Answers) bool {
+	scan := f.scanOf(answers)
+	return rules.EnvDriftCount(scan.files) > 0 ||
+		len(rules.EnvPortRewrites(scan.ports)) > 0 ||
+		len(rules.OwnedEnvRewrites(scan.ports)) > 0 ||
+		f.isolation(answers) != ""
 }
 
 // sourceLabel is where the values come from: the strategy, and the parent it

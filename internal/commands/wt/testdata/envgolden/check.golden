@@ -2,7 +2,7 @@ args: feat/a --check
 err: 
 --- stdout ---
 
-  ! Read-only check — run `wtm env` to reconcile.
+  ! Read-only check — run `wtm env feat/a` to reconcile.
 
   Worktree  feat/a
   Mode      add  ·  read-only check

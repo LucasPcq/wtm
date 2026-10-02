@@ -208,7 +208,7 @@ func actionStyleFor(r envRow) lipgloss.Style {
 // what each case keyword means, colored to match the list's status column.
 func EnvResolveGlossary() string {
 	warn, mut := styles.Warning, styles.Muted
-	caseCol := func(s lipgloss.Style, w string) string { return s.Render(fmt.Sprintf("%-9s", w)) }
+	caseCol := func(s lipgloss.Style, w string) string { return s.Render(fmt.Sprintf("%-10s", w)) }
 	return strings.Join([]string{
 		caseCol(warn, "conflict") + mut.Render("your value differs from the source"),
 		caseCol(warn, "missing") + mut.Render("expected, but has no value yet"),
@@ -455,7 +455,7 @@ const envRowPrefixWidth = 2
 // (normal rows) or plain (the selected row).
 func (m EnvResolveModel) entryText(r envRow, styled bool) string {
 	key := fmt.Sprintf("%-20s", r.key)
-	status := fmt.Sprintf("%-9s", statusWord(r))
+	status := fmt.Sprintf("%-10s", statusWord(r))
 	action, proposed := rowActionValue(r, styled)
 
 	mid := proposed

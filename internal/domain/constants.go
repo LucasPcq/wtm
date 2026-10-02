@@ -1026,7 +1026,7 @@ const (
 	EnvPortReasonSecureScheme   = "https — the run proxy serves plain HTTP"
 
 	// The trailing verdict of `wtm env`.
-	EnvCheckDriftMessage        = "Read-only check — run `wtm env` to reconcile."
+	EnvCheckDriftMessage        = "Read-only check — run `wtm env %s` to reconcile."
 	EnvFileInSyncMessage        = "in sync — nothing to reconcile"
 	EnvFileKeysInSyncMessage    = "keys in sync — its linked values would move"
 	EnvFileValuesSettledMessage = "no key to reconcile — its linked values were settled"
@@ -1072,9 +1072,10 @@ const (
 	EnvWorktreeStepTitle    = "Select a worktree to reconcile"
 	EnvResolveStepLabel     = "Resolve"
 	EnvResolveTitleFmt      = "Resolve drift — %s"
-	EnvResolveSkipReason    = "only safe additions"
+	EnvResolveSkipReason    = "nothing to decide"
 	EnvRecapStepLabel       = "Review & apply"
 	EnvRecapSafeOnly        = "Only safe additions will be applied."
+	EnvRecapAdoptPorts      = "Its linked ports move onto this worktree's own, settled when applied."
 	EnvRecapFieldWorktree   = "Worktree:  "
 	EnvBadgeParent          = "parent"
 	EnvBadgeInSync          = "in sync"

@@ -39,9 +39,9 @@ func EnvOutcomeSummary(result domain.EnvSyncResult) EnvSummary {
 		if EnvHasDrift(result) {
 			// A read-only run that found drift did not leave the worktree in the
 			// state it wants: there is something to do, and it is the reader's.
-			return EnvSummary{Text: domain.EnvCheckDriftMessage, Verdict: domain.EnvVerdictAttention}
+			return EnvSummary{Text: fmt.Sprintf(domain.EnvCheckDriftMessage, result.Branch), Verdict: domain.EnvVerdictAttention}
 		}
-		return EnvSummary{Text: domain.EnvCheckCleanMessage, Verdict: domain.EnvVerdictDone}
+		return EnvSummary{Text: domain.EnvCheckCleanMessage}
 	}
 
 	written := envWrittenSummary(result)

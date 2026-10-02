@@ -158,8 +158,23 @@ func TestRunAppliesTheWizardsDecisions(t *testing.T) {
 	}
 }
 
-func TestRunSkipsTheResolverWhenNothingIsToDecide(t *testing.T) {
+func TestRunAsksNothingOfAWorktreeInSync(t *testing.T) {
 	ctx := testContext(t)
+	makeWorktree(t, ctx, "feat/a")
+
+	prompter := &flowtest.ScriptedPrompter{}
+	_, presenter, err := run(ctx, Request{Worktree: "feat/a"}, prompter)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(prompter.Asked) != 0 || !presenter.reconciled {
+		t.Errorf("asked %v, reconciled %v; want no question and the report", prompter.Asked, presenter.reconciled)
+	}
+}
+
+func TestRunSkipsTheResolverWhenOnlyPortsMove(t *testing.T) {
+	ctx := testContext(t)
+	withPorts(t, ctx)
 	makeWorktree(t, ctx, "feat/a")
 
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyRecap: domain.EnvApplyValue}}
@@ -169,8 +184,9 @@ func TestRunSkipsTheResolverWhenNothingIsToDecide(t *testing.T) {
 	if prompter.AskedKeys() != "env.recap" {
 		t.Errorf("asked %s, want the recap alone", prompter.AskedKeys())
 	}
-	if recap := prompter.Content[KeyRecap].Description; !strings.Contains(recap, domain.EnvRecapSafeOnly) {
-		t.Errorf("recap = %q, want it to say only safe additions apply", recap)
+	recap := prompter.Content[KeyRecap]
+	if !strings.Contains(recap.Description, domain.EnvRecapSafeOnly) || !strings.Contains(recap.Description, "WEB_PORT") || len(recap.Options) != 2 {
+		t.Errorf("recap = %+v, want the port move announced and the verbatim action offered", recap)
 	}
 }
 
@@ -206,8 +222,8 @@ func TestRunAdoptingRecordsTheIsolation(t *testing.T) {
 	if !outcome.IsolationChanged || worktree.RecordedIsolation(ref) != domain.IsolationIsolated {
 		t.Errorf("outcome = %+v, recorded = %q; want isolated, and the change reported", outcome, worktree.RecordedIsolation(ref))
 	}
-	if recap := prompter.Content[KeyRecap].Description; !strings.Contains(recap, domain.RecapFieldIsolation+domain.IsolationSummaryIsolated) {
-		t.Errorf("recap = %q, want the adoption named", recap)
+	if recap := prompter.Content[KeyRecap].Description; !strings.Contains(recap, domain.RecapFieldIsolation+domain.IsolationSummaryIsolated) || !strings.Contains(recap, domain.EnvRecapAdoptPorts) {
+		t.Errorf("recap = %q, want the adoption and its port move named", recap)
 	}
 }
 
