@@ -74,6 +74,10 @@ always had, and resolving nothing allocates no ordinal. When the worktree's own 
 the directory a compose job runs from) sets `COMPOSE_PROJECT_NAME`, that value is the one a
 hook gets.
 
+### The environment of `wtm exec`
+
+`wtm exec` runs its command with the run variables a hook gets, under the same conditions. One difference: a hook keeps the environment it inherited when no run variable applies, while `wtm exec` **always** removes the variables that describe a worktree (`WTM_WORKTREE`, `WTM_BRANCH`, `WTM_ORDINAL`, `WTM_PORT_OFFSET`, `WTM_ISOLATION`, `COMPOSE_PROJECT_NAME`) before adding the target's. A hook runs on the worktree just created from where you stand; an `exec` command runs in worktrees you are not in, and the values your shell carries would point it at your stack instead of theirs.
+
 ## Env strategies
 
 | Strategy | Behavior |

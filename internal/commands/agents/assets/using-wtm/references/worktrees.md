@@ -11,6 +11,7 @@ Everything here assumes the driving rules of `SKILL.md`: `--output json` on data
 - [`clean` and `prune`](#clean-and-prune)
 - [`extract`](#extract)
 - [`env`](#env)
+- [`exec`](#exec)
 - [`relocate`](#relocate)
 - [`checkout` (GitHub PRs)](#checkout-github-prs)
 - [Navigate: `resolve`, `go`, `ui`](#navigate-resolve-go-ui)
@@ -117,6 +118,15 @@ Modes and flags:
 - Namespaces already created stay recorded, so `clean` still drops them.
 - Refused with `--check` (a read-only run records nothing) and on the main checkout as `verbatim`.
 - **A worktree created before the isolation choice existed** (no `isolation` in its `meta.json`) has not adopted it: `wtm env <wt> --yes` reconciles its keys only (no port moved, no `COMPOSE_PROJECT_NAME` written, no ordinal allocated), with a `!` warning, and its JSON carries `"isolation_adoption": "not_adopted"` and no `isolation`. Adopt it with `wtm env <wt> --yes --isolation isolated` (`"isolation_adoption": "adopted"`): it then runs under a new compose project, so its current volumes are no longer used. **Ask the user first.**
+
+## `exec`
+
+`wtm exec <branch>... --yes --output json -- <command>` (or `--all` instead of names) runs a `/bin/sh -c` line in each worktree, in parallel (`--jobs N`, default CPU count), from the worktree root, with that worktree's run variables (the ones your shell carries about the current worktree are removed).
+
+- stdin is closed: never pass an interactive command.
+- Without names or `--all` it refuses under `--yes`.
+- Exit code: `0` when every command passed, `1` when any did not. Read each worktree's `status` and `exit_code` in the JSON to know which one failed and how; the process exit code never carries the child's.
+- `--print` puts the full output in `output` instead of the 20-line `tail`.
 
 ## `relocate`
 
