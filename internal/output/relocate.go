@@ -3,19 +3,12 @@ package output
 import (
 	"fmt"
 	"io"
-	"path/filepath"
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/styles"
 )
-
-// relTarget renders a worktree's target path relative to the repo (base_path +
-// directory name) so the preview stays readable instead of showing absolute paths.
-func relTarget(basePath, toPath string) string {
-	return filepath.Join(basePath, filepath.Base(toPath))
-}
 
 // FormatRelocatePlan prints the planned actions grouped by category (to apply,
 // skipped, blocked) with blank lines between groups, then a note when the user
@@ -64,7 +57,7 @@ func FormatRelocatePlan(w io.Writer, plan domain.RelocatePlan) {
 		section(func() {
 			SectionTitle(w, fmt.Sprintf("Blocked (%d)", len(blocked)))
 			for _, step := range blocked {
-				Error(w, planBlockedLine(step))
+				Error(w, rules.RelocateBlockedLine(step))
 			}
 		})
 	}
@@ -101,18 +94,7 @@ func planApplyLine(basePath string, step domain.RelocateStep) string {
 	if step.Adopt {
 		suffix = styles.Muted.Render(" (+ adopt)")
 	}
-	return fmt.Sprintf("%s %s %s%s", step.Branch, styles.Muted.Render(domain.MoveArrowGlyph), relTarget(basePath, step.ToPath), suffix)
-}
-
-func planBlockedLine(step domain.RelocateStep) string {
-	switch step.Status {
-	case domain.RelocateStatusBlockedJobs:
-		return fmt.Sprintf(domain.RelocateBlockedJobsFmt, step.Branch, step.Branch)
-	case domain.RelocateStatusBlockedName:
-		return step.Detail
-	default:
-		return fmt.Sprintf("%s — target path already occupied: %s", step.Branch, step.ToPath)
-	}
+	return fmt.Sprintf("%s %s %s%s", step.Branch, styles.Muted.Render(domain.MoveArrowGlyph), rules.RelocateTargetLabel(basePath, step.ToPath), suffix)
 }
 
 func planSkipLine(step domain.RelocateStep) string {
@@ -199,92 +181,10 @@ func resultDoneLine(basePath string, step domain.RelocateStepResult) string {
 	case domain.RelocateStatusAdopted:
 		return fmt.Sprintf("%s adopted in place (parent: %s)", step.Branch, step.Parent)
 	case domain.RelocateStatusMovedAdopted:
-		return fmt.Sprintf("%s %s %s (adopted, parent: %s)", step.Branch, styles.Muted.Render(domain.MoveArrowGlyph), relTarget(basePath, step.ToPath), step.Parent)
+		return fmt.Sprintf("%s %s %s (adopted, parent: %s)", step.Branch, styles.Muted.Render(domain.MoveArrowGlyph), rules.RelocateTargetLabel(basePath, step.ToPath), step.Parent)
 	default:
-		return fmt.Sprintf("%s %s %s", step.Branch, styles.Muted.Render(domain.MoveArrowGlyph), relTarget(basePath, step.ToPath))
+		return fmt.Sprintf("%s %s %s", step.Branch, styles.Muted.Render(domain.MoveArrowGlyph), rules.RelocateTargetLabel(basePath, step.ToPath))
 	}
-}
-
-// RelocateRecapParams holds inputs for SprintRelocateRecap.
-type RelocateRecapParams struct {
-	Plan    domain.RelocatePlan
-	Parents map[string]string
-	// PreviousBasePath, when non-empty and different from Plan.BasePath, prepends a
-	// "base_path: <old> → <new>" header so the recap makes the reconfiguration explicit.
-	PreviousBasePath string
-}
-
-// SprintRelocateRecap renders the interactive wizard's confirmation body: the
-// resolved actions (with chosen adoption parents) grouped as To apply / Skipped /
-// Blocked, optionally headed by the base_path change. It returns plain text (no outer
-// padding); the wizard's recap frame owns the vertical spacing.
-func SprintRelocateRecap(params RelocateRecapParams) string {
-	var apply, skipped, blocked []string
-	for _, step := range params.Plan.Steps {
-		switch step.Status {
-		case domain.RelocateStatusMove, domain.RelocateStatusAdopt:
-			apply = append(apply, recapApplyLine(params.Plan.BasePath, step, params.Parents))
-		case domain.RelocateStatusSkippedDirty:
-			skipped = append(skipped, step.Branch+" — uncommitted changes")
-		case domain.RelocateStatusSkippedLocked:
-			skipped = append(skipped, step.Branch+" — locked")
-		case domain.RelocateStatusBlockedDest:
-			blocked = append(blocked, step.Branch+" — target path occupied")
-		case domain.RelocateStatusBlockedJobs, domain.RelocateStatusBlockedName:
-			blocked = append(blocked, planBlockedLine(step))
-		}
-	}
-
-	var b strings.Builder
-	if params.PreviousBasePath != "" && params.PreviousBasePath != params.Plan.BasePath {
-		b.WriteString(fmt.Sprintf("base_path: %s → %s\n\n", params.PreviousBasePath, params.Plan.BasePath))
-	}
-	writeRecapGroup(&b, "To apply:", apply)
-	writeRecapGroup(&b, "Skipped:", skipped)
-	writeRecapGroup(&b, "Blocked:", blocked)
-
-	body := strings.TrimRight(b.String(), "\n")
-	if len(apply)+len(skipped)+len(blocked) == 0 {
-		if body != "" {
-			// A base_path header is present: the config changes even with no worktree to move.
-			body += "\n\nNo worktrees to move — base_path config will be updated."
-		} else {
-			body = "Nothing to relocate — everything is already in place."
-		}
-	}
-	return body
-}
-
-func writeRecapGroup(b *strings.Builder, title string, lines []string) {
-	if len(lines) == 0 {
-		return
-	}
-	if b.Len() > 0 {
-		b.WriteString("\n")
-	}
-	b.WriteString(title)
-	b.WriteString("\n")
-	for _, line := range lines {
-		b.WriteString("  " + line + "\n")
-	}
-}
-
-func recapApplyLine(basePath string, step domain.RelocateStep, parents map[string]string) string {
-	if step.Status == domain.RelocateStatusAdopt {
-		return fmt.Sprintf("%s  adopt in place (parent: %s)", step.Branch, recapResolveParent(step, parents))
-	}
-	target := relTarget(basePath, step.ToPath)
-	if step.Adopt {
-		return fmt.Sprintf("%s → %s (adopt, parent: %s)", step.Branch, target, recapResolveParent(step, parents))
-	}
-	return fmt.Sprintf("%s → %s", step.Branch, target)
-}
-
-func recapResolveParent(step domain.RelocateStep, parents map[string]string) string {
-	if parent, ok := parents[step.Branch]; ok && parent != "" {
-		return parent
-	}
-	return step.Parent
 }
 
 // WriteRelocateResultJSON writes the relocate result as pretty-printed JSON.

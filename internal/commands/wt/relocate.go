@@ -215,7 +215,7 @@ func runRelocateWizard(params runRelocateWizardParams) (relocatetui.RunResult, e
 			})
 			previous = params.CurrentBasePath
 		}
-		return output.SprintRelocateRecap(output.RelocateRecapParams{
+		return rules.RelocateRecap(rules.RelocateRecapParams{
 			Plan:             plan,
 			Parents:          parents,
 			PreviousBasePath: previous,

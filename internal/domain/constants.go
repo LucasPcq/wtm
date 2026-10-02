@@ -1762,6 +1762,27 @@ const (
 	// working-tree state could not be read: it is not moved blind.
 	RelocateUninspectableDetail = "could not determine working-tree state; re-run after resolving, or with --force to move anyway"
 
+	// Relocate flow: the wizard's copy and what the run reports.
+	RelocateWizardErrLabel      = "relocate"
+	RelocateStageMessage        = "Relocating worktrees…"
+	RelocateAlignedMessage      = "All worktrees are already aligned with base_path."
+	RelocateBasePathGateLabel   = "Base path"
+	RelocateBasePathGateTitle   = "Change base_path?"
+	RelocateBasePathGateDescFmt = "Worktrees live under %s. Keep it, or set a new location to move them all to."
+	RelocateBasePathKeepFmt     = "Keep %s"
+	RelocateBasePathChange      = "Change it"
+	RelocateBasePathValueLabel  = "New base_path"
+	RelocateBasePathValueDesc   = "Relative to the repo root (e.g. ../.trees). Existing worktrees move here."
+	RelocateParentLabelFmt      = "Parent for %s"
+	RelocateParentDescFmt       = "%s was created outside wtm, so it has no recorded parent. " +
+		"Pick the branch `wtm sync` should rebase it onto — its files stay where they are. " +
+		"The full set of moves and adoptions is recapped on the final step."
+	RelocateApplyLabel  = "Apply"
+	RelocateApplyOption = "Yes, apply"
+	// RelocateBasePathOnlyFmt previews a relocate that only rewrites base_path
+	// (from, to): no worktree has to move.
+	RelocateBasePathOnlyFmt = "base_path: %s → %s (no worktree to move)"
+
 	// Init recap (LUC-125): labels and copy for the framed end-of-init recap
 	// (accent-bar box + pill title) that summarizes the written config and lists
 	// the next steps. RecapWidth is the fixed render width shared with `relocate`.
