@@ -190,16 +190,21 @@ type CreateResult struct {
 }
 
 // Path is set when the worktree exists but its hooks failed.
-type CreateFailure struct {
+// BatchFailure is one item of a run over several worktrees that did not go
+// through, while the others did.
+type BatchFailure struct {
 	Branch   string `json:"branch"`
 	Path     string `json:"path,omitempty"`
 	Error    string `json:"error"`
 	ExitCode int    `json:"exit_code"`
+	// Privileged is a removal git refused on files only sudo can delete, which a
+	// surface that cannot hand over its terminal has to name the way out of.
+	Privileged bool `json:"-"`
 }
 
 type CreateBatchResult struct {
-	Results []CreateResult  `json:"results"`
-	Failed  []CreateFailure `json:"failed"`
+	Results []CreateResult `json:"results"`
+	Failed  []BatchFailure `json:"failed"`
 }
 
 // CleanParams holds inputs for cleaning a worktree.
@@ -270,21 +275,11 @@ type CleanResult struct {
 	AlreadyAbsent bool   `json:"already_absent"`
 }
 
-type CleanFailure struct {
-	Branch   string `json:"branch"`
-	Path     string `json:"path,omitempty"`
-	Error    string `json:"error"`
-	ExitCode int    `json:"exit_code"`
-	// Privileged is a removal git refused on files only sudo can delete, which a
-	// surface that cannot hand over its terminal has to name the way out of.
-	Privileged bool `json:"-"`
-}
-
 // CleanBatchResult is the clean payload, an envelope even for one worktree.
 // Skipped reuses prune's reasons: dirty, unpushed, open_pr.
 type CleanBatchResult struct {
 	Results          []CleanResult      `json:"results"`
-	Failed           []CleanFailure     `json:"failed"`
+	Failed           []BatchFailure     `json:"failed"`
 	Skipped          []PruneSkip        `json:"skipped"`
 	Reparented       []ReparentResult   `json:"reparented"`
 	OrphanedChildren []ReparentResult   `json:"orphaned_children"`

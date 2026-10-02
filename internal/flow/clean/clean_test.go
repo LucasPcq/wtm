@@ -159,16 +159,16 @@ func TestDropDataAnswersTheDataStep(t *testing.T) {
 type recorder struct {
 	*flowtest.Recorder
 	cleaned *Outcome
-	started []WorktreeProgress
+	started []flow.Progress
 	done    []domain.CleanResult
-	failed  []domain.CleanFailure
+	failed  []domain.BatchFailure
 }
 
-func (r *recorder) WorktreeStarted(progress WorktreeProgress) {
+func (r *recorder) WorktreeStarted(progress flow.Progress) {
 	r.started = append(r.started, progress)
 }
 func (r *recorder) WorktreeCleaned(result domain.CleanResult)  { r.done = append(r.done, result) }
-func (r *recorder) WorktreeFailed(failure domain.CleanFailure) { r.failed = append(r.failed, failure) }
+func (r *recorder) WorktreeFailed(failure domain.BatchFailure) { r.failed = append(r.failed, failure) }
 
 func newRecorder() *recorder { return &recorder{Recorder: &flowtest.Recorder{}} }
 
@@ -195,7 +195,7 @@ func (p failingPresenter) Notice(flow.Notice) { p.t.Error("no notice should be s
 
 func (p failingPresenter) Status(flow.Notice) { p.t.Error("no status should be shown") }
 
-func (p failingPresenter) WorktreeStarted(WorktreeProgress) {
+func (p failingPresenter) WorktreeStarted(flow.Progress) {
 	p.t.Error("nothing should be reported")
 }
 
@@ -203,7 +203,7 @@ func (p failingPresenter) WorktreeCleaned(domain.CleanResult) {
 	p.t.Error("nothing should be reported")
 }
 
-func (p failingPresenter) WorktreeFailed(domain.CleanFailure) {
+func (p failingPresenter) WorktreeFailed(domain.BatchFailure) {
 	p.t.Error("nothing should be reported")
 }
 

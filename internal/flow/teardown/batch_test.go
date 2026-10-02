@@ -63,7 +63,7 @@ func TestBatchKeepsGoingPastAFailureUnlessAskedToStop(t *testing.T) {
 				Targets:       targets,
 				ForceRemoval:  true,
 				StopOnFailure: stop,
-				OnStart:       func(teardown.BatchProgress) { started++ },
+				OnStart:       func(flow.Progress) { started++ },
 				OnDone:        func(teardown.Removal) { done++ },
 			})
 

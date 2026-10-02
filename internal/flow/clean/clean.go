@@ -35,7 +35,7 @@ type Request struct {
 
 type Outcome struct {
 	Results    []domain.CleanResult
-	Failed     []domain.CleanFailure
+	Failed     []domain.BatchFailure
 	Skipped    []domain.PruneSkip
 	Reparented []domain.ReparentResult
 	Orphaned   []domain.ReparentResult
@@ -43,19 +43,13 @@ type Outcome struct {
 	Aborted    bool
 }
 
-type WorktreeProgress struct {
-	Branch   string
-	Position int
-	Total    int
-}
-
 // Presenter hears about each worktree only when the run removes several: a
 // single one reads exactly as it always did.
 type Presenter interface {
 	flow.Presenter
-	WorktreeStarted(WorktreeProgress)
+	WorktreeStarted(flow.Progress)
 	WorktreeCleaned(domain.CleanResult)
-	WorktreeFailed(domain.CleanFailure)
+	WorktreeFailed(domain.BatchFailure)
 	Cleaned(Outcome) error
 }
 
@@ -143,9 +137,9 @@ func (f *cleanFlow) run() (Outcome, error) {
 		StartDown:    answers.Value(KeyData) == owed.DataStart,
 		KeepData:     f.request.KeepData,
 		Recover:      f.recoverRemoveFailure,
-		OnStart: func(progress teardown.BatchProgress) {
+		OnStart: func(progress flow.Progress) {
 			if batch {
-				f.presenter.WorktreeStarted(WorktreeProgress{Branch: progress.Target.Branch, Position: progress.Position, Total: progress.Total})
+				f.presenter.WorktreeStarted(progress)
 			}
 		},
 		OnDone: func(removal teardown.Removal) {
@@ -200,14 +194,8 @@ func resultOf(removal teardown.Removal) domain.CleanResult {
 	return domain.CleanResult{Branch: removal.Target.Branch, Path: removal.Target.Path, AlreadyAbsent: removal.Absent}
 }
 
-func failureOf(removal teardown.Removal) domain.CleanFailure {
-	return domain.CleanFailure{
-		Branch:     removal.Target.Branch,
-		Path:       removal.Target.Path,
-		Error:      removal.Err.Error(),
-		ExitCode:   rules.ExitCode(removal.Err),
-		Privileged: errors.Is(removal.Err, domain.ErrWorktreeRemoveFailed),
-	}
+func failureOf(removal teardown.Removal) domain.BatchFailure {
+	return rules.BatchFailureOf(rules.BatchFailureOfParams{Branch: removal.Target.Branch, Path: removal.Target.Path, Err: removal.Err})
 }
 
 type concludeParams struct {
@@ -215,17 +203,15 @@ type concludeParams struct {
 	First   error
 }
 
-// conclude keeps a single worktree failing exactly as it always did, and marks
-// a batch's failure as already reported: its readout named every one.
 func (f *cleanFlow) conclude(params concludeParams) (Outcome, error) {
 	outcome := params.Outcome
 	if err := f.presenter.Cleaned(outcome); err != nil {
 		return outcome, err
 	}
-	if params.First == nil || len(outcome.Results)+len(outcome.Failed)+len(outcome.Skipped) <= 1 {
-		return outcome, params.First
-	}
-	return outcome, fmt.Errorf("%w: %w", domain.ErrAborted, params.First)
+	return outcome, flow.BatchError(flow.BatchErrorParams{
+		First: params.First,
+		Batch: len(outcome.Results)+len(outcome.Failed)+len(outcome.Skipped) > 1,
+	})
 }
 
 type requestedWorktrees struct {
@@ -241,7 +227,7 @@ func (f *cleanFlow) acceptRequested() (requestedWorktrees, error) {
 	if len(f.request.Branches) == 0 {
 		return requested, nil
 	}
-	names, err := f.wellFormedNames()
+	names, err := rules.DistinctNames(rules.DistinctNamesParams{Names: f.request.Branches, Blank: domain.CleanBranchBlank})
 	if err != nil {
 		return requested, err
 	}
@@ -266,25 +252,6 @@ func (f *cleanFlow) acceptRequested() (requestedWorktrees, error) {
 		}
 	}
 	return requested, nil
-}
-
-// wellFormedNames refuses the command line as a whole before anything is said
-// about the worktrees it names.
-func (f *cleanFlow) wellFormedNames() ([]string, error) {
-	names := make([]string, 0, len(f.request.Branches))
-	seen := make(map[string]bool, len(f.request.Branches))
-	for _, raw := range f.request.Branches {
-		name := strings.TrimSpace(raw)
-		if name == "" {
-			return nil, fmt.Errorf("%w: %s", domain.ErrUsage, domain.CleanBranchBlank)
-		}
-		if seen[name] {
-			return nil, fmt.Errorf("%w: "+domain.CleanBranchGivenTwiceFmt, domain.ErrUsage, name)
-		}
-		seen[name] = true
-		names = append(names, name)
-	}
-	return names, nil
 }
 
 func (f *cleanFlow) targets(selected []string) []teardown.Target {

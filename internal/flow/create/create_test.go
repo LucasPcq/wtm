@@ -200,11 +200,11 @@ func (r *recorder) Created(outcome Outcome) error {
 	return nil
 }
 
-func (r *recorder) BranchStarted(BranchProgress) {}
+func (r *recorder) BranchStarted(flow.Progress) {}
 
 func (r *recorder) BranchCreated(domain.CreateResult) {}
 
-func (r *recorder) BranchFailed(domain.CreateFailure) {}
+func (r *recorder) BranchFailed(domain.BatchFailure) {}
 
 func testContext(t *testing.T) flow.Context {
 	t.Helper()
@@ -591,18 +591,18 @@ func TestEntryBadgeNamesNewAndExisting(t *testing.T) {
 
 type batchRecorder struct {
 	*recorder
-	started   []BranchProgress
+	started   []flow.Progress
 	announced []string
-	failed    []domain.CreateFailure
+	failed    []domain.BatchFailure
 }
 
-func (r *batchRecorder) BranchStarted(p BranchProgress) { r.started = append(r.started, p) }
+func (r *batchRecorder) BranchStarted(p flow.Progress) { r.started = append(r.started, p) }
 
 func (r *batchRecorder) BranchCreated(c domain.CreateResult) {
 	r.announced = append(r.announced, c.Branch)
 }
 
-func (r *batchRecorder) BranchFailed(f domain.CreateFailure) { r.failed = append(r.failed, f) }
+func (r *batchRecorder) BranchFailed(f domain.BatchFailure) { r.failed = append(r.failed, f) }
 
 func occupy(t *testing.T, ctx flow.Context, branchName string) {
 	t.Helper()

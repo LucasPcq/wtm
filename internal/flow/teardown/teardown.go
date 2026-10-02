@@ -163,12 +163,6 @@ func Release(params ReleaseParams) {
 	}
 }
 
-type BatchProgress struct {
-	Target   Target
-	Position int
-	Total    int
-}
-
 type Removal struct {
 	Target     Target
 	Absent     bool
@@ -197,7 +191,7 @@ type BatchParams struct {
 	NameHookPhases bool
 	// Recover settles a removal git reported as failed; nil settles it as Salvage does.
 	Recover func(SalvageParams) error
-	OnStart func(BatchProgress)
+	OnStart func(flow.Progress)
 	OnDone  func(Removal)
 }
 
@@ -218,7 +212,7 @@ func Batch(params BatchParams) []Removal {
 	removals := make([]Removal, 0, len(params.Targets))
 	for index, target := range params.Targets {
 		if params.OnStart != nil {
-			params.OnStart(BatchProgress{Target: target, Position: index + 1, Total: len(params.Targets)})
+			params.OnStart(flow.Progress{Branch: target.Branch, Position: index + 1, Total: len(params.Targets)})
 		}
 		removal := removeOne(removeOneParams{Batch: params, Target: target, Dropper: dropper})
 		removals = append(removals, removal)

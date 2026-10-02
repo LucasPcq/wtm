@@ -4,8 +4,6 @@ package create
 import (
 	"errors"
 	"fmt"
-	"slices"
-	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
@@ -28,24 +26,18 @@ type Request struct {
 
 type Outcome struct {
 	Results    []domain.CreateResult
-	Failed     []domain.CreateFailure
+	Failed     []domain.BatchFailure
 	FromBranch string
 	Aborted    bool
-}
-
-type BranchProgress struct {
-	Branch   string
-	Position int
-	Total    int
 }
 
 // Presenter hears about each branch only when the run holds several: a single
 // one reads exactly as it always did.
 type Presenter interface {
 	flow.Presenter
-	BranchStarted(BranchProgress)
+	BranchStarted(flow.Progress)
 	BranchCreated(domain.CreateResult)
-	BranchFailed(domain.CreateFailure)
+	BranchFailed(domain.BatchFailure)
 	Created(Outcome) error
 }
 
@@ -127,7 +119,7 @@ func (f *createFlow) run() (Outcome, error) {
 	var firstErr error
 	for i, name := range branches {
 		if batch {
-			f.presenter.BranchStarted(BranchProgress{Branch: name, Position: i + 1, Total: len(branches)})
+			f.presenter.BranchStarted(flow.Progress{Branch: name, Position: i + 1, Total: len(branches)})
 		}
 		result, err := f.provisionOne(provisionParams{Branch: name, Source: fromBranch, Answers: answers, Preflight: preflight, Batch: batch})
 		if err == nil {
@@ -137,7 +129,7 @@ func (f *createFlow) run() (Outcome, error) {
 			}
 			continue
 		}
-		failure := domain.CreateFailure{Branch: name, Path: result.Path, Error: err.Error(), ExitCode: rules.ExitCode(err)}
+		failure := rules.BatchFailureOf(rules.BatchFailureOfParams{Branch: name, Path: result.Path, Err: err})
 		outcome.Failed = append(outcome.Failed, failure)
 		if firstErr == nil {
 			firstErr = err
@@ -149,7 +141,7 @@ func (f *createFlow) run() (Outcome, error) {
 	if err := f.presenter.Created(outcome); err != nil {
 		return outcome, err
 	}
-	return outcome, runErr(runErrParams{First: firstErr, Batch: batch})
+	return outcome, flow.BatchError(flow.BatchErrorParams{First: firstErr, Batch: batch})
 }
 
 // A source already up to date skips the source-update step, which must not
@@ -162,38 +154,17 @@ func (f *createFlow) fastForwardsEach(answers flow.Answers) bool {
 	return answer.Value == updateFastForward
 }
 
-type runErrParams struct {
-	First error
-	Batch bool
-}
-
-// runErr keeps a single branch failing exactly as it always did, and marks a
-// batch's failure as already reported: its readout named every one.
-func runErr(params runErrParams) error {
-	if params.First == nil || !params.Batch {
-		return params.First
-	}
-	return fmt.Errorf("%w: %w", domain.ErrAborted, params.First)
-}
-
-// A blank or repeated argument is a malformed invocation (exit 2), where the
-// wizard only says it inline.
 func (f *createFlow) acceptRequested() ([]string, error) {
-	accepted := make([]string, 0, len(f.request.Branches))
-	for _, raw := range f.request.Branches {
-		name := strings.TrimSpace(raw)
-		if name == "" {
-			return nil, fmt.Errorf("%w: %s", domain.ErrUsage, domain.CreateBranchRequired)
-		}
-		if slices.Contains(accepted, name) {
-			return nil, fmt.Errorf("%w: "+domain.CreateBranchGivenTwiceFmt, domain.ErrUsage, name)
-		}
-		if err := f.validateEntry(flow.EntryCheck{Entry: name, Entries: accepted}); err != nil {
+	names, err := rules.DistinctNames(rules.DistinctNamesParams{Names: f.request.Branches, Blank: domain.CreateBranchRequired})
+	if err != nil {
+		return nil, err
+	}
+	for index, name := range names {
+		if err := f.validateEntry(flow.EntryCheck{Entry: name, Entries: names[:index]}); err != nil {
 			return nil, err
 		}
-		accepted = append(accepted, name)
 	}
-	return accepted, nil
+	return names, nil
 }
 
 type provisionParams struct {

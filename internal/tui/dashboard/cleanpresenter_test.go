@@ -14,9 +14,9 @@ import (
 func TestABatchCleanTagsEachStageWithItsWorktree(t *testing.T) {
 	msgs := posted(func(send func(tea.Msg)) {
 		p := newCleanPresenter(presenter{send: send, id: 1})
-		p.WorktreeStarted(cleanflow.WorktreeProgress{Branch: "feat/a", Position: 1, Total: 2})
+		p.WorktreeStarted(flow.Progress{Branch: "feat/a", Position: 1, Total: 2})
 		_ = p.Stage(flow.StageParams{Message: "removing a", Work: func() error { return nil }})
-		p.WorktreeStarted(cleanflow.WorktreeProgress{Branch: "feat/b", Position: 2, Total: 2})
+		p.WorktreeStarted(flow.Progress{Branch: "feat/b", Position: 2, Total: 2})
 		_ = p.Stage(flow.StageParams{Message: "removing b", Work: func() error { return nil }})
 	})
 
@@ -35,10 +35,10 @@ func TestABatchCleanReloadsAsEachWorktreeGoesAndEndsOnATally(t *testing.T) {
 	msgs := posted(func(send func(tea.Msg)) {
 		p := newCleanPresenter(presenter{send: send, id: 1})
 		p.WorktreeCleaned(domain.CleanResult{Branch: "feat/a"})
-		p.WorktreeFailed(domain.CleanFailure{Branch: "feat/b", Error: "locked"})
+		p.WorktreeFailed(domain.BatchFailure{Branch: "feat/b", Error: "locked"})
 		_ = p.Cleaned(cleanflow.Outcome{
 			Results: []domain.CleanResult{{Branch: "feat/a"}},
-			Failed:  []domain.CleanFailure{{Branch: "feat/b", Error: "locked"}},
+			Failed:  []domain.BatchFailure{{Branch: "feat/b", Error: "locked"}},
 		})
 	})
 
@@ -86,7 +86,7 @@ func TestTheGlobalMenuOffersToDeleteSeveralWorktrees(t *testing.T) {
 // not remove names the way out, as a single clean does.
 func TestABatchFailureThatNeedsSudoNamesTheWayOut(t *testing.T) {
 	msgs := posted(func(send func(tea.Msg)) {
-		newCleanPresenter(presenter{send: send, id: 1}).WorktreeFailed(domain.CleanFailure{Branch: "feat/b", Error: "permission denied", Privileged: true})
+		newCleanPresenter(presenter{send: send, id: 1}).WorktreeFailed(domain.BatchFailure{Branch: "feat/b", Error: "permission denied", Privileged: true})
 	})
 	if text := outputText(msgs); !strings.Contains(text, "wtm clean feat/b --force") {
 		t.Errorf("output %q should name the privileged removal", text)

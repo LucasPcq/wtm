@@ -282,7 +282,7 @@ type CreateBatchRow struct {
 
 type CreateBatchParams struct {
 	Created []CreateBatchRow
-	Failed  []domain.CreateFailure
+	Failed  []domain.BatchFailure
 }
 
 func FormatCreateBatch(w io.Writer, p CreateBatchParams) {
@@ -298,7 +298,7 @@ func FormatCreateBatch(w io.Writer, p CreateBatchParams) {
 		Message(w, Indent+row.Path)
 	}
 	for _, failure := range p.Failed {
-		Error(w, fmt.Sprintf(domain.CreateBranchFailedFmt, failure.Branch, failure.Error))
+		Error(w, fmt.Sprintf(domain.BatchFailedFmt, failure.Branch, failure.Error))
 	}
 	Blank(w)
 	Message(w, rules.Tally(
@@ -436,7 +436,7 @@ func FormatCleanBatch(w io.Writer, result domain.CleanBatchResult) {
 		Warning(w, fmt.Sprintf(domain.PruneSkippedFmt, skip.Branch, rules.PruneReasonLabel(skip.Reason)))
 	}
 	for _, failure := range result.Failed {
-		Error(w, fmt.Sprintf(domain.CleanBranchFailedFmt, failure.Branch, failure.Error))
+		Error(w, fmt.Sprintf(domain.BatchFailedFmt, failure.Branch, failure.Error))
 	}
 }
 

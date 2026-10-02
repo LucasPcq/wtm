@@ -129,6 +129,11 @@ const (
 	// indentation on either side and the border between them.
 	RecapFrameChrome = 8
 	// A conclusion's counted summary: "3 applied · 1 skipped", zero counts dropped.
+	// BatchProgressFmt heads one item of a run over several worktrees, and
+	// BatchFailedFmt names the one that did not go through.
+	BatchProgressFmt    = "%s (%d/%d)"
+	BatchFailedFmt      = "%s — %s"
+	BranchGivenTwiceFmt = "%s is given twice"
 	TallyPartFmt        = "%d %s"
 	TallyApplied        = "applied"
 	TallyFastForwarded  = "fast-forwarded"
@@ -3047,11 +3052,8 @@ const (
 	BranchEntryExisting             = "existing"
 	BranchEntryWorktreeExists       = "worktree exists"
 	CreateBranchRequired            = "branch name is required"
-	CreateBranchProgressFmt         = "%s (%d/%d)"
-	CreateBranchFailedFmt           = "%s — %s"
 	CreateBatchExistsFmt            = "%s already exists"
 	CreateBranchListedTwiceFmt      = "%s is already in the list"
-	CreateBranchGivenTwiceFmt       = "%s is given twice"
 	CreateBranchRequiredUnattended  = "branch name is required without the interactive wizard (pass it as an argument)"
 	CreateSourceStepDescription     = "Branch to base the new worktree on"
 	CreateSourceStepDescriptionMany = "Branch to base the new worktrees on"
@@ -3257,9 +3259,6 @@ const (
 	CleanSelectionRequired     = "select at least one worktree to clean"
 	CleanBranchBlank           = "a worktree branch cannot be blank"
 	CleanCheckFailedFmt        = "check %s: %w"
-	CleanBranchGivenTwiceFmt   = "%s is given twice"
-	CleanBranchProgressFmt     = "%s (%d/%d)"
-	CleanBranchFailedFmt       = "%s — %s"
 	CleanWillDeleteManyFmt     = "Will delete %d worktrees and their branches:"
 	CleanWillDeleteRowFmt      = "  %s  %s"
 	CleanBlockerKeyFmt         = "%s:%s"

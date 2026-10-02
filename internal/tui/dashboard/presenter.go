@@ -99,9 +99,9 @@ func newCreatePresenter(base presenter) createPresenter {
 	return createPresenter{presenter: base, selected: new(bool)}
 }
 
-func (p createPresenter) BranchStarted(progress createflow.BranchProgress) {
+func (p createPresenter) BranchStarted(progress flow.Progress) {
 	*p.subject = progress.Branch
-	p.line(fmt.Sprintf(domain.CreateBranchProgressFmt, progress.Branch, progress.Position, progress.Total))
+	p.line(fmt.Sprintf(domain.BatchProgressFmt, progress.Branch, progress.Position, progress.Total))
 }
 
 // BranchCreated shows each worktree the moment it exists rather than when the
@@ -113,7 +113,7 @@ func (p createPresenter) BranchCreated(result domain.CreateResult) {
 	*p.selected = true
 }
 
-func (p createPresenter) BranchFailed(failure domain.CreateFailure) {
+func (p createPresenter) BranchFailed(failure domain.BatchFailure) {
 	p.line(fmt.Sprintf(domain.DashboardFailedFmt, failure.Branch, failure.Error))
 }
 
@@ -166,9 +166,9 @@ func newCleanPresenter(base presenter) cleanPresenter {
 	return cleanPresenter{presenter: base}
 }
 
-func (p cleanPresenter) WorktreeStarted(progress cleanflow.WorktreeProgress) {
+func (p cleanPresenter) WorktreeStarted(progress flow.Progress) {
 	*p.subject = progress.Branch
-	p.line(fmt.Sprintf(domain.CleanBranchProgressFmt, progress.Branch, progress.Position, progress.Total))
+	p.line(fmt.Sprintf(domain.BatchProgressFmt, progress.Branch, progress.Position, progress.Total))
 }
 
 // WorktreeCleaned drops each row the moment its worktree is gone rather than
@@ -178,7 +178,7 @@ func (p cleanPresenter) WorktreeCleaned(result domain.CleanResult) {
 	p.send(cleanedMsg{})
 }
 
-func (p cleanPresenter) WorktreeFailed(failure domain.CleanFailure) {
+func (p cleanPresenter) WorktreeFailed(failure domain.BatchFailure) {
 	p.line(fmt.Sprintf(domain.DashboardFailedFmt, failure.Branch, failure.Error))
 	if failure.Privileged {
 		p.line(fmt.Sprintf(domain.DashboardPrivilegedHintFmt, failure.Branch))
