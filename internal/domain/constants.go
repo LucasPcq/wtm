@@ -1758,6 +1758,10 @@ const (
 	// worktree, naming the command that frees it (branch, branch).
 	RelocateBlockedJobsFmt = "%s — jobs are running in it: run `wtm run down %s` first"
 
+	// RelocateUninspectableDetail is a worktree that needs moving but whose
+	// working-tree state could not be read: it is not moved blind.
+	RelocateUninspectableDetail = "could not determine working-tree state; re-run after resolving, or with --force to move anyway"
+
 	// Init recap (LUC-125): labels and copy for the framed end-of-init recap
 	// (accent-bar box + pill title) that summarizes the written config and lists
 	// the next steps. RecapWidth is the fixed render width shared with `relocate`.

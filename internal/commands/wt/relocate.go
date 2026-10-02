@@ -96,7 +96,13 @@ func runRelocate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("relocate needs a terminal to confirm; re-run with --%s to proceed unattended", domain.FlagYes)
 	}
 
-	plan, err := worktree.PlanRelocate(params)
+	plan, err := worktree.PlanRelocate(worktree.PlanRelocateParams{
+		ProjectDir:     params.ProjectDir,
+		StateDir:       params.StateDir,
+		TargetBasePath: params.TargetBasePath,
+		BaseBranch:     params.BaseBranch,
+		Force:          params.Force,
+	})
 	if err != nil {
 		return err
 	}
