@@ -150,3 +150,30 @@ func newFixture(t *testing.T, branches ...string) fixture {
 }
 
 func (f fixture) worktreePath(branch string) string { return filepath.Join(f.root, branch) }
+
+// The fixture above spells every path canonically; this one keeps the temp
+// dir as the OS hands it out (/var on macOS, /private/var to git and $PWD).
+func TestTheCurrentWorktreeIsFoundThroughASymlinkedPath(t *testing.T) {
+	dir := gittest.InitRepo(t)
+	raw := t.TempDir()
+	gittest.Git(t, dir, "worktree", "add", "-b", "a", filepath.Join(raw, "a"), "main")
+	prompter := &flowtest.ScriptedPrompter{
+		Sets:    map[string][]string{KeySelection: {"a"}},
+		Answers: map[string]string{KeyConfirm: domain.ExecConfirmValue},
+	}
+	_, err := Run(Params{
+		Ctx:       context.Background(),
+		Context:   flow.Context{ProjectDir: dir, StateDir: filepath.Join(dir, ".git", "wtm")},
+		Request:   Request{Command: "true", Jobs: 1, Dir: filepath.Join(raw, "a")},
+		Prompter:  prompter,
+		Presenter: &recorder{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, option := range prompter.Content[KeySelection].Options {
+		if option.Value == "a" && !option.Selected {
+			t.Fatalf("a is where the user stands, through %s", raw)
+		}
+	}
+}

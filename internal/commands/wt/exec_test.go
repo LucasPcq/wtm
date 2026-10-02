@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
 
@@ -45,22 +46,39 @@ func TestExecJSONRunsNamedWorktrees(t *testing.T) {
 	}
 }
 
-func TestExecRefusesWhatItCannotRun(t *testing.T) {
+func TestExecRefusesWhatItCannotRunWithItsExitCode(t *testing.T) {
 	execRepo(t, "a")
-	cases := map[string][]string{
-		"missing dash":     {domain.CmdExec, "a", "--yes"},
-		"empty command":    {domain.CmdExec, "a", "--yes", "--"},
-		"all with names":   {domain.CmdExec, "a", "--all", "--yes", "--", "true"},
-		"json without yes": {domain.CmdExec, "a", "--output", domain.OutputJSON, "--", "true"},
-		"negative jobs":    {domain.CmdExec, "a", "--yes", "--jobs", "-1", "--", "true"},
-		"no selection":     {domain.CmdExec, "--yes", "--", "true"},
-		"bad shell syntax": {domain.CmdExec, "a", "--yes", "--", "if", "then"},
-		"unknown worktree": {domain.CmdExec, "nope", "--yes", "--", "true"},
+	cases := []struct {
+		name string
+		args []string
+		code int
+	}{
+		{"missing dash", []string{domain.CmdExec, "a", "--yes"}, domain.ExitCodeUsage},
+		{"empty command", []string{domain.CmdExec, "a", "--yes", "--"}, domain.ExitCodeUsage},
+		{"all with names", []string{domain.CmdExec, "a", "--all", "--yes", "--", "true"}, domain.ExitCodeUsage},
+		{"negative jobs", []string{domain.CmdExec, "a", "--yes", "--jobs", "-1", "--", "true"}, domain.ExitCodeUsage},
+		{"bad shell syntax", []string{domain.CmdExec, "a", "--yes", "--", "if", "then"}, domain.ExitCodeUsage},
+		{"unknown worktree", []string{domain.CmdExec, "nope", "--yes", "--", "true"}, domain.ExitCodeBranchNotFound},
+		{"json without yes", []string{domain.CmdExec, "a", "--output", domain.OutputJSON, "--", "true"}, domain.ExitCodeError},
+		{"no selection", []string{domain.CmdExec, "--yes", "--", "true"}, domain.ExitCodeError},
+		{"no selection, no terminal", []string{domain.CmdExec, "--", "true"}, domain.ExitCodeError},
 	}
-	for name, args := range cases {
-		if _, _, err := runWtCmd(t, args...); err == nil {
-			t.Errorf("%s: expected a refusal", name)
+	for _, c := range cases {
+		_, _, err := runWtCmd(t, c.args...)
+		if err == nil {
+			t.Errorf("%s: expected a refusal", c.name)
+			continue
 		}
+		if got := rules.ExitCode(err); got != c.code {
+			t.Errorf("%s: exit %d, want %d (%v)", c.name, got, c.code, err)
+		}
+	}
+}
+
+func TestExecWithNamesRunsWithoutATerminalOrYes(t *testing.T) {
+	execRepo(t, "a")
+	if _, _, err := runWtCmd(t, domain.CmdExec, "a", "--", "true"); err != nil {
+		t.Fatalf("nothing needs picking, so nothing needs a terminal: %v", err)
 	}
 }
 

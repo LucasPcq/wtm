@@ -178,3 +178,26 @@ func escapeEnd(line string, start int) int {
 	}
 	return len(line) - 1
 }
+
+func ExecWorktreeCount(n int) string {
+	if n == 1 {
+		return domain.ExecOneWorktree
+	}
+	return fmt.Sprintf(domain.ExecWorktreesFmt, n)
+}
+
+// ExecShortfall names what did not pass, each kind apart: an interrupted run
+// is not a failing one.
+func ExecShortfall(counts domain.ExecCounts) string {
+	var parts []string
+	if counts.Failed > 0 {
+		parts = append(parts, fmt.Sprintf(domain.ExecFailedCountFmt, counts.Failed))
+	}
+	if counts.Interrupted > 0 {
+		parts = append(parts, fmt.Sprintf(domain.ExecInterruptedFmt, counts.Interrupted))
+	}
+	if counts.NotStarted > 0 {
+		parts = append(parts, fmt.Sprintf(domain.ExecNotStartedFmt, counts.NotStarted))
+	}
+	return strings.Join(parts, domain.ExecCountSeparator)
+}

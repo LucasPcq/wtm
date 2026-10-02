@@ -28,11 +28,11 @@ func FormatExecConclusion(w io.Writer, params ExecConclusionParams) {
 	counts := rules.CountExec(params.Results)
 	total := len(params.Results)
 	if counts.Passed == total {
-		Success(w, fmt.Sprintf(domain.ExecAllPassedFmt, params.Command, total, rules.HookDuration(params.Elapsed)))
+		Success(w, fmt.Sprintf(domain.ExecAllPassedFmt, params.Command, rules.ExecWorktreeCount(total), rules.HookDuration(params.Elapsed)))
 		return
 	}
 
-	Error(w, fmt.Sprintf(domain.ExecSomeFailedFmt, params.Command, total-counts.Passed, total))
+	Error(w, fmt.Sprintf(domain.ExecNotAllPassedFmt, params.Command, rules.ExecWorktreeCount(total), rules.ExecShortfall(counts)))
 	nested := &prefixWriter{w: w, prefix: Indent}
 	for _, result := range params.Results {
 		if result.Status == domain.ExecStatusPassed {
@@ -42,7 +42,7 @@ func FormatExecConclusion(w io.Writer, params ExecConclusionParams) {
 		for _, line := range lastLines(result.Tail, domain.ExecConclusionTailLines) {
 			Message(nested, Indent+Indent+line)
 		}
-		if result.Log != "" && result.Status == domain.ExecStatusFailed {
+		if result.Log != "" && result.Status == domain.ExecStatusFailed && result.Error == "" {
 			InfoLine(nested, Indent+domain.ExecLogLabel, result.Log)
 		}
 	}
@@ -52,10 +52,15 @@ func FormatExecConclusion(w io.Writer, params ExecConclusionParams) {
 }
 
 func FormatExecPrint(w io.Writer, results []domain.ExecResult) {
-	for i, result := range results {
-		if i > 0 {
+	printed := 0
+	for _, result := range results {
+		if result.Output == "" {
+			continue
+		}
+		if printed > 0 {
 			Blank(w)
 		}
+		printed++
 		SectionTitle(w, result.Branch)
 		for _, line := range strings.Split(strings.TrimRight(result.Output, "\n"), "\n") {
 			Message(w, Indent+line)

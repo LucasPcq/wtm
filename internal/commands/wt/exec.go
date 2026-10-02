@@ -91,7 +91,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 	}
 
 	interactive := rules.IsHumanFormat(format) && term.IsTerminal(int(os.Stdin.Fd())) && !yes
-	if !interactive && !yes {
+	if !interactive && !yes && len(names) == 0 && !all {
 		return errors.New(domain.ExecNeedsTerminal)
 	}
 

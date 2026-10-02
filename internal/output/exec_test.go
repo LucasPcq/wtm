@@ -38,7 +38,7 @@ func TestConclusionExpandsEachFailureWithTailAndLog(t *testing.T) {
 		},
 	})
 	got := ansi.Strip(buf.String())
-	for _, want := range []string{"2 of 3 worktrees failed", "b (exit 1, 3.2s)", "FAIL x.test.ts", "/s/exec/b.log", "c  interrupted", "1 passed"} {
+	for _, want := range []string{"3 worktrees: 1 failed, 1 interrupted", "b (exit 1, 3.2s)", "FAIL x.test.ts", "/s/exec/b.log", "c  interrupted", "1 passed"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}
@@ -129,6 +129,45 @@ func TestExecViewNeverDrawsMoreRowsThanTheTerminalHolds(t *testing.T) {
 	}
 	got := ansi.Strip(buf.String())
 	if !strings.Contains(got, "1 done · 1 running · 4 queued") || !strings.Contains(got, "b  "+domain.ExecRunningLabel) {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestConclusionSpeaksOfOneWorktreeInTheSingular(t *testing.T) {
+	var buf bytes.Buffer
+	FormatExecConclusion(&buf, ExecConclusionParams{Command: "x", Results: []domain.ExecResult{{Branch: "a", Status: domain.ExecStatusPassed, ExitCode: execCode(0)}}, Elapsed: time.Second})
+	if got := ansi.Strip(buf.String()); !strings.Contains(got, "x · 1 worktree (1.0s)") {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestConclusionHeadlineTellsFailuresFromInterruptions(t *testing.T) {
+	var buf bytes.Buffer
+	FormatExecConclusion(&buf, ExecConclusionParams{Command: "x", Results: []domain.ExecResult{
+		{Branch: "a", Status: domain.ExecStatusInterrupted},
+		{Branch: "b", Status: domain.ExecStatusInterrupted},
+		{Branch: "c", Status: domain.ExecStatusNotStarted},
+	}})
+	got := ansi.Strip(buf.String())
+	if strings.Contains(got, "failed") || !strings.Contains(got, "x · 3 worktrees: 2 interrupted, 1 not started") {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestAStartFailurePointsAtNoLog(t *testing.T) {
+	var buf bytes.Buffer
+	FormatExecConclusion(&buf, ExecConclusionParams{Command: "x", Results: []domain.ExecResult{
+		{Branch: "a", Status: domain.ExecStatusFailed, Error: "chdir: no such file", Log: "/s/exec/a.log"},
+	}})
+	if got := ansi.Strip(buf.String()); strings.Contains(got, "/s/exec/a.log") {
+		t.Fatalf("a command that never started has no output to read: %q", got)
+	}
+}
+
+func TestPrintSkipsWorktreesThatPrintedNothing(t *testing.T) {
+	var buf bytes.Buffer
+	FormatExecPrint(&buf, []domain.ExecResult{{Branch: "a", Output: "ay\n"}, {Branch: "never", Status: domain.ExecStatusNotStarted}})
+	if got := ansi.Strip(buf.String()); strings.Contains(got, "never") {
 		t.Fatalf("got %q", got)
 	}
 }
