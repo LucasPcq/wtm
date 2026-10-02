@@ -565,6 +565,8 @@ then a single **recap** as the last step. The rules:
   Do not add a new one; migrate instead.
 - The breadcrumb denominator is **fixed** (`len(steps)`); an auto-skipped step makes the position
   **jump** (3/5 → 5/5), so the recap reliably reads `n/n`.
+- The breadcrumb names the step by its model's **title** when it has one (`Step 3/4 • Resolve
+  drift — feat/a`), else by its `Name`; the summaries of completed steps keep the `Name`.
 - **One wizard for every interactive entry path.** A command with several entry forms (a picker,
   positional args, `--all`) routes them all through the *same* wizard, skipping the steps a form
   already fixes (e.g. `sync <branches>`/`--all` skip the multi-select but keep the on-conflict

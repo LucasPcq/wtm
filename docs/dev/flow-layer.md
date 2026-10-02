@@ -209,8 +209,8 @@ terminal in alt-screen, so it sets `false` and names the way out instead.
 type Step struct {
 	Kind        StepKind // StepText | StepSelect | StepBranchSelect | StepRecap
 	Key         string   // identifies the answer in Answers
-	Label       string   // the step's name in the breadcrumb / summaries
-	Title       string
+	Label       string   // the step's name in the summaries, and in the breadcrumb when it has no Title
+	Title       string   // what it asks; the CLI breadcrumb and the dashboard modal show it
 	Description string
 	Options     []Option
 

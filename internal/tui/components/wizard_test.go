@@ -1,6 +1,7 @@
 package components
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -123,5 +124,16 @@ func TestWizardCtrlCAbortsFromAnyStep(t *testing.T) {
 
 	if !m.Aborted() {
 		t.Fatal("ctrl+c on step b did not abort the wizard")
+	}
+}
+
+func TestBreadcrumbShowsTheStepTitleOverItsName(t *testing.T) {
+	titled := NewWizard([]Step{{Name: "Resolve", Model: NewSelectList(NewSelectListParams{Title: "Resolve drift — feat/a", Items: []SelectItem{{Label: "a", Value: "a"}}})}})
+	if got := titled.renderBreadcrumb(); !strings.Contains(got, "Resolve drift — feat/a") {
+		t.Errorf("breadcrumb = %q, want the step's title", got)
+	}
+	untitled := NewWizard([]Step{{Name: "Resolve", Model: NewSelectList(NewSelectListParams{Items: []SelectItem{{Label: "a", Value: "a"}}})}})
+	if got := untitled.renderBreadcrumb(); !strings.Contains(got, "Resolve") {
+		t.Errorf("breadcrumb = %q, want the step's name when it has no title", got)
 	}
 }
