@@ -192,9 +192,10 @@ Steps are `flow.Step` values (`Kind`, `Key`, `Label`, `Title`, `Description`, `O
 (`Kind`, `Mode`, `TargetKey`) is what a flow declares about how a surface must schedule
 it; the CLI ignores it, `tui/dashboard/ops.go` enforces it.
 
-`create`, `checkout`, `clean`, `reparent`, `prune`, `relocate`, `sync`, `fast-forward` and `env` are
-migrated. `extract` still drives its `internal/tui/*` wizard packages directly — the
-`components.Step` sections below still describe it. **Any new mutation command goes
+`create`, `checkout`, `extract`, `clean`, `reparent`, `prune`, `relocate`, `sync`,
+`fast-forward` and `env` are migrated: every mutation command goes through `flow/`. A flow that
+creates a worktree as part of its own run embeds create's steps through `create.Embed`
+instead of redeclaring them (`extract`). **Any new mutation command goes
 through `flow/`.** Full reference: [`docs/dev/flow-layer.md`](../../../docs/dev/flow-layer.md)
 and [`docs/dev/adding-a-mutation-command.md`](../../../docs/dev/adding-a-mutation-command.md).
 
@@ -447,9 +448,8 @@ back-navigation still holds — it is just no longer the command's business. `fl
 refuses an unknown `StepKind` rather than guessing, so adding a kind means teaching every
 surface to render it.
 
-The `components.Step` API below remains the model for the wizards **not yet migrated**
-(`extract`) and for
-non-mutation pickers (`run`, `init`). Do not start a new mutation wizard here.
+The `components.Step` API below is no longer the model for any mutation command — all of them
+are on `flow/` — and remains it only for non-mutation pickers (`run`, `init`). Do not start a new mutation wizard here.
 
 A flow with **2+ sequential decisions** (e.g. pick worktree → pick new parent) MUST be a
 single `components.WizardModel`, exposed via a `RunWizard` in the screen package. The wizard
@@ -463,9 +463,8 @@ bug: no breadcrumb, and `Esc` quits the whole flow instead of going back.
   OnMsg, InitCmd, Loading, LoadingText})` — it centralises the program/assertion/abort boilerplate.
   It maps `Esc` at step 1 to `domain.ErrUserAborted`; otherwise pull values from
   `final.Steps()[i].Model.(components.SelectListModel).Value()`.
-- Reference implementation: `internal/tui/extract/extract.go`.
-  (`clean`, `sync`, `relocate` and `checkout` are no longer among them: their steps are declared in
-  `internal/flow/<cmd>/steps.go` and run through `internal/tui/flowui`.)
+- Every mutation wizard but `env`'s is declared in `internal/flow/<cmd>/steps.go` and run
+  through `internal/tui/flowui`; read one of those before touching `components.Step` directly.
 
 Standalone wrappers (`RunStandaloneSelect`/`RunStandaloneConfirm`) are only for a **single**
 one-shot decision where there is no prior step to go back to (e.g. `run up`'s profile picker).
@@ -556,7 +555,7 @@ then a single **recap** as the last step. The rules:
   (`internal/flow/clean/steps.go` `deleteStep`, `internal/flow/sync/steps.go` `confirmStep`
   for the cascade preview).
 - `ConfirmStep`/`ConfirmModel` stay only for genuine one-shot standalone Yes/No prompts outside a
-  wizard (e.g. extract's conflict-marker `ConfirmResolve`). `ConfirmStep.Decide` also returns a
+  wizard. `ConfirmStep.Decide` also returns a
   `skipReason` for parity.
 - Business data shown in a step arrives via an **injected closure** from the command layer (the TUI
   never imports `service`/`output`), e.g. `shared.EnvFallbackDecider`, sync's `PlanPreview`.
@@ -684,7 +683,6 @@ Reference: `internal/flow/create/steps.go` (`createFlow.recap`), pinned by
 
 **Non-migrated wizards** still do it by hand: each `build*Recap` / `recapStep` reads the
 value from its wizard step and **falls back to the flag/arg** when that step was skipped.
-Reference: `internal/tui/extract` `buildCombinedRecap` (`FixedFiles`/`FixedTarget`/`FixedKeep`).
 Add the fallback whenever you add a flag
 that pre-fills a step.
 
@@ -740,16 +738,14 @@ known:
 Each screen lives in its own package under `internal/tui/`:
 ```
 internal/tui/
-  components/     ← shared primitives (wizard, selectlist, multiselect, confirm)
-  flowui/         ← runs a flow.Session as the CLI wizard (every migrated command)
-  dashboard/      ← `wtm ui`, the second surface over flow/
-  newwt/          ← create wizard (still used by extract's embedded sub-flow)
-  runpicker/      ← run list / ps pickers
-  runwizard/      ← run job / profile wizards
-  inittui/        ← global + project init wizards
-  clean/          ← deletion confirm
-  extract/        ← extract wizard
-  worktreepicker/ ← shared worktree-selection picker
+  components/      ← shared primitives (wizard, selectlist, multiselect, confirm)
+  flowui/          ← runs a flow.Session as the CLI wizard (every migrated command)
+  dashboard/       ← `wtm ui`, the second surface over flow/
+  runview/         ← a job's PTY output replayed through a terminal emulator
+  inittui/         ← global + project init wizards
+  worktreepicker/  ← shared worktree-selection picker
+  branchrefresh/   ← background branch refresh for branch pickers
+  worktreerefresh/ ← background worktree refresh for worktree pickers
 ```
 
 ### Rules
@@ -923,8 +919,8 @@ recorder := &flowtest.Recorder{}
 
 A refactor that moves a command's flow between packages must not change what a user sees. Pin the
 observable behavior **first**, against the old code, then move the code and run those tests
-unchanged. That is what `internal/tui/newwt/create_flow_test.go`,
-`internal/commands/wt/create_wizard_test.go`, `create_noninteractive_test.go` and
+unchanged. That is what `internal/commands/wt/create_noninteractive_test.go`, the
+`*_characterization_test.go` files and
 `integration_test.go` are for: step composition per flag combination, recap completeness,
 the `--yes`/`--force` axes, the JSON reparent default, idempotence on an absent worktree.
 
