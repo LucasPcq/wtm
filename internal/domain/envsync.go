@@ -71,3 +71,10 @@ type EnvFileDecision struct {
 	PruneKeys    []string
 	SkipKeys     []string
 }
+
+// EnvResolveDefaults is what the flags already decided, for the resolver to
+// open on: a conflict on its overwrite, an orphan on its removal.
+type EnvResolveDefaults struct {
+	Overwrite bool
+	Prune     bool
+}

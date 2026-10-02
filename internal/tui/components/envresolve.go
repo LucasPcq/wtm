@@ -79,6 +79,7 @@ type NewEnvResolveParams struct {
 	Title       string
 	Description string
 	Files       []domain.EnvFileResult
+	Defaults    domain.EnvResolveDefaults
 }
 
 // NewEnvResolve builds the model from computed per-file drift.
@@ -87,19 +88,19 @@ func NewEnvResolve(params NewEnvResolveParams) EnvResolveModel {
 		title: params.Title,
 		desc:  params.Description,
 		width: 80,
-		rows:  buildEnvRows(params.Files),
+		rows:  buildEnvRows(params.Files, params.Defaults),
 	}
 	m.cursor = m.firstNavigable()
 	return m
 }
 
 // buildEnvRows flattens the files into header + entry rows, dropping in-sync keys.
-func buildEnvRows(files []domain.EnvFileResult) []envRow {
+func buildEnvRows(files []domain.EnvFileResult, defaults domain.EnvResolveDefaults) []envRow {
 	var rows []envRow
 	for _, f := range files {
 		var entries []envRow
 		for _, e := range f.Diff.Entries {
-			row, keep := entryRow(f, e)
+			row, keep := entryRow(f, e, defaults)
 			if keep {
 				entries = append(entries, row)
 			}
@@ -118,7 +119,7 @@ func buildEnvRows(files []domain.EnvFileResult) []envRow {
 }
 
 // entryRow maps one diff entry to a row, or keep=false when the key is in sync.
-func entryRow(f domain.EnvFileResult, e domain.EnvKeyDiff) (envRow, bool) {
+func entryRow(f domain.EnvFileResult, e domain.EnvKeyDiff, defaults domain.EnvResolveDefaults) (envRow, bool) {
 	row := envRow{
 		key:         e.Key,
 		status:      e.Status,
@@ -131,6 +132,9 @@ func entryRow(f domain.EnvFileResult, e domain.EnvKeyDiff) (envRow, bool) {
 	case domain.EnvKeyConflict:
 		row.options = []envOption{{"keep", optKeep}, {"use " + sourceName(e.Source, f.ParentBranch), optOverwrite}}
 		row.canEdit = true
+		if defaults.Overwrite {
+			row.sel = 1
+		}
 		return row, true
 	case domain.EnvKeyMissing:
 		row.options = []envOption{{"accept", optAccept}, {"skip", optSkip}}
@@ -138,6 +142,9 @@ func entryRow(f domain.EnvFileResult, e domain.EnvKeyDiff) (envRow, bool) {
 		return row, true
 	case domain.EnvKeyOrphan:
 		row.options = []envOption{{"keep", optKeep}, {"remove", optRemove}}
+		if defaults.Prune {
+			row.sel = 1
+		}
 		return row, true
 	case domain.EnvKeyResolved:
 		if e.CurrentValue == "" && e.ResolvedValue != "" {

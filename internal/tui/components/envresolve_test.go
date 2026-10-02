@@ -117,3 +117,16 @@ func TestEnvResolveCycleDiscardsEdit(t *testing.T) {
 		t.Fatalf("decision = %v, want keep", d.Decisions)
 	}
 }
+
+func TestEnvResolveOpensOnTheFlagDefaults(t *testing.T) {
+	files := []domain.EnvFileResult{{Target: ".env", Diff: domain.EnvDiff{Entries: []domain.EnvKeyDiff{
+		{Key: "DB_HOST", Status: domain.EnvKeyConflict, CurrentValue: "cur", ResolvedValue: "res", Source: "main"},
+		{Key: "OLD", Status: domain.EnvKeyOrphan, CurrentValue: "1"},
+	}}}}
+	m := NewEnvResolve(NewEnvResolveParams{Files: files, Defaults: domain.EnvResolveDefaults{Overwrite: true, Prune: true}})
+
+	d := m.Decisions()[0]
+	if d.Decisions["DB_HOST"] != domain.EnvDecisionOverwrite || len(d.PruneKeys) != 1 {
+		t.Errorf("decisions = %+v, want the conflict overwritten and the orphan pruned", d)
+	}
+}

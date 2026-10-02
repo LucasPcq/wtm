@@ -147,7 +147,7 @@ func TestRunAppliesTheWizardsDecisions(t *testing.T) {
 	}
 
 	recap := prompter.Content[KeyRecap].Description
-	for _, want := range []string{"Worktree:  feat/a", `SHARED  overwrite → "main"`, `ORPHAN  remove "1"`} {
+	for _, want := range []string{"Worktree:  feat/a", "Mode:      refresh", "Env:       main", `SHARED  overwrite → "main"`, `ORPHAN  remove "1"`} {
 		if !strings.Contains(recap, want) {
 			t.Errorf("recap lacks %q:\n%s", want, recap)
 		}
@@ -206,7 +206,7 @@ func TestRunAdoptingRecordsTheIsolation(t *testing.T) {
 	if !outcome.IsolationChanged || worktree.RecordedIsolation(ref) != domain.IsolationIsolated {
 		t.Errorf("outcome = %+v, recorded = %q; want isolated, and the change reported", outcome, worktree.RecordedIsolation(ref))
 	}
-	if recap := prompter.Content[KeyRecap].Description; !strings.Contains(recap, domain.RecapFieldIsolation+domain.IsolationAdoptSummary) {
+	if recap := prompter.Content[KeyRecap].Description; !strings.Contains(recap, domain.RecapFieldIsolation+domain.IsolationSummaryIsolated) {
 		t.Errorf("recap = %q, want the adoption named", recap)
 	}
 }
@@ -251,5 +251,47 @@ func TestRunCheckAsksNothingAndWritesNothing(t *testing.T) {
 	}
 	if got := read(t, filepath.Join(path, ".env")); strings.Contains(got, "NEW") {
 		t.Errorf(".env = %q, want it untouched", got)
+	}
+}
+
+func TestRunOpensTheResolverOnWhatTheFlagsDecided(t *testing.T) {
+	ctx := testContext(t)
+	path := makeWorktree(t, ctx, "feat/a")
+	write(t, filepath.Join(path, ".env"), "SHARED=mine\nORPHAN=1\n")
+
+	prompter := &flowtest.ScriptedPrompter{
+		Answers:      map[string]string{KeyRecap: domain.EnvApplyValue},
+		EnvDecisions: map[string][]domain.EnvFileDecision{KeyResolve: nil},
+	}
+	request := Request{Worktree: "feat/a", Mode: domain.EnvModeRefresh, OnConflict: domain.EnvDecisionOverwrite, Prune: true}
+	if _, _, err := run(ctx, request, prompter); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := prompter.Content[KeyResolve].EnvDefaults; !got.Overwrite || !got.Prune {
+		t.Errorf("defaults = %+v, want --on-conflict overwrite and --prune carried to the resolver", got)
+	}
+}
+
+func TestPickerBadgesPendingAdditionsAndDisablesARefusedIsolation(t *testing.T) {
+	ctx := testContext(t)
+	makeWorktree(t, ctx, "feat/a")
+	write(t, filepath.Join(ctx.ProjectDir, ".env"), "SHARED=main\nNEW=1\n")
+
+	prompter := &flowtest.ScriptedPrompter{
+		Answers:      map[string]string{KeyWorktree: "feat/a", KeyRecap: domain.EnvApplyValue},
+		EnvDecisions: map[string][]domain.EnvFileDecision{KeyResolve: nil},
+	}
+	if _, _, err := run(ctx, Request{Isolation: domain.IsolationVerbatim}, prompter); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	options := map[string]flow.Option{}
+	for _, option := range prompter.Content[KeyWorktree].Options {
+		options[option.Value] = option
+	}
+	if main := options["main"]; !main.Disabled {
+		t.Errorf("main = %+v, want it disabled: it refuses verbatim", main)
+	}
+	if badges := options["feat/a"].Badges; len(badges) == 0 || badges[len(badges)-1].Text != "1 change(s)" {
+		t.Errorf("feat/a badges = %+v, want the pending addition counted", badges)
 	}
 }

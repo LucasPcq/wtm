@@ -116,6 +116,7 @@ func envResolve(content flow.StepContent) components.EnvResolveModel {
 		Title:       content.Title,
 		Description: components.EnvResolveGlossary(),
 		Files:       content.EnvFiles,
+		Defaults:    content.EnvDefaults,
 	})
 }
 

@@ -17,6 +17,9 @@ type branchScan struct {
 	ports    domain.EnvPortPlan
 	adoption domain.IsolationAdoptionPlan
 	restore  []domain.EnvRestoredEntry
+	// refused is --isolation turned down for this worktree: the picker offers it
+	// disabled rather than letting the apply fail on it.
+	refused bool
 }
 
 // scan runs once, before the first screen, over every worktree the picker may
@@ -66,9 +69,10 @@ func (f *envFlow) scanBranch(branch string) (branchScan, error) {
 		return branchScan{}, err
 	}
 
-	isolation := domain.Isolation("")
-	if branch == f.request.Worktree {
-		isolation = f.request.Isolation
+	isolation := f.request.Isolation
+	refused := f.checkIsolation(t, isolation) != nil
+	if refused {
+		isolation = ""
 	}
 	// A worktree still to adopt its isolation is scanned without its port
 	// pass: resolving one allocates an ordinal, and whether it gets one is the
@@ -101,7 +105,7 @@ func (f *envFlow) scanBranch(branch string) (branchScan, error) {
 		return branchScan{}, err
 	}
 
-	scan := branchScan{files: files, adoption: adoption, restore: preview.planned}
+	scan := branchScan{files: files, adoption: adoption, restore: preview.planned, refused: refused}
 	if !ports.Empty() {
 		if scan.ports, err = envsvc.ComputeEnvPorts(ports); err != nil {
 			return branchScan{}, err

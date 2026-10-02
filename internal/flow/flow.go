@@ -93,8 +93,10 @@ type StepContent struct {
 	Pinned string
 	// Banner is what a loaded step has to say about what it could not load.
 	Banner Banner
-	// EnvFiles is the drift a StepEnvResolve asks about.
-	EnvFiles []domain.EnvFileResult
+	// EnvFiles is the drift a StepEnvResolve asks about, EnvDefaults what its
+	// rows open on.
+	EnvFiles    []domain.EnvFileResult
+	EnvDefaults domain.EnvResolveDefaults
 }
 
 type Banner struct {
@@ -414,6 +416,7 @@ func MergeContent(step Step, built StepContent) StepContent {
 	}
 	content.Banner = built.Banner
 	content.EnvFiles = built.EnvFiles
+	content.EnvDefaults = built.EnvDefaults
 	return content
 }
 

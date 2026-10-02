@@ -33,8 +33,12 @@ func (f *envFlow) worktreeStep() flow.Step {
 		if status.IsParent {
 			badges = append(badges, flow.Badge{Text: domain.EnvBadgeParent})
 		}
-		badges = append(badges, driftBadge(f.scans[status.Branch].files))
-		options = append(options, flow.Option{Label: status.Branch, Value: status.Branch, Badges: badges})
+		scan := f.scans[status.Branch]
+		badges = append(badges, driftBadge(scan.files))
+		if scan.refused {
+			badges = append(badges, flow.Badge{Text: fmt.Sprintf(domain.EnvBadgeRefusesFmt, f.request.Isolation), Tone: domain.ToneDanger})
+		}
+		options = append(options, flow.Option{Label: status.Branch, Value: status.Branch, Badges: badges, Disabled: scan.refused})
 	}
 	return flow.Step{
 		Kind:    flow.StepSelect,
@@ -108,6 +112,10 @@ func (f *envFlow) resolveStep() flow.Step {
 			return flow.StepContent{
 				Title:    fmt.Sprintf(domain.EnvResolveTitleFmt, answers.Value(KeyWorktree)),
 				EnvFiles: f.scanOf(answers).files,
+				EnvDefaults: domain.EnvResolveDefaults{
+					Overwrite: f.request.OnConflict == domain.EnvDecisionOverwrite,
+					Prune:     f.request.Prune,
+				},
 			}, nil
 		},
 		Resolve: func(flow.Answers) (flow.Answer, error) {
@@ -154,10 +162,15 @@ type recapParams struct {
 // discovered after.
 func (f *envFlow) recap(params recapParams) string {
 	answers := params.Answers
+	branch := answers.Value(KeyWorktree)
 	scan := f.scanOf(answers)
-	lines := []string{domain.EnvRecapFieldWorktree + answers.Value(KeyWorktree)}
-	if answers.Value(KeyAdopt) == domain.IsolationAdoptValue {
-		lines = append(lines, domain.RecapFieldIsolation+domain.IsolationAdoptSummary)
+	lines := []string{
+		domain.EnvRecapFieldWorktree + branch,
+		domain.RecapFieldMode + string(f.request.Mode),
+		domain.RecapFieldEnv + f.sourceLabel(branch),
+	}
+	if isolation := f.isolation(answers); isolation != "" {
+		lines = append(lines, domain.RecapFieldIsolation+rules.IsolationSummary(isolation))
 	}
 	lines = append(lines, "")
 
@@ -174,6 +187,16 @@ func (f *envFlow) recap(params recapParams) string {
 		Offered: params.VerbatimOffered,
 	})...)
 	return strings.Join(lines, "\n")
+}
+
+// sourceLabel is where the values come from: the strategy, and the parent it
+// reads when that strategy is "parent".
+func (f *envFlow) sourceLabel(branch string) string {
+	ctx := f.envContext(branch)
+	if ctx.strategy == domain.EnvStrategyParent && ctx.parentBranch != "" {
+		return string(ctx.strategy) + domain.EnvRecapNoteSeparator + ctx.parentBranch
+	}
+	return string(ctx.strategy)
 }
 
 func (f *envFlow) scanOf(answers flow.Answers) branchScan {

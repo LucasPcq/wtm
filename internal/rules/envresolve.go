@@ -21,13 +21,14 @@ func EnvResolvable(files []domain.EnvFileResult) bool {
 	return false
 }
 
-// EnvDriftCount is how many keys need a decision across a worktree's files.
+// EnvDriftCount is how many keys an apply would touch or ask about across a
+// worktree's files — an addition included, or a worktree with only additions
+// pending would read as in sync.
 func EnvDriftCount(files []domain.EnvFileResult) int {
 	count := 0
 	for _, file := range files {
 		for _, entry := range file.Diff.Entries {
-			switch entry.Status {
-			case domain.EnvKeyConflict, domain.EnvKeyMissing, domain.EnvKeyOrphan:
+			if envDecidable(entry) {
 				count++
 			}
 		}
@@ -60,12 +61,18 @@ func EnvResolveRecapLines(params EnvResolveRecapParams) []string {
 	var lines []string
 	for _, file := range params.Files {
 		decision := envDecisionFor(params.Decisions, file.Target)
+		width := 0
+		for _, entry := range file.Diff.Entries {
+			if envDecidable(entry) {
+				width = max(width, len(entry.Key))
+			}
+		}
 		var rows []string
 		for _, entry := range file.Diff.Entries {
 			if !envDecidable(entry) {
 				continue
 			}
-			rows = append(rows, domain.RecapRowIndent+envRecapLine(entry, decision))
+			rows = append(rows, domain.RecapRowIndent+envRecapLine(envRecapLineParams{Entry: entry, Decision: decision, Width: width}))
 		}
 		if len(rows) == 0 {
 			continue
@@ -88,9 +95,17 @@ func envDecisionFor(decisions []domain.EnvFileDecision, target string) domain.En
 	return domain.EnvFileDecision{Target: target}
 }
 
-func envRecapLine(entry domain.EnvKeyDiff, decision domain.EnvFileDecision) string {
+type envRecapLineParams struct {
+	Entry    domain.EnvKeyDiff
+	Decision domain.EnvFileDecision
+	// Width is the longest key of the file, so the actions line up.
+	Width int
+}
+
+func envRecapLine(params envRecapLineParams) string {
+	entry, decision := params.Entry, params.Decision
 	line := func(action, value string) string {
-		return fmt.Sprintf(domain.EnvRecapLineFmt, entry.Key, action, value)
+		return fmt.Sprintf(domain.EnvRecapLineFmt, pad(entry.Key, params.Width), action, value)
 	}
 	if value, ok := decision.FilledValues[entry.Key]; ok {
 		return line(domain.EnvRecapActionSet, envRecapValue(value))

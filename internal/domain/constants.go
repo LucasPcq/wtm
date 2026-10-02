@@ -1073,6 +1073,7 @@ const (
 	EnvRecapFieldWorktree   = "Worktree:  "
 	EnvBadgeParent          = "parent"
 	EnvBadgeInSync          = "in sync"
+	EnvBadgeRefusesFmt      = "refuses %s"
 	EnvBadgeChangesFmt      = "%d change(s)"
 	EnvRecapActionSet       = "set"
 	EnvRecapActionOverwrite = "overwrite →"
