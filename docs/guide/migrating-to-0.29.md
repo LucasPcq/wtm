@@ -39,3 +39,7 @@ A script reading `.already_absent` reads `.results[0].already_absent`. `reparent
 ## The wizard asks for a list of branches
 
 `wtm create` without arguments now asks for one or more branches: type a name, press tab to add another, enter to continue. `wtm create <branch>` with a single argument skips that step as before; with several arguments the list opens pre-filled. The dashboard's create (`wtm ui`) asks the same list; each worktree appears in the list as soon as it exists, and the cursor lands on the first.
+
+## `wtm clean` takes several worktrees
+
+`wtm clean feat/a feat/b` removes both; without arguments the picker lets you check several. Under `--yes`, one unsafe worktree (dirty, unpushed, open PR) refuses the whole run before anything is removed, so pass `--force` or name only the safe ones. The dashboard (`wtm ui`) offers the same from its global menu, « Delete worktrees »; the row menu still deletes the one worktree it was opened from.
