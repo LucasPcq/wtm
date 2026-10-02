@@ -103,6 +103,7 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 
 ## `relocate`
 
+- `{base_path, base_path_updated, steps: [...]}`: `steps` is `[]`, never `null`, and `base_path` is always the one in effect after the run, also when nothing had to change.
 - `blocked_jobs`: worktrees not moved because their jobs are running (exit non-zero; `--force` does not lift it).
 - `blocked_name`: external worktrees left unadopted because their derived name is taken (exit non-zero).
 

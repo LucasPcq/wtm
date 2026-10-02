@@ -1,6 +1,8 @@
 package wt
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -54,4 +56,29 @@ func TestRelocateToWithNoWorktreeToMoveReportsTheRewriteAlone(t *testing.T) {
 	if want := "\n  ✓ config base_path updated to \"../elsewhere\"\n\n"; stdout != want {
 		t.Errorf("stdout = %q, want %q", stdout, want)
 	}
+}
+
+func TestRelocateToRetiresTheEmptiedBasePathDirectory(t *testing.T) {
+	repo := newRelocateRepo(t)
+	repo.create(t, "feat/a")
+
+	if _, err := relocateJSON(t, "--to", "../.worktrees", "--"+domain.FlagYes); err != nil {
+		t.Fatalf("relocate --to: %v", err)
+	}
+	assertGone(t, filepath.Join(repo.root(), ".trees"))
+	assertExists(t, filepath.Join(repo.root(), ".worktrees", "feat-a"))
+}
+
+func TestRelocateToKeepsABasePathDirectoryStillInUse(t *testing.T) {
+	repo := newRelocateRepo(t)
+	repo.create(t, "feat/dirty")
+	from := filepath.Join(repo.root(), ".trees", "feat-dirty")
+	if err := os.WriteFile(filepath.Join(from, "scratch.txt"), []byte("wip"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := relocateJSON(t, "--to", "../.worktrees", "--"+domain.FlagYes); err != nil {
+		t.Fatalf("relocate --to: %v", err)
+	}
+	assertExists(t, from)
 }

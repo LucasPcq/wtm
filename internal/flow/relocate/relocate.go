@@ -149,7 +149,7 @@ type executeParams struct {
 // execute keeps going past a worktree that fails: each one is reported on its
 // own line, and the others are no less safe to move for it.
 func (f *relocateFlow) execute(params executeParams) domain.RelocateResult {
-	result := domain.RelocateResult{BasePath: params.BasePath}
+	result := domain.RelocateResult{BasePath: params.BasePath, Steps: []domain.RelocateStepResult{}}
 	for _, step := range params.Plan.Steps {
 		res := rules.RelocateStepStart(rules.RelocateStepStartParams{Step: step, Parents: params.Parents, BaseBranch: f.request.BaseBranch})
 		if res.Status == domain.RelocateStatusMove || res.Status == domain.RelocateStatusAdopt {
@@ -212,9 +212,10 @@ func (f *relocateFlow) rewriteBasePath(result *domain.RelocateResult) error {
 		return nil
 	}
 	if err := worktree.SetBasePath(worktree.SetBasePathParams{
-		StateDir: f.ctx.StateDir,
-		Project:  f.ctx.Config.Project,
-		BasePath: result.BasePath,
+		ProjectDir: f.ctx.ProjectDir,
+		StateDir:   f.ctx.StateDir,
+		Project:    f.ctx.Config.Project,
+		BasePath:   result.BasePath,
 	}); err != nil {
 		return err
 	}
@@ -224,6 +225,9 @@ func (f *relocateFlow) rewriteBasePath(result *domain.RelocateResult) error {
 
 func (f *relocateFlow) conclude(outcome Outcome) (Outcome, error) {
 	outcome.FromBasePath = f.configBasePath()
+	if outcome.Empty {
+		outcome.Result = domain.RelocateResult{BasePath: f.configBasePath(), Steps: []domain.RelocateStepResult{}}
+	}
 	return outcome, f.presenter.Relocated(outcome)
 }
 

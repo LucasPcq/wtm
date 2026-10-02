@@ -365,7 +365,7 @@ type relocatePresenter struct {
 func (p relocatePresenter) Relocated(outcome relocateflow.Outcome) error {
 	if outcome.Empty {
 		if !p.Human {
-			return output.WriteRelocateResultJSON(p.Cmd.OutOrStdout(), domain.RelocateResult{})
+			return output.WriteRelocateResultJSON(p.Cmd.OutOrStdout(), outcome.Result)
 		}
 		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
 			output.Message(w, domain.RelocateAlignedMessage)

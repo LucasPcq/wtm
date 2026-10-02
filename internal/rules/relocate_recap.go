@@ -56,7 +56,7 @@ func RelocateRecap(params RelocateRecapParams) string {
 
 	var b strings.Builder
 	if params.PreviousBasePath != "" && params.PreviousBasePath != params.Plan.BasePath {
-		b.WriteString(fmt.Sprintf("base_path: %s → %s\n\n", params.PreviousBasePath, params.Plan.BasePath))
+		b.WriteString(fmt.Sprintf("base_path: %s → %s\n", params.PreviousBasePath, params.Plan.BasePath))
 	}
 	writeRelocateRecapGroup(&b, "To apply:", apply)
 	writeRelocateRecapGroup(&b, "Skipped:", skipped)

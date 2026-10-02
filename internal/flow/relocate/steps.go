@@ -79,7 +79,7 @@ func (f *relocateFlow) basePathStep() flow.Step {
 		Title:       domain.RelocateBasePathValueLabel,
 		Description: domain.RelocateBasePathValueDesc,
 		Default:     current,
-		Validate:    rules.ValidateRelocateTarget,
+		Validate:    rules.ValidateBasePathEntry,
 		Skip: func(answers flow.Answers) (bool, string) {
 			return answers.Value(KeyBasePathGate) != basePathChange, ""
 		},

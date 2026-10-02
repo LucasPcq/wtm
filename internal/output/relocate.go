@@ -68,7 +68,7 @@ func FormatRelocatePlan(w io.Writer, plan domain.RelocatePlan) {
 	}
 	if adoptions > 0 {
 		section(func() {
-			Message(w, styles.Primary.Render(fmt.Sprintf("→ You'll choose a parent branch for %d worktree(s).", adoptions)))
+			Message(w, styles.Primary.Render(fmt.Sprintf(domain.RelocateAdoptionsNoteFmt, adoptions, plan.BaseBranch)))
 		})
 	}
 }

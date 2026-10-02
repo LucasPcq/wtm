@@ -77,11 +77,15 @@ func Adopt(params AdoptParams) error {
 }
 
 type SetBasePathParams struct {
-	StateDir string
-	Project  domain.ProjectConfig
-	BasePath string
+	ProjectDir string
+	StateDir   string
+	Project    domain.ProjectConfig
+	BasePath   string
 }
 
+// SetBasePath also retires the previous base_path directory once the moves
+// have emptied it. os.Remove leaves a directory that still holds anything —
+// a worktree a refusal kept there, or files that are not wtm's.
 func SetBasePath(params SetBasePathParams) error {
 	updated := params.Project
 	updated.Worktrees.BasePath = params.BasePath
@@ -91,6 +95,7 @@ func SetBasePath(params SetBasePathParams) error {
 	}); err != nil {
 		return fmt.Errorf("update config base_path: %w", err)
 	}
+	_ = os.Remove(filepath.Join(params.ProjectDir, params.Project.Worktrees.BasePath))
 	return nil
 }
 

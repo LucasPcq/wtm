@@ -67,3 +67,13 @@ func TestRelocateRecapEmpty(t *testing.T) {
 		t.Errorf("expected an empty-state message, got:\n%s", recap)
 	}
 }
+
+func TestRelocateRecapSetsTheBasePathChangeApartByOneBlankLine(t *testing.T) {
+	recap := rules.RelocateRecap(rules.RelocateRecapParams{
+		Plan:             relocateRecapPlan(),
+		PreviousBasePath: "../old",
+	})
+	if !strings.HasPrefix(recap, "base_path: ../old → ../.trees\n\nTo apply:") {
+		t.Errorf("recap =\n%q", recap)
+	}
+}

@@ -159,7 +159,7 @@ func TestRelocateCharacterizeNothingToDo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("relocate json: %v", err)
 	}
-	if want := "{\n  \"base_path\": \"\",\n  \"base_path_updated\": false,\n  \"steps\": null\n}\n"; stdout != want {
+	if want := "{\n  \"base_path\": \"../.trees\",\n  \"base_path_updated\": false,\n  \"steps\": []\n}\n"; stdout != want {
 		t.Errorf("json = %q, want %q", stdout, want)
 	}
 }
@@ -335,7 +335,7 @@ func TestRelocateCharacterizeDryRunText(t *testing.T) {
 		"  • feat/a → ../.worktrees/feat-a\n" +
 		"  • feat/manual → ../.worktrees/feat-manual (+ adopt)\n" +
 		"\n" +
-		"  → You'll choose a parent branch for 1 worktree(s).\n" +
+		"  → 1 worktree(s) to adopt: the wizard asks each parent, --yes uses main.\n" +
 		"\n" +
 		"  = Dry run — no changes made.\n" +
 		"\n"

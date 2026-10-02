@@ -2,6 +2,7 @@ package relocate
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -226,5 +227,29 @@ func TestRunDryRunAsksAndChangesNothing(t *testing.T) {
 	}
 	if _, err := os.Stat(from); err != nil {
 		t.Errorf("a dry run moved feat/x: %v", err)
+	}
+}
+
+func TestRunRefusesABlankBasePath(t *testing.T) {
+	ctx := testContext(t)
+
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{
+		KeyBasePathGate: basePathChange,
+		KeyBasePath:     "",
+	}}
+	if _, _, err := run(t, ctx, Request{}, prompter); !errors.Is(err, domain.ErrInvalidBasePath) {
+		t.Fatalf("err = %v, want ErrInvalidBasePath", err)
+	}
+}
+
+func TestRunEmptyResultNamesTheBasePath(t *testing.T) {
+	ctx := testContext(t)
+
+	outcome, _, err := run(t, ctx, Request{}, flow.Unattended{})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if outcome.Result.BasePath != "../.trees" || outcome.Result.Steps == nil {
+		t.Errorf("result = %+v, want base_path and an empty step list", outcome.Result)
 	}
 }

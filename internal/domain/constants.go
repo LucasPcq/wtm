@@ -1768,7 +1768,7 @@ const (
 	RelocateAlignedMessage      = "All worktrees are already aligned with base_path."
 	RelocateBasePathGateLabel   = "Base path"
 	RelocateBasePathGateTitle   = "Change base_path?"
-	RelocateBasePathGateDescFmt = "Worktrees live under %s. Keep it, or set a new location to move them all to."
+	RelocateBasePathGateDescFmt = "Worktrees live under %s.\nKeep it, or set a new location to move them all to."
 	RelocateBasePathKeepFmt     = "Keep %s"
 	RelocateBasePathChange      = "Change it"
 	RelocateBasePathValueLabel  = "New base_path"
@@ -1778,8 +1778,11 @@ const (
 	RelocateParentDescFmt = "%s was created outside wtm, so it has no recorded parent.\n" +
 		"Pick the branch `wtm sync` should rebase it onto.\n" +
 		"The full set of moves and adoptions is recapped on the final step."
-	RelocateApplyLabel  = "Apply"
-	RelocateApplyOption = "Yes, apply"
+	// RelocateAdoptionsNoteFmt closes a preview (count, base branch): the wizard
+	// asks each parent, --yes adopts onto the base branch.
+	RelocateAdoptionsNoteFmt = "→ %d worktree(s) to adopt: the wizard asks each parent, --yes uses %s."
+	RelocateApplyLabel       = "Apply"
+	RelocateApplyOption      = "Yes, apply"
 	// RelocateBasePathOnlyFmt previews a relocate that only rewrites base_path
 	// (from, to): no worktree has to move.
 	RelocateBasePathOnlyFmt = "base_path: %s → %s (no worktree to move)"
@@ -4048,6 +4051,10 @@ const (
 	// KeyQuit leaves the dashboard. Esc does not: it only closes what is open, so
 	// a persistent dashboard is never left by accident.
 	KeyQuit = "q"
+
+	// KeyInterrupt cancels a wizard wherever it stands, as Esc does on its
+	// first step: a terminal user reaches for it first.
+	KeyInterrupt = "ctrl+c"
 
 	// EscapePrefix is the leading escape a terminal sends for an alt-modified
 	// key, and KeyCtrlPrefix how a control combination is named.
