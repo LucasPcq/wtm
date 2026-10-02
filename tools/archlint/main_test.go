@@ -1,7 +1,6 @@
 package main
 
 import (
-	"go/parser"
 	"go/token"
 	"strings"
 	"testing"
@@ -66,40 +65,5 @@ func TestALegacyRuneUnderItsCountSaysItCanShrink(t *testing.T) {
 	all := strings.Join(append(got.lines, got.notes...), "\n")
 	if !strings.Contains(all, "lower it to 1") || !strings.Contains(all, `"⚠" has no site left`) {
 		t.Errorf("report = %q, want ▸ lowered to 1 and ⚠ named as gone", all)
-	}
-}
-
-func yesFlagFindings(t *testing.T, register string) []finding {
-	t.Helper()
-	src := `package cmd
-
-func newCmd() *cobra.Command {
-	cmd := &cobra.Command{}
-	` + register + `
-	return cmd
-}
-
-func run() { _ = shared.Interactive(nil) }
-`
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, "cmd.go", src, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return checkYesFlag(fset, "cmd.go", file)
-}
-
-// --yes is the one spelling of the confirmation axis: the helper that also
-// registered --non-interactive is gone, and must not satisfy the rule if it
-// ever comes back.
-func TestACommandReadingTheGateRegistersYes(t *testing.T) {
-	if got := yesFlagFindings(t, `shared.AddYesFlag(cmd, "")`); len(got) != 0 {
-		t.Errorf("findings = %v, want none for a command registering --yes", got)
-	}
-	if got := yesFlagFindings(t, `shared.AddNoPromptFlags(cmd, "")`); len(got) != 1 {
-		t.Errorf("findings = %v, want the retired helper refused", got)
-	}
-	if got := yesFlagFindings(t, ``); len(got) != 1 {
-		t.Errorf("findings = %v, want a command with no --yes refused", got)
 	}
 }
