@@ -65,32 +65,11 @@ func (m Model) startCreate() (Model, tea.Cmd) {
 // never presets Force: lifting a refusal is an answer the user gives in the
 // modal, one refusal at a time.
 func (m Model) startClean(branch string) (Model, tea.Cmd) {
-	if reason, refused := m.busyReason(branch); refused {
-		return m.refuse(reason), nil
-	}
-	declared := cleanflow.Operation()
-	m, id := m.beginOp(beginParams{Operation: declared, Target: branch})
-	send := m.sender()
-
-	params := cleanflow.Params{
-		Context: m.flowContext(),
-		Request: cleanflow.Request{
-			Branches:   []string{branch},
-			BaseBranch: m.baseBranch(),
-		},
-		Prompter: prompter{
-			send:      send,
-			title:     domain.DashboardDeleteTitle,
-			shape:     modalForm,
-			opID:      id,
-			targetKey: declared.TargetKey,
-		},
-		Presenter: newCleanPresenter(presenter{send: send, id: id}),
-	}
-
-	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-		_, err := cleanflow.Run(params)
-		return opDoneMsg{id: id, err: err}
+	return m.runClean(runCleanParams{
+		Target:  branch,
+		Request: cleanflow.Request{Branches: []string{branch}, BaseBranch: m.baseBranch()},
+		Title:   domain.DashboardDeleteTitle,
+		Shape:   modalForm,
 	})
 }
 
@@ -98,20 +77,35 @@ func (m Model) startClean(branch string) (Model, tea.Cmd) {
 // worktrees to remove before anything else. Like prune it holds the whole
 // surface, so it needs no per-worktree lock.
 func (m Model) startBatchClean() (Model, tea.Cmd) {
-	if reason, refused := m.busyReason(""); refused {
+	return m.runClean(runCleanParams{
+		Request: cleanflow.Request{BaseBranch: m.baseBranch()},
+		Title:   domain.DashboardDeleteManyTitle,
+		Shape:   modalStepper,
+	})
+}
+
+type runCleanParams struct {
+	Target  string
+	Request cleanflow.Request
+	Title   string
+	Shape   modalShape
+}
+
+func (m Model) runClean(params runCleanParams) (Model, tea.Cmd) {
+	if reason, refused := m.busyReason(params.Target); refused {
 		return m.refuse(reason), nil
 	}
 	declared := cleanflow.Operation()
-	m, id := m.beginOp(beginParams{Operation: declared})
+	m, id := m.beginOp(beginParams{Operation: declared, Target: params.Target})
 	send := m.sender()
 
-	params := cleanflow.Params{
+	run := cleanflow.Params{
 		Context: m.flowContext(),
-		Request: cleanflow.Request{BaseBranch: m.baseBranch()},
+		Request: params.Request,
 		Prompter: prompter{
 			send:      send,
-			title:     domain.DashboardDeleteManyTitle,
-			shape:     modalStepper,
+			title:     params.Title,
+			shape:     params.Shape,
 			opID:      id,
 			targetKey: declared.TargetKey,
 		},
@@ -119,7 +113,7 @@ func (m Model) startBatchClean() (Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-		_, err := cleanflow.Run(params)
+		_, err := cleanflow.Run(run)
 		return opDoneMsg{id: id, err: err}
 	})
 }
