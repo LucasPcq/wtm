@@ -10,6 +10,7 @@ import (
 func TestTheDaemonIsBlindToGit(t *testing.T) {
 	analysistest.Run(t, filepath.Join(analysistest.TestData(), "daemonblind"), daemonblindAnalyzer,
 		internalPrefix+"service/process",
+		internalPrefix+"service/proxy",
 		internalPrefix+"service/runjobs",
 	)
 }

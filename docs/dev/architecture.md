@@ -71,7 +71,7 @@ None of this is left to review. `make lint` runs `tools/archlint`, whose rules a
 | -- | -- |
 | `layers` | each arrow above, from the `layers` table |
 | `servicedag` | each `service/x → service/y` import against `serviceEdges` |
-| `daemonblind` | `service/process` imports nothing that runs git and only allow-listed `infra/` |
+| `daemonblind` | the daemon — `service/process` and `service/proxy` — imports nothing that runs git and only allow-listed `infra/` |
 | `chokepoint` | a service mutator is called from `internal/flow/` only, from any layer |
 
 A command that still drives its service from `commands/` is listed in `.archlint-migrating` with its ticket, and the list may only shrink.

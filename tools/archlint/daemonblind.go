@@ -9,21 +9,22 @@ import (
 
 // The daemon outlives the command that started it and serves every worktree of
 // every repository: it never runs git and never reads a repository's config,
-// it is handed what it needs. service/events joins the list before it exists,
+// it is handed what it needs. service/proxy is served from inside it. service/events joins the list before it exists,
 // so LUC-233 cannot make the broker schema-aware by accident.
 var (
+	daemonPackages  = []dir{"service/process", "service/proxy"}
 	daemonForbidden = []string{"service/worktree", "service/branch", "service/github", "service/events", "config"}
 	daemonInfra     = map[string]bool{"GlobalDir": true}
 )
 
 var daemonblindAnalyzer = &analysis.Analyzer{
 	Name: "daemonblind",
-	Doc:  "service/process imports nothing that runs git and only allow-listed infra",
+	Doc:  "the daemon (service/process, service/proxy) imports nothing that runs git and only allow-listed infra",
 	Run:  runDaemonBlind,
 }
 
 func runDaemonBlind(pass *analysis.Pass) (any, error) {
-	if !dir("service/process").holds(pass.Pkg.Path()) {
+	if !slices.ContainsFunc(daemonPackages, func(d dir) bool { return d.holds(pass.Pkg.Path()) }) {
 		return nil, nil
 	}
 	for _, file := range pass.Files {
@@ -33,7 +34,7 @@ func runDaemonBlind(pass *analysis.Pass) (any, error) {
 				continue
 			}
 			if slices.ContainsFunc(daemonForbidden, func(d string) bool { return dir(d).holds(target) }) {
-				pass.Reportf(imp.Pos(), "the daemon must not import %q: service/process is blind to git and to the repository's config", target)
+				pass.Reportf(imp.Pos(), "the daemon must not import %q: service/process and service/proxy are blind to git and to the repository's config", target)
 			}
 		}
 	}
