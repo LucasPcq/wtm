@@ -65,6 +65,7 @@ func Detail(params DetailParams) domain.WorktreeDetail {
 		WorktreePath:    params.Status.Path,
 		Branch:          params.Status.Branch,
 		IsDirty:         params.Status.IsDirty,
+		IsLocked:        params.Status.IsLocked,
 		IsParent:        params.Status.IsParent,
 		UnpushedCommits: unpushed(params),
 		HasOpenPR:       openPR(params) != nil,

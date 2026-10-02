@@ -2,7 +2,6 @@ package teardown_test
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -39,14 +38,6 @@ func makeTarget(t *testing.T, ctx flow.Context, branch string) teardown.Target {
 	return teardown.Target{Branch: branch, Path: result.Path}
 }
 
-// A locked worktree is one git refuses to remove even with --force.
-func lockWorktree(t *testing.T, ctx flow.Context, path string) {
-	t.Helper()
-	if out, err := exec.Command("git", "-C", ctx.ProjectDir, "worktree", "lock", path).CombinedOutput(); err != nil {
-		t.Fatalf("lock %s: %v: %s", path, err, out)
-	}
-}
-
 func TestBatchKeepsGoingPastAFailureUnlessAskedToStop(t *testing.T) {
 	for name, stop := range map[string]bool{"continue": false, "stop": true} {
 		t.Run(name, func(t *testing.T) {
@@ -54,7 +45,7 @@ func TestBatchKeepsGoingPastAFailureUnlessAskedToStop(t *testing.T) {
 			processtest.Serve(t, nil)
 			ctx := repoContext(t)
 			targets := []teardown.Target{makeTarget(t, ctx, "feat/a"), makeTarget(t, ctx, "feat/b"), makeTarget(t, ctx, "feat/c")}
-			lockWorktree(t, ctx, targets[1].Path)
+			gittest.JamWorktree(t, targets[1].Path)
 			var started, done int
 
 			removals := teardown.Batch(teardown.BatchParams{

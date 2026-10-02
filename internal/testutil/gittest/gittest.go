@@ -2,7 +2,9 @@
 package gittest
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -77,4 +79,14 @@ func PushBranch(t testing.TB, dir, name string) {
 func DeleteBranchInRemote(t testing.TB, remote, name string) {
 	t.Helper()
 	Git(t, remote, "branch", "-D", name)
+}
+
+// JamWorktree breaks the worktree's link back to its repository, which git
+// refuses to remove even under a double --force, leaving it registered. A lock
+// no longer does: wtm lifts it under --force.
+func JamWorktree(t testing.TB, path string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(path, ".git"), []byte("gitdir: /nonexistent\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }

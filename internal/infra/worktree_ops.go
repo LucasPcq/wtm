@@ -80,12 +80,17 @@ type RemoveWorktreeParams struct {
 	ProjectDir string
 	Path       string
 	Force      bool
+	Locked     bool
 }
 
-// RemoveWorktree removes a git worktree directory.
+// RemoveWorktree removes a git worktree directory. A forced removal of a locked
+// worktree passes `--force` twice, which is what git asks to lift the lock.
 func RemoveWorktree(params RemoveWorktreeParams) error {
 	args := []string{"worktree", "remove", params.Path}
 	if params.Force {
+		args = append(args, "--force")
+	}
+	if params.Force && params.Locked {
 		args = append(args, "--force")
 	}
 

@@ -166,7 +166,7 @@ func (f *cleanFlow) resolveDelete(answers flow.Answers) (flow.Answer, error) {
 
 // deleteOptions never offers a plain removal of an unsafe batch: git would
 // refuse some halfway, after their worktree was gone. One worktree keeps the
-// options it always had.
+// options it always had, unless it is locked: git refuses that one outright.
 func deleteOptions(checks []domain.CleanCheckResult) []flow.Option {
 	unsafe := 0
 	for _, check := range checks {
@@ -179,6 +179,9 @@ func deleteOptions(checks []domain.CleanCheckResult) []flow.Option {
 		return []flow.Option{plain}
 	}
 	force := flow.Option{Label: domain.CleanForceDeleteOption, Value: deleteForce, Danger: true}
+	if len(checks) == 1 && checks[0].IsLocked {
+		return []flow.Option{force}
+	}
 	if len(checks) == 1 {
 		return []flow.Option{plain, {Separator: true}, force}
 	}

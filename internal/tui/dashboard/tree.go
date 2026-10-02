@@ -152,6 +152,8 @@ func (m Model) treeBadgeText(badge domain.TreeBadge, node domain.TreeNode) strin
 		return domain.TreeBadgeRebasingText
 	case domain.TreeBadgeDirty:
 		return domain.TreeBadgeDirtyText
+	case domain.TreeBadgeLocked:
+		return domain.TreeBadgeLockedText
 	case domain.TreeBadgeNeedsSync:
 		return domain.TreeBadgeNeedsSyncText
 	case domain.TreeBadgeCycle:
@@ -162,7 +164,7 @@ func (m Model) treeBadgeText(badge domain.TreeBadge, node domain.TreeNode) strin
 
 func styleTreeBadge(badge domain.TreeBadge, text string) string {
 	switch badge {
-	case domain.TreeBadgeRebasing, domain.TreeBadgeDirty, domain.TreeBadgeNeedsSync, domain.TreeBadgeCycle:
+	case domain.TreeBadgeRebasing, domain.TreeBadgeDirty, domain.TreeBadgeLocked, domain.TreeBadgeNeedsSync, domain.TreeBadgeCycle:
 		return styles.DashboardTreeWarn.Render(text)
 	case domain.TreeBadgeRunning:
 		return styles.Success.Render(text)

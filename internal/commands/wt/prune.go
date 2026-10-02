@@ -36,8 +36,8 @@ func newPruneCmd() *cobra.Command {
 			"confirmation, then — like clean — a dedicated confirmation to reparent surviving\n" +
 			"children onto their nearest surviving ancestor (or leave them orphaned). The main checkout and base\n" +
 			"branch are always protected; the current worktree is removed and the shell\n" +
-			"redirected to the base repo. Like clean, worktrees that are dirty, have unpushed\n" +
-			"commits, or have an open PR are unsafe and need --force. Use --yes to skip the\n" +
+			"redirected to the base repo. Like clean, worktrees that are locked, dirty, have\n" +
+			"unpushed commits, or have an open PR are unsafe and need --force. Use --yes to skip the\n" +
 			"prompts (required with --output json); non-interactively, children are left orphaned\n" +
 			"unless --reparent-children is passed. --dry-run previews without changing anything.\n" +
 			"\n" +
@@ -66,7 +66,7 @@ func newPruneCmd() *cobra.Command {
 	cmd.Flags().Bool(domain.FlagClosed, false, "Restrict to worktrees whose PR was closed without merging (needs gh)")
 	cmd.Flags().Bool(domain.FlagGone, false, "Restrict to worktrees whose upstream branch was deleted on the remote")
 	cmd.Flags().Bool(domain.FlagNoFetch, false, "Skip the git fetch --prune that gone-detection performs; use already-fetched state")
-	cmd.Flags().Bool(domain.FlagForce, false, "Lift safety refusals (dirty/unpushed/open-PR): also remove unsafe worktrees; still asks to confirm unless --yes")
+	cmd.Flags().Bool(domain.FlagForce, false, "Lift safety refusals (locked/dirty/unpushed/open-PR): also remove unsafe worktrees; still asks to confirm unless --yes")
 	cmd.Flags().Bool(domain.FlagReparentChildren, false, domain.FlagReparentChildrenDesc)
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; keep every match without the selection picker (use --force for unsafe worktrees)")
 	cmd.Flags().Bool(domain.FlagDryRun, false, "Preview what would be pruned without removing anything")

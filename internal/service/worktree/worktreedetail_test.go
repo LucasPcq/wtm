@@ -55,7 +55,7 @@ func TestDetailBlockersFromMemoryNotFromGH(t *testing.T) {
 
 	got := Detail(DetailParams{
 		ProjectDir: dir,
-		Status:     domain.WorktreeStatus{Branch: "feat/x", Path: dir, IsDirty: true},
+		Status:     domain.WorktreeStatus{Branch: "feat/x", Path: dir, IsDirty: true, IsLocked: true},
 		PRs:        []domain.PRInfo{{Branch: "feat/x", Number: 7, URL: "https://example/7"}},
 		Commits:    domain.DashboardDetailCommits,
 	})
@@ -69,6 +69,9 @@ func TestDetailBlockersFromMemoryNotFromGH(t *testing.T) {
 	}
 	if !keys[domain.CleanBlockerOpenPR] {
 		t.Error("la PR passée en entrée doit produire un blocker open-PR, sans appeler gh")
+	}
+	if !keys[domain.CleanBlockerLocked] {
+		t.Error("le worktree verrouillé doit produire un blocker locked")
 	}
 }
 

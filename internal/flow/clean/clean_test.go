@@ -47,6 +47,15 @@ func TestDeleteRecapCarriesTheReparentDecision(t *testing.T) {
 	}
 }
 
+// git refuses a locked worktree without a double --force, so a plain removal
+// could only fail on it, and hand the reader git's raw error.
+func TestDeleteOptionsOfALockedWorktreeOfferOnlyTheForce(t *testing.T) {
+	options := deleteOptions([]domain.CleanCheckResult{{Branch: "b", WorktreePath: "/b", IsLocked: true}})
+	if hasOption(options, deleteYes) || !hasOption(options, deleteForce) {
+		t.Errorf("options = %+v, want the force row and no plain removal", options)
+	}
+}
+
 func TestDeleteOptionsOfferForceOnlyWhenUnsafe(t *testing.T) {
 	safe := deleteOptions([]domain.CleanCheckResult{domain.CleanCheckResult{Branch: "b", WorktreePath: "/b"}})
 	if len(safe) != 1 || safe[0].Value != deleteYes {

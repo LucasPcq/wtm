@@ -6,6 +6,7 @@ package domain
 type TreeNodeStatus struct {
 	CommitsAhead int  `json:"commits_ahead"`
 	IsDirty      bool `json:"is_dirty"`
+	IsLocked     bool `json:"is_locked"`
 	// RebaseInProgress is true when the worktree has a rebase paused mid-way (e.g.
 	// left by `wtm sync --keep-conflict`) — resolve it with git rebase --continue/--abort.
 	RebaseInProgress bool `json:"rebase_in_progress"`
@@ -70,6 +71,7 @@ const (
 	TreeBadgeOrigin
 	TreeBadgeRebasing
 	TreeBadgeDirty
+	TreeBadgeLocked
 	TreeBadgeNeedsSync
 	TreeBadgeCycle
 )

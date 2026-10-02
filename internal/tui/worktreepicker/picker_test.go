@@ -116,3 +116,21 @@ func hasActiveBadge(badges []components.Badge) bool {
 	}
 	return false
 }
+
+func TestBuildTagsMarksALockedWorktree(t *testing.T) {
+	locked := BuildTags(BuildTagsParams{Status: domain.WorktreeStatus{Branch: "feat/a", IsLocked: true}})
+	found := false
+	for _, tag := range locked {
+		if tag.Text == domain.WorktreeLockedTag && tag.Variant == components.BadgeWarning {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("tags = %+v, want a warning tag naming the lock", locked)
+	}
+	for _, tag := range BuildTags(BuildTagsParams{Status: domain.WorktreeStatus{Branch: "feat/b"}}) {
+		if tag.Text == domain.WorktreeLockedTag {
+			t.Error("an unlocked worktree must not carry the lock tag")
+		}
+	}
+}

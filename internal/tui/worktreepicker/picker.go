@@ -208,6 +208,9 @@ func BuildTags(params BuildTagsParams) []components.Badge {
 	if s.IsParent {
 		tags = append(tags, components.Badge{Text: "parent", Variant: components.BadgeAccent})
 	}
+	if s.IsLocked {
+		tags = append(tags, components.Badge{Text: domain.WorktreeLockedTag, Variant: components.BadgeWarning})
+	}
 	for _, pr := range params.PRs {
 		if pr.Branch == s.Branch {
 			tags = append(tags, components.Badge{Text: fmt.Sprintf("PR #%d", pr.Number), Variant: components.BadgeSuccess})

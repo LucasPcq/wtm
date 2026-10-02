@@ -56,6 +56,7 @@ func BuildTree(params BuildTreeParams) (domain.Forest, error) {
 			Status: domain.TreeNodeStatus{
 				CommitsAhead:     st.CommitsAhead,
 				IsDirty:          st.IsDirty,
+				IsLocked:         st.IsLocked,
 				RebaseInProgress: st.RebaseInProgress,
 				NeedsSync:        needsSync[n.Branch],
 				OriginAhead:      st.OriginAhead,

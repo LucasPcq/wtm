@@ -21,8 +21,8 @@ On a TTY, matches are shown for review (unsafe ones unchecked), then a prune
 confirmation, then — like clean — a dedicated confirmation to reparent surviving
 children onto their nearest surviving ancestor (or leave them orphaned). The main checkout and base
 branch are always protected; the current worktree is removed and the shell
-redirected to the base repo. Like clean, worktrees that are dirty, have unpushed
-commits, or have an open PR are unsafe and need --force. Use --yes to skip the
+redirected to the base repo. Like clean, worktrees that are locked, dirty, have
+unpushed commits, or have an open PR are unsafe and need --force. Use --yes to skip the
 prompts (required with --output json); non-interactively, children are left orphaned
 unless --reparent-children is passed. --dry-run previews without changing anything.
 
@@ -59,7 +59,7 @@ wtm prune [flags]
       --closed              Restrict to worktrees whose PR was closed without merging (needs gh)
       --drop-data           Drop the removed worktrees' data now, starting the shared services that are down to do it
       --dry-run             Preview what would be pruned without removing anything
-      --force               Lift safety refusals (dirty/unpushed/open-PR): also remove unsafe worktrees; still asks to confirm unless --yes
+      --force               Lift safety refusals (locked/dirty/unpushed/open-PR): also remove unsafe worktrees; still asks to confirm unless --yes
       --gone                Restrict to worktrees whose upstream branch was deleted on the remote
   -h, --help                help for prune
       --keep-data           Keep the namespaces the removed worktrees carved out of shared services

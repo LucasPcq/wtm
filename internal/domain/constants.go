@@ -1403,10 +1403,11 @@ const (
 
 	// Prune skip reasons — why a matching worktree was not removed. The current
 	// worktree is not among them: prune removes it (like clean) and redirects the
-	// shell to the base repo afterwards. Dirty/Unpushed/OpenPR mirror clean's
+	// shell to the base repo afterwards. Locked/Dirty/Unpushed/OpenPR mirror clean's
 	// unsafe-to-remove checks: they skip unless --force is passed.
 	PruneSkipBase     = "base_branch"
 	PruneSkipMain     = "main_worktree"
+	PruneSkipLocked   = "locked"
 	PruneSkipDirty    = "dirty"
 	PruneSkipUnpushed = "unpushed"
 	PruneSkipOpenPR   = "open_pr"
@@ -1693,6 +1694,7 @@ const (
 	// both `wtm list`'s text output and its interactive picker — one wording,
 	// reused rather than restated.
 	WorktreeActiveTag = "● active"
+	WorktreeLockedTag = "locked"
 
 	// SummaryNone stands in for a set answer the user left empty, in a wizard
 	// breadcrumb that must still show the step was reached.
@@ -1704,6 +1706,7 @@ const (
 	TreeBadgeRunningFmt    = "▶ %d running"
 	TreeBadgeRebasingText  = "⚠ rebasing"
 	TreeBadgeDirtyText     = "⚠ dirty"
+	TreeBadgeLockedText    = GlyphAttention + " locked"
 	TreeBadgeNeedsSyncText = "⚠ needs sync"
 	TreeBadgeCycleText     = "⚠ cycle"
 
@@ -3197,6 +3200,7 @@ const (
 	CleanDeleteTitle        = "Proceed with deletion?"
 	CleanDeleteOption       = "Yes, delete"
 	CleanForceDeleteOption  = "Yes, force delete (bypass all checks)"
+	CleanWarnLocked         = "Worktree is locked (git worktree lock)"
 	CleanWarnDirty          = "Worktree has uncommitted changes"
 	CleanWarnUnpushedFmt    = "%d commit(s) not pushed to remote"
 	CleanWarnOpenPR         = "Open PR: "
@@ -3208,12 +3212,14 @@ const (
 	// reader they were removing a worktree and nothing else.
 	CleanWillDeleteNamespaceFmt = "  data      %s, dropped from %s"
 	CleanKeepDataLine           = "  data      kept (--keep-data)"
-	// CleanBlockerDirty, CleanBlockerUnpushed and CleanBlockerOpenPR key the
-	// removal refusals a surface lists one by one (rules.CleanBlockers).
+	// The CleanBlocker* key the removal refusals a surface lists one by one
+	// (rules.CleanBlockers).
+	CleanBlockerLocked   = "locked"
 	CleanBlockerDirty    = "dirty"
 	CleanBlockerUnpushed = "unpushed"
 	CleanBlockerOpenPR   = "open_pr"
 
+	CleanUnsafeLocked        = "is locked"
 	CleanUnsafeDirty         = "has uncommitted changes"
 	CleanUnsafeUnpushedFmt   = "has %d unpushed commit(s)"
 	CleanUnsafeOpenPR        = "has an open pull request"
@@ -3263,6 +3269,7 @@ const (
 	PruneLabelGone      = "remote branch gone"
 	PruneLabelBase      = "base branch"
 	PruneLabelMain      = "main checkout"
+	PruneLabelLocked    = "locked — pass --force"
 	PruneLabelDirty     = "dirty — pass --force"
 	PruneLabelUnpushed  = "unpushed commits — pass --force"
 	PruneLabelOpenPR    = "open PR — pass --force"
@@ -3288,6 +3295,7 @@ const (
 	PruneTagMerged   = "merged"
 	PruneTagClosed   = "closed"
 	PruneTagGone     = "gone"
+	PruneTagLocked   = "locked"
 	PruneTagDirty    = "dirty"
 	PruneTagUnpushed = "unpushed"
 	PruneTagOpenPR   = "open PR"

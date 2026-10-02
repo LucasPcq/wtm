@@ -96,7 +96,7 @@ func TestPrintableLen(t *testing.T) {
 }
 
 func TestFormatTagParentOnly(t *testing.T) {
-	got := formatTag(true, false)
+	got := formatTag(domain.WorktreeStatus{IsParent: true}, false)
 	if !strings.Contains(got, "(parent)") {
 		t.Error("expected output to contain '(parent)'")
 	}
@@ -106,7 +106,7 @@ func TestFormatTagParentOnly(t *testing.T) {
 }
 
 func TestFormatTagActiveOnly(t *testing.T) {
-	got := formatTag(false, true)
+	got := formatTag(domain.WorktreeStatus{}, true)
 	if !strings.Contains(got, "active") {
 		t.Error("expected output to contain 'active'")
 	}
@@ -116,7 +116,7 @@ func TestFormatTagActiveOnly(t *testing.T) {
 }
 
 func TestFormatTagBoth(t *testing.T) {
-	got := formatTag(true, true)
+	got := formatTag(domain.WorktreeStatus{IsParent: true}, true)
 	if !strings.Contains(got, "(parent)") {
 		t.Error("expected output to contain '(parent)'")
 	}
@@ -126,9 +126,26 @@ func TestFormatTagBoth(t *testing.T) {
 }
 
 func TestFormatTagNeither(t *testing.T) {
-	got := formatTag(false, false)
+	got := formatTag(domain.WorktreeStatus{}, false)
 	if got != "" {
 		t.Errorf("expected empty string, got %q", got)
+	}
+}
+
+func TestFormatTagMarksALockedWorktree(t *testing.T) {
+	got := formatTag(domain.WorktreeStatus{IsLocked: true}, true)
+	if !strings.Contains(got, domain.TreeBadgeLockedText) || !strings.Contains(got, "active") {
+		t.Errorf("formatTag = %q, want the lock beside the active tag", got)
+	}
+}
+
+func TestWriteWorktreeListJSONCarriesTheLock(t *testing.T) {
+	var buf bytes.Buffer
+	if err := WriteWorktreeListJSON(&buf, WriteWorktreeListJSONParams{Statuses: []domain.WorktreeStatus{{Branch: "feat", IsLocked: true}}}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), `"is_locked": true`) {
+		t.Errorf("list JSON = %s, want is_locked", buf.String())
 	}
 }
 

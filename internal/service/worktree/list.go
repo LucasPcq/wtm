@@ -91,6 +91,7 @@ func buildStatus(params buildStatusParams) domain.WorktreeStatus {
 		Path:             gitWorktree.Path,
 		IsParent:         gitWorktree.IsMain,
 		IsDirty:          dirty,
+		IsLocked:         gitWorktree.Locked,
 		RebaseInProgress: gitWorktree.RebaseInProgress,
 		CommitsAhead:     ahead,
 		CreatedAt:        worktreeCreatedAt(params.StateDir, gitWorktree.Branch, gitWorktree.Path),

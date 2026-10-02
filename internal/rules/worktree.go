@@ -132,6 +132,12 @@ func CleanBlockers(result domain.CleanCheckResult) []domain.CleanBlocker {
 		return nil
 	}
 	var blockers []domain.CleanBlocker
+	if result.IsLocked {
+		blockers = append(blockers, domain.CleanBlocker{
+			Key:   domain.CleanBlockerLocked,
+			Label: domain.CleanWarnLocked,
+		})
+	}
 	if result.IsDirty {
 		blockers = append(blockers, domain.CleanBlocker{
 			Key:   domain.CleanBlockerDirty,
@@ -172,9 +178,13 @@ func FilterStatusesByMatches(statuses []domain.WorktreeStatus, matches []domain.
 	return out
 }
 
-// CleanUnsafeReason words the refusal, in the order a user acts on: uncommitted
-// work, then unpushed commits, then an open pull request.
+// CleanUnsafeReason words the refusal, in the order a user acts on: a lock
+// someone set on purpose, then uncommitted work, then unpushed commits, then an
+// open pull request.
 func CleanUnsafeReason(check domain.CleanCheckResult) (string, bool) {
+	if check.IsLocked {
+		return domain.CleanUnsafeLocked, true
+	}
 	if check.IsDirty {
 		return domain.CleanUnsafeDirty, true
 	}
@@ -227,6 +237,8 @@ func CleanUnsafeRefusal(checks []domain.CleanCheckResult) (string, bool) {
 
 func CleanSkipReason(check domain.CleanCheckResult) string {
 	switch {
+	case check.IsLocked:
+		return domain.PruneSkipLocked
 	case check.IsDirty:
 		return domain.PruneSkipDirty
 	case check.UnpushedCommits > 0:

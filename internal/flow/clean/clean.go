@@ -16,7 +16,7 @@ import (
 
 type Request struct {
 	Branches []string
-	// Force is the safety axis: it lifts the dirty/unpushed/open-PR refusals.
+	// Force is the safety axis: it lifts the locked/dirty/unpushed/open-PR refusals.
 	Force            bool
 	ReparentChildren bool
 	BaseBranch       string

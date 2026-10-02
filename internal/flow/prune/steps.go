@@ -98,6 +98,8 @@ func (f *pruneFlow) candidateBranches() []string {
 
 func candidateTag(candidate domain.PruneCandidate) (string, domain.Tone) {
 	switch candidate.UnsafeReason {
+	case domain.PruneSkipLocked:
+		return domain.PruneTagLocked, domain.ToneDanger
 	case domain.PruneSkipDirty:
 		return domain.PruneTagDirty, domain.ToneDanger
 	case domain.PruneSkipUnpushed:
