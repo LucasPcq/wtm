@@ -27,6 +27,7 @@ func newWatchFixture(t *testing.T) watchFixture {
 	t.Helper()
 	dir := gittest.InitRepo(t)
 	gittest.Git(t, dir, "worktree", "add", "-b", "feat/a", filepath.Join(t.TempDir(), "feat-a"))
+	processtest.Home(t)
 	socket := socktest.Path(t)
 	stop := processtest.RealDaemon(t, socket)
 	return watchFixture{projectDir: dir, stateDir: filepath.Join(dir, ".git", "wtm"), socket: socket, stop: stop}

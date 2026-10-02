@@ -2,6 +2,7 @@ package worktree
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -99,4 +100,26 @@ func TestARepoIsKeyedByItsCommonDir(t *testing.T) {
 		t.Fatalf("root = %s, want %s", got.Root, repo.dir)
 	}
 	assertSamePath(t, got.CommonDir, filepath.Join(repo.dir, ".git"))
+}
+
+// A repository reached through a symlink is still one repository: the key every
+// event carries must not depend on how the path was spelled.
+func TestARepoHasOneKeyWhateverPathReachesIt(t *testing.T) {
+	repo := newOrdinalRepo(t)
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(repo.dir, link); err != nil {
+		t.Fatal(err)
+	}
+
+	direct, err := RepoOf(RepoOfParams{ProjectDir: repo.dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	linked, err := RepoOf(RepoOfParams{ProjectDir: link})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if direct.CommonDir != linked.CommonDir {
+		t.Fatalf("common dir %q through the link, %q directly", linked.CommonDir, direct.CommonDir)
+	}
 }

@@ -1,8 +1,6 @@
 package processtest
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -11,18 +9,11 @@ import (
 
 // RealDaemon runs the actual daemon in this process on socket, for a test about
 // what the daemon itself does — the event broker — rather than about which
-// jobs it reports. Its state lives under a HOME of its own. Stop ends it the way
-// `run daemon stop` would, and the test's cleanup does if nothing else did.
+// jobs it reports. Call Home first: the daemon keeps its index under HOME. Stop
+// ends it the way `run daemon stop` would, and the test's cleanup does if
+// nothing else did.
 func RealDaemon(t *testing.T, socket string) (stop func()) {
 	t.Helper()
-	home, err := os.MkdirTemp("/tmp", "wtmh")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { os.RemoveAll(home) })
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
-
 	exited := make(chan error, 1)
 	go func() { exited <- process.RunDaemon(process.DaemonParams{SocketPath: socket}) }()
 	deadline := time.Now().Add(2 * time.Second)

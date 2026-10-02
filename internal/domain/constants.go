@@ -4588,3 +4588,23 @@ const (
 	EventsReconnectMin    = 200 * time.Millisecond
 	EventsReconnectMax    = 5 * time.Second
 )
+
+// One human line per `wtm events` event; --output json is the contract, these
+// are for a person watching.
+const (
+	EventSnapshotFmt   = "%d worktrees · %s"
+	EventReadyMessage  = "watching for changes"
+	EventCreatedFmt    = "created %s  %s"
+	EventRemovedFmt    = "removed %s"
+	EventRelocatedFmt  = "relocated %s  %s " + MoveArrowGlyph + " %s"
+	EventReparentedFmt = "reparented %s  %s " + MoveArrowGlyph + " %s"
+	EventUpdatedFmt    = "updated %s  %s"
+	EventFieldFmt      = "%s=%s"
+	EventFieldSep      = ", "
+	EventOrdinalNone   = "none"
+)
+
+const (
+	// EventsRepoNotADirFmt names the flag: --repo is a path the user typed.
+	EventsRepoNotADirFmt = "--%s %q is not a directory: %w"
+)

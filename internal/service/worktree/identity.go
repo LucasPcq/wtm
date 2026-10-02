@@ -2,6 +2,7 @@ package worktree
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
@@ -87,10 +88,16 @@ type RepoOfParams struct {
 
 // RepoOf names a repository the way every event does: by its main checkout, and
 // by its git common dir, which is the key — the same from any of its worktrees.
+// The key is resolved through symlinks: git spells a relative common dir from
+// the path it was given, and a publisher and a subscriber reaching the repo by
+// two spellings (macOS's /var and /private/var) would never meet.
 func RepoOf(params RepoOfParams) (domain.EventRepo, error) {
 	commonDir, err := infra.GitCommonDir(infra.GitCommonDirParams{Dir: params.ProjectDir})
 	if err != nil {
 		return domain.EventRepo{}, err
+	}
+	if resolved, err := filepath.EvalSymlinks(commonDir); err == nil {
+		commonDir = resolved
 	}
 	return domain.EventRepo{Root: params.ProjectDir, CommonDir: commonDir}, nil
 }
