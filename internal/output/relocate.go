@@ -73,6 +73,21 @@ func FormatRelocatePlan(w io.Writer, plan domain.RelocatePlan) {
 	}
 }
 
+type RelocatePreviewParams struct {
+	Plan         domain.RelocatePlan
+	FromBasePath string
+}
+
+// FormatRelocatePreview is a dry run's body: the plan, or the base_path rewrite
+// alone when no worktree has to move.
+func FormatRelocatePreview(w io.Writer, params RelocatePreviewParams) {
+	if rules.PlanHasWork(params.Plan) {
+		FormatRelocatePlan(w, params.Plan)
+		return
+	}
+	Message(w, fmt.Sprintf(domain.RelocateBasePathOnlyFmt, params.FromBasePath, params.Plan.BasePath))
+}
+
 // newSectionWriter returns a function that renders a section, inserting a blank
 // line before every section except the first. No blank trails the last section.
 func newSectionWriter(w io.Writer) func(render func()) {

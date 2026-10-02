@@ -12,6 +12,7 @@ import (
 	execflow "github.com/LucasPcq/wtm/internal/flow/exec"
 	ffflow "github.com/LucasPcq/wtm/internal/flow/fastforward"
 	pruneflow "github.com/LucasPcq/wtm/internal/flow/prune"
+	relocateflow "github.com/LucasPcq/wtm/internal/flow/relocate"
 	reparentflow "github.com/LucasPcq/wtm/internal/flow/reparent"
 	syncflow "github.com/LucasPcq/wtm/internal/flow/sync"
 	"github.com/LucasPcq/wtm/internal/output"
@@ -353,4 +354,41 @@ func withoutTails(results []domain.ExecResult) []domain.ExecResult {
 		stripped[i] = result
 	}
 	return stripped
+}
+
+type relocatePresenter struct {
+	shared.CLIPresenter
+}
+
+// Relocated renders the three shapes a relocate run concludes in: nothing to
+// change, a dry-run preview, or a result.
+func (p relocatePresenter) Relocated(outcome relocateflow.Outcome) error {
+	if outcome.Empty {
+		if !p.Human {
+			return output.WriteRelocateResultJSON(p.Cmd.OutOrStdout(), domain.RelocateResult{})
+		}
+		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			output.Message(w, domain.RelocateAlignedMessage)
+		})
+		return nil
+	}
+
+	if !p.Human {
+		return output.WriteRelocateResultJSON(p.Cmd.OutOrStdout(), outcome.Result)
+	}
+
+	// A preview is what the caller asked for, so it goes to stdout as a result.
+	if outcome.DryRun {
+		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			output.FormatRelocatePreview(w, output.RelocatePreviewParams{Plan: outcome.Plan, FromBasePath: outcome.FromBasePath})
+			output.Blank(w)
+			output.Unchanged(w, domain.DryRunNoChanges)
+		})
+		return nil
+	}
+
+	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		output.FormatRelocateResult(w, outcome.Result)
+	})
+	return nil
 }

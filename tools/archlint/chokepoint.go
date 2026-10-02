@@ -25,7 +25,6 @@ var mutators = []mutator{
 	{pkg: "service/worktree", name: "Clean", event: ""},
 	{pkg: "service/worktree", name: "ForceClean", event: ""},
 	{pkg: "service/worktree", name: "FinishRemoval", event: ""},
-	{pkg: "service/worktree", name: "Relocate", event: ""},
 	{pkg: "service/worktree", name: "Move", event: ""},
 	{pkg: "service/worktree", name: "Adopt", event: ""},
 	{pkg: "service/worktree", name: "SetBasePath", event: ""},
