@@ -25,73 +25,6 @@ import (
 	"unicode"
 )
 
-const modulePath = "github.com/LucasPcq/wtm/"
-
-// layers is CLAUDE.md's dependency table, written once. A layer may import the
-// internal packages listed and the external ones listed, plus the stdlib and
-// itself. Anything else is a finding — so a new dependency is a deliberate edit
-// here rather than something that lands unnoticed.
-var layers = map[string]layer{
-	"domain": {
-		why: "types, errors and constants only",
-	},
-	"rules": {
-		internal: []string{"domain"},
-		why:      "pure functions over the domain: stdlib and internal/domain only, no I/O",
-	},
-	"infra": {
-		internal: []string{"domain", "rules"},
-		why:      "I/O, git exec, filesystem wrappers",
-	},
-	"config": {
-		internal: []string{"domain", "infra", "rules", "schemas"},
-		external: []string{"github.com/BurntSushi/toml"},
-		why:      "load and validate the config files",
-	},
-	"service": {
-		internal: []string{"config", "domain", "infra", "rules"},
-		external: []string{"github.com/creack/pty", "go.yaml.in/yaml/v3"},
-		why:      "impure orchestration: no cobra, no bubbletea, no lipgloss",
-	},
-	"flow": {
-		internal: []string{"domain", "rules", "service"},
-		why:      "the run of a command, surface-independent: never cobra, bubbletea, lipgloss, output/, tui/, config/ or commands/ — and therefore never infra/, which needs a service/ wrapper instead",
-	},
-	"output": {
-		internal: []string{"domain", "flow", "rules", "styles"},
-		external: []string{"golang.org/x/term"},
-		why:      "formats and prints, zero decision logic",
-	},
-	"styles": {
-		internal: []string{"domain"},
-		external: []string{"github.com/charmbracelet/lipgloss", "github.com/charmbracelet/x/ansi", "github.com/muesli/termenv"},
-		why:      "the only package that instantiates a lipgloss.Style",
-	},
-	"tui": {
-		internal: []string{"domain", "flow", "rules", "service", "styles"},
-		external: []string{"github.com/charmbracelet/", "github.com/lrstanley/bubblezone", "golang.org/x/term"},
-		why:      "bubbletea models, rendering only",
-	},
-	"commands": {
-		internal: []string{"config", "domain", "flow", "infra", "output", "rules", "schemas", "service", "styles", "tui"},
-		external: []string{"github.com/charmbracelet/bubbletea", "github.com/spf13/cobra", "golang.org/x/term"},
-		why:      "flag wiring, delegating to flow/ and service/",
-	},
-	"schemas": {
-		why: "the embedded JSON Schema files",
-	},
-	"testutil": {
-		internal: []string{"domain", "flow"},
-		why:      "test doubles for the flow seams",
-	},
-}
-
-type layer struct {
-	internal []string
-	external []string
-	why      string
-}
-
 type finding struct {
 	pos  token.Position
 	rule string
@@ -739,34 +672,6 @@ func renderCalls(file *ast.File) map[string]bool {
 		return true
 	})
 	return seen
-}
-
-func allowed(own string, spec layer, target string) bool {
-	if !strings.Contains(strings.Split(target, "/")[0], ".") {
-		return true // stdlib
-	}
-	if strings.HasPrefix(target, modulePath+"internal/") {
-		other := strings.Split(strings.TrimPrefix(target, modulePath+"internal/"), "/")[0]
-		if other == own {
-			return true
-		}
-		return contains(spec.internal, other)
-	}
-	for _, prefix := range spec.external {
-		if strings.HasPrefix(target, prefix) {
-			return true
-		}
-	}
-	return false
-}
-
-func contains(list []string, value string) bool {
-	for _, item := range list {
-		if item == value {
-			return true
-		}
-	}
-	return false
 }
 
 func layerOf(path string) string {
