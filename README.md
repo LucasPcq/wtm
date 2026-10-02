@@ -125,6 +125,7 @@ Every command documents itself: `wtm <command> --help`, or the generated [refere
 | [`prune`](docs/wtm_prune.md) | Remove finished worktrees (merged / closed PR / gone) in one pass (merged/closed need `gh`) |
 | [`extract`](docs/wtm_extract.md) | Move uncommitted changes to another worktree (split an oversized PR) |
 | [`env`](docs/wtm_env.md) | Detect and fix a worktree's `.env` drift against its template + value source |
+| [`exec`](docs/wtm_exec.md) | Run one command in several worktrees, in parallel, each with its own environment |
 | [`relocate`](docs/wtm_relocate.md) | Move worktrees to align with `base_path` and adopt external ones |
 | [`ui`](docs/wtm_ui.md) | Open the full-screen worktree dashboard: browse state and PRs, create and delete worktrees |
 

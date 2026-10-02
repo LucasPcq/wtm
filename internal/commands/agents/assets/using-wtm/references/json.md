@@ -10,6 +10,7 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 - [`env_ports` and the `ports` block](#env_ports-and-the-ports-block)
 - [`env`](#env)
 - [`clean`, `prune`](#clean-prune)
+- [`exec`](#exec)
 - [`relocate`](#relocate)
 - [Stacks: `sync`, `fast-forward`, `reparent`](#stacks-sync-fast-forward-reparent)
 - [The run module](#the-run-module)
@@ -91,6 +92,14 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
   - `dropped`;
   - `deferred`: service down, a drop it refused, or a drop past its 30 s timeout; owed and paid next time wtm finds the service up (`reason` says which);
   - `kept`: `--keep-data`, or another live worktree reduces to the same name (`feat.x` beside `feat/x`), so the namespace is its too; never dropped.
+
+## `exec`
+
+- `{command, results: [{branch, path, status, exit_code?, duration_ms?, log?, tail?, output?, error?}], failed: [branch]}`, an envelope even for one worktree.
+- `status`: `passed` / `failed` / `interrupted` / `not_started`. `exit_code`, `duration_ms` and `log` are absent for `not_started`; `exit_code` is absent for `interrupted`.
+- `error`: the command could not start (e.g. the worktree directory is gone).
+- `tail`: the last 20 lines of the combined stdout and stderr, as a terminal would show them (progress frames rewritten by `\r` collapsed, colours removed; the log keeps the raw bytes). With `--print`, `output` carries the whole output instead.
+- `failed`: every branch whose status is not `passed`, `[]` when all passed.
 
 ## `relocate`
 

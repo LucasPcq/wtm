@@ -2167,6 +2167,7 @@ const (
 	CmdEdit         = "edit"
 	CmdExtract      = "extract"
 	CmdSync         = "sync"
+	CmdExec         = "exec"
 	CmdRelocate     = "relocate"
 	CmdReparent     = "reparent"
 	CmdTree         = "tree"
@@ -4333,4 +4334,64 @@ const (
 	UpgradeJSONNeedsYes   = "--output json requires --yes or --check (the confirmation prompt cannot run in JSON mode)"
 	UpgradeSourceHint     = "this binary was built from source — run `git pull && make install` instead"
 	UpgradePinUnsupported = "--version only applies to a standalone binary; pin the version through your package manager instead"
+)
+
+// wtm exec: one shell line across several worktrees.
+const (
+	FlagPrint = "print"
+
+	ExecLogDirName          = "exec"
+	ExecLogFileExt          = ".log"
+	ExecJSONTailLines       = 20
+	ExecConclusionTailLines = 10
+	// ExecPartialLineCap bounds a line that never ends (binary output, a
+	// progress bar without \r) so the tail cannot grow without limit.
+	ExecPartialLineCap = 4096
+	ExecInterruptGrace = 5 * time.Second
+	// ExecPipeGrace bounds the wait for a process that exited while something it
+	// started (a backgrounded job, a daemon) still holds its output pipe.
+	ExecPipeGrace = time.Second
+
+	ExecWizardErrLabel       = "exec"
+	ExecSelectionLabel       = "Worktrees"
+	ExecSelectionTitle       = "Run in which worktrees?"
+	ExecSelectAtLeastOne     = "select at least one worktree"
+	ExecSelectionRequiredFmt = "no worktree selected: pass worktree names or --%s (a run with --%s or --%s %s cannot open the picker)"
+	ExecConfirmLabel         = "Confirm & run"
+	ExecConfirmTitle         = "Run this command?"
+	ExecConfirmOptionFmt     = "Yes, run in %s"
+	ExecCommandLabel         = "Command"
+	ExecCommandRequired      = "type the command to run"
+	ExecCommandTitle         = "Command to run"
+	ExecCommandDescription   = "A /bin/sh line, run from each worktree's root"
+	ExecConfirmValue         = "run"
+	ExecRecapWorktrees       = "Worktrees:   "
+	ExecRecapCommand         = "Command:     "
+	ExecRecapJobs            = "Concurrency: "
+	ExecNeedsTerminal        = "wtm exec needs a terminal to pick worktrees: pass worktree names or --all"
+
+	ExecQueuedLabel      = "queued"
+	ExecRunningLabel     = "running"
+	ExecInterruptedLabel = "interrupted"
+	ExecNotStartedLabel  = "not started"
+	ExecExitFmt          = "exit %d"
+	ExecPassedLabelFmt   = "%s (%s)"
+	ExecFailedLabelFmt   = "%s (%s, %s)"
+	ExecStateLabelFmt    = "%s  %s"
+	ExecAllPassedFmt     = "%s · %s (%s)"
+	ExecNotAllPassedFmt  = "%s · %s: %s"
+	ExecOneWorktree      = "1 worktree"
+	ExecWorktreesFmt     = "%d worktrees"
+	ExecFailedCountFmt   = "%d failed"
+	ExecInterruptedFmt   = "%d interrupted"
+	ExecNotStartedFmt    = "%d not started"
+	ExecCountSeparator   = ", "
+	ExecPassedCountFmt   = "%d passed"
+	ExecLogLabel         = "log"
+	ExecViewSummaryFmt   = "%d done · %d running · %d queued"
+	// ExecViewMargin keeps the prompt line and the one under the cursor free.
+	ExecViewMargin = 2
+
+	AnsiEscByte = 0x1b
+	AnsiBelByte = 0x07
 )

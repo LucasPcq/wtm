@@ -45,6 +45,10 @@ var (
 	// exits non-zero without printing a second, redundant error line.
 	ErrAborted = errors.New("aborted")
 
+	ErrExecNoCommand       = errors.New("no command: put it after --, e.g. wtm exec --all -- pnpm test")
+	ErrExecUnknownWorktree = errors.New("no worktree with that branch")
+	ErrExecAllWithNames    = errors.New("--all cannot be combined with worktree names")
+
 	// ErrNotGitRepo is returned when the current directory is not a git repository.
 	ErrNotGitRepo = errors.New("not a git repository")
 
