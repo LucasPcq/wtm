@@ -9,6 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow"
 	cleanflow "github.com/LucasPcq/wtm/internal/flow/clean"
 	createflow "github.com/LucasPcq/wtm/internal/flow/create"
+	execflow "github.com/LucasPcq/wtm/internal/flow/exec"
 	ffflow "github.com/LucasPcq/wtm/internal/flow/fastforward"
 	pruneflow "github.com/LucasPcq/wtm/internal/flow/prune"
 	reparentflow "github.com/LucasPcq/wtm/internal/flow/reparent"
@@ -297,4 +298,59 @@ func (p ffPresenter) FastForwarded(outcome ffflow.Outcome) error {
 		output.FormatFastForwardResults(w, outcome.Results)
 	})
 	return nil
+}
+
+type execPresenter struct {
+	shared.CLIPresenter
+	print bool
+	view  *output.ExecView
+}
+
+// Progress draws the live region on a terminal this process may repaint; a
+// pipe or a CI log gets one line per finished worktree instead.
+func (p *execPresenter) Progress(progress execflow.ExecProgress) {
+	if !p.Human {
+		return
+	}
+	stderr := p.Cmd.ErrOrStderr()
+	if !output.IsTerminal(stderr) {
+		if !progress.Beat.Started {
+			output.ExecResultLine(stderr, progress.Beat.Result)
+		}
+		return
+	}
+	if p.view == nil {
+		p.view = output.NewExecView(output.ExecViewParams{W: stderr, Branches: progress.Branches})
+	}
+	p.view.OnBeat(progress.Beat)
+}
+
+func (p *execPresenter) Executed(outcome execflow.Outcome) error {
+	if p.view != nil {
+		p.view.Close()
+	}
+	if p.Format == domain.OutputJSON {
+		results := outcome.Results
+		if p.print {
+			results = withoutTails(results)
+		}
+		return output.WriteExecJSON(p.Cmd.OutOrStdout(), output.ExecJSONParams{Command: outcome.Command, Results: results})
+	}
+	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		if p.print {
+			output.FormatExecPrint(w, outcome.Results)
+			output.Blank(w)
+		}
+		output.FormatExecConclusion(w, output.ExecConclusionParams{Command: outcome.Command, Results: outcome.Results, Elapsed: outcome.Elapsed})
+	})
+	return nil
+}
+
+func withoutTails(results []domain.ExecResult) []domain.ExecResult {
+	stripped := make([]domain.ExecResult, len(results))
+	for i, result := range results {
+		result.Tail = nil
+		stripped[i] = result
+	}
+	return stripped
 }
