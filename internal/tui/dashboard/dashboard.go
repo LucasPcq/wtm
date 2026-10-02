@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -467,9 +468,17 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case worktreesMsg:
 		before := m.selectedBranch()
+		childrenBefore := m.childrenOf(before)
 		next, animCmd := m.applyWorktrees(msg)
 		next = next.withBoard()
 		model, detailCmd := next.triggerDetailReload(before)
+		// The children the detail lists come from this list, not from git: a run
+		// that removed or reparented a row elsewhere changed them under it.
+		if model.selectedBranch() == before && !slices.Equal(childrenBefore, model.childrenOf(before)) {
+			var relinked tea.Cmd
+			model, relinked = model.invalidateDetail(before)
+			detailCmd = tea.Batch(detailCmd, relinked)
+		}
 		// An address is not a function of the jobs alone: the loader dials the
 		// proxy and reads the worktree's .env, so a proxy that came up late or a
 		// port that moved under a job still running is only ever caught here.

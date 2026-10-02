@@ -6,6 +6,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/flow"
 	cleanflow "github.com/LucasPcq/wtm/internal/flow/clean"
 	createflow "github.com/LucasPcq/wtm/internal/flow/create"
 	ffflow "github.com/LucasPcq/wtm/internal/flow/fastforward"
@@ -16,28 +17,37 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
+// A batch's per-item lines go on stderr with the progress; the readout that
+// names every item at the end is each command's own.
+func batchStarted(p shared.CLIPresenter, progress flow.Progress) {
+	if !p.Human {
+		return
+	}
+	output.BranchHeader(shared.OpenBlock(p.Cmd.ErrOrStderr(), true),
+		fmt.Sprintf(domain.BatchProgressFmt, progress.Branch, progress.Position, progress.Total))
+}
+
+func batchFailed(p shared.CLIPresenter, failure domain.BatchFailure) {
+	if !p.Human {
+		return
+	}
+	output.Error(shared.OpenBlock(p.Cmd.ErrOrStderr(), false),
+		fmt.Sprintf(domain.BatchFailedFmt, failure.Branch, failure.Error))
+}
+
 type createPresenter struct {
 	shared.CLIPresenter
 	config shared.ConfigResult
 }
 
-func (p createPresenter) BranchStarted(progress createflow.BranchProgress) {
-	if !p.Human {
-		return
-	}
-	output.BranchHeader(shared.OpenBlock(p.Cmd.ErrOrStderr(), true),
-		fmt.Sprintf(domain.CreateBranchProgressFmt, progress.Branch, progress.Position, progress.Total))
+func (p createPresenter) BranchStarted(progress flow.Progress) {
+	batchStarted(p.CLIPresenter, progress)
 }
 
-// The batch's readout names every created branch at the end, where the CLI reads it.
 func (p createPresenter) BranchCreated(domain.CreateResult) {}
 
-func (p createPresenter) BranchFailed(failure domain.CreateFailure) {
-	if !p.Human {
-		return
-	}
-	output.Error(shared.OpenBlock(p.Cmd.ErrOrStderr(), false),
-		fmt.Sprintf(domain.CreateBranchFailedFmt, failure.Branch, failure.Error))
+func (p createPresenter) BranchFailed(failure domain.BatchFailure) {
+	batchFailed(p.CLIPresenter, failure)
 }
 
 func (p createPresenter) Created(outcome createflow.Outcome) error {
@@ -114,40 +124,52 @@ type cleanPresenter struct {
 	shared.CLIPresenter
 }
 
+func (p cleanPresenter) WorktreeStarted(progress flow.Progress) {
+	batchStarted(p.CLIPresenter, progress)
+}
+
+func (p cleanPresenter) WorktreeCleaned(domain.CleanResult) {}
+
+func (p cleanPresenter) WorktreeFailed(failure domain.BatchFailure) {
+	batchFailed(p.CLIPresenter, failure)
+}
+
 func (p cleanPresenter) Cleaned(outcome cleanflow.Outcome) error {
-	if outcome.AlreadyAbsent {
-		if p.Format == domain.OutputJSON {
-			return output.WriteWorktreeCleanJSON(p.Cmd.OutOrStdout(), output.WriteWorktreeCleanJSONParams{
-				Branch:        outcome.Branch,
-				AlreadyAbsent: true,
-			})
-		}
-		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-			output.Unchanged(w, fmt.Sprintf(domain.CleanAlreadyAbsentFmt, outcome.Branch))
-		})
-		return nil
+	result := domain.CleanBatchResult{
+		Results:          nonNil(outcome.Results),
+		Failed:           nonNil(outcome.Failed),
+		Skipped:          nonNil(outcome.Skipped),
+		Reparented:       nonNil(outcome.Reparented),
+		OrphanedChildren: nonNil(outcome.Orphaned),
+		Namespaces:       nonNil(outcome.Namespaces),
 	}
-
 	if p.Format == domain.OutputJSON {
-		return output.WriteWorktreeCleanJSON(p.Cmd.OutOrStdout(), output.WriteWorktreeCleanJSONParams{
-			Branch:           outcome.Branch,
-			Path:             outcome.Path,
-			Reparented:       outcome.Reparented,
-			OrphanedChildren: outcome.OrphanedChildren,
-			Namespaces:       outcome.Namespaces,
-		})
+		return output.WriteCleanJSON(p.Cmd.OutOrStdout(), result)
 	}
+	switch {
+	case len(outcome.Results)+len(outcome.Failed)+len(outcome.Skipped) > 1:
+		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) { output.FormatCleanBatch(w, result) })
+	case len(outcome.Results) == 1:
+		p.single(outcome)
+	}
+	return nil
+}
 
+func (p cleanPresenter) single(outcome cleanflow.Outcome) {
+	cleaned := outcome.Results[0]
 	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-		output.Success(w, fmt.Sprintf(domain.CleanedFmt, outcome.Branch))
+		if cleaned.AlreadyAbsent {
+			output.Unchanged(w, fmt.Sprintf(domain.CleanAlreadyAbsentFmt, cleaned.Branch))
+			return
+		}
+		output.Success(w, fmt.Sprintf(domain.CleanedFmt, cleaned.Branch))
 		for _, child := range outcome.Reparented {
 			output.Success(w, fmt.Sprintf(domain.CleanReparentedFmt, child.Branch, child.NewParent))
 		}
-		for _, child := range outcome.OrphanedChildren {
+		for _, child := range outcome.Orphaned {
 			output.Warning(w, fmt.Sprintf(domain.CleanStillOrphanedFmt, child.Branch, child.OldParent))
 		}
 	})
-	return nil
 }
 
 type prunePresenter struct {

@@ -181,27 +181,6 @@ func IsTerminal(w io.Writer) bool {
 	return term.IsTerminal(int(file.Fd()))
 }
 
-// TallyPart is one count of a result summary. A zero count is dropped: a
-// conclusion counts what happened, never what did not.
-type TallyPart struct {
-	Count int
-	Label string
-}
-
-// Tally renders the counted half of a multi-item conclusion — "3 applied ·
-// 1 skipped". It is what replaces one line per success: the reader checks the
-// count, and only the exceptions are worth a line of their own.
-func Tally(parts ...TallyPart) string {
-	kept := make([]string, 0, len(parts))
-	for _, part := range parts {
-		if part.Count == 0 {
-			continue
-		}
-		kept = append(kept, fmt.Sprintf(domain.TallyPartFmt, part.Count, part.Label))
-	}
-	return strings.Join(kept, domain.TallySeparator)
-}
-
 type NextStepParams struct {
 	// Command is ready to run as printed; Note says what it does, when the
 	// command alone does not.

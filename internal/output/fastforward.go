@@ -15,11 +15,11 @@ import (
 func FormatFastForwardResults(w io.Writer, results []domain.FastForwardResult) {
 	moved, notable, failed := rules.FastForwardSplit(results)
 
-	tally := Tally(
-		TallyPart{Count: len(moved), Label: domain.TallyFastForwarded},
-		TallyPart{Count: len(results) - len(moved) - len(notable) - len(failed), Label: domain.TallyUpToDate},
-		TallyPart{Count: len(notable), Label: domain.TallySkipped},
-		TallyPart{Count: len(failed), Label: domain.TallyFailed},
+	tally := rules.Tally(
+		domain.TallyPart{Count: len(moved), Label: domain.TallyFastForwarded},
+		domain.TallyPart{Count: len(results) - len(moved) - len(notable) - len(failed), Label: domain.TallyUpToDate},
+		domain.TallyPart{Count: len(notable), Label: domain.TallySkipped},
+		domain.TallyPart{Count: len(failed), Label: domain.TallyFailed},
 	)
 	// The glyph answers "did this run do what it was asked", so it reads the run
 	// and not the count: a tally is one line for several outcomes, and a tick on

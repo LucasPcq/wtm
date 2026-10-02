@@ -91,6 +91,66 @@ func ChildrenOf(params ChildrenOfParams) []domain.WorktreeNode {
 	return children
 }
 
+type ReparentsAfterRemovalParams struct {
+	Nodes      []domain.WorktreeNode
+	Removed    []string
+	BaseBranch string
+}
+
+// ReparentsAfterRemoval moves each surviving child of a removed worktree onto
+// its nearest ancestor the removal spares, the base when none does: moving it
+// onto a parent that is itself going would orphan it a second time.
+func ReparentsAfterRemoval(params ReparentsAfterRemovalParams) []domain.ReparentResult {
+	removed := make(map[string]bool, len(params.Removed))
+	for _, branch := range params.Removed {
+		removed[branch] = true
+	}
+	parentOf := make(map[string]string, len(params.Nodes))
+	for _, node := range params.Nodes {
+		parentOf[node.Branch] = node.SourceBranch
+	}
+
+	var moves []domain.ReparentResult
+	for _, branch := range params.Removed {
+		for _, child := range ChildrenOf(ChildrenOfParams{Nodes: params.Nodes, Branch: branch}) {
+			if removed[child.Branch] {
+				continue
+			}
+			moves = append(moves, domain.ReparentResult{
+				Branch:    child.Branch,
+				OldParent: branch,
+				NewParent: nearestSurvivor(nearestSurvivorParams{
+					ParentOf: parentOf,
+					Removed:  removed,
+					Start:    parentOf[branch],
+					Base:     params.BaseBranch,
+				}),
+			})
+		}
+	}
+	return moves
+}
+
+type nearestSurvivorParams struct {
+	ParentOf map[string]string
+	Removed  map[string]bool
+	Start    string
+	Base     string
+}
+
+func nearestSurvivor(params nearestSurvivorParams) string {
+	seen := map[string]bool{}
+	current := params.Start
+	for current != "" && params.Removed[current] && !seen[current] {
+		seen[current] = true
+		current = params.ParentOf[current]
+	}
+	if current == "" || params.Removed[current] {
+		return params.Base
+	}
+	return current
+}
+
 // ReparentExclusionsParams holds inputs for ReparentExclusions.
 type ReparentExclusionsParams struct {
 	Nodes      []domain.WorktreeNode

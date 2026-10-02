@@ -4,19 +4,18 @@ package clean
 import (
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/orphans"
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/flow/teardown"
 	"github.com/LucasPcq/wtm/internal/rules"
-	"github.com/LucasPcq/wtm/internal/service/shell"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
 
 type Request struct {
-	Branch string
+	Branches []string
 	// Force is the safety axis: it lifts the dirty/unpushed/open-PR refusals.
 	Force            bool
 	ReparentChildren bool
@@ -25,7 +24,7 @@ type Request struct {
 	// prompt it opens belongs to sudo and takes the terminal, so only a surface
 	// that can hand it over sets this.
 	AllowPrivileged bool
-	// KeepData withholds the namespaces this worktree carved out of shared
+	// KeepData withholds the namespaces the worktrees carved out of shared
 	// services. The default is to give them back: clean is the destructive
 	// command, and removing a worktree without its data would leave an orphan
 	// database behind on every iteration.
@@ -35,19 +34,22 @@ type Request struct {
 }
 
 type Outcome struct {
-	Branch           string
-	Path             string
-	AlreadyAbsent    bool
-	Reparented       []domain.ReparentResult
-	OrphanedChildren []domain.ReparentResult
-	// Namespaces is what became of the data the worktree held in the shared
-	// services.
+	Results    []domain.CleanResult
+	Failed     []domain.BatchFailure
+	Skipped    []domain.PruneSkip
+	Reparented []domain.ReparentResult
+	Orphaned   []domain.ReparentResult
 	Namespaces []domain.NamespaceOutcome
 	Aborted    bool
 }
 
+// Presenter hears about each worktree only when the run removes several: a
+// single one reads exactly as it always did.
 type Presenter interface {
 	flow.Presenter
+	WorktreeStarted(flow.Progress)
+	WorktreeCleaned(domain.CleanResult)
+	WorktreeFailed(domain.BatchFailure)
 	Cleaned(Outcome) error
 }
 
@@ -58,8 +60,9 @@ type Params struct {
 	Presenter Presenter
 }
 
-// Operation declares how a surface must schedule a clean: it destroys its target,
-// so it holds the surface until it is done rather than running behind its back.
+// Operation declares how a surface must schedule a clean: it destroys its
+// targets, so it holds the surface until it is done rather than running behind
+// its back.
 func Operation() flow.Operation {
 	return flow.Operation{Kind: domain.OpKindClean, Mode: flow.ModeBlocking, TargetKey: KeyWorktree}
 }
@@ -70,15 +73,9 @@ func Run(params Params) (Outcome, error) {
 		request:   params.Request,
 		prompter:  params.Prompter,
 		presenter: params.Presenter,
-		checks:    make(map[string]checkResult),
+		checks:    make(map[string]domain.CleanCheckEntry),
 	}
 	return f.run()
-}
-
-// checkResult caches one safety check: it queries the PR state over the network.
-type checkResult struct {
-	check domain.CleanCheckResult
-	err   error
 }
 
 type cleanFlow struct {
@@ -86,18 +83,28 @@ type cleanFlow struct {
 	request   Request
 	prompter  flow.Prompter
 	presenter Presenter
-	checks    map[string]checkResult
-	snapshots map[string]owed.Snapshot
+	// checks query the PR state over the network, so each is made once.
+	checks   map[string]domain.CleanCheckEntry
+	holdings owed.Holdings
+	moves    flow.SetMemo[[]domain.ReparentResult]
 }
 
 func (f *cleanFlow) run() (Outcome, error) {
-	// Only an interactive run pre-flights, so an absent or parent worktree is
-	// reported without a single question. The prompt-free path lets the removal
-	// report both idempotently, which is what its machine payload says.
-	if f.request.Branch != "" && f.prompter.Interactive() {
-		_, err := f.checkStaged(f.request.Branch)
-		if handled, outcome, hErr := f.handleCheckError(f.request.Branch, err); handled {
-			return outcome, hErr
+	named := len(f.request.Branches) > 0
+	requested, err := f.acceptRequested()
+	if err != nil {
+		return Outcome{}, err
+	}
+	f.request.Branches = requested.Present
+	if named && len(requested.Present) == 0 {
+		return f.conclude(concludeParams{Outcome: Outcome{Results: requested.Absent}})
+	}
+
+	// Checked before the first question, so the recap of a named worktree needs
+	// no I/O. The prompt-free path checks in resolveDelete instead.
+	if named && f.prompter.Interactive() {
+		if err := f.checkAll(requested.Present); err != nil {
+			return Outcome{}, err
 		}
 	}
 
@@ -110,139 +117,209 @@ func (f *cleanFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	branchName := answers.Value(KeyWorktree)
+	selected := answers.Values(KeyWorktree)
 	force := f.request.Force || answers.Value(KeyDelete) == deleteForce
+	var skipped []domain.PruneSkip
+	if answers.Value(KeyDelete) == deleteSafe {
+		selected, skipped = f.splitUnsafe(selected)
+	}
+	// Read before the first removal, while every worktree still names its parent.
+	nodes, nodesErr := worktree.Nodes(worktree.NodesParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir})
 
-	plan := f.reparentPlan(branchName)
-	return f.remove(removeParams{
-		Params:        f.cleanParams(branchName, force),
-		ReparentPlan:  plan,
-		ApplyReparent: len(plan.Children) > 0 && answers.Value(KeyReparent) == reparentYes,
-		StartDown:     answers.Value(KeyData) == owed.DataStart,
+	batch := len(selected) > 1
+	removals := teardown.Batch(teardown.BatchParams{
+		Context:      f.ctx,
+		Presenter:    f.presenter,
+		Targets:      f.targets(selected),
+		Force:        force,
+		ForceRemoval: force,
+		BaseBranch:   f.request.BaseBranch,
+		StartDown:    answers.Value(KeyData) == owed.DataStart,
+		KeepData:     f.request.KeepData,
+		Recover:      f.recoverRemoveFailure,
+		OnStart: func(progress flow.Progress) {
+			if batch {
+				f.presenter.WorktreeStarted(progress)
+			}
+		},
+		OnDone: func(removal teardown.Removal) {
+			if !batch {
+				return
+			}
+			if removal.Err != nil {
+				f.presenter.WorktreeFailed(failureOf(removal))
+				return
+			}
+			f.presenter.WorktreeCleaned(resultOf(removal))
+		},
+	})
+
+	outcome := Outcome{Results: requested.Absent, Skipped: skipped}
+	var first error
+	for _, removal := range removals {
+		if removal.Err != nil {
+			outcome.Failed = append(outcome.Failed, failureOf(removal))
+			if first == nil {
+				first = removal.Err
+			}
+			continue
+		}
+		outcome.Results = append(outcome.Results, resultOf(removal))
+		outcome.Namespaces = append(outcome.Namespaces, removal.Namespaces...)
+	}
+
+	// What actually went, not what was asked: a parent that failed to go is still
+	// there for its children, and a child that failed to go is orphaned in turn.
+	var moved []domain.ReparentResult
+	if nodesErr == nil {
+		moved = rules.ReparentsAfterRemoval(rules.ReparentsAfterRemovalParams{
+			Nodes:      nodes,
+			Removed:    removedBranches(removals),
+			BaseBranch: f.request.BaseBranch,
+		})
+	}
+	if answers.Value(KeyReparent) == orphans.Reparent && len(moved) > 0 {
+		applied, err := worktree.ApplyReparents(worktree.ApplyReparentsParams{Reparents: moved, StateDir: f.ctx.StateDir})
+		if err != nil {
+			return Outcome{}, err
+		}
+		outcome.Reparented = applied
+	} else {
+		outcome.Orphaned = moved
+	}
+	return f.conclude(concludeParams{Outcome: outcome, First: first})
+}
+
+func resultOf(removal teardown.Removal) domain.CleanResult {
+	return domain.CleanResult{Branch: removal.Target.Branch, Path: removal.Target.Path, AlreadyAbsent: removal.Absent}
+}
+
+func failureOf(removal teardown.Removal) domain.BatchFailure {
+	return rules.BatchFailureOf(rules.BatchFailureOfParams{Branch: removal.Target.Branch, Path: removal.Target.Path, Err: removal.Err})
+}
+
+type concludeParams struct {
+	Outcome Outcome
+	First   error
+}
+
+func (f *cleanFlow) conclude(params concludeParams) (Outcome, error) {
+	outcome := params.Outcome
+	if err := f.presenter.Cleaned(outcome); err != nil {
+		return outcome, err
+	}
+	return outcome, flow.BatchError(flow.BatchErrorParams{
+		First: params.First,
+		Batch: len(outcome.Results)+len(outcome.Failed)+len(outcome.Skipped) > 1,
 	})
 }
 
-func (f *cleanFlow) handleCheckError(branchName string, err error) (bool, Outcome, error) {
-	if errors.Is(err, domain.ErrWorktreeNotFound) {
-		outcome := Outcome{Branch: branchName, AlreadyAbsent: true}
-		return true, outcome, f.presenter.Cleaned(outcome)
+type requestedWorktrees struct {
+	Present []string
+	Absent  []domain.CleanResult
+}
+
+// acceptRequested reads git's own list rather than a check, which would ask the
+// network: an absent worktree is concluded as such, the parent is left out with
+// a warning, and a blank or repeated argument is a malformed invocation (exit 2).
+func (f *cleanFlow) acceptRequested() (requestedWorktrees, error) {
+	var requested requestedWorktrees
+	if len(f.request.Branches) == 0 {
+		return requested, nil
 	}
-	if errors.Is(err, domain.ErrCannotCleanParent) {
-		f.presenter.Notice(flow.Notice{Kind: flow.NoticeWarning, Text: domain.CleanCannotCleanParent})
-		return true, Outcome{Branch: branchName}, nil
-	}
+	names, err := rules.DistinctNames(rules.DistinctNamesParams{Names: f.request.Branches, Blank: domain.CleanBranchBlank})
 	if err != nil {
-		return true, Outcome{}, err
+		return requested, err
 	}
-	return false, Outcome{}, nil
-}
-
-type removeParams struct {
-	Params        domain.CleanParams
-	ReparentPlan  domain.CleanReparentPlan
-	ApplyReparent bool
-	StartDown     bool
-}
-
-func (f *cleanFlow) remove(p removeParams) (Outcome, error) {
-	params := p.Params
-	target := teardown.Target{Branch: params.Branch}
-	if wt, err := worktree.FindByBranch(worktree.FindByBranchParams{
-		ProjectDir: params.ProjectDir,
-		Branch:     params.Branch,
-	}); err == nil {
-		target.Path = wt.Path
-	}
-
-	// Decided before the removal, while the paths still resolve.
-	cwd, _ := os.Getwd()
-	insideRemoved := target.Path != "" && cwd != "" &&
-		rules.IsPathWithin(flow.ResolveSymlinks(target.Path), flow.ResolveSymlinks(cwd))
-
-	// Read afresh rather than from the wizard: a service may have gone down, or
-	// come up, while the recap was on screen. And read now, while the worktree
-	// whose environment it needs still exists.
-	dropper := owed.NewDropper(owed.DropperParams{
-		Context:   f.ctx,
-		Presenter: f.presenter,
-		Snapshot:  owed.Read(owed.ReadParams{Context: f.ctx, Branches: []string{params.Branch}}),
-		StartDown: p.StartDown,
-		KeepData:  f.request.KeepData,
-	})
-	defer dropper.Close()
-
-	if err := teardown.Stop(teardown.StopParams{Context: f.ctx, Presenter: f.presenter, Target: target, Force: params.Force}); err != nil {
-		return Outcome{}, err
-	}
-	params.SkipHooks = true
-	if err := teardown.Hooks(teardown.HooksParams{Context: f.ctx, Presenter: f.presenter, Target: target, Title: domain.HooksTitleOnClean}); err != nil {
-		return Outcome{}, err
-	}
-
-	err := f.presenter.Stage(flow.StageParams{
-		Message: fmt.Sprintf(domain.CleanLoadingFmt, params.Branch),
-		Work:    func() error { return worktree.Clean(params) },
-	})
-	if errors.Is(err, domain.ErrWorktreeNotFound) {
-		outcome := Outcome{Branch: params.Branch, AlreadyAbsent: true}
-		return outcome, f.presenter.Cleaned(outcome)
-	}
-	if errors.Is(err, domain.ErrCannotCleanParent) {
-		f.presenter.Notice(flow.Notice{Kind: flow.NoticeWarning, Text: domain.CleanCannotCleanParent})
-		return Outcome{Branch: params.Branch}, nil
-	}
-	if errors.Is(err, domain.ErrWorktreeRemoveFailed) {
-		err = f.recoverRemoveFailure(recoverParams{Params: params, Path: target.Path, Cause: err})
-	}
+	worktrees, err := worktree.ListAll(worktree.ListAllParams{ProjectDir: f.ctx.ProjectDir})
 	if err != nil {
-		return Outcome{}, err
+		return requested, fmt.Errorf("list worktrees: %w", err)
+	}
+	byBranch := make(map[string]domain.GitWorktree, len(worktrees))
+	for _, wt := range worktrees {
+		byBranch[wt.Branch] = wt
 	}
 
-	namespaces := teardown.Reclaim(teardown.ReclaimParams{Context: f.ctx, Target: target, Dropper: dropper})
-	teardown.Release(teardown.ReleaseParams{Presenter: f.presenter, Target: target})
-
-	if insideRemoved {
-		shell.RequestCd(params.ProjectDir)
+	for _, name := range names {
+		wt, exists := byBranch[name]
+		switch {
+		case !exists:
+			requested.Absent = append(requested.Absent, domain.CleanResult{Branch: name, AlreadyAbsent: true})
+		case wt.IsMain:
+			f.presenter.Notice(flow.Notice{Kind: flow.NoticeWarning, Text: domain.CleanCannotCleanParent})
+		default:
+			requested.Present = append(requested.Present, name)
+		}
 	}
-
-	reparented, reparentErr := f.applyReparent(p.ReparentPlan, p.ApplyReparent)
-	if reparentErr != nil {
-		return Outcome{}, reparentErr
-	}
-
-	outcome := Outcome{
-		Branch:           params.Branch,
-		Path:             target.Path,
-		Reparented:       reparented,
-		OrphanedChildren: orphanedChildren(p.ReparentPlan, p.ApplyReparent),
-		Namespaces:       namespaces,
-	}
-	return outcome, f.presenter.Cleaned(outcome)
+	return requested, nil
 }
 
-type recoverParams struct {
-	Params domain.CleanParams
-	Path   string
-	Cause  error
+func (f *cleanFlow) targets(selected []string) []teardown.Target {
+	targets := make([]teardown.Target, 0, len(selected))
+	for _, branch := range selected {
+		target := teardown.Target{Branch: branch}
+		if wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branch}); err == nil {
+			target.Path = wt.Path
+		}
+		targets = append(targets, target)
+	}
+	return targets
+}
+
+func (f *cleanFlow) splitUnsafe(selected []string) ([]string, []domain.PruneSkip) {
+	var safe []string
+	var skipped []domain.PruneSkip
+	for _, branch := range selected {
+		if reason := rules.CleanSkipReason(f.checks[branch].Check); reason != "" {
+			skipped = append(skipped, domain.PruneSkip{Branch: branch, Reason: reason})
+			continue
+		}
+		safe = append(safe, branch)
+	}
+	return safe, skipped
+}
+
+// Force plays no part in the moves a removal makes necessary.
+func (f *cleanFlow) reparents(selected []string) []domain.ReparentResult {
+	return f.moves.Get(selected, func() []domain.ReparentResult {
+		nodes, err := worktree.Nodes(worktree.NodesParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir})
+		if err != nil {
+			return nil
+		}
+		return rules.ReparentsAfterRemoval(rules.ReparentsAfterRemovalParams{
+			Nodes:      nodes,
+			Removed:    selected,
+			BaseBranch: f.request.BaseBranch,
+		})
+	})
+}
+
+func removedBranches(removals []teardown.Removal) []string {
+	var removed []string
+	for _, removal := range removals {
+		if removal.Err == nil {
+			removed = append(removed, removal.Target.Branch)
+		}
+	}
+	return removed
 }
 
 // recoverRemoveFailure offers the privileged removal when `git worktree remove`
 // failed on files the current user cannot delete (typically root-owned files
 // left by a container). Declined or out of reach, what git did is settled as it
-// stands. A nil error resumes the normal post-removal flow.
-func (f *cleanFlow) recoverRemoveFailure(p recoverParams) error {
-	salvage := teardown.SalvageParams{Presenter: f.presenter, Clean: p.Params, Path: p.Path, Cause: p.Cause}
-	if !f.request.AllowPrivileged || !f.prompter.Interactive() || p.Path == "" {
+// stands.
+func (f *cleanFlow) recoverRemoveFailure(salvage teardown.SalvageParams) error {
+	if !f.request.AllowPrivileged || !f.prompter.Interactive() || salvage.Path == "" {
 		return teardown.Salvage(salvage)
 	}
 
 	f.presenter.Status(flow.Notice{
 		Kind: flow.NoticeWarning,
-		Text: fmt.Sprintf(domain.CleanRemovalFailedFmt, p.Cause),
+		Text: fmt.Sprintf(domain.CleanRemovalFailedFmt, salvage.Cause),
 	})
 
 	confirmed, err := f.prompter.Confirm(flow.ConfirmParams{
-		Title:      fmt.Sprintf(domain.CleanSudoConfirmFmt, p.Path),
+		Title:      fmt.Sprintf(domain.CleanSudoConfirmFmt, salvage.Path),
 		DefaultYes: false,
 	})
 	if err != nil || !confirmed {
@@ -250,73 +327,66 @@ func (f *cleanFlow) recoverRemoveFailure(p recoverParams) error {
 	}
 
 	return worktree.ForceClean(domain.ForceCleanParams{
-		ProjectDir: p.Params.ProjectDir,
-		StateDir:   p.Params.StateDir,
-		Path:       p.Path,
-		Branch:     p.Params.Branch,
-		Force:      p.Params.Force,
+		ProjectDir: salvage.Clean.ProjectDir,
+		StateDir:   salvage.Clean.StateDir,
+		Path:       salvage.Path,
+		Branch:     salvage.Clean.Branch,
+		Force:      salvage.Clean.Force,
 	})
 }
 
-func (f *cleanFlow) applyReparent(plan domain.CleanReparentPlan, apply bool) ([]domain.ReparentResult, error) {
-	if !apply || len(plan.Children) == 0 {
-		return nil, nil
-	}
-	return worktree.ApplyReparentChildren(worktree.ApplyReparentChildrenParams{
-		Plan:     plan,
-		StateDir: f.ctx.StateDir,
-	})
-}
-
-func orphanedChildren(plan domain.CleanReparentPlan, apply bool) []domain.ReparentResult {
-	if apply || len(plan.Children) == 0 {
+// checkAll shows its own progress; checksOf, read while a step loads, leaves it
+// to the host, which already shows one.
+func (f *cleanFlow) checkAll(branches []string) error {
+	missing := f.unchecked(branches)
+	if len(missing) == 0 {
 		return nil
 	}
-	return plan.Children
-}
-
-func (f *cleanFlow) cleanParams(branchName string, force bool) domain.CleanParams {
-	return domain.CleanParams{
-		ProjectDir: f.ctx.ProjectDir,
-		StateDir:   f.ctx.StateDir,
-		Branch:     branchName,
-		Force:      force,
-		BaseBranch: f.request.BaseBranch,
-		Config:     f.ctx.Config,
-	}
-}
-
-// reparentPlan lists the children a removal would orphan. Force plays no part in it.
-func (f *cleanFlow) reparentPlan(branchName string) domain.CleanReparentPlan {
-	return worktree.PlanCleanReparent(f.cleanParams(branchName, false))
-}
-
-func (f *cleanFlow) checkStaged(branchName string) (domain.CleanCheckResult, error) {
-	if cached, ok := f.checks[branchName]; ok {
-		return cached.check, cached.err
-	}
-	var result checkResult
-	if err := f.presenter.Stage(flow.StageParams{
+	return f.presenter.Stage(flow.StageParams{
 		Message: domain.CleanCheckLoading,
 		Work: func() error {
-			result.check, result.err = worktree.Check(f.cleanParams(branchName, false))
+			f.fetchChecks(missing)
 			return nil
 		},
-	}); err != nil {
-		return domain.CleanCheckResult{}, err
-	}
-	f.checks[branchName] = result
-	return result.check, result.err
+	})
 }
 
-// checkCached skips the progress indicator: the host loading a step already shows
-// one of its own.
-func (f *cleanFlow) checkCached(branchName string) (domain.CleanCheckResult, error) {
-	if cached, ok := f.checks[branchName]; ok {
-		return cached.check, cached.err
+// checksOf leaves out a worktree gone or turned parent since git listed it,
+// which the removal reports on its own. Any other failure comes back beside the
+// checks that did read: a recap that folded a worktree out would confirm a
+// removal it never showed, and a refusal must still see the others.
+func (f *cleanFlow) checksOf(branches []string) ([]domain.CleanCheckResult, error) {
+	f.fetchChecks(f.unchecked(branches))
+	checks := make([]domain.CleanCheckResult, 0, len(branches))
+	var unreadable error
+	for _, branch := range branches {
+		entry := f.checks[branch]
+		switch {
+		case entry.Err == nil:
+			checks = append(checks, entry.Check)
+		case errors.Is(entry.Err, domain.ErrWorktreeNotFound), errors.Is(entry.Err, domain.ErrCannotCleanParent):
+		case unreadable == nil:
+			unreadable = fmt.Errorf(domain.CleanCheckFailedFmt, branch, entry.Err)
+		}
 	}
-	var result checkResult
-	result.check, result.err = worktree.Check(f.cleanParams(branchName, false))
-	f.checks[branchName] = result
-	return result.check, result.err
+	return checks, unreadable
+}
+
+func (f *cleanFlow) unchecked(branches []string) []string {
+	var missing []string
+	for _, branch := range branches {
+		if _, cached := f.checks[branch]; !cached {
+			missing = append(missing, branch)
+		}
+	}
+	return missing
+}
+
+func (f *cleanFlow) fetchChecks(branches []string) {
+	if len(branches) == 0 {
+		return
+	}
+	for branch, entry := range worktree.CheckAll(worktree.CheckAllParams{ProjectDir: f.ctx.ProjectDir, Branches: branches}) {
+		f.checks[branch] = entry
+	}
 }

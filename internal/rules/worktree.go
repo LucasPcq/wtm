@@ -186,3 +186,64 @@ func CleanUnsafeReason(check domain.CleanCheckResult) (string, bool) {
 	}
 	return "", false
 }
+
+// CleanBatchBlockers keys each refusal by its worktree, so lifting one never
+// lifts the same refusal on another. One worktree keeps the blockers it always had.
+func CleanBatchBlockers(checks []domain.CleanCheckResult) []domain.CleanBlocker {
+	if len(checks) == 1 {
+		return CleanBlockers(checks[0])
+	}
+	var blockers []domain.CleanBlocker
+	for _, check := range checks {
+		for _, blocker := range CleanBlockers(check) {
+			blockers = append(blockers, domain.CleanBlocker{
+				Key:   fmt.Sprintf(domain.CleanBlockerKeyFmt, check.Branch, blocker.Key),
+				Label: fmt.Sprintf(domain.CleanBlockerLabelFmt, check.Branch, blocker.Label),
+			})
+		}
+	}
+	return blockers
+}
+
+// CleanUnsafeRefusal words why an unattended run removes nothing. The user named
+// every worktree, so one left out silently would be a removal they did not get.
+func CleanUnsafeRefusal(checks []domain.CleanCheckResult) (string, bool) {
+	var lines []string
+	for _, check := range checks {
+		reason, unsafe := CleanUnsafeReason(check)
+		if !unsafe {
+			continue
+		}
+		if len(checks) == 1 {
+			return fmt.Sprintf(domain.CleanForceHintFmt, check.Branch, reason), true
+		}
+		lines = append(lines, fmt.Sprintf(domain.CleanUnsafeLineFmt, check.Branch, reason))
+	}
+	if len(lines) == 0 {
+		return "", false
+	}
+	return fmt.Sprintf(domain.CleanUnsafeManyFmt, len(lines), strings.Join(lines, "\n")), true
+}
+
+func CleanSkipReason(check domain.CleanCheckResult) string {
+	switch {
+	case check.IsDirty:
+		return domain.PruneSkipDirty
+	case check.UnpushedCommits > 0:
+		return domain.PruneSkipUnpushed
+	case check.HasOpenPR:
+		return domain.PruneSkipOpenPR
+	}
+	return ""
+}
+
+func CleanedBranches(results []domain.CleanResult) (removed, absent []string) {
+	for _, result := range results {
+		if result.AlreadyAbsent {
+			absent = append(absent, result.Branch)
+			continue
+		}
+		removed = append(removed, result.Branch)
+	}
+	return removed, absent
+}

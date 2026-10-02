@@ -45,21 +45,17 @@ func TestSetSourceBranchPreservesOtherFields(t *testing.T) {
 	}
 }
 
-func TestApplyReparentChildrenMovesToGrandparent(t *testing.T) {
+func TestApplyReparentsMovesEachChild(t *testing.T) {
 	stateDir := t.TempDir()
 	seedMeta(t, stateDir, "dev/b", domain.WorktreeMetadata{SourceBranch: "dev/a", CreatedAt: "x"})
 	seedMeta(t, stateDir, "dev/c", domain.WorktreeMetadata{SourceBranch: "dev/a", CreatedAt: "x"})
 
-	plan := domain.CleanReparentPlan{
-		Branch:      "dev/a",
-		Grandparent: "feat",
-		Children: []domain.ReparentResult{
-			{Branch: "dev/b", OldParent: "dev/a", NewParent: "feat"},
-			{Branch: "dev/c", OldParent: "dev/a", NewParent: "feat"},
-		},
+	moves := []domain.ReparentResult{
+		{Branch: "dev/b", OldParent: "dev/a", NewParent: "feat"},
+		{Branch: "dev/c", OldParent: "dev/a", NewParent: "feat"},
 	}
 
-	applied, err := ApplyReparentChildren(ApplyReparentChildrenParams{Plan: plan, StateDir: stateDir})
+	applied, err := ApplyReparents(ApplyReparentsParams{Reparents: moves, StateDir: stateDir})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

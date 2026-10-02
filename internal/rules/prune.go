@@ -39,7 +39,6 @@ func ClassifyPrune(params ClassifyPruneParams) domain.PrunePlan {
 	}
 
 	var plan domain.PrunePlan
-	selected := make(map[string]bool)
 
 	for _, st := range params.Statuses {
 		reason, matched := pruneMatchReason(st, params)
@@ -78,13 +77,15 @@ func ClassifyPrune(params ClassifyPruneParams) domain.PrunePlan {
 			UnsafeReason: unsafe,
 			SourceBranch: node.SourceBranch,
 		})
-		selected[st.Branch] = true
 	}
 
-	plan.Reparents = pruneReparents(pruneReparentsParams{
-		Selected:   plan.Selected,
-		SelectedIn: selected,
+	removed := make([]string, 0, len(plan.Selected))
+	for _, candidate := range plan.Selected {
+		removed = append(removed, candidate.Branch)
+	}
+	plan.Reparents = ReparentsAfterRemoval(ReparentsAfterRemovalParams{
 		Nodes:      params.Nodes,
+		Removed:    removed,
 		BaseBranch: params.BaseBranch,
 	})
 	return plan
@@ -192,38 +193,6 @@ func pruneUnsafeReason(params pruneUnsafeParams) string {
 		return domain.PruneSkipOpenPR
 	}
 	return ""
-}
-
-type pruneReparentsParams struct {
-	Selected   []domain.PruneCandidate
-	SelectedIn map[string]bool
-	Nodes      []domain.WorktreeNode
-	BaseBranch string
-}
-
-// pruneReparents computes the grandparent moves for children of pruned worktrees.
-// A child that is itself pruned is skipped; a grandparent that is also pruned
-// falls back to the base branch so no child is left pointing at a removed parent.
-func pruneReparents(params pruneReparentsParams) []domain.ReparentResult {
-	var reparents []domain.ReparentResult
-	for _, cand := range params.Selected {
-		grandparent := cand.SourceBranch
-		if grandparent == "" || params.SelectedIn[grandparent] {
-			grandparent = params.BaseBranch
-		}
-		children := ChildrenOf(ChildrenOfParams{Nodes: params.Nodes, Branch: cand.Branch})
-		for _, child := range children {
-			if params.SelectedIn[child.Branch] {
-				continue
-			}
-			reparents = append(reparents, domain.ReparentResult{
-				Branch:    child.Branch,
-				OldParent: cand.Branch,
-				NewParent: grandparent,
-			})
-		}
-	}
-	return reparents
 }
 
 // FinalizePrunePlanParams holds inputs for FinalizePrunePlan.

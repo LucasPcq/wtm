@@ -11,8 +11,52 @@ import (
 	"github.com/LucasPcq/wtm/internal/service/hooks"
 )
 
-// Check performs pre-deletion checks without deleting anything.
-func Check(params domain.CleanParams) (domain.CleanCheckResult, error) {
+type CheckAllParams struct {
+	ProjectDir string
+	Branches   []string
+}
+
+// CheckAll performs the pre-deletion checks of several worktrees, asking GitHub
+// once for all of them rather than once each — unless that one list was cut
+// short, where a branch missing from it is asked on its own: an open pull
+// request is a refusal, and a refusal is never waived for want of a page.
+func CheckAll(params CheckAllParams) map[string]domain.CleanCheckEntry {
+	open, complete := ghservice.OpenPRsByBranch(params.ProjectDir)
+	entries := make(map[string]domain.CleanCheckEntry, len(params.Branches))
+	for _, branch := range params.Branches {
+		check, err := checkLocal(checkLocalParams{ProjectDir: params.ProjectDir, Branch: branch})
+		if err == nil {
+			check.HasOpenPR, check.PRUrl = cleanOpenPR(cleanOpenPRParams{ProjectDir: params.ProjectDir, Branch: branch, Open: open, Complete: complete})
+		}
+		entries[branch] = domain.CleanCheckEntry{Check: check, Err: err}
+	}
+	return entries
+}
+
+type cleanOpenPRParams struct {
+	ProjectDir string
+	Branch     string
+	Open       map[string]string
+	Complete   bool
+}
+
+func cleanOpenPR(params cleanOpenPRParams) (bool, string) {
+	if url, found := params.Open[params.Branch]; found {
+		return true, url
+	}
+	if params.Complete {
+		return false, ""
+	}
+	found, _, url := ghservice.HasOpenPR(ghservice.HasOpenPRParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
+	return found, url
+}
+
+type checkLocalParams struct {
+	ProjectDir string
+	Branch     string
+}
+
+func checkLocal(params checkLocalParams) (domain.CleanCheckResult, error) {
 	wt, err := infra.FindWorktreeByBranch(infra.FindWorktreeByBranchParams{
 		ProjectDir: params.ProjectDir,
 		Branch:     params.Branch,
@@ -20,31 +64,16 @@ func Check(params domain.CleanParams) (domain.CleanCheckResult, error) {
 	if err != nil {
 		return domain.CleanCheckResult{}, err
 	}
-
 	if wt.IsMain {
 		return domain.CleanCheckResult{}, domain.ErrCannotCleanParent
 	}
-
-	unpushed, _ := infra.UnpushedCommits(infra.UnpushedCommitsParams{
-		ProjectDir: params.ProjectDir,
-		Branch:     params.Branch,
-	})
-
-	haspr, _, prurl := ghservice.HasOpenPR(ghservice.HasOpenPRParams{
-		ProjectDir: params.ProjectDir,
-		Branch:     params.Branch,
-	})
-
+	unpushed, _ := infra.UnpushedCommits(infra.UnpushedCommitsParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
 	dirty, _ := infra.IsDirty(infra.IsDirtyParams{WorktreePath: wt.Path})
-
 	return domain.CleanCheckResult{
 		WorktreePath:    wt.Path,
 		Branch:          params.Branch,
 		UnpushedCommits: unpushed,
-		HasOpenPR:       haspr,
-		PRUrl:           prurl,
 		IsDirty:         dirty,
-		IsParent:        wt.IsMain,
 	}, nil
 }
 

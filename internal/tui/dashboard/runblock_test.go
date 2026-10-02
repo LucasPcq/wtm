@@ -41,7 +41,7 @@ func TestWithoutRunJobsTheMenusAreThoseOfV0271(t *testing.T) {
 			domain.DashboardMenuFastForward, domain.DashboardMenuSync, domain.DashboardMenuReparent, domain.DashboardMenuDelete,
 		}},
 		{"global", func(m Model) Model { return update(m, key(domain.KeyActions)) }, []string{
-			domain.DashboardMenuFastForwardAll, domain.DashboardMenuReparentBatch, domain.DashboardMenuSyncAll, domain.DashboardMenuPrune,
+			domain.DashboardMenuFastForwardAll, domain.DashboardMenuReparentBatch, domain.DashboardMenuSyncAll, domain.DashboardMenuPrune, domain.DashboardMenuDeleteMany,
 		}},
 	}
 	for _, tc := range cases {

@@ -37,9 +37,9 @@ func outputText(msgs []tea.Msg) string {
 func TestABatchTagsEachStageWithItsBranch(t *testing.T) {
 	msgs := posted(func(send func(tea.Msg)) {
 		p := newCreatePresenter(presenter{send: send, id: 1})
-		p.BranchStarted(createflow.BranchProgress{Branch: "feat/a", Position: 1, Total: 2})
+		p.BranchStarted(flow.Progress{Branch: "feat/a", Position: 1, Total: 2})
 		_ = p.Stage(flow.StageParams{Message: "creating a", Work: func() error { return nil }})
-		p.BranchStarted(createflow.BranchProgress{Branch: "feat/b", Position: 2, Total: 2})
+		p.BranchStarted(flow.Progress{Branch: "feat/b", Position: 2, Total: 2})
 		_ = p.HookPhase(flow.HookPhaseParams{Title: "hooks b", Run: func(flow.HookSink) error { return nil }})
 	})
 
@@ -93,7 +93,7 @@ func TestABatchSelectsOnlyItsFirstCreatedBranch(t *testing.T) {
 // quiet: this line is the only place the failure is said.
 func TestABatchFailureIsNamedInThePanel(t *testing.T) {
 	msgs := posted(func(send func(tea.Msg)) {
-		newCreatePresenter(presenter{send: send, id: 1}).BranchFailed(domain.CreateFailure{Branch: "feat/b", Error: "path exists"})
+		newCreatePresenter(presenter{send: send, id: 1}).BranchFailed(domain.BatchFailure{Branch: "feat/b", Error: "path exists"})
 	})
 	body := outputText(msgs)
 	if !strings.Contains(body, domain.GlyphFailure) || !strings.Contains(body, "feat/b") || !strings.Contains(body, "path exists") {
@@ -104,7 +104,7 @@ func TestABatchFailureIsNamedInThePanel(t *testing.T) {
 func TestABatchConclusionCountsWhatHappened(t *testing.T) {
 	outcome := createflow.Outcome{
 		Results: []domain.CreateResult{{Branch: "feat/a"}, {Branch: "feat/c"}},
-		Failed:  []domain.CreateFailure{{Branch: "feat/b", Error: "boom"}},
+		Failed:  []domain.BatchFailure{{Branch: "feat/b", Error: "boom"}},
 	}
 	msgs := posted(func(send func(tea.Msg)) {
 		if err := newCreatePresenter(presenter{send: send, id: 1}).Created(outcome); err != nil {

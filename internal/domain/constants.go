@@ -129,22 +129,37 @@ const (
 	// indentation on either side and the border between them.
 	RecapFrameChrome = 8
 	// A conclusion's counted summary: "3 applied · 1 skipped", zero counts dropped.
-	TallyPartFmt        = "%d %s"
-	TallyApplied        = "applied"
-	TallyFastForwarded  = "fast-forwarded"
-	TallyUpToDate       = "already up to date"
-	TallyFailed         = "failed"
-	TallyCreated        = "created"
-	TallyAlreadyExisted = "already existed"
-	TallyAdded          = "added"
-	TallyRemoved        = "removed"
-	TallyKept           = "kept"
-	TallySkipped        = "skipped"
-	TallyBlocked        = "blocked"
-	TallyPruned         = "pruned"
-	ReparentedPairFmt   = "%s → %s"
-	TallyReparented     = "reparented"
-	TallySeparator      = " · "
+	BatchProgressFmt      = "%s (%d/%d)"
+	BatchFailedFmt        = "%s — %s"
+	BranchGivenTwiceFmt   = "%s is given twice"
+	ReparentIntro         = "These children would otherwise be left orphaned:"
+	ReparentChildFmt      = "  • %s will rebase onto %s instead of %s"
+	ReparentOptionFmt     = "Reparent onto %s (%d)"
+	ReparentManyOptionFmt = "Reparent onto their nearest surviving ancestor (%d)"
+	OrphanOption          = "Leave orphaned"
+	ReparentSummary       = "reparent"
+	OrphanSummary         = "leave orphaned"
+	NoOrphanedChildren    = "no orphaned children"
+	RecapReparentFmt      = "Then reparent %d child worktree(s) onto %s."
+	RecapReparentManyFmt  = "Then reparent %d child worktree(s) onto their nearest surviving ancestor."
+	RecapOrphanFmt        = "Then leave %d child worktree(s) orphaned."
+	TallyPartFmt          = "%d %s"
+	TallyApplied          = "applied"
+	TallyFastForwarded    = "fast-forwarded"
+	TallyUpToDate         = "already up to date"
+	TallyFailed           = "failed"
+	TallyCreated          = "created"
+	TallyAlreadyExisted   = "already existed"
+	TallyAlreadyAbsent    = "already absent"
+	TallyAdded            = "added"
+	TallyRemoved          = "removed"
+	TallyKept             = "kept"
+	TallySkipped          = "skipped"
+	TallyBlocked          = "blocked"
+	TallyPruned           = "pruned"
+	ReparentedPairFmt     = "%s → %s"
+	TallyReparented       = "reparented"
+	TallySeparator        = " · "
 	// The glyph vocabulary. Six runes, one register each, and no seventh: a line
 	// that fits none of them is not a line that needs a new glyph, it is a line
 	// that has not decided what it says. Each is one column wide and carries the
@@ -341,8 +356,9 @@ const (
 	// FlagKeepData withholds the removal a clean would otherwise run. The default
 	// is to detach: clean is the destructive command, and destroying a worktree
 	// without its data would leave an orphan behind on every iteration.
-	FlagKeepData     = "keep-data"
-	FlagKeepDataDesc = "Keep the namespaces the removed worktrees carved out of shared services"
+	FlagKeepData             = "keep-data"
+	FlagReparentChildrenDesc = "Reparent orphaned child worktrees onto their nearest surviving ancestor (no prompt)"
+	FlagKeepDataDesc         = "Keep the namespaces the removed worktrees carved out of shared services"
 	// FlagDropData answers the data step ahead: every namespace is dropped now,
 	// starting the shared services that are down to do it. It is how an
 	// unattended run asks for what --yes will not do by default.
@@ -1799,8 +1815,9 @@ const (
 	AnsiReset       = "\x1b[0m"
 	// Hook phase titles: a bold section header above the phase, so create and
 	// clean read as distinct phases instead of loose lines.
-	HooksTitleOnCreate = "Hooks · On Create"
-	HooksTitleOnClean  = "Hooks · On Clean"
+	HooksTitleOnCreate   = "Hooks · On Create"
+	HooksTitleOnClean    = "Hooks · On Clean"
+	HooksTitleOnCleanFmt = "Hooks · On Clean · %s"
 
 	// create result recap labels (aligned "label   value" rows). "from" names the
 	// start-point of a newly created branch; "parent" replaces it when an existing
@@ -3044,11 +3061,8 @@ const (
 	BranchEntryExisting             = "existing"
 	BranchEntryWorktreeExists       = "worktree exists"
 	CreateBranchRequired            = "branch name is required"
-	CreateBranchProgressFmt         = "%s (%d/%d)"
-	CreateBranchFailedFmt           = "%s — %s"
 	CreateBatchExistsFmt            = "%s already exists"
 	CreateBranchListedTwiceFmt      = "%s is already in the list"
-	CreateBranchGivenTwiceFmt       = "%s is given twice"
 	CreateBranchRequiredUnattended  = "branch name is required without the interactive wizard (pass it as an argument)"
 	CreateSourceStepDescription     = "Branch to base the new worktree on"
 	CreateSourceStepDescriptionMany = "Branch to base the new worktrees on"
@@ -3173,36 +3187,13 @@ const (
 	EnvParentFallbackWarning = "The \"parent\" env strategy needs the source branch checked out to copy its .env; " +
 		"without a worktree it comes from main."
 
-	// PruneReparentPrompt is the confirmation shown when a prune leaves child
-	// worktrees that can be reparented onto their grandparent (count). Hosted as a
-	// step of the prune picker so declining goes back rather than aborting.
-	PruneReparentPrompt = "Reparent %d child worktree(s) onto their grandparent?"
-	// PruneReparentIntro precedes the list of children a prune would otherwise
-	// orphan, shown in the reparent confirmation.
-	PruneReparentIntro = "These children would otherwise be left orphaned:"
-
-	// CleanReparentPrompt is the confirmation shown when cleaning a worktree that
-	// has children which can be reparented onto their grandparent (count,
-	// grandparent). Hosted as a step of the clean confirm wizard.
-	CleanReparentPrompt = "Reparent %d child worktree(s) onto %s?"
-	// CleanReparentIntro precedes the list of children a clean would otherwise
-	// orphan, shown in the reparent confirmation.
-	CleanReparentIntro = "These children would otherwise be left orphaned:"
-
 	// CleanForceHintFmt is the refusal shown when a worktree is unsafe to remove
 	// without --force (branch, reason).
 	CleanForceHintFmt = "worktree %s %s; pass --force to remove it anyway"
 	// The clean flow (internal/flow/clean): step prose, option labels, recap body,
 	// refusals and progress messages. Format verbs: %s branch, %s path, %d counts.
-	CleanPickerTitle        = "Select worktree to clean"
-	CleanPickerDescription  = "The parent worktree cannot be cleaned"
+	CleanPickerTitle        = "Select worktrees to clean"
 	CleanNothingToClean     = "no worktrees to clean (only the parent worktree exists)"
-	CleanNoOrphanedChildren = "no orphaned children"
-	CleanReparentOptionFmt  = "Reparent onto %s (%d)"
-	CleanOrphanOption       = "Leave orphaned"
-	CleanReparentSummary    = "reparent"
-	CleanOrphanSummary      = "leave orphaned"
-	CleanReparentChildFmt   = "  • %s will rebase onto %s instead of %s"
 	CleanDeleteTitle        = "Proceed with deletion?"
 	CleanDeleteOption       = "Yes, delete"
 	CleanForceDeleteOption  = "Yes, force delete (bypass all checks)"
@@ -3217,8 +3208,6 @@ const (
 	// reader they were removing a worktree and nothing else.
 	CleanWillDeleteNamespaceFmt = "  data      %s, dropped from %s"
 	CleanKeepDataLine           = "  data      kept (--keep-data)"
-	CleanRecapReparentFmt       = "Then reparent %d child worktree(s) onto %s."
-	CleanRecapOrphanFmt         = "Then leave %d child worktree(s) orphaned."
 	// CleanBlockerDirty, CleanBlockerUnpushed and CleanBlockerOpenPR key the
 	// removal refusals a surface lists one by one (rules.CleanBlockers).
 	CleanBlockerDirty    = "dirty"
@@ -3249,9 +3238,20 @@ const (
 	// not delete: branch, path, cause, path.
 	CleanLeftOnDiskFmt = "%s is removed, but %s is still on disk (%s) — delete what is left with `sudo rm -rf %s`"
 	// StopWorktreeSurvivorsFmt names the jobs still up after their stop.
-	StopWorktreeSurvivorsFmt = "still running after the stop: %s"
-	CleanRemovalFailedFmt    = "Removal failed: %s"
-	CleanWizardErrLabel      = "clean wizard"
+	StopWorktreeSurvivorsFmt   = "still running after the stop: %s"
+	CleanRemovalFailedFmt      = "Removal failed: %s"
+	CleanWizardErrLabel        = "clean wizard"
+	CleanSelectionRequired     = "select at least one worktree to clean"
+	CleanBranchBlank           = "a worktree branch cannot be blank"
+	CleanCheckFailedFmt        = "check %s: %w"
+	CleanWillDeleteManyFmt     = "Will delete %d worktrees and their branches:"
+	CleanWillDeleteRowFmt      = "  %s  %s"
+	CleanBlockerKeyFmt         = "%s:%s"
+	CleanBlockerLabelFmt       = "%s — %s"
+	CleanDeleteSafeOptionFmt   = "Yes, delete the %d safe one(s), keep the others"
+	CleanForceDeleteManyOption = "Yes, force delete all (bypass all checks)"
+	CleanUnsafeManyFmt         = "%d worktree(s) cannot be removed safely, so nothing was removed:\n%s\npass --force to remove them anyway"
+	CleanUnsafeLineFmt         = "  %s %s"
 	// CleanSudoConfirmFmt is the confirmation title for the privileged `sudo rm -rf`
 	// removal fallback (worktree path).
 	CleanSudoConfirmFmt = "Force-delete %s with `sudo rm -rf`? (you may be prompted for your password)"
@@ -3275,24 +3275,14 @@ const (
 	// gone-detection runs first).
 	PruneScanning         = "Scanning worktrees…"
 	PruneFetchAndScanning = "Fetching remotes and scanning worktrees…"
-	// PruneHooksTitleFmt titles one pruned worktree's on_clean phase.
-	PruneHooksTitleFmt = "Hooks · On Clean · %s"
 	// PruneFailedFmt is where a prune stopped: the branch, the cause. The
 	// worktrees after it are untouched, and so is its data.
-	PruneFailedFmt         = "stopped at %s: %s — it and the worktrees after it were left as they were"
-	PruneNothingToPrune    = "Nothing to prune."
-	PruneConfirmOption     = "Yes, prune"
-	PruneForceOption       = "Yes, force prune (bypass safety checks)"
-	PruneNothingSelected   = "No worktrees selected — nothing will be pruned."
-	PruneWillPruneFmt      = "Will prune %d worktree(s): %s"
-	PruneReparentOptionFmt = "Reparent onto grandparent (%d)"
-	PruneOrphanOption      = "Leave orphaned"
-	PruneReparentChildFmt  = "  • %s will rebase onto %s instead of %s"
-	PruneRecapReparentFmt  = "Then reparent %d child worktree(s) onto their grandparent."
-	PruneRecapOrphanFmt    = "Then leave %d child worktree(s) orphaned."
-	PruneReparentSummary   = "reparent onto grandparent"
-	PruneOrphanSummary     = "leave orphaned"
-	PruneNoChildren        = "no children to reparent"
+	PruneFailedFmt       = "stopped at %s: %s — it and the worktrees after it were left as they were"
+	PruneNothingToPrune  = "Nothing to prune."
+	PruneConfirmOption   = "Yes, prune"
+	PruneForceOption     = "Yes, force prune (bypass safety checks)"
+	PruneNothingSelected = "No worktrees selected — nothing will be pruned."
+	PruneWillPruneFmt    = "Will prune %d worktree(s): %s"
 	// PruneTag* label a candidate in the picker with what made it prunable, or
 	// with the refusal standing in the way of removing it.
 	PruneTagMerged   = "merged"
@@ -3669,8 +3659,11 @@ const (
 	// DashboardMenuPrune removes every finished worktree at once. There is no
 	// preview entry beside it: the recap lists what goes, and closing the modal
 	// removes nothing.
-	DashboardMenuPrune  = "Prune finished worktrees"
-	DashboardMenuDelete = "Delete worktree"
+	DashboardMenuPrune = "Prune finished worktrees"
+	// DashboardMenuDeleteMany removes the worktrees the user checks inside the run,
+	// which is why it lives in the global menu: a context menu hangs off one row.
+	DashboardMenuDeleteMany = "Delete worktrees"
+	DashboardMenuDelete     = "Delete worktree"
 	// DashboardMenuSync leads the row menu: the Tree tab is where a worktree whose
 	// parent moved is flagged, so it is where the rebase has to be reachable from.
 	// It arrives with the row and its descendants checked; the selection stays the
@@ -3735,6 +3728,7 @@ const (
 	DashboardReparentTitle      = "Change parent"
 	DashboardReparentBatchTitle = "Reparent worktrees"
 	DashboardPruneTitle         = "Prune finished worktrees"
+	DashboardDeleteManyTitle    = "Delete worktrees"
 	DashboardSyncTitle          = "Sync worktrees"
 	// DashboardSyncRowTitle heads the same run started from a row: a modal that
 	// renamed the entry the user just picked reads as a different action.

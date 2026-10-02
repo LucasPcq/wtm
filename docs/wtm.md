@@ -31,7 +31,7 @@ wtm [flags]
 
 * [wtm agents](wtm_agents.md)	 - Manage LLM agent integrations for wtm
 * [wtm checkout](wtm_checkout.md)	 - Create a worktree from an existing pull request
-* [wtm clean](wtm_clean.md)	 - Remove a worktree and its local branch
+* [wtm clean](wtm_clean.md)	 - Remove worktrees and their local branches
 * [wtm config](wtm_config.md)	 - Inspect or edit the project wtm config
 * [wtm create](wtm_create.md)	 - Create one or more worktrees
 * [wtm env](wtm_env.md)	 - Reconcile a worktree's .env against its template and value sources

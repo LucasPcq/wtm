@@ -94,7 +94,7 @@ A `✓` headline, nought to three aligned fields, at most one next step. Budget:
 ┃  ! docs/api skipped — open PR #42
 ```
 
-`output.Tally` counts, zero counts dropped; then **one line per exception only**, never per success. Budget: 6 lines plus the exceptions.
+`rules.Tally` counts, zero counts dropped (the CLI and the dashboard share it); then **one line per exception only**, never per success. Budget: 6 lines plus the exceptions.
 
 One nuance that is not a matter of taste: a **destructive** run names what it destroyed — knowing what is gone is actionable — but on one line, because the picker and the recap have already shown that list twice. A non-destructive run counts.
 

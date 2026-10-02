@@ -56,7 +56,7 @@ func newDataFixture(t *testing.T) dataFixture {
 
 func (d dataFixture) run(t *testing.T, request Request) (Outcome, *recorder, error) {
 	t.Helper()
-	request.Branch = d.branch
+	request.Branches = []string{d.branch}
 	request.BaseBranch = "main"
 	presenter := newRecorder()
 	outcome, err := Run(Params{

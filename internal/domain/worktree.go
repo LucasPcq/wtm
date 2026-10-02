@@ -190,16 +190,19 @@ type CreateResult struct {
 }
 
 // Path is set when the worktree exists but its hooks failed.
-type CreateFailure struct {
+type BatchFailure struct {
 	Branch   string `json:"branch"`
 	Path     string `json:"path,omitempty"`
 	Error    string `json:"error"`
 	ExitCode int    `json:"exit_code"`
+	// Privileged is a removal git refused on files only sudo can delete, which a
+	// surface that cannot hand over its terminal has to name the way out of.
+	Privileged bool `json:"-"`
 }
 
 type CreateBatchResult struct {
-	Results []CreateResult  `json:"results"`
-	Failed  []CreateFailure `json:"failed"`
+	Results []CreateResult `json:"results"`
+	Failed  []BatchFailure `json:"failed"`
 }
 
 // CleanParams holds inputs for cleaning a worktree.
@@ -264,24 +267,26 @@ type ReparentResult struct {
 	NewParent string `json:"new_parent"`
 }
 
-// CleanReparentPlan lists the reparenting proposed when cleaning a worktree that
-// is the parent of others: each child would move from the cleaned branch to the
-// grandparent. It is computed before deletion so the command can show a recap.
-type CleanReparentPlan struct {
-	// Branch is the worktree about to be cleaned.
-	Branch string
-	// Grandparent is the parent the children would be reparented onto.
-	Grandparent string
-	Children    []ReparentResult
+type CleanResult struct {
+	Branch        string `json:"branch"`
+	Path          string `json:"path"`
+	AlreadyAbsent bool   `json:"already_absent"`
 }
 
-// CleanResult is the outcome of a clean, including any children reparented onto
-// the grandparent.
-type CleanResult struct {
-	Branch        string           `json:"branch"`
-	Path          string           `json:"path"`
-	AlreadyAbsent bool             `json:"already_absent"`
-	Reparented    []ReparentResult `json:"reparented,omitempty"`
+// CleanBatchResult is the clean payload, an envelope even for one worktree.
+// Skipped reuses prune's reasons: dirty, unpushed, open_pr.
+type CleanBatchResult struct {
+	Results          []CleanResult      `json:"results"`
+	Failed           []BatchFailure     `json:"failed"`
+	Skipped          []PruneSkip        `json:"skipped"`
+	Reparented       []ReparentResult   `json:"reparented"`
+	OrphanedChildren []ReparentResult   `json:"orphaned_children"`
+	Namespaces       []NamespaceOutcome `json:"namespaces"`
+}
+
+type CleanCheckEntry struct {
+	Check CleanCheckResult
+	Err   error
 }
 
 // CleanCheckResult holds the pre-deletion check results.
@@ -323,5 +328,12 @@ type ResolveResult struct {
 // blanket "force".
 type CleanBlocker struct {
 	Key   string
+	Label string
+}
+
+// TallyPart is one count of a result summary. A zero count is dropped: a
+// conclusion counts what happened, never what did not.
+type TallyPart struct {
+	Count int
 	Label string
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/run/initrun"
 	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/tui/components"
 	initwizard "github.com/LucasPcq/wtm/internal/tui/inittui"
 )
@@ -173,10 +174,10 @@ func (p initPresenter) Initialized(outcome initrun.Outcome) error {
 	output.Frame(w, func(w io.Writer) {
 		// The jobs are counted, not named: the reader ticked them one by one in the
 		// wizard, and run.toml is where they live now.
-		output.Success(w, fmt.Sprintf(domain.RunInitConfiguredFmt, report.RunPath, output.Tally(
-			output.TallyPart{Count: report.Added, Label: domain.TallyAdded},
-			output.TallyPart{Count: report.Removed, Label: domain.TallyRemoved},
-			output.TallyPart{Count: report.Kept, Label: domain.TallyKept},
+		output.Success(w, fmt.Sprintf(domain.RunInitConfiguredFmt, report.RunPath, rules.Tally(
+			domain.TallyPart{Count: report.Added, Label: domain.TallyAdded},
+			domain.TallyPart{Count: report.Removed, Label: domain.TallyRemoved},
+			domain.TallyPart{Count: report.Kept, Label: domain.TallyKept},
 		)))
 		detected := report.Detected
 		output.DetectedPortsReport(w, output.DetectedPortsReportParams{

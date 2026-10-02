@@ -52,10 +52,10 @@ func FormatPruneResult(w io.Writer, result domain.PruneResult) {
 		Unchanged(w, domain.PruneNothingToPrune)
 	}
 	if len(result.Pruned) > 0 {
-		Success(w, Tally(
-			TallyPart{Count: len(result.Pruned), Label: domain.TallyPruned},
-			TallyPart{Count: len(result.Reparented), Label: domain.TallyReparented},
-			TallyPart{Count: len(result.Skipped), Label: domain.TallySkipped},
+		Success(w, rules.Tally(
+			domain.TallyPart{Count: len(result.Pruned), Label: domain.TallyPruned},
+			domain.TallyPart{Count: len(result.Reparented), Label: domain.TallyReparented},
+			domain.TallyPart{Count: len(result.Skipped), Label: domain.TallySkipped},
 		))
 		Message(w, Indent+strings.Join(rules.PrunedBranches(result), ", "))
 	}
