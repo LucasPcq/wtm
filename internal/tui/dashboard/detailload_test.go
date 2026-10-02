@@ -240,16 +240,27 @@ func TestMarkerWaitsForTheGraceDelay(t *testing.T) {
 }
 
 // A removal changes rows it never targeted: the parent on screen loses a
-// child, so its detail is reloaded whatever the run held.
-func TestFinishingARunReloadsTheDetailOnScreen(t *testing.T) {
+// child, which only the reloaded list says, so that is when its detail reloads.
+func TestAListThatChangesTheChildrenOnScreenReloadsTheDetail(t *testing.T) {
 	model := newTestModel(t, testWidth, testHeight, "main", "feat/a", "feat/b")
+	model.parents = map[string]string{"feat/a": "main", "feat/b": "main"}
 	model.detailLoading = ""
-	ops, id := model.ops.begin(operation{kind: domain.OpKindClean, targets: []string{"feat/b"}})
-	model.ops = ops
 
-	model, _ = model.finishOp(opDoneMsg{id: id})
+	model = update(model, worktreesMsg{statuses: model.statuses[:2], parents: map[string]string{"feat/a": "main"}})
 
-	if model.detailLoading != model.selectedBranch() {
-		t.Errorf("detailLoading = %q, want the detail on screen (%q) reloaded", model.detailLoading, model.selectedBranch())
+	if model.detailLoading != "main" {
+		t.Errorf("detailLoading = %q, want main's detail reloaded once its children changed", model.detailLoading)
+	}
+}
+
+func TestAListThatChangesNothingOnScreenKeepsTheDetail(t *testing.T) {
+	model := newTestModel(t, testWidth, testHeight, "main", "feat/a")
+	model.parents = map[string]string{"feat/a": "main"}
+	model.detailLoading = ""
+
+	model = update(model, worktreesMsg{statuses: model.statuses, parents: map[string]string{"feat/a": "main"}})
+
+	if model.detailLoading != "" {
+		t.Errorf("detailLoading = %q, want no reload: nothing the panel shows changed", model.detailLoading)
 	}
 }
