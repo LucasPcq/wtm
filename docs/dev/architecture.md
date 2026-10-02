@@ -65,8 +65,16 @@ Every arrow that is *missing* is the point:
 the fix is a thin `service/` wrapper, not an exception: `worktree.FindByBranch` and
 `worktree.ListAll` exist for exactly that reason.
 
-The `flow/` import rule is checked mechanically by the `build-validator` subagent
-(step 6) rather than left to review.
+None of this is left to review. `make lint` runs `tools/archlint`, whose rules are `go/analysis` analyzers resolved by type:
+
+| Rule | Checks |
+| -- | -- |
+| `layers` | each arrow above, from the `layers` table |
+| `servicedag` | each `service/x → service/y` import against `serviceEdges` |
+| `daemonblind` | `service/process` imports nothing that runs git and only allow-listed `infra/` |
+| `chokepoint` | a service mutator is called from `internal/flow/` only, from any layer |
+
+A command that still drives its service from `commands/` is listed in `.archlint-migrating` with its ticket, and the list may only shrink.
 
 ## The founding observation: seven closures
 
