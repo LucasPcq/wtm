@@ -113,3 +113,15 @@ func TestWizardCounterFixedDenominatorAndJump(t *testing.T) {
 		t.Errorf("visiblePosition = %d, want 3 (jumped past skipped b)", got)
 	}
 }
+
+func TestWizardCtrlCAbortsFromAnyStep(t *testing.T) {
+	skip := false
+	m := newAutoSkipWizard(&skip)
+	m = updateWizard(m, key(tea.KeyEnter)) // a → b
+
+	m = updateWizard(m, key(tea.KeyCtrlC))
+
+	if !m.Aborted() {
+		t.Fatal("ctrl+c on step b did not abort the wizard")
+	}
+}

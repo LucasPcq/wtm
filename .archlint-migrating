@@ -10,11 +10,9 @@
 # from commands/. Each needs a Request/Outcome/Presenter in internal/flow/<cmd>
 # before a second surface can run it, or an event can report what it did.
 #   LUC-237  checkout
-#   LUC-238  relocate
 #   LUC-239  env (env.go, envswitch.go)
 #   LUC-241  extract
 chokepoint internal/commands/wt/extract\.go 2
-chokepoint internal/commands/wt/relocate\.go 2
 chokepoint internal/commands/wt/env\.go 1
 chokepoint internal/commands/wt/envswitch\.go 1
 chokepoint internal/commands/checkout/ 1

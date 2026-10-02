@@ -401,3 +401,14 @@ func TestValidateRunRefusesBindsNoPortOnATask(t *testing.T) {
 		t.Fatalf("got %v", errs)
 	}
 }
+
+func TestValidateBasePathEntryRefusesABlankAnswer(t *testing.T) {
+	for _, value := range []string{"", "  ", "/abs"} {
+		if err := ValidateBasePathEntry(value); !errors.Is(err, domain.ErrInvalidBasePath) {
+			t.Errorf("ValidateBasePathEntry(%q) = %v, want ErrInvalidBasePath", value, err)
+		}
+	}
+	if err := ValidateBasePathEntry("../trees"); err != nil {
+		t.Errorf("ValidateBasePathEntry(../trees) = %v", err)
+	}
+}

@@ -137,6 +137,15 @@ func ValidateRelocateTarget(to string) error {
 	return nil
 }
 
+// ValidateBasePathEntry is ValidateRelocateTarget for a value typed in the
+// wizard, where empty is not "keep the current one" but a blank answer.
+func ValidateBasePathEntry(value string) error {
+	if value == "" {
+		return domain.ErrInvalidBasePath
+	}
+	return ValidateRelocateTarget(value)
+}
+
 // ValidateRun checks for structural errors in the run config and returns
 // warnings for ambiguous-but-not-fatal cases. A non-empty error slice means
 // the config should be rejected.

@@ -234,6 +234,11 @@ func (m WizardModel) Init() tea.Cmd {
 
 // Update delegates to the current step and manages transitions.
 func (m WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == domain.KeyInterrupt {
+		m.aborted = true
+		return m, tea.Quit
+	}
+
 	if m.onMsg != nil {
 		if cmd, handled := m.onMsg(&m, msg); handled {
 			return m, cmd

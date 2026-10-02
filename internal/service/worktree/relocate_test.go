@@ -1,7 +1,6 @@
 package worktree
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -25,25 +24,24 @@ func gitPathOf(t *testing.T, repo ordinalRepo, branch string) string {
 	return ""
 }
 
-func relocateTo(t *testing.T, repo ordinalRepo, basePath string) domain.RelocateResult {
+func planAt(t *testing.T, repo ordinalRepo, basePath string) domain.RelocatePlan {
 	t.Helper()
-	result, err := Relocate(RelocateParams{
+	plan, err := PlanRelocate(PlanRelocateParams{
 		ProjectDir:     repo.dir,
 		StateDir:       repo.stateDir,
-		Config:         domain.Config{Project: domain.ProjectConfig{Worktrees: domain.WorktreesConfig{BasePath: basePath, BaseBranch: "main"}}},
 		TargetBasePath: basePath,
 		BaseBranch:     "main",
 	})
 	if err != nil {
-		t.Fatalf("Relocate: %v", err)
+		t.Fatalf("PlanRelocate: %v", err)
 	}
-	return result
+	return plan
 }
 
 // Adopting a worktree that already ran jobs completes its record: what it
 // learned about its ports, its isolation and the namespaces it holds is what
 // clean relies on, and a rewrite from scratch forgot all three.
-func TestRelocateAdoptionKeepsWhatMetaJSONAlreadyHolds(t *testing.T) {
+func TestAdoptKeepsWhatMetaJSONAlreadyHolds(t *testing.T) {
 	globaldir.Isolate(t)
 	repo := newOrdinalRepo(t)
 	repo.addWorktree(t, "feat/x")
@@ -52,9 +50,8 @@ func TestRelocateAdoptionKeepsWhatMetaJSONAlreadyHolds(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result := relocateTo(t, repo, "../trees")
-	if len(result.Steps) != 1 || result.Steps[0].Status != domain.RelocateStatusMovedAdopted {
-		t.Fatalf("steps = %+v, want feat/x moved and adopted", result.Steps)
+	if err := Adopt(AdoptParams{StateDir: repo.stateDir, Branch: "feat/x", Parent: "main"}); err != nil {
+		t.Fatalf("Adopt: %v", err)
 	}
 
 	meta := repo.meta(t, "feat/x")
@@ -68,7 +65,7 @@ func TestRelocateAdoptionKeepsWhatMetaJSONAlreadyHolds(t *testing.T) {
 
 // Jobs are keyed on their worktree's path: moving a worktree they run in
 // leaves them orphaned under a directory that no longer exists.
-func TestRelocateRefusesToMoveAWorktreeWithJobs(t *testing.T) {
+func TestPlanRelocateRefusesToMoveAWorktreeWithJobs(t *testing.T) {
 	globaldir.Isolate(t)
 	repo := newOrdinalRepo(t)
 	repo.addWorktree(t, "feat/x")
@@ -77,11 +74,8 @@ func TestRelocateRefusesToMoveAWorktreeWithJobs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result := relocateTo(t, repo, "../trees")
-	if len(result.Steps) != 1 || result.Steps[0].Status != domain.RelocateStatusBlockedJobs {
-		t.Fatalf("steps = %+v, want feat/x blocked by its jobs", result.Steps)
-	}
-	if _, err := os.Stat(path); err != nil {
-		t.Errorf("the worktree moved anyway: %v", err)
+	plan := planAt(t, repo, "../trees")
+	if len(plan.Steps) != 1 || plan.Steps[0].Status != domain.RelocateStatusBlockedJobs {
+		t.Fatalf("steps = %+v, want feat/x blocked by its jobs", plan.Steps)
 	}
 }

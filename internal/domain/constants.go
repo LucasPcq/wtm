@@ -1758,6 +1758,41 @@ const (
 	// worktree, naming the command that frees it (branch, branch).
 	RelocateBlockedJobsFmt = "%s — jobs are running in it: run `wtm run down %s` first"
 
+	// RelocateUninspectableDetail is a worktree that needs moving but whose
+	// working-tree state could not be read: it is not moved blind.
+	RelocateUninspectableDetail = "could not determine working-tree state; re-run after resolving, or with --force to move anyway"
+
+	// Relocate flow: the wizard's copy and what the run reports.
+	RelocateWizardErrLabel      = "relocate"
+	RelocateStageMessage        = "Relocating worktrees…"
+	RelocateAlignedMessage      = "All worktrees are already aligned with base_path."
+	RelocateBasePathGateLabel   = "Base path"
+	RelocateBasePathGateTitle   = "Change base_path?"
+	RelocateBasePathGateDescFmt = "Worktrees live under %s.\nKeep it, or set a new location to move them all to."
+	RelocateBasePathKeepFmt     = "Keep %s"
+	RelocateBasePathChange      = "Change it"
+	RelocateBasePathValueLabel  = "New base_path"
+	RelocateBasePathValueDesc   = "Relative to the repo root (e.g. ../.trees). Existing worktrees move here."
+	RelocateParentLabelFmt      = "Parent for %s"
+	// RelocateParentDescFmt is broken into lines: a branch step does not wrap.
+	RelocateParentDescFmt = "%s was created outside wtm, so it has no recorded parent.\n" +
+		"Pick the branch `wtm sync` should rebase it onto.\n" +
+		"The full set of moves and adoptions is recapped on the final step."
+	// RelocateAdoptionsNoteFmt closes a preview (count, base branch): the wizard
+	// asks each parent, --yes adopts onto the base branch.
+	RelocateAdoptionsNoteFmt = "→ %d worktree(s) to adopt: the wizard asks each parent, --yes uses %s."
+	RelocateApplyLabel       = "Apply"
+	RelocateApplyOption      = "Yes, apply"
+	// RelocateBasePathOnlyFmt previews a relocate that only rewrites base_path
+	// (from, to): no worktree has to move.
+	RelocateBasePathOnlyFmt = "base_path: %s → %s (no worktree to move)"
+	// RelocateBasePathChangeFmt heads a preview whose plan moves worktrees to a
+	// new base_path (from, to).
+	RelocateBasePathChangeFmt = "base_path: %s → %s"
+	// RelocateNothingAppliedPrefix heads a result where every worktree to move
+	// was skipped, followed by the tally.
+	RelocateNothingAppliedPrefix = "Nothing relocated  "
+
 	// Init recap (LUC-125): labels and copy for the framed end-of-init recap
 	// (accent-bar box + pill title) that summarizes the written config and lists
 	// the next steps. RecapWidth is the fixed render width shared with `relocate`.
@@ -4022,6 +4057,10 @@ const (
 	// KeyQuit leaves the dashboard. Esc does not: it only closes what is open, so
 	// a persistent dashboard is never left by accident.
 	KeyQuit = "q"
+
+	// KeyInterrupt cancels a wizard wherever it stands, as Esc does on its
+	// first step: a terminal user reaches for it first.
+	KeyInterrupt = "ctrl+c"
 
 	// EscapePrefix is the leading escape a terminal sends for an alt-modified
 	// key, and KeyCtrlPrefix how a control combination is named.
