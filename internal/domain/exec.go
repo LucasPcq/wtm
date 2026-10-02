@@ -1,7 +1,5 @@
 package domain
 
-import "time"
-
 type ExecStatus string
 
 const (
@@ -37,52 +35,3 @@ type ExecCounts struct {
 	Interrupted int
 	NotStarted  int
 }
-
-const (
-	FlagPrint = "print"
-
-	ExecLogDirName          = "exec"
-	ExecLogFileExt          = ".log"
-	ExecJSONTailLines       = 20
-	ExecConclusionTailLines = 10
-	// ExecPartialLineCap bounds a line that never ends (binary output, a
-	// progress bar without \r) so the tail cannot grow without limit.
-	ExecPartialLineCap = 4096
-	ExecInterruptGrace = 5 * time.Second
-	// ExecPipeGrace bounds the wait for a process that exited while something it
-	// started (a backgrounded job, a daemon) still holds its output pipe.
-	ExecPipeGrace = time.Second
-
-	ExecWizardErrLabel       = "exec"
-	ExecSelectionLabel       = "Worktrees"
-	ExecSelectionTitle       = "Run in which worktrees?"
-	ExecSelectAtLeastOne     = "select at least one worktree"
-	ExecSelectionRequiredFmt = "no worktree selected: pass worktree names or --%s (a run with --%s or --%s %s cannot open the picker)"
-	ExecConfirmLabel         = "Confirm"
-	ExecConfirmTitle         = "Run this command?"
-	ExecConfirmOption        = "Run"
-	ExecConfirmValue         = "run"
-	ExecRecapWorktrees       = "Worktrees:   "
-	ExecRecapCommand         = "Command:     "
-	ExecRecapJobs            = "Concurrency: "
-	ExecNeedsTerminal        = "wtm exec needs a terminal to pick worktrees: pass worktree names or --all, with --yes"
-
-	ExecQueuedLabel      = "queued"
-	ExecRunningLabel     = "running"
-	ExecInterruptedLabel = "interrupted"
-	ExecNotStartedLabel  = "not started"
-	ExecExitFmt          = "exit %d"
-	ExecPassedLabelFmt   = "%s (%s)"
-	ExecFailedLabelFmt   = "%s (%s, %s)"
-	ExecStateLabelFmt    = "%s  %s"
-	ExecAllPassedFmt     = "%s · %d worktrees (%s)"
-	ExecSomeFailedFmt    = "%s · %d of %d worktrees failed"
-	ExecPassedCountFmt   = "%d passed"
-	ExecLogLabel         = "log"
-	ExecViewSummaryFmt   = "%d done · %d running · %d queued"
-	// ExecViewMargin keeps the prompt line and the one under the cursor free.
-	ExecViewMargin = 2
-
-	AnsiEscByte = 0x1b
-	AnsiBelByte = 0x07
-)
