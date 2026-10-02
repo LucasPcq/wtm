@@ -33,7 +33,9 @@ const (
 // recap covers both the worktree created and what moves into it.
 func (f *extractFlow) session() flow.Session {
 	steps := []flow.Step{f.sourceStep(), f.filesStep(), f.targetStep()}
-	steps = append(steps, f.create.Steps()...)
+	if f.mayCreate() {
+		steps = append(steps, f.create.Steps()...)
+	}
 	steps = append(steps, f.modeStep(), f.recapStep())
 
 	presets := f.create.Presets()
@@ -57,6 +59,12 @@ func (f *extractFlow) targetPreset() string {
 		return targetCreate
 	}
 	return f.request.To
+}
+
+// mayCreate leaves create's steps out of a session whose --to names a worktree
+// already there: the wizard would count them in every breadcrumb.
+func (f *extractFlow) mayCreate() bool {
+	return f.request.To == "" || f.creates
 }
 
 func modeOf(keep bool) string {
@@ -260,7 +268,7 @@ func (f *extractFlow) recap(answers flow.Answers) string {
 	if source := answers.Value(KeySource); source != "" {
 		lines = append(lines, domain.RecapFieldSource+source)
 	}
-	if files := answers.Values(KeyFiles); len(files) > 0 {
+	if files := f.selectedPaths(answers); len(files) > 0 {
 		lines = append(lines, domain.RecapFieldFiles+strings.Join(files, ", "))
 	}
 
@@ -280,6 +288,21 @@ func (f *extractFlow) recap(answers flow.Answers) string {
 		lines = append(lines, warnings...)
 	}
 	return strings.Join(lines, "\n")
+}
+
+// selectedPaths names the files a directory in --files stands for, as the
+// conclusion will; the answer as given when the changes are not known.
+func (f *extractFlow) selectedPaths(answers flow.Answers) []string {
+	given := answers.Values(KeyFiles)
+	selected, err := rules.SelectExtractFiles(rules.SelectExtractFilesParams{Available: f.changes[answers.Value(KeySource)], Paths: given})
+	if err != nil {
+		return given
+	}
+	paths := make([]string, 0, len(selected))
+	for _, file := range selected {
+		paths = append(paths, file.Path)
+	}
+	return paths
 }
 
 // createdTargetLines says a reused branch is checked out as-is, rather than the

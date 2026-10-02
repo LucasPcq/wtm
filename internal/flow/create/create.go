@@ -83,6 +83,9 @@ type createFlow struct {
 }
 
 func (f *createFlow) run() (Outcome, error) {
+	if err := f.refuseOwnParent(); err != nil {
+		return Outcome{}, err
+	}
 	if f.request.From != "" && !rules.BranchCandidateExists(f.candidates, f.request.From) {
 		return Outcome{}, fmt.Errorf("%w: %s", domain.ErrBranchNotFound, f.request.From)
 	}
@@ -157,6 +160,15 @@ func (f *createFlow) fastForwardsEach(answers flow.Answers) bool {
 		return f.request.FastForward
 	}
 	return answer.Value == updateFastForward
+}
+
+func (f *createFlow) refuseOwnParent() error {
+	for _, name := range f.request.Branches {
+		if name == f.request.From {
+			return fmt.Errorf(domain.BranchOwnParentFmt, name, domain.FlagFrom)
+		}
+	}
+	return nil
 }
 
 func (f *createFlow) acceptRequested() ([]string, error) {

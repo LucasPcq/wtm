@@ -921,13 +921,15 @@ const (
 		"Nothing is removed from the source.\n" +
 		"Resolve in %q then discard there, or discard in %q to undo."
 	ExtractSourceNotFoundFmt = "source worktree %q: %w"
+	// BranchOwnParentFmt refuses a --from naming the branch being created.
+	BranchOwnParentFmt = "%s cannot be its own parent: pass another branch to --%s"
 
 	// The conclusion of an extraction.
 	ExtractMovedFmt               = "Moved %s to %s"
 	ExtractCopiedFmt              = "Copied %s to %s"
 	ExtractLabelSource            = "source"
-	ExtractSourceCleaned          = "clean"
-	ExtractSourceKept             = "kept"
+	ExtractSourceCleaned          = "files removed"
+	ExtractSourceKept             = "files kept"
 	ExtractNothingInSourceFmt     = "No uncommitted changes to extract in %s"
 	ExtractNothingAnywhere        = "No worktree has changes to extract"
 	ExtractConflictsFmt           = "Applied to %s with conflicts"

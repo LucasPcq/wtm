@@ -322,3 +322,64 @@ func TestNoWorktreeWithChangesIsNothingToDo(t *testing.T) {
 		t.Errorf("outcome = %+v, want nothing to extract", presenter.extracted)
 	}
 }
+
+// A --to naming a worktree leaves create's questions out of the session, so the
+// breadcrumb counts only what can still be asked.
+func TestAnExistingTargetLeavesCreatesStepsOut(t *testing.T) {
+	r := newRepo(t)
+	f := &extractFlow{ctx: r.ctx, request: Request{Source: "src", To: "dst"}, changes: map[string][]domain.ExtractFile{}, paths: map[string]string{}}
+	f.create = f.embed()
+	for _, step := range f.session().Steps {
+		if strings.HasPrefix(step.Key, "create.") {
+			t.Errorf("step %s is in a session whose target exists", step.Key)
+		}
+	}
+}
+
+func TestANewTargetIsNotOfferedAsItsOwnParent(t *testing.T) {
+	r := newRepo(t)
+	prompter := &flowtest.ScriptedPrompter{
+		Answers: map[string]string{KeySource: "src", create.KeySource: "main", KeyMode: modeMove, KeyRecap: confirmExtract},
+		Sets:    map[string][]string{KeyFiles: {"a.txt"}},
+	}
+	gittest.CreateBranch(t, r.ctx.ProjectDir, "old-br")
+	if _, err := Run(Params{Context: r.ctx, Request: Request{To: "old-br"}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	excluded := prompter.Content[create.KeySource].ExcludeBranches
+	if len(excluded) != 1 || excluded[0] != "old-br" {
+		t.Errorf("excluded = %v, want the target itself", excluded)
+	}
+}
+
+func TestAFromNamingTheTargetIsRefused(t *testing.T) {
+	r := newRepo(t)
+	request := Request{Source: "src", Files: []string{"a.txt"}, To: "feat/x", From: "feat/x"}
+	_, err := Run(Params{Context: r.ctx, Request: request, Prompter: flow.Unattended{}, Presenter: newRecorder()})
+	if err == nil || !strings.Contains(err.Error(), "own parent") {
+		t.Errorf("err = %v, want the own-parent refusal", err)
+	}
+}
+
+func TestFilesMatchingNoChangeAreRefusedBeforeTheRecap(t *testing.T) {
+	r := newRepo(t)
+	prompter := &flowtest.ScriptedPrompter{}
+	_, err := Run(Params{Context: r.ctx, Request: Request{Source: "src", Files: []string{"zzz.txt"}, To: "dst"}, Prompter: prompter, Presenter: newRecorder()})
+	if err == nil || len(prompter.Asked) != 0 {
+		t.Errorf("err = %v, asked %v: want a refusal before any question", err, prompter.Asked)
+	}
+}
+
+func TestTheRecapNamesTheFilesADirectoryStandsFor(t *testing.T) {
+	r := newRepo(t)
+	write(t, filepath.Join(r.src, "dir", "x.txt"), "x\n")
+	write(t, filepath.Join(r.src, "dir", "y.txt"), "y\n")
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyMode: modeMove, KeyRecap: confirmExtract}}
+	request := Request{Source: "src", Files: []string{"dir/"}, To: "dst"}
+	if _, err := Run(Params{Context: r.ctx, Request: request, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if recap := prompter.Content[KeyRecap].Description; !strings.Contains(recap, "Files:     dir/x.txt, dir/y.txt") {
+		t.Errorf("recap:\n%s", recap)
+	}
+}

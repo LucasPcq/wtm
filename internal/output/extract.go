@@ -35,13 +35,11 @@ func PrintExtractResult(w io.Writer, params ExtractResultParams) {
 	Blank(w)
 	writeExtractFiles(w, result.Files)
 	Blank(w)
-	fields := []domain.RecapField{
-		{Label: domain.ExtractLabelSource, Value: result.SourceBranch + " · " + state},
-		{Label: domain.CreateRecapLabelPath, Value: params.Path},
-	}
+	fields := []domain.RecapField{{Label: domain.ExtractLabelSource, Value: result.SourceBranch + " · " + state}}
 	if params.EnvNote != "" {
 		fields = append(fields, domain.RecapField{Label: domain.CreateRecapLabelEnv, Value: params.EnvNote})
 	}
+	fields = append(fields, domain.RecapField{Label: domain.CreateRecapLabelPath, Value: params.Path})
 	writeAlignedFields(w, fields)
 	Blank(w)
 	NextStep(w, NextStepParams{Command: fmt.Sprintf(domain.GoCommandFmt, result.TargetBranch)})

@@ -100,11 +100,21 @@ func (f *extractFlow) run() (Outcome, error) {
 		if len(files) == 0 {
 			return f.conclude(Outcome{Nothing: domain.ErrNoChangesToExtract, Result: domain.ExtractResult{SourceBranch: f.request.Source}})
 		}
+		// A --files matching no change is refused before a recap the run could
+		// never carry out.
+		if len(f.request.Files) > 0 {
+			if _, err := rules.SelectExtractFiles(rules.SelectExtractFilesParams{Available: files, Paths: f.request.Files}); err != nil {
+				return Outcome{}, err
+			}
+		}
 	}
 
 	if f.request.To != "" {
 		_, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: f.request.To})
 		f.creates = err != nil
+	}
+	if f.creates && f.request.From == f.request.To {
+		return Outcome{}, fmt.Errorf(domain.BranchOwnParentFmt, f.request.To, domain.FlagFrom)
 	}
 	f.create = f.embed()
 

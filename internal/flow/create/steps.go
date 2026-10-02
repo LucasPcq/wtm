@@ -158,7 +158,12 @@ func (f *createFlow) sourceStep() flow.Step {
 			case f.reusesBranch(answers):
 				description = domain.RecapParentRecordedForSync
 			}
-			return flow.StepContent{Title: labelSource, Description: description, Pinned: f.pinnedParent(answers)}, nil
+			return flow.StepContent{
+				Title:           labelSource,
+				Description:     description,
+				Pinned:          f.pinnedParent(answers),
+				ExcludeBranches: f.branches(answers),
+			}, nil
 		},
 		Resolve: f.resolveSource,
 		Flag:    domain.FlagFrom,

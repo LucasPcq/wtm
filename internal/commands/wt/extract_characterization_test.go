@@ -165,7 +165,7 @@ func TestCharacterizeExtractMoveToAnExistingWorktree(t *testing.T) {
 		"    new  b.txt\n" +
 		"    del  gone.txt\n" +
 		"\n" +
-		"  source  src · clean\n" +
+		"  source  src · files removed\n" +
 		"  path    ../.trees/dst\n" +
 		"\n" +
 		"  → wtm go dst\n" +
@@ -209,7 +209,7 @@ func TestCharacterizeExtractCopyKeepsTheSource(t *testing.T) {
 		"\n" +
 		"    mod  a.txt\n" +
 		"\n" +
-		"  source  src · kept\n" +
+		"  source  src · files kept\n" +
 		"  path    ../.trees/dst\n" +
 		"\n" +
 		"  → wtm go dst\n" +
@@ -395,7 +395,7 @@ func TestCharacterizeExtractCreatesItsTarget(t *testing.T) {
 		"\n" +
 		"    new  b.txt\n" +
 		"\n" +
-		"  source  src · clean\n" +
+		"  source  src · files removed\n" +
 		"  path    ../.trees/feat-new\n" +
 		"\n" +
 		"  → wtm go feat/new\n" +

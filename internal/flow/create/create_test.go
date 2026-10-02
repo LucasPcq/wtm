@@ -842,3 +842,15 @@ func TestUnattendedRunWarnsTheParentFallback(t *testing.T) {
 		t.Errorf("statuses = %+v, want the fallback said", presenter.Statuses)
 	}
 }
+
+func TestAFromNamingTheBranchItselfIsRefused(t *testing.T) {
+	_, err := Run(Params{
+		Context:   testContext(t),
+		Request:   Request{Branches: []string{"feat/x"}, From: "feat/x"},
+		Prompter:  flow.Unattended{},
+		Presenter: newRecorder(),
+	})
+	if err == nil || !strings.Contains(err.Error(), "own parent") {
+		t.Errorf("err = %v, want the own-parent refusal", err)
+	}
+}

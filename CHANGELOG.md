@@ -22,6 +22,7 @@
 - **`wtm extract` suit les conventions de `wtm create`** : le récapitulatif s'affiche toujours, même quand tous les flags sont donnés ; une cible `--to` nouvelle passe par les mêmes questions que `create` (parent, isolation, mise à jour depuis origin) au lieu d'une question à part après le wizard ; `--from` et `--ff` ne sont plus ignorés quand la cible est choisie dans le wizard ; une source choisie propose son propre parent plutôt que la branche de base ; une branche déjà tenue par un autre worktree est refusée dès qu'on la tape. Sous `--yes`, le repli `parent` → main est signalé comme pour `create`.
 - **La conclusion de `wtm extract` s'aligne sur celle de `create`** : champs `source` et `path` alignés, chemin relatif à `base_path`, couleur sur le seul glyphe, prochaine étape en `→` après un conflit ; « rien à extraire » s'affiche en `=` et nomme la source.
 - Dans les récapitulatifs de `create`, `checkout` et `extract`, la ligne `Update:` est alignée sur les autres champs.
+- **Une branche ne peut plus être son propre parent** : `create <b> --from <b>` et `extract --to <b> --from <b>` sont refusés, et le picker du parent ne propose plus la branche en cours de création. Ctrl-C annule aussi une confirmation isolée (celle des conflits d'`extract`).
 - **Rupture** : `wtm create --output json` et `wtm clean --output json` répondent toujours avec une enveloppe `{"results": [...], "failed": [...]}`. → [Migration vers 0.29](docs/guide/migrating-to-0.29.md)
 
 ## v0.28.0 : Un worktree, une stack isolée
