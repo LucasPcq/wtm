@@ -139,13 +139,15 @@ func (d *Daemon) stop(req process.Request) {
 	d.jobs = kept
 }
 
-// Actions are the requests that changed something, as action:name@workdir.
+// Actions are the requests that changed something, as action:name@workdir. A
+// published event changed nothing the daemon holds: the commands under test
+// publish one on every mutation, and it would bury the jobs they started.
 func (d *Daemon) Actions() []string {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	var actions []string
 	for _, req := range d.requests {
-		if req.Action == process.ActionList {
+		if req.Action == process.ActionList || req.Action == process.ActionPublish {
 			continue
 		}
 		actions = append(actions, string(req.Action)+":"+req.Name+"@"+req.WorkDir)
