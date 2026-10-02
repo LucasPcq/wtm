@@ -1774,8 +1774,9 @@ const (
 	RelocateBasePathValueLabel  = "New base_path"
 	RelocateBasePathValueDesc   = "Relative to the repo root (e.g. ../.trees). Existing worktrees move here."
 	RelocateParentLabelFmt      = "Parent for %s"
-	RelocateParentDescFmt       = "%s was created outside wtm, so it has no recorded parent. " +
-		"Pick the branch `wtm sync` should rebase it onto — its files stay where they are. " +
+	// RelocateParentDescFmt is broken into lines: a branch step does not wrap.
+	RelocateParentDescFmt = "%s was created outside wtm, so it has no recorded parent.\n" +
+		"Pick the branch `wtm sync` should rebase it onto.\n" +
 		"The full set of moves and adoptions is recapped on the final step."
 	RelocateApplyLabel  = "Apply"
 	RelocateApplyOption = "Yes, apply"
