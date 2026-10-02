@@ -52,7 +52,7 @@ func TestExecRefusesWhatItCannotRun(t *testing.T) {
 		"empty command":    {domain.CmdExec, "a", "--yes", "--"},
 		"all with names":   {domain.CmdExec, "a", "--all", "--yes", "--", "true"},
 		"json without yes": {domain.CmdExec, "a", "--output", domain.OutputJSON, "--", "true"},
-		"jobs below one":   {domain.CmdExec, "a", "--yes", "--jobs", "0", "--", "true"},
+		"negative jobs":    {domain.CmdExec, "a", "--yes", "--jobs", "-1", "--", "true"},
 		"no selection":     {domain.CmdExec, "--yes", "--", "true"},
 		"bad shell syntax": {domain.CmdExec, "a", "--yes", "--", "if", "then"},
 		"unknown worktree": {domain.CmdExec, "nope", "--yes", "--", "true"},
@@ -78,5 +78,11 @@ func TestExecPrintShowsEachOutput(t *testing.T) {
 	got := ansi.Strip(stdout)
 	if err != nil || !strings.Contains(got, "a\n") || !strings.Contains(got, "2 worktrees") {
 		t.Fatalf("err = %v, stdout = %q", err, got)
+	}
+}
+
+func TestExecJobsDefaultDoesNotDependOnTheMachine(t *testing.T) {
+	if def := newExecCmd().Flags().Lookup(domain.FlagJobs).DefValue; def != "0" {
+		t.Fatalf("--jobs default = %q: the generated docs would carry this machine's CPU count", def)
 	}
 }

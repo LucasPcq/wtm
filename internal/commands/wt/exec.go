@@ -45,7 +45,7 @@ func newExecCmd() *cobra.Command {
 	}
 
 	cmd.Flags().Bool(domain.FlagAll, false, "Run in every worktree, the main checkout included")
-	cmd.Flags().Int(domain.FlagJobs, runtime.NumCPU(), "How many commands run at once")
+	cmd.Flags().Int(domain.FlagJobs, 0, "How many commands run at once (0: one per CPU)")
 	cmd.Flags().Bool(domain.FlagPrint, false, "Also show the full output of every worktree, successes included")
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts (requires worktree names or --all)")
 	shared.AddOutputFlag(cmd)
@@ -71,8 +71,8 @@ func runExec(cmd *cobra.Command, args []string) error {
 	if all && len(names) > 0 {
 		return fmt.Errorf("%w: %w", domain.ErrUsage, domain.ErrExecAllWithNames)
 	}
-	if jobs < 1 {
-		return fmt.Errorf("%w: --%s must be at least 1", domain.ErrUsage, domain.FlagJobs)
+	if jobs < 0 {
+		return fmt.Errorf("%w: --%s cannot be negative", domain.ErrUsage, domain.FlagJobs)
 	}
 	if format == domain.OutputJSON && !yes {
 		return fmt.Errorf("--output json requires --%s (prompts cannot run in JSON mode)", domain.FlagYes)
@@ -95,13 +95,14 @@ func runExec(cmd *cobra.Command, args []string) error {
 		return errors.New(domain.ExecNeedsTerminal)
 	}
 
+	workers := rules.ExecJobs(rules.ExecJobsParams{Requested: jobs, CPUs: runtime.NumCPU()})
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
 	defer stop()
 
 	_, err = execflow.Run(execflow.Params{
 		Ctx:       ctx,
 		Context:   shared.FlowContext(config),
-		Request:   execflow.Request{Branches: names, All: all, Command: line, Jobs: jobs, Print: printAll, Dir: dir},
+		Request:   execflow.Request{Branches: names, All: all, Command: line, Jobs: workers, Print: printAll, Dir: dir},
 		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),
 		Presenter: &execPresenter{CLIPresenter: shared.NewPresenter(cmd, format), print: printAll},
 	})

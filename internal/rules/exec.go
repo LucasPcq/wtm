@@ -40,8 +40,13 @@ func ResolveExecTargets(params ResolveExecTargetsParams) ([]domain.GitWorktree, 
 		byBranch[candidate.Branch] = candidate
 	}
 	targets := make([]domain.GitWorktree, 0, len(params.Names))
+	seen := make(map[string]bool, len(params.Names))
 	var unknown []string
 	for _, name := range params.Names {
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
 		candidate, ok := byBranch[name]
 		if !ok {
 			unknown = append(unknown, name)
@@ -50,7 +55,7 @@ func ResolveExecTargets(params ResolveExecTargetsParams) ([]domain.GitWorktree, 
 		targets = append(targets, candidate)
 	}
 	if len(unknown) > 0 {
-		return nil, fmt.Errorf("%w: %s", domain.ErrExecUnknownWorktree, strings.Join(unknown, ", "))
+		return nil, fmt.Errorf("%w: %w: %s", domain.ErrBranchNotFound, domain.ErrExecUnknownWorktree, strings.Join(unknown, ", "))
 	}
 	return targets, nil
 }
@@ -114,4 +119,62 @@ func ExecResultLabel(result domain.ExecResult) string {
 		return fmt.Sprintf(domain.ExecFailedLabelFmt, result.Branch, fmt.Sprintf(domain.ExecExitFmt, *result.ExitCode), duration)
 	}
 	return fmt.Sprintf(domain.ExecPassedLabelFmt, result.Branch, duration)
+}
+
+type ExecJobsParams struct {
+	Requested int
+	CPUs      int
+}
+
+func ExecJobs(params ExecJobsParams) int {
+	if params.Requested == 0 {
+		return params.CPUs
+	}
+	return params.Requested
+}
+
+// TerminalLine is a line as a terminal would have left it: the frames a
+// progress bar rewrote with \r collapse to the last one, and escape sequences
+// (colours, cursor moves, hyperlinks) are dropped.
+func TerminalLine(line string) string {
+	if i := strings.LastIndexByte(line, '\r'); i >= 0 {
+		line = line[i+1:]
+	}
+	var out strings.Builder
+	for i := 0; i < len(line); i++ {
+		if line[i] != domain.AnsiEscByte {
+			out.WriteByte(line[i])
+			continue
+		}
+		i = escapeEnd(line, i)
+	}
+	return out.String()
+}
+
+// escapeEnd returns the index of the last byte of the escape sequence starting
+// at start: CSI ends on a final byte in 0x40–0x7E, OSC on BEL or ESC \.
+func escapeEnd(line string, start int) int {
+	if start+1 >= len(line) {
+		return start
+	}
+	switch line[start+1] {
+	case '[':
+		for i := start + 2; i < len(line); i++ {
+			if line[i] >= 0x40 && line[i] <= 0x7e {
+				return i
+			}
+		}
+	case ']':
+		for i := start + 2; i < len(line); i++ {
+			if line[i] == domain.AnsiBelByte {
+				return i
+			}
+			if line[i] == domain.AnsiEscByte && i+1 < len(line) && line[i+1] == '\\' {
+				return i + 1
+			}
+		}
+	default:
+		return start + 1
+	}
+	return len(line) - 1
 }

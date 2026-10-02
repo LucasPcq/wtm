@@ -99,6 +99,7 @@ func runOne(ctx context.Context, params runOneParams) domain.ExecResult {
 	cmd.Env = params.Target.Env
 	cmd.Stdout, cmd.Stderr = out, out
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.WaitDelay = domain.ExecPipeGrace
 
 	begin := time.Now()
 	if err := cmd.Start(); err != nil {
@@ -128,7 +129,7 @@ func runOne(ctx context.Context, params runOneParams) domain.ExecResult {
 		result.Status = domain.ExecStatusInterrupted
 		return result
 	}
-	code := exitCode(waitErr)
+	code := exitCode(waitErr, cmd.ProcessState)
 	result.ExitCode = &code
 	result.Status = domain.ExecStatusPassed
 	if code != 0 {
@@ -155,9 +156,14 @@ func stop(params stopParams) error {
 	}
 }
 
-func exitCode(err error) int {
+// exitCode reads the shell's own status when Wait only complained about the
+// pipes it had to close: the command itself may well have passed.
+func exitCode(err error, state *os.ProcessState) int {
 	if err == nil {
 		return 0
+	}
+	if errors.Is(err, exec.ErrWaitDelay) && state != nil {
+		return state.ExitCode()
 	}
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {

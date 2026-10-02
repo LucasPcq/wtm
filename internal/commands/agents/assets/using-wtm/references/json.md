@@ -98,7 +98,7 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 - `{command, results: [{branch, path, status, exit_code?, duration_ms?, log?, tail?, output?, error?}], failed: [branch]}`, an envelope even for one worktree.
 - `status`: `passed` / `failed` / `interrupted` / `not_started`. `exit_code`, `duration_ms` and `log` are absent for `not_started`; `exit_code` is absent for `interrupted`.
 - `error`: the command could not start (e.g. the worktree directory is gone).
-- `tail`: the last 20 lines of the combined stdout and stderr. With `--print`, `output` carries the whole output instead.
+- `tail`: the last 20 lines of the combined stdout and stderr, as a terminal would show them (progress frames rewritten by `\r` collapsed, colours removed; the log keeps the raw bytes). With `--print`, `output` carries the whole output instead.
 - `failed`: every branch whose status is not `passed`, `[]` when all passed.
 
 ## `relocate`

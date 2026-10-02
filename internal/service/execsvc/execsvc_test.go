@@ -166,3 +166,14 @@ func TestAVanishedWorktreeIsAFailedResultNotAPanic(t *testing.T) {
 		t.Fatalf("the other target must still run: %+v", results[1])
 	}
 }
+
+func TestABackgroundedJobDoesNotHoldTheRun(t *testing.T) {
+	begin := time.Now()
+	results := Run(context.Background(), RunParams{Command: "sleep 6 & echo started", Targets: targets(t, 1), Jobs: 1})
+	if results[0].Status != domain.ExecStatusPassed {
+		t.Fatalf("status = %+v", results[0])
+	}
+	if elapsed := time.Since(begin); elapsed > domain.ExecPipeGrace+2*time.Second {
+		t.Fatalf("took %s: a background job kept the output pipe, and the run, open", elapsed)
+	}
+}

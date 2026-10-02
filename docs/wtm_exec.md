@@ -38,7 +38,7 @@ wtm exec [worktree...] -- <command> [flags]
 ```
       --all             Run in every worktree, the main checkout included
   -h, --help            help for exec
-      --jobs int        How many commands run at once (default 12)
+      --jobs int        How many commands run at once (0: one per CPU)
       --output string   Output format: text or json (default "text")
       --print           Also show the full output of every worktree, successes included
   -y, --yes             Skip all prompts (requires worktree names or --all)

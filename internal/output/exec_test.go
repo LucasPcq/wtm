@@ -116,3 +116,19 @@ func TestExecResultLineMarksPassAndFailure(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestExecViewNeverDrawsMoreRowsThanTheTerminalHolds(t *testing.T) {
+	var buf bytes.Buffer
+	branches := []string{"a", "b", "c", "d", "e", "f"}
+	view := NewExecView(ExecViewParams{W: &buf, Branches: branches, Height: 5})
+	view.OnBeat(domain.ExecBeat{Index: 0, Started: true, Result: domain.ExecResult{Branch: "a"}})
+	view.OnBeat(domain.ExecBeat{Index: 1, Started: true, Result: domain.ExecResult{Branch: "b"}})
+	view.OnBeat(domain.ExecBeat{Index: 0, Result: domain.ExecResult{Branch: "a", Status: domain.ExecStatusPassed, ExitCode: execCode(0)}})
+	if view.painted > 3 {
+		t.Fatalf("painted %d rows in a 5-row terminal: the cursor cannot climb back over them", view.painted)
+	}
+	got := ansi.Strip(buf.String())
+	if !strings.Contains(got, "1 done · 1 running · 4 queued") || !strings.Contains(got, "b  "+domain.ExecRunningLabel) {
+		t.Fatalf("got %q", got)
+	}
+}

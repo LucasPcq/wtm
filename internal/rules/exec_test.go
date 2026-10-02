@@ -102,3 +102,42 @@ func TestExecResultLabel(t *testing.T) {
 		}
 	}
 }
+
+func TestResolveExecTargetsDropsRepeatedNames(t *testing.T) {
+	candidates := []domain.GitWorktree{{Branch: "a", Path: "/w/a"}, {Branch: "b", Path: "/w/b"}}
+	got, err := ResolveExecTargets(ResolveExecTargetsParams{Candidates: candidates, Names: []string{"b", "a", "b"}})
+	if err != nil || len(got) != 2 || got[0].Branch != "b" || got[1].Branch != "a" {
+		t.Fatalf("got %v, %v: a repeated name must run once, at its first place", got, err)
+	}
+}
+
+func TestAnUnknownWorktreeIsABranchNotFound(t *testing.T) {
+	_, err := ResolveExecTargets(ResolveExecTargetsParams{Names: []string{"nope"}})
+	if !errors.Is(err, domain.ErrBranchNotFound) || ExitCode(err) != domain.ExitCodeBranchNotFound {
+		t.Fatalf("err = %v, exit = %d", err, ExitCode(err))
+	}
+}
+
+func TestExecJobsZeroMeansOnePerCPU(t *testing.T) {
+	if got := ExecJobs(ExecJobsParams{Requested: 0, CPUs: 12}); got != 12 {
+		t.Errorf("0 → %d, want the CPU count", got)
+	}
+	if got := ExecJobs(ExecJobsParams{Requested: 3, CPUs: 12}); got != 3 {
+		t.Errorf("3 → %d", got)
+	}
+}
+
+func TestTerminalLineKeepsWhatATerminalWouldShow(t *testing.T) {
+	cases := map[string]string{
+		"progress 10%\rdone":                   "done",
+		"\x1b[31mred\x1b[0m":                   "red",
+		"\x1b[2K\x1b[1Gbar":                    "bar",
+		"\x1b]8;;http://x\x07link\x1b]8;;\x07": "link",
+		"plain":                                "plain",
+	}
+	for in, want := range cases {
+		if got := TerminalLine(in); got != want {
+			t.Errorf("TerminalLine(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

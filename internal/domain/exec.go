@@ -49,6 +49,9 @@ const (
 	// progress bar without \r) so the tail cannot grow without limit.
 	ExecPartialLineCap = 4096
 	ExecInterruptGrace = 5 * time.Second
+	// ExecPipeGrace bounds the wait for a process that exited while something it
+	// started (a backgrounded job, a daemon) still holds its output pipe.
+	ExecPipeGrace = time.Second
 
 	ExecWizardErrLabel       = "exec"
 	ExecSelectionLabel       = "Worktrees"
@@ -76,4 +79,10 @@ const (
 	ExecSomeFailedFmt    = "%s · %d of %d worktrees failed"
 	ExecPassedCountFmt   = "%d passed"
 	ExecLogLabel         = "log"
+	ExecViewSummaryFmt   = "%d done · %d running · %d queued"
+	// ExecViewMargin keeps the prompt line and the one under the cursor free.
+	ExecViewMargin = 2
+
+	AnsiEscByte = 0x1b
+	AnsiBelByte = 0x07
 )

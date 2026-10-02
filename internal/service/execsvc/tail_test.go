@@ -33,3 +33,11 @@ func TestTailCapsALineThatNeverEnds(t *testing.T) {
 		t.Fatalf("partial line not capped: %d lines, %d bytes", len(lines), len(lines[0]))
 	}
 }
+
+func TestTailKeepsWhatATerminalWouldShow(t *testing.T) {
+	tail := newTail(5)
+	_, _ = tail.Write([]byte("progress 10%\rprogress 100%\rdone\n\x1b[31mred\x1b[0m\nstatus\r\n"))
+	if got := strings.Join(tail.Lines(), ","); got != "done,red,status" {
+		t.Fatalf("got %q", got)
+	}
+}
