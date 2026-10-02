@@ -4,6 +4,7 @@
 package dashboard
 
 import (
+	"context"
 	"fmt"
 	"maps"
 	"path/filepath"
@@ -39,7 +40,10 @@ type RunParams struct {
 	Config domain.Config
 	// Publisher reports what the dashboard's own runs change, like any command.
 	Publisher flow.Publisher
-	PRLoader  worktreepicker.PRLoaderFunc
+	// Watch streams the repository's events, which reload the list whoever made
+	// the change. Nil watches through the daemon, starting it.
+	Watch    WatchFunc
+	PRLoader worktreepicker.PRLoaderFunc
 	// PROpener launches the given PR number in the browser (ghservice.OpenPR,
 	// wired with ProjectDir). Injected the same way PRLoader is, so a test can
 	// exercise the REVIEW section's click without shelling out to a real gh.
@@ -176,6 +180,8 @@ type Model struct {
 	params     RunParams
 	listParams domain.ListParams
 	zones      *zone.Manager
+	// eventsSynced is set by the first snapshot of the event stream.
+	eventsSynced bool
 
 	width  int
 	height int
@@ -334,6 +340,14 @@ func (m Model) Close() { m.zones.Close() }
 func Run(params RunParams) error {
 	model := New(params)
 	defer model.Close()
+
+	watch := params.Watch
+	if watch == nil {
+		watch = defaultWatch(params)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go watchEvents(watchEventsParams{Context: ctx, Msgs: model.msgs, Watch: watch})
 
 	if _, err := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithReportFocus()).Run(); err != nil {
 		return fmt.Errorf("dashboard: %w", err)
