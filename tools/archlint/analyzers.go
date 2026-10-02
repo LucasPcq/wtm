@@ -15,4 +15,7 @@ var analyzers = []*analysis.Analyzer{
 	fontcoverAnalyzer,
 	servicedagAnalyzer,
 	daemonblindAnalyzer,
+	metawriterAnalyzer,
+	emitsAnalyzer,
+	publishAnalyzer,
 }
