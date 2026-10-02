@@ -85,7 +85,37 @@ func (m Model) startClean(branch string) (Model, tea.Cmd) {
 			opID:      id,
 			targetKey: declared.TargetKey,
 		},
-		Presenter: cleanPresenter{presenter{send: send, id: id}},
+		Presenter: newCleanPresenter(presenter{send: send, id: id}),
+	}
+
+	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
+		_, err := cleanflow.Run(params)
+		return opDoneMsg{id: id, err: err}
+	})
+}
+
+// startBatchClean runs the same flow with nothing preset, so it asks which
+// worktrees to remove before anything else. Like prune it holds the whole
+// surface, so it needs no per-worktree lock.
+func (m Model) startBatchClean() (Model, tea.Cmd) {
+	if reason, refused := m.busyReason(""); refused {
+		return m.refuse(reason), nil
+	}
+	declared := cleanflow.Operation()
+	m, id := m.beginOp(beginParams{Operation: declared})
+	send := m.sender()
+
+	params := cleanflow.Params{
+		Context: m.flowContext(),
+		Request: cleanflow.Request{BaseBranch: m.baseBranch()},
+		Prompter: prompter{
+			send:      send,
+			title:     domain.DashboardDeleteManyTitle,
+			shape:     modalStepper,
+			opID:      id,
+			targetKey: declared.TargetKey,
+		},
+		Presenter: newCleanPresenter(presenter{send: send, id: id}),
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {

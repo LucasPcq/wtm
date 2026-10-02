@@ -151,10 +151,19 @@ func createTally(outcome createflow.Outcome) string {
 		}
 		created++
 	}
-	parts := []struct {
-		count int
-		label string
-	}{{created, domain.TallyCreated}, {existed, domain.TallyAlreadyExisted}, {len(outcome.Failed), domain.TallyFailed}}
+	return joinTally([]tallyPart{
+		{count: created, label: domain.TallyCreated},
+		{count: existed, label: domain.TallyAlreadyExisted},
+		{count: len(outcome.Failed), label: domain.TallyFailed},
+	})
+}
+
+type tallyPart struct {
+	count int
+	label string
+}
+
+func joinTally(parts []tallyPart) string {
 	kept := make([]string, 0, len(parts))
 	for _, part := range parts {
 		if part.count > 0 {
@@ -164,19 +173,37 @@ func createTally(outcome createflow.Outcome) string {
 	return strings.Join(kept, domain.TallySeparator)
 }
 
+// cleanPresenter is called from the flow's one goroutine, so the subject it
+// shares between its copies needs no lock.
 type cleanPresenter struct{ presenter }
 
-func (p cleanPresenter) WorktreeStarted(cleanflow.WorktreeProgress) {}
-func (p cleanPresenter) WorktreeCleaned(domain.CleanResult)         {}
-func (p cleanPresenter) WorktreeFailed(domain.CleanFailure)         {}
+func newCleanPresenter(base presenter) cleanPresenter {
+	base.subject = new(string)
+	return cleanPresenter{presenter: base}
+}
+
+func (p cleanPresenter) WorktreeStarted(progress cleanflow.WorktreeProgress) {
+	*p.subject = progress.Branch
+	p.line(fmt.Sprintf(domain.CleanBranchProgressFmt, progress.Branch, progress.Position, progress.Total))
+}
+
+// WorktreeCleaned drops each row the moment its worktree is gone rather than
+// when the whole batch is over.
+func (p cleanPresenter) WorktreeCleaned(result domain.CleanResult) {
+	p.finished(result)
+	p.send(cleanedMsg{})
+}
+
+func (p cleanPresenter) WorktreeFailed(failure domain.CleanFailure) {
+	p.line(fmt.Sprintf(domain.DashboardFailedFmt, failure.Branch, failure.Error))
+}
 
 func (p cleanPresenter) Cleaned(outcome cleanflow.Outcome) error {
-	for _, result := range outcome.Results {
-		if result.AlreadyAbsent {
-			p.line(fmt.Sprintf(domain.CleanAlreadyAbsentFmt, result.Branch))
-			continue
+	batch := len(outcome.Results)+len(outcome.Failed)+len(outcome.Skipped) > 1
+	if !batch {
+		for _, result := range outcome.Results {
+			p.finished(result)
 		}
-		p.line(fmt.Sprintf(domain.DashboardFinishedFmt, domain.OpKindClean, result.Branch))
 	}
 	for _, child := range outcome.Reparented {
 		p.line(fmt.Sprintf(domain.CleanReparentedFmt, child.Branch, child.NewParent))
@@ -184,8 +211,28 @@ func (p cleanPresenter) Cleaned(outcome cleanflow.Outcome) error {
 	for _, child := range outcome.Orphaned {
 		p.line(fmt.Sprintf(domain.CleanStillOrphanedFmt, child.Branch, child.OldParent))
 	}
+	for _, skip := range outcome.Skipped {
+		p.line(fmt.Sprintf(domain.PruneSkippedFmt, skip.Branch, rules.PruneReasonLabel(skip.Reason)))
+	}
+	if batch {
+		removed, absent := rules.CleanedBranches(outcome.Results)
+		p.line(joinTally([]tallyPart{
+			{count: len(removed), label: domain.TallyRemoved},
+			{count: len(absent), label: domain.TallyAlreadyAbsent},
+			{count: len(outcome.Skipped), label: domain.TallySkipped},
+			{count: len(outcome.Failed), label: domain.TallyFailed},
+		}))
+	}
 	p.send(cleanedMsg{})
 	return nil
+}
+
+func (p cleanPresenter) finished(result domain.CleanResult) {
+	if result.AlreadyAbsent {
+		p.line(fmt.Sprintf(domain.CleanAlreadyAbsentFmt, result.Branch))
+		return
+	}
+	p.line(fmt.Sprintf(domain.DashboardFinishedFmt, domain.OpKindClean, result.Branch))
 }
 
 type reparentPresenter struct{ presenter }
