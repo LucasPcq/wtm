@@ -2,6 +2,7 @@ package main
 
 import (
 	"go/ast"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -65,6 +66,18 @@ var layers = map[string]layer{
 		internal: []string{"domain", "flow"},
 		why:      "test doubles for the flow seams",
 	},
+}
+
+// serviceEdges is the service row of the layers table split one level down:
+// service/x may import service/y only along an edge declared here. A daemon
+// that starts importing git, or a cycle in the making, is then an edit to this
+// table rather than an import nobody saw.
+var serviceEdges = map[string][]string{
+	"detect":    {"branch"},
+	"process":   {"proxy"},
+	"runconfig": {"shellcmd"},
+	"runjobs":   {"process", "runconfig", "worktree"},
+	"worktree":  {"branch", "env", "github", "hooks", "process"},
 }
 
 type layer struct {
@@ -145,4 +158,44 @@ func runDomain(pass *analysis.Pass) (any, error) {
 		}
 	}
 	return nil, nil
+}
+
+var servicedagAnalyzer = &analysis.Analyzer{
+	Name: "servicedag",
+	Doc:  "a service package imports another only along a declared edge",
+	Run:  runServiceDAG,
+}
+
+func runServiceDAG(pass *analysis.Pass) (any, error) {
+	own := servicePackage(pass.Pkg.Path())
+	if own == "" {
+		return nil, nil
+	}
+	for _, file := range pass.Files {
+		for _, imp := range file.Imports {
+			target, err := strconv.Unquote(imp.Path.Value)
+			if err != nil {
+				continue
+			}
+			other := servicePackage(target)
+			if other == "" || other == own || slices.Contains(serviceEdges[own], other) {
+				continue
+			}
+			pass.Reportf(imp.Pos(), "internal/service/%s must not import %q — undeclared service edge: declare it in serviceEdges (tools/archlint/layers.go), see CLAUDE.md section 9", own, target)
+		}
+	}
+	return nil, nil
+}
+
+// servicePackage is the top-level service a package belongs to ("process" for
+// service/process/processtest), or "" outside service/.
+func servicePackage(pkgPath string) string {
+	if !dir("service").holds(pkgPath) {
+		return ""
+	}
+	parts := strings.Split(internalPath(pkgPath), "/")
+	if len(parts) < 2 {
+		return ""
+	}
+	return parts[1]
 }

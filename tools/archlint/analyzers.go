@@ -13,4 +13,5 @@ var analyzers = []*analysis.Analyzer{
 	tuistyleAnalyzer,
 	mutedlineAnalyzer,
 	fontcoverAnalyzer,
+	servicedagAnalyzer,
 }
