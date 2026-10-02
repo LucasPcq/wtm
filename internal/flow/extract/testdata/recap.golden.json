@@ -1,0 +1,271 @@
+[
+  {
+    "name": "everything picked, an existing target",
+    "input": {
+      "source_picked": "feat/src",
+      "files_picked": [
+        "a.txt",
+        "b.txt"
+      ],
+      "target_picked": "feat/dst",
+      "mode_asked": true
+    },
+    "recap": "Source:    feat/src\nFiles:     a.txt, b.txt\nTarget:    feat/dst\nMode:      move",
+    "action": "Yes, extract"
+  },
+  {
+    "name": "everything from flags",
+    "input": {
+      "source_arg": "feat/src",
+      "files_flag": [
+        "a.txt"
+      ],
+      "target_flag": "feat/dst",
+      "keep_flag": true
+    },
+    "recap": "Source:    feat/src\nFiles:     a.txt\nTarget:    feat/dst\nMode:      copy",
+    "action": "Yes, extract"
+  },
+  {
+    "name": "fixed source, copy asked",
+    "input": {
+      "source_arg": "feat/src",
+      "files_picked": [
+        "a.txt"
+      ],
+      "target_picked": "feat/dst",
+      "mode_asked": true,
+      "mode_keep": true
+    },
+    "recap": "Source:    feat/src\nFiles:     a.txt\nTarget:    feat/dst\nMode:      copy",
+    "action": "Yes, extract"
+  },
+  {
+    "name": "fixed files, a target flag, mode asked",
+    "input": {
+      "source_arg": "feat/src",
+      "files_flag": [
+        "apps/api",
+        "b.txt"
+      ],
+      "target_flag": "feat/dst",
+      "mode_asked": true
+    },
+    "recap": "Source:    feat/src\nFiles:     apps/api, b.txt\nTarget:    feat/dst\nMode:      move",
+    "action": "Yes, extract"
+  },
+  {
+    "name": "a new worktree",
+    "input": {
+      "source_picked": "feat/src",
+      "files_picked": [
+        "a.txt"
+      ],
+      "create_new": true,
+      "branch": "feat/new",
+      "from": "main",
+      "mode_asked": true
+    },
+    "recap": "Source:    feat/src\nFiles:     a.txt\nTarget:    new worktree feat/new from main\nMode:      move",
+    "action": "Yes, create \u0026 extract"
+  },
+  {
+    "name": "a new worktree, keep fixed",
+    "input": {
+      "source_arg": "feat/src",
+      "files_flag": [
+        "a.txt"
+      ],
+      "create_new": true,
+      "branch": "feat/new",
+      "from": "main",
+      "keep_flag": true
+    },
+    "recap": "Source:    feat/src\nFiles:     a.txt\nTarget:    new worktree feat/new from main\nMode:      copy",
+    "action": "Yes, create \u0026 extract"
+  },
+  {
+    "name": "a new worktree, its source fast-forwarded",
+    "input": {
+      "source_arg": "feat/src",
+      "files_picked": [
+        "a.txt"
+      ],
+      "create_new": true,
+      "branch": "feat/new",
+      "from": "main",
+      "behind": true,
+      "fast_forward": true,
+      "mode_asked": true
+    },
+    "recap": "Source:    feat/src\nFiles:     a.txt\nTarget:    new worktree feat/new from main (fast-forward to origin)\nMode:      move",
+    "action": "Yes, create \u0026 extract"
+  },
+  {
+    "name": "a new worktree, the offer declined",
+    "input": {
+      "source_arg": "feat/src",
+      "files_picked": [
+        "a.txt"
+      ],
+      "create_new": true,
+      "branch": "feat/new",
+      "from": "main",
+      "behind": true,
+      "mode_asked": true
+    },
+    "recap": "Source:    feat/src\nFiles:     a.txt\nTarget:    new worktree feat/new from main\nMode:      move",
+    "action": "Yes, create \u0026 extract"
+  },
+  {
+    "name": "a reused branch",
+    "input": {
+      "source_arg": "feat/src",
+      "files_picked": [
+        "a.txt"
+      ],
+      "create_new": true,
+      "branch": "feat/old",
+      "from": "main",
+      "branch_exists": true,
+      "mode_asked": true
+    },
+    "recap": "Source:    feat/src\nFiles:     a.txt\nTarget:    feat/old (existing local branch — reused)\nParent:    main\nMode:      move",
+    "action": "Yes, create \u0026 extract"
+  },
+  {
+    "name": "a reused branch, fast-forwarded itself",
+    "input": {
+      "source_arg": "feat/src",
+      "files_picked": [
+        "a.txt"
+      ],
+      "create_new": true,
+      "branch": "feat/old",
+      "from": "main",
+      "branch_exists": true,
+      "behind": true,
+      "fast_forward": true,
+      "mode_asked": true
+    },
+    "recap": "Source:    feat/src\nFiles:     a.txt\nTarget:    feat/old (existing local branch — reused)\nParent:    main\nUpdate:  fast-forward feat/old to origin\nMode:      move",
+    "action": "Yes, create \u0026 extract"
+  },
+  {
+    "name": "a diverged source",
+    "input": {
+      "source_arg": "feat/src",
+      "files_picked": [
+        "a.txt"
+      ],
+      "create_new": true,
+      "branch": "feat/new",
+      "from": "main",
+      "diverged": true,
+      "mode_asked": true
+    },
+    "recap": "Source:    feat/src\nFiles:     a.txt\nTarget:    new worktree feat/new from main\nMode:      move\n\n⚠ It can't be fast-forwarded. The worktree starts from your local branch, missing commits that are on origin — you may have to rebase or resolve conflicts later.",
+    "action": "Yes, create \u0026 extract"
+  },
+  {
+    "name": "the parent env falls back to main",
+    "input": {
+      "source_arg": "feat/src",
+      "files_picked": [
+        "a.txt"
+      ],
+      "create_new": true,
+      "branch": "feat/new",
+      "from": "feat/base",
+      "env_fallback": true,
+      "mode_asked": true
+    },
+    "recap": "Source:    feat/src\nFiles:     a.txt\nTarget:    new worktree feat/new from feat/base\nMode:      move\n\n⚠ The \"parent\" env strategy needs the source branch checked out to copy its .env; without a worktree it comes from main.",
+    "action": "Yes, create \u0026 extract"
+  },
+  {
+    "name": "both warnings",
+    "input": {
+      "source_arg": "feat/src",
+      "files_picked": [
+        "a.txt"
+      ],
+      "create_new": true,
+      "branch": "feat/new",
+      "from": "feat/base",
+      "diverged": true,
+      "env_fallback": true,
+      "mode_asked": true
+    },
+    "recap": "Source:    feat/src\nFiles:     a.txt\nTarget:    new worktree feat/new from feat/base\nMode:      move\n\n⚠ It can't be fast-forwarded. The worktree starts from your local branch, missing commits that are on origin — you may have to rebase or resolve conflicts later.\n⚠ The \"parent\" env strategy needs the source branch checked out to copy its .env; without a worktree it comes from main.",
+    "action": "Yes, create \u0026 extract"
+  },
+  {
+    "name": "isolation asked",
+    "input": {
+      "source_arg": "feat/src",
+      "files_picked": [
+        "a.txt"
+      ],
+      "create_new": true,
+      "branch": "feat/new",
+      "from": "main",
+      "isolation_applies": true,
+      "isolation_answer": "verbatim",
+      "mode_asked": true
+    },
+    "recap": "Source:    feat/src\nFiles:     a.txt\nTarget:    new worktree feat/new from main\nIsolation: verbatim — .env kept as copied\nMode:      move",
+    "action": "Yes, create \u0026 extract"
+  },
+  {
+    "name": "isolation from its default",
+    "input": {
+      "source_arg": "feat/src",
+      "files_picked": [
+        "a.txt"
+      ],
+      "create_new": true,
+      "branch": "feat/new",
+      "from": "main",
+      "isolation_applies": true,
+      "isolation_answer": "verbatim",
+      "isolation_default": "verbatim",
+      "mode_asked": true
+    },
+    "recap": "Source:    feat/src\nFiles:     a.txt\nTarget:    new worktree feat/new from main\nIsolation: verbatim — .env kept as copied\nMode:      move",
+    "action": "Yes, create \u0026 extract"
+  },
+  {
+    "name": "isolation from its flag",
+    "input": {
+      "source_arg": "feat/src",
+      "files_picked": [
+        "a.txt"
+      ],
+      "create_new": true,
+      "branch": "feat/new",
+      "from": "main",
+      "isolation_applies": true,
+      "isolation_flag": "verbatim",
+      "mode_asked": true
+    },
+    "recap": "Source:    feat/src\nFiles:     a.txt\nTarget:    new worktree feat/new from main\nIsolation: verbatim — .env kept as copied\nMode:      move",
+    "action": "Yes, create \u0026 extract"
+  },
+  {
+    "name": "isolation flag where nothing isolates",
+    "input": {
+      "source_arg": "feat/src",
+      "files_picked": [
+        "a.txt"
+      ],
+      "create_new": true,
+      "branch": "feat/new",
+      "from": "main",
+      "isolation_flag": "isolated",
+      "mode_asked": true
+    },
+    "recap": "Source:    feat/src\nFiles:     a.txt\nTarget:    new worktree feat/new from main\nIsolation: isolated\nMode:      move",
+    "action": "Yes, create \u0026 extract"
+  }
+]

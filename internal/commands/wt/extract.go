@@ -154,7 +154,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 			Animate: shared.Animate(cmd, interactive),
 			Work: func() error {
 				var filesErr error
-				source.available, filesErr = listExtractFiles(source.path)
+				source.available, filesErr = worktree.ListChanges(worktree.ListChangesParams{WorktreePath: source.path})
 				return filesErr
 			},
 		}); err != nil {
@@ -295,7 +295,7 @@ func extractFilesLoader(statuses []domain.WorktreeStatus) func(branch string) []
 		if path == "" {
 			return nil
 		}
-		files, err := listExtractFiles(path)
+		files, err := worktree.ListChanges(worktree.ListChangesParams{WorktreePath: path})
 		if err != nil {
 			return nil
 		}
@@ -387,25 +387,6 @@ func validateOnConflict(cmd *cobra.Command) error {
 	return nil
 }
 
-// listExtractFiles returns the uncommitted files of a worktree classified for
-// extraction.
-func listExtractFiles(sourcePath string) ([]domain.ExtractFile, error) {
-	modified, err := infra.ListModifiedFiles(infra.ListModifiedFilesParams{WorktreePath: sourcePath})
-	if err != nil {
-		return nil, fmt.Errorf("list modified files: %w", err)
-	}
-
-	files := make([]domain.ExtractFile, 0, len(modified))
-	for _, m := range modified {
-		files = append(files, domain.ExtractFile{
-			Path:     m.Path,
-			OrigPath: m.OrigPath,
-			Status:   rules.ClassifyExtractStatus(m.Status),
-		})
-	}
-	return files, nil
-}
-
 type resolveParams struct {
 	cmd        *cobra.Command
 	cfg        shared.ConfigResult
@@ -481,7 +462,7 @@ func resolveSelectionAndTarget(p resolveParams) (extractSelection, error) {
 	if p.needSource {
 		sourceBranch = wizard.SourceBranch
 		sourcePath = worktreePathForBranch(p.statuses, sourceBranch)
-		available, err = listExtractFiles(sourcePath)
+		available, err = worktree.ListChanges(worktree.ListChangesParams{WorktreePath: sourcePath})
 		if err != nil {
 			return extractSelection{}, err
 		}
