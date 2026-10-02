@@ -32,7 +32,7 @@ var fontSafe = map[rune]string{
 // rune of fontSafe.
 var fontLegacy = map[rune]int{
 	'↗': 1, '⊘': 1, '⋯': 2, '▸': 21, '▾': 2, '▶': 1, '◆': 1,
-	'◈': 1, '◉': 1, '○': 5, '◌': 1, '●': 12, '⚠': 20, '❯': 2,
+	'◈': 1, '◉': 1, '○': 5, '◌': 1, '●': 12, '⚠': 19, '❯': 2,
 }
 
 func legacyBudgets() map[string]int {

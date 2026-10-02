@@ -37,6 +37,28 @@ func PRFilterFor(params PRFilterParams) domain.PRFilter {
 	}
 }
 
+// GHConnectionBanner is what a PR listing says about a CLI it could not use;
+// an empty title when there is nothing to say.
+func GHConnectionBanner(conn domain.GHConnection) (title string, lines []string) {
+	switch conn {
+	case domain.GHConnectionNotInstalled:
+		return domain.GHNotInstalledTitle, []string{domain.GHNotInstalledHint, domain.GHNotInstalledURL}
+	case domain.GHConnectionNotAuthenticated:
+		return domain.GHNotAuthenticatedTitle, []string{domain.GHNotAuthenticatedHint, domain.GHNotAuthenticatedRemedy}
+	}
+	return "", nil
+}
+
+// CheckoutPRLabel is a PR's row in the checkout picker, its title cut so the
+// authors line up.
+func CheckoutPRLabel(pr domain.PRInfo) string {
+	title := pr.Title
+	if len(title) > domain.CheckoutPRTitleWidth {
+		title = title[:domain.CheckoutPRTitleWidth-1] + "…"
+	}
+	return fmt.Sprintf(domain.CheckoutPRLabelFmt, pr.Number, title, pr.Author)
+}
+
 // FirstNonEmpty returns the first non-empty string in values, or "" if none.
 func FirstNonEmpty(values ...string) string {
 	for _, v := range values {

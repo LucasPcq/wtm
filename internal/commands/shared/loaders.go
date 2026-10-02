@@ -1,8 +1,6 @@
 package shared
 
 import (
-	"errors"
-
 	"github.com/LucasPcq/wtm/internal/domain"
 	ghservice "github.com/LucasPcq/wtm/internal/service/github"
 	"github.com/LucasPcq/wtm/internal/service/runjobs"
@@ -34,21 +32,11 @@ type loadPRsParams struct {
 }
 
 func loadPRs(params loadPRsParams) ([]domain.PRInfo, domain.GHConnection) {
-	prs, err := ghservice.ListPRs(ghservice.ListPRsParams{
+	return ghservice.ListOpenPRsWithConnection(ghservice.ListPRsParams{
 		ProjectDir: params.ProjectDir,
 		Filter:     params.Filter,
 		WithChecks: params.WithChecks,
 	})
-	if err == nil {
-		return prs, domain.GHConnectionOK
-	}
-	if errors.Is(err, domain.ErrGHNotInstalled) {
-		return nil, domain.GHConnectionNotInstalled
-	}
-	if errors.Is(err, domain.ErrGHNotAuthenticated) {
-		return nil, domain.GHConnectionNotAuthenticated
-	}
-	return nil, domain.GHConnectionOK
 }
 
 // LoadPRsAllStatesGraceful fetches PRs across all states (open/merged/closed)

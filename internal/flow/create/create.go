@@ -284,32 +284,11 @@ type fastForwardParams struct {
 }
 
 func (f *createFlow) applyFastForward(ff fastForwardParams) (bool, error) {
-	subject := ff.Subject
-	params := branch.BranchParams{ProjectDir: f.ctx.ProjectDir, Branch: subject}
-
-	// --ff is best effort: a branch that cannot be cleanly fast-forwarded is left
-	// as-is and creation proceeds from it, and no prompt can run.
-	if !f.prompter.Interactive() {
-		_ = branch.FastForwardIfBehind(params)
-		return true, nil
-	}
-
-	ffErr := f.presenter.Stage(flow.StageParams{
-		Message: fmt.Sprintf(domain.SourceFastForwardLoadingFmt, subject),
-		Work:    func() error { return branch.FastForwardToOrigin(params) },
-	})
-	if ffErr == nil {
-		return true, nil
-	}
-
-	_, ab := branch.Divergence(params)
-	proceed, confirmErr := f.prompter.Confirm(flow.ConfirmParams{
-		Title:      fmt.Sprintf(decide.Pick(decide.PickParams{Many: ff.Many, One: domain.SourceProceedStalePrompt, Several: domain.SourceProceedStalePromptMany}), subject, ab.Behind),
-		Warning:    fmt.Sprintf(domain.SourceProceedStaleWarning, ffErr),
-		DefaultYes: false,
-	})
-	if confirmErr != nil {
-		return false, nil
-	}
-	return proceed, nil
+	return decide.ApplyFastForward(decide.ApplyFastForwardParams{
+		ProjectDir: f.ctx.ProjectDir,
+		Subject:    ff.Subject,
+		Many:       ff.Many,
+		Prompter:   f.prompter,
+		Presenter:  f.presenter,
+	}), nil
 }

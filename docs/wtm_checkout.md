@@ -6,7 +6,8 @@ Create a worktree from an existing pull request
 
 Create a worktree from a pull request.
 A local branch of the PR's name is checked out as-is, keeping commits you never
-pushed; interactive runs offer to fast-forward it when it is behind origin.
+pushed; interactive runs offer to fast-forward it when it is behind origin (--ff
+does it without asking).
 Without arguments, shows an interactive picker of open PRs.
 
 ```
@@ -32,6 +33,7 @@ wtm checkout [number] [flags]
 
 ```
       --env-from string    Override env strategy (example, main, parent)
+      --ff                 Fast-forward the PR's branch to origin when it already exists locally and is behind (non-interactive; skipped when it has diverged)
       --from string        Parent branch for sync (defaults to the PR base branch)
   -h, --help               help for checkout
       --isolation string   How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated

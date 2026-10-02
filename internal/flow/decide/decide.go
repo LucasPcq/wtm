@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/branch"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
@@ -140,4 +141,122 @@ func Pick(params PickParams) string {
 		return params.Several
 	}
 	return params.One
+}
+
+// EnvOptions are the env strategies a create-like run offers, the config's own
+// first and answered by the empty value.
+func EnvOptions(strategy domain.EnvStrategy) []flow.Option {
+	return []flow.Option{
+		{Label: fmt.Sprintf(domain.EnvOptionConfigDefaultFmt, strategy), Value: ""},
+		{Label: domain.EnvOptionExample, Value: string(domain.EnvStrategyExample)},
+		{Label: domain.EnvOptionMain, Value: string(domain.EnvStrategyMain)},
+		{Label: domain.EnvOptionParent, Value: string(domain.EnvStrategyParent)},
+	}
+}
+
+type IsolationOptionsParams struct {
+	First domain.Isolation
+	Many  bool
+}
+
+func IsolationOptions(params IsolationOptionsParams) []flow.Option {
+	label := rules.IsolationOptionLabel
+	if params.Many {
+		label = rules.IsolationOptionLabelMany
+	}
+	choices := rules.IsolationChoices(params.First)
+	options := make([]flow.Option, 0, len(choices))
+	for _, choice := range choices {
+		options = append(options, flow.Option{Label: label(choice), Value: string(choice)})
+	}
+	return options
+}
+
+// UpdateFastForward and UpdateKeep answer a source-update step.
+const (
+	UpdateFastForward = "ff"
+	UpdateKeep        = "keep"
+)
+
+type SourceUpdateStepParams struct {
+	Key         string
+	Prompt      func(flow.Answers) SourceUpdatePrompt
+	FastForward bool
+}
+
+// SourceUpdateStep applies only to a behind-only branch; a diverged one is not a
+// gate here, it becomes a ⚠ line in the recap.
+func SourceUpdateStep(params SourceUpdateStepParams) flow.Step {
+	return flow.Step{
+		Kind:  flow.StepSelect,
+		Key:   params.Key,
+		Label: domain.SourceUpdateLabel,
+		Skip: func(answers flow.Answers) (bool, string) {
+			prompt := params.Prompt(answers)
+			if prompt.Show && !prompt.AbortOnDecline {
+				return false, ""
+			}
+			return true, prompt.SkipReason
+		},
+		Build: func(answers flow.Answers) (flow.StepContent, error) {
+			prompt := params.Prompt(answers)
+			return flow.StepContent{
+				Description: prompt.Description,
+				Options: []flow.Option{
+					{Label: fmt.Sprintf(domain.SourceFastForwardOptionFmt, prompt.Branch), Value: UpdateFastForward},
+					{Separator: true},
+					{Label: domain.SourceKeepAsIsOption, Value: UpdateKeep},
+				},
+			}, nil
+		},
+		Resolve: func(flow.Answers) (flow.Answer, error) {
+			if params.FastForward {
+				return flow.Answer{Value: UpdateFastForward}, nil
+			}
+			return flow.Answer{Value: UpdateKeep}, nil
+		},
+		Summarize: func(answer flow.Answer) string {
+			if answer.Value == UpdateFastForward {
+				return domain.SourceUpdateSummaryFastForward
+			}
+			return domain.SourceUpdateSummaryKeep
+		},
+		Flag: domain.FlagFF,
+	}
+}
+
+type ApplyFastForwardParams struct {
+	ProjectDir string
+	Subject    string
+	Many       bool
+	Prompter   flow.Prompter
+	Presenter  flow.Presenter
+}
+
+// ApplyFastForward runs an accepted fast-forward. Unattended (--ff) it is best
+// effort: a branch that cannot be cleanly fast-forwarded is left as-is and the
+// run proceeds from it. Interactively a failure asks whether to go on from the
+// stale branch; proceed is false when that is declined.
+func ApplyFastForward(params ApplyFastForwardParams) (proceed bool) {
+	branchParams := branch.BranchParams{ProjectDir: params.ProjectDir, Branch: params.Subject}
+	if !params.Prompter.Interactive() {
+		_ = branch.FastForwardIfBehind(branchParams)
+		return true
+	}
+
+	ffErr := params.Presenter.Stage(flow.StageParams{
+		Message: fmt.Sprintf(domain.SourceFastForwardLoadingFmt, params.Subject),
+		Work:    func() error { return branch.FastForwardToOrigin(branchParams) },
+	})
+	if ffErr == nil {
+		return true
+	}
+
+	_, ab := branch.Divergence(branchParams)
+	proceed, err := params.Prompter.Confirm(flow.ConfirmParams{
+		Title:      fmt.Sprintf(Pick(PickParams{Many: params.Many, One: domain.SourceProceedStalePrompt, Several: domain.SourceProceedStalePromptMany}), params.Subject, ab.Behind),
+		Warning:    fmt.Sprintf(domain.SourceProceedStaleWarning, ffErr),
+		DefaultYes: false,
+	})
+	return err == nil && proceed
 }

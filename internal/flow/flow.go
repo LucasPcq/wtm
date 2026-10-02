@@ -42,6 +42,8 @@ type Option struct {
 	Value     string
 	Separator bool
 	Danger    bool
+	// Disabled shows an option that cannot be picked; its badges say why.
+	Disabled bool
 	// Selected pre-checks the option in a StepMultiSelect, so a step can offer a
 	// set it already narrowed rather than an empty one.
 	Selected bool
@@ -82,6 +84,16 @@ type StepContent struct {
 	// of whatever it last returned.
 	ExcludeBranches []string
 	Entries         []string
+	// Pinned overrides Step.Pinned when the branch to pin depends on an earlier
+	// answer — the base of the pull request just picked.
+	Pinned string
+	// Banner is what a loaded step has to say about what it could not load.
+	Banner Banner
+}
+
+type Banner struct {
+	Title string
+	Lines []string
 }
 
 // EntryCheck is one entry of a StepTextList as it is added, with the entries
@@ -106,10 +118,14 @@ type Step struct {
 	Description string
 	Options     []Option
 
-	Default  string
-	Branches []domain.BranchCandidate
-	Pinned   string
-	Refresh  func() []domain.BranchCandidate
+	Default      string
+	Branches     []domain.BranchCandidate
+	Pinned       string
+	PinnedSuffix string
+	// PinAbsent keeps the pinned entry even when no candidate carries it: the base
+	// of a pull request is worth offering before it was ever fetched.
+	PinAbsent bool
+	Refresh   func() []domain.BranchCandidate
 
 	Validate func(value string) error
 	// ValidateSet is Validate for a StepMultiSelect step.
@@ -384,7 +400,33 @@ func MergeContent(step Step, built StepContent) StepContent {
 	content.Blockers = built.Blockers
 	content.ExcludeBranches = built.ExcludeBranches
 	content.Entries = built.Entries
+	content.Pinned = step.Pinned
+	if built.Pinned != "" {
+		content.Pinned = built.Pinned
+	}
+	content.Banner = built.Banner
 	return content
+}
+
+// PinnedAmong is the branch a step pins among the candidates a surface shows.
+func PinnedAmong(step Step, content StepContent, candidates []domain.BranchCandidate) string {
+	if step.PinAbsent {
+		return content.Pinned
+	}
+	for _, candidate := range candidates {
+		if candidate.Name == content.Pinned {
+			return content.Pinned
+		}
+	}
+	return ""
+}
+
+// PinnedSuffix is what labels a branch step's pinned candidate.
+func PinnedSuffix(step Step) string {
+	if step.PinnedSuffix != "" {
+		return step.PinnedSuffix
+	}
+	return domain.PinnedSuffixDefault
 }
 
 // SummarizeSet renders a set answer for a breadcrumb: the names, capped so a

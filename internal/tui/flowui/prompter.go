@@ -113,7 +113,7 @@ type plan struct {
 	refresh     func() []domain.BranchCandidate
 	initCmd     tea.Cmd
 	loadingText string
-	loads       map[int]flow.Step
+	loads       map[int]loadedStep
 	loadErr     error
 }
 
