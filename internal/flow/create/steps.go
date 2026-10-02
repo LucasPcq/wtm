@@ -24,16 +24,15 @@ const (
 )
 
 const (
-	updateFastForward = "ff"
-	updateKeep        = "keep"
+	updateFastForward = decide.UpdateFastForward
+	updateKeep        = decide.UpdateKeep
 	confirmCreate     = "create"
 )
 
 const (
-	labelSource       = "Source branch"
-	labelEnv          = "Env strategy"
-	labelSourceUpdate = "Source update"
-	labelRecap        = "Confirm & create"
+	labelSource = "Source branch"
+	labelEnv    = "Env strategy"
+	labelRecap  = "Confirm & create"
 )
 
 // TEMPORARY DUPLICATION: these steps are also declared, in Bubbletea terms, by
@@ -190,19 +189,13 @@ func (f *createFlow) resolveSource(answers flow.Answers) (flow.Answer, error) {
 }
 
 func (f *createFlow) envStep() flow.Step {
-	strategy := string(f.ctx.Config.Project.Env.Strategy)
 	return flow.Step{
 		Kind:        flow.StepSelect,
 		Key:         KeyEnv,
 		Label:       labelEnv,
 		Title:       labelEnv,
 		Description: domain.CreateEnvStepDescription,
-		Options: []flow.Option{
-			{Label: fmt.Sprintf(domain.EnvOptionConfigDefaultFmt, strategy), Value: ""},
-			{Label: domain.EnvOptionExample, Value: string(domain.EnvStrategyExample)},
-			{Label: domain.EnvOptionMain, Value: string(domain.EnvStrategyMain)},
-			{Label: domain.EnvOptionParent, Value: string(domain.EnvStrategyParent)},
-		},
+		Options:     decide.EnvOptions(f.ctx.Config.Project.Env.Strategy),
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
 			return flow.StepContent{Description: decide.Pick(decide.PickParams{
 				Many:    f.many(answers),
@@ -245,12 +238,12 @@ func (f *createFlow) isolationStep() flow.Step {
 			}
 			return true, domain.IsolationStepIrrelevant
 		},
-		Options: isolationOptions(isolationOptionsParams{First: fallback}),
+		Options: decide.IsolationOptions(decide.IsolationOptionsParams{First: fallback}),
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
 			many := f.many(answers)
 			return flow.StepContent{
 				Description: decide.Pick(decide.PickParams{Many: many, One: domain.IsolationStepDescription, Several: domain.IsolationStepDescriptionMany}),
-				Options:     isolationOptions(isolationOptionsParams{First: fallback, Many: many}),
+				Options:     decide.IsolationOptions(decide.IsolationOptionsParams{First: fallback, Many: many}),
 			}, nil
 		},
 		Resolve: func(flow.Answers) (flow.Answer, error) {
@@ -261,63 +254,12 @@ func (f *createFlow) isolationStep() flow.Step {
 	}
 }
 
-type isolationOptionsParams struct {
-	First domain.Isolation
-	Many  bool
-}
-
-func isolationOptions(params isolationOptionsParams) []flow.Option {
-	label := rules.IsolationOptionLabel
-	if params.Many {
-		label = rules.IsolationOptionLabelMany
-	}
-	choices := rules.IsolationChoices(params.First)
-	options := make([]flow.Option, 0, len(choices))
-	for _, choice := range choices {
-		options = append(options, flow.Option{Label: label(choice), Value: string(choice)})
-	}
-	return options
-}
-
-// sourceUpdateStep applies only to a behind-only branch; a diverged one is not a
-// gate here, it becomes a ⚠ line in the recap.
 func (f *createFlow) sourceUpdateStep() flow.Step {
-	return flow.Step{
-		Kind:  flow.StepSelect,
-		Key:   KeySourceUpdate,
-		Label: labelSourceUpdate,
-		Skip: func(answers flow.Answers) (bool, string) {
-			prompt := f.sourceUpdate(answers)
-			if prompt.Show && !prompt.AbortOnDecline {
-				return false, ""
-			}
-			return true, prompt.SkipReason
-		},
-		Build: func(answers flow.Answers) (flow.StepContent, error) {
-			prompt := f.sourceUpdate(answers)
-			return flow.StepContent{
-				Description: prompt.Description,
-				Options: []flow.Option{
-					{Label: fmt.Sprintf(domain.SourceFastForwardOptionFmt, prompt.Branch), Value: updateFastForward},
-					{Separator: true},
-					{Label: domain.SourceKeepAsIsOption, Value: updateKeep},
-				},
-			}, nil
-		},
-		Resolve: func(flow.Answers) (flow.Answer, error) {
-			if f.request.FastForward {
-				return flow.Answer{Value: updateFastForward}, nil
-			}
-			return flow.Answer{Value: updateKeep}, nil
-		},
-		Summarize: func(answer flow.Answer) string {
-			if answer.Value == updateFastForward {
-				return domain.SourceUpdateSummaryFastForward
-			}
-			return domain.SourceUpdateSummaryKeep
-		},
-		Flag: domain.FlagFF,
-	}
+	return decide.SourceUpdateStep(decide.SourceUpdateStepParams{
+		Key:         KeySourceUpdate,
+		Prompt:      f.sourceUpdate,
+		FastForward: f.request.FastForward,
+	})
 }
 
 func (f *createFlow) recapStep() flow.Step {

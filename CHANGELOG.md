@@ -9,6 +9,9 @@
 - **`wtm relocate --to` réécrit `base_path` même sans worktree à déplacer** : sous `--yes`, la commande répondait « already aligned » et laissait la config intacte ; `--dry-run` annonce désormais ce changement. L'ancien dossier `base_path`, une fois vidé, est supprimé.
 - **`wtm relocate --output json`** : `steps` vaut `[]` au lieu de `null`, et `base_path` est toujours renseigné, même quand rien ne change.
 - **Ctrl-C annule un wizard** à n'importe quelle étape, comme Échap sur la première.
+- **`wtm checkout` suit les conventions de `wtm create`** : le récapitulatif s'affiche toujours avant de créer le worktree, même quand tous les flags sont donnés, et y porte l'avertissement du repli `parent` → main au lieu d'une question à part ; une annulation le dit ; la mise à jour d'une branche locale en retard sur origin est proposée avant le récapitulatif, et `--ff` la fait sous `--yes`.
+- **`wtm checkout` refuse avant de créer quoi que ce soit** ce qu'il ne refusait qu'après : un `--env-from` inconnu (qui laissait un worktree à moitié provisionné, `wtm create` aussi), un `--from` qui ne nomme aucune branche, et la branche d'une PR qu'un autre worktree tient déjà, avant de poser la moindre question.
+- **Le repli de la stratégie `parent` sur le `.env` de main est signalé sous `--yes`** (`create` et `checkout`) : une ligne d'avertissement, et une entrée dans `warnings` en JSON, là où une exécution interactive l'annonce dans son récapitulatif.
 - **Rupture** : `wtm create --output json` et `wtm clean --output json` répondent toujours avec une enveloppe `{"results": [...], "failed": [...]}`. → [Migration vers 0.29](docs/guide/migrating-to-0.29.md)
 
 ## v0.28.0 : Un worktree, une stack isolée

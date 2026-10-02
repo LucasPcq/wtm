@@ -182,16 +182,29 @@ func ListPRsAllStates(projectDir string) ([]domain.PRInfo, error) {
 // flow layer needs it and may not reach that far up.
 func ListPRsWithConnection(projectDir string) ([]domain.PRInfo, domain.GHConnection) {
 	prs, err := ListPRsAllStates(projectDir)
-	if err == nil {
-		return prs, domain.GHConnectionOK
+	return prs, connectionOf(err)
+}
+
+// ListOpenPRsWithConnection is ListPRs with the CLI's availability kept alongside
+// the result, the way ListPRsWithConnection keeps it for every state.
+func ListOpenPRsWithConnection(params ListPRsParams) ([]domain.PRInfo, domain.GHConnection) {
+	prs, err := ListPRs(params)
+	if err != nil {
+		return nil, connectionOf(err)
 	}
-	if errors.Is(err, domain.ErrGHNotInstalled) {
-		return nil, domain.GHConnectionNotInstalled
+	return prs, domain.GHConnectionOK
+}
+
+// connectionOf reads a listing error as the CLI's availability. Any other
+// failure still reads as connected: there is nothing the user could set up.
+func connectionOf(err error) domain.GHConnection {
+	switch {
+	case errors.Is(err, domain.ErrGHNotInstalled):
+		return domain.GHConnectionNotInstalled
+	case errors.Is(err, domain.ErrGHNotAuthenticated):
+		return domain.GHConnectionNotAuthenticated
 	}
-	if errors.Is(err, domain.ErrGHNotAuthenticated) {
-		return nil, domain.GHConnectionNotAuthenticated
-	}
-	return nil, domain.GHConnectionOK
+	return domain.GHConnectionOK
 }
 
 // GetPRDetailParams holds inputs for fetching a single PR's detail.

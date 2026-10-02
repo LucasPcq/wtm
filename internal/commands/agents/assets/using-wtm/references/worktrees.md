@@ -139,7 +139,7 @@ Modes and flags:
 
 `wtm checkout <number> --yes --output json` fetches a PR's branch into a worktree. The PR number and `--yes` are both **required** in JSON mode (no picker). `--yes` resolves the parent to the PR's base branch (a fact, not a guess) and the env strategy to the config default.
 
-- A local branch of the PR's name is **reused as is**, never reset: the response sets `existing_branch: true` and `origin_state`. Under `--yes` no ref is touched even when the branch is behind, so read `origin_state` and decide yourself.
+- A local branch of the PR's name is **reused as is**, never reset: the response sets `existing_branch: true` and `origin_state`. Under `--yes` no ref is touched even when the branch is behind, unless you pass `--ff`: it fast-forwards a behind-only branch to origin first, as on `create`, and leaves a diverged one as is. Without it, read `origin_state` and decide yourself.
 - `--isolation` works as on `create`, and the JSON carries `isolation`, `env_ports` and `warnings` the same way. A name another worktree already reduces to is refused (exit `10`).
 - Fork PRs are out of scope: fall back to `gh pr checkout <number>`. Creating a PR is out of scope too: use `gh pr create`.
 - `gh` must be authenticated (`gh: …` on stderr means `gh auth login`).

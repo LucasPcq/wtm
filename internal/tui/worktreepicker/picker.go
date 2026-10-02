@@ -17,26 +17,17 @@ import (
 )
 
 // LoadingPRsText is the status-line label shown while PRs stream in.
-const LoadingPRsText = "Loading pull requests…"
+const LoadingPRsText = domain.LoadingPRsText
 
 // GHBanner returns the status banner shown in the picker once the PR fetch
 // completes, when the GitHub CLI is unavailable. An empty Title means gh is OK
 // (no banner).
 func GHBanner(conn domain.GHConnection) components.WizardBanner {
-	switch conn {
-	case domain.GHConnectionNotInstalled:
-		return components.WizardBanner{
-			Title: "GitHub CLI not found",
-			Lines: []string{"Install it to see PRs linked to your worktrees:", "https://cli.github.com"},
-		}
-	case domain.GHConnectionNotAuthenticated:
-		return components.WizardBanner{
-			Title: "GitHub not connected",
-			Lines: []string{"Connect to see PRs linked to your worktrees:", "run `gh auth login`"},
-		}
-	default:
+	title, lines := rules.GHConnectionBanner(conn)
+	if title == "" {
 		return components.WizardBanner{}
 	}
+	return components.WizardBanner{Title: title, Lines: lines}
 }
 
 // PRLoaderFunc fetches open PRs and the GitHub CLI connection status. Provided

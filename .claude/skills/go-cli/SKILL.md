@@ -192,8 +192,8 @@ Steps are `flow.Step` values (`Kind`, `Key`, `Label`, `Title`, `Description`, `O
 (`Kind`, `Mode`, `TargetKey`) is what a flow declares about how a surface must schedule
 it; the CLI ignores it, `tui/dashboard/ops.go` enforces it.
 
-`create`, `clean` and `relocate` are migrated. `extract`, `sync`, `prune`, `reparent`,
-`checkout` and `env` still drive their `internal/tui/*` wizard packages directly — the
+`create`, `checkout`, `clean`, `reparent`, `prune`, `relocate`, `sync` and `fast-forward` are
+migrated. `extract` and `env` still drive their `internal/tui/*` wizard packages directly — the
 `components.Step` sections below still describe them. **Any new mutation command goes
 through `flow/`.** Full reference: [`docs/dev/flow-layer.md`](../../../docs/dev/flow-layer.md)
 and [`docs/dev/adding-a-mutation-command.md`](../../../docs/dev/adding-a-mutation-command.md).
@@ -463,8 +463,8 @@ bug: no breadcrumb, and `Esc` quits the whole flow instead of going back.
   OnMsg, InitCmd, Loading, LoadingText})` — it centralises the program/assertion/abort boilerplate.
   It maps `Esc` at step 1 to `domain.ErrUserAborted`; otherwise pull values from
   `final.Steps()[i].Model.(components.SelectListModel).Value()`.
-- Reference implementation: `internal/tui/checkout/wizard.go`.
-  (`clean`, `sync` and `relocate` are no longer among them: their steps are declared in
+- Reference implementation: `internal/tui/extract/extract.go`.
+  (`clean`, `sync`, `relocate` and `checkout` are no longer among them: their steps are declared in
   `internal/flow/<cmd>/steps.go` and run through `internal/tui/flowui`.)
 
 Standalone wrappers (`RunStandaloneSelect`/`RunStandaloneConfirm`) are only for a **single**
@@ -682,8 +682,8 @@ Reference: `internal/flow/create/steps.go` (`createFlow.recap`), pinned by
 
 **Non-migrated wizards** still do it by hand: each `build*Recap` / `recapStep` reads the
 value from its wizard step and **falls back to the flag/arg** when that step was skipped.
-References: `internal/tui/extract` `buildCombinedRecap` (`FixedFiles`/`FixedTarget`/`FixedKeep`), `internal/tui/checkout`
-`buildCheckoutRecap` (`FromOverride`/`EnvOverride`). Add the fallback whenever you add a flag
+Reference: `internal/tui/extract` `buildCombinedRecap` (`FixedFiles`/`FixedTarget`/`FixedKeep`).
+Add the fallback whenever you add a flag
 that pre-fills a step.
 
 ### Async data in a wizard: `Step.Load` (flow) — `InitCmd` / `OnEnter` (legacy)
@@ -705,15 +705,18 @@ step := flow.Step{
 slow sibling. Choosing between them can itself depend on the request — `clean` uses
 `Build` when the branch was given up front (already checked) and `Load` when it was picked
 (checked then and there, over the network): see `internal/flow/clean/steps.go`
-`deleteStep`. The `InitCmd`/`OnEnter`/`UpdateStepModel` plumbing still exists, but it is
-`internal/tui/flowui`'s business, not the command's.
+`deleteStep`. `Load` works on a `StepRecap` and on a `StepSelect`: a select's options may be
+the slow part, as `checkout`'s open pull requests are (`internal/flow/checkout/steps.go`
+`prStep`), with `Option.Disabled` for a row that cannot be picked and `StepContent.Banner`
+for what the load could not list. The `InitCmd`/`OnEnter`/`UpdateStepModel` plumbing still
+exists, but it is `internal/tui/flowui`'s business, not the command's.
 
 **Non-migrated wizards** wire the two async entry points themselves, by when the data is
 known:
 
 - **`InitCmd` + `Loading`/`LoadingText` + `OnMsg`** — one-shot load at wizard start, for data an
-  early step needs that does **not** depend on a later answer (e.g. `checkout` streams open PRs
-  into step 1). Set them via `RunWizardParams`.
+  early step needs that does **not** depend on a later answer (a migrated flow declares it as
+  a `Load` on its first step instead, as `checkout` does for its open PRs). Set them via `RunWizardParams`.
 - **`Step.OnEnter func(prev []Step) tea.Cmd`** — fires each time the wizard *advances* into the
   step (not on back-navigation), for slow work **derived from a prior answer**: a network call or
   git work proportional to the selection. Pair it with an `OnMsg` handler:
@@ -736,10 +739,9 @@ Each screen lives in its own package under `internal/tui/`:
 ```
 internal/tui/
   components/     ← shared primitives (wizard, selectlist, multiselect, confirm)
-  flowui/         ← runs a flow.Session as the CLI wizard (create, clean)
+  flowui/         ← runs a flow.Session as the CLI wizard (every migrated command)
   dashboard/      ← `wtm ui`, the second surface over flow/
   newwt/          ← create wizard (still used by extract's embedded sub-flow)
-  checkout/       ← checkout wizard (PR picker → parent → env)
   runpicker/      ← run list / ps pickers
   runwizard/      ← run job / profile wizards
   inittui/        ← global + project init wizards

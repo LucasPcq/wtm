@@ -63,11 +63,14 @@ func newCreateCmd() *cobra.Command {
 func runCreate(cmd *cobra.Command, args []string) error {
 	fromFlag, _ := cmd.Flags().GetString(domain.FlagFrom)
 	ffFlag, _ := cmd.Flags().GetBool(domain.FlagFF)
-	envFromFlag, _ := cmd.Flags().GetString(domain.FlagEnvFrom)
 	ifNotExists, _ := cmd.Flags().GetBool(domain.FlagIfNotExists)
 	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 	isolation, err := shared.IsolationFlag(cmd)
+	if err != nil {
+		return err
+	}
+	envFromFlag, err := shared.EnvFromFlag(cmd)
 	if err != nil {
 		return err
 	}

@@ -408,6 +408,7 @@ func newSelectList(content flow.StepContent) components.SelectListModel {
 			Value:     option.Value,
 			Separator: option.Separator,
 			Danger:    option.Danger,
+			Disabled:  option.Disabled,
 			Badges:    selectBadges(option.Badges),
 		})
 	}
@@ -438,17 +439,10 @@ func selectBadges(badges []flow.Badge) []components.Badge {
 // surfaces.
 func branchItems(step flow.Step, content flow.StepContent) []components.SelectItem {
 	candidates := flow.KeepBranches(step.Branches, content.ExcludeBranches)
-	pinned := ""
-	for _, candidate := range candidates {
-		if candidate.Name == step.Pinned {
-			pinned = step.Pinned
-			break
-		}
-	}
 	return components.BranchItems(components.BranchItemsParams{
 		Candidates:   candidates,
-		Pinned:       pinned,
-		PinnedSuffix: domain.PinnedSuffixDefault,
+		Pinned:       flow.PinnedAmong(step, content, candidates),
+		PinnedSuffix: flow.PinnedSuffix(step),
 	})
 }
 

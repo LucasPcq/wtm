@@ -35,13 +35,13 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 
 ## `create`, `extract`, `checkout`
 
-`create` wraps its results in an envelope, even for one branch: `{"results": [...], "failed": [{"branch", "path"?, "error", "exit_code"}...]}`. The fields below sit on each entry of `results`; `extract` and `checkout` carry them at the top level. A refusal before anything is created (a bad `--from`, a name clash, a repeated branch) writes no envelope: it is an error on stderr with its exit code. See `worktrees.md`.
+`create` wraps its results in an envelope, even for one branch: `{"results": [...], "failed": [{"branch", "path"?, "error", "exit_code"}...]}`. The fields below sit on each entry of `results`; `extract` and `checkout` carry them at the top level. A refusal before anything is created (a bad `--from` or `--env-from`, a name clash, a repeated branch, a branch another worktree holds) writes no envelope: it is an error on stderr with its exit code. See `worktrees.md`.
 
 - `already_exists: true` when `create --if-not-exists` found the worktree (with its path, possibly outside `base_path`, even the main checkout's).
 - `existing_branch: true` and `origin_state` (`up-to-date` / `behind` / `ahead` / `diverged`) when a same-named local branch was reused as is.
 - `isolation`: the worktree's, `isolated` or `verbatim` (for `extract`, the target's).
 - `env_ports`: present when the port pass ran and the project links anything (shape below). Absent for a verbatim worktree, a project linking nothing, or a pass that could not run.
-- `warnings`: why the port pass could not run ("ports not settled, run `wtm env <branch>` once run.toml is fixed"), or that `--isolation` differed from an existing worktree's and was ignored.
+- `warnings`: why the port pass could not run ("ports not settled, run `wtm env <branch>` once run.toml is fixed"), that `--isolation` differed from an existing worktree's and was ignored, or that `--env-from parent` copied the `.env` from the main checkout because the parent has no worktree.
 - `extract` file entries may carry `"status": "renamed"` with `"orig_path"`.
 
 ## `env_ports` and the `ports` block

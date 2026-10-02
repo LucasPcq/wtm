@@ -1730,6 +1730,7 @@ const (
 	// LoadingBranchesText labels the spinner shown while a branch picker fetches
 	// origin to refresh its divergence badges.
 	LoadingBranchesText = "Fetching branches…"
+	LoadingPRsText      = "Loading pull requests…"
 
 	// LoadingWorktreesText labels the spinner shown while a worktree list fetches
 	// origin to refresh its divergence badges.
@@ -3059,12 +3060,14 @@ const (
 	SourceUpdateSkipRemote   = "source is a remote branch"
 	SourceUpdateSkipUpToDate = "source already up to date"
 	SourceUpdateSkipDiverged = "source diverged from origin — see recap"
+	// SourceUpdateLabel names the step offering to fast-forward the branch a run
+	// starts from, in create and checkout alike.
+	SourceUpdateLabel = "Source update"
 	// SourceFastForwardOptionFmt labels the fast-forward choice on the
 	// source-update step (subject).
 	SourceFastForwardOptionFmt = "Fast-forward %s to origin"
 	// SourceFastForwardLoadingFmt is the spinner message while a fast-forward
-	// runs, in the wizard's confirmation step or checkout's reuse reconciliation
-	// (subject).
+	// runs (subject).
 	SourceFastForwardLoadingFmt = "Updating %s from origin…"
 	// RecapUpdateFastForward is the recap line naming an accepted fast-forward,
 	// shared by create's and extract's combined recaps (subject).
@@ -3090,6 +3093,31 @@ const (
 	// FlagGivenTwiceFmt refuses a repeated single-valued flag, which pflag would
 	// otherwise let the last one win without a word (the value already held).
 	FlagGivenTwiceFmt = "already given as %q: it takes one value"
+
+	// The checkout flow (internal/flow/checkout): step prose, loading lines,
+	// the recap's confirmation and the refusal of a run with no PR to check out.
+	CheckoutPRLabel             = "Pull request"
+	CheckoutPRTitle             = "Select a pull request to checkout"
+	CheckoutPRDescription       = "Linked PRs are disabled — use `wtm go <branch>` to enter them"
+	CheckoutPRLabelFmt          = "#%-4d  %-40s  %s"
+	CheckoutPRTitleWidth        = 40
+	CheckoutPRRecapFmt          = "#%d %s"
+	CheckoutPRRequired          = "PR number required without an interactive terminal (or when --yes is set)"
+	CheckoutParentLabel         = "Parent branch"
+	CheckoutParentDescription   = "Branch this PR is rebased onto by `wtm sync` (defaults to the PR base)"
+	CheckoutEnvLabel            = "Env strategy"
+	CheckoutRecapLabel          = "Confirm"
+	CheckoutRecapConfirmOption  = "Yes, checkout"
+	CheckoutNoPRs               = "No open pull requests"
+	CheckoutFetchingPR          = "Fetching PR…"
+	CheckoutFetchingBranch      = "Fetching branch from origin…"
+	CheckoutSourceUpdateSkipNew = "the branch is new — it starts from origin"
+	GHNotInstalledTitle         = "GitHub CLI not found"
+	GHNotInstalledHint          = "Install it to see PRs linked to your worktrees:"
+	GHNotInstalledURL           = "https://cli.github.com"
+	GHNotAuthenticatedTitle     = "GitHub not connected"
+	GHNotAuthenticatedHint      = "Connect to see PRs linked to your worktrees:"
+	GHNotAuthenticatedRemedy    = "run `gh auth login`"
 
 	// The create flow (internal/flow/create): step prose, option labels, recap
 	// fields and refusals. Format verbs: %s branch, %s env strategy, %s flag name.

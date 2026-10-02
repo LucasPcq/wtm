@@ -1,8 +1,8 @@
 package checkout
 
 import (
-	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,11 +17,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
-
-// createFromPR is exercised directly (white-box, same package) rather than through
-// runCheckout: resolving a domain.PRInfo is the one step that needs GitHub, and
-// createFromPR takes it as a plain param, so the reuse path is fully testable
-// against a real local repo without a network dependency.
 
 func git(t *testing.T, dir string, args ...string) {
 	t.Helper()
@@ -90,121 +85,32 @@ on_create = []
 	return result
 }
 
-// runCmd returns a bare command with its stdout captured in out, for decoding
-// the JSON createFromPR writes.
-func runCmd() (cmd *cobra.Command, out *bytes.Buffer) {
-	cmd = &cobra.Command{}
-	out = &bytes.Buffer{}
-	cmd.SetOut(out)
-	cmd.SetErr(&bytes.Buffer{})
-	return cmd, out
-}
+// G1: a run.toml the port pass refuses leaves the PR worktree created and its
+// hooks run, with the pass left undone named in the JSON.
+func TestCheckoutGoesAheadOverAnInvalidRunToml(t *testing.T) {
+	repo := newCheckoutRepo(t)
+	repo.pushBranch(t, "feat/thing")
+	repo.writeConfig(t, `#:schema ./schemas/project.schema.json
+[worktrees]
+base_path = "../.trees"
+base_branch = "main"
 
-// LUC-172: a local branch of the PR's name is reused as-is, not created from
-// origin — createFromPR reports the reuse and keeps the branch's own commits.
-func TestCreateFromPRReusesExistingLocalBranch(t *testing.T) {
-	work := repoWithRemote(t)
-	result := loadResult(t, work)
+[env]
+strategy = "example"
 
-	branch := "feat/pr-branch"
-	git(t, work, "branch", branch)
-	git(t, work, "push", "origin", branch)
-	// Local-only commit the PR's origin branch does not have.
-	git(t, work, "checkout", branch)
-	git(t, work, "commit", "--allow-empty", "-m", "local-only")
-	want := revParse(t, work, branch)
-	git(t, work, "checkout", "main")
-
-	cmd, out := runCmd()
-	err := createFromPR(cmd, result, createFromPRParams{
-		pr:           domain.PRInfo{Number: 1, Branch: branch, BaseBranch: "main"},
-		parent:       "main",
-		jsonMode:     true,
-		interactive:  false,
-		envConfirmed: true,
-	})
-	if err != nil {
-		t.Fatalf("createFromPR: %v", err)
-	}
-
-	var got output.PRCheckoutJSON
-	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
-		t.Fatalf("decode checkout JSON: %v", err)
-	}
-	if !got.ExistingBranch {
-		t.Error("existing_branch should report the reuse")
-	}
-
-	if head := revParse(t, work, branch); head != want {
-		t.Errorf("branch %s = %s, want unchanged local tip %s — commits were lost", branch, head, want)
-	}
-}
-
-// LUC-172: --yes / JSON never touch refs — a reused branch behind origin is left
-// exactly where it is, and origin_state says so.
-func TestCreateFromPRNonInteractiveDoesNotFastForward(t *testing.T) {
-	work := repoWithRemote(t)
-	result := loadResult(t, work)
-
-	branch := "feat/behind"
-	git(t, work, "branch", branch)
-	git(t, work, "push", "origin", branch)
-	local := revParse(t, work, branch)
-	// Origin advances without the local branch moving, so it falls behind.
-	git(t, work, "commit", "--allow-empty", "-m", "server-commit")
-	git(t, work, "push", "origin", "main:"+branch)
-
-	cmd, out := runCmd()
-	err := createFromPR(cmd, result, createFromPRParams{
-		pr:           domain.PRInfo{Number: 2, Branch: branch, BaseBranch: "main"},
-		parent:       "main",
-		jsonMode:     true,
-		interactive:  false,
-		envConfirmed: true,
-	})
-	if err != nil {
-		t.Fatalf("createFromPR: %v", err)
-	}
-
-	if got := revParse(t, work, branch); got != local {
-		t.Errorf("branch %s moved to %s under non-interactive checkout, want unchanged %s", branch, got, local)
-	}
-
-	var got output.PRCheckoutJSON
-	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
-		t.Fatalf("decode checkout JSON: %v", err)
-	}
-	if got.OriginState != domain.DivergenceLabelBehind {
-		t.Errorf("origin_state = %q, want %q", got.OriginState, domain.DivergenceLabelBehind)
-	}
-}
-
-// G1: a run.toml the port pass refuses leaves the PR worktree created and
-// its hooks run, with the pass left undone named in the JSON.
-func TestCreateFromPRGoesAheadOverAnInvalidRunToml(t *testing.T) {
-	work := repoWithRemote(t)
-	result := loadResult(t, work)
-	result.Config.Project.Hooks.OnCreate = []domain.HookCommand{{Cmd: "touch hook-ran"}}
-	if err := os.WriteFile(filepath.Join(result.StateDir, domain.RunFileName), []byte("bogus_key = 1\n"), 0o644); err != nil {
+[hooks]
+on_create = ["touch hook-ran"]
+`)
+	if err := os.WriteFile(filepath.Join(repo.stateDir, domain.RunFileName), []byte("bogus_key = 1\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	branch := "feat/pr-broken-run"
-	git(t, work, "branch", branch)
-	git(t, work, "push", "origin", branch)
-	git(t, work, "branch", "-D", branch)
 
-	cmd, out := runCmd()
-	if err := createFromPR(cmd, result, createFromPRParams{
-		pr:           domain.PRInfo{Number: 3, Branch: branch, BaseBranch: "main"},
-		parent:       "main",
-		jsonMode:     true,
-		envConfirmed: true,
-	}); err != nil {
-		t.Fatalf("createFromPR must not fail over run.toml: %v", err)
+	stdout, _, err := runCheckoutCmd(t, "42", "--yes", "--output", "json")
+	if err != nil {
+		t.Fatalf("checkout must not fail over run.toml: %v", err)
 	}
-
 	var got output.PRCheckoutJSON
-	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
 		t.Fatalf("decode checkout JSON: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(got.Path, "hook-ran")); err != nil {
@@ -215,38 +121,36 @@ func TestCreateFromPRGoesAheadOverAnInvalidRunToml(t *testing.T) {
 	}
 }
 
-func TestCreateFromPRJSONReportsIsolationAndEnvPorts(t *testing.T) {
-	work := repoWithRemote(t)
-	result := loadResult(t, work)
-	result.Config.Project.Env.Strategy = domain.EnvStrategyMain
-	result.Config.Project.Env.Files = []domain.EnvFile{{Target: ".env"}}
-	if err := config.WriteRun(config.WriteRunParams{StateDir: result.StateDir, Force: true, Config: domain.RunConfig{
+func TestCheckoutJSONReportsIsolationAndEnvPorts(t *testing.T) {
+	repo := newCheckoutRepo(t)
+	repo.pushBranch(t, "feat/thing")
+	repo.writeConfig(t, `#:schema ./schemas/project.schema.json
+[worktrees]
+base_path = "../.trees"
+base_branch = "main"
+
+[env]
+strategy = "main"
+
+[[env.file]]
+target = ".env"
+`)
+	if err := config.WriteRun(config.WriteRunParams{StateDir: repo.stateDir, Force: true, Config: domain.RunConfig{
 		Jobs:     []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "true", Ports: map[string]int{"PORT": 3000}}},
 		EnvPorts: []domain.EnvPortLink{{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"}},
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(work, ".env"), []byte("WEB_PORT=3000\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(repo.work, ".env"), []byte("WEB_PORT=3000\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	branch := "feat/pr-ports"
-	git(t, work, "branch", branch)
-	git(t, work, "push", "origin", branch)
-	git(t, work, "branch", "-D", branch)
 
-	cmd, out := runCmd()
-	if err := createFromPR(cmd, result, createFromPRParams{
-		pr:           domain.PRInfo{Number: 4, Branch: branch, BaseBranch: "main"},
-		parent:       "main",
-		isolation:    domain.IsolationIsolated,
-		jsonMode:     true,
-		envConfirmed: true,
-	}); err != nil {
-		t.Fatalf("createFromPR: %v", err)
+	stdout, _, err := runCheckoutCmd(t, "42", "--yes", "--isolation", string(domain.IsolationIsolated), "--output", "json")
+	if err != nil {
+		t.Fatalf("checkout: %v", err)
 	}
-
 	var got output.PRCheckoutJSON
-	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
 		t.Fatalf("decode checkout JSON: %v", err)
 	}
 	if got.Isolation != domain.IsolationIsolated {
@@ -254,5 +158,67 @@ func TestCreateFromPRJSONReportsIsolationAndEnvPorts(t *testing.T) {
 	}
 	if len(got.EnvPorts.Entries) != 1 || got.EnvPorts.Entries[0].Status != domain.EnvPortStatusRewrite {
 		t.Errorf("env_ports = %+v, want WEB_PORT settled", got.EnvPorts)
+	}
+}
+
+func TestCheckoutRefusesAnUnknownEnvStrategyBeforeCreating(t *testing.T) {
+	repo := newCheckoutRepo(t)
+	repo.pushBranch(t, "feat/thing")
+
+	_, _, err := runCheckoutCmd(t, "42", "--yes", "--env-from", "bogus")
+	if err == nil || !strings.Contains(err.Error(), `invalid --env-from value "bogus"`) {
+		t.Fatalf("err = %v, want --env-from refused", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(repo.work, "..", ".trees", "feat-thing")); statErr == nil {
+		t.Error("a refused --env-from must leave no worktree behind")
+	}
+}
+
+func TestCheckoutRefusesAnUnknownFrom(t *testing.T) {
+	repo := newCheckoutRepo(t)
+	repo.pushBranch(t, "feat/thing")
+
+	_, _, err := runCheckoutCmd(t, "42", "--yes", "--from", "nope")
+	if !errors.Is(err, domain.ErrBranchNotFound) {
+		t.Fatalf("err = %v, want the unknown parent refused", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(repo.work, "..", ".trees", "feat-thing")); statErr == nil {
+		t.Error("a refused --from must leave no worktree behind")
+	}
+}
+
+// Interactively the recap warns of it; unattended, the run says it afterwards.
+func TestCheckoutWarnsAnUnattendedParentFallback(t *testing.T) {
+	repo := newCheckoutRepo(t)
+	repo.pushBranch(t, "feat/thing")
+	git(t, repo.work, "branch", "develop")
+	repo.writeConfig(t, `#:schema ./schemas/project.schema.json
+[worktrees]
+base_path = "../.trees"
+base_branch = "main"
+
+[env]
+strategy = "example"
+
+[[env.file]]
+target = ".env"
+`)
+	if err := os.WriteFile(filepath.Join(repo.work, ".env"), []byte("A=1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr, err := runCheckoutCmd(t, "42", "--yes", "--from", "develop", "--env-from", "parent", "--output", "json")
+	if err != nil {
+		t.Fatalf("checkout: %v", err)
+	}
+	var got output.PRCheckoutJSON
+	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
+		t.Fatalf("decode checkout JSON: %v", err)
+	}
+	if len(got.Warnings) != 1 || got.Warnings[0] != domain.EnvParentFallbackWarning {
+		t.Errorf("warnings = %v, want the fallback named", got.Warnings)
+	}
+	if !strings.Contains(stderr, domain.EnvParentFallbackWarning) {
+		t.Errorf("stderr = %q, want the fallback said", stderr)
 	}
 }

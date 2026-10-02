@@ -25,6 +25,35 @@ type StubParams struct {
 	// Unauthenticated makes `gh auth status` fail, which the service maps to
 	// domain.GHConnectionNotAuthenticated.
 	Unauthenticated bool
+	// Details answer `gh pr view <number>`; a number missing from them fails as
+	// gh does for a pull request that does not exist.
+	Details []PRDetail
+}
+
+// PRDetail is one pull request as `gh pr view --json` describes it.
+type PRDetail struct {
+	Number int
+	Title  string
+	Author string
+	Branch string
+	Base   string
+	Fork   bool
+	Draft  bool
+}
+
+type ghAuthor struct {
+	Login string `json:"login"`
+}
+
+type ghPRDetail struct {
+	Number            int      `json:"number"`
+	Title             string   `json:"title"`
+	Author            ghAuthor `json:"author"`
+	HeadRefName       string   `json:"headRefName"`
+	BaseRefName       string   `json:"baseRefName"`
+	URL               string   `json:"url"`
+	IsCrossRepository bool     `json:"isCrossRepository"`
+	IsDraft           bool     `json:"isDraft"`
 }
 
 // ghPR is the shape service/github parses out of `gh pr list --json`.
@@ -63,18 +92,45 @@ func Stub(t testing.TB, params StubParams) {
 case "$1" in
   auth) exit %d ;;
   pr)
+    if [ "$2" = "view" ]; then
+      case "$3" in
+%s      *) echo "no pull requests found for number $3" >&2; exit 1 ;;
+      esac
+    fi
     cat <<'WTM_GH_STUB_EOF'
 %s
 WTM_GH_STUB_EOF
     exit 0 ;;
 esac
 exit 1
-`, authExit, payload)
+`, authExit, detailCases(t, params.Details), payload)
 
 	if err := os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o755); err != nil {
 		t.Fatalf("write gh stub: %v", err)
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func detailCases(t testing.TB, details []PRDetail) string {
+	t.Helper()
+	var cases strings.Builder
+	for _, detail := range details {
+		payload, err := json.Marshal(ghPRDetail{
+			Number:            detail.Number,
+			Title:             detail.Title,
+			Author:            ghAuthor{Login: detail.Author},
+			HeadRefName:       detail.Branch,
+			BaseRefName:       detail.Base,
+			URL:               fmt.Sprintf("https://github.com/test/test/pull/%d", detail.Number),
+			IsCrossRepository: detail.Fork,
+			IsDraft:           detail.Draft,
+		})
+		if err != nil {
+			t.Fatalf("marshal stub PR detail: %v", err)
+		}
+		fmt.Fprintf(&cases, "        %d) cat <<'WTM_GH_STUB_EOF'\n%s\nWTM_GH_STUB_EOF\n          exit 0 ;;\n", detail.Number, payload)
+	}
+	return cases.String()
 }
 
 // Absent hides `gh` from exec.LookPath. A PATH entry that holds a `gh` is not

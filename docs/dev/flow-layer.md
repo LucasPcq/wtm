@@ -30,6 +30,7 @@ is implemented yet.
 | `wtm prune` | migrated — `internal/flow/prune` |
 | `wtm sync` | migrated — `internal/flow/sync` |
 | `wtm relocate` | migrated — `internal/flow/relocate` (LUC-238). The old `worktree.Relocate` chained three acts; they are now three mutators the flow calls in turn — `worktree.Move`, then `worktree.Adopt` for a worktree created outside wtm, then `worktree.SetBasePath` — so a moved-and-adopted worktree is two observable acts. One `StepBranchSelect` per adoption, keyed `relocate.parent.<branch>`; the recap is skipped when nothing would change. |
+| `wtm checkout` | migrated — `internal/flow/checkout` (LUC-237). Its pull-request picker is a `StepSelect` with a `Load`, the first one: the wizard is on screen while `gh` answers. It follows `create`'s conventions rather than its old wizard's: the recap is always shown, the parent-env fallback is one of its `⚠` lines, an abort says so, and a reused branch behind origin is offered the same source-update step (`decide.SourceUpdateStep`, answered by `--ff` unattended, run by `decide.ApplyFastForward`) before the recap. A PR given by number has its branch fetched before the questions, so that step and `--ff` read origin as it is now rather than as the last fetch left it; a PR picked in the wizard relies on the wizard's own branch refresh, started as it opens. `checkout.create` is the one point the worktree comes into existence, before the hooks — where `worktree.created` will be published (LUC-233) |
 | `wtm run up\|down\|start\|stop\|logs` | migrated — `internal/flow/run/<cmd>`, over the questions in `internal/flow/run/target` and the daemon binding in `internal/flow/run/seam` (LUC-193) |
 | `wtm run ps` | not a flow: it reads the daemon's index and prints it, and asks nothing |
 | `wtm run list` | migrated — `internal/flow/run/list` answers which entry was picked and what to do to it; `internal/commands/run/dispatch.go` runs that action through the flow it already has for it (LUC-217) |
@@ -42,7 +43,8 @@ is implemented yet.
 | Dashboard surface | `internal/tui/dashboard` (`prompter.go`, `presenter.go`, `ops.go`) |
 | Test doubles | `internal/testutil/flowtest` |
 | `extract` | **not migrated** — still driven by `internal/commands/wt` plus its wizard package (`internal/tui/extract`). The model was validated on paper against it; that is not the same as delivered. Tracked as LUC-182. |
-| `checkout`, `env` | **not migrated** either, which nothing said until `archlint`'s `chokepoint` rule counted them: both call their service straight from `internal/commands/`, so no second surface can run them. Listed in `.archlint-migrating`, reported on every `make lint`. |
+| `env` | **not migrated** either, which nothing said until `archlint`'s `chokepoint` rule counted it: it calls its service straight from `internal/commands/`, so no second surface can run it. Listed in `.archlint-migrating`, reported on every `make lint`. |
+| `Load` on a `StepSelect`, `Option.Disabled`, `StepContent.Banner`, `StepContent.Pinned` | since `checkout` (LUC-237). A select may load its options; until they arrive `flowui` draws its description over an empty list. A disabled option is drawn but never picked, its badges saying why. `Banner` is what a load has to say about what it could not list (`gh` missing, no pull request). `Pinned` lets a branch step pin what an earlier answer decides — the base of the pull request just picked — with `Step.PinnedSuffix` naming it and `Step.PinAbsent` keeping it when no candidate carries it; `flow.PinnedAmong` is the one rule both surfaces apply. The dashboard renders `Disabled` and `Pinned`, and ignores `Banner` until a dashboard flow loads one. |
 | `StepMultiSelect` | exists since `reparent`, which needed it to keep its no-argument picker. Rendered by both surfaces: `flowui`, and the dashboard's modal since its Actions menu runs the batch reparent. Since `prune`, an `Option` can also arrive pre-checked and tagged (`Selected`, `Tag`, `Tone`). `Tone` is a `domain` enum, not a `flow` one, so `components.TagVariantOf` can hold the one mapping onto the palette without the widget library learning about `flow`. |
 | `StepContent.Start` and `Option.Badges` | exist since the run module's worktree step (LUC-193), which opens its cursor on the worktree you are standing in and marks each row with what it is running. Both surfaces render them; `Badges` are the trailing words of a `StepSelect` row, where `Tag` is the leading one of a `StepMultiSelect` row. |
 | `StepText` pre-fill | `StepContent.Default`, since the CRUD forms of `run job` and `run profile` (LUC-217). It is content rather than a static field because what a form opens on can depend on the answers before it. |
@@ -211,9 +213,11 @@ type Step struct {
 	Description string
 	Options     []Option
 
-	Branches []domain.BranchCandidate // StepBranchSelect only
-	Pinned   string
-	Refresh  func() []domain.BranchCandidate
+	Branches     []domain.BranchCandidate // StepBranchSelect only
+	Pinned       string
+	PinnedSuffix string // " (default)" unless the step says otherwise
+	PinAbsent    bool   // pin it even when no candidate carries it
+	Refresh      func() []domain.BranchCandidate
 
 	Validate       func(value string) error
 	Skip           func(Answers) (skip bool, reason string)

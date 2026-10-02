@@ -188,6 +188,11 @@ func (m *WizardModel) UpdateStepModel(stepIdx int, fn func(model any) any) {
 		return
 	}
 	m.steps[stepIdx].Model = fn(m.steps[stepIdx].Model)
+	// A model built from scratch knows nothing of the terminal: without the size
+	// a list loaded after the first resize overflows it.
+	if m.height > 0 {
+		m.propagateSize(stepIdx)
+	}
 }
 
 // Done returns true when all steps have been completed.

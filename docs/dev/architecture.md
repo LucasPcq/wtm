@@ -103,8 +103,8 @@ step declaration itself (`Skip`, `Build`, `Load`) and the courier disappears. Th
 the gain that justifies the refactor independently of the dashboard: `create` and
 `clean` inject nothing today.
 
-The closures have not all gone yet, because not every command has migrated:
-`checkout` still injects `EnvFallback`. `prune`'s `ReparentPreview` and `sync`'s
+The closures went with their command's migration: `checkout`'s `EnvFallback` and
+`Target` are now read by its recap step directly. `prune`'s `ReparentPreview` and `sync`'s
 `PlanPreview` both went with their migration — a flow calls `rules.FinalizePrunePlan`
 and `rules.SprintSyncPlan` directly, and `internal/tui/syncpicker` (the package
 `PlanPreview` was injected into) no longer exists. And `internal/commands/wt/create.go` still holds `sourceUpdatePrompt`,
@@ -177,7 +177,7 @@ Two consequences worth keeping:
 
 The cross-file check has to live outside `config.LoadRun`: that loader only ever sees `run.toml` and validates what `run.toml` can answer for alone. Whether a link names a configured env target needs `config.toml` too, so `rules.ValidateEnvPortTargets` is called where both are in hand — `service/worktree.ResolveEnvPorts`.
 
-**Where the question is put, on a worktree being created.** `internal/flow/envports.Settle` runs after `worktree.Create` — it needs the files to exist — but it does not *decide* there. The decision is the worktree's **isolation**, a step of the run that provisions those files (`create.KeyIsolation`, `components.IsolationStep` for the wizards of `extract` and `checkout`), skipped whole when `rules.IsolationApplies` finds nothing in `run.toml` to isolate. `worktree.Create` records the answer in `meta.json` before any hook runs, since a hook reads the ports it decides.
+**Where the question is put, on a worktree being created.** `internal/flow/envports.Settle` runs after `worktree.Create` — it needs the files to exist — but it does not *decide* there. The decision is the worktree's **isolation**, a step of the run that provisions those files (`create.KeyIsolation`, `checkout.KeyIsolation`, `components.IsolationStep` for the wizard of `extract`), skipped whole when `rules.IsolationApplies` finds nothing in `run.toml` to isolate. `worktree.Create` records the answer in `meta.json` before any hook runs, since a hook reads the ports it decides.
 
 **One choice, read by both halves.** Isolation is not a port-pass option; it is what the worktree *is*, and two readers act on it:
 
@@ -199,7 +199,8 @@ They used to be separate: a "keep the ports" answer left the `.env` on its sourc
 | `prune` | `internal/flow/prune` | CLI wizard, unattended, dashboard |
 | `sync` | `internal/flow/sync` | CLI wizard, unattended, dashboard |
 | `relocate` | `internal/flow/relocate` | CLI wizard, unattended |
-| `extract`, `checkout`, `env` | `internal/commands/wt/*.go` + their `internal/tui/*` wizard packages | CLI only |
+| `checkout` | `internal/flow/checkout` | CLI wizard, unattended |
+| `extract`, `env` | `internal/commands/wt/*.go` + their `internal/tui/*` wizard packages | CLI only |
 
 Unmigrated commands still follow the old model, and the parts of the `go-cli` skill
 that describe `components.Step` wizards still apply to them. A **new** mutation
