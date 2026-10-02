@@ -59,9 +59,9 @@ const (
 	ExecConfirmTitle         = "Run this command?"
 	ExecConfirmOption        = "Run"
 	ExecConfirmValue         = "run"
-	ExecRecapWorktrees       = "Worktrees"
-	ExecRecapCommand         = "Command"
-	ExecRecapJobs            = "Concurrency"
+	ExecRecapWorktrees       = "Worktrees:   "
+	ExecRecapCommand         = "Command:     "
+	ExecRecapJobs            = "Concurrency: "
 	ExecNeedsTerminal        = "wtm exec needs a terminal to pick worktrees: pass worktree names or --all, with --yes"
 
 	ExecQueuedLabel      = "queued"

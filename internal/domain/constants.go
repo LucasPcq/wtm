@@ -3368,7 +3368,6 @@ const (
 	OpKindReparent = "reparent"
 	OpKindPrune    = "prune"
 	OpKindSync     = "sync"
-	OpKindExec     = "exec"
 	OpKindRunUp    = "run-up"
 	OpKindRunLogs  = "run-logs"
 	OpKindRunDown  = "run-down"
