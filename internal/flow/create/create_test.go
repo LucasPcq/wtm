@@ -811,3 +811,34 @@ func TestTheWizardKeepsTheSingularForOneBranch(t *testing.T) {
 		t.Errorf("env description = %q, want the singular", got)
 	}
 }
+
+// Interactively the recap warns of it; unattended, the run says it afterwards.
+func TestUnattendedRunWarnsTheParentFallback(t *testing.T) {
+	ctx := testContext(t)
+	ctx.Config.Project.Env.Files = []domain.EnvFile{{Target: ".env"}}
+	if err := os.WriteFile(filepath.Join(ctx.ProjectDir, ".env"), []byte("A=1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("git", "branch", "develop")
+	cmd.Dir = ctx.ProjectDir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git branch: %s: %v", out, err)
+	}
+	presenter := newRecorder()
+
+	outcome, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Branches: []string{"feat/fallback"}, From: "develop", EnvFrom: string(domain.EnvStrategyParent)},
+		Prompter:  flow.Unattended{},
+		Presenter: presenter,
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if warnings := outcome.Results[0].Warnings; len(warnings) != 1 || warnings[0] != domain.EnvParentFallbackWarning {
+		t.Errorf("warnings = %v, want the fallback named", warnings)
+	}
+	if len(presenter.Statuses) != 1 {
+		t.Errorf("statuses = %+v, want the fallback said", presenter.Statuses)
+	}
+}

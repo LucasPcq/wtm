@@ -2,6 +2,7 @@ package checkout
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -157,5 +158,67 @@ target = ".env"
 	}
 	if len(got.EnvPorts.Entries) != 1 || got.EnvPorts.Entries[0].Status != domain.EnvPortStatusRewrite {
 		t.Errorf("env_ports = %+v, want WEB_PORT settled", got.EnvPorts)
+	}
+}
+
+func TestCheckoutRefusesAnUnknownEnvStrategyBeforeCreating(t *testing.T) {
+	repo := newCheckoutRepo(t)
+	repo.pushBranch(t, "feat/thing")
+
+	_, _, err := runCheckoutCmd(t, "42", "--yes", "--env-from", "bogus")
+	if err == nil || !strings.Contains(err.Error(), `invalid --env-from value "bogus"`) {
+		t.Fatalf("err = %v, want --env-from refused", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(repo.work, "..", ".trees", "feat-thing")); statErr == nil {
+		t.Error("a refused --env-from must leave no worktree behind")
+	}
+}
+
+func TestCheckoutRefusesAnUnknownFrom(t *testing.T) {
+	repo := newCheckoutRepo(t)
+	repo.pushBranch(t, "feat/thing")
+
+	_, _, err := runCheckoutCmd(t, "42", "--yes", "--from", "nope")
+	if !errors.Is(err, domain.ErrBranchNotFound) {
+		t.Fatalf("err = %v, want the unknown parent refused", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(repo.work, "..", ".trees", "feat-thing")); statErr == nil {
+		t.Error("a refused --from must leave no worktree behind")
+	}
+}
+
+// Interactively the recap warns of it; unattended, the run says it afterwards.
+func TestCheckoutWarnsAnUnattendedParentFallback(t *testing.T) {
+	repo := newCheckoutRepo(t)
+	repo.pushBranch(t, "feat/thing")
+	git(t, repo.work, "branch", "develop")
+	repo.writeConfig(t, `#:schema ./schemas/project.schema.json
+[worktrees]
+base_path = "../.trees"
+base_branch = "main"
+
+[env]
+strategy = "example"
+
+[[env.file]]
+target = ".env"
+`)
+	if err := os.WriteFile(filepath.Join(repo.work, ".env"), []byte("A=1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr, err := runCheckoutCmd(t, "42", "--yes", "--from", "develop", "--env-from", "parent", "--output", "json")
+	if err != nil {
+		t.Fatalf("checkout: %v", err)
+	}
+	var got output.PRCheckoutJSON
+	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
+		t.Fatalf("decode checkout JSON: %v", err)
+	}
+	if len(got.Warnings) != 1 || got.Warnings[0] != domain.EnvParentFallbackWarning {
+		t.Errorf("warnings = %v, want the fallback named", got.Warnings)
+	}
+	if !strings.Contains(stderr, domain.EnvParentFallbackWarning) {
+		t.Errorf("stderr = %q, want the fallback said", stderr)
 	}
 }

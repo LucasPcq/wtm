@@ -76,6 +76,9 @@ type checkoutFlow struct {
 }
 
 func (f *checkoutFlow) run() (Outcome, error) {
+	if f.request.From != "" && !rules.BranchCandidateExists(f.candidates, f.request.From) {
+		return Outcome{}, fmt.Errorf("%w: %s", domain.ErrBranchNotFound, f.request.From)
+	}
 	if f.request.Number > 0 {
 		pr, err := f.fetchPR()
 		if err != nil {
@@ -88,6 +91,10 @@ func (f *checkoutFlow) run() (Outcome, error) {
 		// Before the questions: whether the branch is behind origin decides one of
 		// them, and --ff answers it from what origin holds now, not from the last fetch.
 		if err := f.fetchBranch(pr); err != nil {
+			return Outcome{}, err
+		}
+		// worktree.Create refuses the same, but only once every question is answered.
+		if err := f.acceptBranch(pr.Branch); err != nil {
 			return Outcome{}, err
 		}
 	}
@@ -145,6 +152,13 @@ type checkoutParams struct {
 	Answers flow.Answers
 }
 
+func (f *checkoutFlow) acceptBranch(name string) error {
+	if target := f.target(name); target.State == domain.BranchTargetCheckedOut {
+		return fmt.Errorf("%w: "+domain.BranchCheckedOutElsewhereFmt, domain.ErrWorktreeExists, name, target.WorktreePath, name)
+	}
+	return worktree.CheckNameFree(worktree.NameCheckParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: name})
+}
+
 func (f *checkoutFlow) fetchBranch(pr domain.PRInfo) error {
 	if f.fetched {
 		return nil
@@ -193,6 +207,11 @@ func (f *checkoutFlow) checkout(params checkoutParams) (Outcome, error) {
 		},
 		Preflight: preflight,
 	})
+	result.Warnings = append(result.Warnings, decide.WarnUnseenFallback(decide.UnseenFallbackParams{
+		Fallback:  decide.EnvFallbackParams{ProjectDir: f.ctx.ProjectDir, Source: parent, Config: f.ctx.Config, EnvOverride: params.Answers.Value(KeyEnv)},
+		Prompter:  f.prompter,
+		Presenter: f.presenter,
+	})...)
 
 	// A reused branch has no start-point, so the hooks see its recorded parent.
 	if err := f.runHooks(hooksParams{WorktreePath: result.Path, Branch: pr.Branch, FromBranch: rules.FirstNonEmpty(startPoint, parent)}); err != nil {

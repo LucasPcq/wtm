@@ -65,12 +65,15 @@ func runCheckout(cmd *cobra.Command, args []string) error {
 
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 	fromOverride, _ := cmd.Flags().GetString(domain.FlagFrom)
-	envOverride, _ := cmd.Flags().GetString(domain.FlagEnvFrom)
 	ffFlag, _ := cmd.Flags().GetBool(domain.FlagFF)
 	review, _ := cmd.Flags().GetBool(domain.FlagReview)
 	mine, _ := cmd.Flags().GetBool(domain.FlagMine)
 	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
 	isolation, err := shared.IsolationFlag(cmd)
+	if err != nil {
+		return err
+	}
+	envOverride, err := shared.EnvFromFlag(cmd)
 	if err != nil {
 		return err
 	}

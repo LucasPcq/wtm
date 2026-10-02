@@ -87,6 +87,19 @@ func IsolationFlag(cmd *cobra.Command) (domain.Isolation, error) {
 	return rules.ParseIsolation(value)
 }
 
+// EnvFromFlag is --env-from, refused here rather than after the worktree it
+// would have provisioned exists.
+func EnvFromFlag(cmd *cobra.Command) (string, error) {
+	value, _ := cmd.Flags().GetString(domain.FlagEnvFrom)
+	if value == "" {
+		return "", nil
+	}
+	if err := rules.ValidateEnvStrategy(domain.EnvStrategy(value)); err != nil {
+		return "", fmt.Errorf("invalid --%s value %q: %w", domain.FlagEnvFrom, value, err)
+	}
+	return value, nil
+}
+
 // AddJobFlag and AddProfileFlag register the run module's second axis. The
 // worktree is the positional subject there, as everywhere else in the CLI, so
 // the job or profile is named by a flag the way --to and --from are.

@@ -260,3 +260,24 @@ func ApplyFastForward(params ApplyFastForwardParams) (proceed bool) {
 	})
 	return err == nil && proceed
 }
+
+type UnseenFallbackParams struct {
+	Fallback  EnvFallbackParams
+	Prompter  flow.Prompter
+	Presenter flow.Presenter
+}
+
+// WarnUnseenFallback says after the fact what a recap warns an interactive run
+// about: an unattended one never saw it, and its .env came from main rather
+// than from the parent it named.
+func WarnUnseenFallback(params UnseenFallbackParams) []string {
+	if params.Prompter.Interactive() {
+		return nil
+	}
+	show, warning := EnvParentFallback(params.Fallback)
+	if !show {
+		return nil
+	}
+	params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: warning})
+	return []string{warning}
+}

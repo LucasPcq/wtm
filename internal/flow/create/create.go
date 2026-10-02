@@ -225,6 +225,11 @@ func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, 
 			},
 			Preflight: params.Preflight,
 		})
+		result.Warnings = append(result.Warnings, decide.WarnUnseenFallback(decide.UnseenFallbackParams{
+			Fallback:  decide.EnvFallbackParams{ProjectDir: f.ctx.ProjectDir, Source: fromBranch, Config: f.ctx.Config, EnvOverride: answers.Value(KeyEnv)},
+			Prompter:  f.prompter,
+			Presenter: f.presenter,
+		})...)
 		if hookErr := f.runHooks(result.Path, branchName, fromBranch); hookErr != nil {
 			return result, hookErr
 		}

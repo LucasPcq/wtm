@@ -369,3 +369,17 @@ func TestAStaleRefStillOffersTheFastForward(t *testing.T) {
 		t.Error("a branch behind origin must be offered its fast-forward, whatever the last fetch saw")
 	}
 }
+
+func TestABranchHeldElsewhereIsRefusedBeforeAsking(t *testing.T) {
+	ctx := testContext(t)
+	git(t, ctx.ProjectDir, "worktree", "add", filepath.Join(t.TempDir(), "held"), "-b", "feat/thing", "origin/feat/thing")
+	prompter := &flowtest.ScriptedPrompter{}
+
+	_, err := Run(Params{Context: ctx, Request: Request{Number: 42}, Prompter: prompter, Presenter: newRecorder()})
+	if !errors.Is(err, domain.ErrWorktreeExists) {
+		t.Fatalf("err = %v, want the held branch refused", err)
+	}
+	if prompter.AskedKeys() != "" {
+		t.Errorf("asked %q before refusing", prompter.AskedKeys())
+	}
+}
