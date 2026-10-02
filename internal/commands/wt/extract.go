@@ -118,8 +118,11 @@ func onConflictFlag(cmd *cobra.Command) (string, error) {
 		return "", nil
 	}
 	if mode != domain.OnConflictAbort && mode != domain.OnConflictResolve {
-		return "", fmt.Errorf("invalid --%s value %q: use %s or %s",
-			domain.FlagOnConflict, mode, domain.OnConflictAbort, domain.OnConflictResolve)
+		return "", rules.InvalidFlagValue(rules.InvalidFlagValueParams{
+			Flag:    domain.FlagOnConflict,
+			Value:   mode,
+			Allowed: []string{domain.OnConflictAbort, domain.OnConflictResolve},
+		})
 	}
 	return mode, nil
 }

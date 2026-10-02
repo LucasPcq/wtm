@@ -146,7 +146,7 @@ func TestCharacterizeExtractRefusalMessages(t *testing.T) {
 	}
 
 	_, _, err = runWtCmd(t, domain.CmdExtract, "src", "--files", "a.txt", "--to", "dst", "--isolation", "loose", "--yes")
-	if want := `unknown isolation "loose" (expected "isolated" or "verbatim")`; err == nil || err.Error() != want {
+	if want := `invalid --isolation value "loose": use isolated or verbatim`; err == nil || err.Error() != want {
 		t.Errorf("an invalid --isolation = %v, want %q", err, want)
 	}
 }
@@ -615,4 +615,18 @@ func gitOutput(t *testing.T, dir string, args ...string) string {
 		t.Fatalf("git %v: %v", args, err)
 	}
 	return string(out)
+}
+
+// An invalid flag value is a usage error (exit 2), as everywhere else.
+func TestCharacterizeExtractInvalidFlagValuesAreUsageErrors(t *testing.T) {
+	newExtractFixture(t)
+	for _, args := range [][]string{
+		{"src", "--files", "a.txt", "--to", "dst", "--on-conflict", "merge", "--yes"},
+		{"src", "--files", "a.txt", "--to", "dst", "--isolation", "loose", "--yes"},
+	} {
+		_, _, err := runWtCmd(t, append([]string{domain.CmdExtract}, args...)...)
+		if !errors.Is(err, domain.ErrUsage) {
+			t.Errorf("extract %v = %v, want a usage error", args, err)
+		}
+	}
 }
