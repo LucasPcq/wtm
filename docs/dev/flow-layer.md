@@ -664,7 +664,9 @@ recorder := &flowtest.Recorder{}
   unnoticed.
 - **`Recorder`** implements `flow.Presenter`, collecting `Stages`, `Hooks`, `Notices`
   and `Statuses`. It runs `Work()` and `Run(sink)` for real, so the service still gets
-  called.
+  called. It is also a `flow.Publisher`: set it as the `Context`'s `Publisher` and
+  `Published` / `PublishedTypes()` hold every event the run reported. A package that
+  calls a mutator must have such a test — `archlint`'s `emits` rule checks it.
 
 The typed conclusion (`Created`, `Cleaned`) is not part of `Recorder` — a test that
 needs it embeds the recorder and adds the one method:
@@ -691,6 +693,22 @@ and `gittest.AddOrigin` gives branches a real upstream. They exist to be run
 unchanged after the refactor. Keep them that way: they are the only thing that proves a
 flow that moved packages still reads the same to a user. When you migrate a command,
 write its characterization tests first, and do not "fix" one to make a refactor pass.
+
+## Publishing what a flow changed
+
+Every change to a worktree's identity is published from the flow that made it, never from the service (`docs/dev/architecture.md`, "The event bus"). The point is right after the mutator succeeded:
+
+| Flow | Event | Where |
+| -- | -- | -- |
+| create, extract (new target) | `worktree.created` | `createFlow.provisionOne`, after `worktree.Create`, before env ports and hooks; never on `AlreadyExists` |
+| checkout | `worktree.created` | `checkoutFlow.checkout`, right after `checkoutFlow.create` |
+| teardown (clean, prune) | `worktree.removed` | `removeOne` after `Clean`, `Salvage` after `FinishRemoval`, clean's `recoverRemoveFailure` after `ForceClean` — through `teardown.PublishRemoved`, with the identity captured before the removal |
+| clean, prune, reparent | `worktree.reparented` | one per moved child, partial results included (`publish.ReparentedAll`) |
+| relocate | `worktree.relocated` / `worktree.updated` | after each `Move` / each `Adopt` (`changed: parent, created_at`) |
+| env | `worktree.updated` | `settleIsolation`, when the recorded isolation actually changed |
+| any flow reading the run env | `worktree.updated` | `flow/ordinal`, the first time the worktree is numbered |
+
+`tools/archlint` holds it: `chokepoint`'s table names each mutator's event, `emits` reports a flow package that calls a mutator without publishing its event or without a `Recorder` test, and `metawriter` reports a `service/worktree` function writing metadata that the table does not list.
 
 ## Two decisions worth not re-opening
 

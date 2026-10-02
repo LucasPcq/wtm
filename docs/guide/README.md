@@ -17,6 +17,7 @@ New to wtm? Start with [Getting started](getting-started.md), then pick a setup 
 | [How `wtm run` works](how-run-works.md) | the job environment (`WTM_*`, `COMPOSE_PROJECT_NAME`), ports and the port check, what `run init` proposes, ports and addresses in a `.env`, compose names |
 | [`run.toml` reference](run-toml.md) | every key of the file, with its default |
 | [Where wtm keeps its state](state.md) | the files under `<git-common-dir>/wtm/` and beside the global config |
+| [The event stream](events.md) | `wtm events`: every worktree change as it happens, for editors, terminal plugins and agents |
 | [Migrating to 0.28](migrating-to-0.28.md) | what changed for a v0.27 user, and what to do about it |
 | [Migrating to 0.29](migrating-to-0.29.md) | the `wtm create --output json` envelope |
 
