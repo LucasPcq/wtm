@@ -16,6 +16,21 @@ type Context struct {
 	ProjectDir string
 	StateDir   string
 	Config     domain.Config
+	// Publisher hears every change a flow makes to a worktree's identity. Nil
+	// publishes nothing: the bus is opportunistic, and a consumer that missed an
+	// event gets the state back from its next snapshot.
+	Publisher Publisher
+}
+
+type Publisher interface {
+	Publish(event domain.Event)
+}
+
+func (c Context) Publish(event domain.Event) {
+	if c.Publisher == nil {
+		return
+	}
+	c.Publisher.Publish(event)
 }
 
 type StepKind int
