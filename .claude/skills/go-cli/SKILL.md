@@ -192,7 +192,7 @@ Steps are `flow.Step` values (`Kind`, `Key`, `Label`, `Title`, `Description`, `O
 (`Kind`, `Mode`, `TargetKey`) is what a flow declares about how a surface must schedule
 it; the CLI ignores it, `tui/dashboard/ops.go` enforces it.
 
-`create` and `clean` are migrated. `extract`, `sync`, `prune`, `relocate`, `reparent`,
+`create`, `clean` and `relocate` are migrated. `extract`, `sync`, `prune`, `reparent`,
 `checkout` and `env` still drive their `internal/tui/*` wizard packages directly — the
 `components.Step` sections below still describe them. **Any new mutation command goes
 through `flow/`.** Full reference: [`docs/dev/flow-layer.md`](../../../docs/dev/flow-layer.md)
@@ -448,7 +448,7 @@ refuses an unknown `StepKind` rather than guessing, so adding a kind means teach
 surface to render it.
 
 The `components.Step` API below remains the model for the wizards **not yet migrated**
-(`extract`, `sync`, `prune`, `relocate`, `reparent`, `checkout`, `env`) and for
+(`extract`, `sync`, `prune`, `reparent`, `checkout`, `env`) and for
 non-mutation pickers (`run`, `init`). Do not start a new mutation wizard here.
 
 A flow with **2+ sequential decisions** (e.g. pick worktree → pick new parent) MUST be a
@@ -463,8 +463,8 @@ bug: no breadcrumb, and `Esc` quits the whole flow instead of going back.
   OnMsg, InitCmd, Loading, LoadingText})` — it centralises the program/assertion/abort boilerplate.
   It maps `Esc` at step 1 to `domain.ErrUserAborted`; otherwise pull values from
   `final.Steps()[i].Model.(components.SelectListModel).Value()`.
-- Reference implementations: `internal/tui/relocate/wizard.go`, `internal/tui/checkout/wizard.go`.
-  (`clean` and `sync` are no longer among them: their steps are declared in
+- Reference implementation: `internal/tui/checkout/wizard.go`.
+  (`clean`, `sync` and `relocate` are no longer among them: their steps are declared in
   `internal/flow/<cmd>/steps.go` and run through `internal/tui/flowui`.)
 
 Standalone wrappers (`RunStandaloneSelect`/`RunStandaloneConfirm`) are only for a **single**
@@ -745,7 +745,6 @@ internal/tui/
   inittui/        ← global + project init wizards
   clean/          ← deletion confirm
   extract/        ← extract wizard
-  relocate/       ← relocate wizard
   worktreepicker/ ← shared worktree-selection picker
 ```
 

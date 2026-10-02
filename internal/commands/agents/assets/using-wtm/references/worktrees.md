@@ -130,7 +130,7 @@ Modes and flags:
 
 ## `relocate`
 
-`wtm relocate --yes --output json` realigns worktrees with `base_path` and adopts externally-created ones. `--to <path>` sets a new `base_path` non-interactively (the interactive wizard, which you cannot drive, also offers it).
+`wtm relocate --yes --output json` realigns worktrees with `base_path` and adopts externally-created ones. `--to <path>` sets a new `base_path` non-interactively (the interactive wizard, which you cannot drive, also offers it); the config is rewritten even when no worktree has to move.
 
 - A worktree whose jobs are running is never moved (`blocked_jobs` in the JSON, exit non-zero, `--force` does not lift it): run `wtm run down <branch>`, then retry.
 - An external worktree whose derived name another worktree already uses is left unadopted (`blocked_name`, exit non-zero).

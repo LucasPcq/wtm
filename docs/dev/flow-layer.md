@@ -29,6 +29,7 @@ is implemented yet.
 | `wtm reparent` | migrated — `internal/flow/reparent` |
 | `wtm prune` | migrated — `internal/flow/prune` |
 | `wtm sync` | migrated — `internal/flow/sync` |
+| `wtm relocate` | migrated — `internal/flow/relocate` (LUC-238). The old `worktree.Relocate` chained three acts; they are now three mutators the flow calls in turn — `worktree.Move`, then `worktree.Adopt` for a worktree created outside wtm, then `worktree.SetBasePath` — so a moved-and-adopted worktree is two observable acts. One `StepBranchSelect` per adoption, keyed `relocate.parent.<branch>`; the recap is skipped when nothing would change. |
 | `wtm run up\|down\|start\|stop\|logs` | migrated — `internal/flow/run/<cmd>`, over the questions in `internal/flow/run/target` and the daemon binding in `internal/flow/run/seam` (LUC-193) |
 | `wtm run ps` | not a flow: it reads the daemon's index and prints it, and asks nothing |
 | `wtm run list` | migrated — `internal/flow/run/list` answers which entry was picked and what to do to it; `internal/commands/run/dispatch.go` runs that action through the flow it already has for it (LUC-217) |
@@ -41,7 +42,7 @@ is implemented yet.
 | Dashboard surface | `internal/tui/dashboard` (`prompter.go`, `presenter.go`, `ops.go`) |
 | Test doubles | `internal/testutil/flowtest` |
 | `extract` | **not migrated** — still driven by `internal/commands/wt` plus its wizard package (`internal/tui/extract`). The model was validated on paper against it; that is not the same as delivered. Tracked as LUC-182. |
-| `checkout`, `relocate`, `env` | **not migrated** either, which nothing said until `archlint`'s `chokepoint` rule counted them: all three call their service straight from `internal/commands/`, so no second surface can run them. Listed in `.archlint-migrating`, reported on every `make lint`. |
+| `checkout`, `env` | **not migrated** either, which nothing said until `archlint`'s `chokepoint` rule counted them: both call their service straight from `internal/commands/`, so no second surface can run them. Listed in `.archlint-migrating`, reported on every `make lint`. |
 | `StepMultiSelect` | exists since `reparent`, which needed it to keep its no-argument picker. Rendered by both surfaces: `flowui`, and the dashboard's modal since its Actions menu runs the batch reparent. Since `prune`, an `Option` can also arrive pre-checked and tagged (`Selected`, `Tag`, `Tone`). `Tone` is a `domain` enum, not a `flow` one, so `components.TagVariantOf` can hold the one mapping onto the palette without the widget library learning about `flow`. |
 | `StepContent.Start` and `Option.Badges` | exist since the run module's worktree step (LUC-193), which opens its cursor on the worktree you are standing in and marks each row with what it is running. Both surfaces render them; `Badges` are the trailing words of a `StepSelect` row, where `Tag` is the leading one of a `StepMultiSelect` row. |
 | `StepText` pre-fill | `StepContent.Default`, since the CRUD forms of `run job` and `run profile` (LUC-217). It is content rather than a static field because what a form opens on can depend on the answers before it. |
