@@ -14,4 +14,5 @@ var analyzers = []*analysis.Analyzer{
 	mutedlineAnalyzer,
 	fontcoverAnalyzer,
 	servicedagAnalyzer,
+	daemonblindAnalyzer,
 }
