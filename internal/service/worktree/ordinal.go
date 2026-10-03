@@ -85,25 +85,37 @@ func readClaim(params WorktreeRef) (claim, error) {
 	if err != nil {
 		return claim{}, fmt.Errorf("list worktrees: %w", err)
 	}
+	return claimFrom(claimFromParams{Worktrees: worktrees, Ref: params})
+}
 
+type claimFromParams struct {
+	Worktrees []domain.GitWorktree
+	Ref       WorktreeRef
+}
+
+// claimFrom is readClaim over a listing the caller already has: a snapshot
+// reads every worktree's number from one `git worktree list`.
+func claimFrom(params claimFromParams) (claim, error) {
+	worktrees := params.Worktrees
+	ref := params.Ref
 	for _, wt := range worktrees {
-		if wt.Branch == params.Branch && wt.IsMain {
+		if wt.Branch == ref.Branch && wt.IsMain {
 			return claim{settled: true, ordinal: domain.MainWorktreeOrdinal}, nil
 		}
 	}
 
-	others, err := otherHolders(otherHoldersParams{Worktrees: worktrees, Ref: params})
+	others, err := otherHolders(otherHoldersParams{Worktrees: worktrees, Ref: ref})
 	if err != nil {
 		return claim{}, err
 	}
 
-	meta, err := loadMetadata(params.StateDir, params.Branch)
+	meta, err := loadMetadata(ref.StateDir, ref.Branch)
 	if err != nil {
 		return claim{others: others}, nil
 	}
 
 	settled := rules.KeepsOrdinal(rules.KeepsOrdinalParams{
-		Branch:  params.Branch,
+		Branch:  ref.Branch,
 		Ordinal: meta.Ordinal,
 		Others:  others,
 	})

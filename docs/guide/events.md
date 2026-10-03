@@ -20,7 +20,7 @@ A subscription opens on a **snapshot**: one `snapshot` event listing every workt
 | `ready` | right after the snapshots, each time they are sent | — |
 | `worktree.created` | `create`, `checkout` or `extract` brought a worktree into existence, before its `on_create` hooks run | — |
 | `worktree.updated` | a field of a worktree's identity changed: its isolation (`wtm env --isolation`), its ordinal (the first time something needs its ports), its parent and creation date (adopted by `wtm relocate`) | `changed`: the fields that changed |
-| `worktree.relocated` | `wtm relocate` moved it | `from_path`: where it was |
+| `worktree.relocated` | `wtm relocate` moved it; a worktree created outside wtm and adopted by `relocate` first appears this way, never as `created` | `from_path`: where it was |
 | `worktree.reparented` | `wtm reparent`, or a `clean` / `prune` that moved its children past a removed parent | `from_parent`: its previous parent |
 | `worktree.removed` | `clean` or `prune` removed it | — |
 
@@ -55,7 +55,7 @@ The repository is `repo.common_dir`, git's common directory with symlinks resolv
 ## Reading it right
 
 - **Treat every event as an upsert** keyed by `(repo.common_dir, branch)`, and every `snapshot` as a reset of that repository's state. Applying an event twice changes nothing.
-- **A reconnection is not an error.** The stream rides on wtm's background daemon. If the daemon stops (`wtm run daemon restart`, an upgrade), `wtm events` waits for it, then opens again on a fresh `snapshot` and `ready`. Events in between are not replayed: the new snapshot already holds their result.
+- **A reconnection is not an error.** The stream rides on wtm's background daemon. If the daemon stops (`wtm run daemon stop`, an upgrade), `wtm events` starts it again — `wtm events` and `wtm ui` are what keep it running while they are open — then opens again on a fresh `snapshot` and `ready`. Events in between are not replayed: the new snapshot already holds their result. A daemon of another wtm version is used as it is: it relays events it does not read; only one too old to know `wtm events` is replaced, and only while it runs no job.
 - **Ignore what you do not know.** A field or a type you do not recognise is skipped, never an error: new ones are added without changing `v`. `v` moves only on a breaking change. `wtm events` itself exits with code `20` if it receives an event of a schema newer than its own: upgrade wtm.
 - **Delivery is opportunistic.** A command publishes its event only if the daemon is running, and never starts it, so nobody pays for the stream unless something listens. A reader that falls far behind is disconnected rather than waited for, and resynchronises from the snapshot it gets on reconnecting.
 

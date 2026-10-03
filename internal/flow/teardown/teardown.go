@@ -286,7 +286,9 @@ func removeOne(params removeOneParams) Removal {
 		Message: fmt.Sprintf(domain.CleanLoadingFmt, target.Branch),
 		Work:    func() error { return worktree.Clean(clean) },
 	})
-	if err == nil {
+	// A branch git refused to delete fails the run after the worktree went:
+	// the worktree is gone all the same, and that is what consumers track.
+	if err == nil || (!errors.Is(err, domain.ErrWorktreeRemoveFailed) && !worktree.StillTracked(worktree.FindByBranchParams{ProjectDir: clean.ProjectDir, Branch: clean.Branch})) {
 		PublishRemoved(salvage)
 	}
 	if errors.Is(err, domain.ErrWorktreeRemoveFailed) {

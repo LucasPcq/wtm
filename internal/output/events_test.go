@@ -57,13 +57,13 @@ func TestAnUnknownTypeWritesNothing(t *testing.T) {
 	}
 }
 
-func TestAJSONEventIsOneCompactLine(t *testing.T) {
+func TestAJSONEventIsWrittenAsReceivedOnOneLine(t *testing.T) {
 	var buf bytes.Buffer
-	if err := WriteEventJSONLine(&buf, domain.Event{V: 1, Type: domain.EventWorktreeCreated, TS: "t", Worktree: &domain.WorktreeIdentity{Branch: "a&b"}}); err != nil {
+	raw := []byte(`{"v":1,"type":"worktree.created","worktree":{"branch":"a&b"},"extra":1}`)
+	if err := WriteEventJSONLine(&buf, raw); err != nil {
 		t.Fatal(err)
 	}
-	got := buf.String()
-	if strings.Count(got, "\n") != 1 || !strings.HasSuffix(got, "\n") || strings.Contains(got, "  ") || !strings.Contains(got, `"branch":"a&b"`) {
+	if got := buf.String(); got != string(raw)+"\n" {
 		t.Fatalf("got %q", got)
 	}
 }

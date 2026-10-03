@@ -164,3 +164,32 @@ func TestAHalfRemovedWorktreeIsPublishedOnce(t *testing.T) {
 		t.Fatalf("published %v, want one worktree.removed", got)
 	}
 }
+
+// git deletes the branch only once the worktree is gone: a branch it refuses to
+// drop (unmerged) fails the removal, but the worktree no longer exists, and a
+// consumer must hear it rather than keep a ghost until its next snapshot.
+func TestAWorktreeGoneIsPublishedEvenWhenItsBranchStays(t *testing.T) {
+	globaldir.Isolate(t)
+	processtest.Serve(t, nil)
+	ctx := repoContext(t)
+	target := makeTarget(t, ctx, "feat/a")
+	if err := os.WriteFile(filepath.Join(target.Path, "work.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gittest.Git(t, target.Path, "add", "work.txt")
+	gittest.Git(t, target.Path, "commit", "-m", "unmerged")
+	recorder := &flowtest.Recorder{}
+	ctx.Publisher = recorder
+
+	removals := teardown.Batch(teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: []teardown.Target{target}})
+
+	if removals[0].Err == nil {
+		t.Fatal("the unmerged branch was expected to fail the removal")
+	}
+	if worktree.StillTracked(worktree.FindByBranchParams{ProjectDir: ctx.ProjectDir, Branch: "feat/a"}) {
+		t.Fatal("fixture: git still tracks the worktree")
+	}
+	if got := recorder.PublishedTypes(); len(got) != 1 || got[0] != domain.EventWorktreeRemoved {
+		t.Fatalf("published %v, want the removal reported", got)
+	}
+}

@@ -69,6 +69,7 @@ func runEvents(cmd *cobra.Command, _ []string) error {
 	return wtmevents.Watch(ctx, wtmevents.WatchParams{
 		ProjectDir: cfg.ProjectDir,
 		StateDir:   cfg.StateDir,
+		ProxyPort:  rules.ProxyPort(cfg.Config.Global),
 		OnEvent:    write,
 		OnWarning: func(err error) {
 			output.Warning(output.Barred(cmd.ErrOrStderr()), err.Error())
@@ -95,11 +96,11 @@ type writerForParams struct {
 
 // writerFor puts no frame around the stream: it never ends on its own, so
 // there is no block to close. Each human line carries the bar on a terminal.
-func writerFor(params writerForParams) func(domain.Event) error {
+func writerFor(params writerForParams) func(wtmevents.Received) error {
 	out := params.Cmd.OutOrStdout()
 	if !rules.IsHumanFormat(params.Format) {
-		return func(event domain.Event) error { return output.WriteEventJSONLine(out, event) }
+		return func(received wtmevents.Received) error { return output.WriteEventJSONLine(out, received.Raw) }
 	}
 	barred := output.Barred(out)
-	return func(event domain.Event) error { return output.WriteEventLine(barred, event) }
+	return func(received wtmevents.Received) error { return output.WriteEventLine(barred, received.Event) }
 }

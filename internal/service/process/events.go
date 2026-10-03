@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -92,8 +93,9 @@ type Delivery struct {
 }
 
 // Subscribe returns once the daemon acknowledged. The channel closes when the
-// daemon ends the stream, the connection drops or ctx is done; a daemon of
-// another build is refused before anything is streamed.
+// daemon ends the stream, the connection drops or ctx is done. Any build that
+// knows subscribe is accepted — the broker never reads what it relays — and one
+// that does not answers ErrDaemonNoSubscribe.
 func Subscribe(ctx context.Context, params SubscribeParams) (<-chan Delivery, error) {
 	var dialer net.Dialer
 	conn, err := dialer.DialContext(ctx, "unix", params.SocketPath)
@@ -145,11 +147,11 @@ func acknowledge(params acknowledgeParams) (*json.Decoder, error) {
 	if err := decoder.Decode(&ack); err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}
-	if err := checkVersion(ack); err != nil {
-		return nil, err
+	if ack.Status == StatusOK {
+		return decoder, nil
 	}
-	if ack.Status != StatusOK {
-		return nil, errors.New(ack.Message)
+	if strings.HasPrefix(ack.Message, domain.DaemonUnknownActionPrefix) {
+		return nil, fmt.Errorf("%w: %s", domain.ErrDaemonNoSubscribe, ack.Message)
 	}
-	return decoder, nil
+	return nil, errors.New(ack.Message)
 }

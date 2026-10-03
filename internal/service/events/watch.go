@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -11,8 +12,9 @@ import (
 )
 
 var (
-	identities   = worktree.Identities
-	ensureDaemon = process.EnsureCurrentDaemon
+	identities    = worktree.Identities
+	ensureDaemon  = process.EnsureDaemon
+	replaceDaemon = process.EnsureCurrentDaemon
 )
 
 type WatchParams struct {
@@ -20,8 +22,11 @@ type WatchParams struct {
 	StateDir   string
 	// SocketPath is the daemon's; empty is the one every command talks to.
 	SocketPath string
+	// ProxyPort is what a daemon this watcher starts serves names on, as for
+	// every other command that starts one: it outlives the watcher's own needs.
+	ProxyPort int
 	// OnEvent receives the stream in order; an error ends Watch with it.
-	OnEvent   func(domain.Event) error
+	OnEvent   func(Received) error
 	OnWarning func(error)
 }
 
@@ -61,6 +66,14 @@ func Watch(ctx context.Context, params WatchParams) error {
 // watchResult says how one subscription ended: fatal ends Watch (a newer
 // schema, a consumer that can no longer write), transient is worth a warning
 // before reconnecting, and neither is a daemon that simply went away.
+// Received is one line of the stream, decoded for a reader that acts on it and
+// as it was sent for one that relays it: a newer publisher's fields survive an
+// older wtm on their way through.
+type Received struct {
+	Event domain.Event
+	Raw   json.RawMessage
+}
+
 type watchResult struct {
 	fatal        error
 	transient    error
@@ -77,23 +90,32 @@ type watchOnceParams struct {
 // snapshot is read waits in the subscription and arrives after ready, where
 // replaying it is harmless, rather than falling between the two.
 func watchOnce(ctx context.Context, params watchOnceParams) watchResult {
-	if err := ensureDaemon(process.DaemonParams{SocketPath: params.Socket}); err != nil {
+	daemon := process.DaemonParams{SocketPath: params.Socket, ProxyPort: params.ProxyPort}
+	if err := ensureDaemon(daemon); err != nil {
 		return watchResult{transient: err}
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	deliveries, err := process.Subscribe(ctx, process.SubscribeParams{SocketPath: params.Socket, Repos: []string{params.Repo.CommonDir}})
+	if errors.Is(err, domain.ErrDaemonNoSubscribe) {
+		// Never a daemon another watcher could need: it cannot serve one.
+		return watchResult{transient: errors.Join(err, replaceDaemon(daemon))}
+	}
 	if err != nil {
 		return watchResult{transient: err}
 	}
-	snapshot, err := snapshotEvent(snapshotParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Repo: params.Repo})
+	snapshot, err := snapshotOf(snapshotParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Repo: params.Repo})
 	if err != nil {
 		return watchResult{transient: err}
 	}
 	if err := params.OnEvent(snapshot); err != nil {
 		return watchResult{fatal: err}
 	}
-	if err := params.OnEvent(readyEvent()); err != nil {
+	ready, err := readyOf()
+	if err != nil {
+		return watchResult{transient: err}
+	}
+	if err := params.OnEvent(ready); err != nil {
 		return watchResult{fatal: err}
 	}
 	for delivery := range deliveries {
@@ -104,7 +126,7 @@ func watchOnce(ctx context.Context, params watchOnceParams) watchResult {
 		if event.V > domain.EventsSchemaVersion {
 			return watchResult{fatal: domain.ErrEventsSchemaNewer, reachedReady: true}
 		}
-		if err := params.OnEvent(event); err != nil {
+		if err := params.OnEvent(Received{Event: event, Raw: delivery.Payload}); err != nil {
 			return watchResult{fatal: err, reachedReady: true}
 		}
 	}
@@ -117,16 +139,36 @@ type snapshotParams struct {
 	Repo       domain.EventRepo
 }
 
-func snapshotEvent(params snapshotParams) (domain.Event, error) {
-	list, err := identities(worktree.IdentitiesParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir})
-	if err != nil {
-		return domain.Event{}, err
-	}
-	return stamp(stampParams{Event: domain.Event{Type: domain.EventSnapshot, Worktrees: list}, Repo: params.Repo}), nil
+// snapshotLine shadows the event's worktrees so a snapshot always carries the
+// list, empty included: a consumer resets its state from it.
+type snapshotLine struct {
+	domain.Event
+	Worktrees []domain.WorktreeIdentity `json:"worktrees"`
 }
 
-func readyEvent() domain.Event {
-	return domain.Event{V: domain.EventsSchemaVersion, Type: domain.EventReady, TS: now()}
+func snapshotOf(params snapshotParams) (Received, error) {
+	list, err := identities(worktree.IdentitiesParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir})
+	if err != nil {
+		return Received{}, err
+	}
+	if list == nil {
+		list = []domain.WorktreeIdentity{}
+	}
+	event := stamp(stampParams{Event: domain.Event{Type: domain.EventSnapshot, Worktrees: list}, Repo: params.Repo})
+	raw, err := json.Marshal(snapshotLine{Event: event, Worktrees: list})
+	if err != nil {
+		return Received{}, err
+	}
+	return Received{Event: event, Raw: raw}, nil
+}
+
+func readyOf() (Received, error) {
+	event := domain.Event{V: domain.EventsSchemaVersion, Type: domain.EventReady, TS: now()}
+	raw, err := json.Marshal(event)
+	if err != nil {
+		return Received{}, err
+	}
+	return Received{Event: event, Raw: raw}, nil
 }
 
 type nextBackoffParams struct {

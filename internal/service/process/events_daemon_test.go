@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/testutil/socktest"
 )
 
 func TestAPublishedEventReachesASubscriberOfItsRepo(t *testing.T) {
@@ -87,11 +88,24 @@ func TestASubscriberKeepsTheDaemonAliveUntilItLeaves(t *testing.T) {
 	}
 }
 
-func TestSubscribingToAnOlderDaemonIsAVersionMismatch(t *testing.T) {
+func TestADaemonThatPredatesSubscribeSaysSo(t *testing.T) {
 	socket := skewSocket(t)
 	serveOld(t, socket, nil)
 	_, err := Subscribe(context.Background(), SubscribeParams{SocketPath: socket})
-	if !errors.Is(err, domain.ErrDaemonVersionMismatch) {
-		t.Fatalf("got %v, want ErrDaemonVersionMismatch", err)
+	if !errors.Is(err, domain.ErrDaemonNoSubscribe) {
+		t.Fatalf("got %v, want ErrDaemonNoSubscribe", err)
+	}
+}
+
+// The broker never reads what it relays, so a daemon of another build that
+// knows subscribe serves a subscriber as well as its own: refusing it is what
+// set two watchers of two builds replacing each other's daemon in a loop.
+func TestADaemonOfAnotherBuildThatKnowsSubscribeIsAccepted(t *testing.T) {
+	socket := skewSocket(t)
+	socktest.Serve(t, socket, func(json.RawMessage) any {
+		return Response{Status: StatusOK, Version: "v0.0.0-other"}
+	})
+	if _, err := Subscribe(context.Background(), SubscribeParams{SocketPath: socket}); err != nil {
+		t.Fatalf("Subscribe = %v, want the other build accepted", err)
 	}
 }

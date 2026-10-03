@@ -31,7 +31,7 @@ func Identity(ref WorktreeRef) (domain.WorktreeIdentity, error) {
 	}
 	for _, wt := range worktrees {
 		if wt.Branch == ref.Branch {
-			return identityOf(identityOfParams{Worktree: wt, Ref: ref}), nil
+			return identityOf(identityOfParams{Worktree: wt, Ref: ref, Listing: worktrees}), nil
 		}
 	}
 	return domain.WorktreeIdentity{}, fmt.Errorf("%w: %s", domain.ErrWorktreeNotFound, ref.Branch)
@@ -55,7 +55,7 @@ func Identities(params IdentitiesParams) ([]domain.WorktreeIdentity, error) {
 			continue
 		}
 		ref := WorktreeRef{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: wt.Branch}
-		identities = append(identities, identityOf(identityOfParams{Worktree: wt, Ref: ref}))
+		identities = append(identities, identityOf(identityOfParams{Worktree: wt, Ref: ref, Listing: worktrees}))
 	}
 	return identities, nil
 }
@@ -63,6 +63,9 @@ func Identities(params IdentitiesParams) ([]domain.WorktreeIdentity, error) {
 type identityOfParams struct {
 	Worktree domain.GitWorktree
 	Ref      WorktreeRef
+	// Listing is the `git worktree list` the worktree was found in, read once
+	// for every identity of a snapshot rather than once each.
+	Listing []domain.GitWorktree
 }
 
 func identityOf(params identityOfParams) domain.WorktreeIdentity {
@@ -72,7 +75,8 @@ func identityOf(params identityOfParams) domain.WorktreeIdentity {
 		IsMain:    params.Worktree.IsMain,
 		Isolation: IsolationOf(params.Ref),
 	}
-	if ordinal, err := Ordinal(params.Ref); err == nil {
+	if c, err := claimFrom(claimFromParams{Worktrees: params.Listing, Ref: params.Ref}); err == nil && c.settled {
+		ordinal := c.ordinal
 		identity.Ordinal = &ordinal
 	}
 	if meta, err := loadMetadata(params.Ref.StateDir, params.Ref.Branch); err == nil {

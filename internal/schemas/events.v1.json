@@ -45,7 +45,7 @@
         "repo": { "$ref": "#/$defs/repo" },
         "worktrees": { "type": "array", "items": { "$ref": "#/$defs/worktree" } }
       },
-      "required": ["repo"]
+      "required": ["repo", "worktrees"]
     },
     {
       "properties": { "type": { "const": "ready" } }

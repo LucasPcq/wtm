@@ -26,17 +26,25 @@ func TestEveryEventTypeMatchesTheSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	snapshot, err := snapshotEvent(snapshotParams{ProjectDir: dir, StateDir: stateDir, Repo: repo})
+	snapshot, err := snapshotOf(snapshotParams{ProjectDir: dir, StateDir: stateDir, Repo: repo})
 	if err != nil {
 		t.Fatal(err)
 	}
-	about := func(event domain.Event) domain.Event {
-		event.Worktree = &identity
-		return stamp(stampParams{Event: event, Repo: repo})
+	ready, err := readyOf()
+	if err != nil {
+		t.Fatal(err)
 	}
-	examples := map[domain.EventType]domain.Event{
-		domain.EventSnapshot:           snapshot,
-		domain.EventReady:              readyEvent(),
+	about := func(event domain.Event) json.RawMessage {
+		event.Worktree = &identity
+		raw, err := json.Marshal(stamp(stampParams{Event: event, Repo: repo}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return raw
+	}
+	examples := map[domain.EventType]json.RawMessage{
+		domain.EventSnapshot:           snapshot.Raw,
+		domain.EventReady:              ready.Raw,
 		domain.EventWorktreeCreated:    about(domain.Event{Type: domain.EventWorktreeCreated}),
 		domain.EventWorktreeUpdated:    about(domain.Event{Type: domain.EventWorktreeUpdated, Changed: []domain.IdentityField{domain.IdentityOrdinal}}),
 		domain.EventWorktreeRelocated:  about(domain.Event{Type: domain.EventWorktreeRelocated, FromPath: "/old/feat-a"}),
@@ -51,12 +59,8 @@ func TestEveryEventTypeMatchesTheSchema(t *testing.T) {
 			t.Errorf("%s has no example: add one here", typ)
 			continue
 		}
-		doc, err := json.Marshal(example)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := schematest.Validate(t, schema, doc); err != nil {
-			t.Errorf("%s does not match events.v1.json: %v\n%s", typ, err, doc)
+		if err := schematest.Validate(t, schema, example); err != nil {
+			t.Errorf("%s does not match events.v1.json: %v\n%s", typ, err, example)
 		}
 	}
 }

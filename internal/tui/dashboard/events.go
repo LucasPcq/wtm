@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/events"
 )
 
@@ -22,8 +23,9 @@ func defaultWatch(params RunParams) WatchFunc {
 		return events.Watch(ctx, events.WatchParams{
 			ProjectDir: params.ProjectDir,
 			StateDir:   params.StateDir,
-			OnEvent: func(event domain.Event) error {
-				onEvent(event)
+			ProxyPort:  rules.ProxyPort(params.Config.Global),
+			OnEvent: func(received events.Received) error {
+				onEvent(received.Event)
 				return nil
 			},
 		})

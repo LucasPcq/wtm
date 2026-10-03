@@ -10,12 +10,12 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
-// WriteEventJSONLine is one JSON Lines record: compact, so a consumer can split
-// the stream on newlines.
-func WriteEventJSONLine(w io.Writer, event domain.Event) error {
-	enc := json.NewEncoder(w)
-	enc.SetEscapeHTML(false)
-	return enc.Encode(event)
+// WriteEventJSONLine is one JSON Lines record, written as it was received:
+// compact, so a consumer can split the stream on newlines, and never decoded
+// on the way, so a field this build does not know still reaches it.
+func WriteEventJSONLine(w io.Writer, raw json.RawMessage) error {
+	_, err := fmt.Fprintf(w, "%s\n", raw)
+	return err
 }
 
 // WriteEventLine renders what a person watching needs: a type it does not know
