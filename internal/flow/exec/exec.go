@@ -8,6 +8,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/ordinal"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/execsvc"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
@@ -128,6 +129,7 @@ func (f *execFlow) execute(params executeParams) Outcome {
 	execTargets := make([]execsvc.Target, len(targets))
 	for i, target := range targets {
 		branches[i] = target.Branch
+		ordinal.BeforeHooks(f.params.Context, target.Branch)
 		execTargets[i] = execsvc.Target{
 			Branch: target.Branch,
 			Path:   target.Path,

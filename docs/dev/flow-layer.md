@@ -30,7 +30,7 @@ is implemented yet.
 | `wtm prune` | migrated — `internal/flow/prune` |
 | `wtm sync` | migrated — `internal/flow/sync` |
 | `wtm relocate` | migrated — `internal/flow/relocate` (LUC-238). The old `worktree.Relocate` chained three acts; they are now three mutators the flow calls in turn — `worktree.Move`, then `worktree.Adopt` for a worktree created outside wtm, then `worktree.SetBasePath` — so a moved-and-adopted worktree is two observable acts. One `StepBranchSelect` per adoption, keyed `relocate.parent.<branch>`; the recap is skipped when nothing would change. |
-| `wtm checkout` | migrated — `internal/flow/checkout` (LUC-237). Its pull-request picker is a `StepSelect` with a `Load`, the first one: the wizard is on screen while `gh` answers. It follows `create`'s conventions rather than its old wizard's: the recap is always shown, the parent-env fallback is one of its `⚠` lines, an abort says so, and a reused branch behind origin is offered the same source-update step (`decide.SourceUpdateStep`, answered by `--ff` unattended, run by `decide.ApplyFastForward`) before the recap. A PR given by number has its branch fetched before the questions, so that step and `--ff` read origin as it is now rather than as the last fetch left it; a PR picked in the wizard relies on the wizard's own branch refresh, started as it opens. `checkout.create` is the one point the worktree comes into existence, before the hooks — where `worktree.created` will be published (LUC-233) |
+| `wtm checkout` | migrated — `internal/flow/checkout` (LUC-237). Its pull-request picker is a `StepSelect` with a `Load`, the first one: the wizard is on screen while `gh` answers. It follows `create`'s conventions rather than its old wizard's: the recap is always shown, the parent-env fallback is one of its `⚠` lines, an abort says so, and a reused branch behind origin is offered the same source-update step (`decide.SourceUpdateStep`, answered by `--ff` unattended, run by `decide.ApplyFastForward`) before the recap. A PR given by number has its branch fetched before the questions, so that step and `--ff` read origin as it is now rather than as the last fetch left it; a PR picked in the wizard relies on the wizard's own branch refresh, started as it opens. `checkout.create` is the one point the worktree comes into existence, before the hooks — where `worktree.created` is published |
 | `wtm run up\|down\|start\|stop\|logs` | migrated — `internal/flow/run/<cmd>`, over the questions in `internal/flow/run/target` and the daemon binding in `internal/flow/run/seam` (LUC-193) |
 | `wtm run ps` | not a flow: it reads the daemon's index and prints it, and asks nothing |
 | `wtm run list` | migrated — `internal/flow/run/list` answers which entry was picked and what to do to it; `internal/commands/run/dispatch.go` runs that action through the flow it already has for it (LUC-217) |
@@ -43,7 +43,7 @@ is implemented yet.
 | Dashboard surface | `internal/tui/dashboard` (`prompter.go`, `presenter.go`, `ops.go`) |
 | Test doubles | `internal/testutil/flowtest` |
 | `extract` | migrated — `internal/flow/extract`, the one flow that embeds another's steps: create's, through `create.Embed` (LUC-241). |
-| `wtm env` | migrated — `internal/flow/env` (LUC-239). Its per-key resolver is the one screen no generic kind could draw, so it is a kind of its own, `StepEnvResolve`: `StepContent.EnvFiles` in, `Answer.EnvDecisions` out, rendered by `flowui` over `components.EnvResolve` and refused by the dashboard, which runs no `env`. `--check` returns before asking. A run that asks scans every worktree once, in a `Stage`, for the picker's drift badges; an unattended run scans nothing. `settleIsolation` is the one point the worktree's isolation changes — where `worktree.updated` will be published (LUC-233) — and `Outcome.IsolationChanged` says whether it did |
+| `wtm env` | migrated — `internal/flow/env` (LUC-239). Its per-key resolver is the one screen no generic kind could draw, so it is a kind of its own, `StepEnvResolve`: `StepContent.EnvFiles` in, `Answer.EnvDecisions` out, rendered by `flowui` over `components.EnvResolve` and refused by the dashboard, which runs no `env`. `--check` returns before asking. A run that asks scans every worktree once, in a `Stage`, for the picker's drift badges; an unattended run scans nothing. `settleIsolation` is the one point the worktree's isolation changes — where `worktree.updated` is published when it did — and `Outcome.IsolationChanged` says whether it did |
 | `Load` on a `StepMultiSelect` | since `extract` (LUC-241): a picked source's changes are listed as the files step opens, over an empty set its `ValidateSet` refuses, so Enter cannot answer a list nobody has seen. |
 | `Load` on a `StepSelect`, `Option.Disabled`, `StepContent.Banner`, `StepContent.Pinned` | since `checkout` (LUC-237). A select may load its options; until they arrive `flowui` draws its description over an empty list. A disabled option is drawn but never picked, its badges saying why. `Banner` is what a load has to say about what it could not list (`gh` missing, no pull request). `Pinned` lets a branch step pin what an earlier answer decides — the base of the pull request just picked — with `Step.PinnedSuffix` naming it and `Step.PinAbsent` keeping it when no candidate carries it; `flow.PinnedAmong` is the one rule both surfaces apply. The dashboard renders `Disabled` and `Pinned`, and ignores `Banner` until a dashboard flow loads one. |
 | `StepMultiSelect` | exists since `reparent`, which needed it to keep its no-argument picker. Rendered by both surfaces: `flowui`, and the dashboard's modal since its Actions menu runs the batch reparent. Since `prune`, an `Option` can also arrive pre-checked and tagged (`Selected`, `Tag`, `Tone`). `Tone` is a `domain` enum, not a `flow` one, so `components.TagVariantOf` can hold the one mapping onto the palette without the widget library learning about `flow`. |
@@ -664,7 +664,9 @@ recorder := &flowtest.Recorder{}
   unnoticed.
 - **`Recorder`** implements `flow.Presenter`, collecting `Stages`, `Hooks`, `Notices`
   and `Statuses`. It runs `Work()` and `Run(sink)` for real, so the service still gets
-  called.
+  called. It is also a `flow.Publisher`: set it as the `Context`'s `Publisher` and
+  `Published` / `PublishedTypes()` hold every event the run reported. A package that
+  calls a mutator must have such a test — `archlint`'s `emits` rule checks it.
 
 The typed conclusion (`Created`, `Cleaned`) is not part of `Recorder` — a test that
 needs it embeds the recorder and adds the one method:
@@ -691,6 +693,22 @@ and `gittest.AddOrigin` gives branches a real upstream. They exist to be run
 unchanged after the refactor. Keep them that way: they are the only thing that proves a
 flow that moved packages still reads the same to a user. When you migrate a command,
 write its characterization tests first, and do not "fix" one to make a refactor pass.
+
+## Publishing what a flow changed
+
+Every change to a worktree's identity is published from the flow that made it, never from the service (`docs/dev/architecture.md`, "The event bus"). The point is right after the mutator succeeded:
+
+| Flow | Event | Where |
+| -- | -- | -- |
+| create, extract (new target) | `worktree.created` | `createFlow.provisionOne`, after `worktree.Create`, before env ports and hooks; never on `AlreadyExists` |
+| checkout | `worktree.created` | `checkoutFlow.checkout`, right after `checkoutFlow.create` |
+| teardown (clean, prune) | `worktree.removed` | `removeOne` after `Clean`, `Salvage` after `FinishRemoval`, clean's `recoverRemoveFailure` after `ForceClean` — through `teardown.PublishRemoved`, with the identity captured before the removal |
+| clean, prune, reparent | `worktree.reparented` | one per moved child, partial results included (`publish.ReparentedAll`) |
+| relocate | `worktree.relocated` / `worktree.updated` | after each `Move` / each `Adopt` (`changed: parent, created_at`) |
+| env | `worktree.updated` | `settleIsolation`, when the recorded isolation actually changed |
+| any flow reading the run env | `worktree.updated` | `flow/ordinal`, the first time the worktree is numbered |
+
+`tools/archlint` holds it: `chokepoint`'s table names each mutator's event, `emits` reports a flow package that calls a mutator without publishing its event or without a `Recorder` test, and `metawriter` reports a `service/worktree` function writing metadata that the table does not list.
 
 ## Two decisions worth not re-opening
 

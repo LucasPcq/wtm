@@ -19,6 +19,13 @@ type WorktreeRef struct {
 	Branch     string
 }
 
+// OrdinalClaim is a worktree's number, and whether this call is the one that
+// gave it: only an allocation is a change to publish.
+type OrdinalClaim struct {
+	Ordinal   int
+	Allocated bool
+}
+
 // EnsureOrdinal returns the worktree's stable number, allocating and persisting
 // one the first time it is asked for. The main checkout is ordinal 0 and is
 // never written: it has no meta.json, so 0 in a linked worktree's metadata can
@@ -26,20 +33,20 @@ type WorktreeRef struct {
 //
 // Allocation reads the ordinals of the worktrees git still lists, not every
 // meta.json in the state dir — a removed worktree must give its number back.
-func EnsureOrdinal(params WorktreeRef) (int, error) {
+func EnsureOrdinal(params WorktreeRef) (OrdinalClaim, error) {
 	if params.ProjectDir == "" || params.StateDir == "" || params.Branch == "" {
-		return 0, domain.ErrOrdinalRefIncomplete
+		return OrdinalClaim{}, domain.ErrOrdinalRefIncomplete
 	}
 
 	claim, err := readClaim(params)
 	if err != nil {
-		return 0, err
+		return OrdinalClaim{}, err
 	}
 	if claim.settled {
-		return claim.ordinal, nil
+		return OrdinalClaim{Ordinal: claim.ordinal}, nil
 	}
 
-	allocated := 0
+	result := OrdinalClaim{}
 	lockErr := infra.WithFileLock(infra.WithFileLockParams{
 		Path: filepath.Join(params.StateDir, domain.OrdinalLockFileName),
 		Do: func() error {
@@ -51,17 +58,18 @@ func EnsureOrdinal(params WorktreeRef) (int, error) {
 				return err
 			}
 			if fresh.settled {
-				allocated = fresh.ordinal
+				result = OrdinalClaim{Ordinal: fresh.ordinal}
 				return nil
 			}
-			allocated, err = persistOrdinal(params, rules.AllocateOrdinal(rules.TakenOrdinals(fresh.others)))
+			ordinal, err := persistOrdinal(params, rules.AllocateOrdinal(rules.TakenOrdinals(fresh.others)))
+			result = OrdinalClaim{Ordinal: ordinal, Allocated: err == nil}
 			return err
 		},
 	})
 	if lockErr != nil {
-		return 0, lockErr
+		return OrdinalClaim{}, lockErr
 	}
-	return allocated, nil
+	return result, nil
 }
 
 // claim is what one look at the repository says about a worktree's number:
@@ -77,25 +85,37 @@ func readClaim(params WorktreeRef) (claim, error) {
 	if err != nil {
 		return claim{}, fmt.Errorf("list worktrees: %w", err)
 	}
+	return claimFrom(claimFromParams{Worktrees: worktrees, Ref: params})
+}
 
+type claimFromParams struct {
+	Worktrees []domain.GitWorktree
+	Ref       WorktreeRef
+}
+
+// claimFrom is readClaim over a listing the caller already has: a snapshot
+// reads every worktree's number from one `git worktree list`.
+func claimFrom(params claimFromParams) (claim, error) {
+	worktrees := params.Worktrees
+	ref := params.Ref
 	for _, wt := range worktrees {
-		if wt.Branch == params.Branch && wt.IsMain {
+		if wt.Branch == ref.Branch && wt.IsMain {
 			return claim{settled: true, ordinal: domain.MainWorktreeOrdinal}, nil
 		}
 	}
 
-	others, err := otherHolders(otherHoldersParams{Worktrees: worktrees, Ref: params})
+	others, err := otherHolders(otherHoldersParams{Worktrees: worktrees, Ref: ref})
 	if err != nil {
 		return claim{}, err
 	}
 
-	meta, err := loadMetadata(params.StateDir, params.Branch)
+	meta, err := loadMetadata(ref.StateDir, ref.Branch)
 	if err != nil {
 		return claim{others: others}, nil
 	}
 
 	settled := rules.KeepsOrdinal(rules.KeepsOrdinalParams{
-		Branch:  params.Branch,
+		Branch:  ref.Branch,
 		Ordinal: meta.Ordinal,
 		Others:  others,
 	})

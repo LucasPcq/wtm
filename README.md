@@ -108,7 +108,7 @@ $ wtm tree
 
 ### Built for scripts and agents
 
-Data commands take `--output json` (the document is the schema), every change takes `--yes` so nothing prompts, and every command takes `--quiet`. `wtm agents install` adds a skill to Claude Code and Cursor so your agent drives wtm without being told how.
+Data commands take `--output json` (the document is the schema), every change takes `--yes` so nothing prompts, and every command takes `--quiet`. `wtm agents install` adds a skill to Claude Code and Cursor so your agent drives wtm without being told how. `wtm events --output json` streams every worktree created, moved or removed, whoever did it, so an editor or a terminal plugin can follow along instead of guessing → [the event stream](docs/guide/events.md).
 
 ## Commands
 
@@ -128,6 +128,7 @@ Every command documents itself: `wtm <command> --help`, or the generated [refere
 | [`exec`](docs/wtm_exec.md) | Run one command in several worktrees, in parallel, each with its own environment |
 | [`relocate`](docs/wtm_relocate.md) | Move worktrees to align with `base_path` and adopt external ones |
 | [`ui`](docs/wtm_ui.md) | Open the full-screen worktree dashboard: browse state and PRs, create and delete worktrees |
+| [`events`](docs/wtm_events.md) | Stream the repository's worktree changes as they happen (JSON Lines for integrations) |
 
 ### Navigate
 

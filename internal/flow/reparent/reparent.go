@@ -7,6 +7,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/decide"
+	"github.com/LucasPcq/wtm/internal/flow/publish"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
 
@@ -95,6 +96,7 @@ func (f *reparentFlow) run() (Outcome, error) {
 			return batchErr
 		},
 	})
+	publish.ReparentedAll(f.ctx, results)
 	if err != nil {
 		return Outcome{}, err
 	}

@@ -3558,8 +3558,10 @@ const (
 	// DashboardGitPollSeconds paces the git one, which costs a `git status` over
 	// the whole working tree plus a rev-list and a divergence read per worktree —
 	// several processes per worktree, and the dashboard's only real background
-	// cost. Local git state does not move on its own, so it is read on a slow
-	// clock; KeyRefresh stays the explicit gesture, and the only one that fetches.
+	// cost. A worktree created, moved or removed reaches the list through the
+	// event stream at once; what is left to this slow clock is what no wtm
+	// command reports — dirty, ahead, behind. KeyRefresh stays the explicit
+	// gesture, and the only one that fetches.
 	// `gh` is never polled at all: PRs load once and refresh only on KeyRefresh.
 	DashboardPollSeconds    = 3
 	DashboardGitPollSeconds = 20
@@ -4493,6 +4495,9 @@ const (
 	// ExitCodeCancelled is a run the user backed out of interactively, so that
 	// `wtm create x && wtm go x` stops there.
 	ExitCodeCancelled = 19
+	// ExitCodeEventsSchemaNewer is a `wtm events` that received an event of a
+	// schema newer than its own: the consumer has to upgrade wtm.
+	ExitCodeEventsSchemaNewer = 20
 
 	// FlagValueInvalidFmt is every flag value that does not parse.
 	FlagValueInvalidFmt = "invalid --%s value %q: use %s"
@@ -4569,4 +4574,39 @@ const (
 
 	AnsiEscByte = 0x1b
 	AnsiBelByte = 0x07
+)
+
+// `wtm events` and the bus behind it.
+const (
+	CmdEvents = "events"
+	FlagRepo  = "repo"
+
+	// EventsPublishTimeout bounds a whole publish, dial included: a mutation
+	// never waits on a daemon nobody may be listening to.
+	EventsPublishTimeout = 250 * time.Millisecond
+	// EventsSubscriberQueue is how far a subscriber may fall behind before it
+	// is cut off rather than waited for.
+	EventsSubscriberQueue = 256
+	EventsReconnectMin    = 200 * time.Millisecond
+	EventsReconnectMax    = 5 * time.Second
+)
+
+// One human line per `wtm events` event; --output json is the contract, these
+// are for a person watching.
+const (
+	EventSnapshotFmt   = "%d worktrees · %s"
+	EventReadyMessage  = "watching for changes"
+	EventCreatedFmt    = "created %s  %s"
+	EventRemovedFmt    = "removed %s"
+	EventRelocatedFmt  = "relocated %s  %s " + MoveArrowGlyph + " %s"
+	EventReparentedFmt = "reparented %s  %s " + MoveArrowGlyph + " %s"
+	EventUpdatedFmt    = "updated %s  %s"
+	EventFieldFmt      = "%s=%s"
+	EventFieldSep      = ", "
+	EventOrdinalNone   = "none"
+)
+
+const (
+	// EventsRepoNotADirFmt names the flag: --repo is a path the user typed.
+	EventsRepoNotADirFmt = "--%s %q is not a directory: %w"
 )

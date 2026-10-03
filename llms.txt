@@ -22,6 +22,7 @@ For an agent working in a repository that uses wtm, `wtm agents install` adds th
 - [Named URLs and addressing](docs/guide/addressing.md): the run proxy, named and port URLs, port 80 on macOS
 - [`run.toml` reference](docs/guide/run-toml.md): every key of the file, with its default
 - [State](docs/guide/state.md): the files wtm keeps under `<git-common-dir>/wtm/` and beside the global config
+- [The event stream](docs/guide/events.md): `wtm events`, every worktree change as JSON Lines, for integrations
 
 ## Reference
 

@@ -8,6 +8,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/service/events"
 	"github.com/LucasPcq/wtm/internal/tui/components"
 	"github.com/LucasPcq/wtm/internal/tui/flowui"
 )
@@ -177,11 +178,13 @@ func (p CLIPresenter) statusBlock(notice flow.Notice) {
 }
 
 // FlowContext: the flow cannot load the config itself, which reads cobra flags.
+// Every command publishes what its flow changes, whoever ran it.
 func FlowContext(config ConfigResult) flow.Context {
 	return flow.Context{
 		ProjectDir: config.ProjectDir,
 		StateDir:   config.StateDir,
 		Config:     config.Config,
+		Publisher:  events.NewPublisher(events.PublisherParams{ProjectDir: config.ProjectDir}),
 	}
 }
 

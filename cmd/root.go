@@ -15,6 +15,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/commands/checkout"
 	"github.com/LucasPcq/wtm/internal/commands/configcmd"
 	"github.com/LucasPcq/wtm/internal/commands/daemon"
+	"github.com/LucasPcq/wtm/internal/commands/events"
 	"github.com/LucasPcq/wtm/internal/commands/initcmd"
 	"github.com/LucasPcq/wtm/internal/commands/resolve"
 	"github.com/LucasPcq/wtm/internal/commands/run"
@@ -52,6 +53,10 @@ func init() {
 	uiCmd := ui.NewCmd(ui.NewCmdParams{Version: effectiveVersion})
 	uiCmd.GroupID = domain.CmdGroupWorktrees
 	rootCmd.AddCommand(uiCmd)
+
+	eventsCmd := events.NewCmd()
+	eventsCmd.GroupID = domain.CmdGroupWorktrees
+	rootCmd.AddCommand(eventsCmd)
 
 	resolveCmd := resolve.NewCmd()
 	resolveCmd.GroupID = domain.CmdGroupNavigate

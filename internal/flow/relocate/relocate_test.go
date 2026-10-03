@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -251,5 +252,38 @@ func TestRunEmptyResultNamesTheBasePath(t *testing.T) {
 	}
 	if outcome.Result.BasePath != "../.trees" || outcome.Result.Steps == nil {
 		t.Errorf("result = %+v, want base_path and an empty step list", outcome.Result)
+	}
+}
+
+func TestAMoveAndAnAdoptionAreEachPublished(t *testing.T) {
+	ctx := testContext(t)
+	from := external(t, ctx, "feat/x")
+	events := &flowtest.Recorder{}
+	ctx.Publisher = events
+
+	if _, _, err := run(t, ctx, Request{}, flow.Unattended{}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	got := events.Published
+	if len(got) != 2 || got[0].Type != domain.EventWorktreeRelocated || got[0].FromPath != from || got[1].Type != domain.EventWorktreeUpdated {
+		t.Fatalf("published %+v, want relocated from %s then updated", got, from)
+	}
+	if !slices.Equal(got[1].Changed, []domain.IdentityField{domain.IdentityParent, domain.IdentityCreatedAt}) || got[1].Worktree.Parent != "main" {
+		t.Fatalf("adoption = %+v", got[1])
+	}
+}
+
+func TestADryRunPublishesNothing(t *testing.T) {
+	ctx := testContext(t)
+	external(t, ctx, "feat/x")
+	events := &flowtest.Recorder{}
+	ctx.Publisher = events
+
+	if _, _, err := run(t, ctx, Request{DryRun: true}, flow.Unattended{}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(events.Published) != 0 {
+		t.Fatalf("a dry run published %v", events.PublishedTypes())
 	}
 }

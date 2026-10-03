@@ -42,3 +42,22 @@ func TestEveryMutatorIsADeclaredFunction(t *testing.T) {
 		}
 	}
 }
+
+// An event column naming no type the bus defines would make emits demand a
+// publication nobody can write.
+func TestEveryMutatorEventIsADeclaredEventType(t *testing.T) {
+	config := &packages.Config{Mode: packages.NeedName | packages.NeedTypes, Dir: "../.."}
+	pkgs, err := packages.Load(config, "./internal/domain")
+	if err != nil || len(pkgs) != 1 {
+		t.Fatalf("load domain: %v", err)
+	}
+	declared := eventTypesOf(pkgs[0].Types)
+	if len(declared) == 0 {
+		t.Fatal("domain declares no EventType constant")
+	}
+	for _, m := range mutators {
+		if m.event != "" && !declared[m.event] {
+			t.Errorf("%s.%s publishes %q, which domain does not declare", m.pkg, m.name, m.event)
+		}
+	}
+}

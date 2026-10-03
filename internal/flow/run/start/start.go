@@ -126,7 +126,7 @@ func (f *startFlow) run() (Outcome, error) {
 	}
 
 	workDir := f.workDirs(answers)[0]
-	if err := seam.RequireEnv(seam.RequireEnvParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, WorkDirs: []string{workDir}}); err != nil {
+	if err := seam.RequireEnv(seam.RequireEnvParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, WorkDirs: []string{workDir}, Publisher: f.ctx.Publisher}); err != nil {
 		return Outcome{}, err
 	}
 	// Refused rather than started: a runner and one of its own children are the
@@ -226,6 +226,7 @@ func (f *startFlow) seamParams(workDir string) seam.Params {
 		PublicPort:  proxy.Public,
 		ProbeBudget: rules.PortProbeBudget(f.request.Config),
 		NoProbe:     f.request.NoProbe,
+		Publisher:   f.ctx.Publisher,
 	}
 }
 

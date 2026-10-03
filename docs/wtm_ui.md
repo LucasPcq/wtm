@@ -12,8 +12,9 @@ run daemon holds something up in, with the addresses its jobs answer on. `n`
 creates a worktree; right-click a row (or press `m`) to reparent, sync, or delete
 it; `a` opens the actions that run over several worktrees at once, syncing or
 reparenting a selection of them; `L` reads a job's logs in the detail panel.
-The list's local git state is re-read every 20 seconds, when the terminal
-regains focus and after each action; the detail panel reloads when the selection
+The list follows every worktree created, moved or removed, whoever did it, as
+`wtm events` reports it; its local git state is re-read every 20 seconds, when
+the terminal regains focus and after each action; the detail panel reloads when the selection
 changes or an operation touches it, and pull requests load once. Nothing is
 fetched on its own: `r` fetches the remote and refreshes all of it.
 Press `?` for the key reference.

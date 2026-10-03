@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -137,6 +138,32 @@ func TestDeletingTheSafeOnesKeepsTheOthers(t *testing.T) {
 	}
 	if _, statErr := os.Stat(unsafe); statErr != nil {
 		t.Errorf("the dirty worktree must survive: %v", statErr)
+	}
+}
+
+func TestAReparentedChildIsPublishedAfterTheRemovals(t *testing.T) {
+	ctx := testContext(t)
+	makeWorktree(t, ctx, "top")
+	makeWorktreeFrom(t, ctx, "mid", "top")
+	makeWorktreeFrom(t, ctx, "leaf", "mid")
+	presenter := newRecorder()
+	ctx.Publisher = presenter.Recorder
+
+	if _, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Branches: []string{"top", "mid"}, BaseBranch: "main", ReparentChildren: true},
+		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}},
+		Presenter: presenter,
+	}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	want := []domain.EventType{domain.EventWorktreeRemoved, domain.EventWorktreeRemoved, domain.EventWorktreeReparented}
+	if got := presenter.PublishedTypes(); !slices.Equal(got, want) {
+		t.Fatalf("published %v, want %v", got, want)
+	}
+	if last := presenter.Published[2]; last.Worktree.Branch != "leaf" || last.FromParent != "mid" || last.Worktree.Parent != "main" {
+		t.Fatalf("reparented = %+v", last)
 	}
 }
 

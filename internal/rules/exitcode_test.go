@@ -26,6 +26,7 @@ func TestExitCode(t *testing.T) {
 		{"usage", fmt.Errorf("unknown flag: --bogus: %w", domain.ErrUsage), domain.ExitCodeUsage},
 		{"wrapped", fmt.Errorf("context: %w", domain.ErrBranchNotFound), domain.ExitCodeBranchNotFound},
 		{"env drift", fmt.Errorf("%w (%w)", domain.ErrEnvDrift, domain.ErrAborted), domain.ExitCodeEnvDrift},
+		{"events schema newer", fmt.Errorf("event v2: %w", domain.ErrEventsSchemaNewer), domain.ExitCodeEventsSchemaNewer},
 	}
 
 	for _, tc := range cases {

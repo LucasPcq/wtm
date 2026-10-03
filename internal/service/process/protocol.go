@@ -1,6 +1,10 @@
 package process
 
-import "github.com/LucasPcq/wtm/internal/domain"
+import (
+	"encoding/json"
+
+	"github.com/LucasPcq/wtm/internal/domain"
+)
 
 // RequestAction identifies the daemon command.
 type RequestAction string
@@ -13,6 +17,10 @@ const (
 	ActionList     RequestAction = "list"
 	ActionAttach   RequestAction = "attach"
 	ActionResize   RequestAction = "resize"
+	// ActionPublish and ActionSubscribe make the daemon a broker for the
+	// `wtm events` stream; it relays payloads it never decodes.
+	ActionPublish   RequestAction = "publish"
+	ActionSubscribe RequestAction = "subscribe"
 )
 
 // Request is a JSON message sent from client to daemon.
@@ -44,6 +52,11 @@ type Request struct {
 	// ActionResize as the pane rendering the job changes size.
 	Cols int `json:"cols,omitempty"`
 	Rows int `json:"rows,omitempty"`
+	// Repo is the git common dir an ActionPublish is about, and Repos the ones
+	// an ActionSubscribe wants; empty Repos is every repository.
+	Repo    string          `json:"repo,omitempty"`
+	Repos   []string        `json:"repos,omitempty"`
+	Payload json.RawMessage `json:"payload,omitempty"`
 }
 
 // ResponseStatus is the status field in a daemon response. For long-lived
@@ -57,6 +70,7 @@ const (
 	StatusError  ResponseStatus = "error"
 	StatusOutput ResponseStatus = "output" // streamed chunk of task output
 	StatusDone   ResponseStatus = "done"   // task exited successfully
+	StatusEvent  ResponseStatus = "event"  // one relayed event of a subscription
 )
 
 // Response is a JSON message sent from daemon to client.
@@ -90,4 +104,7 @@ type Response struct {
 	Joined bool `json:"joined,omitempty"`
 	// Released marks a stop that let go of a shared job without stopping it.
 	Released bool `json:"released,omitempty"`
+	// Repo and Payload carry one relayed event, on StatusEvent.
+	Repo    string          `json:"repo,omitempty"`
+	Payload json.RawMessage `json:"payload,omitempty"`
 }

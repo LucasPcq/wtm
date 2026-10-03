@@ -23,6 +23,7 @@ func (m Model) flowContext() flow.Context {
 		ProjectDir: m.params.ProjectDir,
 		StateDir:   m.params.StateDir,
 		Config:     m.params.Config,
+		Publisher:  m.params.Publisher,
 	}
 }
 
@@ -497,6 +498,8 @@ func (m Model) applyFlow(msg tea.Msg) (Model, tea.Cmd) {
 		return m, m.reload()
 	case fastForwardedMsg:
 		return m, m.reload()
+	case worktreeEventMsg:
+		return m.applyEvent(msg.event)
 	}
 	return m, nil
 }

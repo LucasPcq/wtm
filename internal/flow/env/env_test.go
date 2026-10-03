@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -317,5 +318,30 @@ func TestRunCheckOfAWorktreeInSyncSucceeds(t *testing.T) {
 	makeWorktree(t, ctx, "feat/a")
 	if _, _, err := run(ctx, Request{Worktree: "feat/a", Check: true}, flow.Unattended{}); err != nil {
 		t.Errorf("err = %v, want a clean check to exit 0", err)
+	}
+}
+
+func TestAnIsolationChangeIsPublishedAndAnUnchangedOneIsNot(t *testing.T) {
+	ctx := testContext(t)
+	withPorts(t, ctx)
+	makeWorktree(t, ctx, "feat/a")
+	forgetIsolation(t, ctx, "feat/a")
+	events := &flowtest.Recorder{}
+	ctx.Publisher = events
+
+	for range 2 {
+		if _, _, err := run(ctx, Request{Worktree: "feat/a", Isolation: domain.IsolationIsolated}, flow.Unattended{}); err != nil {
+			t.Fatalf("Run: %v", err)
+		}
+	}
+
+	var updates []domain.Event
+	for _, event := range events.Published {
+		if event.Type == domain.EventWorktreeUpdated && slices.Contains(event.Changed, domain.IdentityIsolation) {
+			updates = append(updates, event)
+		}
+	}
+	if len(updates) != 1 || updates[0].Worktree.Isolation != domain.IsolationIsolated {
+		t.Fatalf("isolation updates = %+v, want exactly one, to isolated", updates)
 	}
 }
