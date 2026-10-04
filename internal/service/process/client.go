@@ -9,7 +9,9 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -339,12 +341,21 @@ func StartDaemon(params DaemonParams) error {
 		args = append(args, "--"+domain.FlagProxyPort, strconv.Itoa(params.ProxyPort))
 	}
 	cmd := exec.Command(exePath, args...)
+	cmd.Env = daemonEnv(os.Environ())
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	cmd.Stdin = nil
 
 	return startDetached(cmd)
+}
+
+// daemonEnv drops what belongs to the one command that started the daemon: its
+// jobs run long after, for other callers.
+func daemonEnv(environ []string) []string {
+	return slices.DeleteFunc(slices.Clone(environ), func(entry string) bool {
+		return strings.HasPrefix(entry, domain.EnvCorrelationID+"=")
+	})
 }
 
 // startDetached never waits on the daemon, but reaps it: a client that lives
