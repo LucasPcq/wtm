@@ -169,6 +169,9 @@ var rootCmd = &cobra.Command{
 		if err := validateOutputFormat(cmd); err != nil {
 			return err
 		}
+		if err := validateCorrelationID(); err != nil {
+			return err
+		}
 		startUpdateCheck(cmd)
 		silenceHumanOutput(cmd)
 		shared.ClearCancelled(cmd)

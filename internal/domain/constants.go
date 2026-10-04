@@ -239,6 +239,13 @@ const (
 	// EnvGoFile is the environment variable used by the shell wrapper to pass the go-file path.
 	EnvGoFile = "WTM_GO_FILE"
 
+	// EnvCorrelationID is copied verbatim onto every event the command publishes.
+	EnvCorrelationID        = "WTM_CORRELATION_ID"
+	CorrelationIDMaxBytes   = 256
+	CorrelationIDInvalidFmt = "$%s %s: %w"
+	CorrelationIDTooLong    = "is longer than 256 bytes"
+	CorrelationIDControl    = "contains a control character"
+
 	// Override git resolution of the main checkout and of the state directory, for tests and CI.
 	EnvProjectDir = "WTM_PROJECT_DIR"
 	EnvStateDir   = "WTM_STATE_DIR"
