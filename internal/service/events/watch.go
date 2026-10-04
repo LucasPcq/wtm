@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -43,10 +45,47 @@ func Watch(ctx context.Context, params WatchParams) error {
 	if err != nil {
 		return err
 	}
+	return retry(ctx, retryParams{
+		OnWarning: params.OnWarning,
+		Once: func() watchResult {
+			return watchOnce(ctx, watchOnceParams{WatchParams: params, Socket: socket, Repo: repo})
+		},
+	})
+}
 
+type WatchAllParams struct {
+	// SocketPath is the daemon's; empty is the one every command talks to.
+	SocketPath string
+	ProxyPort  int
+	OnEvent    func(Received) error
+	OnWarning  func(error)
+}
+
+// WatchAll is Watch over every repository of the registry: one snapshot each,
+// one ready, then every change of any of them. A repository joining is sent as
+// repo.added followed by its own snapshot.
+func WatchAll(ctx context.Context, params WatchAllParams) error {
+	socket := params.SocketPath
+	if socket == "" {
+		socket = process.SocketPath()
+	}
+	return retry(ctx, retryParams{
+		OnWarning: params.OnWarning,
+		Once: func() watchResult {
+			return watchAllOnce(ctx, watchAllOnceParams{WatchAllParams: params, Socket: socket})
+		},
+	})
+}
+
+type retryParams struct {
+	OnWarning func(error)
+	Once      func() watchResult
+}
+
+func retry(ctx context.Context, params retryParams) error {
 	backoff := domain.EventsReconnectMin
 	for {
-		result := watchOnce(ctx, watchOnceParams{WatchParams: params, Socket: socket, Repo: repo})
+		result := params.Once()
 		if ctx.Err() != nil {
 			return nil
 		}
@@ -86,23 +125,12 @@ type watchOnceParams struct {
 	Repo   domain.EventRepo
 }
 
-// watchOnce subscribes before it reads the snapshot: a change made while the
-// snapshot is read waits in the subscription and arrives after ready, where
-// replaying it is harmless, rather than falling between the two.
 func watchOnce(ctx context.Context, params watchOnceParams) watchResult {
-	daemon := process.DaemonParams{SocketPath: params.Socket, ProxyPort: params.ProxyPort}
-	if err := ensureDaemon(daemon); err != nil {
-		return watchResult{transient: err}
-	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	deliveries, err := process.Subscribe(ctx, process.SubscribeParams{SocketPath: params.Socket, Repos: []string{params.Repo.CommonDir}})
-	if errors.Is(err, domain.ErrDaemonNoSubscribe) {
-		// Never a daemon another watcher could need: it cannot serve one.
-		return watchResult{transient: errors.Join(err, replaceDaemon(daemon))}
-	}
-	if err != nil {
-		return watchResult{transient: err}
+	deliveries, failed := subscribe(ctx, subscribeParams{Socket: params.Socket, ProxyPort: params.ProxyPort, Repos: []string{params.Repo.CommonDir}})
+	if deliveries == nil {
+		return failed
 	}
 	snapshot, err := snapshotOf(snapshotParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Repo: params.Repo})
 	if err != nil {
@@ -111,6 +139,99 @@ func watchOnce(ctx context.Context, params watchOnceParams) watchResult {
 	if err := params.OnEvent(snapshot); err != nil {
 		return watchResult{fatal: err}
 	}
+	return relay(relayParams{Deliveries: deliveries, OnEvent: params.OnEvent})
+}
+
+type watchAllOnceParams struct {
+	WatchAllParams
+	Socket string
+}
+
+func watchAllOnce(ctx context.Context, params watchAllOnceParams) watchResult {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	deliveries, failed := subscribe(ctx, subscribeParams{Socket: params.Socket, ProxyPort: params.ProxyPort})
+	if deliveries == nil {
+		return failed
+	}
+	repos, err := Prune(PruneParams{SocketPath: params.Socket})
+	if err != nil {
+		return watchResult{transient: err}
+	}
+	for _, repo := range repos {
+		if err := sendSnapshot(sendSnapshotParams{WatchAllParams: params.WatchAllParams, Repo: eventRepoOf(repo)}); err != nil {
+			return watchResult{fatal: err}
+		}
+	}
+	return relay(relayParams{
+		Deliveries: deliveries,
+		OnEvent:    params.OnEvent,
+		After: func(event domain.Event) error {
+			if event.Type != domain.EventRepoAdded || event.Repo == nil {
+				return nil
+			}
+			return sendSnapshot(sendSnapshotParams{WatchAllParams: params.WatchAllParams, Repo: *event.Repo})
+		},
+	})
+}
+
+type sendSnapshotParams struct {
+	WatchAllParams
+	Repo domain.EventRepo
+}
+
+// sendSnapshot skips a repository it cannot read rather than ending the
+// stream: one broken repository must not blind a reader to every other.
+func sendSnapshot(params sendSnapshotParams) error {
+	snapshot, err := snapshotOf(snapshotParams{
+		ProjectDir: params.Repo.Root,
+		StateDir:   filepath.Join(params.Repo.CommonDir, domain.StateDirName),
+		Repo:       params.Repo,
+	})
+	if err != nil {
+		if params.OnWarning != nil {
+			params.OnWarning(fmt.Errorf("%s: %w", params.Repo.Root, err))
+		}
+		return nil
+	}
+	return params.OnEvent(snapshot)
+}
+
+type subscribeParams struct {
+	Socket    string
+	ProxyPort int
+	Repos     []string
+}
+
+// subscribe comes before the snapshot: a change made while the snapshot is
+// read waits in the subscription and arrives after ready, where replaying it
+// is harmless, rather than falling between the two. A nil channel comes with
+// the result that ends this attempt.
+func subscribe(ctx context.Context, params subscribeParams) (<-chan process.Delivery, watchResult) {
+	daemon := process.DaemonParams{SocketPath: params.Socket, ProxyPort: params.ProxyPort}
+	if err := ensureDaemon(daemon); err != nil {
+		return nil, watchResult{transient: err}
+	}
+	deliveries, err := process.Subscribe(ctx, process.SubscribeParams{SocketPath: params.Socket, Repos: params.Repos})
+	if errors.Is(err, domain.ErrDaemonNoSubscribe) {
+		// Never a daemon another watcher could need: it cannot serve one.
+		return nil, watchResult{transient: errors.Join(err, replaceDaemon(daemon))}
+	}
+	if err != nil {
+		return nil, watchResult{transient: err}
+	}
+	return deliveries, watchResult{}
+}
+
+type relayParams struct {
+	Deliveries <-chan process.Delivery
+	OnEvent    func(Received) error
+	// After runs once an event was handed on, before the next one.
+	After func(domain.Event) error
+}
+
+// relay sends ready, then every delivery until the subscription ends.
+func relay(params relayParams) watchResult {
 	ready, err := readyOf()
 	if err != nil {
 		return watchResult{transient: err}
@@ -118,7 +239,7 @@ func watchOnce(ctx context.Context, params watchOnceParams) watchResult {
 	if err := params.OnEvent(ready); err != nil {
 		return watchResult{fatal: err}
 	}
-	for delivery := range deliveries {
+	for delivery := range params.Deliveries {
 		var event domain.Event
 		if json.Unmarshal(delivery.Payload, &event) != nil {
 			continue
@@ -127,6 +248,12 @@ func watchOnce(ctx context.Context, params watchOnceParams) watchResult {
 			return watchResult{fatal: domain.ErrEventsSchemaNewer, reachedReady: true}
 		}
 		if err := params.OnEvent(Received{Event: event, Raw: delivery.Payload}); err != nil {
+			return watchResult{fatal: err, reachedReady: true}
+		}
+		if params.After == nil {
+			continue
+		}
+		if err := params.After(event); err != nil {
 			return watchResult{fatal: err, reachedReady: true}
 		}
 	}

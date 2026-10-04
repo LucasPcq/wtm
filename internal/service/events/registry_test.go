@@ -153,11 +153,16 @@ func TestPruneDropsARepoNoLongerInitialized(t *testing.T) {
 	if err := Register(RegisterParams{ProjectDir: dir}); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Remove(filepath.Join(dir, ".git", domain.StateDirName, domain.ConfigFileName)); err != nil {
-		t.Fatal(err)
-	}
+	removeConfig(t, dir)
 
 	if repos, err := Prune(PruneParams{}); err != nil || len(repos) != 0 {
 		t.Fatalf("repos = %+v, err = %v", repos, err)
+	}
+}
+
+func removeConfig(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.Remove(filepath.Join(dir, ".git", domain.StateDirName, domain.ConfigFileName)); err != nil {
+		t.Fatal(err)
 	}
 }
