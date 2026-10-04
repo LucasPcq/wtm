@@ -45,7 +45,7 @@ func TestEveryEventTypeMatchesTheSchema(t *testing.T) {
 	examples := map[domain.EventType]json.RawMessage{
 		domain.EventSnapshot:           snapshot.Raw,
 		domain.EventReady:              ready.Raw,
-		domain.EventWorktreeCreated:    about(domain.Event{Type: domain.EventWorktreeCreated}),
+		domain.EventWorktreeCreated:    about(domain.Event{Type: domain.EventWorktreeCreated, CorrelationID: "popup-1"}),
 		domain.EventWorktreeUpdated:    about(domain.Event{Type: domain.EventWorktreeUpdated, Changed: []domain.IdentityField{domain.IdentityOrdinal}}),
 		domain.EventWorktreeRelocated:  about(domain.Event{Type: domain.EventWorktreeRelocated, FromPath: "/old/feat-a"}),
 		domain.EventWorktreeReparented: about(domain.Event{Type: domain.EventWorktreeReparented, FromParent: "main"}),

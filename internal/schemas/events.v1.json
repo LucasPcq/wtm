@@ -8,7 +8,8 @@
   "properties": {
     "v": { "const": 1 },
     "type": { "type": "string" },
-    "ts": { "type": "string", "format": "date-time" }
+    "ts": { "type": "string", "format": "date-time" },
+    "correlation_id": { "type": "string", "maxLength": 256, "description": "WTM_CORRELATION_ID of the command that published the event, verbatim; absent when it had none." }
   },
   "$defs": {
     "repo": {

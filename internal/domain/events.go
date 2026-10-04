@@ -68,13 +68,15 @@ type WorktreeIdentity struct {
 }
 
 type Event struct {
-	V          int                `json:"v"`
-	Type       EventType          `json:"type"`
-	TS         string             `json:"ts"`
-	Repo       *EventRepo         `json:"repo,omitempty"`
-	Worktrees  []WorktreeIdentity `json:"worktrees,omitempty"`
-	Worktree   *WorktreeIdentity  `json:"worktree,omitempty"`
-	Changed    []IdentityField    `json:"changed,omitempty"`
-	FromPath   string             `json:"from_path,omitempty"`
-	FromParent string             `json:"from_parent,omitempty"`
+	V    int       `json:"v"`
+	Type EventType `json:"type"`
+	TS   string    `json:"ts"`
+	// CorrelationID is the publishing command's WTM_CORRELATION_ID, verbatim.
+	CorrelationID string             `json:"correlation_id,omitempty"`
+	Repo          *EventRepo         `json:"repo,omitempty"`
+	Worktrees     []WorktreeIdentity `json:"worktrees,omitempty"`
+	Worktree      *WorktreeIdentity  `json:"worktree,omitempty"`
+	Changed       []IdentityField    `json:"changed,omitempty"`
+	FromPath      string             `json:"from_path,omitempty"`
+	FromParent    string             `json:"from_parent,omitempty"`
 }
