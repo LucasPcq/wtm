@@ -83,3 +83,27 @@ func TestASuccessfulDeprovisioningWritesNothing(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+// Several repositories share one global stream: a worktree line names its own.
+func TestAGlobalLineNamesTheRepositoryOfAWorktree(t *testing.T) {
+	repo := &domain.EventRepo{Root: "/code/app", CommonDir: "/code/app/.git"}
+	identity := &domain.WorktreeIdentity{Branch: "feat/a", Path: "/wt/feat-a"}
+	cases := []struct {
+		event domain.Event
+		want  string
+	}{
+		{domain.Event{Type: domain.EventWorktreeCreated, Repo: repo, Worktree: identity}, "✓ app · created feat/a  /wt/feat-a"},
+		{domain.Event{Type: domain.EventWorktreeRemoved, Repo: repo, Worktree: identity}, "✓ app · removed feat/a"},
+		{domain.Event{Type: domain.EventReady}, "= watching for changes"},
+		{domain.Event{Type: domain.EventRepoAdded, Repo: repo}, "~ watching /code/app"},
+	}
+	for _, c := range cases {
+		var buf bytes.Buffer
+		if err := WriteGlobalEventLine(&buf, c.event); err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.TrimSpace(ansi.Strip(buf.String())); got != c.want {
+			t.Errorf("%s: got %q, want %q", c.event.Type, got, c.want)
+		}
+	}
+}

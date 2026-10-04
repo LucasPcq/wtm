@@ -66,7 +66,7 @@ func runEvents(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 	if global {
-		return stream(streamParams{Cmd: cmd, Format: format, Watch: func(ctx context.Context, watch watchHooks) error {
+		return stream(streamParams{Cmd: cmd, Format: format, Global: true, Watch: func(ctx context.Context, watch watchHooks) error {
 			return wtmevents.WatchAll(ctx, wtmevents.WatchAllParams{
 				ProxyPort: rules.ProxyPort(globalConfig()),
 				OnEvent:   watch.OnEvent,
@@ -131,6 +131,7 @@ type watchHooks struct {
 type streamParams struct {
 	Cmd    *cobra.Command
 	Format string
+	Global bool
 	Watch  func(context.Context, watchHooks) error
 }
 
@@ -145,7 +146,7 @@ func stream(params streamParams) error {
 	ctx = endWhenUnread(ctx, cmd)
 
 	err := params.Watch(ctx, watchHooks{
-		OnEvent: writerFor(writerForParams{Cmd: cmd, Format: params.Format}),
+		OnEvent: writerFor(writerForParams{Cmd: cmd, Format: params.Format, Global: params.Global}),
 		OnWarning: func(err error) {
 			output.Warning(output.Barred(cmd.ErrOrStderr()), err.Error())
 		},
@@ -201,6 +202,7 @@ func repoDir(cmd *cobra.Command) (string, error) {
 type writerForParams struct {
 	Cmd    *cobra.Command
 	Format string
+	Global bool
 }
 
 // writerFor puts no frame around the stream: it never ends on its own, so
@@ -211,5 +213,9 @@ func writerFor(params writerForParams) func(wtmevents.Received) error {
 		return func(received wtmevents.Received) error { return output.WriteEventJSONLine(out, received.Raw) }
 	}
 	barred := output.Barred(out)
-	return func(received wtmevents.Received) error { return output.WriteEventLine(barred, received.Event) }
+	write := output.WriteEventLine
+	if params.Global {
+		write = output.WriteGlobalEventLine
+	}
+	return func(received wtmevents.Received) error { return write(barred, received.Event) }
 }

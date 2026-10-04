@@ -4633,6 +4633,7 @@ const (
 	EventExitCodeFmt          = " (exit %d)"
 	EventRepoAddedFmt         = "watching %s"
 	EventRepoRemovedFmt       = "no longer watching %s"
+	EventRepoPrefixFmt        = "%s · "
 )
 
 const (

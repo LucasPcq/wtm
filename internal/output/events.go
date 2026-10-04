@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -22,6 +23,29 @@ func WriteEventJSONLine(w io.Writer, raw json.RawMessage) error {
 // WriteEventLine renders what a person watching needs: a type it does not know
 // is left out, as the contract asks of every consumer.
 func WriteEventLine(w io.Writer, event domain.Event) error {
+	writeEventLine(eventLineParams{W: w, Event: event})
+	return nil
+}
+
+// WriteGlobalEventLine is WriteEventLine for a stream over several
+// repositories: a worktree line names the repository it belongs to.
+func WriteGlobalEventLine(w io.Writer, event domain.Event) error {
+	prefix := ""
+	if strings.HasPrefix(string(event.Type), domain.EventWorktreePrefix) && event.Repo != nil {
+		prefix = fmt.Sprintf(domain.EventRepoPrefixFmt, filepath.Base(event.Repo.Root))
+	}
+	writeEventLine(eventLineParams{W: w, Event: event, Prefix: prefix})
+	return nil
+}
+
+type eventLineParams struct {
+	W      io.Writer
+	Event  domain.Event
+	Prefix string
+}
+
+func writeEventLine(params eventLineParams) {
+	w, event, prefix := params.W, params.Event, params.Prefix
 	identity := event.Worktree
 	if identity == nil {
 		identity = &domain.WorktreeIdentity{}
@@ -32,32 +56,31 @@ func WriteEventLine(w io.Writer, event domain.Event) error {
 	case domain.EventReady:
 		Unchanged(w, domain.EventReadyMessage)
 	case domain.EventWorktreeCreated:
-		Success(w, fmt.Sprintf(domain.EventCreatedFmt, identity.Branch, identity.Path))
-	case domain.EventWorktreeRemoved:
-		Success(w, fmt.Sprintf(domain.EventRemovedFmt, identity.Branch))
-	case domain.EventWorktreeRelocated:
-		Update(w, fmt.Sprintf(domain.EventRelocatedFmt, identity.Branch, event.FromPath, identity.Path))
-	case domain.EventWorktreeReparented:
-		Update(w, fmt.Sprintf(domain.EventReparentedFmt, identity.Branch, event.FromParent, identity.Parent))
+		Success(w, prefix+fmt.Sprintf(domain.EventCreatedFmt, identity.Branch, identity.Path))
 	case domain.EventWorktreeProvisioned:
 		if hookPassed(event) {
-			Success(w, fmt.Sprintf(domain.EventProvisionedFmt, identity.Branch))
-			return nil
+			Success(w, prefix+fmt.Sprintf(domain.EventProvisionedFmt, identity.Branch))
+			return
 		}
-		Error(w, fmt.Sprintf(domain.EventProvisionFailedFmt, identity.Branch)+hookDetail(event))
+		Error(w, prefix+fmt.Sprintf(domain.EventProvisionFailedFmt, identity.Branch)+hookDetail(event))
 	case domain.EventWorktreeDeprovisioned:
 		if hookPassed(event) {
-			return nil
+			return
 		}
-		Error(w, fmt.Sprintf(domain.EventDeprovisionFailedFmt, identity.Branch)+hookDetail(event))
+		Error(w, prefix+fmt.Sprintf(domain.EventDeprovisionFailedFmt, identity.Branch)+hookDetail(event))
 	case domain.EventRepoAdded:
 		Update(w, fmt.Sprintf(domain.EventRepoAddedFmt, repoRoot(event.Repo)))
 	case domain.EventRepoRemoved:
 		Update(w, fmt.Sprintf(domain.EventRepoRemovedFmt, repoRoot(event.Repo)))
+	case domain.EventWorktreeRemoved:
+		Success(w, prefix+fmt.Sprintf(domain.EventRemovedFmt, identity.Branch))
+	case domain.EventWorktreeRelocated:
+		Update(w, prefix+fmt.Sprintf(domain.EventRelocatedFmt, identity.Branch, event.FromPath, identity.Path))
+	case domain.EventWorktreeReparented:
+		Update(w, prefix+fmt.Sprintf(domain.EventReparentedFmt, identity.Branch, event.FromParent, identity.Parent))
 	case domain.EventWorktreeUpdated:
-		Update(w, fmt.Sprintf(domain.EventUpdatedFmt, identity.Branch, changedFields(changedFieldsParams{Identity: *identity, Changed: event.Changed})))
+		Update(w, prefix+fmt.Sprintf(domain.EventUpdatedFmt, identity.Branch, changedFields(changedFieldsParams{Identity: *identity, Changed: event.Changed})))
 	}
-	return nil
 }
 
 func hookPassed(event domain.Event) bool {
