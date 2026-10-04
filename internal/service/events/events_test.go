@@ -311,3 +311,15 @@ func TestASnapshotOfNothingIsAnEmptyList(t *testing.T) {
 		t.Fatalf("snapshot = %s, want an empty list rather than no field", received.Raw)
 	}
 }
+
+func TestThePublisherListensOnlyWhileTheDaemonRuns(t *testing.T) {
+	f := newWatchFixture(t)
+	publisher := NewPublisher(PublisherParams{ProjectDir: f.projectDir, SocketPath: f.socket})
+	if !publisher.Listening() {
+		t.Fatal("not listening with the daemon up")
+	}
+	f.stop()
+	if publisher.Listening() {
+		t.Fatal("listening with no daemon")
+	}
+}

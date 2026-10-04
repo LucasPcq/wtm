@@ -22,8 +22,11 @@ type Context struct {
 	Publisher Publisher
 }
 
+// Listening is asked before an event is built: reading the identity it
+// carries costs a git call, which a run nobody watches should not pay.
 type Publisher interface {
 	Publish(event domain.Event)
+	Listening() bool
 }
 
 func (c Context) Publish(event domain.Event) {
@@ -31,6 +34,10 @@ func (c Context) Publish(event domain.Event) {
 		return
 	}
 	c.Publisher.Publish(event)
+}
+
+func (c Context) Listening() bool {
+	return c.Publisher != nil && c.Publisher.Listening()
 }
 
 type StepKind int

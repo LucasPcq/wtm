@@ -53,6 +53,12 @@ func (p *Publisher) Publish(event domain.Event) {
 	_ = process.Publish(process.PublishParams{SocketPath: p.socketPath, Repo: p.repo.CommonDir, Payload: payload})
 }
 
+// Listening is a dial, never cached: a run may start the daemon halfway
+// through, and the events it makes after that have someone to reach.
+func (p *Publisher) Listening() bool {
+	return p.socketPath != "" && process.IsDaemonRunning(p.socketPath)
+}
+
 type stampParams struct {
 	Event domain.Event
 	Repo  domain.EventRepo

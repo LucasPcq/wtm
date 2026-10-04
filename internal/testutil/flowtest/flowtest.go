@@ -119,11 +119,15 @@ type Recorder struct {
 	Notices   []flow.Notice
 	Statuses  []flow.Notice
 	Published []domain.Event
+	// Unheard makes the Recorder a publisher no daemon listens to.
+	Unheard bool
 }
 
 // Publish makes a Recorder the flow's Publisher too, so one double records
 // what a run showed and what it reported to the bus.
 func (r *Recorder) Publish(event domain.Event) { r.Published = append(r.Published, event) }
+
+func (r *Recorder) Listening() bool { return !r.Unheard }
 
 func (r *Recorder) PublishedTypes() []domain.EventType {
 	types := make([]domain.EventType, 0, len(r.Published))

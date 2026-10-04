@@ -101,3 +101,16 @@ func TestNoPublisherReadsNothing(t *testing.T) {
 		t.Fatal("captured with nobody to publish to")
 	}
 }
+
+func TestNobodyListeningReadsNothing(t *testing.T) {
+	f := newFixture(t)
+	f.rec.Unheard = true
+
+	publish.Created(f.ctx, "feat/a")
+	if _, ok := publish.Capture(f.ctx, "feat/a"); ok {
+		t.Fatal("captured with nobody listening")
+	}
+	if len(f.rec.Published) != 0 {
+		t.Fatalf("published %v with nobody listening", f.rec.PublishedTypes())
+	}
+}

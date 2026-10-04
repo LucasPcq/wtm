@@ -56,7 +56,7 @@ func ReparentedAll(ctx flow.Context, results []domain.ReparentResult) {
 // last state a consumer saw, and once git forgot the worktree there is nothing
 // left to read.
 func Capture(ctx flow.Context, branch string) (domain.WorktreeIdentity, bool) {
-	if ctx.Publisher == nil {
+	if !ctx.Listening() {
 		return domain.WorktreeIdentity{}, false
 	}
 	identity, err := worktree.Identity(ref(ctx, branch))
@@ -74,7 +74,7 @@ type emitParams struct {
 }
 
 func emit(params emitParams) {
-	if params.Context.Publisher == nil {
+	if !params.Context.Listening() {
 		return
 	}
 	identity, err := worktree.Identity(ref(params.Context, params.Branch))
