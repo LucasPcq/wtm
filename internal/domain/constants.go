@@ -1360,6 +1360,9 @@ const (
 	// root to end the process on ExitCodeCancelled.
 	AnnotationCancelled = "wtm.cancelled"
 	AnnotationOn        = "true"
+	// AnnotationUncorrelated marks a command whose session outlives the caller
+	// that launched it (`wtm ui`): its events never carry WTM_CORRELATION_ID.
+	AnnotationUncorrelated = "wtm.uncorrelated"
 	// AnnotationOutputFormats lists, comma-separated, the --output values a
 	// command accepts besides text and json.
 	AnnotationOutputFormats  = "wtm.output-formats"

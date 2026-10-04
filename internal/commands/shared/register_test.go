@@ -58,3 +58,16 @@ func TestLoadConfigWithAMovedStateDirRegistersNothing(t *testing.T) {
 		t.Fatalf("the registry was written: %v", err)
 	}
 }
+
+func TestAnUncorrelatedCommandIgnoresTheCallersID(t *testing.T) {
+	t.Setenv(domain.EnvCorrelationID, "popup-1")
+	plain := &cobra.Command{}
+	dashboard := &cobra.Command{Annotations: map[string]string{domain.AnnotationUncorrelated: domain.AnnotationOn}}
+
+	if got := CorrelationID(plain); got != "popup-1" {
+		t.Errorf("plain command = %q", got)
+	}
+	if got := CorrelationID(dashboard); got != "" {
+		t.Errorf("uncorrelated command = %q", got)
+	}
+}
