@@ -1,6 +1,6 @@
 # The event stream: `wtm events`
 
-`wtm events` tells whatever reads it what wtm did to a repository's worktrees, as it happens: a terminal plugin opening a pane for a new worktree, an editor closing the window of a removed one, an agent waiting for a sibling to finish provisioning. Without it, an integration can only guess, comparing `wtm list --output json` before and after a command it ran itself, and missing everything that happened anywhere else.
+`wtm events` tells whatever reads it what wtm did to a repository's worktrees, as it happens: a terminal plugin opening a pane for a new worktree, an editor closing the window of a removed one, an agent waiting for a sibling to finish provisioning (`worktree.provisioned`). Without it, an integration can only guess, comparing `wtm list --output json` before and after a command it ran itself, and missing everything that happened anywhere else.
 
 The stream reports every change, whoever made it: a command in another shell, an agent driving wtm, or the `wtm ui` dashboard, which is itself one of its readers.
 
@@ -19,6 +19,7 @@ A subscription opens on a **snapshot**: one `snapshot` event listing every workt
 | `snapshot` | the stream opens, and again after every reconnection | `worktrees`: every worktree as it is now |
 | `ready` | right after the snapshots, each time they are sent | — |
 | `worktree.created` | `create`, `checkout` or `extract` brought a worktree into existence, before its `on_create` hooks run | — |
+| `worktree.provisioned` | the `on_create` hooks of a worktree `create`, `checkout` or `extract` just made have run — also sent when there are none, so it always follows a `created` | `ok`; when `false`, `hook` (the command that failed) and `exit_code` |
 | `worktree.updated` | a field of a worktree's identity changed: its isolation (`wtm env --isolation`), its ordinal (the first time something needs its ports), its parent and creation date (adopted by `wtm relocate`) | `changed`: the fields that changed |
 | `worktree.relocated` | `wtm relocate` moved it; a worktree created outside wtm and adopted by `relocate` first appears this way, never as `created` | `from_path`: where it was |
 | `worktree.reparented` | `wtm reparent`, or a `clean` / `prune` that moved its children past a removed parent | `from_parent`: its previous parent |
@@ -30,6 +31,7 @@ Every event carries `v` (the schema version), `type` and `ts` (RFC 3339, UTC); e
 {"v":1,"type":"snapshot","ts":"2026-10-03T09:12:01.512Z","repo":{"root":"/code/app","common_dir":"/code/app/.git"},"worktrees":[{"branch":"main","path":"/code/app","parent":"","ordinal":0,"isolation":"isolated","is_main":true,"created_at":""}]}
 {"v":1,"type":"ready","ts":"2026-10-03T09:12:01.513Z"}
 {"v":1,"type":"worktree.created","ts":"…","repo":{…},"worktree":{"branch":"feat/login","path":"/code/.trees/feat-login","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-03T09:13:40Z"}}
+{"v":1,"type":"worktree.provisioned","ts":"…","repo":{…},"worktree":{…},"ok":false,"hook":"pnpm install","exit_code":1}
 {"v":1,"type":"worktree.updated","ts":"…","repo":{…},"worktree":{…,"ordinal":1},"changed":["ordinal"]}
 {"v":1,"type":"worktree.relocated","ts":"…","repo":{…},"worktree":{…},"from_path":"/code/old/feat-login"}
 {"v":1,"type":"worktree.reparented","ts":"…","repo":{…},"worktree":{…,"parent":"main"},"from_parent":"feat/auth"}
@@ -116,4 +118,4 @@ Any language reads it the same way: start the process, read stdout line by line,
 
 ## What it does not carry yet
 
-Jobs starting and exiting, `sync` rebasing a chain, and hooks are not on the stream in this version; read them from `wtm run ps --output json` and the command's own output.
+Jobs starting and exiting, `sync` rebasing a chain, and the output of hooks are not on the stream in this version (their outcome is: `worktree.provisioned`); read them from `wtm run ps --output json` and the command's own output.

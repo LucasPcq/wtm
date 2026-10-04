@@ -7,7 +7,7 @@ Stream the repository's worktree changes as they happen
 Print the repository's worktrees, then every change made to them, whoever made it:
 a command in another shell, an agent, or `wtm ui`. The stream opens on a snapshot of
 every worktree and a ready line, then carries one event per change — created,
-updated, relocated, reparented, removed. With --output json each line is one JSON
+provisioned, updated, relocated, reparented, removed. With --output json each line is one JSON
 object (JSON Lines), the contract an integration reads; its schema ships with wtm.
 If the run daemon stops, the stream waits for it and opens again on a fresh
 snapshot: treat every event as an upsert keyed by branch, and every snapshot as a

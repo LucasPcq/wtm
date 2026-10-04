@@ -25,6 +25,7 @@ One JSON object per line:
 | `type` | Meaning | Extra field |
 |---|---|---|
 | `worktree.created` | a worktree exists now (sent before its `on_create` hooks run) | — |
+| `worktree.provisioned` | its `on_create` hooks ran (also sent when there are none): wait for this one, not `created`, before using a worktree | `ok`; on `false`, `hook` and `exit_code` |
 | `worktree.updated` | its identity changed | `changed`: subset of `isolation`, `ordinal`, `parent`, `created_at` |
 | `worktree.relocated` | it moved on disk; a worktree adopted by `relocate` first appears this way, not as `created` | `from_path` |
 | `worktree.reparented` | its parent branch changed | `from_parent` |
