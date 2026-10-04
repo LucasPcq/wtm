@@ -139,7 +139,13 @@ func watchOnce(ctx context.Context, params watchOnceParams) watchResult {
 	if err := params.OnEvent(snapshot); err != nil {
 		return watchResult{fatal: err}
 	}
-	return relay(relayParams{Deliveries: deliveries, OnEvent: params.OnEvent})
+	return relay(relayParams{Deliveries: deliveries, OnEvent: params.OnEvent, Skip: isRepoEvent})
+}
+
+// isRepoEvent is the global stream's: a per-repository reader would get a
+// repo.added with no snapshot after it.
+func isRepoEvent(event domain.Event) bool {
+	return event.Type == domain.EventRepoAdded || event.Type == domain.EventRepoRemoved
 }
 
 type watchAllOnceParams struct {
@@ -226,6 +232,7 @@ func subscribe(ctx context.Context, params subscribeParams) (<-chan process.Deli
 type relayParams struct {
 	Deliveries <-chan process.Delivery
 	OnEvent    func(Received) error
+	Skip       func(domain.Event) bool
 	// After runs once an event was handed on, before the next one.
 	After func(domain.Event) error
 }
@@ -246,6 +253,9 @@ func relay(params relayParams) watchResult {
 		}
 		if event.V > domain.EventsSchemaVersion {
 			return watchResult{fatal: domain.ErrEventsSchemaNewer, reachedReady: true}
+		}
+		if params.Skip != nil && params.Skip(event) {
+			continue
 		}
 		if err := params.OnEvent(Received{Event: event, Raw: delivery.Payload}); err != nil {
 			return watchResult{fatal: err, reachedReady: true}

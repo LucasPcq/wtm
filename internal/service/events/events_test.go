@@ -360,3 +360,24 @@ func TestThePublisherListensOnlyWhileTheDaemonRuns(t *testing.T) {
 		t.Fatal("listening with no daemon")
 	}
 }
+
+// repo.* is the global stream's business: a per-repository stream that relays
+// a repo.added gets no snapshot after it, and would leave its reader empty.
+func TestAPerRepoStreamDoesNotRelayRepoEvents(t *testing.T) {
+	noDaemonSpawn(t)
+	f := newWatchFixture(t)
+	w := f.watch(t)
+	w.next(t)
+	w.next(t)
+	repo, err := worktree.RepoOf(worktree.RepoOfParams{ProjectDir: f.projectDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	announce(announceParams{Bus: busParams{SocketPath: f.socket}, Type: domain.EventRepoRemoved, Repo: repo})
+	NewPublisher(PublisherParams{ProjectDir: f.projectDir, SocketPath: f.socket}).Publish(domain.Event{Type: domain.EventWorktreeCreated, Worktree: &domain.WorktreeIdentity{Branch: "feat/a"}})
+
+	if got := w.next(t); got.Type != domain.EventWorktreeCreated {
+		t.Fatalf("got %s, want the repo event skipped", got.Type)
+	}
+}
