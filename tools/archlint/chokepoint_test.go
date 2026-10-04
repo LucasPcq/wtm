@@ -1,6 +1,7 @@
 package main
 
 import (
+	"go/constant"
 	"go/types"
 	"testing"
 
@@ -41,4 +42,40 @@ func TestEveryMutatorIsADeclaredFunction(t *testing.T) {
 			t.Errorf("%s.%s is not a function of that package", m.pkg, m.name)
 		}
 	}
+}
+
+// An event column naming no type the bus defines would make emits demand a
+// publication nobody can write.
+func TestEveryMutatorEventIsADeclaredEventType(t *testing.T) {
+	config := &packages.Config{Mode: packages.NeedName | packages.NeedTypes, Dir: "../.."}
+	pkgs, err := packages.Load(config, "./internal/domain")
+	if err != nil || len(pkgs) != 1 {
+		t.Fatalf("load domain: %v", err)
+	}
+	declared := eventTypesOf(pkgs[0].Types)
+	if len(declared) == 0 {
+		t.Fatal("domain declares no EventType constant")
+	}
+	for _, m := range mutators {
+		if m.event != "" && !declared[m.event] {
+			t.Errorf("%s.%s publishes %q, which domain does not declare", m.pkg, m.name, m.event)
+		}
+	}
+}
+
+// eventTypesOf reads the values of the domain's EventType constants.
+func eventTypesOf(domain *types.Package) map[string]bool {
+	declared := map[string]bool{}
+	for _, name := range domain.Scope().Names() {
+		c, ok := domain.Scope().Lookup(name).(*types.Const)
+		if !ok || c.Val().Kind() != constant.String {
+			continue
+		}
+		named, ok := c.Type().(*types.Named)
+		if !ok || named.Obj().Name() != "EventType" {
+			continue
+		}
+		declared[constant.StringVal(c.Val())] = true
+	}
+	return declared
 }

@@ -9,6 +9,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/decide"
 	"github.com/LucasPcq/wtm/internal/flow/envports"
+	"github.com/LucasPcq/wtm/internal/flow/ordinal"
+	"github.com/LucasPcq/wtm/internal/flow/publish"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/branch"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
@@ -233,6 +235,7 @@ func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, 
 	if result.AlreadyExists {
 		f.warnIgnoredIsolation(&result)
 	} else {
+		publish.Created(f.ctx, branchName)
 		// Before the hooks: one of them may well read the .env this settles.
 		result.EnvPorts, result.Warnings = envports.SettleFresh(envports.FreshParams{
 			Params: envports.Params{
@@ -283,6 +286,7 @@ func (f *createFlow) runHooks(worktreePath, branchName, fromBranch string) error
 	if len(hooks) == 0 {
 		return nil
 	}
+	ordinal.BeforeHooks(f.ctx, branchName)
 	return f.presenter.HookPhase(flow.HookPhaseParams{
 		Title:   domain.HooksTitleOnCreate,
 		LogPath: rules.HooksLogPath(rules.HooksLogPathParams{StateDir: f.ctx.StateDir, Phase: domain.HookOnCreate, Branch: branchName}),

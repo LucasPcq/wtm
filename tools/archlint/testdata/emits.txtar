@@ -1,0 +1,71 @@
+-- github.com/LucasPcq/wtm/internal/service/worktree/worktree.go --
+package worktree
+
+func Create() error { return nil }
+
+func Move() error { return nil }
+
+func Sync() error { return nil }
+-- github.com/LucasPcq/wtm/internal/flow/publish/publish.go --
+package publish
+
+func Created() {}
+-- github.com/LucasPcq/wtm/internal/testutil/flowtest/flowtest.go --
+package flowtest
+
+type Recorder struct{}
+-- github.com/LucasPcq/wtm/internal/flow/good/good.go --
+package good
+
+import (
+	"github.com/LucasPcq/wtm/internal/flow/publish"
+	wt "github.com/LucasPcq/wtm/internal/service/worktree"
+)
+
+func Run() error {
+	if err := wt.Create(); err != nil {
+		return err
+	}
+	publish.Created()
+	return wt.Sync()
+}
+-- github.com/LucasPcq/wtm/internal/flow/good/good_test.go --
+package good
+
+import (
+	"testing"
+
+	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
+)
+
+func TestRun(t *testing.T) { _ = &flowtest.Recorder{} }
+-- github.com/LucasPcq/wtm/internal/flow/silent/silent.go --
+package silent
+
+import "github.com/LucasPcq/wtm/internal/service/worktree"
+
+func Run() error {
+	return worktree.Move() // want `worktree\.Move changes a worktree's identity but this package never publishes worktree\.relocated`
+}
+-- github.com/LucasPcq/wtm/internal/flow/silent/silent_test.go --
+package silent
+
+import (
+	"testing"
+
+	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
+)
+
+func TestRun(t *testing.T) { _ = flowtest.Recorder{} }
+-- github.com/LucasPcq/wtm/internal/flow/untested/untested.go --
+package untested
+
+import (
+	"github.com/LucasPcq/wtm/internal/flow/publish"
+	"github.com/LucasPcq/wtm/internal/service/worktree"
+)
+
+func Run() error {
+	publish.Created()
+	return worktree.Create() // want `worktree\.Create changes a worktree's identity but no test of this package records what it publishes`
+}

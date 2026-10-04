@@ -1,0 +1,53 @@
+-- github.com/LucasPcq/wtm/internal/domain/domain.go --
+package domain
+
+type Event struct{}
+-- github.com/LucasPcq/wtm/internal/service/process/process.go --
+package process
+
+func Publish() error { return nil }
+
+func relay() error { return Publish() }
+-- github.com/LucasPcq/wtm/internal/service/events/events.go --
+package events
+
+import "github.com/LucasPcq/wtm/internal/service/process"
+
+func Send() error { return process.Publish() }
+-- github.com/LucasPcq/wtm/internal/service/runjobs/runjobs.go --
+package runjobs
+
+import proc "github.com/LucasPcq/wtm/internal/service/process"
+
+func Send() error { return proc.Publish() } // want `process\.Publish is called from service/runjobs: only service/events publishes`
+-- github.com/LucasPcq/wtm/internal/flow/flow.go --
+package flow
+
+import "github.com/LucasPcq/wtm/internal/domain"
+
+type Publisher interface{ Publish(domain.Event) }
+
+type Context struct{ Publisher Publisher }
+
+func (c Context) Publish(event domain.Event) { c.Publisher.Publish(event) }
+-- github.com/LucasPcq/wtm/internal/flow/create/create.go --
+package create
+
+import (
+	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/flow"
+)
+
+func Run(ctx flow.Context) { ctx.Publish(domain.Event{}) }
+-- github.com/LucasPcq/wtm/internal/tui/dash/dash.go --
+package dash
+
+import (
+	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/flow"
+)
+
+func Run(ctx flow.Context, p flow.Publisher) {
+	ctx.Publish(domain.Event{})   // want `flow\.Context\.Publish is called from tui/: only internal/flow publishes`
+	p.Publish(domain.Event{})     // want `flow\.Publisher\.Publish is called from tui/: only internal/flow publishes`
+}

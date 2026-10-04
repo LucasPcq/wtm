@@ -54,8 +54,8 @@ type AddressesParams struct {
 	ProjectDir string
 	StateDir   string
 	Config     domain.RunConfig
-	// Branches must only name worktrees that already have a job up: resolving
-	// an address allocates an ordinal.
+	// A branch no run has given an ordinal yet is skipped: reading an address
+	// never allocates one.
 	Branches []string
 	EnvFiles []domain.EnvFile
 	Global   domain.GlobalConfig

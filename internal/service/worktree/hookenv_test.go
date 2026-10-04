@@ -21,6 +21,9 @@ ports = { DB_PORT = 5432 }
 
 func hookSaw(t *testing.T, repo ordinalRepo, branch, path string) map[string]string {
 	t.Helper()
+	if HookEnvPending(WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: branch}) {
+		repo.ensure(t, branch)
+	}
 	marker := filepath.Join(t.TempDir(), "env")
 	var out bytes.Buffer
 	if err := RunCleanHooks(domain.CleanHooksParams{
@@ -157,16 +160,13 @@ func TestBranchEnvIgnoresTheCallersComposeProject(t *testing.T) {
 	}
 }
 
-// The choice is recorded before on_create runs, so a worktree created isolated
-// hands its first hook the stack it will run under.
+// The choice is recorded by Create itself, before any hook can run: the flow
+// runs on_create right after, and the first hook gets the stack the worktree
+// will run under.
 func TestCreateRecordsIsolationBeforeItsHooksRun(t *testing.T) {
-	unsetComposeProject(t)
 	repo := newOrdinalRepo(t)
-	writeRunConfig(t, repo.stateDir, composeJobConfig)
-	marker := filepath.Join(t.TempDir(), "seen")
 	var cfg domain.Config
 	cfg.Project.Worktrees.BasePath = t.TempDir()
-	cfg.Project.Hooks.OnCreate = []domain.HookCommand{{Cmd: "printenv " + domain.EnvComposeProjectName + " > " + marker}}
 
 	if _, err := Create(domain.CreateParams{
 		ProjectDir: repo.dir,
@@ -175,16 +175,12 @@ func TestCreateRecordsIsolationBeforeItsHooksRun(t *testing.T) {
 		FromBranch: "main",
 		Config:     cfg,
 		Isolation:  domain.IsolationIsolated,
+		SkipHooks:  true,
 	}); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
 
-	got, err := os.ReadFile(marker)
-	if err != nil {
-		t.Fatalf("hook left no marker: %v", err)
-	}
-	want := rules.ComposeProjectName(rules.ComposeProjectNameParams{Project: filepath.Base(repo.dir), Worktree: "feat-x"})
-	if strings.TrimSpace(string(got)) != want {
-		t.Errorf("on_create saw %s=%q, want %q", domain.EnvComposeProjectName, strings.TrimSpace(string(got)), want)
+	if got := RecordedIsolation(WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "feat/x"}); got != domain.IsolationIsolated {
+		t.Errorf("recorded isolation = %q, want %q", got, domain.IsolationIsolated)
 	}
 }

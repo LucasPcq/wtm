@@ -139,7 +139,7 @@ func (f *upFlow) run() (Outcome, error) {
 		f.presenter.Notice(flow.AbortedNotice)
 		return Outcome{Aborted: true}, nil
 	}
-	if err := seam.RequireEnv(seam.RequireEnvParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, WorkDirs: f.workDirs(answers)}); err != nil {
+	if err := seam.RequireEnv(seam.RequireEnvParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, WorkDirs: f.workDirs(answers), Publisher: f.ctx.Publisher}); err != nil {
 		return Outcome{}, err
 	}
 	// Before anything is stopped: a selection that is its own conflict must not
@@ -233,6 +233,7 @@ func (f *upFlow) start(answers flow.Answers) (Outcome, error) {
 		NoProbe:     f.request.NoProbe,
 		ProxyPort:   proxy.Bind,
 		PublicPort:  proxy.Public,
+		Publisher:   f.ctx.Publisher,
 	})
 
 	// Before anything starts: a run defines what its worktrees' log directories

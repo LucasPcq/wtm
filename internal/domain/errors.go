@@ -321,3 +321,13 @@ var (
 	// ErrReleaseNotFound is returned when the requested release tag does not exist.
 	ErrReleaseNotFound = errors.New("release not found")
 )
+
+var (
+	ErrEventsSchemaNewer = errors.New("the event stream speaks a newer schema than this wtm: upgrade wtm")
+	// ErrOrdinalUnallocated is a worktree nothing has numbered yet: the flow
+	// that needs the number allocates it, so the change is published.
+	ErrOrdinalUnallocated = errors.New("worktree has no ordinal yet")
+	// ErrDaemonNoSubscribe is a daemon built before the event bus: it is the one
+	// daemon a watcher replaces, and only while it holds no job.
+	ErrDaemonNoSubscribe = errors.New("the run daemon predates wtm events")
+)

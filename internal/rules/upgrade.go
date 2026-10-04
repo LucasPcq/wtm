@@ -189,6 +189,7 @@ var updateCheckExcluded = map[string]bool{
 	domain.CmdDaemon:     true,
 	domain.CmdCompletion: true,
 	domain.CmdSchema:     true,
+	domain.CmdEvents:     true,
 	// Cobra's completion machinery: __complete runs on every shell Tab, where a
 	// stray line garbles the prompt mid-redraw.
 	domain.CmdShellComp:       true,

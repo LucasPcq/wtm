@@ -854,3 +854,30 @@ func TestAFromNamingTheBranchItselfIsRefused(t *testing.T) {
 		t.Errorf("err = %v, want the own-parent refusal", err)
 	}
 }
+
+func TestRunPublishesTheNewWorktreeOnceAndAReusedOneNever(t *testing.T) {
+	ctx := testContext(t)
+	presenter := newRecorder()
+	ctx.Publisher = presenter.Recorder
+	run := func() {
+		t.Helper()
+		if _, err := Run(Params{
+			Context:   ctx,
+			Request:   Request{Branches: []string{"feat/pub"}, From: "main", IfNotExists: true},
+			Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyEnv: "", KeyRecap: confirmCreate}},
+			Presenter: presenter,
+		}); err != nil {
+			t.Fatalf("Run: %v", err)
+		}
+	}
+
+	run()
+	run()
+
+	if got := presenter.PublishedTypes(); len(got) != 1 || got[0] != domain.EventWorktreeCreated {
+		t.Fatalf("published %v, want one worktree.created", got)
+	}
+	if created := presenter.Published[0].Worktree; created.Branch != "feat/pub" || created.Parent != "main" {
+		t.Fatalf("created = %+v", created)
+	}
+}

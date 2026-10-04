@@ -275,4 +275,25 @@ func TestADaemonKilledWithoutAHandlerLeavesNothingBehindTheNextOneCannotReap(t *
 	if len(jobs) != 1 || jobs[0].Status != domain.JobStatusReaped {
 		t.Fatalf("jobs = %+v, want the reap named so run ps can report it", jobs)
 	}
+	waitForEveryExit(t, killed)
+}
+
+// waitForEveryExit lets a manager that outlived its own daemon see its jobs end:
+// it takes the reap for a crash and rewrites its index, which would otherwise
+// land in a temp dir the test is already removing.
+func waitForEveryExit(t *testing.T, m *Manager) {
+	t.Helper()
+	m.mu.Lock()
+	jobs := make([]*ManagedJob, 0, len(m.jobs))
+	for _, job := range m.jobs {
+		jobs = append(jobs, job)
+	}
+	m.mu.Unlock()
+	for _, job := range jobs {
+		select {
+		case <-job.exited:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("%s never saw its process end", job.Config.Name)
+		}
+	}
 }

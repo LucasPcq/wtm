@@ -12,6 +12,8 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/ordinal"
+	"github.com/LucasPcq/wtm/internal/flow/publish"
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
@@ -78,6 +80,7 @@ func Hooks(params HooksParams) error {
 	if len(hooks) == 0 || params.Target.Path == "" {
 		return nil
 	}
+	ordinal.BeforeHooks(params.Context, params.Target.Branch)
 	return params.Presenter.HookPhase(flow.HookPhaseParams{
 		Title: params.Title,
 		LogPath: rules.HooksLogPath(rules.HooksLogPathParams{
@@ -100,10 +103,15 @@ func Hooks(params HooksParams) error {
 }
 
 type SalvageParams struct {
+	Context   flow.Context
 	Presenter flow.Presenter
 	Clean     domain.CleanParams
 	Path      string
 	Cause     error
+	// Last is the worktree as it was before the removal began, nil when it
+	// could not be read: once git has dropped it there is nothing left to read,
+	// and whoever settles the removal publishes it.
+	Last *domain.WorktreeIdentity
 }
 
 // Salvage settles a removal git reported as failed. Nothing removed — a locked
@@ -119,6 +127,7 @@ func Salvage(params SalvageParams) error {
 	if err := worktree.FinishRemoval(params.Clean); err != nil {
 		return err
 	}
+	PublishRemoved(params)
 	params.Presenter.Status(flow.Notice{
 		Kind: flow.NoticeWarning,
 		Text: fmt.Sprintf(domain.CleanLeftOnDiskFmt, params.Clean.Branch, params.Path, params.Cause, params.Path),
@@ -269,12 +278,22 @@ func removeOne(params removeOneParams) Removal {
 		Config:     batch.Context.Config,
 		SkipHooks:  true,
 	}
+	salvage := SalvageParams{Context: batch.Context, Presenter: batch.Presenter, Clean: clean, Path: target.Path}
+	if last, captured := publish.Capture(batch.Context, target.Branch); captured {
+		salvage.Last = &last
+	}
 	err := batch.Presenter.Stage(flow.StageParams{
 		Message: fmt.Sprintf(domain.CleanLoadingFmt, target.Branch),
 		Work:    func() error { return worktree.Clean(clean) },
 	})
+	// A branch git refused to delete fails the run after the worktree went:
+	// the worktree is gone all the same, and that is what consumers track.
+	if err == nil || (!errors.Is(err, domain.ErrWorktreeRemoveFailed) && !worktree.StillTracked(worktree.FindByBranchParams{ProjectDir: clean.ProjectDir, Branch: clean.Branch})) {
+		PublishRemoved(salvage)
+	}
 	if errors.Is(err, domain.ErrWorktreeRemoveFailed) {
-		err = recoverer(batch)(SalvageParams{Presenter: batch.Presenter, Clean: clean, Path: target.Path, Cause: err})
+		salvage.Cause = err
+		err = recoverer(batch)(salvage)
 	}
 	// Already gone is a removal that happened earlier, which keeps a re-run idempotent.
 	if errors.Is(err, domain.ErrWorktreeNotFound) {
@@ -286,6 +305,15 @@ func removeOne(params removeOneParams) Removal {
 	}
 	removal.Namespaces = Reclaim(ReclaimParams{Context: batch.Context, Target: target, Dropper: params.Dropper})
 	return removal
+}
+
+// PublishRemoved reports a removal that went through, whichever of the three
+// removals settled it.
+func PublishRemoved(params SalvageParams) {
+	if params.Last == nil {
+		return
+	}
+	publish.Removed(params.Context, *params.Last)
 }
 
 func recoverer(batch BatchParams) func(SalvageParams) error {

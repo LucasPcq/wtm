@@ -383,3 +383,17 @@ func TestABranchHeldElsewhereIsRefusedBeforeAsking(t *testing.T) {
 		t.Errorf("asked %q before refusing", prompter.AskedKeys())
 	}
 }
+
+func TestACheckoutPublishesTheWorktreeItCreates(t *testing.T) {
+	ctx := testContext(t)
+	presenter := newRecorder()
+	ctx.Publisher = presenter.Recorder
+
+	if _, err := Run(Params{Context: ctx, Request: Request{Number: 42}, Prompter: flow.Unattended{}, Presenter: presenter}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	if got := presenter.PublishedTypes(); len(got) != 1 || got[0] != domain.EventWorktreeCreated || presenter.Published[0].Worktree.Branch != "feat/thing" {
+		t.Fatalf("published %+v, want one worktree.created for feat/thing", presenter.Published)
+	}
+}

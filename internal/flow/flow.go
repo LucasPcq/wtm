@@ -16,6 +16,28 @@ type Context struct {
 	ProjectDir string
 	StateDir   string
 	Config     domain.Config
+	// Publisher hears every change a flow makes to a worktree's identity. Nil
+	// publishes nothing: the bus is opportunistic, and a consumer that missed an
+	// event gets the state back from its next snapshot.
+	Publisher Publisher
+}
+
+// Listening is asked before an event is built: reading the identity it
+// carries costs a git call, which a run nobody watches should not pay.
+type Publisher interface {
+	Publish(event domain.Event)
+	Listening() bool
+}
+
+func (c Context) Publish(event domain.Event) {
+	if c.Publisher == nil {
+		return
+	}
+	c.Publisher.Publish(event)
+}
+
+func (c Context) Listening() bool {
+	return c.Publisher != nil && c.Publisher.Listening()
 }
 
 type StepKind int

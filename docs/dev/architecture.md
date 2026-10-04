@@ -73,6 +73,9 @@ None of this is left to review. `make lint` runs `tools/archlint`, whose rules a
 | `servicedag` | each `service/x → service/y` import against `serviceEdges` |
 | `daemonblind` | the daemon — `service/process` and `service/proxy` — imports nothing that runs git and only allow-listed `infra/` |
 | `chokepoint` | a service mutator is called from `internal/flow/` only, from any layer |
+| `metawriter` | an exported function of `service/worktree` that reaches `writeMetadata`/`purgeState` is in the mutators table — the table is complete by construction |
+| `emits` | a `flow/` package calling a mutator publishes that mutator's event, and has a test recording it (`flowtest.Recorder`) |
+| `publish` | `process.Publish` is called from `service/events` only; the `flow` seam's `Publish` from `internal/flow/` only |
 
 A command that still drives its service from `commands/` is listed in `.archlint-migrating` with its ticket, and the list may only shrink.
 
@@ -187,6 +190,17 @@ The cross-file check has to live outside `config.LoadRun`: that loader only ever
 | `service/process.runNamespace` — the daemon | carves the worktree's namespace | carves nothing (read from `WTM_ISOLATION`: the daemon never reads metadata) |
 
 They used to be separate: a "keep the ports" answer left the `.env` on its source's ports while the daemon still shifted the jobs, so a front read one port and its back bound another, and the worktree quietly talked to its source. Anything in between the two columns is incoherent by construction, which is why there is no third answer and no `Rewrite` flag any more. The cost of verbatim is that it shares its source's ports; `flow/run/up` measures that (`rules.PortClashes`) and turns the concurrency question into stop-the-other-or-don't-start rather than letting a bind fail. `wtm env --isolation` switches an existing worktree, and its recap's second action records the worktree verbatim rather than skipping the port pass once.
+
+## The event bus — the daemon relays, the flows speak
+
+`wtm events` and `wtm ui` hear every change to a worktree's identity, whoever made it. The pieces, from producer to consumer:
+
+- **`flow.Publisher`**, a seam on `flow.Context`. A flow publishes right after the mutator succeeds, through `internal/flow/publish` (`Created`, `Updated`, `Relocated`, `Reparented`, `Removed`), which reads the worktree's identity (`worktree.Identity`) after the change. A removal captures the identity *before* (`publish.Capture`), since git has forgotten the worktree once it is gone. A nil publisher publishes nothing, and neither does one that is not `Listening()`: the identity is never read for a run no daemon would relay.
+- **`service/events.Publisher`** implements the seam. It stamps the envelope (`v`, `ts`, `repo`) and hands the payload to `process.Publish`, which dials the daemon with a 250 ms budget, never starts it, and reports an error its caller drops: no daemon means no subscriber, and the next subscriber gets the state from its snapshot. Its `Listening()` is a plain dial, asked before every event and never cached, since a run may start the daemon halfway through.
+- **The daemon** (`service/process`, `eventhub.go`) is a broker that never decodes the payload: an envelope `{repo, payload}` in, the same out to every subscriber whose filter holds `repo`. A subscriber that falls 256 events behind is disconnected, never waited for; a subscription keeps the daemon alive; `stop()` closes every subscription. `daemonblind` forbids `service/process` to import `service/events`, so the broker cannot become schema-aware by accident.
+- **`service/events.Watch`** subscribes **before** it reads the snapshot (`worktree.Identities`), so a change made meanwhile waits in the subscription and arrives after `ready`. On EOF it backs off and starts over with a fresh snapshot.
+
+The ordinal is part of the identity, which is why `worktree.EnsureOrdinal` left the env readers: `JobEnv`, `BranchEnv`, `ResolveEnvPorts` and the hook environment now read the ordinal and answer `ErrOrdinalUnallocated` when there is none, and `internal/flow/ordinal` allocates — `Retry` around a read that asked for it, `BeforeHooks` before a hook phase that would read it — and publishes `worktree.updated`. A reader outside any flow (the dashboard's addresses) simply shows nothing for a worktree no run has numbered yet.
 
 ## What is migrated, and what is not
 

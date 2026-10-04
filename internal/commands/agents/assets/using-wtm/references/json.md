@@ -23,6 +23,7 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 - **Check the exit code, and parse stdout only if it is non-empty.** A command that got far enough to have per-item results writes its **whole** document and *then* exits `1` (`run up`, `run down`, `prune`, `sync`, `fast-forward`): read it either way, the entries say which item failed. One exception: `sync --push` whose push fails exits before writing the document. One that failed before that (no such job, daemon refused, config invalid) writes **nothing** on stdout and puts the reason on stderr.
 - `--output json` requires `--yes` on every mutating command (except `env --check`).
 - `--quiet` never affects the JSON.
+- One command streams instead of writing one document: `events`, one JSON object per line, never ending on its own. Its contract is in `references/events.md`.
 
 ## Worktrees: `list`, `tree`, `resolve`
 

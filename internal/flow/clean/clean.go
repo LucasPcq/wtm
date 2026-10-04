@@ -8,6 +8,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/orphans"
+	"github.com/LucasPcq/wtm/internal/flow/publish"
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/flow/teardown"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -180,6 +181,7 @@ func (f *cleanFlow) run() (Outcome, error) {
 	}
 	if answers.Value(KeyReparent) == orphans.Reparent && len(moved) > 0 {
 		applied, err := worktree.ApplyReparents(worktree.ApplyReparentsParams{Reparents: moved, StateDir: f.ctx.StateDir})
+		publish.ReparentedAll(f.ctx, applied)
 		if err != nil {
 			return Outcome{}, err
 		}
@@ -326,13 +328,17 @@ func (f *cleanFlow) recoverRemoveFailure(salvage teardown.SalvageParams) error {
 		return teardown.Salvage(salvage)
 	}
 
-	return worktree.ForceClean(domain.ForceCleanParams{
+	if err := worktree.ForceClean(domain.ForceCleanParams{
 		ProjectDir: salvage.Clean.ProjectDir,
 		StateDir:   salvage.Clean.StateDir,
 		Path:       salvage.Path,
 		Branch:     salvage.Clean.Branch,
 		Force:      salvage.Clean.Force,
-	})
+	}); err != nil {
+		return err
+	}
+	teardown.PublishRemoved(salvage)
+	return nil
 }
 
 // checkAll shows its own progress; checksOf, read while a step loads, leaves it

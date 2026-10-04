@@ -38,13 +38,7 @@ type Daemon struct {
 // XDG_CONFIG_HOME first, which CI runners set, so it moves too.
 func Serve(t *testing.T, jobs []domain.JobInfo) *Daemon {
 	t.Helper()
-	home, err := os.MkdirTemp("/tmp", "wtm")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { os.RemoveAll(home) })
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	Home(t)
 	socket := process.SocketPath()
 	if err := os.MkdirAll(filepath.Dir(socket), 0o755); err != nil {
 		t.Fatal(err)
@@ -139,16 +133,31 @@ func (d *Daemon) stop(req process.Request) {
 	d.jobs = kept
 }
 
-// Actions are the requests that changed something, as action:name@workdir.
+// Actions are the requests that changed something, as action:name@workdir. A
+// published event changed nothing the daemon holds: the commands under test
+// publish one on every mutation, and it would bury the jobs they started.
 func (d *Daemon) Actions() []string {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	var actions []string
 	for _, req := range d.requests {
-		if req.Action == process.ActionList {
+		if req.Action == process.ActionList || req.Action == process.ActionPublish {
 			continue
 		}
 		actions = append(actions, string(req.Action)+":"+req.Name+"@"+req.WorkDir)
 	}
 	return actions
+}
+
+// Home moves HOME, and XDG_CONFIG_HOME with it, to a directory short enough for
+// the daemon's socket, so process.SocketPath() names one only this test uses.
+func Home(t *testing.T) {
+	t.Helper()
+	home, err := os.MkdirTemp("/tmp", "wtm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(home) })
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 }

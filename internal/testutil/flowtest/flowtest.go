@@ -113,11 +113,28 @@ func (p *ScriptedPrompter) Interactive() bool { return true }
 func (p *ScriptedPrompter) AskedKeys() string { return strings.Join(p.Asked, ",") }
 
 type Recorder struct {
-	Stages   []string
-	Hooks    []string
-	Beats    []domain.HookBeat
-	Notices  []flow.Notice
-	Statuses []flow.Notice
+	Stages    []string
+	Hooks     []string
+	Beats     []domain.HookBeat
+	Notices   []flow.Notice
+	Statuses  []flow.Notice
+	Published []domain.Event
+	// Unheard makes the Recorder a publisher no daemon listens to.
+	Unheard bool
+}
+
+// Publish makes a Recorder the flow's Publisher too, so one double records
+// what a run showed and what it reported to the bus.
+func (r *Recorder) Publish(event domain.Event) { r.Published = append(r.Published, event) }
+
+func (r *Recorder) Listening() bool { return !r.Unheard }
+
+func (r *Recorder) PublishedTypes() []domain.EventType {
+	types := make([]domain.EventType, 0, len(r.Published))
+	for _, event := range r.Published {
+		types = append(types, event.Type)
+	}
+	return types
 }
 
 func (r *Recorder) Stage(params flow.StageParams) error {

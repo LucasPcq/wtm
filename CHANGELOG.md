@@ -2,6 +2,9 @@
 
 ## Non publié
 
+- **`wtm events` diffuse les changements de worktrees en direct** : un instantané de tous les worktrees, puis un événement par création, déplacement, changement de parent, d'isolation ou suppression, d'où qu'il vienne (un autre shell, un agent, `wtm ui`). `--output json` donne des JSON Lines, le contrat d'une intégration (éditeur, plugin de terminal comme herdr) ; le flux se reconnecte seul si le daemon redémarre. → [Le flux d'événements](docs/guide/events.md)
+- **`wtm ui` suit les worktrees en direct** : un worktree créé, déplacé ou supprimé ailleurs apparaît dans la liste aussitôt, sans attendre le rafraîchissement de 20 s, qui ne sert plus qu'à l'état git (modifié, en avance, en retard).
+
 - **`wtm create` crée plusieurs worktrees d'un coup** : `wtm create feat/a feat/b fix/c`, ou dans le wizard (tab pour en ajouter un autre, entrée pour continuer). Les questions communes sont posées une seule fois, et un échec n'arrête pas les autres. Le dashboard (`wtm ui`) fait de même : chaque worktree apparaît dans la liste dès qu'il est créé.
 - **`wtm clean` supprime plusieurs worktrees d'un coup** : `wtm clean feat/a feat/b`, ou en en cochant plusieurs dans le picker. Un échec n'arrête pas les autres ; sous `--yes`, un seul worktree non sûr refuse tout le lot sans `--force`. Les enfants d'une chaîne supprimée remontent au plus proche ancêtre qui reste (`prune` aussi). Le dashboard (`wtm ui`) le propose dans son menu global : « Delete worktrees ».
 - **Les worktrees verrouillés sont respectés** (`git worktree lock`) : `wtm clean` et `wtm prune` les refusent comme un worktree sale, avec leur propre message au lieu de l'erreur brute de git, et `--force` lève le verrou. Le dashboard en fait une ligne à lever à part dans sa modale de suppression ; `wtm list` et `wtm tree` les marquent `! locked`, et leur JSON porte `is_locked`.

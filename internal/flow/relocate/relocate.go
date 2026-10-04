@@ -6,6 +6,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/publish"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
@@ -189,20 +190,28 @@ func (f *relocateFlow) carryOut(params carryOutParams) domain.RelocateStepResult
 }
 
 func (f *relocateFlow) move(res domain.RelocateStepResult) error {
-	return worktree.Move(worktree.MoveParams{
+	if err := worktree.Move(worktree.MoveParams{
 		ProjectDir: f.ctx.ProjectDir,
 		From:       res.FromPath,
 		To:         res.ToPath,
 		Force:      f.request.Force,
-	})
+	}); err != nil {
+		return err
+	}
+	publish.Relocated(publish.RelocatedParams{Context: f.ctx, Branch: res.Branch, FromPath: res.FromPath})
+	return nil
 }
 
 func (f *relocateFlow) adopt(res domain.RelocateStepResult) error {
-	return worktree.Adopt(worktree.AdoptParams{
+	if err := worktree.Adopt(worktree.AdoptParams{
 		StateDir: f.ctx.StateDir,
 		Branch:   res.Branch,
 		Parent:   res.Parent,
-	})
+	}); err != nil {
+		return err
+	}
+	publish.Updated(publish.UpdatedParams{Context: f.ctx, Branch: res.Branch, Changed: []domain.IdentityField{domain.IdentityParent, domain.IdentityCreatedAt}})
+	return nil
 }
 
 // rewriteBasePath follows the worktrees, whatever became of them: one held

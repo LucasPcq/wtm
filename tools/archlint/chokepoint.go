@@ -13,7 +13,8 @@ import (
 // second surface can run it and no event can report it. A call inside the
 // mutator's own package is its implementation, not an escape.
 //
-// event is the domain event a flow publishes after the call; LUC-233 fills it.
+// event is the domain event a flow publishes after the call (rule emits); empty
+// for a change that is not part of a worktree's identity.
 type mutator struct {
 	pkg   string
 	name  string
@@ -21,17 +22,17 @@ type mutator struct {
 }
 
 var mutators = []mutator{
-	{pkg: "service/worktree", name: "Create", event: ""},
-	{pkg: "service/worktree", name: "Clean", event: ""},
-	{pkg: "service/worktree", name: "ForceClean", event: ""},
-	{pkg: "service/worktree", name: "FinishRemoval", event: ""},
-	{pkg: "service/worktree", name: "Move", event: ""},
-	{pkg: "service/worktree", name: "Adopt", event: ""},
+	{pkg: "service/worktree", name: "Create", event: "worktree.created"},
+	{pkg: "service/worktree", name: "Clean", event: "worktree.removed"},
+	{pkg: "service/worktree", name: "ForceClean", event: "worktree.removed"},
+	{pkg: "service/worktree", name: "FinishRemoval", event: "worktree.removed"},
+	{pkg: "service/worktree", name: "Move", event: "worktree.relocated"},
+	{pkg: "service/worktree", name: "Adopt", event: "worktree.updated"},
 	{pkg: "service/worktree", name: "SetBasePath", event: ""},
-	{pkg: "service/worktree", name: "ReparentBatch", event: ""},
-	{pkg: "service/worktree", name: "ApplyReparents", event: ""},
-	{pkg: "service/worktree", name: "SetIsolation", event: ""},
-	{pkg: "service/worktree", name: "EnsureOrdinal", event: ""},
+	{pkg: "service/worktree", name: "ReparentBatch", event: "worktree.reparented"},
+	{pkg: "service/worktree", name: "ApplyReparents", event: "worktree.reparented"},
+	{pkg: "service/worktree", name: "SetIsolation", event: "worktree.updated"},
+	{pkg: "service/worktree", name: "EnsureOrdinal", event: "worktree.updated"},
 	{pkg: "service/worktree", name: "RecordNamespaces", event: ""},
 	{pkg: "service/worktree", name: "Sync", event: ""},
 	{pkg: "service/worktree", name: "Extract", event: ""},

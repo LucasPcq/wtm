@@ -1,11 +1,12 @@
 // Package schemas embeds the JSON Schema files used to validate and provide
-// IDE autocomplete for wtm's TOML config files. Schemas are shipped with the
-// binary so they always match the current version's expected structure.
+// IDE autocomplete for wtm's TOML config files, and the contract of the
+// `wtm events` stream. Schemas are shipped with the binary so they always
+// match the current version's expected structure.
 package schemas
 
 import "embed"
 
-//go:embed run.schema.json project.schema.json global.schema.json
+//go:embed run.schema.json project.schema.json global.schema.json events.v1.json
 var fs embed.FS
 
 // Schema identifies one of the JSON Schema files bundled with wtm.
@@ -20,6 +21,9 @@ const (
 
 	// Global is the schema for the global wtm config (per-user defaults).
 	Global Schema = "global.schema.json"
+
+	// Events is the contract of `wtm events`: one schema per breaking version.
+	Events Schema = "events.v1.json"
 )
 
 // Filename returns the basename of the schema file (e.g. "run.schema.json").

@@ -21,6 +21,16 @@ func InvalidFlagValue(params InvalidFlagValueParams) error {
 	return flagValueError{text: fmt.Sprintf(domain.FlagValueInvalidFmt, params.Flag, params.Value, alternatives(params.Allowed))}
 }
 
+type InvalidFlagPathParams struct {
+	Flag   string
+	Path   string
+	Reason string
+}
+
+func InvalidFlagPath(params InvalidFlagPathParams) error {
+	return flagValueError{text: fmt.Sprintf(domain.FlagPathInvalidFmt, params.Flag, params.Path, params.Reason)}
+}
+
 func alternatives(values []string) string {
 	if len(values) < 2 {
 		return strings.Join(values, "")

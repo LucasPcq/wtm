@@ -59,7 +59,7 @@ func Risks(params Params) ([]domain.DataRisk, error) {
 	}
 	var risks []domain.DataRisk
 	for _, dir := range params.WorkDirs {
-		env, err := seam.JobEnv(seam.JobEnvParams{ProjectDir: params.Context.ProjectDir, StateDir: params.Context.StateDir, WorkDir: dir})
+		env, err := seam.JobEnv(seam.JobEnvParams{ProjectDir: params.Context.ProjectDir, StateDir: params.Context.StateDir, WorkDir: dir, Publisher: params.Context.Publisher})
 		if err != nil {
 			return nil, err
 		}

@@ -22,6 +22,7 @@ func writeRunConfig(t *testing.T, stateDir, body string) {
 
 func branchEnv(t *testing.T, repo ordinalRepo, branch string) map[string]string {
 	t.Helper()
+	repo.ensure(t, branch)
 	env, err := BranchEnv(WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: branch})
 	if err != nil {
 		t.Fatalf("BranchEnv(%s): %v", branch, err)
@@ -124,6 +125,7 @@ ports = { DB_PORT = 5432 }
 `)
 	path := repo.addWorktree(t, "feat/x")
 	recordIsolation(t, repo, "feat/x", domain.IsolationIsolated)
+	repo.ensure(t, "feat/x")
 	marker := filepath.Join(t.TempDir(), "seen")
 
 	var out bytes.Buffer

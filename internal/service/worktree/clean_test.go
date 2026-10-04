@@ -155,7 +155,7 @@ func TestCleanPurgesWorktreeState(t *testing.T) {
 	}
 
 	if _, err := os.Stat(metaDir); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("meta dir survived the clean, its ordinal %d stays reserved: %v", ordinal, err)
+		t.Errorf("meta dir survived the clean, its ordinal %d stays reserved: %v", ordinal.Ordinal, err)
 	}
 }
 

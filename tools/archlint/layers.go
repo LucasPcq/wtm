@@ -23,6 +23,7 @@ var layers = map[string]layer{
 	},
 	"infra": {
 		internal: []string{"domain", "rules"},
+		external: []string{"golang.org/x/sys/unix"},
 		why:      "I/O, git exec, filesystem wrappers",
 	},
 	"config": {
@@ -63,8 +64,9 @@ var layers = map[string]layer{
 		why: "the embedded JSON Schema files",
 	},
 	"testutil": {
-		internal: []string{"domain", "flow"},
-		why:      "test doubles for the flow seams",
+		internal: []string{"domain", "flow", "schemas"},
+		external: []string{"github.com/santhosh-tekuri/jsonschema/"},
+		why:      "test doubles for the flow seams, and the validator a contract test checks a bundled schema with",
 	},
 }
 
@@ -74,6 +76,7 @@ var layers = map[string]layer{
 // table rather than an import nobody saw.
 var serviceEdges = map[string][]string{
 	"detect":    {"branch"},
+	"events":    {"process", "worktree"},
 	"process":   {"proxy"},
 	"runconfig": {"shellcmd"},
 	"runjobs":   {"process", "runconfig", "worktree"},
