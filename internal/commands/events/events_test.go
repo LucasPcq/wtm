@@ -195,3 +195,36 @@ func TestARepoThatIsNotARepositoryIsRefusedNamingTheFlag(t *testing.T) {
 		})
 	}
 }
+
+func TestTheStreamEndsWhenItsReaderLeaves(t *testing.T) {
+	processtest.Home(t)
+	processtest.RealDaemon(t, process.SocketPath())
+	dir := initializedRepo(t)
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	cmd := NewCmd()
+	cmd.SetArgs([]string{"--repo", dir, "--" + domain.FlagOutput, domain.OutputJSON})
+	cmd.SetOut(w)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetContext(t.Context())
+	done := make(chan error, 1)
+	go func() { done <- cmd.Execute() }()
+
+	first := make([]byte, 1)
+	if _, err := r.Read(first); err != nil {
+		t.Fatal(err)
+	}
+	r.Close()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("a reader leaving is a success: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the stream outlived its reader")
+	}
+}

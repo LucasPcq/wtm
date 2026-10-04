@@ -4589,6 +4589,9 @@ const (
 	EventsSubscriberQueue = 256
 	EventsReconnectMin    = 200 * time.Millisecond
 	EventsReconnectMax    = 5 * time.Second
+	// EventsReaderGoneCheck is how soon `wtm events | head` exits once head
+	// has read its lines: a quiet stream writes nothing that would fail.
+	EventsReaderGoneCheck = 250 * time.Millisecond
 )
 
 // One human line per `wtm events` event; --output json is the contract, these

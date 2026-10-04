@@ -12,6 +12,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	wtmevents "github.com/LucasPcq/wtm/internal/service/events"
@@ -29,8 +30,8 @@ func NewCmd() *cobra.Command {
 			"object (JSON Lines), the contract an integration reads; its schema ships with wtm.\n" +
 			"If the run daemon stops, the stream waits for it and opens again on a fresh\n" +
 			"snapshot: treat every event as an upsert keyed by branch, and every snapshot as a\n" +
-			"reset. It runs until interrupted, and exits with code 20 if it receives an event of\n" +
-			"a schema newer than its own.",
+			"reset. It runs until interrupted or until the reader of its pipe goes away, and\n" +
+			"exits with code 20 if it receives an event of a schema newer than its own.",
 		Example: `  # Watch this repository's worktrees
   wtm events
 
@@ -64,6 +65,7 @@ func runEvents(cmd *cobra.Command, _ []string) error {
 	}
 	ctx, stop := signal.NotifyContext(parent, os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	ctx = endWhenUnread(ctx, cmd)
 
 	write := writerFor(writerForParams{Cmd: cmd, Format: format})
 	return wtmevents.Watch(ctx, wtmevents.WatchParams{
@@ -75,6 +77,25 @@ func runEvents(cmd *cobra.Command, _ []string) error {
 			output.Warning(output.Barred(cmd.ErrOrStderr()), err.Error())
 		},
 	})
+}
+
+// endWhenUnread stops the stream once its reader has gone, as an interrupt
+// would: `wtm events | head -n 2` returns as soon as head does.
+func endWhenUnread(ctx context.Context, cmd *cobra.Command) context.Context {
+	out, ok := cmd.OutOrStdout().(*os.File)
+	if !ok {
+		return ctx
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	gone := infra.ReaderGone(ctx, infra.ReaderGoneParams{File: out, Every: domain.EventsReaderGoneCheck})
+	go func() {
+		select {
+		case <-gone:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	return ctx
 }
 
 func repoDir(cmd *cobra.Command) (string, error) {

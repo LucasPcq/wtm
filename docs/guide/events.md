@@ -12,7 +12,7 @@ wtm events --repo ~/code/app   # another repository than the current one
 
 ## What the stream carries
 
-A subscription opens on a **snapshot**: one `snapshot` event listing every worktree of the repository, then a single `ready`. After that it carries one event per change, until you interrupt it.
+A subscription opens on a **snapshot**: one `snapshot` event listing every worktree of the repository, then a single `ready`. After that it carries one event per change, until you interrupt it or its reader goes away: `wtm events --output json | head -n 2` prints the current state and returns as soon as `head` does, however quiet the repository.
 
 | Type | Sent when | Extra field |
 | --- | --- | --- |

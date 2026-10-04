@@ -23,6 +23,7 @@ var layers = map[string]layer{
 	},
 	"infra": {
 		internal: []string{"domain", "rules"},
+		external: []string{"golang.org/x/sys/unix"},
 		why:      "I/O, git exec, filesystem wrappers",
 	},
 	"config": {

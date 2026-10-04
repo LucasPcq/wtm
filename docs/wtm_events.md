@@ -11,8 +11,8 @@ updated, relocated, reparented, removed. With --output json each line is one JSO
 object (JSON Lines), the contract an integration reads; its schema ships with wtm.
 If the run daemon stops, the stream waits for it and opens again on a fresh
 snapshot: treat every event as an upsert keyed by branch, and every snapshot as a
-reset. It runs until interrupted, and exits with code 20 if it receives an event of
-a schema newer than its own.
+reset. It runs until interrupted or until the reader of its pipe goes away, and
+exits with code 20 if it receives an event of a schema newer than its own.
 
 ```
 wtm events [flags]
