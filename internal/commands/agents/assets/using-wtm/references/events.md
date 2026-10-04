@@ -5,7 +5,7 @@ Use `wtm events --output json` when you need to **react** to worktrees changing 
 ## Running it
 
 - It **never exits on its own**: it streams until interrupted. Run it in the background, or read a bounded number of lines (`wtm events --output json | head -n 2` gives the current state and returns). Never run it in the foreground of a step that must finish.
-- `--repo <path>` watches another repository than the current directory's.
+- `--repo <path>` watches another repository than the current directory's; a path that is not a git repository exits 2 (usage).
 - It needs no `--yes`: it changes nothing and asks nothing.
 - Exit `20`: it received an event of a schema newer than its own; wtm must be upgraded (ask the user). Interrupted, it exits `0`.
 

@@ -170,14 +170,28 @@ func TestANewerSchemaExitsWithItsOwnCode(t *testing.T) {
 	}
 }
 
-func TestARepoThatIsNotADirectoryIsRefused(t *testing.T) {
-	r := start(t, "--repo", filepath.Join(t.TempDir(), "missing"))
-	select {
-	case err := <-r.done:
-		if err == nil || !strings.Contains(err.Error(), "--"+domain.FlagRepo) {
-			t.Fatalf("err = %v, want one naming --%s", err, domain.FlagRepo)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("the command did not refuse")
+func TestARepoThatIsNotARepositoryIsRefusedNamingTheFlag(t *testing.T) {
+	cases := map[string]struct {
+		path   string
+		reason string
+	}{
+		"missing": {filepath.Join(t.TempDir(), "missing"), domain.FlagPathNotADirectory},
+		"not git": {t.TempDir(), domain.FlagPathNotAGitRepo},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			r := start(t, "--repo", c.path)
+			select {
+			case err := <-r.done:
+				if err == nil || !strings.Contains(err.Error(), "--"+domain.FlagRepo) || !strings.Contains(err.Error(), c.reason) {
+					t.Fatalf("err = %v, want one naming --%s and %q", err, domain.FlagRepo, c.reason)
+				}
+				if rules.ExitCode(err) != domain.ExitCodeUsage {
+					t.Fatalf("exit code %d, want %d", rules.ExitCode(err), domain.ExitCodeUsage)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("the command did not refuse")
+			}
+		})
 	}
 }

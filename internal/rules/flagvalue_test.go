@@ -16,3 +16,13 @@ func TestInvalidFlagValueIsAUsageError(t *testing.T) {
 		t.Errorf("err = %v, want it to exit %d", err, domain.ExitCodeUsage)
 	}
 }
+
+func TestInvalidFlagPathIsAUsageError(t *testing.T) {
+	err := InvalidFlagPath(InvalidFlagPathParams{Flag: "repo", Path: "/tmp/x", Reason: domain.FlagPathNotAGitRepo})
+	if got := err.Error(); got != `invalid --repo "/tmp/x": not a git repository` {
+		t.Errorf("message = %q", got)
+	}
+	if !errors.Is(err, domain.ErrUsage) || ExitCode(err) != domain.ExitCodeUsage {
+		t.Errorf("err = %v, want it to exit %d", err, domain.ExitCodeUsage)
+	}
+}

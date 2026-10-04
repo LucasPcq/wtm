@@ -4607,6 +4607,8 @@ const (
 )
 
 const (
-	// EventsRepoNotADirFmt names the flag: --repo is a path the user typed.
-	EventsRepoNotADirFmt = "--%s %q is not a directory: %w"
+	// FlagPathInvalidFmt names the flag: the path is one the user typed.
+	FlagPathInvalidFmt    = "invalid --%s %q: %s"
+	FlagPathNotADirectory = "not a directory"
+	FlagPathNotAGitRepo   = "not a git repository"
 )

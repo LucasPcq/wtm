@@ -4,7 +4,6 @@ package events
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,6 +15,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	wtmevents "github.com/LucasPcq/wtm/internal/service/events"
+	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
 
 func NewCmd() *cobra.Command {
@@ -82,9 +82,15 @@ func repoDir(cmd *cobra.Command) (string, error) {
 	if repo == "" {
 		return os.Getwd()
 	}
+	refuse := func(reason string) error {
+		return rules.InvalidFlagPath(rules.InvalidFlagPathParams{Flag: domain.FlagRepo, Path: repo, Reason: reason})
+	}
 	info, err := os.Stat(repo)
 	if err != nil || !info.IsDir() {
-		return "", fmt.Errorf(domain.EventsRepoNotADirFmt, domain.FlagRepo, repo, domain.ErrUsage)
+		return "", refuse(domain.FlagPathNotADirectory)
+	}
+	if _, err := worktree.RepoOf(worktree.RepoOfParams{ProjectDir: repo}); err != nil {
+		return "", refuse(domain.FlagPathNotAGitRepo)
 	}
 	return repo, nil
 }
