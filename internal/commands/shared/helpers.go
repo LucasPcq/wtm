@@ -32,9 +32,29 @@ func ProjectRoot(dir string) (string, error) {
 		ProjectDir: dir,
 	})
 	if err != nil {
-		return "", fmt.Errorf("find project root: %w", err)
+		return "", projectRootError(projectRootErrorParams{Dir: dir, Err: err})
 	}
 	return mainPath, nil
+}
+
+type projectRootErrorParams struct {
+	Dir string
+	Err error
+}
+
+// projectRootError asks git why only once it has failed, so a command run in a
+// repository pays nothing for the exit code of one run outside it.
+func projectRootError(params projectRootErrorParams) error {
+	inside, err := infra.InsideGitRepo(params.Dir)
+	if err == nil && !inside {
+		return NotGitRepo(params.Dir)
+	}
+	return fmt.Errorf("find project root: %w", params.Err)
+}
+
+// NotGitRepo is the error every command ends on outside a repository.
+func NotGitRepo(dir string) error {
+	return fmt.Errorf(domain.NotGitRepoFmt, dir, domain.ErrNotGitRepo)
 }
 
 // LoadConfig resolves the main worktree + state dir and loads config.toml from

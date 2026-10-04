@@ -53,4 +53,5 @@ wtm [flags]
 * [wtm tree](wtm_tree.md)	 - Show the worktree forest (parent → child)
 * [wtm ui](wtm_ui.md)	 - Open the worktree dashboard
 * [wtm upgrade](wtm_upgrade.md)	 - Update wtm to the latest release
+* [wtm version](wtm_version.md)	 - Print wtm's version and the versions of its machine contracts
 

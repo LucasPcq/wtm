@@ -5,6 +5,7 @@ package events
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -17,7 +18,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	wtmevents "github.com/LucasPcq/wtm/internal/service/events"
-	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
 
 func NewCmd() *cobra.Command {
@@ -31,8 +31,10 @@ func NewCmd() *cobra.Command {
 			"object (JSON Lines), the contract an integration reads; its schema ships with wtm.\n" +
 			"If the run daemon stops, the stream waits for it and opens again on a fresh\n" +
 			"snapshot: treat every event as an upsert keyed by branch, and every snapshot as a\n" +
-			"reset. It runs until interrupted or until the reader of its pipe goes away, and\n" +
-			"exits with code 20 if it receives an event of a schema newer than its own.",
+			"reset. It runs until interrupted or until the reader of its pipe goes away. It\n" +
+			"ends on a code no retry can change in three cases: 12 in a repository wtm was never\n" +
+			"initialized in, 21 outside a git repository, and 20 if it receives an event of a\n" +
+			"schema newer than its own.",
 		Example: `  # Watch this repository's worktrees
   wtm events
 
@@ -116,8 +118,12 @@ func repoDir(cmd *cobra.Command) (string, error) {
 	if err != nil || !info.IsDir() {
 		return "", refuse(domain.FlagPathNotADirectory)
 	}
-	if _, err := worktree.RepoOf(worktree.RepoOfParams{ProjectDir: repo}); err != nil {
-		return "", refuse(domain.FlagPathNotAGitRepo)
+	inside, err := infra.InsideGitRepo(repo)
+	if err != nil {
+		return "", err
+	}
+	if !inside {
+		return "", fmt.Errorf(domain.FlagPathNotGitRepoFmt, domain.FlagRepo, repo, domain.ErrNotGitRepo)
 	}
 	return repo, nil
 }

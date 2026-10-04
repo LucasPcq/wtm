@@ -179,6 +179,7 @@ Opt-in: `wtm run init` sets it up once per repository.
 | [`agents`](docs/wtm_agents.md) | Install the `using-wtm` skill for LLM agents |
 | [`schema`](docs/wtm_schema.md) | Extract the bundled JSON Schemas |
 | [`upgrade`](docs/wtm_upgrade.md) | Update wtm itself to the latest release |
+| [`version`](docs/wtm_version.md) | Print wtm's version and the versions of its machine contracts |
 
 ## Documentation
 

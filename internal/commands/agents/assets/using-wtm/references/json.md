@@ -15,6 +15,7 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 - [Stacks: `sync`, `fast-forward`, `reparent`](#stacks-sync-fast-forward-reparent)
 - [The run module](#the-run-module)
 - [Job result statuses](#job-result-statuses)
+- [`version`](#version)
 - [`upgrade`](#upgrade)
 
 ## General rules
@@ -149,6 +150,10 @@ A job-result `status` in `run up` / `down` / `start` / `stop`:
 | `released` | a shared job let go of, still up for other worktrees |
 | `not_running` | nothing was up under that name; nothing was stopped (exit 0) |
 | `error` | failed; see `message` (and `output`, `exit_code` on `run up`) |
+
+## `version`
+
+`{"version", "events"}`: the binary's version (`dev` for a local build), then one integer per versioned contract, today `events` (the schema version of `wtm events`). More keys may be added; ignore the ones you do not know.
 
 ## `upgrade`
 

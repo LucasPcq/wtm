@@ -59,7 +59,36 @@ The repository is `repo.common_dir`, git's common directory with symlinks resolv
 - **Ignore what you do not know.** A field or a type you do not recognise is skipped, never an error: new ones are added without changing `v`. `v` moves only on a breaking change. `wtm events` itself exits with code `20` if it receives an event of a schema newer than its own: upgrade wtm.
 - **Delivery is opportunistic.** A command publishes its event only if the daemon is running, and never starts it, so nobody pays for the stream unless something listens. A reader that falls far behind is disconnected rather than waited for, and resynchronises from the snapshot it gets on reconnecting.
 
+### When it exits
+
+`wtm events` exits only when it is interrupted (`0`), when its reader goes away (`0`), or when retrying cannot help. A daemon that is down or restarting never makes it exit: it waits and reconnects on its own. Its error message goes to stderr, never to stdout, so a JSON Lines reader never has to parse it.
+
+| Code | Means | Retry? |
+| --- | --- | --- |
+| `2` | bad usage: an unknown flag, an `--output` it does not know, a `--repo` that is not a directory | no: fix the invocation |
+| `12` | the repository was never initialized with wtm (`wtm init`) | no |
+| `20` | it received an event of a schema newer than its own | no: upgrade wtm |
+| `21` | the current directory, or `--repo`, is not in a git repository | no |
+| anything else | an unexpected failure | yes, with a backoff |
+
 The schema of every line ships with wtm: [`internal/schemas/events.v1.json`](../../internal/schemas/events.v1.json).
+
+## Checking compatibility
+
+An integration runs on whatever wtm its user has installed, which may predate the stream. Ask before reading it:
+
+```sh
+wtm version --output json
+```
+
+```json
+{
+  "version": "0.30.0",
+  "events": 1
+}
+```
+
+`version` is the binary's version (`dev` for a local build); `events` is the schema version of this stream, the `v` its events carry. Read the two cases that mean "upgrade wtm" as such, not as a failure: `wtm version` exiting `2` (an unknown command: a wtm older than this probe, and older than the stream), and an `events` key that is missing or lower than the version you read. More keys will be added as other contracts are versioned; ignore the ones you do not know.
 
 ## A minimal consumer
 

@@ -4498,6 +4498,10 @@ const (
 	// ExitCodeEventsSchemaNewer is a `wtm events` that received an event of a
 	// schema newer than its own: the consumer has to upgrade wtm.
 	ExitCodeEventsSchemaNewer = 20
+	// ExitCodeNotGitRepo is a command run from, or pointed at, a directory that
+	// is not in a git repository. 13 is skipped: it once meant a pull request
+	// already existed, and a script reading it that way must not misread it.
+	ExitCodeNotGitRepo = 21
 
 	// FlagValueInvalidFmt is every flag value that does not parse.
 	FlagValueInvalidFmt = "invalid --%s value %q: use %s"
@@ -4578,8 +4582,12 @@ const (
 
 // `wtm events` and the bus behind it.
 const (
-	CmdEvents = "events"
-	FlagRepo  = "repo"
+	CmdEvents  = "events"
+	CmdVersion = "version"
+	// VersionLineFmt is cobra's own `--version` line, which `wtm version` repeats
+	// so a script reading either one reads the same text.
+	VersionLineFmt = "%s version %s"
+	FlagRepo       = "repo"
 
 	// EventsPublishTimeout bounds a whole publish, dial included: a mutation
 	// never waits on a daemon nobody may be listening to.
@@ -4613,5 +4621,11 @@ const (
 	// FlagPathInvalidFmt names the flag: the path is one the user typed.
 	FlagPathInvalidFmt    = "invalid --%s %q: %s"
 	FlagPathNotADirectory = "not a directory"
-	FlagPathNotAGitRepo   = "not a git repository"
+	// FlagPathNotGitRepoFmt wraps ErrNotGitRepo, so the path refused by a flag
+	// exits on ExitCodeNotGitRepo like the current directory would.
+	FlagPathNotGitRepoFmt = "invalid --%s %q: %w"
+	// NotGitRepoFmt names the directory wtm was run from.
+	NotGitRepoFmt = "%s is %w"
+	// GitNotARepoStderr is how git says it found no repository.
+	GitNotARepoStderr = "not a git repository"
 )

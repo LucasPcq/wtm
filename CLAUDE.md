@@ -115,6 +115,7 @@ internal/
     daemon/                   ←   the hidden `daemon` command and the macOS port-80 relay launchd runs
     ui/                       ←   `wtm ui`: refuses JSON and a missing TTY, then hands off to tui/dashboard
     events/                   ←   `wtm events`: the stream (text or JSON Lines) over service/events.Watch
+    versioncmd/               ←   `wtm version`: the binary's version and each machine contract's (`events`)
   domain/                     ← types, errors, constants only (no methods, no functions)
   rules/                      ← pure functions (stdlib + domain only, no I/O)
   config/                     ← load & validate config.toml + run.toml from <git-common-dir>/wtm/, plus the global config (config.GlobalPath);
