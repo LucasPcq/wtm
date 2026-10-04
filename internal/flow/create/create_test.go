@@ -874,10 +874,80 @@ func TestRunPublishesTheNewWorktreeOnceAndAReusedOneNever(t *testing.T) {
 	run()
 	run()
 
-	if got := presenter.PublishedTypes(); len(got) != 1 || got[0] != domain.EventWorktreeCreated {
-		t.Fatalf("published %v, want one worktree.created", got)
+	want := []domain.EventType{domain.EventWorktreeCreated, domain.EventWorktreeProvisioned}
+	if got := presenter.PublishedTypes(); !slices.Equal(got, want) {
+		t.Fatalf("published %v, want %v once: the second run met the worktree already there", got, want)
 	}
 	if created := presenter.Published[0].Worktree; created.Branch != "feat/pub" || created.Parent != "main" {
 		t.Fatalf("created = %+v", created)
+	}
+}
+
+func runCreate(t *testing.T, ctx flow.Context, presenter Presenter, branches ...string) error {
+	t.Helper()
+	_, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Branches: branches, From: "main"},
+		Prompter:  flow.Unattended{},
+		Presenter: presenter,
+	})
+	return err
+}
+
+func provisioned(events []domain.Event) []domain.Event {
+	var out []domain.Event
+	for _, event := range events {
+		if event.Type == domain.EventWorktreeProvisioned {
+			out = append(out, event)
+		}
+	}
+	return out
+}
+
+func TestCreatePublishesProvisionedAfterCreated(t *testing.T) {
+	ctx := testContext(t)
+	presenter := newRecorder()
+	ctx.Publisher = presenter.Recorder
+
+	if err := runCreate(t, ctx, presenter, "feat/pub"); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	want := []domain.EventType{domain.EventWorktreeCreated, domain.EventWorktreeProvisioned}
+	if got := presenter.PublishedTypes(); !slices.Equal(got, want) {
+		t.Fatalf("published %v, want %v", got, want)
+	}
+	if got := presenter.Published[1]; got.OK == nil || !*got.OK || got.Worktree.Branch != "feat/pub" {
+		t.Fatalf("provisioned = %+v", got)
+	}
+}
+
+func TestAFailingOnCreateHookIsProvisionedNotOK(t *testing.T) {
+	ctx := testContext(t)
+	ctx.Config.Project.Hooks.OnCreate = []domain.HookCommand{{Cmd: "exit 4"}}
+	presenter := newRecorder()
+	ctx.Publisher = presenter.Recorder
+
+	if err := runCreate(t, ctx, presenter, "feat/broken"); err == nil {
+		t.Fatal("want the hook's error")
+	}
+
+	got := provisioned(presenter.Published)
+	if len(got) != 1 || *got[0].OK || got[0].Hook != "exit 4" || got[0].ExitCode == nil || *got[0].ExitCode != 4 {
+		t.Fatalf("provisioned = %+v", got)
+	}
+}
+
+func TestABatchPublishesOneProvisionedPerBranch(t *testing.T) {
+	ctx := testContext(t)
+	ctx.Config.Project.Hooks.OnCreate = []domain.HookCommand{{Cmd: `test "$(basename "$PWD")" != feat-b`}}
+	presenter := &batchRecorder{recorder: newRecorder()}
+	ctx.Publisher = presenter.Recorder
+
+	_ = runCreate(t, ctx, presenter, "feat/a", "feat/b")
+
+	got := provisioned(presenter.Published)
+	if len(got) != 2 || got[0].Worktree.Branch != "feat/a" || !*got[0].OK || got[1].Worktree.Branch != "feat/b" || *got[1].OK {
+		t.Fatalf("provisioned = %+v, want feat/a ok then feat/b not ok", got)
 	}
 }

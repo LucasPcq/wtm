@@ -13,35 +13,35 @@ import (
 // second surface can run it and no event can report it. A call inside the
 // mutator's own package is its implementation, not an escape.
 //
-// event is the domain event a flow publishes after the call (rule emits); empty
-// for a change that is not part of a worktree's identity.
+// events are the domain events a flow publishes after the call (rule emits);
+// none for a change that is not part of a worktree's identity.
 type mutator struct {
-	pkg   string
-	name  string
-	event string
+	pkg    string
+	name   string
+	events []string
 }
 
 var mutators = []mutator{
-	{pkg: "service/worktree", name: "Create", event: "worktree.created"},
-	{pkg: "service/worktree", name: "Clean", event: "worktree.removed"},
-	{pkg: "service/worktree", name: "ForceClean", event: "worktree.removed"},
-	{pkg: "service/worktree", name: "FinishRemoval", event: "worktree.removed"},
-	{pkg: "service/worktree", name: "Move", event: "worktree.relocated"},
-	{pkg: "service/worktree", name: "Adopt", event: "worktree.updated"},
-	{pkg: "service/worktree", name: "SetBasePath", event: ""},
-	{pkg: "service/worktree", name: "ReparentBatch", event: "worktree.reparented"},
-	{pkg: "service/worktree", name: "ApplyReparents", event: "worktree.reparented"},
-	{pkg: "service/worktree", name: "SetIsolation", event: "worktree.updated"},
-	{pkg: "service/worktree", name: "EnsureOrdinal", event: "worktree.updated"},
-	{pkg: "service/worktree", name: "RecordNamespaces", event: ""},
-	{pkg: "service/worktree", name: "Sync", event: ""},
-	{pkg: "service/worktree", name: "Extract", event: ""},
-	{pkg: "service/env", name: "ApplyEnvSync", event: ""},
-	{pkg: "service/env", name: "ApplyEnvPorts", event: ""},
-	{pkg: "service/env", name: "WritePortKeys", event: ""},
-	{pkg: "service/env", name: "AddEnvTargets", event: ""},
-	{pkg: "service/compose", name: "PatchAll", event: ""},
-	{pkg: "service/runconfig", name: "Save", event: ""},
+	{pkg: "service/worktree", name: "Create", events: []string{"worktree.created", "worktree.provisioned"}},
+	{pkg: "service/worktree", name: "Clean", events: []string{"worktree.removed"}},
+	{pkg: "service/worktree", name: "ForceClean", events: []string{"worktree.removed"}},
+	{pkg: "service/worktree", name: "FinishRemoval", events: []string{"worktree.removed"}},
+	{pkg: "service/worktree", name: "Move", events: []string{"worktree.relocated"}},
+	{pkg: "service/worktree", name: "Adopt", events: []string{"worktree.updated"}},
+	{pkg: "service/worktree", name: "SetBasePath"},
+	{pkg: "service/worktree", name: "ReparentBatch", events: []string{"worktree.reparented"}},
+	{pkg: "service/worktree", name: "ApplyReparents", events: []string{"worktree.reparented"}},
+	{pkg: "service/worktree", name: "SetIsolation", events: []string{"worktree.updated"}},
+	{pkg: "service/worktree", name: "EnsureOrdinal", events: []string{"worktree.updated"}},
+	{pkg: "service/worktree", name: "RecordNamespaces"},
+	{pkg: "service/worktree", name: "Sync"},
+	{pkg: "service/worktree", name: "Extract"},
+	{pkg: "service/env", name: "ApplyEnvSync"},
+	{pkg: "service/env", name: "ApplyEnvPorts"},
+	{pkg: "service/env", name: "WritePortKeys"},
+	{pkg: "service/env", name: "AddEnvTargets"},
+	{pkg: "service/compose", name: "PatchAll"},
+	{pkg: "service/runconfig", name: "Save"},
 }
 
 var chokepointAnalyzer = &analysis.Analyzer{

@@ -10,6 +10,8 @@ func Sync() error { return nil }
 package publish
 
 func Created() {}
+
+func Provisioned() {}
 -- github.com/LucasPcq/wtm/internal/testutil/flowtest/flowtest.go --
 package flowtest
 
@@ -27,6 +29,7 @@ func Run() error {
 		return err
 	}
 	publish.Created()
+	publish.Provisioned()
 	return wt.Sync()
 }
 -- github.com/LucasPcq/wtm/internal/flow/good/good_test.go --
@@ -67,5 +70,28 @@ import (
 
 func Run() error {
 	publish.Created()
+	publish.Provisioned()
 	return worktree.Create() // want `worktree\.Create changes a worktree's identity but no test of this package records what it publishes`
 }
+-- github.com/LucasPcq/wtm/internal/flow/halfway/halfway.go --
+package halfway
+
+import (
+	"github.com/LucasPcq/wtm/internal/flow/publish"
+	"github.com/LucasPcq/wtm/internal/service/worktree"
+)
+
+func Run() error {
+	publish.Created()
+	return worktree.Create() // want `worktree\.Create changes a worktree's identity but this package never publishes worktree\.provisioned`
+}
+-- github.com/LucasPcq/wtm/internal/flow/halfway/halfway_test.go --
+package halfway
+
+import (
+	"testing"
+
+	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
+)
+
+func TestRun(t *testing.T) { _ = flowtest.Recorder{} }

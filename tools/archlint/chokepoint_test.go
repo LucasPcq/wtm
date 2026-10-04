@@ -57,8 +57,10 @@ func TestEveryMutatorEventIsADeclaredEventType(t *testing.T) {
 		t.Fatal("domain declares no EventType constant")
 	}
 	for _, m := range mutators {
-		if m.event != "" && !declared[m.event] {
-			t.Errorf("%s.%s publishes %q, which domain does not declare", m.pkg, m.name, m.event)
+		for _, event := range m.events {
+			if !declared[event] {
+				t.Errorf("%s.%s publishes %q, which domain does not declare", m.pkg, m.name, event)
+			}
 		}
 	}
 }

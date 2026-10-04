@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -393,7 +394,24 @@ func TestACheckoutPublishesTheWorktreeItCreates(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 
-	if got := presenter.PublishedTypes(); len(got) != 1 || got[0] != domain.EventWorktreeCreated || presenter.Published[0].Worktree.Branch != "feat/thing" {
-		t.Fatalf("published %+v, want one worktree.created for feat/thing", presenter.Published)
+	want := []domain.EventType{domain.EventWorktreeCreated, domain.EventWorktreeProvisioned}
+	if got := presenter.PublishedTypes(); !slices.Equal(got, want) || presenter.Published[0].Worktree.Branch != "feat/thing" || !*presenter.Published[1].OK {
+		t.Fatalf("published %+v, want %v for feat/thing", presenter.Published, want)
+	}
+}
+
+func TestAFailingOnCreateHookIsPublishedByCheckout(t *testing.T) {
+	ctx := testContext(t)
+	ctx.Config.Project.Hooks.OnCreate = []domain.HookCommand{{Cmd: "exit 6"}}
+	presenter := newRecorder()
+	ctx.Publisher = presenter.Recorder
+
+	if _, err := Run(Params{Context: ctx, Request: Request{Number: 42}, Prompter: flow.Unattended{}, Presenter: presenter}); err == nil {
+		t.Fatal("want the hook's error")
+	}
+
+	last := presenter.Published[len(presenter.Published)-1]
+	if last.Type != domain.EventWorktreeProvisioned || *last.OK || last.Hook != "exit 6" || *last.ExitCode != 6 {
+		t.Fatalf("provisioned = %+v", last)
 	}
 }

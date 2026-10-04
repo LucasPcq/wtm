@@ -428,11 +428,11 @@ func TestOnlyANewTargetIsPublished(t *testing.T) {
 				t.Fatalf("Run: %v", err)
 			}
 
-			if len(presenter.Published) != tc.want {
-				t.Fatalf("published %v, want %d worktree.created", presenter.PublishedTypes(), tc.want)
+			if len(presenter.Published) != 2*tc.want {
+				t.Fatalf("published %v, want %d worktree.created + provisioned", presenter.PublishedTypes(), tc.want)
 			}
-			if tc.want == 1 && (presenter.Published[0].Type != domain.EventWorktreeCreated || presenter.Published[0].Worktree.Branch != "feat/split") {
-				t.Fatalf("published %+v", presenter.Published[0])
+			if tc.want == 1 && (presenter.Published[0].Type != domain.EventWorktreeCreated || presenter.Published[0].Worktree.Branch != "feat/split" || presenter.Published[1].Type != domain.EventWorktreeProvisioned) {
+				t.Fatalf("published %+v", presenter.Published)
 			}
 		})
 	}
