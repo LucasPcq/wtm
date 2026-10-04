@@ -9,7 +9,6 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
-	"github.com/LucasPcq/wtm/internal/service/events"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 	"github.com/LucasPcq/wtm/internal/testutil/globaldir"
 )
@@ -30,7 +29,7 @@ func TestLoadConfigRegistersTheRepository(t *testing.T) {
 	}
 
 	root, _ := filepath.EvalSymlinks(dir)
-	if repos, _ := events.Registered(); len(repos) != 1 || repos[0].Root != root {
+	if repos, _ := infra.ReadRegistry(); len(repos) != 1 || repos[0].Root != root {
 		t.Fatalf("registered %+v", repos)
 	}
 }

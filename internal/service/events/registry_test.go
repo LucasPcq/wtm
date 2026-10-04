@@ -66,7 +66,7 @@ func TestRegisterIsIdempotent(t *testing.T) {
 		}
 	}
 
-	repos, err := Registered()
+	repos, err := infra.ReadRegistry()
 	if err != nil || len(repos) != 1 || repos[0].Root != dir || repos[0].AddedAt == "" {
 		t.Fatalf("repos = %+v, err = %v", repos, err)
 	}
@@ -75,7 +75,7 @@ func TestRegisterIsIdempotent(t *testing.T) {
 func TestAnEmptyRegistryIsNoError(t *testing.T) {
 	processtest.Home(t)
 
-	repos, err := Registered()
+	repos, err := infra.ReadRegistry()
 	if err != nil || len(repos) != 0 {
 		t.Fatalf("repos = %+v, err = %v", repos, err)
 	}
@@ -94,7 +94,7 @@ func TestConcurrentRegistrationsKeepEveryRepo(t *testing.T) {
 	}
 	wg.Wait()
 
-	if repos, _ := Registered(); len(repos) != len(dirs) {
+	if repos, _ := infra.ReadRegistry(); len(repos) != len(dirs) {
 		t.Fatalf("registered %d, want %d", len(repos), len(dirs))
 	}
 }

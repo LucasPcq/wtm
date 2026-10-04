@@ -78,10 +78,6 @@ func Prune(params PruneParams) ([]domain.RegisteredRepo, error) {
 	return kept, nil
 }
 
-func Registered() ([]domain.RegisteredRepo, error) {
-	return infra.ReadRegistry()
-}
-
 func initialized(repo domain.RegisteredRepo) bool {
 	return infra.FileExists(filepath.Join(repo.CommonDir, domain.StateDirName, domain.ConfigFileName))
 }
