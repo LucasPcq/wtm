@@ -11,9 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/service/events"
 )
 
-type worktreeEventMsg struct {
-	event domain.Event
-}
+type worktreesChangedMsg struct{}
 
 // WatchFunc streams a repository's events to onEvent until ctx is done.
 type WatchFunc func(ctx context.Context, onEvent func(domain.Event)) error
@@ -34,32 +32,44 @@ func defaultWatch(params RunParams) WatchFunc {
 
 type watchEventsParams struct {
 	Context context.Context
-	Msgs    chan<- tea.Msg
+	Changes chan<- struct{}
 	Watch   WatchFunc
 }
 
-// watchEvents never waits on the model: a full channel drops the event, and the
-// reload already queued reads whatever it described.
+// watchEvents never waits on the model: Changes holds one pending signal at
+// most, so a burst of events collapses into the single reload that reads them
+// all, and none is lost to a channel full of hook output.
 func watchEvents(params watchEventsParams) {
+	synced := false
 	_ = params.Watch(params.Context, func(event domain.Event) {
+		changed := false
+		changed, synced = worktreesChanged(event, synced)
+		if !changed {
+			return
+		}
 		select {
-		case params.Msgs <- worktreeEventMsg{event: event}:
+		case params.Changes <- struct{}{}:
 		default:
 		}
 	})
 }
 
-// applyEvent reloads on any change to a worktree. The first snapshot is the
-// state Init already loaded; a later one follows a reconnection, during which
-// anything may have changed.
-func (m Model) applyEvent(event domain.Event) (Model, tea.Cmd) {
+// worktreesChanged skips the first snapshot, the state Init already loaded; a
+// later one follows a reconnection, during which anything may have changed.
+func worktreesChanged(event domain.Event, synced bool) (changed, nowSynced bool) {
 	switch {
-	case event.Type == domain.EventSnapshot && !m.eventsSynced:
-		m.eventsSynced = true
-		return m, nil
+	case event.Type == domain.EventSnapshot && !synced:
+		return false, true
 	case event.Type == domain.EventSnapshot, strings.HasPrefix(string(event.Type), domain.EventWorktreePrefix):
-		return m, m.reload()
+		return true, synced
 	default:
-		return m, nil
+		return false, synced
+	}
+}
+
+func awaitChangeCmd(changes <-chan struct{}) tea.Cmd {
+	return func() tea.Msg {
+		<-changes
+		return worktreesChangedMsg{}
 	}
 }

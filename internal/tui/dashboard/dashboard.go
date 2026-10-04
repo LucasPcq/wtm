@@ -180,8 +180,11 @@ type Model struct {
 	params     RunParams
 	listParams domain.ListParams
 	zones      *zone.Manager
-	// eventsSynced is set by the first snapshot of the event stream.
-	eventsSynced bool
+	// changes is signalled by the event watcher; awaitChangeCmd is its only
+	// reader.
+	changes        chan struct{}
+	reloadInFlight bool
+	reloadPending  bool
 
 	width  int
 	height int
@@ -325,6 +328,7 @@ func New(params RunParams) Model {
 		},
 		zones:    zone.New(),
 		msgs:     make(chan tea.Msg, domain.DashboardMsgBuffer),
+		changes:  make(chan struct{}, 1),
 		ghConn:   domain.GHConnectionOK,
 		loading:  true,
 		details:  map[string]domain.WorktreeDetail{},
@@ -347,7 +351,7 @@ func Run(params RunParams) error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go watchEvents(watchEventsParams{Context: ctx, Msgs: model.msgs, Watch: watch})
+	go watchEvents(watchEventsParams{Context: ctx, Changes: model.changes, Watch: watch})
 
 	if _, err := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithReportFocus()).Run(); err != nil {
 		return fmt.Errorf("dashboard: %w", err)
@@ -359,7 +363,7 @@ func (m Model) Init() tea.Cmd {
 	// The spinner is started on demand, at the point a detail load actually
 	// begins (fireDetailTick, reloadDetailCmd) — not here, or it would tick for
 	// the life of the program whether or not anything is loading.
-	return tea.Batch(m.loadWorktreesCmd(false), m.loadPRsCmd(), m.loadJobsCmd(true), pollCmd(), gitPollCmd(), listenCmd(m.msgs))
+	return tea.Batch(m.loadWorktreesCmd(false), m.loadPRsCmd(), m.loadJobsCmd(true), pollCmd(), gitPollCmd(), listenCmd(m.msgs), awaitChangeCmd(m.changes))
 }
 
 func pollCmd() tea.Cmd {
@@ -483,7 +487,12 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		model, cmd := m.handleMouse(msg)
 		return withDetailTrigger(before, model, cmd)
 
+	case worktreesChangedMsg:
+		model, cmd := m.reload()
+		return model, tea.Batch(cmd, awaitChangeCmd(m.changes))
+
 	case worktreesMsg:
+		m, reloadCmd := m.reloadLanded()
 		before := m.selectedBranch()
 		childrenBefore := m.childrenOf(before)
 		next, animCmd := m.applyWorktrees(msg)
@@ -500,7 +509,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// proxy and reads the worktree's .env, so a proxy that came up late or a
 		// port that moved under a job still running is only ever caught here.
 		// This is the git clock, and KeyRefresh comes through it too.
-		return model, tea.Batch(animCmd, detailCmd, next.resolveAddressesCmd(), next.resolveTracesCmd())
+		return model, tea.Batch(reloadCmd, animCmd, detailCmd, next.resolveAddressesCmd(), next.resolveTracesCmd())
 
 	case tracesMsg:
 		m.logged = msg.logged

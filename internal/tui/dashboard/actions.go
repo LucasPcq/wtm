@@ -487,19 +487,9 @@ func (m Model) applyFlow(msg tea.Msg) (Model, tea.Cmd) {
 			m.selectBranch = msg.branch
 		}
 		m.flashPending = append(append([]string(nil), m.flashPending...), msg.branch)
-		return m, m.reload()
-	case cleanedMsg:
-		return m, m.reload()
-	case reparentedMsg:
-		return m, m.reload()
-	case prunedMsg:
-		return m, m.reload()
-	case syncedMsg:
-		return m, m.reload()
-	case fastForwardedMsg:
-		return m, m.reload()
-	case worktreeEventMsg:
-		return m.applyEvent(msg.event)
+		return m.reload()
+	case cleanedMsg, reparentedMsg, prunedMsg, syncedMsg, fastForwardedMsg:
+		return m.reload()
 	}
 	return m, nil
 }
@@ -522,10 +512,26 @@ func (m Model) openModal(msg promptMsg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-// reload re-reads what a finished run changed: the worktrees, and the forest
-// when it has ever been built — a run creates, removes or reparents a node.
-func (m Model) reload() tea.Cmd {
-	return tea.Batch(m.loadWorktreesCmd(false), m.treeCmd())
+// reload re-reads what a run changed: the worktrees, and the forest when it
+// has ever been built — a run creates, removes or reparents a node. One is in
+// flight at a time: what asks meanwhile is read by the one that follows it,
+// so thirty removals cost two reloads, not thirty.
+func (m Model) reload() (Model, tea.Cmd) {
+	if m.reloadInFlight {
+		m.reloadPending = true
+		return m, nil
+	}
+	m.reloadInFlight = true
+	return m, tea.Batch(m.loadWorktreesCmd(false), m.treeCmd())
+}
+
+func (m Model) reloadLanded() (Model, tea.Cmd) {
+	m.reloadInFlight = false
+	if !m.reloadPending {
+		return m, nil
+	}
+	m.reloadPending = false
+	return m.reload()
 }
 
 // appendOutput splits an incoming entry on its newlines so every stored line
