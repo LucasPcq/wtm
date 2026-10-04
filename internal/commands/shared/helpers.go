@@ -12,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/service/events"
 )
 
 // ConfigResult holds the loaded config along with the resolved paths every
@@ -80,6 +81,9 @@ func LoadConfig(cmd *cobra.Command, dir string) (ConfigResult, error) {
 		return ConfigResult{}, fmt.Errorf("loading config: %w", err)
 	}
 
+	// A repository first met here is enrolled for a global `wtm events`; failing
+	// to do so costs that stream a repository, never this command its run.
+	_ = events.Register(events.RegisterParams{ProjectDir: root, CorrelationID: os.Getenv(domain.EnvCorrelationID)})
 	return ConfigResult{Config: cfg, ProjectDir: root, StateDir: stateDir}, nil
 }
 
