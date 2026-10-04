@@ -32,6 +32,10 @@ One JSON object per line:
 
 Every `worktree.*` event carries `worktree`: `branch`, `path`, `parent`, `ordinal` (`null` until allocated), `isolation`, `is_main`, `created_at`. Nothing volatile (dirty, ahead, PR, services): read those from `wtm list --output json`.
 
+## Recognising your own command
+
+Start a command with `WTM_CORRELATION_ID=<any id>` (≤ 256 bytes, no control character, else exit `2`) and every event it publishes carries `correlation_id` with that value, the children of a `clean` included. Wait for the event carrying your id rather than the first one of its type: another agent may be creating worktrees at the same time. Events without an id have no `correlation_id` field.
+
 ## Rules for reading it
 
 - Key a worktree by `(repo.common_dir, branch)`; apply each event as an upsert; a `snapshot` **replaces** your state for that repo.

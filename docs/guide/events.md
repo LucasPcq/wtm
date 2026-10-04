@@ -24,7 +24,7 @@ A subscription opens on a **snapshot**: one `snapshot` event listing every workt
 | `worktree.reparented` | `wtm reparent`, or a `clean` / `prune` that moved its children past a removed parent | `from_parent`: its previous parent |
 | `worktree.removed` | `clean` or `prune` removed it | — |
 
-Every event carries `v` (the schema version), `type` and `ts` (RFC 3339, UTC); every event but `ready` carries `repo`, and every `worktree.*` event the `worktree` it is about. A `removed` carries the last state the worktree had.
+Every event carries `v` (the schema version), `type` and `ts` (RFC 3339, UTC); every event but `ready` carries `repo`, and every `worktree.*` event the `worktree` it is about. A `removed` carries the last state the worktree had. An event published by a command started with `WTM_CORRELATION_ID` carries it as `correlation_id` — see [Recognising your own command](#recognising-your-own-command).
 
 ```jsonc
 {"v":1,"type":"snapshot","ts":"2026-10-03T09:12:01.512Z","repo":{"root":"/code/app","common_dir":"/code/app/.git"},"worktrees":[{"branch":"main","path":"/code/app","parent":"","ordinal":0,"isolation":"isolated","is_main":true,"created_at":""}]}
@@ -58,6 +58,16 @@ The repository is `repo.common_dir`, git's common directory with symlinks resolv
 - **A reconnection is not an error.** The stream rides on wtm's background daemon. If the daemon stops (`wtm run daemon stop`, an upgrade), `wtm events` starts it again — `wtm events` and `wtm ui` are what keep it running while they are open — then opens again on a fresh `snapshot` and `ready`. Events in between are not replayed: the new snapshot already holds their result. A daemon of another wtm version is used as it is: it relays events it does not read; only one too old to know `wtm events` is replaced, and only while it runs no job.
 - **Ignore what you do not know.** A field or a type you do not recognise is skipped, never an error: new ones are added without changing `v`. `v` moves only on a breaking change. `wtm events` itself exits with code `20` if it receives an event of a schema newer than its own: upgrade wtm.
 - **Delivery is opportunistic.** A command publishes its event only if the daemon is running, and never starts it, so nobody pays for the stream unless something listens. A reader that falls far behind is disconnected rather than waited for, and resynchronises from the snapshot it gets on reconnecting.
+
+## Recognising your own command
+
+An integration that runs a wtm command and wants the events *that* command produced — not those of an agent working in the next pane — sets `WTM_CORRELATION_ID` when it starts it:
+
+```sh
+WTM_CORRELATION_ID=popup-42 wtm create feat/login --yes
+```
+
+Every event the command publishes carries `"correlation_id":"popup-42"`, including the ones it publishes on the way (a `clean` that reparents children). wtm never reads the value: any string up to 256 bytes without a control character. Anything else is refused with exit `2` before the command does anything. An event published without one has no `correlation_id` at all, and a `snapshot` never has one. Hooks inherit the variable, so a `wtm` command run from a hook is correlated too; a command run from `wtm ui` never is.
 
 ### When it exits
 
