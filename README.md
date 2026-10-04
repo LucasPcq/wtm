@@ -128,7 +128,7 @@ Every command documents itself: `wtm <command> --help`, or the generated [refere
 | [`exec`](docs/wtm_exec.md) | Run one command in several worktrees, in parallel, each with its own environment |
 | [`relocate`](docs/wtm_relocate.md) | Move worktrees to align with `base_path` and adopt external ones |
 | [`ui`](docs/wtm_ui.md) | Open the full-screen worktree dashboard: browse state and PRs, create and delete worktrees |
-| [`events`](docs/wtm_events.md) | Stream the repository's worktree changes as they happen (JSON Lines for integrations) |
+| [`events`](docs/wtm_events.md) | Stream worktree changes as they happen, in one repository or all of them (JSON Lines for integrations) |
 
 ### Navigate
 

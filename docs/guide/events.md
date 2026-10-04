@@ -8,6 +8,7 @@ The stream reports every change, whoever made it: a command in another shell, an
 wtm events                     # one line per change, for a person watching
 wtm events --output json       # JSON Lines: the contract an integration reads
 wtm events --repo ~/code/app   # another repository than the current one
+cd ~ && wtm events             # every repository wtm knows
 ```
 
 ## What the stream carries
@@ -65,6 +66,16 @@ The repository is `repo.common_dir`, git's common directory with symlinks resolv
 - **Ignore what you do not know.** A field or a type you do not recognise is skipped, never an error: new ones are added without changing `v`. `v` moves only on a breaking change. `wtm events` itself exits with code `20` if it receives an event of a schema newer than its own: upgrade wtm.
 - **Delivery is opportunistic.** A command publishes its event only if the daemon is running, and never starts it, so nobody pays for the stream unless something listens. A reader that falls far behind is disconnected rather than waited for, and resynchronises from the snapshot it gets on reconnecting.
 
+## Every repository at once
+
+Run outside any git repository, without `--repo`, `wtm events` follows every repository wtm was used in. It opens on one `snapshot` per repository, then a single `ready`, and carries the changes of all of them; each event's `repo.common_dir` says which one it is about.
+
+The repositories come from a registry wtm keeps beside its global config (`repos.json`, see [Where wtm keeps its state](state.md)). A repository joins it when `wtm init` runs there, and the first time any wtm command runs in it, so the ones initialized before this version join on their own. It leaves when it is deleted or no longer initialized with wtm: the registry drops it the next time it is written or a global stream starts.
+
+The stream follows the registry as it changes. A repository that joins arrives as `repo.added`, followed right away by its own `snapshot`; one that leaves arrives as `repo.removed` — drop every worktree you hold for that `repo.common_dir`. A repository whose snapshot cannot be read (its config is broken, say) is skipped with a warning on stderr rather than ending the stream.
+
+Before this version, `wtm events` outside a repository exited `21`; it now follows every repository, and `21` only means a `--repo` outside git.
+
 ## Recognising your own command
 
 An integration that runs a wtm command and wants the events *that* command produced — not those of an agent working in the next pane — sets `WTM_CORRELATION_ID` when it starts it:
@@ -84,7 +95,7 @@ Every event the command publishes carries `"correlation_id":"popup-42"`, includi
 | `2` | bad usage: an unknown flag, an `--output` it does not know, a `--repo` that is not a directory | no: fix the invocation |
 | `12` | the repository was never initialized with wtm (`wtm init`) | no |
 | `20` | it received an event of a schema newer than its own | no: upgrade wtm |
-| `21` | the current directory, or `--repo`, is not in a git repository | no |
+| `21` | `--repo` is not in a git repository | no |
 | anything else | an unexpected failure | yes, with a backoff |
 
 The schema of every line ships with wtm: [`internal/schemas/events.v1.json`](../../internal/schemas/events.v1.json).

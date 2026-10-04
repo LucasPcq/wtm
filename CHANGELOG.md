@@ -2,6 +2,7 @@
 
 ## Non publié
 
+- **`wtm events` hors d'un repo suit tous les repos où wtm a servi** : un instantané par repo, un seul `ready`, puis `repo.added` (suivi de l'instantané du nouveau repo) et `repo.removed`. Les repos sont tenus dans un registre (`repos.json`, à côté de la config globale), alimenté par `wtm init` et par la première commande lancée dans un repo. Le code `21` ne concerne plus que `--repo` vers un dossier hors git. → [Tous les repos d'un coup](docs/guide/events.md#every-repository-at-once)
 - **`worktree.deprovisioned` dans `wtm events`** : envoyé après les hooks `on_clean` de `clean` et `prune`, avec leur résultat. `ok: false` signale une suppression interrompue par un hook : le worktree est toujours là, et aucun `removed` ne suit. → [Le flux d'événements](docs/guide/events.md#what-the-stream-carries)
 - **`worktree.provisioned` dans `wtm events`** : envoyé une fois les hooks `on_create` passés (même sans hook), avec leur résultat — `ok`, et en cas d'échec le hook et son code de sortie. Un agent sait enfin quand un worktree voisin est prêt. → [Le flux d'événements](docs/guide/events.md#what-the-stream-carries)
 - **Corrélation des événements avec la commande qui les produit** : une commande lancée avec `WTM_CORRELATION_ID=<id>` recopie cet identifiant dans le champ `correlation_id` de chaque événement qu'elle publie, enfants compris (un `clean` qui déplace des enfants). Un hôte reconnaît ainsi les siens sans les confondre avec ceux d'un agent. → [Reconnaître sa propre commande](docs/guide/events.md#recognising-your-own-command)
