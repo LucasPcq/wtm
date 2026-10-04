@@ -20,14 +20,14 @@ A subscription opens on a **snapshot**: one `snapshot` event listing every workt
 | `snapshot` | the stream opens, and again after every reconnection | `worktrees`: every worktree as it is now |
 | `ready` | right after the snapshots, each time they are sent | — |
 | `worktree.created` | `create`, `checkout` or `extract` brought a worktree into existence, before its `on_create` hooks run | — |
-| `worktree.provisioned` | the `on_create` hooks of a worktree `create`, `checkout` or `extract` just made have run — also sent when there are none, so it always follows a `created` | `ok`; when `false`, `hook` (the command that failed) and `exit_code` |
+| `worktree.provisioned` | the `on_create` hooks of a worktree `create`, `checkout` or `extract` just made have run — also sent when there are none, so it always follows a `created` | `ok`; when `false`, `hook` (the command that failed) and `exit_code` — `hook` is absent when the phase failed before any hook ran, `exit_code` when the hook was killed by a signal |
 | `worktree.updated` | a field of a worktree's identity changed: its isolation (`wtm env --isolation`), its ordinal (the first time something needs its ports), its parent and creation date (adopted by `wtm relocate`) | `changed`: the fields that changed |
 | `worktree.relocated` | `wtm relocate` moved it; a worktree created outside wtm and adopted by `relocate` first appears this way, never as `created` | `from_path`: where it was |
 | `worktree.reparented` | `wtm reparent`, or a `clean` / `prune` that moved its children past a removed parent | `from_parent`: its previous parent |
-| `worktree.deprovisioned` | `clean` or `prune` ran its `on_clean` hooks — also sent when there are none. `ok: true` is followed by `removed`; `ok: false` means the removal stopped there and the worktree is still on disk | `ok`; when `false`, `hook` and `exit_code` |
+| `worktree.deprovisioned` | `clean` or `prune` ran its `on_clean` hooks — also sent when there are none. `ok: true` is followed by `removed`; `ok: false` means the removal stopped there and the worktree is still on disk. A worktree whose directory is already gone gets `ok: true` only without `on_clean` hooks: with some, they cannot run there and the removal stops | `ok`; when `false`, `hook` and `exit_code`, as for `provisioned` |
 | `worktree.removed` | `clean` or `prune` removed it, after its `deprovisioned` | — |
-| `repo.added` | a repository joined the registry a global stream follows (see [Every repository at once](#every-repository-at-once)) | — |
-| `repo.removed` | a repository left it: deleted, or no longer initialized with wtm | — |
+| `repo.added` | global stream only: a repository joined the registry it follows (see [Every repository at once](#every-repository-at-once)) | — |
+| `repo.removed` | global stream only: a repository left it: deleted, or no longer initialized with wtm | — |
 
 Every event carries `v` (the schema version), `type` and `ts` (RFC 3339, UTC); every event but `ready` carries `repo`, and every `worktree.*` event the `worktree` it is about. A `removed` carries the last state the worktree had. An event published by a command started with `WTM_CORRELATION_ID` carries it as `correlation_id` — see [Recognising your own command](#recognising-your-own-command).
 
@@ -72,7 +72,7 @@ Run outside any git repository, without `--repo`, `wtm events` follows every rep
 
 The repositories come from a registry wtm keeps beside its global config (`repos.json`, see [Where wtm keeps its state](state.md)). A repository joins it when `wtm init` runs there, and the first time any wtm command runs in it, so the ones initialized before this version join on their own. It leaves when it is deleted or no longer initialized with wtm: the registry drops it the next time it is written or a global stream starts.
 
-The stream follows the registry as it changes. A repository that joins arrives as `repo.added`, followed right away by its own `snapshot`; one that leaves arrives as `repo.removed` — drop every worktree you hold for that `repo.common_dir`. A repository whose snapshot cannot be read (its config is broken, say) is skipped with a warning on stderr rather than ending the stream.
+The stream follows the registry as it changes. A repository that joins arrives as `repo.added`, followed right away by its own `snapshot`; one that leaves arrives as `repo.removed` — drop every worktree you hold for that `repo.common_dir`. A repository whose snapshot cannot be read (its main checkout was moved, say) is skipped with a warning on stderr rather than ending the stream. A stream that starts drops the repositories gone since the last one, and may then send their `repo.removed` after its `ready`, for a repository it never sent a snapshot of: deleting what you do not hold is a no-op.
 
 Before this version, `wtm events` outside a repository exited `21`; it now follows every repository, and `21` only means a `--repo` outside git.
 

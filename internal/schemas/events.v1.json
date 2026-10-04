@@ -33,11 +33,9 @@
         "created_at": { "type": "string" }
       }
     },
-    "hookOutcome": {
-      "ok": { "type": "boolean", "description": "Whether every hook of the phase passed; true when there were none." },
-      "hook": { "type": "string", "minLength": 1, "description": "The failing hook's command; only when ok is false." },
-      "exit_code": { "type": "integer", "description": "The failing hook's exit status, when it exited with one." }
-    },
+    "hookOk": { "type": "boolean", "description": "Whether every hook of the phase passed; true when there were none." },
+    "hookCmd": { "type": "string", "minLength": 1, "description": "The failing hook's command; only when ok is false, and absent when the phase failed before any hook ran." },
+    "hookExitCode": { "type": "integer", "minimum": 0, "description": "The failing hook's exit status; absent when it was killed by a signal." },
     "changed": {
       "type": "array",
       "minItems": 1,
@@ -69,9 +67,9 @@
         "type": { "const": "worktree.provisioned" },
         "repo": { "$ref": "#/$defs/repo" },
         "worktree": { "$ref": "#/$defs/worktree" },
-        "ok": { "$ref": "#/$defs/hookOutcome/ok" },
-        "hook": { "$ref": "#/$defs/hookOutcome/hook" },
-        "exit_code": { "$ref": "#/$defs/hookOutcome/exit_code" }
+        "ok": { "$ref": "#/$defs/hookOk" },
+        "hook": { "$ref": "#/$defs/hookCmd" },
+        "exit_code": { "$ref": "#/$defs/hookExitCode" }
       },
       "required": ["repo", "worktree", "ok"]
     },
@@ -107,9 +105,9 @@
         "type": { "const": "worktree.deprovisioned" },
         "repo": { "$ref": "#/$defs/repo" },
         "worktree": { "$ref": "#/$defs/worktree" },
-        "ok": { "$ref": "#/$defs/hookOutcome/ok" },
-        "hook": { "$ref": "#/$defs/hookOutcome/hook" },
-        "exit_code": { "$ref": "#/$defs/hookOutcome/exit_code" }
+        "ok": { "$ref": "#/$defs/hookOk" },
+        "hook": { "$ref": "#/$defs/hookCmd" },
+        "exit_code": { "$ref": "#/$defs/hookExitCode" }
       },
       "required": ["repo", "worktree", "ok"]
     },
