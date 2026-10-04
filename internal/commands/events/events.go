@@ -27,8 +27,9 @@ func NewCmd() *cobra.Command {
 		Long: "Print the repository's worktrees, then every change made to them, whoever made it:\n" +
 			"a command in another shell, an agent, or `wtm ui`. The stream opens on a snapshot of\n" +
 			"every worktree and a ready line, then carries one event per change — created,\n" +
-			"provisioned, updated, relocated, reparented, removed. With --output json each line is one JSON\n" +
-			"object (JSON Lines), the contract an integration reads; its schema ships with wtm.\n" +
+			"provisioned, updated, relocated, reparented, deprovisioned, removed. With\n" +
+			"--output json each line is one JSON object (JSON Lines), the contract an\n" +
+			"integration reads; its schema ships with wtm.\n" +
 			"If the run daemon stops, the stream waits for it and opens again on a fresh\n" +
 			"snapshot: treat every event as an upsert keyed by branch, and every snapshot as a\n" +
 			"reset. It runs until interrupted or until the reader of its pipe goes away. It\n" +

@@ -29,6 +29,7 @@ One JSON object per line:
 | `worktree.updated` | its identity changed | `changed`: subset of `isolation`, `ordinal`, `parent`, `created_at` |
 | `worktree.relocated` | it moved on disk; a worktree adopted by `relocate` first appears this way, not as `created` | `from_path` |
 | `worktree.reparented` | its parent branch changed | `from_parent` |
+| `worktree.deprovisioned` | its `on_clean` hooks ran (also sent when there are none); `ok: false` means the removal was aborted and the worktree is still there, and no `removed` follows | `ok`; on `false`, `hook` and `exit_code` |
 | `worktree.removed` | it is gone; `worktree` is its last state | — |
 
 Every `worktree.*` event carries `worktree`: `branch`, `path`, `parent`, `ordinal` (`null` until allocated), `isolation`, `is_main`, `created_at`. Nothing volatile (dirty, ahead, PR, services): read those from `wtm list --output json`.

@@ -23,7 +23,8 @@ A subscription opens on a **snapshot**: one `snapshot` event listing every workt
 | `worktree.updated` | a field of a worktree's identity changed: its isolation (`wtm env --isolation`), its ordinal (the first time something needs its ports), its parent and creation date (adopted by `wtm relocate`) | `changed`: the fields that changed |
 | `worktree.relocated` | `wtm relocate` moved it; a worktree created outside wtm and adopted by `relocate` first appears this way, never as `created` | `from_path`: where it was |
 | `worktree.reparented` | `wtm reparent`, or a `clean` / `prune` that moved its children past a removed parent | `from_parent`: its previous parent |
-| `worktree.removed` | `clean` or `prune` removed it | — |
+| `worktree.deprovisioned` | `clean` or `prune` ran its `on_clean` hooks — also sent when there are none. `ok: true` is followed by `removed`; `ok: false` means the removal stopped there and the worktree is still on disk | `ok`; when `false`, `hook` and `exit_code` |
+| `worktree.removed` | `clean` or `prune` removed it, after its `deprovisioned` | — |
 
 Every event carries `v` (the schema version), `type` and `ts` (RFC 3339, UTC); every event but `ready` carries `repo`, and every `worktree.*` event the `worktree` it is about. A `removed` carries the last state the worktree had. An event published by a command started with `WTM_CORRELATION_ID` carries it as `correlation_id` — see [Recognising your own command](#recognising-your-own-command).
 
@@ -35,6 +36,7 @@ Every event carries `v` (the schema version), `type` and `ts` (RFC 3339, UTC); e
 {"v":1,"type":"worktree.updated","ts":"…","repo":{…},"worktree":{…,"ordinal":1},"changed":["ordinal"]}
 {"v":1,"type":"worktree.relocated","ts":"…","repo":{…},"worktree":{…},"from_path":"/code/old/feat-login"}
 {"v":1,"type":"worktree.reparented","ts":"…","repo":{…},"worktree":{…,"parent":"main"},"from_parent":"feat/auth"}
+{"v":1,"type":"worktree.deprovisioned","ts":"…","repo":{…},"worktree":{…},"ok":true}
 {"v":1,"type":"worktree.removed","ts":"…","repo":{…},"worktree":{…}}
 ```
 
@@ -118,4 +120,4 @@ Any language reads it the same way: start the process, read stdout line by line,
 
 ## What it does not carry yet
 
-Jobs starting and exiting, `sync` rebasing a chain, and the output of hooks are not on the stream in this version (their outcome is: `worktree.provisioned`); read them from `wtm run ps --output json` and the command's own output.
+Jobs starting and exiting, `sync` rebasing a chain, and the output of hooks are not on the stream in this version (their outcome is: `worktree.provisioned` and `worktree.deprovisioned`); read them from `wtm run ps --output json` and the command's own output.

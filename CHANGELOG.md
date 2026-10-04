@@ -2,6 +2,7 @@
 
 ## Non publié
 
+- **`worktree.deprovisioned` dans `wtm events`** : envoyé après les hooks `on_clean` de `clean` et `prune`, avec leur résultat. `ok: false` signale une suppression interrompue par un hook : le worktree est toujours là, et aucun `removed` ne suit. → [Le flux d'événements](docs/guide/events.md#what-the-stream-carries)
 - **`worktree.provisioned` dans `wtm events`** : envoyé une fois les hooks `on_create` passés (même sans hook), avec leur résultat — `ok`, et en cas d'échec le hook et son code de sortie. Un agent sait enfin quand un worktree voisin est prêt. → [Le flux d'événements](docs/guide/events.md#what-the-stream-carries)
 - **Corrélation des événements avec la commande qui les produit** : une commande lancée avec `WTM_CORRELATION_ID=<id>` recopie cet identifiant dans le champ `correlation_id` de chaque événement qu'elle publie, enfants compris (un `clean` qui déplace des enfants). Un hôte reconnaît ainsi les siens sans les confondre avec ceux d'un agent. → [Reconnaître sa propre commande](docs/guide/events.md#recognising-your-own-command)
 - **`wtm events` diffuse les changements de worktrees en direct** : un instantané de tous les worktrees, puis un événement par création, déplacement, changement de parent, d'isolation ou suppression, d'où qu'il vienne (un autre shell, un agent, `wtm ui`). `--output json` donne des JSON Lines, le contrat d'une intégration (éditeur, plugin de terminal comme herdr) ; le flux se reconnecte seul si le daemon redémarre. → [Le flux d'événements](docs/guide/events.md)
