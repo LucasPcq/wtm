@@ -4622,6 +4622,14 @@ const (
 	EventFieldFmt      = "%s=%s"
 	EventFieldSep      = ", "
 	EventOrdinalNone   = "none"
+
+	EventProvisionedFmt       = "provisioned %s"
+	EventProvisionFailedFmt   = "on_create failed for %s"
+	EventDeprovisionFailedFmt = "on_clean failed for %s, kept"
+	EventHookFmt              = "  %s"
+	EventExitCodeFmt          = " (exit %d)"
+	EventRepoAddedFmt         = "watching %s"
+	EventRepoRemovedFmt       = "no longer watching %s"
 )
 
 const (

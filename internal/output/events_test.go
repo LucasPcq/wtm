@@ -23,6 +23,7 @@ func TestEachEventReadsAsOneLine(t *testing.T) {
 	ordinal := 3
 	identity := &domain.WorktreeIdentity{Branch: "feat/a", Path: "/wt/feat-a", Parent: "main", Ordinal: &ordinal, Isolation: domain.IsolationIsolated}
 	repo := &domain.EventRepo{Root: "/repo", CommonDir: "/repo/.git"}
+	passed, failed, exitCode, five := true, false, 3, 5
 
 	cases := []struct {
 		event domain.Event
@@ -36,6 +37,12 @@ func TestEachEventReadsAsOneLine(t *testing.T) {
 		{domain.Event{Type: domain.EventWorktreeRelocated, Worktree: identity, FromPath: "/old"}, "~ relocated feat/a  /old → /wt/feat-a"},
 		{domain.Event{Type: domain.EventWorktreeReparented, Worktree: identity, FromParent: "feat/x"}, "~ reparented feat/a  feat/x → main"},
 		{domain.Event{Type: domain.EventWorktreeUpdated, Worktree: identity, Changed: []domain.IdentityField{domain.IdentityIsolation, domain.IdentityOrdinal}}, "~ updated feat/a  isolation=isolated, ordinal=3"},
+		{domain.Event{Type: domain.EventWorktreeProvisioned, Worktree: identity, OK: &passed}, "✓ provisioned feat/a"},
+		{domain.Event{Type: domain.EventWorktreeProvisioned, Worktree: identity, OK: &failed, Hook: "pnpm install", ExitCode: &exitCode}, "✗ on_create failed for feat/a  pnpm install (exit 3)"},
+		{domain.Event{Type: domain.EventWorktreeProvisioned, Worktree: identity, OK: &failed}, "✗ on_create failed for feat/a"},
+		{domain.Event{Type: domain.EventWorktreeDeprovisioned, Worktree: identity, OK: &failed, Hook: "exit 5", ExitCode: &five}, "✗ on_clean failed for feat/a, kept  exit 5 (exit 5)"},
+		{domain.Event{Type: domain.EventRepoAdded, Repo: repo}, "~ watching /repo"},
+		{domain.Event{Type: domain.EventRepoRemoved, Repo: repo}, "~ no longer watching /repo"},
 	}
 	for _, c := range cases {
 		if got := eventLine(t, c.event); got != c.want {
@@ -65,6 +72,14 @@ func TestAJSONEventIsWrittenAsReceivedOnOneLine(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got := buf.String(); got != string(raw)+"\n" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+// removed follows straight away, and says the same thing.
+func TestASuccessfulDeprovisioningWritesNothing(t *testing.T) {
+	ok := true
+	if got := eventLine(t, domain.Event{Type: domain.EventWorktreeDeprovisioned, Worktree: &domain.WorktreeIdentity{Branch: "feat/a"}, OK: &ok}); got != "" {
 		t.Fatalf("got %q", got)
 	}
 }

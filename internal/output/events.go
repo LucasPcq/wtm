@@ -39,10 +39,40 @@ func WriteEventLine(w io.Writer, event domain.Event) error {
 		Update(w, fmt.Sprintf(domain.EventRelocatedFmt, identity.Branch, event.FromPath, identity.Path))
 	case domain.EventWorktreeReparented:
 		Update(w, fmt.Sprintf(domain.EventReparentedFmt, identity.Branch, event.FromParent, identity.Parent))
+	case domain.EventWorktreeProvisioned:
+		if hookPassed(event) {
+			Success(w, fmt.Sprintf(domain.EventProvisionedFmt, identity.Branch))
+			return nil
+		}
+		Error(w, fmt.Sprintf(domain.EventProvisionFailedFmt, identity.Branch)+hookDetail(event))
+	case domain.EventWorktreeDeprovisioned:
+		if hookPassed(event) {
+			return nil
+		}
+		Error(w, fmt.Sprintf(domain.EventDeprovisionFailedFmt, identity.Branch)+hookDetail(event))
+	case domain.EventRepoAdded:
+		Update(w, fmt.Sprintf(domain.EventRepoAddedFmt, repoRoot(event.Repo)))
+	case domain.EventRepoRemoved:
+		Update(w, fmt.Sprintf(domain.EventRepoRemovedFmt, repoRoot(event.Repo)))
 	case domain.EventWorktreeUpdated:
 		Update(w, fmt.Sprintf(domain.EventUpdatedFmt, identity.Branch, changedFields(changedFieldsParams{Identity: *identity, Changed: event.Changed})))
 	}
 	return nil
+}
+
+func hookPassed(event domain.Event) bool {
+	return event.OK == nil || *event.OK
+}
+
+func hookDetail(event domain.Event) string {
+	if event.Hook == "" {
+		return ""
+	}
+	detail := fmt.Sprintf(domain.EventHookFmt, event.Hook)
+	if event.ExitCode != nil {
+		detail += fmt.Sprintf(domain.EventExitCodeFmt, *event.ExitCode)
+	}
+	return detail
 }
 
 func repoRoot(repo *domain.EventRepo) string {
