@@ -181,12 +181,6 @@ func TestAFinalRefusalExitsOnItsStableCodeAndWritesNothingOnStdout(t *testing.T)
 		code int
 		says string
 	}{
-		"current directory outside git": {
-			cwd:  func(t *testing.T) string { return t.TempDir() },
-			args: func(string) []string { return nil },
-			code: domain.ExitCodeNotGitRepo,
-			says: domain.ErrNotGitRepo.Error(),
-		},
 		"--repo outside git": {
 			cwd:  func(t *testing.T) string { return t.TempDir() },
 			args: func(cwd string) []string { return []string{"--" + domain.FlagRepo, cwd} },
@@ -292,4 +286,32 @@ func TestTheStreamEndsWhenItsReaderLeavesMidWrite(t *testing.T) {
 	}
 	p.read.Close()
 	p.endsCleanly(t)
+}
+
+func TestOutsideARepositoryEventsFollowsTheRegistry(t *testing.T) {
+	processtest.Home(t)
+	processtest.RealDaemon(t, process.SocketPath())
+	t.Setenv(domain.EnvProjectDir, "")
+	t.Setenv(domain.EnvStateDir, "")
+	dir := initializedRepo(t)
+	if err := wtmevents.Register(wtmevents.RegisterParams{ProjectDir: dir}); err != nil {
+		t.Fatal(err)
+	}
+	repo, err := worktree.RepoOf(worktree.RepoOfParams{ProjectDir: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(t.TempDir())
+
+	r := start(t, "--"+domain.FlagOutput, domain.OutputJSON)
+
+	if got := decode(t, r.out.next(t)); got.Type != domain.EventSnapshot || got.Repo == nil || got.Repo.CommonDir != repo.CommonDir {
+		t.Fatalf("first line = %+v", got)
+	}
+	if got := decode(t, r.out.next(t)); got.Type != domain.EventReady {
+		t.Fatalf("second line = %+v", got)
+	}
+	if err := r.end(t); err != nil {
+		t.Fatalf("an interrupted stream is a success: %v", err)
+	}
 }

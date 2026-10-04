@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
+	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/output"
@@ -23,7 +24,7 @@ import (
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   domain.CmdEvents,
-		Short: "Stream the repository's worktree changes as they happen",
+		Short: "Stream worktree changes as they happen, in one repository or all of them",
 		Long: "Print the repository's worktrees, then every change made to them, whoever made it:\n" +
 			"a command in another shell, an agent, or `wtm ui`. The stream opens on a snapshot of\n" +
 			"every worktree and a ready line, then carries one event per change — created,\n" +
@@ -32,10 +33,13 @@ func NewCmd() *cobra.Command {
 			"integration reads; its schema ships with wtm.\n" +
 			"If the run daemon stops, the stream waits for it and opens again on a fresh\n" +
 			"snapshot: treat every event as an upsert keyed by branch, and every snapshot as a\n" +
-			"reset. It runs until interrupted or until the reader of its pipe goes away. It\n" +
-			"ends on a code no retry can change in three cases: 12 in a repository wtm was never\n" +
-			"initialized in, 21 outside a git repository, and 20 if it receives an event of a\n" +
-			"schema newer than its own.",
+			"reset. It runs until interrupted or until the reader of its pipe goes away.\n" +
+			"Run outside any repository, it follows every repository wtm was used in: a\n" +
+			"snapshot for each, one ready line, then repo.added and repo.removed as they come\n" +
+			"and go, a new repository's snapshot right after its repo.added. It ends on a code\n" +
+			"no retry can change in three cases: 12 in a repository wtm was never initialized\n" +
+			"in, 21 when --repo is not in a git repository, and 20 if it receives an event of\n" +
+			"a schema newer than its own.",
 		Example: `  # Watch this repository's worktrees
   wtm events
 
@@ -43,7 +47,10 @@ func NewCmd() *cobra.Command {
   wtm events --output json | jq -c 'select(.type == "worktree.created")'
 
   # Another repository than the current one
-  wtm events --repo ~/code/app --output json`,
+  wtm events --repo ~/code/app --output json
+
+  # Every repository wtm knows
+  cd ~ && wtm events --output json`,
 		Args: cobra.NoArgs,
 		RunE: runEvents,
 	}
@@ -54,6 +61,19 @@ func NewCmd() *cobra.Command {
 
 func runEvents(cmd *cobra.Command, _ []string) error {
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
+	global, err := followsEveryRepo(cmd)
+	if err != nil {
+		return err
+	}
+	if global {
+		return stream(streamParams{Cmd: cmd, Format: format, Watch: func(ctx context.Context, watch watchHooks) error {
+			return wtmevents.WatchAll(ctx, wtmevents.WatchAllParams{
+				ProxyPort: rules.ProxyPort(globalConfig()),
+				OnEvent:   watch.OnEvent,
+				OnWarning: watch.OnWarning,
+			})
+		}})
+	}
 	dir, err := repoDir(cmd)
 	if err != nil {
 		return err
@@ -62,7 +82,60 @@ func runEvents(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
+	return stream(streamParams{Cmd: cmd, Format: format, Watch: func(ctx context.Context, watch watchHooks) error {
+		return wtmevents.Watch(ctx, wtmevents.WatchParams{
+			ProjectDir: cfg.ProjectDir,
+			StateDir:   cfg.StateDir,
+			ProxyPort:  rules.ProxyPort(cfg.Config.Global),
+			OnEvent:    watch.OnEvent,
+			OnWarning:  watch.OnWarning,
+		})
+	}})
+}
 
+// followsEveryRepo is the global stream's trigger: no --repo, and no
+// repository around the current directory to default to.
+func followsEveryRepo(cmd *cobra.Command) (bool, error) {
+	if repo, _ := cmd.Flags().GetString(domain.FlagRepo); repo != "" {
+		return false, nil
+	}
+	if os.Getenv(domain.EnvProjectDir) != "" {
+		return false, nil
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return false, err
+	}
+	inside, err := infra.InsideGitRepo(cwd)
+	if err != nil {
+		return false, err
+	}
+	return !inside, nil
+}
+
+// globalConfig falls back to the defaults: a global config that cannot be read
+// changes the port a daemon this stream starts serves, never whether it runs.
+func globalConfig() domain.GlobalConfig {
+	cfg, err := config.LoadGlobal()
+	if err != nil {
+		return domain.GlobalConfig{}
+	}
+	return cfg
+}
+
+type watchHooks struct {
+	OnEvent   func(wtmevents.Received) error
+	OnWarning func(error)
+}
+
+type streamParams struct {
+	Cmd    *cobra.Command
+	Format string
+	Watch  func(context.Context, watchHooks) error
+}
+
+func stream(params streamParams) error {
+	cmd := params.Cmd
 	parent := cmd.Context()
 	if parent == nil {
 		parent = context.Background()
@@ -71,12 +144,8 @@ func runEvents(cmd *cobra.Command, _ []string) error {
 	defer stop()
 	ctx = endWhenUnread(ctx, cmd)
 
-	write := writerFor(writerForParams{Cmd: cmd, Format: format})
-	err = wtmevents.Watch(ctx, wtmevents.WatchParams{
-		ProjectDir: cfg.ProjectDir,
-		StateDir:   cfg.StateDir,
-		ProxyPort:  rules.ProxyPort(cfg.Config.Global),
-		OnEvent:    write,
+	err := params.Watch(ctx, watchHooks{
+		OnEvent: writerFor(writerForParams{Cmd: cmd, Format: params.Format}),
 		OnWarning: func(err error) {
 			output.Warning(output.Barred(cmd.ErrOrStderr()), err.Error())
 		},

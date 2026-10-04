@@ -35,7 +35,7 @@ wtm [flags]
 * [wtm config](wtm_config.md)	 - Inspect or edit the project wtm config
 * [wtm create](wtm_create.md)	 - Create one or more worktrees
 * [wtm env](wtm_env.md)	 - Reconcile a worktree's .env against its template and value sources
-* [wtm events](wtm_events.md)	 - Stream the repository's worktree changes as they happen
+* [wtm events](wtm_events.md)	 - Stream worktree changes as they happen, in one repository or all of them
 * [wtm exec](wtm_exec.md)	 - Run one command in several worktrees, in parallel
 * [wtm extract](wtm_extract.md)	 - Move uncommitted changes to another worktree
 * [wtm fast-forward](wtm_fast-forward.md)	 - Advance worktree branches to their origin counterpart
