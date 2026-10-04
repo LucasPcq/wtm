@@ -4610,6 +4610,9 @@ const (
 	// EventsReaderGoneCheck is how soon `wtm events | head` exits once head
 	// has read its lines: a quiet stream writes nothing that would fail.
 	EventsReaderGoneCheck = 250 * time.Millisecond
+	// EventsRegistryPruneEvery is how often a global stream looks for the
+	// repositories that went away: deleting one runs no wtm command to say so.
+	EventsRegistryPruneEvery = 30 * time.Second
 )
 
 // One human line per `wtm events` event; --output json is the contract, these

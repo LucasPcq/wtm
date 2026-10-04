@@ -195,3 +195,30 @@ func TestACorruptRegistryIsRebuilt(t *testing.T) {
 		t.Fatalf("repos = %+v, err = %v", repos, err)
 	}
 }
+
+// A global stream prunes on a timer: a registry with nothing to drop is read,
+// never rewritten.
+func TestPruneWithNothingToDropDoesNotRewrite(t *testing.T) {
+	processtest.Home(t)
+	dir := initializedRepo(t)
+	if err := Register(RegisterParams{Root: dir, StateDir: stateOf(dir)}); err != nil {
+		t.Fatal(err)
+	}
+	path, err := infra.RegistryPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(20 * time.Millisecond)
+
+	if _, err := Prune(PruneParams{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if after, _ := os.Stat(path); !after.ModTime().Equal(before.ModTime()) {
+		t.Fatal("the registry was rewritten")
+	}
+}

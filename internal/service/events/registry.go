@@ -57,8 +57,12 @@ type PruneParams struct {
 // Prune drops the repositories that are gone or no longer initialized, and
 // returns the ones left.
 func Prune(params PruneParams) ([]domain.RegisteredRepo, error) {
+	listed, err := infra.ReadRegistry()
+	if err == nil && !slices.ContainsFunc(listed, func(repo domain.RegisteredRepo) bool { return !initialized(repo) }) {
+		return listed, nil
+	}
 	var kept, dropped []domain.RegisteredRepo
-	err := infra.UpdateRegistry(func(repos []domain.RegisteredRepo) []domain.RegisteredRepo {
+	err = infra.UpdateRegistry(func(repos []domain.RegisteredRepo) []domain.RegisteredRepo {
 		kept, dropped = nil, nil
 		for _, repo := range repos {
 			if initialized(repo) {

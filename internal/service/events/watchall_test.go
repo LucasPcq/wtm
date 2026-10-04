@@ -162,3 +162,25 @@ func TestWatchAllPrunesAGoneRepoBeforeItsSnapshots(t *testing.T) {
 		t.Fatalf("got %s, want ready", got.Type)
 	}
 }
+
+// A repository deleted while a global stream runs is reported without waiting
+// for another repository to join or the stream to restart.
+func TestAGlobalStreamNoticesARepoThatWentAway(t *testing.T) {
+	socket := globalFixture(t)
+	previous := pruneEvery
+	pruneEvery = 50 * time.Millisecond
+	t.Cleanup(func() { pruneEvery = previous })
+	kept, gone := initializedRepo(t), initializedRepo(t)
+	register(t, kept)
+	register(t, gone)
+	w := watchAll(t, socket)
+	for range 3 {
+		w.next(t)
+	}
+
+	removeConfig(t, gone)
+
+	if got := w.next(t); got.Type != domain.EventRepoRemoved || got.Repo == nil || got.Repo.Root != rootOf(t, gone) {
+		t.Fatalf("got %+v, want repo.removed for the gone repository", got)
+	}
+}

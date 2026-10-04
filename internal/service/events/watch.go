@@ -14,6 +14,7 @@ import (
 )
 
 var (
+	pruneEvery    = domain.EventsRegistryPruneEvery
 	identities    = worktree.Identities
 	ensureDaemon  = process.EnsureDaemon
 	replaceDaemon = process.EnsureCurrentDaemon
@@ -164,6 +165,7 @@ func watchAllOnce(ctx context.Context, params watchAllOnceParams) watchResult {
 	if err != nil {
 		return watchResult{transient: err}
 	}
+	go pruneUntilDone(ctx, params.Socket)
 	for _, repo := range repos {
 		if err := sendSnapshot(sendSnapshotParams{WatchAllParams: params.WatchAllParams, Repo: eventRepoOf(repo)}); err != nil {
 			return watchResult{fatal: err}
@@ -179,6 +181,21 @@ func watchAllOnce(ctx context.Context, params watchAllOnceParams) watchResult {
 			return sendSnapshot(sendSnapshotParams{WatchAllParams: params.WatchAllParams, Repo: *event.Repo})
 		},
 	})
+}
+
+// pruneUntilDone reports the repositories that go away while the stream runs:
+// their repo.removed reaches this subscription like any other event.
+func pruneUntilDone(ctx context.Context, socket string) {
+	ticker := time.NewTicker(pruneEvery)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			_, _ = Prune(PruneParams{SocketPath: socket})
+		}
+	}
 }
 
 type sendSnapshotParams struct {
