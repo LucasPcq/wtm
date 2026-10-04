@@ -63,9 +63,6 @@ func Watch(ctx context.Context, params WatchParams) error {
 	}
 }
 
-// watchResult says how one subscription ended: fatal ends Watch (a newer
-// schema, a consumer that can no longer write), transient is worth a warning
-// before reconnecting, and neither is a daemon that simply went away.
 // Received is one line of the stream, decoded for a reader that acts on it and
 // as it was sent for one that relays it: a newer publisher's fields survive an
 // older wtm on their way through.
@@ -74,6 +71,9 @@ type Received struct {
 	Raw   json.RawMessage
 }
 
+// watchResult says how one subscription ended: fatal ends Watch (a newer
+// schema, a consumer that can no longer write), transient is worth a warning
+// before reconnecting, and neither is a daemon that simply went away.
 type watchResult struct {
 	fatal        error
 	transient    error

@@ -4594,7 +4594,7 @@ const (
 // One human line per `wtm events` event; --output json is the contract, these
 // are for a person watching.
 const (
-	EventSnapshotFmt   = "%d worktrees · %s"
+	EventSnapshotFmt   = "%s · %s"
 	EventReadyMessage  = "watching for changes"
 	EventCreatedFmt    = "created %s  %s"
 	EventRemovedFmt    = "removed %s"

@@ -29,6 +29,7 @@ func TestEachEventReadsAsOneLine(t *testing.T) {
 		want  string
 	}{
 		{domain.Event{Type: domain.EventSnapshot, Repo: repo, Worktrees: []domain.WorktreeIdentity{*identity, *identity}}, "= 2 worktrees · /repo"},
+		{domain.Event{Type: domain.EventSnapshot, Repo: repo, Worktrees: []domain.WorktreeIdentity{*identity}}, "= 1 worktree · /repo"},
 		{domain.Event{Type: domain.EventReady}, "= watching for changes"},
 		{domain.Event{Type: domain.EventWorktreeCreated, Worktree: identity}, "✓ created feat/a  /wt/feat-a"},
 		{domain.Event{Type: domain.EventWorktreeRemoved, Worktree: identity}, "✓ removed feat/a"},

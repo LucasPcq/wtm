@@ -2,7 +2,6 @@ package main
 
 import (
 	"go/ast"
-	"go/constant"
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
@@ -95,21 +94,4 @@ func qualifierOf(sel *ast.SelectorExpr, fn *types.Func) string {
 		return ident.Name
 	}
 	return fn.Pkg().Name()
-}
-
-// eventTypesOf reads the values of the domain's EventType constants.
-func eventTypesOf(domain *types.Package) map[string]bool {
-	declared := map[string]bool{}
-	for _, name := range domain.Scope().Names() {
-		c, ok := domain.Scope().Lookup(name).(*types.Const)
-		if !ok || c.Val().Kind() != constant.String {
-			continue
-		}
-		named, ok := c.Type().(*types.Named)
-		if !ok || named.Obj().Name() != "EventType" {
-			continue
-		}
-		declared[constant.StringVal(c.Val())] = true
-	}
-	return declared
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 )
 
 // WriteEventJSONLine is one JSON Lines record, written as it was received:
@@ -27,7 +28,7 @@ func WriteEventLine(w io.Writer, event domain.Event) error {
 	}
 	switch event.Type {
 	case domain.EventSnapshot:
-		Unchanged(w, fmt.Sprintf(domain.EventSnapshotFmt, len(event.Worktrees), repoRoot(event.Repo)))
+		Unchanged(w, fmt.Sprintf(domain.EventSnapshotFmt, rules.WorktreeCountLabel(len(event.Worktrees)), repoRoot(event.Repo)))
 	case domain.EventReady:
 		Unchanged(w, domain.EventReadyMessage)
 	case domain.EventWorktreeCreated:

@@ -1368,9 +1368,8 @@ func (m Model) resolveTracesCmd() tea.Cmd {
 // parallel, so that model's statuses may still be empty — which asked for no
 // address at all and left the RUN section without one until the next poll.
 //
-// Only the worktrees that already have a job up are named: BranchEnv allocates
-// an ordinal to whichever branch it is handed, and an idle worktree must not be
-// given one just because a poll swept past it.
+// Only the worktrees that already have a job up are named: an idle one has no
+// address worth showing, and one no run has numbered yet has none at all.
 func (m Model) resolveAddressesCmd() tea.Cmd {
 	if m.params.AddressLoader == nil || len(m.runConfig.Jobs) == 0 {
 		return nil

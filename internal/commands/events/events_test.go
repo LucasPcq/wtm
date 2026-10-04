@@ -135,7 +135,7 @@ func TestTheTextStreamIsOneLinePerEvent(t *testing.T) {
 	dir := initializedRepo(t)
 	r := start(t, "--repo", dir)
 
-	if got := r.out.next(t); !strings.Contains(got, "1 worktrees") {
+	if got := r.out.next(t); !strings.Contains(got, "1 worktree ·") {
 		t.Fatalf("first line = %q", got)
 	}
 	if got := r.out.next(t); !strings.Contains(got, domain.EventReadyMessage) {
