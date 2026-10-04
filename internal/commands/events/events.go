@@ -4,6 +4,7 @@ package events
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/signal"
 	"syscall"
@@ -68,7 +69,7 @@ func runEvents(cmd *cobra.Command, _ []string) error {
 	ctx = endWhenUnread(ctx, cmd)
 
 	write := writerFor(writerForParams{Cmd: cmd, Format: format})
-	return wtmevents.Watch(ctx, wtmevents.WatchParams{
+	err = wtmevents.Watch(ctx, wtmevents.WatchParams{
 		ProjectDir: cfg.ProjectDir,
 		StateDir:   cfg.StateDir,
 		ProxyPort:  rules.ProxyPort(cfg.Config.Global),
@@ -77,6 +78,11 @@ func runEvents(cmd *cobra.Command, _ []string) error {
 			output.Warning(output.Barred(cmd.ErrOrStderr()), err.Error())
 		},
 	})
+	// A reader that left between two writes is the poll's case reached first.
+	if errors.Is(err, syscall.EPIPE) {
+		return nil
+	}
+	return err
 }
 
 // endWhenUnread stops the stream once its reader has gone, as an interrupt

@@ -1,6 +1,7 @@
 package events
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -196,7 +197,13 @@ func TestARepoThatIsNotARepositoryIsRefusedNamingTheFlag(t *testing.T) {
 	}
 }
 
-func TestTheStreamEndsWhenItsReaderLeaves(t *testing.T) {
+type piped struct {
+	read *os.File
+	done chan error
+}
+
+func startPiped(t *testing.T) piped {
+	t.Helper()
 	processtest.Home(t)
 	processtest.RealDaemon(t, process.SocketPath())
 	dir := initializedRepo(t)
@@ -204,27 +211,46 @@ func TestTheStreamEndsWhenItsReaderLeaves(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer w.Close()
+	t.Cleanup(func() { w.Close() })
 	cmd := NewCmd()
 	cmd.SetArgs([]string{"--repo", dir, "--" + domain.FlagOutput, domain.OutputJSON})
 	cmd.SetOut(w)
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetContext(t.Context())
-	done := make(chan error, 1)
-	go func() { done <- cmd.Execute() }()
+	p := piped{read: r, done: make(chan error, 1)}
+	go func() { p.done <- cmd.Execute() }()
+	return p
+}
 
-	first := make([]byte, 1)
-	if _, err := r.Read(first); err != nil {
-		t.Fatal(err)
-	}
-	r.Close()
-
+func (p piped) endsCleanly(t *testing.T) {
+	t.Helper()
 	select {
-	case err := <-done:
+	case err := <-p.done:
 		if err != nil {
 			t.Fatalf("a reader leaving is a success: %v", err)
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("the stream outlived its reader")
 	}
+}
+
+func TestTheStreamEndsWhenItsReaderLeavesAQuietRepository(t *testing.T) {
+	p := startPiped(t)
+	lines := bufio.NewReader(p.read)
+	for range 2 {
+		if _, err := lines.ReadString('\n'); err != nil {
+			t.Fatal(err)
+		}
+	}
+	p.read.Close()
+	p.endsCleanly(t)
+}
+
+func TestTheStreamEndsWhenItsReaderLeavesMidWrite(t *testing.T) {
+	p := startPiped(t)
+	if _, err := p.read.Read(make([]byte, 1)); err != nil {
+		t.Fatal(err)
+	}
+	p.read.Close()
+	p.endsCleanly(t)
 }
