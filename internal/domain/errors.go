@@ -124,6 +124,8 @@ var (
 	// exit code 2.
 	ErrUsage = errors.New("usage error")
 
+	ErrInvalidCorrelationID = errors.New("invalid correlation id")
+
 	// ErrJobNotAttachable is returned for a job with no live output to subscribe
 	// to: a detached launcher, whose stream ended with the launcher, or a job
 	// that is no longer running. Its log file is what is left to read.

@@ -1,6 +1,8 @@
 package publish_test
 
 import (
+	"errors"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -8,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/publish"
+	"github.com/LucasPcq/wtm/internal/service/hooks"
 	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
@@ -112,5 +115,40 @@ func TestNobodyListeningReadsNothing(t *testing.T) {
 	}
 	if len(f.rec.Published) != 0 {
 		t.Fatalf("published %v with nobody listening", f.rec.PublishedTypes())
+	}
+}
+
+func TestProvisionedIsOKWithoutAnError(t *testing.T) {
+	f := newFixture(t)
+
+	publish.Provisioned(publish.ProvisionedParams{Context: f.ctx, Branch: "feat/a"})
+
+	got := f.rec.Published[0]
+	if got.Type != domain.EventWorktreeProvisioned || got.OK == nil || !*got.OK || got.Hook != "" || got.ExitCode != nil || got.Worktree == nil {
+		t.Fatalf("provisioned = %+v", got)
+	}
+}
+
+func TestProvisionedNamesTheFailingHook(t *testing.T) {
+	f := newFixture(t)
+	code := 3
+	err := fmt.Errorf("on_create: %w", hooks.Failure{Cmd: "pnpm install", ExitCode: &code, Err: errors.New("exit status 3")})
+
+	publish.Provisioned(publish.ProvisionedParams{Context: f.ctx, Branch: "feat/a", Err: err})
+
+	got := f.rec.Published[0]
+	if got.OK == nil || *got.OK || got.Hook != "pnpm install" || got.ExitCode == nil || *got.ExitCode != 3 {
+		t.Fatalf("provisioned = %+v", got)
+	}
+}
+
+func TestProvisionedWithAnUntypedErrorIsStillNotOK(t *testing.T) {
+	f := newFixture(t)
+
+	publish.Provisioned(publish.ProvisionedParams{Context: f.ctx, Branch: "feat/a", Err: errors.New("find main checkout")})
+
+	got := f.rec.Published[0]
+	if got.OK == nil || *got.OK || got.Hook != "" || got.ExitCode != nil {
+		t.Fatalf("provisioned = %+v", got)
 	}
 }

@@ -16,17 +16,19 @@ import (
 type PublisherParams struct {
 	ProjectDir string
 	// SocketPath is the daemon's; empty is the one every command talks to.
-	SocketPath string
+	SocketPath    string
+	CorrelationID string
 }
 
 // Publisher satisfies flow.Publisher. The repository is resolved once, on the
 // first event, so a run that changes nothing costs nothing.
 type Publisher struct {
-	projectDir string
-	socketPath string
-	once       sync.Once
-	repo       domain.EventRepo
-	repoErr    error
+	projectDir    string
+	socketPath    string
+	correlationID string
+	once          sync.Once
+	repo          domain.EventRepo
+	repoErr       error
 }
 
 func NewPublisher(params PublisherParams) *Publisher {
@@ -34,7 +36,7 @@ func NewPublisher(params PublisherParams) *Publisher {
 	if socket == "" {
 		socket = process.SocketPath()
 	}
-	return &Publisher{projectDir: params.ProjectDir, socketPath: socket}
+	return &Publisher{projectDir: params.ProjectDir, socketPath: socket, correlationID: params.CorrelationID}
 }
 
 // Publish is opportunistic: a consumer that misses an event gets the state back
@@ -46,6 +48,7 @@ func (p *Publisher) Publish(event domain.Event) {
 	if p.repoErr != nil || p.socketPath == "" {
 		return
 	}
+	event.CorrelationID = p.correlationID
 	payload, err := json.Marshal(stamp(stampParams{Event: event, Repo: p.repo}))
 	if err != nil {
 		return

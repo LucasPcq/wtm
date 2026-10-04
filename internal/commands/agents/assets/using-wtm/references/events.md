@@ -5,10 +5,10 @@ Use `wtm events --output json` when you need to **react** to worktrees changing 
 ## Running it
 
 - It **never exits on its own**: it streams until interrupted. Run it in the background, or read a bounded number of lines (`wtm events --output json | head -n 2` gives the current state and returns). Never run it in the foreground of a step that must finish.
-- `--repo <path>` watches another repository than the current directory's.
+- `--repo <path>` watches another repository than the current directory's. Run outside any git repository, with no `--repo`, it follows **every** repository wtm was used in: one `snapshot` per repository, then one `ready`; `repo.added` (followed by that repository's `snapshot`) and `repo.removed` as repositories come and go.
 - It needs no `--yes`: it changes nothing and asks nothing.
 - A daemon that is down never makes it exit: it waits and reconnects. Interrupted, or once its reader is gone, it exits `0`.
-- These exits are final, do not retry them: `2` bad usage (including a `--repo` that is not a directory), `12` the repository is not initialized with wtm, `20` an event of a newer schema arrived (wtm must be upgraded: ask the user), `21` not in a git repository. Any other non-zero exit is worth retrying with a backoff. The message is on stderr; stdout carries only JSON Lines.
+- These exits are final, do not retry them: `2` bad usage (including a `--repo` that is not a directory), `12` the repository is not initialized with wtm, `20` an event of a newer schema arrived (wtm must be upgraded: ask the user), `21` `--repo` is not in a git repository. Any other non-zero exit is worth retrying with a backoff. The message is on stderr; stdout carries only JSON Lines.
 
 ## Before you rely on it
 
@@ -25,12 +25,20 @@ One JSON object per line:
 | `type` | Meaning | Extra field |
 |---|---|---|
 | `worktree.created` | a worktree exists now (sent before its `on_create` hooks run) | — |
+| `worktree.provisioned` | its `on_create` hooks ran (also sent when there are none): wait for this one, not `created`, before using a worktree | `ok`; on `false`, `hook` and `exit_code` |
 | `worktree.updated` | its identity changed | `changed`: subset of `isolation`, `ordinal`, `parent`, `created_at` |
 | `worktree.relocated` | it moved on disk; a worktree adopted by `relocate` first appears this way, not as `created` | `from_path` |
 | `worktree.reparented` | its parent branch changed | `from_parent` |
+| `worktree.deprovisioned` | its `on_clean` hooks ran (also sent when there are none); `ok: false` means the removal was aborted and the worktree is still there, and no `removed` follows | `ok`; on `false`, `hook` and `exit_code` |
 | `worktree.removed` | it is gone; `worktree` is its last state | — |
+| `repo.added` | (global stream only) a repository wtm now follows; its `snapshot` comes next | — |
+| `repo.removed` | (global stream only) a repository deleted or de-initialized; drop its worktrees | — |
 
 Every `worktree.*` event carries `worktree`: `branch`, `path`, `parent`, `ordinal` (`null` until allocated), `isolation`, `is_main`, `created_at`. Nothing volatile (dirty, ahead, PR, services): read those from `wtm list --output json`.
+
+## Recognising your own command
+
+Start a command with `WTM_CORRELATION_ID=<any id>` (≤ 256 bytes, no control character, else exit `2`) and every event it publishes carries `correlation_id` with that value, the children of a `clean` included. Wait for the event carrying your id rather than the first one of its type: another agent may be creating worktrees at the same time. Events without an id have no `correlation_id` field.
 
 ## Rules for reading it
 

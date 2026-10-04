@@ -114,7 +114,8 @@ internal/
                                   run.toml, the opt-in guard and the prompt gate
     daemon/                   ←   the hidden `daemon` command and the macOS port-80 relay launchd runs
     ui/                       ←   `wtm ui`: refuses JSON and a missing TTY, then hands off to tui/dashboard
-    events/                   ←   `wtm events`: the stream (text or JSON Lines) over service/events.Watch
+    events/                   ←   `wtm events`: the stream (text or JSON Lines) over service/events.Watch,
+                                  or WatchAll outside any repository
     versioncmd/               ←   `wtm version`: the binary's version and each machine contract's (`events`)
   domain/                     ← types, errors, constants only (no methods, no functions)
   rules/                      ← pure functions (stdlib + domain only, no I/O)
@@ -195,7 +196,9 @@ internal/
                                   reaping orphans, the client the commands talk through, and
                                   the schema-blind event broker (`publish` / `subscribe`)
     events/                   ←   the `wtm events` bus as wtm uses it: the Publisher every flow
-                                  reports through, and Watch (subscribe → snapshot → ready)
+                                  reports through, Watch (subscribe → snapshot → ready), the
+                                  registry of repositories wtm was used in (`repos.json`, through
+                                  `infra/registry.go`) and WatchAll, which follows all of them
     runconfig/                ←   load + validate + write run.toml (and its schema)
     runjobs/                  ←   the daemon's jobs as a surface reads them (the dashboard too)
     compose/                  ←   a compose file's `ports:` and absolute names, read and rewritten

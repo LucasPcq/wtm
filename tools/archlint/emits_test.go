@@ -7,5 +7,7 @@ func TestAFlowCallingAMutatorPublishesItsEventAndTestsIt(t *testing.T) {
 		internalPrefix+"flow/good",
 		internalPrefix+"flow/silent",
 		internalPrefix+"flow/untested",
+		internalPrefix+"flow/halfway",
+		internalPrefix+"flow/unhooked",
 	)
 }

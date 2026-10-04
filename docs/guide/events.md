@@ -1,6 +1,6 @@
 # The event stream: `wtm events`
 
-`wtm events` tells whatever reads it what wtm did to a repository's worktrees, as it happens: a terminal plugin opening a pane for a new worktree, an editor closing the window of a removed one, an agent waiting for a sibling to finish provisioning. Without it, an integration can only guess, comparing `wtm list --output json` before and after a command it ran itself, and missing everything that happened anywhere else.
+`wtm events` tells whatever reads it what wtm did to a repository's worktrees, as it happens: a terminal plugin opening a pane for a new worktree, an editor closing the window of a removed one, an agent waiting for a sibling to finish provisioning (`worktree.provisioned`). Without it, an integration can only guess, comparing `wtm list --output json` before and after a command it ran itself, and missing everything that happened anywhere else.
 
 The stream reports every change, whoever made it: a command in another shell, an agent driving wtm, or the `wtm ui` dashboard, which is itself one of its readers.
 
@@ -8,6 +8,7 @@ The stream reports every change, whoever made it: a command in another shell, an
 wtm events                     # one line per change, for a person watching
 wtm events --output json       # JSON Lines: the contract an integration reads
 wtm events --repo ~/code/app   # another repository than the current one
+cd ~ && wtm events             # every repository wtm knows
 ```
 
 ## What the stream carries
@@ -19,20 +20,26 @@ A subscription opens on a **snapshot**: one `snapshot` event listing every workt
 | `snapshot` | the stream opens, and again after every reconnection | `worktrees`: every worktree as it is now |
 | `ready` | right after the snapshots, each time they are sent | — |
 | `worktree.created` | `create`, `checkout` or `extract` brought a worktree into existence, before its `on_create` hooks run | — |
+| `worktree.provisioned` | the `on_create` hooks of a worktree `create`, `checkout` or `extract` just made have run — also sent when there are none, so it always follows a `created` | `ok`; when `false`, `hook` (the command that failed) and `exit_code` — `hook` is absent when the phase failed before any hook ran, `exit_code` when the hook was killed by a signal |
 | `worktree.updated` | a field of a worktree's identity changed: its isolation (`wtm env --isolation`), its ordinal (the first time something needs its ports), its parent and creation date (adopted by `wtm relocate`) | `changed`: the fields that changed |
 | `worktree.relocated` | `wtm relocate` moved it; a worktree created outside wtm and adopted by `relocate` first appears this way, never as `created` | `from_path`: where it was |
 | `worktree.reparented` | `wtm reparent`, or a `clean` / `prune` that moved its children past a removed parent | `from_parent`: its previous parent |
-| `worktree.removed` | `clean` or `prune` removed it | — |
+| `worktree.deprovisioned` | `clean` or `prune` ran its `on_clean` hooks — also sent when there are none. `ok: true` is followed by `removed`; `ok: false` means the removal stopped there and the worktree is still on disk. A worktree whose directory is already gone gets `ok: true` only without `on_clean` hooks: with some, they cannot run there and the removal stops | `ok`; when `false`, `hook` and `exit_code`, as for `provisioned` |
+| `worktree.removed` | `clean` or `prune` removed it, after its `deprovisioned` | — |
+| `repo.added` | global stream only: a repository joined the registry it follows (see [Every repository at once](#every-repository-at-once)) | — |
+| `repo.removed` | global stream only: a repository left it: deleted, or no longer initialized with wtm | — |
 
-Every event carries `v` (the schema version), `type` and `ts` (RFC 3339, UTC); every event but `ready` carries `repo`, and every `worktree.*` event the `worktree` it is about. A `removed` carries the last state the worktree had.
+Every event carries `v` (the schema version), `type` and `ts` (RFC 3339, UTC); every event but `ready` carries `repo`, and every `worktree.*` event the `worktree` it is about. A `removed` carries the last state the worktree had. An event published by a command started with `WTM_CORRELATION_ID` carries it as `correlation_id` — see [Recognising your own command](#recognising-your-own-command).
 
 ```jsonc
 {"v":1,"type":"snapshot","ts":"2026-10-03T09:12:01.512Z","repo":{"root":"/code/app","common_dir":"/code/app/.git"},"worktrees":[{"branch":"main","path":"/code/app","parent":"","ordinal":0,"isolation":"isolated","is_main":true,"created_at":""}]}
 {"v":1,"type":"ready","ts":"2026-10-03T09:12:01.513Z"}
 {"v":1,"type":"worktree.created","ts":"…","repo":{…},"worktree":{"branch":"feat/login","path":"/code/.trees/feat-login","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-03T09:13:40Z"}}
+{"v":1,"type":"worktree.provisioned","ts":"…","repo":{…},"worktree":{…},"ok":false,"hook":"pnpm install","exit_code":1}
 {"v":1,"type":"worktree.updated","ts":"…","repo":{…},"worktree":{…,"ordinal":1},"changed":["ordinal"]}
 {"v":1,"type":"worktree.relocated","ts":"…","repo":{…},"worktree":{…},"from_path":"/code/old/feat-login"}
 {"v":1,"type":"worktree.reparented","ts":"…","repo":{…},"worktree":{…,"parent":"main"},"from_parent":"feat/auth"}
+{"v":1,"type":"worktree.deprovisioned","ts":"…","repo":{…},"worktree":{…},"ok":true}
 {"v":1,"type":"worktree.removed","ts":"…","repo":{…},"worktree":{…}}
 ```
 
@@ -59,6 +66,26 @@ The repository is `repo.common_dir`, git's common directory with symlinks resolv
 - **Ignore what you do not know.** A field or a type you do not recognise is skipped, never an error: new ones are added without changing `v`. `v` moves only on a breaking change. `wtm events` itself exits with code `20` if it receives an event of a schema newer than its own: upgrade wtm.
 - **Delivery is opportunistic.** A command publishes its event only if the daemon is running, and never starts it, so nobody pays for the stream unless something listens. A reader that falls far behind is disconnected rather than waited for, and resynchronises from the snapshot it gets on reconnecting.
 
+## Every repository at once
+
+Run outside any git repository, without `--repo`, `wtm events` follows every repository wtm was used in. It opens on one `snapshot` per repository, then a single `ready`, and carries the changes of all of them; each event's `repo.common_dir` says which one it is about.
+
+The repositories come from a registry wtm keeps beside its global config (`repos.json`, see [Where wtm keeps its state](state.md)). A repository joins it when `wtm init` runs there, and the first time any wtm command runs in it, so the ones initialized before this version join on their own. It leaves when it is deleted or no longer initialized with wtm: a running global stream notices within 30 seconds, and otherwise the registry drops it the next time it is written or a global stream starts.
+
+The stream follows the registry as it changes. A repository that joins arrives as `repo.added`, followed right away by its own `snapshot`; one that leaves arrives as `repo.removed` — drop every worktree you hold for that `repo.common_dir`. A repository whose snapshot cannot be read (its main checkout was moved, say) is skipped with a warning on stderr rather than ending the stream. A stream that starts drops the repositories gone since the last one, and may then send their `repo.removed` after its `ready`, for a repository it never sent a snapshot of: deleting what you do not hold is a no-op.
+
+Before this version, `wtm events` outside a repository exited `21`; it now follows every repository, and `21` only means a `--repo` outside git.
+
+## Recognising your own command
+
+An integration that runs a wtm command and wants the events *that* command produced — not those of an agent working in the next pane — sets `WTM_CORRELATION_ID` when it starts it:
+
+```sh
+WTM_CORRELATION_ID=popup-42 wtm create feat/login --yes
+```
+
+Every event the command publishes carries `"correlation_id":"popup-42"`, including the ones it publishes on the way (a `clean` that reparents children). wtm never reads the value: any string up to 256 bytes without a control character. Anything else is refused with exit `2` before the command does anything. An event published without one has no `correlation_id` at all, and a `snapshot` never has one. Hooks inherit the variable, so a `wtm` command run from a hook is correlated too; a command run from `wtm ui` never is.
+
 ### When it exits
 
 `wtm events` exits only when it is interrupted (`0`), when its reader goes away (`0`), or when retrying cannot help. A daemon that is down or restarting never makes it exit: it waits and reconnects on its own. Its error message goes to stderr, never to stdout, so a JSON Lines reader never has to parse it.
@@ -68,7 +95,7 @@ The repository is `repo.common_dir`, git's common directory with symlinks resolv
 | `2` | bad usage: an unknown flag, an `--output` it does not know, a `--repo` that is not a directory | no: fix the invocation |
 | `12` | the repository was never initialized with wtm (`wtm init`) | no |
 | `20` | it received an event of a schema newer than its own | no: upgrade wtm |
-| `21` | the current directory, or `--repo`, is not in a git repository | no |
+| `21` | `--repo` is not in a git repository | no |
 | anything else | an unexpected failure | yes, with a backoff |
 
 The schema of every line ships with wtm: [`internal/schemas/events.v1.json`](../../internal/schemas/events.v1.json).
@@ -106,4 +133,4 @@ Any language reads it the same way: start the process, read stdout line by line,
 
 ## What it does not carry yet
 
-Jobs starting and exiting, `sync` rebasing a chain, and hooks are not on the stream in this version; read them from `wtm run ps --output json` and the command's own output.
+Jobs starting and exiting, `sync` rebasing a chain, and the output of hooks are not on the stream in this version (their outcome is: `worktree.provisioned` and `worktree.deprovisioned`); read them from `wtm run ps --output json` and the command's own output.

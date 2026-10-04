@@ -1,6 +1,7 @@
 package events
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -35,7 +36,7 @@ func newWatchFixture(t *testing.T) watchFixture {
 }
 
 type watching struct {
-	events chan domain.Event
+	events chan Received
 	done   chan error
 	cancel context.CancelFunc
 }
@@ -43,7 +44,7 @@ type watching struct {
 func (f watchFixture) watch(t *testing.T) watching {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
-	w := watching{events: make(chan domain.Event, 32), done: make(chan error, 1), cancel: cancel}
+	w := watching{events: make(chan Received, 32), done: make(chan error, 1), cancel: cancel}
 	t.Cleanup(cancel)
 	go func() {
 		w.done <- Watch(ctx, WatchParams{
@@ -51,7 +52,7 @@ func (f watchFixture) watch(t *testing.T) watching {
 			StateDir:   f.stateDir,
 			SocketPath: f.socket,
 			OnEvent: func(r Received) error {
-				w.events <- r.Event
+				w.events <- r
 				return nil
 			},
 		})
@@ -61,12 +62,17 @@ func (f watchFixture) watch(t *testing.T) watching {
 
 func (w watching) next(t *testing.T) domain.Event {
 	t.Helper()
+	return w.nextReceived(t).Event
+}
+
+func (w watching) nextReceived(t *testing.T) Received {
+	t.Helper()
 	select {
-	case e := <-w.events:
-		return e
+	case r := <-w.events:
+		return r
 	case <-time.After(5 * time.Second):
 		t.Fatal("no event")
-		return domain.Event{}
+		return Received{}
 	}
 }
 
@@ -108,6 +114,37 @@ func TestAPublishedEventReachesTheWatcherStamped(t *testing.T) {
 	got := w.next(t)
 	if got.Type != domain.EventWorktreeCreated || got.V != domain.EventsSchemaVersion || got.TS == "" || got.Repo == nil || got.Repo.Root != f.projectDir {
 		t.Fatalf("event = %+v", got)
+	}
+}
+
+func TestAPublisherStampsItsCorrelationID(t *testing.T) {
+	noDaemonSpawn(t)
+	f := newWatchFixture(t)
+	w := f.watch(t)
+	w.next(t)
+	w.next(t)
+	created := domain.Event{Type: domain.EventWorktreeCreated, Worktree: &domain.WorktreeIdentity{Branch: "feat/a"}}
+
+	NewPublisher(PublisherParams{ProjectDir: f.projectDir, SocketPath: f.socket, CorrelationID: "popup-1"}).Publish(created)
+	NewPublisher(PublisherParams{ProjectDir: f.projectDir, SocketPath: f.socket}).Publish(created)
+
+	if got := w.next(t); got.CorrelationID != "popup-1" {
+		t.Fatalf("correlated = %+v", got)
+	}
+	if got := w.nextReceived(t); got.Event.CorrelationID != "" || bytes.Contains(got.Raw, []byte("correlation_id")) {
+		t.Fatalf("uncorrelated = %s", got.Raw)
+	}
+}
+
+func TestASnapshotNeverCarriesACorrelationID(t *testing.T) {
+	noDaemonSpawn(t)
+	t.Setenv(domain.EnvCorrelationID, "popup-1")
+	f := newWatchFixture(t)
+	w := f.watch(t)
+	for range 2 {
+		if got := w.nextReceived(t); bytes.Contains(got.Raw, []byte("correlation_id")) {
+			t.Fatalf("%s carries a correlation id: %s", got.Event.Type, got.Raw)
+		}
 	}
 }
 
@@ -321,5 +358,26 @@ func TestThePublisherListensOnlyWhileTheDaemonRuns(t *testing.T) {
 	f.stop()
 	if publisher.Listening() {
 		t.Fatal("listening with no daemon")
+	}
+}
+
+// repo.* is the global stream's business: a per-repository stream that relays
+// a repo.added gets no snapshot after it, and would leave its reader empty.
+func TestAPerRepoStreamDoesNotRelayRepoEvents(t *testing.T) {
+	noDaemonSpawn(t)
+	f := newWatchFixture(t)
+	w := f.watch(t)
+	w.next(t)
+	w.next(t)
+	repo, err := worktree.RepoOf(worktree.RepoOfParams{ProjectDir: f.projectDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	announce(announceParams{Bus: busParams{SocketPath: f.socket}, Type: domain.EventRepoRemoved, Repo: repo})
+	NewPublisher(PublisherParams{ProjectDir: f.projectDir, SocketPath: f.socket}).Publish(domain.Event{Type: domain.EventWorktreeCreated, Worktree: &domain.WorktreeIdentity{Branch: "feat/a"}})
+
+	if got := w.next(t); got.Type != domain.EventWorktreeCreated {
+		t.Fatalf("got %s, want the repo event skipped", got.Type)
 	}
 }

@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 
@@ -62,6 +63,13 @@ func validateOutputFormat(cmd *cobra.Command) error {
 		return nil
 	}
 	return asUsage(fmt.Errorf(domain.OutputFormatInvalidFmt, domain.FlagOutput, flag.Value.String(), strings.Join(formats, ", ")))
+}
+
+func validateCorrelationID() error {
+	if err := rules.ValidateCorrelationID(os.Getenv(domain.EnvCorrelationID)); err != nil {
+		return asUsage(err)
+	}
+	return nil
 }
 
 func unknownCommand(cmd *cobra.Command, args []string) error {

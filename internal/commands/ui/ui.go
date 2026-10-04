@@ -45,7 +45,8 @@ func NewCmd(params NewCmdParams) *cobra.Command {
 			"Press `?` for the key reference.",
 		Example: `  # Press ? inside for the key reference
   wtm ui`,
-		Args: cobra.NoArgs,
+		Args:        cobra.NoArgs,
+		Annotations: map[string]string{domain.AnnotationUncorrelated: domain.AnnotationOn},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runUI(cmd, params.Version)
 		},

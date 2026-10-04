@@ -158,11 +158,15 @@ func TestAReparentedChildIsPublishedAfterTheRemovals(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 
-	want := []domain.EventType{domain.EventWorktreeRemoved, domain.EventWorktreeRemoved, domain.EventWorktreeReparented}
+	want := []domain.EventType{
+		domain.EventWorktreeDeprovisioned, domain.EventWorktreeRemoved,
+		domain.EventWorktreeDeprovisioned, domain.EventWorktreeRemoved,
+		domain.EventWorktreeReparented,
+	}
 	if got := presenter.PublishedTypes(); !slices.Equal(got, want) {
 		t.Fatalf("published %v, want %v", got, want)
 	}
-	if last := presenter.Published[2]; last.Worktree.Branch != "leaf" || last.FromParent != "mid" || last.Worktree.Parent != "main" {
+	if last := presenter.Published[4]; last.Worktree.Branch != "leaf" || last.FromParent != "mid" || last.Worktree.Parent != "main" {
 		t.Fatalf("reparented = %+v", last)
 	}
 }

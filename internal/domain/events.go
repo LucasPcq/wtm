@@ -5,13 +5,17 @@ package domain
 type EventType string
 
 const (
-	EventSnapshot           EventType = "snapshot"
-	EventReady              EventType = "ready"
-	EventWorktreeCreated    EventType = "worktree.created"
-	EventWorktreeUpdated    EventType = "worktree.updated"
-	EventWorktreeRelocated  EventType = "worktree.relocated"
-	EventWorktreeReparented EventType = "worktree.reparented"
-	EventWorktreeRemoved    EventType = "worktree.removed"
+	EventSnapshot              EventType = "snapshot"
+	EventReady                 EventType = "ready"
+	EventWorktreeCreated       EventType = "worktree.created"
+	EventWorktreeProvisioned   EventType = "worktree.provisioned"
+	EventWorktreeUpdated       EventType = "worktree.updated"
+	EventWorktreeRelocated     EventType = "worktree.relocated"
+	EventWorktreeReparented    EventType = "worktree.reparented"
+	EventWorktreeDeprovisioned EventType = "worktree.deprovisioned"
+	EventWorktreeRemoved       EventType = "worktree.removed"
+	EventRepoAdded             EventType = "repo.added"
+	EventRepoRemoved           EventType = "repo.removed"
 
 	// EventWorktreePrefix opens every type about one worktree's identity.
 	EventWorktreePrefix = "worktree."
@@ -22,10 +26,14 @@ var EventTypes = []EventType{
 	EventSnapshot,
 	EventReady,
 	EventWorktreeCreated,
+	EventWorktreeProvisioned,
 	EventWorktreeUpdated,
 	EventWorktreeRelocated,
 	EventWorktreeReparented,
+	EventWorktreeDeprovisioned,
 	EventWorktreeRemoved,
+	EventRepoAdded,
+	EventRepoRemoved,
 }
 
 // EventsSchemaVersion moves on a breaking change only.
@@ -49,6 +57,18 @@ const (
 	IdentityCreatedAt IdentityField = "created_at"
 )
 
+// RegisteredRepo is one line of the registry a global `wtm events` follows.
+type RegisteredRepo struct {
+	CommonDir string `json:"common_dir"`
+	Root      string `json:"root"`
+	AddedAt   string `json:"added_at"`
+}
+
+const (
+	RegistryFileName = "repos.json"
+	RegistryLockName = "repos.json.lock"
+)
+
 type EventRepo struct {
 	Root      string `json:"root"`
 	CommonDir string `json:"common_dir"`
@@ -68,13 +88,17 @@ type WorktreeIdentity struct {
 }
 
 type Event struct {
-	V          int                `json:"v"`
-	Type       EventType          `json:"type"`
-	TS         string             `json:"ts"`
-	Repo       *EventRepo         `json:"repo,omitempty"`
-	Worktrees  []WorktreeIdentity `json:"worktrees,omitempty"`
-	Worktree   *WorktreeIdentity  `json:"worktree,omitempty"`
-	Changed    []IdentityField    `json:"changed,omitempty"`
-	FromPath   string             `json:"from_path,omitempty"`
-	FromParent string             `json:"from_parent,omitempty"`
+	V             int                `json:"v"`
+	Type          EventType          `json:"type"`
+	TS            string             `json:"ts"`
+	CorrelationID string             `json:"correlation_id,omitempty"`
+	Repo          *EventRepo         `json:"repo,omitempty"`
+	Worktrees     []WorktreeIdentity `json:"worktrees,omitempty"`
+	Worktree      *WorktreeIdentity  `json:"worktree,omitempty"`
+	Changed       []IdentityField    `json:"changed,omitempty"`
+	FromPath      string             `json:"from_path,omitempty"`
+	FromParent    string             `json:"from_parent,omitempty"`
+	OK            *bool              `json:"ok,omitempty"`
+	Hook          string             `json:"hook,omitempty"`
+	ExitCode      *int               `json:"exit_code,omitempty"`
 }

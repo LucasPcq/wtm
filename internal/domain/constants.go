@@ -239,6 +239,13 @@ const (
 	// EnvGoFile is the environment variable used by the shell wrapper to pass the go-file path.
 	EnvGoFile = "WTM_GO_FILE"
 
+	// EnvCorrelationID is copied verbatim onto every event the command publishes.
+	EnvCorrelationID        = "WTM_CORRELATION_ID"
+	CorrelationIDMaxBytes   = 256
+	CorrelationIDInvalidFmt = "$%s %s: %w"
+	CorrelationIDTooLong    = "is longer than 256 bytes"
+	CorrelationIDControl    = "contains a control character"
+
 	// Override git resolution of the main checkout and of the state directory, for tests and CI.
 	EnvProjectDir = "WTM_PROJECT_DIR"
 	EnvStateDir   = "WTM_STATE_DIR"
@@ -1353,6 +1360,9 @@ const (
 	// root to end the process on ExitCodeCancelled.
 	AnnotationCancelled = "wtm.cancelled"
 	AnnotationOn        = "true"
+	// AnnotationUncorrelated marks a command whose session outlives the caller
+	// that launched it (`wtm ui`): its events never carry WTM_CORRELATION_ID.
+	AnnotationUncorrelated = "wtm.uncorrelated"
 	// AnnotationOutputFormats lists, comma-separated, the --output values a
 	// command accepts besides text and json.
 	AnnotationOutputFormats  = "wtm.output-formats"
@@ -4600,6 +4610,9 @@ const (
 	// EventsReaderGoneCheck is how soon `wtm events | head` exits once head
 	// has read its lines: a quiet stream writes nothing that would fail.
 	EventsReaderGoneCheck = 250 * time.Millisecond
+	// EventsRegistryPruneEvery is how often a global stream looks for the
+	// repositories that went away: deleting one runs no wtm command to say so.
+	EventsRegistryPruneEvery = 30 * time.Second
 )
 
 // One human line per `wtm events` event; --output json is the contract, these
@@ -4615,6 +4628,15 @@ const (
 	EventFieldFmt      = "%s=%s"
 	EventFieldSep      = ", "
 	EventOrdinalNone   = "none"
+
+	EventProvisionedFmt       = "provisioned %s"
+	EventProvisionFailedFmt   = "on_create failed for %s"
+	EventDeprovisionFailedFmt = "on_clean failed for %s, kept"
+	EventHookFmt              = "  %s"
+	EventExitCodeFmt          = " (exit %d)"
+	EventRepoAddedFmt         = "watching %s"
+	EventRepoRemovedFmt       = "no longer watching %s"
+	EventRepoPrefixFmt        = "%s · "
 )
 
 const (

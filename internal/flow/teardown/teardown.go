@@ -259,13 +259,15 @@ func removeOne(params removeOneParams) Removal {
 		removal.Err = err
 		return removal
 	}
-	if err := Hooks(HooksParams{
+	hookErr := Hooks(HooksParams{
 		Context:   batch.Context,
 		Presenter: batch.Presenter,
 		Target:    target,
 		Title:     hooksTitle(hooksTitleParams{Target: target, Named: batch.NameHookPhases || len(batch.Targets) > 1}),
-	}); err != nil {
-		removal.Err = err
+	})
+	publish.Deprovisioned(publish.DeprovisionedParams{Context: batch.Context, Branch: target.Branch, Err: hookErr})
+	if hookErr != nil {
+		removal.Err = hookErr
 		return removal
 	}
 

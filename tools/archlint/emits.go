@@ -17,11 +17,13 @@ import (
 // that calls a mutator and none of these has changed a worktree no consumer
 // will hear about.
 var emitters = map[string][]objectRef{
-	"worktree.created":    {{Path: internalPrefix + "flow/publish", Name: "Created"}},
-	"worktree.removed":    {{Path: internalPrefix + "flow/publish", Name: "Removed"}, {Path: internalPrefix + "flow/teardown", Name: "PublishRemoved"}},
-	"worktree.relocated":  {{Path: internalPrefix + "flow/publish", Name: "Relocated"}},
-	"worktree.reparented": {{Path: internalPrefix + "flow/publish", Name: "Reparented"}, {Path: internalPrefix + "flow/publish", Name: "ReparentedAll"}},
-	"worktree.updated":    {{Path: internalPrefix + "flow/publish", Name: "Updated"}, {Path: internalPrefix + "flow/ordinal", Name: "Ensure"}},
+	"worktree.created":       {{Path: internalPrefix + "flow/publish", Name: "Created"}},
+	"worktree.provisioned":   {{Path: internalPrefix + "flow/publish", Name: "Provisioned"}},
+	"worktree.deprovisioned": {{Path: internalPrefix + "flow/publish", Name: "Deprovisioned"}},
+	"worktree.removed":       {{Path: internalPrefix + "flow/publish", Name: "Removed"}, {Path: internalPrefix + "flow/teardown", Name: "PublishRemoved"}},
+	"worktree.relocated":     {{Path: internalPrefix + "flow/publish", Name: "Relocated"}},
+	"worktree.reparented":    {{Path: internalPrefix + "flow/publish", Name: "Reparented"}, {Path: internalPrefix + "flow/publish", Name: "ReparentedAll"}},
+	"worktree.updated":       {{Path: internalPrefix + "flow/publish", Name: "Updated"}, {Path: internalPrefix + "flow/ordinal", Name: "Ensure"}},
 }
 
 const flowtestPath = internalPrefix + "testutil/flowtest"
@@ -51,13 +53,15 @@ func runEmits(pass *analysis.Pass) (any, error) {
 			if !ok {
 				return true
 			}
-			event := eventOf(fn)
-			if event == "" {
+			events := eventsOf(fn)
+			if len(events) == 0 {
 				return true
 			}
-			if !published[event] {
-				pass.Reportf(sel.Pos(), "%s.%s changes a worktree's identity but this package never publishes %s: call the flow/publish function for it", qualifierOf(sel, fn), fn.Name(), event)
-				return true
+			for _, event := range events {
+				if !published[event] {
+					pass.Reportf(sel.Pos(), "%s.%s changes a worktree's identity but this package never publishes %s: call the flow/publish function for it", qualifierOf(sel, fn), fn.Name(), event)
+					return true
+				}
 			}
 			if !tested {
 				pass.Reportf(sel.Pos(), "%s.%s changes a worktree's identity but no test of this package records what it publishes (flowtest.Recorder as the Context's Publisher)", qualifierOf(sel, fn), fn.Name())
@@ -68,17 +72,17 @@ func runEmits(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
-func eventOf(fn *types.Func) string {
+func eventsOf(fn *types.Func) []string {
 	if !isMutator(fn) {
-		return ""
+		return nil
 	}
 	pkg := internalPath(fn.Pkg().Path())
 	for _, m := range mutators {
 		if m.pkg == pkg && m.name == fn.Name() {
-			return m.event
+			return m.events
 		}
 	}
-	return ""
+	return nil
 }
 
 func publishedEvents(pass *analysis.Pass) map[string]bool {

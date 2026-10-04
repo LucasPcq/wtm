@@ -2,9 +2,11 @@ package shared
 
 import (
 	"io"
+	"os"
 
 	"github.com/spf13/cobra"
 
+	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -184,7 +186,7 @@ func FlowContext(config ConfigResult) flow.Context {
 		ProjectDir: config.ProjectDir,
 		StateDir:   config.StateDir,
 		Config:     config.Config,
-		Publisher:  events.NewPublisher(events.PublisherParams{ProjectDir: config.ProjectDir}),
+		Publisher:  events.NewPublisher(events.PublisherParams{ProjectDir: config.ProjectDir, CorrelationID: os.Getenv(domain.EnvCorrelationID)}),
 	}
 }
 

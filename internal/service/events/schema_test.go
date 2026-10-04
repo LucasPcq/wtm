@@ -42,14 +42,26 @@ func TestEveryEventTypeMatchesTheSchema(t *testing.T) {
 		}
 		return raw
 	}
+	failed, passed, exitCode := false, true, 3
+	ofRepo := func(typ domain.EventType) json.RawMessage {
+		raw, err := json.Marshal(stamp(stampParams{Event: domain.Event{Type: typ}, Repo: repo}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return raw
+	}
 	examples := map[domain.EventType]json.RawMessage{
-		domain.EventSnapshot:           snapshot.Raw,
-		domain.EventReady:              ready.Raw,
-		domain.EventWorktreeCreated:    about(domain.Event{Type: domain.EventWorktreeCreated}),
-		domain.EventWorktreeUpdated:    about(domain.Event{Type: domain.EventWorktreeUpdated, Changed: []domain.IdentityField{domain.IdentityOrdinal}}),
-		domain.EventWorktreeRelocated:  about(domain.Event{Type: domain.EventWorktreeRelocated, FromPath: "/old/feat-a"}),
-		domain.EventWorktreeReparented: about(domain.Event{Type: domain.EventWorktreeReparented, FromParent: "main"}),
-		domain.EventWorktreeRemoved:    about(domain.Event{Type: domain.EventWorktreeRemoved}),
+		domain.EventRepoAdded:             ofRepo(domain.EventRepoAdded),
+		domain.EventRepoRemoved:           ofRepo(domain.EventRepoRemoved),
+		domain.EventSnapshot:              snapshot.Raw,
+		domain.EventReady:                 ready.Raw,
+		domain.EventWorktreeCreated:       about(domain.Event{Type: domain.EventWorktreeCreated, CorrelationID: "popup-1"}),
+		domain.EventWorktreeProvisioned:   about(domain.Event{Type: domain.EventWorktreeProvisioned, OK: &failed, Hook: "pnpm install", ExitCode: &exitCode}),
+		domain.EventWorktreeUpdated:       about(domain.Event{Type: domain.EventWorktreeUpdated, Changed: []domain.IdentityField{domain.IdentityOrdinal}}),
+		domain.EventWorktreeRelocated:     about(domain.Event{Type: domain.EventWorktreeRelocated, FromPath: "/old/feat-a"}),
+		domain.EventWorktreeReparented:    about(domain.Event{Type: domain.EventWorktreeReparented, FromParent: "main"}),
+		domain.EventWorktreeDeprovisioned: about(domain.Event{Type: domain.EventWorktreeDeprovisioned, OK: &passed}),
+		domain.EventWorktreeRemoved:       about(domain.Event{Type: domain.EventWorktreeRemoved}),
 	}
 	schema := schematest.Compile(t, schemas.Events)
 

@@ -251,7 +251,9 @@ func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, 
 			Prompter:  f.prompter,
 			Presenter: f.presenter,
 		})...)
-		if hookErr := f.runHooks(result.Path, branchName, fromBranch); hookErr != nil {
+		hookErr := f.runHooks(result.Path, branchName, fromBranch)
+		publish.Provisioned(publish.ProvisionedParams{Context: f.ctx, Branch: branchName, Err: hookErr})
+		if hookErr != nil {
 			return result, hookErr
 		}
 	}

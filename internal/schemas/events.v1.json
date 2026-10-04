@@ -8,7 +8,8 @@
   "properties": {
     "v": { "const": 1 },
     "type": { "type": "string" },
-    "ts": { "type": "string", "format": "date-time" }
+    "ts": { "type": "string", "format": "date-time" },
+    "correlation_id": { "type": "string", "maxLength": 256, "description": "WTM_CORRELATION_ID of the command that published the event, verbatim; absent when it had none." }
   },
   "$defs": {
     "repo": {
@@ -32,6 +33,9 @@
         "created_at": { "type": "string" }
       }
     },
+    "hookOk": { "type": "boolean", "description": "Whether every hook of the phase passed; true when there were none." },
+    "hookCmd": { "type": "string", "minLength": 1, "description": "The failing hook's command; only when ok is false, and absent when the phase failed before any hook ran." },
+    "hookExitCode": { "type": "integer", "minimum": 0, "description": "The failing hook's exit status; absent when it was killed by a signal." },
     "changed": {
       "type": "array",
       "minItems": 1,
@@ -57,6 +61,17 @@
         "worktree": { "$ref": "#/$defs/worktree" }
       },
       "required": ["repo", "worktree"]
+    },
+    {
+      "properties": {
+        "type": { "const": "worktree.provisioned" },
+        "repo": { "$ref": "#/$defs/repo" },
+        "worktree": { "$ref": "#/$defs/worktree" },
+        "ok": { "$ref": "#/$defs/hookOk" },
+        "hook": { "$ref": "#/$defs/hookCmd" },
+        "exit_code": { "$ref": "#/$defs/hookExitCode" }
+      },
+      "required": ["repo", "worktree", "ok"]
     },
     {
       "properties": {
@@ -87,11 +102,36 @@
     },
     {
       "properties": {
+        "type": { "const": "worktree.deprovisioned" },
+        "repo": { "$ref": "#/$defs/repo" },
+        "worktree": { "$ref": "#/$defs/worktree" },
+        "ok": { "$ref": "#/$defs/hookOk" },
+        "hook": { "$ref": "#/$defs/hookCmd" },
+        "exit_code": { "$ref": "#/$defs/hookExitCode" }
+      },
+      "required": ["repo", "worktree", "ok"]
+    },
+    {
+      "properties": {
         "type": { "const": "worktree.removed" },
         "repo": { "$ref": "#/$defs/repo" },
         "worktree": { "$ref": "#/$defs/worktree" }
       },
       "required": ["repo", "worktree"]
+    },
+    {
+      "properties": {
+        "type": { "const": "repo.added" },
+        "repo": { "$ref": "#/$defs/repo" }
+      },
+      "required": ["repo"]
+    },
+    {
+      "properties": {
+        "type": { "const": "repo.removed" },
+        "repo": { "$ref": "#/$defs/repo" }
+      },
+      "required": ["repo"]
     }
   ]
 }

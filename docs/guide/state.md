@@ -44,7 +44,9 @@ The global config lives in the OS config directory (`~/.config/wtm/` on Linux, `
 ├── state.json    # what wtm writes for itself (the update check)
 ├── wtm.sock      # the run daemon's socket, shared by every repository
 ├── wtm.lock      # held by the one daemon running
-└── jobs.json     # the daemon's index of what it started
+├── jobs.json     # the daemon's index of what it started
+├── repos.json    # every repository wtm was used in, for `wtm events` run outside one
+└── repos.json.lock
 ```
 
 `jobs.json` is what makes the daemon disposable: it exits about 30 s after its last foreground job, detached services keep running without it, and the next daemon reads the index back, so `wtm run ps` still lists a compose stack after a reboot and `wtm run down` still stops it. `wtm run daemon status` reports what is up; `wtm run daemon restart` replaces a daemon of another wtm build.

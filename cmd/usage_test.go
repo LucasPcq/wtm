@@ -82,3 +82,14 @@ func TestVersionCommandAndFlagPrintTheSameLine(t *testing.T) {
 		t.Errorf("wtm version = %q, --version = %q", command, flag)
 	}
 }
+
+func TestAnInvalidCorrelationIDIsAUsageError(t *testing.T) {
+	t.Setenv(domain.EnvCorrelationID, "a\nb")
+	rootCmd.SetArgs([]string{domain.CmdVersion})
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&bytes.Buffer{})
+	err := rootCmd.Execute()
+	if got := rules.ExitCode(err); got != domain.ExitCodeUsage {
+		t.Fatalf("exit code = %d (%v), want %d", got, err, domain.ExitCodeUsage)
+	}
+}

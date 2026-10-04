@@ -1,20 +1,24 @@
 ## wtm events
 
-Stream the repository's worktree changes as they happen
+Stream worktree changes as they happen, in one repository or all of them
 
 ### Synopsis
 
 Print the repository's worktrees, then every change made to them, whoever made it:
 a command in another shell, an agent, or `wtm ui`. The stream opens on a snapshot of
 every worktree and a ready line, then carries one event per change — created,
-updated, relocated, reparented, removed. With --output json each line is one JSON
-object (JSON Lines), the contract an integration reads; its schema ships with wtm.
+provisioned, updated, relocated, reparented, deprovisioned, removed. With
+--output json each line is one JSON object (JSON Lines), the contract an
+integration reads; its schema ships with wtm.
 If the run daemon stops, the stream waits for it and opens again on a fresh
 snapshot: treat every event as an upsert keyed by branch, and every snapshot as a
-reset. It runs until interrupted or until the reader of its pipe goes away. It
-ends on a code no retry can change in three cases: 12 in a repository wtm was never
-initialized in, 21 outside a git repository, and 20 if it receives an event of a
-schema newer than its own.
+reset. It runs until interrupted or until the reader of its pipe goes away.
+Run outside any repository, it follows every repository wtm was used in: a
+snapshot for each, one ready line, then repo.added and repo.removed as they come
+and go, a new repository's snapshot right after its repo.added. It ends on a code
+no retry can change in three cases: 12 in a repository wtm was never initialized
+in, 21 when --repo is not in a git repository, and 20 if it receives an event of
+a schema newer than its own.
 
 ```
 wtm events [flags]
@@ -31,6 +35,9 @@ wtm events [flags]
 
   # Another repository than the current one
   wtm events --repo ~/code/app --output json
+
+  # Every repository wtm knows
+  cd ~ && wtm events --output json
 ```
 
 ### Options
