@@ -25,11 +25,18 @@ jobs:
       - name: Run tests
         run: go test ./... -race -count=1
 
+      - name: Extract release notes
+        # A beta tag has no section of its own yet: it ships what is under [Unreleased].
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          case "$version" in *-*) version=Unreleased ;; esac
+          make release-notes VERSION="$version" > "$RUNNER_TEMP/notes.md"
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           version: latest
-          args: release --clean
+          args: release --clean --release-notes ${{ runner.temp }}/notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}

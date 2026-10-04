@@ -4,6 +4,49 @@
 
 **Validation is strict.** An unknown key, a misspelt `kind`, a reference to an undeclared job, or two links claiming the same key refuse the file, naming the cause. A refused file never fails a core command (`create`, `extract`, `checkout`, `env`, `clean`…): only the run part is skipped, with a warning. `run up` and `run start` refuse it; `run down`, `run stop` and `run ps` warn and carry on, so what is running can always be stopped.
 
+## Example
+
+```toml
+isolation   = "isolated"
+addressing  = "names"
+concurrency = "parallel"
+
+[[job]]
+name = "docker"
+kind = "service"
+cmd  = "docker compose up -d"
+stop = "docker compose down"
+  [job.ports]
+  DB_PORT = 5432
+
+[[job]]
+name = "api"
+kind = "service"
+cmd  = "pnpm dev"
+cwd  = "apps/api"
+  [job.ports]
+  PORT = 4000
+  [job.url]
+  port = "PORT"
+
+[[job]]
+name    = "migrate"
+kind    = "task"
+cmd     = "pnpm migrate"
+touches = ["docker"]
+
+[[profile]]
+name    = "all"
+jobs    = ["docker", "migrate", "api"]
+default = true
+
+[[env_port]]
+file = "apps/api/.env"
+key  = "DATABASE_URL"
+job  = "docker"
+port = "DB_PORT"
+```
+
 ## Top-level keys
 
 | Key | Default | Meaning |
@@ -67,46 +110,3 @@ Writes a `.env` key's whole value from a template: what a worktree holds of a sh
 | `value` | a template over `{namespace}`, `{port.NAME}`, `{origin}`, `{worktree}`, `{ordinal}` |
 
 A key is written by an `[[env]]` link or an `[[env_port]]` link, never both.
-
-## Example
-
-```toml
-isolation   = "isolated"
-addressing  = "names"
-concurrency = "parallel"
-
-[[job]]
-name = "docker"
-kind = "service"
-cmd  = "docker compose up -d"
-stop = "docker compose down"
-  [job.ports]
-  DB_PORT = 5432
-
-[[job]]
-name = "api"
-kind = "service"
-cmd  = "pnpm dev"
-cwd  = "apps/api"
-  [job.ports]
-  PORT = 4000
-  [job.url]
-  port = "PORT"
-
-[[job]]
-name    = "migrate"
-kind    = "task"
-cmd     = "pnpm migrate"
-touches = ["docker"]
-
-[[profile]]
-name    = "all"
-jobs    = ["docker", "migrate", "api"]
-default = true
-
-[[env_port]]
-file = "apps/api/.env"
-key  = "DATABASE_URL"
-job  = "docker"
-port = "DB_PORT"
-```

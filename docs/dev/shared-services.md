@@ -20,7 +20,7 @@ Every other worktree posts a claim under `<its worktree>:<name>`, with status `d
 
 A claim owns no stream: attaching the run view to one from any worktree reaches the one output there is.
 
-A claim is dropped when its service is no longer up, and `Manager.Adopt` is where that is enforced: a daemon killed without running a handler may leave a shared foreground service to be reaped at the next start-up, and a claim outliving it would be a reference count on nothing — the next worktree would be told its service is already running. The pass runs on every adoption, not only after a reap, because the same hole opens whenever the real job's record is gone and the claims' are not (a deleted main checkout, for one). See LUC-227.
+A claim is dropped when its service is no longer up, and `Manager.Adopt` is where that is enforced: a daemon killed without running a handler may leave a shared foreground service to be reaped at the next start-up, and a claim outliving it would be a reference count on nothing — the next worktree would be told its service is already running. The pass runs on every adoption, not only after a reap, because the same hole opens whenever the real job's record is gone and the claims' are not (a deleted main checkout, for one).
 
 Releasing a claim stops the service only once no worktree holds it. Two worktrees racing to start the same service both succeed — `run up --all` fans out, and losing that race is not a failure. A shared job whose main checkout the client could not resolve is **refused**, never run once per worktree.
 
@@ -102,7 +102,7 @@ A worktree created and thrown away without ever starting the stack therefore owe
 
 ### Writing the two commands
 
-`run init` asks. After the scope step, a step lists three rows per shared service — its name, its `create`, its `remove` — and only the name carries a proposal. wtm has nothing honest to say about the other two: a recipe for postgres would guess the port variable, the user, the host and whether `psql` is even on this machine, and a pre-filled command that is accepted and then fails inside the retry budget reads as a wtm bug rather than as a line to write. It is the same decision LUC-55 already recorded for the port flag of every framework.
+`run init` asks. After the scope step, a step lists three rows per shared service — its name, its `create`, its `remove` — and only the name carries a proposal. wtm has nothing honest to say about the other two: a recipe for postgres would guess the port variable, the user, the host and whether `psql` is even on this machine, and a pre-filled command that is accepted and then fails inside the retry budget reads as a wtm bug rather than as a line to write. It is the same reason wtm does not guess the port flag of a framework.
 
 What wtm *does* know it shows, while the field is open — grouped by where it comes from, since one run-on line stops being readable as soon as a job declares more than one port:
 

@@ -13,6 +13,7 @@ Everything wtm knows about a repository lives under its git common directory (`.
 │   └── meta.json             # one per worktree wtm created or adopted
 ├── logs/<branch>/<job>.log   # each job's output, cleared when the job starts
 ├── hooks/<phase>-<branch>.log  # the raw output of the last on_create / on_clean run
+├── exec/<branch>.log         # the whole output of the last wtm exec in that worktree
 ├── pending-removals.toml     # namespace drops owed by a clean while their service was down
 └── ordinal.lock              # serialises the allocation of worktree numbers
 ```
@@ -20,6 +21,16 @@ Everything wtm knows about a repository lives under its git common directory (`.
 `<branch>` is the branch name URL-escaped into one path segment (`feat/x` → `feat%2Fx`).
 
 ### `meta.json`
+
+```console
+$ cat '.git/wtm/worktrees/feat%2Flogin/meta.json'
+{
+  "source_branch": "main",
+  "created_at": "2026-10-04T16:52:28Z",
+  "env_strategy": "example",
+  "isolation": "isolated"
+}
+```
 
 | Field | Meaning |
 | --- | --- |

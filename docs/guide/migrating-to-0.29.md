@@ -43,3 +43,12 @@ A script reading `.already_absent` reads `.results[0].already_absent`. `reparent
 ## `wtm clean` takes several worktrees
 
 `wtm clean feat/a feat/b` removes both; without arguments the picker lets you check several. Under `--yes`, one unsafe worktree (dirty, unpushed, open PR) refuses the whole run before anything is removed, so pass `--force` or name only the safe ones. The dashboard (`wtm ui`) offers the same from its global menu, « Delete worktrees »; the row menu still deletes the one worktree it was opened from.
+
+## Two exit codes changed
+
+| Code | Now returned by | Before |
+| --- | --- | --- |
+| `21` | any command run outside a git repository | `1` |
+| `19` | every interactive cancellation: Esc, Ctrl-C, "No, cancel", a declined confirmation. Never under `--yes` | `0` |
+
+`wtm create x && wtm go x` now stops when the wizard is cancelled. A script that tested `1` for "not a repository", or read `0` after a cancelled prompt, checks for `21` or `19`. The full list is in [Integrations](integrations.md#the-contract---yes-and---output-json).

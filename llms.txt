@@ -8,7 +8,7 @@ For an agent working in a repository that uses wtm, `wtm agents install` adds th
 
 - [README](README.md): what wtm does, how to install it, and an overview of every command
 - [Getting started](docs/guide/getting-started.md): a ten-minute tutorial from install to two worktrees running side by side
-- [Recipes](docs/guide/recipes.md): complete setups for a pnpm/turbo monorepo, a docker compose app, a shared postgres, AI agents in parallel and stacked PRs
+- [Recipes](docs/guide/recipes.md): complete setups for a pnpm/turbo monorepo, a docker compose app, a shared postgres, AI agents in parallel, stacked PRs, and one command run across worktrees (`wtm exec`)
 - [Troubleshooting](docs/guide/troubleshooting.md): fixes for a port in use, a crashed job, the daemon's version, `wtm go`, exit 16, named URLs and `.env` drift
 
 ## User guide
@@ -22,11 +22,13 @@ For an agent working in a repository that uses wtm, `wtm agents install` adds th
 - [Named URLs and addressing](docs/guide/addressing.md): the run proxy, named and port URLs, port 80 on macOS
 - [`run.toml` reference](docs/guide/run-toml.md): every key of the file, with its default
 - [State](docs/guide/state.md): the files wtm keeps under `<git-common-dir>/wtm/` and beside the global config
+- [Integrations](docs/guide/integrations.md): building on wtm: `--yes` and `--output json`, stable exit codes, the `using-wtm` agent skill, `wtm version --output json`, `WTM_CORRELATION_ID`
 - [The event stream](docs/guide/events.md): `wtm events`, every worktree change as JSON Lines, for integrations
 
 ## Reference
 
 - [Command reference](docs/wtm.md): every command and flag, generated from `--help`
+- [Migrating to 0.29](docs/guide/migrating-to-0.29.md): the `create` and `clean` JSON envelopes, several branches in one run
 - [Migrating to 0.28](docs/guide/migrating-to-0.28.md): breaking changes for 0.27 users, the JSON contract of `wtm run`, exit codes
 - [Changelog](CHANGELOG.md): what changed in each release
 

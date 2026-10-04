@@ -1,687 +1,827 @@
 # Changelog
 
-## Non publié
-
-- **`wtm events` hors d'un repo suit tous les repos où wtm a servi** : un instantané par repo, un seul `ready`, puis `repo.added` (suivi de l'instantané du nouveau repo) et `repo.removed`. Les repos sont tenus dans un registre (`repos.json`, à côté de la config globale), alimenté par `wtm init` et par la première commande lancée dans un repo. Le code `21` ne concerne plus que `--repo` vers un dossier hors git. → [Tous les repos d'un coup](docs/guide/events.md#every-repository-at-once)
-- **`worktree.deprovisioned` dans `wtm events`** : envoyé après les hooks `on_clean` de `clean` et `prune`, avec leur résultat. `ok: false` signale une suppression interrompue par un hook : le worktree est toujours là, et aucun `removed` ne suit. → [Le flux d'événements](docs/guide/events.md#what-the-stream-carries)
-- **`worktree.provisioned` dans `wtm events`** : envoyé une fois les hooks `on_create` passés (même sans hook), avec leur résultat — `ok`, et en cas d'échec le hook et son code de sortie. Un agent sait enfin quand un worktree voisin est prêt. → [Le flux d'événements](docs/guide/events.md#what-the-stream-carries)
-- **Corrélation des événements avec la commande qui les produit** : une commande lancée avec `WTM_CORRELATION_ID=<id>` recopie cet identifiant dans le champ `correlation_id` de chaque événement qu'elle publie, enfants compris (un `clean` qui déplace des enfants). Un hôte reconnaît ainsi les siens sans les confondre avec ceux d'un agent. → [Reconnaître sa propre commande](docs/guide/events.md#recognising-your-own-command)
-- **`wtm events` diffuse les changements de worktrees en direct** : un instantané de tous les worktrees, puis un événement par création, déplacement, changement de parent, d'isolation ou suppression, d'où qu'il vienne (un autre shell, un agent, `wtm ui`). `--output json` donne des JSON Lines, le contrat d'une intégration (éditeur, plugin de terminal comme herdr) ; le flux se reconnecte seul si le daemon redémarre. → [Le flux d'événements](docs/guide/events.md)
-- **`wtm version --output json`** donne la version de wtm et celle de chaque contrat qu'il expose (`events` : le schéma de `wtm events`), pour qu'une intégration sache si le wtm installé la comprend avant de s'y fier. `wtm --version` ne change pas. → [Vérifier la compatibilité](docs/guide/events.md#checking-compatibility)
-- **Codes de sortie de `wtm events` stables** : `12` (repo non initialisé), `20` (schéma plus récent), `21` (pas un repo git) et `2` (usage) sont définitifs, tout le reste vaut la peine de réessayer ; le message va sur stderr, jamais sur stdout. Le code `21` vaut pour toutes les commandes lancées hors d'un repo git, qui sortaient jusqu'ici en `1`, et pour `wtm events --repo` vers un dossier hors git, qui sortait en `2`. → [Quand le flux s'arrête](docs/guide/events.md#when-it-exits)
-- **`wtm ui` suit les worktrees en direct** : un worktree créé, déplacé ou supprimé ailleurs apparaît dans la liste aussitôt, sans attendre le rafraîchissement de 20 s, qui ne sert plus qu'à l'état git (modifié, en avance, en retard).
+All notable changes to wtm are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and wtm adheres to [Semantic Versioning](https://semver.org); how to write an entry is in [docs/dev/changelog.md](docs/dev/changelog.md).
+
+## [Unreleased]
+
+A live event stream for integrations, batch `create` and `clean`, `wtm exec`, and `checkout`, `extract` and `env` aligned on the conventions of `create`.
+
+### Highlights
+
+- **`wtm events`** streams worktree changes live: a snapshot of every worktree, then one event per creation, move, reparent, isolation change or removal, wherever it comes from (another shell, an agent, `wtm ui`); `--output json` gives JSON Lines for editors and terminal plugins, and the stream reconnects on its own when the daemon restarts. → [Event stream](docs/guide/events.md)
+- **`wtm create`** and **`wtm clean`** take several worktrees in one run (`wtm create feat/a feat/b fix/c`, `wtm clean feat/a feat/b`, or tab in the wizard / multi-select in the picker): shared questions are asked once and one failure does not stop the others. → [Migrating to 0.29](docs/guide/migrating-to-0.29.md)
+- **`wtm exec`** runs one command in several worktrees in parallel, each with its own environment (shifted ports, compose project): `wtm exec --all -- pnpm test`, with a per-worktree summary, the output of failures and `--output json`; without arguments it opens a wizard. → [Configuration](docs/guide/configuration.md#the-environment-of-wtm-exec)
+
+### Breaking
+
+- **`wtm create --output json`** always answers with an envelope `{"results": [...], "failed": [...]}`: read `.results[0].path` instead of `.path`. → [Migrating to 0.29](docs/guide/migrating-to-0.29.md)
+- **`wtm clean --output json`** always answers with an envelope `{"results": [...], "failed": [...], ...}`: read `.results[0].already_absent` instead of `.already_absent`. → [Migrating to 0.29](docs/guide/migrating-to-0.29.md)
+- **Exit code `21`** is returned by any command run outside a git repository (was `1`) and by `wtm events --repo` pointing at a non-git directory (was `2`): check for `21` in scripts that tested those codes. → [When it exits](docs/guide/events.md#when-it-exits)
+- **Exit code `19`** is returned by every interactive cancellation (Esc, Ctrl-C, "No, cancel", a declined confirmation), so `wtm create x && wtm go x` stops there: treat `19` as "cancelled" in scripts that expected `0`.
+
+### Added
+
+- **`wtm events`** outside a repository follows every repository wtm has been used in: one snapshot per repository, a single `ready`, then `repo.added` and `repo.removed`; repositories are recorded in `repos.json` next to the global config by `wtm init` and the first command run in a repository. → [Every repository at once](docs/guide/events.md#every-repository-at-once)
+- **`worktree.provisioned`** event in `wtm events`, sent once the `on_create` hooks have run (even with no hook), with their result: `ok`, and on failure the hook and its exit code. → [Event stream](docs/guide/events.md#what-the-stream-carries)
+- **`worktree.deprovisioned`** event in `wtm events`, sent after the `on_clean` hooks of `clean` and `prune` with their result; `ok: false` means a hook interrupted the removal, the worktree is still there and no `removed` follows. → [Event stream](docs/guide/events.md#what-the-stream-carries)
+- **`WTM_CORRELATION_ID`**: a command run with it copies the id into the `correlation_id` of every event it publishes, children included, so a host recognises its own events. → [Recognising your own command](docs/guide/events.md#recognising-your-own-command)
+- **`wtm version --output json`** reports the wtm version and the version of each contract it exposes (`events`), so an integration can check compatibility; `wtm --version` is unchanged. → [Checking compatibility](docs/guide/events.md#checking-compatibility)
+- **`wtm events`** has stable exit codes: `12` (repository not initialized), `20` (newer schema), `21` (not a git repository) and `2` (usage) are final, anything else is worth retrying; the message goes to stderr, never stdout. → [When it exits](docs/guide/events.md#when-it-exits)
+- **`wtm ui`** creates several worktrees in one run, each appearing in the list as soon as it exists, and deletes several from its global menu ("Delete worktrees").
+- **`wtm clean`** and **`wtm prune`** refuse a locked worktree (`git worktree lock`) like a dirty one, with their own message instead of git's raw error; `--force` lifts the lock.
+- **`wtm list`** and **`wtm tree`** mark locked worktrees `! locked`, and their JSON carries `is_locked`; the `wtm ui` delete modal lists the lock as a separate blocker to lift.
+- **Ctrl-C** cancels a wizard at any step, like Esc on the first one, and a standalone confirmation too (the one for `extract` conflicts).
+
+### Changed
+
+- **`wtm clean --yes`** with several worktrees refuses the whole batch when a single one is unsafe, unless `--force`.
+- **`wtm clean`** and **`wtm prune`** move the children of a removed chain to the closest remaining ancestor.
+- **`wtm ui`** picks up worktrees created, moved or removed elsewhere immediately; the 20 s refresh only updates git state (modified, ahead, behind).
+- **`wtm checkout`** always shows the recap before creating the worktree, even with every flag given, and carries the `parent` → main fallback warning there instead of a separate question; a cancellation says so.
+- **`wtm checkout`** offers to update a local branch behind origin before the recap, and `--ff` does it under `--yes`.
+- **`wtm extract`** always shows the recap, even with every flag given.
+- **`wtm extract --to`** with a new target asks the same questions as `create` (parent, isolation, update from origin) instead of a separate question after the wizard.
+- **`wtm extract`** proposes the chosen source's own parent rather than the base branch, and refuses a branch held by another worktree as soon as it is typed.
+- **`wtm extract`** ends like `create`: aligned `source` and `path` fields, path relative to `base_path`, colour on the glyph only, a `→` next step after a conflict, and "nothing to extract" shown as `=` naming the source.
+- **`wtm env`** reports what it did: the verdict first, a count per file ("2 added · 1 overwritten"), and only what is left to handle key by key (a kept conflict, a key without a value, an orphan); `--check` still lists every key.
+- **`wtm env`** sends warnings to stderr, and its JSON gains `path` and a per-key `action`.
+- **`wtm env`** applies every flag in the wizard: `--prune` and `--on-conflict overwrite` preselect the resolver's rows, `--isolation` applies to the worktree picked (main is greyed out for `verbatim`), and the recap names the mode, the value source and the isolation.
+- **`wtm env`** picker badge counts the keys to add.
+- **`wtm env --check`** exits `18` when it finds drift (the report is still written) and `0` when the worktree is up to date, ready for CI.
+- **`wtm env`** uses one vocabulary throughout (add, fill, overwrite, keep, prune, skip), in the past tense in the report and JSON (`pruned` instead of "remove"/"removed").
+- **Wizards** show the step title in the breadcrumb ("Step 3/4 • Resolve drift — feat/a"), so the worktree concerned is on screen at every question.
+- **Wizards** wrap step descriptions and errors at the terminal width instead of cutting them.
+- **Invalid flag values** exit `2` with one message, `invalid --<flag> value "x": use …`, for `--isolation` and `--env-from` everywhere and for the flags of `wtm env`.
+- **Branch names git would reject** (`bad..name`, `a b`, `x.lock`…) are refused upfront with exit `2`, in the wizard and as arguments, instead of failing mid-creation.
+- **`wtm create`** and **`wtm checkout`** under `--yes` report the `parent` strategy falling back to main's `.env` with a warning line, and a `warnings` entry in JSON.
+- **`wtm extract --yes`** reports the `parent` → main fallback like `create`.
+- **Fast-forward** declined after a failure prints `= Aborted.` like other cancellations.
 
-- **`wtm create` crée plusieurs worktrees d'un coup** : `wtm create feat/a feat/b fix/c`, ou dans le wizard (tab pour en ajouter un autre, entrée pour continuer). Les questions communes sont posées une seule fois, et un échec n'arrête pas les autres. Le dashboard (`wtm ui`) fait de même : chaque worktree apparaît dans la liste dès qu'il est créé.
-- **`wtm clean` supprime plusieurs worktrees d'un coup** : `wtm clean feat/a feat/b`, ou en en cochant plusieurs dans le picker. Un échec n'arrête pas les autres ; sous `--yes`, un seul worktree non sûr refuse tout le lot sans `--force`. Les enfants d'une chaîne supprimée remontent au plus proche ancêtre qui reste (`prune` aussi). Le dashboard (`wtm ui`) le propose dans son menu global : « Delete worktrees ».
-- **Les worktrees verrouillés sont respectés** (`git worktree lock`) : `wtm clean` et `wtm prune` les refusent comme un worktree sale, avec leur propre message au lieu de l'erreur brute de git, et `--force` lève le verrou. Le dashboard en fait une ligne à lever à part dans sa modale de suppression ; `wtm list` et `wtm tree` les marquent `! locked`, et leur JSON porte `is_locked`.
-- **`wtm exec` lance une même commande dans plusieurs worktrees** : `wtm exec --all -- pnpm test`, en parallèle, chacun avec son propre environnement (ports décalés, projet compose). Un résumé par worktree, la sortie des échecs, et `--output json` pour les agents. Sans argument, `wtm exec` ouvre un wizard comme `wtm create` : worktrees, commande, confirmation. → [Configuration](docs/guide/configuration.md#the-environment-of-wtm-exec)
-- **`wtm relocate --to` réécrit `base_path` même sans worktree à déplacer** : sous `--yes`, la commande répondait « already aligned » et laissait la config intacte ; `--dry-run` annonce désormais ce changement. L'ancien dossier `base_path`, une fois vidé, est supprimé.
-- **`wtm relocate --output json`** : `steps` vaut `[]` au lieu de `null`, et `base_path` est toujours renseigné, même quand rien ne change.
-- **Ctrl-C annule un wizard** à n'importe quelle étape, comme Échap sur la première.
-- **`wtm checkout` suit les conventions de `wtm create`** : le récapitulatif s'affiche toujours avant de créer le worktree, même quand tous les flags sont donnés, et y porte l'avertissement du repli `parent` → main au lieu d'une question à part ; une annulation le dit ; la mise à jour d'une branche locale en retard sur origin est proposée avant le récapitulatif, et `--ff` la fait sous `--yes`.
-- **`wtm checkout` refuse avant de créer quoi que ce soit** ce qu'il ne refusait qu'après : un `--env-from` inconnu (qui laissait un worktree à moitié provisionné, `wtm create` aussi), un `--from` qui ne nomme aucune branche, et la branche d'une PR qu'un autre worktree tient déjà, avant de poser la moindre question.
-- **Le repli de la stratégie `parent` sur le `.env` de main est signalé sous `--yes`** (`create` et `checkout`) : une ligne d'avertissement, et une entrée dans `warnings` en JSON, là où une exécution interactive l'annonce dans son récapitulatif.
-- **`wtm env` dit ce qu'il a fait** : le verdict en tête, un décompte par fichier (« 2 added · 1 overwritten »), et seulement ce qui reste à traiter clé par clé — un conflit gardé, une clé sans valeur, une orpheline. Une clé remplie dans le wizard ou un conflit écrasé n'apparaît plus comme encore à régler. Les avertissements passent sur stderr ; le JSON gagne `path` et, par clé, `action`. `--check` liste toujours chaque clé.
-- **`wtm env` respecte tous ses flags dans le wizard** : `--prune` et `--on-conflict overwrite` présélectionnent les lignes du résolveur, `--isolation` s'applique au worktree choisi dans le picker (main y est grisé pour `verbatim`), et le récapitulatif nomme le mode, la source des valeurs et l'isolation. Le badge du picker compte les clés à ajouter.
-- **`wtm env --check` sort en `18` quand il trouve de la dérive** (le rapport reste écrit), `0` quand le worktree est à jour : utilisable tel quel en CI. Il compte désormais aussi les clés à ajouter, qu'il annonçait en « No drift ».
-- **Un même vocabulaire pour `wtm env`** : add, fill, overwrite, keep, prune, skip dans le résolveur et le récapitulatif, au passé dans le rapport et le JSON (`pruned` au lieu de « remove »/« removed »).
-- **Les wizards affichent le titre de l'étape** dans le fil d'Ariane (« Step 3/4 • Resolve drift — feat/a »), comme le dashboard : le worktree concerné est à l'écran à chaque question.
-- **Une valeur de flag invalide sort en `2`** avec un seul message, `invalid --<flag> value "x": use …`, pour `--isolation` et `--env-from` partout et pour les flags de `wtm env`.
-- **`wtm env` refuse ce qu'il ignorait** : `--prune` ou `--on-conflict` avec `--check`, et `--on-conflict` en `--mode add`, avant de charger quoi que ce soit.
-- **`wtm extract` suit les conventions de `wtm create`** : le récapitulatif s'affiche toujours, même quand tous les flags sont donnés ; une cible `--to` nouvelle passe par les mêmes questions que `create` (parent, isolation, mise à jour depuis origin) au lieu d'une question à part après le wizard ; `--from` et `--ff` ne sont plus ignorés quand la cible est choisie dans le wizard ; une source choisie propose son propre parent plutôt que la branche de base ; une branche déjà tenue par un autre worktree est refusée dès qu'on la tape. Sous `--yes`, le repli `parent` → main est signalé comme pour `create`.
-- **La conclusion de `wtm extract` s'aligne sur celle de `create`** : champs `source` et `path` alignés, chemin relatif à `base_path`, couleur sur le seul glyphe, prochaine étape en `→` après un conflit ; « rien à extraire » s'affiche en `=` et nomme la source.
-- Dans les récapitulatifs de `create`, `checkout` et `extract`, la ligne `Update:` est alignée sur les autres champs.
-- **Une annulation interactive sort en `19`** (Échap, Ctrl-C, « No, cancel », une confirmation refusée), toutes commandes confondues : `wtm create x && wtm go x` s'arrête là au lieu de continuer. Un refus de fast-forward après échec affiche désormais `= Aborted.` comme les autres annulations.
-- **Un nom de branche que git refuserait est refusé d'emblée** (`bad..name`, `a b`, `x.lock`…), en code `2`, dans le wizard comme en argument, au lieu d'échouer une fois le worktree en cours de création.
-- **Les descriptions des étapes et les erreurs du wizard passent à la ligne** à la largeur du terminal au lieu d'être coupées.
-- **`wtm extract` signale `--from` et `--ff` ignorés** quand la cible existe déjà, comme il le faisait pour `--isolation`.
-- **Une branche ne peut plus être son propre parent** : `create <b> --from <b>` et `extract --to <b> --from <b>` sont refusés, et le picker du parent ne propose plus la branche en cours de création. Ctrl-C annule aussi une confirmation isolée (celle des conflits d'`extract`).
-- **Rupture** : `wtm create --output json` et `wtm clean --output json` répondent toujours avec une enveloppe `{"results": [...], "failed": [...]}`. → [Migration vers 0.29](docs/guide/migrating-to-0.29.md)
-
-## v0.28.0 : Un worktree, une stack isolée
-
-Chaque worktree peut désormais faire tourner ses propres services (serveurs de dev, stack `docker compose`) sur ses propres ports, sous son propre nom, à côté des autres. `wtm run init` détecte vos fichiers compose et vos scripts et écrit la configuration une fois ; `wtm run up` démarre la stack du worktree où vous êtes. Le module reste optionnel : sans `run.toml`, rien ne change.
-
-Cette version casse plusieurs choses pour qui utilisait `wtm run` ou `wtm switch` en 0.27, ou scripte wtm : lisez le [guide de migration](docs/guide/migrating-to-0.28.md) avant de mettre à jour.
-
-### Nouveautés
-
-- **Le module `run`** : des services et des tâches par worktree, groupés en profils, lancés par un daemon en tâche de fond. `wtm run init` les détecte. → [Jobs et profils](docs/guide/jobs-and-profiles.md)
-- **Isolation par worktree** : ports décalés (`3000` → `3010`), `COMPOSE_PROJECT_NAME` propre, et le choix *isolated* ou *verbatim* à la création. → [Isolation](docs/guide/isolation.md)
-- **Les ports vivent dans le `.env`** : wtm réécrit le port dans les valeurs qui le portent (`DATABASE_URL`…) sans toucher au reste de la ligne. → [Comment marche `wtm run`](docs/guide/how-run-works.md)
-- **Des URLs nommées** : `http://web.feat-login.acme.localhost:11080` par job et par worktree, servies par un proxy local ; port 80 sur macOS avec `wtm run proxy install`. → [Adressage](docs/guide/addressing.md)
-- **Services partagés** : un postgres pour tout le dépôt, une base par worktree, supprimée au `clean`. → [Services partagés](docs/guide/shared-services.md)
-- **Un garde-fou sur les données** : `run up` s'arrête avant qu'une migration ne touche des données que le worktree ne possède pas.
-- **Plusieurs worktrees à la fois** : `wtm run up feat-a feat-b`, une vue plein écran par run (`-d` pour rendre la main), et `wtm ui` qui affiche et pilote les services.
-- **`--quiet` sur toutes les commandes**, et `--output json` sur `create`, `extract` et `checkout` rapporte l'isolation et les ports.
-- **Un [guide utilisateur](docs/guide/README.md)** et un README repensé.
-
-### Améliorations
-
-- Une sortie plus lisible et cohérente : une barre `┃` marque les blocs de wtm, les hooks s'affichent pendant qu'ils tournent puis se résument en une ligne.
-- `wtm env` règle aussi les ports et l'isolation d'un worktree.
-- Deux worktrees ne peuvent plus porter le même nom dérivé (`feat.x` et `feat/x`).
-
-### Ruptures
-
-Le détail et la marche à suivre sont dans le [guide de migration](docs/guide/migrating-to-0.28.md).
-
-- `wtm switch` est supprimé → `wtm go` puis `wtm run up`.
-- `--non-interactive` est supprimé → `--yes`, qui fait désormais tourner `init` et `run init` sans aucune question.
-- Les hooks passent par `/bin/sh -c` et reçoivent leurs placeholders déjà entre guillemets.
-- Les commandes `run` prennent le worktree en argument, le job ou le profil en flag, et `run up` démarre un seul profil.
-- Le JSON du module `run` change de forme (`branch` + `path`, un tableau par worktree), et les codes de sortie `2` (usage) et `14` (job ou profil inconnu) s'appliquent partout.
-- `run down --all` ne sort plus du dépôt courant ; `run import` remplace `run.toml` ; `run.toml` est validé plus strictement.
-
-### Corrections
-
-- La fonction shell `wtm` rend enfin le code de sortie de la commande (ouvrez un nouveau shell après la mise à jour).
-- `wtm init` n'installe plus chaque package d'un workspace séparément.
-- Réécrire une valeur de `.env` conserve ses guillemets, son commentaire et ses fins de ligne.
-
-## v0.27.1 — Un worktree enfant ne pousse plus sur la branche de son parent
-
-### Bug fixes
-
-- **Un worktree créé depuis un parent qui n'existe que sur `origin` poussait sur la branche du parent.** wtm passait la ref distante telle quelle à `git worktree add -b`, et git — via son défaut `branch.autoSetupMerge` — configurait alors `origin/<parent>` comme upstream de la branche enfant. Un `git push` avec `push.default = upstream` écrasait directement la branche du parent sur le remote ; avec le défaut `simple`, git refusait mais suggérait `git push origin HEAD:<parent>`, qui fait exactement la même chose. La création passe désormais `--no-track` : la branche enfant n'a plus d'upstream tant qu'elle n'a pas été poussée, et `git push` propose la bonne branche. Le flag prime sur `branch.autoSetupMerge` quelle que soit sa valeur, donc aucune configuration git ne peut ramener le problème. Au passage, `wtm prune --gone` ne proposera plus de supprimer un worktree enfant jamais poussé parce que la branche du parent a disparu du remote.
-
-  **Le correctif n'est pas rétroactif.** Les worktrees enfants créés par une version antérieure gardent leur upstream erroné. Pour vérifier un worktree suspect, depuis son répertoire : `git rev-parse --abbrev-ref @{upstream}` — s'il répond le nom d'une *autre* branche que la sienne, corrigez avec `git branch --unset-upstream`, puis publiez la branche normalement avec `git push -u origin HEAD`.
-
-## v0.27.0 — `wtm upgrade`, `wtm fast-forward` et une aide qui se lit
-
-Deux nouvelles commandes : `wtm upgrade` met le CLI à jour tout seul, `wtm fast-forward` avance une branche sur son homologue distant sans rien rejouer. L'overlay d'aide du dashboard est repris de zéro pour redevenir une référence consultable.
-
-### New features
-
-- **`wtm upgrade` — mettre wtm à jour depuis wtm.** La commande fait ce qu'il faut selon l'installation : un binaire autonome est remplacé sur place après vérification de son SHA256 contre les checksums de la release, un binaire Homebrew ou `go install` est confié à son gestionnaire plutôt que désynchronisé, et un binaire compilé depuis les sources est refusé. `--check` dit ce qui est disponible sans rien toucher, `--version` épingle une release précise.
-- **Une notification passive de mise à jour.** wtm signale en fin de commande qu'une version plus récente existe, sans jamais bloquer ni ralentir la commande en cours. Le header de `wtm ui` affiche la version installée et l'appel à la mise à jour.
-- **`wtm fast-forward` — avancer une branche sur `origin/<branche>`.** Rien d'autre : pas de rebase sur le parent, pas de merge. Une branche qui a divergé est refusée — c'est `wtm sync` qui rejoue les commits locaux, et `--force` ne lève pas ce refus. Disponible au clavier depuis le dashboard comme en CLI (`--all`, ou sélection interactive).
-
-### Improvements
-
-- **L'overlay d'aide du dashboard se lit comme un document.** Les 17 lignes à plat deviennent quatre sections (NAV, ACT, MOUSE, VIEW), appariées sur un écran large et empilées sur un écran étroit ; la souris devient une section à part au lieu d'un suffixe sur chaque touche. L'overlay se dimensionne sur l'écran et fait défiler ce qui dépasse — sur un écran court, sa bordure basse était coupée sans un mot — et il répond enfin à la molette et au clic, lui qui était la seule surface à documenter la souris en l'ignorant. `h`/`l`, que le dashboard bindait sans les lister, y figurent désormais.
-
-### Bug fixes
-
-- **`wtm sync` interactif affichait un picker vide au lieu de son récapitulatif.** L'étape de confirmation montrait « No matches » et le plan n'était jamais chargé.
-- **Le placeholder de chargement n'affiche plus « No matches ».** Ce message répond à un filtre, pas à un chargement en cours (le plan de `sync`, la vérification des worktrees de `clean`).
-
-## v0.26.1 — Le panneau détail ne clignote plus
-
-### Bug fixes
-
-- **Le panneau détail de `wtm ui` se rechargeait tout seul toutes les trois secondes** — le
-  poll qui rafraîchit la liste rechargeait aussi le détail du worktree sélectionné, si bien
-  qu'un panneau qu'on était en train de lire passait en gris derrière un marqueur
-  `refreshing` en continu. Le poll ne touche plus au détail : il se recharge quand la
-  sélection change, quand une opération vient de toucher sa branche, et sur la touche `r`
-  — jamais sur une horloge. La liste, elle, garde son poll court.
-
-## v0.26.0 — `wtm ui` : un dashboard pour piloter ses worktrees
-
-Cette version apporte `wtm ui`, un dashboard plein écran d'où se pilotent les commandes
-mutantes, et la couche `internal/flow` qui le rend possible : chaque commande décrit son
-déroulé une seule fois, indépendamment de la surface, et le CLI comme le dashboard le
-rejouent. Aucune commande, aucun flag et aucune charge `--output json` existants n'ont
-changé.
-
-### New features
-
-- **`wtm ui` — le dashboard plein écran.** `create`, `clean`, `reparent`, `prune` et
-  `sync` s'y lancent avec leurs questions, leurs refus de sécurité et leur sortie
-  streamée dans un panneau dédié. Navigation clavier et souris, aide complète sur `?`.
-- **Un onglet Tree** pour voir la forêt de branches empilées, et le reparentage directement
-  depuis le dashboard.
-- **Un panneau détail qui décrit le travail d'un worktree**, pas seulement son
-  emplacement : dernier commit et activité récente, état réel du working tree
-  (`4 modified · 2 untracked · 1 staged` avec son volume de diff), enfants, drift `.env`,
-  ce qui empêche une suppression, et la pull request dépliée avec ses checks CI et sa
-  décision de review. Une section n'apparaît que si elle a quelque chose à dire — le
-  panneau ne récite pas `none` ni `up to date`.
-  Il distingue aussi trois absences qui se ressemblent : une donnée en cours de
-  rechargement, une absence légitime (`not configured`) et une panne
-  (`⚠ unavailable — <raison>`). Un `gh` cassé ne se lit pas « pas de PR ».
-- **La pull request s'ouvre dans le navigateur** depuis le panneau, à la touche `p` ou au
-  clic sur sa ligne.
-- **`wtm list` marque le worktree courant.** Son tag `● active` existait dans le code mais
-  n'était jamais renseigné : il fonctionne désormais, dans la sortie texte comme dans le
-  sélecteur interactif, et `wtm resolve` le montre aussi. Le dashboard le signale de son
-  côté dans son header, sa liste, son arbre et son détail.
-- **`ui.animations`** — nouvelle clé de config globale (`~/.config/wtm/config.toml`). Les
-  animations du dashboard sont actives par défaut ; `false` les éteint toutes d'un coup,
-  utile sur une liaison lente.
-
-### Improvements
-
-- **Nouvelle palette de couleurs**, appliquée à la sortie humaine de **toutes** les
-  commandes, pas seulement au dashboard : accents retravaillés et rôles clarifiés
-  (navigation, identité, état, structure). Les couleurs restent adaptatives clair/sombre
-  et `NO_COLOR` est toujours respecté.
-
-### Bug fixes
-
-- **`wtm sync`** : l'état du parent est affiné et l'étape parent reste visible ; les
-  parents que la cascade ne couvre pas sont désormais rafraîchis.
-- **La configuration globale documentée était invalide.** Le `README` montrait une clé
-  `agent` sous `~/.config/wtm/config.toml`, absente du schéma — et le décodage refusant
-  les clés inconnues, copier le bloc documenté faisait échouer **toutes** les commandes
-  avec `unknown keys in config.toml: agent`.
-
-## v0.25.0 — Réutiliser une branche locale existante (`create`, `checkout`, `extract`)
-
-### New features
-
-- **`checkout <PR>` réutilise une branche locale existante** — refusait auparavant la PR
-  dès que la branche locale existait, en demandant un `wtm clean` (donc de supprimer des
-  commits non poussés). Elle réutilise désormais la branche telle quelle et propose un
-  fast-forward interactif quand elle est en retard sur origin — jamais sous `--yes`/JSON,
-  qui ne touchent aucune ref. Le recap annonce la réutilisation avant même le fetch, pas
-  après.
-- **`create <branche-existante>` et `extract --to <branche-existante>` réutilisent
-  proprement** — la source devient un simple parent de sync optionnel côté wizard,
-  `--ff` change de sujet pour cibler la branche réutilisée plutôt qu'une source hors
-  sujet, et le recap comme la sortie finale annoncent la réutilisation
-  (`Branch: x (existing local branch — reused)` + `Parent:`) au lieu du `from:` trompeur
-  d'avant.
-- **Une branche déjà checked out ailleurs est signalée proprement** — remontait une
-  erreur git brute en exit `1` ; lève désormais `ErrWorktreeExists` (exit `10`) avec un
-  hint `wtm go <branche>`. `--if-not-exists` renvoie le worktree existant, y compris
-  quand c'est le worktree main qui détient la branche.
-- **Nouveaux champs JSON** — `existing_branch`, `origin_state`, `origin_ahead` et
-  `origin_behind` sur `create` et `checkout` signalent la réutilisation et sa
-  divergence avec origin (`up-to-date`/`behind`/`ahead`/`diverged`).
-
-### Breaking changes
-
-- **`wtm create <branche-existante> --yes` exige désormais `--from`** — `extract --to
-  <branche-existante> --yes` aussi. Le parent d'une branche créée hors de wtm ne peut
-  pas être deviné sans risquer que `sync`, `tree` et `reparent` traitent la supposition
-  comme un fait ; la commande échoue en nommant le flag plutôt que de dégrader
-  silencieusement vers `base_branch`. Une branche neuve garde son défaut `base_branch`,
-  et `checkout <PR>` garde le sien (la base de la PR est un fait GitHub, pas une
-  supposition).
-
-### Improvements
-
-- **L'état de la branche cible n'est inspecté qu'une fois par run** — `branch.Target`
-  (nouveau `service/branch/target.go`) est désormais mémoïsé par nom de branche pour la
-  durée d'un wizard interactif, évitant des dizaines d'appels git redondants par run
-  (`create` en tournait ~20-25 auparavant).
-- **`wtm checkout` a maintenant des tests** — jusqu'ici sans aucune couverture, il en
-  gagne deux (réutilisation de branche, non-mutation des refs sous `--yes`), en testant
-  la logique de création directement, sans dépendance réseau à GitHub.
-- Nouveaux tests de bout en bout : `--yes` qui ne fast-forward jamais une branche en
-  retard, `--ff` qui retargete la branche réutilisée et pas la source, `origin_state`
-  vérifié en JSON, garde-fou `--from` sur `extract`.
-- Chaînes utilisateur dupliquées ("Fast-forward %s to origin", "Updating %s from
-  origin…", la ligne de recap "Update: fast-forward…") centralisées dans
-  `domain/constants.go`.
-
-## v0.24.1 — `wtm extract` : les fichiers non trackés enfin gérés pour de bon
-
-### Bug fixes
-
-- **Les dossiers entièrement neufs ne sont plus tout-ou-rien** — `wtm extract` énumérait ses
-  candidats avec `git status --porcelain`, qui replie un dossier non tracké en une seule entrée
-  `newmod/`. Le picker ne montrait que le dossier et `--files newmod/x.go` échouait sur
-  « is not an uncommitted change ». L'énumération passe à `--untracked-files=all` : chaque fichier
-  est listé et sélectionnable individuellement.
-- **Les chemins avec espaces ou caractères non-ASCII étaient inextractibles** — git les quote
-  (`?? "a b.txt"`, `?? "caf\303\251.txt"`) et le parser conservait guillemets et échappements, si
-  bien qu'aucun `--files` ne matchait et qu'une sélection dans le picker échouait à la copie. Le
-  passage à `git status --porcelain -z` supprime le quoting à la source ; les chemins sont rendus
-  verbatim. Le défaut touchait aussi les fichiers trackés.
-- **Les renommages indexés sont enfin extractibles** — un record `R` était lu comme un chemin bidon
-  `old -> new`. Le chemin d'origine est désormais lu dans son champ dédié et les deux chemins
-  partent ensemble dans le patch (sans quoi la cible recevait l'ajout sans la suppression).
-  Nouveau statut `renamed` et champ `orig_path` dans `--output json`, tag `ren` dans le picker.
-- **`--on-conflict resolve` couvre les fichiers non trackés** — un fichier non tracké déjà présent
-  dans la cible provoquait un abort inconditionnel, avant même que le mode de conflit soit
-  consulté ; il n'existait aucune échappatoire. Il rejoint l'axe `--on-conflict` : `abort` reste
-  le défaut sûr (y compris sous `--yes`), `resolve` écrit des marqueurs de conflit via un merge
-  à base vide. Un contenu identique des deux côtés n'est plus compté comme un conflit. Un fichier
-  binaire, qui ne peut pas porter de marqueurs, continue d'aborter avec un message explicite.
-  Le code de sortie `15` est inchangé.
+### Fixed
 
-### Improvements
+- **`wtm relocate --to`** rewrites `base_path` even when no worktree has to move (under `--yes` it answered "already aligned" and left the config untouched), `--dry-run` announces it, and the emptied old `base_path` directory is removed.
+- **`wtm relocate --output json`** returns `steps: []` instead of `null`, and always fills `base_path`.
+- **`wtm checkout`** and **`wtm create`** reject an unknown `--env-from` before creating anything, instead of leaving a half-provisioned worktree.
+- **`wtm checkout`** rejects a `--from` naming no branch, and a PR branch already held by another worktree, before asking any question.
+- **`wtm env --check`** counts keys to add instead of reporting "No drift".
+- **`wtm env`** no longer counts a key filled in the wizard or an overwritten conflict as still to resolve.
+- **`wtm env`** rejects `--prune` or `--on-conflict` with `--check`, and `--on-conflict` with `--mode add`, instead of ignoring them.
+- **`wtm extract`** no longer ignores `--from` and `--ff` when the target is picked in the wizard.
+- **`wtm extract`** warns that `--from` and `--ff` are ignored when the target already exists, as it did for `--isolation`.
+- **A branch can no longer be its own parent**: `create <b> --from <b>` and `extract --to <b> --from <b>` are refused, and the parent picker no longer offers the branch being created.
+- **Recaps** of `create`, `checkout` and `extract` align the `Update:` line with the other fields.
 
-- **`--files` accepte un dossier** — `--files newmod/` prend tous les changements en dessous.
-  Les entrées « dossier » ayant disparu de l'énumération, c'est ce qui garde fonctionnels les
-  scripts existants qui passaient un dossier.
-- **Les dossiers vidés sont purgés côté source** — déplacer tous les fichiers d'un dossier neuf ne
-  laisse plus une arborescence vide derrière lui.
-- Les fichiers ignorés par `.gitignore` restent volontairement hors de `extract` : `.env` et
-  consorts relèvent de `wtm env`.
+## [0.28.0] - 2026-09-30
 
-## v0.24.0 - Module `env` : Détection & gestion des conflits d'un worktree à un autre
+Each worktree can run its own services (dev servers, a `docker compose` stack) on its own ports and under its own name, next to the others; the `run` module stays opt-in, and nothing changes without a `run.toml`. Read the [migration guide](docs/guide/migrating-to-0.28.md) before upgrading if you used `wtm run` or `wtm switch` in 0.27, or script wtm.
 
-### New features 
+### Highlights
 
-- **wtm env [branch]** - Détecter et de gérer les conflits d'un worktree en fonction de la méthode choisi lors de la création (main, parent, exemple). Sans argument : Affiche un picker interactif.
+- **The `run` module**: per-worktree services and tasks, grouped in profiles and run by a background daemon; `wtm run init` detects compose files and scripts and writes the config once, `wtm run up` starts the stack of the current worktree. → [Jobs and profiles](docs/guide/jobs-and-profiles.md)
+- **Per-worktree isolation**: shifted ports (`3000` → `3010`), its own `COMPOSE_PROJECT_NAME`, and an *isolated* or *verbatim* choice at creation. → [Isolation](docs/guide/isolation.md)
 
-### Improvements
+### Breaking
 
-- Mise à jour du skill et de la documentation
+- **`wtm switch`** is removed: use `wtm go` then `wtm run up`. → [Migrating to 0.28](docs/guide/migrating-to-0.28.md)
+- **`--non-interactive`** is removed: use `--yes`, which runs `init` and `run init` without any question. → [Migrating to 0.28](docs/guide/migrating-to-0.28.md)
+- **Hooks** run through `/bin/sh -c` and receive their placeholders already quoted: drop your own quotes around `{{worktree}}` and re-read hooks with shell characters. → [Migrating to 0.28](docs/guide/migrating-to-0.28.md#hooks)
+- **`run` commands** take the worktree as positional argument and the job or profile as a flag (`run up [worktree...] --profile <p>`), and `run up` starts a single profile: update scripts accordingly. → [Migrating to 0.28](docs/guide/migrating-to-0.28.md#commands)
+- **`run` JSON** changes shape (`branch` + `path`, one array per worktree), and exit codes `2` (usage) and `14` (unknown job or profile) apply everywhere: update consumers. → [Migrating to 0.28](docs/guide/migrating-to-0.28.md#the-json-contract-of-wtm-run)
+- **`run down --all`** no longer leaves the current repository, **`run import`** replaces `run.toml` instead of merging, and **`run.toml`** is validated more strictly: see the guide for each replacement. → [Migrating to 0.28](docs/guide/migrating-to-0.28.md#commands)
 
-## v0.23.0 — Hooks `on_clean`, détection `.env` généralisée & sorties harmonisées
+### Added
 
-### Breaking changes
+- **Ports live in `.env`**: wtm rewrites the port inside the values that carry it (`DATABASE_URL`…) without touching the rest of the line. → [How `wtm run` works](docs/guide/how-run-works.md)
+- **Named URLs** per job and worktree (`http://web.feat-login.acme.localhost:11080`) served by a local proxy, on port 80 on macOS with `wtm run proxy install`. → [Addressing](docs/guide/addressing.md)
+- **Shared services**: one postgres for the whole repository, one database per worktree, dropped on `clean`. → [Shared services](docs/guide/shared-services.md)
+- **`run up`** stops before a migration touches data the worktree does not own.
+- **`wtm run up feat-a feat-b`** runs several worktrees at once, with a full-screen view per run (`-d` to give the terminal back), and **`wtm ui`** shows and drives the services.
+- **`--quiet`** on every command.
+- **`create`**, **`extract`** and **`checkout`** report isolation and ports in `--output json`.
+- **A [user guide](docs/guide/README.md)** and a redesigned README.
 
-- **La config `.env` passe d'un `copy_files` plat à un modèle structuré `[[env.file]]`** — chaque entrée décrit une **cible** (`target`, le fichier de valeurs à provisionner, ex. `.env`, `apps/api/.env`) et son **template committé** (`template`, ex. `.env.example`), avec `.env.local` détecté et marqué `local = true`. `copy_files` est abandonné **sans migration douce** : un `wtm.toml` qui l'utilise doit être régénéré (`wtm init --only env`) ou édité à la main. La détection reconnaît désormais `.env.example` / `.env.dist` / `.env.sample` / `.env.template` / `.env.tmpl` comme templates (priorité dans cet ordre) et distingue templates (committés) et fichiers de valeurs (gitignorés) (LUC-89).
+### Changed
 
-### New features
+- **Output** is more readable and consistent: a `┃` bar marks wtm's blocks, and hooks show while they run then sum up in one line.
+- **`wtm env`** also settles a worktree's ports and isolation.
+- **Two worktrees** can no longer carry the same derived name (`feat.x` and `feat/x`).
 
-- **Hooks `on_clean` — teardown avant suppression** — une nouvelle liste `[hooks] on_clean` s'exécute **dans le worktree, juste avant** que `clean`/`prune` ne le retirent (ex. `docker compose down` pour libérer des ressources externes). Un hook qui sort non-zéro **abandonne la suppression** sauf si son entrée pose `continue_on_error`. Interpolation `{{worktree}}` / `{{branch}}` / `{{root}}` (le `{{from_branch}}` reste réservé à `on_create`). `wtm init` gagne `--clean-command` et `--skip-clean` pour configurer la section en non-interactif (#45).
-- **Fallback `sudo rm -rf` sur suppression bloquée** — si `git worktree remove` échoue sur des fichiers non-supprimables par l'utilisateur courant (typiquement des fichiers root créés par Docker), un run **interactif** propose un `sudo rm -rf` en dernier recours, puis prune la métadonnée git obsolète et supprime la branche. Ne se déclenche **jamais** en mode `--output json` / `--yes`, où l'échec est remonté comme une erreur. Une garde de sécurité refuse d'escalader sur un chemin manifestement dangereux (racine du système de fichiers, `$HOME`, racine du dépôt ou un de ses ancêtres) (#45).
+### Fixed
 
-### Improvements
+- **The `wtm` shell function** returns the command's exit code (open a new shell after upgrading).
+- **`wtm init`** no longer installs every workspace package separately.
+- **Rewriting a `.env` value** keeps its quotes, comment and line endings.
 
-- **Recap `init` encadré & sorties de commandes harmonisées** — le récapitulatif final de `wtm init` est désormais cadré comme les autres sorties, et les micro-conventions d'affichage (icônes, lignes vides, décomptes) sont uniformisées entre commandes pour une lecture homogène (LUC-125).
-- **Provisioning `.env` fidèle au template détecté** — la stratégie `example` copie le template **résolu par la détection** (`.env.dist`, `.env.sample`, …) ou, à défaut, sonde les candidats connus, au lieu de coder en dur `.env.example`. Un projet dont le template committé n'est pas `.env.example` reçoit maintenant bien son `.env` au lieu d'être silencieusement ignoré (LUC-89).
+## [0.27.1] - 2026-09-09
 
-### Bug fixes
+A child worktree no longer pushes to its parent's branch.
 
-- **`wtm sync` : sortie de push et liste de conflits** — le push affiche le spinner « Pushing to origin… » au lieu de paraître figé ; plus de double ligne vide au-dessus du récap sur le chemin picker-confirmé ; les fichiers en conflit sont rendus en **liste verticale** plafonnée à 5 (`…+N more`), dans le footer `--keep-conflict` comme dans le récap d'abandon automatique (#44).
+### Fixed
 
-## v0.22.0 — Module `run` opt-in, bypass `--yes`/`--force` unifié & wizards harmonisés
+- **`wtm create`** from a parent that exists only on `origin` no longer sets `origin/<parent>` as the child's upstream, so `git push` no longer targets the parent's branch, whatever `branch.autoSetupMerge` says.
+- **`wtm prune --gone`** no longer offers to remove a never-pushed child worktree because its parent's branch was deleted from the remote.
+- **Not retroactive**: in a child worktree created earlier, if `git rev-parse --abbrev-ref @{upstream}` names another branch, run `git branch --unset-upstream`, then publish with `git push -u origin HEAD`.
 
-### Breaking changes
+## [0.27.0] - 2026-08-20
 
-- **`--output json` exige désormais `--yes` sur toutes les commandes qui mutent** (`create`, `clean`, `sync`, `prune`, `relocate`, `reparent`, `extract`, `checkout`) — auparavant seuls `clean`/`prune` le demandaient. En JSON, une sélection requise sans défaut (`extract` source/`--files`/`--to`, `sync` branches ou `--all`, `reparent` worktrees + `--to`) **erreure en nommant le flag** au lieu d'ouvrir un picker. `--force` reste un axe séparé : il ne lève que les refus de sécurité et n'implique jamais `--yes` (LUC-119).
-- **Le module `run` devient opt-in** — `wtm init` ne détecte/configure plus les services (suppression de `--skip-services` et `--only services`) ; le module s'initialise via **`wtm run init`**. Toute commande `run` sur un module non initialisé sort en **code 16** avec un message pédagogique (LUC-101).
+Self-update with `wtm upgrade`, `wtm fast-forward`, and a dashboard help overlay that reads like a reference.
 
-### New features
+### Added
 
-- **`wtm run init`** — met en place `run.toml` depuis la détection (docker-compose + scripts de package). Wizard interactif (pré-rempli en ré-exécution) ou auto-génération non-interactive ; les deux fusionnent additivement sans écraser les jobs existants. Seul point d'entrée fonctionnant avant l'existence du module (`run job/profile add` et `run import` en sont aussi exemptés) (LUC-101).
-- **Badges de divergence `origin` dans les listes de worktrees** — `list`/`tree`/pickers/JSON affichent l'avance/retard vis-à-vis d'`origin` à côté du compteur vs base, étiquetés `base ↑N` et `origin ↑a ↓b` (lus depuis les refs remote-tracking en cache, sans fetch ; touche `r` pour rafraîchir). Le contrôle de fast-forward des sources périmées s'étend aux chemins explicites `create --from` / `extract`, avec un flag opt-in `--ff` pour fast-forwarder une source en simple retard en non-interactif (LUC-109).
-- **`wtm extract [source]`** — la source n'est plus le worktree courant mais un **picker en première étape** (worktrees avec changements uniquement), donc on extrait depuis n'importe où. Argument `[source]` requis en non-interactif / `--output json` ; `-y/--yes` saute le récap final (LUC-118).
-- **`wtm reparent` multi-sélection** — reparente plusieurs worktrees sur un même nouveau parent en un seul passage ; le récap liste le parent actuel de chacun (`branche (from parent)`) (LUC-108).
+- **`wtm upgrade`** updates wtm according to how it was installed: a standalone binary is replaced in place after checking its SHA256, a Homebrew or `go install` binary is handed to its manager, a binary built from source is refused; `--check` shows what is available, `--version` pins a release.
+- **Update notice**: wtm mentions a newer version at the end of a command without blocking or slowing it, and the `wtm ui` header shows the installed version and the update call.
+- **`wtm fast-forward`** moves a branch to `origin/<branch>` without rebase or merge; a diverged branch is refused, even with `--force` (use `wtm sync`); available from the dashboard and the CLI (`--all` or interactive selection).
 
-### Improvements
+### Changed
 
-- **Taxonomie `--yes`/`--force` unifiée sur les 8 commandes mutantes** — deux axes orthogonaux (confirmation vs sécurité) alignés sur `gcloud --quiet` / `terraform -input=false` / clig.dev : `--yes` résout chaque décision par son flag ou un **défaut sûr** (sync no-push, extract on-conflict abort, clean/prune orphelins) sans jamais retomber sur un picker ; `clean` converge sur `prune` (LUC-119).
-- **Wizards harmonisés — fil d'Ariane partout** — chaque confirmation vit désormais **dans** son wizard (breadcrumb + retour arrière), plus aucun prompt orphelin où `Esc` annulait tout le run. Forme unique `[saisies] → [sélections optionnelles] → récap`, raisons de skip visibles, `No, cancel` constant, chargements async par étape (`OnEnter`). `clean` est réécrit en un seul wizard (picker → suppression → reparent), et `relocate` unifie l'édition de `base_path` dans le même wizard (LUC-115, LUC-116, LUC-108).
-- **`wtm sync` : la prévisualisation du plan devient l'étape finale du wizard** — `Esc` revient à l'étape précédente au lieu d'abandonner le run ; recall compact (compteur) sur les étapes intermédiaires, liste détaillée sur la confirmation (LUC-110).
-- **`wtm agents install` met à jour une skill déjà installée** au lieu de la laisser intacte — résultat par destination : `created` / `updated` / `unchanged` (aucune écriture) / `skipped` (erreur réelle), identique en interactif et JSON (#34).
-- **Guidage post-`init`** — les worktrees pré-existants sont signalés après un `wtm init`, avec un pointeur vers `wtm relocate` pour les adopter/réaligner (LUC-108).
+- **`wtm ui` help overlay** is split into four sections (NAV, ACT, MOUSE, VIEW), side by side on a wide screen and stacked on a narrow one, sized to the screen with scrolling, responds to the wheel and clicks, and lists `h`/`l`.
 
-### Bug fixes
+### Fixed
 
-- **`wtm prune` détecte mergé/fermé depuis l'état PR GitHub, pas les commits locaux** — l'ancienne heuristique (`git rev-list base..branch == 0`) taguait à tort tout worktree jamais divergé et manquait les squash/rebase-merges. Désormais `--merged` = PR mergée, `--closed` = PR fermée sans merge, `--gone` = distante supprimée (seul filtre hors-ligne) ; une branche sans PR n'est jamais taguée. Alerte sur stderr si `gh` manque ; valeurs JSON `pr_merged`/`pr_closed`/`gone` (LUC-111).
-- **`clean`/`relocate` en environnement non-TTY** — un run piped/CI en format humain sans `--yes` erreure proprement au lieu de lancer un wizard sur un stdin non-interactif ; `relocate` refuse de muter sans `--yes` quand il ne peut pas confirmer.
-- **`clean --reparent-children` ignoré sur le chemin wizard interactif** — le flag est désormais respecté (LUC-119).
+- **`wtm sync`** interactive shows its recap instead of an empty picker.
+- **Loading placeholders** no longer show "No matches" (the `sync` plan, the `clean` worktree checks).
 
-## v0.21.0 — `wtm prune`, `sync --keep-conflict` & parité JSON
+## [0.26.1] - 2026-08-20
 
-### New features
+The `wtm ui` detail panel no longer flickers.
 
-- **`wtm prune [filters]`** — supprime en un passage les worktrees dont le travail est terminé, en reparentant les enfants survivants sur leur grand-parent (comme `clean --reparent-children`). Sans filtre, prune considère tout worktree fini ; les filtres restreignent par catégorie : `--merged` (aucun commit d'avance sur la base — ne capture pas les squash-merges), `--closed` (PR mergée/fermée, nécessite `gh`), `--gone` (branche distante supprimée, lance `git fetch --prune` d'abord sauf `--no-fetch`). Sur TTY : les matches sont présentés pour revue (les worktrees **unsafe** décochés), puis une confirmation de prune, puis — comme `clean` — une confirmation dédiée pour reparenter les enfants. Le worktree principal et la branche de base sont toujours protégés ; le worktree courant est supprimé et le shell redirigé vers le dépôt de base. **Comme `clean`, un worktree dirty, avec commits non-pushés, ou avec une PR ouverte est unsafe et nécessite `--force`** — en mode `--yes`/`--output json` ces worktrees sont reportés sous `skipped` (raison `dirty`/`unpushed`/`open_pr`) plutôt que supprimés, pour ne jamais perdre de travail commité silencieusement. `--dry-run` prévisualise sans rien changer ; `--yes` saute les prompts (requis avec `--output json`) ; non-interactivement les enfants restent orphelins sauf `--reparent-children`.
-- **`wtm sync --keep-conflict`** — laisse un rebase en conflit **en cours dans son worktree** pour résolution manuelle, au lieu de l'abandonner. Les fichiers en conflit sont capturés avant tout abandon, la branche d'un worktree en plein rebase est correctement récupérée, et un second `sync` détecte le rebase en cours (nouveau statut `rebase_in_progress`) pour bloquer ses descendants sans re-tenter. La sortie JSON gagne `conflict_files`, `kept_in_progress` et `path` (#32).
+### Fixed
 
-### Improvements
+- **`wtm ui`** no longer reloads the detail panel every three seconds; it reloads when the selection changes, when an operation touches its branch, and on `r`.
 
-- **Parité `--output json` sur l'ensemble des commandes** — les commandes qui ne l'exposaient pas encore émettent désormais un payload JSON stable et agent-friendly (slices normalisées en `[]` plutôt que `null`, jamais encadré par le framing humain), pour piloter wtm depuis un agent/script de façon homogène.
-- **`--help` groupé, docs générées & README allégé** — l'aide racine range les commandes en sections (`Worktrees:`, `Navigate:`, `Stacked branches:`, `Dev jobs:`, `GitHub:`, `Setup:`). La référence complète des commandes sous `docs/` est désormais **générée** depuis l'arbre Cobra par `tools/gendocs` (`make docs`), le README redevient un guide concis (concepts + tableau d'aperçu groupé pointant vers `docs/`), et la skill agent `using-wtm` est resserrée tout en documentant `prune` et `sync --keep-conflict`.
+## [0.26.0] - 2026-08-20
 
-## v0.20.0 — Pickers de branches : divergence, branches distantes & filtrage
+A full-screen dashboard, `wtm ui`, to drive worktrees; no existing command, flag or JSON payload changes.
 
-### New features
+### Highlights
 
-- **Brancher depuis une branche distante** — `wtm create --from origin/x` crée un worktree à partir d'une branche remote-tracking que vous n'avez pas checkout localement, et `wtm reparent --to origin/x` reparente sur une branche d'intégration distante. Les pickers de branches (create, checkout, reparent, relocate, init) listent désormais les locales **et** les distantes d'`origin` (groupées après un séparateur, taguées `remote`), avec les distantes dont le nom existe déjà en local masquées au profit de la locale. La validation `reparent` accepte une branche locale **ou** un ref `origin/x` (LUC-98).
-- **Badges de divergence dans les pickers de branches** — une branche locale qui a dérivé de sa contrepartie `origin/` est taguée avec son avance/retard (`↓5`, `↑2`, `↑2 ↓5`), pour ne pas brancher sur une base périmée sans le savoir. À l'ouverture, wtm fetch `origin` en arrière-plan (callout `Fetching branches…` non-bloquant) et les badges se rafraîchissent ; la touche **`r`** relance un fetch à la demande. Hors-ligne, le picker reste utilisable avec les derniers compteurs connus (LUC-98).
-- **Fast-forward d'une source périmée avant création** — si la branche source choisie est strictement en retard sur `origin/` (`↓N`), wtm propose de la fast-forward vers origin avant de créer le worktree (la source reste une branche locale, préservant stratégie env, métadonnée parent et cohérence `wtm sync`). Le fast-forward est sauté si le worktree de cette branche a des changements non commités — wtm demande alors s'il faut créer depuis la branche locale telle quelle (défaut non). Une branche **divergée** (`↑N ↓M`) ne peut pas être fast-forwardée : wtm affiche un heads-up explicite et, sur confirmation, crée depuis la locale en préservant les commits locaux (LUC-98).
-- **Filtre inline sur les listes multi-sélection** — dans le picker interactif de `wtm sync` (et `extract`, wizard `init`), `/` entre en mode filtre : la liste se réduit en live aux worktrees dont le nom contient le terme (sous-chaîne, insensible à la casse). `a` coche/décoche tous les worktrees **filtrés**, les cases cochées sont conservées d'un filtre à l'autre, `échap` efface le filtre s'il est actif sinon annule. Le filtrage vit dans le composant `MultiSelect` partagé (LUC-95).
+- **`wtm ui`**: a full-screen dashboard running `create`, `clean`, `reparent`, `prune` and `sync` with their questions, safety refusals and streamed output in a dedicated panel, with keyboard and mouse navigation and full help on `?`.
 
-### Improvements
+### Added
 
-- **Harmonisation & redesign des listes de worktree (LUC-97)** — espacement de ligne désormais uniforme, avec ou sans badge. Les badges deviennent du **texte coloré compact** aligné en colonne (au lieu de chips volumineux) ; la ligne sélectionnée porte un fond teinté + un marqueur de bord gauche `▌▸` ; le statut est une **pastille droite alignée** avec glyphe (`✓ clean`, `⚠ dirty`) qui scanne d'un coup d'œil. Les exemples `wtm list` / `wtm tree` du README reflètent les nouveaux glyphes.
-- **Transparence de la stratégie env `parent`** — avant de créer un worktree (create, extract, checkout), si la stratégie `parent` allait silencieusement copier le `.env` depuis le worktree **principal** parce que la branche source n'a pas de worktree local, wtm le signale et demande confirmation au lieu de copier depuis un emplacement inattendu (LUC-98).
-- **Nettoyage de conformité interne** — extraction des helpers de filtre partagés (`SelectList`/`MultiSelect`), factory `branchrefresh.Handler` unique pour les 5 pickers de branches, fonctions pures déplacées dans `rules/` (`BranchCandidateExists`, `IsRemoteBranch`), et centralisation des constantes (`RemoteBranchPrefix`, glyphes de statut) — aucun changement de comportement.
+- **`wtm ui` Tree tab** shows the forest of stacked branches and reparents from the dashboard.
+- **`wtm ui` detail panel** describes a worktree's work: last commit and recent activity, working tree state (`4 modified · 2 untracked · 1 staged` with diff size), children, `.env` drift, what blocks a removal, and the pull request with its CI checks and review decision; empty sections are hidden.
+- **`wtm ui` detail panel** tells apart data being reloaded, a legitimate absence (`not configured`) and a failure (`⚠ unavailable — <reason>`), so a broken `gh` no longer reads as "no PR".
+- **`wtm ui`** opens the pull request in the browser with `p` or a click on its line.
+- **`wtm list`** marks the current worktree `● active`, in text output and the interactive picker, and **`wtm resolve`** shows it too.
+- **`ui.animations`** in the global config (`~/.config/wtm/config.toml`): `false` turns off every dashboard animation.
 
-## v0.19.0 — Workflow de branches empilées : visualiser, reparenter, sync ciblé
+### Changed
 
-### Breaking changes
+- **New colour palette** for the human output of every command, still adaptive to light/dark and respecting `NO_COLOR`.
 
-- **`wtm sync` ne cascade plus tout par défaut en mode non-interactif** — `sync` rebase désormais un **sous-ensemble** choisi de worktrees : passez des noms de branches, utilisez le **picker multi-select** (sans argument, en TTY), ou `--all` pour toute la cascade. La base est toujours rafraîchie en premier (sauf worktree principal dirty) ; sélectionner la base se contente d'un fetch + fast-forward. **En mode `--output json`, `sync` ne sélectionne plus toutes les branches par défaut** — des noms de branches ou `--all` sont maintenant requis. Un argument de branche inconnu sort en code `11` (LUC-86).
+### Fixed
 
-### New features
+- **`wtm sync`** refines the parent's state, keeps the parent step visible, and refreshes parents the cascade does not cover.
+- **README** no longer documents an `agent` key in the global config, which made every command fail with `unknown keys in config.toml: agent`.
 
-- **`wtm tree`** — affiche la **forêt** des worktrees (liens `parent → enfant` issus du `source_branch`), pensée pour les workflows de branches empilées. Arbre ASCII coloré avec connecteurs (`├─ └─`), annotations par nœud : `↑N` (commits d'avance), `● dirty`, et surtout **`⚠ needs sync`** — le signal d'orchestration clé, levé quand le parent a avancé et que l'enfant doit être rebasé. Un parent sans worktree (ex. `dev`) apparaît en **racine virtuelle** grisée `(no worktree)` ; un cycle de `source_branch` est rendu sans planter et annoté `⚠ cycle`. Flags : `--with-prs` (numéros de PR + marquage mergée/fermée, fetch réseau opt-in comme `wtm list`) et `--output text|json|mermaid` — `json` pour les agents/scripts, `mermaid` pour un `flowchart TD` collable en PR/Notion (LUC-82).
-- **`wtm reparent <branch> --to <parent>`** — change le parent enregistré (`source_branch`) d'un worktree après sa création (métadonnée seulement ; le rebase se fait au prochain `wtm sync`). Utile pour les branches empilées une fois qu'une branche intermédiaire est mergée. Wizard multi-étapes (breadcrumb + back-nav) affichant le parent actuel ; pilotable par arguments directs et `--output json`. La validation cycle / self-parent réutilise le check topologique de `sync` (LUC-88).
-- **`wtm clean` reparente les orphelins** — `clean` détecte désormais les enfants orphelins et propose de les reparenter sur le grand-parent : récap interactif + confirmation (`Esc` annule tout le `clean`), ou l'opt-in `--reparent-children` en mode non-interactif (LUC-88).
+## [0.25.0] - 2026-08-17
 
-### Bug fixes
+`create`, `checkout` and `extract` reuse an existing local branch.
 
-- **Breadcrumb du wizard `relocate` toujours visible** — sur des listes longues ou après plusieurs étapes, le breadcrumb (qui nomme le worktree concerné) ne scrolle plus hors écran. `View()` est découpé en fragments mesurables (head / list / tail) pour dimensionner la liste sur le chrome réel, et les résumés d'étapes terminées sont bornés (les plus anciens se replient en une ligne discrète `… (N earlier steps)`). Le correctif vit dans le composant wizard partagé, donc `reparent` et les autres wizards en profitent aussi (LUC-85).
-- **Sortie de task rejouée au streamer (flaky CI)** — une task rapide pouvait écrire son premier chunk de sortie dans l'historique avant que la goroutine de streaming ne s'abonne, laissant la sortie streamée vide. L'historique est désormais rejoué avant de boucler sur le canal live, sous un seul verrou — plus de gap ni de chevauchement.
+### Breaking
 
-### Improvements
+- **`wtm create <existing-branch> --yes`** and **`wtm extract --to <existing-branch> --yes`** require `--from`, since the parent of a branch created outside wtm cannot be guessed: pass `--from <parent>`. A new branch keeps its `base_branch` default, and `checkout <PR>` keeps the PR base.
 
-- **Espacement vertical harmonisé derrière `output.Frame` (LUC-87)** — chaque commande encadre sa sortie humaine **exactement une fois** (`output.Frame` ou `FrameStart`/`FrameEnd`) ; les helpers et formatters de tables renvoient des corps **bruts** sans lignes vides externes. JSON (`--output json`) et sortie machine (`resolve`, `shell-init`) restent strictement à ras. Le routage se fait sur `rules.IsHumanFormat`.
-- **Spinners unifiés en boîte `RunLoading`** — `shared.StartSpinner` (spinner braille brut, sans padding, écrivant du garbage `\r` dans les pipes) est remplacé par `components.RunLoading` : un loader bordé avec StatusBox + MiniDot identique au chargement du wizard. ~19 sites migrés (`clean`, `create`, `list`, `sync`, `relocate`, `checkout`, `init`, `resolve`, `run/*`) ; en non-TTY / JSON, le travail s'exécute directement sans boîte.
+### Added
 
-## v0.18.0 — `wtm checkout` au top-level (suppression du groupe `pr`)
+- **`wtm checkout <PR>`** reuses an existing local branch instead of asking for a `wtm clean`, and offers an interactive fast-forward when it is behind origin (never under `--yes` or JSON); the recap announces the reuse before the fetch.
+- **`wtm create <existing-branch>`** and **`wtm extract --to <existing-branch>`** reuse the branch: the source becomes an optional sync parent in the wizard, `--ff` targets the reused branch, and the recap and output show `Branch: x (existing local branch — reused)` and `Parent:`.
+- **JSON** of `create` and `checkout` gains `existing_branch`, `origin_state` (`up-to-date`/`behind`/`ahead`/`diverged`), `origin_ahead` and `origin_behind`.
 
-### Breaking changes
+### Changed
 
-- **Suppression du groupe `pr`** — `wtm pr checkout` devient `wtm checkout` (promu sous `Core Commands:`). `wtm pr list` est retiré : la liste des PRs vit déjà dans les pickers de worktrees (`wtm list --with-prs`) et dans le nouveau wizard de `checkout`. Mettez à jour vos scripts et alias. La sortie `--output json` de `checkout` reste `{number, branch, path}` (inchangée vs `pr checkout`).
+- **A branch checked out in another worktree** exits `10` with a `wtm go <branch>` hint instead of a raw git error with exit `1`; `--if-not-exists` returns the existing worktree, even when it is main.
+- **`create`** inspects the target branch once per run instead of making dozens of redundant git calls.
 
-### New features
+## [0.24.1] - 2026-08-11
 
-- **`wtm checkout [number]`** — crée un worktree depuis une pull request. Sans argument : wizard interactif multi-étapes **PR → branche parente → stratégie env** qui s'affiche instantanément et streame les PRs ouvertes en arrière-plan (PRs déjà checkout ou issues d'un fork désactivées). Avec un numéro : checkout direct. Flags `--review` / `--mine` (filtre des PRs), `--from <branche>` (parent de sync, défaut = base de la PR), `--env-from example|main|parent` (override de la stratégie env). Chaque étape du wizard est sautée si elle est déjà résolue par un flag.
+`wtm extract` handles untracked files properly.
 
-### Improvements
+### Added
 
-- **Nettoyage de la tuyauterie PR inutilisée** — retrait de l'affichage PR dédié (`output/pr.go`), des champs jamais consommés (CI status, reviews) et fusion des field-sets `gh pr` en une seule constante. Le fetch GitHub ne récupère plus que ce que `checkout` utilise réellement.
+- **`wtm extract --files`** accepts a directory and takes every change below it.
+- **`wtm extract --output json`** reports staged renames with status `renamed` and an `orig_path` field, tagged `ren` in the picker.
 
-## v0.17.0 — commandes worktree au top-level (suppression du groupe `wt`)
+### Changed
 
-### Breaking changes
+- **`wtm extract`** removes directories left empty in the source after moving their files.
+- **`wtm extract --on-conflict resolve`** covers untracked files already present in the target (conflict markers via an empty-base merge); `abort` stays the default, including under `--yes`, identical content is no longer a conflict, and a binary file still aborts with exit `15`.
 
-- **Suppression du groupe `wt`** — les 8 commandes worktree sont promues au top-level sous `Core Commands:`. `wtm wt list` devient `wtm list`, et de même pour `create`, `clean`, `sync`, `relocate`, `go`, `switch`, `extract`. Aucun alias `wt` n'est conservé : mettez à jour vos scripts et alias. Régénérez l'intégration shell (`eval "$(wtm shell-init)"`) — le wrapper intercepte désormais `wtm go`/`wtm switch` (et non plus `wtm wt go`/`wtm wt switch`). Les groupes `run` et `pr` sont inchangés.
+### Fixed
 
-### Improvements
+- **`wtm extract`** lists each file of a brand-new directory individually instead of a single all-or-nothing entry, so `--files newmod/x.go` works.
+- **`wtm extract`** handles paths with spaces or non-ASCII characters, tracked files included.
+- **`wtm extract`** handles staged renames, moving both the deletion and the addition.
 
-- **PTY drainé jusqu'à l'EOF naturel avant fermeture** dans les jobs détachés — évite une troncature de sortie en fin de process (LUC-84).
+## [0.24.0] - 2026-07-08
 
-## v0.16.0 — `wt relocate` : rassembler les worktrees + grand nettoyage de surface inutilisée
+`wtm env` detects and resolves `.env` drift between worktrees.
 
-### New features
+### Added
 
-- **`wtm wt relocate`** — réorganise les worktrees pour qu'ils vivent tous sous `base_path`. Déplace les worktrees éparpillés (créés ailleurs) vers l'emplacement configuré et **adopte** les worktrees externes existants dans la gestion wtm. Plan/preview des déplacements avant exécution, wizard interactif, et pilotable sans TTY via `--to`, `--force`, `--output json` (statuts par worktree : `moved`, `moved_adopted`, `adopted`, `skipped`, …).
+- **`wtm env [branch]`** detects and resolves a worktree's `.env` conflicts according to the strategy chosen at creation (main, parent, example); without an argument it opens a picker.
 
-### Breaking changes
+## [0.23.0] - 2026-07-07
 
-- **`wtm pr create` retiré** — la création de PR revient à `gh pr create`, qui gère déjà templates, push de branche et détection de la base. C'était un simple wrapper qui ne touchait jamais au modèle worktree. `pr list` et `pr checkout` (les vrais ponts PR↔worktree) sont inchangés.
-- **Décodage strict de la config** — les sections/clés désormais supprimées font échouer le chargement : `[agents]`, `[integrations]` et `[github]` dans le `config.toml` projet, ainsi que `agent` dans le config global (`~/.config/wtm/config.toml`). Retirer ces lignes ou relancer `wtm init`.
+`on_clean` hooks, generalized `.env` detection and harmonized output.
 
-### Improvements
+### Breaking
 
-- **Nettoyage de surface inutilisée** — retrait du scaffolding `project_manager` (intégration VS Code/Cursor jamais livrée), de la config « agent par défaut » jamais consommée (clé `agent`, flag `--agent`, étape du wizard d'`init`, schéma), de la machinerie morte `context.md` / `Detail()` (vue détail jamais branchée), et de la config `[github] auto_draft` (orpheline après le retrait de `pr create`).
+- **`.env` config** moves from a flat `copy_files` to structured `[[env.file]]` entries (`target`, `template`, `local`), with no automatic migration: regenerate it with `wtm init --only env` or edit `config.toml` by hand.
 
-## v0.15.0 — `wt sync` : rebase en cascade de toute la chaîne de worktrees
+### Added
 
-### New features
+- **`[hooks] on_clean`** runs in the worktree just before `clean`/`prune` remove it (e.g. `docker compose down`); a non-zero exit aborts the removal unless the entry sets `continue_on_error`; placeholders `{{worktree}}`, `{{branch}}`, `{{root}}`.
+- **`wtm init --clean-command`** and **`--skip-clean`** configure `on_clean` non-interactively.
+- **`sudo rm -rf` fallback**: when `git worktree remove` hits files the user cannot delete (typically root-owned Docker files), an interactive run offers `sudo rm -rf` as a last resort, never under `--yes` or JSON, and never on a dangerous path (filesystem root, `$HOME`, the repository or its ancestors).
+- **`.env` detection** recognises `.env.example`, `.env.dist`, `.env.sample`, `.env.template` and `.env.tmpl` as templates (in that order), tells templates from value files, and flags `.env.local` as `local = true`.
 
-- **`wtm wt sync`** — remet à jour **toute la chaîne de worktrees** en une commande, dans l'ordre topologique (parents avant enfants), en s'appuyant sur le parent déjà tracké (`source_branch`). Pour la base puis chaque branche (`main → feat → dev1/dev2`) : fetch + fast-forward de la branche depuis son propre `origin/<branche>` (récupère une PR mergée dans le parent), puis rebase `--onto` sur le parent rafraîchi — seuls les commits propres de l'enfant sont rejoués. La cascade est **100 % locale** (les worktrees partagent `.git`).
-- **Push groupé découplé** — après une cascade réussie, un récap détaillé (parent, commit cible, avant→après, commits rejoués) s'affiche **avant** de proposer le push, puis un seul prompt pousse les branches rebasées en `--force-with-lease`. Flags : `--dry-run` (preview 100 % offline), `--base <branche>`, `--push` (seul moyen de push en mode `--output json`), `--no-push`, `-y`/`--yes`.
-- **Statuts par branche (`--output json`)** — `synced`, `up_to_date`, `skipped_dirty` (+ descendants `skipped_ancestor`), `diverged` (local **et** `origin/<branche>` ont divergé → laissé pour réconciliation manuelle), `conflict` (rebase auto-aborté, working tree propre), `error`, `unknown_parent`. Sortie non-zéro si au moins un `conflict`/`error`.
+### Changed
 
-### Improvements
+- **`wtm init`** frames its final recap like other commands, and output conventions (icons, blank lines, counts) are harmonized across commands.
+- **The `example` strategy** copies the detected template (`.env.dist`, `.env.sample`…) instead of hard-coding `.env.example`.
 
-- **Erreurs git remontées au lieu d'être avalées** dans la cascade : un `rev-list`/`git status` en échec produit désormais un statut `error` bloquant plutôt qu'un faux `up_to_date`, et le push n'est tenté que si `origin/<branche>` est réellement absent (évite un force-push sur erreur transitoire).
+### Fixed
 
-## v0.14.0 — Affichage instantané des worktrees + streaming des PRs
+- **`wtm sync`** shows a "Pushing to origin…" spinner, drops a double blank line above the recap, and lists conflicting files vertically, capped at 5 (`…+N more`).
 
-### New features
+## [0.22.0] - 2026-07-03
 
-- **Liste des worktrees instantanée** — `wt list`, `wt go` et `wt switch` affichent les worktrees immédiatement et navigables, sans attendre GitHub. Les PRs sont fetchées en arrière-plan et remplissent les badges (`PR #x`) dès qu'elles arrivent ; une bannière de statut montre la progression (spinner animé) puis, si `gh` est indisponible, le hint d'installation/connexion.
-- **`wt list --with-prs`** — en non-interactif (pipe/JSON), les PRs ne sont plus fetchées par défaut (liste instantanée) ; `--with-prs` les inclut explicitement. Comportement **identique** entre texte et JSON.
+An opt-in `run` module, unified `--yes`/`--force` bypass and harmonized wizards.
 
-### Improvements
+### Breaking
 
-- **Fetch GitHub allégé** — les pickers de worktrees ne récupèrent plus le champ `body` (lourd) des PRs, inutile pour les badges ; `pr list` garde le détail complet.
-- Action « Open PR » disponible immédiatement, l'URL étant résolue à la volée pendant le chargement.
+- **`--output json`** requires `--yes` on every mutating command (`create`, `clean`, `sync`, `prune`, `relocate`, `reparent`, `extract`, `checkout`), and a required selection without a default errors naming the flag instead of opening a picker: pass `--yes` and the named flags.
+- **The `run` module** is opt-in: `wtm init` no longer configures services (`--skip-services` and `--only services` are removed), use `wtm run init`; any `run` command on an uninitialized module exits `16`.
 
-## v0.13.0 — Refonte de `wtm init` : gates de sections, re-init `--only`, éditeur de hooks `on_create`
+### Added
 
-### New features
+- **`wtm run init`** sets up `run.toml` from detection (docker-compose and package scripts), with a wizard pre-filled on re-run or non-interactive generation, merging additively without overwriting existing jobs.
+- **`origin` divergence badges** in `list`, `tree`, pickers and JSON (`base ↑N`, `origin ↑a ↓b`), read from cached remote-tracking refs without fetching; `r` refreshes.
+- **`--ff`** fast-forwards a source that is only behind non-interactively, with the stale-source check extended to `create --from` and `extract`.
+- **`wtm extract [source]`** picks the source in a first step (worktrees with changes only), so you can extract from anywhere; `[source]` is required non-interactively and with `--output json`, and `-y/--yes` skips the final recap.
+- **`wtm reparent`** reparents several worktrees onto one new parent in a single pass, the recap listing each one's current parent.
 
-- **Gates de sections à l'`init`** — chaque section optionnelle (`env`, `hooks`, `services`) démarre par une étape **Configurer / Passer** avec une intro explicative. Passer une section l'écrit en config **commentée** (template prêt à activer) plutôt qu'en valeurs vides. En non-interactif : `--skip-env`, `--skip-hooks`, `--skip-services`.
-- **`wtm init --only <section>`** — re-initialise proprement une ou plusieurs sections (`worktrees`, `env`, `hooks`, `services`) sans toucher aux autres. Accepte le CSV ou la répétition (`--only env,hooks`). Le wizard est **pré-rempli depuis la config existante** (base branch, stratégie env, fichiers copiés, hooks, et jobs détectés déjà configurés). `config.toml` préserve chaque section non ciblée ; `run.toml` régénère les jobs en **conservant les profiles**.
-- **Éditeur de liste de hooks `on_create`** — l'étape hooks devient un vrai éditeur : ajout / édition / suppression / réordonnancement (`shift+↑/↓`) des entrées, chacune avec `cmd`, `cwd` optionnel et toggle `continue_on_error`. Remplace l'ancien duo « install command + packages monorepo ». Pré-rempli depuis la détection à l'`init`, depuis le `on_create` courant en re-init.
+### Changed
 
-### Improvements
+- **`--yes` and `--force`** are two separate axes on all 8 mutating commands: `--yes` resolves each decision by its flag or a safe default (sync does not push, extract aborts on conflict, clean/prune leave orphans) and never falls back to a picker; `--force` only lifts safety refusals and never implies `--yes`.
+- **Wizards** keep every confirmation inside the wizard with a breadcrumb and Back, show skip reasons and a constant `No, cancel`; `clean` is a single wizard (picker → removal → reparent) and `relocate` edits `base_path` in the same wizard.
+- **`wtm sync`** makes the plan preview the final wizard step, Esc going back instead of aborting.
+- **`wtm agents install`** updates an already installed skill and reports `created`, `updated`, `unchanged` or `skipped` per destination.
+- **`wtm init`** points out pre-existing worktrees and suggests `wtm relocate` to adopt them.
 
-- Quand une config existe déjà, `wtm init` guide vers `--only` pour re-initialiser une section ciblée au lieu de tout réécrire.
+### Fixed
 
-## v0.12.0 — `wt extract` : déplacer les changements non-commités entre worktrees
+- **`wtm prune`** detects merged/closed from the GitHub PR state instead of local commits: `--merged` is a merged PR, `--closed` a PR closed without merge, `--gone` a deleted remote branch; a branch without a PR is never tagged, a warning goes to stderr when `gh` is missing, and JSON values are `pr_merged`/`pr_closed`/`gone`.
+- **`wtm clean`** and **`wtm relocate`** in a non-TTY run without `--yes` error out instead of starting a wizard on a non-interactive stdin.
+- **`wtm clean --reparent-children`** is honoured in the interactive wizard.
 
-### New features
+## [0.21.0] - 2026-07-01
 
-- **`wtm wt extract`** — déplace un sous-ensemble des changements non-commités du worktree courant vers un autre worktree (nouveau ou existant), pour découper une PR trop grosse ou isoler du travail sans rapport. Wizard interactif **Files → Target → Mode** (Move/Copy), chaque étape étant sautée si résolue par un flag. Pilotable sans TTY via `--files`, `--to`, `--from`, `--keep`, `--on-conflict`, `--output json`.
-- **Move vs copy** — les fichiers sont déplacés par défaut (retirés de la source une fois posés) ; `--keep` les copie.
-- **Règle de sécurité transactionnelle** — la source n'est nettoyée que si toute l'extraction s'applique proprement. Au moindre conflit, la source est laissée **totalement intacte et récupérable** — jamais d'état à moitié déplacé.
-- **Mode résolution de conflits** — `--on-conflict abort` (défaut) ne change rien et sort en code `15` ; `--on-conflict resolve` applique les changements dans la cible avec des marqueurs de conflit git (via `git merge-file`) pour résoudre comme un rebase, en gardant la source intacte.
+Clean up finished work in one pass with `wtm prune`, keep a conflicting rebase open with `sync --keep-conflict`, and get JSON output from every command.
 
-## v0.11.0 — CLI pilotable par agents LLM + logs des services détachés en live
+### Added
 
-### New features
+- **`wtm prune`** removes every worktree whose work is done in one pass, and reparents surviving children onto their grandparent, as `clean --reparent-children` does.
+- **`wtm prune --merged`**, **`--closed`** and **`--gone`** narrow it to branches with no commit ahead of the base (squash merges not detected), with a merged or closed PR (needs `gh`), or whose remote branch was deleted.
+- **`wtm prune --gone`** runs `git fetch --prune` first, unless **`--no-fetch`**.
+- **`wtm prune`** shows the matches for review on a terminal (unsafe ones unchecked), then asks to confirm the prune, then asks separately about reparenting children.
+- **`wtm prune`** never touches the main worktree or the base branch, and sends the shell back to the base repository when it removes the current worktree.
+- **`wtm prune`** treats a dirty worktree, unpushed commits or an open PR as unsafe and needs `--force`; under `--yes` or `--output json` they are reported under `skipped` with a reason (`dirty`, `unpushed`, `open_pr`) instead of removed.
+- **`wtm prune --dry-run`** previews without changing anything; **`--yes`** skips the prompts (required with `--output json`); non-interactively, children stay orphaned unless **`--reparent-children`**.
+- **`wtm sync --keep-conflict`** leaves a conflicting rebase in progress in its worktree for manual resolution instead of aborting it.
+- **`wtm sync`** detects a rebase already in progress (status `rebase_in_progress`) and blocks its descendants instead of retrying.
+- **`wtm sync --output json`** reports `conflict_files`, `kept_in_progress` and `path`.
 
-- **`wtm pr create --yes`** — mode non-interactif : push automatiquement une branche non poussée et saute les prompts (implicite avec `--output json`). Corrige un cas où `pr create --output json` sur une branche non poussée s'arrêtait silencieusement.
-- **`wtm init` pilotable par flags** — `--non-interactive`, `--agent`, `--shell`, `--base-path`, `--base-branch`, `--env-strategy`, `--install-command`. Résolution `flags > détection > défauts`, échoue proprement si la base branch est introuvable en non-interactif. Un agent peut bootstrapper un projet sans wizard.
-- **`wtm wt create --if-not-exists`** — succès idempotent (`already_exists: true`) si le worktree existe déjà, au lieu d'échouer.
-- **Codes de sortie granulaires** — `10` worktree existe, `11` branch introuvable, `12` config introuvable, `13` PR existe déjà, `14` job non déclaré. Agents et scripts peuvent brancher sur la cause d'échec.
-- **Logs des launchers détachés en live** — un service détaché (`docker compose up -d`…) streame sa sortie de démarrage en direct pendant `wtm run up` (réseau/conteneurs créés et démarrés), comme une task — au lieu d'un simple spinner puis « started ».
+### Changed
 
-### Breaking changes
+- **`--output json`** is available on every command, with a stable payload (empty lists as `[]`, never `null`, never framed).
+- **`wtm --help`** groups commands into sections: Worktrees, Navigate, Stacked branches, Dev jobs, GitHub, Setup.
+- The full command reference under `docs/` is generated from the CLI, and the README is a concise guide pointing to it.
+- The **`using-wtm`** agent skill is tighter and documents `prune` and `sync --keep-conflict`.
 
-- **`config not found` sort en code 12 (au lieu de 0)** — toute commande hors d'un repo initialisé échoue désormais avec un code non nul ; un script comptant sur un exit 0 silencieux doit être ajusté.
-- **`wtm pr create` sort en code 13 si une PR existe déjà** (au lieu de 0) ; en mode JSON la PR existante est imprimée sur stdout.
+### Fixed
 
-### Improvements
+- **`wtm sync`** captures the conflicting files before aborting, and finds the branch of a worktree stuck mid-rebase.
 
-- **`wtm wt clean` idempotent** — supprimer un worktree déjà absent réussit en no-op (`already_absent: true`).
-- **`run stop` / `run down` rejouables** — stopper un job déjà arrêté est un no-op ; un job non déclaré renvoie le code 14.
-- **Forks documentés** — `wtm pr checkout` d'une PR de fork reste refusé (par design), message clair vers `gh pr checkout` ; README + skill `using-wtm` à jour, référence morte supprimée.
+## [0.20.0] - 2026-07-01
 
-## v0.10.0 — Run unifié (start + tail, tasks streamées) + ordre des jobs de profil
+Branch pickers show remote branches and divergence, and multi-select lists can be filtered.
 
-### New features
+### Added
 
-- **`wtm run up` / `run start` : lancement unifié avec tail intégré** — les jobs démarrent et leur sortie est streamée dans la foulée (services en arrière-plan, tasks one-shot en direct) ; plus besoin d'enchaîner `start` puis `logs` à la main.
-- **Ordonnancement des jobs dans le wizard de profil** — nouveau step **Order** après la sélection des jobs (`run profile add` / `edit`) : on réordonne l'ordre d'exécution avec `shift+↑/↓` (ou `J`/`K`). L'ordre choisi est persisté dans `run.toml` et respecté à l'exécution (ex. une task `build` avant le `server`).
+- **`wtm create --from origin/x`** creates a worktree from a remote-tracking branch you have not checked out locally.
+- **`wtm reparent --to origin/x`** reparents onto a remote integration branch; `reparent` accepts a local branch or an `origin/x` ref.
+- Branch pickers (`create`, `checkout`, `reparent`, `relocate`, `init`) list local and `origin` branches, remote ones grouped after a separator and tagged `remote`, hidden when a local branch has the same name.
+- Branch pickers tag a local branch that drifted from `origin/` with its ahead/behind count (`↓5`, `↑2`, `↑2 ↓5`).
+- Branch pickers fetch `origin` in the background on open and refresh the badges; **`r`** fetches again; offline, the last known counts are shown.
+- **`wtm create`** offers to fast-forward a source branch that is strictly behind `origin/` before creating the worktree.
+- **`wtm create`** skips that fast-forward when the branch's worktree has uncommitted changes, and asks whether to create from the local branch as is (default no).
+- **`wtm create`** warns when the source branch has diverged from `origin/` and, on confirmation, creates from the local branch, keeping its commits.
+- Multi-select lists (`sync`, `extract`, the `init` wizard) filter on **`/`** (case-insensitive substring); **`a`** toggles all filtered items, selections survive filter changes, **`Esc`** clears the filter, then cancels.
 
-### Improvements
+### Changed
 
-- **Gestion homogène des échecs service/task** — un échec de task abort proprement le reste du profil, les logs d'échec sont remontés, et le rapport d'abort est nettoyé quand une task échoue.
-- **Spinners de chargement uniformes** — spinners cohérents sur l'ensemble des commandes (`run`, `wt`, `pr`, `resolve`…) et ellipses normalisées (`…`).
-- **Picker `wt go` / `wt switch` enrichi** — spinner de chargement, fetch parallèle des worktrees et callout GitHub CLI quand `gh` est absent.
+- Worktree lists have uniform row spacing, compact coloured badges aligned in columns, a tinted selected row with a left-edge marker, and a right-aligned status with a glyph (`✓ clean`, `⚠ dirty`).
+- **`create`**, **`extract`** and **`checkout`** ask before the `parent` env strategy copies `.env` from the main worktree because the source branch has no local worktree.
 
-## v0.9.0 — `wt list` interactif, run export/import + CRUD jobs/profiles
+## [0.19.0] - 2026-06-27
 
-### New features
+A stacked-branch workflow: see the tree, reparent a branch, and sync only what you pick.
 
-- **`wtm wt list` enrichie** — spinner de chargement pendant la récupération des worktrees, PRs et services ; bandeau d'avertissement quand la GitHub CLI est absente (non installée / non authentifiée) ; nouvelle action **Open PR** pour ouvrir directement la PR liée à une branche.
-- **Retour automatique au repo de base après suppression** — quand on supprime le worktree dans lequel on se trouve (via `wt list` → Clean ou `wtm wt clean`), le shell est ramené dans le repo de base au lieu de rester bloqué dans un dossier fantôme. S'appuie sur le pont `WTM_GO_FILE` existant.
-- **`wtm init` détecte les scripts `package.json`** — après les docker-compose files, une étape MultiSelect propose les scripts du `package.json` racine et, si `pnpm-workspace.yaml` est présent, ceux de chaque workspace. Les scripts `dev`/`start`/`serve`/`watch` (ou leurs formes préfixées `dev:*` / `*:dev`) sont pré-sélectionnés comme `kind="service"` ; les autres (`build`, `test`, `lint`…) comme `kind="task"`.
-- **`wtm run export [--profile <name>]`** — émet `.wtm/run.toml` comme JSON sur stdout. Compatible avec `--profile` pour exporter un seul profil et ses jobs.
-- **`wtm run import [file|-] [--replace --force]`** — ingère un payload JSON et le fusionne dans `.wtm/run.toml`. Par défaut, les nouveaux jobs/profils sont appendés, les doublons sont ignorés avec un avertissement. `--replace --force` écrase le fichier entièrement.
-- **`wtm run job add|rm|edit|list` et `wtm run profile add|rm|edit|list`** — CRUD CLI sur les jobs et profiles déclarés dans `run.toml` (qui vit désormais dans `<git-common-dir>/wtm/`). `add` : mode wizard si lancé sans flags obligatoires, mode flag pour pilotage LLM (`--cmd`, `--kind`, `--stop`, `--cwd` côté job ; `--jobs`, `--default` côté profile). `rm` : sans argument, picker interactif sur les jobs/profiles existants ; `--force` côté `job rm` retire aussi les références d'un job dans les profiles. `edit` : sans argument, picker puis wizard pré-rempli ; avec `<name>`, va directement au wizard. Le rename est autorisé, `ValidateRun` détecte les références orphelines. `list` : picker interactif → menu Edit/Remove en TTY, simple émission de la slice avec `--output json` ou en pipe.
-- **Default profile auto-override** — quand on définit un nouveau profile comme `--default` (ou via le wizard), l'ancien default est automatiquement désactivé au lieu d'erreur "two defaults". Le wizard prévient l'utilisateur (description du step Confirm) avant de basculer.
-- **TextInput re-valide à chaque touche** — les erreurs de validation (ex. "profile already exists") restent visibles tant que la valeur entrée est invalide, et disparaissent dès qu'elle redeviendrait valide. Avant, l'erreur s'effaçait à la première touche, illisible.
+### Breaking
 
-### Breaking changes
+- **`wtm sync`** no longer cascades over everything by default: pass branch names, pick them interactively, or use **`--all`**; with `--output json`, branch names or `--all` are required.
 
-- **`wtm run list --output json` : champs JSON en minuscules** — les clés passent de PascalCase (`Jobs`, `Name`, `Kind`) à lowercase (`job`, `name`, `kind`), alignées sur `run.schema.json`. Impacte tout script ou outil qui parsait la sortie JSON de `run list`.
+### Added
 
-### Improvements
+- **`wtm tree`** shows the forest of worktrees (parent → child), annotated with `↑N`, `● dirty` and `⚠ needs sync` when a parent moved ahead and the child needs a rebase.
+- **`wtm tree`** shows a parent without a worktree as a greyed `(no worktree)` root, and marks a `source_branch` cycle `⚠ cycle` instead of crashing.
+- **`wtm tree --with-prs`** adds PR numbers and merged/closed state; **`--output text|json|mermaid`** prints for agents or as a Mermaid `flowchart TD` to paste into a PR.
+- **`wtm reparent <branch> --to <parent>`** changes a worktree's recorded parent after creation; the rebase happens on the next `wtm sync`.
+- **`wtm reparent`** runs as a wizard showing the current parent, or from arguments and `--output json`, and refuses cycles and self-parenting.
+- **`wtm clean`** detects the children it would orphan and offers to reparent them onto the grandparent (`Esc` cancels the whole clean), or **`--reparent-children`** non-interactively.
+- **`wtm sync`** opens a multi-select picker when run without arguments on a terminal.
 
-- Suppression de la branche dédiée `wt clean` du wrapper shell et de son heuristique fragile `$PWD` ; le mécanisme générique `WTM_GO_FILE` gère désormais toutes les voies d'entrée.
+### Changed
 
-### Migration
+- **`wtm sync`** always refreshes the base first (unless the main worktree is dirty); selecting the base only fetches and fast-forwards it.
+- **`wtm sync`** exits with code `11` on an unknown branch argument.
+- Every command's human output has the same vertical spacing; JSON and machine output (`resolve`, `shell-init`) stay unpadded.
+- Loading spinners are one bordered loader across commands; without a terminal or with JSON, no spinner is drawn and no `\r` reaches a pipe.
 
-- **Re-`eval` de `wtm shell-init` requis** — le template du wrapper shell a changé. Les utilisateurs existants doivent re-`eval "$(wtm shell-init)"` (re-source `.zshrc`/`.bashrc`/config fish) pour bénéficier du retour automatique au repo de base.
+### Fixed
 
-## v0.8.0 — Strict TOML decoding + JSON Schema autocomplete
+- The **`relocate`** wizard breadcrumb, which names the worktree, no longer scrolls off screen on long lists; older completed steps fold into `… (N earlier steps)`, in every wizard.
+- A fast task's first output is no longer lost from its stream.
 
-### New features
+## [0.18.0] - 2026-06-24
 
-- **JSON Schema bundled pour les 3 fichiers de config** — `.wtm/run.toml`, `.wtm/config.toml`, `~/.config/wtm/config.toml`. Fichiers embarqués dans le binaire et écrits dans `.wtm/schemas/` (ou `~/.config/wtm/schemas/`) au moment du `wtm init`. Chaque TOML généré est préfixé par `#:schema ./schemas/...json`.
-- **`wtm schema dump`** — extrait les schémas embarqués vers le disque pour les régénérer après upgrade. `--global` cible le schéma global.
-- **Autocomplete + validation IDE via Taplo** — l'extension "Even Better TOML" (VS Code / Cursor / JetBrains) lit la directive `#:schema` et fournit autocomplete sur les champs et enums (kind, env.strategy, agent, shell), hover docs, erreurs en live.
+`wtm checkout` replaces the `pr` group.
 
-### Bug fixes
+### Breaking
 
-- **Decode TOML strict** — les clés inconnues (typos comme `[[profiles]]` au lieu de `[[profile]]`) sont maintenant rejetées avec un message clair `unknown keys in /path: profiles` au lieu d'être silencieusement ignorées.
+- **`wtm pr checkout`** is now **`wtm checkout`**: update scripts and aliases; its `--output json` stays `{number, branch, path}`.
+- **`wtm pr list`** is removed: use `wtm list --with-prs` or the `checkout` wizard.
 
-## v0.7.2 — Reset terminal modes après détach de `wtm run logs`
+### Added
 
-### Bug fixes
+- **`wtm checkout [number]`** creates a worktree from a pull request; without a number, a wizard (PR → parent branch → env strategy) streams open PRs in the background, disabling those already checked out or from a fork.
+- **`wtm checkout --review`** / **`--mine`** filter PRs, **`--from <branch>`** sets the sync parent (default: the PR's base), **`--env-from example|main|parent`** overrides the env strategy; each skips its wizard step.
 
-- **Le terminal n'est plus corrompu après détach d'un service TUI** — Sortir d'un `wtm run logs <service>` sur un service à TUI interactif (turbo, vite, vim, dev servers à HMR souris) laissait le terminal coincé en mouse-tracking + alt-screen + curseur masqué : taper produisait du garbage, et chaque mouvement de souris écho `<button>;<col>;<row>M` au prompt. La séquence "soft detach" (désactivation des cinq modes mouse, sortie d'alt-screen, ré-affichage du curseur, reset SGR) est désormais émise via `defer` à la sortie de `attachSingleJob` et `multiplexAllJobs`, donc sur Ctrl+C, EOF, ou erreur de connexion. Re-réintègre le fix `4ac6219` perdu au merge du gros refactor `9e8ac08` (PR #7).
+## [0.17.0] - 2026-06-24
 
-## v0.7.1 — Stop tue toute l'arborescence de processus
+Worktree commands move to the top level.
 
-### Bug fixes
+### Breaking
 
-- **`wtm run stop` / `run down` n'orphelinent plus les processus enfants** — `stopWithSignal` envoyait SIGTERM uniquement au PID direct (npm/pnpm), laissant les enfants (node, vite, turbo, nest, tsc, esbuild, …) tourner détachés en arrière-plan. Le signal cible désormais l'intégralité du process group via `kill -PGID`, attend la sortie effective avant de marquer le job *stopped*, et escalade vers SIGKILL après 5 secondes si le groupe ignore SIGTERM. Validé end-to-end sur un projet pnpm + turbo (web + api + tsc watch + esbuild) — toute l'arborescence est nettoyée.
+- **`wtm wt`** is removed: `wtm wt list` becomes `wtm list`, and likewise `create`, `clean`, `sync`, `relocate`, `go`, `switch`, `extract`; update scripts and aliases, and re-run `eval "$(wtm shell-init)"`.
 
-## v0.7.0 — Run config refactor (services + tasks unifiés en jobs)
+### Fixed
 
-### Breaking changes
+- A detached job's output is no longer truncated when its process exits.
 
-- **`.wtm/services.toml` → `.wtm/run.toml`** — le fichier de config est renommé. Sections refactorées : plus de `[[services]]` / `[[profiles]]`, on a maintenant `[[job]]` (avec `kind = "service"` ou `"task"`) et `[[profile]]` (avec `jobs = [...]` au lieu de `services = [...]`). Aucune migration auto — les anciens fichiers ne sont plus lus.
-- **CLI `wtm svc *` → `wtm run *`** — toutes les sous-commandes basculent (`run up`, `run down`, `run ps`, `run logs`, `run start`, `run stop`, `run list`).
-- **Helpers exportés / shell wrapper** — le wrapper `wt switch` appelle maintenant `wtm run up` (regénéré via `wtm shell init`).
+## [0.16.0] - 2026-06-22
 
-### New features
+`wt relocate` gathers worktrees under `base_path`, and unused configuration is removed.
 
-- **Type `task` pour les scripts one-shot** — `kind = "task"` modélise les commandes qui doivent terminer avec succès avant que le profil continue (migrations, seeds, formatters). Le daemon stream l'output live au CLI, le job disparaît de `run ps` après exit, et un échec abort le reste du profil.
-- **Streaming NDJSON pour les tasks** — le protocole daemon/CLI gère plusieurs `Response` par requête (`StatusOutput` pour les chunks, `StatusDone` pour la fin). Le CLI forward le contenu sur stdout pour suivre l'exécution en direct.
-- **Colonne `KIND` dans `run ps`** — distingue services et tasks dans la table et le picker.
-- **Validation stricte du format** — `kind` requis, `task` ne peut pas avoir de `stop`, profils référencent uniquement des jobs déclarés. Les erreurs sont remontées avant l'exécution.
+### Breaking
 
-### Improvements
+- **`wtm pr create`** is removed: use `gh pr create`.
+- The project `config.toml` refuses `[agents]`, `[integrations]` and `[github]`, and the global config refuses `agent`: delete those lines or re-run `wtm init`.
 
-- **Init docker-compose génère du `[[job]]` directement** — la détection à `wtm init` écrit dans `.wtm/run.toml` avec `kind = "service"` et `stop` configuré (donc détaché).
-- **Skill `using-wtm` mis à jour** — la doc agent reflète le nouveau vocabulaire (jobs, kinds, run.toml, `wtm run *`).
+### Added
 
-## v0.6.2 — Style polish (suite)
-
-### Bug fixes
-
-- **Couleurs du picker `wt go` / `wt switch` (vrai fix)** — La release v0.6.1 utilisait `SetDefaultRenderer`, qui remplace le pointeur global mais laisse les styles existants (déclarés au package init) référencer l'ancien renderer. Remplacé par `SetColorProfile` qui mute le renderer partagé en place. Le picker retrouve maintenant effectivement sa barre bleue et ses badges colorés quand invoqué via le shell wrapper.
-- **Padding entre le prompt de confirmation et le résultat du stop** — `svc up` ajoute une ligne vide entre "Stop other services before starting?" et le premier "✓ Stopped services in X", pour qu'on distingue clairement la réponse au prompt du résultat.
-
-## v0.6.1 — Style polish
-
-### Improvements
-
-- **Padding cohérent autour des warnings** — `svc up` (services sur un autre worktree), `pr create` (PR déjà ouverte) et `svc ps` (aucun service running) respectent maintenant un padding top/bottom uniforme.
-- **Padding `wtm init`** — Ajout d'un style dédié `Intro` avec accent primary pour le message "No .wtm/config.toml found", nettoyage du padding autour des messages de succès.
-- **Picker `wt go` / `wt switch` stylisé** — Quand le picker est invoqué depuis le shell wrapper (qui capture stdout via `$()`), lipgloss détectait stdout non-TTY et désactivait les couleurs. La détection bascule maintenant sur stderr, le picker conserve son highlight bleu et ses badges.
-- **Padding bottom après refus d'ouvrir un PR existant** — `pr create` ajoute une ligne vide après le prompt "Open in browser?" quel que soit le choix de l'utilisateur.
-
-## v0.6.0 — Ready for LLM agents
-
-### New features
-
-- **`--output json` sur les commandes data** — `wt list`, `wt create`, `wt clean` (avec `--force`), `pr list`, `pr create`, `pr checkout`, `svc list`, `svc ps`, `svc up`, `svc down`, `svc start`, `svc stop` retournent maintenant du JSON machine-readable sur stdout. Le texte humain reste sur stderr. Permet aux agents (Claude Code, Cursor, scripts) de piloter wtm sans TUI.
-- **`wtm svc list`** — Liste les services et profils déclarés dans `.wtm/services.toml`. En TTY, picker interactif avec actions `up`/`down` sur un profil ou `start`/`stop`/`logs` sur un service, pour découvrir le cycle de vie svc sans mémoriser chaque commande.
-- **`wtm svc ps`** — Liste les services gérés en ce moment par le daemon (name, status, pid, worktree). Picker avec actions `stop`/`logs`/`restart` + une entrée "Stop all running services" qui dispatche `svc down --all`.
-- **`wtm agents install`** — Détecte les destinations skill existantes (`.claude/` / `.cursor/` projet ou global) et installe un skill compact `using-wtm` que Claude Code / Cursor consultent automatiquement quand l'utilisateur parle worktrees, services ou PRs.
-- **Détection `docker-compose` dans `wtm init`** — Si des fichiers `docker-compose*.yml/yaml` sont trouvés, étape wizard MultiSelect pour scaffolder des services correspondants dans `.wtm/services.toml` avec `up -d` / `down --remove-orphans` et détection automatique de la commande (`docker compose` v2 ou `docker-compose` v1).
-- **`wtm svc down --all`** — Stoppe tous les services de tous les worktrees (le comportement par défaut de `svc down` reste scoped au worktree courant).
-
-### Bug fixes
-
-- **Échecs silencieux de `docker compose up -d`** (LUC-56) — Les services launcher-style (ceux avec un `Stop`) affichaient `✓ started` même quand docker échouait (port conflit, image manquante, compose invalide). Le manager attend maintenant la sortie du launcher et remonte l'erreur avec la sortie capturée, nettoyée des ANSI et des redraw `\r` de compose.
-- **`svc down` traversant les worktrees** — `svc down` (et indirectement `wt clean`, `svc up --exclusive`) pouvait stopper des services d'autres worktrees parce que `handleStopAll` ignorait `Request.WorkDir`. Ajout de `StopAllInWorkDir` et respect du workdir côté daemon.
-
-### Improvements
-
-- **Picker `wt switch` aligné sur `wt list`** — Même styling (breadcrumb, badges parent / PR / services / dirty) quand l'utilisateur appelle `wt switch` sans argument.
-- **Spinners sur les opérations svc** — `svc up`, `svc down`, `svc start` affichent maintenant un spinner pendant l'aller-retour daemon (utile quand `docker pull` prend plusieurs secondes).
-- **`output.Error` multi-ligne** — Les erreurs avec sortie capturée (typiquement docker compose) sont formatées en bloc indenté au lieu d'une ligne illisible.
-- **`wtm svc down` scoping par défaut** — Sans `--all`, ne touche que le worktree courant. Help text mis à jour.
-
-## v0.5.1 — Fix TUI et navigation shell
-
-### Corrections
-
-- **TUI invisible dans `wt go` / `wt switch`** — Le picker de worktree ne s'affichait pas quand appelé via le shell wrapper. Le TUI Bubbletea rendait sur stdout, qui était capturé par la substitution `$()`. Le rendu passe maintenant sur stderr.
-- **"Go to worktree" depuis `pr list` et `wt list`** — L'action affichait "requires shell integration" au lieu de naviguer. Les commandes résolvaient le path via un sous-processus `wtm wt go` qui tombait sur le fallback. Remplacé par une résolution directe et écriture dans `WTM_GO_FILE`.
-- **Shell wrapper étendu** — La clause `else` du wrapper (bash/zsh/fish) passe maintenant `WTM_GO_FILE` à toutes les commandes, permettant à n'importe quelle sous-commande de déclencher un `cd`.
-
-## v0.5.0 — New TUI Components, Focus Removal & Unified Output
-
-### Breaking changes
-
-- **`wtm wt focus` removed** — The focus command, `on_focus`/`on_blur` hooks, and active worktree state tracking have been removed. Services are now managed exclusively through `svc up`/`svc down`.
-- **`on_focus` / `on_blur` hooks removed from config** — Only `on_create` hooks remain. Docker lifecycle is handled by the service manager.
-- **Dashboard hidden** — The interactive dashboard is disabled behind a feature flag while being reworked. `wtm` without arguments shows help instead.
-
-### New features
-
-- **`wtm wt switch [branch]`** — New command that combines `wt go` + `svc up` in one step. Supports `--exclusive`, `--parallel`, and `--profile` flags.
-- **Smart `svc up`** — Detects services running on other worktrees and prompts to stop them before starting. Use `--exclusive` to auto-stop or `--parallel` to skip the prompt.
-- **Auto-stop on clean** — `wt clean` automatically stops running services before deleting a worktree.
-- **Reusable TUI components** — New Bubbletea component library (`internal/tui/components/`) with SelectList, TextInput, MultiSelect, Confirm, and Wizard. Full-row highlight, inline filtering (`/`), step breadcrumb, and Esc back navigation.
-- **Contextual PR actions** — `pr list` picker shows "Go to worktree" if a worktree exists for the PR branch, "Checkout into worktree" otherwise.
-- **Worktree badges** — `wt list` picker shows colored badge chips (parent, PR, services, dirty/clean) aligned to the right.
-
-### Improvements
-
-- **Unified output styling** — All CLI messages use standardized helpers (`output.Success`, `output.Error`, `output.Warning`, `output.Loading`, `output.Message`) with consistent `"  "` indent.
-- **Uniform spacing** — Every command has blank line padding top and bottom. Help text is indented to match.
-- **Centralized error display** — All errors go through a styled `✗` handler with proper padding.
-- **PR detail view** — Rewritten with output helpers, no more lipgloss box.
-- **Separator support** — Action lists use visual separators to group navigation, services, and danger actions.
-- **Detached service fix** — Services using `docker compose up -d` (detached mode) are now correctly tracked as running and properly stopped.
-- **Config resolution fix** — `svc up`, `svc start`, `svc down` now correctly read `services.toml` from the main worktree when run from a secondary worktree.
+- **`wtm wt relocate`** moves scattered worktrees under `base_path` and adopts external worktrees into wtm, with a preview before running.
+- **`wtm wt relocate`** runs as a wizard, or without a terminal via `--to`, `--force` and `--output json` (per-worktree status: `moved`, `moved_adopted`, `adopted`, `skipped`, …).
 
 ### Removed
 
-- `charmbracelet/huh` dependency — Fully replaced by custom Bubbletea components.
-- `state.json` active worktree tracking — No longer written to.
-- Docker hooks from `wtm init` wizard — The docker-compose file selection and hook confirmation steps are removed.
+- The default-agent setting: the `agent` key, the `--agent` flag and its `init` wizard step.
+- **`[github] auto_draft`**, unused since `pr create` was removed.
 
-### Tests
+## [0.15.0] - 2026-06-20
 
-- Added 35+ new tests across commands, output, config, and infra layers.
-- Commands: `branchInList`, `buildWorktreeLabel`, `joinTags`, `truncate`, `joinServiceNames`.
-- Output: all block helpers (Success, Error, Warning, Loading, Message, etc.).
-- Config: corrupted TOML, merge precedence, default application.
-- Infra: IsDirty, CurrentBranch, CommitsAhead.
+`wt sync` rebases the whole chain of worktrees in one command.
 
----
+### Added
 
-## v0.4.1 — Migrate GitHub integration to gh CLI
+- **`wtm wt sync`** updates every worktree in topological order: fast-forwards each branch from its own `origin/<branch>`, then rebases it `--onto` its refreshed parent, replaying only its own commits, all locally.
+- **`wtm wt sync`** shows a recap (parent, target commit, before → after, replayed commits) before offering a single push of the rebased branches with `--force-with-lease`.
+- **`wtm wt sync --dry-run`** previews offline; **`--base <branch>`**, **`--push`** (the only way to push with `--output json`), **`--no-push`** and **`-y`/`--yes`**.
+- **`wtm wt sync --output json`** reports a status per branch: `synced`, `up_to_date`, `skipped_dirty`, `skipped_ancestor`, `diverged`, `conflict` (rebase aborted, tree clean), `error`, `unknown_parent`; it exits non-zero on any `conflict` or `error`.
 
-### Breaking changes
+### Fixed
 
-- **`wtm auth` supprimé** — Les commandes `wtm auth login/status/logout` n'existent plus.
-  L'authentification GitHub est désormais gérée par le `gh` CLI.
-  Installez-le et connectez-vous avec `gh auth login` : [cli.github.com](https://cli.github.com).
-- **`WTM_GITHUB_TOKEN` non supporté** — Utilisez `GH_TOKEN` à la place (nativement supporté par `gh`).
+- **`wtm wt sync`** reports a failing git command as a blocking `error` instead of a false `up_to_date`, and pushes only when `origin/<branch>` is really missing.
 
-### Improvements
+## [0.14.0] - 2026-06-20
 
-- Suppression de toute la couche auth custom (OAuth Device Flow, token storage, auto-refresh) au profit du `gh` CLI.
-- `wtm pr list`, `wtm pr create`, `wtm pr checkout` et le dashboard PR passent par `gh` en subprocess.
-- Le README documente désormais les dépendances (`git` requis, `gh` recommandé).
+Worktree lists show up instantly while PRs stream in.
 
----
+### Added
 
-## v0.4.0 — GitHub Integration & PR Management
+- **`wtm wt list --with-prs`** includes PRs in non-interactive output, identically in text and JSON.
 
-### New features
+### Changed
 
-- **GitHub authentication** — `wtm auth login` lance un flux OAuth Device Flow.
-  `wtm auth status` affiche l'état du token, `wtm auth logout` le révoque.
-  Support de `WTM_GITHUB_TOKEN` comme PAT alternatif. Token auto-refreshé en arrière-plan.
-- **`wtm pr list`** — Liste les pull requests du dépôt avec filtres `--mine` et `--review`.
-  Intégré dans le dashboard (panneau droit, touche `p`).
-- **`wtm pr create`** — Assistant interactif pour créer une PR depuis la branche courante :
-  titre, body, draft, reviewers.
-- **`wtm pr checkout`** — Crée un worktree directement depuis une branche de PR existante.
+- **`wt list`**, **`wt go`** and **`wt switch`** show worktrees immediately; PR badges fill in as they arrive, with a progress banner and an install/login hint when `gh` is unavailable.
+- **`wt list`** no longer fetches PRs by default in non-interactive output.
+- Worktree pickers fetch lighter PR data; `pr list` keeps the full detail.
+- The **Open PR** action is available immediately, its URL resolved while loading.
 
-### Breaking changes
+## [0.13.0] - 2026-06-20
 
-- **Commandes regroupées sous `wtm wt` et `wtm svc`** — Les commandes worktree passent
-  sous `wtm wt` (ex. `wtm wt new`, `wtm wt ls`, `wtm wt go`). Les commandes service
-  passent sous `wtm svc` (ex. `wtm svc up`, `wtm svc down`, `wtm svc start`, `wtm svc stop`).
-- **`wtm svc start/stop`** — `start`/`stop` ciblent des services individuels,
-  `up`/`down` gèrent les profils complets. Les deux sont sous `wtm svc`.
+`wtm init` reworked: skip sections, re-initialise one with `--only`, edit `on_create` hooks.
 
-### Improvements
+### Added
 
-- Migration de `gh` CLI vers `go-github` pour la détection de PR ouverte lors du `clean`.
-- Dashboard : logs multiplexés, focus corrigé, split panel worktrees/PRs 50/50.
+- **`wtm init`** opens each optional section (`env`, `hooks`, `services`) with a Configure / Skip step; a skipped section is written commented out, ready to enable.
+- **`wtm init --skip-env`**, **`--skip-hooks`**, **`--skip-services`** skip sections non-interactively.
+- **`wtm init --only <section>`** re-initialises `worktrees`, `env`, `hooks` or `services` (CSV or repeated) without touching the others, pre-filled from the existing config; `run.toml` keeps its profiles.
+- **`wtm init`** edits `on_create` hooks as a list: add, edit, remove and reorder (`shift+↑/↓`) entries, each with `cmd`, optional `cwd` and `continue_on_error`.
 
----
+### Changed
 
-## v0.3.0 — Services & PTY
+- **`wtm init`** points to `--only` when a config already exists.
 
-### New features
+### Removed
+
+- The install command and monorepo packages steps of `wtm init`: use the `on_create` hook editor.
+
+## [0.12.0] - 2026-06-20
+
+`wt extract` moves uncommitted changes between worktrees.
+
+### Added
+
+- **`wtm wt extract`** moves part of the current worktree's uncommitted changes to a new or existing worktree, through a Files → Target → Mode wizard or `--files`, `--to`, `--from`, `--keep`, `--on-conflict` and `--output json`.
+- **`wtm wt extract`** moves files by default; **`--keep`** copies them.
+- **`wtm wt extract`** cleans the source only once the whole extraction applied; on any conflict the source is left untouched.
+- **`wtm wt extract --on-conflict abort`** (default) changes nothing and exits with code `15`; **`resolve`** writes git conflict markers in the target and keeps the source intact.
+
+## [0.11.0] - 2026-06-19
+
+wtm can be driven by agents, and detached services stream their startup logs.
+
+### Breaking
+
+- A command run outside an initialised repository exits with code `12` instead of `0`: adjust scripts relying on a silent success.
+- **`wtm pr create`** exits with code `13` when a PR already exists, instead of `0`; in JSON the existing PR is printed on stdout.
+
+### Added
+
+- **`wtm pr create --yes`** pushes an unpushed branch and skips prompts (implied by `--output json`).
+- **`wtm init --non-interactive`**, with `--agent`, `--shell`, `--base-path`, `--base-branch`, `--env-strategy` and `--install-command`, bootstraps a project from flags, then detection, then defaults; it fails if the base branch cannot be found.
+- **`wtm wt create --if-not-exists`** succeeds with `already_exists: true` when the worktree exists.
+- Exit codes per failure: `10` worktree exists, `11` branch not found, `12` config not found, `13` PR already exists, `14` job not declared.
+- **`wtm run up`** streams a detached service's startup output (`docker compose up -d` creating networks and containers) instead of a spinner.
+
+### Changed
+
+- **`wtm wt clean`** succeeds as a no-op on a worktree already gone (`already_absent: true`).
+- **`run stop`** / **`run down`** are no-ops on a job already stopped; an undeclared job exits with code `14`.
+- **`wtm pr checkout`** on a fork PR is still refused, with a message pointing to `gh pr checkout`.
+
+### Fixed
+
+- **`wtm pr create --output json`** no longer stops silently on an unpushed branch.
+
+## [0.10.0] - 2026-06-09
+
+`run up` and `run start` launch and tail in one step, and profiles run jobs in your order.
+
+### Added
+
+- **`wtm run up`** / **`run start`** start jobs and stream their output straight away: services in the background, tasks live.
+- **`run profile add`** / **`edit`** add an Order step to reorder jobs (`shift+↑/↓` or `J`/`K`); the order is saved in `run.toml` and followed at run time.
+
+### Changed
+
+- A failed task aborts the rest of the profile cleanly and shows its failure logs.
+- Loading spinners and ellipses (`…`) are consistent across commands.
+- The **`wt go`** / **`wt switch`** picker shows a loading spinner, fetches worktrees in parallel and shows a callout when `gh` is missing.
+
+## [0.9.0] - 2026-06-08
+
+An interactive `wt list`, `run.toml` export/import and commands to edit jobs and profiles.
+
+### Breaking
+
+- wtm keeps its config, `run.toml`, schemas and per-worktree metadata in `<git-common-dir>/wtm/` instead of `.wtm/` in the repository: move existing files there or re-run `wtm init`.
+- **`wtm run list --output json`** uses lowercase keys (`job`, `name`, `kind`) instead of PascalCase, matching `run.schema.json`.
+- The shell wrapper changed: re-run `eval "$(wtm shell-init)"` (or re-source your shell config) to get the return to the base repository.
+
+### Added
+
+- **`wtm wt list`** shows a loading spinner, a banner when the GitHub CLI is missing or not authenticated, and an **Open PR** action.
+- Removing the worktree you are in (`wt list` → Clean, or `wtm wt clean`) sends the shell back to the base repository.
+- **`wtm init`** offers the `package.json` scripts, and each pnpm workspace's, as jobs: `dev`/`start`/`serve`/`watch` (and `dev:*`, `*:dev`) preselected as services, the others as tasks.
+- **`wtm run export [--profile <name>]`** prints `run.toml` as JSON on stdout, optionally one profile and its jobs.
+- **`wtm run import [file|-]`** merges a JSON payload into `run.toml`, skipping duplicates with a warning; **`--replace --force`** overwrites the file.
+- **`wtm run job add|rm|edit|list`** and **`wtm run profile add|rm|edit|list`** manage `run.toml` declarations, by wizard or by flags (`--cmd`, `--kind`, `--stop`, `--cwd`; `--jobs`, `--default`).
+- **`run job rm`** / **`run profile rm`** open a picker without an argument; **`run job rm --force`** also removes the job from profiles.
+- **`run job edit`** / **`run profile edit`** open a picker then a pre-filled wizard, renames included; orphaned references are reported.
+- **`run job list`** / **`run profile list`** open an Edit/Remove picker on a terminal and print the list with `--output json` or in a pipe.
+- **`wtm config show`** and **`wtm config edit`** show and edit the config without digging into the git directory.
+
+### Changed
+
+- Setting a profile as default unsets the previous one instead of failing, and the wizard warns before switching.
+- Text inputs re-validate on every key: an error stays visible while the value is invalid and clears once it is valid.
+
+## [0.8.0] - 2026-05-01
+
+Config files are decoded strictly and come with JSON Schemas for IDE autocomplete.
+
+### Added
+
+- JSON Schemas for `run.toml`, the project `config.toml` and the global `config.toml` ship in the binary, are written next to them by `wtm init`, and each generated file starts with a `#:schema` directive.
+- **`wtm schema dump`** writes the embedded schemas to disk, to refresh them after an upgrade; **`--global`** targets the global one.
+- Editors with Taplo ("Even Better TOML" for VS Code, Cursor, JetBrains) get autocomplete on fields and enums, hover docs and live errors.
+
+### Fixed
+
+- Unknown keys in a config file (`[[profiles]]` for `[[profile]]`) are rejected with `unknown keys in <path>: profiles` instead of ignored.
+
+## [0.7.2] - 2026-04-29
+
+The terminal is restored after detaching from a job's logs.
+
+### Fixed
+
+- Leaving **`wtm run logs`** on a job with an interactive TUI (turbo, vite, vim) no longer leaves the terminal in mouse tracking, alternate screen and hidden cursor, on Ctrl+C, EOF or a connection error.
+
+## [0.7.1] - 2026-04-29
+
+Stopping a job stops its whole process tree.
+
+### Fixed
+
+- **`wtm run stop`** / **`run down`** signal the job's whole process group instead of only `npm`/`pnpm`, wait for it to exit before marking it stopped, and send SIGKILL after 5 s if SIGTERM is ignored.
+
+## [0.7.0] - 2026-04-29
+
+Services and one-shot tasks are unified as jobs in `run.toml`.
+
+### Breaking
+
+- **`.wtm/services.toml`** is replaced by **`.wtm/run.toml`**, with `[[job]]` (`kind = "service"` or `"task"`) and `[[profile]]` (`jobs = [...]`): rewrite your file, the old one is no longer read.
+- **`wtm svc`** is renamed **`wtm run`** (`up`, `down`, `ps`, `logs`, `start`, `stop`, `list`): update scripts and aliases.
+- The **`wt switch`** shell wrapper calls `wtm run up`: regenerate it with `wtm shell-init`.
+
+### Added
+
+- **`kind = "task"`** declares a one-shot command (migration, seed, formatter) that must succeed before the profile continues; a failure aborts the rest of the profile.
+- Tasks stream their output live, and leave `run ps` once they exit.
+- **`wtm run ps`** shows a `KIND` column in its table and picker.
+- **`run.toml`** is validated before anything runs: `kind` is required, a task cannot have `stop`, profiles may only reference declared jobs.
+
+### Changed
+
+- **`wtm init`** writes detected docker-compose files as detached `[[job]]` services with a `stop` command.
+- The **`using-wtm`** agent skill uses the new vocabulary (jobs, kinds, `run.toml`, `wtm run`).
+
+## [0.6.2] - 2026-04-13
+
+More output polish.
+
+### Fixed
+
+- The **`wt go`** / **`wt switch`** picker keeps its colours when run through the shell wrapper.
+- **`svc up`** puts a blank line between the "stop other services?" prompt and the result.
+
+## [0.6.1] - 2026-04-12
+
+Output polish.
+
+### Changed
+
+- **`svc up`**, **`pr create`** and **`svc ps`** pad their warnings consistently.
+- **`wtm init`** highlights its "No .wtm/config.toml found" intro and pads its success messages.
+- **`pr create`** adds a blank line after the "Open in browser?" prompt, whatever the answer.
+
+### Fixed
+
+- The **`wt go`** / **`wt switch`** picker keeps its highlight and badges when run through the shell wrapper.
+
+## [0.6.0] - 2026-04-12
+
+wtm can be driven by LLM agents.
+
+### Added
+
+- **`--output json`** on `wt list`, `wt create`, `wt clean` (with `--force`), `pr list`, `pr create`, `pr checkout`, `svc list`, `svc ps`, `svc up`, `svc down`, `svc start` and `svc stop`, with human text on stderr.
+- **`wtm svc list`** lists declared services and profiles; on a terminal, a picker offers `up`/`down` on a profile and `start`/`stop`/`logs` on a service.
+- **`wtm svc ps`** lists the services the daemon is running (name, status, PID, worktree), with `stop`/`logs`/`restart` actions and "Stop all running services".
+- **`wtm agents install`** installs a `using-wtm` skill into the `.claude/` or `.cursor/` directories it finds, project or global.
+- **`wtm init`** detects `docker-compose*.yml`/`.yaml` files and scaffolds matching services, using `docker compose` (v2) or `docker-compose` (v1).
+- **`wtm svc down --all`** stops every service of every worktree.
+
+### Changed
+
+- **`wt switch`** without an argument shows the same picker as `wt list`.
+- **`svc up`**, **`svc down`** and **`svc start`** show a spinner while waiting on the daemon.
+- Errors carrying captured output (docker compose) print as an indented block.
+- **`wtm svc down`** without `--all` only touches the current worktree.
+
+### Fixed
+
+- A service with a `stop` command no longer reports `✓ started` when `docker compose up -d` fails; the error is shown with its output.
+- **`svc down`** (and `wt clean`, `svc up --exclusive`) no longer stops services of other worktrees.
+
+## [0.5.1] - 2026-04-12
+
+Pickers and shell navigation work through the shell wrapper.
+
+### Fixed
+
+- The **`wt go`** / **`wt switch`** picker is visible when run through the shell wrapper.
+- "Go to worktree" from **`pr list`** and **`wt list`** navigates instead of saying shell integration is required.
+- The shell wrapper (bash, zsh, fish) lets any subcommand change the directory.
+
+## [0.5.0] - 2026-04-12
+
+New pickers and wizards, `wt switch`, and focus removed in favour of services.
+
+### Breaking
+
+- **`wtm wt focus`** is removed, along with active-worktree tracking: use `svc up` / `svc down`.
+- The **`on_focus`** / **`on_blur`** hooks are removed: keep only `on_create`, and let the service manager run Docker.
+- The dashboard is hidden while it is reworked: `wtm` without arguments shows help.
+
+### Added
+
+- **`wtm wt switch [branch]`** goes to a worktree and runs `svc up`, with `--exclusive`, `--parallel` and `--profile`.
+- **`svc up`** detects services running in other worktrees and asks to stop them; **`--exclusive`** stops them, **`--parallel`** skips the question.
+- **`wt clean`** stops a worktree's running services before deleting it.
+- Pickers and wizards highlight the full row, filter on **`/`**, show a step breadcrumb and go back with **`Esc`**.
+- The **`pr list`** picker offers "Go to worktree" when the PR branch has one, "Checkout into worktree" otherwise.
+- The **`wt list`** picker shows right-aligned badges: parent, PR, services, dirty/clean.
+
+### Changed
+
+- All messages share one style and indent, every command is padded top and bottom, and help text is indented to match.
+- Errors print through one styled `✗` handler.
+- The PR detail view drops its box.
+- Action lists group navigation, service and destructive actions with separators.
+
+### Fixed
+
+- Services using `docker compose up -d` are tracked as running and stopped properly.
+- **`svc up`**, **`svc start`** and **`svc down`** read `services.toml` from the main worktree when run from another one.
+
+### Removed
+
+- The docker-compose file selection and hook steps of the `wtm init` wizard.
+
+## [0.4.1] - 2026-04-12
+
+GitHub access goes through the `gh` CLI.
+
+### Breaking
+
+- **`wtm auth login|status|logout`** are removed: install `gh` and run `gh auth login`.
+- **`WTM_GITHUB_TOKEN`** is no longer read: use `GH_TOKEN`.
+
+### Changed
+
+- **`pr list`**, **`pr create`**, **`pr checkout`** and the dashboard's PR panel use `gh`.
+- The README lists the dependencies: `git` required, `gh` recommended.
+
+## [0.4.0] - 2026-04-10
+
+GitHub integration and pull-request commands.
+
+### Breaking
+
+- Worktree commands move under **`wtm wt`** (`wtm wt new`, `wtm wt ls`, `wtm wt go`, …) and service commands under **`wtm svc`** (`up`, `down`, `start`, `stop`): update scripts and aliases.
+
+### Added
+
+- **`wtm auth login`** signs in to GitHub with the OAuth device flow; **`auth status`** shows the token state, **`auth logout`** revokes it; `WTM_GITHUB_TOKEN` accepts a personal access token.
+- **`wtm pr list`** lists the repository's pull requests, with **`--mine`** and **`--review`**, also in the dashboard (`p`).
+- **`wtm pr create`** creates a PR from the current branch through a wizard: title, body, draft, reviewers.
+- **`wtm pr checkout`** creates a worktree from an existing PR's branch.
+- **`wtm svc start`** / **`stop`** act on single services, **`up`** / **`down`** on whole profiles.
+
+### Changed
+
+- The dashboard splits worktrees and PRs 50/50 and multiplexes logs.
+
+### Fixed
+
+- Dashboard focus handling.
+
+## [0.3.0] - 2026-04-04
+
+Services run in a background daemon, each in its own terminal.
+
+### Breaking
+
+- Project config moves from `.wtm.toml` to **`.wtm/config.toml`**: move the file.
+
+### Added
+
+- **`wtm up`** starts services from `.wtm/services.toml` profiles in a background daemon, scoped to the worktree; a picker opens when several profiles exist and no `--profile` is given.
+- **`wtm down`** stops the worktree's services.
+- **`wtm logs`** attaches to a service's terminal, with full colours.
+- The dashboard starts (`u`), stops (`x`) and attaches to (`s`) the selected worktree's services, and shows their status.
+- Duplicate services or profiles in `services.toml` raise a warning.
+
+## [0.2.1] - 2026-04-03
+
+A fix for the dashboard launched from the shell.
+
+### Fixed
+
+- Opening the dashboard through the shell wrapper.
+
+## [0.2.0] - 2026-04-03
+
+An interactive dashboard.
+
+### Added
+
+- **`wtm`** without arguments opens a full-screen dashboard of every worktree.
+- The dashboard lists worktrees with branch, clean/dirty status, commits ahead and focus indicator.
+- The dashboard's detail panel shows path, source branch, unpushed commits, context notes and modified files, scrollable.
+- The dashboard creates (`n`), cleans (`d`), focuses (`f`) and navigates to (`Enter`) worktrees.
+- Focusing from the dashboard streams hook output live in a split panel, closed with `Esc`.
+- **`Tab`** / **`Shift+Tab`** cycle panels; **`j`/`k`** or arrows scroll the active one.
+- **`wtm new`** asks for the branch name when none is given.
+
+### Fixed
+
+- Hook errors in the dashboard show in the detail panel instead of corrupting the screen.
+
+## [0.1.2] - 2026-04-02
+
+Fixes for commands run from a child worktree.
+
+### Fixed
+
+- Commands run from a child worktree find the project config.
+- Blur hooks no longer fail when the previous worktree's directory is gone.
+- The shell wrapper returns to the main worktree after cleaning the current one.
+
+## [0.1.1] - 2026-04-02
+
+Initial release.
+
+### Added
+
+- **`wtm init`** sets up global and project configuration through a wizard.
+- **`wtm new [branch]`** creates a worktree with env provisioning, metadata and hooks.
+- **`wtm ls`** lists worktrees with their git status (clean/dirty, commits ahead).
+- **`wtm go [branch]`** moves to a worktree through shell integration.
+- **`wtm focus [branch]`** switches the active worktree and runs `on_blur` / `on_focus` hooks.
+- **`wtm clean [branch]`** removes a worktree, refusing when it is dirty, unpushed or has an open PR.
+- **`wtm shell-init`** generates the shell wrapper for zsh, bash and fish.
+- TOML config: `.wtm.toml` in the project, `~/.config/wtm/config.toml` globally.
+- Three env strategies: `example`, `main`, `parent`.
+- Hooks with template variables, `continue_on_error` and timings.
+- Detection of the base branch, env files, package manager, Docker Compose and pnpm workspaces.
+- Install with Homebrew (`brew install LucasPcq/tap/wtm`), GitHub Releases binaries (macOS/Linux, amd64/arm64) or `go install github.com/LucasPcq/wtm@latest`.
+
+[Unreleased]: https://github.com/LucasPcq/wtm/compare/v0.28.0...HEAD
+[0.28.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.28.0
+[0.27.1]: https://github.com/LucasPcq/wtm/releases/tag/v0.27.1
+[0.27.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.27.0
+[0.26.1]: https://github.com/LucasPcq/wtm/releases/tag/v0.26.1
+[0.26.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.26.0
+[0.25.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.25.0
+[0.24.1]: https://github.com/LucasPcq/wtm/releases/tag/v0.24.1
+[0.24.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.24.0
+[0.23.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.23.0
+[0.22.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.22.0
+[0.21.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.21.0
+[0.20.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.20.0
+[0.19.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.19.0
+[0.18.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.18.0
+[0.17.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.17.0
+[0.16.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.16.0
+[0.15.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.15.0
+[0.14.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.14.0
+[0.13.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.13.0
+[0.12.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.12.0
+[0.11.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.11.0
+[0.10.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.10.0
+[0.9.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.9.0
+[0.8.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.8.0
+[0.7.2]: https://github.com/LucasPcq/wtm/releases/tag/v0.7.2
+[0.7.1]: https://github.com/LucasPcq/wtm/releases/tag/v0.7.1
+[0.7.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.7.0
+[0.6.2]: https://github.com/LucasPcq/wtm/releases/tag/v0.6.2
+[0.6.1]: https://github.com/LucasPcq/wtm/releases/tag/v0.6.1
+[0.6.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.6.0
+[0.5.1]: https://github.com/LucasPcq/wtm/releases/tag/v0.5.1
+[0.5.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.5.0
+[0.4.1]: https://github.com/LucasPcq/wtm/releases/tag/v0.4.1
+[0.4.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.4.0
+[0.3.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.3.0
+[0.2.1]: https://github.com/LucasPcq/wtm/releases/tag/v0.2.1
+[0.2.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.2.0
+[0.1.2]: https://github.com/LucasPcq/wtm/releases/tag/v0.1.2
+[0.1.1]: https://github.com/LucasPcq/wtm/releases/tag/v0.1.1

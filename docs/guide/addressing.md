@@ -1,5 +1,13 @@
 # Named URLs and addressing
 
+```console
+$ wtm run url feat/x --job shop-api
+http://api.feat-x.myrepo.localhost:11080
+$ wtm run url feat/x --job shop-api --raw
+http://localhost:4011
+$ curl "$(wtm run url feat/x --job shop-api)/health"
+```
+
 ## Two ways to reach a job
 
 - A **port URL** is the job's own port: `http://localhost:4012`. Every worktree binds its own port, so two worktrees never collide, but they share `localhost`, and with it the browser's cookie jar and every CORS origin.
@@ -21,7 +29,7 @@ cmd  = "pnpm dev"
 
 The host is `<host>.<worktree>.<repo>.localhost`: `<worktree>` is the branch as a DNS-safe slug, `<repo>` the repository's directory name. A [shared service](shared-services.md) has one address for the whole repository, so its host carries no worktree segment. `wtm run init` offers a name to every service that declares the port it listens on; `wtm run job add|edit --url-port PORT --url-host api` set it by hand.
 
-`wtm run url [branch] --job <name>` prints a job's named URL (`--raw` the port URL) for `$(…)`; `wtm run open` hands it to the browser. `run up`, `run ps` and the run view show the same addresses.
+`wtm run url [worktree] --job <name>` prints a job's named URL (`--raw` the port URL) and nothing else, for `$(…)`; `wtm run open` hands it to the browser. `run up`, `run ps` and the run view show the same addresses.
 
 ## The proxy's port
 
@@ -46,4 +54,23 @@ When a `.env` value points at another job (`VITE_API_URL`, `CORS_ORIGIN`), wtm r
 
 The choice has a consequence outside wtm: named URLs answer while `wtm run` runs the job, and not when you start the app yourself. A project whose author launches dev servers by hand wants `"ports"`. On a machine where the proxy is off, ports are written whatever the mode says, and a notice says so. Under `"ports"` the run surfaces also hand out port URLs and register no name.
 
-`wtm run addressing names|ports` switches the mode and settles every worktree's `.env` onto it (`--keep-env` switches `run.toml` alone). The **main checkout** is the exception: it is the checkout that works without wtm, so a switch brings it back to ports but never moves it onto names; `wtm env main` does that, when you ask. While main's `.env` still holds ports under `"names"`, its working entrance is the port URL, and wtm says so wherever it hands out main's named URL.
+```bash
+wtm run addressing ports --yes             # port numbers, every worktree's .env settled
+wtm run addressing names --yes             # back to named origins
+wtm run addressing names --yes --keep-env  # switch run.toml alone
+```
+
+The switch writes `addressing` in `run.toml`, then settles the worktrees whose `.env` spells the other mode (an interactive run asks first; `wtm run addressing` alone asks for the mode). Under `"names"` the named URL is a worktree's only working entrance: opening its port directly sends an `Origin` the API no longer knows.
+
+### The main checkout
+
+The main checkout is the one that exists without wtm, the one a colleague clones and a `docker compose up` reads, so **a switch brings it back to ports but never moves it onto names**. You do it, when you want it:
+
+```bash
+wtm env main        # the positional takes the main checkout like any other worktree
+```
+
+- Until then, under `"names"`, main's working entrance is its **port** URL. wtm still hands out its name everywhere (`run up`, `run url`, `run open`, the run view, `wtm ui`) and adds a line saying the `.env` is out of step; `--raw` gives the port URL. The route is registered either way, so nothing has to restart.
+- Afterwards, whoever reads main's `.env` or starts its stack depends on the proxy being up. It is worth it right after switching a project to `"names"`, and after `wtm run proxy install`, which drops the `:11080` from the origins already written.
+- To bring main back: `wtm run addressing ports` then `wtm run addressing names` (the first returns main to ports with every worktree, the second moves only the others back).
+- `wtm create` from main is unaffected either way: a copied value carrying main's segment is rewound to the new worktree's.

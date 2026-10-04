@@ -48,7 +48,7 @@ The body writes to the writer it is **handed**, never to the one `Frame` was giv
 
 A streaming pair wraps its own body writer: `output.Barred(w)`. When a command writes across two streams — `sync`'s plan on stderr, its recap on stdout — there is one rule rather than two mechanisms: **every section opens with exactly one blank line on the stream it is about to write to**, the first of them being the frame's leading blank, and `FrameEnd` closes. Same call, same output, one mechanism.
 
-JSON and machine output are never framed and therefore never barred. They emit flush.
+JSON (`--output json`) and machine output (shell-eval: `resolve` success, `shell-init`, `run url`, `run export`) are never framed and therefore never barred. They emit flush. A command routes on `rules.IsHumanFormat(format)`. `wtm events` is the one stream with no frame at all: it never ends, so there is no block to close, and each human line carries the bar on its own.
 
 ### The bar
 
@@ -135,7 +135,7 @@ Which kills `output.Danger`, and with it the third failure register. `!` is some
 
 Secondary detail is expressed by **indentation, not by colour**. A branch list under a count, the lines of a failure's captured output, an address under a job: they are content, they sit one indent in, and they keep the foreground. Muting them was the third job, and it is the one that made the same class of information read at three different densities depending on the command.
 
-These three are checked by `make lint` (`tools/archlint`, rules `glyph`, `tuistyle`, `mutedline`) over `output/`, `styles/` and `tui/` — the layers that put glyphs on a screen. What a linter cannot check it cannot hold, and the first version of this document proved that a table alone does not survive sixty commands.
+These three are checked by `make lint` (`tools/archlint`, rules `glyph`, `tuistyle`, `mutedline` — see [lint.md](lint.md#the-output-vocabulary)) over `output/`, `styles/` and `tui/` — the layers that put glyphs on a screen. What a linter cannot check it cannot hold, and the first version of this document proved that a table alone does not survive sixty commands.
 
 ### What follows from the three rules
 
