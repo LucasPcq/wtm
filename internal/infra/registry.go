@@ -51,7 +51,9 @@ func UpdateRegistry(update func([]domain.RegisteredRepo) []domain.RegisteredRepo
 		Path: filepath.Join(filepath.Dir(path), domain.RegistryLockName),
 		Do: func() error {
 			repos, err := ReadRegistry()
-			if err != nil {
+			// Unparsable is rebuilt from scratch: every repository rejoins the
+			// next time a command runs in it.
+			if err != nil && !errors.As(err, new(*json.SyntaxError)) && !errors.As(err, new(*json.UnmarshalTypeError)) {
 				return err
 			}
 			return writeRegistry(path, update(repos))

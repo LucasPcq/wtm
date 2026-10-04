@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/service/process"
 	"github.com/LucasPcq/wtm/internal/service/process/processtest"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
@@ -169,4 +170,28 @@ func removeConfig(t *testing.T, dir string) {
 
 func stateOf(dir string) string {
 	return filepath.Join(dir, ".git", domain.StateDirName)
+}
+
+// A registry nobody can parse would fail every Register and keep a global
+// stream retrying forever: it is rebuilt instead, from the repositories used.
+func TestACorruptRegistryIsRebuilt(t *testing.T) {
+	processtest.Home(t)
+	path, err := infra.RegistryPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := initializedRepo(t)
+
+	if err := Register(RegisterParams{Root: dir, StateDir: stateOf(dir)}); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	if repos, err := Prune(PruneParams{}); err != nil || len(repos) != 1 {
+		t.Fatalf("repos = %+v, err = %v", repos, err)
+	}
 }
