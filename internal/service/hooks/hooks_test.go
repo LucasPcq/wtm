@@ -275,3 +275,15 @@ func TestAFailingHookReportsItsCommandAndExitCode(t *testing.T) {
 		t.Fatalf("err = %v, want ErrHookFailed in the chain", err)
 	}
 }
+
+func TestAHookKilledBySignalHasNoExitCode(t *testing.T) {
+	err := RunHooks(RunHooksParams{
+		Hooks:   []domain.HookCommand{{Cmd: "kill -9 $$"}},
+		WorkDir: t.TempDir(),
+		Output:  io.Discard,
+	})
+	var failure Failure
+	if !errors.As(err, &failure) || failure.ExitCode != nil {
+		t.Fatalf("err = %v, failure = %+v, want no exit code", err, failure)
+	}
+}

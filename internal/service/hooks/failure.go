@@ -27,7 +27,8 @@ type failureParams struct {
 func failureOf(params failureParams) Failure {
 	failure := Failure{Cmd: params.Cmd, Err: params.Wrapped}
 	var exit *exec.ExitError
-	if errors.As(params.Cause, &exit) {
+	// -1 is a hook killed by a signal: it never exited with a code.
+	if errors.As(params.Cause, &exit) && exit.ExitCode() >= 0 {
 		code := exit.ExitCode()
 		failure.ExitCode = &code
 	}
