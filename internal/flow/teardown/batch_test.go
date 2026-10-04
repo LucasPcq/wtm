@@ -241,19 +241,34 @@ func TestAFailingOnCleanHookStopsAtDeprovisioned(t *testing.T) {
 	}
 }
 
-func TestAWorktreeWhoseDirectoryIsGoneIsStillDeprovisioned(t *testing.T) {
-	globaldir.Isolate(t)
-	processtest.Serve(t, nil)
-	ctx := repoContext(t)
-	ctx.Config.Project.Hooks.OnClean = []domain.HookCommand{{Cmd: "exit 5"}}
-	target := makeTarget(t, ctx, "feat/a")
-	target.Path = ""
-	recorder := &flowtest.Recorder{}
-	ctx.Publisher = recorder
+// A directory deleted by hand is still a worktree git lists: without hooks
+// its removal goes through; on_clean hooks cannot run there and stop it.
+func TestAWorktreeWhoseDirectoryIsGone(t *testing.T) {
+	for name, tc := range map[string]struct {
+		hooks []domain.HookCommand
+		ok    bool
+		want  []domain.EventType
+	}{
+		"without hooks": {ok: true, want: deprovisionedThenRemoved},
+		"with hooks":    {hooks: []domain.HookCommand{{Cmd: "true"}}, want: []domain.EventType{domain.EventWorktreeDeprovisioned}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			globaldir.Isolate(t)
+			processtest.Serve(t, nil)
+			ctx := repoContext(t)
+			ctx.Config.Project.Hooks.OnClean = tc.hooks
+			target := makeTarget(t, ctx, "feat/a")
+			if err := os.RemoveAll(target.Path); err != nil {
+				t.Fatal(err)
+			}
+			recorder := &flowtest.Recorder{}
+			ctx.Publisher = recorder
 
-	teardown.Batch(teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: []teardown.Target{target}, ForceRemoval: true})
+			teardown.Batch(teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: []teardown.Target{target}, ForceRemoval: true})
 
-	if got := recorder.PublishedTypes(); len(got) == 0 || got[0] != domain.EventWorktreeDeprovisioned || !*recorder.Published[0].OK {
-		t.Fatalf("published %+v, want deprovisioned ok first", recorder.Published)
+			if got := recorder.PublishedTypes(); !slices.Equal(got, tc.want) || *recorder.Published[0].OK != tc.ok {
+				t.Fatalf("published %+v, want %v with ok=%v", recorder.Published, tc.want, tc.ok)
+			}
+		})
 	}
 }
