@@ -1,0 +1,21 @@
+args: feat/a --yes --prune
+err: 
+exit: 0
+--- stdout ---
+
+  ✓ Reconciled 1 file(s).
+
+  Worktree  feat/a
+  Mode      add
+
+  .env   strategy: main  ·  source: main
+  ✓ 1 added · 1 pruned
+
+--- stderr ---
+--- .env ---
+WEB_PORT=3010
+REALM=app-feat-a
+SHARED=from-worktree
+NEW_KEY=1
+--- isolation ---
+isolated

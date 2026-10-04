@@ -132,7 +132,7 @@ Without the port: on macOS, `wtm run proxy install` serves the names on port 80,
 **Fix.** Compare it with its source, then reconcile:
 
 ```bash
-wtm env feat/login --check                                   # read-only report
+wtm env feat/login --check                                   # read-only report; exits 18 on drift
 wtm env feat/login                                           # add missing keys, settle the ports
 wtm env feat/login --mode refresh --on-conflict overwrite --yes   # also overwrite diverging values
 wtm env feat/login --prune --yes                             # drop keys no source has any more

@@ -6,10 +6,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/muesli/termenv"
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/styles"
 )
 
 func init() {
@@ -93,7 +96,7 @@ func TestPrintableLen(t *testing.T) {
 }
 
 func TestFormatTagParentOnly(t *testing.T) {
-	got := formatTag(true, false)
+	got := formatTag(domain.WorktreeStatus{IsParent: true}, false)
 	if !strings.Contains(got, "(parent)") {
 		t.Error("expected output to contain '(parent)'")
 	}
@@ -103,7 +106,7 @@ func TestFormatTagParentOnly(t *testing.T) {
 }
 
 func TestFormatTagActiveOnly(t *testing.T) {
-	got := formatTag(false, true)
+	got := formatTag(domain.WorktreeStatus{}, true)
 	if !strings.Contains(got, "active") {
 		t.Error("expected output to contain 'active'")
 	}
@@ -113,7 +116,7 @@ func TestFormatTagActiveOnly(t *testing.T) {
 }
 
 func TestFormatTagBoth(t *testing.T) {
-	got := formatTag(true, true)
+	got := formatTag(domain.WorktreeStatus{IsParent: true}, true)
 	if !strings.Contains(got, "(parent)") {
 		t.Error("expected output to contain '(parent)'")
 	}
@@ -123,9 +126,26 @@ func TestFormatTagBoth(t *testing.T) {
 }
 
 func TestFormatTagNeither(t *testing.T) {
-	got := formatTag(false, false)
+	got := formatTag(domain.WorktreeStatus{}, false)
 	if got != "" {
 		t.Errorf("expected empty string, got %q", got)
+	}
+}
+
+func TestFormatTagMarksALockedWorktree(t *testing.T) {
+	got := formatTag(domain.WorktreeStatus{IsLocked: true}, true)
+	if !strings.Contains(got, domain.TreeBadgeLockedText) || !strings.Contains(got, "active") {
+		t.Errorf("formatTag = %q, want the lock beside the active tag", got)
+	}
+}
+
+func TestWriteWorktreeListJSONCarriesTheLock(t *testing.T) {
+	var buf bytes.Buffer
+	if err := WriteWorktreeListJSON(&buf, WriteWorktreeListJSONParams{Statuses: []domain.WorktreeStatus{{Branch: "feat", IsLocked: true}}}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), `"is_locked": true`) {
+		t.Errorf("list JSON = %s, want is_locked", buf.String())
 	}
 }
 
@@ -233,6 +253,50 @@ func TestFormatPRCheckoutResultLabelsTheEnvNote(t *testing.T) {
 	for _, want := range []string{"Checked out PR #42 (feat/x)", domain.CreateRecapLabelEnv, "4 ports settled (offset +10)", domain.CreateRecapLabelPath, ".worktrees/feat-x"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestFormatCreateBatchCountsAndNamesFailures(t *testing.T) {
+	var b strings.Builder
+	FormatCreateBatch(&b, CreateBatchParams{
+		Created: []CreateBatchRow{{Branch: "feat/a", Path: ".worktrees/feat-a"}, {Branch: "feat/c", Path: ".worktrees/feat-c", AlreadyExists: true}},
+		Failed:  []domain.BatchFailure{{Branch: "feat/b", Error: "path exists"}},
+	})
+	out := ansi.Strip(b.String())
+	for _, want := range []string{"feat/a", ".worktrees/feat-a", "feat/c already exists", "feat/b — path exists", "1 created", "1 already existed", "1 failed"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("readout %q should contain %q", out, want)
+		}
+	}
+}
+
+func TestBranchHeaderMutesOnlyItsGlyph(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.ANSI256)
+	t.Cleanup(func() { lipgloss.SetColorProfile(termenv.Ascii) })
+	var b strings.Builder
+	BranchHeader(&b, "feat/a (1/2)")
+	out := b.String()
+	if !strings.Contains(out, "feat/a (1/2)\n") || strings.Contains(out, styles.Muted.Render("feat/a (1/2)")) {
+		t.Errorf("header %q must keep its text in the terminal's own colour", out)
+	}
+	if !strings.Contains(ansi.Strip(out), domain.GlyphProgress+" feat/a (1/2)") {
+		t.Errorf("header %q should lead with the progress glyph", out)
+	}
+}
+
+func TestFormatCleanBatchCountsAndNamesAnomalies(t *testing.T) {
+	var b strings.Builder
+	FormatCleanBatch(&b, domain.CleanBatchResult{
+		Results:          []domain.CleanResult{{Branch: "feat/a"}, {Branch: "feat/c"}, {Branch: "feat/gone", AlreadyAbsent: true}},
+		Failed:           []domain.BatchFailure{{Branch: "feat/b", Error: "locked"}},
+		Skipped:          []domain.PruneSkip{{Branch: "feat/d", Reason: domain.PruneSkipDirty}},
+		OrphanedChildren: []domain.ReparentResult{{Branch: "leaf", OldParent: "feat/a"}},
+	})
+	out := b.String()
+	for _, want := range []string{"2 removed", "1 already absent", "1 skipped", "1 failed", "feat/a, feat/c", "feat/b — locked", "feat/d", "leaf"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("readout missing %q:\n%s", want, out)
 		}
 	}
 }

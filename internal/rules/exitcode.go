@@ -13,12 +13,20 @@ func ExitCode(err error) int {
 	switch {
 	case err == nil:
 		return domain.ExitCodeOK
+	case errors.Is(err, domain.ErrCancelled):
+		return domain.ExitCodeCancelled
 	case errors.Is(err, domain.ErrWorktreePathExists), errors.Is(err, domain.ErrWorktreeExists), errors.Is(err, domain.ErrWorktreeNameTaken):
 		return domain.ExitCodeWorktreeExists
 	case errors.Is(err, domain.ErrBranchNotFound):
 		return domain.ExitCodeBranchNotFound
 	case errors.Is(err, domain.ErrConfigNotFound):
 		return domain.ExitCodeConfigNotFound
+	case errors.Is(err, domain.ErrNotGitRepo):
+		return domain.ExitCodeNotGitRepo
+	case errors.Is(err, domain.ErrEventsSchemaNewer):
+		return domain.ExitCodeEventsSchemaNewer
+	case errors.Is(err, domain.ErrEnvDrift):
+		return domain.ExitCodeEnvDrift
 	case errors.Is(err, domain.ErrUsage):
 		return domain.ExitCodeUsage
 	case errors.Is(err, domain.ErrJobNotFound), errors.Is(err, domain.ErrProfileNotFound):

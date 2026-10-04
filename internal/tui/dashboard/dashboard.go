@@ -4,9 +4,11 @@
 package dashboard
 
 import (
+	"context"
 	"fmt"
 	"maps"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -15,6 +17,7 @@ import (
 	zone "github.com/lrstanley/bubblezone"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/runconfig"
@@ -33,8 +36,13 @@ type RunParams struct {
 	// Cwd is the directory the shell was in when it launched `wtm ui` — not
 	// necessarily ProjectDir, which LoadConfig may have resolved upward. It is
 	// what the active-worktree match is run against.
-	Cwd      string
-	Config   domain.Config
+	Cwd    string
+	Config domain.Config
+	// Publisher reports what the dashboard's own runs change, like any command.
+	Publisher flow.Publisher
+	// Watch streams the repository's events, which reload the list whoever made
+	// the change. Nil watches through the daemon, starting it.
+	Watch    WatchFunc
 	PRLoader worktreepicker.PRLoaderFunc
 	// PROpener launches the given PR number in the browser (ghservice.OpenPR,
 	// wired with ProjectDir). Injected the same way PRLoader is, so a test can
@@ -49,9 +57,9 @@ type RunParams struct {
 	// PROpener so a click on a RUN row is asserted without launching a browser.
 	URLOpener func(url string) error
 	// AddressLoader is where the named worktrees' jobs answer. It is only ever
-	// given worktrees that already have a job up: BranchEnv allocates an ordinal
-	// the first time it is asked for one. It takes the run.toml the poll already
-	// read, so the file is not read twice a poll.
+	// given worktrees that already have a job up, and a worktree with no ordinal
+	// yet answers nothing. It takes the run.toml the poll already read, so the
+	// file is not read twice a poll.
 	AddressLoader func(request AddressRequest) domain.RunAddresses
 	// LogsLoader reads back a job's persisted output for the detail panel's
 	// logs view. Injected like JobsLoader, so a test never opens a real board.
@@ -172,6 +180,11 @@ type Model struct {
 	params     RunParams
 	listParams domain.ListParams
 	zones      *zone.Manager
+	// changes is signalled by the event watcher; awaitChangeCmd is its only
+	// reader.
+	changes        chan struct{}
+	reloadInFlight bool
+	reloadPending  bool
 
 	width  int
 	height int
@@ -297,11 +310,10 @@ type Model struct {
 	// reports the target outright.
 	tabSlideFrom  int
 	tabSlideSince time.Time
-	// flashBranch and flashSince drive a just-created row's opening beat: the
-	// branch selectRequested last landed the cursor on, and when that
-	// happened. A zero flashSince means nothing is flashing.
-	flashBranch string
-	flashSince  time.Time
+	// flashPending holds the worktrees a run created that the list has not shown
+	// yet; flashes the rows lit since they appeared, each from when it did.
+	flashPending []string
+	flashes      map[string]time.Time
 }
 
 // New builds the dashboard model. Callers outside a program must Close the
@@ -316,6 +328,7 @@ func New(params RunParams) Model {
 		},
 		zones:    zone.New(),
 		msgs:     make(chan tea.Msg, domain.DashboardMsgBuffer),
+		changes:  make(chan struct{}, 1),
 		ghConn:   domain.GHConnectionOK,
 		loading:  true,
 		details:  map[string]domain.WorktreeDetail{},
@@ -332,6 +345,14 @@ func Run(params RunParams) error {
 	model := New(params)
 	defer model.Close()
 
+	watch := params.Watch
+	if watch == nil {
+		watch = defaultWatch(params)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go watchEvents(watchEventsParams{Context: ctx, Changes: model.changes, Watch: watch})
+
 	if _, err := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithReportFocus()).Run(); err != nil {
 		return fmt.Errorf("dashboard: %w", err)
 	}
@@ -342,7 +363,7 @@ func (m Model) Init() tea.Cmd {
 	// The spinner is started on demand, at the point a detail load actually
 	// begins (fireDetailTick, reloadDetailCmd) — not here, or it would tick for
 	// the life of the program whether or not anything is loading.
-	return tea.Batch(m.loadWorktreesCmd(false), m.loadPRsCmd(), m.loadJobsCmd(true), pollCmd(), gitPollCmd(), listenCmd(m.msgs))
+	return tea.Batch(m.loadWorktreesCmd(false), m.loadPRsCmd(), m.loadJobsCmd(true), pollCmd(), gitPollCmd(), listenCmd(m.msgs), awaitChangeCmd(m.changes))
 }
 
 func pollCmd() tea.Cmd {
@@ -466,16 +487,29 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		model, cmd := m.handleMouse(msg)
 		return withDetailTrigger(before, model, cmd)
 
+	case worktreesChangedMsg:
+		model, cmd := m.reload()
+		return model, tea.Batch(cmd, awaitChangeCmd(m.changes))
+
 	case worktreesMsg:
+		m, reloadCmd := m.reloadLanded()
 		before := m.selectedBranch()
+		childrenBefore := m.childrenOf(before)
 		next, animCmd := m.applyWorktrees(msg)
 		next = next.withBoard()
 		model, detailCmd := next.triggerDetailReload(before)
+		// The children the detail lists come from this list, not from git: a run
+		// that removed or reparented a row elsewhere changed them under it.
+		if model.selectedBranch() == before && !slices.Equal(childrenBefore, model.childrenOf(before)) {
+			var relinked tea.Cmd
+			model, relinked = model.invalidateDetail(before)
+			detailCmd = tea.Batch(detailCmd, relinked)
+		}
 		// An address is not a function of the jobs alone: the loader dials the
 		// proxy and reads the worktree's .env, so a proxy that came up late or a
 		// port that moved under a job still running is only ever caught here.
 		// This is the git clock, and KeyRefresh comes through it too.
-		return model, tea.Batch(animCmd, detailCmd, next.resolveAddressesCmd(), next.resolveTracesCmd())
+		return model, tea.Batch(reloadCmd, animCmd, detailCmd, next.resolveAddressesCmd(), next.resolveTracesCmd())
 
 	case tracesMsg:
 		m.logged = msg.logged
@@ -587,10 +621,10 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tabSlideTickCmd()
 
 	case flashTickMsg:
-		// Same bounded shape as tabSlideTickMsg: it stops re-arming, and clears
-		// flashBranch, the moment the flash's duration has elapsed.
-		if m.flashBranch == "" || time.Since(m.flashSince) >= domain.DashboardRowFlash {
-			m.flashBranch = ""
+		// Same bounded shape as tabSlideTickMsg: it stops re-arming once every
+		// flash's duration has elapsed.
+		m = m.settleFlashes()
+		if len(m.flashes) == 0 {
 			return m, nil
 		}
 		return m, flashTickCmd()
@@ -660,8 +694,7 @@ func (m Model) applyWorktrees(msg worktreesMsg) (Model, tea.Cmd) {
 	})
 	m.cursor = rules.ClampIndex(m.cursor, len(m.statuses))
 
-	animate := rules.AnimationsEnabled(m.params.Config)
-	next, flashed := m.selectRequested(animate)
+	next, flashed := m.selectRequested().lightCreated(rules.AnimationsEnabled(m.params.Config))
 	next = next.reflow()
 	if !flashed {
 		return next, nil
@@ -670,25 +703,64 @@ func (m Model) applyWorktrees(msg worktreesMsg) (Model, tea.Cmd) {
 }
 
 // selectRequested lands the cursor on the worktree a finished run created, the
-// one time the list comes back holding it. animate arms its opening flash,
-// gated by ui.animations rather than deciding whether the branch itself
-// should flash — a row still gets found and selected either way.
-func (m Model) selectRequested(animate bool) (Model, bool) {
+// one time the list comes back holding it.
+func (m Model) selectRequested() Model {
 	if m.selectBranch == "" {
-		return m, false
+		return m
 	}
 	for index, status := range m.statuses {
-		if status.Branch != m.selectBranch {
-			continue
+		if status.Branch == m.selectBranch {
+			m.cursor, m.selectBranch = index, ""
+			return m
 		}
-		m.cursor, m.selectBranch = index, ""
-		if !animate {
-			return m, false
-		}
-		m.flashBranch, m.flashSince = status.Branch, time.Now()
-		return m, true
 	}
-	return m, false
+	return m
+}
+
+// lightCreated starts the opening flash of every created row the list now
+// holds. animate is ui.animations: it cuts the flash, never the bookkeeping, so
+// a pending row is dropped once it appears either way.
+func (m Model) lightCreated(animate bool) (Model, bool) {
+	if len(m.flashPending) == 0 {
+		return m, false
+	}
+	shown := make(map[string]bool, len(m.statuses))
+	for _, status := range m.statuses {
+		shown[status.Branch] = true
+	}
+	flashes := make(map[string]time.Time, len(m.flashes)+len(m.flashPending))
+	for branch, since := range m.flashes {
+		flashes[branch] = since
+	}
+	var pending []string
+	lit, now := false, time.Now()
+	for _, branch := range m.flashPending {
+		switch {
+		case !shown[branch]:
+			pending = append(pending, branch)
+		case animate:
+			flashes[branch], lit = now, true
+		}
+	}
+	m.flashPending, m.flashes = pending, flashes
+	return m, lit
+}
+
+func (m Model) settleFlashes() Model {
+	flashes := make(map[string]time.Time, len(m.flashes))
+	for branch, since := range m.flashes {
+		if time.Since(since) < domain.DashboardRowFlash {
+			flashes[branch] = since
+		}
+	}
+	m.flashes = flashes
+	return m
+}
+
+// flashLit reports whether a row is in its opening beat.
+func (m Model) flashLit(branch string) bool {
+	since, lit := m.flashes[branch]
+	return lit && rules.FlashLit(rules.FlashParams{Since: since, Now: time.Now(), Duration: domain.DashboardRowFlash})
 }
 
 func (m Model) updateModal(msg tea.Msg) (Model, tea.Cmd) {
@@ -1305,9 +1377,8 @@ func (m Model) resolveTracesCmd() tea.Cmd {
 // parallel, so that model's statuses may still be empty — which asked for no
 // address at all and left the RUN section without one until the next poll.
 //
-// Only the worktrees that already have a job up are named: BranchEnv allocates
-// an ordinal to whichever branch it is handed, and an idle worktree must not be
-// given one just because a poll swept past it.
+// Only the worktrees that already have a job up are named: an idle one has no
+// address worth showing, and one no run has numbered yet has none at all.
 func (m Model) resolveAddressesCmd() tea.Cmd {
 	if m.params.AddressLoader == nil || len(m.runConfig.Jobs) == 0 {
 		return nil

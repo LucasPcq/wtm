@@ -41,9 +41,14 @@ type opStageMsg struct {
 	stage  string
 }
 
-type createdMsg struct{ branch string }
+// createdMsg is one worktree a create made. selects moves the cursor onto it;
+// a batch asks for that once, for its first.
+type createdMsg struct {
+	branch  string
+	selects bool
+}
 
-type cleanedMsg struct{ branch string }
+type cleanedMsg struct{}
 
 // reparentedMsg says the parent metadata changed, so the rows showing "from <x>"
 // have to be re-read.

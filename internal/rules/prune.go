@@ -39,7 +39,6 @@ func ClassifyPrune(params ClassifyPruneParams) domain.PrunePlan {
 	}
 
 	var plan domain.PrunePlan
-	selected := make(map[string]bool)
 
 	for _, st := range params.Statuses {
 		reason, matched := pruneMatchReason(st, params)
@@ -57,7 +56,7 @@ func ClassifyPrune(params ClassifyPruneParams) domain.PrunePlan {
 			continue
 		}
 
-		// Dirty / unpushed / open-PR are unsafe to remove without --force (mirrors
+		// Locked / dirty / unpushed / open-PR are unsafe to remove without --force (mirrors
 		// clean). Without Force they skip here; with Force the candidate is selected
 		// but tagged so the interactive confirm and FinalizePrunePlan can re-gate it.
 		unsafe := pruneUnsafeReason(pruneUnsafeParams{
@@ -78,13 +77,15 @@ func ClassifyPrune(params ClassifyPruneParams) domain.PrunePlan {
 			UnsafeReason: unsafe,
 			SourceBranch: node.SourceBranch,
 		})
-		selected[st.Branch] = true
 	}
 
-	plan.Reparents = pruneReparents(pruneReparentsParams{
-		Selected:   plan.Selected,
-		SelectedIn: selected,
+	removed := make([]string, 0, len(plan.Selected))
+	for _, candidate := range plan.Selected {
+		removed = append(removed, candidate.Branch)
+	}
+	plan.Reparents = ReparentsAfterRemoval(ReparentsAfterRemovalParams{
 		Nodes:      params.Nodes,
+		Removed:    removed,
 		BaseBranch: params.BaseBranch,
 	})
 	return plan
@@ -179,9 +180,12 @@ type pruneUnsafeParams struct {
 }
 
 // pruneUnsafeReason reports why a worktree is unsafe to remove without --force,
-// mirroring CleanUnsafeReason's precedence (dirty → unpushed → open PR).
+// mirroring CleanUnsafeReason's precedence (locked → dirty → unpushed → open PR).
 // An empty string means the worktree is safe to prune.
 func pruneUnsafeReason(params pruneUnsafeParams) string {
+	if params.Status.IsLocked {
+		return domain.PruneSkipLocked
+	}
 	if params.Status.IsDirty {
 		return domain.PruneSkipDirty
 	}
@@ -194,44 +198,12 @@ func pruneUnsafeReason(params pruneUnsafeParams) string {
 	return ""
 }
 
-type pruneReparentsParams struct {
-	Selected   []domain.PruneCandidate
-	SelectedIn map[string]bool
-	Nodes      []domain.WorktreeNode
-	BaseBranch string
-}
-
-// pruneReparents computes the grandparent moves for children of pruned worktrees.
-// A child that is itself pruned is skipped; a grandparent that is also pruned
-// falls back to the base branch so no child is left pointing at a removed parent.
-func pruneReparents(params pruneReparentsParams) []domain.ReparentResult {
-	var reparents []domain.ReparentResult
-	for _, cand := range params.Selected {
-		grandparent := cand.SourceBranch
-		if grandparent == "" || params.SelectedIn[grandparent] {
-			grandparent = params.BaseBranch
-		}
-		children := ChildrenOf(ChildrenOfParams{Nodes: params.Nodes, Branch: cand.Branch})
-		for _, child := range children {
-			if params.SelectedIn[child.Branch] {
-				continue
-			}
-			reparents = append(reparents, domain.ReparentResult{
-				Branch:    child.Branch,
-				OldParent: cand.Branch,
-				NewParent: grandparent,
-			})
-		}
-	}
-	return reparents
-}
-
 // FinalizePrunePlanParams holds inputs for FinalizePrunePlan.
 type FinalizePrunePlanParams struct {
 	Plan       domain.PrunePlan
 	Chosen     []string
 	BaseBranch string
-	// Force keeps unsafe worktrees (dirty/unpushed/open-PR) in the selection;
+	// Force keeps unsafe worktrees (locked/dirty/unpushed/open-PR) in the selection;
 	// without it, a chosen unsafe worktree is dropped back to Skipped (the
 	// interactive confirm gates this).
 	Force bool
@@ -242,7 +214,7 @@ type FinalizePrunePlanParams struct {
 // surviving worktree is left pointing at a removed parent. It works purely from
 // the plan — each candidate carries its SourceBranch, so parent chains among
 // pruned worktrees are reconstructable without the node graph. Without Force, a
-// chosen unsafe worktree (dirty/unpushed/open-PR) is moved to Skipped rather than
+// chosen unsafe worktree (locked/dirty/unpushed/open-PR) is moved to Skipped rather than
 // removed. Skips carry through unchanged.
 func FinalizePrunePlan(params FinalizePrunePlanParams) domain.PrunePlan {
 	chosen := make(map[string]bool, len(params.Chosen))
@@ -257,7 +229,7 @@ func FinalizePrunePlan(params FinalizePrunePlanParams) domain.PrunePlan {
 
 	out := domain.PrunePlan{Skipped: params.Plan.Skipped}
 
-	// A chosen-but-unsafe worktree (dirty/unpushed/open-PR) is only removed with
+	// A chosen-but-unsafe worktree (locked/dirty/unpushed/open-PR) is only removed with
 	// Force; otherwise drop it from the selection and record it as skipped with
 	// the reason that made it unsafe.
 	if !params.Force {
@@ -331,6 +303,8 @@ func PruneReasonLabel(reason string) string {
 		return domain.PruneLabelBase
 	case domain.PruneSkipMain:
 		return domain.PruneLabelMain
+	case domain.PruneSkipLocked:
+		return domain.PruneLabelLocked
 	case domain.PruneSkipDirty:
 		return domain.PruneLabelDirty
 	case domain.PruneSkipUnpushed:

@@ -52,7 +52,7 @@ This is five gates in one, and the output names which failed:
 | -- | -- |
 | `fmt` | files `gofmt` would change. It fails rather than rewrites — a formatting fix belongs in the commit that caused it |
 | `vet` | the stdlib's own diagnostics |
-| `arch` | `tools/archlint`: the layer graph of CLAUDE.md §9, the `styles/` monopoly on `lipgloss.Style`, type assertions without comma-ok, and a command reading the interactive gate without offering `--yes`. Each finding prints `file:line: [rule] why` |
+| `arch` | `tools/archlint`: the layer graph of CLAUDE.md §9 and the declared `service→service` edges, the `styles/` monopoly on `lipgloss.Style`, type assertions without comma-ok, a command reading the interactive gate without offering `--yes`, a service mutator called from outside `flow/`, the daemon reaching git, and the output vocabulary rules. Each finding prints `file:line: [rule] why` |
 | `dead` | `deadcode`: functions no path reaches, test paths included. Exceptions are listed with their reason in `.deadcode-ignore` |
 | `staticcheck` | everything else |
 

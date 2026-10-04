@@ -2,6 +2,7 @@ package worktree
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/testutil/ghtest"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
 
@@ -153,6 +155,100 @@ func TestCleanPurgesWorktreeState(t *testing.T) {
 	}
 
 	if _, err := os.Stat(metaDir); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("meta dir survived the clean, its ordinal %d stays reserved: %v", ordinal, err)
+		t.Errorf("meta dir survived the clean, its ordinal %d stays reserved: %v", ordinal.Ordinal, err)
+	}
+}
+
+func TestCheckAllChecksEachBranchOnItsOwn(t *testing.T) {
+	source := gittest.InitRepo(t)
+	dirtyPath := filepath.Join(t.TempDir(), "dirty")
+	gitRun(t, source, "worktree", "add", "-q", "-b", "feat/dirty", dirtyPath, "HEAD")
+	if err := os.WriteFile(filepath.Join(dirtyPath, "wip.txt"), []byte("wip\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	entries := CheckAll(CheckAllParams{ProjectDir: source, Branches: []string{"feat/dirty", "feat/ghost", "main"}})
+
+	if entry := entries["feat/dirty"]; entry.Err != nil || !entry.Check.IsDirty || entry.Check.Branch != "feat/dirty" {
+		t.Errorf("feat/dirty = %+v, want a dirty worktree", entry)
+	}
+	if !errors.Is(entries["feat/ghost"].Err, domain.ErrWorktreeNotFound) {
+		t.Errorf("feat/ghost err = %v, want ErrWorktreeNotFound", entries["feat/ghost"].Err)
+	}
+	if !errors.Is(entries["main"].Err, domain.ErrCannotCleanParent) {
+		t.Errorf("main err = %v, want ErrCannotCleanParent", entries["main"].Err)
+	}
+}
+
+func TestCheckAllReportsALockedWorktree(t *testing.T) {
+	source := gittest.InitRepo(t)
+	lockedPath := filepath.Join(t.TempDir(), "locked")
+	gitRun(t, source, "worktree", "add", "-q", "-b", "feat/locked", lockedPath, "HEAD")
+	gitRun(t, source, "worktree", "lock", lockedPath)
+
+	entry := CheckAll(CheckAllParams{ProjectDir: source, Branches: []string{"feat/locked"}})["feat/locked"]
+	if entry.Err != nil || !entry.Check.IsLocked {
+		t.Errorf("feat/locked = %+v, want a locked worktree", entry)
+	}
+}
+
+func TestListMarksALockedWorktree(t *testing.T) {
+	source := gittest.InitRepo(t)
+	lockedPath := filepath.Join(t.TempDir(), "locked")
+	gitRun(t, source, "worktree", "add", "-q", "-b", "feat/locked", lockedPath, "HEAD")
+	gitRun(t, source, "worktree", "lock", lockedPath)
+
+	statuses, err := List(domain.ListParams{ProjectDir: source, StateDir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, status := range statuses {
+		if status.IsLocked != (status.Branch == "feat/locked") {
+			t.Errorf("%s IsLocked = %v", status.Branch, status.IsLocked)
+		}
+	}
+}
+
+func TestCleanForcedRemovesALockedWorktree(t *testing.T) {
+	source := gittest.InitRepo(t)
+	lockedPath := filepath.Join(t.TempDir(), "locked")
+	gitRun(t, source, "worktree", "add", "-q", "-b", "feat/locked", lockedPath, "HEAD")
+	gitRun(t, source, "worktree", "lock", lockedPath)
+
+	if err := Clean(domain.CleanParams{ProjectDir: source, StateDir: t.TempDir(), Branch: "feat/locked", Force: true}); err != nil {
+		t.Fatalf("Clean --force: %v", err)
+	}
+	if _, err := os.Stat(lockedPath); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("locked worktree still present after a forced Clean: %v", err)
+	}
+}
+
+// A truncated list cannot prove a branch has no open pull request, so each
+// branch is then asked on its own. The stub answers every `gh pr list` with the
+// same payload, which is what makes the per-branch question visible here.
+func TestCheckAllAsksEachBranchWhenThePRListIsTruncated(t *testing.T) {
+	cases := map[string]struct {
+		prs        int
+		wantOpenPR bool
+	}{
+		"complete list":  {prs: 199, wantOpenPR: false},
+		"truncated list": {prs: 200, wantOpenPR: true},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			source := gittest.InitRepo(t)
+			gitRun(t, source, "worktree", "add", "-q", "-b", "feat/x", filepath.Join(t.TempDir(), "x"), "HEAD")
+			prs := make([]ghtest.PR, 0, c.prs)
+			for i := 0; i < c.prs; i++ {
+				prs = append(prs, ghtest.PR{Number: i + 1, Branch: fmt.Sprintf("other/%d", i), State: "open"})
+			}
+			ghtest.Stub(t, ghtest.StubParams{PRs: prs})
+
+			entry := CheckAll(CheckAllParams{ProjectDir: source, Branches: []string{"feat/x"}})["feat/x"]
+
+			if entry.Err != nil || entry.Check.HasOpenPR != c.wantOpenPR {
+				t.Errorf("entry = %+v, want HasOpenPR %v", entry, c.wantOpenPR)
+			}
+		})
 	}
 }

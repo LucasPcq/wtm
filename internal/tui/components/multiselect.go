@@ -327,7 +327,7 @@ func (m MultiSelectModel) View() string {
 
 	if m.err != nil {
 		b.WriteString("\n\n")
-		b.WriteString(errorBanner(m.err.Error()))
+		b.WriteString(wrappedErrorBanner(m.err.Error(), m.width))
 	}
 
 	return b.String()

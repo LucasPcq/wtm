@@ -61,3 +61,35 @@ func TestABareGroupShowsItsHelp(t *testing.T) {
 		t.Error("wtm run printed no help")
 	}
 }
+
+// `wtm version` repeats cobra's --version line, and --version keeps printing it.
+func TestVersionCommandAndFlagPrintTheSameLine(t *testing.T) {
+	line := func(args ...string) string {
+		var out bytes.Buffer
+		rootCmd.SetArgs(args)
+		rootCmd.SetOut(&out)
+		t.Cleanup(func() { rootCmd.SetArgs(nil); rootCmd.SetOut(nil) })
+		if err := rootCmd.Execute(); err != nil {
+			t.Fatal(err)
+		}
+		return out.String()
+	}
+	flag := line("--version")
+	if want := "wtm version " + effectiveVersion + "\n"; flag != want {
+		t.Errorf("--version = %q, want %q", flag, want)
+	}
+	if command := line(domain.CmdVersion); command != flag {
+		t.Errorf("wtm version = %q, --version = %q", command, flag)
+	}
+}
+
+func TestAnInvalidCorrelationIDIsAUsageError(t *testing.T) {
+	t.Setenv(domain.EnvCorrelationID, "a\nb")
+	rootCmd.SetArgs([]string{domain.CmdVersion})
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&bytes.Buffer{})
+	err := rootCmd.Execute()
+	if got := rules.ExitCode(err); got != domain.ExitCodeUsage {
+		t.Fatalf("exit code = %d (%v), want %d", got, err, domain.ExitCodeUsage)
+	}
+}

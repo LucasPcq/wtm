@@ -75,6 +75,11 @@ func Error(w io.Writer, msg string) {
 	}
 }
 
+// Unlike Loading, a header is not a non-event: only its glyph is muted.
+func BranchHeader(w io.Writer, msg string) {
+	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Muted.Render(domain.GlyphProgress), msg)
+}
+
 // Loading prints a styled loading/status line: "  › message".
 func Loading(w io.Writer, msg string) {
 	fmt.Fprintf(w, "%s%s %s\n", Indent, styles.Muted.Render(domain.GlyphProgress), styles.Muted.Render(msg))
@@ -174,27 +179,6 @@ func IsTerminal(w io.Writer) bool {
 		return false
 	}
 	return term.IsTerminal(int(file.Fd()))
-}
-
-// TallyPart is one count of a result summary. A zero count is dropped: a
-// conclusion counts what happened, never what did not.
-type TallyPart struct {
-	Count int
-	Label string
-}
-
-// Tally renders the counted half of a multi-item conclusion — "3 applied ·
-// 1 skipped". It is what replaces one line per success: the reader checks the
-// count, and only the exceptions are worth a line of their own.
-func Tally(parts ...TallyPart) string {
-	kept := make([]string, 0, len(parts))
-	for _, part := range parts {
-		if part.Count == 0 {
-			continue
-		}
-		kept = append(kept, fmt.Sprintf(domain.TallyPartFmt, part.Count, part.Label))
-	}
-	return strings.Join(kept, domain.TallySeparator)
 }
 
 type NextStepParams struct {

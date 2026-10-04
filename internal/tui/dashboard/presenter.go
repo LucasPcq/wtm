@@ -27,13 +27,24 @@ import (
 type presenter struct {
 	send func(tea.Msg)
 	id   int
+	// subject is the worktree a run over several is working on right now, nil for
+	// a run that never says: its stages then land on every row it holds.
+	subject *string
 }
 
 func (p presenter) line(text string) { p.send(OutputLineMsg{Text: text}) }
 
+func (p presenter) stage(text string) {
+	target := ""
+	if p.subject != nil {
+		target = *p.subject
+	}
+	p.send(opStageMsg{id: p.id, target: target, stage: text})
+}
+
 func (p presenter) Stage(params flow.StageParams) error {
 	p.line(params.Message)
-	p.send(opStageMsg{id: p.id, stage: params.Message})
+	p.stage(params.Message)
 	return params.Work()
 }
 
@@ -43,7 +54,7 @@ func (p presenter) Stage(params flow.StageParams) error {
 // stream and takes the beats as two more lines around it.
 func (p presenter) HookPhase(params flow.HookPhaseParams) error {
 	p.line(params.Title)
-	p.send(opStageMsg{id: p.id, stage: params.Title})
+	p.stage(params.Title)
 	sink := &flow.LineWriter{Emit: p.line}
 	err := params.Run(flow.HookSink{
 		Output: sink,
@@ -76,36 +87,142 @@ func (p presenter) Status(notice flow.Notice) {
 	}
 }
 
-type createPresenter struct{ presenter }
+// tracking makes a presenter follow the worktree a batch is on, so each stage
+// lands on its own row. Every call comes from the flow's one goroutine, so the
+// state its copies share needs no lock.
+func (p presenter) tracking() presenter {
+	p.subject = new(string)
+	return p
+}
+
+func (p presenter) itemStarted(progress flow.Progress) {
+	*p.subject = progress.Branch
+	p.line(fmt.Sprintf(domain.BatchProgressFmt, progress.Branch, progress.Position, progress.Total))
+}
+
+// itemFailed names the way out of a removal only sudo can finish: the dashboard
+// cannot hand its terminal over to the password prompt.
+func (p presenter) itemFailed(failure domain.BatchFailure) {
+	p.line(fmt.Sprintf(domain.DashboardFailedFmt, failure.Branch, failure.Error))
+	if failure.Privileged {
+		p.line(fmt.Sprintf(domain.DashboardPrivilegedHintFmt, failure.Branch))
+	}
+}
+
+type createPresenter struct {
+	presenter
+	selected *bool
+}
+
+func newCreatePresenter(base presenter) createPresenter {
+	return createPresenter{presenter: base.tracking(), selected: new(bool)}
+}
+
+func (p createPresenter) BranchStarted(progress flow.Progress) { p.itemStarted(progress) }
+
+// BranchCreated shows each worktree the moment it exists rather than when the
+// whole batch is over, and moves the cursor only once: a selection that hops on
+// every branch would yank the row the user is reading.
+func (p createPresenter) BranchCreated(result domain.CreateResult) {
+	p.finished(result)
+	p.send(createdMsg{branch: result.Branch, selects: !*p.selected})
+	*p.selected = true
+}
+
+func (p createPresenter) BranchFailed(failure domain.BatchFailure) { p.itemFailed(failure) }
 
 func (p createPresenter) Created(outcome createflow.Outcome) error {
 	if outcome.Aborted {
 		return nil
 	}
-	p.line(fmt.Sprintf(domain.DashboardFinishedFmt, domain.OpKindCreate, outcome.Branch))
-	if note := rules.EnvPortSettlementNote(outcome.Result.EnvPorts); note != "" {
+	if len(outcome.Results)+len(outcome.Failed) > 1 {
+		p.line(createTally(outcome))
+		return nil
+	}
+	if len(outcome.Results) == 0 {
+		return nil
+	}
+	result := outcome.Results[0]
+	p.finished(result)
+	p.send(createdMsg{branch: result.Branch, selects: true})
+	return nil
+}
+
+func (p createPresenter) finished(result domain.CreateResult) {
+	p.line(fmt.Sprintf(domain.DashboardFinishedFmt, domain.OpKindCreate, result.Branch))
+	if note := rules.EnvPortSettlementNote(result.EnvPorts); note != "" {
 		p.line(note)
 	}
-	p.send(createdMsg{branch: outcome.Branch})
-	return nil
+}
+
+func createTally(outcome createflow.Outcome) string {
+	created, existed := 0, 0
+	for _, result := range outcome.Results {
+		if result.AlreadyExists {
+			existed++
+			continue
+		}
+		created++
+	}
+	return rules.Tally(
+		domain.TallyPart{Count: created, Label: domain.TallyCreated},
+		domain.TallyPart{Count: existed, Label: domain.TallyAlreadyExisted},
+		domain.TallyPart{Count: len(outcome.Failed), Label: domain.TallyFailed},
+	)
 }
 
 type cleanPresenter struct{ presenter }
 
+func newCleanPresenter(base presenter) cleanPresenter {
+	return cleanPresenter{presenter: base.tracking()}
+}
+
+func (p cleanPresenter) WorktreeStarted(progress flow.Progress) { p.itemStarted(progress) }
+
+// WorktreeCleaned drops each row the moment its worktree is gone rather than
+// when the whole batch is over.
+func (p cleanPresenter) WorktreeCleaned(result domain.CleanResult) {
+	p.finished(result)
+	p.send(cleanedMsg{})
+}
+
+func (p cleanPresenter) WorktreeFailed(failure domain.BatchFailure) { p.itemFailed(failure) }
+
 func (p cleanPresenter) Cleaned(outcome cleanflow.Outcome) error {
-	if outcome.AlreadyAbsent {
-		p.line(fmt.Sprintf(domain.CleanAlreadyAbsentFmt, outcome.Branch))
-	} else {
-		p.line(fmt.Sprintf(domain.DashboardFinishedFmt, domain.OpKindClean, outcome.Branch))
+	batch := len(outcome.Results)+len(outcome.Failed)+len(outcome.Skipped) > 1
+	if !batch {
+		for _, result := range outcome.Results {
+			p.finished(result)
+		}
 	}
 	for _, child := range outcome.Reparented {
 		p.line(fmt.Sprintf(domain.CleanReparentedFmt, child.Branch, child.NewParent))
 	}
-	for _, child := range outcome.OrphanedChildren {
+	for _, child := range outcome.Orphaned {
 		p.line(fmt.Sprintf(domain.CleanStillOrphanedFmt, child.Branch, child.OldParent))
 	}
-	p.send(cleanedMsg{branch: outcome.Branch})
+	for _, skip := range outcome.Skipped {
+		p.line(fmt.Sprintf(domain.PruneSkippedFmt, skip.Branch, rules.PruneReasonLabel(skip.Reason)))
+	}
+	if batch {
+		removed, absent := rules.CleanedBranches(outcome.Results)
+		p.line(rules.Tally(
+			domain.TallyPart{Count: len(removed), Label: domain.TallyRemoved},
+			domain.TallyPart{Count: len(absent), Label: domain.TallyAlreadyAbsent},
+			domain.TallyPart{Count: len(outcome.Skipped), Label: domain.TallySkipped},
+			domain.TallyPart{Count: len(outcome.Failed), Label: domain.TallyFailed},
+		))
+	}
+	p.send(cleanedMsg{})
 	return nil
+}
+
+func (p cleanPresenter) finished(result domain.CleanResult) {
+	if result.AlreadyAbsent {
+		p.line(fmt.Sprintf(domain.CleanAlreadyAbsentFmt, result.Branch))
+		return
+	}
+	p.line(fmt.Sprintf(domain.DashboardFinishedFmt, domain.OpKindClean, result.Branch))
 }
 
 type reparentPresenter struct{ presenter }

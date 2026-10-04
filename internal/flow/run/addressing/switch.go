@@ -245,15 +245,7 @@ func readOutOfStep(ctx flow.Context, mode domain.Addressing) outOfStep {
 		if wt.Branch == "" {
 			continue
 		}
-		plan, planErr := worktree.EnvPortPlanFor(worktree.ResolveEnvPortsParams{
-			ProjectDir:   ctx.ProjectDir,
-			StateDir:     ctx.StateDir,
-			Branch:       wt.Branch,
-			WorktreePath: wt.Path,
-			EnvFiles:     ctx.Config.Project.Env.Files,
-			Global:       ctx.Config.Global,
-			Addressing:   mode,
-		})
+		plan, planErr := planOf(planOfParams{Context: ctx, Branch: wt.Branch, Path: wt.Path, Addressing: mode})
 		if planErr != nil || len(rules.EnvPortRewrites(plan)) == 0 {
 			continue
 		}

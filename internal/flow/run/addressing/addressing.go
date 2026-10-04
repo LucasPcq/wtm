@@ -7,6 +7,7 @@ package addressing
 import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/ordinal"
 	"github.com/LucasPcq/wtm/internal/flow/run/target"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
@@ -88,14 +89,7 @@ func drifts(params Params) []drift {
 		if branch == "" {
 			continue
 		}
-		plan, err := worktree.EnvPortPlanFor(worktree.ResolveEnvPortsParams{
-			ProjectDir:   params.Context.ProjectDir,
-			StateDir:     params.Context.StateDir,
-			Branch:       branch,
-			WorktreePath: dir,
-			EnvFiles:     params.Context.Config.Project.Env.Files,
-			Global:       params.Context.Config.Global,
-		})
+		plan, err := planOf(planOfParams{Context: params.Context, Branch: branch, Path: dir})
 		if err != nil {
 			continue
 		}
@@ -105,4 +99,35 @@ func drifts(params Params) []drift {
 		})
 	}
 	return drifts
+}
+
+type planOfParams struct {
+	Context    flow.Context
+	Branch     string
+	Path       string
+	Addressing domain.Addressing
+}
+
+// planOf numbers the worktree the first time its ports are planned, as reading
+// them always did, so the allocation is published.
+func planOf(params planOfParams) (domain.EnvPortPlan, error) {
+	var plan domain.EnvPortPlan
+	err := ordinal.Retry(ordinal.RetryParams{
+		Context: params.Context,
+		Branch:  func() string { return params.Branch },
+		Do: func() error {
+			resolved, planErr := worktree.EnvPortPlanFor(worktree.ResolveEnvPortsParams{
+				ProjectDir:   params.Context.ProjectDir,
+				StateDir:     params.Context.StateDir,
+				Branch:       params.Branch,
+				WorktreePath: params.Path,
+				EnvFiles:     params.Context.Config.Project.Env.Files,
+				Global:       params.Context.Config.Global,
+				Addressing:   params.Addressing,
+			})
+			plan = resolved
+			return planErr
+		},
+	})
+	return plan, err
 }

@@ -19,7 +19,7 @@ You drive wtm without a terminal a human is watching, so everything below exists
 1. **Always pass arguments.** Without one, most commands drop into an interactive picker you cannot navigate. Get the branch, PR number, profile or job name from a discovery call first (see below). A required selection with no safe default is never guessed on your paths: the command errors naming the missing flag instead of opening a picker.
 2. **Never launch a full-screen surface.** Two exist: `wtm ui` (the worktree dashboard) and the **run view** that `wtm run up`, `wtm run start --job <service>` and `wtm run logs` open on a terminal. Both hold the terminal until someone presses `q`, and you can neither read them nor leave them. Use `wtm list --output json` or `wtm tree` instead of `wtm ui`, and pass `-d` (or `--output json`) to every `run up` / `run start`. wtm opens no view under `--output json` or unless both stdin and stdout are a terminal, but do not rely on that. Suggest `wtm ui` to the user when they want to browse worktrees themselves.
 3. **Always add `--output json` on data commands.** JSON goes to stdout; human text and warnings go to stderr, which you can ignore unless the exit code is non-zero. wtm may print a one-line update notice on stderr (at most once a day, never under `--output json`, never in CI or without a TTY); it never touches stdout.
-4. **`--yes` on every command that changes state or could ask something.** JSON mode is non-interactive, so a mutating command (`create`, `clean`, `prune`, `sync`, `fast-forward`, `relocate`, `reparent`, `extract`, `checkout`, `env`, the `run` commands that can ask, `upgrade`) errors under `--output json` without `--yes`. `--yes` resolves every confirmation or decision from its flag, else from a documented **safe default that is never destructive** (for example `sync --yes` does not push, `extract --yes` aborts on conflict, `clean --yes` leaves children orphaned). Read-only commands (`list`, `tree`, `resolve`, `config show`, `run list`, `run ps`, `run logs`, `env --check`) take `--output json` with no `--yes`.
+4. **`--yes` on every command that changes state or could ask something.** JSON mode is non-interactive, so a mutating command (`create`, `clean`, `prune`, `sync`, `fast-forward`, `relocate`, `reparent`, `extract`, `checkout`, `env`, `exec`, the `run` commands that can ask, `upgrade`) errors under `--output json` without `--yes`. `--yes` resolves every confirmation or decision from its flag, else from a documented **safe default that is never destructive** (for example `sync --yes` does not push, `extract --yes` aborts on conflict, `clean --yes` leaves children orphaned). Read-only commands (`list`, `tree`, `resolve`, `config show`, `run list`, `run ps`, `run logs`, `env --check`, `events`) take `--output json` with no `--yes`.
 5. **`--force` is a separate axis: safety, not confirmation.** It only lifts safety refusals (dirty, unpushed, open PR, locked, foreign data) and never implies `--yes`; `--force` alone is rejected in JSON mode. **Never add `--force` on your own initiative**: it exists so that a destructive action is always the user's explicit choice.
 6. **`--quiet`** silences the human report and nothing else: the exit code, the errors and every machine contract (`--output json`, `resolve`, `run url`, `shell-init`, `run export`) still come through. It is the output axis only and does not stop prompts, so pair it with `--yes` on a mutating command.
 7. **Trust exit codes, then parse.** `0` is success; the granular codes below let you branch precisely. On failure, surface the stderr text. Check the exit code, and parse stdout only when it is non-empty (a command that failed before producing results writes nothing on stdout).
@@ -40,6 +40,10 @@ You drive wtm without a terminal a human is watching, so everything below exists
 | `15` | `extract`: selected changes conflict with the target worktree |
 | `16` | no run.toml (no job or profile declared): run `wtm run init` |
 | `17` | `upgrade`: this install cannot be upgraded (built from source, or the binary is not writable) |
+| `18` | `env --check`: the `.env` has drifted (the report or JSON is still written) |
+| `19` | an interactive run the user backed out of (Esc, Ctrl-C, "No, cancel", a declined confirmation); nothing changed. Never under `--yes` |
+| `20` | `events`: it received an event of a newer schema than its own; wtm must be upgraded |
+| `21` | not in a git repository: the current directory, or the path given (`events --repo`), is outside any git repository (`events` alone outside a repository is not an error: it follows every repository) |
 
 ## Discover names before you act
 
@@ -55,6 +59,7 @@ You drive wtm without a terminal a human is watching, so everything below exists
 | What a job printed | `wtm run logs [worktree] --job <name> --output json` |
 | Resolved project config | `wtm config show --output json` |
 | A branch's worktree path | `wtm resolve <branch> --output json` |
+| This wtm's version, and the contract versions it speaks (`events`) | `wtm version --output json` |
 
 ## Which reference to read
 
@@ -62,11 +67,12 @@ Open the reference **before** running a command from its area: each one lists th
 
 | You want to | Read |
 |---|---|
-| Create, list, remove (`clean`, `prune`), relocate a worktree; split changes into another worktree (`extract`); fix `.env` drift (`env`); check out a PR (`checkout`); get a path (`resolve`, `go`); set wtm up (`init`, `config`, `upgrade`, `agents`) | `references/worktrees.md` |
+| Create, list, remove (`clean`, `prune`), relocate a worktree; split changes into another worktree (`extract`); fix `.env` drift (`env`); run one command in several worktrees (`exec`); check out a PR (`checkout`); get a path (`resolve`, `go`); set wtm up (`init`, `config`, `upgrade`, `agents`) | `references/worktrees.md` |
 | Work with stacked branches: `tree`, `sync`, `reparent`, `fast-forward` | `references/stacks.md` |
 | Run, stop or inspect dev jobs: `run up`, `down`, `start`, `stop`, `logs`, `ps`, `url`, `open`, `list`, the daemon, the proxy, statuses, concurrency | `references/run.md` |
 | Configure dev jobs: `run init`, `run job add|edit|rm`, `run profile`, `run addressing`, `run export|import`, and what `run.toml` means (ports, isolation, shared services, namespaces, `touches`, `[[env_port]]`, `[[env]]`, named URLs) | `references/run-config.md` |
 | Parse a command's JSON output, or branch on a `status` value | `references/json.md` |
+| React to worktrees being created, moved or removed by anyone, as it happens: `events` (a stream that never exits on its own) | `references/events.md` |
 
 Before any `wtm run …` command, read `references/run.md`; before changing a job, a profile or `run.toml`, read `references/run-config.md`. Never edit `run.toml` by hand: every field has a flag, and a write is refused exactly as loading the file would refuse it.
 
@@ -81,6 +87,7 @@ On a non-zero exit, read stderr, then:
 - `14`: the job or profile is not declared; check `wtm run list --output json`.
 - `15`: `extract` changed nothing; see `references/worktrees.md` for the retry.
 - `16`: run `wtm run init --yes` to create `run.toml` (see `references/run-config.md`), then re-run the command.
+- `21`: run the command from inside the repository, or point it there (`events --repo`); retrying as is will not help.
 - `17`: nothing to retry. Report the message: a source build updates with `git pull && make install`, an unwritable binary needs the user to re-run with sudo.
 - `gh: …` on stderr: `gh` is not authenticated; tell the user to run `gh auth login`.
 - A `run up` / `run down` that exited non-zero still wrote its whole document: the entries with `status: "error"` name the failing job, with `message`, `output` and `exit_code` (see `references/json.md`).

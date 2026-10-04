@@ -25,6 +25,9 @@ func TestExitCode(t *testing.T) {
 		{"profile not found", fmt.Errorf(domain.RunProfileNotFoundFmt, domain.ErrProfileNotFound, "dev"), domain.ExitCodeNotDeclared},
 		{"usage", fmt.Errorf("unknown flag: --bogus: %w", domain.ErrUsage), domain.ExitCodeUsage},
 		{"wrapped", fmt.Errorf("context: %w", domain.ErrBranchNotFound), domain.ExitCodeBranchNotFound},
+		{"env drift", fmt.Errorf("%w (%w)", domain.ErrEnvDrift, domain.ErrAborted), domain.ExitCodeEnvDrift},
+		{"events schema newer", fmt.Errorf("event v2: %w", domain.ErrEventsSchemaNewer), domain.ExitCodeEventsSchemaNewer},
+		{"not a git repository", fmt.Errorf(domain.NotGitRepoFmt, "/tmp/x", domain.ErrNotGitRepo), domain.ExitCodeNotGitRepo},
 	}
 
 	for _, tc := range cases {

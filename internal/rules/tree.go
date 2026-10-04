@@ -252,6 +252,9 @@ func TreeBadges(node domain.TreeNode) []domain.TreeBadge {
 	} else if node.Status.IsDirty {
 		badges = append(badges, domain.TreeBadgeDirty)
 	}
+	if node.Status.IsLocked {
+		badges = append(badges, domain.TreeBadgeLocked)
+	}
 	if node.Status.NeedsSync {
 		badges = append(badges, domain.TreeBadgeNeedsSync)
 	}

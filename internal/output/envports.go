@@ -27,35 +27,18 @@ func EnvPortsReport(w io.Writer, plan domain.EnvPortPlan, check bool) {
 	}
 
 	Blank(w)
-	if outcome != "" {
+	switch {
+	case outcome == "":
+	case check:
+		Warning(w, outcome)
+	default:
 		Unchanged(w, outcome)
 	}
-	printEnvPortAnomalies(w, anomalies)
-	printEnvPortNotices(w, notices, outcome == "" && len(anomalies) == 0)
-}
-
-// printEnvPortNotices closes the section with what the machine, rather than any
-// one value, made of the pass.
-func printEnvPortNotices(w io.Writer, notices []rules.EnvPortNotice, alone bool) {
-	for i, notice := range notices {
-		if i > 0 || !alone {
-			Blank(w)
-		}
-		Warning(w, notice.Title)
-		Message(w, notice.Line)
+	if len(anomalies) > 0 {
+		Callout(w, domain.EnvPortAnomaliesTitle, anomalies)
 	}
-}
-
-// printEnvPortAnomalies lists the links wtm refused to act on. They survive a
-// declined pass: the user turned down the shift, not the news that a link never
-// matches anything.
-func printEnvPortAnomalies(w io.Writer, anomalies []string) {
-	if len(anomalies) == 0 {
-		return
-	}
-	Warning(w, domain.EnvPortAnomaliesTitle)
-	for _, line := range anomalies {
-		Message(w, line)
+	for _, notice := range notices {
+		Section(w, notice.Title, []string{notice.Line})
 	}
 }
 

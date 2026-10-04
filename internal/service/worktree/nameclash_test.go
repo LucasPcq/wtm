@@ -72,7 +72,7 @@ func TestCreateAllowsTheSameDerivedNameWithoutRunJobs(t *testing.T) {
 	}
 }
 
-func TestRelocateRefusesToAdoptAClashingName(t *testing.T) {
+func TestPlanRelocateRefusesToAdoptAClashingName(t *testing.T) {
 	globaldir.Isolate(t)
 	repo := newOrdinalRepo(t)
 	writeRunConfig(t, repo.stateDir, oneJobRunConfig)
@@ -82,27 +82,15 @@ func TestRelocateRefusesToAdoptAClashingName(t *testing.T) {
 	}
 	repo.addWorktree(t, "feat.x")
 
-	result, err := Relocate(RelocateParams{
-		ProjectDir:     repo.dir,
-		StateDir:       repo.stateDir,
-		Config:         domain.Config{Project: domain.ProjectConfig{Worktrees: domain.WorktreesConfig{BasePath: base, BaseBranch: "main"}}},
-		TargetBasePath: base,
-		BaseBranch:     "main",
-	})
-	if err != nil {
-		t.Fatalf("Relocate: %v", err)
-	}
-	for _, step := range result.Steps {
+	plan := planAt(t, repo, base)
+	for _, step := range plan.Steps {
 		if step.Branch != "feat.x" {
 			continue
 		}
 		if step.Status != domain.RelocateStatusBlockedName || !strings.Contains(step.Detail, "feat/x") {
 			t.Fatalf("feat.x = %+v, want blocked_name naming feat/x", step)
 		}
-		if meta, metaErr := loadMetadata(repo.stateDir, "feat.x"); metaErr == nil && meta.CreatedAt != "" {
-			t.Errorf("feat.x was adopted anyway: %+v", meta)
-		}
 		return
 	}
-	t.Fatalf("no step for feat.x in %+v", result.Steps)
+	t.Fatalf("no step for feat.x in %+v", plan.Steps)
 }

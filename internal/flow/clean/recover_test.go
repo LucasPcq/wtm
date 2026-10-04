@@ -35,7 +35,7 @@ func TestADeclinedPrivilegedRemovalSettlesWhatGitDid(t *testing.T) {
 
 	_, err := Run(Params{
 		Context:   d.ctx,
-		Request:   Request{Branch: d.branch, BaseBranch: "main", Force: true, AllowPrivileged: true},
+		Request:   Request{Branches: []string{d.branch}, BaseBranch: "main", Force: true, AllowPrivileged: true},
 		Prompter:  prompter,
 		Presenter: presenter,
 	})
@@ -66,7 +66,7 @@ func TestAnUnofferedPrivilegedRemovalAsksNothing(t *testing.T) {
 
 	if _, err := Run(Params{
 		Context:   d.ctx,
-		Request:   Request{Branch: d.branch, BaseBranch: "main", Force: true},
+		Request:   Request{Branches: []string{d.branch}, BaseBranch: "main", Force: true},
 		Prompter:  prompter,
 		Presenter: newRecorder(),
 	}); err != nil {

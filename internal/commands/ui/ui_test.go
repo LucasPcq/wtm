@@ -84,3 +84,10 @@ func TestUITakesNoArguments(t *testing.T) {
 		t.Fatal("wtm ui takes no arguments")
 	}
 }
+
+// A dashboard session is never attributed to whoever launched it.
+func TestUIIsUncorrelated(t *testing.T) {
+	if NewCmd(NewCmdParams{}).Annotations[domain.AnnotationUncorrelated] != domain.AnnotationOn {
+		t.Fatal("wtm ui must not carry the caller's correlation id")
+	}
+}

@@ -44,6 +44,19 @@ const (
 	EnvDecisionOverwrite EnvConflictDecision = "overwrite"
 )
 
+// EnvKeyAction is what an apply did to a key; a read-only run leaves it empty,
+// and so does an apply for a key it left as it found it.
+type EnvKeyAction string
+
+const (
+	EnvActionAdded       EnvKeyAction = "added"
+	EnvActionFilled      EnvKeyAction = "filled"
+	EnvActionOverwritten EnvKeyAction = "overwritten"
+	EnvActionKept        EnvKeyAction = "kept"
+	EnvActionPruned      EnvKeyAction = "pruned"
+	EnvActionSkipped     EnvKeyAction = "skipped"
+)
+
 // EnvSourceParent, EnvSourceMain label where a resolved value came from in the
 // parent -> main cascade. An empty Source means no real source value was found.
 const (
@@ -64,6 +77,7 @@ type EnvKeyDiff struct {
 	Placeholder   string       `json:"placeholder,omitempty"`
 	Source        string       `json:"source,omitempty"`
 	Export        bool         `json:"export,omitempty"`
+	Action        EnvKeyAction `json:"action,omitempty"`
 	// SourceLine is the line an added key is copied from, so it lands quoted
 	// and commented the way its source wrote it.
 	SourceLine EnvLine `json:"-"`

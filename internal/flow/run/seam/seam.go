@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/ordinal"
 	"github.com/LucasPcq/wtm/internal/flow/run/target"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -49,6 +51,8 @@ type Params struct {
 	// it entirely.
 	ProbeBudget time.Duration
 	NoProbe     bool
+	// Publisher hears the ordinal a first run allocates to its worktree.
+	Publisher flow.Publisher
 }
 
 type Seam struct {
@@ -78,6 +82,7 @@ func Open(params Params) Seam {
 		ProjectDir: params.ProjectDir,
 		StateDir:   params.StateDir,
 		WorkDir:    params.WorkDir,
+		Publisher:  params.Publisher,
 	})
 	// Resolved once, and only when something declares a shared job: it costs a
 	// git worktree list plus a full environment resolution for the main
@@ -140,7 +145,7 @@ func sharedContext(params Params) *domain.SharedJobContext {
 	if err != nil {
 		return nil
 	}
-	env, err := JobEnv(JobEnvParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, WorkDir: main})
+	env, err := JobEnv(JobEnvParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, WorkDir: main, Publisher: params.Publisher})
 	if err != nil {
 		return nil
 	}
@@ -342,16 +347,27 @@ type JobEnvParams struct {
 	ProjectDir string
 	StateDir   string
 	WorkDir    string
+	Publisher  flow.Publisher
 }
 
 // JobEnv resolves the worktree-scoped environment handed to every job of this
-// run. It fails rather than degrade: a worktree with no offset and no name is
-// one whose jobs would bind the main checkout's ports.
+// run, numbering the worktree the first time one asks. It fails rather than
+// degrade: a worktree with no offset and no name is one whose jobs would bind
+// the main checkout's ports.
 func JobEnv(params JobEnvParams) (map[string]string, error) {
-	env, err := worktree.JobEnv(worktree.JobEnvParams{
-		ProjectDir: params.ProjectDir,
-		StateDir:   params.StateDir,
-		Dir:        params.WorkDir,
+	var env map[string]string
+	err := ordinal.Retry(ordinal.RetryParams{
+		Context: flow.Context{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Publisher: params.Publisher},
+		Branch:  func() string { return target.BranchOf(params.WorkDir) },
+		Do: func() error {
+			resolved, resolveErr := worktree.JobEnv(worktree.JobEnvParams{
+				ProjectDir: params.ProjectDir,
+				StateDir:   params.StateDir,
+				Dir:        params.WorkDir,
+			})
+			env = resolved
+			return resolveErr
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s: %w", domain.ErrWorktreeEnvUnresolved, params.WorkDir, err)
@@ -363,6 +379,7 @@ type RequireEnvParams struct {
 	ProjectDir string
 	StateDir   string
 	WorkDirs   []string
+	Publisher  flow.Publisher
 }
 
 // RequireEnv refuses a start before anything is started when one of its
@@ -374,7 +391,7 @@ func RequireEnv(params RequireEnvParams) error {
 		if err := requireIsolationChosen(requireChosenParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, WorkDir: dir}); err != nil {
 			return err
 		}
-		if _, err := JobEnv(JobEnvParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, WorkDir: dir}); err != nil {
+		if _, err := JobEnv(JobEnvParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, WorkDir: dir, Publisher: params.Publisher}); err != nil {
 			return err
 		}
 	}

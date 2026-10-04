@@ -9,13 +9,15 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/decide"
 	"github.com/LucasPcq/wtm/internal/flow/envports"
+	"github.com/LucasPcq/wtm/internal/flow/ordinal"
+	"github.com/LucasPcq/wtm/internal/flow/publish"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/branch"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
 
 type Request struct {
-	Branch      string
+	Branches    []string
 	From        string
 	EnvFrom     string
 	FastForward bool
@@ -25,14 +27,19 @@ type Request struct {
 }
 
 type Outcome struct {
-	Result     domain.CreateResult
-	Branch     string
+	Results    []domain.CreateResult
+	Failed     []domain.BatchFailure
 	FromBranch string
 	Aborted    bool
 }
 
+// Presenter hears about each branch only when the run holds several: a single
+// one reads exactly as it always did.
 type Presenter interface {
 	flow.Presenter
+	BranchStarted(flow.Progress)
+	BranchCreated(domain.CreateResult)
+	BranchFailed(domain.BatchFailure)
 	Created(Outcome) error
 }
 
@@ -51,38 +58,47 @@ func Operation() flow.Operation {
 
 func Run(params Params) (Outcome, error) {
 	f := &createFlow{
-		ctx:        params.Context,
-		request:    params.Request,
-		prompter:   params.Prompter,
-		presenter:  params.Presenter,
-		candidates: decide.BranchCandidates(params.Context.ProjectDir),
-		target:     decide.MemoizedTarget(params.Context.ProjectDir),
+		ctx:          params.Context,
+		request:      params.Request,
+		prompter:     params.Prompter,
+		presenter:    params.Presenter,
+		candidates:   decide.BranchCandidates(params.Context.ProjectDir),
+		target:       decide.MemoizedTarget(params.Context.ProjectDir),
+		derivedNames: worktree.DerivedNamesMatter(params.Context.StateDir),
 	}
 	return f.run()
 }
 
 type createFlow struct {
-	ctx        flow.Context
-	request    Request
-	prompter   flow.Prompter
-	presenter  Presenter
-	candidates []domain.BranchCandidate
-	target     func(string) domain.BranchTarget
+	ctx          flow.Context
+	request      Request
+	prompter     flow.Prompter
+	presenter    Presenter
+	candidates   []domain.BranchCandidate
+	target       func(string) domain.BranchTarget
+	derivedNames bool
+	// parent, update and branchFlag are set only for a host embedding these
+	// steps (Embed): the parent it offers, and its test's divergence.
+	parent     func(flow.Answers) string
+	update     func(flow.Answers) decide.SourceUpdatePrompt
+	branchFlag string
 }
 
 func (f *createFlow) run() (Outcome, error) {
+	if err := f.refuseOwnParent(); err != nil {
+		return Outcome{}, err
+	}
 	if f.request.From != "" && !rules.BranchCandidateExists(f.candidates, f.request.From) {
 		return Outcome{}, fmt.Errorf("%w: %s", domain.ErrBranchNotFound, f.request.From)
 	}
 
 	// Failing here saves the user a full interactive run that could only ever end in
 	// refusal; worktree.Create's guard is the chokepoint for the other callers.
-	if f.request.Branch != "" {
-		if target := f.target(f.request.Branch); target.State == domain.BranchTargetCheckedOut && !f.request.IfNotExists {
-			return Outcome{}, fmt.Errorf("%w: "+domain.BranchCheckedOutElsewhereFmt,
-				domain.ErrWorktreeExists, f.request.Branch, target.WorktreePath, f.request.Branch)
-		}
+	requested, err := f.acceptRequested()
+	if err != nil {
+		return Outcome{}, err
 	}
+	f.request.Branches = requested
 
 	answers, err := f.prompter.Ask(f.session())
 	if errors.Is(err, domain.ErrUserAborted) {
@@ -93,30 +109,107 @@ func (f *createFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	branchName := answers.Value(KeyBranch)
+	branches := f.branches(answers)
 	fromBranch := answers.Value(KeySource)
 
 	if answers.Value(KeySourceUpdate) == updateFastForward {
-		proceed, ffErr := f.applyFastForward(f.sourceUpdate(answers).Branch)
+		proceed, ffErr := f.applyFastForward(fastForwardParams{Subject: f.sourceUpdate(answers).Branch, Many: f.many(answers)})
 		if ffErr != nil {
 			return Outcome{}, ffErr
 		}
 		if !proceed {
+			f.presenter.Notice(flow.AbortedNotice)
 			return Outcome{Aborted: true}, nil
 		}
 	}
 
+	preflight := envports.Preflight(f.ctx)
+
+	outcome := Outcome{FromBranch: fromBranch}
+	batch := len(branches) > 1
+	var firstErr error
+	for i, name := range branches {
+		if batch {
+			f.presenter.BranchStarted(flow.Progress{Branch: name, Position: i + 1, Total: len(branches)})
+		}
+		result, err := f.provisionOne(provisionParams{Branch: name, Source: fromBranch, Answers: answers, Preflight: preflight, Batch: batch})
+		if err == nil {
+			outcome.Results = append(outcome.Results, result)
+			if batch {
+				f.presenter.BranchCreated(result)
+			}
+			continue
+		}
+		failure := rules.BatchFailureOf(rules.BatchFailureOfParams{Branch: name, Path: result.Path, Err: err})
+		outcome.Failed = append(outcome.Failed, failure)
+		if firstErr == nil {
+			firstErr = err
+		}
+		if batch {
+			f.presenter.BranchFailed(failure)
+		}
+	}
+	if err := f.presenter.Created(outcome); err != nil {
+		return outcome, err
+	}
+	return outcome, flow.BatchError(flow.BatchErrorParams{First: firstErr, Batch: batch})
+}
+
+// A source already up to date skips the source-update step, which must not
+// swallow --ff for the existing branches of a list.
+func (f *createFlow) fastForwardsEach(answers flow.Answers) bool {
+	answer, _ := answers.Get(KeySourceUpdate)
+	if answer.Skipped {
+		return f.request.FastForward
+	}
+	return answer.Value == updateFastForward
+}
+
+func (f *createFlow) refuseOwnParent() error {
+	for _, name := range f.request.Branches {
+		if name == f.request.From {
+			return fmt.Errorf(domain.BranchOwnParentFmt, name, domain.FlagFrom)
+		}
+	}
+	return nil
+}
+
+func (f *createFlow) acceptRequested() ([]string, error) {
+	names, err := rules.DistinctNames(rules.DistinctNamesParams{Names: f.request.Branches, Blank: domain.CreateBranchRequired})
+	if err != nil {
+		return nil, err
+	}
+	for index, name := range names {
+		if err := f.validateEntry(flow.EntryCheck{Entry: name, Entries: names[:index]}); err != nil {
+			return nil, err
+		}
+	}
+	return names, nil
+}
+
+type provisionParams struct {
+	Branch    string
+	Source    string
+	Answers   flow.Answers
+	Preflight error
+	Batch     bool
+}
+
+func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, error) {
+	branchName, fromBranch, answers := params.Branch, params.Source, params.Answers
+
 	// A reused branch is checked out as-is: the source is only its recorded sync parent.
 	target := f.target(branchName)
+	if params.Batch && target.State == domain.BranchTargetExisting && f.fastForwardsEach(answers) {
+		_ = branch.FastForwardIfBehind(branch.BranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branchName})
+	}
 	startPoint := fromBranch
 	if !rules.SourceIsStartPoint(target.State) {
 		startPoint = ""
 	}
 
-	preflight := envports.Preflight(f.ctx)
-
 	var result domain.CreateResult
-	err = f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(flow.StageParams{
 		Message: fmt.Sprintf(domain.CreateLoadingFmt, branchName),
 		Work: func() error {
 			var createErr error
@@ -136,12 +229,13 @@ func (f *createFlow) run() (Outcome, error) {
 		},
 	})
 	if err != nil {
-		return Outcome{}, err
+		return result, err
 	}
 
 	if result.AlreadyExists {
 		f.warnIgnoredIsolation(&result)
 	} else {
+		publish.Created(f.ctx, branchName)
 		// Before the hooks: one of them may well read the .env this settles.
 		result.EnvPorts, result.Warnings = envports.SettleFresh(envports.FreshParams{
 			Params: envports.Params{
@@ -150,16 +244,21 @@ func (f *createFlow) run() (Outcome, error) {
 				WorktreePath: result.Path,
 				Presenter:    f.presenter,
 			},
-			Preflight: preflight,
+			Preflight: params.Preflight,
 		})
-		if hookErr := f.runHooks(result.Path, branchName, fromBranch); hookErr != nil {
-			return Outcome{}, hookErr
+		result.Warnings = append(result.Warnings, decide.WarnUnseenFallback(decide.UnseenFallbackParams{
+			Fallback:  decide.EnvFallbackParams{ProjectDir: f.ctx.ProjectDir, Source: fromBranch, Config: f.ctx.Config, EnvOverride: answers.Value(KeyEnv)},
+			Prompter:  f.prompter,
+			Presenter: f.presenter,
+		})...)
+		hookErr := f.runHooks(result.Path, branchName, fromBranch)
+		publish.Provisioned(publish.ProvisionedParams{Context: f.ctx, Branch: branchName, Err: hookErr})
+		if hookErr != nil {
+			return result, hookErr
 		}
 	}
 	result.Isolation = worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: branchName})
-
-	outcome := Outcome{Result: result, Branch: branchName, FromBranch: fromBranch}
-	return outcome, f.presenter.Created(outcome)
+	return result, nil
 }
 
 func (f *createFlow) warnIgnoredIsolation(result *domain.CreateResult) {
@@ -189,6 +288,7 @@ func (f *createFlow) runHooks(worktreePath, branchName, fromBranch string) error
 	if len(hooks) == 0 {
 		return nil
 	}
+	ordinal.BeforeHooks(f.ctx, branchName)
 	return f.presenter.HookPhase(flow.HookPhaseParams{
 		Title:   domain.HooksTitleOnCreate,
 		LogPath: rules.HooksLogPath(rules.HooksLogPathParams{StateDir: f.ctx.StateDir, Phase: domain.HookOnCreate, Branch: branchName}),
@@ -207,32 +307,17 @@ func (f *createFlow) runHooks(worktreePath, branchName, fromBranch string) error
 	})
 }
 
-func (f *createFlow) applyFastForward(subject string) (bool, error) {
-	params := branch.BranchParams{ProjectDir: f.ctx.ProjectDir, Branch: subject}
+type fastForwardParams struct {
+	Subject string
+	Many    bool
+}
 
-	// --ff is best effort: a branch that cannot be cleanly fast-forwarded is left
-	// as-is and creation proceeds from it, and no prompt can run.
-	if !f.prompter.Interactive() {
-		_ = branch.FastForwardIfBehind(params)
-		return true, nil
-	}
-
-	ffErr := f.presenter.Stage(flow.StageParams{
-		Message: fmt.Sprintf(domain.SourceFastForwardLoadingFmt, subject),
-		Work:    func() error { return branch.FastForwardToOrigin(params) },
-	})
-	if ffErr == nil {
-		return true, nil
-	}
-
-	_, ab := branch.Divergence(params)
-	proceed, confirmErr := f.prompter.Confirm(flow.ConfirmParams{
-		Title:      fmt.Sprintf(domain.SourceProceedStalePrompt, subject, ab.Behind),
-		Warning:    fmt.Sprintf(domain.SourceProceedStaleWarning, ffErr),
-		DefaultYes: false,
-	})
-	if confirmErr != nil {
-		return false, nil
-	}
-	return proceed, nil
+func (f *createFlow) applyFastForward(ff fastForwardParams) (bool, error) {
+	return decide.ApplyFastForward(decide.ApplyFastForwardParams{
+		ProjectDir: f.ctx.ProjectDir,
+		Subject:    ff.Subject,
+		Many:       ff.Many,
+		Prompter:   f.prompter,
+		Presenter:  f.presenter,
+	}), nil
 }

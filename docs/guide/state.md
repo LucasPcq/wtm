@@ -13,6 +13,7 @@ Everything wtm knows about a repository lives under its git common directory (`.
 │   └── meta.json             # one per worktree wtm created or adopted
 ├── logs/<branch>/<job>.log   # each job's output, cleared when the job starts
 ├── hooks/<phase>-<branch>.log  # the raw output of the last on_create / on_clean run
+├── exec/<branch>.log         # the whole output of the last wtm exec in that worktree
 ├── pending-removals.toml     # namespace drops owed by a clean while their service was down
 └── ordinal.lock              # serialises the allocation of worktree numbers
 ```
@@ -20,6 +21,16 @@ Everything wtm knows about a repository lives under its git common directory (`.
 `<branch>` is the branch name URL-escaped into one path segment (`feat/x` → `feat%2Fx`).
 
 ### `meta.json`
+
+```console
+$ cat '.git/wtm/worktrees/feat%2Flogin/meta.json'
+{
+  "source_branch": "main",
+  "created_at": "2026-10-04T16:52:28Z",
+  "env_strategy": "example",
+  "isolation": "isolated"
+}
+```
 
 | Field | Meaning |
 | --- | --- |
@@ -44,7 +55,9 @@ The global config lives in the OS config directory (`~/.config/wtm/` on Linux, `
 ├── state.json    # what wtm writes for itself (the update check)
 ├── wtm.sock      # the run daemon's socket, shared by every repository
 ├── wtm.lock      # held by the one daemon running
-└── jobs.json     # the daemon's index of what it started
+├── jobs.json     # the daemon's index of what it started
+├── repos.json    # every repository wtm was used in, for `wtm events` run outside one
+└── repos.json.lock
 ```
 
 `jobs.json` is what makes the daemon disposable: it exits about 30 s after its last foreground job, detached services keep running without it, and the next daemon reads the index back, so `wtm run ps` still lists a compose stack after a reboot and `wtm run down` still stops it. `wtm run daemon status` reports what is up; `wtm run daemon restart` replaces a daemon of another wtm build.

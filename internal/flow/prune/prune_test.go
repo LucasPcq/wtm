@@ -148,7 +148,7 @@ func TestPruneRunsEachWorktreesTeardownInTurn(t *testing.T) {
 	}
 }
 
-// Only the children of a worktree actually removed move onto their grandparent.
+// Only the children of a worktree actually removed move onto their nearest surviving ancestor.
 func TestPruneReparentsOnlyTheChildrenOfWhatItRemoved(t *testing.T) {
 	p := newPruneFixture(t, "feat/a", "feat/b")
 	p.ctx.Config.Project.Hooks.OnClean = []domain.HookCommand{{Cmd: "test ! -f refuse"}}

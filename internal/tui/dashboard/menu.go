@@ -35,6 +35,7 @@ const (
 	menuRunUpAll
 	menuRunDownAll
 	menuRunLogsAll
+	menuDeleteBatch
 )
 
 // menuEntryKind separates what the menu offers from what it only says. A
@@ -229,11 +230,12 @@ func (m Model) globalMenuItems() []menuItem {
 		{label: domain.DashboardMenuSyncAll, action: menuSyncAll},
 	}
 	prune := menuItem{label: domain.DashboardMenuPrune, action: menuPrune, danger: true}
+	deleteMany := menuItem{label: domain.DashboardMenuDeleteMany, action: menuDeleteBatch, danger: true}
 	run := m.globalRunBlock()
-	items := append(git, prune)
+	items := append(git, prune, deleteMany)
 	if len(run) > 0 {
 		items = append(append([]menuItem{{kind: menuEntryHeading, label: domain.DashboardMenuSectionGit}}, git...), run...)
-		items = append(items, menuItem{kind: menuEntrySeparator}, prune)
+		items = append(items, menuItem{kind: menuEntrySeparator}, prune, deleteMany)
 	}
 	caption, busy := m.busyCaption("")
 	if !busy {
@@ -357,6 +359,8 @@ func (m Model) activateMenu(index int) (Model, tea.Cmd) {
 		return m.startBatchReparent()
 	case menuPrune:
 		return m.startPrune()
+	case menuDeleteBatch:
+		return m.startBatchClean()
 	case menuSyncAll:
 		return m.startSyncAll()
 	case menuFastForwardAll:

@@ -5,13 +5,3 @@
 #
 # THIS LIST MAY ONLY SHRINK. A new entry is a decision to take knowingly, and it
 # belongs in a ticket — not a way to get a commit past the linter.
-
-# mutation — the four worktree-mutating commands still driving their services
-# from commands/. Each needs a Request/Outcome/Presenter in internal/flow/<cmd>
-# before a second surface can run it; until then the dashboard cannot offer them.
-#   LUC-182  extract
-#   —        checkout, relocate, env (no ticket yet)
-mutation internal/commands/wt/extract\.go 2
-mutation internal/commands/wt/relocate\.go 2
-mutation internal/commands/wt/env\.go 1
-mutation internal/commands/checkout/ 1

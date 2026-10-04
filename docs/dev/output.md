@@ -48,7 +48,7 @@ The body writes to the writer it is **handed**, never to the one `Frame` was giv
 
 A streaming pair wraps its own body writer: `output.Barred(w)`. When a command writes across two streams — `sync`'s plan on stderr, its recap on stdout — there is one rule rather than two mechanisms: **every section opens with exactly one blank line on the stream it is about to write to**, the first of them being the frame's leading blank, and `FrameEnd` closes. Same call, same output, one mechanism.
 
-JSON and machine output are never framed and therefore never barred. They emit flush.
+JSON (`--output json`) and machine output (shell-eval: `resolve` success, `shell-init`, `run url`, `run export`) are never framed and therefore never barred. They emit flush. A command routes on `rules.IsHumanFormat(format)`. `wtm events` is the one stream with no frame at all: it never ends, so there is no block to close, and each human line carries the bar on its own.
 
 ### The bar
 
@@ -94,7 +94,7 @@ A `✓` headline, nought to three aligned fields, at most one next step. Budget:
 ┃  ! docs/api skipped — open PR #42
 ```
 
-`output.Tally` counts, zero counts dropped; then **one line per exception only**, never per success. Budget: 6 lines plus the exceptions.
+`rules.Tally` counts, zero counts dropped (the CLI and the dashboard share it); then **one line per exception only**, never per success. Budget: 6 lines plus the exceptions.
 
 One nuance that is not a matter of taste: a **destructive** run names what it destroyed — knowing what is gone is actionable — but on one line, because the picker and the recap have already shown that list twice. A non-destructive run counts.
 
@@ -135,11 +135,11 @@ Which kills `output.Danger`, and with it the third failure register. `!` is some
 
 Secondary detail is expressed by **indentation, not by colour**. A branch list under a count, the lines of a failure's captured output, an address under a job: they are content, they sit one indent in, and they keep the foreground. Muting them was the third job, and it is the one that made the same class of information read at three different densities depending on the command.
 
-These three are checked by `make lint` (`tools/archlint`, rules `glyph`, `tuistyle`, `mutedline`) over `output/`, `styles/` and `tui/` — the layers that put glyphs on a screen. What a linter cannot check it cannot hold, and the first version of this document proved that a table alone does not survive sixty commands.
+These three are checked by `make lint` (`tools/archlint`, rules `glyph`, `tuistyle`, `mutedline` — see [lint.md](lint.md#the-output-vocabulary)) over `output/`, `styles/` and `tui/` — the layers that put glyphs on a screen. What a linter cannot check it cannot hold, and the first version of this document proved that a table alone does not survive sixty commands.
 
 ### What follows from the three rules
 
-**"Nothing to do" is `=`, everywhere** — and "everywhere" includes the places that are not a conclusion. An **empty inventory** is a non-event: `output.UnchangedLine` is `Unchanged` for a formatter that returns a body, so an empty table takes the same glyph as a command that found nothing to do. So does **backing out**: an abort changed nothing, and it is `=` with one wording (`domain.AbortedMessage`) rather than a bare sentence in four.
+**"Nothing to do" is `=`, everywhere** — and "everywhere" includes the places that are not a conclusion. An **empty inventory** is a non-event: `output.UnchangedLine` is `Unchanged` for a formatter that returns a body, so an empty table takes the same glyph as a command that found nothing to do. So does **backing out**: an abort changed nothing, and it is `=` with one wording (`domain.AbortedMessage`) rather than a bare sentence in four. It still exits `19` (`ExitCodeCancelled`): `CLIPresenter.Notice` marks the command when it draws that line, and the root ends the process on the mark, so a shell chaining `wtm create x && wtm go x` stops there while the dashboard, which never reads an exit code, is left alone.
 
 A **state readout** may not hide a non-event as a field value either. `not running` and `not installed` are the `=` register; a `Section` line is where the detail goes, under a conclusion, never instead of one.
 
@@ -164,7 +164,7 @@ The alignment belongs to `Announce`, never to the wording: a format string spell
 
 **"Exactly once" counts uninterrupted blocks, not frames.** A command frames each block of human output once; a prompt between two blocks makes two, because there are two blocks. So does a split across streams — `run down`'s failures on stderr and its recap on stdout. What the rule forbids is a second frame around the same block, or a helper emitting its own padding inside one.
 
-**A diff is not a register.** `wtm env` prints `+` / `!` / `−` per key, and that is deliberate: those runes describe a *change to a line of a file*, not the state of a run, and they read as a column down the left of a file block rather than as the head of a conclusion. It is the one vocabulary outside the table, it is confined to `output/env.go`, and adding a second one is a decision to argue for here first.
+**A diff is not a register.** `wtm env` prints `+` / `!` / `−` per key — every key under `--check`, and under an apply only what it left for the reader, what it did being one counted line per file (`rules.EnvFileTally`) — and that is deliberate: those runes describe a *change to a line of a file*, not the state of a run, and they read as a column down the left of a file block rather than as the head of a conclusion. It is the one vocabulary outside the table, it is confined to `output/env.go`, and adding a second one is a decision to argue for here first.
 
 **The status palette names states, never identities.** `run logs` used to cycle green and yellow across job prefixes, so in the one command whose body is job output, yellow meant "job 3". A label saying where a line came from is chrome.
 
@@ -197,7 +197,7 @@ A hook that runs for forty seconds has to be visible while it runs — silence r
 
 It applies to a terminal this process may repaint. A pipe, a CI log or `--output json` gets the raw stream, unconditionally.
 
-Both paths go through one function, `commands/shared.DrawHookPhase`, and it is one function on purpose: the two callers — the migrated commands through `CLIPresenter`, `extract` and `checkout` through `RunCreateHooksPhase` — drifted apart once, and a hook has to read the same whichever command ran it. It owns the log rather than the view, opening `<state-dir>/hooks/<phase>-<branch>.log` and teeing the raw stream into it on **every** path: the run whose output the reader could not watch is exactly the one whose record has to survive. And it always hands the sink a real writer — the command's own — because a sink left nil falls back to `os.Stderr` in the runner, which is how a hook finds its way onto a terminal that asked for `--quiet`.
+Both paths go through one function, `commands/shared.DrawHookPhase`, and it is one function on purpose: two paths to it — the migrated commands through `CLIPresenter`, `extract` and `checkout` through a helper of their own, since gone — drifted apart once, and a hook has to read the same whichever command ran it. It owns the log rather than the view, opening `<state-dir>/hooks/<phase>-<branch>.log` and teeing the raw stream into it on **every** path: the run whose output the reader could not watch is exactly the one whose record has to survive. And it always hands the sink a real writer — the command's own — because a sink left nil falls back to `os.Stderr` in the runner, which is how a hook finds its way onto a terminal that asked for `--quiet`.
 
 A hook's own bytes are never barred, for the same reason progress is not: `barWriter` re-marks the row after every carriage return, so a bar drawn over a redrawing progress line lands on top of its content. The rule reaches the run module too — `output.RunPrinter` bars the lines it composes and writes a job's chunks through untouched.
 

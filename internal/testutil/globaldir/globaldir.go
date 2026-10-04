@@ -24,3 +24,19 @@ func Isolate(t testing.TB) {
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 }
+
+// Main is Isolate for a whole package: a command test reaching LoadConfig
+// registers its repository, and must not do it in the developer's registry.
+//
+// Its prefix is not Isolate's: a helper that sees a /tmp/wtmhome HOME takes it
+// for one isolated per test and would share this one across the package.
+func Main(m *testing.M) int {
+	home, err := os.MkdirTemp("", "wtmpkg")
+	if err != nil {
+		return 1
+	}
+	defer os.RemoveAll(home)
+	os.Setenv("HOME", home)
+	os.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	return m.Run()
+}

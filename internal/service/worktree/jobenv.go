@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -43,7 +44,7 @@ func BranchEnv(params WorktreeRef) (map[string]string, error) {
 // branchEnvAs resolves the environment under a given isolation: `wtm env
 // --isolation` settles the .env for the choice before recording it.
 func branchEnvAs(params WorktreeRef, isolation domain.Isolation) (map[string]string, error) {
-	ordinal, err := EnsureOrdinal(params)
+	ordinal, err := Ordinal(params)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +140,8 @@ type hookEnvParams struct {
 }
 
 // hookEnv resolves the run variables a lifecycle hook gets, nil when they do not
-// apply — and then nothing is resolved, so no ordinal is allocated either. A
+// apply or the worktree has no number yet (HookEnvPending: the flow allocates it
+// before the hooks run). A
 // COMPOSE_PROJECT_NAME the worktree's own .env sets wins: it is the stack a
 // `docker compose` typed there reaches. Resolving nothing degrades to the
 // hook's own environment rather than to another worktree's values.
@@ -156,4 +158,16 @@ func hookEnv(params hookEnvParams) map[string]string {
 		env[domain.EnvComposeProjectName] = name
 	}
 	return env
+}
+
+// HookEnvPending says whether this worktree's hooks would read its run
+// environment while it has no number yet: the flow allocates one first, so the
+// allocation is published like any other change to the worktree.
+func HookEnvPending(ref WorktreeRef) bool {
+	cfg := runConfig(ref.StateDir)
+	if !rules.RunEnvReachesHooks(rules.RunEnvReachesHooksParams{Config: cfg, Recorded: RecordedIsolation(ref)}) {
+		return false
+	}
+	_, err := Ordinal(ref)
+	return errors.Is(err, domain.ErrOrdinalUnallocated)
 }

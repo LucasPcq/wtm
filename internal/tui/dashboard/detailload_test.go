@@ -238,3 +238,29 @@ func TestMarkerWaitsForTheGraceDelay(t *testing.T) {
 		t.Error("sous le délai d'apparition, aucun marqueur : ce serait du flash déguisé en feedback")
 	}
 }
+
+// A removal changes rows it never targeted: the parent on screen loses a
+// child, which only the reloaded list says, so that is when its detail reloads.
+func TestAListThatChangesTheChildrenOnScreenReloadsTheDetail(t *testing.T) {
+	model := newTestModel(t, testWidth, testHeight, "main", "feat/a", "feat/b")
+	model.parents = map[string]string{"feat/a": "main", "feat/b": "main"}
+	model.detailLoading = ""
+
+	model = update(model, worktreesMsg{statuses: model.statuses[:2], parents: map[string]string{"feat/a": "main"}})
+
+	if model.detailLoading != "main" {
+		t.Errorf("detailLoading = %q, want main's detail reloaded once its children changed", model.detailLoading)
+	}
+}
+
+func TestAListThatChangesNothingOnScreenKeepsTheDetail(t *testing.T) {
+	model := newTestModel(t, testWidth, testHeight, "main", "feat/a")
+	model.parents = map[string]string{"feat/a": "main"}
+	model.detailLoading = ""
+
+	model = update(model, worktreesMsg{statuses: model.statuses, parents: map[string]string{"feat/a": "main"}})
+
+	if model.detailLoading != "" {
+		t.Errorf("detailLoading = %q, want no reload: nothing the panel shows changed", model.detailLoading)
+	}
+}

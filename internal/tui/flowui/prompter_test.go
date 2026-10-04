@@ -688,3 +688,54 @@ func TestAConditionalSelectKeepsItsStartingValue(t *testing.T) {
 		t.Errorf("cursor = %q, want the start the step built", got)
 	}
 }
+
+func TestBuildRendersATextListPrefilledFromItsContent(t *testing.T) {
+	step := flow.Step{
+		Kind:  flow.StepTextList,
+		Key:   "branches",
+		Label: "Branches",
+		Build: func(flow.Answers) (flow.StepContent, error) {
+			return flow.StepContent{Entries: []string{"feat/a"}}, nil
+		},
+	}
+	plan, err := build(flow.Session{Steps: []flow.Step{step, recapStep("r")}})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	model, ok := plan.steps[0].Model.(components.TextListModel)
+	if !ok {
+		t.Fatalf("model = %T, want a TextListModel", plan.steps[0].Model)
+	}
+	if got := strings.Join(model.Values(), ","); got != "feat/a" {
+		t.Errorf("values = %q, want the pre-fill", got)
+	}
+}
+
+func TestAnswerOfReadsATextListAsASet(t *testing.T) {
+	model := components.NewTextList(components.NewTextListParams{Entries: []string{"feat/a", "feat/b"}})
+	answer := answerOf(flow.StepTextList, model)
+	if strings.Join(answer.Values, ",") != "feat/a,feat/b" || !answer.Asked {
+		t.Errorf("answer = %+v, want both entries, asked", answer)
+	}
+}
+
+func TestBuildRendersTheEnvResolverAndReadsItsDecisions(t *testing.T) {
+	files := []domain.EnvFileResult{{Target: ".env", Diff: domain.EnvDiff{Entries: []domain.EnvKeyDiff{
+		{Key: "OLD", Status: domain.EnvKeyOrphan, CurrentValue: "1"},
+	}}}}
+	step := flow.Step{Kind: flow.StepEnvResolve, Key: "resolve", Label: "Resolve", Build: func(flow.Answers) (flow.StepContent, error) {
+		return flow.StepContent{EnvFiles: files}, nil
+	}}
+
+	p, err := build(flow.Session{Steps: []flow.Step{step}})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if len(p.steps) != 1 || !p.steps[0].Callout {
+		t.Fatalf("steps = %+v, want the resolver with its glossary as a callout", p.steps)
+	}
+	answer := answerOf(flow.StepEnvResolve, p.steps[0].Model)
+	if !answer.Asked || len(answer.EnvDecisions) != 1 || answer.EnvDecisions[0].Target != ".env" {
+		t.Errorf("answer = %+v, want the file's decision", answer)
+	}
+}

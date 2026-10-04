@@ -125,24 +125,38 @@ const (
 	// a wrapped line says more than an elided one that says nothing.
 	EnvValueDisplayWidth = 44
 	EnvValueMinWidth     = 24
-	// RecapFrameChrome is what a wizard recap spends around its body: the
-	// indentation on either side and the border between them.
-	RecapFrameChrome = 8
 	// A conclusion's counted summary: "3 applied · 1 skipped", zero counts dropped.
-	TallyPartFmt       = "%d %s"
-	TallyApplied       = "applied"
-	TallyFastForwarded = "fast-forwarded"
-	TallyUpToDate      = "already up to date"
-	TallyFailed        = "failed"
-	TallyAdded         = "added"
-	TallyRemoved       = "removed"
-	TallyKept          = "kept"
-	TallySkipped       = "skipped"
-	TallyBlocked       = "blocked"
-	TallyPruned        = "pruned"
-	ReparentedPairFmt  = "%s → %s"
-	TallyReparented    = "reparented"
-	TallySeparator     = " · "
+	BatchProgressFmt      = "%s (%d/%d)"
+	BatchFailedFmt        = "%s — %s"
+	BranchGivenTwiceFmt   = "%s is given twice"
+	ReparentIntro         = "These children would otherwise be left orphaned:"
+	ReparentChildFmt      = "  • %s will rebase onto %s instead of %s"
+	ReparentOptionFmt     = "Reparent onto %s (%d)"
+	ReparentManyOptionFmt = "Reparent onto their nearest surviving ancestor (%d)"
+	OrphanOption          = "Leave orphaned"
+	ReparentSummary       = "reparent"
+	OrphanSummary         = "leave orphaned"
+	NoOrphanedChildren    = "no orphaned children"
+	RecapReparentFmt      = "Then reparent %d child worktree(s) onto %s."
+	RecapReparentManyFmt  = "Then reparent %d child worktree(s) onto their nearest surviving ancestor."
+	RecapOrphanFmt        = "Then leave %d child worktree(s) orphaned."
+	TallyPartFmt          = "%d %s"
+	TallyApplied          = "applied"
+	TallyFastForwarded    = "fast-forwarded"
+	TallyUpToDate         = "already up to date"
+	TallyFailed           = "failed"
+	TallyCreated          = "created"
+	TallyAlreadyExisted   = "already existed"
+	TallyAlreadyAbsent    = "already absent"
+	TallyAdded            = "added"
+	TallyRemoved          = "removed"
+	TallyKept             = "kept"
+	TallySkipped          = "skipped"
+	TallyBlocked          = "blocked"
+	TallyPruned           = "pruned"
+	ReparentedPairFmt     = "%s → %s"
+	TallyReparented       = "reparented"
+	TallySeparator        = " · "
 	// The glyph vocabulary. Six runes, one register each, and no seventh: a line
 	// that fits none of them is not a line that needs a new glyph, it is a line
 	// that has not decided what it says. Each is one column wide and carries the
@@ -224,6 +238,13 @@ const (
 
 	// EnvGoFile is the environment variable used by the shell wrapper to pass the go-file path.
 	EnvGoFile = "WTM_GO_FILE"
+
+	// EnvCorrelationID is copied verbatim onto every event the command publishes.
+	EnvCorrelationID        = "WTM_CORRELATION_ID"
+	CorrelationIDMaxBytes   = 256
+	CorrelationIDInvalidFmt = "$%s %s: %w"
+	CorrelationIDTooLong    = "is longer than 256 bytes"
+	CorrelationIDControl    = "contains a control character"
 
 	// Override git resolution of the main checkout and of the state directory, for tests and CI.
 	EnvProjectDir = "WTM_PROJECT_DIR"
@@ -339,8 +360,9 @@ const (
 	// FlagKeepData withholds the removal a clean would otherwise run. The default
 	// is to detach: clean is the destructive command, and destroying a worktree
 	// without its data would leave an orphan behind on every iteration.
-	FlagKeepData     = "keep-data"
-	FlagKeepDataDesc = "Keep the namespaces the removed worktrees carved out of shared services"
+	FlagKeepData             = "keep-data"
+	FlagReparentChildrenDesc = "Reparent orphaned child worktrees onto their nearest surviving ancestor (no prompt)"
+	FlagKeepDataDesc         = "Keep the namespaces the removed worktrees carved out of shared services"
 	// FlagDropData answers the data step ahead: every namespace is dropped now,
 	// starting the shared services that are down to do it. It is how an
 	// unattended run asks for what --yes will not do by default.
@@ -878,6 +900,61 @@ const (
 	EnvScanLoading     = "Scanning worktrees for .env drift…"
 	ExtractScanLoading = "Scanning worktrees for changes…"
 
+	// Extract* are the questions `wtm extract` asks, and its recap.
+	ExtractSourceLabel            = "Source worktree"
+	ExtractSourceDescription      = "Which worktree to extract changes from"
+	ExtractFilesLabel             = "Files"
+	ExtractFilesTitle             = "Select files to extract"
+	ExtractFilesNoneFmt           = "No changes to extract in %s — press esc to pick another worktree."
+	ExtractFilesRequired          = "select at least one file"
+	ExtractFilesLoading           = "Loading changes…"
+	ExtractTargetLabel            = "Target worktree"
+	ExtractTargetDescription      = "Where to move the selected files"
+	ExtractTargetCreateOption     = "+ Create a new worktree…"
+	ExtractTargetCreateSummary    = "new worktree"
+	ExtractModeLabel              = "Mode"
+	ExtractModeDescription        = "Move removes the files from the source; copy keeps them."
+	ExtractModeMoveFmt            = "Move — remove the files from %s"
+	ExtractModeCopyFmt            = "Copy — keep the files in %s"
+	ExtractModeMoveSummary        = "move"
+	ExtractModeCopySummary        = "copy"
+	ExtractRecapLabel             = "Confirm"
+	ExtractRecapConfirmOption     = "Yes, extract"
+	ExtractRecapCreateOption      = "Yes, create & extract"
+	ExtractRecapNewTargetFmt      = "new worktree %s from %s"
+	ExtractConflictTitleFmt       = "Apply conflict markers in %s?"
+	ExtractConflictDescriptionFmt = "%s already present in %q.\n\n" +
+		"Applying writes conflict markers there to resolve.\n" +
+		"Nothing is removed from the source.\n" +
+		"Resolve in %q then discard there, or discard in %q to undo."
+	ExtractSourceNotFoundFmt = "source worktree %q: %w"
+	// BranchName* say why git would refuse a branch name, checked before
+	// anything is created.
+	BranchNameInvalidFmt   = "%q is not a valid branch name: %s"
+	BranchNameReserved     = "it is reserved by git"
+	BranchNameLeadingDash  = "it cannot start with -"
+	BranchNameBadSlash     = "a / cannot start or end it, or follow another"
+	BranchNameBadDot       = "it cannot hold .. or end with ."
+	BranchNameAtBrace      = "it cannot hold @{"
+	BranchNameBadChar      = "it cannot hold a space, a control character or any of ~ ^ : ? * [ \\"
+	BranchNameBadComponent = "no part between slashes may start with . or end with .lock"
+	// BranchOwnParentFmt refuses a --from naming the branch being created.
+	BranchOwnParentFmt = "%s cannot be its own parent: pass another branch to --%s"
+
+	// The conclusion of an extraction.
+	ExtractMovedFmt               = "Moved %s to %s"
+	ExtractCopiedFmt              = "Copied %s to %s"
+	ExtractLabelSource            = "source"
+	ExtractSourceCleaned          = "files removed"
+	ExtractSourceKept             = "files kept"
+	ExtractNothingInSourceFmt     = "No uncommitted changes to extract in %s"
+	ExtractNothingAnywhere        = "No worktree has changes to extract"
+	ExtractConflictsFmt           = "Applied to %s with conflicts"
+	ExtractConflictsTitle         = "Conflicts to resolve"
+	ExtractConflictsOthersApplied = "The other files were applied cleanly."
+	ExtractConflictsSourceSafeFmt = "Nothing was removed from %s: discard the applied changes in %s to undo."
+	ExtractConflictsNextFmt       = "resolve the conflicts, then discard the same files in %s"
+
 	// Import* are what `run import` says once run.toml has been replaced. The
 	// .env hint is there because the write reconciles nothing: the values a job
 	// reads still hold whatever the previous config left them at.
@@ -1011,7 +1088,7 @@ const (
 	EnvPortReasonSecureScheme   = "https — the run proxy serves plain HTTP"
 
 	// The trailing verdict of `wtm env`.
-	EnvCheckDriftMessage        = "Read-only check — run `wtm env` to reconcile."
+	EnvCheckDriftMessage        = "Read-only check — run `wtm env %s` to reconcile."
 	EnvFileInSyncMessage        = "in sync — nothing to reconcile"
 	EnvFileKeysInSyncMessage    = "keys in sync — its linked values would move"
 	EnvFileValuesSettledMessage = "no key to reconcile — its linked values were settled"
@@ -1019,12 +1096,17 @@ const (
 	// The detail column of a file block's key rows.
 	EnvKeyRowGap         = "  "
 	EnvDetailWouldAddFmt = "would be added from %s"
-	EnvDetailAddedFmt    = "added from %s"
-	EnvDetailToAddFmt    = "to add from %s"
 	EnvDetailConflictFmt = "conflict — local %s vs %s %s"
-	EnvDetailMissingFmt  = "needs a value — placeholder %s"
-	EnvDetailOrphan      = "orphan — in no source"
-	EnvEmptyValueLabel   = "(empty)"
+	// EnvDetailConflictKeptFmt is a conflict an apply left as it was.
+	EnvDetailConflictKeptFmt = "conflict kept — local %s vs %s %s"
+	EnvTallyAdded            = "added"
+	EnvTallyFilled           = "filled"
+	EnvTallyOverwritten      = "overwritten"
+	EnvTallyPruned           = "pruned"
+	EnvTallySkipped          = "skipped"
+	EnvDetailMissingFmt      = "needs a value — placeholder %s"
+	EnvDetailOrphan          = "orphan — in no source"
+	EnvEmptyValueLabel       = "(empty)"
 	// The glyphs a file block's rows are marked with. One rune each, so the
 	// key column stays aligned whatever a row's status is.
 	EnvKeyGlyphAdd       = "+"
@@ -1043,6 +1125,39 @@ const (
 	// source's ports is only coherent with jobs run on them too.
 	EnvApplyActionLabel   = "Yes, apply"
 	EnvApplyVerbatimLabel = "Apply, and keep this worktree's .env verbatim from now on"
+	EnvApplyValue         = "apply"
+	EnvApplyVerbatimValue = "apply-verbatim"
+
+	// The `wtm env` wizard: its steps, and the recap of what the apply writes.
+	EnvWizardErrLabel       = "env wizard"
+	EnvWorktreeStepLabel    = "Select worktree"
+	EnvWorktreeStepTitle    = "Select a worktree to reconcile"
+	EnvResolveStepLabel     = "Resolve"
+	EnvResolveTitleFmt      = "Resolve drift — %s"
+	EnvResolveSkipReason    = "nothing to decide"
+	EnvRecapStepLabel       = "Review & apply"
+	EnvRecapSafeOnly        = "Only safe additions will be applied."
+	EnvRecapAdoptPorts      = "Its linked ports move onto this worktree's own, settled when applied."
+	EnvRecapFieldWorktree   = "Worktree:  "
+	EnvBadgeParent          = "parent"
+	EnvBadgeInSync          = "in sync"
+	EnvBadgeRefusesFmt      = "refuses %s"
+	EnvBadgeChangesFmt      = "%d change(s)"
+	EnvRecapActionFill      = "fill"
+	EnvRecapActionOverwrite = "overwrite →"
+	EnvRecapActionAdd       = "add"
+	EnvRecapActionSkip      = "skip"
+	EnvRecapActionPrune     = "prune"
+	// The resolver offers the same verbs the recap restates and the report and
+	// the JSON put in the past tense: added, filled, overwritten, kept, pruned.
+	EnvResolveUseFmt      = "use %s"
+	EnvResolveEdit        = "edit"
+	EnvResolveSummaryNone = "reviewed"
+	EnvRecapActionKeep    = "keep"
+	EnvRecapNotAddedFmt   = "(%s not added)"
+	EnvRecapEmptyValue    = "(empty)"
+	EnvRecapLineFmt       = "%s  %s %s"
+	EnvRecapFileFmt       = "%s:"
 	// EnvPortsLeftAloneFmt is the pass the user declined.
 	EnvPortsLeftAloneFmt = "Env ports left alone — %d linked value(s) left as they were"
 	// EnvPortsWouldShiftFmt is what a --check preview says instead of listing
@@ -1241,7 +1356,13 @@ const (
 	// path, a script, a URL, a document. --quiet never silences one: a caller
 	// asking for less noise did not ask for less answer.
 	AnnotationMachineOutput = "wtm.machine-output"
-	AnnotationOn            = "true"
+	// AnnotationCancelled is set on the command a user backed out of, for the
+	// root to end the process on ExitCodeCancelled.
+	AnnotationCancelled = "wtm.cancelled"
+	AnnotationOn        = "true"
+	// AnnotationUncorrelated marks a command whose session outlives the caller
+	// that launched it (`wtm ui`): its events never carry WTM_CORRELATION_ID.
+	AnnotationUncorrelated = "wtm.uncorrelated"
 	// AnnotationOutputFormats lists, comma-separated, the --output values a
 	// command accepts besides text and json.
 	AnnotationOutputFormats  = "wtm.output-formats"
@@ -1385,10 +1506,11 @@ const (
 
 	// Prune skip reasons — why a matching worktree was not removed. The current
 	// worktree is not among them: prune removes it (like clean) and redirects the
-	// shell to the base repo afterwards. Dirty/Unpushed/OpenPR mirror clean's
+	// shell to the base repo afterwards. Locked/Dirty/Unpushed/OpenPR mirror clean's
 	// unsafe-to-remove checks: they skip unless --force is passed.
 	PruneSkipBase     = "base_branch"
 	PruneSkipMain     = "main_worktree"
+	PruneSkipLocked   = "locked"
 	PruneSkipDirty    = "dirty"
 	PruneSkipUnpushed = "unpushed"
 	PruneSkipOpenPR   = "open_pr"
@@ -1675,6 +1797,7 @@ const (
 	// both `wtm list`'s text output and its interactive picker — one wording,
 	// reused rather than restated.
 	WorktreeActiveTag = "● active"
+	WorktreeLockedTag = "locked"
 
 	// SummaryNone stands in for a set answer the user left empty, in a wizard
 	// breadcrumb that must still show the step was reached.
@@ -1686,6 +1809,7 @@ const (
 	TreeBadgeRunningFmt    = "▶ %d running"
 	TreeBadgeRebasingText  = "⚠ rebasing"
 	TreeBadgeDirtyText     = "⚠ dirty"
+	TreeBadgeLockedText    = GlyphAttention + " locked"
 	TreeBadgeNeedsSyncText = "⚠ needs sync"
 	TreeBadgeCycleText     = "⚠ cycle"
 
@@ -1709,6 +1833,7 @@ const (
 	// LoadingBranchesText labels the spinner shown while a branch picker fetches
 	// origin to refresh its divergence badges.
 	LoadingBranchesText = "Fetching branches…"
+	LoadingPRsText      = "Loading pull requests…"
 
 	// LoadingWorktreesText labels the spinner shown while a worktree list fetches
 	// origin to refresh its divergence badges.
@@ -1736,6 +1861,41 @@ const (
 	// RelocateBlockedJobsFmt is the move refused because jobs run in the
 	// worktree, naming the command that frees it (branch, branch).
 	RelocateBlockedJobsFmt = "%s — jobs are running in it: run `wtm run down %s` first"
+
+	// RelocateUninspectableDetail is a worktree that needs moving but whose
+	// working-tree state could not be read: it is not moved blind.
+	RelocateUninspectableDetail = "could not determine working-tree state; re-run after resolving, or with --force to move anyway"
+
+	// Relocate flow: the wizard's copy and what the run reports.
+	RelocateWizardErrLabel      = "relocate"
+	RelocateStageMessage        = "Relocating worktrees…"
+	RelocateAlignedMessage      = "All worktrees are already aligned with base_path."
+	RelocateBasePathGateLabel   = "Base path"
+	RelocateBasePathGateTitle   = "Change base_path?"
+	RelocateBasePathGateDescFmt = "Worktrees live under %s.\nKeep it, or set a new location to move them all to."
+	RelocateBasePathKeepFmt     = "Keep %s"
+	RelocateBasePathChange      = "Change it"
+	RelocateBasePathValueLabel  = "New base_path"
+	RelocateBasePathValueDesc   = "Relative to the repo root (e.g. ../.trees). Existing worktrees move here."
+	RelocateParentLabelFmt      = "Parent for %s"
+	// RelocateParentDescFmt is broken into lines: a branch step does not wrap.
+	RelocateParentDescFmt = "%s was created outside wtm, so it has no recorded parent.\n" +
+		"Pick the branch `wtm sync` should rebase it onto.\n" +
+		"The full set of moves and adoptions is recapped on the final step."
+	// RelocateAdoptionsNoteFmt closes a preview (count, base branch): the wizard
+	// asks each parent, --yes adopts onto the base branch.
+	RelocateAdoptionsNoteFmt = "→ %d worktree(s) to adopt: the wizard asks each parent, --yes uses %s."
+	RelocateApplyLabel       = "Apply"
+	RelocateApplyOption      = "Yes, apply"
+	// RelocateBasePathOnlyFmt previews a relocate that only rewrites base_path
+	// (from, to): no worktree has to move.
+	RelocateBasePathOnlyFmt = "base_path: %s → %s (no worktree to move)"
+	// RelocateBasePathChangeFmt heads a preview whose plan moves worktrees to a
+	// new base_path (from, to).
+	RelocateBasePathChangeFmt = "base_path: %s → %s"
+	// RelocateNothingAppliedPrefix heads a result where every worktree to move
+	// was skipped, followed by the tally.
+	RelocateNothingAppliedPrefix = "Nothing relocated  "
 
 	// Init recap (LUC-125): labels and copy for the framed end-of-init recap
 	// (accent-bar box + pill title) that summarizes the written config and lists
@@ -1797,8 +1957,9 @@ const (
 	AnsiReset       = "\x1b[0m"
 	// Hook phase titles: a bold section header above the phase, so create and
 	// clean read as distinct phases instead of loose lines.
-	HooksTitleOnCreate = "Hooks · On Create"
-	HooksTitleOnClean  = "Hooks · On Clean"
+	HooksTitleOnCreate   = "Hooks · On Create"
+	HooksTitleOnClean    = "Hooks · On Clean"
+	HooksTitleOnCleanFmt = "Hooks · On Clean · %s"
 
 	// create result recap labels (aligned "label   value" rows). "from" names the
 	// start-point of a newly created branch; "parent" replaces it when an existing
@@ -2145,6 +2306,7 @@ const (
 	CmdEdit         = "edit"
 	CmdExtract      = "extract"
 	CmdSync         = "sync"
+	CmdExec         = "exec"
 	CmdRelocate     = "relocate"
 	CmdReparent     = "reparent"
 	CmdTree         = "tree"
@@ -2980,15 +3142,20 @@ const (
 	// keeps the source as-is rather than aborting.
 	SourceFastForwardDescription = "Updates your local branch to origin so the new worktree starts up to date. " +
 		"Skipped if its worktree has uncommitted changes."
+	SourceFastForwardDescriptionMany = "Updates your local branch to origin so the new worktrees start up to date. " +
+		"Skipped if its worktree has uncommitted changes."
 	// SourceDivergedPrompt warns that a diverged source can't be fast-forwarded and
 	// asks whether to create from it anyway (source, ahead, behind).
 	SourceDivergedPrompt = "%s has diverged from origin (%d ahead, %d behind) — create the worktree from it anyway?"
 	// SourceDivergedWarning explains the consequence of a diverged source.
 	SourceDivergedWarning = "It can't be fast-forwarded. The worktree starts from your local branch, missing commits " +
 		"that are on origin — you may have to rebase or resolve conflicts later."
+	SourceDivergedWarningMany = "It can't be fast-forwarded. The worktrees start from your local branch, missing commits " +
+		"that are on origin — you may have to rebase or resolve conflicts later."
 	// SourceProceedStalePrompt asks whether to create from a stale local source
 	// after a fast-forward failed (source, behind).
-	SourceProceedStalePrompt = "Create the worktree from local %s anyway? (behind origin by %d)"
+	SourceProceedStalePrompt     = "Create the worktree from local %s anyway? (behind origin by %d)"
+	SourceProceedStalePromptMany = "Create the worktrees from local %s anyway? (behind origin by %d)"
 	// SourceProceedStaleWarning reports why the fast-forward failed (cause).
 	SourceProceedStaleWarning = "Couldn't fast-forward: %v"
 	// SourceUpdateSkip* explain why a run offers no source reconciliation.
@@ -2996,19 +3163,22 @@ const (
 	SourceUpdateSkipRemote   = "source is a remote branch"
 	SourceUpdateSkipUpToDate = "source already up to date"
 	SourceUpdateSkipDiverged = "source diverged from origin — see recap"
+	// SourceUpdateLabel names the step offering to fast-forward the branch a run
+	// starts from, in create and checkout alike.
+	SourceUpdateLabel = "Source update"
 	// SourceFastForwardOptionFmt labels the fast-forward choice on the
 	// source-update step (subject).
 	SourceFastForwardOptionFmt = "Fast-forward %s to origin"
 	// SourceFastForwardLoadingFmt is the spinner message while a fast-forward
-	// runs, in the wizard's confirmation step or checkout's reuse reconciliation
-	// (subject).
+	// runs (subject).
 	SourceFastForwardLoadingFmt = "Updating %s from origin…"
 	// RecapUpdateFastForward is the recap line naming an accepted fast-forward,
 	// shared by create's and extract's combined recaps (subject).
-	RecapUpdateFastForward = "Update:  fast-forward %s to origin"
+	RecapUpdateFastForward = "Update:    fast-forward %s to origin"
 	// RecapParentRecordedForSync explains, on the source-update step, that a
 	// reused branch's source is recorded for `wtm sync` rather than being a
 	// git start-point.
+	RecapParentRecordedForExisting = "Parent recorded for `wtm sync` for the existing branches — the new ones start from it"
 	RecapParentRecordedForSync     = "Parent recorded for `wtm sync` — the branch already exists and keeps its commits"
 	SourceKeepAsIsOption           = "Keep it as-is"
 	SourceUpdateSummaryFastForward = "fast-forward to origin"
@@ -3017,6 +3187,7 @@ const (
 	// FlowStepRequired*Fmt refuse a step that has no safe default and cannot be
 	// asked (step label, flag name).
 	FlowStepRequiredFmt     = "%s is required and cannot be asked in this mode"
+	FlowEntryRequired       = "a name is required"
 	FlowStepRequiredFlagFmt = "%s is required and cannot be asked in this mode: pass --%s"
 	// FlowStepRequiredArgFmt is the same refusal for a step whose answer is a
 	// positional: naming a flag that does not exist would send the reader looking
@@ -3026,20 +3197,56 @@ const (
 	// otherwise let the last one win without a word (the value already held).
 	FlagGivenTwiceFmt = "already given as %q: it takes one value"
 
+	// The checkout flow (internal/flow/checkout): step prose, loading lines,
+	// the recap's confirmation and the refusal of a run with no PR to check out.
+	CheckoutPRLabel             = "Pull request"
+	CheckoutPRTitle             = "Select a pull request to checkout"
+	CheckoutPRDescription       = "Linked PRs are disabled — use `wtm go <branch>` to enter them"
+	CheckoutPRLabelFmt          = "#%-4d  %-40s  %s"
+	CheckoutPRTitleWidth        = 40
+	CheckoutPRRecapFmt          = "#%d %s"
+	CheckoutPRRequired          = "PR number required without an interactive terminal (or when --yes is set)"
+	CheckoutParentLabel         = "Parent branch"
+	CheckoutParentDescription   = "Branch this PR is rebased onto by `wtm sync` (defaults to the PR base)"
+	CheckoutEnvLabel            = "Env strategy"
+	CheckoutRecapLabel          = "Confirm"
+	CheckoutRecapConfirmOption  = "Yes, checkout"
+	CheckoutNoPRs               = "No open pull requests"
+	CheckoutFetchingPR          = "Fetching PR…"
+	CheckoutFetchingBranch      = "Fetching branch from origin…"
+	CheckoutSourceUpdateSkipNew = "the branch is new — it starts from origin"
+	GHNotInstalledTitle         = "GitHub CLI not found"
+	GHNotInstalledHint          = "Install it to see PRs linked to your worktrees:"
+	GHNotInstalledURL           = "https://cli.github.com"
+	GHNotAuthenticatedTitle     = "GitHub not connected"
+	GHNotAuthenticatedHint      = "Connect to see PRs linked to your worktrees:"
+	GHNotAuthenticatedRemedy    = "run `gh auth login`"
+
 	// The create flow (internal/flow/create): step prose, option labels, recap
 	// fields and refusals. Format verbs: %s branch, %s env strategy, %s flag name.
-	CreateLoadingFmt               = "Creating worktree %s…"
-	CreateBranchStepDescription    = "Name for the new worktree branch"
-	CreateBranchRequired           = "branch name is required"
-	CreateBranchRequiredUnattended = "branch name is required without the interactive wizard (pass it as an argument)"
-	CreateSourceStepDescription    = "Branch to base the new worktree on"
-	CreateEnvStepDescription       = "How to provision .env files in the new worktree"
-	CreateNoSourceFmt              = "no source branch: pass --%s (no base branch configured)"
-	CreateRecapConfirmOption       = "Yes, create worktree"
-	EnvOptionConfigDefaultFmt      = "Use config default (%s)"
-	EnvOptionExample               = "example — copy .env.example → .env"
-	EnvOptionMain                  = "main — copy .env from the main checkout"
-	EnvOptionParent                = "parent — copy .env from source worktree"
+	CreateLoadingFmt                = "Creating worktree %s…"
+	CreateBranchesLabel             = "Branches"
+	CreateBranchLabel               = "Branch name"
+	CreateBranchStepDescription     = "Name for the new worktree branch"
+	CreateBranchesStepDescription   = "Names of the new worktree branches, one at a time"
+	BranchEntryNew                  = "new"
+	BranchEntryExisting             = "existing"
+	BranchEntryWorktreeExists       = "worktree exists"
+	CreateBranchRequired            = "branch name is required"
+	CreateBatchExistsFmt            = "%s already exists"
+	CreateBranchListedTwiceFmt      = "%s is already in the list"
+	CreateBranchRequiredUnattended  = "branch name is required without the interactive wizard (pass it as an argument)"
+	CreateSourceStepDescription     = "Branch to base the new worktree on"
+	CreateSourceStepDescriptionMany = "Branch to base the new worktrees on"
+	CreateEnvStepDescription        = "How to provision .env files in the new worktree"
+	CreateEnvStepDescriptionMany    = "How to provision .env files in the new worktrees"
+	CreateNoSourceFmt               = "no source branch: pass --%s (no base branch configured)"
+	CreateRecapConfirmOption        = "Yes, create worktree"
+	CreateRecapConfirmManyFmt       = "Yes, create %d worktrees"
+	EnvOptionConfigDefaultFmt       = "Use config default (%s)"
+	EnvOptionExample                = "example — copy .env.example → .env"
+	EnvOptionMain                   = "main — copy .env from the main checkout"
+	EnvOptionParent                 = "parent — copy .env from source worktree"
 	// EnvSummaryConfigDefault names the empty env choice rather than leaving a
 	// recap line blank.
 	EnvSummaryConfigDefault = "config default"
@@ -3052,16 +3259,24 @@ const (
 	IsolationStepDescription = "The .env files are copied from another checkout, with its ports and its namespaces in shared services.\n" +
 		"Isolated: wtm moves them onto this worktree's — in the .env and when `wtm run` starts its jobs — so both can run side by side.\n" +
 		"Verbatim: wtm writes nothing into the .env and runs this worktree on the ports and data it was copied with, so it cannot run while its source does."
-	IsolationOptionIsolated  = "Isolate it — its own ports, compose project and namespaces"
-	IsolationOptionVerbatim  = "Keep the .env verbatim — its source's ports and data, one of the two runs at a time"
-	IsolationSummaryIsolated = "isolated"
-	IsolationSummaryVerbatim = "verbatim — .env kept as copied"
+	IsolationStepDescriptionMany = "The .env files are copied from another checkout, with its ports and its namespaces in shared services.\n" +
+		"Isolated: wtm moves them onto each worktree's — in the .env and when `wtm run` starts its jobs — so all of them can run side by side.\n" +
+		"Verbatim: wtm writes nothing into the .env and runs every worktree on the ports and data they were copied with, so only one of them, or their source, runs at a time."
+	IsolationOptionIsolated     = "Isolate it — its own ports, compose project and namespaces"
+	IsolationOptionVerbatim     = "Keep the .env verbatim — its source's ports and data, one of the two runs at a time"
+	IsolationOptionIsolatedMany = "Isolate them — each its own ports, compose project and namespaces"
+	IsolationOptionVerbatimMany = "Keep the .env verbatim — their source's ports and data, one of them runs at a time"
+	IsolationSummaryIsolated    = "isolated"
+	IsolationSummaryVerbatim    = "verbatim — .env kept as copied"
 	// IsolationStepIrrelevant is why the step is not asked: with nothing to
 	// isolate, both answers do exactly the same thing.
 	IsolationStepIrrelevant = "run.toml declares nothing a worktree isolates"
 	// IsolationIgnoredFmt is --isolation given to a run whose worktree already
 	// existed, so nothing was created for it to answer.
-	IsolationIgnoredFmt = "--%s %s ignored: %s already exists and stays %s — switch it with `wtm env %s --%s %s`"
+	// CreationFlagIgnoredFmt is a flag only a creation reads, given to a run whose
+	// target already exists (flag, branch).
+	CreationFlagIgnoredFmt = "--%s ignored: %s already exists, so nothing is created"
+	IsolationIgnoredFmt    = "--%s %s ignored: %s already exists and stays %s — switch it with `wtm env %s --%s %s`"
 
 	// IsolationAdopt* is the migration `wtm env` offers a worktree created
 	// before the choice existed. Keeping it as is comes first: adopting moves the
@@ -3086,6 +3301,7 @@ const (
 	// RecapField* are the aligned labels of the create-like recap bodies —
 	// create, extract and checkout — padded to the widest of them.
 	RecapFieldBranch       = "Branch:    "
+	RecapFieldBranches     = "Branches:  "
 	RecapFieldSource       = "Source:    "
 	RecapFieldParent       = "Parent:    "
 	RecapFieldEnv          = "Env:       "
@@ -3117,7 +3333,8 @@ const (
 	RelocateNameClashFmt = "%s shares its name with %s (%s) — rename one of the two branches to adopt it"
 	// BranchReusedSuffix marks the branch line of a recap when the worktree checks
 	// out an existing local branch instead of creating one.
-	BranchReusedSuffix = " (existing local branch — reused)"
+	BranchReusedSuffix       = " (existing local branch — reused)"
+	BranchListExistingSuffix = " (existing)"
 	// BranchReusedHeadline is the create conclusion for a reused branch (branch).
 	BranchReusedHeadline = "Created worktree %s on existing branch"
 	// BranchReusedNote states that the worktree checked out an existing local
@@ -3137,47 +3354,21 @@ const (
 	ParentRequiredFmt = "%s already exists locally: pass --%s to record its parent branch " +
 		"(it can't be inferred, and `wtm sync` needs it)"
 
-	// EnvParentFallbackPrompt warns, before creating, that the "parent" env
-	// strategy will source .env from main because the source has no local worktree
-	// (source).
-	EnvParentFallbackPrompt = "%s has no local worktree — copy .env from the main checkout instead of the parent?"
 	// EnvParentFallbackWarning explains why the fallback happens.
 	EnvParentFallbackWarning = "The \"parent\" env strategy needs the source branch checked out to copy its .env; " +
 		"without a worktree it comes from main."
-
-	// PruneReparentPrompt is the confirmation shown when a prune leaves child
-	// worktrees that can be reparented onto their grandparent (count). Hosted as a
-	// step of the prune picker so declining goes back rather than aborting.
-	PruneReparentPrompt = "Reparent %d child worktree(s) onto their grandparent?"
-	// PruneReparentIntro precedes the list of children a prune would otherwise
-	// orphan, shown in the reparent confirmation.
-	PruneReparentIntro = "These children would otherwise be left orphaned:"
-
-	// CleanReparentPrompt is the confirmation shown when cleaning a worktree that
-	// has children which can be reparented onto their grandparent (count,
-	// grandparent). Hosted as a step of the clean confirm wizard.
-	CleanReparentPrompt = "Reparent %d child worktree(s) onto %s?"
-	// CleanReparentIntro precedes the list of children a clean would otherwise
-	// orphan, shown in the reparent confirmation.
-	CleanReparentIntro = "These children would otherwise be left orphaned:"
 
 	// CleanForceHintFmt is the refusal shown when a worktree is unsafe to remove
 	// without --force (branch, reason).
 	CleanForceHintFmt = "worktree %s %s; pass --force to remove it anyway"
 	// The clean flow (internal/flow/clean): step prose, option labels, recap body,
 	// refusals and progress messages. Format verbs: %s branch, %s path, %d counts.
-	CleanPickerTitle        = "Select worktree to clean"
-	CleanPickerDescription  = "The parent worktree cannot be cleaned"
+	CleanPickerTitle        = "Select worktrees to clean"
 	CleanNothingToClean     = "no worktrees to clean (only the parent worktree exists)"
-	CleanNoOrphanedChildren = "no orphaned children"
-	CleanReparentOptionFmt  = "Reparent onto %s (%d)"
-	CleanOrphanOption       = "Leave orphaned"
-	CleanReparentSummary    = "reparent"
-	CleanOrphanSummary      = "leave orphaned"
-	CleanReparentChildFmt   = "  • %s will rebase onto %s instead of %s"
 	CleanDeleteTitle        = "Proceed with deletion?"
 	CleanDeleteOption       = "Yes, delete"
 	CleanForceDeleteOption  = "Yes, force delete (bypass all checks)"
+	CleanWarnLocked         = "Worktree is locked (git worktree lock)"
 	CleanWarnDirty          = "Worktree has uncommitted changes"
 	CleanWarnUnpushedFmt    = "%d commit(s) not pushed to remote"
 	CleanWarnOpenPR         = "Open PR: "
@@ -3189,14 +3380,14 @@ const (
 	// reader they were removing a worktree and nothing else.
 	CleanWillDeleteNamespaceFmt = "  data      %s, dropped from %s"
 	CleanKeepDataLine           = "  data      kept (--keep-data)"
-	CleanRecapReparentFmt       = "Then reparent %d child worktree(s) onto %s."
-	CleanRecapOrphanFmt         = "Then leave %d child worktree(s) orphaned."
-	// CleanBlockerDirty, CleanBlockerUnpushed and CleanBlockerOpenPR key the
-	// removal refusals a surface lists one by one (rules.CleanBlockers).
+	// The CleanBlocker* key the removal refusals a surface lists one by one
+	// (rules.CleanBlockers).
+	CleanBlockerLocked   = "locked"
 	CleanBlockerDirty    = "dirty"
 	CleanBlockerUnpushed = "unpushed"
 	CleanBlockerOpenPR   = "open_pr"
 
+	CleanUnsafeLocked        = "is locked"
 	CleanUnsafeDirty         = "has uncommitted changes"
 	CleanUnsafeUnpushedFmt   = "has %d unpushed commit(s)"
 	CleanUnsafeOpenPR        = "has an open pull request"
@@ -3221,9 +3412,20 @@ const (
 	// not delete: branch, path, cause, path.
 	CleanLeftOnDiskFmt = "%s is removed, but %s is still on disk (%s) — delete what is left with `sudo rm -rf %s`"
 	// StopWorktreeSurvivorsFmt names the jobs still up after their stop.
-	StopWorktreeSurvivorsFmt = "still running after the stop: %s"
-	CleanRemovalFailedFmt    = "Removal failed: %s"
-	CleanWizardErrLabel      = "clean wizard"
+	StopWorktreeSurvivorsFmt   = "still running after the stop: %s"
+	CleanRemovalFailedFmt      = "Removal failed: %s"
+	CleanWizardErrLabel        = "clean wizard"
+	CleanSelectionRequired     = "select at least one worktree to clean"
+	CleanBranchBlank           = "a worktree branch cannot be blank"
+	CleanCheckFailedFmt        = "check %s: %w"
+	CleanWillDeleteManyFmt     = "Will delete %d worktrees and their branches:"
+	CleanWillDeleteRowFmt      = "  %s  %s"
+	CleanBlockerKeyFmt         = "%s:%s"
+	CleanBlockerLabelFmt       = "%s — %s"
+	CleanDeleteSafeOptionFmt   = "Yes, delete the %d safe one(s), keep the others"
+	CleanForceDeleteManyOption = "Yes, force delete all (bypass all checks)"
+	CleanUnsafeManyFmt         = "%d worktree(s) cannot be removed safely, so nothing was removed:\n%s\npass --force to remove them anyway"
+	CleanUnsafeLineFmt         = "  %s %s"
 	// CleanSudoConfirmFmt is the confirmation title for the privileged `sudo rm -rf`
 	// removal fallback (worktree path).
 	CleanSudoConfirmFmt = "Force-delete %s with `sudo rm -rf`? (you may be prompted for your password)"
@@ -3235,6 +3437,7 @@ const (
 	PruneLabelGone      = "remote branch gone"
 	PruneLabelBase      = "base branch"
 	PruneLabelMain      = "main checkout"
+	PruneLabelLocked    = "locked — pass --force"
 	PruneLabelDirty     = "dirty — pass --force"
 	PruneLabelUnpushed  = "unpushed commits — pass --force"
 	PruneLabelOpenPR    = "open PR — pass --force"
@@ -3247,29 +3450,20 @@ const (
 	// gone-detection runs first).
 	PruneScanning         = "Scanning worktrees…"
 	PruneFetchAndScanning = "Fetching remotes and scanning worktrees…"
-	// PruneHooksTitleFmt titles one pruned worktree's on_clean phase.
-	PruneHooksTitleFmt = "Hooks · On Clean · %s"
 	// PruneFailedFmt is where a prune stopped: the branch, the cause. The
 	// worktrees after it are untouched, and so is its data.
-	PruneFailedFmt         = "stopped at %s: %s — it and the worktrees after it were left as they were"
-	PruneNothingToPrune    = "Nothing to prune."
-	PruneConfirmOption     = "Yes, prune"
-	PruneForceOption       = "Yes, force prune (bypass safety checks)"
-	PruneNothingSelected   = "No worktrees selected — nothing will be pruned."
-	PruneWillPruneFmt      = "Will prune %d worktree(s): %s"
-	PruneReparentOptionFmt = "Reparent onto grandparent (%d)"
-	PruneOrphanOption      = "Leave orphaned"
-	PruneReparentChildFmt  = "  • %s will rebase onto %s instead of %s"
-	PruneRecapReparentFmt  = "Then reparent %d child worktree(s) onto their grandparent."
-	PruneRecapOrphanFmt    = "Then leave %d child worktree(s) orphaned."
-	PruneReparentSummary   = "reparent onto grandparent"
-	PruneOrphanSummary     = "leave orphaned"
-	PruneNoChildren        = "no children to reparent"
+	PruneFailedFmt       = "stopped at %s: %s — it and the worktrees after it were left as they were"
+	PruneNothingToPrune  = "Nothing to prune."
+	PruneConfirmOption   = "Yes, prune"
+	PruneForceOption     = "Yes, force prune (bypass safety checks)"
+	PruneNothingSelected = "No worktrees selected — nothing will be pruned."
+	PruneWillPruneFmt    = "Will prune %d worktree(s): %s"
 	// PruneTag* label a candidate in the picker with what made it prunable, or
 	// with the refusal standing in the way of removing it.
 	PruneTagMerged   = "merged"
 	PruneTagClosed   = "closed"
 	PruneTagGone     = "gone"
+	PruneTagLocked   = "locked"
 	PruneTagDirty    = "dirty"
 	PruneTagUnpushed = "unpushed"
 	PruneTagOpenPR   = "open PR"
@@ -3374,8 +3568,10 @@ const (
 	// DashboardGitPollSeconds paces the git one, which costs a `git status` over
 	// the whole working tree plus a rev-list and a divergence read per worktree —
 	// several processes per worktree, and the dashboard's only real background
-	// cost. Local git state does not move on its own, so it is read on a slow
-	// clock; KeyRefresh stays the explicit gesture, and the only one that fetches.
+	// cost. A worktree created, moved or removed reaches the list through the
+	// event stream at once; what is left to this slow clock is what no wtm
+	// command reports — dirty, ahead, behind. KeyRefresh stays the explicit
+	// gesture, and the only one that fetches.
 	// `gh` is never polled at all: PRs load once and refresh only on KeyRefresh.
 	DashboardPollSeconds    = 3
 	DashboardGitPollSeconds = 20
@@ -3641,8 +3837,11 @@ const (
 	// DashboardMenuPrune removes every finished worktree at once. There is no
 	// preview entry beside it: the recap lists what goes, and closing the modal
 	// removes nothing.
-	DashboardMenuPrune  = "Prune finished worktrees"
-	DashboardMenuDelete = "Delete worktree"
+	DashboardMenuPrune = "Prune finished worktrees"
+	// DashboardMenuDeleteMany removes the worktrees the user checks inside the run,
+	// which is why it lives in the global menu: a context menu hangs off one row.
+	DashboardMenuDeleteMany = "Delete worktrees"
+	DashboardMenuDelete     = "Delete worktree"
 	// DashboardMenuSync leads the row menu: the Tree tab is where a worktree whose
 	// parent moved is flagged, so it is where the rebase has to be reachable from.
 	// It arrives with the row and its descendants checked; the selection stays the
@@ -3707,6 +3906,7 @@ const (
 	DashboardReparentTitle      = "Change parent"
 	DashboardReparentBatchTitle = "Reparent worktrees"
 	DashboardPruneTitle         = "Prune finished worktrees"
+	DashboardDeleteManyTitle    = "Delete worktrees"
 	DashboardSyncTitle          = "Sync worktrees"
 	// DashboardSyncRowTitle heads the same run started from a row: a modal that
 	// renamed the entry the user just picked reads as a different action.
@@ -3752,6 +3952,7 @@ const (
 	DashboardStepperTextHint = "enter confirm · esc back"
 	// DashboardStepperMultiHint is the multi-select footer, worded like the CLI
 	// wizard's so the same controls read the same on both surfaces.
+	DashboardStepperListHint  = "tab add · backspace remove last · enter confirm · esc back"
 	DashboardStepperMultiHint = "↑↓ move · space toggle · a all · / filter · enter confirm · esc back"
 	// DashboardStepperReorderHint is the same footer for a step whose options are
 	// already the answer and whose question is the order they end up in.
@@ -3913,22 +4114,24 @@ const (
 	HelpConfirm   = "enter confirm"
 	HelpSelect    = "enter select"
 	// WizardDoneRow is the last row of every step that confirms on one.
-	WizardDoneRow = "✓ Done"
-	HelpBack      = "esc back"
-	HelpCancel    = "esc cancel"
-	HelpToggle    = "space toggle"
-	HelpAll       = "a all"
-	HelpFilter    = "/ filter"
-	HelpRefresh   = "r refresh"
-	HelpReorder   = "shift+↑/↓ reorder"
-	HelpDelete    = "d delete"
-	HelpRename    = "r rename"
-	HelpMerge     = "f merge"
-	HelpNew       = "n new"
-	HelpSetKind   = "←→ set type"
-	HelpSetScope  = "←→ set scope"
-	HelpSetRunner = "←→ set runner"
-	HelpSetTouch  = "←→ set service"
+	WizardDoneRow  = "✓ Done"
+	HelpBack       = "esc back"
+	HelpCancel     = "esc cancel"
+	HelpToggle     = "space toggle"
+	HelpAll        = "a all"
+	HelpFilter     = "/ filter"
+	HelpRefresh    = "r refresh"
+	HelpReorder    = "shift+↑/↓ reorder"
+	HelpAddAnother = "tab add another"
+	HelpRemoveLast = "backspace remove last"
+	HelpDelete     = "d delete"
+	HelpRename     = "r rename"
+	HelpMerge      = "f merge"
+	HelpNew        = "n new"
+	HelpSetKind    = "←→ set type"
+	HelpSetScope   = "←→ set scope"
+	HelpSetRunner  = "←→ set runner"
+	HelpSetTouch   = "←→ set service"
 
 	// The runner step: which root-level service starts each of the others. The
 	// relation is declared, never inferred — RunnerListNone is what a row says
@@ -3988,6 +4191,10 @@ const (
 	// KeyQuit leaves the dashboard. Esc does not: it only closes what is open, so
 	// a persistent dashboard is never left by accident.
 	KeyQuit = "q"
+
+	// KeyInterrupt cancels a wizard wherever it stands, as Esc does on its
+	// first step: a terminal user reaches for it first.
+	KeyInterrupt = "ctrl+c"
 
 	// EscapePrefix is the leading escape a terminal sends for an alt-modified
 	// key, and KeyCtrlPrefix how a control combination is named.
@@ -4292,6 +4499,27 @@ const (
 	// install: built from source, or the binary is not writable.
 	ExitCodeUpgradeUnsupported = 17
 
+	// ExitCodeEnvDrift is a `wtm env --check` that found drift, so a CI step can
+	// fail on it without parsing the report.
+	ExitCodeEnvDrift = 18
+	// ExitCodeCancelled is a run the user backed out of interactively, so that
+	// `wtm create x && wtm go x` stops there.
+	ExitCodeCancelled = 19
+	// ExitCodeEventsSchemaNewer is a `wtm events` that received an event of a
+	// schema newer than its own: the consumer has to upgrade wtm.
+	ExitCodeEventsSchemaNewer = 20
+	// ExitCodeNotGitRepo is a command run from, or pointed at, a directory that
+	// is not in a git repository. 13 is skipped: it once meant a pull request
+	// already existed, and a script reading it that way must not misread it.
+	ExitCodeNotGitRepo = 21
+
+	// FlagValueInvalidFmt is every flag value that does not parse.
+	FlagValueInvalidFmt = "invalid --%s value %q: use %s"
+	// EnvDecisionWithCheckFmt names the decision flag a --check would ignore.
+	EnvDecisionWithCheckFmt = "--%s decides what to write, and %w: pass one or the other"
+	FlagValueListSep        = ", "
+	FlagValueLastSep        = " or "
+
 	// UpgradeConfirmPrompt keeps a space before the question mark, unlike every
 	// other prompt here: it ends on a version number, and "0.26.1?" reads as part
 	// of the number rather than as a question.
@@ -4300,4 +4528,126 @@ const (
 	UpgradeJSONNeedsYes   = "--output json requires --yes or --check (the confirmation prompt cannot run in JSON mode)"
 	UpgradeSourceHint     = "this binary was built from source — run `git pull && make install` instead"
 	UpgradePinUnsupported = "--version only applies to a standalone binary; pin the version through your package manager instead"
+)
+
+// wtm exec: one shell line across several worktrees.
+const (
+	FlagPrint = "print"
+
+	ExecLogDirName          = "exec"
+	ExecLogFileExt          = ".log"
+	ExecJSONTailLines       = 20
+	ExecConclusionTailLines = 10
+	// ExecPartialLineCap bounds a line that never ends (binary output, a
+	// progress bar without \r) so the tail cannot grow without limit.
+	ExecPartialLineCap = 4096
+	ExecInterruptGrace = 5 * time.Second
+	// ExecPipeGrace bounds the wait for a process that exited while something it
+	// started (a backgrounded job, a daemon) still holds its output pipe.
+	ExecPipeGrace = time.Second
+
+	ExecWizardErrLabel       = "exec"
+	ExecSelectionLabel       = "Worktrees"
+	ExecSelectionTitle       = "Run in which worktrees?"
+	ExecSelectAtLeastOne     = "select at least one worktree"
+	ExecSelectionRequiredFmt = "no worktree selected: pass worktree names or --%s (a run with --%s or --%s %s cannot open the picker)"
+	ExecConfirmLabel         = "Confirm & run"
+	ExecConfirmTitle         = "Run this command?"
+	ExecConfirmOptionFmt     = "Yes, run in %s"
+	ExecCommandLabel         = "Command"
+	ExecCommandRequired      = "type the command to run"
+	ExecCommandTitle         = "Command to run"
+	ExecCommandDescription   = "A /bin/sh line, run from each worktree's root"
+	ExecConfirmValue         = "run"
+	ExecRecapWorktrees       = "Worktrees:   "
+	ExecRecapCommand         = "Command:     "
+	ExecRecapJobs            = "Concurrency: "
+	ExecNeedsTerminal        = "wtm exec needs a terminal to pick worktrees: pass worktree names or --all"
+
+	ExecQueuedLabel      = "queued"
+	ExecRunningLabel     = "running"
+	ExecInterruptedLabel = "interrupted"
+	ExecNotStartedLabel  = "not started"
+	ExecExitFmt          = "exit %d"
+	ExecPassedLabelFmt   = "%s (%s)"
+	ExecFailedLabelFmt   = "%s (%s, %s)"
+	ExecStateLabelFmt    = "%s  %s"
+	ExecAllPassedFmt     = "%s · %s (%s)"
+	ExecNotAllPassedFmt  = "%s · %s: %s"
+	ExecOneWorktree      = "1 worktree"
+	ExecWorktreesFmt     = "%d worktrees"
+	ExecFailedCountFmt   = "%d failed"
+	ExecInterruptedFmt   = "%d interrupted"
+	ExecNotStartedFmt    = "%d not started"
+	ExecCountSeparator   = ", "
+	ExecPassedCountFmt   = "%d passed"
+	ExecLogLabel         = "log"
+	ExecViewSummaryFmt   = "%d done · %d running · %d queued"
+	// ExecViewMargin keeps the prompt line and the one under the cursor free.
+	ExecViewMargin = 2
+
+	AnsiEscByte = 0x1b
+	AnsiBelByte = 0x07
+)
+
+// `wtm events` and the bus behind it.
+const (
+	CmdEvents  = "events"
+	CmdVersion = "version"
+	// VersionLineFmt is cobra's own `--version` line, which `wtm version` repeats
+	// so a script reading either one reads the same text.
+	VersionLineFmt = "%s version %s"
+	FlagRepo       = "repo"
+
+	// EventsPublishTimeout bounds a whole publish, dial included: a mutation
+	// never waits on a daemon nobody may be listening to.
+	EventsPublishTimeout = 250 * time.Millisecond
+	// EventsSubscriberQueue is how far a subscriber may fall behind before it
+	// is cut off rather than waited for.
+	EventsSubscriberQueue = 256
+	EventsReconnectMin    = 200 * time.Millisecond
+	EventsReconnectMax    = 5 * time.Second
+	// EventsReaderGoneCheck is how soon `wtm events | head` exits once head
+	// has read its lines: a quiet stream writes nothing that would fail.
+	EventsReaderGoneCheck = 250 * time.Millisecond
+	// EventsRegistryPruneEvery is how often a global stream looks for the
+	// repositories that went away: deleting one runs no wtm command to say so.
+	EventsRegistryPruneEvery = 30 * time.Second
+)
+
+// One human line per `wtm events` event; --output json is the contract, these
+// are for a person watching.
+const (
+	EventSnapshotFmt   = "%s · %s"
+	EventReadyMessage  = "watching for changes"
+	EventCreatedFmt    = "created %s  %s"
+	EventRemovedFmt    = "removed %s"
+	EventRelocatedFmt  = "relocated %s  %s " + MoveArrowGlyph + " %s"
+	EventReparentedFmt = "reparented %s  %s " + MoveArrowGlyph + " %s"
+	EventUpdatedFmt    = "updated %s  %s"
+	EventFieldFmt      = "%s=%s"
+	EventFieldSep      = ", "
+	EventOrdinalNone   = "none"
+
+	EventProvisionedFmt       = "provisioned %s"
+	EventProvisionFailedFmt   = "on_create failed for %s"
+	EventDeprovisionFailedFmt = "on_clean failed for %s, kept"
+	EventHookFmt              = "  %s"
+	EventExitCodeFmt          = " (exit %d)"
+	EventRepoAddedFmt         = "watching %s"
+	EventRepoRemovedFmt       = "no longer watching %s"
+	EventRepoPrefixFmt        = "%s · "
+)
+
+const (
+	// FlagPathInvalidFmt names the flag: the path is one the user typed.
+	FlagPathInvalidFmt    = "invalid --%s %q: %s"
+	FlagPathNotADirectory = "not a directory"
+	// FlagPathNotGitRepoFmt wraps ErrNotGitRepo, so the path refused by a flag
+	// exits on ExitCodeNotGitRepo like the current directory would.
+	FlagPathNotGitRepoFmt = "invalid --%s %q: %w"
+	// NotGitRepoFmt names the directory wtm was run from.
+	NotGitRepoFmt = "%s is %w"
+	// GitNotARepoStderr is how git says it found no repository.
+	GitNotARepoStderr = "not a git repository"
 )

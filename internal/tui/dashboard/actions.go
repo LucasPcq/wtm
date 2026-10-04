@@ -23,6 +23,7 @@ func (m Model) flowContext() flow.Context {
 		ProjectDir: m.params.ProjectDir,
 		StateDir:   m.params.StateDir,
 		Config:     m.params.Config,
+		Publisher:  m.params.Publisher,
 	}
 }
 
@@ -52,7 +53,7 @@ func (m Model) startCreate() (Model, tea.Cmd) {
 			opID:      id,
 			targetKey: declared.TargetKey,
 		},
-		Presenter: createPresenter{presenter{send: send, id: id}},
+		Presenter: newCreatePresenter(presenter{send: send, id: id}),
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
@@ -65,31 +66,55 @@ func (m Model) startCreate() (Model, tea.Cmd) {
 // never presets Force: lifting a refusal is an answer the user gives in the
 // modal, one refusal at a time.
 func (m Model) startClean(branch string) (Model, tea.Cmd) {
-	if reason, refused := m.busyReason(branch); refused {
+	return m.runClean(runCleanParams{
+		Target:  branch,
+		Request: cleanflow.Request{Branches: []string{branch}, BaseBranch: m.baseBranch()},
+		Title:   domain.DashboardDeleteTitle,
+		Shape:   modalForm,
+	})
+}
+
+// startBatchClean runs the same flow with nothing preset, so it asks which
+// worktrees to remove before anything else. Like prune it holds the whole
+// surface, so it needs no per-worktree lock.
+func (m Model) startBatchClean() (Model, tea.Cmd) {
+	return m.runClean(runCleanParams{
+		Request: cleanflow.Request{BaseBranch: m.baseBranch()},
+		Title:   domain.DashboardDeleteManyTitle,
+		Shape:   modalStepper,
+	})
+}
+
+type runCleanParams struct {
+	Target  string
+	Request cleanflow.Request
+	Title   string
+	Shape   modalShape
+}
+
+func (m Model) runClean(params runCleanParams) (Model, tea.Cmd) {
+	if reason, refused := m.busyReason(params.Target); refused {
 		return m.refuse(reason), nil
 	}
 	declared := cleanflow.Operation()
-	m, id := m.beginOp(beginParams{Operation: declared, Target: branch})
+	m, id := m.beginOp(beginParams{Operation: declared, Target: params.Target})
 	send := m.sender()
 
-	params := cleanflow.Params{
+	run := cleanflow.Params{
 		Context: m.flowContext(),
-		Request: cleanflow.Request{
-			Branch:     branch,
-			BaseBranch: m.baseBranch(),
-		},
+		Request: params.Request,
 		Prompter: prompter{
 			send:      send,
-			title:     domain.DashboardDeleteTitle,
-			shape:     modalForm,
+			title:     params.Title,
+			shape:     params.Shape,
 			opID:      id,
 			targetKey: declared.TargetKey,
 		},
-		Presenter: cleanPresenter{presenter{send: send, id: id}},
+		Presenter: newCleanPresenter(presenter{send: send, id: id}),
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-		_, err := cleanflow.Run(params)
+		_, err := cleanflow.Run(run)
 		return opDoneMsg{id: id, err: err}
 	})
 }
@@ -458,18 +483,13 @@ func (m Model) applyFlow(msg tea.Msg) (Model, tea.Cmd) {
 		m.ops = m.ops.stage(stageParams{ID: msg.id, Target: m.branchFor(msg.target), Stage: msg.stage})
 		return m, nil
 	case createdMsg:
-		m.selectBranch = msg.branch
-		return m, m.reload()
-	case cleanedMsg:
-		return m, m.reload()
-	case reparentedMsg:
-		return m, m.reload()
-	case prunedMsg:
-		return m, m.reload()
-	case syncedMsg:
-		return m, m.reload()
-	case fastForwardedMsg:
-		return m, m.reload()
+		if msg.selects {
+			m.selectBranch = msg.branch
+		}
+		m.flashPending = append(append([]string(nil), m.flashPending...), msg.branch)
+		return m.reload()
+	case cleanedMsg, reparentedMsg, prunedMsg, syncedMsg, fastForwardedMsg:
+		return m.reload()
 	}
 	return m, nil
 }
@@ -492,10 +512,26 @@ func (m Model) openModal(msg promptMsg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-// reload re-reads what a finished run changed: the worktrees, and the forest
-// when it has ever been built — a run creates, removes or reparents a node.
-func (m Model) reload() tea.Cmd {
-	return tea.Batch(m.loadWorktreesCmd(false), m.treeCmd())
+// reload re-reads what a run changed: the worktrees, and the forest when it
+// has ever been built — a run creates, removes or reparents a node. One is in
+// flight at a time: what asks meanwhile is read by the one that follows it,
+// so thirty removals cost two reloads, not thirty.
+func (m Model) reload() (Model, tea.Cmd) {
+	if m.reloadInFlight {
+		m.reloadPending = true
+		return m, nil
+	}
+	m.reloadInFlight = true
+	return m, tea.Batch(m.loadWorktreesCmd(false), m.treeCmd())
+}
+
+func (m Model) reloadLanded() (Model, tea.Cmd) {
+	m.reloadInFlight = false
+	if !m.reloadPending {
+		return m, nil
+	}
+	m.reloadPending = false
+	return m.reload()
 }
 
 // appendOutput splits an incoming entry on its newlines so every stored line

@@ -2,12 +2,15 @@ package shared
 
 import (
 	"io"
+	"os"
 
 	"github.com/spf13/cobra"
 
+	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/service/events"
 	"github.com/LucasPcq/wtm/internal/tui/components"
 	"github.com/LucasPcq/wtm/internal/tui/flowui"
 )
@@ -85,10 +88,6 @@ type DrawHookPhaseParams struct {
 // writer the command was given and the log is written: a hook must never find
 // its own way to the terminal, and its record must not depend on who was
 // watching.
-//
-// It is one function because the two callers — the migrated commands through
-// CLIPresenter, extract and checkout through RunCreateHooksPhase — drifted apart
-// once already, and a hook has to read the same whichever command ran it.
 func DrawHookPhase(params DrawHookPhaseParams) error {
 	log := output.HookLog(params.LogPath)
 	if log != nil {
@@ -104,10 +103,7 @@ func DrawHookPhase(params DrawHookPhaseParams) error {
 		return params.Run(flow.HookSink{Output: stream})
 	}
 
-	// The phase joins the run's block rather than opening one beside it, and it
-	// does so here rather than in each caller: extract and checkout reach this
-	// through RunCreateHooksPhase, and they used to draw a phase the migrated
-	// commands' presenter had already put a bar on.
+	// The phase joins the run's block rather than opening one beside it.
 	output.SectionTitle(OpenBlock(params.Stderr, true), params.Title)
 	if !output.IsTerminal(params.Stderr) {
 		return params.Run(flow.HookSink{Output: stream})
@@ -126,6 +122,7 @@ func (p CLIPresenter) Notice(notice flow.Notice) {
 		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
 			output.Unchanged(w, notice.Text)
 		})
+		MarkCancelled(p.Cmd)
 		return
 	}
 	if notice.Kind == flow.NoticeWarning {
@@ -183,11 +180,13 @@ func (p CLIPresenter) statusBlock(notice flow.Notice) {
 }
 
 // FlowContext: the flow cannot load the config itself, which reads cobra flags.
+// Every command publishes what its flow changes, whoever ran it.
 func FlowContext(config ConfigResult) flow.Context {
 	return flow.Context{
 		ProjectDir: config.ProjectDir,
 		StateDir:   config.StateDir,
 		Config:     config.Config,
+		Publisher:  events.NewPublisher(events.PublisherParams{ProjectDir: config.ProjectDir, CorrelationID: os.Getenv(domain.EnvCorrelationID)}),
 	}
 }
 

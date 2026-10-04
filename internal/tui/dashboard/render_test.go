@@ -224,7 +224,7 @@ func TestTabSlideDisabledWhenAnimationsOff(t *testing.T) {
 // new-worktree row flash, triggered by the existing selectBranch mechanism.
 func TestRowFlashLightsThenFadesAndStops(t *testing.T) {
 	model := newTestModel(t, testWidth, testHeight, "main")
-	model.selectBranch = "feat/a"
+	model, _ = model.applyFlow(createdMsg{branch: "feat/a", selects: true})
 
 	model, cmd := updateCmd(model, worktreesMsg{
 		statuses: statuses("main", "feat/a"),
@@ -233,16 +233,16 @@ func TestRowFlashLightsThenFadesAndStops(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("landing on a newly created row must start its opening flash")
 	}
-	if model.flashBranch != "feat/a" {
-		t.Fatalf("flashBranch = %q, want feat/a", model.flashBranch)
+	if _, lit := model.flashes["feat/a"]; !lit {
+		t.Fatalf("flashes = %v, want feat/a", model.flashes)
 	}
 
-	model.flashSince = time.Now().Add(-domain.DashboardRowFlash)
+	model.flashes = map[string]time.Time{"feat/a": time.Now().Add(-domain.DashboardRowFlash)}
 	model, cmd = updateCmd(model, flashTickMsg{})
 	if cmd != nil {
 		t.Error("a flash whose duration has elapsed must schedule no further ticks")
 	}
-	if model.flashBranch != "" {
+	if len(model.flashes) != 0 {
 		t.Error("a settled flash must clear its branch")
 	}
 }
@@ -252,7 +252,7 @@ func TestRowFlashDisabledWhenAnimationsOff(t *testing.T) {
 	model := New(RunParams{Config: domain.Config{Global: domain.GlobalConfig{UI: domain.UIConfig{Animations: &off}}}})
 	t.Cleanup(model.Close)
 	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
-	model.selectBranch = "feat/a"
+	model, _ = model.applyFlow(createdMsg{branch: "feat/a", selects: true})
 
 	// The row-selection cmd (triggerDetailReload) legitimately stays non-nil —
 	// only the animation is cut, never the selection it rides along with.
@@ -260,7 +260,7 @@ func TestRowFlashDisabledWhenAnimationsOff(t *testing.T) {
 		statuses: statuses("main", "feat/a"),
 		parents:  map[string]string{},
 	})
-	if model.flashBranch != "" {
+	if len(model.flashes) != 0 {
 		t.Error("ui.animations = false must not arm the flash at all")
 	}
 	if model.cursor != 1 {
@@ -379,5 +379,22 @@ func TestHeaderCountLineDropsFetchedBeforeTheCallToAction(t *testing.T) {
 	}
 	if !strings.Contains(narrow, "v0.26.0") {
 		t.Errorf("narrow line = %q, want the version to survive longest", narrow)
+	}
+}
+
+// A batch lands its worktrees one by one: each lights up as it appears, while
+// the cursor stays on the first instead of hopping to every new row.
+func TestEveryBranchOfABatchFlashesButOnlyTheFirstIsSelected(t *testing.T) {
+	model := newTestModel(t, testWidth, testHeight, "main")
+	model, _ = model.applyFlow(createdMsg{branch: "feat/a", selects: true})
+	model = update(model, worktreesMsg{statuses: statuses("main", "feat/a"), parents: map[string]string{}})
+	model, _ = model.applyFlow(createdMsg{branch: "feat/b"})
+	model = update(model, worktreesMsg{statuses: statuses("main", "feat/a", "feat/b"), parents: map[string]string{}})
+
+	if selected, _ := model.selected(); selected.Branch != "feat/a" {
+		t.Errorf("selected %q, want the first branch of the batch kept", selected.Branch)
+	}
+	if _, lit := model.flashes["feat/b"]; !lit {
+		t.Errorf("flashes = %v, want the later branch lit too", model.flashes)
 	}
 }

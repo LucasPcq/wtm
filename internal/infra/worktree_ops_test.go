@@ -74,6 +74,29 @@ func TestRemoveWorktree(t *testing.T) {
 	}
 }
 
+func TestRemoveWorktreeLiftsALockOnlyWhenTold(t *testing.T) {
+	dir := gittest.InitRepo(t)
+	wtPath := filepath.Join(t.TempDir(), "wt-locked")
+	if err := CreateWorktree(CreateWorktreeParams{ProjectDir: dir, Path: wtPath, Branch: "feat-locked", FromBranch: "HEAD"}); err != nil {
+		t.Fatal(err)
+	}
+	lock := exec.Command("git", "worktree", "lock", wtPath)
+	lock.Dir = dir
+	if out, err := lock.CombinedOutput(); err != nil {
+		t.Fatalf("git worktree lock: %s", out)
+	}
+
+	if err := RemoveWorktree(RemoveWorktreeParams{ProjectDir: dir, Path: wtPath, Force: true}); err == nil {
+		t.Fatal("a single --force must not remove a locked worktree")
+	}
+	if err := RemoveWorktree(RemoveWorktreeParams{ProjectDir: dir, Path: wtPath, Force: true, Locked: true}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, statErr := os.Stat(wtPath); !os.IsNotExist(statErr) {
+		t.Error("worktree directory should be removed")
+	}
+}
+
 // upstreamOf returns the configured upstream of a local branch, or "" when it
 // has none.
 func upstreamOf(t *testing.T, dir, branch string) string {

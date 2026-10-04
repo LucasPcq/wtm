@@ -13,7 +13,7 @@ import (
 
 // Step defines one step in a wizard.
 // Model must be a SelectListModel, TextInputModel, ConfirmModel, MultiSelectModel,
-// ReorderListModel, HookListModel, EnvResolveModel, PortListModel, RouteListModel,
+// TextListModel, ReorderListModel, HookListModel, EnvResolveModel, PortListModel, RouteListModel,
 // ProfileListModel, KindListModel, ScopeListModel, NamespaceListModel, EnvValueListModel,
 // or CmdListModel. Adding one means teaching every switch below about it —
 // TestWizardRendersEveryStepModel and its neighbours are what enforce that.
@@ -188,6 +188,11 @@ func (m *WizardModel) UpdateStepModel(stepIdx int, fn func(model any) any) {
 		return
 	}
 	m.steps[stepIdx].Model = fn(m.steps[stepIdx].Model)
+	// A model built from scratch knows nothing of the terminal: without the size
+	// a list loaded after the first resize overflows it.
+	if m.height > 0 {
+		m.propagateSize(stepIdx)
+	}
 }
 
 // Done returns true when all steps have been completed.
@@ -234,6 +239,11 @@ func (m WizardModel) Init() tea.Cmd {
 
 // Update delegates to the current step and manages transitions.
 func (m WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == domain.KeyInterrupt {
+		m.aborted = true
+		return m, tea.Quit
+	}
+
 	if m.onMsg != nil {
 		if cmd, handled := m.onMsg(&m, msg); handled {
 			return m, cmd
@@ -280,6 +290,10 @@ func (m WizardModel) updateStep(step *Step, msg tea.Msg) (advanced bool, back bo
 		step.Model = updated
 		return updated.Chosen(), updated.Aborted(), c
 	case TextInputModel:
+		updated, c := child.Update(msg)
+		step.Model = updated
+		return updated.Done(), updated.Aborted(), c
+	case TextListModel:
 		updated, c := child.Update(msg)
 		step.Model = updated
 		return updated.Done(), updated.Aborted(), c
@@ -459,7 +473,7 @@ func (m WizardModel) renderDescription() string {
 			Note:  step.CalloutNote,
 		})
 	}
-	return styles.Muted.Render(indentLines(desc))
+	return styles.Muted.Render(indentLines(styles.Wrap(styles.WrapParams{Value: desc, Width: m.width - len(styles.Indent) - 1})))
 }
 
 // chromeHeight is the number of newlines around the current step's list (head +
@@ -515,7 +529,11 @@ func (m WizardModel) renderStatusBanner() string {
 func (m WizardModel) renderBreadcrumb() string {
 	counter := styles.Breadcrumb.Render(fmt.Sprintf("  Step %d/%d", m.visiblePosition(), m.visibleCount()))
 	sep := styles.Breadcrumb.Render(" • ")
-	name := styles.BreadcrumbActive.Render(m.steps[m.current].Name)
+	label := m.steps[m.current].Name
+	if title := m.stepTitle(m.steps[m.current]); title != "" {
+		label = title
+	}
+	name := styles.BreadcrumbActive.Render(label)
 	return counter + sep + name
 }
 
@@ -571,6 +589,7 @@ func (m WizardModel) helpLine() string {
 type rowless interface{ helpRowless() bool }
 
 var _ rowless = TextInputModel{}
+var _ rowless = TextListModel{}
 
 // doneRower is a step whose last row confirms it. The word for enter follows:
 // on such a step enter acts on the row under the cursor, everywhere else it
@@ -616,6 +635,10 @@ func (m *WizardModel) propagateSize(stepIdx int) {
 		child.height = h
 		m.steps[stepIdx].Model = child
 	case TextInputModel:
+		child.width = m.width
+		child.input.Width = max(10, m.width-4)
+		m.steps[stepIdx].Model = child
+	case TextListModel:
 		child.width = m.width
 		child.input.Width = max(10, m.width-4)
 		m.steps[stepIdx].Model = child
@@ -749,6 +772,8 @@ func (m WizardModel) initStep(stepIdx int) tea.Cmd {
 		return child.Init()
 	case TextInputModel:
 		return child.Init()
+	case TextListModel:
+		return child.Init()
 	case ConfirmModel:
 		return child.Init()
 	case MultiSelectModel:
@@ -786,6 +811,8 @@ func (m WizardModel) viewStep(stepIdx int) string {
 	case SelectListModel:
 		return child.View()
 	case TextInputModel:
+		return child.View()
+	case TextListModel:
 		return child.View()
 	case ConfirmModel:
 		return child.View()
@@ -829,6 +856,10 @@ func (m *WizardModel) resetStep(stepIdx int) {
 		child.aborted = false
 		m.steps[stepIdx].Model = child
 	case TextInputModel:
+		child.done = false
+		child.aborted = false
+		m.steps[stepIdx].Model = child
+	case TextListModel:
 		child.done = false
 		child.aborted = false
 		m.steps[stepIdx].Model = child
@@ -913,6 +944,8 @@ func (m WizardModel) stepDescription(step Step) string {
 		return child.desc
 	case TextInputModel:
 		return child.desc
+	case TextListModel:
+		return child.desc
 	case ConfirmModel:
 		return child.desc
 	case MultiSelectModel:
@@ -941,6 +974,48 @@ func (m WizardModel) stepDescription(step Step) string {
 		return child.desc
 	case CmdListModel:
 		return child.desc
+	}
+	return ""
+}
+
+// stepTitle is what the step's model says it asks: the breadcrumb shows it, so
+// a title naming the worktree it is about is on screen wherever the question is.
+func (m WizardModel) stepTitle(step Step) string {
+	switch child := step.Model.(type) {
+	case SelectListModel:
+		return child.title
+	case TextInputModel:
+		return child.title
+	case TextListModel:
+		return child.title
+	case ConfirmModel:
+		return child.title
+	case MultiSelectModel:
+		return child.title
+	case ReorderListModel:
+		return child.title
+	case HookListModel:
+		return child.title
+	case EnvResolveModel:
+		return child.title
+	case PortListModel:
+		return child.title
+	case RouteListModel:
+		return child.title
+	case RunnerListModel:
+		return child.title
+	case ProfileListModel:
+		return child.title
+	case KindListModel:
+		return child.title
+	case ScopeListModel:
+		return child.title
+	case NamespaceListModel:
+		return child.title
+	case EnvValueListModel:
+		return child.title
+	case CmdListModel:
+		return child.title
 	}
 	return ""
 }

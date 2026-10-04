@@ -37,6 +37,10 @@ func (d *fakeDaemon) actions() []string {
 	defer d.mu.Unlock()
 	actions := make([]string, 0, len(d.requests))
 	for _, req := range d.requests {
+		// The event bus starts, wakes and stops nothing.
+		if req.Action == process.ActionPublish {
+			continue
+		}
 		actions = append(actions, string(req.Action)+" "+req.Name)
 	}
 	return actions

@@ -225,6 +225,7 @@ func TestShouldCheckUpdate(t *testing.T) {
 		{"daemon excluded", func(p *rules.ShouldCheckUpdateParams) { p.Command = domain.CmdDaemon }, false},
 		{"completion excluded", func(p *rules.ShouldCheckUpdateParams) { p.Command = domain.CmdCompletion }, false},
 		{"schema excluded", func(p *rules.ShouldCheckUpdateParams) { p.Command = domain.CmdSchema }, false},
+		{"events excluded", func(p *rules.ShouldCheckUpdateParams) { p.Command = domain.CmdEvents }, false},
 		{"inside ttl", func(p *rules.ShouldCheckUpdateParams) { p.CheckedAt = p.Now.Add(-1 * time.Hour) }, false},
 		{"exactly at ttl", func(p *rules.ShouldCheckUpdateParams) { p.CheckedAt = p.Now.Add(-domain.UpdateCheckTTL) }, true},
 		{"never checked", func(p *rules.ShouldCheckUpdateParams) { p.CheckedAt = time.Time{} }, true},

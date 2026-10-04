@@ -9,7 +9,9 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -339,15 +341,31 @@ func StartDaemon(params DaemonParams) error {
 		args = append(args, "--"+domain.FlagProxyPort, strconv.Itoa(params.ProxyPort))
 	}
 	cmd := exec.Command(exePath, args...)
+	cmd.Env = daemonEnv(os.Environ())
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	cmd.Stdin = nil
 
+	return startDetached(cmd)
+}
+
+// daemonEnv drops what belongs to the one command that started the daemon: its
+// jobs run long after, for other callers.
+func daemonEnv(environ []string) []string {
+	return slices.DeleteFunc(slices.Clone(environ), func(entry string) bool {
+		return strings.HasPrefix(entry, domain.EnvCorrelationID+"=")
+	})
+}
+
+// startDetached never waits on the daemon, but reaps it: a client that lives
+// as long as the daemon — `wtm events`, `wtm ui` — stays its parent, and a
+// daemon stopped under it would otherwise linger as a zombie that every
+// "has it exited yet" check still finds.
+func startDetached(cmd *exec.Cmd) error {
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start daemon: %w", err)
 	}
-
-	// Detach — don't wait for the daemon process
+	go func() { _ = cmd.Wait() }()
 	return nil
 }

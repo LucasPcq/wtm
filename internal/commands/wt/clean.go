@@ -16,10 +16,14 @@ import (
 // newCleanCmd creates the wtm clean subcommand.
 func newCleanCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   domain.CmdClean + " [branch]",
-		Short: "Remove a worktree and its local branch",
-		Long: "Remove a git worktree and delete the local branch. The remote branch is never touched.\n" +
-			"Without arguments, shows an interactive picker.\n" +
+		Use:   domain.CmdClean + " [branch...]",
+		Short: "Remove worktrees and their local branches",
+		Long: "Remove git worktrees and delete their local branches. The remote branch is never touched.\n" +
+			"Without arguments, shows an interactive picker where several can be checked.\n" +
+			"\n" +
+			"Several worktrees are removed one after the other: a failure does not stop the others, and\n" +
+			"the run exits with the first failure's code. Under --yes, one unsafe worktree (locked,\n" +
+			"dirty, unpushed, open PR) refuses the whole run before anything is removed, unless --force.\n" +
 			"\n" +
 			"The removal runs in a fixed order: the worktree's jobs are stopped and checked gone (a job\n" +
 			"that will not stop refuses the removal unless --force), the on_clean hooks run, git removes\n" +
@@ -32,23 +36,23 @@ func newCleanCmd() *cobra.Command {
 			"service that is down cannot take its data back: the form asks whether to start it now or\n" +
 			"keep the data until wtm next starts it; --yes keeps it, --drop-data starts it. A namespace\n" +
 			"another worktree reaches under the same name is never dropped.",
-		Example: `  # Pick the worktree to remove
+		Example: `  # Pick the worktrees to remove
   wtm clean
 
   wtm clean feat/login
 
-  # No prompts; its children move onto its parent
-  wtm clean feat/login --yes --reparent-children
+  # Several at once, no prompts; their children move onto the nearest survivor
+  wtm clean feat/login feat/signup --yes --reparent-children
 
   # Keep the databases it holds in shared services
   wtm clean feat/login --yes --keep-data --output json`,
-		Args: cobra.MaximumNArgs(1),
+		Args: cobra.ArbitraryArgs,
 		RunE: runClean,
 	}
 
-	cmd.Flags().Bool(domain.FlagForce, false, "Lift safety refusals (dirty/unpushed/open-PR); still asks to confirm unless --yes")
+	cmd.Flags().Bool(domain.FlagForce, false, "Lift safety refusals (locked/dirty/unpushed/open-PR); still asks to confirm unless --yes")
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (keeps safety checks unless --force)")
-	cmd.Flags().Bool(domain.FlagReparentChildren, false, "Reparent orphaned child worktrees onto the grandparent (no prompt)")
+	cmd.Flags().Bool(domain.FlagReparentChildren, false, domain.FlagReparentChildrenDesc)
 	cmd.Flags().Bool(domain.FlagKeepData, false, domain.FlagKeepDataDesc)
 	cmd.Flags().Bool(domain.FlagDropData, false, domain.FlagDropDataDesc)
 	cmd.MarkFlagsMutuallyExclusive(domain.FlagKeepData, domain.FlagDropData)
@@ -79,11 +83,6 @@ func runClean(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	branchName := ""
-	if len(args) > 0 {
-		branchName = args[0]
-	}
-
 	// --force is the safety axis, not a confirmation bypass: it still runs the wizard,
 	// with the refusals lifted.
 	interactive := rules.IsHumanFormat(format) && term.IsTerminal(int(os.Stdin.Fd())) && !yes
@@ -91,7 +90,7 @@ func runClean(cmd *cobra.Command, args []string) error {
 	_, err = cleanflow.Run(cleanflow.Params{
 		Context: shared.FlowContext(config),
 		Request: cleanflow.Request{
-			Branch:           branchName,
+			Branches:         args,
 			Force:            force,
 			ReparentChildren: reparentFlag,
 			KeepData:         keepData,

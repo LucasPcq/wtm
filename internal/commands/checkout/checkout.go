@@ -3,9 +3,7 @@
 package checkout
 
 import (
-	"errors"
 	"fmt"
-	"io"
 	"os"
 	"strconv"
 
@@ -14,15 +12,8 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/flow/envports"
-	"github.com/LucasPcq/wtm/internal/infra"
-	"github.com/LucasPcq/wtm/internal/output"
+	checkoutflow "github.com/LucasPcq/wtm/internal/flow/checkout"
 	"github.com/LucasPcq/wtm/internal/rules"
-	"github.com/LucasPcq/wtm/internal/service/branch"
-	ghservice "github.com/LucasPcq/wtm/internal/service/github"
-	"github.com/LucasPcq/wtm/internal/service/worktree"
-	checkoutwizard "github.com/LucasPcq/wtm/internal/tui/checkout"
-	"github.com/LucasPcq/wtm/internal/tui/components"
 )
 
 // NewCmd creates the wtm checkout command.
@@ -32,7 +23,8 @@ func NewCmd() *cobra.Command {
 		Short: "Create a worktree from an existing pull request",
 		Long: "Create a worktree from a pull request.\n" +
 			"A local branch of the PR's name is checked out as-is, keeping commits you never\n" +
-			"pushed; interactive runs offer to fast-forward it when it is behind origin.\n" +
+			"pushed; it is fast-forwarded when it is behind origin if you accept, or with\n" +
+			"--ff under --yes.\n" +
 			"Without arguments, shows an interactive picker of open PRs.",
 		Example: `  # Pick among the open pull requests
   wtm checkout
@@ -52,6 +44,7 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().Bool(domain.FlagMine, false, "Show only your PRs")
 	cmd.Flags().String(domain.FlagFrom, "", "Parent branch for sync (defaults to the PR base branch)")
 	cmd.Flags().String(domain.FlagEnvFrom, "", "Override env strategy (example, main, parent)")
+	cmd.Flags().Bool(domain.FlagFF, false, "Fast-forward the PR's branch to origin when it already exists locally and is behind (non-interactive; skipped when it has diverged)")
 	shared.AddIsolationFlag(cmd)
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (PR number required)")
 	shared.AddOutputFlag(cmd)
@@ -72,430 +65,46 @@ func runCheckout(cmd *cobra.Command, args []string) error {
 
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 	fromOverride, _ := cmd.Flags().GetString(domain.FlagFrom)
-	envOverride, _ := cmd.Flags().GetString(domain.FlagEnvFrom)
+	ffFlag, _ := cmd.Flags().GetBool(domain.FlagFF)
+	review, _ := cmd.Flags().GetBool(domain.FlagReview)
+	mine, _ := cmd.Flags().GetBool(domain.FlagMine)
 	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
 	isolation, err := shared.IsolationFlag(cmd)
 	if err != nil {
 		return err
 	}
+	envOverride, err := shared.EnvFromFlag(cmd)
+	if err != nil {
+		return err
+	}
 
 	if format == domain.OutputJSON && !yes {
-		return fmt.Errorf("--output json requires --%s (prompts cannot run in JSON mode)", domain.FlagYes)
+		return domain.ErrJSONNeedsYes
 	}
 
-	// --yes runs prompt-free: parent defaults to the PR base branch, env to the
-	// config strategy, and the env-fallback confirmation is skipped. It behaves like
-	// a non-interactive run (a PR number is required) while still framing human output.
-	opts := checkoutOptions{
-		jsonMode:     format == domain.OutputJSON,
-		interactive:  rules.IsHumanFormat(format) && term.IsTerminal(int(os.Stdin.Fd())) && !yes,
-		fromOverride: fromOverride,
-		envOverride:  envOverride,
-		isolation:    isolation,
-	}
-
+	number := 0
 	if len(args) == 1 {
-		number, parseErr := strconv.Atoi(args[0])
-		if parseErr != nil || number <= 0 {
+		parsed, parseErr := strconv.Atoi(args[0])
+		if parseErr != nil || parsed <= 0 {
 			return fmt.Errorf("invalid PR number %q", args[0])
 		}
-		return checkoutByNumber(cmd, result, number, opts)
+		number = parsed
 	}
 
-	return checkoutInteractive(cmd, result, opts)
-}
+	interactive := rules.IsHumanFormat(format) && term.IsTerminal(int(os.Stdin.Fd())) && !yes
 
-// checkoutOptions carries the resolved invocation mode and overrides.
-type checkoutOptions struct {
-	jsonMode     bool
-	interactive  bool
-	fromOverride string
-	envOverride  string
-	// isolation is --isolation, empty when it was not given.
-	isolation domain.Isolation
-}
-
-// checkoutByNumber handles `wtm checkout <number>`. The loading box owns its own
-// spacing; the persistent top padding comes from the framed result.
-func checkoutByNumber(cmd *cobra.Command, result shared.ConfigResult, number int, opts checkoutOptions) error {
-	var p domain.PRInfo
-	err := components.RunLoading(components.LoadingParams{
-		Message: "Fetching PR…",
-		Animate: shared.Animate(cmd, !opts.jsonMode),
-		Work: func() error {
-			var e error
-			p, e = ghservice.GetPRDetail(ghservice.GetPRDetailParams{
-				ProjectDir: result.ProjectDir,
-				Number:     number,
-			})
-			return e
+	_, err = checkoutflow.Run(checkoutflow.Params{
+		Context: shared.FlowContext(result),
+		Request: checkoutflow.Request{
+			Number:      number,
+			Filter:      rules.PRFilterFor(rules.PRFilterParams{Review: review, Mine: mine}),
+			From:        fromOverride,
+			EnvFrom:     envOverride,
+			FastForward: ffFlag,
+			Isolation:   isolation,
 		},
+		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive}),
+		Presenter: checkoutPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
 	})
-	if err != nil {
-		return fmt.Errorf("fetch PR: %w", err)
-	}
-
-	if err := rules.ValidatePRForCheckout(p); err != nil {
-		return err
-	}
-	parentBranches := parentBranchCandidates(result.ProjectDir)
-
-	resolved, err := resolveParentAndEnv(resolveParams{
-		result:         result,
-		pr:             p,
-		parentBranches: parentBranches,
-		opts:           opts,
-	})
-	if err != nil || resolved.aborted {
-		return err
-	}
-
-	// When the wizard ran it already hosted the env-fallback confirmation; only
-	// the no-wizard interactive path (both --from and --env-from given) still needs
-	// the standalone confirm.
-	return createFromPR(cmd, result, createFromPRParams{pr: p, parent: resolved.parent, env: resolved.env, isolation: resolved.isolation, jsonMode: opts.jsonMode, interactive: opts.interactive, envConfirmed: resolved.wizardRan})
-}
-
-// checkoutInteractive handles `wtm checkout` with no number: it renders the
-// multi-step wizard instantly and streams open PRs in asynchronously.
-func checkoutInteractive(cmd *cobra.Command, result shared.ConfigResult, opts checkoutOptions) error {
-	if !opts.interactive {
-		return fmt.Errorf("PR number required without an interactive terminal (or when --yes is set)")
-	}
-
-	parentBranches := parentBranchCandidates(result.ProjectDir)
-
-	dir := result.ProjectDir
-	review, _ := cmd.Flags().GetBool(domain.FlagReview)
-	mine, _ := cmd.Flags().GetBool(domain.FlagMine)
-	filter := rules.PRFilterFor(rules.PRFilterParams{Review: review, Mine: mine})
-
-	res, err := checkoutwizard.RunWizard(checkoutwizard.WizardParams{
-		ProjectDir:        dir,
-		PRLoader:          func() ([]domain.PRInfo, domain.GHConnection) { return shared.LoadPRsFiltered(dir, filter) },
-		WorktreeBranches:  worktreeBranches(dir),
-		ParentBranches:    parentBranches,
-		ConfigStrategy:    result.Config.Project.Env.Strategy,
-		IncludeParent:     opts.fromOverride == "",
-		IncludeEnv:        opts.envOverride == "",
-		FromOverride:      opts.fromOverride,
-		EnvOverride:       opts.envOverride,
-		IsolationApplies:  envports.IsolationApplies(shared.FlowContext(result)),
-		IsolationOverride: opts.isolation,
-		IsolationDefault:  envports.DefaultIsolation(shared.FlowContext(result)),
-		EnvFallback:       shared.EnvFallbackDecider(dir, result.Config),
-		Target: func(b string) domain.BranchTarget {
-			return branch.Target(branch.BranchParams{ProjectDir: dir, Branch: b})
-		},
-	})
-	if err != nil {
-		if errors.Is(err, domain.ErrUserAborted) {
-			return nil
-		}
-		return err
-	}
-
-	p := res.PR
-	if p.Number == 0 {
-		return nil
-	}
-	if err := rules.ValidatePRForCheckout(p); err != nil {
-		return err
-	}
-
-	parent := rules.FirstNonEmpty(opts.fromOverride, res.FromBranch, p.BaseBranch)
-	env := rules.FirstNonEmpty(opts.envOverride, res.EnvFromOverride)
-
-	// The env-fallback confirmation ran inside the wizard.
-	return createFromPR(cmd, result, createFromPRParams{pr: p, parent: parent, env: env, isolation: res.Isolation, jsonMode: opts.jsonMode, interactive: opts.interactive, envConfirmed: true})
-}
-
-// resolveParams holds inputs for resolving parent/env for a known PR.
-type resolveParams struct {
-	result         shared.ConfigResult
-	pr             domain.PRInfo
-	parentBranches []domain.BranchCandidate
-	opts           checkoutOptions
-}
-
-type resolvedCheckout struct {
-	parent    string
-	env       string
-	isolation domain.Isolation
-	aborted   bool
-	// wizardRan says the wizard already hosted the env-fallback confirmation.
-	wizardRan bool
-}
-
-// resolveParentAndEnv determines the parent branch, the env strategy and the
-// isolation for a known PR, running the wizard for whatever the flags left
-// unset (interactive only).
-func resolveParentAndEnv(params resolveParams) (resolvedCheckout, error) {
-	ctx := shared.FlowContext(params.result)
-	applies := envports.IsolationApplies(ctx)
-	fallback := envports.DefaultIsolation(ctx)
-	resolved := resolvedCheckout{
-		parent:    params.opts.fromOverride,
-		env:       params.opts.envOverride,
-		isolation: rules.FirstIsolation(params.opts.isolation, fallback),
-	}
-
-	needParent := resolved.parent == ""
-	needEnv := resolved.env == ""
-	needIsolation := applies && params.opts.isolation == ""
-
-	if params.opts.interactive && (needParent || needEnv || needIsolation) {
-		resolved.wizardRan = true
-		pr := params.pr
-		res, runErr := checkoutwizard.RunWizard(checkoutwizard.WizardParams{
-			ProjectDir:        params.result.ProjectDir,
-			Preselected:       &pr,
-			ParentBranches:    params.parentBranches,
-			ConfigStrategy:    params.result.Config.Project.Env.Strategy,
-			IncludeParent:     needParent,
-			IncludeEnv:        needEnv,
-			FromOverride:      params.opts.fromOverride,
-			EnvOverride:       params.opts.envOverride,
-			IsolationApplies:  applies,
-			IsolationOverride: params.opts.isolation,
-			IsolationDefault:  fallback,
-			EnvFallback:       shared.EnvFallbackDecider(params.result.ProjectDir, params.result.Config),
-			Target: func(b string) domain.BranchTarget {
-				return branch.Target(branch.BranchParams{ProjectDir: params.result.ProjectDir, Branch: b})
-			},
-		})
-		if runErr != nil {
-			if errors.Is(runErr, domain.ErrUserAborted) {
-				return resolvedCheckout{aborted: true, wizardRan: true}, nil
-			}
-			return resolvedCheckout{wizardRan: true}, runErr
-		}
-		if needParent {
-			resolved.parent = res.FromBranch
-		}
-		if needEnv {
-			resolved.env = res.EnvFromOverride
-		}
-		resolved.isolation = res.Isolation
-	}
-
-	if resolved.parent == "" {
-		resolved.parent = params.pr.BaseBranch
-	}
-	return resolved, nil
-}
-
-// createFromPRParams holds inputs for the final worktree creation step.
-type createFromPRParams struct {
-	pr          domain.PRInfo
-	parent      string
-	env         string
-	isolation   domain.Isolation
-	jsonMode    bool
-	interactive bool
-	// envConfirmed is true when the env-fallback confirmation already ran inside
-	// the wizard; only the no-wizard interactive path confirms it here.
-	envConfirmed bool
-}
-
-func createFromPR(cmd *cobra.Command, result shared.ConfigResult, params createFromPRParams) error {
-	p := params.pr
-
-	if params.interactive && !params.envConfirmed {
-		if show, cp := shared.EnvFallbackDecider(result.ProjectDir, result.Config)(params.parent, params.env); show {
-			if confirmed, _ := components.RunStandaloneConfirm(components.NewConfirm(cp)); !confirmed {
-				return nil
-			}
-		}
-	}
-
-	fetchErr := components.RunLoading(components.LoadingParams{
-		Message: "Fetching branch from origin…",
-		Animate: shared.Animate(cmd, !params.jsonMode),
-		Work: func() error {
-			return infra.FetchBranch(infra.FetchBranchParams{
-				ProjectDir: result.ProjectDir,
-				Branch:     p.Branch,
-			})
-		},
-	})
-	if fetchErr != nil {
-		return fetchErr
-	}
-
-	// A local branch of the PR's name is not a conflict: the worktree checks it
-	// out as-is, keeping commits that were never pushed. Only a branch another
-	// worktree already holds is refused, by worktree.Create.
-	target := branch.Target(branch.BranchParams{ProjectDir: result.ProjectDir, Branch: p.Branch})
-	reused := target.State == domain.BranchTargetExisting
-
-	// The start-point applies only to a branch git has to create. Reusing one is
-	// never destructive, so it needs no confirmation — but a behind-only branch is
-	// worth offering to update, interactively only (--yes / JSON never touch refs).
-	startPoint := domain.RemoteBranchPrefix + p.Branch
-	if reused {
-		startPoint = ""
-		if params.interactive {
-			updated, ok := reconcileReusedBranch(reconcileReusedBranchParams{Cmd: cmd, ProjectDir: result.ProjectDir, Target: target})
-			if !ok {
-				return nil
-			}
-			target = updated
-		}
-	}
-
-	preflight := envports.Preflight(shared.FlowContext(result))
-	var createResult domain.CreateResult
-	var err error
-	if loadErr := components.RunLoading(components.LoadingParams{
-		Message: fmt.Sprintf("Creating worktree %s…", p.Branch),
-		Animate: shared.Animate(cmd, !params.jsonMode),
-		Work: func() error {
-			createResult, err = worktree.Create(domain.CreateParams{
-				ProjectDir:      result.ProjectDir,
-				StateDir:        result.StateDir,
-				Branch:          p.Branch,
-				FromBranch:      startPoint,
-				SourceBranch:    params.parent,
-				Config:          result.Config,
-				EnvFromOverride: params.env,
-				SkipHooks:       true,
-				Isolation:       params.isolation,
-			})
-			return err
-		},
-	}); loadErr != nil {
-		return loadErr
-	}
-
-	// Before the hooks: one of them may read the .env, and it has to read what
-	// this worktree binds rather than what it was copied with.
-	format, _ := cmd.Flags().GetString(domain.FlagOutput)
-	settlement, warnings := envports.SettleFresh(envports.FreshParams{
-		Params: envports.Params{
-			Context:      shared.FlowContext(result),
-			Branch:       createResult.Branch,
-			WorktreePath: createResult.Path,
-			Presenter:    shared.NewPresenter(cmd, format),
-		},
-		Preflight: preflight,
-	})
-
-	// on_create hooks as a distinct, titled phase (shared with create/extract).
-	// A reused branch has no start-point, so the hooks see its recorded parent.
-	if hookErr := shared.RunCreateHooksPhase(shared.CreateHooksPhaseParams{
-		StateDir:     result.StateDir,
-		Cmd:          cmd,
-		ShowHeader:   !params.jsonMode,
-		ProjectDir:   result.ProjectDir,
-		WorktreePath: createResult.Path,
-		Branch:       p.Branch,
-		FromBranch:   rules.FirstNonEmpty(startPoint, params.parent),
-		Hooks:        result.Config.Project.Hooks.OnCreate,
-	}); hookErr != nil {
-		return hookErr
-	}
-
-	if params.jsonMode {
-		return output.WritePRCheckoutJSON(cmd.OutOrStdout(), output.PRCheckoutJSON{
-			Number:         p.Number,
-			Branch:         p.Branch,
-			Path:           createResult.Path,
-			Author:         p.Author,
-			URL:            p.URL,
-			Draft:          p.Draft,
-			ExistingBranch: createResult.ExistingBranch,
-			OriginState:    createResult.OriginState,
-			Isolation:      worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: result.ProjectDir, StateDir: result.StateDir, Branch: createResult.Branch}),
-			EnvPorts:       settlement,
-			Warnings:       warnings,
-		})
-	}
-
-	reusedNote := shared.ReusedBranchNoteResult{}
-	if createResult.ExistingBranch {
-		reusedNote = shared.ReusedBranchNote(shared.ReusedBranchNoteParams{
-			Branch: target.Branch,
-			Ahead:  target.AheadBehind.Ahead,
-			Behind: target.AheadBehind.Behind,
-		})
-	}
-	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-		output.FormatPRCheckoutResult(w, output.PRCheckoutResultParams{
-			Number:            p.Number,
-			Branch:            p.Branch,
-			EnvNote:           rules.EnvPortSettlementNote(settlement),
-			Path:              createResult.Path,
-			ReusedNote:        reusedNote.Text,
-			ReusedNoteWarning: reusedNote.Warning,
-			GoCommand:         fmt.Sprintf(domain.GoCommandFmt, p.Branch),
-		})
-	})
-	return nil
-}
-
-// reconcileReusedBranchParams holds inputs for reconcileReusedBranch.
-type reconcileReusedBranchParams struct {
-	Cmd        *cobra.Command
-	ProjectDir string
-	Target     domain.BranchTarget
-}
-
-// reconcileReusedBranch offers to update a reused local branch that is behind
-// origin, mirroring create's fast-forward offer, and returns the branch's state
-// afterwards so the conclusion reports what is actually checked out. Declining
-// proceeds with the local branch as-is; only a failed fast-forward whose recovery
-// is declined cancels the checkout (ok=false). A diverged branch is never
-// rewritten — the local commits win and the user is told what that means.
-// Interactive runs only.
-func reconcileReusedBranch(p reconcileReusedBranchParams) (updated domain.BranchTarget, ok bool) {
-	target := p.Target
-	if !rules.ShouldOfferFastForward(target.Origin) {
-		return target, true
-	}
-	confirmed, _ := components.RunStandaloneConfirm(components.NewConfirm(components.NewConfirmParams{
-		Title:       fmt.Sprintf(domain.SourceFastForwardPrompt, target.Branch, target.AheadBehind.Behind),
-		Description: domain.SourceFastForwardDescription,
-		DefaultYes:  true,
-	}))
-	if !confirmed {
-		return target, true
-	}
-
-	ffErr := components.RunLoading(components.LoadingParams{
-		Message: fmt.Sprintf(domain.SourceFastForwardLoadingFmt, target.Branch),
-		Animate: shared.Animate(p.Cmd, true),
-		Work: func() error {
-			return branch.FastForwardToOrigin(branch.BranchParams{ProjectDir: p.ProjectDir, Branch: target.Branch})
-		},
-	})
-	if ffErr == nil {
-		return branch.Target(branch.BranchParams{ProjectDir: p.ProjectDir, Branch: target.Branch}), true
-	}
-
-	proceed, _ := components.RunStandaloneConfirm(components.NewConfirm(components.NewConfirmParams{
-		Title:      fmt.Sprintf(domain.SourceProceedStalePrompt, target.Branch, target.AheadBehind.Behind),
-		Warning:    fmt.Sprintf(domain.SourceProceedStaleWarning, ffErr),
-		DefaultYes: false,
-	}))
-	return target, proceed
-}
-
-func worktreeBranches(projectDir string) []string {
-	wts, err := infra.ListWorktrees(infra.ListWorktreesParams{ProjectDir: projectDir})
-	if err != nil {
-		return nil
-	}
-	branches := make([]string, 0, len(wts))
-	for _, wt := range wts {
-		branches = append(branches, wt.Branch)
-	}
-	return branches
-}
-
-// parentBranchCandidates lists the local and origin remote-tracking branches,
-// tagged with their divergence, as the parent-branch options for the checkout
-// wizard. Best effort: a listing failure yields an empty set rather than an error.
-func parentBranchCandidates(projectDir string) []domain.BranchCandidate {
-	return branch.Candidates(branch.ListParams{ProjectDir: projectDir})
+	return err
 }

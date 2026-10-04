@@ -47,6 +47,7 @@ type WorktreeStatus struct {
 	Path         string
 	IsParent     bool
 	IsDirty      bool
+	IsLocked     bool
 	CommitsAhead int
 	CreatedAt    time.Time
 	// RebaseInProgress is true when the worktree has a rebase paused mid-way (e.g.
@@ -70,6 +71,7 @@ type WorktreeListEntry struct {
 	Path             string              `json:"path"`
 	IsParent         bool                `json:"is_parent"`
 	IsDirty          bool                `json:"is_dirty"`
+	IsLocked         bool                `json:"is_locked"`
 	RebaseInProgress bool                `json:"rebase_in_progress"`
 	CommitsAhead     int                 `json:"commits_ahead"`
 	CreatedAt        time.Time           `json:"created_at"`
@@ -189,6 +191,22 @@ type CreateResult struct {
 	Warnings []string `json:"warnings,omitempty"`
 }
 
+// Path is set when the worktree exists but its hooks failed.
+type BatchFailure struct {
+	Branch   string `json:"branch"`
+	Path     string `json:"path,omitempty"`
+	Error    string `json:"error"`
+	ExitCode int    `json:"exit_code"`
+	// Privileged is a removal git refused on files only sudo can delete, which a
+	// surface that cannot hand over its terminal has to name the way out of.
+	Privileged bool `json:"-"`
+}
+
+type CreateBatchResult struct {
+	Results []CreateResult `json:"results"`
+	Failed  []BatchFailure `json:"failed"`
+}
+
 // CleanParams holds inputs for cleaning a worktree.
 type CleanParams struct {
 	ProjectDir string
@@ -251,24 +269,26 @@ type ReparentResult struct {
 	NewParent string `json:"new_parent"`
 }
 
-// CleanReparentPlan lists the reparenting proposed when cleaning a worktree that
-// is the parent of others: each child would move from the cleaned branch to the
-// grandparent. It is computed before deletion so the command can show a recap.
-type CleanReparentPlan struct {
-	// Branch is the worktree about to be cleaned.
-	Branch string
-	// Grandparent is the parent the children would be reparented onto.
-	Grandparent string
-	Children    []ReparentResult
+type CleanResult struct {
+	Branch        string `json:"branch"`
+	Path          string `json:"path"`
+	AlreadyAbsent bool   `json:"already_absent"`
 }
 
-// CleanResult is the outcome of a clean, including any children reparented onto
-// the grandparent.
-type CleanResult struct {
-	Branch        string           `json:"branch"`
-	Path          string           `json:"path"`
-	AlreadyAbsent bool             `json:"already_absent"`
-	Reparented    []ReparentResult `json:"reparented,omitempty"`
+// CleanBatchResult is the clean payload, an envelope even for one worktree.
+// Skipped reuses prune's reasons: dirty, unpushed, open_pr.
+type CleanBatchResult struct {
+	Results          []CleanResult      `json:"results"`
+	Failed           []BatchFailure     `json:"failed"`
+	Skipped          []PruneSkip        `json:"skipped"`
+	Reparented       []ReparentResult   `json:"reparented"`
+	OrphanedChildren []ReparentResult   `json:"orphaned_children"`
+	Namespaces       []NamespaceOutcome `json:"namespaces"`
+}
+
+type CleanCheckEntry struct {
+	Check CleanCheckResult
+	Err   error
 }
 
 // CleanCheckResult holds the pre-deletion check results.
@@ -279,6 +299,7 @@ type CleanCheckResult struct {
 	HasOpenPR       bool
 	PRUrl           string
 	IsDirty         bool
+	IsLocked        bool
 	IsParent        bool
 }
 
@@ -310,5 +331,12 @@ type ResolveResult struct {
 // blanket "force".
 type CleanBlocker struct {
 	Key   string
+	Label string
+}
+
+// TallyPart is one count of a result summary. A zero count is dropped: a
+// conclusion counts what happened, never what did not.
+type TallyPart struct {
+	Count int
 	Label string
 }

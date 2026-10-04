@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/LucasPcq/wtm/schemas/events.v1.json",
+  "title": "wtm events v1",
+  "description": "One line of `wtm events --output json`. Consumers ignore unknown fields and unknown types; `v` changes only on a breaking change.",
+  "type": "object",
+  "required": ["v", "type", "ts"],
+  "properties": {
+    "v": { "const": 1 },
+    "type": { "type": "string" },
+    "ts": { "type": "string", "format": "date-time" },
+    "correlation_id": { "type": "string", "maxLength": 256, "description": "WTM_CORRELATION_ID of the command that published the event, verbatim; absent when it had none." }
+  },
+  "$defs": {
+    "repo": {
+      "type": "object",
+      "required": ["root", "common_dir"],
+      "properties": {
+        "root": { "type": "string", "minLength": 1, "description": "The main checkout." },
+        "common_dir": { "type": "string", "minLength": 1, "description": "git rev-parse --git-common-dir, absolute: the repository's key." }
+      }
+    },
+    "worktree": {
+      "type": "object",
+      "required": ["branch", "path", "parent", "ordinal", "isolation", "is_main", "created_at"],
+      "properties": {
+        "branch": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "parent": { "type": "string", "description": "The branch it was created from; empty for the main checkout." },
+        "ordinal": { "type": ["integer", "null"], "minimum": 0, "description": "Null until the worktree is first given one." },
+        "isolation": { "type": "string" },
+        "is_main": { "type": "boolean" },
+        "created_at": { "type": "string" }
+      }
+    },
+    "hookOk": { "type": "boolean", "description": "Whether every hook of the phase passed; true when there were none." },
+    "hookCmd": { "type": "string", "minLength": 1, "description": "The failing hook's command; only when ok is false, and absent when the phase failed before any hook ran." },
+    "hookExitCode": { "type": "integer", "minimum": 0, "description": "The failing hook's exit status; absent when it was killed by a signal." },
+    "changed": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "enum": ["isolation", "ordinal", "parent", "created_at"] }
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "type": { "const": "snapshot" },
+        "repo": { "$ref": "#/$defs/repo" },
+        "worktrees": { "type": "array", "items": { "$ref": "#/$defs/worktree" } }
+      },
+      "required": ["repo", "worktrees"]
+    },
+    {
+      "properties": { "type": { "const": "ready" } }
+    },
+    {
+      "properties": {
+        "type": { "const": "worktree.created" },
+        "repo": { "$ref": "#/$defs/repo" },
+        "worktree": { "$ref": "#/$defs/worktree" }
+      },
+      "required": ["repo", "worktree"]
+    },
+    {
+      "properties": {
+        "type": { "const": "worktree.provisioned" },
+        "repo": { "$ref": "#/$defs/repo" },
+        "worktree": { "$ref": "#/$defs/worktree" },
+        "ok": { "$ref": "#/$defs/hookOk" },
+        "hook": { "$ref": "#/$defs/hookCmd" },
+        "exit_code": { "$ref": "#/$defs/hookExitCode" }
+      },
+      "required": ["repo", "worktree", "ok"]
+    },
+    {
+      "properties": {
+        "type": { "const": "worktree.updated" },
+        "repo": { "$ref": "#/$defs/repo" },
+        "worktree": { "$ref": "#/$defs/worktree" },
+        "changed": { "$ref": "#/$defs/changed" }
+      },
+      "required": ["repo", "worktree", "changed"]
+    },
+    {
+      "properties": {
+        "type": { "const": "worktree.relocated" },
+        "repo": { "$ref": "#/$defs/repo" },
+        "worktree": { "$ref": "#/$defs/worktree" },
+        "from_path": { "type": "string", "minLength": 1 }
+      },
+      "required": ["repo", "worktree", "from_path"]
+    },
+    {
+      "properties": {
+        "type": { "const": "worktree.reparented" },
+        "repo": { "$ref": "#/$defs/repo" },
+        "worktree": { "$ref": "#/$defs/worktree" },
+        "from_parent": { "type": "string" }
+      },
+      "required": ["repo", "worktree"]
+    },
+    {
+      "properties": {
+        "type": { "const": "worktree.deprovisioned" },
+        "repo": { "$ref": "#/$defs/repo" },
+        "worktree": { "$ref": "#/$defs/worktree" },
+        "ok": { "$ref": "#/$defs/hookOk" },
+        "hook": { "$ref": "#/$defs/hookCmd" },
+        "exit_code": { "$ref": "#/$defs/hookExitCode" }
+      },
+      "required": ["repo", "worktree", "ok"]
+    },
+    {
+      "properties": {
+        "type": { "const": "worktree.removed" },
+        "repo": { "$ref": "#/$defs/repo" },
+        "worktree": { "$ref": "#/$defs/worktree" }
+      },
+      "required": ["repo", "worktree"]
+    },
+    {
+      "properties": {
+        "type": { "const": "repo.added" },
+        "repo": { "$ref": "#/$defs/repo" }
+      },
+      "required": ["repo"]
+    },
+    {
+      "properties": {
+        "type": { "const": "repo.removed" },
+        "repo": { "$ref": "#/$defs/repo" }
+      },
+      "required": ["repo"]
+    }
+  ]
+}

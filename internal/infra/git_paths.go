@@ -1,10 +1,13 @@
 package infra
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/LucasPcq/wtm/internal/domain"
 )
 
 // GitCommonDirParams holds inputs for resolving the git common dir.
@@ -45,4 +48,22 @@ func Toplevel(dir string) (string, error) {
 		return "", fmt.Errorf("git rev-parse --show-toplevel: %w", err)
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+// InsideGitRepo reads git's own verdict rather than any failure of rev-parse:
+// a missing git binary or an unreadable directory is an error, not an answer.
+func InsideGitRepo(dir string) (bool, error) {
+	cmd := exec.Command("git", "rev-parse", "--git-dir")
+	cmd.Dir = dir
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if err == nil {
+		return true, nil
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && strings.Contains(stderr.String(), domain.GitNotARepoStderr) {
+		return false, nil
+	}
+	return false, fmt.Errorf("git rev-parse --git-dir: %w", err)
 }

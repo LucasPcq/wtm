@@ -150,3 +150,19 @@ func readEnv(t *testing.T, worktreePath string) string {
 	}
 	return string(body)
 }
+
+// A fresh worktree is numbered by the pass that first needs its ports, and the
+// number is published like any other change to its identity.
+func TestSettleNumbersAFreshWorktreeAndPublishesIt(t *testing.T) {
+	ctx, worktreePath := settleFixture(t)
+	recorder := &flowtest.Recorder{}
+	ctx.Publisher = recorder
+
+	if _, err := envports.Settle(envports.Params{Context: ctx, Branch: "feature", WorktreePath: worktreePath, Presenter: recorder}); err != nil {
+		t.Fatalf("Settle: %v", err)
+	}
+
+	if len(recorder.Published) != 1 || recorder.Published[0].Type != domain.EventWorktreeUpdated || recorder.Published[0].Changed[0] != domain.IdentityOrdinal {
+		t.Fatalf("published %+v, want the ordinal update", recorder.Published)
+	}
+}

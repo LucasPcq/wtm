@@ -192,7 +192,9 @@ wtm run down --all
 
 ## Next
 
+- Several branches at once: `wtm create feat/a feat/b --yes`, then `wtm exec --all -- pnpm test` runs the tests in every worktree, in parallel, each on its own ports. See [Run a command across worktrees](recipes.md#run-a-command-across-worktrees).
 - [Recipes](recipes.md): a turbo monorepo, a docker compose app, a shared postgres, AI agents in parallel, stacked PRs.
 - [Troubleshooting](troubleshooting.md): what to do when a port is taken or a job crashes.
 - The [user guide](README.md) explains isolation, jobs and profiles, and the proxy in depth.
+- [Integrations](integrations.md): driving wtm from a script, an agent or another tool.
 - `wtm <command> --help` shows every flag, with examples; the [command reference](../wtm.md) is the same text.

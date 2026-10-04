@@ -7,6 +7,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/orphans"
 	"github.com/LucasPcq/wtm/internal/flow/run/owed"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
@@ -100,7 +101,7 @@ func TestReparentIsPresetByTheFlag(t *testing.T) {
 	if prompter.AskedKeys() != KeySelection+","+KeyConfirm {
 		t.Errorf("asked %q, want the reparent step answered by the flag", prompter.AskedKeys())
 	}
-	if answers.Value(KeyReparent) != reparentYes {
+	if answers.Value(KeyReparent) != orphans.Reparent {
 		t.Errorf("reparent = %q, want the preset read back", answers.Value(KeyReparent))
 	}
 }
@@ -137,8 +138,8 @@ func TestRecapStatesTheReparentDecisionFromEitherSource(t *testing.T) {
 		answer  string
 		want    string
 	}{
-		{"answered in the wizard", Request{}, reparentYes, "reparent 1 child"},
-		{"declined in the wizard", Request{}, reparentNo, "leave 1 child"},
+		{"answered in the wizard", Request{}, orphans.Reparent, "reparent 1 child"},
+		{"declined in the wizard", Request{}, orphans.Orphan, "leave 1 child"},
 		{"answered by the flag", Request{ReparentChildren: true}, "", "reparent 1 child"},
 	}
 
@@ -244,27 +245,6 @@ func TestForceSurvivesAPlainConfirmation(t *testing.T) {
 				t.Errorf("removed = %v, want %s", kept, tt.want)
 			}
 		})
-	}
-}
-
-// The proposal names each child, where it lands and what it leaves — the recap
-// only ever states a count, so this list is the one place the moves are legible.
-func TestReparentProposalListsEveryMove(t *testing.T) {
-	proposal := reparentProposal([]domain.ReparentResult{
-		{Branch: "child-a", OldParent: "parent-wt", NewParent: "main"},
-		{Branch: "child-b", OldParent: "parent-wt", NewParent: "main"},
-	})
-
-	if !strings.HasPrefix(proposal, domain.PruneReparentIntro) {
-		t.Errorf("proposal must open with its intro:\n%s", proposal)
-	}
-	for _, name := range []string{"child-a", "child-b", "parent-wt", "main"} {
-		if !strings.Contains(proposal, name) {
-			t.Errorf("proposal must name %q:\n%s", name, proposal)
-		}
-	}
-	if lines := strings.Count(proposal, "\n"); lines != 2 {
-		t.Errorf("proposal has %d line breaks, want one line per move under the intro:\n%s", lines, proposal)
 	}
 }
 

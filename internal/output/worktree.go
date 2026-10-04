@@ -54,7 +54,7 @@ func buildRows(statuses []domain.WorktreeStatus, activeBranch string, prs []doma
 	for _, s := range statuses {
 		r := row{
 			branch:   styles.Bold.Render(s.Branch),
-			tag:      formatTag(s.IsParent, s.Branch == activeBranch),
+			tag:      formatTag(s, s.Branch == activeBranch),
 			pr:       formatPRTag(s.Branch, prs),
 			services: formatServicesTag(s.Path, svcs),
 			ahead:    formatAhead(s.CommitsAhead),
@@ -84,20 +84,18 @@ func formatServicesTag(worktreePath string, svcs []domain.JobInfo) string {
 	return ""
 }
 
-func formatTag(isParent bool, isActive bool) string {
-	tags := ""
-	if isParent {
-		tags = styles.Muted.Render("(parent)")
+func formatTag(s domain.WorktreeStatus, isActive bool) string {
+	var tags []string
+	if s.IsParent {
+		tags = append(tags, styles.Muted.Render("(parent)"))
 	}
 	if isActive {
-		active := styles.Success.Render(domain.WorktreeActiveTag)
-		if tags != "" {
-			tags += "  " + active
-		} else {
-			tags = active
-		}
+		tags = append(tags, styles.Success.Render(domain.WorktreeActiveTag))
 	}
-	return tags
+	if s.IsLocked {
+		tags = append(tags, styles.Warning.Render(domain.TreeBadgeLockedText))
+	}
+	return strings.Join(tags, "  ")
 }
 
 // formatWorktreeState renders the status column. A paused rebase takes
@@ -203,6 +201,7 @@ func WriteWorktreeListJSON(w io.Writer, params WriteWorktreeListJSONParams) erro
 			Path:             s.Path,
 			IsParent:         s.IsParent,
 			IsDirty:          s.IsDirty,
+			IsLocked:         s.IsLocked,
 			RebaseInProgress: s.RebaseInProgress,
 			CommitsAhead:     s.CommitsAhead,
 			CreatedAt:        s.CreatedAt,
@@ -272,6 +271,40 @@ type CreateResultParams struct {
 	ReusedNoteWarning bool
 	// GoCommand is the ready-to-run jump-in command (e.g. "wtm go feat-x").
 	GoCommand string
+}
+
+type CreateBatchRow struct {
+	Branch        string
+	Path          string
+	AlreadyExists bool
+}
+
+type CreateBatchParams struct {
+	Created []CreateBatchRow
+	Failed  []domain.BatchFailure
+}
+
+func FormatCreateBatch(w io.Writer, p CreateBatchParams) {
+	created, existed := 0, 0
+	for _, row := range p.Created {
+		if row.AlreadyExists {
+			existed++
+			Unchanged(w, fmt.Sprintf(domain.CreateBatchExistsFmt, row.Branch))
+		} else {
+			created++
+			Success(w, row.Branch)
+		}
+		Message(w, Indent+row.Path)
+	}
+	for _, failure := range p.Failed {
+		Error(w, fmt.Sprintf(domain.BatchFailedFmt, failure.Branch, failure.Error))
+	}
+	Blank(w)
+	Message(w, rules.Tally(
+		domain.TallyPart{Count: created, Label: domain.TallyCreated},
+		domain.TallyPart{Count: existed, Label: domain.TallyAlreadyExisted},
+		domain.TallyPart{Count: len(p.Failed), Label: domain.TallyFailed},
+	))
 }
 
 // FormatCreateResult prints the create conclusion: a ✓ headline, an aligned
@@ -371,26 +404,39 @@ func writeAlignedFields(w io.Writer, fields []domain.RecapField) {
 	}
 }
 
-// WriteWorktreeCleanJSONParams holds inputs for the clean payload.
-type WriteWorktreeCleanJSONParams struct {
-	Branch        string                  `json:"branch"`
-	Path          string                  `json:"path"`
-	AlreadyAbsent bool                    `json:"already_absent"`
-	Reparented    []domain.ReparentResult `json:"reparented,omitempty"`
-	// OrphanedChildren lists children left dangling because reparenting was not
-	// authorized (no --reparent-children in non-interactive mode).
-	OrphanedChildren []domain.ReparentResult `json:"orphaned_children,omitempty"`
-	// Namespaces is what became of the data the worktree held in the shared
-	// services: dropped, deferred to the service's next start, or kept.
-	Namespaces []domain.NamespaceOutcome `json:"namespaces"`
+func WriteCleanJSON(w io.Writer, result domain.CleanBatchResult) error {
+	return encodeJSON(w, result)
 }
 
-// WriteWorktreeCleanJSON writes the JSON payload for `clean`.
-func WriteWorktreeCleanJSON(w io.Writer, params WriteWorktreeCleanJSONParams) error {
-	if params.Namespaces == nil {
-		params.Namespaces = []domain.NamespaceOutcome{}
+// FormatCleanBatch counts what went as it was asked, and names one by one what
+// the reader still has to deal with. Raw body — the caller's frame owns the padding.
+func FormatCleanBatch(w io.Writer, result domain.CleanBatchResult) {
+	removed, absent := rules.CleanedBranches(result.Results)
+	tally := rules.Tally(
+		domain.TallyPart{Count: len(removed), Label: domain.TallyRemoved},
+		domain.TallyPart{Count: len(absent), Label: domain.TallyAlreadyAbsent},
+		domain.TallyPart{Count: len(result.Reparented), Label: domain.TallyReparented},
+		domain.TallyPart{Count: len(result.Skipped), Label: domain.TallySkipped},
+		domain.TallyPart{Count: len(result.Failed), Label: domain.TallyFailed},
+	)
+	if len(removed) == 0 {
+		Unchanged(w, tally)
+	} else {
+		Success(w, tally)
+		Message(w, Indent+strings.Join(removed, ", "))
 	}
-	return encodeJSON(w, params)
+	if len(result.Reparented) > 0 {
+		Message(w, Indent+strings.Join(rules.ReparentedPairs(result.Reparented), ", "))
+	}
+	for _, child := range result.OrphanedChildren {
+		Warning(w, fmt.Sprintf(domain.CleanStillOrphanedFmt, child.Branch, child.OldParent))
+	}
+	for _, skip := range result.Skipped {
+		Warning(w, fmt.Sprintf(domain.PruneSkippedFmt, skip.Branch, rules.PruneReasonLabel(skip.Reason)))
+	}
+	for _, failure := range result.Failed {
+		Error(w, fmt.Sprintf(domain.BatchFailedFmt, failure.Branch, failure.Error))
+	}
 }
 
 // WriteReparentJSONParams holds the reparent payload: the list of worktrees whose

@@ -57,6 +57,7 @@ type daemonServer struct {
 	// never finds the socket gone.
 	lastActivity atomic.Int64
 	shutdown     chan struct{}
+	events       *eventHub
 	stopOnce     sync.Once
 	// stopped closes once stop has run to its end: RunDaemon returning is the
 	// process exiting, and a foreground job still in its grace period would die
@@ -93,6 +94,7 @@ func RunDaemon(params DaemonParams) error {
 		listener:   listener,
 		socketPath: params.SocketPath,
 		shutdown:   make(chan struct{}),
+		events:     newEventHub(domain.EventsSubscriberQueue),
 		stopped:    make(chan struct{}),
 	}
 
@@ -173,6 +175,7 @@ func (d *daemonServer) publicPort() int {
 func (d *daemonServer) stop() {
 	d.stopOnce.Do(func() {
 		close(d.shutdown)
+		d.events.close()
 		d.listener.Close()
 		d.manager.StopForeground()
 		close(d.stopped)
@@ -260,6 +263,10 @@ func (d *daemonServer) handleConnection(conn net.Conn) {
 		d.handleResize(encoder, req)
 	case ActionShutdown:
 		d.handleShutdown(encoder)
+	case ActionPublish:
+		d.handlePublish(encoder, req)
+	case ActionSubscribe:
+		d.handleSubscribe(conn, encoder, req)
 	default:
 		encoder.Encode(Response{Status: StatusError, Message: fmt.Sprintf("%s: %s", domain.DaemonUnknownActionPrefix, req.Action)})
 	}

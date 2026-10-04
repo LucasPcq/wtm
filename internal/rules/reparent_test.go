@@ -143,3 +143,47 @@ func TestReparentExclusionsIgnoreBranchesOutsideTheForest(t *testing.T) {
 		t.Error("a branch with no worktree can never close a cycle")
 	}
 }
+
+func TestReparentsAfterRemovalWalksPastRemovedAncestors(t *testing.T) {
+	moves := ReparentsAfterRemoval(ReparentsAfterRemovalParams{
+		Nodes: []domain.WorktreeNode{
+			{Branch: "dev", SourceBranch: "main"},
+			{Branch: "top", SourceBranch: "dev"},
+			{Branch: "mid", SourceBranch: "top"},
+			{Branch: "leaf", SourceBranch: "mid"},
+			{Branch: "gone-too", SourceBranch: "top"},
+		},
+		Removed:    []string{"top", "mid", "gone-too"},
+		BaseBranch: "main",
+	})
+
+	if len(moves) != 1 {
+		t.Fatalf("moves = %+v, want only the surviving leaf moved", moves)
+	}
+	if moves[0] != (domain.ReparentResult{Branch: "leaf", OldParent: "mid", NewParent: "dev"}) {
+		t.Errorf("move = %+v, want leaf onto dev, the nearest survivor", moves[0])
+	}
+}
+
+func TestReparentsAfterRemovalFallsBackToTheBase(t *testing.T) {
+	moves := ReparentsAfterRemoval(ReparentsAfterRemovalParams{
+		Nodes: []domain.WorktreeNode{
+			{Branch: "orphan-root"},
+			{Branch: "child", SourceBranch: "orphan-root"},
+			{Branch: "a", SourceBranch: "b"},
+			{Branch: "b", SourceBranch: "a"},
+			{Branch: "c", SourceBranch: "a"},
+		},
+		Removed:    []string{"orphan-root", "a", "b"},
+		BaseBranch: "main",
+	})
+
+	for _, move := range moves {
+		if move.NewParent != "main" {
+			t.Errorf("move = %+v, want the base when no ancestor survives (a cycle included)", move)
+		}
+	}
+	if len(moves) != 2 {
+		t.Errorf("moves = %+v, want child and c moved", moves)
+	}
+}

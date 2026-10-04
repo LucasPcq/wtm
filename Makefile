@@ -1,7 +1,7 @@
 BINARY   := wtm
 BUILD_DIR := bin
 
-.PHONY: build test vet fmt lint arch dead dead-strict dupl tidy docs demos release install clean
+.PHONY: build test vet fmt lint arch dead dead-strict dupl tidy docs demos release release-notes install clean
 
 build:
 	go build -o $(BUILD_DIR)/$(BINARY) .
@@ -19,8 +19,9 @@ fmt:
 		{ echo "gofmt needed:"; gofmt -l cmd internal tools *.go; exit 1; }
 
 # arch checks the rules of CLAUDE.md section 9 that no general-purpose linter
-# knows about: the layer graph, the styles monopoly, comma-ok assertions, the
-# confirmation axis. See tools/archlint.
+# knows about: layers and service edges, the styles monopoly, comma-ok
+# assertions, the confirmation axis, mutators reached outside flow/. See
+# tools/archlint.
 arch:
 	go run ./tools/archlint
 
@@ -62,6 +63,14 @@ demos:
 
 release: docs
 	goreleaser release --snapshot --clean
+
+# release-notes prints the CHANGELOG section of VERSION (0.29.0, no v): the
+# release workflow publishes it as the GitHub release notes.
+release-notes:
+	@test -n "$(VERSION)" || { echo "usage: make release-notes VERSION=x.y.z"; exit 1; }
+	@awk -v v="$(VERSION)" 'index($$0, "## [" v "]") == 1 { on = 1; next } on && /^## \[/ { exit } on && /^\[[^]]+\]: / { exit } on' CHANGELOG.md | \
+		sed -e '/./,$$!d'
+	@grep -q "^## \[$(VERSION)\]" CHANGELOG.md || { echo "no CHANGELOG section for $(VERSION)" >&2; exit 1; }
 
 install:
 	go install .

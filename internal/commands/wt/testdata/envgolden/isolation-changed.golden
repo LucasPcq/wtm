@@ -1,0 +1,76 @@
+args: feat/v --yes --isolation isolated --output json
+err: 
+exit: 0
+--- stdout ---
+{
+  "branch": "feat/v",
+  "path": "<trees>/feat-v",
+  "mode": "add",
+  "check": false,
+  "files": [
+    {
+      "target": ".env",
+      "strategy": "main",
+      "source": "main",
+      "diff": {
+        "mode": "add",
+        "entries": [
+          {
+            "key": "WEB_PORT",
+            "status": "resolved",
+            "current_value": "3000"
+          },
+          {
+            "key": "REALM",
+            "status": "resolved",
+            "current_value": "main-realm"
+          }
+        ]
+      },
+      "applied": false
+    }
+  ],
+  "ports": {
+    "offset": 10,
+    "entries": [
+      {
+        "file": ".env",
+        "key": "WEB_PORT",
+        "port": "PORT",
+        "base": 3000,
+        "resolved": 3010,
+        "moves": [
+          {
+            "port": "PORT",
+            "job": "web",
+            "base": 3000,
+            "resolved": 3010
+          }
+        ],
+        "addressing": "ports",
+        "status": "rewrite",
+        "current_value": "3000",
+        "new_value": "3010"
+      }
+    ],
+    "addressing": "names",
+    "public_port": 11080,
+    "owned": [
+      {
+        "file": ".env",
+        "key": "REALM",
+        "value": "app-feat-v",
+        "changed": true
+      }
+    ],
+    "applied": true
+  },
+  "isolation": "isolated",
+  "isolation_changed": true
+}
+--- stderr ---
+--- .env ---
+WEB_PORT=3010
+REALM=app-feat-v
+--- isolation ---
+isolated

@@ -238,6 +238,7 @@ func TestTreeBadgesFollowTheCanonicalOrder(t *testing.T) {
 			CommitsAhead: 2,
 			OriginState:  domain.DivergenceAhead,
 			IsDirty:      true,
+			IsLocked:     true,
 			NeedsSync:    true,
 			InCycle:      true,
 		},
@@ -250,6 +251,7 @@ func TestTreeBadgesFollowTheCanonicalOrder(t *testing.T) {
 		domain.TreeBadgeAhead,
 		domain.TreeBadgeOrigin,
 		domain.TreeBadgeDirty,
+		domain.TreeBadgeLocked,
 		domain.TreeBadgeNeedsSync,
 		domain.TreeBadgeCycle,
 	}

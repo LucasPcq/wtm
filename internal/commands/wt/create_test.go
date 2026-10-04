@@ -1,7 +1,6 @@
 package wt
 
 import (
-	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -81,10 +80,7 @@ func TestWtCreateReusesExistingLocalBranch(t *testing.T) {
 		t.Fatalf("wt create on an existing branch: %v", err)
 	}
 
-	var got domain.CreateResult
-	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
-		t.Fatalf("decode create JSON: %v (payload %q)", err, stdout)
-	}
+	got := decodeCreated(t, stdout)
 	if !got.ExistingBranch {
 		t.Error("existing_branch should report the reuse")
 	}
@@ -154,10 +150,7 @@ func TestWtCreateIfNotExistsWithBranchCheckedOutElsewhere(t *testing.T) {
 		t.Fatalf("--if-not-exists should succeed idempotently: %v", err)
 	}
 
-	var got domain.CreateResult
-	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
-		t.Fatalf("decode create JSON: %v (payload %q)", err, stdout)
-	}
+	got := decodeCreated(t, stdout)
 	if !got.AlreadyExists {
 		t.Error("already_exists should be true")
 	}
@@ -194,10 +187,7 @@ func TestWtCreateIfNotExistsWithFreeExistingBranchCreates(t *testing.T) {
 		t.Fatalf("wt create --if-not-exists on a free existing branch: %v", err)
 	}
 
-	var got domain.CreateResult
-	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
-		t.Fatalf("decode create JSON: %v (payload %q)", err, stdout)
-	}
+	got := decodeCreated(t, stdout)
 	if got.AlreadyExists {
 		t.Error("a free existing branch is not an already-existing worktree")
 	}
@@ -269,10 +259,7 @@ func TestWtCreateYesDoesNotFastForwardBehindBranch(t *testing.T) {
 		t.Errorf("branch %s moved to %s under --yes, want unchanged %s", branch, got, local)
 	}
 
-	var got domain.CreateResult
-	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
-		t.Fatalf("decode create JSON: %v (payload %q)", err, stdout)
-	}
+	got := decodeCreated(t, stdout)
 	if got.OriginState != domain.DivergenceLabelBehind {
 		t.Errorf("origin_state = %q, want %q", got.OriginState, domain.DivergenceLabelBehind)
 	}

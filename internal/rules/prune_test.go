@@ -157,6 +157,33 @@ func TestClassifyPruneDirtySkipUnlessForce(t *testing.T) {
 	}
 }
 
+func TestClassifyPruneLockedSkipUnlessForce(t *testing.T) {
+	build := func(force bool) domain.PrunePlan {
+		return ClassifyPrune(ClassifyPruneParams{
+			Statuses: []domain.WorktreeStatus{status("locked", func(s *domain.WorktreeStatus) {
+				s.IsLocked = true
+				s.IsDirty = true
+			})},
+			Nodes:      []domain.WorktreeNode{node("locked", "main")},
+			PRStates:   map[string]string{"locked": domain.PRStateMerged},
+			Merged:     true,
+			BaseBranch: "main",
+			Force:      force,
+		})
+	}
+
+	if reason := skippedBranches(build(false))["locked"]; reason != domain.PruneSkipLocked {
+		t.Errorf("without force, a locked worktree is skipped as locked, got %q", reason)
+	}
+	forced := build(true)
+	if len(forced.Selected) != 1 || forced.Selected[0].UnsafeReason != domain.PruneSkipLocked {
+		t.Errorf("with force, the locked worktree is selected and tagged locked, got %+v", forced)
+	}
+	if PruneReasonLabel(domain.PruneSkipLocked) == domain.PruneSkipLocked {
+		t.Error("the locked skip needs a label naming --force")
+	}
+}
+
 func TestClassifyPruneUnpushedSkipUnlessForce(t *testing.T) {
 	// A gone branch with local commits not on the remote is unsafe: without force
 	// it is skipped (guarding against silent loss of committed work); with force it
@@ -378,5 +405,24 @@ func TestPruneClassifyForce(t *testing.T) {
 				t.Errorf("PruneClassifyForce(%+v) = %v, want %v", tt.params, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestClassifyPruneReparentsPastAPrunedGrandparent(t *testing.T) {
+	plan := ClassifyPrune(ClassifyPruneParams{
+		Statuses: []domain.WorktreeStatus{status("feat", nil), status("dev", nil), status("child", nil)},
+		PRStates: map[string]string{"feat": domain.PRStateMerged, "dev": domain.PRStateMerged},
+		Nodes: []domain.WorktreeNode{
+			node("release", "main"),
+			node("dev", "release"),
+			node("feat", "dev"),
+			node("child", "feat"),
+		},
+		Merged:     true,
+		BaseBranch: "main",
+	})
+
+	if len(plan.Reparents) != 1 || plan.Reparents[0].NewParent != "release" {
+		t.Fatalf("reparents = %+v, want child onto release, not straight onto the base", plan.Reparents)
 	}
 }

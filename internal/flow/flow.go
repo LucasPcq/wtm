@@ -3,6 +3,7 @@
 package flow
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -15,6 +16,28 @@ type Context struct {
 	ProjectDir string
 	StateDir   string
 	Config     domain.Config
+	// Publisher hears every change a flow makes to a worktree's identity. Nil
+	// publishes nothing: the bus is opportunistic, and a consumer that missed an
+	// event gets the state back from its next snapshot.
+	Publisher Publisher
+}
+
+// Listening is asked before an event is built: reading the identity it
+// carries costs a git call, which a run nobody watches should not pay.
+type Publisher interface {
+	Publish(event domain.Event)
+	Listening() bool
+}
+
+func (c Context) Publish(event domain.Event) {
+	if c.Publisher == nil {
+		return
+	}
+	c.Publisher.Publish(event)
+}
+
+func (c Context) Listening() bool {
+	return c.Publisher != nil && c.Publisher.Listening()
 }
 
 type StepKind int
@@ -31,6 +54,13 @@ const (
 	// already the answer, and what the step collects is the sequence they end up
 	// in. Its answer is carried by Answer.Values, like a multi-select's.
 	StepReorder
+	// StepTextList collects names typed one by one; its answer is carried by
+	// Answer.Values, in the order they were added.
+	StepTextList
+	// StepEnvResolve asks for a decision on every drifting key of a worktree's
+	// .env files (StepContent.EnvFiles); its answer is carried by
+	// Answer.EnvDecisions.
+	StepEnvResolve
 )
 
 type Option struct {
@@ -38,6 +68,8 @@ type Option struct {
 	Value     string
 	Separator bool
 	Danger    bool
+	// Disabled shows an option that cannot be picked; its badges say why.
+	Disabled bool
 	// Selected pre-checks the option in a StepMultiSelect, so a step can offer a
 	// set it already narrowed rather than an empty one.
 	Selected bool
@@ -77,6 +109,28 @@ type StepContent struct {
 	// refresh stays authoritative on what exists — the exclusion is applied on top
 	// of whatever it last returned.
 	ExcludeBranches []string
+	Entries         []string
+	// Pinned overrides Step.Pinned when the branch to pin depends on an earlier
+	// answer — the base of the pull request just picked.
+	Pinned string
+	// Banner is what a loaded step has to say about what it could not load.
+	Banner Banner
+	// EnvFiles is the drift a StepEnvResolve asks about, EnvDefaults what its
+	// rows open on.
+	EnvFiles    []domain.EnvFileResult
+	EnvDefaults domain.EnvResolveDefaults
+}
+
+type Banner struct {
+	Title string
+	Lines []string
+}
+
+// EntryCheck is one entry of a StepTextList as it is added, with the entries
+// already in the list: a duplicate or a clash is only visible against them.
+type EntryCheck struct {
+	Entry   string
+	Entries []string
 }
 
 // Blocker is one safety refusal standing in the way of the step's dangerous
@@ -94,16 +148,22 @@ type Step struct {
 	Description string
 	Options     []Option
 
-	Default  string
-	Branches []domain.BranchCandidate
-	Pinned   string
-	Refresh  func() []domain.BranchCandidate
+	Default      string
+	Branches     []domain.BranchCandidate
+	Pinned       string
+	PinnedSuffix string
+	// PinAbsent keeps the pinned entry even when no candidate carries it: the base
+	// of a pull request is worth offering before it was ever fetched.
+	PinAbsent bool
+	Refresh   func() []domain.BranchCandidate
 
 	Validate func(value string) error
 	// ValidateSet is Validate for a StepMultiSelect step.
-	ValidateSet func(values []string) error
-	Skip        func(Answers) (skip bool, reason string)
-	Build       func(Answers) (StepContent, error)
+	ValidateSet   func(values []string) error
+	ValidateEntry func(EntryCheck) error
+	EntryBadge    func(entry string) Badge
+	Skip          func(Answers) (skip bool, reason string)
+	Build         func(Answers) (StepContent, error)
 
 	Load           func(Answers) (StepContent, error)
 	LoadingMessage string
@@ -147,10 +207,12 @@ type Answer struct {
 	Value string
 	// Values is the answer of a StepMultiSelect or StepReorder step; every other
 	// kind leaves it nil and answers with Value.
-	Values     []string
-	Skipped    bool
-	SkipReason string
-	Asked      bool
+	Values []string
+	// EnvDecisions is the answer of a StepEnvResolve step.
+	EnvDecisions []domain.EnvFileDecision
+	Skipped      bool
+	SkipReason   string
+	Asked        bool
 }
 
 type Answers struct {
@@ -369,7 +431,36 @@ func MergeContent(step Step, built StepContent) StepContent {
 	content.Start = built.Start
 	content.Blockers = built.Blockers
 	content.ExcludeBranches = built.ExcludeBranches
+	content.Entries = built.Entries
+	content.Pinned = step.Pinned
+	if built.Pinned != "" {
+		content.Pinned = built.Pinned
+	}
+	content.Banner = built.Banner
+	content.EnvFiles = built.EnvFiles
+	content.EnvDefaults = built.EnvDefaults
 	return content
+}
+
+// PinnedAmong is the branch a step pins among the candidates a surface shows.
+func PinnedAmong(step Step, content StepContent, candidates []domain.BranchCandidate) string {
+	if step.PinAbsent {
+		return content.Pinned
+	}
+	for _, candidate := range candidates {
+		if candidate.Name == content.Pinned {
+			return content.Pinned
+		}
+	}
+	return ""
+}
+
+// PinnedSuffix is what labels a branch step's pinned candidate.
+func PinnedSuffix(step Step) string {
+	if step.PinnedSuffix != "" {
+		return step.PinnedSuffix
+	}
+	return domain.PinnedSuffixDefault
 }
 
 // SummarizeSet renders a set answer for a breadcrumb: the names, capped so a
@@ -384,4 +475,20 @@ func SummarizeSet(answer Answer) string {
 		return strings.Join(values, ", ")
 	}
 	return strings.Join(values[:maxNames], ", ") + fmt.Sprintf(" +%d", len(values)-maxNames)
+}
+
+// CheckEntry is the one place an entry of a StepTextList is accepted, so the
+// wizard and the test double cannot disagree on what a blank or a clash is.
+func CheckEntry(step Step, check EntryCheck) (string, error) {
+	entry := strings.TrimSpace(check.Entry)
+	if entry == "" {
+		return "", errors.New(domain.FlowEntryRequired)
+	}
+	if step.ValidateEntry == nil {
+		return entry, nil
+	}
+	if err := step.ValidateEntry(EntryCheck{Entry: entry, Entries: check.Entries}); err != nil {
+		return "", err
+	}
+	return entry, nil
 }

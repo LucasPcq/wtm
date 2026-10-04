@@ -7,6 +7,7 @@ Complete setups for common projects. Each one shows the `run.toml` it ends with 
 - [One postgres, a database per worktree](#one-postgres-a-database-per-worktree)
 - [Several AI agents, each in its own worktree](#several-ai-agents-each-in-its-own-worktree)
 - [Stacked pull requests](#stacked-pull-requests)
+- [Run a command across worktrees](#run-a-command-across-worktrees)
 
 ## A pnpm or turbo monorepo
 
@@ -197,7 +198,7 @@ Give each agent a branch, a directory and a running stack of its own. Every comm
 wtm agents install                                       # once: the using-wtm skill for Claude Code / Cursor
 
 branch=agent/fix-checkout
-wtm create "$branch" --if-not-exists --yes --output json  # {"branch", "path", "isolation", ...}
+wtm create "$branch" --if-not-exists --yes --output json  # {"results": [{"branch", "path", "isolation", ...}], "failed": []}
 cd "$(wtm resolve "$branch")"
 
 wtm run up "$branch" -d --yes --output json              # per-job status, ports and URLs
@@ -211,7 +212,7 @@ wtm clean "$branch" --yes                                # add --force once the 
 
 - `run up --yes` leaves the other worktrees' jobs running, so agents starting at the same time do not stop each other. Setting `concurrency = "parallel"` in `run.toml` makes that the answer for people too.
 - Under `--yes` a missing choice is an error naming its flag, never a picker: `run start` needs `--job`, `create` needs the branch.
-- Exit codes are stable: `10` the worktree already exists, `11` the branch does not exist, `14` a job or profile `run.toml` does not declare, `16` no `run.toml`, `2` a usage error.
+- Exit codes are stable: `10` the worktree already exists, `11` the branch does not exist, `12` the repository was never initialized with wtm, `14` a job or profile `run.toml` does not declare, `16` no `run.toml`, `18` a `wtm env --check` that found drift, `19` an interactive run you backed out of (so `wtm create x && wtm go x` stops there), `20` a `wtm events` that received an event of a newer schema, `21` not in a git repository, `2` a usage error. Which of them `wtm events` treats as final is in [The event stream](events.md#when-it-exits).
 - `wtm run ps --output json` lists everything running, across repositories, and `wtm list --output json` every worktree with its state.
 - `clean --yes` still refuses a worktree with uncommitted or unpushed work; that refusal is lifted only by `--force`.
 
@@ -255,3 +256,34 @@ wtm clean feat/api --yes
 ```
 
 Or in one pass once several PRs are merged, with `gh` installed: `wtm prune --merged --reparent-children --yes`. `wtm tree --output mermaid` prints the stack as a flowchart for a PR description.
+
+## Run a command across worktrees
+
+Several branches in flight, one lockfile bump or one test suite to run on all of them. Create them in one go, run the command everywhere in parallel, remove them in one go:
+
+```console
+$ wtm create feat/login feat/billing fix/header --yes
+$ wtm exec --all -- 'pnpm lint && pnpm test'
+
+  ✓ main (41.2s)
+  ✗ feat/billing (exit 1, 38.7s)
+  ✓ feat/login (40.1s)
+  ✓ fix/header (39.5s)
+
+  ✗ pnpm lint && pnpm test · 4 worktrees: 1 failed
+    ✗ feat/billing (exit 1, 38.7s)
+        FAIL  src/invoice.test.ts > rounds the total
+      log  /code/acme/.git/wtm/exec/feat%2Fbilling.log
+    ✓ 3 passed
+
+$ wtm clean feat/login fix/header --yes
+```
+
+- Everything after `--` is one `/bin/sh -c` line, run from each worktree's root: quote it when it holds `&&` or a pipe, or your own shell takes them.
+- Each command gets **its own worktree's** environment: the variables your shell carries about the worktree you stand in are removed, and the target's run variables (compose project, shifted ports) are added when it has them, as for its hooks. See [The environment of `wtm exec`](configuration.md#the-environment-of-wtm-exec).
+- Name worktrees (`wtm exec feat/login feat/billing -- pnpm test`), or `--all` for every one, the main checkout included. Without either, `wtm exec` opens a wizard that also asks for the command.
+- `--jobs N` caps how many run at once (one per CPU by default): `wtm exec --all --jobs 2 -- pnpm install`. stdin is closed, so an interactive command cannot wait for input.
+- Successes show one line; failures show the tail of their output. `--print` shows every worktree's full output: `wtm exec --all --yes --print -- git log -1 --oneline`. Each worktree's whole output is kept in `.git/wtm/exec/<branch>.log`.
+- The run exits `1` when any command failed; each worktree's own exit code is in the report, and in `--output json` (`{command, results: [{branch, path, status, exit_code, …}], failed: [branch…]}`) for a script or an agent.
+
+`create` and `clean` with several branches go one after the other, and a failure does not stop the others: the run ends with what succeeded and what failed, and exits with the first failure's code. Under `--yes`, `clean` refuses the whole batch before removing anything when one worktree is unsafe (dirty, unpushed, open PR, locked): pass `--force`, or name only the safe ones. Their `--output json` is an envelope, `{"results": [...], "failed": [...]}` (see [Migrating to 0.29](migrating-to-0.29.md)).

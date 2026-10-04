@@ -5,6 +5,7 @@ package envports
 import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/ordinal"
 	"github.com/LucasPcq/wtm/internal/rules"
 	envsvc "github.com/LucasPcq/wtm/internal/service/env"
 	"github.com/LucasPcq/wtm/internal/service/runconfig"
@@ -58,13 +59,22 @@ type settleParams struct {
 }
 
 func settle(params settleParams) (domain.EnvPortPlan, error) {
-	resolved, err := worktree.ResolveEnvPorts(worktree.ResolveEnvPortsParams{
-		ProjectDir:   params.Context.ProjectDir,
-		StateDir:     params.Context.StateDir,
-		Branch:       params.Branch,
-		WorktreePath: params.WorktreePath,
-		EnvFiles:     params.Context.Config.Project.Env.Files,
-		Global:       params.Context.Config.Global,
+	var resolved envsvc.EnvPortsParams
+	err := ordinal.Retry(ordinal.RetryParams{
+		Context: params.Context,
+		Branch:  func() string { return params.Branch },
+		Do: func() error {
+			ports, resolveErr := worktree.ResolveEnvPorts(worktree.ResolveEnvPortsParams{
+				ProjectDir:   params.Context.ProjectDir,
+				StateDir:     params.Context.StateDir,
+				Branch:       params.Branch,
+				WorktreePath: params.WorktreePath,
+				EnvFiles:     params.Context.Config.Project.Env.Files,
+				Global:       params.Context.Config.Global,
+			})
+			resolved = ports
+			return resolveErr
+		},
 	})
 	if err != nil || resolved.Empty() {
 		return domain.EnvPortPlan{}, err

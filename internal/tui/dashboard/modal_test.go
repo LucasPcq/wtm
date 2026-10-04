@@ -584,3 +584,104 @@ func TestTheModalMultiSelectCarriesItsBadgesAndStart(t *testing.T) {
 		t.Errorf("space toggled %q, want the row the step starts on", got)
 	}
 }
+
+func textListSession() flow.Session {
+	return flow.Session{Steps: []flow.Step{
+		{
+			Kind: flow.StepTextList, Key: "branches", Label: "Branches", Title: "Branches",
+			ValidateEntry: func(check flow.EntryCheck) error {
+				if check.Entry == "taken" {
+					return errors.New("taken already")
+				}
+				return nil
+			},
+			EntryBadge: func(entry string) flow.Badge { return flow.Badge{Text: "new " + entry, Tone: domain.ToneSuccess} },
+		},
+		{Kind: flow.StepRecap, Key: "recap", Label: "Recap", Options: []flow.Option{{Label: "go", Value: "go"}}},
+	}}
+}
+
+func typeInto(mo modal, text string) modal {
+	for _, char := range text {
+		mo, _ = mo.update(key(string(char)))
+	}
+	return mo
+}
+
+func TestTheModalAnswersATextListWithEveryEntry(t *testing.T) {
+	reply := make(chan promptReply, 1)
+	mo, _ := newModal(modalParams{Shape: modalStepper, Session: textListSession(), Reply: reply, Width: testWidth, Height: testHeight})
+
+	mo = typeInto(mo, "feat/a")
+	mo, _ = mo.update(namedKey(tea.KeyTab))
+	mo = typeInto(mo, "feat/b")
+	mo, _ = mo.update(namedKey(tea.KeyEnter))
+	_, cmd := mo.update(namedKey(tea.KeyEnter))
+
+	if cmd == nil {
+		t.Fatal("confirming the recap must answer the session")
+	}
+	cmd()
+	answered := <-reply
+	if got := answered.answers.Values("branches"); len(got) != 2 || got[0] != "feat/a" || got[1] != "feat/b" {
+		t.Errorf("values = %v, want both entries in the order typed", got)
+	}
+}
+
+func TestTheModalTextListRefusesWhatTheStepRefuses(t *testing.T) {
+	reply := make(chan promptReply, 1)
+	mo, _ := newModal(modalParams{Shape: modalStepper, Session: textListSession(), Reply: reply, Width: testWidth, Height: testHeight})
+
+	mo = typeInto(mo, "taken")
+	mo, _ = mo.update(namedKey(tea.KeyTab))
+
+	if got := mo.textList.Values(); len(got) != 0 {
+		t.Errorf("values = %v, want the refused entry kept out of the list", got)
+	}
+	body := strings.Join(mo.body(noMarks{}), "\n")
+	if !strings.Contains(strings.ToLower(body), "taken already") {
+		t.Errorf("the refusal must be on screen:\n%s", body)
+	}
+}
+
+func TestTheModalRendersATextListBody(t *testing.T) {
+	reply := make(chan promptReply, 1)
+	mo, _ := newModal(modalParams{Shape: modalStepper, Session: textListSession(), Reply: reply, Width: testWidth, Height: testHeight})
+
+	mo = typeInto(mo, "feat/a")
+	mo, _ = mo.update(namedKey(tea.KeyTab))
+
+	body := strings.Join(mo.body(noMarks{}), "\n")
+	if !strings.Contains(body, "new feat/a") {
+		t.Errorf("each entry must carry the badge the step declares:\n%s", body)
+	}
+	if !strings.Contains(body, domain.DashboardStepperListHint) {
+		t.Errorf("the footer must name the list controls:\n%s", body)
+	}
+}
+
+// The step's Build only knows the entries the request carried — none, on this
+// surface — so stepping back must put back what the user typed.
+func TestGoingBackToATextListKeepsTheEntries(t *testing.T) {
+	reply := make(chan promptReply, 1)
+	mo, _ := newModal(modalParams{Shape: modalStepper, Session: textListSession(), Reply: reply, Width: testWidth, Height: testHeight})
+
+	mo = typeInto(mo, "feat/a")
+	mo, _ = mo.update(namedKey(tea.KeyEnter))
+	mo, _ = mo.update(namedKey(tea.KeyEsc))
+
+	if got := mo.textList.Values(); len(got) != 1 || got[0] != "feat/a" {
+		t.Errorf("values = %v, want the list typed before stepping forward", got)
+	}
+}
+
+func TestEscOnTheFirstTextListCancelsTheRun(t *testing.T) {
+	reply := make(chan promptReply, 1)
+	mo, _ := newModal(modalParams{Shape: modalStepper, Session: textListSession(), Reply: reply, Width: testWidth, Height: testHeight})
+
+	_, cmd := mo.update(namedKey(tea.KeyEsc))
+	cmd()
+	if answered := <-reply; !errors.Is(answered.err, domain.ErrUserAborted) {
+		t.Errorf("err = %v, want the run cancelled", answered.err)
+	}
+}

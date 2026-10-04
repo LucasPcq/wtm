@@ -104,6 +104,12 @@ func FastForwardToOrigin(params BranchParams) error {
 	return nil
 }
 
+// FetchFromOrigin updates the branch's remote-tracking ref, so what is checked out
+// next is what origin holds now.
+func FetchFromOrigin(params BranchParams) error {
+	return infra.FetchBranch(infra.FetchBranchParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
+}
+
 // Check gathers a branch's state against origin in one network round trip, so a
 // recap and the run that follows it read the same facts and the branch is
 // fetched once rather than twice.

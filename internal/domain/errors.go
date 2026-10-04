@@ -45,6 +45,10 @@ var (
 	// exits non-zero without printing a second, redundant error line.
 	ErrAborted = errors.New("aborted")
 
+	ErrExecNoCommand       = errors.New("no command: put it after --, e.g. wtm exec --all -- pnpm test")
+	ErrExecUnknownWorktree = errors.New("no worktree with that branch")
+	ErrExecAllWithNames    = errors.New("--all cannot be combined with worktree names")
+
 	// ErrNotGitRepo is returned when the current directory is not a git repository.
 	ErrNotGitRepo = errors.New("not a git repository")
 
@@ -105,8 +109,6 @@ var (
 	// source every other .env is copied from, so there is nothing for it to copy.
 	ErrIsolationMain = errors.New("the main checkout is always isolated: it is the one the others copy from")
 
-	// ErrEnvIsolationWithCheck refuses to record a choice on a run that promised
-	// to write nothing.
 	ErrEnvIsolationWithCheck = errors.New("--isolation records a choice for the worktree, and --check writes nothing: pass one or the other")
 
 	// ErrGHNotInstalled is returned when the gh CLI is not found on PATH.
@@ -121,6 +123,8 @@ var (
 	// ErrUsage marks a command line refused before the command ran; it maps to
 	// exit code 2.
 	ErrUsage = errors.New("usage error")
+
+	ErrInvalidCorrelationID = errors.New("invalid correlation id")
 
 	// ErrJobNotAttachable is returned for a job with no live output to subscribe
 	// to: a detached launcher, whose stream ended with the launcher, or a job
@@ -140,6 +144,15 @@ var (
 	// module is initialized — run.toml is absent or declares no job/profile. The
 	// message points at the dedicated setup command.
 	ErrRunNotInitialized = errors.New("no run.toml — run `wtm run init`")
+
+	// ErrCancelled is a run the user backed out of — Esc, Ctrl-C, "No, cancel",
+	// a declined confirmation. It always travels with ErrAborted: the `=` line
+	// saying so is already on screen.
+	ErrCancelled = errors.New("cancelled")
+
+	// ErrJSONNeedsYes refuses --output json on a command that could ask
+	// something: JSON mode is non-interactive, so the decisions need --yes.
+	ErrJSONNeedsYes = errors.New("--output json requires --yes (prompts cannot run in JSON mode)")
 
 	// ErrExtractConflict is returned when the selected changes do not apply
 	// cleanly onto the target worktree. The extraction is aborted and the source
@@ -194,17 +207,17 @@ var (
 	ErrReparentBranchesRequired = errors.New("specify at least one worktree (no interactive picker under --yes, without a terminal, or in --output json mode)")
 	ErrReparentParentRequired   = errors.New("specify the new parent with --to (no interactive picker under --yes, without a terminal, or in --output json mode)")
 
-	// ErrEnvWorktreeRequired is returned when `wtm env` is invoked without a worktree
-	// argument and cannot fall back to the interactive picker (--yes, no terminal, or
-	// --output json).
-	ErrEnvWorktreeRequired = errors.New("specify a worktree (no interactive picker under --yes, without a terminal, or in --output json mode)")
+	ErrEnvWorktreeRequired = errors.New("specify a worktree (no interactive picker under --yes or --check, without a terminal, or in --output json mode)")
+	ErrEnvJSONNeedsYes     = errors.New("--output json requires --yes or --check (interactive resolution cannot run in JSON mode)")
+	// ErrEnvDecisionWithCheck and ErrEnvOnConflictNeedsRefresh refuse a flag
+	// the run would silently ignore.
+	ErrEnvDecisionWithCheck      = errors.New("--check writes nothing")
+	ErrEnvOnConflictNeedsRefresh = errors.New("--on-conflict settles conflicts, and --mode add reports none: pass --mode refresh")
 
-	// ErrEnvJSONNeedsYes is returned when `wtm env` runs in --output json without
-	// --yes: interactive resolution cannot run in JSON mode.
-	ErrEnvJSONNeedsYes = errors.New("--output json requires --yes (interactive resolution cannot run in JSON mode)")
-
-	// ErrEnvNoFiles is returned when `wtm env` runs on a project whose config
-	// declares no env files to reconcile.
+	// ErrEnvDrift is a --check that found drift. It travels with ErrAborted: the
+	// report naming the drift is already on screen, so only the exit code is
+	// left to say it.
+	ErrEnvDrift   = errors.New("the .env has drifted from its sources")
 	ErrEnvNoFiles = errors.New("no env files configured — run `wtm init --only env` to detect them")
 
 	// ErrEnvFileNoTarget is returned when an env.file entry has an empty target.
@@ -309,4 +322,14 @@ var (
 
 	// ErrReleaseNotFound is returned when the requested release tag does not exist.
 	ErrReleaseNotFound = errors.New("release not found")
+)
+
+var (
+	ErrEventsSchemaNewer = errors.New("the event stream speaks a newer schema than this wtm: upgrade wtm")
+	// ErrOrdinalUnallocated is a worktree nothing has numbered yet: the flow
+	// that needs the number allocates it, so the change is published.
+	ErrOrdinalUnallocated = errors.New("worktree has no ordinal yet")
+	// ErrDaemonNoSubscribe is a daemon built before the event bus: it is the one
+	// daemon a watcher replaces, and only while it holds no job.
+	ErrDaemonNoSubscribe = errors.New("the run daemon predates wtm events")
 )

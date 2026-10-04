@@ -80,9 +80,10 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 		return envsvc.EnvPortsParams{}, err
 	}
 
-	// BranchEnv rather than EnsureOrdinal: it settles the offset and the worktree
-	// label in one place, so a .env and the route a job answers under can never
-	// disagree on which worktree they belong to.
+	// The environment rather than the ordinal alone: it settles the offset and
+	// the worktree label in one place, so a .env and the route a job answers
+	// under can never disagree on which worktree they belong to. An unnumbered
+	// worktree answers ErrOrdinalUnallocated, and the flow allocates.
 	env, err := branchEnvAs(ref, isolation)
 	if err != nil {
 		return envsvc.EnvPortsParams{}, err

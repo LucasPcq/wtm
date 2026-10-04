@@ -113,7 +113,7 @@ type plan struct {
 	refresh     func() []domain.BranchCandidate
 	initCmd     tea.Cmd
 	loadingText string
-	loads       map[int]flow.Step
+	loads       map[int]loadedStep
 	loadErr     error
 }
 
@@ -202,6 +202,10 @@ func answerOf(kind flow.StepKind, model any) flow.Answer {
 		if list, ok := model.(components.SelectListModel); ok {
 			return flow.Answer{Value: list.Value(), Asked: true}
 		}
+	case flow.StepTextList:
+		if list, ok := model.(components.TextListModel); ok {
+			return flow.Answer{Values: list.Values(), Asked: true}
+		}
 	case flow.StepMultiSelect:
 		if list, ok := model.(components.MultiSelectModel); ok {
 			return flow.Answer{Values: list.Values(), Asked: true}
@@ -209,6 +213,10 @@ func answerOf(kind flow.StepKind, model any) flow.Answer {
 	case flow.StepReorder:
 		if list, ok := model.(components.ReorderListModel); ok {
 			return flow.Answer{Values: list.Values(), Asked: true}
+		}
+	case flow.StepEnvResolve:
+		if resolve, ok := model.(components.EnvResolveModel); ok {
+			return flow.Answer{EnvDecisions: resolve.Decisions(), Asked: true}
 		}
 	}
 	return flow.Answer{}

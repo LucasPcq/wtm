@@ -12,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/service/events"
 )
 
 // ConfigResult holds the loaded config along with the resolved paths every
@@ -32,9 +33,29 @@ func ProjectRoot(dir string) (string, error) {
 		ProjectDir: dir,
 	})
 	if err != nil {
-		return "", fmt.Errorf("find project root: %w", err)
+		return "", projectRootError(projectRootErrorParams{Dir: dir, Err: err})
 	}
 	return mainPath, nil
+}
+
+type projectRootErrorParams struct {
+	Dir string
+	Err error
+}
+
+// projectRootError asks git why only once it has failed, so a command run in a
+// repository pays nothing for the exit code of one run outside it.
+func projectRootError(params projectRootErrorParams) error {
+	inside, err := infra.InsideGitRepo(params.Dir)
+	if err == nil && !inside {
+		return NotGitRepo(params.Dir)
+	}
+	return fmt.Errorf("find project root: %w", params.Err)
+}
+
+// NotGitRepo is the error every command ends on outside a repository.
+func NotGitRepo(dir string) error {
+	return fmt.Errorf(domain.NotGitRepoFmt, dir, domain.ErrNotGitRepo)
 }
 
 // LoadConfig resolves the main worktree + state dir and loads config.toml from
@@ -60,7 +81,31 @@ func LoadConfig(cmd *cobra.Command, dir string) (ConfigResult, error) {
 		return ConfigResult{}, fmt.Errorf("loading config: %w", err)
 	}
 
+	Register(RegisterParams{Root: root, StateDir: stateDir, CorrelationID: CorrelationID(cmd)})
 	return ConfigResult{Config: cfg, ProjectDir: root, StateDir: stateDir}, nil
+}
+
+type RegisterParams struct {
+	Root          string
+	StateDir      string
+	CorrelationID string
+}
+
+// Register enrolls a repository for a global `wtm events`: failing to costs
+// that stream a repository, never the command its run. A state dir moved out
+// of the repository is one the registry cannot tell is still initialized.
+func Register(params RegisterParams) {
+	if os.Getenv(domain.EnvStateDir) != "" {
+		return
+	}
+	_ = events.Register(events.RegisterParams{Root: params.Root, StateDir: params.StateDir, CorrelationID: params.CorrelationID})
+}
+
+func CorrelationID(cmd *cobra.Command) string {
+	if cmd.Annotations[domain.AnnotationUncorrelated] == domain.AnnotationOn {
+		return ""
+	}
+	return os.Getenv(domain.EnvCorrelationID)
 }
 
 // AddOutputFlag registers the standard --output flag on cmd.
@@ -84,7 +129,31 @@ func AddIsolationFlag(cmd *cobra.Command) {
 // IsolationFlag reads --isolation, refusing a value that is neither answer.
 func IsolationFlag(cmd *cobra.Command) (domain.Isolation, error) {
 	value, _ := cmd.Flags().GetString(domain.FlagIsolation)
-	return rules.ParseIsolation(value)
+	isolation, err := rules.ParseIsolation(value)
+	if err != nil {
+		return "", rules.InvalidFlagValue(rules.InvalidFlagValueParams{Flag: domain.FlagIsolation, Value: value, Allowed: IsolationValues})
+	}
+	return isolation, nil
+}
+
+// IsolationValues and EnvStrategyValues are what the two flags accept, as an
+// error names them.
+var (
+	IsolationValues   = []string{string(domain.IsolationIsolated), string(domain.IsolationVerbatim)}
+	EnvStrategyValues = []string{string(domain.EnvStrategyExample), string(domain.EnvStrategyMain), string(domain.EnvStrategyParent)}
+)
+
+// EnvFromFlag is --env-from, refused here rather than after the worktree it
+// would have provisioned exists.
+func EnvFromFlag(cmd *cobra.Command) (string, error) {
+	value, _ := cmd.Flags().GetString(domain.FlagEnvFrom)
+	if value == "" {
+		return "", nil
+	}
+	if err := rules.ValidateEnvStrategy(domain.EnvStrategy(value)); err != nil {
+		return "", rules.InvalidFlagValue(rules.InvalidFlagValueParams{Flag: domain.FlagEnvFrom, Value: value, Allowed: EnvStrategyValues})
+	}
+	return value, nil
 }
 
 // AddJobFlag and AddProfileFlag register the run module's second axis. The

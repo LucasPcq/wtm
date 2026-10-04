@@ -28,7 +28,7 @@ func (p *plan) componentStep(step flow.Step, conditional bool) (components.Step,
 		// owns its model — a recap owns its cancel row and the plan its Load
 		// fills in, a multi-select owns its checked set — so its Skip gates the
 		// step instead of replacing it.
-		if step.Kind == flow.StepSelect {
+		if step.Kind == flow.StepSelect && step.Load == nil {
 			return p.choiceStep(step), nil
 		}
 		built, err := p.componentStep(step, false)
@@ -41,15 +41,28 @@ func (p *plan) componentStep(step flow.Step, conditional bool) (components.Step,
 	case flow.StepText:
 		return p.contentStep(step, func(content flow.StepContent) any { return textInput(step, content) })
 	case flow.StepSelect:
+		if step.Load != nil {
+			return p.loadedSelectStep(step), nil
+		}
 		return p.contentStep(step, func(content flow.StepContent) any { return selectList(content) })
 	case flow.StepBranchSelect:
 		return p.branchStep(step)
+	case flow.StepTextList:
+		return p.contentStep(step, func(content flow.StepContent) any { return TextList(step, content) })
 	case flow.StepMultiSelect:
+		if step.Load != nil {
+			return p.loadedMultiSelectStep(step), nil
+		}
 		return p.contentStep(step, func(content flow.StepContent) any { return multiSelect(step, content) })
 	case flow.StepReorder:
 		return p.contentStep(step, func(content flow.StepContent) any { return reorderList(content) })
 	case flow.StepRecap:
 		return p.recapStep(step), nil
+	case flow.StepEnvResolve:
+		built, err := p.contentStep(step, func(content flow.StepContent) any { return envResolve(content) })
+		// The glossary the model carries as its description reads as a legend.
+		built.Callout = true
+		return built, err
 	}
 	return components.Step{}, unsupportedKindErr(step)
 }
@@ -78,6 +91,35 @@ func textInput(step flow.Step, content flow.StepContent) components.TextInputMod
 		Description: content.Description,
 		Default:     content.Default,
 		Validate:    step.Validate,
+	})
+}
+
+// TextList is shared with the dashboard, so an entry is refused and badged the
+// same way on both surfaces.
+func TextList(step flow.Step, content flow.StepContent) components.TextListModel {
+	params := components.NewTextListParams{
+		Title:       content.Title,
+		Description: content.Description,
+		Entries:     content.Entries,
+		Required:    domain.FlowEntryRequired,
+		Check: func(entry components.TextListEntry) (string, error) {
+			return flow.CheckEntry(step, flow.EntryCheck{Entry: entry.Entry, Entries: entry.Entries})
+		},
+	}
+	if step.EntryBadge != nil {
+		params.Badge = func(entry string) components.Badge {
+			return toBadges([]flow.Badge{step.EntryBadge(entry)})[0]
+		}
+	}
+	return components.NewTextList(params)
+}
+
+func envResolve(content flow.StepContent) components.EnvResolveModel {
+	return components.NewEnvResolve(components.NewEnvResolveParams{
+		Title:       content.Title,
+		Description: components.EnvResolveGlossary(),
+		Files:       content.EnvFiles,
+		Defaults:    content.EnvDefaults,
 	})
 }
 
@@ -132,7 +174,7 @@ func (p *plan) branchStep(step flow.Step) (components.Step, error) {
 		return components.NewSelectList(components.NewSelectListParams{
 			Title:       content.Title,
 			Description: content.Description,
-			Items:       p.branchItems(step.Pinned, content.ExcludeBranches),
+			Items:       p.branchItems(step, content),
 		}), nil
 	}
 
@@ -165,19 +207,12 @@ func (p *plan) branchStep(step flow.Step) (components.Step, error) {
 
 // branchItems applies the step's exclusions over whatever the refresh last
 // returned, so narrowing and refreshing do not fight over the same list.
-func (p *plan) branchItems(pinned string, exclude []string) []components.SelectItem {
-	candidates := flow.KeepBranches(p.candidates, exclude)
-	found := ""
-	for _, candidate := range candidates {
-		if candidate.Name == pinned {
-			found = pinned
-			break
-		}
-	}
+func (p *plan) branchItems(step flow.Step, content flow.StepContent) []components.SelectItem {
+	candidates := flow.KeepBranches(p.candidates, content.ExcludeBranches)
 	return components.BranchItems(components.BranchItemsParams{
 		Candidates:   candidates,
-		Pinned:       found,
-		PinnedSuffix: domain.PinnedSuffixDefault,
+		Pinned:       flow.PinnedAmong(step, content, candidates),
+		PinnedSuffix: flow.PinnedSuffix(step),
 	})
 }
 
@@ -245,11 +280,50 @@ func (p *plan) recapStep(step flow.Step) components.Step {
 // loadedRecapStep shows an empty recap — where Enter is a no-op — until the loaded
 // body replaces it, so a run is never confirmed before its consequences are visible.
 func (p *plan) loadedRecapStep(step flow.Step) components.Step {
+	built := p.loadedStep(loadedStep{step: step, placeholder: placeholder(step), model: func(content flow.StepContent) any {
+		return recapList(content)
+	}})
+	built.Recap = true
+	return built
+}
+
+// loadedSelectStep draws the step's title and description with no option until
+// its options arrive, so the wizard is on screen before a slow listing answers.
+func (p *plan) loadedSelectStep(step flow.Step) components.Step {
+	return p.loadedStep(loadedStep{
+		step:        step,
+		placeholder: selectList(flow.MergeContent(step, flow.StepContent{})),
+		model: func(content flow.StepContent) any {
+			return selectList(flow.MergeContent(step, content))
+		},
+	})
+}
+
+// loadedMultiSelectStep holds an empty set until the options arrive: the step's
+// ValidateSet refuses it, so Enter cannot answer a list nobody has seen yet.
+func (p *plan) loadedMultiSelectStep(step flow.Step) components.Step {
+	return p.loadedStep(loadedStep{
+		step:        step,
+		placeholder: multiSelect(step, flow.MergeContent(step, flow.StepContent{})),
+		model: func(content flow.StepContent) any {
+			return multiSelect(step, flow.MergeContent(step, content))
+		},
+	})
+}
+
+type loadedStep struct {
+	step        flow.Step
+	placeholder any
+	model       func(flow.StepContent) any
+}
+
+func (p *plan) loadedStep(loaded loadedStep) components.Step {
+	step := loaded.step
 	idx := len(p.steps)
 	if p.loads == nil {
-		p.loads = map[int]flow.Step{}
+		p.loads = map[int]loadedStep{}
 	}
-	p.loads[idx] = step
+	p.loads[idx] = loaded
 
 	// The wizard runs OnEnter on every step it advances to, but never on the one it
 	// starts on, so a load landing first is fired from the init command instead —
@@ -263,8 +337,7 @@ func (p *plan) loadedRecapStep(step flow.Step) components.Step {
 
 	return components.Step{
 		Name:    step.Label,
-		Model:   placeholder(step),
-		Recap:   true,
+		Model:   loaded.placeholder,
 		Summary: summaryFor(step),
 		OnEnter: func(prev []components.Step) tea.Cmd {
 			answers := p.answersFrom(prev)
@@ -288,24 +361,25 @@ func (p *plan) loadHandler() components.WizardMsgHandler {
 	return func(w *components.WizardModel, msg tea.Msg) (tea.Cmd, bool) {
 		switch m := msg.(type) {
 		case loadRequestMsg:
-			step, ok := p.loads[m.idx]
+			loaded, ok := p.loads[m.idx]
 			if !ok {
 				return nil, false
 			}
-			w.UpdateStepModel(m.idx, func(any) any { return placeholder(step) })
-			return tea.Batch(w.StartLoading(step.LoadingMessage), runLoad(m.idx, step, m.answers)), true
+			w.UpdateStepModel(m.idx, func(any) any { return loaded.placeholder })
+			return tea.Batch(w.StartLoading(loaded.step.LoadingMessage), runLoad(m.idx, loaded.step, m.answers)), true
 		case loadDoneMsg:
-			step, ok := p.loads[m.idx]
+			loaded, ok := p.loads[m.idx]
 			if !ok {
 				return nil, false
 			}
 			content := m.content
 			if m.err != nil {
 				p.loadErr = m.err
-				content = flow.StepContent{Title: step.Title, Description: m.err.Error()}
+				content = flow.StepContent{Title: loaded.step.Title, Description: m.err.Error()}
 			}
-			w.UpdateStepModel(m.idx, func(any) any { return recapList(content) })
+			w.UpdateStepModel(m.idx, func(any) any { return loaded.model(content) })
 			w.SetLoading(false)
+			w.SetBanner(components.WizardBanner{Title: content.Banner.Title, Lines: content.Banner.Lines})
 			return nil, true
 		}
 		return nil, false
@@ -388,6 +462,7 @@ func toItems(options []flow.Option) []components.SelectItem {
 			Value:     option.Value,
 			Separator: option.Separator,
 			Danger:    option.Danger,
+			Disabled:  option.Disabled,
 			Badges:    toBadges(option.Badges),
 		})
 	}
@@ -413,10 +488,14 @@ func summaryFor(step flow.Step) func(any) string {
 		switch step.Kind {
 		case flow.StepText:
 			return components.TextSummary
+		case flow.StepTextList:
+			return components.TextListSummary
 		case flow.StepMultiSelect:
 			return components.MultiSelectSummary(domain.SummaryNone)
 		case flow.StepReorder:
 			return components.ReorderSummary
+		case flow.StepEnvResolve:
+			return components.EnvResolveSummary
 		}
 		return components.SelectSummary
 	}

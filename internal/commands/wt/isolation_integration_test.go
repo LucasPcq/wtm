@@ -148,12 +148,12 @@ func TestEnvReconcilesKeysOverAnInvalidRunToml(t *testing.T) {
 		t.Errorf("warnings = %v, want the skipped port pass named", result.Warnings)
 	}
 
-	human, _, err := runWtCmd(t, domain.CmdEnv, "feat/e", "--yes")
+	_, stderr, err := runWtCmd(t, domain.CmdEnv, "feat/e", "--yes")
 	if err != nil {
 		t.Fatalf("env: %v", err)
 	}
-	if !strings.Contains(human, "bogus_key") {
-		t.Errorf("report = %q, want the skipped port pass named", human)
+	if !strings.Contains(stderr, "bogus_key") {
+		t.Errorf("stderr = %q, want the skipped port pass named", stderr)
 	}
 }
 
@@ -165,10 +165,7 @@ func TestCreateJSONReportsIsolationAndEnvPorts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	var res domain.CreateResult
-	if err := json.Unmarshal([]byte(out), &res); err != nil {
-		t.Fatalf("decode create result: %v\n%s", err, out)
-	}
+	res := decodeCreated(t, out)
 	if res.Isolation != domain.IsolationIsolated {
 		t.Errorf("isolation = %q, want isolated", res.Isolation)
 	}
@@ -203,10 +200,7 @@ func TestCreateWarnsAnIsolationTheExistingWorktreeIgnores(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create --if-not-exists: %v", err)
 	}
-	var res domain.CreateResult
-	if err := json.Unmarshal([]byte(out), &res); err != nil {
-		t.Fatalf("decode create result: %v\n%s", err, out)
-	}
+	res := decodeCreated(t, out)
 	if !res.AlreadyExists || res.Isolation != domain.IsolationIsolated {
 		t.Errorf("result = %+v, want the existing isolated worktree", res)
 	}

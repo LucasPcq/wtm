@@ -1,0 +1,349 @@
+[
+  {
+    "name": "a:{\"pr\":{\"number\":42,\"title\":\"Add the thing\",\"author\":\"\",\"branch\":\"feat/thing\",\"base_branch\":\"main\",\"state\":\"\",\"url\":\"\",\"is_fork\":false,\"is_draft\":false,\"checks\":{\"passed\":0,\"failed\":0,\"pending\":0},\"review_decision\":\"\"},\"parent_answer\":\"main\",\"env_asked\":true}",
+    "input": {
+      "pr": {
+        "number": 42,
+        "title": "Add the thing",
+        "author": "",
+        "branch": "feat/thing",
+        "base_branch": "main",
+        "state": "",
+        "url": "",
+        "is_fork": false,
+        "is_draft": false,
+        "checks": {
+          "passed": 0,
+          "failed": 0,
+          "pending": 0
+        },
+        "review_decision": ""
+      },
+      "parent_answer": "main",
+      "env_asked": true
+    },
+    "recap": "PR:        #42 Add the thing\nParent:    main\nEnv:       config default"
+  },
+  {
+    "name": "b:{\"pr\":{\"number\":42,\"title\":\"Add the thing\",\"author\":\"\",\"branch\":\"feat/thing\",\"base_branch\":\"main\",\"state\":\"\",\"url\":\"\",\"is_fork\":false,\"is_draft\":false,\"checks\":{\"passed\":0,\"failed\":0,\"pending\":0},\"review_decision\":\"\"},\"parent_answer\":\"develop\",\"env_answer\":\"main\",\"env_asked\":true}",
+    "input": {
+      "pr": {
+        "number": 42,
+        "title": "Add the thing",
+        "author": "",
+        "branch": "feat/thing",
+        "base_branch": "main",
+        "state": "",
+        "url": "",
+        "is_fork": false,
+        "is_draft": false,
+        "checks": {
+          "passed": 0,
+          "failed": 0,
+          "pending": 0
+        },
+        "review_decision": ""
+      },
+      "parent_answer": "develop",
+      "env_answer": "main",
+      "env_asked": true
+    },
+    "recap": "PR:        #42 Add the thing\nParent:    develop\nEnv:       main"
+  },
+  {
+    "name": "c:{\"pr\":{\"number\":42,\"title\":\"Add the thing\",\"author\":\"\",\"branch\":\"feat/thing\",\"base_branch\":\"main\",\"state\":\"\",\"url\":\"\",\"is_fork\":false,\"is_draft\":false,\"checks\":{\"passed\":0,\"failed\":0,\"pending\":0},\"review_decision\":\"\"},\"from_flag\":\"develop\",\"env_asked\":true}",
+    "input": {
+      "pr": {
+        "number": 42,
+        "title": "Add the thing",
+        "author": "",
+        "branch": "feat/thing",
+        "base_branch": "main",
+        "state": "",
+        "url": "",
+        "is_fork": false,
+        "is_draft": false,
+        "checks": {
+          "passed": 0,
+          "failed": 0,
+          "pending": 0
+        },
+        "review_decision": ""
+      },
+      "from_flag": "develop",
+      "env_asked": true
+    },
+    "recap": "PR:        #42 Add the thing\nParent:    develop\nEnv:       config default"
+  },
+  {
+    "name": "d:{\"pr\":{\"number\":42,\"title\":\"Add the thing\",\"author\":\"\",\"branch\":\"feat/thing\",\"base_branch\":\"main\",\"state\":\"\",\"url\":\"\",\"is_fork\":false,\"is_draft\":false,\"checks\":{\"passed\":0,\"failed\":0,\"pending\":0},\"review_decision\":\"\"},\"env_flag\":\"example\",\"parent_answer\":\"main\"}",
+    "input": {
+      "pr": {
+        "number": 42,
+        "title": "Add the thing",
+        "author": "",
+        "branch": "feat/thing",
+        "base_branch": "main",
+        "state": "",
+        "url": "",
+        "is_fork": false,
+        "is_draft": false,
+        "checks": {
+          "passed": 0,
+          "failed": 0,
+          "pending": 0
+        },
+        "review_decision": ""
+      },
+      "env_flag": "example",
+      "parent_answer": "main"
+    },
+    "recap": "PR:        #42 Add the thing\nParent:    main\nEnv:       example"
+  },
+  {
+    "name": "e:{\"pr\":{\"number\":42,\"title\":\"Add the thing\",\"author\":\"\",\"branch\":\"feat/thing\",\"base_branch\":\"main\",\"state\":\"\",\"url\":\"\",\"is_fork\":false,\"is_draft\":false,\"checks\":{\"passed\":0,\"failed\":0,\"pending\":0},\"review_decision\":\"\"},\"from_flag\":\"develop\",\"env_flag\":\"main\",\"isolation_answer\":\"verbatim\",\"isolation_applies\":true,\"isolation_default\":\"isolated\"}",
+    "input": {
+      "pr": {
+        "number": 42,
+        "title": "Add the thing",
+        "author": "",
+        "branch": "feat/thing",
+        "base_branch": "main",
+        "state": "",
+        "url": "",
+        "is_fork": false,
+        "is_draft": false,
+        "checks": {
+          "passed": 0,
+          "failed": 0,
+          "pending": 0
+        },
+        "review_decision": ""
+      },
+      "from_flag": "develop",
+      "env_flag": "main",
+      "isolation_answer": "verbatim",
+      "isolation_applies": true,
+      "isolation_default": "isolated"
+    },
+    "recap": "PR:        #42 Add the thing\nParent:    develop\nEnv:       main\nIsolation: verbatim — .env kept as copied"
+  },
+  {
+    "name": "f:{\"pr\":{\"number\":42,\"title\":\"Add the thing\",\"author\":\"\",\"branch\":\"feat/thing\",\"base_branch\":\"main\",\"state\":\"\",\"url\":\"\",\"is_fork\":false,\"is_draft\":false,\"checks\":{\"passed\":0,\"failed\":0,\"pending\":0},\"review_decision\":\"\"},\"parent_answer\":\"main\",\"env_asked\":true,\"isolation_answer\":\"isolated\",\"isolation_applies\":true,\"isolation_default\":\"isolated\"}",
+    "input": {
+      "pr": {
+        "number": 42,
+        "title": "Add the thing",
+        "author": "",
+        "branch": "feat/thing",
+        "base_branch": "main",
+        "state": "",
+        "url": "",
+        "is_fork": false,
+        "is_draft": false,
+        "checks": {
+          "passed": 0,
+          "failed": 0,
+          "pending": 0
+        },
+        "review_decision": ""
+      },
+      "parent_answer": "main",
+      "env_asked": true,
+      "isolation_answer": "isolated",
+      "isolation_applies": true,
+      "isolation_default": "isolated"
+    },
+    "recap": "PR:        #42 Add the thing\nParent:    main\nEnv:       config default\nIsolation: isolated"
+  },
+  {
+    "name": "g:{\"pr\":{\"number\":42,\"title\":\"Add the thing\",\"author\":\"\",\"branch\":\"feat/thing\",\"base_branch\":\"main\",\"state\":\"\",\"url\":\"\",\"is_fork\":false,\"is_draft\":false,\"checks\":{\"passed\":0,\"failed\":0,\"pending\":0},\"review_decision\":\"\"},\"isolation_flag\":\"verbatim\",\"parent_answer\":\"main\",\"env_asked\":true}",
+    "input": {
+      "pr": {
+        "number": 42,
+        "title": "Add the thing",
+        "author": "",
+        "branch": "feat/thing",
+        "base_branch": "main",
+        "state": "",
+        "url": "",
+        "is_fork": false,
+        "is_draft": false,
+        "checks": {
+          "passed": 0,
+          "failed": 0,
+          "pending": 0
+        },
+        "review_decision": ""
+      },
+      "isolation_flag": "verbatim",
+      "parent_answer": "main",
+      "env_asked": true
+    },
+    "recap": "PR:        #42 Add the thing\nParent:    main\nEnv:       config default\nIsolation: verbatim — .env kept as copied"
+  },
+  {
+    "name": "h:{\"pr\":{\"number\":42,\"title\":\"Add the thing\",\"author\":\"\",\"branch\":\"feat/thing\",\"base_branch\":\"main\",\"state\":\"\",\"url\":\"\",\"is_fork\":false,\"is_draft\":false,\"checks\":{\"passed\":0,\"failed\":0,\"pending\":0},\"review_decision\":\"\"},\"isolation_flag\":\"isolated\",\"parent_answer\":\"main\",\"env_asked\":true,\"isolation_applies\":true}",
+    "input": {
+      "pr": {
+        "number": 42,
+        "title": "Add the thing",
+        "author": "",
+        "branch": "feat/thing",
+        "base_branch": "main",
+        "state": "",
+        "url": "",
+        "is_fork": false,
+        "is_draft": false,
+        "checks": {
+          "passed": 0,
+          "failed": 0,
+          "pending": 0
+        },
+        "review_decision": ""
+      },
+      "isolation_flag": "isolated",
+      "parent_answer": "main",
+      "env_asked": true,
+      "isolation_applies": true
+    },
+    "recap": "PR:        #42 Add the thing\nParent:    main\nEnv:       config default\nIsolation: isolated"
+  },
+  {
+    "name": "i:{\"pr\":{\"number\":42,\"title\":\"Add the thing\",\"author\":\"\",\"branch\":\"feat/thing\",\"base_branch\":\"main\",\"state\":\"\",\"url\":\"\",\"is_fork\":false,\"is_draft\":false,\"checks\":{\"passed\":0,\"failed\":0,\"pending\":0},\"review_decision\":\"\"},\"parent_answer\":\"main\",\"env_asked\":true,\"branch_exists\":true}",
+    "input": {
+      "pr": {
+        "number": 42,
+        "title": "Add the thing",
+        "author": "",
+        "branch": "feat/thing",
+        "base_branch": "main",
+        "state": "",
+        "url": "",
+        "is_fork": false,
+        "is_draft": false,
+        "checks": {
+          "passed": 0,
+          "failed": 0,
+          "pending": 0
+        },
+        "review_decision": ""
+      },
+      "parent_answer": "main",
+      "env_asked": true,
+      "branch_exists": true
+    },
+    "recap": "PR:        #42 Add the thing\nBranch:    feat/thing (existing local branch — reused)\nParent:    main\nEnv:       config default"
+  },
+  {
+    "name": "j:{\"pr\":{\"number\":42,\"title\":\"Add the thing\",\"author\":\"\",\"branch\":\"feat/thing\",\"base_branch\":\"main\",\"state\":\"\",\"url\":\"\",\"is_fork\":false,\"is_draft\":false,\"checks\":{\"passed\":0,\"failed\":0,\"pending\":0},\"review_decision\":\"\"},\"parent_answer\":\"develop\",\"env_answer\":\"parent\",\"env_asked\":true,\"parent_falls_to_main\":true}",
+    "input": {
+      "pr": {
+        "number": 42,
+        "title": "Add the thing",
+        "author": "",
+        "branch": "feat/thing",
+        "base_branch": "main",
+        "state": "",
+        "url": "",
+        "is_fork": false,
+        "is_draft": false,
+        "checks": {
+          "passed": 0,
+          "failed": 0,
+          "pending": 0
+        },
+        "review_decision": ""
+      },
+      "parent_answer": "develop",
+      "env_answer": "parent",
+      "env_asked": true,
+      "parent_falls_to_main": true
+    },
+    "recap": "PR:        #42 Add the thing\nParent:    develop\nEnv:       parent\n\n⚠ The \"parent\" env strategy needs the source branch checked out to copy its .env; without a worktree it comes from main."
+  },
+  {
+    "name": "k:{\"pr\":{\"number\":42,\"title\":\"Add the thing\",\"author\":\"\",\"branch\":\"feat/thing\",\"base_branch\":\"main\",\"state\":\"\",\"url\":\"\",\"is_fork\":false,\"is_draft\":false,\"checks\":{\"passed\":0,\"failed\":0,\"pending\":0},\"review_decision\":\"\"},\"from_flag\":\"develop\",\"env_flag\":\"parent\",\"isolation_answer\":\"isolated\",\"isolation_applies\":true,\"isolation_default\":\"isolated\",\"parent_falls_to_main\":true}",
+    "input": {
+      "pr": {
+        "number": 42,
+        "title": "Add the thing",
+        "author": "",
+        "branch": "feat/thing",
+        "base_branch": "main",
+        "state": "",
+        "url": "",
+        "is_fork": false,
+        "is_draft": false,
+        "checks": {
+          "passed": 0,
+          "failed": 0,
+          "pending": 0
+        },
+        "review_decision": ""
+      },
+      "from_flag": "develop",
+      "env_flag": "parent",
+      "isolation_answer": "isolated",
+      "isolation_applies": true,
+      "isolation_default": "isolated",
+      "parent_falls_to_main": true
+    },
+    "recap": "PR:        #42 Add the thing\nParent:    develop\nEnv:       parent\nIsolation: isolated\n\n⚠ The \"parent\" env strategy needs the source branch checked out to copy its .env; without a worktree it comes from main."
+  },
+  {
+    "name": "l:{\"pr\":{\"number\":42,\"title\":\"Add the thing\",\"author\":\"\",\"branch\":\"feat/thing\",\"base_branch\":\"main\",\"state\":\"\",\"url\":\"\",\"is_fork\":false,\"is_draft\":false,\"checks\":{\"passed\":0,\"failed\":0,\"pending\":0},\"review_decision\":\"\"},\"picked\":true,\"parent_answer\":\"main\",\"env_asked\":true}",
+    "input": {
+      "pr": {
+        "number": 42,
+        "title": "Add the thing",
+        "author": "",
+        "branch": "feat/thing",
+        "base_branch": "main",
+        "state": "",
+        "url": "",
+        "is_fork": false,
+        "is_draft": false,
+        "checks": {
+          "passed": 0,
+          "failed": 0,
+          "pending": 0
+        },
+        "review_decision": ""
+      },
+      "picked": true,
+      "parent_answer": "main",
+      "env_asked": true
+    },
+    "recap": "PR:        #42 Add the thing\nParent:    main\nEnv:       config default"
+  },
+  {
+    "name": "m:{\"pr\":{\"number\":42,\"title\":\"Add the thing\",\"author\":\"\",\"branch\":\"feat/thing\",\"base_branch\":\"main\",\"state\":\"\",\"url\":\"\",\"is_fork\":false,\"is_draft\":false,\"checks\":{\"passed\":0,\"failed\":0,\"pending\":0},\"review_decision\":\"\"},\"picked\":true,\"parent_answer\":\"develop\",\"env_answer\":\"parent\",\"env_asked\":true,\"branch_exists\":true,\"parent_falls_to_main\":true}",
+    "input": {
+      "pr": {
+        "number": 42,
+        "title": "Add the thing",
+        "author": "",
+        "branch": "feat/thing",
+        "base_branch": "main",
+        "state": "",
+        "url": "",
+        "is_fork": false,
+        "is_draft": false,
+        "checks": {
+          "passed": 0,
+          "failed": 0,
+          "pending": 0
+        },
+        "review_decision": ""
+      },
+      "picked": true,
+      "parent_answer": "develop",
+      "env_answer": "parent",
+      "env_asked": true,
+      "branch_exists": true,
+      "parent_falls_to_main": true
+    },
+    "recap": "PR:        #42 Add the thing\nBranch:    feat/thing (existing local branch — reused)\nParent:    develop\nEnv:       parent\n\n⚠ The \"parent\" env strategy needs the source branch checked out to copy its .env; without a worktree it comes from main."
+  }
+]

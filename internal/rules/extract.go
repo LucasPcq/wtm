@@ -100,3 +100,34 @@ func ExtractStatusLabel(status domain.ExtractFileStatus) string {
 		return "mod"
 	}
 }
+
+// ExtractStatusTone colours a file's tag in the selector: a new file, a
+// deletion and a modification read apart at a glance.
+func ExtractStatusTone(status domain.ExtractFileStatus) domain.Tone {
+	switch status {
+	case domain.ExtractStatusUntracked:
+		return domain.ToneSuccess
+	case domain.ExtractStatusDeleted:
+		return domain.ToneDanger
+	case domain.ExtractStatusRenamed:
+		return domain.ToneNeutral
+	default:
+		return domain.ToneWarning
+	}
+}
+
+// ExtractFileLabel names both paths of a rename, since both take part in the
+// extraction.
+func ExtractFileLabel(file domain.ExtractFile) string {
+	if file.OrigPath == "" {
+		return file.Path
+	}
+	return file.OrigPath + " → " + file.Path
+}
+
+func FileCount(count int) string {
+	if count == 1 {
+		return "1 file"
+	}
+	return fmt.Sprintf("%d files", count)
+}

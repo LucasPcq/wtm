@@ -12,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/service/events"
 	ghservice "github.com/LucasPcq/wtm/internal/service/github"
 	"github.com/LucasPcq/wtm/internal/service/integration"
 	"github.com/LucasPcq/wtm/internal/service/runjobs"
@@ -36,14 +37,16 @@ func NewCmd(params NewCmdParams) *cobra.Command {
 			"creates a worktree; right-click a row (or press `m`) to reparent, sync, or delete\n" +
 			"it; `a` opens the actions that run over several worktrees at once, syncing or\n" +
 			"reparenting a selection of them; `L` reads a job's logs in the detail panel.\n" +
-			fmt.Sprintf("The list's local git state is re-read every %d seconds, when the terminal\n", domain.DashboardGitPollSeconds) +
-			"regains focus and after each action; the detail panel reloads when the selection\n" +
+			"The list follows every worktree created, moved or removed, whoever did it, as\n" +
+			fmt.Sprintf("`wtm events` reports it; its local git state is re-read every %d seconds, when\n", domain.DashboardGitPollSeconds) +
+			"the terminal regains focus and after each action; the detail panel reloads when the selection\n" +
 			"changes or an operation touches it, and pull requests load once. Nothing is\n" +
 			"fetched on its own: `r` fetches the remote and refreshes all of it.\n" +
 			"Press `?` for the key reference.",
 		Example: `  # Press ? inside for the key reference
   wtm ui`,
-		Args: cobra.NoArgs,
+		Args:        cobra.NoArgs,
+		Annotations: map[string]string{domain.AnnotationUncorrelated: domain.AnnotationOn},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runUI(cmd, params.Version)
 		},
@@ -87,12 +90,14 @@ type buildParams struct {
 
 func buildRunParams(params buildParams) dashboard.RunParams {
 	result := params.Result
+	publisher := events.NewPublisher(events.PublisherParams{ProjectDir: result.ProjectDir})
 
 	return dashboard.RunParams{
 		ProjectDir: result.ProjectDir,
 		StateDir:   result.StateDir,
 		Cwd:        infra.ResolvePath(params.Dir),
 		Config:     result.Config,
+		Publisher:  publisher,
 		Version:    params.Version,
 		// Read from the cached state only: the dashboard must not pay a network
 		// round-trip to draw its header.
@@ -105,10 +110,12 @@ func buildRunParams(params buildParams) dashboard.RunParams {
 		LogsLoader: dashboard.DefaultLogsLoader(dashboard.LogsLoaderParams{
 			ProjectDir: result.ProjectDir,
 			StateDir:   result.StateDir,
+			Publisher:  publisher,
 		}),
 		BoardLoader: dashboard.DefaultBoardLoader(dashboard.LogsLoaderParams{
 			ProjectDir: result.ProjectDir,
 			StateDir:   result.StateDir,
+			Publisher:  publisher,
 			PublicPort: func() int {
 				return runjobs.PublicPort(runjobs.PublicPortParams{StateDir: result.StateDir, Global: result.Config.Global})
 			},

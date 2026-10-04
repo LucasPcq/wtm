@@ -27,3 +27,19 @@ func ExpandTabs(line string) string {
 	}
 	return strings.ReplaceAll(line, "\t", strings.Repeat(" ", domain.TabWidth))
 }
+
+type WrapParams struct {
+	Value string
+	Width int
+}
+
+// Wrap breaks a text at word boundaries so no line exceeds Width visible
+// columns. A terminal does not wrap a line it is told is shorter than it is: a
+// description past the pane's edge is simply cut off. A Width under one leaves
+// the text as it is.
+func Wrap(params WrapParams) string {
+	if params.Width < 1 {
+		return params.Value
+	}
+	return ansi.Wrap(params.Value, params.Width, "")
+}

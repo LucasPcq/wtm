@@ -118,6 +118,7 @@ func (f *logsFlow) run() (Outcome, error) {
 		Jobs:       f.request.Config.Jobs,
 		ProxyPort:  proxy.Bind,
 		PublicPort: proxy.Public,
+		Publisher:  f.ctx.Publisher,
 	})
 
 	return Outcome{WorkDirs: workDirs}, f.presenter.Show(ShowParams{
