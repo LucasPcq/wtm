@@ -5,13 +5,14 @@ package domain
 type EventType string
 
 const (
-	EventSnapshot           EventType = "snapshot"
-	EventReady              EventType = "ready"
-	EventWorktreeCreated    EventType = "worktree.created"
-	EventWorktreeUpdated    EventType = "worktree.updated"
-	EventWorktreeRelocated  EventType = "worktree.relocated"
-	EventWorktreeReparented EventType = "worktree.reparented"
-	EventWorktreeRemoved    EventType = "worktree.removed"
+	EventSnapshot            EventType = "snapshot"
+	EventReady               EventType = "ready"
+	EventWorktreeCreated     EventType = "worktree.created"
+	EventWorktreeProvisioned EventType = "worktree.provisioned"
+	EventWorktreeUpdated     EventType = "worktree.updated"
+	EventWorktreeRelocated   EventType = "worktree.relocated"
+	EventWorktreeReparented  EventType = "worktree.reparented"
+	EventWorktreeRemoved     EventType = "worktree.removed"
 
 	// EventWorktreePrefix opens every type about one worktree's identity.
 	EventWorktreePrefix = "worktree."
@@ -22,6 +23,7 @@ var EventTypes = []EventType{
 	EventSnapshot,
 	EventReady,
 	EventWorktreeCreated,
+	EventWorktreeProvisioned,
 	EventWorktreeUpdated,
 	EventWorktreeRelocated,
 	EventWorktreeReparented,
@@ -68,10 +70,9 @@ type WorktreeIdentity struct {
 }
 
 type Event struct {
-	V    int       `json:"v"`
-	Type EventType `json:"type"`
-	TS   string    `json:"ts"`
-	// CorrelationID is the publishing command's WTM_CORRELATION_ID, verbatim.
+	V             int                `json:"v"`
+	Type          EventType          `json:"type"`
+	TS            string             `json:"ts"`
 	CorrelationID string             `json:"correlation_id,omitempty"`
 	Repo          *EventRepo         `json:"repo,omitempty"`
 	Worktrees     []WorktreeIdentity `json:"worktrees,omitempty"`
@@ -79,4 +80,7 @@ type Event struct {
 	Changed       []IdentityField    `json:"changed,omitempty"`
 	FromPath      string             `json:"from_path,omitempty"`
 	FromParent    string             `json:"from_parent,omitempty"`
+	OK            *bool              `json:"ok,omitempty"`
+	Hook          string             `json:"hook,omitempty"`
+	ExitCode      *int               `json:"exit_code,omitempty"`
 }

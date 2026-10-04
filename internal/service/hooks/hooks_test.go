@@ -260,3 +260,18 @@ func TestRunHooksLeavesTheHookUnnamedWhenASurfaceReportedIt(t *testing.T) {
 		t.Errorf("RunHooks() = %q, want the hook left unnamed", err)
 	}
 }
+
+func TestAFailingHookReportsItsCommandAndExitCode(t *testing.T) {
+	err := RunHooks(RunHooksParams{
+		Hooks:   []domain.HookCommand{{Cmd: "exit 3"}},
+		WorkDir: t.TempDir(),
+		Output:  io.Discard,
+	})
+	var failure Failure
+	if !errors.As(err, &failure) || failure.Cmd != "exit 3" || failure.ExitCode == nil || *failure.ExitCode != 3 {
+		t.Fatalf("err = %v, failure = %+v", err, failure)
+	}
+	if !errors.Is(err, domain.ErrHookFailed) {
+		t.Fatalf("err = %v, want ErrHookFailed in the chain", err)
+	}
+}

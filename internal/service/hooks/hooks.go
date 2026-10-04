@@ -146,10 +146,11 @@ func runSingleHook(params runSingleHookParams) error {
 	params.Report(beat)
 
 	if err != nil {
+		wrapped := fmt.Errorf("%w: %w", domain.ErrHookFailed, err)
 		if params.Named {
-			return fmt.Errorf(domain.HookFailedNamedFmt, hook.Cmd, domain.ErrHookFailed, err)
+			wrapped = fmt.Errorf(domain.HookFailedNamedFmt, hook.Cmd, domain.ErrHookFailed, err)
 		}
-		return fmt.Errorf("%w: %w", domain.ErrHookFailed, err)
+		return failureOf(failureParams{Cmd: hook.Cmd, Wrapped: wrapped, Cause: err})
 	}
 	return nil
 }

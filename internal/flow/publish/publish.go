@@ -5,8 +5,11 @@
 package publish
 
 import (
+	"errors"
+
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/service/hooks"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
 
@@ -65,6 +68,28 @@ func Capture(ctx flow.Context, branch string) (domain.WorktreeIdentity, bool) {
 
 func Removed(ctx flow.Context, last domain.WorktreeIdentity) {
 	ctx.Publish(domain.Event{Type: domain.EventWorktreeRemoved, Worktree: &last})
+}
+
+type ProvisionedParams struct {
+	Context flow.Context
+	Branch  string
+	// Err is the on_create phase's; nil is a worktree ready to use.
+	Err error
+}
+
+func Provisioned(params ProvisionedParams) {
+	emit(emitParams{Context: params.Context, Branch: params.Branch, Event: outcome(domain.EventWorktreeProvisioned, params.Err)})
+}
+
+func outcome(typ domain.EventType, err error) domain.Event {
+	ok := err == nil
+	event := domain.Event{Type: typ, OK: &ok}
+	var failure hooks.Failure
+	if errors.As(err, &failure) {
+		event.Hook = failure.Cmd
+		event.ExitCode = failure.ExitCode
+	}
+	return event
 }
 
 type emitParams struct {

@@ -33,6 +33,11 @@
         "created_at": { "type": "string" }
       }
     },
+    "hookOutcome": {
+      "ok": { "type": "boolean", "description": "Whether every hook of the phase passed; true when there were none." },
+      "hook": { "type": "string", "minLength": 1, "description": "The failing hook's command; only when ok is false." },
+      "exit_code": { "type": "integer", "description": "The failing hook's exit status, when it exited with one." }
+    },
     "changed": {
       "type": "array",
       "minItems": 1,
@@ -58,6 +63,17 @@
         "worktree": { "$ref": "#/$defs/worktree" }
       },
       "required": ["repo", "worktree"]
+    },
+    {
+      "properties": {
+        "type": { "const": "worktree.provisioned" },
+        "repo": { "$ref": "#/$defs/repo" },
+        "worktree": { "$ref": "#/$defs/worktree" },
+        "ok": { "$ref": "#/$defs/hookOutcome/ok" },
+        "hook": { "$ref": "#/$defs/hookOutcome/hook" },
+        "exit_code": { "$ref": "#/$defs/hookOutcome/exit_code" }
+      },
+      "required": ["repo", "worktree", "ok"]
     },
     {
       "properties": {
