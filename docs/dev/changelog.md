@@ -38,6 +38,8 @@ One sentence on what this release is about, for someone deciding whether to upgr
 
 ## Rules
 
+- **Curate, don't inventory.** A reader skims a release in thirty seconds to decide whether to upgrade: list what they would notice — a new command or flag, a behaviour that changed under them, a bug they may have hit. Wizard wording, alignment, message tweaks and small consistency fixes are left out, or folded into one closing bullet per area (`**`wtm env`**: clearer report, warnings on stderr, stricter flag checks.`). A release with more than ~15 bullets is an inventory: cut.
+- **Short.** Aim for 20 words a bullet; the guide link carries the rest.
 - **One bullet, one line, one change.** Bold the command, flag or file it is about, then say what the user gets, in the present tense. No "now", no "we", no internal names (packages, tickets, PR numbers).
 - **Effect, not mechanism.** "`clean` refuses a locked worktree unless `--force`", not how the lock is detected. The detail belongs in the guide: end the bullet with `→ [Page](docs/guide/…)` when there is one.
 - **Breaking is always its own section**, and every entry says what to do instead. A change that needs more than one line of instructions gets a `docs/guide/migrating-to-<version>.md` page, linked from the bullet.
