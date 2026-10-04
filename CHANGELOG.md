@@ -4,6 +4,8 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-10-04
+
 A live event stream for integrations, batch `create` and `clean`, `wtm exec`, and `checkout`, `extract` and `env` aligned on the conventions of `create`.
 
 ### Highlights
@@ -785,7 +787,8 @@ Initial release.
 - Detection of the base branch, env files, package manager, Docker Compose and pnpm workspaces.
 - Install with Homebrew (`brew install LucasPcq/tap/wtm`), GitHub Releases binaries (macOS/Linux, amd64/arm64) or `go install github.com/LucasPcq/wtm@latest`.
 
-[Unreleased]: https://github.com/LucasPcq/wtm/compare/v0.28.0...HEAD
+[Unreleased]: https://github.com/LucasPcq/wtm/compare/v0.29.0...HEAD
+[0.29.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.29.0
 [0.28.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.28.0
 [0.27.1]: https://github.com/LucasPcq/wtm/releases/tag/v0.27.1
 [0.27.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.27.0
