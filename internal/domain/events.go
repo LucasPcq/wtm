@@ -31,6 +31,15 @@ var EventTypes = []EventType{
 // EventsSchemaVersion moves on a breaking change only.
 const EventsSchemaVersion = 1
 
+// EventsFinalExitCodes are the codes `wtm events` ends on that a retry cannot
+// change; any other non-zero exit is worth retrying.
+var EventsFinalExitCodes = []int{
+	ExitCodeUsage,
+	ExitCodeConfigNotFound,
+	ExitCodeEventsSchemaNewer,
+	ExitCodeNotGitRepo,
+}
+
 type IdentityField string
 
 const (

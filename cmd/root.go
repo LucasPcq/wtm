@@ -24,6 +24,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/commands/shell"
 	"github.com/LucasPcq/wtm/internal/commands/ui"
 	"github.com/LucasPcq/wtm/internal/commands/upgrade"
+	"github.com/LucasPcq/wtm/internal/commands/versioncmd"
 	"github.com/LucasPcq/wtm/internal/commands/wt"
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -91,6 +92,10 @@ func init() {
 	upgradeCmd := upgrade.NewCmd(upgrade.NewCmdParams{Version: effectiveVersion})
 	upgradeCmd.GroupID = domain.CmdGroupSetup
 	rootCmd.AddCommand(upgradeCmd)
+
+	versionCmd := versioncmd.NewCmd(versioncmd.NewCmdParams{Version: effectiveVersion})
+	versionCmd.GroupID = domain.CmdGroupSetup
+	rootCmd.AddCommand(versionCmd)
 
 	rootCmd.AddCommand(daemon.NewCmd())
 	rootCmd.AddCommand(daemon.NewProxyForwardCmd())

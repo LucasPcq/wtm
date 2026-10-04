@@ -171,27 +171,66 @@ func TestANewerSchemaExitsWithItsOwnCode(t *testing.T) {
 	}
 }
 
-func TestARepoThatIsNotARepositoryIsRefusedNamingTheFlag(t *testing.T) {
+// A consumer decides whether to retry from the exit code alone, so each final
+// refusal is checked for its code, for a message, and for a stdout a JSON Lines
+// reader can trust to be empty.
+func TestAFinalRefusalExitsOnItsStableCodeAndWritesNothingOnStdout(t *testing.T) {
 	cases := map[string]struct {
-		path   string
-		reason string
+		cwd  func(t *testing.T) string
+		args func(cwd string) []string
+		code int
+		says string
 	}{
-		"missing": {filepath.Join(t.TempDir(), "missing"), domain.FlagPathNotADirectory},
-		"not git": {t.TempDir(), domain.FlagPathNotAGitRepo},
+		"current directory outside git": {
+			cwd:  func(t *testing.T) string { return t.TempDir() },
+			args: func(string) []string { return nil },
+			code: domain.ExitCodeNotGitRepo,
+			says: domain.ErrNotGitRepo.Error(),
+		},
+		"--repo outside git": {
+			cwd:  func(t *testing.T) string { return t.TempDir() },
+			args: func(cwd string) []string { return []string{"--" + domain.FlagRepo, cwd} },
+			code: domain.ExitCodeNotGitRepo,
+			says: "--" + domain.FlagRepo,
+		},
+		"--repo not a directory": {
+			cwd:  func(t *testing.T) string { return t.TempDir() },
+			args: func(cwd string) []string { return []string{"--" + domain.FlagRepo, filepath.Join(cwd, "missing")} },
+			code: domain.ExitCodeUsage,
+			says: domain.FlagPathNotADirectory,
+		},
+		"repository not initialized": {
+			cwd:  func(t *testing.T) string { return gittest.InitRepo(t) },
+			args: func(string) []string { return nil },
+			code: domain.ExitCodeConfigNotFound,
+			says: "wtm init",
+		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			r := start(t, "--repo", c.path)
-			select {
-			case err := <-r.done:
-				if err == nil || !strings.Contains(err.Error(), "--"+domain.FlagRepo) || !strings.Contains(err.Error(), c.reason) {
-					t.Fatalf("err = %v, want one naming --%s and %q", err, domain.FlagRepo, c.reason)
-				}
-				if rules.ExitCode(err) != domain.ExitCodeUsage {
-					t.Fatalf("exit code %d, want %d", rules.ExitCode(err), domain.ExitCodeUsage)
-				}
-			case <-time.After(5 * time.Second):
-				t.Fatal("the command did not refuse")
+			t.Setenv(domain.EnvProjectDir, "")
+			t.Setenv(domain.EnvStateDir, "")
+			cwd := c.cwd(t)
+			t.Chdir(cwd)
+			var stdout, stderr bytes.Buffer
+			cmd := NewCmd()
+			cmd.SetArgs(append(c.args(cwd), "--"+domain.FlagOutput, domain.OutputJSON))
+			cmd.SetOut(&stdout)
+			cmd.SetErr(&stderr)
+			cmd.SetContext(t.Context())
+			// The root silences both and prints the error on stderr itself.
+			cmd.SilenceUsage, cmd.SilenceErrors = true, true
+
+			err := cmd.Execute()
+
+			if got := rules.ExitCode(err); got != c.code {
+				t.Fatalf("exit code %d (%v), want %d", got, err, c.code)
+			}
+			if !strings.Contains(err.Error(), c.says) {
+				t.Errorf("err = %q, want it to say %q", err, c.says)
+			}
+			if stdout.Len() != 0 {
+				t.Errorf("stdout = %q, want nothing", stdout.String())
 			}
 		})
 	}

@@ -5,9 +5,14 @@ Use `wtm events --output json` when you need to **react** to worktrees changing 
 ## Running it
 
 - It **never exits on its own**: it streams until interrupted. Run it in the background, or read a bounded number of lines (`wtm events --output json | head -n 2` gives the current state and returns). Never run it in the foreground of a step that must finish.
-- `--repo <path>` watches another repository than the current directory's; a path that is not a git repository exits 2 (usage).
+- `--repo <path>` watches another repository than the current directory's.
 - It needs no `--yes`: it changes nothing and asks nothing.
-- Exit `20`: it received an event of a schema newer than its own; wtm must be upgraded (ask the user). Interrupted, it exits `0`.
+- A daemon that is down never makes it exit: it waits and reconnects. Interrupted, or once its reader is gone, it exits `0`.
+- These exits are final, do not retry them: `2` bad usage (including a `--repo` that is not a directory), `12` the repository is not initialized with wtm, `20` an event of a newer schema arrived (wtm must be upgraded: ask the user), `21` not in a git repository. Any other non-zero exit is worth retrying with a backoff. The message is on stderr; stdout carries only JSON Lines.
+
+## Before you rely on it
+
+`wtm version --output json` gives `{"version", "events"}`: `events` is the schema version of this stream (the `v` of its events). Exit `2` on `wtm version` (unknown command), or a missing `events` key, means this wtm is too old for the stream: ask the user to upgrade (`wtm upgrade`). Ignore keys you do not know.
 
 ## The sequence
 

@@ -43,6 +43,7 @@ You drive wtm without a terminal a human is watching, so everything below exists
 | `18` | `env --check`: the `.env` has drifted (the report or JSON is still written) |
 | `19` | an interactive run the user backed out of (Esc, Ctrl-C, "No, cancel", a declined confirmation); nothing changed. Never under `--yes` |
 | `20` | `events`: it received an event of a newer schema than its own; wtm must be upgraded |
+| `21` | not in a git repository: the current directory, or the path given (`events --repo`), is outside any git repository |
 
 ## Discover names before you act
 
@@ -58,6 +59,7 @@ You drive wtm without a terminal a human is watching, so everything below exists
 | What a job printed | `wtm run logs [worktree] --job <name> --output json` |
 | Resolved project config | `wtm config show --output json` |
 | A branch's worktree path | `wtm resolve <branch> --output json` |
+| This wtm's version, and the contract versions it speaks (`events`) | `wtm version --output json` |
 
 ## Which reference to read
 
@@ -85,6 +87,7 @@ On a non-zero exit, read stderr, then:
 - `14`: the job or profile is not declared; check `wtm run list --output json`.
 - `15`: `extract` changed nothing; see `references/worktrees.md` for the retry.
 - `16`: run `wtm run init --yes` to create `run.toml` (see `references/run-config.md`), then re-run the command.
+- `21`: run the command from inside the repository, or point it there (`events --repo`); retrying as is will not help.
 - `17`: nothing to retry. Report the message: a source build updates with `git pull && make install`, an unwritable binary needs the user to re-run with sudo.
 - `gh: …` on stderr: `gh` is not authenticated; tell the user to run `gh auth login`.
 - A `run up` / `run down` that exited non-zero still wrote its whole document: the entries with `status: "error"` name the failing job, with `message`, `output` and `exit_code` (see `references/json.md`).
