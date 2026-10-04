@@ -42,16 +42,17 @@ func TestEveryEventTypeMatchesTheSchema(t *testing.T) {
 		}
 		return raw
 	}
-	failed, exitCode := false, 3
+	failed, passed, exitCode := false, true, 3
 	examples := map[domain.EventType]json.RawMessage{
-		domain.EventSnapshot:            snapshot.Raw,
-		domain.EventReady:               ready.Raw,
-		domain.EventWorktreeCreated:     about(domain.Event{Type: domain.EventWorktreeCreated, CorrelationID: "popup-1"}),
-		domain.EventWorktreeProvisioned: about(domain.Event{Type: domain.EventWorktreeProvisioned, OK: &failed, Hook: "pnpm install", ExitCode: &exitCode}),
-		domain.EventWorktreeUpdated:     about(domain.Event{Type: domain.EventWorktreeUpdated, Changed: []domain.IdentityField{domain.IdentityOrdinal}}),
-		domain.EventWorktreeRelocated:   about(domain.Event{Type: domain.EventWorktreeRelocated, FromPath: "/old/feat-a"}),
-		domain.EventWorktreeReparented:  about(domain.Event{Type: domain.EventWorktreeReparented, FromParent: "main"}),
-		domain.EventWorktreeRemoved:     about(domain.Event{Type: domain.EventWorktreeRemoved}),
+		domain.EventSnapshot:              snapshot.Raw,
+		domain.EventReady:                 ready.Raw,
+		domain.EventWorktreeCreated:       about(domain.Event{Type: domain.EventWorktreeCreated, CorrelationID: "popup-1"}),
+		domain.EventWorktreeProvisioned:   about(domain.Event{Type: domain.EventWorktreeProvisioned, OK: &failed, Hook: "pnpm install", ExitCode: &exitCode}),
+		domain.EventWorktreeUpdated:       about(domain.Event{Type: domain.EventWorktreeUpdated, Changed: []domain.IdentityField{domain.IdentityOrdinal}}),
+		domain.EventWorktreeRelocated:     about(domain.Event{Type: domain.EventWorktreeRelocated, FromPath: "/old/feat-a"}),
+		domain.EventWorktreeReparented:    about(domain.Event{Type: domain.EventWorktreeReparented, FromParent: "main"}),
+		domain.EventWorktreeDeprovisioned: about(domain.Event{Type: domain.EventWorktreeDeprovisioned, OK: &passed}),
+		domain.EventWorktreeRemoved:       about(domain.Event{Type: domain.EventWorktreeRemoved}),
 	}
 	schema := schematest.Compile(t, schemas.Events)
 

@@ -81,6 +81,17 @@ func Provisioned(params ProvisionedParams) {
 	emit(emitParams{Context: params.Context, Branch: params.Branch, Event: outcome(domain.EventWorktreeProvisioned, params.Err)})
 }
 
+type DeprovisionedParams struct {
+	Context flow.Context
+	Branch  string
+	// Err is the on_clean phase's; nil lets the removal go on.
+	Err error
+}
+
+func Deprovisioned(params DeprovisionedParams) {
+	emit(emitParams{Context: params.Context, Branch: params.Branch, Event: outcome(domain.EventWorktreeDeprovisioned, params.Err)})
+}
+
 func outcome(typ domain.EventType, err error) domain.Event {
 	ok := err == nil
 	event := domain.Event{Type: typ, OK: &ok}

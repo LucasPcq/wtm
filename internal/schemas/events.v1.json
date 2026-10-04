@@ -104,6 +104,17 @@
     },
     {
       "properties": {
+        "type": { "const": "worktree.deprovisioned" },
+        "repo": { "$ref": "#/$defs/repo" },
+        "worktree": { "$ref": "#/$defs/worktree" },
+        "ok": { "$ref": "#/$defs/hookOutcome/ok" },
+        "hook": { "$ref": "#/$defs/hookOutcome/hook" },
+        "exit_code": { "$ref": "#/$defs/hookOutcome/exit_code" }
+      },
+      "required": ["repo", "worktree", "ok"]
+    },
+    {
+      "properties": {
         "type": { "const": "worktree.removed" },
         "repo": { "$ref": "#/$defs/repo" },
         "worktree": { "$ref": "#/$defs/worktree" }

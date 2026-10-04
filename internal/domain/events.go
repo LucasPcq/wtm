@@ -5,14 +5,15 @@ package domain
 type EventType string
 
 const (
-	EventSnapshot            EventType = "snapshot"
-	EventReady               EventType = "ready"
-	EventWorktreeCreated     EventType = "worktree.created"
-	EventWorktreeProvisioned EventType = "worktree.provisioned"
-	EventWorktreeUpdated     EventType = "worktree.updated"
-	EventWorktreeRelocated   EventType = "worktree.relocated"
-	EventWorktreeReparented  EventType = "worktree.reparented"
-	EventWorktreeRemoved     EventType = "worktree.removed"
+	EventSnapshot              EventType = "snapshot"
+	EventReady                 EventType = "ready"
+	EventWorktreeCreated       EventType = "worktree.created"
+	EventWorktreeProvisioned   EventType = "worktree.provisioned"
+	EventWorktreeUpdated       EventType = "worktree.updated"
+	EventWorktreeRelocated     EventType = "worktree.relocated"
+	EventWorktreeReparented    EventType = "worktree.reparented"
+	EventWorktreeDeprovisioned EventType = "worktree.deprovisioned"
+	EventWorktreeRemoved       EventType = "worktree.removed"
 
 	// EventWorktreePrefix opens every type about one worktree's identity.
 	EventWorktreePrefix = "worktree."
@@ -27,6 +28,7 @@ var EventTypes = []EventType{
 	EventWorktreeUpdated,
 	EventWorktreeRelocated,
 	EventWorktreeReparented,
+	EventWorktreeDeprovisioned,
 	EventWorktreeRemoved,
 }
 

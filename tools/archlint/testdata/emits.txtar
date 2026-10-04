@@ -3,6 +3,8 @@ package worktree
 
 func Create() error { return nil }
 
+func Clean() error { return nil }
+
 func Move() error { return nil }
 
 func Sync() error { return nil }
@@ -12,6 +14,8 @@ package publish
 func Created() {}
 
 func Provisioned() {}
+
+func Removed() {}
 -- github.com/LucasPcq/wtm/internal/testutil/flowtest/flowtest.go --
 package flowtest
 
@@ -87,6 +91,28 @@ func Run() error {
 }
 -- github.com/LucasPcq/wtm/internal/flow/halfway/halfway_test.go --
 package halfway
+
+import (
+	"testing"
+
+	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
+)
+
+func TestRun(t *testing.T) { _ = flowtest.Recorder{} }
+-- github.com/LucasPcq/wtm/internal/flow/unhooked/unhooked.go --
+package unhooked
+
+import (
+	"github.com/LucasPcq/wtm/internal/flow/publish"
+	"github.com/LucasPcq/wtm/internal/service/worktree"
+)
+
+func Run() error {
+	defer publish.Removed()
+	return worktree.Clean() // want `worktree\.Clean changes a worktree's identity but this package never publishes worktree\.deprovisioned`
+}
+-- github.com/LucasPcq/wtm/internal/flow/unhooked/unhooked_test.go --
+package unhooked
 
 import (
 	"testing"

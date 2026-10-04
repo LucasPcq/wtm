@@ -3,6 +3,7 @@ package teardown_test
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -126,11 +127,12 @@ func TestEveryRemovalIsPublishedWithItsLastState(t *testing.T) {
 
 	teardown.Batch(teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: targets, ForceRemoval: true})
 
-	if len(recorder.Published) != 2 {
-		t.Fatalf("published %v, want two removals", recorder.PublishedTypes())
+	want := []domain.EventType{domain.EventWorktreeDeprovisioned, domain.EventWorktreeRemoved, domain.EventWorktreeDeprovisioned, domain.EventWorktreeRemoved}
+	if got := recorder.PublishedTypes(); !slices.Equal(got, want) {
+		t.Fatalf("published %v, want %v", got, want)
 	}
 	for i, event := range recorder.Published {
-		if event.Type != domain.EventWorktreeRemoved || event.Worktree.Branch != targets[i].Branch || event.Worktree.Parent != "main" {
+		if event.Worktree.Branch != targets[i/2].Branch || event.Worktree.Parent != "main" {
 			t.Errorf("event %d = %+v", i, event)
 		}
 	}
@@ -160,8 +162,8 @@ func TestAHalfRemovedWorktreeIsPublishedOnce(t *testing.T) {
 	if removals[0].Err != nil {
 		t.Fatalf("removal: %v", removals[0].Err)
 	}
-	if got := recorder.PublishedTypes(); len(got) != 1 || got[0] != domain.EventWorktreeRemoved {
-		t.Fatalf("published %v, want one worktree.removed", got)
+	if got := recorder.PublishedTypes(); !slices.Equal(got, deprovisionedThenRemoved) {
+		t.Fatalf("published %v, want %v", got, deprovisionedThenRemoved)
 	}
 }
 
@@ -189,7 +191,69 @@ func TestAWorktreeGoneIsPublishedEvenWhenItsBranchStays(t *testing.T) {
 	if worktree.StillTracked(worktree.FindByBranchParams{ProjectDir: ctx.ProjectDir, Branch: "feat/a"}) {
 		t.Fatal("fixture: git still tracks the worktree")
 	}
-	if got := recorder.PublishedTypes(); len(got) != 1 || got[0] != domain.EventWorktreeRemoved {
+	if got := recorder.PublishedTypes(); !slices.Equal(got, deprovisionedThenRemoved) {
 		t.Fatalf("published %v, want the removal reported", got)
+	}
+}
+
+var deprovisionedThenRemoved = []domain.EventType{domain.EventWorktreeDeprovisioned, domain.EventWorktreeRemoved}
+
+func TestARemovalWithoutHooksIsDeprovisionedThenRemoved(t *testing.T) {
+	globaldir.Isolate(t)
+	processtest.Serve(t, nil)
+	ctx := repoContext(t)
+	recorder := &flowtest.Recorder{}
+	ctx.Publisher = recorder
+
+	teardown.Batch(teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: []teardown.Target{makeTarget(t, ctx, "feat/a")}, ForceRemoval: true})
+
+	if got := recorder.PublishedTypes(); !slices.Equal(got, deprovisionedThenRemoved) {
+		t.Fatalf("published %v, want %v", got, deprovisionedThenRemoved)
+	}
+	if ok := recorder.Published[0].OK; ok == nil || !*ok {
+		t.Fatalf("deprovisioned = %+v", recorder.Published[0])
+	}
+}
+
+func TestAFailingOnCleanHookStopsAtDeprovisioned(t *testing.T) {
+	globaldir.Isolate(t)
+	processtest.Serve(t, nil)
+	ctx := repoContext(t)
+	ctx.Config.Project.Hooks.OnClean = []domain.HookCommand{{Cmd: "exit 5"}}
+	target := makeTarget(t, ctx, "feat/a")
+	recorder := &flowtest.Recorder{}
+	ctx.Publisher = recorder
+
+	removals := teardown.Batch(teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: []teardown.Target{target}, ForceRemoval: true})
+
+	if removals[0].Err == nil {
+		t.Fatal("want the hook's error")
+	}
+	if got := recorder.PublishedTypes(); !slices.Equal(got, []domain.EventType{domain.EventWorktreeDeprovisioned}) {
+		t.Fatalf("published %v, want deprovisioned alone", got)
+	}
+	got := recorder.Published[0]
+	if *got.OK || got.Hook != "exit 5" || got.ExitCode == nil || *got.ExitCode != 5 {
+		t.Fatalf("deprovisioned = %+v", got)
+	}
+	if _, err := os.Stat(target.Path); err != nil {
+		t.Fatalf("the worktree must survive: %v", err)
+	}
+}
+
+func TestAWorktreeWhoseDirectoryIsGoneIsStillDeprovisioned(t *testing.T) {
+	globaldir.Isolate(t)
+	processtest.Serve(t, nil)
+	ctx := repoContext(t)
+	ctx.Config.Project.Hooks.OnClean = []domain.HookCommand{{Cmd: "exit 5"}}
+	target := makeTarget(t, ctx, "feat/a")
+	target.Path = ""
+	recorder := &flowtest.Recorder{}
+	ctx.Publisher = recorder
+
+	teardown.Batch(teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: []teardown.Target{target}, ForceRemoval: true})
+
+	if got := recorder.PublishedTypes(); len(got) == 0 || got[0] != domain.EventWorktreeDeprovisioned || !*recorder.Published[0].OK {
+		t.Fatalf("published %+v, want deprovisioned ok first", recorder.Published)
 	}
 }

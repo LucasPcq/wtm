@@ -17,12 +17,13 @@ import (
 // that calls a mutator and none of these has changed a worktree no consumer
 // will hear about.
 var emitters = map[string][]objectRef{
-	"worktree.created":     {{Path: internalPrefix + "flow/publish", Name: "Created"}},
-	"worktree.provisioned": {{Path: internalPrefix + "flow/publish", Name: "Provisioned"}},
-	"worktree.removed":     {{Path: internalPrefix + "flow/publish", Name: "Removed"}, {Path: internalPrefix + "flow/teardown", Name: "PublishRemoved"}},
-	"worktree.relocated":   {{Path: internalPrefix + "flow/publish", Name: "Relocated"}},
-	"worktree.reparented":  {{Path: internalPrefix + "flow/publish", Name: "Reparented"}, {Path: internalPrefix + "flow/publish", Name: "ReparentedAll"}},
-	"worktree.updated":     {{Path: internalPrefix + "flow/publish", Name: "Updated"}, {Path: internalPrefix + "flow/ordinal", Name: "Ensure"}},
+	"worktree.created":       {{Path: internalPrefix + "flow/publish", Name: "Created"}},
+	"worktree.provisioned":   {{Path: internalPrefix + "flow/publish", Name: "Provisioned"}},
+	"worktree.deprovisioned": {{Path: internalPrefix + "flow/publish", Name: "Deprovisioned"}},
+	"worktree.removed":       {{Path: internalPrefix + "flow/publish", Name: "Removed"}, {Path: internalPrefix + "flow/teardown", Name: "PublishRemoved"}},
+	"worktree.relocated":     {{Path: internalPrefix + "flow/publish", Name: "Relocated"}},
+	"worktree.reparented":    {{Path: internalPrefix + "flow/publish", Name: "Reparented"}, {Path: internalPrefix + "flow/publish", Name: "ReparentedAll"}},
+	"worktree.updated":       {{Path: internalPrefix + "flow/publish", Name: "Updated"}, {Path: internalPrefix + "flow/ordinal", Name: "Ensure"}},
 }
 
 const flowtestPath = internalPrefix + "testutil/flowtest"

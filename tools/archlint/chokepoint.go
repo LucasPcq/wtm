@@ -23,7 +23,7 @@ type mutator struct {
 
 var mutators = []mutator{
 	{pkg: "service/worktree", name: "Create", events: []string{"worktree.created", "worktree.provisioned"}},
-	{pkg: "service/worktree", name: "Clean", events: []string{"worktree.removed"}},
+	{pkg: "service/worktree", name: "Clean", events: []string{"worktree.removed", "worktree.deprovisioned"}},
 	{pkg: "service/worktree", name: "ForceClean", events: []string{"worktree.removed"}},
 	{pkg: "service/worktree", name: "FinishRemoval", events: []string{"worktree.removed"}},
 	{pkg: "service/worktree", name: "Move", events: []string{"worktree.relocated"}},
