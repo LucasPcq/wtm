@@ -14,6 +14,8 @@ const (
 	EventWorktreeReparented    EventType = "worktree.reparented"
 	EventWorktreeDeprovisioned EventType = "worktree.deprovisioned"
 	EventWorktreeRemoved       EventType = "worktree.removed"
+	EventRepoAdded             EventType = "repo.added"
+	EventRepoRemoved           EventType = "repo.removed"
 
 	// EventWorktreePrefix opens every type about one worktree's identity.
 	EventWorktreePrefix = "worktree."
@@ -30,6 +32,8 @@ var EventTypes = []EventType{
 	EventWorktreeReparented,
 	EventWorktreeDeprovisioned,
 	EventWorktreeRemoved,
+	EventRepoAdded,
+	EventRepoRemoved,
 }
 
 // EventsSchemaVersion moves on a breaking change only.
@@ -51,6 +55,18 @@ const (
 	IdentityOrdinal   IdentityField = "ordinal"
 	IdentityParent    IdentityField = "parent"
 	IdentityCreatedAt IdentityField = "created_at"
+)
+
+// RegisteredRepo is one line of the registry a global `wtm events` follows.
+type RegisteredRepo struct {
+	CommonDir string `json:"common_dir"`
+	Root      string `json:"root"`
+	AddedAt   string `json:"added_at"`
+}
+
+const (
+	RegistryFileName = "repos.json"
+	RegistryLockName = "repos.json.lock"
 )
 
 type EventRepo struct {

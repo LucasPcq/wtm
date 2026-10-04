@@ -120,6 +120,20 @@
         "worktree": { "$ref": "#/$defs/worktree" }
       },
       "required": ["repo", "worktree"]
+    },
+    {
+      "properties": {
+        "type": { "const": "repo.added" },
+        "repo": { "$ref": "#/$defs/repo" }
+      },
+      "required": ["repo"]
+    },
+    {
+      "properties": {
+        "type": { "const": "repo.removed" },
+        "repo": { "$ref": "#/$defs/repo" }
+      },
+      "required": ["repo"]
     }
   ]
 }

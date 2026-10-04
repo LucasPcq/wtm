@@ -25,6 +25,8 @@ A subscription opens on a **snapshot**: one `snapshot` event listing every workt
 | `worktree.reparented` | `wtm reparent`, or a `clean` / `prune` that moved its children past a removed parent | `from_parent`: its previous parent |
 | `worktree.deprovisioned` | `clean` or `prune` ran its `on_clean` hooks — also sent when there are none. `ok: true` is followed by `removed`; `ok: false` means the removal stopped there and the worktree is still on disk | `ok`; when `false`, `hook` and `exit_code` |
 | `worktree.removed` | `clean` or `prune` removed it, after its `deprovisioned` | — |
+| `repo.added` | a repository joined the registry a global stream follows (see [Every repository at once](#every-repository-at-once)) | — |
+| `repo.removed` | a repository left it: deleted, or no longer initialized with wtm | — |
 
 Every event carries `v` (the schema version), `type` and `ts` (RFC 3339, UTC); every event but `ready` carries `repo`, and every `worktree.*` event the `worktree` it is about. A `removed` carries the last state the worktree had. An event published by a command started with `WTM_CORRELATION_ID` carries it as `correlation_id` — see [Recognising your own command](#recognising-your-own-command).
 
