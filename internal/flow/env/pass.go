@@ -83,7 +83,7 @@ func (f *envFlow) resolvePorts(params resolvePortsParams) (envsvc.EnvPortsParams
 	var ports envsvc.EnvPortsParams
 	err := ordinal.Retry(ordinal.RetryParams{
 		Context: f.ctx,
-		Branch:  branch,
+		Branch:  func() string { return branch },
 		Do: func() error {
 			resolved, resolveErr := worktree.ResolveEnvPorts(worktree.ResolveEnvPortsParams{
 				ProjectDir:   f.ctx.ProjectDir,

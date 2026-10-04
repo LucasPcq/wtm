@@ -114,7 +114,7 @@ func planOf(params planOfParams) (domain.EnvPortPlan, error) {
 	var plan domain.EnvPortPlan
 	err := ordinal.Retry(ordinal.RetryParams{
 		Context: params.Context,
-		Branch:  params.Branch,
+		Branch:  func() string { return params.Branch },
 		Do: func() error {
 			resolved, planErr := worktree.EnvPortPlanFor(worktree.ResolveEnvPortsParams{
 				ProjectDir:   params.Context.ProjectDir,

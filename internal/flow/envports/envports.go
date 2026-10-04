@@ -62,7 +62,7 @@ func settle(params settleParams) (domain.EnvPortPlan, error) {
 	var resolved envsvc.EnvPortsParams
 	err := ordinal.Retry(ordinal.RetryParams{
 		Context: params.Context,
-		Branch:  params.Branch,
+		Branch:  func() string { return params.Branch },
 		Do: func() error {
 			ports, resolveErr := worktree.ResolveEnvPorts(worktree.ResolveEnvPortsParams{
 				ProjectDir:   params.Context.ProjectDir,

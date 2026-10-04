@@ -358,7 +358,7 @@ func JobEnv(params JobEnvParams) (map[string]string, error) {
 	var env map[string]string
 	err := ordinal.Retry(ordinal.RetryParams{
 		Context: flow.Context{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Publisher: params.Publisher},
-		Branch:  target.BranchOf(params.WorkDir),
+		Branch:  func() string { return target.BranchOf(params.WorkDir) },
 		Do: func() error {
 			resolved, resolveErr := worktree.JobEnv(worktree.JobEnvParams{
 				ProjectDir: params.ProjectDir,

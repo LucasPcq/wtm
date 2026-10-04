@@ -24,8 +24,10 @@ func Ensure(ctx flow.Context, branch string) error {
 
 type RetryParams struct {
 	Context flow.Context
-	Branch  string
-	Do      func() error
+	// Branch is read only when a number has to be allocated: a caller that
+	// has to ask git for it pays that only once in a worktree's life.
+	Branch func() string
+	Do     func() error
 }
 
 // Retry allocates exactly when the service would once have done it lazily: the
@@ -36,7 +38,7 @@ func Retry(params RetryParams) error {
 	if !errors.Is(err, domain.ErrOrdinalUnallocated) {
 		return err
 	}
-	if err := Ensure(params.Context, params.Branch); err != nil {
+	if err := Ensure(params.Context, params.Branch()); err != nil {
 		return err
 	}
 	return params.Do()

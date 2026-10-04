@@ -46,7 +46,7 @@ func TestRetryAllocatesWhenTheServiceAsksForANumber(t *testing.T) {
 	ctx, rec := newContext(t)
 	calls := 0
 
-	err := ordinal.Retry(ordinal.RetryParams{Context: ctx, Branch: "feat/a", Do: func() error {
+	err := ordinal.Retry(ordinal.RetryParams{Context: ctx, Branch: func() string { return "feat/a" }, Do: func() error {
 		calls++
 		if calls == 1 {
 			return domain.ErrOrdinalUnallocated
@@ -64,13 +64,28 @@ func TestRetryLeavesAnyOtherErrorAlone(t *testing.T) {
 	boom := errors.New("boom")
 	calls := 0
 
-	err := ordinal.Retry(ordinal.RetryParams{Context: ctx, Branch: "feat/a", Do: func() error {
+	err := ordinal.Retry(ordinal.RetryParams{Context: ctx, Branch: func() string { return "feat/a" }, Do: func() error {
 		calls++
 		return boom
 	}})
 
 	if !errors.Is(err, boom) || calls != 1 || len(rec.Published) != 0 {
 		t.Fatalf("err = %v, calls = %d, published %v", err, calls, rec.PublishedTypes())
+	}
+}
+
+func TestRetryReadsTheBranchOnlyToAllocate(t *testing.T) {
+	ctx, _ := newContext(t)
+	asked := 0
+
+	err := ordinal.Retry(ordinal.RetryParams{
+		Context: ctx,
+		Branch:  func() string { asked++; return "feat/a" },
+		Do:      func() error { return nil },
+	})
+
+	if err != nil || asked != 0 {
+		t.Fatalf("err = %v, branch asked %d times for a worktree that already has its number", err, asked)
 	}
 }
 
