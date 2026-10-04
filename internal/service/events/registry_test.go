@@ -60,7 +60,7 @@ func TestRegisterIsIdempotent(t *testing.T) {
 	dir := initializedRepo(t)
 
 	for range 2 {
-		if err := Register(RegisterParams{ProjectDir: dir}); err != nil {
+		if err := Register(RegisterParams{Root: dir, StateDir: stateOf(dir)}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -89,7 +89,7 @@ func TestConcurrentRegistrationsKeepEveryRepo(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for _, dir := range dirs {
-		wg.Go(func() { _ = Register(RegisterParams{ProjectDir: dir}) })
+		wg.Go(func() { _ = Register(RegisterParams{Root: dir, StateDir: stateOf(dir)}) })
 	}
 	wg.Wait()
 
@@ -106,7 +106,7 @@ func TestRegisterPublishesRepoAddedOnce(t *testing.T) {
 	dir := initializedRepo(t)
 
 	for range 2 {
-		if err := Register(RegisterParams{ProjectDir: dir, SocketPath: socket, CorrelationID: "c"}); err != nil {
+		if err := Register(RegisterParams{Root: dir, StateDir: stateOf(dir), SocketPath: socket, CorrelationID: "c"}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -128,7 +128,7 @@ func TestPruneDropsARepoThatIsGoneAndPublishesIt(t *testing.T) {
 	processtest.RealDaemon(t, socket)
 	kept, gone := initializedRepo(t), initializedRepo(t)
 	for _, dir := range []string{kept, gone} {
-		if err := Register(RegisterParams{ProjectDir: dir}); err != nil {
+		if err := Register(RegisterParams{Root: dir, StateDir: stateOf(dir)}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -150,7 +150,7 @@ func TestPruneDropsARepoThatIsGoneAndPublishesIt(t *testing.T) {
 func TestPruneDropsARepoNoLongerInitialized(t *testing.T) {
 	processtest.Home(t)
 	dir := initializedRepo(t)
-	if err := Register(RegisterParams{ProjectDir: dir}); err != nil {
+	if err := Register(RegisterParams{Root: dir, StateDir: stateOf(dir)}); err != nil {
 		t.Fatal(err)
 	}
 	removeConfig(t, dir)
@@ -165,4 +165,8 @@ func removeConfig(t *testing.T, dir string) {
 	if err := os.Remove(filepath.Join(dir, ".git", domain.StateDirName, domain.ConfigFileName)); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func stateOf(dir string) string {
+	return filepath.Join(dir, ".git", domain.StateDirName)
 }

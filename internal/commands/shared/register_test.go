@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/service/events"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 	"github.com/LucasPcq/wtm/internal/testutil/globaldir"
@@ -31,5 +32,29 @@ func TestLoadConfigRegistersTheRepository(t *testing.T) {
 	root, _ := filepath.EvalSymlinks(dir)
 	if repos, _ := events.Registered(); len(repos) != 1 || repos[0].Root != root {
 		t.Fatalf("registered %+v", repos)
+	}
+}
+
+// A state dir moved out of the repository (tests, CI) is one the registry
+// cannot check is initialized: it would add and prune it on every command.
+func TestLoadConfigWithAMovedStateDirRegistersNothing(t *testing.T) {
+	globaldir.Isolate(t)
+	dir := gittest.InitRepo(t)
+	state := t.TempDir()
+	if err := os.WriteFile(filepath.Join(state, domain.ConfigFileName), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(domain.EnvStateDir, state)
+
+	if _, err := LoadConfig(&cobra.Command{}, dir); err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+
+	path, err := infra.RegistryPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("the registry was written: %v", err)
 	}
 }

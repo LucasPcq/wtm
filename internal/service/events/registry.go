@@ -8,11 +8,14 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/service/process"
-	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
 
 type RegisterParams struct {
-	ProjectDir string
+	// Root is the main checkout, and StateDir the wtm directory inside the git
+	// common dir: both are already resolved by the caller, so registering costs
+	// no git call.
+	Root     string
+	StateDir string
 	// SocketPath is the daemon's; empty is the one every command talks to.
 	SocketPath    string
 	CorrelationID string
@@ -21,15 +24,16 @@ type RegisterParams struct {
 // Register enrolls the repository a command runs in, for a global stream to
 // follow. The common case — already listed — reads the file and nothing else.
 func Register(params RegisterParams) error {
-	repo, err := worktree.RepoOf(worktree.RepoOfParams{ProjectDir: params.ProjectDir})
-	if err != nil {
-		return err
+	commonDir := filepath.Dir(params.StateDir)
+	if resolved, err := filepath.EvalSymlinks(commonDir); err == nil {
+		commonDir = resolved
 	}
+	repo := domain.EventRepo{Root: params.Root, CommonDir: commonDir}
 	if listed, err := infra.ReadRegistry(); err == nil && containsRepo(listed, repo.CommonDir) {
 		return nil
 	}
 	added := false
-	err = infra.UpdateRegistry(func(repos []domain.RegisteredRepo) []domain.RegisteredRepo {
+	err := infra.UpdateRegistry(func(repos []domain.RegisteredRepo) []domain.RegisteredRepo {
 		if containsRepo(repos, repo.CommonDir) {
 			return repos
 		}

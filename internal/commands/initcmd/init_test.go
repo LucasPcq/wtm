@@ -9,6 +9,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/service/events"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 	"github.com/LucasPcq/wtm/internal/testutil/globaldir"
 )
@@ -120,5 +121,23 @@ func TestInitOnAnInitialisedProjectAlignsItsNextSteps(t *testing.T) {
 	}
 	if len(columns) != 1 {
 		t.Errorf("notes start on %d different columns:\n%s", len(columns), out)
+	}
+}
+
+func TestInitFromASubdirectoryRegistersTheRepositoryRoot(t *testing.T) {
+	dir := freshProject(t)
+	sub := filepath.Join(dir, "packages", "api")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(sub)
+
+	if out, err := runInitCmd(t, "--"+domain.FlagYes); err != nil {
+		t.Fatalf("init: %v\n%s", err, out)
+	}
+
+	root, _ := filepath.EvalSymlinks(dir)
+	if repos, _ := events.Registered(); len(repos) != 1 || repos[0].Root != root {
+		t.Fatalf("registered %+v, want the root %s", repos, root)
 	}
 }

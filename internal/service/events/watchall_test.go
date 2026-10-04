@@ -50,7 +50,7 @@ func globalFixture(t *testing.T) string {
 
 func register(t *testing.T, dir string) {
 	t.Helper()
-	if err := Register(RegisterParams{ProjectDir: dir, SocketPath: "/nonexistent"}); err != nil {
+	if err := Register(RegisterParams{Root: dir, StateDir: stateOf(dir), SocketPath: "/nonexistent"}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -104,7 +104,7 @@ func TestARepoAddedIsFollowedByItsSnapshot(t *testing.T) {
 	w.next(t)
 	dir := initializedRepo(t)
 
-	if err := Register(RegisterParams{ProjectDir: dir, SocketPath: socket}); err != nil {
+	if err := Register(RegisterParams{Root: dir, StateDir: stateOf(dir), SocketPath: socket}); err != nil {
 		t.Fatal(err)
 	}
 

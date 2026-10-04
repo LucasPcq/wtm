@@ -81,10 +81,23 @@ func LoadConfig(cmd *cobra.Command, dir string) (ConfigResult, error) {
 		return ConfigResult{}, fmt.Errorf("loading config: %w", err)
 	}
 
-	// A repository first met here is enrolled for a global `wtm events`; failing
-	// to do so costs that stream a repository, never this command its run.
-	_ = events.Register(events.RegisterParams{ProjectDir: root, CorrelationID: os.Getenv(domain.EnvCorrelationID)})
+	Register(RegisterParams{Root: root, StateDir: stateDir})
 	return ConfigResult{Config: cfg, ProjectDir: root, StateDir: stateDir}, nil
+}
+
+type RegisterParams struct {
+	Root     string
+	StateDir string
+}
+
+// Register enrolls a repository for a global `wtm events`: failing to costs
+// that stream a repository, never the command its run. A state dir moved out
+// of the repository is one the registry cannot tell is still initialized.
+func Register(params RegisterParams) {
+	if os.Getenv(domain.EnvStateDir) != "" {
+		return
+	}
+	_ = events.Register(events.RegisterParams{Root: params.Root, StateDir: params.StateDir, CorrelationID: os.Getenv(domain.EnvCorrelationID)})
 }
 
 // AddOutputFlag registers the standard --output flag on cmd.

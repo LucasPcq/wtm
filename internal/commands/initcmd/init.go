@@ -16,7 +16,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/detect"
-	"github.com/LucasPcq/wtm/internal/service/events"
 	"github.com/LucasPcq/wtm/internal/tui/components"
 	initwizard "github.com/LucasPcq/wtm/internal/tui/inittui"
 )
@@ -231,7 +230,9 @@ func createProjectConfig(cmd *cobra.Command, dir, stateDir string, flagged bool)
 	}); err != nil {
 		return fmt.Errorf("write project config: %w", err)
 	}
-	_ = events.Register(events.RegisterParams{ProjectDir: dir, CorrelationID: os.Getenv(domain.EnvCorrelationID)})
+	if root, err := shared.ProjectRoot(dir); err == nil {
+		shared.Register(shared.RegisterParams{Root: root, StateDir: stateDir})
+	}
 
 	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
 		output.InitProjectRecap(w, output.InitProjectRecapParams{
