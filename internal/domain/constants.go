@@ -3256,19 +3256,15 @@ const (
 	// declares something a worktree can isolate. It is one choice for the .env
 	// and for the jobs `wtm run` starts, because the two disagreeing is what
 	// wires a worktree to its neighbour's services without a word.
-	IsolationStepName        = "Isolation"
-	IsolationStepDescription = "The .env files are copied from another checkout, with its ports and its namespaces in shared services.\n" +
-		"Isolated: wtm moves them onto this worktree's — in the .env and when `wtm run` starts its jobs — so both can run side by side.\n" +
-		"Verbatim: wtm writes nothing into the .env and runs this worktree on the ports and data it was copied with, so it cannot run while its source does."
-	IsolationStepDescriptionMany = "The .env files are copied from another checkout, with its ports and its namespaces in shared services.\n" +
-		"Isolated: wtm moves them onto each worktree's — in the .env and when `wtm run` starts its jobs — so all of them can run side by side.\n" +
-		"Verbatim: wtm writes nothing into the .env and runs every worktree on the ports and data they were copied with, so only one of them, or their source, runs at a time."
-	IsolationOptionIsolated     = "Isolate it — its own ports, compose project and namespaces"
-	IsolationOptionVerbatim     = "Keep the .env verbatim — its source's ports and data, one of the two runs at a time"
-	IsolationOptionIsolatedMany = "Isolate them — each its own ports, compose project and namespaces"
-	IsolationOptionVerbatimMany = "Keep the .env verbatim — their source's ports and data, one of them runs at a time"
-	IsolationSummaryIsolated    = "isolated"
-	IsolationSummaryVerbatim    = "verbatim — .env kept as copied"
+	IsolationStepName            = "Isolation"
+	IsolationStepDescription     = "How the new worktree runs next to its source"
+	IsolationStepDescriptionMany = "How the new worktrees run next to their source"
+	IsolationOptionIsolated      = "isolated — its own ports, compose project and namespaces"
+	IsolationOptionVerbatim      = "verbatim — keep the copied .env, one of the two runs at a time"
+	IsolationOptionIsolatedMany  = "isolated — each its own ports, compose project and namespaces"
+	IsolationOptionVerbatimMany  = "verbatim — keep the copied .env, one of them runs at a time"
+	IsolationSummaryIsolated     = "isolated"
+	IsolationSummaryVerbatim     = "verbatim — .env kept as copied"
 	// IsolationStepIrrelevant is why the step is not asked: with nothing to
 	// isolate, both answers do exactly the same thing.
 	IsolationStepIrrelevant = "run.toml declares nothing a worktree isolates"

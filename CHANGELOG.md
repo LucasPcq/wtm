@@ -7,6 +7,7 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 ### Changed
 
 - **`wtm create <branch>...`** with several names skips the branches step, as a single name does, and opens the wizard on the source branch.
+- **`wtm create`** and **`wtm checkout`** ask the isolation question in one line, the detail is in the guide. → [Isolation](docs/guide/isolation.md)
 
 ### Fixed
 
