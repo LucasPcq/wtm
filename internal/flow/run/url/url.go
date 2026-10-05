@@ -56,7 +56,7 @@ func Run(ctx context.Context, params Params) (Outcome, error) {
 	}
 
 	workDir := target.WorkDir(ctx, target.WorkDirParams{Named: named, Cwd: params.Request.Cwd})
-	entries, err := urls.Open(urls.Params{
+	entries, err := urls.Open(ctx, urls.Params{
 		Context: params.Context,
 		Config:  params.Request.Config,
 		Raw:     params.Request.Raw,

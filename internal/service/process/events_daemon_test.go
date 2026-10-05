@@ -51,7 +51,7 @@ func TestShuttingDownEndsSubscribersAndTheDaemon(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewClient(d.socket).Send(Request{Action: ActionShutdown}); err != nil {
+	if _, err := NewClient(d.socket).Send(t.Context(), Request{Action: ActionShutdown}); err != nil {
 		t.Fatal(err)
 	}
 	select {

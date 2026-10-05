@@ -83,7 +83,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 			}()
 			go func() {
 				defer wg.Done()
-				services = shared.LoadJobsGraceful()
+				services = shared.LoadJobsGraceful(cmd.Context())
 			}()
 			wg.Wait()
 			return listErr

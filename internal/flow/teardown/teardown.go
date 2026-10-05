@@ -47,7 +47,7 @@ func Stop(ctx context.Context, params StopParams) error {
 		Message: fmt.Sprintf(domain.CleanStoppingServicesFmt, params.Target.Branch),
 		Work: func(ctx context.Context) error {
 			var stopErr error
-			stopped, stopErr = process.StopWorktreeJobs(process.WorktreeJobsParams{
+			stopped, stopErr = process.StopWorktreeJobs(ctx, process.WorktreeJobsParams{
 				SocketPath: process.SocketPath(),
 				WorkDir:    params.Target.Path,
 			})
@@ -165,7 +165,7 @@ func Release(ctx context.Context, params ReleaseParams) {
 	if params.Target.Path == "" {
 		return
 	}
-	if err := process.ReleaseWorktreeJobs(process.WorktreeJobsParams{
+	if err := process.ReleaseWorktreeJobs(ctx, process.WorktreeJobsParams{
 		SocketPath: process.SocketPath(),
 		WorkDir:    params.Target.Path,
 	}); err != nil {

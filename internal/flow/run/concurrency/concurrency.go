@@ -188,7 +188,7 @@ func (q *Question) clearOthers(ctx context.Context, answers flow.Answers) error 
 		Message: domain.RunStoppingOthers,
 		Work: func(ctx context.Context) error {
 			for _, dir := range dirs {
-				reports = append(reports, stopReport(client, dir))
+				reports = append(reports, stopReport(ctx, client, dir))
 			}
 			return nil
 		},
@@ -202,8 +202,8 @@ func (q *Question) clearOthers(ctx context.Context, answers flow.Answers) error 
 	return nil
 }
 
-func stopReport(client *process.Client, dir string) flow.Notice {
-	resp, err := client.Send(process.Request{Action: process.ActionStopAll, WorkDir: dir})
+func stopReport(ctx context.Context, client *process.Client, dir string) flow.Notice {
+	resp, err := client.Send(ctx, process.Request{Action: process.ActionStopAll, WorkDir: dir})
 	if err != nil {
 		return warning(fmt.Sprintf(domain.RunStopOtherFailFmt, filepath.Base(dir), err))
 	}

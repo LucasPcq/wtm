@@ -29,10 +29,10 @@ type Reader struct {
 	proxyPort int
 }
 
-func Open(params Params) Reader {
+func Open(ctx context.Context, params Params) Reader {
 	proxyPort := 0
 	if !params.Raw {
-		proxyPort = process.PublicProxyPort(rules.RunProxyPort(rules.RunProxyPortParams{Run: params.Config, Global: params.Context.Config.Global}))
+		proxyPort = process.PublicProxyPort(ctx, rules.RunProxyPort(rules.RunProxyPortParams{Run: params.Config, Global: params.Context.Config.Global}))
 	}
 	return Reader{ctx: params.Context, config: params.Config, proxyPort: proxyPort}
 }

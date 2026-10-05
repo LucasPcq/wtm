@@ -140,10 +140,10 @@ func TestRunURLUnknownJobIsNotDeclared(t *testing.T) {
 func TestPublicProxyPortWithoutDaemon(t *testing.T) {
 	shortHome(t)
 
-	if got := process.PublicProxyPort(4000); got != 4000 {
+	if got := process.PublicProxyPort(t.Context(), 4000); got != 4000 {
 		t.Errorf("sans daemon ni redirection déclarée, le port de bind est la réponse : got %d", got)
 	}
-	if got := process.PublicProxyPort(0); got != 0 {
+	if got := process.PublicProxyPort(t.Context(), 0); got != 0 {
 		t.Errorf("proxy éteint : got %d, want 0", got)
 	}
 }

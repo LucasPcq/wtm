@@ -232,13 +232,13 @@ type subscribeParams struct {
 // the result that ends this attempt.
 func subscribe(ctx context.Context, params subscribeParams) (<-chan process.Delivery, watchResult) {
 	daemon := process.DaemonParams{SocketPath: params.Socket, ProxyPort: params.ProxyPort}
-	if err := ensureDaemon(daemon); err != nil {
+	if err := ensureDaemon(ctx, daemon); err != nil {
 		return nil, watchResult{transient: err}
 	}
 	deliveries, err := process.Subscribe(ctx, process.SubscribeParams{SocketPath: params.Socket, Repos: params.Repos})
 	if errors.Is(err, domain.ErrDaemonNoSubscribe) {
 		// Never a daemon another watcher could need: it cannot serve one.
-		return nil, watchResult{transient: errors.Join(err, replaceDaemon(daemon))}
+		return nil, watchResult{transient: errors.Join(err, replaceDaemon(ctx, daemon))}
 	}
 	if err != nil {
 		return nil, watchResult{transient: err}

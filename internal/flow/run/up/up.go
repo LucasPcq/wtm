@@ -190,13 +190,13 @@ func (f *upFlow) connect() error {
 	return f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.RunDaemonConnecting,
 		Work: func(ctx context.Context) error {
-			if err := process.EnsureCurrentDaemon(process.DaemonParams{
+			if err := process.EnsureCurrentDaemon(ctx, process.DaemonParams{
 				SocketPath: process.SocketPath(),
 				ProxyPort:  rules.ProxyPort(f.ctx.Config.Global),
 			}); err != nil {
 				return fmt.Errorf("ensure daemon: %w", err)
 			}
-			f.service = runlogs.NewService(runlogs.ServiceParams{SocketPath: process.SocketPath()})
+			f.service = runlogs.NewService(f.runCtx, runlogs.ServiceParams{SocketPath: process.SocketPath()})
 			// A daemon that cannot list is not a reason to refuse the run: the
 			// counts decorate a picker and the question defaults to stopping
 			// nothing.
@@ -225,7 +225,7 @@ func (f *upFlow) start(ctx context.Context, answers flow.Answers) (Outcome, erro
 	}
 
 	warnings := addressing.Lines(f.runCtx, addressing.Params{Context: f.ctx, WorkDirs: workDirs})
-	proxy := seam.ProxyPortsFor(seam.ProxyPortsParams{Global: f.ctx.Config.Global, Run: f.request.Config})
+	proxy := seam.ProxyPortsFor(ctx, seam.ProxyPortsParams{Global: f.ctx.Config.Global, Run: f.request.Config})
 	set := seam.OpenSet(f.runCtx, seam.SetParams{
 		ProjectDir:  f.ctx.ProjectDir,
 		StateDir:    f.ctx.StateDir,

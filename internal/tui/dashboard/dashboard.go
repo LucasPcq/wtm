@@ -1401,7 +1401,7 @@ func (m Model) jobsLoader() func(bool) ([]domain.JobInfo, bool) {
 	if m.params.JobsLoader != nil {
 		return m.params.JobsLoader
 	}
-	return runjobs.Read
+	return func(wake bool) ([]domain.JobInfo, bool) { return runjobs.Read(m.ctx, wake) }
 }
 
 // applyJobs also reloads the detail on screen when the project's declared jobs

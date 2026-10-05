@@ -135,7 +135,7 @@ func collectRelocateCandidates(ctx context.Context, params PlanRelocateParams) (
 			InspectErr:   dirtyErr != nil,
 			IsLocked:     w.Locked,
 			DestOccupied: !samePath(w.Path, to) && pathExists(to),
-			HasJobs:      !samePath(w.Path, to) && process.WorktreeHasJobs(w.Path),
+			HasJobs:      !samePath(w.Path, to) && process.WorktreeHasJobs(ctx, w.Path),
 		})
 	}
 

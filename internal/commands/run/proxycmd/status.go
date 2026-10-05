@@ -1,8 +1,10 @@
 package proxycmd
 
 import (
-	"github.com/spf13/cobra"
+	"context"
 	"io"
+
+	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/config"
@@ -32,7 +34,7 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	status := collectStatus(configured)
+	status := collectStatus(cmd.Context(), configured)
 
 	if format, _ := cmd.Flags().GetString(domain.FlagOutput); format == domain.OutputJSON {
 		return output.WriteProxyStatusJSON(cmd.OutOrStdout(), status)
@@ -53,7 +55,7 @@ func configuredBindPort() (int, error) {
 	return rules.ProxyPort(global), nil
 }
 
-func collectStatus(configured int) domain.ProxyStatus {
+func collectStatus(ctx context.Context, configured int) domain.ProxyStatus {
 	status := proxy.NewRedirector(proxy.RedirectorParams{}).Inspect()
 	status.ConfiguredPort = configured
 	status.BindPort = configured
@@ -61,7 +63,7 @@ func collectStatus(configured int) domain.ProxyStatus {
 
 	socketPath := process.SocketPath()
 	if process.IsDaemonRunning(socketPath) {
-		resp, err := process.NewClient(socketPath).Send(process.Request{Action: process.ActionList})
+		resp, err := process.NewClient(socketPath).Send(ctx, process.Request{Action: process.ActionList})
 		if err == nil && resp.Status != process.StatusError {
 			status.DaemonUp = true
 			status.BindPort = resp.ProxyPort

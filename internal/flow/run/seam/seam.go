@@ -77,7 +77,7 @@ type Seam struct {
 func Open(ctx context.Context, params Params) Seam {
 	branch := target.BranchOf(ctx, params.WorkDir)
 	logDir := logDirOf(params.StateDir, branch)
-	service := runlogs.NewService(runlogs.ServiceParams{SocketPath: process.SocketPath()})
+	service := runlogs.NewService(ctx, runlogs.ServiceParams{SocketPath: process.SocketPath()})
 	env, envErr := JobEnv(ctx, JobEnvParams{
 		ProjectDir: params.ProjectDir,
 		StateDir:   params.StateDir,
@@ -480,7 +480,7 @@ type ProxyPorts struct {
 	Public int
 }
 
-func ProxyPortsFor(params ProxyPortsParams) ProxyPorts {
+func ProxyPortsFor(ctx context.Context, params ProxyPortsParams) ProxyPorts {
 	bind := rules.RunProxyPort(rules.RunProxyPortParams{Run: params.Run, Global: params.Global})
-	return ProxyPorts{Bind: bind, Public: process.PublicProxyPort(bind)}
+	return ProxyPorts{Bind: bind, Public: process.PublicProxyPort(ctx, bind)}
 }

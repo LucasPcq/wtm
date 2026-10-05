@@ -290,7 +290,7 @@ func TestDaemonShutdownWaitsForItsForegroundJobs(t *testing.T) {
 	}
 	time.Sleep(200 * time.Millisecond)
 
-	if _, err := NewClient(daemon.socket).Send(Request{Action: ActionShutdown}); err != nil {
+	if _, err := NewClient(daemon.socket).Send(t.Context(), Request{Action: ActionShutdown}); err != nil {
 		t.Fatalf("shutdown: %v", err)
 	}
 	select {
@@ -318,7 +318,7 @@ func TestDaemonStopTwiceDoesNotPanic(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, _ = NewClient(daemon.socket).Send(Request{Action: ActionShutdown})
+			_, _ = NewClient(daemon.socket).Send(t.Context(), Request{Action: ActionShutdown})
 		}()
 	}
 	wg.Wait()

@@ -15,17 +15,19 @@ type ServiceParams struct {
 }
 
 // NewService binds this seam to the running daemon. The caller is the one that
-// made sure it is up — this package never starts it.
-func NewService(params ServiceParams) Service {
-	return &daemonService{client: process.NewClient(params.SocketPath)}
+// made sure it is up — this package never starts it. ctx bounds every request
+// the Service interface sends without one of its own: a listing, a resize.
+func NewService(ctx context.Context, params ServiceParams) Service {
+	return &daemonService{ctx: ctx, client: process.NewClient(params.SocketPath)}
 }
 
 type daemonService struct {
+	ctx    context.Context
 	client *process.Client
 }
 
 func (s *daemonService) Start(ctx context.Context, req StartRequest) (StartResult, error) {
-	resp, err := s.client.SendStreamContext(ctx, process.Request{
+	resp, err := s.client.SendStream(ctx, process.Request{
 		Action:  process.ActionStart,
 		Job:     &req.Job,
 		WorkDir: req.WorkDir,
@@ -44,7 +46,7 @@ func (s *daemonService) Start(ctx context.Context, req StartRequest) (StartResul
 }
 
 func (s *daemonService) List(workDir string) ([]domain.JobInfo, error) {
-	resp, err := s.client.Send(process.Request{Action: process.ActionList, WorkDir: workDir})
+	resp, err := s.client.Send(s.ctx, process.Request{Action: process.ActionList, WorkDir: workDir})
 	if err != nil {
 		return nil, err
 	}
@@ -65,6 +67,7 @@ func (s *daemonService) Attach(req AttachRequest) (Stream, error) {
 		return nil, err
 	}
 	return newConnStream(connStreamParams{
+		Ctx:     s.ctx,
 		Conn:    conn,
 		Client:  s.client,
 		Name:    req.Name,
@@ -77,6 +80,7 @@ func (s *daemonService) Tail(req TailRequest) ([]string, error) {
 }
 
 type connStreamParams struct {
+	Ctx     context.Context
 	Conn    net.Conn
 	Client  *process.Client
 	Name    string
@@ -87,6 +91,7 @@ type connStreamParams struct {
 // both directions once the daemon accepted it, so resizing takes its own
 // connection rather than sending JSON down this one.
 type connStream struct {
+	ctx     context.Context
 	conn    net.Conn
 	client  *process.Client
 	name    string
@@ -99,6 +104,7 @@ type connStream struct {
 
 func newConnStream(params connStreamParams) *connStream {
 	stream := &connStream{
+		ctx:     params.Ctx,
 		conn:    params.Conn,
 		client:  params.Client,
 		name:    params.Name,
@@ -127,7 +133,7 @@ func (s *connStream) Resize(size Size) error {
 	if s.client == nil {
 		return fmt.Errorf("resize %s: stream has no daemon client", s.name)
 	}
-	return s.client.Resize(process.ResizeParams{
+	return s.client.Resize(s.ctx, process.ResizeParams{
 		Name:    s.name,
 		WorkDir: s.workDir,
 		Cols:    size.Cols,

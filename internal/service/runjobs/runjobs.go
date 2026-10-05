@@ -4,6 +4,8 @@
 package runjobs
 
 import (
+	"context"
+
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
@@ -28,7 +30,7 @@ func (l Listing) Diverged() bool {
 // so nobody listening says nothing about whether detached stacks are up: when
 // the index still holds some, one is started to read them back. When it holds
 // nothing there is nothing to report, and no daemon is forked for it.
-func List() Listing {
+func List(ctx context.Context) Listing {
 	socketPath := process.SocketPath()
 	if !process.IsDaemonRunning(socketPath) {
 		if !process.HasAnyIndexedJob() {
@@ -38,14 +40,14 @@ func List() Listing {
 		if err != nil {
 			return Listing{}
 		}
-		if err := process.EnsureDaemon(process.DaemonParams{
+		if err := process.EnsureDaemon(ctx, process.DaemonParams{
 			SocketPath: socketPath,
 			ProxyPort:  rules.ProxyPort(global),
 		}); err != nil {
 			return Listing{}
 		}
 	}
-	resp, err := process.NewClient(socketPath).Send(process.Request{Action: process.ActionList})
+	resp, err := process.NewClient(socketPath).Send(ctx, process.Request{Action: process.ActionList})
 	if err != nil {
 		return Listing{}
 	}
@@ -65,8 +67,8 @@ func liveJobs(jobs []domain.JobInfo) []domain.JobInfo {
 }
 
 // Load is List for a caller whose question is only what is running.
-func Load() []domain.JobInfo {
-	return List().Jobs
+func Load(ctx context.Context) []domain.JobInfo {
+	return List(ctx).Jobs
 }
 
 // Peek is Load for a reader whose question does not justify waking anything —
@@ -76,12 +78,12 @@ func Load() []domain.JobInfo {
 // the index still holds jobs means "cannot say", never "nothing is running". A
 // caller that took that silence for an answer would blink a detached stack out
 // of its panel on every poll.
-func Peek() (jobs []domain.JobInfo, known bool) {
+func Peek(ctx context.Context) (jobs []domain.JobInfo, known bool) {
 	socketPath := process.SocketPath()
 	if !process.IsDaemonRunning(socketPath) {
 		return nil, !process.HasAnyIndexedJob()
 	}
-	resp, err := process.NewClient(socketPath).Send(process.Request{Action: process.ActionList})
+	resp, err := process.NewClient(socketPath).Send(ctx, process.Request{Action: process.ActionList})
 	if err != nil {
 		return nil, false
 	}

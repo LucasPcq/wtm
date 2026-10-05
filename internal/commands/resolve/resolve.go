@@ -133,7 +133,7 @@ func pickAmbiguousWorktree(cmd *cobra.Command, cwd, projectDir string, matches [
 			}()
 			go func() {
 				defer wg.Done()
-				services = shared.LoadJobsGraceful()
+				services = shared.LoadJobsGraceful(cmd.Context())
 			}()
 			wg.Wait()
 			return listErr
