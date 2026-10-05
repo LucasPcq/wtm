@@ -1,7 +1,9 @@
 package rules
 
 import (
+	"context"
 	"errors"
+	"fmt"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 )
@@ -13,7 +15,7 @@ func ExitCode(err error) int {
 	switch {
 	case err == nil:
 		return domain.ExitCodeOK
-	case errors.Is(err, domain.ErrCancelled):
+	case errors.Is(err, domain.ErrCancelled), errors.Is(err, context.Canceled):
 		return domain.ExitCodeCancelled
 	case errors.Is(err, domain.ErrWorktreePathExists), errors.Is(err, domain.ErrWorktreeExists), errors.Is(err, domain.ErrWorktreeNameTaken):
 		return domain.ExitCodeWorktreeExists
@@ -40,4 +42,19 @@ func ExitCode(err error) int {
 	default:
 		return domain.ExitCodeError
 	}
+}
+
+type InterruptedParams struct {
+	Err       error
+	Signalled bool
+}
+
+// Interrupted reads a failure that followed an interrupt as the interrupt: the
+// git or hook error it surfaced through is how the cancellation got out, not
+// what went wrong. A run that ended cleanly despite the signal keeps its nil.
+func Interrupted(params InterruptedParams) error {
+	if params.Err == nil || !params.Signalled || errors.Is(params.Err, domain.ErrCancelled) {
+		return params.Err
+	}
+	return fmt.Errorf("%w: %w", domain.ErrCancelled, params.Err)
 }

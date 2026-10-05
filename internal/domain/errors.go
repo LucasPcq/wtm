@@ -146,8 +146,8 @@ var (
 	ErrRunNotInitialized = errors.New("no run.toml — run `wtm run init`")
 
 	// ErrCancelled is a run the user backed out of — Esc, Ctrl-C, "No, cancel",
-	// a declined confirmation. It always travels with ErrAborted: the `=` line
-	// saying so is already on screen.
+	// a declined confirmation — or interrupted (SIGINT, SIGTERM). A backed-out
+	// run carries ErrAborted too: the `=` line saying so is already on screen.
 	ErrCancelled = errors.New("cancelled")
 
 	// ErrJSONNeedsYes refuses --output json on a command that could ask
