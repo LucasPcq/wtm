@@ -7,6 +7,7 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 ### Fixed
 
 - **`run.toml`**: a link to a `.env` that `config.toml` does not configure is ignored with a warning, and no longer stops the other `.env` values from being written. → [run.toml](docs/guide/run-toml.md#env)
+- **`wtm create`** keeps the names you are typing when the branch fetch finishes, and a refreshed branch or worktree picker keeps its highlighted row.
 
 ## [0.29.0] - 2026-10-04
 

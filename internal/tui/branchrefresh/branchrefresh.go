@@ -1,8 +1,8 @@
 // Package branchrefresh wires the "r" refresh key into branch pickers: it
 // re-fetches origin, recomputes the divergence-tagged candidates, and rebuilds
-// the current wizard step in place. Each branch step must read its candidates
-// from the shared holder (so a rebuild picks up the fresh list) and set
-// Step.CanRefresh so the key is gated to branch steps only.
+// the branch step in place when it is the one on screen. Each branch step must
+// read its candidates from the shared holder (so a step entered later picks up the
+// fresh list) and set Step.CanRefresh, which gates both the key and the rebuild.
 package branchrefresh
 
 import (
@@ -38,7 +38,7 @@ type HandleParams struct {
 	// Fetch takes precedence over ProjectDir.
 	Fetch func() []domain.BranchCandidate
 	// Holder is the candidate slice the branch steps' Build hooks read from; Handle
-	// overwrites it with the fresh candidates before rebuilding the current step.
+	// overwrites it with the fresh candidates before refreshing the current step.
 	Holder *[]domain.BranchCandidate
 }
 
@@ -92,7 +92,7 @@ func Handle(params HandleParams) (tea.Cmd, bool) {
 
 	if msg, ok := params.Msg.(RefreshedMsg); ok {
 		*params.Holder = msg.Candidates
-		w.RebuildCurrentStep()
+		w.RefreshCurrentStep()
 		w.SetLoading(false)
 		return nil, true
 	}

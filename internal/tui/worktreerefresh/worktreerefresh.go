@@ -1,8 +1,8 @@
 // Package worktreerefresh wires the "r" refresh key into interactive worktree
 // lists: it re-fetches origin, recomputes the worktree statuses (origin
-// divergence, dirty, base-ahead), and rebuilds the current wizard step in place.
-// The worktree step must read its rows from the shared holder (so a rebuild picks
-// up the fresh statuses) and set Step.CanRefresh so the key is gated to it only.
+// divergence, dirty, base-ahead), and rebuilds the worktree step in place when it
+// is the one on screen. The worktree step must read its rows from the shared holder
+// and set Step.CanRefresh, which gates both the key and the rebuild.
 // It mirrors branchrefresh, typed to worktree statuses instead of branch candidates.
 package worktreerefresh
 
@@ -34,7 +34,7 @@ type HandleParams struct {
 	Msg        tea.Msg
 	ListParams domain.ListParams
 	// Holder is the status slice the worktree step's Build hook reads from; Handle
-	// overwrites it with the fresh statuses before rebuilding the current step.
+	// overwrites it with the fresh statuses before refreshing the current step.
 	Holder *[]domain.WorktreeStatus
 }
 
@@ -61,7 +61,7 @@ func Handle(params HandleParams) (tea.Cmd, bool) {
 		if len(msg.Statuses) > 0 {
 			*params.Holder = msg.Statuses
 		}
-		w.RebuildCurrentStep()
+		w.RefreshCurrentStep()
 		w.SetLoading(false)
 		return nil, true
 	}
