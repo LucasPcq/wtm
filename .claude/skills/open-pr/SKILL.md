@@ -114,7 +114,7 @@ gh pr create --base "$BASE" --title "<title>" --body-file <body.md> \
   --attach "$PROOF/before.gif#Before" --attach "$PROOF/after.gif#After"
 ```
 
-Write the body to a temp file (not in the repository) and pass `--body-file`, so backticks and code fences survive the shell. `--attach` uploads each image or video to GitHub; where the body should show it, reference it by **exactly the path passed to `--attach`** (`![Before]($PROOF/before.gif)`, with the real path) and `gh` rewrites the link to the upload — an attachment the body does not reference is appended at the end. `gh pr edit --attach` and `gh pr comment --attach` work the same way to add proof later. Never merge, never enable auto-merge. If a PR already exists for the branch (`gh pr view`), update it with `gh pr edit --body-file` instead of opening another.
+Write the body to a temp file (not in the repository) and pass `--body-file`, so backticks and code fences survive the shell. `--attach` uploads each image or video to GitHub; where the body should show it, reference it by **exactly the path passed to `--attach`** (`![Before]($PROOF/before.gif)`, with the real path) and `gh` rewrites the link to the upload — an attachment the body does not reference is appended at the end. GIF/PNG render inline that way; an MP4 renders as a player only as a bare URL on its own line, so leave videos unreferenced and let `gh` append them. `gh pr edit --attach` and `gh pr comment --attach` work the same way to add proof later. Never merge, never enable auto-merge. If a PR already exists for the branch (`gh pr view`), update it with `gh pr edit --body-file` instead of opening another.
 
 ## 7. Report
 
