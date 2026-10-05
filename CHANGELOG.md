@@ -4,6 +4,10 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+### Changed
+
+- **`wtm create <branch>...`** with several names skips the branches step, as a single name does, and opens the wizard on the source branch.
+
 ### Fixed
 
 - **`run.toml`**: a link to a `.env` that `config.toml` does not configure is ignored with a warning, and no longer stops the other `.env` values from being written. → [run.toml](docs/guide/run-toml.md#env)

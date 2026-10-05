@@ -38,7 +38,7 @@ const (
 func (f *createFlow) session() flow.Session {
 	return flow.Session{
 		ErrLabel: domain.WizardErrLabel,
-		Presets:  flow.NewAnswers(f.presets()),
+		Presets:  f.presetAnswers(),
 		Steps: []flow.Step{
 			f.branchStep(),
 			f.sourceStep(),
@@ -56,24 +56,28 @@ func (f *createFlow) presets() map[string]string {
 		KeyEnv:       f.request.EnvFrom,
 		KeyIsolation: string(f.request.Isolation),
 	}
-	// One argument answers the step, as it always did; several pre-fill the list
-	// so the wizard can still edit them.
 	if len(f.request.Branches) == 1 {
 		presets[KeyBranch] = f.request.Branches[0]
 	}
 	return presets
 }
 
+// Names given as arguments answer the list step, however many there are.
+func (f *createFlow) presetAnswers() flow.Answers {
+	answers := flow.NewAnswers(f.presets())
+	if len(f.request.Branches) > 1 {
+		return answers.WithValues(KeyBranch, f.request.Branches)
+	}
+	return answers
+}
+
 func (f *createFlow) branchStep() flow.Step {
 	return flow.Step{
-		Kind:        flow.StepTextList,
-		Key:         KeyBranch,
-		Label:       domain.CreateBranchesLabel,
-		Title:       domain.CreateBranchesLabel,
-		Description: domain.CreateBranchesStepDescription,
-		Build: func(flow.Answers) (flow.StepContent, error) {
-			return flow.StepContent{Entries: f.request.Branches}, nil
-		},
+		Kind:          flow.StepTextList,
+		Key:           KeyBranch,
+		Label:         domain.CreateBranchesLabel,
+		Title:         domain.CreateBranchesLabel,
+		Description:   domain.CreateBranchesStepDescription,
 		ValidateEntry: f.validateEntry,
 		EntryBadge:    f.entryBadge,
 		ValidateSet: func(values []string) error {
@@ -83,10 +87,7 @@ func (f *createFlow) branchStep() flow.Step {
 			return nil
 		},
 		Resolve: func(flow.Answers) (flow.Answer, error) {
-			if len(f.request.Branches) == 0 {
-				return flow.Answer{}, errors.New(domain.CreateBranchRequiredUnattended)
-			}
-			return flow.Answer{Values: f.request.Branches}, nil
+			return flow.Answer{}, errors.New(domain.CreateBranchRequiredUnattended)
 		},
 		Summarize: flow.SummarizeSet,
 		Arg:       true,

@@ -494,13 +494,19 @@ func TestMultiAsksTheListThenTheSharedQuestionsOnce(t *testing.T) {
 	}
 }
 
-func TestMultiPrefillsTheListFromSeveralArguments(t *testing.T) {
-	_, prompter, err := multiRun(t, Request{Branches: []string{"feat/a", "feat/b"}}, []string{"feat/a", "feat/b", "feat/c"})
+func TestMultiWithSeveralArgumentsSkipsTheListStep(t *testing.T) {
+	outcome, prompter, err := multiRun(t, Request{Branches: []string{"feat/a", "feat/b"}}, nil)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if got := strings.Join(prompter.Content[KeyBranch].Entries, ","); got != "feat/a,feat/b" {
-		t.Errorf("pre-fill = %q, want the arguments", got)
+	if _, asked := prompter.Content[KeyBranch]; asked {
+		t.Error("several arguments answer the step, as a single one does")
+	}
+	if !strings.Contains(prompter.Content[KeyRecap].Description, "feat/b") {
+		t.Errorf("recap %q should list both arguments", prompter.Content[KeyRecap].Description)
+	}
+	if len(outcome.Results) != 2 {
+		t.Errorf("results = %d, want both arguments created", len(outcome.Results))
 	}
 }
 
