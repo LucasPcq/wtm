@@ -2,6 +2,7 @@
 package up
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -77,8 +78,9 @@ func Operation() flow.Operation {
 	}
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &upFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -88,6 +90,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type upFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -154,7 +157,7 @@ func (f *upFlow) run() (Outcome, error) {
 		return Outcome{Aborted: err == nil}, err
 	}
 
-	cfg, err := f.concurrency.Apply(answers)
+	cfg, err := f.concurrency.Apply(f.runCtx, answers)
 	f.request.Config = cfg
 	if err != nil {
 		return Outcome{}, err
@@ -184,9 +187,9 @@ func (f *upFlow) allowForeignData(answers flow.Answers) (bool, error) {
 // and the concurrency question are about what is already running, so neither
 // can be built before this.
 func (f *upFlow) connect() error {
-	return f.presenter.Stage(flow.StageParams{
+	return f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.RunDaemonConnecting,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			if err := process.EnsureCurrentDaemon(process.DaemonParams{
 				SocketPath: process.SocketPath(),
 				ProxyPort:  rules.ProxyPort(f.ctx.Config.Global),
@@ -266,7 +269,7 @@ func (f *upFlow) start(answers flow.Answers) (Outcome, error) {
 	}
 	// A shared service this run brought up is the moment to pay what a clean
 	// owed it while it was down.
-	owed.Settle(owed.Params{Context: f.ctx, Presenter: f.presenter})
+	owed.Settle(f.runCtx, owed.Params{Context: f.ctx, Presenter: f.presenter})
 
 	return Outcome{
 		WorkDirs: workDirs,

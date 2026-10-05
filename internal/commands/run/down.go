@@ -53,7 +53,7 @@ func runDown(cmd *cobra.Command, args []string) error {
 	}
 	warnRunConfig(cmd, ctx)
 
-	outcome, err := downflow.Run(downflow.Params{
+	outcome, err := downflow.Run(cmd.Context(), downflow.Params{
 		Context: ctx.FlowContext(),
 		Request: downflow.Request{
 			Worktrees: args,

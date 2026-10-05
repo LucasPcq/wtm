@@ -2,6 +2,7 @@
 package clean
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -68,8 +69,9 @@ func Operation() flow.Operation {
 	return flow.Operation{Kind: domain.OpKindClean, Mode: flow.ModeBlocking, TargetKey: KeyWorktree}
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &cleanFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -80,6 +82,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type cleanFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -128,7 +131,7 @@ func (f *cleanFlow) run() (Outcome, error) {
 	nodes, nodesErr := worktree.Nodes(worktree.NodesParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir})
 
 	batch := len(selected) > 1
-	removals := teardown.Batch(teardown.BatchParams{
+	removals := teardown.Batch(f.runCtx, teardown.BatchParams{
 		Context:      f.ctx,
 		Presenter:    f.presenter,
 		Targets:      f.targets(selected),
@@ -310,9 +313,9 @@ func removedBranches(removals []teardown.Removal) []string {
 // failed on files the current user cannot delete (typically root-owned files
 // left by a container). Declined or out of reach, what git did is settled as it
 // stands.
-func (f *cleanFlow) recoverRemoveFailure(salvage teardown.SalvageParams) error {
+func (f *cleanFlow) recoverRemoveFailure(ctx context.Context, salvage teardown.SalvageParams) error {
 	if !f.request.AllowPrivileged || !f.prompter.Interactive() || salvage.Path == "" {
-		return teardown.Salvage(salvage)
+		return teardown.Salvage(ctx, salvage)
 	}
 
 	f.presenter.Status(flow.Notice{
@@ -325,7 +328,7 @@ func (f *cleanFlow) recoverRemoveFailure(salvage teardown.SalvageParams) error {
 		DefaultYes: false,
 	})
 	if err != nil || !confirmed {
-		return teardown.Salvage(salvage)
+		return teardown.Salvage(ctx, salvage)
 	}
 
 	if err := worktree.ForceClean(domain.ForceCleanParams{
@@ -337,7 +340,7 @@ func (f *cleanFlow) recoverRemoveFailure(salvage teardown.SalvageParams) error {
 	}); err != nil {
 		return err
 	}
-	teardown.PublishRemoved(salvage)
+	teardown.PublishRemoved(ctx, salvage)
 	return nil
 }
 
@@ -348,9 +351,9 @@ func (f *cleanFlow) checkAll(branches []string) error {
 	if len(missing) == 0 {
 		return nil
 	}
-	return f.presenter.Stage(flow.StageParams{
+	return f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.CleanCheckLoading,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			f.fetchChecks(missing)
 			return nil
 		},

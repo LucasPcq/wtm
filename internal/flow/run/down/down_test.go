@@ -59,7 +59,7 @@ func run(t *testing.T, repo string, request down.Request) (down.Outcome, *record
 	presenter := &recorder{Recorder: &flowtest.Recorder{}}
 	request.Cwd = repo
 	request.Config = declared
-	outcome, err := down.Run(down.Params{
+	outcome, err := down.Run(t.Context(), down.Params{
 		Context:   flow.Context{ProjectDir: repo},
 		Request:   request,
 		Prompter:  flow.Unattended{},
@@ -219,7 +219,7 @@ func TestDownBackedOutOfSaysAborted(t *testing.T) {
 	processtest.Serve(t, nil)
 	presenter := &recorder{Recorder: &flowtest.Recorder{}}
 
-	outcome, err := down.Run(down.Params{
+	outcome, err := down.Run(t.Context(), down.Params{
 		Context:   flow.Context{ProjectDir: repo},
 		Request:   down.Request{Cwd: repo, Config: declared},
 		Prompter:  &flowtest.ScriptedPrompter{Abort: true},

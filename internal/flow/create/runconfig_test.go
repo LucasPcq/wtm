@@ -89,7 +89,7 @@ func TestRunCreatesWhateverStateRunTomlIsIn(t *testing.T) {
 			tc.setup(t, &ctx)
 			presenter := newRecorder()
 
-			outcome, err := Run(Params{
+			outcome, err := Run(t.Context(), Params{
 				Context:   ctx,
 				Request:   Request{Branches: []string{"feat/broken"}, From: "main", EnvFrom: "example"},
 				Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyIsolation: string(domain.IsolationIsolated), KeyRecap: confirmCreate}},
@@ -147,7 +147,7 @@ func TestRunSettlesTheConfiguredEnvDespiteAnOrphanLink(t *testing.T) {
 	}
 	presenter := newRecorder()
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/orphan"}, From: "main", EnvFrom: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyIsolation: string(domain.IsolationIsolated), KeyRecap: confirmCreate}},
@@ -185,7 +185,7 @@ func TestRunSettlesTheConfiguredEnvDespiteAnOrphanLink(t *testing.T) {
 // have written — an ordinal — is left behind in the worktree's record.
 func TestRunAllocatesNoOrdinalAtCreate(t *testing.T) {
 	ctx := testContext(t)
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/lazy"}, From: "main", EnvFrom: "example"},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyRecap: confirmCreate}},
@@ -223,7 +223,7 @@ func portContext(t *testing.T) flow.Context {
 // The outcome carries what the JSON reports: the worktree's isolation and the
 // port pass in `wtm env`'s shape.
 func TestRunReportsTheIsolationAndThePortPass(t *testing.T) {
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   portContext(t),
 		Request:   Request{Branches: []string{"feat/ports"}, From: "main", EnvFrom: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyIsolation: string(domain.IsolationIsolated), KeyRecap: confirmCreate}},
@@ -245,7 +245,7 @@ func TestRunReportsTheIsolationAndThePortPass(t *testing.T) {
 // there keeps what it is, and the flag is not dropped without a word.
 func TestRunWarnsAnIsolationTheExistingWorktreeIgnores(t *testing.T) {
 	ctx := portContext(t)
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/there"}, From: "main", EnvFrom: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyIsolation: string(domain.IsolationIsolated), KeyRecap: confirmCreate}},
@@ -255,7 +255,7 @@ func TestRunWarnsAnIsolationTheExistingWorktreeIgnores(t *testing.T) {
 	}
 
 	presenter := newRecorder()
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/there"}, From: "main", IfNotExists: true, Isolation: domain.IsolationVerbatim},
 		Prompter:  flow.Unattended{},

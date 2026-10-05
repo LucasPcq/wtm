@@ -2,6 +2,7 @@
 package logs
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -65,8 +66,9 @@ type Params struct {
 	Presenter Presenter
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &logsFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -76,6 +78,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type logsFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -133,9 +136,9 @@ func (f *logsFlow) run() (Outcome, error) {
 // connect wakes the daemon: a job whose log is on disk is still read through it,
 // and the worktree picker shows what each worktree is running.
 func (f *logsFlow) connect() error {
-	return f.presenter.Stage(flow.StageParams{
+	return f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.RunDaemonConnecting,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			if err := process.EnsureDaemon(process.DaemonParams{
 				SocketPath: process.SocketPath(),
 				ProxyPort:  rules.ProxyPort(f.ctx.Config.Global),

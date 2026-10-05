@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -15,9 +16,9 @@ func TestABatchCleanTagsEachStageWithItsWorktree(t *testing.T) {
 	msgs := posted(func(send func(tea.Msg)) {
 		p := newCleanPresenter(presenter{send: send, id: 1})
 		p.WorktreeStarted(flow.Progress{Branch: "feat/a", Position: 1, Total: 2})
-		_ = p.Stage(flow.StageParams{Message: "removing a", Work: func() error { return nil }})
+		_ = p.Stage(t.Context(), flow.StageParams{Message: "removing a", Work: func(context.Context) error { return nil }})
 		p.WorktreeStarted(flow.Progress{Branch: "feat/b", Position: 2, Total: 2})
-		_ = p.Stage(flow.StageParams{Message: "removing b", Work: func() error { return nil }})
+		_ = p.Stage(t.Context(), flow.StageParams{Message: "removing b", Work: func(context.Context) error { return nil }})
 	})
 
 	targets := map[string]string{}

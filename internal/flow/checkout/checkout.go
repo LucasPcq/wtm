@@ -2,6 +2,7 @@
 package checkout
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -49,8 +50,9 @@ type Params struct {
 	Presenter Presenter
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &checkoutFlow{
+		runCtx:     ctx,
 		ctx:        params.Context,
 		request:    params.Request,
 		prompter:   params.Prompter,
@@ -63,6 +65,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type checkoutFlow struct {
+	runCtx     context.Context
 	ctx        flow.Context
 	request    Request
 	prompter   flow.Prompter
@@ -120,7 +123,7 @@ func (f *checkoutFlow) run() (Outcome, error) {
 	}
 
 	if answers.Value(KeySourceUpdate) == decide.UpdateFastForward {
-		proceed := decide.ApplyFastForward(decide.ApplyFastForwardParams{
+		proceed := decide.ApplyFastForward(f.runCtx, decide.ApplyFastForwardParams{
 			ProjectDir: f.ctx.ProjectDir,
 			Subject:    pr.Branch,
 			Prompter:   f.prompter,
@@ -136,9 +139,9 @@ func (f *checkoutFlow) run() (Outcome, error) {
 
 func (f *checkoutFlow) fetchPR() (domain.PRInfo, error) {
 	var pr domain.PRInfo
-	err := f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.CheckoutFetchingPR,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			var fetchErr error
 			pr, fetchErr = ghservice.GetPRDetail(ghservice.GetPRDetailParams{ProjectDir: f.ctx.ProjectDir, Number: f.request.Number})
 			return fetchErr
@@ -166,9 +169,9 @@ func (f *checkoutFlow) fetchBranch(pr domain.PRInfo) error {
 	if f.fetched {
 		return nil
 	}
-	err := f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.CheckoutFetchingBranch,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			return branch.FetchFromOrigin(branch.BranchParams{ProjectDir: f.ctx.ProjectDir, Branch: pr.Branch})
 		},
 	})
@@ -241,9 +244,9 @@ type createParams struct {
 // is published before its hooks run.
 func (f *checkoutFlow) create(params createParams) (domain.CreateResult, error) {
 	var result domain.CreateResult
-	err := f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: fmt.Sprintf(domain.CreateLoadingFmt, params.PR.Branch),
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			var createErr error
 			result, createErr = worktree.Create(domain.CreateParams{
 				ProjectDir:      f.ctx.ProjectDir,

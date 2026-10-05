@@ -74,7 +74,7 @@ func runUI(cmd *cobra.Command, version string) error {
 		return err
 	}
 
-	return dashboard.Run(buildRunParams(buildParams{Dir: dir, Result: result, Version: version}))
+	return dashboard.Run(cmd.Context(), buildRunParams(buildParams{Dir: dir, Result: result, Version: version}))
 }
 
 // buildRunParams assembles the dashboard's inputs from the resolved config and

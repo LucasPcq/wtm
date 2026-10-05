@@ -42,7 +42,7 @@ func runURL(cmd *cobra.Command, args []string) error {
 	raw, _ := cmd.Flags().GetBool(domain.FlagRaw)
 	job, _ := cmd.Flags().GetString(domain.FlagJob)
 
-	outcome, err := urlflow.Run(urlflow.Params{
+	outcome, err := urlflow.Run(cmd.Context(), urlflow.Params{
 		Context: ctx.FlowContext(),
 		Request: urlflow.Request{
 			Worktree: runctx.FirstArg(args),

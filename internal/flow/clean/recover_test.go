@@ -33,7 +33,7 @@ func TestADeclinedPrivilegedRemovalSettlesWhatGitDid(t *testing.T) {
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}}
 	presenter := newRecorder()
 
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   d.ctx,
 		Request:   Request{Branches: []string{d.branch}, BaseBranch: "main", Force: true, AllowPrivileged: true},
 		Prompter:  prompter,
@@ -64,7 +64,7 @@ func TestAnUnofferedPrivilegedRemovalAsksNothing(t *testing.T) {
 	plantUndeletable(t, d.path)
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}}
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   d.ctx,
 		Request:   Request{Branches: []string{d.branch}, BaseBranch: "main", Force: true},
 		Prompter:  prompter,

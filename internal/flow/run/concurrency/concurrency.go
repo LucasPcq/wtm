@@ -3,6 +3,7 @@
 package concurrency
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -127,13 +128,13 @@ func (q *Question) Decided(answers flow.Answers) domain.Concurrency {
 // Apply carries the decision out, in the order a start needs it: the remembered
 // answer written, the setting set aside said, the other worktrees stopped. It
 // returns the run config the start goes on with.
-func (q *Question) Apply(answers flow.Answers) (domain.RunConfig, error) {
+func (q *Question) Apply(ctx context.Context, answers flow.Answers) (domain.RunConfig, error) {
 	cfg, err := q.remember(answers)
 	if err != nil {
 		return cfg, err
 	}
 	q.noticeOverridden(answers)
-	return cfg, q.clearOthers(answers)
+	return cfg, q.clearOthers(ctx, answers)
 }
 
 // remember is never silent: a file changed without a word is a file nobody
@@ -170,7 +171,7 @@ func (q *Question) noticeOverridden(answers flow.Answers) {
 
 // clearOthers reports a worktree that refuses to stop and carries on: the
 // answer was about this machine's load, not about a dependency.
-func (q *Question) clearOthers(answers flow.Answers) error {
+func (q *Question) clearOthers(ctx context.Context, answers flow.Answers) error {
 	if q.Decided(answers) != domain.ConcurrencyExclusive {
 		return nil
 	}
@@ -183,9 +184,9 @@ func (q *Question) clearOthers(answers flow.Answers) error {
 	// Reported after the stage, never inside it: a spinner owns the stream while
 	// it runs, so a line written under it is repainted over.
 	var reports []flow.Notice
-	err := q.params.Presenter.Stage(flow.StageParams{
+	err := q.params.Presenter.Stage(ctx, flow.StageParams{
 		Message: domain.RunStoppingOthers,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			for _, dir := range dirs {
 				reports = append(reports, stopReport(client, dir))
 			}

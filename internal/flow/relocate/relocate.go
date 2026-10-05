@@ -2,6 +2,7 @@
 package relocate
 
 import (
+	"context"
 	"errors"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -49,8 +50,9 @@ type Params struct {
 	Presenter Presenter
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &relocateFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -60,6 +62,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type relocateFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -115,9 +118,9 @@ type applyParams struct {
 // base_path, and a worktree may have changed while it was open.
 func (f *relocateFlow) apply(params applyParams) (Outcome, error) {
 	var result domain.RelocateResult
-	err := f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.RelocateStageMessage,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			plan, err := f.planAt(params.BasePath)
 			if err != nil {
 				return err

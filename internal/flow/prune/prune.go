@@ -2,6 +2,7 @@
 package prune
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -66,8 +67,9 @@ func Operation() flow.Operation {
 	return flow.Operation{Kind: domain.OpKindPrune, Mode: flow.ModeBlocking}
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &pruneFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -77,6 +79,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type pruneFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -138,9 +141,9 @@ func (f *pruneFlow) scan() error {
 	needPRs := f.request.Merged || f.request.Closed || !f.request.Force
 
 	var connection domain.GHConnection
-	err := f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: f.scanMessage(needPRs),
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			var prs []domain.PRInfo
 			if needPRs {
 				prs, connection = github.ListPRsWithConnection(f.ctx.ProjectDir)
@@ -184,7 +187,7 @@ func (f *pruneFlow) remove(params removeParams) (Outcome, error) {
 	// is about to print for the same services.
 	f.settleOwedNamespaces()
 
-	removals := teardown.Batch(teardown.BatchParams{
+	removals := teardown.Batch(f.runCtx, teardown.BatchParams{
 		Context:   f.ctx,
 		Presenter: f.presenter,
 		Targets:   f.targets(),
@@ -285,7 +288,7 @@ func (f *pruneFlow) settleOwedNamespaces() {
 	if f.request.DryRun {
 		return
 	}
-	result := owed.Settle(owed.Params{Context: f.ctx, Presenter: f.presenter})
+	result := owed.Settle(f.runCtx, owed.Params{Context: f.ctx, Presenter: f.presenter})
 	for _, line := range rules.OwedLines(result.Owed) {
 		f.presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: line})
 	}

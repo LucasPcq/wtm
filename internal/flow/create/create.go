@@ -2,6 +2,7 @@
 package create
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -56,8 +57,9 @@ func Operation() flow.Operation {
 	return flow.Operation{Kind: domain.OpKindCreate, Mode: flow.ModeBackground, TargetKey: KeyBranch}
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &createFlow{
+		runCtx:       ctx,
 		ctx:          params.Context,
 		request:      params.Request,
 		prompter:     params.Prompter,
@@ -70,6 +72,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type createFlow struct {
+	runCtx       context.Context
 	ctx          flow.Context
 	request      Request
 	prompter     flow.Prompter
@@ -209,9 +212,9 @@ func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, 
 	}
 
 	var result domain.CreateResult
-	err := f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: fmt.Sprintf(domain.CreateLoadingFmt, branchName),
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			var createErr error
 			result, createErr = worktree.Create(domain.CreateParams{
 				ProjectDir:      f.ctx.ProjectDir,
@@ -313,7 +316,7 @@ type fastForwardParams struct {
 }
 
 func (f *createFlow) applyFastForward(ff fastForwardParams) (bool, error) {
-	return decide.ApplyFastForward(decide.ApplyFastForwardParams{
+	return decide.ApplyFastForward(f.runCtx, decide.ApplyFastForwardParams{
 		ProjectDir: f.ctx.ProjectDir,
 		Subject:    ff.Subject,
 		Many:       ff.Many,

@@ -30,7 +30,7 @@ func statuses(branches ...string) []domain.WorktreeStatus {
 
 func newTestModel(t *testing.T, width, height int, branches ...string) Model {
 	t.Helper()
-	model := New(RunParams{})
+	model := New(t.Context(), RunParams{})
 	t.Cleanup(model.Close)
 	model = update(model, tea.WindowSizeMsg{Width: width, Height: height})
 	return update(model, worktreesMsg{statuses: statuses(branches...), parents: map[string]string{}})
@@ -576,7 +576,7 @@ func fire(cmd tea.Cmd) {
 
 func TestJobsAreReadWithoutAnExplicitRefresh(t *testing.T) {
 	wakes := make(chan bool, 8)
-	model := New(RunParams{JobsLoader: func(wake bool) ([]domain.JobInfo, bool) {
+	model := New(t.Context(), RunParams{JobsLoader: func(wake bool) ([]domain.JobInfo, bool) {
 		wakes <- wake
 		return nil, true
 	}})
@@ -659,7 +659,7 @@ func TestAReadThatTellsNothingIsUpClearsTheCounts(t *testing.T) {
 
 func TestJobsPollOnlyAsksAddressesForWorktreesThatHaveSomethingUp(t *testing.T) {
 	asked := make(chan []string, 1)
-	model := New(RunParams{
+	model := New(t.Context(), RunParams{
 		JobsLoader: func(bool) ([]domain.JobInfo, bool) {
 			return []domain.JobInfo{
 				{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/tmp/a"},
@@ -704,7 +704,7 @@ func TestJobsPollOnlyAsksAddressesForWorktreesThatHaveSomethingUp(t *testing.T) 
 // often, and re-deriving from a reading identical to the last one is where an
 // idle dashboard spent its git.
 func TestAJobsPollThatFindsTheSameThingsUpDerivesNothingAgain(t *testing.T) {
-	model := New(RunParams{
+	model := New(t.Context(), RunParams{
 		AddressLoader: func(AddressRequest) domain.RunAddresses { return domain.RunAddresses{} },
 		TraceLoader:   func([]string) map[string]map[string]bool { return nil },
 	})
@@ -742,7 +742,7 @@ func TestAJobsPollThatFindsTheSameThingsUpDerivesNothingAgain(t *testing.T) {
 // again — and the jobs poll cannot see either of them.
 func TestAddressesAreResolvedAgainOnTheGitPoll(t *testing.T) {
 	asked := make(chan []string, 8)
-	model := New(RunParams{
+	model := New(t.Context(), RunParams{
 		AddressLoader: func(request AddressRequest) domain.RunAddresses {
 			asked <- request.Branches
 			return domain.RunAddresses{
@@ -778,7 +778,7 @@ func TestAddressesAreResolvedAgainOnTheGitPoll(t *testing.T) {
 // stopping beside another still up moves no branch, and the tree carries a
 // per-node count that would keep saying two.
 func TestAJobStoppingBesideAnotherStillUpRederives(t *testing.T) {
-	model := New(RunParams{
+	model := New(t.Context(), RunParams{
 		AddressLoader: func(AddressRequest) domain.RunAddresses { return domain.RunAddresses{} },
 		TraceLoader:   func([]string) map[string]map[string]bool { return nil },
 	})
@@ -817,7 +817,7 @@ func forget(asked chan []string) {
 
 func TestJobsPollAsksNoAddressWhenNothingIsUp(t *testing.T) {
 	called := false
-	model := New(RunParams{
+	model := New(t.Context(), RunParams{
 		JobsLoader: func(bool) ([]domain.JobInfo, bool) { return nil, true },
 		AddressLoader: func(AddressRequest) domain.RunAddresses {
 			called = true
@@ -841,7 +841,7 @@ func TestJobsPollAsksNoAddressWhenNothingIsUp(t *testing.T) {
 // m.statuses is still empty. Capturing the statuses there asked for no address
 // at all, and the RUN section showed no url until the next poll.
 func TestAddressesLandEvenWhenTheJobsLoadRacesTheWorktrees(t *testing.T) {
-	model := New(RunParams{
+	model := New(t.Context(), RunParams{
 		JobsLoader: func(bool) ([]domain.JobInfo, bool) {
 			return []domain.JobInfo{{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/tmp/a"}}, true
 		},

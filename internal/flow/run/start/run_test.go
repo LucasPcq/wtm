@@ -59,7 +59,7 @@ func (f fixture) run(t *testing.T, request start.Request, presenter *watcher) (s
 	if request.Config.Jobs == nil {
 		request.Config = declared
 	}
-	return start.Run(start.Params{
+	return start.Run(t.Context(), start.Params{
 		Context:   flow.Context{ProjectDir: f.repo, StateDir: filepath.Join(f.repo, ".git", "wtm")},
 		Request:   request,
 		Prompter:  flow.Unattended{},
@@ -152,7 +152,7 @@ func TestStartBackedOutOfSaysAborted(t *testing.T) {
 	f := newFixture(t)
 	presenter := &watcher{Recorder: &flowtest.Recorder{}}
 
-	outcome, err := start.Run(start.Params{
+	outcome, err := start.Run(t.Context(), start.Params{
 		Context:   flow.Context{ProjectDir: f.repo},
 		Request:   start.Request{Cwd: f.repo, Config: declared},
 		Prompter:  &flowtest.ScriptedPrompter{Abort: true},

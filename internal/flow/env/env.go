@@ -2,6 +2,7 @@
 package env
 
 import (
+	"context"
 	"errors"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -47,8 +48,9 @@ type Params struct {
 	Presenter Presenter
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &envFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -59,6 +61,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type envFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -80,7 +83,7 @@ func (f *envFlow) run() (Outcome, error) {
 	}
 
 	if f.prompter.Interactive() {
-		if err := f.presenter.Stage(flow.StageParams{Message: domain.EnvScanLoading, Work: f.scan}); err != nil {
+		if err := f.presenter.Stage(f.runCtx, flow.StageParams{Message: domain.EnvScanLoading, Work: f.scan}); err != nil {
 			return Outcome{}, err
 		}
 	}

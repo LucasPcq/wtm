@@ -1,6 +1,7 @@
 package env
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -24,7 +25,7 @@ type branchScan struct {
 
 // scan runs once, before the first screen, over every worktree the picker may
 // offer — the list badges each one with its drift.
-func (f *envFlow) scan() error {
+func (f *envFlow) scan(ctx context.Context) error {
 	statuses, err := worktree.List(domain.ListParams{
 		ProjectDir: f.ctx.ProjectDir,
 		StateDir:   f.ctx.StateDir,
@@ -48,7 +49,7 @@ func (f *envFlow) scan() error {
 	}
 
 	for _, branch := range branches {
-		scan, err := f.scanBranch(branch)
+		scan, err := f.scanBranch(ctx, branch)
 		if err != nil {
 			return err
 		}
@@ -57,14 +58,14 @@ func (f *envFlow) scan() error {
 	return nil
 }
 
-func (f *envFlow) scanBranch(branch string) (branchScan, error) {
+func (f *envFlow) scanBranch(ctx context.Context, branch string) (branchScan, error) {
 	t := target{branch: branch, path: pathOf(f.statuses, branch)}
 	adoption, err := f.adoption(t)
 	if err != nil {
 		return branchScan{}, err
 	}
-	ctx := f.envContext(branch)
-	preview, err := f.planSwitch(planSwitchParams{Target: t, Ctx: ctx, Isolation: domain.IsolationVerbatim})
+	env := f.envContext(branch)
+	preview, err := f.planSwitch(planSwitchParams{Target: t, Ctx: env, Isolation: domain.IsolationVerbatim})
 	if err != nil {
 		return branchScan{}, err
 	}
@@ -93,10 +94,10 @@ func (f *envFlow) scanBranch(branch string) (branchScan, error) {
 		Branch:             branch,
 		MainPath:           f.ctx.ProjectDir,
 		WorktreePath:       t.path,
-		ParentWorktreePath: ctx.parentPath,
-		ParentBranch:       ctx.parentBranch,
+		ParentWorktreePath: env.parentPath,
+		ParentBranch:       env.parentBranch,
 		Files:              f.ctx.Config.Project.Env.Files,
-		Strategy:           ctx.strategy,
+		Strategy:           env.strategy,
 		Mode:               f.request.Mode,
 		Ports:              ports,
 		Reserved:           reserved,

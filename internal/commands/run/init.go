@@ -1,10 +1,12 @@
 package run
 
 import (
+	"context"
 	"fmt"
-	"github.com/LucasPcq/wtm/internal/service/proxy"
 	"io"
 	"os"
+
+	"github.com/LucasPcq/wtm/internal/service/proxy"
 
 	"github.com/spf13/cobra"
 
@@ -99,7 +101,7 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 	writePortKeys, _ := cmd.Flags().GetBool(domain.FlagWritePortKeys)
 	interactive := shared.Interactive(shared.UnattendedParams{TTY: runctx.IsTTY(), Format: format, Yes: yes})
 
-	outcome, err := initrun.Run(initrun.Params{
+	outcome, err := initrun.Run(cmd.Context(), initrun.Params{
 		Context:   shared.FlowContext(res),
 		Request:   initrun.Request{PatchCompose: patchCompose, LinkEnv: linkEnv, WritePortKeys: writePortKeys, Redirection: inspectRedirection()},
 		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive}),
@@ -150,11 +152,11 @@ type initPresenter struct {
 	animate bool
 }
 
-func (p initPresenter) Stage(params flow.StageParams) error {
+func (p initPresenter) Stage(ctx context.Context, params flow.StageParams) error {
 	return components.RunLoading(components.LoadingParams{
 		Message: params.Message,
 		Animate: p.animate,
-		Work:    params.Work,
+		Work:    func() error { return params.Work(ctx) },
 	})
 }
 

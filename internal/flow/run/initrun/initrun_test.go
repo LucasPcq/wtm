@@ -68,7 +68,7 @@ func run(t *testing.T, params Params) (Outcome, *recorder) {
 	t.Helper()
 	presenter := &recorder{Recorder: &flowtest.Recorder{}}
 	params.Presenter = presenter
-	outcome, err := Run(params)
+	outcome, err := Run(t.Context(), params)
 	if err != nil {
 		t.Fatalf("run: %v", err)
 	}

@@ -1,6 +1,7 @@
 package env
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -113,7 +114,7 @@ func run(ctx flow.Context, request Request, prompter flow.Prompter) (Outcome, *r
 		request.OnConflict = domain.EnvDecisionKeep
 	}
 	presenter := &recorder{}
-	outcome, err := Run(Params{Context: ctx, Request: request, Prompter: prompter, Presenter: presenter})
+	outcome, err := Run(context.Background(), Params{Context: ctx, Request: request, Prompter: prompter, Presenter: presenter})
 	return outcome, presenter, err
 }
 

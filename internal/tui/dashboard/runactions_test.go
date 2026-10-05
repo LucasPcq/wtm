@@ -44,7 +44,7 @@ func runModel(t *testing.T, running ...string) Model {
 		t.Fatalf("Save: %v", err)
 	}
 
-	model := New(RunParams{StateDir: stateDir, Cwd: "/tmp/a"})
+	model := New(t.Context(), RunParams{StateDir: stateDir, Cwd: "/tmp/a"})
 	t.Cleanup(model.Close)
 	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 	model = update(model, worktreesMsg{statuses: statuses("a", "b"), parents: map[string]string{}})

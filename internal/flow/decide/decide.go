@@ -2,6 +2,7 @@
 package decide
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -237,16 +238,16 @@ type ApplyFastForwardParams struct {
 // effort: a branch that cannot be cleanly fast-forwarded is left as-is and the
 // run proceeds from it. Interactively a failure asks whether to go on from the
 // stale branch; proceed is false when that is declined.
-func ApplyFastForward(params ApplyFastForwardParams) (proceed bool) {
+func ApplyFastForward(ctx context.Context, params ApplyFastForwardParams) (proceed bool) {
 	branchParams := branch.BranchParams{ProjectDir: params.ProjectDir, Branch: params.Subject}
 	if !params.Prompter.Interactive() {
 		_ = branch.FastForwardIfBehind(branchParams)
 		return true
 	}
 
-	ffErr := params.Presenter.Stage(flow.StageParams{
+	ffErr := params.Presenter.Stage(ctx, flow.StageParams{
 		Message: fmt.Sprintf(domain.SourceFastForwardLoadingFmt, params.Subject),
-		Work:    func() error { return branch.FastForwardToOrigin(branchParams) },
+		Work:    func(ctx context.Context) error { return branch.FastForwardToOrigin(branchParams) },
 	})
 	if ffErr == nil {
 		return true

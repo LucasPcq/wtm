@@ -2,6 +2,7 @@
 package down
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -93,8 +94,9 @@ func Operation() flow.Operation {
 	}
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &downFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -104,6 +106,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type downFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -174,9 +177,9 @@ func (f *downFlow) wake(workDirs []string) error {
 	if !indexed {
 		return nil
 	}
-	return f.presenter.Stage(flow.StageParams{
+	return f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.RunDaemonConnecting,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			return process.EnsureDaemon(process.DaemonParams{
 				SocketPath: process.SocketPath(),
 				ProxyPort:  rules.ProxyPort(f.ctx.Config.Global),
@@ -241,9 +244,9 @@ func (f *downFlow) stopProfile(outcome Outcome, workDir string) ([]domain.JobAct
 			continue
 		}
 		var resp process.Response
-		err := f.presenter.Stage(flow.StageParams{
+		err := f.presenter.Stage(f.runCtx, flow.StageParams{
 			Message: fmt.Sprintf(domain.RunStoppingFmt, job.Name),
-			Work: func() error {
+			Work: func(ctx context.Context) error {
 				var sendErr error
 				resp, sendErr = client.Send(process.Request{
 					Action:  process.ActionStop,
@@ -315,9 +318,9 @@ func (f *downFlow) stoppedJobs(workDir string) ([]domain.JobInfo, error) {
 	request := process.Request{Action: process.ActionStopAll, WorkDir: workDir}
 
 	var resp process.Response
-	if err := f.presenter.Stage(flow.StageParams{
+	if err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.RunStoppingJobs,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			var sendErr error
 			resp, sendErr = client().Send(request)
 			return sendErr

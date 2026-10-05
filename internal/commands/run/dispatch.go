@@ -44,7 +44,7 @@ func (p dispatchParams) dispatchStop() error {
 	if err != nil {
 		return err
 	}
-	_, err = stopflow.Run(stopflow.Params{
+	_, err = stopflow.Run(p.Cmd.Context(), stopflow.Params{
 		Context:   t.FlowContext(),
 		Request:   stopflow.Request{Cwd: p.WorkDir, Job: p.Job, Config: t.Run},
 		Prompter:  t.Prompter(false),
@@ -58,7 +58,7 @@ func (p dispatchParams) dispatchStart() error {
 	if err != nil {
 		return err
 	}
-	outcome, err := startflow.Run(startflow.Params{
+	outcome, err := startflow.Run(p.Cmd.Context(), startflow.Params{
 		Context:   t.FlowContext(),
 		Request:   startflow.Request{Cwd: p.WorkDir, Job: p.Job, Config: t.Run},
 		Prompter:  confirming(t),
@@ -78,7 +78,7 @@ func (p dispatchParams) dispatchLogs() error {
 	if err != nil {
 		return err
 	}
-	_, err = logsflow.Run(logsflow.Params{
+	_, err = logsflow.Run(p.Cmd.Context(), logsflow.Params{
 		Context:   t.FlowContext(),
 		Request:   logsflow.Request{Cwd: p.WorkDir, Job: p.Job, Config: t.Run},
 		Prompter:  t.Prompter(false),
@@ -92,7 +92,7 @@ func (p dispatchParams) dispatchUp() error {
 	if err != nil {
 		return err
 	}
-	outcome, err := upflow.Run(upflow.Params{
+	outcome, err := upflow.Run(p.Cmd.Context(), upflow.Params{
 		Context: t.FlowContext(),
 		Request: upflow.Request{Cwd: p.WorkDir, Profile: p.Profile, Config: t.Run},
 		// The picker asked its question already; the concurrency one it did not,
@@ -111,7 +111,7 @@ func (p dispatchParams) dispatchDown(all bool) error {
 	if err != nil {
 		return err
 	}
-	outcome, err := downflow.Run(downflow.Params{
+	outcome, err := downflow.Run(p.Cmd.Context(), downflow.Params{
 		Context:   t.FlowContext(),
 		Request:   downflow.Request{Cwd: p.WorkDir, Profile: p.Profile, All: all, Config: t.Run},
 		Prompter:  t.Prompter(false),

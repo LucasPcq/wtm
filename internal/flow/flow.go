@@ -3,6 +3,7 @@
 package flow
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -309,9 +310,11 @@ type Prompter interface {
 	Interactive() bool
 }
 
+// StageParams.Work is handed the context to run under: the one Stage was given,
+// or one the surface derived from it to cancel this unit of work on its own.
 type StageParams struct {
 	Message string
-	Work    func() error
+	Work    func(context.Context) error
 }
 
 // HookSink is where a hook phase reports: the raw output as it is produced, and
@@ -353,7 +356,7 @@ type Notice struct {
 }
 
 type Presenter interface {
-	Stage(StageParams) error
+	Stage(context.Context, StageParams) error
 	HookPhase(HookPhaseParams) error
 	// Notice concludes the run; Status is one line inside an ongoing phase.
 	Notice(Notice)

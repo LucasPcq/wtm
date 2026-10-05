@@ -76,7 +76,7 @@ func runRelocate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("relocate needs a terminal to confirm; re-run with --%s to proceed unattended", domain.FlagYes)
 	}
 
-	_, err = relocateflow.Run(relocateflow.Params{
+	_, err = relocateflow.Run(cmd.Context(), relocateflow.Params{
 		Context: shared.FlowContext(cfg),
 		Request: relocateflow.Request{
 			To:         to,

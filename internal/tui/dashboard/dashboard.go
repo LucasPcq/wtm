@@ -177,6 +177,8 @@ const (
 // Model is the dashboard's root Bubbletea model. It owns its own zone manager
 // so hit-testing is per-program state rather than a package global.
 type Model struct {
+	// ctx is the program's: every flow and load the dashboard starts runs under it.
+	ctx        context.Context
 	params     RunParams
 	listParams domain.ListParams
 	zones      *zone.Manager
@@ -318,8 +320,9 @@ type Model struct {
 
 // New builds the dashboard model. Callers outside a program must Close the
 // returned model's zone manager; Run does it for them.
-func New(params RunParams) Model {
+func New(ctx context.Context, params RunParams) Model {
 	return Model{
+		ctx:    ctx,
 		params: params,
 		listParams: domain.ListParams{
 			ProjectDir: params.ProjectDir,
@@ -341,15 +344,15 @@ func (m Model) Close() { m.zones.Close() }
 
 // Run opens the dashboard on the alternate screen. It restores the terminal on
 // exit without re-emitting anything into the scrollback.
-func Run(params RunParams) error {
-	model := New(params)
+func Run(ctx context.Context, params RunParams) error {
+	model := New(ctx, params)
 	defer model.Close()
 
 	watch := params.Watch
 	if watch == nil {
 		watch = defaultWatch(params)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	go watchEvents(watchEventsParams{Context: ctx, Changes: model.changes, Watch: watch})
 

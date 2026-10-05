@@ -37,7 +37,7 @@ func runStop(cmd *cobra.Command, args []string) error {
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 	job, _ := cmd.Flags().GetString(domain.FlagJob)
 
-	outcome, err := stopflow.Run(stopflow.Params{
+	outcome, err := stopflow.Run(cmd.Context(), stopflow.Params{
 		Context: ctx.FlowContext(),
 		Request: stopflow.Request{
 			Worktrees: args,

@@ -2,6 +2,8 @@ package shared
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -207,5 +209,20 @@ func TestAnAbortNoticeMarksTheCommandCancelled(t *testing.T) {
 	presenter.Notice(flow.AbortedNotice)
 	if !Cancelled(presenter.Cmd) {
 		t.Error("an abort did not mark the command cancelled")
+	}
+}
+
+// The work runs under the context the flow handed the stage: a cancelled run
+// must reach the git or hook process the stage is waiting on.
+func TestStageHandsItsContextToTheWork(t *testing.T) {
+	presenter, _ := testPresenter(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	err := presenter.Stage(ctx, flow.StageParams{Message: "fetching", Work: func(work context.Context) error {
+		return work.Err()
+	}})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Stage = %v, want the work to see the cancelled context", err)
 	}
 }

@@ -132,7 +132,7 @@ func TestLoadingJobsCarriesWhyRunTomlCannotBeRead(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(stateDir, domain.RunFileName), []byte("[[job]\nname = "), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	model := New(RunParams{StateDir: stateDir, JobsLoader: func(bool) ([]domain.JobInfo, bool) { return nil, true }})
+	model := New(t.Context(), RunParams{StateDir: stateDir, JobsLoader: func(bool) ([]domain.JobInfo, bool) { return nil, true }})
 	t.Cleanup(model.Close)
 
 	msg, ok := model.loadJobsCmd(false)().(jobsMsg)
