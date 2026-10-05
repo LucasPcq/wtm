@@ -25,18 +25,16 @@ type CheckParams struct {
 	EnvFiles []domain.EnvFile
 }
 
-// Check is everything the port pass would refuse run.toml for, read before a
-// worktree exists: a core command then leaves the run part out rather than
-// stopping half-way through a creation.
-func Check(params CheckParams) error {
+// Check reads run.toml before a worktree exists, so a core command leaves the
+// run part out rather than stopping half-way through a creation. The error is
+// what refuses the file; the lines are the links the port pass will ignore.
+func Check(params CheckParams) ([]string, error) {
 	cfg, err := config.LoadRun(params.StateDir)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if errs := rules.ValidateEnvTargets(rules.ValidateEnvTargetsParams{Config: cfg, Files: params.EnvFiles}); len(errs) > 0 {
-		return fmt.Errorf("invalid run config: %s", strings.Join(errs, "; "))
-	}
-	return nil
+	_, dropped := rules.PartitionEnvTargets(rules.PartitionEnvTargetsParams{Config: cfg, Files: params.EnvFiles})
+	return dropped, nil
 }
 
 // SaveParams holds the inputs for Save.

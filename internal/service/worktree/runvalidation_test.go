@@ -22,10 +22,11 @@ func resolveErr(t *testing.T, repo ordinalRepo, global domain.GlobalConfig) erro
 	return err
 }
 
-// An [[env]] link is held to the same file check as an [[env_port]]: a key
-// written into a .env nothing provisions is a promise wtm cannot keep.
-func TestResolveEnvPortsRefusesAnEnvValueOnAnUnconfiguredFile(t *testing.T) {
+// A link on a .env nothing provisions can only fail to apply: it is left out,
+// and the links on configured files resolve as if it were not there.
+func TestResolveEnvPortsLeavesOutALinkOnAnUnconfiguredFile(t *testing.T) {
 	repo := newOrdinalRepo(t)
+	globaldir.Isolate(t)
 	writeRunConfig(t, repo.stateDir, `
 [[job]]
 name = "kc"
@@ -37,10 +38,30 @@ file = ".env.local"
 key = "REALM"
 job = "kc"
 value = "{worktree}"
+
+[[env]]
+file = ".env"
+key = "KC_NAME"
+job = "kc"
+value = "{worktree}"
 `)
-	err := resolveErr(t, repo, domain.GlobalConfig{})
-	if err == nil || !strings.Contains(err.Error(), ".env.local") {
-		t.Fatalf("want a refusal naming .env.local, got %v", err)
+	resolved, err := ResolveEnvPorts(ResolveEnvPortsParams{
+		ProjectDir:   repo.dir,
+		StateDir:     repo.stateDir,
+		Branch:       "main",
+		WorktreePath: repo.dir,
+		EnvFiles:     []domain.EnvFile{{Target: ".env"}},
+	})
+	if err != nil {
+		t.Fatalf("ResolveEnvPorts: %v", err)
+	}
+	if len(resolved.ValueLinks) != 1 || resolved.ValueLinks[0].File != ".env" {
+		t.Errorf("value links = %+v, want the configured one alone", resolved.ValueLinks)
+	}
+	for _, entry := range resolved.Owned {
+		if entry.File == ".env.local" {
+			t.Errorf("owned = %+v, want nothing written into the unconfigured file", resolved.Owned)
+		}
 	}
 }
 

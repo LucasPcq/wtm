@@ -311,7 +311,8 @@ const (
 	// one, so a key holding both is a line to delete, not a merge to define.
 	EnvValueLinkClashesPortFmt = "%s in %s is written by both an [[env]] link and an [[env_port]] link — an [[env]] value writes its own port, so drop the [[env_port]] line"
 
-	EnvValueLinkUnconfiguredFileFmt = "env %s references %s, which is not a configured env file — add it to [env] in %s or drop the link"
+	EnvValueLinkUnconfiguredFileFmt = "env %s in %s ignored: not a configured env file — add it to [env] in %s or drop the link"
+	EnvPortLinkUnconfiguredFileFmt  = "env_port %s in %s ignored: not a configured env file — add it to [env] in %s or drop the link"
 	// EnvValueUnknownTokenFmt names the placeholder rather than the value, since
 	// a long URL makes the offending braces hard to find.
 	EnvValueUnknownTokenFmt = "env %s in %s: unknown placeholder %s"

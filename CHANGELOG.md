@@ -4,6 +4,10 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+### Fixed
+
+- **`run.toml`**: a link to a `.env` that `config.toml` does not configure is ignored with a warning, and no longer stops the other `.env` values from being written. → [run.toml](docs/guide/run-toml.md#env)
+
 ## [0.29.0] - 2026-10-04
 
 wtm opens up to other tools with a live event stream, and works on several worktrees at once.

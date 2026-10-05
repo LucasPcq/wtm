@@ -50,6 +50,11 @@ func DefaultIsolation(ctx flow.Context) domain.Isolation {
 // where it is one confirmation among the others rather than a second one, put
 // after the point of no return. What is left here is a report of what happened.
 func Settle(params Params) (domain.EnvPortPlan, error) {
+	ignored, err := runconfig.Check(runconfig.CheckParams{StateDir: params.Context.StateDir, EnvFiles: params.Context.Config.Project.Env.Files})
+	if err != nil {
+		return domain.EnvPortPlan{}, err
+	}
+	reportIgnored(params.Presenter, ignored)
 	return settle(settleParams{Params: params, Notices: rules.EnvPortNotices})
 }
 
@@ -103,30 +108,45 @@ func settle(params settleParams) (domain.EnvPortPlan, error) {
 	return plan, nil
 }
 
-// Preflight is what run.toml would be refused for, read before the worktree
-// exists so the creation can go ahead without the run part.
-func Preflight(ctx flow.Context) error {
-	return runconfig.Check(runconfig.CheckParams{StateDir: ctx.StateDir, EnvFiles: ctx.Config.Project.Env.Files})
+// RunCheck is run.toml read before the worktree exists: Err refuses the
+// whole run part, Ignored names the links the pass goes ahead without.
+type RunCheck struct {
+	Err     error
+	Ignored []string
+}
+
+// Preflight reads run.toml before the worktree exists so the creation can go
+// ahead without the run part.
+func Preflight(ctx flow.Context) RunCheck {
+	ignored, err := runconfig.Check(runconfig.CheckParams{StateDir: ctx.StateDir, EnvFiles: ctx.Config.Project.Env.Files})
+	return RunCheck{Err: err, Ignored: ignored}
 }
 
 type FreshParams struct {
 	Params
-	// Preflight is what Preflight returned before the worktree was created.
-	Preflight error
+	Preflight RunCheck
 }
 
 // SettleFresh is Settle for a worktree a core command has just created, which
 // the run module must never fail: whatever stands in the way is a warning,
 // returned for the command's JSON, and the .env stays as it was copied.
 func SettleFresh(params FreshParams) (domain.EnvPortPlan, []string) {
-	if params.Preflight != nil {
-		return domain.EnvPortPlan{}, notSettled(notSettledParams{Params: params.Params, Cause: params.Preflight, RunConfig: true})
+	if params.Preflight.Err != nil {
+		return domain.EnvPortPlan{}, notSettled(notSettledParams{Params: params.Params, Cause: params.Preflight.Err, RunConfig: true})
 	}
+	warnings := reportIgnored(params.Presenter, params.Preflight.Ignored)
 	plan, err := settle(settleParams{Params: params.Params, Notices: rules.EnvPortNoticesOnCreate})
 	if err != nil {
-		return domain.EnvPortPlan{}, notSettled(notSettledParams{Params: params.Params, Cause: err})
+		return domain.EnvPortPlan{}, append(warnings, notSettled(notSettledParams{Params: params.Params, Cause: err})...)
 	}
-	return plan, nil
+	return plan, warnings
+}
+
+func reportIgnored(presenter flow.Presenter, ignored []string) []string {
+	for _, line := range ignored {
+		presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: line})
+	}
+	return ignored
 }
 
 type notSettledParams struct {

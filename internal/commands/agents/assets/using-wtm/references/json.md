@@ -43,7 +43,7 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 - `existing_branch: true` and `origin_state` (`up-to-date` / `behind` / `ahead` / `diverged`) when a same-named local branch was reused as is.
 - `isolation`: the worktree's, `isolated` or `verbatim` (for `extract`, the target's).
 - `env_ports`: present when the port pass ran and the project links anything (shape below). Absent for a verbatim worktree, a project linking nothing, or a pass that could not run.
-- `warnings`: why the port pass could not run ("ports not settled, run `wtm env <branch>` once run.toml is fixed"), that `--isolation` differed from an existing worktree's and was ignored, or that `--env-from parent` copied the `.env` from the main checkout because the parent has no worktree.
+- `warnings`: a `run.toml` link ignored because its `.env` is not a configured `[env]` target, why the port pass could not run ("ports not settled, run `wtm env <branch>` once run.toml is fixed"), that `--isolation` differed from an existing worktree's and was ignored, or that `--env-from parent` copied the `.env` from the main checkout because the parent has no worktree.
 - `extract` file entries may carry `"status": "renamed"` with `"orig_path"`.
 
 ## `env_ports` and the `ports` block
