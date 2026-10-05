@@ -200,7 +200,7 @@ func (f *startFlow) connect() error {
 	return f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.RunDaemonConnecting,
 		Work: func(ctx context.Context) error {
-			if err := process.EnsureCurrentDaemon(process.DaemonParams{
+			if err := process.EnsureCurrentDaemon(ctx, process.DaemonParams{
 				SocketPath: process.SocketPath(),
 				ProxyPort:  rules.ProxyPort(f.ctx.Config.Global),
 			}); err != nil {
@@ -209,7 +209,7 @@ func (f *startFlow) connect() error {
 			// A daemon that cannot list is not a reason to refuse the run: the
 			// counts decorate a picker, and the guard below only ever adds to
 			// what this gesture already names.
-			f.jobs, _ = runlogs.NewService(runlogs.ServiceParams{SocketPath: process.SocketPath()}).List("")
+			f.jobs, _ = runlogs.NewService(ctx, runlogs.ServiceParams{SocketPath: process.SocketPath()}).List("")
 			f.running = rules.RunningJobsByWorktree(f.jobs)
 			return nil
 		},
@@ -219,7 +219,7 @@ func (f *startFlow) connect() error {
 // seamParams lists every declared job on the board, not just this one: starting
 // a job is no reason to hide the ones already up beside it.
 func (f *startFlow) seamParams(workDir string) seam.Params {
-	proxy := seam.ProxyPortsFor(seam.ProxyPortsParams{Global: f.ctx.Config.Global, Run: f.request.Config})
+	proxy := seam.ProxyPortsFor(f.runCtx, seam.ProxyPortsParams{Global: f.ctx.Config.Global, Run: f.request.Config})
 	return seam.Params{
 		ProjectDir:  f.ctx.ProjectDir,
 		StateDir:    f.ctx.StateDir,

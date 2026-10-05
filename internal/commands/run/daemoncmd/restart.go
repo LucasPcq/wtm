@@ -1,8 +1,9 @@
 package daemoncmd
 
 import (
-	"github.com/spf13/cobra"
 	"io"
+
+	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/config"
@@ -29,7 +30,7 @@ func newRestartCmd() *cobra.Command {
 }
 
 func runRestart(cmd *cobra.Command, _ []string) error {
-	status := collectStatus()
+	status := collectStatus(cmd.Context())
 	if status.Running {
 		confirmed, err := confirmStop(cmd, status)
 		if err != nil {
@@ -38,7 +39,7 @@ func runRestart(cmd *cobra.Command, _ []string) error {
 		if !confirmed {
 			return domain.ErrUserAborted
 		}
-		if err := shutdown(); err != nil {
+		if err := shutdown(cmd.Context()); err != nil {
 			return err
 		}
 	}
@@ -47,7 +48,7 @@ func runRestart(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	if err := process.EnsureDaemon(process.DaemonParams{
+	if err := process.EnsureDaemon(cmd.Context(), process.DaemonParams{
 		SocketPath: process.SocketPath(),
 		ProxyPort:  rules.ProxyPort(global),
 	}); err != nil {
@@ -55,14 +56,14 @@ func runRestart(cmd *cobra.Command, _ []string) error {
 	}
 
 	if format, _ := cmd.Flags().GetString(domain.FlagOutput); format == domain.OutputJSON {
-		return output.WriteDaemonStatusJSON(cmd.OutOrStdout(), collectStatus())
+		return output.WriteDaemonStatusJSON(cmd.OutOrStdout(), collectStatus(cmd.Context()))
 	}
 	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
 		// The readout is the detail; without a conclusion above it the reader has
 		// to infer the outcome from a `State` field, which every sibling states.
 		output.Success(w, domain.DaemonRestarted)
 		output.Blank(w)
-		output.DaemonStatusFields(w, collectStatus())
+		output.DaemonStatusFields(w, collectStatus(cmd.Context()))
 	})
 	return nil
 }

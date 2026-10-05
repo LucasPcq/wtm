@@ -13,11 +13,11 @@ import (
 // Read is the index as a surface that polls reads it: waking a sleeping daemon
 // only when the caller says the question is worth it. A waking read always
 // knows — it opens the daemon rather than asking whether one is listening.
-func Read(wake bool) (jobs []domain.JobInfo, known bool) {
+func Read(ctx context.Context, wake bool) (jobs []domain.JobInfo, known bool) {
 	if wake {
-		return Load(), true
+		return Load(ctx), true
 	}
-	return Peek()
+	return Peek(ctx)
 }
 
 type PublicPortParams struct {
@@ -29,9 +29,9 @@ type PublicPortParams struct {
 // read on each call, like the port itself: `wtm run addressing` may switch the
 // project while a surface is open, and a daemon started after it must not leave
 // every address unpublished.
-func PublicPort(params PublicPortParams) int {
+func PublicPort(ctx context.Context, params PublicPortParams) int {
 	run, _ := runconfig.Load(params.StateDir)
-	return process.PublicProxyPort(rules.RunProxyPort(rules.RunProxyPortParams{Run: run, Global: params.Global}))
+	return process.PublicProxyPort(ctx, rules.RunProxyPort(rules.RunProxyPortParams{Run: run, Global: params.Global}))
 }
 
 type TracesParams struct {
@@ -73,6 +73,6 @@ func Addresses(ctx context.Context, params AddressesParams) domain.RunAddresses 
 		Branches:   params.Branches,
 		EnvFiles:   params.EnvFiles,
 		Global:     params.Global,
-		ProxyPort:  process.PublicProxyPort(rules.RunProxyPort(rules.RunProxyPortParams{Run: params.Config, Global: params.Global})),
+		ProxyPort:  process.PublicProxyPort(ctx, rules.RunProxyPort(rules.RunProxyPortParams{Run: params.Config, Global: params.Global})),
 	})
 }

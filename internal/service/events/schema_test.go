@@ -1,6 +1,7 @@
 package events
 
 import (
+	"context"
 	"encoding/json"
 	"path/filepath"
 	"strings"
@@ -29,7 +30,7 @@ func TestEveryEventTypeMatchesTheSchema(t *testing.T) {
 	}
 	previous := listJobs
 	crashed := 1
-	listJobs = func(string) ([]domain.JobInfo, error) {
+	listJobs = func(context.Context, string) ([]domain.JobInfo, error) {
 		return []domain.JobInfo{
 			{Name: "web", Kind: domain.JobKindService, Status: domain.JobStatusRunning, State: domain.JobStateRunning, WorkDir: identity.Path, URL: "http://web.feat-a.app.localhost"},
 			{Name: "api", Kind: domain.JobKindService, Status: domain.JobStatusCrashed, WorkDir: identity.Path, ExitCode: &crashed},

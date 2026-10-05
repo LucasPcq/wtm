@@ -118,10 +118,10 @@ func buildRunParams(ctx context.Context, params buildParams) dashboard.RunParams
 			StateDir:   result.StateDir,
 			Publisher:  publisher,
 			PublicPort: func() int {
-				return runjobs.PublicPort(runjobs.PublicPortParams{StateDir: result.StateDir, Global: result.Config.Global})
+				return runjobs.PublicPort(ctx, runjobs.PublicPortParams{StateDir: result.StateDir, Global: result.Config.Global})
 			},
 		}),
-		JobsLoader: runjobs.Read,
+		JobsLoader: func(wake bool) ([]domain.JobInfo, bool) { return runjobs.Read(ctx, wake) },
 		TraceLoader: func(branches []string) map[string]map[string]bool {
 			return runjobs.Traces(runjobs.TracesParams{StateDir: result.StateDir, Branches: branches})
 		},

@@ -63,7 +63,7 @@ func Read(ctx context.Context, params ReadParams) Snapshot {
 	if len(holdings) == 0 {
 		return Snapshot{Config: cfg}
 	}
-	up := rules.SharedJobsUp(rules.SharedJobsUpParams{Jobs: runjobs.Load(), Config: cfg})
+	up := rules.SharedJobsUp(rules.SharedJobsUpParams{Jobs: runjobs.Load(ctx), Config: cfg})
 	return Snapshot{Config: cfg, Holdings: holdings, Up: up}
 }
 

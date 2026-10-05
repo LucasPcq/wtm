@@ -79,7 +79,7 @@ func (w watching) nextReceived(t *testing.T) Received {
 func noDaemonSpawn(t *testing.T) {
 	t.Helper()
 	previous := ensureDaemon
-	ensureDaemon = func(params process.DaemonParams) error {
+	ensureDaemon = func(_ context.Context, params process.DaemonParams) error {
 		if !process.IsDaemonRunning(params.SocketPath) {
 			return errors.New("no daemon")
 		}
@@ -248,9 +248,9 @@ func TestTheDaemonAWatcherStartsServesTheProxy(t *testing.T) {
 	f := newWatchFixture(t)
 	var asked process.DaemonParams
 	previous := ensureDaemon
-	ensureDaemon = func(params process.DaemonParams) error {
+	ensureDaemon = func(ctx context.Context, params process.DaemonParams) error {
 		asked = params
-		return previous(params)
+		return previous(ctx, params)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -280,9 +280,9 @@ func TestOnlyADaemonThatPredatesSubscribeIsReplaced(t *testing.T) {
 	})
 	previousEnsure, previousReplace := ensureDaemon, replaceDaemon
 	t.Cleanup(func() { ensureDaemon, replaceDaemon = previousEnsure, previousReplace })
-	ensureDaemon = func(process.DaemonParams) error { return nil }
+	ensureDaemon = func(context.Context, process.DaemonParams) error { return nil }
 	replaced := make(chan struct{}, 8)
-	replaceDaemon = func(process.DaemonParams) error {
+	replaceDaemon = func(context.Context, process.DaemonParams) error {
 		replaced <- struct{}{}
 		return nil
 	}
@@ -354,7 +354,7 @@ func TestASnapshotCarriesEachWorktreesJobs(t *testing.T) {
 	identities = func(context.Context, worktree.IdentitiesParams) ([]domain.WorktreeIdentity, error) {
 		return []domain.WorktreeIdentity{{Branch: "main", Path: "/r", IsMain: true}, {Branch: "feat/a", Path: "/wt/a"}}, nil
 	}
-	listJobs = func(string) ([]domain.JobInfo, error) {
+	listJobs = func(context.Context, string) ([]domain.JobInfo, error) {
 		return []domain.JobInfo{{Name: "web", Kind: domain.JobKindService, Status: domain.JobStatusRunning, State: domain.JobStateRunning, WorkDir: "/wt/a"}}, nil
 	}
 	t.Cleanup(func() { identities, listJobs = previousIdentities, previousJobs })
@@ -382,7 +382,7 @@ func TestASnapshotSaysNothingOfJobsItCouldNotAsk(t *testing.T) {
 	identities = func(context.Context, worktree.IdentitiesParams) ([]domain.WorktreeIdentity, error) {
 		return []domain.WorktreeIdentity{{Branch: "main", Path: "/r", IsMain: true}}, nil
 	}
-	listJobs = func(string) ([]domain.JobInfo, error) { return nil, errors.New("daemon gone") }
+	listJobs = func(context.Context, string) ([]domain.JobInfo, error) { return nil, errors.New("daemon gone") }
 	t.Cleanup(func() { identities, listJobs = previousIdentities, previousJobs })
 
 	received, err := snapshotOf(t.Context(), snapshotParams{Repo: domain.EventRepo{Root: "/r", CommonDir: "/r/.git"}, Socket: "daemon.sock"})

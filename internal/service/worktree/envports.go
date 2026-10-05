@@ -98,7 +98,7 @@ func ResolveEnvPorts(ctx context.Context, params ResolveEnvPortsParams) (envsvc.
 		Jobs:       jobsByName(cfg),
 		Worktree:   env[domain.EnvWorktree],
 		Project:    filepath.Base(params.ProjectDir),
-		PublicPort: process.PublicProxyPort(rules.ProxyPort(params.Global)),
+		PublicPort: process.PublicProxyPort(ctx, rules.ProxyPort(params.Global)),
 	}
 
 	ordinal, err := strconv.Atoi(env[domain.EnvOrdinal])

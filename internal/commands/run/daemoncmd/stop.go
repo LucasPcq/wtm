@@ -1,6 +1,7 @@
 package daemoncmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -30,7 +31,7 @@ func newStopCmd() *cobra.Command {
 }
 
 func runStop(cmd *cobra.Command, _ []string) error {
-	status := collectStatus()
+	status := collectStatus(cmd.Context())
 	if !status.Running {
 		// Nothing was stopped, so nothing succeeded: a tick here reads as an act.
 		return reportStopped(cmd, reportStoppedParams{Message: domain.DaemonAlreadyStopped, Noop: true})
@@ -44,7 +45,7 @@ func runStop(cmd *cobra.Command, _ []string) error {
 		return domain.ErrUserAborted
 	}
 
-	if err := shutdown(); err != nil {
+	if err := shutdown(cmd.Context()); err != nil {
 		return err
 	}
 	return reportStopped(cmd, reportStoppedParams{Message: domain.DaemonStopped})
@@ -71,8 +72,8 @@ func confirmStop(cmd *cobra.Command, status domain.DaemonStatus) (bool, error) {
 	}))
 }
 
-func shutdown() error {
-	return process.Shutdown(process.SocketPath())
+func shutdown(ctx context.Context) error {
+	return process.Shutdown(ctx, process.SocketPath())
 }
 
 type reportStoppedParams struct {
@@ -82,7 +83,7 @@ type reportStoppedParams struct {
 
 func reportStopped(cmd *cobra.Command, params reportStoppedParams) error {
 	if format, _ := cmd.Flags().GetString(domain.FlagOutput); format == domain.OutputJSON {
-		return output.WriteDaemonStatusJSON(cmd.OutOrStdout(), collectStatus())
+		return output.WriteDaemonStatusJSON(cmd.OutOrStdout(), collectStatus(cmd.Context()))
 	}
 	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
 		if params.Noop {

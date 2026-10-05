@@ -43,8 +43,8 @@ func loadPRs(ctx context.Context, params loadPRsParams) ([]domain.PRInfo, domain
 
 // LoadJobsGraceful fetches the daemon's jobs, returning nil when there are none
 // to fetch.
-func LoadJobsGraceful() []domain.JobInfo { return runjobs.Load() }
+func LoadJobsGraceful(ctx context.Context) []domain.JobInfo { return runjobs.Load(ctx) }
 
 // LoadJobs is LoadJobsGraceful for the callers whose whole output is that list,
 // and which therefore have to report a daemon of another build.
-func LoadJobs() runjobs.Listing { return runjobs.List() }
+func LoadJobs(ctx context.Context) runjobs.Listing { return runjobs.List(ctx) }

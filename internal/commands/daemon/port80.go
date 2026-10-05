@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"context"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -22,7 +23,7 @@ func NewProxyForwardCmd() *cobra.Command {
 	}
 }
 
-func runProxyForward(_ *cobra.Command, _ []string) error {
+func runProxyForward(cmd *cobra.Command, _ []string) error {
 	listeners, err := proxy.LaunchdListeners(domain.ProxySocketKey)
 	if err != nil {
 		return err
@@ -30,19 +31,19 @@ func runProxyForward(_ *cobra.Command, _ []string) error {
 
 	return proxy.Forward(proxy.ForwardParams{
 		Listeners: listeners,
-		Target:    proxy.Cached(daemonProxyPort, time.Duration(domain.ProxyTargetCacheMs)*time.Millisecond),
+		Target:    proxy.Cached(func() (int, error) { return daemonProxyPort(cmd.Context()) }, time.Duration(domain.ProxyTargetCacheMs)*time.Millisecond),
 	})
 }
 
 // daemonProxyPort asks the daemon where its proxy really is, rather than
 // trusting a port frozen into the LaunchAgent at install time.
-func daemonProxyPort() (int, error) {
+func daemonProxyPort(ctx context.Context) (int, error) {
 	socketPath := process.SocketPath()
 	if !process.IsDaemonRunning(socketPath) {
 		return 0, domain.ErrProxyNoTarget
 	}
 
-	resp, err := process.NewClient(socketPath).Send(process.Request{Action: process.ActionList})
+	resp, err := process.NewClient(socketPath).Send(ctx, process.Request{Action: process.ActionList})
 	if err != nil {
 		return 0, err
 	}

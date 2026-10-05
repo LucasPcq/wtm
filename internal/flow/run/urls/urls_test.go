@@ -52,7 +52,7 @@ func TestAJobIsReachedByItsNameWhereTheProxyAnswers(t *testing.T) {
 	daemon.ProxyPublicPort = 8480
 	ctx := context(t)
 
-	reader := urls.Open(urls.Params{Context: ctx, Config: domain.RunConfig{Jobs: jobs}})
+	reader := urls.Open(t.Context(), urls.Params{Context: ctx, Config: domain.RunConfig{Jobs: jobs}})
 
 	if !reader.Serving() {
 		t.Fatal("Serving() = false with the proxy up")
@@ -68,7 +68,7 @@ func TestRawIsTheJobsOwnPort(t *testing.T) {
 	processtest.Serve(t, nil).ProxyPublicPort = 8480
 	ctx := context(t)
 
-	reader := urls.Open(urls.Params{Context: ctx, Config: domain.RunConfig{Jobs: jobs}, Raw: true})
+	reader := urls.Open(t.Context(), urls.Params{Context: ctx, Config: domain.RunConfig{Jobs: jobs}, Raw: true})
 
 	if reader.Serving() {
 		t.Error("Serving() = true under --raw")
@@ -82,7 +82,7 @@ func TestPortsAddressingPublishesNoName(t *testing.T) {
 	globaldir.Isolate(t)
 	ctx := context(t)
 
-	reader := urls.Open(urls.Params{Context: ctx, Config: domain.RunConfig{Jobs: jobs, Addressing: domain.AddressingPorts}})
+	reader := urls.Open(t.Context(), urls.Params{Context: ctx, Config: domain.RunConfig{Jobs: jobs, Addressing: domain.AddressingPorts}})
 
 	if reader.Serving() {
 		t.Error("Serving() = true under ports addressing")
@@ -99,7 +99,7 @@ func TestALinkedWorktreeIsReachedOnItsOwnPort(t *testing.T) {
 	ctx := context(t)
 	dir := filepath.Join(t.TempDir(), "feature")
 	gittest.Git(t, ctx.ProjectDir, "worktree", "add", "-b", "feature", dir)
-	reader := urls.Open(urls.Params{Context: ctx, Config: domain.RunConfig{Jobs: jobs, Addressing: domain.AddressingPorts}})
+	reader := urls.Open(t.Context(), urls.Params{Context: ctx, Config: domain.RunConfig{Jobs: jobs, Addressing: domain.AddressingPorts}})
 
 	main := onlyEntry(t, reader, ctx.ProjectDir)
 	linked := onlyEntry(t, reader, dir)

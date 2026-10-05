@@ -32,7 +32,7 @@ func BringUp(ctx context.Context, params BringUpParams) (release func(), err err
 		return nil, err
 	}
 	socket := process.SocketPath()
-	if err := process.EnsureDaemon(process.DaemonParams{SocketPath: socket, ProxyPort: rules.ProxyPort(params.Context.Config.Global)}); err != nil {
+	if err := process.EnsureDaemon(ctx, process.DaemonParams{SocketPath: socket, ProxyPort: rules.ProxyPort(params.Context.Config.Global)}); err != nil {
 		return nil, fmt.Errorf("ensure daemon: %w", err)
 	}
 
@@ -53,6 +53,6 @@ func BringUp(ctx context.Context, params BringUpParams) (release func(), err err
 		return nil, fmt.Errorf(domain.OwedBringUpFailedFmt, job.Name, rules.SanitizeLogLine(string(outcomes.One().FailedOutput)))
 	}
 	return func() {
-		_, _ = process.NewClient(socket).Send(process.Request{Action: process.ActionStop, Name: job.Name, WorkDir: main})
+		_, _ = process.NewClient(socket).Send(ctx, process.Request{Action: process.ActionStop, Name: job.Name, WorkDir: main})
 	}, nil
 }

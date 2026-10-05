@@ -238,13 +238,13 @@ type subscribeParams struct {
 // the result that ends this attempt.
 func subscribe(ctx context.Context, params subscribeParams) (<-chan process.Delivery, watchResult) {
 	daemon := process.DaemonParams{SocketPath: params.Socket, ProxyPort: params.ProxyPort}
-	if err := ensureDaemon(daemon); err != nil {
+	if err := ensureDaemon(ctx, daemon); err != nil {
 		return nil, watchResult{transient: err}
 	}
 	deliveries, err := process.Subscribe(ctx, process.SubscribeParams{SocketPath: params.Socket, Repos: params.Repos})
 	if errors.Is(err, domain.ErrDaemonNoSubscribe) {
 		// Never a daemon another watcher could need: it cannot serve one.
-		return nil, watchResult{transient: errors.Join(err, replaceDaemon(daemon))}
+		return nil, watchResult{transient: errors.Join(err, replaceDaemon(ctx, daemon))}
 	}
 	if err != nil {
 		return nil, watchResult{transient: err}
@@ -317,7 +317,7 @@ func snapshotOf(ctx context.Context, params snapshotParams) (Received, error) {
 		list = []domain.WorktreeIdentity{}
 	}
 	event := stamp(stampParams{Event: domain.Event{Type: domain.EventSnapshot, Worktrees: list}, Repo: params.Repo})
-	raw, err := json.Marshal(snapshotLine{Event: event, Worktrees: withJobs(withJobsParams{Worktrees: list, Socket: params.Socket})})
+	raw, err := json.Marshal(snapshotLine{Event: event, Worktrees: withJobs(ctx, withJobsParams{Worktrees: list, Socket: params.Socket})})
 	if err != nil {
 		return Received{}, err
 	}
@@ -331,8 +331,8 @@ type withJobsParams struct {
 
 // withJobs leaves every worktree's jobs nil when the daemon cannot say: an
 // empty list would tell a reader its jobs are all gone.
-func withJobs(params withJobsParams) []domain.SnapshotWorktree {
-	jobs, err := listJobs(params.Socket)
+func withJobs(ctx context.Context, params withJobsParams) []domain.SnapshotWorktree {
+	jobs, err := listJobs(ctx, params.Socket)
 	branches := make(map[string]string, len(params.Worktrees))
 	for _, identity := range params.Worktrees {
 		branches[identity.Path] = identity.Branch
@@ -348,11 +348,11 @@ func withJobs(params withJobsParams) []domain.SnapshotWorktree {
 	return out
 }
 
-func daemonJobs(socket string) ([]domain.JobInfo, error) {
+func daemonJobs(ctx context.Context, socket string) ([]domain.JobInfo, error) {
 	if socket == "" {
 		return nil, errNoDaemon
 	}
-	resp, err := process.NewClient(socket).Send(process.Request{Action: process.ActionList})
+	resp, err := process.NewClient(socket).Send(ctx, process.Request{Action: process.ActionList})
 	if err != nil {
 		return nil, err
 	}

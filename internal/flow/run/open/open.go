@@ -54,13 +54,13 @@ func Run(ctx context.Context, params Params) (Outcome, error) {
 		prompter:  params.Prompter,
 		presenter: params.Presenter,
 		open:      params.Open,
-		reader: urls.Open(urls.Params{
+		reader: urls.Open(ctx, urls.Params{
 			Context: params.Context,
 			Config:  params.Request.Config,
 			Raw:     params.Request.Raw,
 		}),
 	}
-	return f.run()
+	return f.run(ctx)
 }
 
 type openFlow struct {
@@ -75,14 +75,14 @@ type openFlow struct {
 	named *target.Resolved
 }
 
-func (f *openFlow) run() (Outcome, error) {
+func (f *openFlow) run(ctx context.Context) (Outcome, error) {
 	named, err := target.Named(f.runCtx, target.ResolveParams{ProjectDir: f.ctx.ProjectDir, Query: f.request.Worktree})
 	if err != nil {
 		return Outcome{}, err
 	}
 	f.named = named
 
-	answers, err := f.prompter.Ask(f.session())
+	answers, err := f.prompter.Ask(f.session(ctx))
 	if errors.Is(err, domain.ErrUserAborted) {
 		f.presenter.Notice(flow.AbortedNotice)
 		return Outcome{Aborted: true}, nil
@@ -122,7 +122,7 @@ func (f *openFlow) published(workDir string) []domain.JobURLEntry {
 	return entries
 }
 
-func (f *openFlow) session() flow.Session {
+func (f *openFlow) session(ctx context.Context) flow.Session {
 	return flow.Session{
 		ErrLabel: domain.CmdOpen,
 		Presets:  target.Presets(target.PresetParams{Named: f.named, Job: f.request.Job}),
@@ -133,7 +133,7 @@ func (f *openFlow) session() flow.Session {
 				// What each worktree already has up, which is half of deciding
 				// which one to open. A daemon that cannot answer leaves the
 				// badges off rather than refusing the run.
-				Running: rules.RunningJobsByWorktree(runjobs.Load()),
+				Running: rules.RunningJobsByWorktree(runjobs.Load(ctx)),
 			}),
 			target.URLStep(f.runCtx, target.URLParams{
 				Published: f.published,

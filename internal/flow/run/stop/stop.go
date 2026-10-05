@@ -70,7 +70,7 @@ func Run(ctx context.Context, params Params) (Outcome, error) {
 		prompter:  params.Prompter,
 		presenter: params.Presenter,
 	}
-	return f.run()
+	return f.run(ctx)
 }
 
 type stopFlow struct {
@@ -83,7 +83,7 @@ type stopFlow struct {
 	named []target.Resolved
 }
 
-func (f *stopFlow) run() (Outcome, error) {
+func (f *stopFlow) run(ctx context.Context) (Outcome, error) {
 	if !f.request.ByName {
 		if err := target.RequireDeclared(target.DeclaredParams{Config: f.request.Config, Job: f.request.Job}); err != nil {
 			return Outcome{}, err
@@ -123,7 +123,7 @@ func (f *stopFlow) run() (Outcome, error) {
 		return outcome, f.presenter.Stopped(outcome)
 	}
 
-	running, err := process.NewClient(socket).Send(process.Request{Action: process.ActionList})
+	running, err := process.NewClient(socket).Send(ctx, process.Request{Action: process.ActionList})
 	if err != nil {
 		return Outcome{}, fmt.Errorf("stop %s: %w", outcome.Job, err)
 	}
@@ -164,7 +164,7 @@ func (f *stopFlow) wake(workDirs []string) error {
 	return f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.RunDaemonConnecting,
 		Work: func(ctx context.Context) error {
-			return process.EnsureDaemon(process.DaemonParams{
+			return process.EnsureDaemon(ctx, process.DaemonParams{
 				SocketPath: process.SocketPath(),
 				ProxyPort:  rules.ProxyPort(f.ctx.Config.Global),
 			})
@@ -211,7 +211,7 @@ func (f *stopFlow) stop(params stopParams) (string, error) {
 		Message: fmt.Sprintf(domain.RunStoppingFmt, job),
 		Work: func(ctx context.Context) error {
 			var sendErr error
-			resp, sendErr = client.Send(process.Request{
+			resp, sendErr = client.Send(ctx, process.Request{
 				Action:  process.ActionStop,
 				Name:    job,
 				WorkDir: params.WorkDir,
@@ -258,7 +258,7 @@ func (f *stopFlow) pickable() []domain.JobConfig {
 	if !process.IsDaemonRunning(socket) {
 		return nil
 	}
-	infos, _ := runlogs.NewService(runlogs.ServiceParams{SocketPath: socket}).List("")
+	infos, _ := runlogs.NewService(f.runCtx, runlogs.ServiceParams{SocketPath: socket}).List("")
 	seen := map[string]bool{}
 	var jobs []domain.JobConfig
 	for _, info := range infos {
@@ -276,5 +276,5 @@ func (f *stopFlow) running() map[string]int {
 	if !process.IsDaemonRunning(socket) {
 		return nil
 	}
-	return target.RunningJobs(runlogs.NewService(runlogs.ServiceParams{SocketPath: socket}))
+	return target.RunningJobs(runlogs.NewService(f.runCtx, runlogs.ServiceParams{SocketPath: socket}))
 }

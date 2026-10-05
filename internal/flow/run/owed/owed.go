@@ -41,7 +41,7 @@ func Settle(ctx context.Context, params Params) Result {
 	}
 
 	live := liveBranches(ctx, params.Context.ProjectDir)
-	up := rules.SharedJobsUp(rules.SharedJobsUpParams{Jobs: runjobs.Load(), Config: cfg})
+	up := rules.SharedJobsUp(rules.SharedJobsUpParams{Jobs: runjobs.Load(ctx), Config: cfg})
 	var done []domain.NamespaceRef
 	for _, ref := range owed {
 		name := rules.NamespaceName(rules.NamespaceNameParams{Config: cfg, Ref: ref})

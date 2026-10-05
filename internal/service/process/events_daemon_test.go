@@ -51,7 +51,7 @@ func TestShuttingDownEndsSubscribersAndTheDaemon(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewClient(d.socket).Send(Request{Action: ActionShutdown}); err != nil {
+	if _, err := NewClient(d.socket).Send(t.Context(), Request{Action: ActionShutdown}); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -122,7 +122,7 @@ func TestTheDaemonPublishesAJobsLifecycleUnderItsOrigin(t *testing.T) {
 	dir := t.TempDir()
 	origin := &domain.EventOrigin{Repo: domain.EventRepo{Root: "/code/app", CommonDir: "/code/app/.git"}, CorrelationID: "popup-7"}
 	job := domain.JobConfig{Name: "web", Kind: domain.JobKindService, Cmd: "echo 'Error: boom'; exit 4"}
-	resp, err := NewClient(d.socket).Send(Request{Action: ActionStart, Job: &job, WorkDir: dir, Env: map[string]string{domain.EnvBranch: "feat/a"}, Origin: origin})
+	resp, err := NewClient(d.socket).Send(t.Context(), Request{Action: ActionStart, Job: &job, WorkDir: dir, Env: map[string]string{domain.EnvBranch: "feat/a"}, Origin: origin})
 	if err != nil || resp.Status != StatusOK {
 		t.Fatalf("start: %+v, %v", resp, err)
 	}
@@ -153,7 +153,7 @@ func TestAJobStartedWithoutAnOriginPublishesNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	job := domain.JobConfig{Name: "migrate", Kind: domain.JobKindTask, Cmd: "true"}
-	if _, err := NewClient(d.socket).Send(Request{Action: ActionStart, Job: &job, WorkDir: t.TempDir()}); err != nil {
+	if _, err := NewClient(d.socket).Send(t.Context(), Request{Action: ActionStart, Job: &job, WorkDir: t.TempDir()}); err != nil {
 		t.Fatal(err)
 	}
 	select {
