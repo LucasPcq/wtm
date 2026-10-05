@@ -10,6 +10,7 @@ A *flow* is everything a command does between "the flags are parsed" and "the re
 - [Surfaces and scheduling](#surfaces-and-scheduling)
 - [Hook output](#hook-output)
 - [Publishing what a flow changed](#publishing-what-a-flow-changed)
+- [Cancellation](#cancellation)
 - [Testing a flow](#testing-a-flow)
 - [Settled decisions](#settled-decisions)
 - [Known gaps](#known-gaps)
@@ -24,7 +25,7 @@ internal/flow/create/
   steps.go    the session: the flow.Step declarations and the recap
 ```
 
-The entry point is always the same shape — one struct parameter, one outcome, one error:
+The entry point is always the same shape — the run's context, one struct parameter, one outcome, one error:
 
 ```go
 type Params struct {
@@ -34,10 +35,10 @@ type Params struct {
 	Presenter Presenter     // where the phases go
 }
 
-func Run(params Params) (Outcome, error)
+func Run(ctx context.Context, params Params) (Outcome, error)
 ```
 
-`Run` is a package-level function; behind it an unexported `createFlow` / `cleanFlow` struct holds the params so the step declarations can close over them.
+`Run` is a package-level function; behind it an unexported `createFlow` / `cleanFlow` struct holds the params (and the context, as `runCtx`) so the step declarations can close over them. The context is a carrier, like an `io.Writer`: it is never a `Params` field.
 
 **Errors are returned, never presented.** There is no `Presenter.Error`: on the CLI Cobra prints the error and `rules.ExitCode` sets the status; on the dashboard the caller puts it in the output panel. A user abort is not an error: the flow emits `flow.AbortedNotice` and returns `Outcome{Aborted: true}` with a `nil` error.
 
@@ -75,7 +76,7 @@ type Session struct {
 
 ```go
 type Presenter interface {
-	Stage(StageParams) error         // one unit of work under a progress indicator
+	Stage(context.Context, StageParams) error // one unit of work under a progress indicator; Work gets the context
 	HookPhase(HookPhaseParams) error // a titled hook phase and the sink it streams into
 	Notice(Notice)                   // concludes the run
 	Status(Notice)                   // one line inside an ongoing phase
@@ -320,6 +321,16 @@ Every change to a worktree's identity is published from the flow that made it, n
 
 `tools/archlint` holds it: `chokepoint`'s table names each mutator's event, `emits` reports a flow package that calls a mutator without publishing its event or without a test recording what it publishes, and `metawriter` reports a `service/worktree` metadata writer the table does not list.
 
+## Cancellation
+
+The first SIGINT or SIGTERM cancels the root context (`cmd/root.go`, `signal.NotifyContext`) and gives the next signal back to the default handler, so a second Ctrl-C kills a run that is slow to unwind. A run that fails after the signal is read as cancelled (`rules.Interrupted`) and exits on `ExitCodeCancelled` (19); one that ends cleanly anyway, as `wtm events` does, keeps its 0.
+
+The context travels down every layer as the first argument: `cmd.Context()` in the runner, `Run(ctx, Params)` in the flow, `Stage(ctx, StageParams)` whose `Work(ctx)` must use the context it is handed (a surface may narrow it to cancel that one stage), then every service and infra function that reaches a subprocess or the daemon. The dashboard runs its flows under its program's context.
+
+- **Subprocesses** start through `infra.Command`: on cancel, SIGINT, SIGTERM `SubprocessInterruptGrace` later, the kill once `WaitDelay` runs out. git stays in wtm's process group, so the terminal's own Ctrl-C reaches it and a credential prompt can still read `/dev/tty`. Hooks and `wtm exec` start through `infra.GroupCommand`, in their own process group, and every signal goes to the whole group.
+- **The daemon is never signalled.** A request in flight closes its own socket (`Client.SendStream`), and a wait on the daemon starting or stopping selects on `ctx.Done()`. The daemon's own children (jobs, the namespaces it creates, its probes) live by the daemon, not by a client's context.
+- **What must finish runs under `context.WithoutCancel`**: today `git rebase --abort`, so an interrupted rebase is still undone.
+
 ## Testing a flow
 
 A flow is tested without a terminal, with the two doubles in `internal/testutil/flowtest`:
@@ -334,7 +345,7 @@ recorder := &flowtest.Recorder{}
 ```
 
 - **`ScriptedPrompter`** walks the session as a real host does — presets, `Skip`, `Build`/`Load`, `Validate`/`ValidateSet`/`ValidateEntry` — and answers from `Answers`, `Sets` (set kinds) or `EnvDecisions`. It records `Asked` (`AskedKeys()` for a one-line assertion) and the `Content` each step produced, so a test can assert on what the user would have seen. A step with nothing scripted is an error, so a new question cannot slip in unnoticed. Like `flowui`, it first builds every step from the presets alone and fails on a `Build` that errors there. `Abort` makes `Ask` return `ErrUserAborted`; `Confirmed` answers every `Confirm`.
-- **`Recorder`** implements `flow.Presenter`, collecting `Stages`, `Hooks`, `Beats`, `Notices` and `Statuses`, and runs `Work()` and `Run(sink)` for real. It is also a `flow.Publisher`: set it as the `Context`'s `Publisher` and `Published` / `PublishedTypes()` hold every event (`Unheard` simulates nobody listening). The `emits` rule requires such a test in every package that calls a mutator.
+- **`Recorder`** implements `flow.Presenter`, collecting `Stages`, `Hooks`, `Beats`, `Notices` and `Statuses`, and runs `Work(ctx)` and `Run(sink)` for real. It is also a `flow.Publisher`: set it as the `Context`'s `Publisher` and `Published` / `PublishedTypes()` hold every event (`Unheard` simulates nobody listening). The `emits` rule requires such a test in every package that calls a mutator.
 
 The typed conclusion is not part of `Recorder`; a test embeds it and adds the command's methods:
 
@@ -361,6 +372,9 @@ For the unattended path, `flow.Unattended{}` **is** the double (`internal/flow/u
 ## Known gaps
 
 Deliberately open, not to be fixed opportunistically:
+
+- Ctrl-C under a spinner (`components.RunLoading`), `runview` or a picker does not cancel the run: a Bubbletea program holds the terminal in raw mode, so the key never becomes a signal. Only SIGTERM, or a run with no spinner (`--output json`, no TTY), reaches the root context there.
+- A cancellation stops a mutation wherever its next subprocess starts: a `clean` can be left with the worktree gone and the branch still there. There are no safe checkpoints yet.
 
 - `clean --force` without a TTY resolves the delete step without any safety check (`resolveDelete` returns early on `Force`) and without a confirmation.
 - `flow.Context` duplicates `shared.ConfigResult`, which imports cobra and so cannot be reused as is.

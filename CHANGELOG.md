@@ -15,6 +15,7 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 - **`wtm env`** reports what it changes: a verbatim switch shows the port that moved in an origin list, `--check` names the `[[env]]` key it would rewrite, and the wizard previews an overwrite on the worktree's own port. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
 - **`wtm env`** rebuilds a declared `.env` missing from the worktree the way `wtm create` provisions it (the template under `example`), then settles its ports, instead of leaving it absent; `--check` reports it as drift. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
 - **`wtm run`** commands exit `19` when you back out of a question (Esc, Ctrl-C, "No, cancel", a declined import), like every other command, instead of `1`. → [Exit codes](docs/guide/integrations.md#the-contract---yes-and---output-json)
+- **Interrupting wtm** (SIGINT, SIGTERM) stops the git, hook or `wtm exec` process it waits on and exits with code 19; a second interrupt quits at once. → [Integrations](docs/guide/integrations.md)
 
 ## [0.29.2] - 2026-10-06
 

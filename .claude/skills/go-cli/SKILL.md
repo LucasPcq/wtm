@@ -319,8 +319,8 @@ type Params struct {
   Presenter Presenter
 }
 
-func Run(params Params) (Outcome, error) {
-  f := &splitFlow{ctx: params.Context, request: params.Request,
+func Run(ctx context.Context, params Params) (Outcome, error) {
+  f := &splitFlow{runCtx: ctx, ctx: params.Context, request: params.Request,
     prompter: params.Prompter, presenter: params.Presenter}
   return f.run()
 }
@@ -907,7 +907,7 @@ recorder := &flowtest.Recorder{}
   would have read. A step with nothing scripted is an **error**: a new question cannot
   slip into a flow unnoticed. `Abort: true` simulates the user backing out.
 - **`Recorder`** implements `flow.Presenter` and collects `Stages`, `Hooks`, `Notices`,
-  `Statuses`. It runs `Work()` and `Run(sink)` for real, so the service still executes.
+  `Statuses`. It runs `Work(ctx)` and `Run(sink)` for real, so the service still executes.
 - The **typed conclusion** is not on `Recorder` — embed it and add the one method:
   `type rec struct{ *flowtest.Recorder; got create.Outcome }` +
   `func (r *rec) Created(o create.Outcome) error { r.got = o; return nil }`.

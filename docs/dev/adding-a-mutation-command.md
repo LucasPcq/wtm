@@ -46,8 +46,8 @@ type Params struct {
 	Presenter Presenter
 }
 
-func Run(params Params) (Outcome, error) {
-	f := &splitFlow{ctx: params.Context, request: params.Request,
+func Run(ctx context.Context, params Params) (Outcome, error) {
+	f := &splitFlow{runCtx: ctx, ctx: params.Context, request: params.Request,
 		prompter: params.Prompter, presenter: params.Presenter}
 	return f.run()
 }
@@ -57,6 +57,7 @@ Rules that are not negotiable:
 
 - The package imports **only** `internal/service`, `internal/rules`, `internal/domain` and the stdlib. Never cobra, bubbletea, lipgloss, `internal/output`, `internal/tui`, `internal/config` or `internal/commands`. If you need something only `infra/` has, add a thin wrapper in `service/` — as `worktree.FindByBranch` does.
 - `Request` carries **no `--yes` and no `--output`**. `--force` does belong there.
+- The run's `context.Context` is the first argument, never a `Params` field. Every service call that may reach a subprocess or the daemon takes it, and a `Stage`'s work uses the one `Work` is handed (see [flow-layer.md](flow-layer.md#cancellation)).
 - Errors are returned. A user abort is `presenter.Notice(flow.AbortedNotice)` followed by `Outcome{Aborted: true}, nil`.
 - Long work goes through `presenter.Stage`; hook output through `presenter.HookPhase`; a line inside an ongoing phase through `presenter.Status`. The flow never prints.
 

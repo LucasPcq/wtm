@@ -18,7 +18,7 @@ func viewWithWarnings(t *testing.T, warnings []string) string {
 	board := runlogstest.NewBoard(runlogstest.BoardParams{Views: []runlogs.JobView{
 		inWorktree(running("web"), "/work/main", "main"),
 	}})
-	model := New(Params{Board: board, Warnings: warnings})
+	model := New(t.Context(), Params{Board: board, Warnings: warnings})
 	t.Cleanup(func() { model.panes.closeAll() })
 	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 	return update(model, exec(t, model.refreshCmd())).View()
@@ -48,7 +48,7 @@ func TestTheAddressingBandIsDismissable(t *testing.T) {
 	board := runlogstest.NewBoard(runlogstest.BoardParams{Views: []runlogs.JobView{
 		inWorktree(running("web"), "/work/main", "main"),
 	}})
-	model := New(Params{Board: board, Warnings: []string{driftLine}})
+	model := New(t.Context(), Params{Board: board, Warnings: []string{driftLine}})
 	t.Cleanup(func() { model.panes.closeAll() })
 	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 	model = update(model, exec(t, model.refreshCmd()))

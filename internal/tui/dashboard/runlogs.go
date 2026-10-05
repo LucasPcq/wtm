@@ -181,7 +181,7 @@ func (m Model) applyPreviewBoard(msg previewBoardMsg) (Model, tea.Cmd) {
 	if msg.board == nil || !m.logsOpen() || msg.branch != m.logsBranch || m.previewOn || m.logsJob == "" {
 		return m, nil
 	}
-	m.preview = runview.NewPreview(runview.PreviewParams{Board: msg.board, Job: m.logsJob})
+	m.preview = runview.NewPreview(m.ctx, runview.PreviewParams{Board: msg.board, Job: m.logsJob})
 	m.previewOn = true
 
 	// Init is what asks the board for its jobs and opens the stream: a preview

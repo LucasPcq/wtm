@@ -15,7 +15,7 @@ import (
 func sequenceLines(t *testing.T, emit func(runlogs.Sink)) string {
 	t.Helper()
 	msgs := make(chan tea.Msg, 64)
-	watcher := detachedWatcher{send: func(msg tea.Msg) { msgs <- msg }, id: 1}
+	watcher := detachedWatcher{ctx: t.Context(), send: func(msg tea.Msg) { msgs <- msg }, id: 1}
 	if _, err := watcher.Sequence(seam.SequenceParams{
 		Start: func(_ context.Context, sink runlogs.Sink) (runlogs.Outcomes, error) {
 			emit(sink)

@@ -147,7 +147,7 @@ func open(ctx context.Context, params Params) (reader, error) {
 	if err != nil {
 		return reader{}, err
 	}
-	return reader{runCtx: ctx, ctx: params.Context, run: run, jobs: jobsOf(params)}, nil
+	return reader{runCtx: ctx, ctx: params.Context, run: run, jobs: jobsOf(ctx, params)}, nil
 }
 
 func refOf(ctx flow.Context, branch string) worktree.WorktreeRef {
@@ -202,9 +202,9 @@ func namedList(named *target.Resolved) []target.Resolved {
 	return []target.Resolved{*named}
 }
 
-func jobsOf(params Params) []domain.JobInfo {
+func jobsOf(ctx context.Context, params Params) []domain.JobInfo {
 	if params.Jobs == nil {
-		return runjobs.Current()
+		return runjobs.Current(ctx)
 	}
 	return params.Jobs()
 }
@@ -233,7 +233,7 @@ func readRun(ctx context.Context, params readRunParams) runRead {
 		return runRead{addressing: &addressing}
 	}
 	offset := rules.PortOffsetFromEnv(env)
-	entries := urls.Open(urls.Params{Context: params.Context, Config: params.Run}).At(env)
+	entries := urls.Open(ctx, urls.Params{Context: params.Context, Config: params.Run}).At(env)
 	byJob := make(map[string]string, len(entries))
 	for _, entry := range entries {
 		byJob[entry.Job] = entry.URL

@@ -39,7 +39,7 @@ type viewParams struct {
 func openRunView(params viewParams) (runlogs.Outcomes, error) {
 	out := params.Cmd.OutOrStdout()
 	rest := &detachedRun{params: params}
-	result, err := runview.Run(runview.Params{
+	result, err := runview.Run(params.Cmd.Context(), runview.Params{
 		Board:      params.Board,
 		Job:        params.Job,
 		Profile:    params.Profile,
