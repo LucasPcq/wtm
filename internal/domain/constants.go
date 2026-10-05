@@ -4566,8 +4566,8 @@ const (
 	// ExitCodeEnvDrift is a `wtm env --check` that found drift, so a CI step can
 	// fail on it without parsing the report.
 	ExitCodeEnvDrift = 18
-	// ExitCodeCancelled is a run the user backed out of interactively, so that
-	// `wtm create x && wtm go x` stops there.
+	// ExitCodeCancelled is a run the user backed out of interactively or
+	// interrupted, so that `wtm create x && wtm go x` stops there.
 	ExitCodeCancelled = 19
 	// ExitCodeEventsSchemaNewer is a `wtm events` that received an event of a
 	// schema newer than its own: the consumer has to upgrade wtm.
