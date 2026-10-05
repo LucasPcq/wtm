@@ -3,11 +3,11 @@
 #        sandbox.sh --clean <dir>    stops its jobs and daemon, then deletes it
 #
 # A throwaway copy of the docs/demos "acme" project with its own HOME, so a
-# capture never reads or writes the real ~/.config/wtm, daemon or worktrees.
+# run never reads or writes the real ~/.config/wtm, daemon or worktrees.
 # `source <dir>/env.sh` enters it (HOME, PATH with the given wtm, short prompt).
 set -euo pipefail
 
-marker=.wtm-pr-sandbox
+marker=.wtm-sandbox
 
 if [[ "${1:-}" == "--clean" ]]; then
   dir=${2:?sandbox directory}
@@ -23,7 +23,7 @@ fi
 bin=${1:?wtm binary to put on PATH}
 # Under /tmp, not $TMPDIR: macOS's long /var/folders path pushes the daemon's
 # unix socket past the 104-byte limit.
-dir=$(mktemp -d /tmp/wtm-pr.XXXXXX)
+dir=$(mktemp -d /tmp/wtm-sandbox.XXXXXX)
 touch "$dir/$marker"
 port_base=$((20000 + RANDOM % 9000))
 

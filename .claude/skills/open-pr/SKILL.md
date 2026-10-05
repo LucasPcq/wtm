@@ -7,7 +7,7 @@ description: Open a pull request on the wtm repository (this Go CLI) the way its
 
 A reviewer of this repo wants three things from a PR, in this order: which branch it lands on, what changes for someone typing `wtm`, and enough evidence to believe it without checking out the branch. Every step below serves one of those.
 
-`S=.claude/skills/open-pr/scripts` (paths are relative to the repository root).
+`S=.claude/skills/open-pr/scripts` (paths are relative to the repository root). Every terminal capture goes through the **`wtm-sandbox`** skill.
 
 ## 1. Pick the base branch
 
@@ -69,9 +69,9 @@ Pick the **smallest view that makes the point** — one or two visuals, each pla
   ```
 - **Files / layering** — a shallow file tree with one comment per entry, as a `diff` when it is a move.
 - **Package or stack relations** — Mermaid. For a PR inside a stack, `wtm tree --output mermaid` gives the stack ready to paste; trim it to this branch's ancestors and children.
-- **Motion** — a GIF only when the change *is* the movement. One idea per GIF, under ~10 s.
+- **Motion** — a GIF (MP4 past ~10 s) only when the change *is* the movement. One idea per recording.
 
-Capture recipe (binaries for both sides, isolated sandbox, tmux, VHS, hosting, cleanup): **read `references/proof.md` before capturing anything.** The short version: captures run in a throwaway sandbox under `/tmp`, never in this repository or the real `~/.config/wtm`; text goes inline in the body; GIFs/PNGs go to an orphan branch `pr-assets/<branch-slug>` via `$S/publish-proof.sh`, never into the PR's commits; everything is cleaned up afterwards.
+**Capture with the `wtm-sandbox` skill** — load it now if it is not already: it builds the before (merge-base with `$BASE`) and after binaries, gives each its own throwaway sandbox, and drives them with tmux (text frames) or VHS (GIF/MP4/PNG), then cleans up. Text frames go inline in the body; image and video files stay in the temp directory and are attached by `gh` in step 6 — never committed to the PR branch.
 
 ## 4. Before pushing
 
@@ -110,10 +110,11 @@ Title: Conventional Commits like the history (`fix(tui): …`, `feat(run): …`,
 
 ```bash
 git push -u origin HEAD
-gh pr create --base "$BASE" --title "<title>" --body-file <body.md>
+gh pr create --base "$BASE" --title "<title>" --body-file <body.md> \
+  --attach "$PROOF/before.gif#Before" --attach "$PROOF/after.gif#After"
 ```
 
-Write the body to a temp file (not in the repository) and pass `--body-file`, so backticks and code fences survive the shell. Never merge, never enable auto-merge. If a PR already exists for the branch (`gh pr view`), update it with `gh pr edit --body-file` instead of opening another.
+Write the body to a temp file (not in the repository) and pass `--body-file`, so backticks and code fences survive the shell. `--attach` uploads each image or video to GitHub; where the body should show it, reference it by **exactly the path passed to `--attach`** (`![Before]($PROOF/before.gif)`, with the real path) and `gh` rewrites the link to the upload — an attachment the body does not reference is appended at the end. `gh pr edit --attach` and `gh pr comment --attach` work the same way to add proof later. Never merge, never enable auto-merge. If a PR already exists for the branch (`gh pr view`), update it with `gh pr edit --body-file` instead of opening another.
 
 ## 7. Report
 
