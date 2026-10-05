@@ -160,19 +160,25 @@ func (m WizardModel) CurrentStepCanRefresh() bool {
 	return m.steps[m.current].CanRefresh
 }
 
-// RebuildCurrentStep re-runs the current step's Build hook (if any) against the
-// completed prior steps, re-deriving its model. Used to refresh a step in place
-// after its data source changed (e.g. branch candidates were re-fetched). Unlike
-// buildStep it also rebuilds the first step, which advance never reaches.
-func (m *WizardModel) RebuildCurrentStep() {
-	if m.current < 0 || m.current >= len(m.steps) {
+// RefreshCurrentStep re-derives a CanRefresh step from its Build hook once its
+// data source changed (e.g. branch candidates were re-fetched), keeping the
+// highlighted row. Any other step is left as the user has it — a refreshable step
+// not reached yet reads the fresh data on entry — and so is a list being filtered.
+func (m *WizardModel) RefreshCurrentStep() {
+	if !m.CurrentStepCanRefresh() {
 		return
 	}
 	step := &m.steps[m.current]
-	if step.Build == nil {
+	shown, isList := step.Model.(SelectListModel)
+	if step.Build == nil || (isList && shown.Filtering()) {
 		return
 	}
-	step.Model = step.Build(m.steps[:m.current])
+	rebuilt := step.Build(m.steps[:m.current])
+	if fresh, ok := rebuilt.(SelectListModel); ok && isList {
+		fresh.startOn(shown.Value())
+		rebuilt = fresh
+	}
+	step.Model = rebuilt
 	m.propagateSize(m.current)
 }
 
