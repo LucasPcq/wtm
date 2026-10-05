@@ -152,8 +152,8 @@ type Model struct {
 	cancel context.CancelFunc
 }
 
-func New(params Params) Model {
-	ctx, cancel := context.WithCancel(context.Background())
+func New(ctx context.Context, params Params) Model {
+	ctx, cancel := context.WithCancel(ctx)
 	panes := newPaneStore(PaneSize{})
 	msgs := make(chan tea.Msg, domain.RunViewMsgBuffer)
 	return Model{
@@ -197,8 +197,8 @@ type PreviewParams struct {
 // chrome of its own and no keys. The host owns the navigation, and everything
 // the reader might act on — focus, filter, scrollback, opening a url — belongs
 // to the full view, which is what enter is for.
-func NewPreview(params PreviewParams) Model {
-	model := New(Params{Board: params.Board, Job: params.Job})
+func NewPreview(ctx context.Context, params PreviewParams) Model {
+	model := New(ctx, Params{Board: params.Board, Job: params.Job})
 	model.preview = true
 	return model
 }
@@ -238,8 +238,8 @@ func (m Model) Close() {
 // Run opens the view on the alternate screen and returns what to say once it is
 // given back. Leaving it detaches: the jobs it was showing keep running, and a
 // start sequence it was reporting on carries on without a reader.
-func Run(params Params) (Result, error) {
-	model := New(params)
+func Run(ctx context.Context, params Params) (Result, error) {
+	model := New(ctx, params)
 	// Mouse tracking, or the wheel falls through to the host terminal and writes
 	// escape sequences over the view instead of scrolling the pane.
 	options := []tea.ProgramOption{tea.WithAltScreen(), tea.WithMouseCellMotion()}

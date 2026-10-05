@@ -59,7 +59,7 @@ func (h *handoff) SetStdout(w io.Writer) { h.out = w }
 func (h *handoff) SetStderr(io.Writer)   {}
 
 func (h *handoff) Run() error {
-	result, err := runview.Run(runview.Params{
+	result, err := runview.Run(h.ctx, runview.Params{
 		Board:     h.params.Board,
 		Job:       h.params.Job,
 		Profile:   h.params.Profile,

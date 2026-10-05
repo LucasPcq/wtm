@@ -25,7 +25,7 @@ func multiModel(t *testing.T) Model {
 		inWorktree(running("api"), "/work/main", "main"),
 		inWorktree(running("web"), "/work/feature", "feature"),
 	}})
-	model := New(Params{Board: board})
+	model := New(t.Context(), Params{Board: board})
 	t.Cleanup(func() { model.panes.closeAll() })
 	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 	return update(model, exec(t, model.refreshCmd()))
@@ -114,7 +114,7 @@ func TestTheSequenceEndsOnlyWhenEveryWorktreeHasReported(t *testing.T) {
 		inWorktree(running("web"), "/work/main", "main"),
 		inWorktree(running("web"), "/work/feature", "feature"),
 	}})
-	model := New(Params{
+	model := New(t.Context(), Params{
 		Board:     board,
 		Worktrees: []string{"main", "feature"},
 		Start:     func(context.Context, runlogs.Sink) (runlogs.Outcomes, error) { return nil, nil },
@@ -173,7 +173,7 @@ func TestFollowingTheRunKeepsThePaneOfAWorktreeStillStarting(t *testing.T) {
 		inWorktree(running("web"), "/work/main", "main"),
 		inWorktree(running("web"), "/work/feature", "feature"),
 	}})
-	model := New(Params{
+	model := New(t.Context(), Params{
 		Board:     board,
 		Worktrees: []string{"main", "feature"},
 		Start:     func(context.Context, runlogs.Sink) (runlogs.Outcomes, error) { return nil, nil },
@@ -292,7 +292,7 @@ func manyWorktreesModel(t *testing.T, worktrees ...string) Model {
 		}
 	}
 	board := runlogstest.NewBoard(runlogstest.BoardParams{Views: views})
-	model := New(Params{Board: board, Profile: "dev"})
+	model := New(t.Context(), Params{Board: board, Profile: "dev"})
 	t.Cleanup(func() { model.panes.closeAll() })
 	model = update(model, tea.WindowSizeMsg{Width: 100, Height: 24})
 	return update(model, exec(t, model.refreshCmd()))

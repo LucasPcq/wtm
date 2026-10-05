@@ -12,6 +12,7 @@ A fix release for `wtm create` and `run.toml`, with a shorter isolation question
 
 - **`wtm create <branch>...`** with several names skips the branches step, as a single name does, and opens the wizard on the source branch.
 - **`wtm create`** and **`wtm checkout`** ask the isolation question in one line, the detail is in the guide. → [Isolation](docs/guide/isolation.md)
+- **Interrupting wtm** (SIGINT, SIGTERM) stops the git, hook or `wtm exec` process it waits on and exits with code 19; a second interrupt quits at once. → [Integrations](docs/guide/integrations.md)
 
 ### Fixed
 

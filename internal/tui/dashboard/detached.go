@@ -15,6 +15,7 @@ import (
 // dashboard has a list one wants to come back over, so a start there gives the
 // surface back and reports; watching a run is what the logs view is for.
 type detachedWatcher struct {
+	ctx  context.Context
 	send func(tea.Msg)
 	id   int
 }
@@ -23,7 +24,7 @@ func (w detachedWatcher) Sequence(params seam.SequenceParams) (runlogs.Outcomes,
 	if params.Start == nil {
 		return nil, nil
 	}
-	return params.Start(context.Background(), detachedSink{
+	return params.Start(w.ctx, detachedSink{
 		send: w.send,
 		id:   w.id,
 		// N sequences interleave in one panel, and two jobs called `web` are

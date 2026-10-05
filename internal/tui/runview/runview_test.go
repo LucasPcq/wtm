@@ -90,7 +90,7 @@ func newHarness(t *testing.T, params harnessParams) *testHarness {
 		Lines:   params.Lines,
 	})
 
-	model := New(Params{Board: board, Job: params.Job})
+	model := New(t.Context(), Params{Board: board, Job: params.Job})
 	t.Cleanup(func() { model.panes.closeAll() })
 	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 
@@ -347,7 +347,7 @@ func TestAJobListArrivingMidAttachDoesNotAttachTwice(t *testing.T) {
 		Streams: map[string]runlogs.Stream{"api": stream},
 	})
 
-	model := New(Params{Board: board})
+	model := New(t.Context(), Params{Board: board})
 	t.Cleanup(func() {
 		model.cancel()
 		model.panes.closeAll()

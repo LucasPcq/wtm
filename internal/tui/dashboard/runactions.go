@@ -123,7 +123,7 @@ func (m Model) runUp(params runUpParams) (Model, tea.Cmd) {
 			opID:      id,
 			targetKey: declared.TargetKey,
 		},
-		Presenter: runPresenter{presenter: presenter{send: send, id: id}, Watcher: detachedWatcher{send: send, id: id}},
+		Presenter: runPresenter{presenter: presenter{send: send, id: id}, Watcher: detachedWatcher{ctx: m.ctx, send: send, id: id}},
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
@@ -174,7 +174,7 @@ func (m Model) startRunJob(selected domain.WorktreeStatus) (Model, tea.Cmd) {
 			opID:      id,
 			targetKey: declared.TargetKey,
 		},
-		Presenter: runPresenter{presenter: presenter{send: send, id: id}, Watcher: detachedWatcher{send: send, id: id}},
+		Presenter: runPresenter{presenter: presenter{send: send, id: id}, Watcher: detachedWatcher{ctx: m.ctx, send: send, id: id}},
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {

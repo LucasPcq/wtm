@@ -10,7 +10,7 @@ import (
 
 func TestOpenKeyDoesNothingWithoutAURL(t *testing.T) {
 	opened := ""
-	model := New(Params{Open: func(url string) error {
+	model := New(t.Context(), Params{Open: func(url string) error {
 		opened = url
 		return nil
 	}})
@@ -26,7 +26,7 @@ func TestOpenKeyDoesNothingWithoutAURL(t *testing.T) {
 
 func TestOpenKeyOpensTheSelectedJobURL(t *testing.T) {
 	opened := ""
-	model := New(Params{Open: func(url string) error {
+	model := New(t.Context(), Params{Open: func(url string) error {
 		opened = url
 		return nil
 	}})
@@ -47,7 +47,7 @@ func TestOpenKeyOpensTheSelectedJobURL(t *testing.T) {
 // A machine with no xdg-open must say so: a key that silently does nothing is
 // indistinguishable from a frozen terminal.
 func TestOpenKeyReportsAnOpenerThatFailed(t *testing.T) {
-	model := New(Params{Open: func(string) error { return errors.New("no xdg-open") }})
+	model := New(t.Context(), Params{Open: func(string) error { return errors.New("no xdg-open") }})
 	model.selected = "web"
 	model.sequence.remember(runlogs.Event{Job: "web", URL: "http://localhost:3010"})
 

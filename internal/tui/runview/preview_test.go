@@ -17,7 +17,7 @@ import (
 func previewHarness(t *testing.T, job string, views []runlogs.JobView, lines map[string][]string) *testHarness {
 	t.Helper()
 	board := runlogstest.NewBoard(runlogstest.BoardParams{Views: views, Lines: lines})
-	model := NewPreview(PreviewParams{Board: board, Job: job})
+	model := NewPreview(t.Context(), PreviewParams{Board: board, Job: job})
 	t.Cleanup(model.Close)
 
 	sized, _ := model.SetSize(60, 12)
