@@ -345,3 +345,31 @@ func TestAnIsolationChangeIsPublishedAndAnUnchangedOneIsNot(t *testing.T) {
 		t.Fatalf("isolation updates = %+v, want exactly one, to isolated", updates)
 	}
 }
+
+func TestRunSettlesTheConfiguredEnvDespiteAnOrphanLink(t *testing.T) {
+	ctx := testContext(t)
+	write(t, filepath.Join(ctx.ProjectDir, ".env"), "SHARED=main\nWEB_PORT=3000\n")
+	if err := config.WriteRun(config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
+		Jobs: []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}}},
+		EnvPorts: []domain.EnvPortLink{
+			{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"},
+			{File: "services/x/.env", Key: "X_PORT", Job: "web", Port: "PORT"},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	path := makeWorktree(t, ctx, "feat/a")
+
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyRecap: domain.EnvApplyValue}}
+	outcome, _, err := run(ctx, Request{Worktree: "feat/a"}, prompter)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := read(t, filepath.Join(path, ".env")); strings.Contains(got, "WEB_PORT=3000") {
+		t.Errorf(".env = %q, want WEB_PORT moved off main's port", got)
+	}
+	warnings := outcome.Result.Warnings
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "X_PORT") || !strings.Contains(warnings[0], "services/x/.env") || strings.Contains(warnings[0], "not settled") {
+		t.Errorf("warnings = %v, want the orphan link named alone, the pass settled", warnings)
+	}
+}

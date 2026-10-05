@@ -191,7 +191,7 @@ type provisionParams struct {
 	Branch    string
 	Source    string
 	Answers   flow.Answers
-	Preflight error
+	Preflight envports.RunCheck
 	Batch     bool
 }
 

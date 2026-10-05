@@ -30,7 +30,7 @@ Enter
 Wait+Screen@15s /Env strategy/
 Sleep 1.5s
 Enter
-Wait+Screen@15s /Isolate it/
+Wait+Screen@15s /runs next to its source/
 Sleep 2s
 Enter
 Wait+Screen@15s /Yes, create worktree/

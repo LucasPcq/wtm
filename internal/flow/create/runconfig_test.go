@@ -3,6 +3,7 @@ package create
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -68,14 +69,6 @@ func TestRunCreatesWhateverStateRunTomlIsIn(t *testing.T) {
 			cause: "bogus_key",
 		},
 		{
-			name: "link on a file config.toml does not provision",
-			setup: func(t *testing.T, ctx *flow.Context) {
-				ctx.Config.Project.Env.Files = []domain.EnvFile{{Target: ".env"}}
-				linkedRunConfig(t, *ctx, "apps/gone/.env")
-			},
-			cause: "apps/gone/.env",
-		},
-		{
 			name: "neighbour meta unreadable, links declared",
 			setup: func(t *testing.T, ctx *flow.Context) {
 				ctx.Config.Project.Env.Files = []domain.EnvFile{{Target: ".env"}}
@@ -126,6 +119,65 @@ func TestRunCreatesWhateverStateRunTomlIsIn(t *testing.T) {
 				t.Errorf("statuses = %+v, want a warning naming %q", presenter.Statuses, tc.cause)
 			}
 		})
+	}
+}
+
+// A link naming a .env config.toml does not provision is that link's problem
+// alone: the configured .env is still settled, and the orphan is named.
+func TestRunSettlesTheConfiguredEnvDespiteAnOrphanLink(t *testing.T) {
+	ctx := testContext(t)
+	ctx.Config.Project.Env.Strategy = domain.EnvStrategyMain
+	ctx.Config.Project.Env.Files = []domain.EnvFile{{Target: ".env"}}
+	if err := os.WriteFile(filepath.Join(ctx.ProjectDir, ".env"), []byte("WEB_PORT=3000\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.WriteRun(config.WriteRunParams{
+		StateDir: ctx.StateDir,
+		Force:    true,
+		Config: domain.RunConfig{
+			Jobs: []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "true", Ports: map[string]int{"PORT": 3000}}},
+			EnvPorts: []domain.EnvPortLink{
+				{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"},
+				{File: "services/x/.env", Key: "X_PORT", Job: "web", Port: "PORT"},
+			},
+			EnvValues: []domain.EnvValueLink{{File: "services/x/.env", Key: "X_NAME", Job: "web", Value: "{worktree}"}},
+		},
+	}); err != nil {
+		t.Fatalf("write run config: %v", err)
+	}
+	presenter := newRecorder()
+
+	outcome, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Branches: []string{"feat/orphan"}, From: "main", EnvFrom: "main"},
+		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyIsolation: string(domain.IsolationIsolated), KeyRecap: confirmCreate}},
+		Presenter: presenter,
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	result := outcome.Results[0]
+	body, err := os.ReadFile(filepath.Join(result.Path, ".env"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), "WEB_PORT=3000") {
+		t.Errorf(".env = %q, want WEB_PORT moved off main's port", body)
+	}
+	if !result.EnvPorts.Applied {
+		t.Errorf("env_ports = %+v, want the configured link applied", result.EnvPorts)
+	}
+	for _, key := range []string{"X_PORT", "X_NAME"} {
+		if !slices.ContainsFunc(result.Warnings, func(w string) bool { return strings.Contains(w, key) && strings.Contains(w, "services/x/.env") }) {
+			t.Errorf("warnings = %v, want one naming the orphan link %s", result.Warnings, key)
+		}
+		if !recordedWarning(presenter.Statuses, key) {
+			t.Errorf("statuses = %+v, want a warning naming %s", presenter.Statuses, key)
+		}
+	}
+	if len(result.Warnings) != 2 {
+		t.Errorf("warnings = %v, want exactly the two orphan links", result.Warnings)
 	}
 }
 
