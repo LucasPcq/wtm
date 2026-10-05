@@ -4,6 +4,10 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [0.29.1] - 2026-10-05
+
+A fix release for `wtm create` and `run.toml`, with a shorter isolation question.
+
 ### Changed
 
 - **`wtm create <branch>...`** with several names skips the branches step, as a single name does, and opens the wizard on the source branch.
@@ -701,7 +705,8 @@ Initial release.
 - **Detection** of the base branch, env files, package manager, Docker Compose and pnpm workspaces.
 - **Install** with Homebrew (`brew install LucasPcq/tap/wtm`), release binaries or `go install`.
 
-[Unreleased]: https://github.com/LucasPcq/wtm/compare/v0.29.0...HEAD
+[Unreleased]: https://github.com/LucasPcq/wtm/compare/v0.29.1...HEAD
+[0.29.1]: https://github.com/LucasPcq/wtm/releases/tag/v0.29.1
 [0.29.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.29.0
 [0.28.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.28.0
 [0.27.1]: https://github.com/LucasPcq/wtm/releases/tag/v0.27.1
