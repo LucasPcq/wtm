@@ -16,3 +16,5 @@ Reference documentation for people (and agents) working **on** wtm. It describes
 | [changelog.md](changelog.md) | How to write `CHANGELOG.md`: the release template, the rules, and how a section becomes the GitHub release notes |
 
 For the coding standards themselves (immutability, struct params, constants, comment density), see [`CLAUDE.md`](../../CLAUDE.md) and the `go-cli` skill in `.claude/skills/go-cli/SKILL.md`.
+
+To open a pull request (base branch from `wtm tree`, before/after terminal proof hosted on a `pr-assets/<branch>` orphan branch, body template), follow the `open-pr` skill in `.claude/skills/open-pr/SKILL.md`.
