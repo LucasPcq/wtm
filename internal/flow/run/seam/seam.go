@@ -74,11 +74,11 @@ type Seam struct {
 	shared     *domain.SharedJobContext
 }
 
-func Open(params Params) Seam {
-	branch := target.BranchOf(params.WorkDir)
+func Open(ctx context.Context, params Params) Seam {
+	branch := target.BranchOf(ctx, params.WorkDir)
 	logDir := logDirOf(params.StateDir, branch)
 	service := runlogs.NewService(runlogs.ServiceParams{SocketPath: process.SocketPath()})
-	env, envErr := JobEnv(JobEnvParams{
+	env, envErr := JobEnv(ctx, JobEnvParams{
 		ProjectDir: params.ProjectDir,
 		StateDir:   params.StateDir,
 		WorkDir:    params.WorkDir,
@@ -87,7 +87,7 @@ func Open(params Params) Seam {
 	// Resolved once, and only when something declares a shared job: it costs a
 	// git worktree list plus a full environment resolution for the main
 	// checkout, and every run command opens a seam.
-	shared := sharedContext(params)
+	shared := sharedContext(ctx, params)
 	return Seam{
 		service: service,
 		board: runlogs.NewBoard(runlogs.BoardParams{
@@ -102,7 +102,7 @@ func Open(params Params) Seam {
 			// and every surface over it then reads the same trace rather than
 			// listing its own idea of what this worktree has run.
 			Logged:         process.LoggedJobs(logDir),
-			SharedWorktree: sharedWorktreeOf(sharedWorktreeParams{Shared: shared, WorkDir: params.WorkDir}),
+			SharedWorktree: sharedWorktreeOf(ctx, sharedWorktreeParams{Shared: shared, WorkDir: params.WorkDir}),
 			Env:            env,
 		}),
 		workDir:    params.WorkDir,
@@ -137,22 +137,22 @@ func sharedLogDirOf(shared *domain.SharedJobContext) string {
 
 // A project declaring no shared job pays nothing — the git calls below would
 // otherwise be added to every single run command, `run ps` included.
-func sharedContext(params Params) *domain.SharedJobContext {
+func sharedContext(ctx context.Context, params Params) *domain.SharedJobContext {
 	if !rules.AnySharedJob(declaredOf(params)) {
 		return nil
 	}
-	main, err := worktree.MainCheckout(worktree.MainCheckoutParams{ProjectDir: params.ProjectDir})
+	main, err := worktree.MainCheckout(ctx, worktree.MainCheckoutParams{ProjectDir: params.ProjectDir})
 	if err != nil {
 		return nil
 	}
-	env, err := JobEnv(JobEnvParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, WorkDir: main, Publisher: params.Publisher})
+	env, err := JobEnv(ctx, JobEnvParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, WorkDir: main, Publisher: params.Publisher})
 	if err != nil {
 		return nil
 	}
 	return &domain.SharedJobContext{
 		WorkDir: main,
 		Env:     env,
-		LogDir:  logDirOf(params.StateDir, target.BranchOf(main)),
+		LogDir:  logDirOf(params.StateDir, target.BranchOf(ctx, main)),
 	}
 }
 
@@ -163,11 +163,11 @@ type sharedWorktreeParams struct {
 
 // sharedWorktreeOf names where this worktree's shared services run, empty when
 // they run here.
-func sharedWorktreeOf(params sharedWorktreeParams) string {
+func sharedWorktreeOf(ctx context.Context, params sharedWorktreeParams) string {
 	if params.Shared == nil || params.Shared.WorkDir == params.WorkDir {
 		return ""
 	}
-	return target.BranchOf(params.Shared.WorkDir)
+	return target.BranchOf(ctx, params.Shared.WorkDir)
 }
 
 func (s Seam) Board() runlogs.Board { return s.board }
@@ -250,7 +250,7 @@ func (s Seam) start(ctx context.Context, sink runlogs.Sink, params StartParams) 
 		return runlogs.Outcome{}, s.envErr
 	}
 	return runlogs.Run(ctx, runlogs.RunParams{
-		BaseOwners:     s.baseOwners(),
+		BaseOwners:     s.baseOwners(ctx),
 		Service:        s.service,
 		Sink:           sink,
 		Jobs:           params.Jobs,
@@ -265,7 +265,7 @@ func (s Seam) start(ctx context.Context, sink runlogs.Sink, params StartParams) 
 		ProxyPort:      s.proxyPort,
 		PublicPort:     s.publicPort,
 		Shared:         s.shared,
-		SharedWorktree: sharedWorktreeOf(sharedWorktreeParams{Shared: s.shared, WorkDir: s.workDir}),
+		SharedWorktree: sharedWorktreeOf(ctx, sharedWorktreeParams{Shared: s.shared, WorkDir: s.workDir}),
 	})
 }
 
@@ -285,7 +285,7 @@ func declaredOf(params Params) []domain.JobConfig {
 // does not blame a command for a port the main checkout holds. An unreachable
 // daemon yields nothing, which restores the older message rather than refusing
 // the run: a diagnosis never blocks a start.
-func (s Seam) baseOwners() map[int]string {
+func (s Seam) baseOwners(ctx context.Context) map[int]string {
 	running, err := s.service.List("")
 	if err != nil {
 		return nil
@@ -294,13 +294,13 @@ func (s Seam) baseOwners() map[int]string {
 		SelfWorkDir: s.workDir,
 		Jobs:        s.declared,
 		Running:     running,
-		Holders:     holdersOf(running),
+		Holders:     holdersOf(ctx, running),
 	})
 }
 
 // holdersOf names each worktree the daemon has something up in. The branch is
 // looked up here rather than carried by the daemon, which must never run git.
-func holdersOf(running []domain.JobInfo) []rules.PortHolder {
+func holdersOf(ctx context.Context, running []domain.JobInfo) []rules.PortHolder {
 	seen := make(map[string]bool, len(running))
 	holders := make([]rules.PortHolder, 0, len(running))
 	for _, info := range running {
@@ -310,7 +310,7 @@ func holdersOf(running []domain.JobInfo) []rules.PortHolder {
 		seen[info.WorkDir] = true
 		holders = append(holders, rules.PortHolder{
 			WorkDir:  info.WorkDir,
-			Worktree: target.BranchOf(info.WorkDir),
+			Worktree: target.BranchOf(ctx, info.WorkDir),
 		})
 	}
 	return holders
@@ -354,13 +354,13 @@ type JobEnvParams struct {
 // run, numbering the worktree the first time one asks. It fails rather than
 // degrade: a worktree with no offset and no name is one whose jobs would bind
 // the main checkout's ports.
-func JobEnv(params JobEnvParams) (map[string]string, error) {
+func JobEnv(ctx context.Context, params JobEnvParams) (map[string]string, error) {
 	var env map[string]string
-	err := ordinal.Retry(ordinal.RetryParams{
+	err := ordinal.Retry(ctx, ordinal.RetryParams{
 		Context: flow.Context{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Publisher: params.Publisher},
-		Branch:  func() string { return target.BranchOf(params.WorkDir) },
+		Branch:  func() string { return target.BranchOf(ctx, params.WorkDir) },
 		Do: func() error {
-			resolved, resolveErr := worktree.JobEnv(worktree.JobEnvParams{
+			resolved, resolveErr := worktree.JobEnv(ctx, worktree.JobEnvParams{
 				ProjectDir: params.ProjectDir,
 				StateDir:   params.StateDir,
 				Dir:        params.WorkDir,
@@ -386,12 +386,12 @@ type RequireEnvParams struct {
 // worktrees has no environment to give its jobs, or has yet to choose its
 // isolation. The choice is checked first: resolving the environment allocates
 // the ordinal the choice is about.
-func RequireEnv(params RequireEnvParams) error {
+func RequireEnv(ctx context.Context, params RequireEnvParams) error {
 	for _, dir := range params.WorkDirs {
-		if err := requireIsolationChosen(requireChosenParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, WorkDir: dir}); err != nil {
+		if err := requireIsolationChosen(ctx, requireChosenParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, WorkDir: dir}); err != nil {
 			return err
 		}
-		if _, err := JobEnv(JobEnvParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, WorkDir: dir, Publisher: params.Publisher}); err != nil {
+		if _, err := JobEnv(ctx, JobEnvParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, WorkDir: dir, Publisher: params.Publisher}); err != nil {
 			return err
 		}
 	}
@@ -404,12 +404,12 @@ type requireChosenParams struct {
 	WorkDir    string
 }
 
-func requireIsolationChosen(params requireChosenParams) error {
-	branch := target.BranchOf(params.WorkDir)
+func requireIsolationChosen(ctx context.Context, params requireChosenParams) error {
+	branch := target.BranchOf(ctx, params.WorkDir)
 	if branch == "" {
 		return nil
 	}
-	plan, err := worktree.IsolationAdoptionFor(worktree.IsolationAdoptionParams{
+	plan, err := worktree.IsolationAdoptionFor(ctx, worktree.IsolationAdoptionParams{
 		Ref:          worktree.WorktreeRef{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: branch},
 		WorktreePath: params.WorkDir,
 	})

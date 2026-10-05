@@ -395,7 +395,7 @@ func (m Model) loadWorktreesCmd(fetch bool) tea.Cmd {
 		if fetch {
 			list = worktree.Refresh
 		}
-		statuses, err := list(listParams)
+		statuses, err := list(m.ctx, listParams)
 		if err != nil {
 			return worktreesMsg{err: err}
 		}
@@ -406,7 +406,7 @@ func (m Model) loadWorktreesCmd(fetch bool) tea.Cmd {
 				Branch:   status.Branch,
 			})
 		}
-		fetchedAt := worktree.LastFetchAt(worktree.LastFetchAtParams{ProjectDir: projectDir})
+		fetchedAt := worktree.LastFetchAt(m.ctx, worktree.LastFetchAtParams{ProjectDir: projectDir})
 		return worktreesMsg{statuses: statuses, parents: parents, fetchedAt: fetchedAt}
 	}
 }
@@ -416,7 +416,7 @@ func (m Model) loadWorktreesCmd(fetch bool) tea.Cmd {
 func (m Model) loadTreeCmd() tea.Cmd {
 	listParams, running := m.listParams, m.running
 	return func() tea.Msg {
-		forest, err := worktree.BuildTree(worktree.BuildTreeParams{
+		forest, err := worktree.BuildTree(m.ctx, worktree.BuildTreeParams{
 			ProjectDir: listParams.ProjectDir,
 			StateDir:   listParams.StateDir,
 			Config:     listParams.Config,

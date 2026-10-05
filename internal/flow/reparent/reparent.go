@@ -65,7 +65,7 @@ type reparentFlow struct {
 }
 
 func (f *reparentFlow) run() (Outcome, error) {
-	nodes, err := worktree.Nodes(worktree.NodesParams{
+	nodes, err := worktree.Nodes(f.runCtx, worktree.NodesParams{
 		ProjectDir: f.ctx.ProjectDir,
 		StateDir:   f.ctx.StateDir,
 	})
@@ -73,7 +73,7 @@ func (f *reparentFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 	f.nodes = nodes
-	f.candidates = decide.BranchCandidates(f.ctx.ProjectDir)
+	f.candidates = decide.BranchCandidates(f.runCtx, f.ctx.ProjectDir)
 
 	answers, err := f.prompter.Ask(f.session())
 	if errors.Is(err, domain.ErrUserAborted) {
@@ -89,7 +89,7 @@ func (f *reparentFlow) run() (Outcome, error) {
 		Message: domain.ReparentStageMessage,
 		Work: func(ctx context.Context) error {
 			var batchErr error
-			results, batchErr = worktree.ReparentBatch(domain.ReparentBatchParams{
+			results, batchErr = worktree.ReparentBatch(ctx, domain.ReparentBatchParams{
 				ProjectDir: f.ctx.ProjectDir,
 				StateDir:   f.ctx.StateDir,
 				Branches:   answers.Values(KeyBranches),
@@ -99,7 +99,7 @@ func (f *reparentFlow) run() (Outcome, error) {
 			return batchErr
 		},
 	})
-	publish.ReparentedAll(f.ctx, results)
+	publish.ReparentedAll(f.runCtx, f.ctx, results)
 	if err != nil {
 		return Outcome{}, err
 	}

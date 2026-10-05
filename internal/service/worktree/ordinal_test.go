@@ -32,7 +32,7 @@ func (r ordinalRepo) addWorktree(t *testing.T, branch string) string {
 
 func (r ordinalRepo) ensure(t *testing.T, branch string) int {
 	t.Helper()
-	claim, err := EnsureOrdinal(WorktreeRef{
+	claim, err := EnsureOrdinal(t.Context(), WorktreeRef{
 		ProjectDir: r.dir,
 		StateDir:   r.stateDir,
 		Branch:     branch,
@@ -256,7 +256,7 @@ func TestEnsureOrdinalNeverCollidesUnderConcurrency(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ordinal, err := EnsureOrdinal(WorktreeRef{
+			ordinal, err := EnsureOrdinal(t.Context(), WorktreeRef{
 				ProjectDir: repo.dir,
 				StateDir:   repo.stateDir,
 				Branch:     branch,
@@ -292,7 +292,7 @@ func TestEnsureOrdinalRefusesWhenAnotherOrdinalIsUnreadable(t *testing.T) {
 		t.Fatalf("corrupt meta: %v", err)
 	}
 
-	_, err := EnsureOrdinal(WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "feat/two"})
+	_, err := EnsureOrdinal(t.Context(), WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "feat/two"})
 	if !errors.Is(err, domain.ErrOrdinalUnreadable) {
 		t.Errorf("error = %v, want %v", err, domain.ErrOrdinalUnreadable)
 	}
@@ -312,7 +312,7 @@ func TestEnsureOrdinalRefusesAnIncompleteReference(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if _, err := EnsureOrdinal(c.ref); !errors.Is(err, domain.ErrOrdinalRefIncomplete) {
+			if _, err := EnsureOrdinal(t.Context(), c.ref); !errors.Is(err, domain.ErrOrdinalRefIncomplete) {
 				t.Errorf("error = %v, want %v", err, domain.ErrOrdinalRefIncomplete)
 			}
 		})

@@ -48,14 +48,14 @@ func runAddressing(cmd *cobra.Command, args []string) error {
 	}
 
 	keepEnv, _ := cmd.Flags().GetBool(domain.FlagKeepEnv)
-	outcome, err := addressingflow.Switch(addressingflow.SwitchParams{
+	outcome, err := addressingflow.Switch(cmd.Context(), addressingflow.SwitchParams{
 		Context: ctx.FlowContext(),
 		Request: addressingflow.SwitchRequest{
 			Mode:    domain.Addressing(runctx.FirstArg(args)),
 			KeepEnv: keepEnv,
 			Config:  ctx.Run,
 		},
-		Prompter:  ctx.Prompter(ctx.Interactive),
+		Prompter:  ctx.Prompter(cmd.Context(), ctx.Interactive),
 		Presenter: addressingPresenter{CLIPresenter: ctx.CLI(cmd)},
 	})
 	if err != nil {

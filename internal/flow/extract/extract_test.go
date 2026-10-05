@@ -230,7 +230,7 @@ func TestTheNewTargetsParentIsTheSourcesOwn(t *testing.T) {
 		t.Errorf("the parent offered first = %q, want the picked source's recorded parent", got)
 	}
 
-	unattended := &extractFlow{ctx: r.ctx}
+	unattended := &extractFlow{runCtx: t.Context(), ctx: r.ctx}
 	if got := unattended.defaultParent(flow.NewAnswers(map[string]string{KeySource: "dst"})); got != "" {
 		t.Errorf("a source with no recorded parent = %q, want create's base branch to stand in", got)
 	}
@@ -327,9 +327,9 @@ func TestNoWorktreeWithChangesIsNothingToDo(t *testing.T) {
 // breadcrumb counts only what can still be asked.
 func TestAnExistingTargetLeavesCreatesStepsOut(t *testing.T) {
 	r := newRepo(t)
-	f := &extractFlow{ctx: r.ctx, request: Request{Source: "src", To: "dst"}, changes: map[string][]domain.ExtractFile{}, paths: map[string]string{}}
-	f.create = f.embed()
-	for _, step := range f.session().Steps {
+	f := &extractFlow{runCtx: t.Context(), ctx: r.ctx, request: Request{Source: "src", To: "dst"}, changes: map[string][]domain.ExtractFile{}, paths: map[string]string{}}
+	f.create = f.embed(t.Context())
+	for _, step := range f.session(t.Context()).Steps {
 		if strings.HasPrefix(step.Key, "create.") {
 			t.Errorf("step %s is in a session whose target exists", step.Key)
 		}

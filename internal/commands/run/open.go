@@ -55,9 +55,9 @@ func runOpen(cmd *cobra.Command, args []string) error {
 			Raw:      raw,
 			Config:   ctx.Run,
 		},
-		Prompter:  ctx.Prompter(ctx.Interactive),
+		Prompter:  ctx.Prompter(cmd.Context(), ctx.Interactive),
 		Presenter: openPresenter{CLIPresenter: ctx.CLI(cmd)},
-		Open:      openInBrowser,
+		Open:      func(url string) error { return openInBrowser(cmd.Context(), url) },
 	})
 	if err != nil {
 		return err

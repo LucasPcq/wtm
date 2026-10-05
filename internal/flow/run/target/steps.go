@@ -1,6 +1,7 @@
 package target
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -25,19 +26,19 @@ type WorktreeParams struct {
 // WorktreeStep asks which worktree the command acts on. It is skipped when the
 // repository holds a single one — a list of one asks nothing — and answers with
 // the current worktree whenever it is not asked.
-func WorktreeStep(params WorktreeParams) flow.Step {
+func WorktreeStep(ctx context.Context, params WorktreeParams) flow.Step {
 	list := &worktreeList{projectDir: params.ProjectDir}
 	// Spelled the way git spells it, whatever the caller passed: the listing is,
 	// and on macOS a /var that git calls /private/var would otherwise match no
 	// row — losing the cursor and the "current" badge without a word.
-	params.Current = Root(params.Current)
+	params.Current = Root(ctx, params.Current)
 
 	return flow.Step{
 		Kind:  flow.StepSelect,
 		Key:   KeyWorktree,
 		Label: domain.RunWorktreeStepName,
 		Skip: func(flow.Answers) (bool, string) {
-			worktrees, err := list.get()
+			worktrees, err := list.get(ctx)
 			if err != nil {
 				return true, domain.RunWorktreeUnreadable
 			}
@@ -47,7 +48,7 @@ func WorktreeStep(params WorktreeParams) flow.Step {
 			return false, ""
 		},
 		Build: func(flow.Answers) (flow.StepContent, error) {
-			worktrees, err := list.get()
+			worktrees, err := list.get(ctx)
 			if err != nil {
 				return flow.StepContent{}, fmt.Errorf("list worktrees: %w", err)
 			}
@@ -63,7 +64,7 @@ func WorktreeStep(params WorktreeParams) flow.Step {
 		},
 		// The answer is a path, which is the daemon's key; the recap shows the
 		// branch, which is what the reader typed and recognises.
-		Summarize: func(answer flow.Answer) string { return list.branchOf(answer.Value) },
+		Summarize: func(answer flow.Answer) string { return list.branchOf(ctx, answer.Value) },
 	}
 }
 
@@ -105,16 +106,16 @@ type WorktreesParams struct {
 // of WorktreeStep, for the commands that can address several at once. It skips
 // and resolves exactly as the single one does: a repository holding one
 // worktree asks nothing, and a run that cannot ask acts on the current one.
-func WorktreesStep(params WorktreesParams) flow.Step {
+func WorktreesStep(ctx context.Context, params WorktreesParams) flow.Step {
 	list := &worktreeList{projectDir: params.ProjectDir}
-	params.Current = Root(params.Current)
+	params.Current = Root(ctx, params.Current)
 
 	return flow.Step{
 		Kind:  flow.StepMultiSelect,
 		Key:   KeyWorktree,
 		Label: domain.RunWorktreesStepName,
 		Skip: func(flow.Answers) (bool, string) {
-			worktrees, err := list.get()
+			worktrees, err := list.get(ctx)
 			if err != nil {
 				return true, domain.RunWorktreeUnreadable
 			}
@@ -124,7 +125,7 @@ func WorktreesStep(params WorktreesParams) flow.Step {
 			return false, ""
 		},
 		Build: func(flow.Answers) (flow.StepContent, error) {
-			worktrees, err := list.get()
+			worktrees, err := list.get(ctx)
 			if err != nil {
 				return flow.StepContent{}, fmt.Errorf("list worktrees: %w", err)
 			}
@@ -147,7 +148,7 @@ func WorktreesStep(params WorktreesParams) flow.Step {
 		Resolve: func(flow.Answers) (flow.Answer, error) {
 			return flow.Answer{Values: []string{params.Current}}, nil
 		},
-		Summarize: func(answer flow.Answer) string { return list.branchesOf(answer.Values) },
+		Summarize: func(answer flow.Answer) string { return list.branchesOf(ctx, answer.Values) },
 	}
 }
 
@@ -261,9 +262,9 @@ type URLParams struct {
 // none asks nothing — a single address is the answer, not a question — and a run
 // that cannot ask is refused with the jobs it could have meant, rather than with
 // the generic "pass --job": naming them is what makes the refusal actionable.
-func URLStep(params URLParams) flow.Step {
+func URLStep(ctx context.Context, params URLParams) flow.Step {
 	published := func(answers flow.Answers) []domain.JobURLEntry {
-		return params.Published(WorkDir(WorkDirParams{Answers: answers, Named: params.Named, Cwd: params.Cwd}))
+		return params.Published(WorkDir(ctx, WorkDirParams{Answers: answers, Named: params.Named, Cwd: params.Cwd}))
 	}
 
 	return flow.Step{

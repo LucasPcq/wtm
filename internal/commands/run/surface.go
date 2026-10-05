@@ -46,7 +46,7 @@ func openRunView(params viewParams) (runlogs.Outcomes, error) {
 		Worktrees:  params.Worktrees,
 		Warnings:   params.Warnings,
 		Start:      params.Start,
-		Open:       integration.OpenURL,
+		Open:       func(url string) error { return integration.OpenURL(params.Cmd.Context(), url) },
 		Hyperlinks: true,
 		Detach:     runview.Detach{Notice: rest.open, Sink: rest, Await: true},
 	})

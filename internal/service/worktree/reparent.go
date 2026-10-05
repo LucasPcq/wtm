@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -14,8 +15,8 @@ import (
 // or an origin remote-tracking branch (origin/x), and the combined change must keep
 // the parent graph acyclic. A single-element Branches is the ordinary one-worktree
 // reparent.
-func ReparentBatch(params domain.ReparentBatchParams) ([]domain.ReparentResult, error) {
-	nodes, err := buildNodes(params.ProjectDir, params.StateDir)
+func ReparentBatch(ctx context.Context, params domain.ReparentBatchParams) ([]domain.ReparentResult, error) {
+	nodes, err := buildNodes(ctx, params.ProjectDir, params.StateDir)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +31,7 @@ func ReparentBatch(params domain.ReparentBatchParams) ([]domain.ReparentResult, 
 		}
 	}
 
-	if !infra.BranchOrRemoteExists(infra.BranchOrRemoteExistsParams{
+	if !infra.BranchOrRemoteExists(ctx, infra.BranchOrRemoteExistsParams{
 		ProjectDir: params.ProjectDir,
 		Ref:        params.NewParent,
 	}) {

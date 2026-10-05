@@ -1,8 +1,8 @@
 package infra
 
 import (
+	"context"
 	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
 
@@ -16,8 +16,8 @@ type IsDirtyParams struct {
 }
 
 // IsDirty checks if a worktree has uncommitted changes.
-func IsDirty(params IsDirtyParams) (bool, error) {
-	cmd := exec.Command("git", "-C", params.WorktreePath, "status", "--porcelain")
+func IsDirty(ctx context.Context, params IsDirtyParams) (bool, error) {
+	cmd := Command(ctx, "git", "-C", params.WorktreePath, "status", "--porcelain")
 	out, err := cmd.Output()
 	if err != nil {
 		return false, fmt.Errorf("git status: %w", err)
@@ -34,8 +34,8 @@ type CommitsAheadParams struct {
 
 // CommitsAhead returns how many commits a branch is ahead of the base branch.
 // Returns 0 if the base branch doesn't exist or on error.
-func CommitsAhead(params CommitsAheadParams) (int, error) {
-	cmd := exec.Command("git", "-C", params.WorktreePath, "rev-list", "--count",
+func CommitsAhead(ctx context.Context, params CommitsAheadParams) (int, error) {
+	cmd := Command(ctx, "git", "-C", params.WorktreePath, "rev-list", "--count",
 		params.BaseBranch+".."+params.Branch)
 	out, err := cmd.Output()
 	if err != nil {
@@ -57,8 +57,8 @@ type ListModifiedFilesParams struct {
 // file. -z keeps paths verbatim (no quoting of spaces or non-ASCII) and
 // --untracked-files=all lists the contents of new directories instead of
 // collapsing them into a single entry, so each file can be selected on its own.
-func ListModifiedFiles(params ListModifiedFilesParams) ([]domain.PorcelainEntry, error) {
-	cmd := exec.Command("git", "-C", params.WorktreePath,
+func ListModifiedFiles(ctx context.Context, params ListModifiedFilesParams) ([]domain.PorcelainEntry, error) {
+	cmd := Command(ctx, "git", "-C", params.WorktreePath,
 		"status", "--porcelain", "-z", "--untracked-files=all")
 	out, err := cmd.Output()
 	if err != nil {
@@ -80,8 +80,8 @@ type UnpushedCommitsParams struct {
 
 // UnpushedCommits returns the count of local commits not present on the remote.
 // Returns 0 if there is no remote tracking branch.
-func UnpushedCommits(params UnpushedCommitsParams) (int, error) {
-	cmd := exec.Command("git", "rev-list", "--count", "origin/"+params.Branch+".."+params.Branch)
+func UnpushedCommits(ctx context.Context, params UnpushedCommitsParams) (int, error) {
+	cmd := Command(ctx, "git", "rev-list", "--count", "origin/"+params.Branch+".."+params.Branch)
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.Output()
 	if err != nil {

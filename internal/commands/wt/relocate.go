@@ -82,9 +82,9 @@ func runRelocate(cmd *cobra.Command, _ []string) error {
 			To:         to,
 			Force:      force,
 			DryRun:     dryRun,
-			BaseBranch: resolveBase("", cfg),
+			BaseBranch: resolveBase(cmd.Context(), "", cfg),
 		},
-		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: canPrompt && !yes && !dryRun, Stderr: true}),
+		Prompter:  shared.FlowPrompter(cmd.Context(), shared.FlowPrompterParams{Interactive: canPrompt && !yes && !dryRun, Stderr: true}),
 		Presenter: relocatePresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
 	})
 	return err

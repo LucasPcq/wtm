@@ -2,6 +2,7 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -74,7 +75,7 @@ func runUI(cmd *cobra.Command, version string) error {
 		return err
 	}
 
-	return dashboard.Run(cmd.Context(), buildRunParams(buildParams{Dir: dir, Result: result, Version: version}))
+	return dashboard.Run(cmd.Context(), buildRunParams(cmd.Context(), buildParams{Dir: dir, Result: result, Version: version}))
 }
 
 // buildRunParams assembles the dashboard's inputs from the resolved config and
@@ -88,7 +89,7 @@ type buildParams struct {
 	Version string
 }
 
-func buildRunParams(params buildParams) dashboard.RunParams {
+func buildRunParams(ctx context.Context, params buildParams) dashboard.RunParams {
 	result := params.Result
 	publisher := events.NewPublisher(events.PublisherParams{ProjectDir: result.ProjectDir})
 
@@ -102,17 +103,17 @@ func buildRunParams(params buildParams) dashboard.RunParams {
 		// Read from the cached state only: the dashboard must not pay a network
 		// round-trip to draw its header.
 		UpgradeLatest: selfupdate.CachedUpgrade(params.Version),
-		PRLoader:      func() ([]domain.PRInfo, domain.GHConnection) { return shared.LoadPRsWithChecks(result.ProjectDir) },
+		PRLoader:      func() ([]domain.PRInfo, domain.GHConnection) { return shared.LoadPRsWithChecks(ctx, result.ProjectDir) },
 		PROpener: func(number int) error {
-			return ghservice.OpenPR(ghservice.OpenPRParams{ProjectDir: result.ProjectDir, Number: number})
+			return ghservice.OpenPR(ctx, ghservice.OpenPRParams{ProjectDir: result.ProjectDir, Number: number})
 		},
-		URLOpener: integration.OpenURL,
-		LogsLoader: dashboard.DefaultLogsLoader(dashboard.LogsLoaderParams{
+		URLOpener: func(url string) error { return integration.OpenURL(ctx, url) },
+		LogsLoader: dashboard.DefaultLogsLoader(ctx, dashboard.LogsLoaderParams{
 			ProjectDir: result.ProjectDir,
 			StateDir:   result.StateDir,
 			Publisher:  publisher,
 		}),
-		BoardLoader: dashboard.DefaultBoardLoader(dashboard.LogsLoaderParams{
+		BoardLoader: dashboard.DefaultBoardLoader(ctx, dashboard.LogsLoaderParams{
 			ProjectDir: result.ProjectDir,
 			StateDir:   result.StateDir,
 			Publisher:  publisher,
@@ -125,7 +126,7 @@ func buildRunParams(params buildParams) dashboard.RunParams {
 			return runjobs.Traces(runjobs.TracesParams{StateDir: result.StateDir, Branches: branches})
 		},
 		AddressLoader: func(request dashboard.AddressRequest) domain.RunAddresses {
-			return runjobs.Addresses(runjobs.AddressesParams{
+			return runjobs.Addresses(ctx, runjobs.AddressesParams{
 				ProjectDir: result.ProjectDir,
 				StateDir:   result.StateDir,
 				Config:     request.Config,

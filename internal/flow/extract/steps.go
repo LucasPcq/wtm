@@ -1,6 +1,7 @@
 package extract
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -31,12 +32,12 @@ const (
 
 // The session is flat: create's own steps follow the target, gated on it, so one
 // recap covers both the worktree created and what moves into it.
-func (f *extractFlow) session() flow.Session {
+func (f *extractFlow) session(ctx context.Context) flow.Session {
 	steps := []flow.Step{f.sourceStep(), f.filesStep(), f.targetStep()}
 	if f.mayCreate() {
 		steps = append(steps, f.create.Steps()...)
 	}
-	steps = append(steps, f.modeStep(), f.recapStep())
+	steps = append(steps, f.modeStep(), f.recapStep(ctx))
 
 	presets := f.create.Presets()
 	presets[KeySource] = f.request.Source
@@ -78,12 +79,12 @@ func (f *extractFlow) createsTarget(answers flow.Answers) bool {
 	return answers.Value(KeyTarget) == targetCreate
 }
 
-func (f *extractFlow) embed() create.Embedded {
+func (f *extractFlow) embed(ctx context.Context) create.Embedded {
 	branch := ""
 	if f.creates {
 		branch = f.request.To
 	}
-	return create.Embed(create.EmbedParams{
+	return create.Embed(ctx, create.EmbedParams{
 		Context:      f.ctx,
 		Applies:      f.createsTarget,
 		Branch:       branch,
@@ -242,7 +243,7 @@ func modeSummary(mode string) string {
 	return domain.ExtractModeMoveSummary
 }
 
-func (f *extractFlow) recapStep() flow.Step {
+func (f *extractFlow) recapStep(ctx context.Context) flow.Step {
 	return flow.Step{
 		Kind:  flow.StepRecap,
 		Key:   KeyRecap,
@@ -253,7 +254,7 @@ func (f *extractFlow) recapStep() flow.Step {
 				action = domain.ExtractRecapCreateOption
 			}
 			return flow.StepContent{
-				Description: f.recap(answers),
+				Description: f.recap(ctx, answers),
 				Options:     []flow.Option{{Label: action, Value: confirmExtract}},
 			}, nil
 		},
@@ -263,7 +264,7 @@ func (f *extractFlow) recapStep() flow.Step {
 	}
 }
 
-func (f *extractFlow) recap(answers flow.Answers) string {
+func (f *extractFlow) recap(ctx context.Context, answers flow.Answers) string {
 	var lines []string
 	if source := answers.Value(KeySource); source != "" {
 		lines = append(lines, domain.RecapFieldSource+source)

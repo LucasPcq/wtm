@@ -29,7 +29,7 @@ func repoContext(t *testing.T) flow.Context {
 
 func makeTarget(t *testing.T, ctx flow.Context, branch string) teardown.Target {
 	t.Helper()
-	result, err := worktree.Create(domain.CreateParams{
+	result, err := worktree.Create(t.Context(), domain.CreateParams{
 		ProjectDir: ctx.ProjectDir, StateDir: ctx.StateDir, Branch: branch,
 		FromBranch: "main", SourceBranch: "main", Config: ctx.Config, SkipHooks: true,
 	})
@@ -188,7 +188,7 @@ func TestAWorktreeGoneIsPublishedEvenWhenItsBranchStays(t *testing.T) {
 	if removals[0].Err == nil {
 		t.Fatal("the unmerged branch was expected to fail the removal")
 	}
-	if worktree.StillTracked(worktree.FindByBranchParams{ProjectDir: ctx.ProjectDir, Branch: "feat/a"}) {
+	if worktree.StillTracked(t.Context(), worktree.FindByBranchParams{ProjectDir: ctx.ProjectDir, Branch: "feat/a"}) {
 		t.Fatal("fixture: git still tracks the worktree")
 	}
 	if got := recorder.PublishedTypes(); !slices.Equal(got, deprovisionedThenRemoved) {

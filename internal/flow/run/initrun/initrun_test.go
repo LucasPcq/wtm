@@ -1,6 +1,7 @@
 package initrun
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -28,7 +29,7 @@ type fakeWizard struct {
 	questions []Question
 }
 
-func (w *fakeWizard) AskServices(question Question) (domain.InitProjectAnswers, error) {
+func (w *fakeWizard) AskServices(_ context.Context, question Question) (domain.InitProjectAnswers, error) {
 	w.questions = append(w.questions, question)
 	return w.answer(question)
 }

@@ -115,7 +115,7 @@ func runEnv(cmd *cobra.Command, args []string) error {
 			Isolation:  isolation,
 		},
 		// The wizard runs only fully interactively, and never for --check.
-		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: isInteractive() && rules.IsHumanFormat(format) && !yes && !check, Stderr: true}),
+		Prompter:  shared.FlowPrompter(cmd.Context(), shared.FlowPrompterParams{Interactive: isInteractive() && rules.IsHumanFormat(format) && !yes && !check, Stderr: true}),
 		Presenter: envPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
 	})
 	return err

@@ -92,7 +92,7 @@ func (f *logsFlow) run() (Outcome, error) {
 	if err := target.RequireDeclared(target.DeclaredParams{Config: f.request.Config, Job: f.request.Job}); err != nil {
 		return Outcome{}, err
 	}
-	named, err := target.NamedAll(target.ResolveAllParams{ProjectDir: f.ctx.ProjectDir, Queries: f.request.Worktrees})
+	named, err := target.NamedAll(f.runCtx, target.ResolveAllParams{ProjectDir: f.ctx.ProjectDir, Queries: f.request.Worktrees})
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -111,10 +111,10 @@ func (f *logsFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	workDirs := target.WorkDirs(target.WorkDirsParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})
-	warnings := addressing.Lines(addressing.Params{Context: f.ctx, WorkDirs: workDirs})
+	workDirs := target.WorkDirs(f.runCtx, target.WorkDirsParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})
+	warnings := addressing.Lines(f.runCtx, addressing.Params{Context: f.ctx, WorkDirs: workDirs})
 	proxy := seam.ProxyPortsFor(seam.ProxyPortsParams{Global: f.ctx.Config.Global, Run: f.request.Config})
-	set := seam.OpenSet(seam.SetParams{
+	set := seam.OpenSet(f.runCtx, seam.SetParams{
 		ProjectDir: f.ctx.ProjectDir,
 		StateDir:   f.ctx.StateDir,
 		WorkDirs:   workDirs,
@@ -158,7 +158,7 @@ func (f *logsFlow) session() flow.Session {
 		ErrLabel: domain.CmdLogs,
 		Presets:  target.Presets(target.PresetParams{Worktrees: target.Dirs(f.named), Job: f.request.Job}),
 		Steps: []flow.Step{
-			target.WorktreesStep(target.WorktreesParams{
+			target.WorktreesStep(f.runCtx, target.WorktreesParams{
 				ProjectDir: f.ctx.ProjectDir,
 				Current:    f.request.Cwd,
 				Selected:   target.Preselected(target.PreselectedParams{Named: f.named, Precheck: f.request.Precheck}),

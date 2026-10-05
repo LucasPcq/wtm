@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -25,15 +26,15 @@ type ConfigResult struct {
 }
 
 // ProjectRoot returns the main checkout path from any worktree.
-func ProjectRoot(dir string) (string, error) {
+func ProjectRoot(ctx context.Context, dir string) (string, error) {
 	if override := os.Getenv(domain.EnvProjectDir); override != "" {
 		return override, nil
 	}
-	mainPath, err := infra.FindMainWorktreePath(infra.FindMainWorktreeParams{
+	mainPath, err := infra.FindMainWorktreePath(ctx, infra.FindMainWorktreeParams{
 		ProjectDir: dir,
 	})
 	if err != nil {
-		return "", projectRootError(projectRootErrorParams{Dir: dir, Err: err})
+		return "", projectRootError(ctx, projectRootErrorParams{Dir: dir, Err: err})
 	}
 	return mainPath, nil
 }
@@ -45,8 +46,8 @@ type projectRootErrorParams struct {
 
 // projectRootError asks git why only once it has failed, so a command run in a
 // repository pays nothing for the exit code of one run outside it.
-func projectRootError(params projectRootErrorParams) error {
-	inside, err := infra.InsideGitRepo(params.Dir)
+func projectRootError(ctx context.Context, params projectRootErrorParams) error {
+	inside, err := infra.InsideGitRepo(ctx, params.Dir)
 	if err == nil && !inside {
 		return NotGitRepo(params.Dir)
 	}
@@ -63,12 +64,12 @@ func NotGitRepo(dir string) error {
 // the top-level handler can pick the right exit code (e.g. ExitCodeConfigNotFound
 // when the repo is uninitialized); it does not print anything itself.
 func LoadConfig(cmd *cobra.Command, dir string) (ConfigResult, error) {
-	root, err := ProjectRoot(dir)
+	root, err := ProjectRoot(cmd.Context(), dir)
 	if err != nil {
 		return ConfigResult{}, err
 	}
 
-	stateDir, err := StateDir(dir)
+	stateDir, err := StateDir(cmd.Context(), dir)
 	if err != nil {
 		return ConfigResult{}, err
 	}

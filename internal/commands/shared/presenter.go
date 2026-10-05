@@ -198,9 +198,9 @@ type FlowPrompterParams struct {
 	Stderr      bool
 }
 
-func FlowPrompter(params FlowPrompterParams) flow.Prompter {
+func FlowPrompter(ctx context.Context, params FlowPrompterParams) flow.Prompter {
 	if !params.Interactive {
 		return flow.Unattended{}
 	}
-	return flowui.New(flowui.Params{Stderr: params.Stderr})
+	return flowui.New(ctx, flowui.Params{Stderr: params.Stderr})
 }

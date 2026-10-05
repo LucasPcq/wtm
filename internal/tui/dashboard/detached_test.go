@@ -117,7 +117,7 @@ func TestTheDetachedWatcherReturnsTheOutcomeToTheFlow(t *testing.T) {
 // terminal now, and it takes it on purpose.
 func TestStartingAProfileFromTheDashboardNeverAsksForTheTerminal(t *testing.T) {
 	stateDir := t.TempDir()
-	if err := runconfig.Save(runconfig.SaveParams{
+	if err := runconfig.Save(t.Context(), runconfig.SaveParams{
 		StateDir: stateDir,
 		Config: domain.RunConfig{Jobs: []domain.JobConfig{
 			{Name: "web", Kind: domain.JobKindService, Cmd: "true"},

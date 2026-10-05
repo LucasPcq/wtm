@@ -11,7 +11,7 @@ import (
 )
 
 func TestRunHooksSuccess(t *testing.T) {
-	err := RunHooks(RunHooksParams{
+	err := RunHooks(t.Context(), RunHooksParams{
 		Hooks:   []domain.HookCommand{{Cmd: "echo hello"}},
 		WorkDir: t.TempDir(),
 	})
@@ -21,7 +21,7 @@ func TestRunHooksSuccess(t *testing.T) {
 }
 
 func TestRunHooksFailure(t *testing.T) {
-	err := RunHooks(RunHooksParams{
+	err := RunHooks(t.Context(), RunHooksParams{
 		Hooks:   []domain.HookCommand{{Cmd: "false"}},
 		WorkDir: t.TempDir(),
 	})
@@ -31,7 +31,7 @@ func TestRunHooksFailure(t *testing.T) {
 }
 
 func TestRunHooksStopsOnFirstError(t *testing.T) {
-	err := RunHooks(RunHooksParams{
+	err := RunHooks(t.Context(), RunHooksParams{
 		Hooks: []domain.HookCommand{
 			{Cmd: "false"},
 			{Cmd: "echo should-not-run"},
@@ -44,7 +44,7 @@ func TestRunHooksStopsOnFirstError(t *testing.T) {
 }
 
 func TestRunHooksContinueOnError(t *testing.T) {
-	err := RunHooks(RunHooksParams{
+	err := RunHooks(t.Context(), RunHooksParams{
 		Hooks: []domain.HookCommand{
 			{Cmd: "false", ContinueOnError: true},
 			{Cmd: "echo should-run"},
@@ -57,7 +57,7 @@ func TestRunHooksContinueOnError(t *testing.T) {
 }
 
 func TestRunHooksEmptyList(t *testing.T) {
-	err := RunHooks(RunHooksParams{
+	err := RunHooks(t.Context(), RunHooksParams{
 		Hooks:   nil,
 		WorkDir: t.TempDir(),
 	})
@@ -68,7 +68,7 @@ func TestRunHooksEmptyList(t *testing.T) {
 
 func TestRunHooksCwdOverride(t *testing.T) {
 	dir := t.TempDir()
-	err := RunHooks(RunHooksParams{
+	err := RunHooks(t.Context(), RunHooksParams{
 		Hooks:   []domain.HookCommand{{Cmd: "pwd", Cwd: dir}},
 		WorkDir: "/tmp",
 	})
@@ -131,7 +131,7 @@ func TestResolveTemplateVars(t *testing.T) {
 func TestRunHooksReportsEachBeatToTheCaller(t *testing.T) {
 	var beats []domain.HookBeat
 	var out strings.Builder
-	if err := RunHooks(RunHooksParams{
+	if err := RunHooks(t.Context(), RunHooksParams{
 		Hooks:   []domain.HookCommand{{Cmd: "echo hello"}},
 		WorkDir: t.TempDir(),
 		Output:  &out,
@@ -155,7 +155,7 @@ func TestRunHooksReportsEachBeatToTheCaller(t *testing.T) {
 // show it, and it is gone from the stream by then.
 func TestRunHooksCarriesTheFailureStderrOnTheBeat(t *testing.T) {
 	var beats []domain.HookBeat
-	err := RunHooks(RunHooksParams{
+	err := RunHooks(t.Context(), RunHooksParams{
 		Hooks:   []domain.HookCommand{{Cmd: "echo boom >&2; false"}},
 		WorkDir: t.TempDir(),
 		Output:  io.Discard,
@@ -178,7 +178,7 @@ func TestRunHooksCarriesTheFailureStderrOnTheBeat(t *testing.T) {
 // remove.
 func TestRunHooksFailureDoesNotRepeatTheCommand(t *testing.T) {
 	cmd := "exit 3"
-	err := RunHooks(RunHooksParams{
+	err := RunHooks(t.Context(), RunHooksParams{
 		Hooks:   []domain.HookCommand{{Cmd: cmd}},
 		WorkDir: t.TempDir(),
 		Output:  io.Discard,
@@ -209,7 +209,7 @@ func (s *unguardedSink) Write(p []byte) (int, error) {
 
 func TestRunHooksSerializesTheTwoStreamsOntoOneSink(t *testing.T) {
 	sink := &unguardedSink{}
-	err := RunHooks(RunHooksParams{
+	err := RunHooks(t.Context(), RunHooksParams{
 		Hooks: []domain.HookCommand{{
 			Cmd: "for i in 1 2 3 4 5 6 7 8 9 10; do echo out; echo err >&2; done",
 		}},
@@ -228,7 +228,7 @@ func TestRunHooksSerializesTheTwoStreamsOntoOneSink(t *testing.T) {
 // With no reporter installed nobody has drawn the hook's result line, so the
 // error is the only place its command can still appear.
 func TestRunHooksNamesTheHookWhenNoSurfaceReportedIt(t *testing.T) {
-	err := RunHooks(RunHooksParams{
+	err := RunHooks(t.Context(), RunHooksParams{
 		Hooks:   []domain.HookCommand{{Cmd: "exit 3"}},
 		WorkDir: t.TempDir(),
 		Output:  io.Discard,
@@ -247,7 +247,7 @@ func TestRunHooksNamesTheHookWhenNoSurfaceReportedIt(t *testing.T) {
 // A surface that reported the beats already printed the command; repeating it in
 // the error spells a long install line twice on one screen.
 func TestRunHooksLeavesTheHookUnnamedWhenASurfaceReportedIt(t *testing.T) {
-	err := RunHooks(RunHooksParams{
+	err := RunHooks(t.Context(), RunHooksParams{
 		Hooks:   []domain.HookCommand{{Cmd: "exit 3"}},
 		WorkDir: t.TempDir(),
 		Output:  io.Discard,
@@ -262,7 +262,7 @@ func TestRunHooksLeavesTheHookUnnamedWhenASurfaceReportedIt(t *testing.T) {
 }
 
 func TestAFailingHookReportsItsCommandAndExitCode(t *testing.T) {
-	err := RunHooks(RunHooksParams{
+	err := RunHooks(t.Context(), RunHooksParams{
 		Hooks:   []domain.HookCommand{{Cmd: "exit 3"}},
 		WorkDir: t.TempDir(),
 		Output:  io.Discard,
@@ -277,7 +277,7 @@ func TestAFailingHookReportsItsCommandAndExitCode(t *testing.T) {
 }
 
 func TestAHookKilledBySignalHasNoExitCode(t *testing.T) {
-	err := RunHooks(RunHooksParams{
+	err := RunHooks(t.Context(), RunHooksParams{
 		Hooks:   []domain.HookCommand{{Cmd: "kill -9 $$"}},
 		WorkDir: t.TempDir(),
 		Output:  io.Discard,

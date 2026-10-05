@@ -10,14 +10,14 @@ import (
 )
 
 func TestDetectInstallReportsSourceForDevBuild(t *testing.T) {
-	got := selfupdate.DetectInstall(domain.Version)
+	got := selfupdate.DetectInstall(t.Context(), domain.Version)
 	if got.Method != domain.InstallSource {
 		t.Fatalf("Method = %q, want %q", got.Method, domain.InstallSource)
 	}
 }
 
 func TestDetectInstallResolvesARealBinaryPath(t *testing.T) {
-	got := selfupdate.DetectInstall("0.26.1")
+	got := selfupdate.DetectInstall(t.Context(), "0.26.1")
 	if got.BinaryPath == "" {
 		t.Fatal("BinaryPath is empty; DetectInstall must resolve the running executable")
 	}

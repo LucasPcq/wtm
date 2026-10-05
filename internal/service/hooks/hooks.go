@@ -3,15 +3,16 @@ package hooks
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -33,7 +34,7 @@ type RunHooksParams struct {
 
 // RunHooks executes each hook command sequentially with template interpolation.
 // Stops on first error unless the hook has ContinueOnError set.
-func RunHooks(params RunHooksParams) error {
+func RunHooks(ctx context.Context, params RunHooksParams) error {
 	output := params.Output
 	if output == nil {
 		output = os.Stderr
@@ -52,7 +53,7 @@ func RunHooks(params RunHooksParams) error {
 
 	for _, hook := range params.Hooks {
 		resolved := rules.ResolveTemplateVars(hook, params.Vars)
-		err := runSingleHook(runSingleHookParams{
+		err := runSingleHook(ctx, runSingleHookParams{
 			Hook:       resolved,
 			DefaultDir: params.WorkDir,
 			Env:        params.Env,
@@ -109,7 +110,7 @@ func writerReporter(w io.Writer) func(domain.HookBeat) {
 	}
 }
 
-func runSingleHook(params runSingleHookParams) error {
+func runSingleHook(ctx context.Context, params runSingleHookParams) error {
 	hook := params.Hook
 
 	if rules.IsBlankCommand(hook.Cmd) {
@@ -117,7 +118,7 @@ func runSingleHook(params runSingleHookParams) error {
 	}
 
 	spec := rules.ShellCommand(hook.Cmd)
-	cmd := exec.Command(spec.Name, spec.Args...)
+	cmd := infra.GroupCommand(ctx, spec.Name, spec.Args...)
 
 	if hook.Cwd != "" {
 		cmd.Dir = hook.Cwd

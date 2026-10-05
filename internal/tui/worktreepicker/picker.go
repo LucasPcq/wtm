@@ -3,6 +3,7 @@
 package worktreepicker
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -72,7 +73,7 @@ type RunParams struct {
 
 // Run shows the picker and returns the selected worktree.
 // Returns domain.ErrUserAborted when the user presses Esc.
-func Run(params RunParams) (domain.WorktreeStatus, error) {
+func Run(ctx context.Context, params RunParams) (domain.WorktreeStatus, error) {
 	if params.Title == "" {
 		params.Title = "Select a worktree"
 	}
@@ -126,7 +127,7 @@ func Run(params RunParams) (domain.WorktreeStatus, error) {
 		Loading:     loading,
 		LoadingText: LoadingPRsText,
 		OnMsg: func(w *components.WizardModel, msg tea.Msg) (tea.Cmd, bool) {
-			if cmd, handled := worktreerefresh.Handle(worktreerefresh.HandleParams{
+			if cmd, handled := worktreerefresh.Handle(ctx, worktreerefresh.HandleParams{
 				Wizard:     w,
 				Msg:        msg,
 				ListParams: listParams,

@@ -106,7 +106,7 @@ func followsEveryRepo(cmd *cobra.Command) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	inside, err := infra.InsideGitRepo(cwd)
+	inside, err := infra.InsideGitRepo(cmd.Context(), cwd)
 	if err != nil {
 		return false, err
 	}
@@ -189,7 +189,7 @@ func repoDir(cmd *cobra.Command) (string, error) {
 	if err != nil || !info.IsDir() {
 		return "", refuse(domain.FlagPathNotADirectory)
 	}
-	inside, err := infra.InsideGitRepo(repo)
+	inside, err := infra.InsideGitRepo(cmd.Context(), repo)
 	if err != nil {
 		return "", err
 	}

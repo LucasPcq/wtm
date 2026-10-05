@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -20,13 +21,13 @@ type CheckAllParams struct {
 // once for all of them rather than once each — unless that one list was cut
 // short, where a branch missing from it is asked on its own: an open pull
 // request is a refusal, and a refusal is never waived for want of a page.
-func CheckAll(params CheckAllParams) map[string]domain.CleanCheckEntry {
-	open, complete := ghservice.OpenPRsByBranch(params.ProjectDir)
+func CheckAll(ctx context.Context, params CheckAllParams) map[string]domain.CleanCheckEntry {
+	open, complete := ghservice.OpenPRsByBranch(ctx, params.ProjectDir)
 	entries := make(map[string]domain.CleanCheckEntry, len(params.Branches))
 	for _, branch := range params.Branches {
-		check, err := checkLocal(checkLocalParams{ProjectDir: params.ProjectDir, Branch: branch})
+		check, err := checkLocal(ctx, checkLocalParams{ProjectDir: params.ProjectDir, Branch: branch})
 		if err == nil {
-			check.HasOpenPR, check.PRUrl = cleanOpenPR(cleanOpenPRParams{ProjectDir: params.ProjectDir, Branch: branch, Open: open, Complete: complete})
+			check.HasOpenPR, check.PRUrl = cleanOpenPR(ctx, cleanOpenPRParams{ProjectDir: params.ProjectDir, Branch: branch, Open: open, Complete: complete})
 		}
 		entries[branch] = domain.CleanCheckEntry{Check: check, Err: err}
 	}
@@ -40,14 +41,14 @@ type cleanOpenPRParams struct {
 	Complete   bool
 }
 
-func cleanOpenPR(params cleanOpenPRParams) (bool, string) {
+func cleanOpenPR(ctx context.Context, params cleanOpenPRParams) (bool, string) {
 	if url, found := params.Open[params.Branch]; found {
 		return true, url
 	}
 	if params.Complete {
 		return false, ""
 	}
-	found, _, url := ghservice.HasOpenPR(ghservice.HasOpenPRParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
+	found, _, url := ghservice.HasOpenPR(ctx, ghservice.HasOpenPRParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
 	return found, url
 }
 
@@ -56,8 +57,8 @@ type checkLocalParams struct {
 	Branch     string
 }
 
-func checkLocal(params checkLocalParams) (domain.CleanCheckResult, error) {
-	wt, err := infra.FindWorktreeByBranch(infra.FindWorktreeByBranchParams{
+func checkLocal(ctx context.Context, params checkLocalParams) (domain.CleanCheckResult, error) {
+	wt, err := infra.FindWorktreeByBranch(ctx, infra.FindWorktreeByBranchParams{
 		ProjectDir: params.ProjectDir,
 		Branch:     params.Branch,
 	})
@@ -67,8 +68,8 @@ func checkLocal(params checkLocalParams) (domain.CleanCheckResult, error) {
 	if wt.IsMain {
 		return domain.CleanCheckResult{}, domain.ErrCannotCleanParent
 	}
-	unpushed, _ := infra.UnpushedCommits(infra.UnpushedCommitsParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
-	dirty, _ := infra.IsDirty(infra.IsDirtyParams{WorktreePath: wt.Path})
+	unpushed, _ := infra.UnpushedCommits(ctx, infra.UnpushedCommitsParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
+	dirty, _ := infra.IsDirty(ctx, infra.IsDirtyParams{WorktreePath: wt.Path})
 	return domain.CleanCheckResult{
 		WorktreePath:    wt.Path,
 		Branch:          params.Branch,
@@ -79,8 +80,8 @@ func checkLocal(params checkLocalParams) (domain.CleanCheckResult, error) {
 }
 
 // Clean removes the worktree and deletes the local branch.
-func Clean(params domain.CleanParams) error {
-	wt, err := infra.FindWorktreeByBranch(infra.FindWorktreeByBranchParams{
+func Clean(ctx context.Context, params domain.CleanParams) error {
+	wt, err := infra.FindWorktreeByBranch(ctx, infra.FindWorktreeByBranchParams{
 		ProjectDir: params.ProjectDir,
 		Branch:     params.Branch,
 	})
@@ -95,7 +96,7 @@ func Clean(params domain.CleanParams) error {
 	// on_clean hooks run inline unless the caller opts to run them as a separate
 	// phase (clean's phased output) via SkipHooks.
 	if !params.SkipHooks {
-		if err := RunCleanHooks(domain.CleanHooksParams{
+		if err := RunCleanHooks(ctx, domain.CleanHooksParams{
 			ProjectDir:   params.ProjectDir,
 			StateDir:     params.StateDir,
 			WorktreePath: wt.Path,
@@ -106,7 +107,7 @@ func Clean(params domain.CleanParams) error {
 		}
 	}
 
-	if err := infra.RemoveWorktree(infra.RemoveWorktreeParams{
+	if err := infra.RemoveWorktree(ctx, infra.RemoveWorktreeParams{
 		ProjectDir: params.ProjectDir,
 		Path:       wt.Path,
 		Force:      params.Force,
@@ -115,7 +116,7 @@ func Clean(params domain.CleanParams) error {
 		return fmt.Errorf("%w: %w", domain.ErrWorktreeRemoveFailed, err)
 	}
 
-	if err := infra.DeleteLocalBranch(infra.DeleteLocalBranchParams{
+	if err := infra.DeleteLocalBranch(ctx, infra.DeleteLocalBranchParams{
 		ProjectDir: params.ProjectDir,
 		Branch:     params.Branch,
 		Force:      params.Force,
@@ -134,19 +135,19 @@ func Clean(params domain.CleanParams) error {
 // still reference files being removed. A failing hook aborts the removal unless
 // the entry sets continue_on_error. Exposed so `clean` can run them as a distinct,
 // titled phase before the removal spinner.
-func RunCleanHooks(params domain.CleanHooksParams) error {
+func RunCleanHooks(ctx context.Context, params domain.CleanHooksParams) error {
 	if len(params.Hooks) == 0 {
 		return nil
 	}
 
-	mainPath, err := infra.FindMainWorktreePath(infra.FindMainWorktreeParams{
+	mainPath, err := infra.FindMainWorktreePath(ctx, infra.FindMainWorktreeParams{
 		ProjectDir: params.ProjectDir,
 	})
 	if err != nil {
 		return fmt.Errorf("find main checkout: %w", err)
 	}
 
-	if err := hooks.RunHooks(hooks.RunHooksParams{
+	if err := hooks.RunHooks(ctx, hooks.RunHooksParams{
 		Hooks:   params.Hooks,
 		WorkDir: params.WorktreePath,
 		Vars: rules.TemplateVars{
@@ -154,7 +155,7 @@ func RunCleanHooks(params domain.CleanHooksParams) error {
 			Branch:   params.Branch,
 			Root:     mainPath,
 		},
-		Env: hookEnv(hookEnvParams{
+		Env: hookEnv(ctx, hookEnvParams{
 			Ref:          WorktreeRef{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: params.Branch},
 			WorktreePath: params.WorktreePath,
 		}),
@@ -171,7 +172,7 @@ func RunCleanHooks(params domain.CleanHooksParams) error {
 // undeletable files: it deletes the directory with `sudo rm -rf`, prunes the
 // stale git metadata, then deletes the local branch. Intended to run only after
 // the user has confirmed the privileged deletion.
-func ForceClean(params domain.ForceCleanParams) error {
+func ForceClean(ctx context.Context, params domain.ForceCleanParams) error {
 	homeDir, _ := os.UserHomeDir()
 	if err := rules.ValidateSudoDeletePath(rules.SudoDeletePathParams{
 		Path:       params.Path,
@@ -181,15 +182,15 @@ func ForceClean(params domain.ForceCleanParams) error {
 		return err
 	}
 
-	if err := infra.SudoDeleteDir(infra.SudoDeleteDirParams{Path: params.Path}); err != nil {
+	if err := infra.SudoDeleteDir(ctx, infra.SudoDeleteDirParams{Path: params.Path}); err != nil {
 		return err
 	}
 
-	if err := infra.PruneWorktrees(params.ProjectDir); err != nil {
+	if err := infra.PruneWorktrees(ctx, params.ProjectDir); err != nil {
 		return fmt.Errorf("prune worktrees: %w", err)
 	}
 
-	if err := infra.DeleteLocalBranch(infra.DeleteLocalBranchParams{
+	if err := infra.DeleteLocalBranch(ctx, infra.DeleteLocalBranchParams{
 		ProjectDir: params.ProjectDir,
 		Branch:     params.Branch,
 		Force:      params.Force,

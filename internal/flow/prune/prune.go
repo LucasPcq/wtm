@@ -146,10 +146,10 @@ func (f *pruneFlow) scan() error {
 		Work: func(ctx context.Context) error {
 			var prs []domain.PRInfo
 			if needPRs {
-				prs, connection = github.ListPRsWithConnection(f.ctx.ProjectDir)
+				prs, connection = github.ListPRsWithConnection(ctx, f.ctx.ProjectDir)
 			}
 			var planErr error
-			f.plan, planErr = worktree.PlanPrune(f.params(), prs)
+			f.plan, planErr = worktree.PlanPrune(ctx, f.params(), prs)
 			return planErr
 		},
 	})
@@ -222,7 +222,7 @@ func (f *pruneFlow) remove(params removeParams) (Outcome, error) {
 	reparents := reparentsOf(reparentsOfParams{Reparents: f.plan.Reparents, Pruned: result.Pruned})
 	if params.ReparentChildren {
 		applied, err := worktree.ApplyReparents(worktree.ApplyReparentsParams{Reparents: reparents, StateDir: f.ctx.StateDir})
-		publish.ReparentedAll(f.ctx, applied)
+		publish.ReparentedAll(f.runCtx, f.ctx, applied)
 		if err != nil {
 			return Outcome{}, err
 		}

@@ -16,7 +16,7 @@ func TestExecCandidatesSkipsVanishedDirectoriesAndKeepsMain(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	candidates, err := ExecCandidates(ExecCandidatesParams{ProjectDir: repo.dir})
+	candidates, err := ExecCandidates(t.Context(), ExecCandidatesParams{ProjectDir: repo.dir})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestExecEnvAlwaysStripsTheCallersWorktreeVariables(t *testing.T) {
 	repo := newOrdinalRepo(t)
 	path := repo.addWorktree(t, "plain")
 
-	env := ExecEnv(ExecEnvParams{Ref: WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "plain"}, WorktreePath: path})
+	env := ExecEnv(t.Context(), ExecEnvParams{Ref: WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "plain"}, WorktreePath: path})
 
 	if _, ok := rules.LookupEnv(env, domain.EnvComposeProjectName); ok {
 		t.Error("the caller's COMPOSE_PROJECT_NAME leaked into another worktree")
@@ -58,7 +58,7 @@ func TestExecEnvCarriesTheTargetsRunVariables(t *testing.T) {
 	recordIsolation(t, repo, "feat/x", domain.IsolationIsolated)
 	repo.ensure(t, "feat/x")
 
-	env := ExecEnv(ExecEnvParams{Ref: WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "feat/x"}, WorktreePath: path})
+	env := ExecEnv(t.Context(), ExecEnvParams{Ref: WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "feat/x"}, WorktreePath: path})
 
 	saw := hookSaw(t, repo, "feat/x", path)
 	for _, key := range append([]string{"DB_PORT"}, domain.WorktreeScopedEnv...) {

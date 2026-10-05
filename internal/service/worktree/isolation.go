@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
@@ -38,8 +39,8 @@ type SetIsolationParams struct {
 
 // SetIsolation records a new choice for an existing worktree. It writes the
 // record only: bringing the .env in line with it is the caller's next step.
-func SetIsolation(params SetIsolationParams) error {
-	isMain, err := isMainBranch(params.Ref)
+func SetIsolation(ctx context.Context, params SetIsolationParams) error {
+	isMain, err := isMainBranch(ctx, params.Ref)
 	if err != nil {
 		return err
 	}
@@ -57,8 +58,8 @@ func SetIsolation(params SetIsolationParams) error {
 
 // CheckIsolation refuses a choice SetIsolation would refuse, before anything is
 // written for it.
-func CheckIsolation(params SetIsolationParams) error {
-	isMain, err := isMainBranch(params.Ref)
+func CheckIsolation(ctx context.Context, params SetIsolationParams) error {
+	isMain, err := isMainBranch(ctx, params.Ref)
 	if err != nil || !isMain {
 		return err
 	}
@@ -72,8 +73,8 @@ func mainIsolation(isolation domain.Isolation) error {
 	return nil
 }
 
-func isMainBranch(ref WorktreeRef) (bool, error) {
-	worktrees, err := infra.ListWorktrees(infra.ListWorktreesParams{ProjectDir: ref.ProjectDir})
+func isMainBranch(ctx context.Context, ref WorktreeRef) (bool, error) {
+	worktrees, err := infra.ListWorktrees(ctx, infra.ListWorktreesParams{ProjectDir: ref.ProjectDir})
 	if err != nil {
 		return false, fmt.Errorf("list worktrees: %w", err)
 	}
@@ -95,12 +96,12 @@ type IsolationAdoptionParams struct {
 // answer is asked before the worktree is touched. A run.toml that cannot be
 // read leaves nothing to adopt — the port pass is skipped for that reason, and
 // says so itself.
-func IsolationAdoptionFor(params IsolationAdoptionParams) (domain.IsolationAdoptionPlan, error) {
+func IsolationAdoptionFor(ctx context.Context, params IsolationAdoptionParams) (domain.IsolationAdoptionPlan, error) {
 	cfg, err := config.LoadRun(params.Ref.StateDir)
 	if err != nil {
 		return domain.IsolationAdoptionPlan{}, nil
 	}
-	isMain, err := isMainBranch(params.Ref)
+	isMain, err := isMainBranch(ctx, params.Ref)
 	if err != nil {
 		return domain.IsolationAdoptionPlan{}, err
 	}

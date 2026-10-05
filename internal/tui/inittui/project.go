@@ -1,6 +1,7 @@
 package inittui
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -88,7 +89,7 @@ type SectionPrefill struct {
 // introduced by a "gate" step that explains what the section does and offers
 // Configure / Skip; its sub-steps auto-skip when the gate is skipped. Services
 // are configured separately by `wtm run init` (see RunServicesWizard).
-func RunProjectWizard(projectDir string, detection domain.InitDetectionResult) (domain.InitProjectAnswers, error) {
+func RunProjectWizard(ctx context.Context, projectDir string, detection domain.InitDetectionResult) (domain.InitProjectAnswers, error) {
 	s := newStepSet()
 	holder := &detection.Branches
 
@@ -108,7 +109,7 @@ func RunProjectWizard(projectDir string, detection domain.InitDetectionResult) (
 	s.add(stepHooksCleanGate, hooksCleanGate())
 	addHooksCleanSteps(s, autoSkipWhenGateSkipped(s.at(stepHooksCleanGate)), nil)
 
-	final, err := runWizard(runWizardParams{steps: s.steps, projectDir: projectDir, holder: holder})
+	final, err := runWizard(ctx, runWizardParams{steps: s.steps, projectDir: projectDir, holder: holder})
 	if err != nil {
 		return domain.InitProjectAnswers{}, err
 	}
@@ -123,7 +124,7 @@ func RunProjectWizard(projectDir string, detection domain.InitDetectionResult) (
 // already declares, so what stays checked is kept and what is unchecked is
 // dropped. Returns empty answers with no error when nothing is detected — the
 // caller reports how to add jobs manually.
-func RunServicesWizard(params ServicesWizardParams) (domain.InitProjectAnswers, error) {
+func RunServicesWizard(ctx context.Context, params ServicesWizardParams) (domain.InitProjectAnswers, error) {
 	s := newStepSet()
 	steps := addServicesSteps(s, addServicesStepsParams{
 		Detection:    params.Detection,
@@ -144,7 +145,7 @@ func RunServicesWizard(params ServicesWizardParams) (domain.InitProjectAnswers, 
 		Answers: []int{s.at(stepEnvLink), s.at(stepComposePatch)},
 	}))
 
-	final, err := runWizard(runWizardParams{steps: s.steps, projectDir: params.ProjectDir})
+	final, err := runWizard(ctx, runWizardParams{steps: s.steps, projectDir: params.ProjectDir})
 	if err != nil {
 		return domain.InitProjectAnswers{}, err
 	}
@@ -194,7 +195,7 @@ type SectionWizardParams struct {
 // without gates or core steps. Used by `wtm init --only <section>`. Returns a
 // nil-ish answers set with no steps when nothing is configurable; callers handle
 // the empty case.
-func RunSectionWizard(params SectionWizardParams) (domain.InitProjectAnswers, error) {
+func RunSectionWizard(ctx context.Context, params SectionWizardParams) (domain.InitProjectAnswers, error) {
 	s := newStepSet()
 	holder := &params.Detection.Branches
 	for _, section := range params.Sections {
@@ -224,7 +225,7 @@ func RunSectionWizard(params SectionWizardParams) (domain.InitProjectAnswers, er
 		wp.holder = holder
 	}
 
-	final, err := runWizard(wp)
+	final, err := runWizard(ctx, wp)
 	if err != nil {
 		return domain.InitProjectAnswers{}, err
 	}
@@ -410,13 +411,13 @@ type runWizardParams struct {
 
 // runWizard runs the bubbletea program for the given steps and returns the
 // final model, mapping abort/quit to ErrUserAborted.
-func runWizard(params runWizardParams) (components.WizardModel, error) {
+func runWizard(ctx context.Context, params runWizardParams) (components.WizardModel, error) {
 	wp := components.WizardParams{Steps: params.steps}
 	if params.holder != nil {
-		wp.InitCmd = branchrefresh.Cmd(params.projectDir)
+		wp.InitCmd = branchrefresh.Cmd(ctx, params.projectDir)
 		wp.Loading = true
 		wp.LoadingText = domain.LoadingBranchesText
-		wp.OnMsg = branchrefresh.Handler(params.projectDir, params.holder)
+		wp.OnMsg = branchrefresh.Handler(ctx, params.projectDir, params.holder)
 	}
 
 	wiz := components.NewWizardWithParams(wp)

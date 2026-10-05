@@ -24,7 +24,7 @@ func loadedSelect(content flow.StepContent) flow.Step {
 func runFirstLoad(t *testing.T, plan *plan) components.WizardModel {
 	t.Helper()
 	wizard := components.NewWizardWithParams(components.WizardParams{Steps: plan.steps, Loading: true})
-	handle := plan.handler()
+	handle := plan.handler(t.Context())
 	cmd, handled := handle(&wizard, plan.initCmd())
 	if !handled {
 		t.Fatal("the load request must be handled")
@@ -144,7 +144,7 @@ func TestALoadedSelectKeepsTheTerminalSize(t *testing.T) {
 	sized, _ := wizard.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
 	wizard = sized.(components.WizardModel)
 
-	handle := plan.handler()
+	handle := plan.handler(t.Context())
 	cmd, _ := handle(&wizard, plan.initCmd())
 	for _, sub := range cmd().(tea.BatchMsg) {
 		if done, ok := sub().(loadDoneMsg); ok {

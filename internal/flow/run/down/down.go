@@ -119,7 +119,7 @@ func (f *downFlow) run() (Outcome, error) {
 	if err := target.RequireDeclared(target.DeclaredParams{Config: f.request.Config, Profile: f.request.Profile}); err != nil {
 		return Outcome{}, err
 	}
-	named, err := target.NamedAll(target.ResolveAllParams{ProjectDir: f.ctx.ProjectDir, Queries: f.request.Worktrees})
+	named, err := target.NamedAll(f.runCtx, target.ResolveAllParams{ProjectDir: f.ctx.ProjectDir, Queries: f.request.Worktrees})
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -139,7 +139,7 @@ func (f *downFlow) run() (Outcome, error) {
 		All:     f.request.All,
 	}
 	if !f.request.All {
-		outcome.WorkDirs = target.WorkDirs(target.WorkDirsParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})
+		outcome.WorkDirs = target.WorkDirs(f.runCtx, target.WorkDirsParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})
 	}
 
 	if err := f.wake(outcome.WorkDirs); err != nil {
@@ -220,7 +220,7 @@ func (f *downFlow) stopIn(outcome Outcome, workDir string) ([]domain.JobActionRe
 }
 
 func (f *downFlow) branchOf(workDir string) string {
-	return target.NamedBranch(target.NamedBranchParams{Named: f.named, Dir: workDir})
+	return target.NamedBranch(f.runCtx, target.NamedBranchParams{Named: f.named, Dir: workDir})
 }
 
 // stopProfile stops the profile's jobs one by one, so a job that refuses is
@@ -272,7 +272,7 @@ func (f *downFlow) stopProfile(outcome Outcome, workDir string) ([]domain.JobAct
 // in, one worktree at a time: the daemon is machine-wide, and --all never
 // reaches into another repository.
 func (f *downFlow) stopEverywhere() ([]domain.WorktreeJobResults, error) {
-	worktrees, err := worktree.ListAll(worktree.ListAllParams{ProjectDir: f.ctx.ProjectDir})
+	worktrees, err := worktree.ListAll(f.runCtx, worktree.ListAllParams{ProjectDir: f.ctx.ProjectDir})
 	if err != nil {
 		return nil, fmt.Errorf("stop all jobs: %w", err)
 	}
@@ -369,7 +369,7 @@ func (f *downFlow) session() flow.Session {
 		ErrLabel: domain.CmdDown,
 		Presets:  target.Presets(target.PresetParams{Worktrees: target.Dirs(f.named), Profile: f.request.Profile}),
 		Steps: []flow.Step{
-			target.WorktreesStep(target.WorktreesParams{
+			target.WorktreesStep(f.runCtx, target.WorktreesParams{
 				ProjectDir: f.ctx.ProjectDir,
 				Current:    f.request.Cwd,
 				Selected:   target.Preselected(target.PreselectedParams{Named: f.named, Precheck: f.request.Precheck}),

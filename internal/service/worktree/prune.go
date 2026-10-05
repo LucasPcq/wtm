@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"sync"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -12,14 +13,14 @@ import (
 // graph, PR states, and (for the Gone filter) a pruning fetch plus per-branch
 // upstream-gone probing — then returns the side-effect-free plan. The PR set is
 // passed in so the command owns its graceful/spinner behavior.
-func PlanPrune(params domain.PruneParams, prs []domain.PRInfo) (domain.PrunePlan, error) {
+func PlanPrune(ctx context.Context, params domain.PruneParams, prs []domain.PRInfo) (domain.PrunePlan, error) {
 	if params.Gone && !params.NoFetch {
 		// Best-effort, like sync's base fetch: stale local refs are better than a
 		// hard failure offline. The user opted into the network cost with --gone.
-		_ = infra.FetchPrune(infra.FetchPruneParams{ProjectDir: params.ProjectDir})
+		_ = infra.FetchPrune(ctx, infra.FetchPruneParams{ProjectDir: params.ProjectDir})
 	}
 
-	statuses, err := List(domain.ListParams{
+	statuses, err := List(ctx, domain.ListParams{
 		ProjectDir: params.ProjectDir,
 		StateDir:   params.StateDir,
 		Config:     params.Config,
@@ -28,19 +29,19 @@ func PlanPrune(params domain.PruneParams, prs []domain.PRInfo) (domain.PrunePlan
 		return domain.PrunePlan{}, err
 	}
 
-	nodes, err := buildNodes(params.ProjectDir, params.StateDir)
+	nodes, err := buildNodes(ctx, params.ProjectDir, params.StateDir)
 	if err != nil {
 		return domain.PrunePlan{}, err
 	}
 
 	gone := map[string]bool{}
 	if params.Gone {
-		gone = computeGone(params.ProjectDir, statuses)
+		gone = computeGone(ctx, params.ProjectDir, statuses)
 	}
 
 	// Unpushed commits make a candidate unsafe to remove (like clean), so probe
 	// every listed worktree — the guard applies regardless of the active filter.
-	unpushed := computeUnpushed(params.ProjectDir, statuses)
+	unpushed := computeUnpushed(ctx, params.ProjectDir, statuses)
 
 	return rules.ClassifyPrune(rules.ClassifyPruneParams{
 		Statuses:   statuses,
@@ -71,7 +72,7 @@ func prStates(prs []domain.PRInfo) map[string]string {
 
 // computeGone probes, concurrently, whether each worktree's branch has a deleted
 // upstream ("[gone]"). Bounded by statusWorkers.
-func computeGone(projectDir string, statuses []domain.WorktreeStatus) map[string]bool {
+func computeGone(ctx context.Context, projectDir string, statuses []domain.WorktreeStatus) map[string]bool {
 	result := make(map[string]bool, len(statuses))
 	var mu sync.Mutex
 
@@ -83,7 +84,7 @@ func computeGone(projectDir string, statuses []domain.WorktreeStatus) map[string
 		go func(branch string) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			if !infra.UpstreamGone(infra.UpstreamGoneParams{ProjectDir: projectDir, Branch: branch}) {
+			if !infra.UpstreamGone(ctx, infra.UpstreamGoneParams{ProjectDir: projectDir, Branch: branch}) {
 				return
 			}
 			mu.Lock()
@@ -99,7 +100,7 @@ func computeGone(projectDir string, statuses []domain.WorktreeStatus) map[string
 // computeUnpushed probes, concurrently, how many local commits each worktree's
 // branch has that are not on its remote. Bounded by statusWorkers. Branches with
 // no remote tracking ref report 0 (nothing to lose on the remote).
-func computeUnpushed(projectDir string, statuses []domain.WorktreeStatus) map[string]int {
+func computeUnpushed(ctx context.Context, projectDir string, statuses []domain.WorktreeStatus) map[string]int {
 	result := make(map[string]int, len(statuses))
 	var mu sync.Mutex
 
@@ -111,7 +112,7 @@ func computeUnpushed(projectDir string, statuses []domain.WorktreeStatus) map[st
 		go func(branch string) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			n, _ := infra.UnpushedCommits(infra.UnpushedCommitsParams{ProjectDir: projectDir, Branch: branch})
+			n, _ := infra.UnpushedCommits(ctx, infra.UnpushedCommitsParams{ProjectDir: projectDir, Branch: branch})
 			if n == 0 {
 				return
 			}

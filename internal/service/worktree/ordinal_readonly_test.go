@@ -13,7 +13,7 @@ func TestReadingTheEnvironmentNeverNumbersAWorktree(t *testing.T) {
 	recordIsolation(t, repo, "feat/x", domain.IsolationIsolated)
 	ref := WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "feat/x"}
 
-	if _, err := BranchEnv(ref); !errors.Is(err, domain.ErrOrdinalUnallocated) {
+	if _, err := BranchEnv(t.Context(), ref); !errors.Is(err, domain.ErrOrdinalUnallocated) {
 		t.Fatalf("BranchEnv = %v, want ErrOrdinalUnallocated", err)
 	}
 	if got := repo.meta(t, "feat/x").Ordinal; got != 0 {
@@ -26,11 +26,11 @@ func TestEnsureOrdinalSaysWhetherItAllocated(t *testing.T) {
 	repo.addWorktree(t, "feat/x")
 	ref := WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "feat/x"}
 
-	first, err := EnsureOrdinal(ref)
+	first, err := EnsureOrdinal(t.Context(), ref)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := EnsureOrdinal(ref)
+	second, err := EnsureOrdinal(t.Context(), ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,16 +44,16 @@ func TestHookEnvIsPendingOnlyWhenHooksWouldReadAnUnnumberedWorktree(t *testing.T
 	repo.addWorktree(t, "feat/x")
 	ref := WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "feat/x"}
 
-	if HookEnvPending(ref) {
+	if HookEnvPending(t.Context(), ref) {
 		t.Fatal("pending with no run.toml")
 	}
 	writeRunConfig(t, repo.stateDir, composeJobConfig)
 	recordIsolation(t, repo, "feat/x", domain.IsolationIsolated)
-	if !HookEnvPending(ref) {
+	if !HookEnvPending(t.Context(), ref) {
 		t.Fatal("not pending for an unnumbered worktree whose hooks read the run env")
 	}
 	repo.ensure(t, "feat/x")
-	if HookEnvPending(ref) {
+	if HookEnvPending(t.Context(), ref) {
 		t.Fatal("still pending once numbered")
 	}
 }

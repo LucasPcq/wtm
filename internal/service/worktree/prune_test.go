@@ -73,7 +73,7 @@ func TestPlanPruneGHBased(t *testing.T) {
 	}
 	prs := []domain.PRInfo{{Branch: "feat-merged", State: domain.PRStateMerged}}
 
-	plan, err := PlanPrune(params, prs)
+	plan, err := PlanPrune(t.Context(), params, prs)
 	if err != nil {
 		t.Fatalf("PlanPrune: %v", err)
 	}

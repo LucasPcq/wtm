@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -18,8 +19,8 @@ const statusWorkers = 8
 
 // List returns all worktrees enriched with git status, sorted with parent first
 // then children by creation date (oldest first).
-func List(params domain.ListParams) ([]domain.WorktreeStatus, error) {
-	gitWorktrees, err := infra.ListWorktrees(infra.ListWorktreesParams{
+func List(ctx context.Context, params domain.ListParams) ([]domain.WorktreeStatus, error) {
+	gitWorktrees, err := infra.ListWorktrees(ctx, infra.ListWorktreesParams{
 		ProjectDir: params.ProjectDir,
 	})
 	if err != nil {
@@ -37,7 +38,7 @@ func List(params domain.ListParams) ([]domain.WorktreeStatus, error) {
 		go func(idx int, wt domain.GitWorktree) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			statuses[idx] = buildStatus(buildStatusParams{
+			statuses[idx] = buildStatus(ctx, buildStatusParams{
 				GitWorktree: wt,
 				BaseBranch:  baseBranch,
 				StateDir:    params.StateDir,
@@ -56,9 +57,9 @@ func List(params domain.ListParams) ([]domain.WorktreeStatus, error) {
 // the latest remote state. A failed fetch is ignored (best effort): the list
 // still refreshes from whatever remote-tracking refs are present. The dirty and
 // base-ahead fields are local and recompute harmlessly.
-func Refresh(params domain.ListParams) ([]domain.WorktreeStatus, error) {
-	_ = infra.Fetch(infra.FetchParams{ProjectDir: params.ProjectDir})
-	return List(params)
+func Refresh(ctx context.Context, params domain.ListParams) ([]domain.WorktreeStatus, error) {
+	_ = infra.Fetch(ctx, infra.FetchParams{ProjectDir: params.ProjectDir})
+	return List(ctx, params)
 }
 
 type buildStatusParams struct {
@@ -68,20 +69,20 @@ type buildStatusParams struct {
 	ProjectDir  string
 }
 
-func buildStatus(params buildStatusParams) domain.WorktreeStatus {
+func buildStatus(ctx context.Context, params buildStatusParams) domain.WorktreeStatus {
 	gitWorktree := params.GitWorktree
-	dirty, _ := infra.IsDirty(infra.IsDirtyParams{WorktreePath: gitWorktree.Path})
+	dirty, _ := infra.IsDirty(ctx, infra.IsDirtyParams{WorktreePath: gitWorktree.Path})
 
 	ahead := 0
 	if !gitWorktree.IsMain {
-		ahead, _ = infra.CommitsAhead(infra.CommitsAheadParams{
+		ahead, _ = infra.CommitsAhead(ctx, infra.CommitsAheadParams{
 			WorktreePath: gitWorktree.Path,
 			BaseBranch:   params.BaseBranch,
 			Branch:       gitWorktree.Branch,
 		})
 	}
 
-	originState, originAB := branch.Divergence(branch.BranchParams{
+	originState, originAB := branch.Divergence(ctx, branch.BranchParams{
 		ProjectDir: params.ProjectDir,
 		Branch:     gitWorktree.Branch,
 	})
@@ -130,8 +131,8 @@ type ListAllParams struct {
 
 // ListAll returns the raw worktrees; List enriches them with metadata, divergence
 // and dirtiness.
-func ListAll(params ListAllParams) ([]domain.GitWorktree, error) {
-	return infra.ListWorktrees(infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
+func ListAll(ctx context.Context, params ListAllParams) ([]domain.GitWorktree, error) {
+	return infra.ListWorktrees(ctx, infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
 }
 
 type LastFetchAtParams struct {
@@ -141,8 +142,8 @@ type LastFetchAtParams struct {
 // LastFetchAt dates the last successful fetch, zero when the repository has
 // never fetched. A thin wrapper so callers above service/ (the dashboard's
 // header, in particular) never reach into infra/ directly.
-func LastFetchAt(params LastFetchAtParams) time.Time {
-	return infra.LastFetchAt(infra.LastFetchAtParams{ProjectDir: params.ProjectDir})
+func LastFetchAt(ctx context.Context, params LastFetchAtParams) time.Time {
+	return infra.LastFetchAt(ctx, infra.LastFetchAtParams{ProjectDir: params.ProjectDir})
 }
 
 type MainCheckoutParams struct {
@@ -154,8 +155,8 @@ type MainCheckoutParams struct {
 // declared port is the port it binds. A bare clone has none, and a shared job
 // then has nowhere to run rather than silently taking a linked worktree that
 // `clean` may remove under it.
-func MainCheckout(params MainCheckoutParams) (string, error) {
-	worktrees, err := infra.ListWorktrees(infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
+func MainCheckout(ctx context.Context, params MainCheckoutParams) (string, error) {
+	worktrees, err := infra.ListWorktrees(ctx, infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
 	if err != nil {
 		return "", err
 	}

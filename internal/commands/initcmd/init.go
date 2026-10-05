@@ -95,7 +95,7 @@ func runInit(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	stateDir, err := shared.StateDir(dir)
+	stateDir, err := shared.StateDir(cmd.Context(), dir)
 	if err != nil {
 		return fmt.Errorf("wtm must be run inside a git repository: %w", err)
 	}
@@ -198,7 +198,7 @@ func resolveProjectAnswers(cmd *cobra.Command, projectDir string, flagged bool, 
 		}, detection)
 	}
 
-	answers, err := initwizard.RunProjectWizard(projectDir, detection)
+	answers, err := initwizard.RunProjectWizard(cmd.Context(), projectDir, detection)
 	if err != nil {
 		if errors.Is(err, domain.ErrUserAborted) {
 			return domain.InitProjectAnswers{}, err
@@ -213,7 +213,7 @@ func createProjectConfig(cmd *cobra.Command, dir, stateDir string, flagged bool)
 	_ = components.RunLoading(components.LoadingParams{
 		Message: "Detecting project settings…",
 		Animate: shared.Animate(cmd, !flagged),
-		Work:    func() error { detection = detect.ProjectEnvironment(dir); return nil },
+		Work:    func() error { detection = detect.ProjectEnvironment(cmd.Context(), dir); return nil },
 	})
 
 	answers, err := resolveProjectAnswers(cmd, dir, flagged, detection)
@@ -230,7 +230,7 @@ func createProjectConfig(cmd *cobra.Command, dir, stateDir string, flagged bool)
 	}); err != nil {
 		return fmt.Errorf("write project config: %w", err)
 	}
-	if root, err := shared.ProjectRoot(dir); err == nil {
+	if root, err := shared.ProjectRoot(cmd.Context(), dir); err == nil {
 		shared.Register(shared.RegisterParams{Root: root, StateDir: stateDir, CorrelationID: shared.CorrelationID(cmd)})
 	}
 

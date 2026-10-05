@@ -223,7 +223,7 @@ func TestProjectConfigExists(t *testing.T) {
 func TestBaseBranchFallback(t *testing.T) {
 	dir := t.TempDir()
 
-	branch := BaseBranch(dir)
+	branch := BaseBranch(t.Context(), dir)
 	if branch != domain.DefaultBaseBranch {
 		t.Errorf("expected fallback %s, got %s", domain.DefaultBaseBranch, branch)
 	}

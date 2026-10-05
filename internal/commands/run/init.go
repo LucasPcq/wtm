@@ -104,7 +104,7 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 	outcome, err := initrun.Run(cmd.Context(), initrun.Params{
 		Context:   shared.FlowContext(res),
 		Request:   initrun.Request{PatchCompose: patchCompose, LinkEnv: linkEnv, WritePortKeys: writePortKeys, Redirection: inspectRedirection()},
-		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive}),
+		Prompter:  shared.FlowPrompter(cmd.Context(), shared.FlowPrompterParams{Interactive: interactive}),
 		Wizard:    servicesWizard{},
 		Presenter: initPresenter{CLIPresenter: shared.NewPresenter(cmd, format), animate: shared.Animate(cmd, interactive)},
 	})
@@ -125,7 +125,7 @@ var inspectRedirection = func() domain.ProxyStatus {
 
 type servicesWizard struct{}
 
-func (servicesWizard) AskServices(question initrun.Question) (domain.InitProjectAnswers, error) {
+func (servicesWizard) AskServices(ctx context.Context, question initrun.Question) (domain.InitProjectAnswers, error) {
 	var prefill *initwizard.SectionPrefill
 	if question.Prefill != nil {
 		prefill = &initwizard.SectionPrefill{
@@ -133,7 +133,7 @@ func (servicesWizard) AskServices(question initrun.Question) (domain.InitProject
 			ScriptIndices: question.Prefill.ScriptIndices,
 		}
 	}
-	return initwizard.RunServicesWizard(initwizard.ServicesWizardParams{
+	return initwizard.RunServicesWizard(ctx, initwizard.ServicesWizardParams{
 		ProjectDir:   question.ProjectDir,
 		Detection:    question.Detection,
 		Existing:     question.Existing,

@@ -87,7 +87,7 @@ func (f *cleanFlow) worktreeStep() flow.Step {
 }
 
 func (f *cleanFlow) cleanableOptions() ([]flow.Option, error) {
-	worktrees, err := worktree.ListAll(worktree.ListAllParams{ProjectDir: f.ctx.ProjectDir})
+	worktrees, err := worktree.ListAll(f.runCtx, worktree.ListAllParams{ProjectDir: f.ctx.ProjectDir})
 	if err != nil {
 		return nil, fmt.Errorf("list worktrees: %w", err)
 	}

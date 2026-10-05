@@ -1,6 +1,7 @@
 package selfupdate
 
 import (
+	"context"
 	"os"
 	"time"
 
@@ -108,7 +109,7 @@ func StartCheck(params StartCheckParams) *Check {
 // version known — fresh or cached. The install method is resolved here rather
 // than in the goroutine: it shells out to `go env`, which would blow the drain
 // window and cost the notice.
-func (c *Check) Notice(timeout time.Duration) (current string, latest string, method domain.InstallMethod, ok bool) {
+func (c *Check) Notice(ctx context.Context, timeout time.Duration) (current string, latest string, method domain.InstallMethod, ok bool) {
 	if c == nil {
 		return "", "", "", false
 	}
@@ -127,5 +128,5 @@ func (c *Check) Notice(timeout time.Duration) (current string, latest string, me
 		return "", "", "", false
 	}
 
-	return rules.NormalizeVersion(c.version), latest, DetectInstall(c.version).Method, true
+	return rules.NormalizeVersion(c.version), latest, DetectInstall(ctx, c.version).Method, true
 }

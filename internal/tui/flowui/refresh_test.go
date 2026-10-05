@@ -40,7 +40,7 @@ func startWizard(t *testing.T, steps ...flow.Step) components.WizardModel {
 	}
 	wizard := components.NewWizardWithParams(components.WizardParams{
 		Steps:   plan.steps,
-		OnMsg:   plan.handler(),
+		OnMsg:   plan.handler(t.Context()),
 		Loading: true,
 	})
 	return update(wizard, tea.WindowSizeMsg{Width: 100, Height: 40})

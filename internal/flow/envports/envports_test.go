@@ -26,7 +26,7 @@ func TestSettleWithoutLinksReportsNothing(t *testing.T) {
 		t.Error("a project with no run.toml must not pose the step")
 	}
 
-	settlement, err := envports.Settle(envports.Params{
+	settlement, err := envports.Settle(t.Context(), envports.Params{
 		Context:      ctx,
 		Branch:       "feat/x",
 		WorktreePath: t.TempDir(),
@@ -83,7 +83,7 @@ func TestSettleMovesTheCopiedPortsWhenTheRunSaidSo(t *testing.T) {
 	}
 
 	presenter := &flowtest.Recorder{}
-	settlement, err := envports.Settle(envports.Params{
+	settlement, err := envports.Settle(t.Context(), envports.Params{
 		Context:      ctx,
 		Branch:       "feature",
 		WorktreePath: worktreePath,
@@ -117,14 +117,14 @@ func TestSettleMovesTheCopiedPortsWhenTheRunSaidSo(t *testing.T) {
 // wtm derives — ports, identity, slices — may be written behind that answer.
 func TestSettleLeavesAVerbatimWorktreeAsCopied(t *testing.T) {
 	ctx, worktreePath := settleFixture(t)
-	if err := worktree.SetIsolation(worktree.SetIsolationParams{
+	if err := worktree.SetIsolation(t.Context(), worktree.SetIsolationParams{
 		Ref:       worktree.WorktreeRef{ProjectDir: ctx.ProjectDir, StateDir: ctx.StateDir, Branch: "feature"},
 		Isolation: domain.IsolationVerbatim,
 	}); err != nil {
 		t.Fatalf("SetIsolation: %v", err)
 	}
 
-	settlement, err := envports.Settle(envports.Params{
+	settlement, err := envports.Settle(t.Context(), envports.Params{
 		Context:      ctx,
 		Branch:       "feature",
 		WorktreePath: worktreePath,
@@ -158,7 +158,7 @@ func TestSettleNumbersAFreshWorktreeAndPublishesIt(t *testing.T) {
 	recorder := &flowtest.Recorder{}
 	ctx.Publisher = recorder
 
-	if _, err := envports.Settle(envports.Params{Context: ctx, Branch: "feature", WorktreePath: worktreePath, Presenter: recorder}); err != nil {
+	if _, err := envports.Settle(t.Context(), envports.Params{Context: ctx, Branch: "feature", WorktreePath: worktreePath, Presenter: recorder}); err != nil {
 		t.Fatalf("Settle: %v", err)
 	}
 

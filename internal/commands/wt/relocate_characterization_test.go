@@ -57,7 +57,7 @@ func (r relocateRepo) root() string { return filepath.Dir(r.dir) }
 
 func (r relocateRepo) gitPath(t *testing.T, branch string) string {
 	t.Helper()
-	worktrees, err := worktree.ListAll(worktree.ListAllParams{ProjectDir: r.dir})
+	worktrees, err := worktree.ListAll(t.Context(), worktree.ListAllParams{ProjectDir: r.dir})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -16,8 +17,8 @@ type ResolveSyncBranchesParams struct {
 // ResolveSyncBranches maps each query (a branch name or unambiguous substring) to
 // a concrete worktree branch. An unknown query returns domain.ErrBranchNotFound;
 // an ambiguous substring returns a descriptive error listing the candidates.
-func ResolveSyncBranches(params ResolveSyncBranchesParams) ([]string, error) {
-	worktrees, err := infra.ListWorktrees(infra.ListWorktreesParams{
+func ResolveSyncBranches(ctx context.Context, params ResolveSyncBranchesParams) ([]string, error) {
+	worktrees, err := infra.ListWorktrees(ctx, infra.ListWorktreesParams{
 		ProjectDir: params.ProjectDir,
 	})
 	if err != nil {
@@ -60,8 +61,8 @@ func matchSyncBranch(worktrees []domain.GitWorktree, query string) (string, erro
 
 // Resolve returns a direct path on an exact match, the candidates when ambiguous,
 // and every worktree for an empty query (the picker).
-func Resolve(params domain.ResolveParams) (domain.ResolveResult, error) {
-	worktrees, err := infra.ListWorktrees(infra.ListWorktreesParams{
+func Resolve(ctx context.Context, params domain.ResolveParams) (domain.ResolveResult, error) {
+	worktrees, err := infra.ListWorktrees(ctx, infra.ListWorktreesParams{
 		ProjectDir: params.ProjectDir,
 	})
 	if err != nil {
@@ -114,8 +115,8 @@ type FindByBranchParams struct {
 
 // FindByBranch never matches a substring, unlike Resolve: a caller already holding
 // a branch name must not land on a different worktree.
-func FindByBranch(params FindByBranchParams) (domain.GitWorktree, error) {
-	return infra.FindWorktreeByBranch(infra.FindWorktreeByBranchParams{
+func FindByBranch(ctx context.Context, params FindByBranchParams) (domain.GitWorktree, error) {
+	return infra.FindWorktreeByBranch(ctx, infra.FindWorktreeByBranchParams{
 		ProjectDir: params.ProjectDir,
 		Branch:     params.Branch,
 	})
@@ -127,8 +128,8 @@ type CurrentBranchParams struct {
 
 // CurrentBranch names the branch checked out in the worktree containing Dir,
 // which may be any of its subdirectories. A detached HEAD returns an error.
-func CurrentBranch(params CurrentBranchParams) (string, error) {
-	return infra.CurrentBranch(params.Dir)
+func CurrentBranch(ctx context.Context, params CurrentBranchParams) (string, error) {
+	return infra.CurrentBranch(ctx, params.Dir)
 }
 
 // Root is the worktree containing dir, spelled the way git spells it. It exists
@@ -137,6 +138,6 @@ func CurrentBranch(params CurrentBranchParams) (string, error) {
 // the job's own working directory, which run.toml's `cwd` is resolved against.
 // A subdirectory — or macOS's /var where git says /private/var — would both
 // mis-resolve that `cwd` and split one worktree into two keys.
-func Root(dir string) (string, error) {
-	return infra.Toplevel(dir)
+func Root(ctx context.Context, dir string) (string, error) {
+	return infra.Toplevel(ctx, dir)
 }

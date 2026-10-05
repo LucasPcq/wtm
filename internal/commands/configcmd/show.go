@@ -38,7 +38,7 @@ func runShow(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("get working directory: %w", err)
 	}
 
-	stateDir, err := shared.StateDir(wd)
+	stateDir, err := shared.StateDir(cmd.Context(), wd)
 	if err != nil {
 		return err
 	}

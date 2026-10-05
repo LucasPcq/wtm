@@ -83,7 +83,7 @@ func read(t *testing.T, path string) string {
 // before the choice existed.
 func makeWorktree(t *testing.T, ctx flow.Context, branch string) string {
 	t.Helper()
-	result, err := worktree.Create(domain.CreateParams{
+	result, err := worktree.Create(t.Context(), domain.CreateParams{
 		ProjectDir:   ctx.ProjectDir,
 		StateDir:     ctx.StateDir,
 		Branch:       branch,

@@ -1,6 +1,8 @@
 package env
 
 import (
+	"context"
+
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/ordinal"
@@ -32,7 +34,7 @@ type envRunPass struct {
 // runPass settles the run values of a worktree that chose its isolation, and
 // leaves a worktree that never did exactly as it is: no port moved, no compose
 // project written, no ordinal allocated — only the keys are reconciled.
-func (f *envFlow) runPass(params runPassParams) envRunPass {
+func (f *envFlow) runPass(ctx context.Context, params runPassParams) envRunPass {
 	pass := envRunPass{branch: params.Target.branch, reserved: params.Reserved}
 	if params.Adoption.Pending {
 		pass.reserved = append(pass.reserved, domain.WtmOwnedEnvKeys...)
@@ -48,7 +50,7 @@ func (f *envFlow) runPass(params runPassParams) envRunPass {
 	if rules.IsVerbatim(params.Isolation) {
 		return pass
 	}
-	pass.ports, pass.warnings = f.resolvePorts(resolvePortsParams{Target: params.Target, Isolation: params.Isolation})
+	pass.ports, pass.warnings = f.resolvePorts(ctx, resolvePortsParams{Target: params.Target, Isolation: params.Isolation})
 	return pass
 }
 
@@ -73,7 +75,7 @@ type resolvePortsParams struct {
 // binds on. A run.toml that cannot be used skips only the port pass, and the
 // warning says why: the keys never depend on it. A link to a .env config.toml
 // does not provision is warned about and left out, never the pass with it.
-func (f *envFlow) resolvePorts(params resolvePortsParams) (envsvc.EnvPortsParams, []string) {
+func (f *envFlow) resolvePorts(ctx context.Context, params resolvePortsParams) (envsvc.EnvPortsParams, []string) {
 	branch := params.Target.branch
 	ignored, err := runconfig.Check(runconfig.CheckParams{StateDir: f.ctx.StateDir, EnvFiles: f.ctx.Config.Project.Env.Files})
 	if err != nil {
@@ -83,11 +85,11 @@ func (f *envFlow) resolvePorts(params resolvePortsParams) (envsvc.EnvPortsParams
 		})}
 	}
 	var ports envsvc.EnvPortsParams
-	err = ordinal.Retry(ordinal.RetryParams{
+	err = ordinal.Retry(ctx, ordinal.RetryParams{
 		Context: f.ctx,
 		Branch:  func() string { return branch },
 		Do: func() error {
-			resolved, resolveErr := worktree.ResolveEnvPorts(worktree.ResolveEnvPortsParams{
+			resolved, resolveErr := worktree.ResolveEnvPorts(ctx, worktree.ResolveEnvPortsParams{
 				ProjectDir:   f.ctx.ProjectDir,
 				StateDir:     f.ctx.StateDir,
 				Branch:       branch,

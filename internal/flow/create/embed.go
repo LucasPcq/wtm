@@ -1,6 +1,7 @@
 package create
 
 import (
+	"context"
 	"errors"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -36,11 +37,12 @@ type Embedded struct {
 	applies func(flow.Answers) bool
 }
 
-func Embed(params EmbedParams) Embedded {
+func Embed(ctx context.Context, params EmbedParams) Embedded {
 	f := &createFlow{
+		runCtx:       ctx,
 		ctx:          params.Context,
 		request:      Request{From: params.From, FastForward: params.FastForward, Isolation: params.Isolation},
-		candidates:   decide.BranchCandidates(params.Context.ProjectDir),
+		candidates:   decide.BranchCandidates(ctx, params.Context.ProjectDir),
 		target:       params.Target,
 		derivedNames: worktree.DerivedNamesMatter(params.Context.StateDir),
 		parent:       params.Parent,
@@ -51,7 +53,7 @@ func Embed(params EmbedParams) Embedded {
 		f.request.Branches = []string{params.Branch}
 	}
 	if f.target == nil {
-		f.target = decide.MemoizedTarget(params.Context.ProjectDir)
+		f.target = decide.MemoizedTarget(ctx, params.Context.ProjectDir)
 	}
 	return Embedded{flow: f, applies: params.Applies}
 }

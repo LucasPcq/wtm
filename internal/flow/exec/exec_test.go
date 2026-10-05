@@ -208,7 +208,7 @@ func TestUnattendedWithoutACommandIsAUsageErrorNamingTheDash(t *testing.T) {
 }
 
 func TestTheCommandStepRefusesWhatTheShellCannotRun(t *testing.T) {
-	step := (&execFlow{}).commandStep()
+	step := (&execFlow{}).commandStep(t.Context())
 	for _, bad := range []string{"", "   ", "if then"} {
 		if step.Validate(bad) == nil {
 			t.Errorf("%q accepted", bad)
@@ -224,9 +224,9 @@ func TestTheCommandStepRefusesWhatTheShellCannotRun(t *testing.T) {
 
 func TestTheStepsReadLikeCreate(t *testing.T) {
 	fx := newFixture(t, "a", "b")
-	f := &execFlow{params: Params{Context: flow.Context{ProjectDir: fx.dir}, Request: Request{Jobs: 1}}}
+	f := &execFlow{runCtx: t.Context(), params: Params{Context: flow.Context{ProjectDir: fx.dir}, Request: Request{Jobs: 1}}}
 	var labels []string
-	for _, step := range f.session().Steps {
+	for _, step := range f.session(t.Context()).Steps {
 		labels = append(labels, step.Label)
 	}
 	if got := strings.Join(labels, " > "); got != "Worktrees > Command > Confirm & run" {

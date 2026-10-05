@@ -1,6 +1,8 @@
 package flowui
 
 import (
+	"context"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -346,10 +348,10 @@ func (p *plan) loadedStep(loaded loadedStep) components.Step {
 	}
 }
 
-func (p *plan) handler() components.WizardMsgHandler {
+func (p *plan) handler(ctx context.Context) components.WizardMsgHandler {
 	var handlers []components.WizardMsgHandler
 	if p.refresh != nil {
-		handlers = append(handlers, branchrefresh.HandlerFunc(p.refresh, &p.candidates))
+		handlers = append(handlers, branchrefresh.HandlerFunc(ctx, p.refresh, &p.candidates))
 	}
 	if len(p.loads) > 0 {
 		handlers = append(handlers, p.loadHandler())

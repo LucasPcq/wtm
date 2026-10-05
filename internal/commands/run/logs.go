@@ -61,7 +61,7 @@ func runLogs(cmd *cobra.Command, args []string) error {
 			Job:       job,
 			Config:    ctx.Run,
 		},
-		Prompter:  ctx.Prompter(ctx.Interactive),
+		Prompter:  ctx.Prompter(cmd.Context(), ctx.Interactive),
 		Presenter: logsPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
 	})
 	if err != nil {

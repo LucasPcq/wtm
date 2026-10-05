@@ -117,7 +117,7 @@ func (f *syncFlow) run() (Outcome, error) {
 
 	// Rebuilt for the answered selection: what the recap memoized served the
 	// preview, and the answers may have narrowed it since.
-	plan, err := worktree.PlanSync(syncParams)
+	plan, err := worktree.PlanSync(f.runCtx, syncParams)
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -165,7 +165,7 @@ func (f *syncFlow) run() (Outcome, error) {
 // is I/O, so only the run that could actually ask pays for it; every other
 // outcome is settled by the flags alone.
 func (f *syncFlow) load() error {
-	statuses, err := worktree.List(domain.ListParams{
+	statuses, err := worktree.List(f.runCtx, domain.ListParams{
 		ProjectDir: f.ctx.ProjectDir,
 		StateDir:   f.ctx.StateDir,
 		Config:     f.ctx.Config,
@@ -191,7 +191,7 @@ func (f *syncFlow) resolvedBranches() ([]string, error) {
 	if len(f.request.Branches) == 0 {
 		return nil, nil
 	}
-	return worktree.ResolveSyncBranches(worktree.ResolveSyncBranchesParams{
+	return worktree.ResolveSyncBranches(f.runCtx, worktree.ResolveSyncBranchesParams{
 		ProjectDir: f.ctx.ProjectDir,
 		Queries:    f.request.Branches,
 	})
@@ -201,7 +201,7 @@ func (f *syncFlow) scanParents() error {
 	return f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.SyncParentScanning,
 		Work: func(ctx context.Context) error {
-			classified, err := worktree.ClassifyParents(worktree.ClassifyParentsParams{
+			classified, err := worktree.ClassifyParents(ctx, worktree.ClassifyParentsParams{
 				ProjectDir: f.ctx.ProjectDir,
 				StateDir:   f.ctx.StateDir,
 				BaseBranch: f.request.BaseBranch,
@@ -218,7 +218,7 @@ func (f *syncFlow) rebase(params worktree.SyncParams) (domain.SyncResult, error)
 		Message: domain.SyncRebasing,
 		Work: func(ctx context.Context) error {
 			var syncErr error
-			result, syncErr = worktree.Sync(params)
+			result, syncErr = worktree.Sync(ctx, params)
 			return syncErr
 		},
 	})
@@ -230,7 +230,7 @@ func (f *syncFlow) push(result domain.SyncResult) (domain.SyncResult, error) {
 	err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.SyncPushing,
 		Work: func(ctx context.Context) error {
-			pushed = worktree.PushSynced(worktree.PushSyncedParams{
+			pushed = worktree.PushSynced(ctx, worktree.PushSyncedParams{
 				ProjectDir: f.ctx.ProjectDir,
 				Result:     result,
 			})

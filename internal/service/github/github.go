@@ -2,11 +2,13 @@ package github
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra"
 )
 
 func ensureGH() error {
@@ -17,19 +19,19 @@ func ensureGH() error {
 	return nil
 }
 
-func ensureAuth() error {
+func ensureAuth(ctx context.Context) error {
 	if err := ensureGH(); err != nil {
 		return err
 	}
-	cmd := exec.Command("gh", "auth", "status")
+	cmd := infra.Command(ctx, "gh", "auth", "status")
 	if err := cmd.Run(); err != nil {
 		return domain.ErrGHNotAuthenticated
 	}
 	return nil
 }
 
-func runGH(dir string, args ...string) ([]byte, error) {
-	cmd := exec.Command("gh", args...)
+func runGH(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	cmd := infra.Command(ctx, "gh", args...)
 	cmd.Dir = dir
 
 	var stdout, stderr bytes.Buffer

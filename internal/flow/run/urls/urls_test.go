@@ -35,7 +35,7 @@ func context(t *testing.T) flow.Context {
 
 func onlyEntry(t *testing.T, reader urls.Reader, dir string) domain.JobURLEntry {
 	t.Helper()
-	entries, err := reader.In(dir)
+	entries, err := reader.In(t.Context(), dir)
 	if err != nil {
 		t.Fatalf("In: %v", err)
 	}

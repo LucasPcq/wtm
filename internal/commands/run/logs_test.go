@@ -187,7 +187,7 @@ func TestRunLogsWithoutATerminalWritesPrefixedLines(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
 	}
-	root, err := infra.Toplevel(dir)
+	root, err := infra.Toplevel(t.Context(), dir)
 	if err != nil {
 		t.Fatalf("toplevel: %v", err)
 	}
@@ -334,7 +334,7 @@ func TestRunLogsJSONNeverOpensTheView(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
 	}
-	root, err := infra.Toplevel(cwd)
+	root, err := infra.Toplevel(t.Context(), cwd)
 	if err != nil {
 		t.Fatalf("toplevel: %v", err)
 	}
@@ -348,7 +348,7 @@ func TestRunLogsJSONNeverOpensTheView(t *testing.T) {
 
 	// Tail reads the file itself rather than asking the daemon, so the history
 	// this replays has to be on disk where the command will look for it.
-	logDir := rules.WorktreeLogDir(rules.WorktreeLogDirParams{StateDir: stateDir, Branch: target.BranchOf(root)})
+	logDir := rules.WorktreeLogDir(rules.WorktreeLogDirParams{StateDir: stateDir, Branch: target.BranchOf(t.Context(), root)})
 	if logDir == "" {
 		t.Fatal("the test worktree resolved to no log dir")
 	}

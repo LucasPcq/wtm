@@ -126,7 +126,7 @@ func (f *envFlow) answeredTarget(branch string) (target, error) {
 }
 
 func (f *envFlow) lookup(branch string) (target, error) {
-	wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branch})
+	wt, err := worktree.FindByBranch(f.runCtx, worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branch})
 	if err != nil {
 		return target{}, err
 	}
@@ -192,7 +192,7 @@ func (f *envFlow) apply(params applyParams) (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	pass := f.runPass(runPassParams{Target: params.Target, Adoption: adoption, Isolation: params.Isolation, Reserved: sw.keys()})
+	pass := f.runPass(f.runCtx, runPassParams{Target: params.Target, Adoption: adoption, Isolation: params.Isolation, Reserved: sw.keys()})
 
 	result, err := f.reconcile(reconcileParams{Target: params.Target, Ctx: ctx, Pass: pass, Resolutions: params.Resolutions})
 	if err != nil {
@@ -278,12 +278,12 @@ func (f *envFlow) settleIsolation(sw envSwitch) (switchOutcome, error) {
 	}
 
 	before := worktree.RecordedIsolation(sw.ref)
-	if err := worktree.SetIsolation(worktree.SetIsolationParams{Ref: sw.ref, Isolation: sw.isolation}); err != nil {
+	if err := worktree.SetIsolation(f.runCtx, worktree.SetIsolationParams{Ref: sw.ref, Isolation: sw.isolation}); err != nil {
 		return switchOutcome{}, err
 	}
 	outcome.changed = worktree.RecordedIsolation(sw.ref) != before
 	if outcome.changed {
-		publish.Updated(publish.UpdatedParams{Context: f.ctx, Branch: sw.ref.Branch, Changed: []domain.IdentityField{domain.IdentityIsolation}})
+		publish.Updated(f.runCtx, publish.UpdatedParams{Context: f.ctx, Branch: sw.ref.Branch, Changed: []domain.IdentityField{domain.IdentityIsolation}})
 	}
 	return outcome, nil
 }
@@ -294,11 +294,11 @@ func (f *envFlow) checkIsolation(t target, isolation domain.Isolation) error {
 	if isolation == "" {
 		return nil
 	}
-	return worktree.CheckIsolation(worktree.SetIsolationParams{Ref: f.ref(t.branch), Isolation: isolation})
+	return worktree.CheckIsolation(f.runCtx, worktree.SetIsolationParams{Ref: f.ref(t.branch), Isolation: isolation})
 }
 
 func (f *envFlow) adoption(t target) (domain.IsolationAdoptionPlan, error) {
-	return worktree.IsolationAdoptionFor(worktree.IsolationAdoptionParams{
+	return worktree.IsolationAdoptionFor(f.runCtx, worktree.IsolationAdoptionParams{
 		Ref:          f.ref(t.branch),
 		WorktreePath: t.path,
 	})
@@ -343,7 +343,7 @@ func (f *envFlow) envContext(branch string) envContext {
 
 	parentPath := ""
 	if parentBranch != "" {
-		if wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: parentBranch}); err == nil {
+		if wt, err := worktree.FindByBranch(f.runCtx, worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: parentBranch}); err == nil {
 			parentPath = wt.Path
 		}
 	}

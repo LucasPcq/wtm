@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -36,7 +37,7 @@ type ResolveEnvPortsParams struct {
 // into its .env files: the links and bases run.toml declares, and the offset its
 // ordinal binds on. A project declaring no link resolves to zero links, which
 // every caller treats as nothing to do.
-func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error) {
+func ResolveEnvPorts(ctx context.Context, params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error) {
 	cfg, err := config.LoadRun(params.StateDir)
 	if err != nil {
 		return envsvc.EnvPortsParams{}, err
@@ -59,7 +60,7 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 
 	cfg, _ = rules.PartitionEnvTargets(rules.PartitionEnvTargetsParams{Config: cfg, Files: params.EnvFiles})
 
-	owned, err := ownedEnvWrites(ownedEnvWritesParams{Resolve: params, Config: cfg})
+	owned, err := ownedEnvWrites(ctx, ownedEnvWritesParams{Resolve: params, Config: cfg})
 	if err != nil {
 		return envsvc.EnvPortsParams{}, err
 	}
@@ -82,7 +83,7 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 	// the worktree label in one place, so a .env and the route a job answers
 	// under can never disagree on which worktree they belong to. An unnumbered
 	// worktree answers ErrOrdinalUnallocated, and the flow allocates.
-	env, err := branchEnvAs(ref, isolation)
+	env, err := branchEnvAs(ctx, ref, isolation)
 	if err != nil {
 		return envsvc.EnvPortsParams{}, err
 	}
@@ -131,8 +132,8 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 // not applied. A surface handing out named URLs reads it to know whether the
 // .env behind them answers on those names yet; `wtm env` computes the very same
 // plan before writing it, so the two can never disagree.
-func EnvPortPlanFor(params ResolveEnvPortsParams) (domain.EnvPortPlan, error) {
-	resolved, err := ResolveEnvPorts(params)
+func EnvPortPlanFor(ctx context.Context, params ResolveEnvPortsParams) (domain.EnvPortPlan, error) {
+	resolved, err := ResolveEnvPorts(ctx, params)
 	if err != nil || resolved.Empty() {
 		return domain.EnvPortPlan{}, err
 	}
@@ -150,13 +151,13 @@ type ownedEnvWritesParams struct {
 // from inside another worktree, or from a job, would stamp that worktree's name
 // into this one's .env. The main checkout gets the name its jobs run under,
 // which never follows its branch.
-func ownedEnvWrites(params ownedEnvWritesParams) ([]domain.EnvOwnedEntry, error) {
+func ownedEnvWrites(ctx context.Context, params ownedEnvWritesParams) ([]domain.EnvOwnedEntry, error) {
 	targets := rules.OwnedEnvTargets(rules.OwnedEnvTargetsParams{Config: params.Config, EnvFiles: params.Resolve.EnvFiles})
 	if len(targets) == 0 {
 		return nil, nil
 	}
 
-	isMain, err := isMainBranch(WorktreeRef{ProjectDir: params.Resolve.ProjectDir, Branch: params.Resolve.Branch})
+	isMain, err := isMainBranch(ctx, WorktreeRef{ProjectDir: params.Resolve.ProjectDir, Branch: params.Resolve.Branch})
 	if err != nil {
 		return nil, err
 	}

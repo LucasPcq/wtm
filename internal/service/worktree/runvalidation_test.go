@@ -11,7 +11,7 @@ import (
 func resolveErr(t *testing.T, repo ordinalRepo, global domain.GlobalConfig) error {
 	t.Helper()
 	globaldir.Isolate(t)
-	_, err := ResolveEnvPorts(ResolveEnvPortsParams{
+	_, err := ResolveEnvPorts(t.Context(), ResolveEnvPortsParams{
 		ProjectDir:   repo.dir,
 		StateDir:     repo.stateDir,
 		Branch:       "main",
@@ -45,7 +45,7 @@ key = "KC_NAME"
 job = "kc"
 value = "{worktree}"
 `)
-	resolved, err := ResolveEnvPorts(ResolveEnvPortsParams{
+	resolved, err := ResolveEnvPorts(t.Context(), ResolveEnvPortsParams{
 		ProjectDir:   repo.dir,
 		StateDir:     repo.stateDir,
 		Branch:       "main",

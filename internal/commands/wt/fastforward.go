@@ -80,7 +80,7 @@ func runFastForward(cmd *cobra.Command, args []string) error {
 			Force:    force,
 		},
 		// The picker may be reached through the shell wrapper, which consumes stdout.
-		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),
+		Prompter:  shared.FlowPrompter(cmd.Context(), shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),
 		Presenter: ffPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
 	})
 	return err

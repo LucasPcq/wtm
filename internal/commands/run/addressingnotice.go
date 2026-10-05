@@ -1,6 +1,8 @@
 package run
 
 import (
+	"context"
+
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/run/addressing"
@@ -11,8 +13,8 @@ import (
 // It answers whether there is anything to say, so a caller that has to open a
 // frame can decide before opening it: a frame around nothing is two blank lines
 // on every run that was fine.
-func addressingDrift(config shared.ConfigResult, workDir string) (flow.Notice, bool) {
-	return addressing.Notice(addressing.Params{
+func addressingDrift(ctx context.Context, config shared.ConfigResult, workDir string) (flow.Notice, bool) {
+	return addressing.Notice(ctx, addressing.Params{
 		Context:  shared.FlowContext(config),
 		WorkDirs: []string{workDir},
 	})

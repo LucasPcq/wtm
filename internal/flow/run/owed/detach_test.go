@@ -105,7 +105,7 @@ func holdingFixture(t *testing.T) (flow.Context, string) {
 // dropped, so a drop that still needed its directory would fail here.
 func removeWorktree(t *testing.T, ctx flow.Context) {
 	t.Helper()
-	wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: ctx.ProjectDir, Branch: "feat-live"})
+	wt, err := worktree.FindByBranch(t.Context(), worktree.FindByBranchParams{ProjectDir: ctx.ProjectDir, Branch: "feat-live"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,7 +271,7 @@ func TestDropperStartsAServiceDownAndLetsItGoAfterwards(t *testing.T) {
 	if len(outcomes) != 1 || outcomes[0].Status != domain.NamespaceDropped {
 		t.Errorf("outcomes = %+v, want it dropped", outcomes)
 	}
-	main, err := worktree.MainCheckout(worktree.MainCheckoutParams{ProjectDir: ctx.ProjectDir})
+	main, err := worktree.MainCheckout(t.Context(), worktree.MainCheckoutParams{ProjectDir: ctx.ProjectDir})
 	if err != nil {
 		t.Fatal(err)
 	}

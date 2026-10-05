@@ -26,7 +26,7 @@ type branchScan struct {
 // scan runs once, before the first screen, over every worktree the picker may
 // offer — the list badges each one with its drift.
 func (f *envFlow) scan(ctx context.Context) error {
-	statuses, err := worktree.List(domain.ListParams{
+	statuses, err := worktree.List(ctx, domain.ListParams{
 		ProjectDir: f.ctx.ProjectDir,
 		StateDir:   f.ctx.StateDir,
 		Config:     f.ctx.Config,
@@ -80,7 +80,7 @@ func (f *envFlow) scanBranch(ctx context.Context, branch string) (branchScan, er
 	// question the wizard is about to ask.
 	var ports envsvc.EnvPortsParams
 	if !adoption.Pending || isolation != "" {
-		ports, _ = f.resolvePorts(resolvePortsParams{Target: t, Isolation: isolation})
+		ports, _ = f.resolvePorts(ctx, resolvePortsParams{Target: t, Isolation: isolation})
 	}
 
 	var reserved []string

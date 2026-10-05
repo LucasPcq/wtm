@@ -89,7 +89,7 @@ func (f *stopFlow) run() (Outcome, error) {
 			return Outcome{}, err
 		}
 	}
-	named, err := target.NamedAll(target.ResolveAllParams{ProjectDir: f.ctx.ProjectDir, Queries: f.request.Worktrees})
+	named, err := target.NamedAll(f.runCtx, target.ResolveAllParams{ProjectDir: f.ctx.ProjectDir, Queries: f.request.Worktrees})
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -109,7 +109,7 @@ func (f *stopFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 	outcome := Outcome{
-		WorkDirs: target.WorkDirs(target.WorkDirsParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd}),
+		WorkDirs: target.WorkDirs(f.runCtx, target.WorkDirsParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd}),
 		Job:      job,
 	}
 
@@ -194,7 +194,7 @@ func (f *stopFlow) job(answers flow.Answers) (string, error) {
 }
 
 func (f *stopFlow) branchOf(workDir string) string {
-	return target.NamedBranch(target.NamedBranchParams{Named: f.named, Dir: workDir})
+	return target.NamedBranch(f.runCtx, target.NamedBranchParams{Named: f.named, Dir: workDir})
 }
 
 type stopParams struct {
@@ -238,7 +238,7 @@ func (f *stopFlow) session() flow.Session {
 		ErrLabel: domain.CmdStop,
 		Presets:  target.Presets(target.PresetParams{Worktrees: target.Dirs(f.named), Job: f.request.Job}),
 		Steps: []flow.Step{
-			target.WorktreesStep(target.WorktreesParams{
+			target.WorktreesStep(f.runCtx, target.WorktreesParams{
 				ProjectDir: f.ctx.ProjectDir,
 				Current:    f.request.Cwd,
 				Selected:   target.Dirs(f.named),

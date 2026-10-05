@@ -44,14 +44,14 @@ func runRm(cmd *cobra.Command, args []string) error {
 	}
 
 	force, _ := cmd.Flags().GetBool(domain.FlagForce)
-	outcome, err := jobflow.Remove(jobflow.RemoveParams{
+	outcome, err := jobflow.Remove(cmd.Context(), jobflow.RemoveParams{
 		Context: ctx.FlowContext(),
 		Request: jobflow.RemoveRequest{
 			Name:   runctx.FirstArg(args),
 			Force:  force,
 			Config: ctx.Run,
 		},
-		Prompter:  ctx.Prompter(ctx.Interactive),
+		Prompter:  ctx.Prompter(cmd.Context(), ctx.Interactive),
 		Presenter: presenter{CLIPresenter: ctx.CLI(cmd)},
 	})
 	if err != nil {

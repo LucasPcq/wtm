@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -12,8 +13,8 @@ import (
 // removal failed. `git worktree remove` drops its own entry even when it could
 // not delete every file, so a failure is either nothing done or a removal done
 // badly, and the two call for opposite answers.
-func StillTracked(params FindByBranchParams) bool {
-	_, err := FindByBranch(params)
+func StillTracked(ctx context.Context, params FindByBranchParams) bool {
+	_, err := FindByBranch(ctx, params)
 	return !errors.Is(err, domain.ErrWorktreeNotFound)
 }
 
@@ -21,8 +22,8 @@ func StillTracked(params FindByBranchParams) bool {
 // the branch and wtm's state go the way a clean removal takes them, so the
 // worktree is not half-gone — unknown to git, yet with a branch and a namespace
 // nothing will ever reclaim.
-func FinishRemoval(params domain.CleanParams) error {
-	if err := infra.DeleteLocalBranch(infra.DeleteLocalBranchParams{
+func FinishRemoval(ctx context.Context, params domain.CleanParams) error {
+	if err := infra.DeleteLocalBranch(ctx, infra.DeleteLocalBranchParams{
 		ProjectDir: params.ProjectDir,
 		Branch:     params.Branch,
 		Force:      params.Force,

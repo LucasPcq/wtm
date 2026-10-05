@@ -25,7 +25,7 @@ func projectDirOf(stateDir string) string { return filepath.Dir(filepath.Dir(sta
 // gitToplevel spells a worktree the way the run commands key it on the daemon.
 func gitToplevel(t *testing.T, dir string) string {
 	t.Helper()
-	top, err := infra.Toplevel(dir)
+	top, err := infra.Toplevel(t.Context(), dir)
 	if err != nil {
 		t.Fatal(err)
 	}

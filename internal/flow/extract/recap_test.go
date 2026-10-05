@@ -67,7 +67,7 @@ func recapFlowFor(t *testing.T, in recapInput) *extractFlow {
 		config.Project.Env.Strategy = domain.EnvStrategyParent
 		config.Project.Env.Files = []domain.EnvFile{{Target: ".env"}}
 	}
-	f := &extractFlow{
+	f := &extractFlow{runCtx: t.Context(),
 		ctx:     flow.Context{ProjectDir: gittest.InitRepo(t), StateDir: t.TempDir(), Config: config},
 		request: Request{Source: in.SourceArg, Files: in.FilesFlag, To: in.TargetFlag, Isolation: in.IsolationFlag},
 		target: func(string) domain.BranchTarget {
@@ -90,7 +90,7 @@ func recapFlowFor(t *testing.T, in recapInput) *extractFlow {
 			return decide.SourceUpdatePrompt{Branch: subject}
 		},
 	}
-	f.create = f.embed()
+	f.create = f.embed(t.Context())
 	return f
 }
 
@@ -126,7 +126,7 @@ func TestRecapReadsAsItAlwaysDid(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			f := recapFlowFor(t, c.Input)
-			content, err := f.recapStep().Build(recapAnswersFor(c.Input))
+			content, err := f.recapStep(t.Context()).Build(recapAnswersFor(c.Input))
 			if err != nil {
 				t.Fatal(err)
 			}

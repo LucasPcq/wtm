@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"sync"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -23,13 +24,13 @@ type BuildTreeParams struct {
 // signal per node, attaches any matching PR, and hands the enriched nodes to
 // rules.BuildForest. It performs no rendering and never fails on a bad parent
 // chain (cycles are broken by the rules layer).
-func BuildTree(params BuildTreeParams) (domain.Forest, error) {
-	nodes, err := buildNodes(params.ProjectDir, params.StateDir)
+func BuildTree(ctx context.Context, params BuildTreeParams) (domain.Forest, error) {
+	nodes, err := buildNodes(ctx, params.ProjectDir, params.StateDir)
 	if err != nil {
 		return domain.Forest{}, err
 	}
 
-	statuses, err := List(domain.ListParams{
+	statuses, err := List(ctx, domain.ListParams{
 		ProjectDir: params.ProjectDir,
 		StateDir:   params.StateDir,
 		Config:     params.Config,
@@ -42,7 +43,7 @@ func BuildTree(params BuildTreeParams) (domain.Forest, error) {
 		statusByBranch[s.Branch] = s
 	}
 
-	needsSync := computeNeedsSync(nodes)
+	needsSync := computeNeedsSync(ctx, nodes)
 
 	forestNodes := make([]rules.ForestNode, 0, len(nodes))
 	for _, n := range nodes {
@@ -76,7 +77,7 @@ func BuildTree(params BuildTreeParams) (domain.Forest, error) {
 // advanced past it: the parent ref must resolve locally and not be an ancestor
 // of the child branch. Probes run concurrently (two git calls each). A parent
 // branch that does not exist locally yields no signal (false).
-func computeNeedsSync(nodes []domain.WorktreeNode) map[string]bool {
+func computeNeedsSync(ctx context.Context, nodes []domain.WorktreeNode) map[string]bool {
 	result := make(map[string]bool, len(nodes))
 	var mu sync.Mutex
 
@@ -91,7 +92,7 @@ func computeNeedsSync(nodes []domain.WorktreeNode) map[string]bool {
 		go func(node domain.WorktreeNode) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			if !parentAdvanced(node) {
+			if !parentAdvanced(ctx, node) {
 				return
 			}
 			mu.Lock()
@@ -107,14 +108,14 @@ func computeNeedsSync(nodes []domain.WorktreeNode) map[string]bool {
 // parentAdvanced reports whether the node's parent tip is NOT an ancestor of the
 // node's branch — i.e. the parent moved and the child needs a rebase. A parent
 // ref that cannot be resolved from the child worktree returns false (no signal).
-func parentAdvanced(node domain.WorktreeNode) bool {
-	if _, err := infra.Tip(infra.TipParams{
+func parentAdvanced(ctx context.Context, node domain.WorktreeNode) bool {
+	if _, err := infra.Tip(ctx, infra.TipParams{
 		WorktreePath: node.Path,
 		Ref:          node.SourceBranch,
 	}); err != nil {
 		return false
 	}
-	return !infra.IsAncestor(infra.IsAncestorParams{
+	return !infra.IsAncestor(ctx, infra.IsAncestorParams{
 		WorktreePath: node.Path,
 		Ancestor:     node.SourceBranch,
 		Descendant:   node.Branch,

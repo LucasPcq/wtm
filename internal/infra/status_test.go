@@ -12,7 +12,7 @@ import (
 func TestIsDirty_CleanRepo(t *testing.T) {
 	dir := gittest.InitRepo(t)
 
-	dirty, err := IsDirty(IsDirtyParams{WorktreePath: dir})
+	dirty, err := IsDirty(t.Context(), IsDirtyParams{WorktreePath: dir})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -26,7 +26,7 @@ func TestIsDirty_DirtyRepo(t *testing.T) {
 
 	os.WriteFile(filepath.Join(dir, "untracked.txt"), []byte("hello"), 0o644)
 
-	dirty, err := IsDirty(IsDirtyParams{WorktreePath: dir})
+	dirty, err := IsDirty(t.Context(), IsDirtyParams{WorktreePath: dir})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestListModifiedFiles_ReportsRenameOrigin(t *testing.T) {
 	gitRun(t, dir, "commit", "-m", "add old")
 	gitRun(t, dir, "mv", "old.txt", "new.txt")
 
-	entries, err := ListModifiedFiles(ListModifiedFilesParams{WorktreePath: dir})
+	entries, err := ListModifiedFiles(t.Context(), ListModifiedFilesParams{WorktreePath: dir})
 	if err != nil {
 		t.Fatalf("ListModifiedFiles: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestListModifiedFiles_SkipsIgnoredFiles(t *testing.T) {
 
 func listedPaths(t *testing.T, dir string) map[string]string {
 	t.Helper()
-	entries, err := ListModifiedFiles(ListModifiedFilesParams{WorktreePath: dir})
+	entries, err := ListModifiedFiles(t.Context(), ListModifiedFilesParams{WorktreePath: dir})
 	if err != nil {
 		t.Fatalf("ListModifiedFiles: %v", err)
 	}

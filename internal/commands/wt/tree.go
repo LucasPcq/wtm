@@ -68,10 +68,10 @@ func runTree(cmd *cobra.Command, _ []string) error {
 		Work: func() error {
 			var prs []domain.PRInfo
 			if withPRs {
-				prs = shared.LoadPRsAllStatesGraceful(cfg.ProjectDir)
+				prs = shared.LoadPRsAllStatesGraceful(cmd.Context(), cfg.ProjectDir)
 			}
 			var e error
-			forest, e = worktree.BuildTree(worktree.BuildTreeParams{
+			forest, e = worktree.BuildTree(cmd.Context(), worktree.BuildTreeParams{
 				ProjectDir: cfg.ProjectDir,
 				StateDir:   cfg.StateDir,
 				Config:     cfg.Config,

@@ -65,7 +65,7 @@ func runReparent(cmd *cobra.Command, args []string) error {
 	_, err = reparentflow.Run(cmd.Context(), reparentflow.Params{
 		Context:   shared.FlowContext(config),
 		Request:   reparentflow.Request{Branches: args, To: to},
-		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),
+		Prompter:  shared.FlowPrompter(cmd.Context(), shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),
 		Presenter: reparentPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
 	})
 	return err

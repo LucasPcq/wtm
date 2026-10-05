@@ -86,11 +86,11 @@ func holdingOf(ctx context.Context, params holdingParams) (domain.NamespaceHoldi
 	if len(jobs.Jobs) == 0 {
 		return domain.NamespaceHolding{}, false
 	}
-	wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: params.Context.ProjectDir, Branch: params.Branch})
+	wt, err := worktree.FindByBranch(ctx, worktree.FindByBranchParams{ProjectDir: params.Context.ProjectDir, Branch: params.Branch})
 	if err != nil {
 		return domain.NamespaceHolding{}, false
 	}
-	env, err := seam.JobEnv(seam.JobEnvParams{ProjectDir: params.Context.ProjectDir, StateDir: params.Context.StateDir, WorkDir: wt.Path, Publisher: params.Context.Publisher})
+	env, err := seam.JobEnv(ctx, seam.JobEnvParams{ProjectDir: params.Context.ProjectDir, StateDir: params.Context.StateDir, WorkDir: wt.Path, Publisher: params.Context.Publisher})
 	if err != nil {
 		return domain.NamespaceHolding{}, false
 	}
@@ -299,7 +299,7 @@ func drop(ctx context.Context, params dropParams) runjobs.RemoveNamespacesResult
 	_ = params.Presenter.Stage(ctx, flow.StageParams{
 		Message: fmt.Sprintf(domain.DataDroppingFmt, params.Holding.Branch, strings.Join(names, ", ")),
 		Work: func(ctx context.Context) error {
-			result = runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
+			result = runjobs.RemoveWorktreeNamespaces(ctx, runjobs.RemoveNamespacesParams{
 				Config:  params.Holding.Config,
 				Env:     params.Holding.Env,
 				WorkDir: params.Context.ProjectDir,

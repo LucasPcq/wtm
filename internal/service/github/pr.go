@@ -1,6 +1,7 @@
 package github
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -18,8 +19,8 @@ type HasOpenPRParams struct {
 // HasOpenPR checks if a branch has an open PR via the gh CLI. Returns the PR
 // number and URL when found. Returns false gracefully if gh is not installed,
 // not authenticated, or the call fails.
-func HasOpenPR(params HasOpenPRParams) (bool, int, string) {
-	if err := ensureAuth(); err != nil {
+func HasOpenPR(ctx context.Context, params HasOpenPRParams) (bool, int, string) {
+	if err := ensureAuth(ctx); err != nil {
 		return false, 0, ""
 	}
 
@@ -28,7 +29,7 @@ func HasOpenPR(params HasOpenPRParams) (bool, int, string) {
 		URL    string `json:"url"`
 	}
 
-	data, err := runGH(params.ProjectDir, "pr", "list",
+	data, err := runGH(ctx, params.ProjectDir, "pr", "list",
 		"--head", params.Branch,
 		"--state", "open",
 		"--json", "number,url",
@@ -52,9 +53,9 @@ const openPRsLimit = 200
 // call however many worktrees ask. It answers an empty map wherever HasOpenPR
 // would answer false. complete is false when the list hit its limit: a branch
 // missing from it may then still have an open pull request.
-func OpenPRsByBranch(projectDir string) (open map[string]string, complete bool) {
+func OpenPRsByBranch(ctx context.Context, projectDir string) (open map[string]string, complete bool) {
 	open = map[string]string{}
-	if err := ensureAuth(); err != nil {
+	if err := ensureAuth(ctx); err != nil {
 		return open, true
 	}
 
@@ -63,7 +64,7 @@ func OpenPRsByBranch(projectDir string) (open map[string]string, complete bool) 
 		URL    string `json:"url"`
 	}
 
-	data, err := runGH(projectDir, "pr", "list",
+	data, err := runGH(ctx, projectDir, "pr", "list",
 		"--state", "open",
 		"--json", "headRefName,url",
 		"--limit", strconv.Itoa(openPRsLimit),
@@ -93,8 +94,8 @@ type ListPRsParams struct {
 }
 
 // ListPRs fetches open PRs via gh CLI and filters them.
-func ListPRs(params ListPRsParams) ([]domain.PRInfo, error) {
-	if err := ensureAuth(); err != nil {
+func ListPRs(ctx context.Context, params ListPRsParams) ([]domain.PRInfo, error) {
+	if err := ensureAuth(ctx); err != nil {
 		return nil, err
 	}
 
@@ -116,7 +117,7 @@ func ListPRs(params ListPRsParams) ([]domain.PRInfo, error) {
 		args = append(args, "--search", "review-requested:@me")
 	}
 
-	data, err := runGH(params.ProjectDir, args...)
+	data, err := runGH(ctx, params.ProjectDir, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list PRs: %w", err)
 	}
@@ -138,12 +139,12 @@ func ListPRs(params ListPRsParams) ([]domain.PRInfo, error) {
 // `wtm tree --with-prs`. Results are newest-first; callers match by head branch
 // and take the first hit. State is normalised to lowercase ("open"/"merged"/
 // "closed").
-func ListPRsAllStates(projectDir string) ([]domain.PRInfo, error) {
-	if err := ensureAuth(); err != nil {
+func ListPRsAllStates(ctx context.Context, projectDir string) ([]domain.PRInfo, error) {
+	if err := ensureAuth(ctx); err != nil {
 		return nil, err
 	}
 
-	data, err := runGH(projectDir, "pr", "list",
+	data, err := runGH(ctx, projectDir, "pr", "list",
 		"--state", "all",
 		"--json", domain.GHPRFieldsWithState,
 		"--limit", "100",
@@ -180,15 +181,15 @@ func ListPRsAllStates(projectDir string) ([]domain.PRInfo, error) {
 // alongside the result, so a caller can tell "gh unavailable" apart from "no
 // PRs" and say so. It lives here rather than in commands/shared because the
 // flow layer needs it and may not reach that far up.
-func ListPRsWithConnection(projectDir string) ([]domain.PRInfo, domain.GHConnection) {
-	prs, err := ListPRsAllStates(projectDir)
+func ListPRsWithConnection(ctx context.Context, projectDir string) ([]domain.PRInfo, domain.GHConnection) {
+	prs, err := ListPRsAllStates(ctx, projectDir)
 	return prs, connectionOf(err)
 }
 
 // ListOpenPRsWithConnection is ListPRs with the CLI's availability kept alongside
 // the result, the way ListPRsWithConnection keeps it for every state.
-func ListOpenPRsWithConnection(params ListPRsParams) ([]domain.PRInfo, domain.GHConnection) {
-	prs, err := ListPRs(params)
+func ListOpenPRsWithConnection(ctx context.Context, params ListPRsParams) ([]domain.PRInfo, domain.GHConnection) {
+	prs, err := ListPRs(ctx, params)
 	if err != nil {
 		return nil, connectionOf(err)
 	}
@@ -214,12 +215,12 @@ type GetPRDetailParams struct {
 }
 
 // GetPRDetail fetches a single PR's identity and head/base branches via gh CLI.
-func GetPRDetail(params GetPRDetailParams) (domain.PRInfo, error) {
-	if err := ensureAuth(); err != nil {
+func GetPRDetail(ctx context.Context, params GetPRDetailParams) (domain.PRInfo, error) {
+	if err := ensureAuth(ctx); err != nil {
 		return domain.PRInfo{}, err
 	}
 
-	data, err := runGH(params.ProjectDir, "pr", "view", strconv.Itoa(params.Number),
+	data, err := runGH(ctx, params.ProjectDir, "pr", "view", strconv.Itoa(params.Number),
 		"--json", domain.GHPRFields,
 	)
 	if err != nil {
@@ -243,11 +244,11 @@ type OpenPRParams struct {
 // OpenPR opens a pull request in the browser via `gh pr view --web`, run in
 // the project directory: gh already knows the repository and carries its own
 // authentication, which an OS-level URL opener would not.
-func OpenPR(params OpenPRParams) error {
-	if err := ensureAuth(); err != nil {
+func OpenPR(ctx context.Context, params OpenPRParams) error {
+	if err := ensureAuth(ctx); err != nil {
 		return err
 	}
-	_, err := runGH(params.ProjectDir, "pr", "view", "--web", strconv.Itoa(params.Number))
+	_, err := runGH(ctx, params.ProjectDir, "pr", "view", "--web", strconv.Itoa(params.Number))
 	if err != nil {
 		return fmt.Errorf("open PR: %w", err)
 	}

@@ -4,6 +4,7 @@
 package events
 
 import (
+	"context"
 	"encoding/json"
 	"sync"
 	"time"
@@ -41,9 +42,9 @@ func NewPublisher(params PublisherParams) *Publisher {
 
 // Publish is opportunistic: a consumer that misses an event gets the state back
 // from its next snapshot, so nothing here may fail or slow the command.
-func (p *Publisher) Publish(event domain.Event) {
+func (p *Publisher) Publish(ctx context.Context, event domain.Event) {
 	p.once.Do(func() {
-		p.repo, p.repoErr = worktree.RepoOf(worktree.RepoOfParams{ProjectDir: p.projectDir})
+		p.repo, p.repoErr = worktree.RepoOf(ctx, worktree.RepoOfParams{ProjectDir: p.projectDir})
 	})
 	if p.repoErr != nil || p.socketPath == "" {
 		return

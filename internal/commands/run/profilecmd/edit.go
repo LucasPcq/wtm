@@ -64,14 +64,14 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	outcome, err := profileflow.Edit(profileflow.EditParams{
+	outcome, err := profileflow.Edit(cmd.Context(), profileflow.EditParams{
 		Context: ctx.FlowContext(),
 		Request: profileflow.EditRequest{
 			Name:   runctx.FirstArg(args),
 			Patch:  profilePatchFromFlags(cmd),
 			Config: ctx.Run,
 		},
-		Prompter:  ctx.Prompter(ctx.Interactive),
+		Prompter:  ctx.Prompter(cmd.Context(), ctx.Interactive),
 		Presenter: presenter{CLIPresenter: ctx.CLI(cmd)},
 	})
 	if err != nil {

@@ -4538,7 +4538,9 @@ const (
 	// ExecPartialLineCap bounds a line that never ends (binary output, a
 	// progress bar without \r) so the tail cannot grow without limit.
 	ExecPartialLineCap = 4096
-	ExecInterruptGrace = 5 * time.Second
+	// SubprocessInterruptGrace is how long a cancelled subprocess has between
+	// SIGINT and SIGTERM; the kill follows one ExecPipeGrace later.
+	SubprocessInterruptGrace = time.Second
 	// ExecPipeGrace bounds the wait for a process that exited while something it
 	// started (a backgrounded job, a daemon) still holds its output pipe.
 	ExecPipeGrace = time.Second
