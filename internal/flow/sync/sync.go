@@ -2,6 +2,7 @@
 package sync
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -63,6 +64,7 @@ func Operation() flow.Operation {
 }
 
 type syncFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -78,8 +80,9 @@ type syncFlow struct {
 	selection []string
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &syncFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -195,9 +198,9 @@ func (f *syncFlow) resolvedBranches() ([]string, error) {
 }
 
 func (f *syncFlow) scanParents() error {
-	return f.presenter.Stage(flow.StageParams{
+	return f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.SyncParentScanning,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			classified, err := worktree.ClassifyParents(worktree.ClassifyParentsParams{
 				ProjectDir: f.ctx.ProjectDir,
 				StateDir:   f.ctx.StateDir,
@@ -211,9 +214,9 @@ func (f *syncFlow) scanParents() error {
 
 func (f *syncFlow) rebase(params worktree.SyncParams) (domain.SyncResult, error) {
 	var result domain.SyncResult
-	err := f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.SyncRebasing,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			var syncErr error
 			result, syncErr = worktree.Sync(params)
 			return syncErr
@@ -224,9 +227,9 @@ func (f *syncFlow) rebase(params worktree.SyncParams) (domain.SyncResult, error)
 
 func (f *syncFlow) push(result domain.SyncResult) (domain.SyncResult, error) {
 	pushed := result
-	err := f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.SyncPushing,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			pushed = worktree.PushSynced(worktree.PushSyncedParams{
 				ProjectDir: f.ctx.ProjectDir,
 				Result:     result,

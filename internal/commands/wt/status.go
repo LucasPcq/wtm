@@ -100,7 +100,7 @@ var statusPrompter = func(interactive bool) flow.Prompter {
 }
 
 func reportStatus(cmd *cobra.Command, report statusReport) error {
-	outcome, err := statusflow.Run(report.Params)
+	outcome, err := statusflow.Run(cmd.Context(), report.Params)
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func reportStatus(cmd *cobra.Command, report statusReport) error {
 }
 
 func reportStatusAll(cmd *cobra.Command, report statusReport) error {
-	docs, err := statusflow.RunAll(report.Params)
+	docs, err := statusflow.RunAll(cmd.Context(), report.Params)
 	if err != nil {
 		return err
 	}

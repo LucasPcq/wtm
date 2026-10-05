@@ -3,6 +3,7 @@
 package initrun
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -94,30 +95,30 @@ type Report struct {
 	AddressingDrift     *flow.Notice
 }
 
-func Run(params Params) (Outcome, error) {
-	ctx := params.Context
-	envFiles := ctx.Config.Project.Env.Files
+func Run(ctx context.Context, params Params) (Outcome, error) {
+	project := params.Context
+	envFiles := project.Config.Project.Env.Files
 
 	var detection domain.InitDetectionResult
 	var envScans map[string]domain.EnvPortScan
-	_ = params.Presenter.Stage(flow.StageParams{
+	_ = params.Presenter.Stage(ctx, flow.StageParams{
 		Message: domain.RunInitDetectingMessage,
-		Work: func() error {
-			detection = detect.ProjectEnvironment(ctx.ProjectDir)
+		Work: func(ctx context.Context) error {
+			detection = detect.ProjectEnvironment(project.ProjectDir)
 			detection.ComposeScans = compose.ScanAll(compose.ScanAllParams{
-				ProjectDir: ctx.ProjectDir,
+				ProjectDir: project.ProjectDir,
 				Files:      detection.DockerComposeFiles,
-				Project:    filepath.Base(ctx.ProjectDir),
+				Project:    filepath.Base(project.ProjectDir),
 			})
 			envScans = detect.ScanEnvPorts(detect.ScanEnvPortsParams{
-				ProjectDir: ctx.ProjectDir,
+				ProjectDir: project.ProjectDir,
 				Files:      detection.EnvFiles,
 			})
 			return nil
 		},
 	})
 
-	existing, err := runconfig.Load(ctx.StateDir)
+	existing, err := runconfig.Load(project.StateDir)
 	if err != nil {
 		return Outcome{}, fmt.Errorf("load run.toml: %w", err)
 	}
@@ -128,7 +129,7 @@ func Run(params Params) (Outcome, error) {
 		Existing:  existing,
 		EnvScans:  envScans,
 		EnvLines: detect.EnvLines(detect.EnvPortCandidatesParams{
-			ProjectDir: ctx.ProjectDir,
+			ProjectDir: project.ProjectDir,
 			Files:      envFiles,
 		}),
 	})
@@ -164,7 +165,7 @@ func Run(params Params) (Outcome, error) {
 		Patch: answers.PatchCompose,
 	})
 	unverifiable := compose.VerifyAll(compose.VerifyAllParams{
-		ProjectDir:  ctx.ProjectDir,
+		ProjectDir:  project.ProjectDir,
 		ByFile:      plan.Patches,
 		NamesByFile: namePlan.Patches,
 	})
@@ -236,7 +237,7 @@ func Run(params Params) (Outcome, error) {
 		Ask:        !answers.EnvLinksAsked,
 		LinkEnv:    params.Request.LinkEnv || (answers.EnvLinksAsked && answers.LinkEnv),
 		Declined:   answers.EnvLinksAsked && !answers.LinkEnv,
-		ProjectDir: ctx.ProjectDir,
+		ProjectDir: project.ProjectDir,
 		EnvFiles:   envFiles,
 		Config:     outcome.Config,
 	})
@@ -253,7 +254,7 @@ func Run(params Params) (Outcome, error) {
 			EnvFiles:   envFiles,
 		})
 	}
-	writtenKeys, err := envsvc.WritePortKeys(envsvc.WritePortKeysParams{ProjectDir: ctx.ProjectDir, Writes: portKeys})
+	writtenKeys, err := envsvc.WritePortKeys(envsvc.WritePortKeysParams{ProjectDir: project.ProjectDir, Writes: portKeys})
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -271,13 +272,13 @@ func Run(params Params) (Outcome, error) {
 	// keeps binding its defaults, while a run.toml declaring ports the compose
 	// does not read would announce an isolation that is not there.
 	if err := compose.PatchAll(compose.PatchAllParams{
-		ProjectDir:  ctx.ProjectDir,
+		ProjectDir:  project.ProjectDir,
 		ByFile:      outcome.Patches,
 		NamesByFile: namePatches,
 	}); err != nil {
 		return Outcome{}, err
 	}
-	if err := runconfig.Save(runconfig.SaveParams{StateDir: ctx.StateDir, Config: outcome.Config}); err != nil {
+	if err := runconfig.Save(runconfig.SaveParams{StateDir: project.StateDir, Config: outcome.Config}); err != nil {
 		return Outcome{}, err
 	}
 
@@ -289,8 +290,8 @@ func Run(params Params) (Outcome, error) {
 	})
 	if len(addedTargets) > 0 {
 		if err := envsvc.AddEnvTargets(envsvc.AddEnvTargetsParams{
-			StateDir: ctx.StateDir,
-			Project:  ctx.Config.Project,
+			StateDir: project.StateDir,
+			Project:  project.Config.Project,
 			Targets:  addedTargets,
 		}); err != nil {
 			return Outcome{}, fmt.Errorf("add env targets: %w", err)
@@ -298,7 +299,7 @@ func Run(params Params) (Outcome, error) {
 	}
 
 	result := Outcome{Report: report(reportParams{
-		Context:     ctx,
+		Context:     project,
 		Redirection: params.Request.Redirection,
 		Detection:   detection,
 		Answers:     answers,

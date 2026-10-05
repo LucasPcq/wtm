@@ -65,7 +65,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 	parallel, _ := cmd.Flags().GetBool(domain.FlagParallel)
 	noProbe, _ := cmd.Flags().GetBool(domain.FlagNoProbe)
 
-	outcome, err := startflow.Run(startflow.Params{
+	outcome, err := startflow.Run(cmd.Context(), startflow.Params{
 		Context: ctx.FlowContext(),
 		Request: startflow.Request{
 			Worktree:  runctx.FirstArg(args),

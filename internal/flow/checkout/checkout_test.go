@@ -76,7 +76,7 @@ func TestRunAsksWhatTheNumberLeavesOpen(t *testing.T) {
 	}}
 	presenter := newRecorder()
 
-	outcome, err := Run(Params{Context: testContext(t), Request: Request{Number: 42}, Prompter: prompter, Presenter: presenter})
+	outcome, err := Run(t.Context(), Params{Context: testContext(t), Request: Request{Number: 42}, Prompter: prompter, Presenter: presenter})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestRunPicksAmongTheLoadedPRs(t *testing.T) {
 	}}
 	presenter := newRecorder()
 
-	if _, err := Run(Params{Context: testContext(t), Prompter: prompter, Presenter: presenter}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: testContext(t), Prompter: prompter, Presenter: presenter}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	options := prompter.Content[KeyPR].Options
@@ -130,7 +130,7 @@ func TestEverythingGivenStillShowsTheRecap(t *testing.T) {
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyRecap: confirmCheckout}}
 	presenter := newRecorder()
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   testContext(t),
 		Request:   Request{Number: 42, From: "main", EnvFrom: "example"},
 		Prompter:  prompter,
@@ -153,7 +153,7 @@ func TestTheParentFallbackIsARecapWarning(t *testing.T) {
 	git(t, ctx.ProjectDir, "branch", "develop")
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyRecap: confirmCheckout}}
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Number: 42, From: "develop", EnvFrom: "parent"},
 		Prompter:  prompter,
@@ -197,7 +197,7 @@ func TestABehindBranchIsOfferedAFastForwardBeforeTheRecap(t *testing.T) {
 	}}
 	presenter := newRecorder()
 
-	if _, err := Run(Params{Context: ctx, Request: Request{Number: 42}, Prompter: prompter, Presenter: presenter}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: ctx, Request: Request{Number: 42}, Prompter: prompter, Presenter: presenter}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	want := strings.Join([]string{KeyParent, KeyEnv, KeySourceUpdate, KeyRecap}, ",")
@@ -217,7 +217,7 @@ func TestABehindBranchIsOfferedAFastForwardBeforeTheRecap(t *testing.T) {
 
 func TestANewBranchIsNeverOfferedAFastForward(t *testing.T) {
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyParent: "main", KeyEnv: "", KeyRecap: confirmCheckout}}
-	if _, err := Run(Params{Context: testContext(t), Request: Request{Number: 42}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: testContext(t), Request: Request{Number: 42}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if _, asked := prompter.Content[KeySourceUpdate]; asked {
@@ -231,7 +231,7 @@ func TestUnattendedFastForwardsOnlyWithTheFlag(t *testing.T) {
 		behindLocally(t, ctx)
 		before := revParse(t, ctx.ProjectDir, "feat/thing")
 
-		if _, err := Run(Params{Context: ctx, Request: Request{Number: 42, FastForward: ff}, Prompter: flow.Unattended{}, Presenter: newRecorder()}); err != nil {
+		if _, err := Run(t.Context(), Params{Context: ctx, Request: Request{Number: 42, FastForward: ff}, Prompter: flow.Unattended{}, Presenter: newRecorder()}); err != nil {
 			t.Fatalf("Run (ff=%v): %v", ff, err)
 		}
 		moved := revParse(t, ctx.ProjectDir, "feat/thing") != before
@@ -249,7 +249,7 @@ func TestADivergedBranchIsARecapWarning(t *testing.T) {
 	git(t, ctx.ProjectDir, "checkout", "main")
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyParent: "main", KeyEnv: "", KeyRecap: confirmCheckout}}
 
-	if _, err := Run(Params{Context: ctx, Request: Request{Number: 42}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: ctx, Request: Request{Number: 42}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if _, asked := prompter.Content[KeySourceUpdate]; asked {
@@ -261,7 +261,7 @@ func TestADivergedBranchIsARecapWarning(t *testing.T) {
 }
 
 func TestUnattendedWithoutANumberIsRefused(t *testing.T) {
-	_, err := Run(Params{Context: testContext(t), Prompter: flow.Unattended{}, Presenter: newRecorder()})
+	_, err := Run(t.Context(), Params{Context: testContext(t), Prompter: flow.Unattended{}, Presenter: newRecorder()})
 	if err == nil || err.Error() != domain.CheckoutPRRequired {
 		t.Errorf("err = %v, want %q", err, domain.CheckoutPRRequired)
 	}
@@ -269,7 +269,7 @@ func TestUnattendedWithoutANumberIsRefused(t *testing.T) {
 
 func TestUnattendedTakesThePRBase(t *testing.T) {
 	presenter := newRecorder()
-	outcome, err := Run(Params{Context: testContext(t), Request: Request{Number: 42}, Prompter: flow.Unattended{}, Presenter: presenter})
+	outcome, err := Run(t.Context(), Params{Context: testContext(t), Request: Request{Number: 42}, Prompter: flow.Unattended{}, Presenter: presenter})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -280,7 +280,7 @@ func TestUnattendedTakesThePRBase(t *testing.T) {
 
 func TestAForkIsRefusedBeforeAsking(t *testing.T) {
 	prompter := &flowtest.ScriptedPrompter{}
-	_, err := Run(Params{Context: testContext(t), Request: Request{Number: 9}, Prompter: prompter, Presenter: newRecorder()})
+	_, err := Run(t.Context(), Params{Context: testContext(t), Request: Request{Number: 9}, Prompter: prompter, Presenter: newRecorder()})
 	if err == nil || !strings.Contains(err.Error(), "is from a fork") {
 		t.Errorf("err = %v, want the fork refused", err)
 	}
@@ -291,7 +291,7 @@ func TestAForkIsRefusedBeforeAsking(t *testing.T) {
 
 func TestAbortChecksOutNothing(t *testing.T) {
 	presenter := newRecorder()
-	outcome, err := Run(Params{Context: testContext(t), Request: Request{Number: 42}, Prompter: &flowtest.ScriptedPrompter{Abort: true}, Presenter: presenter})
+	outcome, err := Run(t.Context(), Params{Context: testContext(t), Request: Request{Number: 42}, Prompter: &flowtest.ScriptedPrompter{Abort: true}, Presenter: presenter})
 	if err != nil {
 		t.Fatalf("an abort is not an error: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestRunRunsHooksAsTheirOwnPhase(t *testing.T) {
 	ctx.Config.Project.Hooks.OnCreate = []domain.HookCommand{{Cmd: "echo hooked"}}
 	presenter := newRecorder()
 
-	if _, err := Run(Params{Context: ctx, Request: Request{Number: 42}, Prompter: flow.Unattended{}, Presenter: presenter}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: ctx, Request: Request{Number: 42}, Prompter: flow.Unattended{}, Presenter: presenter}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if len(presenter.Hooks) != 1 || presenter.Hooks[0] != domain.HooksTitleOnCreate {
@@ -318,7 +318,7 @@ func TestRunRunsHooksAsTheirOwnPhase(t *testing.T) {
 
 func TestAPresenterErrorIsTheRunsError(t *testing.T) {
 	presenter := &failingPresenter{recorder: newRecorder()}
-	_, err := Run(Params{Context: testContext(t), Request: Request{Number: 42}, Prompter: flow.Unattended{}, Presenter: presenter})
+	_, err := Run(t.Context(), Params{Context: testContext(t), Request: Request{Number: 42}, Prompter: flow.Unattended{}, Presenter: presenter})
 	if !errors.Is(err, errWrite) {
 		t.Errorf("err = %v, want the presenter's", err)
 	}
@@ -345,7 +345,7 @@ func TestFFReadsOriginAsItIsNow(t *testing.T) {
 	ctx := testContext(t)
 	staleBehind(t, ctx)
 
-	if _, err := Run(Params{Context: ctx, Request: Request{Number: 42, FastForward: true}, Prompter: flow.Unattended{}, Presenter: newRecorder()}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: ctx, Request: Request{Number: 42, FastForward: true}, Prompter: flow.Unattended{}, Presenter: newRecorder()}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if local, origin := revParse(t, ctx.ProjectDir, "feat/thing"), revParse(t, ctx.ProjectDir, "origin/feat/thing"); local != origin {
@@ -358,7 +358,7 @@ func TestAStaleRefStillOffersTheFastForward(t *testing.T) {
 	staleBehind(t, ctx)
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeySourceUpdate: decide.UpdateKeep, KeyRecap: confirmCheckout}}
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Number: 42, From: "main", EnvFrom: "example"},
 		Prompter:  prompter,
@@ -376,7 +376,7 @@ func TestABranchHeldElsewhereIsRefusedBeforeAsking(t *testing.T) {
 	git(t, ctx.ProjectDir, "worktree", "add", filepath.Join(t.TempDir(), "held"), "-b", "feat/thing", "origin/feat/thing")
 	prompter := &flowtest.ScriptedPrompter{}
 
-	_, err := Run(Params{Context: ctx, Request: Request{Number: 42}, Prompter: prompter, Presenter: newRecorder()})
+	_, err := Run(t.Context(), Params{Context: ctx, Request: Request{Number: 42}, Prompter: prompter, Presenter: newRecorder()})
 	if !errors.Is(err, domain.ErrWorktreeExists) {
 		t.Fatalf("err = %v, want the held branch refused", err)
 	}
@@ -390,7 +390,7 @@ func TestACheckoutPublishesTheWorktreeItCreates(t *testing.T) {
 	presenter := newRecorder()
 	ctx.Publisher = presenter.Recorder
 
-	if _, err := Run(Params{Context: ctx, Request: Request{Number: 42}, Prompter: flow.Unattended{}, Presenter: presenter}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: ctx, Request: Request{Number: 42}, Prompter: flow.Unattended{}, Presenter: presenter}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -406,7 +406,7 @@ func TestAFailingOnCreateHookIsPublishedByCheckout(t *testing.T) {
 	presenter := newRecorder()
 	ctx.Publisher = presenter.Recorder
 
-	if _, err := Run(Params{Context: ctx, Request: Request{Number: 42}, Prompter: flow.Unattended{}, Presenter: presenter}); err == nil {
+	if _, err := Run(t.Context(), Params{Context: ctx, Request: Request{Number: 42}, Prompter: flow.Unattended{}, Presenter: presenter}); err == nil {
 		t.Fatal("want the hook's error")
 	}
 

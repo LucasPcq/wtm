@@ -2,6 +2,7 @@
 package start
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -68,8 +69,9 @@ func Operation() flow.Operation {
 	}
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &startFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -79,6 +81,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type startFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -155,7 +158,7 @@ func (f *startFlow) run() (Outcome, error) {
 		return Outcome{Aborted: true}, nil
 	}
 
-	cfg, err := f.concurrency.Apply(answers)
+	cfg, err := f.concurrency.Apply(f.runCtx, answers)
 	f.request.Config = cfg
 	if err != nil {
 		return Outcome{}, err
@@ -186,7 +189,7 @@ func (f *startFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 	if rules.IsShared(job) {
-		owed.Settle(owed.Params{Context: f.ctx, Presenter: f.presenter})
+		owed.Settle(f.runCtx, owed.Params{Context: f.ctx, Presenter: f.presenter})
 	}
 	return Outcome{WorkDir: workDir, Job: job, Result: result.One(), Aborted: result.Aborted()}, nil
 }
@@ -194,9 +197,9 @@ func (f *startFlow) run() (Outcome, error) {
 // connect wakes the daemon before anything is asked: the worktree picker shows
 // what each worktree is already running, which only the daemon knows.
 func (f *startFlow) connect() error {
-	return f.presenter.Stage(flow.StageParams{
+	return f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.RunDaemonConnecting,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			if err := process.EnsureCurrentDaemon(process.DaemonParams{
 				SocketPath: process.SocketPath(),
 				ProxyPort:  rules.ProxyPort(f.ctx.Config.Global),

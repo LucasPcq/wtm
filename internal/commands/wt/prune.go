@@ -117,7 +117,7 @@ func runPrune(cmd *cobra.Command, _ []string) error {
 		return errors.New(domain.PruneNeedsTerminal)
 	}
 
-	_, err = pruneflow.Run(pruneflow.Params{
+	_, err = pruneflow.Run(cmd.Context(), pruneflow.Params{
 		Context: shared.FlowContext(config),
 		Request: pruneflow.Request{
 			Merged:           merged,

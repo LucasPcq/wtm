@@ -2,6 +2,7 @@
 package extract
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -50,8 +51,9 @@ type Params struct {
 	Presenter Presenter
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &extractFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -63,6 +65,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type extractFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -136,9 +139,9 @@ func (f *extractFlow) run() (Outcome, error) {
 }
 
 func (f *extractFlow) listWorktrees() error {
-	return f.presenter.Stage(flow.StageParams{
+	return f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.ExtractScanLoading,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			statuses, err := worktree.List(domain.ListParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Config: f.ctx.Config})
 			if err != nil {
 				return fmt.Errorf("list worktrees: %w", err)
@@ -168,9 +171,9 @@ func (f *extractFlow) sourceChanges(branch string) ([]domain.ExtractFile, error)
 	}
 	f.paths[branch] = wt.Path
 	var files []domain.ExtractFile
-	err = f.presenter.Stage(flow.StageParams{
+	err = f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.ExtractScanLoading,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			var listErr error
 			files, listErr = worktree.ListChanges(worktree.ListChangesParams{WorktreePath: wt.Path})
 			return listErr

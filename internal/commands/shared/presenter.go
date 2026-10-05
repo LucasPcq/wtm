@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"io"
 	"os"
 
@@ -53,11 +54,11 @@ func (p CLIPresenter) phase(separate bool) io.Writer {
 	return OpenBlock(p.Cmd.ErrOrStderr(), separate)
 }
 
-func (p CLIPresenter) Stage(params flow.StageParams) error {
+func (p CLIPresenter) Stage(ctx context.Context, params flow.StageParams) error {
 	return components.RunLoading(components.LoadingParams{
 		Message: params.Message,
 		Animate: Animate(p.Cmd, p.Human),
-		Work:    params.Work,
+		Work:    func() error { return params.Work(ctx) },
 	})
 }
 

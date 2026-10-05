@@ -93,7 +93,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 
 	interactive := rules.IsHumanFormat(format) && !yes && term.IsTerminal(int(os.Stdin.Fd()))
 
-	_, err = extractflow.Run(extractflow.Params{
+	_, err = extractflow.Run(cmd.Context(), extractflow.Params{
 		Context: shared.FlowContext(config),
 		Request: extractflow.Request{
 			Source:      source,

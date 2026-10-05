@@ -98,7 +98,7 @@ func TestStatusReadsTheCurrentWorktreeWithTheStateOfEveryDeclaredJob(t *testing.
 	f := setup(t)
 	exit := 1
 
-	doc, err := runStatus(status.Params{
+	doc, err := runStatus(t, status.Params{
 		Context: f.ctx,
 		Request: status.Request{Cwd: f.repo},
 		Jobs: jobs(
@@ -143,7 +143,7 @@ func toStrings(codes []domain.StatusProblemCode) []string {
 func TestStatusNeverPutsAnEnvValueInTheDocument(t *testing.T) {
 	f := setup(t)
 
-	doc, err := runStatus(status.Params{Context: f.ctx, Request: status.Request{Cwd: f.repo}, Jobs: jobs()})
+	doc, err := runStatus(t, status.Params{Context: f.ctx, Request: status.Request{Cwd: f.repo}, Jobs: jobs()})
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestStatusNeverPutsAnEnvValueInTheDocument(t *testing.T) {
 func TestANamedWorktreeMissingAnEnvFileIsToldToRunEnv(t *testing.T) {
 	f := setup(t)
 
-	doc, err := runStatus(status.Params{Context: f.ctx, Request: status.Request{Worktree: "feat/x", Cwd: f.repo}, Jobs: jobs()})
+	doc, err := runStatus(t, status.Params{Context: f.ctx, Request: status.Request{Worktree: "feat/x", Cwd: f.repo}, Jobs: jobs()})
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestANamedWorktreeMissingAnEnvFileIsToldToRunEnv(t *testing.T) {
 func TestStatusNeverNumbersTheWorktreeItReads(t *testing.T) {
 	f := setup(t)
 
-	doc, err := runStatus(status.Params{Context: f.ctx, Request: status.Request{Cwd: f.linked}, Jobs: jobs()})
+	doc, err := runStatus(t, status.Params{Context: f.ctx, Request: status.Request{Cwd: f.linked}, Jobs: jobs()})
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
@@ -200,7 +200,7 @@ func TestStatusNeverNumbersTheWorktreeItReads(t *testing.T) {
 func TestStatusAllReadsEveryWorktree(t *testing.T) {
 	f := setup(t)
 
-	docs, err := status.RunAll(unattended(status.Params{Context: f.ctx, Request: status.Request{Cwd: f.repo}, Jobs: jobs()}))
+	docs, err := status.RunAll(t.Context(), unattended(status.Params{Context: f.ctx, Request: status.Request{Cwd: f.repo}, Jobs: jobs()}))
 	if err != nil {
 		t.Fatalf("status --all: %v", err)
 	}
@@ -216,7 +216,7 @@ func TestWithoutRunTomlTheJobsAndAddressesAreEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	doc, err := runStatus(status.Params{Context: f.ctx, Request: status.Request{Cwd: f.repo}, Jobs: jobs()})
+	doc, err := runStatus(t, status.Params{Context: f.ctx, Request: status.Request{Cwd: f.repo}, Jobs: jobs()})
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
@@ -233,8 +233,8 @@ func unattended(params status.Params) status.Params {
 }
 
 // runStatus is a run nobody can be asked in: no terminal, JSON or --quiet.
-func runStatus(params status.Params) (domain.StatusDocument, error) {
-	outcome, err := status.Run(unattended(params))
+func runStatus(t *testing.T, params status.Params) (domain.StatusDocument, error) {
+	outcome, err := status.Run(t.Context(), unattended(params))
 	return outcome.Document, err
 }
 
@@ -244,7 +244,7 @@ func TestTheInteractiveRunPicksTheWorktreeOpenedOnTheCurrentOne(t *testing.T) {
 	f := setup(t)
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{target.KeyWorktree: f.linked}}
 
-	outcome, err := status.Run(status.Params{Context: f.ctx, Request: status.Request{Cwd: f.repo}, Prompter: prompter, Presenter: &flowtest.Recorder{}, Jobs: jobs()})
+	outcome, err := status.Run(t.Context(), status.Params{Context: f.ctx, Request: status.Request{Cwd: f.repo}, Prompter: prompter, Presenter: &flowtest.Recorder{}, Jobs: jobs()})
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
@@ -264,7 +264,7 @@ func TestAPositionalAnswersThePickerWithoutAsking(t *testing.T) {
 	f := setup(t)
 	prompter := &flowtest.ScriptedPrompter{}
 
-	outcome, err := status.Run(status.Params{Context: f.ctx, Request: status.Request{Worktree: "feat/x", Cwd: f.repo}, Prompter: prompter, Presenter: &flowtest.Recorder{}, Jobs: jobs()})
+	outcome, err := status.Run(t.Context(), status.Params{Context: f.ctx, Request: status.Request{Worktree: "feat/x", Cwd: f.repo}, Prompter: prompter, Presenter: &flowtest.Recorder{}, Jobs: jobs()})
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
@@ -277,7 +277,7 @@ func TestBackingOutOfThePickerReadsNothing(t *testing.T) {
 	f := setup(t)
 	recorder := &flowtest.Recorder{}
 
-	outcome, err := status.Run(status.Params{Context: f.ctx, Request: status.Request{Cwd: f.repo}, Prompter: &flowtest.ScriptedPrompter{Abort: true}, Presenter: recorder, Jobs: jobs()})
+	outcome, err := status.Run(t.Context(), status.Params{Context: f.ctx, Request: status.Request{Cwd: f.repo}, Prompter: &flowtest.ScriptedPrompter{Abort: true}, Presenter: recorder, Jobs: jobs()})
 	if err != nil || !outcome.Aborted {
 		t.Fatalf("outcome = %+v, err = %v; want an abort", outcome, err)
 	}

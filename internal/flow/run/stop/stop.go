@@ -2,6 +2,7 @@
 package stop
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -61,8 +62,9 @@ func Operation() flow.Operation {
 	}
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &stopFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -72,6 +74,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type stopFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -158,9 +161,9 @@ func (f *stopFlow) wake(workDirs []string) error {
 	if !indexed {
 		return nil
 	}
-	return f.presenter.Stage(flow.StageParams{
+	return f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.RunDaemonConnecting,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			return process.EnsureDaemon(process.DaemonParams{
 				SocketPath: process.SocketPath(),
 				ProxyPort:  rules.ProxyPort(f.ctx.Config.Global),
@@ -204,9 +207,9 @@ func (f *stopFlow) stop(params stopParams) (string, error) {
 	client := process.NewClient(params.Socket)
 	job := params.Job
 	var resp process.Response
-	if err := f.presenter.Stage(flow.StageParams{
+	if err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: fmt.Sprintf(domain.RunStoppingFmt, job),
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			var sendErr error
 			resp, sendErr = client.Send(process.Request{
 				Action:  process.ActionStop,

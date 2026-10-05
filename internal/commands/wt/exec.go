@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/signal"
 	"runtime"
 
 	"github.com/spf13/cobra"
@@ -94,11 +93,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 	}
 
 	workers := rules.ExecJobs(rules.ExecJobsParams{Requested: jobs, CPUs: runtime.NumCPU()})
-	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
-	defer stop()
-
-	_, err = execflow.Run(execflow.Params{
-		Ctx:       ctx,
+	_, err = execflow.Run(cmd.Context(), execflow.Params{
 		Context:   shared.FlowContext(config),
 		Request:   execflow.Request{Branches: names, All: all, Command: split.Command, Jobs: workers, Print: printAll, Dir: dir},
 		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),

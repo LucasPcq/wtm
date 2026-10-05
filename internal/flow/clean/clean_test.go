@@ -1,6 +1,7 @@
 package clean
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -179,7 +180,7 @@ type failingPresenter struct {
 	t *testing.T
 }
 
-func (p failingPresenter) Stage(flow.StageParams) error {
+func (p failingPresenter) Stage(context.Context, flow.StageParams) error {
 	p.t.Error("no progress should be shown")
 	return nil
 }
@@ -251,7 +252,7 @@ func TestRunConfirmsThenRemoves(t *testing.T) {
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}}
 	presenter := newRecorder()
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/gone"}, BaseBranch: "main"},
 		Prompter:  prompter,
@@ -285,7 +286,7 @@ func TestRunPurgesTheWorktreeJobLogs(t *testing.T) {
 	logs := writeJobLog(t, ctx, "feat/logged")
 	kept := writeJobLog(t, ctx, "feat/kept")
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/logged"}, BaseBranch: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}},
@@ -316,7 +317,7 @@ func TestRunSucceedsWhenTheJobLogPurgeFails(t *testing.T) {
 		t.Fatalf("the fixture does not make the purge fail, so it proves nothing")
 	}
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/logged"}, BaseBranch: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}},
@@ -350,7 +351,7 @@ func TestRunOffersForceOnlyWhenUnsafe(t *testing.T) {
 	}
 
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteForce}}
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/dirty"}, BaseBranch: "main"},
 		Prompter:  prompter,
@@ -381,7 +382,7 @@ func TestRunOnAbsentWorktreeConcludesWithoutAsking(t *testing.T) {
 	prompter := &flowtest.ScriptedPrompter{}
 	presenter := newRecorder()
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   testContext(t),
 		Request:   Request{Branches: []string{"feat/ghost"}, BaseBranch: "main"},
 		Prompter:  prompter,
@@ -405,7 +406,7 @@ func TestRunAbortedRemovesNothing(t *testing.T) {
 	ctx := testContext(t)
 	path := makeWorktree(t, ctx, "feat/keep")
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/keep"}, BaseBranch: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Abort: true},

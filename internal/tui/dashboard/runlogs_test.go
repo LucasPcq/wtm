@@ -16,7 +16,7 @@ import (
 
 func logsModel(t *testing.T, params RunParams, branches ...string) Model {
 	t.Helper()
-	model := New(params)
+	model := New(t.Context(), params)
 	t.Cleanup(model.Close)
 	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 	return update(model, worktreesMsg{statuses: statuses(branches...), parents: map[string]string{}})

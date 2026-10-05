@@ -126,7 +126,7 @@ func TestStartingAProfileFromTheDashboardNeverAsksForTheTerminal(t *testing.T) {
 		t.Fatalf("Save: %v", err)
 	}
 
-	model := New(RunParams{StateDir: stateDir})
+	model := New(t.Context(), RunParams{StateDir: stateDir})
 	t.Cleanup(model.Close)
 	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 	model = update(model, worktreesMsg{statuses: statuses("a"), parents: map[string]string{}})

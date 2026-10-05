@@ -117,7 +117,7 @@ func runEnv(cmd *cobra.Command, args []string) error {
 	if len(args) == 1 {
 		worktreeArg = args[0]
 	}
-	_, err = envflow.Run(envflow.Params{
+	_, err = envflow.Run(cmd.Context(), envflow.Params{
 		Context: shared.FlowContext(cfg),
 		Request: envflow.Request{
 			Worktree:   worktreeArg,

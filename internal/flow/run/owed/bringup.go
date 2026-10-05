@@ -22,7 +22,7 @@ type BringUpParams struct {
 // what is owed to it can be given back now, and hands back how to let it go.
 // Letting go is main's hold released: the service stops unless a worktree took
 // a claim on it meanwhile.
-func BringUp(params BringUpParams) (release func(), err error) {
+func BringUp(ctx context.Context, params BringUpParams) (release func(), err error) {
 	job, found := rules.FindJob(params.Config, params.Job)
 	if !found {
 		return nil, fmt.Errorf("%w: %s", domain.ErrJobNotFound, params.Job)
@@ -45,7 +45,7 @@ func BringUp(params BringUpParams) (release func(), err error) {
 		NoProbe:    true,
 		Publisher:  params.Context.Publisher,
 	})
-	outcomes, err := mainSeam.Starter(seam.StartParams{Jobs: rules.JobsWithEffectivePorts(params.Config, []domain.JobConfig{job})})(context.Background(), nil)
+	outcomes, err := mainSeam.Starter(seam.StartParams{Jobs: rules.JobsWithEffectivePorts(params.Config, []domain.JobConfig{job})})(ctx, nil)
 	if err != nil {
 		return nil, err
 	}

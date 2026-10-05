@@ -46,7 +46,7 @@ func runOpen(cmd *cobra.Command, args []string) error {
 	raw, _ := cmd.Flags().GetBool(domain.FlagRaw)
 	job, _ := cmd.Flags().GetString(domain.FlagJob)
 
-	outcome, err := openflow.Run(openflow.Params{
+	outcome, err := openflow.Run(cmd.Context(), openflow.Params{
 		Context: ctx.FlowContext(),
 		Request: openflow.Request{
 			Worktree: runctx.FirstArg(args),

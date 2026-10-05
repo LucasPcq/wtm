@@ -3,6 +3,7 @@
 package flowtest
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -170,9 +171,9 @@ func (r *Recorder) PublishedTypes() []domain.EventType {
 	return types
 }
 
-func (r *Recorder) Stage(params flow.StageParams) error {
+func (r *Recorder) Stage(ctx context.Context, params flow.StageParams) error {
 	r.Stages = append(r.Stages, params.Message)
-	return params.Work()
+	return params.Work(ctx)
 }
 
 func (r *Recorder) HookPhase(params flow.HookPhaseParams) error {

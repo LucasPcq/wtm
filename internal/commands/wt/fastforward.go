@@ -70,7 +70,7 @@ func runFastForward(cmd *cobra.Command, args []string) error {
 	// also skipping the question.
 	interactive := rules.IsHumanFormat(format) && !yes && term.IsTerminal(int(os.Stdin.Fd()))
 
-	_, err = ffflow.Run(ffflow.Params{
+	_, err = ffflow.Run(cmd.Context(), ffflow.Params{
 		Context: shared.FlowContext(config),
 		Request: ffflow.Request{
 			Branches: args,

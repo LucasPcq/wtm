@@ -97,7 +97,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 		return errors.New(domain.SyncNeedsTerminal)
 	}
 
-	_, err = syncflow.Run(syncflow.Params{
+	_, err = syncflow.Run(cmd.Context(), syncflow.Params{
 		Context: shared.FlowContext(config),
 		Request: syncflow.Request{
 			Branches:     args,

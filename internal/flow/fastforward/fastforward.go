@@ -2,6 +2,7 @@
 package fastforward
 
 import (
+	"context"
 	"errors"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -47,8 +48,9 @@ func Operation() flow.Operation {
 	return flow.Operation{Kind: domain.OpKindFastForward, Mode: flow.ModeBlocking}
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &fastForwardFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -59,6 +61,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type fastForwardFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -142,9 +145,9 @@ type advanceParams struct {
 
 func (f *fastForwardFlow) advance(params advanceParams) ([]domain.FastForwardResult, error) {
 	var results []domain.FastForwardResult
-	err := f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.FastForwardStage,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			for _, name := range params.Branches {
 				check := f.check(name)
 				results = append(results, branch.FastForward(branch.FastForwardParams{

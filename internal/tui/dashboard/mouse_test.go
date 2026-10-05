@@ -300,7 +300,7 @@ func TestClickingTheActionsButtonOpensTheGlobalMenu(t *testing.T) {
 // without shelling out to a real gh.
 func prModel(t *testing.T, opener func(number int) error) Model {
 	t.Helper()
-	model := New(RunParams{PROpener: opener})
+	model := New(t.Context(), RunParams{PROpener: opener})
 	t.Cleanup(model.Close)
 	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 	model = update(model, worktreesMsg{statuses: statuses("feat/x"), parents: map[string]string{}})
@@ -364,7 +364,7 @@ func TestNoPRZoneWhenThereIsNoPR(t *testing.T) {
 // the detail panel showing: what a click on a RUN row is asserted against.
 func runningDetailModel(t *testing.T, params RunParams, addresses map[string]domain.JobAddress, jobs ...domain.JobConfig) Model {
 	t.Helper()
-	model := New(params)
+	model := New(t.Context(), params)
 	t.Cleanup(model.Close)
 	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 	model = update(model, worktreesMsg{statuses: statuses("a"), parents: map[string]string{}})
@@ -415,7 +415,7 @@ func TestClickingTheAddressOpensItAndClickingTheRowOpensTheLogs(t *testing.T) {
 }
 
 func TestADownJobRowTakesNoZone(t *testing.T) {
-	model := New(RunParams{})
+	model := New(t.Context(), RunParams{})
 	t.Cleanup(model.Close)
 	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 	model = update(model, worktreesMsg{statuses: statuses("a"), parents: map[string]string{}})

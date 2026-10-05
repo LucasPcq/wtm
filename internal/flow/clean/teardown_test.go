@@ -59,7 +59,7 @@ func (d dataFixture) run(t *testing.T, request Request) (Outcome, *recorder, err
 	request.Branches = []string{d.branch}
 	request.BaseBranch = "main"
 	presenter := newRecorder()
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   d.ctx,
 		Request:   request,
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}},

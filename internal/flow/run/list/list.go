@@ -4,6 +4,7 @@
 package list
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -37,7 +38,7 @@ type Params struct {
 	Presenter flow.Presenter
 }
 
-func Run(params Params) (Selection, error) {
+func Run(ctx context.Context, params Params) (Selection, error) {
 	answers, err := params.Prompter.Ask(flow.Session{
 		ErrLabel: domain.CmdList,
 		Steps: []flow.Step{

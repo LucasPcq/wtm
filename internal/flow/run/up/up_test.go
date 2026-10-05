@@ -21,7 +21,7 @@ func TestExclusiveIsRefusedOnSeveralWorktrees(t *testing.T) {
 	second := filepath.Join(t.TempDir(), "feature")
 	gittest.Git(t, repo, "worktree", "add", "-b", "feature", second)
 
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   flow.Context{ProjectDir: repo},
 		Request:   Request{Worktrees: []string{"main", "feature"}, Cwd: repo, Exclusive: true},
 		Prompter:  flow.Unattended{},

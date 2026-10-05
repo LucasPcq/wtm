@@ -43,7 +43,6 @@ type Presenter interface {
 }
 
 type Params struct {
-	Ctx       context.Context
 	Context   flow.Context
 	Request   Request
 	Prompter  flow.Prompter
@@ -51,14 +50,15 @@ type Params struct {
 }
 
 type execFlow struct {
+	runCtx     context.Context
 	params     Params
 	candidates []domain.GitWorktree
 	selection  []domain.GitWorktree
 	current    string
 }
 
-func Run(params Params) (Outcome, error) {
-	f := &execFlow{params: params}
+func Run(ctx context.Context, params Params) (Outcome, error) {
+	f := &execFlow{runCtx: ctx, params: params}
 	return f.run()
 }
 
@@ -142,7 +142,7 @@ func (f *execFlow) execute(params executeParams) Outcome {
 	}
 
 	begin := time.Now()
-	results := execsvc.Run(f.params.Ctx, execsvc.RunParams{
+	results := execsvc.Run(f.runCtx, execsvc.RunParams{
 		Command:    params.Command,
 		Targets:    execTargets,
 		Jobs:       f.params.Request.Jobs,

@@ -236,7 +236,7 @@ func TestPruneDryRunWithNothingToPruneIsStillADryRun(t *testing.T) {
 	p := newPruneFixture(t)
 	presenter := &recorder{Recorder: &flowtest.Recorder{}}
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   p.ctx,
 		Request:   Request{Gone: true, NoFetch: true, Force: true, DryRun: true},
 		Prompter:  &flowtest.ScriptedPrompter{},

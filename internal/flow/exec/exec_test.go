@@ -1,7 +1,6 @@
 package exec
 
 import (
-	"context"
 	"errors"
 	"path/filepath"
 	"strings"
@@ -25,8 +24,7 @@ func (r *recorder) Executed(o Outcome) error { r.executed = &o; return nil }
 func run(t *testing.T, fx fixture, request Request, prompter flow.Prompter) (Outcome, *recorder, error) {
 	t.Helper()
 	rec := &recorder{}
-	outcome, err := Run(Params{
-		Ctx:       context.Background(),
+	outcome, err := Run(t.Context(), Params{
 		Context:   flow.Context{ProjectDir: fx.dir, StateDir: fx.stateDir},
 		Request:   request,
 		Prompter:  prompter,
@@ -161,8 +159,7 @@ func TestTheCurrentWorktreeIsFoundThroughASymlinkedPath(t *testing.T) {
 		Sets:    map[string][]string{KeySelection: {"a"}},
 		Answers: map[string]string{KeyConfirm: domain.ExecConfirmValue},
 	}
-	_, err := Run(Params{
-		Ctx:       context.Background(),
+	_, err := Run(t.Context(), Params{
 		Context:   flow.Context{ProjectDir: dir, StateDir: filepath.Join(dir, ".git", "wtm")},
 		Request:   Request{Command: "true", Jobs: 1, Dir: filepath.Join(raw, "a")},
 		Prompter:  prompter,

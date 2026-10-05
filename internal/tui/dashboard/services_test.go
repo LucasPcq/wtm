@@ -16,7 +16,7 @@ import (
 
 func servicesModel(t *testing.T, running ...string) Model {
 	t.Helper()
-	model := New(RunParams{})
+	model := New(t.Context(), RunParams{})
 	t.Cleanup(model.Close)
 	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 	known := append([]string{"idle"}, running...)

@@ -59,7 +59,7 @@ func runReparent(cmd *cobra.Command, args []string) error {
 	// The one place --yes is read: which Prompter gets installed.
 	interactive := rules.IsHumanFormat(format) && !yes && term.IsTerminal(int(os.Stdin.Fd()))
 
-	_, err = reparentflow.Run(reparentflow.Params{
+	_, err = reparentflow.Run(cmd.Context(), reparentflow.Params{
 		Context:   shared.FlowContext(config),
 		Request:   reparentflow.Request{Branches: args, To: to},
 		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),

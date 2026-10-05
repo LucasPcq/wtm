@@ -80,7 +80,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 	force, _ := cmd.Flags().GetBool(domain.FlagForce)
 	profile, _ := cmd.Flags().GetString(domain.FlagProfile)
 
-	outcome, err := upflow.Run(upflow.Params{
+	outcome, err := upflow.Run(cmd.Context(), upflow.Params{
 		Context: ctx.FlowContext(),
 		Request: upflow.Request{
 			Worktrees: args,

@@ -27,7 +27,7 @@ func (c *capturing) Ask(session flow.Session) (flow.Answers, error) {
 // that with an abort, so `wtm run list` closed before drawing its picker.
 func TestRunListOpensOnItsPicker(t *testing.T) {
 	prompter := &capturing{}
-	if _, err := listflow.Run(listflow.Params{
+	if _, err := listflow.Run(t.Context(), listflow.Params{
 		Request: listflow.Request{Config: domain.RunConfig{
 			Jobs:     []domain.JobConfig{{Name: "api", Kind: domain.JobKindService}},
 			Profiles: []domain.ProfileConfig{{Name: "dev", Jobs: []string{"api"}}},

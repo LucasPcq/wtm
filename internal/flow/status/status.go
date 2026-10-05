@@ -4,6 +4,7 @@
 package status
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -42,7 +43,7 @@ type Outcome struct {
 	Aborted  bool
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	named, err := target.Named(target.ResolveParams{ProjectDir: params.Context.ProjectDir, Query: params.Request.Worktree})
 	if err != nil {
 		return Outcome{}, err
@@ -62,9 +63,9 @@ func Run(params Params) (Outcome, error) {
 		return Outcome{}, fmt.Errorf("%w: %s", domain.ErrStatusDetached, workDir)
 	}
 	var doc domain.StatusDocument
-	err = params.Presenter.Stage(flow.StageParams{
+	err = params.Presenter.Stage(ctx, flow.StageParams{
 		Message: domain.StatusLoading,
-		Work: func() error {
+		Work: func(context.Context) error {
 			identity, err := worktree.Identity(refOf(params.Context, branch))
 			if err != nil {
 				return err
@@ -101,11 +102,11 @@ func session(params sessionParams) flow.Session {
 
 // RunAll is every worktree of the repository a branch names, main first as
 // git lists it; the jobs are read once for all of them. It asks nothing.
-func RunAll(params Params) ([]domain.StatusDocument, error) {
+func RunAll(ctx context.Context, params Params) ([]domain.StatusDocument, error) {
 	var docs []domain.StatusDocument
-	err := params.Presenter.Stage(flow.StageParams{
+	err := params.Presenter.Stage(ctx, flow.StageParams{
 		Message: domain.StatusLoading,
-		Work: func() error {
+		Work: func(context.Context) error {
 			var err error
 			docs, err = readAll(params)
 			return err

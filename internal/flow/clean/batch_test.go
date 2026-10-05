@@ -39,7 +39,7 @@ func TestRunCleansSeveralAndKeepsGoingPastAFailure(t *testing.T) {
 	gittest.JamWorktree(t, jammed)
 	presenter := newRecorder()
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/a", "feat/b", "feat/c"}, BaseBranch: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}},
@@ -70,7 +70,7 @@ func TestUnattendedRefusesTheWholeBatchWhenOneIsUnsafe(t *testing.T) {
 	safe := makeWorktree(t, ctx, "feat/a")
 	dirty(t, makeWorktree(t, ctx, "feat/b"))
 
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/a", "feat/b"}, BaseBranch: "main"},
 		Prompter:  flow.Unattended{},
@@ -90,7 +90,7 @@ func TestALockedWorktreeIsRefusedUntilForced(t *testing.T) {
 	locked := makeWorktree(t, ctx, "feat/locked")
 	gittest.Git(t, ctx.ProjectDir, "worktree", "lock", locked)
 	run := func(force bool) error {
-		_, err := Run(Params{
+		_, err := Run(t.Context(), Params{
 			Context:   ctx,
 			Request:   Request{Branches: []string{"feat/locked"}, BaseBranch: "main", Force: force},
 			Prompter:  flow.Unattended{},
@@ -117,7 +117,7 @@ func TestDeletingTheSafeOnesKeepsTheOthers(t *testing.T) {
 	dirty(t, unsafe)
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteSafe}}
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/a", "feat/b"}, BaseBranch: "main"},
 		Prompter:  prompter,
@@ -149,7 +149,7 @@ func TestAReparentedChildIsPublishedAfterTheRemovals(t *testing.T) {
 	presenter := newRecorder()
 	ctx.Publisher = presenter.Recorder
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"top", "mid"}, BaseBranch: "main", ReparentChildren: true},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}},
@@ -178,7 +178,7 @@ func TestRunReparentsAChainOntoTheNearestSurvivor(t *testing.T) {
 	makeWorktreeFrom(t, ctx, "mid", "top")
 	makeWorktreeFrom(t, ctx, "leaf", "mid")
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"top", "mid"}, BaseBranch: "main", ReparentChildren: true},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}},
@@ -197,7 +197,7 @@ func TestTheParentWorktreeIsLeftOutWithAWarning(t *testing.T) {
 	prompter := &flowtest.ScriptedPrompter{}
 	presenter := newRecorder()
 
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   testContext(t),
 		Request:   Request{Branches: []string{"main"}, BaseBranch: "main"},
 		Prompter:  prompter,
@@ -219,7 +219,7 @@ func TestARepeatedArgumentIsAUsageError(t *testing.T) {
 	ctx := testContext(t)
 	makeWorktree(t, ctx, "feat/a")
 
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/a", " feat/a "}, BaseBranch: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{},
@@ -235,7 +235,7 @@ func TestAnAbsentWorktreeAmongSeveralIsReportedNotFailed(t *testing.T) {
 	ctx := testContext(t)
 	makeWorktree(t, ctx, "feat/a")
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/ghost", "feat/a"}, BaseBranch: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}},
@@ -293,7 +293,7 @@ func TestABatchDropsTheDataOfEveryWorktreeItRemoves(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   d.ctx,
 		Request:   Request{Branches: []string{d.branch, "feat/more"}, BaseBranch: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}},
@@ -334,7 +334,7 @@ func TestReparentingFollowsWhatTheRunActuallyRemoved(t *testing.T) {
 			makeWorktreeFrom(t, ctx, "leaf", "mid")
 			gittest.JamWorktree(t, paths[c.jammed])
 
-			outcome, _ := Run(Params{
+			outcome, _ := Run(t.Context(), Params{
 				Context:   ctx,
 				Request:   Request{Branches: []string{"top", "mid"}, BaseBranch: "main", ReparentChildren: true, Force: true},
 				Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}},
@@ -353,7 +353,7 @@ func TestReparentingFollowsWhatTheRunActuallyRemoved(t *testing.T) {
 func TestNamingOnlyTheParentStillConcludes(t *testing.T) {
 	presenter := newRecorder()
 
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   testContext(t),
 		Request:   Request{Branches: []string{"main"}, BaseBranch: "main"},
 		Prompter:  flow.Unattended{},
@@ -373,7 +373,7 @@ func TestNamingOnlyTheParentStillConcludes(t *testing.T) {
 func TestAMalformedListIsRefusedBeforeAnyWarning(t *testing.T) {
 	presenter := newRecorder()
 
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   testContext(t),
 		Request:   Request{Branches: []string{"main", "main"}, BaseBranch: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{},
@@ -414,7 +414,7 @@ func TestDeletingTheSafeOnesReparentsTheChildItKeeps(t *testing.T) {
 	makeWorktree(t, ctx, "top")
 	dirty(t, makeWorktreeFrom(t, ctx, "mid", "top"))
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"top", "mid"}, BaseBranch: "main", ReparentChildren: true},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteSafe}},

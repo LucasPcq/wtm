@@ -101,7 +101,7 @@ func runCheckout(cmd *cobra.Command, args []string) error {
 
 	interactive := rules.IsHumanFormat(format) && term.IsTerminal(int(os.Stdin.Fd())) && !yes
 
-	_, err = checkoutflow.Run(checkoutflow.Params{
+	_, err = checkoutflow.Run(cmd.Context(), checkoutflow.Params{
 		Context: shared.FlowContext(result),
 		Request: checkoutflow.Request{
 			Number:      number,

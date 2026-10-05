@@ -2,6 +2,7 @@
 package reparent
 
 import (
+	"context"
 	"errors"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -41,8 +42,9 @@ func Operation() flow.Operation {
 	return flow.Operation{Kind: domain.OpKindReparent, Mode: flow.ModeBlocking}
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &reparentFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -52,6 +54,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type reparentFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -82,9 +85,9 @@ func (f *reparentFlow) run() (Outcome, error) {
 	}
 
 	var results []domain.ReparentResult
-	err = f.presenter.Stage(flow.StageParams{
+	err = f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.ReparentStageMessage,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			var batchErr error
 			results, batchErr = worktree.ReparentBatch(domain.ReparentBatchParams{
 				ProjectDir: f.ctx.ProjectDir,

@@ -84,7 +84,7 @@ func runClean(cmd *cobra.Command, args []string) error {
 	// with the refusals lifted.
 	interactive := rules.IsHumanFormat(format) && term.IsTerminal(int(os.Stdin.Fd())) && !yes
 
-	_, err = cleanflow.Run(cleanflow.Params{
+	_, err = cleanflow.Run(cmd.Context(), cleanflow.Params{
 		Context: shared.FlowContext(config),
 		Request: cleanflow.Request{
 			Branches:         args,
