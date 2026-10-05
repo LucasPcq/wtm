@@ -110,3 +110,5 @@ Writes a `.env` key's whole value from a template: what a worktree holds of a sh
 | `value` | a template over `{namespace}`, `{port.NAME}`, `{origin}`, `{worktree}`, `{ordinal}` |
 
 A key is written by an `[[env]]` link or an `[[env_port]]` link, never both.
+
+A link, of either table, whose `file` is not a `.env` target configured in `config.toml` is ignored with a warning: `create`, `checkout` and `wtm env` still write every other link, and name the ignored one (`env_port KEY in FILE ignored: not a configured env file…`) in their output and in the JSON `warnings`. Add the file to `[env]`, or delete the link.

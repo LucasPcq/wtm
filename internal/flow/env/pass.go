@@ -71,17 +71,19 @@ type resolvePortsParams struct {
 
 // resolvePorts gathers the [[env_port]] links and the offset this worktree
 // binds on. A run.toml that cannot be used skips only the port pass, and the
-// warning says why: the keys never depend on it.
+// warning says why: the keys never depend on it. A link to a .env config.toml
+// does not provision is warned about and left out, never the pass with it.
 func (f *envFlow) resolvePorts(params resolvePortsParams) (envsvc.EnvPortsParams, []string) {
 	branch := params.Target.branch
-	if err := runconfig.Check(runconfig.CheckParams{StateDir: f.ctx.StateDir, EnvFiles: f.ctx.Config.Project.Env.Files}); err != nil {
+	ignored, err := runconfig.Check(runconfig.CheckParams{StateDir: f.ctx.StateDir, EnvFiles: f.ctx.Config.Project.Env.Files})
+	if err != nil {
 		return envsvc.EnvPortsParams{}, []string{rules.PortsNotSettledWarning(rules.PortsNotSettledWarningParams{
 			Cause:                 err.Error(),
 			PortsNotSettledParams: rules.PortsNotSettledParams{Branch: branch, RunConfig: true},
 		})}
 	}
 	var ports envsvc.EnvPortsParams
-	err := ordinal.Retry(ordinal.RetryParams{
+	err = ordinal.Retry(ordinal.RetryParams{
 		Context: f.ctx,
 		Branch:  func() string { return branch },
 		Do: func() error {
@@ -99,12 +101,12 @@ func (f *envFlow) resolvePorts(params resolvePortsParams) (envsvc.EnvPortsParams
 		},
 	})
 	if err != nil {
-		return envsvc.EnvPortsParams{}, []string{rules.PortsNotSettledWarning(rules.PortsNotSettledWarningParams{
+		return envsvc.EnvPortsParams{}, append(ignored, rules.PortsNotSettledWarning(rules.PortsNotSettledWarningParams{
 			Cause:                 err.Error(),
 			PortsNotSettledParams: rules.PortsNotSettledParams{Branch: branch},
-		})}
+		}))
 	}
-	return ports, nil
+	return ports, ignored
 }
 
 type planSwitchParams struct {

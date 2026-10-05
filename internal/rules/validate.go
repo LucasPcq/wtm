@@ -415,7 +415,7 @@ func JobHostLabel(job domain.JobConfig) string {
 // validateEnvPortLinks checks what run.toml can answer for on its own: that each
 // link names a port the file declares, a key a shell could export, and a pair no
 // other link already claims. Whether the file it names is a configured env target
-// needs .wtm.toml and is checked by ValidateEnvPortTargets instead.
+// needs .wtm.toml and is settled by PartitionEnvTargets instead.
 func validateEnvPortLinks(cfg domain.RunConfig) []string {
 	bases := EnvPortBases(cfg)
 
@@ -548,41 +548,37 @@ func envPortLinkError(bases map[domain.PortRef]int, link domain.EnvPortLink) str
 		link.Key, link.File, link.Port, link.Job, strings.Join(jobs, ", "))
 }
 
-type ValidateEnvTargetsParams struct {
+type PartitionEnvTargetsParams struct {
 	Config domain.RunConfig
 	Files  []domain.EnvFile
 }
 
-// ValidateEnvTargets holds every link run.toml declares, [[env_port]] and
-// [[env]] alike, to the .env files config.toml provisions.
-func ValidateEnvTargets(params ValidateEnvTargetsParams) []string {
-	errs := ValidateEnvPortTargets(params.Config.EnvPorts, params.Files)
+// PartitionEnvTargets sets aside the links naming a .env config.toml does not
+// provision: such a link can only fail to apply, so it is reported and the
+// rest of the pass goes ahead without it.
+func PartitionEnvTargets(params PartitionEnvTargetsParams) (domain.RunConfig, []string) {
 	targets := make(map[string]bool, len(params.Files))
 	for _, f := range params.Files {
 		targets[f.Target] = true
 	}
+
+	kept := params.Config
+	kept.EnvPorts = nil
+	kept.EnvValues = nil
+	var dropped []string
+	for _, link := range params.Config.EnvPorts {
+		if !targets[link.File] {
+			dropped = append(dropped, fmt.Sprintf(domain.EnvPortLinkUnconfiguredFileFmt, link.Key, link.File, domain.ConfigFileName))
+			continue
+		}
+		kept.EnvPorts = append(kept.EnvPorts, link)
+	}
 	for _, link := range params.Config.EnvValues {
 		if !targets[link.File] {
-			errs = append(errs, fmt.Sprintf(domain.EnvValueLinkUnconfiguredFileFmt, link.Key, link.File, domain.ConfigFileName))
+			dropped = append(dropped, fmt.Sprintf(domain.EnvValueLinkUnconfiguredFileFmt, link.Key, link.File, domain.ConfigFileName))
+			continue
 		}
+		kept.EnvValues = append(kept.EnvValues, link)
 	}
-	return errs
-}
-
-// ValidateEnvPortTargets is the half of the link check that needs both configs:
-// a link may only name a .env the project actually provisions, otherwise wtm
-// would promise to rewrite a file nothing ever creates.
-func ValidateEnvPortTargets(links []domain.EnvPortLink, files []domain.EnvFile) []string {
-	targets := make(map[string]bool, len(files))
-	for _, f := range files {
-		targets[f.Target] = true
-	}
-
-	var errs []string
-	for _, link := range links {
-		if !targets[link.File] {
-			errs = append(errs, fmt.Sprintf("env_port %s references %s, which is not a configured env file — add it to [env] in %s or drop the link", link.Key, link.File, domain.ConfigFileName))
-		}
-	}
-	return errs
+	return kept, dropped
 }

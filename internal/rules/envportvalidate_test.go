@@ -93,16 +93,45 @@ func TestValidateRunPortsAllowsTheSameKeyInTwoFiles(t *testing.T) {
 	}
 }
 
-func TestValidateEnvPortTargets(t *testing.T) {
+func TestPartitionEnvTargets(t *testing.T) {
 	files := []domain.EnvFile{{Target: ".env"}, {Target: "apps/web/.env"}}
-
-	if errs := ValidateEnvPortTargets([]domain.EnvPortLink{{File: ".env", Key: "K", Port: "P"}}, files); len(errs) > 0 {
-		t.Errorf("ValidateEnvPortTargets() = %v, want no error for a configured target", errs)
+	cfg := domain.RunConfig{
+		EnvPorts: []domain.EnvPortLink{
+			{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"},
+			{File: "services/x/.env", Key: "X_PORT", Job: "web", Port: "PORT"},
+		},
+		EnvValues: []domain.EnvValueLink{
+			{File: "apps/web/.env", Key: "REALM", Job: "kc", Value: "{namespace}"},
+			{File: "services/x/.env", Key: "DB_NAME", Job: "pg", Value: "{namespace}"},
+		},
 	}
 
-	errs := ValidateEnvPortTargets([]domain.EnvPortLink{{File: "services/api/.env", Key: "K", Port: "P"}}, files)
-	if len(errs) != 1 || !strings.Contains(errs[0], "not a configured env file") {
-		t.Errorf("ValidateEnvPortTargets() = %v, want a refusal naming the unconfigured file", errs)
+	kept, dropped := PartitionEnvTargets(PartitionEnvTargetsParams{Config: cfg, Files: files})
+
+	if len(kept.EnvPorts) != 1 || kept.EnvPorts[0].Key != "WEB_PORT" {
+		t.Errorf("kept env_port = %+v, want the configured link alone", kept.EnvPorts)
+	}
+	if len(kept.EnvValues) != 1 || kept.EnvValues[0].Key != "REALM" {
+		t.Errorf("kept env = %+v, want the configured link alone", kept.EnvValues)
+	}
+	if len(dropped) != 2 || !strings.Contains(dropped[0], "X_PORT") || !strings.Contains(dropped[1], "DB_NAME") {
+		t.Fatalf("dropped = %v, want one message per orphan link, env_port first", dropped)
+	}
+	for _, line := range dropped {
+		if !strings.Contains(line, "services/x/.env") || !strings.Contains(line, "ignored") {
+			t.Errorf("dropped line %q must name the file and say the link is ignored", line)
+		}
+	}
+	if len(cfg.EnvPorts) != 2 || len(cfg.EnvValues) != 2 {
+		t.Error("PartitionEnvTargets must not alter the config it is given")
+	}
+}
+
+func TestPartitionEnvTargetsKeepsAFullyConfiguredRunConfig(t *testing.T) {
+	cfg := domain.RunConfig{EnvPorts: []domain.EnvPortLink{{File: ".env", Key: "K", Port: "P"}}}
+	kept, dropped := PartitionEnvTargets(PartitionEnvTargetsParams{Config: cfg, Files: []domain.EnvFile{{Target: ".env"}}})
+	if len(dropped) != 0 || len(kept.EnvPorts) != 1 {
+		t.Errorf("kept = %+v, dropped = %v; want everything kept", kept.EnvPorts, dropped)
 	}
 }
 

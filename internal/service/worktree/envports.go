@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -18,9 +17,9 @@ type ResolveEnvPortsParams struct {
 	StateDir     string
 	Branch       string
 	WorktreePath string
-	// EnvFiles are the value targets .wtm.toml configures. A link may only name
-	// one of them, and this is the only place both files are in hand — LoadRun
-	// validates what run.toml can answer for alone and never sees .wtm.toml.
+	// EnvFiles are the value targets .wtm.toml configures. A link naming any
+	// other file is left out of the pass — LoadRun validates what run.toml can
+	// answer for alone and never sees .wtm.toml.
 	EnvFiles []domain.EnvFile
 	// Global carries the machine's [proxy] table. The project says whether it
 	// wants addresses; this says whether the machine can serve them.
@@ -58,6 +57,8 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 		return envsvc.EnvPortsParams{}, nil
 	}
 
+	cfg, _ = rules.PartitionEnvTargets(rules.PartitionEnvTargetsParams{Config: cfg, Files: params.EnvFiles})
+
 	owned, err := ownedEnvWrites(ownedEnvWritesParams{Resolve: params, Config: cfg})
 	if err != nil {
 		return envsvc.EnvPortsParams{}, err
@@ -73,9 +74,6 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 		return envsvc.EnvPortsParams{WorktreePath: params.WorktreePath, Owned: owned}, nil
 	}
 
-	if errs := rules.ValidateEnvTargets(rules.ValidateEnvTargetsParams{Config: cfg, Files: params.EnvFiles}); len(errs) > 0 {
-		return envsvc.EnvPortsParams{}, fmt.Errorf("invalid run config: %s", strings.Join(errs, "; "))
-	}
 	if err := rules.ValidateProxy(params.Global.Proxy); err != nil {
 		return envsvc.EnvPortsParams{}, err
 	}
