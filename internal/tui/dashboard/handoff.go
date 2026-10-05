@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"context"
 	"io"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -39,6 +40,7 @@ type handoffDoneMsg struct {
 // this process rather than re-executing the binary is what keeps its result
 // typed: a child process could only have returned an exit code.
 type handoff struct {
+	ctx    context.Context
 	params seam.SequenceParams
 	// detached is where the run reports if the reader closes the view before it
 	// ends. It posts to the model, which is safe from here: tea.Exec has the
@@ -64,7 +66,7 @@ func (h *handoff) Run() error {
 		Worktrees: h.params.Worktrees,
 		Warnings:  h.params.Warnings,
 		Start:     h.params.Start,
-		Open:      integration.OpenURL,
+		Open:      func(url string) error { return integration.OpenURL(h.ctx, url) },
 		Detach:    runview.Detach{Sink: h.detached},
 		In:        h.in,
 		Out:       h.out,
@@ -80,8 +82,8 @@ func (h *handoff) Run() error {
 // asked for again: RestoreTerminal puts back the alternate screen, the bracketed
 // paste and the focus reporting, but never the mouse tracking it turned off —
 // and every one of this dashboard's click targets depends on it.
-func handoffCmd(msg handoffMsg, send func(tea.Msg)) tea.Cmd {
-	cmd := &handoff{params: msg.params, detached: detachedRun{send: send}}
+func handoffCmd(ctx context.Context, msg handoffMsg, send func(tea.Msg)) tea.Cmd {
+	cmd := &handoff{ctx: ctx, params: msg.params, detached: detachedRun{send: send}}
 	return tea.Exec(cmd, func(err error) tea.Msg {
 		return handoffDoneMsg{
 			reply:    msg.reply,

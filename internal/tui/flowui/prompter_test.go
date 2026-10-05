@@ -272,7 +272,7 @@ func TestSummarizeUsesTheFlowWording(t *testing.T) {
 }
 
 func TestInteractivePrompterReportsItself(t *testing.T) {
-	if !New(Params{}).Interactive() {
+	if !New(t.Context(), Params{}).Interactive() {
 		t.Error("the wizard prompter must report that it can ask")
 	}
 }
@@ -407,7 +407,7 @@ func TestALoadedStepLoadsEvenWhenItComesFirst(t *testing.T) {
 	}
 
 	wizard := components.NewWizardWithParams(components.WizardParams{Steps: plan.steps})
-	handle := plan.handler()
+	handle := plan.handler(t.Context())
 
 	cmd, handled := handle(&wizard, plan.initCmd())
 	if !handled {
@@ -496,7 +496,7 @@ func TestAConditionalLoadedRecapKeepsItsLoad(t *testing.T) {
 		t.Fatal("a conditional recap must still fire its load on entry")
 	}
 
-	handle := plan.handler()
+	handle := plan.handler(t.Context())
 	cmd, handled := handle(&wizard, recap.OnEnter(prev)())
 	if !handled {
 		t.Fatal("the load request must be handled")

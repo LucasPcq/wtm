@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -47,9 +48,9 @@ type LogsLoaderParams struct {
 // DefaultBoardLoader opens the worktree's board, which is what a live preview
 // attaches through. NoProbe: nothing is being started here, so there is no port
 // to wait for.
-func DefaultBoardLoader(params LogsLoaderParams) func(logsRequest) runlogs.Board {
+func DefaultBoardLoader(ctx context.Context, params LogsLoaderParams) func(logsRequest) runlogs.Board {
 	return func(req logsRequest) runlogs.Board {
-		return seam.Open(seam.Params{
+		return seam.Open(ctx, seam.Params{
 			ProjectDir: params.ProjectDir,
 			StateDir:   params.StateDir,
 			WorkDir:    req.WorkDir,
@@ -72,9 +73,9 @@ func publicPortOf(params LogsLoaderParams) int {
 
 // DefaultLogsLoader reads back what a job persisted, whether or not it still
 // runs. NoProbe: nothing is being started here, so there is no port to wait for.
-func DefaultLogsLoader(params LogsLoaderParams) func(logsRequest) ([]string, error) {
+func DefaultLogsLoader(ctx context.Context, params LogsLoaderParams) func(logsRequest) ([]string, error) {
 	return func(req logsRequest) ([]string, error) {
-		board := seam.Open(seam.Params{
+		board := seam.Open(ctx, seam.Params{
 			ProjectDir: params.ProjectDir,
 			StateDir:   params.StateDir,
 			WorkDir:    req.WorkDir,

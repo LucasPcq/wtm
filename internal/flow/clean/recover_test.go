@@ -52,7 +52,7 @@ func TestADeclinedPrivilegedRemovalSettlesWhatGitDid(t *testing.T) {
 	if !hasStatus(presenter, "sudo rm -rf "+d.path) {
 		t.Errorf("statuses = %+v, want the leftover named", presenter.Statuses)
 	}
-	if worktree.StillTracked(worktree.FindByBranchParams{ProjectDir: d.ctx.ProjectDir, Branch: d.branch}) {
+	if worktree.StillTracked(t.Context(), worktree.FindByBranchParams{ProjectDir: d.ctx.ProjectDir, Branch: d.branch}) {
 		t.Error("git still tracks the worktree")
 	}
 }

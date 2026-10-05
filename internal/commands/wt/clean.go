@@ -92,12 +92,12 @@ func runClean(cmd *cobra.Command, args []string) error {
 			ReparentChildren: reparentFlag,
 			KeepData:         keepData,
 			DropData:         dropData,
-			BaseBranch:       resolveBase("", config),
+			BaseBranch:       resolveBase(cmd.Context(), "", config),
 			// The CLI owns the terminal it prompts on, so it can hand it to sudo.
 			AllowPrivileged: true,
 		},
 		// The picker may be reached through the shell wrapper, which consumes stdout.
-		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),
+		Prompter:  shared.FlowPrompter(cmd.Context(), shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),
 		Presenter: cleanPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
 	})
 	return err

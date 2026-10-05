@@ -127,12 +127,12 @@ func runPrune(cmd *cobra.Command, _ []string) error {
 			Force:            force,
 			ReparentChildren: reparentChildren,
 			DryRun:           dryRun,
-			BaseBranch:       resolveBase("", config),
+			BaseBranch:       resolveBase(cmd.Context(), "", config),
 			KeepData:         keepData,
 			DropData:         dropData,
 		},
 		// The picker may be reached through the shell wrapper, which consumes stdout.
-		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),
+		Prompter:  shared.FlowPrompter(cmd.Context(), shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),
 		Presenter: prunePresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
 	})
 	return err

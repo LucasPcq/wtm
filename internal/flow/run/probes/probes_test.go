@@ -35,7 +35,7 @@ type fixture struct {
 
 func offer(t *testing.T, fx fixture, results runlogs.Outcomes) domain.RunConfig {
 	t.Helper()
-	cfg, err := probes.OfferToSilence(probes.Params{
+	cfg, err := probes.OfferToSilence(t.Context(), probes.Params{
 		Context:   flow.Context{StateDir: fx.stateDir},
 		Prompter:  fx.prompter,
 		Presenter: fx.presenter,
@@ -106,7 +106,7 @@ func TestAnAbortedRunIsNotOffered(t *testing.T) {
 }
 
 func TestNobodyToAskIsNotOffered(t *testing.T) {
-	cfg, err := probes.OfferToSilence(probes.Params{
+	cfg, err := probes.OfferToSilence(t.Context(), probes.Params{
 		Context:   flow.Context{StateDir: t.TempDir()},
 		Prompter:  flow.Unattended{},
 		Presenter: &flowtest.Recorder{},

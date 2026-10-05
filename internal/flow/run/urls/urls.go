@@ -4,6 +4,7 @@
 package urls
 
 import (
+	"context"
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -42,8 +43,8 @@ func (r Reader) Serving() bool { return r.proxyPort > 0 }
 
 // In lists the jobs reachable in one worktree. The worktree is what makes the
 // addresses differ: its ordinal decides every port.
-func (r Reader) In(dir string) ([]domain.JobURLEntry, error) {
-	env, err := seam.JobEnv(seam.JobEnvParams{ProjectDir: r.ctx.ProjectDir, StateDir: r.ctx.StateDir, WorkDir: dir, Publisher: r.ctx.Publisher})
+func (r Reader) In(ctx context.Context, dir string) ([]domain.JobURLEntry, error) {
+	env, err := seam.JobEnv(ctx, seam.JobEnvParams{ProjectDir: r.ctx.ProjectDir, StateDir: r.ctx.StateDir, WorkDir: dir, Publisher: r.ctx.Publisher})
 	if err != nil {
 		return nil, err
 	}

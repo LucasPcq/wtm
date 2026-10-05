@@ -42,7 +42,7 @@ func (f *envFlow) pickerKey(branch string) scanKey {
 // scan runs once, before the first screen, over every worktree the picker may
 // offer — the list badges each one with its drift.
 func (f *envFlow) scan(ctx context.Context) error {
-	statuses, err := worktree.List(domain.ListParams{
+	statuses, err := worktree.List(ctx, domain.ListParams{
 		ProjectDir: f.ctx.ProjectDir,
 		StateDir:   f.ctx.StateDir,
 		Config:     f.ctx.Config,
@@ -115,7 +115,7 @@ func (f *envFlow) scanBranch(key scanKey) (branchScan, error) {
 	// ordinal, and whether it gets one is what the run is deciding.
 	var ports envsvc.EnvPortsParams
 	if !state.adoption.Pending && !state.movesOntoIsolation(key.isolation) {
-		ports, _ = f.resolvePorts(resolvePortsParams{Target: t, Isolation: key.isolation, Addressing: addressing})
+		ports, _ = f.resolvePorts(f.runCtx, resolvePortsParams{Target: t, Isolation: key.isolation, Addressing: addressing})
 	}
 
 	reserved := preview.keys()

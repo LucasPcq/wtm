@@ -24,7 +24,9 @@ func TestLoadConfigRegistersTheRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := LoadConfig(&cobra.Command{}, dir); err != nil {
+	cmd := &cobra.Command{}
+	cmd.SetContext(t.Context())
+	if _, err := LoadConfig(cmd, dir); err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
 
@@ -45,7 +47,9 @@ func TestLoadConfigWithAMovedStateDirRegistersNothing(t *testing.T) {
 	}
 	t.Setenv(domain.EnvStateDir, state)
 
-	if _, err := LoadConfig(&cobra.Command{}, dir); err != nil {
+	cmd := &cobra.Command{}
+	cmd.SetContext(t.Context())
+	if _, err := LoadConfig(cmd, dir); err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
 

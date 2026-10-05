@@ -58,7 +58,7 @@ func Settle(ctx context.Context, params Params) Result {
 		_ = params.Presenter.Stage(ctx, flow.StageParams{
 			Message: fmt.Sprintf(domain.OwedDroppingFmt, name, ref.Job),
 			Work: func(ctx context.Context) error {
-				removed = runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
+				removed = runjobs.RemoveWorktreeNamespaces(ctx, runjobs.RemoveNamespacesParams{
 					Config:  rules.JobsNamed(cfg, ref.Job),
 					Env:     rules.NamespaceEnv(rules.NamespaceEnvParams{Worktree: ref.Worktree, Ordinal: ref.Ordinal}),
 					WorkDir: params.Context.ProjectDir,
@@ -93,7 +93,7 @@ func Settle(ctx context.Context, params Params) Result {
 // at creation.
 func liveBranches(ctx context.Context, projectDir string) map[string][]string {
 	live := map[string][]string{}
-	all, err := worktree.ListAll(worktree.ListAllParams{ProjectDir: projectDir})
+	all, err := worktree.ListAll(ctx, worktree.ListAllParams{ProjectDir: projectDir})
 	if err != nil {
 		return live
 	}

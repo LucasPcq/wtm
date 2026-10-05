@@ -253,11 +253,11 @@ func globalUpdateCheck() *bool {
 
 // printUpdateNotice drains the passive check started in PersistentPreRun. It is
 // nil-safe: a suppressed check leaves updateCheck nil.
-func printUpdateNotice() {
+func printUpdateNotice(ctx context.Context) {
 	if quiet, _ := rootCmd.Flags().GetBool(domain.FlagQuiet); quiet {
 		return
 	}
-	current, latest, method, ok := updateCheck.Notice(domain.UpdateNoticeWait)
+	current, latest, method, ok := updateCheck.Notice(ctx, domain.UpdateNoticeWait)
 	if !ok {
 		return
 	}
@@ -311,9 +311,9 @@ func interruptible() (context.Context, context.CancelFunc) {
 // Execute runs the root command and exits with the appropriate code.
 func Execute() {
 	ctx, stop := interruptible()
+	defer stop()
 	runErr := rootCmd.ExecuteContext(ctx)
 	err := rules.Interrupted(rules.InterruptedParams{Err: runErr, Signalled: ctx.Err() != nil})
-	stop()
 	if err != nil {
 		// ErrAborted means the command already printed its own report; just
 		// propagate the non-zero exit without a second error line — unless --quiet
@@ -323,9 +323,9 @@ func Execute() {
 			output.Error(os.Stderr, abortLine(err))
 			output.Blank(os.Stderr)
 		}
-		printUpdateNotice()
+		printUpdateNotice(ctx)
 		os.Exit(rules.ExitCode(err))
 	}
 
-	printUpdateNotice()
+	printUpdateNotice(ctx)
 }

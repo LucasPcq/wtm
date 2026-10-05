@@ -263,7 +263,7 @@ func TestDeleteOptionsOfABatch(t *testing.T) {
 }
 
 func TestABatchStatesEachRefusalUnderItsWorktree(t *testing.T) {
-	f := &cleanFlow{
+	f := &cleanFlow{runCtx: t.Context(),
 		request: Request{Branches: []string{"feat/a", "feat/b"}},
 		checks: map[string]domain.CleanCheckEntry{
 			"feat/a": {Check: domain.CleanCheckResult{Branch: "feat/a", WorktreePath: "/w/a", IsDirty: true}},
@@ -392,7 +392,7 @@ func TestAMalformedListIsRefusedBeforeAnyWarning(t *testing.T) {
 // removal would still reach it.
 func TestAnUnreadableCheckRefusesTheRecap(t *testing.T) {
 	boom := errors.New("cannot read worktree")
-	f := &cleanFlow{
+	f := &cleanFlow{runCtx: t.Context(),
 		request: Request{Branches: []string{"feat/a", "feat/b"}},
 		checks: map[string]domain.CleanCheckEntry{
 			"feat/a": {Check: domain.CleanCheckResult{Branch: "feat/a", WorktreePath: "/w/a"}},
@@ -430,7 +430,7 @@ func TestDeletingTheSafeOnesReparentsTheChildItKeeps(t *testing.T) {
 }
 
 func TestAnUnreadableCheckDoesNotHideAnotherRefusal(t *testing.T) {
-	f := &cleanFlow{
+	f := &cleanFlow{runCtx: t.Context(),
 		checks: map[string]domain.CleanCheckEntry{
 			"feat/a": {Err: errors.New("cannot read worktree")},
 			"feat/b": {Check: domain.CleanCheckResult{Branch: "feat/b", IsDirty: true}},

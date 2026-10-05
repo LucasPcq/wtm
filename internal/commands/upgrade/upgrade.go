@@ -64,7 +64,7 @@ func run(cmd *cobra.Command, version string) error {
 	pin, _ := cmd.Flags().GetString(domain.FlagVersionPin)
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 
-	install := selfupdate.DetectInstall(version)
+	install := selfupdate.DetectInstall(cmd.Context(), version)
 	if install.Method == domain.InstallSource {
 		return domain.ErrUpgradeFromSource
 	}
@@ -132,7 +132,7 @@ func run(cmd *cobra.Command, version string) error {
 
 func apply(cmd *cobra.Command, install selfupdate.Install, release domain.ReleaseInfo, version string) error {
 	if install.Method != domain.InstallStandalone {
-		ran, err := selfupdate.Delegate(selfupdate.DelegateParams{
+		ran, err := selfupdate.Delegate(cmd.Context(), selfupdate.DelegateParams{
 			Method: install.Method,
 			Stdout: cmd.OutOrStdout(),
 			Stderr: cmd.ErrOrStderr(),

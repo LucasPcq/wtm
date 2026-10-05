@@ -185,7 +185,7 @@ func TestStatusNeverNumbersTheWorktreeItReads(t *testing.T) {
 	if doc.Offset != nil {
 		t.Errorf("offset = %d, want none for a worktree no run has numbered", *doc.Offset)
 	}
-	identity, err := worktree.Identity(worktree.WorktreeRef{ProjectDir: f.repo, StateDir: f.ctx.StateDir, Branch: "feat/x"})
+	identity, err := worktree.Identity(t.Context(), worktree.WorktreeRef{ProjectDir: f.repo, StateDir: f.ctx.StateDir, Branch: "feat/x"})
 	if err != nil {
 		t.Fatal(err)
 	}

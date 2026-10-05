@@ -3,6 +3,7 @@
 package probes
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -25,7 +26,7 @@ type Params struct {
 // command never reads the variable. A port another worktree holds is not
 // offered: the run already said whose it is. It returns the config the run goes
 // on with.
-func OfferToSilence(params Params) (domain.RunConfig, error) {
+func OfferToSilence(ctx context.Context, params Params) (domain.RunConfig, error) {
 	// Never after an abort: the question to answer then is why the run stopped,
 	// not whether to hear less about it.
 	if !params.Prompter.Interactive() || params.Results.Aborted() {
@@ -51,7 +52,7 @@ func OfferToSilence(params Params) (domain.RunConfig, error) {
 	}
 
 	cfg := rules.SilenceProbes(rules.SilenceProbesParams{Config: params.Config, Jobs: names})
-	if err := runconfig.Save(runconfig.SaveParams{StateDir: params.Context.StateDir, Config: cfg}); err != nil {
+	if err := runconfig.Save(ctx, runconfig.SaveParams{StateDir: params.Context.StateDir, Config: cfg}); err != nil {
 		return params.Config, fmt.Errorf("silence port probes: %w", err)
 	}
 	params.Presenter.Status(flow.Notice{

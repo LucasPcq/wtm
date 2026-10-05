@@ -27,7 +27,7 @@ func BringUp(ctx context.Context, params BringUpParams) (release func(), err err
 	if !found {
 		return nil, fmt.Errorf("%w: %s", domain.ErrJobNotFound, params.Job)
 	}
-	main, err := worktree.MainCheckout(worktree.MainCheckoutParams{ProjectDir: params.Context.ProjectDir})
+	main, err := worktree.MainCheckout(ctx, worktree.MainCheckoutParams{ProjectDir: params.Context.ProjectDir})
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func BringUp(ctx context.Context, params BringUpParams) (release func(), err err
 		return nil, fmt.Errorf("ensure daemon: %w", err)
 	}
 
-	mainSeam := seam.Open(seam.Params{
+	mainSeam := seam.Open(ctx, seam.Params{
 		ProjectDir: params.Context.ProjectDir,
 		StateDir:   params.Context.StateDir,
 		WorkDir:    main,

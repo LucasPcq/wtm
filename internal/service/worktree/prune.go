@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"sync"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -18,9 +19,9 @@ type PlanPruneParams struct {
 // PlanPrune gathers what ClassifyPrune reasons over — worktree statuses, the
 // parent graph, upstream state, PR states — then returns the side-effect-free
 // plan. Every git probe is per worktree, never per branch of the repository.
-func PlanPrune(params PlanPruneParams) (domain.PrunePlan, error) {
+func PlanPrune(ctx context.Context, params PlanPruneParams) (domain.PrunePlan, error) {
 	prune := params.Prune
-	worktrees, err := infra.ListWorktrees(infra.ListWorktreesParams{ProjectDir: prune.ProjectDir})
+	worktrees, err := infra.ListWorktrees(ctx, infra.ListWorktreesParams{ProjectDir: prune.ProjectDir})
 	if err != nil {
 		return domain.PrunePlan{}, err
 	}
@@ -29,10 +30,10 @@ func PlanPrune(params PlanPruneParams) (domain.PrunePlan, error) {
 	if prune.Gone && !prune.NoFetch {
 		// Best-effort, like sync's base fetch: stale local refs are better than a
 		// hard failure offline.
-		_ = refreshUpstreams(refreshUpstreamsParams{ProjectDir: prune.ProjectDir, Branches: branches})
+		_ = refreshUpstreams(ctx, refreshUpstreamsParams{ProjectDir: prune.ProjectDir, Branches: branches})
 	}
 
-	statuses, err := List(domain.ListParams{
+	statuses, err := List(ctx, domain.ListParams{
 		ProjectDir: prune.ProjectDir,
 		StateDir:   prune.StateDir,
 		Config:     prune.Config,
@@ -41,19 +42,19 @@ func PlanPrune(params PlanPruneParams) (domain.PrunePlan, error) {
 		return domain.PrunePlan{}, err
 	}
 
-	nodes, err := buildNodes(prune.ProjectDir, prune.StateDir)
+	nodes, err := buildNodes(ctx, prune.ProjectDir, prune.StateDir)
 	if err != nil {
 		return domain.PrunePlan{}, err
 	}
 
 	gone := map[string]bool{}
 	if prune.Gone {
-		gone = computeGone(prune.ProjectDir, branches)
+		gone = computeGone(ctx, prune.ProjectDir, branches)
 	}
 
 	// Unpushed commits make a candidate unsafe to remove (like clean), so probe
 	// every listed worktree — the guard applies regardless of the active filter.
-	unpushed := computeUnpushed(prune.ProjectDir, statuses)
+	unpushed := computeUnpushed(ctx, prune.ProjectDir, statuses)
 
 	return rules.ClassifyPrune(rules.ClassifyPruneParams{
 		Statuses:   statuses,
@@ -74,8 +75,8 @@ type WorktreeBranchesParams struct {
 }
 
 // WorktreeBranches names the branch of every worktree, the main one included.
-func WorktreeBranches(params WorktreeBranchesParams) ([]string, error) {
-	worktrees, err := infra.ListWorktrees(infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
+func WorktreeBranches(ctx context.Context, params WorktreeBranchesParams) ([]string, error) {
+	worktrees, err := infra.ListWorktrees(ctx, infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
 	if err != nil {
 		return nil, err
 	}
@@ -101,8 +102,8 @@ type refreshUpstreamsParams struct {
 // branches: what origin no longer has loses its remote-tracking ref, the rest
 // is fetched. A repository's other branches are neither fetched nor pruned,
 // which is what keeps prune's cost proportional to its worktrees.
-func refreshUpstreams(params refreshUpstreamsParams) error {
-	upstreams, err := infra.Upstreams(infra.UpstreamsParams{ProjectDir: params.ProjectDir, Branches: params.Branches})
+func refreshUpstreams(ctx context.Context, params refreshUpstreamsParams) error {
+	upstreams, err := infra.Upstreams(ctx, infra.UpstreamsParams{ProjectDir: params.ProjectDir, Branches: params.Branches})
 	if err != nil {
 		return err
 	}
@@ -111,7 +112,7 @@ func refreshUpstreams(params refreshUpstreamsParams) error {
 	for remoteRef := range tracking {
 		remoteRefs = append(remoteRefs, remoteRef)
 	}
-	existing, err := infra.ExistingRemoteRefs(infra.RemoteRefsParams{
+	existing, err := infra.ExistingRemoteRefs(ctx, infra.RemoteRefsParams{
 		ProjectDir: params.ProjectDir,
 		Remote:     domain.OriginRemote,
 		Refs:       remoteRefs,
@@ -128,10 +129,10 @@ func refreshUpstreams(params refreshUpstreamsParams) error {
 		}
 		deleted = append(deleted, tracking[remoteRef])
 	}
-	if err := infra.DeleteRefs(infra.DeleteRefsParams{ProjectDir: params.ProjectDir, Refs: deleted}); err != nil {
+	if err := infra.DeleteRefs(ctx, infra.DeleteRefsParams{ProjectDir: params.ProjectDir, Refs: deleted}); err != nil {
 		return err
 	}
-	return infra.FetchRemoteRefs(infra.RemoteRefsParams{
+	return infra.FetchRemoteRefs(ctx, infra.RemoteRefsParams{
 		ProjectDir: params.ProjectDir,
 		Remote:     domain.OriginRemote,
 		Refs:       present,
@@ -152,9 +153,9 @@ func prStates(prs []domain.PRInfo) map[string]string {
 }
 
 // computeGone reads whether each branch has a deleted upstream ("[gone]").
-func computeGone(projectDir string, branches []string) map[string]bool {
+func computeGone(ctx context.Context, projectDir string, branches []string) map[string]bool {
 	gone := map[string]bool{}
-	upstreams, err := infra.Upstreams(infra.UpstreamsParams{ProjectDir: projectDir, Branches: branches})
+	upstreams, err := infra.Upstreams(ctx, infra.UpstreamsParams{ProjectDir: projectDir, Branches: branches})
 	if err != nil {
 		return gone
 	}
@@ -169,7 +170,7 @@ func computeGone(projectDir string, branches []string) map[string]bool {
 // computeUnpushed probes, concurrently, how many local commits each worktree's
 // branch has that are not on its remote. Bounded by statusWorkers. Branches with
 // no remote tracking ref report 0 (nothing to lose on the remote).
-func computeUnpushed(projectDir string, statuses []domain.WorktreeStatus) map[string]int {
+func computeUnpushed(ctx context.Context, projectDir string, statuses []domain.WorktreeStatus) map[string]int {
 	result := make(map[string]int, len(statuses))
 	var mu sync.Mutex
 
@@ -181,7 +182,7 @@ func computeUnpushed(projectDir string, statuses []domain.WorktreeStatus) map[st
 		go func(branch string) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			n, _ := infra.UnpushedCommits(infra.UnpushedCommitsParams{ProjectDir: projectDir, Branch: branch})
+			n, _ := infra.UnpushedCommits(ctx, infra.UnpushedCommitsParams{ProjectDir: projectDir, Branch: branch})
 			if n == 0 {
 				return
 			}

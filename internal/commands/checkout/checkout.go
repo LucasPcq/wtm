@@ -112,7 +112,7 @@ func runCheckout(cmd *cobra.Command, args []string) error {
 			Isolation:   isolation,
 			Ask:         ask,
 		},
-		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive}),
+		Prompter:  shared.FlowPrompter(cmd.Context(), shared.FlowPrompterParams{Interactive: interactive}),
 		Presenter: checkoutPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
 	})
 	return err

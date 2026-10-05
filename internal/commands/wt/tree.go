@@ -67,7 +67,7 @@ func runTree(cmd *cobra.Command, _ []string) error {
 		Animate: shared.Animate(cmd, rules.IsHumanFormat(format)),
 		Work: func() error {
 			var e error
-			forest, e = worktree.BuildTree(worktree.BuildTreeParams{
+			forest, e = worktree.BuildTree(cmd.Context(), worktree.BuildTreeParams{
 				ProjectDir: cfg.ProjectDir,
 				StateDir:   cfg.StateDir,
 				Config:     cfg.Config,

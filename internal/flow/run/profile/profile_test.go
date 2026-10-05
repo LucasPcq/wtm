@@ -32,7 +32,7 @@ func declared() domain.RunConfig {
 // A profile with no job selected is not a profile: naming which jobs it starts
 // is the whole request, so a run that cannot be asked is refused naming --jobs.
 func TestAddWithoutJobsIsRefusedNamingTheFlag(t *testing.T) {
-	_, err := profileflow.Add(profileflow.AddParams{
+	_, err := profileflow.Add(t.Context(), profileflow.AddParams{
 		Context:   flow.Context{StateDir: t.TempDir()},
 		Request:   profileflow.AddRequest{Initial: domain.ProfileConfig{Name: "dev"}, Config: declared()},
 		Prompter:  flow.Unattended{},
@@ -48,7 +48,7 @@ func TestAddWithoutJobsIsRefusedNamingTheFlag(t *testing.T) {
 func TestAddKeepsTheOrderTheFlagGave(t *testing.T) {
 	ctx := flow.Context{StateDir: t.TempDir()}
 
-	_, err := profileflow.Add(profileflow.AddParams{
+	_, err := profileflow.Add(t.Context(), profileflow.AddParams{
 		Context: ctx,
 		Request: profileflow.AddRequest{
 			Initial: domain.ProfileConfig{Name: "dev", Jobs: []string{"seed", "api"}},
@@ -88,7 +88,7 @@ func TestOrderStepOffersOnlyTheSelectedJobs(t *testing.T) {
 	}
 
 	ctx := flow.Context{StateDir: t.TempDir()}
-	if _, err := profileflow.Add(profileflow.AddParams{
+	if _, err := profileflow.Add(t.Context(), profileflow.AddParams{
 		Context:   ctx,
 		Request:   profileflow.AddRequest{Config: declared()},
 		Prompter:  prompter,
@@ -112,7 +112,7 @@ func TestAddAsDefaultTakesItFromTheProfileThatHeldIt(t *testing.T) {
 	cfg := declared()
 	cfg.Profiles = []domain.ProfileConfig{{Name: "old", Jobs: []string{"api"}, Default: true}}
 
-	if _, err := profileflow.Add(profileflow.AddParams{
+	if _, err := profileflow.Add(t.Context(), profileflow.AddParams{
 		Context: ctx,
 		Request: profileflow.AddRequest{
 			Initial: domain.ProfileConfig{Name: "new", Jobs: []string{"web"}, Default: true},
@@ -161,7 +161,7 @@ func TestOrderStepIsWhatTheProfileRecords(t *testing.T) {
 	}
 
 	ctx := flow.Context{StateDir: t.TempDir()}
-	if _, err := profileflow.Add(profileflow.AddParams{
+	if _, err := profileflow.Add(t.Context(), profileflow.AddParams{
 		Context:   ctx,
 		Request:   profileflow.AddRequest{Config: declared()},
 		Prompter:  prompter,

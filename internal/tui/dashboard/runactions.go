@@ -483,7 +483,7 @@ func (m Model) urlOpener() func(string) error {
 	if m.params.URLOpener != nil {
 		return m.params.URLOpener
 	}
-	return integration.OpenURL
+	return func(url string) error { return integration.OpenURL(m.ctx, url) }
 }
 
 // openSelectedAddress opens the address of the job the surface designates: the

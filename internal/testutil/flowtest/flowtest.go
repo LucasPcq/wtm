@@ -155,11 +155,13 @@ type Recorder struct {
 
 // Publish makes a Recorder the flow's Publisher too, so one double records
 // what a run showed and what it reported to the bus.
-func (r *Recorder) Publish(event domain.Event) { r.Published = append(r.Published, event) }
+func (r *Recorder) Publish(_ context.Context, event domain.Event) {
+	r.Published = append(r.Published, event)
+}
 
 func (r *Recorder) Listening() bool { return !r.Unheard }
 
-func (r *Recorder) Origin() (domain.EventOrigin, bool) {
+func (r *Recorder) Origin(context.Context) (domain.EventOrigin, bool) {
 	return r.From, r.From.Repo.CommonDir != ""
 }
 

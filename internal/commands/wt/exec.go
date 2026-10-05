@@ -1,6 +1,7 @@
 package wt
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -74,7 +75,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 	if jobs < 0 {
 		return fmt.Errorf("%w: --%s cannot be negative", domain.ErrUsage, domain.FlagJobs)
 	}
-	if err := checkExecLine(split.Command); err != nil {
+	if err := checkExecLine(cmd.Context(), split.Command); err != nil {
 		return err
 	}
 
@@ -96,7 +97,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 	_, err = execflow.Run(cmd.Context(), execflow.Params{
 		Context:   shared.FlowContext(config),
 		Request:   execflow.Request{Branches: names, All: all, Command: split.Command, Jobs: workers, Print: printAll, Dir: dir},
-		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),
+		Prompter:  shared.FlowPrompter(cmd.Context(), shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),
 		Presenter: &execPresenter{CLIPresenter: shared.NewPresenter(cmd, format), print: printAll},
 	})
 	return err
@@ -104,11 +105,11 @@ func runExec(cmd *cobra.Command, args []string) error {
 
 // checkExecLine only checks a command given after --: one the wizard asks for
 // is checked by its step.
-func checkExecLine(line string) error {
+func checkExecLine(ctx context.Context, line string) error {
 	if line == "" {
 		return nil
 	}
-	if err := shellcmd.CheckSyntax(line); err != nil {
+	if err := shellcmd.CheckSyntax(ctx, line); err != nil {
 		return fmt.Errorf("%w: %v", domain.ErrUsage, err)
 	}
 	return nil

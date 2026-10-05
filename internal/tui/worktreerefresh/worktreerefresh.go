@@ -7,6 +7,8 @@
 package worktreerefresh
 
 import (
+	"context"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -21,9 +23,9 @@ type RefreshedMsg struct {
 
 // Cmd fetches origin and re-lists worktrees off the UI thread. A list error
 // yields nil statuses so Handle leaves the holder unchanged.
-func Cmd(params domain.ListParams) tea.Cmd {
+func Cmd(ctx context.Context, params domain.ListParams) tea.Cmd {
 	return func() tea.Msg {
-		statuses, _ := worktree.Refresh(params)
+		statuses, _ := worktree.Refresh(ctx, params)
 		return RefreshedMsg{Statuses: statuses}
 	}
 }
@@ -43,7 +45,7 @@ type HandleParams struct {
 // not own (the refresh key on a non-worktree/filtering step, or any unrelated
 // message) so the picker can chain its own handling. A refresh that returns no
 // statuses (list error) leaves the holder unchanged.
-func Handle(params HandleParams) (tea.Cmd, bool) {
+func Handle(ctx context.Context, params HandleParams) (tea.Cmd, bool) {
 	w := params.Wizard
 
 	if key, ok := params.Msg.(tea.KeyMsg); ok && key.String() == domain.KeyRefresh {
@@ -54,7 +56,7 @@ func Handle(params HandleParams) (tea.Cmd, bool) {
 		if !ok || sl.Filtering() {
 			return nil, false
 		}
-		return tea.Batch(w.StartLoading(domain.LoadingWorktreesText), Cmd(params.ListParams)), true
+		return tea.Batch(w.StartLoading(domain.LoadingWorktreesText), Cmd(ctx, params.ListParams)), true
 	}
 
 	if msg, ok := params.Msg.(RefreshedMsg); ok {

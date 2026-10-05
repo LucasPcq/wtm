@@ -92,7 +92,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 			Force:     force,
 			Config:    ctx.Run,
 		},
-		Prompter:  ctx.Prompter(ctx.Interactive),
+		Prompter:  ctx.Prompter(cmd.Context(), ctx.Interactive),
 		Presenter: upPresenter{CLIPresenter: shared.NewPresenter(cmd, format), detach: detach},
 	})
 	if err != nil {

@@ -67,10 +67,10 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	outcome, err := jobflow.Add(jobflow.AddParams{
+	outcome, err := jobflow.Add(cmd.Context(), jobflow.AddParams{
 		Context:   ctx.FlowContext(),
 		Request:   jobflow.AddRequest{Initial: initial, Config: ctx.Run},
-		Prompter:  ctx.Prompter(ctx.Interactive),
+		Prompter:  ctx.Prompter(cmd.Context(), ctx.Interactive),
 		Presenter: presenter{CLIPresenter: ctx.CLI(cmd)},
 	})
 	if err != nil {

@@ -62,7 +62,7 @@ func runDown(cmd *cobra.Command, args []string) error {
 			All:       all,
 			Config:    ctx.Run,
 		},
-		Prompter:  ctx.Prompter(!all && ctx.Interactive),
+		Prompter:  ctx.Prompter(cmd.Context(), !all && ctx.Interactive),
 		Presenter: downPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
 	})
 	if err != nil {

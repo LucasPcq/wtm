@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -36,7 +37,7 @@ type ResolveEnvPortsParams struct {
 // into its .env files: the links and bases run.toml declares, and the offset its
 // ordinal binds on. A project declaring no link resolves to zero links, which
 // every caller treats as nothing to do.
-func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error) {
+func ResolveEnvPorts(ctx context.Context, params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error) {
 	cfg, err := config.LoadRun(params.StateDir)
 	if err != nil {
 		return envsvc.EnvPortsParams{}, err
@@ -59,7 +60,7 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 
 	cfg, _ = rules.PartitionEnvTargets(rules.PartitionEnvTargetsParams{Config: cfg, Files: params.EnvFiles})
 
-	isMain, err := writesMainShapedValues(writesMainShapedValuesParams{Resolve: params, Config: cfg, Ref: ref})
+	isMain, err := writesMainShapedValues(ctx, writesMainShapedValuesParams{Resolve: params, Config: cfg, Ref: ref})
 	if err != nil {
 		return envsvc.EnvPortsParams{}, err
 	}
@@ -83,7 +84,7 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 	// the worktree label in one place, so a .env and the route a job answers
 	// under can never disagree on which worktree they belong to. An unnumbered
 	// worktree answers ErrOrdinalUnallocated, and the flow allocates.
-	env, err := branchEnvAs(ref, isolation)
+	env, err := branchEnvAs(ctx, ref, isolation)
 	if err != nil {
 		return envsvc.EnvPortsParams{}, err
 	}
@@ -143,8 +144,8 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 // not applied. A surface handing out named URLs reads it to know whether the
 // .env behind them answers on those names yet; `wtm env` computes the very same
 // plan before writing it, so the two can never disagree.
-func EnvPortPlanFor(params ResolveEnvPortsParams) (domain.EnvPortPlan, error) {
-	resolved, err := ResolveEnvPorts(params)
+func EnvPortPlanFor(ctx context.Context, params ResolveEnvPortsParams) (domain.EnvPortPlan, error) {
+	resolved, err := ResolveEnvPorts(ctx, params)
 	if err != nil || resolved.Empty() {
 		return domain.EnvPortPlan{}, err
 	}
@@ -159,12 +160,12 @@ type writesMainShapedValuesParams struct {
 
 // writesMainShapedValues asks git whether this is the main checkout only when
 // the answer changes a value: a compose project name or an [[env]] link.
-func writesMainShapedValues(params writesMainShapedValuesParams) (bool, error) {
+func writesMainShapedValues(ctx context.Context, params writesMainShapedValuesParams) (bool, error) {
 	targets := rules.OwnedEnvTargets(rules.OwnedEnvTargetsParams{Config: params.Config, EnvFiles: params.Resolve.EnvFiles})
 	if len(targets) == 0 && len(params.Config.EnvValues) == 0 {
 		return false, nil
 	}
-	return isMainBranch(params.Ref)
+	return isMainBranch(ctx, params.Ref)
 }
 
 type ownedEnvWritesParams struct {

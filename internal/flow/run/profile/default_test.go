@@ -16,7 +16,7 @@ func withProfiles(t *testing.T, profiles ...domain.ProfileConfig) (flow.Context,
 	ctx := flow.Context{StateDir: t.TempDir()}
 	cfg := declared()
 	cfg.Profiles = profiles
-	if err := runconfig.Save(runconfig.SaveParams{StateDir: ctx.StateDir, Config: cfg}); err != nil {
+	if err := runconfig.Save(t.Context(), runconfig.SaveParams{StateDir: ctx.StateDir, Config: cfg}); err != nil {
 		t.Fatalf("save: %v", err)
 	}
 	return ctx, cfg
@@ -42,7 +42,7 @@ func TestAddingANewDefaultSaysWhichOneItReplaced(t *testing.T) {
 	ctx, cfg := withProfiles(t, domain.ProfileConfig{Name: "full", Jobs: []string{"api", "web"}, Default: true})
 	rec := &recorder{}
 
-	_, err := profileflow.Add(profileflow.AddParams{
+	_, err := profileflow.Add(t.Context(), profileflow.AddParams{
 		Context:   ctx,
 		Request:   profileflow.AddRequest{Initial: domain.ProfileConfig{Name: "api-only", Jobs: []string{"api"}, Default: true}, Config: cfg},
 		Prompter:  flow.Unattended{},
@@ -60,7 +60,7 @@ func TestEditingTheDefaultOntoItselfSaysNothing(t *testing.T) {
 	ctx, cfg := withProfiles(t, domain.ProfileConfig{Name: "full", Jobs: []string{"api", "web"}, Default: true})
 	rec := &recorder{}
 
-	_, err := profileflow.Edit(profileflow.EditParams{
+	_, err := profileflow.Edit(t.Context(), profileflow.EditParams{
 		Context:   ctx,
 		Request:   profileflow.EditRequest{Name: "full", Patch: patchJobs("api"), Config: cfg},
 		Prompter:  flow.Unattended{},
@@ -81,7 +81,7 @@ func TestRemovingTheDefaultSaysWhatRunUpStartsNow(t *testing.T) {
 	)
 	rec := &recorder{}
 
-	_, err := profileflow.Remove(profileflow.RemoveParams{
+	_, err := profileflow.Remove(t.Context(), profileflow.RemoveParams{
 		Context:   ctx,
 		Request:   profileflow.RemoveRequest{Name: "full", Config: cfg},
 		Prompter:  flow.Unattended{},
@@ -103,7 +103,7 @@ func TestRemovingTheDefaultAmongSeveralSaysRunUpNeedsAProfile(t *testing.T) {
 	)
 	rec := &recorder{}
 
-	_, err := profileflow.Remove(profileflow.RemoveParams{
+	_, err := profileflow.Remove(t.Context(), profileflow.RemoveParams{
 		Context:   ctx,
 		Request:   profileflow.RemoveRequest{Name: "full", Config: cfg},
 		Prompter:  flow.Unattended{},
@@ -121,7 +121,7 @@ func TestRemovingTheLastProfileSaysNothingAboutADefault(t *testing.T) {
 	ctx, cfg := withProfiles(t, domain.ProfileConfig{Name: "full", Jobs: []string{"api"}, Default: true})
 	rec := &recorder{}
 
-	_, err := profileflow.Remove(profileflow.RemoveParams{
+	_, err := profileflow.Remove(t.Context(), profileflow.RemoveParams{
 		Context:   ctx,
 		Request:   profileflow.RemoveRequest{Name: "full", Config: cfg},
 		Prompter:  flow.Unattended{},

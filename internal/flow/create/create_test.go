@@ -27,7 +27,7 @@ func newFlow(t *testing.T, request Request, target func(string) domain.BranchTar
 	if target == nil {
 		target = func(string) domain.BranchTarget { return domain.BranchTarget{} }
 	}
-	return &createFlow{
+	return &createFlow{runCtx: t.Context(),
 		ctx:      flow.Context{ProjectDir: t.TempDir(), Config: config},
 		request:  request,
 		prompter: flow.Unattended{},

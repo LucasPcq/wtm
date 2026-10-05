@@ -118,7 +118,7 @@ func TestOperationBlocksTheWholeSurface(t *testing.T) {
 // and the warning travels as Warning so every surface folds it in the same way.
 func TestPushQuestionNamesBothOutcomes(t *testing.T) {
 	prompter := &pushPrompter{interactive: true, answer: true}
-	f := &syncFlow{prompter: prompter}
+	f := &syncFlow{runCtx: t.Context(), prompter: prompter}
 
 	if !f.shouldPush(pushableResult()) {
 		t.Fatal("an interactive run that accepted must push")
@@ -136,7 +136,7 @@ func TestPushQuestionNamesBothOutcomes(t *testing.T) {
 
 func TestPushIsNeverAskedWithoutATerminal(t *testing.T) {
 	prompter := &pushPrompter{interactive: false, answer: true}
-	f := &syncFlow{prompter: prompter}
+	f := &syncFlow{runCtx: t.Context(), prompter: prompter}
 
 	if f.shouldPush(pushableResult()) {
 		t.Fatal("a run that cannot ask must not push: --push is how it opts in")
@@ -148,7 +148,7 @@ func TestPushIsNeverAskedWithoutATerminal(t *testing.T) {
 
 func TestPushFlagSkipsTheQuestion(t *testing.T) {
 	prompter := &pushPrompter{interactive: true}
-	f := &syncFlow{prompter: prompter, request: Request{Push: true}}
+	f := &syncFlow{runCtx: t.Context(), prompter: prompter, request: Request{Push: true}}
 
 	if !f.shouldPush(pushableResult()) {
 		t.Fatal("--push must push")
@@ -160,7 +160,7 @@ func TestPushFlagSkipsTheQuestion(t *testing.T) {
 
 func TestNoPushWinsOverAnAnsweredQuestion(t *testing.T) {
 	prompter := &pushPrompter{interactive: true, answer: true}
-	f := &syncFlow{prompter: prompter, request: Request{NoPush: true}}
+	f := &syncFlow{runCtx: t.Context(), prompter: prompter, request: Request{NoPush: true}}
 
 	if f.shouldPush(pushableResult()) {
 		t.Fatal("--no-push must never push")

@@ -6,6 +6,8 @@
 package branchrefresh
 
 import (
+	"context"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -19,9 +21,9 @@ type RefreshedMsg struct {
 }
 
 // Cmd fetches origin and recomputes the branch candidates off the UI thread.
-func Cmd(projectDir string) tea.Cmd {
+func Cmd(ctx context.Context, projectDir string) tea.Cmd {
 	return CmdFunc(func() []domain.BranchCandidate {
-		return branch.Refresh(branch.ListParams{ProjectDir: projectDir})
+		return branch.Refresh(ctx, branch.ListParams{ProjectDir: projectDir})
 	})
 }
 
@@ -42,28 +44,28 @@ type HandleParams struct {
 	Holder *[]domain.BranchCandidate
 }
 
-func (p HandleParams) fetch() func() []domain.BranchCandidate {
+func (p HandleParams) fetch(ctx context.Context) func() []domain.BranchCandidate {
 	if p.Fetch != nil {
 		return p.Fetch
 	}
 	return func() []domain.BranchCandidate {
-		return branch.Refresh(branch.ListParams{ProjectDir: p.ProjectDir})
+		return branch.Refresh(ctx, branch.ListParams{ProjectDir: p.ProjectDir})
 	}
 }
 
 // Handler returns a wizard message handler that wires the refresh key/message for
 // a picker whose branch steps read from holder. Pickers that also handle async
 // messages chain it first — it returns handled=false for messages it does not own.
-func Handler(projectDir string, holder *[]domain.BranchCandidate) components.WizardMsgHandler {
-	return HandlerFunc(func() []domain.BranchCandidate {
-		return branch.Refresh(branch.ListParams{ProjectDir: projectDir})
+func Handler(ctx context.Context, projectDir string, holder *[]domain.BranchCandidate) components.WizardMsgHandler {
+	return HandlerFunc(ctx, func() []domain.BranchCandidate {
+		return branch.Refresh(ctx, branch.ListParams{ProjectDir: projectDir})
 	}, holder)
 }
 
 // HandlerFunc is Handler for a caller that already holds the fetch itself.
-func HandlerFunc(fetch func() []domain.BranchCandidate, holder *[]domain.BranchCandidate) components.WizardMsgHandler {
+func HandlerFunc(ctx context.Context, fetch func() []domain.BranchCandidate, holder *[]domain.BranchCandidate) components.WizardMsgHandler {
 	return func(w *components.WizardModel, msg tea.Msg) (tea.Cmd, bool) {
-		return Handle(HandleParams{
+		return Handle(ctx, HandleParams{
 			Wizard: w,
 			Msg:    msg,
 			Fetch:  fetch,
@@ -76,7 +78,7 @@ func HandlerFunc(fetch func() []domain.BranchCandidate, holder *[]domain.BranchC
 // Call it first from a picker's OnMsg: it returns handled=false for messages it
 // does not own (the refresh key on a non-branch/filtering step, or any unrelated
 // message) so the picker can chain its own handling.
-func Handle(params HandleParams) (tea.Cmd, bool) {
+func Handle(ctx context.Context, params HandleParams) (tea.Cmd, bool) {
 	w := params.Wizard
 
 	if key, ok := params.Msg.(tea.KeyMsg); ok && key.String() == domain.KeyRefresh {
@@ -87,7 +89,7 @@ func Handle(params HandleParams) (tea.Cmd, bool) {
 		if !ok || sl.Filtering() {
 			return nil, false
 		}
-		return tea.Batch(w.StartLoading(domain.LoadingBranchesText), CmdFunc(params.fetch())), true
+		return tea.Batch(w.StartLoading(domain.LoadingBranchesText), CmdFunc(params.fetch(ctx))), true
 	}
 
 	if msg, ok := params.Msg.(RefreshedMsg); ok {

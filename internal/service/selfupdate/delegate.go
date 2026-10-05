@@ -1,10 +1,12 @@
 package selfupdate
 
 import (
+	"context"
 	"io"
 	"os/exec"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra"
 )
 
 type DelegateParams struct {
@@ -16,7 +18,7 @@ type DelegateParams struct {
 // Delegate hands the upgrade to the package manager that owns the binary.
 // It reports ran=false when that tool is absent from PATH, so the caller can
 // print the command instead of failing.
-func Delegate(params DelegateParams) (ran bool, err error) {
+func Delegate(ctx context.Context, params DelegateParams) (ran bool, err error) {
 	commands, ok := delegatedCommands(params.Method)
 	if !ok {
 		return false, nil
@@ -27,7 +29,7 @@ func Delegate(params DelegateParams) (ran bool, err error) {
 	}
 
 	for _, argv := range commands {
-		cmd := exec.Command(argv[0], argv[1:]...)
+		cmd := infra.Command(ctx, argv[0], argv[1:]...)
 		cmd.Stdout = params.Stdout
 		cmd.Stderr = params.Stderr
 		if err := cmd.Run(); err != nil {

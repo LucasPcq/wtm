@@ -11,7 +11,7 @@ import (
 // The delete step states its refusals twice on purpose: as prose for a surface
 // that can only print, and as blockers for one that can have each of them lifted.
 func TestDeleteStepStatesEachRefusalOnItsOwn(t *testing.T) {
-	f := &cleanFlow{
+	f := &cleanFlow{runCtx: t.Context(),
 		request: Request{Branches: []string{"feat"}},
 		checks: map[string]domain.CleanCheckEntry{
 			"feat": {Check: domain.CleanCheckResult{
@@ -44,7 +44,7 @@ func TestDeleteStepStatesEachRefusalOnItsOwn(t *testing.T) {
 }
 
 func TestDeleteStepOfBlockedNothingHasNoBlockers(t *testing.T) {
-	f := &cleanFlow{
+	f := &cleanFlow{runCtx: t.Context(),
 		request: Request{Branches: []string{"feat"}},
 		checks: map[string]domain.CleanCheckEntry{
 			"feat": {Check: domain.CleanCheckResult{Branch: "feat", WorktreePath: "/w/feat"}},

@@ -4,6 +4,7 @@
 package runconfig
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -46,9 +47,9 @@ type SaveParams struct {
 // Save validates cfg via rules.ValidateRun and writes it to <stateDir>/run.toml,
 // overwriting any previous content. Validation errors are joined with "; "
 // and prefixed "invalid run config: ".
-func Save(params SaveParams) error {
+func Save(ctx context.Context, params SaveParams) error {
 	_, errs := rules.ValidateRun(params.Config)
-	errs = append(errs, shellSyntaxErrors(params.Config)...)
+	errs = append(errs, shellSyntaxErrors(ctx, params.Config)...)
 	errs = append(errs, rules.ValidateNamespaces(params.Config)...)
 	errs = append(errs, rules.ValidateJobNames(params.Config)...)
 	if len(errs) > 0 {
@@ -64,7 +65,7 @@ func Save(params SaveParams) error {
 // shellSyntaxErrors rejects the commands the shell could not parse. Every write
 // path goes through Save, so this is the one moment a broken quote can still be
 // named — after it, the failure surfaces as a job that dies at startup.
-func shellSyntaxErrors(cfg domain.RunConfig) []string {
+func shellSyntaxErrors(ctx context.Context, cfg domain.RunConfig) []string {
 	var errs []string
 	for _, job := range cfg.Jobs {
 		for _, field := range []struct {
@@ -74,7 +75,7 @@ func shellSyntaxErrors(cfg domain.RunConfig) []string {
 			if rules.IsBlankCommand(field.line) {
 				continue
 			}
-			if err := shellcmd.CheckSyntax(field.line); err != nil {
+			if err := shellcmd.CheckSyntax(ctx, field.line); err != nil {
 				errs = append(errs, fmt.Sprintf("job %q: %s is not a valid shell command: %v", job.Name, field.name, err))
 			}
 		}

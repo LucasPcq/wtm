@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,12 +34,12 @@ type OrdinalClaim struct {
 //
 // Allocation reads the ordinals of the worktrees git still lists, not every
 // meta.json in the state dir — a removed worktree must give its number back.
-func EnsureOrdinal(params WorktreeRef) (OrdinalClaim, error) {
+func EnsureOrdinal(ctx context.Context, params WorktreeRef) (OrdinalClaim, error) {
 	if params.ProjectDir == "" || params.StateDir == "" || params.Branch == "" {
 		return OrdinalClaim{}, domain.ErrOrdinalRefIncomplete
 	}
 
-	claim, err := readClaim(params)
+	claim, err := readClaim(ctx, params)
 	if err != nil {
 		return OrdinalClaim{}, err
 	}
@@ -53,7 +54,7 @@ func EnsureOrdinal(params WorktreeRef) (OrdinalClaim, error) {
 			// Everything is read again here, git included. The claim above was
 			// taken outside the lock, so the worktree list it saw may predate a
 			// worktree another process has since created and numbered.
-			fresh, err := readClaim(params)
+			fresh, err := readClaim(ctx, params)
 			if err != nil {
 				return err
 			}
@@ -80,8 +81,8 @@ type claim struct {
 	others  []rules.OrdinalHolder
 }
 
-func readClaim(params WorktreeRef) (claim, error) {
-	worktrees, err := infra.ListWorktrees(infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
+func readClaim(ctx context.Context, params WorktreeRef) (claim, error) {
+	worktrees, err := infra.ListWorktrees(ctx, infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
 	if err != nil {
 		return claim{}, fmt.Errorf("list worktrees: %w", err)
 	}

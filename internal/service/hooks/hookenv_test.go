@@ -15,7 +15,7 @@ func TestRunHooksInjectsWorktreeEnv(t *testing.T) {
 	marker := filepath.Join(dir, "seen")
 
 	var out bytes.Buffer
-	if err := RunHooks(RunHooksParams{
+	if err := RunHooks(t.Context(), RunHooksParams{
 		Hooks:   []domain.HookCommand{{Cmd: "printenv " + domain.EnvComposeProjectName + " > " + marker}},
 		WorkDir: dir,
 		Env:     map[string]string{domain.EnvComposeProjectName: "feat-x"},
@@ -45,7 +45,7 @@ func TestRunHooksWithoutEnvKeepsProcessEnvironment(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunHooks(RunHooksParams{
+	if err := RunHooks(t.Context(), RunHooksParams{
 		Hooks:   []domain.HookCommand{{Cmd: script}},
 		WorkDir: dir,
 		Output:  &out,
@@ -71,7 +71,7 @@ func TestRunHooksWithEnvDropsTheCallersWorktreeVariables(t *testing.T) {
 	marker := filepath.Join(dir, "seen")
 
 	var out bytes.Buffer
-	if err := RunHooks(RunHooksParams{
+	if err := RunHooks(t.Context(), RunHooksParams{
 		Hooks:   []domain.HookCommand{{Cmd: "printenv " + domain.EnvComposeProjectName + " > " + marker + " || true"}},
 		WorkDir: dir,
 		Env:     map[string]string{domain.EnvIsolation: string(domain.IsolationVerbatim)},

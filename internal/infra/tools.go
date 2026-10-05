@@ -1,6 +1,7 @@
 package infra
 
 import (
+	"context"
 	"os/exec"
 	"strings"
 
@@ -9,8 +10,8 @@ import (
 
 // BaseBranch detects the default remote branch for the repo at dir via
 // git symbolic-ref. Returns domain.DefaultBaseBranch if detection fails.
-func BaseBranch(dir string) string {
-	cmd := exec.Command("git", "symbolic-ref", "refs/remotes/origin/HEAD")
+func BaseBranch(ctx context.Context, dir string) string {
+	cmd := Command(ctx, "git", "symbolic-ref", "refs/remotes/origin/HEAD")
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {
@@ -29,9 +30,9 @@ func BaseBranch(dir string) string {
 // DockerComposeCommand returns the docker-compose invocation available on the
 // host: "docker compose" (v2 plugin), "docker-compose" (v1 standalone), or
 // "docker compose" as a safe default when neither is detectable.
-func DockerComposeCommand() string {
+func DockerComposeCommand(ctx context.Context) string {
 	if _, err := exec.LookPath(domain.DockerBin); err == nil {
-		if err := exec.Command(domain.DockerBin, domain.ComposeSubcommand, domain.ComposeVersionArg).Run(); err == nil {
+		if err := Command(ctx, domain.DockerBin, domain.ComposeSubcommand, domain.ComposeVersionArg).Run(); err == nil {
 			return domain.ComposeCommand
 		}
 	}

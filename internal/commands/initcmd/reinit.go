@@ -58,7 +58,7 @@ func runReinit(cmd *cobra.Command, dir, stateDir string, sections []string) erro
 		return fmt.Errorf("no wtm config found — run `wtm init` first: %w", domain.ErrConfigNotFound)
 	}
 
-	detection := detect.ProjectEnvironment(dir)
+	detection := detect.ProjectEnvironment(cmd.Context(), dir)
 
 	var answers domain.InitProjectAnswers
 	if !interactive(cmd) {
@@ -79,7 +79,7 @@ func runReinit(cmd *cobra.Command, dir, stateDir string, sections []string) erro
 			Description: "This regenerates the selected section(s) cleanly.",
 			Warning:     reinitWarning(sections),
 		}
-		wizardAnswers, err := initwizard.RunSectionWizard(initwizard.SectionWizardParams{
+		wizardAnswers, err := initwizard.RunSectionWizard(cmd.Context(), initwizard.SectionWizardParams{
 			ProjectDir: dir,
 			Sections:   sections,
 			Detection:  detection,

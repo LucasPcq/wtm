@@ -44,7 +44,7 @@ func TestTheNamedProfileIsTheOneStarted(t *testing.T) {
 			{Name: "back", Jobs: []string{"db"}},
 		},
 	}
-	f := &upFlow{request: Request{Config: cfg}}
+	f := &upFlow{runCtx: t.Context(), request: Request{Config: cfg}}
 
 	got, err := f.resolveProfile(flow.NewAnswers(map[string]string{target.KeyProfile: "back"}))
 	if err != nil {
@@ -60,7 +60,7 @@ func TestTheOnlyProfileIsStartedWithoutBeingNamed(t *testing.T) {
 		Jobs:     []domain.JobConfig{{Name: "web", Kind: domain.JobKindService}},
 		Profiles: []domain.ProfileConfig{{Name: "front", Jobs: []string{"web"}}},
 	}
-	f := &upFlow{request: Request{Config: cfg}}
+	f := &upFlow{runCtx: t.Context(), request: Request{Config: cfg}}
 
 	got, err := f.resolveProfile(flow.Answers{})
 	if err != nil {
@@ -75,7 +75,7 @@ func TestNoProfileDeclaredStartsEveryJob(t *testing.T) {
 	cfg := domain.RunConfig{
 		Jobs: []domain.JobConfig{{Name: "migrate", Kind: domain.JobKindTask}, {Name: "web", Kind: domain.JobKindService}},
 	}
-	f := &upFlow{request: Request{Config: cfg}}
+	f := &upFlow{runCtx: t.Context(), request: Request{Config: cfg}}
 
 	got, err := f.resolveProfile(flow.Answers{})
 	if err != nil {
@@ -92,9 +92,9 @@ func TestAnUnattendedRunRefusesSeveralProfilesWithNoDefault(t *testing.T) {
 		Jobs:     []domain.JobConfig{{Name: "web", Kind: domain.JobKindService}},
 		Profiles: []domain.ProfileConfig{{Name: "front", Jobs: []string{"web"}}, {Name: "back", Jobs: []string{"web"}}},
 	}
-	f := &upFlow{ctx: flow.Context{ProjectDir: repo}, request: Request{Cwd: repo, Config: cfg}}
+	f := &upFlow{runCtx: t.Context(), ctx: flow.Context{ProjectDir: repo}, request: Request{Cwd: repo, Config: cfg}}
 
-	_, err := flow.Unattended{}.Ask(f.session())
+	_, err := flow.Unattended{}.Ask(f.session(t.Context()))
 
 	if !errors.Is(err, domain.ErrProfileRequired) {
 		t.Fatalf("err = %v, want the run refused naming --profile", err)

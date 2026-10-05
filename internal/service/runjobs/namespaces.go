@@ -57,7 +57,7 @@ func (r RemoveNamespacesResult) Deferred() []domain.NamespaceRef {
 // service. wtm never learns what a database or a realm is: it names the namespace
 // and runs the command run.toml declares, with the worktree's whole
 // environment.
-func RemoveWorktreeNamespaces(params RemoveNamespacesParams) RemoveNamespacesResult {
+func RemoveWorktreeNamespaces(ctx context.Context, params RemoveNamespacesParams) RemoveNamespacesResult {
 	var result RemoveNamespacesResult
 	for _, job := range sharedNamespaces(params.Config) {
 		ref := domain.NamespaceRef{
@@ -69,7 +69,7 @@ func RemoveWorktreeNamespaces(params RemoveNamespacesParams) RemoveNamespacesRes
 			result.Down = append(result.Down, ref)
 			continue
 		}
-		if err := runRemoval(job, params); err != nil {
+		if err := runRemoval(ctx, job, params); err != nil {
 			result.Failed = append(result.Failed, FailedRemoval{Ref: ref, Err: err})
 			continue
 		}
@@ -92,7 +92,7 @@ func sharedNamespaces(cfg domain.RunConfig) []domain.JobConfig {
 	return jobs
 }
 
-func runRemoval(job domain.JobConfig, params RemoveNamespacesParams) error {
+func runRemoval(parent context.Context, job domain.JobConfig, params RemoveNamespacesParams) error {
 	expand := rules.ExpandNamespaceParams{
 		Namespace: *job.Namespace,
 		Worktree:  params.Env[domain.EnvWorktree],
@@ -114,7 +114,7 @@ func runRemoval(job domain.JobConfig, params RemoveNamespacesParams) error {
 	if timeout <= 0 {
 		timeout = domain.NamespaceRemoveTimeout
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 
 	spec := rules.ShellCommand(job.Namespace.Remove)
@@ -134,6 +134,9 @@ func runRemoval(job domain.JobConfig, params RemoveNamespacesParams) error {
 		Overrides: overrides,
 	})
 	output, runErr := cmd.CombinedOutput()
+	if err := parent.Err(); err != nil {
+		return fmt.Errorf(domain.NamespaceRemoveFailedFmt, job.Name, expanded.Name, err)
+	}
 	if ctx.Err() != nil {
 		return fmt.Errorf(domain.NamespaceRemoveFailedFmt, job.Name, expanded.Name,
 			fmt.Errorf(domain.NamespaceRemoveTimedOutFmt, timeout))

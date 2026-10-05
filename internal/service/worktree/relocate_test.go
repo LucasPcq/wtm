@@ -11,7 +11,7 @@ import (
 
 func gitPathOf(t *testing.T, repo ordinalRepo, branch string) string {
 	t.Helper()
-	worktrees, err := ListAll(ListAllParams{ProjectDir: repo.dir})
+	worktrees, err := ListAll(t.Context(), ListAllParams{ProjectDir: repo.dir})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +26,7 @@ func gitPathOf(t *testing.T, repo ordinalRepo, branch string) string {
 
 func planAt(t *testing.T, repo ordinalRepo, basePath string) domain.RelocatePlan {
 	t.Helper()
-	plan, err := PlanRelocate(PlanRelocateParams{
+	plan, err := PlanRelocate(t.Context(), PlanRelocateParams{
 		ProjectDir:     repo.dir,
 		StateDir:       repo.stateDir,
 		TargetBasePath: basePath,

@@ -1,9 +1,9 @@
 package infra
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -16,8 +16,8 @@ type ListWorktreesParams struct {
 }
 
 // ListWorktrees returns all git worktrees with their path and branch.
-func ListWorktrees(params ListWorktreesParams) ([]domain.GitWorktree, error) {
-	cmd := exec.Command("git", "worktree", "list", "--porcelain")
+func ListWorktrees(ctx context.Context, params ListWorktreesParams) ([]domain.GitWorktree, error) {
+	cmd := Command(ctx, "git", "worktree", "list", "--porcelain")
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.Output()
 	if err != nil {
@@ -60,7 +60,7 @@ func ListWorktrees(params ListWorktreesParams) ([]domain.GitWorktree, error) {
 		if worktrees[i].Branch != "" {
 			continue
 		}
-		if branch, ok := rebaseInProgressBranch(worktrees[i].Path); ok {
+		if branch, ok := rebaseInProgressBranch(ctx, worktrees[i].Path); ok {
 			worktrees[i].Branch = branch
 			worktrees[i].RebaseInProgress = true
 		}
@@ -73,9 +73,9 @@ func ListWorktrees(params ListWorktreesParams) ([]domain.GitWorktree, error) {
 // in the worktree, read from the rebase state's head-name (interactive/merge
 // rebase writes rebase-merge, the am-based rebase writes rebase-apply). It returns
 // ok=false when no rebase is in progress.
-func rebaseInProgressBranch(worktreePath string) (string, bool) {
+func rebaseInProgressBranch(ctx context.Context, worktreePath string) (string, bool) {
 	for _, stateDir := range []string{"rebase-merge", "rebase-apply"} {
-		pathOut, err := exec.Command("git", "-C", worktreePath,
+		pathOut, err := Command(ctx, "git", "-C", worktreePath,
 			"rev-parse", "--git-path", stateDir+"/head-name").Output()
 		if err != nil {
 			continue
@@ -108,8 +108,8 @@ type FindMainWorktreeParams struct {
 }
 
 // FindMainWorktreePath returns the path of the main (first) worktree.
-func FindMainWorktreePath(params FindMainWorktreeParams) (string, error) {
-	cmd := exec.Command("git", "worktree", "list", "--porcelain")
+func FindMainWorktreePath(ctx context.Context, params FindMainWorktreeParams) (string, error) {
+	cmd := Command(ctx, "git", "worktree", "list", "--porcelain")
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.Output()
 	if err != nil {
@@ -132,8 +132,8 @@ type FindWorktreeByBranchParams struct {
 }
 
 // FindWorktreeByBranch returns the worktree matching the given branch name.
-func FindWorktreeByBranch(params FindWorktreeByBranchParams) (domain.GitWorktree, error) {
-	worktrees, err := ListWorktrees(ListWorktreesParams{ProjectDir: params.ProjectDir})
+func FindWorktreeByBranch(ctx context.Context, params FindWorktreeByBranchParams) (domain.GitWorktree, error) {
+	worktrees, err := ListWorktrees(ctx, ListWorktreesParams{ProjectDir: params.ProjectDir})
 	if err != nil {
 		return domain.GitWorktree{}, err
 	}

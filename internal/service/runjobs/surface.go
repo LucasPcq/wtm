@@ -1,6 +1,8 @@
 package runjobs
 
 import (
+	"context"
+
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
@@ -63,8 +65,8 @@ type AddressesParams struct {
 
 // Addresses is where the named worktrees' jobs answer, against the public port
 // dialed now rather than once at startup.
-func Addresses(params AddressesParams) domain.RunAddresses {
-	return worktree.RunAddressesFor(worktree.RunAddressesForParams{
+func Addresses(ctx context.Context, params AddressesParams) domain.RunAddresses {
+	return worktree.RunAddressesFor(ctx, worktree.RunAddressesForParams{
 		ProjectDir: params.ProjectDir,
 		StateDir:   params.StateDir,
 		RunConfig:  params.Config,

@@ -81,7 +81,7 @@ func Hooks(ctx context.Context, params HooksParams) error {
 	if len(hooks) == 0 || params.Target.Path == "" {
 		return nil
 	}
-	ordinal.BeforeHooks(params.Context, params.Target.Branch)
+	ordinal.BeforeHooks(ctx, params.Context, params.Target.Branch)
 	return params.Presenter.HookPhase(flow.HookPhaseParams{
 		Title: params.Title,
 		LogPath: rules.HooksLogPath(rules.HooksLogPathParams{
@@ -90,7 +90,7 @@ func Hooks(ctx context.Context, params HooksParams) error {
 			Branch:   params.Target.Branch,
 		}),
 		Run: func(sink flow.HookSink) error {
-			return worktree.RunCleanHooks(domain.CleanHooksParams{
+			return worktree.RunCleanHooks(ctx, domain.CleanHooksParams{
 				ProjectDir:   params.Context.ProjectDir,
 				StateDir:     params.Context.StateDir,
 				WorktreePath: params.Target.Path,
@@ -122,10 +122,10 @@ type SalvageParams struct {
 // leftover directory is named, rather than stranding a worktree git no longer
 // knows beside a branch and a namespace nothing would ever reclaim.
 func Salvage(ctx context.Context, params SalvageParams) error {
-	if worktree.StillTracked(worktree.FindByBranchParams{ProjectDir: params.Clean.ProjectDir, Branch: params.Clean.Branch}) {
+	if worktree.StillTracked(ctx, worktree.FindByBranchParams{ProjectDir: params.Clean.ProjectDir, Branch: params.Clean.Branch}) {
 		return params.Cause
 	}
-	if err := worktree.FinishRemoval(params.Clean); err != nil {
+	if err := worktree.FinishRemoval(ctx, params.Clean); err != nil {
 		return err
 	}
 	PublishRemoved(ctx, params)
@@ -266,7 +266,7 @@ func removeOne(ctx context.Context, params removeOneParams) Removal {
 		Target:    target,
 		Title:     hooksTitle(hooksTitleParams{Target: target, Named: batch.NameHookPhases || len(batch.Targets) > 1}),
 	})
-	publish.Deprovisioned(publish.DeprovisionedParams{Context: batch.Context, Branch: target.Branch, Err: hookErr})
+	publish.Deprovisioned(ctx, publish.DeprovisionedParams{Context: batch.Context, Branch: target.Branch, Err: hookErr})
 	if hookErr != nil {
 		removal.Err = hookErr
 		return removal
@@ -282,16 +282,16 @@ func removeOne(ctx context.Context, params removeOneParams) Removal {
 		SkipHooks:  true,
 	}
 	salvage := SalvageParams{Context: batch.Context, Presenter: batch.Presenter, Clean: clean, Path: target.Path}
-	if last, captured := publish.Capture(batch.Context, target.Branch); captured {
+	if last, captured := publish.Capture(ctx, batch.Context, target.Branch); captured {
 		salvage.Last = &last
 	}
 	err := batch.Presenter.Stage(ctx, flow.StageParams{
 		Message: fmt.Sprintf(domain.CleanLoadingFmt, target.Branch),
-		Work:    func(ctx context.Context) error { return worktree.Clean(clean) },
+		Work:    func(ctx context.Context) error { return worktree.Clean(ctx, clean) },
 	})
 	// A branch git refused to delete fails the run after the worktree went:
 	// the worktree is gone all the same, and that is what consumers track.
-	if err == nil || (!errors.Is(err, domain.ErrWorktreeRemoveFailed) && !worktree.StillTracked(worktree.FindByBranchParams{ProjectDir: clean.ProjectDir, Branch: clean.Branch})) {
+	if err == nil || (!errors.Is(err, domain.ErrWorktreeRemoveFailed) && !worktree.StillTracked(ctx, worktree.FindByBranchParams{ProjectDir: clean.ProjectDir, Branch: clean.Branch})) {
 		PublishRemoved(ctx, salvage)
 	}
 	if errors.Is(err, domain.ErrWorktreeRemoveFailed) {
@@ -316,7 +316,7 @@ func PublishRemoved(ctx context.Context, params SalvageParams) {
 	if params.Last == nil {
 		return
 	}
-	publish.Removed(params.Context, *params.Last)
+	publish.Removed(ctx, params.Context, *params.Last)
 }
 
 func recoverer(batch BatchParams) func(context.Context, SalvageParams) error {

@@ -36,7 +36,7 @@ func testContext(t *testing.T) flow.Context {
 func stack(t *testing.T, ctx flow.Context) {
 	t.Helper()
 	for _, step := range []struct{ branch, from string }{{"feat", "main"}, {"dev-a", "feat"}} {
-		if _, err := worktree.Create(domain.CreateParams{
+		if _, err := worktree.Create(t.Context(), domain.CreateParams{
 			ProjectDir:   ctx.ProjectDir,
 			StateDir:     ctx.StateDir,
 			Branch:       step.branch,
@@ -185,7 +185,7 @@ func TestRunAbortsWithoutTouchingAnything(t *testing.T) {
 
 func parentOf(t *testing.T, ctx flow.Context, branchName string) string {
 	t.Helper()
-	nodes, err := worktree.Nodes(worktree.NodesParams{ProjectDir: ctx.ProjectDir, StateDir: ctx.StateDir})
+	nodes, err := worktree.Nodes(t.Context(), worktree.NodesParams{ProjectDir: ctx.ProjectDir, StateDir: ctx.StateDir})
 	if err != nil {
 		t.Fatalf("nodes: %v", err)
 	}

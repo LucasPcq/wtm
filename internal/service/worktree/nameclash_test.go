@@ -22,7 +22,7 @@ cmd = "pnpm dev"
 func createIn(t *testing.T, repo ordinalRepo, base, branch string) error {
 	t.Helper()
 	cfg := domain.Config{Project: domain.ProjectConfig{Worktrees: domain.WorktreesConfig{BasePath: base, BaseBranch: "main"}}}
-	_, err := Create(domain.CreateParams{
+	_, err := Create(t.Context(), domain.CreateParams{
 		ProjectDir: repo.dir,
 		StateDir:   repo.stateDir,
 		Branch:     branch,

@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -11,7 +12,7 @@ import (
 // testFlow installs a Prompter: session() reads Interactive() to resolve the
 // parent question from the flags.
 func testFlow(request Request, statuses []domain.WorktreeStatus) *syncFlow {
-	return &syncFlow{request: request, statuses: statuses, prompter: flow.Unattended{}}
+	return &syncFlow{runCtx: context.Background(), request: request, statuses: statuses, prompter: flow.Unattended{}}
 }
 
 var stack = []domain.WorktreeStatus{

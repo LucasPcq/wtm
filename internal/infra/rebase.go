@@ -1,8 +1,8 @@
 package infra
 
 import (
+	"context"
 	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
 )
@@ -14,8 +14,8 @@ type TipParams struct {
 }
 
 // Tip returns the short commit SHA a ref points to.
-func Tip(params TipParams) (string, error) {
-	cmd := exec.Command("git", "-C", params.WorktreePath, "rev-parse", "--short", params.Ref)
+func Tip(ctx context.Context, params TipParams) (string, error) {
+	cmd := Command(ctx, "git", "-C", params.WorktreePath, "rev-parse", "--short", params.Ref)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("git rev-parse %s: %w", params.Ref, err)
@@ -56,8 +56,8 @@ type RebaseOntoParams struct {
 // progress for manual resolution. Either way the result reports Conflicted=true
 // with a nil error. A non-conflict failure returns an error (after a best-effort
 // abort).
-func RebaseOnto(params RebaseOntoParams) (RebaseResult, error) {
-	cmd := exec.Command("git", "-C", params.WorktreePath,
+func RebaseOnto(ctx context.Context, params RebaseOntoParams) (RebaseResult, error) {
+	cmd := Command(ctx, "git", "-C", params.WorktreePath,
 		"rebase", "--onto", params.NewBase, params.Upstream, params.Branch)
 	out, err := cmd.CombinedOutput()
 	if err == nil {
@@ -67,23 +67,23 @@ func RebaseOnto(params RebaseOntoParams) (RebaseResult, error) {
 	output := strings.TrimSpace(string(out))
 
 	if strings.Contains(output, "CONFLICT") {
-		files := ConflictedFiles(params.WorktreePath)
+		files := ConflictedFiles(ctx, params.WorktreePath)
 		if params.KeepConflict {
 			return RebaseResult{Conflicted: true, Output: output, Files: files, Kept: true}, nil
 		}
-		abortRebase(params.WorktreePath)
+		abortRebase(ctx, params.WorktreePath)
 		return RebaseResult{Conflicted: true, Output: output, Files: files}, nil
 	}
 
-	abortRebase(params.WorktreePath)
+	abortRebase(ctx, params.WorktreePath)
 	return RebaseResult{Output: output}, fmt.Errorf("git rebase: %s", output)
 }
 
 // ConflictedFiles returns the unmerged paths in a worktree, i.e. the files with
 // conflict markers during a stopped rebase/merge (`git diff --name-only
 // --diff-filter=U`). A clean tree or any error yields nil.
-func ConflictedFiles(worktreePath string) []string {
-	cmd := exec.Command("git", "-C", worktreePath, "diff", "--name-only", "--diff-filter=U")
+func ConflictedFiles(ctx context.Context, worktreePath string) []string {
+	cmd := Command(ctx, "git", "-C", worktreePath, "diff", "--name-only", "--diff-filter=U")
 	out, err := cmd.Output()
 	if err != nil {
 		return nil
@@ -97,8 +97,8 @@ func ConflictedFiles(worktreePath string) []string {
 
 // abortRebase best-effort aborts an in-progress rebase. A "no rebase in
 // progress" error is expected when the failure happened before any apply.
-func abortRebase(worktreePath string) {
-	exec.Command("git", "-C", worktreePath, "rebase", "--abort").Run()
+func abortRebase(ctx context.Context, worktreePath string) {
+	_ = Command(context.WithoutCancel(ctx), "git", "-C", worktreePath, "rebase", "--abort").Run()
 }
 
 // FastForwardParams holds inputs for fast-forwarding a checked-out branch.
@@ -109,8 +109,8 @@ type FastForwardParams struct {
 
 // FastForwardBranch fast-forwards the branch checked out in WorktreePath to Onto
 // (e.g. origin/main). It fails if the branch has diverged (no fast-forward).
-func FastForwardBranch(params FastForwardParams) error {
-	cmd := exec.Command("git", "-C", params.WorktreePath, "merge", "--ff-only", params.Onto)
+func FastForwardBranch(ctx context.Context, params FastForwardParams) error {
+	cmd := Command(ctx, "git", "-C", params.WorktreePath, "merge", "--ff-only", params.Onto)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git merge --ff-only %s: %s", params.Onto, strings.TrimSpace(string(out)))
@@ -127,8 +127,8 @@ type BehindParams struct {
 
 // Behind returns the number of commits present in Upstream but not in Branch.
 // Zero means the branch already contains everything from its parent.
-func Behind(params BehindParams) (int, error) {
-	return revListCount(params.WorktreePath, params.Branch+".."+params.Upstream)
+func Behind(ctx context.Context, params BehindParams) (int, error) {
+	return revListCount(ctx, params.WorktreePath, params.Branch+".."+params.Upstream)
 }
 
 // CommitCountParams holds inputs for counting commits in a revision range.
@@ -139,12 +139,12 @@ type CommitCountParams struct {
 
 // CommitCount returns the number of commits in the given revision range
 // (e.g. "<oldParentTip>..<branch>").
-func CommitCount(params CommitCountParams) (int, error) {
-	return revListCount(params.WorktreePath, params.Range)
+func CommitCount(ctx context.Context, params CommitCountParams) (int, error) {
+	return revListCount(ctx, params.WorktreePath, params.Range)
 }
 
-func revListCount(worktreePath, revRange string) (int, error) {
-	cmd := exec.Command("git", "-C", worktreePath, "rev-list", "--count", revRange)
+func revListCount(ctx context.Context, worktreePath, revRange string) (int, error) {
+	cmd := Command(ctx, "git", "-C", worktreePath, "rev-list", "--count", revRange)
 	out, err := cmd.Output()
 	if err != nil {
 		return 0, fmt.Errorf("git rev-list --count %s: %w", revRange, err)
@@ -164,8 +164,8 @@ type IsAncestorParams struct {
 }
 
 // IsAncestor reports whether Ancestor is an ancestor of (or equal to) Descendant.
-func IsAncestor(params IsAncestorParams) bool {
-	cmd := exec.Command("git", "-C", params.WorktreePath,
+func IsAncestor(ctx context.Context, params IsAncestorParams) bool {
+	cmd := Command(ctx, "git", "-C", params.WorktreePath,
 		"merge-base", "--is-ancestor", params.Ancestor, params.Descendant)
 	return cmd.Run() == nil
 }
@@ -184,8 +184,8 @@ type RemoteBranchParams struct {
 // "+" when genuinely missing. Only "+" lines count as a real divergence. A missing
 // remote ref or any error yields false (nothing to integrate). Reads local refs
 // only — no network.
-func RemoteHasUnintegratedCommits(params RemoteBranchParams) bool {
-	cmd := exec.Command("git", "-C", params.WorktreePath,
+func RemoteHasUnintegratedCommits(ctx context.Context, params RemoteBranchParams) bool {
+	cmd := Command(ctx, "git", "-C", params.WorktreePath,
 		"cherry", params.Branch, "origin/"+params.Branch)
 	out, err := cmd.Output()
 	if err != nil {
@@ -204,17 +204,17 @@ func RemoteHasUnintegratedCommits(params RemoteBranchParams) bool {
 // tip differs from the remote tip. Meant to be called only on non-diverged
 // branches (local is ahead or rewritten, never behind unresolved). Reads local
 // refs only — no network.
-func AheadOfRemote(params RemoteBranchParams) bool {
+func AheadOfRemote(ctx context.Context, params RemoteBranchParams) bool {
 	remoteRef := "origin/" + params.Branch
-	remoteTip, err := exec.Command("git", "-C", params.WorktreePath, "rev-parse", remoteRef).Output()
+	remoteTip, err := Command(ctx, "git", "-C", params.WorktreePath, "rev-parse", remoteRef).Output()
 	if err != nil {
 		// Only treat the branch as pushable when origin/<branch> genuinely does
 		// not exist (a push would create it). Any other rev-parse failure must
 		// NOT be read as "remote missing" — that could trigger an unwanted
 		// force-push under --push (non-interactive).
-		return !remoteRefExists(params.WorktreePath, remoteRef)
+		return !remoteRefExists(ctx, params.WorktreePath, remoteRef)
 	}
-	localTip, err := exec.Command("git", "-C", params.WorktreePath, "rev-parse", params.Branch).Output()
+	localTip, err := Command(ctx, "git", "-C", params.WorktreePath, "rev-parse", params.Branch).Output()
 	if err != nil {
 		return false
 	}
@@ -223,8 +223,8 @@ func AheadOfRemote(params RemoteBranchParams) bool {
 
 // remoteRefExists reports whether a remote-tracking ref (e.g. origin/<branch>)
 // is present locally. Reads local refs only — no network.
-func remoteRefExists(worktreePath, remoteRef string) bool {
-	cmd := exec.Command("git", "-C", worktreePath,
+func remoteRefExists(ctx context.Context, worktreePath, remoteRef string) bool {
+	cmd := Command(ctx, "git", "-C", worktreePath,
 		"show-ref", "--verify", "--quiet", "refs/remotes/"+remoteRef)
 	return cmd.Run() == nil
 }
@@ -237,8 +237,8 @@ type PushForceParams struct {
 
 // PushForceWithLease pushes Branch to origin with --force-with-lease, which
 // refuses to overwrite remote commits the local ref has not seen.
-func PushForceWithLease(params PushForceParams) error {
-	cmd := exec.Command("git", "-C", params.WorktreePath,
+func PushForceWithLease(ctx context.Context, params PushForceParams) error {
+	cmd := Command(ctx, "git", "-C", params.WorktreePath,
 		"push", "--force-with-lease", "origin", params.Branch)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

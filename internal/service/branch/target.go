@@ -1,6 +1,8 @@
 package branch
 
 import (
+	"context"
+
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
 )
@@ -12,17 +14,17 @@ import (
 // only the recorded sync parent, and to refuse a branch git cannot check out
 // twice. Best effort: an unreadable repo classifies as BranchTargetNew, leaving
 // git itself to report the failure.
-func Target(params BranchParams) domain.BranchTarget {
-	if !infra.LocalBranchExists(infra.LocalBranchExistsParams{
+func Target(ctx context.Context, params BranchParams) domain.BranchTarget {
+	if !infra.LocalBranchExists(ctx, infra.LocalBranchExistsParams{
 		ProjectDir: params.ProjectDir,
 		Branch:     params.Branch,
 	}) {
 		return domain.BranchTarget{State: domain.BranchTargetNew, Branch: params.Branch}
 	}
 
-	state, ab := Divergence(params)
+	state, ab := Divergence(ctx, params)
 
-	wt, err := infra.FindWorktreeByBranch(infra.FindWorktreeByBranchParams{
+	wt, err := infra.FindWorktreeByBranch(ctx, infra.FindWorktreeByBranchParams{
 		ProjectDir: params.ProjectDir,
 		Branch:     params.Branch,
 	})

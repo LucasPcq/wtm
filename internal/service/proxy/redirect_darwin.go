@@ -3,6 +3,7 @@
 package proxy
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -44,7 +45,7 @@ func (r launchdRedirector) Plan() (Plan, error) {
 	}, nil
 }
 
-func (r launchdRedirector) Apply() error {
+func (r launchdRedirector) Apply(ctx context.Context) error {
 	plan, err := r.Plan()
 	if err != nil {
 		return err
@@ -56,24 +57,24 @@ func (r launchdRedirector) Apply() error {
 	}
 	// A reinstall onto a loaded agent would keep serving the old target, so the
 	// unload comes first and its failure is the expected case, not an error.
-	_ = exec.Command(domain.LaunchctlBin, domain.LaunchctlUnload, path).Run()
+	_ = exec.CommandContext(ctx, domain.LaunchctlBin, domain.LaunchctlUnload, path).Run()
 	if writeErr := os.WriteFile(path, []byte(plan.Files[0].Content), 0o644); writeErr != nil {
 		return writeErr
 	}
 
-	out, err := exec.Command(domain.LaunchctlBin, domain.LaunchctlLoad, path).CombinedOutput()
+	out, err := exec.CommandContext(ctx, domain.LaunchctlBin, domain.LaunchctlLoad, path).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("launchctl load: %w: %s", err, out)
 	}
 	return nil
 }
 
-func (r launchdRedirector) Remove() error {
+func (r launchdRedirector) Remove(ctx context.Context) error {
 	path := r.plistPath()
 	if _, err := os.Stat(path); err != nil {
 		return nil
 	}
-	_ = exec.Command(domain.LaunchctlBin, domain.LaunchctlUnload, path).Run()
+	_ = exec.CommandContext(ctx, domain.LaunchctlBin, domain.LaunchctlUnload, path).Run()
 	return os.Remove(path)
 }
 

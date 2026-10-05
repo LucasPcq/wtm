@@ -1,8 +1,8 @@
 package infra
 
 import (
+	"context"
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -17,7 +17,7 @@ const upstreamFieldSep = "\x00"
 
 // Upstreams reads what each branch tracks in one `git for-each-ref`, however
 // many branches are asked about.
-func Upstreams(params UpstreamsParams) (map[string]domain.Upstream, error) {
+func Upstreams(ctx context.Context, params UpstreamsParams) (map[string]domain.Upstream, error) {
 	upstreams := map[string]domain.Upstream{}
 	if len(params.Branches) == 0 {
 		return upstreams, nil
@@ -28,7 +28,7 @@ func Upstreams(params UpstreamsParams) (map[string]domain.Upstream, error) {
 	for _, branch := range params.Branches {
 		args = append(args, domain.LocalRefPrefix+branch)
 	}
-	cmd := exec.Command("git", args...)
+	cmd := Command(ctx, "git", args...)
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.Output()
 	if err != nil {
@@ -57,12 +57,12 @@ type RemoteRefsParams struct {
 
 // ExistingRemoteRefs asks the remote which of Refs it has, without fetching
 // anything: the remote filters its advertisement down to the refs named.
-func ExistingRemoteRefs(params RemoteRefsParams) (map[string]bool, error) {
+func ExistingRemoteRefs(ctx context.Context, params RemoteRefsParams) (map[string]bool, error) {
 	existing := map[string]bool{}
 	if len(params.Refs) == 0 {
 		return existing, nil
 	}
-	cmd := exec.Command("git", append([]string{"ls-remote", params.Remote}, params.Refs...)...)
+	cmd := Command(ctx, "git", append([]string{"ls-remote", params.Remote}, params.Refs...)...)
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.Output()
 	if err != nil {
@@ -86,11 +86,11 @@ func ExistingRemoteRefs(params RemoteRefsParams) (map[string]bool, error) {
 // FetchRemoteRefs fetches the named refs of a remote, each landing on its
 // remote-tracking ref through the remote's configured refspec, as a full fetch
 // would land it. Every ref must exist on the remote.
-func FetchRemoteRefs(params RemoteRefsParams) error {
+func FetchRemoteRefs(ctx context.Context, params RemoteRefsParams) error {
 	if len(params.Refs) == 0 {
 		return nil
 	}
-	cmd := exec.Command("git", append([]string{"fetch", "--quiet", params.Remote}, params.Refs...)...)
+	cmd := Command(ctx, "git", append([]string{"fetch", "--quiet", params.Remote}, params.Refs...)...)
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -106,7 +106,7 @@ type DeleteRefsParams struct {
 
 // DeleteRefs deletes the refs in one transaction; a ref already absent is not
 // an error.
-func DeleteRefs(params DeleteRefsParams) error {
+func DeleteRefs(ctx context.Context, params DeleteRefsParams) error {
 	if len(params.Refs) == 0 {
 		return nil
 	}
@@ -114,7 +114,7 @@ func DeleteRefs(params DeleteRefsParams) error {
 	for _, ref := range params.Refs {
 		fmt.Fprintf(&stdin, "delete %s\n", ref)
 	}
-	cmd := exec.Command("git", "update-ref", "--stdin")
+	cmd := Command(ctx, "git", "update-ref", "--stdin")
 	cmd.Dir = params.ProjectDir
 	cmd.Stdin = strings.NewReader(stdin.String())
 	out, err := cmd.CombinedOutput()

@@ -1,11 +1,11 @@
 package wt
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -75,7 +75,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 			wg.Add(2)
 			go func() {
 				defer wg.Done()
-				statuses, listErr = worktree.List(domain.ListParams{
+				statuses, listErr = worktree.List(cmd.Context(), domain.ListParams{
 					ProjectDir: result.ProjectDir,
 					StateDir:   result.StateDir,
 					Config:     result.Config,
@@ -100,7 +100,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 	if !interactive {
 		var prs []domain.PRInfo
 		if withPRs {
-			prs, _ = shared.LoadPRs(result.ProjectDir)
+			prs, _ = shared.LoadPRs(cmd.Context(), result.ProjectDir)
 		}
 		if format == domain.OutputJSON {
 			return output.WriteWorktreeListJSON(cmd.OutOrStdout(), output.WriteWorktreeListJSONParams{
@@ -127,7 +127,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	selected, action, prs, err := pickWorktreeAndAction(pickParams{
+	selected, action, prs, err := pickWorktreeAndAction(cmd.Context(), pickParams{
 		statuses:     statuses,
 		services:     services,
 		projectDir:   result.ProjectDir,
@@ -142,7 +142,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return executeWorktreeAction(cmd, action, selected, prs, result)
+	return executeWorktreeAction(cmd.Context(), cmd, action, selected, prs, result)
 }
 
 const (
@@ -178,7 +178,7 @@ type pickParams struct {
 // in asynchronously, refreshing the row badges when they arrive. It returns the
 // selected worktree, the chosen action, and the PRs loaded by the time the user
 // confirmed (used to resolve the Open PR action).
-func pickWorktreeAndAction(params pickParams) (domain.WorktreeStatus, string, []domain.PRInfo, error) {
+func pickWorktreeAndAction(ctx context.Context, params pickParams) (domain.WorktreeStatus, string, []domain.PRInfo, error) {
 	statuses := params.statuses
 
 	var (
@@ -261,12 +261,12 @@ func pickWorktreeAndAction(params pickParams) (domain.WorktreeStatus, string, []
 			},
 		},
 		InitCmd: worktreepicker.PRLoadCmd(func() ([]domain.PRInfo, domain.GHConnection) {
-			return shared.LoadPRs(params.projectDir)
+			return shared.LoadPRs(ctx, params.projectDir)
 		}),
 		Loading:     true,
 		LoadingText: worktreepicker.LoadingPRsText,
 		OnMsg: func(w *components.WizardModel, msg tea.Msg) (tea.Cmd, bool) {
-			if cmd, handled := worktreerefresh.Handle(worktreerefresh.HandleParams{
+			if cmd, handled := worktreerefresh.Handle(ctx, worktreerefresh.HandleParams{
 				Wizard:     w,
 				Msg:        msg,
 				ListParams: listParams,
@@ -376,7 +376,7 @@ func buildActionItems(params buildActionItemsParams) []components.SelectItem {
 	}
 }
 
-func executeWorktreeAction(cmd *cobra.Command, action string, selected domain.WorktreeStatus, prs []domain.PRInfo, result shared.ConfigResult) error {
+func executeWorktreeAction(ctx context.Context, cmd *cobra.Command, action string, selected domain.WorktreeStatus, prs []domain.PRInfo, result shared.ConfigResult) error {
 	bin, err := os.Executable()
 	if err != nil {
 		return err
@@ -393,21 +393,21 @@ func executeWorktreeAction(cmd *cobra.Command, action string, selected domain.Wo
 
 	case lsActionOpenPR:
 		if pr, ok := findPRForBranch(prs, selected.Branch); ok {
-			return exec.Command("open", pr.URL).Run()
+			return infra.Command(ctx, "open", pr.URL).Run()
 		}
 		// PRs may not have finished streaming when the action menu was built;
 		// resolve the URL for this branch directly.
-		found, _, url := ghservice.HasOpenPR(ghservice.HasOpenPRParams{
+		found, _, url := ghservice.HasOpenPR(ctx, ghservice.HasOpenPRParams{
 			ProjectDir: result.ProjectDir,
 			Branch:     selected.Branch,
 		})
 		if !found {
 			return nil
 		}
-		return exec.Command("open", url).Run()
+		return infra.Command(ctx, "open", url).Run()
 
 	case lsActionServicesUp:
-		cmd := exec.Command(bin, domain.CmdRun, domain.CmdUp)
+		cmd := infra.Command(ctx, bin, domain.CmdRun, domain.CmdUp)
 		cmd.Dir = selected.Path
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
@@ -415,7 +415,7 @@ func executeWorktreeAction(cmd *cobra.Command, action string, selected domain.Wo
 		return cmd.Run()
 
 	case lsActionServicesDown:
-		cmd := exec.Command(bin, domain.CmdRun, domain.CmdDown)
+		cmd := infra.Command(ctx, bin, domain.CmdRun, domain.CmdDown)
 		cmd.Dir = selected.Path
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
@@ -423,7 +423,7 @@ func executeWorktreeAction(cmd *cobra.Command, action string, selected domain.Wo
 		return cmd.Run()
 
 	case lsActionLogs:
-		cmd := exec.Command(bin, domain.CmdRun, domain.CmdLogs)
+		cmd := infra.Command(ctx, bin, domain.CmdRun, domain.CmdLogs)
 		cmd.Dir = selected.Path
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
@@ -431,7 +431,7 @@ func executeWorktreeAction(cmd *cobra.Command, action string, selected domain.Wo
 		return cmd.Run()
 
 	case lsActionClean:
-		cmd := exec.Command(bin, domain.CmdClean, selected.Branch)
+		cmd := infra.Command(ctx, bin, domain.CmdClean, selected.Branch)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr

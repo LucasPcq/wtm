@@ -57,6 +57,7 @@ func (p project) corrupt(t *testing.T) {
 func command(t *testing.T, args ...string) *cobra.Command {
 	t.Helper()
 	cmd := &cobra.Command{Use: "probe"}
+	cmd.SetContext(t.Context())
 	shared.AddOutputFlag(cmd)
 	shared.AddYesFlag(cmd, "")
 	if err := cmd.ParseFlags(args); err != nil {

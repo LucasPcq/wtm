@@ -114,7 +114,7 @@ func (f *fastForwardFlow) run() (Outcome, error) {
 }
 
 func (f *fastForwardFlow) load() error {
-	statuses, err := worktree.List(domain.ListParams{
+	statuses, err := worktree.List(f.runCtx, domain.ListParams{
 		ProjectDir: f.ctx.ProjectDir,
 		StateDir:   f.ctx.StateDir,
 		Config:     f.ctx.Config,
@@ -127,7 +127,7 @@ func (f *fastForwardFlow) load() error {
 	if len(f.request.Branches) == 0 {
 		return nil
 	}
-	selection, err := worktree.ResolveSyncBranches(worktree.ResolveSyncBranchesParams{
+	selection, err := worktree.ResolveSyncBranches(f.runCtx, worktree.ResolveSyncBranchesParams{
 		ProjectDir: f.ctx.ProjectDir,
 		Queries:    f.request.Branches,
 	})
@@ -150,7 +150,7 @@ func (f *fastForwardFlow) advance(params advanceParams) ([]domain.FastForwardRes
 		Work: func(ctx context.Context) error {
 			for _, name := range params.Branches {
 				check := f.check(name)
-				results = append(results, branch.FastForward(branch.FastForwardParams{
+				results = append(results, branch.FastForward(ctx, branch.FastForwardParams{
 					ProjectDir: f.ctx.ProjectDir,
 					Branch:     name,
 					Force:      params.Force,
@@ -169,7 +169,7 @@ func (f *fastForwardFlow) check(name string) domain.FastForwardCheck {
 	if cached, ok := f.checks[name]; ok {
 		return cached
 	}
-	result, err := branch.Check(branch.BranchParams{ProjectDir: f.ctx.ProjectDir, Branch: name})
+	result, err := branch.Check(f.runCtx, branch.BranchParams{ProjectDir: f.ctx.ProjectDir, Branch: name})
 	if err != nil {
 		result = domain.FastForwardCheck{Branch: name, State: domain.DivergenceUnknown}
 	}

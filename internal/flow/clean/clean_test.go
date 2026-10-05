@@ -81,7 +81,7 @@ func TestDeleteOptionsOfferForceOnlyWhenUnsafe(t *testing.T) {
 // --force lifts the refusal without even running the check, which is what keeps a
 // --yes --force run from touching the network.
 func TestResolveDeleteForceSkipsTheCheck(t *testing.T) {
-	f := &cleanFlow{
+	f := &cleanFlow{runCtx: t.Context(),
 		request:   Request{Force: true},
 		checks:    map[string]domain.CleanCheckEntry{},
 		presenter: failingPresenter{t: t},
@@ -97,7 +97,7 @@ func TestResolveDeleteForceSkipsTheCheck(t *testing.T) {
 }
 
 func TestResolveDeleteKeepsSafetyWithoutForce(t *testing.T) {
-	f := &cleanFlow{checks: map[string]domain.CleanCheckEntry{
+	f := &cleanFlow{runCtx: t.Context(), checks: map[string]domain.CleanCheckEntry{
 		"feat": {Check: domain.CleanCheckResult{Branch: "feat", IsDirty: true}},
 	}}
 
@@ -111,7 +111,7 @@ func TestResolveDeleteKeepsSafetyWithoutForce(t *testing.T) {
 }
 
 func TestResolveDeleteAllowsASafeWorktree(t *testing.T) {
-	f := &cleanFlow{checks: map[string]domain.CleanCheckEntry{
+	f := &cleanFlow{runCtx: t.Context(), checks: map[string]domain.CleanCheckEntry{
 		"feat": {Check: domain.CleanCheckResult{Branch: "feat"}},
 	}}
 
@@ -127,7 +127,7 @@ func TestResolveDeleteAllowsASafeWorktree(t *testing.T) {
 // --reparent-children answers through the presets, so the recap line and the
 // execution read the same answer.
 func TestPresetReparentAnswersTheStep(t *testing.T) {
-	if got := (&cleanFlow{request: Request{ReparentChildren: true}}).session().Presets.Value(KeyReparent); got != orphans.Reparent {
+	if got := (&cleanFlow{runCtx: t.Context(), request: Request{ReparentChildren: true}}).session().Presets.Value(KeyReparent); got != orphans.Reparent {
 		t.Errorf("preset = %q, want the reparent authorized", got)
 	}
 	if got := (&cleanFlow{}).session().Presets.Value(KeyReparent); got != "" {
@@ -147,7 +147,7 @@ func TestDropDataAnswersTheDataStep(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			f := &cleanFlow{request: c.request}
+			f := &cleanFlow{runCtx: t.Context(), request: c.request}
 			if got := f.session().Presets.Value(KeyData); got != c.want {
 				t.Errorf("preset = %q, want %q", got, c.want)
 			}
@@ -230,7 +230,7 @@ func makeWorktree(t *testing.T, ctx flow.Context, branchName string) string {
 
 func makeWorktreeFrom(t *testing.T, ctx flow.Context, branchName, from string) string {
 	t.Helper()
-	result, err := worktree.Create(domain.CreateParams{
+	result, err := worktree.Create(t.Context(), domain.CreateParams{
 		ProjectDir:   ctx.ProjectDir,
 		StateDir:     ctx.StateDir,
 		Branch:       branchName,

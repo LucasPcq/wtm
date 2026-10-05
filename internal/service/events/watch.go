@@ -46,7 +46,7 @@ func Watch(ctx context.Context, params WatchParams) error {
 	if socket == "" {
 		socket = process.SocketPath()
 	}
-	repo, err := worktree.RepoOf(worktree.RepoOfParams{ProjectDir: params.ProjectDir})
+	repo, err := worktree.RepoOf(ctx, worktree.RepoOfParams{ProjectDir: params.ProjectDir})
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func watchOnce(ctx context.Context, params watchOnceParams) watchResult {
 	if deliveries == nil {
 		return failed
 	}
-	snapshot, err := snapshotOf(snapshotParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Repo: params.Repo, Socket: params.Socket})
+	snapshot, err := snapshotOf(ctx, snapshotParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Repo: params.Repo, Socket: params.Socket})
 	if err != nil {
 		return watchResult{transient: err}
 	}
@@ -171,7 +171,7 @@ func watchAllOnce(ctx context.Context, params watchAllOnceParams) watchResult {
 	}
 	go pruneUntilDone(ctx, params.Socket)
 	for _, repo := range repos {
-		if err := sendSnapshot(sendSnapshotParams{WatchAllParams: params.WatchAllParams, Repo: eventRepoOf(repo), Socket: params.Socket}); err != nil {
+		if err := sendSnapshot(ctx, sendSnapshotParams{WatchAllParams: params.WatchAllParams, Repo: eventRepoOf(repo), Socket: params.Socket}); err != nil {
 			return watchResult{fatal: err}
 		}
 	}
@@ -182,7 +182,7 @@ func watchAllOnce(ctx context.Context, params watchAllOnceParams) watchResult {
 			if event.Type != domain.EventRepoAdded || event.Repo == nil {
 				return nil
 			}
-			return sendSnapshot(sendSnapshotParams{WatchAllParams: params.WatchAllParams, Repo: *event.Repo, Socket: params.Socket})
+			return sendSnapshot(ctx, sendSnapshotParams{WatchAllParams: params.WatchAllParams, Repo: *event.Repo, Socket: params.Socket})
 		},
 	})
 }
@@ -210,8 +210,8 @@ type sendSnapshotParams struct {
 
 // sendSnapshot skips a repository it cannot read rather than ending the
 // stream: one broken repository must not blind a reader to every other.
-func sendSnapshot(params sendSnapshotParams) error {
-	snapshot, err := snapshotOf(snapshotParams{
+func sendSnapshot(ctx context.Context, params sendSnapshotParams) error {
+	snapshot, err := snapshotOf(ctx, snapshotParams{
 		ProjectDir: params.Repo.Root,
 		StateDir:   filepath.Join(params.Repo.CommonDir, domain.StateDirName),
 		Repo:       params.Repo,
@@ -308,8 +308,8 @@ type snapshotLine struct {
 	Worktrees []domain.SnapshotWorktree `json:"worktrees"`
 }
 
-func snapshotOf(params snapshotParams) (Received, error) {
-	list, err := identities(worktree.IdentitiesParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir})
+func snapshotOf(ctx context.Context, params snapshotParams) (Received, error) {
+	list, err := identities(ctx, worktree.IdentitiesParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir})
 	if err != nil {
 		return Received{}, err
 	}

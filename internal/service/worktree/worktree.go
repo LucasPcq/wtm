@@ -2,6 +2,7 @@
 package worktree
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -17,7 +18,7 @@ import (
 )
 
 // Create orchestrates worktree creation: git worktree add, env copy, metadata, hooks.
-func Create(params domain.CreateParams) (domain.CreateResult, error) {
+func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResult, error) {
 	sanitized := rules.SanitizeBranchName(params.Branch)
 	worktreePath := filepath.Join(params.ProjectDir, params.Config.Project.Worktrees.BasePath, sanitized)
 
@@ -37,7 +38,7 @@ func Create(params domain.CreateParams) (domain.CreateResult, error) {
 	// The branch is a separate axis from the directory: it may already exist (the
 	// worktree then checks it out as-is, FromBranch unused) or already be checked
 	// out somewhere else, which git allows only once.
-	target := branch.Target(branch.BranchParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
+	target := branch.Target(ctx, branch.BranchParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
 	if target.State == domain.BranchTargetCheckedOut {
 		if params.IfNotExists {
 			return domain.CreateResult{
@@ -50,12 +51,12 @@ func Create(params domain.CreateParams) (domain.CreateResult, error) {
 			domain.ErrWorktreeExists, params.Branch, target.WorktreePath, params.Branch)
 	}
 
-	if err := CheckNameFree(NameCheckParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: params.Branch}); err != nil {
+	if err := CheckNameFree(ctx, NameCheckParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: params.Branch}); err != nil {
 		return domain.CreateResult{}, err
 	}
 
 	reuseBranch := target.State == domain.BranchTargetExisting
-	if err := infra.CreateWorktree(infra.CreateWorktreeParams{
+	if err := infra.CreateWorktree(ctx, infra.CreateWorktreeParams{
 		ProjectDir:  params.ProjectDir,
 		Path:        worktreePath,
 		Branch:      params.Branch,
@@ -67,7 +68,7 @@ func Create(params domain.CreateParams) (domain.CreateResult, error) {
 
 	strategy := rules.ResolveEnvStrategy(params.Config.Project.Env.Strategy, params.EnvFromOverride)
 
-	mainPath, err := infra.FindMainWorktreePath(infra.FindMainWorktreeParams{
+	mainPath, err := infra.FindMainWorktreePath(ctx, infra.FindMainWorktreeParams{
 		ProjectDir: params.ProjectDir,
 	})
 	if err != nil {
@@ -86,7 +87,7 @@ func Create(params domain.CreateParams) (domain.CreateResult, error) {
 			Files:              envFiles,
 			TargetDir:          worktreePath,
 			MainWorktreePath:   mainPath,
-			ParentWorktreePath: parentWorktreePath(params.ProjectDir, sourceBranch),
+			ParentWorktreePath: parentWorktreePath(ctx, params.ProjectDir, sourceBranch),
 		})
 		if copyErr != nil {
 			return domain.CreateResult{}, fmt.Errorf("copy env files: %w", copyErr)
@@ -111,7 +112,7 @@ func Create(params domain.CreateParams) (domain.CreateResult, error) {
 	// on_create hooks run inline unless the caller opts to run them as a separate
 	// phase (create's phased output) via SkipHooks.
 	if !params.SkipHooks {
-		if err := RunCreateHooks(domain.CreateHooksParams{
+		if err := RunCreateHooks(ctx, domain.CreateHooksParams{
 			ProjectDir:   params.ProjectDir,
 			StateDir:     params.StateDir,
 			WorktreePath: worktreePath,
@@ -140,15 +141,15 @@ func Create(params domain.CreateParams) (domain.CreateResult, error) {
 // RunCreateHooks executes the on_create hooks in the new worktree, streaming their
 // output. It is a no-op when no hooks are configured. Exposed so `create` can run
 // them as a distinct, titled phase after the silent creation spinner.
-func RunCreateHooks(params domain.CreateHooksParams) error {
+func RunCreateHooks(ctx context.Context, params domain.CreateHooksParams) error {
 	if len(params.Hooks) == 0 {
 		return nil
 	}
-	mainPath, err := infra.FindMainWorktreePath(infra.FindMainWorktreeParams{ProjectDir: params.ProjectDir})
+	mainPath, err := infra.FindMainWorktreePath(ctx, infra.FindMainWorktreeParams{ProjectDir: params.ProjectDir})
 	if err != nil {
 		return fmt.Errorf("find main checkout: %w", err)
 	}
-	if err := hooks.RunHooks(hooks.RunHooksParams{
+	if err := hooks.RunHooks(ctx, hooks.RunHooksParams{
 		Hooks:   params.Hooks,
 		WorkDir: params.WorktreePath,
 		Vars: rules.TemplateVars{
@@ -157,7 +158,7 @@ func RunCreateHooks(params domain.CreateHooksParams) error {
 			Root:       mainPath,
 			FromBranch: params.FromBranch,
 		},
-		Env: hookEnv(hookEnvParams{
+		Env: hookEnv(ctx, hookEnvParams{
 			Ref:          WorktreeRef{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: params.Branch},
 			WorktreePath: params.WorktreePath,
 		}),
@@ -174,8 +175,8 @@ func RunCreateHooks(params domain.CreateHooksParams) error {
 // branched off. Returns "" when the parent has no local worktree (e.g. a remote
 // start-point like origin/x), letting env provisioning fall back to the main
 // worktree instead of copying from the wrong directory.
-func parentWorktreePath(projectDir, parentBranch string) string {
-	wt, err := infra.FindWorktreeByBranch(infra.FindWorktreeByBranchParams{
+func parentWorktreePath(ctx context.Context, projectDir, parentBranch string) string {
+	wt, err := infra.FindWorktreeByBranch(ctx, infra.FindWorktreeByBranchParams{
 		ProjectDir: projectDir,
 		Branch:     parentBranch,
 	})
@@ -197,12 +198,12 @@ type EnvFallbackParams struct {
 // will silently fall back to the main worktree: the resolved strategy is "parent"
 // but the source branch has no local worktree to copy from. Lets a command warn
 // before creating.
-func EnvParentFallsBackToMain(params EnvFallbackParams) bool {
+func EnvParentFallsBackToMain(ctx context.Context, params EnvFallbackParams) bool {
 	strategy := rules.ResolveEnvStrategy(params.Config.Project.Env.Strategy, params.EnvOverride)
 	return rules.ParentEnvFallsBackToMain(rules.ParentEnvFallbackParams{
 		Strategy:          strategy,
 		HasCopyFiles:      len(params.Config.Project.Env.Files) > 0,
-		SourceHasWorktree: parentWorktreePath(params.ProjectDir, params.Source) != "",
+		SourceHasWorktree: parentWorktreePath(ctx, params.ProjectDir, params.Source) != "",
 	})
 }
 

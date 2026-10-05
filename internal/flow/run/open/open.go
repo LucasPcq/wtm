@@ -76,7 +76,7 @@ type openFlow struct {
 }
 
 func (f *openFlow) run() (Outcome, error) {
-	named, err := target.Named(target.ResolveParams{ProjectDir: f.ctx.ProjectDir, Query: f.request.Worktree})
+	named, err := target.Named(f.runCtx, target.ResolveParams{ProjectDir: f.ctx.ProjectDir, Query: f.request.Worktree})
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -91,8 +91,8 @@ func (f *openFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	workDir := target.WorkDir(target.WorkDirParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})
-	published, err := f.reader.In(workDir)
+	workDir := target.WorkDir(f.runCtx, target.WorkDirParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})
+	published, err := f.reader.In(f.runCtx, workDir)
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -105,7 +105,7 @@ func (f *openFlow) run() (Outcome, error) {
 	// is meaningless under --raw, which asked for the port, and equally so with
 	// no proxy: there is no name for the .env to disagree with.
 	if !f.request.Raw && f.reader.Serving() {
-		if notice, drifting := addressing.Notice(addressing.Params{Context: f.ctx, WorkDirs: []string{workDir}}); drifting {
+		if notice, drifting := addressing.Notice(f.runCtx, addressing.Params{Context: f.ctx, WorkDirs: []string{workDir}}); drifting {
 			f.presenter.Status(notice)
 		}
 	}
@@ -118,7 +118,7 @@ func (f *openFlow) run() (Outcome, error) {
 // published feeds the picker. A worktree whose addresses cannot be resolved
 // offers none, and the run then refuses it by name.
 func (f *openFlow) published(workDir string) []domain.JobURLEntry {
-	entries, _ := f.reader.In(workDir)
+	entries, _ := f.reader.In(f.runCtx, workDir)
 	return entries
 }
 
@@ -127,7 +127,7 @@ func (f *openFlow) session() flow.Session {
 		ErrLabel: domain.CmdOpen,
 		Presets:  target.Presets(target.PresetParams{Named: f.named, Job: f.request.Job}),
 		Steps: []flow.Step{
-			target.WorktreeStep(target.WorktreeParams{
+			target.WorktreeStep(f.runCtx, target.WorktreeParams{
 				ProjectDir: f.ctx.ProjectDir,
 				Current:    f.request.Cwd,
 				// What each worktree already has up, which is half of deciding
@@ -135,7 +135,7 @@ func (f *openFlow) session() flow.Session {
 				// badges off rather than refusing the run.
 				Running: rules.RunningJobsByWorktree(runjobs.Load()),
 			}),
-			target.URLStep(target.URLParams{
+			target.URLStep(f.runCtx, target.URLParams{
 				Published: f.published,
 				Named:     f.named,
 				Cwd:       f.request.Cwd,

@@ -372,7 +372,7 @@ func (f *syncFlow) syncParams(input syncParamsInput) worktree.SyncParams {
 // not affect the plan, so it is not read here. A failure is returned rather than
 // folded into an empty plan, which would read as "nothing to rebase".
 func (f *syncFlow) planFor(answers flow.Answers) (domain.SyncPlan, error) {
-	plan, err := worktree.PlanSync(f.syncParams(syncParamsInput{Selected: answers.Values(KeySelection)}))
+	plan, err := worktree.PlanSync(f.runCtx, f.syncParams(syncParamsInput{Selected: answers.Values(KeySelection)}))
 	if err != nil {
 		//lint:ignore ST1005 domain.SyncPlanFailedFmt reproduces the old picker's
 		//text verbatim; a lowercase rewrite would change observable output.
@@ -394,7 +394,7 @@ func (f *syncFlow) staleParents(answers flow.Answers) []domain.ParentUpdate {
 	if cached, known := f.stale[key]; known {
 		return cached
 	}
-	parents := worktree.StaleParents(worktree.StaleParentsParams{
+	parents := worktree.StaleParents(f.runCtx, worktree.StaleParentsParams{
 		Sync:       f.syncParams(syncParamsInput{Selected: branches}),
 		Branches:   branches,
 		Classified: f.classified,

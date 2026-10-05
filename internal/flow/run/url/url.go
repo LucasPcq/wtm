@@ -47,7 +47,7 @@ func Run(ctx context.Context, params Params) (Outcome, error) {
 	if err := target.RequireDeclared(target.DeclaredParams{Config: params.Request.Config, Job: params.Request.Job}); err != nil {
 		return Outcome{}, err
 	}
-	named, err := target.Named(target.ResolveParams{
+	named, err := target.Named(ctx, target.ResolveParams{
 		ProjectDir: params.Context.ProjectDir,
 		Query:      params.Request.Worktree,
 	})
@@ -55,12 +55,12 @@ func Run(ctx context.Context, params Params) (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	workDir := target.WorkDir(target.WorkDirParams{Named: named, Cwd: params.Request.Cwd})
+	workDir := target.WorkDir(ctx, target.WorkDirParams{Named: named, Cwd: params.Request.Cwd})
 	entries, err := urls.Open(urls.Params{
 		Context: params.Context,
 		Config:  params.Request.Config,
 		Raw:     params.Request.Raw,
-	}).In(workDir)
+	}).In(ctx, workDir)
 	if err != nil {
 		return Outcome{}, err
 	}

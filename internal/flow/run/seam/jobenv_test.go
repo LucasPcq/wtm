@@ -18,11 +18,11 @@ func TestTheFirstRunNumbersItsWorktreeAndPublishesIt(t *testing.T) {
 	rec := &flowtest.Recorder{}
 	params := seam.JobEnvParams{ProjectDir: dir, StateDir: filepath.Join(dir, ".git", "wtm"), WorkDir: path, Publisher: rec}
 
-	env, err := seam.JobEnv(params)
+	env, err := seam.JobEnv(t.Context(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := seam.JobEnv(params); err != nil {
+	if _, err := seam.JobEnv(t.Context(), params); err != nil {
 		t.Fatal(err)
 	}
 

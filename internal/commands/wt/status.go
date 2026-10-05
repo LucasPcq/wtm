@@ -1,6 +1,7 @@
 package wt
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -66,7 +67,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	params := statusflow.Params{
 		Context:   shared.FlowContext(cfg),
 		Request:   statusflow.Request{Worktree: runctx.FirstArg(args), Cwd: dir},
-		Prompter:  statusPrompter(interactive),
+		Prompter:  statusPrompter(cmd.Context(), interactive),
 		Presenter: shared.NewPresenter(cmd, format),
 	}
 	if all {
@@ -95,8 +96,8 @@ type statusReport struct {
 // statusPrompter is the run module's picker in a fully interactive run, and
 // Unattended — the current worktree, no question — everywhere else. A var so a
 // test can stand in for the terminal.
-var statusPrompter = func(interactive bool) flow.Prompter {
-	return shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive, Stderr: true})
+var statusPrompter = func(ctx context.Context, interactive bool) flow.Prompter {
+	return shared.FlowPrompter(ctx, shared.FlowPrompterParams{Interactive: interactive, Stderr: true})
 }
 
 func reportStatus(cmd *cobra.Command, report statusReport) error {

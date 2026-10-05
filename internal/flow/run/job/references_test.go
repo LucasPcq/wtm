@@ -16,7 +16,7 @@ import (
 func removeUnattended(t *testing.T, ctx flow.Context, request jobflow.RemoveRequest) (*recorder, jobflow.Outcome, error) {
 	t.Helper()
 	presenter := &recorder{}
-	outcome, err := jobflow.Remove(jobflow.RemoveParams{
+	outcome, err := jobflow.Remove(t.Context(), jobflow.RemoveParams{
 		Context: ctx, Request: request, Prompter: flow.Unattended{}, Presenter: presenter,
 	})
 	return presenter, outcome, err
@@ -135,7 +135,7 @@ func TestRenameRefusesASharedJobWorktreesHoldDataIn(t *testing.T) {
 	writeMeta(t, ctx.StateDir, "feat/a", "db")
 	name := "postgres"
 
-	_, err := jobflow.Edit(jobflow.EditParams{
+	_, err := jobflow.Edit(t.Context(), jobflow.EditParams{
 		Context:   ctx,
 		Request:   jobflow.EditRequest{Name: "db", Patch: rules.JobPatch{Name: &name}, Config: sharedDB()},
 		Prompter:  flow.Unattended{},
@@ -157,7 +157,7 @@ func TestRenameWarnsWhenThePublishedHostChanges(t *testing.T) {
 	name := "backend"
 	presenter := &recorder{}
 
-	_, err := jobflow.Edit(jobflow.EditParams{
+	_, err := jobflow.Edit(t.Context(), jobflow.EditParams{
 		Context:   ctx,
 		Request:   jobflow.EditRequest{Name: "api", Patch: rules.JobPatch{Name: &name}, Config: cfg},
 		Prompter:  flow.Unattended{},

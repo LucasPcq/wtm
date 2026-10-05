@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -13,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/output"
 )
 
@@ -36,7 +36,7 @@ func runEdit(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("get working directory: %w", err)
 	}
 
-	stateDir, err := shared.StateDir(wd)
+	stateDir, err := shared.StateDir(cmd.Context(), wd)
 	if err != nil {
 		return err
 	}
@@ -54,7 +54,7 @@ func runEdit(cmd *cobra.Command, _ []string) error {
 		editor = defaultEditor
 	}
 
-	editCmd := exec.Command(editor, path)
+	editCmd := infra.Command(cmd.Context(), editor, path)
 	editCmd.Stdin = os.Stdin
 	editCmd.Stdout = os.Stdout
 	editCmd.Stderr = os.Stderr

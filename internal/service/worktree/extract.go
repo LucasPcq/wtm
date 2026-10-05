@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,8 +18,8 @@ type ListChangesParams struct {
 
 // ListChanges returns the uncommitted files of a worktree classified for
 // extraction.
-func ListChanges(params ListChangesParams) ([]domain.ExtractFile, error) {
-	modified, err := infra.ListModifiedFiles(infra.ListModifiedFilesParams{WorktreePath: params.WorktreePath})
+func ListChanges(ctx context.Context, params ListChangesParams) ([]domain.ExtractFile, error) {
+	modified, err := infra.ListModifiedFiles(ctx, infra.ListModifiedFilesParams{WorktreePath: params.WorktreePath})
 	if err != nil {
 		return nil, fmt.Errorf("list modified files: %w", err)
 	}
@@ -39,7 +40,7 @@ func ListChanges(params ListChangesParams) ([]domain.ExtractFile, error) {
 // first and the source is cleaned only on success. Any conflict aborts the
 // operation with the source left untouched. With Keep set, the source is not
 // cleaned (copy instead of move).
-func Extract(params domain.ExtractParams) (domain.ExtractResult, error) {
+func Extract(ctx context.Context, params domain.ExtractParams) (domain.ExtractResult, error) {
 	if params.SourcePath == params.TargetPath {
 		return domain.ExtractResult{}, domain.ErrSameWorktree
 	}
@@ -49,7 +50,7 @@ func Extract(params domain.ExtractParams) (domain.ExtractResult, error) {
 
 	tracked, untracked := splitByStatus(params.Files)
 
-	trackedConflicts := conflictingFiles(conflictScanParams{
+	trackedConflicts := conflictingFiles(ctx, conflictScanParams{
 		SourcePath: params.SourcePath,
 		TargetPath: params.TargetPath,
 		Tracked:    tracked,
@@ -87,10 +88,10 @@ func Extract(params domain.ExtractParams) (domain.ExtractResult, error) {
 		UntrackedConflicts: collisions.Conflicting,
 	}
 	if len(trackedConflicts)+len(collisions.Conflicting) > 0 {
-		return resolveExtract(plan)
+		return resolveExtract(ctx, plan)
 	}
 
-	return cleanExtract(plan)
+	return cleanExtract(ctx, plan)
 }
 
 // extractPlan is the resolved extraction work: the request plus the selected
@@ -108,9 +109,9 @@ type extractPlan struct {
 
 // cleanExtract handles the no-conflict path: apply the whole selection to the
 // target and, unless Keep is set, remove it from the source (full move).
-func cleanExtract(plan extractPlan) (domain.ExtractResult, error) {
+func cleanExtract(ctx context.Context, plan extractPlan) (domain.ExtractResult, error) {
 	params := plan.Params
-	patch, err := infra.DiffFiles(infra.DiffFilesParams{
+	patch, err := infra.DiffFiles(ctx, infra.DiffFilesParams{
 		WorktreePath: params.SourcePath,
 		Files:        plan.Tracked,
 	})
@@ -118,12 +119,12 @@ func cleanExtract(plan extractPlan) (domain.ExtractResult, error) {
 		return domain.ExtractResult{}, err
 	}
 
-	if err := infra.ApplyPatch(infra.ApplyPatchParams{
+	if err := infra.ApplyPatch(ctx, infra.ApplyPatchParams{
 		WorktreePath: params.TargetPath,
 		Patch:        patch,
 		ThreeWay:     true,
 	}); err != nil {
-		rollbackTarget(rollbackTargetParams{TargetPath: params.TargetPath, Patch: patch, Tracked: plan.Tracked})
+		rollbackTarget(ctx, rollbackTargetParams{TargetPath: params.TargetPath, Patch: patch, Tracked: plan.Tracked})
 		return domain.ExtractResult{}, conflictError(conflictErrorParams{Tracked: plan.Tracked, TargetBranch: params.TargetBranch})
 	}
 
@@ -132,13 +133,13 @@ func cleanExtract(plan extractPlan) (domain.ExtractResult, error) {
 		TargetPath: params.TargetPath,
 		Files:      plan.Untracked,
 	}); err != nil {
-		rollbackTarget(rollbackTargetParams{TargetPath: params.TargetPath, Patch: patch, Tracked: plan.Tracked})
+		rollbackTarget(ctx, rollbackTargetParams{TargetPath: params.TargetPath, Patch: patch, Tracked: plan.Tracked})
 		removeTargetFiles(removeFilesParams{Dir: params.TargetPath, Files: plan.Untracked})
 		return domain.ExtractResult{}, err
 	}
 
 	if !params.Keep {
-		if err := cleanSource(cleanSourceParams{
+		if err := cleanSource(ctx, cleanSourceParams{
 			SourcePath: params.SourcePath,
 			Patch:      patch,
 			Tracked:    plan.Tracked,
@@ -160,7 +161,7 @@ func cleanExtract(plan extractPlan) (domain.ExtractResult, error) {
 // resolveExtract handles the conflict path in resolve mode: clean files are
 // applied normally, conflicting files are written with merge markers, untracked
 // files are copied, and the source is left fully intact (recoverable).
-func resolveExtract(plan extractPlan) (domain.ExtractResult, error) {
+func resolveExtract(ctx context.Context, plan extractPlan) (domain.ExtractResult, error) {
 	params := plan.Params
 	clean := subtract(plan.Tracked, plan.Conflicts)
 	// An untracked file that already exists in the target is merged like a tracked
@@ -168,24 +169,24 @@ func resolveExtract(plan extractPlan) (domain.ExtractResult, error) {
 	// for a file absent from HEAD, so it degenerates into a two-way merge.
 	merged := append(append([]string{}, plan.Conflicts...), plan.UntrackedConflicts...)
 
-	cleanPatch, err := infra.DiffFiles(infra.DiffFilesParams{
+	cleanPatch, err := infra.DiffFiles(ctx, infra.DiffFilesParams{
 		WorktreePath: params.SourcePath,
 		Files:        clean,
 	})
 	if err != nil {
 		return domain.ExtractResult{}, err
 	}
-	if err := infra.ApplyPatch(infra.ApplyPatchParams{
+	if err := infra.ApplyPatch(ctx, infra.ApplyPatchParams{
 		WorktreePath: params.TargetPath,
 		Patch:        cleanPatch,
 		ThreeWay:     true,
 	}); err != nil {
-		rollbackTarget(rollbackTargetParams{TargetPath: params.TargetPath, Patch: cleanPatch, Tracked: clean})
+		rollbackTarget(ctx, rollbackTargetParams{TargetPath: params.TargetPath, Patch: cleanPatch, Tracked: clean})
 		return domain.ExtractResult{}, conflictError(conflictErrorParams{Tracked: clean, TargetBranch: params.TargetBranch})
 	}
 
 	for _, f := range merged {
-		if _, err := infra.MergeFile(infra.MergeFileParams{
+		if _, err := infra.MergeFile(ctx, infra.MergeFileParams{
 			SourceWorktree: params.SourcePath,
 			TargetWorktree: params.TargetPath,
 			RelPath:        f,
@@ -219,9 +220,9 @@ func resolveExtract(plan extractPlan) (domain.ExtractResult, error) {
 // apply, and untracked files that already exist there with different content.
 // Binary collisions are left out — they abort whatever the user answers, so
 // offering to resolve them would be a dead end.
-func ConflictingFiles(params domain.ConflictCheckParams) []string {
+func ConflictingFiles(ctx context.Context, params domain.ConflictCheckParams) []string {
 	tracked, untracked := splitByStatus(params.Files)
-	conflicts := conflictingFiles(conflictScanParams{
+	conflicts := conflictingFiles(ctx, conflictScanParams{
 		SourcePath: params.SourcePath,
 		TargetPath: params.TargetPath,
 		Tracked:    tracked,
@@ -314,15 +315,15 @@ type conflictScanParams struct {
 
 // conflictingFiles returns the tracked files whose changes do not apply cleanly
 // onto the target, checked one by one so the message can name them.
-func conflictingFiles(params conflictScanParams) []string {
+func conflictingFiles(ctx context.Context, params conflictScanParams) []string {
 	var conflicts []string
 	for _, f := range params.Tracked {
-		patch, err := infra.DiffFiles(infra.DiffFilesParams{WorktreePath: params.SourcePath, Files: []string{f}})
+		patch, err := infra.DiffFiles(ctx, infra.DiffFilesParams{WorktreePath: params.SourcePath, Files: []string{f}})
 		if err != nil {
 			conflicts = append(conflicts, f)
 			continue
 		}
-		if err := infra.ApplyPatch(infra.ApplyPatchParams{
+		if err := infra.ApplyPatch(ctx, infra.ApplyPatchParams{
 			WorktreePath: params.TargetPath,
 			Patch:        patch,
 			ThreeWay:     true,
@@ -417,15 +418,15 @@ type cleanSourceParams struct {
 // cleanSource reverts the extracted changes in the source worktree by
 // reverse-applying the same patch and unstaging the affected paths, then deletes
 // the extracted untracked files.
-func cleanSource(params cleanSourceParams) error {
-	if err := infra.ApplyPatch(infra.ApplyPatchParams{
+func cleanSource(ctx context.Context, params cleanSourceParams) error {
+	if err := infra.ApplyPatch(ctx, infra.ApplyPatchParams{
 		WorktreePath: params.SourcePath,
 		Patch:        params.Patch,
 		Reverse:      true,
 	}); err != nil {
 		return err
 	}
-	if err := infra.ResetPaths(infra.ResetPathsParams{
+	if err := infra.ResetPaths(ctx, infra.ResetPathsParams{
 		WorktreePath: params.SourcePath,
 		Files:        params.Tracked,
 	}); err != nil {
@@ -464,14 +465,14 @@ type rollbackTargetParams struct {
 
 // rollbackTarget best-effort undoes a partial application on the target so a
 // failed extraction leaves it as it was.
-func rollbackTarget(params rollbackTargetParams) {
-	_ = infra.ApplyPatch(infra.ApplyPatchParams{
+func rollbackTarget(ctx context.Context, params rollbackTargetParams) {
+	_ = infra.ApplyPatch(ctx, infra.ApplyPatchParams{
 		WorktreePath: params.TargetPath,
 		Patch:        params.Patch,
 		ThreeWay:     true,
 		Reverse:      true,
 	})
-	_ = infra.ResetPaths(infra.ResetPathsParams{WorktreePath: params.TargetPath, Files: params.Tracked})
+	_ = infra.ResetPaths(ctx, infra.ResetPathsParams{WorktreePath: params.TargetPath, Files: params.Tracked})
 }
 
 type removeFilesParams struct {

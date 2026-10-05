@@ -77,7 +77,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 			Force:     force,
 			Config:    ctx.Run,
 		},
-		Prompter:  ctx.Prompter(ctx.Interactive),
+		Prompter:  ctx.Prompter(cmd.Context(), ctx.Interactive),
 		Presenter: startPresenter{CLIPresenter: shared.NewPresenter(cmd, format), detach: detach},
 	})
 	if err != nil {
