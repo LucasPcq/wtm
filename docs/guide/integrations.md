@@ -46,7 +46,7 @@ Check the exit code first, and parse stdout only when it is non-empty. A command
 | --- | --- |
 | `0` | success |
 | `1` | a generic error; `exec` when any command failed |
-| `2` | bad usage: an unknown flag or command, a value that does not parse, too many arguments |
+| `2` | bad usage: an unknown flag or command, a value that does not parse, two flags that cannot be combined, too many arguments |
 | `10` | the worktree or its path already exists (`create --if-not-exists` turns it into a success) |
 | `11` | the branch does not exist |
 | `12` | the repository was never initialized with wtm (`wtm init`) |

@@ -16,6 +16,7 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 ### Fixed
 
 - **`wtm env main`** no longer writes `[[env]]` namespaces into the main checkout (`wt_main`, `acme-main`), and puts back the template's value where an earlier run did. → [Shared services](docs/guide/shared-services.md#telling-the-app-env)
+- **Flags that cannot be combined** (`clean`/`prune --keep-data --drop-data`, `run up`/`run start --exclusive --parallel`) exit `2`, a usage error, instead of `1`. → [Exit codes](docs/guide/integrations.md#the-contract---yes-and---output-json)
 
 ## [0.29.1] - 2026-10-05
 

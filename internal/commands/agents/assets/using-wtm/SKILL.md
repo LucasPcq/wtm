@@ -32,7 +32,7 @@ You drive wtm without a terminal a human is watching, so everything below exists
 |---|---|
 | `0` | success |
 | `1` | generic error |
-| `2` | bad usage: an unknown flag or command, a flag value that does not parse, an unknown `--output` format, too many arguments |
+| `2` | bad usage: an unknown flag or command, a flag value that does not parse, two flags that cannot be combined (`--keep-data --drop-data`, `--exclusive --parallel`), an unknown `--output` format, too many arguments |
 | `10` | worktree (or its path) already exists, or the branch is checked out in another worktree, or (with run jobs declared) its derived name is taken |
 | `11` | branch not found |
 | `12` | config not found: repo not initialized (`wtm init`) |
