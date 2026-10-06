@@ -6,6 +6,7 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 ### Added
 
+- **`wtm events --all`** follows every repository wtm knows from any directory, ignoring an inherited `GIT_DIR`; integrations should pass it instead of running from outside a repository. → [Every repository at once](docs/guide/events.md#every-repository-at-once)
 - **`wtm env --addressing ports|names`** moves the main checkout's addresses onto names, or back to ports, on its own. → [The main checkout](docs/guide/addressing.md#the-main-checkout)
 
 ### Changed

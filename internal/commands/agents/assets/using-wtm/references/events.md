@@ -5,10 +5,10 @@ Use `wtm events --output json` when you need to **react** to worktrees changing 
 ## Running it
 
 - It **never exits on its own**: it streams until interrupted. Run it in the background, or read a bounded number of lines (`wtm events --output json | head -n 2` gives the current state and returns). Never run it in the foreground of a step that must finish.
-- `--repo <path>` watches another repository than the current directory's. Run outside any git repository, with no `--repo`, it follows **every** repository wtm was used in: one `snapshot` per repository, then one `ready`; `repo.added` (followed by that repository's `snapshot`) and `repo.removed` as repositories come and go.
+- `--repo <path>` watches another repository than the current directory's. `--all` follows **every** repository wtm was used in, whatever the current directory or an inherited `GIT_DIR`: one `snapshot` per repository, then one `ready`; `repo.added` (followed by that repository's `snapshot`) and `repo.removed` as repositories come and go. To watch everything, always pass `--all` rather than running from outside a repository (which does the same implicitly). `--all` with `--repo` exits `2`.
 - It needs no `--yes`: it changes nothing and asks nothing.
 - A daemon that is down never makes it exit: it waits and reconnects. Interrupted, or once its reader is gone, it exits `0`.
-- These exits are final, do not retry them: `2` bad usage (including a `--repo` that is not a directory), `12` the repository is not initialized with wtm, `20` an event of a newer schema arrived (wtm must be upgraded: ask the user), `21` `--repo` is not in a git repository. Any other non-zero exit is worth retrying with a backoff. The message is on stderr; stdout carries only JSON Lines.
+- These exits are final, do not retry them: `2` bad usage (including a `--repo` that is not a directory, `--all` with `--repo`, and `--all` on a wtm older than 0.29.2), `12` the repository is not initialized with wtm, `20` an event of a newer schema arrived (wtm must be upgraded: ask the user), `21` `--repo` is not in a git repository. Any other non-zero exit is worth retrying with a backoff. The message is on stderr; stdout carries only JSON Lines.
 
 ## Before you rely on it
 

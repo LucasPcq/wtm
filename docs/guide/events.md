@@ -6,7 +6,7 @@
 wtm events                     # one line per change, for a person watching
 wtm events --output json       # JSON Lines: the contract an integration reads
 wtm events --repo ~/code/app   # another repository than the current one
-cd ~ && wtm events             # every repository wtm knows
+wtm events --all               # every repository wtm knows
 ```
 
 Report every hook that failed, in any worktree, as it happens:
@@ -73,7 +73,11 @@ Nothing volatile is in it (dirty, ahead, behind, pull request, services): those 
 
 ## Every repository at once
 
-Run outside any git repository without `--repo`, `wtm events` follows every repository wtm was used in: one `snapshot` per repository, a single `ready`, then the changes of all of them, each event's `repo.common_dir` saying which.
+`wtm events --all` follows every repository wtm was used in: one `snapshot` per repository, a single `ready`, then the changes of all of them, each event's `repo.common_dir` saying which.
+
+- `--all` does so whatever the current directory, and ignores an inherited `GIT_DIR` or `GIT_WORK_TREE`, which would otherwise make every repository read as the one they name. An integration should always pass it rather than rely on where it runs. `--all` with `--repo` is refused with exit `2`.
+- Run outside any git repository without `--repo`, `wtm events` does the same, implicitly. Inside a repository, or with `GIT_DIR` set, that same command follows only that repository.
+- `--all` exists from wtm 0.29.2: an older wtm refuses it as an unknown flag (exit `2`), and `wtm version --output json` gives the `version` to compare.
 
 - The repositories come from a registry beside the global config (`repos.json`, see [Where wtm keeps its state](state.md)). A repository joins when `wtm init` runs there and the first time any wtm command runs in it, so older ones join on their own.
 - A repository that joins arrives as `repo.added`, followed right away by its `snapshot`. One that leaves (deleted, or no longer initialized) arrives as `repo.removed`: drop every worktree you hold for that `repo.common_dir`. A running global stream notices within 30 seconds; otherwise the registry drops it the next time it is written or a global stream starts.

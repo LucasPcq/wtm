@@ -43,7 +43,7 @@ You drive wtm without a terminal a human is watching, so everything below exists
 | `18` | `env --check`: the `.env` has drifted (the report or JSON is still written) |
 | `19` | an interactive run the user backed out of (Esc, Ctrl-C, "No, cancel", a declined confirmation); nothing changed. Never under `--yes` |
 | `20` | `events`: it received an event of a newer schema than its own; wtm must be upgraded |
-| `21` | not in a git repository: the current directory, or the path given (`events --repo`), is outside any git repository (`events` alone outside a repository is not an error: it follows every repository) |
+| `21` | not in a git repository: the current directory, or the path given (`events --repo`), is outside any git repository (`events --all`, or `events` alone outside a repository, is not an error: it follows every repository) |
 
 ## Discover names before you act
 
