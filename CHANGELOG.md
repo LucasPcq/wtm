@@ -21,7 +21,7 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 - **Interrupting `sync`** aborts the rebase in progress, pushes nothing, and no longer ends on "Everything is in sync". → [Interrupting a run](docs/guide/integrations.md#interrupting-a-run)
 - **Interrupting `run up`** lists the jobs left running, the one being started included, instead of "No job left running".
 - **A second Ctrl+C** no longer leaves behind a git or hook that ignored the first, nor the ssh a git started.
-- **Backing out of a confirmation** (`run daemon stop`, `upgrade`, `run proxy install`) prints `Aborted.` and exits `19`.
+- **Backing out of a confirmation or a picker** (`run daemon stop`, `upgrade`, `run proxy install`, `run up`, `run down`) prints `Aborted.` and exits `19`.
 
 ## [0.29.2] - 2026-10-06
 

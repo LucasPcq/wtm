@@ -55,11 +55,17 @@ func PlanPrune(ctx context.Context, params PlanPruneParams) (domain.PrunePlan, e
 	// Unpushed commits make a candidate unsafe to remove (like clean), so probe
 	// every listed worktree — the guard applies regardless of the active filter.
 	unpushed := computeUnpushed(ctx, prune.ProjectDir, statuses)
+	prs := params.PRs()
+	// Every probe above reads a failure as "nothing to report": cut short by an
+	// interrupt, they would plan a branch with unpushed commits as safe to go.
+	if err := ctx.Err(); err != nil {
+		return domain.PrunePlan{}, err
+	}
 
 	return rules.ClassifyPrune(rules.ClassifyPruneParams{
 		Statuses:   statuses,
 		Nodes:      nodes,
-		PRStates:   prStates(params.PRs()),
+		PRStates:   prStates(prs),
 		Gone:       gone,
 		Unpushed:   unpushed,
 		Merged:     prune.Merged,
