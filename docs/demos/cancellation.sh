@@ -27,7 +27,9 @@ git commit -q --allow-empty -m "chore: main moved"
 printf '#!/bin/sh\nsleep 4\n' > .git/hooks/post-checkout
 chmod +x .git/hooks/post-checkout
 
-# run up: a migration between the API and the web app.
+# run up: the main checkout on named addresses, and a migration between the
+# API and the web app.
+wtm env main --addressing names --yes >/dev/null 2>&1
 python3 - .git/wtm/run.toml <<'PY'
 import sys
 path = sys.argv[1]
@@ -37,7 +39,7 @@ text = text.replace('''[[profile]]
   jobs = ["api", "web"]''', '''[[job]]
   name = "migrate"
   kind = "task"
-  cmd = "sleep 6"
+  cmd = "sleep 20"
 
 [[profile]]
   name = "dev"
