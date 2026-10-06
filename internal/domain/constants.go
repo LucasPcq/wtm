@@ -1875,6 +1875,9 @@ const (
 	// ("origin/feature"). Used to strip/build remote refs and to detect whether a
 	// picked start-point is remote.
 	RemoteBranchPrefix = "origin/"
+	OriginRemote       = "origin"
+	LocalRefPrefix     = "refs/heads/"
+	RemoteRefPrefix    = "refs/remotes/"
 
 	// LoadingBranchesText labels the spinner shown while a branch picker fetches
 	// origin to refresh its divergence badges.

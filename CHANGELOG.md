@@ -13,10 +13,12 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 - **`wtm env`** prints only the values wtm writes, in text and JSON (`"redacted": true` for the others), and masks URL passwords, also in `env_ports`; `--show-values` prints everything. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
 - **`wtm env main`** keeps the addressing its `.env` spells: reconciling its keys no longer moves it onto named URLs; pass `--addressing names` for that. → [The main checkout](docs/guide/addressing.md#the-main-checkout)
+- **`wtm prune`** reads only the branches that have a worktree, on git and on GitHub, so its time no longer grows with the repository's branches; it no longer refreshes the other remote-tracking refs. → [Stacked pull requests](docs/guide/recipes.md#stacked-pull-requests)
 - **`wtm env`** asks whether to keep or switch the worktree's isolation (the main checkout: its addressing), keeping it by default; the recap's verbatim action is gone. → [Isolation](docs/guide/isolation.md#changing-your-mind)
 
 ### Fixed
 
+- **`wtm prune`** and **`wtm tree --with-prs`** find a worktree's pull request however many newer ones the repository has, instead of only among the 100 newest. → [Stacked pull requests](docs/guide/recipes.md#stacked-pull-requests)
 - **`wtm env main`** no longer writes `[[env]]` namespaces into the main checkout (`wt_main`, `acme-main`), and puts back the template's value where an earlier run did. → [Shared services](docs/guide/shared-services.md#telling-the-app-env)
 - **Flags that cannot be combined** (`clean`/`prune --keep-data --drop-data`, `run up`/`run start --exclusive --parallel`) exit `2`, a usage error, instead of `1`. → [Exit codes](docs/guide/integrations.md#the-contract---yes-and---output-json)
 - **`wtm run list`** in a terminal opens its picker again instead of printing `Aborted.` straight away.

@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-// PR is one pull request the stubbed `gh pr list --state all` reports.
+// PR is one pull request the stubbed `gh` reports.
 type PR struct {
 	Number int
 	Branch string
@@ -64,22 +64,17 @@ type ghPR struct {
 	State       string `json:"state"`
 }
 
-// Stub puts a fake `gh` first on PATH for the rest of the test.
+// Stub puts a fake `gh` first on PATH for the rest of the test. Like the real
+// CLI, `pr list` returns at most --limit pull requests (newest first: the order
+// of PRs), and `api graphql` answers each branch it is asked about with the
+// first pull request of that branch.
 func Stub(t testing.TB, params StubParams) {
 	t.Helper()
 
-	items := make([]ghPR, 0, len(params.PRs))
-	for _, pr := range params.PRs {
-		items = append(items, ghPR{
-			Number:      pr.Number,
-			HeadRefName: pr.Branch,
-			URL:         fmt.Sprintf("https://github.com/test/test/pull/%d", pr.Number),
-			State:       strings.ToUpper(pr.State),
-		})
-	}
-	payload, err := json.Marshal(items)
-	if err != nil {
-		t.Fatalf("marshal stub PRs: %v", err)
+	dir := t.TempDir()
+	listing := filepath.Join(dir, "prs.jsonl")
+	if err := os.WriteFile(listing, []byte(prLines(t, params.PRs)), 0o644); err != nil {
+		t.Fatalf("write stub PRs: %v", err)
 	}
 
 	authExit := 0
@@ -87,28 +82,68 @@ func Stub(t testing.TB, params StubParams) {
 		authExit = 1
 	}
 
-	dir := t.TempDir()
 	script := fmt.Sprintf(`#!/bin/sh
+listing=%q
 case "$1" in
   auth) exit %d ;;
+  api)
+    printf '['
+    sep="" prev=""
+    for arg in "$@"; do
+      if [ "$prev" = "-f" ]; then
+        case "$arg" in
+          b[0-9]*=*)
+            branch="${arg#*=}"
+            pr=$(awk -v b="$branch" -F '\t' '$1 == b { print $2; exit }' "$listing")
+            if [ -n "$pr" ]; then printf '%%s%%s' "$sep" "$pr"; sep=","; fi ;;
+        esac
+      fi
+      prev="$arg"
+    done
+    printf ']\n'
+    exit 0 ;;
   pr)
     if [ "$2" = "view" ]; then
       case "$3" in
 %s      *) echo "no pull requests found for number $3" >&2; exit 1 ;;
       esac
     fi
-    cat <<'WTM_GH_STUB_EOF'
-%s
-WTM_GH_STUB_EOF
+    limit=30 prev=""
+    for arg in "$@"; do
+      if [ "$prev" = "--limit" ]; then limit="$arg"; fi
+      prev="$arg"
+    done
+    printf '['
+    head -n "$limit" "$listing" | cut -f 2 | paste -sd ',' -
+    printf ']\n'
     exit 0 ;;
 esac
 exit 1
-`, authExit, detailCases(t, params.Details), payload)
+`, listing, authExit, detailCases(t, params.Details))
 
 	if err := os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o755); err != nil {
 		t.Fatalf("write gh stub: %v", err)
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+// prLines writes one "<branch>\t<json>" line per pull request, in order.
+func prLines(t testing.TB, prs []PR) string {
+	t.Helper()
+	var lines strings.Builder
+	for _, pr := range prs {
+		payload, err := json.Marshal(ghPR{
+			Number:      pr.Number,
+			HeadRefName: pr.Branch,
+			URL:         fmt.Sprintf("https://github.com/test/test/pull/%d", pr.Number),
+			State:       strings.ToUpper(pr.State),
+		})
+		if err != nil {
+			t.Fatalf("marshal stub PR: %v", err)
+		}
+		fmt.Fprintf(&lines, "%s\t%s\n", pr.Branch, payload)
+	}
+	return lines.String()
 }
 
 func detailCases(t testing.TB, details []PRDetail) string {

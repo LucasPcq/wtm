@@ -14,8 +14,10 @@ specific categories — --merged (PR merged), --closed (PR closed unmerged), --g
 
 --merged and --closed require the GitHub CLI (`gh`) to be installed and authenticated;
 without it they match nothing and prune prints a notice — only --gone still applies.
-gone-detection runs `git fetch --prune` first so deleted remote branches are seen
-(pass --no-fetch to skip).
+gone-detection first fetches the worktrees' branches from origin, dropping the
+remote-tracking refs of those deleted there (pass --no-fetch to skip). Only branches
+with a worktree are read, on git and on GitHub: the remote-tracking refs of the
+other branches are left as they are.
 
 On a TTY, matches are shown for review (unsafe ones unchecked), then a prune
 confirmation, then — like clean — a dedicated confirmation to reparent surviving
@@ -64,7 +66,7 @@ wtm prune [flags]
   -h, --help                help for prune
       --keep-data           Keep the namespaces the removed worktrees carved out of shared services
       --merged              Restrict to worktrees whose PR was merged on GitHub (needs gh)
-      --no-fetch            Skip the git fetch --prune that gone-detection performs; use already-fetched state
+      --no-fetch            Skip the fetch of the worktrees' branches that gone-detection performs; use already-fetched state
       --output string       Output format: text or json (default "text")
       --reparent-children   Reparent orphaned child worktrees onto their nearest surviving ancestor (no prompt)
   -y, --yes                 Skip all prompts; keep every match without the selection picker (use --force for unsafe worktrees)

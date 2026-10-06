@@ -133,21 +133,38 @@ func ListPRs(params ListPRsParams) ([]domain.PRInfo, error) {
 	return prs, nil
 }
 
-// ListPRsAllStates fetches PRs across every state (open, merged, closed) so a
-// branch whose PR was merged or closed can be flagged as a clean candidate by
-// `wtm tree --with-prs`. Results are newest-first; callers match by head branch
-// and take the first hit. State is normalised to lowercase ("open"/"merged"/
-// "closed").
-func ListPRsAllStates(projectDir string) ([]domain.PRInfo, error) {
+type ListPRsOfBranchesParams struct {
+	ProjectDir string
+	Branches   []string
+}
+
+// prsPerQuery bounds the aliases of one GraphQL query, far below the API's
+// node limit; a repository with more worktrees costs one more query per batch.
+const prsPerQuery = 100
+
+// ListPRsOfBranches finds the newest pull request of each branch, whatever its
+// state and however many pull requests the repository has, in one GraphQL query
+// per prsPerQuery branches. State is normalised to lowercase
+// ("open"/"merged"/"closed"); a branch without a pull request is absent.
+func ListPRsOfBranches(params ListPRsOfBranchesParams) ([]domain.PRInfo, error) {
 	if err := ensureAuth(); err != nil {
 		return nil, err
 	}
 
-	data, err := runGH(projectDir, "pr", "list",
-		"--state", "all",
-		"--json", domain.GHPRFieldsWithState,
-		"--limit", "100",
-	)
+	prs := []domain.PRInfo{}
+	for start := 0; start < len(params.Branches); start += prsPerQuery {
+		batch := params.Branches[start:min(start+prsPerQuery, len(params.Branches))]
+		found, err := queryPRsOfBranches(params.ProjectDir, batch)
+		if err != nil {
+			return nil, err
+		}
+		prs = append(prs, found...)
+	}
+	return prs, nil
+}
+
+func queryPRsOfBranches(projectDir string, branches []string) ([]domain.PRInfo, error) {
+	data, err := runGH(projectDir, prsOfBranchesArgs(branches)...)
 	if err != nil {
 		return nil, fmt.Errorf("list PRs: %w", err)
 	}
@@ -176,12 +193,31 @@ func ListPRsAllStates(projectDir string) ([]domain.PRInfo, error) {
 	return prs, nil
 }
 
-// ListPRsWithConnection is ListPRsAllStates with the CLI's availability kept
-// alongside the result, so a caller can tell "gh unavailable" apart from "no
-// PRs" and say so. It lives here rather than in commands/shared because the
-// flow layer needs it and may not reach that far up.
-func ListPRsWithConnection(projectDir string) ([]domain.PRInfo, domain.GHConnection) {
-	prs, err := ListPRsAllStates(projectDir)
+// prsOfBranchesArgs builds one aliased pullRequests field per branch. Branch
+// names travel as variables, never spliced into the query text. gh fills
+// {owner} and {repo} from the repository the command runs in.
+func prsOfBranchesArgs(branches []string) []string {
+	variables := []string{"$owner: String!", "$name: String!"}
+	fields := make([]string, 0, len(branches))
+	args := []string{"api", "graphql", "-F", "owner={owner}", "-F", "name={repo}"}
+	for index, branch := range branches {
+		alias := fmt.Sprintf("b%d", index)
+		variables = append(variables, fmt.Sprintf("$%s: String!", alias))
+		fields = append(fields, fmt.Sprintf(
+			"%s: pullRequests(headRefName: $%s, first: 1, orderBy: {field: CREATED_AT, direction: DESC}) { nodes { number url state headRefName } }",
+			alias, alias))
+		args = append(args, "-f", alias+"="+branch)
+	}
+	query := fmt.Sprintf("query(%s) { repository(owner: $owner, name: $name) { %s } }",
+		strings.Join(variables, ", "), strings.Join(fields, " "))
+	return append(args, "-f", "query="+query, "--jq", "[.data.repository[].nodes[]]")
+}
+
+// ListPRsOfBranchesWithConnection is ListPRsOfBranches with the CLI's
+// availability kept alongside the result, so a caller can tell "gh unavailable"
+// apart from "no PRs" and say so.
+func ListPRsOfBranchesWithConnection(params ListPRsOfBranchesParams) ([]domain.PRInfo, domain.GHConnection) {
+	prs, err := ListPRsOfBranches(params)
 	return prs, connectionOf(err)
 }
 

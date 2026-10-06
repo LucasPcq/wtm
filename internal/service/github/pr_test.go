@@ -1,6 +1,7 @@
 package github
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -89,5 +90,25 @@ func TestConvertGHPRNoChecksLeavesZeroValue(t *testing.T) {
 	}
 	if pr.ReviewDecision != "" {
 		t.Errorf("ReviewDecision = %q, want empty", pr.ReviewDecision)
+	}
+}
+
+func TestPRsOfBranchesArgsPassBranchesAsVariables(t *testing.T) {
+	args := prsOfBranchesArgs([]string{"feat/a", `evil") { x }`})
+
+	joined := strings.Join(args, "\n")
+	for _, want := range []string{"b0=feat/a", "b1=evil\") { x }", "owner={owner}", "name={repo}"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("args lack %q:\n%s", want, joined)
+		}
+	}
+	query := ""
+	for _, arg := range args {
+		if after, found := strings.CutPrefix(arg, "query="); found {
+			query = after
+		}
+	}
+	if strings.Contains(query, "evil") || strings.Count(query, "pullRequests(") != 2 {
+		t.Errorf("query must alias one pullRequests per branch and carry no branch name: %s", query)
 	}
 }

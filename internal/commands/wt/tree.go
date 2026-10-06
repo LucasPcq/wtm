@@ -66,16 +66,12 @@ func runTree(cmd *cobra.Command, _ []string) error {
 		Message: "Building worktree tree…",
 		Animate: shared.Animate(cmd, rules.IsHumanFormat(format)),
 		Work: func() error {
-			var prs []domain.PRInfo
-			if withPRs {
-				prs = shared.LoadPRsAllStatesGraceful(cfg.ProjectDir)
-			}
 			var e error
 			forest, e = worktree.BuildTree(worktree.BuildTreeParams{
 				ProjectDir: cfg.ProjectDir,
 				StateDir:   cfg.StateDir,
 				Config:     cfg.Config,
-				PRs:        prs,
+				WithPRs:    withPRs,
 			})
 			return e
 		},

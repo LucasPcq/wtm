@@ -183,49 +183,6 @@ func FastForwardRef(params FastForwardRefParams) error {
 	return nil
 }
 
-// FetchPruneParams holds inputs for a pruning fetch.
-type FetchPruneParams struct {
-	ProjectDir string
-	Remote     string
-}
-
-// FetchPrune runs `git fetch --prune <remote>` so branches deleted on the remote
-// drop their local remote-tracking refs, making UpstreamGone accurate. Remote
-// defaults to origin.
-func FetchPrune(params FetchPruneParams) error {
-	remote := params.Remote
-	if remote == "" {
-		remote = strings.TrimSuffix(domain.RemoteBranchPrefix, "/")
-	}
-	cmd := exec.Command("git", "fetch", "--prune", remote)
-	cmd.Dir = params.ProjectDir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git fetch --prune %s: %s", remote, strings.TrimSpace(string(out)))
-	}
-	return nil
-}
-
-// UpstreamGoneParams holds inputs for UpstreamGone.
-type UpstreamGoneParams struct {
-	ProjectDir string
-	Branch     string
-}
-
-// UpstreamGone reports whether Branch has a configured upstream whose remote-
-// tracking ref no longer exists — git's "[gone]" marker, set once the remote
-// branch was deleted and a pruning fetch ran. A branch with no upstream, or one
-// whose upstream still exists, returns false.
-func UpstreamGone(params UpstreamGoneParams) bool {
-	cmd := exec.Command("git", "for-each-ref", "--format=%(upstream:track)", "refs/heads/"+params.Branch)
-	cmd.Dir = params.ProjectDir
-	out, err := cmd.Output()
-	if err != nil {
-		return false
-	}
-	return strings.TrimSpace(string(out)) == "[gone]"
-}
-
 // AheadBehindParams holds inputs for computing a local branch's divergence.
 type AheadBehindParams struct {
 	ProjectDir string

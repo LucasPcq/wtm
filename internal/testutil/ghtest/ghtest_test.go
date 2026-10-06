@@ -72,3 +72,35 @@ func TestStubCanRefuseAuthentication(t *testing.T) {
 		t.Error("an unauthenticated stub must fail `gh auth status`")
 	}
 }
+
+func TestStubListHonoursTheLimit(t *testing.T) {
+	ghtest.Stub(t, ghtest.StubParams{PRs: []ghtest.PR{
+		{Number: 3, Branch: "c", State: "open"},
+		{Number: 2, Branch: "b", State: "merged"},
+		{Number: 1, Branch: "a", State: "closed"},
+	}})
+
+	out, err := exec.Command("gh", "pr", "list", "--state", "all", "--limit", "2").Output()
+	if err != nil {
+		t.Fatalf("pr list: %v", err)
+	}
+	if strings.Count(string(out), "headRefName") != 2 || strings.Contains(string(out), `"a"`) {
+		t.Errorf("pr list --limit 2 = %s, want the two newest", out)
+	}
+}
+
+func TestStubAnswersAGraphQLLookupByBranch(t *testing.T) {
+	ghtest.Stub(t, ghtest.StubParams{PRs: []ghtest.PR{
+		{Number: 9, Branch: "feat", State: "merged"},
+		{Number: 4, Branch: "feat", State: "closed"},
+		{Number: 2, Branch: "other", State: "open"},
+	}})
+
+	out, err := exec.Command("gh", "api", "graphql", "-f", "b0=feat", "-f", "b1=missing").Output()
+	if err != nil {
+		t.Fatalf("api graphql: %v", err)
+	}
+	if strings.Count(string(out), "headRefName") != 1 || !strings.Contains(string(out), `"number":9`) {
+		t.Errorf("api graphql = %s, want only feat's newest pull request", out)
+	}
+}
