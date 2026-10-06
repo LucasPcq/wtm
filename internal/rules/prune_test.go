@@ -426,3 +426,29 @@ func TestClassifyPruneReparentsPastAPrunedGrandparent(t *testing.T) {
 		t.Fatalf("reparents = %+v, want child onto release, not straight onto the base", plan.Reparents)
 	}
 }
+
+func TestOriginTrackingRefsReadsEachBranchAndItsOriginUpstream(t *testing.T) {
+	got := OriginTrackingRefs(OriginTrackingRefsParams{
+		Branches: []string{"plain", "renamed", "elsewhere"},
+		Upstreams: map[string]domain.Upstream{
+			"plain":     {Remote: "origin", RemoteRef: "refs/heads/plain", TrackingRef: "refs/remotes/origin/plain"},
+			"renamed":   {Remote: "origin", RemoteRef: "refs/heads/other", TrackingRef: "refs/remotes/origin/other"},
+			"elsewhere": {Remote: "fork", RemoteRef: "refs/heads/elsewhere", TrackingRef: "refs/remotes/fork/elsewhere"},
+		},
+	})
+
+	want := map[string]string{
+		"refs/heads/plain":     "refs/remotes/origin/plain",
+		"refs/heads/renamed":   "refs/remotes/origin/renamed",
+		"refs/heads/other":     "refs/remotes/origin/other",
+		"refs/heads/elsewhere": "refs/remotes/origin/elsewhere",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("refs = %v, want %v", got, want)
+	}
+	for remoteRef, tracking := range want {
+		if got[remoteRef] != tracking {
+			t.Errorf("%s → %q, want %q", remoteRef, got[remoteRef], tracking)
+		}
+	}
+}

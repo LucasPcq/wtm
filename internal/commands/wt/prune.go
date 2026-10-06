@@ -29,8 +29,10 @@ func newPruneCmd() *cobra.Command {
 			"\n" +
 			"--merged and --closed require the GitHub CLI (`gh`) to be installed and authenticated;\n" +
 			"without it they match nothing and prune prints a notice — only --gone still applies.\n" +
-			"gone-detection runs `git fetch --prune` first so deleted remote branches are seen\n" +
-			"(pass --no-fetch to skip).\n" +
+			"gone-detection first fetches the worktrees' branches from origin, dropping the\n" +
+			"remote-tracking refs of those deleted there (pass --no-fetch to skip). Only branches\n" +
+			"with a worktree are read, on git and on GitHub: the remote-tracking refs of the\n" +
+			"other branches are left as they are.\n" +
 			"\n" +
 			"On a TTY, matches are shown for review (unsafe ones unchecked), then a prune\n" +
 			"confirmation, then — like clean — a dedicated confirmation to reparent surviving\n" +
@@ -65,7 +67,7 @@ func newPruneCmd() *cobra.Command {
 	cmd.Flags().Bool(domain.FlagMerged, false, "Restrict to worktrees whose PR was merged on GitHub (needs gh)")
 	cmd.Flags().Bool(domain.FlagClosed, false, "Restrict to worktrees whose PR was closed without merging (needs gh)")
 	cmd.Flags().Bool(domain.FlagGone, false, "Restrict to worktrees whose upstream branch was deleted on the remote")
-	cmd.Flags().Bool(domain.FlagNoFetch, false, "Skip the git fetch --prune that gone-detection performs; use already-fetched state")
+	cmd.Flags().Bool(domain.FlagNoFetch, false, "Skip the fetch of the worktrees' branches that gone-detection performs; use already-fetched state")
 	cmd.Flags().Bool(domain.FlagForce, false, "Lift safety refusals (locked/dirty/unpushed/open-PR): also remove unsafe worktrees; still asks to confirm unless --yes")
 	cmd.Flags().Bool(domain.FlagReparentChildren, false, domain.FlagReparentChildrenDesc)
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; keep every match without the selection picker (use --force for unsafe worktrees)")
