@@ -229,3 +229,27 @@ func TestPruneDeletesTheBranchOfWhatItRemoved(t *testing.T) {
 		t.Error("feat/a's branch survived its prune")
 	}
 }
+
+// A dry run that finds nothing is still a dry run: the outcome must not read
+// as a prune that ran and removed nothing.
+func TestPruneDryRunWithNothingToPruneIsStillADryRun(t *testing.T) {
+	p := newPruneFixture(t)
+	presenter := &recorder{Recorder: &flowtest.Recorder{}}
+
+	outcome, err := Run(Params{
+		Context:   p.ctx,
+		Request:   Request{Gone: true, NoFetch: true, Force: true, DryRun: true},
+		Prompter:  &flowtest.ScriptedPrompter{},
+		Presenter: presenter,
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !outcome.Empty || !outcome.Result.DryRun {
+		t.Errorf("outcome = %+v, want an empty dry run", outcome)
+	}
+	if presenter.pruned == nil || !presenter.pruned.Result.DryRun {
+		t.Error("the presenter must be told the empty run was a dry run")
+	}
+}

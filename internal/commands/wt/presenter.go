@@ -187,7 +187,7 @@ type prunePresenter struct {
 func (p prunePresenter) Pruned(outcome pruneflow.Outcome) error {
 	if outcome.Empty {
 		if p.Format == domain.OutputJSON {
-			return output.WritePruneResultJSON(p.Cmd.OutOrStdout(), domain.PruneResult{})
+			return output.WritePruneResultJSON(p.Cmd.OutOrStdout(), outcome.Result)
 		}
 		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
 			output.Unchanged(w, domain.PruneNothingToPrune)

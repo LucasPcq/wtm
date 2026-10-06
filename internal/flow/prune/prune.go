@@ -92,7 +92,7 @@ func (f *pruneFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 	if len(f.plan.Selected) == 0 {
-		return f.conclude(Outcome{Empty: true})
+		return f.conclude(Outcome{Empty: true, Result: domain.PruneResult{DryRun: f.request.DryRun}})
 	}
 	if f.request.DryRun {
 		return f.conclude(Outcome{

@@ -26,6 +26,7 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 - **`wtm run list`** in a terminal opens its picker again instead of printing `Aborted.` straight away.
 - **`wtm env`**'s resolver shows a kept conflict as your value alone, instead of an arrow from your value to itself.
 - **`wtm checkout <not a number>`** exits `2`, a usage error, before reading the config; so do `sync --push --no-push`, `sync --ff-parents --no-ff-parents` and `--all` with a name on `sync`, `fast-forward` and `run down`. → [Exit codes](docs/guide/integrations.md#the-contract---yes-and---output-json)
+- **`wtm prune --dry-run --output json`** reports `"dry_run": true` when there is nothing to prune.
 
 ## [0.29.1] - 2026-10-05
 
