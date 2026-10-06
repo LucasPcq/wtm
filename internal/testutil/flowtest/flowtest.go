@@ -140,6 +140,8 @@ type Recorder struct {
 	Published []domain.Event
 	// Unheard makes the Recorder a publisher no daemon listens to.
 	Unheard bool
+	// From is the origin it hands a request to the daemon; zero names none.
+	From domain.EventOrigin
 }
 
 // Publish makes a Recorder the flow's Publisher too, so one double records
@@ -147,6 +149,10 @@ type Recorder struct {
 func (r *Recorder) Publish(event domain.Event) { r.Published = append(r.Published, event) }
 
 func (r *Recorder) Listening() bool { return !r.Unheard }
+
+func (r *Recorder) Origin() (domain.EventOrigin, bool) {
+	return r.From, r.From.Repo.CommonDir != ""
+}
 
 func (r *Recorder) PublishedTypes() []domain.EventType {
 	types := make([]domain.EventType, 0, len(r.Published))

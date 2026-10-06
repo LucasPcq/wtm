@@ -109,3 +109,74 @@ func TestADaemonOfAnotherBuildThatKnowsSubscribeIsAccepted(t *testing.T) {
 		t.Fatalf("Subscribe = %v, want the other build accepted", err)
 	}
 }
+
+func TestTheDaemonPublishesAJobsLifecycleUnderItsOrigin(t *testing.T) {
+	d := idleDaemon(t, time.Hour, daemonNamespaceBudget)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	deliveries, err := Subscribe(ctx, SubscribeParams{SocketPath: d.socket, Repos: []string{"/code/app/.git"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dir := t.TempDir()
+	origin := &domain.EventOrigin{Repo: domain.EventRepo{Root: "/code/app", CommonDir: "/code/app/.git"}, CorrelationID: "popup-7"}
+	job := domain.JobConfig{Name: "web", Kind: domain.JobKindService, Cmd: "echo 'Error: boom'; exit 4"}
+	resp, err := NewClient(d.socket).Send(Request{Action: ActionStart, Job: &job, WorkDir: dir, Env: map[string]string{domain.EnvBranch: "feat/a"}, Origin: origin})
+	if err != nil || resp.Status != StatusOK {
+		t.Fatalf("start: %+v, %v", resp, err)
+	}
+
+	started := nextJobEvent(t, deliveries)
+	crashed := nextJobEvent(t, deliveries)
+	if started.Type != domain.EventJobStarted || crashed.Type != domain.EventJobCrashed {
+		t.Fatalf("heard %s then %s", started.Type, crashed.Type)
+	}
+	want := domain.WorktreeRef{Branch: "feat/a", Path: dir}
+	if crashed.Worktree != want || crashed.Repo != origin.Repo || crashed.Job.Name != "web" || crashed.Job.Kind != domain.JobKindService {
+		t.Fatalf("crashed = %+v", crashed)
+	}
+	if crashed.V != domain.EventsSchemaVersion || crashed.TS == "" || crashed.CorrelationID != "popup-7" {
+		t.Fatalf("crashed is stamped %d %q %q", crashed.V, crashed.TS, crashed.CorrelationID)
+	}
+	if crashed.ExitCode == nil || *crashed.ExitCode != 4 || len(crashed.LastLines) == 0 {
+		t.Fatalf("crashed carries exit %v and lines %q", crashed.ExitCode, crashed.LastLines)
+	}
+}
+
+func TestAJobStartedWithoutAnOriginPublishesNothing(t *testing.T) {
+	d := idleDaemon(t, time.Hour, daemonNamespaceBudget)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	deliveries, err := Subscribe(ctx, SubscribeParams{SocketPath: d.socket})
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := domain.JobConfig{Name: "migrate", Kind: domain.JobKindTask, Cmd: "true"}
+	if _, err := NewClient(d.socket).Send(Request{Action: ActionStart, Job: &job, WorkDir: t.TempDir()}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case got := <-deliveries:
+		t.Fatalf("published %s for a job nobody can place in a repository", got.Payload)
+	case <-time.After(300 * time.Millisecond):
+	}
+}
+
+func nextJobEvent(t *testing.T, deliveries <-chan Delivery) domain.JobEvent {
+	t.Helper()
+	select {
+	case delivery := <-deliveries:
+		var event domain.JobEvent
+		if err := json.Unmarshal(delivery.Payload, &event); err != nil {
+			t.Fatal(err)
+		}
+		if delivery.Repo != event.Repo.CommonDir {
+			t.Fatalf("delivered under %q, want the event's repository", delivery.Repo)
+		}
+		return event
+	case <-time.After(5 * time.Second):
+		t.Fatal("no job event")
+		return domain.JobEvent{}
+	}
+}

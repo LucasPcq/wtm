@@ -144,6 +144,9 @@ type RunParams struct {
 	// with nowhere to run, and the daemon refuses it rather than starting one
 	// instance per worktree.
 	Shared *domain.SharedJobContext
+	// Origin is what the daemon publishes the jobs' events under; nil publishes
+	// none.
+	Origin *domain.EventOrigin
 }
 
 // Run starts a profile's jobs in their declared order and reports each step to
@@ -172,6 +175,7 @@ func Run(ctx context.Context, params RunParams) (Outcome, error) {
 		worktree:       params.Worktree,
 		logDir:         params.LogDir,
 		shared:         params.Shared,
+		origin:         params.Origin,
 		env:            params.Env,
 		prober:         params.Prober,
 		project:        params.Project,
@@ -211,6 +215,7 @@ type runner struct {
 	nextConfig NextConfigLookup
 	baseOwners map[int]string
 	shared     *domain.SharedJobContext
+	origin     *domain.EventOrigin
 	// servedPort is what the daemon answered its proxy is really on, and
 	// noticedProxy records that the run has already explained a refusal — the
 	// fact belongs to the run, not to each job that would repeat it.
@@ -253,6 +258,7 @@ func (r *runner) run() Outcome {
 			Env:     r.env,
 			Routes:  routes,
 			Shared:  r.shared,
+			Origin:  r.origin,
 			OnOutput: func(chunk []byte) {
 				r.captured = append(r.captured, chunk...)
 				r.emit(Event{Phase: PhaseOutput, Job: job.Name, Kind: job.Kind, Step: i + 1, Chunk: chunk})

@@ -33,6 +33,45 @@
         "created_at": { "type": "string" }
       }
     },
+    "snapshotWorktree": {
+      "allOf": [{ "$ref": "#/$defs/worktree" }],
+      "properties": {
+        "jobs": {
+          "type": ["array", "null"],
+          "description": "The worktree's jobs as they are now; null when the daemon could not be asked. A shared service is listed under the worktree it runs in.",
+          "items": {
+            "type": "object",
+            "required": ["name", "kind", "state"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "kind": { "$ref": "#/$defs/jobKind" },
+              "state": { "enum": ["starting", "running", "crashed", "stopped"] },
+              "url": { "type": "string" },
+              "exit_code": { "type": "integer", "description": "On a crashed job only." }
+            }
+          }
+        }
+      }
+    },
+    "jobKind": { "enum": ["service", "task"] },
+    "jobWorktree": {
+      "type": "object",
+      "required": ["branch", "path"],
+      "description": "Names the worktree the job runs in; it does not describe it, so never upsert an identity from it.",
+      "properties": {
+        "branch": { "type": "string" },
+        "path": { "type": "string", "minLength": 1 }
+      }
+    },
+    "job": {
+      "type": "object",
+      "required": ["name", "kind"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "kind": { "$ref": "#/$defs/jobKind" },
+        "url": { "type": "string", "minLength": 1, "description": "Where the job answers; absent for one that publishes no address." }
+      }
+    },
     "hookOk": { "type": "boolean", "description": "Whether every hook of the phase passed; true when there were none." },
     "hookCmd": { "type": "string", "minLength": 1, "description": "The failing hook's command; only when ok is false, and absent when the phase failed before any hook ran." },
     "hookExitCode": { "type": "integer", "minimum": 0, "description": "The failing hook's exit status; absent when it was killed by a signal." },
@@ -47,7 +86,7 @@
       "properties": {
         "type": { "const": "snapshot" },
         "repo": { "$ref": "#/$defs/repo" },
-        "worktrees": { "type": "array", "items": { "$ref": "#/$defs/worktree" } }
+        "worktrees": { "type": "array", "items": { "$ref": "#/$defs/snapshotWorktree" } }
       },
       "required": ["repo", "worktrees"]
     },
@@ -132,6 +171,27 @@
         "repo": { "$ref": "#/$defs/repo" }
       },
       "required": ["repo"]
+    },
+    {
+      "properties": {
+        "type": { "enum": ["job.started", "job.exited", "job.stopped"] },
+        "repo": { "$ref": "#/$defs/repo" },
+        "worktree": { "$ref": "#/$defs/jobWorktree" },
+        "job": { "$ref": "#/$defs/job" },
+        "exit_code": { "const": 0, "description": "On job.exited only." }
+      },
+      "required": ["repo", "worktree", "job"]
+    },
+    {
+      "properties": {
+        "type": { "const": "job.crashed" },
+        "repo": { "$ref": "#/$defs/repo" },
+        "worktree": { "$ref": "#/$defs/jobWorktree" },
+        "job": { "$ref": "#/$defs/job" },
+        "exit_code": { "type": "integer", "description": "What the process exited with; -1 when a signal killed it." },
+        "last_lines": { "type": "array", "items": { "type": "string" }, "description": "The last lines it wrote, terminal escapes removed; absent when it wrote none." }
+      },
+      "required": ["repo", "worktree", "job", "exit_code"]
     }
   ]
 }

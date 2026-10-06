@@ -72,7 +72,7 @@ Open the reference **before** running a command from its area: each one lists th
 | Run, stop or inspect dev jobs: `run up`, `down`, `start`, `stop`, `logs`, `ps`, `url`, `open`, `list`, the daemon, the proxy, statuses, concurrency | `references/run.md` |
 | Configure dev jobs: `run init`, `run job add|edit|rm`, `run profile`, `run addressing`, `run export|import`, and what `run.toml` means (ports, isolation, shared services, namespaces, `touches`, `[[env_port]]`, `[[env]]`, named URLs) | `references/run-config.md` |
 | Parse a command's JSON output, or branch on a `status` value | `references/json.md` |
-| React to worktrees being created, moved or removed by anyone, as it happens: `events` (a stream that never exits on its own) | `references/events.md` |
+| React to worktrees being created, moved or removed by anyone, or to their jobs starting, crashing or stopping, as it happens: `events` (a stream that never exits on its own) | `references/events.md` |
 
 Before any `wtm run …` command, read `references/run.md`; before changing a job, a profile or `run.toml`, read `references/run-config.md`. Never edit `run.toml` by hand: every field has a flag, and a write is refused exactly as loading the file would refuse it.
 

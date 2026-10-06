@@ -4667,6 +4667,9 @@ const (
 	// EventsRegistryPruneEvery is how often a global stream looks for the
 	// repositories that went away: deleting one runs no wtm command to say so.
 	EventsRegistryPruneEvery = 30 * time.Second
+	// JobEventLastLines is how much of its output a job.crashed carries: the
+	// error, without the whole log.
+	JobEventLastLines = 10
 )
 
 // One human line per `wtm events` event; --output json is the contract, these
@@ -4691,6 +4694,12 @@ const (
 	EventRepoAddedFmt         = "watching %s"
 	EventRepoRemovedFmt       = "no longer watching %s"
 	EventRepoPrefixFmt        = "%s · "
+
+	EventJobStartedFmt = "started %s in %s"
+	EventJobCrashedFmt = "%s crashed in %s"
+	EventJobExitedFmt  = "%s finished in %s"
+	EventJobStoppedFmt = "stopped %s in %s"
+	EventJobURLFmt     = "  %s"
 )
 
 const (

@@ -297,7 +297,7 @@ A hook phase reports through `flow.HookSink`: `Output`, the raw stream, and `OnH
 
 ## Publishing what a flow changed
 
-Every change to a worktree's identity is published from the flow that made it, never from the service, through `internal/flow/publish` (how the bus works: [architecture.md](architecture.md#the-event-bus--the-daemon-relays-the-flows-speak)). The point is right after the mutator succeeded:
+Every change to a worktree's identity is published from the flow that made it, never from the service, through `internal/flow/publish` (how the bus works: [architecture.md](architecture.md#the-event-bus--the-daemon-relays-the-flows-speak-the-jobs-report)). The point is right after the mutator succeeded:
 
 | Event | Published by |
 | -- | -- |

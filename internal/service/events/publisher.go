@@ -1,6 +1,6 @@
 // Package events is the `wtm events` bus as wtm itself uses it: the publisher
 // every flow reports through, and the watcher behind both consumers. The
-// daemon only relays; the schema lives here, never in service/process.
+// daemon relays these and writes only job.*, from domain.JobEvent.
 package events
 
 import (
@@ -42,9 +42,7 @@ func NewPublisher(params PublisherParams) *Publisher {
 // Publish is opportunistic: a consumer that misses an event gets the state back
 // from its next snapshot, so nothing here may fail or slow the command.
 func (p *Publisher) Publish(event domain.Event) {
-	p.once.Do(func() {
-		p.repo, p.repoErr = worktree.RepoOf(worktree.RepoOfParams{ProjectDir: p.projectDir})
-	})
+	p.resolve()
 	if p.repoErr != nil || p.socketPath == "" {
 		return
 	}
@@ -54,6 +52,20 @@ func (p *Publisher) Publish(event domain.Event) {
 		return
 	}
 	_ = process.Publish(process.PublishParams{SocketPath: p.socketPath, Repo: p.repo.CommonDir, Payload: payload})
+}
+
+func (p *Publisher) Origin() (domain.EventOrigin, bool) {
+	p.resolve()
+	if p.repoErr != nil {
+		return domain.EventOrigin{}, false
+	}
+	return domain.EventOrigin{Repo: p.repo, CorrelationID: p.correlationID}, true
+}
+
+func (p *Publisher) resolve() {
+	p.once.Do(func() {
+		p.repo, p.repoErr = worktree.RepoOf(worktree.RepoOfParams{ProjectDir: p.projectDir})
+	})
 }
 
 // Listening is a dial, never cached: a run may start the daemon halfway

@@ -249,6 +249,7 @@ func (f *downFlow) stopProfile(outcome Outcome, workDir string) ([]domain.JobAct
 					Action:  process.ActionStop,
 					Name:    job.Name,
 					WorkDir: workDir,
+					Origin:  f.ctx.Origin(),
 				})
 				return sendErr
 			},
@@ -312,7 +313,7 @@ func (f *downFlow) stopAll(workDir string) ([]domain.JobActionResult, error) {
 // stoppedJobs asks the daemon to empty one worktree, and answers with what it
 // reported.
 func (f *downFlow) stoppedJobs(workDir string) ([]domain.JobInfo, error) {
-	request := process.Request{Action: process.ActionStopAll, WorkDir: workDir}
+	request := process.Request{Action: process.ActionStopAll, WorkDir: workDir, Origin: f.ctx.Origin()}
 
 	var resp process.Response
 	if err := f.presenter.Stage(flow.StageParams{

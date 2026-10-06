@@ -101,6 +101,9 @@ type StartRequest struct {
 	// Shared is where a shared job runs — the main checkout, with its own
 	// environment and log directory. Nil for a per-worktree job.
 	Shared *domain.SharedJobContext
+	// Origin is what the daemon publishes this job's events under; nil
+	// publishes none.
+	Origin *domain.EventOrigin
 	// OnOutput receives what the job writes while it starts — everything for a
 	// task or a detached launcher, nothing for a job the daemon backgrounds.
 	OnOutput func([]byte)

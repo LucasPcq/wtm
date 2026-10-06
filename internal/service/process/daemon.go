@@ -88,15 +88,15 @@ func RunDaemon(params DaemonParams) error {
 
 	registry := proxy.NewRegistry()
 	store := NewStateStore(StatePath())
-	manager := NewManagerWith(ManagerParams{Routes: registry, Index: store, NamespaceBudget: daemonNamespaceBudget})
 	d := &daemonServer{
-		manager:    manager,
 		listener:   listener,
 		socketPath: params.SocketPath,
 		shutdown:   make(chan struct{}),
 		events:     newEventHub(domain.EventsSubscriberQueue),
 		stopped:    make(chan struct{}),
 	}
+	manager := NewManagerWith(ManagerParams{Routes: registry, Index: store, NamespaceBudget: daemonNamespaceBudget, OnTransition: d.publishJob})
+	d.manager = manager
 
 	if params.ProxyPort > 0 {
 		server := proxy.NewServer(proxy.ServerParams{Port: params.ProxyPort, Registry: registry})
@@ -293,6 +293,7 @@ func (d *daemonServer) handleStart(encoder replyEncoder, req Request) {
 			Env:      req.Env,
 			Routes:   req.Routes,
 			Shared:   req.Shared,
+			Origin:   req.Origin,
 			Streamer: responseStreamWriter{encoder: encoder},
 		})
 		if err != nil {
@@ -317,6 +318,7 @@ func (d *daemonServer) handleStart(encoder replyEncoder, req Request) {
 			Env:      req.Env,
 			Routes:   req.Routes,
 			Shared:   req.Shared,
+			Origin:   req.Origin,
 			Streamer: responseStreamWriter{encoder: encoder},
 		}); err != nil {
 			encoder.Encode(Response{Status: StatusError, Message: err.Error()})
@@ -326,7 +328,7 @@ func (d *daemonServer) handleStart(encoder replyEncoder, req Request) {
 		return
 	}
 
-	if err := d.manager.Start(StartParams{Job: *req.Job, WorkDir: req.WorkDir, LogDir: req.LogDir, Env: req.Env, Routes: req.Routes, Shared: req.Shared}); err != nil {
+	if err := d.manager.Start(StartParams{Job: *req.Job, WorkDir: req.WorkDir, LogDir: req.LogDir, Env: req.Env, Routes: req.Routes, Shared: req.Shared, Origin: req.Origin}); err != nil {
 		encoder.Encode(Response{Status: StatusError, Message: err.Error()})
 		return
 	}
@@ -344,6 +346,7 @@ func (d *daemonServer) handleShutdown(encoder replyEncoder) {
 }
 
 func (d *daemonServer) handleStop(encoder replyEncoder, req Request) {
+	d.manager.AttributeStop(AttributeStopParams{WorkDir: req.WorkDir, Name: req.Name, CorrelationID: correlationOf(req)})
 	ref := d.manager.sharedRefOf(jobKey(req.Name, req.WorkDir))
 	if err := d.manager.Stop(JobRef{Name: req.Name, WorkDir: req.WorkDir}); err != nil {
 		encoder.Encode(Response{Status: StatusError, Message: err.Error()})
@@ -369,6 +372,7 @@ func (d *daemonServer) handleStopAll(encoder replyEncoder, req Request) {
 		refs = append(refs, d.manager.sharedRefOf(jobKey(job.Name, job.WorkDir)))
 	}
 
+	d.manager.AttributeStop(AttributeStopParams{WorkDir: req.WorkDir, CorrelationID: correlationOf(req)})
 	var err error
 	if req.WorkDir != "" {
 		err = d.manager.StopAllInWorkDir(req.WorkDir)
@@ -408,13 +412,55 @@ func (d *daemonServer) jobInfoOf(job ManagedJob) domain.JobInfo {
 		PID:       detachedAwarePID(job),
 		StartedAt: job.StartedAt,
 		ExitCode:  job.ExitCode,
-		URL: rules.JobURL(rules.JobURLParams{
-			Job:        job.Config,
-			Ports:      jobPorts(job.Config, job.Env),
-			Host:       rules.JobOwnRoute(job.Routes, job.Name),
-			PublicPort: d.publicPort(),
-		}),
+		URL:       d.jobURL(job),
+		State:     stateOf(job),
 	}
+}
+
+func (d *daemonServer) jobURL(job ManagedJob) string {
+	return rules.JobURL(rules.JobURLParams{
+		Job:        job.Config,
+		Ports:      jobPorts(job.Config, job.Env),
+		Host:       rules.JobOwnRoute(job.Routes, job.Name),
+		PublicPort: d.publicPort(),
+	})
+}
+
+func stateOf(job ManagedJob) domain.JobState {
+	state, _ := rules.JobStateOf(rules.JobStateOfParams{Status: job.Status, Detached: rules.IsDetached(job.Config)})
+	return state
+}
+
+func correlationOf(req Request) string {
+	if req.Origin == nil {
+		return ""
+	}
+	return req.Origin.CorrelationID
+}
+
+// publishJob is the one event the daemon writes rather than relays: it alone
+// sees a job end. A job started without an origin is not published, since
+// nothing says which repository it belongs to.
+func (d *daemonServer) publishJob(transition JobTransition) {
+	job := transition.Job
+	if job.Origin == nil || job.Origin.Repo.CommonDir == "" {
+		return
+	}
+	payload, err := json.Marshal(domain.JobEvent{
+		V:             domain.EventsSchemaVersion,
+		Type:          transition.Type,
+		TS:            time.Now().UTC().Format(time.RFC3339Nano),
+		CorrelationID: transition.CorrelationID,
+		Repo:          job.Origin.Repo,
+		Worktree:      domain.WorktreeRef{Branch: job.Env[domain.EnvBranch], Path: job.WorkDir},
+		Job:           domain.EventJob{Name: job.Name, Kind: job.Config.Kind, URL: d.jobURL(job)},
+		ExitCode:      transition.ExitCode,
+		LastLines:     transition.LastLines,
+	})
+	if err != nil {
+		return
+	}
+	d.events.publish(eventHubPublishParams{Repo: job.Origin.Repo.CommonDir, Payload: payload})
 }
 
 // A claim, like a detached launcher, has no process of its own to report: the

@@ -212,6 +212,7 @@ func (f *stopFlow) stop(params stopParams) (string, error) {
 				Action:  process.ActionStop,
 				Name:    job,
 				WorkDir: params.WorkDir,
+				Origin:  f.ctx.Origin(),
 			})
 			return sendErr
 		},

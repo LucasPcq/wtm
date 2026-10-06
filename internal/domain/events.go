@@ -16,9 +16,14 @@ const (
 	EventWorktreeRemoved       EventType = "worktree.removed"
 	EventRepoAdded             EventType = "repo.added"
 	EventRepoRemoved           EventType = "repo.removed"
+	EventJobStarted            EventType = "job.started"
+	EventJobCrashed            EventType = "job.crashed"
+	EventJobExited             EventType = "job.exited"
+	EventJobStopped            EventType = "job.stopped"
 
 	// EventWorktreePrefix opens every type about one worktree's identity.
 	EventWorktreePrefix = "worktree."
+	EventJobPrefix      = "job."
 )
 
 // EventTypes is every type v1 defines, in the order the guide documents them.
@@ -34,6 +39,10 @@ var EventTypes = []EventType{
 	EventWorktreeRemoved,
 	EventRepoAdded,
 	EventRepoRemoved,
+	EventJobStarted,
+	EventJobCrashed,
+	EventJobExited,
+	EventJobStopped,
 }
 
 // EventsSchemaVersion moves on a breaking change only.
@@ -101,4 +110,51 @@ type Event struct {
 	OK            *bool              `json:"ok,omitempty"`
 	Hook          string             `json:"hook,omitempty"`
 	ExitCode      *int               `json:"exit_code,omitempty"`
+	Job           *EventJob          `json:"job,omitempty"`
+	LastLines     []string           `json:"last_lines,omitempty"`
+}
+
+type EventJob struct {
+	Name string  `json:"name"`
+	Kind JobKind `json:"kind"`
+	URL  string  `json:"url,omitempty"`
+}
+
+// JobEvent is a job.* line as the daemon writes it. Its worktree names the
+// worktree and describes nothing else: the daemon cannot read the identity, so
+// a reader must not upsert one from it.
+type JobEvent struct {
+	V             int         `json:"v"`
+	Type          EventType   `json:"type"`
+	TS            string      `json:"ts"`
+	CorrelationID string      `json:"correlation_id,omitempty"`
+	Repo          EventRepo   `json:"repo"`
+	Worktree      WorktreeRef `json:"worktree"`
+	Job           EventJob    `json:"job"`
+	ExitCode      *int        `json:"exit_code,omitempty"`
+	LastLines     []string    `json:"last_lines,omitempty"`
+}
+
+// EventOrigin travels with a request to the daemon: what the events it causes
+// carry that only the client knows, the daemon being blind to git.
+type EventOrigin struct {
+	Repo          EventRepo `json:"repo"`
+	CorrelationID string    `json:"correlation_id,omitempty"`
+}
+
+// JobSnapshot is one job as a snapshot reports it.
+type JobSnapshot struct {
+	Name     string   `json:"name"`
+	Kind     JobKind  `json:"kind"`
+	State    JobState `json:"state"`
+	URL      string   `json:"url,omitempty"`
+	ExitCode *int     `json:"exit_code,omitempty"`
+}
+
+// SnapshotWorktree is a snapshot's worktree: its identity, and its jobs as they
+// are now. Jobs is nil when the daemon could not be asked, empty when it holds
+// none.
+type SnapshotWorktree struct {
+	WorktreeIdentity
+	Jobs []JobSnapshot `json:"jobs"`
 }

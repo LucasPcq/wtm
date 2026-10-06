@@ -33,6 +33,7 @@ func (s *daemonService) Start(ctx context.Context, req StartRequest) (StartResul
 		Env:     req.Env,
 		Routes:  req.Routes,
 		Shared:  req.Shared,
+		Origin:  req.Origin,
 	}, req.OnOutput)
 	if err != nil {
 		return StartResult{}, err

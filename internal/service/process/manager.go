@@ -86,9 +86,16 @@ type ManagedJob struct {
 	// ExitCode, like Status, is written by the goroutine that reaps the process
 	// and read by List: both are only ever touched under the manager lock.
 	ExitCode *int
-	output   *outputHub    // nil for detached launcher-style services
-	logs     *LogSink      // nil when the client asked for no persisted log
-	exited   chan struct{} // closed when the underlying process has been reaped
+	// Origin is what this job's events are published under; nil publishes none.
+	Origin *domain.EventOrigin
+	// stopping is set, under the manager lock, once a stop reaches the job: the
+	// process then dies of that stop, and its exit is not a crash.
+	stopping bool
+	// stopCorrelation is the correlation id of the command asking for the stop.
+	stopCorrelation string
+	output          *outputHub    // nil for detached launcher-style services
+	logs            *LogSink      // nil when the client asked for no persisted log
+	exited          chan struct{} // closed when the underlying process has been reaped
 	// drained is closed once the PTY has been copied to its natural EOF and the
 	// log sink closed. Reaping is not the end of the output: the tail of what a
 	// job printed on its way out is still in flight when exited closes, and the
@@ -104,10 +111,21 @@ type RouteSink interface {
 	Remove(host string)
 }
 
+// JobTransition is one change of a job's lifecycle, as the daemon publishes
+// it: Job is a copy taken when it happened.
+type JobTransition struct {
+	Job           ManagedJob
+	Type          domain.EventType
+	ExitCode      *int
+	LastLines     []string
+	CorrelationID string
+}
+
 type Manager struct {
-	jobs   map[string]*ManagedJob
-	routes RouteSink
-	index  JobIndex
+	jobs         map[string]*ManagedJob
+	routes       RouteSink
+	index        JobIndex
+	onTransition func(JobTransition)
 	// namespaceBudget bounds the retries of a namespace's attach. Zero takes
 	// domain.NamespaceCreateTimeout; a test sets it so a command that is simply
 	// wrong does not hold the suite for the whole budget.
@@ -140,6 +158,9 @@ type ManagerParams struct {
 	// Stacks verifies what a detached launcher started. Nil takes the real one,
 	// which shells out to docker.
 	Stacks Stacks
+	// OnTransition hears every job starting and ending, outside the lock. Nil
+	// hears nothing.
+	OnTransition func(JobTransition)
 }
 
 func NewManagerWith(params ManagerParams) *Manager {
@@ -158,6 +179,7 @@ func NewManagerWith(params ManagerParams) *Manager {
 		namespaceBudget: params.NamespaceBudget,
 		orphans:         orphans,
 		stacks:          stacks,
+		onTransition:    params.OnTransition,
 	}
 }
 
@@ -212,6 +234,7 @@ func (m *Manager) Adopt(records []domain.JobRecord) {
 			LogDir:    record.LogDir,
 			SharedDir: record.SharedDir,
 			MainHolds: record.MainHolds,
+			Origin:    record.Origin,
 			exited:    exited,
 		}
 	}
@@ -286,6 +309,7 @@ func (m *Manager) upRecordsLocked() []domain.JobRecord {
 			MainHolds: job.MainHolds,
 			PID:       job.PID,
 			PGID:      job.PGID,
+			Origin:    job.Origin,
 		})
 	}
 	return records
@@ -331,6 +355,8 @@ type StartParams struct {
 	// per-worktree job, and cleared by startShared before it starts the real one
 	// so the ordinary path takes over.
 	Shared *domain.SharedJobContext
+	// Origin is what the job's events are published under; nil publishes none.
+	Origin *domain.EventOrigin
 	// real marks the second pass startShared makes to spawn the service itself.
 	// Without it a nil Shared would mean two different things — "this is the
 	// real start" and "the client resolved nothing" — and the second would
@@ -413,6 +439,7 @@ func (m *Manager) Start(params StartParams) error {
 		Routes:    params.Routes,
 		LogDir:    params.LogDir,
 		SharedDir: sharedDirOf(params),
+		Origin:    params.Origin,
 		output:    hub,
 		logs:      logs,
 		exited:    make(chan struct{}),
@@ -427,6 +454,7 @@ func (m *Manager) Start(params StartParams) error {
 
 	switch {
 	case job.Kind == domain.JobKindTask:
+		m.notify(notifyParams{Job: managed, Type: domain.EventJobStarted})
 		return m.runTask(managed, params.Streamer)
 	case rules.IsDetached(job):
 		if err := m.waitDetached(managed, params.Streamer); err != nil {
@@ -437,18 +465,82 @@ func (m *Manager) Start(params StartParams) error {
 		// now: a launcher that failed left nothing behind. A stop that reached the
 		// launcher first has had the last word.
 		m.mu.Lock()
-		if managed.Status == domain.JobStatusRunning {
+		up := managed.Status == domain.JobStatusRunning
+		if up {
 			managed.Status = domain.JobStatusDetached
 		}
 		m.mu.Unlock()
 		m.persist()
+		if up {
+			m.notify(notifyParams{Job: managed, Type: domain.EventJobStarted})
+		}
 		return nil
 	default:
 		go m.drainToHub(managed)
+		// Heard before the reaper starts, so a job dying at once still reads
+		// started, then crashed.
+		m.notify(notifyParams{Job: managed, Type: domain.EventJobStarted})
 		go m.waitForExit(managed)
 		m.persist()
 		return nil
 	}
+}
+
+type notifyParams struct {
+	Job       *ManagedJob
+	Type      domain.EventType
+	ExitCode  *int
+	LastLines []string
+}
+
+// notify is never called with the lock held: the copy it hands on is taken
+// under it.
+func (m *Manager) notify(params notifyParams) {
+	if m.onTransition == nil {
+		return
+	}
+	m.mu.Lock()
+	job := *params.Job
+	m.mu.Unlock()
+	correlation := job.stopCorrelation
+	if params.Type != domain.EventJobStopped && job.Origin != nil {
+		correlation = job.Origin.CorrelationID
+	}
+	m.onTransition(JobTransition{
+		Job:           job,
+		Type:          params.Type,
+		ExitCode:      params.ExitCode,
+		LastLines:     params.LastLines,
+		CorrelationID: correlation,
+	})
+}
+
+type endedParams struct {
+	Job      *ManagedJob
+	ExitCode int
+	Output   string
+}
+
+// ended publishes how a job's process ended on its own: a stop that reached it
+// first publishes its own event instead.
+func (m *Manager) ended(params endedParams) {
+	m.mu.Lock()
+	stopping := params.Job.stopping
+	m.mu.Unlock()
+	if stopping {
+		return
+	}
+	code := params.ExitCode
+	if code == 0 && params.Job.Config.Kind == domain.JobKindTask {
+		m.notify(notifyParams{Job: params.Job, Type: domain.EventJobExited, ExitCode: &code})
+		return
+	}
+	m.notify(notifyParams{
+		Job:       params.Job,
+		Type:      domain.EventJobCrashed,
+		ExitCode:  &code,
+		LastLines: rules.LastLines(rules.LastLinesParams{Text: cleanPTYOutput(params.Output), Count: domain.JobEventLastLines}),
+	})
 }
 
 type launchFailedParams struct {
@@ -665,9 +757,7 @@ func (m *Manager) runTask(job *ManagedJob, streamer io.Writer) error {
 	// "why it failed" without the user having to run `run logs`.
 	var captured string
 	if waitErr != nil {
-		job.output.mu.Lock()
-		captured = strings.TrimSpace(string(job.output.history.Snapshot()))
-		job.output.mu.Unlock()
+		captured = strings.TrimSpace(job.output.historyText())
 	}
 
 	// Closing the hub closed the subscriber channel, which lets the streaming
@@ -681,6 +771,8 @@ func (m *Manager) runTask(job *ManagedJob, streamer io.Writer) error {
 	m.mu.Lock()
 	delete(m.jobs, key)
 	m.mu.Unlock()
+
+	m.ended(endedParams{Job: job, ExitCode: exit, Output: captured})
 
 	if waitErr != nil {
 		// When a streamer was attached the client already saw the output live,
@@ -762,6 +854,7 @@ func (m *Manager) waitDetached(job *ManagedJob, streamer io.Writer) error {
 	job.closeLogs()
 
 	if err != nil {
+		m.ended(endedParams{Job: job, ExitCode: exitCodeOf(err), Output: buf.String()})
 		// When a streamer was attached the client already saw the output live,
 		// so return a concise error instead of re-embedding the capture (mirrors
 		// runTask) — otherwise `run up` would print the launcher output twice.
@@ -856,6 +949,12 @@ type outputHub struct {
 
 func newOutputHub(capacity int) *outputHub {
 	return &outputHub{history: newRingBuffer(capacity), subs: make(map[int]chan []byte)}
+}
+
+func (h *outputHub) historyText() string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return string(h.history.Snapshot())
 }
 
 func (h *outputHub) Write(p []byte) (int, error) {
@@ -1044,12 +1143,48 @@ type stopProcessParams struct {
 // The route goes only once the job is down: a stop command that fails leaves the
 // stack up, and it must stay reachable under its name.
 func (m *Manager) stopProcess(params stopProcessParams) error {
+	m.setStopping(setStoppingParams{Job: params.Job, Stopping: true})
 	err := m.tearDown(params)
 	if err != nil {
+		m.setStopping(setStoppingParams{Job: params.Job, Stopping: false})
 		return err
 	}
 	m.withdrawRoute(params.Job)
 	return nil
+}
+
+type setStoppingParams struct {
+	Job      *ManagedJob
+	Stopping bool
+}
+
+func (m *Manager) setStopping(params setStoppingParams) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	params.Job.stopping = params.Stopping
+}
+
+type AttributeStopParams struct {
+	// WorkDir empty is every worktree, Name empty every job of it.
+	WorkDir       string
+	Name          string
+	CorrelationID string
+}
+
+// AttributeStop names the command behind the stops about to follow, so their
+// events carry its correlation id rather than the start's.
+func (m *Manager) AttributeStop(params AttributeStopParams) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, job := range m.jobs {
+		if params.WorkDir != "" && job.WorkDir != params.WorkDir {
+			continue
+		}
+		if params.Name != "" && job.Name != params.Name {
+			continue
+		}
+		job.stopCorrelation = params.CorrelationID
+	}
 }
 
 func (m *Manager) tearDown(params stopProcessParams) error {
@@ -1216,6 +1351,7 @@ func (m *Manager) markStopped(job *ManagedJob) {
 	m.mu.Unlock()
 
 	m.persist()
+	m.notify(notifyParams{Job: job, Type: domain.EventJobStopped})
 }
 
 func (m *Manager) stopWithCommand(job *ManagedJob) error {
@@ -1294,7 +1430,9 @@ func (m *Manager) waitForExit(job *ManagedJob) {
 
 	m.mu.Lock()
 	job.ExitCode = &exit
-	crashed := job.Status == domain.JobStatusRunning && job.Config.Stop == ""
+	// A process killed by a stop is not a crash: the stop marks it stopped
+	// once it is reaped.
+	crashed := job.Status == domain.JobStatusRunning && job.Config.Stop == "" && !job.stopping
 	if crashed {
 		job.Status = domain.JobStatusCrashed
 	}
@@ -1309,6 +1447,8 @@ func (m *Manager) waitForExit(job *ManagedJob) {
 
 	m.withdrawRoute(job)
 	m.persist()
+	waitDrained(job)
+	m.ended(endedParams{Job: job, ExitCode: exit, Output: job.output.historyText()})
 }
 
 // publishRoute makes a started job reachable by name — under its own, and under

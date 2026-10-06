@@ -57,6 +57,10 @@ type Request struct {
 	Repo    string          `json:"repo,omitempty"`
 	Repos   []string        `json:"repos,omitempty"`
 	Payload json.RawMessage `json:"payload,omitempty"`
+	// Origin is who asks, for the job events this request causes: the
+	// repository and correlation id a start's events carry, the correlation id
+	// of a stop's. Nil on a start publishes none of that job's events.
+	Origin *domain.EventOrigin `json:"origin,omitempty"`
 }
 
 // ResponseStatus is the status field in a daemon response. For long-lived
