@@ -191,3 +191,31 @@ func EnvValueOwnedKeys(links []domain.EnvValueLink, file string) map[string]bool
 func EnvValueHasPlaceholder(value string) bool {
 	return envValueToken.MatchString(value)
 }
+
+type MainEnvValueRepairsParams struct {
+	// Stamps are the [[env]] values wtm would write into the main checkout,
+	// which it did until it stopped writing them there.
+	Stamps   []domain.EnvOwnedEntry
+	Current  map[string][]domain.EnvLine
+	Template map[string][]domain.EnvLine
+}
+
+// MainEnvValueRepairs puts back the template's value of every key the main
+// checkout still holds exactly as wtm stamped it. The match is what makes the
+// value wtm's own: one the user edited since is left alone, and so is a key the
+// template does not have.
+func MainEnvValueRepairs(params MainEnvValueRepairsParams) []domain.EnvOwnedEntry {
+	var repairs []domain.EnvOwnedEntry
+	for _, stamp := range params.Stamps {
+		current, held := pairsByKey(params.Current[stamp.File])[stamp.Key]
+		if !held || current.Value != stamp.Value {
+			continue
+		}
+		template, known := pairsByKey(params.Template[stamp.File])[stamp.Key]
+		if !known {
+			continue
+		}
+		repairs = append(repairs, domain.EnvOwnedEntry{File: stamp.File, Key: stamp.Key, Value: template.Value})
+	}
+	return repairs
+}

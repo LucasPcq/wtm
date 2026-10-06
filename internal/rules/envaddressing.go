@@ -82,3 +82,56 @@ func AddressingDriftLines(drifts []AddressingDriftParams) []string {
 	}
 	return lines
 }
+
+type MainAddressingParams struct {
+	Names domain.EnvPortPlan
+	Ports domain.EnvPortPlan
+}
+
+// MainAddressing reads the main checkout's .env from the plans each mode would
+// apply: current is the mode its linked values spell, and matters is false when
+// both modes write the same values, so there is nothing to choose.
+func MainAddressing(params MainAddressingParams) (current domain.Addressing, matters bool) {
+	current = domain.AddressingNames
+	if AddressedByPort(params.Names) {
+		current = domain.AddressingPorts
+	}
+	ports := make(map[string]string, len(params.Ports.Entries))
+	for _, entry := range params.Ports.Entries {
+		ports[entry.File+"\x00"+entry.Key] = settledValue(entry)
+	}
+	for _, entry := range params.Names.Entries {
+		if value, ok := ports[entry.File+"\x00"+entry.Key]; ok && value != settledValue(entry) {
+			return current, true
+		}
+	}
+	return current, false
+}
+
+func settledValue(entry domain.EnvPortEntry) string {
+	if entry.Status == domain.EnvPortStatusRewrite {
+		return entry.NewValue
+	}
+	return entry.CurrentValue
+}
+
+type EnvAddressingParams struct {
+	Requested domain.Addressing
+	Project   domain.Addressing
+	IsMain    bool
+}
+
+// ValidateEnvAddressing refuses an --addressing a worktree cannot take: names
+// on a project addressed by ports, which publishes none, and anything but the
+// project's mode on a linked worktree, which always follows run.toml.
+func ValidateEnvAddressing(params EnvAddressingParams) error {
+	switch {
+	case params.Requested == "" || params.Requested == params.Project:
+		return nil
+	case params.Requested == domain.AddressingNames:
+		return domain.ErrEnvAddressingProjectPorts
+	case !params.IsMain:
+		return domain.ErrEnvAddressingMainOnly
+	}
+	return nil
+}

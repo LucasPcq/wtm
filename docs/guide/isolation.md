@@ -34,6 +34,8 @@ PORT=5173
 
 ## Changing your mind
 
+`wtm env feat/login` asks it: the step offers to keep the worktree's isolation (first, so reconciling the `.env` changes nothing else) or to switch it, and the recap names what the switch puts back. Unattended, a run keeps the isolation unless the flag says otherwise:
+
 ```bash
 wtm env feat/login --isolation verbatim --yes    # back onto its source's values
 wtm env feat/login --isolation isolated --yes    # its own ports, project and namespaces again
@@ -41,7 +43,7 @@ wtm env feat/login --isolation isolated --yes    # its own ports, project and na
 
 - `--isolation isolated` writes every port, compose project and namespace value the worktree was left without.
 - `--isolation verbatim` puts the values wtm owns (linked ports, `[[env]]` values, `COMPOSE_PROJECT_NAME`) back to the source's, removes those the source lacks, and leaves every other key alone. The worktree shares its source's compose volumes again; namespaces it already created stay recorded, so `wtm clean` still drops them.
-- The new isolation is recorded only once the `.env` is in line with it: a run that fails or is cancelled records nothing. The interactive `wtm env` shows the values it will put back first, and its recap can keep a worktree verbatim from then on.
+- The new isolation is recorded only once the `.env` is in line with it: a run that fails or is cancelled records nothing. The interactive `wtm env` shows the values it will put back before anything is written.
 
 ## Worktrees created before v0.28
 
@@ -50,7 +52,7 @@ A worktree created by an earlier wtm has no `isolation` in its `meta.json`. It k
 | Command | Effect |
 | --- | --- |
 | `wtm env <branch> --yes` | reconciles its keys and **touches nothing run-related** (no port shift, no `COMPOSE_PROJECT_NAME`); a warning says the adoption is pending |
-| `wtm env <branch>` | the interactive run offers to adopt isolation and names what changes: a new compose project, so the volumes it uses today (`<old project>_*`) are no longer used |
+| `wtm env <branch>` | the interactive run offers to keep it as is, adopt isolation (naming what changes: a new compose project, so the volumes it uses today, `<old project>_*`, are no longer used), or record it verbatim |
 | `wtm env <branch> --isolation isolated` | adopts isolation explicitly |
 | `wtm env <branch> --isolation verbatim` | records that it stays on its source's values |
 

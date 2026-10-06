@@ -719,7 +719,7 @@ const (
 	// is not there to say the same thing.
 	AddressingDriftGlyph = "⚠ "
 	AddressingDriftTitle = "Published names, unsettled .env"
-	AddressingPortedFmt  = "%s's .env still spells ports — `wtm env %s` aligns it"
+	AddressingPortedFmt  = "%s's .env still spells ports — `wtm env %s --addressing names` aligns it"
 	AddressingDriftFmt   = "%s's .env is out of step with its names — `wtm env %s` settles it"
 
 	// FlagKeepEnv withholds the .env pass of `run addressing`, as --keep-data
@@ -738,7 +738,7 @@ const (
 	AddressingSettleNo        = "No, only run.toml"
 	AddressingSettledFmt      = "%s settled"
 	AddressingPendingFmt      = "%s still out of step — `wtm env <worktree>` settles one"
-	AddressingMainLeftFmt     = "%s left as is — `wtm env %s` moves it onto names, if you want it to"
+	AddressingMainLeftFmt     = "%s left as is — `wtm env %s --addressing names` moves it onto names, if you want it to"
 	AddressingMainLeftDescFmt = "\n%s is left out: a pass over every worktree never moves it onto names."
 	AddressingSettleFailedFmt = "%s: %v"
 	AddressingWorktreeNoun    = "worktree"
@@ -1114,20 +1114,41 @@ const (
 	EnvKeyGlyphAttention = "!"
 	EnvKeyGlyphOrphan    = "−"
 	// EnvFileHeaderFmt heads a file block; EnvFileSourceFmt is its muted half.
-	EnvFileHeaderFmt   = "%s   %s"
-	EnvFileSourceFmt   = "strategy: %s  ·  source: %s"
-	EnvFieldWorktree   = "Worktree"
-	EnvFieldMode       = "Mode"
-	EnvFieldIsolation  = "Isolation"
-	EnvModeCheckSuffix = "  ·  read-only check"
-	// The two ways to apply on the `wtm env` recap. The second exists so the
-	// port pass is proposed, as `wtm create` proposes it, and never imposed —
-	// and declining it records the worktree verbatim, since a .env left on its
-	// source's ports is only coherent with jobs run on them too.
-	EnvApplyActionLabel   = "Yes, apply"
-	EnvApplyVerbatimLabel = "Apply, and keep this worktree's .env verbatim from now on"
-	EnvApplyValue         = "apply"
-	EnvApplyVerbatimValue = "apply-verbatim"
+	EnvFileHeaderFmt    = "%s   %s"
+	EnvFileSourceFmt    = "strategy: %s  ·  source: %s"
+	EnvFieldWorktree    = "Worktree"
+	EnvFieldMode        = "Mode"
+	EnvFieldIsolation   = "Isolation"
+	EnvModeCheckSuffix  = "  ·  read-only check"
+	EnvApplyActionLabel = "Yes, apply"
+	EnvApplyValue       = "apply"
+
+	// EnvIsolation* is the `wtm env` step that keeps or switches a linked
+	// worktree's isolation. Keeping comes first: reconciling the keys is what
+	// the command is usually run for.
+	EnvIsolationStepLabel     = "Isolation"
+	EnvIsolationTitleFmt      = "Isolation — %s"
+	EnvIsolationDescription   = "How this worktree runs next to its source. Keeping it only reconciles the .env."
+	EnvIsolationKeepIsolated  = "Keep isolated — its own ports, compose project and namespaces"
+	EnvIsolationKeepVerbatim  = "Keep verbatim — its source's ports and compose project"
+	EnvIsolationToVerbatim    = "Switch to verbatim — the values wtm owns go back to the source's"
+	EnvIsolationToIsolated    = "Switch to isolated — its own ports and compose project, its own empty volumes"
+	EnvIsolationAdoptVerbatim = "Record it verbatim — keep its source's values from now on"
+
+	// EnvAddressing* is the step the main checkout gets instead: it is always
+	// isolated, and the one checkout no pass ever moves onto names unasked.
+	EnvAddressingStepLabel   = "Addressing"
+	EnvAddressingTitleFmt    = "Addressing — %s"
+	EnvAddressingDescription = "The main checkout is the one that exists without wtm. On names, whoever reads its .env depends on the run proxy."
+	EnvAddressingKeepPorts   = "Keep ports — http://localhost:<port>, as without wtm"
+	EnvAddressingKeepNames   = "Keep names — served by the run proxy"
+	EnvAddressingToNames     = "Move onto names — http://<job>.<repo>.localhost, served by the run proxy"
+	EnvAddressingToPorts     = "Back to ports — http://localhost:<port>, as without wtm"
+	EnvRecapFieldAddressing  = "Addresses: "
+	EnvRecapUnchanged        = " (unchanged)"
+	EnvIsolationMainSkip     = "the main checkout is always isolated"
+	EnvAddressingSkip        = "both modes write the same values"
+	EnvAddressingLinkedSkip  = "a linked worktree follows run.toml"
 
 	// The `wtm env` wizard: its steps, and the recap of what the apply writes.
 	EnvWizardErrLabel       = "env wizard"
@@ -1192,10 +1213,9 @@ const (
 	// EnvDetailRestored* are the file-block rows of those values.
 	EnvDetailRestoredFmt        = "back to the source's %s (was %s)"
 	EnvDetailRestoredRemovedFmt = "removed — the source has none (was %s)"
-	// EnvRestoreRecap* head the wizard recap's preview of what verbatim puts
-	// back: the switch asked for, or the one the verbatim action would make.
+	// EnvRestoreRecapTitle heads the wizard recap's preview of what the switch
+	// to verbatim puts back.
 	EnvRestoreRecapTitle       = "Back to the source's values"
-	EnvRestoreRecapIfKeptTitle = "Keeping it verbatim also puts back"
 	EnvIsolationNotSwitchedFmt = "%s was not switched to %s: %s — run `wtm env %s --isolation %s` once run.toml is fixed"
 
 	// The [[env_port]] detection of `wtm run init`.
@@ -1338,17 +1358,18 @@ const (
 	IsolationUnknownFmt = "unknown isolation %q (expected %q or %q)"
 
 	// Flag names.
-	FlagFrom      = "from"
-	FlagFF        = "ff"
-	FlagEnvFrom   = "env-from"
-	FlagIsolation = "isolation"
-	FlagForce     = "force"
-	FlagBase      = "base"
-	FlagExclusive = "exclusive"
-	FlagParallel  = "parallel"
-	FlagDetach    = "detach"
-	FlagProfile   = "profile"
-	FlagOutput    = "output"
+	FlagFrom       = "from"
+	FlagFF         = "ff"
+	FlagEnvFrom    = "env-from"
+	FlagIsolation  = "isolation"
+	FlagAddressing = "addressing"
+	FlagForce      = "force"
+	FlagBase       = "base"
+	FlagExclusive  = "exclusive"
+	FlagParallel   = "parallel"
+	FlagDetach     = "detach"
+	FlagProfile    = "profile"
+	FlagOutput     = "output"
 	// FlagQuiet silences a command's human output. It is the output axis, not the
 	// confirmation one: --quiet still asks and --yes still reports, so a script
 	// wanting neither passes both.
@@ -3284,10 +3305,8 @@ const (
 	IsolationAdoptKeepLabel   = "Keep as is — ports and compose project untouched"
 	IsolationAdoptComposeFmt  = "Adopt isolation — new compose project %s, your current volumes (%s_*) will no longer be used"
 	IsolationAdoptPortsLabel  = "Adopt isolation — its ports move onto this worktree's own"
-	IsolationAdoptKeepValue   = "keep"
-	IsolationAdoptValue       = "adopt"
+	EnvKeepValue              = "keep"
 	IsolationAdoptKeptSummary = "kept as is"
-	IsolationAdoptSummary     = "adopted"
 	// EnvIsolationNotAdoptedFmt is what `wtm env` says of the run values it left
 	// alone on such a worktree, and how to adopt isolation later.
 	EnvIsolationNotAdoptedFmt = "%s predates isolation: its ports and compose project were left as they are — adopt it with `wtm env %s --isolation isolated`"

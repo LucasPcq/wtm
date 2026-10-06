@@ -123,6 +123,19 @@ func TestEnvPortPlanTouches(t *testing.T) {
 	}
 }
 
+func TestEnvPortPlanTouchesCountsAnOwnedValueItRewrites(t *testing.T) {
+	plan := domain.EnvPortPlan{Owned: []domain.EnvOwnedEntry{
+		{File: "apps/api/.env", Key: "REALM", Value: "acme", Changed: true},
+		{File: "apps/web/.env", Key: "REALM", Value: "acme"},
+	}}
+	if !EnvPortPlanTouches(plan, "apps/api/.env") {
+		t.Error("EnvPortPlanTouches() = false for a file whose owned value it rewrites")
+	}
+	if EnvPortPlanTouches(plan, "apps/web/.env") {
+		t.Error("EnvPortPlanTouches() = true for a file whose owned value is already right")
+	}
+}
+
 // A file the repository does not have anywhere is never "no drift": nothing is
 // missing from it because nothing can ever be in it.
 func TestEnvSummaryRefusesToCallAnUnresolvableFileClean(t *testing.T) {

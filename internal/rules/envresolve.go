@@ -137,34 +137,22 @@ func envRecapValue(value string) string {
 	return fmt.Sprintf("%q", value)
 }
 
-type EnvRestoreRecapParams struct {
-	Entries []domain.EnvRestoredEntry
-	// Switch is a run asked to go verbatim; otherwise the lines preview what the
-	// verbatim action would do on top of the apply, and only when it is Offered.
-	Switch  bool
-	Offered bool
-}
-
-// EnvRestoreRecapLines previews what verbatim puts back, before it is written.
-func EnvRestoreRecapLines(params EnvRestoreRecapParams) []string {
-	if len(params.Entries) == 0 || (!params.Switch && !params.Offered) {
+// EnvRestoreRecapLines previews what the switch to verbatim puts back, before
+// it is written.
+func EnvRestoreRecapLines(entries []domain.EnvRestoredEntry) []string {
+	if len(entries) == 0 {
 		return nil
 	}
-	title := domain.EnvRestoreRecapTitle
-	if !params.Switch {
-		title = domain.EnvRestoreRecapIfKeptTitle
-	}
-
-	lines := []string{"", title}
+	lines := []string{"", domain.EnvRestoreRecapTitle}
 	var files []string
-	for _, entry := range params.Entries {
+	for _, entry := range entries {
 		if !slices.Contains(files, entry.File) {
 			files = append(files, entry.File)
 		}
 	}
 	for _, file := range files {
 		lines = append(lines, file)
-		for _, row := range EnvRestoredRows(params.Entries, file) {
+		for _, row := range EnvRestoredRows(entries, file) {
 			lines = append(lines, domain.RecapRowIndent+row)
 		}
 	}

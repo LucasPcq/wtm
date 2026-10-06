@@ -109,6 +109,12 @@ var (
 	// source every other .env is copied from, so there is nothing for it to copy.
 	ErrIsolationMain = errors.New("the main checkout is always isolated: it is the one the others copy from")
 
+	// ErrEnvAddressingMainOnly and ErrEnvAddressingProjectPorts refuse an
+	// --addressing `wtm env` cannot honour: a linked worktree follows run.toml's
+	// mode, and a project on ports publishes no name to move onto.
+	ErrEnvAddressingMainOnly     = errors.New("--addressing other than run.toml's applies to the main checkout only: the other worktrees follow `wtm run addressing`")
+	ErrEnvAddressingProjectPorts = errors.New("run.toml addresses by ports, so no name is published: switch the project with `wtm run addressing names` first")
+
 	ErrEnvIsolationWithCheck = errors.New("--isolation records a choice for the worktree, and --check writes nothing: pass one or the other")
 
 	// ErrGHNotInstalled is returned when the gh CLI is not found on PATH.

@@ -51,7 +51,7 @@ job   = "postgres"
 value = "postgresql://app:app@localhost:{port.POSTGRES_PORT}/{namespace}"
 ```
 
-The placeholders are `{namespace}`, `{port.NAME}` (a port of that job, as it resolves in the worktree), `{origin}` (the job's published address), `{worktree}` and `{ordinal}`; anything else is refused when `run.toml` is read. A key may be written by an `[[env]]` link or an `[[env_port]]` link, never both. The links are settled when a worktree is created and whenever `wtm env` reconciles it, no daemon needed.
+The placeholders are `{namespace}`, `{port.NAME}` (a port of that job, as it resolves in the worktree), `{origin}` (the job's published address), `{worktree}` and `{ordinal}`; anything else is refused when `run.toml` is read. A key may be written by an `[[env]]` link or an `[[env_port]]` link, never both. The links are settled when a worktree is created and whenever `wtm env` reconciles it, no daemon needed. The main checkout gets none: its databases and realms are its own, so its `.env` keeps the values it has, and `wtm env main` puts back the template's value of any key an earlier wtm wrote there (`wt_main`, `acme-main`).
 
 ## What `clean` and `prune` do with the data
 

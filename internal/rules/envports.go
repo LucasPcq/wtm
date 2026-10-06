@@ -725,5 +725,10 @@ func EnvPortPlanTouches(plan domain.EnvPortPlan, target string) bool {
 			return true
 		}
 	}
+	for _, e := range OwnedEnvRewrites(plan) {
+		if e.File == target {
+			return true
+		}
+	}
 	return false
 }

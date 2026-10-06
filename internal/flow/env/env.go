@@ -25,6 +25,9 @@ type Request struct {
 	// Isolation settles the worktree on it, recorded only once its .env is in
 	// line; empty keeps the recorded one unless the wizard picks another.
 	Isolation domain.Isolation
+	// Addressing writes the main checkout's linked values in that mode; empty
+	// keeps the one its .env spells. Every other worktree follows run.toml.
+	Addressing domain.Addressing
 }
 
 type Outcome struct {
@@ -53,7 +56,9 @@ func Run(params Params) (Outcome, error) {
 		request:   params.Request,
 		prompter:  params.Prompter,
 		presenter: params.Presenter,
-		scans:     map[string]branchScan{},
+		scans:     map[scanKey]branchScan{},
+		modes:     map[string]modeState{},
+		refused:   map[string]string{},
 	}
 	return f.run()
 }
@@ -64,10 +69,12 @@ type envFlow struct {
 	prompter  flow.Prompter
 	presenter Presenter
 
-	// statuses and scans exist only for a run that asks: they feed the picker's
-	// badges and every screen after it.
+	// statuses, scans and refused exist only for a run that asks: they feed
+	// the picker's badges and every screen after it.
 	statuses []domain.WorktreeStatus
-	scans    map[string]branchScan
+	scans    map[scanKey]branchScan
+	refused  map[string]string
+	modes    map[string]modeState
 }
 
 func (f *envFlow) run() (Outcome, error) {
@@ -98,7 +105,7 @@ func (f *envFlow) run() (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	params := applyParams{Target: target, Isolation: f.isolation(answers)}
+	params := applyParams{Target: target, Isolation: f.isolation(answers), Addressing: f.addressing(answers)}
 	if f.prompter.Interactive() {
 		resolve, _ := answers.Get(KeyResolve)
 		params.Resolutions = resolutions(resolve.EnvDecisions)
@@ -130,16 +137,23 @@ func (f *envFlow) lookup(branch string) (target, error) {
 	return target{branch: wt.Branch, path: wt.Path}, nil
 }
 
-// isolation is the one the run settles the worktree on: --isolation, else the
-// wizard's adoption or its verbatim action, else none — the recorded one stays.
+// isolation is the one the run settles the worktree on, empty to keep the
+// recorded one.
 func (f *envFlow) isolation(answers flow.Answers) domain.Isolation {
-	if answers.Value(KeyAdopt) == domain.IsolationAdoptValue {
-		return domain.IsolationIsolated
+	return domain.Isolation(changed(answers.Value(KeyIsolation)))
+}
+
+// addressing is the mode the run writes the main checkout's linked values in,
+// empty to keep the one its .env spells.
+func (f *envFlow) addressing(answers flow.Answers) domain.Addressing {
+	return domain.Addressing(changed(answers.Value(KeyAddressing)))
+}
+
+func changed(answer string) string {
+	if answer == domain.EnvKeepValue {
+		return ""
 	}
-	if answers.Value(KeyRecap) == domain.EnvApplyVerbatimValue {
-		return domain.IsolationVerbatim
-	}
-	return f.request.Isolation
+	return answer
 }
 
 func resolutions(decisions []domain.EnvFileDecision) map[string]envsvc.EnvResolution {
@@ -167,8 +181,9 @@ func toSet(keys []string) map[string]bool {
 }
 
 type applyParams struct {
-	Target    target
-	Isolation domain.Isolation
+	Target     target
+	Isolation  domain.Isolation
+	Addressing domain.Addressing
 	// Resolutions are the wizard's decisions; nil is a run driven by its flags.
 	Resolutions map[string]envsvc.EnvResolution
 }
@@ -179,7 +194,11 @@ func (f *envFlow) apply(params applyParams) (Outcome, error) {
 	if err := f.checkIsolation(params.Target, params.Isolation); err != nil {
 		return Outcome{}, err
 	}
-	adoption, err := f.adoption(params.Target)
+	addressing, err := f.settledAddressing(params.Target, params.Addressing)
+	if err != nil {
+		return Outcome{}, err
+	}
+	state, err := f.stateOf(params.Target)
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -189,7 +208,7 @@ func (f *envFlow) apply(params applyParams) (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	pass := f.runPass(runPassParams{Target: params.Target, Adoption: adoption, Isolation: params.Isolation, Reserved: sw.keys()})
+	pass := f.runPass(runPassParams{Target: params.Target, Adoption: state.adoption, Isolation: params.Isolation, Addressing: addressing, Reserved: sw.keys()})
 
 	result, err := f.reconcile(reconcileParams{Target: params.Target, Ctx: ctx, Pass: pass, Resolutions: params.Resolutions})
 	if err != nil {

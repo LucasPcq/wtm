@@ -233,3 +233,39 @@ func linksForFile(links []domain.EnvPortLink, file string) []domain.EnvPortLink 
 	}
 	return out
 }
+
+type MainEnvValueRepairsParams struct {
+	MainPath string
+	Files    []domain.EnvFile
+	Stamps   []domain.EnvOwnedEntry
+}
+
+// MainEnvValueRepairs reads the main checkout's files and their templates for
+// the [[env]] values wtm once wrote there, and plans putting them back.
+func MainEnvValueRepairs(params MainEnvValueRepairsParams) ([]domain.EnvOwnedEntry, error) {
+	current := map[string][]domain.EnvLine{}
+	template := map[string][]domain.EnvLine{}
+	for _, file := range params.Files {
+		if !stampsFile(params.Stamps, file.Target) {
+			continue
+		}
+		lines, err := readEnvFile(filepath.Join(params.MainPath, file.Target))
+		if err != nil {
+			return nil, err
+		}
+		current[file.Target] = lines
+		if template[file.Target], err = templateLines(params.MainPath, file); err != nil {
+			return nil, err
+		}
+	}
+	return rules.MainEnvValueRepairs(rules.MainEnvValueRepairsParams{Stamps: params.Stamps, Current: current, Template: template}), nil
+}
+
+func stampsFile(stamps []domain.EnvOwnedEntry, target string) bool {
+	for _, stamp := range stamps {
+		if stamp.File == target {
+			return true
+		}
+	}
+	return false
+}

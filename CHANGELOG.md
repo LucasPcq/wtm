@@ -4,6 +4,19 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+### Added
+
+- **`wtm env --addressing ports|names`** moves the main checkout's addresses onto names, or back to ports, on its own. → [The main checkout](docs/guide/addressing.md#the-main-checkout)
+
+### Changed
+
+- **`wtm env main`** keeps the addressing its `.env` spells: reconciling its keys no longer moves it onto named URLs; pass `--addressing names` for that. → [The main checkout](docs/guide/addressing.md#the-main-checkout)
+- **`wtm env`** asks whether to keep or switch the worktree's isolation (the main checkout: its addressing), keeping it by default; the recap's verbatim action is gone. → [Isolation](docs/guide/isolation.md#changing-your-mind)
+
+### Fixed
+
+- **`wtm env main`** no longer writes `[[env]]` namespaces into the main checkout (`wt_main`, `acme-main`), and puts back the template's value where an earlier run did. → [Shared services](docs/guide/shared-services.md#telling-the-app-env)
+
 ## [0.29.1] - 2026-10-05
 
 A fix release for `wtm create` and `run.toml`, with a shorter isolation question.

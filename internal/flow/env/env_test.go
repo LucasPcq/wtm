@@ -178,16 +178,19 @@ func TestRunSkipsTheResolverWhenOnlyPortsMove(t *testing.T) {
 	withPorts(t, ctx)
 	makeWorktree(t, ctx, "feat/a")
 
-	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyRecap: domain.EnvApplyValue}}
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyIsolation: domain.EnvKeepValue, KeyRecap: domain.EnvApplyValue}}
 	if _, _, err := run(ctx, Request{Worktree: "feat/a"}, prompter); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if prompter.AskedKeys() != "env.recap" {
-		t.Errorf("asked %s, want the recap alone", prompter.AskedKeys())
+	if prompter.AskedKeys() != "env.isolation,env.recap" {
+		t.Errorf("asked %s, want the isolation and the recap alone", prompter.AskedKeys())
 	}
 	recap := prompter.Content[KeyRecap]
-	if !strings.Contains(recap.Description, domain.EnvRecapSafeOnly) || !strings.Contains(recap.Description, "WEB_PORT") || len(recap.Options) != 2 {
-		t.Errorf("recap = %+v, want the port move announced and the verbatim action offered", recap)
+	if !strings.Contains(recap.Description, domain.EnvRecapSafeOnly) || !strings.Contains(recap.Description, "WEB_PORT") || len(recap.Options) != 1 {
+		t.Errorf("recap = %+v, want the port move announced and a single confirmation", recap)
+	}
+	if want := domain.RecapFieldIsolation + domain.IsolationSummaryIsolated + domain.EnvRecapUnchanged; !strings.Contains(recap.Description, want) {
+		t.Errorf("recap lacks %q:\n%s", want, recap.Description)
 	}
 }
 
@@ -215,7 +218,7 @@ func TestRunAdoptingRecordsTheIsolation(t *testing.T) {
 	forgetIsolation(t, ctx, "feat/a")
 	ref := worktree.WorktreeRef{ProjectDir: ctx.ProjectDir, StateDir: ctx.StateDir, Branch: "feat/a"}
 
-	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyAdopt: domain.IsolationAdoptValue, KeyRecap: domain.EnvApplyValue}}
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyIsolation: string(domain.IsolationIsolated), KeyRecap: domain.EnvApplyValue}}
 	outcome, _, err := run(ctx, Request{Worktree: "feat/a"}, prompter)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -360,7 +363,7 @@ func TestRunSettlesTheConfiguredEnvDespiteAnOrphanLink(t *testing.T) {
 	}
 	path := makeWorktree(t, ctx, "feat/a")
 
-	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyRecap: domain.EnvApplyValue}}
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyIsolation: domain.EnvKeepValue, KeyRecap: domain.EnvApplyValue}}
 	outcome, _, err := run(ctx, Request{Worktree: "feat/a"}, prompter)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -371,5 +374,223 @@ func TestRunSettlesTheConfiguredEnvDespiteAnOrphanLink(t *testing.T) {
 	warnings := outcome.Result.Warnings
 	if len(warnings) != 1 || !strings.Contains(warnings[0], "X_PORT") || !strings.Contains(warnings[0], "services/x/.env") || strings.Contains(warnings[0], "not settled") {
 		t.Errorf("warnings = %v, want the orphan link named alone, the pass settled", warnings)
+	}
+}
+
+const namedAPI = `
+[[job]]
+name = "api"
+kind = "service"
+cmd = "pnpm dev"
+ports = { PORT = 4001 }
+url = { port = "PORT" }
+
+[[env_port]]
+file = ".env"
+key = "API_URL"
+job = "api"
+port = "PORT"
+`
+
+// withNamedAPI publishes a job by name and links a URL-shaped value to it,
+// with main's .env still spelling the port, as a checkout predating wtm does.
+func withNamedAPI(t *testing.T, ctx flow.Context, addressing domain.Addressing) {
+	t.Helper()
+	write(t, filepath.Join(ctx.StateDir, domain.RunFileName), "addressing = \""+string(addressing)+"\"\n"+namedAPI)
+	write(t, filepath.Join(ctx.ProjectDir, ".env"), "SHARED=main\nAPI_URL=http://localhost:4001\n")
+}
+
+func setIsolation(t *testing.T, ctx flow.Context, branch string, isolation domain.Isolation) {
+	t.Helper()
+	ref := worktree.WorktreeRef{ProjectDir: ctx.ProjectDir, StateDir: ctx.StateDir, Branch: branch}
+	if err := worktree.SetIsolation(worktree.SetIsolationParams{Ref: ref, Isolation: isolation}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func recorded(ctx flow.Context, branch string) domain.Isolation {
+	return worktree.RecordedIsolation(worktree.WorktreeRef{ProjectDir: ctx.ProjectDir, StateDir: ctx.StateDir, Branch: branch})
+}
+
+func TestTheWizardSwitchesAnIsolatedWorktreeToVerbatim(t *testing.T) {
+	ctx := testContext(t)
+	withPorts(t, ctx)
+	path := makeWorktree(t, ctx, "feat/a")
+	if _, _, err := run(ctx, Request{Worktree: "feat/a"}, flow.Unattended{}); err != nil {
+		t.Fatalf("settle: %v", err)
+	}
+	if got := read(t, filepath.Join(path, ".env")); strings.Contains(got, "WEB_PORT=3000") {
+		t.Fatalf(".env = %q, want its own port before the switch", got)
+	}
+
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{
+		KeyWorktree:  "feat/a",
+		KeyIsolation: string(domain.IsolationVerbatim),
+		KeyRecap:     domain.EnvApplyValue,
+	}}
+	outcome, _, err := run(ctx, Request{}, prompter)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if options := prompter.Content[KeyIsolation].Options; len(options) != 2 || options[0].Value != domain.EnvKeepValue || options[0].Label != domain.EnvIsolationKeepIsolated {
+		t.Errorf("options = %+v, want keeping isolated first, then the switch", options)
+	}
+	if recap := prompter.Content[KeyRecap].Description; !strings.Contains(recap, domain.EnvRestoreRecapTitle) || !strings.Contains(recap, domain.RecapFieldIsolation+domain.IsolationSummaryVerbatim) {
+		t.Errorf("recap = %q, want the switch and what it puts back", recap)
+	}
+	if recap := prompter.Content[KeyRecap].Description; strings.Contains(recap, domain.EnvRecapFieldAddressing) {
+		t.Errorf("recap = %q, want no addressing line on a linked worktree", recap)
+	}
+	if !outcome.IsolationChanged || recorded(ctx, "feat/a") != domain.IsolationVerbatim {
+		t.Errorf("outcome = %+v, recorded = %q; want verbatim recorded", outcome, recorded(ctx, "feat/a"))
+	}
+	if got := read(t, filepath.Join(path, ".env")); !strings.Contains(got, "WEB_PORT=3000") {
+		t.Errorf(".env = %q, want the source's port back", got)
+	}
+}
+
+func TestTheWizardMovesAVerbatimWorktreeOntoIsolation(t *testing.T) {
+	ctx := testContext(t)
+	withPorts(t, ctx)
+	path := makeWorktree(t, ctx, "feat/a")
+	setIsolation(t, ctx, "feat/a", domain.IsolationVerbatim)
+
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyIsolation: string(domain.IsolationIsolated), KeyRecap: domain.EnvApplyValue}}
+	outcome, _, err := run(ctx, Request{Worktree: "feat/a"}, prompter)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if options := prompter.Content[KeyIsolation].Options; len(options) != 2 || options[0].Label != domain.EnvIsolationKeepVerbatim {
+		t.Errorf("options = %+v, want keeping verbatim first", options)
+	}
+	if recap := prompter.Content[KeyRecap].Description; !strings.Contains(recap, domain.EnvRecapAdoptPorts) {
+		t.Errorf("recap = %q, want the port move announced", recap)
+	}
+	if !outcome.IsolationChanged || recorded(ctx, "feat/a") != domain.IsolationIsolated {
+		t.Errorf("outcome = %+v, recorded = %q; want isolated recorded", outcome, recorded(ctx, "feat/a"))
+	}
+	if got := read(t, filepath.Join(path, ".env")); strings.Contains(got, "WEB_PORT=3000") {
+		t.Errorf(".env = %q, want its own port", got)
+	}
+}
+
+func TestAnUnattendedRunKeepsAVerbatimWorktreeAsItIs(t *testing.T) {
+	ctx := testContext(t)
+	withPorts(t, ctx)
+	path := makeWorktree(t, ctx, "feat/a")
+	setIsolation(t, ctx, "feat/a", domain.IsolationVerbatim)
+
+	outcome, _, err := run(ctx, Request{Worktree: "feat/a"}, flow.Unattended{})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if outcome.IsolationChanged || recorded(ctx, "feat/a") != domain.IsolationVerbatim {
+		t.Errorf("outcome = %+v, recorded = %q; want it left verbatim", outcome, recorded(ctx, "feat/a"))
+	}
+	if got := read(t, filepath.Join(path, ".env")); !strings.Contains(got, "WEB_PORT=3000") {
+		t.Errorf(".env = %q, want the source's port kept", got)
+	}
+}
+
+func TestMainKeepsWhatItsEnvSpellsUnlessAsked(t *testing.T) {
+	ctx := testContext(t)
+	withNamedAPI(t, ctx, domain.AddressingNames)
+	env := filepath.Join(ctx.ProjectDir, ".env")
+
+	if _, _, err := run(ctx, Request{Worktree: "main"}, flow.Unattended{}); err != nil {
+		t.Fatalf("unattended: %v", err)
+	}
+	if got := read(t, env); !strings.Contains(got, "API_URL=http://localhost:4001") {
+		t.Fatalf(".env = %q, want main left on ports", got)
+	}
+	if _, _, err := run(ctx, Request{Worktree: "main", Check: true}, flow.Unattended{}); err != nil {
+		t.Errorf("check: %v, want main on ports to read as in sync", err)
+	}
+
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyAddressing: domain.EnvKeepValue}}
+	if _, _, err := run(ctx, Request{Worktree: "main"}, prompter); err != nil {
+		t.Fatalf("wizard: %v", err)
+	}
+	if prompter.AskedKeys() != "env.addressing" {
+		t.Errorf("asked %s, want the addressing alone", prompter.AskedKeys())
+	}
+	if options := prompter.Content[KeyAddressing].Options; len(options) != 2 || options[0].Label != domain.EnvAddressingKeepPorts {
+		t.Errorf("options = %+v, want keeping ports first", options)
+	}
+
+	if _, _, err := run(ctx, Request{Worktree: "main", Addressing: domain.AddressingNames}, flow.Unattended{}); err != nil {
+		t.Fatalf("to names: %v", err)
+	}
+	if got := read(t, env); !strings.Contains(got, ".localhost") || strings.Contains(got, "localhost:4001") {
+		t.Fatalf(".env = %q, want main moved onto names", got)
+	}
+
+	prompter = &flowtest.ScriptedPrompter{Answers: map[string]string{KeyAddressing: string(domain.AddressingPorts), KeyRecap: domain.EnvApplyValue}}
+	if _, _, err := run(ctx, Request{Worktree: "main"}, prompter); err != nil {
+		t.Fatalf("back to ports: %v", err)
+	}
+	if options := prompter.Content[KeyAddressing].Options; options[0].Label != domain.EnvAddressingKeepNames {
+		t.Errorf("options = %+v, want keeping names first once main is on them", options)
+	}
+	if recap := prompter.Content[KeyRecap].Description; !strings.Contains(recap, domain.EnvRecapFieldAddressing+string(domain.AddressingPorts)) {
+		t.Errorf("recap = %q, want the move back to ports named", recap)
+	}
+	if got := read(t, env); !strings.Contains(got, "API_URL=http://localhost:4001") {
+		t.Errorf(".env = %q, want main back on ports", got)
+	}
+}
+
+func TestAddressingFlagsAWorktreeCannotTakeAreRefused(t *testing.T) {
+	ctx := testContext(t)
+	withNamedAPI(t, ctx, domain.AddressingNames)
+	makeWorktree(t, ctx, "feat/a")
+
+	if _, _, err := run(ctx, Request{Worktree: "feat/a", Addressing: domain.AddressingPorts}, flow.Unattended{}); !errors.Is(err, domain.ErrEnvAddressingMainOnly) {
+		t.Errorf("linked worktree on ports: err = %v, want ErrEnvAddressingMainOnly", err)
+	}
+	if _, _, err := run(ctx, Request{Worktree: "feat/a", Addressing: domain.AddressingNames}, flow.Unattended{}); err != nil {
+		t.Errorf("linked worktree on the project's mode: err = %v, want it accepted", err)
+	}
+
+	withNamedAPI(t, ctx, domain.AddressingPorts)
+	if _, _, err := run(ctx, Request{Worktree: "main", Addressing: domain.AddressingNames}, flow.Unattended{}); !errors.Is(err, domain.ErrEnvAddressingProjectPorts) {
+		t.Errorf("main on names in a ports project: err = %v, want ErrEnvAddressingProjectPorts", err)
+	}
+}
+
+func TestMainGetsBackTheEnvValuesWtmStampedIntoIt(t *testing.T) {
+	ctx := testContext(t)
+	write(t, filepath.Join(ctx.StateDir, domain.RunFileName), `
+[[job]]
+name = "kc"
+kind = "service"
+cmd = "run-kc"
+
+[[env]]
+file = ".env"
+key = "KEYCLOAK_REALM"
+job = "kc"
+value = "acme-{worktree}"
+`)
+	write(t, filepath.Join(ctx.ProjectDir, ".env.example"), "SHARED=\nKEYCLOAK_REALM=acme\n")
+	env := filepath.Join(ctx.ProjectDir, ".env")
+	write(t, env, "SHARED=main\nKEYCLOAK_REALM=acme-main\n")
+
+	if _, _, err := run(ctx, Request{Worktree: "main", Check: true}, flow.Unattended{}); !errors.Is(err, domain.ErrEnvDrift) {
+		t.Errorf("check: err = %v, want the stamped value counted as drift", err)
+	}
+	if _, _, err := run(ctx, Request{Worktree: "main"}, flow.Unattended{}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := read(t, env); got != "SHARED=main\nKEYCLOAK_REALM=acme\n" {
+		t.Errorf(".env = %q, want the template's realm back", got)
+	}
+
+	write(t, env, "SHARED=main\nKEYCLOAK_REALM=my-realm\n")
+	if _, _, err := run(ctx, Request{Worktree: "main"}, flow.Unattended{}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := read(t, env); got != "SHARED=main\nKEYCLOAK_REALM=my-realm\n" {
+		t.Errorf(".env = %q, want a value the user chose left alone", got)
 	}
 }

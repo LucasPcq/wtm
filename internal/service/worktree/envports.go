@@ -59,10 +59,11 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 
 	cfg, _ = rules.PartitionEnvTargets(rules.PartitionEnvTargetsParams{Config: cfg, Files: params.EnvFiles})
 
-	owned, err := ownedEnvWrites(ownedEnvWritesParams{Resolve: params, Config: cfg})
+	isMain, err := writesMainShapedValues(writesMainShapedValuesParams{Resolve: params, Config: cfg, Ref: ref})
 	if err != nil {
 		return envsvc.EnvPortsParams{}, err
 	}
+	owned := ownedEnvWrites(ownedEnvWritesParams{Resolve: params, Config: cfg, IsMain: isMain})
 
 	// The identity needs neither an ordinal nor an offset, so a project with no
 	// link resolves without asking git anything — EnsureOrdinal writes, and this
@@ -113,11 +114,22 @@ func ResolveEnvPorts(params ResolveEnvPortsParams) (envsvc.EnvPortsParams, error
 	if err != nil {
 		return envsvc.EnvPortsParams{}, err
 	}
+	valueLinks := cfg.EnvValues
+	// The main checkout's databases and realms are its own: its [[env]] keys
+	// are plain keys there, and a value wtm stamped into it earlier goes back
+	// to the template's.
+	if isMain {
+		valueLinks = nil
+		values, err = envsvc.MainEnvValueRepairs(envsvc.MainEnvValueRepairsParams{MainPath: params.WorktreePath, Files: params.EnvFiles, Stamps: values})
+		if err != nil {
+			return envsvc.EnvPortsParams{}, err
+		}
+	}
 
 	return envsvc.EnvPortsParams{
 		WorktreePath: params.WorktreePath,
 		Links:        cfg.EnvPorts,
-		ValueLinks:   cfg.EnvValues,
+		ValueLinks:   valueLinks,
 		Owned:        append(owned, values...),
 		Bases:        rules.EnvPortBases(cfg),
 		Shared:       rules.SharedJobNames(cfg),
@@ -139,9 +151,26 @@ func EnvPortPlanFor(params ResolveEnvPortsParams) (domain.EnvPortPlan, error) {
 	return envsvc.ComputeEnvPorts(resolved)
 }
 
+type writesMainShapedValuesParams struct {
+	Resolve ResolveEnvPortsParams
+	Config  domain.RunConfig
+	Ref     WorktreeRef
+}
+
+// writesMainShapedValues asks git whether this is the main checkout only when
+// the answer changes a value: a compose project name or an [[env]] link.
+func writesMainShapedValues(params writesMainShapedValuesParams) (bool, error) {
+	targets := rules.OwnedEnvTargets(rules.OwnedEnvTargetsParams{Config: params.Config, EnvFiles: params.Resolve.EnvFiles})
+	if len(targets) == 0 && len(params.Config.EnvValues) == 0 {
+		return false, nil
+	}
+	return isMainBranch(params.Ref)
+}
+
 type ownedEnvWritesParams struct {
 	Resolve ResolveEnvPortsParams
 	Config  domain.RunConfig
+	IsMain  bool
 }
 
 // ownedEnvWrites resolves the compose project name from the branch and the
@@ -150,21 +179,17 @@ type ownedEnvWritesParams struct {
 // from inside another worktree, or from a job, would stamp that worktree's name
 // into this one's .env. The main checkout gets the name its jobs run under,
 // which never follows its branch.
-func ownedEnvWrites(params ownedEnvWritesParams) ([]domain.EnvOwnedEntry, error) {
+func ownedEnvWrites(params ownedEnvWritesParams) []domain.EnvOwnedEntry {
 	targets := rules.OwnedEnvTargets(rules.OwnedEnvTargetsParams{Config: params.Config, EnvFiles: params.Resolve.EnvFiles})
 	if len(targets) == 0 {
-		return nil, nil
+		return nil
 	}
 
-	isMain, err := isMainBranch(WorktreeRef{ProjectDir: params.Resolve.ProjectDir, Branch: params.Resolve.Branch})
-	if err != nil {
-		return nil, err
-	}
 	name := rules.ComposeProjectName(rules.ComposeProjectNameParams{
 		Project:  filepath.Base(params.Resolve.ProjectDir),
 		Worktree: rules.WorktreeSlug(params.Resolve.Branch),
 	})
-	if isMain {
+	if params.IsMain {
 		name = mainComposeProject(mainComposeProjectParams{ProjectDir: params.Resolve.ProjectDir, Config: params.Config})
 	}
 
@@ -172,7 +197,7 @@ func ownedEnvWrites(params ownedEnvWritesParams) ([]domain.EnvOwnedEntry, error)
 		Config:   params.Config,
 		EnvFiles: params.Resolve.EnvFiles,
 		Values:   map[string]string{domain.EnvComposeProjectName: name},
-	}), nil
+	})
 }
 
 func jobsByName(cfg domain.RunConfig) map[string]domain.JobConfig {

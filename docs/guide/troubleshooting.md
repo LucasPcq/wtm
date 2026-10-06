@@ -138,4 +138,4 @@ wtm env feat/login --mode refresh --on-conflict overwrite --yes   # also overwri
 wtm env feat/login --prune --yes                             # drop keys no source has any more
 ```
 
-The values come from the strategy the worktree was created with (`example`, `main` or `parent`); `--from` overrides it for one run. The ports and addresses `run.toml` links are settled on the worktree's own at the same time. `wtm env main` does the same for the main checkout.
+The values come from the strategy the worktree was created with (`example`, `main` or `parent`); `--from` overrides it for one run. The ports and addresses `run.toml` links are settled on the worktree's own at the same time. `wtm env main` does the same for the main checkout, keeping the addressing its `.env` spells unless `--addressing` says otherwise.
