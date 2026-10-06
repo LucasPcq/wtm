@@ -101,25 +101,36 @@ func writeJobEventLine(params jobEventLineParams) {
 	if job == nil {
 		return
 	}
-	w, prefix := params.W, params.Prefix
+	w, prefix, held := params.W, params.Prefix, heldBy(params.Event.HeldBy)
 	switch params.Event.Type {
 	case domain.EventJobStarted:
 		url := ""
 		if job.URL != "" {
 			url = fmt.Sprintf(domain.EventJobURLFmt, job.URL)
 		}
-		Success(w, prefix+fmt.Sprintf(domain.EventJobStartedFmt, job.Name, params.Branch)+url)
+		Success(w, prefix+fmt.Sprintf(domain.EventJobStartedFmt, job.Name, params.Branch)+held+url)
 	case domain.EventJobExited:
-		Success(w, prefix+fmt.Sprintf(domain.EventJobExitedFmt, job.Name, params.Branch))
+		Success(w, prefix+fmt.Sprintf(domain.EventJobExitedFmt, job.Name, params.Branch)+held)
 	case domain.EventJobStopped:
-		Update(w, prefix+fmt.Sprintf(domain.EventJobStoppedFmt, job.Name, params.Branch))
+		Update(w, prefix+fmt.Sprintf(domain.EventJobStoppedFmt, job.Name, params.Branch)+held)
 	case domain.EventJobCrashed:
-		line := prefix + fmt.Sprintf(domain.EventJobCrashedFmt, job.Name, params.Branch)
+		line := prefix + fmt.Sprintf(domain.EventJobCrashedFmt, job.Name, params.Branch) + held
 		if params.Event.ExitCode != nil {
 			line += fmt.Sprintf(domain.EventExitCodeFmt, *params.Event.ExitCode)
 		}
 		Error(w, strings.Join(append([]string{line}, params.Event.LastLines...), "\n"))
 	}
+}
+
+func heldBy(refs []domain.WorktreeRef) string {
+	if len(refs) == 0 {
+		return ""
+	}
+	branches := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		branches = append(branches, ref.Branch)
+	}
+	return fmt.Sprintf(domain.EventJobHeldByFmt, strings.Join(branches, domain.EventFieldSep))
 }
 
 func hookPassed(event domain.Event) bool {

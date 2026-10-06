@@ -56,6 +56,9 @@ func TestEachJobEventNamesTheJobAndItsWorktree(t *testing.T) {
 	web := &domain.EventJob{Name: "web", Kind: domain.JobKindService, URL: "http://web.feat-a.app.localhost"}
 	migrate := &domain.EventJob{Name: "migrate", Kind: domain.JobKindTask}
 	one, zero := 1, 0
+	main := &domain.WorktreeIdentity{Branch: "main", Path: "/repo"}
+	db := &domain.EventJob{Name: "db", Kind: domain.JobKindService, Shared: true}
+	holders := []domain.WorktreeRef{{Branch: "feat/a", Path: "/wt/feat-a"}, {Branch: "feat/b", Path: "/wt/feat-b"}}
 
 	cases := []struct {
 		event domain.Event
@@ -66,6 +69,8 @@ func TestEachJobEventNamesTheJobAndItsWorktree(t *testing.T) {
 		{domain.Event{Type: domain.EventJobExited, Worktree: worktree, Job: migrate, ExitCode: &zero}, "✓ migrate finished in feat/a"},
 		{domain.Event{Type: domain.EventJobStopped, Worktree: worktree, Job: web}, "~ stopped web in feat/a"},
 		{domain.Event{Type: domain.EventJobCrashed, Worktree: worktree, Job: web, ExitCode: &one, LastLines: []string{"listening", "Error: boom"}}, "✗ web crashed in feat/a (exit 1)\n    listening\n    Error: boom"},
+		{domain.Event{Type: domain.EventJobCrashed, Worktree: main, Job: db, ExitCode: &one, HeldBy: holders}, "✗ db crashed in main · held by feat/a, feat/b (exit 1)"},
+		{domain.Event{Type: domain.EventJobStarted, Worktree: main, Job: db, HeldBy: holders}, "✓ started db in main · held by feat/a, feat/b"},
 	}
 	for _, c := range cases {
 		if got := eventLine(t, c.event); got != c.want {

@@ -47,6 +47,9 @@ func (m *Manager) startShared(params StartParams) error {
 		real.Env = shared.Env
 		real.LogDir = shared.LogDir
 		real.real = true
+		if !mainAsks {
+			real.claimant = &domain.WorktreeRef{Branch: params.Env[domain.EnvBranch], Path: params.WorkDir}
+		}
 		// Losing the race to another worktree starting the same service is a
 		// success, not a failure: `run up --all` fans out over worktrees, and
 		// two of them reaching here at once must not fail one whole run.
@@ -64,6 +67,7 @@ func (m *Manager) startShared(params StartParams) error {
 	} else {
 		m.claim(claimParams{Key: ownKey, Real: realKey, Params: params})
 	}
+	m.settleClaimant(realKey)
 	namespace, err := m.runNamespace(namespaceParams{Job: params.Job, Env: params.Env, WorkDir: params.WorkDir, Creating: true})
 	if err != nil {
 		if mainAsks {
@@ -85,6 +89,16 @@ func (m *Manager) startShared(params StartParams) error {
 	}
 	m.persist()
 	return nil
+}
+
+// settleClaimant forgets who spawned the service once that worktree's claim
+// stands, or failed to: from then on the claims alone say who holds it.
+func (m *Manager) settleClaimant(key string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if real, ok := m.jobs[key]; ok {
+		real.claimant = nil
+	}
 }
 
 type noteInLogParams struct {
@@ -133,13 +147,18 @@ type releaseParams struct {
 // rather than a service nobody can reach.
 func (m *Manager) releaseClaim(params releaseParams) {
 	m.mu.Lock()
+	ref := sharedRef{Name: params.Name, Dir: params.Dir}
+	holders := m.holdersOfLocked(ref)
 	claim, held := m.jobs[params.Key]
 	if held && claim.Status == domain.JobStatusJoined {
 		delete(m.jobs, params.Key)
 	}
-	remaining := m.claimsLocked(sharedRef{Name: params.Name, Dir: params.Dir})
-	real, found := m.realSharedLocked(sharedRef{Name: params.Name, Dir: params.Dir})
+	remaining := m.claimsLocked(ref)
+	real, found := m.realSharedLocked(ref)
 	realRunning := found && real.Status == domain.JobStatusRunning
+	if found && remaining == 0 && !real.MainHolds {
+		real.stopHolders = holders
+	}
 	m.mu.Unlock()
 
 	m.persist()
@@ -187,6 +206,7 @@ func (m *Manager) claim(params claimParams) {
 func (m *Manager) stopShared(job *ManagedJob) error {
 	m.mu.Lock()
 	ref := sharedRef{Name: job.Name, Dir: job.SharedDir}
+	holders := m.holdersOfLocked(ref)
 	if job.Status == domain.JobStatusJoined {
 		delete(m.jobs, jobKey(job.Name, job.WorkDir))
 	} else {
@@ -198,6 +218,9 @@ func (m *Manager) stopShared(job *ManagedJob) error {
 	// goroutine that reaps the process, and reading it outside is a race.
 	realRunning := found && real.Status == domain.JobStatusRunning
 	mainHolds := found && real.MainHolds
+	if found && remaining == 0 && !mainHolds {
+		real.stopHolders = holders
+	}
 	m.mu.Unlock()
 
 	m.persist()
@@ -266,6 +289,16 @@ func (m *Manager) claimsLocked(ref sharedRef) int {
 		}
 	}
 	return count
+}
+
+// holdersOfLocked is holdersLocked by reference, empty when the service is not
+// up to be held.
+func (m *Manager) holdersOfLocked(ref sharedRef) []domain.WorktreeRef {
+	real, found := m.realSharedLocked(ref)
+	if !found {
+		return []domain.WorktreeRef{}
+	}
+	return m.holdersLocked(real)
 }
 
 // realSharedLocked is a direct lookup, not a search: the claim carries the very

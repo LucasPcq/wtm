@@ -80,3 +80,40 @@ func TestWorktreeJobsKeepsOnlyThatWorktreesReportedJobs(t *testing.T) {
 		t.Fatalf("a worktree with no job reports %#v, want an empty list", none)
 	}
 }
+
+func TestAWorktreeHoldingASharedServiceListsItAsItsInstanceIs(t *testing.T) {
+	code := 1
+	jobs := []domain.JobInfo{
+		{Name: "db", Kind: domain.JobKindService, Status: domain.JobStatusCrashed, WorkDir: "/main", SharedDir: "/main", ExitCode: &code},
+		{Name: "db", Kind: domain.JobKindService, Status: domain.JobStatusJoined, WorkDir: "/wt/x", SharedDir: "/main", URL: "postgres://x"},
+		{Name: "web", Kind: domain.JobKindService, Status: domain.JobStatusRunning, WorkDir: "/wt/x"},
+	}
+	branches := map[string]string{"/main": "main", "/wt/x": "feat/x"}
+
+	got := WorktreeJobs(WorktreeJobsParams{Path: "/wt/x", Jobs: jobs, Branches: branches})
+	if len(got) != 2 || got[0].Name != "db" || got[1].Name != "web" {
+		t.Fatalf("feat/x lists %+v, want db and web", got)
+	}
+	db := got[0]
+	if !db.Shared || db.State != domain.JobStateCrashed || db.ExitCode == nil || *db.ExitCode != 1 || db.URL != "postgres://x" {
+		t.Fatalf("db = %+v, want the instance's crash, shared, at the claim's url", db)
+	}
+	if db.Owner == nil || *db.Owner != (domain.WorktreeRef{Branch: "main", Path: "/main"}) {
+		t.Fatalf("owner = %+v, want main", db.Owner)
+	}
+	if got[1].Shared || got[1].Owner != nil {
+		t.Fatalf("web = %+v, want an unshared job unchanged", got[1])
+	}
+
+	main := WorktreeJobs(WorktreeJobsParams{Path: "/main", Jobs: jobs, Branches: branches})
+	if len(main) != 1 || !main[0].Shared || main[0].Owner != nil {
+		t.Fatalf("main lists %+v, want its own instance, shared, with no owner", main)
+	}
+}
+
+func TestAClaimWhoseInstanceIsGoneIsLeftOut(t *testing.T) {
+	jobs := []domain.JobInfo{{Name: "db", Kind: domain.JobKindService, Status: domain.JobStatusJoined, WorkDir: "/wt/x", SharedDir: "/main"}}
+	if got := WorktreeJobs(WorktreeJobsParams{Path: "/wt/x", Jobs: jobs}); len(got) != 0 {
+		t.Fatalf("got %+v, want nothing", got)
+	}
+}

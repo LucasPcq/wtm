@@ -47,7 +47,9 @@
               "kind": { "$ref": "#/$defs/jobKind" },
               "state": { "enum": ["starting", "running", "crashed", "stopped"] },
               "url": { "type": "string" },
-              "exit_code": { "type": "integer", "description": "On a crashed job only." }
+              "exit_code": { "type": "integer", "description": "On a crashed job only." },
+              "shared": { "type": "boolean", "description": "A service run once for the repository, in the main checkout." },
+              "owner": { "$ref": "#/$defs/jobWorktree", "description": "On a worktree that holds a shared service: where it runs. The state is that instance's." }
             }
           }
         }
@@ -69,8 +71,14 @@
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "kind": { "$ref": "#/$defs/jobKind" },
-        "url": { "type": "string", "minLength": 1, "description": "Where the job answers; absent for one that publishes no address." }
+        "url": { "type": "string", "minLength": 1, "description": "Where the job answers; absent for one that publishes no address." },
+        "shared": { "type": "boolean", "description": "A service run once for the repository, in the main checkout; its events are those of every worktree in held_by." }
       }
+    },
+    "heldBy": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/jobWorktree" },
+      "description": "On a shared job: the worktrees holding it when the change happened; absent when none does."
     },
     "hookOk": { "type": "boolean", "description": "Whether every hook of the phase passed; true when there were none." },
     "hookCmd": { "type": "string", "minLength": 1, "description": "The failing hook's command; only when ok is false, and absent when the phase failed before any hook ran." },
@@ -178,7 +186,8 @@
         "repo": { "$ref": "#/$defs/repo" },
         "worktree": { "$ref": "#/$defs/jobWorktree" },
         "job": { "$ref": "#/$defs/job" },
-        "exit_code": { "const": 0, "description": "On job.exited only." }
+        "exit_code": { "const": 0, "description": "On job.exited only." },
+        "held_by": { "$ref": "#/$defs/heldBy" }
       },
       "required": ["repo", "worktree", "job"]
     },
@@ -189,7 +198,8 @@
         "worktree": { "$ref": "#/$defs/jobWorktree" },
         "job": { "$ref": "#/$defs/job" },
         "exit_code": { "type": "integer", "description": "What the process exited with; -1 when a signal killed it." },
-        "last_lines": { "type": "array", "items": { "type": "string" }, "description": "The last lines it wrote, terminal escapes removed; absent when it wrote none." }
+        "last_lines": { "type": "array", "items": { "type": "string" }, "description": "The last lines it wrote, terminal escapes removed; absent when it wrote none." },
+        "held_by": { "$ref": "#/$defs/heldBy" }
       },
       "required": ["repo", "worktree", "job", "exit_code"]
     }

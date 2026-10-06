@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -93,9 +94,15 @@ type ManagedJob struct {
 	stopping bool
 	// stopCorrelation is the correlation id of the command asking for the stop.
 	stopCorrelation string
-	output          *outputHub    // nil for detached launcher-style services
-	logs            *LogSink      // nil when the client asked for no persisted log
-	exited          chan struct{} // closed when the underlying process has been reaped
+	// claimant is the worktree whose start spawned this shared job, until its
+	// claim is posted: the job.started it causes is that worktree's business.
+	claimant *domain.WorktreeRef
+	// stopHolders are the worktrees that held this shared job when the release
+	// that stops it began, the releasing one included.
+	stopHolders []domain.WorktreeRef
+	output      *outputHub    // nil for detached launcher-style services
+	logs        *LogSink      // nil when the client asked for no persisted log
+	exited      chan struct{} // closed when the underlying process has been reaped
 	// drained is closed once the PTY has been copied to its natural EOF and the
 	// log sink closed. Reaping is not the end of the output: the tail of what a
 	// job printed on its way out is still in flight when exited closes, and the
@@ -119,6 +126,8 @@ type JobTransition struct {
 	ExitCode      *int
 	LastLines     []string
 	CorrelationID string
+	// HeldBy is nil for a job that is not shared.
+	HeldBy []domain.WorktreeRef
 }
 
 type Manager struct {
@@ -356,7 +365,8 @@ type StartParams struct {
 	// so the ordinary path takes over.
 	Shared *domain.SharedJobContext
 	// Origin is what the job's events are published under; nil publishes none.
-	Origin *domain.EventOrigin
+	Origin   *domain.EventOrigin
+	claimant *domain.WorktreeRef
 	// real marks the second pass startShared makes to spawn the service itself.
 	// Without it a nil Shared would mean two different things — "this is the
 	// real start" and "the client resolved nothing" — and the second would
@@ -440,6 +450,7 @@ func (m *Manager) Start(params StartParams) error {
 		LogDir:    params.LogDir,
 		SharedDir: sharedDirOf(params),
 		Origin:    params.Origin,
+		claimant:  params.claimant,
 		output:    hub,
 		logs:      logs,
 		exited:    make(chan struct{}),
@@ -491,6 +502,9 @@ type notifyParams struct {
 	Type      domain.EventType
 	ExitCode  *int
 	LastLines []string
+	// HeldBy overrides the holders read at emission, for a transition whose
+	// claims are gone by then.
+	HeldBy []domain.WorktreeRef
 }
 
 // notify is never called with the lock held: the copy it hands on is taken
@@ -501,6 +515,10 @@ func (m *Manager) notify(params notifyParams) {
 	}
 	m.mu.Lock()
 	job := *params.Job
+	held := params.HeldBy
+	if held == nil {
+		held = m.heldByLocked(heldByParams{Job: params.Job, Type: params.Type})
+	}
 	m.mu.Unlock()
 	correlation := job.stopCorrelation
 	if params.Type != domain.EventJobStopped && job.Origin != nil {
@@ -512,13 +530,56 @@ func (m *Manager) notify(params notifyParams) {
 		ExitCode:      params.ExitCode,
 		LastLines:     params.LastLines,
 		CorrelationID: correlation,
+		HeldBy:        held,
 	})
+}
+
+type heldByParams struct {
+	Job  *ManagedJob
+	Type domain.EventType
+}
+
+func (m *Manager) heldByLocked(params heldByParams) []domain.WorktreeRef {
+	job := params.Job
+	if params.Type == domain.EventJobStopped && job.stopHolders != nil {
+		return job.stopHolders
+	}
+	holders := m.holdersLocked(job)
+	if holders == nil || job.claimant == nil || slices.Contains(holders, *job.claimant) {
+		return holders
+	}
+	return sortedRefs(append(holders, *job.claimant))
+}
+
+// holdersLocked names the worktrees holding a claim on a shared job: empty for
+// one nobody holds, nil for a job that is not a shared service's instance.
+func (m *Manager) holdersLocked(job *ManagedJob) []domain.WorktreeRef {
+	if job.SharedDir == "" || job.Status == domain.JobStatusJoined {
+		return nil
+	}
+	holders := []domain.WorktreeRef{}
+	for _, claim := range m.jobs {
+		if claim.Name == job.Name && claim.SharedDir == job.SharedDir && claim.Status == domain.JobStatusJoined {
+			holders = append(holders, worktreeRefOf(claim))
+		}
+	}
+	return sortedRefs(holders)
+}
+
+func worktreeRefOf(job *ManagedJob) domain.WorktreeRef {
+	return domain.WorktreeRef{Branch: job.Env[domain.EnvBranch], Path: job.WorkDir}
+}
+
+func sortedRefs(refs []domain.WorktreeRef) []domain.WorktreeRef {
+	slices.SortFunc(refs, func(a, b domain.WorktreeRef) int { return strings.Compare(a.Path, b.Path) })
+	return refs
 }
 
 type endedParams struct {
 	Job      *ManagedJob
 	ExitCode int
 	Output   string
+	HeldBy   []domain.WorktreeRef
 }
 
 // ended publishes how a job's process ended on its own: a stop that reached it
@@ -532,13 +593,14 @@ func (m *Manager) ended(params endedParams) {
 	}
 	code := params.ExitCode
 	if code == 0 && params.Job.Config.Kind == domain.JobKindTask {
-		m.notify(notifyParams{Job: params.Job, Type: domain.EventJobExited, ExitCode: &code})
+		m.notify(notifyParams{Job: params.Job, Type: domain.EventJobExited, ExitCode: &code, HeldBy: params.HeldBy})
 		return
 	}
 	m.notify(notifyParams{
 		Job:       params.Job,
 		Type:      domain.EventJobCrashed,
 		ExitCode:  &code,
+		HeldBy:    params.HeldBy,
 		LastLines: rules.LastLines(rules.LastLinesParams{Text: cleanPTYOutput(params.Output), Count: domain.JobEventLastLines}),
 	})
 }
@@ -1433,6 +1495,8 @@ func (m *Manager) waitForExit(job *ManagedJob) {
 	// A process killed by a stop is not a crash: the stop marks it stopped
 	// once it is reaped.
 	crashed := job.Status == domain.JobStatusRunning && job.Config.Stop == "" && !job.stopping
+	// Read before the claims go: they are who the crash is news to.
+	held := m.heldByLocked(heldByParams{Job: job, Type: domain.EventJobCrashed})
 	if crashed {
 		job.Status = domain.JobStatusCrashed
 	}
@@ -1448,7 +1512,7 @@ func (m *Manager) waitForExit(job *ManagedJob) {
 	m.withdrawRoute(job)
 	m.persist()
 	waitDrained(job)
-	m.ended(endedParams{Job: job, ExitCode: exit, Output: job.output.historyText()})
+	m.ended(endedParams{Job: job, ExitCode: exit, Output: job.output.historyText(), HeldBy: held})
 }
 
 // publishRoute makes a started job reachable by name — under its own, and under

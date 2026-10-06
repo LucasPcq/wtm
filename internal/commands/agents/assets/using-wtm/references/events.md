@@ -40,7 +40,7 @@ One JSON object per line:
 
 Every `worktree.*` event carries `worktree`: `branch`, `path`, `parent`, `ordinal` (`null` until allocated), `isolation`, `is_main`, `created_at`. Nothing volatile (dirty, ahead, PR, services): read those from `wtm list --output json`.
 
-Every `job.*` event carries `worktree` with only `branch` and `path` (it names the worktree, never upsert an identity from it) and `job`: `name`, `kind` (`service` or `task`), `url` when it publishes one. A shared service's events and snapshot entry belong to the worktree it runs in (the main checkout). A detached stack (`docker compose up -d`) gets `started` and `stopped`, but its crash after the launcher exited is not seen: check `wtm run ps --output json` when it matters.
+Every `job.*` event carries `worktree` with only `branch` and `path` (it names the worktree, never upsert an identity from it) and `job`: `name`, `kind` (`service` or `task`), `url` when it publishes one, `shared: true` for a shared service. A shared service runs once, in the main checkout, and its single event per change names that worktree: `held_by` lists the worktrees holding it at that moment (`{branch, path}`), so to follow one worktree take the events whose `worktree.path` or `held_by` holds it. In the snapshot, a worktree that holds a shared service lists it with the instance's state, `shared: true` and `owner` (where it runs). A detached stack (`docker compose up -d`) gets `started` and `stopped`, but its crash after the launcher exited is not seen: check `wtm run ps --output json` when it matters.
 
 ## Catching a job that crashes after `run up -d`
 

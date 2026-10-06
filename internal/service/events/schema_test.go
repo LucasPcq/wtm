@@ -3,6 +3,7 @@ package events
 import (
 	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -32,12 +33,17 @@ func TestEveryEventTypeMatchesTheSchema(t *testing.T) {
 		return []domain.JobInfo{
 			{Name: "web", Kind: domain.JobKindService, Status: domain.JobStatusRunning, State: domain.JobStateRunning, WorkDir: identity.Path, URL: "http://web.feat-a.app.localhost"},
 			{Name: "api", Kind: domain.JobKindService, Status: domain.JobStatusCrashed, WorkDir: identity.Path, ExitCode: &crashed},
+			{Name: "db", Kind: domain.JobKindService, Status: domain.JobStatusJoined, WorkDir: identity.Path, SharedDir: dir},
+			{Name: "db", Kind: domain.JobKindService, Status: domain.JobStatusRunning, WorkDir: dir, SharedDir: dir},
 		}, nil
 	}
 	t.Cleanup(func() { listJobs = previous })
 	snapshot, err := snapshotOf(snapshotParams{ProjectDir: dir, StateDir: stateDir, Repo: repo, Socket: "daemon.sock"})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !strings.Contains(string(snapshot.Raw), `"owner"`) {
+		t.Fatalf("the snapshot example holds no shared service: %s", snapshot.Raw)
 	}
 	ready, err := readyOf()
 	if err != nil {
@@ -86,7 +92,7 @@ func TestEveryEventTypeMatchesTheSchema(t *testing.T) {
 		domain.EventJobStarted:            ofJob(domain.JobEvent{Type: domain.EventJobStarted, Job: domain.EventJob{Name: "web", Kind: domain.JobKindService, URL: "http://web.feat-a.app.localhost"}}),
 		domain.EventJobExited:             ofJob(domain.JobEvent{Type: domain.EventJobExited, Job: domain.EventJob{Name: "migrate", Kind: domain.JobKindTask}, ExitCode: &zero}),
 		domain.EventJobStopped:            ofJob(domain.JobEvent{Type: domain.EventJobStopped, CorrelationID: "popup-2", Job: domain.EventJob{Name: "web", Kind: domain.JobKindService}}),
-		domain.EventJobCrashed:            ofJob(domain.JobEvent{Type: domain.EventJobCrashed, Job: domain.EventJob{Name: "web", Kind: domain.JobKindService}, ExitCode: &exitCode, LastLines: []string{"Error: boom"}}),
+		domain.EventJobCrashed:            ofJob(domain.JobEvent{Type: domain.EventJobCrashed, Job: domain.EventJob{Name: "db", Kind: domain.JobKindService, Shared: true}, ExitCode: &exitCode, LastLines: []string{"Error: boom"}, HeldBy: []domain.WorktreeRef{{Branch: "feat/a", Path: identity.Path}}}),
 	}
 	schema := schematest.Compile(t, schemas.Events)
 

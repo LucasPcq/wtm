@@ -1,6 +1,8 @@
 package process
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -185,5 +187,116 @@ func TestTheOriginSurvivesTheIndex(t *testing.T) {
 	jobs := next.List()
 	if len(jobs) != 1 || jobs[0].Origin == nil || *jobs[0].Origin != *testOrigin {
 		t.Fatalf("adopted %+v, want the origin back", jobs)
+	}
+}
+
+type observedShared struct {
+	manager *Manager
+	log     *transitionLog
+	main    string
+	first   string
+	second  string
+	job     domain.JobConfig
+}
+
+func newObservedShared(t *testing.T, cmd string) observedShared {
+	t.Helper()
+	root := t.TempDir()
+	manager, log := newObservedManager()
+	shared := observedShared{
+		manager: manager,
+		log:     log,
+		main:    filepath.Join(root, "main"),
+		first:   filepath.Join(root, "feat-a"),
+		second:  filepath.Join(root, "feat-b"),
+		job:     domain.JobConfig{Name: "db", Kind: domain.JobKindService, Cmd: cmd, Scope: domain.JobScopeShared},
+	}
+	for _, dir := range []string{shared.main, shared.first, shared.second} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() { _ = manager.StopAll() })
+	return shared
+}
+
+func (s observedShared) start(t *testing.T, workDir, branch string) {
+	t.Helper()
+	err := s.manager.Start(StartParams{
+		Job:     s.job,
+		WorkDir: workDir,
+		Env:     map[string]string{domain.EnvBranch: branch},
+		Origin:  testOrigin,
+		Shared:  &domain.SharedJobContext{WorkDir: s.main, Env: map[string]string{domain.EnvBranch: "main"}},
+	})
+	if err != nil {
+		t.Fatalf("start from %s: %v", branch, err)
+	}
+}
+
+func (s observedShared) ref(branch string) domain.WorktreeRef {
+	paths := map[string]string{"main": s.main, "feat/a": s.first, "feat/b": s.second}
+	return domain.WorktreeRef{Branch: branch, Path: paths[branch]}
+}
+
+func TestASharedServiceStartedForAWorktreeIsHeldByIt(t *testing.T) {
+	s := newObservedShared(t, "sleep 30")
+	s.start(t, s.first, "feat/a")
+	s.start(t, s.second, "feat/b")
+
+	seen := s.log.await(t, 1)
+	time.Sleep(100 * time.Millisecond)
+	if got := s.log.types(); !slices.Equal(got, []domain.EventType{domain.EventJobStarted}) {
+		t.Fatalf("heard %v, want one started for two worktrees", got)
+	}
+	if seen[0].Job.WorkDir != s.main || !slices.Equal(seen[0].HeldBy, []domain.WorktreeRef{s.ref("feat/a")}) {
+		t.Fatalf("started in %s held by %+v, want main held by feat/a", seen[0].Job.WorkDir, seen[0].HeldBy)
+	}
+}
+
+func TestASharedServiceCrashIsHeardByEveryWorktreeHoldingIt(t *testing.T) {
+	s := newObservedShared(t, "sleep 1; exit 5")
+	s.start(t, s.first, "feat/a")
+	s.start(t, s.second, "feat/b")
+
+	seen := s.log.await(t, 2)
+	crash := seen[1]
+	if crash.Type != domain.EventJobCrashed {
+		t.Fatalf("heard %v", s.log.types())
+	}
+	if want := []domain.WorktreeRef{s.ref("feat/a"), s.ref("feat/b")}; !slices.Equal(crash.HeldBy, want) {
+		t.Fatalf("crash held by %+v, want %+v", crash.HeldBy, want)
+	}
+}
+
+func TestASharedServiceStopIsHeardByTheWorktreeThatLetItGo(t *testing.T) {
+	s := newObservedShared(t, "sleep 30")
+	s.start(t, s.first, "feat/a")
+	s.start(t, s.second, "feat/b")
+	if err := s.manager.Stop(JobRef{Name: "db", WorkDir: s.first}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.manager.Stop(JobRef{Name: "db", WorkDir: s.second}); err != nil {
+		t.Fatal(err)
+	}
+
+	seen := s.log.await(t, 2)
+	time.Sleep(100 * time.Millisecond)
+	if got := s.log.types(); !slices.Equal(got, []domain.EventType{domain.EventJobStarted, domain.EventJobStopped}) {
+		t.Fatalf("heard %v, want one stop once nobody holds it", got)
+	}
+	if !slices.Equal(seen[1].HeldBy, []domain.WorktreeRef{s.ref("feat/b")}) {
+		t.Fatalf("stop held by %+v, want feat/b, whose release stopped it", seen[1].HeldBy)
+	}
+}
+
+func TestAJobThatIsNotSharedIsHeldByNobody(t *testing.T) {
+	m, log := newObservedManager()
+	job := domain.JobConfig{Name: "migrate", Kind: domain.JobKindTask, Cmd: "true"}
+	_ = m.Start(StartParams{Job: job, WorkDir: t.TempDir(), Origin: testOrigin})
+	for _, transition := range log.await(t, 2) {
+		if transition.HeldBy != nil {
+			t.Fatalf("%s held by %+v, want nil", transition.Type, transition.HeldBy)
+		}
 	}
 }

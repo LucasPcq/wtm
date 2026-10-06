@@ -112,12 +112,15 @@ type Event struct {
 	ExitCode      *int               `json:"exit_code,omitempty"`
 	Job           *EventJob          `json:"job,omitempty"`
 	LastLines     []string           `json:"last_lines,omitempty"`
+	HeldBy        []WorktreeRef      `json:"held_by,omitempty"`
 }
 
 type EventJob struct {
 	Name string  `json:"name"`
 	Kind JobKind `json:"kind"`
 	URL  string  `json:"url,omitempty"`
+	// Shared is a service run once for the repository, in the main checkout.
+	Shared bool `json:"shared,omitempty"`
 }
 
 // JobEvent is a job.* line as the daemon writes it. Its worktree names the
@@ -133,6 +136,9 @@ type JobEvent struct {
 	Job           EventJob    `json:"job"`
 	ExitCode      *int        `json:"exit_code,omitempty"`
 	LastLines     []string    `json:"last_lines,omitempty"`
+	// HeldBy are the worktrees holding a shared job when the change happened:
+	// the one event a shared service sends is theirs too.
+	HeldBy []WorktreeRef `json:"held_by,omitempty"`
 }
 
 // EventOrigin travels with a request to the daemon: what the events it causes
@@ -149,6 +155,10 @@ type JobSnapshot struct {
 	State    JobState `json:"state"`
 	URL      string   `json:"url,omitempty"`
 	ExitCode *int     `json:"exit_code,omitempty"`
+	Shared   bool     `json:"shared,omitempty"`
+	// Owner is where a shared service a worktree holds runs; absent on the
+	// worktree that runs it.
+	Owner *WorktreeRef `json:"owner,omitempty"`
 }
 
 // SnapshotWorktree is a snapshot's worktree: its identity, and its jobs as they

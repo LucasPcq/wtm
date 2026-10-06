@@ -79,16 +79,17 @@ The background daemon that runs `wtm run` jobs sees each one start and end, and 
 | Field | Meaning |
 | --- | --- |
 | `worktree` | `branch` and `path` only: it names the worktree the job runs in, it does not describe it. Never upsert a worktree's identity from it |
-| `job` | `name`, `kind` (`service` or `task`), and `url` when the job is published under a name or a port |
+| `job` | `name`, `kind` (`service` or `task`), `url` when the job is published under a name or a port, and `shared: true` for a [shared service](shared-services.md) |
+| `held_by` | on a shared service's event: the worktrees holding it when the change happened, each `{branch, path}`; absent when none does |
 | `exit_code` | on `job.crashed` and `job.exited`: what the process exited with, `-1` when a signal killed it |
 | `last_lines` | on `job.crashed`: the last lines it printed (at most 10, terminal escapes removed); `wtm run logs` has the rest |
 
-In the snapshot, each worktree carries `jobs`: one `{name, kind, state, url?, exit_code?}` per job (`exit_code` on a crashed one only) the daemon holds for it, sorted by name. `state` is one of `starting` (a detached launcher still running), `running`, `crashed` and `stopped`; a task that exited is no longer held, so `exited` only appears as an event. `jobs` is `[]` when the worktree has none, and `null` when the daemon could not be asked.
+In the snapshot, each worktree carries `jobs`: one `{name, kind, state, url?, exit_code?, shared?, owner?}` per job (`exit_code` on a crashed one only) the daemon holds for it, sorted by name. A shared service a worktree holds is listed there with the state of the instance it holds, `shared: true` and `owner`: the `{branch, path}` of the worktree it runs in; the main checkout lists the instance itself, `shared: true` and no `owner`. `state` is one of `starting` (a detached launcher still running), `running`, `crashed` and `stopped`; a task that exited is no longer held, so `exited` only appears as an event. `jobs` is `[]` when the worktree has none, and `null` when the daemon could not be asked.
 
 - **One job, one sequence.** A service reads `started`, then `crashed` or `stopped`; a task `started`, then `exited`, `crashed` or `stopped`. A job killed by a stop is `stopped`, never `crashed`.
 - **A crash after `run up -d` is on the stream.** `run up` checks the ports once and returns; whatever happens next reaches only a reader of `job.crashed`.
 - **Correlation.** The jobs a `run up` or `run start` started with `WTM_CORRELATION_ID` set carry it on every later `job.*` event, a crash an hour later included. A `job.stopped` carries the id of the `run stop` or `run down` that stopped it, or none.
-- **Shared services** belong to the worktree they run in, the main checkout: their events and their snapshot entry are there. A linked worktree that only holds one gets neither.
+- **Shared services** run once, in the main checkout, and send one event per change, about that worktree, whoever holds them. `held_by` names the worktrees holding the service when it happened: a reader that follows one worktree takes the events whose `worktree.path` or `held_by` holds it. A crash lists every holder; a stop, the worktree whose release stopped it (a worktree that let go while the service kept running for others is no longer a holder).
 
 ### What is not seen
 

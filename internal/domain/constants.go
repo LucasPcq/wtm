@@ -4700,6 +4700,7 @@ const (
 	EventJobExitedFmt  = "%s finished in %s"
 	EventJobStoppedFmt = "stopped %s in %s"
 	EventJobURLFmt     = "  %s"
+	EventJobHeldByFmt  = " · held by %s"
 )
 
 const (

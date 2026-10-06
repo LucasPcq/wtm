@@ -414,6 +414,7 @@ func (d *daemonServer) jobInfoOf(job ManagedJob) domain.JobInfo {
 		ExitCode:  job.ExitCode,
 		URL:       d.jobURL(job),
 		State:     stateOf(job),
+		SharedDir: job.SharedDir,
 	}
 }
 
@@ -453,9 +454,10 @@ func (d *daemonServer) publishJob(transition JobTransition) {
 		CorrelationID: transition.CorrelationID,
 		Repo:          job.Origin.Repo,
 		Worktree:      domain.WorktreeRef{Branch: job.Env[domain.EnvBranch], Path: job.WorkDir},
-		Job:           domain.EventJob{Name: job.Name, Kind: job.Config.Kind, URL: d.jobURL(job)},
+		Job:           domain.EventJob{Name: job.Name, Kind: job.Config.Kind, URL: d.jobURL(job), Shared: transition.HeldBy != nil},
 		ExitCode:      transition.ExitCode,
 		LastLines:     transition.LastLines,
+		HeldBy:        transition.HeldBy,
 	})
 	if err != nil {
 		return

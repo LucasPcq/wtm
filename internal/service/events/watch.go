@@ -333,11 +333,15 @@ type withJobsParams struct {
 // empty list would tell a reader its jobs are all gone.
 func withJobs(params withJobsParams) []domain.SnapshotWorktree {
 	jobs, err := listJobs(params.Socket)
+	branches := make(map[string]string, len(params.Worktrees))
+	for _, identity := range params.Worktrees {
+		branches[identity.Path] = identity.Branch
+	}
 	out := make([]domain.SnapshotWorktree, 0, len(params.Worktrees))
 	for _, identity := range params.Worktrees {
 		entry := domain.SnapshotWorktree{WorktreeIdentity: identity}
 		if err == nil {
-			entry.Jobs = rules.WorktreeJobs(rules.WorktreeJobsParams{Path: identity.Path, Jobs: jobs})
+			entry.Jobs = rules.WorktreeJobs(rules.WorktreeJobsParams{Path: identity.Path, Jobs: jobs, Branches: branches})
 		}
 		out = append(out, entry)
 	}

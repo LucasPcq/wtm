@@ -472,6 +472,9 @@ type JobInfo struct {
 	ExitCode *int `json:"exit_code,omitempty"`
 	// State is empty from a daemon built before it, and for a claim.
 	State JobState `json:"state,omitempty"`
+	// SharedDir is the main checkout a shared job runs in, on the instance and
+	// on every claim; empty from a daemon built before it.
+	SharedDir string `json:"shared_dir,omitempty"`
 	// Released marks a shared job this stop let go of without stopping it: the
 	// service is still up for another worktree.
 	Released bool `json:"released,omitempty"`
