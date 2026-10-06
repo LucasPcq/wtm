@@ -5,7 +5,6 @@ package checkout
 import (
 	"fmt"
 	"os"
-	"strconv"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -36,7 +35,7 @@ func NewCmd() *cobra.Command {
 
   # No prompts, with a JSON result
   wtm checkout 42 --yes --output json`,
-		Args: cobra.MaximumNArgs(1),
+		Args: cobra.MatchAll(cobra.MaximumNArgs(1), prNumberArg),
 		RunE: runCheckout,
 	}
 
@@ -48,8 +47,23 @@ func NewCmd() *cobra.Command {
 	shared.AddIsolationFlag(cmd)
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (PR number required)")
 	shared.AddOutputFlag(cmd)
+	shared.RequireYesInJSON(cmd)
 
 	return cmd
+}
+
+// prNumberArg refuses a malformed number as a usage error, before the config is
+// read or any other flag is weighed.
+func prNumberArg(_ *cobra.Command, args []string) error {
+	_, err := prNumber(args)
+	return err
+}
+
+func prNumber(args []string) (int, error) {
+	if len(args) == 0 {
+		return 0, nil
+	}
+	return rules.ParsePRNumber(args[0])
 }
 
 func runCheckout(cmd *cobra.Command, args []string) error {
@@ -78,17 +92,9 @@ func runCheckout(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if format == domain.OutputJSON && !yes {
-		return domain.ErrJSONNeedsYes
-	}
-
-	number := 0
-	if len(args) == 1 {
-		parsed, parseErr := strconv.Atoi(args[0])
-		if parseErr != nil || parsed <= 0 {
-			return fmt.Errorf("invalid PR number %q", args[0])
-		}
-		number = parsed
+	number, err := prNumber(args)
+	if err != nil {
+		return err
 	}
 
 	interactive := rules.IsHumanFormat(format) && term.IsTerminal(int(os.Stdin.Fd())) && !yes

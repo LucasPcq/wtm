@@ -40,6 +40,7 @@ func newRelocateCmd() *cobra.Command {
 	cmd.Flags().Bool(domain.FlagForce, false, "Lift safety refusals (dirty/locked): move those worktrees too; still asks to confirm unless --yes")
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (parents default to the base branch)")
 	shared.AddOutputFlag(cmd)
+	shared.RequireYesInJSON(cmd, domain.FlagDryRun)
 
 	return cmd
 }
@@ -53,10 +54,6 @@ func runRelocate(cmd *cobra.Command, _ []string) error {
 
 	if err := rules.ValidateRelocateTarget(to); err != nil {
 		return err
-	}
-
-	if format == domain.OutputJSON && !yes && !dryRun {
-		return fmt.Errorf("--output json requires --%s or --%s (the confirmation cannot run in JSON mode)", domain.FlagYes, domain.FlagDryRun)
 	}
 
 	dir, err := os.Getwd()

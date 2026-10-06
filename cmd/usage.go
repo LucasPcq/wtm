@@ -13,25 +13,11 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
-// usageError keeps cobra's own message and adds domain.ErrUsage to the chain,
-// which is what rules.ExitCode reads.
-type usageError struct{ err error }
-
-func (e usageError) Error() string   { return e.err.Error() }
-func (e usageError) Unwrap() []error { return []error{e.err, domain.ErrUsage} }
-
-func asUsage(err error) error {
-	if err == nil {
-		return nil
-	}
-	return usageError{err: err}
-}
-
 // markUsageErrors routes every refusal cobra makes on its own — a flag, a value
 // or an argument count — through ErrUsage. The root's Args is set because cobra
 // only reports an unknown top-level command when it has none.
 func markUsageErrors(root *cobra.Command) {
-	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return asUsage(err) })
+	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return rules.Usage(err) })
 	if root.Args == nil {
 		root.Args = unknownCommand
 	}
@@ -46,7 +32,7 @@ func wrapArgs(cmd *cobra.Command) {
 		cmd.RunE = func(c *cobra.Command, _ []string) error { return c.Help() }
 	}
 	if validate := cmd.Args; validate != nil {
-		cmd.Args = func(c *cobra.Command, args []string) error { return asUsage(validate(c, args)) }
+		cmd.Args = func(c *cobra.Command, args []string) error { return rules.Usage(validate(c, args)) }
 	}
 	for _, sub := range cmd.Commands() {
 		wrapArgs(sub)
@@ -57,9 +43,9 @@ func wrapArgs(cmd *cobra.Command) {
 // of cobra, which returns them raw after the hooks, past the FlagErrorFunc.
 func validateFlagGroups(cmd *cobra.Command) error {
 	if err := cmd.ValidateRequiredFlags(); err != nil {
-		return asUsage(err)
+		return rules.Usage(err)
 	}
-	return asUsage(cmd.ValidateFlagGroups())
+	return rules.Usage(cmd.ValidateFlagGroups())
 }
 
 func validateOutputFormat(cmd *cobra.Command) error {
@@ -71,12 +57,12 @@ func validateOutputFormat(cmd *cobra.Command) error {
 	if slices.Contains(formats, flag.Value.String()) {
 		return nil
 	}
-	return asUsage(fmt.Errorf(domain.OutputFormatInvalidFmt, domain.FlagOutput, flag.Value.String(), strings.Join(formats, ", ")))
+	return rules.Usage(fmt.Errorf(domain.OutputFormatInvalidFmt, domain.FlagOutput, flag.Value.String(), strings.Join(formats, ", ")))
 }
 
 func validateCorrelationID() error {
 	if err := rules.ValidateCorrelationID(os.Getenv(domain.EnvCorrelationID)); err != nil {
-		return asUsage(err)
+		return rules.Usage(err)
 	}
 	return nil
 }

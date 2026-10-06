@@ -138,7 +138,7 @@ func TestRelocateCharacterizeJSONNeedsYesOrDryRun(t *testing.T) {
 	newRelocateRepo(t)
 
 	_, _, err := runWtCmd(t, domain.CmdRelocate, "--output", domain.OutputJSON)
-	if err == nil || err.Error() != "--output json requires --yes or --dry-run (the confirmation cannot run in JSON mode)" {
+	if err == nil || err.Error() != "--output json requires --yes or --dry-run (prompts cannot run in JSON mode)" {
 		t.Fatalf("err = %v", err)
 	}
 }

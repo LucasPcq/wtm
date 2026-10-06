@@ -60,6 +60,7 @@ func newEnvCmd() *cobra.Command {
 	cmd.Flags().String(domain.FlagAddressing, "", "Write the main checkout's linked addresses as ports (as without wtm) or names (served by the run proxy); default: what its .env spells")
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (additions only)")
 	shared.AddOutputFlag(cmd)
+	shared.RequireYesInJSON(cmd, domain.FlagCheck)
 
 	return cmd
 }
@@ -91,8 +92,6 @@ func runEnv(cmd *cobra.Command, args []string) error {
 	prune, _ := cmd.Flags().GetBool(domain.FlagPrune)
 	showValues, _ := cmd.Flags().GetBool(domain.FlagShowValues)
 	if err := rules.ValidateEnvFlags(rules.EnvFlagsParams{
-		Format:        format,
-		Yes:           yes,
 		Check:         check,
 		Prune:         prune,
 		OnConflictSet: cmd.Flags().Changed(domain.FlagOnConflict),

@@ -36,6 +36,7 @@ func newReparentCmd() *cobra.Command {
 	cmd.Flags().String(domain.FlagTo, "", "New parent branch to rebase onto")
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (needs at least one worktree and --to)")
 	shared.AddOutputFlag(cmd)
+	shared.RequireYesInJSON(cmd)
 
 	return cmd
 }
@@ -44,10 +45,6 @@ func runReparent(cmd *cobra.Command, args []string) error {
 	to, _ := cmd.Flags().GetString(domain.FlagTo)
 	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
-
-	if format == domain.OutputJSON && !yes {
-		return fmt.Errorf("--output json requires --%s (the confirmation cannot run in JSON mode)", domain.FlagYes)
-	}
 
 	dir, err := os.Getwd()
 	if err != nil {

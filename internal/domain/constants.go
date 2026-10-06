@@ -995,14 +995,13 @@ const (
 	ImportEnvHint        = "wtm env"
 	ImportEnvHintNote    = "reconcile the .env files against this configuration"
 
-	ImportJSONNeedsYesFmt = "--%s %s requires --%s"
-	ImportInvalidFmt      = "invalid run config:\n  %s"
-	ImportInvalidSep      = "\n  "
-	ImportStdinArg        = "-"
-	ImportNeedsYesFmt     = "replacing run.toml is destructive: pass --%s to confirm it without a prompt"
-	ImportDeclined        = "run.toml left unchanged."
-	ImportConfirmTitle    = "Replace run.toml?"
-	ImportConfirmDescFmt  = "The payload replaces the whole file: %d job(s), %d profile(s). What run.toml holds today is lost."
+	ImportInvalidFmt     = "invalid run config:\n  %s"
+	ImportInvalidSep     = "\n  "
+	ImportStdinArg       = "-"
+	ImportNeedsYesFmt    = "replacing run.toml is destructive: pass --%s to confirm it without a prompt"
+	ImportDeclined       = "run.toml left unchanged."
+	ImportConfirmTitle   = "Replace run.toml?"
+	ImportConfirmDescFmt = "The payload replaces the whole file: %d job(s), %d profile(s). What run.toml holds today is lost."
 
 	// RunStreamCrashedFmt corrects a job announced as started that the daemon
 	// found gone at the end of the sequence.
@@ -1404,6 +1403,10 @@ const (
 	// AnnotationOutputFormats lists, comma-separated, the --output values a
 	// command accepts besides text and json.
 	AnnotationOutputFormats = "wtm.output-formats"
+	// AnnotationJSONNeedsYes marks a command that could ask: --output json is
+	// refused without --yes or one of the space-separated flags it lists.
+	AnnotationJSONNeedsYes = "wtm.json-needs-yes"
+	JSONNeedsYesFmt        = "--output json requires %s (prompts cannot run in JSON mode)"
 
 	// AnnotationMutuallyExclusive is the key cobra's MarkFlagsMutuallyExclusive
 	// writes on each flag of a group: one space-separated group per entry.
@@ -3255,6 +3258,7 @@ const (
 	CheckoutPRTitleWidth        = 40
 	CheckoutPRRecapFmt          = "#%d %s"
 	CheckoutPRRequired          = "PR number required without an interactive terminal (or when --yes is set)"
+	CheckoutPRNumberInvalidFmt  = "invalid PR number %q"
 	CheckoutParentLabel         = "Parent branch"
 	CheckoutParentDescription   = "Branch this PR is rebased onto by `wtm sync` (defaults to the PR base)"
 	CheckoutEnvLabel            = "Env strategy"
@@ -3510,8 +3514,6 @@ const (
 	PruneTagDirty    = "dirty"
 	PruneTagUnpushed = "unpushed"
 	PruneTagOpenPR   = "open PR"
-	// PruneJSONNeedsYes refuses a JSON run that would have to prompt.
-	PruneJSONNeedsYes = "--output json requires --yes or --dry-run (the selection prompt cannot run in JSON mode)"
 	// PruneNeedsTerminal refuses a run that can neither prompt nor resolve.
 	PruneNeedsTerminal = "prune needs a terminal to confirm; pass --yes to run non-interactively"
 
@@ -4582,7 +4584,6 @@ const (
 	// of the number rather than as a question.
 	UpgradeConfirmPrompt = "Update %s %s → %s ?"
 
-	UpgradeJSONNeedsYes   = "--output json requires --yes or --check (the confirmation prompt cannot run in JSON mode)"
 	UpgradeSourceHint     = "this binary was built from source — run `git pull && make install` instead"
 	UpgradePinUnsupported = "--version only applies to a standalone binary; pin the version through your package manager instead"
 )
