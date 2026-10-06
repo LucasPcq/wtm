@@ -4,6 +4,10 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [0.29.2] - 2026-10-06
+
+For scripts and agents: `wtm events` follows every repository and reports job crashes, `wtm env` stops printing secrets, `wtm prune` stays fast on repositories with many branches, and usage errors exit `2`.
+
 ### Added
 
 - **`wtm events --all`** follows every repository wtm knows from any directory, ignoring an inherited `GIT_DIR`; integrations should pass it instead of running from outside a repository. → [Every repository at once](docs/guide/events.md#every-repository-at-once)
@@ -22,10 +26,9 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 - **`wtm prune`** and **`wtm tree --with-prs`** find a worktree's pull request however many newer ones the repository has, instead of only among the 100 newest. → [Stacked pull requests](docs/guide/recipes.md#stacked-pull-requests)
 - **`wtm env main`** no longer writes `[[env]]` namespaces into the main checkout (`wt_main`, `acme-main`), and puts back the template's value where an earlier run did. → [Shared services](docs/guide/shared-services.md#telling-the-app-env)
-- **Flags that cannot be combined** (`clean`/`prune --keep-data --drop-data`, `run up`/`run start --exclusive --parallel`) exit `2`, a usage error, instead of `1`. → [Exit codes](docs/guide/integrations.md#the-contract---yes-and---output-json)
+- **Usage errors exit `2`** instead of `1`: flags that cannot be combined (`clean`/`prune --keep-data --drop-data`, `run up --exclusive --parallel`, `sync --push --no-push`…), `--all` with a name, and `wtm checkout <not a number>`, now refused before the config is read. → [Exit codes](docs/guide/integrations.md#the-contract---yes-and---output-json)
 - **`wtm run list`** in a terminal opens its picker again instead of printing `Aborted.` straight away.
 - **`wtm env`**'s resolver shows a kept conflict as your value alone, instead of an arrow from your value to itself.
-- **`wtm checkout <not a number>`** exits `2`, a usage error, before reading the config; so do `sync --push --no-push`, `sync --ff-parents --no-ff-parents` and `--all` with a name on `sync`, `fast-forward` and `run down`. → [Exit codes](docs/guide/integrations.md#the-contract---yes-and---output-json)
 - **`wtm prune --dry-run --output json`** reports `"dry_run": true` when there is nothing to prune.
 
 ## [0.29.1] - 2026-10-05
@@ -729,7 +732,8 @@ Initial release.
 - **Detection** of the base branch, env files, package manager, Docker Compose and pnpm workspaces.
 - **Install** with Homebrew (`brew install LucasPcq/tap/wtm`), release binaries or `go install`.
 
-[Unreleased]: https://github.com/LucasPcq/wtm/compare/v0.29.1...HEAD
+[Unreleased]: https://github.com/LucasPcq/wtm/compare/v0.29.2...HEAD
+[0.29.2]: https://github.com/LucasPcq/wtm/releases/tag/v0.29.2
 [0.29.1]: https://github.com/LucasPcq/wtm/releases/tag/v0.29.1
 [0.29.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.29.0
 [0.28.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.28.0
