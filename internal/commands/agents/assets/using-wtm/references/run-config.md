@@ -134,7 +134,7 @@ Decided **once per worktree, at creation**. `create`, `extract` and `checkout` a
 - **`verbatim`**: the `.env` stays **byte for byte** as copied (no port, no identity, no `[[env]]` value), and the daemon runs the worktree as that file describes it: offset 0 (its source's ports), no namespace carved, no `COMPOSE_PROJECT_NAME` imposed. The worktree **cannot run while its source does** (a port clash, see `run.md`), and a job whose `touches` reach its source's data is refused.
 - The two halves (the `.env` and the jobs) never disagree: a `.env` on the source's ports with jobs on shifted ones would wire the worktree to its source silently.
 - `isolation = "isolated" | "verbatim"` in `run.toml` sets the default for unattended runs. The main checkout is always isolated.
-- `wtm env <wt> --yes --isolation isolated|verbatim` switches an existing worktree, and adopts one created before the choice existed (ask the user first: an adopted worktree runs under a new compose project, so its current volumes stop being used). Details in `worktrees.md` (`env`).
+- `wtm env <wt> --yes --isolation isolated|verbatim` switches an existing worktree (interactively, `wtm env` asks it, keeping the current isolation first), and adopts one created before the choice existed (ask the user first: an adopted worktree runs under a new compose project, so its current volumes stop being used). Details in `worktrees.md` (`env`).
 
 ## The worktree's identity in a job's environment
 
@@ -169,9 +169,9 @@ On an isolated worktree, `COMPOSE_PROJECT_NAME` is **also written into the `.env
 
 ## `touches`: jobs that change data
 
-`touches = ["postgres-pay"]` marks a job that changes data (a migration, a reset, a seed) and names the services it writes to. `run up` / `run start` then refuse to start it on data the worktree does not own (see `run.md`, Foreign data); a job without `touches` is never checked.
+`touches = ["postgres-billing"]` marks a job that changes data (a migration, a reset, a seed) and names the services it writes to. `run up` / `run start` then refuse to start it on data the worktree does not own (see `run.md`, Foreign data); a job without `touches` is never checked.
 
-- `run init` asks it in its "Data tasks" step: one row per task, cycling through the shared and compose services, pre-set when the task's name carries a data verb (`reset`, `migrate`, `seed`, `init`, `orm`…) and shares a word with exactly one service (`orm:pay:reset` → `postgres-pay`). A task `run.toml` already gives touches keeps them.
+- `run init` asks it in its "Data tasks" step: one row per task, cycling through the shared and compose services, pre-set when the task's name carries a data verb (`reset`, `migrate`, `seed`, `init`, `orm`…) and shares a word with exactly one service (`orm:billing:reset` → `postgres-billing`). A task `run.toml` already gives touches keeps them.
 - Outside the wizard: `run job add <job> --touches <service>` or `run job edit <job> --touches <service>` (repeatable, replaces the list, `''` drops it). A name that is not a declared job is refused.
 - **Whenever you add a job that migrates, resets or seeds data, pass `--touches`**: nothing sets it unasked, and without it the job escapes the check.
 
@@ -194,6 +194,7 @@ On an isolated worktree, `COMPOSE_PROJECT_NAME` is **also written into the `.env
 
 - Refused when `run.toml` is read: a key written by both tables, a placeholder outside the list.
 - wtm owns an `[[env]]` key's line: a worktree's own value there is replaced, and `wtm env` never reports it as drift.
+- **Never in the main checkout**: its databases and realms are its own, so its `[[env]]` keys are plain keys there. `wtm env main` puts back the template's value of a key still holding exactly what an earlier wtm stamped (`wt_main`, `acme-main`), reported like any owned value; a value the user edited is left alone.
 - `run init`'s `[[env]]` step lists every managed `.env` key and pre-checks those named after a shared service; a key whose value carries that service's port is left to `[[env_port]]`, and marking a key the port table already writes moves it rather than declaring it twice.
 
 ## Addressing: names or ports
@@ -207,9 +208,9 @@ On an isolated worktree, `COMPOSE_PROJECT_NAME` is **also written into the `.env
 
 **Switch it with `wtm run addressing <names|ports>`**, never by editing `run.toml`: the command writes the setting, then settles the worktrees whose `.env` spells the other one. Under `--yes` the mode argument is required and the worktrees are settled unless `--keep-env`. Running it with the mode already in place settles what an earlier `--keep-env` left behind. Setting `ports` is a real inverse: port numbers go back into values wtm wrote as addresses. JSON: see `json.md`.
 
-**The main checkout is never provisioned, so under `names` its `.env` still holds ports.** `run addressing` settles main back to `ports`, never onto `names` (the output says main was left as is): moving main onto names makes it depend on the proxy, and only `wtm env main`, naming it, does that. Its jobs are still published under names, so a cross-origin call made through them is refused until `wtm env main` aligns it. Aligning main is a **choice**: it stops behaving as a checkout without wtm, and going back means `wtm run addressing ports` (which brings main back with every worktree) then `wtm run addressing names` (which leaves main on ports), `addressing` having no per-worktree scope. The same applies to a linked worktree whose port pass was declined.
+**The main checkout is never provisioned, so under `names` its `.env` still holds ports.** `run addressing` settles main back to `ports`, never onto `names` (the output says main was left as is), and `wtm env main` keeps whatever main's `.env` spells: moving main onto names makes it depend on the proxy, and only `wtm env main --addressing names` (or the wizard's addressing step) does that. Its jobs are still published under names, so a cross-origin call made through them is refused until main is moved. Aligning main is a **choice**: it stops behaving as a checkout without wtm; `wtm env main --addressing ports` brings it back alone.
 
-Every surface hands out the named URL whatever the `.env` spells; a worktree whose `.env` is out of step gets one warning line naming `wtm env <worktree>` (a `!` line in the stream, a band in the run view, a note in `wtm ui`). The route is registered either way, so nothing restarts. Only keys declared as `[[env_port]]` links are seen, so silence means nothing **linked** is out of step. A `.env` already on names whose port went stale keeps its names and is told they are out of step.
+Every surface hands out the named URL whatever the `.env` spells; a worktree whose `.env` still spells ports gets one warning line naming `wtm env <worktree> --addressing names` (a `!` line in the stream, a band in the run view, a note in `wtm ui`). The route is registered either way, so nothing restarts. Only keys declared as `[[env_port]]` links are seen, so silence means nothing **linked** is out of step. A `.env` already on names whose port went stale keeps its names and is told they are out of step.
 
 ## `run export` / `run import`
 

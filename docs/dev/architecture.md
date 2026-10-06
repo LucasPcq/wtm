@@ -42,9 +42,10 @@ internal/
     extract/                  ←   `wtm extract`: the run (extract.go) + its questions (steps.go),
                                   create's own embedded through `create.Embed`
     env/                      ←   `wtm env`: the run (env.go) + its questions (steps.go), the
-                                  pre-scan the wizard reads (scan.go) and the port pass and
-                                  isolation switch (pass.go); its per-key resolver is its own
-                                  kind, `flow.StepEnvResolve`
+                                  pre-scan the wizard reads (scan.go), how the worktree runs
+                                  today that its isolation and addressing steps keep or switch
+                                  (mode.go), and the port pass and isolation switch (pass.go);
+                                  its per-key resolver is its own kind, `flow.StepEnvResolve`
     relocate/                 ←   `wtm relocate`: the run (relocate.go) + its questions (steps.go);
                                   the move, the adoption and the base_path rewrite are three
                                   separate service calls (`worktree.Move`/`Adopt`/`SetBasePath`)
@@ -243,7 +244,7 @@ The cross-file check has to live outside `config.LoadRun`: that loader only ever
 | `service/worktree.BranchEnv` — every job and hook | `WTM_PORT_OFFSET = ordinal × block`, `COMPOSE_PROJECT_NAME` derived (the main's without its branch) | offset 0, `COMPOSE_PROJECT_NAME` left to the `.env`, `WTM_ISOLATION=verbatim` |
 | `service/process.runNamespace` — the daemon | carves the worktree's namespace | carves nothing (read from `WTM_ISOLATION`: the daemon never reads metadata) |
 
-They used to be separate: a "keep the ports" answer left the `.env` on its source's ports while the daemon still shifted the jobs, so a front read one port and its back bound another, and the worktree quietly talked to its source. Anything in between the two columns is incoherent by construction, which is why there is no third answer and no `Rewrite` flag any more. The cost of verbatim is that it shares its source's ports; `flow/run/up` measures that (`rules.PortClashes`) and turns the concurrency question into stop-the-other-or-don't-start rather than letting a bind fail. `wtm env --isolation` switches an existing worktree, and its recap's second action records the worktree verbatim rather than skipping the port pass once.
+They used to be separate: a "keep the ports" answer left the `.env` on its source's ports while the daemon still shifted the jobs, so a front read one port and its back bound another, and the worktree quietly talked to its source. Anything in between the two columns is incoherent by construction, which is why there is no third answer and no `Rewrite` flag any more. The cost of verbatim is that it shares its source's ports; `flow/run/up` measures that (`rules.PortClashes`) and turns the concurrency question into stop-the-other-or-don't-start rather than letting a bind fail. `wtm env --isolation` switches an existing worktree, and the interactive run asks the same question as a step that keeps the current isolation first, rather than skipping the port pass once.
 
 ## The event bus — the daemon relays, the flows speak
 

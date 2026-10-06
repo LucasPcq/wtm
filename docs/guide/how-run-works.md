@@ -176,7 +176,7 @@ wtm finds the **declared base** inside the value and shifts only that number; cr
 ```
 
 - `wtm run init` offers the keys of your configured `.env` targets whose value holds a declared base; `--link-env` writes them without asking. Nothing is linked otherwise.
-- The rewrite happens when an **isolated** worktree is created (never a verbatim one) and whenever `wtm env` reconciles; its recap also offers "Apply, and keep this worktree's .env verbatim from now on", and `--check` counts a pending shift as drift.
+- The rewrite happens when an **isolated** worktree is created (never a verbatim one) and whenever `wtm env` reconciles; its isolation step can switch the worktree to verbatim instead, and `--check` counts a pending shift as drift.
 - `wtm env --mode refresh` compares linked values **modulo the offset**: `5442` in a worktree against `5432` in `main` is not a conflict.
 - wtm reports rather than guesses when the key is missing, the base appears more than once, or neither the base nor any offset of it is there.
 
@@ -207,7 +207,7 @@ When the browser is on the worktree's **name**, it sends a named `Origin`, and a
 
 It does so only when the linked job **publishes a url** for that port (so Postgres is left alone: the proxy only speaks HTTP) **and** the value **has the shape of a URL** (so `PORT` stays a number). Without the port-80 redirection the origin carries the proxy's port (`…localhost:11080`), which changes nothing for CORS or cookies.
 
-- `wtm run addressing ports|names` switches the mode, and the main checkout keeps ports unless you run `wtm env main`: see [Addressing](addressing.md#addressing-what-a-env-value-holds).
+- `wtm run addressing ports|names` switches the mode, and the main checkout keeps ports unless you run `wtm env main --addressing names`: see [Addressing](addressing.md#addressing-what-a-env-value-holds).
 - Under `names`, the named URL is the only working entrance of a worktree: `localhost:5183` sends an `Origin` the API no longer knows. `wtm run url` and `wtm run open` hand out the right link.
 - wtm only sees keys declared as links: a `CORS_ORIGIN` linked to nothing is invisible to both the pass and the warning, so silence means "nothing linked is out of step". A `.env` holding named origins whose port went stale (after `wtm run proxy install`) keeps its names and is told they are out of step.
 

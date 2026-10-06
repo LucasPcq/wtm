@@ -58,11 +58,11 @@ Which worktrees it takes is the one place the main checkout is treated apart, an
 
 | Command | Linked worktrees | Main |
 | -- | -- | -- |
-| `wtm env <worktree>` | aligned on the mode | aligned on the mode — naming it is the choice |
+| `wtm env <worktree>` | aligned on the mode | kept on the mode its `.env` spells — `--addressing` or the wizard's step is the choice |
 | `wtm run addressing ports` | settled | settled: ports is the state main has without wtm |
-| `wtm run addressing names` | settled | left as is, and said so — `wtm env main` is its own decision |
+| `wtm run addressing names` | settled | left as is, and said so — `wtm env main --addressing names` is its own decision |
 
-Without the return leg, `wtm run addressing ports` after a `wtm env main` would leave main on names under a project that says ports, and silently: the drift warning only reads a project on names. The condition lives in the command's choice of worktrees, not in the pass — the plan and the drift reading stay free of any main-shaped condition, as below.
+Without the return leg, `wtm run addressing ports` after a `wtm env main --addressing names` would leave main on names under a project that says ports, and silently: the drift warning only reads a project on names. The condition lives in the command's choice of worktrees, not in the pass — the plan and the drift reading stay free of any main-shaped condition, as below.
 
 ## Recognising wtm's own writing
 
@@ -90,9 +90,11 @@ Under `names`, **the named URL becomes the only working entrance.** Opening `loc
 
 ## The main checkout is not a special case
 
-The spec that introduced `names` said the main checkout stays on ports. **No code enforces that, and none should.** Nothing in the port pass tests the ordinal, the base branch, or whether a checkout is the main one: `worktree.List` comes from `git worktree list`, which includes it, so `wtm env main` is accepted and writes named origins like anywhere else. The port substitution is the identity there (offset 0); the origin rewrite is not — it replaces an authority, which has nothing to do with the offset.
+The spec that introduced `names` said the main checkout stays on ports. **No code enforces that, and none should.** Nothing in the port pass tests the ordinal, the base branch, or whether a checkout is the main one: `worktree.List` comes from `git worktree list`, which includes it, so the pass writes named origins on main like anywhere else when it is asked to. The port substitution is the identity there (offset 0); the origin rewrite is not — it replaces an authority, which has nothing to do with the offset.
 
 What "main stays on ports" really means is that **no command provisions it**: `create` and `extract` write the new worktree, and there is no such event for main. That is a gap in the lifecycle, not a guard in the code — so the answer is a warning, not a refusal.
+
+The one main-shaped condition is in `flow/env`, and it is about the *question*, not the pass: reconciling main's keys is something a user runs often, moving it onto names is a decision taken once, and folding the second into the first made every `wtm env main` an addressing switch. So `wtm env` reads which mode main's `.env` spells (`rules.MainAddressing`, from the plans of both modes: `AddressedByPort` on the names plan, and whether the two plans write any value differently) and passes it to the pass as `ResolveEnvPortsParams.Addressing`, unless `--addressing` or the wizard's addressing step asked for the other one. `rules.ValidateEnvAddressing` keeps the override to main: a linked worktree follows `run.toml`.
 
 `rules.PendingOriginRewrites` counts what a `wtm env` on a worktree would still move onto a named origin, `rules.AddressingDriftLine`/`Lines` phrase it, `worktree.EnvPortPlanFor` computes the plan without applying it (the same one `wtm env` writes, so the two cannot disagree), and `flow/run/addressing` is what the run flows read. They hand the lines to the **surface**, which renders them once where they can be seen: a band in the run view, a callout beside a stream, nothing at all on a machine run. A notice printed after the view reaches a reader who has already followed the URL.
 

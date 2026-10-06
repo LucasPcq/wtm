@@ -15,8 +15,9 @@ type runPassParams struct {
 	Adoption domain.IsolationAdoptionPlan
 	// Isolation is the one this run settles the worktree on, empty to keep the
 	// recorded one.
-	Isolation domain.Isolation
-	Reserved  []string
+	Isolation  domain.Isolation
+	Addressing domain.Addressing
+	Reserved   []string
 }
 
 // envRunPass is the run half of a `wtm env`: the port and owned-value pass, and
@@ -48,7 +49,7 @@ func (f *envFlow) runPass(params runPassParams) envRunPass {
 	if rules.IsVerbatim(params.Isolation) {
 		return pass
 	}
-	pass.ports, pass.warnings = f.resolvePorts(resolvePortsParams{Target: params.Target, Isolation: params.Isolation})
+	pass.ports, pass.warnings = f.resolvePorts(resolvePortsParams{Target: params.Target, Isolation: params.Isolation, Addressing: params.Addressing})
 	return pass
 }
 
@@ -65,8 +66,9 @@ func (p envRunPass) decorate(ctx flow.Context, result domain.EnvSyncResult) doma
 }
 
 type resolvePortsParams struct {
-	Target    target
-	Isolation domain.Isolation
+	Target     target
+	Isolation  domain.Isolation
+	Addressing domain.Addressing
 }
 
 // resolvePorts gathers the [[env_port]] links and the offset this worktree
@@ -95,6 +97,7 @@ func (f *envFlow) resolvePorts(params resolvePortsParams) (envsvc.EnvPortsParams
 				EnvFiles:     f.ctx.Config.Project.Env.Files,
 				Global:       f.ctx.Config.Global,
 				Isolation:    params.Isolation,
+				Addressing:   params.Addressing,
 			})
 			ports = resolved
 			return resolveErr

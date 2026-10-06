@@ -10,17 +10,22 @@ import (
 )
 
 const (
-	KeyWorktree = "env.worktree"
-	KeyAdopt    = "env.adopt"
-	KeyResolve  = "env.resolve"
-	KeyRecap    = "env.recap"
+	KeyWorktree   = "env.worktree"
+	KeyIsolation  = "env.isolation"
+	KeyAddressing = "env.addressing"
+	KeyResolve    = "env.resolve"
+	KeyRecap      = "env.recap"
 )
 
 func (f *envFlow) session() flow.Session {
 	return flow.Session{
 		ErrLabel: domain.EnvWizardErrLabel,
-		Presets:  flow.NewAnswers(map[string]string{KeyWorktree: f.request.Worktree}),
-		Steps:    []flow.Step{f.worktreeStep(), f.adoptStep(), f.resolveStep(), f.recapStep()},
+		Presets: flow.NewAnswers(map[string]string{
+			KeyWorktree:   f.request.Worktree,
+			KeyIsolation:  string(f.request.Isolation),
+			KeyAddressing: string(f.request.Addressing),
+		}),
+		Steps: []flow.Step{f.worktreeStep(), f.isolationStep(), f.addressingStep(), f.resolveStep(), f.recapStep()},
 	}
 }
 
@@ -33,12 +38,12 @@ func (f *envFlow) worktreeStep() flow.Step {
 		if status.IsParent {
 			badges = append(badges, flow.Badge{Text: domain.EnvBadgeParent})
 		}
-		scan := f.scans[status.Branch]
-		badges = append(badges, driftBadge(scan))
-		if scan.refused {
-			badges = append(badges, flow.Badge{Text: fmt.Sprintf(domain.EnvBadgeRefusesFmt, f.request.Isolation), Tone: domain.ToneDanger})
+		badges = append(badges, driftBadge(f.scans[f.pickerKey(status.Branch)]))
+		refused := f.refused[status.Branch]
+		if refused != "" {
+			badges = append(badges, flow.Badge{Text: fmt.Sprintf(domain.EnvBadgeRefusesFmt, refused), Tone: domain.ToneDanger})
 		}
-		options = append(options, flow.Option{Label: status.Branch, Value: status.Branch, Badges: badges, Disabled: scan.refused})
+		options = append(options, flow.Option{Label: status.Branch, Value: status.Branch, Badges: badges, Disabled: refused != ""})
 	}
 	return flow.Step{
 		Kind:    flow.StepSelect,
@@ -63,38 +68,127 @@ func driftBadge(scan branchScan) flow.Badge {
 	return flow.Badge{Text: fmt.Sprintf(domain.EnvBadgeChangesFmt, count), Tone: domain.ToneWarning}
 }
 
-// adoptStep asks a worktree created before the isolation choice whether to
-// adopt it. Keeping it as is opens under the cursor: adopting leaves its data
-// behind in the compose project it runs under today.
-func (f *envFlow) adoptStep() flow.Step {
+// isolationStep keeps or switches a linked worktree's isolation. Keeping opens
+// under the cursor: reconciling the keys is what `wtm env` is usually run for,
+// and a worktree created before the choice existed keeps its data where it is.
+func (f *envFlow) isolationStep() flow.Step {
 	return flow.Step{
 		Kind:  flow.StepSelect,
-		Key:   KeyAdopt,
-		Label: domain.IsolationAdoptStepName,
+		Key:   KeyIsolation,
+		Label: domain.EnvIsolationStepLabel,
+		Flag:  domain.FlagIsolation,
 		Skip: func(answers flow.Answers) (bool, string) {
-			return f.request.Isolation != "" || !f.scanOf(answers).adoption.Pending, ""
+			state, err := f.answeredState(answers)
+			switch {
+			case err != nil || state.asksIsolation():
+				return false, ""
+			case state.isMain:
+				return true, domain.EnvIsolationMainSkip
+			}
+			return true, domain.IsolationStepIrrelevant
 		},
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
-			plan := f.scanOf(answers).adoption
-			return flow.StepContent{
-				Title:       fmt.Sprintf(domain.IsolationAdoptTitleFmt, answers.Value(KeyWorktree)),
-				Description: domain.IsolationAdoptDescription,
-				Options: []flow.Option{
-					{Label: domain.IsolationAdoptKeepLabel, Value: domain.IsolationAdoptKeepValue},
-					{Label: rules.IsolationAdoptOptionLabel(plan), Value: domain.IsolationAdoptValue, Danger: plan.ComposeProject != ""},
-				},
-			}, nil
-		},
-		Resolve: func(flow.Answers) (flow.Answer, error) {
-			return flow.Answer{Value: domain.IsolationAdoptKeepValue}, nil
-		},
-		Summarize: func(answer flow.Answer) string {
-			if answer.Value == domain.IsolationAdoptValue {
-				return domain.IsolationAdoptSummary
+			state, err := f.answeredState(answers)
+			if err != nil {
+				return flow.StepContent{}, err
 			}
-			return domain.IsolationAdoptKeptSummary
+			content := flow.StepContent{
+				Title:       fmt.Sprintf(domain.EnvIsolationTitleFmt, answers.Value(KeyWorktree)),
+				Description: domain.EnvIsolationDescription,
+				Options:     isolationOptions(state),
+			}
+			if state.adoption.Pending {
+				content.Description = domain.IsolationAdoptDescription
+			}
+			return content, nil
+		},
+		Resolve: keep,
+		Summarize: func(answer flow.Answer) string {
+			if answer.Value == domain.EnvKeepValue {
+				return domain.IsolationAdoptKeptSummary
+			}
+			return rules.IsolationSummary(domain.Isolation(answer.Value))
 		},
 	}
+}
+
+func isolationOptions(state modeState) []flow.Option {
+	switch {
+	case state.adoption.Pending:
+		return []flow.Option{
+			{Label: domain.IsolationAdoptKeepLabel, Value: domain.EnvKeepValue},
+			{Label: rules.IsolationAdoptOptionLabel(state.adoption), Value: string(domain.IsolationIsolated), Danger: state.adoption.ComposeProject != ""},
+			{Label: domain.EnvIsolationAdoptVerbatim, Value: string(domain.IsolationVerbatim)},
+		}
+	case rules.IsVerbatim(state.recorded):
+		return []flow.Option{
+			{Label: domain.EnvIsolationKeepVerbatim, Value: domain.EnvKeepValue},
+			{Label: domain.EnvIsolationToIsolated, Value: string(domain.IsolationIsolated)},
+		}
+	}
+	return []flow.Option{
+		{Label: domain.EnvIsolationKeepIsolated, Value: domain.EnvKeepValue},
+		{Label: domain.EnvIsolationToVerbatim, Value: string(domain.IsolationVerbatim)},
+	}
+}
+
+// addressingStep is the main checkout's: no pass over every worktree moves it
+// onto names, so this is the one place it is asked, and keeping what its .env
+// spells opens under the cursor.
+func (f *envFlow) addressingStep() flow.Step {
+	return flow.Step{
+		Kind:  flow.StepSelect,
+		Key:   KeyAddressing,
+		Label: domain.EnvAddressingStepLabel,
+		Flag:  domain.FlagAddressing,
+		Skip: func(answers flow.Answers) (bool, string) {
+			state, err := f.answeredState(answers)
+			switch {
+			case err != nil || state.asksAddressing():
+				return false, ""
+			case !state.isMain:
+				return true, domain.EnvAddressingLinkedSkip
+			}
+			return true, domain.EnvAddressingSkip
+		},
+		Build: func(answers flow.Answers) (flow.StepContent, error) {
+			state, err := f.answeredState(answers)
+			if err != nil {
+				return flow.StepContent{}, err
+			}
+			return flow.StepContent{
+				Title:       fmt.Sprintf(domain.EnvAddressingTitleFmt, answers.Value(KeyWorktree)),
+				Description: domain.EnvAddressingDescription,
+				Options:     addressingOptions(state.current),
+			}, nil
+		},
+		Resolve: keep,
+		Summarize: func(answer flow.Answer) string {
+			if answer.Value == domain.EnvKeepValue {
+				return domain.IsolationAdoptKeptSummary
+			}
+			return answer.Value
+		},
+	}
+}
+
+func addressingOptions(current domain.Addressing) []flow.Option {
+	if current == domain.AddressingPorts {
+		return []flow.Option{
+			{Label: domain.EnvAddressingKeepPorts, Value: domain.EnvKeepValue},
+			{Label: domain.EnvAddressingToNames, Value: string(domain.AddressingNames)},
+		}
+	}
+	return []flow.Option{
+		{Label: domain.EnvAddressingKeepNames, Value: domain.EnvKeepValue},
+		{Label: domain.EnvAddressingToPorts, Value: string(domain.AddressingPorts)},
+	}
+}
+
+// keep is the unattended answer of both mode steps: a run with no flag never
+// changes how a worktree runs.
+func keep(flow.Answers) (flow.Answer, error) {
+	return flow.Answer{Value: domain.EnvKeepValue}, nil
 }
 
 // resolveStep is skipped when no key is left to decide: an addition is one, since
@@ -105,15 +199,23 @@ func (f *envFlow) resolveStep() flow.Step {
 		Key:   KeyResolve,
 		Label: domain.EnvResolveStepLabel,
 		Skip: func(answers flow.Answers) (bool, string) {
-			if rules.EnvResolvable(f.scanOf(answers).files) {
+			if !f.prompter.Interactive() {
+				return true, domain.EnvResolveSkipReason
+			}
+			scan, err := f.scanOf(answers)
+			if err != nil || rules.EnvResolvable(scan.files) {
 				return false, ""
 			}
 			return true, domain.EnvResolveSkipReason
 		},
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
+			scan, err := f.scanOf(answers)
+			if err != nil {
+				return flow.StepContent{}, err
+			}
 			return flow.StepContent{
 				Title:    fmt.Sprintf(domain.EnvResolveTitleFmt, answers.Value(KeyWorktree)),
-				EnvFiles: f.scanOf(answers).files,
+				EnvFiles: scan.files,
 				EnvDefaults: domain.EnvResolveDefaults{
 					Overwrite: f.request.OnConflict == domain.EnvDecisionOverwrite,
 					Prune:     f.request.Prune,
@@ -131,15 +233,23 @@ func (f *envFlow) recapStep() flow.Step {
 		Kind:  flow.StepRecap,
 		Key:   KeyRecap,
 		Label: domain.EnvRecapStepLabel,
-		// Nobody is asked to confirm a run that would write nothing.
+		// Nobody is asked to confirm a run that would write nothing; an
+		// unattended one is applied without reading its scan.
 		Skip: func(answers flow.Answers) (bool, string) {
-			return !f.applies(answers), ""
+			if !f.prompter.Interactive() {
+				return false, ""
+			}
+			applies, err := f.applies(answers)
+			return err == nil && !applies, ""
 		},
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
-			options := f.applyOptions(answers)
+			description, err := f.recap(answers)
+			if err != nil {
+				return flow.StepContent{}, err
+			}
 			return flow.StepContent{
-				Description: f.recap(recapParams{Answers: answers, VerbatimOffered: len(options) > 1}),
-				Options:     options,
+				Description: description,
+				Options:     []flow.Option{{Label: domain.EnvApplyActionLabel, Value: domain.EnvApplyValue}},
 			}, nil
 		},
 		Resolve: func(flow.Answers) (flow.Answer, error) {
@@ -148,35 +258,32 @@ func (f *envFlow) recapStep() flow.Step {
 	}
 }
 
-// applyOptions offers the port pass as a choice rather than a fait accompli. A
-// worktree with no port to move keeps the single plain confirmation.
-func (f *envFlow) applyOptions(answers flow.Answers) []flow.Option {
-	apply := flow.Option{Label: domain.EnvApplyActionLabel, Value: domain.EnvApplyValue}
-	if len(rules.EnvPortRewrites(f.scanOf(answers).ports)) == 0 {
-		return []flow.Option{apply}
-	}
-	return []flow.Option{apply, {Label: domain.EnvApplyVerbatimLabel, Value: domain.EnvApplyVerbatimValue}}
-}
-
-type recapParams struct {
-	Answers         flow.Answers
-	VerbatimOffered bool
-}
-
 // recap restates the worktree, every decision with its value, and the port
 // values the apply will shift — announced before it happens rather than
 // discovered after.
-func (f *envFlow) recap(params recapParams) string {
-	answers := params.Answers
+func (f *envFlow) recap(answers flow.Answers) (string, error) {
 	branch := answers.Value(KeyWorktree)
-	scan := f.scanOf(answers)
+	state, err := f.answeredState(answers)
+	if err != nil {
+		return "", err
+	}
+	scan, err := f.scanOf(answers)
+	if err != nil {
+		return "", err
+	}
+	isolation := f.isolation(answers)
 	lines := []string{
 		domain.EnvRecapFieldWorktree + branch,
 		domain.RecapFieldMode + string(f.request.Mode),
 		domain.RecapFieldEnv + f.sourceLabel(branch),
 	}
-	if isolation := f.isolation(answers); isolation != "" {
-		lines = append(lines, domain.RecapFieldIsolation+rules.IsolationSummary(isolation))
+	// Read from the state rather than the answers' Skipped: a step the wizard
+	// skipped on its way here reaches the recap carrying its first option.
+	if state.asksIsolation() || f.request.Isolation != "" {
+		lines = append(lines, domain.RecapFieldIsolation+isolationRecap(isolationRecapParams{State: state, Isolation: isolation}))
+	}
+	if state.asksAddressing() || f.request.Addressing != "" {
+		lines = append(lines, domain.EnvRecapFieldAddressing+addressingRecap(addressingRecapParams{State: state, Addressing: f.addressing(answers)}))
 	}
 	lines = append(lines, "")
 
@@ -187,27 +294,55 @@ func (f *envFlow) recap(params recapParams) string {
 		lines = append(lines, domain.EnvRecapSafeOnly)
 	}
 	lines = append(lines, rules.EnvPortRecapLines(scan.ports)...)
-	// An adopting worktree was scanned without its port pass, which would have
-	// allocated its ordinal before the question was answered.
-	if answers.Value(KeyAdopt) == domain.IsolationAdoptValue {
+	// A worktree moving onto isolation was scanned without its port pass, which
+	// would have allocated its ordinal before the answer was confirmed.
+	if state.movesOntoIsolation(isolation) {
 		lines = append(lines, "", domain.EnvRecapAdoptPorts)
 	}
-	lines = append(lines, rules.EnvRestoreRecapLines(rules.EnvRestoreRecapParams{
-		Entries: scan.restore,
-		Switch:  rules.IsVerbatim(f.request.Isolation),
-		Offered: params.VerbatimOffered,
-	})...)
-	return strings.Join(lines, "\n")
+	if rules.IsVerbatim(isolation) {
+		lines = append(lines, rules.EnvRestoreRecapLines(scan.restore)...)
+	}
+	return strings.Join(lines, "\n"), nil
+}
+
+type isolationRecapParams struct {
+	State     modeState
+	Isolation domain.Isolation
+}
+
+func isolationRecap(params isolationRecapParams) string {
+	switch {
+	case params.Isolation != "":
+		return rules.IsolationSummary(params.Isolation)
+	case params.State.adoption.Pending:
+		return domain.IsolationAdoptKeptSummary
+	}
+	return rules.IsolationSummary(rules.EffectiveIsolation(params.State.recorded)) + domain.EnvRecapUnchanged
+}
+
+type addressingRecapParams struct {
+	State      modeState
+	Addressing domain.Addressing
+}
+
+func addressingRecap(params addressingRecapParams) string {
+	if params.Addressing == "" || params.Addressing == params.State.current {
+		return string(params.State.current) + domain.EnvRecapUnchanged
+	}
+	return string(params.Addressing)
 }
 
 // applies reports whether confirming would write anything: a key, a port, an
 // owned value, or an isolation to record.
-func (f *envFlow) applies(answers flow.Answers) bool {
-	scan := f.scanOf(answers)
+func (f *envFlow) applies(answers flow.Answers) (bool, error) {
+	scan, err := f.scanOf(answers)
+	if err != nil {
+		return false, err
+	}
 	return rules.EnvDriftCount(scan.files) > 0 ||
 		len(rules.EnvPortRewrites(scan.ports)) > 0 ||
 		len(rules.OwnedEnvRewrites(scan.ports)) > 0 ||
-		f.isolation(answers) != ""
+		f.isolation(answers) != "", nil
 }
 
 // sourceLabel is where the values come from: the strategy, and the parent it
@@ -220,6 +355,6 @@ func (f *envFlow) sourceLabel(branch string) string {
 	return string(ctx.strategy)
 }
 
-func (f *envFlow) scanOf(answers flow.Answers) branchScan {
-	return f.scans[answers.Value(KeyWorktree)]
+func (f *envFlow) scanOf(answers flow.Answers) (branchScan, error) {
+	return f.scanFor(scanKey{branch: answers.Value(KeyWorktree), isolation: f.isolation(answers), addressing: f.addressing(answers)})
 }

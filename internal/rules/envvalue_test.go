@@ -159,3 +159,28 @@ func TestValidateRefusesALinkOnAnUnknownJob(t *testing.T) {
 		t.Errorf("errors = %v, want the unknown job named", errs)
 	}
 }
+
+func TestMainEnvValueRepairsPutsBackOnlyWhatWtmStamped(t *testing.T) {
+	stamps := []domain.EnvOwnedEntry{
+		{File: ".env", Key: "REALM", Value: "acme-main"},
+		{File: ".env", Key: "DB_URL", Value: "postgres://localhost:5432/wt_main"},
+		{File: ".env", Key: "EDITED", Value: "x-main"},
+		{File: ".env", Key: "NO_TEMPLATE", Value: "y-main"},
+	}
+	current := map[string][]domain.EnvLine{".env": ParseEnv("REALM=acme-main\nDB_URL=postgres://localhost:5432/wt_main\nEDITED=mine\nNO_TEMPLATE=y-main\n")}
+	template := map[string][]domain.EnvLine{".env": ParseEnv("REALM=acme\nDB_URL=postgres://localhost:5432/acme\nEDITED=x\n")}
+
+	got := MainEnvValueRepairs(MainEnvValueRepairsParams{Stamps: stamps, Current: current, Template: template})
+	want := []domain.EnvOwnedEntry{
+		{File: ".env", Key: "REALM", Value: "acme"},
+		{File: ".env", Key: "DB_URL", Value: "postgres://localhost:5432/acme"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("repairs = %+v, want %+v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("repairs[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}

@@ -74,7 +74,7 @@ type ProposedTouchesParams struct {
 
 // ProposedTouches reads a task's name: it proposes a service only when the name
 // carries a data verb and shares a word with exactly one service —
-// `orm:pay:reset` and `postgres-pay`. Anything less certain proposes nothing.
+// `orm:billing:reset` and `postgres-billing`. Anything less certain proposes nothing.
 func ProposedTouches(params ProposedTouchesParams) []string {
 	words := nameWords(params.Task)
 	subjects := make([]string, 0, len(words))

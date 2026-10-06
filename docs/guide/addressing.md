@@ -64,13 +64,16 @@ The switch writes `addressing` in `run.toml`, then settles the worktrees whose `
 
 ### The main checkout
 
-The main checkout is the one that exists without wtm, the one a colleague clones and a `docker compose up` reads, so **a switch brings it back to ports but never moves it onto names**. You do it, when you want it:
+The main checkout is the one that exists without wtm, the one a colleague clones and a `docker compose up` reads, so **nothing moves it onto names unless you ask**: a switch brings it back to ports but never onto names, and `wtm env main` keeps whatever its `.env` spells. You choose, when you want it:
 
 ```bash
-wtm env main        # the positional takes the main checkout like any other worktree
+wtm env main                          # the wizard asks: keep ports, or move onto names
+wtm env main --addressing names --yes # move main onto the named URLs
+wtm env main --addressing ports --yes # bring main back to ports, and only main
 ```
 
-- Until then, under `"names"`, main's working entrance is its **port** URL. wtm still hands out its name everywhere (`run up`, `run url`, `run open`, the run view, `wtm ui`) and adds a line saying the `.env` is out of step; `--raw` gives the port URL. The route is registered either way, so nothing has to restart.
+- Until then, under `"names"`, main's working entrance is its **port** URL. wtm still hands out its name everywhere (`run up`, `run url`, `run open`, the run view, `wtm ui`) and adds a line saying the `.env` still spells ports; `--raw` gives the port URL. The route is registered either way, so nothing has to restart.
 - Afterwards, whoever reads main's `.env` or starts its stack depends on the proxy being up. It is worth it right after switching a project to `"names"`, and after `wtm run proxy install`, which drops the `:11080` from the origins already written.
-- To bring main back: `wtm run addressing ports` then `wtm run addressing names` (the first returns main to ports with every worktree, the second moves only the others back).
+- Reconciling main's keys (`wtm env main`, `--yes`, `--check`) never changes its addressing: it is read against the mode its `.env` already spells. It writes no `[[env]]` namespace into main either, so `--addressing ports` really does give back a checkout without wtm; see [Shared services](shared-services.md#telling-the-app-env).
+- `--addressing` is the main checkout's alone: a linked worktree follows `run.toml` (`wtm run addressing`), and `--addressing names` is refused while the project addresses by ports.
 - `wtm create` from main is unaffected either way: a copied value carrying main's segment is rewound to the new worktree's.

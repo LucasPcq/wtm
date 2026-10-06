@@ -3,7 +3,7 @@ err:
 exit: 0
 --- stdout ---
 
-  ✓ Settled 1 linked .env value(s).
+  = No changes written.
 
   Worktree  main
   Mode      add
@@ -20,6 +20,6 @@ exit: 0
 --- stderr ---
 --- .env ---
 WEB_PORT=9999
-REALM=app-main
+REALM=other
 --- isolation ---
 
