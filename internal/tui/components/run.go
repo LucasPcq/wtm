@@ -49,7 +49,7 @@ func RunWizard(params RunWizardParams) (WizardModel, error) {
 
 	finalModel, err := tea.NewProgram(wiz, opts...).Run()
 	if err != nil {
-		return WizardModel{}, fmt.Errorf("%s: %w", params.ErrLabel, err)
+		return WizardModel{}, fmt.Errorf("%s: %w", params.ErrLabel, ProgramError(err))
 	}
 
 	final, ok := finalModel.(WizardModel)
@@ -71,7 +71,7 @@ type standaloneModel struct {
 }
 
 // RunStandaloneSelect runs a SelectList as a standalone tea.Program.
-// Returns the selected value or ErrAborted.
+// Returns the selected value, or ErrAborted on Esc or Ctrl-C.
 func RunStandaloneSelect(sl SelectListModel) (string, error) {
 	m := standaloneModel{
 		child: sl,
@@ -83,7 +83,7 @@ func RunStandaloneSelect(sl SelectListModel) (string, error) {
 	p := tea.NewProgram(m, tea.WithOutput(os.Stderr))
 	finalModel, err := p.Run()
 	if err != nil {
-		return "", fmt.Errorf("select: %w", err)
+		return "", fmt.Errorf("select: %w", ProgramError(err))
 	}
 
 	final, ok := finalModel.(standaloneModel)
@@ -100,7 +100,7 @@ func RunStandaloneSelect(sl SelectListModel) (string, error) {
 }
 
 // RunStandaloneConfirm runs a ConfirmModel as a standalone tea.Program.
-// Returns true for Yes, false for No, or ErrAborted on Esc.
+// Returns true for Yes, false for No, or ErrAborted on Esc or Ctrl-C.
 func RunStandaloneConfirm(cm ConfirmModel) (bool, error) {
 	m := standaloneModel{
 		child: cm,
@@ -112,7 +112,7 @@ func RunStandaloneConfirm(cm ConfirmModel) (bool, error) {
 	p := tea.NewProgram(m, tea.WithOutput(os.Stderr))
 	finalModel, err := p.Run()
 	if err != nil {
-		return false, fmt.Errorf("confirm: %w", err)
+		return false, fmt.Errorf("confirm: %w", ProgramError(err))
 	}
 
 	final, ok := finalModel.(standaloneModel)
@@ -128,7 +128,7 @@ func RunStandaloneConfirm(cm ConfirmModel) (bool, error) {
 	return child.Confirmed(), nil
 }
 
-// ErrAborted is returned when the user presses Esc in a standalone component.
+// ErrAborted is returned when the user presses Esc or Ctrl-C in a standalone component.
 var ErrAborted = fmt.Errorf("user aborted")
 
 func (m standaloneModel) Init() tea.Cmd {
@@ -154,6 +154,10 @@ func (m standaloneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.child = child
 		}
 		return m, nil
+	}
+	if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == domain.KeyInterrupt {
+		m.aborted = true
+		return m, tea.Quit
 	}
 
 	switch child := m.child.(type) {

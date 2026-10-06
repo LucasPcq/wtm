@@ -1,12 +1,14 @@
 package components
 
 import (
+	"context"
 	"os"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"golang.org/x/term"
 
+	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/styles"
 )
 
@@ -30,9 +32,7 @@ func newMutedSpinner() spinner.Model {
 // their own wait rather than going through RunLoading.
 func MutedSpinner() spinner.Model { return newMutedSpinner() }
 
-// LoadingParams configures RunLoading.
 type LoadingParams struct {
-	// Message is the text shown next to the spinner.
 	Message string
 	// Work is the blocking operation to run while the loader animates. Capture any
 	// results via closure.
@@ -48,15 +48,18 @@ type loadingDoneMsg struct{ err error }
 // background, then quits. Its View returns "" once done so the box is cleared
 // from the terminal, leaving the command's framed result as the only output.
 type loadingModel struct {
-	spinner spinner.Model
-	message string
-	work    tea.Cmd
-	err     error
-	done    bool
+	ctx        context.Context
+	spinner    spinner.Model
+	message    string
+	work       tea.Cmd
+	err        error
+	done       bool
+	cancelling bool
+	abandoned  bool
 }
 
 func (m loadingModel) Init() tea.Cmd {
-	return tea.Batch(m.spinner.Tick, m.work)
+	return tea.Batch(m.spinner.Tick, m.work, AwaitInterrupt(m.ctx))
 }
 
 func (m loadingModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -69,8 +72,28 @@ func (m loadingModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
+	case InterruptedMsg:
+		m.cancelling = true
+		return m, nil
+	case tea.KeyMsg:
+		if msg.String() != domain.KeyInterrupt {
+			return m, nil
+		}
+		return m.interrupt()
 	}
-	// Ignore key presses: the blocking work is not cancellable.
+	return m, nil
+}
+
+// interrupt cancels the work and keeps waiting for it to unwind: quitting at
+// once would leave a git or docker child running behind a prompt that came back.
+func (m loadingModel) interrupt() (tea.Model, tea.Cmd) {
+	if m.cancelling {
+		m.abandoned = true
+		m.done = true
+		return m, tea.Quit
+	}
+	m.cancelling = true
+	Interrupt(m.ctx)
 	return m, nil
 }
 
@@ -78,19 +101,29 @@ func (m loadingModel) View() string {
 	if m.done {
 		return ""
 	}
-	return "\n" + renderLoadingBox(m.spinner.View(), m.message) + "\n"
+	message := m.message
+	if m.cancelling {
+		message = domain.CancellingMessage
+	}
+	return "\n" + renderLoadingBox(m.spinner.View(), message) + "\n"
 }
 
 // RunLoading runs work while showing an animated bordered loading box on stderr,
 // then clears the box and returns work's error. When params.Animate is false or
 // stderr is not a terminal, work runs directly with no box, so piped and JSON
 // output stay clean.
-func RunLoading(params LoadingParams) error {
+//
+// The terminal is raw while the box is up, so Ctrl-C arrives as a key: the
+// first one cancels ctx, the second stops waiting for the work to notice.
+func RunLoading(ctx context.Context, params LoadingParams) error {
 	if !params.Animate || !term.IsTerminal(int(os.Stderr.Fd())) {
 		return params.Work()
 	}
 
+	watch, stop := context.WithCancel(ctx)
+	defer stop()
 	m := loadingModel{
+		ctx:     watch,
 		spinner: newMutedSpinner(),
 		message: params.Message,
 		work: func() tea.Msg {
@@ -98,12 +131,22 @@ func RunLoading(params LoadingParams) error {
 		},
 	}
 
-	final, err := tea.NewProgram(m, tea.WithOutput(os.Stderr)).Run()
+	// Bubbletea's own handler would end the program on the very SIGINT the
+	// first Ctrl-C raises, before the work has unwound.
+	final, err := tea.NewProgram(m, tea.WithOutput(os.Stderr), tea.WithoutSignalHandler()).Run()
 	if err != nil {
-		return err
+		return ProgramError(err)
 	}
-	if lm, ok := final.(loadingModel); ok {
-		return lm.err
+	return loadingOutcome(final)
+}
+
+func loadingOutcome(final tea.Model) error {
+	lm, ok := final.(loadingModel)
+	if !ok {
+		return nil
 	}
-	return nil
+	if lm.abandoned {
+		return domain.ErrCancelled
+	}
+	return lm.err
 }

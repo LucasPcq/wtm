@@ -153,7 +153,7 @@ type initPresenter struct {
 }
 
 func (p initPresenter) Stage(ctx context.Context, params flow.StageParams) error {
-	return components.RunLoading(components.LoadingParams{
+	return components.RunLoading(ctx, components.LoadingParams{
 		Message: params.Message,
 		Animate: p.animate,
 		Work:    func() error { return params.Work(ctx) },

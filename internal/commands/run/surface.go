@@ -1,6 +1,7 @@
 package run
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -50,6 +51,10 @@ func openRunView(params viewParams) (runlogs.Outcomes, error) {
 		Hyperlinks: true,
 		Detach:     runview.Detach{Notice: rest.open, Sink: rest, Await: true},
 	})
+	if errors.Is(err, domain.ErrCancelled) {
+		frameRecap(out, result.Recap)
+		return result.Outcomes, err
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -61,10 +66,15 @@ func openRunView(params viewParams) (runlogs.Outcomes, error) {
 		output.FrameEnd(out)
 		return result.Outcomes, nil
 	}
-	if result.Recap != "" {
-		output.Frame(out, func(w io.Writer) { fmt.Fprintln(w, result.Recap) })
-	}
+	frameRecap(out, result.Recap)
 	return result.Outcomes, nil
+}
+
+func frameRecap(out io.Writer, recap string) {
+	if recap == "" {
+		return
+	}
+	output.Frame(out, func(w io.Writer) { fmt.Fprintln(w, recap) })
 }
 
 // detachedRun reports what is left of a run once the reader has closed the

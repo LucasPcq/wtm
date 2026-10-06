@@ -46,7 +46,7 @@ func runPs(cmd *cobra.Command, _ []string) error {
 
 	var listing runjobs.Listing
 	var held domain.HeldAddresses
-	loadErr := components.RunLoading(components.LoadingParams{
+	loadErr := shared.Load(cmd, components.LoadingParams{
 		Message: domain.RunLoadingJobs,
 		Animate: shared.Animate(cmd, true),
 		Work: func() error {

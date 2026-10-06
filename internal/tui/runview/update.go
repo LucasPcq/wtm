@@ -37,8 +37,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case keyReach:
 		m.reaching = !m.reaching
 		return m, nil
-	case keyQuit, keyInterrupt:
+	case keyQuit:
 		return m.detach()
+	case keyInterrupt:
+		return m.interrupt()
 	case keyUp, keyVimUp:
 		return m.move(-1)
 	case keyDown, keyVimDown:
@@ -210,7 +212,7 @@ func strokeOf(msg tea.KeyMsg) domain.KeyStroke {
 func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case keyInterrupt:
-		return m.detach()
+		return m.interrupt()
 	case keyEscape:
 		m.filtering, m.filter = false, ""
 		return m.setSelection(m.resolveSelection())
@@ -242,6 +244,44 @@ func (m Model) detach() (tea.Model, tea.Cmd) {
 	if m.runDone || m.start == nil || m.onLeave.Sink == nil {
 		m.cancel()
 	}
+	m.relay.detach()
+	m.panes.closeAll()
+	return m, tea.Quit
+}
+
+func (m Model) inFlight() bool {
+	return m.start != nil && !m.runDone
+}
+
+// interrupt is Ctrl-C where the process owns the run: the first one cancels it
+// and keeps the view up while it unwinds, the second stops waiting. With no run
+// in flight there is nothing to interrupt, and the key leaves as q does.
+func (m Model) interrupt() (tea.Model, tea.Cmd) {
+	if !m.onLeave.Await || !m.inFlight() {
+		return m.detach()
+	}
+	if m.cancelling {
+		return m.leaveInterrupted()
+	}
+	m.cancelling = true
+	components.Interrupt(m.runCtx)
+	m.cancel()
+	return m, nil
+}
+
+// applyInterrupted is the run's context ending under the view — the first
+// Ctrl-C, or a signal from elsewhere.
+func (m Model) applyInterrupted() (tea.Model, tea.Cmd) {
+	if !m.inFlight() {
+		return m.detach()
+	}
+	m.cancelling = true
+	return m, nil
+}
+
+func (m Model) leaveInterrupted() (tea.Model, tea.Cmd) {
+	m.interrupted = true
+	m.cancel()
 	m.relay.detach()
 	m.panes.closeAll()
 	return m, tea.Quit

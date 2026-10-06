@@ -118,7 +118,7 @@ func pickAmbiguousWorktree(cmd *cobra.Command, cwd, projectDir string, matches [
 		wg       sync.WaitGroup
 	)
 
-	loadErr := components.RunLoading(components.LoadingParams{
+	loadErr := shared.Load(cmd, components.LoadingParams{
 		Message: "Loading worktrees…",
 		Animate: shared.Animate(cmd, true),
 		Work: func() error {

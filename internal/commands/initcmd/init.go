@@ -210,7 +210,7 @@ func resolveProjectAnswers(cmd *cobra.Command, projectDir string, flagged bool, 
 
 func createProjectConfig(cmd *cobra.Command, dir, stateDir string, flagged bool) error {
 	var detection domain.InitDetectionResult
-	_ = components.RunLoading(components.LoadingParams{
+	_ = components.RunLoading(cmd.Context(), components.LoadingParams{
 		Message: "Detecting project settings…",
 		Animate: shared.Animate(cmd, !flagged),
 		Work:    func() error { detection = detect.ProjectEnvironment(cmd.Context(), dir); return nil },
