@@ -237,6 +237,9 @@ func Batch(ctx context.Context, params BatchParams) []Removal {
 		if params.OnDone != nil {
 			params.OnDone(removal)
 		}
+		if removal.Err != nil && params.StopOnFailure && ctx.Err() != nil {
+			removals = append(removals, notReached(params.Targets[index+1:])...)
+		}
 		if removal.Err != nil && params.StopOnFailure {
 			break
 		}

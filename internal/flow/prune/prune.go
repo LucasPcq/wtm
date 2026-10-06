@@ -249,7 +249,7 @@ func (f *pruneFlow) remove(params removeParams) (Outcome, error) {
 		if removal.Err != nil {
 			failure = removal.Err
 			result.Failed = &domain.PruneFailure{Branch: candidate.Branch, Path: candidate.Path, Error: removal.Err.Error()}
-			break
+			continue
 		}
 		result.Pruned = append(result.Pruned, candidate)
 		result.Namespaces = append(result.Namespaces, removal.Namespaces...)

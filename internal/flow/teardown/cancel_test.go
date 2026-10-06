@@ -34,6 +34,18 @@ func (p *interruptingPresenter) Stage(ctx context.Context, params flow.StagePara
 	return p.Recorder.Stage(ctx, params)
 }
 
+// hookInterruptingPresenter presses Ctrl-C once the hook phase is under way,
+// whatever the time it took to get there.
+type hookInterruptingPresenter struct {
+	*flowtest.Recorder
+	Cancel context.CancelFunc
+}
+
+func (p *hookInterruptingPresenter) HookPhase(params flow.HookPhaseParams) error {
+	time.AfterFunc(200*time.Millisecond, p.Cancel)
+	return p.Recorder.HookPhase(params)
+}
+
 func branchExists(t *testing.T, dir, branch string) bool {
 	t.Helper()
 	return exec.Command("git", "-C", dir, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch).Run() == nil
@@ -78,9 +90,8 @@ func TestAnInterruptedCleanHookKeepsTheWorktree(t *testing.T) {
 	ctx.Config.Project.Hooks.OnClean = []domain.HookCommand{{Cmd: "sleep 30"}}
 	targets := []teardown.Target{makeTarget(t, ctx, "feat/a"), makeTarget(t, ctx, "feat/b")}
 	runCtx, cancel := context.WithCancel(t.Context())
-	time.AfterFunc(300*time.Millisecond, cancel)
 
-	removals := teardown.Batch(runCtx, teardown.BatchParams{Context: ctx, Presenter: &flowtest.Recorder{}, Targets: targets, ForceRemoval: true})
+	removals := teardown.Batch(runCtx, teardown.BatchParams{Context: ctx, Presenter: &hookInterruptingPresenter{Recorder: &flowtest.Recorder{}, Cancel: cancel}, Targets: targets, ForceRemoval: true})
 
 	if len(removals) != 2 || removals[0].Err == nil || !removals[1].NotReached {
 		t.Fatalf("removals = %+v, want feat/a refused and feat/b not reached", removals)
@@ -90,5 +101,22 @@ func TestAnInterruptedCleanHookKeepsTheWorktree(t *testing.T) {
 	}
 	if _, err := os.Stat(targets[0].Path); err != nil || !branchExists(t, ctx.ProjectDir, "feat/a") {
 		t.Errorf("feat/a stat = %v, want it kept", err)
+	}
+}
+
+// A batch that stops at its first failure still names what an interrupt left
+// behind it: prune's report would otherwise lose the worktrees it never reached.
+func TestABatchStoppedByAnInterruptedFailureNamesTheRest(t *testing.T) {
+	globaldir.Isolate(t)
+	processtest.Serve(t, nil)
+	ctx := repoContext(t)
+	ctx.Config.Project.Hooks.OnClean = []domain.HookCommand{{Cmd: "sleep 30"}}
+	targets := []teardown.Target{makeTarget(t, ctx, "feat/a"), makeTarget(t, ctx, "feat/b")}
+	runCtx, cancel := context.WithCancel(t.Context())
+
+	removals := teardown.Batch(runCtx, teardown.BatchParams{Context: ctx, Presenter: &hookInterruptingPresenter{Recorder: &flowtest.Recorder{}, Cancel: cancel}, Targets: targets, ForceRemoval: true, StopOnFailure: true})
+
+	if len(removals) != 2 || removals[0].Err == nil || !removals[1].NotReached {
+		t.Fatalf("removals = %+v, want feat/a refused and feat/b not reached", removals)
 	}
 }

@@ -121,7 +121,8 @@ func TestCommandStopsWhatTheChildStarted(t *testing.T) {
 	cancel()
 	_ = cmd.Wait()
 
-	deadline := time.Now().Add(domain.SubprocessInterruptGrace)
+	// A shell's background job ignores SIGINT: it goes on the SIGTERM a grace later.
+	deadline := time.Now().Add(2 * domain.SubprocessInterruptGrace)
 	for syscall.Kill(grandchild, 0) == nil {
 		if time.Now().After(deadline) {
 			t.Fatal("the grandchild outlived the cancelled child")

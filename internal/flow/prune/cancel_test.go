@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
@@ -21,6 +22,16 @@ func (r interruptingRecorder) Stage(ctx context.Context, params flow.StageParams
 		r.cancel()
 	}
 	return r.recorder.Stage(ctx, params)
+}
+
+type hookInterrupting struct {
+	*recorder
+	cancel context.CancelFunc
+}
+
+func (r hookInterrupting) HookPhase(params flow.HookPhaseParams) error {
+	time.AfterFunc(200*time.Millisecond, r.cancel)
+	return r.recorder.HookPhase(params)
 }
 
 // An interrupt during a removal still drops that worktree's data — nothing
@@ -46,5 +57,26 @@ func TestAnInterruptedPruneReclaimsWhatItRemovedAndNamesTheRest(t *testing.T) {
 	result := outcome.Result
 	if len(result.Pruned) != 1 || len(result.Skipped) != 1 || result.Skipped[0].Reason != domain.PruneSkipInterrupted {
 		t.Errorf("result = %+v, want feat/a pruned and feat/b skipped as interrupted", result)
+	}
+}
+
+// Ctrl-C during a worktree's on_clean refuses it and stops the prune there:
+// the report names it failed and every worktree after it skipped.
+func TestAnInterruptedHookStopsThePruneAndNamesTheRest(t *testing.T) {
+	p := newPruneFixture(t, "feat/a", "feat/b", "feat/c")
+	p.ctx.Config.Project.Hooks.OnClean = []domain.HookCommand{{Cmd: "sleep 30"}}
+	runCtx, cancel := context.WithCancel(t.Context())
+	f := p.flow("feat/a", "feat/b", "feat/c")
+	f.runCtx = runCtx
+	f.presenter = hookInterrupting{recorder: &recorder{Recorder: &flowtest.Recorder{}}, cancel: cancel}
+
+	outcome, err := f.remove(removeParams{})
+
+	if !errors.Is(err, domain.ErrCancelled) {
+		t.Fatalf("err = %v, want the run read as cancelled", err)
+	}
+	result := outcome.Result
+	if result.Failed == nil || result.Failed.Branch != "feat/a" || len(result.Skipped) != 2 {
+		t.Errorf("result = %+v, want feat/a failed and feat/b, feat/c skipped", result)
 	}
 }
