@@ -51,6 +51,7 @@ func newExtractCmd() *cobra.Command {
 	cmd.Flags().String(domain.FlagOnConflict, "", "On conflict: abort (default) or resolve (write conflict markers in the target)")
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (requires a source arg, --files and --to; --from is also required when --to already exists locally; errors if a selection is missing)")
 	shared.AddOutputFlag(cmd)
+	shared.RequireYesInJSON(cmd)
 
 	return cmd
 }
@@ -77,9 +78,6 @@ func runExtract(cmd *cobra.Command, args []string) error {
 
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
-	if format == domain.OutputJSON && !yes {
-		return domain.ErrJSONNeedsYes
-	}
 
 	files, _ := cmd.Flags().GetStringSlice(domain.FlagFiles)
 	to, _ := cmd.Flags().GetString(domain.FlagTo)

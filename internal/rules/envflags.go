@@ -7,8 +7,6 @@ import (
 )
 
 type EnvFlagsParams struct {
-	Format        string
-	Yes           bool
 	Check         bool
 	Prune         bool
 	OnConflictSet bool
@@ -21,8 +19,6 @@ type EnvFlagsParams struct {
 // even in JSON.
 func ValidateEnvFlags(params EnvFlagsParams) error {
 	switch {
-	case params.Format == domain.OutputJSON && !params.Yes && !params.Check:
-		return domain.ErrEnvJSONNeedsYes
 	case params.Check && params.Isolation != "":
 		return domain.ErrEnvIsolationWithCheck
 	case params.Check && params.Prune:

@@ -44,7 +44,7 @@ func runDown(cmd *cobra.Command, args []string) error {
 	// --all is a different question, not a wider answer to this one: it takes
 	// neither a worktree nor a profile.
 	if all && (len(args) > 0 || profile != "") {
-		return fmt.Errorf("--%s cannot be combined with a worktree or --%s", domain.FlagAll, domain.FlagProfile)
+		return rules.Usage(fmt.Errorf("--%s cannot be combined with a worktree or --%s", domain.FlagAll, domain.FlagProfile))
 	}
 
 	ctx, err := runctx.Open(runctx.OpenParams{Cmd: cmd, TolerateRunConfig: true})

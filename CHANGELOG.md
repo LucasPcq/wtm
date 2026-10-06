@@ -16,6 +16,7 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 - **`wtm env main`** keeps the addressing its `.env` spells: reconciling its keys no longer moves it onto named URLs; pass `--addressing names` for that. → [The main checkout](docs/guide/addressing.md#the-main-checkout)
 - **`wtm prune`** reads only the branches that have a worktree, on git and on GitHub, so its time no longer grows with the repository's branches; it no longer refreshes the other remote-tracking refs. → [Stacked pull requests](docs/guide/recipes.md#stacked-pull-requests)
 - **`wtm env`** asks whether to keep or switch the worktree's isolation (the main checkout: its addressing), keeping it by default; the recap's verbatim action is gone. → [Isolation](docs/guide/isolation.md#changing-your-mind)
+- **`--output json` without `--yes`** on a command that could ask (`create`, `checkout`, `sync`, `clean`, `env`…) exits `2`, a usage error, instead of `1`: a script branching on `1` should read `2`. → [Exit codes](docs/guide/integrations.md#the-contract---yes-and---output-json)
 
 ### Fixed
 
@@ -24,6 +25,7 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 - **Flags that cannot be combined** (`clean`/`prune --keep-data --drop-data`, `run up`/`run start --exclusive --parallel`) exit `2`, a usage error, instead of `1`. → [Exit codes](docs/guide/integrations.md#the-contract---yes-and---output-json)
 - **`wtm run list`** in a terminal opens its picker again instead of printing `Aborted.` straight away.
 - **`wtm env`**'s resolver shows a kept conflict as your value alone, instead of an arrow from your value to itself.
+- **`wtm checkout <not a number>`** exits `2`, a usage error, before reading the config; so do `sync --push --no-push`, `sync --ff-parents --no-ff-parents` and `--all` with a name on `sync`, `fast-forward` and `run down`. → [Exit codes](docs/guide/integrations.md#the-contract---yes-and---output-json)
 
 ## [0.29.1] - 2026-10-05
 

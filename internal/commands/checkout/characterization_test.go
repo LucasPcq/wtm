@@ -3,12 +3,14 @@ package checkout
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 	"github.com/LucasPcq/wtm/internal/testutil/ghtest"
 )
@@ -91,8 +93,6 @@ func TestCharacterizeRefusals(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"a number that is not one", []string{"abc", "--yes"}, `invalid PR number "abc"`},
-		{"a number that is not positive", []string{"0", "--yes"}, `invalid PR number "0"`},
 		{"json without --yes", []string{"42", "--output", "json"}, "--output json requires --yes (prompts cannot run in JSON mode)"},
 		{"no number under --yes", []string{"--yes"}, "PR number required without an interactive terminal (or when --yes is set)"},
 		{"no number without a terminal", nil, "PR number required without an interactive terminal (or when --yes is set)"},
@@ -110,6 +110,45 @@ func TestCharacterizeRefusals(t *testing.T) {
 			}
 			if stdout != "" {
 				t.Errorf("stdout = %q, want nothing on a refusal", stdout)
+			}
+		})
+	}
+}
+
+// An argument that is not a PR number is a command line refused before the
+// command runs: exit 2, nothing on stdout, whatever else the line asks for and
+// whether or not the repository has a config (LUC-273).
+func TestAnInvalidPRNumberIsAUsageError(t *testing.T) {
+	cases := []struct {
+		name   string
+		args   []string
+		noRepo bool
+	}{
+		{"not a number", []string{"feat/c"}, false},
+		{"not a number, under --yes", []string{"feat/c", "--yes"}, false},
+		{"not a number, in JSON", []string{"feat/c", "--output", "json", "--yes"}, false},
+		{"not a number, in JSON without --yes", []string{"feat/c", "--output", "json"}, false},
+		{"not positive", []string{"0", "--yes"}, false},
+		{"outside an initialised repository", []string{"feat/c", "--yes"}, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if c.noRepo {
+				t.Chdir(t.TempDir())
+				t.Setenv(domain.EnvProjectDir, "")
+			} else {
+				newCheckoutRepo(t)
+			}
+			stdout, _, err := runCheckoutCmd(t, c.args...)
+			want := fmt.Sprintf(domain.CheckoutPRNumberInvalidFmt, c.args[0])
+			if err == nil || err.Error() != want {
+				t.Fatalf("error = %v, want %q", err, want)
+			}
+			if got := rules.ExitCode(err); got != domain.ExitCodeUsage {
+				t.Errorf("exit code = %d, want %d", got, domain.ExitCodeUsage)
+			}
+			if stdout != "" {
+				t.Errorf("stdout = %q, want nothing on a usage error", stdout)
 			}
 		})
 	}

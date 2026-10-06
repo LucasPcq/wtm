@@ -158,10 +158,6 @@ var (
 	// saying so is already on screen.
 	ErrCancelled = errors.New("cancelled")
 
-	// ErrJSONNeedsYes refuses --output json on a command that could ask
-	// something: JSON mode is non-interactive, so the decisions need --yes.
-	ErrJSONNeedsYes = errors.New("--output json requires --yes (prompts cannot run in JSON mode)")
-
 	// ErrExtractConflict is returned when the selected changes do not apply
 	// cleanly onto the target worktree. The extraction is aborted and the source
 	// worktree is left untouched.
@@ -216,7 +212,6 @@ var (
 	ErrReparentParentRequired   = errors.New("specify the new parent with --to (no interactive picker under --yes, without a terminal, or in --output json mode)")
 
 	ErrEnvWorktreeRequired = errors.New("specify a worktree (no interactive picker under --yes or --check, without a terminal, or in --output json mode)")
-	ErrEnvJSONNeedsYes     = errors.New("--output json requires --yes or --check (interactive resolution cannot run in JSON mode)")
 	// ErrEnvDecisionWithCheck and ErrEnvOnConflictNeedsRefresh refuse a flag
 	// the run would silently ignore.
 	ErrEnvDecisionWithCheck      = errors.New("--check writes nothing")
@@ -237,10 +232,6 @@ var (
 	// ErrEnvFileBadTemplate is returned when an env.file template is not a known
 	// template of its target (a recognized suffix appended to the target path).
 	ErrEnvFileBadTemplate = errors.New("env file template must be a known template of its target")
-
-	// ErrCleanJSONNeedsYes is returned when clean runs in --output json without
-	// --yes: confirmations cannot run in JSON mode.
-	ErrCleanJSONNeedsYes = errors.New("--output json requires --yes (confirmations cannot run in JSON mode; add --force to lift safety checks)")
 
 	// ErrUnsafeSudoDeletePath is returned when the `sudo rm -rf` recovery path
 	// would target an obviously dangerous location (a filesystem root, the home

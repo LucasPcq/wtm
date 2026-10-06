@@ -76,6 +76,7 @@ func newPruneCmd() *cobra.Command {
 	cmd.Flags().Bool(domain.FlagDropData, false, domain.FlagDropDataDesc)
 	cmd.MarkFlagsMutuallyExclusive(domain.FlagKeepData, domain.FlagDropData)
 	shared.AddOutputFlag(cmd)
+	shared.RequireYesInJSON(cmd, domain.FlagDryRun)
 
 	return cmd
 }
@@ -97,10 +98,6 @@ func runPrune(cmd *cobra.Command, _ []string) error {
 	// (merged, closed-PR, or gone). Reason flags narrow to specific categories.
 	if !merged && !closed && !gone {
 		merged, closed, gone = true, true, true
-	}
-
-	if format == domain.OutputJSON && !yes && !dryRun {
-		return errors.New(domain.PruneJSONNeedsYes)
 	}
 
 	dir, err := os.Getwd()
