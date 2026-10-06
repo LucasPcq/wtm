@@ -1,6 +1,6 @@
 # The event stream: `wtm events`
 
-`wtm events` tells whatever reads it what wtm does to a repository's worktrees, as it happens, whoever does it: a command in another shell, an agent, or the `wtm ui` dashboard (itself one of its readers). A terminal plugin opens a pane for a new worktree, an editor closes the window of a removed one, an agent waits for a sibling to finish provisioning, all without polling `wtm list`.
+`wtm events` tells whatever reads it what wtm does to a repository's worktrees and their jobs, as it happens, whoever does it: a command in another shell, an agent, or the `wtm ui` dashboard (itself one of its readers). A terminal plugin opens a pane for a new worktree, an editor closes the window of a removed one, an agent waits for a sibling to finish provisioning or learns that the server it started an hour ago crashed, all without polling `wtm list` or `wtm run ps`.
 
 ```sh
 wtm events                     # one line per change, for a person watching
@@ -18,10 +18,10 @@ $ wtm events --output json | jq -c 'select(.type == "worktree.provisioned" and .
 
 ## What the stream carries
 
-A subscription opens on a **snapshot** (one `snapshot` event listing every worktree), then a single `ready`, then one event per change until you interrupt it or its reader goes away. `wtm events --output json | head -n 2` prints the current state and returns.
+A subscription opens on a **snapshot** (one `snapshot` event listing every worktree and its jobs), then a single `ready`, then one event per change until you interrupt it or its reader goes away. `wtm events --output json | head -n 2` prints the current state and returns.
 
 ```jsonc
-{"v":1,"type":"snapshot","ts":"2026-10-03T09:12:01.512Z","repo":{"root":"/code/app","common_dir":"/code/app/.git"},"worktrees":[{"branch":"main","path":"/code/app","parent":"","ordinal":0,"isolation":"isolated","is_main":true,"created_at":""}]}
+{"v":1,"type":"snapshot","ts":"2026-10-03T09:12:01.512Z","repo":{"root":"/code/app","common_dir":"/code/app/.git"},"worktrees":[{"branch":"main","path":"/code/app","parent":"","ordinal":0,"isolation":"isolated","is_main":true,"created_at":"","jobs":[{"name":"db","kind":"service","state":"running"}]}]}
 {"v":1,"type":"ready","ts":"2026-10-03T09:12:01.513Z"}
 {"v":1,"type":"worktree.created","ts":"…","repo":{…},"worktree":{"branch":"feat/login","path":"/code/.trees/feat-login","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-03T09:13:40Z"}}
 {"v":1,"type":"worktree.provisioned","ts":"…","repo":{…},"worktree":{…},"ok":false,"hook":"pnpm install","exit_code":1}
@@ -30,11 +30,15 @@ A subscription opens on a **snapshot** (one `snapshot` event listing every workt
 {"v":1,"type":"worktree.reparented","ts":"…","repo":{…},"worktree":{…,"parent":"main"},"from_parent":"feat/auth"}
 {"v":1,"type":"worktree.deprovisioned","ts":"…","repo":{…},"worktree":{…},"ok":true}
 {"v":1,"type":"worktree.removed","ts":"…","repo":{…},"worktree":{…}}
+{"v":1,"type":"job.started","ts":"…","repo":{…},"worktree":{"branch":"feat/login","path":"/code/.trees/feat-login"},"job":{"name":"web","kind":"service","url":"http://web.feat-login.app.localhost"}}
+{"v":1,"type":"job.crashed","ts":"…","repo":{…},"worktree":{…},"job":{…},"exit_code":1,"last_lines":["Error: listen EADDRINUSE :::3000"]}
+{"v":1,"type":"job.exited","ts":"…","repo":{…},"worktree":{…},"job":{"name":"migrate","kind":"task"},"exit_code":0}
+{"v":1,"type":"job.stopped","ts":"…","repo":{…},"worktree":{…},"job":{…}}
 ```
 
 | Type | Sent when | Extra field |
 | --- | --- | --- |
-| `snapshot` | the stream opens, and again after every reconnection | `worktrees`: every worktree as it is now |
+| `snapshot` | the stream opens, and again after every reconnection | `worktrees`: every worktree as it is now, each with its `jobs` (see [Jobs](#jobs)) |
 | `ready` | right after the snapshots, each time they are sent | — |
 | `worktree.created` | `create`, `checkout` or `extract` brought a worktree into existence, before its `on_create` hooks run | — |
 | `worktree.provisioned` | its `on_create` hooks have run; also sent when there are none, so it always follows a `created` | `ok`; when `false`, `hook` (the command that failed) and `exit_code`. `hook` is absent when the phase failed before any hook ran, `exit_code` when the hook was killed by a signal |
@@ -45,8 +49,12 @@ A subscription opens on a **snapshot** (one `snapshot` event listing every workt
 | `worktree.removed` | `clean` or `prune` removed it, after its `deprovisioned` | — |
 | `repo.added` | global stream only: a repository joined the registry (see [Every repository at once](#every-repository-at-once)) | — |
 | `repo.removed` | global stream only: a repository left it (deleted, or no longer initialized with wtm) | — |
+| `job.started` | a job's process is up: a service's, a task's, or a detached launcher's once it exited `0` | — |
+| `job.crashed` | a job ended on its own: a service whose process exited, a task or a detached launcher that exited non-zero | `exit_code` (`-1` when a signal killed it), `last_lines` |
+| `job.exited` | a task exited `0` | `exit_code` |
+| `job.stopped` | `run stop`, `run down` or the job's `stop` command took it down | — |
 
-- Every event carries `v` (the schema version), `type` and `ts` (RFC 3339, UTC); every event but `ready` carries `repo`, and every `worktree.*` event the `worktree` it is about. A `removed` carries the worktree's last state.
+- Every event carries `v` (the schema version), `type` and `ts` (RFC 3339, UTC); every event but `ready` carries `repo`, every `worktree.*` event the `worktree` it is about, and every `job.*` event the `worktree` and `job` it is about. A `removed` carries the worktree's last state.
 - `deprovisioned` with `ok: true` is followed by `removed`; `ok: false` means the removal stopped there and the worktree is still on disk. A worktree whose directory is already gone gets `ok: true` only without `on_clean` hooks: with some, they cannot run there and the removal stops.
 - An event published by a command started with `WTM_CORRELATION_ID` carries it as `correlation_id`; see [Recognising your own command](#recognising-your-own-command).
 
@@ -62,13 +70,38 @@ A subscription opens on a **snapshot** (one `snapshot` event listing every workt
 | `is_main` | whether it is the main checkout |
 | `created_at` | when wtm created or adopted it, RFC 3339; empty when it never did |
 
-Nothing volatile is in it (dirty, ahead, behind, pull request, services): those change without any wtm command running, so read them from `wtm list --output json`. `repo.common_dir` is git's common directory with symlinks resolved, the same from any worktree however its path was spelled; `repo.root` is the main checkout.
+Nothing volatile is in it (dirty, ahead, behind, pull request): those change without any wtm command running, so read them from `wtm list --output json`. Jobs are not part of the identity either: they come as their own events, and in the snapshot.
+
+## Jobs
+
+The background daemon that runs `wtm run` jobs sees each one start and end, and publishes it. A `job.*` event carries:
+
+| Field | Meaning |
+| --- | --- |
+| `worktree` | `branch` and `path` only: it names the worktree the job runs in, it does not describe it. Never upsert a worktree's identity from it |
+| `job` | `name`, `kind` (`service` or `task`), `url` when the job is published under a name or a port, and `shared: true` for a [shared service](shared-services.md) |
+| `held_by` | on a shared service's event: the worktrees holding it when the change happened, each `{branch, path}`; absent when none does |
+| `exit_code` | on `job.crashed` and `job.exited`: what the process exited with, `-1` when a signal killed it |
+| `last_lines` | on `job.crashed`: the last lines it printed (at most 10, terminal escapes removed); `wtm run logs` has the rest |
+
+In the snapshot, each worktree carries `jobs`: one `{name, kind, state, url?, exit_code?, shared?, owner?}` per job (`exit_code` on a crashed one only) the daemon holds for it, sorted by name. A shared service a worktree holds is listed there with the state of the instance it holds, `shared: true` and `owner`: the `{branch, path}` of the worktree it runs in; the main checkout lists the instance itself, `shared: true` and no `owner`. `state` is one of `starting` (a detached launcher still running), `running`, `crashed` and `stopped`; a task that exited is no longer held, so `exited` only appears as an event. `jobs` is `[]` when the worktree has none, and `null` when the daemon could not be asked.
+
+- **One job, one sequence.** A service reads `started`, then `crashed` or `stopped`; a task `started`, then `exited`, `crashed` or `stopped`. A job killed by a stop is `stopped`, never `crashed`.
+- **A crash after `run up -d` is on the stream.** `run up` checks the ports once and returns; whatever happens next reaches only a reader of `job.crashed`.
+- **Correlation.** The jobs a `run up` or `run start` started with `WTM_CORRELATION_ID` set carry it on every later `job.*` event, a crash an hour later included. A `job.stopped` carries the id of the `run stop` or `run down` that stopped it, or none.
+- **Shared services** run once, in the main checkout, and send one event per change, about that worktree, whoever holds them. `held_by` names the worktrees holding the service when it happened: a reader that follows one worktree takes the events whose `worktree.path` or `held_by` holds it. A crash lists every holder, and lets go of every claim: from then on only the main checkout's snapshot lists the crashed service, so the crash's `held_by` is the holders' last word on it. A stop lists the worktree whose release stopped it, and carries the correlation id of that worktree's `run stop` or `run down` (a worktree that let go while the service kept running for others is no longer a holder, and sends nothing).
+
+### What is not seen
+
+- **A detached stack crashing.** A job with a `stop` command (`docker compose up -d`) is `started` once its launcher exits `0`, and `stopped` by `run stop` or `run down`, but the containers it left running are Docker's: no daemon watches them, so a container that dies later sends nothing. `wtm run ps` and the snapshot report what the daemon last knew. Watching them is planned (LUC-270).
+- **The daemon is a job's only witness.** It stays up for as long as it runs a job of its own, and while a `wtm events` reader is connected, so neither goes unwatched. A daemon stopped by hand (`wtm run daemon stop`, an upgrade) takes its foreground jobs down with it, and the next one does not report them: read the state from the snapshot of the reconnected stream.
+- **Jobs started by an older wtm**, or by a daemon of a version without job events, publish none. `repo.common_dir` is git's common directory with symlinks resolved, the same from any worktree however its path was spelled; `repo.root` is the main checkout.
 
 ## Reading it right
 
-- **Treat every event as an upsert** keyed by `(repo.common_dir, branch)`, and every `snapshot` as a reset of that repository's state. Applying an event twice changes nothing.
+- **Treat every `worktree.*` event as an upsert** keyed by `(repo.common_dir, branch)`, every `job.*` event as one keyed by `(repo.common_dir, worktree.path, job.name)`, and every `snapshot` as a reset of that repository's state, jobs included. Applying an event twice changes nothing.
 - **A reconnection is not an error.** The stream rides on wtm's background daemon. If the daemon stops (`wtm run daemon stop`, an upgrade), `wtm events` starts it again (it and `wtm ui` keep it running while open) and reopens on a fresh `snapshot` and `ready`. Events in between are not replayed: the snapshot holds their result. A daemon of another wtm version is used as it is, since it relays events without reading them; only one too old to know `wtm events` is replaced, and only while it runs no job.
-- **Ignore what you do not know.** An unknown field or type is skipped, never an error: new ones are added without changing `v`, which moves only on a breaking change.
+- **Ignore what you do not know.** An unknown field or type is skipped, never an error: new ones are added without changing `v`, which moves only on a breaking change. The `job.*` types and the snapshot's `jobs` came that way, in wtm 0.29.2, still `v: 1`.
 - **Delivery is opportunistic.** A command publishes only if the daemon is running, and never starts it, so nobody pays for the stream unless something listens. A reader that falls far behind is disconnected, and resynchronises from the snapshot it gets on reconnecting.
 
 ## Every repository at once
@@ -154,4 +187,4 @@ $ wtm version --output json
 
 ## What it does not carry yet
 
-Jobs starting and exiting, `sync` rebasing a chain, and the output of hooks are not on the stream (their outcome is: `provisioned` and `deprovisioned`); read them from `wtm run ps --output json` and the command's own output. See [Integrations](integrations.md) for the rest of what a tool can build on.
+`sync` rebasing a chain, the output of hooks (their outcome is: `provisioned` and `deprovisioned`) and whether a job is ready to answer are not on the stream; read them from the command's own output and `wtm run ps --output json`. See [Integrations](integrations.md) for the rest of what a tool can build on.

@@ -349,6 +349,51 @@ func TestASnapshotOfNothingIsAnEmptyList(t *testing.T) {
 	}
 }
 
+func TestASnapshotCarriesEachWorktreesJobs(t *testing.T) {
+	previousIdentities, previousJobs := identities, listJobs
+	identities = func(worktree.IdentitiesParams) ([]domain.WorktreeIdentity, error) {
+		return []domain.WorktreeIdentity{{Branch: "main", Path: "/r", IsMain: true}, {Branch: "feat/a", Path: "/wt/a"}}, nil
+	}
+	listJobs = func(string) ([]domain.JobInfo, error) {
+		return []domain.JobInfo{{Name: "web", Kind: domain.JobKindService, Status: domain.JobStatusRunning, State: domain.JobStateRunning, WorkDir: "/wt/a"}}, nil
+	}
+	t.Cleanup(func() { identities, listJobs = previousIdentities, previousJobs })
+
+	received, err := snapshotOf(snapshotParams{Repo: domain.EventRepo{Root: "/r", CommonDir: "/r/.git"}, Socket: "daemon.sock"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var line struct {
+		Worktrees []domain.SnapshotWorktree `json:"worktrees"`
+	}
+	if err := json.Unmarshal(received.Raw, &line); err != nil {
+		t.Fatal(err)
+	}
+	if len(line.Worktrees) != 2 || line.Worktrees[0].Jobs == nil || len(line.Worktrees[0].Jobs) != 0 {
+		t.Fatalf("main's jobs = %#v, want an empty list: %s", line.Worktrees, received.Raw)
+	}
+	if jobs := line.Worktrees[1].Jobs; len(jobs) != 1 || jobs[0].Name != "web" || jobs[0].State != domain.JobStateRunning {
+		t.Fatalf("feat/a's jobs = %#v, want web running", jobs)
+	}
+}
+
+func TestASnapshotSaysNothingOfJobsItCouldNotAsk(t *testing.T) {
+	previousIdentities, previousJobs := identities, listJobs
+	identities = func(worktree.IdentitiesParams) ([]domain.WorktreeIdentity, error) {
+		return []domain.WorktreeIdentity{{Branch: "main", Path: "/r", IsMain: true}}, nil
+	}
+	listJobs = func(string) ([]domain.JobInfo, error) { return nil, errors.New("daemon gone") }
+	t.Cleanup(func() { identities, listJobs = previousIdentities, previousJobs })
+
+	received, err := snapshotOf(snapshotParams{Repo: domain.EventRepo{Root: "/r", CommonDir: "/r/.git"}, Socket: "daemon.sock"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(received.Raw), `"jobs":null`) {
+		t.Fatalf("snapshot = %s, want jobs null rather than an empty list", received.Raw)
+	}
+}
+
 func TestThePublisherListensOnlyWhileTheDaemonRuns(t *testing.T) {
 	f := newWatchFixture(t)
 	publisher := NewPublisher(PublisherParams{ProjectDir: f.projectDir, SocketPath: f.socket})

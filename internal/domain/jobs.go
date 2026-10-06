@@ -285,6 +285,18 @@ const (
 	JobStatusReaped JobStatus = "reaped"
 )
 
+// JobState is a job as `wtm events` reports it, the one vocabulary every
+// reader of a job's lifecycle shares; JobStatus stays the daemon's own.
+type JobState string
+
+const (
+	JobStateStarting JobState = "starting"
+	JobStateRunning  JobState = "running"
+	JobStateCrashed  JobState = "crashed"
+	JobStateExited   JobState = "exited"
+	JobStateStopped  JobState = "stopped"
+)
+
 // JobRoute is one name the proxy serves a started job under: the job the name
 // belongs to, the host it answers on, and the port variable whose resolved
 // value sits behind it.
@@ -341,6 +353,9 @@ type JobRecord struct {
 	// MainHolds is the main checkout's own hold on a shared service, carried by
 	// the real job: main posts no claim, so this is the only record of it.
 	MainHolds bool `json:"main_holds,omitempty"`
+	// Origin is kept so a daemon that adopts the job can still publish its
+	// stop under the repository it belongs to.
+	Origin *EventOrigin `json:"origin,omitempty"`
 }
 
 // NamespaceRef is one worktree's namespace of one shared service, named by what it
@@ -455,6 +470,11 @@ type JobInfo struct {
 	// signal killed it. A detached launcher exiting does not end its job, so it
 	// keeps a nil code for as long as the service it started is registered.
 	ExitCode *int `json:"exit_code,omitempty"`
+	// State is empty from a daemon built before it, and for a claim.
+	State JobState `json:"state,omitempty"`
+	// SharedDir is the main checkout a shared job runs in, on the instance and
+	// on every claim; empty from a daemon built before it.
+	SharedDir string `json:"shared_dir,omitempty"`
 	// Released marks a shared job this stop let go of without stopping it: the
 	// service is still up for another worktree.
 	Released bool `json:"released,omitempty"`

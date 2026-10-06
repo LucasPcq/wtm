@@ -108,6 +108,7 @@ Neither check fails the run or changes the exit code. Do not treat them as error
 - **Ports declared but not bound.** Declaring a port injects a variable; nothing forces the command to read it. After the jobs start, wtm dials each declared port and reports the silent ones under "Ports declared but not bound". When the *base* port answers instead, the variable never reached the process: a `--port`-only CLI, a hard-coded port, a `.env` that wins, or a task runner filtering env (**Turborepo's default `envMode: "strict"` does exactly this**: a root `turbo run dev` job needs `globalPassThroughEnv` in `turbo.json`). When the base port turns out to be held by another worktree (the main checkout running alongside), the report names that worktree instead of blaming the job's command. `--no-probe` skips the check; `port_probe_timeout` in `run.toml` sets its budget (default 15s, negative disables) and `probe = false` on a job silences it for that job.
 - **Next dev origins.** When the proxy serves a job whose directory holds a `next.config.*` without `allowedDevOrigins`, `run up` prints the exact line to add under "Next dev origins". Vite needs nothing: it allows `.localhost` already.
 - `run up` / `run start` warn when a job with a `stop` command has a `cmd` without `-d` / `--detach` (such a `cmd` blocks the run; see `run-config.md`).
+- **A crash after the check is not reported by `run up`**: it has returned. To catch one, watch `wtm events --output json` for `job.crashed` (see `events.md`), or check `run ps` later.
 
 ## `run ps`
 

@@ -51,6 +51,50 @@ func TestEachEventReadsAsOneLine(t *testing.T) {
 	}
 }
 
+func TestEachJobEventNamesTheJobAndItsWorktree(t *testing.T) {
+	worktree := &domain.WorktreeIdentity{Branch: "feat/a", Path: "/wt/feat-a"}
+	web := &domain.EventJob{Name: "web", Kind: domain.JobKindService, URL: "http://web.feat-a.app.localhost"}
+	migrate := &domain.EventJob{Name: "migrate", Kind: domain.JobKindTask}
+	one, zero := 1, 0
+	main := &domain.WorktreeIdentity{Branch: "main", Path: "/repo"}
+	db := &domain.EventJob{Name: "db", Kind: domain.JobKindService, Shared: true}
+	holders := []domain.WorktreeRef{{Branch: "feat/a", Path: "/wt/feat-a"}, {Branch: "feat/b", Path: "/wt/feat-b"}}
+
+	cases := []struct {
+		event domain.Event
+		want  string
+	}{
+		{domain.Event{Type: domain.EventJobStarted, Worktree: worktree, Job: web}, "✓ started web in feat/a  http://web.feat-a.app.localhost"},
+		{domain.Event{Type: domain.EventJobStarted, Worktree: worktree, Job: migrate}, "✓ started migrate in feat/a"},
+		{domain.Event{Type: domain.EventJobExited, Worktree: worktree, Job: migrate, ExitCode: &zero}, "✓ migrate finished in feat/a"},
+		{domain.Event{Type: domain.EventJobStopped, Worktree: worktree, Job: web}, "~ stopped web in feat/a"},
+		{domain.Event{Type: domain.EventJobCrashed, Worktree: worktree, Job: web, ExitCode: &one, LastLines: []string{"listening", "Error: boom"}}, "✗ web crashed in feat/a (exit 1)\n    listening\n    Error: boom"},
+		{domain.Event{Type: domain.EventJobCrashed, Worktree: main, Job: db, ExitCode: &one, HeldBy: holders}, "✗ db crashed in main · held by feat/a, feat/b (exit 1)"},
+		{domain.Event{Type: domain.EventJobStarted, Worktree: main, Job: db, HeldBy: holders}, "✓ started db in main · held by feat/a, feat/b"},
+	}
+	for _, c := range cases {
+		if got := eventLine(t, c.event); got != c.want {
+			t.Errorf("%s: got %q, want %q", c.event.Type, got, c.want)
+		}
+	}
+}
+
+func TestTheGlobalStreamNamesTheRepositoryOfAJobEvent(t *testing.T) {
+	var buf bytes.Buffer
+	event := domain.Event{
+		Type:     domain.EventJobStopped,
+		Repo:     &domain.EventRepo{Root: "/code/app", CommonDir: "/code/app/.git"},
+		Worktree: &domain.WorktreeIdentity{Branch: "feat/a"},
+		Job:      &domain.EventJob{Name: "web"},
+	}
+	if err := WriteGlobalEventLine(&buf, event); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(ansi.Strip(buf.String())); got != "~ app · stopped web in feat/a" {
+		t.Fatalf("got %q", got)
+	}
+}
+
 func TestAnUnallocatedOrdinalReadsAsNone(t *testing.T) {
 	identity := &domain.WorktreeIdentity{Branch: "feat/a"}
 	got := eventLine(t, domain.Event{Type: domain.EventWorktreeUpdated, Worktree: identity, Changed: []domain.IdentityField{domain.IdentityOrdinal}})

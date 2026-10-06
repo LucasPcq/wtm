@@ -31,11 +31,15 @@ func WriteEventLine(w io.Writer, event domain.Event) error {
 // repositories: a worktree line names the repository it belongs to.
 func WriteGlobalEventLine(w io.Writer, event domain.Event) error {
 	prefix := ""
-	if strings.HasPrefix(string(event.Type), domain.EventWorktreePrefix) && event.Repo != nil {
+	if aboutAWorktree(event.Type) && event.Repo != nil {
 		prefix = fmt.Sprintf(domain.EventRepoPrefixFmt, filepath.Base(event.Repo.Root))
 	}
 	writeEventLine(eventLineParams{W: w, Event: event, Prefix: prefix})
 	return nil
+}
+
+func aboutAWorktree(eventType domain.EventType) bool {
+	return strings.HasPrefix(string(eventType), domain.EventWorktreePrefix) || strings.HasPrefix(string(eventType), domain.EventJobPrefix)
 }
 
 type eventLineParams struct {
@@ -80,7 +84,53 @@ func writeEventLine(params eventLineParams) {
 		Update(w, prefix+fmt.Sprintf(domain.EventReparentedFmt, identity.Branch, event.FromParent, identity.Parent))
 	case domain.EventWorktreeUpdated:
 		Update(w, prefix+fmt.Sprintf(domain.EventUpdatedFmt, identity.Branch, changedFields(changedFieldsParams{Identity: *identity, Changed: event.Changed})))
+	case domain.EventJobStarted, domain.EventJobCrashed, domain.EventJobExited, domain.EventJobStopped:
+		writeJobEventLine(jobEventLineParams{W: w, Event: event, Prefix: prefix, Branch: identity.Branch})
 	}
+}
+
+type jobEventLineParams struct {
+	W      io.Writer
+	Event  domain.Event
+	Prefix string
+	Branch string
+}
+
+func writeJobEventLine(params jobEventLineParams) {
+	job := params.Event.Job
+	if job == nil {
+		return
+	}
+	w, prefix, held := params.W, params.Prefix, heldBy(params.Event.HeldBy)
+	switch params.Event.Type {
+	case domain.EventJobStarted:
+		url := ""
+		if job.URL != "" {
+			url = fmt.Sprintf(domain.EventJobURLFmt, job.URL)
+		}
+		Success(w, prefix+fmt.Sprintf(domain.EventJobStartedFmt, job.Name, params.Branch)+held+url)
+	case domain.EventJobExited:
+		Success(w, prefix+fmt.Sprintf(domain.EventJobExitedFmt, job.Name, params.Branch)+held)
+	case domain.EventJobStopped:
+		Update(w, prefix+fmt.Sprintf(domain.EventJobStoppedFmt, job.Name, params.Branch)+held)
+	case domain.EventJobCrashed:
+		line := prefix + fmt.Sprintf(domain.EventJobCrashedFmt, job.Name, params.Branch) + held
+		if params.Event.ExitCode != nil {
+			line += fmt.Sprintf(domain.EventExitCodeFmt, *params.Event.ExitCode)
+		}
+		Error(w, strings.Join(append([]string{line}, params.Event.LastLines...), "\n"))
+	}
+}
+
+func heldBy(refs []domain.WorktreeRef) string {
+	if len(refs) == 0 {
+		return ""
+	}
+	branches := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		branches = append(branches, ref.Branch)
+	}
+	return fmt.Sprintf(domain.EventJobHeldByFmt, strings.Join(branches, domain.EventFieldSep))
 }
 
 func hookPassed(event domain.Event) bool {
