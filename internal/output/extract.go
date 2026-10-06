@@ -9,6 +9,7 @@ import (
 )
 
 func WriteExtractJSON(w io.Writer, result domain.ExtractResult) error {
+	result.EnvPorts = rules.RedactEnvPortPlan(result.EnvPorts)
 	return encodeJSON(w, result)
 }
 

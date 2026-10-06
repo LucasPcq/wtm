@@ -28,23 +28,22 @@ exit: 0
           {
             "key": "SHARED",
             "status": "conflict",
-            "current_value": "from-worktree",
-            "resolved_value": "from-main",
             "source": "main",
-            "action": "kept"
+            "action": "kept",
+            "redacted": true
           },
           {
             "key": "ORPHAN",
             "status": "orphan",
-            "current_value": "1",
-            "action": "kept"
+            "action": "kept",
+            "redacted": true
           },
           {
             "key": "NEW_KEY",
             "status": "resolved",
-            "resolved_value": "1",
             "source": "main",
-            "action": "added"
+            "action": "added",
+            "redacted": true
           }
         ]
       },

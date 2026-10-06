@@ -27,7 +27,7 @@ func TestPrintEnvReportNeverListsTheValuesItMoved(t *testing.T) {
 	}
 
 	var declined bytes.Buffer
-	PrintEnvReport(&declined, result)
+	PrintEnvReport(&declined, EnvReportParams{Result: result})
 	if strings.Contains(declined.String(), "BECOMES") {
 		t.Errorf("a declined pass printed its table:\n%s", declined.String())
 	}
@@ -37,7 +37,7 @@ func TestPrintEnvReportNeverListsTheValuesItMoved(t *testing.T) {
 
 	result.Ports.Applied = true
 	var applied bytes.Buffer
-	PrintEnvReport(&applied, result)
+	PrintEnvReport(&applied, EnvReportParams{Result: result})
 	if strings.Contains(applied.String(), "BECOMES") {
 		t.Errorf("an applied pass printed its table:\n%s", applied.String())
 	}
@@ -62,13 +62,13 @@ func TestPrintEnvReportPreviewsThePortPassAsACount(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	PrintEnvReport(&buf, domain.EnvSyncResult{
+	PrintEnvReport(&buf, EnvReportParams{Result: domain.EnvSyncResult{
 		Branch: "feat/x",
 		Mode:   domain.EnvModeAdd,
 		Check:  true,
 		Files:  []domain.EnvFileResult{{Target: ".env"}},
 		Ports:  plan,
-	})
+	}})
 
 	if strings.Contains(buf.String(), "BECOMES") {
 		t.Errorf("a preview printed its table:\n%s", buf.String())
@@ -82,12 +82,12 @@ func TestPrintEnvReportPreviewsThePortPassAsACount(t *testing.T) {
 // picked interactively otherwise gets no confirmation of what was reconciled.
 func TestPrintEnvReportNamesTheWorktreeAndMode(t *testing.T) {
 	var buf bytes.Buffer
-	PrintEnvReport(&buf, domain.EnvSyncResult{
+	PrintEnvReport(&buf, EnvReportParams{Result: domain.EnvSyncResult{
 		Branch: "feat/x",
 		Mode:   domain.EnvModeRefresh,
 		Check:  true,
 		Files:  []domain.EnvFileResult{{Target: ".env"}},
-	})
+	}})
 
 	for _, want := range []string{"feat/x", "refresh", "read-only check"} {
 		if !strings.Contains(buf.String(), want) {

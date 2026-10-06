@@ -1,7 +1,19 @@
-args: main --check --prune
-err: --prune decides what to write, and --check writes nothing: pass one or the other
-exit: 1
+args: feat/a --check --mode refresh
+err: the .env has drifted from its sources
+exit: 18
 --- stdout ---
+
+  ! Read-only check — run `wtm env feat/a` to reconcile.
+
+  Worktree  feat/a
+  Mode      refresh  ·  read-only check
+
+  .env   strategy: main  ·  source: main
+  + NEW_KEY        would be added from main
+  ! SHARED         conflict — local value differs from main
+  ! CLIENT_SECRET  conflict — local value differs from main
+  − ORPHAN         orphan — in no source
+
 Usage:
   wtm env [worktree] [flags]
 
@@ -35,4 +47,12 @@ Flags:
   -y, --yes                  Skip all prompts; resolve every decision from flags and safe defaults (additions only)
 
 --- stderr ---
-Error: --prune decides what to write, and --check writes nothing: pass one or the other
+Error: the .env has drifted from its sources
+--- .env ---
+WEB_PORT=3010
+REALM=app-feat-a
+SHARED=from-worktree
+ORPHAN=1
+CLIENT_SECRET=worktree-s3cr3t
+--- isolation ---
+isolated

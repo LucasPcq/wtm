@@ -77,6 +77,7 @@ func WriteProfileResultJSON(w io.Writer, result ProfileActionResult) error {
 
 // WritePRCheckoutJSON writes the payload for `wtm checkout`.
 func WritePRCheckoutJSON(w io.Writer, payload PRCheckoutJSON) error {
+	payload.EnvPorts = rules.RedactEnvPortPlan(payload.EnvPorts)
 	return encodeJSON(w, payload)
 }
 

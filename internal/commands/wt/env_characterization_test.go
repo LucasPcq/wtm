@@ -136,6 +136,22 @@ func driftSetup(t *testing.T, dir string) {
 	writeEnvFile(t, worktreeEnvPath(dir, "feat/a"), wt+"SHARED=from-worktree\nORPHAN=1\n")
 }
 
+// secretSetup adds to driftSetup a secret that diverged between main and the
+// worktree, so a refresh check has a conflict whose two values are secrets.
+func secretSetup(t *testing.T, dir string) {
+	t.Helper()
+	driftSetup(t, dir)
+	main := readEnvOf(t, dir, "main")
+	writeEnvFile(t, filepath.Join(dir, ".env"), main+"CLIENT_SECRET="+envMainSecret+"\n")
+	wt := readEnvOf(t, dir, "feat/a")
+	writeEnvFile(t, worktreeEnvPath(dir, "feat/a"), wt+"CLIENT_SECRET="+envWorktreeSecret+"\n")
+}
+
+const (
+	envMainSecret     = "main-s3cr3t"
+	envWorktreeSecret = "worktree-s3cr3t"
+)
+
 func noFilesSetup(t *testing.T, dir string) {
 	t.Helper()
 	if err := setupMinimalConfig(t, filepath.Join(dir, ".git", "wtm")); err != nil {
@@ -155,6 +171,10 @@ func envGoldenCases() []envGoldenCase {
 		{name: "check", setup: driftSetup, args: []string{"feat/a", "--" + domain.FlagCheck}, branch: "feat/a"},
 		{name: "check-clean", setup: envCreate("feat/a", "--from", "main", "--yes"), args: []string{"feat/a", "--" + domain.FlagCheck}, branch: "feat/a"},
 		{name: "check-json", setup: driftSetup, args: append([]string{"feat/a", "--" + domain.FlagCheck}, json...), branch: "feat/a"},
+		{name: "check-refresh", setup: secretSetup, args: []string{"feat/a", "--" + domain.FlagCheck, "--" + domain.FlagMode, "refresh"}, branch: "feat/a"},
+		{name: "check-refresh-json", setup: secretSetup, args: append([]string{"feat/a", "--" + domain.FlagCheck, "--" + domain.FlagMode, "refresh"}, json...), branch: "feat/a"},
+		{name: "check-refresh-show-values", setup: secretSetup, args: []string{"feat/a", "--" + domain.FlagCheck, "--" + domain.FlagMode, "refresh", "--" + domain.FlagShowValues}, branch: "feat/a"},
+		{name: "check-refresh-show-values-json", setup: secretSetup, args: append([]string{"feat/a", "--" + domain.FlagCheck, "--" + domain.FlagMode, "refresh", "--" + domain.FlagShowValues}, json...), branch: "feat/a"},
 		{name: "prune", setup: driftSetup, args: []string{"feat/a", yes, "--" + domain.FlagPrune}, branch: "feat/a"},
 		{name: "refresh-overwrite", setup: driftSetup, args: []string{"feat/a", yes, "--" + domain.FlagMode, "refresh", "--" + domain.FlagOnConflict, "overwrite"}, branch: "feat/a"},
 		{name: "refresh-keep-json", setup: driftSetup, args: append([]string{"feat/a", yes, "--" + domain.FlagMode, "refresh"}, json...), branch: "feat/a"},
@@ -187,5 +207,76 @@ func envGoldenCases() []envGoldenCase {
 		{name: "err-isolation-with-check", args: []string{"main", "--" + domain.FlagCheck, isolation, "verbatim"}},
 		{name: "err-prune-with-check", args: []string{"main", "--" + domain.FlagCheck, "--" + domain.FlagPrune}},
 		{name: "err-on-conflict-in-add", args: []string{"main", yes, "--" + domain.FlagOnConflict, "overwrite"}},
+	}
+}
+
+// The leak LUC-263 closes: `wtm env --check --output json` wrote the value of
+// every key, secrets included, into whatever read it — an agent's context, a
+// CI log. Only the values wtm writes itself may appear, unless asked.
+func TestEnvReportWithholdsTheValuesWtmDoesNotWrite(t *testing.T) {
+	check := "--" + domain.FlagCheck
+	refresh := []string{"--" + domain.FlagMode, "refresh"}
+	json := []string{"--" + domain.FlagOutput, domain.OutputJSON}
+	yes := "--" + domain.FlagYes
+	for name, args := range map[string][]string{
+		"check":              append([]string{"feat/a", check}, refresh...),
+		"check json":         append(append([]string{"feat/a", check}, refresh...), json...),
+		"apply":              append([]string{"feat/a", yes}, refresh...),
+		"apply json":         append(append([]string{"feat/a", yes}, refresh...), json...),
+		"apply add json":     append([]string{"feat/a", yes}, json...),
+		"check add (text)":   {"feat/a", check},
+		"check add (json)":   append([]string{"feat/a", check}, json...),
+		"apply prune (json)": append([]string{"feat/a", yes, "--" + domain.FlagPrune}, json...),
+	} {
+		t.Run(name, func(t *testing.T) {
+			globaldir.Isolate(t)
+			dir := isolationRepo(t)
+			secretSetup(t, dir)
+
+			stdout, stderr, _ := runWtCmd(t, append([]string{domain.CmdEnv}, args...)...)
+
+			out := stdout + stderr
+			for _, secret := range []string{envMainSecret, envWorktreeSecret, "from-worktree", "from-main"} {
+				if strings.Contains(out, secret) {
+					t.Errorf("output carries %q:\n%s", secret, out)
+				}
+			}
+		})
+	}
+}
+
+func TestEnvReportStillShowsTheValuesWtmWrites(t *testing.T) {
+	globaldir.Isolate(t)
+	dir := isolationRepo(t)
+	secretSetup(t, dir)
+
+	stdout, _, _ := runWtCmd(t, domain.CmdEnv, "feat/a", "--"+domain.FlagCheck, "--"+domain.FlagOutput, domain.OutputJSON)
+
+	for _, want := range []string{`"current_value": "3010"`, `"current_value": "app-feat-a"`, `"redacted": true`} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("JSON lacks %s:\n%s", want, stdout)
+		}
+	}
+}
+
+func TestEnvShowValuesPrintsEveryValue(t *testing.T) {
+	for name, extra := range map[string][]string{
+		"text": nil,
+		"json": {"--" + domain.FlagOutput, domain.OutputJSON},
+	} {
+		t.Run(name, func(t *testing.T) {
+			globaldir.Isolate(t)
+			dir := isolationRepo(t)
+			secretSetup(t, dir)
+
+			args := append([]string{domain.CmdEnv, "feat/a", "--" + domain.FlagCheck, "--" + domain.FlagMode, "refresh", "--" + domain.FlagShowValues}, extra...)
+			stdout, _, _ := runWtCmd(t, args...)
+
+			for _, secret := range []string{envMainSecret, envWorktreeSecret} {
+				if !strings.Contains(stdout, secret) {
+					t.Errorf("--show-values output lacks %q:\n%s", secret, stdout)
+				}
+			}
+		})
 	}
 }

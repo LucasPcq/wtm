@@ -1,11 +1,11 @@
-args: feat/a --check --output json
+args: feat/a --check --mode refresh --show-values --output json
 err: the .env has drifted from its sources
 exit: 18
 --- stdout ---
 {
   "branch": "feat/a",
   "path": "<trees>/feat-a",
-  "mode": "add",
+  "mode": "refresh",
   "check": true,
   "files": [
     {
@@ -13,7 +13,7 @@ exit: 18
       "strategy": "main",
       "source": "main",
       "diff": {
-        "mode": "add",
+        "mode": "refresh",
         "entries": [
           {
             "key": "WEB_PORT",
@@ -27,19 +27,28 @@ exit: 18
           },
           {
             "key": "SHARED",
-            "status": "resolved",
-            "redacted": true
+            "status": "conflict",
+            "current_value": "from-worktree",
+            "resolved_value": "from-main",
+            "source": "main"
           },
           {
             "key": "ORPHAN",
             "status": "orphan",
-            "redacted": true
+            "current_value": "1"
+          },
+          {
+            "key": "CLIENT_SECRET",
+            "status": "conflict",
+            "current_value": "worktree-s3cr3t",
+            "resolved_value": "main-s3cr3t",
+            "source": "main"
           },
           {
             "key": "NEW_KEY",
             "status": "resolved",
-            "source": "main",
-            "redacted": true
+            "resolved_value": "1",
+            "source": "main"
           }
         ]
       },
@@ -121,5 +130,6 @@ WEB_PORT=3010
 REALM=app-feat-a
 SHARED=from-worktree
 ORPHAN=1
+CLIENT_SECRET=worktree-s3cr3t
 --- isolation ---
 isolated
