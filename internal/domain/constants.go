@@ -250,6 +250,17 @@ const (
 	EnvProjectDir = "WTM_PROJECT_DIR"
 	EnvStateDir   = "WTM_STATE_DIR"
 
+	// Git's own variables that pin every git command to one repository,
+	// whatever directory it runs in.
+	EnvGitDir                        = "GIT_DIR"
+	EnvGitWorkTree                   = "GIT_WORK_TREE"
+	EnvGitCommonDir                  = "GIT_COMMON_DIR"
+	EnvGitIndexFile                  = "GIT_INDEX_FILE"
+	EnvGitObjectDirectory            = "GIT_OBJECT_DIRECTORY"
+	EnvGitAlternateObjectDirectories = "GIT_ALTERNATE_OBJECT_DIRECTORIES"
+	EnvGitNamespace                  = "GIT_NAMESPACE"
+	EnvGitPrefix                     = "GIT_PREFIX"
+
 	// Worktree-scoped variables injected into every job and lifecycle hook, so
 	// two worktrees running the same services never share a resource.
 	EnvWorktree           = "WTM_WORKTREE"
@@ -4442,6 +4453,20 @@ const (
 	ComposeNoDeps      = "--no-deps "
 	ComposeCmdHyphened = "docker-compose"
 )
+
+// GitRepoScopedEnv is what `wtm events --all` drops before it reads any
+// repository: inherited, one of them would make every repository read as the
+// one it names.
+var GitRepoScopedEnv = []string{
+	EnvGitDir,
+	EnvGitWorkTree,
+	EnvGitCommonDir,
+	EnvGitIndexFile,
+	EnvGitObjectDirectory,
+	EnvGitAlternateObjectDirectories,
+	EnvGitNamespace,
+	EnvGitPrefix,
+}
 
 var WorktreeScopedEnv = []string{
 	EnvWorktree,

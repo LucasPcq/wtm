@@ -193,6 +193,12 @@ func TestAFinalRefusalExitsOnItsStableCodeAndWritesNothingOnStdout(t *testing.T)
 			code: domain.ExitCodeUsage,
 			says: domain.FlagPathNotADirectory,
 		},
+		"--all with --repo": {
+			cwd:  func(t *testing.T) string { return t.TempDir() },
+			args: func(cwd string) []string { return []string{"--" + domain.FlagAll, "--" + domain.FlagRepo, cwd} },
+			code: domain.ExitCodeUsage,
+			says: "--" + domain.FlagRepo,
+		},
 		"repository not initialized": {
 			cwd:  func(t *testing.T) string { return gittest.InitRepo(t) },
 			args: func(string) []string { return nil },
@@ -310,6 +316,115 @@ func TestOutsideARepositoryEventsFollowsTheRegistry(t *testing.T) {
 	}
 	if got := decode(t, r.out.next(t)); got.Type != domain.EventReady {
 		t.Fatalf("second line = %+v", got)
+	}
+	if err := r.end(t); err != nil {
+		t.Fatalf("an interrupted stream is a success: %v", err)
+	}
+}
+
+func registeredRepo(t *testing.T) string {
+	t.Helper()
+	dir := initializedRepo(t)
+	if err := wtmevents.Register(wtmevents.RegisterParams{Root: dir, StateDir: filepath.Join(dir, ".git", domain.StateDirName)}); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+// snapshotsUntilReady reads the global stream's opening, keyed by the path of
+// each repository's main checkout.
+func snapshotsUntilReady(t *testing.T, r running) map[string]domain.Event {
+	t.Helper()
+	snapshots := map[string]domain.Event{}
+	for {
+		event := decode(t, r.out.next(t))
+		if event.Type == domain.EventReady {
+			return snapshots
+		}
+		if event.Type != domain.EventSnapshot || event.Repo == nil {
+			t.Fatalf("before ready: %+v", event)
+		}
+		snapshots[realPath(t, event.Repo.Root)] = event
+	}
+}
+
+func realPath(t *testing.T, path string) string {
+	t.Helper()
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resolved
+}
+
+func TestAllFollowsEveryRepositoryFromInsideOne(t *testing.T) {
+	processtest.Home(t)
+	processtest.RealDaemon(t, process.SocketPath())
+	t.Setenv(domain.EnvProjectDir, "")
+	t.Setenv(domain.EnvStateDir, "")
+	inside, other := registeredRepo(t), registeredRepo(t)
+	t.Chdir(inside)
+
+	r := start(t, "--"+domain.FlagAll, "--"+domain.FlagOutput, domain.OutputJSON)
+
+	snapshots := snapshotsUntilReady(t, r)
+	for _, dir := range []string{inside, other} {
+		if _, ok := snapshots[realPath(t, dir)]; !ok {
+			t.Errorf("no snapshot of %s in %v", dir, snapshots)
+		}
+	}
+	if err := r.end(t); err != nil {
+		t.Fatalf("an interrupted stream is a success: %v", err)
+	}
+}
+
+func TestAllReadsEachRepositoryWhateverGitDirSays(t *testing.T) {
+	processtest.Home(t)
+	processtest.RealDaemon(t, process.SocketPath())
+	t.Setenv(domain.EnvProjectDir, "")
+	t.Setenv(domain.EnvStateDir, "")
+	pinned, other := registeredRepo(t), registeredRepo(t)
+	t.Chdir(t.TempDir())
+	t.Setenv(domain.EnvGitDir, filepath.Join(pinned, ".git"))
+	t.Setenv(domain.EnvGitWorkTree, pinned)
+
+	r := start(t, "--"+domain.FlagAll, "--"+domain.FlagOutput, domain.OutputJSON)
+
+	snapshot, ok := snapshotsUntilReady(t, r)[realPath(t, other)]
+	if !ok {
+		t.Fatal("no snapshot of the repository GIT_DIR does not name")
+	}
+	if len(snapshot.Worktrees) != 1 || realPath(t, snapshot.Worktrees[0].Path) != realPath(t, other) {
+		t.Fatalf("its worktrees = %+v, want its own main checkout", snapshot.Worktrees)
+	}
+	_ = r.end(t)
+}
+
+// herdr-wtm 0.2.0 runs exactly this — no flag, cwd=/ — so the implicit global
+// stream keeps its trigger, its opening and the environment it was given.
+func TestTheImplicitGlobalStreamIsUnchangedByAll(t *testing.T) {
+	processtest.Home(t)
+	processtest.RealDaemon(t, process.SocketPath())
+	t.Setenv(domain.EnvProjectDir, "")
+	t.Setenv(domain.EnvStateDir, "")
+	first, second := registeredRepo(t), registeredRepo(t)
+	t.Chdir(t.TempDir())
+	t.Setenv(domain.EnvGitNamespace, "kept")
+
+	r := start(t, "--"+domain.FlagOutput, domain.OutputJSON)
+
+	snapshots := snapshotsUntilReady(t, r)
+	if len(snapshots) != 2 {
+		t.Fatalf("snapshots = %v, want one per registered repository", snapshots)
+	}
+	for _, dir := range []string{first, second} {
+		snapshot, ok := snapshots[realPath(t, dir)]
+		if !ok || snapshot.V != domain.EventsSchemaVersion || len(snapshot.Worktrees) != 1 {
+			t.Errorf("snapshot of %s = %+v", dir, snapshot)
+		}
+	}
+	if got := os.Getenv(domain.EnvGitNamespace); got != "kept" {
+		t.Errorf("$%s = %q: the implicit stream must not touch the environment", domain.EnvGitNamespace, got)
 	}
 	if err := r.end(t); err != nil {
 		t.Fatalf("an interrupted stream is a success: %v", err)

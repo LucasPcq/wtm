@@ -34,12 +34,13 @@ func NewCmd() *cobra.Command {
 			"If the run daemon stops, the stream waits for it and opens again on a fresh\n" +
 			"snapshot: treat every event as an upsert keyed by branch, and every snapshot as a\n" +
 			"reset. It runs until interrupted or until the reader of its pipe goes away.\n" +
-			"Run outside any repository, it follows every repository wtm was used in: a\n" +
-			"snapshot for each, one ready line, then repo.added and repo.removed as they come\n" +
-			"and go, a new repository's snapshot right after its repo.added. It ends on a code\n" +
-			"no retry can change in three cases: 12 in a repository wtm was never initialized\n" +
-			"in, 21 when --repo is not in a git repository, and 20 if it receives an event of\n" +
-			"a schema newer than its own.",
+			"With --all it follows every repository wtm was used in, whatever the current\n" +
+			"directory or $GIT_DIR, as it does when run outside any repository without --repo:\n" +
+			"a snapshot for each, one ready line, then repo.added and repo.removed as they\n" +
+			"come and go, a new repository's snapshot right after its repo.added.\n" +
+			"It ends on a code no retry can change: 2 for --all with --repo, 12 in a\n" +
+			"repository wtm was never initialized in, 21 when --repo is not in a git\n" +
+			"repository, and 20 if it receives an event of a schema newer than its own.",
 		Example: `  # Watch this repository's worktrees
   wtm events
 
@@ -49,12 +50,13 @@ func NewCmd() *cobra.Command {
   # Another repository than the current one
   wtm events --repo ~/code/app --output json
 
-  # Every repository wtm knows
-  cd ~ && wtm events --output json`,
+  # Every repository wtm knows, wherever it runs
+  wtm events --all --output json`,
 		Args: cobra.NoArgs,
 		RunE: runEvents,
 	}
 	cmd.Flags().String(domain.FlagRepo, "", "Watch the repository holding this path instead of the current one")
+	cmd.Flags().Bool(domain.FlagAll, false, "Watch every repository wtm knows, whatever the current directory or $GIT_DIR")
 	shared.AddOutputFlag(cmd)
 	return cmd
 }
@@ -93,10 +95,20 @@ func runEvents(cmd *cobra.Command, _ []string) error {
 	}})
 }
 
-// followsEveryRepo is the global stream's trigger: no --repo, and no
-// repository around the current directory to default to.
+// followsEveryRepo is the global stream's trigger: --all, or no --repo and no
+// repository around the current directory to default to. Only --all drops the
+// inherited git variables: the implicit trigger is a contract integrations
+// already rely on, and stays as it shipped.
 func followsEveryRepo(cmd *cobra.Command) (bool, error) {
-	if repo, _ := cmd.Flags().GetString(domain.FlagRepo); repo != "" {
+	all, _ := cmd.Flags().GetBool(domain.FlagAll)
+	repo, _ := cmd.Flags().GetString(domain.FlagRepo)
+	if all && repo != "" {
+		return false, fmt.Errorf("%w: %w", domain.ErrUsage, domain.ErrEventsAllWithRepo)
+	}
+	if all {
+		return true, forgetRepoScopedGitEnv()
+	}
+	if repo != "" {
 		return false, nil
 	}
 	if os.Getenv(domain.EnvProjectDir) != "" {
@@ -111,6 +123,17 @@ func followsEveryRepo(cmd *cobra.Command) (bool, error) {
 		return false, err
 	}
 	return !inside, nil
+}
+
+// forgetRepoScopedGitEnv keeps an inherited $GIT_DIR from answering for every
+// repository the stream reads, and out of a daemon it starts.
+func forgetRepoScopedGitEnv() error {
+	for _, name := range domain.GitRepoScopedEnv {
+		if err := os.Unsetenv(name); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // globalConfig falls back to the defaults: a global config that cannot be read

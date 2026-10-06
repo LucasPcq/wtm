@@ -49,6 +49,8 @@ var (
 	ErrExecUnknownWorktree = errors.New("no worktree with that branch")
 	ErrExecAllWithNames    = errors.New("--all cannot be combined with worktree names")
 
+	ErrEventsAllWithRepo = errors.New("--all cannot be combined with --repo: --all follows every repository")
+
 	// ErrNotGitRepo is returned when the current directory is not a git repository.
 	ErrNotGitRepo = errors.New("not a git repository")
 
