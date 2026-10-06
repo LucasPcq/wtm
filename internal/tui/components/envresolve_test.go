@@ -130,3 +130,34 @@ func TestEnvResolveOpensOnTheFlagDefaults(t *testing.T) {
 		t.Errorf("decisions = %+v, want the conflict overwritten and the orphan pruned", d)
 	}
 }
+
+// TestEnvResolveConflictKeepShowsOnlyTheLocalValue: on [keep] a conflict row used to
+// read "cur" → "cur", an arrow that changes nothing (LUC-272).
+func TestEnvResolveConflictKeepShowsOnlyTheLocalValue(t *testing.T) {
+	m := conflictModel(t)
+
+	if got := m.entryText(m.rows[m.cursor], false); !strings.HasSuffix(got, `conflict    "cur"   [keep]`) {
+		t.Errorf("keep row = %q, want the local value alone", got)
+	}
+	if view := m.View(); strings.Contains(view, "→") {
+		t.Errorf("a kept conflict shows an arrow:\n%s", view)
+	}
+
+	m = sendEnv(m, tea.KeyMsg{Type: tea.KeyRight})
+	if got := m.entryText(m.rows[m.cursor], false); !strings.HasSuffix(got, `"cur" → "res"   [use main]`) {
+		t.Errorf("use-main row = %q, want it unchanged", got)
+	}
+}
+
+func TestEnvResolveOrphanShowsItsValueWithoutArrow(t *testing.T) {
+	files := []domain.EnvFileResult{{Target: ".env", Diff: domain.EnvDiff{Entries: []domain.EnvKeyDiff{
+		{Key: "OLD", Status: domain.EnvKeyOrphan, CurrentValue: "stale"},
+	}}}}
+	m := NewEnvResolve(NewEnvResolveParams{Files: files})
+	for _, want := range []string{`"stale"   [keep]`, `"stale"   [prune]`} {
+		if got := m.entryText(m.rows[m.cursor], false); !strings.HasSuffix(got, want) {
+			t.Errorf("orphan row = %q, want suffix %q", got, want)
+		}
+		m = sendEnv(m, tea.KeyMsg{Type: tea.KeyRight})
+	}
+}
