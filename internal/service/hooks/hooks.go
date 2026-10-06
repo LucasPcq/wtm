@@ -33,7 +33,8 @@ type RunHooksParams struct {
 }
 
 // RunHooks executes each hook command sequentially with template interpolation.
-// Stops on first error unless the hook has ContinueOnError set.
+// Stops on first error unless the hook has ContinueOnError set, and on an
+// interrupt whatever it has: the hook running is stopped, the rest never start.
 func RunHooks(ctx context.Context, params RunHooksParams) error {
 	output := params.Output
 	if output == nil {
@@ -51,7 +52,10 @@ func RunHooks(ctx context.Context, params RunHooksParams) error {
 		report = writerReporter(sink)
 	}
 
-	for _, hook := range params.Hooks {
+	for index, hook := range params.Hooks {
+		if ctx.Err() != nil {
+			return fmt.Errorf(domain.HooksInterruptedFmt, domain.ErrCancelled, len(params.Hooks)-index)
+		}
 		resolved := rules.ResolveTemplateVars(hook, params.Vars)
 		err := runSingleHook(ctx, runSingleHookParams{
 			Hook:       resolved,
@@ -66,7 +70,8 @@ func RunHooks(ctx context.Context, params RunHooksParams) error {
 		if err == nil {
 			continue
 		}
-		if resolved.ContinueOnError {
+		// An interrupt is not the hook's failure: continue_on_error does not go past it.
+		if resolved.ContinueOnError && ctx.Err() == nil {
 			continue
 		}
 		return err

@@ -58,3 +58,18 @@ func Interrupted(params InterruptedParams) error {
 	}
 	return fmt.Errorf("%w: %w", domain.ErrCancelled, params.Err)
 }
+
+type BackedOutParams struct {
+	Err error
+	// Cancelled is the mark a command leaves when the user backed out of it.
+	Cancelled bool
+}
+
+// BackedOut reads a run that failed after the user backed out of it — a
+// picker escaped, then the runner's own ErrAborted — as the cancellation it is.
+func BackedOut(params BackedOutParams) error {
+	if params.Err == nil || !params.Cancelled || errors.Is(params.Err, domain.ErrCancelled) {
+		return params.Err
+	}
+	return fmt.Errorf("%w: %w", params.Err, domain.ErrCancelled)
+}

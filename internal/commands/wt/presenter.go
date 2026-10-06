@@ -60,10 +60,11 @@ func (p createPresenter) Created(outcome createflow.Outcome) error {
 		return output.WriteWorktreeCreateJSON(p.Cmd.OutOrStdout(), domain.CreateBatchResult{
 			Results: nonNil(outcome.Results),
 			Failed:  nonNil(outcome.Failed),
+			Skipped: outcome.Skipped,
 		})
 	}
 	switch {
-	case len(outcome.Results)+len(outcome.Failed) > 1:
+	case len(outcome.Results)+len(outcome.Failed)+len(outcome.Skipped) > 1:
 		p.batch(outcome)
 	case len(outcome.Results) == 1:
 		p.single(outcome.Results[0], outcome.FromBranch)
@@ -88,7 +89,7 @@ func (p createPresenter) batch(outcome createflow.Outcome) {
 		})
 	}
 	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-		output.FormatCreateBatch(w, output.CreateBatchParams{Created: rows, Failed: outcome.Failed})
+		output.FormatCreateBatch(w, output.CreateBatchParams{Created: rows, Failed: outcome.Failed, Skipped: outcome.Skipped})
 	})
 }
 

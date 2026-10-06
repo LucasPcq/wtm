@@ -55,11 +55,26 @@ Check the exit code first, and parse stdout only when it is non-empty. A command
 | `16` | no `run.toml` (`wtm run init`) |
 | `17` | `upgrade`: this install cannot upgrade itself |
 | `18` | `env --check` found drift |
-| `19` | cancelled: an interactive run the user backed out of, or any run interrupted by Ctrl+C, SIGINT or SIGTERM (`--yes` included). Behind a spinner or the run view, the first Ctrl+C shows "Cancelling…" while the work stops; a second one quits at once |
+| `19` | cancelled: an interactive run the user backed out of, or any run interrupted by Ctrl+C, SIGINT or SIGTERM (`--yes` included). See [Interrupting a run](#interrupting-a-run) |
 | `20` | `events` received an event of a newer schema: upgrade wtm |
 | `21` | not in a git repository (the current directory, or `events --repo`) |
 
 `wtm resolve <branch>` and `wtm run url --job <name>` print a bare path or URL for `$(…)`: `cd "$(wtm resolve feat/login)"`. Every flag of every command is in `wtm <command> --help` and the [command reference](../wtm.md).
+
+### Interrupting a run
+
+The first Ctrl+C (or SIGINT, SIGTERM) cancels the run; behind a spinner or the run view it shows "Cancelling…" while the work stops. wtm stops between two units of work, never half-way through one:
+
+| What was running | What an interrupt does |
+| --- | --- |
+| `clean`, `prune` | the worktree being removed is removed all the way (branch, data, event); the next ones are left untouched and listed as skipped, `interrupted` |
+| `create`, `checkout`, `extract` | the worktree is created whole or not at all; one created just before the interrupt is kept, its ports and `on_create` hooks not run, and named; the branches not reached are listed as skipped, `interrupted` |
+| a hook | the hook is stopped (its process group gets SIGINT, then SIGTERM, then SIGKILL); the hooks after it never start, `continue_on_error` included. An `on_clean` hook stopped this way keeps the worktree |
+| `sync`, `fast-forward` | a rebase in progress is aborted, the branch left where it was; nothing is pushed, and the branches not reached are reported `cancelled` |
+| `run up`, `run start` | the jobs already started, the one being started included, keep running; the recap lists them, `wtm run down` stops them |
+| a fetch, a `git` talking to a remote | stopped, with what it started (ssh) — never a daemon it left behind on purpose (credential cache, fsmonitor, an ssh `ControlPersist` master) |
+
+The command still writes its report or its JSON document, then exits `19`. Running it again finishes the work. A second Ctrl+C quits at once — once a worktree being created or removed is done — and is then killed by the signal (exit `130` in a shell) unless the report was already written.
 
 ## AI agents: `wtm agents install`
 

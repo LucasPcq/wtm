@@ -110,11 +110,8 @@ func run(cmd *cobra.Command, version string) error {
 			Description: rules.UpgradeCommandFor(install.Method),
 			DefaultYes:  true,
 		}))
-		if err != nil {
-			return err
-		}
-		if !confirmed {
-			return domain.ErrUserAborted
+		if err != nil || !confirmed {
+			return shared.Declined(cmd, err)
 		}
 	}
 

@@ -177,8 +177,12 @@ type Removal struct {
 	Target     Target
 	Absent     bool
 	Namespaces []domain.NamespaceOutcome
+	// NotReached is a target an interrupt stopped the batch before: untouched.
+	NotReached bool
 	Err        error
 }
+
+func (r Removal) Removed() bool { return r.Err == nil && !r.NotReached }
 
 type BatchParams struct {
 	Context   flow.Context
@@ -221,6 +225,10 @@ func Batch(ctx context.Context, params BatchParams) []Removal {
 
 	removals := make([]Removal, 0, len(params.Targets))
 	for index, target := range params.Targets {
+		if ctx.Err() != nil {
+			removals = append(removals, notReached(params.Targets[index:])...)
+			break
+		}
 		if params.OnStart != nil {
 			params.OnStart(flow.Progress{Branch: target.Branch, Position: index + 1, Total: len(params.Targets)})
 		}
@@ -234,9 +242,13 @@ func Batch(ctx context.Context, params BatchParams) []Removal {
 		}
 	}
 
+	// The claims of what went are let go of, interrupted or not: nothing would
+	// release them later.
+	shielded, release := worktree.Shield(ctx)
+	defer release()
 	for _, removal := range removals {
-		if removal.Err == nil {
-			Release(ctx, ReleaseParams{Presenter: params.Presenter, Target: removal.Target})
+		if removal.Removed() {
+			Release(shielded, ReleaseParams{Presenter: params.Presenter, Target: removal.Target})
 		}
 	}
 	dropper.Close()
@@ -254,6 +266,24 @@ type removeOneParams struct {
 }
 
 func removeOne(ctx context.Context, params removeOneParams) Removal {
+	removal := prepare(ctx, params)
+	if removal.Err != nil {
+		removal.Err = flow.Interrupted(ctx, removal.Err)
+		return removal
+	}
+	// From here the worktree goes all the way — removal, branch, event, data —
+	// or not at all: an interrupt half-way would strand a branch, a namespace
+	// and an event nobody publishes.
+	shielded, release := worktree.Shield(ctx)
+	defer release()
+	removal = remove(shielded, removeParams{removeOneParams: params, Interrupted: ctx.Err})
+	removal.Err = flow.Interrupted(ctx, removal.Err)
+	return removal
+}
+
+// prepare is what may be interrupted before a removal: the jobs stopping, the
+// on_clean hooks. Either refuses the removal and leaves the worktree whole.
+func prepare(ctx context.Context, params removeOneParams) Removal {
 	batch, target := params.Batch, params.Target
 	removal := Removal{Target: target}
 	if err := Stop(ctx, StopParams{Context: batch.Context, Presenter: batch.Presenter, Target: target, Force: batch.Force}); err != nil {
@@ -266,12 +296,27 @@ func removeOne(ctx context.Context, params removeOneParams) Removal {
 		Target:    target,
 		Title:     hooksTitle(hooksTitleParams{Target: target, Named: batch.NameHookPhases || len(batch.Targets) > 1}),
 	})
-	publish.Deprovisioned(ctx, publish.DeprovisionedParams{Context: batch.Context, Branch: target.Branch, Err: hookErr})
+	publish.Deprovisioned(context.WithoutCancel(ctx), publish.DeprovisionedParams{Context: batch.Context, Branch: target.Branch, Err: hookErr})
 	if hookErr != nil {
 		removal.Err = hookErr
 		return removal
 	}
+	if ctx.Err() != nil {
+		removal.Err = domain.ErrCancelled
+	}
+	return removal
+}
 
+type removeParams struct {
+	removeOneParams
+	// Interrupted reports an interrupt the shielded removal goes on through: it
+	// then asks nobody anything.
+	Interrupted func() error
+}
+
+func remove(ctx context.Context, params removeParams) Removal {
+	batch, target := params.Batch, params.Target
+	removal := Removal{Target: target}
 	clean := domain.CleanParams{
 		ProjectDir: batch.Context.ProjectDir,
 		StateDir:   batch.Context.StateDir,
@@ -296,7 +341,7 @@ func removeOne(ctx context.Context, params removeOneParams) Removal {
 	}
 	if errors.Is(err, domain.ErrWorktreeRemoveFailed) {
 		salvage.Cause = err
-		err = recoverer(batch)(ctx, salvage)
+		err = recoverer(recovererParams{Batch: batch, Interrupted: params.Interrupted() != nil})(ctx, salvage)
 	}
 	// Already gone is a removal that happened earlier, which keeps a re-run idempotent.
 	if errors.Is(err, domain.ErrWorktreeNotFound) {
@@ -310,6 +355,14 @@ func removeOne(ctx context.Context, params removeOneParams) Removal {
 	return removal
 }
 
+func notReached(targets []Target) []Removal {
+	removals := make([]Removal, 0, len(targets))
+	for _, target := range targets {
+		removals = append(removals, Removal{Target: target, NotReached: true})
+	}
+	return removals
+}
+
 // PublishRemoved reports a removal that went through, whichever of the three
 // removals settled it.
 func PublishRemoved(ctx context.Context, params SalvageParams) {
@@ -319,9 +372,16 @@ func PublishRemoved(ctx context.Context, params SalvageParams) {
 	publish.Removed(ctx, params.Context, *params.Last)
 }
 
-func recoverer(batch BatchParams) func(context.Context, SalvageParams) error {
-	if batch.Recover != nil {
-		return batch.Recover
+type recovererParams struct {
+	Batch       BatchParams
+	Interrupted bool
+}
+
+// recoverer is the batch's own unless the run was interrupted: a recovery
+// may ask for sudo, and an interrupted run asks nothing.
+func recoverer(params recovererParams) func(context.Context, SalvageParams) error {
+	if params.Batch.Recover != nil && !params.Interrupted {
+		return params.Batch.Recover
 	}
 	return Salvage
 }

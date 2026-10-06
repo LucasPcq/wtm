@@ -17,6 +17,11 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 - **`wtm run`** commands exit `19` when you back out of a question (Esc, Ctrl-C, "No, cancel", a declined import), like every other command, instead of `1`. → [Exit codes](docs/guide/integrations.md#the-contract---yes-and---output-json)
 - **Interrupting wtm** (SIGINT, SIGTERM) stops the git, hook or `wtm exec` process it waits on and exits with code 19; a second interrupt quits at once. → [Integrations](docs/guide/integrations.md)
 - **Ctrl+C** stops wtm behind a spinner, a picker or the run view: the first press cancels and shows "Cancelling…", a second one quits at once. → [Integrations](docs/guide/integrations.md#the-contract---yes-and---output-json)
+- **Interrupting** `clean`, `prune`, `create`, `checkout` or `extract` never leaves a worktree half removed or half created, lists the worktrees not reached, and runs no further hook. → [Interrupting a run](docs/guide/integrations.md#interrupting-a-run)
+- **Interrupting `sync`** aborts the rebase in progress, pushes nothing, and no longer ends on "Everything is in sync". → [Interrupting a run](docs/guide/integrations.md#interrupting-a-run)
+- **Interrupting `run up`** lists the jobs left running, the one being started included, instead of "No job left running".
+- **A second Ctrl+C** no longer leaves behind a git or hook that ignored the first, nor the ssh a git started.
+- **Backing out of a confirmation** (`run daemon stop`, `upgrade`, `run proxy install`) prints `Aborted.` and exits `19`.
 
 ## [0.29.2] - 2026-10-06
 

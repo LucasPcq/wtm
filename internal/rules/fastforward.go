@@ -69,7 +69,19 @@ func FastForwardStatusLabel(status domain.FastForwardStatus) string {
 		return domain.FastForwardLabelNoRemote
 	case domain.FFFailed:
 		return domain.FastForwardLabelFailed
+	case domain.FFCancelled:
+		return domain.FastForwardLabelCancelled
 	default:
 		return domain.FastForwardLabelUpToDate
 	}
+}
+
+// FastForwardInterrupted reports a run an interrupt stopped before every branch.
+func FastForwardInterrupted(results []domain.FastForwardResult) bool {
+	for _, result := range results {
+		if result.Status == domain.FFCancelled {
+			return true
+		}
+	}
+	return false
 }

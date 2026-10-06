@@ -205,7 +205,12 @@ func (f *checkoutFlow) checkout(params checkoutParams) (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	publish.Created(f.runCtx, f.ctx, result.Branch)
+	settled := context.WithoutCancel(f.runCtx)
+	publish.Created(settled, f.ctx, result.Branch)
+	if f.runCtx.Err() != nil {
+		publish.Provisioned(settled, publish.ProvisionedParams{Context: f.ctx, Branch: result.Branch, Err: domain.ErrCancelled})
+		return Outcome{}, fmt.Errorf(domain.CreateSetupInterruptedFmt, domain.ErrLeftBehind, result.Path)
+	}
 
 	// Before the hooks: one of them may read the .env, and it has to read what
 	// this worktree binds rather than what it was copied with.
@@ -226,9 +231,9 @@ func (f *checkoutFlow) checkout(params checkoutParams) (Outcome, error) {
 
 	// A reused branch has no start-point, so the hooks see its recorded parent.
 	hookErr := f.runHooks(hooksParams{WorktreePath: result.Path, Branch: pr.Branch, FromBranch: rules.FirstNonEmpty(startPoint, parent)})
-	publish.Provisioned(f.runCtx, publish.ProvisionedParams{Context: f.ctx, Branch: result.Branch, Err: hookErr})
+	publish.Provisioned(settled, publish.ProvisionedParams{Context: f.ctx, Branch: result.Branch, Err: hookErr})
 	if hookErr != nil {
-		return Outcome{}, hookErr
+		return Outcome{}, flow.Interrupted(f.runCtx, hookErr)
 	}
 	result.Isolation = worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: result.Branch})
 	result.Origins = f.origins(params.Answers)
@@ -248,8 +253,13 @@ type createParams struct {
 // never reuses a worktree, so whatever it returns without an error is new, and
 // is published before its hooks run.
 func (f *checkoutFlow) create(params createParams) (domain.CreateResult, error) {
+	if f.runCtx.Err() != nil {
+		return domain.CreateResult{}, domain.ErrCancelled
+	}
+	whole, release := worktree.Shield(f.runCtx)
+	defer release()
 	var result domain.CreateResult
-	err := f.presenter.Stage(f.runCtx, flow.StageParams{
+	err := f.presenter.Stage(whole, flow.StageParams{
 		Message: fmt.Sprintf(domain.CreateLoadingFmt, params.PR.Branch),
 		Work: func(ctx context.Context) error {
 			var createErr error

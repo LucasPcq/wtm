@@ -38,11 +38,8 @@ func runStop(cmd *cobra.Command, _ []string) error {
 	}
 
 	confirmed, err := confirmStop(cmd, status)
-	if err != nil {
-		return err
-	}
-	if !confirmed {
-		return domain.ErrUserAborted
+	if err != nil || !confirmed {
+		return shared.Declined(cmd, err)
 	}
 
 	if err := shutdown(cmd.Context()); err != nil {
@@ -66,11 +63,14 @@ func confirmStop(cmd *cobra.Command, status domain.DaemonStatus) (bool, error) {
 		return false, fmt.Errorf("stopping the daemon would stop %d foreground service(s): pass --%s to confirm", status.Foreground, domain.FlagYes)
 	}
 
-	return components.RunStandaloneConfirm(components.NewConfirm(components.NewConfirmParams{
+	return runConfirm(components.NewConfirm(components.NewConfirmParams{
 		Title:       domain.DaemonStopConfirmTitle,
 		Description: fmt.Sprintf(domain.DaemonStopConfirmFmt, status.Foreground),
 	}))
 }
+
+// runConfirm is a variable so a test can answer the question.
+var runConfirm = components.RunStandaloneConfirm
 
 func shutdown(ctx context.Context) error {
 	return process.Shutdown(ctx, process.SocketPath())

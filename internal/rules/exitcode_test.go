@@ -91,3 +91,17 @@ func TestInterrupted(t *testing.T) {
 		})
 	}
 }
+
+// A runner that returns ErrAborted after the user escaped its picker never
+// reaches the hook that maps the mark to 19: the root reads the mark instead.
+func TestARunTheUserBackedOutOfExitsCancelled(t *testing.T) {
+	if got := rules.ExitCode(rules.BackedOut(rules.BackedOutParams{Err: domain.ErrAborted, Cancelled: true})); got != domain.ExitCodeCancelled {
+		t.Errorf("exit code = %d, want %d", got, domain.ExitCodeCancelled)
+	}
+	if got := rules.ExitCode(rules.BackedOut(rules.BackedOutParams{Err: domain.ErrAborted})); got != domain.ExitCodeError {
+		t.Errorf("an unmarked failure exits %d, want %d", got, domain.ExitCodeError)
+	}
+	if rules.BackedOut(rules.BackedOutParams{Cancelled: true}) != nil {
+		t.Error("a clean run became an error")
+	}
+}

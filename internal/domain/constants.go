@@ -193,6 +193,13 @@ const (
 	// glyph filed off.
 	SyncPlanEmpty     = "No worktrees to sync."
 	SyncNothingToPush = "Everything is in sync with origin — nothing to push."
+	// SyncInterruptedSummary closes a run an interrupt stopped: nothing was
+	// pushed, and the rest is what a second run picks up.
+	SyncInterruptedSummary  = "Interrupted — nothing pushed; run `wtm sync` again to finish."
+	SyncCancelledDetail     = "interrupted before its rebase finished; branch unchanged"
+	SyncNotReachedDetail    = "interrupted before it was reached; branch unchanged"
+	SyncCancelledLineFmt    = "%s not synced — interrupted, branch unchanged"
+	SyncBaseInterruptedNote = "(not refreshed — interrupted)"
 	// HookLogTailLabel labels the path a collapsed phase kept its output at. A
 	// label is chrome, so it is muted and the path is not.
 	HookLogTailLabel = "full output:"
@@ -1567,6 +1574,9 @@ const (
 	PruneSkipDirty    = "dirty"
 	PruneSkipUnpushed = "unpushed"
 	PruneSkipOpenPR   = "open_pr"
+	// PruneSkipInterrupted is a worktree an interrupt stopped the batch before
+	// (clean and prune): untouched, safe to run again.
+	PruneSkipInterrupted = "interrupted"
 
 	// The wizard step settling the kind of a script checked outside the dev ones.
 	// The description spells both kinds out: arriving here having checked
@@ -3127,6 +3137,7 @@ const (
 	SyncLabelConflict         = "conflict"
 	SyncLabelUnknownParent    = "skipped — no recorded parent"
 	SyncLabelError            = "failed"
+	SyncLabelCancelled        = "interrupted, unchanged"
 	// SyncLabelConflictKept, SyncLabelConflictAborted and SyncLabelErrorFmt say what
 	// the bare status cannot: which of the two conflict modes ran — and so whether
 	// there is anything left to clean up — and why a step failed (cause).
@@ -3167,11 +3178,12 @@ const (
 	FastForwardForceHintFmt = "%s has %s Use --%s to fast-forward anyway"
 	// FastForwardLabel* say in a few words what became of one branch
 	// (rules.FastForwardStatusLabel).
-	FastForwardLabelUpToDate = "already up to date"
-	FastForwardLabelAdvanced = "fast-forwarded from origin"
-	FastForwardLabelDiverged = "diverged"
-	FastForwardLabelNoRemote = "no origin counterpart"
-	FastForwardLabelFailed   = "failed"
+	FastForwardLabelUpToDate  = "already up to date"
+	FastForwardLabelAdvanced  = "fast-forwarded from origin"
+	FastForwardLabelDiverged  = "diverged"
+	FastForwardLabelNoRemote  = "no origin counterpart"
+	FastForwardLabelFailed    = "failed"
+	FastForwardLabelCancelled = "interrupted, unchanged"
 	// FastForwardDivergedHintFmt names the gesture that does handle a divergence:
 	// this one never rewrites a branch carrying local commits. Verbs: branch,
 	// ahead, behind, branch.
@@ -3484,19 +3496,25 @@ const (
 
 	// PruneLabel* are the short phrases a reason or a skip reads as, shared by
 	// every surface that shows one.
-	PruneLabelPRMerged  = "PR merged"
-	PruneLabelPRClosed  = "PR closed"
-	PruneLabelGone      = "remote branch gone"
-	PruneLabelBase      = "base branch"
-	PruneLabelMain      = "main checkout"
-	PruneLabelLocked    = "locked — pass --force"
-	PruneLabelDirty     = "dirty — pass --force"
-	PruneLabelUnpushed  = "unpushed commits — pass --force"
-	PruneLabelOpenPR    = "open PR — pass --force"
-	PruneSkippedFmt     = "Skipped %s (%s)"
-	PruneWizardErrLabel = "prune wizard"
-	PruneSelectionTitle = "Select worktrees to prune"
-	PruneConfirmTitle   = "Confirm"
+	PruneLabelPRMerged    = "PR merged"
+	PruneLabelPRClosed    = "PR closed"
+	PruneLabelGone        = "remote branch gone"
+	PruneLabelBase        = "base branch"
+	PruneLabelMain        = "main checkout"
+	PruneLabelLocked      = "locked — pass --force"
+	PruneLabelDirty       = "dirty — pass --force"
+	PruneLabelUnpushed    = "unpushed commits — pass --force"
+	PruneLabelOpenPR      = "open PR — pass --force"
+	PruneLabelInterrupted = "interrupted before it was reached"
+	// HooksInterruptedFmt wraps ErrCancelled with the count of hooks never started.
+	HooksInterruptedFmt = "%w: %d hook(s) not run"
+	// CreateSetupInterruptedFmt is a worktree created whole whose setup — ports,
+	// on_create hooks — an interrupt stopped before it began.
+	CreateSetupInterruptedFmt = "%w: %s was created but not set up (ports, on_create hooks)"
+	PruneSkippedFmt           = "Skipped %s (%s)"
+	PruneWizardErrLabel       = "prune wizard"
+	PruneSelectionTitle       = "Select worktrees to prune"
+	PruneConfirmTitle         = "Confirm"
 	// PruneScanning and PruneFetchAndScanning distinguish the two costs of the
 	// planning phase: the second one also hits the network (gh, and the fetch
 	// gone-detection runs first).

@@ -2,6 +2,7 @@ package output
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -205,5 +206,27 @@ func TestFormatSyncResultFailedFastForwardNamesTheObstacle(t *testing.T) {
 	}
 	if strings.Contains(out, "--ff-parents") {
 		t.Errorf("must not suggest the flag already passed, got:\n%s", out)
+	}
+}
+
+// An interrupted sync never concludes "everything is in sync": it names the
+// branches it did not reach and says nothing was pushed.
+func TestAnInterruptedSyncDoesNotClaimToBeInSync(t *testing.T) {
+	steps := []domain.SyncStepResult{
+		{Branch: "feat-a", SourceBranch: "main", Status: domain.SyncStatusSynced},
+		{Branch: "feat-b", SourceBranch: "feat-a", Status: domain.SyncStatusCancelled},
+	}
+	var buf bytes.Buffer
+	FormatSyncResult(&buf, domain.SyncResult{BaseBranch: "main", Steps: steps})
+	FormatSyncPushSummary(&buf, steps)
+
+	got := buf.String()
+	if strings.Contains(got, domain.SyncNothingToPush) {
+		t.Errorf("output claims the run is in sync:\n%s", got)
+	}
+	for _, want := range []string{fmt.Sprintf(domain.SyncCancelledLineFmt, "feat-b"), domain.SyncInterruptedSummary} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output lacks %q:\n%s", want, got)
+		}
 	}
 }

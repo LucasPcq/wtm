@@ -38,7 +38,7 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 
 ## `create`, `extract`, `checkout`
 
-`create` wraps its results in an envelope, even for one branch: `{"results": [...], "failed": [{"branch", "path"?, "error", "exit_code"}...]}`. The fields below sit on each entry of `results`; `extract` and `checkout` carry them at the top level. A refusal before anything is created (a bad `--from` or `--env-from`, a name clash, a repeated branch, a branch another worktree holds) writes no envelope: it is an error on stderr with its exit code. See `worktrees.md`.
+`create` wraps its results in an envelope, even for one branch: `{"results": [...], "failed": [{"branch", "path"?, "error", "exit_code"}...], "skipped"?: [{"branch", "reason": "interrupted"}]}`. After an interrupt (exit `19`), a `failed` entry with a `path` was created but not set up (ports, `on_create` hooks), and `skipped` lists the branches never reached. The fields below sit on each entry of `results`; `extract` and `checkout` carry them at the top level. A refusal before anything is created (a bad `--from` or `--env-from`, a name clash, a repeated branch, a branch another worktree holds) writes no envelope: it is an error on stderr with its exit code. See `worktrees.md`.
 
 - `already_exists: true` when `create --if-not-exists` found the worktree (with its path, possibly outside `base_path`, even the main checkout's).
 - `existing_branch: true` and `origin_state` (`up-to-date` / `behind` / `ahead` / `diverged`) when a same-named local branch was reused as is.
@@ -96,7 +96,7 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 
 - `clean`: `{results: [{branch, path, already_absent}], failed: [{branch, path?, error, exit_code}], skipped, reparented, orphaned_children, namespaces}`, an envelope even for one worktree.
 - `prune`: `pruned` lists the removed worktrees, with `reason` values: `pr_merged` / `pr_closed` / `gone`.
-- `skipped` (both): unsafe worktrees left alone without `--force` (for `clean`, only when the user chose to delete the safe ones; under `--yes` it refuses instead), reason `locked` / `dirty` / `unpushed` / `open_pr`. When every match is unsafe, `prune` returns `pruned: []` and `skipped: []`: nothing was removed, not nothing matched.
+- `skipped` (both): unsafe worktrees left alone without `--force` (for `clean`, only when the user chose to delete the safe ones; under `--yes` it refuses instead), reason `locked` / `dirty` / `unpushed` / `open_pr`, or `interrupted` for a worktree an interrupt stopped the run before (untouched; exit `19`). When every match is unsafe, `prune` returns `pruned: []` and `skipped: []`: nothing was removed, not nothing matched.
 - `failed`: `prune` stops at the first failure and reports it as one object `{branch, path, error}`; `clean` keeps going and reports an array. Exit non-zero either way.
 - `namespaces` (both): one entry per namespace a removed worktree held: `{branch, job, name, status, reason?}`, `name` like `app_feat-x`, `status` one of:
   - `dropped`;
@@ -119,8 +119,8 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 
 ## Stacks: `sync`, `fast-forward`, `reparent`
 
-- `sync`: one step per branch with `status` (`conflict`, `error`, `diverged`, …), `path`, and `kept_in_progress: true` when `--keep-conflict` left a rebase paused there. Plus `base_targeted` (whether the base was fetched or fast-forwarded) and `parent_updates: [{branch, status, old_tip, new_tip, behind, children, detail}]` with `status` `behind` / `fast_forwarded` / `diverged` / `ff_failed`. Exit non-zero on `conflict` or `error`; `diverged` keeps exit 0. Meanings in `stacks.md`.
-- `fast-forward`: `[{branch, status, old_tip, new_tip, behind, detail?}]`, `status` one of `already up to date`, `fast-forwarded from origin`, `diverged`, `no origin counterpart`, `failed`. Only `failed` makes the exit non-zero.
+- `sync`: one step per branch with `status` (`conflict`, `error`, `diverged`, `cancelled` for a branch an interrupt reached first — rebase aborted, branch unchanged, exit `19`, nothing pushed; …), `path`, and `kept_in_progress: true` when `--keep-conflict` left a rebase paused there. Plus `base_targeted` (whether the base was fetched or fast-forwarded) and `parent_updates: [{branch, status, old_tip, new_tip, behind, children, detail}]` with `status` `behind` / `fast_forwarded` / `diverged` / `ff_failed`. Exit non-zero on `conflict` or `error`; `diverged` keeps exit 0. Meanings in `stacks.md`.
+- `fast-forward`: `[{branch, status, old_tip, new_tip, behind, detail?}]`, `status` one of `already up to date`, `fast-forwarded from origin`, `diverged`, `no origin counterpart`, `failed`, `interrupted, unchanged` (exit `19`). Only `failed` makes the exit non-zero.
 - `reparent`: `{"reparented": [{branch, old_parent, new_parent}, …]}`.
 
 ## The run module

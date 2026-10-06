@@ -4,9 +4,11 @@ package fastforward
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/branch"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
@@ -107,6 +109,9 @@ func (f *fastForwardFlow) run() (Outcome, error) {
 	if err != nil {
 		return outcome, err
 	}
+	if rules.FastForwardInterrupted(results) {
+		return outcome, fmt.Errorf("%w: %w", domain.ErrAborted, domain.ErrCancelled)
+	}
 	if hasFailure(results) {
 		return outcome, domain.ErrAborted
 	}
@@ -149,6 +154,10 @@ func (f *fastForwardFlow) advance(params advanceParams) ([]domain.FastForwardRes
 		Message: domain.FastForwardStage,
 		Work: func(ctx context.Context) error {
 			for _, name := range params.Branches {
+				if ctx.Err() != nil {
+					results = append(results, branch.FastForward(ctx, branch.FastForwardParams{ProjectDir: f.ctx.ProjectDir, Branch: name}))
+					continue
+				}
 				check := f.check(name)
 				results = append(results, branch.FastForward(ctx, branch.FastForwardParams{
 					ProjectDir: f.ctx.ProjectDir,

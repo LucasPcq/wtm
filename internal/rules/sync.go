@@ -88,6 +88,23 @@ func HasSyncFailure(steps []domain.SyncStepResult) bool {
 	return false
 }
 
+// SyncStepCutShort reports a step an interrupt may have cut short: its git
+// failed, or never got the answer it read divergence from. Every other status
+// is a state the branch really is in.
+func SyncStepCutShort(step domain.SyncStepResult) bool {
+	return step.Status == domain.SyncStatusError || step.Status == domain.SyncStatusDiverged
+}
+
+// SyncInterrupted reports a run an interrupt stopped before every step was done.
+func SyncInterrupted(steps []domain.SyncStepResult) bool {
+	for _, step := range steps {
+		if step.Status == domain.SyncStatusCancelled {
+			return true
+		}
+	}
+	return false
+}
+
 // PushDecision is the resolved push action after applying the non-interactive
 // push flags and the pushable count.
 type PushDecision int
@@ -197,6 +214,8 @@ func SyncStatusLabel(status domain.SyncStepStatus) string {
 		return domain.SyncLabelUnknownParent
 	case domain.SyncStatusError:
 		return domain.SyncLabelError
+	case domain.SyncStatusCancelled:
+		return domain.SyncLabelCancelled
 	default:
 		return string(status)
 	}

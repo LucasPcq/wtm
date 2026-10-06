@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -42,5 +44,22 @@ func TestTheMarkDoesNotOutliveItsRun(t *testing.T) {
 	shared.ClearCancelled(cmd)
 	if shared.Cancelled(cmd) {
 		t.Error("a cleared command still reads as cancelled")
+	}
+}
+
+// An interrupt that left a worktree behind says so: "Aborted." alone hid a
+// worktree the reader did not know had been created.
+func TestAnInterruptThatLeftSomethingBehindIsNamed(t *testing.T) {
+	err := fmt.Errorf(domain.CreateSetupInterruptedFmt, domain.ErrLeftBehind, "/trees/feat-x")
+	interrupted := rules.Interrupted(rules.InterruptedParams{Err: err, Signalled: true})
+
+	if got := abortLine(interrupted); !strings.Contains(got, "/trees/feat-x was created but not set up") {
+		t.Errorf("the run says %q, want the worktree left behind named", got)
+	}
+	if rules.ExitCode(interrupted) != domain.ExitCodeCancelled {
+		t.Errorf("exit code = %d, want %d", rules.ExitCode(interrupted), domain.ExitCodeCancelled)
+	}
+	if got := abortLine(fmt.Errorf("%w: git fetch: signal: interrupt", domain.ErrCancelled)); got != domain.AbortedMessage {
+		t.Errorf("a bare interrupt says %q, want %q", got, domain.AbortedMessage)
 	}
 }

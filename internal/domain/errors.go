@@ -1,6 +1,9 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 var (
 	// ErrWorktreeNotFound is returned when a worktree cannot be located.
@@ -157,6 +160,11 @@ var (
 	// a declined confirmation — or interrupted (SIGINT, SIGTERM). A backed-out
 	// run carries ErrAborted too: the `=` line saying so is already on screen.
 	ErrCancelled = errors.New("cancelled")
+
+	// ErrLeftBehind is an interrupt that left something the reader has to
+	// know about — a worktree created but not set up: its message is printed
+	// whole, where a bare interrupt reads "Aborted.".
+	ErrLeftBehind = fmt.Errorf("%w", ErrCancelled)
 
 	// ErrExtractConflict is returned when the selected changes do not apply
 	// cleanly onto the target worktree. The extraction is aborted and the source

@@ -72,8 +72,17 @@ func printBase(w io.Writer, result domain.SyncResult) {
 		InfoLine(w, "Base", fmt.Sprintf("%s  %s  %s",
 			result.BaseBranch,
 			styles.Muted.Render(result.BaseOldTip),
-			styles.Muted.Render("(already up to date / no fast-forward)")))
+			styles.Muted.Render(baseUnchangedNote(result))))
 	}
+}
+
+// baseUnchangedNote cannot tell an interrupted fetch from an up-to-date base,
+// so an interrupted run does not claim the latter.
+func baseUnchangedNote(result domain.SyncResult) string {
+	if rules.SyncInterrupted(result.Steps) {
+		return domain.SyncBaseInterruptedNote
+	}
+	return "(already up to date / no fast-forward)"
 }
 
 // FormatSyncPushSummary prints the trailing summary of which branches were
@@ -143,6 +152,8 @@ func printStep(w io.Writer, step domain.SyncStepResult) {
 		}
 	case domain.SyncStatusError:
 		Error(w, fmt.Sprintf("%s failed — %s", step.Branch, step.Detail))
+	case domain.SyncStatusCancelled:
+		Warning(w, fmt.Sprintf(domain.SyncCancelledLineFmt, step.Branch))
 	}
 }
 
@@ -173,6 +184,11 @@ func printPushSummary(w io.Writer, steps []domain.SyncStepResult) {
 		}
 	}
 
+	// An interrupted run pushed nothing, whatever it has ready: that is the line.
+	if rules.SyncInterrupted(steps) {
+		Warning(w, domain.SyncInterruptedSummary)
+		return
+	}
 	if len(pushed) > 0 {
 		Success(w, fmt.Sprintf("Pushed %d branch(es) (force-with-lease): %s", len(pushed), strings.Join(pushed, ", ")))
 	}

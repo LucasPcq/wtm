@@ -1,7 +1,9 @@
 package owed
 
 import (
+	"context"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -36,5 +38,22 @@ func TestDropperDefersWhatAServiceTheDaemonRefusedHolds(t *testing.T) {
 		if strings.HasPrefix(action, "stop:") {
 			t.Errorf("requests = %v: a service never started has nothing to let go of", daemon.Actions())
 		}
+	}
+}
+
+// A service brought up for the drop is let go of even when the run was
+// interrupted meanwhile: nothing else would ever stop it.
+func TestABroughtUpServiceIsLetGoOfAfterAnInterrupt(t *testing.T) {
+	ctx, _ := holdingFixture(t)
+	daemon := processtest.Serve(t, nil)
+	snapshot := readHolding(t, ctx, false)
+	runCtx, cancel := context.WithCancel(t.Context())
+
+	dropper := NewDropper(runCtx, DropperParams{Context: ctx, Presenter: &flowtest.Recorder{}, Snapshot: snapshot, StartDown: true})
+	cancel()
+	dropper.Close()
+
+	if !slices.ContainsFunc(daemon.Actions(), func(action string) bool { return strings.HasPrefix(action, "stop:") }) {
+		t.Errorf("requests = %v, want the service stopped", daemon.Actions())
 	}
 }

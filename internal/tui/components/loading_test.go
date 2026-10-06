@@ -170,3 +170,28 @@ func TestABubbleteaInterruptIsACancellation(t *testing.T) {
 		}
 	}
 }
+
+// A shielded step — a worktree being removed — is never left behind: the
+// first Ctrl-C cancels the run around it, the second waits for it all the same.
+func TestASecondCtrlCWaitsForShieldedWork(t *testing.T) {
+	root, cancel := context.WithCancel(t.Context())
+	raised := stubInterrupt(t, cancel)
+	shielded := context.WithValue(context.WithoutCancel(root), domain.ShieldedFrom{}, root)
+	m, stop := newLoadingModel(shielded, LoadingParams{Message: "Removing feat/a…", Work: func() error { return nil }})
+	t.Cleanup(stop)
+
+	m, _ = updateLoading(t, m, key(tea.KeyCtrlC))
+	if raised.Load() != 1 || root.Err() == nil {
+		t.Fatal("the first ctrl+c did not cancel the run around the shielded step")
+	}
+	m, cmd := updateLoading(t, m, key(tea.KeyCtrlC))
+	if isQuit(cmd) || m.abandoned {
+		t.Fatal("the second ctrl+c abandoned a shielded step")
+	}
+	if raised.Load() != 1 {
+		t.Errorf("raised %d interrupts, want 1", raised.Load())
+	}
+	if !strings.Contains(m.View(), domain.CancellingMessage) {
+		t.Errorf("view = %q, want the cancellation shown", m.View())
+	}
+}

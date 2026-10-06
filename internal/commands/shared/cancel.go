@@ -1,9 +1,13 @@
 package shared
 
 import (
+	"errors"
+	"io"
+
 	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/output"
 )
 
 // MarkCancelled records that the user backed out of cmd. A flow concludes an
@@ -41,4 +45,16 @@ func EndAborted(cmd *cobra.Command) error {
 		return nil
 	}
 	return domain.ErrAborted
+}
+
+// Declined concludes a command whose confirmation the user declined or
+// escaped: the `=` line every abort reads as, and the cancelled exit code.
+// Any other error is the command's to return.
+func Declined(cmd *cobra.Command, err error) error {
+	if err != nil && !errors.Is(err, domain.ErrUserAborted) {
+		return err
+	}
+	output.Frame(cmd.OutOrStdout(), func(w io.Writer) { output.Unchanged(w, domain.AbortedMessage) })
+	MarkCancelled(cmd)
+	return nil
 }

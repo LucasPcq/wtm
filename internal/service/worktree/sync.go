@@ -123,6 +123,10 @@ func Sync(ctx context.Context, params SyncParams) (domain.SyncResult, error) {
 
 	skipped := make(map[string]bool)
 	for _, step := range plan.Steps {
+		if ctx.Err() != nil {
+			result.Steps = append(result.Steps, cancelledStep(cancelledStepParams{Step: step, OldTips: oldTips, Detail: domain.SyncNotReachedDetail}))
+			continue
+		}
 		stepResult, blocks := evaluateStep(ctx, stepEval{
 			Step:         step,
 			OldTips:      oldTips,
@@ -132,6 +136,9 @@ func Sync(ctx context.Context, params SyncParams) (domain.SyncResult, error) {
 		})
 		if blocks {
 			skipped[step.Branch] = true
+		}
+		if ctx.Err() != nil && rules.SyncStepCutShort(stepResult) {
+			stepResult = cancelledStep(cancelledStepParams{Step: step, OldTips: oldTips, Detail: domain.SyncCancelledDetail})
 		}
 		result.Steps = append(result.Steps, stepResult)
 	}
@@ -606,6 +613,24 @@ type stepEval struct {
 
 // evaluateStep computes the outcome of one cascade step. The second return value
 // reports whether this branch must block its descendants (skip/conflict/error).
+type cancelledStepParams struct {
+	Step    domain.SyncStep
+	OldTips map[string]string
+	Detail  string
+}
+
+func cancelledStep(params cancelledStepParams) domain.SyncStepResult {
+	return domain.SyncStepResult{
+		Branch:       params.Step.Branch,
+		SourceBranch: params.Step.SourceBranch,
+		Path:         params.Step.Path,
+		Status:       domain.SyncStatusCancelled,
+		OldTip:       params.OldTips[params.Step.Branch],
+		NewTip:       params.OldTips[params.Step.Branch],
+		Detail:       params.Detail,
+	}
+}
+
 func evaluateStep(ctx context.Context, e stepEval) (domain.SyncStepResult, bool) {
 	result := domain.SyncStepResult{
 		Branch:       e.Step.Branch,
@@ -736,14 +761,16 @@ func evaluateStep(ctx context.Context, e stepEval) (domain.SyncStepResult, bool)
 		return result, true
 	}
 
+	// A rebase that went through is reported as it is, interrupt or not.
+	settled := context.WithoutCancel(ctx)
 	result.Status = domain.SyncStatusSynced
-	if tip, tipErr := infra.Tip(ctx, infra.TipParams{
+	if tip, tipErr := infra.Tip(settled, infra.TipParams{
 		WorktreePath: e.Step.Path,
 		Ref:          e.Step.Branch,
 	}); tipErr == nil {
 		result.NewTip = tip
 	}
-	result.PushPending = infra.AheadOfRemote(ctx, infra.RemoteBranchParams{
+	result.PushPending = infra.AheadOfRemote(settled, infra.RemoteBranchParams{
 		WorktreePath: e.Step.Path,
 		Branch:       e.Step.Branch,
 	})

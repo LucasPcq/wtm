@@ -56,6 +56,8 @@ type loadingModel struct {
 	done       bool
 	cancelling bool
 	abandoned  bool
+	// shielded work cannot be left behind: a second Ctrl-C waits for it too.
+	shielded bool
 }
 
 func (m loadingModel) Init() tea.Cmd {
@@ -87,6 +89,9 @@ func (m loadingModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // interrupt cancels the work and keeps waiting for it to unwind: quitting at
 // once would leave a git or docker child running behind a prompt that came back.
 func (m loadingModel) interrupt() (tea.Model, tea.Cmd) {
+	if m.cancelling && m.shielded {
+		return m, nil
+	}
 	if m.cancelling {
 		m.abandoned = true
 		m.done = true
@@ -114,22 +119,15 @@ func (m loadingModel) View() string {
 // output stay clean.
 //
 // The terminal is raw while the box is up, so Ctrl-C arrives as a key: the
-// first one cancels ctx, the second stops waiting for the work to notice.
+// first one cancels ctx, the second stops waiting for the work to notice —
+// unless the work is shielded, which is always waited for.
 func RunLoading(ctx context.Context, params LoadingParams) error {
 	if !params.Animate || !term.IsTerminal(int(os.Stderr.Fd())) {
 		return params.Work()
 	}
 
-	watch, stop := context.WithCancel(ctx)
+	m, stop := newLoadingModel(ctx, params)
 	defer stop()
-	m := loadingModel{
-		ctx:     watch,
-		spinner: newMutedSpinner(),
-		message: params.Message,
-		work: func() tea.Msg {
-			return loadingDoneMsg{err: params.Work()}
-		},
-	}
 
 	// Bubbletea's own handler would end the program on the very SIGINT the
 	// first Ctrl-C raises, before the work has unwound.
@@ -138,6 +136,25 @@ func RunLoading(ctx context.Context, params LoadingParams) error {
 		return ProgramError(err)
 	}
 	return loadingOutcome(final)
+}
+
+// newLoadingModel watches the context a shielded one was made from: that is
+// where the interrupt it goes on through shows.
+func newLoadingModel(ctx context.Context, params LoadingParams) (loadingModel, context.CancelFunc) {
+	outer, shielded := ctx.Value(domain.ShieldedFrom{}).(context.Context)
+	if !shielded {
+		outer = ctx
+	}
+	watch, stop := context.WithCancel(outer)
+	return loadingModel{
+		ctx:      watch,
+		shielded: shielded,
+		spinner:  newMutedSpinner(),
+		message:  params.Message,
+		work: func() tea.Msg {
+			return loadingDoneMsg{err: params.Work()}
+		},
+	}, stop
 }
 
 func loadingOutcome(final tea.Model) error {

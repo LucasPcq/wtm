@@ -128,8 +128,9 @@ func RunStandaloneConfirm(cm ConfirmModel) (bool, error) {
 	return child.Confirmed(), nil
 }
 
-// ErrAborted is returned when the user presses Esc or Ctrl-C in a standalone component.
-var ErrAborted = fmt.Errorf("user aborted")
+// ErrAborted is returned when the user presses Esc or Ctrl-C in a standalone
+// component: the user backing out, as a wizard reports it.
+var ErrAborted = fmt.Errorf("%w", domain.ErrUserAborted)
 
 func (m standaloneModel) Init() tea.Cmd {
 	switch child := m.child.(type) {

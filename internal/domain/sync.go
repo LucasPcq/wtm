@@ -63,6 +63,9 @@ const (
 	SyncStatusError SyncStepStatus = "error"
 	// SyncStatusUnknownParent means no parent could be determined (missing metadata).
 	SyncStatusUnknownParent SyncStepStatus = "unknown_parent"
+	// SyncStatusCancelled means an interrupt reached the branch before or
+	// during its rebase: an interrupted rebase is aborted, the branch unchanged.
+	SyncStatusCancelled SyncStepStatus = "cancelled"
 )
 
 // ParentStatus is the state of a parent no step covers — a branch with no

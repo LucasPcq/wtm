@@ -134,6 +134,11 @@ func runOnStream(params streamParams) (runlogs.Outcomes, error) {
 		Hyperlinks: params.Hyperlinks,
 	})
 	outcomes, err := params.Start(params.Cmd.Context(), printer)
+	if err != nil && interruptedWithAnAccount(params.Cmd, outcomes) {
+		output.RunInterrupted(out, outcomes)
+		output.FrameEnd(out)
+		return outcomes, err
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -152,11 +157,17 @@ func runOnStream(params streamParams) (runlogs.Outcomes, error) {
 // made a document unreadable (LUC-198).
 func runForMachine(params streamParams) (runlogs.Outcomes, error) {
 	outcomes, err := params.Start(params.Cmd.Context(), nil)
-	if err != nil {
+	if err != nil && !interruptedWithAnAccount(params.Cmd, outcomes) {
 		return nil, err
 	}
-	if err := output.WriteRunOutcomesJSON(params.Cmd.OutOrStdout(), outcomes); err != nil {
-		return nil, err
+	if writeErr := output.WriteRunOutcomesJSON(params.Cmd.OutOrStdout(), outcomes); writeErr != nil {
+		return nil, writeErr
 	}
-	return outcomes, nil
+	return outcomes, err
+}
+
+// interruptedWithAnAccount is a run an interrupt stopped once it had started
+// something: what it left running is still owed to the reader.
+func interruptedWithAnAccount(cmd *cobra.Command, outcomes runlogs.Outcomes) bool {
+	return cmd.Context().Err() != nil && outcomes.Recorded()
 }
