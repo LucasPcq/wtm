@@ -220,6 +220,8 @@ func (m *Manager) stopShared(job *ManagedJob) error {
 	mainHolds := found && real.MainHolds
 	if found && remaining == 0 && !mainHolds {
 		real.stopHolders = holders
+		// The stop was attributed on the claim this release just deleted.
+		real.stopCorrelation = job.stopCorrelation
 	}
 	m.mu.Unlock()
 

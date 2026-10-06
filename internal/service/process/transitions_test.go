@@ -300,3 +300,29 @@ func TestAJobThatIsNotSharedIsHeldByNobody(t *testing.T) {
 		}
 	}
 }
+
+// The stop is attributed on the claim, which the release deletes before the
+// service it stops publishes anything.
+func TestASharedServiceStoppedByARelease_CarriesTheReleasersCorrelationID(t *testing.T) {
+	cases := []struct {
+		name string
+		stop func(s observedShared) error
+	}{
+		{"run stop", func(s observedShared) error { return s.manager.Stop(JobRef{Name: "db", WorkDir: s.first}) }},
+		{"run down", func(s observedShared) error { return s.manager.StopAllInWorkDir(s.first) }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := newObservedShared(t, "sleep 30")
+			s.start(t, s.first, "feat/a")
+			s.manager.AttributeStop(AttributeStopParams{WorkDir: s.first, CorrelationID: "agent-a"})
+			if err := tc.stop(s); err != nil {
+				t.Fatal(err)
+			}
+			seen := s.log.await(t, 2)
+			if seen[1].Type != domain.EventJobStopped || seen[1].CorrelationID != "agent-a" {
+				t.Fatalf("heard %s carrying %q, want job.stopped carrying agent-a", seen[1].Type, seen[1].CorrelationID)
+			}
+		})
+	}
+}
