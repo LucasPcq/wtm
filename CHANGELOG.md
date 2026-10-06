@@ -11,6 +11,7 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 ### Changed
 
+- **`wtm env`** prints only the values wtm writes, in text and JSON (`"redacted": true` for the others), and masks URL passwords, also in `env_ports`; `--show-values` prints everything. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
 - **`wtm env main`** keeps the addressing its `.env` spells: reconciling its keys no longer moves it onto named URLs; pass `--addressing names` for that. → [The main checkout](docs/guide/addressing.md#the-main-checkout)
 - **`wtm env`** asks whether to keep or switch the worktree's isolation (the main checkout: its addressing), keeping it by default; the recap's verbatim action is gone. → [Isolation](docs/guide/isolation.md#changing-your-mind)
 

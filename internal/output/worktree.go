@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -246,8 +247,13 @@ func matchRunningServices(worktreePath string, services []domain.JobInfo) []stri
 }
 
 // WriteWorktreeCreateJSON writes the JSON payload for `create`.
-func WriteWorktreeCreateJSON(w io.Writer, v any) error {
-	return encodeJSON(w, v)
+func WriteWorktreeCreateJSON(w io.Writer, batch domain.CreateBatchResult) error {
+	results := slices.Clone(batch.Results)
+	for i, result := range results {
+		results[i].EnvPorts = rules.RedactEnvPortPlan(result.EnvPorts)
+	}
+	batch.Results = results
+	return encodeJSON(w, batch)
 }
 
 // CreateResultParams holds inputs for the framed create conclusion.

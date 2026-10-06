@@ -32,6 +32,10 @@ func EnvReportFields(result domain.EnvSyncResult) []domain.RecapField {
 type EnvKeyRowsParams struct {
 	File  domain.EnvFileResult
 	Check bool
+	// Managed are the keys whose values a row may print (EnvManagedKeys);
+	// ShowValues prints them all.
+	Managed    map[string]bool
+	ShowValues bool
 }
 
 // EnvKeyRows renders one file's keys as aligned rows, in the order a reader
@@ -76,13 +80,8 @@ func EnvKeyRows(params EnvKeyRowsParams) []domain.EnvKeyRow {
 	for _, e := range added {
 		rows = append(rows, row(e, fmt.Sprintf(domain.EnvDetailWouldAddFmt, EnvSourceName(e.Source, f.ParentBranch))))
 	}
-	conflictFmt := domain.EnvDetailConflictFmt
-	if !params.Check {
-		conflictFmt = domain.EnvDetailConflictKeptFmt
-	}
 	for _, e := range conflicts {
-		rows = append(rows, row(e, fmt.Sprintf(conflictFmt,
-			EnvQuote(e.CurrentValue), EnvSourceName(e.Source, f.ParentBranch), EnvQuote(e.ResolvedValue))))
+		rows = append(rows, row(e, envConflictDetail(envConflictDetailParams{Entry: e, Rows: params})))
 	}
 	for _, e := range missing {
 		rows = append(rows, row(e, fmt.Sprintf(domain.EnvDetailMissingFmt, EnvQuote(e.Placeholder))))
@@ -91,6 +90,31 @@ func EnvKeyRows(params EnvKeyRowsParams) []domain.EnvKeyRow {
 		rows = append(rows, row(e, domain.EnvDetailOrphan))
 	}
 	return rows
+}
+
+type envConflictDetailParams struct {
+	Entry domain.EnvKeyDiff
+	Rows  EnvKeyRowsParams
+}
+
+func envConflictDetail(params envConflictDetailParams) string {
+	e, rows := params.Entry, params.Rows
+	source := EnvSourceName(e.Source, rows.File.ParentBranch)
+	if !rows.ShowValues && !rows.Managed[e.Key] {
+		if rows.Check {
+			return fmt.Sprintf(domain.EnvDetailConflictRedactedFmt, source)
+		}
+		return fmt.Sprintf(domain.EnvDetailConflictKeptRedactedFmt, source)
+	}
+	conflictFmt := domain.EnvDetailConflictFmt
+	if !rows.Check {
+		conflictFmt = domain.EnvDetailConflictKeptFmt
+	}
+	current, resolved := e.CurrentValue, e.ResolvedValue
+	if !rows.ShowValues {
+		current, resolved = MaskURLPassword(current), MaskURLPassword(resolved)
+	}
+	return fmt.Sprintf(conflictFmt, EnvQuote(current), source, EnvQuote(resolved))
 }
 
 // EnvFileTally counts what an apply did to a file's keys — "2 added · 1

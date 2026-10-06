@@ -610,6 +610,8 @@ const (
 	OriginSchemeHTTP      = "http"
 	OriginSchemeHTTPS     = "https"
 	OriginSchemeSeparator = "://"
+	// MaskedURLPassword stands for the password of a URL a report prints.
+	MaskedURLPassword = "***"
 	// OriginListSeparator is what an app splits a multi-origin setting on.
 	OriginListSeparator = ","
 	// The loopback spellings a .env value reaches a local job by, beside the TLD.
@@ -1111,14 +1113,17 @@ const (
 	EnvDetailConflictFmt = "conflict — local %s vs %s %s"
 	// EnvDetailConflictKeptFmt is a conflict an apply left as it was.
 	EnvDetailConflictKeptFmt = "conflict kept — local %s vs %s %s"
-	EnvTallyAdded            = "added"
-	EnvTallyFilled           = "filled"
-	EnvTallyOverwritten      = "overwritten"
-	EnvTallyPruned           = "pruned"
-	EnvTallySkipped          = "skipped"
-	EnvDetailMissingFmt      = "needs a value — placeholder %s"
-	EnvDetailOrphan          = "orphan — in no source"
-	EnvEmptyValueLabel       = "(empty)"
+	// The same two rows for a key whose values the report withholds.
+	EnvDetailConflictRedactedFmt     = "conflict — local value differs from %s"
+	EnvDetailConflictKeptRedactedFmt = "conflict kept — local value differs from %s"
+	EnvTallyAdded                    = "added"
+	EnvTallyFilled                   = "filled"
+	EnvTallyOverwritten              = "overwritten"
+	EnvTallyPruned                   = "pruned"
+	EnvTallySkipped                  = "skipped"
+	EnvDetailMissingFmt              = "needs a value — placeholder %s"
+	EnvDetailOrphan                  = "orphan — in no source"
+	EnvEmptyValueLabel               = "(empty)"
 	// The glyphs a file block's rows are marked with. One rune each, so the
 	// key column stays aligned whatever a row's status is.
 	EnvKeyGlyphAdd       = "+"
@@ -1454,6 +1459,9 @@ const (
 	FlagMode  = "mode"
 	FlagCheck = "check"
 	FlagPrune = "prune"
+	// FlagShowValues prints the values of keys wtm does not write, which a
+	// report withholds by default.
+	FlagShowValues = "show-values"
 
 	// FlagReparentChildren opts in (non-interactively) to reparenting the orphaned
 	// children of a cleaned worktree onto its grandparent. In interactive mode the
