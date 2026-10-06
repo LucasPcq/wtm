@@ -739,3 +739,25 @@ func TestBuildRendersTheEnvResolverAndReadsItsDecisions(t *testing.T) {
 		t.Errorf("answer = %+v, want the file's decision", answer)
 	}
 }
+
+func TestTheEnvResolverStepKeepsAConflictWithoutAnArrow(t *testing.T) {
+	files := []domain.EnvFileResult{{Target: ".env", Diff: domain.EnvDiff{Entries: []domain.EnvKeyDiff{
+		{Key: "DB_HOST", Status: domain.EnvKeyConflict, CurrentValue: "WT-value", ResolvedValue: "MAIN-value", Source: domain.EnvSourceMain},
+	}}}}
+	step := flow.Step{Kind: flow.StepEnvResolve, Key: "resolve", Label: "Resolve", Build: func(flow.Answers) (flow.StepContent, error) {
+		return flow.StepContent{EnvFiles: files}, nil
+	}}
+
+	p, err := build(flow.Session{Steps: []flow.Step{step}})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	resolver, ok := p.steps[0].Model.(components.EnvResolveModel)
+	if !ok {
+		t.Fatalf("step model = %T, want the env resolver", p.steps[0].Model)
+	}
+	view := resolver.View()
+	if strings.Contains(view, "→") || !strings.Contains(view, `"WT-value"   [keep]`) {
+		t.Errorf("a kept conflict should show the local value alone, without an arrow:\n%s", view)
+	}
+}
