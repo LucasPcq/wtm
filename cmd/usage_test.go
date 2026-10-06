@@ -2,7 +2,11 @@ package cmd
 
 import (
 	"bytes"
+	"strings"
 	"testing"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -92,4 +96,67 @@ func TestAnInvalidCorrelationIDIsAUsageError(t *testing.T) {
 	if got := rules.ExitCode(err); got != domain.ExitCodeUsage {
 		t.Fatalf("exit code = %d (%v), want %d", got, err, domain.ExitCodeUsage)
 	}
+}
+
+func TestEveryMutuallyExclusivePairExitsWithTheUsageCode(t *testing.T) {
+	pairs := exclusivePairs(rootCmd)
+	if len(pairs) == 0 {
+		t.Fatal("no mutually exclusive flag group found in the command tree")
+	}
+	for _, pair := range pairs {
+		t.Run(strings.Join(pair.args, " "), func(t *testing.T) {
+			t.Cleanup(func() { resetFlags(pair.cmd) })
+			rootCmd.SetArgs(pair.args)
+			rootCmd.SetOut(&bytes.Buffer{})
+			rootCmd.SetErr(&bytes.Buffer{})
+			err := rootCmd.Execute()
+			if got := rules.ExitCode(err); got != domain.ExitCodeUsage {
+				t.Errorf("exit code = %d (%v), want %d", got, err, domain.ExitCodeUsage)
+			}
+		})
+	}
+}
+
+type exclusivePair struct {
+	cmd  *cobra.Command
+	args []string
+}
+
+func exclusivePairs(cmd *cobra.Command) []exclusivePair {
+	var pairs []exclusivePair
+	seen := map[string]bool{}
+	cmd.LocalFlags().VisitAll(func(f *pflag.Flag) {
+		for _, group := range f.Annotations[domain.AnnotationMutuallyExclusive] {
+			if seen[group] {
+				continue
+			}
+			seen[group] = true
+			names := strings.Fields(group)
+			for i, first := range names {
+				for _, second := range names[i+1:] {
+					path := strings.Fields(cmd.CommandPath())[1:]
+					args := append(path, flagArg(cmd, first), flagArg(cmd, second))
+					pairs = append(pairs, exclusivePair{cmd: cmd, args: args})
+				}
+			}
+		}
+	})
+	for _, sub := range cmd.Commands() {
+		pairs = append(pairs, exclusivePairs(sub)...)
+	}
+	return pairs
+}
+
+func flagArg(cmd *cobra.Command, name string) string {
+	if cmd.Flags().Lookup(name).Value.Type() == "bool" {
+		return "--" + name
+	}
+	return "--" + name + "=x"
+}
+
+func resetFlags(cmd *cobra.Command) {
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		_ = f.Value.Set(f.DefValue)
+		f.Changed = false
+	})
 }

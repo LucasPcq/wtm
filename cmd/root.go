@@ -166,6 +166,9 @@ var rootCmd = &cobra.Command{
   wtm ui`,
 	RunE: rootRunE,
 	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+		if err := validateFlagGroups(cmd); err != nil {
+			return err
+		}
 		if err := validateOutputFormat(cmd); err != nil {
 			return err
 		}

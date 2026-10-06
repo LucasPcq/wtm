@@ -53,6 +53,15 @@ func wrapArgs(cmd *cobra.Command) {
 	}
 }
 
+// validateFlagGroups runs cobra's own required-flag and flag-group checks ahead
+// of cobra, which returns them raw after the hooks, past the FlagErrorFunc.
+func validateFlagGroups(cmd *cobra.Command) error {
+	if err := cmd.ValidateRequiredFlags(); err != nil {
+		return asUsage(err)
+	}
+	return asUsage(cmd.ValidateFlagGroups())
+}
+
 func validateOutputFormat(cmd *cobra.Command) error {
 	flag := cmd.Flags().Lookup(domain.FlagOutput)
 	if flag == nil {

@@ -1398,7 +1398,12 @@ const (
 	AnnotationUncorrelated = "wtm.uncorrelated"
 	// AnnotationOutputFormats lists, comma-separated, the --output values a
 	// command accepts besides text and json.
-	AnnotationOutputFormats  = "wtm.output-formats"
+	AnnotationOutputFormats = "wtm.output-formats"
+
+	// AnnotationMutuallyExclusive is the key cobra's MarkFlagsMutuallyExclusive
+	// writes on each flag of a group: one space-separated group per entry.
+	AnnotationMutuallyExclusive = "cobra_annotation_mutually_exclusive"
+
 	OutputFormatInvalidFmt   = "invalid --%s %q: expected one of %s"
 	UnknownCommandFmt        = "unknown command %q for %q"
 	UnknownCommandSuggestFmt = "\n\nDid you mean this?\n\t%s"
