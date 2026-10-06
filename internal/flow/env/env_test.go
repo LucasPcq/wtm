@@ -594,3 +594,24 @@ value = "acme-{worktree}"
 		t.Errorf(".env = %q, want a value the user chose left alone", got)
 	}
 }
+
+// LUC-265: every step after the picker read the worktree before it was picked,
+// so `wtm env` with no argument failed with "worktree not found:" instead of
+// asking which one.
+func TestWithNoWorktreeGivenThePickerIsAskedFirst(t *testing.T) {
+	ctx := testContext(t)
+	makeWorktree(t, ctx, "feat/a")
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{
+		KeyWorktree:   "feat/a",
+		KeyIsolation:  domain.EnvKeepValue,
+		KeyAddressing: domain.EnvKeepValue,
+		KeyRecap:      domain.EnvApplyValue,
+	}}
+
+	if _, _, err := run(ctx, Request{Mode: domain.EnvModeRefresh}, prompter); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(prompter.Asked) == 0 || prompter.Asked[0] != KeyWorktree {
+		t.Errorf("asked = %s, want the worktree picker first", prompter.AskedKeys())
+	}
+}
