@@ -114,7 +114,7 @@ func actionStep() flow.Step {
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
 			kind, name, ok := splitEntry(answers.Value(KeyEntry))
 			if !ok {
-				return flow.StepContent{}, domain.ErrUserAborted
+				return flow.StepContent{}, nil
 			}
 			return flow.StepContent{
 				Title:   fmt.Sprintf(domain.RunCRUDActionTitleFmt, name),

@@ -53,6 +53,7 @@ func newExecCmd() *cobra.Command {
 	cmd.Flags().Bool(domain.FlagPrint, false, "Also show the full output of every worktree, successes included")
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts (requires worktree names or --all, and the command after --)")
 	shared.AddOutputFlag(cmd)
+	shared.RequireYesInJSON(cmd)
 	return cmd
 }
 
@@ -73,9 +74,6 @@ func runExec(cmd *cobra.Command, args []string) error {
 	}
 	if jobs < 0 {
 		return fmt.Errorf("%w: --%s cannot be negative", domain.ErrUsage, domain.FlagJobs)
-	}
-	if format == domain.OutputJSON && !yes {
-		return domain.ErrJSONNeedsYes
 	}
 	if err := checkExecLine(split.Command); err != nil {
 		return err

@@ -56,6 +56,9 @@ func newSyncCmd() *cobra.Command {
 	cmd.Flags().Bool(domain.FlagNoFFParents, false, "Never fast-forward those parents; rebase onto them as they are")
 	cmd.Flags().String(domain.FlagBase, "", "Base branch to sync from (defaults to config or detected base)")
 	shared.AddOutputFlag(cmd)
+	shared.RequireYesInJSON(cmd, domain.FlagDryRun)
+	cmd.MarkFlagsMutuallyExclusive(domain.FlagPush, domain.FlagNoPush)
+	cmd.MarkFlagsMutuallyExclusive(domain.FlagFFParents, domain.FlagNoFFParents)
 
 	return cmd
 }
@@ -72,18 +75,8 @@ func runSync(cmd *cobra.Command, args []string) error {
 	baseOverride, _ := cmd.Flags().GetString(domain.FlagBase)
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 
-	if push && noPush {
-		return fmt.Errorf("--%s and --%s are mutually exclusive", domain.FlagPush, domain.FlagNoPush)
-	}
-	if ffParents && noFFParents {
-		return fmt.Errorf("--%s and --%s are mutually exclusive", domain.FlagFFParents, domain.FlagNoFFParents)
-	}
 	if all && len(args) > 0 {
-		return fmt.Errorf("--%s cannot be combined with branch arguments", domain.FlagAll)
-	}
-
-	if format == domain.OutputJSON && !yes && !dryRun {
-		return fmt.Errorf("--output json requires --%s or --%s (prompts cannot run in JSON mode)", domain.FlagYes, domain.FlagDryRun)
+		return rules.Usage(fmt.Errorf("--%s cannot be combined with branch arguments", domain.FlagAll))
 	}
 
 	dir, err := os.Getwd()

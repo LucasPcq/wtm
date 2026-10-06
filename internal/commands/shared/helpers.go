@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -119,6 +120,33 @@ func Animate(cmd *cobra.Command, want bool) bool {
 
 func AddOutputFlag(cmd *cobra.Command) {
 	cmd.Flags().String(domain.FlagOutput, domain.OutputText, "Output format: text or json")
+}
+
+// RequireYesInJSON refuses --output json, before the command runs, without
+// --yes or one of unattended: the flags that also keep it from asking.
+func RequireYesInJSON(cmd *cobra.Command, unattended ...string) {
+	if cmd.Annotations == nil {
+		cmd.Annotations = map[string]string{}
+	}
+	cmd.Annotations[domain.AnnotationJSONNeedsYes] = strings.Join(unattended, " ")
+	cmd.PreRunE = func(c *cobra.Command, _ []string) error { return RefuseJSONWithoutYes(c) }
+}
+
+func RefuseJSONWithoutYes(cmd *cobra.Command) error {
+	unattended, marked := cmd.Annotations[domain.AnnotationJSONNeedsYes]
+	if !marked {
+		return nil
+	}
+	if format, _ := cmd.Flags().GetString(domain.FlagOutput); format != domain.OutputJSON {
+		return nil
+	}
+	flags := append([]string{domain.FlagYes}, strings.Fields(unattended)...)
+	for _, flag := range flags {
+		if set, _ := cmd.Flags().GetBool(flag); set {
+			return nil
+		}
+	}
+	return rules.JSONNeedsYes(flags)
 }
 
 // AddIsolationFlag registers --isolation on a command that creates a worktree.

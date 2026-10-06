@@ -4,6 +4,7 @@ package prune
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
@@ -91,7 +92,7 @@ func (f *pruneFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 	if len(f.plan.Selected) == 0 {
-		return f.conclude(Outcome{Empty: true})
+		return f.conclude(Outcome{Empty: true, Result: domain.PruneResult{DryRun: f.request.DryRun}})
 	}
 	if f.request.DryRun {
 		return f.conclude(Outcome{
@@ -137,16 +138,19 @@ func (f *pruneFlow) run() (Outcome, error) {
 func (f *pruneFlow) scan() error {
 	needPRs := f.request.Merged || f.request.Closed || !f.request.Force
 
-	var connection domain.GHConnection
+	var lookup prLookup
 	err := f.presenter.Stage(flow.StageParams{
 		Message: f.scanMessage(needPRs),
 		Work: func() error {
-			var prs []domain.PRInfo
-			if needPRs {
-				prs, connection = github.ListPRsWithConnection(f.ctx.ProjectDir)
+			awaitPRs, err := f.startPRLookup(needPRs)
+			if err != nil {
+				return err
 			}
 			var planErr error
-			f.plan, planErr = worktree.PlanPrune(f.params(), prs)
+			f.plan, planErr = worktree.PlanPrune(worktree.PlanPruneParams{
+				Prune: f.params(),
+				PRs:   func() []domain.PRInfo { lookup = awaitPRs(); return lookup.prs },
+			})
 			return planErr
 		},
 	})
@@ -157,11 +161,37 @@ func (f *pruneFlow) scan() error {
 	// prune reads "done" from GitHub, so say so when the CLI is unavailable:
 	// merged/closed detection is then inert and only --gone applies.
 	if needPRs {
-		if title, lines, show := rules.PruneGHNotice(connection); show {
+		if title, lines, show := rules.PruneGHNotice(lookup.connection); show {
 			f.presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: title, Lines: lines})
 		}
 	}
 	return nil
+}
+
+type prLookup struct {
+	prs        []domain.PRInfo
+	connection domain.GHConnection
+}
+
+// startPRLookup asks GitHub while the git side of the scan runs: the two are
+// independent, and on a large repository each costs about a second.
+func (f *pruneFlow) startPRLookup(needPRs bool) (func() prLookup, error) {
+	if !needPRs {
+		return func() prLookup { return prLookup{connection: domain.GHConnectionOK} }, nil
+	}
+	branches, err := worktree.WorktreeBranches(worktree.WorktreeBranchesParams{ProjectDir: f.ctx.ProjectDir})
+	if err != nil {
+		return nil, err
+	}
+	done := make(chan prLookup, 1)
+	go func() {
+		prs, connection := github.ListPRsOfBranchesWithConnection(github.ListPRsOfBranchesParams{
+			ProjectDir: f.ctx.ProjectDir,
+			Branches:   branches,
+		})
+		done <- prLookup{prs: prs, connection: connection}
+	}()
+	return sync.OnceValue(func() prLookup { return <-done }), nil
 }
 
 func (f *pruneFlow) scanMessage(needPRs bool) string {

@@ -257,6 +257,8 @@ wtm clean feat/api --yes
 
 Or in one pass once several PRs are merged, with `gh` installed: `wtm prune --merged --reparent-children --yes`. `wtm tree --output mermaid` prints the stack as a flowchart for a PR description.
 
+`prune` only reads the branches that have a worktree: it asks GitHub for their pull requests in one query, however old the pull request, and its fetch refreshes only their remote-tracking refs, so a repository with thousands of branches costs it no more than one with ten. The remote-tracking refs of the other branches are left as they are: `git fetch --prune` refreshes them.
+
 ## Run a command across worktrees
 
 Several branches in flight, one lockfile bump or one test suite to run on all of them. Create them in one go, run the command everywhere in parallel, remove them in one go:

@@ -4,6 +4,33 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [0.29.2] - 2026-10-06
+
+For scripts and agents: `wtm events` follows every repository and reports job crashes, `wtm env` stops printing secrets, `wtm prune` stays fast on repositories with many branches, and usage errors exit `2`.
+
+### Added
+
+- **`wtm events --all`** follows every repository wtm knows from any directory, ignoring an inherited `GIT_DIR`; integrations should pass it instead of running from outside a repository. → [Every repository at once](docs/guide/events.md#every-repository-at-once)
+- **`wtm env --addressing ports|names`** moves the main checkout's addresses onto names, or back to ports, on its own. → [The main checkout](docs/guide/addressing.md#the-main-checkout)
+- **`wtm events`** reports jobs starting, crashing, exiting and stopping (`job.*`), shared services naming the worktrees that hold them, and its snapshot lists each worktree's jobs; same schema `v: 1`. → [Jobs](docs/guide/events.md#jobs)
+
+### Changed
+
+- **`wtm env`** prints only the values wtm writes, in text and JSON (`"redacted": true` for the others), and masks URL passwords, also in `env_ports`; `--show-values` prints everything. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
+- **`wtm env main`** keeps the addressing its `.env` spells: reconciling its keys no longer moves it onto named URLs; pass `--addressing names` for that. → [The main checkout](docs/guide/addressing.md#the-main-checkout)
+- **`wtm prune`** reads only the branches that have a worktree, on git and on GitHub, so its time no longer grows with the repository's branches; it no longer refreshes the other remote-tracking refs. → [Stacked pull requests](docs/guide/recipes.md#stacked-pull-requests)
+- **`wtm env`** asks whether to keep or switch the worktree's isolation (the main checkout: its addressing), keeping it by default; the recap's verbatim action is gone. → [Isolation](docs/guide/isolation.md#changing-your-mind)
+- **`--output json` without `--yes`** on a command that could ask (`create`, `checkout`, `sync`, `clean`, `env`…) exits `2`, a usage error, instead of `1`: a script branching on `1` should read `2`. → [Exit codes](docs/guide/integrations.md#the-contract---yes-and---output-json)
+
+### Fixed
+
+- **`wtm prune`** and **`wtm tree --with-prs`** find a worktree's pull request however many newer ones the repository has, instead of only among the 100 newest. → [Stacked pull requests](docs/guide/recipes.md#stacked-pull-requests)
+- **`wtm env main`** no longer writes `[[env]]` namespaces into the main checkout (`wt_main`, `acme-main`), and puts back the template's value where an earlier run did. → [Shared services](docs/guide/shared-services.md#telling-the-app-env)
+- **Usage errors exit `2`** instead of `1`: flags that cannot be combined (`clean`/`prune --keep-data --drop-data`, `run up --exclusive --parallel`, `sync --push --no-push`…), `--all` with a name, and `wtm checkout <not a number>`, now refused before the config is read. → [Exit codes](docs/guide/integrations.md#the-contract---yes-and---output-json)
+- **`wtm run list`** in a terminal opens its picker again instead of printing `Aborted.` straight away.
+- **`wtm env`**'s resolver shows a kept conflict as your value alone, instead of an arrow from your value to itself.
+- **`wtm prune --dry-run --output json`** reports `"dry_run": true` when there is nothing to prune.
+
 ## [0.29.1] - 2026-10-05
 
 A fix release for `wtm create` and `run.toml`, with a shorter isolation question.
@@ -705,7 +732,8 @@ Initial release.
 - **Detection** of the base branch, env files, package manager, Docker Compose and pnpm workspaces.
 - **Install** with Homebrew (`brew install LucasPcq/tap/wtm`), release binaries or `go install`.
 
-[Unreleased]: https://github.com/LucasPcq/wtm/compare/v0.29.1...HEAD
+[Unreleased]: https://github.com/LucasPcq/wtm/compare/v0.29.2...HEAD
+[0.29.2]: https://github.com/LucasPcq/wtm/releases/tag/v0.29.2
 [0.29.1]: https://github.com/LucasPcq/wtm/releases/tag/v0.29.1
 [0.29.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.29.0
 [0.28.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.28.0

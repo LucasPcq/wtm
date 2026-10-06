@@ -52,6 +52,7 @@ func newCreateCmd() *cobra.Command {
 	cmd.Flags().Bool(domain.FlagIfNotExists, false, "Succeed silently if the worktree already exists (idempotent)")
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (branch names required; source defaults to the base branch for a new branch, and --from is required for one that already exists)")
 	shared.AddOutputFlag(cmd)
+	shared.RequireYesInJSON(cmd)
 
 	return cmd
 }
@@ -69,10 +70,6 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	envFromFlag, err := shared.EnvFromFlag(cmd)
 	if err != nil {
 		return err
-	}
-
-	if format == domain.OutputJSON && !yes {
-		return domain.ErrJSONNeedsYes
 	}
 
 	dir, err := os.Getwd()

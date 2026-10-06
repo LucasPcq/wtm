@@ -459,15 +459,7 @@ func (m EnvResolveModel) entryText(r envRow, styled bool) string {
 	status := fmt.Sprintf("%-10s", statusWord(r))
 	action, proposed := rowActionValue(r, styled)
 
-	mid := proposed
-	switch r.status {
-	case domain.EnvKeyMissing:
-		// no current value
-	case domain.EnvKeyOrphan:
-		mid = valText(r.current, styled)
-	default:
-		mid = valText(r.current, styled) + arrow(styled) + proposed
-	}
+	mid := entryValues(r, proposed, styled)
 
 	if styled {
 		key = styles.Bold.Render(key)
@@ -477,6 +469,19 @@ func (m EnvResolveModel) entryText(r envRow, styled bool) string {
 		action = "[" + action + "]"
 	}
 	return key + "  " + status + "  " + mid + "   " + action
+}
+
+// entryValues is the value column: the proposed value alone for a missing key, the
+// current value alone for an orphan or a kept conflict (an arrow would announce a
+// change that does not happen), and current → proposed otherwise.
+func entryValues(r envRow, proposed string, styled bool) string {
+	if r.status == domain.EnvKeyMissing {
+		return proposed
+	}
+	if r.status == domain.EnvKeyOrphan || (!r.useEdit && r.options[r.sel].code == optKeep) {
+		return valText(r.current, styled)
+	}
+	return valText(r.current, styled) + arrow(styled) + proposed
 }
 
 func arrow(styled bool) string {
@@ -528,11 +533,8 @@ func rowActionValue(r envRow, styled bool) (action, proposed string) {
 		return domain.EnvRecapActionSkip, muted("(left missing)", styled)
 	case optRemove:
 		return domain.EnvRecapActionPrune, ""
-	default: // optKeep
-		if r.status == domain.EnvKeyOrphan {
-			return domain.EnvRecapActionKeep, ""
-		}
-		return domain.EnvRecapActionKeep, valText(r.current, styled)
+	default: // optKeep: entryValues shows what is kept
+		return domain.EnvRecapActionKeep, ""
 	}
 }
 

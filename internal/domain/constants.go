@@ -250,6 +250,17 @@ const (
 	EnvProjectDir = "WTM_PROJECT_DIR"
 	EnvStateDir   = "WTM_STATE_DIR"
 
+	// Git's own variables that pin every git command to one repository,
+	// whatever directory it runs in.
+	EnvGitDir                        = "GIT_DIR"
+	EnvGitWorkTree                   = "GIT_WORK_TREE"
+	EnvGitCommonDir                  = "GIT_COMMON_DIR"
+	EnvGitIndexFile                  = "GIT_INDEX_FILE"
+	EnvGitObjectDirectory            = "GIT_OBJECT_DIRECTORY"
+	EnvGitAlternateObjectDirectories = "GIT_ALTERNATE_OBJECT_DIRECTORIES"
+	EnvGitNamespace                  = "GIT_NAMESPACE"
+	EnvGitPrefix                     = "GIT_PREFIX"
+
 	// Worktree-scoped variables injected into every job and lifecycle hook, so
 	// two worktrees running the same services never share a resource.
 	EnvWorktree           = "WTM_WORKTREE"
@@ -599,6 +610,8 @@ const (
 	OriginSchemeHTTP      = "http"
 	OriginSchemeHTTPS     = "https"
 	OriginSchemeSeparator = "://"
+	// MaskedURLPassword stands for the password of a URL a report prints.
+	MaskedURLPassword = "***"
 	// OriginListSeparator is what an app splits a multi-origin setting on.
 	OriginListSeparator = ","
 	// The loopback spellings a .env value reaches a local job by, beside the TLD.
@@ -719,7 +732,7 @@ const (
 	// is not there to say the same thing.
 	AddressingDriftGlyph = "⚠ "
 	AddressingDriftTitle = "Published names, unsettled .env"
-	AddressingPortedFmt  = "%s's .env still spells ports — `wtm env %s` aligns it"
+	AddressingPortedFmt  = "%s's .env still spells ports — `wtm env %s --addressing names` aligns it"
 	AddressingDriftFmt   = "%s's .env is out of step with its names — `wtm env %s` settles it"
 
 	// FlagKeepEnv withholds the .env pass of `run addressing`, as --keep-data
@@ -738,7 +751,7 @@ const (
 	AddressingSettleNo        = "No, only run.toml"
 	AddressingSettledFmt      = "%s settled"
 	AddressingPendingFmt      = "%s still out of step — `wtm env <worktree>` settles one"
-	AddressingMainLeftFmt     = "%s left as is — `wtm env %s` moves it onto names, if you want it to"
+	AddressingMainLeftFmt     = "%s left as is — `wtm env %s --addressing names` moves it onto names, if you want it to"
 	AddressingMainLeftDescFmt = "\n%s is left out: a pass over every worktree never moves it onto names."
 	AddressingSettleFailedFmt = "%s: %v"
 	AddressingWorktreeNoun    = "worktree"
@@ -982,14 +995,13 @@ const (
 	ImportEnvHint        = "wtm env"
 	ImportEnvHintNote    = "reconcile the .env files against this configuration"
 
-	ImportJSONNeedsYesFmt = "--%s %s requires --%s"
-	ImportInvalidFmt      = "invalid run config:\n  %s"
-	ImportInvalidSep      = "\n  "
-	ImportStdinArg        = "-"
-	ImportNeedsYesFmt     = "replacing run.toml is destructive: pass --%s to confirm it without a prompt"
-	ImportDeclined        = "run.toml left unchanged."
-	ImportConfirmTitle    = "Replace run.toml?"
-	ImportConfirmDescFmt  = "The payload replaces the whole file: %d job(s), %d profile(s). What run.toml holds today is lost."
+	ImportInvalidFmt     = "invalid run config:\n  %s"
+	ImportInvalidSep     = "\n  "
+	ImportStdinArg       = "-"
+	ImportNeedsYesFmt    = "replacing run.toml is destructive: pass --%s to confirm it without a prompt"
+	ImportDeclined       = "run.toml left unchanged."
+	ImportConfirmTitle   = "Replace run.toml?"
+	ImportConfirmDescFmt = "The payload replaces the whole file: %d job(s), %d profile(s). What run.toml holds today is lost."
 
 	// RunStreamCrashedFmt corrects a job announced as started that the daemon
 	// found gone at the end of the sequence.
@@ -1100,34 +1112,58 @@ const (
 	EnvDetailConflictFmt = "conflict — local %s vs %s %s"
 	// EnvDetailConflictKeptFmt is a conflict an apply left as it was.
 	EnvDetailConflictKeptFmt = "conflict kept — local %s vs %s %s"
-	EnvTallyAdded            = "added"
-	EnvTallyFilled           = "filled"
-	EnvTallyOverwritten      = "overwritten"
-	EnvTallyPruned           = "pruned"
-	EnvTallySkipped          = "skipped"
-	EnvDetailMissingFmt      = "needs a value — placeholder %s"
-	EnvDetailOrphan          = "orphan — in no source"
-	EnvEmptyValueLabel       = "(empty)"
+	// The same two rows for a key whose values the report withholds.
+	EnvDetailConflictRedactedFmt     = "conflict — local value differs from %s"
+	EnvDetailConflictKeptRedactedFmt = "conflict kept — local value differs from %s"
+	EnvTallyAdded                    = "added"
+	EnvTallyFilled                   = "filled"
+	EnvTallyOverwritten              = "overwritten"
+	EnvTallyPruned                   = "pruned"
+	EnvTallySkipped                  = "skipped"
+	EnvDetailMissingFmt              = "needs a value — placeholder %s"
+	EnvDetailOrphan                  = "orphan — in no source"
+	EnvEmptyValueLabel               = "(empty)"
 	// The glyphs a file block's rows are marked with. One rune each, so the
 	// key column stays aligned whatever a row's status is.
 	EnvKeyGlyphAdd       = "+"
 	EnvKeyGlyphAttention = "!"
 	EnvKeyGlyphOrphan    = "−"
 	// EnvFileHeaderFmt heads a file block; EnvFileSourceFmt is its muted half.
-	EnvFileHeaderFmt   = "%s   %s"
-	EnvFileSourceFmt   = "strategy: %s  ·  source: %s"
-	EnvFieldWorktree   = "Worktree"
-	EnvFieldMode       = "Mode"
-	EnvFieldIsolation  = "Isolation"
-	EnvModeCheckSuffix = "  ·  read-only check"
-	// The two ways to apply on the `wtm env` recap. The second exists so the
-	// port pass is proposed, as `wtm create` proposes it, and never imposed —
-	// and declining it records the worktree verbatim, since a .env left on its
-	// source's ports is only coherent with jobs run on them too.
-	EnvApplyActionLabel   = "Yes, apply"
-	EnvApplyVerbatimLabel = "Apply, and keep this worktree's .env verbatim from now on"
-	EnvApplyValue         = "apply"
-	EnvApplyVerbatimValue = "apply-verbatim"
+	EnvFileHeaderFmt    = "%s   %s"
+	EnvFileSourceFmt    = "strategy: %s  ·  source: %s"
+	EnvFieldWorktree    = "Worktree"
+	EnvFieldMode        = "Mode"
+	EnvFieldIsolation   = "Isolation"
+	EnvModeCheckSuffix  = "  ·  read-only check"
+	EnvApplyActionLabel = "Yes, apply"
+	EnvApplyValue       = "apply"
+
+	// EnvIsolation* is the `wtm env` step that keeps or switches a linked
+	// worktree's isolation. Keeping comes first: reconciling the keys is what
+	// the command is usually run for.
+	EnvIsolationStepLabel     = "Isolation"
+	EnvIsolationTitleFmt      = "Isolation — %s"
+	EnvIsolationDescription   = "How this worktree runs next to its source. Keeping it only reconciles the .env."
+	EnvIsolationKeepIsolated  = "Keep isolated — its own ports, compose project and namespaces"
+	EnvIsolationKeepVerbatim  = "Keep verbatim — its source's ports and compose project"
+	EnvIsolationToVerbatim    = "Switch to verbatim — the values wtm owns go back to the source's"
+	EnvIsolationToIsolated    = "Switch to isolated — its own ports and compose project, its own empty volumes"
+	EnvIsolationAdoptVerbatim = "Record it verbatim — keep its source's values from now on"
+
+	// EnvAddressing* is the step the main checkout gets instead: it is always
+	// isolated, and the one checkout no pass ever moves onto names unasked.
+	EnvAddressingStepLabel   = "Addressing"
+	EnvAddressingTitleFmt    = "Addressing — %s"
+	EnvAddressingDescription = "The main checkout is the one that exists without wtm. On names, whoever reads its .env depends on the run proxy."
+	EnvAddressingKeepPorts   = "Keep ports — http://localhost:<port>, as without wtm"
+	EnvAddressingKeepNames   = "Keep names — served by the run proxy"
+	EnvAddressingToNames     = "Move onto names — http://<job>.<repo>.localhost, served by the run proxy"
+	EnvAddressingToPorts     = "Back to ports — http://localhost:<port>, as without wtm"
+	EnvRecapFieldAddressing  = "Addresses: "
+	EnvRecapUnchanged        = " (unchanged)"
+	EnvIsolationMainSkip     = "the main checkout is always isolated"
+	EnvAddressingSkip        = "both modes write the same values"
+	EnvAddressingLinkedSkip  = "a linked worktree follows run.toml"
 
 	// The `wtm env` wizard: its steps, and the recap of what the apply writes.
 	EnvWizardErrLabel       = "env wizard"
@@ -1192,10 +1228,9 @@ const (
 	// EnvDetailRestored* are the file-block rows of those values.
 	EnvDetailRestoredFmt        = "back to the source's %s (was %s)"
 	EnvDetailRestoredRemovedFmt = "removed — the source has none (was %s)"
-	// EnvRestoreRecap* head the wizard recap's preview of what verbatim puts
-	// back: the switch asked for, or the one the verbatim action would make.
+	// EnvRestoreRecapTitle heads the wizard recap's preview of what the switch
+	// to verbatim puts back.
 	EnvRestoreRecapTitle       = "Back to the source's values"
-	EnvRestoreRecapIfKeptTitle = "Keeping it verbatim also puts back"
 	EnvIsolationNotSwitchedFmt = "%s was not switched to %s: %s — run `wtm env %s --isolation %s` once run.toml is fixed"
 
 	// The [[env_port]] detection of `wtm run init`.
@@ -1338,17 +1373,18 @@ const (
 	IsolationUnknownFmt = "unknown isolation %q (expected %q or %q)"
 
 	// Flag names.
-	FlagFrom      = "from"
-	FlagFF        = "ff"
-	FlagEnvFrom   = "env-from"
-	FlagIsolation = "isolation"
-	FlagForce     = "force"
-	FlagBase      = "base"
-	FlagExclusive = "exclusive"
-	FlagParallel  = "parallel"
-	FlagDetach    = "detach"
-	FlagProfile   = "profile"
-	FlagOutput    = "output"
+	FlagFrom       = "from"
+	FlagFF         = "ff"
+	FlagEnvFrom    = "env-from"
+	FlagIsolation  = "isolation"
+	FlagAddressing = "addressing"
+	FlagForce      = "force"
+	FlagBase       = "base"
+	FlagExclusive  = "exclusive"
+	FlagParallel   = "parallel"
+	FlagDetach     = "detach"
+	FlagProfile    = "profile"
+	FlagOutput     = "output"
 	// FlagQuiet silences a command's human output. It is the output axis, not the
 	// confirmation one: --quiet still asks and --yes still reports, so a script
 	// wanting neither passes both.
@@ -1366,7 +1402,16 @@ const (
 	AnnotationUncorrelated = "wtm.uncorrelated"
 	// AnnotationOutputFormats lists, comma-separated, the --output values a
 	// command accepts besides text and json.
-	AnnotationOutputFormats  = "wtm.output-formats"
+	AnnotationOutputFormats = "wtm.output-formats"
+	// AnnotationJSONNeedsYes marks a command that could ask: --output json is
+	// refused without --yes or one of the space-separated flags it lists.
+	AnnotationJSONNeedsYes = "wtm.json-needs-yes"
+	JSONNeedsYesFmt        = "--output json requires %s (prompts cannot run in JSON mode)"
+
+	// AnnotationMutuallyExclusive is the key cobra's MarkFlagsMutuallyExclusive
+	// writes on each flag of a group: one space-separated group per entry.
+	AnnotationMutuallyExclusive = "cobra_annotation_mutually_exclusive"
+
 	OutputFormatInvalidFmt   = "invalid --%s %q: expected one of %s"
 	UnknownCommandFmt        = "unknown command %q for %q"
 	UnknownCommandSuggestFmt = "\n\nDid you mean this?\n\t%s"
@@ -1417,6 +1462,9 @@ const (
 	FlagMode  = "mode"
 	FlagCheck = "check"
 	FlagPrune = "prune"
+	// FlagShowValues prints the values of keys wtm does not write, which a
+	// report withholds by default.
+	FlagShowValues = "show-values"
 
 	// FlagReparentChildren opts in (non-interactively) to reparenting the orphaned
 	// children of a cleaned worktree onto its grandparent. In interactive mode the
@@ -1830,6 +1878,9 @@ const (
 	// ("origin/feature"). Used to strip/build remote refs and to detect whether a
 	// picked start-point is remote.
 	RemoteBranchPrefix = "origin/"
+	OriginRemote       = "origin"
+	LocalRefPrefix     = "refs/heads/"
+	RemoteRefPrefix    = "refs/remotes/"
 
 	// LoadingBranchesText labels the spinner shown while a branch picker fetches
 	// origin to refresh its divergence badges.
@@ -3207,6 +3258,7 @@ const (
 	CheckoutPRTitleWidth        = 40
 	CheckoutPRRecapFmt          = "#%d %s"
 	CheckoutPRRequired          = "PR number required without an interactive terminal (or when --yes is set)"
+	CheckoutPRNumberInvalidFmt  = "invalid PR number %q"
 	CheckoutParentLabel         = "Parent branch"
 	CheckoutParentDescription   = "Branch this PR is rebased onto by `wtm sync` (defaults to the PR base)"
 	CheckoutEnvLabel            = "Env strategy"
@@ -3284,10 +3336,8 @@ const (
 	IsolationAdoptKeepLabel   = "Keep as is — ports and compose project untouched"
 	IsolationAdoptComposeFmt  = "Adopt isolation — new compose project %s, your current volumes (%s_*) will no longer be used"
 	IsolationAdoptPortsLabel  = "Adopt isolation — its ports move onto this worktree's own"
-	IsolationAdoptKeepValue   = "keep"
-	IsolationAdoptValue       = "adopt"
+	EnvKeepValue              = "keep"
 	IsolationAdoptKeptSummary = "kept as is"
-	IsolationAdoptSummary     = "adopted"
 	// EnvIsolationNotAdoptedFmt is what `wtm env` says of the run values it left
 	// alone on such a worktree, and how to adopt isolation later.
 	EnvIsolationNotAdoptedFmt = "%s predates isolation: its ports and compose project were left as they are — adopt it with `wtm env %s --isolation isolated`"
@@ -3464,8 +3514,6 @@ const (
 	PruneTagDirty    = "dirty"
 	PruneTagUnpushed = "unpushed"
 	PruneTagOpenPR   = "open PR"
-	// PruneJSONNeedsYes refuses a JSON run that would have to prompt.
-	PruneJSONNeedsYes = "--output json requires --yes or --dry-run (the selection prompt cannot run in JSON mode)"
 	// PruneNeedsTerminal refuses a run that can neither prompt nor resolve.
 	PruneNeedsTerminal = "prune needs a terminal to confirm; pass --yes to run non-interactively"
 
@@ -4424,6 +4472,20 @@ const (
 	ComposeCmdHyphened = "docker-compose"
 )
 
+// GitRepoScopedEnv is what `wtm events --all` drops before it reads any
+// repository: inherited, one of them would make every repository read as the
+// one it names.
+var GitRepoScopedEnv = []string{
+	EnvGitDir,
+	EnvGitWorkTree,
+	EnvGitCommonDir,
+	EnvGitIndexFile,
+	EnvGitObjectDirectory,
+	EnvGitAlternateObjectDirectories,
+	EnvGitNamespace,
+	EnvGitPrefix,
+}
+
 var WorktreeScopedEnv = []string{
 	EnvWorktree,
 	EnvBranch,
@@ -4522,7 +4584,6 @@ const (
 	// of the number rather than as a question.
 	UpgradeConfirmPrompt = "Update %s %s → %s ?"
 
-	UpgradeJSONNeedsYes   = "--output json requires --yes or --check (the confirmation prompt cannot run in JSON mode)"
 	UpgradeSourceHint     = "this binary was built from source — run `git pull && make install` instead"
 	UpgradePinUnsupported = "--version only applies to a standalone binary; pin the version through your package manager instead"
 )
@@ -4610,6 +4671,9 @@ const (
 	// EventsRegistryPruneEvery is how often a global stream looks for the
 	// repositories that went away: deleting one runs no wtm command to say so.
 	EventsRegistryPruneEvery = 30 * time.Second
+	// JobEventLastLines is how much of its output a job.crashed carries: the
+	// error, without the whole log.
+	JobEventLastLines = 10
 )
 
 // One human line per `wtm events` event; --output json is the contract, these
@@ -4634,6 +4698,13 @@ const (
 	EventRepoAddedFmt         = "watching %s"
 	EventRepoRemovedFmt       = "no longer watching %s"
 	EventRepoPrefixFmt        = "%s · "
+
+	EventJobStartedFmt = "started %s in %s"
+	EventJobCrashedFmt = "%s crashed in %s"
+	EventJobExitedFmt  = "%s finished in %s"
+	EventJobStoppedFmt = "stopped %s in %s"
+	EventJobURLFmt     = "  %s"
+	EventJobHeldByFmt  = " · held by %s"
 )
 
 const (

@@ -24,9 +24,14 @@ func newEnvCmd() *cobra.Command {
 			"parent); --from overrides it for one run. When run.toml declares ports, the\n" +
 			"values wtm owns are then settled on the worktree's isolation.\n\n" +
 			"Pass a worktree, or omit it to pick one. --check reports and writes nothing.\n" +
+			"A report prints only the values wtm writes (ports, owned values); the others,\n" +
+			"secrets included, are withheld unless --show-values.\n" +
 			"Unattended (--yes, no terminal, --output json) it applies safe additions only:\n" +
-			"conflicts need --on-conflict, orphans --prune. --isolation switches the worktree\n" +
-			"to isolated or verbatim, recorded once its .env is in line — see the isolation guide.",
+			"conflicts need --on-conflict, orphans --prune.\n\n" +
+			"A run keeps how the worktree runs unless asked: the wizard offers to switch a\n" +
+			"worktree between isolated and verbatim (--isolation), and the main checkout\n" +
+			"between port and named addresses (--addressing) — see the isolation and\n" +
+			"addressing guides.",
 		Example: `  # Pick a worktree and reconcile its .env files
   wtm env
 
@@ -37,19 +42,25 @@ func newEnvCmd() *cobra.Command {
   wtm env feat/login --mode refresh --on-conflict overwrite --prune --yes
 
   # Give a worktree created before 0.28 its own ports and compose project
-  wtm env feat/login --isolation isolated --yes`,
+  wtm env feat/login --isolation isolated --yes
+
+  # Reconcile the main checkout, moving its addresses back to ports
+  wtm env main --addressing ports --yes`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runEnv,
 	}
 
 	cmd.Flags().String(domain.FlagMode, string(domain.EnvModeAdd), "Reconciliation mode: add (fill gaps) or refresh (also settle value conflicts)")
 	cmd.Flags().Bool(domain.FlagCheck, false, "Read-only drift report; write nothing")
+	cmd.Flags().Bool(domain.FlagShowValues, false, "Print the values of keys wtm does not write (secrets included); withheld by default")
 	cmd.Flags().Bool(domain.FlagPrune, false, "Remove orphan keys (present in the .env but in no source)")
 	cmd.Flags().String(domain.FlagFrom, "", "Override the value source strategy (example, main, parent)")
 	cmd.Flags().String(domain.FlagOnConflict, "", "Conflict resolution with --mode refresh: keep (default) or overwrite")
 	cmd.Flags().String(domain.FlagIsolation, "", "Switch the worktree to isolated (its own ports, compose project and namespaces) or verbatim (the values wtm owns back to the source's)")
+	cmd.Flags().String(domain.FlagAddressing, "", "Write the main checkout's linked addresses as ports (as without wtm) or names (served by the run proxy); default: what its .env spells")
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (additions only)")
 	shared.AddOutputFlag(cmd)
+	shared.RequireYesInJSON(cmd, domain.FlagCheck)
 
 	return cmd
 }
@@ -71,13 +82,16 @@ func runEnv(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	addressing, err := envAddressing(cmd)
+	if err != nil {
+		return err
+	}
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
 	check, _ := cmd.Flags().GetBool(domain.FlagCheck)
 	prune, _ := cmd.Flags().GetBool(domain.FlagPrune)
+	showValues, _ := cmd.Flags().GetBool(domain.FlagShowValues)
 	if err := rules.ValidateEnvFlags(rules.EnvFlagsParams{
-		Format:        format,
-		Yes:           yes,
 		Check:         check,
 		Prune:         prune,
 		OnConflictSet: cmd.Flags().Changed(domain.FlagOnConflict),
@@ -113,10 +127,11 @@ func runEnv(cmd *cobra.Command, args []string) error {
 			Prune:      prune,
 			Check:      check,
 			Isolation:  isolation,
+			Addressing: addressing,
 		},
 		// The wizard runs only fully interactively, and never for --check.
 		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: isInteractive() && rules.IsHumanFormat(format) && !yes && !check, Stderr: true}),
-		Presenter: envPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
+		Presenter: envPresenter{CLIPresenter: shared.NewPresenter(cmd, format), showValues: showValues},
 	})
 	return err
 }
@@ -141,6 +156,16 @@ func envFrom(cmd *cobra.Command) (string, error) {
 		return "", rules.InvalidFlagValue(rules.InvalidFlagValueParams{Flag: domain.FlagFrom, Value: v, Allowed: shared.EnvStrategyValues})
 	}
 	return v, nil
+}
+
+// envAddressing validates and returns the --addressing value, "" when unset.
+func envAddressing(cmd *cobra.Command) (domain.Addressing, error) {
+	v, _ := cmd.Flags().GetString(domain.FlagAddressing)
+	switch domain.Addressing(v) {
+	case "", domain.AddressingNames, domain.AddressingPorts:
+		return domain.Addressing(v), nil
+	}
+	return "", rules.InvalidFlagValue(rules.InvalidFlagValueParams{Flag: domain.FlagAddressing, Value: v, Allowed: []string{string(domain.AddressingPorts), string(domain.AddressingNames)}})
 }
 
 // envOnConflict validates and returns the --on-conflict decision, defaulting to

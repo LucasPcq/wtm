@@ -72,6 +72,7 @@ type Seam struct {
 	jobs       []domain.JobConfig
 	declared   []domain.JobConfig
 	shared     *domain.SharedJobContext
+	publisher  flow.Publisher
 }
 
 func Open(params Params) Seam {
@@ -119,6 +120,7 @@ func Open(params Params) Seam {
 		projectDir: params.ProjectDir,
 		stateDir:   params.StateDir,
 		shared:     shared,
+		publisher:  params.Publisher,
 	}
 }
 
@@ -266,6 +268,7 @@ func (s Seam) start(ctx context.Context, sink runlogs.Sink, params StartParams) 
 		PublicPort:     s.publicPort,
 		Shared:         s.shared,
 		SharedWorktree: sharedWorktreeOf(sharedWorktreeParams{Shared: s.shared, WorkDir: s.workDir}),
+		Origin:         flow.Context{Publisher: s.publisher}.Origin(),
 	})
 }
 

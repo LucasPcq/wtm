@@ -4,22 +4,34 @@ import (
 	"fmt"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/rules"
 	envsvc "github.com/LucasPcq/wtm/internal/service/env"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
 
 // branchScan is what the wizard shows of one worktree before anything is
-// written: its drift, the port pass that rides along with the apply, whether it
-// still has to adopt its isolation, and what keeping it verbatim puts back.
+// written: its drift, the port pass that rides along with the apply, and what
+// a switch to verbatim puts back.
 type branchScan struct {
-	files    []domain.EnvFileResult
-	ports    domain.EnvPortPlan
-	adoption domain.IsolationAdoptionPlan
-	restore  []domain.EnvRestoredEntry
-	// refused is --isolation turned down for this worktree: the picker offers it
-	// disabled rather than letting the apply fail on it.
-	refused bool
+	files   []domain.EnvFileResult
+	ports   domain.EnvPortPlan
+	restore []domain.EnvRestoredEntry
+}
+
+// scanKey is one worktree under one answer to each mode step: what the recap
+// shows follows those answers.
+type scanKey struct {
+	branch     string
+	isolation  domain.Isolation
+	addressing domain.Addressing
+}
+
+// pickerKey is the scan the picker badges a worktree with: the run as its
+// flags ask for it, or as it is for a worktree that refuses them.
+func (f *envFlow) pickerKey(branch string) scanKey {
+	if f.refused[branch] != "" {
+		return scanKey{branch: branch}
+	}
+	return scanKey{branch: branch, isolation: f.request.Isolation, addressing: f.request.Addressing}
 }
 
 // scan runs once, before the first screen, over every worktree the picker may
@@ -41,56 +53,72 @@ func (f *envFlow) scan() error {
 		if pathOf(statuses, preset) == "" {
 			return fmt.Errorf("%w: %s", domain.ErrWorktreeNotFound, preset)
 		}
-		if err := f.checkIsolation(target{branch: preset}, f.request.Isolation); err != nil {
+		if err := f.checkFlags(target{branch: preset, path: pathOf(statuses, preset)}); err != nil {
 			return err
 		}
 		branches = []string{preset}
 	}
 
 	for _, branch := range branches {
-		scan, err := f.scanBranch(branch)
-		if err != nil {
+		if err := f.checkFlags(target{branch: branch, path: pathOf(statuses, branch)}); err != nil {
+			refused := f.refusedFlag(err)
+			if refused == "" {
+				return err
+			}
+			f.refused[branch] = refused
+		}
+		if _, err := f.scanFor(f.pickerKey(branch)); err != nil {
 			return err
 		}
-		f.scans[branch] = scan
 	}
 	return nil
 }
 
-func (f *envFlow) scanBranch(branch string) (branchScan, error) {
-	t := target{branch: branch, path: pathOf(f.statuses, branch)}
-	adoption, err := f.adoption(t)
+func (f *envFlow) scanFor(key scanKey) (branchScan, error) {
+	if scan, ok := f.scans[key]; ok {
+		return scan, nil
+	}
+	scan, err := f.scanBranch(key)
 	if err != nil {
 		return branchScan{}, err
 	}
-	ctx := f.envContext(branch)
-	preview, err := f.planSwitch(planSwitchParams{Target: t, Ctx: ctx, Isolation: domain.IsolationVerbatim})
+	f.scans[key] = scan
+	return scan, nil
+}
+
+func (f *envFlow) scanBranch(key scanKey) (branchScan, error) {
+	t, err := f.answeredTarget(key.branch)
+	if err != nil {
+		return branchScan{}, err
+	}
+	state, err := f.stateOf(t)
+	if err != nil {
+		return branchScan{}, err
+	}
+	addressing, err := f.settledAddressing(t, key.addressing)
+	if err != nil {
+		return branchScan{}, err
+	}
+	ctx := f.envContext(key.branch)
+	preview, err := f.planSwitch(planSwitchParams{Target: t, Ctx: ctx, Isolation: key.isolation})
 	if err != nil {
 		return branchScan{}, err
 	}
 
-	isolation := f.request.Isolation
-	refused := f.checkIsolation(t, isolation) != nil
-	if refused {
-		isolation = ""
-	}
-	// A worktree still to adopt its isolation is scanned without its port
-	// pass: resolving one allocates an ordinal, and whether it gets one is the
-	// question the wizard is about to ask.
+	// A worktree that has not adopted isolation, or is about to take ports of
+	// its own, is scanned without its port pass: resolving one allocates an
+	// ordinal, and whether it gets one is what the run is deciding.
 	var ports envsvc.EnvPortsParams
-	if !adoption.Pending || isolation != "" {
-		ports, _ = f.resolvePorts(resolvePortsParams{Target: t, Isolation: isolation})
+	if !state.adoption.Pending && !state.movesOntoIsolation(key.isolation) {
+		ports, _ = f.resolvePorts(resolvePortsParams{Target: t, Isolation: key.isolation, Addressing: addressing})
 	}
 
-	var reserved []string
-	if rules.IsVerbatim(isolation) {
-		reserved = restoredKeys(preview.planned)
-	}
-	if adoption.Pending {
+	reserved := preview.keys()
+	if state.adoption.Pending {
 		reserved = append(reserved, domain.WtmOwnedEnvKeys...)
 	}
 	files, err := envsvc.ComputeEnvDiff(envsvc.ComputeEnvParams{
-		Branch:             branch,
+		Branch:             key.branch,
 		MainPath:           f.ctx.ProjectDir,
 		WorktreePath:       t.path,
 		ParentWorktreePath: ctx.parentPath,
@@ -105,7 +133,7 @@ func (f *envFlow) scanBranch(branch string) (branchScan, error) {
 		return branchScan{}, err
 	}
 
-	scan := branchScan{files: files, adoption: adoption, restore: preview.planned, refused: refused}
+	scan := branchScan{files: files, restore: preview.planned}
 	if !ports.Empty() {
 		if scan.ports, err = envsvc.ComputeEnvPorts(ports); err != nil {
 			return branchScan{}, err

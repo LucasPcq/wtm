@@ -36,6 +36,10 @@ func (p *ScriptedPrompter) Ask(session flow.Session) (flow.Answers, error) {
 		p.Content = map[string]flow.StepContent{}
 	}
 
+	if err := buildBeforeAsking(session); err != nil {
+		return flow.Answers{}, err
+	}
+
 	answers := session.Presets
 	for _, step := range session.Steps {
 		if _, known := answers.Get(step.Key); known {
@@ -92,6 +96,21 @@ func (p *ScriptedPrompter) Ask(session flow.Session) (flow.Answers, error) {
 	return answers, nil
 }
 
+// buildBeforeAsking is the pass the wizard makes before it opens: every step is
+// built from the presets alone, so a Build that fails on an answer not given yet
+// aborts the session before its first question.
+func buildBeforeAsking(session flow.Session) error {
+	for _, step := range session.Steps {
+		if _, preset := session.Presets.Get(step.Key); preset || step.Build == nil {
+			continue
+		}
+		if _, err := step.Build(session.Presets); err != nil {
+			return fmt.Errorf("step %q cannot be built before the session opens: %w", step.Key, err)
+		}
+	}
+	return nil
+}
+
 func stepContent(step flow.Step, answers flow.Answers) (flow.StepContent, error) {
 	switch {
 	case step.Build != nil:
@@ -121,6 +140,8 @@ type Recorder struct {
 	Published []domain.Event
 	// Unheard makes the Recorder a publisher no daemon listens to.
 	Unheard bool
+	// From is the origin it hands a request to the daemon; zero names none.
+	From domain.EventOrigin
 }
 
 // Publish makes a Recorder the flow's Publisher too, so one double records
@@ -128,6 +149,10 @@ type Recorder struct {
 func (r *Recorder) Publish(event domain.Event) { r.Published = append(r.Published, event) }
 
 func (r *Recorder) Listening() bool { return !r.Unheard }
+
+func (r *Recorder) Origin() (domain.EventOrigin, bool) {
+	return r.From, r.From.Repo.CommonDir != ""
+}
 
 func (r *Recorder) PublishedTypes() []domain.EventType {
 	types := make([]domain.EventType, 0, len(r.Published))

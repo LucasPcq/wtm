@@ -336,3 +336,24 @@ func ReparentedPairs(results []domain.ReparentResult) []string {
 	}
 	return pairs
 }
+
+type OriginTrackingRefsParams struct {
+	Branches  []string
+	Upstreams map[string]domain.Upstream
+}
+
+// OriginTrackingRefs maps each ref of origin a prune reads to the remote-tracking
+// ref it lands on: every branch's namesake, which unpushed and divergence read,
+// and the upstream it tracks on origin when that one has another name.
+func OriginTrackingRefs(params OriginTrackingRefsParams) map[string]string {
+	refs := make(map[string]string, len(params.Branches))
+	for _, branch := range params.Branches {
+		refs[domain.LocalRefPrefix+branch] = domain.RemoteRefPrefix + domain.OriginRemote + "/" + branch
+		upstream := params.Upstreams[branch]
+		if upstream.Remote != domain.OriginRemote || upstream.RemoteRef == "" || upstream.TrackingRef == "" {
+			continue
+		}
+		refs[upstream.RemoteRef] = upstream.TrackingRef
+	}
+	return refs
+}

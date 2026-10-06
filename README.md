@@ -123,7 +123,7 @@ wtm is meant to be driven by something other than a person, and says so in its c
 
 - **A skill for your agent:** `wtm agents install` adds the `using-wtm` skill to Claude Code and Cursor, so the agent knows the commands and their unattended forms without being told.
 - **Nothing prompts, everything parses:** data commands take `--output json`, every change takes `--yes`, exit codes are stable, and `wtm version --output json` reports the contract versions an integration can check.
-- **A live event stream:** `wtm events --output json` emits JSON Lines for every worktree created, provisioned, moved or removed, whoever did it; run outside a repository, it follows all of them. `WTM_CORRELATION_ID` ties an event to the run that caused it.
+- **A live event stream:** `wtm events --output json` emits JSON Lines for every worktree created, provisioned, moved or removed, and every job started, crashed or stopped, whoever did it; run outside a repository, it follows all of them. `WTM_CORRELATION_ID` ties an event to the run that caused it.
 
 ```bash
 wtm create feat/a feat/b --yes --output json

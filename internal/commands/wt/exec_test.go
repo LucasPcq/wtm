@@ -59,7 +59,7 @@ func TestExecRefusesWhatItCannotRunWithItsExitCode(t *testing.T) {
 		{"negative jobs", []string{domain.CmdExec, "a", "--yes", "--jobs", "-1", "--", "true"}, domain.ExitCodeUsage},
 		{"bad shell syntax", []string{domain.CmdExec, "a", "--yes", "--", "if", "then"}, domain.ExitCodeUsage},
 		{"unknown worktree", []string{domain.CmdExec, "nope", "--yes", "--", "true"}, domain.ExitCodeBranchNotFound},
-		{"json without yes", []string{domain.CmdExec, "a", "--output", domain.OutputJSON, "--", "true"}, domain.ExitCodeError},
+		{"json without yes", []string{domain.CmdExec, "a", "--output", domain.OutputJSON, "--", "true"}, domain.ExitCodeUsage},
 		{"no selection", []string{domain.CmdExec, "--yes", "--", "true"}, domain.ExitCodeError},
 		{"no selection, no terminal", []string{domain.CmdExec, "--", "true"}, domain.ExitCodeError},
 	}

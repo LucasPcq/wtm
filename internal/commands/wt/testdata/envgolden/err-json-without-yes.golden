@@ -1,6 +1,6 @@
 args: feat/a --output json
-err: --output json requires --yes or --check (interactive resolution cannot run in JSON mode)
-exit: 1
+err: --output json requires --yes or --check (prompts cannot run in JSON mode)
+exit: 2
 --- stdout ---
 Usage:
   wtm env [worktree] [flags]
@@ -18,7 +18,11 @@ Examples:
   # Give a worktree created before 0.28 its own ports and compose project
   wtm env feat/login --isolation isolated --yes
 
+  # Reconcile the main checkout, moving its addresses back to ports
+  wtm env main --addressing ports --yes
+
 Flags:
+      --addressing string    Write the main checkout's linked addresses as ports (as without wtm) or names (served by the run proxy); default: what its .env spells
       --check                Read-only drift report; write nothing
       --from string          Override the value source strategy (example, main, parent)
   -h, --help                 help for env
@@ -27,7 +31,8 @@ Flags:
       --on-conflict string   Conflict resolution with --mode refresh: keep (default) or overwrite
       --output string        Output format: text or json (default "text")
       --prune                Remove orphan keys (present in the .env but in no source)
+      --show-values          Print the values of keys wtm does not write (secrets included); withheld by default
   -y, --yes                  Skip all prompts; resolve every decision from flags and safe defaults (additions only)
 
 --- stderr ---
-Error: --output json requires --yes or --check (interactive resolution cannot run in JSON mode)
+Error: --output json requires --yes or --check (prompts cannot run in JSON mode)

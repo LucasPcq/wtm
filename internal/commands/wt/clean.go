@@ -57,6 +57,7 @@ func newCleanCmd() *cobra.Command {
 	cmd.Flags().Bool(domain.FlagDropData, false, domain.FlagDropDataDesc)
 	cmd.MarkFlagsMutuallyExclusive(domain.FlagKeepData, domain.FlagDropData)
 	shared.AddOutputFlag(cmd)
+	shared.RequireYesInJSON(cmd)
 
 	return cmd
 }
@@ -68,10 +69,6 @@ func runClean(cmd *cobra.Command, args []string) error {
 	keepData, _ := cmd.Flags().GetBool(domain.FlagKeepData)
 	dropData, _ := cmd.Flags().GetBool(domain.FlagDropData)
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
-
-	if format == domain.OutputJSON && !yes {
-		return domain.ErrCleanJSONNeedsYes
-	}
 
 	dir, err := os.Getwd()
 	if err != nil {

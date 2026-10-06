@@ -478,6 +478,26 @@ func TestPruneNothingToPrune(t *testing.T) {
 	}
 }
 
+func TestPruneDryRunWithNothingToPruneSaysItIsADryRun(t *testing.T) {
+	setupPrune(t, pruneSetup{Worktrees: []string{"live-wt"}})
+	ghtest.Stub(t, ghtest.StubParams{PRs: []ghtest.PR{
+		{Number: 1, Branch: "live-wt", State: domain.PRStateOpen},
+	}})
+
+	result, _ := runPruneJSON(t, "--"+domain.FlagDryRun)
+	if !result.DryRun || len(result.Pruned) != 0 {
+		t.Errorf("result = %+v, want an empty dry run", result)
+	}
+
+	stdout, _, err := runWtCmd(t, domain.CmdPrune, "--"+domain.FlagDryRun)
+	if err != nil {
+		t.Fatalf("human prune: %v", err)
+	}
+	if !strings.Contains(stdout, "Nothing to prune") {
+		t.Errorf("stdout = %q, want it to say nothing to prune", stdout)
+	}
+}
+
 // --- Hooks against removals -----------------------------------------------
 
 // TestPruneTearsEachWorktreeDownBeforeTheNext: each worktree goes through its

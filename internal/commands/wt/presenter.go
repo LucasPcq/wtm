@@ -187,7 +187,7 @@ type prunePresenter struct {
 func (p prunePresenter) Pruned(outcome pruneflow.Outcome) error {
 	if outcome.Empty {
 		if p.Format == domain.OutputJSON {
-			return output.WritePruneResultJSON(p.Cmd.OutOrStdout(), domain.PruneResult{})
+			return output.WritePruneResultJSON(p.Cmd.OutOrStdout(), outcome.Result)
 		}
 		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
 			output.Unchanged(w, domain.PruneNothingToPrune)
@@ -398,14 +398,16 @@ func (p relocatePresenter) Relocated(outcome relocateflow.Outcome) error {
 
 type envPresenter struct {
 	shared.CLIPresenter
+	showValues bool
 }
 
 func (p envPresenter) Reconciled(outcome envflow.Outcome) error {
+	report := output.EnvReportParams{Result: outcome.Result, ShowValues: p.showValues}
 	if p.Format == domain.OutputJSON {
-		return output.WriteEnvJSON(p.Cmd.OutOrStdout(), outcome.Result)
+		return output.WriteEnvJSON(p.Cmd.OutOrStdout(), report)
 	}
 	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-		output.PrintEnvReport(w, outcome.Result)
+		output.PrintEnvReport(w, report)
 	})
 	return nil
 }

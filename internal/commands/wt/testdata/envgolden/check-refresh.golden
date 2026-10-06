@@ -1,0 +1,58 @@
+args: feat/a --check --mode refresh
+err: the .env has drifted from its sources
+exit: 18
+--- stdout ---
+
+  ! Read-only check — run `wtm env feat/a` to reconcile.
+
+  Worktree  feat/a
+  Mode      refresh  ·  read-only check
+
+  .env   strategy: main  ·  source: main
+  + NEW_KEY        would be added from main
+  ! SHARED         conflict — local value differs from main
+  ! CLIENT_SECRET  conflict — local value differs from main
+  − ORPHAN         orphan — in no source
+
+Usage:
+  wtm env [worktree] [flags]
+
+Examples:
+  # Pick a worktree and reconcile its .env files
+  wtm env
+
+  # Read-only drift report, for a script
+  wtm env feat/login --check --output json
+
+  # Also settle the values that diverge, and drop the keys no source has
+  wtm env feat/login --mode refresh --on-conflict overwrite --prune --yes
+
+  # Give a worktree created before 0.28 its own ports and compose project
+  wtm env feat/login --isolation isolated --yes
+
+  # Reconcile the main checkout, moving its addresses back to ports
+  wtm env main --addressing ports --yes
+
+Flags:
+      --addressing string    Write the main checkout's linked addresses as ports (as without wtm) or names (served by the run proxy); default: what its .env spells
+      --check                Read-only drift report; write nothing
+      --from string          Override the value source strategy (example, main, parent)
+  -h, --help                 help for env
+      --isolation string     Switch the worktree to isolated (its own ports, compose project and namespaces) or verbatim (the values wtm owns back to the source's)
+      --mode string          Reconciliation mode: add (fill gaps) or refresh (also settle value conflicts) (default "add")
+      --on-conflict string   Conflict resolution with --mode refresh: keep (default) or overwrite
+      --output string        Output format: text or json (default "text")
+      --prune                Remove orphan keys (present in the .env but in no source)
+      --show-values          Print the values of keys wtm does not write (secrets included); withheld by default
+  -y, --yes                  Skip all prompts; resolve every decision from flags and safe defaults (additions only)
+
+--- stderr ---
+Error: the .env has drifted from its sources
+--- .env ---
+WEB_PORT=3010
+REALM=app-feat-a
+SHARED=from-worktree
+ORPHAN=1
+CLIENT_SECRET=worktree-s3cr3t
+--- isolation ---
+isolated

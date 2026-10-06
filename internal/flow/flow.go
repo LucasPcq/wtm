@@ -27,6 +27,9 @@ type Context struct {
 type Publisher interface {
 	Publish(event domain.Event)
 	Listening() bool
+	// Origin is what the daemon stamps on the job events a request causes;
+	// false when the repository cannot be named.
+	Origin() (domain.EventOrigin, bool)
 }
 
 func (c Context) Publish(event domain.Event) {
@@ -34,6 +37,19 @@ func (c Context) Publish(event domain.Event) {
 		return
 	}
 	c.Publisher.Publish(event)
+}
+
+// Origin is nil without a publisher, or a repository to name: the daemon then
+// publishes nothing about the jobs the request starts.
+func (c Context) Origin() *domain.EventOrigin {
+	if c.Publisher == nil {
+		return nil
+	}
+	origin, ok := c.Publisher.Origin()
+	if !ok {
+		return nil
+	}
+	return &origin
 }
 
 func (c Context) Listening() bool {

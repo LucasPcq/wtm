@@ -14,7 +14,8 @@ import (
 // file — what the run did to it counted, what it left for the reader named key
 // by key — and the port pass. It emits a raw body with no outer blank lines;
 // the caller's frame owns the outer padding.
-func PrintEnvReport(w io.Writer, result domain.EnvSyncResult) {
+func PrintEnvReport(w io.Writer, params EnvReportParams) {
+	result := params.Result
 	printEnvSummary(w, result)
 	Blank(w)
 	writeAlignedFields(w, rules.EnvReportFields(result))
@@ -22,20 +23,31 @@ func PrintEnvReport(w io.Writer, result domain.EnvSyncResult) {
 	for _, f := range result.Files {
 		Blank(w)
 		printEnvFile(w, envFileBlock{
-			file:     f,
-			check:    result.Check,
-			hasPorts: rules.EnvPortsMoveIn(rules.EnvPortsMoveInParams{Result: result, Target: f.Target}),
-			restored: rules.EnvRestoredRows(result.Restored, f.Target),
+			file:       f,
+			check:      result.Check,
+			managed:    rules.EnvManagedKeys(rules.EnvManagedKeysParams{Plan: result.Ports, Target: f.Target}),
+			showValues: params.ShowValues,
+			hasPorts:   rules.EnvPortsMoveIn(rules.EnvPortsMoveInParams{Result: result, Target: f.Target}),
+			restored:   rules.EnvRestoredRows(result.Restored, f.Target),
 		})
 	}
 	EnvPortsReport(w, result.Ports, result.Check)
 }
 
+type EnvReportParams struct {
+	Result domain.EnvSyncResult
+	// ShowValues prints the values of the keys wtm does not write, withheld
+	// otherwise.
+	ShowValues bool
+}
+
 type envFileBlock struct {
-	file     domain.EnvFileResult
-	check    bool
-	hasPorts bool
-	restored []string
+	file       domain.EnvFileResult
+	check      bool
+	managed    map[string]bool
+	showValues bool
+	hasPorts   bool
+	restored   []string
 }
 
 // printEnvFile renders one file block: its header, what the run did as one
@@ -61,7 +73,7 @@ func printEnvFile(w io.Writer, block envFileBlock) {
 	for _, row := range block.restored {
 		Update(w, row)
 	}
-	rows := rules.EnvKeyRows(rules.EnvKeyRowsParams{File: f, Check: check})
+	rows := rules.EnvKeyRows(rules.EnvKeyRowsParams{File: f, Check: check, Managed: block.managed, ShowValues: block.showValues})
 	for _, row := range rows {
 		printEnvKeyRow(w, row)
 	}
@@ -111,6 +123,9 @@ func printEnvSummary(w io.Writer, result domain.EnvSyncResult) {
 
 // WriteEnvJSON writes the reconciliation result as pretty-printed JSON. The
 // domain result carries its own json tags; it is never framed.
-func WriteEnvJSON(w io.Writer, result domain.EnvSyncResult) error {
-	return encodeJSON(w, result)
+func WriteEnvJSON(w io.Writer, params EnvReportParams) error {
+	if params.ShowValues {
+		return encodeJSON(w, params.Result)
+	}
+	return encodeJSON(w, rules.RedactEnvResult(params.Result))
 }

@@ -19,7 +19,7 @@ wtm events --output json | jq -c 'select(.type == "worktree.provisioned")'
 ## The contract: `--yes` and `--output json`
 
 - **`--output json`** on every data command writes one JSON document on stdout. Human text, warnings and errors go to stderr, so stdout parses as is.
-- **`--yes`** on every command that changes something, or could ask: it never prompts. A decision takes its flag, else a documented safe default that is never destructive (`sync --yes` does not push, `extract --yes` aborts on conflict, `clean --yes` leaves children orphaned unless `--reparent-children`). A required choice with no safe default is an error naming the missing flag, never a picker. JSON mode requires `--yes` on a mutating command.
+- **`--yes`** on every command that changes something, or could ask: it never prompts. A decision takes its flag, else a documented safe default that is never destructive (`sync --yes` does not push, `extract --yes` aborts on conflict, `clean --yes` leaves children orphaned unless `--reparent-children`). A required choice with no safe default is an error naming the missing flag, never a picker. JSON mode requires `--yes` on a mutating command: without it, the command exits `2` before doing anything.
 - **`--force`** is a separate axis: it lifts safety refusals (dirty, unpushed, open PR, locked, foreign data) and never implies `--yes`.
 - **`--quiet`** silences the human report only: errors, the exit code and the JSON still come through.
 
@@ -46,7 +46,7 @@ Check the exit code first, and parse stdout only when it is non-empty. A command
 | --- | --- |
 | `0` | success |
 | `1` | a generic error; `exec` when any command failed |
-| `2` | bad usage: an unknown flag or command, a value that does not parse, too many arguments |
+| `2` | bad usage: an unknown flag or command, a value or an argument that does not parse (`checkout feat/c`), two flags that cannot be combined, too many arguments, `--output json` without `--yes` |
 | `10` | the worktree or its path already exists (`create --if-not-exists` turns it into a success) |
 | `11` | the branch does not exist |
 | `12` | the repository was never initialized with wtm (`wtm init`) |

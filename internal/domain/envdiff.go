@@ -78,6 +78,9 @@ type EnvKeyDiff struct {
 	Source        string       `json:"source,omitempty"`
 	Export        bool         `json:"export,omitempty"`
 	Action        EnvKeyAction `json:"action,omitempty"`
+	// Redacted says a value was withheld: the key is not one wtm writes, and
+	// the report was not asked to show values.
+	Redacted bool `json:"redacted,omitempty"`
 	// SourceLine is the line an added key is copied from, so it lands quoted
 	// and commented the way its source wrote it.
 	SourceLine EnvLine `json:"-"`

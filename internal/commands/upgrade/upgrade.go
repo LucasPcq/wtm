@@ -53,6 +53,7 @@ func NewCmd(params NewCmdParams) *cobra.Command {
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip the confirmation prompt")
 	cmd.Flags().String(domain.FlagVersionPin, "", "Install a specific release instead of the latest (standalone installs only)")
 	shared.AddOutputFlag(cmd)
+	shared.RequireYesInJSON(cmd, domain.FlagCheck)
 
 	return cmd
 }
@@ -62,10 +63,6 @@ func run(cmd *cobra.Command, version string) error {
 	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
 	pin, _ := cmd.Flags().GetString(domain.FlagVersionPin)
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
-
-	if format == domain.OutputJSON && !yes && !check {
-		return errors.New(domain.UpgradeJSONNeedsYes)
-	}
 
 	install := selfupdate.DetectInstall(version)
 	if install.Method == domain.InstallSource {

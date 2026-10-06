@@ -11,9 +11,15 @@ parent); --from overrides it for one run. When run.toml declares ports, the
 values wtm owns are then settled on the worktree's isolation.
 
 Pass a worktree, or omit it to pick one. --check reports and writes nothing.
+A report prints only the values wtm writes (ports, owned values); the others,
+secrets included, are withheld unless --show-values.
 Unattended (--yes, no terminal, --output json) it applies safe additions only:
-conflicts need --on-conflict, orphans --prune. --isolation switches the worktree
-to isolated or verbatim, recorded once its .env is in line — see the isolation guide.
+conflicts need --on-conflict, orphans --prune.
+
+A run keeps how the worktree runs unless asked: the wizard offers to switch a
+worktree between isolated and verbatim (--isolation), and the main checkout
+between port and named addresses (--addressing) — see the isolation and
+addressing guides.
 
 ```
 wtm env [worktree] [flags]
@@ -33,11 +39,15 @@ wtm env [worktree] [flags]
 
   # Give a worktree created before 0.28 its own ports and compose project
   wtm env feat/login --isolation isolated --yes
+
+  # Reconcile the main checkout, moving its addresses back to ports
+  wtm env main --addressing ports --yes
 ```
 
 ### Options
 
 ```
+      --addressing string    Write the main checkout's linked addresses as ports (as without wtm) or names (served by the run proxy); default: what its .env spells
       --check                Read-only drift report; write nothing
       --from string          Override the value source strategy (example, main, parent)
   -h, --help                 help for env
@@ -46,6 +56,7 @@ wtm env [worktree] [flags]
       --on-conflict string   Conflict resolution with --mode refresh: keep (default) or overwrite
       --output string        Output format: text or json (default "text")
       --prune                Remove orphan keys (present in the .env but in no source)
+      --show-values          Print the values of keys wtm does not write (secrets included); withheld by default
   -y, --yes                  Skip all prompts; resolve every decision from flags and safe defaults (additions only)
 ```
 

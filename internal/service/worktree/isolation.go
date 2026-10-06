@@ -72,6 +72,11 @@ func mainIsolation(isolation domain.Isolation) error {
 	return nil
 }
 
+// IsMain says whether the branch is the one the main checkout has out.
+func IsMain(ref WorktreeRef) (bool, error) {
+	return isMainBranch(ref)
+}
+
 func isMainBranch(ref WorktreeRef) (bool, error) {
 	worktrees, err := infra.ListWorktrees(infra.ListWorktreesParams{ProjectDir: ref.ProjectDir})
 	if err != nil {

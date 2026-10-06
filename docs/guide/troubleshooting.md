@@ -138,4 +138,6 @@ wtm env feat/login --mode refresh --on-conflict overwrite --yes   # also overwri
 wtm env feat/login --prune --yes                             # drop keys no source has any more
 ```
 
-The values come from the strategy the worktree was created with (`example`, `main` or `parent`); `--from` overrides it for one run. The ports and addresses `run.toml` links are settled on the worktree's own at the same time. `wtm env main` does the same for the main checkout.
+The values come from the strategy the worktree was created with (`example`, `main` or `parent`); `--from` overrides it for one run. The ports and addresses `run.toml` links are settled on the worktree's own at the same time. `wtm env main` does the same for the main checkout, keeping the addressing its `.env` spells unless `--addressing` says otherwise.
+
+The report prints only the values wtm writes itself: the linked ports and addresses (with a URL's password masked), `COMPOSE_PROJECT_NAME` and the `[[env]]` values. Every other value, secrets included, is withheld, so the report and its `--output json` are safe to paste into a log or an agent's context; a conflict reads "local value differs from main". `--show-values` prints them all.

@@ -44,6 +44,7 @@ against the new configuration.`,
 	}
 	shared.AddYesFlag(cmd, "Replace run.toml without confirming")
 	shared.AddOutputFlag(cmd)
+	shared.RequireYesInJSON(cmd)
 	return cmd
 }
 
@@ -60,9 +61,6 @@ func runImport(cmd *cobra.Command, args []string) error {
 
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
-	if format == domain.OutputJSON && !yes {
-		return fmt.Errorf(domain.ImportJSONNeedsYesFmt, domain.FlagOutput, domain.OutputJSON, domain.FlagYes)
-	}
 
 	data, err := readImportSource(args)
 	if err != nil {

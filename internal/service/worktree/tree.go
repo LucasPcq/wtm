@@ -6,6 +6,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/service/github"
 )
 
 // BuildTreeParams holds inputs for assembling the worktree forest.
@@ -13,9 +14,9 @@ type BuildTreeParams struct {
 	ProjectDir string
 	StateDir   string
 	Config     domain.Config
-	// PRs is the optional PR set (all states) fetched by the command when
-	// --with-prs is set. Empty means PR annotations are omitted.
-	PRs []domain.PRInfo
+	// WithPRs annotates each worktree with its newest pull request, whatever
+	// its state. Without gh, the annotations are omitted.
+	WithPRs bool
 }
 
 // BuildTree assembles the rendered forest of worktrees: it loads the parent
@@ -28,6 +29,7 @@ func BuildTree(params BuildTreeParams) (domain.Forest, error) {
 	if err != nil {
 		return domain.Forest{}, err
 	}
+	awaitPRs := startTreePRLookup(treePRLookupParams{ProjectDir: params.ProjectDir, Nodes: nodes, WithPRs: params.WithPRs})
 
 	statuses, err := List(domain.ListParams{
 		ProjectDir: params.ProjectDir,
@@ -43,6 +45,7 @@ func BuildTree(params BuildTreeParams) (domain.Forest, error) {
 	}
 
 	needsSync := computeNeedsSync(nodes)
+	prs := awaitPRs()
 
 	forestNodes := make([]rules.ForestNode, 0, len(nodes))
 	for _, n := range nodes {
@@ -62,7 +65,7 @@ func BuildTree(params BuildTreeParams) (domain.Forest, error) {
 				OriginAhead:      st.OriginAhead,
 				OriginBehind:     st.OriginBehind,
 				OriginState:      st.OriginState,
-				PR:               matchTreePR(n.Branch, params.PRs),
+				PR:               matchTreePR(n.Branch, prs),
 			},
 		})
 	}
@@ -70,6 +73,31 @@ func BuildTree(params BuildTreeParams) (domain.Forest, error) {
 	return rules.BuildForest(rules.BuildForestParams{
 		Nodes: forestNodes,
 	}), nil
+}
+
+type treePRLookupParams struct {
+	ProjectDir string
+	Nodes      []domain.WorktreeNode
+	WithPRs    bool
+}
+
+// startTreePRLookup asks GitHub while the tree's git probes run.
+func startTreePRLookup(params treePRLookupParams) func() []domain.PRInfo {
+	if !params.WithPRs {
+		return func() []domain.PRInfo { return nil }
+	}
+	branches := make([]string, 0, len(params.Nodes))
+	for _, node := range params.Nodes {
+		if node.Branch != "" {
+			branches = append(branches, node.Branch)
+		}
+	}
+	done := make(chan []domain.PRInfo, 1)
+	go func() {
+		prs, _ := github.ListPRsOfBranches(github.ListPRsOfBranchesParams{ProjectDir: params.ProjectDir, Branches: branches})
+		done <- prs
+	}()
+	return sync.OnceValue(func() []domain.PRInfo { return <-done })
 }
 
 // computeNeedsSync probes, per non-main worktree, whether its parent tip has

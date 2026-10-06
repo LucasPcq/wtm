@@ -8,7 +8,7 @@ import (
 
 // eventHub relays events it never reads: the payload is opaque, so a daemon of
 // an older build relays types it does not know, and the daemon stays blind to
-// the git state the events describe.
+// the git state the events describe. publishJob is its one writer of its own.
 type eventHub struct {
 	mu     sync.Mutex
 	subs   map[int]*eventSub

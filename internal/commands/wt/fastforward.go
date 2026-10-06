@@ -40,6 +40,7 @@ func newFastForwardCmd() *cobra.Command {
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (requires branch args or --all)")
 	cmd.Flags().Bool(domain.FlagForce, false, "Fast-forward a worktree that has uncommitted changes")
 	shared.AddOutputFlag(cmd)
+	shared.RequireYesInJSON(cmd)
 
 	return cmd
 }
@@ -51,10 +52,7 @@ func runFastForward(cmd *cobra.Command, args []string) error {
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 
 	if all && len(args) > 0 {
-		return fmt.Errorf("--%s cannot be combined with branch arguments", domain.FlagAll)
-	}
-	if format == domain.OutputJSON && !yes {
-		return fmt.Errorf("--output json requires --%s (the confirmation cannot run in JSON mode)", domain.FlagYes)
+		return rules.Usage(fmt.Errorf("--%s cannot be combined with branch arguments", domain.FlagAll))
 	}
 
 	dir, err := os.Getwd()

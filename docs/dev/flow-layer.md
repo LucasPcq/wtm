@@ -161,7 +161,7 @@ type Step struct {
 
 `flowui` renders every kind; the dashboard's modal renders all but `StepEnvResolve` and refuses an unknown kind (`domain.DashboardUnsupportedStepFmt`) rather than guessing. **A kind that is drawn must be read back**: a kind rendered but not read answers empty, and the flow writes that absence as if it were the answer. `TestEveryDrawableKindIsReadBack` (`internal/tui/flowui`) pins it. Adding a kind means teaching every surface that runs a flow using it.
 
-**`StepContent`** is what may depend on earlier answers (`Title`, `Options`, `Default`, `Start`, `ExcludeBranches`, `Pinned`, `Banner`, `Blockers`, …). `flow.MergeContent` lays it over the step's static fields, and both surfaces read it through there. A `Load` runs while the step is on screen, so a slow source (`gh`, a worktree's changes) never blocks the wizard.
+**`StepContent`** is what may depend on earlier answers (`Title`, `Options`, `Default`, `Start`, `ExcludeBranches`, `Pinned`, `Banner`, `Blockers`, …). `flow.MergeContent` lays it over the step's static fields, and both surfaces read it through there. A `Load` runs while the step is on screen, so a slow source (`gh`, a worktree's changes) never blocks the wizard. A `Build` runs twice: once before the session's first question, with only the presets known, then again when its step is reached. **A `Build` that reads an earlier answer returns empty content while that answer is missing, never an error**: an error from that first pass aborts the whole session before anything is drawn. `ScriptedPrompter` makes the same first pass, so a flow test catches it.
 
 **`Blockers`** are the safety refusals standing in the way of a step's dangerous option, each named on its own (`Key`, `Label`) instead of folded into prose. `rules.CleanBlockers` produces them, `internal/flow/clean/steps.go` attaches them to the delete step, and the dashboard renders each as a checkbox to tick before the dangerous option becomes submittable.
 
@@ -297,7 +297,7 @@ A hook phase reports through `flow.HookSink`: `Output`, the raw stream, and `OnH
 
 ## Publishing what a flow changed
 
-Every change to a worktree's identity is published from the flow that made it, never from the service, through `internal/flow/publish` (how the bus works: [architecture.md](architecture.md#the-event-bus--the-daemon-relays-the-flows-speak)). The point is right after the mutator succeeded:
+Every change to a worktree's identity is published from the flow that made it, never from the service, through `internal/flow/publish` (how the bus works: [architecture.md](architecture.md#the-event-bus--the-daemon-relays-the-flows-speak-the-jobs-report)). The point is right after the mutator succeeded:
 
 | Event | Published by |
 | -- | -- |
@@ -322,7 +322,7 @@ prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{
 recorder := &flowtest.Recorder{}
 ```
 
-- **`ScriptedPrompter`** walks the session as a real host does — presets, `Skip`, `Build`/`Load`, `Validate`/`ValidateSet`/`ValidateEntry` — and answers from `Answers`, `Sets` (set kinds) or `EnvDecisions`. It records `Asked` (`AskedKeys()` for a one-line assertion) and the `Content` each step produced, so a test can assert on what the user would have seen. A step with nothing scripted is an error, so a new question cannot slip in unnoticed. `Abort` makes `Ask` return `ErrUserAborted`; `Confirmed` answers every `Confirm`.
+- **`ScriptedPrompter`** walks the session as a real host does — presets, `Skip`, `Build`/`Load`, `Validate`/`ValidateSet`/`ValidateEntry` — and answers from `Answers`, `Sets` (set kinds) or `EnvDecisions`. It records `Asked` (`AskedKeys()` for a one-line assertion) and the `Content` each step produced, so a test can assert on what the user would have seen. A step with nothing scripted is an error, so a new question cannot slip in unnoticed. Like `flowui`, it first builds every step from the presets alone and fails on a `Build` that errors there. `Abort` makes `Ask` return `ErrUserAborted`; `Confirmed` answers every `Confirm`.
 - **`Recorder`** implements `flow.Presenter`, collecting `Stages`, `Hooks`, `Beats`, `Notices` and `Statuses`, and runs `Work()` and `Run(sink)` for real. It is also a `flow.Publisher`: set it as the `Context`'s `Publisher` and `Published` / `PublishedTypes()` hold every event (`Unheard` simulates nobody listening). The `emits` rule requires such a test in every package that calls a mutator.
 
 The typed conclusion is not part of `Recorder`; a test embeds it and adds the command's methods:

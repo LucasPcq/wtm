@@ -113,3 +113,13 @@ type FastForwardBlocker struct {
 	Key   string
 	Label string
 }
+
+// Upstream is what a local branch tracks, as `git for-each-ref` reads it: empty
+// fields for a branch with no upstream. Gone is git's "[gone]": an upstream
+// configured whose remote-tracking ref no longer exists.
+type Upstream struct {
+	Remote      string
+	RemoteRef   string
+	TrackingRef string
+	Gone        bool
+}
