@@ -36,6 +36,10 @@ func (p *ScriptedPrompter) Ask(session flow.Session) (flow.Answers, error) {
 		p.Content = map[string]flow.StepContent{}
 	}
 
+	if err := buildBeforeAsking(session); err != nil {
+		return flow.Answers{}, err
+	}
+
 	answers := session.Presets
 	for _, step := range session.Steps {
 		if _, known := answers.Get(step.Key); known {
@@ -90,6 +94,21 @@ func (p *ScriptedPrompter) Ask(session flow.Session) (flow.Answers, error) {
 		answers = answers.With(step.Key, flow.Answer{Value: value, Asked: true})
 	}
 	return answers, nil
+}
+
+// buildBeforeAsking is the pass the wizard makes before it opens: every step is
+// built from the presets alone, so a Build that fails on an answer not given yet
+// aborts the session before its first question.
+func buildBeforeAsking(session flow.Session) error {
+	for _, step := range session.Steps {
+		if _, preset := session.Presets.Get(step.Key); preset || step.Build == nil {
+			continue
+		}
+		if _, err := step.Build(session.Presets); err != nil {
+			return fmt.Errorf("step %q cannot be built before the session opens: %w", step.Key, err)
+		}
+	}
+	return nil
 }
 
 func stepContent(step flow.Step, answers flow.Answers) (flow.StepContent, error) {

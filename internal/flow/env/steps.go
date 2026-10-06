@@ -87,7 +87,7 @@ func (f *envFlow) isolationStep() flow.Step {
 			}
 			return true, domain.IsolationStepIrrelevant
 		},
-		Build: func(answers flow.Answers) (flow.StepContent, error) {
+		Build: afterWorktree(func(answers flow.Answers) (flow.StepContent, error) {
 			state, err := f.answeredState(answers)
 			if err != nil {
 				return flow.StepContent{}, err
@@ -101,7 +101,7 @@ func (f *envFlow) isolationStep() flow.Step {
 				content.Description = domain.IsolationAdoptDescription
 			}
 			return content, nil
-		},
+		}),
 		Resolve: keep,
 		Summarize: func(answer flow.Answer) string {
 			if answer.Value == domain.EnvKeepValue {
@@ -151,7 +151,7 @@ func (f *envFlow) addressingStep() flow.Step {
 			}
 			return true, domain.EnvAddressingSkip
 		},
-		Build: func(answers flow.Answers) (flow.StepContent, error) {
+		Build: afterWorktree(func(answers flow.Answers) (flow.StepContent, error) {
 			state, err := f.answeredState(answers)
 			if err != nil {
 				return flow.StepContent{}, err
@@ -161,7 +161,7 @@ func (f *envFlow) addressingStep() flow.Step {
 				Description: domain.EnvAddressingDescription,
 				Options:     addressingOptions(state.current),
 			}, nil
-		},
+		}),
 		Resolve: keep,
 		Summarize: func(answer flow.Answer) string {
 			if answer.Value == domain.EnvKeepValue {
@@ -182,6 +182,17 @@ func addressingOptions(current domain.Addressing) []flow.Option {
 	return []flow.Option{
 		{Label: domain.EnvAddressingKeepNames, Value: domain.EnvKeepValue},
 		{Label: domain.EnvAddressingToPorts, Value: string(domain.AddressingPorts)},
+	}
+}
+
+// afterWorktree builds a step only once the worktree is answered: the wizard
+// builds every step before its first question, when none is yet.
+func afterWorktree(build func(flow.Answers) (flow.StepContent, error)) func(flow.Answers) (flow.StepContent, error) {
+	return func(answers flow.Answers) (flow.StepContent, error) {
+		if answers.Value(KeyWorktree) == "" {
+			return flow.StepContent{}, nil
+		}
+		return build(answers)
 	}
 }
 
@@ -208,7 +219,7 @@ func (f *envFlow) resolveStep() flow.Step {
 			}
 			return true, domain.EnvResolveSkipReason
 		},
-		Build: func(answers flow.Answers) (flow.StepContent, error) {
+		Build: afterWorktree(func(answers flow.Answers) (flow.StepContent, error) {
 			scan, err := f.scanOf(answers)
 			if err != nil {
 				return flow.StepContent{}, err
@@ -221,7 +232,7 @@ func (f *envFlow) resolveStep() flow.Step {
 					Prune:     f.request.Prune,
 				},
 			}, nil
-		},
+		}),
 		Resolve: func(flow.Answers) (flow.Answer, error) {
 			return flow.Answer{}, nil
 		},
@@ -242,7 +253,7 @@ func (f *envFlow) recapStep() flow.Step {
 			applies, err := f.applies(answers)
 			return err == nil && !applies, ""
 		},
-		Build: func(answers flow.Answers) (flow.StepContent, error) {
+		Build: afterWorktree(func(answers flow.Answers) (flow.StepContent, error) {
 			description, err := f.recap(answers)
 			if err != nil {
 				return flow.StepContent{}, err
@@ -251,7 +262,7 @@ func (f *envFlow) recapStep() flow.Step {
 				Description: description,
 				Options:     []flow.Option{{Label: domain.EnvApplyActionLabel, Value: domain.EnvApplyValue}},
 			}, nil
-		},
+		}),
 		Resolve: func(flow.Answers) (flow.Answer, error) {
 			return flow.Answer{Value: domain.EnvApplyValue}, nil
 		},
