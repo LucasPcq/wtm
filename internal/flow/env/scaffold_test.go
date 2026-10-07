@@ -63,9 +63,15 @@ func TestTheWizardRebuildsAMissingEnvWithoutAskingForItsPlaceholders(t *testing.
 	if _, err := os.Stat(filepath.Join(path, ".env")); err != nil {
 		t.Errorf(".env not rebuilt: %v", err)
 	}
-	for _, key := range prompter.Asked {
-		if key == KeyResolve {
-			t.Errorf("asked %s: a rebuilt file has nothing to resolve", prompter.AskedKeys())
+	if prompter.AskedKeys() != "env.worktree,env.isolation,env.recap" {
+		t.Errorf("asked %s, want no resolver for a rebuilt file and the recap before it is written", prompter.AskedKeys())
+	}
+	if recap := prompter.Content[KeyRecap].Description; !strings.Contains(recap, ".env: create from template") {
+		t.Errorf("recap lacks the file it creates:\n%s", recap)
+	}
+	for _, option := range prompter.Content[KeyWorktree].Options {
+		if option.Value == "feat/a" && (len(option.Badges) == 0 || option.Badges[len(option.Badges)-1].Text == domain.EnvBadgeInSync) {
+			t.Errorf("feat/a badges = %+v, want the missing file counted as a change", option.Badges)
 		}
 	}
 }

@@ -4802,6 +4802,7 @@ const (
 	// lacked, rebuilt by `wtm env` from the copy create would have made.
 	EnvFileCreatedFmt        = "created from %s"
 	EnvFileWouldCreateFmt    = "missing: wtm env creates it from %s"
+	EnvRecapCreatedFmt       = "%s: create from %s"
 	StatusLoading            = "Reading the worktree's state…"
 	StatusAllWithWorktreeMsg = "--all reads every worktree: drop the [worktree] argument"
 )
