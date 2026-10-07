@@ -26,7 +26,7 @@ $ wtm status feat/x
 
 `ports` says which ports the worktree binds: `+10` is its offset from the main checkout's ports, `base` the main checkout's own, `source's` a verbatim worktree sharing its source's. A worktree created before the [isolation](isolation.md) choice reads `not chosen`.
 
-Without an argument it reads the worktree you are in. `wtm status --all` reads every worktree of the repository as a table, then names each problem under the worktree it belongs to:
+Without an argument, in a terminal, it opens the same worktree picker as the `run` commands, the cursor on the worktree you are in: Enter reads that one, and you can pick any other from wherever you stand (Esc backs out). Without a terminal, with `--output json`, `--quiet` or `--yes`, it reads the worktree you are in and asks nothing. `wtm status --all` reads every worktree of the repository as a table, then names each problem under the worktree it belongs to:
 
 ```
 $ wtm status --all
@@ -55,7 +55,7 @@ Without a `run.toml`, the table keeps only the `ENV` column.
 
 ## What it never does
 
-It changes nothing and asks nothing, so it needs no `--yes`, in JSON either. It never starts the run daemon: when none is running, it reads the job index the daemon keeps and checks each process itself, so a job that died with the daemon reads `crashed` rather than `running`. It never numbers a worktree no run has numbered yet (its offset and addresses are then left out). And it never prints a value from a `.env` file: it only checks which files exist.
+It changes nothing, and asks nothing but that picker, so it needs no `--yes`, in JSON either. It never starts the run daemon: when none is running, it reads the job index the daemon keeps and checks each process itself, so a job that died with the daemon reads `crashed` rather than `running`. It never numbers a worktree no run has numbered yet (its offset and addresses are then left out). And it never prints a value from a `.env` file: it only checks which files exist.
 
 It exits `0` whatever it finds. A script reads `problems` in the JSON document rather than the exit code.
 

@@ -9,9 +9,11 @@ Read one worktree's state in one document: its branch and path, how it runs
 job run.toml declares with its state (the states `wtm events` reports) and its
 address, and each problem found with the exact command that fixes it.
 
-[worktree] defaults to the current one. It changes nothing, asks nothing, never
-starts the run daemon (with none running it reads the job index and checks the
-processes itself) and needs no --yes. No .env value appears in its output.
+Without [worktree], a terminal opens the worktree picker on the current one;
+anywhere else (no terminal, --output json, --quiet, --yes) it reads the current one and
+asks nothing. It changes nothing, never starts the run daemon (with none running
+it reads the job index and checks the processes itself) and needs no --yes.
+No .env value appears in its output.
 It exits 0 whatever it finds: read `problems`.
 
 ```
@@ -38,6 +40,7 @@ wtm status [worktree] [flags]
       --all             Read every worktree of the repository (JSON: an array of the same documents)
   -h, --help            help for status
       --output string   Output format: text or json (default "text")
+  -y, --yes             Skip the worktree picker: read the current worktree (never required, JSON included)
 ```
 
 ### Options inherited from parent commands

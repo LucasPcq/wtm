@@ -9,8 +9,10 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/run/target"
 	"github.com/LucasPcq/wtm/internal/flow/status"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
+	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 	"github.com/LucasPcq/wtm/internal/testutil/globaldir"
 )
@@ -96,7 +98,7 @@ func TestStatusReadsTheCurrentWorktreeWithTheStateOfEveryDeclaredJob(t *testing.
 	f := setup(t)
 	exit := 1
 
-	doc, err := status.Run(status.Params{
+	doc, err := runStatus(status.Params{
 		Context: f.ctx,
 		Request: status.Request{Cwd: f.repo},
 		Jobs: jobs(
@@ -141,7 +143,7 @@ func toStrings(codes []domain.StatusProblemCode) []string {
 func TestStatusNeverPutsAnEnvValueInTheDocument(t *testing.T) {
 	f := setup(t)
 
-	doc, err := status.Run(status.Params{Context: f.ctx, Request: status.Request{Cwd: f.repo}, Jobs: jobs()})
+	doc, err := runStatus(status.Params{Context: f.ctx, Request: status.Request{Cwd: f.repo}, Jobs: jobs()})
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
@@ -157,7 +159,7 @@ func TestStatusNeverPutsAnEnvValueInTheDocument(t *testing.T) {
 func TestANamedWorktreeMissingAnEnvFileIsToldToRunEnv(t *testing.T) {
 	f := setup(t)
 
-	doc, err := status.Run(status.Params{Context: f.ctx, Request: status.Request{Worktree: "feat/x", Cwd: f.repo}, Jobs: jobs()})
+	doc, err := runStatus(status.Params{Context: f.ctx, Request: status.Request{Worktree: "feat/x", Cwd: f.repo}, Jobs: jobs()})
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
@@ -175,7 +177,7 @@ func TestANamedWorktreeMissingAnEnvFileIsToldToRunEnv(t *testing.T) {
 func TestStatusNeverNumbersTheWorktreeItReads(t *testing.T) {
 	f := setup(t)
 
-	doc, err := status.Run(status.Params{Context: f.ctx, Request: status.Request{Cwd: f.linked}, Jobs: jobs()})
+	doc, err := runStatus(status.Params{Context: f.ctx, Request: status.Request{Cwd: f.linked}, Jobs: jobs()})
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
@@ -198,7 +200,7 @@ func TestStatusNeverNumbersTheWorktreeItReads(t *testing.T) {
 func TestStatusAllReadsEveryWorktree(t *testing.T) {
 	f := setup(t)
 
-	docs, err := status.RunAll(status.Params{Context: f.ctx, Request: status.Request{Cwd: f.repo}, Jobs: jobs()})
+	docs, err := status.RunAll(unattended(status.Params{Context: f.ctx, Request: status.Request{Cwd: f.repo}, Jobs: jobs()}))
 	if err != nil {
 		t.Fatalf("status --all: %v", err)
 	}
@@ -214,12 +216,72 @@ func TestWithoutRunTomlTheJobsAndAddressesAreEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	doc, err := status.Run(status.Params{Context: f.ctx, Request: status.Request{Cwd: f.repo}, Jobs: jobs()})
+	doc, err := runStatus(status.Params{Context: f.ctx, Request: status.Request{Cwd: f.repo}, Jobs: jobs()})
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
 
 	if doc.RunConfig || doc.Addressing != nil || doc.Offset != nil || len(doc.Jobs) != 0 || doc.Jobs == nil {
 		t.Errorf("doc = %+v, want no run part and an empty jobs list", doc)
+	}
+}
+
+func unattended(params status.Params) status.Params {
+	params.Prompter = flow.Unattended{}
+	params.Presenter = &flowtest.Recorder{}
+	return params
+}
+
+// runStatus is a run nobody can be asked in: no terminal, JSON or --quiet.
+func runStatus(params status.Params) (domain.StatusDocument, error) {
+	outcome, err := status.Run(unattended(params))
+	return outcome.Document, err
+}
+
+// Without a positional, a fully interactive run asks which worktree with the
+// run module's own picker, opened on the one it was launched from.
+func TestTheInteractiveRunPicksTheWorktreeOpenedOnTheCurrentOne(t *testing.T) {
+	f := setup(t)
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{target.KeyWorktree: f.linked}}
+
+	outcome, err := status.Run(status.Params{Context: f.ctx, Request: status.Request{Cwd: f.repo}, Prompter: prompter, Presenter: &flowtest.Recorder{}, Jobs: jobs()})
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+
+	if prompter.AskedKeys() != target.KeyWorktree {
+		t.Errorf("asked %s, want the worktree picker alone", prompter.AskedKeys())
+	}
+	if start := prompter.Content[target.KeyWorktree].Start; start != f.repo {
+		t.Errorf("picker opens on %q, want the current worktree %q", start, f.repo)
+	}
+	if outcome.Document.Branch != "feat/x" {
+		t.Errorf("branch = %q, want the picked worktree", outcome.Document.Branch)
+	}
+}
+
+func TestAPositionalAnswersThePickerWithoutAsking(t *testing.T) {
+	f := setup(t)
+	prompter := &flowtest.ScriptedPrompter{}
+
+	outcome, err := status.Run(status.Params{Context: f.ctx, Request: status.Request{Worktree: "feat/x", Cwd: f.repo}, Prompter: prompter, Presenter: &flowtest.Recorder{}, Jobs: jobs()})
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	if len(prompter.Asked) != 0 || outcome.Document.Branch != "feat/x" {
+		t.Errorf("asked %v, branch %q; want feat/x and no question", prompter.Asked, outcome.Document.Branch)
+	}
+}
+
+func TestBackingOutOfThePickerReadsNothing(t *testing.T) {
+	f := setup(t)
+	recorder := &flowtest.Recorder{}
+
+	outcome, err := status.Run(status.Params{Context: f.ctx, Request: status.Request{Cwd: f.repo}, Prompter: &flowtest.ScriptedPrompter{Abort: true}, Presenter: recorder, Jobs: jobs()})
+	if err != nil || !outcome.Aborted {
+		t.Fatalf("outcome = %+v, err = %v; want an abort", outcome, err)
+	}
+	if len(recorder.Stages) != 0 {
+		t.Errorf("stages = %v, want nothing read after the abort", recorder.Stages)
 	}
 }

@@ -1,8 +1,10 @@
 // Package status runs the `wtm status` flow: a worktree's whole state, read
-// without asking, numbering, waking or writing anything.
+// without numbering, waking or writing anything. The only question it asks is
+// which worktree, and only a fully interactive run asks it.
 package status
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -18,7 +20,8 @@ import (
 )
 
 type Request struct {
-	// Worktree is the positional as it was typed; Cwd answers for it when empty.
+	// Worktree is the positional as it was typed; Cwd is the worktree the
+	// picker opens on, and the answer when nobody is asked.
 	Worktree string
 	Cwd      string
 }
@@ -26,34 +29,92 @@ type Request struct {
 type Params struct {
 	Context flow.Context
 	Request Request
+	// Prompter asks which worktree only in a fully interactive run; Unattended
+	// takes the current one, which keeps every other path question-free.
+	Prompter  flow.Prompter
+	Presenter flow.Presenter
 	// Jobs is what is up, machine-wide; nil reads it without waking the daemon.
 	Jobs func() []domain.JobInfo
 }
 
-func Run(params Params) (domain.StatusDocument, error) {
+type Outcome struct {
+	Document domain.StatusDocument
+	Aborted  bool
+}
+
+func Run(params Params) (Outcome, error) {
 	named, err := target.Named(target.ResolveParams{ProjectDir: params.Context.ProjectDir, Query: params.Request.Worktree})
 	if err != nil {
-		return domain.StatusDocument{}, err
+		return Outcome{}, err
 	}
-	workDir := target.WorkDir(target.WorkDirParams{Named: named, Cwd: params.Request.Cwd})
+	answers, err := params.Prompter.Ask(session(sessionParams{Params: params, Named: named}))
+	if errors.Is(err, domain.ErrUserAborted) {
+		params.Presenter.Notice(flow.AbortedNotice)
+		return Outcome{Aborted: true}, nil
+	}
+	if err != nil {
+		return Outcome{}, err
+	}
+
+	workDir := target.WorkDir(target.WorkDirParams{Answers: answers, Named: named, Cwd: params.Request.Cwd})
 	branch := target.NamedBranch(target.NamedBranchParams{Named: namedList(named), Dir: workDir})
 	if branch == "" {
-		return domain.StatusDocument{}, fmt.Errorf("%w: %s", domain.ErrStatusDetached, workDir)
+		return Outcome{}, fmt.Errorf("%w: %s", domain.ErrStatusDetached, workDir)
 	}
-	identity, err := worktree.Identity(refOf(params.Context, branch))
-	if err != nil {
-		return domain.StatusDocument{}, err
+	var doc domain.StatusDocument
+	err = params.Presenter.Stage(flow.StageParams{
+		Message: domain.StatusLoading,
+		Work: func() error {
+			identity, err := worktree.Identity(refOf(params.Context, branch))
+			if err != nil {
+				return err
+			}
+			r, err := open(params)
+			if err != nil {
+				return err
+			}
+			doc, err = r.document(identity)
+			return err
+		},
+	})
+	return Outcome{Document: doc}, err
+}
+
+type sessionParams struct {
+	Params
+	Named *target.Resolved
+}
+
+// session is the run module's own worktree question, opened on the current
+// worktree: a positional answers it, and so does the current worktree when
+// nobody can be asked.
+func session(params sessionParams) flow.Session {
+	return flow.Session{
+		ErrLabel: domain.CmdStatus,
+		Presets:  target.Presets(target.PresetParams{Named: params.Named}),
+		Steps: []flow.Step{target.WorktreeStep(target.WorktreeParams{
+			ProjectDir: params.Context.ProjectDir,
+			Current:    params.Request.Cwd,
+		})},
 	}
-	r, err := open(params)
-	if err != nil {
-		return domain.StatusDocument{}, err
-	}
-	return r.document(identity)
 }
 
 // RunAll is every worktree of the repository a branch names, main first as
-// git lists it; the jobs are read once for all of them.
+// git lists it; the jobs are read once for all of them. It asks nothing.
 func RunAll(params Params) ([]domain.StatusDocument, error) {
+	var docs []domain.StatusDocument
+	err := params.Presenter.Stage(flow.StageParams{
+		Message: domain.StatusLoading,
+		Work: func() error {
+			var err error
+			docs, err = readAll(params)
+			return err
+		},
+	})
+	return docs, err
+}
+
+func readAll(params Params) ([]domain.StatusDocument, error) {
 	identities, err := worktree.Identities(worktree.IdentitiesParams{ProjectDir: params.Context.ProjectDir, StateDir: params.Context.StateDir})
 	if err != nil {
 		return nil, err

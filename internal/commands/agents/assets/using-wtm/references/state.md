@@ -7,7 +7,7 @@ wtm status [worktree] --output json      # one worktree: the current one when om
 wtm status --all --output json           # every worktree: an array of the same documents
 ```
 
-It changes nothing, asks nothing and needs no `--yes`. It never starts the run daemon: with none running, it reads the job index and checks the processes itself. It never writes a `.env` value into its output. It **exits `0` whatever it finds**: branch on `problems`, not on the exit code. `--all` with a `[worktree]` is a usage error (exit `2`).
+It changes nothing and needs no `--yes`. Run without a terminal or with `--output json`, it never asks: an omitted `[worktree]` is the current directory's (a human in a terminal gets a worktree picker instead). It never starts the run daemon: with none running, it reads the job index and checks the processes itself. It never writes a `.env` value into its output. It **exits `0` whatever it finds**: branch on `problems`, not on the exit code. `--all` with a `[worktree]` is a usage error (exit `2`).
 
 ## The document
 
