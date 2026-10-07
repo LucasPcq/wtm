@@ -10,7 +10,7 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 ### Fixed
 
-- **`wtm env`** masks the passwords it still printed: the values `--isolation verbatim` restores, `[[env]]` keys in JSON, and multi-host, DSN (`password=`) and unparsable URLs, also in the text conflict lines and `env_ports`. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
+- **`wtm env`** masks the passwords it still printed: the values `--isolation verbatim` restores, `[[env]]` keys in JSON, and multi-host, unparsable or scheme-less URLs (`user:pass@host`), commas in a password, and `password=` / `Pwd=` pairs in any connection-string format, also in the text conflict lines and `env_ports`. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
 - **`wtm env`** reports what it changes: a verbatim switch shows the port that moved in an origin list, `--check` names the `[[env]]` key it would rewrite, and the wizard previews an overwrite on the worktree's own port. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
 
 ## [0.29.2] - 2026-10-06

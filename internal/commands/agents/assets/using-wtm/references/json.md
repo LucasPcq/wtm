@@ -65,7 +65,7 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 - Entry `status`: `rewrite` or `unchanged` are settled values. `missing_key`, `base_not_found`, `ambiguous`, `foreign_host`, `secure_scheme` are values wtm left alone (a refusal to report).
 - `foreign_host`: where a value pointed that the proxy does not serve.
 - `owned`: the values wtm writes whole (`COMPOSE_PROJECT_NAME`, `[[env]]`).
-- `current_value` / `new_value`: every password a value carries is masked as `***` — a URL's (`postgres://app:***@localhost:5442/db`), each URL of a comma-separated list, a `password=` pair (libpq DSN, query string), and a URL with an `@` past its host up to that `@`; every other value is as written. `wtm env --show-values` prints it whole.
+- `current_value` / `new_value`: every password a value carries is masked as `***` — a URL's (`postgres://app:***@localhost:5442/db`), each URL of a comma-separated list (a comma inside a password stays masked), a credential without a scheme (`app:***@tcp(localhost:3306)/db`), a `password=` or `pwd=` pair to the end of its value in its format (libpq DSN, query string, ADO.NET, ODBC, jdbc), and a URL with an `@` past its host up to that `@`; every other value is as written. `wtm env --show-values` prints it whole.
 - `applied`: whether the rewrites were written.
 
 ## `env`

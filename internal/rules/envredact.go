@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 )
@@ -108,45 +109,165 @@ func RedactEnvPortPlan(plan domain.EnvPortPlan) domain.EnvPortPlan {
 	return plan
 }
 
-// passwordParam is a password given as a key=value pair: a libpq DSN, a query
-// string, a jdbc property list.
-var passwordParam = regexp.MustCompile(`(?i)(password=)(?:'[^']*'?|[^\s&;']*)`)
-
 // MaskURLPassword masks every password a value carries — a URL's, one per
 // element of a comma-separated list, a password= pair — and returns the rest
-// byte for byte. Past a URL's authority, an "@" cannot be told from a password
-// net/url read as a path or a fragment ("app:12#x@h"), so everything up to the
-// last one is masked: a report masks too much rather than print a secret.
+// byte for byte. Where parsers disagree on where a password ends, it masks up
+// to the farthest of their readings: a report masks too much rather than print
+// a secret.
 func MaskURLPassword(value string) string {
-	parts := strings.Split(value, domain.OriginListSeparator)
+	parts := urlListParts(value)
 	for i, part := range parts {
-		parts[i] = passwordParam.ReplaceAllString(maskURLUserinfo(part), "${1}"+domain.MaskedURLPassword)
+		parts[i] = maskPasswordPairs(maskURLUserinfo(part))
 	}
 	return strings.Join(parts, domain.OriginListSeparator)
 }
 
+var urlListElement = regexp.MustCompile(`^\s*[A-Za-z][A-Za-z0-9+.-]*://`)
+
+// urlListParts splits a list only before an element that starts a URL of its
+// own, so a comma inside a password stays in its URL.
+func urlListParts(value string) []string {
+	var parts []string
+	for i, part := range strings.Split(value, domain.OriginListSeparator) {
+		if i > 0 && !urlListElement.MatchString(part) {
+			parts[len(parts)-1] += domain.OriginListSeparator + part
+			continue
+		}
+		parts = append(parts, part)
+	}
+	return parts
+}
+
+// maskURLUserinfo reads a userinfo net/url finds up to the path rather than to
+// a "?" or "#": the host a client connects to follows the last "@" before it.
+// Past the authority, an "@" cannot be told from a password net/url read as a
+// path ("app:12/x@h"), so a URL without userinfo is masked up to its last one.
 func maskURLUserinfo(value string) string {
 	scheme := strings.Index(value, domain.OriginSchemeSeparator)
 	if scheme < 0 {
-		return value
+		return maskUserinfo(maskUserinfoParams{Value: value, End: len(value)})
 	}
 	start := scheme + len(domain.OriginSchemeSeparator)
-	authority := value[start:]
-	if u, err := url.Parse(value); err == nil && u.Opaque == "" && u.User != nil {
-		if _, has := u.User.Password(); !has {
-			return value
-		}
-		if end := strings.IndexAny(authority, "/?#"); end >= 0 {
-			authority = authority[:end]
-		}
+	u, err := url.Parse(value)
+	if err != nil || u.Opaque != "" || u.User == nil {
+		return maskUserinfo(maskUserinfoParams{Value: value, Start: start, End: len(value), MaskUser: true})
 	}
+	end := len(value)
+	if slash := strings.Index(value[start:], "/"); slash >= 0 {
+		end = start + slash
+	}
+	return maskUserinfo(maskUserinfoParams{Value: value, Start: start, End: end})
+}
+
+type maskUserinfoParams struct {
+	Value      string
+	Start, End int
+	// MaskUser masks a userinfo with no ":" whole.
+	MaskUser bool
+}
+
+func maskUserinfo(params maskUserinfoParams) string {
+	authority := params.Value[params.Start:params.End]
 	at := strings.LastIndex(authority, "@")
 	if at < 0 {
-		return value
+		return params.Value
 	}
-	from := 0
-	if colon := strings.Index(authority[:at], ":"); colon >= 0 {
-		from = colon + 1
+	colon := strings.Index(authority[:at], ":")
+	if colon < 0 && !params.MaskUser {
+		return params.Value
 	}
-	return value[:start+from] + domain.MaskedURLPassword + value[start+at:]
+	return params.Value[:params.Start+colon+1] + domain.MaskedURLPassword + params.Value[params.Start+at:]
+}
+
+// passwordKey is a password given as a key=value pair: a libpq DSN, a query
+// string, an ADO.NET, ODBC or jdbc property list.
+var passwordKey = regexp.MustCompile(`(?i)(?:password|pwd)\s*=\s*`)
+
+func maskPasswordPairs(value string) string {
+	var out strings.Builder
+	done := 0
+	for _, loc := range passwordKey.FindAllStringIndex(value, -1) {
+		if loc[0] < done {
+			continue
+		}
+		out.WriteString(value[done:loc[1]])
+		out.WriteString(domain.MaskedURLPassword)
+		done = loc[1] + passwordValueLength(passwordValueParams{Before: value[:loc[0]], Value: value[loc[1]:]})
+	}
+	out.WriteString(value[done:])
+	return out.String()
+}
+
+type passwordValueParams struct {
+	// Before is the text ahead of the key: its separator names the format.
+	Before string
+	Value  string
+}
+
+func passwordValueLength(params passwordValueParams) int {
+	before := strings.TrimRightFunc(strings.TrimRightFunc(params.Before, isKeyRune), unicode.IsSpace)
+	switch {
+	case strings.HasSuffix(before, ";"):
+		return propertyValueLength(params.Value)
+	case strings.HasSuffix(before, "?"), strings.HasSuffix(before, "&"):
+		return indexOrLength(params.Value, "&#")
+	default:
+		return libpqValueLength(params.Value)
+	}
+}
+
+// propertyQuotes are the openings an ADO.NET or jdbc value may be quoted
+// with, and their closings, doubled to escape one.
+var propertyQuotes = map[byte]byte{'"': '"', '\'': '\'', '{': '}'}
+
+// propertyValueLength reads an ADO.NET or jdbc value: up to the next ";", or
+// to its closing quote.
+func propertyValueLength(value string) int {
+	if value == "" {
+		return 0
+	}
+	quote, quoted := propertyQuotes[value[0]]
+	if !quoted {
+		return indexOrLength(value, ";")
+	}
+	for i := 1; i < len(value); i++ {
+		if value[i] != quote {
+			continue
+		}
+		if i+1 < len(value) && value[i+1] == quote {
+			i++
+			continue
+		}
+		return i + 1
+	}
+	return len(value)
+}
+
+// libpqValueLength reads a libpq value: up to whitespace, or to its closing
+// single quote, a backslash escaping the next character in both.
+func libpqValueLength(value string) int {
+	quoted := strings.HasPrefix(value, "'")
+	for i := 0; i < len(value); i++ {
+		switch {
+		case value[i] == '\\':
+			i++
+		case quoted && i > 0 && value[i] == '\'':
+			return i + 1
+		case !quoted && unicode.IsSpace(rune(value[i])):
+			return i
+		}
+	}
+	return len(value)
+}
+
+// isKeyRune is a rune of a prefix the password key carries, "ssl" in sslpassword.
+func isKeyRune(r rune) bool {
+	return r == '_' || r < unicode.MaxASCII && (unicode.IsLetter(r) || unicode.IsDigit(r))
+}
+
+func indexOrLength(value, chars string) int {
+	if i := strings.IndexAny(value, chars); i >= 0 {
+		return i
+	}
+	return len(value)
 }
