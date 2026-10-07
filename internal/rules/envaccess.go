@@ -66,7 +66,7 @@ func EnvPortAnomalies(plan domain.EnvPortPlan) []domain.EnvPortEntry {
 // the wrong services — or at another worktree's slice of a shared one.
 func EnvHasDrift(result domain.EnvSyncResult) bool {
 	for _, file := range result.Files {
-		if file.Unresolvable || EnvDriftCount([]domain.EnvFileResult{file}) > 0 {
+		if file.Unresolvable || file.Created || EnvDriftCount([]domain.EnvFileResult{file}) > 0 {
 			return true
 		}
 		for _, status := range []domain.EnvKeyStatus{domain.EnvKeyMissing, domain.EnvKeyConflict, domain.EnvKeyOrphan} {

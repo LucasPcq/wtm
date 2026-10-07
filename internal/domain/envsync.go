@@ -22,6 +22,9 @@ type EnvFileResult struct {
 	// entry naming a path the repository does not have, and no amount of
 	// syncing will ever fill it.
 	Unresolvable bool `json:"unresolvable,omitempty"`
+	// Created says the worktree lacked the file: an apply wrote it from the
+	// copy create would have made, a --check reports that it would.
+	Created bool `json:"created,omitempty"`
 }
 
 // EnvSyncResult is the full outcome of `wtm env` on one worktree across all its

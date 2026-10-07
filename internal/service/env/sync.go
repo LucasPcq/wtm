@@ -59,6 +59,9 @@ type computedFile struct {
 	// fresh project has no source either, but it does have a template — this is
 	// a config.toml entry pointing at nothing.
 	unresolvable bool
+	// created says the worktree lacked the file and child is its scaffold: it
+	// is written even when the reconciliation changes nothing in it.
+	created bool
 }
 
 // ComputeEnvParams holds the inputs to compute a worktree's env drift, without any
@@ -284,13 +287,15 @@ func fileResult(paths envPaths, c computedFile, applied bool) domain.EnvFileResu
 		ParentBranch:   parentBranch,
 		ParentFallback: c.parentFallback,
 		Unresolvable:   c.unresolvable,
+		Created:        c.created,
 	}
 }
 
 // computeFile reads the four documents for one env file according to the strategy
 // and computes its diff.
 func computeFile(paths envPaths, f domain.EnvFile) (computedFile, error) {
-	child, err := readEnvFile(filepath.Join(paths.WorktreePath, f.Target))
+	childPath := filepath.Join(paths.WorktreePath, f.Target)
+	child, err := readEnvFile(childPath)
 	if err != nil {
 		return computedFile{}, err
 	}
@@ -302,6 +307,13 @@ func computeFile(paths envPaths, f domain.EnvFile) (computedFile, error) {
 	parent, main, source, fallback, err := valueSources(paths, f)
 	if err != nil {
 		return computedFile{}, err
+	}
+	unresolvable := child == nil && template == nil && parent == nil && main == nil
+
+	created := false
+	if !fileExists(childPath) {
+		child = scaffoldOf(scaffoldParams{Strategy: paths.Strategy, Template: template, Parent: parent, Main: main})
+		created = child != nil
 	}
 
 	diff := rules.DiffEnv(rules.EnvDiffParams{
@@ -321,8 +333,30 @@ func computeFile(paths envPaths, f domain.EnvFile) (computedFile, error) {
 		parentFallback: fallback,
 		child:          child,
 		diff:           diff,
-		unresolvable:   child == nil && template == nil && parent == nil && main == nil,
+		unresolvable:   unresolvable,
+		created:        created,
 	}, nil
+}
+
+type scaffoldParams struct {
+	Strategy domain.EnvStrategy
+	Template []domain.EnvLine
+	Parent   []domain.EnvLine
+	Main     []domain.EnvLine
+}
+
+// scaffoldOf is what a missing file starts from, the copy create would have
+// made: the template under example, the strategy's source otherwise. Without it
+// a file whose keys are all placeholders is never written, nobody being there
+// to fill them.
+func scaffoldOf(params scaffoldParams) []domain.EnvLine {
+	if params.Strategy == domain.EnvStrategyExample {
+		return params.Template
+	}
+	if params.Parent != nil {
+		return params.Parent
+	}
+	return params.Main
 }
 
 // ownedKeys are the keys the reconciliation leaves to others in one file: what
@@ -453,7 +487,7 @@ func applyFile(paths envPaths, c *computedFile, res EnvResolution) (bool, error)
 	c.diff = rules.EnvDiffActions(diff)
 
 	rendered := rules.RenderEnv(reconciled)
-	if rendered == rules.RenderEnv(c.child) {
+	if rendered == rules.RenderEnv(c.child) && !c.created {
 		return false, nil
 	}
 
