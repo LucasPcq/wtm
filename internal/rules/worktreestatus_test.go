@@ -76,3 +76,18 @@ func TestAJobKilledByASignalIsNotGivenItsSentinelCode(t *testing.T) {
 		t.Errorf("problems = %+v", got)
 	}
 }
+
+func TestAFixQuotesTheNamesItCarries(t *testing.T) {
+	got := StatusProblems(StatusProblemsParams{
+		Branch:     "feat;touch$IFS/tmp/p",
+		MissingEnv: []domain.EnvMissingFile{{Target: ".env", Scaffolded: true}},
+		Jobs:       []domain.JobSnapshot{{Name: "api", State: domain.JobStateCrashed}},
+	})
+	want := []string{
+		"wtm env 'feat;touch$IFS/tmp/p' --yes",
+		"wtm run start 'feat;touch$IFS/tmp/p' --job api -d --yes",
+	}
+	if len(got) != 2 || got[0].Fix != want[0] || got[1].Fix != want[1] {
+		t.Errorf("fixes = %+v, want %q", got, want)
+	}
+}

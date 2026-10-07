@@ -48,7 +48,9 @@ type StatusProblemsParams struct {
 	IsolationPending bool
 }
 
-// StatusProblems names each anomaly with the one command that clears it.
+// StatusProblems names each anomaly with the one command that clears it. A
+// branch may hold `;` or `$`, and a fix is meant to be run as printed: every
+// name is quoted as one shell word.
 func StatusProblems(params StatusProblemsParams) []domain.StatusProblem {
 	problems := []domain.StatusProblem{}
 	for _, file := range params.MissingEnv {
@@ -58,7 +60,7 @@ func StatusProblems(params StatusProblemsParams) []domain.StatusProblem {
 		problems = append(problems, domain.StatusProblem{
 			Code:    domain.StatusProblemIsolationPending,
 			Message: fmt.Sprintf(domain.StatusProblemIsolationPendingFmt, params.Branch),
-			Fix:     fmt.Sprintf(domain.StatusFixIsolationPendingFmt, params.Branch),
+			Fix:     fmt.Sprintf(domain.StatusFixIsolationPendingFmt, shellQuote(params.Branch)),
 		})
 	}
 	for _, job := range params.Jobs {
@@ -68,7 +70,7 @@ func StatusProblems(params StatusProblemsParams) []domain.StatusProblem {
 		problems = append(problems, domain.StatusProblem{
 			Code:    domain.StatusProblemJobCrashed,
 			Message: crashedMessage(job),
-			Fix:     fmt.Sprintf(domain.StatusFixJobCrashedFmt, params.Branch, job.Name),
+			Fix:     fmt.Sprintf(domain.StatusFixJobCrashedFmt, shellQuote(params.Branch), shellQuote(job.Name)),
 		})
 	}
 	return problems
@@ -86,9 +88,9 @@ func envMissingProblem(params envMissingParams) domain.StatusProblem {
 	problem := domain.StatusProblem{Code: domain.StatusProblemEnvMissing, Message: fmt.Sprintf(domain.StatusProblemEnvMissingFmt, file.Target)}
 	switch {
 	case file.Scaffolded:
-		problem.Fix = fmt.Sprintf(domain.StatusFixEnvMissingFmt, params.Branch)
+		problem.Fix = fmt.Sprintf(domain.StatusFixEnvMissingFmt, shellQuote(params.Branch))
 	case file.HasTemplate:
-		problem.Fix = fmt.Sprintf(domain.StatusFixEnvFromTemplateFmt, params.Branch)
+		problem.Fix = fmt.Sprintf(domain.StatusFixEnvFromTemplateFmt, shellQuote(params.Branch))
 	default:
 		problem.Message = fmt.Sprintf(domain.StatusProblemEnvNowhereFmt, file.Target)
 		problem.Fix = domain.StatusFixEnvNowhere
