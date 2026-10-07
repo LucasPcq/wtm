@@ -144,7 +144,7 @@ func TestMaskURLPasswordMasksOnlyAURLPassword(t *testing.T) {
 		"postgres://app@localhost:5432/db":  "postgres://app@localhost:5432/db",
 		"postgres://app:@localhost:5432/db": "postgres://app:***@localhost:5432/db",
 		"http://[::1:3010":                  "http://[::1:3010",
-		"not a url: user:pass@host":         "not a url: user:pass@host",
+		"not a url: user:pass@host":         "not a url:***@host",
 		"":                                  "",
 		"http://localhost:3010,http://a:b@localhost": "http://localhost:3010,http://a:***@localhost",
 	}
@@ -319,5 +319,139 @@ func TestElideEnvValueMasksAPasswordWithoutUserinfo(t *testing.T) {
 
 	if strings.Contains(got, fakeSecret) {
 		t.Errorf("ElideEnvValue() = %q, want the password masked", got)
+	}
+}
+
+// LUC-278: a comma inside a URL's userinfo split the value before net/url read
+// it, so neither half looked like a credential and the password came out whole.
+func TestMaskURLPasswordKeepsACommaInsideAPassword(t *testing.T) {
+	cases := map[string]string{
+		"postgres://app:ab," + fakeSecret + "@localhost:5432/db":                    "postgres://app:***@localhost:5432/db",
+		"host=localhost password=ab," + fakeSecret + " dbname=app":                  "host=localhost password=*** dbname=app",
+		"http://localhost:3010,postgres://app:ab," + fakeSecret + "@localhost:5432": "http://localhost:3010,postgres://app:***@localhost:5432",
+		"mongodb://app:pw@h1:27017,h2:27018/db":                                     "mongodb://app:***@h1:27017,h2:27018/db",
+	}
+	for in, want := range cases {
+		if got := MaskURLPassword(in); got != want {
+			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// LUC-278: a credential without a scheme — a go-sql-driver DSN, a redis
+// address — was printed whole; the restored rows used to elide it to "…@host".
+func TestMaskURLPasswordMasksASchemelessCredential(t *testing.T) {
+	cases := map[string]string{
+		"app:" + fakeSecret + "@tcp(localhost:3306)/db": "app:***@tcp(localhost:3306)/db",
+		"app:" + fakeSecret + "@localhost:6379":         "app:***@localhost:6379",
+		"not a url: user:" + fakeSecret + "@host":       "not a url:***@host",
+		"noreply@example.com":                           "noreply@example.com",
+	}
+	for in, want := range cases {
+		if got := MaskURLPassword(in); got != want {
+			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// LUC-278: net/url ends the authority at "?" or "#", but the host a client
+// connects to follows the last "@" before the path, so the text between is the
+// password.
+func TestMaskURLPasswordReadsTheAuthorityUpToThePath(t *testing.T) {
+	cases := map[string]string{
+		"mongodb://app:pw@x?" + fakeSecret + "@h1:27017/db": "mongodb://app:***@h1:27017/db",
+		"mongodb://app@x#:" + fakeSecret + "@h1:27017/db":   "mongodb://app@x#:***@h1:27017/db",
+		"postgres://app:pw@x#" + fakeSecret + "@host/db":    "postgres://app:***@host/db",
+	}
+	for in, want := range cases {
+		if got := MaskURLPassword(in); got != want {
+			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// LUC-278: a password= value ends where the format it is written in ends it —
+// whitespace in a libpq DSN, ";" in an ADO.NET or jdbc string, "&" in a query —
+// and each one left the rest of the password visible.
+func TestMaskURLPasswordMasksAPasswordPairToItsEnd(t *testing.T) {
+	cases := map[string]string{
+		"host=localhost password = " + fakeSecret + " dbname=app":               "host=localhost password = *** dbname=app",
+		"host=localhost password=ab;" + fakeSecret + " dbname=app":              "host=localhost password=*** dbname=app",
+		"host=localhost password=ab&" + fakeSecret + " dbname=app":              "host=localhost password=*** dbname=app",
+		`host=localhost password='ab\'` + fakeSecret + `' dbname=app`:           "host=localhost password=*** dbname=app",
+		`host=localhost password=ab\ ` + fakeSecret + " dbname=app":             "host=localhost password=*** dbname=app",
+		"host=localhost sslpassword=" + fakeSecret + " dbname=app":              "host=localhost sslpassword=*** dbname=app",
+		"Server=x;Password=ab " + fakeSecret + ";Database=d":                    "Server=x;Password=***;Database=d",
+		`Server=x;Password="ab;` + fakeSecret + `";Database=d`:                  "Server=x;Password=***;Database=d",
+		`Server=x;Password='ab;` + fakeSecret + `';Database=d`:                  "Server=x;Password=***;Database=d",
+		"jdbc:sqlserver://h:1433;user=app;password={ab;" + fakeSecret + "};x=1": "jdbc:sqlserver://h:1433;user=app;password=***;x=1",
+		"postgres://h/db?user=app&password=ab'" + fakeSecret + "&x=1":           "postgres://h/db?user=app&password=***&x=1",
+		"postgres://h/db?PASSWORD=" + fakeSecret + "#frag":                      "postgres://h/db?PASSWORD=***#frag",
+	}
+	for in, want := range cases {
+		if got := MaskURLPassword(in); got != want {
+			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// LUC-278: the restored rows print a value whole since LUC-274, so a
+// credential MaskURLPassword misses is no longer cut away at its last "@".
+func TestEnvRestoredRowsMaskASchemelessCredential(t *testing.T) {
+	rows := EnvRestoredRows([]domain.EnvRestoredEntry{{
+		File: ".env", Key: "MYSQL_DSN",
+		From: "app:" + fakeSecret + "@tcp(localhost:3316)/db",
+		To:   "app:" + fakeSecret + "@tcp(localhost:3306)/db",
+	}}, ".env")
+
+	if len(rows) != 1 || strings.Contains(rows[0], fakeSecret) {
+		t.Errorf("rows = %q, want the password masked", rows)
+	}
+}
+
+// LUC-278: ODBC and ADO.NET spell the password key "Pwd", which was printed whole.
+func TestMaskURLPasswordMasksAPwdPair(t *testing.T) {
+	cases := map[string]string{
+		"Driver={ODBC};Server=x;Uid=app;Pwd=" + fakeSecret + ";Database=d": "Driver={ODBC};Server=x;Uid=app;Pwd=***;Database=d",
+		"Server=x;PWD={ab;" + fakeSecret + "}":                             "Server=x;PWD=***",
+		"host=localhost pwd = " + fakeSecret + " dbname=app":               "host=localhost pwd = *** dbname=app",
+		"postgres://h/db?pwd=" + fakeSecret + "&x=1":                       "postgres://h/db?pwd=***&x=1",
+	}
+	for in, want := range cases {
+		if got := MaskURLPassword(in); got != want {
+			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// LUC-278: a "://" anywhere in a value made it a URL from there, so the
+// credential ahead of it, and a URL nested in another's query, came out whole.
+func TestMaskURLPasswordMasksACredentialAroundAnotherURL(t *testing.T) {
+	cases := map[string]string{
+		"app:" + fakeSecret + "@tcp(h:3306)/db?redirect=http://x":               "app:***@tcp(h:3306)/db?redirect=http://x",
+		"postgres://app:pw@h/db?next=http://u:" + fakeSecret + "@x":             "postgres://app:***@h/db?next=http://u:***@x",
+		"jdbc:mysql://app:" + fakeSecret + "@localhost:3306/db?next=http://x/y": "jdbc:mysql://app:***@localhost:3306/db?next=http://x/y",
+	}
+	for in, want := range cases {
+		if got := MaskURLPassword(in); got != want {
+			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// LUC-278: a password= value is read whole before the value is split into a
+// list, and a separator only names a format when the key follows it directly.
+func TestMaskURLPasswordReadsAPasswordPairAcrossTheList(t *testing.T) {
+	cases := map[string]string{
+		"host=h password=ab,c://" + fakeSecret + " dbname=x":     "host=h password=*** dbname=x",
+		"host=h password='ab,c://d " + fakeSecret + "' dbname=x": "host=h password=*** dbname=x",
+		"host=x& password=ab&" + fakeSecret + " dbname=y":        "host=x& password=*** dbname=y",
+		"host=a; password=ab;" + fakeSecret + " dbname=y":        "host=a; password=*** dbname=y",
+		"Server=x; Password=ab " + fakeSecret + "; Database=d":   "Server=x; Password=***; Database=d",
+	}
+	for in, want := range cases {
+		if got := MaskURLPassword(in); got != want {
+			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
+		}
 	}
 }

@@ -225,3 +225,64 @@ func TestEnvCheckTextNamesAHandEditedOwnedKey(t *testing.T) {
 		t.Errorf("check text does not name REALM:\n%s", stdout)
 	}
 }
+
+// LUC-278: a comma in a URL's password, a credential without a scheme, a
+// password= value past its first separator and a Pwd= pair leaked from every
+// surface — the verbatim rows among them, which used to elide a value to "…@host".
+func TestEveryEnvSurfaceMasksThePasswordsParsersReadDifferently(t *testing.T) {
+	const commaPassword, mysqlPassword, adoPassword, pwdPassword = "comma-s3cr3t", "mysql-s3cr3t", "ado-s3cr3t", "pwd-s3cr3t"
+	dir := linkedSecretRepo(t, map[string]string{
+		"DATABASE_URL": "postgres://app:ab," + commaPassword + "@localhost:3000/db",
+		"MYSQL_DSN":    "app:" + mysqlPassword + "@tcp(localhost:3000)/db",
+		"ADO_DSN":      "Server=localhost:3000;Password=ab " + adoPassword + ";Database=d",
+		"ODBC_DSN":     "Server=localhost:3000;Uid=app;Pwd=" + pwdPassword + ";Database=d",
+	})
+	secrets := []string{commaPassword, mysqlPassword, adoPassword, pwdPassword}
+
+	stdout, stderr, err := runWtCmd(t, jsonArgs(domain.CmdCreate, "feat/a", "--from", "main")...)
+	if err != nil {
+		t.Fatalf("create: %v\n%s", err, stderr)
+	}
+	assertNoSecret(t, "create JSON", stdout+stderr, secrets...)
+
+	path := worktreeEnvPath(dir, "feat/a")
+	current, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeEnvFile(t, path, strings.ReplaceAll(string(current), "s3cr3t", "s3cr3t-local"))
+
+	refresh := []string{domain.CmdEnv, "feat/a", "--" + domain.FlagCheck, "--" + domain.FlagMode, string(domain.EnvModeRefresh)}
+	stdout, stderr, _ = runWtCmd(t, jsonArgs(refresh...)...)
+	assertNoSecret(t, "check JSON", stdout+stderr, secrets...)
+	stdout, stderr, _ = runWtCmd(t, refresh...)
+	assertNoSecret(t, "check text", stdout+stderr, secrets...)
+
+	stdout, _, _ = runWtCmd(t, jsonArgs(append(refresh, "--"+domain.FlagShowValues)...)...)
+	for _, secret := range secrets {
+		if !strings.Contains(stdout, secret) {
+			t.Errorf("--show-values lacks %q:\n%s", secret, stdout)
+		}
+	}
+
+	envCreate("feat/b", "--from", "main", "--yes")(t, dir)
+	verbatim := func(branch string) []string {
+		return []string{domain.CmdEnv, branch, "--yes", "--" + domain.FlagIsolation, string(domain.IsolationVerbatim)}
+	}
+	stdout, stderr, err = runWtCmd(t, append(verbatim("feat/a"), "--"+domain.FlagOutput, domain.OutputJSON)...)
+	if err != nil {
+		t.Fatalf("env --isolation verbatim: %v\n%s", err, stderr)
+	}
+	assertNoSecret(t, "verbatim JSON", stdout+stderr, secrets...)
+	if !strings.Contains(stdout, `"restored"`) {
+		t.Errorf("verbatim JSON restores nothing to test:\n%s", stdout)
+	}
+	stdout, stderr, err = runWtCmd(t, verbatim("feat/b")...)
+	if err != nil {
+		t.Fatalf("env --isolation verbatim: %v\n%s", err, stderr)
+	}
+	assertNoSecret(t, "verbatim text", stdout+stderr, secrets...)
+	if !strings.Contains(stdout, "back to the source's") {
+		t.Errorf("verbatim text shows no restored row to test:\n%s", stdout)
+	}
+}
