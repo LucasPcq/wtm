@@ -11,6 +11,7 @@ How wtm works beyond `--help`. Every flag of every command is in `wtm <command> 
 ## Worktrees
 
 - **[Configuration](configuration.md)**: `config.toml`, how `.env` files are provisioned, `on_create` / `on_clean` hooks, the environment of `wtm exec`, the global config.
+- **[A worktree's state](status.md)**: `wtm status`, what a worktree runs, what it lacks, and the command that fixes each problem.
 - **[Where wtm keeps its state](state.md)**: the files under `<git-common-dir>/wtm/` and beside the global config.
 
 ## Dev stacks with `wtm run`

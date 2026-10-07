@@ -4760,3 +4760,48 @@ const (
 	RememberedInvalidFmt    = "invalid remembered %s %q in [wizard.remembered] (expected one of %s)"
 	RememberWriteFailedFmt  = "could not remember the answer: %v"
 )
+
+const (
+	// StatusFix*Fmt are the commands that clear each problem `wtm status`
+	// reports, spelled unattended so an agent can run them as given.
+	StatusFixEnvMissingFmt       = "wtm env %s --yes"
+	StatusFixEnvFromTemplateFmt  = "wtm env %s --from example --yes"
+	StatusFixEnvNowhere          = "wtm config edit"
+	StatusFixJobCrashedFmt       = "wtm run start %s --job %s -d --yes"
+	StatusFixIsolationPendingFmt = "wtm env %s --isolation isolated --yes"
+
+	StatusProblemEnvMissingFmt       = "%s is missing"
+	StatusProblemEnvNowhereFmt       = "%s is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand"
+	StatusProblemJobKilledFmt        = "%s crashed (killed by a signal)"
+	StatusProblemJobCrashedFmt       = "%s crashed"
+	StatusProblemJobCrashedCodeFmt   = "%s crashed (exit %d)"
+	StatusProblemIsolationPendingFmt = "%s predates isolation: run up and run start refuse it until its isolation is chosen"
+
+	StatusHeadlineCleanFmt    = "%s — nothing to fix"
+	StatusHeadlineProblemsFmt = "%s — %d problem(s)"
+	StatusFieldPath           = "path"
+	StatusFieldIsolation      = "isolation"
+	StatusFieldAddressing     = "addressing"
+	StatusFieldOffset         = "offset"
+	StatusFieldEnv            = "env"
+	StatusFieldRun            = "run"
+	StatusMainSuffix          = " (main)"
+	StatusOffsetFmt           = "+%d"
+	StatusOffsetUnallocated   = "not numbered yet"
+	StatusRunConfigAbsent     = "no run.toml"
+	StatusEnvFilesFmt         = "%d file(s)"
+	StatusEnvMissingCountFmt  = "%d file(s) · %d missing"
+	StatusJobsTitle           = "JOBS"
+	StatusJobsEmpty           = "no job declared"
+	StatusJobOwnerFmt         = "held from %s"
+	StatusAllCleanFmt         = "%d worktree(s) — nothing to fix"
+	StatusAllProblemsFmt      = "%d worktree(s) · %d with problems"
+	StatusSummarySeparator    = "  "
+
+	// EnvFileCreatedFmt and EnvFileWouldCreateFmt are a .env the worktree
+	// lacked, rebuilt by `wtm env` from the copy create would have made.
+	EnvFileCreatedFmt        = "created from %s"
+	EnvFileWouldCreateFmt    = "missing: wtm env creates it from %s"
+	StatusLoading            = "Reading the worktree's state…"
+	StatusAllWithWorktreeMsg = "--all reads every worktree: drop the [worktree] argument"
+)

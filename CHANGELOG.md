@@ -7,6 +7,7 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 ### Added
 
 - **"Always use this answer"** in the wizards of `create`, `checkout` and `extract`: tick it with `tab` and the env strategy, the isolation or the source fast-forward is no longer asked in that repository; `--ask` asks again. → [Remembered answers](docs/guide/configuration.md#remembered-answers)
+- **`wtm status [worktree]`** reads a worktree's isolation, missing `.env` files and jobs in one document, each problem with the command that fixes it; `--all` reads every worktree. → [A worktree's state](docs/guide/status.md)
 
 ### Fixed
 

@@ -238,7 +238,7 @@ func (f *envFlow) apply(params applyParams) (Outcome, error) {
 
 type reconcileParams struct {
 	Target      target
-	Ctx         envContext
+	Ctx         Source
 	Pass        envRunPass
 	Resolutions map[string]envsvc.EnvResolution
 }
@@ -249,10 +249,10 @@ func (f *envFlow) reconcile(params reconcileParams) (domain.EnvSyncResult, error
 			Branch:             params.Target.branch,
 			MainPath:           f.ctx.ProjectDir,
 			WorktreePath:       params.Target.path,
-			ParentWorktreePath: params.Ctx.parentPath,
-			ParentBranch:       params.Ctx.parentBranch,
+			ParentWorktreePath: params.Ctx.ParentPath,
+			ParentBranch:       params.Ctx.ParentBranch,
 			Files:              f.ctx.Config.Project.Env.Files,
-			Strategy:           params.Ctx.strategy,
+			Strategy:           params.Ctx.Strategy,
 			Mode:               f.request.Mode,
 			Resolutions:        params.Resolutions,
 			Ports:              params.Pass.ports,
@@ -263,10 +263,10 @@ func (f *envFlow) reconcile(params reconcileParams) (domain.EnvSyncResult, error
 		Branch:             params.Target.branch,
 		MainPath:           f.ctx.ProjectDir,
 		WorktreePath:       params.Target.path,
-		ParentWorktreePath: params.Ctx.parentPath,
-		ParentBranch:       params.Ctx.parentBranch,
+		ParentWorktreePath: params.Ctx.ParentPath,
+		ParentBranch:       params.Ctx.ParentBranch,
 		Files:              f.ctx.Config.Project.Env.Files,
-		Strategy:           params.Ctx.strategy,
+		Strategy:           params.Ctx.Strategy,
 		Mode:               f.request.Mode,
 		Prune:              f.request.Prune,
 		Check:              f.request.Check,
@@ -338,19 +338,31 @@ func pathOf(statuses []domain.WorktreeStatus, branch string) string {
 	return ""
 }
 
-// envContext is the resolved value strategy plus the recorded parent branch
-// and its worktree path — empty when it has none, so "parent" falls back to
-// main.
-type envContext struct {
-	strategy     domain.EnvStrategy
-	parentBranch string
-	parentPath   string
+// Source is the resolved value strategy plus the recorded parent branch and
+// its worktree path — empty when it has none, so "parent" falls back to main.
+type Source struct {
+	Strategy     domain.EnvStrategy
+	ParentBranch string
+	ParentPath   string
 }
 
-func (f *envFlow) envContext(branch string) envContext {
-	base := f.ctx.Config.Project.Env.Strategy
+func (f *envFlow) envContext(branch string) Source {
+	return SourceOf(SourceParams{Context: f.ctx, Branch: branch, From: f.request.From})
+}
+
+type SourceParams struct {
+	Context flow.Context
+	Branch  string
+	// From is a --from override, empty for the strategy the worktree recorded.
+	From string
+}
+
+// SourceOf is where a worktree's .env values come from, as `wtm env` resolves
+// it: a reader predicting what the command will do asks it here.
+func SourceOf(params SourceParams) Source {
+	base := params.Context.Config.Project.Env.Strategy
 	parentBranch := ""
-	if meta, ok := worktree.Metadata(worktree.ParentBranchParams{StateDir: f.ctx.StateDir, Branch: branch}); ok {
+	if meta, ok := worktree.Metadata(worktree.ParentBranchParams{StateDir: params.Context.StateDir, Branch: params.Branch}); ok {
 		if meta.EnvStrategy != "" {
 			base = meta.EnvStrategy
 		}
@@ -359,14 +371,14 @@ func (f *envFlow) envContext(branch string) envContext {
 
 	parentPath := ""
 	if parentBranch != "" {
-		if wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: parentBranch}); err == nil {
+		if wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: params.Context.ProjectDir, Branch: parentBranch}); err == nil {
 			parentPath = wt.Path
 		}
 	}
-	return envContext{
-		strategy:     rules.ResolveEnvStrategy(base, f.request.From),
-		parentBranch: parentBranch,
-		parentPath:   parentPath,
+	return Source{
+		Strategy:     rules.ResolveEnvStrategy(base, params.From),
+		ParentBranch: parentBranch,
+		ParentPath:   parentPath,
 	}
 }
 

@@ -331,4 +331,8 @@ var (
 	// ErrDaemonNoSubscribe is a daemon built before the event bus: it is the one
 	// daemon a watcher replaces, and only while it holds no job.
 	ErrDaemonNoSubscribe = errors.New("the run daemon predates wtm events")
+
+	// ErrStatusDetached refuses `wtm status` on a detached HEAD: a worktree's
+	// state is keyed on its branch.
+	ErrStatusDetached = errors.New("worktree is on a detached HEAD: wtm status needs a branch")
 )

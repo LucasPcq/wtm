@@ -9,6 +9,7 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 - [`create`, `extract`, `checkout`](#create-extract-checkout)
 - [`env_ports` and the `ports` block](#env_ports-and-the-ports-block)
 - [`env`](#env)
+- [`status`](#status)
 - [`clean`, `prune`](#clean-prune)
 - [`exec`](#exec)
 - [`relocate`](#relocate)
@@ -86,6 +87,10 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 - `ports` is empty when the project declares no link, and always empty for a `verbatim` worktree.
 - `isolation`: the worktree's. `isolation_adoption` appears only for a worktree created before the isolation choice: `not_adopted` (run values left alone, no `isolation` reported, empty `ports`) or `adopted` (this run recorded it and settled its values).
 - `isolation_changed`: the recorded isolation changed. `restored`: the values `--isolation verbatim` put back to the source's (`removed` when the source lacked the key), passwords masked in `from` / `to`.
+
+## `status`
+
+`status [worktree]` writes one object, `status --all` an array of the same objects (main first): `branch`, `path`, `main`, `isolation`, `addressing` and `offset` (`null` without `run.toml`; `offset` `null` before a run numbers the worktree), `run_config`, `env` `{declared, missing[]}`, `jobs[]` `{name, kind, state, url?, exit_code?, shared?, owner?}` with `state` in the `job.*` vocabulary (`starting`, `running`, `crashed`, `exited`, `stopped`), and `problems[]` `{code, message, fix}`, always present. It exits `0` whatever it finds and needs no `--yes`. The codes and their fixes are in `references/state.md`.
 
 ## `clean`, `prune`
 

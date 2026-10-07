@@ -360,10 +360,10 @@ func (f *envFlow) applies(answers flow.Answers) (bool, error) {
 // reads when that strategy is "parent".
 func (f *envFlow) sourceLabel(branch string) string {
 	ctx := f.envContext(branch)
-	if ctx.strategy == domain.EnvStrategyParent && ctx.parentBranch != "" {
-		return string(ctx.strategy) + domain.EnvRecapNoteSeparator + ctx.parentBranch
+	if ctx.Strategy == domain.EnvStrategyParent && ctx.ParentBranch != "" {
+		return string(ctx.Strategy) + domain.EnvRecapNoteSeparator + ctx.ParentBranch
 	}
-	return string(ctx.strategy)
+	return string(ctx.Strategy)
 }
 
 func (f *envFlow) scanOf(answers flow.Answers) (branchScan, error) {
