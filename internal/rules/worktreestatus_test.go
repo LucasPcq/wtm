@@ -54,7 +54,7 @@ func TestEveryStatusProblemCarriesTheCommandThatClearsIt(t *testing.T) {
 		{Code: domain.StatusProblemEnvMissing, Message: "apps/e2e/.env is missing", Fix: "wtm env feat/x --yes"},
 		{Code: domain.StatusProblemEnvMissing, Message: "apps/web/.env is missing", Fix: "wtm env feat/x --from example --yes"},
 		{Code: domain.StatusProblemEnvMissing, Message: "apps/doc/.env is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand", Fix: "wtm config edit"},
-		{Code: domain.StatusProblemIsolationPending, Message: "feat/x predates isolation: run up and run start refuse it until its isolation is chosen", Fix: "wtm env feat/x --isolation isolated --yes"},
+		{Code: domain.StatusProblemIsolationPending, Message: "predates the isolation choice: run up and run start refuse it", Fix: "wtm env feat/x --isolation isolated --yes"},
 		{Code: domain.StatusProblemJobCrashed, Message: "worker crashed (exit 2)", Fix: "wtm run start feat/x --job worker -d --yes"},
 	}
 	if !reflect.DeepEqual(got, want) {

@@ -59,7 +59,7 @@ func StatusProblems(params StatusProblemsParams) []domain.StatusProblem {
 	if params.IsolationPending {
 		problems = append(problems, domain.StatusProblem{
 			Code:    domain.StatusProblemIsolationPending,
-			Message: fmt.Sprintf(domain.StatusProblemIsolationPendingFmt, params.Branch),
+			Message: domain.StatusProblemIsolationPendingMessage,
 			Fix:     fmt.Sprintf(domain.StatusFixIsolationPendingFmt, shellQuote(params.Branch)),
 		})
 	}
@@ -132,7 +132,7 @@ func StatusFields(params StatusFieldsParams) []domain.RecapField {
 	}
 	fields := []domain.RecapField{
 		{Label: domain.StatusFieldPath, Value: path},
-		{Label: domain.StatusFieldIsolation, Value: string(doc.Isolation)},
+		{Label: domain.StatusFieldIsolation, Value: statusIsolation(doc)},
 	}
 	if !doc.RunConfig {
 		fields = append(fields, domain.RecapField{Label: domain.StatusFieldRun, Value: domain.StatusRunConfigAbsent})
@@ -141,23 +141,49 @@ func StatusFields(params StatusFieldsParams) []domain.RecapField {
 		fields = append(fields, domain.RecapField{Label: domain.StatusFieldAddressing, Value: string(*doc.Addressing)})
 	}
 	if doc.RunConfig {
-		fields = append(fields, domain.RecapField{Label: domain.StatusFieldOffset, Value: statusOffset(doc.Offset)})
+		fields = append(fields, domain.RecapField{Label: domain.StatusFieldPorts, Value: statusPorts(doc)})
 	}
 	return append(fields, domain.RecapField{Label: domain.StatusFieldEnv, Value: statusEnv(doc.Env)})
 }
 
-func statusOffset(offset *int) string {
-	if offset == nil {
-		return domain.StatusOffsetUnallocated
+func isolationPending(doc domain.StatusDocument) bool {
+	return slices.ContainsFunc(doc.Problems, func(problem domain.StatusProblem) bool {
+		return problem.Code == domain.StatusProblemIsolationPending
+	})
+}
+
+// statusIsolation reads a worktree that never chose as such: the isolation a
+// run would apply to it is not one it has.
+func statusIsolation(doc domain.StatusDocument) string {
+	if isolationPending(doc) {
+		return domain.StatusIsolationNotChosen
 	}
-	return fmt.Sprintf(domain.StatusOffsetFmt, *offset)
+	return string(doc.Isolation)
+}
+
+// statusPorts says which ports the worktree binds, relative to the main
+// checkout's: its own offset, the main's own, or its source's.
+func statusPorts(doc domain.StatusDocument) string {
+	switch {
+	case isolationPending(doc):
+		return domain.StatusCellNone
+	case doc.Isolation == domain.IsolationVerbatim:
+		return domain.StatusPortsSource
+	case doc.Main:
+		return domain.StatusPortsBase
+	case doc.Offset == nil:
+		return domain.StatusPortsUnallocated
+	default:
+		return fmt.Sprintf(domain.StatusPortsOffsetFmt, *doc.Offset)
+	}
 }
 
 func statusEnv(env domain.StatusEnv) string {
+	files := Plural(PluralParams{Count: env.Declared, One: domain.StatusNounFile, Many: domain.StatusNounFiles})
 	if len(env.Missing) == 0 {
-		return fmt.Sprintf(domain.StatusEnvFilesFmt, env.Declared)
+		return files
 	}
-	return fmt.Sprintf(domain.StatusEnvMissingCountFmt, env.Declared, len(env.Missing))
+	return files + domain.TallySeparator + fmt.Sprintf(domain.StatusEnvMissingFmt, len(env.Missing))
 }
 
 // StatusJobRows is one aligned row per job: its state, then where it answers
@@ -182,15 +208,31 @@ func StatusJobRows(jobs []domain.JobSnapshot) []domain.RecapField {
 	return rows
 }
 
-// StatusSummary is a worktree on one line, for the readout of every worktree:
-// how it runs, then its jobs counted by state.
-func StatusSummary(doc domain.StatusDocument) string {
-	parts := []string{string(doc.Isolation)}
-	if doc.RunConfig {
-		parts = append(parts, statusOffset(doc.Offset))
+// StatusTable is the inventory `status --all` prints: one row per worktree,
+// and the run columns only when run.toml declares jobs.
+func StatusTable(docs []domain.StatusDocument) domain.StatusTable {
+	withRun := slices.ContainsFunc(docs, func(doc domain.StatusDocument) bool { return doc.RunConfig })
+	header := []string{domain.StatusColWorktree}
+	if withRun {
+		header = append(header, domain.StatusColIsolation, domain.StatusColPorts, domain.StatusColJobs)
 	}
+	table := domain.StatusTable{Header: append(header, domain.StatusColEnv)}
+	for _, doc := range docs {
+		cells := []string{doc.Branch}
+		if withRun {
+			cells = append(cells, statusIsolation(doc), statusPorts(doc), statusJobsCell(doc.Jobs))
+		}
+		table.Rows = append(table.Rows, domain.StatusRow{
+			Cells:     append(cells, statusEnvCell(doc.Env)),
+			Attention: len(doc.Problems) > 0,
+		})
+	}
+	return table
+}
+
+func statusJobsCell(jobs []domain.JobSnapshot) string {
 	counts := map[domain.JobState]int{}
-	for _, job := range doc.Jobs {
+	for _, job := range jobs {
 		counts[job.State]++
 	}
 	tally := Tally(
@@ -200,26 +242,51 @@ func StatusSummary(doc domain.StatusDocument) string {
 		domain.TallyPart{Count: counts[domain.JobStateExited], Label: string(domain.JobStateExited)},
 		domain.TallyPart{Count: counts[domain.JobStateStopped], Label: string(domain.JobStateStopped)},
 	)
-	if tally != "" {
-		parts = append(parts, tally)
+	if tally == "" {
+		return domain.StatusCellNone
 	}
-	return strings.Join(parts, domain.TallySeparator)
+	return tally
+}
+
+// statusEnvCell is the one thing a table row needs of the .env files: whether
+// any is missing.
+func statusEnvCell(env domain.StatusEnv) string {
+	if len(env.Missing) > 0 {
+		return fmt.Sprintf(domain.StatusEnvMissingFmt, len(env.Missing))
+	}
+	return Plural(PluralParams{Count: env.Declared, One: domain.StatusNounFile, Many: domain.StatusNounFiles})
+}
+
+// StatusHeadline concludes on one worktree: nothing to fix, or how much.
+func StatusHeadline(doc domain.StatusDocument) string {
+	if len(doc.Problems) == 0 {
+		return fmt.Sprintf(domain.StatusHeadlineCleanFmt, doc.Branch)
+	}
+	return fmt.Sprintf(domain.StatusHeadlineProblemsFmt, doc.Branch,
+		Plural(PluralParams{Count: len(doc.Problems), One: domain.StatusNounProblem, Many: domain.StatusNounProblems}))
 }
 
 // StatusAllHeadline counts the worktrees, and how many have something to fix.
 func StatusAllHeadline(docs []domain.StatusDocument) string {
-	troubled := 0
-	for _, doc := range docs {
-		if len(doc.Problems) > 0 {
-			troubled++
-		}
+	worktrees := Plural(PluralParams{Count: len(docs), One: domain.StatusNounWorktree, Many: domain.StatusNounWorktrees})
+	troubled := len(StatusTroubled(docs))
+	if troubled == 0 {
+		return fmt.Sprintf(domain.StatusAllCleanFmt, worktrees)
 	}
-	if !StatusTroubled(docs) {
-		return fmt.Sprintf(domain.StatusAllCleanFmt, len(docs))
+	verb := domain.StatusNeedsAttention
+	if troubled > 1 {
+		verb = domain.StatusNeedAttention
 	}
-	return fmt.Sprintf(domain.StatusAllProblemsFmt, len(docs), troubled)
+	return fmt.Sprintf(domain.StatusAllProblemsFmt, worktrees, troubled, verb)
 }
 
-func StatusTroubled(docs []domain.StatusDocument) bool {
-	return slices.ContainsFunc(docs, func(doc domain.StatusDocument) bool { return len(doc.Problems) > 0 })
+// StatusTroubled is the worktrees with something to fix, in their order.
+func StatusTroubled(docs []domain.StatusDocument) []domain.StatusDocument {
+	troubled := []domain.StatusDocument{}
+	for _, doc := range docs {
+		if len(doc.Problems) > 0 {
+			troubled = append(troubled, doc)
+		}
+	}
+	return troubled
 }

@@ -57,3 +57,15 @@ type EnvMissingFile struct {
 	// copy.
 	HasTemplate bool
 }
+
+// StatusTable is `status --all`'s inventory, its cells already worded.
+type StatusTable struct {
+	Header []string
+	Rows   []StatusRow
+}
+
+// StatusRow is one worktree; Attention marks one with something to fix.
+type StatusRow struct {
+	Cells     []string
+	Attention bool
+}

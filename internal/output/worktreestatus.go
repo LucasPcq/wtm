@@ -3,9 +3,12 @@ package output
 import (
 	"fmt"
 	"io"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/styles"
 )
 
 func WriteStatusJSON(w io.Writer, doc domain.StatusDocument) error {
@@ -23,10 +26,11 @@ type FormatStatusParams struct {
 // body — the caller's frame owns the padding.
 func FormatStatus(w io.Writer, params FormatStatusParams) {
 	doc := params.Document
+	headline := rules.StatusHeadline(doc)
 	if len(doc.Problems) == 0 {
-		Unchanged(w, fmt.Sprintf(domain.StatusHeadlineCleanFmt, doc.Branch))
+		Unchanged(w, headline)
 	} else {
-		Warning(w, fmt.Sprintf(domain.StatusHeadlineProblemsFmt, doc.Branch, len(doc.Problems)))
+		Warning(w, headline)
 	}
 	Blank(w)
 	writeAlignedFields(w, rules.StatusFields(rules.StatusFieldsParams{Document: doc, ProjectDir: params.ProjectDir}))
@@ -36,8 +40,15 @@ func FormatStatus(w io.Writer, params FormatStatusParams) {
 		writeStatusJobs(w, writeStatusJobsParams{Jobs: doc.Jobs, Hyperlinks: params.Hyperlinks})
 	}
 
-	for _, problem := range doc.Problems {
+	if len(doc.Problems) > 0 {
 		Blank(w)
+		writeStatusProblems(w, doc.Problems)
+	}
+}
+
+// writeStatusProblems pairs each problem with the command that clears it.
+func writeStatusProblems(w io.Writer, problems []domain.StatusProblem) {
+	for _, problem := range problems {
 		Warning(w, problem.Message)
 		NextStep(w, NextStepParams{Command: problem.Fix})
 	}
@@ -69,31 +80,70 @@ func WriteStatusAllJSON(w io.Writer, docs []domain.StatusDocument) error {
 	return encodeJSON(w, docs)
 }
 
-// FormatStatusAll counts the worktrees, then gives each one line, and expands
-// only the ones with something to fix. Raw body — the caller's frame owns the
-// padding.
+// FormatStatusAll counts the worktrees, lists them as a table — an inventory
+// — and then names each problem under the worktree it belongs to, with its fix.
+// Raw body — the caller's frame owns the padding.
 func FormatStatusAll(w io.Writer, docs []domain.StatusDocument) {
 	headline := rules.StatusAllHeadline(docs)
-	if rules.StatusTroubled(docs) {
-		Warning(w, headline)
-	} else {
+	troubled := rules.StatusTroubled(docs)
+	if len(troubled) == 0 {
 		Unchanged(w, headline)
+	} else {
+		Warning(w, headline)
 	}
-	for _, doc := range docs {
+	Blank(w)
+	writeStatusTable(w, rules.StatusTable(docs))
+	for _, doc := range troubled {
 		Blank(w)
-		writeStatusLine(w, doc)
+		SectionTitle(w, doc.Branch)
+		writeStatusProblems(w, doc.Problems)
 	}
 }
 
-func writeStatusLine(w io.Writer, doc domain.StatusDocument) {
-	line := doc.Branch + domain.StatusSummarySeparator + rules.StatusSummary(doc)
-	if len(doc.Problems) == 0 {
-		Unchanged(w, line)
-		return
+// writeStatusTable pads every cell to its column, the header muted as chrome,
+// and marks a row needing attention with the glyph in a margin column of its
+// own, so the names stay aligned whatever the row says.
+func writeStatusTable(w io.Writer, table domain.StatusTable) {
+	widths := make([]int, len(table.Header))
+	for i, title := range table.Header {
+		widths[i] = utf8.RuneCountInString(title)
 	}
-	Warning(w, line)
-	for _, problem := range doc.Problems {
-		Message(w, Indent+problem.Message)
-		fmt.Fprintln(w, Indent+NextStepLine(NextStepParams{Command: problem.Fix}))
+	for _, row := range table.Rows {
+		for i, cell := range row.Cells {
+			widths[i] = max(widths[i], utf8.RuneCountInString(cell))
+		}
 	}
+	fmt.Fprintf(w, "%s%s%s\n", Indent, statusMargin(false), styles.Muted.Render(statusCells(statusCellsParams{Cells: table.Header, Widths: widths})))
+	for _, row := range table.Rows {
+		fmt.Fprintf(w, "%s%s%s\n", Indent, statusMargin(row.Attention), statusCells(statusCellsParams{Cells: row.Cells, Widths: widths}))
+	}
+}
+
+func statusMargin(attention bool) string {
+	if !attention {
+		return statusMarginBlank
+	}
+	return styles.Warning.Render(domain.GlyphAttention) + "  "
+}
+
+const statusMarginBlank = "   "
+
+type statusCellsParams struct {
+	Cells  []string
+	Widths []int
+}
+
+// statusCells leaves the last column unpadded: trailing spaces would only
+// widen the line.
+func statusCells(params statusCellsParams) string {
+	var b strings.Builder
+	last := len(params.Cells) - 1
+	for i, cell := range params.Cells {
+		b.WriteString(cell)
+		if i == last {
+			break
+		}
+		b.WriteString(strings.Repeat(" ", params.Widths[i]-utf8.RuneCountInString(cell)+2))
+	}
+	return b.String()
 }

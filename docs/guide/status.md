@@ -5,13 +5,13 @@
 ```
 $ wtm status feat/x
 
-  ! feat/x — 2 problem(s)
+  ! feat/x — 2 problems
 
   path        /code/acme.trees/feat-x
   isolation   isolated
   addressing  names
-  offset      +10
-  env         2 file(s) · 1 missing
+  ports       +10
+  env         2 files · 1 missing
 
   JOBS
   web  running  http://web.feat-x.acme.localhost:8080
@@ -24,7 +24,34 @@ $ wtm status feat/x
   → wtm run start feat/x --job api -d --yes
 ```
 
-Without an argument it reads the worktree you are in. `wtm status --all` reads every worktree of the repository, one line each, and expands only the ones with something to fix.
+`ports` says which ports the worktree binds: `+10` is its offset from the main checkout's ports, `base` the main checkout's own, `source's` a verbatim worktree sharing its source's. A worktree created before the [isolation](isolation.md) choice reads `not chosen`.
+
+Without an argument it reads the worktree you are in. `wtm status --all` reads every worktree of the repository as a table, then names each problem under the worktree it belongs to:
+
+```
+$ wtm status --all
+
+  ! 5 worktrees · 2 need attention
+
+     WORKTREE       ISOLATION   PORTS     JOBS                   ENV
+     main           isolated    base      2 stopped              2 files
+     feat/login     isolated    +10       2 running              2 files
+  !  feat/payments  isolated    +20       1 running · 1 crashed  1 missing
+  !  fix/legacy     not chosen  —         2 stopped              2 files
+     docs/readme    verbatim    source's  2 stopped              2 files
+
+  feat/payments
+  ! apps/web/.env is missing
+  → wtm env feat/payments --yes
+  ! api crashed (exit 1)
+  → wtm run start feat/payments --job api -d --yes
+
+  fix/legacy
+  ! predates the isolation choice: run up and run start refuse it
+  → wtm env fix/legacy --isolation isolated --yes
+```
+
+Without a `run.toml`, the table keeps only the `ENV` column.
 
 ## What it never does
 

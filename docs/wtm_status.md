@@ -25,7 +25,7 @@ wtm status [worktree] [flags]
 
   wtm status feat/login --output json
 
-  # Every worktree, one line each, problems expanded
+  # Every worktree as a table, then each problem with its fix
   wtm status --all
 
   # The commands that fix what it found
