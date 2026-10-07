@@ -226,7 +226,7 @@ func (f *envFlow) resolveStep() flow.Step {
 			}
 			return flow.StepContent{
 				Title:    fmt.Sprintf(domain.EnvResolveTitleFmt, answers.Value(KeyWorktree)),
-				EnvFiles: scan.files,
+				EnvFiles: scan.preview,
 				EnvDefaults: domain.EnvResolveDefaults{
 					Overwrite: f.request.OnConflict == domain.EnvDecisionOverwrite,
 					Prune:     f.request.Prune,
@@ -299,7 +299,7 @@ func (f *envFlow) recap(answers flow.Answers) (string, error) {
 	lines = append(lines, "")
 
 	resolve, _ := answers.Get(KeyResolve)
-	if body := rules.EnvResolveRecapLines(rules.EnvResolveRecapParams{Files: scan.files, Decisions: resolve.EnvDecisions}); len(body) > 0 && !resolve.Skipped {
+	if body := rules.EnvResolveRecapLines(rules.EnvResolveRecapParams{Files: scan.preview, Decisions: resolve.EnvDecisions}); len(body) > 0 && !resolve.Skipped {
 		lines = append(lines, body...)
 	} else {
 		lines = append(lines, domain.EnvRecapSafeOnly)

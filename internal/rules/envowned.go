@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"fmt"
 	"path"
 	"slices"
 	"strings"
@@ -136,4 +137,33 @@ func OwnedEnvRewrites(plan domain.EnvPortPlan) []domain.EnvOwnedEntry {
 		}
 	}
 	return out
+}
+
+type EnvOwnedRowsParams struct {
+	Plan  domain.EnvPortPlan
+	File  string
+	Check bool
+}
+
+// EnvOwnedRows names, in a read-only check, each key of one file wtm would
+// rewrite in full: the check is asked for that list, and an apply counts it in
+// its summary instead.
+func EnvOwnedRows(params EnvOwnedRowsParams) []string {
+	if !params.Check {
+		return nil
+	}
+	var mine []domain.EnvOwnedEntry
+	width := 0
+	for _, entry := range OwnedEnvRewrites(params.Plan) {
+		if entry.File == params.File {
+			mine = append(mine, entry)
+			width = max(width, len(entry.Key))
+		}
+	}
+
+	rows := make([]string, 0, len(mine))
+	for _, entry := range mine {
+		rows = append(rows, pad(entry.Key, width)+domain.EnvKeyRowGap+fmt.Sprintf(domain.EnvDetailOwnedWouldSetFmt, EnvQuote(MaskURLPassword(entry.Value))))
+	}
+	return rows
 }

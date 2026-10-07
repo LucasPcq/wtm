@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 	envsvc "github.com/LucasPcq/wtm/internal/service/env"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
@@ -12,7 +13,10 @@ import (
 // written: its drift, the port pass that rides along with the apply, and what
 // a switch to verbatim puts back.
 type branchScan struct {
-	files   []domain.EnvFileResult
+	files []domain.EnvFileResult
+	// preview is files with each linked source value on this worktree's port,
+	// as an overwrite or an addition ends up once the port pass ran.
+	preview []domain.EnvFileResult
 	ports   domain.EnvPortPlan
 	restore []domain.EnvRestoredEntry
 }
@@ -133,7 +137,11 @@ func (f *envFlow) scanBranch(key scanKey) (branchScan, error) {
 		return branchScan{}, err
 	}
 
-	scan := branchScan{files: files, restore: preview.planned}
+	scan := branchScan{
+		files:   files,
+		preview: rules.SettleEnvResolvedValues(rules.SettleEnvResolvedValuesParams{Files: files, Ports: ports.PlanParams()}),
+		restore: preview.planned,
+	}
 	if !ports.Empty() {
 		if scan.ports, err = envsvc.ComputeEnvPorts(ports); err != nil {
 			return branchScan{}, err

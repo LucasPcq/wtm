@@ -2,6 +2,7 @@ package rules
 
 import (
 	"net/url"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -43,46 +44,56 @@ func EnvManagedKeys(params EnvManagedKeysParams) map[string]bool {
 	return managed
 }
 
-// RedactEnvResult withholds the values of the keys wtm does not write, and the
-// password of a port-linked URL, so a report piped into a log or an agent's
+// RedactEnvResult withholds the values of the keys wtm does not write, and
+// masks the passwords in those it does, so a report piped into a log or an agent's
 // context never carries a secret. It returns a copy: the classification of a
 // report runs on the values.
 func RedactEnvResult(result domain.EnvSyncResult) domain.EnvSyncResult {
 	files := slices.Clone(result.Files)
 	for i, file := range files {
-		keys := EnvManagedKeysParams{Plan: result.Ports, Target: file.Target}
-		managed, linked := EnvManagedKeys(keys), envPortLinkedKeys(keys)
+		managed := EnvManagedKeys(EnvManagedKeysParams{Plan: result.Ports, Target: file.Target})
 		entries := slices.Clone(file.Diff.Entries)
 		for j, entry := range entries {
-			entries[j] = redactEnvKey(redactEnvKeyParams{Entry: entry, Managed: managed[entry.Key], Linked: linked[entry.Key]})
+			entries[j] = redactEnvKey(redactEnvKeyParams{Entry: entry, Managed: managed[entry.Key]})
 		}
 		files[i].Diff.Entries = entries
 	}
 	result.Files = files
 	result.Ports = RedactEnvPortPlan(result.Ports)
+	result.Restored = redactEnvRestored(result.Restored)
 	return result
 }
 
 type redactEnvKeyParams struct {
 	Entry   domain.EnvKeyDiff
 	Managed bool
-	Linked  bool
 }
 
+// redactEnvKey masks a managed key's values rather than trusting them: the
+// current one is read before wtm writes its own, so it may be the user's.
 func redactEnvKey(params redactEnvKeyParams) domain.EnvKeyDiff {
 	entry := params.Entry
-	if params.Linked {
+	if params.Managed {
 		entry.CurrentValue = MaskURLPassword(entry.CurrentValue)
 		entry.ResolvedValue = MaskURLPassword(entry.ResolvedValue)
 		return entry
 	}
-	if params.Managed || (entry.CurrentValue == "" && entry.ResolvedValue == "") {
+	if entry.CurrentValue == "" && entry.ResolvedValue == "" {
 		return entry
 	}
 	entry.CurrentValue = ""
 	entry.ResolvedValue = ""
 	entry.Redacted = true
 	return entry
+}
+
+func redactEnvRestored(entries []domain.EnvRestoredEntry) []domain.EnvRestoredEntry {
+	masked := slices.Clone(entries)
+	for i, entry := range masked {
+		masked[i].From = MaskURLPassword(entry.From)
+		masked[i].To = MaskURLPassword(entry.To)
+	}
+	return masked
 }
 
 // RedactEnvPortPlan masks the password of every port-linked URL a plan
@@ -97,31 +108,45 @@ func RedactEnvPortPlan(plan domain.EnvPortPlan) domain.EnvPortPlan {
 	return plan
 }
 
-// MaskURLPassword replaces the password of a URL with a mask and returns every
-// other value byte for byte: a plain port, a URL without one, a string
-// net/url cannot parse. The value is spliced rather than re-serialised, so
-// nothing but the password can change.
+// passwordParam is a password given as a key=value pair: a libpq DSN, a query
+// string, a jdbc property list.
+var passwordParam = regexp.MustCompile(`(?i)(password=)(?:'[^']*'?|[^\s&;']*)`)
+
+// MaskURLPassword masks every password a value carries — a URL's, one per
+// element of a comma-separated list, a password= pair — and returns the rest
+// byte for byte. Past a URL's authority, an "@" cannot be told from a password
+// net/url read as a path or a fragment ("app:12#x@h"), so everything up to the
+// last one is masked: a report masks too much rather than print a secret.
 func MaskURLPassword(value string) string {
-	u, err := url.Parse(value)
-	if err != nil || u.User == nil {
-		return value
+	parts := strings.Split(value, domain.OriginListSeparator)
+	for i, part := range parts {
+		parts[i] = passwordParam.ReplaceAllString(maskURLUserinfo(part), "${1}"+domain.MaskedURLPassword)
 	}
-	if _, has := u.User.Password(); !has {
-		return value
-	}
+	return strings.Join(parts, domain.OriginListSeparator)
+}
+
+func maskURLUserinfo(value string) string {
 	scheme := strings.Index(value, domain.OriginSchemeSeparator)
 	if scheme < 0 {
 		return value
 	}
 	start := scheme + len(domain.OriginSchemeSeparator)
 	authority := value[start:]
-	if end := strings.IndexAny(authority, "/?#"); end >= 0 {
-		authority = authority[:end]
+	if u, err := url.Parse(value); err == nil && u.Opaque == "" && u.User != nil {
+		if _, has := u.User.Password(); !has {
+			return value
+		}
+		if end := strings.IndexAny(authority, "/?#"); end >= 0 {
+			authority = authority[:end]
+		}
 	}
 	at := strings.LastIndex(authority, "@")
-	colon := strings.Index(authority, ":")
-	if at < 0 || colon < 0 || colon > at {
+	if at < 0 {
 		return value
 	}
-	return value[:start+colon+1] + domain.MaskedURLPassword + value[start+at:]
+	from := 0
+	if colon := strings.Index(authority[:at], ":"); colon >= 0 {
+		from = colon + 1
+	}
+	return value[:start+from] + domain.MaskedURLPassword + value[start+at:]
 }

@@ -615,3 +615,62 @@ func TestWithNoWorktreeGivenThePickerIsAskedFirst(t *testing.T) {
 		t.Errorf("asked = %s, want the worktree picker first", prompter.AskedKeys())
 	}
 }
+
+// LUC-274: overwriting a port-linked conflict takes the source's value and the
+// port pass then shifts it onto this worktree's port, but the resolver and the
+// recap previewed the source's port — a value the file never gets.
+func TestTheResolverPreviewsALinkedOverwriteOnTheWorktreesPort(t *testing.T) {
+	ctx := testContext(t)
+	write(t, filepath.Join(ctx.ProjectDir, ".env"), "SHARED=main\nDB_URL=postgres://app:main@localhost:3000/db\n")
+	if err := config.WriteRun(config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
+		Jobs:     []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}}},
+		EnvPorts: []domain.EnvPortLink{{File: ".env", Key: "DB_URL", Job: "web", Port: "PORT"}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	path := makeWorktree(t, ctx, "feat/a")
+	if _, _, err := run(ctx, Request{Worktree: "feat/a"}, flow.Unattended{}); err != nil {
+		t.Fatalf("settle: %v", err)
+	}
+	settled := read(t, filepath.Join(path, ".env"))
+	if strings.Contains(settled, "localhost:3000") {
+		t.Fatalf("setup: .env = %q, want its own port", settled)
+	}
+	write(t, filepath.Join(path, ".env"), strings.Replace(settled, "app:main@", "app:mine@", 1))
+
+	prompter := &flowtest.ScriptedPrompter{
+		Answers: map[string]string{KeyWorktree: "feat/a", KeyIsolation: domain.EnvKeepValue, KeyRecap: domain.EnvApplyValue},
+		EnvDecisions: map[string][]domain.EnvFileDecision{KeyResolve: {{
+			Target:    ".env",
+			Decisions: map[string]domain.EnvConflictDecision{"DB_URL": domain.EnvDecisionOverwrite},
+		}}},
+	}
+	if _, _, err := run(ctx, Request{Mode: domain.EnvModeRefresh}, prompter); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	written := read(t, filepath.Join(path, ".env"))
+	want := ""
+	for _, line := range strings.Split(written, "\n") {
+		if value, ok := strings.CutPrefix(line, "DB_URL="); ok {
+			want = value
+		}
+	}
+	if !strings.Contains(want, "app:main@") || strings.Contains(want, "localhost:3000") {
+		t.Fatalf(".env = %q, want the source's value on the worktree's port", written)
+	}
+	var preview string
+	for _, file := range prompter.Content[KeyResolve].EnvFiles {
+		for _, entry := range file.Diff.Entries {
+			if entry.Key == "DB_URL" {
+				preview = entry.ResolvedValue
+			}
+		}
+	}
+	if preview != want {
+		t.Errorf("resolver previews %q, want %q — what the overwrite writes", preview, want)
+	}
+	if recap := prompter.Content[KeyRecap].Description; !strings.Contains(recap, want) {
+		t.Errorf("recap lacks %q:\n%s", want, recap)
+	}
+}

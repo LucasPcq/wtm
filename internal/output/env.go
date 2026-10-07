@@ -29,6 +29,7 @@ func PrintEnvReport(w io.Writer, params EnvReportParams) {
 			showValues: params.ShowValues,
 			hasPorts:   rules.EnvPortsMoveIn(rules.EnvPortsMoveInParams{Result: result, Target: f.Target}),
 			restored:   rules.EnvRestoredRows(result.Restored, f.Target),
+			owned:      rules.EnvOwnedRows(rules.EnvOwnedRowsParams{Plan: result.Ports, File: f.Target, Check: result.Check}),
 		})
 	}
 	EnvPortsReport(w, result.Ports, result.Check)
@@ -48,6 +49,7 @@ type envFileBlock struct {
 	showValues bool
 	hasPorts   bool
 	restored   []string
+	owned      []string
 }
 
 // printEnvFile renders one file block: its header, what the run did as one
@@ -73,11 +75,14 @@ func printEnvFile(w io.Writer, block envFileBlock) {
 	for _, row := range block.restored {
 		Update(w, row)
 	}
+	for _, row := range block.owned {
+		Update(w, row)
+	}
 	rows := rules.EnvKeyRows(rules.EnvKeyRowsParams{File: f, Check: check, Managed: block.managed, ShowValues: block.showValues})
 	for _, row := range rows {
 		printEnvKeyRow(w, row)
 	}
-	if tally != "" || len(rows) > 0 || len(block.restored) > 0 {
+	if tally != "" || len(rows) > 0 || len(block.restored) > 0 || len(block.owned) > 0 {
 		return
 	}
 
