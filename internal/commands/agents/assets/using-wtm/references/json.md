@@ -64,7 +64,7 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 - Entry `status`: `rewrite` or `unchanged` are settled values. `missing_key`, `base_not_found`, `ambiguous`, `foreign_host`, `secure_scheme` are values wtm left alone (a refusal to report).
 - `foreign_host`: where a value pointed that the proxy does not serve.
 - `owned`: the values wtm writes whole (`COMPOSE_PROJECT_NAME`, `[[env]]`).
-- `current_value` / `new_value`: a URL's password is masked (`postgres://app:***@localhost:5442/db`); every other value is as written. `wtm env --show-values` prints it whole.
+- `current_value` / `new_value`: every password a value carries is masked as `***` — a URL's (`postgres://app:***@localhost:5442/db`), each URL of a comma-separated list, a `password=` pair (libpq DSN, query string); every other value is as written. `wtm env --show-values` prints it whole.
 - `applied`: whether the rewrites were written.
 
 ## `env`
@@ -80,11 +80,11 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 ```
 
 - Key `status`: `resolved` / `missing_unresolved` / `conflict` / `orphan` — the drift the run found. Key `action` is what an apply did to it: `added`, `filled`, `overwritten`, `kept`, `pruned` or `skipped`; absent under `--check` and for a key left as it was (an unanswered `missing_unresolved` stays without one).
-- Values are withheld for the keys wtm does not write: an entry for one has no `current_value` / `resolved_value` and carries `"redacted": true` (absent when there was no value to withhold: an empty value, a missing key). Only port-linked keys, `COMPOSE_PROJECT_NAME` and `[[env]]` keys show their values. An addition is still told apart by its `source`. `--show-values` writes every value, secrets included: never pass it in a context that is logged or shared.
+- Values are withheld for the keys wtm does not write: an entry for one has no `current_value` / `resolved_value` and carries `"redacted": true` (absent when there was no value to withhold: an empty value, a missing key). Only port-linked keys, `COMPOSE_PROJECT_NAME` and `[[env]]` keys show their values, with their passwords masked as in `env_ports`. An addition is still told apart by its `source`. `--show-values` writes every value, secrets included: never pass it in a context that is logged or shared.
 - Key `source` (on an addition or a conflict) names the level the value came from. File `source` names the value source (`template (no .env to sync from)` on a fresh project). `parent_fallback: true` means main was used because the parent had no readable file; `parent_branch` names the parent. `unresolvable: true` flags a configured file that exists nowhere.
 - `ports` is empty when the project declares no link, and always empty for a `verbatim` worktree.
 - `isolation`: the worktree's. `isolation_adoption` appears only for a worktree created before the isolation choice: `not_adopted` (run values left alone, no `isolation` reported, empty `ports`) or `adopted` (this run recorded it and settled its values).
-- `isolation_changed`: the recorded isolation changed. `restored`: the values `--isolation verbatim` put back to the source's (`removed` when the source lacked the key).
+- `isolation_changed`: the recorded isolation changed. `restored`: the values `--isolation verbatim` put back to the source's (`removed` when the source lacked the key), passwords masked in `from` / `to`.
 
 ## `clean`, `prune`
 

@@ -566,7 +566,7 @@ func ElideEnvValue(params ElideEnvValueParams) string {
 		width = domain.EnvValueDisplayWidth
 	}
 
-	value := params.Value
+	value := MaskURLPassword(params.Value)
 	if at := strings.LastIndex(value, domain.EnvCredentialsSeparator); at >= 0 {
 		value = domain.Ellipsis + value[at:]
 	}
