@@ -100,14 +100,19 @@ func unsupportedKindErr(step flow.Step) error {
 type binding struct {
 	key  string
 	kind flow.StepKind
+	// recalled is a step the wizard never shows: its answer is remembered, and
+	// settled against the answers before it, since its Skip still reads them.
+	recalled bool
+	step     flow.Step
 }
 
 type plan struct {
 	steps    []components.Step
 	bindings []binding
 	presets  flow.Answers
-	// skips are the steps resolved as irrelevant before the wizard started.
-	skips map[string]string
+	// settled are the steps answered before the wizard started: irrelevant, or
+	// remembered with nothing earlier to decide whether they apply.
+	settled map[string]flow.Answer
 	// candidates backs every branch step, so a refresh replaces the list once.
 	candidates  []domain.BranchCandidate
 	refresh     func() []domain.BranchCandidate
@@ -118,10 +123,14 @@ type plan struct {
 }
 
 func build(session flow.Session) (*plan, error) {
-	p := &plan{presets: session.Presets, skips: map[string]string{}}
+	p := &plan{presets: session.Presets, settled: map[string]flow.Answer{}}
 
 	for _, step := range session.Steps {
 		if _, preset := session.Presets.Get(step.Key); preset {
+			continue
+		}
+		if _, recalled := flow.Recalled(step); recalled {
+			p.recall(step)
 			continue
 		}
 
@@ -130,7 +139,7 @@ func build(session flow.Session) (*plan, error) {
 		conditional := step.Skip != nil
 		if conditional && len(p.steps) == 0 {
 			if skip, reason := step.Skip(p.known()); skip {
-				p.skips[step.Key] = reason
+				p.settled[step.Key] = flow.Answer{Skipped: true, SkipReason: reason}
 				continue
 			}
 			conditional = false
@@ -146,10 +155,26 @@ func build(session flow.Session) (*plan, error) {
 	return p, nil
 }
 
+// recall settles a remembered step now when nothing asked later can change
+// whether it applies — the wizard neither builds nor auto-skips step 0 either —
+// and otherwise gives it a place it always skips past, unseen.
+func (p *plan) recall(step flow.Step) {
+	if step.Skip == nil || len(p.steps) == 0 {
+		p.settled[step.Key], _ = flow.Settle(step, p.known())
+		return
+	}
+	p.steps = append(p.steps, components.Step{
+		Name:     step.Label,
+		Model:    placeholder(step),
+		AutoSkip: func(components.WizardModel) bool { return true },
+	})
+	p.bindings = append(p.bindings, binding{key: step.Key, kind: step.Kind, recalled: true, step: step})
+}
+
 func (p *plan) known() flow.Answers {
 	answers := p.presets
-	for key, reason := range p.skips {
-		answers = answers.With(key, flow.Answer{Skipped: true, SkipReason: reason})
+	for key, answer := range p.settled {
+		answers = answers.With(key, answer)
 	}
 	return answers
 }
@@ -160,9 +185,17 @@ func (p *plan) answersFrom(prev []components.Step) flow.Answers {
 		if i >= len(prev) {
 			break
 		}
-		answers = answers.With(b.key, answerOf(b.kind, prev[i].Model))
+		answers = answers.With(b.key, p.answerAt(b, prev[i].Model, answers))
 	}
 	return answers
+}
+
+func (p *plan) answerAt(b binding, model any, answers flow.Answers) flow.Answer {
+	if b.recalled {
+		answer, _ := flow.Settle(b.step, answers)
+		return answer
+	}
+	return answerOf(b.kind, model)
 }
 
 func (p *plan) read(final components.WizardModel) (flow.Answers, error) {
@@ -171,6 +204,10 @@ func (p *plan) read(final components.WizardModel) (flow.Answers, error) {
 	for i, b := range p.bindings {
 		if i >= len(steps) {
 			break
+		}
+		if b.recalled {
+			answers = answers.With(b.key, p.answerAt(b, steps[i].Model, answers))
+			continue
 		}
 		answer := answerOf(b.kind, steps[i].Model)
 		if answer.Value == domain.WizardCancelValue {
@@ -200,7 +237,7 @@ func answerOf(kind flow.StepKind, model any) flow.Answer {
 		}
 	case flow.StepSelect, flow.StepBranchSelect, flow.StepRecap:
 		if list, ok := model.(components.SelectListModel); ok {
-			return flow.Answer{Value: list.Value(), Asked: true}
+			return flow.Answer{Value: list.Value(), Asked: true, Remember: list.Remembering()}
 		}
 	case flow.StepTextList:
 		if list, ok := model.(components.TextListModel); ok {

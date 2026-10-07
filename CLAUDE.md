@@ -120,7 +120,7 @@ The annotated map of every sub-package is in `docs/dev/architecture.md`.
 Every worktree-mutating command (`create`, `clean`, `sync`, `fast-forward`, `prune`, `relocate`, `reparent`, `extract`, `checkout`, `env`, plus `init`/`run init`) follows this model:
 
 - **`--yes` / `-y` — the confirmation axis: fully unattended, zero prompts.** Each input resolves as:
-  1. **Decision / confirmation** → its flag, else a documented **safe default**, never destructive (`sync --yes` does not push; `extract --yes` aborts on conflict; `clean`/`prune --yes` leave orphans unless `--reparent-children`).
+  1. **Decision / confirmation** → its flag, else the **remembered answer** (`[wizard.remembered]`, ticked "Always use this answer" in the wizard), else a documented **safe default**, never destructive (`sync --yes` does not push; `extract --yes` aborts on conflict; `clean`/`prune --yes` leave orphans unless `--reparent-children`). Only a `StepSelect` opting in with `Step.Memory` remembers, never a confirmation or a destructive option (`rules.RememberableValues`); `--ask` ignores the memory for one run.
   2. **Required selection with no safe default** → its flag/arg, else an **error naming the missing flag**. Never fall back to a picker.
   3. A picker runs only in a **fully interactive** run (no `--yes`, TTY, human output).
 - `--yes` is the only spelling of that axis — no `--non-interactive`. JSON mode requires `--yes`.
@@ -128,7 +128,7 @@ Every worktree-mutating command (`create`, `clean`, `sync`, `fast-forward`, `pru
 
 Implementation: `interactive := isTTY && rules.IsHumanFormat(format) && !yes`; a migrated command expresses case 2 as a step `Resolve` that names the flag (see `internal/flow/sync/steps.go`). Decision defaults go through a pure rule where one exists (`rules.DecidePush`).
 
-**Recap completeness:** a flag never makes a recap line disappear — the recap reads the step's answer, else the flag/arg that resolved it (`Session.Presets`). **Re-init completeness:** a re-init step shows the complete candidate list, pre-filled from the config on disk, and reads an answer that may be empty as `(value, asked)` so a step never reinstates what the user removed. Details: `docs/dev/flow-layer.md`.
+**Recap completeness:** a flag or a remembered answer never makes a recap line disappear — the recap reads the step's answer, else the flag/arg that resolved it (`Session.Presets`). **Re-init completeness:** a re-init step shows the complete candidate list, pre-filled from the config on disk, and reads an answer that may be empty as `(value, asked)` so a step never reinstates what the user removed. Details: `docs/dev/flow-layer.md`.
 
 ## 10. Commit messages in English
 

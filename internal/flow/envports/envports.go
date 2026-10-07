@@ -41,6 +41,16 @@ func DefaultIsolation(ctx flow.Context) domain.Isolation {
 	return rules.EffectiveIsolation(cfg.Isolation)
 }
 
+// IsolationOrigin is what DefaultIsolation answers from: run.toml when it says,
+// else the built-in default.
+func IsolationOrigin(ctx flow.Context) domain.AnswerOrigin {
+	cfg, err := runconfig.Load(ctx.StateDir)
+	if err != nil || cfg.Isolation == "" {
+		return domain.AnswerOriginDefault
+	}
+	return domain.AnswerOriginConfig
+}
+
 // Settle moves the host ports a freshly provisioned .env holds onto the ones
 // this worktree binds. The values were just copied from main or from a parent,
 // so they carry that worktree's ports and nothing else would fix them. A

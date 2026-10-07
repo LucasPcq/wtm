@@ -28,6 +28,10 @@ const (
 const confirmCheckout = "checkout"
 
 func (f *checkoutFlow) session() flow.Session {
+	return flow.Recall(flow.RecallParams{Session: f.steps(), Remembered: f.ctx.Config.Project.Wizard.Remembered, Ask: f.request.Ask})
+}
+
+func (f *checkoutFlow) steps() flow.Session {
 	return flow.Session{
 		ErrLabel: domain.WizardErrLabel,
 		Presets:  flow.NewAnswers(f.presets()),
@@ -157,6 +161,7 @@ func (f *checkoutFlow) envStep() flow.Step {
 		Resolve:     func(flow.Answers) (flow.Answer, error) { return flow.Answer{Value: ""}, nil },
 		Summarize:   envSummary,
 		Flag:        domain.FlagEnvFrom,
+		Memory:      flow.Memory{ID: domain.RememberEnvStrategy},
 	}
 }
 
@@ -185,6 +190,7 @@ func (f *checkoutFlow) isolationStep() flow.Step {
 		Resolve:   func(flow.Answers) (flow.Answer, error) { return flow.Answer{Value: string(fallback)}, nil },
 		Summarize: func(answer flow.Answer) string { return rules.IsolationSummary(domain.Isolation(answer.Value)) },
 		Flag:      domain.FlagIsolation,
+		Memory:    flow.Memory{ID: domain.RememberIsolation},
 	}
 }
 
@@ -244,13 +250,15 @@ func (f *checkoutFlow) recap(answers flow.Answers) string {
 		lines = append(lines, domain.RecapFieldParent+source)
 	}
 	env := answers.Value(KeyEnv)
-	lines = append(lines, domain.RecapFieldEnv+envSummary(flow.Answer{Value: env}))
+	lines = append(lines, domain.RecapFieldEnv+envSummary(flow.Answer{Value: env})+flow.RememberedMark(answers, KeyEnv))
 	if rules.IsolationRecapShown(rules.IsolationRecapShownParams{Applies: f.applies, Override: f.request.Isolation}) {
-		lines = append(lines, domain.RecapFieldIsolation+rules.IsolationSummary(f.isolation(answers)))
+		lines = append(lines, domain.RecapFieldIsolation+rules.IsolationSummary(f.isolation(answers))+flow.RememberedMark(answers, KeyIsolation))
 	}
 	if answers.Value(KeySourceUpdate) == decide.UpdateFastForward {
-		lines = append(lines, fmt.Sprintf(domain.RecapUpdateFastForward, pr.Branch))
+		lines = append(lines, fmt.Sprintf(domain.RecapUpdateFastForward, pr.Branch)+flow.RememberedMark(answers, KeySourceUpdate))
 	}
+	lines = append(lines, decide.KeptSourceLines(answers, KeySourceUpdate)...)
+	lines = append(lines, flow.RememberedHint(answers, KeyEnv, KeyIsolation, KeySourceUpdate)...)
 
 	var warnings []string
 	if prompt := f.sourceUpdate(answers); prompt.Show && prompt.AbortOnDecline && prompt.Warning != "" {

@@ -37,15 +37,19 @@ type SelectListModel struct {
 	desc      string
 	chosen    bool
 	aborted   bool
+	toggle    string
+	remember  bool
 }
 
 // NewSelectList creates a SelectList with the given title, description, and items.
 func NewSelectList(params NewSelectListParams) SelectListModel {
 	m := SelectListModel{
-		items: params.Items,
-		title: params.Title,
-		desc:  params.Description,
-		width: 80,
+		items:    params.Items,
+		title:    params.Title,
+		desc:     params.Description,
+		width:    80,
+		toggle:   params.Toggle,
+		remember: params.Toggle != "" && params.ToggleOn,
 	}
 	m.refilter()
 	m.snapToSelectable()
@@ -61,6 +65,10 @@ type NewSelectListParams struct {
 	// Start is the value the cursor opens on. An empty or unknown one leaves it
 	// on the first selectable item.
 	Start string
+	// Toggle offers a checkbox under the items, flipped with tab, whose label it
+	// is; ToggleOn opens it ticked.
+	Toggle   string
+	ToggleOn bool
 }
 
 // startOn places the cursor on the named value, so a list with a standing answer
@@ -76,6 +84,9 @@ func (m *SelectListModel) startOn(value string) {
 		}
 	}
 }
+
+// Remembering reports the toggle ticked when the selection was confirmed.
+func (m SelectListModel) Remembering() bool { return m.remember }
 
 // Chosen returns true after the user confirmed a selection.
 func (m SelectListModel) Chosen() bool { return m.chosen }
@@ -174,6 +185,8 @@ func (m SelectListModel) updateNormal(msg tea.KeyMsg) SelectListModel {
 		m.aborted = true
 	case "/":
 		m.filtering = true
+	case "tab":
+		m.remember = m.toggle != "" && !m.remember
 	}
 	return m
 }
@@ -252,8 +265,19 @@ func (m SelectListModel) View() string {
 	if len(m.filtered) == 0 {
 		b.WriteString(styles.Muted.Render("  No matches"))
 	}
+	if m.toggle != "" {
+		b.WriteString("\n\n" + m.renderToggle())
+	}
 
 	return b.String()
+}
+
+func (m SelectListModel) renderToggle() string {
+	check := domain.DashboardGlyphCheckOff
+	if m.remember {
+		check = domain.DashboardGlyphCheckOn
+	}
+	return strings.Repeat(" ", rowPrefixWidth+rowLead) + check + " " + styles.Muted.Render(m.toggle)
 }
 
 // Row layout constants. A row is laid out as:
@@ -439,10 +463,22 @@ func (m SelectListModel) visibleHeight() int {
 	if m.height <= 0 {
 		return 0
 	}
-	return max(1, m.height-filterOverhead(m.filtering, m.filter))
+	return max(1, m.height-filterOverhead(m.filtering, m.filter)-m.toggleOverhead())
 }
 
-func (m SelectListModel) helpActions() []string { return []string{domain.HelpFilter} }
+func (m SelectListModel) toggleOverhead() int {
+	if m.toggle == "" {
+		return 0
+	}
+	return 2
+}
+
+func (m SelectListModel) helpActions() []string {
+	if m.toggle != "" {
+		return []string{domain.HelpRemember, domain.HelpFilter}
+	}
+	return []string{domain.HelpFilter}
+}
 
 func (m SelectListModel) helpModal() string {
 	if m.filtering {

@@ -44,11 +44,15 @@ func (f *extractFlow) session() flow.Session {
 	if f.request.KeepSet {
 		presets[KeyMode] = modeOf(f.request.Keep)
 	}
-	return flow.Session{
-		ErrLabel: domain.WizardErrLabel,
-		Presets:  flow.NewAnswers(presets).WithValues(KeyFiles, f.request.Files),
-		Steps:    steps,
-	}
+	return flow.Recall(flow.RecallParams{
+		Session: flow.Session{
+			ErrLabel: domain.WizardErrLabel,
+			Presets:  flow.NewAnswers(presets).WithValues(KeyFiles, f.request.Files),
+			Steps:    steps,
+		},
+		Remembered: f.ctx.Config.Project.Wizard.Remembered,
+		Ask:        f.request.Ask,
+	})
 }
 
 func (f *extractFlow) targetPreset() string {
@@ -283,6 +287,9 @@ func (f *extractFlow) recap(answers flow.Answers) string {
 	}
 
 	lines = append(lines, domain.RecapFieldMode+modeSummary(answers.Value(KeyMode)))
+	if f.createsTarget(answers) {
+		lines = append(lines, flow.RememberedHint(answers, create.KeyIsolation, create.KeySourceUpdate)...)
+	}
 	if len(warnings) > 0 {
 		lines = append(lines, "")
 		lines = append(lines, warnings...)
@@ -313,22 +320,23 @@ func createdTargetLines(plan create.Plan) []string {
 		lines = append(lines, domain.RecapFieldTarget+plan.Branch+domain.BranchReusedSuffix)
 		if parent := plan.From; parent != "" {
 			if plan.FastForward == parent {
-				parent += domain.RecapFastForwardSuffix
+				parent += domain.RecapFastForwardSuffix + plan.UpdateMark
 			}
 			lines = append(lines, domain.RecapFieldParent+parent)
 		}
 	} else {
 		source := plan.From
 		if plan.FastForward != "" && plan.FastForward == plan.From {
-			source += domain.RecapFastForwardSuffix
+			source += domain.RecapFastForwardSuffix + plan.UpdateMark
 		}
 		lines = append(lines, domain.RecapFieldTarget+fmt.Sprintf(domain.ExtractRecapNewTargetFmt, plan.Branch, source))
 	}
 	if plan.FastForward != "" && plan.FastForward != plan.From {
-		lines = append(lines, fmt.Sprintf(domain.RecapUpdateFastForward, plan.FastForward))
+		lines = append(lines, fmt.Sprintf(domain.RecapUpdateFastForward, plan.FastForward)+plan.UpdateMark)
 	}
+	lines = append(lines, plan.KeptSource...)
 	if plan.Isolation != "" {
-		lines = append(lines, domain.RecapFieldIsolation+rules.IsolationSummary(plan.Isolation))
+		lines = append(lines, domain.RecapFieldIsolation+rules.IsolationSummary(plan.Isolation)+plan.IsolationMark)
 	}
 	return lines
 }

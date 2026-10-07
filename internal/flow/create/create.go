@@ -24,6 +24,8 @@ type Request struct {
 	IfNotExists bool
 	// Isolation is --isolation, empty when it was not given.
 	Isolation domain.Isolation
+	// Ask asks the remembered questions again (--ask).
+	Ask bool
 }
 
 type Outcome struct {
@@ -100,7 +102,8 @@ func (f *createFlow) run() (Outcome, error) {
 	}
 	f.request.Branches = requested
 
-	answers, err := f.prompter.Ask(f.session())
+	session := f.session()
+	answers, err := f.prompter.Ask(session)
 	if errors.Is(err, domain.ErrUserAborted) {
 		f.presenter.Notice(flow.AbortedNotice)
 		return Outcome{Aborted: true}, nil
@@ -108,6 +111,7 @@ func (f *createFlow) run() (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
+	decide.Remember(decide.RememberParams{Context: f.ctx, Session: session, Answers: answers, Presenter: f.presenter})
 
 	branches := f.branches(answers)
 	fromBranch := answers.Value(KeySource)
@@ -133,6 +137,7 @@ func (f *createFlow) run() (Outcome, error) {
 			f.presenter.BranchStarted(flow.Progress{Branch: name, Position: i + 1, Total: len(branches)})
 		}
 		result, err := f.provisionOne(provisionParams{Branch: name, Source: fromBranch, Answers: answers, Preflight: preflight, Batch: batch})
+		result.Origins = f.origins(answers)
 		if err == nil {
 			outcome.Results = append(outcome.Results, result)
 			if batch {
@@ -156,13 +161,30 @@ func (f *createFlow) run() (Outcome, error) {
 }
 
 // A source already up to date skips the source-update step, which must not
-// swallow --ff for the existing branches of a list.
+// swallow --ff, nor a remembered fast-forward, for the existing branches of a list.
 func (f *createFlow) fastForwardsEach(answers flow.Answers) bool {
 	answer, _ := answers.Get(KeySourceUpdate)
 	if answer.Skipped {
-		return f.request.FastForward
+		return f.request.FastForward || f.remembersFastForward()
 	}
 	return answer.Value == updateFastForward
+}
+
+func (f *createFlow) remembersFastForward() bool {
+	return !f.request.Ask && f.ctx.Config.Project.Wizard.Remembered[domain.RememberSourceUpdate] == updateFastForward
+}
+
+func (f *createFlow) origins(answers flow.Answers) map[string]domain.AnswerOrigin {
+	return decide.Origins(decide.OriginsParams{
+		Context:         f.ctx,
+		Answers:         answers,
+		EnvKey:          KeyEnv,
+		IsolationKey:    KeyIsolation,
+		SourceUpdateKey: KeySourceUpdate,
+		EnvFlag:         f.request.EnvFrom != "",
+		IsolationFlag:   f.request.Isolation != "",
+		FastForward:     f.request.FastForward,
+	})
 }
 
 func (f *createFlow) refuseOwnParent() error {

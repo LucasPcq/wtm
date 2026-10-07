@@ -193,6 +193,8 @@ type Step struct {
 	// thing for a step answered by a positional, which has no flag to name.
 	Flag string
 	Arg  bool
+
+	Memory Memory
 }
 
 // Mode is how long a flow holds the surface that runs it. A background flow gives
@@ -229,6 +231,10 @@ type Answer struct {
 	Skipped      bool
 	SkipReason   string
 	Asked        bool
+	// Recalled is an answer the repository remembered, not asked; Remember is
+	// one the user asked never to be asked again.
+	Recalled bool
+	Remember bool
 }
 
 type Answers struct {

@@ -431,7 +431,7 @@ func TestSelectOpensOnTheStepsStartingValue(t *testing.T) {
 		Start: "/wt/c",
 	}
 
-	if got := selectList(content).Value(); got != "/wt/c" {
+	if got := selectList(flow.Step{}, content).Value(); got != "/wt/c" {
 		t.Errorf("cursor = %q, want the starting value", got)
 	}
 }
@@ -442,7 +442,7 @@ func TestSelectWithoutAStartOpensOnTheFirstOption(t *testing.T) {
 		{Label: "feature-b", Value: "/wt/b"},
 	}}
 
-	if got := selectList(content).Value(); got != "/wt/a" {
+	if got := selectList(flow.Step{}, content).Value(); got != "/wt/a" {
 		t.Errorf("cursor = %q, want the first option", got)
 	}
 }
@@ -454,7 +454,7 @@ func TestSelectRendersTheBadgesAStepDeclares(t *testing.T) {
 		Badges: []flow.Badge{{Text: "3 jobs", Tone: domain.ToneSuccess}, {Text: "current"}},
 	}}}
 
-	view := selectList(content).View()
+	view := selectList(flow.Step{}, content).View()
 	for _, want := range []string{"3 jobs", "current"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("view is missing %q:\n%s", want, view)
@@ -622,7 +622,7 @@ func TestABuiltStepKeepsItsStartingValue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("content: %v", err)
 	}
-	if got := selectList(content).Value(); got != "/wt/feat" {
+	if got := selectList(flow.Step{}, content).Value(); got != "/wt/feat" {
 		t.Errorf("cursor = %q, want the start the step built", got)
 	}
 }

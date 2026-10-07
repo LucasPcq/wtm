@@ -30,6 +30,7 @@ func (p checkoutPresenter) CheckedOut(outcome checkoutflow.Outcome) error {
 			Isolation:      result.Isolation,
 			EnvPorts:       result.EnvPorts,
 			Warnings:       result.Warnings,
+			Origins:        result.Origins,
 		})
 	}
 

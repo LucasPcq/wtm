@@ -1376,6 +1376,7 @@ const (
 	IsolationUnknownFmt = "unknown isolation %q (expected %q or %q)"
 
 	// Flag names.
+	FlagAsk        = "ask"
 	FlagFrom       = "from"
 	FlagFF         = "ff"
 	FlagEnvFrom    = "env-from"
@@ -3360,6 +3361,7 @@ const (
 	RecapFieldFiles        = "Files:     "
 	RecapFieldTarget       = "Target:    "
 	RecapFieldMode         = "Mode:      "
+	RecapFieldSourceUpdate = "Update:    "
 	RecapFastForwardSuffix = " (fast-forward to origin)"
 	WarningPrefix          = "⚠ "
 	WizardErrLabel         = "wizard"
@@ -4721,4 +4723,38 @@ const (
 	NotGitRepoFmt = "%s is %w"
 	// GitNotARepoStderr is how git says it found no repository.
 	GitNotARepoStderr = "not a git repository"
+)
+
+// The memory ids a question remembers its answer under, in [wizard.remembered].
+// One id is shared by every command asking the same question.
+const (
+	RememberEnvStrategy  = "env_strategy"
+	RememberIsolation    = "isolation"
+	RememberSourceUpdate = "source_update"
+)
+
+// SourceUpdateFastForward and SourceUpdateKeep answer a source-update question.
+const (
+	SourceUpdateFastForward = "ff"
+	SourceUpdateKeep        = "keep"
+)
+
+const (
+	AnswerOriginFlag       AnswerOrigin = "flag"
+	AnswerOriginRemembered AnswerOrigin = "remembered"
+	AnswerOriginPrompt     AnswerOrigin = "prompt"
+	AnswerOriginConfig     AnswerOrigin = "config"
+	AnswerOriginDefault    AnswerOrigin = "default"
+)
+
+const (
+	RememberToggleLabel     = "Always use this answer in this repo"
+	HelpRemember            = "tab always use"
+	RecapRememberedSuffix   = " · remembered"
+	RecapWillRememberSuffix = " · will be remembered"
+	RecapRememberedHint     = "Remembered answers are not asked: --ask asks them again."
+	FlagAskUsage            = "Ask again the questions this repository remembers an answer to, to change or forget it"
+	RememberedUnknownFmt    = "unknown remembered answer %q in [wizard.remembered] (expected one of %s)"
+	RememberedInvalidFmt    = "invalid remembered %s %q in [wizard.remembered] (expected one of %s)"
+	RememberWriteFailedFmt  = "could not remember the answer: %v"
 )

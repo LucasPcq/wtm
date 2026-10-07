@@ -10,11 +10,9 @@ func (Unattended) Ask(session Session) (Answers, error) {
 		if _, known := answers.Get(step.Key); known {
 			continue
 		}
-		if step.Skip != nil {
-			if skip, reason := step.Skip(answers); skip {
-				answers = answers.With(step.Key, Answer{Skipped: true, SkipReason: reason})
-				continue
-			}
+		if answer, settled := Settle(step, answers); settled {
+			answers = answers.With(step.Key, answer)
+			continue
 		}
 		if step.Resolve == nil {
 			return Answers{}, requiredErr(step)

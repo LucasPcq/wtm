@@ -16,8 +16,10 @@ type ScriptedPrompter struct {
 	Sets map[string][]string
 	// EnvDecisions answers a StepEnvResolve step.
 	EnvDecisions map[string][]domain.EnvFileDecision
-	Abort        bool
-	Confirmed    bool
+	// Remember ticks "always use this answer" on these steps.
+	Remember  map[string]bool
+	Abort     bool
+	Confirmed bool
 
 	Asked   []string
 	Content map[string]flow.StepContent
@@ -45,11 +47,9 @@ func (p *ScriptedPrompter) Ask(session flow.Session) (flow.Answers, error) {
 		if _, known := answers.Get(step.Key); known {
 			continue
 		}
-		if step.Skip != nil {
-			if skip, reason := step.Skip(answers); skip {
-				answers = answers.With(step.Key, flow.Answer{Skipped: true, SkipReason: reason})
-				continue
-			}
+		if answer, settled := flow.Settle(step, answers); settled {
+			answers = answers.With(step.Key, answer)
+			continue
 		}
 		content, err := stepContent(step, answers)
 		if err != nil {
@@ -91,7 +91,7 @@ func (p *ScriptedPrompter) Ask(session flow.Session) (flow.Answers, error) {
 			}
 		}
 		p.Asked = append(p.Asked, step.Key)
-		answers = answers.With(step.Key, flow.Answer{Value: value, Asked: true})
+		answers = answers.With(step.Key, flow.Answer{Value: value, Asked: true, Remember: p.remembers(step)})
 	}
 	return answers, nil
 }
@@ -119,6 +119,14 @@ func stepContent(step flow.Step, answers flow.Answers) (flow.StepContent, error)
 		return step.Load(answers)
 	}
 	return flow.StepContent{Title: step.Title, Description: step.Description, Options: step.Options}, nil
+}
+
+// remembers is the toggle as the wizard shows it: --ask opens it ticked.
+func (p *ScriptedPrompter) remembers(step flow.Step) bool {
+	if ticked, scripted := p.Remember[step.Key]; scripted {
+		return ticked
+	}
+	return step.Memory.Reask && step.Memory.Value != ""
 }
 
 func (p *ScriptedPrompter) Confirm(flow.ConfirmParams) (bool, error) {
