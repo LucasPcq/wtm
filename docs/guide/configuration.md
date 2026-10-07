@@ -110,7 +110,7 @@ source_update = "ff"        # ff | keep
 
 - **A flag always wins**: `--env-from`, `--isolation` and `--ff` answer for one run whatever is remembered.
 - **It applies without a wizard too**: under `--yes` or `--output json`, a remembered answer comes before the config default (`env.strategy`, `run.toml`'s `isolation`). The JSON says which one settled each answer, in `origins`: `flag`, `remembered`, `config` or `default`. A script that needs a fixed result passes the flag.
-- **Changing your mind**: `--ask` asks the remembered questions again, the box already ticked. Change the answer, or untick it to forget it (the recap says `· will be forgotten`); "Use config default" can't be remembered, so picking it forgets too. Under `--yes`, `--ask` ignores the memory for that run. Deleting a line from `[wizard.remembered]` (`wtm config edit`) forgets it too.
+- **Changing your mind**: `--ask` asks the remembered questions again, the box already ticked. Change the answer, or untick it to forget it (the recap says `· clears the remembered answer`); "Use config default" can't be remembered, so picking it forgets too. Under `--yes`, `--ask` ignores the memory for that run. Deleting a line from `[wizard.remembered]` (`wtm config edit`) forgets it too.
 - **Only harmless questions remember.** A confirmation, a pick (a branch, a worktree, files) or a destructive option never does, and an answer the question no longer offers is asked again rather than guessed.
 - The memory is per repository, like the rest of `config.toml`. The dashboard (`wtm ui`) honours it but has no checkbox.
 
