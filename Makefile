@@ -1,7 +1,7 @@
 BINARY   := wtm
 BUILD_DIR := bin
 
-.PHONY: build test vet fmt lint arch dead dead-strict dupl tidy docs demos release release-notes install clean
+.PHONY: build test vet fmt lint arch dead dead-strict dupl tidy docs site site-dev demos release release-notes install clean
 
 build:
 	go build -o $(BUILD_DIR)/$(BINARY) .
@@ -56,6 +56,14 @@ tidy:
 
 docs:
 	go run ./tools/gendocs
+
+# site builds the documentation site (site/, Starlight) from docs/, README.md and
+# CHANGELOG.md into site/dist; site-dev serves it with live reload. Both need Node 22.
+site:
+	cd site && npm ci && npm run build
+
+site-dev:
+	cd site && npm install && npm run dev
 
 # Re-records the README GIFs from docs/demos/*.tape (needs vhs).
 demos:
