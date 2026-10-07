@@ -151,3 +151,27 @@ func TestARememberedConditionalStepIsSettledAgainstEarlierAnswers(t *testing.T) 
 func sameAnswer(a, b flow.Answer) bool {
 	return a.Value == b.Value && a.Recalled == b.Recalled && a.Skipped == b.Skipped && a.SkipReason == b.SkipReason
 }
+
+func TestATickOnAnAnswerNoMemoryHoldsIsDropped(t *testing.T) {
+	step := rememberableStep(flow.Memory{Value: "parent", Reask: true})
+	step.Options = append([]flow.Option{{Label: "config default", Value: ""}}, step.Options...)
+	plan, err := build(flow.Session{Steps: []flow.Step{step, recapStep("r")}})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	wizard := components.NewWizard(plan.steps)
+	wizard.Init()
+	for range 3 {
+		wizard = update(wizard, tea.KeyMsg{Type: tea.KeyUp})
+	}
+	wizard = update(wizard, tea.KeyMsg{Type: tea.KeyEnter})
+	wizard = update(wizard, tea.KeyMsg{Type: tea.KeyEnter})
+
+	answers, err := plan.read(wizard)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if answer, _ := answers.Get("env"); answer.Value != "" || answer.Remember || !answer.Forget {
+		t.Errorf("answer = %+v, want the config default, not to be remembered, the memory to be forgotten", answer)
+	}
+}

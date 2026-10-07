@@ -91,7 +91,7 @@ func (p *ScriptedPrompter) Ask(session flow.Session) (flow.Answers, error) {
 			}
 		}
 		p.Asked = append(p.Asked, step.Key)
-		answers = answers.With(step.Key, flow.Answer{Value: value, Asked: true, Remember: p.remembers(step)})
+		answers = answers.With(step.Key, flow.Asked(step, flow.Answer{Value: value, Asked: true, Remember: p.remembers(step)}))
 	}
 	return answers, nil
 }

@@ -80,6 +80,15 @@ func Rememberable(step Step, value string) bool {
 	})
 }
 
+// Asked is how a host hands back an answer it asked: a tick on a value the step
+// cannot remember (its "config default", say) is dropped rather than promised in
+// the recap, and a remembered question left unticked is marked to be forgotten.
+func Asked(step Step, answer Answer) Answer {
+	answer.Remember = answer.Remember && Rememberable(step, answer.Value)
+	answer.Forget = !answer.Remember && step.Memory.ID != "" && step.Memory.Value != ""
+	return answer
+}
+
 // Remembering is what a confirmed session asks to keep and to forget: a ticked
 // answer is kept, and a remembered question asked again and left unticked is
 // forgotten.
@@ -90,11 +99,12 @@ func Remembering(session Session, answers Answers) rules.RememberedChange {
 		if step.Memory.ID == "" || !known || !answer.Asked || answer.Skipped {
 			continue
 		}
-		if answer.Remember && Rememberable(step, answer.Value) {
+		answer = Asked(step, answer)
+		if answer.Remember {
 			change.Remember[step.Memory.ID] = answer.Value
 			continue
 		}
-		if step.Memory.Value != "" {
+		if answer.Forget {
 			change.Forget = append(change.Forget, step.Memory.ID)
 		}
 	}
@@ -109,6 +119,8 @@ func RememberedMark(answers Answers, key string) string {
 		return domain.RecapRememberedSuffix
 	case answer.Remember:
 		return domain.RecapWillRememberSuffix
+	case answer.Forget:
+		return domain.RecapWillForgetSuffix
 	}
 	return ""
 }

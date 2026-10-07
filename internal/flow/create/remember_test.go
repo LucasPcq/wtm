@@ -222,3 +222,33 @@ func TestFastForwardFlagWinsOverARememberedKeep(t *testing.T) {
 		}
 	}
 }
+
+// The config-default row answers "", which no memory holds: ticking it must not
+// promise in the recap what the run then does the opposite of.
+func TestTickingTheConfigDefaultSaysItForgetsInsteadOfRemembering(t *testing.T) {
+	ctx := rememberingContext(t, map[string]string{domain.RememberEnvStrategy: string(domain.EnvStrategyParent)})
+	prompter := &flowtest.ScriptedPrompter{
+		Answers:  map[string]string{KeyEnv: "", KeyIsolation: string(domain.IsolationIsolated), KeyRecap: confirmCreate},
+		Remember: map[string]bool{KeyEnv: true},
+	}
+
+	if _, err := Run(Params{
+		Context:   ctx,
+		Request:   Request{Branches: []string{"feat/x"}, From: "main", Ask: true},
+		Prompter:  prompter,
+		Presenter: newRecorder(),
+	}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	recap := prompter.Content[KeyRecap].Description
+	if !strings.Contains(recap, "Env:       "+domain.EnvSummaryConfigDefault+domain.RecapWillForgetSuffix) {
+		t.Errorf("recap %q should say the env strategy will be forgotten", recap)
+	}
+	if strings.Contains(recap, domain.RecapWillRememberSuffix) {
+		t.Errorf("recap %q promises to remember an answer no memory can hold", recap)
+	}
+	if remembered := rememberedOnDisk(t, ctx); len(remembered) != 0 {
+		t.Errorf("remembered = %v, want the env strategy forgotten", remembered)
+	}
+}

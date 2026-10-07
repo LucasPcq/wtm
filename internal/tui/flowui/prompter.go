@@ -150,7 +150,7 @@ func build(session flow.Session) (*plan, error) {
 			return nil, err
 		}
 		p.steps = append(p.steps, built)
-		p.bindings = append(p.bindings, binding{key: step.Key, kind: step.Kind})
+		p.bindings = append(p.bindings, binding{key: step.Key, kind: step.Kind, step: step})
 	}
 	return p, nil
 }
@@ -195,7 +195,7 @@ func (p *plan) answerAt(b binding, model any, answers flow.Answers) flow.Answer 
 		answer, _ := flow.Settle(b.step, answers)
 		return answer
 	}
-	return answerOf(b.kind, model)
+	return flow.Asked(b.step, answerOf(b.kind, model))
 }
 
 func (p *plan) read(final components.WizardModel) (flow.Answers, error) {
@@ -209,7 +209,7 @@ func (p *plan) read(final components.WizardModel) (flow.Answers, error) {
 			answers = answers.With(b.key, p.answerAt(b, steps[i].Model, answers))
 			continue
 		}
-		answer := answerOf(b.kind, steps[i].Model)
+		answer := flow.Asked(b.step, answerOf(b.kind, steps[i].Model))
 		if answer.Value == domain.WizardCancelValue {
 			return flow.Answers{}, domain.ErrUserAborted
 		}

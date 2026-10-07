@@ -235,6 +235,8 @@ type Answer struct {
 	// one the user asked never to be asked again.
 	Recalled bool
 	Remember bool
+	// Forget is a remembered question asked again and left unticked.
+	Forget bool
 }
 
 type Answers struct {

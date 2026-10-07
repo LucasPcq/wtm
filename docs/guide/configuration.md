@@ -80,16 +80,16 @@ wtm exec --all -- 'echo "$WTM_BRANCH on port offset $WTM_PORT_OFFSET"'
 Some questions get the same answer every time. In the wizard of `wtm create`, `wtm checkout` and `wtm extract`, three of them offer a checkbox under their options: the env strategy, the isolation, and whether to fast-forward a source branch that is behind origin.
 
 ```
- Env strategy
- Where the new worktree's .env values come from.
+  How to provision .env files in the new worktree
 
- ▸ example — copy .env.example
-   main — copy from the main checkout
-   parent — copy from the source worktree
+   Use config default (example)
+   example — copy .env.example → .env
+ ▸ main — copy .env from the main checkout
+   parent — copy .env from source worktree
 
    [x] Always use this answer in this repo
 
- ↑/↓ navigate · tab always use · / filter · enter select · esc back
+  ↑↓ navigate • tab always use • / filter • enter confirm • esc back
 ```
 
 `tab` ticks it. Once the recap is confirmed, the answer is written to `config.toml` and the question is no longer asked in this repository (cancelling remembers nothing). The recap still names it:
@@ -110,7 +110,7 @@ source_update = "ff"        # ff | keep
 
 - **A flag always wins**: `--env-from`, `--isolation` and `--ff` answer for one run whatever is remembered.
 - **It applies without a wizard too**: under `--yes` or `--output json`, a remembered answer comes before the config default (`env.strategy`, `run.toml`'s `isolation`). The JSON says which one settled each answer, in `origins`: `flag`, `remembered`, `config` or `default`. A script that needs a fixed result passes the flag.
-- **Changing your mind**: `--ask` asks the remembered questions again, the box already ticked. Change the answer, or untick it to forget it. Under `--yes`, `--ask` ignores the memory for that run. Deleting a line from `[wizard.remembered]` (`wtm config edit`) forgets it too.
+- **Changing your mind**: `--ask` asks the remembered questions again, the box already ticked. Change the answer, or untick it to forget it (the recap says `· will be forgotten`); "Use config default" can't be remembered, so picking it forgets too. Under `--yes`, `--ask` ignores the memory for that run. Deleting a line from `[wizard.remembered]` (`wtm config edit`) forgets it too.
 - **Only harmless questions remember.** A confirmation, a pick (a branch, a worktree, files) or a destructive option never does, and an answer the question no longer offers is asked again rather than guessed.
 - The memory is per repository, like the rest of `config.toml`. The dashboard (`wtm ui`) honours it but has no checkbox.
 
