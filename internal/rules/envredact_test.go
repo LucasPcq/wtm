@@ -423,3 +423,35 @@ func TestMaskURLPasswordMasksAPwdPair(t *testing.T) {
 		}
 	}
 }
+
+// LUC-278: a "://" anywhere in a value made it a URL from there, so the
+// credential ahead of it, and a URL nested in another's query, came out whole.
+func TestMaskURLPasswordMasksACredentialAroundAnotherURL(t *testing.T) {
+	cases := map[string]string{
+		"app:" + fakeSecret + "@tcp(h:3306)/db?redirect=http://x":               "app:***@tcp(h:3306)/db?redirect=http://x",
+		"postgres://app:pw@h/db?next=http://u:" + fakeSecret + "@x":             "postgres://app:***@h/db?next=http://u:***@x",
+		"jdbc:mysql://app:" + fakeSecret + "@localhost:3306/db?next=http://x/y": "jdbc:mysql://app:***@localhost:3306/db?next=http://x/y",
+	}
+	for in, want := range cases {
+		if got := MaskURLPassword(in); got != want {
+			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// LUC-278: a password= value is read whole before the value is split into a
+// list, and a separator only names a format when the key follows it directly.
+func TestMaskURLPasswordReadsAPasswordPairAcrossTheList(t *testing.T) {
+	cases := map[string]string{
+		"host=h password=ab,c://" + fakeSecret + " dbname=x":     "host=h password=*** dbname=x",
+		"host=h password='ab,c://d " + fakeSecret + "' dbname=x": "host=h password=*** dbname=x",
+		"host=x& password=ab&" + fakeSecret + " dbname=y":        "host=x& password=*** dbname=y",
+		"host=a; password=ab;" + fakeSecret + " dbname=y":        "host=a; password=*** dbname=y",
+		"Server=x; Password=ab " + fakeSecret + "; Database=d":   "Server=x; Password=***; Database=d",
+	}
+	for in, want := range cases {
+		if got := MaskURLPassword(in); got != want {
+			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

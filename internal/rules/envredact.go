@@ -117,19 +117,23 @@ func RedactEnvPortPlan(plan domain.EnvPortPlan) domain.EnvPortPlan {
 func MaskURLPassword(value string) string {
 	parts := urlListParts(value)
 	for i, part := range parts {
-		parts[i] = maskPasswordPairs(maskURLUserinfo(part))
+		parts[i] = maskURLUserinfo(part)
 	}
-	return strings.Join(parts, domain.OriginListSeparator)
+	return maskPasswordPairs(strings.Join(parts, domain.OriginListSeparator))
 }
 
-var urlListElement = regexp.MustCompile(`^\s*[A-Za-z][A-Za-z0-9+.-]*://`)
+// urlScheme starts a URL, a jdbc one ("jdbc:mysql://") included.
+var (
+	urlScheme         = regexp.MustCompile(`^\s*[A-Za-z][A-Za-z0-9+.:-]*://`)
+	embeddedURLScheme = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.:-]*://`)
+)
 
 // urlListParts splits a list only before an element that starts a URL of its
 // own, so a comma inside a password stays in its URL.
 func urlListParts(value string) []string {
 	var parts []string
 	for i, part := range strings.Split(value, domain.OriginListSeparator) {
-		if i > 0 && !urlListElement.MatchString(part) {
+		if i > 0 && !urlScheme.MatchString(part) {
 			parts[len(parts)-1] += domain.OriginListSeparator + part
 			continue
 		}
@@ -142,12 +146,14 @@ func urlListParts(value string) []string {
 // a "?" or "#": the host a client connects to follows the last "@" before it.
 // Past the authority, an "@" cannot be told from a password net/url read as a
 // path ("app:12/x@h"), so a URL without userinfo is masked up to its last one.
+// A value that does not start with a scheme is a credential up to its last "@"
+// ("app:pw@tcp(h)/db"), whatever URL it carries further on.
 func maskURLUserinfo(value string) string {
-	scheme := strings.Index(value, domain.OriginSchemeSeparator)
-	if scheme < 0 {
+	scheme := urlScheme.FindStringIndex(value)
+	if scheme == nil {
 		return maskUserinfo(maskUserinfoParams{Value: value, End: len(value)})
 	}
-	start := scheme + len(domain.OriginSchemeSeparator)
+	start := scheme[1]
 	u, err := url.Parse(value)
 	if err != nil || u.Opaque != "" || u.User == nil {
 		return maskUserinfo(maskUserinfoParams{Value: value, Start: start, End: len(value), MaskUser: true})
@@ -156,7 +162,16 @@ func maskURLUserinfo(value string) string {
 	if slash := strings.Index(value[start:], "/"); slash >= 0 {
 		end = start + slash
 	}
-	return maskUserinfo(maskUserinfoParams{Value: value, Start: start, End: end})
+	return maskUserinfo(maskUserinfoParams{Value: value[:end], Start: start, End: end}) + maskEmbeddedURL(value[end:])
+}
+
+// maskEmbeddedURL masks a URL a path or a query carries ("?next=http://u:pw@h").
+func maskEmbeddedURL(value string) string {
+	at := embeddedURLScheme.FindStringIndex(value)
+	if at == nil {
+		return value
+	}
+	return value[:at[0]] + maskURLUserinfo(value[at[0]:])
 }
 
 type maskUserinfoParams struct {
@@ -205,12 +220,16 @@ type passwordValueParams struct {
 }
 
 func passwordValueLength(params passwordValueParams) int {
-	before := strings.TrimRightFunc(strings.TrimRightFunc(params.Before, isKeyRune), unicode.IsSpace)
+	key := strings.TrimRightFunc(params.Before, isKeyRune)
+	spaced := strings.TrimRightFunc(key, unicode.IsSpace)
 	switch {
-	case strings.HasSuffix(before, ";"):
-		return propertyValueLength(params.Value)
-	case strings.HasSuffix(before, "?"), strings.HasSuffix(before, "&"):
+	case strings.HasSuffix(key, "?"), strings.HasSuffix(key, "&"):
 		return indexOrLength(params.Value, "&#")
+	case strings.HasSuffix(key, ";"):
+		return propertyValueLength(params.Value)
+	case strings.HasSuffix(spaced, ";"):
+		// "a; password=" reads as ADO.NET and as libpq: mask the longer.
+		return max(propertyValueLength(params.Value), libpqValueLength(params.Value))
 	default:
 		return libpqValueLength(params.Value)
 	}
