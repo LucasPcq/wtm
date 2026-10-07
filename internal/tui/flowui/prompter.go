@@ -71,7 +71,7 @@ func (p Prompter) Ask(session flow.Session) (flow.Answers, error) {
 	if err != nil {
 		return flow.Answers{}, err
 	}
-	if len(plan.steps) == 0 {
+	if plan.entered == 0 {
 		return plan.known(), nil
 	}
 
@@ -100,8 +100,10 @@ func unsupportedKindErr(step flow.Step) error {
 type binding struct {
 	key  string
 	kind flow.StepKind
-	// recalled is a step the wizard never shows: its answer is remembered, and
-	// settled against the answers before it, since its Skip still reads them.
+	// settled is a step answered before the wizard opened, its answer already
+	// known; recalled is one remembered behind a condition, settled against the
+	// answers before it, since its Skip still reads them. Neither is entered.
+	settled  bool
 	recalled bool
 	step     flow.Step
 }
@@ -120,13 +122,16 @@ type plan struct {
 	loadingText string
 	loads       map[int]loadedStep
 	loadErr     error
+	// entered counts the steps the wizard will actually put on screen.
+	entered int
 }
 
 func build(session flow.Session) (*plan, error) {
 	p := &plan{presets: session.Presets, settled: map[string]flow.Answer{}}
 
 	for _, step := range session.Steps {
-		if _, preset := session.Presets.Get(step.Key); preset {
+		if answer, preset := session.Presets.Get(step.Key); preset {
+			p.settledStep(step, settledLine(step, answer, flagSuffix(step)))
 			continue
 		}
 		if _, recalled := flow.Recalled(step); recalled {
@@ -134,10 +139,11 @@ func build(session flow.Session) (*plan, error) {
 			continue
 		}
 
-		// The wizard neither builds nor auto-skips step 0, so a conditional step that
-		// would land there is decided here instead, against what is already known.
+		// The wizard neither builds nor auto-skips the step it opens on, so a
+		// conditional step that would land there is decided here instead,
+		// against what is already known.
 		conditional := step.Skip != nil
-		if conditional && len(p.steps) == 0 {
+		if conditional && p.entered == 0 {
 			if skip, reason := step.Skip(p.known()); skip {
 				p.settled[step.Key] = flow.Answer{Skipped: true, SkipReason: reason}
 				continue
@@ -151,24 +157,69 @@ func build(session flow.Session) (*plan, error) {
 		}
 		p.steps = append(p.steps, built)
 		p.bindings = append(p.bindings, binding{key: step.Key, kind: step.Kind, step: step})
+		p.entered++
 	}
 	return p, nil
 }
 
+// settledStep keeps a step nobody is asked in its place in the wizard, so the
+// trail reads it where it would have been asked and the counter never skips it.
+func (p *plan) settledStep(step flow.Step, line string) {
+	p.steps = append(p.steps, components.Step{Name: step.Label, Model: placeholder(step), Settled: line})
+	p.bindings = append(p.bindings, binding{key: step.Key, kind: step.Kind, settled: true, step: step})
+}
+
 // recall settles a remembered step now when nothing asked later can change
-// whether it applies — the wizard neither builds nor auto-skips step 0 either —
-// and otherwise gives it a place it always skips past, unseen.
+// whether it applies, and otherwise on entry, against the answers before it.
 func (p *plan) recall(step flow.Step) {
-	if step.Skip == nil || len(p.steps) == 0 {
-		p.settled[step.Key], _ = flow.Settle(step, p.known())
+	if step.Skip == nil || p.entered == 0 {
+		answer, _ := flow.Settle(step, p.known())
+		p.settled[step.Key] = answer
+		if answer.Recalled {
+			p.settledStep(step, settledLine(step, answer, domain.RecapRememberedSuffix))
+		}
 		return
 	}
+	line, reason := "", ""
 	p.steps = append(p.steps, components.Step{
-		Name:     step.Label,
-		Model:    placeholder(step),
-		AutoSkip: func(components.WizardModel) bool { return true },
+		Name:  step.Label,
+		Model: placeholder(step),
+		Build: func(prev []components.Step) any {
+			answer, _ := flow.Settle(step, p.answersFrom(prev))
+			line, reason = "", answer.SkipReason
+			if answer.Recalled {
+				line = settledLine(step, answer, domain.RecapRememberedSuffix)
+			}
+			return placeholder(step)
+		},
+		AutoSkip:       func(components.WizardModel) bool { return true },
+		SettledSummary: func() string { return line },
+		SkipReason:     func() string { return reason },
 	})
 	p.bindings = append(p.bindings, binding{key: step.Key, kind: step.Kind, recalled: true, step: step})
+}
+
+// settledLine is what the trail says of an answer nobody was asked: the step's
+// own summary, as an answered step reads, and what settled it.
+func settledLine(step flow.Step, answer flow.Answer, suffix string) string {
+	summary := answer.Value
+	switch {
+	case step.Summarize != nil:
+		summary = step.Summarize(answer)
+	case len(answer.Values) > 0:
+		summary = flow.SummarizeSet(answer)
+	}
+	if summary == "" {
+		summary = domain.SummaryNone
+	}
+	return summary + suffix
+}
+
+func flagSuffix(step flow.Step) string {
+	if step.Flag == "" {
+		return ""
+	}
+	return fmt.Sprintf(domain.TrailFlagSuffixFmt, step.Flag)
 }
 
 func (p *plan) known() flow.Answers {
@@ -191,6 +242,10 @@ func (p *plan) answersFrom(prev []components.Step) flow.Answers {
 }
 
 func (p *plan) answerAt(b binding, model any, answers flow.Answers) flow.Answer {
+	if b.settled {
+		answer, _ := answers.Get(b.key)
+		return answer
+	}
 	if b.recalled {
 		answer, _ := flow.Settle(b.step, answers)
 		return answer
@@ -204,6 +259,9 @@ func (p *plan) read(final components.WizardModel) (flow.Answers, error) {
 	for i, b := range p.bindings {
 		if i >= len(steps) {
 			break
+		}
+		if b.settled {
+			continue
 		}
 		if b.recalled {
 			answers = answers.With(b.key, p.answerAt(b, steps[i].Model, answers))

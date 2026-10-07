@@ -4753,6 +4753,7 @@ const (
 	RecapRememberedSuffix   = " · remembered"
 	RecapWillRememberSuffix = " · will be remembered"
 	RecapWillForgetSuffix   = " · clears the remembered answer"
+	TrailFlagSuffixFmt      = " · --%s"
 	RecapRememberedHint     = "Remembered answers are not asked: --ask asks them again."
 	FlagAskUsage            = "Ask again the questions this repository remembers an answer to, to change or forget it"
 	RememberedUnknownFmt    = "unknown remembered answer %q in [wizard.remembered] (expected one of %s)"

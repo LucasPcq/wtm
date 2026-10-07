@@ -36,6 +36,14 @@ type Step struct {
 	// completed-step summaries as "⊘ <Name> — <reason>"; an empty reason keeps the
 	// skipped step hidden (compat with init section gates).
 	SkipReason func() string
+	// Settled is a step answered before the wizard opened — by a flag, or by an
+	// answer the repository remembers. It is never entered: it keeps its place,
+	// counts in the steps, and reads "✓ <Name>: <Settled>" in the summaries.
+	Settled string
+	// SettledSummary is Settled for a step settled only on entry: read once
+	// AutoSkip returned true, a non-empty one shows the step as Settled does
+	// rather than hiding it or listing it as skipped.
+	SettledSummary func() string
 	// Recap marks the final synthesis step: its description is rendered with a
 	// distinct "Review & confirm" header (see styles.RenderRecap) so it reads as
 	// the action point rather than another prompt.
@@ -70,6 +78,7 @@ type WizardModel struct {
 	steps         []Step
 	skipped       []bool
 	skippedReason []string
+	settled       []string
 	current       int
 	width         int
 	height        int
@@ -93,14 +102,26 @@ type WizardBanner struct {
 	Lines []string
 }
 
-// NewWizard creates a wizard with the given steps.
+// NewWizard creates a wizard with the given steps. It opens on the first step
+// that is not Settled.
 func NewWizard(steps []Step) WizardModel {
-	return WizardModel{
+	m := WizardModel{
 		steps:         steps,
 		skipped:       make([]bool, len(steps)),
 		skippedReason: make([]string, len(steps)),
+		settled:       make([]string, len(steps)),
 		width:         80,
 	}
+	for m.current < len(steps)-1 && steps[m.current].Settled != "" {
+		m.settle(m.current, steps[m.current].Settled)
+		m.current++
+	}
+	return m
+}
+
+func (m *WizardModel) settle(stepIdx int, summary string) {
+	m.skipped[stepIdx] = true
+	m.settled[stepIdx] = summary
 }
 
 // WizardParams holds inputs for a wizard that runs a background command and/or
@@ -422,6 +443,10 @@ func (m WizardModel) renderTop() string {
 func (m WizardModel) renderSummaries(maxLines int) string {
 	var lines []string
 	for i := 0; i < m.current; i++ {
+		if settled := m.settled[i]; settled != "" {
+			lines = append(lines, styles.SummaryLine.Render(fmt.Sprintf("  ✓ %s: %s", m.steps[i].Name, settled)))
+			continue
+		}
 		if m.skipped[i] {
 			if reason := m.skippedReason[i]; reason != "" {
 				line := fmt.Sprintf("  ⊘ %s — %s", m.steps[i].Name, reason)
@@ -714,10 +739,20 @@ func (m *WizardModel) propagateSize(stepIdx int) {
 func (m WizardModel) advance() (tea.Model, tea.Cmd) {
 	m.current++
 	for m.current < len(m.steps) {
+		step := m.steps[m.current]
+		if step.Settled != "" {
+			m.settle(m.current, step.Settled)
+			m.current++
+			continue
+		}
 		m.buildStep(m.current)
-		if m.steps[m.current].AutoSkip != nil && m.steps[m.current].AutoSkip(m) {
+		step = m.steps[m.current]
+		if step.AutoSkip != nil && step.AutoSkip(m) {
 			m.skipped[m.current] = true
-			if sr := m.steps[m.current].SkipReason; sr != nil {
+			if step.SettledSummary != nil {
+				m.settled[m.current] = step.SettledSummary()
+			}
+			if sr := step.SkipReason; sr != nil && m.settled[m.current] == "" {
 				m.skippedReason[m.current] = sr()
 			}
 			m.current++
@@ -765,6 +800,7 @@ func (m WizardModel) goBack() (tea.Model, tea.Cmd) {
 	for i := prev; i < m.current; i++ {
 		m.skipped[i] = false
 		m.skippedReason[i] = ""
+		m.settled[i] = ""
 	}
 	m.current = prev
 	m.resetStep(m.current)

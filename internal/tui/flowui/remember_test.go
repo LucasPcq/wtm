@@ -82,8 +82,8 @@ func TestARememberedFirstStepIsSettledUpFront(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
-	if got := names(plan.steps); len(got) != 1 || got[0] != "Recap" {
-		t.Fatalf("steps = %v, want the recap alone", got)
+	if got := plan.steps[0].Settled; got != "parent"+domain.RecapRememberedSuffix {
+		t.Fatalf("settled = %q, want the remembered parent in place", got)
 	}
 	wizard := components.NewWizard(plan.steps)
 	wizard.Init()
@@ -174,4 +174,112 @@ func TestATickOnAnAnswerNoMemoryHoldsIsDropped(t *testing.T) {
 	if answer, _ := answers.Get("env"); answer.Value != "" || answer.Remember || !answer.Forget {
 		t.Errorf("answer = %+v, want the config default, not to be remembered, the memory to be forgotten", answer)
 	}
+}
+
+// A question nobody was asked keeps its line in the trail and its place in the
+// count: a flag names itself, a remembered answer says so, and the counter
+// reads every settled step as done where it stands.
+func TestTheTrailReadsBackFlagsAndRememberedAnswers(t *testing.T) {
+	name := textStep("name")
+	name.Arg = true
+	env := rememberableStep(flow.Memory{})
+	env.Flag = domain.FlagEnvFrom
+	isolation := selectStep("iso", "isolated", "verbatim")
+	isolation.Memory = flow.Memory{ID: domain.RememberIsolation, Value: "verbatim"}
+	isolation.Skip = func(flow.Answers) (bool, string) { return false, "" }
+	session := flow.Session{
+		Presets: flow.NewAnswers(map[string]string{"name": "feat/x", "env": "main"}),
+		Steps:   []flow.Step{name, env, textStep("asked"), isolation, recapStep("r")},
+	}
+
+	plan, err := build(session)
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	wizard := sized(components.NewWizard(plan.steps))
+	opening := wizard.View()
+	for _, want := range []string{"Step 3/5", "✓ Text name: feat/x\n", "✓ Select env: main · --env-from"} {
+		if !strings.Contains(opening, want) {
+			t.Errorf("opening view should contain %q:\n%s", want, opening)
+		}
+	}
+
+	for _, r := range "typed" {
+		wizard = update(wizard, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	wizard = update(wizard, tea.KeyMsg{Type: tea.KeyEnter})
+	recap := wizard.View()
+	for _, want := range []string{"Step 5/5", "✓ Text asked: typed", "✓ Select iso: verbatim" + domain.RecapRememberedSuffix} {
+		if !strings.Contains(recap, want) {
+			t.Errorf("recap view should contain %q:\n%s", want, recap)
+		}
+	}
+	trail := []string{"✓ Text name", "✓ Select env", "✓ Text asked", "✓ Select iso"}
+	for i := 1; i < len(trail); i++ {
+		if strings.Index(recap, trail[i-1]) > strings.Index(recap, trail[i]) {
+			t.Errorf("trail out of session order: %q before %q:\n%s", trail[i], trail[i-1], recap)
+		}
+	}
+
+	wizard = update(wizard, tea.KeyMsg{Type: tea.KeyEnter})
+	answers, err := plan.read(wizard)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if answers.Value("name") != "feat/x" || answers.Value("env") != "main" || answers.Value("iso") != "verbatim" {
+		t.Errorf("answers = %q %q %q, want the presets and the remembered answer", answers.Value("name"), answers.Value("env"), answers.Value("iso"))
+	}
+}
+
+// Settled at the very front, a remembered step still gets its line, and the
+// wizard opens on the first question it asks.
+func TestARememberedFirstStepHasItsTrailLine(t *testing.T) {
+	plan, err := build(flow.Session{Steps: []flow.Step{rememberableStep(flow.Memory{Value: "parent"}), recapStep("r")}})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	wizard := sized(components.NewWizard(plan.steps))
+	view := wizard.View()
+	for _, want := range []string{"Step 2/2", "✓ Select env: parent" + domain.RecapRememberedSuffix} {
+		if !strings.Contains(view, want) {
+			t.Errorf("view should contain %q:\n%s", want, view)
+		}
+	}
+	if wizard = update(wizard, tea.KeyMsg{Type: tea.KeyEsc}); !wizard.Aborted() {
+		t.Error("esc on the first question asked should back out, not land on the settled step")
+	}
+}
+
+func TestAnAllSettledSessionOpensNoWizard(t *testing.T) {
+	step := rememberableStep(flow.Memory{})
+	plan, err := build(flow.Session{Presets: flow.NewAnswers(map[string]string{"env": "main"}), Steps: []flow.Step{step}})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if plan.entered != 0 {
+		t.Errorf("entered = %d, want nothing to ask", plan.entered)
+	}
+}
+
+// A remembered step behind a condition that rules it out reads as skipped, not
+// as remembered.
+func TestARememberedStepRuledOutReadsAsSkipped(t *testing.T) {
+	step := rememberableStep(flow.Memory{Value: "parent"})
+	step.Skip = func(flow.Answers) (bool, string) { return true, "nothing to do" }
+	plan, err := build(flow.Session{Steps: []flow.Step{textStep("name"), step, recapStep("r")}})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	wizard := sized(components.NewWizard(plan.steps))
+	wizard = update(wizard, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	wizard = update(wizard, tea.KeyMsg{Type: tea.KeyEnter})
+	view := wizard.View()
+	if !strings.Contains(view, "⊘ Select env — nothing to do") || strings.Contains(view, domain.RecapRememberedSuffix) {
+		t.Errorf("view should list the step as skipped, not remembered:\n%s", view)
+	}
+}
+
+func sized(wizard components.WizardModel) components.WizardModel {
+	wizard.Init()
+	return update(wizard, tea.WindowSizeMsg{Width: 100, Height: 60})
 }

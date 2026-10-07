@@ -128,7 +128,7 @@ Every worktree-mutating command (`create`, `clean`, `sync`, `fast-forward`, `pru
 
 Implementation: `interactive := isTTY && rules.IsHumanFormat(format) && !yes`; a migrated command expresses case 2 as a step `Resolve` that names the flag (see `internal/flow/sync/steps.go`). Decision defaults go through a pure rule where one exists (`rules.DecidePush`).
 
-**Recap completeness:** a flag or a remembered answer never makes a recap line disappear — the recap reads the step's answer, else the flag/arg that resolved it (`Session.Presets`). **Re-init completeness:** a re-init step shows the complete candidate list, pre-filled from the config on disk, and reads an answer that may be empty as `(value, asked)` so a step never reinstates what the user removed. Details: `docs/dev/flow-layer.md`.
+**Recap completeness:** a flag or a remembered answer never makes a recap line disappear, nor its line in the wizard trail — the recap reads the step's answer, else the flag/arg that resolved it (`Session.Presets`). **Re-init completeness:** a re-init step shows the complete candidate list, pre-filled from the config on disk, and reads an answer that may be empty as `(value, asked)` so a step never reinstates what the user removed. Details: `docs/dev/flow-layer.md`.
 
 ## 10. Commit messages in English
 

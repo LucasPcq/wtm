@@ -92,13 +92,21 @@ Some questions get the same answer every time. In the wizard of `wtm create`, `w
   ↑↓ navigate • tab always use • / filter • enter confirm • esc back
 ```
 
-`tab` ticks it. Once the recap is confirmed, the answer is written to `config.toml` and the question is no longer asked in this repository (cancelling remembers nothing). The recap still names it:
+`tab` ticks it. Once the recap is confirmed, the answer is written to `config.toml` and the question is no longer asked in this repository (cancelling remembers nothing). The wizard still lists it where it would have been asked, as it does a question a flag answered, and the recap names it:
 
 ```
- Env:       parent · remembered
- Isolation: isolated · remembered
+  Step 5/6 • Confirm & create
 
- Remembered answers are not asked: --ask asks them again.
+  ✓ Branch: feat/two
+  ✓ Source branch: main
+  ✓ Env strategy: parent · remembered
+  ✓ Isolation: isolated · remembered
+  ⊘ Source update — source already up to date
+
+  ┃  Env:       parent · remembered
+  ┃  Isolation: isolated · remembered
+  ┃
+  ┃  Remembered answers are not asked: --ask asks them again.
 ```
 
 ```toml
