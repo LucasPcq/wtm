@@ -19,7 +19,7 @@ type StatusJobsParams struct {
 
 // StatusJobs is every job a worktree can run, with the state the events
 // stream would give it: a declared job nothing holds is stopped, and one still
-// up after leaving run.toml keeps its place at the end.
+// running after leaving run.toml keeps its place at the end.
 func StatusJobs(params StatusJobsParams) []domain.JobSnapshot {
 	jobs := make([]domain.JobSnapshot, 0, len(params.Declared)+len(params.Up))
 	for _, declared := range params.Declared {
@@ -33,12 +33,18 @@ func StatusJobs(params StatusJobsParams) []domain.JobSnapshot {
 		jobs = append(jobs, job)
 	}
 	for _, up := range params.Up {
-		if slices.ContainsFunc(params.Declared, func(declared domain.JobConfig) bool { return declared.Name == up.Name }) {
+		if !stillUp(up) || slices.ContainsFunc(params.Declared, func(declared domain.JobConfig) bool { return declared.Name == up.Name }) {
 			continue
 		}
 		jobs = append(jobs, up)
 	}
 	return jobs
+}
+
+// stillUp keeps a job run.toml no longer declares only while it runs: once it
+// ended there is nothing to start again, and a fix naming it would be refused.
+func stillUp(job domain.JobSnapshot) bool {
+	return job.State == domain.JobStateRunning || job.State == domain.JobStateStarting
 }
 
 type StatusProblemsParams struct {

@@ -61,7 +61,7 @@ It exits `0` whatever it finds. A script reads `problems` in the JSON document r
 
 ## Jobs
 
-Every job `run.toml` declares is listed, in its order, with the state [`wtm events`](events.md#jobs) reports: `starting`, `running`, `crashed`, `exited` (a task that finished) or `stopped`. A job nothing started yet is `stopped`. A job still up that `run.toml` no longer declares comes last. The address is the one `wtm run url` gives.
+Every job `run.toml` declares is listed, in its order, with the state [`wtm events`](events.md#jobs) reports: `starting`, `running`, `crashed`, `exited` (a task that finished) or `stopped`. A job nothing started yet is `stopped`. A job still running that `run.toml` no longer declares comes last. The address is the one `wtm run url` gives.
 
 ## Problems
 

@@ -19,6 +19,7 @@ func TestStatusJobsListsEveryDeclaredJobWithItsState(t *testing.T) {
 			{Name: "worker", Kind: domain.JobKindService, State: domain.JobStateCrashed, ExitCode: &code},
 			{Name: "api", Kind: domain.JobKindService, State: domain.JobStateRunning, URL: "http://daemon"},
 			{Name: "legacy", Kind: domain.JobKindService, State: domain.JobStateRunning},
+			{Name: "gone", Kind: domain.JobKindService, State: domain.JobStateCrashed},
 		},
 		URLs: map[string]string{"api": "http://localhost:3091"},
 	})

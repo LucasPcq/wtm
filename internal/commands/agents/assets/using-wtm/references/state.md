@@ -29,7 +29,7 @@ It changes nothing, asks nothing and needs no `--yes`. It never starts the run d
 ```
 
 - `addressing` and `offset` are `null` without a `run.toml` (`run_config: false`), and `offset` is `null` for a worktree no run has numbered yet (its jobs then have no `url` either). Reading a worktree never numbers it.
-- `jobs` lists every job `run.toml` declares, in its order, then any job still up that it no longer declares. `state` is the same vocabulary as the `job.*` events: `starting`, `running`, `crashed`, `exited` (a task that finished), `stopped`. A job nothing has started is `stopped`. `exit_code` appears on a crash only. A shared service the worktree holds carries `shared: true` and `owner` (where it runs).
+- `jobs` lists every job `run.toml` declares, in its order, then any job still running that it no longer declares. `state` is the same vocabulary as the `job.*` events: `starting`, `running`, `crashed`, `exited` (a task that finished), `stopped`. A job nothing has started is `stopped`. `exit_code` appears on a crash only. A shared service the worktree holds carries `shared: true` and `owner` (where it runs).
 - `env.declared` counts the `.env` files `config.toml` declares; `env.missing` names the ones the worktree lacks. Drift inside an existing file is `wtm env <worktree> --check --output json`.
 - `problems` is always present, empty when there is nothing to fix.
 
