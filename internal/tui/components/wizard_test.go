@@ -212,3 +212,15 @@ func TestTheFirstAskedStepAfterSettledOnesOffersCancel(t *testing.T) {
 		t.Errorf("help = %q, want esc back once a step was asked", help)
 	}
 }
+
+func TestARuledOutStepBeforeTheOpeningIsListedAsSkipped(t *testing.T) {
+	m := NewWizard([]Step{
+		{Name: "update", Model: NewTextInput(NewTextInputParams{}), Ruled: "source already up to date"},
+		{Name: "asked", Model: NewTextInput(NewTextInputParams{Title: "asked"})},
+	})
+	m.Init()
+	m = updateWizard(m, tea.WindowSizeMsg{Width: 100, Height: 60})
+	if view := m.View(); !strings.Contains(view, "Step 2/2") || !strings.Contains(view, "⊘ update — source already up to date") {
+		t.Errorf("view should count and list the ruled-out step:\n%s", view)
+	}
+}

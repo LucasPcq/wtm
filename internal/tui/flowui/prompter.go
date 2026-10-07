@@ -146,6 +146,7 @@ func build(session flow.Session) (*plan, error) {
 		if conditional && p.entered == 0 {
 			if skip, reason := step.Skip(p.known()); skip {
 				p.settled[step.Key] = flow.Answer{Skipped: true, SkipReason: reason}
+				p.ruledStep(step, reason)
 				continue
 			}
 			conditional = false
@@ -169,6 +170,16 @@ func (p *plan) settledStep(step flow.Step, line string) {
 	p.bindings = append(p.bindings, binding{key: step.Key, kind: step.Kind, settled: true, step: step})
 }
 
+// ruledStep keeps a step ruled out before the wizard opened where it stands, as
+// one ruled out on entry is; a step with no reason to give stays unlisted.
+func (p *plan) ruledStep(step flow.Step, reason string) {
+	if reason == "" {
+		return
+	}
+	p.steps = append(p.steps, components.Step{Name: step.Label, Model: placeholder(step), Ruled: reason})
+	p.bindings = append(p.bindings, binding{key: step.Key, kind: step.Kind, settled: true, step: step})
+}
+
 // recall settles a remembered step now when nothing asked later can change
 // whether it applies, and otherwise on entry, against the answers before it.
 func (p *plan) recall(step flow.Step) {
@@ -177,7 +188,9 @@ func (p *plan) recall(step flow.Step) {
 		p.settled[step.Key] = answer
 		if answer.Recalled {
 			p.settledStep(step, settledLine(step, answer, domain.RecapRememberedSuffix))
+			return
 		}
+		p.ruledStep(step, answer.SkipReason)
 		return
 	}
 	line, reason := "", ""

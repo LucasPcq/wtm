@@ -44,6 +44,9 @@ type Step struct {
 	// AutoSkip returned true, a non-empty one shows the step as Settled does
 	// rather than hiding it or listing it as skipped.
 	SettledSummary func() string
+	// Ruled is a step its condition ruled out before the wizard opened, with the
+	// reason: hopped over like Settled, listed as "⊘ <Name> — <Ruled>".
+	Ruled string
 	// Recap marks the final synthesis step: its description is rendered with a
 	// distinct "Review & confirm" header (see styles.RenderRecap) so it reads as
 	// the action point rather than another prompt.
@@ -112,11 +115,25 @@ func NewWizard(steps []Step) WizardModel {
 		settled:       make([]string, len(steps)),
 		width:         80,
 	}
-	for m.current < len(steps)-1 && steps[m.current].Settled != "" {
-		m.settle(m.current, steps[m.current].Settled)
+	for m.current < len(steps)-1 && m.hops(m.current) {
 		m.current++
 	}
 	return m
+}
+
+// hops marks a step decided before the wizard opened, and says whether it was.
+func (m *WizardModel) hops(stepIdx int) bool {
+	step := m.steps[stepIdx]
+	switch {
+	case step.Settled != "":
+		m.settle(stepIdx, step.Settled)
+	case step.Ruled != "":
+		m.skipped[stepIdx] = true
+		m.skippedReason[stepIdx] = step.Ruled
+	default:
+		return false
+	}
+	return true
 }
 
 func (m *WizardModel) settle(stepIdx int, summary string) {
@@ -750,14 +767,12 @@ func (m *WizardModel) propagateSize(stepIdx int) {
 func (m WizardModel) advance() (tea.Model, tea.Cmd) {
 	m.current++
 	for m.current < len(m.steps) {
-		step := m.steps[m.current]
-		if step.Settled != "" {
-			m.settle(m.current, step.Settled)
+		if m.hops(m.current) {
 			m.current++
 			continue
 		}
 		m.buildStep(m.current)
-		step = m.steps[m.current]
+		step := m.steps[m.current]
 		if step.AutoSkip != nil && step.AutoSkip(m) {
 			m.skipped[m.current] = true
 			if step.SettledSummary != nil {

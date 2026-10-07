@@ -82,8 +82,8 @@ func TestBuildResolvesAConditionalFirstStepUpFront(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
-	if got := names(dropped.steps); strings.Join(got, ",") != "Recap" {
-		t.Errorf("steps = %v, want the irrelevant step dropped", got)
+	if got := names(dropped.steps); strings.Join(got, ",") != "Conditional,Recap" || dropped.steps[0].Ruled != "nothing to reconcile" || dropped.entered != 1 {
+		t.Errorf("steps = %v, want the irrelevant step kept in place, ruled out with its reason, never entered", got)
 	}
 	answer, _ := dropped.known().Get("c")
 	if !answer.Skipped || answer.SkipReason != "nothing to reconcile" {
