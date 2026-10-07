@@ -2,6 +2,7 @@ package rules
 
 import (
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -104,6 +105,51 @@ func PlanEnvPorts(params PlanEnvPortsParams) domain.EnvPortPlan {
 	}
 
 	return plan
+}
+
+type SettleEnvResolvedValuesParams struct {
+	Files []domain.EnvFileResult
+	// Ports plans the worktree's links; its Lines are ignored.
+	Ports PlanEnvPortsParams
+}
+
+// SettleEnvResolvedValues spells each source value a link follows the way the
+// port pass leaves it: a value taken from the source is shifted onto this
+// worktree's port right after it is written, so previewing the source's
+// spelling shows a port the file never gets. It returns a copy.
+func SettleEnvResolvedValues(params SettleEnvResolvedValuesParams) []domain.EnvFileResult {
+	files := slices.Clone(params.Files)
+	for i, file := range files {
+		entries := slices.Clone(file.Diff.Entries)
+		for j, entry := range entries {
+			entries[j].ResolvedValue = settledEnvValue(settledEnvValueParams{Ports: params.Ports, File: file.Target, Entry: entry})
+		}
+		files[i].Diff.Entries = entries
+	}
+	return files
+}
+
+type settledEnvValueParams struct {
+	Ports PlanEnvPortsParams
+	File  string
+	Entry domain.EnvKeyDiff
+}
+
+func settledEnvValue(params settledEnvValueParams) string {
+	value := params.Entry.ResolvedValue
+	ports := params.Ports
+	ports.Links = slices.DeleteFunc(slices.Clone(ports.Links), func(link domain.EnvPortLink) bool {
+		return link.File != params.File || link.Key != params.Entry.Key
+	})
+	if value == "" || len(ports.Links) == 0 {
+		return value
+	}
+	ports.Lines = map[string][]domain.EnvLine{params.File: {{Kind: domain.EnvLinePair, Key: params.Entry.Key, Value: value}}}
+	plan := PlanEnvPorts(ports)
+	if len(plan.Entries) != 1 || plan.Entries[0].Status != domain.EnvPortStatusRewrite {
+		return value
+	}
+	return plan.Entries[0].NewValue
 }
 
 // linkGroup is every link one .env key follows, in declaration order.
@@ -566,7 +612,7 @@ func ElideEnvValue(params ElideEnvValueParams) string {
 		width = domain.EnvValueDisplayWidth
 	}
 
-	value := params.Value
+	value := MaskURLPassword(params.Value)
 	if at := strings.LastIndex(value, domain.EnvCredentialsSeparator); at >= 0 {
 		value = domain.Ellipsis + value[at:]
 	}

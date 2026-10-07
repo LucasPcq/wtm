@@ -350,3 +350,28 @@ func TestPlanEnvPortsLeavesAnUndeclaredPortAlone(t *testing.T) {
 		t.Errorf("value = %q, want the external origin untouched", plan.Entries[0].NewValue)
 	}
 }
+
+// LUC-274: a source value a link follows is previewed on this worktree's port;
+// a key no link follows, and the input, are left alone.
+func TestSettleEnvResolvedValuesShiftsOnlyALinkedValue(t *testing.T) {
+	files := []domain.EnvFileResult{{Target: ".env", Diff: domain.EnvDiff{Entries: []domain.EnvKeyDiff{
+		{Key: "DB_URL", Status: domain.EnvKeyConflict, ResolvedValue: "postgres://app:pw@localhost:5432/db"},
+		{Key: "OTHER", Status: domain.EnvKeyConflict, ResolvedValue: "localhost:5432"},
+	}}}}
+
+	settled := SettleEnvResolvedValues(SettleEnvResolvedValuesParams{Files: files, Ports: PlanEnvPortsParams{
+		Links:  []domain.EnvPortLink{{File: ".env", Key: "DB_URL", Job: "db", Port: "PG"}},
+		Bases:  map[domain.PortRef]int{{Job: "db", Name: "PG"}: 5432},
+		Offset: 10,
+	}})
+
+	if got := settled[0].Diff.Entries[0].ResolvedValue; got != "postgres://app:pw@localhost:5442/db" {
+		t.Errorf("DB_URL = %q, want it on the worktree's port", got)
+	}
+	if got := settled[0].Diff.Entries[1].ResolvedValue; got != "localhost:5432" {
+		t.Errorf("OTHER = %q, want it untouched", got)
+	}
+	if got := files[0].Diff.Entries[0].ResolvedValue; got != "postgres://app:pw@localhost:5432/db" {
+		t.Errorf("input = %q, want it untouched", got)
+	}
+}
