@@ -1,0 +1,17 @@
+/* The terminal-green accent of the README GIFs, so the site and the demos read as one product. */
+:root {
+  --sl-color-accent-low: #1a2e05;
+  --sl-color-accent: #65a30d;
+  --sl-color-accent-high: #d9f99d;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #ecfccb;
+  --sl-color-accent: #4d7c0f;
+  --sl-color-accent-high: #1a2e05;
+}
+
+.hero img {
+  border-radius: 0.75rem;
+  box-shadow: 0 1.5rem 3rem -1rem rgb(0 0 0 / 0.45);
+}

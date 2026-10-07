@@ -6,6 +6,7 @@ For an agent working in a repository that uses wtm, `wtm agents install` adds th
 
 ## Start here
 
+- [Documentation site](https://lucaspcq.github.io/wtm/): the same pages with search and archived versions; [llms-full.txt](https://lucaspcq.github.io/wtm/llms-full.txt) holds all of them as one text file
 - [README](README.md): what wtm does, how to install it, and an overview of every command
 - [Getting started](docs/guide/getting-started.md): a ten-minute tutorial from install to two worktrees running side by side
 - [Recipes](docs/guide/recipes.md): complete setups for a pnpm/turbo monorepo, a docker compose app, a shared postgres, AI agents in parallel, stacked PRs, and one command run across worktrees (`wtm exec`)

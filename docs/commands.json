@@ -1,0 +1,356 @@
+{
+  "groups": [
+    {
+      "id": "worktrees",
+      "title": "Worktrees",
+      "commands": [
+        {
+          "path": "wtm clean",
+          "file": "wtm_clean.md",
+          "short": "Remove worktrees and their local branches"
+        },
+        {
+          "path": "wtm create",
+          "file": "wtm_create.md",
+          "short": "Create one or more worktrees"
+        },
+        {
+          "path": "wtm env",
+          "file": "wtm_env.md",
+          "short": "Reconcile a worktree's .env against its template and value sources"
+        },
+        {
+          "path": "wtm events",
+          "file": "wtm_events.md",
+          "short": "Stream worktree changes as they happen, in one repository or all of them"
+        },
+        {
+          "path": "wtm exec",
+          "file": "wtm_exec.md",
+          "short": "Run one command in several worktrees, in parallel"
+        },
+        {
+          "path": "wtm extract",
+          "file": "wtm_extract.md",
+          "short": "Move uncommitted changes to another worktree"
+        },
+        {
+          "path": "wtm list",
+          "file": "wtm_list.md",
+          "short": "List all worktrees"
+        },
+        {
+          "path": "wtm prune",
+          "file": "wtm_prune.md",
+          "short": "Remove finished worktrees (merged, closed PR or gone) in one pass"
+        },
+        {
+          "path": "wtm relocate",
+          "file": "wtm_relocate.md",
+          "short": "Move worktrees to align with base_path and adopt external ones"
+        },
+        {
+          "path": "wtm tree",
+          "file": "wtm_tree.md",
+          "short": "Show the worktree forest (parent → child)"
+        },
+        {
+          "path": "wtm ui",
+          "file": "wtm_ui.md",
+          "short": "Open the worktree dashboard"
+        }
+      ]
+    },
+    {
+      "id": "navigate",
+      "title": "Navigate",
+      "commands": [
+        {
+          "path": "wtm go",
+          "file": "wtm_go.md",
+          "short": "Switch to a worktree"
+        },
+        {
+          "path": "wtm resolve",
+          "file": "wtm_resolve.md",
+          "short": "Resolve a branch to its worktree path"
+        }
+      ]
+    },
+    {
+      "id": "stack",
+      "title": "Stacked branches",
+      "commands": [
+        {
+          "path": "wtm fast-forward",
+          "file": "wtm_fast-forward.md",
+          "short": "Advance worktree branches to their origin counterpart"
+        },
+        {
+          "path": "wtm reparent",
+          "file": "wtm_reparent.md",
+          "short": "Change the parent one or more worktrees are rebased onto"
+        },
+        {
+          "path": "wtm sync",
+          "file": "wtm_sync.md",
+          "short": "Rebase selected worktrees onto their parent, in cascade"
+        }
+      ]
+    },
+    {
+      "id": "jobs",
+      "title": "Dev jobs",
+      "commands": [
+        {
+          "path": "wtm run",
+          "file": "wtm_run.md",
+          "short": "Manage dev jobs (services + tasks)",
+          "commands": [
+            {
+              "path": "wtm run addressing",
+              "file": "wtm_run_addressing.md",
+              "short": "Switch how the .env files spell a job's address"
+            },
+            {
+              "path": "wtm run daemon",
+              "file": "wtm_run_daemon.md",
+              "short": "Inspect, stop or restart the process that runs the jobs",
+              "commands": [
+                {
+                  "path": "wtm run daemon restart",
+                  "file": "wtm_run_daemon_restart.md",
+                  "short": "Hand the jobs over to a daemon built from this binary"
+                },
+                {
+                  "path": "wtm run daemon status",
+                  "file": "wtm_run_daemon_status.md",
+                  "short": "Report whether a daemon is running, and which build it is"
+                },
+                {
+                  "path": "wtm run daemon stop",
+                  "file": "wtm_run_daemon_stop.md",
+                  "short": "Stop the daemon, leaving detached services running"
+                }
+              ]
+            },
+            {
+              "path": "wtm run down",
+              "file": "wtm_run_down.md",
+              "short": "Stop a worktree's running jobs"
+            },
+            {
+              "path": "wtm run export",
+              "file": "wtm_run_export.md",
+              "short": "Export run.toml as JSON on stdout"
+            },
+            {
+              "path": "wtm run import",
+              "file": "wtm_run_import.md",
+              "short": "Replace run.toml with a JSON run config"
+            },
+            {
+              "path": "wtm run init",
+              "file": "wtm_run_init.md",
+              "short": "Configure the run module (services \u0026 tasks) for this repo"
+            },
+            {
+              "path": "wtm run job",
+              "file": "wtm_run_job.md",
+              "short": "Add, remove, or edit jobs in run.toml",
+              "commands": [
+                {
+                  "path": "wtm run job add",
+                  "file": "wtm_run_job_add.md",
+                  "short": "Add a job to run.toml"
+                },
+                {
+                  "path": "wtm run job edit",
+                  "file": "wtm_run_job_edit.md",
+                  "short": "Edit an existing job"
+                },
+                {
+                  "path": "wtm run job list",
+                  "file": "wtm_run_job_list.md",
+                  "short": "List jobs from run.toml"
+                },
+                {
+                  "path": "wtm run job rm",
+                  "file": "wtm_run_job_rm.md",
+                  "short": "Remove a job from run.toml"
+                }
+              ]
+            },
+            {
+              "path": "wtm run list",
+              "file": "wtm_run_list.md",
+              "short": "List jobs and profiles declared in run.toml"
+            },
+            {
+              "path": "wtm run logs",
+              "file": "wtm_run_logs.md",
+              "short": "Attach to a job's output"
+            },
+            {
+              "path": "wtm run open",
+              "file": "wtm_run_open.md",
+              "short": "Open a job's URL in the browser"
+            },
+            {
+              "path": "wtm run profile",
+              "file": "wtm_run_profile.md",
+              "short": "Add, remove, or edit profiles in run.toml",
+              "commands": [
+                {
+                  "path": "wtm run profile add",
+                  "file": "wtm_run_profile_add.md",
+                  "short": "Add a profile to run.toml"
+                },
+                {
+                  "path": "wtm run profile edit",
+                  "file": "wtm_run_profile_edit.md",
+                  "short": "Edit an existing profile"
+                },
+                {
+                  "path": "wtm run profile list",
+                  "file": "wtm_run_profile_list.md",
+                  "short": "List profiles from run.toml"
+                },
+                {
+                  "path": "wtm run profile rm",
+                  "file": "wtm_run_profile_rm.md",
+                  "short": "Remove a profile from run.toml"
+                }
+              ]
+            },
+            {
+              "path": "wtm run proxy",
+              "file": "wtm_run_proxy.md",
+              "short": "Inspect and install the redirection that serves named URLs on port 80",
+              "commands": [
+                {
+                  "path": "wtm run proxy install",
+                  "file": "wtm_run_proxy_install.md",
+                  "short": "Serve named URLs on port 80 so they drop their port"
+                },
+                {
+                  "path": "wtm run proxy status",
+                  "file": "wtm_run_proxy_status.md",
+                  "short": "Report what actually serves named URLs on this machine"
+                },
+                {
+                  "path": "wtm run proxy uninstall",
+                  "file": "wtm_run_proxy_uninstall.md",
+                  "short": "Remove the redirection and give named URLs their port back"
+                }
+              ]
+            },
+            {
+              "path": "wtm run ps",
+              "file": "wtm_run_ps.md",
+              "short": "List currently running jobs"
+            },
+            {
+              "path": "wtm run start",
+              "file": "wtm_run_start.md",
+              "short": "Start a single job"
+            },
+            {
+              "path": "wtm run stop",
+              "file": "wtm_run_stop.md",
+              "short": "Stop one job, in one or more worktrees"
+            },
+            {
+              "path": "wtm run up",
+              "file": "wtm_run_up.md",
+              "short": "Start a profile's jobs"
+            },
+            {
+              "path": "wtm run url",
+              "file": "wtm_run_url.md",
+              "short": "Print where a job is reachable in a worktree"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "github",
+      "title": "GitHub",
+      "commands": [
+        {
+          "path": "wtm checkout",
+          "file": "wtm_checkout.md",
+          "short": "Create a worktree from an existing pull request"
+        }
+      ]
+    },
+    {
+      "id": "setup",
+      "title": "Setup",
+      "commands": [
+        {
+          "path": "wtm agents",
+          "file": "wtm_agents.md",
+          "short": "Manage LLM agent integrations for wtm",
+          "commands": [
+            {
+              "path": "wtm agents install",
+              "file": "wtm_agents_install.md",
+              "short": "Install the using-wtm skill into .claude / .cursor"
+            }
+          ]
+        },
+        {
+          "path": "wtm config",
+          "file": "wtm_config.md",
+          "short": "Inspect or edit the project wtm config",
+          "commands": [
+            {
+              "path": "wtm config edit",
+              "file": "wtm_config_edit.md",
+              "short": "Open the project config.toml in $EDITOR"
+            },
+            {
+              "path": "wtm config show",
+              "file": "wtm_config_show.md",
+              "short": "Print the project config.toml"
+            }
+          ]
+        },
+        {
+          "path": "wtm init",
+          "file": "wtm_init.md",
+          "short": "Initialize wtm configuration"
+        },
+        {
+          "path": "wtm schema",
+          "file": "wtm_schema.md",
+          "short": "Inspect or extract bundled JSON Schemas",
+          "commands": [
+            {
+              "path": "wtm schema dump",
+              "file": "wtm_schema_dump.md",
+              "short": "Write embedded schemas to \u003cstate-dir\u003e/schemas/ (or the global config's schemas/ with --global)"
+            }
+          ]
+        },
+        {
+          "path": "wtm shell-init",
+          "file": "wtm_shell-init.md",
+          "short": "Generate shell integration function"
+        },
+        {
+          "path": "wtm upgrade",
+          "file": "wtm_upgrade.md",
+          "short": "Update wtm to the latest release"
+        },
+        {
+          "path": "wtm version",
+          "file": "wtm_version.md",
+          "short": "Print wtm's version and the versions of its machine contracts"
+        }
+      ]
+    }
+  ]
+}
