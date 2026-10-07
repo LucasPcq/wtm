@@ -154,6 +154,10 @@ func AddIsolationFlag(cmd *cobra.Command) {
 	cmd.Flags().String(domain.FlagIsolation, "", "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated")
 }
 
+func AddAskFlag(cmd *cobra.Command) {
+	cmd.Flags().Bool(domain.FlagAsk, false, domain.FlagAskUsage)
+}
+
 // IsolationFlag reads --isolation, refusing a value that is neither answer.
 func IsolationFlag(cmd *cobra.Command) (domain.Isolation, error) {
 	value, _ := cmd.Flags().GetString(domain.FlagIsolation)

@@ -29,6 +29,7 @@ type projectTemplateData struct {
 	OnCreate    []domain.HookCommand
 	SkipClean   bool
 	OnClean     []domain.HookCommand
+	Remembered  map[string]string
 }
 
 type WriteProjectParams struct {
@@ -112,6 +113,7 @@ func configToTemplate(c domain.ProjectConfig) projectTemplateData {
 		OnCreate:    c.Hooks.OnCreate,
 		SkipClean:   false,
 		OnClean:     c.Hooks.OnClean,
+		Remembered:  c.Wizard.Remembered,
 	}
 }
 

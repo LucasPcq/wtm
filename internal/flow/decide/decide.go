@@ -6,8 +6,10 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/envports"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/branch"
+	"github.com/LucasPcq/wtm/internal/service/memory"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
 
@@ -174,8 +176,8 @@ func IsolationOptions(params IsolationOptionsParams) []flow.Option {
 
 // UpdateFastForward and UpdateKeep answer a source-update step.
 const (
-	UpdateFastForward = "ff"
-	UpdateKeep        = "keep"
+	UpdateFastForward = domain.SourceUpdateFastForward
+	UpdateKeep        = domain.SourceUpdateKeep
 )
 
 type SourceUpdateStepParams struct {
@@ -185,12 +187,18 @@ type SourceUpdateStepParams struct {
 }
 
 // SourceUpdateStep applies only to a behind-only branch; a diverged one is not a
-// gate here, it becomes a ⚠ line in the recap.
+// gate here, it becomes a ⚠ line in the recap. --ff answers it through Resolve
+// rather than as a preset, so under --ff it remembers nothing: the flag wins.
 func SourceUpdateStep(params SourceUpdateStepParams) flow.Step {
+	memory := flow.Memory{ID: domain.RememberSourceUpdate}
+	if params.FastForward {
+		memory = flow.Memory{}
+	}
 	return flow.Step{
-		Kind:  flow.StepSelect,
-		Key:   params.Key,
-		Label: domain.SourceUpdateLabel,
+		Memory: memory,
+		Kind:   flow.StepSelect,
+		Key:    params.Key,
+		Label:  domain.SourceUpdateLabel,
 		Skip: func(answers flow.Answers) (bool, string) {
 			prompt := params.Prompt(answers)
 			if prompt.Show && !prompt.AbortOnDecline {
@@ -280,4 +288,82 @@ func WarnUnseenFallback(params UnseenFallbackParams) []string {
 	}
 	params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: warning})
 	return []string{warning}
+}
+
+type RememberParams struct {
+	Context   flow.Context
+	Session   flow.Session
+	Answers   flow.Answers
+	Presenter flow.Presenter
+}
+
+// Remember keeps what a confirmed session ticked. Failing to write it costs the
+// next run a question, never this run its worktree.
+func Remember(params RememberParams) {
+	err := memory.Remember(memory.RememberParams{
+		StateDir: params.Context.StateDir,
+		Change:   flow.Remembering(params.Session, params.Answers),
+	})
+	if err != nil {
+		params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: fmt.Sprintf(domain.RememberWriteFailedFmt, err)})
+	}
+}
+
+// OriginsParams names the steps of a session creating a worktree, and the flags
+// its request carried; an empty key is a question the session does not ask.
+type OriginsParams struct {
+	Context         flow.Context
+	Answers         flow.Answers
+	EnvKey          string
+	IsolationKey    string
+	SourceUpdateKey string
+	EnvFlag         bool
+	IsolationFlag   bool
+	FastForward     bool
+}
+
+// Origins says, per memory id, what settled each answer a step could have
+// remembered, for the JSON a script reads to know whether a remembered answer
+// stood in for a flag it did not pass.
+func Origins(params OriginsParams) map[string]domain.AnswerOrigin {
+	questions := []struct {
+		id       string
+		key      string
+		flag     bool
+		fallback domain.AnswerOrigin
+	}{
+		{domain.RememberEnvStrategy, params.EnvKey, params.EnvFlag, domain.AnswerOriginConfig},
+		{domain.RememberIsolation, params.IsolationKey, params.IsolationFlag, envports.IsolationOrigin(params.Context)},
+		{domain.RememberSourceUpdate, params.SourceUpdateKey, params.FastForward, domain.AnswerOriginDefault},
+	}
+	origins := map[string]domain.AnswerOrigin{}
+	for _, question := range questions {
+		if question.key == "" {
+			continue
+		}
+		origin, settled := flow.OriginOf(flow.OriginParams{
+			Answers:  params.Answers,
+			Key:      question.key,
+			Flag:     question.flag,
+			Fallback: question.fallback,
+		})
+		if settled {
+			origins[question.id] = origin
+		}
+	}
+	if len(origins) == 0 {
+		return nil
+	}
+	return origins
+}
+
+// KeptSourceLines names a source left behind origin by a remembered or
+// to-be-remembered "keep": asked, it is a visible choice; settled from memory,
+// it would otherwise leave no trace in the recap.
+func KeptSourceLines(answers flow.Answers, key string) []string {
+	mark := flow.RememberedMark(answers, key)
+	if mark == "" || answers.Value(key) != UpdateKeep {
+		return nil
+	}
+	return []string{domain.RecapFieldSourceUpdate + domain.SourceUpdateSummaryKeep + mark}
 }

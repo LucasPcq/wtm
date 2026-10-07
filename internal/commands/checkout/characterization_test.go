@@ -228,7 +228,7 @@ func TestCharacterizeJSONCheckout(t *testing.T) {
 	if stderr != "" {
 		t.Errorf("stderr = %q, want nothing", stderr)
 	}
-	want := `{"author":"octocat","branch":"feat/thing","existing_branch":false,"is_draft":false,"isolation":"isolated","number":42,"path":"<trees>/feat-thing","url":"https://github.com/test/test/pull/42"}`
+	want := `{"author":"octocat","branch":"feat/thing","existing_branch":false,"is_draft":false,"isolation":"isolated","number":42,"origins":{"env_strategy":"config"},"path":"<trees>/feat-thing","url":"https://github.com/test/test/pull/42"}`
 	var normalized bytes.Buffer
 	encoder := json.NewEncoder(&normalized)
 	encoder.SetEscapeHTML(false)

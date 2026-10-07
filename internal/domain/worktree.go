@@ -189,6 +189,9 @@ type CreateResult struct {
 	// Warnings are what the run module could not do for the worktree, which
 	// never fails its creation (a port pass left undone, and why).
 	Warnings []string `json:"warnings,omitempty"`
+	// Origins says, per memory id, what settled each answer the wizard could
+	// have remembered: a flag, a remembered answer, the config or the default.
+	Origins map[string]AnswerOrigin `json:"origins,omitempty"`
 }
 
 // Path is set when the worktree exists but its hooks failed.

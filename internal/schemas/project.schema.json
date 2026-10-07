@@ -97,6 +97,22 @@
           }
         }
       }
+    },
+    "wizard": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "remembered": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Answers the wizard no longer asks in this repository, written by its \"Always use this answer\" toggle. They apply under --yes too; an explicit flag still wins, and --ask asks them again.",
+          "properties": {
+            "env_strategy": { "type": "string", "enum": ["example", "main", "parent"], "description": "The env strategy create and checkout use without asking." },
+            "isolation": { "type": "string", "enum": ["isolated", "verbatim"], "description": "The isolation create, checkout and extract give a new worktree without asking." },
+            "source_update": { "type": "string", "enum": ["ff", "keep"], "description": "Whether a source branch behind origin is fast-forwarded (ff) or kept as-is (keep), without asking." }
+          }
+        }
+      }
     }
   }
 }

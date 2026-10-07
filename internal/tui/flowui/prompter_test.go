@@ -44,7 +44,9 @@ func names(steps []components.Step) []string {
 	return out
 }
 
-func TestBuildSkipsPresetSteps(t *testing.T) {
+// A preset is never asked, but keeps its place: the trail reads it where it
+// would have been asked.
+func TestBuildSettlesPresetSteps(t *testing.T) {
 	session := flow.Session{
 		Presets: flow.NewAnswers(map[string]string{"a": "given"}),
 		Steps:   []flow.Step{textStep("a"), selectStep("b", "one"), recapStep("r")},
@@ -54,8 +56,11 @@ func TestBuildSkipsPresetSteps(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
-	if got := names(plan.steps); strings.Join(got, ",") != "Select b,Recap" {
-		t.Errorf("steps = %v, want the preset one dropped", got)
+	if got := names(plan.steps); strings.Join(got, ",") != "Text a,Select b,Recap" {
+		t.Errorf("steps = %v, want the preset one kept in place", got)
+	}
+	if plan.steps[0].Settled != "given" || plan.entered != 2 {
+		t.Errorf("settled = %q, entered = %d, want the preset settled and two steps entered", plan.steps[0].Settled, plan.entered)
 	}
 	if got := plan.known().Value("a"); got != "given" {
 		t.Errorf("preset value = %q, want it available to every step", got)
@@ -77,8 +82,8 @@ func TestBuildResolvesAConditionalFirstStepUpFront(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
-	if got := names(dropped.steps); strings.Join(got, ",") != "Recap" {
-		t.Errorf("steps = %v, want the irrelevant step dropped", got)
+	if got := names(dropped.steps); strings.Join(got, ",") != "Conditional,Recap" || dropped.steps[0].Ruled != "nothing to reconcile" || dropped.entered != 1 {
+		t.Errorf("steps = %v, want the irrelevant step kept in place, ruled out with its reason, never entered", got)
 	}
 	answer, _ := dropped.known().Get("c")
 	if !answer.Skipped || answer.SkipReason != "nothing to reconcile" {
@@ -431,7 +436,7 @@ func TestSelectOpensOnTheStepsStartingValue(t *testing.T) {
 		Start: "/wt/c",
 	}
 
-	if got := selectList(content).Value(); got != "/wt/c" {
+	if got := selectList(flow.Step{}, content).Value(); got != "/wt/c" {
 		t.Errorf("cursor = %q, want the starting value", got)
 	}
 }
@@ -442,7 +447,7 @@ func TestSelectWithoutAStartOpensOnTheFirstOption(t *testing.T) {
 		{Label: "feature-b", Value: "/wt/b"},
 	}}
 
-	if got := selectList(content).Value(); got != "/wt/a" {
+	if got := selectList(flow.Step{}, content).Value(); got != "/wt/a" {
 		t.Errorf("cursor = %q, want the first option", got)
 	}
 }
@@ -454,7 +459,7 @@ func TestSelectRendersTheBadgesAStepDeclares(t *testing.T) {
 		Badges: []flow.Badge{{Text: "3 jobs", Tone: domain.ToneSuccess}, {Text: "current"}},
 	}}}
 
-	view := selectList(content).View()
+	view := selectList(flow.Step{}, content).View()
 	for _, want := range []string{"3 jobs", "current"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("view is missing %q:\n%s", want, view)
@@ -622,7 +627,7 @@ func TestABuiltStepKeepsItsStartingValue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("content: %v", err)
 	}
-	if got := selectList(content).Value(); got != "/wt/feat" {
+	if got := selectList(flow.Step{}, content).Value(); got != "/wt/feat" {
 		t.Errorf("cursor = %q, want the start the step built", got)
 	}
 }

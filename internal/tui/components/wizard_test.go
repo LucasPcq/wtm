@@ -137,3 +137,90 @@ func TestBreadcrumbShowsTheStepTitleOverItsName(t *testing.T) {
 		t.Errorf("breadcrumb = %q, want the step's name when it has no title", got)
 	}
 }
+
+func TestWizardOpensPastSettledStepsAndCountsThem(t *testing.T) {
+	m := NewWizard([]Step{
+		{Name: "flagged", Model: NewTextInput(NewTextInputParams{}), Settled: "given · --flag"},
+		{Name: "asked", Model: NewTextInput(NewTextInputParams{Title: "asked"})},
+		{Name: "kept", Model: NewTextInput(NewTextInputParams{}), Settled: "kept · remembered"},
+		{Name: "last", Model: NewTextInput(NewTextInputParams{Title: "last"})},
+	})
+	m.Init()
+	m = updateWizard(m, tea.WindowSizeMsg{Width: 100, Height: 60})
+
+	if m.current != 1 || !m.Skipped(0) {
+		t.Fatalf("current = %d, want the wizard opened on the first asked step", m.current)
+	}
+	if view := m.View(); !strings.Contains(view, "Step 2/4") || !strings.Contains(view, "✓ flagged: given · --flag") {
+		t.Errorf("view should count the settled step and list it:\n%s", view)
+	}
+
+	m = updateWizard(m, key(tea.KeyEnter))
+	if m.current != 3 {
+		t.Fatalf("current = %d, want the settled step passed over", m.current)
+	}
+	if view := m.View(); !strings.Contains(view, "Step 4/4") || !strings.Contains(view, "✓ kept: kept · remembered") {
+		t.Errorf("view should list the settled step where it stands:\n%s", view)
+	}
+
+	m = updateWizard(m, key(tea.KeyEsc))
+	if m.current != 1 {
+		t.Errorf("current = %d, want esc to hop back over the settled step", m.current)
+	}
+	m = updateWizard(m, key(tea.KeyEsc))
+	if !m.Aborted() {
+		t.Error("esc on the first asked step should back out")
+	}
+}
+
+func TestASettledSummaryReplacesTheSkipLine(t *testing.T) {
+	m := NewWizard([]Step{
+		{Name: "a", Model: NewTextInput(NewTextInputParams{Title: "a"})},
+		{
+			Name:           "b",
+			Model:          NewTextInput(NewTextInputParams{}),
+			AutoSkip:       func(WizardModel) bool { return true },
+			SettledSummary: func() string { return "verbatim · remembered" },
+			SkipReason:     func() string { return "unused" },
+		},
+		{Name: "c", Model: NewTextInput(NewTextInputParams{Title: "c"})},
+	})
+	m.Init()
+	m = updateWizard(m, tea.WindowSizeMsg{Width: 100, Height: 60})
+	m = updateWizard(m, key(tea.KeyEnter))
+
+	view := m.View()
+	if !strings.Contains(view, "✓ b: verbatim · remembered") || strings.Contains(view, "⊘") {
+		t.Errorf("view should read the step as settled:\n%s", view)
+	}
+}
+
+// Esc on the first step asked backs out, whatever settled steps precede it, and
+// the help bar must say so.
+func TestTheFirstAskedStepAfterSettledOnesOffersCancel(t *testing.T) {
+	m := NewWizard([]Step{
+		{Name: "flagged", Model: NewTextInput(NewTextInputParams{}), Settled: "given"},
+		{Name: "asked", Model: NewSelectList(NewSelectListParams{Items: []SelectItem{{Label: "a", Value: "a"}}})},
+		{Name: "last", Model: NewSelectList(NewSelectListParams{Items: []SelectItem{{Label: "b", Value: "b"}}})},
+	})
+	m.Init()
+	if help := m.helpLine(); !strings.Contains(help, "esc cancel") {
+		t.Errorf("help = %q, want esc cancel on the first asked step", help)
+	}
+	m = updateWizard(m, key(tea.KeyEnter))
+	if help := m.helpLine(); !strings.Contains(help, "esc back") {
+		t.Errorf("help = %q, want esc back once a step was asked", help)
+	}
+}
+
+func TestARuledOutStepBeforeTheOpeningIsListedAsSkipped(t *testing.T) {
+	m := NewWizard([]Step{
+		{Name: "update", Model: NewTextInput(NewTextInputParams{}), Ruled: "source already up to date"},
+		{Name: "asked", Model: NewTextInput(NewTextInputParams{Title: "asked"})},
+	})
+	m.Init()
+	m = updateWizard(m, tea.WindowSizeMsg{Width: 100, Height: 60})
+	if view := m.View(); !strings.Contains(view, "Step 2/2") || !strings.Contains(view, "⊘ update — source already up to date") {
+		t.Errorf("view should count and list the ruled-out step:\n%s", view)
+	}
+}

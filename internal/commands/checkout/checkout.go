@@ -45,6 +45,7 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().String(domain.FlagEnvFrom, "", "Override env strategy (example, main, parent)")
 	cmd.Flags().Bool(domain.FlagFF, false, "Fast-forward the PR's branch to origin when it already exists locally and is behind (non-interactive; skipped when it has diverged)")
 	shared.AddIsolationFlag(cmd)
+	shared.AddAskFlag(cmd)
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (PR number required)")
 	shared.AddOutputFlag(cmd)
 	shared.RequireYesInJSON(cmd)
@@ -83,6 +84,7 @@ func runCheckout(cmd *cobra.Command, args []string) error {
 	review, _ := cmd.Flags().GetBool(domain.FlagReview)
 	mine, _ := cmd.Flags().GetBool(domain.FlagMine)
 	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
+	ask, _ := cmd.Flags().GetBool(domain.FlagAsk)
 	isolation, err := shared.IsolationFlag(cmd)
 	if err != nil {
 		return err
@@ -108,6 +110,7 @@ func runCheckout(cmd *cobra.Command, args []string) error {
 			EnvFrom:     envOverride,
 			FastForward: ffFlag,
 			Isolation:   isolation,
+			Ask:         ask,
 		},
 		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive}),
 		Presenter: checkoutPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},

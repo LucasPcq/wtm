@@ -36,6 +36,10 @@ const (
 )
 
 func (f *createFlow) session() flow.Session {
+	return flow.Recall(flow.RecallParams{Session: f.steps(), Remembered: f.ctx.Config.Project.Wizard.Remembered, Ask: f.request.Ask})
+}
+
+func (f *createFlow) steps() flow.Session {
 	return flow.Session{
 		ErrLabel: domain.WizardErrLabel,
 		Presets:  f.presetAnswers(),
@@ -208,6 +212,7 @@ func (f *createFlow) envStep() flow.Step {
 		Resolve:   func(flow.Answers) (flow.Answer, error) { return flow.Answer{Value: ""}, nil },
 		Summarize: envSummary,
 		Flag:      domain.FlagEnvFrom,
+		Memory:    flow.Memory{ID: domain.RememberEnvStrategy},
 	}
 }
 
@@ -253,6 +258,7 @@ func (f *createFlow) isolationStep() flow.Step {
 		},
 		Summarize: func(answer flow.Answer) string { return rules.IsolationSummary(domain.Isolation(answer.Value)) },
 		Flag:      domain.FlagIsolation,
+		Memory:    flow.Memory{ID: domain.RememberIsolation},
 	}
 }
 
@@ -357,22 +363,25 @@ func (f *createFlow) recap(answers flow.Answers) string {
 	if answers.Value(KeySourceUpdate) == updateFastForward {
 		ffBranch = f.sourceUpdate(answers).Branch
 	}
+	updateMark := flow.RememberedMark(answers, KeySourceUpdate)
 	sourceLabel := source
 	if ffBranch != "" && ffBranch == source {
-		sourceLabel += domain.RecapFastForwardSuffix
+		sourceLabel += domain.RecapFastForwardSuffix + updateMark
 	}
 
 	var lines []string
 	if line := f.branchLine(answers); line != "" {
 		lines = append(lines, line)
 	}
-	lines = append(lines, sourceField+sourceLabel, domain.RecapFieldEnv+envLabel)
+	lines = append(lines, sourceField+sourceLabel, domain.RecapFieldEnv+envLabel+flow.RememberedMark(answers, KeyEnv))
 	if isolation := answers.Value(KeyIsolation); isolation != "" {
-		lines = append(lines, domain.RecapFieldIsolation+rules.IsolationSummary(domain.Isolation(isolation)))
+		lines = append(lines, domain.RecapFieldIsolation+rules.IsolationSummary(domain.Isolation(isolation))+flow.RememberedMark(answers, KeyIsolation))
 	}
 	if ffBranch != "" && ffBranch != source {
-		lines = append(lines, fmt.Sprintf(domain.RecapUpdateFastForward, ffBranch))
+		lines = append(lines, fmt.Sprintf(domain.RecapUpdateFastForward, ffBranch)+updateMark)
 	}
+	lines = append(lines, decide.KeptSourceLines(answers, KeySourceUpdate)...)
+	lines = append(lines, flow.RememberedHint(answers, KeyEnv, KeyIsolation, KeySourceUpdate)...)
 
 	if warnings := f.warnings(answers); len(warnings) > 0 {
 		lines = append(lines, "")

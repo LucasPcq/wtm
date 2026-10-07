@@ -14,7 +14,18 @@ type ProjectConfig struct {
 	Worktrees WorktreesConfig `toml:"worktrees" json:"worktrees"`
 	Env       EnvConfig       `toml:"env" json:"env"`
 	Hooks     HooksConfig     `toml:"hooks" json:"hooks"`
+	Wizard    WizardConfig    `toml:"wizard" json:"wizard"`
 }
+
+// WizardConfig.Remembered holds the answers this repository chose never to be
+// asked again, keyed by a question's memory id (domain.Remember*).
+type WizardConfig struct {
+	Remembered map[string]string `toml:"remembered" json:"remembered,omitempty"`
+}
+
+// AnswerOrigin says what settled a rememberable answer, for a reader that has to
+// know whether a remembered one stood in for a flag it did not pass.
+type AnswerOrigin string
 
 // WorktreesConfig controls worktree creation defaults.
 type WorktreesConfig struct {
