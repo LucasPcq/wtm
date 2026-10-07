@@ -1228,6 +1228,9 @@ const (
 	// EnvDetailRestored* are the file-block rows of those values.
 	EnvDetailRestoredFmt        = "back to the source's %s (was %s)"
 	EnvDetailRestoredRemovedFmt = "removed — the source has none (was %s)"
+	// EnvDetailOwnedWouldSetFmt is a check's row for a key wtm writes in full
+	// and would rewrite.
+	EnvDetailOwnedWouldSetFmt = "would be set to wtm's value %s"
 	// EnvRestoreRecapTitle heads the wizard recap's preview of what the switch
 	// to verbatim puts back.
 	EnvRestoreRecapTitle       = "Back to the source's values"

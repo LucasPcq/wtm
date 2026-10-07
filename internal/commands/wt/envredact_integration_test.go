@@ -189,3 +189,39 @@ func TestEveryEnvSurfaceMasksThePasswordsNetURLCannotRead(t *testing.T) {
 		}
 	}
 }
+
+// LUC-274: a verbatim switch's row for an origin list was elided from the left
+// down to its last origin, the same on both sides, hiding the port that moved.
+func TestEnvVerbatimTextShowsTheMoveInAList(t *testing.T) {
+	dir := linkedSecretRepo(t, map[string]string{"ORIGINS": "http://localhost:3000,http://a:" + dbPassword + "@localhost:3001"})
+	envCreate("feat/a", "--from", "main", "--yes")(t, dir)
+
+	stdout, stderr, err := runWtCmd(t, domain.CmdEnv, "feat/a", "--yes", "--"+domain.FlagIsolation, string(domain.IsolationVerbatim))
+	if err != nil {
+		t.Fatalf("env --isolation verbatim: %v\n%s", err, stderr)
+	}
+
+	assertNoSecret(t, "verbatim text", stdout+stderr, dbPassword)
+	if !strings.Contains(stdout, `back to the source's "http://localhost:3000,`) || !strings.Contains(stdout, `(was "http://localhost:3010,`) {
+		t.Errorf("verbatim text hides the move:\n%s", stdout)
+	}
+}
+
+// LUC-274: a check whose only finding was a hand-edited [[env]] key named
+// nothing.
+func TestEnvCheckTextNamesAHandEditedOwnedKey(t *testing.T) {
+	dir := databaseURLRepo(t)
+	envCreate("feat/a", "--from", "main", "--yes")(t, dir)
+	path := worktreeEnvPath(dir, "feat/a")
+	current, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeEnvFile(t, path, strings.Replace(string(current), "REALM=app-feat-a", "REALM=edited", 1))
+
+	stdout, _, _ := runWtCmd(t, domain.CmdEnv, "feat/a", "--"+domain.FlagCheck)
+
+	if !strings.Contains(stdout, `REALM  would be set to wtm's value "app-feat-a"`) {
+		t.Errorf("check text does not name REALM:\n%s", stdout)
+	}
+}

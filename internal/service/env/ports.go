@@ -38,6 +38,18 @@ type EnvPortsParams struct {
 // case and means every caller can skip the whole reconciliation.
 func (p EnvPortsParams) Empty() bool { return len(p.Links) == 0 && len(p.Owned) == 0 }
 
+// PlanParams is the port plan of these links over no .env yet.
+func (p EnvPortsParams) PlanParams() rules.PlanEnvPortsParams {
+	return rules.PlanEnvPortsParams{
+		Links:   p.Links,
+		Bases:   p.Bases,
+		Offset:  p.Offset,
+		Block:   p.Block,
+		Origins: p.Origins,
+		Shared:  p.Shared,
+	}
+}
+
 // ComputeEnvPorts resolves every link against the worktree's current .env files,
 // writing nothing. A file that does not exist yields missing keys rather than
 // silence — a link the user declared must stay visible in the report.
@@ -47,15 +59,9 @@ func ComputeEnvPorts(params EnvPortsParams) (domain.EnvPortPlan, error) {
 		return domain.EnvPortPlan{}, err
 	}
 
-	plan := rules.PlanEnvPorts(rules.PlanEnvPortsParams{
-		Links:   params.Links,
-		Bases:   params.Bases,
-		Offset:  params.Offset,
-		Block:   params.Block,
-		Lines:   lines,
-		Origins: params.Origins,
-		Shared:  params.Shared,
-	})
+	planParams := params.PlanParams()
+	planParams.Lines = lines
+	plan := rules.PlanEnvPorts(planParams)
 	owned, err := planOwned(params)
 	if err != nil {
 		return domain.EnvPortPlan{}, err

@@ -64,8 +64,9 @@ func RestoreOwnedEnv(params RestoreOwnedEnvParams) ([]domain.EnvLine, []domain.E
 	return out, entries
 }
 
-// EnvRestoredRows renders one file's restored values as aligned rows, the
-// values elided like the port table's: a URL wtm owns may carry a password.
+// EnvRestoredRows renders one file's restored values as aligned rows, each
+// value whole with its passwords masked: an elided one can cut away the very
+// port that moved.
 func EnvRestoredRows(entries []domain.EnvRestoredEntry, file string) []string {
 	var mine []domain.EnvRestoredEntry
 	width := 0
@@ -84,9 +85,9 @@ func EnvRestoredRows(entries []domain.EnvRestoredEntry, file string) []string {
 }
 
 func restoredDetail(entry domain.EnvRestoredEntry) string {
-	was := EnvQuote(ElideEnvValue(ElideEnvValueParams{Value: entry.From}))
+	was := EnvQuote(MaskURLPassword(entry.From))
 	if entry.Removed {
 		return fmt.Sprintf(domain.EnvDetailRestoredRemovedFmt, was)
 	}
-	return fmt.Sprintf(domain.EnvDetailRestoredFmt, EnvQuote(ElideEnvValue(ElideEnvValueParams{Value: entry.To})), was)
+	return fmt.Sprintf(domain.EnvDetailRestoredFmt, EnvQuote(MaskURLPassword(entry.To)), was)
 }

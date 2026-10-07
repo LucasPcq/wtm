@@ -139,14 +139,13 @@ func TestMaskURLPasswordMasksOnlyAURLPassword(t *testing.T) {
 		"postgres://app:hunter2@localhost:5432/db": "postgres://app:***@localhost:5432/db",
 		"redis://:hunter2@127.0.0.1:6379":          "redis://:***@127.0.0.1:6379",
 		"amqp://u:p%40ss@localhost:5672/vhost?x=1": "amqp://u:***@localhost:5672/vhost?x=1",
-		"3010":           "3010",
-		"localhost:3010": "localhost:3010",
-		"http://localhost:3010/callback?next=/a@b":   "http://localhost:3010/callback?next=/a@b",
-		"postgres://app@localhost:5432/db":           "postgres://app@localhost:5432/db",
-		"postgres://app:@localhost:5432/db":          "postgres://app:***@localhost:5432/db",
-		"http://[::1:3010":                           "http://[::1:3010",
-		"not a url: user:pass@host":                  "not a url: user:pass@host",
-		"":                                           "",
+		"3010":                              "3010",
+		"localhost:3010":                    "localhost:3010",
+		"postgres://app@localhost:5432/db":  "postgres://app@localhost:5432/db",
+		"postgres://app:@localhost:5432/db": "postgres://app:***@localhost:5432/db",
+		"http://[::1:3010":                  "http://[::1:3010",
+		"not a url: user:pass@host":         "not a url: user:pass@host",
+		"":                                  "",
 		"http://localhost:3010,http://a:b@localhost": "http://localhost:3010,http://a:***@localhost",
 	}
 	for in, want := range cases {
@@ -215,8 +214,25 @@ func TestMaskURLPasswordMasksWhatNetURLCannotRead(t *testing.T) {
 		"postgres://localhost:5432/db?user=app&password=" + fakeSecret + "&x=1": "postgres://localhost:5432/db?user=app&password=***&x=1",
 		"jdbc:postgresql://localhost:5432/db?user=app&password=" + fakeSecret:   "jdbc:postgresql://localhost:5432/db?user=app&password=***",
 		"jdbc:sqlserver://localhost:1433;user=app;Password=" + fakeSecret:       "jdbc:sqlserver://localhost:1433;user=app;Password=***",
+		"postgres://app:12#" + fakeSecret + "@localhost:5432/db":                "postgres://app:***@localhost:5432/db",
+		"postgres://app:12/" + fakeSecret + "@localhost:5432/db":                "postgres://app:***@localhost:5432/db",
 		"jdbc:mysql://app:" + fakeSecret + "@localhost:3306/db":                 "jdbc:mysql://app:***@localhost:3306/db",
 		" postgres://app:" + fakeSecret + "@localhost:5432/db ":                 " postgres://app:***@localhost:5432/db ",
+	}
+	for in, want := range cases {
+		if got := MaskURLPassword(in); got != want {
+			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// LUC-274: an "@" past a URL's authority cannot be told from a password that
+// net/url read as a path or a fragment ("app:12#x@h"), so it is masked too.
+func TestMaskURLPasswordOverMasksAnAtPastTheAuthority(t *testing.T) {
+	cases := map[string]string{
+		"http://localhost:3010/a@b?next=c@d": "http://localhost:***@d",
+		"http://host:3000/users/@me":         "http://host:***@me",
+		"http://host/users/@me":              "http://***@me",
 	}
 	for in, want := range cases {
 		if got := MaskURLPassword(in); got != want {
@@ -231,7 +247,6 @@ func TestMaskURLPasswordKeepsTheShapesItAlreadyHandled(t *testing.T) {
 		"postgres://app:p%40ss@localhost:5432/db":     "postgres://app:***@localhost:5432/db",
 		"postgres://app:p@ss@localhost:5432/db":       "postgres://app:***@localhost:5432/db",
 		"postgres://app:pw@[::1]:5432/db":             "postgres://app:***@[::1]:5432/db",
-		"http://localhost:3010/a@b?next=c@d":          "http://localhost:3010/a@b?next=c@d",
 		"postgres://app:@localhost:5432/db":           "postgres://app:***@localhost:5432/db",
 		"redis://:pw@localhost:6379":                  "redis://:***@localhost:6379",
 		"http://localhost:3010,http://localhost:3011": "http://localhost:3010,http://localhost:3011",

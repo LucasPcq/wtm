@@ -114,8 +114,9 @@ var passwordParam = regexp.MustCompile(`(?i)(password=)(?:'[^']*'?|[^\s&;']*)`)
 
 // MaskURLPassword masks every password a value carries — a URL's, one per
 // element of a comma-separated list, a password= pair — and returns the rest
-// byte for byte. A URL net/url cannot read is masked up to its last "@": a
-// report masks too much rather than print a secret.
+// byte for byte. Past a URL's authority, an "@" cannot be told from a password
+// net/url read as a path or a fragment ("app:12#x@h"), so everything up to the
+// last one is masked: a report masks too much rather than print a secret.
 func MaskURLPassword(value string) string {
 	parts := strings.Split(value, domain.OriginListSeparator)
 	for i, part := range parts {
@@ -131,10 +132,7 @@ func maskURLUserinfo(value string) string {
 	}
 	start := scheme + len(domain.OriginSchemeSeparator)
 	authority := value[start:]
-	if u, err := url.Parse(value); err == nil && u.Opaque == "" {
-		if u.User == nil {
-			return value
-		}
+	if u, err := url.Parse(value); err == nil && u.Opaque == "" && u.User != nil {
 		if _, has := u.User.Password(); !has {
 			return value
 		}
@@ -143,9 +141,12 @@ func maskURLUserinfo(value string) string {
 		}
 	}
 	at := strings.LastIndex(authority, "@")
-	colon := strings.Index(authority, ":")
-	if at < 0 || colon < 0 || colon > at {
+	if at < 0 {
 		return value
 	}
-	return value[:start+colon+1] + domain.MaskedURLPassword + value[start+at:]
+	from := 0
+	if colon := strings.Index(authority[:at], ":"); colon >= 0 {
+		from = colon + 1
+	}
+	return value[:start+from] + domain.MaskedURLPassword + value[start+at:]
 }

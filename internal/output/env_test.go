@@ -95,3 +95,21 @@ func TestPrintEnvReportNamesTheWorktreeAndMode(t *testing.T) {
 		}
 	}
 }
+
+// LUC-274: the check named nothing when an [[env]] key was all it would change.
+func TestPrintEnvReportOfACheckNamesTheOwnedKeyItWouldRewrite(t *testing.T) {
+	result := domain.EnvSyncResult{
+		Branch: "feat/x",
+		Mode:   domain.EnvModeAdd,
+		Check:  true,
+		Files:  []domain.EnvFileResult{{Target: ".env"}},
+		Ports:  domain.EnvPortPlan{Owned: []domain.EnvOwnedEntry{{File: ".env", Key: "REALM", Value: "app-feat-x", Changed: true}}},
+	}
+
+	var out bytes.Buffer
+	PrintEnvReport(&out, EnvReportParams{Result: result})
+
+	if !strings.Contains(out.String(), "REALM") {
+		t.Errorf("the check names no key:\n%s", out.String())
+	}
+}

@@ -67,3 +67,21 @@ func TestEnvHasNoDriftWhenTheOwnedKeyIsSettled(t *testing.T) {
 		t.Error("drift reported, want none")
 	}
 }
+
+// LUC-274: a check that found a hand-edited [[env]] key said only "keys in
+// sync — its linked values would move", naming nothing.
+func TestEnvOwnedRowsNameTheKeyACheckWouldRewrite(t *testing.T) {
+	plan := ownedOnlyResult(false).Ports
+
+	rows := EnvOwnedRows(EnvOwnedRowsParams{Plan: plan, File: "apps/crm/api/.env", Check: true})
+
+	if len(rows) != 1 || !strings.HasPrefix(rows[0], "DATABASE_URL ") || !strings.Contains(rows[0], `"postgresql://app@localhost:5432/app_feat-a"`) {
+		t.Errorf("rows = %q, want the key named with the value wtm would write", rows)
+	}
+	if rows := EnvOwnedRows(EnvOwnedRowsParams{Plan: plan, File: ".env", Check: true}); len(rows) != 0 {
+		t.Errorf("rows of another file = %q, want none", rows)
+	}
+	if rows := EnvOwnedRows(EnvOwnedRowsParams{Plan: plan, File: "apps/crm/api/.env"}); len(rows) != 0 {
+		t.Errorf("rows of an apply = %q, want none: its summary counts the write", rows)
+	}
+}
