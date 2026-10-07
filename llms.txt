@@ -9,6 +9,8 @@ For an agent working in a repository that uses wtm, `wtm agents install` adds th
 - [README](README.md): what wtm does, how to install it, and an overview of every command
 - [Getting started](docs/guide/getting-started.md): a ten-minute tutorial from install to two worktrees running side by side
 - [Recipes](docs/guide/recipes.md): complete setups for a pnpm/turbo monorepo, a docker compose app, a shared postgres, AI agents in parallel, stacked PRs, and one command run across worktrees (`wtm exec`)
+- [Installation](docs/guide/installation.md): Homebrew, `go install` or a release binary, installing a specific version, `wtm upgrade`
+- [Platform support](docs/guide/platform-support.md): macOS and Linux (amd64, arm64), WSL2, no native Windows; port 80 named URLs are macOS only
 - [Troubleshooting](docs/guide/troubleshooting.md): fixes for a port in use, a crashed job, the daemon's version, `wtm go`, exit 16, named URLs and `.env` drift
 
 ## User guide

@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question or idea
+    url: https://github.com/LucasPcq/wtm/discussions
+    about: How to set up a stack, whether wtm fits a workflow, or an idea to discuss before it becomes a request.
+  - name: Troubleshooting guide
+    url: https://github.com/LucasPcq/wtm/blob/main/docs/guide/troubleshooting.md
+    about: A port in use, a crashed job, wtm go not changing directory, .env drift and the other usual suspects.
+  - name: Security vulnerability
+    url: https://github.com/LucasPcq/wtm/security/advisories/new
+    about: Report it privately, not in a public issue.

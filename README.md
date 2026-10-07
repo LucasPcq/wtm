@@ -54,9 +54,11 @@ go install github.com/LucasPcq/wtm@latest
 
 **Updating:** `wtm upgrade` updates wtm the way it was installed (Homebrew, `go install` or a standalone binary). wtm checks for a new release at most once a day; `WTM_NO_UPDATE_CHECK=1` turns that off.
 
+**A specific version:** `go install github.com/LucasPcq/wtm@v0.28.0`, that release's binary, or `wtm upgrade --version 0.28.0` on a binary install. See [Installation](docs/guide/installation.md).
+
 </details>
 
-wtm needs `git`. [`gh`](https://cli.github.com) is optional and unlocks the GitHub features (`checkout` a PR, PR status, `prune` of merged branches).
+wtm runs on macOS and Linux (amd64, arm64), and on Windows through WSL2: see [Platform support](docs/guide/platform-support.md). It needs `git`. [`gh`](https://cli.github.com) is optional and unlocks the GitHub features (`checkout` a PR, PR status, `prune` of merged branches).
 
 ## Quick start
 

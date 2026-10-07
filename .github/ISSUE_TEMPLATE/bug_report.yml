@@ -1,0 +1,55 @@
+name: Bug report
+description: wtm did something wrong, crashed, or printed something misleading
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what wtm did, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The commands, in order, from a fresh state if you can. Paste the output as text rather than a screenshot.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: version
+    attributes:
+      label: wtm version
+      description: The output of `wtm version --output json`.
+      render: json
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS
+        - Linux
+        - WSL2
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installed with
+      options:
+        - Homebrew
+        - go install
+        - Release binary
+        - Built from source
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: For a `wtm run` issue, the relevant part of `wtm run export`; for a create/clean issue, `.git/wtm/config.toml`. Remove any secret first.
+      render: toml

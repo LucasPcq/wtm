@@ -5,6 +5,8 @@ How wtm works beyond `--help`. Every flag of every command is in `wtm <command> 
 ## Start here
 
 - **[Getting started](getting-started.md)**: install, two worktrees running side by side, cleaning one up. Ten minutes.
+- **[Installation](installation.md)**: every way to install, a specific version, updating.
+- **[Platform support](platform-support.md)**: macOS, Linux, WSL2, and what each one supports.
 - **[Recipes](recipes.md)**: complete setups to copy: a pnpm/turbo monorepo, a docker compose app, a shared postgres, agents in parallel, stacked PRs, one command across worktrees.
 - **[Troubleshooting](troubleshooting.md)**: a port in use, a crashed job, `wtm go` not changing directory, `.env` drift, and the other usual suspects.
 
