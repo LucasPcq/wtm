@@ -194,3 +194,21 @@ func TestASettledSummaryReplacesTheSkipLine(t *testing.T) {
 		t.Errorf("view should read the step as settled:\n%s", view)
 	}
 }
+
+// Esc on the first step asked backs out, whatever settled steps precede it, and
+// the help bar must say so.
+func TestTheFirstAskedStepAfterSettledOnesOffersCancel(t *testing.T) {
+	m := NewWizard([]Step{
+		{Name: "flagged", Model: NewTextInput(NewTextInputParams{}), Settled: "given"},
+		{Name: "asked", Model: NewSelectList(NewSelectListParams{Items: []SelectItem{{Label: "a", Value: "a"}}})},
+		{Name: "last", Model: NewSelectList(NewSelectListParams{Items: []SelectItem{{Label: "b", Value: "b"}}})},
+	})
+	m.Init()
+	if help := m.helpLine(); !strings.Contains(help, "esc cancel") {
+		t.Errorf("help = %q, want esc cancel on the first asked step", help)
+	}
+	m = updateWizard(m, key(tea.KeyEnter))
+	if help := m.helpLine(); !strings.Contains(help, "esc back") {
+		t.Errorf("help = %q, want esc back once a step was asked", help)
+	}
+}

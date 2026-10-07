@@ -283,3 +283,41 @@ func sized(wizard components.WizardModel) components.WizardModel {
 	wizard.Init()
 	return update(wizard, tea.WindowSizeMsg{Width: 100, Height: 60})
 }
+
+// `wtm create feat/x` presets its branch list with one plain value: the trail
+// read it as an empty set ("Branches: none").
+func TestASinglePresetOfASetStepReadsItsValue(t *testing.T) {
+	branches := flow.Step{Kind: flow.StepTextList, Key: "branches", Label: "Branches", Summarize: flow.SummarizeSet, Arg: true}
+	plan, err := build(flow.Session{
+		Presets: flow.NewAnswers(map[string]string{"branches": "feat/x"}),
+		Steps:   []flow.Step{branches, recapStep("r")},
+	})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if got := plan.steps[0].Settled; got != "feat/x" {
+		t.Errorf("settled = %q, want the one branch", got)
+	}
+}
+
+// Two flags answer sync's parents step: the trail names the one that did.
+func TestThePresetFlagNamesTheFlagThatAnswered(t *testing.T) {
+	step := selectStep("parents", "ff", "keep")
+	step.Flag = "ff-parents"
+	step.PresetFlag = func(answer flow.Answer) string {
+		if answer.Value == "ff" {
+			return "ff-parents"
+		}
+		return "no-ff-parents"
+	}
+	plan, err := build(flow.Session{
+		Presets: flow.NewAnswers(map[string]string{"parents": "keep"}),
+		Steps:   []flow.Step{step, recapStep("r")},
+	})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if got := plan.steps[0].Settled; got != "keep · --no-ff-parents" {
+		t.Errorf("settled = %q, want the flag that answered", got)
+	}
+}

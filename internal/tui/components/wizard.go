@@ -647,12 +647,23 @@ func (m WizardModel) composedHelp(actions []string) string {
 		parts = append(parts, domain.HelpRefresh)
 	}
 	parts = append(parts, m.confirmHelp())
-	if m.visiblePosition() > 1 {
+	if m.canGoBack() {
 		parts = append(parts, domain.HelpBack)
 	} else {
 		parts = append(parts, domain.HelpCancel)
 	}
 	return domain.HelpBarIndent + strings.Join(parts, domain.HelpBarSep)
+}
+
+// canGoBack is whether esc has an asked step to return to; a settled or skipped
+// one before it is hopped over, and esc then backs out of the wizard instead.
+func (m WizardModel) canGoBack() bool {
+	for i := m.current - 1; i >= 0; i-- {
+		if !m.skipped[i] {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *WizardModel) propagateSize(stepIdx int) {

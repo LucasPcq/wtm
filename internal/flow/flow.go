@@ -193,6 +193,9 @@ type Step struct {
 	// thing for a step answered by a positional, which has no flag to name.
 	Flag string
 	Arg  bool
+	// PresetFlag names the flag a preset came from, for a step two flags answer
+	// (--ff-parents, --no-ff-parents) where Flag alone would name the wrong one.
+	PresetFlag func(Answer) string
 
 	Memory Memory
 }
@@ -491,6 +494,9 @@ func PinnedSuffix(step Step) string {
 // large selection does not overflow the line.
 func SummarizeSet(answer Answer) string {
 	values := answer.Values
+	if len(values) == 0 && answer.Value != "" {
+		values = []string{answer.Value}
+	}
 	if len(values) == 0 {
 		return domain.SummaryNone
 	}

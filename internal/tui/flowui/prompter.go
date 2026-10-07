@@ -131,7 +131,7 @@ func build(session flow.Session) (*plan, error) {
 
 	for _, step := range session.Steps {
 		if answer, preset := session.Presets.Get(step.Key); preset {
-			p.settledStep(step, settledLine(step, answer, flagSuffix(step)))
+			p.settledStep(step, settledLine(step, answer, flagSuffix(step, answer)))
 			continue
 		}
 		if _, recalled := flow.Recalled(step); recalled {
@@ -215,11 +215,15 @@ func settledLine(step flow.Step, answer flow.Answer, suffix string) string {
 	return summary + suffix
 }
 
-func flagSuffix(step flow.Step) string {
-	if step.Flag == "" {
+func flagSuffix(step flow.Step, answer flow.Answer) string {
+	flag := step.Flag
+	if step.PresetFlag != nil {
+		flag = step.PresetFlag(answer)
+	}
+	if flag == "" {
 		return ""
 	}
-	return fmt.Sprintf(domain.TrailFlagSuffixFmt, step.Flag)
+	return fmt.Sprintf(domain.TrailFlagSuffixFmt, flag)
 }
 
 func (p *plan) known() flow.Answers {

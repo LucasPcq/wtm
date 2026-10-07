@@ -237,6 +237,12 @@ func (f *syncFlow) parentsStep() flow.Step {
 			return domain.SyncParentKeepSummary
 		},
 		Flag: domain.FlagFFParents,
+		PresetFlag: func(answer flow.Answer) string {
+			if answer.Value == parentFF {
+				return domain.FlagFFParents
+			}
+			return domain.FlagNoFFParents
+		},
 	}
 }
 
