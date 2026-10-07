@@ -87,3 +87,17 @@ func Peek() (jobs []domain.JobInfo, known bool) {
 	}
 	return liveJobs(resp.Jobs), true
 }
+
+// Current is what is up without waking anything: the daemon when one listens,
+// else the index read back the way a daemon starting now would read it.
+func Current() []domain.JobInfo {
+	socketPath := process.SocketPath()
+	if !process.IsDaemonRunning(socketPath) {
+		return liveJobs(process.IndexedJobs())
+	}
+	resp, err := process.NewClient(socketPath).Send(process.Request{Action: process.ActionList})
+	if err != nil {
+		return liveJobs(process.IndexedJobs())
+	}
+	return liveJobs(resp.Jobs)
+}

@@ -7,11 +7,14 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 ### Added
 
 - **"Always use this answer"** in the wizards of `create`, `checkout` and `extract`: tick it with `tab` and the env strategy, the isolation or the source fast-forward is no longer asked in that repository; `--ask` asks again. → [Remembered answers](docs/guide/configuration.md#remembered-answers)
+- **`wtm status [worktree]`** reads a worktree's isolation, missing `.env` files and jobs in one document, each problem with the command that fixes it; `--all` reads every worktree. → [A worktree's state](docs/guide/status.md)
 
 ### Fixed
 
 - **`wtm env`** masks the passwords it still printed: the values `--isolation verbatim` restores, `[[env]]` keys in JSON, and multi-host, DSN (`password=`) and unparsable URLs, also in the text conflict lines and `env_ports`. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
 - **`wtm env`** reports what it changes: a verbatim switch shows the port that moved in an origin list, `--check` names the `[[env]]` key it would rewrite, and the wizard previews an overwrite on the worktree's own port. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
+- **`wtm env`** rebuilds a declared `.env` missing from the worktree the way `wtm create` provisions it (the template under `example`), then settles its ports, instead of leaving it absent; `--check` reports it as drift. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
+- **`wtm run`** commands exit `19` when you back out of a question (Esc, Ctrl-C, "No, cancel", a declined import), like every other command, instead of `1`. → [Exit codes](docs/guide/integrations.md#the-contract---yes-and---output-json)
 
 ## [0.29.2] - 2026-10-06
 

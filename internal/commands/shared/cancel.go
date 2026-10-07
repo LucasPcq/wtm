@@ -23,3 +23,22 @@ func ClearCancelled(cmd *cobra.Command) {
 func Cancelled(cmd *cobra.Command) bool {
 	return cmd.Annotations[domain.AnnotationCancelled] == domain.AnnotationOn
 }
+
+// BackedOut is how a runner ends a run the user backed out of: marked, and
+// with no error. An error would skip the root's post-run, which is what reads
+// the mark, and the run would exit 1 instead of ExitCodeCancelled.
+func BackedOut(cmd *cobra.Command) error {
+	MarkCancelled(cmd)
+	return nil
+}
+
+// EndAborted ends a runner whose flow reported an aborted outcome. The flow's
+// abort notice is what marks a user backing out; an outcome aborted without
+// it is a run that failed (`run up`'s sequence stopping on a job), which keeps
+// its error and its exit code.
+func EndAborted(cmd *cobra.Command) error {
+	if Cancelled(cmd) {
+		return nil
+	}
+	return domain.ErrAborted
+}

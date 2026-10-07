@@ -61,7 +61,7 @@ func (f *envFlow) worktreeStep() flow.Step {
 // driftBadge counts the port pass with the keys: a worktree whose only drift is
 // a port to move is not in sync.
 func driftBadge(scan branchScan) flow.Badge {
-	count := rules.EnvDriftCount(scan.files) + len(rules.EnvPortRewrites(scan.ports)) + len(rules.OwnedEnvRewrites(scan.ports))
+	count := rules.EnvDriftCount(scan.files) + len(rules.EnvCreatedRecapLines(scan.files)) + len(rules.EnvPortRewrites(scan.ports)) + len(rules.OwnedEnvRewrites(scan.ports))
 	if count == 0 {
 		return flow.Badge{Text: domain.EnvBadgeInSync, Tone: domain.ToneSuccess}
 	}
@@ -297,6 +297,7 @@ func (f *envFlow) recap(answers flow.Answers) (string, error) {
 		lines = append(lines, domain.EnvRecapFieldAddressing+addressingRecap(addressingRecapParams{State: state, Addressing: f.addressing(answers)}))
 	}
 	lines = append(lines, "")
+	lines = append(lines, rules.EnvCreatedRecapLines(scan.files)...)
 
 	resolve, _ := answers.Get(KeyResolve)
 	if body := rules.EnvResolveRecapLines(rules.EnvResolveRecapParams{Files: scan.preview, Decisions: resolve.EnvDecisions}); len(body) > 0 && !resolve.Skipped {
@@ -343,14 +344,15 @@ func addressingRecap(params addressingRecapParams) string {
 	return string(params.Addressing)
 }
 
-// applies reports whether confirming would write anything: a key, a port, an
-// owned value, or an isolation to record.
+// applies reports whether confirming would write anything: a file to rebuild,
+// a key, a port, an owned value, or an isolation to record.
 func (f *envFlow) applies(answers flow.Answers) (bool, error) {
 	scan, err := f.scanOf(answers)
 	if err != nil {
 		return false, err
 	}
 	return rules.EnvDriftCount(scan.files) > 0 ||
+		len(rules.EnvCreatedRecapLines(scan.files)) > 0 ||
 		len(rules.EnvPortRewrites(scan.ports)) > 0 ||
 		len(rules.OwnedEnvRewrites(scan.ports)) > 0 ||
 		f.isolation(answers) != "", nil
@@ -360,10 +362,10 @@ func (f *envFlow) applies(answers flow.Answers) (bool, error) {
 // reads when that strategy is "parent".
 func (f *envFlow) sourceLabel(branch string) string {
 	ctx := f.envContext(branch)
-	if ctx.strategy == domain.EnvStrategyParent && ctx.parentBranch != "" {
-		return string(ctx.strategy) + domain.EnvRecapNoteSeparator + ctx.parentBranch
+	if ctx.Strategy == domain.EnvStrategyParent && ctx.ParentBranch != "" {
+		return string(ctx.Strategy) + domain.EnvRecapNoteSeparator + ctx.ParentBranch
 	}
-	return string(ctx.strategy)
+	return string(ctx.Strategy)
 }
 
 func (f *envFlow) scanOf(answers flow.Answers) (branchScan, error) {

@@ -127,7 +127,7 @@ Without the port: on macOS, `wtm run proxy install` serves the names on port 80,
 
 ## A `.env` is out of date
 
-**Symptom.** A worktree's `.env` misses a key the template gained, still carries a value from before, or points at the wrong port after `run.toml` changed.
+**Symptom.** A worktree's `.env` misses a key the template gained, still carries a value from before, points at the wrong port after `run.toml` changed, or is gone altogether (`wtm status` reports `env_missing`).
 
 **Fix.** Compare it with its source, then reconcile:
 
@@ -138,6 +138,6 @@ wtm env feat/login --mode refresh --on-conflict overwrite --yes   # also overwri
 wtm env feat/login --prune --yes                             # drop keys no source has any more
 ```
 
-The values come from the strategy the worktree was created with (`example`, `main` or `parent`); `--from` overrides it for one run. The ports and addresses `run.toml` links are settled on the worktree's own at the same time. `wtm env main` does the same for the main checkout, keeping the addressing its `.env` spells unless `--addressing` says otherwise.
+The values come from the strategy the worktree was created with (`example`, `main` or `parent`); `--from` overrides it for one run. A file missing from the worktree is rebuilt the way `wtm create` provisions it — the template under `example`, the parent's or main's copy otherwise. The ports and addresses `run.toml` links are settled on the worktree's own at the same time. `wtm env main` does the same for the main checkout, keeping the addressing its `.env` spells unless `--addressing` says otherwise.
 
 The report prints only the values wtm writes itself: the linked ports and addresses, `COMPOSE_PROJECT_NAME` and the `[[env]]` values, each with its password masked as `***` (a URL's, every URL of a comma-separated list, a `password=` pair; a URL with an `@` past its host is masked up to that `@`, since it cannot be told from a password). Every other value, secrets included, is withheld, so the report and its `--output json` are safe to paste into a log or an agent's context; a conflict reads "local value differs from main". `--show-values` prints them all. A `--check` names each `[[env]]` key it would rewrite, and the wizard previews a linked value it would overwrite on the worktree's own port, as it is written.

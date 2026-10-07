@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"testing"
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -331,6 +332,12 @@ func AwaitDaemonStopped(socketPath string) error {
 // port travels on the command line because only a client can read the user's
 // global config — the daemon is global and outlives any one of them.
 func StartDaemon(params DaemonParams) error {
+	// Under go test the executable is the test binary: forked as "daemon" it
+	// runs the whole suite again, which forks again, and so on until the
+	// machine gives out. No test can be served by it either way.
+	if testing.Testing() {
+		return domain.ErrDaemonForkInTest
+	}
 	exePath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("find executable: %w", err)

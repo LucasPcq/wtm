@@ -90,7 +90,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
 			output.Unchanged(w, domain.ImportDeclined)
 		})
-		return domain.ErrAborted
+		return shared.BackedOut(cmd)
 	}
 
 	if err := config.WriteRun(config.WriteRunParams{

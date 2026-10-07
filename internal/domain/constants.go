@@ -4760,3 +4760,69 @@ const (
 	RememberedInvalidFmt    = "invalid remembered %s %q in [wizard.remembered] (expected one of %s)"
 	RememberWriteFailedFmt  = "could not remember the answer: %v"
 )
+
+const (
+	// StatusFix*Fmt are the commands that clear each problem `wtm status`
+	// reports, spelled unattended so an agent can run them as given.
+	StatusFixEnvMissingFmt       = "wtm env %s --yes"
+	StatusFixEnvFromTemplateFmt  = "wtm env %s --from example --yes"
+	StatusFixEnvNowhere          = "wtm config edit"
+	StatusFixJobCrashedFmt       = "wtm run start %s --job %s -d --yes"
+	StatusFixIsolationPendingFmt = "wtm env %s --isolation isolated --yes"
+
+	StatusProblemEnvMissingFmt           = "%s is missing"
+	StatusProblemEnvNowhereFmt           = "%s is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand"
+	StatusProblemJobKilledFmt            = "%s crashed (killed by a signal)"
+	StatusProblemJobCrashedFmt           = "%s crashed"
+	StatusProblemJobCrashedCodeFmt       = "%s crashed (exit %d)"
+	StatusProblemIsolationPendingMessage = "predates the isolation choice: run up and run start refuse it"
+
+	// PluralFmt is a count beside its agreed noun (rules.Plural).
+	PluralFmt = "%d %s"
+
+	StatusHeadlineCleanFmt    = "%s — nothing to fix"
+	StatusHeadlineProblemsFmt = "%s — %s"
+	StatusAllCleanFmt         = "%s — nothing to fix"
+	StatusAllProblemsFmt      = "%s · %d %s"
+	StatusNeedsAttention      = "needs attention"
+	StatusNeedAttention       = "need attention"
+	StatusNounWorktree        = "worktree"
+	StatusNounWorktrees       = "worktrees"
+	StatusNounProblem         = "problem"
+	StatusNounProblems        = "problems"
+	StatusNounFile            = "file"
+	StatusNounFiles           = "files"
+	StatusFieldPath           = "path"
+	StatusFieldIsolation      = "isolation"
+	StatusFieldAddressing     = "addressing"
+	StatusFieldPorts          = "ports"
+	StatusFieldEnv            = "env"
+	StatusFieldRun            = "run"
+	StatusMainSuffix          = " (main)"
+	StatusIsolationNotChosen  = "not chosen"
+	// StatusPorts* say which ports a worktree binds: its offset from the main
+	// checkout's, the main's own, or its source's for a verbatim one.
+	StatusPortsOffsetFmt   = "+%d"
+	StatusPortsBase        = "base"
+	StatusPortsSource      = "source's"
+	StatusPortsUnallocated = "not numbered"
+	StatusCellNone         = "—"
+	StatusRunConfigAbsent  = "no run.toml"
+	StatusEnvMissingFmt    = "%d missing"
+	StatusJobsTitle        = "JOBS"
+	StatusJobsEmpty        = "no job declared"
+	StatusJobOwnerFmt      = "held from %s"
+	StatusColWorktree      = "WORKTREE"
+	StatusColIsolation     = "ISOLATION"
+	StatusColPorts         = "PORTS"
+	StatusColJobs          = "JOBS"
+	StatusColEnv           = "ENV"
+
+	// EnvFileCreatedFmt and EnvFileWouldCreateFmt are a .env the worktree
+	// lacked, rebuilt by `wtm env` from the copy create would have made.
+	EnvFileCreatedFmt        = "created from %s"
+	EnvFileWouldCreateFmt    = "missing: wtm env creates it from %s"
+	EnvRecapCreatedFmt       = "%s: create from %s"
+	StatusLoading            = "Reading the worktree's state…"
+	StatusAllWithWorktreeMsg = "--all reads every worktree: drop the [worktree] argument"
+)

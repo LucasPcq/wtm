@@ -146,6 +146,7 @@ Every command documents itself: `wtm <command> --help`, or the generated [refere
 | [`create`](docs/wtm_create.md) | Create one or more worktrees (runs env provisioning + `on_create` hooks) |
 | [`list`](docs/wtm_list.md) | List all worktrees |
 | [`tree`](docs/wtm_tree.md) | Show the worktree forest (parent → child) |
+| [`status`](docs/wtm_status.md) | A worktree's whole state (isolation, missing `.env`, jobs) and the command fixing each problem ([guide](docs/guide/status.md)) |
 | [`clean`](docs/wtm_clean.md) | Remove worktrees and their local branches |
 | [`prune`](docs/wtm_prune.md) | Remove finished worktrees (merged / closed PR / gone) in one pass (merged/closed need `gh`) |
 | [`extract`](docs/wtm_extract.md) | Move uncommitted changes to another worktree (split an oversized PR) |

@@ -114,7 +114,7 @@ func (f *envFlow) resolvePorts(params resolvePortsParams) (envsvc.EnvPortsParams
 
 type planSwitchParams struct {
 	Target    target
-	Ctx       envContext
+	Ctx       Source
 	Isolation domain.Isolation
 }
 
@@ -143,8 +143,8 @@ func (f *envFlow) planSwitch(params planSwitchParams) (envSwitch, error) {
 	sw.restore = envsvc.OwnedRestoreParams{
 		MainPath:           f.ctx.ProjectDir,
 		WorktreePath:       params.Target.path,
-		ParentWorktreePath: params.Ctx.parentPath,
-		Strategy:           params.Ctx.strategy,
+		ParentWorktreePath: params.Ctx.ParentPath,
+		Strategy:           params.Ctx.Strategy,
 		Files:              f.ctx.Config.Project.Env.Files,
 		Keys:               keys,
 	}

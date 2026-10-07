@@ -1,6 +1,10 @@
 package rules
 
-import "github.com/LucasPcq/wtm/internal/domain"
+import (
+	"fmt"
+
+	"github.com/LucasPcq/wtm/internal/domain"
+)
 
 // This file reads the env reconciliation types. It lives in rules/ rather than
 // beside those types because internal/domain holds types, errors and constants
@@ -66,7 +70,7 @@ func EnvPortAnomalies(plan domain.EnvPortPlan) []domain.EnvPortEntry {
 // the wrong services — or at another worktree's slice of a shared one.
 func EnvHasDrift(result domain.EnvSyncResult) bool {
 	for _, file := range result.Files {
-		if file.Unresolvable || EnvDriftCount([]domain.EnvFileResult{file}) > 0 {
+		if file.Unresolvable || file.Created || EnvDriftCount([]domain.EnvFileResult{file}) > 0 {
 			return true
 		}
 		for _, status := range []domain.EnvKeyStatus{domain.EnvKeyMissing, domain.EnvKeyConflict, domain.EnvKeyOrphan} {
@@ -87,4 +91,17 @@ func EnvAppliedFiles(result domain.EnvSyncResult) int {
 		}
 	}
 	return applied
+}
+
+// EnvCreatedRecapLines names each file an apply rebuilds, with where from: a
+// file the worktree lacks is a change even when every key of it is in sync.
+func EnvCreatedRecapLines(files []domain.EnvFileResult) []string {
+	lines := []string{}
+	for _, file := range files {
+		if !file.Created {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf(domain.EnvRecapCreatedFmt, file.Target, file.Source))
+	}
+	return lines
 }

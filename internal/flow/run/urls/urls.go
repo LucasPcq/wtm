@@ -47,6 +47,12 @@ func (r Reader) In(dir string) ([]domain.JobURLEntry, error) {
 	if err != nil {
 		return nil, err
 	}
+	return r.At(env), nil
+}
+
+// At lists the jobs reachable under an environment already resolved, for a
+// reader that must not number the worktree to ask.
+func (r Reader) At(env map[string]string) []domain.JobURLEntry {
 	addresses := rules.WorktreeJobAddresses(rules.WorktreeJobAddressesParams{
 		Config:     r.config,
 		PortOffset: rules.PortOffsetFromEnv(env),
@@ -63,5 +69,5 @@ func (r Reader) In(dir string) ([]domain.JobURLEntry, error) {
 		}
 		entries = append(entries, domain.JobURLEntry{Job: job.Name, URL: url})
 	}
-	return entries, nil
+	return entries
 }

@@ -57,6 +57,8 @@ internal/
     sync/                     ←   `wtm sync`: the run (sync.go) + its questions (steps.go)
     fastforward/              ←   `wtm fast-forward`: the run + its questions
     exec/                     ←   `wtm exec`: the run + its questions
+    status/                   ←   `wtm status`: a worktree's state read without asking,
+                                  numbering or waking anything (no Prompter, no Presenter)
     runlogs/                  ←   the jobs a surface shows (`Board`), their live streams,
                                   and the profile start sequence (reports events, not steps)
     run/                      ←   the `run` module's flows, mirroring its command tree:
@@ -102,7 +104,8 @@ internal/
                                   registry of repositories wtm was used in (`repos.json`, through
                                   `infra/registry.go`) and WatchAll, which follows all of them
     runconfig/                ←   load + validate + write run.toml (and its schema)
-    runjobs/                  ←   the daemon's jobs as a surface reads them (the dashboard too)
+    runjobs/                  ←   the daemon's jobs as a surface reads them (the dashboard too);
+                                  `Current` reads the index itself when no daemon listens
     compose/                  ←   a compose file's `ports:` and absolute names, read and rewritten
     portprobe/                ←   is anything listening on a port
     shellcmd/                 ←   checks that a config command is a valid /bin/sh line

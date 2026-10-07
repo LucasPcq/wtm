@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/spf13/cobra"
+
 	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -52,9 +54,9 @@ func (p upPresenter) Sequence(params seam.SequenceParams) (runlogs.Outcomes, err
 // concluded is what the runner does with an outcome the surface has already
 // shown: nothing but the exit code. Every surface has named the jobs itself,
 // so an error here would only repeat them (LUC-198).
-func concluded(outcome upflow.Outcome) error {
+func concluded(cmd *cobra.Command, outcome upflow.Outcome) error {
 	if outcome.Aborted {
-		return domain.ErrAborted
+		return shared.EndAborted(cmd)
 	}
 	return nil
 }

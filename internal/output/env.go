@@ -65,6 +65,7 @@ func printEnvFile(w io.Writer, block envFileBlock) {
 		return
 	}
 
+	printEnvCreated(w, envCreatedParams{File: f, Check: check})
 	tally := ""
 	if !check {
 		tally = rules.EnvFileTally(f)
@@ -82,7 +83,7 @@ func printEnvFile(w io.Writer, block envFileBlock) {
 	for _, row := range rows {
 		printEnvKeyRow(w, row)
 	}
-	if tally != "" || len(rows) > 0 || len(block.restored) > 0 || len(block.owned) > 0 {
+	if f.Created || tally != "" || len(rows) > 0 || len(block.restored) > 0 || len(block.owned) > 0 {
 		return
 	}
 
@@ -94,6 +95,23 @@ func printEnvFile(w io.Writer, block envFileBlock) {
 		Warning(w, verdict)
 	default:
 		Success(w, verdict)
+	}
+}
+
+type envCreatedParams struct {
+	File  domain.EnvFileResult
+	Check bool
+}
+
+// printEnvCreated says a file the worktree lacked was, or would be, written
+// from the copy create would have made.
+func printEnvCreated(w io.Writer, params envCreatedParams) {
+	switch {
+	case !params.File.Created:
+	case params.Check:
+		Warning(w, fmt.Sprintf(domain.EnvFileWouldCreateFmt, params.File.Source))
+	default:
+		Success(w, fmt.Sprintf(domain.EnvFileCreatedFmt, params.File.Source))
 	}
 }
 
