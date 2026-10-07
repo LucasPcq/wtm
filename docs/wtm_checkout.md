@@ -32,6 +32,7 @@ wtm checkout [number] [flags]
 ### Options
 
 ```
+      --ask                Ask again the questions this repository remembers an answer to, to change or forget it
       --env-from string    Override env strategy (example, main, parent)
       --ff                 Fast-forward the PR's branch to origin when it already exists locally and is behind (non-interactive; skipped when it has diverged)
       --from string        Parent branch for sync (defaults to the PR base branch)

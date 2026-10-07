@@ -140,11 +140,9 @@ func (mo modal) advance() (modal, tea.Cmd) {
 		if answer, known := mo.answers.Get(step.Key); known && !answer.Asked && !answer.Skipped {
 			continue
 		}
-		if step.Skip != nil {
-			if skip, reason := step.Skip(mo.answers); skip {
-				mo.answers = mo.answers.With(step.Key, flow.Answer{Skipped: true, SkipReason: reason})
-				continue
-			}
+		if answer, settled := flow.Settle(step, mo.answers); settled {
+			mo.answers = mo.answers.With(step.Key, answer)
+			continue
 		}
 		mo.index = index
 		return mo.enter(step)

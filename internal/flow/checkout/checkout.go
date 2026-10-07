@@ -26,6 +26,8 @@ type Request struct {
 	EnvFrom     string
 	FastForward bool
 	Isolation   domain.Isolation
+	// Ask asks the remembered questions again (--ask).
+	Ask bool
 }
 
 // Outcome.Target is the PR branch's state once checked out, so a reused branch
@@ -101,7 +103,8 @@ func (f *checkoutFlow) run() (Outcome, error) {
 		}
 	}
 
-	answers, err := f.prompter.Ask(f.session())
+	session := f.session()
+	answers, err := f.prompter.Ask(session)
 	if errors.Is(err, domain.ErrUserAborted) {
 		f.presenter.Notice(flow.AbortedNotice)
 		return Outcome{Aborted: true}, nil
@@ -109,6 +112,7 @@ func (f *checkoutFlow) run() (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
+	decide.Remember(decide.RememberParams{Context: f.ctx, Session: session, Answers: answers, Presenter: f.presenter})
 
 	pr, found := f.pr(answers)
 	if !found {
@@ -224,6 +228,7 @@ func (f *checkoutFlow) checkout(params checkoutParams) (Outcome, error) {
 		return Outcome{}, hookErr
 	}
 	result.Isolation = worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: result.Branch})
+	result.Origins = f.origins(params.Answers)
 
 	outcome := Outcome{PR: pr, Result: result, Target: target}
 	return outcome, f.presenter.CheckedOut(outcome)
@@ -289,6 +294,19 @@ func (f *checkoutFlow) runHooks(params hooksParams) error {
 				OnHook:       sink.OnHook,
 			})
 		},
+	})
+}
+
+func (f *checkoutFlow) origins(answers flow.Answers) map[string]domain.AnswerOrigin {
+	return decide.Origins(decide.OriginsParams{
+		Context:         f.ctx,
+		Answers:         answers,
+		EnvKey:          KeyEnv,
+		IsolationKey:    KeyIsolation,
+		SourceUpdateKey: KeySourceUpdate,
+		EnvFlag:         f.request.EnvFrom != "",
+		IsolationFlag:   f.request.Isolation != "",
+		FastForward:     f.request.FastForward,
 	})
 }
 

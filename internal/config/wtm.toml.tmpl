@@ -75,3 +75,12 @@ on_clean = [
 {{- end }}
 ]
 {{- end }}
+{{- if .Remembered }}
+
+# Answers the wizard no longer asks, kept by "Always use this answer".
+# --ask asks them again; deleting a line forgets it.
+[wizard.remembered]
+{{- range $id, $value := .Remembered }}
+{{ $id }} = "{{ $value }}"
+{{- end }}
+{{- end }}

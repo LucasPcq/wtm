@@ -107,6 +107,7 @@ internal/
     portprobe/                ←   is anything listening on a port
     shellcmd/                 ←   checks that a config command is a valid /bin/sh line
     execsvc/                  ←   runs one shell line in several worktrees at once
+    memory/                   ←   writes the answers the wizard remembers ([wizard.remembered] in config.toml)
   output/                     ← format and print results (zero decision logic)
   styles/                     ← all Lipgloss styles (only package allowed to instantiate lipgloss.Style)
   tui/                        ← Bubbletea models (zero business logic, rendering only)

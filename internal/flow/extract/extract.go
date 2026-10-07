@@ -26,6 +26,8 @@ type Request struct {
 	// OnConflict is --on-conflict, empty when it was not given.
 	OnConflict string
 	Isolation  domain.Isolation
+	// Ask asks the remembered questions again (--ask).
+	Ask bool
 }
 
 // Outcome is Nothing when there was nothing to extract — no worktree with
@@ -121,13 +123,15 @@ func (f *extractFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	answers, err := f.prompter.Ask(f.session())
+	session := f.session()
+	answers, err := f.prompter.Ask(session)
 	if errors.Is(err, domain.ErrUserAborted) {
 		return f.abort()
 	}
 	if err != nil {
 		return Outcome{}, err
 	}
+	decide.Remember(decide.RememberParams{Context: f.ctx, Session: session, Answers: answers, Presenter: f.presenter})
 	return f.extract(answers)
 }
 
@@ -220,6 +224,7 @@ type target struct {
 	branch   string
 	envPorts domain.EnvPortPlan
 	warnings []string
+	origins  map[string]domain.AnswerOrigin
 }
 
 func (f *extractFlow) extract(answers flow.Answers) (Outcome, error) {
@@ -260,6 +265,7 @@ func (f *extractFlow) extract(answers flow.Answers) (Outcome, error) {
 	}
 	result.Warnings = dest.warnings
 	result.EnvPorts = dest.envPorts
+	result.Origins = dest.origins
 	result.Isolation = worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: dest.branch})
 	return f.conclude(Outcome{Result: result})
 }
@@ -274,7 +280,7 @@ func (f *extractFlow) resolveTarget(answers flow.Answers) (target, bool, error) 
 	if err != nil || !proceed {
 		return target{}, proceed, err
 	}
-	return target{path: created.Path, branch: created.Branch, envPorts: created.EnvPorts, warnings: created.Warnings}, true, nil
+	return target{path: created.Path, branch: created.Branch, envPorts: created.EnvPorts, warnings: created.Warnings, origins: created.Origins}, true, nil
 }
 
 // existingTarget is a worktree the extraction did not create, so --isolation had

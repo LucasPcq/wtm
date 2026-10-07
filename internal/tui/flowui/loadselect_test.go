@@ -81,7 +81,7 @@ func TestALoadedSelectFillsItsOptionsAndBanner(t *testing.T) {
 }
 
 func TestADisabledOptionIsNotPickable(t *testing.T) {
-	list := selectList(flow.StepContent{Options: []flow.Option{
+	list := selectList(flow.Step{}, flow.StepContent{Options: []flow.Option{
 		{Label: "linked", Value: "1", Disabled: true},
 		{Label: "free", Value: "2"},
 	}})

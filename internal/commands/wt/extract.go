@@ -49,6 +49,7 @@ func newExtractCmd() *cobra.Command {
 	cmd.Flags().Bool(domain.FlagFF, false, "Fast-forward the parent branch to origin before creating the target (non-interactive; skipped when it has diverged)")
 	cmd.Flags().Bool(domain.FlagKeep, false, "Copy instead of move (keep the changes in the source)")
 	cmd.Flags().String(domain.FlagOnConflict, "", "On conflict: abort (default) or resolve (write conflict markers in the target)")
+	shared.AddAskFlag(cmd)
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (requires a source arg, --files and --to; --from is also required when --to already exists locally; errors if a selection is missing)")
 	shared.AddOutputFlag(cmd)
 	shared.RequireYesInJSON(cmd)
@@ -84,6 +85,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	from, _ := cmd.Flags().GetString(domain.FlagFrom)
 	keep, _ := cmd.Flags().GetBool(domain.FlagKeep)
 	ff, _ := cmd.Flags().GetBool(domain.FlagFF)
+	ask, _ := cmd.Flags().GetBool(domain.FlagAsk)
 	source := ""
 	if len(args) == 1 {
 		source = args[0]
@@ -103,6 +105,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 			FastForward: ff,
 			OnConflict:  onConflict,
 			Isolation:   isolation,
+			Ask:         ask,
 		},
 		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive}),
 		Presenter: extractPresenter{CLIPresenter: shared.NewPresenter(cmd, format), config: config},

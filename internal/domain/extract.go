@@ -67,4 +67,6 @@ type ExtractResult struct {
 	// Warnings are what the run module could not do for a target this
 	// extraction created, which never fails it.
 	Warnings []string `json:"warnings,omitempty"`
+	// Origins is CreateResult's, for a target this extraction created.
+	Origins map[string]AnswerOrigin `json:"origins,omitempty"`
 }

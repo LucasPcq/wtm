@@ -76,8 +76,9 @@ func loadProjectConfig(path string) (domain.ProjectConfig, error) {
 			BasePath:   raw.Worktrees.BasePath,
 			BaseBranch: raw.Worktrees.BaseBranch,
 		},
-		Env:   buildEnvConfig(raw.Env),
-		Hooks: hooks,
+		Env:    buildEnvConfig(raw.Env),
+		Hooks:  hooks,
+		Wizard: domain.WizardConfig{Remembered: raw.Wizard.Remembered},
 	}
 
 	return cfg, nil
@@ -102,8 +103,11 @@ type rawProjectConfig struct {
 		BasePath   string `toml:"base_path"`
 		BaseBranch string `toml:"base_branch"`
 	} `toml:"worktrees"`
-	Env   rawEnvConfig   `toml:"env"`
-	Hooks rawHooksConfig `toml:"hooks"`
+	Env    rawEnvConfig   `toml:"env"`
+	Hooks  rawHooksConfig `toml:"hooks"`
+	Wizard struct {
+		Remembered map[string]string `toml:"remembered"`
+	} `toml:"wizard"`
 }
 
 // rawEnvConfig decodes the [env] table.

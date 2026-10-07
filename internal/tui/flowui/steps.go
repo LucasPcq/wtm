@@ -44,7 +44,7 @@ func (p *plan) componentStep(step flow.Step, conditional bool) (components.Step,
 		if step.Load != nil {
 			return p.loadedSelectStep(step), nil
 		}
-		return p.contentStep(step, func(content flow.StepContent) any { return selectList(content) })
+		return p.contentStep(step, func(content flow.StepContent) any { return selectList(step, content) })
 	case flow.StepBranchSelect:
 		return p.branchStep(step)
 	case flow.StepTextList:
@@ -245,13 +245,7 @@ func (p *plan) choiceStep(step flow.Step) components.Step {
 			if skip, reason := step.Skip(p.answersFrom(prev)); skip {
 				return false, reason, components.NewSelectListParams{}
 			}
-			content := p.rebuild(step, prev)
-			return true, "", components.NewSelectListParams{
-				Title:       content.Title,
-				Description: content.Description,
-				Items:       toItems(content.Options),
-				Start:       content.Start,
-			}
+			return true, "", selectParams(step, p.rebuild(step, prev))
 		},
 	})
 }
@@ -292,9 +286,9 @@ func (p *plan) loadedRecapStep(step flow.Step) components.Step {
 func (p *plan) loadedSelectStep(step flow.Step) components.Step {
 	return p.loadedStep(loadedStep{
 		step:        step,
-		placeholder: selectList(flow.MergeContent(step, flow.StepContent{})),
+		placeholder: selectList(step, flow.MergeContent(step, flow.StepContent{})),
 		model: func(content flow.StepContent) any {
-			return selectList(flow.MergeContent(step, content))
+			return selectList(step, flow.MergeContent(step, content))
 		},
 	})
 }
@@ -429,13 +423,29 @@ func (p *plan) rebuild(step flow.Step, prev []components.Step) flow.StepContent 
 	return content
 }
 
-func selectList(content flow.StepContent) components.SelectListModel {
-	return components.NewSelectList(components.NewSelectListParams{
+func selectList(step flow.Step, content flow.StepContent) components.SelectListModel {
+	return components.NewSelectList(selectParams(step, content))
+}
+
+// selectParams offers "always use this answer" on a step that may remember
+// one; asked again under --ask, it opens ticked on the remembered answer.
+func selectParams(step flow.Step, content flow.StepContent) components.NewSelectListParams {
+	params := components.NewSelectListParams{
 		Title:       content.Title,
 		Description: content.Description,
 		Items:       toItems(content.Options),
 		Start:       content.Start,
-	})
+	}
+	memory := step.Memory
+	if step.Kind != flow.StepSelect || memory.ID == "" {
+		return params
+	}
+	params.Toggle = domain.RememberToggleLabel
+	if memory.Reask && memory.Value != "" {
+		params.ToggleOn = true
+		params.Start = memory.Value
+	}
+	return params
 }
 
 func recapList(content flow.StepContent) components.SelectListModel {

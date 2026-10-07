@@ -4,6 +4,10 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+### Added
+
+- **"Always use this answer"** in the wizards of `create`, `checkout` and `extract`: tick it with `tab` and the env strategy, the isolation or the source fast-forward is no longer asked in that repository; `--ask` asks again. → [Remembered answers](docs/guide/configuration.md#remembered-answers)
+
 ### Fixed
 
 - **`wtm env`** masks the passwords it still printed: the values `--isolation verbatim` restores, `[[env]]` keys in JSON, and multi-host, DSN (`password=`) and unparsable URLs, also in the text conflict lines and `env_ports`. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)

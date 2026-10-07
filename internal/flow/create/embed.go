@@ -117,16 +117,24 @@ type Plan struct {
 	FastForward string
 	Isolation   domain.Isolation
 	Warnings    []string
+	// The marks say where an answer stands in the repository's memory;
+	// KeptSource names a source a remembered "keep" leaves behind.
+	IsolationMark string
+	UpdateMark    string
+	KeptSource    []string
 }
 
 func (e Embedded) Plan(answers flow.Answers) Plan {
 	f := e.flow
 	plan := Plan{
-		Branch:    answers.Value(KeyBranch),
-		From:      answers.Value(KeySource),
-		Reused:    f.reusesBranch(answers),
-		Isolation: domain.Isolation(answers.Value(KeyIsolation)),
-		Warnings:  f.warnings(answers),
+		Branch:        answers.Value(KeyBranch),
+		From:          answers.Value(KeySource),
+		Reused:        f.reusesBranch(answers),
+		Isolation:     domain.Isolation(answers.Value(KeyIsolation)),
+		Warnings:      f.warnings(answers),
+		IsolationMark: flow.RememberedMark(answers, KeyIsolation),
+		UpdateMark:    flow.RememberedMark(answers, KeySourceUpdate),
+		KeptSource:    decide.KeptSourceLines(answers, KeySourceUpdate),
 	}
 	if answers.Value(KeySourceUpdate) == updateFastForward {
 		plan.FastForward = f.sourceUpdate(answers).Branch
@@ -161,6 +169,7 @@ func (e Embedded) Provision(params ProvisionParams) (result domain.CreateResult,
 		Answers:   answers,
 		Preflight: envports.Preflight(f.ctx),
 	})
+	result.Origins = f.origins(answers)
 	return result, true, err
 }
 

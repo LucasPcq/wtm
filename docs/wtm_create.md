@@ -37,6 +37,7 @@ wtm create [branch...] [flags]
 ### Options
 
 ```
+      --ask                Ask again the questions this repository remembers an answer to, to change or forget it
       --env-from string    Override env strategy (example, main, parent)
       --ff                 Fast-forward to origin before creating — the source branch, or the branch itself when it already exists locally (non-interactive; skipped when it has diverged)
       --from string        Source branch to start from — or, when the branch already exists locally, the parent to record for wtm sync (required there without the wizard)

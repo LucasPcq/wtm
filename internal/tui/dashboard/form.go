@@ -73,10 +73,11 @@ func buildFormRows(params buildFormParams) ([]formRow, flow.Answers, error) {
 		if _, preset := session.Presets.Get(step.Key); preset {
 			continue
 		}
-		if step.Skip != nil {
-			if skip, _ := step.Skip(answers); skip {
-				continue
+		if answer, settled := flow.Settle(step, answers); settled {
+			if answer.Recalled {
+				answers = answers.With(step.Key, answer)
 			}
+			continue
 		}
 
 		content, err := stepContent(step, answers)

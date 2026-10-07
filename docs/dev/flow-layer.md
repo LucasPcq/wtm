@@ -145,6 +145,8 @@ type Step struct {
 	Summarize func(Answer) string
 	Flag      string // what an unattended run should pass instead
 	Arg       bool   // ...or that it is a positional
+
+	Memory Memory // the answer this repository may remember (ID, Value, Reask)
 }
 ```
 
@@ -175,6 +177,8 @@ type Answer struct {
 	Skipped      bool
 	SkipReason   string
 	Asked        bool // false for a preset, a Resolve fallback, or a skip
+	Recalled     bool // settled from a remembered answer, not asked
+	Remember     bool // the user ticked "Always use this answer"
 }
 ```
 
@@ -192,11 +196,9 @@ for _, step := range session.Steps {
 	if _, known := answers.Get(step.Key); known {
 		continue // a flag or a positional already answered it
 	}
-	if step.Skip != nil {
-		if skip, reason := step.Skip(answers); skip {
-			answers = answers.With(step.Key, Answer{Skipped: true, SkipReason: reason})
-			continue
-		}
+	if answer, settled := Settle(step, answers); settled {
+		answers = answers.With(step.Key, answer) // skipped, or remembered
+		continue
 	}
 	if step.Resolve == nil {
 		return Answers{}, requiredErr(step) // refuse, naming step.Flag or the positional
@@ -218,6 +220,15 @@ for _, step := range session.Steps {
 | 3. Interactive only | **no `Resolve`** | `Unattended` refuses with `requiredErr(step)`. It never falls back to a picker |
 
 The default a `Resolve` returns is **never destructive**: `clean --yes` leaves children orphaned unless `--reparent-children`, `sync --yes` does not push, `extract --yes` aborts on conflict.
+
+### Remembered answers
+
+The precedence of a decision is **flag > remembered answer > `Resolve`'s default**, on every surface. A `StepSelect` opts in with `Step.Memory{ID: domain.Remember…}`; the flow lays what `config.toml`'s `[wizard.remembered]` holds on its steps with `flow.Recall` (`Ask` is `--ask`, which asks them again), and every host settles a step through **`flow.Settle`**: its `Skip` first — a remembered fast-forward never fires for a source that is not behind — then the remembered value. `flowui` keeps every step nobody is asked — a preset, a remembered answer — in its place in the wizard as a `components.Step.Settled` step: never entered, counted in "Step n/N", read in the trail as `✓ <Label>: <summary> · --<flag>` or `· remembered`. A remembered step behind a condition is settled on entry (`SettledSummary`), against the answers given before it, and reads `⊘` when its condition rules it out. The dashboard has no trail; it honours the memory but offers no toggle.
+
+- **What can be remembered** is one table, `rules.RememberableValues`: an ID and the values its question offers, nothing destructive. `flow.Rememberable` also refuses a recap, any kind but `StepSelect`, an option the step no longer offers and a `Danger` one, so a stale value is asked again, never guessed. `config` refuses an unknown ID or value at load.
+- **Writing it**: `flowui` draws "Always use this answer in this repo" under an opted-in step (`tab`), read back as `Answer.Remember`. After a confirmed `Ask`, `decide.Remember` writes `flow.Remembering(session, answers)` through `service/memory`: a ticked answer is kept, a remembered question asked again under `--ask` and left unticked is forgotten. An aborted session writes nothing.
+- **Reading it back**: every host hands an asked answer through `flow.Asked`, which drops a tick on a value no memory holds and marks a remembered question left unticked as `Forget`; the recap marks the line (`flow.RememberedMark`: remembered, will be remembered, clears the remembered answer) and closes with `flow.RememberedHint`; a remembered "keep" adds its own line (`decide.KeptSourceLines`), since a kept source otherwise has none. The JSON of `create`, `checkout` and `extract` carries `origins` (`decide.Origins`): `flag`, `remembered`, `config`, `default`.
+- **A flag answered through `Resolve` rather than as a preset** (`--ff`) must keep the memory off its step (`decide.SourceUpdateStep`), or the memory would settle it first.
 
 **`--force` never travels this path.** It is a `Request` field, the safety axis. `--force` alone does not imply `--yes` — the session still runs and asks to confirm, the refusals already lifted. `--yes` alone does not lift a refusal: `clean --yes` on a dirty worktree fails naming `--force` (`resolveDelete` in `internal/flow/clean/steps.go` runs the safety check while answering the step). Where the recap offers a dangerous option, the flag and the answer converge on one value: `request.Force || answers.Value(KeyDelete) == deleteForce`.
 

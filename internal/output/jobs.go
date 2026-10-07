@@ -36,7 +36,8 @@ type PRCheckoutJSON struct {
 	Isolation domain.Isolation   `json:"isolation,omitempty"`
 	EnvPorts  domain.EnvPortPlan `json:"env_ports,omitzero"`
 	// Warnings are what the run module could not do for the new worktree.
-	Warnings []string `json:"warnings,omitempty"`
+	Warnings []string                       `json:"warnings,omitempty"`
+	Origins  map[string]domain.AnswerOrigin `json:"origins,omitempty"`
 }
 
 // WriteWorktreeJobResultsJSON writes one document per worktree, whatever their

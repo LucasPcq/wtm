@@ -49,6 +49,7 @@ func newCreateCmd() *cobra.Command {
 	cmd.Flags().Bool(domain.FlagFF, false, "Fast-forward to origin before creating — the source branch, or the branch itself when it already exists locally (non-interactive; skipped when it has diverged)")
 	cmd.Flags().String(domain.FlagEnvFrom, "", "Override env strategy (example, main, parent)")
 	shared.AddIsolationFlag(cmd)
+	shared.AddAskFlag(cmd)
 	cmd.Flags().Bool(domain.FlagIfNotExists, false, "Succeed silently if the worktree already exists (idempotent)")
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (branch names required; source defaults to the base branch for a new branch, and --from is required for one that already exists)")
 	shared.AddOutputFlag(cmd)
@@ -62,6 +63,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	ffFlag, _ := cmd.Flags().GetBool(domain.FlagFF)
 	ifNotExists, _ := cmd.Flags().GetBool(domain.FlagIfNotExists)
 	yes, _ := cmd.Flags().GetBool(domain.FlagYes)
+	ask, _ := cmd.Flags().GetBool(domain.FlagAsk)
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 	isolation, err := shared.IsolationFlag(cmd)
 	if err != nil {
@@ -95,6 +97,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 			FastForward: ffFlag,
 			IfNotExists: ifNotExists,
 			Isolation:   isolation,
+			Ask:         ask,
 		},
 		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive}),
 		Presenter: createPresenter{CLIPresenter: shared.NewPresenter(cmd, format), config: config},

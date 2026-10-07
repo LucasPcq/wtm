@@ -8,6 +8,7 @@ Everything here assumes the driving rules of `SKILL.md`: `--output json` on data
 - [`create`](#create)
 - [An existing local branch](#an-existing-local-branch)
 - [Isolation at creation](#isolation-at-creation)
+- [Remembered answers](#remembered-answers)
 - [`clean` and `prune`](#clean-and-prune)
 - [`extract`](#extract)
 - [`env`](#env)
@@ -45,12 +46,21 @@ Only a branch **another worktree already holds** is refused (exit `10`).
 
 ## Isolation at creation
 
-`create`, `extract` and `checkout` take `--isolation isolated|verbatim`: how the new worktree stands against its source. Without it, your paths take `run.toml`'s `isolation`, else `isolated`.
+`create`, `extract` and `checkout` take `--isolation isolated|verbatim`: how the new worktree stands against its source. Without it, your paths take a [remembered answer](#remembered-answers), else `run.toml`'s `isolation`, else `isolated`.
 
 - `isolated`: wtm writes the worktree's own ports, `COMPOSE_PROJECT_NAME` and `[[env]]` namespaces into its `.env`, and runs its jobs on the same shifted ports.
 - `verbatim`: the `.env` stays byte for byte as copied, and the worktree's jobs run on its source's ports. Such a worktree **cannot run while its source does**.
 
 `--isolation` only answers a creation. On a worktree `--if-not-exists` found already there, or an existing `extract --to` target, it is ignored; when it differs from the worktree's, a `warnings` entry says so and names `wtm env <branch> --isolation …`. The full model is in `run-config.md` (Isolation).
+
+## Remembered answers
+
+In the interactive wizard of `create`, `checkout` and `extract`, the user can tick "Always use this answer in this repo" on three questions: the env strategy, the isolation and whether to fast-forward a source behind origin. The answer lands in `config.toml` under `[wizard.remembered]` (`env_strategy`, `isolation`, `source_update`), and **it applies under `--yes` and `--output json` too**: it stands in for the flag you did not pass, ahead of the config default.
+
+- **For a guaranteed result, pass the flag**: `--env-from`, `--isolation`, `--ff`. A flag always wins over a remembered answer.
+- The JSON says what settled each of these answers: `origins` (see `json.md`). `"remembered"` means the user's memory chose, not your command.
+- `--ask` ignores the memory for one run: under `--yes` the answers fall back to the config and the safe defaults. It forgets nothing.
+- Never edit `[wizard.remembered]` on your own initiative: it is the user's preference. Nothing destructive can be remembered.
 
 ## `clean` and `prune`
 

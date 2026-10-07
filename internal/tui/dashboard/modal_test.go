@@ -685,3 +685,32 @@ func TestEscOnTheFirstTextListCancelsTheRun(t *testing.T) {
 		t.Errorf("err = %v, want the run cancelled", answered.err)
 	}
 }
+
+// The dashboard offers no toggle, but honours what the CLI remembered: the
+// question is passed over and its answer reaches the flow as remembered.
+func TestTheModalPassesOverARememberedQuestion(t *testing.T) {
+	session := flow.Session{Steps: []flow.Step{
+		{
+			Kind: flow.StepSelect, Key: "env", Label: "Env",
+			Options: []flow.Option{{Label: "example", Value: "example"}, {Label: "main", Value: "main"}},
+			Memory:  flow.Memory{ID: domain.RememberEnvStrategy, Value: "main"},
+		},
+		{Kind: flow.StepRecap, Key: "recap", Label: "Recap", Options: []flow.Option{{Label: "go", Value: "go"}}},
+	}}
+
+	reply := make(chan promptReply, 1)
+	mo, _ := newModal(modalParams{Shape: modalStepper, Session: session, Reply: reply, Width: testWidth, Height: testHeight})
+	if mo.index != 1 {
+		t.Fatalf("index = %d, want the remembered question passed over", mo.index)
+	}
+
+	_, cmd := mo.update(namedKey(tea.KeyEnter))
+	if cmd == nil {
+		t.Fatal("confirming the recap must answer the session")
+	}
+	cmd()
+	answered := <-reply
+	if answer, _ := answered.answers.Get("env"); answer.Value != "main" || !answer.Recalled {
+		t.Errorf("env = %+v, want the remembered main", answer)
+	}
+}

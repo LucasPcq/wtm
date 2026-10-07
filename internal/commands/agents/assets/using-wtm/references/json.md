@@ -44,6 +44,7 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 - `isolation`: the worktree's, `isolated` or `verbatim` (for `extract`, the target's).
 - `env_ports`: present when the port pass ran and the project links anything (shape below). Absent for a verbatim worktree, a project linking nothing, or a pass that could not run.
 - `warnings`: a `run.toml` link ignored because its `.env` is not a configured `[env]` target, why the port pass could not run ("ports not settled, run `wtm env <branch>` once run.toml is fixed"), that `--isolation` differed from an existing worktree's and was ignored, or that `--env-from parent` copied the `.env` from the main checkout because the parent has no worktree.
+- `origins`: what settled each answer the wizard can remember, keyed `env_strategy`, `isolation`, `source_update`: `flag`, `remembered` (the user's `[wizard.remembered]`, see `worktrees.md`), `config` (`config.toml` or `run.toml`) or `default`. A question that did not apply has no key (`isolation` with nothing to isolate, `source_update` with a source not behind, `env_strategy` on `extract`).
 - `extract` file entries may carry `"status": "renamed"` with `"orig_path"`.
 
 ## `env_ports` and the `ports` block
