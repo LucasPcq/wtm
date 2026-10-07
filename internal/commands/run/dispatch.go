@@ -68,7 +68,7 @@ func (p dispatchParams) dispatchStart() error {
 		return err
 	}
 	if outcome.Aborted {
-		return domain.ErrAborted
+		return shared.EndAborted(p.Cmd)
 	}
 	return nil
 }
@@ -103,7 +103,7 @@ func (p dispatchParams) dispatchUp() error {
 	if err != nil {
 		return err
 	}
-	return concluded(outcome)
+	return concluded(p.Cmd, outcome)
 }
 
 func (p dispatchParams) dispatchDown(all bool) error {

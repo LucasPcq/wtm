@@ -98,7 +98,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	return concluded(outcome)
+	return concluded(cmd, outcome)
 }
 
 // reportRunConfig prints what the config got wrong before anything is started:

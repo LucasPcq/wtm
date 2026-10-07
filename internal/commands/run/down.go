@@ -68,7 +68,10 @@ func runDown(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if outcome.Aborted || outcome.Failed() {
+	if outcome.Aborted {
+		return shared.EndAborted(cmd)
+	}
+	if outcome.Failed() {
 		return domain.ErrAborted
 	}
 	return nil
