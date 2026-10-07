@@ -335,4 +335,8 @@ var (
 	// ErrStatusDetached refuses `wtm status` on a detached HEAD: a worktree's
 	// state is keyed on its branch.
 	ErrStatusDetached = errors.New("worktree is on a detached HEAD: wtm status needs a branch")
+
+	// ErrDaemonForkInTest refuses to fork the daemon from a test binary, which
+	// would run the test suite again rather than serve anything.
+	ErrDaemonForkInTest = errors.New("refusing to fork the run daemon from a test binary")
 )
