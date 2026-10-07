@@ -18,7 +18,7 @@ Your repository will differ; the steps do not. The outputs below are what wtm pr
 brew install LucasPcq/tap/wtm
 ```
 
-Or `go install github.com/LucasPcq/wtm@latest`, or a binary from the [releases](https://github.com/LucasPcq/wtm/releases). wtm needs `git`; [`gh`](https://cli.github.com) is optional and unlocks the GitHub features.
+Or `go install github.com/LucasPcq/wtm@latest`, or a binary from the [releases](https://github.com/LucasPcq/wtm/releases): see [Installation](installation.md) for a specific version and [Platform support](platform-support.md) for Linux and WSL2. wtm needs `git`; [`gh`](https://cli.github.com) is optional and unlocks the GitHub features.
 
 Then add the shell integration, which is what lets `wtm go` change your directory:
 

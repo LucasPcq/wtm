@@ -1,0 +1,21 @@
+name: Feature request
+description: Something wtm should do, or do differently
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to do, and where wtm gets in the way today. Start from the situation, not the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like
+      description: The command, flag or behaviour you have in mind, if you have one.
+  - type: textarea
+    id: workaround
+    attributes:
+      label: How you work around it today
+      description: A script, a hook, another tool, or nothing.
