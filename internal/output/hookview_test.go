@@ -171,7 +171,7 @@ func TestHookViewMovesBackExactlyTheRowsItPrinted(t *testing.T) {
 		_, _ = view.Write([]byte("a line of hook output\n"))
 
 		up := 0
-		if _, err := fmt.Sscanf(buf.String(), domain.AnsiCursorUpFmt, &up); err != nil {
+		if _, err := fmt.Sscanf(buf.String(), domain.AnsiPrevLineFmt, &up); err != nil {
 			t.Fatalf("repaint %d moved no cursor: %q", i, buf.String())
 		}
 		if up != drawn {
@@ -222,6 +222,20 @@ func TestHookViewBarsTheLinesItKeepsAndNotTheCursorMoves(t *testing.T) {
 	}
 	if !strings.Contains(got[escape:], domain.AccentBarGlyph) {
 		t.Errorf("the result line that survives must carry the bar: %q", got)
+	}
+}
+
+func TestHookViewRepaintsFromTheStartOfTheRow(t *testing.T) {
+	var buf bytes.Buffer
+	view := NewHookView(HookViewParams{W: &buf})
+	view.OnHook(domain.HookBeat{Cmd: "pnpm install", Started: true})
+	_, _ = view.Write([]byte("^C"))
+
+	buf.Reset()
+	view.OnHook(domain.HookBeat{Cmd: "pnpm install"})
+
+	if !strings.HasPrefix(buf.String(), fmt.Sprintf(domain.AnsiPrevLineFmt, 1)) {
+		t.Errorf("repaint = %q, want it to start with a move to column zero of the row above", buf.String())
 	}
 }
 

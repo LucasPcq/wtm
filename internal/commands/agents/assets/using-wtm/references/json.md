@@ -119,7 +119,7 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 
 ## Stacks: `sync`, `fast-forward`, `reparent`
 
-- `sync`: one step per branch with `status` (`conflict`, `error`, `diverged`, `cancelled` for a branch an interrupt reached first — rebase aborted, branch unchanged, exit `19`, nothing pushed; …), `path`, and `kept_in_progress: true` when `--keep-conflict` left a rebase paused there. Plus `base_targeted` (whether the base was fetched or fast-forwarded) and `parent_updates: [{branch, status, old_tip, new_tip, behind, children, detail}]` with `status` `behind` / `fast_forwarded` / `diverged` / `ff_failed`. Exit non-zero on `conflict` or `error`; `diverged` keeps exit 0. Meanings in `stacks.md`.
+- `sync`: one step per branch with `status` (`conflict`, `error`, `diverged`, `cancelled` for a branch an interrupt reached first — rebase aborted, branch unchanged, exit `19`, nothing pushed; …), `path`, and `kept_in_progress: true` when `--keep-conflict` left a rebase paused there. Plus `base_targeted` (whether the base was fetched or fast-forwarded), `base_interrupted: true` when an interrupt cut the base's refresh short and `parent_updates: [{branch, status, old_tip, new_tip, behind, children, detail}]` with `status` `behind` / `fast_forwarded` / `diverged` / `ff_failed`. Exit non-zero on `conflict` or `error`; `diverged` keeps exit 0. Meanings in `stacks.md`.
 - `fast-forward`: `[{branch, status, old_tip, new_tip, behind, detail?}]`, `status` one of `already up to date`, `fast-forwarded from origin`, `diverged`, `no origin counterpart`, `failed`, `interrupted, unchanged` (exit `19`). Only `failed` makes the exit non-zero.
 - `reparent`: `{"reparented": [{branch, old_parent, new_parent}, …]}`.
 
@@ -129,7 +129,7 @@ One contract across the module: **each command has one fixed shape, and the exit
 
 Commands acting on worktrees answer with **an array of per-worktree documents**, even for one worktree, in the order you named them:
 
-- `run up`: `[{branch, path, profile?, aborted, jobs: [{name, status, url?, held?, namespace?, …}]}]`. A failed job's entry is `{name, status: "error", message, output, exit_code}`: `message` is the daemon's one-line reason, `output` everything the job wrote before failing. A runner's `held` is `[{job, url}]`.
+- `run up`: `[{branch, path, profile?, aborted, interrupted?, jobs: [{name, status, url?, held?, namespace?, …}]}]`; `interrupted: true` when an interrupt stopped that worktree's start (exit `19`, the jobs already started keep running). A failed job's entry is `{name, status: "error", message, output, exit_code}`: `message` is the daemon's one-line reason, `output` everything the job wrote before failing. A runner's `held` is `[{job, url}]`.
 - `run down` / `run stop`: `[{branch, path, jobs: [{name, status, message?}]}]`. `run down --all`: one document per worktree it emptied.
 - `run logs`: `[{branch, path, lines: [{job, at, text}]}]`. `at` is RFC3339 UTC; lines are grouped by job, so `at` is not monotonic across jobs. `lines: []` when nothing was recorded.
 

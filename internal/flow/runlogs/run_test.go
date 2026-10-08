@@ -72,6 +72,23 @@ func TestOutcomeRecorded(t *testing.T) {
 	}
 }
 
+func TestAnInterruptedRunSaysSo(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	outcome, err := runlogs.Run(ctx, runlogs.RunParams{
+		Service: &runlogstest.Service{},
+		Sink:    &runlogstest.Sink{},
+		Jobs:    []domain.JobConfig{migrate, api},
+		WorkDir: "/work/api",
+		LogDir:  "/state/logs/api",
+	})
+
+	if !errors.Is(err, context.Canceled) || !outcome.Interrupted {
+		t.Fatalf("err = %v, interrupted = %v, want the run read as interrupted", err, outcome.Interrupted)
+	}
+}
+
 func TestRunStartsEveryJobInDeclaredOrder(t *testing.T) {
 	service := &runlogstest.Service{}
 

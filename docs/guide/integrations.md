@@ -68,10 +68,11 @@ The first Ctrl+C (or SIGINT, SIGTERM) cancels the run; behind a spinner or the r
 | What was running | What an interrupt does |
 | --- | --- |
 | `clean`, `prune` | the worktree being removed is removed all the way (branch, data, event); the next ones are left untouched and listed as skipped, `interrupted` |
-| `create`, `checkout`, `extract` | the worktree is created whole or not at all; one created just before the interrupt is kept, its ports and `on_create` hooks not run, and named; the branches not reached are listed as skipped, `interrupted` |
-| a hook | the hook is stopped (its process group gets SIGINT, then SIGTERM, then SIGKILL); the hooks after it never start, `continue_on_error` included. An `on_clean` hook stopped this way keeps the worktree |
+| `create`, `checkout`, `extract` | the worktree is created whole or not at all; one created just before the interrupt, or whose `on_create` hooks it stopped, is kept and named; the branches not reached are listed as skipped, `interrupted` |
+| a hook | the hook is stopped (its process group gets SIGINT, then SIGTERM, then SIGKILL); the hooks after it never start, `continue_on_error` included, and it is reported as `hook stopped` rather than by its shell's exit status. An `on_clean` hook stopped this way keeps the worktree |
 | `sync`, `fast-forward` | a rebase in progress is aborted, the branch left where it was; nothing is pushed, and the branches not reached are reported `cancelled` |
 | `run up`, `run start` | the jobs already started, the one being started included, keep running; the recap lists them, `wtm run down` stops them |
+| `wtm ui` | quitting it (`q`, Ctrl+C) with a run in flight cancels that run as above and waits for it to stop, then exits `19`; a second Ctrl+C leaves at once |
 | a fetch, a `git` talking to a remote | stopped, with what it started (ssh) — never a daemon it left behind on purpose (credential cache, fsmonitor, an ssh `ControlPersist` master) |
 
 The command still writes its report or its JSON document, then exits `19`. Running it again finishes the work. A second Ctrl+C quits at once — once a worktree being created or removed is done — and is then killed by the signal (exit `130` in a shell) unless the report was already written.

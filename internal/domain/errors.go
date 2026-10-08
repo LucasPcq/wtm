@@ -19,6 +19,9 @@ var (
 	// run, a caller that declined one — the runner wraps it in HookFailedNamedFmt
 	// instead, because then the error is the only thing there is to read.
 	ErrHookFailed = errors.New("hook failed")
+	// ErrHookStopped is a hook wtm stopped itself, on an interrupt: the status
+	// its shell exited with then says nothing about the hook.
+	ErrHookStopped = errors.New("hook stopped")
 
 	// ErrConfigNotFound is returned when no configuration file is found.
 	ErrConfigNotFound = errors.New("config file not found")

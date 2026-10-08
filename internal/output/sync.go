@@ -76,10 +76,8 @@ func printBase(w io.Writer, result domain.SyncResult) {
 	}
 }
 
-// baseUnchangedNote cannot tell an interrupted fetch from an up-to-date base,
-// so an interrupted run does not claim the latter.
 func baseUnchangedNote(result domain.SyncResult) string {
-	if rules.SyncInterrupted(result.Steps) {
+	if result.BaseInterrupted {
 		return domain.SyncBaseInterruptedNote
 	}
 	return "(already up to date / no fast-forward)"
@@ -167,7 +165,7 @@ func syncedLine(step domain.SyncStepResult) string {
 	return fmt.Sprintf(domain.SyncRebasedLineFmt,
 		step.Branch,
 		step.SourceBranch,
-		styles.Muted.Render(fmt.Sprintf(domain.SyncCommitsReplayedFmt, step.CommitsReplayed)),
+		styles.Muted.Render(rules.Plural(rules.PluralParams{Count: step.CommitsReplayed, One: domain.SyncCommitOne, Many: domain.SyncCommitMany})),
 		pushed)
 }
 

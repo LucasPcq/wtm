@@ -39,7 +39,7 @@ func runStop(cmd *cobra.Command, _ []string) error {
 
 	confirmed, err := confirmStop(cmd, status)
 	if err != nil || !confirmed {
-		return shared.Declined(cmd, err)
+		return shared.BackedOut(cmd, err)
 	}
 
 	if err := shutdown(cmd.Context()); err != nil {

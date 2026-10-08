@@ -28,11 +28,12 @@ func interruptedStart(t *testing.T) (*cobra.Command, *bytes.Buffer, runlogs.Star
 	cmd.SetErr(&bytes.Buffer{})
 	start := func(context.Context, runlogs.Sink) (runlogs.Outcomes, error) {
 		return runlogs.Outcomes{{
-			Worktree:   "main",
-			Started:    []string{"api", "migrate"},
-			NotStarted: []string{"web"},
-			Steps:      3,
-			Results:    []domain.JobActionResult{{Name: "api", Status: domain.JobActionStarted}, {Name: "migrate", Status: domain.JobActionStarted}},
+			Worktree:    "main",
+			Started:     []string{"api", "migrate"},
+			NotStarted:  []string{"web"},
+			Steps:       3,
+			Interrupted: true,
+			Results:     []domain.JobActionResult{{Name: "api", Status: domain.JobActionStarted}, {Name: "migrate", Status: domain.JobActionStarted}},
 		}}, context.Canceled
 	}
 	return cmd, &stdout, start
@@ -72,7 +73,7 @@ func TestAnInterruptedMachineRunStillWritesItsDocument(t *testing.T) {
 	if decodeErr := json.Unmarshal(stdout.Bytes(), &documents); decodeErr != nil {
 		t.Fatalf("stdout is not the document: %v\n%s", decodeErr, stdout.String())
 	}
-	if len(documents) != 1 || len(documents[0].Jobs) != 2 {
-		t.Errorf("documents = %+v, want api and migrate listed", documents)
+	if len(documents) != 1 || len(documents[0].Jobs) != 2 || !documents[0].Interrupted {
+		t.Errorf("documents = %+v, want api and migrate listed, the worktree marked interrupted", documents)
 	}
 }

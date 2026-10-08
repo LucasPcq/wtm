@@ -232,8 +232,11 @@ func (f *checkoutFlow) checkout(params checkoutParams) (Outcome, error) {
 	// A reused branch has no start-point, so the hooks see its recorded parent.
 	hookErr := f.runHooks(hooksParams{WorktreePath: result.Path, Branch: pr.Branch, FromBranch: rules.FirstNonEmpty(startPoint, parent)})
 	publish.Provisioned(settled, publish.ProvisionedParams{Context: f.ctx, Branch: result.Branch, Err: hookErr})
+	if hookErr != nil && f.runCtx.Err() != nil {
+		return Outcome{}, fmt.Errorf(domain.CreateHooksInterruptedFmt, domain.ErrLeftBehind, result.Path)
+	}
 	if hookErr != nil {
-		return Outcome{}, flow.Interrupted(f.runCtx, hookErr)
+		return Outcome{}, hookErr
 	}
 	result.Isolation = worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: result.Branch})
 	result.Origins = f.origins(params.Answers)

@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
@@ -81,5 +82,31 @@ func TestAnInterruptedBatchSkipsTheBranchesItNeverReached(t *testing.T) {
 	}
 	if len(outcome.Skipped) != 1 || outcome.Skipped[0] != (domain.PruneSkip{Branch: "feat/y", Reason: domain.PruneSkipInterrupted}) {
 		t.Errorf("skipped = %+v, want feat/y skipped as interrupted", outcome.Skipped)
+	}
+}
+
+// An interrupt that lands while the hooks run stops them, keeps the worktree,
+// and says so: the reader is left with a checkout whose setup did not finish.
+func TestAnInterruptDuringTheHooksNamesTheWorktreeLeftBehind(t *testing.T) {
+	ctx := testContext(t)
+	ctx.Config.Project.Hooks.OnCreate = []domain.HookCommand{{Cmd: "sleep 30"}, {Cmd: "echo never"}}
+	runCtx, cancel := context.WithCancel(t.Context())
+	time.AfterFunc(300*time.Millisecond, cancel)
+
+	outcome, err := Run(runCtx, Params{
+		Context:   ctx,
+		Request:   Request{Branches: []string{"feat/x"}, From: "main"},
+		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyEnv: "", KeyRecap: confirmCreate}},
+		Presenter: newRecorder(),
+	})
+
+	if !errors.Is(err, domain.ErrLeftBehind) || !strings.Contains(err.Error(), "hooks did not finish") {
+		t.Fatalf("err = %v, want the worktree named as left with its hooks unfinished", err)
+	}
+	if len(outcome.Failed) != 1 || outcome.Failed[0].ExitCode != domain.ExitCodeCancelled {
+		t.Fatalf("failed = %+v, want feat/x as cancelled", outcome.Failed)
+	}
+	if _, statErr := os.Stat(outcome.Failed[0].Path); statErr != nil {
+		t.Errorf("worktree not on disk: %v", statErr)
 	}
 }

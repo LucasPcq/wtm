@@ -32,7 +32,10 @@ type Outcome struct {
 	// among Steps. No Failed means every job was reached.
 	Failed     string
 	FailedStep int
-	Steps      int
+	// Interrupted says an interrupt ended the sequence: what it started keeps
+	// running, and what it never reached is in NotStarted.
+	Interrupted bool
+	Steps       int
 	// FailedOutput is what the job that ended the sequence had written, raw. A
 	// surface that never showed it live — machine output, a CI log, an agent
 	// reading JSON — has nothing else to say why the run stopped, and the
@@ -194,7 +197,9 @@ func Run(ctx context.Context, params RunParams) (Outcome, error) {
 	if r.sink == nil {
 		r.sink = noSink{}
 	}
-	return r.run(), ctx.Err()
+	outcome := r.run()
+	outcome.Interrupted = ctx.Err() != nil
+	return outcome, ctx.Err()
 }
 
 type runner struct {

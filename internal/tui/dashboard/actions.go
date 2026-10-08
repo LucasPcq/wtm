@@ -434,6 +434,9 @@ func (m Model) beginOp(params beginParams) (Model, int) {
 func (m Model) finishOp(msg opDoneMsg) (Model, tea.Cmd) {
 	op, _ := m.ops.byID(msg.id)
 	m.ops = m.ops.end(msg.id)
+	if m.quitting && !m.ops.active() {
+		return m, tea.Quit
+	}
 	m, detailCmd := m.invalidateDetail(op.firstTarget())
 	// A run that just started or stopped jobs changes what the badges and the
 	// RUN section say, and waiting for the next poll to notice is what made a
@@ -497,7 +500,7 @@ func (m Model) applyFlow(msg tea.Msg) (Model, tea.Cmd) {
 // openModal refuses a second question rather than stacking it: two modals would
 // leave the user answering one flow while another waits behind it, unseen.
 func (m Model) openModal(msg promptMsg) (Model, tea.Cmd) {
-	if m.modal.open {
+	if m.modal.open || m.quitting {
 		return m, replyCmd(msg.reply, promptReply{err: domain.ErrUserAborted})
 	}
 	modal, cmd := newModal(modalParams{

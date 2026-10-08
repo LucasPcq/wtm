@@ -2017,8 +2017,10 @@ const (
 	HookViewMinWidth = 8
 	// TabWidth is what a tab is expanded to before a line is measured.
 	TabWidth = 8
-	// The cursor moves a surface makes to redraw a block it already printed.
-	AnsiCursorUpFmt = "\x1b[%dA"
+	// The cursor moves a surface makes to redraw a block it already printed. The
+	// move lands in column zero: a ^C the terminal echoed leaves the cursor
+	// mid-row, and an erase from there keeps the start of the row it is redrawing.
+	AnsiPrevLineFmt = "\x1b[%dF"
 	AnsiClearBelow  = "\x1b[J"
 	AnsiReset       = "\x1b[0m"
 	// Hook phase titles: a bold section header above the phase, so create and
@@ -3107,7 +3109,8 @@ const (
 	SyncNothingToSync         = "No worktrees to sync."
 	SyncUpToDateSuffix        = "already up to date"
 	SyncRebasedLineFmt        = "%s rebased onto %s   %s%s"
-	SyncCommitsReplayedFmt    = "%d commits"
+	SyncCommitOne             = "commit"
+	SyncCommitMany            = "commits"
 	FastForwardStateFmt       = "%s — %s"
 	// SyncNoRebaseStep and SyncNoStaleParent are why a decision was never put to
 	// the user: nothing is rebased, or no parent is behind its remote.
@@ -3511,6 +3514,9 @@ const (
 	// CreateSetupInterruptedFmt is a worktree created whole whose setup — ports,
 	// on_create hooks — an interrupt stopped before it began.
 	CreateSetupInterruptedFmt = "%w: %s was created but not set up (ports, on_create hooks)"
+	// CreateHooksInterruptedFmt is the same worktree when the interrupt came
+	// while its on_create hooks ran.
+	CreateHooksInterruptedFmt = "%w: %s was created but its on_create hooks did not finish"
 	PruneSkippedFmt           = "Skipped %s (%s)"
 	PruneWizardErrLabel       = "prune wizard"
 	PruneSelectionTitle       = "Select worktrees to prune"
@@ -4052,6 +4058,9 @@ const (
 	// DashboardOperationLabel names a failed run in the output panel when the
 	// failure is the run itself rather than one of its phases.
 	DashboardOperationLabel = "operation"
+	// DashboardCancellingNotice is what the output panel says once a quit has
+	// cancelled the runs in flight and waits for them to stop.
+	DashboardCancellingNotice = "Cancelling… — ctrl+c again to quit at once"
 	// DashboardOpenPRLabel names a failed browser launch for the REVIEW
 	// section's PR line, in the same "✗ <label>: <err>" form.
 	DashboardOpenPRLabel = "open PR"

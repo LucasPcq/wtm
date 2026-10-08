@@ -45,7 +45,7 @@ func runRm(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if outcome.Aborted {
-		return shared.EndAborted(cmd)
+		return domain.ErrAborted
 	}
 	return nil
 }

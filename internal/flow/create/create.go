@@ -305,8 +305,11 @@ func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, 
 		})...)
 		hookErr := f.runHooks(result.Path, branchName, fromBranch)
 		publish.Provisioned(context.WithoutCancel(f.runCtx), publish.ProvisionedParams{Context: f.ctx, Branch: branchName, Err: hookErr})
+		if hookErr != nil && f.runCtx.Err() != nil {
+			return result, fmt.Errorf(domain.CreateHooksInterruptedFmt, domain.ErrLeftBehind, result.Path)
+		}
 		if hookErr != nil {
-			return result, flow.Interrupted(f.runCtx, hookErr)
+			return result, hookErr
 		}
 	}
 	result.Isolation = worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: branchName})

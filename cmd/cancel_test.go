@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"strings"
@@ -61,5 +62,20 @@ func TestAnInterruptThatLeftSomethingBehindIsNamed(t *testing.T) {
 	}
 	if got := abortLine(fmt.Errorf("%w: git fetch: signal: interrupt", domain.ErrCancelled)); got != domain.AbortedMessage {
 		t.Errorf("a bare interrupt says %q, want %q", got, domain.AbortedMessage)
+	}
+}
+
+// A bare interrupt reads like a run the user backed out of — nothing failed —
+// while one that left a worktree behind stays a failure the reader must act on.
+func TestAnInterruptIsReportedInTheBackedOutRegister(t *testing.T) {
+	var bare, left bytes.Buffer
+	reportFailure(&bare, fmt.Errorf("%w: git fetch: signal: interrupt", domain.ErrCancelled))
+	reportFailure(&left, fmt.Errorf(domain.CreateSetupInterruptedFmt, domain.ErrLeftBehind, "/trees/feat-x"))
+
+	if !strings.Contains(bare.String(), domain.GlyphUnchanged+" "+domain.AbortedMessage) {
+		t.Errorf("bare interrupt = %q, want the %q line", bare.String(), domain.GlyphUnchanged)
+	}
+	if !strings.Contains(left.String(), domain.GlyphFailure) {
+		t.Errorf("left behind = %q, want it reported as a failure", left.String())
 	}
 }

@@ -106,6 +106,7 @@ func Sync(ctx context.Context, params SyncParams) (domain.SyncResult, error) {
 		})
 		result.BaseUpdated = updated
 		result.BaseNewTip = newTip
+		result.BaseInterrupted = !updated && ctx.Err() != nil
 	}
 
 	// Parents outside the cascade are reconciled BEFORE the steps run, so a child

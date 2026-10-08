@@ -183,6 +183,28 @@ func TestFormatSyncResultReportsTargetedBase(t *testing.T) {
 	}
 }
 
+// The base reads as interrupted only when the interrupt cut its own refresh: a
+// run stopped later, between two rebases, did read it.
+func TestSyncBaseIsInterruptedOnlyWhenItsRefreshWas(t *testing.T) {
+	steps := []domain.SyncStepResult{
+		{Branch: "feat/a", SourceBranch: "main", Status: domain.SyncStatusSynced},
+		{Branch: "feat/b", SourceBranch: "feat/a", Status: domain.SyncStatusCancelled},
+	}
+	for _, tc := range []struct {
+		interrupted bool
+		want        string
+	}{
+		{interrupted: false, want: "already up to date"},
+		{interrupted: true, want: domain.SyncBaseInterruptedNote},
+	} {
+		var buf bytes.Buffer
+		FormatSyncResult(&buf, domain.SyncResult{BaseBranch: "main", BaseTargeted: true, BaseOldTip: "aaa1111", BaseInterrupted: tc.interrupted, Steps: steps})
+		if !strings.Contains(buf.String(), tc.want) {
+			t.Errorf("base interrupted=%v: want %q in\n%s", tc.interrupted, tc.want, buf.String())
+		}
+	}
+}
+
 // A fast-forward that was asked for and failed must name the obstacle, never
 // re-suggest the flag the user already passed — otherwise the same command is
 // replayed forever on a stale parent.

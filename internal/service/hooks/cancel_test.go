@@ -26,6 +26,9 @@ func TestACancelledRunStopsTheHookInFlight(t *testing.T) {
 	if err == nil {
 		t.Fatal("a cancelled hook reported success")
 	}
+	if !errors.Is(err, domain.ErrHookStopped) || strings.Contains(err.Error(), "exit status") {
+		t.Errorf("err = %v, want the hook named as stopped, not by the status its shell exited with", err)
+	}
 	if elapsed := time.Since(begin); elapsed > domain.SubprocessInterruptGrace {
 		t.Fatalf("the hook ran %v after the cancel", elapsed)
 	}

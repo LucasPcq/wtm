@@ -70,7 +70,7 @@ func (p dispatchParams) dispatchStart() error {
 		return err
 	}
 	if outcome.Aborted {
-		return shared.EndAborted(p.Cmd)
+		return domain.ErrAborted
 	}
 	return nil
 }

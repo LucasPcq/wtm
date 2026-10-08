@@ -111,7 +111,7 @@ func run(cmd *cobra.Command, version string) error {
 			DefaultYes:  true,
 		}))
 		if err != nil || !confirmed {
-			return shared.Declined(cmd, err)
+			return shared.BackedOut(cmd, err)
 		}
 	}
 

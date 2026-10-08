@@ -53,7 +53,7 @@ func openRunView(params viewParams) (runlogs.Outcomes, error) {
 	})
 	if errors.Is(err, domain.ErrCancelled) {
 		frameRecap(out, result.Recap)
-		return result.Outcomes, err
+		return result.Outcomes, reported(err)
 	}
 	if err != nil {
 		return nil, err
@@ -137,7 +137,7 @@ func runOnStream(params streamParams) (runlogs.Outcomes, error) {
 	if err != nil && interruptedWithAnAccount(params.Cmd, outcomes) {
 		output.RunInterrupted(out, outcomes)
 		output.FrameEnd(out)
-		return outcomes, err
+		return outcomes, reported(err)
 	}
 	if err != nil {
 		return nil, err
@@ -164,6 +164,12 @@ func runForMachine(params streamParams) (runlogs.Outcomes, error) {
 		return nil, writeErr
 	}
 	return outcomes, err
+}
+
+// reported marks an interrupt whose recap is already on screen, so the root
+// adds no "Aborted." under it; the exit code still says cancelled.
+func reported(err error) error {
+	return fmt.Errorf("%w: %w", domain.ErrAborted, err)
 }
 
 // interruptedWithAnAccount is a run an interrupt stopped once it had started

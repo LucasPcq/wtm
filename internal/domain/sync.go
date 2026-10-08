@@ -133,11 +133,14 @@ type SyncResult struct {
 	BaseBranch string `json:"base_branch"`
 	// BaseTargeted is false when every step rebases onto some other parent: the
 	// base is then left untouched rather than moved as a side effect.
-	BaseTargeted bool             `json:"base_targeted"`
-	BaseUpdated  bool             `json:"base_updated"`
-	BaseOldTip   string           `json:"base_old_tip"`
-	BaseNewTip   string           `json:"base_new_tip"`
-	Steps        []SyncStepResult `json:"steps"`
+	BaseTargeted bool   `json:"base_targeted"`
+	BaseUpdated  bool   `json:"base_updated"`
+	BaseOldTip   string `json:"base_old_tip"`
+	BaseNewTip   string `json:"base_new_tip"`
+	// BaseInterrupted says the interrupt came while the base was being refreshed,
+	// so an unmoved base may simply not have been read.
+	BaseInterrupted bool             `json:"base_interrupted,omitempty"`
+	Steps           []SyncStepResult `json:"steps"`
 	// SelectedBranches lists the branches the run was asked to sync: the explicit
 	// args, or every managed worktree when --all was used. It makes the JSON
 	// output self-describing for agents (which branches this cascade covered).

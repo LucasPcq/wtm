@@ -246,6 +246,17 @@ func abortLine(err error) string {
 	return err.Error()
 }
 
+// reportFailure prints a bare interrupt in the register of a run the user backed
+// out of — `=`, nothing failed — and anything else, a worktree an interrupt left
+// behind included, as the failure it is.
+func reportFailure(w io.Writer, err error) {
+	if errors.Is(err, domain.ErrCancelled) && !errors.Is(err, domain.ErrLeftBehind) {
+		output.Unchanged(w, abortLine(err))
+		return
+	}
+	output.Error(w, abortLine(err))
+}
+
 func globalUpdateCheck() *bool {
 	cfg, err := config.LoadGlobal()
 	if err != nil {
@@ -357,7 +368,7 @@ func Execute() {
 		// discarded that report, in which case this is the only line there is.
 		if !errors.Is(err, domain.ErrAborted) || humanOutputSilenced {
 			output.Blank(os.Stderr)
-			output.Error(os.Stderr, abortLine(err))
+			reportFailure(os.Stderr, err)
 			output.Blank(os.Stderr)
 		}
 		printUpdateNotice(ctx)

@@ -123,7 +123,7 @@ func (v *ExecView) clear() {
 	if v.painted == 0 {
 		return
 	}
-	fmt.Fprintf(v.w, domain.AnsiCursorUpFmt+domain.AnsiClearBelow, v.painted)
+	fmt.Fprintf(v.w, domain.AnsiPrevLineFmt+domain.AnsiClearBelow, v.painted)
 	v.painted = 0
 }
 

@@ -373,11 +373,12 @@ func WriteRunOutcomesJSON(w io.Writer, outcomes runlogs.Outcomes) error {
 			results = []domain.JobActionResult{}
 		}
 		documents = append(documents, domain.WorktreeRunResult{
-			Branch:  outcome.Worktree,
-			Path:    outcome.WorkDir,
-			Profile: outcome.Profile,
-			Aborted: outcome.Aborted(),
-			Jobs:    results,
+			Branch:      outcome.Worktree,
+			Path:        outcome.WorkDir,
+			Profile:     outcome.Profile,
+			Aborted:     outcome.Aborted(),
+			Interrupted: outcome.Interrupted,
+			Jobs:        results,
 		})
 	}
 	return encodeJSON(w, documents)

@@ -151,6 +151,13 @@ func runSingleHook(ctx context.Context, params runSingleHookParams) error {
 	}
 	params.Report(beat)
 
+	if err != nil && ctx.Err() != nil {
+		stopped := error(domain.ErrHookStopped)
+		if params.Named {
+			stopped = fmt.Errorf("%s: %w", hook.Cmd, domain.ErrHookStopped)
+		}
+		return failureOf(failureParams{Cmd: hook.Cmd, Wrapped: stopped})
+	}
 	if err != nil {
 		wrapped := fmt.Errorf("%w: %w", domain.ErrHookFailed, err)
 		if params.Named {

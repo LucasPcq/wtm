@@ -56,7 +56,7 @@ func (p upPresenter) Sequence(params seam.SequenceParams) (runlogs.Outcomes, err
 // so an error here would only repeat them (LUC-198).
 func concluded(cmd *cobra.Command, outcome upflow.Outcome) error {
 	if outcome.Aborted {
-		return shared.EndAborted(cmd)
+		return domain.ErrAborted
 	}
 	return nil
 }

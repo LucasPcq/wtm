@@ -63,7 +63,7 @@ func runOpen(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if outcome.Aborted {
-		return shared.EndAborted(cmd)
+		return domain.ErrAborted
 	}
 	// The shape follows the format, as it does for `run url`: a caller asking
 	// for a document gets the address that was opened, not an empty stdout.
