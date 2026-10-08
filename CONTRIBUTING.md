@@ -53,4 +53,4 @@ wtm follows a layered architecture with rules checked by `make lint`: `commands/
 
 ## Code of conduct
 
-Everyone taking part in wtm's issues, discussions and pull requests follows the [Code of Conduct](CODE_OF_CONDUCT.md). Report a problem privately to picquelucas17+wtm@gmail.com.
+Everyone taking part in wtm's issues, discussions and pull requests follows the [Code of Conduct](CODE_OF_CONDUCT.md). Report a problem privately to contact@wtm.sh.

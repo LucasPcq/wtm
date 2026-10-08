@@ -41,8 +41,8 @@ body { margin: 0; background: var(--ground); color: var(--body); font: 17px/1.6 
 a { color: inherit; }
 code { font-family: var(--mono); font-size: 0.86em; color: var(--text); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
-@media (min-width: 760px) { .wrap { padding: 0 40px; } }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 0 16px; }
+@media (min-width: 760px) { .wrap { padding: 0 32px; } }
 
 /* lockup: the branch mark and the wordmark, as on the social preview */
 .lockup { display: inline-flex; align-items: center; gap: 0.16em; text-decoration: none; color: var(--text); }
@@ -82,7 +82,7 @@ code { font-family: var(--mono); font-size: 0.86em; color: var(--text); }
 .tag::before { content: '>_ '; color: var(--accent); }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .hero-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 20px; margin-top: 56px; padding-top: 32px; border-top: 1px solid var(--line); }
-.hero-foot .install { flex: 1 1 420px; }
+.hero-foot .install { flex: 1 1 420px; min-width: 0; }
 .agent-note { flex-basis: 100%; margin: 0; font: 13px/1.7 var(--mono); color: var(--muted); }
 .agent-note a { color: var(--accent); }
 
@@ -131,28 +131,26 @@ code { font-family: var(--mono); font-size: 0.86em; color: var(--text); }
 .scene .screen { min-height: calc(1.65em * 15 + 38px); }
 
 /* fig. 1 */
-.machine { border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface); }
-.machine-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 18px 20px; border-bottom: 1px solid var(--line); font: 14px var(--mono); }
-.machine-head label { color: var(--text); }
-.machine-head input[type='range'] { flex: 1; min-width: 160px; height: 44px; accent-color: var(--accent); }
-.machine-head output { min-width: 2ch; font-weight: 800; color: var(--accent); }
-.machine-head .sum { color: var(--muted); }
-.machine-head .sum b { color: var(--accent); }
-.lanes-scroll { overflow-x: auto; }
-.lanes { width: 100%; border-collapse: collapse; font: 13px var(--mono); white-space: nowrap; }
-.lanes th { padding: 12px 20px 8px 0; text-align: left; font-weight: 400; color: var(--muted); border-bottom: 1px solid var(--line); }
-.lanes th:first-child, .lanes td:first-child { padding-left: 20px; }
-.lanes td { padding: 9px 20px 9px 0; border-bottom: 1px dashed var(--line); color: var(--body); }
-.lanes td:first-child { color: var(--text); font-weight: 700; }
-.lanes td.port { color: var(--accent); }
-.lanes tr { outline: none; }
-.lanes tr.active td { background: color-mix(in srgb, var(--accent) 9%, transparent); }
-.lanes tr:focus-visible td { box-shadow: inset 0 -2px var(--accent); }
-.lanes tr.fresh { animation: lane-in 0.35s ease-out; }
+.machine { border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+.machine-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.wt-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.wt-tab { min-height: 36px; padding: 0 12px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--muted); font: 500 13px var(--mono); cursor: pointer; }
+.wt-tab:hover { color: var(--text); }
+.wt-tab[aria-selected='true'] { border-color: var(--line-strong); background: var(--ground); color: var(--text); }
+.wt-create { min-height: 36px; padding: 0 14px; border: 1px dashed var(--line-strong); border-radius: 8px; background: none; color: var(--text); font: 13px var(--mono); cursor: pointer; }
+.wt-create:hover { border-color: var(--accent); }
+.wt-create .g { color: var(--accent); }
+.wt-panel { display: grid; gap: 1px; background: var(--t-line); }
+.wt-panel[hidden] { display: none; }
+@media (min-width: 900px) { .wt-panel { grid-template-columns: 1fr 1.25fr 1fr; } }
+.envfile { min-width: 0; background: var(--t-bg); color: var(--t-text); }
+.envfile-head { display: flex; justify-content: space-between; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--t-line); font: 12px var(--mono); color: var(--t-text); }
+.envfile-body { padding: 14px 16px 18px; font: 13px/1.75 var(--mono); overflow-x: auto; }
+.envfile-body .ln { min-height: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fresh { animation: lane-in 0.35s ease-out; }
+.wt-panel.fresh .g { animation: flash 1.2s ease-out; }
 @keyframes lane-in { from { opacity: 0; transform: translateY(-4px); } }
-.machine-foot { display: grid; gap: 10px; padding: 16px 20px 20px; }
-.machine-event { margin: 0; padding: 12px 14px; border-radius: 8px; background: var(--t-bg); color: var(--t-green); font: 12px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
-.machine-note { margin: 0; font: 12px var(--mono); color: var(--muted); }
+@keyframes flash { from { background: rgb(126 231 135 / 0.35); } }
 
 /* features: text beside its session */
 .feature { display: grid; gap: 32px; align-items: start; padding: 56px 0; border-top: 1px dashed var(--line); }
@@ -165,7 +163,8 @@ code { font-family: var(--mono); font-size: 0.86em; color: var(--text); }
 .feature.wide { grid-template-columns: minmax(0, 1fr); }
 .feature.wide p { max-width: 640px; }
 .tui .ch { display: inline-block; width: 1ch; text-align: center; }
-.tui .screen { font-size: 14px; line-height: 1.22; padding: 16px 20px; }
+.tui { width: fit-content; max-width: 100%; }
+.tui .screen { font-size: 15px; line-height: 1.22; padding: 16px 20px; }
 .tui .ln { min-height: 1.22em; }
 
 /* agents */
@@ -176,6 +175,7 @@ code { font-family: var(--mono); font-size: 0.86em; color: var(--text); }
 .points dd { margin: 4px 0 0; color: var(--muted); }
 
 /* vs git worktree */
+.lanes-scroll { overflow-x: auto; }
 .compare { width: 100%; min-width: 620px; border-collapse: collapse; }
 .compare th, .compare td { padding: 16px 20px 16px 0; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
 .compare thead th { font: 500 13px var(--mono); color: var(--muted); }

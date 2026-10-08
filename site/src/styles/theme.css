@@ -1,15 +1,41 @@
-/* The terminal-green accent of the README GIFs, so the site and the demos read as one product. */
+/* The landing page's identity (src/styles/landing.css), on Starlight's tokens. */
 :root {
-  --sl-color-accent-low: #1a2e05;
-  --sl-color-accent: #65a30d;
-  --sl-color-accent-high: #d9f99d;
+  --sl-font: 'IBM Plex Sans', system-ui, sans-serif;
+  --sl-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sl-color-accent-low: #12261b;
+  --sl-color-accent: #7ee787;
+  --sl-color-accent-high: #aff5b4;
+  --sl-color-white: #e6edf3;
+  --sl-color-gray-1: #c9d1d9;
+  --sl-color-gray-2: #b1bac4;
+  --sl-color-gray-3: #8b949e;
+  --sl-color-gray-4: #6e7681;
+  --sl-color-gray-5: #30363d;
+  --sl-color-gray-6: #161b22;
+  --sl-color-black: #0b0f14;
 }
 
 :root[data-theme='light'] {
-  --sl-color-accent-low: #ecfccb;
-  --sl-color-accent: #4d7c0f;
-  --sl-color-accent-high: #1a2e05;
+  --sl-color-accent-low: #dafbe1;
+  --sl-color-accent: #1a7f37;
+  --sl-color-accent-high: #0f5323;
+  --sl-color-white: #1f2328;
+  --sl-color-gray-1: #31373d;
+  --sl-color-gray-2: #424a53;
+  --sl-color-gray-3: #59636e;
+  --sl-color-gray-4: #818b98;
+  --sl-color-gray-5: #d1d9e0;
+  --sl-color-gray-6: #eaeef2;
+  --sl-color-gray-7: #f6f8fa;
+  --sl-color-black: #ffffff;
 }
+
+.site-title { gap: 0.4rem; }
+.site-title span { font: 800 1.5rem/1 var(--sl-font-mono); letter-spacing: -0.04em; color: var(--sl-color-white); }
+.site-title img { height: 1.25rem; width: auto; }
+
+.sidebar-content a[aria-current='page'] { background: var(--sl-color-accent-low); color: var(--sl-color-accent-high); font-weight: 600; }
+:root[data-theme='light'] .sidebar-content a[aria-current='page'] { color: var(--sl-color-accent); }
 
 .hero img {
   border-radius: 0.75rem;

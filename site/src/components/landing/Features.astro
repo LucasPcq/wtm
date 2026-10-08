@@ -56,12 +56,27 @@ const stacks = [
   out(),
   out('  4 branch(es) ready to push (force-with-lease).'),
 ];
+const bar = '<span class="m">┃</span>  ';
+const events = [
+  cmd('wtm events'),
+  out(`${bar}<span class="m">= 1 worktree · /code/acme</span>`),
+  out(`${bar}<span class="m">= watching for changes</span>`, 900),
+  out(`${bar}<span class="g">✓</span> created agent/checkout  <span class="m">/code/acme.trees/agent-checkout</span>`, 1300),
+  out(`${bar}<span class="y">~</span> updated agent/checkout  <span class="m">ordinal=1</span>`, 250),
+  out(`${bar}<span class="g">✓</span> provisioned agent/checkout`, 1500),
+  out(`${bar}<span class="g">✓</span> started api in agent/checkout  <span class="c">http://api.agent-checkout.acme.localhost</span>`, 1200),
+  out(`${bar}<span class="g">✓</span> started web in agent/checkout  <span class="c">http://web.agent-checkout.acme.localhost</span>`, 300),
+  out(`${bar}<span class="r">✗</span> web crashed in agent/checkout <span class="m">(exit 1)</span>`, 1900),
+  out(`${bar}    <span class="m">Error: Cannot find module './routes/checkout'</span>`, 80),
+  out(`${bar}<span class="y">~</span> stopped api in agent/checkout`, 1600),
+  out(`${bar}<span class="g">✓</span> removed agent/search`, 1300),
+];
 ---
 <section class="section" id="features">
   <div class="wrap">
     <p class="prompt">wtm --help</p>
-    <h2>Create, run, watch, sync.</h2>
-    <p class="lede">Four commands cover the day. Every terminal on this page replays what wtm printed in a sandbox repository called <code>acme</code>, trimmed to fit.</p>
+    <h2>Create, run, watch, sync, follow.</h2>
+    <p class="lede">Five commands cover the day. Every terminal on this page replays what wtm printed in a sandbox repository called <code>acme</code>, trimmed to fit.</p>
 
     <div class="feature">
       <div>
@@ -98,6 +113,16 @@ const stacks = [
         <p>Branch off a branch. When <code>main</code> moves, <code>wtm sync</code> rebases the whole chain, parents before children, and aborts cleanly on a conflict.</p>
       </div>
       <Session title="~/code/acme" lines={stacks} />
+    </div>
+
+    <div class="feature">
+      <div>
+        <span class="cmdname">wtm events</span>
+        <h3>Every change, as it happens</h3>
+        <p>Whoever makes it, a shell, an agent or <code>wtm ui</code>: worktrees created and removed, hooks that failed, jobs that started or crashed with their last lines. <code>--output json</code> turns it into JSON Lines for an orchestrator to read, no polling.</p>
+        <p><a href={`${base}guide/events/`}>The event stream →</a></p>
+      </div>
+      <Session title="~/code/acme" lines={events} />
     </div>
   </div>
 </section>

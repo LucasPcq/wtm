@@ -1,76 +1,75 @@
 ---
-import { lanes, MAX_AGENTS } from '../../lib/machine.mjs';
+import { INITIAL, panel, worktree } from '../../lib/machine.mjs';
 
-const initial = 4;
-const rows = lanes(initial);
+const selected = 1;
 ---
 <section class="section" id="machine">
   <div class="wrap">
-    <p class="prompt fig">fig. 1 — one laptop, one stack per worktree</p>
+    <p class="prompt fig">fig. 1 — what wtm writes in each worktree</p>
     <h2>git worktree gives each branch a directory. wtm gives it the rest.</h2>
-    <p class="lede">Ports, containers and the database are shared by every checkout until something keeps them apart. Slide to add agents: each worktree takes the next block of ports, its own Compose project, its own database in the shared postgres and its own URL.</p>
-    <div class="machine">
+    <p class="lede">The same repository, three worktrees. wtm rewrites the ports and addresses in each one's <code>.env</code> files when it creates it, and hands every job the worktree's identity when it runs it. Pick a worktree, or create one.</p>
+    <div class="machine" id="worktrees">
       <div class="machine-head">
-        <label for="agents">worktrees</label>
-        <input id="agents" type="range" min="1" max={MAX_AGENTS} value={initial} />
-        <output for="agents" id="agents-count">{initial}</output>
-        <span class="sum">port collisions: <b>0</b></span>
+        <div class="wt-tabs" role="tablist" aria-label="Worktree">
+          {INITIAL.map((branch, i) => (
+            <button type="button" role="tab" class="wt-tab" aria-selected={i === selected ? 'true' : 'false'} data-wt={i}>{branch}</button>
+          ))}
+        </div>
+        <button type="button" class="wt-create" id="wt-create" hidden><span class="g">$</span> wtm create <span id="wt-next"></span></button>
       </div>
-      <div class="lanes-scroll">
-        <table class="lanes">
-          <thead><tr><th>worktree</th><th>web</th><th>api</th><th>compose project</th><th>database</th><th>url</th></tr></thead>
-          <tbody id="lanes">
-            {rows.map((l) => (
-              <tr tabindex="0" data-event={l.event}>
-                <td>{l.branch}</td><td class="port">:{l.web}</td><td class="port">:{l.api}</td><td>{l.compose}</td><td>{l.database}</td><td>{l.url}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div class="machine-foot">
-        <pre class="machine-event" id="lane-event" aria-live="polite">{rows[1].event}</pre>
-        <p class="machine-note">postgres :5432 runs once, with one database per worktree · the line above is the <code>wtm events</code> entry of the selected worktree</p>
+      <div class="wt-panels">
+        {INITIAL.map((branch, i) => (
+          <div class="wt-panel" role="tabpanel" data-wt={i} hidden={i !== selected} set:html={panel(worktree(branch, i))} />
+        ))}
       </div>
     </div>
   </div>
 </section>
 
 <script>
-  import { lanes } from '../../lib/machine.mjs';
+  import { AGENTS, INITIAL, panel, worktree } from '../../lib/machine.mjs';
 
-  const slider = document.querySelector<HTMLInputElement>('#agents');
-  const count = document.querySelector<HTMLOutputElement>('#agents-count');
-  const body = document.querySelector<HTMLTableSectionElement>('#lanes');
-  const event = document.querySelector<HTMLPreElement>('#lane-event');
+  const root = document.querySelector<HTMLElement>('#worktrees');
+  const tabs = root?.querySelector<HTMLElement>('.wt-tabs');
+  const panels = root?.querySelector<HTMLElement>('.wt-panels');
+  const create = root?.querySelector<HTMLButtonElement>('#wt-create');
+  const next = root?.querySelector<HTMLElement>('#wt-next');
+  let created = 0;
 
-  const select = (row: HTMLTableRowElement) => {
-    body?.querySelectorAll('tr').forEach((r) => r.classList.toggle('active', r === row));
-    if (event) event.textContent = row.dataset.event ?? '';
+  const select = (index: string) => {
+    tabs?.querySelectorAll<HTMLElement>('.wt-tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.wt === index)));
+    panels?.querySelectorAll<HTMLElement>('.wt-panel').forEach((p) => { p.hidden = p.dataset.wt !== index; });
   };
 
-  const render = (n: number) => {
-    if (!body || !count) return;
-    count.value = String(n);
-    body.replaceChildren(...lanes(n).map((l) => {
-      const row = document.createElement('tr');
-      row.tabIndex = 0;
-      row.dataset.event = l.event;
-      for (const [text, port] of [[l.branch, false], [`:${l.web}`, true], [`:${l.api}`, true], [l.compose, false], [l.database, false], [l.url, false]] as const) {
-        const td = document.createElement('td');
-        td.textContent = text;
-        if (port) td.className = 'port';
-        row.append(td);
-      }
-      row.addEventListener('mouseenter', () => select(row));
-      row.addEventListener('focus', () => select(row));
-      return row;
-    }));
-    const rows = body.querySelectorAll('tr');
-    rows[rows.length - 1].classList.add('fresh');
-    select(rows[rows.length - 1]);
+  const showNext = () => {
+    if (!create || !next) return;
+    create.hidden = created >= AGENTS.length;
+    next.textContent = AGENTS[created] ?? '';
   };
 
-  slider?.addEventListener('input', () => render(Number(slider.value)));
-  if (slider) render(Number(slider.value));
+  tabs?.addEventListener('click', (event) => {
+    const tab = (event.target as HTMLElement).closest<HTMLElement>('.wt-tab');
+    if (tab?.dataset.wt) select(tab.dataset.wt);
+  });
+
+  create?.addEventListener('click', () => {
+    if (!tabs || !panels || created >= AGENTS.length) return;
+    const ordinal = INITIAL.length + created;
+    const branch = AGENTS[created];
+    const tab = document.createElement('button');
+    Object.assign(tab, { type: 'button', className: 'wt-tab fresh', textContent: branch });
+    tab.setAttribute('role', 'tab');
+    tab.dataset.wt = String(ordinal);
+    tabs.append(tab);
+    const view = document.createElement('div');
+    Object.assign(view, { className: 'wt-panel fresh', innerHTML: panel(worktree(branch, ordinal)) });
+    view.setAttribute('role', 'tabpanel');
+    view.dataset.wt = String(ordinal);
+    panels.append(view);
+    created += 1;
+    select(String(ordinal));
+    showNext();
+  });
+
+  showNext();
 </script>

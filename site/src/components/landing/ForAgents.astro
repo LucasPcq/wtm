@@ -7,15 +7,14 @@ const lines = [
   cmd('wtm agents install'),
   out('  <span class="m"># once: the using-wtm skill, for Claude Code</span>'),
   out(),
-  cmd('wtm create agent/checkout agent/search agent/oauth agent/billing --yes --output json > /dev/null'),
-  cmd('wtm run up agent/checkout agent/search agent/oauth agent/billing -d --yes --output json | jq -r \'.[].jobs[].url\''),
+  cmd('agents="agent/checkout agent/search agent/oauth agent/billing"'),
+  cmd('wtm create $agents --yes --output json > /dev/null'),
+  cmd('wtm run up $agents -d --yes --output json | jq -r \'.[].jobs[].url\''),
   out('<span class="c">http://api.agent-checkout.acme.localhost</span>'),
   out('<span class="c">http://web.agent-checkout.acme.localhost</span>'),
   out('<span class="c">http://api.agent-search.acme.localhost</span>'),
   out('<span class="c">http://web.agent-search.acme.localhost</span>'),
   out('<span class="m">…</span>'),
-  out(),
-  cmd('wtm events --all --output json | jq -c \'select(.type == "job.crashed")\''),
 ];
 const points = [
   { k: '--yes', text: 'Every command runs unattended. A missing choice is an error naming its flag, never a prompt the agent cannot answer.' },

@@ -15,7 +15,7 @@ export const play = async (screen: Element) => {
     line.classList.remove('pending');
     const typed = line.querySelector<HTMLElement>('.typed');
     if (!typed) {
-      await sleep(55);
+      await sleep(Number(line.dataset.delay ?? 55));
       continue;
     }
     const text = line.dataset.text ?? '';

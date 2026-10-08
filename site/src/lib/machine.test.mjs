@@ -1,40 +1,38 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { lanes, MAX_AGENTS } from './machine.mjs';
+import { AGENTS, INITIAL, panel, worktree } from './machine.mjs';
 
-test('one lane is the main checkout on the base ports', () => {
-  const [main] = lanes(1);
-  assert.equal(lanes(1).length, 1);
-  assert.deepEqual(
-    { branch: main.branch, web: main.web, api: main.api, compose: main.compose, database: main.database, url: main.url },
-    { branch: 'main', web: 3000, api: 4000, compose: 'acme', database: 'app', url: 'http://localhost:3000' },
-  );
+const entry = (wt, path, key) => wt.files.find((f) => f.path === path).entries.find((e) => e.key === key);
+
+test('the main checkout keeps the project defaults and is compared to nothing', () => {
+  const main = worktree('main', 0);
+  assert.equal(entry(main, 'apps/web/.env', 'PORT').value, '3000');
+  assert.equal(entry(main, 'apps/web/.env', 'API_URL').value, 'http://localhost:4000');
+  assert.equal(entry(main, 'apps/api/.env', 'DATABASE_URL').value, 'postgresql://app:app@localhost:5432/app');
+  assert.ok(main.files.flatMap((f) => f.entries).every((e) => e.was === undefined));
 });
 
-test('a worktree shifts its ports by ten per ordinal and gets its own names', () => {
-  const lane = lanes(2)[1];
-  assert.equal(lane.branch, 'agent/fix-checkout');
-  assert.equal(lane.slug, 'agent-fix-checkout');
-  assert.equal(lane.web, 3010);
-  assert.equal(lane.api, 4010);
-  assert.equal(lane.compose, 'acme-agent-fix-checkout');
-  assert.equal(lane.database, 'app_agent-fix-checkout');
-  assert.equal(lane.url, 'http://web.agent-fix-checkout.acme.localhost');
+test('a worktree shifts its ports by ten per ordinal and names its own resources', () => {
+  const wt = worktree('feat/login', 1);
+  assert.deepEqual(entry(wt, 'apps/web/.env', 'PORT'), { key: 'PORT', value: '3010', was: '3000' });
+  assert.equal(entry(wt, 'apps/web/.env', 'API_URL').value, 'http://api.feat-login.acme.localhost');
+  assert.equal(entry(wt, 'apps/api/.env', 'PORT').value, '4010');
+  assert.equal(entry(wt, 'apps/api/.env', 'DATABASE_URL').value, 'postgresql://app:app@localhost:5432/app_feat-login');
+  const job = wt.files.find((f) => f.path.startsWith('environment')).entries;
+  assert.deepEqual(Object.fromEntries(job.map((e) => [e.key, e.value])), {
+    WTM_BRANCH: 'feat/login', WTM_WORKTREE: 'feat-login', WTM_ORDINAL: '1', WTM_PORT_OFFSET: '10', COMPOSE_PROJECT_NAME: 'acme-feat-login',
+  });
 });
 
-test('the maximum has no duplicated port and the count is clamped', () => {
-  const all = lanes(MAX_AGENTS);
-  assert.equal(all.length, 12);
-  const ports = all.flatMap((l) => [l.web, l.api]);
+test('no two worktrees on the page share a port', () => {
+  const all = [...INITIAL, ...AGENTS].map((branch, ordinal) => worktree(branch, ordinal));
+  const ports = all.flatMap((wt) => wt.files.flatMap((f) => f.entries.filter((e) => e.key === 'PORT').map((e) => e.value)));
   assert.equal(new Set(ports).size, ports.length);
-  assert.equal(lanes(40).length, 12);
-  assert.equal(lanes(0).length, 1);
 });
 
-test('the hover event is a parseable job.started line', () => {
-  const event = JSON.parse(lanes(2)[1].event);
-  assert.equal(event.type, 'job.started');
-  assert.equal(event.worktree.branch, 'agent/fix-checkout');
-  assert.equal(event.job.url, 'http://web.agent-fix-checkout.acme.localhost');
+test('a changed value is preceded by what main has, as a shell comment', () => {
+  const html = panel(worktree('feat/login', 1));
+  assert.match(html, /<span class="ln m"># main: 3000<\/span><span class="ln"><span class="c">PORT<\/span>=<span class="g">3010<\/span>/);
+  assert.doesNotMatch(panel(worktree('main', 0)), /# main:/);
 });

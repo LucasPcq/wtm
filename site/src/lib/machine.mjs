@@ -1,38 +1,61 @@
-// The numbers follow wtm's rules (docs/guide/how-run-works.md, addressing.md,
-// shared-services.md) so the figure stays true: base ports on main, +10 per ordinal.
+// What wtm writes for a worktree of the sandbox repository `acme`, following its
+// rules (docs/guide/how-run-works.md, shared-services.md): the main checkout keeps
+// the defaults, worktree n adds n × 10 to every port and names its own resources.
 const REPO = 'acme';
-const WEB = 3000;
-const API = 4000;
 const BLOCK = 10;
-const TASKS = ['fix-checkout', 'add-search', 'oauth-login', 'dark-mode', 'rate-limit', 'i18n', 'csv-export', 'retry-jobs', 'audit-log', 'cache-warmup', 'billing-v2'];
 
-export const MAX_AGENTS = TASKS.length + 1;
+export const INITIAL = ['main', 'feat/login', 'feat/search'];
+export const AGENTS = ['agent/checkout', 'agent/billing', 'agent/oauth'];
 
-const lane = (ordinal) => {
-  const branch = ordinal === 0 ? 'main' : `agent/${TASKS[ordinal - 1]}`;
+const esc = (s) => s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+
+export const worktree = (branch, ordinal) => {
   const slug = branch.replaceAll('/', '-');
-  const web = WEB + ordinal * BLOCK;
-  const url = ordinal === 0 ? `http://localhost:${web}` : `http://web.${slug}.${REPO}.localhost`;
-  const event = JSON.stringify({
-    v: 1,
-    type: 'job.started',
-    worktree: { branch, path: ordinal === 0 ? `/code/${REPO}` : `/code/.trees/${slug}` },
-    job: { name: 'web', kind: 'service', url },
-  });
+  const main = ordinal === 0;
+  const offset = ordinal * BLOCK;
+  const vs = (value, mainValue) => (main ? { value } : { value, was: mainValue });
+  const pair = (key, value, mainValue) => ({ key, ...vs(value, mainValue) });
   return {
     branch,
     slug,
-    ordinal,
-    web,
-    api: API + ordinal * BLOCK,
-    compose: ordinal === 0 ? REPO : `${REPO}-${slug}`,
-    database: ordinal === 0 ? 'app' : `app_${slug}`,
-    url,
-    event,
+    files: [
+      {
+        path: 'apps/web/.env',
+        by: 'wtm create',
+        entries: [
+          pair('PORT', String(3000 + offset), '3000'),
+          pair('API_URL', main ? 'http://localhost:4000' : `http://api.${slug}.${REPO}.localhost`, 'http://localhost:4000'),
+        ],
+      },
+      {
+        path: 'apps/api/.env',
+        by: 'wtm create',
+        entries: [
+          pair('PORT', String(4000 + offset), '4000'),
+          pair('DATABASE_URL', `postgresql://app:app@localhost:5432/${main ? 'app' : `app_${slug}`}`, 'postgresql://app:app@localhost:5432/app'),
+        ],
+      },
+      {
+        path: 'environment of every job',
+        by: 'wtm run up',
+        entries: [
+          { key: 'WTM_BRANCH', value: branch },
+          { key: 'WTM_WORKTREE', value: slug },
+          { key: 'WTM_ORDINAL', value: String(ordinal) },
+          { key: 'WTM_PORT_OFFSET', value: String(offset) },
+          { key: 'COMPOSE_PROJECT_NAME', value: `${REPO}-${slug}` },
+        ],
+      },
+    ],
   };
 };
 
-export const lanes = (count) => {
-  const clamped = Math.min(Math.max(Math.trunc(count) || 1, 1), MAX_AGENTS);
-  return Array.from({ length: clamped }, (_, ordinal) => lane(ordinal));
+const line = (e) => {
+  const changed = e.was !== undefined && e.was !== e.value;
+  const value = changed ? `<span class="g">${esc(e.value)}</span>` : esc(e.value);
+  const note = changed ? `<span class="ln m"># main: ${esc(e.was)}</span>` : '';
+  return `${note}<span class="ln"><span class="c">${e.key}</span>=${value}</span>`;
 };
+
+export const panel = (wt) =>
+  wt.files.map((f) => `<div class="envfile"><div class="envfile-head"><span>${esc(f.path)}</span><span class="m">${f.by}</span></div><div class="envfile-body">${f.entries.map(line).join('')}</div></div>`).join('');

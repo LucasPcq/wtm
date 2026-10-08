@@ -4,9 +4,10 @@ import { CONTACT } from '../../../site.config.mjs';
 <section class="section">
   <div class="wrap letter">
     <p class="prompt">git log --reverse | head -1</p>
-    <h2>Why wtm exists</h2>
-    <p>wtm started at work, out of necessity. I was juggling several branches at once, and every one of them needed its own running app. I wrote a few shell scripts to copy the <code>.env</code>, shift the ports and keep the containers apart.</p>
-    <p>Then I needed those scripts on every project. The tools that existed handled the worktree and stopped there, nowhere near ready for professional use. So I built the one I wanted: a real CLI, tested, documented, scriptable, and now the thing my Claude Code agents use to run in parallel without stepping on each other.</p>
+    <h2>Built inside a monorepo that runs a dozen services.</h2>
+    <p>I work at a startup on a monorepo with two apps, each with its own frontend, backend and back office, and a Docker setup running several databases and services. As AI agents took on more of the work, we could run several tasks at once. Every task then needed its own running stack, so that I could check what an agent had done, and so that the agent could check it itself.</p>
+    <p>It started as shell scripts: one to create a worktree, copy its <code>.env</code> and run the hooks, another to clean it up. Rewriting the ports inside the <code>.env</code> files by hand soon became the hard part. I carried those scripts to my own projects, and tried the tools built around creating worktrees. They stopped at the worktree, and none of them could run a stack like ours.</p>
+    <p>So I built wtm. Today the whole team uses it every day at work, to run tasks in several worktrees at once and to start part or all of the monorepo on its own ports in each.</p>
     <div class="signature">
       <img src="https://github.com/LucasPcq.png?size=96" alt="" width="48" height="48" loading="lazy" />
       <div><b>Lucas Picque</b><span>Founder · <a href="https://github.com/LucasPcq">@LucasPcq</a>{CONTACT && <> · <a href={`mailto:${CONTACT}`}>{CONTACT}</a></>}</span></div>
