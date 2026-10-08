@@ -1,0 +1,20 @@
+---
+import Install from './Install.astro';
+import { base } from '../../lib/base.mjs';
+---
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <p class="section-label">git worktree manager · for people and agents</p>
+      <h1>Worktrees isolate code. <em>wtm isolates the runtime.</em></h1>
+      <p class="sub">Each branch gets its own ports, Docker Compose project, database and URL, so ten Claude Code agents can run their apps on one laptop without stepping on each other.</p>
+      <Install />
+      <div class="actions">
+        <a class="btn btn-primary" href={`${base}guide/getting-started/`}>Get started</a>
+        <a class="btn" href="https://github.com/LucasPcq/wtm">Star on GitHub</a>
+      </div>
+      <p class="agent-link">Are you an agent? Read <a href={`${base}llms.txt`}>llms.txt</a>, then run <code>wtm agents install</code>.</p>
+    </div>
+    <slot name="terminal" />
+  </div>
+</section>

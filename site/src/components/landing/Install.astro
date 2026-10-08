@@ -1,0 +1,23 @@
+---
+const commands = [
+  { key: 'brew', label: 'Homebrew', cmd: 'brew install LucasPcq/tap/wtm' },
+  { key: 'go', label: 'Go', cmd: 'go install github.com/LucasPcq/wtm@latest' },
+  { key: 'bin', label: 'Binary', cmd: 'github.com/LucasPcq/wtm/releases' },
+];
+---
+<div class="install">
+  <div class="install-tabs" role="tablist">
+    {commands.map((c, i) => (
+      <>
+        <input type="radio" name="install" id={`i-${c.key}`} checked={i === 0} />
+        <label for={`i-${c.key}`}>{c.label}</label>
+      </>
+    ))}
+  </div>
+  {commands.map((c) => (
+    <div class="install-cmd" data-k={c.key}>
+      <code>{c.cmd}</code>
+      <button class="copy" type="button" data-copy={c.cmd}>copy</button>
+    </div>
+  ))}
+</div>

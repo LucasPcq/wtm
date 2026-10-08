@@ -1,0 +1,58 @@
+---
+import '../styles/landing.css';
+import { DOMAIN, SITE_URL } from '../../site.config.mjs';
+
+interface Props { title: string; description: string }
+const { title, description } = Astro.props;
+import { base } from '../lib/base.mjs';
+const canonical = new URL(base, SITE_URL).href;
+const contact = DOMAIN ? `mailto:hello@${DOMAIN}` : 'https://github.com/LucasPcq/wtm/issues';
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={new URL(`${base}assets/hero.gif`, SITE_URL).href} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <header class="nav">
+      <div class="wrap">
+        <a class="brand" href={base}>wtm<span>_</span></a>
+        <a class="link" href={`${base}docs/`}>Docs</a>
+        <a class="link optional" href={`${base}changelog/`}>Changelog</a>
+        <a class="link" href="https://github.com/LucasPcq/wtm">GitHub</a>
+      </div>
+    </header>
+    <main><slot /></main>
+    <footer class="footer">
+      <div class="wrap">
+        <a href={`${base}docs/`}>Docs</a>
+        <a href={`${base}guide/getting-started/`}>Getting started</a>
+        <a href={`${base}changelog/`}>Changelog</a>
+        <a href="https://github.com/LucasPcq/wtm">GitHub</a>
+        <a href={`${base}llms.txt`}>llms.txt</a>
+        <a href={contact}>Contact</a>
+        <span class="end">MIT licensed · built by Lucas Picque</span>
+      </div>
+    </footer>
+    <script>
+      for (const button of document.querySelectorAll<HTMLButtonElement>('button.copy[data-copy]')) {
+        button.addEventListener('click', async () => {
+          await navigator.clipboard.writeText(button.dataset.copy ?? '');
+          button.textContent = 'copied';
+          setTimeout(() => (button.textContent = 'copy'), 1500);
+        });
+      }
+    </script>
+  </body>
+</html>

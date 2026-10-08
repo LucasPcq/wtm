@@ -1,3 +1,7 @@
 ---
+import Landing from '../layouts/Landing.astro';
+import Hero from '../components/landing/Hero.astro';
 ---
-<html lang="en"><head><meta charset="utf-8" /><title>wtm</title></head><body><a href={`${import.meta.env.BASE_URL}docs/`}>Docs</a></body></html>
+<Landing title="wtm — worktrees isolate code, wtm isolates the runtime" description="A git worktree manager that gives every branch its own ports, Docker Compose project, database and URL, so many Claude Code agents can run their apps on one machine.">
+  <Hero />
+</Landing>
