@@ -48,16 +48,24 @@ func FormatPrunePlan(w io.Writer, plan domain.PrunePlan) {
 // actionable — but the picker and the recap have already shown that list twice,
 // so it does not get a line each. Raw body — the command's frame owns the padding.
 func FormatPruneResult(w io.Writer, result domain.PruneResult) {
-	if len(result.Pruned) == 0 && result.Failed == nil {
-		Unchanged(w, domain.PruneNothingToPrune)
+	failed := 0
+	if result.Failed != nil {
+		failed = 1
 	}
-	if len(result.Pruned) > 0 {
-		Success(w, rules.Tally(
-			domain.TallyPart{Count: len(result.Pruned), Label: domain.TallyPruned},
-			domain.TallyPart{Count: len(result.Reparented), Label: domain.TallyReparented},
-			domain.TallyPart{Count: len(result.Skipped), Label: domain.TallySkipped},
-		))
+	tally := rules.Tally(
+		domain.TallyPart{Count: len(result.Pruned), Label: domain.TallyPruned},
+		domain.TallyPart{Count: len(result.Reparented), Label: domain.TallyReparented},
+		domain.TallyPart{Count: len(result.Skipped), Label: domain.TallySkipped},
+		domain.TallyPart{Count: failed, Label: domain.TallyFailed},
+	)
+	switch {
+	case len(result.Pruned) > 0:
+		Success(w, tally)
 		Message(w, Indent+strings.Join(rules.PrunedBranches(result), ", "))
+	case tally != "":
+		Unchanged(w, tally)
+	default:
+		Unchanged(w, domain.PruneNothingToPrune)
 	}
 	// Which parent a child was moved onto is not accounting: its next `wtm sync`
 	// rebases onto that branch.

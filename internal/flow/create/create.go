@@ -2,6 +2,7 @@
 package create
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -32,6 +33,7 @@ type Request struct {
 type Outcome struct {
 	Results    []domain.CreateResult
 	Failed     []domain.BatchFailure
+	Skipped    []domain.PruneSkip
 	FromBranch string
 	Aborted    bool
 }
@@ -136,6 +138,11 @@ func (f *createFlow) run() (Outcome, error) {
 	batch := len(branches) > 1
 	var firstErr error
 	for i, name := range branches {
+		if f.runCtx.Err() != nil {
+			outcome.Skipped = interrupted(branches[i:])
+			firstErr = cmp.Or(firstErr, error(domain.ErrCancelled))
+			break
+		}
 		if batch {
 			f.presenter.BranchStarted(flow.Progress{Branch: name, Position: i + 1, Total: len(branches)})
 		}
@@ -161,6 +168,14 @@ func (f *createFlow) run() (Outcome, error) {
 		return outcome, err
 	}
 	return outcome, flow.BatchError(flow.BatchErrorParams{First: firstErr, Batch: batch})
+}
+
+func interrupted(branches []string) []domain.PruneSkip {
+	skipped := make([]domain.PruneSkip, 0, len(branches))
+	for _, name := range branches {
+		skipped = append(skipped, domain.PruneSkip{Branch: name, Reason: domain.PruneSkipInterrupted})
+	}
+	return skipped
 }
 
 // A source already up to date skips the source-update step, which must not
@@ -233,8 +248,15 @@ func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, 
 		startPoint = ""
 	}
 
+	if f.runCtx.Err() != nil {
+		return domain.CreateResult{}, domain.ErrCancelled
+	}
+	// Created whole or not at all: an interrupt waits for the worktree, then
+	// stops what would have followed it.
+	whole, release := worktree.Shield(f.runCtx)
+	defer release()
 	var result domain.CreateResult
-	err := f.presenter.Stage(f.runCtx, flow.StageParams{
+	err := f.presenter.Stage(whole, flow.StageParams{
 		Message: fmt.Sprintf(domain.CreateLoadingFmt, branchName),
 		Work: func(ctx context.Context) error {
 			var createErr error
@@ -260,7 +282,12 @@ func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, 
 	if result.AlreadyExists {
 		f.warnIgnoredIsolation(&result)
 	} else {
-		publish.Created(f.runCtx, f.ctx, branchName)
+		publish.Created(whole, f.ctx, branchName)
+		release()
+		if f.runCtx.Err() != nil {
+			publish.Provisioned(context.WithoutCancel(f.runCtx), publish.ProvisionedParams{Context: f.ctx, Branch: branchName, Err: domain.ErrCancelled})
+			return result, fmt.Errorf(domain.CreateSetupInterruptedFmt, domain.ErrLeftBehind, result.Path)
+		}
 		// Before the hooks: one of them may well read the .env this settles.
 		result.EnvPorts, result.Warnings = envports.SettleFresh(f.runCtx, envports.FreshParams{
 			Params: envports.Params{
@@ -277,7 +304,10 @@ func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, 
 			Presenter: f.presenter,
 		})...)
 		hookErr := f.runHooks(result.Path, branchName, fromBranch)
-		publish.Provisioned(f.runCtx, publish.ProvisionedParams{Context: f.ctx, Branch: branchName, Err: hookErr})
+		publish.Provisioned(context.WithoutCancel(f.runCtx), publish.ProvisionedParams{Context: f.ctx, Branch: branchName, Err: hookErr})
+		if hookErr != nil && f.runCtx.Err() != nil {
+			return result, fmt.Errorf(domain.CreateHooksInterruptedFmt, domain.ErrLeftBehind, result.Path)
+		}
 		if hookErr != nil {
 			return result, hookErr
 		}

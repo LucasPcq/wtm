@@ -55,8 +55,16 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 		return domain.CreateResult{}, err
 	}
 
+	if err := ctx.Err(); err != nil {
+		return domain.CreateResult{}, err
+	}
+	// Once git starts adding the worktree, it is created whole — checkout, env
+	// files, metadata — or an interrupt would leave one wtm cannot read.
+	whole, release := infra.Shield(ctx)
+	defer release()
+
 	reuseBranch := target.State == domain.BranchTargetExisting
-	if err := infra.CreateWorktree(ctx, infra.CreateWorktreeParams{
+	if err := infra.CreateWorktree(whole, infra.CreateWorktreeParams{
 		ProjectDir:  params.ProjectDir,
 		Path:        worktreePath,
 		Branch:      params.Branch,
@@ -68,7 +76,7 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 
 	strategy := rules.ResolveEnvStrategy(params.Config.Project.Env.Strategy, params.EnvFromOverride)
 
-	mainPath, err := infra.FindMainWorktreePath(ctx, infra.FindMainWorktreeParams{
+	mainPath, err := infra.FindMainWorktreePath(whole, infra.FindMainWorktreeParams{
 		ProjectDir: params.ProjectDir,
 	})
 	if err != nil {
@@ -87,7 +95,7 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 			Files:              envFiles,
 			TargetDir:          worktreePath,
 			MainWorktreePath:   mainPath,
-			ParentWorktreePath: parentWorktreePath(ctx, params.ProjectDir, sourceBranch),
+			ParentWorktreePath: parentWorktreePath(whole, params.ProjectDir, sourceBranch),
 		})
 		if copyErr != nil {
 			return domain.CreateResult{}, fmt.Errorf("copy env files: %w", copyErr)
@@ -108,6 +116,7 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 	if err := writeMetadata(metaDir, metadata); err != nil {
 		return domain.CreateResult{}, err
 	}
+	release()
 
 	// on_create hooks run inline unless the caller opts to run them as a separate
 	// phase (create's phased output) via SkipHooks.

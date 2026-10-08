@@ -31,6 +31,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/commands/wt"
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/selfupdate"
@@ -233,6 +234,9 @@ var humanOutputSilenced bool
 // printed as it is; the bare sentinel has no text worth reading, so it points at
 // the flag that took the report away rather than pretending to explain.
 func abortLine(err error) string {
+	if errors.Is(err, domain.ErrLeftBehind) {
+		return err.Error()
+	}
 	if errors.Is(err, domain.ErrCancelled) {
 		return domain.AbortedMessage
 	}
@@ -240,6 +244,17 @@ func abortLine(err error) string {
 		return domain.QuietAbortedMessage
 	}
 	return err.Error()
+}
+
+// reportFailure prints a bare interrupt in the register of a run the user backed
+// out of — `=`, nothing failed — and anything else, a worktree an interrupt left
+// behind included, as the failure it is.
+func reportFailure(w io.Writer, err error) {
+	if errors.Is(err, domain.ErrCancelled) && !errors.Is(err, domain.ErrLeftBehind) {
+		output.Unchanged(w, abortLine(err))
+		return
+	}
+	output.Error(w, abortLine(err))
 }
 
 func globalUpdateCheck() *bool {
@@ -299,28 +314,61 @@ func Root() *cobra.Command {
 	return rootCmd
 }
 
-// interruptible is the root context. The first interrupt cancels it and hands
-// the next one back to the default handler, so a run slow to unwind can still
-// be killed outright.
+// interruptible is the root context. The first interrupt cancels it; the
+// second ends the process — once no shielded git step is left half done, and
+// after killing whatever a cancellation is still waiting on.
 func interruptible() (context.Context, context.CancelFunc) {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	context.AfterFunc(ctx, stop)
+	ctx, cancel := context.WithCancel(context.Background())
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-signals
+		cancel()
+		second := <-signals
+		infra.KillCancelled()
+		go func() { dieOn(<-signals) }()
+		infra.AwaitShields()
+		dieOn(second)
+	}()
+	stop := func() {
+		signal.Stop(signals)
+		cancel()
+	}
 	return ctx, stop
+}
+
+// dieOn ends the process the way the default handler would have: by the signal.
+func dieOn(sig os.Signal) {
+	signal.Reset(sig)
+	unix, ok := sig.(syscall.Signal)
+	if !ok {
+		os.Exit(domain.ExitCodeCancelled)
+	}
+	_ = syscall.Kill(os.Getpid(), unix)
+}
+
+// settle is the last thing a run does: nothing it started may outlive it, and
+// nothing shielded may be cut off half-way by the exit.
+func settle() {
+	infra.KillCancelled()
+	infra.AwaitShields()
 }
 
 // Execute runs the root command and exits with the appropriate code.
 func Execute() {
 	ctx, stop := interruptible()
 	defer stop()
-	runErr := rootCmd.ExecuteContext(ctx)
+	executed, runErr := rootCmd.ExecuteContextC(ctx)
+	runErr = rules.BackedOut(rules.BackedOutParams{Err: runErr, Cancelled: executed != nil && shared.Cancelled(executed)})
 	err := rules.Interrupted(rules.InterruptedParams{Err: runErr, Signalled: ctx.Err() != nil})
+	settle()
 	if err != nil {
 		// ErrAborted means the command already printed its own report; just
 		// propagate the non-zero exit without a second error line — unless --quiet
 		// discarded that report, in which case this is the only line there is.
 		if !errors.Is(err, domain.ErrAborted) || humanOutputSilenced {
 			output.Blank(os.Stderr)
-			output.Error(os.Stderr, abortLine(err))
+			reportFailure(os.Stderr, err)
 			output.Blank(os.Stderr)
 		}
 		printUpdateNotice(ctx)

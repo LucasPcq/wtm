@@ -76,7 +76,7 @@ func runInstall(cmd *cobra.Command, _ []string) error {
 		Description: domain.ProxyInstallConfirmDesc,
 	})
 	if err != nil || !confirmed {
-		return err
+		return shared.BackedOut(cmd, err)
 	}
 
 	if applyErr := redirector.Apply(cmd.Context()); applyErr != nil {
@@ -122,7 +122,7 @@ func runUninstall(cmd *cobra.Command, _ []string) error {
 		Description: domain.ProxyUninstallConfirmDesc,
 	})
 	if err != nil || !confirmed {
-		return err
+		return shared.BackedOut(cmd, err)
 	}
 
 	if removeErr := redirector.Remove(cmd.Context()); removeErr != nil {

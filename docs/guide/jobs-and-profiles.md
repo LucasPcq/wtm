@@ -58,7 +58,7 @@ The runner carries its children's ports and named URLs, and wtm will not start a
 
 ## The run view, or `-d`
 
-`run up`, `run start` on a service and `run logs` open the **run view**: a full-screen view with one pane per job. Leaving it (`q`) **detaches** (the jobs keep running in the background daemon), and `wtm run logs` reopens it. Ctrl+C outside focus mode detaches too once every job has started; while `run up` or `run start` is still starting them, it cancels the start instead: the view shows "Cancelling…" until the start has stopped, then exits with code 19, and a second Ctrl+C quits at once.
+`run up`, `run start` on a service and `run logs` open the **run view**: a full-screen view with one pane per job. Leaving it (`q`) **detaches** (the jobs keep running in the background daemon), and `wtm run logs` reopens it. Ctrl+C outside focus mode detaches too once every job has started; while `run up` or `run start` is still starting them, it cancels the start instead: the view shows "Cancelling…" until the start has stopped, then exits with code 19, and a second Ctrl+C quits at once. The jobs already started, the one being started included, keep running: the recap lists them, and `wtm run down` stops them.
 
 - `-d` starts the jobs and gives the prompt back instead. A task always runs inline, with or without `-d`.
 - No view opens unless both stdin and stdout are a terminal (`wtm run up > run.log` included), nor under `--output json`: the run reports itself as lines, which is what a script or an agent gets.

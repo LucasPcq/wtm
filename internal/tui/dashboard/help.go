@@ -133,7 +133,7 @@ func helpColumnStart(layout domain.HelpLayout, column int) int {
 func (m Model) helpKey(key string) (tea.Model, tea.Cmd) {
 	switch key {
 	case keyQuit, keyInterrupt:
-		return m, tea.Quit
+		return m.quit()
 	case keyHelp, keyEscape:
 		m.showHelp = false
 	case keyUp, keyVimUp:

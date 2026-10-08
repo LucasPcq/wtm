@@ -143,7 +143,8 @@ func (f *syncFlow) run() (Outcome, error) {
 	}
 	f.presenter.Rebased(result)
 
-	if !f.request.DryRun && f.shouldPush(result) {
+	// An interrupted run pushes nothing, and offers nothing to push.
+	if !f.request.DryRun && f.runCtx.Err() == nil && f.shouldPush(result) {
 		pushed, pushErr := f.push(result)
 		if pushErr != nil {
 			return Outcome{}, pushErr
@@ -154,6 +155,9 @@ func (f *syncFlow) run() (Outcome, error) {
 	outcome, err := f.conclude(Outcome{Result: result, Plan: plan})
 	if err != nil {
 		return outcome, err
+	}
+	if rules.SyncInterrupted(result.Steps) || f.runCtx.Err() != nil {
+		return outcome, fmt.Errorf("%w: %w", domain.ErrAborted, domain.ErrCancelled)
 	}
 	if !f.request.DryRun && rules.HasSyncFailure(result.Steps) {
 		return outcome, domain.ErrAborted

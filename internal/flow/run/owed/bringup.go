@@ -45,14 +45,20 @@ func BringUp(ctx context.Context, params BringUpParams) (release func(), err err
 		NoProbe:    true,
 		Publisher:  params.Context.Publisher,
 	})
+	// Letting go must happen whatever stopped the run: the service is up only
+	// because this run brought it up.
+	release = func() {
+		_, _ = process.NewClient(socket).Send(context.WithoutCancel(ctx), process.Request{Action: process.ActionStop, Name: job.Name, WorkDir: main})
+	}
 	outcomes, err := mainSeam.Starter(seam.StartParams{Jobs: rules.JobsWithEffectivePorts(params.Config, []domain.JobConfig{job})})(ctx, nil)
+	if err != nil && ctx.Err() != nil {
+		release()
+	}
 	if err != nil {
 		return nil, err
 	}
 	if outcomes.Aborted() {
 		return nil, fmt.Errorf(domain.OwedBringUpFailedFmt, job.Name, rules.SanitizeLogLine(string(outcomes.One().FailedOutput)))
 	}
-	return func() {
-		_, _ = process.NewClient(socket).Send(ctx, process.Request{Action: process.ActionStop, Name: job.Name, WorkDir: main})
-	}, nil
+	return release, nil
 }

@@ -533,8 +533,11 @@ type WorktreeRunResult struct {
 	Profile string `json:"profile,omitempty"`
 	// Aborted says this worktree stopped short. The others carry on regardless,
 	// so it is read per worktree and never for the run as a whole.
-	Aborted bool              `json:"aborted"`
-	Jobs    []JobActionResult `json:"jobs"`
+	Aborted bool `json:"aborted"`
+	// Interrupted says an interrupt stopped this worktree's start; the jobs it
+	// had started keep running.
+	Interrupted bool              `json:"interrupted,omitempty"`
+	Jobs        []JobActionResult `json:"jobs"`
 }
 
 // WorktreeJobResults is one worktree's part of `run down` and `run stop`.

@@ -8,6 +8,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
 )
 
@@ -38,8 +39,8 @@ func abortableConfig() domain.RunConfig {
 }
 
 // Backing out of a run command's question exits 19 like every other picker: the
-// runner ends on the cancelled mark the root turns into that code. Returning
-// ErrAborted there skipped the root's post-run, and Esc exited 1.
+// runner ends on the cancelled mark, which the root reads to turn its ErrAborted
+// into that code.
 func TestBackingOutOfARunCommandExitsCancelled(t *testing.T) {
 	cases := [][]string{
 		{domain.CmdUp},
@@ -72,8 +73,9 @@ func TestBackingOutOfARunCommandExitsCancelled(t *testing.T) {
 			if findErr != nil {
 				t.Fatal(findErr)
 			}
-			if err != nil || !shared.Cancelled(sub) {
-				t.Errorf("err = %v, cancelled = %v; want no error and the cancelled mark (exit 19)", err, shared.Cancelled(sub))
+			exit := rules.ExitCode(rules.BackedOut(rules.BackedOutParams{Err: err, Cancelled: shared.Cancelled(sub)}))
+			if exit != domain.ExitCodeCancelled {
+				t.Errorf("err = %v, cancelled = %v; want exit %d", err, shared.Cancelled(sub), domain.ExitCodeCancelled)
 			}
 		})
 	}

@@ -57,6 +57,10 @@ type RebaseOntoParams struct {
 // with a nil error. A non-conflict failure returns an error (after a best-effort
 // abort).
 func RebaseOnto(ctx context.Context, params RebaseOntoParams) (RebaseResult, error) {
+	// The rebase may be interrupted, its abort may not: the process waits for
+	// it, so no worktree is left half rebased behind an exit.
+	settled, release := Shield(ctx)
+	defer release()
 	cmd := Command(ctx, "git", "-C", params.WorktreePath,
 		"rebase", "--onto", params.NewBase, params.Upstream, params.Branch)
 	out, err := cmd.CombinedOutput()
@@ -71,11 +75,11 @@ func RebaseOnto(ctx context.Context, params RebaseOntoParams) (RebaseResult, err
 		if params.KeepConflict {
 			return RebaseResult{Conflicted: true, Output: output, Files: files, Kept: true}, nil
 		}
-		abortRebase(ctx, params.WorktreePath)
+		abortRebase(settled, params.WorktreePath)
 		return RebaseResult{Conflicted: true, Output: output, Files: files}, nil
 	}
 
-	abortRebase(ctx, params.WorktreePath)
+	abortRebase(settled, params.WorktreePath)
 	return RebaseResult{Output: output}, fmt.Errorf("git rebase: %s", output)
 }
 
@@ -97,8 +101,8 @@ func ConflictedFiles(ctx context.Context, worktreePath string) []string {
 
 // abortRebase best-effort aborts an in-progress rebase. A "no rebase in
 // progress" error is expected when the failure happened before any apply.
-func abortRebase(ctx context.Context, worktreePath string) {
-	_ = Command(context.WithoutCancel(ctx), "git", "-C", worktreePath, "rebase", "--abort").Run()
+func abortRebase(settled context.Context, worktreePath string) {
+	_ = Command(settled, "git", "-C", worktreePath, "rebase", "--abort").Run()
 }
 
 // FastForwardParams holds inputs for fast-forwarding a checked-out branch.

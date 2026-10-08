@@ -70,6 +70,11 @@ func checkLocal(ctx context.Context, params checkLocalParams) (domain.CleanCheck
 	}
 	unpushed, _ := infra.UnpushedCommits(ctx, infra.UnpushedCommitsParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
 	dirty, _ := infra.IsDirty(ctx, infra.IsDirtyParams{WorktreePath: wt.Path})
+	// Both reads fail as "safe": cut short by an interrupt, they would clear a
+	// dirty worktree for removal.
+	if err := ctx.Err(); err != nil {
+		return domain.CleanCheckResult{}, err
+	}
 	return domain.CleanCheckResult{
 		WorktreePath:    wt.Path,
 		Branch:          params.Branch,

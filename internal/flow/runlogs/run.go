@@ -32,7 +32,10 @@ type Outcome struct {
 	// among Steps. No Failed means every job was reached.
 	Failed     string
 	FailedStep int
-	Steps      int
+	// Interrupted says an interrupt ended the sequence: what it started keeps
+	// running, and what it never reached is in NotStarted.
+	Interrupted bool
+	Steps       int
 	// FailedOutput is what the job that ended the sequence had written, raw. A
 	// surface that never showed it live — machine output, a CI log, an agent
 	// reading JSON — has nothing else to say why the run stopped, and the
@@ -157,8 +160,9 @@ type RunParams struct {
 //
 // Cancelling ctx stops the reporting, not the jobs. A surface the user detached
 // from is gone, and there is nobody left to emit to; what the daemon is running
-// keeps running, the sequence stops where it stands, and the jobs it never
-// reached come back as NotStarted with the context's error.
+// keeps running — the job whose start was in flight included, counted among
+// Started — the sequence stops where it stands, and the jobs it never reached
+// come back as NotStarted with the context's error.
 func Run(ctx context.Context, params RunParams) (Outcome, error) {
 	if params.Service == nil {
 		return Outcome{}, domain.ErrRunServiceRequired
@@ -193,7 +197,9 @@ func Run(ctx context.Context, params RunParams) (Outcome, error) {
 	if r.sink == nil {
 		r.sink = noSink{}
 	}
-	return r.run(), ctx.Err()
+	outcome := r.run()
+	outcome.Interrupted = ctx.Err() != nil
+	return outcome, ctx.Err()
 }
 
 type runner struct {
@@ -267,9 +273,12 @@ func (r *runner) run() Outcome {
 		if err != nil {
 			// A read the detach itself broke says nothing about the job: the
 			// daemon took the request and is running it. Naming it among the ones
-			// not started is the one thing the report must not do — it is what
-			// made leaving look like it had killed the job.
+			// not started — or concluding that nothing is left running — is the
+			// one thing the report must not do: it is what made leaving look like
+			// it had killed the job.
 			if r.ctx.Err() != nil {
+				r.started = append(r.started, job.Name)
+				r.results = append(r.results, domain.JobActionResult{Name: job.Name, Status: r.startedStatus(job)})
 				return r.detached(i + 1)
 			}
 			return r.abort(abortParams{Index: i, Job: job, Reason: err.Error()})

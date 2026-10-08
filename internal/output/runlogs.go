@@ -335,6 +335,34 @@ func (p *RunPrinter) Conclude(warnings []string) {
 	NextStep(p.out, NextStepParams{Command: domain.RunStreamStopHint, Note: domain.RunStreamStopNote})
 }
 
+// RunInterrupted is the account of a start an interrupt cut short: what each
+// worktree has left running — the job being started included — and what it
+// never reached. Raw body.
+func RunInterrupted(w io.Writer, outcomes runlogs.Outcomes) {
+	running := false
+	for _, outcome := range outcomes {
+		Blank(w)
+		if outcome.Worktree != "" {
+			Message(w, outcome.Worktree)
+		}
+		if len(outcome.Started) > 0 {
+			running = true
+			Message(w, fmt.Sprintf(domain.RunViewRecapRunningFmt, strings.Join(outcome.Started, ", ")))
+		}
+		if len(outcome.NotStarted) > 0 {
+			Message(w, fmt.Sprintf(domain.RunViewRecapNotStartedFmt, strings.Join(outcome.NotStarted, ", ")))
+		}
+		if len(outcome.Started) == 0 {
+			Unchanged(w, domain.RunViewRecapNoneRunning)
+		}
+	}
+	if !running {
+		return
+	}
+	Blank(w)
+	NextStep(w, NextStepParams{Command: domain.RunStreamStopHint, Note: domain.RunStreamStopNote})
+}
+
 // WriteRunOutcomesJSON writes one document per worktree the run reached,
 // whatever their number: a caller parses one shape.
 func WriteRunOutcomesJSON(w io.Writer, outcomes runlogs.Outcomes) error {
@@ -345,11 +373,12 @@ func WriteRunOutcomesJSON(w io.Writer, outcomes runlogs.Outcomes) error {
 			results = []domain.JobActionResult{}
 		}
 		documents = append(documents, domain.WorktreeRunResult{
-			Branch:  outcome.Worktree,
-			Path:    outcome.WorkDir,
-			Profile: outcome.Profile,
-			Aborted: outcome.Aborted(),
-			Jobs:    results,
+			Branch:      outcome.Worktree,
+			Path:        outcome.WorkDir,
+			Profile:     outcome.Profile,
+			Aborted:     outcome.Aborted(),
+			Interrupted: outcome.Interrupted,
+			Jobs:        results,
 		})
 	}
 	return encodeJSON(w, documents)

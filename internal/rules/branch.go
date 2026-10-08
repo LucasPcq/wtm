@@ -139,7 +139,7 @@ func FastForwardSplit(results []domain.FastForwardResult) (moved, notable, faile
 		switch result.Status {
 		case domain.FFAdvanced:
 			moved = append(moved, result)
-		case domain.FFDiverged, domain.FFNoUpstream:
+		case domain.FFDiverged, domain.FFNoUpstream, domain.FFCancelled:
 			notable = append(notable, result)
 		case domain.FFFailed:
 			failed = append(failed, result)

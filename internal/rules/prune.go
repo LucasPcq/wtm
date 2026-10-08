@@ -311,6 +311,8 @@ func PruneReasonLabel(reason string) string {
 		return domain.PruneLabelUnpushed
 	case domain.PruneSkipOpenPR:
 		return domain.PruneLabelOpenPR
+	case domain.PruneSkipInterrupted:
+		return domain.PruneLabelInterrupted
 	default:
 		return reason
 	}

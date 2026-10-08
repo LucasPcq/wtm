@@ -56,7 +56,7 @@ func (p upPresenter) Sequence(params seam.SequenceParams) (runlogs.Outcomes, err
 // so an error here would only repeat them (LUC-198).
 func concluded(cmd *cobra.Command, outcome upflow.Outcome) error {
 	if outcome.Aborted {
-		return shared.EndAborted(cmd)
+		return domain.ErrAborted
 	}
 	return nil
 }
@@ -99,14 +99,17 @@ func (p startPresenter) Sequence(params seam.SequenceParams) (runlogs.Outcomes, 
 // cause, which is exactly what the `output` field exists to avoid.
 func (p startPresenter) machine(params seam.SequenceParams) (runlogs.Outcomes, error) {
 	outcomes, err := params.Start(p.Cmd.Context(), nil)
-	if err != nil {
+	if err != nil && !interruptedWithAnAccount(p.Cmd, outcomes) {
 		return outcomes, err
 	}
-	return outcomes, output.WriteJobResultJSON(p.Cmd.OutOrStdout(), jobResult(jobResultParams{
+	if writeErr := output.WriteJobResultJSON(p.Cmd.OutOrStdout(), jobResult(jobResultParams{
 		Job:     params.Job,
 		Inline:  params.Inline,
 		Outcome: outcomes.One(),
-	}))
+	})); writeErr != nil {
+		return outcomes, writeErr
+	}
+	return outcomes, err
 }
 
 type jobResultParams struct {

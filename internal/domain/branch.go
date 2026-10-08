@@ -81,6 +81,8 @@ const (
 	FFDiverged
 	FFNoUpstream
 	FFFailed
+	// FFCancelled is a branch an interrupt reached first: left where it was.
+	FFCancelled
 )
 
 // FastForwardCheck is one branch's state against origin, gathered in a single

@@ -2,6 +2,7 @@
 package clean
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -161,6 +162,11 @@ func (f *cleanFlow) run() (Outcome, error) {
 	outcome := Outcome{Results: requested.Absent, Skipped: skipped}
 	var first error
 	for _, removal := range removals {
+		if removal.NotReached {
+			outcome.Skipped = append(outcome.Skipped, domain.PruneSkip{Branch: removal.Target.Branch, Reason: domain.PruneSkipInterrupted})
+			first = cmp.Or(first, domain.ErrCancelled)
+			continue
+		}
 		if removal.Err != nil {
 			outcome.Failed = append(outcome.Failed, failureOf(removal))
 			if first == nil {
@@ -302,7 +308,7 @@ func (f *cleanFlow) reparents(selected []string) []domain.ReparentResult {
 func removedBranches(removals []teardown.Removal) []string {
 	var removed []string
 	for _, removal := range removals {
-		if removal.Err == nil {
+		if removal.Removed() {
 			removed = append(removed, removal.Target.Branch)
 		}
 	}

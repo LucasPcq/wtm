@@ -178,7 +178,11 @@ const (
 // so hit-testing is per-program state rather than a package global.
 type Model struct {
 	// ctx is the program's: every flow and load the dashboard starts runs under it.
+	// quit cancels it before leaving, so a run in flight stops between two units
+	// of work instead of being cut off by the exit; quitting says it has.
 	ctx        context.Context
+	cancel     context.CancelFunc
+	quitting   bool
 	params     RunParams
 	listParams domain.ListParams
 	zones      *zone.Manager
@@ -321,8 +325,10 @@ type Model struct {
 // New builds the dashboard model. Callers outside a program must Close the
 // returned model's zone manager; Run does it for them.
 func New(ctx context.Context, params RunParams) Model {
+	ctx, cancel := context.WithCancel(ctx)
 	return Model{
 		ctx:    ctx,
+		cancel: cancel,
 		params: params,
 		listParams: domain.ListParams{
 			ProjectDir: params.ProjectDir,
@@ -340,7 +346,10 @@ func New(ctx context.Context, params RunParams) Model {
 	}
 }
 
-func (m Model) Close() { m.zones.Close() }
+func (m Model) Close() {
+	m.cancel()
+	m.zones.Close()
+}
 
 // Run opens the dashboard on the alternate screen. It restores the terminal on
 // exit without re-emitting anything into the scrollback.
@@ -356,10 +365,31 @@ func Run(ctx context.Context, params RunParams) error {
 	defer cancel()
 	go watchEvents(watchEventsParams{Context: ctx, Changes: model.changes, Watch: watch})
 
-	if _, err := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithReportFocus()).Run(); err != nil {
+	final, err := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithReportFocus()).Run()
+	if err != nil {
 		return fmt.Errorf("dashboard: %w", err)
 	}
+	if left, ok := final.(Model); ok && left.quitting {
+		return domain.ErrCancelled
+	}
 	return nil
+}
+
+// quit leaves at once when nothing is in flight. A run still going is cancelled
+// first and the dashboard waits for it to unwind — a hook stopped, a removal
+// finished — before leaving; a second Ctrl+C leaves without waiting.
+func (m Model) quit() (tea.Model, tea.Cmd) {
+	if !m.ops.active() {
+		return m, tea.Quit
+	}
+	m.quitting = true
+	m.cancel()
+	var cmd tea.Cmd
+	if m.modal.open {
+		m.modal, cmd = m.modal.cancel()
+	}
+	m = m.appendOutput(OutputLineMsg{Text: domain.DashboardCancellingNotice})
+	return m, cmd
 }
 
 func (m Model) Init() tea.Cmd {
@@ -888,11 +918,20 @@ func (m Model) refresh() (Model, tea.Cmd) {
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
+	// Leaving, the dashboard waits for its runs to unwind and reads one key only:
+	// the second Ctrl+C that stops waiting.
+	if m.quitting {
+		if key == keyInterrupt {
+			return m, tea.Quit
+		}
+		return m, nil
+	}
+
 	// A modal owns the keyboard while it is up: it is a question, and nothing
 	// behind it may be acted on before it is answered.
 	if m.modal.open {
 		if key == keyInterrupt {
-			return m, tea.Quit
+			return m.quit()
 		}
 		return m.updateModal(msg)
 	}
@@ -940,7 +979,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch key {
 	case keyInterrupt, keyQuit:
-		return m, tea.Quit
+		return m.quit()
 	case keyHelp:
 		m.showHelp, m.helpScroll = true, 0
 	case keyRefresh:

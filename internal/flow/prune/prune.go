@@ -2,6 +2,7 @@
 package prune
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -240,10 +241,15 @@ func (f *pruneFlow) remove(params removeParams) (Outcome, error) {
 	var failure error
 	for index, removal := range removals {
 		candidate := f.plan.Selected[index]
+		if removal.NotReached {
+			result.Skipped = append(result.Skipped, domain.PruneSkip{Branch: candidate.Branch, Reason: domain.PruneSkipInterrupted})
+			failure = cmp.Or(failure, domain.ErrCancelled)
+			continue
+		}
 		if removal.Err != nil {
 			failure = removal.Err
 			result.Failed = &domain.PruneFailure{Branch: candidate.Branch, Path: candidate.Path, Error: removal.Err.Error()}
-			break
+			continue
 		}
 		result.Pruned = append(result.Pruned, candidate)
 		result.Namespaces = append(result.Namespaces, removal.Namespaces...)

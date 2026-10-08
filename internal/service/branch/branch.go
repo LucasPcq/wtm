@@ -168,6 +168,9 @@ type FastForwardParams struct {
 // of it rather than returning an error: a run over several branches keeps going
 // past the one it could not move.
 func FastForward(ctx context.Context, params FastForwardParams) domain.FastForwardResult {
+	if ctx.Err() != nil {
+		return labelled(domain.FastForwardResult{Branch: params.Branch}, domain.FFCancelled)
+	}
 	check, err := resolveCheck(ctx, params)
 	if err != nil {
 		return failed(params.Branch, err)
@@ -191,7 +194,11 @@ func FastForward(ctx context.Context, params FastForwardParams) domain.FastForwa
 		return labelled(result, domain.FFFailed)
 	}
 
-	if ffErr := advance(ctx, check, params.ProjectDir); ffErr != nil {
+	ffErr := advance(ctx, check, params.ProjectDir)
+	if ffErr != nil && ctx.Err() != nil {
+		return labelled(result, domain.FFCancelled)
+	}
+	if ffErr != nil {
 		result.Detail = ffErr.Error()
 		return labelled(result, domain.FFFailed)
 	}

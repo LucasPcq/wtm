@@ -72,6 +72,23 @@ func TestOutcomeRecorded(t *testing.T) {
 	}
 }
 
+func TestAnInterruptedRunSaysSo(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	outcome, err := runlogs.Run(ctx, runlogs.RunParams{
+		Service: &runlogstest.Service{},
+		Sink:    &runlogstest.Sink{},
+		Jobs:    []domain.JobConfig{migrate, api},
+		WorkDir: "/work/api",
+		LogDir:  "/state/logs/api",
+	})
+
+	if !errors.Is(err, context.Canceled) || !outcome.Interrupted {
+		t.Fatalf("err = %v, interrupted = %v, want the run read as interrupted", err, outcome.Interrupted)
+	}
+}
+
 func TestRunStartsEveryJobInDeclaredOrder(t *testing.T) {
 	service := &runlogstest.Service{}
 
@@ -307,13 +324,13 @@ func TestRunStopsReportingWhenTheSurfaceDetaches(t *testing.T) {
 	if outcome.Aborted() {
 		t.Fatalf("a detach reads as an abort: %+v", outcome)
 	}
-	if !reflect.DeepEqual(outcome.Started, []string{"docker"}) {
-		t.Fatalf("left running %v, want docker — a detach tears nothing down", outcome.Started)
+	// migrate is among them: the detach landed while its request was in
+	// flight, and the daemon took it — StartedNames says so. Leaving it out made
+	// the recap of an interrupted run say "No job left running" over a job the
+	// daemon was running (LUC-257).
+	if !reflect.DeepEqual(outcome.Started, []string{"docker", "migrate"}) {
+		t.Fatalf("left running %v, want docker and the in-flight migrate — a detach tears nothing down", outcome.Started)
 	}
-	// migrate is not among them: the detach landed while its request was in
-	// flight, and the daemon took it — StartedNames says so. Naming a job that
-	// is running among the ones never started is what made leaving the view look
-	// like it had killed the job.
 	if !reflect.DeepEqual(outcome.NotStarted, []string{"api"}) {
 		t.Fatalf("not started %v, want only the job the detach really cut short", outcome.NotStarted)
 	}

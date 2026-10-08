@@ -112,7 +112,7 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 	if outcome.Aborted {
-		return shared.EndAborted(cmd)
+		return domain.ErrAborted
 	}
 	return nil
 }

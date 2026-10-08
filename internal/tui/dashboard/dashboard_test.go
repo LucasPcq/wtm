@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -328,6 +329,46 @@ func TestQuitKeys(t *testing.T) {
 		if _, ok := cmd().(tea.QuitMsg); !ok {
 			t.Errorf("%s produced %T, want tea.QuitMsg", msg.String(), cmd())
 		}
+	}
+}
+
+func TestQuittingWithARunInFlightCancelsItAndWaitsForIt(t *testing.T) {
+	model := newTestModel(t, testWidth, testHeight, "a")
+	model, id := model.beginOp(beginParams{Operation: flow.Operation{Kind: domain.OpKindClean, Mode: flow.ModeBlocking}, Target: "a"})
+
+	model, cmd := updateCmd(model, namedKey(tea.KeyCtrlC))
+	if cmd != nil {
+		if _, quit := cmd().(tea.QuitMsg); quit {
+			t.Fatal("a run in flight must be cancelled and waited for, not cut off by the exit")
+		}
+	}
+	if model.ctx.Err() == nil {
+		t.Fatal("the first ctrl+c must cancel the runs in flight")
+	}
+	if !model.quitting {
+		t.Fatal("the dashboard must remember it is leaving")
+	}
+
+	_, cmd = updateCmd(model, opDoneMsg{id: id, err: domain.ErrCancelled})
+	if cmd == nil {
+		t.Fatal("the last run unwinding must quit")
+	}
+	if _, quit := cmd().(tea.QuitMsg); !quit {
+		t.Errorf("the last run unwinding produced %T, want tea.QuitMsg", cmd())
+	}
+}
+
+func TestASecondCtrlCLeavesWithoutWaiting(t *testing.T) {
+	model := newTestModel(t, testWidth, testHeight, "a")
+	model, _ = model.beginOp(beginParams{Operation: flow.Operation{Kind: domain.OpKindClean, Mode: flow.ModeBlocking}, Target: "a"})
+	model = update(model, key(domain.KeyQuit))
+
+	_, cmd := updateCmd(model, namedKey(tea.KeyCtrlC))
+	if cmd == nil {
+		t.Fatal("a second ctrl+c must quit")
+	}
+	if _, quit := cmd().(tea.QuitMsg); !quit {
+		t.Errorf("a second ctrl+c produced %T, want tea.QuitMsg", cmd())
 	}
 }
 
