@@ -1,12 +1,13 @@
 ---
 import '../styles/landing.css';
-import { DOMAIN, SITE_URL } from '../../site.config.mjs';
+import Mark from '../components/landing/Mark.astro';
+import { CONTACT, SITE_URL } from '../../site.config.mjs';
+import { base } from '../lib/base.mjs';
 
 interface Props { title: string; description: string }
 const { title, description } = Astro.props;
-import { base } from '../lib/base.mjs';
 const canonical = new URL(base, SITE_URL).href;
-const contact = DOMAIN ? `mailto:hello@${DOMAIN}` : 'https://github.com/LucasPcq/wtm/issues';
+const contact = CONTACT ? `mailto:${CONTACT}` : 'https://github.com/LucasPcq/wtm/issues';
 ---
 <!doctype html>
 <html lang="en">
@@ -19,37 +20,46 @@ const contact = DOMAIN ? `mailto:hello@${DOMAIN}` : 'https://github.com/LucasPcq
     <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:image" content={new URL(`${base}assets/hero.gif`, SITE_URL).href} />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet" />
   </head>
   <body>
     <header class="nav">
       <div class="wrap">
-        <a class="brand" href={base}>wtm<span>_</span></a>
-        <a class="link" href={`${base}docs/`}>Docs</a>
-        <a class="link optional" href={`${base}changelog/`}>Changelog</a>
-        <a class="link" href="https://github.com/LucasPcq/wtm">GitHub</a>
+        <a class="lockup" href={base} aria-label="wtm home"><Mark /><b>wtm</b></a>
+        <a class="link" href={`${base}docs/`}>docs</a>
+        <a class="link optional" href={`${base}changelog/`}>changelog</a>
+        <a class="link" href="https://github.com/LucasPcq/wtm">github</a>
       </div>
     </header>
     <main><slot /></main>
     <footer class="footer">
       <div class="wrap">
+        <a class="lockup" href={base} aria-label="wtm home"><Mark /><b>wtm</b></a>
         <a href={`${base}docs/`}>Docs</a>
         <a href={`${base}guide/getting-started/`}>Getting started</a>
         <a href={`${base}changelog/`}>Changelog</a>
         <a href="https://github.com/LucasPcq/wtm">GitHub</a>
         <a href={`${base}llms.txt`}>llms.txt</a>
         <a href={contact}>Contact</a>
-        <span class="end">MIT licensed · built by Lucas Picque</span>
+        <span class="end">MIT licensed</span>
       </div>
     </footer>
     <script>
+      import { wireSessions } from '../lib/play';
+
+      wireSessions();
       for (const button of document.querySelectorAll<HTMLButtonElement>('button.copy[data-copy]')) {
         button.addEventListener('click', async () => {
-          await navigator.clipboard.writeText(button.dataset.copy ?? '');
-          button.textContent = 'copied';
+          try {
+            await navigator.clipboard.writeText(button.dataset.copy ?? '');
+            button.textContent = 'copied';
+          } catch {
+            button.textContent = 'select it';
+          }
           setTimeout(() => (button.textContent = 'copy'), 1500);
         });
       }

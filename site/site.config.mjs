@@ -9,8 +9,9 @@ import { fileURLToPath } from 'node:url';
 export const SITE = dirname(fileURLToPath(import.meta.url));
 export const REPO = dirname(SITE);
 // The site's own domain once it has one: SITE_URL, BASE, the CNAME file and the
-// contact address all follow it. Null publishes to GitHub Pages under /wtm.
-export const DOMAIN = process.env.SITE_DOMAIN ?? null;
+// contact address all follow it. SITE_DOMAIN='' publishes to GitHub Pages under /wtm.
+export const DOMAIN = (process.env.SITE_DOMAIN ?? 'wtm.sh') || null;
+export const CONTACT = DOMAIN ? `contact@${DOMAIN}` : null;
 export const SITE_URL = DOMAIN ? `https://${DOMAIN}` : 'https://lucaspcq.github.io';
 export const BASE = process.env.DOCS_BASE ?? (DOMAIN ? '' : '/wtm');
 export const DOCS_REF = process.env.DOCS_REF ?? 'main';

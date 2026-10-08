@@ -1,32 +1,40 @@
 ---
+import Session from './Session.astro';
 import { base } from '../../lib/base.mjs';
-const script = `wtm agents install       # a skill for Claude Code
+import { cmd, out } from '../../lib/term.mjs';
 
-for issue in checkout search oauth billing; do
-  wtm create "agent/$issue" --yes --output json
-  wtm run up "agent/$issue" -d --yes
-done
-
-wtm events --all --output json \\
-  | jq -c 'select(.type == "job.crashed")'`;
+const lines = [
+  cmd('wtm agents install'),
+  out('  <span class="m"># once: the using-wtm skill, for Claude Code</span>'),
+  out(),
+  cmd('wtm create agent/checkout agent/search agent/oauth agent/billing --yes --output json > /dev/null'),
+  cmd('wtm run up agent/checkout agent/search agent/oauth agent/billing -d --yes --output json | jq -r \'.[].jobs[].url\''),
+  out('<span class="c">http://api.agent-checkout.acme.localhost</span>'),
+  out('<span class="c">http://web.agent-checkout.acme.localhost</span>'),
+  out('<span class="c">http://api.agent-search.acme.localhost</span>'),
+  out('<span class="c">http://web.agent-search.acme.localhost</span>'),
+  out('<span class="m">…</span>'),
+  out(),
+  cmd('wtm events --all --output json | jq -c \'select(.type == "job.crashed")\''),
+];
 const points = [
-  { k: '--yes', text: 'Every command runs unattended; a missing choice is an error naming its flag, never a prompt.' },
+  { k: '--yes', text: 'Every command runs unattended. A missing choice is an error naming its flag, never a prompt the agent cannot answer.' },
   { k: '--output json', text: 'A document to read instead of text to parse, with published JSON schemas.' },
-  { k: 'exit codes', text: 'Stable and documented: 10 exists, 11 no branch, 16 no run.toml…' },
-  { k: 'wtm events', text: 'Every worktree and job change as JSON Lines, for the agent or its orchestrator.' },
+  { k: 'exit codes', text: 'Stable and documented: 10 the worktree exists, 11 no such branch, 16 no run.toml…' },
+  { k: 'wtm events', text: 'Every worktree and job change as JSON Lines, for the agent or whatever orchestrates it.' },
 ];
 ---
-<section class="section">
-  <div class="wrap grid-2">
+<section class="section" id="agents">
+  <div class="wrap agents">
     <div>
-      <p class="section-label">built for claude code</p>
-      <h2>Your agents drive it. You watch.</h2>
-      <p class="lede">wtm ships a skill that teaches Claude Code the commands and their unattended forms. Four issues, four agents, four stacks, one laptop.</p>
+      <p class="prompt">wtm agents install</p>
+      <h2>Built for Claude Code to drive.</h2>
+      <p class="lede">wtm ships a skill that teaches Claude Code its commands and their unattended forms. Four issues, four agents, four running stacks, one laptop.</p>
       <dl class="points">
-        {points.map((p) => (<div><dt class="mono">{p.k}</dt><dd>{p.text}</dd></div>))}
+        {points.map((p) => (<div><dt>{p.k}</dt><dd>{p.text}</dd></div>))}
       </dl>
-      <p><a class="btn" href={`${base}guide/recipes/`}>Recipe: several agents in parallel</a></p>
+      <a class="btn" href={`${base}guide/recipes/#several-ai-agents-each-in-its-own-worktree`}>Recipe: agents in parallel</a>
     </div>
-    <div class="term"><div class="term-bar"><i></i><i></i><i></i><b>orchestrator.sh</b></div><pre class="term-body">{script}</pre></div>
+    <Session title="orchestrator" lines={lines} />
   </div>
 </section>

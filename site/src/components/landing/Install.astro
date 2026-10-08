@@ -1,17 +1,12 @@
 ---
-const tabs = [
-  { key: 'brew', label: 'Homebrew' },
-  { key: 'go', label: 'Go' },
-  { key: 'bin', label: 'Binary' },
-];
 const commands = [
-  { key: 'brew', cmd: 'brew install LucasPcq/tap/wtm' },
-  { key: 'go', cmd: 'go install github.com/LucasPcq/wtm@latest' },
+  { key: 'brew', label: 'Homebrew', cmd: 'brew install LucasPcq/tap/wtm' },
+  { key: 'go', label: 'Go', cmd: 'go install github.com/LucasPcq/wtm@latest' },
 ];
 ---
 <div class="install">
   <div class="install-tabs" role="radiogroup" aria-label="Install method">
-    {tabs.map((c, i) => (
+    {[...commands, { key: 'bin', label: 'Binary' }].map((c, i) => (
       <>
         <input type="radio" name="install" id={`i-${c.key}`} checked={i === 0} />
         <label for={`i-${c.key}`}>{c.label}</label>
@@ -24,5 +19,5 @@ const commands = [
       <button class="copy" type="button" data-copy={c.cmd}>copy</button>
     </div>
   ))}
-  <a class="install-link" href="https://github.com/LucasPcq/wtm/releases/latest">Download a release for macOS or Linux →</a>
+  <a class="install-link" data-k="bin" href="https://github.com/LucasPcq/wtm/releases/latest">Download a release for macOS or Linux →</a>
 </div>

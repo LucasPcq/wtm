@@ -1,0 +1,25 @@
+---
+import { frame, SELECTABLE } from '../../lib/dashboard.mjs';
+---
+<figure class="term tui" id="dashboard">
+  <div class="term-bar">
+    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    <span class="title">wtm ui</span>
+  </div>
+  {SELECTABLE.map((name, i) => (
+    <div class="screen" data-frame={name} hidden={i > 0} set:html={frame(name).map((l) => `<span class="ln">${l}</span>`).join('')} />
+  ))}
+</figure>
+
+<script>
+  const frames = [...document.querySelectorAll<HTMLElement>('#dashboard [data-frame]')];
+  if (frames.length && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    let shown = 0;
+    setInterval(() => {
+      if (document.hidden) return;
+      frames[shown].hidden = true;
+      shown = (shown + 1) % frames.length;
+      frames[shown].hidden = false;
+    }, 2200);
+  }
+</script>
