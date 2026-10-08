@@ -1,0 +1,21 @@
+---
+const rows = [
+  ['New worktree', 'an empty checkout', '.env copied, hooks run, ports shifted'],
+  ['Two branches running', 'same ports, containers and database', 'own ports, COMPOSE_PROJECT_NAME, database and URL'],
+  ['Stacked branches', 'rebase each one by hand, in order', 'wtm sync rebases the chain'],
+  ['Many worktrees', 'one command each', 'wtm create a b c, wtm exec --all'],
+  ['Agents and tools', 'parse porcelain output', '--output json, --yes, a skill, an event stream'],
+];
+---
+<section class="section">
+  <div class="wrap">
+    <p class="section-label">vs. git worktree</p>
+    <h2>Same git underneath. Everything around it handled.</h2>
+    <div class="lanes-scroll">
+      <table class="compare">
+        <thead><tr><th></th><th class="mono">git worktree</th><th class="mono">wtm</th></tr></thead>
+        <tbody>{rows.map(([what, git, wtm]) => (<tr><th scope="row">{what}</th><td>{git}</td><td>{wtm}</td></tr>))}</tbody>
+      </table>
+    </div>
+  </div>
+</section>

@@ -127,3 +127,22 @@ code, pre, .mono { font-family: var(--mono); font-size: 0.875em; }
 @keyframes lane-in { from { opacity: 0; transform: translateY(-4px); } }
 .machine-event { margin: 16px 0 0; padding: 12px; border-radius: 8px; background: #0d0f0d; color: #cfe8a8; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .machine-note { color: var(--muted); font-size: 12px; margin: 12px 0 0; }
+.cards { display: grid; gap: 16px; }
+@media (min-width: 800px) { .cards { grid-template-columns: repeat(3, 1fr); } }
+.card { border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; background: var(--bg-raised); }
+.card h3 { margin: 8px 0; font-size: 18px; }
+.card p { margin: 0; color: var(--muted); }
+.card-k { color: var(--error); font-size: 12px; }
+.feature { margin-top: 56px; }
+.feature h3 { font-size: 22px; margin: 0 0 8px; }
+.feature p { color: var(--muted); }
+.feature img { width: 100%; border-radius: var(--radius); border: 1px solid var(--line); }
+.feature .term { margin-top: 16px; }
+.points { margin: 0 0 24px; display: grid; gap: 14px; }
+.points dt { color: var(--accent-high); font-size: 13px; }
+.points dd { margin: 2px 0 0; color: var(--muted); }
+.compare { width: 100%; border-collapse: collapse; min-width: 560px; }
+.compare th, .compare td { text-align: left; padding: 14px 16px 14px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.compare thead th { color: var(--muted); font-weight: 400; font-size: 13px; }
+.compare td:last-child { color: var(--accent-high); }
+.compare td:nth-child(2) { color: var(--muted); }

@@ -1,0 +1,32 @@
+---
+import { base } from '../../lib/base.mjs';
+const script = `wtm agents install       # a skill for Claude Code
+
+for issue in checkout search oauth billing; do
+  wtm create "agent/$issue" --yes --output json
+  wtm run up "agent/$issue" -d --yes
+done
+
+wtm events --all --output json \\
+  | jq -c 'select(.type == "job.crashed")'`;
+const points = [
+  { k: '--yes', text: 'Every command runs unattended; a missing choice is an error naming its flag, never a prompt.' },
+  { k: '--output json', text: 'A document to read instead of text to parse, with published JSON schemas.' },
+  { k: 'exit codes', text: 'Stable and documented: 10 exists, 11 no branch, 16 no run.toml…' },
+  { k: 'wtm events', text: 'Every worktree and job change as JSON Lines, for the agent or its orchestrator.' },
+];
+---
+<section class="section">
+  <div class="wrap grid-2">
+    <div>
+      <p class="section-label">built for claude code</p>
+      <h2>Your agents drive it. You watch.</h2>
+      <p class="lede">wtm ships a skill that teaches Claude Code the commands and their unattended forms. Four issues, four agents, four stacks, one laptop.</p>
+      <dl class="points">
+        {points.map((p) => (<div><dt class="mono">{p.k}</dt><dd>{p.text}</dd></div>))}
+      </dl>
+      <p><a class="btn" href={`${base}guide/recipes/`}>Recipe: several agents in parallel</a></p>
+    </div>
+    <div class="term"><div class="term-bar"><i></i><i></i><i></i><b>orchestrator.sh</b></div><pre class="term-body">{script}</pre></div>
+  </div>
+</section>

@@ -1,0 +1,45 @@
+---
+import { base } from '../../lib/base.mjs';
+const runToml = `[[job]]
+name = "web"
+kind = "service"
+cmd  = "pnpm dev"
+  [job.ports]
+  PORT = 3000          # 3010, 3020… in each worktree
+  [job.url]
+  port = "PORT"        # web.<branch>.acme.localhost
+
+[[job]]
+name  = "postgres"
+cmd   = "docker compose up -d postgres"
+scope = "shared"       # one container, a database each
+  [job.namespace]
+  name = "app_{worktree}"`;
+---
+<section class="section">
+  <div class="wrap">
+    <p class="section-label">how it works</p>
+    <h2>Create, run, see, clean.</h2>
+    <div class="feature grid-2">
+      <div><h3>Worktrees, provisioned</h3><p><code>wtm create a b c</code> makes the worktrees, copies the <code>.env</code> files and runs your hooks (<code>pnpm install</code>…). <code>wtm clean</code> refuses anything uncommitted or unpushed.</p></div>
+      <img src={`${base}assets/hero.gif`} alt="wtm create walks through its wizard, wtm go jumps in, wtm run up opens the run view" loading="lazy" />
+    </div>
+    <div class="feature grid-2">
+      <div><h3>One run.toml, a stack per worktree</h3><p>Declare your jobs once; <code>wtm run init</code> writes it from your Compose files and package scripts. Each worktree then runs it on its own ports, project, database and URL.</p><div class="term"><div class="term-bar"><i></i><i></i><i></i><b>.wtm/run.toml</b></div><pre class="term-body">{runToml}</pre></div></div>
+      <img src={`${base}assets/isolation.gif`} alt="wtm run up on two worktrees at once: each runs its own api and web on its own named URLs" loading="lazy" />
+    </div>
+    <div class="feature grid-2">
+      <div><h3>One screen for all of it</h3><p><code>wtm ui</code> shows every worktree, the branch tree, PR status and running services, live, whichever shell or agent changed them.</p></div>
+      <img src={`${base}assets/dashboard.gif`} alt="The wtm ui dashboard: worktrees, a new one created from the dashboard, the branch tree" loading="lazy" />
+    </div>
+    <div class="feature grid-2">
+      <div><h3>Stacked branches</h3><p>Branch off a branch; <code>wtm sync</code> rebases the whole chain in order, <code>wtm tree</code> shows it.</p></div>
+      <div class="term"><div class="term-bar"><i></i><i></i><i></i><b>wtm tree</b></div><pre class="term-body">main
+└─ feat/api-v2              base ↑4
+   ├─ feat/api-v2-auth      base ↑2  <span class="err">⚠ needs sync</span>
+   └─ feat/api-v2-billing   base ↑3
+<span class="p">$ wtm sync feat/api-v2-auth --yes</span>
+<span class="dim"># rebased onto feat/api-v2, its children after it</span></pre></div>
+    </div>
+  </div>
+</section>

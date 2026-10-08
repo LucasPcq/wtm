@@ -1,0 +1,19 @@
+---
+const items = [
+  { k: '01', title: 'Same ports', text: 'Two branches, one :3000. The second dev server dies on EADDRINUSE.' },
+  { k: '02', title: 'Same containers, same database', text: 'One Compose project and one postgres for every branch: migrations from one branch break the other.' },
+  { k: '03', title: 'Which directory is which?', text: 'Copy the .env, install dependencies, remember the paths. By hand, for every worktree.' },
+];
+---
+<section class="section">
+  <div class="wrap">
+    <p class="section-label">the problem</p>
+    <h2>git worktree gives each branch a directory.<br />Everything else still collides.</h2>
+    <p class="lede">One developer on two branches feels it. Five agents on five branches cannot work at all.</p>
+    <div class="cards">
+      {items.map((i) => (
+        <div class="card"><span class="mono card-k">[{i.k}]</span><h3>{i.title}</h3><p>{i.text}</p></div>
+      ))}
+    </div>
+  </div>
+</section>
