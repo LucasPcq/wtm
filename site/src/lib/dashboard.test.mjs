@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { frame, SELECTABLE } from './dashboard.mjs';
+import { frame, MIN_COLUMNS, SELECTABLE } from './dashboard.mjs';
 
 const visible = (html) => html.replace(/<[^>]+>/g, '').replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&');
 
@@ -10,6 +10,14 @@ test('every line of every frame has the same width, so the boxes close', () => {
     const widths = new Set(frame(selected).map((line) => [...visible(line)].length));
     assert.equal(widths.size, 1, `frame ${selected}: widths ${[...widths]}`);
   }
+});
+
+test('a frame stretches to the columns it is given, never below its minimum', () => {
+  for (const columns of [MIN_COLUMNS, 120, 151]) {
+    const widths = new Set(frame('feat/login', columns).map((line) => [...visible(line)].length));
+    assert.deepEqual([...widths], [columns]);
+  }
+  assert.equal([...visible(frame('main', 40)[0])].length, MIN_COLUMNS);
 });
 
 test('the selected worktree carries the selection bar and its name heads the detail pane', () => {

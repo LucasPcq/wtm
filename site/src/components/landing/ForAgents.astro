@@ -24,16 +24,18 @@ const points = [
 ];
 ---
 <section class="section" id="agents">
-  <div class="wrap agents">
-    <div>
-      <p class="prompt">wtm agents install</p>
-      <h2>Built for Claude Code to drive.</h2>
-      <p class="lede">wtm ships a skill that teaches Claude Code its commands and their unattended forms. Four issues, four agents, four running stacks, one laptop.</p>
-      <dl class="points">
-        {points.map((p) => (<div><dt>{p.k}</dt><dd>{p.text}</dd></div>))}
-      </dl>
-      <a class="btn" href={`${base}guide/recipes/#several-ai-agents-each-in-its-own-worktree`}>Recipe: agents in parallel</a>
+  <div class="wrap">
+    <div class="agents">
+      <div>
+        <p class="prompt">wtm agents install</p>
+        <h2>Built for Claude Code to drive.</h2>
+        <p class="lede">wtm ships a skill that teaches Claude Code its commands and their unattended forms. Four issues, four agents, four running stacks, one laptop.</p>
+        <a class="btn" href={`${base}guide/recipes/#several-ai-agents-each-in-its-own-worktree`}>Recipe: agents in parallel</a>
+      </div>
+      <Session title="orchestrator" lines={lines} />
     </div>
-    <Session title="orchestrator" lines={lines} />
+    <dl class="points">
+      {points.map((p) => (<div><dt>{p.k}</dt><dd>{p.text}</dd></div>))}
+    </dl>
   </div>
 </section>

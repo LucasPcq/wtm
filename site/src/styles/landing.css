@@ -41,7 +41,7 @@ body { margin: 0; background: var(--ground); color: var(--body); font: 17px/1.6 
 a { color: inherit; }
 code { font-family: var(--mono); font-size: 0.86em; color: var(--text); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.wrap { max-width: 1320px; margin: 0 auto; padding: 0 16px; }
+.wrap { max-width: 1440px; margin: 0 auto; padding: 0 16px; }
 @media (min-width: 760px) { .wrap { padding: 0 32px; } }
 
 /* lockup: the branch mark and the wordmark, as on the social preview */
@@ -81,15 +81,20 @@ code { font-family: var(--mono); font-size: 0.86em; color: var(--text); }
 .tag { margin: 0 0 20px; font: 15px var(--mono); color: var(--muted); }
 .tag::before { content: '>_ '; color: var(--accent); }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; }
-.hero-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 20px; margin-top: 56px; padding-top: 32px; border-top: 1px solid var(--line); }
-.hero-foot .install { flex: 1 1 420px; min-width: 0; }
-.agent-note { flex-basis: 100%; margin: 0; font: 13px/1.7 var(--mono); color: var(--muted); }
+.hero-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin-top: 56px; padding: 8px; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--surface); }
+.hero-foot .install { display: flex; flex-wrap: wrap; align-items: center; flex: 1 1 520px; min-width: 0; max-width: none; border: 0; background: none; }
+.hero-foot .install-tabs { border: 0; padding: 0 12px 0 0; margin-right: 4px; border-right: 1px solid var(--line); }
+.hero-foot .install-cmd, .hero-foot .install-link { flex: 1 1 260px; min-width: 0; padding: 8px 12px; }
+.hero-foot .actions { margin-left: auto; }
+.hero .agent-note { margin: 14px 0 0 4px; }
+@media (max-width: 640px) { .hero-foot .install-tabs { border-right: 0; } .hero-foot .actions { margin-left: 0; } }
+.agent-note { margin: 0; font: 13px/1.7 var(--mono); color: var(--muted); }
 .agent-note a { color: var(--accent); }
 
 .install { max-width: 520px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); }
 .install-tabs { display: flex; border-bottom: 1px solid var(--line); padding: 0 6px; }
 .install input { position: absolute; opacity: 0; pointer-events: none; }
-.install label { padding: 10px 12px; font: 13px var(--mono); color: var(--muted); cursor: pointer; }
+.install label { padding: 8px 12px; border-radius: 8px; font: 13px var(--mono); color: var(--muted); cursor: pointer; }
 .install input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: -4px; border-radius: 6px; }
 .install-cmd, .install-link { display: none; align-items: center; gap: 12px; padding: 12px 16px; font: 15px var(--mono); }
 .install-cmd code { flex: 1; overflow-x: auto; white-space: nowrap; font-size: 15px; }
@@ -100,7 +105,7 @@ code { font-family: var(--mono); font-size: 0.86em; color: var(--text); }
 .install:has(#i-bin:checked) [data-k='bin'] { display: flex; }
 .install:has(#i-brew:checked) label[for='i-brew'],
 .install:has(#i-go:checked) label[for='i-go'],
-.install:has(#i-bin:checked) label[for='i-bin'] { color: var(--text); box-shadow: inset 0 -2px var(--accent); }
+.install:has(#i-bin:checked) label[for='i-bin'] { color: var(--text); background: var(--ground); box-shadow: inset 0 0 0 1px var(--line-strong); }
 .copy { min-height: 32px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 6px; background: none; color: var(--muted); font: 12px var(--mono); cursor: pointer; }
 .copy:hover { color: var(--text); }
 
@@ -156,21 +161,28 @@ code { font-family: var(--mono); font-size: 0.86em; color: var(--text); }
 .feature { display: grid; gap: 32px; align-items: start; padding: 56px 0; border-top: 1px dashed var(--line); }
 .feature:first-of-type { border-top: 0; padding-top: 0; }
 .feature > * { min-width: 0; }
-@media (min-width: 1000px) { .feature { grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 64px; } }
+@media (min-width: 1000px) {
+  .feature { grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 64px; align-items: center; }
+  .feature.flip { grid-template-columns: minmax(0, 1fr) minmax(0, 380px); }
+  .feature.flip > :first-child { order: 2; }
+}
 .feature h3 { margin: 0 0 12px; font: 600 24px/1.25 var(--sans); color: var(--text); }
 .feature p { margin: 0 0 14px; color: var(--muted); }
 .feature .cmdname { display: inline-block; margin-bottom: 14px; font: 500 13px var(--mono); color: var(--accent); }
 .feature.wide { grid-template-columns: minmax(0, 1fr); }
 .feature.wide p { max-width: 640px; }
 .tui .ch { display: inline-block; width: 1ch; text-align: center; }
-.tui { width: fit-content; max-width: 100%; }
-.tui .screen { font-size: 15px; line-height: 1.22; padding: 16px 20px; }
+.tui .screen { font-size: 14px; line-height: 1.22; padding: 16px 20px; }
 .tui .ln { min-height: 1.22em; }
 
 /* agents */
 .agents { display: grid; gap: 48px; }
-@media (min-width: 1000px) { .agents { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: start; } }
-.points { display: grid; gap: 18px; margin: 0 0 32px; }
+@media (min-width: 1000px) { .agents { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: center; } }
+.agents .lede { margin-bottom: 28px; }
+.points { display: grid; gap: 16px; margin: 56px 0 0; }
+@media (min-width: 720px) { .points { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .points { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.points > div { padding: 20px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface); }
 .points dt { font: 500 14px var(--mono); color: var(--accent); }
 .points dd { margin: 4px 0 0; color: var(--muted); }
 
@@ -203,8 +215,10 @@ code { font-family: var(--mono); font-size: 0.86em; color: var(--text); }
 .roadmap .m { color: var(--muted); }
 
 /* founder */
-.letter { max-width: 720px; }
-.letter p { margin: 0 0 20px; font-size: 19px; color: var(--body); }
+.letter { display: grid; gap: 32px; }
+@media (min-width: 1000px) { .letter { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 80px; align-items: start; } }
+.letter h2 { margin-bottom: 0; }
+.letter p:not(.prompt) { margin: 0 0 18px; font-size: 18px; color: var(--body); }
 .signature { display: flex; align-items: center; gap: 14px; margin-top: 32px; }
 .signature img { border-radius: 50%; border: 1px solid var(--line-strong); }
 .signature b { display: block; color: var(--text); }

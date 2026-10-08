@@ -1,7 +1,7 @@
 // A frame of `wtm ui`, transcribed from a run in the sandbox (100 columns) and
 // trimmed of what needs GitHub; one frame per selected worktree.
 const LEFT = 40;
-const RIGHT = 54;
+export const MIN_COLUMNS = 98;
 const PROXY = 'acme.localhost';
 
 const worktrees = [
@@ -43,7 +43,7 @@ const listRows = (selected) =>
     ];
   });
 
-const detailRows = (selected) => {
+const detailRows = (selected, RIGHT) => {
   const slug = selected.replaceAll('/', '-');
   const url = (job) => `http://${job}.${slug}.${PROXY}`;
   return [
@@ -62,10 +62,12 @@ const detailRows = (selected) => {
   ];
 };
 
-export const frame = (selected) => {
-  const total = LEFT + RIGHT + 4;
+// Like the real TUI, the frame takes the terminal's width: the detail pane grows.
+export const frame = (selected, columns = MIN_COLUMNS) => {
+  const total = Math.max(columns, MIN_COLUMNS);
+  const RIGHT = total - LEFT - 4;
   const left = [[['', ' '], ['b', 'Worktrees']], [], ...listRows(selected)];
-  const right = detailRows(selected);
+  const right = detailRows(selected, RIGHT);
   const height = Math.max(left.length, right.length) + 1;
   const body = Array.from({ length: height }, (_, i) => `${pin('│')}${cell(left[i] ?? [], LEFT)}${pin('││')}${cell(right[i] ?? [], RIGHT)}${pin('│')}`);
   return [
