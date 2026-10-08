@@ -20,15 +20,18 @@ export const recentReleases = (markdown, count) => {
 export const monthYear = (iso) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
-export const firstCommitDate = (repo) =>
-  execFileSync('git', ['-C', repo, 'log', '--reverse', '--format=%ad', '--date=short'], { encoding: 'utf8' }).split('\n')[0];
+const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
 
-export const releaseFacts = async () => {
-  const { REPO, stableTags } = await import('../../site.config.mjs');
+// Bundled into the page, import.meta.url no longer points into the repository, so
+// the repository is found from the working directory instead of site.config.mjs.
+export const releaseFacts = () => {
+  const repo = git('rev-parse', '--show-toplevel');
+  const tags = git('-C', repo, 'tag', '--list', 'v*', '--sort=-v:refname').split('\n').filter((t) => /^v\d+\.\d+\.\d+$/.test(t));
+  const firstCommit = git('-C', repo, 'log', '--reverse', '--format=%ad', '--date=short').split('\n')[0];
   return {
-    releases: stableTags.length,
-    latest: stableTags[0]?.slice(1) ?? '',
-    since: monthYear(firstCommitDate(REPO)),
-    recent: recentReleases(readFileSync(join(REPO, 'CHANGELOG.md'), 'utf8'), 3),
+    releases: tags.length,
+    latest: tags[0]?.slice(1) ?? '',
+    since: monthYear(firstCommit),
+    recent: recentReleases(readFileSync(join(repo, 'CHANGELOG.md'), 'utf8'), 3),
   };
 };

@@ -1,0 +1,24 @@
+---
+interface Props { facts: { releases: number; latest: string; since: string; recent: { version: string; date: string; summary: string }[] } }
+const { facts } = Astro.props;
+import { base } from '../../lib/base.mjs';
+const stats = [
+  { n: String(facts.releases), label: `releases since ${facts.since}` },
+  { n: `v${facts.latest}`, label: 'latest release' },
+  { n: 'MIT', label: 'open source' },
+  { n: '3', label: 'macOS · Linux · WSL2' },
+];
+const anchor = (r: { version: string; date: string }) => `${base}changelog/#${r.version.replaceAll('.', '')}---${r.date}`;
+---
+<section class="section">
+  <div class="wrap">
+    <p class="section-label">shipping</p>
+    <h2>Shipped every week, in the open.</h2>
+    <div class="stats">{stats.map((s) => (<div><b class="mono">{s.n}</b><span>{s.label}</span></div>))}</div>
+    <ol class="releases">
+      {facts.recent.map((r) => (
+        <li><a class="mono" href={anchor(r)}>v{r.version}</a><time class="mono">{r.date}</time><span>{r.summary.split('`').map((part, i) => (i % 2 ? <code>{part}</code> : part))}</span></li>
+      ))}
+    </ol>
+  </div>
+</section>

@@ -2,11 +2,17 @@
 import Landing from '../layouts/Landing.astro';
 import Hero from '../components/landing/Hero.astro';
 import StoryTerminal from '../components/landing/StoryTerminal.astro';
-import Machine from '../components/landing/Machine.astro';
 import Problem from '../components/landing/Problem.astro';
+import Machine from '../components/landing/Machine.astro';
 import HowItWorks from '../components/landing/HowItWorks.astro';
 import ForAgents from '../components/landing/ForAgents.astro';
 import Compare from '../components/landing/Compare.astro';
+import Shipping from '../components/landing/Shipping.astro';
+import Roadmap from '../components/landing/Roadmap.astro';
+import Founder from '../components/landing/Founder.astro';
+import { releaseFacts } from '../lib/facts.mjs';
+
+const facts = releaseFacts();
 ---
 <Landing title="wtm — worktrees isolate code, wtm isolates the runtime" description="A git worktree manager that gives every branch its own ports, Docker Compose project, database and URL, so many Claude Code agents can run their apps on one machine.">
   <Hero><StoryTerminal slot="terminal" /></Hero>
@@ -15,4 +21,7 @@ import Compare from '../components/landing/Compare.astro';
   <HowItWorks />
   <ForAgents />
   <Compare />
+  <Shipping facts={facts} />
+  <Roadmap />
+  <Founder />
 </Landing>

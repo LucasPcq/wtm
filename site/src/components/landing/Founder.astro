@@ -1,0 +1,15 @@
+---
+import { DOMAIN } from '../../../site.config.mjs';
+const contact = DOMAIN ? `hello@${DOMAIN}` : null;
+---
+<section class="section">
+  <div class="wrap letter">
+    <p class="section-label">why I built it</p>
+    <p>wtm started at work, out of necessity. I was juggling several branches at once, and every one of them needed its own running app. I wrote a few shell scripts to copy the <code>.env</code>, shift the ports and keep the containers apart.</p>
+    <p>Then I needed those scripts on every project. The tools that existed handled the worktree and stopped there, nowhere near ready for professional use. So I built the one I wanted: a real CLI, tested, documented, scriptable, and now the thing my Claude Code agents use to run in parallel without stepping on each other.</p>
+    <div class="signature">
+      <img src="https://github.com/LucasPcq.png?size=96" alt="Lucas Picque" width="48" height="48" loading="lazy" />
+      <div><b>Lucas Picque</b><span>Founder · <a href="https://github.com/LucasPcq">@LucasPcq</a>{contact && <> · <a href={`mailto:${contact}`}>{contact}</a></>}</span></div>
+    </div>
+  </div>
+</section>
