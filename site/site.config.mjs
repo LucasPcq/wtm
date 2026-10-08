@@ -24,7 +24,7 @@ const git = (...args) => execFileSync('git', ['-C', REPO, ...args], { encoding: 
 const parse = (tag) => tag.slice(1).split('.').map(Number);
 const compare = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
 
-export const stableTags = git('tag', '--list', 'v*')
+const stableTags = git('tag', '--list', 'v*')
   .split('\n')
   .filter((t) => /^v\d+\.\d+\.\d+$/.test(t))
   .sort((a, b) => compare(parse(b), parse(a)));

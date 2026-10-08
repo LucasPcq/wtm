@@ -61,7 +61,7 @@ code, pre, .mono { font-family: var(--mono); font-size: 0.875em; }
 .term-bar i { width: 10px; height: 10px; border-radius: 50%; background: #2c322b; display: inline-block; }
 .term-bar b { margin-left: 8px; font-weight: 400; }
 .term-body { margin: 0; padding: 16px; font: 13px/1.7 var(--mono); overflow-x: auto; white-space: pre; }
-.term-body .p { color: var(--accent); }
+.term-body .p { color: #a3e635; }
 .term-body .ok { color: #84cc16; }
 .term-body .err { color: var(--error); }
 .term-body .dim { color: #8b958a; }

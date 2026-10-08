@@ -60,7 +60,7 @@ docs:
 # site builds the documentation site (site/, Starlight) from docs/, README.md and
 # CHANGELOG.md into site/dist; site-dev serves it with live reload. Both need Node 22.
 site:
-	cd site && npm ci && npm run build
+	cd site && npm ci && npm test && npm run build
 
 site-dev:
 	cd site && npm install && npm run dev
