@@ -1,0 +1,25 @@
+---
+import Landing from '../layouts/Landing.astro';
+import { CONTACT } from '../../site.config.mjs';
+---
+<Landing title="Privacy — wtm" description="What wtm and wtm.sh collect: no telemetry, no analytics, no cookies.">
+  <section class="section legal">
+    <div class="wrap">
+      <p class="prompt">cat PRIVACY</p>
+      <h2>Privacy</h2>
+      <p class="lede">wtm collects no data. No telemetry, no analytics, no account.</p>
+
+      <h3>The wtm tool</h3>
+      <p>wtm runs on your machine. Your repositories, configuration, environment files and logs stay there; nothing is sent to wtm or its maintainer.</p>
+      <p>wtm itself makes one kind of network request: at most once a day it asks the GitHub API for the latest release, so it can tell you an update exists. The request carries wtm's version and nothing about your work. <code>WTM_NO_UPDATE_CHECK=1</code> turns it off. <code>wtm upgrade</code> downloads the new release from GitHub when you run it.</p>
+      <p>Some commands call tools you have installed and configured yourself: <code>git</code> talks to your remotes, and the GitHub features go through your own <a href="https://cli.github.com">gh</a> login. Those requests are between you and those services, under their terms.</p>
+
+      <h3>This website</h3>
+      <p>wtm.sh is a static site hosted on GitHub Pages. It sets no cookies and runs no analytics. GitHub, as the host, receives your IP address with each request (<a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub's privacy statement</a>), and the fonts are served by Google Fonts (<a href="https://policies.google.com/privacy">Google's privacy policy</a>).</p>
+
+      <h3>Contact</h3>
+      <p>wtm is maintained by Lucas Picque. If you write to {CONTACT ? <a href={`mailto:${CONTACT}`}>{CONTACT}</a> : 'the maintainer'}, your message is used only to answer you.</p>
+      <p class="updated">Last updated October 8, 2026.</p>
+    </div>
+  </section>
+</Landing>
