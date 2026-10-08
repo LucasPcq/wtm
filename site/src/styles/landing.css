@@ -74,6 +74,7 @@ code, pre, .mono { font-family: var(--mono); font-size: 0.875em; }
 .hero .agent-link { font: 13px var(--mono); color: var(--muted); }
 .hero .agent-link a { color: var(--accent-high); }
 .hero-grid { display: grid; gap: 48px; }
+.hero-grid > *, .grid-2 > * { min-width: 0; }
 @media (min-width: 1000px) { .hero-grid { grid-template-columns: 1fr 1.1fr; align-items: center; } }
 
 .install { border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-raised); max-width: 520px; }
@@ -99,3 +100,14 @@ code, pre, .mono { font-family: var(--mono); font-size: 0.875em; }
 .footer .end { margin-left: auto; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+.story { position: relative; min-width: 0; }
+.story > input { position: absolute; opacity: 0; pointer-events: none; }
+.story-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; margin-bottom: 12px; font-size: 12px; }
+.story-toggle label { padding: 4px 12px; border-radius: 999px; cursor: pointer; color: var(--muted); }
+.story:has(#story-before:checked) label[for='story-before'] { background: color-mix(in srgb, var(--error) 18%, transparent); color: var(--text); }
+.story:has(#story-after:checked) label[for='story-after'] { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--text); }
+.story-scene { display: none; min-height: 17em; }
+.story:has(#story-before:checked) [data-scene='before'],
+.story:has(#story-after:checked) [data-scene='after'] { display: block; }
+.story .line { transition: opacity 0.2s; }
+.story .line.pending { opacity: 0; }

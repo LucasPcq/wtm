@@ -1,7 +1,8 @@
 ---
 import Landing from '../layouts/Landing.astro';
 import Hero from '../components/landing/Hero.astro';
+import StoryTerminal from '../components/landing/StoryTerminal.astro';
 ---
 <Landing title="wtm — worktrees isolate code, wtm isolates the runtime" description="A git worktree manager that gives every branch its own ports, Docker Compose project, database and URL, so many Claude Code agents can run their apps on one machine.">
-  <Hero />
+  <Hero><StoryTerminal slot="terminal" /></Hero>
 </Landing>
