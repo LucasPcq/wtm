@@ -8,7 +8,11 @@ import { fileURLToPath } from 'node:url';
 
 export const SITE = dirname(fileURLToPath(import.meta.url));
 export const REPO = dirname(SITE);
-export const BASE = process.env.DOCS_BASE ?? '/wtm';
+// The site's own domain once it has one: SITE_URL, BASE, the CNAME file and the
+// contact address all follow it. Null publishes to GitHub Pages under /wtm.
+export const DOMAIN = process.env.SITE_DOMAIN ?? null;
+export const SITE_URL = DOMAIN ? `https://${DOMAIN}` : 'https://lucaspcq.github.io';
+export const BASE = process.env.DOCS_BASE ?? (DOMAIN ? '' : '/wtm');
 export const DOCS_REF = process.env.DOCS_REF ?? 'main';
 export const GENERATED_DIRS = ['guide', 'reference', 'dev'];
 
@@ -20,7 +24,7 @@ const git = (...args) => execFileSync('git', ['-C', REPO, ...args], { encoding: 
 const parse = (tag) => tag.slice(1).split('.').map(Number);
 const compare = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
 
-const stableTags = git('tag', '--list', 'v*')
+export const stableTags = git('tag', '--list', 'v*')
   .split('\n')
   .filter((t) => /^v\d+\.\d+\.\d+$/.test(t))
   .sort((a, b) => compare(parse(b), parse(a)));

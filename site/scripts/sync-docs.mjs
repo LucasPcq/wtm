@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, normalize, posix } from 'node:path';
 
-import { archivedVersions, BASE, DOCS_REF, GENERATED_DIRS, REPO, SITE } from '../site.config.mjs';
+import { archivedVersions, BASE, DOCS_REF, DOMAIN, GENERATED_DIRS, REPO, SITE } from '../site.config.mjs';
 
 const CONTENT = join(SITE, 'src/content/docs');
 const VERSIONS = join(SITE, 'src/content/versions');
@@ -111,6 +111,7 @@ const syncTree = ({ source, prefix, ref, editable }) => {
 
 for (const dir of [...GENERATED_DIRS, ...archivedVersions.map((v) => v.slug)]) rmSync(join(CONTENT, dir), { recursive: true, force: true });
 rmSync(join(CONTENT, 'changelog.md'), { force: true });
+rmSync(join(CONTENT, 'docs.mdx'), { force: true });
 rmSync(VERSIONS, { recursive: true, force: true });
 
 let pages = syncTree({ source: fromWorktree, prefix: '', ref: DOCS_REF, editable: true });
@@ -136,5 +137,11 @@ mkdirSync(join(SITE, 'public/schemas'), { recursive: true });
 for (const f of readdirSync(join(REPO, 'internal/schemas')).filter((f) => f.endsWith('.json'))) {
   cpSync(join(REPO, 'internal/schemas', f), join(SITE, 'public/schemas', f));
 }
+
+const home = readFileSync(join(SITE, 'src/docs-home.mdx'), 'utf8').replaceAll('__BASE__', BASE);
+writeFileSync(join(CONTENT, 'docs.mdx'), home);
+
+rmSync(join(SITE, 'public/CNAME'), { force: true });
+if (DOMAIN) writeFileSync(join(SITE, 'public/CNAME'), `${DOMAIN}\n`);
 
 console.log(`synced ${pages} pages (current + ${archivedVersions.map((v) => v.slug).join(', ') || 'no archived version'})`);

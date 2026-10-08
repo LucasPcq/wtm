@@ -4,13 +4,13 @@ import starlightLinksValidator from 'starlight-links-validator';
 import starlightLlmsTxt from 'starlight-llms-txt';
 import starlightVersions from 'starlight-versions';
 
-import { archivedVersions, BASE, currentLabel, currentSidebar } from './site.config.mjs';
+import { archivedVersions, BASE, currentLabel, currentSidebar, SITE_URL } from './site.config.mjs';
 
 const archivedPages = archivedVersions.map(({ slug }) => `${slug}/**`);
 
 export default defineConfig({
-  site: 'https://lucaspcq.github.io',
-  base: BASE,
+  site: SITE_URL,
+  base: BASE || '/',
   markdown: { smartypants: false },
   integrations: [
     starlight({
@@ -25,7 +25,7 @@ export default defineConfig({
         starlightVersions({
           current: { label: currentLabel },
           versions: archivedVersions.map(({ slug, label }) => ({ slug, label })),
-          exclude: ['index.mdx', 'changelog.md'],
+          exclude: ['docs.mdx', 'changelog.md'],
         }),
         starlightLinksValidator({
           errorOnLocalLinks: false,

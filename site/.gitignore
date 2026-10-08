@@ -5,4 +5,4 @@ public/assets/
 public/schemas/
 src/content/versions/
 src/content/docs/*
-!src/content/docs/index.mdx
+public/CNAME

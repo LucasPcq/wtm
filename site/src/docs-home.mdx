@@ -10,7 +10,7 @@ hero:
     file: ../../../../docs/assets/hero.gif
   actions:
     - text: Get started
-      link: /wtm/guide/getting-started/
+      link: __BASE__/guide/getting-started/
       icon: right-arrow
     - text: Install
       link: '#install'
@@ -51,8 +51,8 @@ Configure it once, share it with `wtm run export`, and every developer and every
 <img src={isolation.src} alt="wtm run up on two worktrees at once: each runs its own api and web on its own named URLs" />
 
 <CardGrid>
-  <LinkCard title="How wtm run works" href="/wtm/guide/how-run-works/" description="Jobs, ports and the environment each worktree gets." />
-  <LinkCard title="Shared services" href="/wtm/guide/shared-services/" description="One postgres for the repository, one database per worktree." />
+  <LinkCard title="How wtm run works" href="__BASE__/guide/how-run-works/" description="Jobs, ports and the environment each worktree gets." />
+  <LinkCard title="Shared services" href="__BASE__/guide/shared-services/" description="One postgres for the repository, one database per worktree." />
 </CardGrid>
 
 ## Built for agents
@@ -65,7 +65,7 @@ wtm run up feat/a --yes -d
 wtm events --output json | jq -c 'select(.type == "worktree.provisioned")'
 ```
 
-This site is also served as plain text for agents: [`llms.txt`](/wtm/llms.txt), [`llms-full.txt`](/wtm/llms-full.txt).
+This site is also served as plain text for agents: [`llms.txt`](__BASE__/llms.txt), [`llms-full.txt`](__BASE__/llms-full.txt).
 
 ## One screen for all of it
 
@@ -87,7 +87,7 @@ This site is also served as plain text for agents: [`llms.txt`](/wtm/llms.txt), 
     ```
   </TabItem>
   <TabItem label="Binary">
-    Download the archive for your platform from the [releases](https://github.com/LucasPcq/wtm/releases), then:
+    Download the archive for your platform from the [releases](https://github.com/LucasPcq__BASE__/releases), then:
 
     ```bash
     tar -xzf wtm_*_linux_amd64.tar.gz   # or _linux_arm64, _darwin_amd64, _darwin_arm64
@@ -103,11 +103,11 @@ echo 'eval "$(wtm shell-init)"' >> ~/.zshrc   # ~/.bashrc for bash
 cd your-repo && wtm init
 ```
 
-macOS and Linux, amd64 and arm64; Windows through WSL2. A specific version, updating and the other details are in [Installation](/wtm/guide/installation/).
+macOS and Linux, amd64 and arm64; Windows through WSL2. A specific version, updating and the other details are in [Installation](__BASE__/guide/installation/).
 
 <CardGrid>
-  <LinkCard title="Getting started" href="/wtm/guide/getting-started/" description="Ten minutes from install to two branches running side by side." />
-  <LinkCard title="Recipes" href="/wtm/guide/recipes/" description="A pnpm monorepo, a compose app, a shared postgres, agents in parallel." />
-  <LinkCard title="Command reference" href="/wtm/reference/wtm/" description="Every command and flag, generated from --help." />
-  <LinkCard title="Changelog" href="/wtm/changelog/" description="What changed in each release." />
+  <LinkCard title="Getting started" href="__BASE__/guide/getting-started/" description="Ten minutes from install to two branches running side by side." />
+  <LinkCard title="Recipes" href="__BASE__/guide/recipes/" description="A pnpm monorepo, a compose app, a shared postgres, agents in parallel." />
+  <LinkCard title="Command reference" href="__BASE__/reference/wtm/" description="Every command and flag, generated from --help." />
+  <LinkCard title="Changelog" href="__BASE__/changelog/" description="What changed in each release." />
 </CardGrid>
