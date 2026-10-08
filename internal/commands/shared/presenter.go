@@ -55,7 +55,7 @@ func (p CLIPresenter) phase(separate bool) io.Writer {
 }
 
 func (p CLIPresenter) Stage(ctx context.Context, params flow.StageParams) error {
-	return components.RunLoading(components.LoadingParams{
+	return components.RunLoading(ctx, components.LoadingParams{
 		Message: params.Message,
 		Animate: Animate(p.Cmd, p.Human),
 		Work:    func() error { return params.Work(ctx) },

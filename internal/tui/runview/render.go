@@ -553,6 +553,9 @@ func (m Model) renderStatus(width int) string {
 	if m.notice != "" {
 		status = styles.Warning.Render(truncate(m.notice, width))
 	}
+	if m.cancelling {
+		status = styles.Warning.Render(truncate(domain.CancellingMessage, width))
+	}
 	if m.err != nil {
 		status = styles.DangerText.Render(truncate(m.err.Error(), width))
 	}

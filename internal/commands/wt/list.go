@@ -68,7 +68,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 		wg       sync.WaitGroup
 	)
 
-	err = components.RunLoading(components.LoadingParams{
+	err = shared.Load(cmd, components.LoadingParams{
 		Message: "Loading worktrees…",
 		Animate: shared.Animate(cmd, rules.IsHumanFormat(format)),
 		Work: func() error {

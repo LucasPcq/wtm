@@ -62,7 +62,7 @@ func runTree(cmd *cobra.Command, _ []string) error {
 	withPRs, _ := cmd.Flags().GetBool(domain.FlagWithPRs)
 
 	var forest domain.Forest
-	err = components.RunLoading(components.LoadingParams{
+	err = shared.Load(cmd, components.LoadingParams{
 		Message: "Building worktree tree…",
 		Animate: shared.Animate(cmd, rules.IsHumanFormat(format)),
 		Work: func() error {

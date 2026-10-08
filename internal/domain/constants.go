@@ -4245,6 +4245,9 @@ const (
 	// KeyInterrupt cancels a wizard wherever it stands, as Esc does on its
 	// first step: a terminal user reaches for it first.
 	KeyInterrupt = "ctrl+c"
+	// CancellingMessage replaces a wait's message once the first Ctrl-C has
+	// cancelled the work under it; a second one stops waiting.
+	CancellingMessage = "Cancelling…"
 
 	// EscapePrefix is the leading escape a terminal sends for an alt-modified
 	// key, and KeyCtrlPrefix how a control combination is named.

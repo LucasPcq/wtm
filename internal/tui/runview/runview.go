@@ -12,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/tui/components"
 )
 
 type Params struct {
@@ -66,6 +67,10 @@ type Detach struct {
 	// the one running the sequence, and returning would exit out from under it.
 	// A surface that outlives the view — a dashboard — sets it false and gets
 	// its terminal back while the run reports into it.
+	//
+	// It is also what gives Ctrl-C its shell meaning: the process owns the run,
+	// so Ctrl-C interrupts it rather than leaving. Inside a dashboard the key
+	// keeps leaving, since interrupting would take the dashboard down with it.
 	Await bool
 }
 
@@ -126,6 +131,10 @@ type Model struct {
 	// runDone reports that the sequence is over, which is what makes leaving an
 	// ordinary quit rather than a detach.
 	runDone bool
+	// cancelling is a run the first Ctrl-C interrupted, still unwinding; the view
+	// stays up until it has. interrupted is the view left on that interrupt.
+	cancelling  bool
+	interrupted bool
 	// profile names the run the view is reporting on, for the header and the recap.
 	profile string
 	open    OpenFunc
@@ -243,6 +252,11 @@ func Run(ctx context.Context, params Params) (Result, error) {
 	// Mouse tracking, or the wheel falls through to the host terminal and writes
 	// escape sequences over the view instead of scrolling the pane.
 	options := []tea.ProgramOption{tea.WithAltScreen(), tea.WithMouseCellMotion()}
+	if params.Detach.Await {
+		// Bubbletea's own handler would end the view on the very SIGINT the first
+		// Ctrl-C raises, before the run has unwound.
+		options = append(options, tea.WithoutSignalHandler())
+	}
 	if params.In != nil {
 		options = append(options, tea.WithInput(params.In))
 	}
@@ -253,11 +267,15 @@ func Run(ctx context.Context, params Params) (Result, error) {
 	if err != nil {
 		model.cancel()
 		model.panes.closeAll()
-		return Result{}, fmt.Errorf("run view: %w", err)
+		return Result{}, fmt.Errorf("run view: %w", components.ProgramError(err))
 	}
 	last, ok := final.(Model)
 	if !ok {
 		return Result{}, nil
+	}
+	if last.interrupted {
+		last.cancel()
+		return last.result(), domain.ErrCancelled
 	}
 	return last.awaitDetached(), nil
 }
@@ -295,6 +313,9 @@ func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{m.refreshCmd(), pollCmd(), m.listenCmd()}
 	if m.start != nil {
 		cmds = append(cmds, m.startCmd(), m.frameCmd())
+	}
+	if m.onLeave.Await {
+		cmds = append(cmds, components.AwaitInterrupt(m.runCtx))
 	}
 	return tea.Batch(cmds...)
 }
@@ -467,7 +488,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.applyEvent(msg)
 
 	case runFinishedMsg:
-		return m.applyRunFinished(msg)
+		model, cmd := m.applyRunFinished(msg)
+		if model.cancelling {
+			return model.leaveInterrupted()
+		}
+		return model, cmd
+
+	case components.InterruptedMsg:
+		return m.applyInterrupted()
 
 	case openFailedMsg:
 		m.notice = fmt.Sprintf(domain.RunViewOpenFailedFmt, msg.err)
