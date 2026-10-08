@@ -1,0 +1,113 @@
+---
+title: wtm
+description: One branch, one worktree, one isolated dev stack. A git worktree manager for teams and AI agents working on several branches at once.
+template: splash
+editUrl: false
+hero:
+  title: One branch, one worktree, one isolated dev stack.
+  tagline: A worktree manager for teams that work on several branches at once, and let their agents do too.
+  image:
+    file: ../../../../docs/assets/hero.gif
+  actions:
+    - text: Get started
+      link: __BASE__/guide/getting-started/
+      icon: right-arrow
+    - text: Install
+      link: '#install'
+      variant: secondary
+    - text: GitHub
+      link: https://github.com/LucasPcq/wtm
+      icon: github
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard, Tabs, TabItem } from '@astrojs/starlight/components';
+import isolation from '../../../../docs/assets/isolation.gif';
+import dashboard from '../../../../docs/assets/dashboard.gif';
+
+## A worktree ready to code, in one command
+
+`git worktree` gives each branch a directory. Everything else is still on you: copy the `.env`, install dependencies, remember which directory holds which branch, and run two branches' dev servers without them fighting over the same ports, containers and databases.
+
+<CardGrid>
+  <Card title="Provisioned" icon="rocket">
+    `wtm create` copies the `.env` files, runs your `on_create` hooks (`pnpm install`, …) and shifts the ports. `wtm go` jumps into it.
+  </Card>
+  <Card title="Cleaned when merged" icon="approve-check">
+    `wtm prune` removes every worktree whose PR is merged, in one pass, and refuses one that still holds uncommitted or unpushed work.
+  </Card>
+  <Card title="Stacked branches" icon="seti:git">
+    Every worktree records its parent. `wtm tree` draws the forest, `wtm sync` rebases a branch and its descendants in order.
+  </Card>
+  <Card title="Many at once" icon="list-format">
+    `wtm create a b c`, `wtm exec --all -- pnpm test`: one command across worktrees, in parallel, each with its own environment.
+  </Card>
+</CardGrid>
+
+## Your whole stack, once per worktree
+
+Configure it once, share it with `wtm run export`, and every developer and every agent gets the full stack in its own worktree: its own ports, its own `COMPOSE_PROJECT_NAME`, its own database in a shared postgres, its own URL. Two branches run side by side; an agent can start the app it is working on and test it end to end without touching yours.
+
+<img src={isolation.src} alt="wtm run up on two worktrees at once: each runs its own api and web on its own named URLs" />
+
+<CardGrid>
+  <LinkCard title="How wtm run works" href="__BASE__/guide/how-run-works/" description="Jobs, ports and the environment each worktree gets." />
+  <LinkCard title="Shared services" href="__BASE__/guide/shared-services/" description="One postgres for the repository, one database per worktree." />
+</CardGrid>
+
+## Built for agents
+
+wtm is meant to be driven by something other than a person. `wtm agents install` adds a skill that teaches Claude Code or Cursor the commands and their unattended forms. Data commands take `--output json`, every change takes `--yes`, exit codes are stable, and `wtm events` streams every change as JSON Lines.
+
+```bash
+wtm create feat/a feat/b --yes --output json
+wtm run up feat/a --yes -d
+wtm events --output json | jq -c 'select(.type == "worktree.provisioned")'
+```
+
+This site is also served as plain text for agents: [`llms.txt`](__BASE__/llms.txt), [`llms-full.txt`](__BASE__/llms-full.txt).
+
+## One screen for all of it
+
+`wtm ui` shows every worktree, the branch tree, PR status and the running services, and updates live as worktrees come and go from any shell or agent.
+
+<img src={dashboard.src} alt="The wtm ui dashboard: worktrees, a new one created from the dashboard, the branch tree" />
+
+## Install
+
+<Tabs syncKey="install">
+  <TabItem label="Homebrew">
+    ```bash
+    brew install LucasPcq/tap/wtm
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```bash
+    go install github.com/LucasPcq/wtm@latest
+    ```
+  </TabItem>
+  <TabItem label="Binary">
+    Download the archive for your platform from the [releases](https://github.com/LucasPcq/wtm/releases), then:
+
+    ```bash
+    tar -xzf wtm_*_linux_amd64.tar.gz   # or _linux_arm64, _darwin_amd64, _darwin_arm64
+    sudo mv wtm /usr/local/bin/
+    ```
+  </TabItem>
+</Tabs>
+
+Then let `wtm go` change your directory, and set up a repository:
+
+```bash
+echo 'eval "$(wtm shell-init)"' >> ~/.zshrc   # ~/.bashrc for bash
+cd your-repo && wtm init
+```
+
+macOS and Linux, amd64 and arm64; Windows through WSL2. A specific version, updating and the other details are in [Installation](__BASE__/guide/installation/).
+
+<CardGrid>
+  <LinkCard title="Getting started" href="__BASE__/guide/getting-started/" description="Ten minutes from install to two branches running side by side." />
+  <LinkCard title="Recipes" href="__BASE__/guide/recipes/" description="A pnpm monorepo, a compose app, a shared postgres, agents in parallel." />
+  <LinkCard title="Command reference" href="__BASE__/reference/wtm/" description="Every command and flag, generated from --help." />
+  <LinkCard title="Changelog" href="__BASE__/changelog/" description="What changed in each release." />
+</CardGrid>

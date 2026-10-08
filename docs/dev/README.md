@@ -2,7 +2,7 @@
 
 Reference documentation for people (and agents) working **on** wtm. It describes the code as delivered, not the design that preceded it.
 
-> The rest of `docs/` is **generated** by `tools/gendocs` from the Cobra command tree (`make docs`) and must never be hand-edited. `docs/dev/` is hand-written and is the only manual content under `docs/`; gendocs only writes `wtm_*.md` at the root of `docs/`, so this subdirectory survives a regeneration untouched.
+> The rest of `docs/` is **generated** by `tools/gendocs` from the Cobra command tree (`make docs`) and must never be hand-edited. `docs/dev/` is hand-written and is the only manual content under `docs/`; gendocs only writes `wtm_*.md` and `commands.json` (the command reference grouped like `wtm --help`, read by the documentation site) at the root of `docs/`, so this subdirectory survives a regeneration untouched.
 
 | Document | What it covers |
 | -- | -- |

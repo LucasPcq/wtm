@@ -1,0 +1,19 @@
+---
+import { CONTACT } from '../../../site.config.mjs';
+---
+<section class="section">
+  <div class="wrap letter">
+    <div>
+      <p class="prompt">git log --reverse | head -1</p>
+      <h2>Built inside a monorepo that runs a dozen services.</h2>
+      <div class="signature">
+        <img src="https://github.com/LucasPcq.png?size=96" alt="" width="48" height="48" loading="lazy" />
+        <div><b>Lucas Picque</b><span>Founder · <a href="https://github.com/LucasPcq">@LucasPcq</a>{CONTACT && <> · <a href={`mailto:${CONTACT}`}>{CONTACT}</a></>}</span></div>
+      </div>
+    </div>
+    <div>
+      <p>I work at a startup on a monorepo of two apps, each with a frontend, a backend and a back office, over Docker with several databases. Once AI agents could take several tasks at once, every task needed its own running stack, for me to check the work and for the agent to check it itself.</p>
+      <p>It started as shell scripts to create a worktree, copy its <code>.env</code> and run the hooks. The tools I tried stopped at the worktree. So I built wtm, and today the whole team runs part or all of the monorepo in several worktrees at once with it.</p>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,40 @@
+---
+import Session from './Session.astro';
+import { base } from '../../lib/base.mjs';
+import { cmd, out } from '../../lib/term.mjs';
+
+const lines = [
+  cmd('wtm agents install    # once: the skill for Claude Code'),
+  out(),
+  cmd('agents="agent/checkout agent/search agent/oauth agent/billing"'),
+  cmd('wtm create $agents --yes --output json > /dev/null'),
+  cmd('wtm run up $agents -d --yes --output json | jq -r \'.[].jobs[].url\''),
+  out('<span class="c">http://api.agent-checkout.acme.localhost</span>'),
+  out('<span class="c">http://web.agent-checkout.acme.localhost</span>'),
+  out('<span class="c">http://api.agent-search.acme.localhost</span>'),
+  out('<span class="c">http://web.agent-search.acme.localhost</span>'),
+  out('<span class="m">…</span>'),
+];
+const points = [
+  { k: '--yes', text: 'Every command runs unattended. A missing choice is an error naming its flag, never a prompt the agent cannot answer.' },
+  { k: '--output json', text: 'A document to read instead of text to parse, with published JSON schemas.' },
+  { k: 'exit codes', text: 'Stable and documented: 10 the worktree exists, 11 no such branch, 16 no run.toml…' },
+  { k: 'wtm events', text: 'Every worktree and job change as JSON Lines, for the agent or whatever orchestrates it.' },
+];
+---
+<section class="section" id="agents">
+  <div class="wrap">
+    <div class="agents">
+      <div>
+        <p class="prompt">wtm agents install</p>
+        <h2>Built for Claude Code to drive.</h2>
+        <p class="lede">wtm ships a skill that teaches Claude Code its commands and their unattended forms. Four issues, four agents, four running stacks, one laptop.</p>
+        <a class="btn" href={`${base}guide/recipes/#several-ai-agents-each-in-its-own-worktree`}>Recipe: agents in parallel</a>
+      </div>
+      <Session title="orchestrator" lines={lines} />
+    </div>
+    <dl class="points">
+      {points.map((p) => (<div><dt>{p.k}</dt><dd>{p.text}</dd></div>))}
+    </dl>
+  </div>
+</section>

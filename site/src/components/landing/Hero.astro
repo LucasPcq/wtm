@@ -1,0 +1,103 @@
+---
+import Install from './Install.astro';
+import Mark from './Mark.astro';
+import { base } from '../../lib/base.mjs';
+import { cmd, out, render } from '../../lib/term.mjs';
+
+const before = [
+  cmd('git worktree add ../feat-login feat/login'),
+  out('<span class="m">Preparing worktree (checking out \'feat/login\')</span>'),
+  cmd('git worktree add ../feat-search feat/search'),
+  out('<span class="m">Preparing worktree (checking out \'feat/search\')</span>'),
+  out(),
+  cmd('cd ../feat-login && pnpm dev'),
+  out('  <span class="g">✓</span> ready on http://localhost:3000'),
+  cmd('cd ../feat-search && pnpm dev'),
+  out('  <span class="r">Error: listen EADDRINUSE: address already in use :::3000</span>'),
+  cmd('pnpm db:migrate'),
+  out('  <span class="r">Error: Environment variable not found: DATABASE_URL.</span>'),
+  cmd('docker compose up -d postgres'),
+  out('  <span class="r">Conflict. The container name "/acme-postgres-1" is already in use</span>'),
+];
+const after = [
+  cmd('wtm create feat/login feat/search --yes'),
+  out('  <span class="g">✓</span> feat/login'),
+  out('    <span class="m">../acme.trees/feat-login</span>'),
+  out('  <span class="g">✓</span> feat/search'),
+  out('    <span class="m">../acme.trees/feat-search</span>'),
+  out(),
+  out('  2 created'),
+  out(),
+  cmd('wtm run up feat/login feat/search -d --yes'),
+  out('  <span class="g">✓</span> api started · feat/login · <span class="c">http://api.feat-login.acme.localhost</span>'),
+  out('  <span class="g">✓</span> api started · feat/search · <span class="c">http://api.feat-search.acme.localhost</span>'),
+  out('  <span class="g">✓</span> web started · feat/login · <span class="c">http://web.feat-login.acme.localhost</span>'),
+  out('  <span class="g">✓</span> web started · feat/search · <span class="c">http://web.feat-search.acme.localhost</span>'),
+];
+---
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <a class="lockup" href={base} aria-label="wtm"><Mark /><b>wtm</b></a>
+        <h1>Worktrees isolate code. <span>wtm isolates the runtime.</span></h1>
+        <p class="tag">for teams and their agents</p>
+        <p class="sub">Every branch gets its own worktree, ports, Docker Compose project, database and URL, so ten Claude Code agents can run their apps on one laptop.</p>
+      </div>
+      <div class="term scenes" id="hero-term">
+        <input type="radio" name="scene" id="scene-before" />
+        <input type="radio" name="scene" id="scene-after" checked />
+        <div class="term-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="term-tabs"><label for="scene-before">without wtm</label><label for="scene-after">with wtm</label></span>
+        </div>
+        <div class="screen scene" data-scene="before" set:html={render(before)} />
+        <div class="screen scene" data-scene="after" set:html={render(after)} />
+      </div>
+    </div>
+    <div class="hero-foot">
+      <Install />
+      <div class="actions">
+        <a class="btn btn-primary" href={`${base}guide/getting-started/`}>Get started</a>
+        <a class="btn" href="https://github.com/LucasPcq/wtm">View on GitHub</a>
+      </div>
+    </div>
+    <p class="agent-note">Agents: read <a href={`${base}llms.txt`}>llms.txt</a>, then <code>wtm agents install</code>.</p>
+  </div>
+</section>
+
+<script>
+  import { play, stop } from '../../lib/play';
+
+  const term = document.querySelector<HTMLElement>('#hero-term');
+  const before = term?.querySelector('[data-scene="before"]');
+  const after = term?.querySelector('[data-scene="after"]');
+  const beforeInput = term?.querySelector<HTMLInputElement>('#scene-before');
+  const afterInput = term?.querySelector<HTMLInputElement>('#scene-after');
+  let touched = false;
+
+  const show = (scene: 'before' | 'after') => {
+    if (!before || !after || !beforeInput || !afterInput) return;
+    (scene === 'before' ? beforeInput : afterInput).checked = true;
+    stop(scene === 'before' ? after : before);
+    return play(scene === 'before' ? before : after);
+  };
+
+  term?.querySelector('.term-tabs')?.addEventListener('click', (event) => {
+    const label = (event.target as HTMLElement).closest('label');
+    if (!label) return;
+    touched = true;
+    event.preventDefault();
+    show(label.htmlFor === 'scene-before' ? 'before' : 'after');
+  });
+  beforeInput?.addEventListener('change', () => { touched = true; show('before'); });
+  afterInput?.addEventListener('change', () => { touched = true; show('after'); });
+
+  const autoplay = async () => {
+    await show('before');
+    if (touched) return;
+    await new Promise((resolve) => setTimeout(resolve, 1400));
+    if (!touched) show('after');
+  };
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) autoplay();
+</script>

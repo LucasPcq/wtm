@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.astro/
+public/assets/
+public/schemas/
+src/content/versions/
+src/content/docs/*
+public/CNAME

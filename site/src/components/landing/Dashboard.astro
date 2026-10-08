@@ -1,0 +1,50 @@
+---
+import { frame, SELECTABLE } from '../../lib/dashboard.mjs';
+
+const html = (name: string, columns?: number) => frame(name, columns).map((l) => `<span class="ln">${l}</span>`).join('');
+---
+<figure class="term tui" id="dashboard">
+  <div class="term-bar">
+    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    <span class="title">wtm ui</span>
+  </div>
+  {SELECTABLE.map((name, i) => (
+    <div class="screen" data-frame={name} hidden={i > 0} set:html={html(name)} />
+  ))}
+</figure>
+
+<script>
+  import { frame } from '../../lib/dashboard.mjs';
+
+  const root = document.querySelector<HTMLElement>('#dashboard');
+  const frames = [...(root?.querySelectorAll<HTMLElement>('[data-frame]') ?? [])];
+
+  const fit = () => {
+    const screen = frames.find((f) => !f.hidden);
+    if (!screen) return;
+    const probe = document.createElement('span');
+    probe.className = 'ch';
+    probe.textContent = '0';
+    screen.append(probe);
+    const char = probe.getBoundingClientRect().width;
+    probe.remove();
+    const style = getComputedStyle(screen);
+    const inner = screen.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const columns = Math.floor(inner / char);
+    for (const f of frames) f.innerHTML = frame(f.dataset.frame ?? '', columns).map((l) => `<span class="ln">${l}</span>`).join('');
+  };
+
+  let pending = 0;
+  addEventListener('resize', () => { cancelAnimationFrame(pending); pending = requestAnimationFrame(fit); });
+  document.fonts.ready.then(fit);
+
+  if (frames.length && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    let shown = 0;
+    setInterval(() => {
+      if (document.hidden) return;
+      frames[shown].hidden = true;
+      shown = (shown + 1) % frames.length;
+      frames[shown].hidden = false;
+    }, 2200);
+  }
+</script>

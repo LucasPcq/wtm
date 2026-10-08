@@ -112,3 +112,5 @@ Every TOML file `wtm init` writes starts with a `#:schema ./schemas/...json` dir
 wtm schema dump            # <git-common-dir>/wtm/schemas/{run,project}.schema.json
 wtm schema dump --global   # global.schema.json, beside the global config
 ```
+
+The schemas of the latest release are also published at `https://wtm.sh/schemas/<name>.json` (`project.schema.json`, `run.schema.json`, `global.schema.json`, `events.v1.json`), for a file written outside a repository or a tool that should not depend on a local copy.

@@ -1,0 +1,75 @@
+---
+import { INITIAL, panel, worktree } from '../../lib/machine.mjs';
+
+const selected = 1;
+---
+<section class="section" id="machine">
+  <div class="wrap">
+    <p class="prompt fig">fig. 1 — what wtm writes in each worktree</p>
+    <h2>git worktree gives each branch a directory. wtm gives it the rest.</h2>
+    <p class="lede">The same repository, three worktrees. wtm rewrites the ports and addresses in each one's <code>.env</code> files when it creates it, and hands every job the worktree's identity when it runs it. Pick a worktree, or create one.</p>
+    <div class="machine" id="worktrees">
+      <div class="machine-head">
+        <div class="wt-tabs" role="tablist" aria-label="Worktree">
+          {INITIAL.map((branch, i) => (
+            <button type="button" role="tab" class="wt-tab" aria-selected={i === selected ? 'true' : 'false'} data-wt={i}>{branch}</button>
+          ))}
+        </div>
+        <button type="button" class="wt-create" id="wt-create" hidden><span class="g">$</span> wtm create <span id="wt-next"></span></button>
+      </div>
+      <div class="wt-panels">
+        {INITIAL.map((branch, i) => (
+          <div class="wt-panel" role="tabpanel" data-wt={i} hidden={i !== selected} set:html={panel(worktree(branch, i))} />
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { AGENTS, INITIAL, panel, worktree } from '../../lib/machine.mjs';
+
+  const root = document.querySelector<HTMLElement>('#worktrees');
+  const tabs = root?.querySelector<HTMLElement>('.wt-tabs');
+  const panels = root?.querySelector<HTMLElement>('.wt-panels');
+  const create = root?.querySelector<HTMLButtonElement>('#wt-create');
+  const next = root?.querySelector<HTMLElement>('#wt-next');
+  let created = 0;
+
+  const select = (index: string) => {
+    tabs?.querySelectorAll<HTMLElement>('.wt-tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.wt === index)));
+    panels?.querySelectorAll<HTMLElement>('.wt-panel').forEach((p) => { p.hidden = p.dataset.wt !== index; });
+  };
+
+  const showNext = () => {
+    if (!create || !next) return;
+    create.hidden = created >= AGENTS.length;
+    next.textContent = AGENTS[created] ?? '';
+  };
+
+  tabs?.addEventListener('click', (event) => {
+    const tab = (event.target as HTMLElement).closest<HTMLElement>('.wt-tab');
+    if (tab?.dataset.wt) select(tab.dataset.wt);
+  });
+
+  create?.addEventListener('click', () => {
+    if (!tabs || !panels || created >= AGENTS.length) return;
+    const ordinal = INITIAL.length + created;
+    const branch = AGENTS[created];
+    const tab = document.createElement('button');
+    Object.assign(tab, { type: 'button', className: 'wt-tab fresh', textContent: branch });
+    tab.setAttribute('role', 'tab');
+    tab.dataset.wt = String(ordinal);
+    tabs.append(tab);
+    const view = document.createElement('div');
+    Object.assign(view, { className: 'wt-panel fresh', innerHTML: panel(worktree(branch, ordinal)) });
+    view.setAttribute('role', 'tabpanel');
+    view.dataset.wt = String(ordinal);
+    panels.append(view);
+    created += 1;
+    select(String(ordinal));
+    showNext();
+  });
+
+  showNext();
+</script>
