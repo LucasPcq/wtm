@@ -4,8 +4,7 @@ import { base } from '../../lib/base.mjs';
 import { cmd, out } from '../../lib/term.mjs';
 
 const lines = [
-  cmd('wtm agents install'),
-  out('  <span class="m"># once: the using-wtm skill, for Claude Code</span>'),
+  cmd('wtm agents install    # once: the skill for Claude Code'),
   out(),
   cmd('agents="agent/checkout agent/search agent/oauth agent/billing"'),
   cmd('wtm create $agents --yes --output json > /dev/null'),

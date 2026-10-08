@@ -33,6 +33,6 @@ test('no two worktrees on the page share a port', () => {
 
 test('a changed value is preceded by what main has, as a shell comment', () => {
   const html = panel(worktree('feat/login', 1));
-  assert.match(html, /<span class="ln m"># main: 3000<\/span><span class="ln"><span class="c">PORT<\/span>=<span class="g">3010<\/span>/);
+  assert.match(html, /<span class="ln m"># main: 3000<\/span><span class="ln"><span class="m">PORT=<\/span><span class="p">3010<\/span>/);
   assert.doesNotMatch(panel(worktree('main', 0)), /# main:/);
 });

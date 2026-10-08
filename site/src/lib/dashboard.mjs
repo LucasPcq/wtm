@@ -34,8 +34,8 @@ const spread = (left, right, width) => {
 
 const listRows = (selected) =>
   worktrees.flatMap((w) => {
-    const bar = w.name === selected ? ['g', '▌ '] : ['', '  '];
-    const nameCls = w.name === selected ? 'b' : '';
+    const bar = w.name === selected ? ['p', '▌ '] : ['', '  '];
+    const nameCls = w.name === selected ? 'pb' : '';
     return [
       spread([['', ' '], bar, [nameCls, w.name]], [['g', 'clean'], ['', ' ']], LEFT),
       spread([['', ' '], bar, ['m', w.sub]], w.running ? [['g', '▶ 2 running'], ['', ' ']] : [], LEFT),
@@ -48,9 +48,9 @@ const detailRows = (selected, RIGHT) => {
   const url = (job) => `http://${job}.${slug}.${PROXY}`;
   return [
     spread([['', '   '], ['b', 'DETAIL'], ['m', '    LOGS']], [], RIGHT),
-    [['', ' '], ['g', '━━━━━━━━━━'], ['m', '─'.repeat(RIGHT - 12)], ['', ' ']],
+    [['', ' '], ['p', '━━━━━━━━━━'], ['m', '─'.repeat(RIGHT - 12)], ['', ' ']],
     [],
-    spread([['', ' '], ['b', selected]], selected === 'main' ? [['g', '● you are here'], ['', ' ']] : [], RIGHT),
+    spread([['', ' '], ['pb', selected]], selected === 'main' ? [['g', '● you are here'], ['', ' ']] : [], RIGHT),
     [['', ' '], ['m', '─'.repeat(RIGHT - 2)], ['', ' ']],
     [],
     [['', ' '], ['g', 'clean'], ['m', ' · active just now']],
@@ -71,9 +71,9 @@ export const frame = (selected, columns = MIN_COLUMNS) => {
   const height = Math.max(left.length, right.length) + 1;
   const body = Array.from({ length: height }, (_, i) => `${pin('│')}${cell(left[i] ?? [], LEFT)}${pin('││')}${cell(right[i] ?? [], RIGHT)}${pin('│')}`);
   return [
-    cell(spread([['', ' '], ['gb', 'wtm'], ['', '  acme · base main · '], ['g', '●'], ['', ' main']], [['m', 'v0.29.2'], ['', ' ']], total), total),
+    cell(spread([['', ' '], ['ob', 'wtm'], ['', '  acme · base main · '], ['g', '●'], ['', ' main']], [['m', 'v0.29.2'], ['', ' ']], total), total),
     cell(spread([['', '  '], ['b', 'Worktrees'], ['m', '    Tree    Services']], [['m', '+ New worktree    ⋯ Actions    5 worktrees'], ['', ' ']], total), total),
-    span('g', '━━━━━━━━━━━━━') + span('m', '─'.repeat(total - 13)),
+    span('p', '━━━━━━━━━━━━━') + span('m', '─'.repeat(total - 13)),
     pin(`╭${'─'.repeat(LEFT)}╮╭${'─'.repeat(RIGHT)}╮`),
     ...body,
     pin(`╰${'─'.repeat(LEFT)}╯╰${'─'.repeat(RIGHT)}╯`),

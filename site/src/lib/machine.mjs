@@ -52,9 +52,9 @@ export const worktree = (branch, ordinal) => {
 
 const line = (e) => {
   const changed = e.was !== undefined && e.was !== e.value;
-  const value = changed ? `<span class="g">${esc(e.value)}</span>` : esc(e.value);
+  const value = changed ? `<span class="p">${esc(e.value)}</span>` : esc(e.value);
   const note = changed ? `<span class="ln m"># main: ${esc(e.was)}</span>` : '';
-  return `${note}<span class="ln"><span class="c">${e.key}</span>=${value}</span>`;
+  return `${note}<span class="ln"><span class="m">${e.key}=</span>${value}</span>`;
 };
 
 export const panel = (wt) =>
