@@ -239,3 +239,9 @@ code { font-family: var(--mono); font-size: 0.86em; color: var(--text); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .nav .lockup svg { width: 0.62em; height: 0.62em; }
+
+.legal .wrap { max-width: 820px; }
+.legal h3 { margin: 40px 0 12px; font: 600 20px var(--sans); color: var(--text); }
+.legal p:not(.prompt, .lede, .updated) { margin: 0 0 16px; font-size: 17px; color: var(--body); }
+.legal a { color: var(--accent); }
+.legal .updated { margin-top: 40px; font: 13px var(--mono); color: var(--muted); }

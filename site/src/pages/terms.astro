@@ -1,0 +1,27 @@
+---
+import Landing from '../layouts/Landing.astro';
+import { CONTACT } from '../../site.config.mjs';
+import { base } from '../lib/base.mjs';
+---
+<Landing title="Terms — wtm" description="wtm is free and open source under the MIT license.">
+  <section class="section legal">
+    <div class="wrap">
+      <p class="prompt">cat TERMS</p>
+      <h2>Terms</h2>
+      <p class="lede">wtm is free and open source. Use it at work, in a team, in a product.</p>
+
+      <h3>License</h3>
+      <p>wtm is released under the <a href="https://github.com/LucasPcq/wtm/blob/main/LICENSE">MIT license</a>: you may use, copy, modify and distribute it, commercially or not, as long as the copyright and license notice are kept. There is no fee and no account.</p>
+
+      <h3>No warranty</h3>
+      <p>As the license states, wtm is provided as is, without warranty of any kind. wtm creates and removes worktrees and branches and starts processes on your machine; it refuses to remove uncommitted or unpushed work unless you pass <code>--force</code>, but keep your work pushed.</p>
+
+      <h3>Support</h3>
+      <p>Bugs and feature requests go to <a href="https://github.com/LucasPcq/wtm/issues">GitHub issues</a>, security reports to the <a href="https://github.com/LucasPcq/wtm/blob/main/SECURITY.md">security policy</a>. Support is best effort; there is no paid plan today.</p>
+
+      <h3>Who runs wtm</h3>
+      <p>wtm and wtm.sh are built and maintained by Lucas Picque{CONTACT && <>, reachable at <a href={`mailto:${CONTACT}`}>{CONTACT}</a></>}. See also the <a href={`${base}privacy/`}>privacy page</a>.</p>
+      <p class="updated">Last updated October 8, 2026.</p>
+    </div>
+  </section>
+</Landing>

@@ -15,6 +15,6 @@ const anchor = (r: { version: string; date: string }) => `${base}changelog/#${r.
         <li><a href={anchor(r)}>v{r.version}</a><time datetime={r.date}>{r.date}</time><span>{r.summary.split('`').map((part, i) => (i % 2 ? <code>{part}</code> : part))}</span></li>
       ))}
     </ol>
-    <p class="facts"><span>MIT licensed</span><span>macOS, Linux, Windows through WSL2</span><span>Homebrew, Go, binaries</span><span><a href={`${base}changelog/`}>Full changelog</a></span></p>
+    <p class="facts"><span>Free and open source (MIT)</span><span>macOS, Linux, Windows through WSL2</span><span>Homebrew, Go, binaries</span><span><a href={`${base}changelog/`}>Full changelog</a></span></p>
   </div>
 </section>
