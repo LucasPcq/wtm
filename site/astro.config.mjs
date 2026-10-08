@@ -16,7 +16,7 @@ export default defineConfig({
     starlight({
       title: 'wtm',
       description: 'One branch, one worktree, one isolated dev stack. A git worktree manager for teams and AI agents.',
-      logo: { src: './src/assets/logo.svg', replacesTitle: true },
+      logo: { src: './src/assets/logo.svg' },
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/LucasPcq/wtm' }],
       editLink: { baseUrl: 'https://github.com/LucasPcq/wtm/edit/main/' },
       customCss: ['./src/styles/theme.css'],

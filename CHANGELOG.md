@@ -6,7 +6,7 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 ### Added
 
-- **Documentation site** at [https://lucaspcq.github.io/wtm](https://lucaspcq.github.io/wtm/): the guide, the command reference grouped like `wtm --help`, the changelog, search, the docs of every release since 0.28, and `llms.txt` / `llms-full.txt` for agents. The JSON schemas are published there too. → [IDE autocomplete + validation](docs/guide/configuration.md#ide-autocomplete--validation)
+- **Website and documentation** at [wtm.sh](https://wtm.sh): a product page, then under [/docs](https://wtm.sh/docs/) the guide, the command reference grouped like `wtm --help`, the changelog, search, the docs of every release since 0.28, and `llms.txt` / `llms-full.txt` for agents. The JSON schemas are published there too. → [IDE autocomplete + validation](docs/guide/configuration.md#ide-autocomplete--validation)
 
 ## [0.29.2] - 2026-10-06
 

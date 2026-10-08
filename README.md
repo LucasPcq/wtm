@@ -8,7 +8,7 @@
 <p align="center">
   <a href="https://github.com/LucasPcq/wtm/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/LucasPcq/wtm?sort=semver"></a>
   <a href="https://github.com/LucasPcq/wtm/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/LucasPcq/wtm/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="https://lucaspcq.github.io/wtm/"><img alt="Documentation" src="https://img.shields.io/badge/docs-lucaspcq.github.io%2Fwtm-65a30d"></a>
+  <a href="https://wtm.sh/docs/"><img alt="Documentation" src="https://img.shields.io/badge/docs-wtm.sh-7ee787"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
 </p>
 
@@ -208,7 +208,7 @@ Opt-in: `wtm run init` sets it up once per repository.
 
 ## Documentation
 
-Everything below is also on the **[documentation site](https://lucaspcq.github.io/wtm/)**, with search, every past version since 0.28, and [`llms-full.txt`](https://lucaspcq.github.io/wtm/llms-full.txt) for agents.
+Everything below is also on the **[documentation site](https://wtm.sh/docs/)**, with search, every past version since 0.28, and [`llms-full.txt`](https://wtm.sh/llms-full.txt) for agents.
 
 - **[Getting started](docs/guide/getting-started.md):** from install to two branches running side by side, in ten minutes. Then [recipes](docs/guide/recipes.md) for common setups and [troubleshooting](docs/guide/troubleshooting.md).
 - **[User guide](docs/guide/README.md):** [configuration](docs/guide/configuration.md), [isolation](docs/guide/isolation.md), [jobs and profiles](docs/guide/jobs-and-profiles.md), [how `wtm run` works](docs/guide/how-run-works.md), [shared services](docs/guide/shared-services.md), [named URLs](docs/guide/addressing.md), the [`run.toml` reference](docs/guide/run-toml.md), [where wtm keeps its state](docs/guide/state.md).

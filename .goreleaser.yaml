@@ -50,7 +50,7 @@ brews:
       owner: LucasPcq
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    homepage: "https://lucaspcq.github.io/wtm/"
+    homepage: "https://wtm.sh"
     description: "Worktree Manager — orchestrate git worktrees, AI agents, and team workflows"
     license: "MIT"
     install: |
