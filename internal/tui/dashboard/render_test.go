@@ -24,7 +24,7 @@ func TestHeaderIsWiredThroughTheRealPath(t *testing.T) {
 		activePath = "/repo/worktree-manager-cli.worktrees/feat-a"
 	)
 
-	model := New(RunParams{ProjectDir: projectDir, Cwd: activePath})
+	model := New(t.Context(), RunParams{ProjectDir: projectDir, Cwd: activePath})
 	t.Cleanup(model.Close)
 	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 
@@ -117,7 +117,7 @@ func TestHeaderDropsSegmentsRightToLeftWhenNarrow(t *testing.T) {
 	// say) would pass both just as well. Pin the ORDER itself: a width that
 	// fits repo+base+active only without the active segment must show base
 	// and drop active, never the reverse.
-	order := New(RunParams{})
+	order := New(t.Context(), RunParams{})
 	t.Cleanup(order.Close)
 	order.repoName, order.activeBranch = "demo-repo", "wip"
 	order.params.Config.Project.Worktrees.BaseBranch = "trunk"
@@ -138,7 +138,7 @@ func TestHeaderDropsSegmentsRightToLeftWhenNarrow(t *testing.T) {
 // guard directly: reverting it to "return wordmark" unconditionally would
 // make this fail, since the bare wordmark itself does not fit width 4.
 func TestContextLineGoesEmptyRatherThanOverflowAnUnfittableWidth(t *testing.T) {
-	model := New(RunParams{})
+	model := New(t.Context(), RunParams{})
 	t.Cleanup(model.Close)
 
 	const tooNarrowForTheWordmark = 4 // the wordmark alone renders 5 columns wide.
@@ -205,7 +205,7 @@ func TestTabRuleDoesNotSlideOnAnAlreadyActiveTab(t *testing.T) {
 
 func TestTabSlideDisabledWhenAnimationsOff(t *testing.T) {
 	off := false
-	model := New(RunParams{Config: domain.Config{Global: domain.GlobalConfig{UI: domain.UIConfig{Animations: &off}}}})
+	model := New(t.Context(), RunParams{Config: domain.Config{Global: domain.GlobalConfig{UI: domain.UIConfig{Animations: &off}}}})
 	t.Cleanup(model.Close)
 	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 	model = update(model, worktreesMsg{statuses: statuses("main", "feat/a"), parents: map[string]string{}})
@@ -249,7 +249,7 @@ func TestRowFlashLightsThenFadesAndStops(t *testing.T) {
 
 func TestRowFlashDisabledWhenAnimationsOff(t *testing.T) {
 	off := false
-	model := New(RunParams{Config: domain.Config{Global: domain.GlobalConfig{UI: domain.UIConfig{Animations: &off}}}})
+	model := New(t.Context(), RunParams{Config: domain.Config{Global: domain.GlobalConfig{UI: domain.UIConfig{Animations: &off}}}})
 	t.Cleanup(model.Close)
 	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 	model, _ = model.applyFlow(createdMsg{branch: "feat/a", selects: true})
@@ -323,7 +323,7 @@ func TestHeaderShowsTheVersionAndCallsToActionWhenOutdated(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			model := New(RunParams{ProjectDir: "/repo/wtm", Version: tc.version, UpgradeLatest: tc.latest})
+			model := New(t.Context(), RunParams{ProjectDir: "/repo/wtm", Version: tc.version, UpgradeLatest: tc.latest})
 			t.Cleanup(model.Close)
 			model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 			model = update(model, worktreesMsg{
@@ -349,7 +349,7 @@ func TestHeaderShowsTheVersionAndCallsToActionWhenOutdated(t *testing.T) {
 // The count row is hard-truncated by wordmarkRow, so it has to shed segments
 // itself. The call to action is the last thing to go before the version.
 func TestHeaderCountLineDropsFetchedBeforeTheCallToAction(t *testing.T) {
-	model := New(RunParams{ProjectDir: "/repo/wtm", Version: "0.26.0", UpgradeLatest: "0.26.1"})
+	model := New(t.Context(), RunParams{ProjectDir: "/repo/wtm", Version: "0.26.0", UpgradeLatest: "0.26.1"})
 	t.Cleanup(model.Close)
 	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 	model = update(model, worktreesMsg{

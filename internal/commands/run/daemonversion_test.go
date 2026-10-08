@@ -15,7 +15,7 @@ import (
 func TestClientRefusesADaemonOfAnotherBuild(t *testing.T) {
 	startFakeDaemon(t, &fakeDaemon{Version: "0.27.0"})
 
-	_, err := process.NewClient(process.SocketPath()).Send(process.Request{Action: process.ActionStart, Job: &apiJob})
+	_, err := process.NewClient(process.SocketPath()).Send(t.Context(), process.Request{Action: process.ActionStart, Job: &apiJob})
 
 	if !errors.Is(err, domain.ErrDaemonVersionMismatch) {
 		t.Fatalf("error = %v, want a version mismatch", err)
@@ -33,7 +33,7 @@ func TestClientRefusesADaemonOfAnotherBuild(t *testing.T) {
 func TestClientReadsAnUnstampedAnswerAsOlder(t *testing.T) {
 	startFakeDaemon(t, &fakeDaemon{Version: "none"})
 
-	_, err := process.NewClient(process.SocketPath()).Send(process.Request{Action: process.ActionStart, Job: &apiJob})
+	_, err := process.NewClient(process.SocketPath()).Send(t.Context(), process.Request{Action: process.ActionStart, Job: &apiJob})
 
 	if !errors.Is(err, domain.ErrDaemonVersionMismatch) {
 		t.Fatalf("error = %v, want a version mismatch", err)
@@ -46,7 +46,7 @@ func TestClientReadsAnUnstampedAnswerAsOlder(t *testing.T) {
 func TestClientAcceptsADaemonOfTheSameBuild(t *testing.T) {
 	startFakeDaemon(t, &fakeDaemon{})
 
-	if _, err := process.NewClient(process.SocketPath()).Send(process.Request{Action: process.ActionList}); err != nil {
+	if _, err := process.NewClient(process.SocketPath()).Send(t.Context(), process.Request{Action: process.ActionList}); err != nil {
 		t.Fatalf("the nominal path must cost nothing: %v", err)
 	}
 }

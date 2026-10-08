@@ -33,7 +33,7 @@ func TestADeclinedPrivilegedRemovalSettlesWhatGitDid(t *testing.T) {
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}}
 	presenter := newRecorder()
 
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   d.ctx,
 		Request:   Request{Branches: []string{d.branch}, BaseBranch: "main", Force: true, AllowPrivileged: true},
 		Prompter:  prompter,
@@ -52,7 +52,7 @@ func TestADeclinedPrivilegedRemovalSettlesWhatGitDid(t *testing.T) {
 	if !hasStatus(presenter, "sudo rm -rf "+d.path) {
 		t.Errorf("statuses = %+v, want the leftover named", presenter.Statuses)
 	}
-	if worktree.StillTracked(worktree.FindByBranchParams{ProjectDir: d.ctx.ProjectDir, Branch: d.branch}) {
+	if worktree.StillTracked(t.Context(), worktree.FindByBranchParams{ProjectDir: d.ctx.ProjectDir, Branch: d.branch}) {
 		t.Error("git still tracks the worktree")
 	}
 }
@@ -64,7 +64,7 @@ func TestAnUnofferedPrivilegedRemovalAsksNothing(t *testing.T) {
 	plantUndeletable(t, d.path)
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}}
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   d.ctx,
 		Request:   Request{Branches: []string{d.branch}, BaseBranch: "main", Force: true},
 		Prompter:  prompter,

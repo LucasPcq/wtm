@@ -16,7 +16,7 @@ func TestRecentCommits(t *testing.T) {
 	gittest.Git(t, dir, "add", ".")
 	gittest.Git(t, dir, "commit", "-m", "feat: premier ajout")
 
-	commits, err := RecentCommits(RecentCommitsParams{WorktreePath: dir, Limit: 5})
+	commits, err := RecentCommits(t.Context(), RecentCommitsParams{WorktreePath: dir, Limit: 5})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -45,7 +45,7 @@ func TestRecentCommitsSubjectWithSeparator(t *testing.T) {
 	gittest.Git(t, dir, "add", ".")
 	gittest.Git(t, dir, "commit", "-m", "fix: garder a|b intact")
 
-	commits, err := RecentCommits(RecentCommitsParams{WorktreePath: dir, Limit: 1})
+	commits, err := RecentCommits(t.Context(), RecentCommitsParams{WorktreePath: dir, Limit: 1})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -65,7 +65,7 @@ func TestDiffShortstat(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stat, err := DiffShortstat(DiffShortstatParams{WorktreePath: dir})
+	stat, err := DiffShortstat(t.Context(), DiffShortstatParams{WorktreePath: dir})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestBranchDiffShortstat(t *testing.T) {
 	gittest.Git(t, dir, "add", ".")
 	gittest.Git(t, dir, "commit", "-m", "feat: two more lines")
 
-	stat, err := BranchDiffShortstat(BranchDiffShortstatParams{WorktreePath: dir, Base: "main", Branch: "feat/x"})
+	stat, err := BranchDiffShortstat(t.Context(), BranchDiffShortstatParams{WorktreePath: dir, Base: "main", Branch: "feat/x"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestBranchDiffShortstat(t *testing.T) {
 
 func TestLastFetchAtWithoutFetchHead(t *testing.T) {
 	dir := gittest.InitRepo(t)
-	if got := LastFetchAt(LastFetchAtParams{ProjectDir: dir}); !got.IsZero() {
+	if got := LastFetchAt(t.Context(), LastFetchAtParams{ProjectDir: dir}); !got.IsZero() {
 		t.Errorf("LastFetchAt = %v, want zéro quand FETCH_HEAD est absent", got)
 	}
 }
@@ -114,7 +114,7 @@ func TestRecentCommitsNoCommits(t *testing.T) {
 	dir := t.TempDir()
 	gittest.Git(t, dir, "init", "-b", "main")
 
-	if _, err := RecentCommits(RecentCommitsParams{WorktreePath: dir, Limit: 5}); err == nil {
+	if _, err := RecentCommits(t.Context(), RecentCommitsParams{WorktreePath: dir, Limit: 5}); err == nil {
 		t.Fatal("attendu une erreur sur un dépôt sans commit")
 	}
 }

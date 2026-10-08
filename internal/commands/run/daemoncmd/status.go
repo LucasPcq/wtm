@@ -1,8 +1,10 @@
 package daemoncmd
 
 import (
-	"github.com/spf13/cobra"
+	"context"
 	"io"
+
+	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -25,7 +27,7 @@ func newStatusCmd() *cobra.Command {
 }
 
 func runStatus(cmd *cobra.Command, _ []string) error {
-	status := collectStatus()
+	status := collectStatus(cmd.Context())
 
 	if format, _ := cmd.Flags().GetString(domain.FlagOutput); format == domain.OutputJSON {
 		return output.WriteDaemonStatusJSON(cmd.OutOrStdout(), status)
@@ -39,7 +41,7 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 // collectStatus asks the daemon rather than the index: the index says what was
 // started, the daemon says what it is holding right now, and a status that
 // disagreed with `run ps` would be worse than no status at all.
-func collectStatus() domain.DaemonStatus {
+func collectStatus(ctx context.Context) domain.DaemonStatus {
 	status := domain.DaemonStatus{
 		SocketPath:  process.SocketPath(),
 		StatePath:   process.StatePath(),
@@ -52,7 +54,7 @@ func collectStatus() domain.DaemonStatus {
 
 	// Sent raw: the client's own send refuses a version mismatch, which is the
 	// one thing this command exists to report rather than hide.
-	resp, err := process.NewClient(status.SocketPath).SendUnchecked(process.Request{Action: process.ActionList})
+	resp, err := process.NewClient(status.SocketPath).SendUnchecked(ctx, process.Request{Action: process.ActionList})
 	if err != nil {
 		return status
 	}

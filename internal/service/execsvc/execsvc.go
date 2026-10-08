@@ -9,10 +9,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra"
 )
 
 type Target struct {
@@ -94,31 +94,23 @@ func runOne(ctx context.Context, params runOneParams) domain.ExecResult {
 	}
 	out := &lockedWriter{w: io.MultiWriter(sinks...)}
 
-	cmd := exec.Command(domain.ShellBin, domain.ShellCommandFlag, params.Command)
+	cmd := infra.GroupCommand(ctx, domain.ShellBin, domain.ShellCommandFlag, params.Command)
 	cmd.Dir = params.Target.Path
 	cmd.Env = params.Target.Env
 	cmd.Stdout, cmd.Stderr = out, out
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.WaitDelay = domain.ExecPipeGrace
 
 	begin := time.Now()
 	if err := cmd.Start(); err != nil {
+		if ctx.Err() != nil {
+			result.Status = domain.ExecStatusInterrupted
+			return result
+		}
 		result.Status = domain.ExecStatusFailed
 		result.Error = err.Error()
 		return result
 	}
-
-	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
-
-	interrupted := false
-	var waitErr error
-	select {
-	case waitErr = <-done:
-	case <-ctx.Done():
-		interrupted = true
-		waitErr = stop(stopParams{Pid: cmd.Process.Pid, Done: done})
-	}
+	waitErr := cmd.Wait()
+	interrupted := ctx.Err() != nil
 
 	result.DurationMs = time.Since(begin).Milliseconds()
 	result.Tail = tail.Lines()
@@ -136,24 +128,6 @@ func runOne(ctx context.Context, params runOneParams) domain.ExecResult {
 		result.Status = domain.ExecStatusFailed
 	}
 	return result
-}
-
-type stopParams struct {
-	Pid  int
-	Done <-chan error
-}
-
-// stop gives the group SIGINT and a grace period, then SIGKILL: a command that
-// traps SIGINT must not hang the whole run.
-func stop(params stopParams) error {
-	_ = syscall.Kill(-params.Pid, syscall.SIGINT)
-	select {
-	case err := <-params.Done:
-		return err
-	case <-time.After(domain.ExecInterruptGrace):
-		_ = syscall.Kill(-params.Pid, syscall.SIGKILL)
-		return <-params.Done
-	}
 }
 
 // exitCode reads the shell's own status when Wait only complained about the

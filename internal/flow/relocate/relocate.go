@@ -2,6 +2,7 @@
 package relocate
 
 import (
+	"context"
 	"errors"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -49,8 +50,9 @@ type Params struct {
 	Presenter Presenter
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &relocateFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -60,6 +62,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type relocateFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -115,9 +118,9 @@ type applyParams struct {
 // base_path, and a worktree may have changed while it was open.
 func (f *relocateFlow) apply(params applyParams) (Outcome, error) {
 	var result domain.RelocateResult
-	err := f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.RelocateStageMessage,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			plan, err := f.planAt(params.BasePath)
 			if err != nil {
 				return err
@@ -190,7 +193,7 @@ func (f *relocateFlow) carryOut(params carryOutParams) domain.RelocateStepResult
 }
 
 func (f *relocateFlow) move(res domain.RelocateStepResult) error {
-	if err := worktree.Move(worktree.MoveParams{
+	if err := worktree.Move(f.runCtx, worktree.MoveParams{
 		ProjectDir: f.ctx.ProjectDir,
 		From:       res.FromPath,
 		To:         res.ToPath,
@@ -198,7 +201,7 @@ func (f *relocateFlow) move(res domain.RelocateStepResult) error {
 	}); err != nil {
 		return err
 	}
-	publish.Relocated(publish.RelocatedParams{Context: f.ctx, Branch: res.Branch, FromPath: res.FromPath})
+	publish.Relocated(f.runCtx, publish.RelocatedParams{Context: f.ctx, Branch: res.Branch, FromPath: res.FromPath})
 	return nil
 }
 
@@ -210,7 +213,7 @@ func (f *relocateFlow) adopt(res domain.RelocateStepResult) error {
 	}); err != nil {
 		return err
 	}
-	publish.Updated(publish.UpdatedParams{Context: f.ctx, Branch: res.Branch, Changed: []domain.IdentityField{domain.IdentityParent, domain.IdentityCreatedAt}})
+	publish.Updated(f.runCtx, publish.UpdatedParams{Context: f.ctx, Branch: res.Branch, Changed: []domain.IdentityField{domain.IdentityParent, domain.IdentityCreatedAt}})
 	return nil
 }
 
@@ -241,7 +244,7 @@ func (f *relocateFlow) conclude(outcome Outcome) (Outcome, error) {
 }
 
 func (f *relocateFlow) planAt(basePath string) (domain.RelocatePlan, error) {
-	return worktree.PlanRelocate(worktree.PlanRelocateParams{
+	return worktree.PlanRelocate(f.runCtx, worktree.PlanRelocateParams{
 		ProjectDir:     f.ctx.ProjectDir,
 		StateDir:       f.ctx.StateDir,
 		TargetBasePath: basePath,

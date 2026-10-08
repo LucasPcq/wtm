@@ -39,14 +39,14 @@ type viewParams struct {
 func openRunView(params viewParams) (runlogs.Outcomes, error) {
 	out := params.Cmd.OutOrStdout()
 	rest := &detachedRun{params: params}
-	result, err := runview.Run(runview.Params{
+	result, err := runview.Run(params.Cmd.Context(), runview.Params{
 		Board:      params.Board,
 		Job:        params.Job,
 		Profile:    params.Profile,
 		Worktrees:  params.Worktrees,
 		Warnings:   params.Warnings,
 		Start:      params.Start,
-		Open:       integration.OpenURL,
+		Open:       func(url string) error { return integration.OpenURL(params.Cmd.Context(), url) },
 		Hyperlinks: true,
 		Detach:     runview.Detach{Notice: rest.open, Sink: rest, Await: true},
 	})

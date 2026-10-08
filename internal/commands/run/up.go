@@ -80,7 +80,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 	force, _ := cmd.Flags().GetBool(domain.FlagForce)
 	profile, _ := cmd.Flags().GetString(domain.FlagProfile)
 
-	outcome, err := upflow.Run(upflow.Params{
+	outcome, err := upflow.Run(cmd.Context(), upflow.Params{
 		Context: ctx.FlowContext(),
 		Request: upflow.Request{
 			Worktrees: args,
@@ -92,7 +92,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 			Force:     force,
 			Config:    ctx.Run,
 		},
-		Prompter:  ctx.Prompter(ctx.Interactive),
+		Prompter:  ctx.Prompter(cmd.Context(), ctx.Interactive),
 		Presenter: upPresenter{CLIPresenter: shared.NewPresenter(cmd, format), detach: detach},
 	})
 	if err != nil {

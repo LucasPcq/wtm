@@ -117,7 +117,7 @@ func runEnv(cmd *cobra.Command, args []string) error {
 	if len(args) == 1 {
 		worktreeArg = args[0]
 	}
-	_, err = envflow.Run(envflow.Params{
+	_, err = envflow.Run(cmd.Context(), envflow.Params{
 		Context: shared.FlowContext(cfg),
 		Request: envflow.Request{
 			Worktree:   worktreeArg,
@@ -130,7 +130,7 @@ func runEnv(cmd *cobra.Command, args []string) error {
 			Addressing: addressing,
 		},
 		// The wizard runs only fully interactively, and never for --check.
-		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: isInteractive() && rules.IsHumanFormat(format) && !yes && !check, Stderr: true}),
+		Prompter:  shared.FlowPrompter(cmd.Context(), shared.FlowPrompterParams{Interactive: isInteractive() && rules.IsHumanFormat(format) && !yes && !check, Stderr: true}),
 		Presenter: envPresenter{CLIPresenter: shared.NewPresenter(cmd, format), showValues: showValues},
 	})
 	return err

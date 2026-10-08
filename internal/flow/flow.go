@@ -3,6 +3,7 @@
 package flow
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -25,27 +26,27 @@ type Context struct {
 // Listening is asked before an event is built: reading the identity it
 // carries costs a git call, which a run nobody watches should not pay.
 type Publisher interface {
-	Publish(event domain.Event)
+	Publish(ctx context.Context, event domain.Event)
 	Listening() bool
 	// Origin is what the daemon stamps on the job events a request causes;
 	// false when the repository cannot be named.
-	Origin() (domain.EventOrigin, bool)
+	Origin(ctx context.Context) (domain.EventOrigin, bool)
 }
 
-func (c Context) Publish(event domain.Event) {
+func (c Context) Publish(ctx context.Context, event domain.Event) {
 	if c.Publisher == nil {
 		return
 	}
-	c.Publisher.Publish(event)
+	c.Publisher.Publish(ctx, event)
 }
 
 // Origin is nil without a publisher, or a repository to name: the daemon then
 // publishes nothing about the jobs the request starts.
-func (c Context) Origin() *domain.EventOrigin {
+func (c Context) Origin(ctx context.Context) *domain.EventOrigin {
 	if c.Publisher == nil {
 		return nil
 	}
-	origin, ok := c.Publisher.Origin()
+	origin, ok := c.Publisher.Origin(ctx)
 	if !ok {
 		return nil
 	}
@@ -336,9 +337,11 @@ type Prompter interface {
 	Interactive() bool
 }
 
+// StageParams.Work is handed the context to run under: the one Stage was given,
+// or one the surface derived from it to cancel this unit of work on its own.
 type StageParams struct {
 	Message string
-	Work    func() error
+	Work    func(context.Context) error
 }
 
 // HookSink is where a hook phase reports: the raw output as it is produced, and
@@ -380,7 +383,7 @@ type Notice struct {
 }
 
 type Presenter interface {
-	Stage(StageParams) error
+	Stage(context.Context, StageParams) error
 	HookPhase(HookPhaseParams) error
 	// Notice concludes the run; Status is one line inside an ongoing phase.
 	Notice(Notice)

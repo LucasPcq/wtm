@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -23,8 +24,8 @@ type PlanRelocateParams struct {
 	Force          bool
 }
 
-func PlanRelocate(params PlanRelocateParams) (domain.RelocatePlan, error) {
-	candidates, err := collectRelocateCandidates(params)
+func PlanRelocate(ctx context.Context, params PlanRelocateParams) (domain.RelocatePlan, error) {
+	candidates, err := collectRelocateCandidates(ctx, params)
 	if err != nil {
 		return domain.RelocatePlan{}, err
 	}
@@ -44,11 +45,11 @@ type MoveParams struct {
 	Force      bool
 }
 
-func Move(params MoveParams) error {
+func Move(ctx context.Context, params MoveParams) error {
 	if err := os.MkdirAll(filepath.Dir(params.To), 0o755); err != nil {
 		return fmt.Errorf("create target dir: %w", err)
 	}
-	return infra.MoveWorktree(infra.MoveWorktreeParams{
+	return infra.MoveWorktree(ctx, infra.MoveWorktreeParams{
 		ProjectDir: params.ProjectDir,
 		From:       params.From,
 		To:         params.To,
@@ -99,8 +100,8 @@ func SetBasePath(params SetBasePathParams) error {
 	return nil
 }
 
-func collectRelocateCandidates(params PlanRelocateParams) ([]rules.RelocateCandidate, error) {
-	worktrees, err := infra.ListWorktrees(infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
+func collectRelocateCandidates(ctx context.Context, params PlanRelocateParams) ([]rules.RelocateCandidate, error) {
+	worktrees, err := infra.ListWorktrees(ctx, infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +118,7 @@ func collectRelocateCandidates(params PlanRelocateParams) ([]rules.RelocateCandi
 			continue
 		}
 
-		dirty, dirtyErr := infra.IsDirty(infra.IsDirtyParams{WorktreePath: w.Path})
+		dirty, dirtyErr := infra.IsDirty(ctx, infra.IsDirtyParams{WorktreePath: w.Path})
 		to := rules.DesiredWorktreePath(rules.DesiredWorktreePathParams{
 			ProjectDir: params.ProjectDir,
 			BasePath:   params.TargetBasePath,
@@ -134,7 +135,7 @@ func collectRelocateCandidates(params PlanRelocateParams) ([]rules.RelocateCandi
 			InspectErr:   dirtyErr != nil,
 			IsLocked:     w.Locked,
 			DestOccupied: !samePath(w.Path, to) && pathExists(to),
-			HasJobs:      !samePath(w.Path, to) && process.WorktreeHasJobs(w.Path),
+			HasJobs:      !samePath(w.Path, to) && process.WorktreeHasJobs(ctx, w.Path),
 		})
 	}
 

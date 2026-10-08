@@ -28,7 +28,7 @@ func TestSetIsolationKeepsTheRestOfTheRecord(t *testing.T) {
 	ordinal := repo.ensure(t, "feat/x")
 
 	ref := WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "feat/x"}
-	if err := SetIsolation(SetIsolationParams{Ref: ref, Isolation: domain.IsolationVerbatim}); err != nil {
+	if err := SetIsolation(t.Context(), SetIsolationParams{Ref: ref, Isolation: domain.IsolationVerbatim}); err != nil {
 		t.Fatalf("SetIsolation: %v", err)
 	}
 
@@ -44,11 +44,11 @@ func TestSetIsolationRefusesAVerbatimMain(t *testing.T) {
 	repo := newOrdinalRepo(t)
 	ref := WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "main"}
 
-	err := SetIsolation(SetIsolationParams{Ref: ref, Isolation: domain.IsolationVerbatim})
+	err := SetIsolation(t.Context(), SetIsolationParams{Ref: ref, Isolation: domain.IsolationVerbatim})
 	if !errors.Is(err, domain.ErrIsolationMain) {
 		t.Errorf("err = %v, want %v", err, domain.ErrIsolationMain)
 	}
-	if err := SetIsolation(SetIsolationParams{Ref: ref, Isolation: domain.IsolationIsolated}); err != nil {
+	if err := SetIsolation(t.Context(), SetIsolationParams{Ref: ref, Isolation: domain.IsolationIsolated}); err != nil {
 		t.Errorf("isolating main is what it already is, want no error: %v", err)
 	}
 }
@@ -58,7 +58,7 @@ func TestCreateRecordsTheIsolationChosen(t *testing.T) {
 	var cfg domain.Config
 	cfg.Project.Worktrees.BasePath = t.TempDir()
 
-	if _, err := Create(domain.CreateParams{
+	if _, err := Create(t.Context(), domain.CreateParams{
 		ProjectDir: repo.dir,
 		StateDir:   repo.stateDir,
 		Branch:     "feat/x",
@@ -84,7 +84,7 @@ func TestBranchEnvOfAVerbatimWorktreeRunsOnTheBasePorts(t *testing.T) {
 	repo.ensure(t, "feat/x")
 	ref := WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "feat/x"}
 
-	isolated, err := BranchEnv(ref)
+	isolated, err := BranchEnv(t.Context(), ref)
 	if err != nil {
 		t.Fatalf("BranchEnv: %v", err)
 	}
@@ -92,10 +92,10 @@ func TestBranchEnvOfAVerbatimWorktreeRunsOnTheBasePorts(t *testing.T) {
 		t.Fatalf("isolated env = %v, want an offset and a compose project", isolated)
 	}
 
-	if err := SetIsolation(SetIsolationParams{Ref: ref, Isolation: domain.IsolationVerbatim}); err != nil {
+	if err := SetIsolation(t.Context(), SetIsolationParams{Ref: ref, Isolation: domain.IsolationVerbatim}); err != nil {
 		t.Fatalf("SetIsolation: %v", err)
 	}
-	verbatim, err := BranchEnv(ref)
+	verbatim, err := BranchEnv(t.Context(), ref)
 	if err != nil {
 		t.Fatalf("BranchEnv: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestIsolationAdoptionForALegacyWorktreeAllocatesNothing(t *testing.T) {
 	path := repo.addWorktree(t, "feat/x")
 	ref := WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "feat/x"}
 
-	plan, err := IsolationAdoptionFor(IsolationAdoptionParams{Ref: ref, WorktreePath: path})
+	plan, err := IsolationAdoptionFor(t.Context(), IsolationAdoptionParams{Ref: ref, WorktreePath: path})
 	if err != nil {
 		t.Fatalf("IsolationAdoptionFor: %v", err)
 	}
@@ -130,12 +130,12 @@ func TestIsolationAdoptionForALegacyWorktreeAllocatesNothing(t *testing.T) {
 	}
 
 	writeEnv(t, path, "COMPOSE_PROJECT_NAME=kept\n")
-	if plan, _ := IsolationAdoptionFor(IsolationAdoptionParams{Ref: ref, WorktreePath: path}); plan.CurrentComposeProject != "kept" {
+	if plan, _ := IsolationAdoptionFor(t.Context(), IsolationAdoptionParams{Ref: ref, WorktreePath: path}); plan.CurrentComposeProject != "kept" {
 		t.Errorf("current project = %q, want the .env's", plan.CurrentComposeProject)
 	}
 
 	recordIsolation(t, repo, "feat/x", domain.IsolationIsolated)
-	if plan, _ := IsolationAdoptionFor(IsolationAdoptionParams{Ref: ref, WorktreePath: path}); plan.Pending {
+	if plan, _ := IsolationAdoptionFor(t.Context(), IsolationAdoptionParams{Ref: ref, WorktreePath: path}); plan.Pending {
 		t.Error("a worktree that chose has nothing to adopt")
 	}
 }

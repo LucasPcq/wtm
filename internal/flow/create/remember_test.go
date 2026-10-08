@@ -41,7 +41,7 @@ func TestARememberedAnswerIsNotAskedAndTheRecapStillNamesIt(t *testing.T) {
 	})
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyBranch: "feat/x", KeySource: "main", KeyRecap: confirmCreate}}
 
-	outcome, err := Run(Params{Context: ctx, Prompter: prompter, Presenter: newRecorder()})
+	outcome, err := Run(t.Context(), Params{Context: ctx, Prompter: prompter, Presenter: newRecorder()})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestAFlagOverridesTheRememberedAnswer(t *testing.T) {
 	})
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyRecap: confirmCreate}}
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/x"}, From: "main", EnvFrom: string(domain.EnvStrategyExample), Isolation: domain.IsolationIsolated},
 		Prompter:  prompter,
@@ -107,7 +107,7 @@ func TestTickingAlwaysRemembersTheAnswerOnceConfirmed(t *testing.T) {
 		Remember: map[string]bool{KeyEnv: true},
 	}
 
-	if _, err := Run(Params{Context: ctx, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: ctx, Prompter: prompter, Presenter: newRecorder()}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -124,7 +124,7 @@ func TestAnAbortedSessionRemembersNothing(t *testing.T) {
 	ctx := rememberingContext(t, nil)
 	prompter := &flowtest.ScriptedPrompter{Abort: true, Remember: map[string]bool{KeyEnv: true}}
 
-	if _, err := Run(Params{Context: ctx, Request: Request{Branches: []string{"feat/x"}}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: ctx, Request: Request{Branches: []string{"feat/x"}}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if remembered := rememberedOnDisk(t, ctx); len(remembered) != 0 {
@@ -146,7 +146,7 @@ func TestAskAsksAgainAndKeepsWhatStaysTicked(t *testing.T) {
 		Remember: map[string]bool{KeyIsolation: false},
 	}
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/x"}, From: "main", Ask: true},
 		Prompter:  prompter,
@@ -167,7 +167,7 @@ func TestAskAsksAgainAndKeepsWhatStaysTicked(t *testing.T) {
 func TestAnUnattendedRunTakesTheRememberedAnswerAndSaysSo(t *testing.T) {
 	ctx := rememberingContext(t, map[string]string{domain.RememberEnvStrategy: string(domain.EnvStrategyMain)})
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/x"}, From: "main"},
 		Prompter:  flow.Unattended{},
@@ -193,7 +193,7 @@ func TestAnUnattendedRunTakesTheRememberedAnswerAndSaysSo(t *testing.T) {
 func TestAskUnattendedIgnoresTheMemory(t *testing.T) {
 	ctx := rememberingContext(t, map[string]string{domain.RememberEnvStrategy: string(domain.EnvStrategyMain)})
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/x"}, From: "main", Ask: true},
 		Prompter:  flow.Unattended{},
@@ -232,7 +232,7 @@ func TestTickingTheConfigDefaultSaysItForgetsInsteadOfRemembering(t *testing.T) 
 		Remember: map[string]bool{KeyEnv: true},
 	}
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/x"}, From: "main", Ask: true},
 		Prompter:  prompter,

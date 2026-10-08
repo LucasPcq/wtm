@@ -1,6 +1,7 @@
 package run
 
 import (
+	"context"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
@@ -16,7 +17,7 @@ func backingOut(t *testing.T) {
 	t.Helper()
 	previousTTY, previousPrompter := runctx.IsTTY, shared.InteractivePrompter
 	runctx.IsTTY = func() bool { return true }
-	shared.InteractivePrompter = func(shared.FlowPrompterParams) flow.Prompter {
+	shared.InteractivePrompter = func(context.Context, shared.FlowPrompterParams) flow.Prompter {
 		return &flowtest.ScriptedPrompter{Abort: true}
 	}
 	t.Cleanup(func() { runctx.IsTTY, shared.InteractivePrompter = previousTTY, previousPrompter })

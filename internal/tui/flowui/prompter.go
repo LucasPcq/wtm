@@ -4,6 +4,7 @@
 package flowui
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -20,11 +21,14 @@ type Params struct {
 	Stderr bool
 }
 
+// Prompter keeps the run's context for the reads a wizard does in the
+// background (the branch refresh): Ask belongs to flow.Prompter, which takes none.
 type Prompter struct {
+	ctx    context.Context
 	params Params
 }
 
-func New(params Params) Prompter { return Prompter{params: params} }
+func New(ctx context.Context, params Params) Prompter { return Prompter{ctx: ctx, params: params} }
 
 func (Prompter) Interactive() bool { return true }
 
@@ -80,7 +84,7 @@ func (p Prompter) Ask(session flow.Session) (flow.Answers, error) {
 		Stderr:      p.params.Stderr,
 		ErrLabel:    session.ErrLabel,
 		InitCmd:     plan.initCmd,
-		OnMsg:       plan.handler(),
+		OnMsg:       plan.handler(p.ctx),
 		Loading:     plan.initCmd != nil,
 		LoadingText: plan.loadingText,
 	})

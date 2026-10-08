@@ -2,6 +2,7 @@ package wt
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"path/filepath"
@@ -110,7 +111,7 @@ func fakeTerminal(t *testing.T, tty bool, answer string) *promptedRun {
 	run := &promptedRun{prompter: &flowtest.ScriptedPrompter{Answers: map[string]string{target.KeyWorktree: answer}}}
 	previousTTY, previousPrompter := runctx.IsTTY, statusPrompter
 	runctx.IsTTY = func() bool { return tty }
-	statusPrompter = func(interactive bool) flow.Prompter {
+	statusPrompter = func(_ context.Context, interactive bool) flow.Prompter {
 		run.interactive = append(run.interactive, interactive)
 		if !interactive {
 			return flow.Unattended{}

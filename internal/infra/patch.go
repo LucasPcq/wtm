@@ -2,6 +2,7 @@ package infra
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -21,13 +22,13 @@ type DiffFilesParams struct {
 // unstaged) for the given tracked files, relative to HEAD. The patch reproduces
 // the change when applied onto another worktree. Returns an empty slice when
 // Files is empty.
-func DiffFiles(params DiffFilesParams) ([]byte, error) {
+func DiffFiles(ctx context.Context, params DiffFilesParams) ([]byte, error) {
 	if len(params.Files) == 0 {
 		return nil, nil
 	}
 
 	args := append([]string{"-C", params.WorktreePath, "diff", "HEAD", "--binary", "--"}, params.Files...)
-	cmd := exec.Command("git", args...)
+	cmd := Command(ctx, "git", args...)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("git diff: %w", err)
@@ -48,7 +49,7 @@ type ApplyPatchParams struct {
 // stdin. Check performs a dry run (no changes). ThreeWay enables the 3-way merge
 // fallback. Reverse undoes the patch. A non-nil error means the patch did not
 // apply cleanly.
-func ApplyPatch(params ApplyPatchParams) error {
+func ApplyPatch(ctx context.Context, params ApplyPatchParams) error {
 	if len(params.Patch) == 0 {
 		return nil
 	}
@@ -64,7 +65,7 @@ func ApplyPatch(params ApplyPatchParams) error {
 		args = append(args, "--check")
 	}
 
-	cmd := exec.Command("git", args...)
+	cmd := Command(ctx, "git", args...)
 	cmd.Stdin = bytes.NewReader(params.Patch)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -87,8 +88,8 @@ type MergeFileParams struct {
 // version; "ours" is the target's current content; "theirs" is the source's
 // working content. On conflict it writes conflict markers in place and returns
 // conflicted=true; a clean merge returns false.
-func MergeFile(params MergeFileParams) (bool, error) {
-	base, err := writeTempFile("wtm-merge-base-*", showHead(params.SourceWorktree, params.RelPath))
+func MergeFile(ctx context.Context, params MergeFileParams) (bool, error) {
+	base, err := writeTempFile("wtm-merge-base-*", showHead(ctx, params.SourceWorktree, params.RelPath))
 	if err != nil {
 		return false, err
 	}
@@ -114,7 +115,7 @@ func MergeFile(params MergeFileParams) (bool, error) {
 		}
 	}
 
-	cmd := exec.Command("git", "merge-file",
+	cmd := Command(ctx, "git", "merge-file",
 		"-L", params.TargetBranch, "-L", "base", "-L", "incoming ("+params.SourceBranch+")",
 		targetPath, base, otherPath)
 	out, err := cmd.CombinedOutput()
@@ -131,8 +132,8 @@ func MergeFile(params MergeFileParams) (bool, error) {
 
 // showHead returns the HEAD version of relPath in the worktree, or nil when the
 // file is not tracked at HEAD (e.g. newly added).
-func showHead(worktree, relPath string) []byte {
-	cmd := exec.Command("git", "-C", worktree, "show", "HEAD:"+relPath)
+func showHead(ctx context.Context, worktree, relPath string) []byte {
+	cmd := Command(ctx, "git", "-C", worktree, "show", "HEAD:"+relPath)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil
@@ -163,13 +164,13 @@ type ResetPathsParams struct {
 
 // ResetPaths unstages the given paths (`git reset -- <paths>`) so the index
 // matches HEAD after the working tree has been reverted.
-func ResetPaths(params ResetPathsParams) error {
+func ResetPaths(ctx context.Context, params ResetPathsParams) error {
 	if len(params.Files) == 0 {
 		return nil
 	}
 
 	args := append([]string{"-C", params.WorktreePath, "reset", "--quiet", "HEAD", "--"}, params.Files...)
-	cmd := exec.Command("git", args...)
+	cmd := Command(ctx, "git", args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git reset: %s: %w", strings.TrimSpace(string(out)), err)

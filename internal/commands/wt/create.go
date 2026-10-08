@@ -88,7 +88,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	// terminal also takes the prompt-free path.
 	interactive := rules.IsHumanFormat(format) && !yes && term.IsTerminal(int(os.Stdin.Fd()))
 
-	_, err = createflow.Run(createflow.Params{
+	_, err = createflow.Run(cmd.Context(), createflow.Params{
 		Context: shared.FlowContext(config),
 		Request: createflow.Request{
 			Branches:    args,
@@ -99,7 +99,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 			Isolation:   isolation,
 			Ask:         ask,
 		},
-		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive}),
+		Prompter:  shared.FlowPrompter(cmd.Context(), shared.FlowPrompterParams{Interactive: interactive}),
 		Presenter: createPresenter{CLIPresenter: shared.NewPresenter(cmd, format), config: config},
 	})
 	return err

@@ -2,6 +2,7 @@
 package start
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -68,17 +69,19 @@ func Operation() flow.Operation {
 	}
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &startFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
 		presenter: params.Presenter,
 	}
-	return f.run()
+	return f.run(ctx)
 }
 
 type startFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -92,11 +95,11 @@ type startFlow struct {
 	concurrency *concurrency.Question
 }
 
-func (f *startFlow) run() (Outcome, error) {
+func (f *startFlow) run(ctx context.Context) (Outcome, error) {
 	if err := target.RequireDeclared(target.DeclaredParams{Config: f.request.Config, Job: f.request.Job}); err != nil {
 		return Outcome{}, err
 	}
-	named, err := target.Named(target.ResolveParams{ProjectDir: f.ctx.ProjectDir, Query: f.request.Worktree})
+	named, err := target.Named(f.runCtx, target.ResolveParams{ProjectDir: f.ctx.ProjectDir, Query: f.request.Worktree})
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -126,7 +129,7 @@ func (f *startFlow) run() (Outcome, error) {
 	}
 
 	workDir := f.workDirs(answers)[0]
-	if err := seam.RequireEnv(seam.RequireEnvParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, WorkDirs: []string{workDir}, Publisher: f.ctx.Publisher}); err != nil {
+	if err := seam.RequireEnv(f.runCtx, seam.RequireEnvParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, WorkDirs: []string{workDir}, Publisher: f.ctx.Publisher}); err != nil {
 		return Outcome{}, err
 	}
 	// Refused rather than started: a runner and one of its own children are the
@@ -139,7 +142,7 @@ func (f *startFlow) run() (Outcome, error) {
 		return Outcome{}, fmt.Errorf("%s:\n%s", domain.JobConflictTitle, strings.Join(rules.JobConflictLines(conflicts), "\n"))
 	}
 
-	proceed, err := foreigndata.Allow(foreigndata.Params{
+	proceed, err := foreigndata.Allow(f.runCtx, foreigndata.Params{
 		Context:  f.ctx,
 		Config:   f.request.Config,
 		Jobs:     []domain.JobConfig{job},
@@ -155,14 +158,14 @@ func (f *startFlow) run() (Outcome, error) {
 		return Outcome{Aborted: true}, nil
 	}
 
-	cfg, err := f.concurrency.Apply(answers)
+	cfg, err := f.concurrency.Apply(f.runCtx, answers)
 	f.request.Config = cfg
 	if err != nil {
 		return Outcome{}, err
 	}
 
-	warnings := addressing.Lines(addressing.Params{Context: f.ctx, WorkDirs: []string{workDir}})
-	runSeam := seam.Open(f.seamParams(workDir))
+	warnings := addressing.Lines(f.runCtx, addressing.Params{Context: f.ctx, WorkDirs: []string{workDir}})
+	runSeam := seam.Open(f.runCtx, f.seamParams(workDir))
 
 	result, err := f.presenter.Sequence(seam.SequenceParams{
 		Board:    runSeam.Board(),
@@ -174,7 +177,7 @@ func (f *startFlow) run() (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	cfg, err = probes.OfferToSilence(probes.Params{
+	cfg, err = probes.OfferToSilence(ctx, probes.Params{
 		Context:   f.ctx,
 		Prompter:  f.prompter,
 		Presenter: f.presenter,
@@ -186,7 +189,7 @@ func (f *startFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 	if rules.IsShared(job) {
-		owed.Settle(owed.Params{Context: f.ctx, Presenter: f.presenter})
+		owed.Settle(f.runCtx, owed.Params{Context: f.ctx, Presenter: f.presenter})
 	}
 	return Outcome{WorkDir: workDir, Job: job, Result: result.One(), Aborted: result.Aborted()}, nil
 }
@@ -194,10 +197,10 @@ func (f *startFlow) run() (Outcome, error) {
 // connect wakes the daemon before anything is asked: the worktree picker shows
 // what each worktree is already running, which only the daemon knows.
 func (f *startFlow) connect() error {
-	return f.presenter.Stage(flow.StageParams{
+	return f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.RunDaemonConnecting,
-		Work: func() error {
-			if err := process.EnsureCurrentDaemon(process.DaemonParams{
+		Work: func(ctx context.Context) error {
+			if err := process.EnsureCurrentDaemon(ctx, process.DaemonParams{
 				SocketPath: process.SocketPath(),
 				ProxyPort:  rules.ProxyPort(f.ctx.Config.Global),
 			}); err != nil {
@@ -206,7 +209,7 @@ func (f *startFlow) connect() error {
 			// A daemon that cannot list is not a reason to refuse the run: the
 			// counts decorate a picker, and the guard below only ever adds to
 			// what this gesture already names.
-			f.jobs, _ = runlogs.NewService(runlogs.ServiceParams{SocketPath: process.SocketPath()}).List("")
+			f.jobs, _ = runlogs.NewService(ctx, runlogs.ServiceParams{SocketPath: process.SocketPath()}).List("")
 			f.running = rules.RunningJobsByWorktree(f.jobs)
 			return nil
 		},
@@ -216,7 +219,7 @@ func (f *startFlow) connect() error {
 // seamParams lists every declared job on the board, not just this one: starting
 // a job is no reason to hide the ones already up beside it.
 func (f *startFlow) seamParams(workDir string) seam.Params {
-	proxy := seam.ProxyPortsFor(seam.ProxyPortsParams{Global: f.ctx.Config.Global, Run: f.request.Config})
+	proxy := seam.ProxyPortsFor(f.runCtx, seam.ProxyPortsParams{Global: f.ctx.Config.Global, Run: f.request.Config})
 	return seam.Params{
 		ProjectDir:  f.ctx.ProjectDir,
 		StateDir:    f.ctx.StateDir,
@@ -244,7 +247,7 @@ func (f *startFlow) question() *concurrency.Question {
 }
 
 func (f *startFlow) workDirs(answers flow.Answers) []string {
-	return []string{target.WorkDir(target.WorkDirParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})}
+	return []string{target.WorkDir(f.runCtx, target.WorkDirParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})}
 }
 
 // startingJobs is empty while the job is unknown: the run refuses it later.
@@ -261,13 +264,13 @@ func (f *startFlow) session() flow.Session {
 		ErrLabel: domain.CmdStart,
 		Presets:  target.Presets(target.PresetParams{Named: f.named, Job: f.request.Job}),
 		Steps: []flow.Step{
-			target.WorktreeStep(target.WorktreeParams{
+			target.WorktreeStep(f.runCtx, target.WorktreeParams{
 				ProjectDir: f.ctx.ProjectDir,
 				Current:    f.request.Cwd,
 				Running:    f.running,
 			}),
 			target.JobStep(target.JobParams{Jobs: f.request.Config.Jobs, Flag: domain.FlagJob}),
-			f.concurrency.Step(),
+			f.concurrency.Step(f.runCtx),
 		},
 	}
 }

@@ -46,7 +46,7 @@ func startedHarness(t *testing.T, params harnessParams, script func(runlogs.Sink
 		Lines:   params.Lines,
 	})
 
-	model := New(Params{
+	model := New(t.Context(), Params{
 		Board: board,
 		Job:   params.Job,
 		Start: func(_ context.Context, emitter runlogs.Sink) (runlogs.Outcomes, error) {
@@ -418,7 +418,7 @@ func TestDetachCancelsTheReportingOfARun(t *testing.T) {
 // A sink emitting into a view that is gone must not hold the run's goroutine
 // for ever.
 func TestSinkGivesUpOnceTheViewIsGone(t *testing.T) {
-	model := New(Params{
+	model := New(t.Context(), Params{
 		Board: runlogstest.NewBoard(runlogstest.BoardParams{}),
 		Start: func(context.Context, runlogs.Sink) (runlogs.Outcomes, error) { return runlogs.Outcomes{{}}, nil },
 	})
@@ -458,7 +458,7 @@ func TestFollowingStopsWhenTheReaderTakesTheCursor(t *testing.T) {
 // A run feeds panes from its own goroutine, so the clock has to be running
 // before the first chunk lands and while nothing else is subscribed.
 func TestRedrawClockRunsWhileTheRunDoes(t *testing.T) {
-	model := New(Params{
+	model := New(t.Context(), Params{
 		Board: runlogstest.NewBoard(runlogstest.BoardParams{}),
 		Start: func(context.Context, runlogs.Sink) (runlogs.Outcomes, error) { return runlogs.Outcomes{{}}, nil },
 	})
@@ -483,7 +483,7 @@ func TestRedrawClockRunsWhileTheRunDoes(t *testing.T) {
 // the output the run writes straight into panes is never put on screen: no
 // PhaseOutput ever reaches the model, so nothing else would.
 func TestRedrawClockIsArmedAgainWhenTheSequenceStarts(t *testing.T) {
-	model := New(Params{
+	model := New(t.Context(), Params{
 		Board: runlogstest.NewBoard(runlogstest.BoardParams{Views: []runlogs.JobView{stopped("migrate")}}),
 		Start: func(context.Context, runlogs.Sink) (runlogs.Outcomes, error) { return runlogs.Outcomes{{}}, nil },
 	})

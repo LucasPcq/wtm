@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"io"
 	"os"
 
@@ -53,11 +54,11 @@ func (p CLIPresenter) phase(separate bool) io.Writer {
 	return OpenBlock(p.Cmd.ErrOrStderr(), separate)
 }
 
-func (p CLIPresenter) Stage(params flow.StageParams) error {
+func (p CLIPresenter) Stage(ctx context.Context, params flow.StageParams) error {
 	return components.RunLoading(components.LoadingParams{
 		Message: params.Message,
 		Animate: Animate(p.Cmd, p.Human),
-		Work:    params.Work,
+		Work:    func() error { return params.Work(ctx) },
 	})
 }
 
@@ -197,15 +198,15 @@ type FlowPrompterParams struct {
 	Stderr      bool
 }
 
-func FlowPrompter(params FlowPrompterParams) flow.Prompter {
+func FlowPrompter(ctx context.Context, params FlowPrompterParams) flow.Prompter {
 	if !params.Interactive {
 		return flow.Unattended{}
 	}
-	return InteractivePrompter(params)
+	return InteractivePrompter(ctx, params)
 }
 
 // InteractivePrompter is the wizard a fully interactive run asks through. A
 // var so a test can stand in for the terminal.
-var InteractivePrompter = func(params FlowPrompterParams) flow.Prompter {
-	return flowui.New(flowui.Params{Stderr: params.Stderr})
+var InteractivePrompter = func(ctx context.Context, params FlowPrompterParams) flow.Prompter {
+	return flowui.New(ctx, flowui.Params{Stderr: params.Stderr})
 }

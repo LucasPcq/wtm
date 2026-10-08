@@ -29,7 +29,7 @@ func drain(msgs chan tea.Msg) (lines []string, askedForTerminal bool) {
 
 func TestTheDetachedWatcherNeverAsksForTheTerminal(t *testing.T) {
 	msgs := make(chan tea.Msg, 32)
-	watcher := detachedWatcher{send: func(msg tea.Msg) { msgs <- msg }, id: 1}
+	watcher := detachedWatcher{ctx: t.Context(), send: func(msg tea.Msg) { msgs <- msg }, id: 1}
 
 	if _, err := watcher.Sequence(seam.SequenceParams{
 		Profile: "dev",
@@ -57,7 +57,7 @@ func TestTheDetachedWatcherNeverAsksForTheTerminal(t *testing.T) {
 
 func TestTheDetachedWatcherReportsAFailedJob(t *testing.T) {
 	msgs := make(chan tea.Msg, 8)
-	watcher := detachedWatcher{send: func(msg tea.Msg) { msgs <- msg }, id: 1}
+	watcher := detachedWatcher{ctx: t.Context(), send: func(msg tea.Msg) { msgs <- msg }, id: 1}
 
 	if _, err := watcher.Sequence(seam.SequenceParams{
 		Job: "web",
@@ -78,7 +78,7 @@ func TestTheDetachedWatcherReportsAFailedJob(t *testing.T) {
 // A raw output chunk belongs to the logs view, not to a three-line output panel.
 func TestTheDetachedWatcherKeepsRawOutputOffTheOutputPanel(t *testing.T) {
 	msgs := make(chan tea.Msg, 8)
-	watcher := detachedWatcher{send: func(msg tea.Msg) { msgs <- msg }, id: 1}
+	watcher := detachedWatcher{ctx: t.Context(), send: func(msg tea.Msg) { msgs <- msg }, id: 1}
 
 	if _, err := watcher.Sequence(seam.SequenceParams{
 		Start: func(_ context.Context, sink runlogs.Sink) (runlogs.Outcomes, error) {
@@ -96,7 +96,7 @@ func TestTheDetachedWatcherKeepsRawOutputOffTheOutputPanel(t *testing.T) {
 }
 
 func TestTheDetachedWatcherReturnsTheOutcomeToTheFlow(t *testing.T) {
-	watcher := detachedWatcher{send: func(tea.Msg) {}, id: 1}
+	watcher := detachedWatcher{ctx: t.Context(), send: func(tea.Msg) {}, id: 1}
 
 	outcomes, err := watcher.Sequence(seam.SequenceParams{
 		Start: func(context.Context, runlogs.Sink) (runlogs.Outcomes, error) {
@@ -117,7 +117,7 @@ func TestTheDetachedWatcherReturnsTheOutcomeToTheFlow(t *testing.T) {
 // terminal now, and it takes it on purpose.
 func TestStartingAProfileFromTheDashboardNeverAsksForTheTerminal(t *testing.T) {
 	stateDir := t.TempDir()
-	if err := runconfig.Save(runconfig.SaveParams{
+	if err := runconfig.Save(t.Context(), runconfig.SaveParams{
 		StateDir: stateDir,
 		Config: domain.RunConfig{Jobs: []domain.JobConfig{
 			{Name: "web", Kind: domain.JobKindService, Cmd: "true"},
@@ -126,7 +126,7 @@ func TestStartingAProfileFromTheDashboardNeverAsksForTheTerminal(t *testing.T) {
 		t.Fatalf("Save: %v", err)
 	}
 
-	model := New(RunParams{StateDir: stateDir})
+	model := New(t.Context(), RunParams{StateDir: stateDir})
 	t.Cleanup(model.Close)
 	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 	model = update(model, worktreesMsg{statuses: statuses("a"), parents: map[string]string{}})
@@ -164,7 +164,7 @@ func TestStartingAProfileFromTheDashboardNeverAsksForTheTerminal(t *testing.T) {
 // several, left out above one.
 func TestTheDetachedWatcherNamesTheWorktreeAboveSeveralOfThem(t *testing.T) {
 	msgs := make(chan tea.Msg, 32)
-	watcher := detachedWatcher{send: func(msg tea.Msg) { msgs <- msg }, id: 1}
+	watcher := detachedWatcher{ctx: t.Context(), send: func(msg tea.Msg) { msgs <- msg }, id: 1}
 
 	if _, err := watcher.Sequence(seam.SequenceParams{
 		Profile:   "dev",
@@ -186,7 +186,7 @@ func TestTheDetachedWatcherNamesTheWorktreeAboveSeveralOfThem(t *testing.T) {
 
 func TestTheDetachedWatcherSaysNothingAboutASingleWorktree(t *testing.T) {
 	msgs := make(chan tea.Msg, 32)
-	watcher := detachedWatcher{send: func(msg tea.Msg) { msgs <- msg }, id: 1}
+	watcher := detachedWatcher{ctx: t.Context(), send: func(msg tea.Msg) { msgs <- msg }, id: 1}
 
 	if _, err := watcher.Sequence(seam.SequenceParams{
 		Profile:   "dev",
@@ -208,7 +208,7 @@ func TestTheDetachedWatcherSaysNothingAboutASingleWorktree(t *testing.T) {
 // run holding three rows would otherwise write the same text on all three.
 func TestTheDetachedWatcherPostsItsStageAgainstItsWorktree(t *testing.T) {
 	msgs := make(chan tea.Msg, 32)
-	watcher := detachedWatcher{send: func(msg tea.Msg) { msgs <- msg }, id: 7}
+	watcher := detachedWatcher{ctx: t.Context(), send: func(msg tea.Msg) { msgs <- msg }, id: 7}
 
 	if _, err := watcher.Sequence(seam.SequenceParams{
 		Worktrees: []string{"feat-a", "feat-b"},

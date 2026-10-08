@@ -3,6 +3,7 @@
 package flowtest
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -154,11 +155,13 @@ type Recorder struct {
 
 // Publish makes a Recorder the flow's Publisher too, so one double records
 // what a run showed and what it reported to the bus.
-func (r *Recorder) Publish(event domain.Event) { r.Published = append(r.Published, event) }
+func (r *Recorder) Publish(_ context.Context, event domain.Event) {
+	r.Published = append(r.Published, event)
+}
 
 func (r *Recorder) Listening() bool { return !r.Unheard }
 
-func (r *Recorder) Origin() (domain.EventOrigin, bool) {
+func (r *Recorder) Origin(context.Context) (domain.EventOrigin, bool) {
 	return r.From, r.From.Repo.CommonDir != ""
 }
 
@@ -170,9 +173,9 @@ func (r *Recorder) PublishedTypes() []domain.EventType {
 	return types
 }
 
-func (r *Recorder) Stage(params flow.StageParams) error {
+func (r *Recorder) Stage(ctx context.Context, params flow.StageParams) error {
 	r.Stages = append(r.Stages, params.Message)
-	return params.Work()
+	return params.Work(ctx)
 }
 
 func (r *Recorder) HookPhase(params flow.HookPhaseParams) error {

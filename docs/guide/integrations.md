@@ -55,7 +55,7 @@ Check the exit code first, and parse stdout only when it is non-empty. A command
 | `16` | no `run.toml` (`wtm run init`) |
 | `17` | `upgrade`: this install cannot upgrade itself |
 | `18` | `env --check` found drift |
-| `19` | an interactive run the user backed out of; never under `--yes` |
+| `19` | cancelled: an interactive run the user backed out of, or any run interrupted by SIGINT/SIGTERM (`--yes` included) |
 | `20` | `events` received an event of a newer schema: upgrade wtm |
 | `21` | not in a git repository (the current directory, or `events --repo`) |
 

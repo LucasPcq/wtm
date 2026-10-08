@@ -16,7 +16,7 @@ import (
 func TestARunStartedFromARowNamesItsWorktree(t *testing.T) {
 	selected := domain.WorktreeStatus{Branch: "feat/x", Path: "/wt/x"}
 
-	named, err := target.Named(target.ResolveParams{
+	named, err := target.Named(t.Context(), target.ResolveParams{
 		ProjectDir: t.TempDir(),
 		Query:      runWorktree(selected),
 	})
@@ -37,14 +37,14 @@ func TestARunStartedFromARowNamesItsWorktree(t *testing.T) {
 func runModel(t *testing.T, running ...string) Model {
 	t.Helper()
 	stateDir := t.TempDir()
-	if err := runconfig.Save(runconfig.SaveParams{
+	if err := runconfig.Save(t.Context(), runconfig.SaveParams{
 		StateDir: stateDir,
 		Config:   domain.RunConfig{Jobs: []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "true"}}},
 	}); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 
-	model := New(RunParams{StateDir: stateDir, Cwd: "/tmp/a"})
+	model := New(t.Context(), RunParams{StateDir: stateDir, Cwd: "/tmp/a"})
 	t.Cleanup(model.Close)
 	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 	model = update(model, worktreesMsg{statuses: statuses("a", "b"), parents: map[string]string{}})

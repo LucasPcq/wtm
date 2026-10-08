@@ -2,6 +2,7 @@
 package logs
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -65,17 +66,19 @@ type Params struct {
 	Presenter Presenter
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &logsFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
 		presenter: params.Presenter,
 	}
-	return f.run()
+	return f.run(ctx)
 }
 
 type logsFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -85,11 +88,11 @@ type logsFlow struct {
 	running map[string]int
 }
 
-func (f *logsFlow) run() (Outcome, error) {
+func (f *logsFlow) run(ctx context.Context) (Outcome, error) {
 	if err := target.RequireDeclared(target.DeclaredParams{Config: f.request.Config, Job: f.request.Job}); err != nil {
 		return Outcome{}, err
 	}
-	named, err := target.NamedAll(target.ResolveAllParams{ProjectDir: f.ctx.ProjectDir, Queries: f.request.Worktrees})
+	named, err := target.NamedAll(f.runCtx, target.ResolveAllParams{ProjectDir: f.ctx.ProjectDir, Queries: f.request.Worktrees})
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -108,10 +111,10 @@ func (f *logsFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	workDirs := target.WorkDirs(target.WorkDirsParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})
-	warnings := addressing.Lines(addressing.Params{Context: f.ctx, WorkDirs: workDirs})
-	proxy := seam.ProxyPortsFor(seam.ProxyPortsParams{Global: f.ctx.Config.Global, Run: f.request.Config})
-	set := seam.OpenSet(seam.SetParams{
+	workDirs := target.WorkDirs(f.runCtx, target.WorkDirsParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})
+	warnings := addressing.Lines(f.runCtx, addressing.Params{Context: f.ctx, WorkDirs: workDirs})
+	proxy := seam.ProxyPortsFor(ctx, seam.ProxyPortsParams{Global: f.ctx.Config.Global, Run: f.request.Config})
+	set := seam.OpenSet(f.runCtx, seam.SetParams{
 		ProjectDir: f.ctx.ProjectDir,
 		StateDir:   f.ctx.StateDir,
 		WorkDirs:   workDirs,
@@ -133,16 +136,16 @@ func (f *logsFlow) run() (Outcome, error) {
 // connect wakes the daemon: a job whose log is on disk is still read through it,
 // and the worktree picker shows what each worktree is running.
 func (f *logsFlow) connect() error {
-	return f.presenter.Stage(flow.StageParams{
+	return f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.RunDaemonConnecting,
-		Work: func() error {
-			if err := process.EnsureDaemon(process.DaemonParams{
+		Work: func(ctx context.Context) error {
+			if err := process.EnsureDaemon(ctx, process.DaemonParams{
 				SocketPath: process.SocketPath(),
 				ProxyPort:  rules.ProxyPort(f.ctx.Config.Global),
 			}); err != nil {
 				return fmt.Errorf("ensure daemon: %w", err)
 			}
-			f.running = target.RunningJobs(runlogs.NewService(runlogs.ServiceParams{SocketPath: process.SocketPath()}))
+			f.running = target.RunningJobs(runlogs.NewService(ctx, runlogs.ServiceParams{SocketPath: process.SocketPath()}))
 			return nil
 		},
 	})
@@ -155,7 +158,7 @@ func (f *logsFlow) session() flow.Session {
 		ErrLabel: domain.CmdLogs,
 		Presets:  target.Presets(target.PresetParams{Worktrees: target.Dirs(f.named), Job: f.request.Job}),
 		Steps: []flow.Step{
-			target.WorktreesStep(target.WorktreesParams{
+			target.WorktreesStep(f.runCtx, target.WorktreesParams{
 				ProjectDir: f.ctx.ProjectDir,
 				Current:    f.request.Cwd,
 				Selected:   target.Preselected(target.PreselectedParams{Named: f.named, Precheck: f.request.Precheck}),

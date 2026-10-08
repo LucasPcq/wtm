@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -53,9 +54,9 @@ type recordingPresenter struct {
 	order []string
 }
 
-func (p *recordingPresenter) Stage(params flow.StageParams) error {
+func (p *recordingPresenter) Stage(ctx context.Context, params flow.StageParams) error {
 	p.order = append(p.order, "stage:"+params.Message)
-	return params.Work()
+	return params.Work(ctx)
 }
 
 func (p *recordingPresenter) HookPhase(flow.HookPhaseParams) error { return nil }
@@ -117,7 +118,7 @@ func TestOperationBlocksTheWholeSurface(t *testing.T) {
 // and the warning travels as Warning so every surface folds it in the same way.
 func TestPushQuestionNamesBothOutcomes(t *testing.T) {
 	prompter := &pushPrompter{interactive: true, answer: true}
-	f := &syncFlow{prompter: prompter}
+	f := &syncFlow{runCtx: t.Context(), prompter: prompter}
 
 	if !f.shouldPush(pushableResult()) {
 		t.Fatal("an interactive run that accepted must push")
@@ -135,7 +136,7 @@ func TestPushQuestionNamesBothOutcomes(t *testing.T) {
 
 func TestPushIsNeverAskedWithoutATerminal(t *testing.T) {
 	prompter := &pushPrompter{interactive: false, answer: true}
-	f := &syncFlow{prompter: prompter}
+	f := &syncFlow{runCtx: t.Context(), prompter: prompter}
 
 	if f.shouldPush(pushableResult()) {
 		t.Fatal("a run that cannot ask must not push: --push is how it opts in")
@@ -147,7 +148,7 @@ func TestPushIsNeverAskedWithoutATerminal(t *testing.T) {
 
 func TestPushFlagSkipsTheQuestion(t *testing.T) {
 	prompter := &pushPrompter{interactive: true}
-	f := &syncFlow{prompter: prompter, request: Request{Push: true}}
+	f := &syncFlow{runCtx: t.Context(), prompter: prompter, request: Request{Push: true}}
 
 	if !f.shouldPush(pushableResult()) {
 		t.Fatal("--push must push")
@@ -159,7 +160,7 @@ func TestPushFlagSkipsTheQuestion(t *testing.T) {
 
 func TestNoPushWinsOverAnAnsweredQuestion(t *testing.T) {
 	prompter := &pushPrompter{interactive: true, answer: true}
-	f := &syncFlow{prompter: prompter, request: Request{NoPush: true}}
+	f := &syncFlow{runCtx: t.Context(), prompter: prompter, request: Request{NoPush: true}}
 
 	if f.shouldPush(pushableResult()) {
 		t.Fatal("--no-push must never push")
@@ -190,7 +191,7 @@ func TestStaleParentsReadTheMemoBeforeReplanning(t *testing.T) {
 func TestAnEmptyCascadeConcludesBeforeStagingAnything(t *testing.T) {
 	presenter := &recordingPresenter{}
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   baseOnlyRepo(t),
 		Request:   Request{Branches: []string{"main"}, BaseBranch: "other-base"},
 		Prompter:  flow.Unattended{},
@@ -215,7 +216,7 @@ func TestAnEmptyCascadeConcludesBeforeStagingAnything(t *testing.T) {
 func TestAnUnattendedRunShowsThePlanBeforeItRebases(t *testing.T) {
 	presenter := &recordingPresenter{}
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   oneStackRepo(t),
 		Request:   Request{All: true, BaseBranch: "main"},
 		Prompter:  flow.Unattended{},
@@ -239,7 +240,7 @@ func TestAnUnattendedRunShowsThePlanBeforeItRebases(t *testing.T) {
 func TestABaseOnlyRefreshShowsNoPlan(t *testing.T) {
 	presenter := &recordingPresenter{}
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   baseOnlyRepo(t),
 		Request:   Request{All: true, BaseBranch: "main"},
 		Prompter:  flow.Unattended{},
@@ -266,7 +267,7 @@ func TestAnAskedRunNeverShowsThePlanTwice(t *testing.T) {
 		Answers: map[string]string{KeyConflict: conflictNormal, KeyConfirm: confirmSync},
 	}
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   oneStackRepo(t),
 		Request:   Request{All: true, BaseBranch: "main"},
 		Prompter:  prompter,
@@ -291,7 +292,7 @@ func TestADryRunShowsThePlanAndAsksNothing(t *testing.T) {
 	presenter := &recordingPresenter{}
 	prompter := &flowtest.ScriptedPrompter{}
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   oneStackRepo(t),
 		Request:   Request{All: true, DryRun: true, BaseBranch: "main"},
 		Prompter:  prompter,
@@ -315,7 +316,7 @@ func TestADryRunShowsThePlanAndAsksNothing(t *testing.T) {
 func TestADryRunWithoutATargetStillPicks(t *testing.T) {
 	prompter := &flowtest.ScriptedPrompter{Sets: map[string][]string{KeySelection: {"feat-a"}}}
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   oneStackRepo(t),
 		Request:   Request{DryRun: true, BaseBranch: "main"},
 		Prompter:  prompter,

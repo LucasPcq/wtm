@@ -35,10 +35,10 @@ func runRm(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	outcome, err := profileflow.Remove(profileflow.RemoveParams{
+	outcome, err := profileflow.Remove(cmd.Context(), profileflow.RemoveParams{
 		Context:   ctx.FlowContext(),
 		Request:   profileflow.RemoveRequest{Name: runctx.FirstArg(args), Config: ctx.Run},
-		Prompter:  ctx.Prompter(ctx.Interactive),
+		Prompter:  ctx.Prompter(cmd.Context(), ctx.Interactive),
 		Presenter: presenter{CLIPresenter: ctx.CLI(cmd)},
 	})
 	if err != nil {

@@ -2,6 +2,7 @@
 package decide
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -13,13 +14,13 @@ import (
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
 
-func BranchCandidates(projectDir string) []domain.BranchCandidate {
-	return branch.Candidates(branch.ListParams{ProjectDir: projectDir})
+func BranchCandidates(ctx context.Context, projectDir string) []domain.BranchCandidate {
+	return branch.Candidates(ctx, branch.ListParams{ProjectDir: projectDir})
 }
 
 // MemoizedTarget caches branch classification for one run: it costs ~3 git
 // subprocesses, and a step, a recap and a warning all classify the same name.
-func MemoizedTarget(projectDir string) func(string) domain.BranchTarget {
+func MemoizedTarget(ctx context.Context, projectDir string) func(string) domain.BranchTarget {
 	cache := make(map[string]domain.BranchTarget)
 	return func(name string) domain.BranchTarget {
 		if name == "" {
@@ -28,7 +29,7 @@ func MemoizedTarget(projectDir string) func(string) domain.BranchTarget {
 		if target, ok := cache[name]; ok {
 			return target
 		}
-		target := branch.Target(branch.BranchParams{ProjectDir: projectDir, Branch: name})
+		target := branch.Target(ctx, branch.BranchParams{ProjectDir: projectDir, Branch: name})
 		cache[name] = target
 		return target
 	}
@@ -57,7 +58,7 @@ type SourceUpdateParams struct {
 // SourceUpdate classifies the divergence from origin of whichever branch the
 // worktree starts from: the target branch when it already exists locally (its
 // commits are what gets checked out), the source branch otherwise.
-func SourceUpdate(params SourceUpdateParams) SourceUpdatePrompt {
+func SourceUpdate(ctx context.Context, params SourceUpdateParams) SourceUpdatePrompt {
 	subject := params.Source
 	if params.Target != nil && params.Branch != "" &&
 		params.Target(params.Branch).State == domain.BranchTargetExisting {
@@ -70,7 +71,7 @@ func SourceUpdate(params SourceUpdateParams) SourceUpdatePrompt {
 		return SourceUpdatePrompt{Branch: subject, SkipReason: domain.SourceUpdateSkipRemote}
 	}
 
-	state, ab := branch.Divergence(branch.BranchParams{ProjectDir: params.ProjectDir, Branch: subject})
+	state, ab := branch.Divergence(ctx, branch.BranchParams{ProjectDir: params.ProjectDir, Branch: subject})
 	if rules.ShouldOfferFastForward(state) {
 		return SourceUpdatePrompt{
 			Branch:      subject,
@@ -116,11 +117,11 @@ type EnvFallbackParams struct {
 
 // EnvParentFallback: the "parent" strategy silently sources .env from the main
 // worktree when the source branch has no local one.
-func EnvParentFallback(params EnvFallbackParams) (bool, string) {
+func EnvParentFallback(ctx context.Context, params EnvFallbackParams) (bool, string) {
 	if params.Source == "" {
 		return false, ""
 	}
-	applies := worktree.EnvParentFallsBackToMain(worktree.EnvFallbackParams{
+	applies := worktree.EnvParentFallsBackToMain(ctx, worktree.EnvFallbackParams{
 		ProjectDir:  params.ProjectDir,
 		Source:      params.Source,
 		Config:      params.Config,
@@ -245,22 +246,22 @@ type ApplyFastForwardParams struct {
 // effort: a branch that cannot be cleanly fast-forwarded is left as-is and the
 // run proceeds from it. Interactively a failure asks whether to go on from the
 // stale branch; proceed is false when that is declined.
-func ApplyFastForward(params ApplyFastForwardParams) (proceed bool) {
+func ApplyFastForward(ctx context.Context, params ApplyFastForwardParams) (proceed bool) {
 	branchParams := branch.BranchParams{ProjectDir: params.ProjectDir, Branch: params.Subject}
 	if !params.Prompter.Interactive() {
-		_ = branch.FastForwardIfBehind(branchParams)
+		_ = branch.FastForwardIfBehind(ctx, branchParams)
 		return true
 	}
 
-	ffErr := params.Presenter.Stage(flow.StageParams{
+	ffErr := params.Presenter.Stage(ctx, flow.StageParams{
 		Message: fmt.Sprintf(domain.SourceFastForwardLoadingFmt, params.Subject),
-		Work:    func() error { return branch.FastForwardToOrigin(branchParams) },
+		Work:    func(ctx context.Context) error { return branch.FastForwardToOrigin(ctx, branchParams) },
 	})
 	if ffErr == nil {
 		return true
 	}
 
-	_, ab := branch.Divergence(branchParams)
+	_, ab := branch.Divergence(ctx, branchParams)
 	proceed, err := params.Prompter.Confirm(flow.ConfirmParams{
 		Title:      fmt.Sprintf(Pick(PickParams{Many: params.Many, One: domain.SourceProceedStalePrompt, Several: domain.SourceProceedStalePromptMany}), params.Subject, ab.Behind),
 		Warning:    fmt.Sprintf(domain.SourceProceedStaleWarning, ffErr),
@@ -278,11 +279,11 @@ type UnseenFallbackParams struct {
 // WarnUnseenFallback says after the fact what a recap warns an interactive run
 // about: an unattended one never saw it, and its .env came from main rather
 // than from the parent it named.
-func WarnUnseenFallback(params UnseenFallbackParams) []string {
+func WarnUnseenFallback(ctx context.Context, params UnseenFallbackParams) []string {
 	if params.Prompter.Interactive() {
 		return nil
 	}
-	show, warning := EnvParentFallback(params.Fallback)
+	show, warning := EnvParentFallback(ctx, params.Fallback)
 	if !show {
 		return nil
 	}

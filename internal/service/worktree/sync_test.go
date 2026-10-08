@@ -97,7 +97,7 @@ func TestSyncFastForwardsBranchFromRemote(t *testing.T) {
 
 	writeMeta(t, stateDir, "feat", "main")
 
-	result, err := Sync(SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
+	result, err := Sync(t.Context(), SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
 	if err != nil {
 		t.Fatalf("Sync error: %v", err)
 	}
@@ -136,7 +136,7 @@ func TestSyncDivergedBranchIsSkipped(t *testing.T) {
 	commitFile(t, dir, "main.txt", "main moved")
 	writeMeta(t, stateDir, "feat", "main")
 
-	result, err := Sync(SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
+	result, err := Sync(t.Context(), SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
 	if err != nil {
 		t.Fatalf("Sync error: %v", err)
 	}
@@ -173,7 +173,7 @@ func TestSyncResyncAfterRebaseIsUpToDateAndPushable(t *testing.T) {
 	writeMeta(t, stateDir, "dev1", "feat")
 
 	// First sync: rebases everything locally, no push.
-	first, err := Sync(SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
+	first, err := Sync(t.Context(), SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
 	if err != nil {
 		t.Fatalf("first Sync error: %v", err)
 	}
@@ -182,7 +182,7 @@ func TestSyncResyncAfterRebaseIsUpToDateAndPushable(t *testing.T) {
 	}
 
 	// Second sync: nothing new to rebase, and the branch must NOT look diverged.
-	second, err := Sync(SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
+	second, err := Sync(t.Context(), SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
 	if err != nil {
 		t.Fatalf("second Sync error: %v", err)
 	}
@@ -228,7 +228,7 @@ func TestSyncCascadeCleanRebase(t *testing.T) {
 	writeMeta(t, stateDir, "feat", "main")
 	writeMeta(t, stateDir, "dev1", "feat")
 
-	result, err := Sync(SyncParams{
+	result, err := Sync(t.Context(), SyncParams{
 		ProjectDir: dir,
 		StateDir:   stateDir,
 		BaseBranch: "main",
@@ -280,7 +280,7 @@ func TestSyncSelectedBranchOnly(t *testing.T) {
 	writeMeta(t, stateDir, "feat", "main")
 	writeMeta(t, stateDir, "other", "main")
 
-	result, err := Sync(SyncParams{
+	result, err := Sync(t.Context(), SyncParams{
 		ProjectDir:       dir,
 		StateDir:         stateDir,
 		BaseBranch:       "main",
@@ -329,7 +329,7 @@ func TestSyncSkipsDirtyAndDescendants(t *testing.T) {
 		t.Fatalf("dirty feat: %v", err)
 	}
 
-	result, err := Sync(SyncParams{
+	result, err := Sync(t.Context(), SyncParams{
 		ProjectDir: dir,
 		StateDir:   stateDir,
 		BaseBranch: "main",
@@ -366,7 +366,7 @@ func TestSyncMissingParentRefIsError(t *testing.T) {
 	// Record a parent branch that does not exist, so behind-counting fails.
 	writeMeta(t, stateDir, "feat", "ghost-parent")
 
-	result, err := Sync(SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
+	result, err := Sync(t.Context(), SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
 	if err != nil {
 		t.Fatalf("Sync error: %v", err)
 	}

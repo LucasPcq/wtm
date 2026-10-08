@@ -70,7 +70,7 @@ func runFastForward(cmd *cobra.Command, args []string) error {
 	// also skipping the question.
 	interactive := rules.IsHumanFormat(format) && !yes && term.IsTerminal(int(os.Stdin.Fd()))
 
-	_, err = ffflow.Run(ffflow.Params{
+	_, err = ffflow.Run(cmd.Context(), ffflow.Params{
 		Context: shared.FlowContext(config),
 		Request: ffflow.Request{
 			Branches: args,
@@ -78,7 +78,7 @@ func runFastForward(cmd *cobra.Command, args []string) error {
 			Force:    force,
 		},
 		// The picker may be reached through the shell wrapper, which consumes stdout.
-		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),
+		Prompter:  shared.FlowPrompter(cmd.Context(), shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),
 		Presenter: ffPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
 	})
 	return err

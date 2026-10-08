@@ -16,7 +16,7 @@ import (
 
 func detailModel(t *testing.T, status domain.WorktreeStatus) Model {
 	t.Helper()
-	model := New(RunParams{})
+	model := New(t.Context(), RunParams{})
 	t.Cleanup(model.Close)
 	model = update(model, tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 	return update(model, worktreesMsg{statuses: []domain.WorktreeStatus{status}, parents: map[string]string{}})

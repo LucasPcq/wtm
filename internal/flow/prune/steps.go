@@ -43,7 +43,9 @@ func (f *pruneFlow) session() flow.Session {
 			owed.DataStep(owed.DataStepParams{
 				Key:      KeyData,
 				KeepData: f.request.KeepData,
-				Snapshot: func(answers flow.Answers) owed.Snapshot { return f.holdings.Of(f.ctx, answers.Values(KeySelection)) },
+				Snapshot: func(answers flow.Answers) owed.Snapshot {
+					return f.holdings.Of(f.runCtx, f.ctx, answers.Values(KeySelection))
+				},
 			}),
 			f.confirmStep(),
 		},
@@ -159,7 +161,7 @@ func (f *pruneFlow) recap(answers flow.Answers, selected []string) string {
 		description = fmt.Sprintf(domain.PruneWillPruneFmt, len(selected), strings.Join(selected, ", "))
 	}
 	data := rules.DataRecapLines(rules.DataRecapLinesParams{
-		Held:      f.holdings.Of(f.ctx, selected).Held(),
+		Held:      f.holdings.Of(f.runCtx, f.ctx, selected).Held(),
 		StartDown: answers.Value(KeyData) == owed.DataStart,
 		KeepData:  f.request.KeepData,
 	})

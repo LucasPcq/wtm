@@ -15,7 +15,7 @@ func TestARememberedAnswerIsSettledAndTheRecapStillNamesIt(t *testing.T) {
 		domain.RememberIsolation:   string(domain.IsolationVerbatim),
 	}
 
-	answers, err := (flow.Unattended{}).Ask(f.session())
+	answers, err := (flow.Unattended{}).Ask(f.session(t.Context()))
 	if err != nil {
 		t.Fatalf("Ask: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestCheckoutFlagsWinOverTheRememberedAnswers(t *testing.T) {
 		domain.RememberIsolation:   string(domain.IsolationVerbatim),
 	}
 
-	answers, err := (flow.Unattended{}).Ask(f.session())
+	answers, err := (flow.Unattended{}).Ask(f.session(t.Context()))
 	if err != nil {
 		t.Fatalf("Ask: %v", err)
 	}

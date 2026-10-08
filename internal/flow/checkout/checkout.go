@@ -2,6 +2,7 @@
 package checkout
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -51,20 +52,22 @@ type Params struct {
 	Presenter Presenter
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &checkoutFlow{
+		runCtx:     ctx,
 		ctx:        params.Context,
 		request:    params.Request,
 		prompter:   params.Prompter,
 		presenter:  params.Presenter,
-		candidates: decide.BranchCandidates(params.Context.ProjectDir),
-		target:     decide.MemoizedTarget(params.Context.ProjectDir),
+		candidates: decide.BranchCandidates(ctx, params.Context.ProjectDir),
+		target:     decide.MemoizedTarget(ctx, params.Context.ProjectDir),
 		applies:    envports.IsolationApplies(params.Context),
 	}
-	return f.run()
+	return f.run(ctx)
 }
 
 type checkoutFlow struct {
+	runCtx     context.Context
 	ctx        flow.Context
 	request    Request
 	prompter   flow.Prompter
@@ -79,7 +82,7 @@ type checkoutFlow struct {
 	prs []domain.PRInfo
 }
 
-func (f *checkoutFlow) run() (Outcome, error) {
+func (f *checkoutFlow) run(ctx context.Context) (Outcome, error) {
 	if f.request.From != "" && !rules.BranchCandidateExists(f.candidates, f.request.From) {
 		return Outcome{}, fmt.Errorf("%w: %s", domain.ErrBranchNotFound, f.request.From)
 	}
@@ -103,7 +106,7 @@ func (f *checkoutFlow) run() (Outcome, error) {
 		}
 	}
 
-	session := f.session()
+	session := f.session(ctx)
 	answers, err := f.prompter.Ask(session)
 	if errors.Is(err, domain.ErrUserAborted) {
 		f.presenter.Notice(flow.AbortedNotice)
@@ -124,7 +127,7 @@ func (f *checkoutFlow) run() (Outcome, error) {
 	}
 
 	if answers.Value(KeySourceUpdate) == decide.UpdateFastForward {
-		proceed := decide.ApplyFastForward(decide.ApplyFastForwardParams{
+		proceed := decide.ApplyFastForward(f.runCtx, decide.ApplyFastForwardParams{
 			ProjectDir: f.ctx.ProjectDir,
 			Subject:    pr.Branch,
 			Prompter:   f.prompter,
@@ -140,11 +143,11 @@ func (f *checkoutFlow) run() (Outcome, error) {
 
 func (f *checkoutFlow) fetchPR() (domain.PRInfo, error) {
 	var pr domain.PRInfo
-	err := f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.CheckoutFetchingPR,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			var fetchErr error
-			pr, fetchErr = ghservice.GetPRDetail(ghservice.GetPRDetailParams{ProjectDir: f.ctx.ProjectDir, Number: f.request.Number})
+			pr, fetchErr = ghservice.GetPRDetail(ctx, ghservice.GetPRDetailParams{ProjectDir: f.ctx.ProjectDir, Number: f.request.Number})
 			return fetchErr
 		},
 	})
@@ -163,17 +166,17 @@ func (f *checkoutFlow) acceptBranch(name string) error {
 	if target := f.target(name); target.State == domain.BranchTargetCheckedOut {
 		return fmt.Errorf("%w: "+domain.BranchCheckedOutElsewhereFmt, domain.ErrWorktreeExists, name, target.WorktreePath, name)
 	}
-	return worktree.CheckNameFree(worktree.NameCheckParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: name})
+	return worktree.CheckNameFree(f.runCtx, worktree.NameCheckParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: name})
 }
 
 func (f *checkoutFlow) fetchBranch(pr domain.PRInfo) error {
 	if f.fetched {
 		return nil
 	}
-	err := f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.CheckoutFetchingBranch,
-		Work: func() error {
-			return branch.FetchFromOrigin(branch.BranchParams{ProjectDir: f.ctx.ProjectDir, Branch: pr.Branch})
+		Work: func(ctx context.Context) error {
+			return branch.FetchFromOrigin(ctx, branch.BranchParams{ProjectDir: f.ctx.ProjectDir, Branch: pr.Branch})
 		},
 	})
 	f.fetched = err == nil
@@ -190,7 +193,7 @@ func (f *checkoutFlow) checkout(params checkoutParams) (Outcome, error) {
 	// A local branch of the PR's name is checked out as-is, keeping commits never
 	// pushed; only one another worktree holds is refused, by worktree.Create. It is
 	// read again here because the fetch just moved what it is compared with.
-	target := branch.Target(branchParams)
+	target := branch.Target(f.runCtx, branchParams)
 	startPoint := domain.RemoteBranchPrefix + pr.Branch
 	if target.State == domain.BranchTargetExisting {
 		startPoint = ""
@@ -202,11 +205,11 @@ func (f *checkoutFlow) checkout(params checkoutParams) (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	publish.Created(f.ctx, result.Branch)
+	publish.Created(f.runCtx, f.ctx, result.Branch)
 
 	// Before the hooks: one of them may read the .env, and it has to read what
 	// this worktree binds rather than what it was copied with.
-	result.EnvPorts, result.Warnings = envports.SettleFresh(envports.FreshParams{
+	result.EnvPorts, result.Warnings = envports.SettleFresh(f.runCtx, envports.FreshParams{
 		Params: envports.Params{
 			Context:      f.ctx,
 			Branch:       result.Branch,
@@ -215,7 +218,7 @@ func (f *checkoutFlow) checkout(params checkoutParams) (Outcome, error) {
 		},
 		Preflight: preflight,
 	})
-	result.Warnings = append(result.Warnings, decide.WarnUnseenFallback(decide.UnseenFallbackParams{
+	result.Warnings = append(result.Warnings, decide.WarnUnseenFallback(f.runCtx, decide.UnseenFallbackParams{
 		Fallback:  decide.EnvFallbackParams{ProjectDir: f.ctx.ProjectDir, Source: parent, Config: f.ctx.Config, EnvOverride: params.Answers.Value(KeyEnv)},
 		Prompter:  f.prompter,
 		Presenter: f.presenter,
@@ -223,7 +226,7 @@ func (f *checkoutFlow) checkout(params checkoutParams) (Outcome, error) {
 
 	// A reused branch has no start-point, so the hooks see its recorded parent.
 	hookErr := f.runHooks(hooksParams{WorktreePath: result.Path, Branch: pr.Branch, FromBranch: rules.FirstNonEmpty(startPoint, parent)})
-	publish.Provisioned(publish.ProvisionedParams{Context: f.ctx, Branch: result.Branch, Err: hookErr})
+	publish.Provisioned(f.runCtx, publish.ProvisionedParams{Context: f.ctx, Branch: result.Branch, Err: hookErr})
 	if hookErr != nil {
 		return Outcome{}, hookErr
 	}
@@ -246,11 +249,11 @@ type createParams struct {
 // is published before its hooks run.
 func (f *checkoutFlow) create(params createParams) (domain.CreateResult, error) {
 	var result domain.CreateResult
-	err := f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: fmt.Sprintf(domain.CreateLoadingFmt, params.PR.Branch),
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			var createErr error
-			result, createErr = worktree.Create(domain.CreateParams{
+			result, createErr = worktree.Create(ctx, domain.CreateParams{
 				ProjectDir:      f.ctx.ProjectDir,
 				StateDir:        f.ctx.StateDir,
 				Branch:          params.PR.Branch,
@@ -278,12 +281,12 @@ func (f *checkoutFlow) runHooks(params hooksParams) error {
 	if len(hooks) == 0 {
 		return nil
 	}
-	ordinal.BeforeHooks(f.ctx, params.Branch)
+	ordinal.BeforeHooks(f.runCtx, f.ctx, params.Branch)
 	return f.presenter.HookPhase(flow.HookPhaseParams{
 		Title:   domain.HooksTitleOnCreate,
 		LogPath: rules.HooksLogPath(rules.HooksLogPathParams{StateDir: f.ctx.StateDir, Phase: domain.HookOnCreate, Branch: params.Branch}),
 		Run: func(sink flow.HookSink) error {
-			return worktree.RunCreateHooks(domain.CreateHooksParams{
+			return worktree.RunCreateHooks(f.runCtx, domain.CreateHooksParams{
 				ProjectDir:   f.ctx.ProjectDir,
 				StateDir:     f.ctx.StateDir,
 				WorktreePath: params.WorktreePath,

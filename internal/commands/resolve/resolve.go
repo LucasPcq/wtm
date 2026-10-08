@@ -45,7 +45,7 @@ func runResolve(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("get working directory: %w", err)
 	}
 
-	root, err := shared.ProjectRoot(dir)
+	root, err := shared.ProjectRoot(cmd.Context(), dir)
 	if err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func runResolve(cmd *cobra.Command, args []string) error {
 	query := strings.Join(args, " ")
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 
-	result, err := worktree.Resolve(domain.ResolveParams{
+	result, err := worktree.Resolve(cmd.Context(), domain.ResolveParams{
 		ProjectDir: root,
 		Query:      query,
 	})
@@ -125,7 +125,7 @@ func pickAmbiguousWorktree(cmd *cobra.Command, cwd, projectDir string, matches [
 			wg.Add(2)
 			go func() {
 				defer wg.Done()
-				statuses, listErr = worktree.List(domain.ListParams{
+				statuses, listErr = worktree.List(cmd.Context(), domain.ListParams{
 					ProjectDir: cfgResult.ProjectDir,
 					StateDir:   cfgResult.StateDir,
 					Config:     cfgResult.Config,
@@ -133,7 +133,7 @@ func pickAmbiguousWorktree(cmd *cobra.Command, cwd, projectDir string, matches [
 			}()
 			go func() {
 				defer wg.Done()
-				services = shared.LoadJobsGraceful()
+				services = shared.LoadJobsGraceful(cmd.Context())
 			}()
 			wg.Wait()
 			return listErr
@@ -148,7 +148,7 @@ func pickAmbiguousWorktree(cmd *cobra.Command, cwd, projectDir string, matches [
 		filtered = statuses
 	}
 
-	return worktreepicker.Run(worktreepicker.RunParams{
+	return worktreepicker.Run(cmd.Context(), worktreepicker.RunParams{
 		Statuses:     filtered,
 		Services:     services,
 		Title:        "Select a worktree",
@@ -157,7 +157,7 @@ func pickAmbiguousWorktree(cmd *cobra.Command, cwd, projectDir string, matches [
 		Config:       cfgResult.Config,
 		ActiveBranch: rules.ActiveWorktree(rules.ActiveWorktreeParams{Cwd: infra.ResolvePath(cwd), Statuses: statuses}),
 		PRLoader: func() ([]domain.PRInfo, domain.GHConnection) {
-			return shared.LoadPRs(cfgResult.ProjectDir)
+			return shared.LoadPRs(cmd.Context(), cfgResult.ProjectDir)
 		},
 	})
 }

@@ -1,6 +1,7 @@
 package run
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"time"
@@ -39,8 +40,8 @@ func runPs(cmd *cobra.Command, _ []string) error {
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 
 	if format == domain.OutputJSON {
-		jobs := rules.JobsByWorktree(shared.LoadJobs().Jobs)
-		return output.WriteRunningJobsJSON(cmd.OutOrStdout(), runningJobs(runningJobsParams{Jobs: jobs, Held: runjobs.Held(jobs)}))
+		jobs := rules.JobsByWorktree(shared.LoadJobs(cmd.Context()).Jobs)
+		return output.WriteRunningJobsJSON(cmd.OutOrStdout(), runningJobs(cmd.Context(), runningJobsParams{Jobs: jobs, Held: runjobs.Held(cmd.Context(), jobs)}))
 	}
 
 	var listing runjobs.Listing
@@ -49,8 +50,8 @@ func runPs(cmd *cobra.Command, _ []string) error {
 		Message: domain.RunLoadingJobs,
 		Animate: shared.Animate(cmd, true),
 		Work: func() error {
-			listing = shared.LoadJobs()
-			held = runjobs.Held(listing.Jobs)
+			listing = shared.LoadJobs(cmd.Context())
+			held = runjobs.Held(cmd.Context(), listing.Jobs)
 			return nil
 		},
 	})
@@ -64,8 +65,8 @@ func runPs(cmd *cobra.Command, _ []string) error {
 		fmt.Fprint(w, output.FormatRunningJobs(output.FormatRunningJobsParams{
 			Jobs:       jobs,
 			Now:        time.Now(),
-			Branches:   branchesOf(jobs),
-			Projects:   projectsOf(jobs),
+			Branches:   branchesOf(cmd.Context(), jobs),
+			Projects:   projectsOf(cmd.Context(), jobs),
 			Held:       held,
 			Hyperlinks: output.IsTerminal(out),
 		}))
@@ -79,26 +80,26 @@ func runPs(cmd *cobra.Command, _ []string) error {
 
 // branchesOf names each work dir once: a table of eight jobs in two worktrees
 // asks git twice, not eight times.
-func branchesOf(jobs []domain.JobInfo) map[string]string {
+func branchesOf(ctx context.Context, jobs []domain.JobInfo) map[string]string {
 	branches := map[string]string{}
 	for _, job := range jobs {
 		if _, seen := branches[job.WorkDir]; seen {
 			continue
 		}
-		branches[job.WorkDir] = target.BranchOf(job.WorkDir)
+		branches[job.WorkDir] = target.BranchOf(ctx, job.WorkDir)
 	}
 	return branches
 }
 
 // projectsOf names each work dir's repository, nil when they all belong to one:
 // the daemon is machine-wide, and "main" alone is ambiguous across two repos.
-func projectsOf(jobs []domain.JobInfo) map[string]string {
+func projectsOf(ctx context.Context, jobs []domain.JobInfo) map[string]string {
 	projects := map[string]string{}
 	for _, job := range jobs {
 		if _, seen := projects[job.WorkDir]; seen {
 			continue
 		}
-		projects[job.WorkDir] = target.ProjectOf(job.WorkDir)
+		projects[job.WorkDir] = target.ProjectOf(ctx, job.WorkDir)
 	}
 	if rules.DistinctValues(projects) < 2 {
 		return nil
@@ -113,15 +114,15 @@ type runningJobsParams struct {
 	Held domain.HeldAddresses
 }
 
-func runningJobs(params runningJobsParams) []domain.RunningJob {
+func runningJobs(ctx context.Context, params runningJobsParams) []domain.RunningJob {
 	jobs := params.Jobs
-	branches := branchesOf(jobs)
+	branches := branchesOf(ctx, jobs)
 	projects := map[string]string{}
 	rows := make([]domain.RunningJob, 0, len(jobs))
 	for _, job := range jobs {
 		project, seen := projects[job.WorkDir]
 		if !seen {
-			project = target.ProjectOf(job.WorkDir)
+			project = target.ProjectOf(ctx, job.WorkDir)
 			projects[job.WorkDir] = project
 		}
 		rows = append(rows, domain.RunningJob{

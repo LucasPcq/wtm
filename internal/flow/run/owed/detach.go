@@ -1,6 +1,7 @@
 package owed
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -46,15 +47,15 @@ type ReadParams struct {
 
 // Read must run before the removal: the holdings are read from each worktree's
 // own state and environment, both gone with it.
-func Read(params ReadParams) Snapshot {
+func Read(ctx context.Context, params ReadParams) Snapshot {
 	cfg, err := runconfig.Load(params.Context.StateDir)
 	if err != nil || len(rules.Removable(cfg).Jobs) == 0 {
 		return Snapshot{}
 	}
-	live := liveBranches(params.Context.ProjectDir)
+	live := liveBranches(ctx, params.Context.ProjectDir)
 	var holdings []domain.NamespaceHolding
 	for _, branch := range params.Branches {
-		holding, found := holdingOf(holdingParams{Context: params.Context, Config: cfg, Branch: branch, Live: live})
+		holding, found := holdingOf(ctx, holdingParams{Context: params.Context, Config: cfg, Branch: branch, Live: live})
 		if found {
 			holdings = append(holdings, holding)
 		}
@@ -62,7 +63,7 @@ func Read(params ReadParams) Snapshot {
 	if len(holdings) == 0 {
 		return Snapshot{Config: cfg}
 	}
-	up := rules.SharedJobsUp(rules.SharedJobsUpParams{Jobs: runjobs.Load(), Config: cfg})
+	up := rules.SharedJobsUp(rules.SharedJobsUpParams{Jobs: runjobs.Load(ctx), Config: cfg})
 	return Snapshot{Config: cfg, Holdings: holdings, Up: up}
 }
 
@@ -76,7 +77,7 @@ type holdingParams struct {
 // holdingOf keeps only what the worktree actually carved out: one created and
 // thrown away without ever starting the stack owes nothing, and running its
 // detach would be a DROP DATABASE on a database that never existed.
-func holdingOf(params holdingParams) (domain.NamespaceHolding, bool) {
+func holdingOf(ctx context.Context, params holdingParams) (domain.NamespaceHolding, bool) {
 	held := worktree.NamespacesOf(worktree.ParentBranchParams{StateDir: params.Context.StateDir, Branch: params.Branch})
 	if len(held) == 0 {
 		return domain.NamespaceHolding{}, false
@@ -85,11 +86,11 @@ func holdingOf(params holdingParams) (domain.NamespaceHolding, bool) {
 	if len(jobs.Jobs) == 0 {
 		return domain.NamespaceHolding{}, false
 	}
-	wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: params.Context.ProjectDir, Branch: params.Branch})
+	wt, err := worktree.FindByBranch(ctx, worktree.FindByBranchParams{ProjectDir: params.Context.ProjectDir, Branch: params.Branch})
 	if err != nil {
 		return domain.NamespaceHolding{}, false
 	}
-	env, err := seam.JobEnv(seam.JobEnvParams{ProjectDir: params.Context.ProjectDir, StateDir: params.Context.StateDir, WorkDir: wt.Path, Publisher: params.Context.Publisher})
+	env, err := seam.JobEnv(ctx, seam.JobEnvParams{ProjectDir: params.Context.ProjectDir, StateDir: params.Context.StateDir, WorkDir: wt.Path, Publisher: params.Context.Publisher})
 	if err != nil {
 		return domain.NamespaceHolding{}, false
 	}
@@ -197,10 +198,10 @@ type Dropper struct {
 	release func()
 }
 
-func NewDropper(params DropperParams) *Dropper {
+func NewDropper(ctx context.Context, params DropperParams) *Dropper {
 	d := &Dropper{params: params, up: params.Snapshot.Up, release: func() {}}
 	if params.StartDown && !params.KeepData && len(params.Snapshot.Holdings) > 0 {
-		d.bringUpDown()
+		d.bringUpDown(ctx)
 	}
 	return d
 }
@@ -210,7 +211,7 @@ func (d *Dropper) Close() { d.release() }
 // Drop gives back what branch held, now that its worktree is gone, and says
 // which way each namespace went. What could not be dropped is owed to the
 // service's next start; what is dropped settles any older debt for it.
-func (d *Dropper) Drop(branch string) []domain.NamespaceOutcome {
+func (d *Dropper) Drop(ctx context.Context, branch string) []domain.NamespaceOutcome {
 	holding, found := d.params.Snapshot.holding(branch)
 	if !found {
 		return nil
@@ -222,7 +223,7 @@ func (d *Dropper) Drop(branch string) []domain.NamespaceOutcome {
 		return d.keepShared(holding)
 	}
 
-	result := drop(dropParams{Context: d.params.Context, Presenter: d.params.Presenter, Holding: holding, Up: d.up})
+	result := drop(ctx, dropParams{Context: d.params.Context, Presenter: d.params.Presenter, Holding: holding, Up: d.up})
 	d.report(result)
 	if err := runjobs.QueueRemovals(runjobs.QueueRemovalsParams{StateDir: d.params.Context.StateDir, Refs: result.Deferred()}); err != nil {
 		d.params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: err.Error()})
@@ -248,7 +249,7 @@ func (d *Dropper) keepShared(holding domain.NamespaceHolding) []domain.Namespace
 
 // bringUpDown starts every service the snapshot needs that is down; Close lets
 // them all go once the data is dropped.
-func (d *Dropper) bringUpDown() {
+func (d *Dropper) bringUpDown(ctx context.Context) {
 	up := make(map[string]bool, len(d.up))
 	for job, isUp := range d.up {
 		up[job] = isUp
@@ -256,11 +257,11 @@ func (d *Dropper) bringUpDown() {
 	var releases []func()
 	for _, job := range rules.DownServices(d.params.Snapshot.Held()) {
 		var jobRelease func()
-		err := d.params.Presenter.Stage(flow.StageParams{
+		err := d.params.Presenter.Stage(ctx, flow.StageParams{
 			Message: fmt.Sprintf(domain.OwedBringUpStageFmt, job),
-			Work: func() error {
+			Work: func(ctx context.Context) error {
 				var bringErr error
-				jobRelease, bringErr = BringUp(BringUpParams{Context: d.params.Context, Config: d.params.Snapshot.Config, Job: job})
+				jobRelease, bringErr = BringUp(ctx, BringUpParams{Context: d.params.Context, Config: d.params.Snapshot.Config, Job: job})
 				return bringErr
 			},
 		})
@@ -289,16 +290,16 @@ type dropParams struct {
 // drop runs the detach commands under a stage: a DROP DATABASE takes seconds,
 // and the line reporting it would otherwise follow a silent pause. They run
 // from the project: the worktree's directory is gone by now.
-func drop(params dropParams) runjobs.RemoveNamespacesResult {
+func drop(ctx context.Context, params dropParams) runjobs.RemoveNamespacesResult {
 	names := make([]string, 0, len(params.Holding.Config.Jobs))
 	for _, job := range params.Holding.Config.Jobs {
 		names = append(names, job.Name)
 	}
 	var result runjobs.RemoveNamespacesResult
-	_ = params.Presenter.Stage(flow.StageParams{
+	_ = params.Presenter.Stage(ctx, flow.StageParams{
 		Message: fmt.Sprintf(domain.DataDroppingFmt, params.Holding.Branch, strings.Join(names, ", ")),
-		Work: func() error {
-			result = runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
+		Work: func(ctx context.Context) error {
+			result = runjobs.RemoveWorktreeNamespaces(ctx, runjobs.RemoveNamespacesParams{
 				Config:  params.Holding.Config,
 				Env:     params.Holding.Env,
 				WorkDir: params.Context.ProjectDir,

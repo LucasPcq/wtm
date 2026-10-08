@@ -51,10 +51,10 @@ func runList(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	selection, err := listflow.Run(listflow.Params{
+	selection, err := listflow.Run(cmd.Context(), listflow.Params{
 		Context:   ctx.FlowContext(),
 		Request:   listflow.Request{Config: ctx.Run},
-		Prompter:  ctx.Prompter(true),
+		Prompter:  ctx.Prompter(cmd.Context(), true),
 		Presenter: shared.NewPresenter(cmd, format),
 	})
 	if err != nil {

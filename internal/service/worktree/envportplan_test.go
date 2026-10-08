@@ -40,7 +40,7 @@ func writeEnv(t *testing.T, dir, body string) {
 func planOf(t *testing.T, repo ordinalRepo, branch, path string) domain.EnvPortPlan {
 	t.Helper()
 	globaldir.Isolate(t)
-	plan, err := EnvPortPlanFor(ResolveEnvPortsParams{
+	plan, err := EnvPortPlanFor(t.Context(), ResolveEnvPortsParams{
 		ProjectDir:   repo.dir,
 		StateDir:     repo.stateDir,
 		Branch:       branch,
@@ -109,7 +109,7 @@ func TestRunAddressesForServesTheNameOfAnUnsettledWorktree(t *testing.T) {
 	writeRunConfig(t, repo.stateDir, namedRunConfig)
 	writeEnv(t, repo.dir, "VITE_API_URL=http://localhost:4001\n")
 
-	answer := RunAddressesFor(RunAddressesForParams{
+	answer := RunAddressesFor(t.Context(), RunAddressesForParams{
 		ProjectDir: repo.dir,
 		StateDir:   repo.stateDir,
 		RunConfig:  runConfigOf(t, repo),

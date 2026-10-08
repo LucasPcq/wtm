@@ -55,7 +55,7 @@ func addWorktree(t *testing.T, projectDir, branch string) string {
 	}
 	// Created the way `wtm create` creates one: with its isolation chosen. A
 	// worktree without one is refused a start until it chooses.
-	if err := worktree.SetIsolation(worktree.SetIsolationParams{
+	if err := worktree.SetIsolation(t.Context(), worktree.SetIsolationParams{
 		Ref:       worktree.WorktreeRef{ProjectDir: projectDir, StateDir: filepath.Join(projectDir, ".git", "wtm"), Branch: branch},
 		Isolation: domain.IsolationIsolated,
 	}); err != nil {

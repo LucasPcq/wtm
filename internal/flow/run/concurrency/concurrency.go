@@ -3,6 +3,7 @@
 package concurrency
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -60,21 +61,21 @@ func New(params Params) *Question {
 // Step is asked at most once per project. It is skipped when nothing runs
 // elsewhere and when run.toml already holds the answer — unless a port this run
 // needs is bound next door, where running side by side is no longer on offer.
-func (q *Question) Step() flow.Step {
+func (q *Question) Step(ctx context.Context) flow.Step {
 	return flow.Step{
 		Kind:  flow.StepSelect,
 		Key:   Key,
 		Label: domain.RunConcurrencyStepName,
 		Skip: func(answers flow.Answers) (bool, string) {
-			if q.decide(answers).Ask {
+			if q.decide(ctx, answers).Ask {
 				return false, ""
 			}
 			return true, q.skipReason(answers)
 		},
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
-			decision := q.decide(answers)
+			decision := q.decide(ctx, answers)
 			if decision.Clash {
-				return q.clashContent(answers), nil
+				return q.clashContent(ctx, answers), nil
 			}
 			if decision.Contradiction {
 				return q.contradictionContent(answers), nil
@@ -94,10 +95,10 @@ func (q *Question) Step() flow.Step {
 		// Leaving the others alone is the answer that stops nothing, which is what
 		// a safe default means here.
 		Resolve: func(answers flow.Answers) (flow.Answer, error) {
-			decision := q.decide(answers)
+			decision := q.decide(ctx, answers)
 			if decision.Clash {
 				return flow.Answer{}, fmt.Errorf(domain.RunPortClashRefusedFmt,
-					strings.Join(rules.PortClashLines(q.clashes(answers)), "\n"),
+					strings.Join(rules.PortClashLines(q.clashes(ctx, answers)), "\n"),
 					domain.FlagExclusive, domain.FlagIsolation, domain.IsolationIsolated)
 			}
 			return flow.Answer{Value: string(decision.Value)}, nil
@@ -117,28 +118,28 @@ func (q *Question) Cancelled(answers flow.Answers) bool {
 // A skipped step carries no value — Skip short-circuits Resolve — so reading the
 // answer alone would silently turn every non-interactive --exclusive into a
 // parallel run.
-func (q *Question) Decided(answers flow.Answers) domain.Concurrency {
+func (q *Question) Decided(ctx context.Context, answers flow.Answers) domain.Concurrency {
 	if answers.Answered(Key) {
 		return concurrencyOf(answers.Value(Key))
 	}
-	return q.decide(answers).Value
+	return q.decide(ctx, answers).Value
 }
 
 // Apply carries the decision out, in the order a start needs it: the remembered
 // answer written, the setting set aside said, the other worktrees stopped. It
 // returns the run config the start goes on with.
-func (q *Question) Apply(answers flow.Answers) (domain.RunConfig, error) {
-	cfg, err := q.remember(answers)
+func (q *Question) Apply(ctx context.Context, answers flow.Answers) (domain.RunConfig, error) {
+	cfg, err := q.remember(ctx, answers)
 	if err != nil {
 		return cfg, err
 	}
-	q.noticeOverridden(answers)
-	return cfg, q.clearOthers(answers)
+	q.noticeOverridden(ctx, answers)
+	return cfg, q.clearOthers(ctx, answers)
 }
 
 // remember is never silent: a file changed without a word is a file nobody
 // knows to change back.
-func (q *Question) remember(answers flow.Answers) (domain.RunConfig, error) {
+func (q *Question) remember(ctx context.Context, answers flow.Answers) (domain.RunConfig, error) {
 	answer := answers.Value(Key)
 	if !remembers(answer) {
 		return q.params.Config, nil
@@ -146,7 +147,7 @@ func (q *Question) remember(answers flow.Answers) (domain.RunConfig, error) {
 
 	cfg := q.params.Config
 	cfg.Concurrency = concurrencyOf(answer)
-	if err := runconfig.Save(runconfig.SaveParams{StateDir: q.params.Context.StateDir, Config: cfg}); err != nil {
+	if err := runconfig.Save(ctx, runconfig.SaveParams{StateDir: q.params.Context.StateDir, Config: cfg}); err != nil {
 		return q.params.Config, fmt.Errorf("remember concurrency: %w", err)
 	}
 	q.params.Config = cfg
@@ -160,8 +161,8 @@ func (q *Question) remember(answers flow.Answers) (domain.RunConfig, error) {
 // noticeOverridden is only ever reached where nobody could be asked: the safe
 // default destroys nothing, and a default that goes unsaid is a default nobody
 // can correct.
-func (q *Question) noticeOverridden(answers flow.Answers) {
-	if answers.Answered(Key) || !q.decide(answers).Contradiction {
+func (q *Question) noticeOverridden(ctx context.Context, answers flow.Answers) {
+	if answers.Answered(Key) || !q.decide(ctx, answers).Contradiction {
 		return
 	}
 	q.params.Presenter.Status(warning(fmt.Sprintf(domain.RunConcurrencyOverriddenFmt,
@@ -170,8 +171,8 @@ func (q *Question) noticeOverridden(answers flow.Answers) {
 
 // clearOthers reports a worktree that refuses to stop and carries on: the
 // answer was about this machine's load, not about a dependency.
-func (q *Question) clearOthers(answers flow.Answers) error {
-	if q.Decided(answers) != domain.ConcurrencyExclusive {
+func (q *Question) clearOthers(ctx context.Context, answers flow.Answers) error {
+	if q.Decided(ctx, answers) != domain.ConcurrencyExclusive {
 		return nil
 	}
 	dirs := q.otherDirs(answers)
@@ -183,11 +184,11 @@ func (q *Question) clearOthers(answers flow.Answers) error {
 	// Reported after the stage, never inside it: a spinner owns the stream while
 	// it runs, so a line written under it is repainted over.
 	var reports []flow.Notice
-	err := q.params.Presenter.Stage(flow.StageParams{
+	err := q.params.Presenter.Stage(ctx, flow.StageParams{
 		Message: domain.RunStoppingOthers,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			for _, dir := range dirs {
-				reports = append(reports, stopReport(client, dir))
+				reports = append(reports, stopReport(ctx, client, dir))
 			}
 			return nil
 		},
@@ -201,8 +202,8 @@ func (q *Question) clearOthers(answers flow.Answers) error {
 	return nil
 }
 
-func stopReport(client *process.Client, dir string) flow.Notice {
-	resp, err := client.Send(process.Request{Action: process.ActionStopAll, WorkDir: dir})
+func stopReport(ctx context.Context, client *process.Client, dir string) flow.Notice {
+	resp, err := client.Send(ctx, process.Request{Action: process.ActionStopAll, WorkDir: dir})
 	if err != nil {
 		return warning(fmt.Sprintf(domain.RunStopOtherFailFmt, filepath.Base(dir), err))
 	}
@@ -234,8 +235,8 @@ func (q *Question) contradictionContent(answers flow.Answers) flow.StepContent {
 	}
 }
 
-func (q *Question) clashContent(answers flow.Answers) flow.StepContent {
-	clashes := q.clashes(answers)
+func (q *Question) clashContent(ctx context.Context, answers flow.Answers) flow.StepContent {
+	clashes := q.clashes(ctx, answers)
 	// The answer is the exclusive one, so it names every worktree it stops, not
 	// only the ones holding a port: the description already says which those are.
 	others := q.otherDirs(answers)
@@ -277,35 +278,35 @@ func concurrencyOf(answer string) domain.Concurrency {
 
 func remembers(answer string) bool { return strings.HasSuffix(answer, alwaysSuffix) }
 
-func (q *Question) decide(answers flow.Answers) rules.ConcurrencyDecision {
+func (q *Question) decide(ctx context.Context, answers flow.Answers) rules.ConcurrencyDecision {
 	return rules.DecideConcurrency(rules.ConcurrencyParams{
 		Exclusive:     q.params.Exclusive,
 		Parallel:      q.params.Parallel,
 		Config:        q.params.Config.Concurrency,
 		OthersRunning: q.othersRunning(answers),
 		Selection:     len(q.params.WorkDirs(answers)),
-		Clashes:       len(q.clashes(answers)) > 0,
+		Clashes:       len(q.clashes(ctx, answers)) > 0,
 	})
 }
 
 // clashes are measured only when something runs elsewhere: it costs a git
 // lookup per worktree involved, and with nothing up there is nothing to hit.
-func (q *Question) clashes(answers flow.Answers) []domain.PortClash {
+func (q *Question) clashes(ctx context.Context, answers flow.Answers) []domain.PortClash {
 	if !q.othersRunning(answers) {
 		return nil
 	}
 	return rules.PortClashes(rules.PortClashesParams{
-		Starting: q.StartingClaims(answers),
-		Held:     q.heldClaims(answers),
+		Starting: q.StartingClaims(ctx, answers),
+		Held:     q.heldClaims(ctx, answers),
 	})
 }
 
 // StartingClaims are the ports each selected worktree's jobs would bind.
-func (q *Question) StartingClaims(answers flow.Answers) []domain.PortClaim {
+func (q *Question) StartingClaims(ctx context.Context, answers flow.Answers) []domain.PortClaim {
 	jobs := q.params.Starting(answers)
 	var claims []domain.PortClaim
 	for _, dir := range q.params.WorkDirs(answers) {
-		offset, known := q.offsetOf(dir)
+		offset, known := q.offsetOf(ctx, dir)
 		if !known {
 			continue
 		}
@@ -315,7 +316,7 @@ func (q *Question) StartingClaims(answers flow.Answers) []domain.PortClaim {
 }
 
 // heldClaims are read from the declarations: the daemon keeps no port per job.
-func (q *Question) heldClaims(answers flow.Answers) []domain.PortClaim {
+func (q *Question) heldClaims(ctx context.Context, answers flow.Answers) []domain.PortClaim {
 	selected := selectedSet(q.params.WorkDirs(answers))
 	declared := make(map[string]domain.JobConfig, len(q.params.Config.Jobs))
 	for _, job := range rules.JobsWithEffectivePorts(q.params.Config, q.params.Config.Jobs) {
@@ -328,7 +329,7 @@ func (q *Question) heldClaims(answers flow.Answers) []domain.PortClaim {
 		if !known || !rules.IsJobUp(info.Status) || selected[info.WorkDir] {
 			continue
 		}
-		offset, resolved := q.offsetOf(info.WorkDir)
+		offset, resolved := q.offsetOf(ctx, info.WorkDir)
 		if !resolved {
 			continue
 		}
@@ -343,11 +344,11 @@ func (q *Question) heldClaims(answers flow.Answers) []domain.PortClaim {
 
 // offsetOf leaves a worktree whose offset cannot be resolved claiming nothing
 // rather than main's ports; the run refuses it anyway.
-func (q *Question) offsetOf(dir string) (int, bool) {
+func (q *Question) offsetOf(ctx context.Context, dir string) (int, bool) {
 	if offset, known := q.offsets[dir]; known {
 		return offset, true
 	}
-	env, err := seam.JobEnv(seam.JobEnvParams{ProjectDir: q.params.Context.ProjectDir, StateDir: q.params.Context.StateDir, WorkDir: dir, Publisher: q.params.Context.Publisher})
+	env, err := seam.JobEnv(ctx, seam.JobEnvParams{ProjectDir: q.params.Context.ProjectDir, StateDir: q.params.Context.StateDir, WorkDir: dir, Publisher: q.params.Context.Publisher})
 	if err != nil {
 		return 0, false
 	}

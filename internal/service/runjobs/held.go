@@ -1,6 +1,7 @@
 package runjobs
 
 import (
+	"context"
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/config"
@@ -14,18 +15,18 @@ import (
 // Held is where the apps of each runner up among jobs answer. The daemon is
 // machine-wide, so each worktree is read against its own repository; one whose
 // project or environment cannot be read is left out rather than guessed.
-func Held(jobs []domain.JobInfo) domain.HeldAddresses {
+func Held(ctx context.Context, jobs []domain.JobInfo) domain.HeldAddresses {
 	held := domain.HeldAddresses{}
 	for dir, names := range rules.UpJobsByWorkDir(jobs) {
-		if entries := heldIn(dir, names); len(entries) > 0 {
+		if entries := heldIn(ctx, dir, names); len(entries) > 0 {
 			held[dir] = entries
 		}
 	}
 	return held
 }
 
-func heldIn(dir string, names []string) map[string][]domain.JobURLEntry {
-	commonDir, err := infra.GitCommonDir(infra.GitCommonDirParams{Dir: dir})
+func heldIn(ctx context.Context, dir string, names []string) map[string][]domain.JobURLEntry {
+	commonDir, err := infra.GitCommonDir(ctx, infra.GitCommonDirParams{Dir: dir})
 	if err != nil {
 		return nil
 	}
@@ -38,15 +39,15 @@ func heldIn(dir string, names []string) map[string][]domain.JobURLEntry {
 	if err != nil {
 		return nil
 	}
-	projectDir, err := worktree.MainCheckout(worktree.MainCheckoutParams{ProjectDir: dir})
+	projectDir, err := worktree.MainCheckout(ctx, worktree.MainCheckoutParams{ProjectDir: dir})
 	if err != nil {
 		return nil
 	}
-	branch, err := worktree.CurrentBranch(worktree.CurrentBranchParams{Dir: dir})
+	branch, err := worktree.CurrentBranch(ctx, worktree.CurrentBranchParams{Dir: dir})
 	if err != nil {
 		return nil
 	}
-	addresses := Addresses(AddressesParams{
+	addresses := Addresses(ctx, AddressesParams{
 		ProjectDir: projectDir,
 		StateDir:   stateDir,
 		Config:     run,

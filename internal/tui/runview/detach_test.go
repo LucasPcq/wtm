@@ -88,7 +88,7 @@ func (s *stepwiseStart) next(t *testing.T) string {
 
 func detachModel(t *testing.T, start *stepwiseStart, onLeave Detach) Model {
 	t.Helper()
-	model := New(Params{
+	model := New(t.Context(), Params{
 		Board:  runlogstest.NewBoard(runlogstest.BoardParams{Views: []runlogs.JobView{stopped("migrate")}}),
 		Start:  start.run,
 		Detach: onLeave,

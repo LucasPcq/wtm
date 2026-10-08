@@ -6,6 +6,7 @@
 package runctx
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -108,8 +109,8 @@ func (c Context) FlowContext() flow.Context { return shared.FlowContext(c.Config
 // ask. The gate is passed rather than read from the context because `run down
 // --all` narrows it further — it takes neither a worktree nor a profile, so
 // there is nothing left to ask about.
-func (c Context) Prompter(interactive bool) flow.Prompter {
-	return shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive, Stderr: true})
+func (c Context) Prompter(ctx context.Context, interactive bool) flow.Prompter {
+	return shared.FlowPrompter(ctx, shared.FlowPrompterParams{Interactive: interactive, Stderr: true})
 }
 
 func (c Context) CLI(cmd *cobra.Command) shared.CLIPresenter {

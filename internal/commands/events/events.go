@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/signal"
 	"syscall"
 
 	"github.com/spf13/cobra"
@@ -118,7 +117,7 @@ func followsEveryRepo(cmd *cobra.Command) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	inside, err := infra.InsideGitRepo(cwd)
+	inside, err := infra.InsideGitRepo(cmd.Context(), cwd)
 	if err != nil {
 		return false, err
 	}
@@ -160,13 +159,7 @@ type streamParams struct {
 
 func stream(params streamParams) error {
 	cmd := params.Cmd
-	parent := cmd.Context()
-	if parent == nil {
-		parent = context.Background()
-	}
-	ctx, stop := signal.NotifyContext(parent, os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	ctx = endWhenUnread(ctx, cmd)
+	ctx := endWhenUnread(cmd.Context(), cmd)
 
 	err := params.Watch(ctx, watchHooks{
 		OnEvent: writerFor(writerForParams{Cmd: cmd, Format: params.Format, Global: params.Global}),
@@ -212,7 +205,7 @@ func repoDir(cmd *cobra.Command) (string, error) {
 	if err != nil || !info.IsDir() {
 		return "", refuse(domain.FlagPathNotADirectory)
 	}
-	inside, err := infra.InsideGitRepo(repo)
+	inside, err := infra.InsideGitRepo(cmd.Context(), repo)
 	if err != nil {
 		return "", err
 	}

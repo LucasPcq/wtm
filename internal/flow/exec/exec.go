@@ -43,7 +43,6 @@ type Presenter interface {
 }
 
 type Params struct {
-	Ctx       context.Context
 	Context   flow.Context
 	Request   Request
 	Prompter  flow.Prompter
@@ -51,23 +50,24 @@ type Params struct {
 }
 
 type execFlow struct {
+	runCtx     context.Context
 	params     Params
 	candidates []domain.GitWorktree
 	selection  []domain.GitWorktree
 	current    string
 }
 
-func Run(params Params) (Outcome, error) {
-	f := &execFlow{params: params}
-	return f.run()
+func Run(ctx context.Context, params Params) (Outcome, error) {
+	f := &execFlow{runCtx: ctx, params: params}
+	return f.run(ctx)
 }
 
-func (f *execFlow) run() (Outcome, error) {
+func (f *execFlow) run(ctx context.Context) (Outcome, error) {
 	if err := f.load(); err != nil {
 		return Outcome{}, err
 	}
 
-	answers, err := f.params.Prompter.Ask(f.session())
+	answers, err := f.params.Prompter.Ask(f.session(ctx))
 	if errors.Is(err, domain.ErrUserAborted) || (err == nil && answers.Value(KeyConfirm) == domain.WizardCancelValue) {
 		f.params.Presenter.Notice(flow.AbortedNotice)
 		return Outcome{Aborted: true}, nil
@@ -92,7 +92,7 @@ func (f *execFlow) run() (Outcome, error) {
 }
 
 func (f *execFlow) load() error {
-	candidates, err := worktree.ExecCandidates(worktree.ExecCandidatesParams{ProjectDir: f.params.Context.ProjectDir})
+	candidates, err := worktree.ExecCandidates(f.runCtx, worktree.ExecCandidatesParams{ProjectDir: f.params.Context.ProjectDir})
 	if err != nil {
 		return err
 	}
@@ -129,11 +129,11 @@ func (f *execFlow) execute(params executeParams) Outcome {
 	execTargets := make([]execsvc.Target, len(targets))
 	for i, target := range targets {
 		branches[i] = target.Branch
-		ordinal.BeforeHooks(f.params.Context, target.Branch)
+		ordinal.BeforeHooks(f.runCtx, f.params.Context, target.Branch)
 		execTargets[i] = execsvc.Target{
 			Branch: target.Branch,
 			Path:   target.Path,
-			Env: worktree.ExecEnv(worktree.ExecEnvParams{
+			Env: worktree.ExecEnv(f.runCtx, worktree.ExecEnvParams{
 				Ref:          worktree.WorktreeRef{ProjectDir: f.params.Context.ProjectDir, StateDir: f.params.Context.StateDir, Branch: target.Branch},
 				WorktreePath: target.Path,
 			}),
@@ -142,7 +142,7 @@ func (f *execFlow) execute(params executeParams) Outcome {
 	}
 
 	begin := time.Now()
-	results := execsvc.Run(f.params.Ctx, execsvc.RunParams{
+	results := execsvc.Run(f.runCtx, execsvc.RunParams{
 		Command:    params.Command,
 		Targets:    execTargets,
 		Jobs:       f.params.Request.Jobs,

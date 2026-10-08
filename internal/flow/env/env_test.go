@@ -1,6 +1,7 @@
 package env
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -82,7 +83,7 @@ func read(t *testing.T, path string) string {
 // before the choice existed.
 func makeWorktree(t *testing.T, ctx flow.Context, branch string) string {
 	t.Helper()
-	result, err := worktree.Create(domain.CreateParams{
+	result, err := worktree.Create(t.Context(), domain.CreateParams{
 		ProjectDir:   ctx.ProjectDir,
 		StateDir:     ctx.StateDir,
 		Branch:       branch,
@@ -113,7 +114,7 @@ func run(ctx flow.Context, request Request, prompter flow.Prompter) (Outcome, *r
 		request.OnConflict = domain.EnvDecisionKeep
 	}
 	presenter := &recorder{}
-	outcome, err := Run(Params{Context: ctx, Request: request, Prompter: prompter, Presenter: presenter})
+	outcome, err := Run(context.Background(), Params{Context: ctx, Request: request, Prompter: prompter, Presenter: presenter})
 	return outcome, presenter, err
 }
 
@@ -403,7 +404,7 @@ func withNamedAPI(t *testing.T, ctx flow.Context, addressing domain.Addressing) 
 func setIsolation(t *testing.T, ctx flow.Context, branch string, isolation domain.Isolation) {
 	t.Helper()
 	ref := worktree.WorktreeRef{ProjectDir: ctx.ProjectDir, StateDir: ctx.StateDir, Branch: branch}
-	if err := worktree.SetIsolation(worktree.SetIsolationParams{Ref: ref, Isolation: isolation}); err != nil {
+	if err := worktree.SetIsolation(t.Context(), worktree.SetIsolationParams{Ref: ref, Isolation: isolation}); err != nil {
 		t.Fatal(err)
 	}
 }

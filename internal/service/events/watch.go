@@ -46,7 +46,7 @@ func Watch(ctx context.Context, params WatchParams) error {
 	if socket == "" {
 		socket = process.SocketPath()
 	}
-	repo, err := worktree.RepoOf(worktree.RepoOfParams{ProjectDir: params.ProjectDir})
+	repo, err := worktree.RepoOf(ctx, worktree.RepoOfParams{ProjectDir: params.ProjectDir})
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func watchOnce(ctx context.Context, params watchOnceParams) watchResult {
 	if deliveries == nil {
 		return failed
 	}
-	snapshot, err := snapshotOf(snapshotParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Repo: params.Repo, Socket: params.Socket})
+	snapshot, err := snapshotOf(ctx, snapshotParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Repo: params.Repo, Socket: params.Socket})
 	if err != nil {
 		return watchResult{transient: err}
 	}
@@ -171,7 +171,7 @@ func watchAllOnce(ctx context.Context, params watchAllOnceParams) watchResult {
 	}
 	go pruneUntilDone(ctx, params.Socket)
 	for _, repo := range repos {
-		if err := sendSnapshot(sendSnapshotParams{WatchAllParams: params.WatchAllParams, Repo: eventRepoOf(repo), Socket: params.Socket}); err != nil {
+		if err := sendSnapshot(ctx, sendSnapshotParams{WatchAllParams: params.WatchAllParams, Repo: eventRepoOf(repo), Socket: params.Socket}); err != nil {
 			return watchResult{fatal: err}
 		}
 	}
@@ -182,7 +182,7 @@ func watchAllOnce(ctx context.Context, params watchAllOnceParams) watchResult {
 			if event.Type != domain.EventRepoAdded || event.Repo == nil {
 				return nil
 			}
-			return sendSnapshot(sendSnapshotParams{WatchAllParams: params.WatchAllParams, Repo: *event.Repo, Socket: params.Socket})
+			return sendSnapshot(ctx, sendSnapshotParams{WatchAllParams: params.WatchAllParams, Repo: *event.Repo, Socket: params.Socket})
 		},
 	})
 }
@@ -210,8 +210,8 @@ type sendSnapshotParams struct {
 
 // sendSnapshot skips a repository it cannot read rather than ending the
 // stream: one broken repository must not blind a reader to every other.
-func sendSnapshot(params sendSnapshotParams) error {
-	snapshot, err := snapshotOf(snapshotParams{
+func sendSnapshot(ctx context.Context, params sendSnapshotParams) error {
+	snapshot, err := snapshotOf(ctx, snapshotParams{
 		ProjectDir: params.Repo.Root,
 		StateDir:   filepath.Join(params.Repo.CommonDir, domain.StateDirName),
 		Repo:       params.Repo,
@@ -238,13 +238,13 @@ type subscribeParams struct {
 // the result that ends this attempt.
 func subscribe(ctx context.Context, params subscribeParams) (<-chan process.Delivery, watchResult) {
 	daemon := process.DaemonParams{SocketPath: params.Socket, ProxyPort: params.ProxyPort}
-	if err := ensureDaemon(daemon); err != nil {
+	if err := ensureDaemon(ctx, daemon); err != nil {
 		return nil, watchResult{transient: err}
 	}
 	deliveries, err := process.Subscribe(ctx, process.SubscribeParams{SocketPath: params.Socket, Repos: params.Repos})
 	if errors.Is(err, domain.ErrDaemonNoSubscribe) {
 		// Never a daemon another watcher could need: it cannot serve one.
-		return nil, watchResult{transient: errors.Join(err, replaceDaemon(daemon))}
+		return nil, watchResult{transient: errors.Join(err, replaceDaemon(ctx, daemon))}
 	}
 	if err != nil {
 		return nil, watchResult{transient: err}
@@ -308,8 +308,8 @@ type snapshotLine struct {
 	Worktrees []domain.SnapshotWorktree `json:"worktrees"`
 }
 
-func snapshotOf(params snapshotParams) (Received, error) {
-	list, err := identities(worktree.IdentitiesParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir})
+func snapshotOf(ctx context.Context, params snapshotParams) (Received, error) {
+	list, err := identities(ctx, worktree.IdentitiesParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir})
 	if err != nil {
 		return Received{}, err
 	}
@@ -317,7 +317,7 @@ func snapshotOf(params snapshotParams) (Received, error) {
 		list = []domain.WorktreeIdentity{}
 	}
 	event := stamp(stampParams{Event: domain.Event{Type: domain.EventSnapshot, Worktrees: list}, Repo: params.Repo})
-	raw, err := json.Marshal(snapshotLine{Event: event, Worktrees: withJobs(withJobsParams{Worktrees: list, Socket: params.Socket})})
+	raw, err := json.Marshal(snapshotLine{Event: event, Worktrees: withJobs(ctx, withJobsParams{Worktrees: list, Socket: params.Socket})})
 	if err != nil {
 		return Received{}, err
 	}
@@ -331,8 +331,8 @@ type withJobsParams struct {
 
 // withJobs leaves every worktree's jobs nil when the daemon cannot say: an
 // empty list would tell a reader its jobs are all gone.
-func withJobs(params withJobsParams) []domain.SnapshotWorktree {
-	jobs, err := listJobs(params.Socket)
+func withJobs(ctx context.Context, params withJobsParams) []domain.SnapshotWorktree {
+	jobs, err := listJobs(ctx, params.Socket)
 	branches := make(map[string]string, len(params.Worktrees))
 	for _, identity := range params.Worktrees {
 		branches[identity.Path] = identity.Branch
@@ -348,11 +348,11 @@ func withJobs(params withJobsParams) []domain.SnapshotWorktree {
 	return out
 }
 
-func daemonJobs(socket string) ([]domain.JobInfo, error) {
+func daemonJobs(ctx context.Context, socket string) ([]domain.JobInfo, error) {
 	if socket == "" {
 		return nil, errNoDaemon
 	}
-	resp, err := process.NewClient(socket).Send(process.Request{Action: process.ActionList})
+	resp, err := process.NewClient(socket).Send(ctx, process.Request{Action: process.ActionList})
 	if err != nil {
 		return nil, err
 	}

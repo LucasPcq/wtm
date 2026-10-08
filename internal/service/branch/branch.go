@@ -4,6 +4,7 @@
 package branch
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -22,26 +23,26 @@ type ListParams struct {
 // ordered candidate set, with each local branch tagged with its ahead/behind
 // divergence from its same-name origin counterpart. Errors are swallowed (best
 // effort): a repo with no branches yet simply yields an empty list.
-func Candidates(params ListParams) []domain.BranchCandidate {
-	local, err := infra.ListLocalBranches(infra.ListBranchesParams{ProjectDir: params.ProjectDir})
+func Candidates(ctx context.Context, params ListParams) []domain.BranchCandidate {
+	local, err := infra.ListLocalBranches(ctx, infra.ListBranchesParams{ProjectDir: params.ProjectDir})
 	if err != nil {
 		return nil
 	}
-	remote, _ := infra.ListRemoteBranches(infra.ListBranchesParams{ProjectDir: params.ProjectDir})
+	remote, _ := infra.ListRemoteBranches(ctx, infra.ListBranchesParams{ProjectDir: params.ProjectDir})
 
 	return rules.MergeBranchCandidates(rules.MergeBranchCandidatesParams{
 		Local:      local,
 		Remote:     remote,
-		Divergence: divergence(divergenceParams{ProjectDir: params.ProjectDir, Local: local, Remote: remote}),
+		Divergence: divergence(ctx, divergenceParams{ProjectDir: params.ProjectDir, Local: local, Remote: remote}),
 	})
 }
 
 // Refresh fetches origin then recomputes the candidate set so the divergence
 // badges reflect the latest remote state. A failed fetch is ignored so the
 // picker still refreshes from whatever remote-tracking refs are present.
-func Refresh(params ListParams) []domain.BranchCandidate {
-	_ = infra.Fetch(infra.FetchParams{ProjectDir: params.ProjectDir})
-	return Candidates(params)
+func Refresh(ctx context.Context, params ListParams) []domain.BranchCandidate {
+	_ = infra.Fetch(ctx, infra.FetchParams{ProjectDir: params.ProjectDir})
+	return Candidates(ctx, params)
 }
 
 // BranchParams identifies a single local branch to inspect or update.
@@ -53,8 +54,8 @@ type BranchParams struct {
 // Divergence classifies how a local branch relates to its origin counterpart,
 // using the current remote-tracking refs without fetching. Returns
 // DivergenceUnknown when the branch has no origin counterpart.
-func Divergence(params BranchParams) (domain.DivergenceState, domain.AheadBehind) {
-	ab, err := infra.AheadBehind(infra.AheadBehindParams{
+func Divergence(ctx context.Context, params BranchParams) (domain.DivergenceState, domain.AheadBehind) {
+	ab, err := infra.AheadBehind(ctx, infra.AheadBehindParams{
 		ProjectDir: params.ProjectDir,
 		Local:      params.Branch,
 		Remote:     domain.RemoteBranchPrefix + params.Branch,
@@ -71,11 +72,11 @@ func Divergence(params BranchParams) (domain.DivergenceState, domain.AheadBehind
 // or one that cannot be cleanly fast-forwarded (diverged, dirty, or fetch/FF
 // failure) is left untouched — creation then proceeds from the local branch
 // as-is, mirroring the "keep the local version" choice offered interactively.
-func FastForwardIfBehind(params BranchParams) error {
+func FastForwardIfBehind(ctx context.Context, params BranchParams) error {
 	if rules.IsRemoteBranch(params.Branch) {
 		return nil
 	}
-	if err := FastForwardToOrigin(params); err != nil {
+	if err := FastForwardToOrigin(ctx, params); err != nil {
 		return err
 	}
 	return nil
@@ -85,15 +86,15 @@ func FastForwardIfBehind(params BranchParams) error {
 // fetches first, then refuses (without modifying anything) when the branch has
 // diverged, when its worktree has uncommitted changes, or when the fast-forward
 // otherwise fails. A branch that is already up to date is a no-op.
-func FastForwardToOrigin(params BranchParams) error {
-	check, err := Check(params)
+func FastForwardToOrigin(ctx context.Context, params BranchParams) error {
+	check, err := Check(ctx, params)
 	if err != nil {
 		return err
 	}
 	if check.State == domain.DivergenceDiverged {
 		return fmt.Errorf("%s has diverged from origin (%d ahead, %d behind)", params.Branch, check.Ahead, check.Behind)
 	}
-	result := FastForward(FastForwardParams{
+	result := FastForward(ctx, FastForwardParams{
 		ProjectDir: params.ProjectDir,
 		Branch:     params.Branch,
 		Check:      &check,
@@ -106,20 +107,20 @@ func FastForwardToOrigin(params BranchParams) error {
 
 // FetchFromOrigin updates the branch's remote-tracking ref, so what is checked out
 // next is what origin holds now.
-func FetchFromOrigin(params BranchParams) error {
-	return infra.FetchBranch(infra.FetchBranchParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
+func FetchFromOrigin(ctx context.Context, params BranchParams) error {
+	return infra.FetchBranch(ctx, infra.FetchBranchParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
 }
 
 // Check gathers a branch's state against origin in one network round trip, so a
 // recap and the run that follows it read the same facts and the branch is
 // fetched once rather than twice.
-func Check(params BranchParams) (domain.FastForwardCheck, error) {
+func Check(ctx context.Context, params BranchParams) (domain.FastForwardCheck, error) {
 	check := domain.FastForwardCheck{Branch: params.Branch, State: domain.DivergenceUnknown}
 
 	// A branch origin does not carry fails here; the ahead/behind below settles it.
-	_ = infra.FetchBranch(infra.FetchBranchParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
+	_ = infra.FetchBranch(ctx, infra.FetchBranchParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
 
-	ab, err := infra.AheadBehind(infra.AheadBehindParams{
+	ab, err := infra.AheadBehind(ctx, infra.AheadBehindParams{
 		ProjectDir: params.ProjectDir,
 		Local:      params.Branch,
 		Remote:     domain.RemoteBranchPrefix + params.Branch,
@@ -131,7 +132,7 @@ func Check(params BranchParams) (domain.FastForwardCheck, error) {
 	check.Ahead, check.Behind = ab.Ahead, ab.Behind
 	check.State = rules.ClassifyDivergence(ab.Ahead, ab.Behind)
 
-	wt, err := infra.FindWorktreeByBranch(infra.FindWorktreeByBranchParams{
+	wt, err := infra.FindWorktreeByBranch(ctx, infra.FindWorktreeByBranchParams{
 		ProjectDir: params.ProjectDir,
 		Branch:     params.Branch,
 	})
@@ -143,7 +144,7 @@ func Check(params BranchParams) (domain.FastForwardCheck, error) {
 	}
 	check.WorktreePath = wt.Path
 
-	dirty, err := infra.IsDirty(infra.IsDirtyParams{WorktreePath: wt.Path})
+	dirty, err := infra.IsDirty(ctx, infra.IsDirtyParams{WorktreePath: wt.Path})
 	if err != nil {
 		return check, err
 	}
@@ -166,14 +167,14 @@ type FastForwardParams struct {
 // FastForward advances a branch to its origin counterpart, reporting what became
 // of it rather than returning an error: a run over several branches keeps going
 // past the one it could not move.
-func FastForward(params FastForwardParams) domain.FastForwardResult {
-	check, err := resolveCheck(params)
+func FastForward(ctx context.Context, params FastForwardParams) domain.FastForwardResult {
+	check, err := resolveCheck(ctx, params)
 	if err != nil {
 		return failed(params.Branch, err)
 	}
 
 	result := domain.FastForwardResult{Branch: params.Branch, Behind: check.Behind}
-	result.OldTip, _ = infra.Tip(infra.TipParams{WorktreePath: params.ProjectDir, Ref: params.Branch})
+	result.OldTip, _ = infra.Tip(ctx, infra.TipParams{WorktreePath: params.ProjectDir, Ref: params.Branch})
 	result.NewTip = result.OldTip
 
 	if !check.HasUpstream {
@@ -190,34 +191,34 @@ func FastForward(params FastForwardParams) domain.FastForwardResult {
 		return labelled(result, domain.FFFailed)
 	}
 
-	if ffErr := advance(check, params.ProjectDir); ffErr != nil {
+	if ffErr := advance(ctx, check, params.ProjectDir); ffErr != nil {
 		result.Detail = ffErr.Error()
 		return labelled(result, domain.FFFailed)
 	}
-	if tip, tipErr := infra.Tip(infra.TipParams{WorktreePath: params.ProjectDir, Ref: params.Branch}); tipErr == nil {
+	if tip, tipErr := infra.Tip(ctx, infra.TipParams{WorktreePath: params.ProjectDir, Ref: params.Branch}); tipErr == nil {
 		result.NewTip = tip
 	}
 	return labelled(result, domain.FFAdvanced)
 }
 
-func resolveCheck(params FastForwardParams) (domain.FastForwardCheck, error) {
+func resolveCheck(ctx context.Context, params FastForwardParams) (domain.FastForwardCheck, error) {
 	if params.Check != nil {
 		return *params.Check, nil
 	}
-	return Check(BranchParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
+	return Check(ctx, BranchParams{ProjectDir: params.ProjectDir, Branch: params.Branch})
 }
 
 // advance moves the ref where it must be moved: a branch checked out nowhere is
 // advanced by fetching straight into it, one that is checked out must go through
 // its own worktree.
-func advance(check domain.FastForwardCheck, projectDir string) error {
+func advance(ctx context.Context, check domain.FastForwardCheck, projectDir string) error {
 	if check.WorktreePath == "" {
-		return infra.FastForwardRef(infra.FastForwardRefParams{
+		return infra.FastForwardRef(ctx, infra.FastForwardRefParams{
 			ProjectDir: projectDir,
 			Branch:     check.Branch,
 		})
 	}
-	return infra.FastForwardBranch(infra.FastForwardParams{
+	return infra.FastForwardBranch(ctx, infra.FastForwardParams{
 		WorktreePath: check.WorktreePath,
 		Onto:         domain.RemoteBranchPrefix + check.Branch,
 	})
@@ -242,7 +243,7 @@ type divergenceParams struct {
 
 // divergence computes ahead/behind only for local branches that have a same-name
 // origin counterpart, bounding the number of git calls to the overlap.
-func divergence(params divergenceParams) map[string]domain.AheadBehind {
+func divergence(ctx context.Context, params divergenceParams) map[string]domain.AheadBehind {
 	remoteSet := make(map[string]struct{}, len(params.Remote))
 	for _, r := range params.Remote {
 		remoteSet[strings.TrimPrefix(r, domain.RemoteBranchPrefix)] = struct{}{}
@@ -253,7 +254,7 @@ func divergence(params divergenceParams) map[string]domain.AheadBehind {
 		if _, ok := remoteSet[b]; !ok {
 			continue
 		}
-		ab, err := infra.AheadBehind(infra.AheadBehindParams{
+		ab, err := infra.AheadBehind(ctx, infra.AheadBehindParams{
 			ProjectDir: params.ProjectDir,
 			Local:      b,
 			Remote:     domain.RemoteBranchPrefix + b,

@@ -13,7 +13,7 @@ func TestListLocalBranches(t *testing.T) {
 	gittest.CreateBranch(t, dir, "feature/login")
 	gittest.CreateBranch(t, dir, "develop")
 
-	branches, err := ListLocalBranches(ListBranchesParams{ProjectDir: dir})
+	branches, err := ListLocalBranches(t.Context(), ListBranchesParams{ProjectDir: dir})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestListRemoteBranches(t *testing.T) {
 	createRemoteRef(t, dir, "release")
 	createRemoteRef(t, dir, "HEAD") // the symbolic pointer must be excluded
 
-	branches, err := ListRemoteBranches(ListBranchesParams{ProjectDir: dir})
+	branches, err := ListRemoteBranches(t.Context(), ListBranchesParams{ProjectDir: dir})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -79,13 +79,13 @@ func TestBranchOrRemoteExists(t *testing.T) {
 	gittest.CreateBranch(t, dir, "local-feat")
 	createRemoteRef(t, dir, "remote-feat")
 
-	if !BranchOrRemoteExists(BranchOrRemoteExistsParams{ProjectDir: dir, Ref: "local-feat"}) {
+	if !BranchOrRemoteExists(t.Context(), BranchOrRemoteExistsParams{ProjectDir: dir, Ref: "local-feat"}) {
 		t.Error("expected local branch to be found")
 	}
-	if !BranchOrRemoteExists(BranchOrRemoteExistsParams{ProjectDir: dir, Ref: "origin/remote-feat"}) {
+	if !BranchOrRemoteExists(t.Context(), BranchOrRemoteExistsParams{ProjectDir: dir, Ref: "origin/remote-feat"}) {
 		t.Error("expected origin remote-tracking branch to be found")
 	}
-	if BranchOrRemoteExists(BranchOrRemoteExistsParams{ProjectDir: dir, Ref: "origin/nope"}) {
+	if BranchOrRemoteExists(t.Context(), BranchOrRemoteExistsParams{ProjectDir: dir, Ref: "origin/nope"}) {
 		t.Error("nonexistent ref must not be found")
 	}
 }
@@ -93,7 +93,7 @@ func TestBranchOrRemoteExists(t *testing.T) {
 func TestCurrentBranch(t *testing.T) {
 	dir := gittest.InitRepo(t)
 
-	branch, err := CurrentBranch(dir)
+	branch, err := CurrentBranch(t.Context(), dir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestCommitsAhead(t *testing.T) {
 		}
 	}
 
-	count, err := CommitsAhead(CommitsAheadParams{
+	count, err := CommitsAhead(t.Context(), CommitsAheadParams{
 		WorktreePath: dir,
 		BaseBranch:   baseBranch,
 		Branch:       "feature",
@@ -149,14 +149,14 @@ func TestCommitsAhead(t *testing.T) {
 func TestCommitsAhead_NoneAhead(t *testing.T) {
 	dir := gittest.InitRepo(t)
 
-	branch, err := CurrentBranch(dir)
+	branch, err := CurrentBranch(t.Context(), dir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	gittest.CreateBranch(t, dir, "no-ahead")
 
-	count, err := CommitsAhead(CommitsAheadParams{
+	count, err := CommitsAhead(t.Context(), CommitsAheadParams{
 		WorktreePath: dir,
 		BaseBranch:   branch,
 		Branch:       "no-ahead",
@@ -172,7 +172,7 @@ func TestCommitsAhead_NoneAhead(t *testing.T) {
 func TestAheadBehind(t *testing.T) {
 	dir := gittest.InitRepo(t)
 
-	branch, err := CurrentBranch(dir)
+	branch, err := CurrentBranch(t.Context(), dir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestAheadBehind(t *testing.T) {
 		}
 	}
 
-	got, err := AheadBehind(AheadBehindParams{
+	got, err := AheadBehind(t.Context(), AheadBehindParams{
 		ProjectDir: dir,
 		Local:      branch,
 		Remote:     "origin/" + branch,
@@ -225,7 +225,7 @@ func TestDeleteLocalBranch(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	gittest.CreateBranch(t, dir, "to-delete")
 
-	err := DeleteLocalBranch(DeleteLocalBranchParams{
+	err := DeleteLocalBranch(t.Context(), DeleteLocalBranchParams{
 		ProjectDir: dir,
 		Branch:     "to-delete",
 		Force:      false,
@@ -234,7 +234,7 @@ func TestDeleteLocalBranch(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	branches, _ := ListLocalBranches(ListBranchesParams{ProjectDir: dir})
+	branches, _ := ListLocalBranches(t.Context(), ListBranchesParams{ProjectDir: dir})
 	for _, b := range branches {
 		if b == "to-delete" {
 			t.Error("branch should have been deleted")
@@ -270,7 +270,7 @@ func TestFastForwardRef(t *testing.T) {
 	runGit(t, dir, "push", "-u", "origin", "feat")
 	advanceOriginOf(t, dir, "feat")
 
-	if err := FastForwardRef(FastForwardRefParams{ProjectDir: dir, Branch: "feat"}); err != nil {
+	if err := FastForwardRef(t.Context(), FastForwardRefParams{ProjectDir: dir, Branch: "feat"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if got, want := revParse(t, dir, "feat"), revParse(t, dir, "origin/feat"); got != want {
@@ -295,7 +295,7 @@ func TestFastForwardRefRefusesNonFastForward(t *testing.T) {
 	runGit(t, dir, "worktree", "remove", "--force", tmp)
 	runGit(t, dir, "branch", "-f", "feat", sideways)
 
-	if err := FastForwardRef(FastForwardRefParams{ProjectDir: dir, Branch: "feat"}); err == nil {
+	if err := FastForwardRef(t.Context(), FastForwardRefParams{ProjectDir: dir, Branch: "feat"}); err == nil {
 		t.Fatal("a non-fast-forward update must be refused")
 	}
 	if got := revParse(t, dir, "feat"); got != sideways {
@@ -315,7 +315,7 @@ func TestFastForwardRefRefusesCheckedOutBranch(t *testing.T) {
 	runGit(t, dir, "worktree", "add", wt, "feat")
 	before := revParse(t, dir, "feat")
 
-	if err := FastForwardRef(FastForwardRefParams{ProjectDir: dir, Branch: "feat"}); err == nil {
+	if err := FastForwardRef(t.Context(), FastForwardRefParams{ProjectDir: dir, Branch: "feat"}); err == nil {
 		t.Fatal("git should refuse to fetch into a checked-out branch")
 	}
 	if got := revParse(t, dir, "feat"); got != before {

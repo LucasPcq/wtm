@@ -2,6 +2,7 @@
 package prune
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -67,8 +68,9 @@ func Operation() flow.Operation {
 	return flow.Operation{Kind: domain.OpKindPrune, Mode: flow.ModeBlocking}
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &pruneFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -78,6 +80,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type pruneFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -139,15 +142,15 @@ func (f *pruneFlow) scan() error {
 	needPRs := f.request.Merged || f.request.Closed || !f.request.Force
 
 	var lookup prLookup
-	err := f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: f.scanMessage(needPRs),
-		Work: func() error {
-			awaitPRs, err := f.startPRLookup(needPRs)
+		Work: func(ctx context.Context) error {
+			awaitPRs, err := f.startPRLookup(ctx, needPRs)
 			if err != nil {
 				return err
 			}
 			var planErr error
-			f.plan, planErr = worktree.PlanPrune(worktree.PlanPruneParams{
+			f.plan, planErr = worktree.PlanPrune(ctx, worktree.PlanPruneParams{
 				Prune: f.params(),
 				PRs:   func() []domain.PRInfo { lookup = awaitPRs(); return lookup.prs },
 			})
@@ -175,17 +178,17 @@ type prLookup struct {
 
 // startPRLookup asks GitHub while the git side of the scan runs: the two are
 // independent, and on a large repository each costs about a second.
-func (f *pruneFlow) startPRLookup(needPRs bool) (func() prLookup, error) {
+func (f *pruneFlow) startPRLookup(ctx context.Context, needPRs bool) (func() prLookup, error) {
 	if !needPRs {
 		return func() prLookup { return prLookup{connection: domain.GHConnectionOK} }, nil
 	}
-	branches, err := worktree.WorktreeBranches(worktree.WorktreeBranchesParams{ProjectDir: f.ctx.ProjectDir})
+	branches, err := worktree.WorktreeBranches(ctx, worktree.WorktreeBranchesParams{ProjectDir: f.ctx.ProjectDir})
 	if err != nil {
 		return nil, err
 	}
 	done := make(chan prLookup, 1)
 	go func() {
-		prs, connection := github.ListPRsOfBranchesWithConnection(github.ListPRsOfBranchesParams{
+		prs, connection := github.ListPRsOfBranchesWithConnection(ctx, github.ListPRsOfBranchesParams{
 			ProjectDir: f.ctx.ProjectDir,
 			Branches:   branches,
 		})
@@ -214,7 +217,7 @@ func (f *pruneFlow) remove(params removeParams) (Outcome, error) {
 	// is about to print for the same services.
 	f.settleOwedNamespaces()
 
-	removals := teardown.Batch(teardown.BatchParams{
+	removals := teardown.Batch(f.runCtx, teardown.BatchParams{
 		Context:   f.ctx,
 		Presenter: f.presenter,
 		Targets:   f.targets(),
@@ -249,7 +252,7 @@ func (f *pruneFlow) remove(params removeParams) (Outcome, error) {
 	reparents := reparentsOf(reparentsOfParams{Reparents: f.plan.Reparents, Pruned: result.Pruned})
 	if params.ReparentChildren {
 		applied, err := worktree.ApplyReparents(worktree.ApplyReparentsParams{Reparents: reparents, StateDir: f.ctx.StateDir})
-		publish.ReparentedAll(f.ctx, applied)
+		publish.ReparentedAll(f.runCtx, f.ctx, applied)
 		if err != nil {
 			return Outcome{}, err
 		}
@@ -315,7 +318,7 @@ func (f *pruneFlow) settleOwedNamespaces() {
 	if f.request.DryRun {
 		return
 	}
-	result := owed.Settle(owed.Params{Context: f.ctx, Presenter: f.presenter})
+	result := owed.Settle(f.runCtx, owed.Params{Context: f.ctx, Presenter: f.presenter})
 	for _, line := range rules.OwedLines(result.Owed) {
 		f.presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: line})
 	}

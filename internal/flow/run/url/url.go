@@ -2,6 +2,8 @@
 package url
 
 import (
+	"context"
+
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/run/target"
@@ -41,11 +43,11 @@ type Params struct {
 
 // Run needs neither Prompter nor Presenter: it asks nothing and shows nothing,
 // which is the whole contract of a substitution surface.
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	if err := target.RequireDeclared(target.DeclaredParams{Config: params.Request.Config, Job: params.Request.Job}); err != nil {
 		return Outcome{}, err
 	}
-	named, err := target.Named(target.ResolveParams{
+	named, err := target.Named(ctx, target.ResolveParams{
 		ProjectDir: params.Context.ProjectDir,
 		Query:      params.Request.Worktree,
 	})
@@ -53,12 +55,12 @@ func Run(params Params) (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	workDir := target.WorkDir(target.WorkDirParams{Named: named, Cwd: params.Request.Cwd})
-	entries, err := urls.Open(urls.Params{
+	workDir := target.WorkDir(ctx, target.WorkDirParams{Named: named, Cwd: params.Request.Cwd})
+	entries, err := urls.Open(ctx, urls.Params{
 		Context: params.Context,
 		Config:  params.Request.Config,
 		Raw:     params.Request.Raw,
-	}).In(workDir)
+	}).In(ctx, workDir)
 	if err != nil {
 		return Outcome{}, err
 	}

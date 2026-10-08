@@ -120,7 +120,7 @@ func TestTheStreamOpensOnASnapshotAndCarriesWhatIsPublished(t *testing.T) {
 	if got := decode(t, r.out.next(t)); got.Type != domain.EventReady {
 		t.Fatalf("second line = %+v", got)
 	}
-	wtmevents.NewPublisher(wtmevents.PublisherParams{ProjectDir: dir}).Publish(domain.Event{Type: domain.EventWorktreeCreated, Worktree: &domain.WorktreeIdentity{Branch: "feat/a", Path: "/p"}})
+	wtmevents.NewPublisher(wtmevents.PublisherParams{ProjectDir: dir}).Publish(t.Context(), domain.Event{Type: domain.EventWorktreeCreated, Worktree: &domain.WorktreeIdentity{Branch: "feat/a", Path: "/p"}})
 	if got := decode(t, r.out.next(t)); got.Type != domain.EventWorktreeCreated || got.Worktree.Branch != "feat/a" {
 		t.Fatalf("third line = %+v", got)
 	}
@@ -152,7 +152,7 @@ func TestANewerSchemaExitsWithItsOwnCode(t *testing.T) {
 	r := start(t, "--repo", dir, "--"+domain.FlagOutput, domain.OutputJSON)
 	r.out.next(t)
 	r.out.next(t)
-	repo, err := worktree.RepoOf(worktree.RepoOfParams{ProjectDir: dir})
+	repo, err := worktree.RepoOf(t.Context(), worktree.RepoOfParams{ProjectDir: dir})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,7 +303,7 @@ func TestOutsideARepositoryEventsFollowsTheRegistry(t *testing.T) {
 	if err := wtmevents.Register(wtmevents.RegisterParams{Root: dir, StateDir: filepath.Join(dir, ".git", domain.StateDirName)}); err != nil {
 		t.Fatal(err)
 	}
-	repo, err := worktree.RepoOf(worktree.RepoOfParams{ProjectDir: dir})
+	repo, err := worktree.RepoOf(t.Context(), worktree.RepoOfParams{ProjectDir: dir})
 	if err != nil {
 		t.Fatal(err)
 	}

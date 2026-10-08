@@ -10,7 +10,7 @@ import (
 
 // A job started alone gets the port check `run up` gives it, on the same budget.
 func TestTheStartedJobIsProbedOnRunTomlsBudget(t *testing.T) {
-	f := &startFlow{request: Request{Config: domain.RunConfig{PortProbeTimeout: 3}}}
+	f := &startFlow{runCtx: t.Context(), request: Request{Config: domain.RunConfig{PortProbeTimeout: 3}}}
 
 	params := f.seamParams("/wt/here")
 	if params.ProbeBudget != 3*time.Second || params.NoProbe {
@@ -19,7 +19,7 @@ func TestTheStartedJobIsProbedOnRunTomlsBudget(t *testing.T) {
 }
 
 func TestNoProbeSkipsThePortCheck(t *testing.T) {
-	f := &startFlow{request: Request{NoProbe: true}}
+	f := &startFlow{runCtx: t.Context(), request: Request{NoProbe: true}}
 
 	if !f.seamParams("/wt/here").NoProbe {
 		t.Error("--no-probe did not reach the seam")
@@ -27,7 +27,7 @@ func TestNoProbeSkipsThePortCheck(t *testing.T) {
 }
 
 func TestStartAsksAboutTheOtherWorktrees(t *testing.T) {
-	f := &startFlow{request: Request{Cwd: "/wt/here"}}
+	f := &startFlow{runCtx: t.Context(), request: Request{Cwd: "/wt/here"}}
 	f.concurrency = f.question()
 
 	for _, step := range f.session().Steps {

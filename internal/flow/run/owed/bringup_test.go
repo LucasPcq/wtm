@@ -19,8 +19,8 @@ func TestDropperDefersWhatAServiceTheDaemonRefusedHolds(t *testing.T) {
 	snapshot := readHolding(t, ctx, false)
 	presenter := &flowtest.Recorder{}
 
-	dropper := NewDropper(DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot, StartDown: true})
-	outcomes := dropper.Drop("feat-live")
+	dropper := NewDropper(t.Context(), DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot, StartDown: true})
+	outcomes := dropper.Drop(t.Context(), "feat-live")
 	dropper.Close()
 
 	if body, _ := os.ReadFile(witness); len(body) != 0 {

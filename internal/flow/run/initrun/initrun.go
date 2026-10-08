@@ -3,6 +3,7 @@
 package initrun
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -37,7 +38,7 @@ type Presenter interface {
 // scopes, namespaces, routes, commands, profiles) that no flow.StepKind renders,
 // and adding a kind means teaching every surface to draw it.
 type Wizard interface {
-	AskServices(Question) (domain.InitProjectAnswers, error)
+	AskServices(context.Context, Question) (domain.InitProjectAnswers, error)
 }
 
 // Question is everything the wizard reads. Prefill is nil on a first init, and
@@ -94,41 +95,41 @@ type Report struct {
 	AddressingDrift     *flow.Notice
 }
 
-func Run(params Params) (Outcome, error) {
-	ctx := params.Context
-	envFiles := ctx.Config.Project.Env.Files
+func Run(ctx context.Context, params Params) (Outcome, error) {
+	project := params.Context
+	envFiles := project.Config.Project.Env.Files
 
 	var detection domain.InitDetectionResult
 	var envScans map[string]domain.EnvPortScan
-	_ = params.Presenter.Stage(flow.StageParams{
+	_ = params.Presenter.Stage(ctx, flow.StageParams{
 		Message: domain.RunInitDetectingMessage,
-		Work: func() error {
-			detection = detect.ProjectEnvironment(ctx.ProjectDir)
+		Work: func(ctx context.Context) error {
+			detection = detect.ProjectEnvironment(ctx, project.ProjectDir)
 			detection.ComposeScans = compose.ScanAll(compose.ScanAllParams{
-				ProjectDir: ctx.ProjectDir,
+				ProjectDir: project.ProjectDir,
 				Files:      detection.DockerComposeFiles,
-				Project:    filepath.Base(ctx.ProjectDir),
+				Project:    filepath.Base(project.ProjectDir),
 			})
 			envScans = detect.ScanEnvPorts(detect.ScanEnvPortsParams{
-				ProjectDir: ctx.ProjectDir,
+				ProjectDir: project.ProjectDir,
 				Files:      detection.EnvFiles,
 			})
 			return nil
 		},
 	})
 
-	existing, err := runconfig.Load(ctx.StateDir)
+	existing, err := runconfig.Load(project.StateDir)
 	if err != nil {
 		return Outcome{}, fmt.Errorf("load run.toml: %w", err)
 	}
 
-	answers, err := askServices(askServicesParams{
+	answers, err := askServices(ctx, askServicesParams{
 		Params:    params,
 		Detection: detection,
 		Existing:  existing,
 		EnvScans:  envScans,
 		EnvLines: detect.EnvLines(detect.EnvPortCandidatesParams{
-			ProjectDir: ctx.ProjectDir,
+			ProjectDir: project.ProjectDir,
 			Files:      envFiles,
 		}),
 	})
@@ -164,7 +165,7 @@ func Run(params Params) (Outcome, error) {
 		Patch: answers.PatchCompose,
 	})
 	unverifiable := compose.VerifyAll(compose.VerifyAllParams{
-		ProjectDir:  ctx.ProjectDir,
+		ProjectDir:  project.ProjectDir,
 		ByFile:      plan.Patches,
 		NamesByFile: namePlan.Patches,
 	})
@@ -236,7 +237,7 @@ func Run(params Params) (Outcome, error) {
 		Ask:        !answers.EnvLinksAsked,
 		LinkEnv:    params.Request.LinkEnv || (answers.EnvLinksAsked && answers.LinkEnv),
 		Declined:   answers.EnvLinksAsked && !answers.LinkEnv,
-		ProjectDir: ctx.ProjectDir,
+		ProjectDir: project.ProjectDir,
 		EnvFiles:   envFiles,
 		Config:     outcome.Config,
 	})
@@ -253,7 +254,7 @@ func Run(params Params) (Outcome, error) {
 			EnvFiles:   envFiles,
 		})
 	}
-	writtenKeys, err := envsvc.WritePortKeys(envsvc.WritePortKeysParams{ProjectDir: ctx.ProjectDir, Writes: portKeys})
+	writtenKeys, err := envsvc.WritePortKeys(envsvc.WritePortKeysParams{ProjectDir: project.ProjectDir, Writes: portKeys})
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -271,13 +272,13 @@ func Run(params Params) (Outcome, error) {
 	// keeps binding its defaults, while a run.toml declaring ports the compose
 	// does not read would announce an isolation that is not there.
 	if err := compose.PatchAll(compose.PatchAllParams{
-		ProjectDir:  ctx.ProjectDir,
+		ProjectDir:  project.ProjectDir,
 		ByFile:      outcome.Patches,
 		NamesByFile: namePatches,
 	}); err != nil {
 		return Outcome{}, err
 	}
-	if err := runconfig.Save(runconfig.SaveParams{StateDir: ctx.StateDir, Config: outcome.Config}); err != nil {
+	if err := runconfig.Save(ctx, runconfig.SaveParams{StateDir: project.StateDir, Config: outcome.Config}); err != nil {
 		return Outcome{}, err
 	}
 
@@ -289,16 +290,16 @@ func Run(params Params) (Outcome, error) {
 	})
 	if len(addedTargets) > 0 {
 		if err := envsvc.AddEnvTargets(envsvc.AddEnvTargetsParams{
-			StateDir: ctx.StateDir,
-			Project:  ctx.Config.Project,
+			StateDir: project.StateDir,
+			Project:  project.Config.Project,
 			Targets:  addedTargets,
 		}); err != nil {
 			return Outcome{}, fmt.Errorf("add env targets: %w", err)
 		}
 	}
 
-	result := Outcome{Report: report(reportParams{
-		Context:     ctx,
+	result := Outcome{Report: report(ctx, reportParams{
+		Context:     project,
 		Redirection: params.Request.Redirection,
 		Detection:   detection,
 		Answers:     answers,
@@ -327,7 +328,7 @@ type askServicesParams struct {
 // nobody can answer it, straight from detection. On a re-run the wizard is
 // pre-filled with what run.toml already declares so the subsequent merge is
 // additive rather than a fresh overwrite.
-func askServices(params askServicesParams) (domain.InitProjectAnswers, error) {
+func askServices(ctx context.Context, params askServicesParams) (domain.InitProjectAnswers, error) {
 	request := params.Params.Request
 	if !params.Params.Prompter.Interactive() {
 		return rules.AutoServicesAnswers(rules.AutoServicesAnswersParams{
@@ -344,16 +345,16 @@ func askServices(params askServicesParams) (domain.InitProjectAnswers, error) {
 		}
 	}
 
-	ctx := params.Params.Context
-	return params.Params.Wizard.AskServices(Question{
-		ProjectDir:   ctx.ProjectDir,
+	project := params.Params.Context
+	return params.Params.Wizard.AskServices(ctx, Question{
+		ProjectDir:   project.ProjectDir,
 		Detection:    params.Detection,
 		Existing:     params.Existing,
 		Prefill:      prefill,
 		PatchCompose: request.PatchCompose,
 		EnvScans:     params.EnvScans,
 		EnvLines:     params.EnvLines,
-		EnvFiles:     ctx.Config.Project.Env.Files,
+		EnvFiles:     project.Config.Project.Env.Files,
 	})
 }
 
@@ -421,20 +422,20 @@ type reportParams struct {
 	Redirection domain.ProxyStatus
 }
 
-func report(params reportParams) Report {
-	ctx, cfg := params.Context, params.Outcome.Config
+func report(ctx context.Context, params reportParams) Report {
+	project, cfg := params.Context, params.Outcome.Config
 
 	// Re-read after the writes: the reports below say what is still missing, and
 	// the scan they were computed from predates the keys this run just wrote.
 	envScans := detect.ScanEnvPorts(detect.ScanEnvPortsParams{
-		ProjectDir: ctx.ProjectDir,
+		ProjectDir: project.ProjectDir,
 		Files:      params.Detection.EnvFiles,
 	})
 	composeJobs := rules.ComposeJobsFor(rules.ComposeJobsParams{Config: cfg, Files: params.Answers.DockerComposeFiles})
-	proxyPort := rules.ProxyPort(ctx.Config.Global)
+	proxyPort := rules.ProxyPort(project.Config.Global)
 
 	result := Report{
-		RunPath:    filepath.Join(ctx.StateDir, domain.RunFileName),
+		RunPath:    filepath.Join(project.StateDir, domain.RunFileName),
 		Added:      len(params.Outcome.Merge.Added),
 		Removed:    len(params.Outcome.Removed),
 		Kept:       len(params.Outcome.Merge.Skipped),
@@ -472,7 +473,7 @@ func report(params reportParams) Report {
 	}
 	// The main checkout is the one no command ever provisions, so it is the one
 	// the addressing just chosen leaves behind.
-	if notice, ok := addressing.Notice(addressing.Params{Context: ctx, WorkDirs: []string{ctx.ProjectDir}}); ok {
+	if notice, ok := addressing.Notice(ctx, addressing.Params{Context: project, WorkDirs: []string{project.ProjectDir}}); ok {
 		result.AddressingDrift = &notice
 	}
 	return result

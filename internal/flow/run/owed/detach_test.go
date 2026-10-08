@@ -105,7 +105,7 @@ func holdingFixture(t *testing.T) (flow.Context, string) {
 // dropped, so a drop that still needed its directory would fail here.
 func removeWorktree(t *testing.T, ctx flow.Context) {
 	t.Helper()
-	wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: ctx.ProjectDir, Branch: "feat-live"})
+	wt, err := worktree.FindByBranch(t.Context(), worktree.FindByBranchParams{ProjectDir: ctx.ProjectDir, Branch: "feat-live"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func removeWorktree(t *testing.T, ctx flow.Context) {
 
 func readHolding(t *testing.T, ctx flow.Context, up bool) Snapshot {
 	t.Helper()
-	snapshot := Read(ReadParams{Context: ctx, Branches: []string{"feat-live"}})
+	snapshot := Read(t.Context(), ReadParams{Context: ctx, Branches: []string{"feat-live"}})
 	if len(snapshot.Holdings) != 1 {
 		t.Fatalf("holdings = %+v, want feat-live's", snapshot.Holdings)
 	}
@@ -128,8 +128,8 @@ func TestDropperDropsWhatAServiceUpHoldsOnceTheWorktreeIsGone(t *testing.T) {
 	removeWorktree(t, ctx)
 	presenter := &flowtest.Recorder{}
 
-	dropper := NewDropper(DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot})
-	outcomes := dropper.Drop("feat-live")
+	dropper := NewDropper(t.Context(), DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot})
+	outcomes := dropper.Drop(t.Context(), "feat-live")
 	dropper.Close()
 
 	if body, _ := os.ReadFile(witness); strings.TrimSpace(string(body)) != "app_feat-live" {
@@ -149,7 +149,7 @@ func TestDropperQueuesWhatAServiceDownHolds(t *testing.T) {
 	snapshot := readHolding(t, ctx, false)
 	presenter := &flowtest.Recorder{}
 
-	outcomes := NewDropper(DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot}).Drop("feat-live")
+	outcomes := NewDropper(t.Context(), DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot}).Drop(t.Context(), "feat-live")
 
 	if body, _ := os.ReadFile(witness); len(body) != 0 {
 		t.Errorf("remove ran with %q against a service down", body)
@@ -174,7 +174,7 @@ func TestDropperNamesTheCauseOfADropRefusedByAServiceUp(t *testing.T) {
 	snapshot.Holdings[0].Config.Jobs[0].Namespace.Remove = "echo 'database is being accessed by other users' >&2; exit 1"
 	presenter := &flowtest.Recorder{}
 
-	outcomes := NewDropper(DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot}).Drop("feat-live")
+	outcomes := NewDropper(t.Context(), DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot}).Drop(t.Context(), "feat-live")
 
 	if len(presenter.Statuses) != 1 {
 		t.Fatalf("statuses = %+v, want one line", presenter.Statuses)
@@ -201,7 +201,7 @@ func TestDropperSettlesAnOlderDebtForTheNamespaceItDrops(t *testing.T) {
 	}
 	snapshot := readHolding(t, ctx, true)
 
-	NewDropper(DropperParams{Context: ctx, Presenter: &flowtest.Recorder{}, Snapshot: snapshot}).Drop("feat-live")
+	NewDropper(t.Context(), DropperParams{Context: ctx, Presenter: &flowtest.Recorder{}, Snapshot: snapshot}).Drop(t.Context(), "feat-live")
 
 	if left := runjobs.LoadPendingRemovals(ctx.StateDir); len(left) != 0 {
 		t.Errorf("queue = %+v, want the old debt settled", left)
@@ -213,7 +213,7 @@ func TestDropperWithKeepDataRunsNothing(t *testing.T) {
 	snapshot := readHolding(t, ctx, true)
 	presenter := &flowtest.Recorder{}
 
-	outcomes := NewDropper(DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot, KeepData: true}).Drop("feat-live")
+	outcomes := NewDropper(t.Context(), DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot, KeepData: true}).Drop(t.Context(), "feat-live")
 
 	if body, _ := os.ReadFile(witness); len(body) != 0 {
 		t.Errorf("remove ran with %q under --keep-data", body)
@@ -237,7 +237,7 @@ func TestDropperKeepsANamespaceAnotherWorktreeSharesByItsSlug(t *testing.T) {
 	}
 	presenter := &flowtest.Recorder{}
 
-	outcomes := NewDropper(DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot}).Drop("feat-live")
+	outcomes := NewDropper(t.Context(), DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot}).Drop(t.Context(), "feat-live")
 
 	if body, _ := os.ReadFile(witness); len(body) != 0 {
 		t.Errorf("remove ran with %q on a namespace feat/live still uses", body)
@@ -261,8 +261,8 @@ func TestDropperStartsAServiceDownAndLetsItGoAfterwards(t *testing.T) {
 	snapshot := readHolding(t, ctx, false)
 	presenter := &flowtest.Recorder{}
 
-	dropper := NewDropper(DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot, StartDown: true})
-	outcomes := dropper.Drop("feat-live")
+	dropper := NewDropper(t.Context(), DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot, StartDown: true})
+	outcomes := dropper.Drop(t.Context(), "feat-live")
 	dropper.Close()
 
 	if body, _ := os.ReadFile(witness); strings.TrimSpace(string(body)) != "app_feat-live" {
@@ -271,7 +271,7 @@ func TestDropperStartsAServiceDownAndLetsItGoAfterwards(t *testing.T) {
 	if len(outcomes) != 1 || outcomes[0].Status != domain.NamespaceDropped {
 		t.Errorf("outcomes = %+v, want it dropped", outcomes)
 	}
-	main, err := worktree.MainCheckout(worktree.MainCheckoutParams{ProjectDir: ctx.ProjectDir})
+	main, err := worktree.MainCheckout(t.Context(), worktree.MainCheckoutParams{ProjectDir: ctx.ProjectDir})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -287,7 +287,7 @@ func TestDropperDefersWhatAServiceThatWouldNotStartHolds(t *testing.T) {
 	snapshot.Config = domain.RunConfig{}
 	presenter := &flowtest.Recorder{}
 
-	outcomes := NewDropper(DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot, StartDown: true}).Drop("feat-live")
+	outcomes := NewDropper(t.Context(), DropperParams{Context: ctx, Presenter: presenter, Snapshot: snapshot, StartDown: true}).Drop(t.Context(), "feat-live")
 
 	if body, _ := os.ReadFile(witness); len(body) != 0 {
 		t.Errorf("remove ran with %q against a service that never started", body)

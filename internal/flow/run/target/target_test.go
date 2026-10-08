@@ -8,7 +8,7 @@ import (
 
 func TestNamedBranchPrefersTheBranchThePositionalNamed(t *testing.T) {
 	dir := t.TempDir()
-	got := target.NamedBranch(target.NamedBranchParams{
+	got := target.NamedBranch(t.Context(), target.NamedBranchParams{
 		Named: []target.Resolved{{Dir: "/elsewhere", Branch: "other"}, {Dir: dir, Branch: "feat/x"}},
 		Dir:   dir,
 	})
@@ -18,7 +18,7 @@ func TestNamedBranchPrefersTheBranchThePositionalNamed(t *testing.T) {
 }
 
 func TestNamedBranchAsksGitForAWorktreeNobodyNamed(t *testing.T) {
-	got := target.NamedBranch(target.NamedBranchParams{
+	got := target.NamedBranch(t.Context(), target.NamedBranchParams{
 		Named: []target.Resolved{{Dir: "/elsewhere", Branch: "other"}},
 		Dir:   t.TempDir(),
 	})

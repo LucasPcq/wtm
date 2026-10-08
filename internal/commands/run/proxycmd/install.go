@@ -79,7 +79,7 @@ func runInstall(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	if applyErr := redirector.Apply(); applyErr != nil {
+	if applyErr := redirector.Apply(cmd.Context()); applyErr != nil {
 		return applyErr
 	}
 	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
@@ -125,7 +125,7 @@ func runUninstall(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	if removeErr := redirector.Remove(); removeErr != nil {
+	if removeErr := redirector.Remove(cmd.Context()); removeErr != nil {
 		return removeErr
 	}
 	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {

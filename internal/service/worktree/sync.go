@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -31,8 +32,8 @@ type SyncParams struct {
 
 // PlanSync builds the ordered cascade plan without touching any branch. Used to
 // preview the operation and surface ordering errors (e.g. cycles) before acting.
-func PlanSync(params SyncParams) (domain.SyncPlan, error) {
-	nodes, err := buildNodes(params.ProjectDir, params.StateDir)
+func PlanSync(ctx context.Context, params SyncParams) (domain.SyncPlan, error) {
+	nodes, err := buildNodes(ctx, params.ProjectDir, params.StateDir)
 	if err != nil {
 		return domain.SyncPlan{}, err
 	}
@@ -55,8 +56,8 @@ func PlanSync(params SyncParams) (domain.SyncPlan, error) {
 // Sync runs the cascade: it fetches and fast-forwards the base, then rebases
 // every managed worktree onto its (refreshed) parent in topological order. The
 // rebases are entirely local — pushing is a separate step (see PushSynced).
-func Sync(params SyncParams) (domain.SyncResult, error) {
-	nodes, err := buildNodes(params.ProjectDir, params.StateDir)
+func Sync(ctx context.Context, params SyncParams) (domain.SyncResult, error) {
+	nodes, err := buildNodes(ctx, params.ProjectDir, params.StateDir)
 	if err != nil {
 		return domain.SyncResult{}, err
 	}
@@ -70,7 +71,7 @@ func Sync(params SyncParams) (domain.SyncResult, error) {
 	plan.Steps = rules.FilterSyncSteps(plan.Steps, params.SelectedBranches)
 
 	mainPath := mainWorktreePath(nodes, params.ProjectDir)
-	oldTips := captureTips(captureTipsParams{
+	oldTips := captureTips(ctx, captureTipsParams{
 		MainPath:   mainPath,
 		BaseBranch: params.BaseBranch,
 		Steps:      plan.Steps,
@@ -99,7 +100,7 @@ func Sync(params SyncParams) (domain.SyncResult, error) {
 	}
 
 	if !params.DryRun && baseTargeted {
-		newTip, updated := updateBase(updateBaseParams{
+		newTip, updated := updateBase(ctx, updateBaseParams{
 			MainPath:   mainPath,
 			BaseBranch: params.BaseBranch,
 		})
@@ -111,7 +112,7 @@ func Sync(params SyncParams) (domain.SyncResult, error) {
 	// is rebased onto the refreshed parent rather than a stale ref. Dry-run stays
 	// offline — it neither fetches nor moves anything — but still reports what the
 	// cached remote-tracking refs already show, so the preview names the problem.
-	result.ParentUpdates = reconcileParents(reconcileParentsParams{
+	result.ParentUpdates = reconcileParents(ctx, reconcileParentsParams{
 		Nodes:       nodes,
 		Steps:       plan.Steps,
 		MainPath:    mainPath,
@@ -122,7 +123,7 @@ func Sync(params SyncParams) (domain.SyncResult, error) {
 
 	skipped := make(map[string]bool)
 	for _, step := range plan.Steps {
-		stepResult, blocks := evaluateStep(stepEval{
+		stepResult, blocks := evaluateStep(ctx, stepEval{
 			Step:         step,
 			OldTips:      oldTips,
 			Skipped:      skipped,
@@ -149,8 +150,8 @@ type ClassifyParentsParams struct {
 // nothing. A wizard runs it before its first question: which parents a selection
 // leaves uncovered is only known step by step, their state against origin is not
 // — so the network work happens once and the wizard filters it locally.
-func ClassifyParents(params ClassifyParentsParams) ([]domain.ParentUpdate, error) {
-	nodes, err := buildNodes(params.ProjectDir, params.StateDir)
+func ClassifyParents(ctx context.Context, params ClassifyParentsParams) ([]domain.ParentUpdate, error) {
+	nodes, err := buildNodes(ctx, params.ProjectDir, params.StateDir)
 	if err != nil {
 		return nil, err
 	}
@@ -168,11 +169,11 @@ func ClassifyParents(params ClassifyParentsParams) ([]domain.ParentUpdate, error
 	if len(branches) == 0 {
 		return nil, nil
 	}
-	infra.Fetch(infra.FetchParams{ProjectDir: mainPath})
+	infra.Fetch(ctx, infra.FetchParams{ProjectDir: mainPath})
 
 	updates := make([]domain.ParentUpdate, 0, len(branches))
 	for _, branch := range branches {
-		update, ok := reconcileParent(reconcileParentParams{
+		update, ok := reconcileParent(ctx, reconcileParentParams{
 			Parent:       domain.ParentUpdate{Branch: branch},
 			WorktreePath: pathByBranch[branch],
 			MainPath:     mainPath,
@@ -194,10 +195,10 @@ type StaleParentsParams struct {
 
 // StaleParents narrows a ClassifyParents inspection to what the given selection
 // leaves uncovered. No network, so a wizard can call it while building a step.
-func StaleParents(params StaleParentsParams) []domain.ParentUpdate {
+func StaleParents(ctx context.Context, params StaleParentsParams) []domain.ParentUpdate {
 	preview := params.Sync
 	preview.SelectedBranches = params.Branches
-	plan, err := PlanSync(preview)
+	plan, err := PlanSync(ctx, preview)
 	if err != nil {
 		return nil
 	}
@@ -221,7 +222,7 @@ type reconcileParentsParams struct {
 	Offline bool
 }
 
-func reconcileParents(params reconcileParentsParams) []domain.ParentUpdate {
+func reconcileParents(ctx context.Context, params reconcileParentsParams) []domain.ParentUpdate {
 	pathByBranch := make(map[string]string, len(params.Nodes))
 	for _, node := range params.Nodes {
 		pathByBranch[node.Branch] = node.Path
@@ -238,12 +239,12 @@ func reconcileParents(params reconcileParentsParams) []domain.ParentUpdate {
 	// One fetch refreshes every origin ref, so the loop below is pure ref
 	// arithmetic. A failure is not fatal — the cached refs still say something.
 	if !params.Offline {
-		infra.Fetch(infra.FetchParams{ProjectDir: params.MainPath})
+		infra.Fetch(ctx, infra.FetchParams{ProjectDir: params.MainPath})
 	}
 
 	updates := make([]domain.ParentUpdate, 0, len(pending))
 	for _, parent := range pending {
-		update, ok := reconcileParent(reconcileParentParams{
+		update, ok := reconcileParent(ctx, reconcileParentParams{
 			Parent:       parent,
 			WorktreePath: pathByBranch[parent.Branch],
 			MainPath:     params.MainPath,
@@ -267,7 +268,7 @@ type reconcileParentParams struct {
 
 // reconcileParent returns false when there is nothing worth reporting: no remote
 // counterpart, or a local ref that already carries it.
-func reconcileParent(params reconcileParentParams) (domain.ParentUpdate, bool) {
+func reconcileParent(ctx context.Context, params reconcileParentParams) (domain.ParentUpdate, bool) {
 	update := params.Parent
 	gitDir := params.MainPath
 	if params.WorktreePath != "" {
@@ -275,17 +276,17 @@ func reconcileParent(params reconcileParentParams) (domain.ParentUpdate, bool) {
 	}
 
 	remoteRef := domain.RemoteBranchPrefix + update.Branch
-	if _, err := infra.Tip(infra.TipParams{WorktreePath: gitDir, Ref: remoteRef}); err != nil {
+	if _, err := infra.Tip(ctx, infra.TipParams{WorktreePath: gitDir, Ref: remoteRef}); err != nil {
 		return domain.ParentUpdate{}, false
 	}
 
-	tip, err := infra.Tip(infra.TipParams{WorktreePath: gitDir, Ref: update.Branch})
+	tip, err := infra.Tip(ctx, infra.TipParams{WorktreePath: gitDir, Ref: update.Branch})
 	if err != nil {
 		return domain.ParentUpdate{}, false
 	}
 	update.OldTip, update.NewTip = tip, tip
 
-	if infra.IsAncestor(infra.IsAncestorParams{
+	if infra.IsAncestor(ctx, infra.IsAncestorParams{
 		WorktreePath: gitDir,
 		Ancestor:     remoteRef,
 		Descendant:   update.Branch,
@@ -293,7 +294,7 @@ func reconcileParent(params reconcileParentParams) (domain.ParentUpdate, bool) {
 		return domain.ParentUpdate{}, false
 	}
 
-	if !infra.IsAncestor(infra.IsAncestorParams{
+	if !infra.IsAncestor(ctx, infra.IsAncestorParams{
 		WorktreePath: gitDir,
 		Ancestor:     update.Branch,
 		Descendant:   remoteRef,
@@ -303,7 +304,7 @@ func reconcileParent(params reconcileParentParams) (domain.ParentUpdate, bool) {
 		// After a local rebase of the parent they are all patch-present, so there
 		// is nothing to reconcile and nothing to report — the same refinement
 		// integrateRemote applies to a step's own branch.
-		if !infra.RemoteHasUnintegratedCommits(infra.RemoteBranchParams{
+		if !infra.RemoteHasUnintegratedCommits(ctx, infra.RemoteBranchParams{
 			WorktreePath: gitDir,
 			Branch:       update.Branch,
 		}) {
@@ -314,7 +315,7 @@ func reconcileParent(params reconcileParentParams) (domain.ParentUpdate, bool) {
 	}
 
 	update.Status = domain.ParentBehind
-	if behind, behindErr := infra.Behind(infra.BehindParams{
+	if behind, behindErr := infra.Behind(ctx, infra.BehindParams{
 		WorktreePath: gitDir,
 		Branch:       update.Branch,
 		Upstream:     remoteRef,
@@ -324,7 +325,7 @@ func reconcileParent(params reconcileParentParams) (domain.ParentUpdate, bool) {
 	if !params.FastForward {
 		return update, true
 	}
-	if ffErr := fastForwardParent(fastForwardParentParams{
+	if ffErr := fastForwardParent(ctx, fastForwardParentParams{
 		Branch:       update.Branch,
 		WorktreePath: params.WorktreePath,
 		ProjectDir:   gitDir,
@@ -335,7 +336,7 @@ func reconcileParent(params reconcileParentParams) (domain.ParentUpdate, bool) {
 	}
 
 	update.Status = domain.ParentFastForwarded
-	if newTip, tipErr := infra.Tip(infra.TipParams{WorktreePath: gitDir, Ref: update.Branch}); tipErr == nil {
+	if newTip, tipErr := infra.Tip(ctx, infra.TipParams{WorktreePath: gitDir, Ref: update.Branch}); tipErr == nil {
 		update.NewTip = newTip
 	}
 	return update, true
@@ -352,22 +353,22 @@ type fastForwardParentParams struct {
 // into its ref; a checked-out one must be advanced inside its own worktree, and
 // only while that worktree is clean — the same guard updateBase applies to the
 // base.
-func fastForwardParent(params fastForwardParentParams) error {
+func fastForwardParent(ctx context.Context, params fastForwardParentParams) error {
 	if params.WorktreePath == "" {
-		return infra.FastForwardRef(infra.FastForwardRefParams{
+		return infra.FastForwardRef(ctx, infra.FastForwardRefParams{
 			ProjectDir: params.ProjectDir,
 			Branch:     params.Branch,
 		})
 	}
 
-	dirty, err := infra.IsDirty(infra.IsDirtyParams{WorktreePath: params.WorktreePath})
+	dirty, err := infra.IsDirty(ctx, infra.IsDirtyParams{WorktreePath: params.WorktreePath})
 	if err != nil {
 		return fmt.Errorf("cannot check %s worktree: %w", params.Branch, err)
 	}
 	if dirty {
 		return fmt.Errorf("worktree has uncommitted changes")
 	}
-	return infra.FastForwardBranch(infra.FastForwardParams{
+	return infra.FastForwardBranch(ctx, infra.FastForwardParams{
 		WorktreePath: params.WorktreePath,
 		Onto:         domain.RemoteBranchPrefix + params.Branch,
 	})
@@ -392,8 +393,8 @@ type PushSyncedParams struct {
 
 // PushSynced force-pushes (with lease) every branch that was rebased in the run.
 // It mutates and returns a copy of the result with Pushed flags set.
-func PushSynced(params PushSyncedParams) domain.SyncResult {
-	worktrees, err := infra.ListWorktrees(infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
+func PushSynced(ctx context.Context, params PushSyncedParams) domain.SyncResult {
+	worktrees, err := infra.ListWorktrees(ctx, infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
 	if err != nil {
 		return params.Result
 	}
@@ -412,7 +413,7 @@ func PushSynced(params PushSyncedParams) domain.SyncResult {
 		if path == "" {
 			continue
 		}
-		if pushErr := infra.PushForceWithLease(infra.PushForceParams{
+		if pushErr := infra.PushForceWithLease(ctx, infra.PushForceParams{
 			WorktreePath: path,
 			Branch:       step.Branch,
 		}); pushErr != nil {
@@ -433,12 +434,12 @@ type NodesParams struct {
 // Nodes is the managed worktrees with their recorded parents: the graph the
 // reparent and sync rules are validated against. flow/ cannot reach infra/, so
 // this is where it reads it from.
-func Nodes(params NodesParams) ([]domain.WorktreeNode, error) {
-	return buildNodes(params.ProjectDir, params.StateDir)
+func Nodes(ctx context.Context, params NodesParams) ([]domain.WorktreeNode, error) {
+	return buildNodes(ctx, params.ProjectDir, params.StateDir)
 }
 
-func buildNodes(projectDir, stateDir string) ([]domain.WorktreeNode, error) {
-	worktrees, err := infra.ListWorktrees(infra.ListWorktreesParams{ProjectDir: projectDir})
+func buildNodes(ctx context.Context, projectDir, stateDir string) ([]domain.WorktreeNode, error) {
+	worktrees, err := infra.ListWorktrees(ctx, infra.ListWorktreesParams{ProjectDir: projectDir})
 	if err != nil {
 		return nil, err
 	}
@@ -478,10 +479,10 @@ type captureTipsParams struct {
 
 // captureTips records every branch tip BEFORE any rebase. The recorded parent
 // tip is later used as the rebase upstream so only a child's own commits replay.
-func captureTips(params captureTipsParams) map[string]string {
+func captureTips(ctx context.Context, params captureTipsParams) map[string]string {
 	tips := make(map[string]string, len(params.Steps)+1)
 
-	if tip, err := infra.Tip(infra.TipParams{
+	if tip, err := infra.Tip(ctx, infra.TipParams{
 		WorktreePath: params.MainPath,
 		Ref:          params.BaseBranch,
 	}); err == nil {
@@ -489,7 +490,7 @@ func captureTips(params captureTipsParams) map[string]string {
 	}
 
 	for _, step := range params.Steps {
-		if tip, err := infra.Tip(infra.TipParams{
+		if tip, err := infra.Tip(ctx, infra.TipParams{
 			WorktreePath: step.Path,
 			Ref:          step.Branch,
 		}); err == nil {
@@ -509,31 +510,31 @@ type updateBaseParams struct {
 // base (no fast-forward), missing remote, or a dirty main worktree is non-fatal:
 // the cascade then rebases onto the local base as-is. The dirty guard mirrors the
 // per-worktree behaviour — the base is only advanced when its worktree is clean.
-func updateBase(params updateBaseParams) (string, bool) {
-	currentTip, _ := infra.Tip(infra.TipParams{
+func updateBase(ctx context.Context, params updateBaseParams) (string, bool) {
+	currentTip, _ := infra.Tip(ctx, infra.TipParams{
 		WorktreePath: params.MainPath,
 		Ref:          params.BaseBranch,
 	})
 
-	if dirty, err := infra.IsDirty(infra.IsDirtyParams{WorktreePath: params.MainPath}); err != nil || dirty {
+	if dirty, err := infra.IsDirty(ctx, infra.IsDirtyParams{WorktreePath: params.MainPath}); err != nil || dirty {
 		return currentTip, false
 	}
 
-	if fetchErr := infra.FetchBranch(infra.FetchBranchParams{
+	if fetchErr := infra.FetchBranch(ctx, infra.FetchBranchParams{
 		ProjectDir: params.MainPath,
 		Branch:     params.BaseBranch,
 	}); fetchErr != nil {
 		return currentTip, false
 	}
 
-	if ffErr := infra.FastForwardBranch(infra.FastForwardParams{
+	if ffErr := infra.FastForwardBranch(ctx, infra.FastForwardParams{
 		WorktreePath: params.MainPath,
 		Onto:         domain.RemoteBranchPrefix + params.BaseBranch,
 	}); ffErr != nil {
 		return currentTip, false
 	}
 
-	newTip, _ := infra.Tip(infra.TipParams{
+	newTip, _ := infra.Tip(ctx, infra.TipParams{
 		WorktreePath: params.MainPath,
 		Ref:          params.BaseBranch,
 	})
@@ -550,8 +551,8 @@ const (
 // integrateRemote fast-forwards a branch from its own origin/<branch> before it
 // is rebased. Returns integrateDiverged when local and remote have both moved
 // (no fast-forward possible). A missing remote branch is a no-op.
-func integrateRemote(step domain.SyncStep) integrateOutcome {
-	if fetchErr := infra.FetchBranch(infra.FetchBranchParams{
+func integrateRemote(ctx context.Context, step domain.SyncStep) integrateOutcome {
+	if fetchErr := infra.FetchBranch(ctx, infra.FetchBranchParams{
 		ProjectDir: step.Path,
 		Branch:     step.Branch,
 	}); fetchErr != nil {
@@ -559,7 +560,7 @@ func integrateRemote(step domain.SyncStep) integrateOutcome {
 	}
 
 	remoteRef := domain.RemoteBranchPrefix + step.Branch
-	localHasRemote := infra.IsAncestor(infra.IsAncestorParams{
+	localHasRemote := infra.IsAncestor(ctx, infra.IsAncestorParams{
 		WorktreePath: step.Path,
 		Ancestor:     remoteRef,
 		Descendant:   step.Branch,
@@ -568,13 +569,13 @@ func integrateRemote(step domain.SyncStep) integrateOutcome {
 		return integrateProceed
 	}
 
-	remoteHasLocal := infra.IsAncestor(infra.IsAncestorParams{
+	remoteHasLocal := infra.IsAncestor(ctx, infra.IsAncestorParams{
 		WorktreePath: step.Path,
 		Ancestor:     step.Branch,
 		Descendant:   remoteRef,
 	})
 	if remoteHasLocal {
-		infra.FastForwardBranch(infra.FastForwardParams{
+		infra.FastForwardBranch(ctx, infra.FastForwardParams{
 			WorktreePath: step.Path,
 			Onto:         remoteRef,
 		})
@@ -586,7 +587,7 @@ func integrateRemote(step domain.SyncStep) integrateOutcome {
 	// local branch. After a prior local rebase the remote's commits are
 	// patch-present locally (just rewritten), so there is nothing to reconcile —
 	// proceed and let the rebase see behind == 0 (up_to_date).
-	if infra.RemoteHasUnintegratedCommits(infra.RemoteBranchParams{
+	if infra.RemoteHasUnintegratedCommits(ctx, infra.RemoteBranchParams{
 		WorktreePath: step.Path,
 		Branch:       step.Branch,
 	}) {
@@ -605,7 +606,7 @@ type stepEval struct {
 
 // evaluateStep computes the outcome of one cascade step. The second return value
 // reports whether this branch must block its descendants (skip/conflict/error).
-func evaluateStep(e stepEval) (domain.SyncStepResult, bool) {
+func evaluateStep(ctx context.Context, e stepEval) (domain.SyncStepResult, bool) {
 	result := domain.SyncStepResult{
 		Branch:       e.Step.Branch,
 		SourceBranch: e.Step.SourceBranch,
@@ -635,7 +636,7 @@ func evaluateStep(e stepEval) (domain.SyncStepResult, bool) {
 		return result, true
 	}
 
-	dirty, dirtyErr := infra.IsDirty(infra.IsDirtyParams{WorktreePath: e.Step.Path})
+	dirty, dirtyErr := infra.IsDirty(ctx, infra.IsDirtyParams{WorktreePath: e.Step.Path})
 	if dirtyErr != nil {
 		// Could not determine cleanliness — do not rebase blind. Block the
 		// branch (and its descendants) so a real git failure is surfaced rather
@@ -654,20 +655,20 @@ func evaluateStep(e stepEval) (domain.SyncStepResult, bool) {
 	// commits merged into origin/<branch> elsewhere are included. A true
 	// committed divergence (no fast-forward) is left for the user to reconcile.
 	// Skipped in dry-run, which stays fully offline.
-	if !e.DryRun && integrateRemote(e.Step) == integrateDiverged {
+	if !e.DryRun && integrateRemote(ctx, e.Step) == integrateDiverged {
 		result.Status = domain.SyncStatusDiverged
 		result.Detail = "local and origin/" + e.Step.Branch + " have diverged"
 		return result, true
 	}
 
-	if tip, err := infra.Tip(infra.TipParams{
+	if tip, err := infra.Tip(ctx, infra.TipParams{
 		WorktreePath: e.Step.Path,
 		Ref:          e.Step.SourceBranch,
 	}); err == nil {
 		result.OntoTip = tip
 	}
 
-	behind, behindErr := infra.Behind(infra.BehindParams{
+	behind, behindErr := infra.Behind(ctx, infra.BehindParams{
 		WorktreePath: e.Step.Path,
 		Branch:       e.Step.Branch,
 		Upstream:     e.Step.SourceBranch,
@@ -681,14 +682,14 @@ func evaluateStep(e stepEval) (domain.SyncStepResult, bool) {
 	}
 	if behind == 0 {
 		result.Status = domain.SyncStatusUpToDate
-		if tip, err := infra.Tip(infra.TipParams{
+		if tip, err := infra.Tip(ctx, infra.TipParams{
 			WorktreePath: e.Step.Path,
 			Ref:          e.Step.Branch,
 		}); err == nil {
 			result.NewTip = tip
 		}
 		if !e.DryRun {
-			result.PushPending = infra.AheadOfRemote(infra.RemoteBranchParams{
+			result.PushPending = infra.AheadOfRemote(ctx, infra.RemoteBranchParams{
 				WorktreePath: e.Step.Path,
 				Branch:       e.Step.Branch,
 			})
@@ -700,7 +701,7 @@ func evaluateStep(e stepEval) (domain.SyncStepResult, bool) {
 	if upstream == "" {
 		upstream = e.Step.SourceBranch
 	}
-	result.CommitsReplayed, _ = infra.CommitCount(infra.CommitCountParams{
+	result.CommitsReplayed, _ = infra.CommitCount(ctx, infra.CommitCountParams{
 		WorktreePath: e.Step.Path,
 		Range:        upstream + ".." + e.Step.Branch,
 	})
@@ -711,7 +712,7 @@ func evaluateStep(e stepEval) (domain.SyncStepResult, bool) {
 		return result, false
 	}
 
-	rebaseResult, err := infra.RebaseOnto(infra.RebaseOntoParams{
+	rebaseResult, err := infra.RebaseOnto(ctx, infra.RebaseOntoParams{
 		WorktreePath: e.Step.Path,
 		NewBase:      e.Step.SourceBranch,
 		Upstream:     upstream,
@@ -736,13 +737,13 @@ func evaluateStep(e stepEval) (domain.SyncStepResult, bool) {
 	}
 
 	result.Status = domain.SyncStatusSynced
-	if tip, tipErr := infra.Tip(infra.TipParams{
+	if tip, tipErr := infra.Tip(ctx, infra.TipParams{
 		WorktreePath: e.Step.Path,
 		Ref:          e.Step.Branch,
 	}); tipErr == nil {
 		result.NewTip = tip
 	}
-	result.PushPending = infra.AheadOfRemote(infra.RemoteBranchParams{
+	result.PushPending = infra.AheadOfRemote(ctx, infra.RemoteBranchParams{
 		WorktreePath: e.Step.Path,
 		Branch:       e.Step.Branch,
 	})

@@ -2,6 +2,7 @@
 package env
 
 import (
+	"context"
 	"errors"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -50,8 +51,9 @@ type Params struct {
 	Presenter Presenter
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &envFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -64,6 +66,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type envFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -87,7 +90,7 @@ func (f *envFlow) run() (Outcome, error) {
 	}
 
 	if f.prompter.Interactive() {
-		if err := f.presenter.Stage(flow.StageParams{Message: domain.EnvScanLoading, Work: f.scan}); err != nil {
+		if err := f.presenter.Stage(f.runCtx, flow.StageParams{Message: domain.EnvScanLoading, Work: f.scan}); err != nil {
 			return Outcome{}, err
 		}
 	}
@@ -130,7 +133,7 @@ func (f *envFlow) answeredTarget(branch string) (target, error) {
 }
 
 func (f *envFlow) lookup(branch string) (target, error) {
-	wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branch})
+	wt, err := worktree.FindByBranch(f.runCtx, worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branch})
 	if err != nil {
 		return target{}, err
 	}
@@ -208,7 +211,7 @@ func (f *envFlow) apply(params applyParams) (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	pass := f.runPass(runPassParams{Target: params.Target, Adoption: state.adoption, Isolation: params.Isolation, Addressing: addressing, Reserved: sw.keys()})
+	pass := f.runPass(f.runCtx, runPassParams{Target: params.Target, Adoption: state.adoption, Isolation: params.Isolation, Addressing: addressing, Reserved: sw.keys()})
 
 	result, err := f.reconcile(reconcileParams{Target: params.Target, Ctx: ctx, Pass: pass, Resolutions: params.Resolutions})
 	if err != nil {
@@ -294,12 +297,12 @@ func (f *envFlow) settleIsolation(sw envSwitch) (switchOutcome, error) {
 	}
 
 	before := worktree.RecordedIsolation(sw.ref)
-	if err := worktree.SetIsolation(worktree.SetIsolationParams{Ref: sw.ref, Isolation: sw.isolation}); err != nil {
+	if err := worktree.SetIsolation(f.runCtx, worktree.SetIsolationParams{Ref: sw.ref, Isolation: sw.isolation}); err != nil {
 		return switchOutcome{}, err
 	}
 	outcome.changed = worktree.RecordedIsolation(sw.ref) != before
 	if outcome.changed {
-		publish.Updated(publish.UpdatedParams{Context: f.ctx, Branch: sw.ref.Branch, Changed: []domain.IdentityField{domain.IdentityIsolation}})
+		publish.Updated(f.runCtx, publish.UpdatedParams{Context: f.ctx, Branch: sw.ref.Branch, Changed: []domain.IdentityField{domain.IdentityIsolation}})
 	}
 	return outcome, nil
 }
@@ -310,11 +313,11 @@ func (f *envFlow) checkIsolation(t target, isolation domain.Isolation) error {
 	if isolation == "" {
 		return nil
 	}
-	return worktree.CheckIsolation(worktree.SetIsolationParams{Ref: f.ref(t.branch), Isolation: isolation})
+	return worktree.CheckIsolation(f.runCtx, worktree.SetIsolationParams{Ref: f.ref(t.branch), Isolation: isolation})
 }
 
 func (f *envFlow) adoption(t target) (domain.IsolationAdoptionPlan, error) {
-	return worktree.IsolationAdoptionFor(worktree.IsolationAdoptionParams{
+	return worktree.IsolationAdoptionFor(f.runCtx, worktree.IsolationAdoptionParams{
 		Ref:          f.ref(t.branch),
 		WorktreePath: t.path,
 	})
@@ -347,7 +350,7 @@ type Source struct {
 }
 
 func (f *envFlow) envContext(branch string) Source {
-	return SourceOf(SourceParams{Context: f.ctx, Branch: branch, From: f.request.From})
+	return SourceOf(f.runCtx, SourceParams{Context: f.ctx, Branch: branch, From: f.request.From})
 }
 
 type SourceParams struct {
@@ -359,7 +362,7 @@ type SourceParams struct {
 
 // SourceOf is where a worktree's .env values come from, as `wtm env` resolves
 // it: a reader predicting what the command will do asks it here.
-func SourceOf(params SourceParams) Source {
+func SourceOf(ctx context.Context, params SourceParams) Source {
 	base := params.Context.Config.Project.Env.Strategy
 	parentBranch := ""
 	if meta, ok := worktree.Metadata(worktree.ParentBranchParams{StateDir: params.Context.StateDir, Branch: params.Branch}); ok {
@@ -371,7 +374,7 @@ func SourceOf(params SourceParams) Source {
 
 	parentPath := ""
 	if parentBranch != "" {
-		if wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: params.Context.ProjectDir, Branch: parentBranch}); err == nil {
+		if wt, err := worktree.FindByBranch(ctx, worktree.FindByBranchParams{ProjectDir: params.Context.ProjectDir, Branch: parentBranch}); err == nil {
 			parentPath = wt.Path
 		}
 	}

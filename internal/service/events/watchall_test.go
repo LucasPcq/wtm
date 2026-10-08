@@ -57,7 +57,7 @@ func register(t *testing.T, dir string) {
 
 func rootOf(t *testing.T, dir string) string {
 	t.Helper()
-	repo, err := worktree.RepoOf(worktree.RepoOfParams{ProjectDir: dir})
+	repo, err := worktree.RepoOf(t.Context(), worktree.RepoOfParams{ProjectDir: dir})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,11 +123,11 @@ func TestARepoWhoseSnapshotFailsIsSkippedWithAWarning(t *testing.T) {
 	register(t, bad)
 	badRoot := rootOf(t, bad)
 	previous := identities
-	identities = func(params worktree.IdentitiesParams) ([]domain.WorktreeIdentity, error) {
+	identities = func(ctx context.Context, params worktree.IdentitiesParams) ([]domain.WorktreeIdentity, error) {
 		if params.ProjectDir == badRoot {
 			return nil, errors.New("unreadable")
 		}
-		return previous(params)
+		return previous(t.Context(), params)
 	}
 	t.Cleanup(func() { identities = previous })
 

@@ -35,7 +35,7 @@ func newDataFixture(t *testing.T) dataFixture {
 	globaldir.Isolate(t)
 	ctx := testContext(t)
 	makeWorktree(t, ctx, "feat/data")
-	wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: ctx.ProjectDir, Branch: "feat/data"})
+	wt, err := worktree.FindByBranch(t.Context(), worktree.FindByBranchParams{ProjectDir: ctx.ProjectDir, Branch: "feat/data"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func (d dataFixture) run(t *testing.T, request Request) (Outcome, *recorder, err
 	request.Branches = []string{d.branch}
 	request.BaseBranch = "main"
 	presenter := newRecorder()
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   d.ctx,
 		Request:   request,
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}},
@@ -224,7 +224,7 @@ func TestAHalfRemovedWorktreeIsFinishedAndItsLeftoverNamed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("clean: %v", err)
 	}
-	if worktree.StillTracked(worktree.FindByBranchParams{ProjectDir: d.ctx.ProjectDir, Branch: d.branch}) {
+	if worktree.StillTracked(t.Context(), worktree.FindByBranchParams{ProjectDir: d.ctx.ProjectDir, Branch: d.branch}) {
 		t.Error("git still tracks the worktree")
 	}
 	if out, _ := exec.Command("git", "-C", d.ctx.ProjectDir, "branch", "--list", d.branch).Output(); strings.TrimSpace(string(out)) != "" {

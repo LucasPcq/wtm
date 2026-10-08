@@ -2,6 +2,7 @@
 package create
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -58,20 +59,22 @@ func Operation() flow.Operation {
 	return flow.Operation{Kind: domain.OpKindCreate, Mode: flow.ModeBackground, TargetKey: KeyBranch}
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &createFlow{
+		runCtx:       ctx,
 		ctx:          params.Context,
 		request:      params.Request,
 		prompter:     params.Prompter,
 		presenter:    params.Presenter,
-		candidates:   decide.BranchCandidates(params.Context.ProjectDir),
-		target:       decide.MemoizedTarget(params.Context.ProjectDir),
+		candidates:   decide.BranchCandidates(ctx, params.Context.ProjectDir),
+		target:       decide.MemoizedTarget(ctx, params.Context.ProjectDir),
 		derivedNames: worktree.DerivedNamesMatter(params.Context.StateDir),
 	}
 	return f.run()
 }
 
 type createFlow struct {
+	runCtx       context.Context
 	ctx          flow.Context
 	request      Request
 	prompter     flow.Prompter
@@ -223,7 +226,7 @@ func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, 
 	// A reused branch is checked out as-is: the source is only its recorded sync parent.
 	target := f.target(branchName)
 	if params.Batch && target.State == domain.BranchTargetExisting && f.fastForwardsEach(answers) {
-		_ = branch.FastForwardIfBehind(branch.BranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branchName})
+		_ = branch.FastForwardIfBehind(f.runCtx, branch.BranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branchName})
 	}
 	startPoint := fromBranch
 	if !rules.SourceIsStartPoint(target.State) {
@@ -231,11 +234,11 @@ func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, 
 	}
 
 	var result domain.CreateResult
-	err := f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: fmt.Sprintf(domain.CreateLoadingFmt, branchName),
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			var createErr error
-			result, createErr = worktree.Create(domain.CreateParams{
+			result, createErr = worktree.Create(ctx, domain.CreateParams{
 				ProjectDir:      f.ctx.ProjectDir,
 				StateDir:        f.ctx.StateDir,
 				Branch:          branchName,
@@ -257,9 +260,9 @@ func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, 
 	if result.AlreadyExists {
 		f.warnIgnoredIsolation(&result)
 	} else {
-		publish.Created(f.ctx, branchName)
+		publish.Created(f.runCtx, f.ctx, branchName)
 		// Before the hooks: one of them may well read the .env this settles.
-		result.EnvPorts, result.Warnings = envports.SettleFresh(envports.FreshParams{
+		result.EnvPorts, result.Warnings = envports.SettleFresh(f.runCtx, envports.FreshParams{
 			Params: envports.Params{
 				Context:      f.ctx,
 				Branch:       branchName,
@@ -268,13 +271,13 @@ func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, 
 			},
 			Preflight: params.Preflight,
 		})
-		result.Warnings = append(result.Warnings, decide.WarnUnseenFallback(decide.UnseenFallbackParams{
+		result.Warnings = append(result.Warnings, decide.WarnUnseenFallback(f.runCtx, decide.UnseenFallbackParams{
 			Fallback:  decide.EnvFallbackParams{ProjectDir: f.ctx.ProjectDir, Source: fromBranch, Config: f.ctx.Config, EnvOverride: answers.Value(KeyEnv)},
 			Prompter:  f.prompter,
 			Presenter: f.presenter,
 		})...)
 		hookErr := f.runHooks(result.Path, branchName, fromBranch)
-		publish.Provisioned(publish.ProvisionedParams{Context: f.ctx, Branch: branchName, Err: hookErr})
+		publish.Provisioned(f.runCtx, publish.ProvisionedParams{Context: f.ctx, Branch: branchName, Err: hookErr})
 		if hookErr != nil {
 			return result, hookErr
 		}
@@ -310,12 +313,12 @@ func (f *createFlow) runHooks(worktreePath, branchName, fromBranch string) error
 	if len(hooks) == 0 {
 		return nil
 	}
-	ordinal.BeforeHooks(f.ctx, branchName)
+	ordinal.BeforeHooks(f.runCtx, f.ctx, branchName)
 	return f.presenter.HookPhase(flow.HookPhaseParams{
 		Title:   domain.HooksTitleOnCreate,
 		LogPath: rules.HooksLogPath(rules.HooksLogPathParams{StateDir: f.ctx.StateDir, Phase: domain.HookOnCreate, Branch: branchName}),
 		Run: func(sink flow.HookSink) error {
-			return worktree.RunCreateHooks(domain.CreateHooksParams{
+			return worktree.RunCreateHooks(f.runCtx, domain.CreateHooksParams{
 				ProjectDir:   f.ctx.ProjectDir,
 				StateDir:     f.ctx.StateDir,
 				WorktreePath: worktreePath,
@@ -335,7 +338,7 @@ type fastForwardParams struct {
 }
 
 func (f *createFlow) applyFastForward(ff fastForwardParams) (bool, error) {
-	return decide.ApplyFastForward(decide.ApplyFastForwardParams{
+	return decide.ApplyFastForward(f.runCtx, decide.ApplyFastForwardParams{
 		ProjectDir: f.ctx.ProjectDir,
 		Subject:    ff.Subject,
 		Many:       ff.Many,

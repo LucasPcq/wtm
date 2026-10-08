@@ -1,6 +1,7 @@
 package run
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -15,7 +16,7 @@ func stubOpener(t *testing.T) *string {
 	var opened string
 	previous := openInBrowser
 	t.Cleanup(func() { openInBrowser = previous })
-	openInBrowser = func(url string) error {
+	openInBrowser = func(_ context.Context, url string) error {
 		opened = url
 		return nil
 	}

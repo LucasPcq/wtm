@@ -104,7 +104,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	if err := reportImport(cmd, incoming, format); err != nil {
 		return err
 	}
-	if notice, ok := addressingDrift(result, result.ProjectDir); ok && rules.IsHumanFormat(format) {
+	if notice, ok := addressingDrift(cmd.Context(), result, result.ProjectDir); ok && rules.IsHumanFormat(format) {
 		output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
 			output.Callout(w, notice.Text, notice.Lines)
 		})

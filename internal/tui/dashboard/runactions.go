@@ -123,11 +123,11 @@ func (m Model) runUp(params runUpParams) (Model, tea.Cmd) {
 			opID:      id,
 			targetKey: declared.TargetKey,
 		},
-		Presenter: runPresenter{presenter: presenter{send: send, id: id}, Watcher: detachedWatcher{send: send, id: id}},
+		Presenter: runPresenter{presenter: presenter{send: send, id: id}, Watcher: detachedWatcher{ctx: m.ctx, send: send, id: id}},
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-		outcome, err := upflow.Run(flowParams)
+		outcome, err := upflow.Run(m.ctx, flowParams)
 		conclude(concludeParams{Send: send, Kind: declared.Kind, Outcomes: outcome.Results})
 		return opDoneMsg{id: id, err: err}
 	})
@@ -174,11 +174,11 @@ func (m Model) startRunJob(selected domain.WorktreeStatus) (Model, tea.Cmd) {
 			opID:      id,
 			targetKey: declared.TargetKey,
 		},
-		Presenter: runPresenter{presenter: presenter{send: send, id: id}, Watcher: detachedWatcher{send: send, id: id}},
+		Presenter: runPresenter{presenter: presenter{send: send, id: id}, Watcher: detachedWatcher{ctx: m.ctx, send: send, id: id}},
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-		outcome, err := startflow.Run(params)
+		outcome, err := startflow.Run(m.ctx, params)
 		conclude(concludeParams{Send: send, Kind: declared.Kind, Outcomes: runlogs.Outcomes{outcome.Result}})
 		return opDoneMsg{id: id, err: err}
 	})
@@ -225,7 +225,7 @@ func (m Model) stopRunJob(selected domain.WorktreeStatus) (Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-		_, err := stopflow.Run(params)
+		_, err := stopflow.Run(m.ctx, params)
 		return opDoneMsg{id: id, err: err}
 	})
 }
@@ -308,7 +308,7 @@ func (m Model) runDown(params runDownParams) (Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-		_, err := downflow.Run(flowParams)
+		_, err := downflow.Run(m.ctx, flowParams)
 		return opDoneMsg{id: id, err: err}
 	})
 }
@@ -414,7 +414,7 @@ func (m Model) runLogs(params runLogsParams) (Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-		_, err := logsflow.Run(flowParams)
+		_, err := logsflow.Run(m.ctx, flowParams)
 		return opDoneMsg{id: id, err: err}
 	})
 }
@@ -483,7 +483,7 @@ func (m Model) urlOpener() func(string) error {
 	if m.params.URLOpener != nil {
 		return m.params.URLOpener
 	}
-	return integration.OpenURL
+	return func(url string) error { return integration.OpenURL(m.ctx, url) }
 }
 
 // openSelectedAddress opens the address of the job the surface designates: the

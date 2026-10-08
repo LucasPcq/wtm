@@ -4566,8 +4566,8 @@ const (
 	// ExitCodeEnvDrift is a `wtm env --check` that found drift, so a CI step can
 	// fail on it without parsing the report.
 	ExitCodeEnvDrift = 18
-	// ExitCodeCancelled is a run the user backed out of interactively, so that
-	// `wtm create x && wtm go x` stops there.
+	// ExitCodeCancelled is a run the user backed out of interactively or
+	// interrupted, so that `wtm create x && wtm go x` stops there.
 	ExitCodeCancelled = 19
 	// ExitCodeEventsSchemaNewer is a `wtm events` that received an event of a
 	// schema newer than its own: the consumer has to upgrade wtm.
@@ -4604,7 +4604,9 @@ const (
 	// ExecPartialLineCap bounds a line that never ends (binary output, a
 	// progress bar without \r) so the tail cannot grow without limit.
 	ExecPartialLineCap = 4096
-	ExecInterruptGrace = 5 * time.Second
+	// SubprocessInterruptGrace is how long a cancelled subprocess has between
+	// SIGINT and SIGTERM; the kill follows one ExecPipeGrace later.
+	SubprocessInterruptGrace = time.Second
 	// ExecPipeGrace bounds the wait for a process that exited while something it
 	// started (a backgrounded job, a daemon) still holds its output pipe.
 	ExecPipeGrace = time.Second

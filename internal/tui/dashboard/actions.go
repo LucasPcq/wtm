@@ -57,7 +57,7 @@ func (m Model) startCreate() (Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-		_, err := createflow.Run(params)
+		_, err := createflow.Run(m.ctx, params)
 		return opDoneMsg{id: id, err: err}
 	})
 }
@@ -114,7 +114,7 @@ func (m Model) runClean(params runCleanParams) (Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-		_, err := cleanflow.Run(run)
+		_, err := cleanflow.Run(m.ctx, run)
 		return opDoneMsg{id: id, err: err}
 	})
 }
@@ -142,7 +142,7 @@ func (m Model) startReparent(branch string) (Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-		_, err := reparentflow.Run(params)
+		_, err := reparentflow.Run(m.ctx, params)
 		return opDoneMsg{id: id, err: err}
 	})
 }
@@ -169,7 +169,7 @@ func (m Model) startBatchReparent() (Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-		_, err := reparentflow.Run(params)
+		_, err := reparentflow.Run(m.ctx, params)
 		return opDoneMsg{id: id, err: err}
 	})
 }
@@ -205,7 +205,7 @@ func (m Model) startPrune() (Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-		_, err := pruneflow.Run(params)
+		_, err := pruneflow.Run(m.ctx, params)
 		return opDoneMsg{id: id, err: err}
 	})
 }
@@ -294,7 +294,7 @@ func (m Model) runFastForward(params runFastForwardParams) (Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-		_, err := ffflow.Run(flowParams)
+		_, err := ffflow.Run(m.ctx, flowParams)
 		return opDoneMsg{id: id, err: err}
 	})
 }
@@ -333,7 +333,7 @@ func (m Model) runSync(params runSyncParams) (Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-		_, err := syncflow.Run(flowParams)
+		_, err := syncflow.Run(m.ctx, flowParams)
 		return opDoneMsg{id: id, err: err}
 	})
 }
@@ -467,7 +467,7 @@ func (m Model) applyFlow(msg tea.Msg) (Model, tea.Cmd) {
 	case promptMsg:
 		return m.openModal(msg)
 	case handoffMsg:
-		return m, handoffCmd(msg, m.sender())
+		return m, handoffCmd(m.ctx, msg, m.sender())
 	case OutputLineMsg:
 		return m.appendOutput(msg), nil
 	case opTargetMsg:

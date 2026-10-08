@@ -123,7 +123,7 @@ func TestTheModelKeepsHearingFromARunPastTheMailbox(t *testing.T) {
 	const steps = domain.RunViewMsgBuffer * 3
 
 	finished := make(chan struct{})
-	model := New(Params{
+	model := New(t.Context(), Params{
 		Board: runlogstest.NewBoard(runlogstest.BoardParams{
 			Views: []runlogs.JobView{stopped("migrate")},
 		}),
@@ -161,7 +161,7 @@ func TestTheModelKeepsHearingFromTheReadersPastAStreamEnding(t *testing.T) {
 		Streams: map[string]runlogs.Stream{"api": first, "web": second},
 	})
 
-	p := newProgram(t, New(Params{Board: board}))
+	p := newProgram(t, New(t.Context(), Params{Board: board}))
 	p.send(tea.WindowSizeMsg{Width: testWidth, Height: testHeight})
 	p.waitFor("api to be attached", func(m Model) bool { return m.panes.stream("api") != nil })
 
@@ -211,7 +211,7 @@ func expectFrame(t *testing.T, answers <-chan tea.Msg, why string) {
 // The clock coalesces writes, it does not repaint: the view has no animation of
 // its own, so a frame nothing wrote for redraws what the screen already holds.
 func TestTheClockAsksForNoFrameWhileTheJobSaysNothing(t *testing.T) {
-	model := New(Params{})
+	model := New(t.Context(), Params{})
 	defer model.cancel()
 	key := jobKeyOf("", "api")
 	model.panes.follow(key)
@@ -221,7 +221,7 @@ func TestTheClockAsksForNoFrameWhileTheJobSaysNothing(t *testing.T) {
 }
 
 func TestTheClockAsksForAFrameOnceTheJobWrites(t *testing.T) {
-	model := New(Params{})
+	model := New(t.Context(), Params{})
 	defer model.cancel()
 	key := jobKeyOf("", "api")
 	model.panes.follow(key)
@@ -235,7 +235,7 @@ func TestTheClockAsksForAFrameOnceTheJobWrites(t *testing.T) {
 // opens. The clock reads the followed job from the store rather than from a
 // copy of the model, so moving the cursor moves it without restarting it.
 func TestTheClockFollowsTheCursorAndIgnoresTheJobsBehindIt(t *testing.T) {
-	model := New(Params{})
+	model := New(t.Context(), Params{})
 	defer model.cancel()
 	shown, hidden := jobKeyOf("", "api"), jobKeyOf("", "worker")
 	model.panes.follow(shown)
@@ -253,7 +253,7 @@ func TestTheClockFollowsTheCursorAndIgnoresTheJobsBehindIt(t *testing.T) {
 // give up when the view goes, the way the listener does, or it outlives the
 // program that started it.
 func TestTheClockStopsWithTheView(t *testing.T) {
-	model := New(Params{})
+	model := New(t.Context(), Params{})
 	key := jobKeyOf("", "api")
 	model.panes.follow(key)
 	model.panes.open(openPaneParams{Key: key, Source: sourceLive})
@@ -272,9 +272,9 @@ func TestTheClockStopsWithTheView(t *testing.T) {
 }
 
 func TestAHostedPreviewRedrawsSlowerThanTheFullView(t *testing.T) {
-	full := New(Params{})
+	full := New(t.Context(), Params{})
 	defer full.cancel()
-	preview := NewPreview(PreviewParams{})
+	preview := NewPreview(t.Context(), PreviewParams{})
 	defer preview.cancel()
 
 	if preview.frameInterval() <= full.frameInterval() {

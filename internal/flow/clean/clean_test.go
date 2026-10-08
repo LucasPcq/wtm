@@ -1,6 +1,7 @@
 package clean
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -80,7 +81,7 @@ func TestDeleteOptionsOfferForceOnlyWhenUnsafe(t *testing.T) {
 // --force lifts the refusal without even running the check, which is what keeps a
 // --yes --force run from touching the network.
 func TestResolveDeleteForceSkipsTheCheck(t *testing.T) {
-	f := &cleanFlow{
+	f := &cleanFlow{runCtx: t.Context(),
 		request:   Request{Force: true},
 		checks:    map[string]domain.CleanCheckEntry{},
 		presenter: failingPresenter{t: t},
@@ -96,7 +97,7 @@ func TestResolveDeleteForceSkipsTheCheck(t *testing.T) {
 }
 
 func TestResolveDeleteKeepsSafetyWithoutForce(t *testing.T) {
-	f := &cleanFlow{checks: map[string]domain.CleanCheckEntry{
+	f := &cleanFlow{runCtx: t.Context(), checks: map[string]domain.CleanCheckEntry{
 		"feat": {Check: domain.CleanCheckResult{Branch: "feat", IsDirty: true}},
 	}}
 
@@ -110,7 +111,7 @@ func TestResolveDeleteKeepsSafetyWithoutForce(t *testing.T) {
 }
 
 func TestResolveDeleteAllowsASafeWorktree(t *testing.T) {
-	f := &cleanFlow{checks: map[string]domain.CleanCheckEntry{
+	f := &cleanFlow{runCtx: t.Context(), checks: map[string]domain.CleanCheckEntry{
 		"feat": {Check: domain.CleanCheckResult{Branch: "feat"}},
 	}}
 
@@ -126,7 +127,7 @@ func TestResolveDeleteAllowsASafeWorktree(t *testing.T) {
 // --reparent-children answers through the presets, so the recap line and the
 // execution read the same answer.
 func TestPresetReparentAnswersTheStep(t *testing.T) {
-	if got := (&cleanFlow{request: Request{ReparentChildren: true}}).session().Presets.Value(KeyReparent); got != orphans.Reparent {
+	if got := (&cleanFlow{runCtx: t.Context(), request: Request{ReparentChildren: true}}).session().Presets.Value(KeyReparent); got != orphans.Reparent {
 		t.Errorf("preset = %q, want the reparent authorized", got)
 	}
 	if got := (&cleanFlow{}).session().Presets.Value(KeyReparent); got != "" {
@@ -146,7 +147,7 @@ func TestDropDataAnswersTheDataStep(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			f := &cleanFlow{request: c.request}
+			f := &cleanFlow{runCtx: t.Context(), request: c.request}
 			if got := f.session().Presets.Value(KeyData); got != c.want {
 				t.Errorf("preset = %q, want %q", got, c.want)
 			}
@@ -179,7 +180,7 @@ type failingPresenter struct {
 	t *testing.T
 }
 
-func (p failingPresenter) Stage(flow.StageParams) error {
+func (p failingPresenter) Stage(context.Context, flow.StageParams) error {
 	p.t.Error("no progress should be shown")
 	return nil
 }
@@ -229,7 +230,7 @@ func makeWorktree(t *testing.T, ctx flow.Context, branchName string) string {
 
 func makeWorktreeFrom(t *testing.T, ctx flow.Context, branchName, from string) string {
 	t.Helper()
-	result, err := worktree.Create(domain.CreateParams{
+	result, err := worktree.Create(t.Context(), domain.CreateParams{
 		ProjectDir:   ctx.ProjectDir,
 		StateDir:     ctx.StateDir,
 		Branch:       branchName,
@@ -251,7 +252,7 @@ func TestRunConfirmsThenRemoves(t *testing.T) {
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}}
 	presenter := newRecorder()
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/gone"}, BaseBranch: "main"},
 		Prompter:  prompter,
@@ -285,7 +286,7 @@ func TestRunPurgesTheWorktreeJobLogs(t *testing.T) {
 	logs := writeJobLog(t, ctx, "feat/logged")
 	kept := writeJobLog(t, ctx, "feat/kept")
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/logged"}, BaseBranch: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}},
@@ -316,7 +317,7 @@ func TestRunSucceedsWhenTheJobLogPurgeFails(t *testing.T) {
 		t.Fatalf("the fixture does not make the purge fail, so it proves nothing")
 	}
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/logged"}, BaseBranch: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}},
@@ -350,7 +351,7 @@ func TestRunOffersForceOnlyWhenUnsafe(t *testing.T) {
 	}
 
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteForce}}
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/dirty"}, BaseBranch: "main"},
 		Prompter:  prompter,
@@ -381,7 +382,7 @@ func TestRunOnAbsentWorktreeConcludesWithoutAsking(t *testing.T) {
 	prompter := &flowtest.ScriptedPrompter{}
 	presenter := newRecorder()
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   testContext(t),
 		Request:   Request{Branches: []string{"feat/ghost"}, BaseBranch: "main"},
 		Prompter:  prompter,
@@ -405,7 +406,7 @@ func TestRunAbortedRemovesNothing(t *testing.T) {
 	ctx := testContext(t)
 	path := makeWorktree(t, ctx, "feat/keep")
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/keep"}, BaseBranch: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Abort: true},

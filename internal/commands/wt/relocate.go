@@ -73,15 +73,15 @@ func runRelocate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("relocate needs a terminal to confirm; re-run with --%s to proceed unattended", domain.FlagYes)
 	}
 
-	_, err = relocateflow.Run(relocateflow.Params{
+	_, err = relocateflow.Run(cmd.Context(), relocateflow.Params{
 		Context: shared.FlowContext(cfg),
 		Request: relocateflow.Request{
 			To:         to,
 			Force:      force,
 			DryRun:     dryRun,
-			BaseBranch: resolveBase("", cfg),
+			BaseBranch: resolveBase(cmd.Context(), "", cfg),
 		},
-		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: canPrompt && !yes && !dryRun, Stderr: true}),
+		Prompter:  shared.FlowPrompter(cmd.Context(), shared.FlowPrompterParams{Interactive: canPrompt && !yes && !dryRun, Stderr: true}),
 		Presenter: relocatePresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
 	})
 	return err

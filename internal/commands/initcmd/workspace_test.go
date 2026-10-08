@@ -45,7 +45,7 @@ func TestInitInstallsAWorkspaceOnceFromItsRoot(t *testing.T) {
 			writeFile(t, filepath.Join(dir, "packages", "api", "package.json"), `{"name":"api"}`)
 			writeFile(t, filepath.Join(dir, "packages", "web", "package.json"), `{"name":"web"}`)
 
-			answers, err := rules.BuildProjectAnswers(rules.InitProjectFlags{BaseBranch: "main"}, detect.ProjectEnvironment(dir))
+			answers, err := rules.BuildProjectAnswers(rules.InitProjectFlags{BaseBranch: "main"}, detect.ProjectEnvironment(t.Context(), dir))
 			if err != nil {
 				t.Fatalf("BuildProjectAnswers: %v", err)
 			}

@@ -1,12 +1,12 @@
 package process
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"syscall"
-	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 )
@@ -45,13 +45,10 @@ func daemonLockHeld(socketPath string) bool {
 // awaitDaemonGone waits while a daemon holds the lock without answering: one
 // stopping its jobs, or one not listening yet. It returns as soon as either is
 // over — the socket answering, or the lock free for a new daemon to take.
-func awaitDaemonGone(socketPath string) error {
-	deadline := time.Now().Add(domain.DaemonStopTimeout)
-	for time.Now().Before(deadline) {
-		if IsDaemonRunning(socketPath) || !daemonLockHeld(socketPath) {
-			return nil
-		}
-		time.Sleep(domain.DaemonPollInterval)
-	}
-	return fmt.Errorf("a stopping daemon did not exit within %v", domain.DaemonStopTimeout)
+func awaitDaemonGone(ctx context.Context, socketPath string) error {
+	return poll(ctx, pollParams{
+		Timeout: domain.DaemonStopTimeout,
+		Done:    func() bool { return IsDaemonRunning(socketPath) || !daemonLockHeld(socketPath) },
+		Expired: fmt.Errorf("a stopping daemon did not exit within %v", domain.DaemonStopTimeout),
+	})
 }

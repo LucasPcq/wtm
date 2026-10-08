@@ -13,10 +13,10 @@ func TestTheEmbeddedQuestionsRecallTheirAnswer(t *testing.T) {
 	in := recapInput{SourceArg: "feat/src", FilesFlag: []string{"a.go"}, CreateNew: true, Branch: "feat/new", From: "main"}
 	f := recapFlowFor(t, in)
 	f.ctx.Config.Project.Wizard.Remembered = map[string]string{domain.RememberIsolation: string(domain.IsolationVerbatim)}
-	f.create = f.embed()
+	f.create = f.embed(t.Context())
 
 	var recalled string
-	for _, step := range f.session().Steps {
+	for _, step := range f.session(t.Context()).Steps {
 		if step.Key == create.KeyIsolation {
 			recalled = step.Memory.Value
 		}
@@ -26,7 +26,7 @@ func TestTheEmbeddedQuestionsRecallTheirAnswer(t *testing.T) {
 	}
 
 	answers := recapAnswersFor(in).With(create.KeyIsolation, flow.Answer{Value: string(domain.IsolationVerbatim), Recalled: true})
-	content, err := f.recapStep().Build(answers)
+	content, err := f.recapStep(t.Context()).Build(answers)
 	if err != nil {
 		t.Fatal(err)
 	}

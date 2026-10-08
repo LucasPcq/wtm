@@ -21,7 +21,7 @@ var declared = domain.RunConfig{
 func run(t *testing.T, cfg domain.RunConfig, prompter flow.Prompter) (list.Selection, *flowtest.Recorder, error) {
 	t.Helper()
 	presenter := &flowtest.Recorder{}
-	selection, err := list.Run(list.Params{Request: list.Request{Config: cfg}, Prompter: prompter, Presenter: presenter})
+	selection, err := list.Run(t.Context(), list.Params{Request: list.Request{Config: cfg}, Prompter: prompter, Presenter: presenter})
 	return selection, presenter, err
 }
 

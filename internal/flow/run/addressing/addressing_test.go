@@ -63,7 +63,7 @@ func (r repo) params() Params {
 func TestNoticeNamesTheWorktreeStillOnPorts(t *testing.T) {
 	r := newRepo(t, namedConfig, "VITE_API_URL=http://localhost:4001\n")
 
-	notice, ok := Notice(r.params())
+	notice, ok := Notice(t.Context(), r.params())
 
 	if !ok {
 		t.Fatal("no notice for a .env the published names do not answer on")
@@ -80,7 +80,7 @@ func TestNoticeStaysSilentOnPortAddressing(t *testing.T) {
 	r := newRepo(t, strings.Replace(namedConfig, `addressing = "names"`, `addressing = "ports"`, 1),
 		"VITE_API_URL=http://localhost:4001\n")
 
-	if _, ok := Notice(r.params()); ok {
+	if _, ok := Notice(t.Context(), r.params()); ok {
 		t.Error("a project addressing by port publishes no name to be wrong about")
 	}
 }
@@ -92,7 +92,7 @@ func TestNoticeStaysSilentWithoutAWorktree(t *testing.T) {
 	params := r.params()
 	params.WorkDirs = []string{filepath.Join(t.TempDir(), "gone")}
 
-	if _, ok := Notice(params); ok {
+	if _, ok := Notice(t.Context(), params); ok {
 		t.Error("a directory git cannot name must yield no warning")
 	}
 }

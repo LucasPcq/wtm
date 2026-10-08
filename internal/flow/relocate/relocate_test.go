@@ -54,7 +54,7 @@ func run(t *testing.T, ctx flow.Context, request Request, prompter flow.Prompter
 		request.BaseBranch = "main"
 	}
 	presenter := &recorder{}
-	outcome, err := Run(Params{Context: ctx, Request: request, Prompter: prompter, Presenter: presenter})
+	outcome, err := Run(t.Context(), Params{Context: ctx, Request: request, Prompter: prompter, Presenter: presenter})
 	return outcome, presenter, err
 }
 

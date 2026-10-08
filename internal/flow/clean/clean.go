@@ -2,6 +2,7 @@
 package clean
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -68,8 +69,9 @@ func Operation() flow.Operation {
 	return flow.Operation{Kind: domain.OpKindClean, Mode: flow.ModeBlocking, TargetKey: KeyWorktree}
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &cleanFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -80,6 +82,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type cleanFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -125,10 +128,10 @@ func (f *cleanFlow) run() (Outcome, error) {
 		selected, skipped = f.splitUnsafe(selected)
 	}
 	// Read before the first removal, while every worktree still names its parent.
-	nodes, nodesErr := worktree.Nodes(worktree.NodesParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir})
+	nodes, nodesErr := worktree.Nodes(f.runCtx, worktree.NodesParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir})
 
 	batch := len(selected) > 1
-	removals := teardown.Batch(teardown.BatchParams{
+	removals := teardown.Batch(f.runCtx, teardown.BatchParams{
 		Context:      f.ctx,
 		Presenter:    f.presenter,
 		Targets:      f.targets(selected),
@@ -181,7 +184,7 @@ func (f *cleanFlow) run() (Outcome, error) {
 	}
 	if answers.Value(KeyReparent) == orphans.Reparent && len(moved) > 0 {
 		applied, err := worktree.ApplyReparents(worktree.ApplyReparentsParams{Reparents: moved, StateDir: f.ctx.StateDir})
-		publish.ReparentedAll(f.ctx, applied)
+		publish.ReparentedAll(f.runCtx, f.ctx, applied)
 		if err != nil {
 			return Outcome{}, err
 		}
@@ -233,7 +236,7 @@ func (f *cleanFlow) acceptRequested() (requestedWorktrees, error) {
 	if err != nil {
 		return requested, err
 	}
-	worktrees, err := worktree.ListAll(worktree.ListAllParams{ProjectDir: f.ctx.ProjectDir})
+	worktrees, err := worktree.ListAll(f.runCtx, worktree.ListAllParams{ProjectDir: f.ctx.ProjectDir})
 	if err != nil {
 		return requested, fmt.Errorf("list worktrees: %w", err)
 	}
@@ -260,7 +263,7 @@ func (f *cleanFlow) targets(selected []string) []teardown.Target {
 	targets := make([]teardown.Target, 0, len(selected))
 	for _, branch := range selected {
 		target := teardown.Target{Branch: branch}
-		if wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branch}); err == nil {
+		if wt, err := worktree.FindByBranch(f.runCtx, worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branch}); err == nil {
 			target.Path = wt.Path
 		}
 		targets = append(targets, target)
@@ -284,7 +287,7 @@ func (f *cleanFlow) splitUnsafe(selected []string) ([]string, []domain.PruneSkip
 // Force plays no part in the moves a removal makes necessary.
 func (f *cleanFlow) reparents(selected []string) []domain.ReparentResult {
 	return f.moves.Get(selected, func() []domain.ReparentResult {
-		nodes, err := worktree.Nodes(worktree.NodesParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir})
+		nodes, err := worktree.Nodes(f.runCtx, worktree.NodesParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir})
 		if err != nil {
 			return nil
 		}
@@ -310,9 +313,9 @@ func removedBranches(removals []teardown.Removal) []string {
 // failed on files the current user cannot delete (typically root-owned files
 // left by a container). Declined or out of reach, what git did is settled as it
 // stands.
-func (f *cleanFlow) recoverRemoveFailure(salvage teardown.SalvageParams) error {
+func (f *cleanFlow) recoverRemoveFailure(ctx context.Context, salvage teardown.SalvageParams) error {
 	if !f.request.AllowPrivileged || !f.prompter.Interactive() || salvage.Path == "" {
-		return teardown.Salvage(salvage)
+		return teardown.Salvage(ctx, salvage)
 	}
 
 	f.presenter.Status(flow.Notice{
@@ -325,10 +328,10 @@ func (f *cleanFlow) recoverRemoveFailure(salvage teardown.SalvageParams) error {
 		DefaultYes: false,
 	})
 	if err != nil || !confirmed {
-		return teardown.Salvage(salvage)
+		return teardown.Salvage(ctx, salvage)
 	}
 
-	if err := worktree.ForceClean(domain.ForceCleanParams{
+	if err := worktree.ForceClean(ctx, domain.ForceCleanParams{
 		ProjectDir: salvage.Clean.ProjectDir,
 		StateDir:   salvage.Clean.StateDir,
 		Path:       salvage.Path,
@@ -337,7 +340,7 @@ func (f *cleanFlow) recoverRemoveFailure(salvage teardown.SalvageParams) error {
 	}); err != nil {
 		return err
 	}
-	teardown.PublishRemoved(salvage)
+	teardown.PublishRemoved(ctx, salvage)
 	return nil
 }
 
@@ -348,9 +351,9 @@ func (f *cleanFlow) checkAll(branches []string) error {
 	if len(missing) == 0 {
 		return nil
 	}
-	return f.presenter.Stage(flow.StageParams{
+	return f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.CleanCheckLoading,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			f.fetchChecks(missing)
 			return nil
 		},
@@ -392,7 +395,7 @@ func (f *cleanFlow) fetchChecks(branches []string) {
 	if len(branches) == 0 {
 		return
 	}
-	for branch, entry := range worktree.CheckAll(worktree.CheckAllParams{ProjectDir: f.ctx.ProjectDir, Branches: branches}) {
+	for branch, entry := range worktree.CheckAll(f.runCtx, worktree.CheckAllParams{ProjectDir: f.ctx.ProjectDir, Branches: branches}) {
 		f.checks[branch] = entry
 	}
 }

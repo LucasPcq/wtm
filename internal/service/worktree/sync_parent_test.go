@@ -52,7 +52,7 @@ func setupBranchOnlyParent(t *testing.T) (dir, stateDir, devPath string) {
 func TestSyncFastForwardsBranchOnlyParent(t *testing.T) {
 	dir, stateDir, devPath := setupBranchOnlyParent(t)
 
-	result, err := Sync(SyncParams{
+	result, err := Sync(t.Context(), SyncParams{
 		ProjectDir:         dir,
 		StateDir:           stateDir,
 		BaseBranch:         "main",
@@ -89,7 +89,7 @@ func TestSyncReportsStaleParentWhenNotAsked(t *testing.T) {
 	dir, stateDir, devPath := setupBranchOnlyParent(t)
 	featureBefore := git(t, dir, "rev-parse", "feature")
 
-	result, err := Sync(SyncParams{
+	result, err := Sync(t.Context(), SyncParams{
 		ProjectDir:       dir,
 		StateDir:         stateDir,
 		BaseBranch:       "main",
@@ -140,7 +140,7 @@ func TestSyncFastForwardsUnselectedParentWorktree(t *testing.T) {
 	writeMeta(t, stateDir, "feat", "main")
 	writeMeta(t, stateDir, "dev", "feat")
 
-	result, err := Sync(SyncParams{
+	result, err := Sync(t.Context(), SyncParams{
 		ProjectDir:         dir,
 		StateDir:           stateDir,
 		BaseBranch:         "main",
@@ -183,7 +183,7 @@ func TestSyncDivergedParentIsNeverFastForwarded(t *testing.T) {
 	git(t, dir, "branch", "-f", "feature", localTip)
 	featureBefore := git(t, dir, "rev-parse", "feature")
 
-	result, err := Sync(SyncParams{
+	result, err := Sync(t.Context(), SyncParams{
 		ProjectDir:         dir,
 		StateDir:           stateDir,
 		BaseBranch:         "main",
@@ -228,7 +228,7 @@ func TestSyncParentAlreadyInCascadeIsNotDoubleHandled(t *testing.T) {
 	writeMeta(t, stateDir, "feat", "main")
 	writeMeta(t, stateDir, "dev", "feat")
 
-	result, err := Sync(SyncParams{
+	result, err := Sync(t.Context(), SyncParams{
 		ProjectDir:         dir,
 		StateDir:           stateDir,
 		BaseBranch:         "main",
@@ -274,7 +274,7 @@ func TestSyncDeepCascadeThreeLevels(t *testing.T) {
 	writeMeta(t, stateDir, "dev1", "feat")
 	writeMeta(t, stateDir, "dev2", "dev1")
 
-	result, err := Sync(SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
+	result, err := Sync(t.Context(), SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
 	if err != nil {
 		t.Fatalf("Sync error: %v", err)
 	}
@@ -306,7 +306,7 @@ func TestSyncLeavesBaseAloneWhenNoStepTargetsIt(t *testing.T) {
 	advanceRemoteBranch(t, dir, "main", "main", "remote-main.txt")
 	mainBefore := git(t, dir, "rev-parse", "main")
 
-	result, err := Sync(SyncParams{
+	result, err := Sync(t.Context(), SyncParams{
 		ProjectDir:       dir,
 		StateDir:         stateDir,
 		BaseBranch:       "main",
@@ -342,7 +342,7 @@ func TestSyncRefreshesBaseWhenAStepTargetsIt(t *testing.T) {
 	advanceRemoteBranch(t, dir, "main", "main", "remote-main.txt")
 	mainBefore := git(t, dir, "rev-parse", "main")
 
-	result, err := Sync(SyncParams{
+	result, err := Sync(t.Context(), SyncParams{
 		ProjectDir:       dir,
 		StateDir:         stateDir,
 		BaseBranch:       "main",
@@ -369,7 +369,7 @@ func TestSyncBaseOnlyRefreshKeepsWorking(t *testing.T) {
 	advanceRemoteBranch(t, dir, "main", "main", "remote-main.txt")
 	mainBefore := git(t, dir, "rev-parse", "main")
 
-	result, err := Sync(SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
+	result, err := Sync(t.Context(), SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
 	if err != nil {
 		t.Fatalf("Sync error: %v", err)
 	}
@@ -410,7 +410,7 @@ func TestSyncLocallyRebasedParentIsNotReportedDiverged(t *testing.T) {
 	commitFile(t, devPath, "dev.txt", "dev work")
 	writeMeta(t, stateDir, "dev", "feature")
 
-	result, err := Sync(SyncParams{
+	result, err := Sync(t.Context(), SyncParams{
 		ProjectDir:       dir,
 		StateDir:         stateDir,
 		BaseBranch:       "main",
@@ -453,7 +453,7 @@ func TestSyncFailedParentFastForwardIsReportedWithReason(t *testing.T) {
 		t.Fatalf("write scratch: %v", err)
 	}
 
-	result, err := Sync(SyncParams{
+	result, err := Sync(t.Context(), SyncParams{
 		ProjectDir:         dir,
 		StateDir:           stateDir,
 		BaseBranch:         "main",
@@ -479,7 +479,7 @@ func TestSyncFailedParentFastForwardIsReportedWithReason(t *testing.T) {
 func TestClassifyParents(t *testing.T) {
 	dir, stateDir, _ := setupBranchOnlyParent(t)
 
-	updates, err := ClassifyParents(ClassifyParentsParams{
+	updates, err := ClassifyParents(t.Context(), ClassifyParentsParams{
 		ProjectDir: dir,
 		StateDir:   stateDir,
 		BaseBranch: "main",
@@ -512,7 +512,7 @@ func TestSyncDryRunReportsParentsWithoutTouchingAnything(t *testing.T) {
 	dir, stateDir, _ := setupBranchOnlyParent(t)
 	featureBefore := git(t, dir, "rev-parse", "feature")
 
-	result, err := Sync(SyncParams{
+	result, err := Sync(t.Context(), SyncParams{
 		ProjectDir:         dir,
 		StateDir:           stateDir,
 		BaseBranch:         "main",
@@ -545,7 +545,7 @@ func TestSyncAllStillRefreshesTheBase(t *testing.T) {
 	advanceRemoteBranch(t, dir, "main", "main", "remote-main.txt")
 	mainBefore := git(t, dir, "rev-parse", "main")
 
-	result, err := Sync(SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
+	result, err := Sync(t.Context(), SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
 	if err != nil {
 		t.Fatalf("Sync error: %v", err)
 	}

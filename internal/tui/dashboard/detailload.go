@@ -93,7 +93,7 @@ func (m Model) applyDetail(msg detailMsg) Model {
 func (m Model) loadDetailCmd(branch string) tea.Cmd {
 	params := m.detailParams(branch)
 	return func() tea.Msg {
-		return detailMsg{branch: branch, detail: worktree.Detail(params)}
+		return detailMsg{branch: branch, detail: worktree.Detail(m.ctx, params)}
 	}
 }
 

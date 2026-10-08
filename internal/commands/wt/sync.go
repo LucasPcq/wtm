@@ -1,6 +1,7 @@
 package wt
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -97,7 +98,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 		return errors.New(domain.SyncNeedsTerminal)
 	}
 
-	_, err = syncflow.Run(syncflow.Params{
+	_, err = syncflow.Run(cmd.Context(), syncflow.Params{
 		Context: shared.FlowContext(config),
 		Request: syncflow.Request{
 			Branches:     args,
@@ -108,21 +109,21 @@ func runSync(cmd *cobra.Command, args []string) error {
 			Push:         push,
 			NoPush:       noPush,
 			DryRun:       dryRun,
-			BaseBranch:   resolveBase(baseOverride, config),
+			BaseBranch:   resolveBase(cmd.Context(), baseOverride, config),
 		},
 		// The picker may be reached through the shell wrapper, which consumes stdout.
-		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),
+		Prompter:  shared.FlowPrompter(cmd.Context(), shared.FlowPrompterParams{Interactive: interactive, Stderr: true}),
 		Presenter: syncPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
 	})
 	return err
 }
 
-func resolveBase(override string, cfg shared.ConfigResult) string {
+func resolveBase(ctx context.Context, override string, cfg shared.ConfigResult) string {
 	if override != "" {
 		return override
 	}
 	if cfg.Config.Project.Worktrees.BaseBranch != "" {
 		return cfg.Config.Project.Worktrees.BaseBranch
 	}
-	return detect.BaseBranch(cfg.ProjectDir)
+	return detect.BaseBranch(ctx, cfg.ProjectDir)
 }

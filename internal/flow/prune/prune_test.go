@@ -1,6 +1,7 @@
 package prune
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -47,13 +48,13 @@ func newPruneFixture(t *testing.T, branches ...string) pruneFixture {
 
 	paths := map[string]string{}
 	for _, branch := range branches {
-		if _, err := worktree.Create(domain.CreateParams{
+		if _, err := worktree.Create(t.Context(), domain.CreateParams{
 			ProjectDir: repo, StateDir: ctx.StateDir, Branch: branch, FromBranch: "main",
 			SourceBranch: "main", Config: ctx.Config, SkipHooks: true,
 		}); err != nil {
 			t.Fatalf("create %s: %v", branch, err)
 		}
-		wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: repo, Branch: branch})
+		wt, err := worktree.FindByBranch(t.Context(), worktree.FindByBranchParams{ProjectDir: repo, Branch: branch})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -75,7 +76,7 @@ func newPruneFixture(t *testing.T, branches ...string) pruneFixture {
 }
 
 func (p pruneFixture) flow(branches ...string) *pruneFlow {
-	f := &pruneFlow{ctx: p.ctx, prompter: &flowtest.ScriptedPrompter{}, presenter: &recorder{Recorder: &flowtest.Recorder{}}}
+	f := &pruneFlow{runCtx: context.Background(), ctx: p.ctx, prompter: &flowtest.ScriptedPrompter{}, presenter: &recorder{Recorder: &flowtest.Recorder{}}}
 	for _, branch := range branches {
 		f.plan.Selected = append(f.plan.Selected, domain.PruneCandidate{Branch: branch, Path: p.paths[branch], Reason: domain.PruneReasonPRMerged})
 	}
@@ -236,7 +237,7 @@ func TestPruneDryRunWithNothingToPruneIsStillADryRun(t *testing.T) {
 	p := newPruneFixture(t)
 	presenter := &recorder{Recorder: &flowtest.Recorder{}}
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   p.ctx,
 		Request:   Request{Gone: true, NoFetch: true, Force: true, DryRun: true},
 		Prompter:  &flowtest.ScriptedPrompter{},

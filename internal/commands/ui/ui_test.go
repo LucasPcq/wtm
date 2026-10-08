@@ -17,7 +17,7 @@ func TestBuildRunParamsThreadsTheWorkingDirectoryAsCwd(t *testing.T) {
 	const cwd = "/repo/wt/feat-a"
 	result := shared.ConfigResult{ProjectDir: "/repo", StateDir: "/repo/.wtm"}
 
-	params := buildRunParams(buildParams{Dir: cwd, Result: result, Version: "0.26.1"})
+	params := buildRunParams(t.Context(), buildParams{Dir: cwd, Result: result, Version: "0.26.1"})
 
 	if params.Cwd != cwd {
 		t.Errorf("Cwd = %q, want %q — the directory wtm ui actually ran from", params.Cwd, cwd)

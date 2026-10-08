@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -38,7 +39,7 @@ func TestABatchTagsEachStageWithItsBranch(t *testing.T) {
 	msgs := posted(func(send func(tea.Msg)) {
 		p := newCreatePresenter(presenter{send: send, id: 1})
 		p.BranchStarted(flow.Progress{Branch: "feat/a", Position: 1, Total: 2})
-		_ = p.Stage(flow.StageParams{Message: "creating a", Work: func() error { return nil }})
+		_ = p.Stage(t.Context(), flow.StageParams{Message: "creating a", Work: func(context.Context) error { return nil }})
 		p.BranchStarted(flow.Progress{Branch: "feat/b", Position: 2, Total: 2})
 		_ = p.HookPhase(flow.HookPhaseParams{Title: "hooks b", Run: func(flow.HookSink) error { return nil }})
 	})
@@ -56,7 +57,7 @@ func TestABatchTagsEachStageWithItsBranch(t *testing.T) {
 
 func TestASingleCreateKeepsItsStagesUntargeted(t *testing.T) {
 	msgs := posted(func(send func(tea.Msg)) {
-		_ = newCreatePresenter(presenter{send: send, id: 1}).Stage(flow.StageParams{Message: "creating", Work: func() error { return nil }})
+		_ = newCreatePresenter(presenter{send: send, id: 1}).Stage(t.Context(), flow.StageParams{Message: "creating", Work: func(context.Context) error { return nil }})
 	})
 	for _, msg := range msgs {
 		if stage, ok := msg.(opStageMsg); ok && stage.target != "" {

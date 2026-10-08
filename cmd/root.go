@@ -2,11 +2,14 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -250,11 +253,11 @@ func globalUpdateCheck() *bool {
 
 // printUpdateNotice drains the passive check started in PersistentPreRun. It is
 // nil-safe: a suppressed check leaves updateCheck nil.
-func printUpdateNotice() {
+func printUpdateNotice(ctx context.Context) {
 	if quiet, _ := rootCmd.Flags().GetBool(domain.FlagQuiet); quiet {
 		return
 	}
-	current, latest, method, ok := updateCheck.Notice(domain.UpdateNoticeWait)
+	current, latest, method, ok := updateCheck.Notice(ctx, domain.UpdateNoticeWait)
 	if !ok {
 		return
 	}
@@ -296,9 +299,22 @@ func Root() *cobra.Command {
 	return rootCmd
 }
 
+// interruptible is the root context. The first interrupt cancels it and hands
+// the next one back to the default handler, so a run slow to unwind can still
+// be killed outright.
+func interruptible() (context.Context, context.CancelFunc) {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	context.AfterFunc(ctx, stop)
+	return ctx, stop
+}
+
 // Execute runs the root command and exits with the appropriate code.
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
+	ctx, stop := interruptible()
+	defer stop()
+	runErr := rootCmd.ExecuteContext(ctx)
+	err := rules.Interrupted(rules.InterruptedParams{Err: runErr, Signalled: ctx.Err() != nil})
+	if err != nil {
 		// ErrAborted means the command already printed its own report; just
 		// propagate the non-zero exit without a second error line — unless --quiet
 		// discarded that report, in which case this is the only line there is.
@@ -307,9 +323,9 @@ func Execute() {
 			output.Error(os.Stderr, abortLine(err))
 			output.Blank(os.Stderr)
 		}
-		printUpdateNotice()
+		printUpdateNotice(ctx)
 		os.Exit(rules.ExitCode(err))
 	}
 
-	printUpdateNotice()
+	printUpdateNotice(ctx)
 }

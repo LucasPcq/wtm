@@ -27,7 +27,7 @@ func TestDetachWorktreeRunsTheCommandWithTheNamespaceName(t *testing.T) {
 	dir := t.TempDir()
 	witness := filepath.Join(dir, "witness")
 
-	got := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
+	got := runjobs.RemoveWorktreeNamespaces(t.Context(), runjobs.RemoveNamespacesParams{
 		Config:  namespaceConfig("printf '%s\\n' \"$WTM_NAMESPACE\" >> " + witness),
 		Env:     worktreeEnv(),
 		WorkDir: dir,
@@ -54,7 +54,7 @@ func TestDetachWorktreeDefersWhenTheServiceIsDown(t *testing.T) {
 	dir := t.TempDir()
 	witness := filepath.Join(dir, "witness")
 
-	got := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
+	got := runjobs.RemoveWorktreeNamespaces(t.Context(), runjobs.RemoveNamespacesParams{
 		Config:  namespaceConfig("printf 'ran\\n' >> " + witness),
 		Env:     worktreeEnv(),
 		WorkDir: dir,
@@ -76,7 +76,7 @@ func TestDetachWorktreeDefersWhenTheServiceIsDown(t *testing.T) {
 }
 
 func TestDetachWorktreeDefersAFailedCommand(t *testing.T) {
-	got := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
+	got := runjobs.RemoveWorktreeNamespaces(t.Context(), runjobs.RemoveNamespacesParams{
 		Config:  namespaceConfig("exit 3"),
 		Env:     worktreeEnv(),
 		WorkDir: t.TempDir(),
@@ -97,7 +97,7 @@ func TestDetachWorktreeDefersAFailedCommand(t *testing.T) {
 // A drop blocked on a lock nobody releases must not hold the clean for ever.
 func TestRemoveGivesUpOnACommandThatNeverReturns(t *testing.T) {
 	started := time.Now()
-	got := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
+	got := runjobs.RemoveWorktreeNamespaces(t.Context(), runjobs.RemoveNamespacesParams{
 		Config:  namespaceConfig("sleep 600; true"),
 		Env:     worktreeEnv(),
 		WorkDir: t.TempDir(),

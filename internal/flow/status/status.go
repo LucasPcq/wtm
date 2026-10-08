@@ -4,6 +4,7 @@
 package status
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -42,12 +43,12 @@ type Outcome struct {
 	Aborted  bool
 }
 
-func Run(params Params) (Outcome, error) {
-	named, err := target.Named(target.ResolveParams{ProjectDir: params.Context.ProjectDir, Query: params.Request.Worktree})
+func Run(ctx context.Context, params Params) (Outcome, error) {
+	named, err := target.Named(ctx, target.ResolveParams{ProjectDir: params.Context.ProjectDir, Query: params.Request.Worktree})
 	if err != nil {
 		return Outcome{}, err
 	}
-	answers, err := params.Prompter.Ask(session(sessionParams{Params: params, Named: named}))
+	answers, err := params.Prompter.Ask(session(ctx, sessionParams{Params: params, Named: named}))
 	if errors.Is(err, domain.ErrUserAborted) {
 		params.Presenter.Notice(flow.AbortedNotice)
 		return Outcome{Aborted: true}, nil
@@ -56,20 +57,20 @@ func Run(params Params) (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	workDir := target.WorkDir(target.WorkDirParams{Answers: answers, Named: named, Cwd: params.Request.Cwd})
-	branch := target.NamedBranch(target.NamedBranchParams{Named: namedList(named), Dir: workDir})
+	workDir := target.WorkDir(ctx, target.WorkDirParams{Answers: answers, Named: named, Cwd: params.Request.Cwd})
+	branch := target.NamedBranch(ctx, target.NamedBranchParams{Named: namedList(named), Dir: workDir})
 	if branch == "" {
 		return Outcome{}, fmt.Errorf("%w: %s", domain.ErrStatusDetached, workDir)
 	}
 	var doc domain.StatusDocument
-	err = params.Presenter.Stage(flow.StageParams{
+	err = params.Presenter.Stage(ctx, flow.StageParams{
 		Message: domain.StatusLoading,
-		Work: func() error {
-			identity, err := worktree.Identity(refOf(params.Context, branch))
+		Work: func(ctx context.Context) error {
+			identity, err := worktree.Identity(ctx, refOf(params.Context, branch))
 			if err != nil {
 				return err
 			}
-			r, err := open(params)
+			r, err := open(ctx, params)
 			if err != nil {
 				return err
 			}
@@ -88,11 +89,11 @@ type sessionParams struct {
 // session is the run module's own worktree question, opened on the current
 // worktree: a positional answers it, and so does the current worktree when
 // nobody can be asked.
-func session(params sessionParams) flow.Session {
+func session(ctx context.Context, params sessionParams) flow.Session {
 	return flow.Session{
 		ErrLabel: domain.CmdStatus,
 		Presets:  target.Presets(target.PresetParams{Named: params.Named}),
-		Steps: []flow.Step{target.WorktreeStep(target.WorktreeParams{
+		Steps: []flow.Step{target.WorktreeStep(ctx, target.WorktreeParams{
 			ProjectDir: params.Context.ProjectDir,
 			Current:    params.Request.Cwd,
 		})},
@@ -101,25 +102,25 @@ func session(params sessionParams) flow.Session {
 
 // RunAll is every worktree of the repository a branch names, main first as
 // git lists it; the jobs are read once for all of them. It asks nothing.
-func RunAll(params Params) ([]domain.StatusDocument, error) {
+func RunAll(ctx context.Context, params Params) ([]domain.StatusDocument, error) {
 	var docs []domain.StatusDocument
-	err := params.Presenter.Stage(flow.StageParams{
+	err := params.Presenter.Stage(ctx, flow.StageParams{
 		Message: domain.StatusLoading,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			var err error
-			docs, err = readAll(params)
+			docs, err = readAll(ctx, params)
 			return err
 		},
 	})
 	return docs, err
 }
 
-func readAll(params Params) ([]domain.StatusDocument, error) {
-	identities, err := worktree.Identities(worktree.IdentitiesParams{ProjectDir: params.Context.ProjectDir, StateDir: params.Context.StateDir})
+func readAll(ctx context.Context, params Params) ([]domain.StatusDocument, error) {
+	identities, err := worktree.Identities(ctx, worktree.IdentitiesParams{ProjectDir: params.Context.ProjectDir, StateDir: params.Context.StateDir})
 	if err != nil {
 		return nil, err
 	}
-	r, err := open(params)
+	r, err := open(ctx, params)
 	if err != nil {
 		return nil, err
 	}
@@ -135,17 +136,18 @@ func readAll(params Params) ([]domain.StatusDocument, error) {
 }
 
 type reader struct {
-	ctx  flow.Context
-	run  domain.RunConfig
-	jobs []domain.JobInfo
+	runCtx context.Context
+	ctx    flow.Context
+	run    domain.RunConfig
+	jobs   []domain.JobInfo
 }
 
-func open(params Params) (reader, error) {
+func open(ctx context.Context, params Params) (reader, error) {
 	run, err := runconfig.Load(params.Context.StateDir)
 	if err != nil {
 		return reader{}, err
 	}
-	return reader{ctx: params.Context, run: run, jobs: jobsOf(params)}, nil
+	return reader{runCtx: ctx, ctx: params.Context, run: run, jobs: jobsOf(ctx, params)}, nil
 }
 
 func refOf(ctx flow.Context, branch string) worktree.WorktreeRef {
@@ -154,14 +156,14 @@ func refOf(ctx flow.Context, branch string) worktree.WorktreeRef {
 
 func (r reader) document(identity domain.WorktreeIdentity) (domain.StatusDocument, error) {
 	ref := refOf(r.ctx, identity.Branch)
-	read := readRun(readRunParams{Context: r.ctx, Ref: ref, Run: r.run})
+	read := readRun(r.runCtx, readRunParams{Context: r.ctx, Ref: ref, Run: r.run})
 	jobs := rules.StatusJobs(rules.StatusJobsParams{
 		Declared: r.run.Jobs,
-		Up:       upJobs(upJobsParams{Path: identity.Path, Jobs: r.jobs}),
+		Up:       upJobs(r.runCtx, upJobsParams{Path: identity.Path, Jobs: r.jobs}),
 		URLs:     read.urls,
 	})
 	files := r.ctx.Config.Project.Env.Files
-	source := envflow.SourceOf(envflow.SourceParams{Context: r.ctx, Branch: identity.Branch})
+	source := envflow.SourceOf(r.runCtx, envflow.SourceParams{Context: r.ctx, Branch: identity.Branch})
 	missing := envsvc.MissingTargets(envsvc.MissingTargetsParams{
 		WorktreePath: identity.Path,
 		MainPath:     r.ctx.ProjectDir,
@@ -169,7 +171,7 @@ func (r reader) document(identity domain.WorktreeIdentity) (domain.StatusDocumen
 		Strategy:     source.Strategy,
 		Files:        files,
 	})
-	adoption, err := worktree.IsolationAdoptionFor(worktree.IsolationAdoptionParams{Ref: ref, WorktreePath: identity.Path})
+	adoption, err := worktree.IsolationAdoptionFor(r.runCtx, worktree.IsolationAdoptionParams{Ref: ref, WorktreePath: identity.Path})
 	if err != nil {
 		return domain.StatusDocument{}, err
 	}
@@ -200,9 +202,9 @@ func namedList(named *target.Resolved) []target.Resolved {
 	return []target.Resolved{*named}
 }
 
-func jobsOf(params Params) []domain.JobInfo {
+func jobsOf(ctx context.Context, params Params) []domain.JobInfo {
 	if params.Jobs == nil {
-		return runjobs.Current()
+		return runjobs.Current(ctx)
 	}
 	return params.Jobs()
 }
@@ -221,17 +223,17 @@ type runRead struct {
 
 // readRun leaves the offset and the addresses out for a worktree no run has
 // numbered: reading them must not be what numbers it.
-func readRun(params readRunParams) runRead {
+func readRun(ctx context.Context, params readRunParams) runRead {
 	if !rules.IsRunInitialized(params.Run) {
 		return runRead{}
 	}
 	addressing := rules.EffectiveAddressing(params.Run)
-	env, err := worktree.BranchEnv(params.Ref)
+	env, err := worktree.BranchEnv(ctx, params.Ref)
 	if err != nil {
 		return runRead{addressing: &addressing}
 	}
 	offset := rules.PortOffsetFromEnv(env)
-	entries := urls.Open(urls.Params{Context: params.Context, Config: params.Run}).At(env)
+	entries := urls.Open(ctx, urls.Params{Context: params.Context, Config: params.Run}).At(env)
 	byJob := make(map[string]string, len(entries))
 	for _, entry := range entries {
 		byJob[entry.Job] = entry.URL
@@ -246,7 +248,7 @@ type upJobsParams struct {
 
 // upJobs names where each shared service runs by asking git once per checkout
 // holding one, not once per job.
-func upJobs(params upJobsParams) []domain.JobSnapshot {
+func upJobs(ctx context.Context, params upJobsParams) []domain.JobSnapshot {
 	branches := map[string]string{}
 	for _, job := range params.Jobs {
 		if job.SharedDir == "" {
@@ -255,7 +257,7 @@ func upJobs(params upJobsParams) []domain.JobSnapshot {
 		if _, seen := branches[job.SharedDir]; seen {
 			continue
 		}
-		branches[job.SharedDir] = target.BranchOf(job.SharedDir)
+		branches[job.SharedDir] = target.BranchOf(ctx, job.SharedDir)
 	}
 	return rules.WorktreeJobs(rules.WorktreeJobsParams{
 		Path:     params.Path,

@@ -177,6 +177,8 @@ const (
 // Model is the dashboard's root Bubbletea model. It owns its own zone manager
 // so hit-testing is per-program state rather than a package global.
 type Model struct {
+	// ctx is the program's: every flow and load the dashboard starts runs under it.
+	ctx        context.Context
 	params     RunParams
 	listParams domain.ListParams
 	zones      *zone.Manager
@@ -318,8 +320,9 @@ type Model struct {
 
 // New builds the dashboard model. Callers outside a program must Close the
 // returned model's zone manager; Run does it for them.
-func New(params RunParams) Model {
+func New(ctx context.Context, params RunParams) Model {
 	return Model{
+		ctx:    ctx,
 		params: params,
 		listParams: domain.ListParams{
 			ProjectDir: params.ProjectDir,
@@ -341,15 +344,15 @@ func (m Model) Close() { m.zones.Close() }
 
 // Run opens the dashboard on the alternate screen. It restores the terminal on
 // exit without re-emitting anything into the scrollback.
-func Run(params RunParams) error {
-	model := New(params)
+func Run(ctx context.Context, params RunParams) error {
+	model := New(ctx, params)
 	defer model.Close()
 
 	watch := params.Watch
 	if watch == nil {
 		watch = defaultWatch(params)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	go watchEvents(watchEventsParams{Context: ctx, Changes: model.changes, Watch: watch})
 
@@ -392,7 +395,7 @@ func (m Model) loadWorktreesCmd(fetch bool) tea.Cmd {
 		if fetch {
 			list = worktree.Refresh
 		}
-		statuses, err := list(listParams)
+		statuses, err := list(m.ctx, listParams)
 		if err != nil {
 			return worktreesMsg{err: err}
 		}
@@ -403,7 +406,7 @@ func (m Model) loadWorktreesCmd(fetch bool) tea.Cmd {
 				Branch:   status.Branch,
 			})
 		}
-		fetchedAt := worktree.LastFetchAt(worktree.LastFetchAtParams{ProjectDir: projectDir})
+		fetchedAt := worktree.LastFetchAt(m.ctx, worktree.LastFetchAtParams{ProjectDir: projectDir})
 		return worktreesMsg{statuses: statuses, parents: parents, fetchedAt: fetchedAt}
 	}
 }
@@ -413,7 +416,7 @@ func (m Model) loadWorktreesCmd(fetch bool) tea.Cmd {
 func (m Model) loadTreeCmd() tea.Cmd {
 	listParams, running := m.listParams, m.running
 	return func() tea.Msg {
-		forest, err := worktree.BuildTree(worktree.BuildTreeParams{
+		forest, err := worktree.BuildTree(m.ctx, worktree.BuildTreeParams{
 			ProjectDir: listParams.ProjectDir,
 			StateDir:   listParams.StateDir,
 			Config:     listParams.Config,
@@ -1398,7 +1401,7 @@ func (m Model) jobsLoader() func(bool) ([]domain.JobInfo, bool) {
 	if m.params.JobsLoader != nil {
 		return m.params.JobsLoader
 	}
-	return runjobs.Read
+	return func(wake bool) ([]domain.JobInfo, bool) { return runjobs.Read(m.ctx, wake) }
 }
 
 // applyJobs also reloads the detail on screen when the project's declared jobs

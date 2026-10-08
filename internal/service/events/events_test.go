@@ -79,7 +79,7 @@ func (w watching) nextReceived(t *testing.T) Received {
 func noDaemonSpawn(t *testing.T) {
 	t.Helper()
 	previous := ensureDaemon
-	ensureDaemon = func(params process.DaemonParams) error {
+	ensureDaemon = func(_ context.Context, params process.DaemonParams) error {
 		if !process.IsDaemonRunning(params.SocketPath) {
 			return errors.New("no daemon")
 		}
@@ -109,7 +109,7 @@ func TestAPublishedEventReachesTheWatcherStamped(t *testing.T) {
 	w.next(t)
 	w.next(t)
 
-	NewPublisher(PublisherParams{ProjectDir: f.projectDir, SocketPath: f.socket}).Publish(domain.Event{Type: domain.EventWorktreeCreated, Worktree: &domain.WorktreeIdentity{Branch: "feat/a"}})
+	NewPublisher(PublisherParams{ProjectDir: f.projectDir, SocketPath: f.socket}).Publish(t.Context(), domain.Event{Type: domain.EventWorktreeCreated, Worktree: &domain.WorktreeIdentity{Branch: "feat/a"}})
 
 	got := w.next(t)
 	if got.Type != domain.EventWorktreeCreated || got.V != domain.EventsSchemaVersion || got.TS == "" || got.Repo == nil || got.Repo.Root != f.projectDir {
@@ -125,8 +125,8 @@ func TestAPublisherStampsItsCorrelationID(t *testing.T) {
 	w.next(t)
 	created := domain.Event{Type: domain.EventWorktreeCreated, Worktree: &domain.WorktreeIdentity{Branch: "feat/a"}}
 
-	NewPublisher(PublisherParams{ProjectDir: f.projectDir, SocketPath: f.socket, CorrelationID: "popup-1"}).Publish(created)
-	NewPublisher(PublisherParams{ProjectDir: f.projectDir, SocketPath: f.socket}).Publish(created)
+	NewPublisher(PublisherParams{ProjectDir: f.projectDir, SocketPath: f.socket, CorrelationID: "popup-1"}).Publish(t.Context(), created)
+	NewPublisher(PublisherParams{ProjectDir: f.projectDir, SocketPath: f.socket}).Publish(t.Context(), created)
 
 	if got := w.next(t); got.CorrelationID != "popup-1" {
 		t.Fatalf("correlated = %+v", got)
@@ -152,9 +152,9 @@ func TestAnEventPublishedDuringTheSnapshotArrivesAfterReady(t *testing.T) {
 	noDaemonSpawn(t)
 	f := newWatchFixture(t)
 	previous := identities
-	identities = func(params worktree.IdentitiesParams) ([]domain.WorktreeIdentity, error) {
-		NewPublisher(PublisherParams{ProjectDir: f.projectDir, SocketPath: f.socket}).Publish(domain.Event{Type: domain.EventWorktreeCreated, Worktree: &domain.WorktreeIdentity{Branch: "feat/b"}})
-		return previous(params)
+	identities = func(ctx context.Context, params worktree.IdentitiesParams) ([]domain.WorktreeIdentity, error) {
+		NewPublisher(PublisherParams{ProjectDir: f.projectDir, SocketPath: f.socket}).Publish(t.Context(), domain.Event{Type: domain.EventWorktreeCreated, Worktree: &domain.WorktreeIdentity{Branch: "feat/b"}})
+		return previous(t.Context(), params)
 	}
 	t.Cleanup(func() { identities = previous })
 	w := f.watch(t)
@@ -189,7 +189,7 @@ func TestANewerSchemaEndsWatch(t *testing.T) {
 	w := f.watch(t)
 	w.next(t)
 	w.next(t)
-	repo, err := worktree.RepoOf(worktree.RepoOfParams{ProjectDir: f.projectDir})
+	repo, err := worktree.RepoOf(t.Context(), worktree.RepoOfParams{ProjectDir: f.projectDir})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,9 +248,9 @@ func TestTheDaemonAWatcherStartsServesTheProxy(t *testing.T) {
 	f := newWatchFixture(t)
 	var asked process.DaemonParams
 	previous := ensureDaemon
-	ensureDaemon = func(params process.DaemonParams) error {
+	ensureDaemon = func(ctx context.Context, params process.DaemonParams) error {
 		asked = params
-		return previous(params)
+		return previous(ctx, params)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -280,9 +280,9 @@ func TestOnlyADaemonThatPredatesSubscribeIsReplaced(t *testing.T) {
 	})
 	previousEnsure, previousReplace := ensureDaemon, replaceDaemon
 	t.Cleanup(func() { ensureDaemon, replaceDaemon = previousEnsure, previousReplace })
-	ensureDaemon = func(process.DaemonParams) error { return nil }
+	ensureDaemon = func(context.Context, process.DaemonParams) error { return nil }
 	replaced := make(chan struct{}, 8)
-	replaceDaemon = func(process.DaemonParams) error {
+	replaceDaemon = func(context.Context, process.DaemonParams) error {
 		replaced <- struct{}{}
 		return nil
 	}
@@ -316,7 +316,7 @@ func TestARelayedEventKeepsTheFieldsThisBuildDoesNotKnow(t *testing.T) {
 	}()
 	<-raws
 	<-raws
-	repo, err := worktree.RepoOf(worktree.RepoOfParams{ProjectDir: f.projectDir})
+	repo, err := worktree.RepoOf(ctx, worktree.RepoOfParams{ProjectDir: f.projectDir})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,10 +337,10 @@ func TestARelayedEventKeepsTheFieldsThisBuildDoesNotKnow(t *testing.T) {
 
 func TestASnapshotOfNothingIsAnEmptyList(t *testing.T) {
 	previous := identities
-	identities = func(worktree.IdentitiesParams) ([]domain.WorktreeIdentity, error) { return nil, nil }
+	identities = func(context.Context, worktree.IdentitiesParams) ([]domain.WorktreeIdentity, error) { return nil, nil }
 	t.Cleanup(func() { identities = previous })
 
-	received, err := snapshotOf(snapshotParams{Repo: domain.EventRepo{Root: "/r", CommonDir: "/r/.git"}})
+	received, err := snapshotOf(t.Context(), snapshotParams{Repo: domain.EventRepo{Root: "/r", CommonDir: "/r/.git"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -351,15 +351,15 @@ func TestASnapshotOfNothingIsAnEmptyList(t *testing.T) {
 
 func TestASnapshotCarriesEachWorktreesJobs(t *testing.T) {
 	previousIdentities, previousJobs := identities, listJobs
-	identities = func(worktree.IdentitiesParams) ([]domain.WorktreeIdentity, error) {
+	identities = func(context.Context, worktree.IdentitiesParams) ([]domain.WorktreeIdentity, error) {
 		return []domain.WorktreeIdentity{{Branch: "main", Path: "/r", IsMain: true}, {Branch: "feat/a", Path: "/wt/a"}}, nil
 	}
-	listJobs = func(string) ([]domain.JobInfo, error) {
+	listJobs = func(context.Context, string) ([]domain.JobInfo, error) {
 		return []domain.JobInfo{{Name: "web", Kind: domain.JobKindService, Status: domain.JobStatusRunning, State: domain.JobStateRunning, WorkDir: "/wt/a"}}, nil
 	}
 	t.Cleanup(func() { identities, listJobs = previousIdentities, previousJobs })
 
-	received, err := snapshotOf(snapshotParams{Repo: domain.EventRepo{Root: "/r", CommonDir: "/r/.git"}, Socket: "daemon.sock"})
+	received, err := snapshotOf(t.Context(), snapshotParams{Repo: domain.EventRepo{Root: "/r", CommonDir: "/r/.git"}, Socket: "daemon.sock"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -379,13 +379,13 @@ func TestASnapshotCarriesEachWorktreesJobs(t *testing.T) {
 
 func TestASnapshotSaysNothingOfJobsItCouldNotAsk(t *testing.T) {
 	previousIdentities, previousJobs := identities, listJobs
-	identities = func(worktree.IdentitiesParams) ([]domain.WorktreeIdentity, error) {
+	identities = func(context.Context, worktree.IdentitiesParams) ([]domain.WorktreeIdentity, error) {
 		return []domain.WorktreeIdentity{{Branch: "main", Path: "/r", IsMain: true}}, nil
 	}
-	listJobs = func(string) ([]domain.JobInfo, error) { return nil, errors.New("daemon gone") }
+	listJobs = func(context.Context, string) ([]domain.JobInfo, error) { return nil, errors.New("daemon gone") }
 	t.Cleanup(func() { identities, listJobs = previousIdentities, previousJobs })
 
-	received, err := snapshotOf(snapshotParams{Repo: domain.EventRepo{Root: "/r", CommonDir: "/r/.git"}, Socket: "daemon.sock"})
+	received, err := snapshotOf(t.Context(), snapshotParams{Repo: domain.EventRepo{Root: "/r", CommonDir: "/r/.git"}, Socket: "daemon.sock"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -414,13 +414,13 @@ func TestAPerRepoStreamDoesNotRelayRepoEvents(t *testing.T) {
 	w := f.watch(t)
 	w.next(t)
 	w.next(t)
-	repo, err := worktree.RepoOf(worktree.RepoOfParams{ProjectDir: f.projectDir})
+	repo, err := worktree.RepoOf(t.Context(), worktree.RepoOfParams{ProjectDir: f.projectDir})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	announce(announceParams{Bus: busParams{SocketPath: f.socket}, Type: domain.EventRepoRemoved, Repo: repo})
-	NewPublisher(PublisherParams{ProjectDir: f.projectDir, SocketPath: f.socket}).Publish(domain.Event{Type: domain.EventWorktreeCreated, Worktree: &domain.WorktreeIdentity{Branch: "feat/a"}})
+	NewPublisher(PublisherParams{ProjectDir: f.projectDir, SocketPath: f.socket}).Publish(t.Context(), domain.Event{Type: domain.EventWorktreeCreated, Worktree: &domain.WorktreeIdentity{Branch: "feat/a"}})
 
 	if got := w.next(t); got.Type != domain.EventWorktreeCreated {
 		t.Fatalf("got %s, want the repo event skipped", got.Type)

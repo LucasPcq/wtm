@@ -47,7 +47,7 @@ func TestSettleWithdrawsADebtWhoseWorktreeExistsAgain(t *testing.T) {
 	ctx, witness := fixture(t)
 	presenter := &flowtest.Recorder{}
 
-	result := Settle(Params{Context: ctx, Presenter: presenter})
+	result := Settle(t.Context(), Params{Context: ctx, Presenter: presenter})
 
 	if body, _ := os.ReadFile(witness); len(body) != 0 {
 		t.Errorf("remove ran with %q, want nothing dropped", body)
@@ -68,8 +68,8 @@ func TestSettleWithdrawsADebtWhoseWorktreeExistsAgain(t *testing.T) {
 func TestSettleLeavesADebtOwedWhileItsServiceIsDown(t *testing.T) {
 	ctx, _ := fixture(t)
 
-	Settle(Params{Context: ctx, Presenter: &flowtest.Recorder{}})
-	result := Settle(Params{Context: ctx, Presenter: &flowtest.Recorder{}})
+	Settle(t.Context(), Params{Context: ctx, Presenter: &flowtest.Recorder{}})
+	result := Settle(t.Context(), Params{Context: ctx, Presenter: &flowtest.Recorder{}})
 
 	if len(result.Settled) != 0 || result.Owed["postgres"] != 1 {
 		t.Errorf("result = %+v, want nothing paid and one still owed", result)

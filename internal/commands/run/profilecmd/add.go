@@ -45,13 +45,13 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	jobs, _ := cmd.Flags().GetStringSlice(domain.FlagJobs)
 	isDefault, _ := cmd.Flags().GetBool(domain.FlagDefault)
 
-	outcome, err := profileflow.Add(profileflow.AddParams{
+	outcome, err := profileflow.Add(cmd.Context(), profileflow.AddParams{
 		Context: ctx.FlowContext(),
 		Request: profileflow.AddRequest{
 			Initial: domain.ProfileConfig{Name: runctx.FirstArg(args), Jobs: jobs, Default: isDefault},
 			Config:  ctx.Run,
 		},
-		Prompter:  ctx.Prompter(ctx.Interactive),
+		Prompter:  ctx.Prompter(cmd.Context(), ctx.Interactive),
 		Presenter: presenter{CLIPresenter: ctx.CLI(cmd)},
 	})
 	if err != nil {

@@ -48,10 +48,10 @@ func runList(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Backing out of a listing is not a failure: nothing was asked for.
-	_, err = jobflow.List(jobflow.ListParams{
+	_, err = jobflow.List(cmd.Context(), jobflow.ListParams{
 		Context:   ctx.FlowContext(),
 		Request:   jobflow.ListRequest{Config: ctx.Run},
-		Prompter:  ctx.Prompter(ctx.Interactive),
+		Prompter:  ctx.Prompter(cmd.Context(), ctx.Interactive),
 		Presenter: presenter{CLIPresenter: ctx.CLI(cmd)},
 	})
 	return err

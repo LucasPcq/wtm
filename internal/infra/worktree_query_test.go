@@ -10,7 +10,7 @@ import (
 func TestFindMainWorktreePath(t *testing.T) {
 	dir := gittest.InitRepo(t)
 
-	mainPath, err := FindMainWorktreePath(FindMainWorktreeParams{ProjectDir: dir})
+	mainPath, err := FindMainWorktreePath(t.Context(), FindMainWorktreeParams{ProjectDir: dir})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -27,14 +27,14 @@ func TestListWorktrees(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	wtPath := filepath.Join(t.TempDir(), "wt1")
 
-	_ = CreateWorktree(CreateWorktreeParams{
+	_ = CreateWorktree(t.Context(), CreateWorktreeParams{
 		ProjectDir: dir,
 		Path:       wtPath,
 		Branch:     "feature-test",
 		FromBranch: "HEAD",
 	})
 
-	worktrees, err := ListWorktrees(ListWorktreesParams{ProjectDir: dir})
+	worktrees, err := ListWorktrees(t.Context(), ListWorktreesParams{ProjectDir: dir})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -58,14 +58,14 @@ func TestFindWorktreeByBranch(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	wtPath := filepath.Join(t.TempDir(), "wt-find")
 
-	_ = CreateWorktree(CreateWorktreeParams{
+	_ = CreateWorktree(t.Context(), CreateWorktreeParams{
 		ProjectDir: dir,
 		Path:       wtPath,
 		Branch:     "feat-find",
 		FromBranch: "HEAD",
 	})
 
-	wt, err := FindWorktreeByBranch(FindWorktreeByBranchParams{
+	wt, err := FindWorktreeByBranch(t.Context(), FindWorktreeByBranchParams{
 		ProjectDir: dir,
 		Branch:     "feat-find",
 	})
@@ -80,7 +80,7 @@ func TestFindWorktreeByBranch(t *testing.T) {
 func TestFindWorktreeByBranchNotFound(t *testing.T) {
 	dir := gittest.InitRepo(t)
 
-	_, err := FindWorktreeByBranch(FindWorktreeByBranchParams{
+	_, err := FindWorktreeByBranch(t.Context(), FindWorktreeByBranchParams{
 		ProjectDir: dir,
 		Branch:     "nonexistent",
 	})

@@ -4,6 +4,7 @@
 package owed
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -28,7 +29,7 @@ type Result struct {
 // Settle drops every owed namespace whose service is up, and says so one line
 // each. A debt whose worktree exists again is withdrawn instead: the namespace
 // now belongs to the new worktree, and dropping it would destroy its data.
-func Settle(params Params) Result {
+func Settle(ctx context.Context, params Params) Result {
 	result := Result{Owed: map[string]int{}}
 	owed := runjobs.LoadPendingRemovals(params.Context.StateDir)
 	if len(owed) == 0 {
@@ -39,8 +40,8 @@ func Settle(params Params) Result {
 		return result
 	}
 
-	live := liveBranches(params.Context.ProjectDir)
-	up := rules.SharedJobsUp(rules.SharedJobsUpParams{Jobs: runjobs.Load(), Config: cfg})
+	live := liveBranches(ctx, params.Context.ProjectDir)
+	up := rules.SharedJobsUp(rules.SharedJobsUpParams{Jobs: runjobs.Load(ctx), Config: cfg})
 	var done []domain.NamespaceRef
 	for _, ref := range owed {
 		name := rules.NamespaceName(rules.NamespaceNameParams{Config: cfg, Ref: ref})
@@ -54,10 +55,10 @@ func Settle(params Params) Result {
 			continue
 		}
 		var removed runjobs.RemoveNamespacesResult
-		_ = params.Presenter.Stage(flow.StageParams{
+		_ = params.Presenter.Stage(ctx, flow.StageParams{
 			Message: fmt.Sprintf(domain.OwedDroppingFmt, name, ref.Job),
-			Work: func() error {
-				removed = runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
+			Work: func(ctx context.Context) error {
+				removed = runjobs.RemoveWorktreeNamespaces(ctx, runjobs.RemoveNamespacesParams{
 					Config:  rules.JobsNamed(cfg, ref.Job),
 					Env:     rules.NamespaceEnv(rules.NamespaceEnvParams{Worktree: ref.Worktree, Ordinal: ref.Ordinal}),
 					WorkDir: params.Context.ProjectDir,
@@ -90,9 +91,9 @@ func Settle(params Params) Result {
 // liveBranches are the worktrees that exist, by the slug a namespace names
 // them by. More than one under a slug is a collision that predates the refusal
 // at creation.
-func liveBranches(projectDir string) map[string][]string {
+func liveBranches(ctx context.Context, projectDir string) map[string][]string {
 	live := map[string][]string{}
-	all, err := worktree.ListAll(worktree.ListAllParams{ProjectDir: projectDir})
+	all, err := worktree.ListAll(ctx, worktree.ListAllParams{ProjectDir: projectDir})
 	if err != nil {
 		return live
 	}

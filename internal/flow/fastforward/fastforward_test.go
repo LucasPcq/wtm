@@ -1,6 +1,7 @@
 package fastforward
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -20,7 +21,7 @@ func flowWith(request Request, checks map[string]domain.FastForwardCheck) *fastF
 			OriginAhead:  check.Ahead,
 		})
 	}
-	return &fastForwardFlow{request: request, statuses: statuses, checks: checks}
+	return &fastForwardFlow{runCtx: context.Background(), request: request, statuses: statuses, checks: checks}
 }
 
 func selectedAnswers(branches ...string) flow.Answers {

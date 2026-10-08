@@ -38,7 +38,7 @@ func TestSyncKeepConflictLeavesRebaseInProgress(t *testing.T) {
 	stateDir := filepath.Join(dir, ".git", "wtm")
 	featPath := conflictingSiblings(t, dir, stateDir, t.TempDir())
 
-	result, err := Sync(SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main", KeepConflict: true})
+	result, err := Sync(t.Context(), SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main", KeepConflict: true})
 	if err != nil {
 		t.Fatalf("Sync error: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestSyncDefaultConflictAbortsButReportsFiles(t *testing.T) {
 	stateDir := filepath.Join(dir, ".git", "wtm")
 	featPath := conflictingSiblings(t, dir, stateDir, t.TempDir())
 
-	result, err := Sync(SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
+	result, err := Sync(t.Context(), SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
 	if err != nil {
 		t.Fatalf("Sync error: %v", err)
 	}
@@ -95,14 +95,14 @@ func TestSyncSecondRunReportsRebaseInProgress(t *testing.T) {
 	stateDir := filepath.Join(dir, ".git", "wtm")
 	featPath := conflictingSiblings(t, dir, stateDir, t.TempDir())
 
-	if _, err := Sync(SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main", KeepConflict: true}); err != nil {
+	if _, err := Sync(t.Context(), SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main", KeepConflict: true}); err != nil {
 		t.Fatalf("first Sync: %v", err)
 	}
 	if !rebaseInProgress(t, featPath) {
 		t.Fatal("expected the first run to leave a rebase in progress")
 	}
 
-	result, err := Sync(SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
+	result, err := Sync(t.Context(), SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main"})
 	if err != nil {
 		t.Fatalf("second Sync errored (cycle-detection regression): %v", err)
 	}
@@ -136,7 +136,7 @@ func TestSyncKeepConflictContinuesIndependentBranches(t *testing.T) {
 	// main moves on conflict.txt → feat conflicts, sib rebases cleanly.
 	commitFile(t, dir, "conflict.txt", "main change")
 
-	result, err := Sync(SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main", KeepConflict: true})
+	result, err := Sync(t.Context(), SyncParams{ProjectDir: dir, StateDir: stateDir, BaseBranch: "main", KeepConflict: true})
 	if err != nil {
 		t.Fatalf("Sync error: %v", err)
 	}

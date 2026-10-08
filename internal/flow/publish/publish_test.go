@@ -37,7 +37,7 @@ func newFixture(t *testing.T) fixture {
 func TestCreatedCarriesTheWorktreeAsItNowIs(t *testing.T) {
 	f := newFixture(t)
 
-	publish.Created(f.ctx, "feat/a")
+	publish.Created(t.Context(), f.ctx, "feat/a")
 
 	if !slices.Equal(f.rec.PublishedTypes(), []domain.EventType{domain.EventWorktreeCreated}) {
 		t.Fatalf("published %v", f.rec.PublishedTypes())
@@ -54,9 +54,9 @@ func TestCreatedCarriesTheWorktreeAsItNowIs(t *testing.T) {
 func TestEachEventCarriesTheFieldItIsAbout(t *testing.T) {
 	f := newFixture(t)
 
-	publish.Updated(publish.UpdatedParams{Context: f.ctx, Branch: "feat/a", Changed: []domain.IdentityField{domain.IdentityIsolation}})
-	publish.Relocated(publish.RelocatedParams{Context: f.ctx, Branch: "feat/a", FromPath: "/old"})
-	publish.Reparented(publish.ReparentedParams{Context: f.ctx, Branch: "feat/a", FromParent: "feat/x"})
+	publish.Updated(t.Context(), publish.UpdatedParams{Context: f.ctx, Branch: "feat/a", Changed: []domain.IdentityField{domain.IdentityIsolation}})
+	publish.Relocated(t.Context(), publish.RelocatedParams{Context: f.ctx, Branch: "feat/a", FromPath: "/old"})
+	publish.Reparented(t.Context(), publish.ReparentedParams{Context: f.ctx, Branch: "feat/a", FromParent: "feat/x"})
 
 	got := f.rec.Published
 	if len(got) != 3 {
@@ -70,12 +70,12 @@ func TestEachEventCarriesTheFieldItIsAbout(t *testing.T) {
 func TestRemovedCarriesTheStateCapturedBeforeTheRemoval(t *testing.T) {
 	f := newFixture(t)
 
-	last, ok := publish.Capture(f.ctx, "feat/a")
+	last, ok := publish.Capture(t.Context(), f.ctx, "feat/a")
 	if !ok {
 		t.Fatal("capture failed")
 	}
 	gittest.Git(t, f.ctx.ProjectDir, "worktree", "remove", f.path)
-	publish.Removed(f.ctx, last)
+	publish.Removed(t.Context(), f.ctx, last)
 
 	if len(f.rec.Published) != 1 || f.rec.Published[0].Type != domain.EventWorktreeRemoved || f.rec.Published[0].Worktree.Branch != "feat/a" {
 		t.Fatalf("published %+v", f.rec.Published)
@@ -85,8 +85,8 @@ func TestRemovedCarriesTheStateCapturedBeforeTheRemoval(t *testing.T) {
 func TestAWorktreeThatCannotBeReadPublishesNothing(t *testing.T) {
 	f := newFixture(t)
 
-	publish.Created(f.ctx, "nope")
-	if _, ok := publish.Capture(f.ctx, "nope"); ok {
+	publish.Created(t.Context(), f.ctx, "nope")
+	if _, ok := publish.Capture(t.Context(), f.ctx, "nope"); ok {
 		t.Fatal("captured a worktree that does not exist")
 	}
 
@@ -99,8 +99,8 @@ func TestNoPublisherReadsNothing(t *testing.T) {
 	f := newFixture(t)
 	f.ctx.Publisher = nil
 
-	publish.Created(f.ctx, "feat/a")
-	if _, ok := publish.Capture(f.ctx, "feat/a"); ok {
+	publish.Created(t.Context(), f.ctx, "feat/a")
+	if _, ok := publish.Capture(t.Context(), f.ctx, "feat/a"); ok {
 		t.Fatal("captured with nobody to publish to")
 	}
 }
@@ -109,8 +109,8 @@ func TestNobodyListeningReadsNothing(t *testing.T) {
 	f := newFixture(t)
 	f.rec.Unheard = true
 
-	publish.Created(f.ctx, "feat/a")
-	if _, ok := publish.Capture(f.ctx, "feat/a"); ok {
+	publish.Created(t.Context(), f.ctx, "feat/a")
+	if _, ok := publish.Capture(t.Context(), f.ctx, "feat/a"); ok {
 		t.Fatal("captured with nobody listening")
 	}
 	if len(f.rec.Published) != 0 {
@@ -121,7 +121,7 @@ func TestNobodyListeningReadsNothing(t *testing.T) {
 func TestProvisionedIsOKWithoutAnError(t *testing.T) {
 	f := newFixture(t)
 
-	publish.Provisioned(publish.ProvisionedParams{Context: f.ctx, Branch: "feat/a"})
+	publish.Provisioned(t.Context(), publish.ProvisionedParams{Context: f.ctx, Branch: "feat/a"})
 
 	got := f.rec.Published[0]
 	if got.Type != domain.EventWorktreeProvisioned || got.OK == nil || !*got.OK || got.Hook != "" || got.ExitCode != nil || got.Worktree == nil {
@@ -134,7 +134,7 @@ func TestProvisionedNamesTheFailingHook(t *testing.T) {
 	code := 3
 	err := fmt.Errorf("on_create: %w", hooks.Failure{Cmd: "pnpm install", ExitCode: &code, Err: errors.New("exit status 3")})
 
-	publish.Provisioned(publish.ProvisionedParams{Context: f.ctx, Branch: "feat/a", Err: err})
+	publish.Provisioned(t.Context(), publish.ProvisionedParams{Context: f.ctx, Branch: "feat/a", Err: err})
 
 	got := f.rec.Published[0]
 	if got.OK == nil || *got.OK || got.Hook != "pnpm install" || got.ExitCode == nil || *got.ExitCode != 3 {
@@ -145,7 +145,7 @@ func TestProvisionedNamesTheFailingHook(t *testing.T) {
 func TestProvisionedWithAnUntypedErrorIsStillNotOK(t *testing.T) {
 	f := newFixture(t)
 
-	publish.Provisioned(publish.ProvisionedParams{Context: f.ctx, Branch: "feat/a", Err: errors.New("find main checkout")})
+	publish.Provisioned(t.Context(), publish.ProvisionedParams{Context: f.ctx, Branch: "feat/a", Err: errors.New("find main checkout")})
 
 	got := f.rec.Published[0]
 	if got.OK == nil || *got.OK || got.Hook != "" || got.ExitCode != nil {

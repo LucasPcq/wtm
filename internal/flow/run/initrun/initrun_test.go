@@ -1,6 +1,7 @@
 package initrun
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -28,7 +29,7 @@ type fakeWizard struct {
 	questions []Question
 }
 
-func (w *fakeWizard) AskServices(question Question) (domain.InitProjectAnswers, error) {
+func (w *fakeWizard) AskServices(_ context.Context, question Question) (domain.InitProjectAnswers, error) {
 	w.questions = append(w.questions, question)
 	return w.answer(question)
 }
@@ -68,7 +69,7 @@ func run(t *testing.T, params Params) (Outcome, *recorder) {
 	t.Helper()
 	presenter := &recorder{Recorder: &flowtest.Recorder{}}
 	params.Presenter = presenter
-	outcome, err := Run(params)
+	outcome, err := Run(t.Context(), params)
 	if err != nil {
 		t.Fatalf("run: %v", err)
 	}

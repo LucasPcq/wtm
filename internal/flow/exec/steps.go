@@ -1,6 +1,7 @@
 package exec
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -18,11 +19,11 @@ const (
 	KeyConfirm   = "exec.confirm"
 )
 
-func (f *execFlow) session() flow.Session {
+func (f *execFlow) session(ctx context.Context) flow.Session {
 	return flow.Session{
 		ErrLabel: domain.ExecWizardErrLabel,
 		Presets:  f.presetSelection(),
-		Steps:    []flow.Step{f.selectionStep(), f.commandStep(), f.confirmStep()},
+		Steps:    []flow.Step{f.selectionStep(), f.commandStep(ctx), f.confirmStep()},
 	}
 }
 
@@ -72,7 +73,7 @@ func (f *execFlow) selectionOptions() []flow.Option {
 	return options
 }
 
-func (f *execFlow) commandStep() flow.Step {
+func (f *execFlow) commandStep(ctx context.Context) flow.Step {
 	return flow.Step{
 		Kind:        flow.StepText,
 		Key:         KeyCommand,
@@ -83,7 +84,7 @@ func (f *execFlow) commandStep() flow.Step {
 			if strings.TrimSpace(value) == "" {
 				return errors.New(domain.ExecCommandRequired)
 			}
-			return shellcmd.CheckSyntax(value)
+			return shellcmd.CheckSyntax(ctx, value)
 		},
 		Resolve: func(flow.Answers) (flow.Answer, error) {
 			return flow.Answer{}, fmt.Errorf("%w: %w", domain.ErrUsage, domain.ErrExecNoCommand)

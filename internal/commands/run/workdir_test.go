@@ -83,14 +83,14 @@ func TestNamedAndCurrentWorktreeAgreeOnTheKey(t *testing.T) {
 	worktreePath := addWorktree(t, os.Getenv(domain.EnvProjectDir), "feat/same")
 	projectDir := os.Getenv(domain.EnvProjectDir)
 
-	resolved, err := target.Named(target.ResolveParams{ProjectDir: projectDir, Query: "feat/same"})
+	resolved, err := target.Named(t.Context(), target.ResolveParams{ProjectDir: projectDir, Query: "feat/same"})
 	if err != nil {
 		t.Fatalf("resolve named: %v", err)
 	}
-	named := target.WorkDir(target.WorkDirParams{Named: resolved, Cwd: projectDir})
+	named := target.WorkDir(t.Context(), target.WorkDirParams{Named: resolved, Cwd: projectDir})
 
 	enterWorktree(t, worktreePath)
-	current := target.WorkDir(target.WorkDirParams{Cwd: worktreePath})
+	current := target.WorkDir(t.Context(), target.WorkDirParams{Cwd: worktreePath})
 
 	if named != current {
 		t.Errorf("naming the worktree gives %q, standing in it gives %q — the daemon would see two jobs", named, current)

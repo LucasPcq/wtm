@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"context"
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -42,10 +43,10 @@ func (p presenter) stage(text string) {
 	p.send(opStageMsg{id: p.id, target: target, stage: text})
 }
 
-func (p presenter) Stage(params flow.StageParams) error {
+func (p presenter) Stage(ctx context.Context, params flow.StageParams) error {
 	p.line(params.Message)
 	p.stage(params.Message)
-	return params.Work()
+	return params.Work(ctx)
 }
 
 // HookPhase streams the hooks as they run: RunHooks writes from this goroutine,

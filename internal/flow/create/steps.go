@@ -113,7 +113,7 @@ func (f *createFlow) validateEntry(check flow.EntryCheck) error {
 	if !f.derivedNames {
 		return nil
 	}
-	return worktree.CheckNameFree(worktree.NameCheckParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: check.Entry})
+	return worktree.CheckNameFree(f.runCtx, worktree.NameCheckParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: check.Entry})
 }
 
 func (f *createFlow) entryBadge(entry string) flow.Badge {
@@ -150,7 +150,7 @@ func (f *createFlow) sourceStep() flow.Step {
 		Branches:    f.candidates,
 		Pinned:      f.pinnedParent(flow.Answers{}),
 		Refresh: func() []domain.BranchCandidate {
-			return branch.Refresh(branch.ListParams{ProjectDir: f.ctx.ProjectDir})
+			return branch.Refresh(f.runCtx, branch.ListParams{ProjectDir: f.ctx.ProjectDir})
 		},
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
 			description := domain.CreateSourceStepDescription
@@ -306,7 +306,7 @@ func (f *createFlow) sourceUpdate(answers flow.Answers) decide.SourceUpdatePromp
 	if names := f.branches(answers); len(names) == 1 {
 		single = names[0]
 	}
-	return decide.SourceUpdate(decide.SourceUpdateParams{
+	return decide.SourceUpdate(f.runCtx, decide.SourceUpdateParams{
 		ProjectDir: f.ctx.ProjectDir,
 		Target:     f.target,
 		Branch:     single,
@@ -397,7 +397,7 @@ func (f *createFlow) warnings(answers flow.Answers) []string {
 	if prompt := f.sourceUpdate(answers); prompt.Show && prompt.AbortOnDecline && prompt.Warning != "" {
 		warnings = append(warnings, domain.WarningPrefix+prompt.Warning)
 	}
-	if show, warning := decide.EnvParentFallback(decide.EnvFallbackParams{
+	if show, warning := decide.EnvParentFallback(f.runCtx, decide.EnvFallbackParams{
 		ProjectDir:  f.ctx.ProjectDir,
 		Source:      answers.Value(KeySource),
 		Config:      f.ctx.Config,

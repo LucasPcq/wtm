@@ -2,6 +2,7 @@
 package down
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -93,17 +94,19 @@ func Operation() flow.Operation {
 	}
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &downFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
 		presenter: params.Presenter,
 	}
-	return f.run()
+	return f.run(ctx)
 }
 
 type downFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -112,11 +115,11 @@ type downFlow struct {
 	named []target.Resolved
 }
 
-func (f *downFlow) run() (Outcome, error) {
+func (f *downFlow) run(ctx context.Context) (Outcome, error) {
 	if err := target.RequireDeclared(target.DeclaredParams{Config: f.request.Config, Profile: f.request.Profile}); err != nil {
 		return Outcome{}, err
 	}
-	named, err := target.NamedAll(target.ResolveAllParams{ProjectDir: f.ctx.ProjectDir, Queries: f.request.Worktrees})
+	named, err := target.NamedAll(f.runCtx, target.ResolveAllParams{ProjectDir: f.ctx.ProjectDir, Queries: f.request.Worktrees})
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -136,7 +139,7 @@ func (f *downFlow) run() (Outcome, error) {
 		All:     f.request.All,
 	}
 	if !f.request.All {
-		outcome.WorkDirs = target.WorkDirs(target.WorkDirsParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})
+		outcome.WorkDirs = target.WorkDirs(f.runCtx, target.WorkDirsParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})
 	}
 
 	if err := f.wake(outcome.WorkDirs); err != nil {
@@ -148,7 +151,7 @@ func (f *downFlow) run() (Outcome, error) {
 		return outcome, f.presenter.Downed(outcome)
 	}
 
-	results, err := f.stop(outcome)
+	results, err := f.stop(ctx, outcome)
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -174,10 +177,10 @@ func (f *downFlow) wake(workDirs []string) error {
 	if !indexed {
 		return nil
 	}
-	return f.presenter.Stage(flow.StageParams{
+	return f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.RunDaemonConnecting,
-		Work: func() error {
-			return process.EnsureDaemon(process.DaemonParams{
+		Work: func(ctx context.Context) error {
+			return process.EnsureDaemon(ctx, process.DaemonParams{
 				SocketPath: process.SocketPath(),
 				ProxyPort:  rules.ProxyPort(f.ctx.Config.Global),
 			})
@@ -189,14 +192,14 @@ func (f *downFlow) wake(workDirs []string) error {
 // is a round-trip to the daemon per job rather than a stack coming up, and the
 // daemon is one server — the concurrency would buy nothing and interleave the
 // stages a surface shows.
-func (f *downFlow) stop(outcome Outcome) ([]domain.WorktreeJobResults, error) {
+func (f *downFlow) stop(ctx context.Context, outcome Outcome) ([]domain.WorktreeJobResults, error) {
 	if outcome.All {
-		return f.stopEverywhere()
+		return f.stopEverywhere(ctx)
 	}
 
 	results := make([]domain.WorktreeJobResults, 0, len(outcome.WorkDirs))
 	for _, workDir := range outcome.WorkDirs {
-		jobs, err := f.stopIn(outcome, workDir)
+		jobs, err := f.stopIn(ctx, outcome, workDir)
 		if err != nil {
 			return nil, err
 		}
@@ -209,27 +212,27 @@ func (f *downFlow) stop(outcome Outcome) ([]domain.WorktreeJobResults, error) {
 	return results, nil
 }
 
-func (f *downFlow) stopIn(outcome Outcome, workDir string) ([]domain.JobActionResult, error) {
+func (f *downFlow) stopIn(ctx context.Context, outcome Outcome, workDir string) ([]domain.JobActionResult, error) {
 	if outcome.Profile != "" {
-		return f.stopProfile(outcome, workDir)
+		return f.stopProfile(ctx, outcome, workDir)
 	}
 	return f.stopAll(workDir)
 }
 
 func (f *downFlow) branchOf(workDir string) string {
-	return target.NamedBranch(target.NamedBranchParams{Named: f.named, Dir: workDir})
+	return target.NamedBranch(f.runCtx, target.NamedBranchParams{Named: f.named, Dir: workDir})
 }
 
 // stopProfile stops the profile's jobs one by one, so a job that refuses is
 // named rather than lost inside a single failure for the whole set.
-func (f *downFlow) stopProfile(outcome Outcome, workDir string) ([]domain.JobActionResult, error) {
+func (f *downFlow) stopProfile(ctx context.Context, outcome Outcome, workDir string) ([]domain.JobActionResult, error) {
 	profile, ok := rules.FindProfile(f.request.Config, outcome.Profile)
 	if !ok {
 		return nil, fmt.Errorf(domain.RunProfileNotFoundFmt, domain.ErrProfileNotFound, outcome.Profile)
 	}
 
 	client := process.NewClient(process.SocketPath())
-	running, err := client.Send(process.Request{Action: process.ActionList})
+	running, err := client.Send(ctx, process.Request{Action: process.ActionList})
 	if err != nil {
 		return nil, fmt.Errorf("stop profile %s: %w", outcome.Profile, err)
 	}
@@ -241,15 +244,15 @@ func (f *downFlow) stopProfile(outcome Outcome, workDir string) ([]domain.JobAct
 			continue
 		}
 		var resp process.Response
-		err := f.presenter.Stage(flow.StageParams{
+		err := f.presenter.Stage(f.runCtx, flow.StageParams{
 			Message: fmt.Sprintf(domain.RunStoppingFmt, job.Name),
-			Work: func() error {
+			Work: func(ctx context.Context) error {
 				var sendErr error
-				resp, sendErr = client.Send(process.Request{
+				resp, sendErr = client.Send(ctx, process.Request{
 					Action:  process.ActionStop,
 					Name:    job.Name,
 					WorkDir: workDir,
-					Origin:  f.ctx.Origin(),
+					Origin:  f.ctx.Origin(ctx),
 				})
 				return sendErr
 			},
@@ -269,12 +272,12 @@ func (f *downFlow) stopProfile(outcome Outcome, workDir string) ([]domain.JobAct
 // stopEverywhere empties every worktree of this project the daemon holds jobs
 // in, one worktree at a time: the daemon is machine-wide, and --all never
 // reaches into another repository.
-func (f *downFlow) stopEverywhere() ([]domain.WorktreeJobResults, error) {
-	worktrees, err := worktree.ListAll(worktree.ListAllParams{ProjectDir: f.ctx.ProjectDir})
+func (f *downFlow) stopEverywhere(ctx context.Context) ([]domain.WorktreeJobResults, error) {
+	worktrees, err := worktree.ListAll(f.runCtx, worktree.ListAllParams{ProjectDir: f.ctx.ProjectDir})
 	if err != nil {
 		return nil, fmt.Errorf("stop all jobs: %w", err)
 	}
-	running, err := client().Send(process.Request{Action: process.ActionList})
+	running, err := client().Send(ctx, process.Request{Action: process.ActionList})
 	if err != nil {
 		return nil, fmt.Errorf("stop all jobs: %w", err)
 	}
@@ -313,14 +316,14 @@ func (f *downFlow) stopAll(workDir string) ([]domain.JobActionResult, error) {
 // stoppedJobs asks the daemon to empty one worktree, and answers with what it
 // reported.
 func (f *downFlow) stoppedJobs(workDir string) ([]domain.JobInfo, error) {
-	request := process.Request{Action: process.ActionStopAll, WorkDir: workDir, Origin: f.ctx.Origin()}
+	request := process.Request{Action: process.ActionStopAll, WorkDir: workDir, Origin: f.ctx.Origin(f.runCtx)}
 
 	var resp process.Response
-	if err := f.presenter.Stage(flow.StageParams{
+	if err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.RunStoppingJobs,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			var sendErr error
-			resp, sendErr = client().Send(request)
+			resp, sendErr = client().Send(ctx, request)
 			return sendErr
 		},
 	}); err != nil {
@@ -367,7 +370,7 @@ func (f *downFlow) session() flow.Session {
 		ErrLabel: domain.CmdDown,
 		Presets:  target.Presets(target.PresetParams{Worktrees: target.Dirs(f.named), Profile: f.request.Profile}),
 		Steps: []flow.Step{
-			target.WorktreesStep(target.WorktreesParams{
+			target.WorktreesStep(f.runCtx, target.WorktreesParams{
 				ProjectDir: f.ctx.ProjectDir,
 				Current:    f.request.Cwd,
 				Selected:   target.Preselected(target.PreselectedParams{Named: f.named, Precheck: f.request.Precheck}),
@@ -382,7 +385,7 @@ func (f *downFlow) running() map[string]int {
 	if !process.IsDaemonRunning(socket) {
 		return nil
 	}
-	return target.RunningJobs(runlogs.NewService(runlogs.ServiceParams{SocketPath: socket}))
+	return target.RunningJobs(runlogs.NewService(f.runCtx, runlogs.ServiceParams{SocketPath: socket}))
 }
 
 // stoppedStatus tells a shared job this worktree let go of apart from one that

@@ -1,10 +1,12 @@
 package run
 
 import (
+	"context"
 	"fmt"
-	"github.com/LucasPcq/wtm/internal/service/proxy"
 	"io"
 	"os"
+
+	"github.com/LucasPcq/wtm/internal/service/proxy"
 
 	"github.com/spf13/cobra"
 
@@ -99,10 +101,10 @@ func runRunInit(cmd *cobra.Command, _ []string) error {
 	writePortKeys, _ := cmd.Flags().GetBool(domain.FlagWritePortKeys)
 	interactive := shared.Interactive(shared.UnattendedParams{TTY: runctx.IsTTY(), Format: format, Yes: yes})
 
-	outcome, err := initrun.Run(initrun.Params{
+	outcome, err := initrun.Run(cmd.Context(), initrun.Params{
 		Context:   shared.FlowContext(res),
 		Request:   initrun.Request{PatchCompose: patchCompose, LinkEnv: linkEnv, WritePortKeys: writePortKeys, Redirection: inspectRedirection()},
-		Prompter:  shared.FlowPrompter(shared.FlowPrompterParams{Interactive: interactive}),
+		Prompter:  shared.FlowPrompter(cmd.Context(), shared.FlowPrompterParams{Interactive: interactive}),
 		Wizard:    servicesWizard{},
 		Presenter: initPresenter{CLIPresenter: shared.NewPresenter(cmd, format), animate: shared.Animate(cmd, interactive)},
 	})
@@ -123,7 +125,7 @@ var inspectRedirection = func() domain.ProxyStatus {
 
 type servicesWizard struct{}
 
-func (servicesWizard) AskServices(question initrun.Question) (domain.InitProjectAnswers, error) {
+func (servicesWizard) AskServices(ctx context.Context, question initrun.Question) (domain.InitProjectAnswers, error) {
 	var prefill *initwizard.SectionPrefill
 	if question.Prefill != nil {
 		prefill = &initwizard.SectionPrefill{
@@ -131,7 +133,7 @@ func (servicesWizard) AskServices(question initrun.Question) (domain.InitProject
 			ScriptIndices: question.Prefill.ScriptIndices,
 		}
 	}
-	return initwizard.RunServicesWizard(initwizard.ServicesWizardParams{
+	return initwizard.RunServicesWizard(ctx, initwizard.ServicesWizardParams{
 		ProjectDir:   question.ProjectDir,
 		Detection:    question.Detection,
 		Existing:     question.Existing,
@@ -150,11 +152,11 @@ type initPresenter struct {
 	animate bool
 }
 
-func (p initPresenter) Stage(params flow.StageParams) error {
+func (p initPresenter) Stage(ctx context.Context, params flow.StageParams) error {
 	return components.RunLoading(components.LoadingParams{
 		Message: params.Message,
 		Animate: p.animate,
-		Work:    params.Work,
+		Work:    func() error { return params.Work(ctx) },
 	})
 }
 
