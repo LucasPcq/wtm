@@ -111,3 +111,19 @@ code, pre, .mono { font-family: var(--mono); font-size: 0.875em; }
 .story:has(#story-after:checked) [data-scene='after'] { display: block; }
 .story .line { transition: opacity 0.2s; }
 .story .line.pending { opacity: 0; }
+.machine { border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-raised); padding: 20px; min-width: 0; }
+.machine-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; font-size: 13px; margin-bottom: 16px; }
+.machine-head input[type='range'] { flex: 1; min-width: 140px; accent-color: var(--accent); }
+.machine-head output { color: var(--accent-high); font-weight: 700; min-width: 2ch; }
+.machine-sum b { color: var(--accent); }
+.lanes-scroll { overflow-x: auto; }
+.lanes { width: 100%; border-collapse: collapse; font-size: 12.5px; white-space: nowrap; }
+.lanes th { text-align: left; color: var(--muted); font-weight: 400; padding: 6px 12px 6px 0; border-bottom: 1px solid var(--line); }
+.lanes td { padding: 7px 12px 7px 0; border-bottom: 1px dashed var(--line); }
+.lanes td:first-child { color: var(--accent-high); }
+.lanes tr { cursor: default; outline: none; }
+.lanes tr.active td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.lanes tr.fresh { animation: lane-in 0.35s ease-out; }
+@keyframes lane-in { from { opacity: 0; transform: translateY(-4px); } }
+.machine-event { margin: 16px 0 0; padding: 12px; border-radius: 8px; background: #0d0f0d; color: #cfe8a8; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.machine-note { color: var(--muted); font-size: 12px; margin: 12px 0 0; }

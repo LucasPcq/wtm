@@ -1,0 +1,72 @@
+---
+import { lanes, MAX_AGENTS } from '../../lib/machine.mjs';
+const initial = 4;
+const rows = lanes(initial);
+---
+<section class="section" id="machine">
+  <div class="wrap">
+    <p class="section-label">fig. 1 — the machine</p>
+    <h2>One laptop. A whole stack per branch.</h2>
+    <p class="lede">Slide to add agents. Every worktree gets the next block of ports, its own Compose project, its own database in the shared postgres and its own URL. Nothing to declare per branch.</p>
+    <div class="machine" data-max={MAX_AGENTS}>
+      <div class="machine-head mono">
+        <label for="agents">agents</label>
+        <input id="agents" type="range" min="1" max={MAX_AGENTS} value={initial} />
+        <output for="agents" id="agents-count">{initial}</output>
+        <span class="machine-sum">collisions: <b>0</b></span>
+      </div>
+      <div class="lanes-scroll">
+        <table class="lanes mono">
+          <thead><tr><th>worktree</th><th>web</th><th>api</th><th>compose project</th><th>database</th><th>url</th></tr></thead>
+          <tbody id="lanes">
+            {rows.map((l) => (
+              <tr tabindex="0" data-event={l.event}>
+                <td>{l.branch}</td><td>:{l.web}</td><td>:{l.api}</td><td>{l.compose}</td><td>{l.database}</td><td>{l.url}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <pre class="machine-event mono" id="lane-event" aria-live="polite">{rows[1].event}</pre>
+      <p class="machine-note mono">postgres :5432 is shared, one database each · <code>wtm events</code> line shown for the selected worktree</p>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { lanes } from '../../lib/machine.mjs';
+
+  const slider = document.querySelector<HTMLInputElement>('#agents');
+  const count = document.querySelector<HTMLOutputElement>('#agents-count');
+  const body = document.querySelector<HTMLTableSectionElement>('#lanes');
+  const event = document.querySelector<HTMLPreElement>('#lane-event');
+
+  const select = (row: HTMLTableRowElement) => {
+    body?.querySelectorAll('tr').forEach((r) => r.classList.toggle('active', r === row));
+    if (event) event.textContent = row.dataset.event ?? '';
+  };
+
+  const render = (n: number) => {
+    if (!body || !count) return;
+    count.value = String(n);
+    body.replaceChildren(...lanes(n).map((l) => {
+      const row = document.createElement('tr');
+      row.tabIndex = 0;
+      row.dataset.event = l.event;
+      for (const cell of [l.branch, `:${l.web}`, `:${l.api}`, l.compose, l.database, l.url]) {
+        const td = document.createElement('td');
+        td.textContent = cell;
+        row.append(td);
+      }
+      row.addEventListener('mouseenter', () => select(row));
+      row.addEventListener('focus', () => select(row));
+      return row;
+    }));
+    const rows = body.querySelectorAll('tr');
+    rows[rows.length - 1].classList.add('fresh');
+    select(rows[rows.length - 1]);
+  };
+
+  slider?.addEventListener('input', () => render(Number(slider.value)));
+  if (slider) render(Number(slider.value));
+</script>
