@@ -47,8 +47,10 @@ const after: Line[] = [
     lines.forEach((line, i) => setTimeout(() => line.classList.remove('pending'), 260 * (i + 1)));
   };
   const sceneFor = (id: string) => story?.querySelector(`[data-scene="${id === 'story-before' ? 'before' : 'after'}"]`);
+  let autoplay: ReturnType<typeof setTimeout> | undefined;
+  story?.querySelector('.story-toggle')?.addEventListener('click', () => clearTimeout(autoplay));
   story?.querySelectorAll<HTMLInputElement>('input[name="story"]').forEach((input) =>
-    input.addEventListener('change', () => { const s = sceneFor(input.id); if (s) play(s); }),
+    input.addEventListener('change', () => { clearTimeout(autoplay); const s = sceneFor(input.id); if (s) play(s); }),
   );
   if (story && !reduced) {
     const beforeInput = story.querySelector<HTMLInputElement>('#story-before');
@@ -58,7 +60,7 @@ const after: Line[] = [
       seen.disconnect();
       beforeInput.checked = true;
       play(sceneFor('story-before')!);
-      setTimeout(() => { afterInput.checked = true; play(sceneFor('story-after')!); }, 260 * 9 + 1600);
+      autoplay = setTimeout(() => { afterInput.checked = true; play(sceneFor('story-after')!); }, 260 * 9 + 1600);
     });
     seen.observe(story);
   }
