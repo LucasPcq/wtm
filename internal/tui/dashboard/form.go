@@ -74,7 +74,7 @@ func buildFormRows(params buildFormParams) ([]formRow, flow.Answers, error) {
 			continue
 		}
 		if answer, settled := flow.Settle(step, answers); settled {
-			if answer.Recalled {
+			if answer.Recalled || answer.Given {
 				answers = answers.With(step.Key, answer)
 			}
 			continue

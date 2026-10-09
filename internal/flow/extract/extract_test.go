@@ -205,6 +205,36 @@ func TestANewTargetAsksCreatesQuestionsThenCreatesIt(t *testing.T) {
 	}
 }
 
+// LUC-281: --ff only answered unattended runs, so the wizard still offered the
+// fast-forward of a new target's source the flag had already accepted.
+func TestFastForwardFlagIsNeverAsked(t *testing.T) {
+	r := newRepo(t)
+	gittest.AddOrigin(t, r.ctx.ProjectDir)
+	gittest.Git(t, r.ctx.ProjectDir, "commit", "--allow-empty", "-m", "on origin only")
+	gittest.Git(t, r.ctx.ProjectDir, "push", "origin", "main")
+	gittest.Git(t, r.ctx.ProjectDir, "reset", "--hard", "HEAD~1")
+	prompter := &flowtest.ScriptedPrompter{
+		Answers: map[string]string{
+			KeyTarget:        targetCreate,
+			create.KeyBranch: "feat/split",
+			create.KeySource: "main",
+			KeyMode:          modeMove,
+			KeyRecap:         confirmExtract,
+		},
+		Sets: map[string][]string{KeyFiles: {"a.txt"}},
+	}
+
+	if _, err := Run(t.Context(), Params{Context: r.ctx, Request: Request{Source: "src", FastForward: true}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got, want := prompter.AskedKeys(), "extract.files,extract.target,create.branch,create.source,extract.mode,extract.recap"; got != want {
+		t.Errorf("asked %s, want %s: --ff answers the source update", got, want)
+	}
+	if recap := prompter.Content[KeyRecap].Description; !strings.Contains(recap, "fast-forward") {
+		t.Errorf("recap = %q, want the fast-forward the flag accepted", recap)
+	}
+}
+
 // The parent a new target is offered first is the source's own, ahead of the
 // base branch, whether the source was named or picked.
 func TestTheNewTargetsParentIsTheSourcesOwn(t *testing.T) {

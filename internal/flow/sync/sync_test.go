@@ -286,6 +286,25 @@ func TestAnAskedRunNeverShowsThePlanTwice(t *testing.T) {
 	}
 }
 
+// LUC-281: --keep-conflict used to lead the options with "keep" and still put
+// the question, so a run that only scripts the confirmation failed on it.
+func TestKeepConflictIsNeverAsked(t *testing.T) {
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyConfirm: confirmSync}}
+
+	if _, err := Run(t.Context(), Params{
+		Context:   oneStackRepo(t),
+		Request:   Request{All: true, KeepConflict: true, BaseBranch: "main"},
+		Prompter:  prompter,
+		Presenter: &recordingPresenter{},
+	}); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+
+	if prompter.AskedKeys() != KeyConfirm {
+		t.Fatalf("--keep-conflict answers the conflict step, yet asked %q", prompter.AskedKeys())
+	}
+}
+
 // --dry-run confirms nothing, so the recap never runs and the plan takes the
 // same route as an unattended run — even on a surface that could have asked.
 func TestADryRunShowsThePlanAndAsksNothing(t *testing.T) {

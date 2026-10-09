@@ -148,11 +148,14 @@ func (f *syncFlow) conflictStep() flow.Step {
 			return flow.StepContent{
 				Title:       domain.SyncConflictTitle,
 				Description: conflictDescription(len(answers.Values(KeySelection))),
-				Options:     f.conflictOptions(),
+				Options: []flow.Option{
+					{Label: domain.SyncConflictNormal, Value: conflictNormal},
+					{Label: domain.SyncConflictKeep, Value: conflictKeep, Danger: true},
+				},
 			}, nil
 		},
 		Resolve: func(flow.Answers) (flow.Answer, error) {
-			return flow.Answer{Value: f.conflictDefault()}, nil
+			return flow.Answer{Value: conflictNormal}, nil
 		},
 		Summarize: func(answer flow.Answer) string {
 			if answer.Value == conflictKeep {
@@ -160,7 +163,8 @@ func (f *syncFlow) conflictStep() flow.Step {
 			}
 			return domain.SyncConflictNormalSummary
 		},
-		Flag: domain.FlagKeepConflict,
+		Flag:  domain.FlagKeepConflict,
+		Given: f.givenConflict(),
 	}
 }
 
@@ -185,23 +189,11 @@ func conflictDescription(count int) string {
 	return fmt.Sprintf(domain.SyncCounterFmt, count) + "\n\n" + domain.SyncConflictIntro
 }
 
-// conflictOptions leads with what --keep-conflict asked for rather than
-// answering the step: the question stays visible, and its other outcome stays
-// one keystroke away.
-func (f *syncFlow) conflictOptions() []flow.Option {
-	normal := flow.Option{Label: domain.SyncConflictNormal, Value: conflictNormal}
-	keep := flow.Option{Label: domain.SyncConflictKeep, Value: conflictKeep, Danger: true}
-	if f.request.KeepConflict {
-		return []flow.Option{keep, normal}
-	}
-	return []flow.Option{normal, keep}
-}
-
-func (f *syncFlow) conflictDefault() string {
+func (f *syncFlow) givenConflict() string {
 	if f.request.KeepConflict {
 		return conflictKeep
 	}
-	return conflictNormal
+	return ""
 }
 
 // parentsStep asks about the parents no step covers. It is skipped when the

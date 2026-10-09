@@ -197,6 +197,9 @@ type Step struct {
 	// PresetFlag names the flag a preset came from, for a step two flags answer
 	// (--ff-parents, --no-ff-parents) where Flag alone would name the wrong one.
 	PresetFlag func(Answer) string
+	// Given is the answer a flag gives a conditional step, settled only once its
+	// Skip lets the step stand: a preset would answer a step the run rules out.
+	Given string
 
 	Memory Memory
 }
@@ -238,6 +241,8 @@ type Answer struct {
 	// Recalled is an answer the repository remembered, not asked; Remember is
 	// one the user asked never to be asked again.
 	Recalled bool
+	// Given is an answer the step's flag settled (Step.Given).
+	Given    bool
 	Remember bool
 	// Forget is a remembered question asked again and left unticked.
 	Forget bool

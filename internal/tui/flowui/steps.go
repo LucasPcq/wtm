@@ -323,8 +323,9 @@ func (p *plan) loadedStep(loaded loadedStep) components.Step {
 
 	// The wizard runs OnEnter on every step it advances to, but never on the one it
 	// starts on, so a load landing first is fired from the init command instead —
-	// otherwise the run would sit on the placeholder for ever.
-	if idx == 0 {
+	// otherwise the run would sit on the placeholder for ever. The first step asked
+	// may follow settled ones, so it is counted by entered, not by position.
+	if p.entered == 0 {
 		p.initCmd = tea.Batch(p.initCmd, func() tea.Msg {
 			return loadRequestMsg{idx: idx, answers: p.known()}
 		})

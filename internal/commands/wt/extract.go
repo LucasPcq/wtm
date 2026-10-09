@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -46,7 +45,7 @@ func newExtractCmd() *cobra.Command {
 	cmd.Flags().String(domain.FlagTo, "", "Target worktree branch; created if it does not exist")
 	shared.AddIsolationFlag(cmd)
 	cmd.Flags().String(domain.FlagFrom, "", "Parent branch when creating the target worktree")
-	cmd.Flags().Bool(domain.FlagFF, false, "Fast-forward the parent branch to origin before creating the target (non-interactive; skipped when it has diverged)")
+	cmd.Flags().Bool(domain.FlagFF, false, "Fast-forward the parent branch to origin before creating the target (answers the wizard's question; skipped when it has diverged)")
 	cmd.Flags().Bool(domain.FlagKeep, false, "Copy instead of move (keep the changes in the source)")
 	cmd.Flags().String(domain.FlagOnConflict, "", "On conflict: abort (default) or resolve (write conflict markers in the target)")
 	shared.AddAskFlag(cmd)
@@ -91,7 +90,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 		source = args[0]
 	}
 
-	interactive := rules.IsHumanFormat(format) && !yes && term.IsTerminal(int(os.Stdin.Fd()))
+	interactive := rules.IsHumanFormat(format) && !yes && shared.StdinIsTerminal()
 
 	_, err = extractflow.Run(cmd.Context(), extractflow.Params{
 		Context: shared.FlowContext(config),

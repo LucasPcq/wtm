@@ -160,22 +160,60 @@ func TestSourceStepRefusesAGuessedParent(t *testing.T) {
 	}
 }
 
-// --ff accepts the offer unattended; its absence keeps the branch where it is.
-func TestSourceUpdateResolvesFromTheFlagOnly(t *testing.T) {
-	answer, err := newFlow(t, Request{FastForward: true}, nil).sourceUpdateStep().Resolve(flow.Answers{})
-	if err != nil {
-		t.Fatalf("Resolve: %v", err)
-	}
-	if answer.Value != updateFastForward {
-		t.Errorf("answer = %q, want the fast-forward accepted", answer.Value)
+// --ff answers the offer once it stands; its absence keeps the branch where it is.
+func TestSourceUpdateIsGivenByTheFlagOnly(t *testing.T) {
+	if given := newFlow(t, Request{FastForward: true}, nil).sourceUpdateStep().Given; given != updateFastForward {
+		t.Errorf("given = %q, want --ff to accept the fast-forward", given)
 	}
 
-	answer, err = newFlow(t, Request{}, nil).sourceUpdateStep().Resolve(flow.Answers{})
+	step := newFlow(t, Request{}, nil).sourceUpdateStep()
+	if step.Given != "" {
+		t.Errorf("given = %q, want no answer without --ff", step.Given)
+	}
+	answer, err := step.Resolve(flow.Answers{})
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
 	if answer.Value != updateKeep {
-		t.Errorf("answer = %q, want the branch left as-is", answer.Value)
+		t.Errorf("answer = %q, want the branch kept as it is", answer.Value)
+	}
+}
+
+// LUC-281: --ff only answered unattended runs, so the wizard still offered the
+// fast-forward the flag had already accepted.
+func TestFastForwardFlagIsNeverAsked(t *testing.T) {
+	ctx := testContext(t)
+	gittest.AddOrigin(t, ctx.ProjectDir)
+	gittest.Git(t, ctx.ProjectDir, "commit", "--allow-empty", "-m", "on origin only")
+	gittest.Git(t, ctx.ProjectDir, "push", "origin", "main")
+	gittest.Git(t, ctx.ProjectDir, "reset", "--hard", "HEAD~1")
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{
+		KeyBranch: "feat/w", KeySource: "main", KeyEnv: "", KeyRecap: confirmCreate,
+	}}
+
+	if _, err := Run(t.Context(), Params{Context: ctx, Request: Request{FastForward: true}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if _, asked := prompter.Content[KeySourceUpdate]; asked {
+		t.Errorf("--ff answers the source update, yet asked %q", prompter.AskedKeys())
+	}
+	if recap := prompter.Content[KeyRecap].Description; !strings.Contains(recap, "fast-forward") {
+		t.Errorf("recap = %q, want the fast-forward the flag accepted", recap)
+	}
+}
+
+// Nothing to reconcile, nothing to announce: --ff answers a question the run
+// puts, never one its Skip removed.
+func TestFastForwardFlagAnnouncesNothingWhenTheSourceIsUpToDate(t *testing.T) {
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{
+		KeyBranch: "feat/w", KeySource: "main", KeyEnv: "", KeyRecap: confirmCreate,
+	}}
+
+	if _, err := Run(t.Context(), Params{Context: testContext(t), Request: Request{FastForward: true}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if recap := prompter.Content[KeyRecap].Description; strings.Contains(recap, "fast-forward") {
+		t.Errorf("recap = %q, want no fast-forward announced for an up-to-date source", recap)
 	}
 }
 

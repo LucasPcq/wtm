@@ -90,31 +90,54 @@ func TestConflictStepDefaultsToAborting(t *testing.T) {
 	}
 }
 
-// --keep-conflict reorders the options instead of answering the step: the
-// question stays visible and its other outcome one keystroke away, as the picker
-// had it.
-func TestConflictStepLeadsWithKeepWhenFlagged(t *testing.T) {
-	f := testFlow(Request{KeepConflict: true}, stack)
+func TestKeepConflictAnswersTheConflictStep(t *testing.T) {
+	f := testFlow(Request{All: true, KeepConflict: true, BaseBranch: "main"}, stack)
 
-	if _, preset := f.session().Presets.Get(KeyConflict); preset {
-		t.Fatal("--keep-conflict must not make the question disappear")
-	}
-	content, err := f.conflictStep().Build(flow.Answers{})
-	if err != nil {
-		t.Fatalf("build conflict: %v", err)
-	}
-	if content.Options[0].Value != conflictKeep {
-		t.Fatalf("--keep-conflict must lead with keep, got %q", content.Options[0].Value)
+	answer, settled := flow.Settle(f.conflictStep(), f.session().Presets)
+	if !settled || answer.Value != conflictKeep || !answer.Given {
+		t.Fatalf("--keep-conflict must answer the step, got %+v", answer)
 	}
 }
 
-func TestConflictStepResolvesToKeepWhenFlagged(t *testing.T) {
-	answer, err := testFlow(Request{KeepConflict: true}, stack).conflictStep().Resolve(flow.Answers{})
-	if err != nil {
-		t.Fatalf("resolve conflict: %v", err)
+func TestTheConflictStepStaysAQuestionWithoutTheFlag(t *testing.T) {
+	f := testFlow(Request{All: true, BaseBranch: "main"}, stack)
+
+	if _, settled := flow.Settle(f.conflictStep(), f.session().Presets); settled {
+		t.Fatal("without --keep-conflict the question must still be put")
 	}
-	if answer.Value != conflictKeep {
-		t.Fatalf("an unattended run must honour --keep-conflict, got %q", answer.Value)
+}
+
+// A dry run rebases nothing: the step keeps saying why it is not asked rather
+// than reading back a flag that changes nothing.
+func TestADryRunRulesOutTheConflictStepDespiteTheFlag(t *testing.T) {
+	f := testFlow(Request{All: true, DryRun: true, KeepConflict: true, BaseBranch: "main"}, stack)
+
+	answer, _ := flow.Settle(f.conflictStep(), f.session().Presets)
+	if !answer.Skipped || answer.SkipReason != domain.SyncDryRunNoQuestion {
+		t.Fatalf("a dry run must rule the step out, got %+v", answer)
+	}
+}
+
+func TestAnUnattendedRunHonoursKeepConflict(t *testing.T) {
+	f := testFlow(Request{All: true, KeepConflict: true, BaseBranch: "main"}, stack)
+
+	answers, err := flow.Unattended{}.Ask(f.session())
+	if err != nil {
+		t.Fatalf("ask: %v", err)
+	}
+	if got := answers.Value(KeyConflict); got != conflictKeep {
+		t.Fatalf("an unattended run must honour --keep-conflict, got %q", got)
+	}
+}
+
+func TestTheConflictStepReadsBackItsFlag(t *testing.T) {
+	step := testFlow(Request{KeepConflict: true}, stack).conflictStep()
+
+	if step.Flag != domain.FlagKeepConflict {
+		t.Fatalf("the trail must name --%s, got %q", domain.FlagKeepConflict, step.Flag)
+	}
+	if got := step.Summarize(flow.Answer{Value: conflictKeep}); got != domain.SyncConflictKeepSummary {
+		t.Fatalf("summary = %q, want %q", got, domain.SyncConflictKeepSummary)
 	}
 }
 
