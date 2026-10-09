@@ -184,16 +184,23 @@ func TestReduceEnvPortValueKeepsRealConflictsVisible(t *testing.T) {
 	}
 }
 
-func TestElideEnvValueHidesCredentials(t *testing.T) {
-	got := ElideEnvValue(ElideEnvValueParams{Value: "postgres://user:supersecret@localhost:5442/app"})
-	if got != "…@localhost:5442/app" {
-		t.Fatalf("ElideEnvValue() = %q, want the credentials elided", got)
+func TestEnvPortBecomesShowsOnlyWhereTheOriginLands(t *testing.T) {
+	got := envPortBecomes(envPortBecomesParams{Entry: domain.EnvPortEntry{
+		CurrentValue: "postgres://user:supersecret@localhost:5432/app",
+		NewValue:     "postgres://user:supersecret@localhost:5442/app",
+	}})
+	if got != "localhost:5442" {
+		t.Fatalf("envPortBecomes() = %q, want only the origin it lands on", got)
 	}
 }
 
-func TestElideEnvValueKeepsShortValues(t *testing.T) {
-	if got := ElideEnvValue(ElideEnvValueParams{Value: "http://localhost:3010"}); got != "http://localhost:3010" {
-		t.Errorf("ElideEnvValue() = %q, want it unchanged", got)
+func TestEnvPortBecomesListsEveryOriginOfAList(t *testing.T) {
+	got := envPortBecomes(envPortBecomesParams{Entry: domain.EnvPortEntry{
+		CurrentValue: "http://localhost:3000,http://localhost:3001",
+		NewValue:     "http://localhost:3010,http://localhost:3011",
+	}})
+	if got != "localhost:3010, localhost:3011" {
+		t.Errorf("envPortBecomes() = %q, want both origins", got)
 	}
 }
 

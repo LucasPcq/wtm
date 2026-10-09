@@ -18,12 +18,12 @@ exit: 0
           {
             "key": "WEB_PORT",
             "status": "resolved",
-            "current_value": "3000"
+            "redacted": true
           },
           {
             "key": "REALM",
             "status": "resolved",
-            "current_value": "main-realm"
+            "redacted": true
           }
         ]
       },
@@ -49,8 +49,12 @@ exit: 0
         ],
         "addressing": "ports",
         "status": "rewrite",
-        "current_value": "3000",
-        "new_value": "3010"
+        "origins": [
+          {
+            "from": "3000",
+            "to": "3010"
+          }
+        ]
       }
     ],
     "addressing": "names",

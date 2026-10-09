@@ -592,30 +592,25 @@ func envPairByKey(lines []domain.EnvLine, key string) (domain.EnvLine, bool) {
 	return domain.EnvLine{}, false
 }
 
-type ElideEnvValueParams struct {
-	Value string
-	// Width is the room the value has. Zero is a surface that could not measure
-	// itself — a pipe, a test — and falls back to the default.
+type envPortBecomesParams struct {
+	Entry domain.EnvPortEntry
+	// Width is the room the column has. Zero is a surface that could not
+	// measure itself — a pipe, a test — and falls back to the default.
 	Width int
 }
 
-// ElideEnvValue shortens a value for display. Cutting at the credentials
-// separator is not only about width: a DATABASE_URL printed whole puts a
-// password on screen, and the part worth reading is the host and the port.
-//
-// The width is an input because a named origin is long by nature —
-// `http://admin.feat-x.monorepo.localhost:11080` is past fifty characters — and
-// a value cut to a fixed budget on a wide terminal is unreadable for no reason.
-func ElideEnvValue(params ElideEnvValueParams) string {
+// envPortBecomes is where a link's origins land, and nothing else of the
+// value: the rest of it is the user's, a password among it.
+func envPortBecomes(params envPortBecomesParams) string {
 	width := params.Width
 	if width <= 0 {
 		width = domain.EnvValueDisplayWidth
 	}
-
-	value := MaskURLPassword(params.Value)
-	if at := strings.LastIndex(value, domain.EnvCredentialsSeparator); at >= 0 {
-		value = domain.Ellipsis + value[at:]
+	moves := EnvPortOrigins(params.Entry)
+	if len(moves) == 0 {
+		return domain.Ellipsis
 	}
+	value := strings.Join(originSide(moves, false), domain.EnvOriginJoin)
 	if len(value) <= width {
 		return value
 	}

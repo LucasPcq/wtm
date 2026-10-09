@@ -28,12 +28,12 @@ func TestEnvPortTableLinesGroupsFilesUnderNamedRules(t *testing.T) {
 	got := strings.Join(EnvPortTableLines(EnvPortTableParams{Plan: samplePlan(t)}), "\n")
 	want := strings.Join([]string{
 		"KEY           FOLLOWS        PORT         BECOMES",
-		"── .env ────────────────────────────────────────────────────────",
-		"DATABASE_URL  POSTGRES_PORT  5432 → 5442  …@localhost:5442/app",
-		"REDIS_URL     REDIS_PORT     6379 → 6389  redis://localhost:6389",
+		"── .env ────────────────────────────────────────────────",
+		"DATABASE_URL  POSTGRES_PORT  5432 → 5442  localhost:5442",
+		"REDIS_URL     REDIS_PORT     6379 → 6389  localhost:6389",
 		"",
-		"── apps/web/.env ───────────────────────────────────────────────",
-		"VITE_API_URL  API_PORT       3000 → 3010  http://localhost:3010",
+		"── apps/web/.env ───────────────────────────────────────",
+		"VITE_API_URL  API_PORT       3000 → 3010  localhost:3010",
 	}, "\n")
 
 	if got != want {
@@ -54,7 +54,7 @@ func TestEnvPortTableLinesWidensColumnsToFitTheHeader(t *testing.T) {
 
 	lines := EnvPortTableLines(EnvPortTableParams{Plan: plan})
 	header, row := lines[0], lines[len(lines)-1]
-	if runeIndex(header, domain.EnvPortHeaderBecomes) != runeIndex(row, "http://") {
+	if runeIndex(header, domain.EnvPortHeaderBecomes) != runeIndex(row, ":5442") {
 		t.Errorf("header and row columns do not line up:\n%s\n%s", header, row)
 	}
 }
@@ -178,7 +178,7 @@ func namedOriginPlan(t *testing.T) domain.EnvPortPlan {
 }
 
 func TestEnvPortTableLinesSpendsTheWidthItIsGivenOnTheValue(t *testing.T) {
-	const origin = "http://admin.feat-x.monorepo-exemple-wtm.localhost:11080"
+	const origin = "admin.feat-x.monorepo-exemple-wtm.localhost:11080"
 
 	wide := strings.Join(EnvPortTableLines(EnvPortTableParams{Plan: namedOriginPlan(t), Width: 120}), "\n")
 	if !strings.Contains(wide, origin) {

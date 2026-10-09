@@ -54,7 +54,7 @@ func envPortLinks(values map[string]string) []domain.EnvPortLink {
 	return links
 }
 
-func TestCreateJSONMasksThePasswordOfAPortLinkedURL(t *testing.T) {
+func TestCreateJSONShowsOnlyTheOriginOfAPortLinkedURL(t *testing.T) {
 	databaseURLRepo(t)
 
 	stdout, _, err := runWtCmd(t, domain.CmdCreate, "feat/a", "--from", "main", "--yes", "--"+domain.FlagOutput, domain.OutputJSON)
@@ -65,12 +65,12 @@ func TestCreateJSONMasksThePasswordOfAPortLinkedURL(t *testing.T) {
 	if strings.Contains(stdout, dbPassword) {
 		t.Errorf("create JSON carries the password:\n%s", stdout)
 	}
-	if !strings.Contains(stdout, "postgres://app:***@localhost:3010/db") {
-		t.Errorf("create JSON lacks the rewritten URL with its password masked:\n%s", stdout)
+	if !strings.Contains(stdout, `"to": "localhost:3010"`) || strings.Contains(stdout, "postgres://") {
+		t.Errorf("create JSON = want the origin the URL moved to, and nothing else of it:\n%s", stdout)
 	}
 }
 
-func TestEnvMasksThePasswordOfAPortLinkedURLUnlessShowValues(t *testing.T) {
+func TestEnvWithholdsAPortLinkedURLUnlessShowValues(t *testing.T) {
 	dir := databaseURLRepo(t)
 	envCreate("feat/a", "--from", "main", "--yes")(t, dir)
 	json := []string{"--" + domain.FlagOutput, domain.OutputJSON}
@@ -85,8 +85,8 @@ func TestEnvMasksThePasswordOfAPortLinkedURLUnlessShowValues(t *testing.T) {
 			if strings.Contains(stdout+stderr, dbPassword) {
 				t.Errorf("output carries the password:\n%s%s", stdout, stderr)
 			}
-			if name == "check json" && !strings.Contains(stdout, `"current_value": "postgres://app:***@localhost:3010/db"`) {
-				t.Errorf("JSON lacks the URL with its password masked:\n%s", stdout)
+			if name == "check json" && strings.Contains(stdout, "postgres://") {
+				t.Errorf("JSON carries the URL:\n%s", stdout)
 			}
 		})
 	}
@@ -112,7 +112,7 @@ func assertNoSecret(t *testing.T, label, out string, secrets ...string) {
 
 // LUC-274 F1: a switch to verbatim reported the source's URL it put back
 // with its password.
-func TestEnvVerbatimJSONMasksTheRestoredPassword(t *testing.T) {
+func TestEnvVerbatimJSONNamesOnlyTheRestoredOrigin(t *testing.T) {
 	dir := databaseURLRepo(t)
 	envCreate("feat/a", "--from", "main", "--yes")(t, dir)
 
@@ -122,14 +122,14 @@ func TestEnvVerbatimJSONMasksTheRestoredPassword(t *testing.T) {
 	}
 
 	assertNoSecret(t, "verbatim JSON", stdout+stderr, dbPassword)
-	if !strings.Contains(stdout, `"to": "postgres://app:***@localhost:3000/db"`) {
-		t.Errorf("verbatim JSON lacks the restored URL with its password masked:\n%s", stdout)
+	if !strings.Contains(stdout, `"from": "localhost:3010"`) || !strings.Contains(stdout, `"to": "localhost:3000"`) || strings.Contains(stdout, "postgres://") {
+		t.Errorf("verbatim JSON = want the restored origin and nothing else of the URL:\n%s", stdout)
 	}
 }
 
 // LUC-274 F2: the current value of an [[env]] key is whatever the user left
 // there before wtm writes its own.
-func TestEnvCheckJSONMasksThePasswordOfAnOwnedKey(t *testing.T) {
+func TestEnvCheckJSONWithholdsTheUserValueOfAnOwnedKey(t *testing.T) {
 	const ownedPassword = "owned-s3cr3t"
 	dir := databaseURLRepo(t)
 	envCreate("feat/a", "--from", "main", "--yes")(t, dir)
@@ -143,8 +143,8 @@ func TestEnvCheckJSONMasksThePasswordOfAnOwnedKey(t *testing.T) {
 	stdout, stderr, _ := runWtCmd(t, jsonArgs(domain.CmdEnv, "feat/a", "--"+domain.FlagCheck)...)
 
 	assertNoSecret(t, "check JSON", stdout+stderr, ownedPassword)
-	if !strings.Contains(stdout, "postgres://app:***@localhost:5432/app") {
-		t.Errorf("check JSON lacks the owned value with its password masked:\n%s", stdout)
+	if !strings.Contains(stdout, `"value": "app-feat-a"`) || strings.Contains(stdout, "postgres://") {
+		t.Errorf("check JSON = want wtm's value and not the user's:\n%s", stdout)
 	}
 }
 
@@ -202,7 +202,7 @@ func TestEnvVerbatimTextShowsTheMoveInAList(t *testing.T) {
 	}
 
 	assertNoSecret(t, "verbatim text", stdout+stderr, dbPassword)
-	if !strings.Contains(stdout, `back to the source's "http://localhost:3000,`) || !strings.Contains(stdout, `(was "http://localhost:3010,`) {
+	if !strings.Contains(stdout, `back to the source's localhost:3000 (was localhost:3010)`) {
 		t.Errorf("verbatim text hides the move:\n%s", stdout)
 	}
 }

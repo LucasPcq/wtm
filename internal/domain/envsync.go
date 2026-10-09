@@ -58,11 +58,12 @@ type EnvSyncResult struct {
 // EnvRestoredEntry is one value wtm owns put back to its source's. Removed is
 // a key the source does not have, so its line was dropped.
 type EnvRestoredEntry struct {
-	File    string `json:"file"`
-	Key     string `json:"key"`
-	From    string `json:"from"`
-	To      string `json:"to,omitempty"`
-	Removed bool   `json:"removed,omitempty"`
+	File    string          `json:"file"`
+	Key     string          `json:"key"`
+	From    string          `json:"from,omitempty"`
+	To      string          `json:"to,omitempty"`
+	Origins []EnvOriginMove `json:"origins,omitempty"`
+	Removed bool            `json:"removed,omitempty"`
 }
 
 // EnvFileDecision is what a reader decided for one file's drift. A key absent

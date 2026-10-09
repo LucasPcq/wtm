@@ -89,6 +89,7 @@ func RewriteOrigin(params RewriteOriginParams) OriginRewrite {
 	var urls int
 	var mine []int
 	var foreign string
+	var foreignSeen bool
 	for i, element := range elements {
 		scheme, authority, ok := splitOrigin(element.value)
 		if !ok {
@@ -101,8 +102,9 @@ func RewriteOrigin(params RewriteOriginParams) OriginRewrite {
 		}) {
 			// A loopback address on some other port is not foreign, only
 			// unanchored: it names this machine, just not this job's port.
-			if host, _ := splitHostPort(authority); !isLoopbackHost(host) && foreign == "" {
-				foreign = authority
+			if host, _ := splitHostPort(authority); !isLoopbackHost(host) && !foreignSeen {
+				foreign = printableForeignHost(printableForeignHostParams{Value: params.Value, Authority: authority})
+				foreignSeen = true
 			}
 			continue
 		}
@@ -116,7 +118,7 @@ func RewriteOrigin(params RewriteOriginParams) OriginRewrite {
 		return OriginRewrite{Fallback: true}
 	}
 	if len(mine) == 0 {
-		if foreign != "" {
+		if foreignSeen {
 			return OriginRewrite{Status: domain.EnvPortStatusForeignHost, ForeignHost: foreign}
 		}
 		return OriginRewrite{Status: domain.EnvPortStatusNotFound}

@@ -3,6 +3,7 @@ package rules
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 )
@@ -64,14 +65,20 @@ func RestoreOwnedEnv(params RestoreOwnedEnvParams) ([]domain.EnvLine, []domain.E
 	return out, entries
 }
 
-// EnvRestoredRows renders one file's restored values as aligned rows, each
-// value whole with its passwords masked: an elided one can cut away the very
-// port that moved.
-func EnvRestoredRows(entries []domain.EnvRestoredEntry, file string) []string {
+type EnvRestoredRowsParams struct {
+	Entries    []domain.EnvRestoredEntry
+	File       string
+	ShowValues bool
+}
+
+// EnvRestoredRows renders one file's restored values as aligned rows. Without
+// --show-values a row names only the origins wtm had moved: the value put back
+// is the source's, the user's.
+func EnvRestoredRows(params EnvRestoredRowsParams) []string {
 	var mine []domain.EnvRestoredEntry
 	width := 0
-	for _, entry := range entries {
-		if entry.File == file {
+	for _, entry := range params.Entries {
+		if entry.File == params.File {
 			mine = append(mine, entry)
 			width = max(width, len(entry.Key))
 		}
@@ -79,15 +86,32 @@ func EnvRestoredRows(entries []domain.EnvRestoredEntry, file string) []string {
 
 	rows := make([]string, 0, len(mine))
 	for _, entry := range mine {
-		rows = append(rows, pad(entry.Key, width)+domain.EnvKeyRowGap+restoredDetail(entry))
+		rows = append(rows, pad(entry.Key, width)+domain.EnvKeyRowGap+restoredDetail(restoredDetailParams{Entry: entry, ShowValues: params.ShowValues}))
 	}
 	return rows
 }
 
-func restoredDetail(entry domain.EnvRestoredEntry) string {
-	was := EnvQuote(MaskURLPassword(entry.From))
-	if entry.Removed {
-		return fmt.Sprintf(domain.EnvDetailRestoredRemovedFmt, was)
+type restoredDetailParams struct {
+	Entry      domain.EnvRestoredEntry
+	ShowValues bool
+}
+
+func restoredDetail(params restoredDetailParams) string {
+	entry := params.Entry
+	if params.ShowValues {
+		if entry.Removed {
+			return fmt.Sprintf(domain.EnvDetailRestoredRemovedFmt, EnvQuote(entry.From))
+		}
+		return fmt.Sprintf(domain.EnvDetailRestoredFmt, EnvQuote(entry.To), EnvQuote(entry.From))
 	}
-	return fmt.Sprintf(domain.EnvDetailRestoredFmt, EnvQuote(MaskURLPassword(entry.To)), was)
+	if entry.Removed {
+		return domain.EnvDetailRestoredRemoved
+	}
+	moves, ok := EnvOriginMoves(EnvOriginMovesParams{From: entry.From, To: entry.To})
+	if !ok {
+		return domain.EnvDetailRestoredValue
+	}
+	return fmt.Sprintf(domain.EnvDetailRestoredFmt,
+		strings.Join(originSide(moves, false), domain.EnvOriginJoin),
+		strings.Join(originSide(moves, true), domain.EnvOriginJoin))
 }

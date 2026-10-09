@@ -1,6 +1,7 @@
 package rules_test
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -160,7 +161,7 @@ func TestRestoreOwnedEnvPutsBackOnlyTheOwnedKeys(t *testing.T) {
 		{File: ".env", Key: "WEB_PORT", From: "3010", To: "3000"},
 		{File: ".env", Key: "COMPOSE_PROJECT_NAME", From: "repo-feat", Removed: true},
 	}
-	if len(entries) != len(want) || entries[0] != want[0] || entries[1] != want[1] {
+	if !reflect.DeepEqual(entries, want) {
 		t.Fatalf("entries = %+v, want %+v", entries, want)
 	}
 }

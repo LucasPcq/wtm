@@ -25,10 +25,9 @@ func PrintEnvReport(w io.Writer, params EnvReportParams) {
 		printEnvFile(w, envFileBlock{
 			file:       f,
 			check:      result.Check,
-			managed:    rules.EnvManagedKeys(rules.EnvManagedKeysParams{Plan: result.Ports, Target: f.Target}),
 			showValues: params.ShowValues,
 			hasPorts:   rules.EnvPortsMoveIn(rules.EnvPortsMoveInParams{Result: result, Target: f.Target}),
-			restored:   rules.EnvRestoredRows(result.Restored, f.Target),
+			restored:   rules.EnvRestoredRows(rules.EnvRestoredRowsParams{Entries: result.Restored, File: f.Target, ShowValues: params.ShowValues}),
 			owned:      rules.EnvOwnedRows(rules.EnvOwnedRowsParams{Plan: result.Ports, File: f.Target, Check: result.Check}),
 		})
 	}
@@ -37,15 +36,14 @@ func PrintEnvReport(w io.Writer, params EnvReportParams) {
 
 type EnvReportParams struct {
 	Result domain.EnvSyncResult
-	// ShowValues prints the values of the keys wtm does not write, withheld
-	// otherwise.
+	// ShowValues prints every value whole; otherwise a report shows only what
+	// wtm wrote itself.
 	ShowValues bool
 }
 
 type envFileBlock struct {
 	file       domain.EnvFileResult
 	check      bool
-	managed    map[string]bool
 	showValues bool
 	hasPorts   bool
 	restored   []string
@@ -79,7 +77,7 @@ func printEnvFile(w io.Writer, block envFileBlock) {
 	for _, row := range block.owned {
 		Update(w, row)
 	}
-	rows := rules.EnvKeyRows(rules.EnvKeyRowsParams{File: f, Check: check, Managed: block.managed, ShowValues: block.showValues})
+	rows := rules.EnvKeyRows(rules.EnvKeyRowsParams{File: f, Check: check, ShowValues: block.showValues})
 	for _, row := range rows {
 		printEnvKeyRow(w, row)
 	}
@@ -148,7 +146,7 @@ func printEnvSummary(w io.Writer, result domain.EnvSyncResult) {
 // domain result carries its own json tags; it is never framed.
 func WriteEnvJSON(w io.Writer, params EnvReportParams) error {
 	if params.ShowValues {
-		return encodeJSON(w, params.Result)
+		return encodeJSON(w, rules.AnnotateEnvOrigins(params.Result))
 	}
 	return encodeJSON(w, rules.RedactEnvResult(params.Result))
 }
