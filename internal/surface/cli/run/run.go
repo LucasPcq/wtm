@@ -3,11 +3,11 @@ package run
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/daemoncmd"
-	"github.com/LucasPcq/wtm/internal/commands/run/jobcmd"
-	"github.com/LucasPcq/wtm/internal/commands/run/profilecmd"
-	"github.com/LucasPcq/wtm/internal/commands/run/proxycmd"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/daemoncmd"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/jobcmd"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/profilecmd"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/proxycmd"
 )
 
 // NewCmd creates the wtm run command group — manages dev jobs

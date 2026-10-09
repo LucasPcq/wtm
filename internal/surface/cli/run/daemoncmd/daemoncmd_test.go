@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/daemoncmd"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/service/process/processtest"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/daemoncmd"
 	"github.com/LucasPcq/wtm/internal/testutil/globaldir"
 )
 

@@ -1,5 +1,5 @@
 // Package output formats and prints results. It contains zero decision logic.
-package output
+package render
 
 import (
 	"encoding/json"

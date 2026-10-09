@@ -6,9 +6,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 )
 
 // warnIndexFrozen says, before anything is started, that nothing about it will be
@@ -21,7 +21,7 @@ func warnIndexFrozen(cmd *cobra.Command) {
 	if !rules.IsHumanFormat(format) || !process.IndexFrozen() {
 		return
 	}
-	output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
-		output.Callout(w, domain.DaemonIndexFrozenTitle, rules.IndexFrozenLines(process.StatePath()))
+	render.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
+		render.Callout(w, domain.DaemonIndexFrozenTitle, rules.IndexFrozenLines(process.StatePath()))
 	})
 }

@@ -7,12 +7,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/service/process"
-	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/runctx"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
 func newStopCmd() *cobra.Command {
@@ -83,14 +83,14 @@ type reportStoppedParams struct {
 
 func reportStopped(cmd *cobra.Command, params reportStoppedParams) error {
 	if format, _ := cmd.Flags().GetString(domain.FlagOutput); format == domain.OutputJSON {
-		return output.WriteDaemonStatusJSON(cmd.OutOrStdout(), collectStatus(cmd.Context()))
+		return render.WriteDaemonStatusJSON(cmd.OutOrStdout(), collectStatus(cmd.Context()))
 	}
-	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+	render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
 		if params.Noop {
-			output.Unchanged(w, params.Message)
+			render.Unchanged(w, params.Message)
 			return
 		}
-		output.Success(w, params.Message)
+		render.Success(w, params.Message)
 	})
 	return nil
 }

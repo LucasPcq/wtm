@@ -7,10 +7,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	createflow "github.com/LucasPcq/wtm/internal/flow/create"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 // newCreateCmd creates the wtm create subcommand.

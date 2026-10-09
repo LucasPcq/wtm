@@ -6,12 +6,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	downflow "github.com/LucasPcq/wtm/internal/flow/run/down"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/runctx"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 // newDownCmd creates the wtm run down subcommand.
@@ -86,12 +86,12 @@ type downPresenter struct {
 
 func (p downPresenter) Downed(outcome downflow.Outcome) error {
 	if p.Format == domain.OutputJSON {
-		return output.WriteWorktreeJobResultsJSON(p.Cmd.OutOrStdout(), outcome.Results)
+		return render.WriteWorktreeJobResultsJSON(p.Cmd.OutOrStdout(), outcome.Results)
 	}
 
 	out, errOut := p.Cmd.OutOrStdout(), p.Cmd.ErrOrStderr()
 	if outcome.NoDaemon || len(outcome.Stopped()) == 0 {
-		output.Frame(out, func(w io.Writer) { output.Unchanged(w, p.nothingRunning(outcome)) })
+		render.Frame(out, func(w io.Writer) { render.Unchanged(w, p.nothingRunning(outcome)) })
 		return nil
 	}
 
@@ -99,21 +99,21 @@ func (p downPresenter) Downed(outcome downflow.Outcome) error {
 	// reaches a reader piping stdout; the recap then accounts for it alongside
 	// what did go down.
 	if rules.WorktreeJobsHaveErrors(outcome.Results) {
-		output.FrameStart(errOut)
-		barred := output.Barred(errOut)
+		render.FrameStart(errOut)
+		barred := render.Barred(errOut)
 		for _, worktree := range outcome.Results {
 			for _, result := range worktree.Jobs {
 				if result.Status != domain.JobActionError {
 					continue
 				}
-				output.Error(barred, p.qualify(fmt.Sprintf("%s: %s", result.Name, result.Message), outcome, worktree))
+				render.Error(barred, p.qualify(fmt.Sprintf("%s: %s", result.Name, result.Message), outcome, worktree))
 			}
 		}
-		output.FrameEnd(errOut)
+		render.FrameEnd(errOut)
 	}
 
-	output.Frame(out, func(w io.Writer) {
-		fmt.Fprint(w, output.FormatRunDownRecap(output.RunDownRecapParams{
+	render.Frame(out, func(w io.Writer) {
+		fmt.Fprint(w, render.FormatRunDownRecap(render.RunDownRecapParams{
 			Profile: outcome.Profile,
 			Results: outcome.Results,
 		}))

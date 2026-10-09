@@ -5,12 +5,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 func newRestartCmd() *cobra.Command {
@@ -56,14 +56,14 @@ func runRestart(cmd *cobra.Command, _ []string) error {
 	}
 
 	if format, _ := cmd.Flags().GetString(domain.FlagOutput); format == domain.OutputJSON {
-		return output.WriteDaemonStatusJSON(cmd.OutOrStdout(), collectStatus(cmd.Context()))
+		return render.WriteDaemonStatusJSON(cmd.OutOrStdout(), collectStatus(cmd.Context()))
 	}
-	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+	render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
 		// The readout is the detail; without a conclusion above it the reader has
 		// to infer the outcome from a `State` field, which every sibling states.
-		output.Success(w, domain.DaemonRestarted)
-		output.Blank(w)
-		output.DaemonStatusFields(w, collectStatus(cmd.Context()))
+		render.Success(w, domain.DaemonRestarted)
+		render.Blank(w)
+		render.DaemonStatusFields(w, collectStatus(cmd.Context()))
 	})
 	return nil
 }

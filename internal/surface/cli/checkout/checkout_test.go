@@ -11,10 +11,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
 
@@ -109,7 +109,7 @@ on_create = ["touch hook-ran"]
 	if err != nil {
 		t.Fatalf("checkout must not fail over run.toml: %v", err)
 	}
-	var got output.PRCheckoutJSON
+	var got render.PRCheckoutJSON
 	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
 		t.Fatalf("decode checkout JSON: %v", err)
 	}
@@ -149,7 +149,7 @@ target = ".env"
 	if err != nil {
 		t.Fatalf("checkout: %v", err)
 	}
-	var got output.PRCheckoutJSON
+	var got render.PRCheckoutJSON
 	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
 		t.Fatalf("decode checkout JSON: %v", err)
 	}
@@ -211,7 +211,7 @@ target = ".env"
 	if err != nil {
 		t.Fatalf("checkout: %v", err)
 	}
-	var got output.PRCheckoutJSON
+	var got render.PRCheckoutJSON
 	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
 		t.Fatalf("decode checkout JSON: %v", err)
 	}

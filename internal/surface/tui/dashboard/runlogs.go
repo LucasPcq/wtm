@@ -15,7 +15,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/styles"
-	"github.com/LucasPcq/wtm/internal/tui/runview"
+	"github.com/LucasPcq/wtm/internal/surface/tui/runview"
 )
 
 // logsRequest is what a tail needs and the dashboard has to supply: the daemon

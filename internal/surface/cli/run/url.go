@@ -5,11 +5,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	urlflow "github.com/LucasPcq/wtm/internal/flow/run/url"
-	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/runctx"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 func newURLCmd() *cobra.Command {
@@ -60,7 +60,7 @@ func runURL(cmd *cobra.Command, args []string) error {
 	// publishes — narrowed by --job as the line is — where a line is one address
 	// and therefore has to be unambiguous.
 	if ctx.Format == domain.OutputJSON {
-		return output.WriteJobURLsJSON(cmd.OutOrStdout(), outcome.Entries)
+		return render.WriteJobURLsJSON(cmd.OutOrStdout(), outcome.Entries)
 	}
 
 	entry, err := outcome.One()
@@ -74,5 +74,5 @@ func runURL(cmd *cobra.Command, args []string) error {
 // outputJobURL writes one address as the document `run url` writes for a set of
 // them: one shape for one question, whichever command was asked it.
 func outputJobURL(cmd *cobra.Command, entry domain.JobURLEntry) error {
-	return output.WriteJobURLsJSON(cmd.OutOrStdout(), []domain.JobURLEntry{entry})
+	return render.WriteJobURLsJSON(cmd.OutOrStdout(), []domain.JobURLEntry{entry})
 }

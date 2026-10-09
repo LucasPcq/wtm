@@ -9,7 +9,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 )
 
 func TestRunJobAdd_OK(t *testing.T) {
@@ -228,7 +228,7 @@ func TestRunProfileAdd_OK(t *testing.T) {
 		t.Fatalf("run profile add: %v", err)
 	}
 
-	var result output.ProfileActionResult
+	var result render.ProfileActionResult
 	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
 		t.Fatalf("parse JSON: %v\noutput: %s", err, stdout)
 	}
@@ -468,7 +468,7 @@ func TestRunProfileRm_JSONOutput(t *testing.T) {
 		t.Fatalf("run profile rm --output json: %v", err)
 	}
 
-	var result output.ProfileActionResult
+	var result render.ProfileActionResult
 	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
 		t.Fatalf("parse JSON: %v\noutput: %s", err, stdout)
 	}
@@ -1032,7 +1032,7 @@ func TestRunProfileEdit_JSON(t *testing.T) {
 		t.Fatalf("run profile edit: %v", err)
 	}
 
-	var result output.ProfileActionResult
+	var result render.ProfileActionResult
 	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
 		t.Fatalf("parse JSON: %v\noutput: %s", err, stdout)
 	}

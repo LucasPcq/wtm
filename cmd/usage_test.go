@@ -9,9 +9,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 func TestCobraRefusalsExitWithTheUsageCode(t *testing.T) {

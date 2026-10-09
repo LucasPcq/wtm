@@ -6,11 +6,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	jobflow "github.com/LucasPcq/wtm/internal/flow/run/job"
-	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/runctx"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 func newListCmd() *cobra.Command {
@@ -38,9 +38,9 @@ func runList(cmd *cobra.Command, _ []string) error {
 
 	answered, err := ctx.Listing(runctx.ListingParams{
 		Cmd:  cmd,
-		JSON: func(w io.Writer) error { return output.WriteJobsJSON(w, ctx.Run.Jobs) },
+		JSON: func(w io.Writer) error { return render.WriteJobsJSON(w, ctx.Run.Jobs) },
 		Table: func(w io.Writer) {
-			fmt.Fprint(w, output.FormatRunConfig(output.FormatRunConfigParams{Config: domain.RunConfig{Jobs: ctx.Run.Jobs}, Empty: domain.RunJobsEmpty}))
+			fmt.Fprint(w, render.FormatRunConfig(render.FormatRunConfigParams{Config: domain.RunConfig{Jobs: ctx.Run.Jobs}, Empty: domain.RunJobsEmpty}))
 		},
 	})
 	if answered || err != nil {

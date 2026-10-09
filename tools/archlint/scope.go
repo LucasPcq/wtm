@@ -19,7 +19,18 @@ func internalPath(pkgPath string) string {
 	return rest
 }
 
+// layerOfPackage is the longest row of the layers table holding the package:
+// surface/cli/render sits inside surface/cli and is a layer of its own.
 func layerOfPackage(pkgPath string) string {
+	longest := ""
+	for name := range layers {
+		if len(name) > len(longest) && dir(name).holds(pkgPath) {
+			longest = name
+		}
+	}
+	if longest != "" {
+		return longest
+	}
 	return strings.Split(internalPath(pkgPath), "/")[0]
 }
 

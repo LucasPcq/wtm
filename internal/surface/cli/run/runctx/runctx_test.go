@@ -11,10 +11,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/runctx"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 	"github.com/LucasPcq/wtm/internal/testutil/globaldir"
 )

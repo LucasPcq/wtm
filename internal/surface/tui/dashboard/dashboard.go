@@ -23,9 +23,9 @@ import (
 	"github.com/LucasPcq/wtm/internal/service/runconfig"
 	"github.com/LucasPcq/wtm/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
-	"github.com/LucasPcq/wtm/internal/tui/components"
-	"github.com/LucasPcq/wtm/internal/tui/runview"
-	"github.com/LucasPcq/wtm/internal/tui/worktreepicker"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/tui/runview"
+	"github.com/LucasPcq/wtm/internal/surface/tui/worktreepicker"
 )
 
 // RunParams holds what the dashboard needs to keep itself fed. The PR loader is

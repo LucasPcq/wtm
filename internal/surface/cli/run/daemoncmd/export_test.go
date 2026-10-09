@@ -3,7 +3,7 @@ package daemoncmd
 import (
 	"testing"
 
-	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
 func StubConfirm(t *testing.T, answer func(components.ConfirmModel) (bool, error)) {

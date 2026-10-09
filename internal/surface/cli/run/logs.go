@@ -8,14 +8,14 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	logsflow "github.com/LucasPcq/wtm/internal/flow/run/logs"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/styles"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/runctx"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 // newLogsCmd creates the wtm run logs subcommand.
@@ -153,7 +153,7 @@ func writeJobLogsJSON(params jobLinesParams) error {
 			// One unreadable file is not the whole document: the other jobs still
 			// have something to hand over, and stdout stays a clean document
 			// because the reason goes to stderr.
-			output.Error(output.Barred(params.Cmd.ErrOrStderr()), fmt.Sprintf("%s: %v", view.Name, historyErr))
+			render.Error(render.Barred(params.Cmd.ErrOrStderr()), fmt.Sprintf("%s: %v", view.Name, historyErr))
 			continue
 		}
 		i, ok := index[view.WorkDir]
@@ -166,7 +166,7 @@ func writeJobLogsJSON(params jobLinesParams) error {
 			logs[i].Lines = append(logs[i].Lines, rules.ParseLogLine(rules.ParseLogLineParams{Job: view.Name, Line: line}))
 		}
 	}
-	return output.WriteJobLogsJSON(params.Cmd.OutOrStdout(), logs)
+	return render.WriteJobLogsJSON(params.Cmd.OutOrStdout(), logs)
 }
 
 // writeJobLines is `run logs` with no terminal to draw on: one prefixed line per
@@ -186,12 +186,12 @@ func writeJobLines(params jobLinesParams) error {
 	}
 	out := params.Cmd.OutOrStdout()
 	if len(views) == 0 {
-		output.Frame(out, func(w io.Writer) { output.Unchanged(w, domain.RunLogsNoJobs) })
+		render.Frame(out, func(w io.Writer) { render.Unchanged(w, domain.RunLogsNoJobs) })
 		return nil
 	}
 
-	output.FrameStart(out)
-	barred := output.Barred(out)
+	render.FrameStart(out)
+	barred := render.Barred(out)
 	writer := &lineWriter{out: barred}
 	var wg sync.WaitGroup
 	attached := false
@@ -202,7 +202,7 @@ func writeJobLines(params jobLinesParams) error {
 		if !view.Attachable {
 			lines, historyErr := params.Board.History(runlogs.HistoryParams{Job: view.Name, WorkDir: view.WorkDir})
 			if historyErr != nil {
-				output.Error(output.Barred(params.Cmd.ErrOrStderr()), fmt.Sprintf("%s: %v", view.Name, historyErr))
+				render.Error(render.Barred(params.Cmd.ErrOrStderr()), fmt.Sprintf("%s: %v", view.Name, historyErr))
 				continue
 			}
 			for _, line := range lines {
@@ -213,7 +213,7 @@ func writeJobLines(params jobLinesParams) error {
 
 		stream, attachErr := params.Board.Attach(runlogs.AttachParams{Job: view.Name, WorkDir: view.WorkDir})
 		if attachErr != nil {
-			output.Error(output.Barred(params.Cmd.ErrOrStderr()), fmt.Sprintf("%s: %v", view.Name, attachErr))
+			render.Error(render.Barred(params.Cmd.ErrOrStderr()), fmt.Sprintf("%s: %v", view.Name, attachErr))
 			continue
 		}
 
@@ -233,9 +233,9 @@ func writeJobLines(params jobLinesParams) error {
 	// A worktree whose jobs are all down and none of which ever wrote a line has
 	// nothing to show; saying so beats an empty frame.
 	if !attached && !writer.wrote {
-		output.Unchanged(barred, domain.RunLogsNoJobs)
+		render.Unchanged(barred, domain.RunLogsNoJobs)
 	}
-	output.FrameEnd(out)
+	render.FrameEnd(out)
 	return nil
 }
 
@@ -251,7 +251,7 @@ func (w *lineWriter) write(prefix string, line string) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.wrote = true
-	fmt.Fprintf(w.out, "%s%s %s\n", output.Indent, prefix, line)
+	fmt.Fprintf(w.out, "%s%s %s\n", render.Indent, prefix, line)
 }
 
 // streamReader reads a job's chunks as the io.Reader a line scanner needs.

@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -18,7 +17,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/service/integration"
 	"github.com/LucasPcq/wtm/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/internal/service/selfupdate"
-	"github.com/LucasPcq/wtm/internal/tui/dashboard"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
+	"github.com/LucasPcq/wtm/internal/surface/tui/dashboard"
 )
 
 type NewCmdParams struct {

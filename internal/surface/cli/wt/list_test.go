@@ -7,8 +7,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
-// This is the repair internal/commands/wt/list.go:107 exists to make real:
-// ActiveBranch was hard-coded to "" (dead code, per output/worktree.go's
+// This is the repair internal/surface/cli/wt/list.go:107 exists to make real:
+// ActiveBranch was hard-coded to "" (dead code, per surface/cli/render/worktree.go's
 // unreachable "active" tag) until it was wired to rules.ActiveWorktree. A
 // test that hand-builds FormatWorktreeListParams would pin the formatter, not
 // the wiring — this one runs the actual `wtm list` command from inside a real

@@ -6,7 +6,7 @@ export const out = (html = '', delay) => ({ kind: 'out', html, delay });
 const esc = (s) => s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 const RAIL = '<span class="p">┃</span>';
 
-// wtm frames its human output with a violet rail (internal/output/frame.go) and
+// wtm frames its human output with a violet rail (internal/surface/cli/render/frame.go) and
 // never its JSON; the rail spans the block's first to last non-blank line.
 const framed = (text) => /^wtm\s/.test(text) && !/--output json|\|/.test(text);
 

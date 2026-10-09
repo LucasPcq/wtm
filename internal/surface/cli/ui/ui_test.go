@@ -4,9 +4,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 // buildRunParams is what threads the real working directory into the

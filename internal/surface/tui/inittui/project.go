@@ -10,8 +10,8 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
-	"github.com/LucasPcq/wtm/internal/tui/branchrefresh"
-	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/tui/branchrefresh"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
 // Step keys identify wizard steps so extraction is positional-independent —

@@ -183,7 +183,7 @@ func ParentFlagsDecision(params DecideParentFastForwardParams) ParentDecision {
 }
 
 // CommitCountLabel renders a commit distance for prose ("1 commit" / "3 commits").
-// It lives here because output/ and tui/ both need it and cannot import each other.
+// It lives here because surface/cli/render/ and surface/tui/ both need it and cannot import each other.
 func CommitCountLabel(n int) string {
 	if n == 1 {
 		return "1 commit"

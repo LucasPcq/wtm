@@ -3,7 +3,7 @@ package shared
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
 // Load is RunLoading for a read. A listing an interrupt cut short is no answer

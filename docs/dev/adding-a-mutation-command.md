@@ -2,7 +2,7 @@
 
 A *mutation command* is one that changes worktree state: it creates, removes, moves or rewrites something, and therefore has questions to ask, safety refusals to honor, and two bypass axes to expose. Every new one goes through `internal/flow/` — the model in [flow-layer.md](flow-layer.md).
 
-A read-only command (`list`, `tree`, `resolve`) needs none of this: parse flags, call the service, hand the result to `output/`.
+A read-only command (`list`, `tree`, `resolve`) needs none of this: parse flags, call the service, hand the result to `surface/cli/render/`.
 
 ## 1. Declare the vocabulary in `domain/`
 
@@ -55,7 +55,7 @@ func Run(ctx context.Context, params Params) (Outcome, error) {
 
 Rules that are not negotiable:
 
-- The package imports **only** `internal/service`, `internal/rules`, `internal/domain` and the stdlib. Never cobra, bubbletea, lipgloss, `internal/output`, `internal/tui`, `internal/config` or `internal/commands`. If you need something only `infra/` has, add a thin wrapper in `service/` — as `worktree.FindByBranch` does.
+- The package imports **only** `internal/service`, `internal/rules`, `internal/domain` and the stdlib. Never cobra, bubbletea, lipgloss, `internal/surface/cli/render`, `internal/surface/tui`, `internal/config` or `internal/surface/cli`. If you need something only `infra/` has, add a thin wrapper in `service/` — as `worktree.FindByBranch` does.
 - `Request` carries **no `--yes` and no `--output`**. `--force` does belong there.
 - The run's `context.Context` is the first argument, never a `Params` field. Every service call that may reach a subprocess or the daemon takes it, and a `Stage`'s work uses the one `Work` is handed (see [flow-layer.md](flow-layer.md#cancellation)).
 - Errors are returned. A user abort is `presenter.Notice(flow.AbortedNotice)` followed by `Outcome{Aborted: true}, nil`.
@@ -109,7 +109,7 @@ func Operation() flow.Operation {
 
 ## 4. Wire the command
 
-`internal/commands/wt/split.go` holds flag wiring and nothing else:
+`internal/surface/cli/wt/split.go` holds flag wiring and nothing else:
 
 ```go
 func runSplit(cmd *cobra.Command, args []string) error {
@@ -153,17 +153,17 @@ Register the command in its parent group and give it a `GroupID` (`domain.CmdGro
 
 ## 5. Add the CLI presenter
 
-In `internal/commands/wt/presenter.go`, next to `createPresenter` and `cleanPresenter`:
+In `internal/surface/cli/wt/presenter.go`, next to `createPresenter` and `cleanPresenter`:
 
 ```go
 type splitPresenter struct{ cliPresenter }
 
 func (p splitPresenter) Split(outcome splitflow.Outcome) error {
 	if p.format == domain.OutputJSON {
-		return output.WriteSplitJSON(p.cmd.OutOrStdout(), outcome.Result)
+		return render.WriteSplitJSON(p.cmd.OutOrStdout(), outcome.Result)
 	}
-	output.Frame(p.cmd.OutOrStdout(), func() {
-		output.FormatSplitResult(p.cmd.OutOrStdout(), /* … */)
+	render.Frame(p.cmd.OutOrStdout(), func() {
+		render.FormatSplitResult(p.cmd.OutOrStdout(), /* … */)
 	})
 	return nil
 }
@@ -181,9 +181,9 @@ func (p splitPresenter) Split(outcome splitflow.Outcome) error {
 
 1. `make docs` — regenerates `docs/`, never hand-edited.
 2. Add the command to the `README.md` overview table, in the same group as the root `--help`.
-3. Update the agent skill (`internal/commands/agents/assets/using-wtm/`, the reference file of the command's topic) if the agent-facing surface changed (a new command, a new flag, a changed JSON shape, changed failure/abort semantics).
+3. Update the agent skill (`internal/surface/cli/agents/assets/using-wtm/`, the reference file of the command's topic) if the agent-facing surface changed (a new command, a new flag, a changed JSON shape, changed failure/abort semantics).
 4. Run the `build-validator` subagent. Step 6 fails the run if `internal/flow/` gained a forbidden import.
 
 ## Optional: make it work in the dashboard
 
-Nothing in the flow changes. In `internal/tui/dashboard/actions.go`, add a `startSplit` that checks `busyReason`, calls `beginOp(splitflow.Operation())`, and launches `splitflow.Run` in a `tea.Cmd` with the dashboard's `prompter` and a presenter embedding `dashboard.presenter` plus the typed conclusion. If the flow uses a step kind the dashboard's modal cannot render, that is the only work left — and `flowui` will refuse an unknown kind rather than guess, so you will hear about it immediately.
+Nothing in the flow changes. In `internal/surface/tui/dashboard/actions.go`, add a `startSplit` that checks `busyReason`, calls `beginOp(splitflow.Operation())`, and launches `splitflow.Run` in a `tea.Cmd` with the dashboard's `prompter` and a presenter embedding `dashboard.presenter` plus the typed conclusion. If the flow uses a step kind the dashboard's modal cannot render, that is the only work left — and `flowui` will refuse an unknown kind rather than guess, so you will hear about it immediately.

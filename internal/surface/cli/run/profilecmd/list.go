@@ -6,11 +6,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	profileflow "github.com/LucasPcq/wtm/internal/flow/run/profile"
-	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/runctx"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 func newListCmd() *cobra.Command {
@@ -38,9 +38,9 @@ func runList(cmd *cobra.Command, _ []string) error {
 
 	answered, err := ctx.Listing(runctx.ListingParams{
 		Cmd:  cmd,
-		JSON: func(w io.Writer) error { return output.WriteProfilesJSON(w, ctx.Run.Profiles) },
+		JSON: func(w io.Writer) error { return render.WriteProfilesJSON(w, ctx.Run.Profiles) },
 		Table: func(w io.Writer) {
-			fmt.Fprint(w, output.FormatRunConfig(output.FormatRunConfigParams{Config: domain.RunConfig{Profiles: ctx.Run.Profiles}, Empty: domain.RunProfilesEmpty}))
+			fmt.Fprint(w, render.FormatRunConfig(render.FormatRunConfigParams{Config: domain.RunConfig{Profiles: ctx.Run.Profiles}, Empty: domain.RunProfilesEmpty}))
 		},
 	})
 	if answered || err != nil {

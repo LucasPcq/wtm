@@ -6,13 +6,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
 	"github.com/LucasPcq/wtm/internal/service/proxy"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 func newStatusCmd() *cobra.Command {
@@ -37,10 +37,10 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	status := collectStatus(cmd.Context(), configured)
 
 	if format, _ := cmd.Flags().GetString(domain.FlagOutput); format == domain.OutputJSON {
-		return output.WriteProxyStatusJSON(cmd.OutOrStdout(), status)
+		return render.WriteProxyStatusJSON(cmd.OutOrStdout(), status)
 	}
-	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-		output.ProxyStatusReport(w, status)
+	render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		render.ProxyStatusReport(w, status)
 	})
 	return nil
 }

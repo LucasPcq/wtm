@@ -10,8 +10,8 @@ import (
 
 var (
 	cobraCommand    = objectRef{Path: "github.com/spf13/cobra", Name: "Command"}
-	interactiveGate = objectRef{Path: internalPrefix + "commands/shared", Name: "Interactive"}
-	yesFlag         = objectRef{Path: internalPrefix + "commands/shared", Name: "AddYesFlag"}
+	interactiveGate = objectRef{Path: internalPrefix + "surface/cli/shared", Name: "Interactive"}
+	yesFlag         = objectRef{Path: internalPrefix + "surface/cli/shared", Name: "AddYesFlag"}
 )
 
 // yesflagAnalyzer enforces the confirmation axis: a file that builds a command
@@ -24,7 +24,7 @@ var yesflagAnalyzer = &analysis.Analyzer{
 }
 
 func runYesFlag(pass *analysis.Pass) (any, error) {
-	if layerOfPackage(pass.Pkg.Path()) != "commands" {
+	if layerOfPackage(pass.Pkg.Path()) != "surface/cli" {
 		return nil, nil
 	}
 	for _, file := range pass.Files {

@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	syncflow "github.com/LucasPcq/wtm/internal/flow/sync"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
 )
 

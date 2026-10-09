@@ -13,7 +13,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
-	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
 // RefreshedMsg carries the re-listed worktree statuses back into the wizard.

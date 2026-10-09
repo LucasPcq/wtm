@@ -10,15 +10,15 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/run/initrun"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
-	"github.com/LucasPcq/wtm/internal/tui/components"
-	initwizard "github.com/LucasPcq/wtm/internal/tui/inittui"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/runctx"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
+	initwizard "github.com/LucasPcq/wtm/internal/surface/tui/inittui"
 )
 
 // newInitCmd creates the wtm run init subcommand — the dedicated entry point
@@ -163,26 +163,26 @@ func (p initPresenter) Stage(ctx context.Context, params flow.StageParams) error
 func (p initPresenter) Initialized(outcome initrun.Outcome) error {
 	w := p.Cmd.OutOrStdout()
 	if outcome.NothingDetected {
-		output.Frame(w, func(w io.Writer) {
-			output.Unchanged(w, domain.RunInitNothingDetected)
-			output.Blank(w)
-			output.NextStep(w, output.NextStepParams{Command: domain.RunInitByHandJob, Note: domain.RunInitByHandJobNote})
-			output.NextStep(w, output.NextStepParams{Command: domain.RunInitByHandProfile, Note: domain.RunInitByHandProfNote})
+		render.Frame(w, func(w io.Writer) {
+			render.Unchanged(w, domain.RunInitNothingDetected)
+			render.Blank(w)
+			render.NextStep(w, render.NextStepParams{Command: domain.RunInitByHandJob, Note: domain.RunInitByHandJobNote})
+			render.NextStep(w, render.NextStepParams{Command: domain.RunInitByHandProfile, Note: domain.RunInitByHandProfNote})
 		})
 		return nil
 	}
 
 	report := outcome.Report
-	output.Frame(w, func(w io.Writer) {
+	render.Frame(w, func(w io.Writer) {
 		// The jobs are counted, not named: the reader ticked them one by one in the
 		// wizard, and run.toml is where they live now.
-		output.Success(w, fmt.Sprintf(domain.RunInitConfiguredFmt, report.RunPath, rules.Tally(
+		render.Success(w, fmt.Sprintf(domain.RunInitConfiguredFmt, report.RunPath, rules.Tally(
 			domain.TallyPart{Count: report.Added, Label: domain.TallyAdded},
 			domain.TallyPart{Count: report.Removed, Label: domain.TallyRemoved},
 			domain.TallyPart{Count: report.Kept, Label: domain.TallyKept},
 		)))
 		detected := report.Detected
-		output.DetectedPortsReport(w, output.DetectedPortsReportParams{
+		render.DetectedPortsReport(w, render.DetectedPortsReportParams{
 			Patched:       detected.Patches,
 			Written:       detected.Written,
 			Withheld:      detected.Withheld,
@@ -196,33 +196,33 @@ func (p initPresenter) Initialized(outcome initrun.Outcome) error {
 			EnvUnreadable: detected.EnvUnreadable,
 		})
 		if len(report.SharingLines) > 0 {
-			output.Blank(w)
-			output.Callout(w, domain.ComposeSharingTitle, report.SharingLines)
+			render.Blank(w)
+			render.Callout(w, domain.ComposeSharingTitle, report.SharingLines)
 		}
-		output.ComposeNamesReport(w, output.ComposeNamesReportParams{
+		render.ComposeNamesReport(w, render.ComposeNamesReportParams{
 			Patched:  report.NamePatches,
 			Withheld: report.NamesWithheld,
 		})
-		output.EnvPortLinksReport(w, report.Links, report.LinkBases)
-		output.PortKeysReport(w, report.PortKeys)
+		render.EnvPortLinksReport(w, report.Links, report.LinkBases)
+		render.PortKeysReport(w, report.PortKeys)
 		// Last, and alone in a frame: everything above is what the run did, this
 		// is what it could not do without the reader.
-		output.PortIsolationReport(w, output.PortIsolationReportParams{
+		render.PortIsolationReport(w, render.PortIsolationReportParams{
 			Unported: report.Unported,
 			Ignoring: report.Ignoring,
 		})
-		output.PortCommandOnlyReport(w, report.CommandOnly)
+		render.PortCommandOnlyReport(w, report.CommandOnly)
 		if len(report.ProxyCollisionLines) > 0 {
-			output.Callout(w, domain.ProxyPortCollisionTitle, report.ProxyCollisionLines)
+			render.Callout(w, domain.ProxyPortCollisionTitle, report.ProxyCollisionLines)
 		}
 		if len(report.ProxyInstallLines) > 0 {
-			output.Callout(w, domain.ProxyInstallHintTitle, report.ProxyInstallLines)
+			render.Callout(w, domain.ProxyInstallHintTitle, report.ProxyInstallLines)
 		}
 		if drift := report.AddressingDrift; drift != nil {
-			output.Callout(w, drift.Text, drift.Lines)
+			render.Callout(w, drift.Text, drift.Lines)
 		}
-		output.Blank(w)
-		output.NextSteps(w, []output.NextStepParams{
+		render.Blank(w)
+		render.NextSteps(w, []render.NextStepParams{
 			{Command: domain.RunInitNextUp, Note: domain.RunInitNextUpNote},
 			{Command: domain.RunInitNextJobAdd, Note: domain.RunInitNextJobAddNote},
 		})

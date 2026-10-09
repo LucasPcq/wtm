@@ -1,15 +1,15 @@
--- github.com/LucasPcq/wtm/internal/output/badge/badge.go --
+-- github.com/LucasPcq/wtm/internal/surface/cli/render/badge/badge.go --
 package badge
 
 import st "github.com/LucasPcq/wtm/internal/styles"
 
-var chip = st.BadgeOK // want `internal/output must not use styles\.BadgeOK`
+var chip = st.BadgeOK // want `internal/surface/cli/render must not use styles\.BadgeOK`
 
-var title = st.DashboardTitle // want `internal/output must not use styles\.DashboardTitle`
+var title = st.DashboardTitle // want `internal/surface/cli/render must not use styles\.DashboardTitle`
 
 var fine = st.Accent
--- github.com/LucasPcq/wtm/internal/output/output.go --
-package output
+-- github.com/LucasPcq/wtm/internal/surface/cli/render/render.go --
+package render
 
 import (
 	"io"
@@ -43,7 +43,7 @@ var (
 	BadgeOK        = Style{}
 	DashboardTitle = Style{}
 )
--- github.com/LucasPcq/wtm/internal/tui/glyphs/glyphs.go --
+-- github.com/LucasPcq/wtm/internal/surface/tui/glyphs/glyphs.go --
 package glyphs
 
 var done = "✓" // want `the glyph "✓" is domain\.GlyphSuccess`

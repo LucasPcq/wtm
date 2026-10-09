@@ -3,11 +3,11 @@ package run
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/runctx"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 // newExportCmd creates the wtm run export subcommand.
@@ -45,5 +45,5 @@ func runExport(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-	return output.WriteRunConfigJSON(cmd.OutOrStdout(), ctx.Run)
+	return render.WriteRunConfigJSON(cmd.OutOrStdout(), ctx.Run)
 }

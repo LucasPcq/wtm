@@ -40,7 +40,7 @@ type NewConfirmParams struct {
 	Title       string
 	Description string
 	// Warning, when non-empty, renders above the Yes/No options as a styled
-	// "! message" banner — same look as output.Warning, mirrored inside the wizard.
+	// "! message" banner — same look as render.Warning, mirrored inside the wizard.
 	Warning    string
 	DefaultYes bool
 }

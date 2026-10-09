@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
 func TestAReadCutShortByAnInterruptIsNoAnswer(t *testing.T) {

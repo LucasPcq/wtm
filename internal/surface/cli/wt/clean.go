@@ -7,10 +7,10 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	cleanflow "github.com/LucasPcq/wtm/internal/flow/clean"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 // newCleanCmd creates the wtm clean subcommand.

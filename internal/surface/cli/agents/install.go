@@ -12,11 +12,11 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/service/detect"
-	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
 const (
@@ -81,8 +81,8 @@ func runInstall(cmd *cobra.Command, _ []string) error {
 		if format == domain.OutputJSON {
 			return writeAgentsJSON(cmd.OutOrStdout(), nil)
 		}
-		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-			output.Unchanged(w, "No destinations selected.")
+		render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			render.Unchanged(w, "No destinations selected.")
 		})
 		return nil
 	}
@@ -275,20 +275,20 @@ func writeAgentsJSON(w io.Writer, results []agentInstallResult) error {
 }
 
 func printAgentResults(dest io.Writer, results []agentInstallResult) {
-	output.Frame(dest, func(w io.Writer) {
+	render.Frame(dest, func(w io.Writer) {
 		for _, r := range results {
 			switch r.Action {
 			case agentActionCreated:
-				output.Success(w, fmt.Sprintf("Created %s", r.Path))
+				render.Success(w, fmt.Sprintf("Created %s", r.Path))
 			case agentActionUpdated:
-				output.Update(w, fmt.Sprintf("Updated %s", r.Path))
+				render.Update(w, fmt.Sprintf("Updated %s", r.Path))
 			case agentActionUnchanged:
-				output.Unchanged(w, fmt.Sprintf("Up to date %s", r.Path))
+				render.Unchanged(w, fmt.Sprintf("Up to date %s", r.Path))
 			case agentActionSkipped:
 				if r.Reason != "" {
-					output.Warning(w, fmt.Sprintf("Skipped %s — %s", r.Path, r.Reason))
+					render.Warning(w, fmt.Sprintf("Skipped %s — %s", r.Path, r.Reason))
 				} else {
-					output.Warning(w, fmt.Sprintf("Skipped %s", r.Path))
+					render.Warning(w, fmt.Sprintf("Skipped %s", r.Path))
 				}
 			}
 		}

@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 )
 
 // MarkCancelled records that the user backed out of cmd. A flow concludes an
@@ -36,7 +36,7 @@ func BackedOut(cmd *cobra.Command, err error) error {
 	if err != nil && !errors.Is(err, domain.ErrUserAborted) {
 		return err
 	}
-	output.Frame(cmd.OutOrStdout(), func(w io.Writer) { output.Unchanged(w, domain.AbortedMessage) })
+	render.Frame(cmd.OutOrStdout(), func(w io.Writer) { render.Unchanged(w, domain.AbortedMessage) })
 	MarkCancelled(cmd)
 	return nil
 }

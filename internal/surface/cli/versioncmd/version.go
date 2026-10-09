@@ -5,10 +5,10 @@ package versioncmd
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 type NewCmdParams struct {
@@ -33,10 +33,10 @@ func NewCmd(params NewCmdParams) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			format, _ := cmd.Flags().GetString(domain.FlagOutput)
 			if rules.IsHumanFormat(format) {
-				output.VersionLine(cmd.OutOrStdout(), params.Version)
+				render.VersionLine(cmd.OutOrStdout(), params.Version)
 				return nil
 			}
-			return output.WriteVersionJSON(cmd.OutOrStdout(), domain.VersionReport{
+			return render.WriteVersionJSON(cmd.OutOrStdout(), domain.VersionReport{
 				Version: params.Version,
 				Events:  domain.EventsSchemaVersion,
 			})

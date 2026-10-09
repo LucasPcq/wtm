@@ -10,14 +10,14 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
-	"github.com/LucasPcq/wtm/internal/tui/components"
-	"github.com/LucasPcq/wtm/internal/tui/worktreepicker"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/tui/worktreepicker"
 )
 
 // NewCmd creates the wtm resolve command. Its bare-path stdout is what the shell
@@ -61,8 +61,8 @@ func runResolve(cmd *cobra.Command, args []string) error {
 		if format == domain.OutputJSON {
 			return err
 		}
-		output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
-			output.Warning(w, fmt.Sprintf("No worktree found matching %q", query))
+		render.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
+			render.Warning(w, fmt.Sprintf("No worktree found matching %q", query))
 		})
 		return nil
 	}
@@ -95,7 +95,7 @@ func runResolve(cmd *cobra.Command, args []string) error {
 // wrapper reads) or as {path, branch} JSON.
 func emitResolved(cmd *cobra.Command, format string, path string, branch string) error {
 	if format == domain.OutputJSON {
-		return output.WriteResolveJSON(cmd.OutOrStdout(), output.ResolveJSON{Path: path, Branch: branch})
+		return render.WriteResolveJSON(cmd.OutOrStdout(), render.ResolveJSON{Path: path, Branch: branch})
 	}
 	fmt.Fprintln(cmd.OutOrStdout(), path)
 	return nil

@@ -9,10 +9,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	profileflow "github.com/LucasPcq/wtm/internal/flow/run/profile"
-	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 // NewCmd creates the wtm run profile command group.
@@ -42,20 +42,20 @@ type presenter struct {
 func (p presenter) Changed(outcome profileflow.Outcome) error {
 	out := p.Cmd.OutOrStdout()
 	if p.Format == domain.OutputJSON {
-		return output.WriteProfileResultJSON(out, output.ProfileActionResult{
+		return render.WriteProfileResultJSON(out, render.ProfileActionResult{
 			Name:   outcome.Name,
 			Status: outcome.Status,
 		})
 	}
 
-	output.Frame(out, func(w io.Writer) {
+	render.Frame(out, func(w io.Writer) {
 		switch outcome.Status {
 		case domain.JobActionUpdated:
-			output.Update(w, fmt.Sprintf(domain.RunProfileUpdatedFmt, outcome.Name))
+			render.Update(w, fmt.Sprintf(domain.RunProfileUpdatedFmt, outcome.Name))
 		case domain.JobActionRemoved:
-			output.Success(w, fmt.Sprintf(domain.RunProfileRemovedFmt, outcome.Name))
+			render.Success(w, fmt.Sprintf(domain.RunProfileRemovedFmt, outcome.Name))
 		default:
-			output.Success(w, fmt.Sprintf(domain.RunProfileAddedFmt, outcome.Name))
+			render.Success(w, fmt.Sprintf(domain.RunProfileAddedFmt, outcome.Name))
 		}
 	})
 	return nil

@@ -14,12 +14,12 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/runconfig"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 // IsTTY is the run module's one terminal gate, for its prompts and its
@@ -136,7 +136,7 @@ func (c Context) Listing(params ListingParams) (bool, error) {
 	if c.Interactive {
 		return false, nil
 	}
-	output.Frame(out, func(w io.Writer) { params.Table(w) })
+	render.Frame(out, func(w io.Writer) { params.Table(w) })
 	return true, nil
 }
 

@@ -14,16 +14,16 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	ghservice "github.com/LucasPcq/wtm/internal/service/github"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
-	"github.com/LucasPcq/wtm/internal/tui/components"
-	"github.com/LucasPcq/wtm/internal/tui/worktreepicker"
-	"github.com/LucasPcq/wtm/internal/tui/worktreerefresh"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/tui/worktreepicker"
+	"github.com/LucasPcq/wtm/internal/surface/tui/worktreerefresh"
 )
 
 // newListCmd creates the wtm list subcommand.
@@ -103,14 +103,14 @@ func runList(cmd *cobra.Command, _ []string) error {
 			prs, _ = shared.LoadPRs(cmd.Context(), result.ProjectDir)
 		}
 		if format == domain.OutputJSON {
-			return output.WriteWorktreeListJSON(cmd.OutOrStdout(), output.WriteWorktreeListJSONParams{
+			return render.WriteWorktreeListJSON(cmd.OutOrStdout(), render.WriteWorktreeListJSONParams{
 				Statuses: statuses,
 				PRInfos:  prs,
 				Services: services,
 			})
 		}
-		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-			fmt.Fprintln(w, strings.TrimRight(output.FormatWorktreeList(output.FormatWorktreeListParams{
+		render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			fmt.Fprintln(w, strings.TrimRight(render.FormatWorktreeList(render.FormatWorktreeListParams{
 				Statuses:     statuses,
 				ActiveBranch: activeBranch,
 				PRInfos:      prs,
@@ -121,8 +121,8 @@ func runList(cmd *cobra.Command, _ []string) error {
 	}
 
 	if len(statuses) == 0 {
-		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-			output.Unchanged(w, domain.NoWorktreesMessage)
+		render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			render.Unchanged(w, domain.NoWorktreesMessage)
 		})
 		return nil
 	}

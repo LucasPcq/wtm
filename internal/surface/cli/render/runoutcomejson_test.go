@@ -1,4 +1,4 @@
-package output_test
+package render_test
 
 import (
 	"bytes"
@@ -9,13 +9,13 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
-	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 )
 
 func decodeResults(t *testing.T, outcome runlogs.Outcome) []domain.JobActionResult {
 	t.Helper()
 	var buf bytes.Buffer
-	if err := output.WriteRunOutcomesJSON(&buf, runlogs.Outcomes{outcome}); err != nil {
+	if err := render.WriteRunOutcomesJSON(&buf, runlogs.Outcomes{outcome}); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	var documents []domain.WorktreeRunResult
@@ -68,7 +68,7 @@ func TestRunOutcomeJSONPutsEachProbeOnItsOwnJob(t *testing.T) {
 
 func TestRunOutcomeJSONOmitsPortsWhenNothingWasProbed(t *testing.T) {
 	var buf bytes.Buffer
-	if err := output.WriteRunOutcomesJSON(&buf, runlogs.Outcomes{{
+	if err := render.WriteRunOutcomesJSON(&buf, runlogs.Outcomes{{
 		Results: []domain.JobActionResult{{Name: "seed", Status: domain.JobActionDone}},
 	}}); err != nil {
 		t.Fatalf("write: %v", err)
@@ -83,7 +83,7 @@ func TestRunOutcomeJSONOmitsPortsWhenNothingWasProbed(t *testing.T) {
 // shape does not depend on how many worktrees the run reached.
 func TestRunOutcomesJSONOfOneWorktreeIsStillAnArrayOfDocuments(t *testing.T) {
 	var buf bytes.Buffer
-	err := output.WriteRunOutcomesJSON(&buf, runlogs.Outcomes{{
+	err := render.WriteRunOutcomesJSON(&buf, runlogs.Outcomes{{
 		WorkDir: "/work/main", Worktree: "main", Profile: "dev",
 		Results: []domain.JobActionResult{{Name: "web", Status: domain.JobActionStarted}},
 	}})
@@ -104,7 +104,7 @@ func TestRunOutcomesJSONOfOneWorktreeIsStillAnArrayOfDocuments(t *testing.T) {
 
 func TestRunOutcomesJSONOfNothingIsAnEmptyArray(t *testing.T) {
 	var buf bytes.Buffer
-	if err := output.WriteRunOutcomesJSON(&buf, nil); err != nil {
+	if err := render.WriteRunOutcomesJSON(&buf, nil); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	if strings.TrimSpace(buf.String()) != "[]" {
@@ -114,7 +114,7 @@ func TestRunOutcomesJSONOfNothingIsAnEmptyArray(t *testing.T) {
 
 func TestRunOutcomesJSONOfSeveralWorktreesNamesEachOne(t *testing.T) {
 	var buf bytes.Buffer
-	err := output.WriteRunOutcomesJSON(&buf, runlogs.Outcomes{
+	err := render.WriteRunOutcomesJSON(&buf, runlogs.Outcomes{
 		{
 			WorkDir: "/work/main", Worktree: "main", Profile: "dev",
 			Results: []domain.JobActionResult{{Name: "web", Status: domain.JobActionStarted}},
@@ -155,7 +155,7 @@ func TestWorktreeJobResultsJSONIsAnArrayOfDocumentsWhateverTheArity(t *testing.T
 		{{Branch: "main", Path: "/work/main", Jobs: jobs}, {Branch: "feature", Path: "/work/feature"}},
 	} {
 		var buf bytes.Buffer
-		if err := output.WriteWorktreeJobResultsJSON(&buf, results); err != nil {
+		if err := render.WriteWorktreeJobResultsJSON(&buf, results); err != nil {
 			t.Fatalf("write: %v", err)
 		}
 		var documents []map[string]any
@@ -182,7 +182,7 @@ func TestWorktreeJobResultsJSONDoesNotTouchItsInput(t *testing.T) {
 		{Branch: "feature", Path: "/work/feature"},
 	}
 
-	if err := output.WriteWorktreeJobResultsJSON(&bytes.Buffer{}, results); err != nil {
+	if err := render.WriteWorktreeJobResultsJSON(&bytes.Buffer{}, results); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	for _, result := range results {
@@ -195,7 +195,7 @@ func TestWorktreeJobResultsJSONDoesNotTouchItsInput(t *testing.T) {
 // The frame writes one blank line after the body it is given, and a body whose
 // last line has no break of its own swallows it.
 func TestRunDownRecapEndsOnItsOwnLineBreak(t *testing.T) {
-	recap := output.FormatRunDownRecap(output.RunDownRecapParams{
+	recap := render.FormatRunDownRecap(render.RunDownRecapParams{
 		Profile: "dev",
 		Results: []domain.WorktreeJobResults{
 			{Branch: "main", Path: "/work/main", Jobs: []domain.JobActionResult{
@@ -215,7 +215,7 @@ func TestRunDownRecapEndsOnItsOwnLineBreak(t *testing.T) {
 // A shared job another worktree still holds was let go of, not stopped: the
 // recap says so apart, or the reader believes the service is gone for everyone.
 func TestRunDownRecapTellsAReleasedJobApart(t *testing.T) {
-	recap := ansi.Strip(output.FormatRunDownRecap(output.RunDownRecapParams{
+	recap := ansi.Strip(render.FormatRunDownRecap(render.RunDownRecapParams{
 		Results: []domain.WorktreeJobResults{
 			{Branch: "feat/x", Path: "/work/x", Jobs: []domain.JobActionResult{
 				{Name: "web", Status: domain.JobActionStopped},

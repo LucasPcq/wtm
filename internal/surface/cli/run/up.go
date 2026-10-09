@@ -6,12 +6,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	upflow "github.com/LucasPcq/wtm/internal/flow/run/up"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/runctx"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 // newUpCmd creates the wtm run up subcommand.
@@ -108,12 +108,12 @@ func reportRunConfig(cmd *cobra.Command, cfg domain.RunConfig) error {
 	if len(warnings) == 0 && len(errs) == 0 {
 		return nil
 	}
-	output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
+	render.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
 		for _, warning := range warnings {
-			output.Warning(w, warning)
+			render.Warning(w, warning)
 		}
 		for _, e := range errs {
-			output.Error(w, e)
+			render.Error(w, e)
 		}
 	})
 	if len(errs) == 0 {
@@ -136,9 +136,9 @@ func warnRunConfig(cmd *cobra.Command, ctx runctx.Context) {
 	if len(lines) == 0 {
 		return
 	}
-	output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
+	render.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
 		for _, line := range lines {
-			output.Warning(w, line)
+			render.Warning(w, line)
 		}
 	})
 }

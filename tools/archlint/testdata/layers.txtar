@@ -34,3 +34,21 @@ var _ = in.GlobalDir
 package worktree
 
 func Create() error { return nil }
+-- github.com/LucasPcq/wtm/internal/surface/cli/shared/shared.go --
+package shared
+
+func Interactive() bool { return false }
+-- github.com/LucasPcq/wtm/internal/surface/cli/render/render.go --
+package render
+
+import (
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared" // want `internal/surface/cli/render must not import "github.com/LucasPcq/wtm/internal/surface/cli/shared" — formats and prints`
+)
+
+func Message() bool { return shared.Interactive() }
+-- github.com/LucasPcq/wtm/internal/surface/cli/wt/wt.go --
+package wt
+
+import "github.com/LucasPcq/wtm/internal/surface/cli/render"
+
+var _ = render.Message

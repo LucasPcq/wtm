@@ -8,11 +8,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	syncflow "github.com/LucasPcq/wtm/internal/flow/sync"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/detect"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 // newSyncCmd creates the wtm sync subcommand.

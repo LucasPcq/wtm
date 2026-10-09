@@ -9,13 +9,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
-	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/runctx"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
 func newImportCmd() *cobra.Command {
@@ -87,8 +87,8 @@ func runImport(cmd *cobra.Command, args []string) error {
 	// Declining is the module's one abort: the `=` register, and the exit every
 	// other backed-out run command gives.
 	if !confirmImport(confirmImportParams{Interactive: interactive, Incoming: incoming}) {
-		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-			output.Unchanged(w, domain.ImportDeclined)
+		render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			render.Unchanged(w, domain.ImportDeclined)
 		})
 		shared.MarkCancelled(cmd)
 		return domain.ErrAborted
@@ -106,8 +106,8 @@ func runImport(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if notice, ok := addressingDrift(cmd.Context(), result, result.ProjectDir); ok && rules.IsHumanFormat(format) {
-		output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
-			output.Callout(w, notice.Text, notice.Lines)
+		render.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
+			render.Callout(w, notice.Text, notice.Lines)
 		})
 	}
 	return nil
@@ -136,7 +136,7 @@ func confirmImport(params confirmImportParams) bool {
 func readsStdin(args []string) bool { return len(args) == 0 || args[0] == domain.ImportStdinArg }
 
 func reportImport(cmd *cobra.Command, cfg domain.RunConfig, format string) error {
-	ir := output.ImportResult{EnvPorts: len(cfg.EnvPorts)}
+	ir := render.ImportResult{EnvPorts: len(cfg.EnvPorts)}
 	for _, job := range cfg.Jobs {
 		ir.Jobs = append(ir.Jobs, job.Name)
 	}
@@ -145,10 +145,10 @@ func reportImport(cmd *cobra.Command, cfg domain.RunConfig, format string) error
 	}
 
 	if format == domain.OutputJSON {
-		return output.WriteImportResultJSON(cmd.OutOrStdout(), ir)
+		return render.WriteImportResultJSON(cmd.OutOrStdout(), ir)
 	}
-	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-		output.WriteImportResultText(w, ir)
+	render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		render.WriteImportResultText(w, ir)
 	})
 	return nil
 }

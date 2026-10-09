@@ -14,8 +14,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 	"github.com/LucasPcq/wtm/internal/testutil/runlogstest"
-	"github.com/LucasPcq/wtm/internal/tui/components"
 )
 
 // stubInterrupt counts the SIGINTs the view raises instead of sending them to

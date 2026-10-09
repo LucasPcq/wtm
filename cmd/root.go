@@ -14,27 +14,27 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/LucasPcq/wtm/internal/commands/agents"
-	"github.com/LucasPcq/wtm/internal/commands/checkout"
-	"github.com/LucasPcq/wtm/internal/commands/configcmd"
-	"github.com/LucasPcq/wtm/internal/commands/daemon"
-	"github.com/LucasPcq/wtm/internal/commands/events"
-	"github.com/LucasPcq/wtm/internal/commands/initcmd"
-	"github.com/LucasPcq/wtm/internal/commands/resolve"
-	"github.com/LucasPcq/wtm/internal/commands/run"
-	"github.com/LucasPcq/wtm/internal/commands/schema"
-	"github.com/LucasPcq/wtm/internal/commands/shared"
-	"github.com/LucasPcq/wtm/internal/commands/shell"
-	"github.com/LucasPcq/wtm/internal/commands/ui"
-	"github.com/LucasPcq/wtm/internal/commands/upgrade"
-	"github.com/LucasPcq/wtm/internal/commands/versioncmd"
-	"github.com/LucasPcq/wtm/internal/commands/wt"
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/selfupdate"
+	"github.com/LucasPcq/wtm/internal/surface/cli/agents"
+	"github.com/LucasPcq/wtm/internal/surface/cli/checkout"
+	"github.com/LucasPcq/wtm/internal/surface/cli/configcmd"
+	"github.com/LucasPcq/wtm/internal/surface/cli/daemon"
+	"github.com/LucasPcq/wtm/internal/surface/cli/events"
+	"github.com/LucasPcq/wtm/internal/surface/cli/initcmd"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/resolve"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run"
+	"github.com/LucasPcq/wtm/internal/surface/cli/schema"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shell"
+	"github.com/LucasPcq/wtm/internal/surface/cli/ui"
+	"github.com/LucasPcq/wtm/internal/surface/cli/upgrade"
+	"github.com/LucasPcq/wtm/internal/surface/cli/versioncmd"
+	"github.com/LucasPcq/wtm/internal/surface/cli/wt"
 )
 
 func init() {
@@ -251,10 +251,10 @@ func abortLine(err error) string {
 // behind included, as the failure it is.
 func reportFailure(w io.Writer, err error) {
 	if errors.Is(err, domain.ErrCancelled) && !errors.Is(err, domain.ErrLeftBehind) {
-		output.Unchanged(w, abortLine(err))
+		render.Unchanged(w, abortLine(err))
 		return
 	}
-	output.Error(w, abortLine(err))
+	render.Error(w, abortLine(err))
 }
 
 func globalUpdateCheck() *bool {
@@ -277,8 +277,8 @@ func printUpdateNotice(ctx context.Context) {
 		return
 	}
 
-	output.Frame(os.Stderr, func(w io.Writer) {
-		output.UpdateNotice(w, output.UpdateNoticeParams{Current: current, Latest: latest, Method: method})
+	render.Frame(os.Stderr, func(w io.Writer) {
+		render.UpdateNotice(w, render.UpdateNoticeParams{Current: current, Latest: latest, Method: method})
 	})
 }
 
@@ -289,7 +289,7 @@ func init() {
 		startUpdateCheck(cmd)
 
 		w := cmd.OutOrStdout()
-		output.Blank(w)
+		render.Blank(w)
 
 		// Temporarily swap the output writer to capture and indent the help text.
 		orig := cmd.OutOrStdout()
@@ -300,9 +300,9 @@ func init() {
 
 		for _, line := range strings.Split(buf.String(), "\n") {
 			if line == "" {
-				output.Blank(w)
+				render.Blank(w)
 			} else {
-				output.Message(w, line)
+				render.Message(w, line)
 			}
 		}
 	})
@@ -367,9 +367,9 @@ func Execute() {
 		// propagate the non-zero exit without a second error line — unless --quiet
 		// discarded that report, in which case this is the only line there is.
 		if !errors.Is(err, domain.ErrAborted) || humanOutputSilenced {
-			output.Blank(os.Stderr)
+			render.Blank(os.Stderr)
 			reportFailure(os.Stderr, err)
-			output.Blank(os.Stderr)
+			render.Blank(os.Stderr)
 		}
 		printUpdateNotice(ctx)
 		os.Exit(rules.ExitCode(err))

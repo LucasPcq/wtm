@@ -10,9 +10,9 @@ import (
 	"github.com/creack/pty"
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/runctx"
 	"github.com/LucasPcq/wtm/internal/testutil/runlogstest"
 )
 

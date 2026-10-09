@@ -8,12 +8,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
-	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
 // newTreeCmd creates the wtm tree subcommand.
@@ -82,12 +82,12 @@ func runTree(cmd *cobra.Command, _ []string) error {
 
 	switch format {
 	case domain.OutputJSON:
-		return output.WriteTreeJSON(cmd.OutOrStdout(), forest)
+		return render.WriteTreeJSON(cmd.OutOrStdout(), forest)
 	case domain.OutputMermaid:
-		return output.WriteTreeMermaid(cmd.OutOrStdout(), forest)
+		return render.WriteTreeMermaid(cmd.OutOrStdout(), forest)
 	default:
-		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-			fmt.Fprintln(w, strings.TrimRight(output.FormatTree(forest), "\n"))
+		render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			fmt.Fprintln(w, strings.TrimRight(render.FormatTree(forest), "\n"))
 		})
 		return nil
 	}

@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/service/runconfig"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 )
 
 func TestRunAddressingWritesTheModeAndReportsJSON(t *testing.T) {
@@ -20,7 +20,7 @@ func TestRunAddressingWritesTheModeAndReportsJSON(t *testing.T) {
 		t.Fatalf("run addressing: %v", err)
 	}
 
-	var result output.AddressingResult
+	var result render.AddressingResult
 	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
 		t.Fatalf("stdout = %q: %v", stdout, err)
 	}

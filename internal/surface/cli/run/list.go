@@ -6,11 +6,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	listflow "github.com/LucasPcq/wtm/internal/flow/run/list"
-	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/runctx"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 // newListCmd creates the wtm run list subcommand.
@@ -41,12 +41,12 @@ func runList(cmd *cobra.Command, _ []string) error {
 
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
 	if format == domain.OutputJSON {
-		return output.WriteRunConfigJSON(cmd.OutOrStdout(), ctx.Run)
+		return render.WriteRunConfigJSON(cmd.OutOrStdout(), ctx.Run)
 	}
 
 	if !ctx.Interactive || (len(ctx.Run.Jobs) == 0 && len(ctx.Run.Profiles) == 0) {
-		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-			fmt.Fprint(w, output.FormatRunConfig(output.FormatRunConfigParams{Config: ctx.Run, Empty: domain.RunListEmpty}))
+		render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			fmt.Fprint(w, render.FormatRunConfig(render.FormatRunConfigParams{Config: ctx.Run, Empty: domain.RunListEmpty}))
 		})
 		return nil
 	}

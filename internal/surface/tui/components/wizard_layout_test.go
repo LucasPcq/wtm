@@ -11,7 +11,7 @@ import (
 )
 
 // manyParentSteps builds a relocate-like wizard: one SelectList parent picker per
-// worktree, each over a long candidate list. Mirrors internal/tui/relocate.
+// worktree, each over a long candidate list. Mirrors internal/surface/tui/relocate.
 func manyParentSteps(stepCount, branchCount int) []Step {
 	items := make([]SelectItem, branchCount)
 	for i := range items {

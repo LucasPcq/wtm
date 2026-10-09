@@ -9,7 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow/run/seam"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
 	"github.com/LucasPcq/wtm/internal/service/integration"
-	"github.com/LucasPcq/wtm/internal/tui/runview"
+	"github.com/LucasPcq/wtm/internal/surface/tui/runview"
 )
 
 // handoffMsg asks the dashboard to give the terminal to the run view, and blocks

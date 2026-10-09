@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	cleanflow "github.com/LucasPcq/wtm/internal/flow/clean"
@@ -18,8 +17,9 @@ import (
 	relocateflow "github.com/LucasPcq/wtm/internal/flow/relocate"
 	reparentflow "github.com/LucasPcq/wtm/internal/flow/reparent"
 	syncflow "github.com/LucasPcq/wtm/internal/flow/sync"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 // A batch's per-item lines go on stderr with the progress; the readout that
@@ -28,7 +28,7 @@ func batchStarted(p shared.CLIPresenter, progress flow.Progress) {
 	if !p.Human {
 		return
 	}
-	output.BranchHeader(shared.OpenBlock(p.Cmd.ErrOrStderr(), true),
+	render.BranchHeader(shared.OpenBlock(p.Cmd.ErrOrStderr(), true),
 		fmt.Sprintf(domain.BatchProgressFmt, progress.Branch, progress.Position, progress.Total))
 }
 
@@ -36,7 +36,7 @@ func batchFailed(p shared.CLIPresenter, failure domain.BatchFailure) {
 	if !p.Human {
 		return
 	}
-	output.Error(shared.OpenBlock(p.Cmd.ErrOrStderr(), false),
+	render.Error(shared.OpenBlock(p.Cmd.ErrOrStderr(), false),
 		fmt.Sprintf(domain.BatchFailedFmt, failure.Branch, failure.Error))
 }
 
@@ -57,7 +57,7 @@ func (p createPresenter) BranchFailed(failure domain.BatchFailure) {
 
 func (p createPresenter) Created(outcome createflow.Outcome) error {
 	if p.Format == domain.OutputJSON {
-		return output.WriteWorktreeCreateJSON(p.Cmd.OutOrStdout(), domain.CreateBatchResult{
+		return render.WriteWorktreeCreateJSON(p.Cmd.OutOrStdout(), domain.CreateBatchResult{
 			Results: nonNil(outcome.Results),
 			Failed:  nonNil(outcome.Failed),
 			Skipped: outcome.Skipped,
@@ -80,16 +80,16 @@ func nonNil[T any](items []T) []T {
 }
 
 func (p createPresenter) batch(outcome createflow.Outcome) {
-	rows := make([]output.CreateBatchRow, 0, len(outcome.Results))
+	rows := make([]render.CreateBatchRow, 0, len(outcome.Results))
 	for _, result := range outcome.Results {
-		rows = append(rows, output.CreateBatchRow{
+		rows = append(rows, render.CreateBatchRow{
 			Branch:        result.Branch,
 			Path:          createDisplayPath(displayPathParams{Config: p.config.Config, ProjectDir: p.config.ProjectDir, Path: result.Path}),
 			AlreadyExists: result.AlreadyExists,
 		})
 	}
-	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-		output.FormatCreateBatch(w, output.CreateBatchParams{Created: rows, Failed: outcome.Failed, Skipped: outcome.Skipped})
+	render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		render.FormatCreateBatch(w, render.CreateBatchParams{Created: rows, Failed: outcome.Failed, Skipped: outcome.Skipped})
 	})
 }
 
@@ -106,8 +106,8 @@ func (p createPresenter) single(result domain.CreateResult, from string) {
 		})
 	}
 
-	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-		output.FormatCreateResult(w, output.CreateResultParams{
+	render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		render.FormatCreateResult(w, render.CreateResultParams{
 			Branch:        result.Branch,
 			AlreadyExists: result.AlreadyExists,
 			From:          from,
@@ -150,11 +150,11 @@ func (p cleanPresenter) Cleaned(outcome cleanflow.Outcome) error {
 		Namespaces:       nonNil(outcome.Namespaces),
 	}
 	if p.Format == domain.OutputJSON {
-		return output.WriteCleanJSON(p.Cmd.OutOrStdout(), result)
+		return render.WriteCleanJSON(p.Cmd.OutOrStdout(), result)
 	}
 	switch {
 	case len(outcome.Results)+len(outcome.Failed)+len(outcome.Skipped) > 1:
-		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) { output.FormatCleanBatch(w, result) })
+		render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) { render.FormatCleanBatch(w, result) })
 	case len(outcome.Results) == 1:
 		p.single(outcome)
 	}
@@ -163,17 +163,17 @@ func (p cleanPresenter) Cleaned(outcome cleanflow.Outcome) error {
 
 func (p cleanPresenter) single(outcome cleanflow.Outcome) {
 	cleaned := outcome.Results[0]
-	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+	render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
 		if cleaned.AlreadyAbsent {
-			output.Unchanged(w, fmt.Sprintf(domain.CleanAlreadyAbsentFmt, cleaned.Branch))
+			render.Unchanged(w, fmt.Sprintf(domain.CleanAlreadyAbsentFmt, cleaned.Branch))
 			return
 		}
-		output.Success(w, fmt.Sprintf(domain.CleanedFmt, cleaned.Branch))
+		render.Success(w, fmt.Sprintf(domain.CleanedFmt, cleaned.Branch))
 		for _, child := range outcome.Reparented {
-			output.Success(w, fmt.Sprintf(domain.CleanReparentedFmt, child.Branch, child.NewParent))
+			render.Success(w, fmt.Sprintf(domain.CleanReparentedFmt, child.Branch, child.NewParent))
 		}
 		for _, child := range outcome.Orphaned {
-			output.Warning(w, fmt.Sprintf(domain.CleanStillOrphanedFmt, child.Branch, child.OldParent))
+			render.Warning(w, fmt.Sprintf(domain.CleanStillOrphanedFmt, child.Branch, child.OldParent))
 		}
 	})
 }
@@ -188,27 +188,27 @@ type prunePresenter struct {
 func (p prunePresenter) Pruned(outcome pruneflow.Outcome) error {
 	if outcome.Empty {
 		if p.Format == domain.OutputJSON {
-			return output.WritePruneResultJSON(p.Cmd.OutOrStdout(), outcome.Result)
+			return render.WritePruneResultJSON(p.Cmd.OutOrStdout(), outcome.Result)
 		}
-		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-			output.Unchanged(w, domain.PruneNothingToPrune)
+		render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			render.Unchanged(w, domain.PruneNothingToPrune)
 		})
 		return nil
 	}
 
 	if p.Format == domain.OutputJSON {
-		return output.WritePruneResultJSON(p.Cmd.OutOrStdout(), outcome.Result)
+		return render.WritePruneResultJSON(p.Cmd.OutOrStdout(), outcome.Result)
 	}
 
 	if outcome.Result.DryRun {
-		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-			output.FormatPrunePlan(w, outcome.Plan)
+		render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			render.FormatPrunePlan(w, outcome.Plan)
 		})
 		return nil
 	}
 
-	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-		output.FormatPruneResult(w, outcome.Result)
+	render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		render.FormatPruneResult(w, outcome.Result)
 	})
 	return nil
 }
@@ -229,7 +229,7 @@ func (p syncPresenter) Planned(plan domain.SyncPlan) {
 	if !p.Human {
 		return
 	}
-	output.FormatSyncPlan(p.section(p.Cmd.ErrOrStderr()), plan)
+	render.FormatSyncPlan(p.section(p.Cmd.ErrOrStderr()), plan)
 }
 
 // Rebased is the recap the user reads BEFORE being asked to push.
@@ -237,21 +237,21 @@ func (p syncPresenter) Rebased(result domain.SyncResult) {
 	if !p.Human {
 		return
 	}
-	output.FormatSyncResult(p.section(p.Cmd.OutOrStdout()), result)
+	render.FormatSyncResult(p.section(p.Cmd.OutOrStdout()), result)
 }
 
 func (p syncPresenter) Synced(outcome syncflow.Outcome) error {
 	if p.Format == domain.OutputJSON {
-		return output.WriteSyncResultJSON(p.Cmd.OutOrStdout(), outcome.Result)
+		return render.WriteSyncResultJSON(p.Cmd.OutOrStdout(), outcome.Result)
 	}
 	if outcome.Empty {
-		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-			output.Unchanged(w, domain.SyncNothingToSync)
+		render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			render.Unchanged(w, domain.SyncNothingToSync)
 		})
 		return nil
 	}
-	output.FormatSyncPushSummary(output.Barred(p.Cmd.OutOrStdout()), outcome.Result.Steps)
-	output.FrameEnd(p.Cmd.OutOrStdout())
+	render.FormatSyncPushSummary(render.Barred(p.Cmd.OutOrStdout()), outcome.Result.Steps)
+	render.FrameEnd(p.Cmd.OutOrStdout())
 	return nil
 }
 
@@ -261,14 +261,14 @@ type reparentPresenter struct {
 
 func (p reparentPresenter) Reparented(outcome reparentflow.Outcome) error {
 	if p.Format == domain.OutputJSON {
-		return output.WriteReparentJSON(p.Cmd.OutOrStdout(), outcome.Results)
+		return render.WriteReparentJSON(p.Cmd.OutOrStdout(), outcome.Results)
 	}
 
-	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+	render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
 		for _, result := range outcome.Results {
-			output.Success(w, fmt.Sprintf(domain.ReparentedFmt, result.Branch, result.OldParent, result.NewParent))
+			render.Success(w, fmt.Sprintf(domain.ReparentedFmt, result.Branch, result.OldParent, result.NewParent))
 		}
-		output.NextStep(w, output.NextStepParams{
+		render.NextStep(w, render.NextStepParams{
 			Command: reparentSyncHint(outcome.Results),
 			Note:    domain.ReparentSyncHintNote,
 		})
@@ -291,16 +291,16 @@ type ffPresenter struct {
 
 func (p ffPresenter) FastForwarded(outcome ffflow.Outcome) error {
 	if p.Format == domain.OutputJSON {
-		return output.WriteFastForwardJSON(p.Cmd.OutOrStdout(), outcome.Results)
+		return render.WriteFastForwardJSON(p.Cmd.OutOrStdout(), outcome.Results)
 	}
 	if outcome.Empty {
-		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-			output.Unchanged(w, domain.FastForwardNothingToDo)
+		render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			render.Unchanged(w, domain.FastForwardNothingToDo)
 		})
 		return nil
 	}
-	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-		output.FormatFastForwardResults(w, outcome.Results)
+	render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		render.FormatFastForwardResults(w, outcome.Results)
 	})
 	return nil
 }
@@ -308,7 +308,7 @@ func (p ffPresenter) FastForwarded(outcome ffflow.Outcome) error {
 type execPresenter struct {
 	shared.CLIPresenter
 	print bool
-	view  *output.ExecView
+	view  *render.ExecView
 }
 
 // Progress draws the live region on a terminal this process may repaint; a
@@ -318,14 +318,14 @@ func (p *execPresenter) Progress(progress execflow.ExecProgress) {
 		return
 	}
 	stderr := p.Cmd.ErrOrStderr()
-	if !output.IsTerminal(stderr) {
+	if !render.IsTerminal(stderr) {
 		if !progress.Beat.Started {
-			output.ExecResultLine(stderr, progress.Beat.Result)
+			render.ExecResultLine(stderr, progress.Beat.Result)
 		}
 		return
 	}
 	if p.view == nil {
-		p.view = output.NewExecView(output.ExecViewParams{W: stderr, Branches: progress.Branches})
+		p.view = render.NewExecView(render.ExecViewParams{W: stderr, Branches: progress.Branches})
 	}
 	p.view.OnBeat(progress.Beat)
 }
@@ -339,14 +339,14 @@ func (p *execPresenter) Executed(outcome execflow.Outcome) error {
 		if p.print {
 			results = withoutTails(results)
 		}
-		return output.WriteExecJSON(p.Cmd.OutOrStdout(), output.ExecJSONParams{Command: outcome.Command, Results: results})
+		return render.WriteExecJSON(p.Cmd.OutOrStdout(), render.ExecJSONParams{Command: outcome.Command, Results: results})
 	}
-	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+	render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
 		if p.print {
-			output.FormatExecPrint(w, outcome.Results)
-			output.Blank(w)
+			render.FormatExecPrint(w, outcome.Results)
+			render.Blank(w)
 		}
-		output.FormatExecConclusion(w, output.ExecConclusionParams{Command: outcome.Command, Results: outcome.Results, Elapsed: outcome.Elapsed})
+		render.FormatExecConclusion(w, render.ExecConclusionParams{Command: outcome.Command, Results: outcome.Results, Elapsed: outcome.Elapsed})
 	})
 	return nil
 }
@@ -369,30 +369,30 @@ type relocatePresenter struct {
 func (p relocatePresenter) Relocated(outcome relocateflow.Outcome) error {
 	if outcome.Empty {
 		if !p.Human {
-			return output.WriteRelocateResultJSON(p.Cmd.OutOrStdout(), outcome.Result)
+			return render.WriteRelocateResultJSON(p.Cmd.OutOrStdout(), outcome.Result)
 		}
-		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-			output.Unchanged(w, domain.RelocateAlignedMessage)
+		render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			render.Unchanged(w, domain.RelocateAlignedMessage)
 		})
 		return nil
 	}
 
 	if !p.Human {
-		return output.WriteRelocateResultJSON(p.Cmd.OutOrStdout(), outcome.Result)
+		return render.WriteRelocateResultJSON(p.Cmd.OutOrStdout(), outcome.Result)
 	}
 
 	// A preview is what the caller asked for, so it goes to stdout as a result.
 	if outcome.DryRun {
-		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-			output.FormatRelocatePreview(w, output.RelocatePreviewParams{Plan: outcome.Plan, FromBasePath: outcome.FromBasePath})
-			output.Blank(w)
-			output.Unchanged(w, domain.DryRunNoChanges)
+		render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			render.FormatRelocatePreview(w, render.RelocatePreviewParams{Plan: outcome.Plan, FromBasePath: outcome.FromBasePath})
+			render.Blank(w)
+			render.Unchanged(w, domain.DryRunNoChanges)
 		})
 		return nil
 	}
 
-	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-		output.FormatRelocateResult(w, outcome.Result)
+	render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		render.FormatRelocateResult(w, outcome.Result)
 	})
 	return nil
 }
@@ -403,12 +403,12 @@ type envPresenter struct {
 }
 
 func (p envPresenter) Reconciled(outcome envflow.Outcome) error {
-	report := output.EnvReportParams{Result: outcome.Result, ShowValues: p.showValues}
+	report := render.EnvReportParams{Result: outcome.Result, ShowValues: p.showValues}
 	if p.Format == domain.OutputJSON {
-		return output.WriteEnvJSON(p.Cmd.OutOrStdout(), report)
+		return render.WriteEnvJSON(p.Cmd.OutOrStdout(), report)
 	}
-	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-		output.PrintEnvReport(w, report)
+	render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		render.PrintEnvReport(w, report)
 	})
 	return nil
 }
@@ -424,19 +424,19 @@ func (p extractPresenter) Extracted(outcome extractflow.Outcome) error {
 		if outcome.Nothing != nil {
 			result = domain.ExtractResult{Files: []domain.ExtractFile{}}
 		}
-		return output.WriteExtractJSON(p.Cmd.OutOrStdout(), result)
+		return render.WriteExtractJSON(p.Cmd.OutOrStdout(), result)
 	}
 	path := createDisplayPath(displayPathParams{Config: p.config.Config, ProjectDir: p.config.ProjectDir, Path: result.TargetPath})
-	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+	render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
 		switch {
 		case errors.Is(outcome.Nothing, domain.ErrNoDirtyWorktrees):
-			output.Unchanged(w, domain.ExtractNothingAnywhere)
+			render.Unchanged(w, domain.ExtractNothingAnywhere)
 		case outcome.Nothing != nil:
-			output.Unchanged(w, fmt.Sprintf(domain.ExtractNothingInSourceFmt, result.SourceBranch))
+			render.Unchanged(w, fmt.Sprintf(domain.ExtractNothingInSourceFmt, result.SourceBranch))
 		case len(result.Conflicts) > 0:
-			output.PrintExtractConflicts(w, output.ExtractConflictsParams{Result: result, Path: path})
+			render.PrintExtractConflicts(w, render.ExtractConflictsParams{Result: result, Path: path})
 		default:
-			output.PrintExtractResult(w, output.ExtractResultParams{
+			render.PrintExtractResult(w, render.ExtractResultParams{
 				Result:  result,
 				Path:    path,
 				EnvNote: rules.EnvPortSettlementNote(result.EnvPorts),

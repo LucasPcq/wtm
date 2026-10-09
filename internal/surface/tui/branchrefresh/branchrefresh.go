@@ -12,7 +12,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/service/branch"
-	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
 // RefreshedMsg carries the re-fetched branch candidates back into the wizard.

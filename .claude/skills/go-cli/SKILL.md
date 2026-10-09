@@ -124,8 +124,6 @@ cmd/
   root.go                     ← cobra root, version, help
 
 internal/
-  commands/                   ← flag wiring only → delegates to flow/service (zero logic)
-    ui/                       ←   `wtm ui`: refuses JSON + missing TTY, hands off to tui/dashboard
   domain/                     ← types, errors, constants only (no methods, no functions)
   rules/                      ← pure business rules (stdlib + domain only, no I/O)
   config/                     ← load & validate config.toml + run.toml from <git-common-dir>/wtm/
@@ -142,40 +140,43 @@ internal/
     github/                   ←   PR operations via gh CLI
     detect/                   ←   auto-detection (package manager, env files, scripts)
     integration/              ←   third-party adapters (VS Code, Cursor)
-  output/                     ← format and print results (zero decision logic)
   styles/                     ← all Lipgloss styles + shared Indent constant
-  tui/                        ← Bubbletea models (zero business logic, rendering only)
-    flowui/                   ←   runs a flow.Session as the CLI wizard (the only translator
-                                  between flow.Step and components.Step)
-    dashboard/                ←   `wtm ui`, the second surface over flow/ (its own
-                                  Prompter/Presenter, mouse zones via bubblezone)
   infra/                      ← I/O, git exec, filesystem wrappers
+  surface/                    ← the interfaces
+    cli/                      ←   flag wiring only → delegates to flow/service (zero logic)
+      ui/                     ←     `wtm ui`: refuses JSON + missing TTY, hands off to tui/dashboard
+      render/                 ←     format and print results (zero decision logic)
+    tui/                      ←   Bubbletea models (zero business logic, rendering only)
+      flowui/                 ←     runs a flow.Session as the CLI wizard (the only translator
+                                    between flow.Step and components.Step)
+      dashboard/              ←     `wtm ui`, the second surface over flow/ (its own
+                                    Prompter/Presenter, mouse zones via bubblezone)
   testutil/gittest/           ← shared test helpers (InitRepo, CreateBranch)
   testutil/flowtest/          ← test doubles for the two flow seams (Prompter, Presenter)
 ```
 
 **Hard rules:**
-- `commands/` has zero business logic
+- `surface/cli/` has zero business logic
 - `domain/` imports only stdlib (unchanged)
 - `rules/` imports only stdlib + internal/domain
 - `flow/` imports **only** `internal/service/`, `internal/rules/`, `internal/domain/` and the
-  stdlib — never cobra, bubbletea or lipgloss, and never `output/`, `tui/`, `config/` or
-  `commands/`. It therefore cannot reach `infra/` either: add a thin `service/` wrapper
+  stdlib — never cobra, bubbletea or lipgloss, and never `surface/` or `config/`.
+  It therefore cannot reach `infra/` either: add a thin `service/` wrapper
   instead (e.g. `worktree.FindByBranch`, `worktree.ListAll`). `build-validator` step 6
   checks this mechanically.
 - `service/` has zero imports of `cobra`, `bubbletea`, `lipgloss`
-- `output/` and `tui/` have zero decision logic — only rendering
+- `surface/cli/render/` and `surface/tui/` have zero decision logic — only rendering
 - `styles/` is the only package allowed to instantiate `lipgloss.Style`
 
 **The `flow/` layer — where the flow of a mutation command lives.** A command that
-mutates worktree state does **not** orchestrate: `commands/` reads the flags, builds a
+mutates worktree state does **not** orchestrate: `surface/cli/` reads the flags, builds a
 `Request`, picks a `Prompter` and a `Presenter`, and calls `<cmd>.Run`. Three seams let a
 second surface replay the same run:
 
 - **`flow.Prompter`** — `Ask(Session) (Answers, error)` for a whole question-and-recap
   sequence, `Confirm(ConfirmParams) (bool, error)` for a standalone post-execution
-  decision, `Interactive() bool`. Implementations: `tui/flowui` (the CLI wizard),
-  `flow.Unattended` (`--yes` / no TTY / JSON), `tui/dashboard`. Read `Interactive()` only
+  decision, `Interactive() bool`. Implementations: `surface/tui/flowui` (the CLI wizard),
+  `flow.Unattended` (`--yes` / no TTY / JSON), `surface/tui/dashboard`. Read `Interactive()` only
   to (a) not offer a decision nobody can answer, (b) feed a pure rule that takes it as an
   input (`rules.DecidePush`).
 - **`flow.Presenter`** — `Stage`, `HookPhase`, `Notice`, `Status`, plus **one typed
@@ -190,7 +191,7 @@ second surface replay the same run:
 Steps are `flow.Step` values (`Kind`, `Key`, `Label`, `Title`, `Description`, `Options`,
 `Skip`, `Build`, `Load`, `Resolve`, `Summarize`, `Flag`). `flow.Operation`
 (`Kind`, `Mode`, `TargetKey`) is what a flow declares about how a surface must schedule
-it; the CLI ignores it, `tui/dashboard/ops.go` enforces it.
+it; the CLI ignores it, `surface/tui/dashboard/ops.go` enforces it.
 
 `create`, `checkout`, `extract`, `clean`, `reparent`, `prune`, `relocate`, `sync`,
 `fast-forward` and `env` are migrated: every mutation command goes through `flow/`. A flow that
@@ -212,7 +213,7 @@ Before marking any task done, invoke the `build-validator` subagent.
 The real pattern used in this project — no dependency injection, uses helper functions:
 
 ```go
-// internal/commands/wt/list.go
+// internal/surface/cli/wt/list.go
 func newListCmd() *cobra.Command {
   cmd := &cobra.Command{
     Use:   domain.CmdList,
@@ -243,13 +244,13 @@ Key conventions:
 - `shared.AddOutputFlag(cmd)` instead of duplicating the output flag registration
 - `shared.LoadConfig(cmd, dir)` resolves the main worktree path **and** the state dir, then loads `<state-dir>/config.toml`. Returns `ConfigResult{Config, ProjectDir, StateDir}`.
 - Unexported constructor (`newListCmd`), registered by the parent group
-- A `run` command opens its context with `runctx.Open(runctx.OpenParams{Cmd: cmd})` instead (config, run.toml, the opt-in guard and the interactive gate in one call), then hands `ctx.FlowContext()` to its flow — see `internal/commands/run/start.go`
+- A `run` command opens its context with `runctx.Open(runctx.OpenParams{Cmd: cmd})` instead (config, run.toml, the opt-in guard and the interactive gate in one call), then hands `ctx.FlowContext()` to its flow — see `internal/surface/cli/run/start.go`
 
 ### Mutation command — build a Request, call the flow
 
 A command that **mutates worktree state** does not orchestrate anything: it reads the
 flags, builds the `Request`, picks the two seams, and calls `<cmd>.Run`. This is the
-whole runner (see `internal/commands/wt/create.go`, `clean.go`):
+whole runner (see `internal/surface/cli/wt/create.go`, `clean.go`):
 
 ```go
 func runClean(cmd *cobra.Command, args []string) error {
@@ -284,11 +285,11 @@ func runClean(cmd *cobra.Command, args []string) error {
 ```
 
 - `flowContext` / `flowPrompter` / `cliPresenter` are shared helpers in
-  `internal/commands/wt/presenter.go`. `flowPrompter` returns `flow.Unattended{}` when
+  `internal/surface/cli/wt/presenter.go`. `flowPrompter` returns `flow.Unattended{}` when
   `Interactive` is false, `flowui.New(...)` otherwise — that is the entire `--yes` wiring.
 - The command's presenter embeds `cliPresenter` and adds **only** the typed conclusion
   (`Created`, `Cleaned`), which is where `--output json` branches and where
-  `output.Frame` is applied — exactly once.
+  `render.Frame` is applied — exactly once.
 - No safety check, no picker fallback, no `need*` guard in the runner: those belong to
   the flow's steps. If you are writing an `if !interactive` in a runner beyond the line
   above, the logic is in the wrong layer.
@@ -339,7 +340,7 @@ is **returned**; the flow never prints.
 
 ### State-dir resolution
 
-wtm stores all of its state under `<git-common-dir>/wtm/` (i.e. `.git/wtm/` for a normal clone), so nothing leaks into the user's working tree. Resolution helpers live in `internal/commands/shared/`:
+wtm stores all of its state under `<git-common-dir>/wtm/` (i.e. `.git/wtm/` for a normal clone), so nothing leaks into the user's working tree. Resolution helpers live in `internal/surface/cli/shared/`:
 
 ```go
 shared.StateDir(dir)                   // <git-common-dir>/wtm/
@@ -354,19 +355,19 @@ Two env-var overrides exist for tests / CI:
 
 ### Adding a new command
 
-1. Create `internal/commands/<group>/<name>.go` with unexported constructor
+1. Create `internal/surface/cli/<group>/<name>.go` with unexported constructor
 2. Use `domain.CmdXxx` for the `Use:` field (add constant if new)
 3. Register in the parent group's `NewXxxCmd()` function
 4. Set the command's `GroupID` to the right root `--help` section
    (`domain.CmdGroup*` — Worktrees / Navigate / Stack / Jobs / GitHub / Setup). An
    unset `GroupID` renders under a stray "Additional Commands" heading.
 5. **Read-only command** → follow the `runList` pattern: getwd → `shared.LoadConfig` → delegate
-   to `service/` → format via `output/`.
+   to `service/` → format via `surface/cli/render/`.
    **Mutation command** (creates/removes/moves/rewrites worktree state) → it goes
    through `flow/`: declare `Request`/`Outcome`/`Presenter`/`Params`/`Run` in
    `internal/flow/<name>/`, declare its questions as `flow.Step` in `steps.go`, and keep
    the runner to the shape in "Mutation command" above. Never put the flow in
-   `commands/`, and never inject a service closure into a TUI package.
+   `surface/cli/`, and never inject a service closure into a TUI package.
 6. Regenerate the reference and update the guide: `make docs` (writes `docs/`, never
    hand-edited) and add the command to the `README.md` overview table. See CLAUDE.md
    "Docs & README".
@@ -376,7 +377,7 @@ Full recipe, step by step: [`docs/dev/adding-a-mutation-command.md`](../../../do
 ### Shared flag helpers
 
 ```go
-// internal/commands/shared/helpers.go
+// internal/surface/cli/shared/helpers.go
 
 // AddOutputFlag registers the standard --output flag on cmd.
 func AddOutputFlag(cmd *cobra.Command) {
@@ -389,7 +390,7 @@ Call it as `shared.AddOutputFlag(cmd)` from a command constructor.
 ### TUI command — Cobra launches a Bubbletea program
 
 The command runner is the only place where `tea.NewProgram` is called.
-All TUI state lives in `internal/tui/`, never in `commands/`.
+All TUI state lives in `internal/surface/tui/`, never in `surface/cli/`.
 
 ```go
 func runBrowseTUI(ctx context.Context, items []domain.Item) error {
@@ -430,7 +431,7 @@ Config files include a `#:schema ./schemas/xxx.json` directive for editor suppor
 
 ### Shared components
 
-All reusable TUI primitives live in `internal/tui/components/`:
+All reusable TUI primitives live in `internal/surface/tui/components/`:
 - `WizardModel` — multi-step form driver
 - `SelectListModel` — single-choice list with filter
 - `MultiSelectModel` — toggle-able multi-choice list
@@ -441,7 +442,7 @@ All reusable TUI primitives live in `internal/tui/components/`:
 ### Multi-step form → declare `flow.Step`, or `WizardModel` for a non-migrated wizard
 
 **A mutation command declares its steps as `flow.Step` values in
-`internal/flow/<cmd>/steps.go`, and never touches a Bubbletea model.** `internal/tui/flowui`
+`internal/flow/<cmd>/steps.go`, and never touches a Bubbletea model.** `internal/surface/tui/flowui`
 is the single translator: it turns a `flow.Session` into `components.Step`s and runs the
 same `WizardModel` under the hood, so everything below about breadcrumbs and
 back-navigation still holds — it is just no longer the command's business. `flowui`
@@ -464,7 +465,7 @@ bug: no breadcrumb, and `Esc` quits the whole flow instead of going back.
   It maps `Esc` at step 1 to `domain.ErrUserAborted`; otherwise pull values from
   `final.Steps()[i].Model.(components.SelectListModel).Value()`.
 - Every mutation wizard but `env`'s is declared in `internal/flow/<cmd>/steps.go` and run
-  through `internal/tui/flowui`; read one of those before touching `components.Step` directly.
+  through `internal/surface/tui/flowui`; read one of those before touching `components.Step` directly.
 
 Standalone wrappers (`RunStandaloneSelect`/`RunStandaloneConfirm`) are only for a **single**
 one-shot decision where there is no prior step to go back to (e.g. `run up`'s profile picker).
@@ -547,7 +548,7 @@ then a single **recap** as the last step. The rules:
   auto-skips index 0). When a conditional select would otherwise be first (e.g. `clean --branch`
   with no picker), compute it synchronously and add a concrete step only when it applies. In the
   flow model this is not the command's problem: the step just carries a `Skip`
-  (`internal/flow/clean/steps.go`, `reparentStep`) and `internal/tui/flowui/prompter.go` decides
+  (`internal/flow/clean/steps.go`, `reparentStep`) and `internal/surface/tui/flowui/prompter.go` decides
   it against what is already known before the wizard starts.
 - For an **async** recap (safety check, plan preview), keep a hand-built `SelectListModel` step with
   `Recap: true` and swap its model in via `OnMsg`/`UpdateStepModel` (RecapStep's `Build` is sync).
@@ -558,7 +559,7 @@ then a single **recap** as the last step. The rules:
   wizard. `ConfirmStep.Decide` also returns a
   `skipReason` for parity.
 - Business data shown in a step arrives via an **injected closure** from the command layer (the TUI
-  never imports `service`/`output`), e.g. `shared.EnvFallbackDecider`, sync's `PlanPreview`.
+  never imports `service`/`render`), e.g. `shared.EnvFallbackDecider`, sync's `PlanPreview`.
   This detour exists **only** because a TUI package may not call the service — a migrated
   command has no closures: `flow/` calls the service itself from `Skip`/`Build`/`Load`.
   Do not add a new one; migrate instead.
@@ -709,7 +710,7 @@ slow sibling. Choosing between them can itself depend on the request — `clean`
 the slow part, as `checkout`'s open pull requests are (`internal/flow/checkout/steps.go`
 `prStep`), with `Option.Disabled` for a row that cannot be picked and `StepContent.Banner`
 for what the load could not list. The `InitCmd`/`OnEnter`/`UpdateStepModel` plumbing still
-exists, but it is `internal/tui/flowui`'s business, not the command's.
+exists, but it is `internal/surface/tui/flowui`'s business, not the command's.
 
 **Non-migrated wizards** wire the two async entry points themselves, by when the data is
 known:
@@ -735,9 +736,9 @@ known:
 
 ### Screen-specific TUI
 
-Each screen lives in its own package under `internal/tui/`:
+Each screen lives in its own package under `internal/surface/tui/`:
 ```
-internal/tui/
+internal/surface/tui/
   components/      ← shared primitives (wizard, selectlist, multiselect, confirm)
   flowui/          ← runs a flow.Session as the CLI wizard (every migrated command)
   dashboard/       ← `wtm ui`, the second surface over flow/
@@ -751,11 +752,11 @@ internal/tui/
 ### Rules
 - `Update` is a pure function — no side effects, only return `(tea.Model, tea.Cmd)`
 - Never import `lipgloss` in TUI models — delegate all styling to `styles/`
-- Never import `cobra` or `service` inside a `tui/` model
+- Never import `cobra` or `service` inside a `surface/tui/` model
 - TUI packages may import `domain/` (types), `styles/` (rendering) and `flow/` (to run a
   session — that is what `flowui` and `dashboard` do); a flow never imports a TUI package
 - A surface that runs a flow off the UI goroutine reaches the model **only** through
-  `tea.Msg` — see `internal/tui/dashboard` (`prompter` replies over a channel,
+  `tea.Msg` — see `internal/surface/tui/dashboard` (`prompter` replies over a channel,
   `presenter` posts one `OutputLineMsg` per line via `flow.LineWriter`)
 
 ---
@@ -774,27 +775,27 @@ The `Indent` constant is the canonical source for left-padding:
 const Indent = "  "
 ```
 
-`output/block.go` aliases it as `output.Indent`. TUI components use `styles.Indent`.
+`surface/cli/render/block.go` aliases it as `render.Indent`. TUI components use `styles.Indent`.
 Never write a literal `"  "` for padding — always use the constant.
 
 ---
 
 ## Output — Formatted Printing
 
-`internal/output/block.go` provides shared helpers for structured terminal output:
+`internal/surface/cli/render/block.go` provides shared helpers for structured terminal output:
 
 ```go
-output.Blank(w)                    // empty line — use ONLY as an inter-section separator
-output.Unchanged(w, "…")           // = already in the desired state — EVERY no-op, no exception
-output.NextStep(w, output.NextStepParams{Command: "wtm go x", Note: "jump in"})  // → the only hint shape
-output.Tally(output.TallyPart{Count: 3, Label: domain.TallyApplied}, …)          // "3 applied · 1 skipped"
-output.Success(w, "Done")          // ✓ Done
-output.Warning(w, "Be careful")    // ! Be careful
-output.Error(w, "Failed")          // ✗ Failed
-output.Message(w, "Info")          // plain indented line
-output.SectionTitle(w, "TITLE")    // bold title
-output.InfoLine(w, "key", "value") // key  value
-output.Announce(w, "Title", items) // raw block: title + key-values (no outer blanks)
+render.Blank(w)                    // empty line — use ONLY as an inter-section separator
+render.Unchanged(w, "…")           // = already in the desired state — EVERY no-op, no exception
+render.NextStep(w, render.NextStepParams{Command: "wtm go x", Note: "jump in"})  // → the only hint shape
+render.Tally(render.TallyPart{Count: 3, Label: domain.TallyApplied}, …)          // "3 applied · 1 skipped"
+render.Success(w, "Done")          // ✓ Done
+render.Warning(w, "Be careful")    // ! Be careful
+render.Error(w, "Failed")          // ✗ Failed
+render.Message(w, "Info")          // plain indented line
+render.SectionTitle(w, "TITLE")    // bold title
+render.InfoLine(w, "key", "value") // key  value
+render.Announce(w, "Title", items) // raw block: title + key-values (no outer blanks)
 ```
 
 JSON output uses `encodeJSON(w, v)` (pretty-printed, no HTML escaping).
@@ -808,18 +809,18 @@ only the top/bottom.
 
 ```go
 // Simple buffered output — one leading + one trailing blank line:
-output.Frame(w, func(w io.Writer) {
+render.Frame(w, func(w io.Writer) {
     // Write to the writer the frame HANDS you, never to the one it was given:
     // that is what puts the accent bar on every line of the block.
-    output.Success(w, "Created worktree feature-x")
+    render.Success(w, "Created worktree feature-x")
 })
 
 // Streaming / split-stream (plan on stderr, result on stdout) — explicit pair:
-output.FrameStart(cmd.ErrOrStderr())
-output.FormatSyncPlan(output.Barred(cmd.ErrOrStderr()), plan)   // raw, barred by the caller
+render.FrameStart(cmd.ErrOrStderr())
+render.FormatSyncPlan(render.Barred(cmd.ErrOrStderr()), plan)   // raw, barred by the caller
 // … spinner, work …
-output.FormatSyncResult(cmd.OutOrStdout(), result) // raw
-output.FrameEnd(cmd.OutOrStdout())
+render.FormatSyncResult(cmd.OutOrStdout(), result) // raw
+render.FrameEnd(cmd.OutOrStdout())
 ```
 
 Rules:
@@ -827,16 +828,16 @@ Rules:
   (streaming). Route on `rules.IsHumanFormat(format)`.
 - **JSON and machine output are never framed** — `--output json` and shell-eval
   paths (`resolve` success, `shell-init`) stay strictly flush.
-- **Helpers/formatters return raw bodies** — no leading/trailing `output.Blank`.
-  `output.Blank` is allowed only as a genuine *inter-section* separator inside a body.
+- **Helpers/formatters return raw bodies** — no leading/trailing `render.Blank`.
+  `render.Blank` is allowed only as a genuine *inter-section* separator inside a body.
 - **No stacked blanks** (`\n\n\n`+). Spinners do not self-pad — the frame owns the
   leading blank, so open the frame before starting a spinner.
 - **The full reference is [`docs/dev/output.md`](../../../docs/dev/output.md)** — the four levels, the two shapes of a conclusion, the glyph vocabulary, the two-stream split, `--quiet`. Read it before adding a command or changing what one prints.
-- **The glyph carries the only colour on its line**; the message stays in the default foreground. `=` and `›` are the exception and mute the whole line, because there the line is the non-event. Every glyph is one column — badges are a TUI widget, not a line of CLI output. Two failure registers, `!` and `✗`; there is no `output.Danger`.
+- **The glyph carries the only colour on its line**; the message stays in the default foreground. `=` and `›` are the exception and mute the whole line, because there the line is the non-event. Every glyph is one column — badges are a TUI widget, not a line of CLI output. Two failure registers, `!` and `✗`; there is no `render.Danger`.
 - **`Muted` has two jobs and no third**: chrome (labels, table headers, tree connectors) and a non-event line. Secondary detail — a branch list under a count, a failure's captured output — is **indented, not muted**.
-- **A conclusion is not optional**, an empty inventory is `=` (`output.UnchangedLine` for a formatter returning a body), an abort is `=` with one wording (`domain.AbortedMessage`), and a hint is always `output.NextStep`.
+- **A conclusion is not optional**, an empty inventory is `=` (`render.UnchangedLine` for a formatter returning a body), an abort is `=` with one wording (`domain.AbortedMessage`), and a hint is always `render.NextStep`.
 - **A block has to earn its place**: it prints when it changes what the reader does next. Success contracts to a count, anomalies are named one by one; detail belongs to the command whose subject it is (ports → `wtm env`, not `create`); a successful run has a fixed shape whatever happened. See [`docs/dev/output.md`](../../../docs/dev/output.md), "The one question".
-- **A hook phase is shown, not kept**: `output.HookView` draws a bounded tail and replaces it with one result line per hook. Terminals only (`output.IsTerminal`) — a pipe or `--output json` gets the raw stream. Every path goes through `commands/shared.DrawHookPhase`, which opens `<state-dir>/hooks/<phase>-<branch>.log` and tees the raw stream into it whatever it draws, and which always hands the sink the command's own writer (a nil sink falls back to `os.Stderr` and escapes `--quiet`). The phase reports through `flow.HookSink` (output + `domain.HookBeat`); `service/hooks` renders only its no-reporter fallback.
+- **A hook phase is shown, not kept**: `render.HookView` draws a bounded tail and replaces it with one result line per hook. Terminals only (`render.IsTerminal`) — a pipe or `--output json` gets the raw stream. Every path goes through `surface/cli/shared.DrawHookPhase`, which opens `<state-dir>/hooks/<phase>-<branch>.log` and tees the raw stream into it whatever it draws, and which always hands the sink the command's own writer (a nil sink falls back to `os.Stderr` and escapes `--quiet`). The phase reports through `flow.HookSink` (output + `domain.HookBeat`); `service/hooks` renders only its no-reporter fallback.
 - **TUI views own their single top/bottom blank** (`WizardModel`/`standaloneModel`
   both open with one leading `\n`); don't add a manual blank before launching a wizard.
 
@@ -919,7 +920,7 @@ recorder := &flowtest.Recorder{}
 
 A refactor that moves a command's flow between packages must not change what a user sees. Pin the
 observable behavior **first**, against the old code, then move the code and run those tests
-unchanged. That is what `internal/commands/wt/create_noninteractive_test.go`, the
+unchanged. That is what `internal/surface/cli/wt/create_noninteractive_test.go`, the
 `*_characterization_test.go` files and
 `integration_test.go` are for: step composition per flag combination, recap completeness,
 the `--yes`/`--force` axes, the JSON reparent default, idempotence on an absent worktree.
@@ -949,9 +950,9 @@ Before calling `build-validator`, verify manually:
 - [ ] All external input is validated in `internal/config/` before reaching service
 - [ ] No nested conditionals — early returns throughout
 - [ ] No type assertions without comma-ok
-- [ ] No business logic in `commands/` or `tui/`
+- [ ] No business logic in `surface/cli/` or `surface/tui/`
 - [ ] A mutation command's flow is in `internal/flow/<cmd>/`, not in its runner
-- [ ] `internal/flow/` imports no cobra/bubbletea/lipgloss, no `output`/`tui`/`config`/`commands`
+- [ ] `internal/flow/` imports no cobra/bubbletea/lipgloss, no `surface`/`config`
 - [ ] Every `flow.Step` has a deliberate `Resolve` (safe default, flag-naming error, or absent on purpose)
 - [ ] No `lipgloss` imports outside `internal/styles/`
 - [ ] No `cobra` or `bubbletea` imports inside `internal/service/`

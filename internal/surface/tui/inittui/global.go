@@ -6,7 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
 // RunGlobalWizard presents the global config setup wizard.

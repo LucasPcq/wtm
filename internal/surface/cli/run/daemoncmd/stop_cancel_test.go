@@ -5,12 +5,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/daemoncmd"
-	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/service/process/processtest"
-	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/daemoncmd"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/runctx"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
 // Backing out of the stop confirmation — Esc, Ctrl-C or "No" — is a

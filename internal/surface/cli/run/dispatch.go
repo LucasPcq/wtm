@@ -5,8 +5,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	downflow "github.com/LucasPcq/wtm/internal/flow/run/down"
@@ -14,6 +12,8 @@ import (
 	startflow "github.com/LucasPcq/wtm/internal/flow/run/start"
 	stopflow "github.com/LucasPcq/wtm/internal/flow/run/stop"
 	upflow "github.com/LucasPcq/wtm/internal/flow/run/up"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/runctx"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 // dispatchParams is an action `run list`'s picker chose, run in this process. It

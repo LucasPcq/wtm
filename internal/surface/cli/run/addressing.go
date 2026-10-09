@@ -5,11 +5,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	addressingflow "github.com/LucasPcq/wtm/internal/flow/run/addressing"
-	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/runctx"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 func newAddressingCmd() *cobra.Command {
@@ -72,7 +72,7 @@ type addressingPresenter struct {
 }
 
 func (p addressingPresenter) Switched(outcome addressingflow.SwitchOutcome) error {
-	result := output.AddressingResult{
+	result := render.AddressingResult{
 		Addressing: outcome.Current,
 		Previous:   outcome.Previous,
 		Changed:    outcome.Changed,
@@ -82,8 +82,8 @@ func (p addressingPresenter) Switched(outcome addressingflow.SwitchOutcome) erro
 	}
 	out := p.Cmd.OutOrStdout()
 	if p.Format == domain.OutputJSON {
-		return output.WriteAddressingResultJSON(out, result)
+		return render.WriteAddressingResultJSON(out, result)
 	}
-	output.Frame(out, func(w io.Writer) { output.AddressingSwitched(w, result) })
+	render.Frame(out, func(w io.Writer) { render.AddressingSwitched(w, result) })
 	return nil
 }

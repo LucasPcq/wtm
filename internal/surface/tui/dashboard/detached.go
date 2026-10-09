@@ -87,7 +87,7 @@ func (s detachedSink) Emit(event runlogs.Event) {
 }
 
 // emit posts a line the panel can attribute. The rule is the CLI's
-// (output.RunPrinter.qualify): the worktree is named above several of them, and
+// (render.RunPrinter.qualify): the worktree is named above several of them, and
 // left out above one.
 func (s detachedSink) emit(text string, event runlogs.Event) {
 	if !s.multi || s.target(event) == "" {

@@ -405,7 +405,7 @@ func TestAHeldWorktreeKeepsAnInertEntryThatSaysWhy(t *testing.T) {
 	}
 }
 
-// styles/ owns every visual attribute. A .Width()/.MaxWidth() chained in tui/ is
+// styles/ owns every visual attribute. A .Width()/.MaxWidth() chained in surface/tui/ is
 // a dimension and stays allowed; a .Bold()/.Foreground()/.Underline() is a
 // choice and belongs in a named style.
 func TestNoStyleAttributeIsChosenOutsideStyles(t *testing.T) {

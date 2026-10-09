@@ -26,10 +26,10 @@ var glyphVocabulary = map[string]string{
 // are left out on purpose: `=` and `!` are ordinary bytes to an env parser or a
 // pnpm workspace pattern, and a rule that cannot tell those apart is a rule
 // people work around.
-var drawingLayers = map[string]bool{"output": true, "styles": true, "tui": true}
+var drawingLayers = map[string]bool{"styles": true, "surface/cli/render": true, "surface/tui": true}
 
 var (
-	outputMessage = objectRef{Path: internalPrefix + "output", Name: "Message"}
+	outputMessage = objectRef{Path: internalPrefix + "surface/cli/render", Name: "Message"}
 	mutedStyle    = objectRef{Path: internalPrefix + "styles", Name: "Muted"}
 )
 
@@ -64,12 +64,12 @@ func runGlyph(pass *analysis.Pass) (any, error) {
 
 var tuistyleAnalyzer = &analysis.Analyzer{
 	Name: "tuistyle",
-	Doc:  "internal/output uses no badge or dashboard style",
+	Doc:  "internal/surface/cli/render uses no badge or dashboard style",
 	Run:  runTUIStyle,
 }
 
 func runTUIStyle(pass *analysis.Pass) (any, error) {
-	if layerOfPackage(pass.Pkg.Path()) != "output" {
+	if layerOfPackage(pass.Pkg.Path()) != "surface/cli/render" {
 		return nil, nil
 	}
 	for _, file := range pass.Files {
@@ -84,7 +84,7 @@ func runTUIStyle(pass *analysis.Pass) (any, error) {
 			}
 			name := sel.Sel.Name
 			if strings.HasPrefix(name, "Badge") || strings.HasPrefix(name, "Dashboard") {
-				pass.Reportf(sel.Pos(), "internal/output must not use styles.%s: a badge is a TUI widget and a dashboard style belongs to that surface — a line of CLI output is text", name)
+				pass.Reportf(sel.Pos(), "internal/surface/cli/render must not use styles.%s: a badge is a TUI widget and a dashboard style belongs to that surface — a line of CLI output is text", name)
 			}
 			return true
 		})
@@ -109,7 +109,7 @@ func runMutedLine(pass *analysis.Pass) (any, error) {
 				return true
 			}
 			if rendersMutedWhole(pass.TypesInfo, call.Args[1]) {
-				pass.Reportf(call.Pos(), "a bare line muted whole is the `=` register without its glyph: use output.Unchanged for a non-event, or subordinate detail with an indent — see docs/dev/output.md")
+				pass.Reportf(call.Pos(), "a bare line muted whole is the `=` register without its glyph: use render.Unchanged for a non-event, or subordinate detail with an indent — see docs/dev/output.md")
 			}
 			return true
 		})

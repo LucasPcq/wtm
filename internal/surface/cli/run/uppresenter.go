@@ -6,15 +6,15 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow/run/seam"
 	stopflow "github.com/LucasPcq/wtm/internal/flow/run/stop"
 	upflow "github.com/LucasPcq/wtm/internal/flow/run/up"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/runctx"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 // upPresenter is the CLI half of the up flow: the flow decides what to start,
@@ -102,7 +102,7 @@ func (p startPresenter) machine(params seam.SequenceParams) (runlogs.Outcomes, e
 	if err != nil && !interruptedWithAnAccount(p.Cmd, outcomes) {
 		return outcomes, err
 	}
-	if writeErr := output.WriteJobResultJSON(p.Cmd.OutOrStdout(), jobResult(jobResultParams{
+	if writeErr := render.WriteJobResultJSON(p.Cmd.OutOrStdout(), jobResult(jobResultParams{
 		Job:     params.Job,
 		Inline:  params.Inline,
 		Outcome: outcomes.One(),
@@ -123,7 +123,7 @@ type jobResultParams struct {
 // about the same job rather than agreeing by coincidence. Nothing recorded means
 // the run never reached it, which only a start that failed outright can produce.
 func jobResult(params jobResultParams) domain.JobActionResult {
-	for _, result := range output.RunOutcomeResults(params.Outcome) {
+	for _, result := range render.RunOutcomeResults(params.Outcome) {
 		if result.Name == params.Job {
 			return result
 		}
@@ -144,15 +144,15 @@ func (p stopPresenter) Stopped(outcome stopflow.Outcome) error {
 		return p.machine(outcome)
 	}
 	out := p.Cmd.OutOrStdout()
-	output.Frame(out, func(w io.Writer) {
+	render.Frame(out, func(w io.Writer) {
 		for _, worktree := range outcome.Results {
 			for _, result := range worktree.Jobs {
 				line := p.qualify(fmt.Sprintf(rules.StoppedFmt(result.Status), result.Name), outcome, worktree)
 				if result.Status == domain.JobActionNotRunning {
-					output.Unchanged(w, line)
+					render.Unchanged(w, line)
 					continue
 				}
-				output.Success(w, line)
+				render.Success(w, line)
 			}
 		}
 	})
@@ -160,7 +160,7 @@ func (p stopPresenter) Stopped(outcome stopflow.Outcome) error {
 }
 
 func (p stopPresenter) machine(outcome stopflow.Outcome) error {
-	return output.WriteWorktreeJobResultsJSON(p.Cmd.OutOrStdout(), outcome.Results)
+	return render.WriteWorktreeJobResultsJSON(p.Cmd.OutOrStdout(), outcome.Results)
 }
 
 // qualify names the worktree at the end of the line, the way every other run

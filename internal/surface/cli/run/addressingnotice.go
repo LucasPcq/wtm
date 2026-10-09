@@ -3,9 +3,9 @@ package run
 import (
 	"context"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/run/addressing"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 // addressingDrift is the callout `run import` puts out where a teammate receives

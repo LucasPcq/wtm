@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	checkoutflow "github.com/LucasPcq/wtm/internal/flow/checkout"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 type checkoutPresenter struct {
@@ -18,7 +18,7 @@ type checkoutPresenter struct {
 func (p checkoutPresenter) CheckedOut(outcome checkoutflow.Outcome) error {
 	pr, result := outcome.PR, outcome.Result
 	if p.Format == domain.OutputJSON {
-		return output.WritePRCheckoutJSON(p.Cmd.OutOrStdout(), output.PRCheckoutJSON{
+		return render.WritePRCheckoutJSON(p.Cmd.OutOrStdout(), render.PRCheckoutJSON{
 			Number:         pr.Number,
 			Branch:         pr.Branch,
 			Path:           result.Path,
@@ -42,8 +42,8 @@ func (p checkoutPresenter) CheckedOut(outcome checkoutflow.Outcome) error {
 			Behind: outcome.Target.AheadBehind.Behind,
 		})
 	}
-	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-		output.FormatPRCheckoutResult(w, output.PRCheckoutResultParams{
+	render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		render.FormatPRCheckoutResult(w, render.PRCheckoutResultParams{
 			Number:            pr.Number,
 			Branch:            pr.Branch,
 			EnvNote:           rules.EnvPortSettlementNote(result.EnvPorts),

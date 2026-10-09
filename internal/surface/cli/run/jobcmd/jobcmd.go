@@ -11,11 +11,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	jobflow "github.com/LucasPcq/wtm/internal/flow/run/job"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 // NewCmd creates the wtm run job command group.
@@ -47,26 +47,26 @@ type presenter struct {
 func (p presenter) Changed(outcome jobflow.Outcome) error {
 	out := p.Cmd.OutOrStdout()
 	if p.Format == domain.OutputJSON {
-		return output.WriteJobResultJSON(out, domain.JobActionResult{
+		return render.WriteJobResultJSON(out, domain.JobActionResult{
 			Name:   outcome.Name,
 			Status: outcome.Status,
 		})
 	}
 
-	output.Frame(out, func(w io.Writer) {
+	render.Frame(out, func(w io.Writer) {
 		switch outcome.Status {
 		case domain.JobActionUpdated:
-			output.Update(w, fmt.Sprintf(domain.RunJobUpdatedFmt, outcome.Name))
+			render.Update(w, fmt.Sprintf(domain.RunJobUpdatedFmt, outcome.Name))
 		case domain.JobActionUnchanged:
-			output.Unchanged(w, fmt.Sprintf(domain.RunJobUnchangedFmt, outcome.Name))
+			render.Unchanged(w, fmt.Sprintf(domain.RunJobUnchangedFmt, outcome.Name))
 		case domain.JobActionRemoved:
-			output.Success(w, fmt.Sprintf(domain.RunJobRemovedFmt, outcome.Name))
+			render.Success(w, fmt.Sprintf(domain.RunJobRemovedFmt, outcome.Name))
 		default:
-			output.Success(w, fmt.Sprintf(domain.RunJobAddedFmt, outcome.Name))
+			render.Success(w, fmt.Sprintf(domain.RunJobAddedFmt, outcome.Name))
 		}
 		// What the removal dragged along, each named so the reader can put it back.
 		for _, line := range removalLines(outcome.Effect) {
-			output.Message(w, output.Indent+line)
+			render.Message(w, render.Indent+line)
 		}
 	})
 	return nil

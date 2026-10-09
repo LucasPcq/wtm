@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
 // envValueWizard drives the three steps that feed each other the way the wizard

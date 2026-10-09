@@ -8,13 +8,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow/run/target"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/runjobs"
-	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
 // newPsCmd creates the wtm run ps subcommand.
@@ -41,7 +41,7 @@ func runPs(cmd *cobra.Command, _ []string) error {
 
 	if format == domain.OutputJSON {
 		jobs := rules.JobsByWorktree(shared.LoadJobs(cmd.Context()).Jobs)
-		return output.WriteRunningJobsJSON(cmd.OutOrStdout(), runningJobs(cmd.Context(), runningJobsParams{Jobs: jobs, Held: runjobs.Held(cmd.Context(), jobs)}))
+		return render.WriteRunningJobsJSON(cmd.OutOrStdout(), runningJobs(cmd.Context(), runningJobsParams{Jobs: jobs, Held: runjobs.Held(cmd.Context(), jobs)}))
 	}
 
 	var listing runjobs.Listing
@@ -61,18 +61,18 @@ func runPs(cmd *cobra.Command, _ []string) error {
 
 	out := cmd.OutOrStdout()
 	jobs := rules.JobsByWorktree(listing.Jobs)
-	output.Frame(out, func(w io.Writer) {
-		fmt.Fprint(w, output.FormatRunningJobs(output.FormatRunningJobsParams{
+	render.Frame(out, func(w io.Writer) {
+		fmt.Fprint(w, render.FormatRunningJobs(render.FormatRunningJobsParams{
 			Jobs:       jobs,
 			Now:        time.Now(),
 			Branches:   branchesOf(cmd.Context(), jobs),
 			Projects:   projectsOf(cmd.Context(), jobs),
 			Held:       held,
-			Hyperlinks: output.IsTerminal(out),
+			Hyperlinks: render.IsTerminal(out),
 		}))
 		if listing.Diverged() {
-			output.Blank(w)
-			output.Warning(w, fmt.Sprintf(domain.RunDaemonDivergedFmt, rules.DaemonVersionLabel(listing.DaemonVersion), domain.Version))
+			render.Blank(w)
+			render.Warning(w, fmt.Sprintf(domain.RunDaemonDivergedFmt, rules.DaemonVersionLabel(listing.DaemonVersion), domain.Version))
 		}
 	})
 	return nil

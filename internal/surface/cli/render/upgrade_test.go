@@ -1,4 +1,4 @@
-package output_test
+package render_test
 
 import (
 	"bytes"
@@ -7,12 +7,12 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 )
 
 func TestUpgradeResultJSON(t *testing.T) {
 	var buf bytes.Buffer
-	err := output.UpgradeResultJSON(&buf, domain.UpgradeResult{
+	err := render.UpgradeResultJSON(&buf, domain.UpgradeResult{
 		Installed: "0.26.1",
 		Latest:    "0.27.0",
 		UpToDate:  false,
@@ -58,7 +58,7 @@ func TestUpdateNoticeNamesTheCommand(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			output.UpdateNotice(&buf, output.UpdateNoticeParams{
+			render.UpdateNotice(&buf, render.UpdateNoticeParams{
 				Current: "0.26.1",
 				Latest:  "0.27.0",
 				Method:  tc.method,

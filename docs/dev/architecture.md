@@ -9,14 +9,6 @@ One line per package: what it owns. The import rules between them are the next s
 ```
 cmd/                          ← entry points, cobra setup only
 internal/
-  commands/                   ← flag wiring, delegates to flow/service (zero business logic)
-    run/runctx/               ←   what every `run` command opens on: its directory, the config,
-                                  run.toml, the opt-in guard and the prompt gate
-    daemon/                   ←   the hidden `daemon` command and the macOS port-80 relay launchd runs
-    ui/                       ←   `wtm ui`: refuses JSON and a missing TTY, then hands off to tui/dashboard
-    events/                   ←   `wtm events`: the stream (text or JSON Lines) over service/events.Watch,
-                                  or WatchAll outside any repository
-    versioncmd/               ←   `wtm version`: the binary's version and each machine contract's (`events`)
   domain/                     ← types, errors, constants only (no methods, no functions)
   rules/                      ← pure functions (stdlib + domain only, no I/O)
   config/                     ← load & validate config.toml + run.toml from <git-common-dir>/wtm/, plus the global config (config.GlobalPath);
@@ -111,27 +103,36 @@ internal/
     shellcmd/                 ←   checks that a config command is a valid /bin/sh line
     execsvc/                  ←   runs one shell line in several worktrees at once
     memory/                   ←   writes the answers the wizard remembers ([wizard.remembered] in config.toml)
-  output/                     ← format and print results (zero decision logic)
   styles/                     ← all Lipgloss styles (only package allowed to instantiate lipgloss.Style)
-  tui/                        ← Bubbletea models (zero business logic, rendering only)
-    flowui/                   ←   runs a flow.Session as a wizard (the only translator
-                                  between flow.Step and components.Step)
-    dashboard/                ←   `wtm ui`: the full-screen worktree dashboard, the second
-                                  surface over flow/ (its own Prompter/Presenter, mouse
-                                  zones via bubblezone). It also hands the terminal to
-                                  runview (`handoff.go`) for the run flows that draw
-    runview/                  ←   a job's raw PTY output replayed through a terminal
-                                  emulator (`github.com/charmbracelet/x/vt`)
   infra/                      ← I/O, git exec, filesystem wrappers
+  surface/                    ← the interfaces
+    cli/                      ←   flag wiring, delegates to flow/service (zero business logic)
+      run/runctx/             ←     what every `run` command opens on: its directory, the config,
+                                    run.toml, the opt-in guard and the prompt gate
+      daemon/                 ←     the hidden `daemon` command and the macOS port-80 relay launchd runs
+      ui/                     ←     `wtm ui`: refuses JSON and a missing TTY, then hands off to tui/dashboard
+      events/                 ←     `wtm events`: the stream (text or JSON Lines) over service/events.Watch,
+                                    or WatchAll outside any repository
+      versioncmd/             ←     `wtm version`: the binary's version and each machine contract's (`events`)
+      render/                 ←     format and print results (zero decision logic)
+    tui/                      ←   Bubbletea models (zero business logic, rendering only)
+      flowui/                 ←     runs a flow.Session as a wizard (the only translator
+                                    between flow.Step and components.Step)
+      dashboard/              ←     `wtm ui`: the full-screen worktree dashboard, the second
+                                    surface over flow/ (its own Prompter/Presenter, mouse
+                                    zones via bubblezone). It also hands the terminal to
+                                    runview (`handoff.go`) for the run flows that draw
+      runview/                ←     a job's raw PTY output replayed through a terminal
+                                    emulator (`github.com/charmbracelet/x/vt`)
 ```
 
 ## Who may call whom
 
 ```mermaid
 flowchart TD
-  commands["commands/"] --> flow["flow/"]
-  commands --> output["output/"]
-  commands --> tui["tui/"]
+  commands["surface/cli/"] --> flow["flow/"]
+  commands --> output["surface/cli/render/"]
+  commands --> tui["surface/tui/"]
   commands --> config["config/"]
   tui --> flow
   flow --> service["service/"]
@@ -148,11 +149,11 @@ Every arrow that is *missing* is the point:
 
 | Interdiction | What it buys |
 | -- | -- |
-| `commands/` has no business logic | A command is readable as flags in, one call out. Changing the flow never means editing flag parsing. |
+| `surface/cli/` has no business logic | A command is readable as flags in, one call out. Changing the flow never means editing flag parsing. |
 | `domain/` holds types, errors and constants only | Nothing can acquire a dependency by hiding behind a method on a shared type. |
 | `rules/` imports only stdlib + `domain/` | Decisions stay testable with no repo, no network, no temp dir. `rules.DecidePush` is a table test, not an integration test. |
 | `service/` never imports cobra, bubbletea or lipgloss | The git operations are callable from a test, a flow, a daemon — anything that is not a terminal. |
-| `output/` and `tui/` hold no decision logic | Two surfaces can render the same run without disagreeing about what it means. |
+| `surface/cli/render/` and `surface/tui/` hold no decision logic | Two surfaces can render the same run without disagreeing about what it means. |
 | `styles/` is the only package instantiating `lipgloss.Style` | A theme change is one file. |
 | `flow/` imports only `service/`, `rules/`, `domain/` and the stdlib | The flow cannot grow a dependency on the surface that runs it. This is what makes a second surface possible at all — see below. |
 
@@ -176,7 +177,7 @@ Whatever answers, a resolved worktree is always **the worktree root as git spell
 
 ## The founding observation: seven closures
 
-Before this layering existed, `internal/commands/wt/*.go` did three things at once: read the flags, run the flow itself, **and** hand the TUI closures that called back into the service. The TUI is forbidden from importing `service/`, so the command passed it functions instead:
+Before this layering existed, `internal/surface/cli/wt/*.go` did three things at once: read the flags, run the flow itself, **and** hand the TUI closures that called back into the service. The TUI is forbidden from importing `service/`, so the command passed it functions instead:
 
 | Closure injected into the TUI | Command | What it called back into |
 | -- | -- | -- |
@@ -185,14 +186,14 @@ Before this layering existed, `internal/commands/wt/*.go` did three things at on
 | `EnvFallback` | `create`, `extract` | `shared.EnvParentFallbackApplies` |
 | `Check` | `clean` | `worktree.Check` |
 | `ReparentPreview` | `clean` | `worktree.PlanCleanReparent` |
-| `PlanPreview` | `sync` | `worktree.PlanSync` + `output.SprintSyncPlan` |
+| `PlanPreview` | `sync` | `worktree.PlanSync` + `render.SprintSyncPlan` |
 | `LoadFiles` | `extract` | `infra.ListModifiedFiles` |
 
 The rule was respected and the architecture was still defeated: the service call happened on the TUI's goroutine, at the TUI's whim, with the command as a courier. Worse, the flow lived on both sides of that boundary — the dashboard could not replay it without duplicating it.
 
 `flow/` **is allowed** to call the service. Those closures become hooks carried by the step declaration itself (`Skip`, `Build`, `Load`) and the courier disappears. That is the gain that justifies the refactor independently of the dashboard: `create` and `clean` inject nothing today.
 
-The closures went with their command's migration: `checkout`'s `EnvFallback` and `Target` are now read by its recap step directly. `prune`'s `ReparentPreview` and `sync`'s `PlanPreview` both went with their migration — a flow calls `rules.FinalizePrunePlan` and `rules.SprintSyncPlan` directly, and `internal/tui/syncpicker` (the package `PlanPreview` was injected into) no longer exists. `extract`'s three went with its migration, along with `LoadFiles`: its files step loads them itself, and the create sub-flow it embedded in Bubbletea terms is now create's own steps, through `create.Embed`.
+The closures went with their command's migration: `checkout`'s `EnvFallback` and `Target` are now read by its recap step directly. `prune`'s `ReparentPreview` and `sync`'s `PlanPreview` both went with their migration — a flow calls `rules.FinalizePrunePlan` and `rules.SprintSyncPlan` directly, and `internal/surface/tui/syncpicker` (the package `PlanPreview` was injected into) no longer exists. `extract`'s three went with its migration, along with `LoadFiles`: its files step loads them itself, and the create sub-flow it embedded in Bubbletea terms is now create's own steps, through `create.Embed`.
 
 ## The run module — a flow that asks nothing
 
@@ -206,13 +207,13 @@ Three surfaces consume it, chosen by one pure rule (`rules.DecideRunSurface`, wh
 
 | Surface | Who | What it does with the seam |
 | -- | -- | -- |
-| `internal/tui/runview` | a terminal | full screen, one VT-emulated pane per job, tmux-style focus; returns its recap for the command to frame |
-| `output.RunPrinter` | `-d`, a pipe, CI | renders each `Event` as a line on stdout/stderr |
-| `output.WriteRunOutcomeJSON` | `--output json` | the array of job results, with the failing job's `output` and `exit_code` |
+| `internal/surface/tui/runview` | a terminal | full screen, one VT-emulated pane per job, tmux-style focus; returns its recap for the command to frame |
+| `render.RunPrinter` | `-d`, a pipe, CI | renders each `Event` as a line on stdout/stderr |
+| `render.WriteRunOutcomeJSON` | `--output json` | the array of job results, with the failing job's `output` and `exit_code` |
 
 Everything a job needs to know about *which* worktree it belongs to is resolved by the client and travels down the seam beside `WorkDir` and `LogDir`: `RunParams.Env` → `StartRequest.Env` → `process.Request.Env` → `cmd.Env`. It cannot be inherited — the daemon is global, outlives the command that forked it, and its own environment belongs to whichever worktree happened to start it. `service/worktree.EnsureOrdinal` is what gives the worktree the stable number those variables derive from, and `service/worktree.JobEnv`/`BranchEnv` assemble them; the daemon keeps the resolved map on the `ManagedJob` so the job's stop command runs in the same environment its start did.
 
-`internal/commands/run/surface.go` is the whole wiring: open the seam, build the starter, switch on the rule. The one thing left in the command is `handleConcurrentJobs` — the question `run up` asks about another worktree's jobs. It is a `flow.Prompter` question in everything but name, and `runlogs` has no Prompter; it stays put until the `--exclusive`/`--parallel` axis is reopened, which worktree isolation may remove entirely.
+`internal/surface/cli/run/surface.go` is the whole wiring: open the seam, build the starter, switch on the rule. The one thing left in the command is `handleConcurrentJobs` — the question `run up` asks about another worktree's jobs. It is a `flow.Prompter` question in everything but name, and `runlogs` has no Prompter; it stays put until the `--exclusive`/`--parallel` axis is reopened, which worktree isolation may remove entirely.
 
 ## Worktree ports and the `.env` — a terminal transformation, not a source
 

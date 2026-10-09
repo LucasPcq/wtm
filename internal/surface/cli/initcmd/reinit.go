@@ -8,14 +8,14 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/detect"
-	"github.com/LucasPcq/wtm/internal/tui/components"
-	initwizard "github.com/LucasPcq/wtm/internal/tui/inittui"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
+	initwizard "github.com/LucasPcq/wtm/internal/surface/tui/inittui"
 )
 
 // parseSections validates and de-duplicates the --only values (CSV or repeated),
@@ -87,8 +87,8 @@ func runReinit(cmd *cobra.Command, dir, stateDir string, sections []string) erro
 			Confirm:    confirm,
 		})
 		if errors.Is(err, domain.ErrUserAborted) {
-			output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-				output.Unchanged(w, domain.AbortedMessage)
+			render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+				render.Unchanged(w, domain.AbortedMessage)
 			})
 			shared.MarkCancelled(cmd)
 			return nil
@@ -104,7 +104,7 @@ func runReinit(cmd *cobra.Command, dir, stateDir string, sections []string) erro
 	}
 
 	var applyErr error
-	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+	render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
 		applyErr = applyConfigReinit(applyReinitParams{
 			Out:      w,
 			StateDir: stateDir,
@@ -215,7 +215,7 @@ func applyConfigReinit(params applyReinitParams) error {
 		return fmt.Errorf("write project config: %w", err)
 	}
 
-	output.Success(params.Out, "Rewrote config.toml")
+	render.Success(params.Out, "Rewrote config.toml")
 	return nil
 }
 

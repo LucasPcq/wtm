@@ -10,12 +10,12 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/selfupdate"
-	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
 type NewCmdParams struct {
@@ -139,8 +139,8 @@ func apply(cmd *cobra.Command, install selfupdate.Install, release domain.Releas
 		}
 		if !ran {
 			w := cmd.ErrOrStderr()
-			output.Frame(w, func(w io.Writer) {
-				output.Warning(w, fmt.Sprintf("run `%s` to update", rules.UpgradeCommandFor(install.Method)))
+			render.Frame(w, func(w io.Writer) {
+				render.Warning(w, fmt.Sprintf("run `%s` to update", rules.UpgradeCommandFor(install.Method)))
 			})
 		}
 
@@ -160,10 +160,10 @@ func apply(cmd *cobra.Command, install selfupdate.Install, release domain.Releas
 func report(cmd *cobra.Command, format string, result domain.UpgradeResult) error {
 	w := cmd.OutOrStdout()
 	if !rules.IsHumanFormat(format) {
-		return output.UpgradeResultJSON(w, result)
+		return render.UpgradeResultJSON(w, result)
 	}
 
-	output.Frame(w, func(w io.Writer) { output.UpgradeReport(w, result) })
+	render.Frame(w, func(w io.Writer) { render.UpgradeReport(w, result) })
 
 	return nil
 }

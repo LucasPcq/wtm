@@ -10,11 +10,11 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/events"
-	"github.com/LucasPcq/wtm/internal/tui/components"
-	"github.com/LucasPcq/wtm/internal/tui/flowui"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/tui/flowui"
 )
 
 // CLIPresenter is the CLI half of flow.Presenter: the flow decides what happens,
@@ -40,13 +40,13 @@ func NewPresenter(cmd *cobra.Command, format string) CLIPresenter {
 // The surface, not the caller, says whether a block is already open: the frames
 // beside this one are written by code that never sees this presenter.
 func OpenBlock(w io.Writer, separate bool) io.Writer {
-	if !output.BlockOpen(w) {
-		output.FrameStart(w)
-		return output.Barred(w)
+	if !render.BlockOpen(w) {
+		render.FrameStart(w)
+		return render.Barred(w)
 	}
-	barred := output.Barred(w)
+	barred := render.Barred(w)
 	if separate {
-		output.Blank(barred)
+		render.Blank(barred)
 	}
 	return barred
 }
@@ -91,7 +91,7 @@ type DrawHookPhaseParams struct {
 // its own way to the terminal, and its record must not depend on who was
 // watching.
 func DrawHookPhase(params DrawHookPhaseParams) error {
-	log := output.HookLog(params.LogPath)
+	log := render.HookLog(params.LogPath)
 	if log != nil {
 		defer func() { _ = log.Close() }()
 	}
@@ -106,12 +106,12 @@ func DrawHookPhase(params DrawHookPhaseParams) error {
 	}
 
 	// The phase joins the run's block rather than opening one beside it.
-	output.SectionTitle(OpenBlock(params.Stderr, true), params.Title)
-	if !output.IsTerminal(params.Stderr) {
+	render.SectionTitle(OpenBlock(params.Stderr, true), params.Title)
+	if !render.IsTerminal(params.Stderr) {
 		return params.Run(flow.HookSink{Output: stream})
 	}
 
-	view := output.NewHookView(output.HookViewParams{W: params.Stderr, Log: log, LogPath: params.LogPath, Bar: true})
+	view := render.NewHookView(render.HookViewParams{W: params.Stderr, Log: log, LogPath: params.LogPath, Bar: true})
 	defer view.Close()
 	return params.Run(flow.HookSink{Output: view, OnHook: view.OnHook})
 }
@@ -121,20 +121,20 @@ func (p CLIPresenter) Notice(notice flow.Notice) {
 	// A bare sentence there reads as a result, and is how the tree ended up with
 	// four wordings for one outcome.
 	if notice.IsAbort() {
-		output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-			output.Unchanged(w, notice.Text)
+		render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+			render.Unchanged(w, notice.Text)
 		})
 		MarkCancelled(p.Cmd)
 		return
 	}
 	if notice.Kind == flow.NoticeWarning {
-		output.Frame(p.Cmd.ErrOrStderr(), func(w io.Writer) {
-			output.Warning(w, notice.Text)
+		render.Frame(p.Cmd.ErrOrStderr(), func(w io.Writer) {
+			render.Warning(w, notice.Text)
 		})
 		return
 	}
-	output.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-		output.Message(w, notice.Text)
+	render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
+		render.Message(w, notice.Text)
 	})
 }
 
@@ -157,28 +157,28 @@ func (p CLIPresenter) Status(notice flow.Notice) {
 func (p CLIPresenter) statusLine(w io.Writer, notice flow.Notice) {
 	switch notice.Kind {
 	case flow.NoticeWarning:
-		output.Warning(w, notice.Text)
+		render.Warning(w, notice.Text)
 	case flow.NoticeNote:
-		output.Unchanged(w, notice.Text)
+		render.Unchanged(w, notice.Text)
 	default:
-		output.Success(w, notice.Text)
+		render.Success(w, notice.Text)
 	}
 }
 
 func (p CLIPresenter) statusBlock(notice flow.Notice) {
 	if !p.Human {
-		output.Warning(p.Cmd.ErrOrStderr(), notice.Text)
+		render.Warning(p.Cmd.ErrOrStderr(), notice.Text)
 		for _, line := range notice.Lines {
-			output.Message(p.Cmd.ErrOrStderr(), output.Indent+line)
+			render.Message(p.Cmd.ErrOrStderr(), render.Indent+line)
 		}
 		return
 	}
 	w := p.phase(true)
 	if notice.Kind == flow.NoticeNote {
-		output.Section(w, notice.Text, notice.Lines)
+		render.Section(w, notice.Text, notice.Lines)
 		return
 	}
-	output.Callout(w, notice.Text, notice.Lines)
+	render.Callout(w, notice.Text, notice.Lines)
 }
 
 // FlowContext: the flow cannot load the config itself, which reads cobra flags.

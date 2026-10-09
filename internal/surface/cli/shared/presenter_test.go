@@ -13,7 +13,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
-	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 )
 
 // bordered asks the style itself what a box is drawn with, so this stops
@@ -144,7 +144,7 @@ func TestStatus_TakesNoSecondBlankAfterAFrameClosedTheBlock(t *testing.T) {
 	presenter, stderr := testPresenter(t)
 
 	presenter.Status(flow.Notice{Kind: flow.NoticeSuccess, Text: "stopped services on a"})
-	output.Frame(stderr, func(w io.Writer) { output.Message(w, "a job's output") })
+	render.Frame(stderr, func(w io.Writer) { render.Message(w, "a job's output") })
 	stderr.Reset()
 	presenter.Status(flow.Notice{Kind: flow.NoticeMessage, Text: "port probes silenced for web"})
 
@@ -157,13 +157,13 @@ func TestStatus_TakesNoSecondBlankAfterAFrameClosedTheBlock(t *testing.T) {
 // run: what decided the spacing used to be an event with nothing to do with it.
 func TestStatus_ReadsTheSameWhicheverRanBefore(t *testing.T) {
 	first, firstErr := testPresenter(t)
-	output.Frame(firstErr, func(w io.Writer) { output.Message(w, "a job's output") })
+	render.Frame(firstErr, func(w io.Writer) { render.Message(w, "a job's output") })
 	firstErr.Reset()
 	first.Status(flow.Notice{Kind: flow.NoticeMessage, Text: "silenced"})
 
 	second, secondErr := testPresenter(t)
 	second.Status(flow.Notice{Kind: flow.NoticeSuccess, Text: "stopped services on a"})
-	output.Frame(secondErr, func(w io.Writer) { output.Message(w, "a job's output") })
+	render.Frame(secondErr, func(w io.Writer) { render.Message(w, "a job's output") })
 	secondErr.Reset()
 	second.Status(flow.Notice{Kind: flow.NoticeMessage, Text: "silenced"})
 
@@ -177,8 +177,8 @@ func TestStatus_ReadsTheSameWhicheverRanBefore(t *testing.T) {
 // beside it.
 func TestDrawHookPhase_JoinsAnAlreadyOpenBlock(t *testing.T) {
 	var stderr bytes.Buffer
-	output.FrameStart(&stderr)
-	output.Message(output.Barred(&stderr), "a port was left alone")
+	render.FrameStart(&stderr)
+	render.Message(render.Barred(&stderr), "a port was left alone")
 	stderr.Reset()
 
 	err := DrawHookPhase(DrawHookPhaseParams{

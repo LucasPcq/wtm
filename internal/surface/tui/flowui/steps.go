@@ -7,8 +7,8 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
-	"github.com/LucasPcq/wtm/internal/tui/branchrefresh"
-	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/tui/branchrefresh"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
 type (

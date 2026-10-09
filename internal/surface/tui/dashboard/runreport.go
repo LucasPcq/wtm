@@ -10,7 +10,7 @@ import (
 )
 
 // runEventLines is what the panel says about the phases a start reports beside
-// its steps, in the CLI's words (output.RunPrinter): a job that died after its
+// its steps, in the CLI's words (render.RunPrinter): a job that died after its
 // ✓, the ports nobody bound, and what an abort left standing. The abort's own
 // headline is the run's conclusion, written once the flow returns.
 func runEventLines(event runlogs.Event) []string {

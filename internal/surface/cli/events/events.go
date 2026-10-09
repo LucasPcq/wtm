@@ -11,13 +11,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	wtmevents "github.com/LucasPcq/wtm/internal/service/events"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 func NewCmd() *cobra.Command {
@@ -164,7 +164,7 @@ func stream(params streamParams) error {
 	err := params.Watch(ctx, watchHooks{
 		OnEvent: writerFor(writerForParams{Cmd: cmd, Format: params.Format, Global: params.Global}),
 		OnWarning: func(err error) {
-			output.Warning(output.Barred(cmd.ErrOrStderr()), err.Error())
+			render.Warning(render.Barred(cmd.ErrOrStderr()), err.Error())
 		},
 	})
 	// A reader that left between two writes is the poll's case reached first.
@@ -226,12 +226,12 @@ type writerForParams struct {
 func writerFor(params writerForParams) func(wtmevents.Received) error {
 	out := params.Cmd.OutOrStdout()
 	if !rules.IsHumanFormat(params.Format) {
-		return func(received wtmevents.Received) error { return output.WriteEventJSONLine(out, received.Raw) }
+		return func(received wtmevents.Received) error { return render.WriteEventJSONLine(out, received.Raw) }
 	}
-	barred := output.Barred(out)
-	write := output.WriteEventLine
+	barred := render.Barred(out)
+	write := render.WriteEventLine
 	if params.Global {
-		write = output.WriteGlobalEventLine
+		write = render.WriteGlobalEventLine
 	}
 	return func(received wtmevents.Received) error { return write(barred, received.Event) }
 }

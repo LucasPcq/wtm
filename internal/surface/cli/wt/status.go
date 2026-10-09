@@ -9,13 +9,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	statusflow "github.com/LucasPcq/wtm/internal/flow/status"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/runctx"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 func newStatusCmd() *cobra.Command {
@@ -113,13 +113,13 @@ func reportStatus(cmd *cobra.Command, report statusReport) error {
 
 	out := cmd.OutOrStdout()
 	if report.Format == domain.OutputJSON {
-		return output.WriteStatusJSON(out, outcome.Document)
+		return render.WriteStatusJSON(out, outcome.Document)
 	}
-	output.Frame(out, func(w io.Writer) {
-		output.FormatStatus(w, output.FormatStatusParams{
+	render.Frame(out, func(w io.Writer) {
+		render.FormatStatus(w, render.FormatStatusParams{
 			Document:   outcome.Document,
 			ProjectDir: report.ProjectDir,
-			Hyperlinks: output.IsTerminal(out),
+			Hyperlinks: render.IsTerminal(out),
 		})
 	})
 	return nil
@@ -133,10 +133,10 @@ func reportStatusAll(cmd *cobra.Command, report statusReport) error {
 
 	out := cmd.OutOrStdout()
 	if report.Format == domain.OutputJSON {
-		return output.WriteStatusAllJSON(out, docs)
+		return render.WriteStatusAllJSON(out, docs)
 	}
-	output.Frame(out, func(w io.Writer) {
-		output.FormatStatusAll(w, docs)
+	render.Frame(out, func(w io.Writer) {
+		render.FormatStatusAll(w, docs)
 	})
 	return nil
 }

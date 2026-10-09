@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 )
 
 // newGoCmd creates the wtm go subcommand (fallback when shell wrapper is not configured).
@@ -26,10 +26,10 @@ func newGoCmd() *cobra.Command {
 }
 
 func runGo(cmd *cobra.Command, _ []string) error {
-	output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
-		output.Warning(w, "wtm go requires shell integration to change your working directory.")
-		output.Blank(w)
-		output.Message(w, domain.MsgShellInitHint)
+	render.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
+		render.Warning(w, "wtm go requires shell integration to change your working directory.")
+		render.Blank(w)
+		render.Message(w, domain.MsgShellInitHint)
 	})
 	return nil
 }

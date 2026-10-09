@@ -8,11 +8,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/schemas"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 func newDumpCmd() *cobra.Command {
@@ -44,9 +44,9 @@ func runDump(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return err
 		}
-		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
 			for _, p := range written {
-				output.Success(w, fmt.Sprintf("Wrote %s", p))
+				render.Success(w, fmt.Sprintf("Wrote %s", p))
 			}
 		})
 		return nil
@@ -65,9 +65,9 @@ func runDump(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+	render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
 		for _, p := range written {
-			output.Success(w, fmt.Sprintf("Wrote %s", p))
+			render.Success(w, fmt.Sprintf("Wrote %s", p))
 		}
 	})
 	return nil

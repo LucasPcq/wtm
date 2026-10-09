@@ -21,7 +21,7 @@ func skillFile(t *testing.T, name string) string {
 
 func guideFile(t *testing.T, name string) string {
 	t.Helper()
-	content, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "guide", name))
+	content, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "docs", "guide", name))
 	if err != nil {
 		t.Fatalf("docs/guide/%s: %v", name, err)
 	}

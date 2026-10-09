@@ -5,12 +5,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/run/runctx"
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/service/proxy"
-	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/run/runctx"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
 func newInstallCmd() *cobra.Command {
@@ -59,8 +59,8 @@ func runInstall(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-		output.ProxyPlanReport(w, output.ProxyPlanReportParams{
+	render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		render.ProxyPlanReport(w, render.ProxyPlanReportParams{
 			Files:      plan.Files,
 			Script:     plan.Script,
 			Full:       full,
@@ -82,8 +82,8 @@ func runInstall(cmd *cobra.Command, _ []string) error {
 	if applyErr := redirector.Apply(cmd.Context()); applyErr != nil {
 		return applyErr
 	}
-	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-		output.Success(w, domain.ProxyInstallDone)
+	render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		render.Success(w, domain.ProxyInstallDone)
 	})
 	return nil
 }
@@ -99,8 +99,8 @@ func runUninstall(cmd *cobra.Command, _ []string) error {
 		return domain.ErrProxyRedirectUnsupported
 	}
 	if !status.Installed {
-		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-			output.Unchanged(w, domain.ProxyUninstallNothing)
+		render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			render.Unchanged(w, domain.ProxyUninstallNothing)
 		})
 		return nil
 	}
@@ -113,8 +113,8 @@ func runUninstall(cmd *cobra.Command, _ []string) error {
 		plan.Files[i].Change = domain.ProxyUninstallChange
 	}
 
-	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-		output.ProxyPlanReport(w, output.ProxyPlanReportParams{Files: plan.Files})
+	render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		render.ProxyPlanReport(w, render.ProxyPlanReportParams{Files: plan.Files})
 	})
 
 	confirmed, err := confirm(cmd, components.NewConfirmParams{
@@ -128,8 +128,8 @@ func runUninstall(cmd *cobra.Command, _ []string) error {
 	if removeErr := redirector.Remove(cmd.Context()); removeErr != nil {
 		return removeErr
 	}
-	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-		output.Success(w, domain.ProxyUninstallDone)
+	render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		render.Success(w, domain.ProxyUninstallDone)
 	})
 	return nil
 }

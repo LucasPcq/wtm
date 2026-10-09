@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
 // The step borrows the runner list; what goes through it has to come back as

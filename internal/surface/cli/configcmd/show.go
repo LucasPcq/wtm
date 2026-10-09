@@ -9,10 +9,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
 func newShowCmd() *cobra.Command {
@@ -62,12 +62,12 @@ func runShow(cmd *cobra.Command, _ []string) error {
 func runShowJSON(cmd *cobra.Command, stateDir string) error {
 	cfg, err := config.LoadProjectRaw(stateDir)
 	if errors.Is(err, domain.ErrConfigNotFound) {
-		return output.WriteProjectConfigJSON(cmd.OutOrStdout(), domain.ProjectConfig{})
+		return render.WriteProjectConfigJSON(cmd.OutOrStdout(), domain.ProjectConfig{})
 	}
 	if err != nil {
 		return err
 	}
-	return output.WriteProjectConfigJSON(cmd.OutOrStdout(), cfg)
+	return render.WriteProjectConfigJSON(cmd.OutOrStdout(), cfg)
 }
 
 // runValidate loads and validates the merged config, reporting the outcome in the
@@ -76,21 +76,21 @@ func runValidate(cmd *cobra.Command, stateDir string, format string) error {
 	_, err := config.Load(config.LoadParams{StateDir: stateDir})
 
 	if format == domain.OutputJSON {
-		payload := output.ConfigValidateJSON{Valid: err == nil}
+		payload := render.ConfigValidateJSON{Valid: err == nil}
 		if err != nil {
 			payload.Error = err.Error()
 		}
-		return output.WriteConfigValidateJSON(cmd.OutOrStdout(), payload)
+		return render.WriteConfigValidateJSON(cmd.OutOrStdout(), payload)
 	}
 
 	if err != nil {
-		output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
-			output.Error(w, err.Error())
+		render.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
+			render.Error(w, err.Error())
 		})
 		return domain.ErrAborted
 	}
-	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-		output.Success(w, "Config is valid.")
+	render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		render.Success(w, "Config is valid.")
 	})
 	return nil
 }
@@ -100,8 +100,8 @@ func runShowText(cmd *cobra.Command, stateDir string) error {
 	path := filepath.Join(stateDir, domain.ConfigFileName)
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		output.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
-			output.Warning(w, fmt.Sprintf("No config at %s. Run `wtm init` first.", path))
+		render.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
+			render.Warning(w, fmt.Sprintf("No config at %s. Run `wtm init` first.", path))
 		})
 		return nil
 	}
@@ -110,9 +110,9 @@ func runShowText(cmd *cobra.Command, stateDir string) error {
 	}
 
 	var writeErr error
-	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-		output.InfoLine(w, "path", path)
-		output.Blank(w)
+	render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		render.InfoLine(w, "path", path)
+		render.Blank(w)
 		_, writeErr = w.Write(data)
 	})
 	if writeErr != nil {

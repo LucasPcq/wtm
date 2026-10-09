@@ -9,9 +9,9 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/service/integration"
-	"github.com/LucasPcq/wtm/internal/tui/runview"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/tui/runview"
 )
 
 // showRunView is the full-screen surface, a variable for the same reason: a
@@ -63,7 +63,7 @@ func openRunView(params viewParams) (runlogs.Outcomes, error) {
 		if rest.printer != nil {
 			rest.printer.Conclude(params.Warnings)
 		}
-		output.FrameEnd(out)
+		render.FrameEnd(out)
 		return result.Outcomes, nil
 	}
 	frameRecap(out, result.Recap)
@@ -74,7 +74,7 @@ func frameRecap(out io.Writer, recap string) {
 	if recap == "" {
 		return
 	}
-	output.Frame(out, func(w io.Writer) { fmt.Fprintln(w, recap) })
+	render.Frame(out, func(w io.Writer) { fmt.Fprintln(w, recap) })
 }
 
 // detachedRun reports what is left of a run once the reader has closed the
@@ -83,7 +83,7 @@ func frameRecap(out io.Writer, recap string) {
 // the view is the only thing that knows whether they did.
 type detachedRun struct {
 	params  viewParams
-	printer *output.RunPrinter
+	printer *render.RunPrinter
 }
 
 // open runs with the terminal already given back, which is what makes writing
@@ -91,9 +91,9 @@ type detachedRun struct {
 // said the reader left.
 func (d *detachedRun) open() {
 	out, errOut := d.params.Cmd.OutOrStdout(), d.params.Cmd.ErrOrStderr()
-	output.FrameStart(out)
-	output.Message(output.Barred(out), domain.RunDetachedNotice)
-	d.printer = output.NewRunPrinter(output.RunPrinterParams{
+	render.FrameStart(out)
+	render.Message(render.Barred(out), domain.RunDetachedNotice)
+	d.printer = render.NewRunPrinter(render.RunPrinterParams{
 		Out:        out,
 		Err:        errOut,
 		Profile:    d.params.Profile,
@@ -125,8 +125,8 @@ type streamParams struct {
 func runOnStream(params streamParams) (runlogs.Outcomes, error) {
 	out, errOut := params.Cmd.OutOrStdout(), params.Cmd.ErrOrStderr()
 
-	output.FrameStart(out)
-	printer := output.NewRunPrinter(output.RunPrinterParams{
+	render.FrameStart(out)
+	printer := render.NewRunPrinter(render.RunPrinterParams{
 		Out:        out,
 		Err:        errOut,
 		Profile:    params.Profile,
@@ -135,8 +135,8 @@ func runOnStream(params streamParams) (runlogs.Outcomes, error) {
 	})
 	outcomes, err := params.Start(params.Cmd.Context(), printer)
 	if err != nil && interruptedWithAnAccount(params.Cmd, outcomes) {
-		output.RunInterrupted(out, outcomes)
-		output.FrameEnd(out)
+		render.RunInterrupted(out, outcomes)
+		render.FrameEnd(out)
 		return outcomes, reported(err)
 	}
 	if err != nil {
@@ -144,11 +144,11 @@ func runOnStream(params streamParams) (runlogs.Outcomes, error) {
 	}
 
 	if outcomes.Aborted() {
-		output.FrameEnd(errOut)
+		render.FrameEnd(errOut)
 		return outcomes, nil
 	}
 	printer.Conclude(params.Warnings)
-	output.FrameEnd(out)
+	render.FrameEnd(out)
 	return outcomes, nil
 }
 
@@ -160,7 +160,7 @@ func runForMachine(params streamParams) (runlogs.Outcomes, error) {
 	if err != nil && !interruptedWithAnAccount(params.Cmd, outcomes) {
 		return nil, err
 	}
-	if writeErr := output.WriteRunOutcomesJSON(params.Cmd.OutOrStdout(), outcomes); writeErr != nil {
+	if writeErr := render.WriteRunOutcomesJSON(params.Cmd.OutOrStdout(), outcomes); writeErr != nil {
 		return nil, writeErr
 	}
 	return outcomes, err

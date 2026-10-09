@@ -38,12 +38,12 @@ Each rule is a `golang.org/x/tools/go/analysis` Analyzer resolved by type — an
 
 ### The output vocabulary
 
-The glyph table was written down and the surface diverged anyway — sixty commands, five renderings of "nothing to do", `!` alone rendered as a filled chip. Four rules hold the parts a table cannot say (the reasoning is in [output.md](output.md#three-rules-that-make-the-vocabulary-hold)). The first three run only over the layers that put glyphs on a screen (`output`, `styles`, `tui`): `rules/` and `service/` are left out because `=` and `!` are ordinary bytes to an env parser or a pnpm workspace pattern, and a check that cannot tell those apart is one people work around. `fontcover` runs over every string, since the runes it is about are declared in `domain`.
+The glyph table was written down and the surface diverged anyway — sixty commands, five renderings of "nothing to do", `!` alone rendered as a filled chip. Four rules hold the parts a table cannot say (the reasoning is in [output.md](output.md#three-rules-that-make-the-vocabulary-hold)). The first three run only over the layers that put glyphs on a screen (`surface/cli/render`, `styles`, `surface/tui`): `rules/` and `service/` are left out because `=` and `!` are ordinary bytes to an env parser or a pnpm workspace pattern, and a check that cannot tell those apart is one people work around. `fontcover` runs over every string, since the runes it is about are declared in `domain`.
 
 | Rule | Catches |
 | -- | -- |
 | `glyph` | a vocabulary rune written as a literal — `"✓"`, `"!"`, `"→"` … — instead of its `domain` constant, which is how a seventh glyph appears and how an existing one takes a second meaning |
-| `tuistyle` | `styles.Badge*` or `styles.Dashboard*` used from `internal/output`: a badge is a widget, and its padding made an attention line two columns wider than the failure line under it |
+| `tuistyle` | `styles.Badge*` or `styles.Dashboard*` used from `internal/surface/cli/render`: a badge is a widget, and its padding made an attention line two columns wider than the failure line under it |
 | `mutedline` | `Message(w, styles.Muted.Render(x))` — a bare line muted whole, which is the `=` register with its glyph filed off |
 | `fontcover` | a non-letter rune missing from common monospace fonts, in any string of `internal/` — the terminal borrows it from a wider fallback face and it eats the space after it. The allowed set, `fontSafe`, was measured over thirteen fonts; `fontLegacy` holds the runes that predate the rule and may only shrink |
 
@@ -70,6 +70,6 @@ So it is not re-proposed:
 
 | Rule | Measured | Why not |
 | -- | -- | -- |
-| Structs for 2+ inputs (`CLAUDE.md` §2) | 546 functions at 2+ non-carrier inputs, 17 at 4+ | A count cannot tell a related pair from a carrier pair. A gate at 2 fires on most of `output/`; one at 4 still fires on a syscall wrapper whose arity is the ABI, and on list widgets whose `renderRow` gains nothing from a struct. Encoding a rule that cannot tell the cases apart teaches people to work around the linter. It stays a review rule |
+| Structs for 2+ inputs (`CLAUDE.md` §2) | 546 functions at 2+ non-carrier inputs, 17 at 4+ | A count cannot tell a related pair from a carrier pair. A gate at 2 fires on most of `surface/cli/render/`; one at 4 still fires on a syscall wrapper whose arity is the ABI, and on list widgets whose `renderRow` gains nothing from a struct. Encoding a rule that cannot tell the cases apart teaches people to work around the linter. It stays a review rule |
 | Comment density (`CLAUDE.md` §8) | — | The ceiling is met as easily by deleting the comments that earn their place as the ones that do not, so the number measures the wrong thing. The rule itself needs rethinking before anything can check it |
 | A `label  value` format string hand-aligning its own column | 1 match in `domain` (`DetailReviewDecisionFmt`), and it is a dashboard fragment, not a block | The regex that finds a hand-aligned label finds the one legitimate use too. `Announce` owning the alignment is the fix; a gate over it would teach people to space their labels differently rather than to use the helper |

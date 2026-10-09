@@ -8,8 +8,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/styles"
-	"github.com/LucasPcq/wtm/internal/tui/components"
-	"github.com/LucasPcq/wtm/internal/tui/flowui"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
+	"github.com/LucasPcq/wtm/internal/surface/tui/flowui"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

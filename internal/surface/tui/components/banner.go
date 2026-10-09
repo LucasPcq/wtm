@@ -8,7 +8,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/styles"
 )
 
-// errorBanner renders an inline error line "  ✗ Message" matching output.Error.
+// errorBanner renders an inline error line "  ✗ Message" matching render.Error.
 // The first rune of msg is capitalized so wizard errors read like sentences.
 // wrappedErrorBanner is errorBanner for a step that knows its width, its
 // continuation lines hung under the message rather than under the glyph.
@@ -32,7 +32,7 @@ func errorBanner(msg string) string {
 }
 
 // warningBanner renders an inline warning line "  ! Message" matching
-// output.Warning. Capitalizes the first rune for readability.
+// render.Warning. Capitalizes the first rune for readability.
 func warningBanner(msg string) string {
 	var b strings.Builder
 	b.WriteString(styles.Indent)

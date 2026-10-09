@@ -10,14 +10,14 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/output"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/detect"
-	"github.com/LucasPcq/wtm/internal/tui/components"
-	initwizard "github.com/LucasPcq/wtm/internal/tui/inittui"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
+	"github.com/LucasPcq/wtm/internal/surface/tui/components"
+	initwizard "github.com/LucasPcq/wtm/internal/surface/tui/inittui"
 )
 
 // NewCmd creates the wtm init command.
@@ -109,10 +109,10 @@ func runInit(cmd *cobra.Command, _ []string) error {
 	}
 
 	if detect.ProjectConfigExists(stateDir) {
-		output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-			output.Unchanged(w, fmt.Sprintf(domain.InitAlreadyExistsFmt, filepath.Join(stateDir, domain.ConfigFileName)))
-			output.Blank(w)
-			output.NextSteps(w, []output.NextStepParams{
+		render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+			render.Unchanged(w, fmt.Sprintf(domain.InitAlreadyExistsFmt, filepath.Join(stateDir, domain.ConfigFileName)))
+			render.Blank(w)
+			render.NextSteps(w, []render.NextStepParams{
 				{Command: domain.InitReconfigureCmd, Note: domain.InitReconfigureNote},
 				{Command: domain.InitEditCmd, Note: domain.InitEditNote},
 				{Command: domain.InitRunInitCmd, Note: domain.InitRunInitNote},
@@ -141,10 +141,10 @@ func ensureGlobalConfig(cmd *cobra.Command, flagged bool) error {
 		return fmt.Errorf("write global config: %w", err)
 	}
 
-	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-		output.InitGlobalRecap(w, output.InitGlobalRecapParams{
+	render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		render.InitGlobalRecap(w, render.InitGlobalRecapParams{
 			Fields: rules.InitGlobalRecapFields(answers),
-			NextSteps: []output.NextStepParams{
+			NextSteps: []render.NextStepParams{
 				{Command: domain.InitNextStepShell, Note: domain.InitNextStepShellNote},
 			},
 		})
@@ -161,7 +161,7 @@ func resolveGlobalAnswers(cmd *cobra.Command, flagged bool) (domain.InitGlobalAn
 		return rules.BuildGlobalAnswers(rules.InitGlobalFlags{Shell: shell})
 	}
 
-	output.Message(cmd.OutOrStdout(), "No global config found. Let's set one up.")
+	render.Message(cmd.OutOrStdout(), "No global config found. Let's set one up.")
 
 	answers, err := initwizard.RunGlobalWizard()
 	if err != nil {
@@ -234,11 +234,11 @@ func createProjectConfig(cmd *cobra.Command, dir, stateDir string, flagged bool)
 		shared.Register(shared.RegisterParams{Root: root, StateDir: stateDir, CorrelationID: shared.CorrelationID(cmd)})
 	}
 
-	output.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-		output.InitProjectRecap(w, output.InitProjectRecapParams{
+	render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
+		render.InitProjectRecap(w, render.InitProjectRecapParams{
 			ConfigPath: rules.DisplayPath(rules.DisplayPathParams{Base: dir, Target: filepath.Join(stateDir, domain.ConfigFileName)}),
 			Fields:     rules.InitProjectRecapFields(answers),
-			NextSteps: []output.NextStepParams{
+			NextSteps: []render.NextStepParams{
 				{Command: domain.InitNextStepCreate, Note: domain.InitNextStepCreateNote},
 				{Command: domain.InitNextStepRelocate, Note: domain.InitNextStepRelocateNote},
 				{Command: domain.InitNextStepRunInit, Note: domain.InitNextStepRunInitNote},

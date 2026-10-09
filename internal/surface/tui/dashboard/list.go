@@ -8,7 +8,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/styles"
-	"github.com/LucasPcq/wtm/internal/tui/worktreepicker"
+	"github.com/LucasPcq/wtm/internal/surface/tui/worktreepicker"
 )
 
 const (
