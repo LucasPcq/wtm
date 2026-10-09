@@ -285,8 +285,7 @@ func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, 
 		publish.Created(whole, f.ctx, branchName)
 		release()
 		if f.runCtx.Err() != nil {
-			publish.Provisioned(context.WithoutCancel(f.runCtx), publish.ProvisionedParams{Context: f.ctx, Branch: branchName, Err: domain.ErrCancelled})
-			return result, fmt.Errorf(domain.CreateSetupInterruptedFmt, domain.ErrLeftBehind, result.Path)
+			return result, f.leftUnset(result)
 		}
 		// Before the hooks: one of them may well read the .env this settles.
 		result.EnvPorts, result.Warnings = envports.SettleFresh(f.runCtx, envports.FreshParams{
@@ -303,6 +302,10 @@ func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, 
 			Prompter:  f.prompter,
 			Presenter: f.presenter,
 		})...)
+		// The port pass only warns, and no hook may follow to notice the interrupt.
+		if f.runCtx.Err() != nil {
+			return result, f.leftUnset(result)
+		}
 		hookErr := f.runHooks(result.Path, branchName, fromBranch)
 		publish.Provisioned(context.WithoutCancel(f.runCtx), publish.ProvisionedParams{Context: f.ctx, Branch: branchName, Err: hookErr})
 		if hookErr != nil && f.runCtx.Err() != nil {
@@ -314,6 +317,11 @@ func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, 
 	}
 	result.Isolation = worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: branchName})
 	return result, nil
+}
+
+func (f *createFlow) leftUnset(result domain.CreateResult) error {
+	publish.Provisioned(context.WithoutCancel(f.runCtx), publish.ProvisionedParams{Context: f.ctx, Branch: result.Branch, Err: domain.ErrCancelled})
+	return fmt.Errorf(domain.CreateSetupInterruptedFmt, domain.ErrLeftBehind, result.Path)
 }
 
 func (f *createFlow) warnIgnoredIsolation(result *domain.CreateResult) {

@@ -208,8 +208,7 @@ func (f *checkoutFlow) checkout(params checkoutParams) (Outcome, error) {
 	settled := context.WithoutCancel(f.runCtx)
 	publish.Created(settled, f.ctx, result.Branch)
 	if f.runCtx.Err() != nil {
-		publish.Provisioned(settled, publish.ProvisionedParams{Context: f.ctx, Branch: result.Branch, Err: domain.ErrCancelled})
-		return Outcome{}, fmt.Errorf(domain.CreateSetupInterruptedFmt, domain.ErrLeftBehind, result.Path)
+		return Outcome{}, f.leftUnset(result)
 	}
 
 	// Before the hooks: one of them may read the .env, and it has to read what
@@ -228,6 +227,10 @@ func (f *checkoutFlow) checkout(params checkoutParams) (Outcome, error) {
 		Prompter:  f.prompter,
 		Presenter: f.presenter,
 	})...)
+	// The port pass only warns, and no hook may follow to notice the interrupt.
+	if f.runCtx.Err() != nil {
+		return Outcome{}, f.leftUnset(result)
+	}
 
 	// A reused branch has no start-point, so the hooks see its recorded parent.
 	hookErr := f.runHooks(hooksParams{WorktreePath: result.Path, Branch: pr.Branch, FromBranch: rules.FirstNonEmpty(startPoint, parent)})
@@ -243,6 +246,11 @@ func (f *checkoutFlow) checkout(params checkoutParams) (Outcome, error) {
 
 	outcome := Outcome{PR: pr, Result: result, Target: target}
 	return outcome, f.presenter.CheckedOut(outcome)
+}
+
+func (f *checkoutFlow) leftUnset(result domain.CreateResult) error {
+	publish.Provisioned(context.WithoutCancel(f.runCtx), publish.ProvisionedParams{Context: f.ctx, Branch: result.Branch, Err: domain.ErrCancelled})
+	return fmt.Errorf(domain.CreateSetupInterruptedFmt, domain.ErrLeftBehind, result.Path)
 }
 
 type createParams struct {

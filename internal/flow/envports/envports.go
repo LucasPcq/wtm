@@ -148,6 +148,10 @@ func SettleFresh(ctx context.Context, params FreshParams) (domain.EnvPortPlan, [
 	}
 	warnings := reportIgnored(params.Presenter, params.Preflight.Ignored)
 	plan, err := settle(ctx, settleParams{Params: params.Params, Notices: rules.EnvPortNoticesOnCreate})
+	// An interrupt is the caller's to report, as a worktree left unset.
+	if err != nil && ctx.Err() != nil {
+		return domain.EnvPortPlan{}, warnings
+	}
 	if err != nil {
 		return domain.EnvPortPlan{}, append(warnings, notSettled(notSettledParams{Params: params.Params, Cause: err})...)
 	}

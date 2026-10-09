@@ -957,3 +957,22 @@ func TestABatchPublishesOneProvisionedPerBranch(t *testing.T) {
 		t.Fatalf("provisioned = %+v, want feat/a ok then feat/b not ok", got)
 	}
 }
+
+// The branch typed into the wizard folds to the folder of a worktree another
+// branch holds: an idempotent create must refuse it rather than return it.
+func TestAWizardBranchSharingAnotherWorktreeFolderIsRefused(t *testing.T) {
+	ctx := testContext(t)
+	if _, err := Run(t.Context(), Params{Context: ctx, Request: Request{Branches: []string{"feat-x"}, From: "main"}, Prompter: flow.Unattended{}, Presenter: newRecorder()}); err != nil {
+		t.Fatal(err)
+	}
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyBranch: "feat/x", KeySource: "main", KeyEnv: "", KeyRecap: confirmCreate}}
+
+	outcome, err := Run(t.Context(), Params{Context: ctx, Request: Request{IfNotExists: true}, Prompter: prompter, Presenter: newRecorder()})
+
+	if !errors.Is(err, domain.ErrWorktreeNameTaken) {
+		t.Fatalf("err = %v, want ErrWorktreeNameTaken", err)
+	}
+	if len(outcome.Results) != 0 || len(outcome.Failed) != 1 || outcome.Failed[0].ExitCode != domain.ExitCodeWorktreeExists {
+		t.Errorf("outcome = %+v, want feat/x failed with exit %d and nothing returned", outcome, domain.ExitCodeWorktreeExists)
+	}
+}
