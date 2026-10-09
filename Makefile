@@ -1,7 +1,7 @@
 BINARY   := wtm
 BUILD_DIR := bin
 
-.PHONY: build test vet fmt lint arch dead dead-strict dupl tidy docs site site-dev demos release release-notes install clean
+.PHONY: build test vet fmt lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
 
 build:
 	go build -o $(BUILD_DIR)/$(BINARY) .
@@ -39,7 +39,13 @@ dead:
 dead-strict:
 	@go tool deadcode ./... | grep -v -E -f .deadcode-ignore | grep -v -E '/(testutil|processtest)/' || true
 
-lint: fmt vet arch dead
+# sumtype checks that a type switch over a sealed interface declared with
+# //go-sumtype:decl (kernel.Error, kernel.Value) handles every variant. The
+# declaration is a standalone comment: gofmt rewrites it inside a doc comment.
+sumtype:
+	go tool go-sumtype $$(go list ./...)
+
+lint: fmt vet arch dead sumtype
 	go tool staticcheck ./...
 
 # dupl reports token-level clones. It is not part of `lint`: a clone is a

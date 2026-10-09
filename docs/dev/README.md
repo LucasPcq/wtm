@@ -7,6 +7,7 @@ Reference documentation for people (and agents) working **on** wtm. It describes
 | Document | What it covers |
 | -- | -- |
 | [architecture.md](architecture.md) | The annotated package map, who may call whom and what each interdiction buys, how a command designates a worktree |
+| [commands.md](commands.md) | `internal/kernel/` — the engine's contract: commands, fields and forms, rules across fields, errors and their message catalogue, results, units of work (`Each`, sagas), the checks every command runs |
 | [flow-layer.md](flow-layer.md) | `internal/flow/` — the three seams, the step model, unattended resolution, embedding, scheduling, events, testing a flow |
 | [adding-a-mutation-command.md](adding-a-mutation-command.md) | End-to-end recipe for a new worktree-mutating command |
 | [output.md](output.md) | What a command prints: the one question a block has to answer, the frame and the accent bar, the four levels, the two shapes of a conclusion, the glyph vocabulary, `--quiet` |

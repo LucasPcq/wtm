@@ -11,6 +11,10 @@ cmd/                          ← entry points, cobra setup only
 internal/
   domain/                     ← types, errors, constants only (no methods, no functions)
   rules/                      ← pure functions (stdlib + domain only, no I/O)
+  kernel/                     ← the skeleton of the command engine (stdlib only, no business vocabulary): Command,
+                                fields, rules, errors, results, Each / Saga (commands.md)
+    text/                     ←   the one catalogue turning a kernel.Code and its params into English
+    kerneltest/               ←   the checks every command runs on itself (DependsOn, sagas)
   config/                     ← load & validate config.toml + run.toml from <git-common-dir>/wtm/, plus the global config (config.GlobalPath);
                                 every write puts the file's JSON schema (schemas/) beside it
   flow/                       ← the flow of each command, surface-independent (see below):
@@ -152,6 +156,7 @@ Every arrow that is *missing* is the point:
 | `surface/cli/` has no business logic | A command is readable as flags in, one call out. Changing the flow never means editing flag parsing. |
 | `domain/` holds types, errors and constants only | Nothing can acquire a dependency by hiding behind a method on a shared type. |
 | `rules/` imports only stdlib + `domain/` | Decisions stay testable with no repo, no network, no temp dir. `rules.DecidePush` is a table test, not an integration test. |
+| `kernel/` imports only the stdlib | The skeleton carries no business vocabulary: a command composes `kernel` with `domain/`, never the reverse, so a change to the domain never reaches the contract every command, `dispatch` and surface share. I/O reaches it only as functions it is handed (`Observe`, `Apply`, the `Shield`). |
 | `service/` never imports cobra, bubbletea or lipgloss | The git operations are callable from a test, a flow, a daemon — anything that is not a terminal. |
 | `surface/cli/render/` and `surface/tui/` hold no decision logic | Two surfaces can render the same run without disagreeing about what it means. |
 | `styles/` is the only package instantiating `lipgloss.Style` | A theme change is one file. |

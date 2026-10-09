@@ -7,6 +7,7 @@ Mandatory coding standards for `wtm`. When in doubt, consult the `go-cli` skill 
 | Read | Before |
 | -- | -- |
 | [`docs/dev/architecture.md`](docs/dev/architecture.md) | adding a package, an import between layers, or a `service→service` edge (annotated package map) |
+| [`docs/dev/commands.md`](docs/dev/commands.md) | touching `internal/kernel/`: the engine's contract (fields, rules, errors and their codes, results, `Each` / sagas) |
 | [`docs/dev/flow-layer.md`](docs/dev/flow-layer.md) | touching anything under `internal/flow/`, a Prompter/Presenter, a step kind, or the dashboard's run of a flow |
 | [`docs/dev/adding-a-mutation-command.md`](docs/dev/adding-a-mutation-command.md) | adding a worktree-mutating command |
 | [`docs/dev/output.md`](docs/dev/output.md) | adding a command or changing what one prints (frame, glyphs, block helpers, `--quiet`, JSON contract, hook view) |
@@ -52,15 +53,15 @@ func Connect(params ConnectParams) error
 
 ## 3. Shared types — no duplication
 
-Types, enums, sentinel errors and constants are defined once in `internal/domain/`. Pure functions with no I/O (lookups, transforms, classification) live in `internal/rules/`.
+Types, enums, sentinel errors and constants are defined once in `internal/domain/`. Pure functions with no I/O (lookups, transforms, classification) live in `internal/rules/`. The engine's contract is the exception: `internal/kernel/` declares its own vocabulary (`Kind`, `Status`, `Reason`, `FieldType`, the `kernel.Code` constants), and a migrated command declares its codes as `kernel.Code` constants beside it, each with its message in `kernel/text`.
 
 ## 4. Validate all external input
 
-Config files, CLI flags and environment variables are validated at the boundary (`config/` or command entry), with `go-playground/validator` tags or guard clauses. The service layer receives only clean data.
+Config files, CLI flags and environment variables are validated at the boundary (`config/` or command entry) with guard clauses. A command on the engine declares its checks as data: per-field `Constraints` in its `FieldSpec`, rules across fields as `kernel.Rules` combinators, both producing `kernel.FieldError` codes (`docs/dev/commands.md`). The service layer receives only clean data.
 
 ## 5. Centralized constants — no magic strings or numbers
 
-Every string key, exit code, flag name, env var name and format identifier is a named constant in `internal/domain/constants.go`.
+Every string key, exit code, flag name, env var name and format identifier is a named constant in `internal/domain/constants.go`, except the engine's codes and params, which live in `internal/kernel/` and beside each migrated command.
 
 ```go
 // ❌ os.Exit(1); cmd.Flags().String("output", ...)
@@ -73,7 +74,7 @@ Every error or guard returns immediately; the happy path is last. Never nest `if
 
 ## 7. No unsafe type assertions
 
-Always comma-ok (`s, ok := v.(string); if !ok { return fmt.Errorf("expected string, got %T", v) }`). Prefer typed interfaces and concrete structs over `any`. Type at the source, not downstream.
+Always comma-ok (`s, ok := v.(string); if !ok { return fmt.Errorf("expected string, got %T", v) }`). Prefer typed interfaces and concrete structs over `any`. Type at the source, not downstream. A value that takes one of a closed set of shapes is a sealed interface (an unexported method) with one type per shape, declared `//go-sumtype:decl` on a line of its own so `make lint` checks every type switch over it (`kernel.Error`, `kernel.Value`) — never one struct whose fields are valid only for some value of another.
 
 ## 8. Comments — the exception, not the rule
 
@@ -86,6 +87,8 @@ cmd/            entry points, cobra setup only
 internal/
   domain/       types, errors, constants only
   rules/        pure functions (stdlib + domain only, no I/O)
+  kernel/       the command engine's skeleton (stdlib only): fields, rules, errors, results, Each / sagas;
+                text/ its message catalogue, kerneltest/ the checks every command runs
   config/       load & validate config.toml, run.toml, global config; writes the JSON schema beside each
   flow/         each command's flow, surface-independent (one package per command)
   service/      impure orchestration: git exec, I/O, hooks, the run daemon, the event bus
@@ -103,6 +106,7 @@ The annotated map of every sub-package is in `docs/dev/architecture.md`.
 - `surface/cli/` has zero business logic.
 - `domain/` has types, errors and constants only — no methods, no free functions.
 - `rules/` imports only stdlib and `internal/domain` — no I/O, no side effects.
+- `kernel/` imports only the stdlib — no `domain/`, no business vocabulary: a command composes `kernel` with `domain`, never the reverse. I/O reaches it only as functions it is handed (`Observe`, `Apply`, the `Shield`). The engine writes no text: an error, a warning or a progress event is a `kernel.Code` plus params, and `kernel/text` holds the English.
 - `service/` never imports `cobra`, `bubbletea`, `lipgloss`.
 - `surface/cli/render/` and `surface/tui/` have zero decision logic — only rendering.
 - `styles/` is the only package allowed to instantiate `lipgloss.Style`.
@@ -139,7 +143,7 @@ Every commit message — subject and body — is in English, whatever language t
 ## 11. Validate before commit
 
 ```
-make lint          # fmt + vet + arch (tools/archlint) + dead (deadcode) + staticcheck — all gating
+make lint          # fmt + vet + arch (tools/archlint) + dead (deadcode) + sumtype (go-sumtype) + staticcheck — all gating
 make test          # go test ./... -race -count=1
 make docs          # regenerate docs/ from the Cobra tree
 make demos         # re-record the README GIFs (needs vhs)
@@ -147,6 +151,7 @@ make release-notes VERSION=x.y.z   # print a CHANGELOG section as release notes
 make dupl          # clone report, informative only
 ```
 
+- Tests of the engine (`internal/kernel/` and the layers built on it) use testify (`assert`, `require`); each test file holds only `Test…` functions, the example and fakes in `fixture_test.go`, shared helpers in `helpers_test.go`. The rest of the repository keeps stdlib `testing`.
 - A new architectural rule goes into `tools/archlint`, not into a paragraph here. `.archlint-migrating` and `.deadcode-ignore` may only shrink; a new entry needs a stated reason. See `docs/dev/lint.md`.
 - `.claude/hooks/pre-commit-gates.sh` runs `make lint` and a `go mod tidy` check on every `git commit` and blocks it on failure. It does not run the tests. `WTM_SKIP_GATES=1 git commit …` only when the gate itself is wrong.
 - **Invoke the `build-validator` subagent before marking any task done** — it adds the `-race` test suite, dependency hygiene and the duplication report.

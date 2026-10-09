@@ -3,7 +3,7 @@
 `make lint` is the mechanical half of `CLAUDE.md`. Every rule in it exists because a reviewer would otherwise have to hold the layer rules in their head on every PR, and the ones nobody holds are the ones that drift. Read this before adding a rule, an exception, or arguing that a check is wrong.
 
 ```
-make lint         # fmt + vet + arch + dead + staticcheck — all gating
+make lint         # fmt + vet + arch + dead + sumtype + staticcheck — all gating
 make test         # go test ./... -race -count=1
 make dupl         # clone report, informative only
 make dead-strict  # deadcode without -test: code only a test still reaches, informative only
@@ -15,6 +15,7 @@ make dead-strict  # deadcode without -test: code only a test still reaches, info
 | `vet` | the stdlib's own suspicions | — |
 | `arch` (`tools/archlint`) | the project's own rules, below | it checks a package against itself, and knows nothing about this project's layers |
 | `dead` (`deadcode`) | functions no path reaches, **test paths included** | it reports the unused *within* a package; a function exported and called by nobody is invisible to it |
+| `sumtype` (`go-sumtype`) | a type switch over a sealed interface (`kernel.Error`, `kernel.Value`) that misses a variant and has no default | Go has no sum types: nothing else knows the interface is closed. The `//go-sumtype:decl <Type>` line stands alone, outside the doc comment, which `gofmt` would rewrite |
 | `staticcheck` | the rest | — |
 
 ## `tools/archlint`

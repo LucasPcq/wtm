@@ -21,6 +21,9 @@ var layers = map[string]layer{
 		internal: []string{"domain"},
 		why:      "pure functions over the domain: stdlib and internal/domain only, no I/O",
 	},
+	"kernel": {
+		why: "the skeleton of the command engine: stdlib only, no business vocabulary, no I/O",
+	},
 	"infra": {
 		internal: []string{"domain", "rules"},
 		external: []string{"golang.org/x/sys/unix"},

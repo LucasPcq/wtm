@@ -17,6 +17,19 @@ var _ domain.Worktree
 package infra
 
 func GlobalDir() (string, error) { return "", nil }
+-- github.com/LucasPcq/wtm/internal/kernel/kernel.go --
+package kernel
+
+type Code string
+-- github.com/LucasPcq/wtm/internal/kernel/text/text.go --
+package text
+
+import (
+	"github.com/LucasPcq/wtm/internal/kernel"
+	_ "github.com/LucasPcq/wtm/internal/domain" // want `internal/kernel must not import "github.com/LucasPcq/wtm/internal/domain" — the skeleton`
+)
+
+var _ kernel.Code
 -- github.com/LucasPcq/wtm/internal/rules/bad/bad.go --
 package bad
 
