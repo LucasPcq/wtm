@@ -10,8 +10,8 @@ exit: 0
   Isolation  verbatim — .env kept as copied
 
   .env   strategy: main  ·  source: main
-  ~ WEB_PORT  back to the source's "3000" (was "3010")
-  ~ REALM     back to the source's "main-realm" (was "app-feat-i")
+  ~ WEB_PORT  back to the source's 3000 (was 3010)
+  ~ REALM     back to the source's value
 
 --- stderr ---
 --- .env ---

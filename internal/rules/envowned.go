@@ -163,7 +163,7 @@ func EnvOwnedRows(params EnvOwnedRowsParams) []string {
 
 	rows := make([]string, 0, len(mine))
 	for _, entry := range mine {
-		rows = append(rows, pad(entry.Key, width)+domain.EnvKeyRowGap+fmt.Sprintf(domain.EnvDetailOwnedWouldSetFmt, EnvQuote(MaskURLPassword(entry.Value))))
+		rows = append(rows, pad(entry.Key, width)+domain.EnvKeyRowGap+fmt.Sprintf(domain.EnvDetailOwnedWouldSetFmt, EnvQuote(entry.Value)))
 	}
 	return rows
 }

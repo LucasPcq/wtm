@@ -31,7 +31,7 @@ Flags:
       --on-conflict string   Conflict resolution with --mode refresh: keep (default) or overwrite
       --output string        Output format: text or json (default "text")
       --prune                Remove orphan keys (present in the .env but in no source)
-      --show-values          Print the values of keys wtm does not write (secrets included); withheld by default
+      --show-values          Print every value whole, secrets included; by default a report shows only what wtm writes
   -y, --yes                  Skip all prompts; resolve every decision from flags and safe defaults (additions only)
 
 --- stderr ---

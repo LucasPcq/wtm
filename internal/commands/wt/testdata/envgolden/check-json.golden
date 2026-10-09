@@ -18,12 +18,12 @@ exit: 18
           {
             "key": "WEB_PORT",
             "status": "resolved",
-            "current_value": "3010"
+            "redacted": true
           },
           {
             "key": "REALM",
             "status": "resolved",
-            "current_value": "app-feat-a"
+            "redacted": true
           },
           {
             "key": "SHARED",
@@ -64,8 +64,7 @@ exit: 18
           }
         ],
         "addressing": "ports",
-        "status": "unchanged",
-        "current_value": "3010"
+        "status": "unchanged"
       }
     ],
     "addressing": "names",
@@ -111,7 +110,7 @@ Flags:
       --on-conflict string   Conflict resolution with --mode refresh: keep (default) or overwrite
       --output string        Output format: text or json (default "text")
       --prune                Remove orphan keys (present in the .env but in no source)
-      --show-values          Print the values of keys wtm does not write (secrets included); withheld by default
+      --show-values          Print every value whole, secrets included; by default a report shows only what wtm writes
   -y, --yes                  Skip all prompts; resolve every decision from flags and safe defaults (additions only)
 
 --- stderr ---

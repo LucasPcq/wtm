@@ -245,17 +245,22 @@ func TestEnvReportWithholdsTheValuesWtmDoesNotWrite(t *testing.T) {
 	}
 }
 
-func TestEnvReportStillShowsTheValuesWtmWrites(t *testing.T) {
+// LUC-279: the report keeps what wtm writes — an owned value whole — and
+// withholds the values it read from the files, its own keys' included.
+func TestEnvReportShowsOnlyWhatWtmWrites(t *testing.T) {
 	globaldir.Isolate(t)
 	dir := isolationRepo(t)
 	secretSetup(t, dir)
 
 	stdout, _, _ := runWtCmd(t, domain.CmdEnv, "feat/a", "--"+domain.FlagCheck, "--"+domain.FlagOutput, domain.OutputJSON)
 
-	for _, want := range []string{`"current_value": "3010"`, `"current_value": "app-feat-a"`, `"redacted": true`} {
+	for _, want := range []string{`"value": "app-feat-a"`, `"redacted": true`} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("JSON lacks %s:\n%s", want, stdout)
 		}
+	}
+	if strings.Contains(stdout, `"current_value"`) {
+		t.Errorf("JSON carries a value read from a file:\n%s", stdout)
 	}
 }
 

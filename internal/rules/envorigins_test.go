@@ -326,9 +326,24 @@ func TestReduceOriginValueCanonicalizes(t *testing.T) {
 	}
 }
 
-func TestRewriteOriginNamesAForeignHostWithoutItsCredentials(t *testing.T) {
-	got := rules.RewriteOrigin(rewriteParams("https://u:pw@api.staging.example.com/v1"))
+func TestRewriteOriginNamesAForeignHost(t *testing.T) {
+	got := rules.RewriteOrigin(rewriteParams("https://api.staging.example.com/v1"))
 	if got.Status != domain.EnvPortStatusForeignHost || got.ForeignHost != "api.staging.example.com" {
 		t.Fatalf("got %+v, want foreign host api.staging.example.com", got)
+	}
+}
+
+// LUC-279: the host was read up to a "#" before the "@", so a password came
+// out as the foreign host; a value carrying credentials names no host at all.
+func TestRewriteOriginNamesNoForeignHostBesideCredentials(t *testing.T) {
+	for _, value := range []string{
+		"https://u:pw@api.staging.example.com/v1",
+		"http://user:hunter2#x@api.staging.example.com/v1",
+		"http://user:hunter2?x@api.staging.example.com/v1",
+	} {
+		got := rules.RewriteOrigin(rewriteParams(value))
+		if got.Status != domain.EnvPortStatusForeignHost || got.ForeignHost != "" {
+			t.Errorf("RewriteOrigin(%q) = %+v, want foreign_host with no host named", value, got)
+		}
 	}
 }

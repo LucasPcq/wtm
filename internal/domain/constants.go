@@ -115,11 +115,13 @@ const (
 	// EnvInterpolation is what a dotenv reader expands outside single quotes.
 	EnvInterpolation = "$"
 
-	// EnvCredentialsSeparator ends the userinfo part of a URL. A value is elided
-	// there before display: what precedes it is a password, what follows is the
-	// host and the port the reader is actually looking for.
+	// EnvCredentialsSeparator ends the userinfo part of a URL.
 	EnvCredentialsSeparator = "@"
-	// EnvValueDisplayWidth caps an elided .env value in the port table, for a
+	// EnvOriginJoin separates the origins a report lists for one value.
+	EnvOriginJoin = ", "
+	// EnvPortKeyword is the key a DSN gives its port under (libpq, jdbc, ADO.NET).
+	EnvPortKeyword = "port"
+	// EnvValueDisplayWidth caps the origins of a value in the port table, for a
 	// surface that could not measure itself. EnvValueMinWidth is the floor a
 	// measured one never goes under: below it the value is unrecognisable, and
 	// a wrapped line says more than an elided one that says nothing.
@@ -617,8 +619,6 @@ const (
 	OriginSchemeHTTP      = "http"
 	OriginSchemeHTTPS     = "https"
 	OriginSchemeSeparator = "://"
-	// MaskedURLPassword stands for the password of a URL a report prints.
-	MaskedURLPassword = "***"
 	// OriginListSeparator is what an app splits a multi-origin setting on.
 	OriginListSeparator = ","
 	// The loopback spellings a .env value reaches a local job by, beside the TLD.
@@ -1105,6 +1105,7 @@ const (
 	// The two refusals an origin rewrite adds. Both name what wtm saw rather
 	// than what it wanted, since the value is the thing the reader must fix.
 	EnvPortReasonForeignHostFmt = "points at %s, which no job here serves"
+	EnvPortReasonForeignHost    = "points at another host, which no job here serves"
 	EnvPortReasonSecureScheme   = "https — the run proxy serves plain HTTP"
 
 	// The trailing verdict of `wtm env`.
@@ -1119,7 +1120,7 @@ const (
 	EnvDetailConflictFmt = "conflict — local %s vs %s %s"
 	// EnvDetailConflictKeptFmt is a conflict an apply left as it was.
 	EnvDetailConflictKeptFmt = "conflict kept — local %s vs %s %s"
-	// The same two rows for a key whose values the report withholds.
+	// The same two rows without --show-values.
 	EnvDetailConflictRedactedFmt     = "conflict — local value differs from %s"
 	EnvDetailConflictKeptRedactedFmt = "conflict kept — local value differs from %s"
 	EnvTallyAdded                    = "added"
@@ -1234,6 +1235,8 @@ const (
 	EnvRestoredFmt         = "%d value(s) wtm owns back to the source's."
 	// EnvDetailRestored* are the file-block rows of those values.
 	EnvDetailRestoredFmt        = "back to the source's %s (was %s)"
+	EnvDetailRestoredValue      = "back to the source's value"
+	EnvDetailRestoredRemoved    = "removed — the source has none"
 	EnvDetailRestoredRemovedFmt = "removed — the source has none (was %s)"
 	// EnvDetailOwnedWouldSetFmt is a check's row for a key wtm writes in full
 	// and would rewrite.

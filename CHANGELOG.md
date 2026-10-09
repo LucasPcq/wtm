@@ -4,6 +4,10 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+### Breaking
+
+- **`env_ports` and `env --output json`** no longer carry linked values (`current_value`, `new_value`, restored `from` / `to`): read `origins`, or pass `wtm env --show-values`. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
+
 ### Added
 
 - **"Always use this answer"** in the wizards of `create`, `checkout` and `extract`: tick it with `tab` and the env strategy, the isolation or the source fast-forward is no longer asked in that repository; `--ask` asks again. → [Remembered answers](docs/guide/configuration.md#remembered-answers)
@@ -11,7 +15,7 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 ### Fixed
 
-- **`wtm env`** masks the passwords it still printed: the values `--isolation verbatim` restores, `[[env]]` keys in JSON, and multi-host, unparsable or scheme-less URLs (`user:pass@host`), commas in a password, and `password=` / `Pwd=` pairs in any connection-string format, also in the text conflict lines and `env_ports`. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
+- **`wtm env`** prints of a value only what wtm writes — the host:port a port link moves, `[[env]]` values — so no password reaches its text or JSON, whatever the connection-string format. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
 - **`wtm env`** reports what it changes: a verbatim switch shows the port that moved in an origin list, `--check` names the `[[env]]` key it would rewrite, and the wizard previews an overwrite on the worktree's own port. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
 - **`wtm env`** rebuilds a declared `.env` missing from the worktree the way `wtm create` provisions it (the template under `example`), then settles its ports, instead of leaving it absent; `--check` reports it as drift. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
 - **Interrupting wtm** (SIGINT, SIGTERM) stops the git, hook or `wtm exec` process it waits on and exits with code 19; a second interrupt quits at once. → [Integrations](docs/guide/integrations.md)

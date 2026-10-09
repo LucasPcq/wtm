@@ -126,6 +126,13 @@ type EnvPortMove struct {
 	Resolved int    `json:"resolved"`
 }
 
+// EnvOriginMove is one host:port, or a bare port, wtm moved in a value. A
+// host shows only when it names this machine.
+type EnvOriginMove struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
 // EnvPortEntry is one link resolved against the worktree's offset and the value
 // currently in the file. NewValue is meaningful only for EnvPortStatusRewrite.
 type EnvPortEntry struct {
@@ -146,6 +153,9 @@ type EnvPortEntry struct {
 	Status       EnvPortStatus `json:"status"`
 	CurrentValue string        `json:"current_value,omitempty"`
 	NewValue     string        `json:"new_value,omitempty"`
+	// Origins is what a report shows of the move without --show-values: the
+	// values themselves are the user's, the host:port wtm moved is its own.
+	Origins []EnvOriginMove `json:"origins,omitempty"`
 	// ForeignHost is what the value pointed at when it pointed somewhere the
 	// proxy does not serve. Only EnvPortStatusForeignHost carries it.
 	ForeignHost string `json:"foreign_host,omitempty"`

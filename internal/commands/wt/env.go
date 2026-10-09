@@ -24,8 +24,8 @@ func newEnvCmd() *cobra.Command {
 			"parent); --from overrides it for one run. When run.toml declares ports, the\n" +
 			"values wtm owns are then settled on the worktree's isolation.\n\n" +
 			"Pass a worktree, or omit it to pick one. --check reports and writes nothing.\n" +
-			"A report prints only the values wtm writes (ports, owned values); the others,\n" +
-			"secrets included, are withheld unless --show-values.\n" +
+			"A report prints only what wtm writes (the host:port it moves, owned values);\n" +
+			"every other part of a value, secrets included, is withheld unless --show-values.\n" +
 			"Unattended (--yes, no terminal, --output json) it applies safe additions only:\n" +
 			"conflicts need --on-conflict, orphans --prune.\n\n" +
 			"A run keeps how the worktree runs unless asked: the wizard offers to switch a\n" +
@@ -52,7 +52,7 @@ func newEnvCmd() *cobra.Command {
 
 	cmd.Flags().String(domain.FlagMode, string(domain.EnvModeAdd), "Reconciliation mode: add (fill gaps) or refresh (also settle value conflicts)")
 	cmd.Flags().Bool(domain.FlagCheck, false, "Read-only drift report; write nothing")
-	cmd.Flags().Bool(domain.FlagShowValues, false, "Print the values of keys wtm does not write (secrets included); withheld by default")
+	cmd.Flags().Bool(domain.FlagShowValues, false, "Print every value whole, secrets included; by default a report shows only what wtm writes")
 	cmd.Flags().Bool(domain.FlagPrune, false, "Remove orphan keys (present in the .env but in no source)")
 	cmd.Flags().String(domain.FlagFrom, "", "Override the value source strategy (example, main, parent)")
 	cmd.Flags().String(domain.FlagOnConflict, "", "Conflict resolution with --mode refresh: keep (default) or overwrite")

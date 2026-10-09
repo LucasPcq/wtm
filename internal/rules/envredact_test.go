@@ -2,6 +2,7 @@ package rules
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
@@ -16,6 +17,7 @@ func redactFixture() domain.EnvSyncResult {
 			Target: ".env",
 			Diff: domain.EnvDiff{Mode: domain.EnvModeRefresh, Entries: []domain.EnvKeyDiff{
 				{Key: "WEB_PORT", Status: domain.EnvKeyResolved, CurrentValue: "3010"},
+				{Key: "DATABASE_URL", Status: domain.EnvKeyConflict, CurrentValue: "postgres://app:" + fakeSecret + "@localhost:5442/db", ResolvedValue: "postgres://app:" + fakeSecret + "@localhost:5432/db", Source: domain.EnvSourceMain},
 				{Key: "REALM", Status: domain.EnvKeyResolved, CurrentValue: "app-feat-a"},
 				{Key: domain.EnvComposeProjectName, Status: domain.EnvKeyResolved, CurrentValue: "app-feat-a"},
 				{Key: "CLIENT_SECRET", Status: domain.EnvKeyConflict, CurrentValue: fakeSecret, ResolvedValue: fakeSecret + "-main", Source: domain.EnvSourceMain},
@@ -26,8 +28,12 @@ func redactFixture() domain.EnvSyncResult {
 			}},
 		}},
 		Ports: domain.EnvPortPlan{
-			Entries: []domain.EnvPortEntry{{File: ".env", Key: "WEB_PORT", Status: domain.EnvPortStatusUnchanged, CurrentValue: "3010"}},
-			Owned:   []domain.EnvOwnedEntry{{File: ".env", Key: "REALM", Value: "app-feat-a"}},
+			Entries: []domain.EnvPortEntry{
+				{File: ".env", Key: "WEB_PORT", Status: domain.EnvPortStatusUnchanged, CurrentValue: "3010"},
+				{File: ".env", Key: "DATABASE_URL", Status: domain.EnvPortStatusRewrite,
+					CurrentValue: "postgres://app:" + fakeSecret + "@localhost:5432/db", NewValue: "postgres://app:" + fakeSecret + "@localhost:5442/db"},
+			},
+			Owned: []domain.EnvOwnedEntry{{File: ".env", Key: "REALM", Value: "app-feat-a"}},
 		},
 	}
 }
@@ -55,7 +61,7 @@ func TestRedactEnvResultWithholdsTheValuesWtmDoesNotWrite(t *testing.T) {
 	if strings.Contains(string(body), fakeSecret) {
 		t.Errorf("redacted JSON still carries a secret: %s", body)
 	}
-	for _, key := range []string{"CLIENT_SECRET", "NEW_SECRET", "OLD_SECRET"} {
+	for _, key := range []string{"CLIENT_SECRET", "NEW_SECRET", "OLD_SECRET", "DATABASE_URL"} {
 		e := entryOf(t, redacted, key)
 		if !e.Redacted || e.CurrentValue != "" || e.ResolvedValue != "" {
 			t.Errorf("%s = %+v, want its values withheld and redacted set", key, e)
@@ -66,13 +72,23 @@ func TestRedactEnvResultWithholdsTheValuesWtmDoesNotWrite(t *testing.T) {
 	}
 }
 
-func TestRedactEnvResultKeepsTheValuesWtmWrites(t *testing.T) {
+// LUC-279: what wtm writes reaches the report through the port plan — an owned
+// value whole, a link's origins — never through the values the reconciliation
+// read from the files, which are the user's.
+func TestRedactEnvResultKeepsWhatWtmWrites(t *testing.T) {
 	redacted := RedactEnvResult(redactFixture())
 
-	for key, want := range map[string]string{"WEB_PORT": "3010", "REALM": "app-feat-a", domain.EnvComposeProjectName: "app-feat-a"} {
-		e := entryOf(t, redacted, key)
-		if e.Redacted || e.CurrentValue != want {
-			t.Errorf("%s = %+v, want its value %q shown", key, e, want)
+	if got := redacted.Ports.Owned[0].Value; got != "app-feat-a" {
+		t.Errorf("owned value = %q, want wtm's value whole", got)
+	}
+	link := redacted.Ports.Entries[1]
+	want := []domain.EnvOriginMove{{From: "localhost:5432", To: "localhost:5442"}}
+	if !slices.Equal(link.Origins, want) || link.CurrentValue != "" || link.NewValue != "" {
+		t.Errorf("link = %+v, want its origins %v and no value", link, want)
+	}
+	for _, key := range []string{"WEB_PORT", "REALM", domain.EnvComposeProjectName} {
+		if e := entryOf(t, redacted, key); !e.Redacted || e.CurrentValue != "" {
+			t.Errorf("%s = %+v, want its value withheld: the file's value is not wtm's", key, e)
 		}
 	}
 }
@@ -98,20 +114,25 @@ func TestRedactEnvResultLeavesItsInputIntact(t *testing.T) {
 	if e := entryOf(t, result, "CLIENT_SECRET"); e.CurrentValue != fakeSecret {
 		t.Errorf("input entry = %+v, want it untouched — the report classifies on it", e)
 	}
+	if got := result.Ports.Entries[1].NewValue; !strings.Contains(got, fakeSecret) {
+		t.Errorf("input plan = %q, want it untouched", got)
+	}
 }
 
-func TestEnvKeyRowsWithholdAConflictValueWtmDoesNotWrite(t *testing.T) {
+func TestEnvKeyRowsWithholdEveryConflictValue(t *testing.T) {
 	result := redactFixture()
 
-	rows := EnvKeyRows(EnvKeyRowsParams{File: result.Files[0], Check: true, Managed: EnvManagedKeys(EnvManagedKeysParams{Plan: result.Ports, Target: ".env"})})
+	rows := EnvKeyRows(EnvKeyRowsParams{File: result.Files[0], Check: true})
 
 	for _, row := range rows {
 		if strings.Contains(row.Text, fakeSecret) {
 			t.Errorf("row %q prints a secret", row.Text)
 		}
 	}
-	if !strings.Contains(rowText(rows, "CLIENT_SECRET"), "differs from main") {
-		t.Errorf("conflict row = %q, want it to say the values differ", rowText(rows, "CLIENT_SECRET"))
+	for _, key := range []string{"CLIENT_SECRET", "DATABASE_URL"} {
+		if !strings.Contains(rowText(rows, key), "differs from main") {
+			t.Errorf("conflict row = %q, want it to say the values differ", rowText(rows, key))
+		}
 	}
 }
 
@@ -134,324 +155,161 @@ func rowText(rows []domain.EnvKeyRow, key string) string {
 	return ""
 }
 
-func TestMaskURLPasswordMasksOnlyAURLPassword(t *testing.T) {
-	cases := map[string]string{
-		"postgres://app:hunter2@localhost:5432/db": "postgres://app:***@localhost:5432/db",
-		"redis://:hunter2@127.0.0.1:6379":          "redis://:***@127.0.0.1:6379",
-		"amqp://u:p%40ss@localhost:5672/vhost?x=1": "amqp://u:***@localhost:5672/vhost?x=1",
-		"3010":                              "3010",
-		"localhost:3010":                    "localhost:3010",
-		"postgres://app@localhost:5432/db":  "postgres://app@localhost:5432/db",
-		"postgres://app:@localhost:5432/db": "postgres://app:***@localhost:5432/db",
-		"http://[::1:3010":                  "http://[::1:3010",
-		"not a url: user:pass@host":         "not a url:***@host",
-		"":                                  "",
-		"http://localhost:3010,http://a:b@localhost": "http://localhost:3010,http://a:***@localhost",
-	}
-	for in, want := range cases {
-		if got := MaskURLPassword(in); got != want {
-			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
+// leakShapes are every value the LUC-274 and LUC-278 reviews found a password
+// printed from, and the shapes the deny-list parser was extended for. Each
+// carries fakeSecret where a client reads a credential.
+var leakShapes = []string{
+	"postgres://app:" + fakeSecret + "@localhost:5432/db",
+	"redis://:" + fakeSecret + "@127.0.0.1:6379",
+	"amqp://u:" + fakeSecret + "%40ss@localhost:5672/vhost?x=1",
+	"not a url: user:" + fakeSecret + "@localhost:3000",
+	"http://localhost:3000,http://a:" + fakeSecret + "@localhost:3001",
+	"mongodb://app:" + fakeSecret + "@localhost:27017,localhost:27018/db",
+	"postgres://app:pa#" + fakeSecret + "@localhost:5432/db",
+	"postgres://app:pa/" + fakeSecret + "@localhost:5432/db",
+	"postgres://app:pa%zz" + fakeSecret + "@localhost:5432/db",
+	"postgres://app:12#" + fakeSecret + "@localhost:5432/db",
+	"postgres://app:12/" + fakeSecret + "@localhost:5432/db",
+	"postgres://app:ab," + fakeSecret + "@localhost:5432/db",
+	"postgres://app:pw@[::1]:5432/" + fakeSecret,
+	"host=localhost port=5432 password=" + fakeSecret + " dbname=app",
+	"host=localhost port=5432 password='" + fakeSecret + " x' dbname=app",
+	"host=localhost port=5432 password = " + fakeSecret + " dbname=app",
+	`host=localhost port=5432 password='ab\'` + fakeSecret + `' dbname=app`,
+	`host=localhost port=5432 password=ab\ ` + fakeSecret + " dbname=app",
+	"host=localhost port=5432 sslpassword=" + fakeSecret + " dbname=app",
+	"host=localhost port=5432 password=ab," + fakeSecret + " dbname=app",
+	"host=h port=5432 password=ab,c://" + fakeSecret + " dbname=x",
+	"host=a; port=5432; password=ab;" + fakeSecret + " dbname=y",
+	"host=localhost port=5432 pwd = " + fakeSecret + " dbname=app",
+	"postgres://localhost:5432/db?user=app&password=" + fakeSecret + "&x=1",
+	"postgres://localhost:5432/db?PASSWORD=" + fakeSecret + "#frag",
+	"postgres://localhost:5432/db?pwd=" + fakeSecret + "&x=1",
+	"jdbc:postgresql://localhost:5432/db?user=app&password=" + fakeSecret,
+	"jdbc:sqlserver://localhost:1433;user=app;Password=" + fakeSecret,
+	"jdbc:sqlserver://localhost:1433;user=app;password={ab;" + fakeSecret + "};x=1",
+	"jdbc:mysql://app:" + fakeSecret + "@localhost:3306/db",
+	"jdbc:mysql://app:" + fakeSecret + "@localhost:3306/db?next=http://x/y",
+	"Server=localhost,1433;Password=ab " + fakeSecret + ";Database=d",
+	`Server=localhost,1433;Password="ab;` + fakeSecret + `";Database=d`,
+	"Driver={ODBC};Server=localhost,1433;Uid=app;Pwd=" + fakeSecret + ";Database=d",
+	"app:" + fakeSecret + "@tcp(localhost:3306)/db",
+	"app:" + fakeSecret + "@localhost:6379",
+	"app:" + fakeSecret + "@tcp(localhost:3306)/db?redirect=http://x",
+	"mongodb://app:pw@x?" + fakeSecret + "@localhost:27017/db",
+	"mongodb://app@x#:" + fakeSecret + "@localhost:27017/db",
+	"postgres://app:pw@localhost:5432/db?next=http://u:" + fakeSecret + "@x",
+	"http://user:" + fakeSecret + "#x@api.staging.example.com/v1",
+	" postgres://app:" + fakeSecret + "@localhost:5432/db ",
+	"http://localhost:3000/a@" + fakeSecret + "?next=c@d",
+	"postgres://app:5432@localhost:5432/" + fakeSecret,
+}
+
+var leakPorts = strings.NewReplacer("5432", "5442", "6379", "6389", "5672", "5682", "3000", "3010",
+	"3001", "3011", "27017", "27027", "27018", "27028", "1433", "1443", "3306", "3316")
+
+// LUC-279: a value's secret reaches no surface of `wtm env` without
+// --show-values — whatever its shape, since the report keeps only what wtm
+// wrote rather than masking what a parser recognises.
+func TestEnvReportCarriesNoSecretWithoutShowValues(t *testing.T) {
+	for _, from := range leakShapes {
+		result := leakResult(from, leakPorts.Replace(from))
+
+		body, err := json.Marshal(RedactEnvResult(result))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(body), fakeSecret) {
+			t.Errorf("JSON for %q carries the secret: %s", from, body)
+		}
+		for _, line := range leakTextLines(result) {
+			if strings.Contains(line, fakeSecret) {
+				t.Errorf("text for %q carries the secret: %q", from, line)
+			}
 		}
 	}
 }
 
-func TestRedactEnvResultMasksThePasswordOfAPortLinkedURL(t *testing.T) {
-	result := domain.EnvSyncResult{
+func TestEnvReportShowsTheValuesWhenAsked(t *testing.T) {
+	result := leakResult(leakShapes[0], leakPorts.Replace(leakShapes[0]))
+
+	body, _ := json.Marshal(AnnotateEnvOrigins(result))
+	if !strings.Contains(string(body), fakeSecret) {
+		t.Errorf("--show-values JSON = %s, want every value whole", body)
+	}
+	rows := EnvRestoredRows(EnvRestoredRowsParams{Entries: result.Restored, File: ".env", ShowValues: true})
+	if !strings.Contains(rows[0], fakeSecret) {
+		t.Errorf("--show-values restored row = %q, want the values whole", rows[0])
+	}
+}
+
+func leakResult(from, to string) domain.EnvSyncResult {
+	foreign := RewriteOrigin(RewriteOriginParams{Value: from, Origin: "http://web.feat-x.app.localhost:1355", JobLabel: "web", Project: "app", Base: 3000, Resolved: 3010})
+	return domain.EnvSyncResult{
+		Check: true,
 		Files: []domain.EnvFileResult{{Target: ".env", Diff: domain.EnvDiff{Entries: []domain.EnvKeyDiff{
-			{Key: "DATABASE_URL", Status: domain.EnvKeyResolved, CurrentValue: "postgres://app:" + fakeSecret + "@localhost:5442/db"},
+			{Key: "URL", Status: domain.EnvKeyConflict, CurrentValue: to, ResolvedValue: from, Source: domain.EnvSourceMain},
+			{Key: "NEW", Status: domain.EnvKeyResolved, ResolvedValue: from, Source: domain.EnvSourceMain},
+			{Key: "OLD", Status: domain.EnvKeyOrphan, CurrentValue: from},
 		}}}},
-		Ports: domain.EnvPortPlan{Entries: []domain.EnvPortEntry{{
-			File: ".env", Key: "DATABASE_URL", Status: domain.EnvPortStatusRewrite,
-			CurrentValue: "postgres://app:" + fakeSecret + "@localhost:5432/db",
-			NewValue:     "postgres://app:" + fakeSecret + "@localhost:5442/db",
-		}}},
-	}
-
-	redacted := RedactEnvResult(result)
-
-	body, _ := json.Marshal(redacted)
-	if strings.Contains(string(body), fakeSecret) {
-		t.Errorf("redacted JSON carries the password: %s", body)
-	}
-	if got := redacted.Ports.Entries[0].NewValue; got != "postgres://app:***@localhost:5442/db" {
-		t.Errorf("new_value = %q, want only the password masked", got)
-	}
-	if got := entryOf(t, redacted, "DATABASE_URL"); got.Redacted || got.CurrentValue != "postgres://app:***@localhost:5442/db" {
-		t.Errorf("entry = %+v, want its value shown with the password masked", got)
-	}
-	if result.Ports.Entries[0].NewValue == redacted.Ports.Entries[0].NewValue {
-		t.Error("the input plan was masked in place")
+		Ports: domain.EnvPortPlan{Entries: []domain.EnvPortEntry{
+			{File: ".env", Key: "URL", Port: "db", Status: domain.EnvPortStatusRewrite, CurrentValue: from, NewValue: to},
+			{File: ".env", Key: "API", Port: "web", Status: foreign.Status, CurrentValue: from, NewValue: foreign.Value, ForeignHost: foreign.ForeignHost},
+		}},
+		Restored: []domain.EnvRestoredEntry{
+			{File: ".env", Key: "URL", From: to, To: from},
+			{File: ".env", Key: "GONE", From: to, Removed: true},
+		},
 	}
 }
 
-func TestEnvKeyRowsMaskThePasswordOfAManagedConflict(t *testing.T) {
-	file := fileWith(domain.EnvKeyDiff{Key: "DATABASE_URL", Status: domain.EnvKeyConflict, Source: domain.EnvSourceMain,
-		CurrentValue: "postgres://app:" + fakeSecret + "@localhost:5442/db", ResolvedValue: "postgres://app:other@localhost:5442/db"})
-	managed := map[string]bool{"DATABASE_URL": true}
-
-	masked := EnvKeyRows(EnvKeyRowsParams{File: file, Check: true, Managed: managed})
-	shown := EnvKeyRows(EnvKeyRowsParams{File: file, Check: true, Managed: managed, ShowValues: true})
-
-	if strings.Contains(masked[0].Text, fakeSecret) || !strings.Contains(masked[0].Text, "app:***@") {
-		t.Errorf("row = %q, want the password masked", masked[0].Text)
+func leakTextLines(result domain.EnvSyncResult) []string {
+	var lines []string
+	for _, row := range EnvKeyRows(EnvKeyRowsParams{File: result.Files[0], Check: true}) {
+		lines = append(lines, row.Text)
 	}
-	if !strings.Contains(shown[0].Text, fakeSecret) {
-		t.Errorf("row = %q, want the full value with --show-values", shown[0].Text)
-	}
+	lines = append(lines, EnvRestoredRows(EnvRestoredRowsParams{Entries: result.Restored, File: ".env"})...)
+	lines = append(lines, EnvRestoreRecapLines(result.Restored)...)
+	lines = append(lines, EnvPortTableLines(EnvPortTableParams{Plan: result.Ports})...)
+	lines = append(lines, EnvPortAnomalyLines(result.Ports)...)
+	return lines
 }
 
-// LUC-274 F3: every value below carries fakeSecret where net/url either fails
-// or finds no userinfo, and each one used to come out whole.
-func TestMaskURLPasswordMasksWhatNetURLCannotRead(t *testing.T) {
-	cases := map[string]string{
-		"mongodb://app:" + fakeSecret + "@h1:27017,h2:27018/db":                 "mongodb://app:***@h1:27017,h2:27018/db",
-		"postgres://app:pa#" + fakeSecret + "@localhost:5432/db":                "postgres://app:***@localhost:5432/db",
-		"postgres://app:pa/" + fakeSecret + "@localhost:5432/db":                "postgres://app:***@localhost:5432/db",
-		"postgres://app:pa%zz" + fakeSecret + "@localhost:5432/db":              "postgres://app:***@localhost:5432/db",
-		"http://localhost:3010,http://a:" + fakeSecret + "@localhost:3011":      "http://localhost:3010,http://a:***@localhost:3011",
-		"host=localhost port=5432 password=" + fakeSecret + " dbname=app":       "host=localhost port=5432 password=*** dbname=app",
-		"host=localhost password='" + fakeSecret + " x' dbname=app":             "host=localhost password=*** dbname=app",
-		"postgres://localhost:5432/db?user=app&password=" + fakeSecret + "&x=1": "postgres://localhost:5432/db?user=app&password=***&x=1",
-		"jdbc:postgresql://localhost:5432/db?user=app&password=" + fakeSecret:   "jdbc:postgresql://localhost:5432/db?user=app&password=***",
-		"jdbc:sqlserver://localhost:1433;user=app;Password=" + fakeSecret:       "jdbc:sqlserver://localhost:1433;user=app;Password=***",
-		"postgres://app:12#" + fakeSecret + "@localhost:5432/db":                "postgres://app:***@localhost:5432/db",
-		"postgres://app:12/" + fakeSecret + "@localhost:5432/db":                "postgres://app:***@localhost:5432/db",
-		"jdbc:mysql://app:" + fakeSecret + "@localhost:3306/db":                 "jdbc:mysql://app:***@localhost:3306/db",
-		" postgres://app:" + fakeSecret + "@localhost:5432/db ":                 " postgres://app:***@localhost:5432/db ",
+func TestEnvOriginMoves(t *testing.T) {
+	cases := []struct {
+		from, to string
+		want     []domain.EnvOriginMove
+	}{
+		{"3000", "3010", []domain.EnvOriginMove{{From: "3000", To: "3010"}}},
+		{"postgres://app:pw@localhost:5432/db", "postgres://app:pw@localhost:5442/db", []domain.EnvOriginMove{{From: "localhost:5432", To: "localhost:5442"}}},
+		{"postgres://app:pw@db.internal:5432/db", "postgres://app:pw@db.internal:5442/db", []domain.EnvOriginMove{{From: ":5432", To: ":5442"}}},
+		{"host=localhost port=5432 password=x", "host=localhost port=5442 password=x", []domain.EnvOriginMove{{From: ":5432", To: ":5442"}}},
+		{"http://[::1]:3000", "http://[::1]:3010", []domain.EnvOriginMove{{From: "[::1]:3000", To: "[::1]:3010"}}},
+		{"http://localhost:3000/cb", "http://web.feat-x.app.localhost:1355/cb", []domain.EnvOriginMove{{From: "localhost:3000", To: "web.feat-x.app.localhost:1355"}}},
+		{"http://localhost:3000,http://localhost:3001", "http://localhost:3010,http://localhost:3011",
+			[]domain.EnvOriginMove{{From: "localhost:3000", To: "localhost:3010"}, {From: "localhost:3001", To: "localhost:3011"}}},
 	}
-	for in, want := range cases {
-		if got := MaskURLPassword(in); got != want {
-			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
+	for _, c := range cases {
+		got, ok := EnvOriginMoves(EnvOriginMovesParams{From: c.from, To: c.to})
+		if !ok || !slices.Equal(got, c.want) {
+			t.Errorf("EnvOriginMoves(%q, %q) = %v, %v; want %v", c.from, c.to, got, ok, c.want)
 		}
 	}
 }
 
-// LUC-274: an "@" past a URL's authority cannot be told from a password that
-// net/url read as a path or a fragment ("app:12#x@h"), so it is masked too.
-func TestMaskURLPasswordOverMasksAnAtPastTheAuthority(t *testing.T) {
-	cases := map[string]string{
-		"http://localhost:3010/a@b?next=c@d": "http://localhost:***@d",
-		"http://host:3000/users/@me":         "http://host:***@me",
-		"http://host/users/@me":              "http://***@me",
+// A difference wtm did not make — a password, a user, a database — is not an
+// origin, and reading it as one would print it.
+func TestEnvOriginMovesRefusesADifferenceThatIsNotAPort(t *testing.T) {
+	cases := [][2]string{
+		{"postgres://app:12345@localhost:5432/db", "postgres://app:54321@localhost:5432/db"},
+		{"host=localhost port=5432 password=12345", "host=localhost port=5432 password=54321"},
+		{"postgres://app:old@localhost:5432/db", "postgres://app:new@localhost:5442/db"},
+		{"postgres://localhost:5432/a", "postgres://localhost:5432/b"},
+		{"same", "same"},
 	}
-	for in, want := range cases {
-		if got := MaskURLPassword(in); got != want {
-			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-// LUC-274 F3: the shapes net/url already read must stay exactly as they were.
-func TestMaskURLPasswordKeepsTheShapesItAlreadyHandled(t *testing.T) {
-	cases := map[string]string{
-		"postgres://app:p%40ss@localhost:5432/db":     "postgres://app:***@localhost:5432/db",
-		"postgres://app:p@ss@localhost:5432/db":       "postgres://app:***@localhost:5432/db",
-		"postgres://app:pw@[::1]:5432/db":             "postgres://app:***@[::1]:5432/db",
-		"postgres://app:@localhost:5432/db":           "postgres://app:***@localhost:5432/db",
-		"redis://:pw@localhost:6379":                  "redis://:***@localhost:6379",
-		"http://localhost:3010,http://localhost:3011": "http://localhost:3010,http://localhost:3011",
-		"localhost:3010":                              "localhost:3010",
-	}
-	for in, want := range cases {
-		if got := MaskURLPassword(in); got != want {
-			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-// LUC-274 F1: a switch to verbatim reported the source's value it put back
-// whole — the restored keys are all ones wtm writes, a port-linked URL among them.
-func TestRedactEnvResultMasksTheRestoredValues(t *testing.T) {
-	result := domain.EnvSyncResult{Restored: []domain.EnvRestoredEntry{{
-		File: ".env", Key: "DATABASE_URL",
-		From: "postgres://app:" + fakeSecret + "@localhost:5442/db",
-		To:   "postgres://app:" + fakeSecret + "@localhost:5432/db",
-	}}}
-
-	redacted := RedactEnvResult(result)
-
-	body, _ := json.Marshal(redacted)
-	if strings.Contains(string(body), fakeSecret) {
-		t.Errorf("redacted JSON carries the password: %s", body)
-	}
-	if got := redacted.Restored[0]; got.From != "postgres://app:***@localhost:5442/db" || got.To != "postgres://app:***@localhost:5432/db" {
-		t.Errorf("restored = %+v, want both values with the password masked", got)
-	}
-	if result.Restored[0].To == redacted.Restored[0].To {
-		t.Error("the input restored entries were masked in place")
-	}
-}
-
-// LUC-274 F2: an [[env]] key's current value is read before wtm writes its
-// own, so it can be anything the user put there.
-func TestRedactEnvResultMasksThePasswordOfAnOwnedKey(t *testing.T) {
-	result := domain.EnvSyncResult{
-		Files: []domain.EnvFileResult{{Target: ".env", Diff: domain.EnvDiff{Entries: []domain.EnvKeyDiff{
-			{Key: "REALM", Status: domain.EnvKeyConflict, CurrentValue: "postgres://app:" + fakeSecret + "@localhost:5432/db", ResolvedValue: "app-feat-a"},
-		}}}},
-		Ports: domain.EnvPortPlan{Owned: []domain.EnvOwnedEntry{{File: ".env", Key: "REALM", Value: "app-feat-a"}}},
-	}
-
-	redacted := RedactEnvResult(result)
-
-	if got := entryOf(t, redacted, "REALM"); got.Redacted || got.CurrentValue != "postgres://app:***@localhost:5432/db" || got.ResolvedValue != "app-feat-a" {
-		t.Errorf("entry = %+v, want its values shown with the password masked", got)
-	}
-}
-
-// LUC-274 F3: the text conflict line of a managed key printed what
-// MaskURLPassword could not read.
-func TestEnvKeyRowsMaskAConflictNetURLCannotRead(t *testing.T) {
-	file := fileWith(domain.EnvKeyDiff{Key: "DATABASE_URL", Status: domain.EnvKeyConflict, Source: domain.EnvSourceMain,
-		CurrentValue: "mongodb://app:" + fakeSecret + "@h1:3010,h2:3011/db", ResolvedValue: "host=h1 port=3010 password=" + fakeSecret})
-
-	rows := EnvKeyRows(EnvKeyRowsParams{File: file, Check: true, Managed: map[string]bool{"DATABASE_URL": true}})
-
-	if strings.Contains(rows[0].Text, fakeSecret) {
-		t.Errorf("row = %q, want the passwords masked", rows[0].Text)
-	}
-}
-
-// LUC-274 F3: the port table and the restored rows cut a value at its last
-// "@", which a password outside a URL's userinfo does not have.
-func TestElideEnvValueMasksAPasswordWithoutUserinfo(t *testing.T) {
-	got := ElideEnvValue(ElideEnvValueParams{Value: "host=h port=3010 password=" + fakeSecret})
-
-	if strings.Contains(got, fakeSecret) {
-		t.Errorf("ElideEnvValue() = %q, want the password masked", got)
-	}
-}
-
-// LUC-278: a comma inside a URL's userinfo split the value before net/url read
-// it, so neither half looked like a credential and the password came out whole.
-func TestMaskURLPasswordKeepsACommaInsideAPassword(t *testing.T) {
-	cases := map[string]string{
-		"postgres://app:ab," + fakeSecret + "@localhost:5432/db":                    "postgres://app:***@localhost:5432/db",
-		"host=localhost password=ab," + fakeSecret + " dbname=app":                  "host=localhost password=*** dbname=app",
-		"http://localhost:3010,postgres://app:ab," + fakeSecret + "@localhost:5432": "http://localhost:3010,postgres://app:***@localhost:5432",
-		"mongodb://app:pw@h1:27017,h2:27018/db":                                     "mongodb://app:***@h1:27017,h2:27018/db",
-	}
-	for in, want := range cases {
-		if got := MaskURLPassword(in); got != want {
-			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-// LUC-278: a credential without a scheme — a go-sql-driver DSN, a redis
-// address — was printed whole; the restored rows used to elide it to "…@host".
-func TestMaskURLPasswordMasksASchemelessCredential(t *testing.T) {
-	cases := map[string]string{
-		"app:" + fakeSecret + "@tcp(localhost:3306)/db": "app:***@tcp(localhost:3306)/db",
-		"app:" + fakeSecret + "@localhost:6379":         "app:***@localhost:6379",
-		"not a url: user:" + fakeSecret + "@host":       "not a url:***@host",
-		"noreply@example.com":                           "noreply@example.com",
-	}
-	for in, want := range cases {
-		if got := MaskURLPassword(in); got != want {
-			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-// LUC-278: net/url ends the authority at "?" or "#", but the host a client
-// connects to follows the last "@" before the path, so the text between is the
-// password.
-func TestMaskURLPasswordReadsTheAuthorityUpToThePath(t *testing.T) {
-	cases := map[string]string{
-		"mongodb://app:pw@x?" + fakeSecret + "@h1:27017/db": "mongodb://app:***@h1:27017/db",
-		"mongodb://app@x#:" + fakeSecret + "@h1:27017/db":   "mongodb://app@x#:***@h1:27017/db",
-		"postgres://app:pw@x#" + fakeSecret + "@host/db":    "postgres://app:***@host/db",
-	}
-	for in, want := range cases {
-		if got := MaskURLPassword(in); got != want {
-			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-// LUC-278: a password= value ends where the format it is written in ends it —
-// whitespace in a libpq DSN, ";" in an ADO.NET or jdbc string, "&" in a query —
-// and each one left the rest of the password visible.
-func TestMaskURLPasswordMasksAPasswordPairToItsEnd(t *testing.T) {
-	cases := map[string]string{
-		"host=localhost password = " + fakeSecret + " dbname=app":               "host=localhost password = *** dbname=app",
-		"host=localhost password=ab;" + fakeSecret + " dbname=app":              "host=localhost password=*** dbname=app",
-		"host=localhost password=ab&" + fakeSecret + " dbname=app":              "host=localhost password=*** dbname=app",
-		`host=localhost password='ab\'` + fakeSecret + `' dbname=app`:           "host=localhost password=*** dbname=app",
-		`host=localhost password=ab\ ` + fakeSecret + " dbname=app":             "host=localhost password=*** dbname=app",
-		"host=localhost sslpassword=" + fakeSecret + " dbname=app":              "host=localhost sslpassword=*** dbname=app",
-		"Server=x;Password=ab " + fakeSecret + ";Database=d":                    "Server=x;Password=***;Database=d",
-		`Server=x;Password="ab;` + fakeSecret + `";Database=d`:                  "Server=x;Password=***;Database=d",
-		`Server=x;Password='ab;` + fakeSecret + `';Database=d`:                  "Server=x;Password=***;Database=d",
-		"jdbc:sqlserver://h:1433;user=app;password={ab;" + fakeSecret + "};x=1": "jdbc:sqlserver://h:1433;user=app;password=***;x=1",
-		"postgres://h/db?user=app&password=ab'" + fakeSecret + "&x=1":           "postgres://h/db?user=app&password=***&x=1",
-		"postgres://h/db?PASSWORD=" + fakeSecret + "#frag":                      "postgres://h/db?PASSWORD=***#frag",
-	}
-	for in, want := range cases {
-		if got := MaskURLPassword(in); got != want {
-			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-// LUC-278: the restored rows print a value whole since LUC-274, so a
-// credential MaskURLPassword misses is no longer cut away at its last "@".
-func TestEnvRestoredRowsMaskASchemelessCredential(t *testing.T) {
-	rows := EnvRestoredRows([]domain.EnvRestoredEntry{{
-		File: ".env", Key: "MYSQL_DSN",
-		From: "app:" + fakeSecret + "@tcp(localhost:3316)/db",
-		To:   "app:" + fakeSecret + "@tcp(localhost:3306)/db",
-	}}, ".env")
-
-	if len(rows) != 1 || strings.Contains(rows[0], fakeSecret) {
-		t.Errorf("rows = %q, want the password masked", rows)
-	}
-}
-
-// LUC-278: ODBC and ADO.NET spell the password key "Pwd", which was printed whole.
-func TestMaskURLPasswordMasksAPwdPair(t *testing.T) {
-	cases := map[string]string{
-		"Driver={ODBC};Server=x;Uid=app;Pwd=" + fakeSecret + ";Database=d": "Driver={ODBC};Server=x;Uid=app;Pwd=***;Database=d",
-		"Server=x;PWD={ab;" + fakeSecret + "}":                             "Server=x;PWD=***",
-		"host=localhost pwd = " + fakeSecret + " dbname=app":               "host=localhost pwd = *** dbname=app",
-		"postgres://h/db?pwd=" + fakeSecret + "&x=1":                       "postgres://h/db?pwd=***&x=1",
-	}
-	for in, want := range cases {
-		if got := MaskURLPassword(in); got != want {
-			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-// LUC-278: a "://" anywhere in a value made it a URL from there, so the
-// credential ahead of it, and a URL nested in another's query, came out whole.
-func TestMaskURLPasswordMasksACredentialAroundAnotherURL(t *testing.T) {
-	cases := map[string]string{
-		"app:" + fakeSecret + "@tcp(h:3306)/db?redirect=http://x":               "app:***@tcp(h:3306)/db?redirect=http://x",
-		"postgres://app:pw@h/db?next=http://u:" + fakeSecret + "@x":             "postgres://app:***@h/db?next=http://u:***@x",
-		"jdbc:mysql://app:" + fakeSecret + "@localhost:3306/db?next=http://x/y": "jdbc:mysql://app:***@localhost:3306/db?next=http://x/y",
-	}
-	for in, want := range cases {
-		if got := MaskURLPassword(in); got != want {
-			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-// LUC-278: a password= value is read whole before the value is split into a
-// list, and a separator only names a format when the key follows it directly.
-func TestMaskURLPasswordReadsAPasswordPairAcrossTheList(t *testing.T) {
-	cases := map[string]string{
-		"host=h password=ab,c://" + fakeSecret + " dbname=x":     "host=h password=*** dbname=x",
-		"host=h password='ab,c://d " + fakeSecret + "' dbname=x": "host=h password=*** dbname=x",
-		"host=x& password=ab&" + fakeSecret + " dbname=y":        "host=x& password=*** dbname=y",
-		"host=a; password=ab;" + fakeSecret + " dbname=y":        "host=a; password=*** dbname=y",
-		"Server=x; Password=ab " + fakeSecret + "; Database=d":   "Server=x; Password=***; Database=d",
-	}
-	for in, want := range cases {
-		if got := MaskURLPassword(in); got != want {
-			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
+	for _, c := range cases {
+		if got, ok := EnvOriginMoves(EnvOriginMovesParams{From: c[0], To: c[1]}); ok {
+			t.Errorf("EnvOriginMoves(%q, %q) = %v, want no reading", c[0], c[1], got)
 		}
 	}
 }
