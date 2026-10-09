@@ -675,3 +675,44 @@ func TestTheResolverPreviewsALinkedOverwriteOnTheWorktreesPort(t *testing.T) {
 		t.Errorf("recap lacks %q:\n%s", want, recap)
 	}
 }
+
+const dsnEnv = "WEB_PORT=3000\n" +
+	"DSN_BARE=host=localhost port=3000 password=s3cret dbname=app\n" +
+	"DSN_DQ=\"host=localhost port=3000 password=s3cret dbname=app\"\n" +
+	"DSN_SQ='host=localhost port=3000 password=s3cret dbname=app'\n"
+
+// LUC-280: a bare value with spaces whose port moved came back double-quoted,
+// so the worktree's .env differed from its source beyond the port.
+func TestSettlingAPortKeepsEachValuesQuoting(t *testing.T) {
+	ctx := testContext(t)
+	write(t, filepath.Join(ctx.ProjectDir, ".env"), dsnEnv)
+	if err := config.WriteRun(config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
+		Jobs: []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}}},
+		EnvPorts: []domain.EnvPortLink{
+			{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"},
+			{File: ".env", Key: "DSN_BARE", Job: "web", Port: "PORT"},
+			{File: ".env", Key: "DSN_DQ", Job: "web", Port: "PORT"},
+			{File: ".env", Key: "DSN_SQ", Job: "web", Port: "PORT"},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	path := makeWorktree(t, ctx, "feat/a")
+	write(t, filepath.Join(path, ".env"), dsnEnv)
+
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{
+		KeyWorktree:   "feat/a",
+		KeyIsolation:  domain.EnvKeepValue,
+		KeyAddressing: domain.EnvKeepValue,
+		KeyRecap:      domain.EnvApplyValue,
+	}}
+	if _, _, err := run(ctx, Request{}, prompter); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	got := read(t, filepath.Join(path, ".env"))
+	port, _, _ := strings.Cut(strings.TrimPrefix(got, "WEB_PORT="), "\n")
+	if port == "3000" || strings.ReplaceAll(got, port, "3000") != dsnEnv {
+		t.Errorf(".env =\n%s\nwant the source with only its port moved:\n%s", got, dsnEnv)
+	}
+}

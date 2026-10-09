@@ -274,3 +274,50 @@ func TestRunWarnsAnIsolationTheExistingWorktreeIgnores(t *testing.T) {
 		t.Errorf("statuses = %+v, want the warning shown", presenter.Statuses)
 	}
 }
+
+const dsnEnv = "WEB_PORT=3000\n" +
+	"DSN_BARE=host=localhost port=3000 password=s3cret dbname=app\n" +
+	"DSN_DQ=\"host=localhost port=3000 password=s3cret dbname=app\"\n" +
+	"DSN_SQ='host=localhost port=3000 password=s3cret dbname=app'\n"
+
+// LUC-280: a bare value with spaces whose port moved came back double-quoted,
+// so the new worktree's .env differed from its source beyond the port.
+func TestCreateKeepsEachMovedValuesQuoting(t *testing.T) {
+	ctx := testContext(t)
+	ctx.Config.Project.Env.Strategy = domain.EnvStrategyMain
+	ctx.Config.Project.Env.Files = []domain.EnvFile{{Target: ".env"}}
+	if err := config.WriteRun(config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
+		Jobs: []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "true", Ports: map[string]int{"PORT": 3000}}},
+		EnvPorts: []domain.EnvPortLink{
+			{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"},
+			{File: ".env", Key: "DSN_BARE", Job: "web", Port: "PORT"},
+			{File: ".env", Key: "DSN_DQ", Job: "web", Port: "PORT"},
+			{File: ".env", Key: "DSN_SQ", Job: "web", Port: "PORT"},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ctx.ProjectDir, ".env"), []byte(dsnEnv), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	outcome, err := Run(t.Context(), Params{
+		Context:   ctx,
+		Request:   Request{Branches: []string{"feat/dsn"}, From: "main", EnvFrom: "main"},
+		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyIsolation: string(domain.IsolationIsolated), KeyRecap: confirmCreate}},
+		Presenter: newRecorder(),
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(outcome.Results[0].Path, ".env"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(body)
+	port, _, _ := strings.Cut(strings.TrimPrefix(got, "WEB_PORT="), "\n")
+	if port == "3000" || strings.ReplaceAll(got, port, "3000") != dsnEnv {
+		t.Errorf(".env =\n%s\nwant the source with only its port moved:\n%s", got, dsnEnv)
+	}
+}
