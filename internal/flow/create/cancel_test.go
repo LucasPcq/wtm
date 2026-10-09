@@ -85,19 +85,28 @@ func TestAnInterruptedBatchSkipsTheBranchesItNeverReached(t *testing.T) {
 	}
 }
 
+type interruptingHooks struct {
+	*recorder
+	cancel context.CancelFunc
+}
+
+func (r interruptingHooks) HookPhase(params flow.HookPhaseParams) error {
+	time.AfterFunc(300*time.Millisecond, r.cancel)
+	return r.recorder.HookPhase(params)
+}
+
 // An interrupt that lands while the hooks run stops them, keeps the worktree,
 // and says so: the reader is left with a checkout whose setup did not finish.
 func TestAnInterruptDuringTheHooksNamesTheWorktreeLeftBehind(t *testing.T) {
 	ctx := testContext(t)
 	ctx.Config.Project.Hooks.OnCreate = []domain.HookCommand{{Cmd: "sleep 30"}, {Cmd: "echo never"}}
 	runCtx, cancel := context.WithCancel(t.Context())
-	time.AfterFunc(300*time.Millisecond, cancel)
 
 	outcome, err := Run(runCtx, Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/x"}, From: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyEnv: "", KeyRecap: confirmCreate}},
-		Presenter: newRecorder(),
+		Presenter: interruptingHooks{recorder: newRecorder(), cancel: cancel},
 	})
 
 	if !errors.Is(err, domain.ErrLeftBehind) || !strings.Contains(err.Error(), "hooks did not finish") {
@@ -108,5 +117,51 @@ func TestAnInterruptDuringTheHooksNamesTheWorktreeLeftBehind(t *testing.T) {
 	}
 	if _, statErr := os.Stat(outcome.Failed[0].Path); statErr != nil {
 		t.Errorf("worktree not on disk: %v", statErr)
+	}
+}
+
+type cancelOnUpdate struct {
+	*flowtest.Recorder
+	cancel context.CancelFunc
+}
+
+func (p cancelOnUpdate) Publish(ctx context.Context, event domain.Event) {
+	if event.Type == domain.EventWorktreeUpdated {
+		p.cancel()
+	}
+	p.Recorder.Publish(ctx, event)
+}
+
+// The ports settle on the cancellable context, and with no on_create hook
+// nothing came after them to notice an interrupt: the run read as a success.
+func TestAnInterruptWhileThePortsSettleNamesTheWorktreeLeftBehind(t *testing.T) {
+	ctx := testContext(t)
+	ctx.Config.Project.Env.Files = []domain.EnvFile{{Target: ".env"}}
+	linkedRunConfig(t, ctx, ".env")
+	presenter := newRecorder()
+	runCtx, cancel := context.WithCancel(t.Context())
+	ctx.Publisher = cancelOnUpdate{Recorder: presenter.Recorder, cancel: cancel}
+
+	outcome, err := Run(runCtx, Params{
+		Context:   ctx,
+		Request:   Request{Branches: []string{"feat/x"}, From: "main"},
+		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyEnv: "", KeyIsolation: string(domain.IsolationIsolated), KeyRecap: confirmCreate}},
+		Presenter: presenter,
+	})
+
+	if !errors.Is(err, domain.ErrLeftBehind) || !strings.Contains(err.Error(), "not set up") {
+		t.Fatalf("err = %v, want the worktree named as created but not set up", err)
+	}
+	if len(outcome.Results) != 0 || len(outcome.Failed) != 1 || outcome.Failed[0].ExitCode != domain.ExitCodeCancelled {
+		t.Fatalf("outcome = %+v, want feat/x failed as cancelled", outcome)
+	}
+	provisioned := presenter.Published[len(presenter.Published)-1]
+	if provisioned.Type != domain.EventWorktreeProvisioned || provisioned.OK == nil || *provisioned.OK {
+		t.Errorf("last event = %+v, want worktree.provisioned with ok false", provisioned)
+	}
+	for _, status := range presenter.Statuses {
+		if strings.Contains(status.Text, "ports not settled") {
+			t.Errorf("warned %q: the error already says the ports were not set up", status.Text)
+		}
 	}
 }

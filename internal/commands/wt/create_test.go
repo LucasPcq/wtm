@@ -165,6 +165,36 @@ func TestWtCreateIfNotExistsWithBranchCheckedOutElsewhere(t *testing.T) {
 	}
 }
 
+// feat/x and feat-x share a folder name: the worktree there is feat-x's, and
+// an agent retrying with --if-not-exists must be refused, not sent into it.
+func TestWtCreateRefusesTheWorktreeOfABranchSharingItsName(t *testing.T) {
+	for name, flags := range map[string][]string{"plain": nil, "if-not-exists": {"--" + domain.FlagIfNotExists}} {
+		t.Run(name, func(t *testing.T) {
+			dir := gittest.InitRepo(t)
+			stateDir := filepath.Join(dir, ".git", "wtm")
+			t.Setenv(domain.EnvProjectDir, dir)
+			t.Setenv(domain.EnvStateDir, stateDir)
+			t.Setenv(domain.EnvGoFile, "")
+			if err := setupMinimalConfig(t, stateDir); err != nil {
+				t.Fatalf("setup config: %v", err)
+			}
+			if _, _, err := runWtCmd(t, domain.CmdCreate, "feat-x", "--from", "main", "--output", domain.OutputJSON, "--"+domain.FlagYes); err != nil {
+				t.Fatalf("create feat-x: %v", err)
+			}
+
+			args := append([]string{domain.CmdCreate, "feat/x", "--from", "main", "--output", domain.OutputJSON, "--" + domain.FlagYes}, flags...)
+			stdout, _, err := runWtCmd(t, args...)
+
+			if !errors.Is(err, domain.ErrWorktreeNameTaken) || rules.ExitCode(err) != domain.ExitCodeWorktreeExists {
+				t.Errorf("err = %v (exit %d), want ErrWorktreeNameTaken, exit %d", err, rules.ExitCode(err), domain.ExitCodeWorktreeExists)
+			}
+			if strings.Contains(stdout, "already_exists\": true") {
+				t.Errorf("stdout hands out feat-x's worktree:\n%s", stdout)
+			}
+		})
+	}
+}
+
 // A branch that exists but is free is not an "already exists" case: --if-not-exists
 // must still create the worktree.
 func TestWtCreateIfNotExistsWithFreeExistingBranchCreates(t *testing.T) {

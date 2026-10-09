@@ -47,7 +47,7 @@ Check the exit code first, and parse stdout only when it is non-empty. A command
 | `0` | success |
 | `1` | a generic error; `exec` when any command failed |
 | `2` | bad usage: an unknown flag or command, a value or an argument that does not parse (`checkout feat/c`), two flags that cannot be combined, too many arguments, `--output json` without `--yes` |
-| `10` | the worktree or its path already exists (`create --if-not-exists` turns it into a success) |
+| `10` | the worktree or its path already exists (`create --if-not-exists` turns it into a success when the worktree there holds the requested branch, never when it is another branch's, e.g. `feat-x` for `feat/x`) |
 | `11` | the branch does not exist |
 | `12` | the repository was never initialized with wtm (`wtm init`) |
 | `14` | a job or profile `run.toml` does not declare |
@@ -68,7 +68,7 @@ The first Ctrl+C (or SIGINT, SIGTERM) cancels the run; behind a spinner or the r
 | What was running | What an interrupt does |
 | --- | --- |
 | `clean`, `prune` | the worktree being removed is removed all the way (branch, data, event); the next ones are left untouched and listed as skipped, `interrupted` |
-| `create`, `checkout`, `extract` | the worktree is created whole or not at all; one created just before the interrupt, or whose `on_create` hooks it stopped, is kept and named; the branches not reached are listed as skipped, `interrupted` |
+| `create`, `checkout`, `extract` | the worktree is created whole or not at all; one created just before the interrupt, or whose ports or `on_create` hooks it stopped, is kept and named; the branches not reached are listed as skipped, `interrupted` |
 | a hook | the hook is stopped (its process group gets SIGINT, then SIGTERM, then SIGKILL); the hooks after it never start, `continue_on_error` included, and it is reported as `hook stopped` rather than by its shell's exit status. An `on_clean` hook stopped this way keeps the worktree |
 | `sync`, `fast-forward` | a rebase in progress is aborted, the branch left where it was; nothing is pushed, and the branches not reached are reported `cancelled` |
 | `run up`, `run start` | the jobs already started, the one being started included, keep running; the recap lists them, `wtm run down` stops them |

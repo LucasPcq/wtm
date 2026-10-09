@@ -83,7 +83,7 @@ Before any `wtm run …` command, read `references/run.md`; before changing a jo
 On a non-zero exit, read stderr, then:
 
 - `2`: fix the invocation; check `wtm <cmd> --help`.
-- `10`: the path is taken, or the branch is checked out in another worktree. Get its path with `wtm resolve <branch> --output json` (the user enters it with `wtm go <branch>`), or pick a different branch name. `--if-not-exists` on `create` turns this into a success returning the existing worktree's path. With run jobs declared it can also mean two branches reduce to the same name (`feat.x` beside `feat/x`): pick another branch name.
+- `10`: the path is taken, or the branch is checked out in another worktree. Get its path with `wtm resolve <branch> --output json` (the user enters it with `wtm go <branch>`), or pick a different branch name. `--if-not-exists` on `create` turns this into a success returning the existing worktree's path, only when that worktree holds the branch you asked for. It can also mean two branches reduce to the same name (`feat-x` beside `feat/x`, and with run jobs declared `feat.x` too), which `--if-not-exists` never turns into a success: pick another branch name.
 - `11`: wrong name; re-run the relevant discovery call.
 - `12`: repo not initialized. Run `wtm init --yes` with flags (see `references/worktrees.md`), or ask the user to run the interactive `wtm init`.
 - `14`: the job or profile is not declared; check `wtm run list --output json`.

@@ -22,19 +22,6 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 	sanitized := rules.SanitizeBranchName(params.Branch)
 	worktreePath := filepath.Join(params.ProjectDir, params.Config.Project.Worktrees.BasePath, sanitized)
 
-	if _, err := os.Stat(worktreePath); err == nil {
-		// Idempotent path: with --if-not-exists, an existing worktree is a
-		// no-op success so agents can safely retry.
-		if params.IfNotExists {
-			return domain.CreateResult{
-				Branch:        params.Branch,
-				Path:          worktreePath,
-				AlreadyExists: true,
-			}, nil
-		}
-		return domain.CreateResult{}, fmt.Errorf("%w: %s", domain.ErrWorktreePathExists, worktreePath)
-	}
-
 	// The branch is a separate axis from the directory: it may already exist (the
 	// worktree then checks it out as-is, FromBranch unused) or already be checked
 	// out somewhere else, which git allows only once.
@@ -53,6 +40,17 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 
 	if err := CheckNameFree(ctx, NameCheckParams{ProjectDir: params.ProjectDir, StateDir: params.StateDir, Branch: params.Branch}); err != nil {
 		return domain.CreateResult{}, err
+	}
+
+	if infra.FileExists(worktreePath) {
+		occupant, err := occupantOf(ctx, occupantParams{ProjectDir: params.ProjectDir, Path: worktreePath})
+		if err != nil {
+			return domain.CreateResult{}, err
+		}
+		if occupant == params.Branch && params.IfNotExists {
+			return domain.CreateResult{Branch: params.Branch, Path: worktreePath, AlreadyExists: true}, nil
+		}
+		return domain.CreateResult{}, rules.OccupiedPathProblem(rules.OccupiedPathParams{Branch: params.Branch, Path: worktreePath, Occupant: occupant})
 	}
 
 	if err := ctx.Err(); err != nil {
@@ -214,6 +212,25 @@ func EnvParentFallsBackToMain(ctx context.Context, params EnvFallbackParams) boo
 		HasCopyFiles:      len(params.Config.Project.Env.Files) > 0,
 		SourceHasWorktree: parentWorktreePath(ctx, params.ProjectDir, params.Source) != "",
 	})
+}
+
+type occupantParams struct {
+	ProjectDir string
+	Path       string
+}
+
+func occupantOf(ctx context.Context, params occupantParams) (string, error) {
+	worktrees, err := infra.ListWorktrees(ctx, infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
+	if err != nil {
+		return "", err
+	}
+	path := infra.ResolvePath(params.Path)
+	for _, wt := range worktrees {
+		if infra.ResolvePath(wt.Path) == path {
+			return wt.Branch, nil
+		}
+	}
+	return "", nil
 }
 
 func writeMetadata(metaDir string, metadata domain.WorktreeMetadata) error {
