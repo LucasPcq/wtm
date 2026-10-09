@@ -138,7 +138,7 @@ func build(session flow.Session) (*plan, error) {
 			p.settledStep(step, settledLine(step, answer, flagSuffix(step, answer)))
 			continue
 		}
-		if _, recalled := flow.Recalled(step); recalled {
+		if _, recalled := flow.Recalled(step); recalled || step.Given != "" {
 			p.recall(step)
 			continue
 		}
@@ -184,14 +184,15 @@ func (p *plan) ruledStep(step flow.Step, reason string) {
 	p.bindings = append(p.bindings, binding{key: step.Key, kind: step.Kind, settled: true, step: step})
 }
 
-// recall settles a remembered step now when nothing asked later can change
-// whether it applies, and otherwise on entry, against the answers before it.
+// recall settles a step its flag or memory answers now when nothing asked later
+// can change whether it applies, and otherwise on entry, against the answers
+// before it.
 func (p *plan) recall(step flow.Step) {
 	if step.Skip == nil || p.entered == 0 {
 		answer, _ := flow.Settle(step, p.known())
 		p.settled[step.Key] = answer
-		if answer.Recalled {
-			p.settledStep(step, settledLine(step, answer, domain.RecapRememberedSuffix))
+		if suffix, settled := settledSuffix(step, answer); settled {
+			p.settledStep(step, settledLine(step, answer, suffix))
 			return
 		}
 		p.ruledStep(step, answer.SkipReason)
@@ -204,8 +205,8 @@ func (p *plan) recall(step flow.Step) {
 		Build: func(prev []components.Step) any {
 			answer, _ := flow.Settle(step, p.answersFrom(prev))
 			line, reason = "", answer.SkipReason
-			if answer.Recalled {
-				line = settledLine(step, answer, domain.RecapRememberedSuffix)
+			if suffix, settled := settledSuffix(step, answer); settled {
+				line = settledLine(step, answer, suffix)
 			}
 			return placeholder(step)
 		},
@@ -230,6 +231,16 @@ func settledLine(step flow.Step, answer flow.Answer, suffix string) string {
 		summary = domain.SummaryNone
 	}
 	return summary + suffix
+}
+
+func settledSuffix(step flow.Step, answer flow.Answer) (string, bool) {
+	switch {
+	case answer.Given:
+		return flagSuffix(step, answer), true
+	case answer.Recalled:
+		return domain.RecapRememberedSuffix, true
+	}
+	return "", false
 }
 
 func flagSuffix(step flow.Step, answer flow.Answer) string {

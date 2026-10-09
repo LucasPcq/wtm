@@ -225,6 +225,27 @@ func TestANewBranchIsNeverOfferedAFastForward(t *testing.T) {
 	}
 }
 
+// LUC-281: --ff only answered unattended runs, so the wizard still offered the
+// fast-forward the flag had already accepted.
+func TestFastForwardFlagIsNeverAsked(t *testing.T) {
+	ctx := testContext(t)
+	behindLocally(t, ctx)
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyParent: "main", KeyEnv: "", KeyRecap: confirmCheckout}}
+
+	if _, err := Run(t.Context(), Params{Context: ctx, Request: Request{Number: 42, FastForward: true}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if want := strings.Join([]string{KeyParent, KeyEnv, KeyRecap}, ","); prompter.AskedKeys() != want {
+		t.Errorf("asked %q, want %q: --ff answers the source update", prompter.AskedKeys(), want)
+	}
+	if recap := prompter.Content[KeyRecap].Description; !strings.Contains(recap, "fast-forward feat/thing to origin") {
+		t.Errorf("recap = %q, want the fast-forward named", recap)
+	}
+	if local, origin := revParse(t, ctx.ProjectDir, "feat/thing"), revParse(t, ctx.ProjectDir, "origin/feat/thing"); local != origin {
+		t.Errorf("feat/thing = %s, want fast-forwarded to %s", local, origin)
+	}
+}
+
 func TestUnattendedFastForwardsOnlyWithTheFlag(t *testing.T) {
 	for _, ff := range []bool{false, true} {
 		ctx := testContext(t)

@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -46,7 +45,7 @@ func newCreateCmd() *cobra.Command {
 	// No backquotes in this usage string: cobra reads backquoted text as the flag's
 	// value placeholder, which would render as "--from wtm sync" instead of string.
 	cmd.Flags().String(domain.FlagFrom, "", "Source branch to start from — or, when the branch already exists locally, the parent to record for wtm sync (required there without the wizard)")
-	cmd.Flags().Bool(domain.FlagFF, false, "Fast-forward to origin before creating — the source branch, or the branch itself when it already exists locally (non-interactive; skipped when it has diverged)")
+	cmd.Flags().Bool(domain.FlagFF, false, "Fast-forward to origin before creating — the source branch, or the branch itself when it already exists locally (answers the wizard's question; skipped when it has diverged)")
 	cmd.Flags().String(domain.FlagEnvFrom, "", "Override env strategy (example, main, parent)")
 	shared.AddIsolationFlag(cmd)
 	shared.AddAskFlag(cmd)
@@ -86,7 +85,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 
 	// The wizard needs a TTY and is skipped by --yes; a human-format run without a
 	// terminal also takes the prompt-free path.
-	interactive := rules.IsHumanFormat(format) && !yes && term.IsTerminal(int(os.Stdin.Fd()))
+	interactive := rules.IsHumanFormat(format) && !yes && shared.StdinIsTerminal()
 
 	_, err = createflow.Run(cmd.Context(), createflow.Params{
 		Context: shared.FlowContext(config),

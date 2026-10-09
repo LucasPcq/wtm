@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
@@ -204,6 +205,10 @@ func FlowPrompter(ctx context.Context, params FlowPrompterParams) flow.Prompter 
 	}
 	return InteractivePrompter(ctx, params)
 }
+
+// StdinIsTerminal is the terminal gate of a command whose wizard renders on
+// stderr, so stdout may be consumed. A var so a test can stand in for the terminal.
+var StdinIsTerminal = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
 
 // InteractivePrompter is the wizard a fully interactive run asks through. A
 // var so a test can stand in for the terminal.

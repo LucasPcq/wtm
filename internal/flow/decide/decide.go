@@ -188,15 +188,14 @@ type SourceUpdateStepParams struct {
 }
 
 // SourceUpdateStep applies only to a behind-only branch; a diverged one is not a
-// gate here, it becomes a ⚠ line in the recap. --ff answers it through Resolve
-// rather than as a preset, so under --ff it remembers nothing: the flag wins.
+// gate here, it becomes a ⚠ line in the recap.
 func SourceUpdateStep(params SourceUpdateStepParams) flow.Step {
-	memory := flow.Memory{ID: domain.RememberSourceUpdate}
+	given := ""
 	if params.FastForward {
-		memory = flow.Memory{}
+		given = UpdateFastForward
 	}
 	return flow.Step{
-		Memory: memory,
+		Memory: flow.Memory{ID: domain.RememberSourceUpdate},
 		Kind:   flow.StepSelect,
 		Key:    params.Key,
 		Label:  domain.SourceUpdateLabel,
@@ -219,9 +218,6 @@ func SourceUpdateStep(params SourceUpdateStepParams) flow.Step {
 			}, nil
 		},
 		Resolve: func(flow.Answers) (flow.Answer, error) {
-			if params.FastForward {
-				return flow.Answer{Value: UpdateFastForward}, nil
-			}
 			return flow.Answer{Value: UpdateKeep}, nil
 		},
 		Summarize: func(answer flow.Answer) string {
@@ -230,7 +226,8 @@ func SourceUpdateStep(params SourceUpdateStepParams) flow.Step {
 			}
 			return domain.SourceUpdateSummaryKeep
 		},
-		Flag: domain.FlagFF,
+		Flag:  domain.FlagFF,
+		Given: given,
 	}
 }
 

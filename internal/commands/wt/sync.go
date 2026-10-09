@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -93,7 +92,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 	// --dry-run keeps the picker: it still selects what to preview, it just never
 	// confirms — which is why it is not folded into interactive, only into the
 	// refusal below.
-	interactive := rules.IsHumanFormat(format) && term.IsTerminal(int(os.Stdin.Fd())) && !yes
+	interactive := rules.IsHumanFormat(format) && shared.StdinIsTerminal() && !yes
 	if !interactive && !yes && !dryRun {
 		return errors.New(domain.SyncNeedsTerminal)
 	}

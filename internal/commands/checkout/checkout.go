@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/LucasPcq/wtm/internal/commands/shared"
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -43,7 +42,7 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().Bool(domain.FlagMine, false, "Show only your PRs")
 	cmd.Flags().String(domain.FlagFrom, "", "Parent branch for sync (defaults to the PR base branch)")
 	cmd.Flags().String(domain.FlagEnvFrom, "", "Override env strategy (example, main, parent)")
-	cmd.Flags().Bool(domain.FlagFF, false, "Fast-forward the PR's branch to origin when it already exists locally and is behind (non-interactive; skipped when it has diverged)")
+	cmd.Flags().Bool(domain.FlagFF, false, "Fast-forward the PR's branch to origin when it already exists locally and is behind (answers the wizard's question; skipped when it has diverged)")
 	shared.AddIsolationFlag(cmd)
 	shared.AddAskFlag(cmd)
 	cmd.Flags().BoolP(domain.FlagYes, "y", false, "Skip all prompts; resolve every decision from flags and safe defaults (PR number required)")
@@ -99,7 +98,7 @@ func runCheckout(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	interactive := rules.IsHumanFormat(format) && term.IsTerminal(int(os.Stdin.Fd())) && !yes
+	interactive := rules.IsHumanFormat(format) && shared.StdinIsTerminal() && !yes
 
 	_, err = checkoutflow.Run(cmd.Context(), checkoutflow.Params{
 		Context: shared.FlowContext(result),

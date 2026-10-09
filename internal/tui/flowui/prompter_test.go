@@ -426,6 +426,75 @@ func TestALoadedStepLoadsEvenWhenItComesFirst(t *testing.T) {
 	}
 }
 
+// LUC-281: once --keep-conflict settled sync's conflict step, `sync --all
+// --keep-conflict` opened on its loaded recap behind three settled steps, and
+// sat on the empty placeholder.
+func TestALoadedStepLoadsWhenSettledStepsComeFirst(t *testing.T) {
+	given := selectStep("g", "one")
+	given.Given = "one"
+	plan, err := build(flow.Session{
+		Presets: flow.NewAnswers(map[string]string{"a": "given"}),
+		Steps:   []flow.Step{textStep("a"), given, loadedRecap("r")},
+	})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if plan.initCmd == nil {
+		t.Fatal("the first step asked must load at init, wherever it stands")
+	}
+
+	wizard := components.NewWizardWithParams(components.WizardParams{Steps: plan.steps})
+	handle := plan.handler(t.Context())
+	cmd, handled := handle(&wizard, plan.initCmd())
+	if !handled {
+		t.Fatal("the load request must be handled")
+	}
+	for _, sub := range cmd().(tea.BatchMsg) {
+		if done, ok := sub().(loadDoneMsg); ok {
+			handle(&wizard, done)
+		}
+	}
+
+	view := wizard.Steps()[2].Model.(components.SelectListModel).View()
+	if !strings.Contains(view, "Yes, do it") {
+		t.Errorf("the recap must show its loaded content, not the placeholder:\n%s", view)
+	}
+}
+
+// A flag's answer is read back in the trail with the flag that gave it.
+func TestBuildSettlesAGivenStepWithItsFlag(t *testing.T) {
+	given := selectStep("g", "one")
+	given.Given, given.Flag = "one", "pick-one"
+	plan, err := build(flow.Session{Steps: []flow.Step{given, selectStep("b", "two")}})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if got, want := plan.steps[0].Settled, "one · --pick-one"; got != want {
+		t.Errorf("settled = %q, want %q", got, want)
+	}
+	if got := plan.known().Value("g"); got != "one" {
+		t.Errorf("given value = %q, want it available to every step", got)
+	}
+}
+
+// A step its Skip rules out is ruled out even under its flag: the flag answers
+// a question the run puts, never one it removed.
+func TestBuildRulesOutAGivenStepItsSkipRemoves(t *testing.T) {
+	given := selectStep("g", "one")
+	given.Given = "one"
+	given.Skip = func(flow.Answers) (bool, string) { return true, "nothing to decide" }
+	plan, err := build(flow.Session{Steps: []flow.Step{given, selectStep("b", "two")}})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if plan.steps[0].Ruled != "nothing to decide" {
+		t.Errorf("ruled = %q, want the skip reason", plan.steps[0].Ruled)
+	}
+	if got := plan.known().Value("g"); got != "" {
+		t.Errorf("a ruled-out step must carry no value, got %q", got)
+	}
+}
+
 func TestSelectOpensOnTheStepsStartingValue(t *testing.T) {
 	content := flow.StepContent{
 		Options: []flow.Option{

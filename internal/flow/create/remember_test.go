@@ -210,15 +210,22 @@ func TestAskUnattendedIgnoresTheMemory(t *testing.T) {
 	}
 }
 
-// --ff is answered through Resolve, not as a preset, so it must keep the
-// memory from settling the step first: a flag always wins.
+// A flag always wins: under --ff a remembered "keep" never settles the step.
 func TestFastForwardFlagWinsOverARememberedKeep(t *testing.T) {
 	f := newFlow(t, Request{FastForward: true}, nil)
-	f.ctx.Config.Project.Wizard.Remembered = map[string]string{domain.RememberSourceUpdate: domain.SourceUpdateKeep}
+	session := flow.Recall(flow.RecallParams{
+		Session:    f.session(),
+		Remembered: map[string]string{domain.RememberSourceUpdate: domain.SourceUpdateKeep},
+	})
 
-	for _, step := range f.session().Steps {
-		if step.Key == KeySourceUpdate && step.Memory.Value != "" {
-			t.Errorf("source-update step recalls %q under --ff", step.Memory.Value)
+	for _, step := range session.Steps {
+		if step.Key != KeySourceUpdate {
+			continue
+		}
+		step.Skip = nil
+		answer, _ := flow.Settle(step, flow.Answers{})
+		if answer.Value != updateFastForward || !answer.Given || answer.Recalled {
+			t.Errorf("answer = %+v, want --ff to settle the step over the memory", answer)
 		}
 	}
 }

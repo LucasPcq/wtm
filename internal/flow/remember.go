@@ -39,14 +39,17 @@ func Recall(params RecallParams) Session {
 	return session
 }
 
-// Settle answers a step nobody has to be asked: one its Skip rules out, or one
-// whose answer is remembered. A preset is not its business: a flag always wins,
-// so a surface looks for one first.
+// Settle answers a step nobody has to be asked: one its Skip rules out, one its
+// flag answers, or one whose answer is remembered. A preset is not its business:
+// a flag always wins, so a surface looks for one first.
 func Settle(step Step, answers Answers) (Answer, bool) {
 	if step.Skip != nil {
 		if skip, reason := step.Skip(answers); skip {
 			return Answer{Skipped: true, SkipReason: reason}, true
 		}
+	}
+	if step.Given != "" {
+		return Answer{Value: step.Given, Given: true}, true
 	}
 	if value, ok := Recalled(step); ok {
 		return Answer{Value: value, Recalled: true}, true
