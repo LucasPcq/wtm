@@ -96,7 +96,7 @@ Worktrees that share their ports (a [verbatim](isolation.md) worktree and its so
 | `detached` | a service whose launcher exited, leaving the work to something wtm does not own (a compose stack); nothing about it is verified, and it survives the daemon |
 | `joined` | this worktree's hold on a [shared service](shared-services.md) running in the main checkout; it owns no process |
 | `stopped` | stopped on request |
-| `crashed` | a service that exited without being asked to (`exit_code` in the JSON says how) |
+| `crashed` | a service that exited without being asked to (`exit_code` in the JSON says how); `run down` settles it to `stopped` |
 | `reaped` | a service that outlived the daemon which owned it, taken down by the next one |
 
 The results of `run up`, `run down` and `run stop` use their own vocabulary: `started`, `joined`, `done` (a task that ran to the end), `stopped`, `released` (a shared service this worktree let go of, still up for others), `already_running`, `not_running` (nothing was up under that name) and `error`.

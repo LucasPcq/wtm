@@ -66,15 +66,6 @@ func collectStatus(ctx context.Context) domain.DaemonStatus {
 		status.PID, _ = process.DaemonPeerPID(status.SocketPath)
 	}
 	status.ProxyPort = resp.ProxyPort
-	for _, job := range resp.Jobs {
-		if !rules.IsJobUp(job.Status) {
-			continue
-		}
-		if job.Status == domain.JobStatusDetached {
-			status.Detached++
-			continue
-		}
-		status.Foreground++
-	}
+	status.Foreground, status.Detached = rules.CountDaemonJobs(resp.Jobs)
 	return status
 }

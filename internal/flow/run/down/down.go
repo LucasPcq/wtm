@@ -239,7 +239,13 @@ func (f *downFlow) stopProfile(ctx context.Context, outcome Outcome, workDir str
 	jobs := rules.ProfileJobs(f.request.Config, profile)
 	results := make([]domain.JobActionResult, 0, len(jobs))
 	for _, job := range jobs {
-		if !rules.JobUpIn(rules.JobUpInParams{Jobs: running.Jobs, Name: job.Name, WorkDir: workDir}) {
+		held := rules.JobUpInParams{Jobs: running.Jobs, Name: job.Name, WorkDir: workDir}
+		if rules.JobCrashedIn(held) {
+			if err := f.settle(ctx, process.Request{Action: process.ActionStop, Name: job.Name, WorkDir: workDir}); err != nil {
+				return nil, err
+			}
+		}
+		if !rules.JobUpIn(held) {
 			results = append(results, domain.JobActionResult{Name: job.Name, Status: domain.JobActionNotRunning})
 			continue
 		}
@@ -286,8 +292,14 @@ func (f *downFlow) stopEverywhere(ctx context.Context) ([]domain.WorktreeJobResu
 		dirs = append(dirs, wt.Path)
 	}
 
+	held := rules.WorkDirsWithJobsUpParams{Jobs: running.Jobs, Within: dirs}
+	for _, workDir := range rules.WorkDirsWithOnlyCrashedJobs(held) {
+		if err := f.settle(ctx, process.Request{Action: process.ActionStopAll, WorkDir: workDir}); err != nil {
+			return nil, err
+		}
+	}
 	var results []domain.WorktreeJobResults
-	for _, workDir := range rules.WorkDirsWithJobsUp(rules.WorkDirsWithJobsUpParams{Jobs: running.Jobs, Within: dirs}) {
+	for _, workDir := range rules.WorkDirsWithJobsUp(held) {
 		jobs, err := f.stopAll(workDir)
 		if err != nil {
 			return nil, err
@@ -333,6 +345,20 @@ func (f *downFlow) stoppedJobs(workDir string) ([]domain.JobInfo, error) {
 		return nil, fmt.Errorf("stop all: %s", resp.Message)
 	}
 	return resp.Jobs, nil
+}
+
+// settle puts down what crashed there. Nothing was running, so nothing is
+// reported stopped: a crash `run down` has seen stops reading as one.
+func (f *downFlow) settle(ctx context.Context, request process.Request) error {
+	request.Origin = f.ctx.Origin(ctx)
+	resp, err := client().Send(ctx, request)
+	if err != nil {
+		return fmt.Errorf("settle crashed jobs: %w", err)
+	}
+	if resp.Status == process.StatusError {
+		return fmt.Errorf("settle crashed jobs: %s", resp.Message)
+	}
+	return nil
 }
 
 // nothingRunning is what a down reports with no daemon to ask: every worktree

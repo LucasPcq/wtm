@@ -67,3 +67,20 @@ func WorktreeJobsHaveErrors(results []domain.WorktreeJobResults) bool {
 	}
 	return false
 }
+
+// CountDaemonJobs splits what the daemon holds up by what stopping it costs:
+// a supervised job dies with it — one `run up -d` started included, -d only
+// skipping the run view — while a detached stack outlives it. A claim on a
+// shared service owns no process, and is neither.
+func CountDaemonJobs(jobs []domain.JobInfo) (supervised, detached int) {
+	for _, job := range jobs {
+		switch {
+		case job.Status == domain.JobStatusDetached:
+			detached++
+		case job.Status == domain.JobStatusJoined, !IsJobUp(job.Status):
+		default:
+			supervised++
+		}
+	}
+	return supervised, detached
+}

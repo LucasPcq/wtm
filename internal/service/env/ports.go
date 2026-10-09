@@ -54,12 +54,22 @@ func (p EnvPortsParams) PlanParams() rules.PlanEnvPortsParams {
 // writing nothing. A file that does not exist yields missing keys rather than
 // silence — a link the user declared must stay visible in the report.
 func ComputeEnvPorts(params EnvPortsParams) (domain.EnvPortPlan, error) {
+	return computeEnvPorts(computeEnvPortsParams{Ports: params})
+}
+
+type computeEnvPortsParams struct {
+	Ports EnvPortsParams
+	// Reconciled holds files as they would be written, read in place of the disk.
+	Reconciled map[string][]domain.EnvLine
+}
+
+func computeEnvPorts(params computeEnvPortsParams) (domain.EnvPortPlan, error) {
 	lines, err := readLinkedFiles(params)
 	if err != nil {
 		return domain.EnvPortPlan{}, err
 	}
 
-	planParams := params.PlanParams()
+	planParams := params.Ports.PlanParams()
 	planParams.Lines = lines
 	plan := rules.PlanEnvPorts(planParams)
 	owned, err := planOwned(params)
@@ -72,17 +82,17 @@ func ComputeEnvPorts(params EnvPortsParams) (domain.EnvPortPlan, error) {
 
 // planOwned reads each file an owned key lands in and says whether it already
 // holds that value, so a report never announces a write that changed nothing.
-func planOwned(params EnvPortsParams) ([]domain.EnvOwnedEntry, error) {
-	if len(params.Owned) == 0 {
+func planOwned(params computeEnvPortsParams) ([]domain.EnvOwnedEntry, error) {
+	if len(params.Ports.Owned) == 0 {
 		return nil, nil
 	}
 
 	byFile := map[string][]domain.EnvLine{}
-	out := make([]domain.EnvOwnedEntry, 0, len(params.Owned))
-	for _, entry := range params.Owned {
+	out := make([]domain.EnvOwnedEntry, 0, len(params.Ports.Owned))
+	for _, entry := range params.Ports.Owned {
 		lines, read := byFile[entry.File]
 		if !read {
-			parsed, err := readEnvFile(filepath.Join(params.WorktreePath, entry.File))
+			parsed, err := params.read(entry.File)
 			if err != nil {
 				return nil, err
 			}
@@ -192,13 +202,20 @@ func EnvValueRefsFor(params EnvPortsParams, target string) map[string]rules.EnvV
 	return rules.EnvValueRefsByKey(linksForFile(params.Links, target), params.Bases, params.Origins)
 }
 
-func readLinkedFiles(params EnvPortsParams) (map[string][]domain.EnvLine, error) {
+func (p computeEnvPortsParams) read(file string) ([]domain.EnvLine, error) {
+	if lines, ok := p.Reconciled[file]; ok {
+		return lines, nil
+	}
+	return readEnvFile(filepath.Join(p.Ports.WorktreePath, file))
+}
+
+func readLinkedFiles(params computeEnvPortsParams) (map[string][]domain.EnvLine, error) {
 	lines := map[string][]domain.EnvLine{}
-	for _, link := range params.Links {
+	for _, link := range params.Ports.Links {
 		if _, read := lines[link.File]; read {
 			continue
 		}
-		parsed, err := readEnvFile(filepath.Join(params.WorktreePath, link.File))
+		parsed, err := params.read(link.File)
 		if err != nil {
 			return nil, err
 		}

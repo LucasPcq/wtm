@@ -30,6 +30,9 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 - **`wtm create --if-not-exists`** no longer returns the worktree of another branch sharing the folder name (`feat-x` for `feat/x`): it refuses with exit `10`, like a create without the flag. → [Integrations](docs/guide/integrations.md#the-contract---yes-and---output-json)
 - **Quitting `wtm ui`** while a run is in flight cancels it and waits for it to stop, then exits `19`; a second Ctrl+C leaves at once. Quitting no longer leaves a hook's processes running.
 - **A flag answers its wizard question** instead of only preselecting it: `wtm sync --keep-conflict` no longer asks "On conflict", and `create`, `checkout` and `extract --ff` no longer offer the fast-forward of a source behind origin; the trail reads the flag (`· --keep-conflict`, `· --ff`). → [Stacked pull requests](docs/guide/recipes.md#stacked-pull-requests)
+- **`wtm run down`** settles a crashed job: `wtm status` and `run ps` read it `stopped` instead of reporting the crash again. → [Event stream](docs/guide/events.md)
+- **`wtm env --check`** on a missing `.env` plans the ports the apply settles instead of "no such key in this file", and names the file the main checkout lacks when keys need a value.
+- **`wtm run daemon status`** reads jobs as supervised or detached stacks, a `run up -d` job being supervised, and no longer counts a claim on a shared service.
 
 ## [0.29.2] - 2026-10-06
 

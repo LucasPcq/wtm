@@ -3,6 +3,7 @@ package daemoncmd_test
 import (
 	"bytes"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
@@ -172,5 +173,28 @@ func TestRestartThatWouldKillForegroundServicesRequiresYes(t *testing.T) {
 	}
 	if shutdowns(daemon) != 0 {
 		t.Errorf("requests = %v, want the daemon left alone", daemon.Actions())
+	}
+}
+
+// LUC-276 (d): a claim on a shared service owns no process, so it is neither
+// supervised nor a detached stack; and the readout says supervised, which a job
+// `run up -d` started is, rather than foreground, which -d seemed to contradict.
+func TestStatusCountsAClaimAsNeitherAndSaysSupervised(t *testing.T) {
+	processtest.Serve(t, append(slices.Clone(mixed), domain.JobInfo{Name: "pg", Status: domain.JobStatusJoined, WorkDir: "/w2"}))
+
+	stdout, err := execute(t, domain.CmdStatus, "--output", domain.OutputJSON)
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	if status := decodeStatus(t, stdout); status.Foreground != 1 || status.Detached != 1 {
+		t.Errorf("status = %+v, want one supervised and one detached, the claim in neither", status)
+	}
+
+	text, err := execute(t, domain.CmdStatus)
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	if !strings.Contains(text, "1 supervised · 1 detached stack(s)") {
+		t.Errorf("readout = %q, want the jobs as supervised and detached stacks", text)
 	}
 }
