@@ -145,10 +145,9 @@ func envPortAnomalyReason(e domain.EnvPortEntry) string {
 	case domain.EnvPortStatusAmbiguous:
 		return fmt.Sprintf(domain.EnvPortReasonAmbiguousFmt, e.Base)
 	case domain.EnvPortStatusForeignHost:
-		if e.ForeignHost == "" {
-			return domain.EnvPortReasonForeignHost
-		}
-		return fmt.Sprintf(domain.EnvPortReasonForeignHostFmt, e.ForeignHost)
+		// The host is the user's text, not wtm's: naming it is what let a
+		// password through when parsers disagreed on where userinfo ends.
+		return domain.EnvPortReasonForeignHost
 	case domain.EnvPortStatusSecureScheme:
 		return domain.EnvPortReasonSecureScheme
 	default:

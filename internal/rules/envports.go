@@ -207,7 +207,7 @@ func planEnvPortKey(params planEnvPortKeyParams) domain.EnvPortEntry {
 		Lines:    params.Lines,
 		Origins:  params.Origins,
 	})
-	merged.Moves = []domain.EnvPortMove{moveOf(params.Group.Links[0], params.Group.Bases[0], resolvedPort(params, 0))}
+	merged.Moves = []domain.EnvPortMove{moveOf(moveOfParams{Key: params, Index: 0, Entry: merged})}
 	if len(params.Group.Links) == 1 {
 		return merged
 	}
@@ -228,7 +228,7 @@ func planEnvPortKey(params planEnvPortKeyParams) domain.EnvPortEntry {
 			Origins:  params.Origins,
 		})
 		merged = foldEnvPortEntry(merged, next)
-		merged.Moves = append(merged.Moves, moveOf(params.Group.Links[i], params.Group.Bases[i], resolvedPort(params, i)))
+		merged.Moves = append(merged.Moves, moveOf(moveOfParams{Key: params, Index: i, Entry: next}))
 	}
 	return merged
 }
@@ -266,8 +266,20 @@ func ResolvedPort(params ResolvedPortParams) int {
 	return params.Base + params.Offset
 }
 
-func moveOf(link domain.EnvPortLink, base, resolved int) domain.EnvPortMove {
-	return domain.EnvPortMove{Port: link.Port, Job: link.Job, Base: base, Resolved: resolved}
+type moveOfParams struct {
+	Key   planEnvPortKeyParams
+	Index int
+	// Entry is the link's own reading, which says whether it took an address.
+	Entry domain.EnvPortEntry
+}
+
+func moveOf(params moveOfParams) domain.EnvPortMove {
+	link := params.Key.Group.Links[params.Index]
+	move := domain.EnvPortMove{Port: link.Port, Job: link.Job, Base: params.Key.Group.Bases[params.Index], Resolved: resolvedPort(params.Key, params.Index)}
+	if params.Entry.Addressing == domain.AddressingNames {
+		move.Origin = linkOrigin(linkOriginParams{Link: link, Origins: params.Key.Origins})
+	}
+	return move
 }
 
 // foldEnvPortEntry keeps what the run has done so far and what the next link
@@ -367,13 +379,7 @@ func planOriginEntry(entry domain.EnvPortEntry, value string, params planEnvPort
 		return entry, false
 	}
 
-	origin := LinkOrigin(LinkOriginParams{
-		Job:        params.Origins.Jobs[params.Link.Job],
-		PortName:   params.Link.Port,
-		Worktree:   params.Origins.Worktree,
-		Project:    params.Origins.Project,
-		PublicPort: params.Origins.PublicPort,
-	})
+	origin := linkOrigin(linkOriginParams{Link: params.Link, Origins: params.Origins})
 	if origin == "" {
 		return entry, false
 	}
@@ -395,6 +401,21 @@ func planOriginEntry(entry domain.EnvPortEntry, value string, params planEnvPort
 	entry.NewValue = rewrite.Value
 	entry.ForeignHost = rewrite.ForeignHost
 	return entry, true
+}
+
+type linkOriginParams struct {
+	Link    domain.EnvPortLink
+	Origins OriginContext
+}
+
+func linkOrigin(params linkOriginParams) string {
+	return LinkOrigin(LinkOriginParams{
+		Job:        params.Origins.Jobs[params.Link.Job],
+		PortName:   params.Link.Port,
+		Worktree:   params.Origins.Worktree,
+		Project:    params.Origins.Project,
+		PublicPort: params.Origins.PublicPort,
+	})
 }
 
 // alreadyResolvedStatus classifies a value the base does not appear in. Finding
@@ -599,18 +620,17 @@ type envPortBecomesParams struct {
 	Width int
 }
 
-// envPortBecomes is where a link's origins land, and nothing else of the
-// value: the rest of it is the user's, a password among it.
+// envPortBecomes is where a link's ports land, built from the plan alone: the
+// value is the user's, a password among it, and no part of it is printed.
 func envPortBecomes(params envPortBecomesParams) string {
 	width := params.Width
 	if width <= 0 {
 		width = domain.EnvValueDisplayWidth
 	}
-	moves := EnvPortOrigins(params.Entry)
-	if len(moves) == 0 {
+	if len(params.Entry.Moves) == 0 {
 		return domain.Ellipsis
 	}
-	value := strings.Join(originSide(moves, false), domain.EnvOriginJoin)
+	value := EnvPortMovesTo(params.Entry.Moves)
 	if len(value) <= width {
 		return value
 	}

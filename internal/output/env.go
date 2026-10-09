@@ -146,7 +146,7 @@ func printEnvSummary(w io.Writer, result domain.EnvSyncResult) {
 // domain result carries its own json tags; it is never framed.
 func WriteEnvJSON(w io.Writer, params EnvReportParams) error {
 	if params.ShowValues {
-		return encodeJSON(w, rules.AnnotateEnvOrigins(params.Result))
+		return encodeJSON(w, params.Result)
 	}
 	return encodeJSON(w, rules.RedactEnvResult(params.Result))
 }

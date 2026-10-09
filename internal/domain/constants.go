@@ -117,10 +117,10 @@ const (
 
 	// EnvCredentialsSeparator ends the userinfo part of a URL.
 	EnvCredentialsSeparator = "@"
-	// EnvOriginJoin separates the origins a report lists for one value.
+	// EnvOriginJoin separates the ports or addresses a report lists for one value.
 	EnvOriginJoin = ", "
-	// EnvPortKeyword is the key a DSN gives its port under (libpq, jdbc, ADO.NET).
-	EnvPortKeyword = "port"
+	// EnvPortSideFmt is a port a report names, rendered from the plan's number.
+	EnvPortSideFmt = ":%d"
 	// EnvValueDisplayWidth caps the origins of a value in the port table, for a
 	// surface that could not measure itself. EnvValueMinWidth is the floor a
 	// measured one never goes under: below it the value is unrecognisable, and
@@ -1104,9 +1104,8 @@ const (
 	EnvPortReasonNotFoundFmt  = "no %d to shift in the value"
 	// The two refusals an origin rewrite adds. Both name what wtm saw rather
 	// than what it wanted, since the value is the thing the reader must fix.
-	EnvPortReasonForeignHostFmt = "points at %s, which no job here serves"
-	EnvPortReasonForeignHost    = "points at another host, which no job here serves"
-	EnvPortReasonSecureScheme   = "https — the run proxy serves plain HTTP"
+	EnvPortReasonForeignHost  = "points at another host, which no job here serves"
+	EnvPortReasonSecureScheme = "https — the run proxy serves plain HTTP"
 
 	// The trailing verdict of `wtm env`.
 	EnvCheckDriftMessage        = "Read-only check — run `wtm env %s` to reconcile."
@@ -1236,6 +1235,7 @@ const (
 	// EnvDetailRestored* are the file-block rows of those values.
 	EnvDetailRestoredFmt        = "back to the source's %s (was %s)"
 	EnvDetailRestoredValue      = "back to the source's value"
+	EnvDetailRestoredPortsFmt   = "back to the source's %s"
 	EnvDetailRestoredRemoved    = "removed — the source has none"
 	EnvDetailRestoredRemovedFmt = "removed — the source has none (was %s)"
 	// EnvDetailOwnedWouldSetFmt is a check's row for a key wtm writes in full

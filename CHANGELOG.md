@@ -6,7 +6,7 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 ### Breaking
 
-- **`env_ports` and `env --output json`** no longer carry linked values (`current_value`, `new_value`, restored `from` / `to`): read `origins`, or pass `wtm env --show-values`. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
+- **`env_ports` and `env --output json`** no longer carry linked values (`current_value`, `new_value`, `foreign_host`, restored `from` / `to`): read `moves` and restored `ports`, or pass `wtm env --show-values`. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
 
 ### Added
 
@@ -15,7 +15,7 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 ### Fixed
 
-- **`wtm env`** prints of a value only what wtm writes — the host:port a port link moves, `[[env]]` values — so no password reaches its text or JSON, whatever the connection-string format. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
+- **`wtm env`** prints no text read from a value — only the ports and addresses wtm writes and its `[[env]]` values — so no password reaches its text or JSON, whatever the connection-string format. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
 - **`wtm env`** reports what it changes: a verbatim switch shows the port that moved in an origin list, `--check` names the `[[env]]` key it would rewrite, and the wizard previews an overwrite on the worktree's own port. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
 - **`wtm env`** rebuilds a declared `.env` missing from the worktree the way `wtm create` provisions it (the template under `example`), then settles its ports, instead of leaving it absent; `--check` reports it as drift. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
 - **Interrupting wtm** (SIGINT, SIGTERM) stops the git, hook or `wtm exec` process it waits on and exits with code 19; a second interrupt quits at once. → [Integrations](docs/guide/integrations.md)

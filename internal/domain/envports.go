@@ -45,6 +45,13 @@ type EnvKeyRef struct {
 	Key  string
 }
 
+// EnvOwnedKeys are the keys wtm writes into an isolated worktree, and the base
+// ports run.toml declares for the port-linked ones among them.
+type EnvOwnedKeys struct {
+	Refs      []EnvKeyRef
+	PortBases map[EnvKeyRef][]int
+}
+
 // EnvValueField is one candidate row of the [[env]] step: a .env key that could
 // follow a shared service's namespace. wtm cannot detect which key is a realm or a
 // database name — the value is opaque, with none of the three signs that make a
@@ -124,13 +131,9 @@ type EnvPortMove struct {
 	Job      string `json:"job"`
 	Base     int    `json:"base"`
 	Resolved int    `json:"resolved"`
-}
-
-// EnvOriginMove is one host:port, or a bare port, wtm moved in a value. A
-// host shows only when it names this machine.
-type EnvOriginMove struct {
-	From string `json:"from"`
-	To   string `json:"to"`
+	// Origin is the address wtm writes for this port under AddressingNames,
+	// built from the job and the worktree, never read back from the value.
+	Origin string `json:"origin,omitempty"`
 }
 
 // EnvPortEntry is one link resolved against the worktree's offset and the value
@@ -153,9 +156,6 @@ type EnvPortEntry struct {
 	Status       EnvPortStatus `json:"status"`
 	CurrentValue string        `json:"current_value,omitempty"`
 	NewValue     string        `json:"new_value,omitempty"`
-	// Origins is what a report shows of the move without --show-values: the
-	// values themselves are the user's, the host:port wtm moved is its own.
-	Origins []EnvOriginMove `json:"origins,omitempty"`
 	// ForeignHost is what the value pointed at when it pointed somewhere the
 	// proxy does not serve. Only EnvPortStatusForeignHost carries it.
 	ForeignHost string `json:"foreign_host,omitempty"`

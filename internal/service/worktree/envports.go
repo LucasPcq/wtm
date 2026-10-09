@@ -216,10 +216,13 @@ type OwnedEnvKeysParams struct {
 
 // OwnedEnvKeys are the .env keys wtm writes into an isolated worktree, whatever
 // this one's isolation: they are what a switch to verbatim puts back.
-func OwnedEnvKeys(params OwnedEnvKeysParams) ([]domain.EnvKeyRef, error) {
+func OwnedEnvKeys(params OwnedEnvKeysParams) (domain.EnvOwnedKeys, error) {
 	cfg, err := config.LoadRun(params.StateDir)
 	if err != nil {
-		return nil, err
+		return domain.EnvOwnedKeys{}, err
 	}
-	return rules.OwnedEnvKeyRefs(rules.OwnedEnvTargetsParams{Config: cfg, EnvFiles: params.EnvFiles}), nil
+	return domain.EnvOwnedKeys{
+		Refs:      rules.OwnedEnvKeyRefs(rules.OwnedEnvTargetsParams{Config: cfg, EnvFiles: params.EnvFiles}),
+		PortBases: rules.EnvPortBasesByKey(cfg),
+	}, nil
 }

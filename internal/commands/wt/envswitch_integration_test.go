@@ -78,7 +78,7 @@ func TestEnvVerbatimPutsTheOwnedValuesBack(t *testing.T) {
 	for _, entry := range result.Restored {
 		restored[entry.Key] = entry
 	}
-	if len(restored) != 3 || !slices.Equal(restored["WEB_PORT"].Origins, []domain.EnvOriginMove{{From: "3010", To: "3000"}}) || restored["REALM"].Key == "" || !restored[domain.EnvComposeProjectName].Removed {
+	if len(restored) != 3 || !slices.Equal(restored["WEB_PORT"].Ports, []int{3000}) || restored["REALM"].Key == "" || !restored[domain.EnvComposeProjectName].Removed {
 		t.Errorf("restored = %+v, want WEB_PORT, REALM and COMPOSE_PROJECT_NAME", result.Restored)
 	}
 

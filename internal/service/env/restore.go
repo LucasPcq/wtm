@@ -15,7 +15,7 @@ type OwnedRestoreParams struct {
 	ParentWorktreePath string
 	Strategy           domain.EnvStrategy
 	Files              []domain.EnvFile
-	Keys               []domain.EnvKeyRef
+	Keys               domain.EnvOwnedKeys
 }
 
 // PlanOwnedRestore is what putting the owned keys back to the source's values
@@ -40,7 +40,7 @@ func restoreOwned(params OwnedRestoreParams, write bool) ([]domain.EnvRestoredEn
 
 	var restored []domain.EnvRestoredEntry
 	for _, file := range params.Files {
-		keys := keysOf(params.Keys, file.Target)
+		keys := keysOf(params.Keys.Refs, file.Target)
 		if len(keys) == 0 {
 			continue
 		}
@@ -57,7 +57,7 @@ func restoreOwned(params OwnedRestoreParams, write bool) ([]domain.EnvRestoredEn
 			return nil, err
 		}
 
-		lines, entries := rules.RestoreOwnedEnv(rules.RestoreOwnedEnvParams{File: file.Target, Child: child, Source: source, Keys: keys})
+		lines, entries := rules.RestoreOwnedEnv(rules.RestoreOwnedEnvParams{File: file.Target, Child: child, Source: source, Keys: keys, PortBases: portBasesOf(params.Keys.PortBases, file.Target)})
 		restored = append(restored, entries...)
 		if !write || len(entries) == 0 {
 			continue
@@ -83,6 +83,16 @@ func provisioningSource(paths envPaths, file domain.EnvFile) ([]domain.EnvLine, 
 	default:
 		return templateLines(paths.MainPath, file)
 	}
+}
+
+func portBasesOf(bases map[domain.EnvKeyRef][]int, file string) map[string][]int {
+	mine := map[string][]int{}
+	for ref, ports := range bases {
+		if ref.File == file {
+			mine[ref.Key] = ports
+		}
+	}
+	return mine
 }
 
 func keysOf(refs []domain.EnvKeyRef, file string) []string {

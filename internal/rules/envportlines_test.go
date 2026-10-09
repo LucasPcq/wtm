@@ -28,12 +28,12 @@ func TestEnvPortTableLinesGroupsFilesUnderNamedRules(t *testing.T) {
 	got := strings.Join(EnvPortTableLines(EnvPortTableParams{Plan: samplePlan(t)}), "\n")
 	want := strings.Join([]string{
 		"KEY           FOLLOWS        PORT         BECOMES",
-		"── .env ────────────────────────────────────────────────",
-		"DATABASE_URL  POSTGRES_PORT  5432 → 5442  localhost:5442",
-		"REDIS_URL     REDIS_PORT     6379 → 6389  localhost:6389",
+		"── .env ─────────────────────────────────────────",
+		"DATABASE_URL  POSTGRES_PORT  5432 → 5442  :5442",
+		"REDIS_URL     REDIS_PORT     6379 → 6389  :6389",
 		"",
-		"── apps/web/.env ───────────────────────────────────────",
-		"VITE_API_URL  API_PORT       3000 → 3010  localhost:3010",
+		"── apps/web/.env ────────────────────────────────",
+		"VITE_API_URL  API_PORT       3000 → 3010  :3010",
 	}, "\n")
 
 	if got != want {
