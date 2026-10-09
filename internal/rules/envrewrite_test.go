@@ -39,6 +39,13 @@ func TestWithEnvValueKeepsTheLineAsWritten(t *testing.T) {
 		{"a bare value needing quotes is quoted", "GREETING=hello", "hello world", `GREETING="hello world"`},
 		{"a bare value gaining a dollar is single-quoted", "PW=secret", "pa$w0rd", "PW='pa$w0rd'"},
 		{"a single-quoted value gaining a quote falls back", "Q='a'", "it's", "Q=it's"},
+		{"a bare value with spaces stays bare", "DSN=host=localhost port=3000 dbname=app", "host=localhost port=3010 dbname=app", "DSN=host=localhost port=3010 dbname=app"},
+		{"a bare value with spaces keeps its comment", "DSN=host=db port=3000 # libpq", "host=db port=3010", "DSN=host=db port=3010 # libpq"},
+		{"a double-quoted value with spaces stays double", `DSN="host=localhost port=3000"`, "host=localhost port=3010", `DSN="host=localhost port=3010"`},
+		{"a single-quoted value with spaces stays single", "DSN='host=localhost port=3000'", "host=localhost port=3010", "DSN='host=localhost port=3010'"},
+		{"a bare spaced value gaining a comment mark is quoted", "DSN=a b", "a #b", `DSN="a #b"`},
+		{"a bare spaced value gaining an edge space is quoted", "DSN=a b", "a b ", `DSN="a b "`},
+		{"a bare spaced value gaining a newline is quoted", "DSN=a b", "a\nb", "DSN=\"a\nb\""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

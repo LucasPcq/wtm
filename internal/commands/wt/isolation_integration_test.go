@@ -262,3 +262,56 @@ func ownedWritten(plan domain.EnvPortPlan, key string) bool {
 	}
 	return false
 }
+
+const dsnEnv = "WEB_PORT=3000\n" +
+	"DSN_BARE=host=localhost port=3000 password=s3cret dbname=app\n" +
+	"DSN_DQ=\"host=localhost port=3000 password=s3cret dbname=app\"\n" +
+	"DSN_SQ='host=localhost port=3000 password=s3cret dbname=app'\n"
+
+func dsnRepo(t *testing.T) string {
+	t.Helper()
+	dir := isolationRepo(t)
+	if err := config.WriteRun(config.WriteRunParams{StateDir: filepath.Join(dir, ".git", "wtm"), Force: true, Config: domain.RunConfig{
+		Jobs: []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}}},
+		EnvPorts: []domain.EnvPortLink{
+			{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"},
+			{File: ".env", Key: "DSN_BARE", Job: "web", Port: "PORT"},
+			{File: ".env", Key: "DSN_DQ", Job: "web", Port: "PORT"},
+			{File: ".env", Key: "DSN_SQ", Job: "web", Port: "PORT"},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte(dsnEnv), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func assertOnlyThePortMoved(t *testing.T, got string) {
+	t.Helper()
+	port, _, _ := strings.Cut(strings.TrimPrefix(got, "WEB_PORT="), "\n")
+	if port == "3000" || strings.ReplaceAll(got, port, "3000") != dsnEnv {
+		t.Errorf(".env =\n%s\nwant the source with only its port moved:\n%s", got, dsnEnv)
+	}
+}
+
+// LUC-280: a bare value with spaces whose port moved came back double-quoted.
+func TestCreateMovesAPortInsideAValueWithoutRequotingIt(t *testing.T) {
+	dir := dsnRepo(t)
+	if _, _, err := runWtCmd(t, domain.CmdCreate, "feat/dsn", "--from", "main", "--yes"); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	assertOnlyThePortMoved(t, worktreeEnv(t, dir, "feat/dsn"))
+}
+
+func TestEnvMovesAPortInsideAValueWithoutRequotingIt(t *testing.T) {
+	dir := dsnRepo(t)
+	if _, _, err := runWtCmd(t, domain.CmdCreate, "feat/dsn", "--from", "main", "--yes", "--"+domain.FlagIsolation, "verbatim"); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, _, err := runWtCmd(t, domain.CmdEnv, "feat/dsn", "--yes", "--"+domain.FlagIsolation, "isolated"); err != nil {
+		t.Fatalf("env: %v", err)
+	}
+	assertOnlyThePortMoved(t, worktreeEnv(t, dir, "feat/dsn"))
+}

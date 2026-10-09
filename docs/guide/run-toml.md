@@ -96,7 +96,7 @@ Links a `.env` key to a declared port, so the port inside its value follows the 
 | `job` | the job declaring the port, required since two jobs may both declare a `PORT` |
 | `port` | the declared port name |
 
-wtm finds the declared base inside the value and shifts only that number or, under `addressing = "names"`, writes the job's whole named origin when the value is a URL and the job publishes one. A value where the base is missing or appears twice is reported and left alone.
+wtm finds the declared base inside the value and shifts only that number or, under `addressing = "names"`, writes the job's whole named origin when the value is a URL and the job publishes one. A value where the base is missing or appears twice is reported and left alone. The rest of the line stays as written: its quotes or their absence (a libpq `host=… port=5432 dbname=app` stays unquoted), its inline comment, `export` and line ending; quotes are added only when the new value would not read back without them.
 
 ## `[[env]]`
 

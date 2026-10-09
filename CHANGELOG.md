@@ -21,6 +21,7 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 - **Interrupting `run up`** lists the jobs left running, the one being started included, instead of "No job left running"; `--output json` marks the worktree `interrupted`.
 - **A second Ctrl+C** no longer leaves behind a git or hook that ignored the first, nor the ssh a git started.
 - **Backing out** of a question, a picker or a confirmation (Esc, Ctrl-C, "No, cancel", a declined import) exits `19` in every command, `wtm run` commands, `run daemon stop`, `upgrade` and `run proxy install` included, instead of `1` or `0`. → [Exit codes](docs/guide/integrations.md#the-contract---yes-and---output-json)
+- **`wtm create`** and **`wtm env`** no longer add quotes around an unquoted value with spaces whose port they move, such as a libpq DSN: only the port changes. → [`[[env_port]]`](docs/guide/run-toml.md#env_port)
 - **Quitting `wtm ui`** while a run is in flight cancels it and waits for it to stop, then exits `19`; a second Ctrl+C leaves at once. Quitting no longer leaves a hook's processes running.
 
 ## [0.29.2] - 2026-10-06

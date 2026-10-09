@@ -110,13 +110,19 @@ type envValueSpan struct {
 	// dollar says the value it held already carried a `$`, so a bare `$` in its
 	// replacement is the file's own interpolation rather than one wtm adds.
 	dollar bool
+	// spaced says the bare value it held already carried whitespace, so the
+	// file writes such values bare and only a reparse can require quotes.
+	spaced bool
 }
 
 func (s envValueSpan) quoted(value string) string {
 	if s.quote != 0 {
 		return string(s.quote) + value + string(s.quote)
 	}
-	if needsQuote(value) || (strings.Contains(value, domain.EnvInterpolation) && !s.dollar) {
+	if strings.Contains(value, domain.EnvInterpolation) && !s.dollar {
+		return ""
+	}
+	if needsQuote(value) && !s.spaced {
 		return ""
 	}
 	return value
@@ -147,7 +153,7 @@ func valueSpan(line domain.EnvLine) (envValueSpan, bool) {
 	if end > len(raw) || raw[start:end] != line.Value {
 		return envValueSpan{}, false
 	}
-	return envValueSpan{start: start, end: end, dollar: dollar}, true
+	return envValueSpan{start: start, end: end, dollar: dollar, spaced: strings.ContainsAny(line.Value, " \t")}, true
 }
 
 func isEnvQuote(c byte) bool {
