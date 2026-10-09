@@ -54,19 +54,18 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 
 ```
 {offset, addressing, public_port,
- entries: [{file, key, port, base, resolved, moves: [{port, job, base, resolved}],
-            addressing, status, origins: [{from, to}], foreign_host}],
+ entries: [{file, key, port, base, resolved, moves: [{port, job, base, resolved, origin}],
+            addressing, status}],
  owned: [{file, key, value, changed}],
  applied}
 ```
 
 - `addressing` at the top is what the project asked for (`names` / `ports`); each entry's `addressing` is how that one value was written.
 - `public_port`: the port a named URL announces (absent when nothing serves names).
-- `moves`: every port a value holding several origins follows.
+- `moves`: every port the value follows, `base` → `resolved`. `origin` is the address wtm writes for it under named addressing (`http://web.feat-x.app.localhost:1355`), absent for a port.
 - Entry `status`: `rewrite` or `unchanged` are settled values. `missing_key`, `base_not_found`, `ambiguous`, `foreign_host`, `secure_scheme` are values wtm left alone (a refusal to report).
-- `foreign_host`: where a value pointed that the proxy does not serve; empty when the value carries credentials (an `@`) or the authority is not a plain host name or IP.
 - `owned`: the values wtm writes whole (`COMPOSE_PROJECT_NAME`, `[[env]]`).
-- `origins`: what wtm moved in the value, and nothing else of it — one `{from, to}` per host:port that changed, in the order the value holds them (`{"from": "localhost:5432", "to": "localhost:5442"}`). A host shows only when it names this machine (`localhost`, `127.0.0.1`, `[::1]`, a `*.localhost` route); any other is reduced to its port (`":5432"`), a value that is a bare port to the number (`"3010"`). Absent when the link moves nothing, or when the two values differ by more than their ports. The values themselves (scheme, user, password, path, query) are never written: `current_value` / `new_value` appear only under `wtm env --show-values`, whole.
+- No text of a value is written: every field comes from wtm's own plan (port numbers, the address it builds, run.toml names). `current_value` / `new_value`, and `foreign_host` (where a refused value pointed), appear only under `wtm env --show-values`, whole.
 - `applied`: whether the rewrites were written.
 
 ## `env`
@@ -77,16 +76,16 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
           diff: {mode, entries: [{key, status, current_value, resolved_value, placeholder, source, export, action?, redacted?}]}}],
  ports: {…see above…},
  isolation, isolation_adoption, isolation_changed,
- restored: [{file, key, origins, removed}],
+ restored: [{file, key, ports, removed}],
  warnings}
 ```
 
 - Key `status`: `resolved` / `missing_unresolved` / `conflict` / `orphan` — the drift the run found. Key `action` is what an apply did to it: `added`, `filled`, `overwritten`, `kept`, `pruned` or `skipped`; absent under `--check` and for a key left as it was (an unanswered `missing_unresolved` stays without one).
-- Values are withheld for every key, wtm's own included: the values the reconciliation compares are read from the files, so they are the user's. An entry has no `current_value` / `resolved_value` and carries `"redacted": true` (absent when there was no value to withhold: an empty value, a missing key). What wtm writes is in `ports`: `owned[].value` whole (`COMPOSE_PROJECT_NAME`, `[[env]]`), and each link's `origins`. An addition is still told apart by its `source`. `--show-values` writes every value, secrets included: never pass it in a context that is logged or shared.
+- Values are withheld for every key, wtm's own included: the values the reconciliation compares are read from the files, so they are the user's. An entry has no `current_value` / `resolved_value` and carries `"redacted": true` (absent when there was no value to withhold: an empty value, a missing key). What wtm writes is in `ports`: `owned[].value` whole (`COMPOSE_PROJECT_NAME`, `[[env]]`), and each link's `moves`. `placeholder` is the one text shown from a file: it comes from the committed template. An addition is still told apart by its `source`. `--show-values` writes every value, secrets included: never pass it in a context that is logged or shared.
 - Key `source` (on an addition or a conflict) names the level the value came from. File `source` names the value source (`template (no <file> in the main checkout)` when the main checkout has no copy of the file, so its keys need a value). `parent_fallback: true` means main was used because the parent had no readable file; `parent_branch` names the parent. `unresolvable: true` flags a configured file that exists nowhere. `created: true` is a file the worktree lacked: an apply rebuilt it as `create` provisions it (`applied` too), a `--check` reports it as drift.
 - `ports` is empty when the project declares no link, and always empty for a `verbatim` worktree.
 - `isolation`: the worktree's. `isolation_adoption` appears only for a worktree created before the isolation choice: `not_adopted` (run values left alone, no `isolation` reported, empty `ports`) or `adopted` (this run recorded it and settled its values).
-- `isolation_changed`: the recorded isolation changed. `restored`: the values `--isolation verbatim` put back to the source's (`removed` when the source lacked the key), with the `origins` that moved back (`from` the worktree's, `to` the source's, as in `ports`); `from` / `to`, the values whole, only under `--show-values`.
+- `isolation_changed`: the recorded isolation changed. `restored`: the values `--isolation verbatim` put back to the source's (`removed` when the source lacked the key), with `ports`, the base ports run.toml declares for a linked key (where its value goes back to); `from` / `to`, the values whole, only under `--show-values`.
 
 ## `status`
 

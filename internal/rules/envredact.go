@@ -6,11 +6,15 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
-// RedactEnvResult is a report without --show-values. It is an allow-list: of
-// a value it keeps only what wtm wrote itself — an owned value whole, the
-// host:port a port link moved — so a report piped into a log or an agent's
-// context never carries a secret, whatever shape the value has. It returns a
-// copy: the classification of a report runs on the values.
+// RedactEnvResult is a report without --show-values. No text read from a
+// value reaches it: what stays is what wtm builds itself — an owned value it
+// rendered, a link's ports and the address it writes — so a report piped into
+// a log or an agent's context never carries a secret, whatever shape the value
+// has. It returns a copy: the classification of a report runs on the values.
+//
+// The one value that stays is a missing key's placeholder: it is read from the
+// committed template, which is meant to be read, and it is what the reader has
+// to fill in.
 func RedactEnvResult(result domain.EnvSyncResult) domain.EnvSyncResult {
 	files := slices.Clone(result.Files)
 	for i, file := range files {
@@ -23,14 +27,6 @@ func RedactEnvResult(result domain.EnvSyncResult) domain.EnvSyncResult {
 	result.Files = files
 	result.Ports = RedactEnvPortPlan(result.Ports)
 	result.Restored = redactEnvRestored(result.Restored)
-	return result
-}
-
-// AnnotateEnvOrigins adds to a full report the origins a redacted one keeps,
-// so --show-values only adds to the JSON a reader already knows.
-func AnnotateEnvOrigins(result domain.EnvSyncResult) domain.EnvSyncResult {
-	result.Ports = annotatePortOrigins(result.Ports)
-	result.Restored = annotateRestoredOrigins(result.Restored)
 	return result
 }
 
@@ -48,7 +44,7 @@ func redactEnvKey(entry domain.EnvKeyDiff) domain.EnvKeyDiff {
 }
 
 func redactEnvRestored(entries []domain.EnvRestoredEntry) []domain.EnvRestoredEntry {
-	redacted := annotateRestoredOrigins(entries)
+	redacted := slices.Clone(entries)
 	for i := range redacted {
 		redacted[i].From = ""
 		redacted[i].To = ""
@@ -56,42 +52,16 @@ func redactEnvRestored(entries []domain.EnvRestoredEntry) []domain.EnvRestoredEn
 	return redacted
 }
 
-func annotateRestoredOrigins(entries []domain.EnvRestoredEntry) []domain.EnvRestoredEntry {
-	annotated := slices.Clone(entries)
-	for i, entry := range annotated {
-		if entry.Removed {
-			continue
-		}
-		annotated[i].Origins, _ = EnvOriginMoves(EnvOriginMovesParams{From: entry.From, To: entry.To})
-	}
-	return annotated
-}
-
-// RedactEnvPortPlan keeps of every port link the origins it moved, and drops
-// the values they sit in.
+// RedactEnvPortPlan drops from every port link the values it was read from
+// and written to, and the host a refusal found in them; the moves, numbers and
+// addresses wtm builds, say the rest.
 func RedactEnvPortPlan(plan domain.EnvPortPlan) domain.EnvPortPlan {
-	plan = annotatePortOrigins(plan)
-	for i := range plan.Entries {
-		plan.Entries[i].CurrentValue = ""
-		plan.Entries[i].NewValue = ""
-	}
-	return plan
-}
-
-func annotatePortOrigins(plan domain.EnvPortPlan) domain.EnvPortPlan {
 	entries := slices.Clone(plan.Entries)
-	for i, entry := range entries {
-		entries[i].Origins = EnvPortOrigins(entry)
+	for i := range entries {
+		entries[i].CurrentValue = ""
+		entries[i].NewValue = ""
+		entries[i].ForeignHost = ""
 	}
 	plan.Entries = entries
 	return plan
-}
-
-// EnvPortOrigins are the origins one link moves, none when it moves nothing.
-func EnvPortOrigins(entry domain.EnvPortEntry) []domain.EnvOriginMove {
-	if entry.NewValue == "" {
-		return nil
-	}
-	moves, _ := EnvOriginMoves(EnvOriginMovesParams{From: entry.CurrentValue, To: entry.NewValue})
-	return moves
 }

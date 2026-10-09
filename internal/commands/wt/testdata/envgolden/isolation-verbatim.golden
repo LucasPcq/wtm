@@ -10,7 +10,7 @@ exit: 0
   Isolation  verbatim — .env kept as copied
 
   .env   strategy: main  ·  source: main
-  ~ WEB_PORT  back to the source's 3000 (was 3010)
+  ~ WEB_PORT  back to the source's :3000
   ~ REALM     back to the source's value
 
 --- stderr ---

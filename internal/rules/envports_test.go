@@ -184,23 +184,24 @@ func TestReduceEnvPortValueKeepsRealConflictsVisible(t *testing.T) {
 	}
 }
 
-func TestEnvPortBecomesShowsOnlyWhereTheOriginLands(t *testing.T) {
+func TestEnvPortBecomesIsBuiltFromThePlan(t *testing.T) {
 	got := envPortBecomes(envPortBecomesParams{Entry: domain.EnvPortEntry{
 		CurrentValue: "postgres://user:supersecret@localhost:5432/app",
 		NewValue:     "postgres://user:supersecret@localhost:5442/app",
+		Moves:        []domain.EnvPortMove{{Base: 5432, Resolved: 5442}},
 	}})
-	if got != "localhost:5442" {
-		t.Fatalf("envPortBecomes() = %q, want only the origin it lands on", got)
+	if got != ":5442" {
+		t.Fatalf("envPortBecomes() = %q, want the port it lands on", got)
 	}
 }
 
-func TestEnvPortBecomesListsEveryOriginOfAList(t *testing.T) {
-	got := envPortBecomes(envPortBecomesParams{Entry: domain.EnvPortEntry{
-		CurrentValue: "http://localhost:3000,http://localhost:3001",
-		NewValue:     "http://localhost:3010,http://localhost:3011",
-	}})
-	if got != "localhost:3010, localhost:3011" {
-		t.Errorf("envPortBecomes() = %q, want both origins", got)
+func TestEnvPortBecomesListsEveryMove(t *testing.T) {
+	got := envPortBecomes(envPortBecomesParams{Entry: domain.EnvPortEntry{Moves: []domain.EnvPortMove{
+		{Base: 3000, Resolved: 3010},
+		{Base: 3001, Origin: "http://admin.feat-x.app.localhost:1355"},
+	}}, Width: 200})
+	if got != ":3010, http://admin.feat-x.app.localhost:1355" {
+		t.Errorf("envPortBecomes() = %q, want each move's landing", got)
 	}
 }
 

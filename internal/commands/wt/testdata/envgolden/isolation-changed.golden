@@ -48,13 +48,7 @@ exit: 0
           }
         ],
         "addressing": "ports",
-        "status": "rewrite",
-        "origins": [
-          {
-            "from": "3000",
-            "to": "3010"
-          }
-        ]
+        "status": "rewrite"
       }
     ],
     "addressing": "names",

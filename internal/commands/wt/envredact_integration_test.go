@@ -4,6 +4,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -65,8 +66,8 @@ func TestCreateJSONShowsOnlyTheOriginOfAPortLinkedURL(t *testing.T) {
 	if strings.Contains(stdout, dbPassword) {
 		t.Errorf("create JSON carries the password:\n%s", stdout)
 	}
-	if !strings.Contains(stdout, `"to": "localhost:3010"`) || strings.Contains(stdout, "postgres://") {
-		t.Errorf("create JSON = want the origin the URL moved to, and nothing else of it:\n%s", stdout)
+	if !strings.Contains(stdout, `"resolved": 3010`) || strings.Contains(stdout, "postgres://") || strings.Contains(stdout, "localhost") {
+		t.Errorf("create JSON = want the port the URL moved to, and nothing of the URL:\n%s", stdout)
 	}
 }
 
@@ -112,7 +113,7 @@ func assertNoSecret(t *testing.T, label, out string, secrets ...string) {
 
 // LUC-274 F1: a switch to verbatim reported the source's URL it put back
 // with its password.
-func TestEnvVerbatimJSONNamesOnlyTheRestoredOrigin(t *testing.T) {
+func TestEnvVerbatimJSONNamesOnlyTheDeclaredPort(t *testing.T) {
 	dir := databaseURLRepo(t)
 	envCreate("feat/a", "--from", "main", "--yes")(t, dir)
 
@@ -122,8 +123,8 @@ func TestEnvVerbatimJSONNamesOnlyTheRestoredOrigin(t *testing.T) {
 	}
 
 	assertNoSecret(t, "verbatim JSON", stdout+stderr, dbPassword)
-	if !strings.Contains(stdout, `"from": "localhost:3010"`) || !strings.Contains(stdout, `"to": "localhost:3000"`) || strings.Contains(stdout, "postgres://") {
-		t.Errorf("verbatim JSON = want the restored origin and nothing else of the URL:\n%s", stdout)
+	if !strings.Contains(stdout, `"ports": [`) || strings.Contains(stdout, "postgres://") || strings.Contains(stdout, "localhost") {
+		t.Errorf("verbatim JSON = want the declared port and nothing of the URL:\n%s", stdout)
 	}
 }
 
@@ -202,7 +203,7 @@ func TestEnvVerbatimTextShowsTheMoveInAList(t *testing.T) {
 	}
 
 	assertNoSecret(t, "verbatim text", stdout+stderr, dbPassword)
-	if !strings.Contains(stdout, `back to the source's localhost:3000 (was localhost:3010)`) {
+	if !strings.Contains(stdout, `back to the source's :3000`) {
 		t.Errorf("verbatim text hides the move:\n%s", stdout)
 	}
 }
@@ -284,5 +285,58 @@ func TestEveryEnvSurfaceMasksThePasswordsParsersReadDifferently(t *testing.T) {
 	assertNoSecret(t, "verbatim text", stdout+stderr, secrets...)
 	if !strings.Contains(stdout, "back to the source's") {
 		t.Errorf("verbatim text shows no restored row to test:\n%s", stdout)
+	}
+}
+
+// LUC-279 audit, leak A: a password shaped like a local host was printed as
+// the host wtm moved, from create's JSON to the verbatim rows.
+func TestEveryEnvSurfaceOmitsAPasswordShapedLikeALocalHost(t *testing.T) {
+	const secret = "host-s3cr3t"
+	linkedSecretRepo(t, map[string]string{
+		"PG_DSN":  "host=localhost password=" + secret + ".localhost:3000",
+		"PG_URL":  "postgres://app:" + secret + ".localhost:3000/zz@db/app",
+		"ADO_DSN": "Server=db;Password=" + secret + ".localhost:3000;",
+	})
+
+	stdout, stderr, err := runWtCmd(t, jsonArgs(domain.CmdCreate, "feat/a", "--from", "main")...)
+	if err != nil {
+		t.Fatalf("create: %v\n%s", err, stderr)
+	}
+	assertNoSecret(t, "create JSON", stdout+stderr, secret)
+
+	check := []string{domain.CmdEnv, "feat/a", "--" + domain.FlagCheck}
+	stdout, stderr, _ = runWtCmd(t, jsonArgs(check...)...)
+	assertNoSecret(t, "check JSON", stdout+stderr, secret)
+	stdout, stderr, _ = runWtCmd(t, check...)
+	assertNoSecret(t, "check text", stdout+stderr, secret)
+
+	stdout, stderr, err = runWtCmd(t, domain.CmdEnv, "feat/a", "--yes", "--"+domain.FlagIsolation, string(domain.IsolationVerbatim))
+	if err != nil {
+		t.Fatalf("env --isolation verbatim: %v\n%s", err, stderr)
+	}
+	assertNoSecret(t, "verbatim text", stdout+stderr, secret)
+}
+
+// LUC-279 audit, leak B: a verbatim switch paired the worktree's value with
+// the source's, so a number edited in a password read as a port that moved.
+func TestEnvVerbatimOmitsANumberEditedInAPassword(t *testing.T) {
+	const before, after = "48151623", "42424242"
+	dir := linkedSecretRepo(t, map[string]string{"ADO_DSN": "Server=localhost:3000;Password=ab:" + before + ";"})
+	envCreate("feat/a", "--from", "main", "--yes")(t, dir)
+	path := worktreeEnvPath(dir, "feat/a")
+	current, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeEnvFile(t, path, strings.Replace(string(current), before, after, 1))
+
+	verbatim := []string{domain.CmdEnv, "feat/a", "--yes", "--" + domain.FlagIsolation, string(domain.IsolationVerbatim)}
+	stdout, stderr, err := runWtCmd(t, verbatim...)
+	if err != nil {
+		t.Fatalf("env --isolation verbatim: %v\n%s", err, stderr)
+	}
+	assertNoSecret(t, "verbatim text", stdout+stderr, before, after)
+	if !regexp.MustCompile(`ADO_DSN +back to the source's value\n`).MatchString(stdout) {
+		t.Errorf("verbatim text does not say the whole value goes back:\n%s", stdout)
 	}
 }
