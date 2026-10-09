@@ -210,17 +210,23 @@ func SyncEnv(params SyncEnvParams) (domain.EnvSyncResult, error) {
 	}
 
 	files := make([]domain.EnvFileResult, 0, len(params.Files))
+	// A --check plans the ports on what the apply would write, not on the disk:
+	// a file the apply rebuilds holds the keys the port pass then settles.
+	reconciled := map[string][]domain.EnvLine{}
 	for _, f := range params.Files {
 		c, err := computeFile(paths, f)
 		if err != nil {
 			return domain.EnvSyncResult{}, err
 		}
-		applied := false
-		if !params.Check {
-			applied, err = applyFile(paths, &c, flagResolution(params, c.diff))
-			if err != nil {
-				return domain.EnvSyncResult{}, err
-			}
+		resolution := flagResolution(params, c.diff)
+		if params.Check {
+			reconciled[f.Target] = rules.ApplyEnvDiff(applyDiffParams(c, resolution))
+			files = append(files, fileResult(paths, c, false))
+			continue
+		}
+		applied, err := applyFile(paths, &c, resolution)
+		if err != nil {
+			return domain.EnvSyncResult{}, err
 		}
 		files = append(files, fileResult(paths, c, applied))
 	}
@@ -228,7 +234,7 @@ func SyncEnv(params SyncEnvParams) (domain.EnvSyncResult, error) {
 	// The ports come last, on files that are now reconciled: the value sources
 	// carry another worktree's port, so applying the offset before the merge
 	// would only see it overwritten.
-	ports, err := settleEnvPorts(settleEnvPortsParams{Ports: params.Ports, Write: !params.Check, Owned: !params.Check})
+	ports, err := settleEnvPorts(settleEnvPortsParams{Ports: params.Ports, Write: !params.Check, Owned: !params.Check, Reconciled: reconciled})
 	if err != nil {
 		return domain.EnvSyncResult{}, err
 	}
@@ -250,6 +256,9 @@ type settleEnvPortsParams struct {
 	// Both are false on a --check run, which writes nothing at all.
 	Write bool
 	Owned bool
+	// Reconciled is each file as a --check run would have written it, read in
+	// place of the disk.
+	Reconciled map[string][]domain.EnvLine
 }
 
 // settleEnvPorts applies the worktree's offset to the linked values, or merely
@@ -261,7 +270,7 @@ func settleEnvPorts(params settleEnvPortsParams) (domain.EnvPortPlan, error) {
 		return domain.EnvPortPlan{}, nil
 	}
 	if !params.Write {
-		plan, err := ComputeEnvPorts(params.Ports)
+		plan, err := computeEnvPorts(computeEnvPortsParams{Ports: params.Ports, Reconciled: params.Reconciled})
 		if err != nil || !params.Owned {
 			return plan, err
 		}
@@ -391,7 +400,7 @@ func valueSources(paths envPaths, f domain.EnvFile) (parent, main []domain.EnvLi
 			return nil, nil, "", false, err
 		}
 		if main == nil {
-			return nil, nil, domain.EnvSourceLabelNone, false, nil
+			return nil, nil, fmt.Sprintf(domain.EnvSourceLabelNoMainFmt, f.Target), false, nil
 		}
 		return nil, main, domain.EnvSourceLabelMain, false, nil
 
@@ -425,7 +434,7 @@ func parentFallback(paths envPaths, f domain.EnvFile, fallbackLabel string) (par
 		return nil, nil, "", false, err
 	}
 	if main == nil {
-		return nil, nil, domain.EnvSourceLabelNone, false, nil
+		return nil, nil, fmt.Sprintf(domain.EnvSourceLabelNoMainFmt, f.Target), false, nil
 	}
 	return nil, main, fallbackLabel, true, nil
 }
@@ -474,15 +483,7 @@ func flagResolution(params SyncEnvParams, diff domain.EnvDiff) EnvResolution {
 // current content, recording on c's diff what it did to each key. Returns
 // whether it wrote.
 func applyFile(paths envPaths, c *computedFile, res EnvResolution) (bool, error) {
-	diff := rules.ApplyEnvDiffParams{
-		Child:        c.child,
-		Diff:         c.diff,
-		Decisions:    res.Decisions,
-		FilledValues: res.FilledValues,
-		Prune:        res.Prune,
-		PruneKeys:    res.PruneKeys,
-		SkipKeys:     res.SkipKeys,
-	}
+	diff := applyDiffParams(*c, res)
 	reconciled := rules.ApplyEnvDiff(diff)
 	c.diff = rules.EnvDiffActions(diff)
 
@@ -495,6 +496,18 @@ func applyFile(paths envPaths, c *computedFile, res EnvResolution) (bool, error)
 		return false, err
 	}
 	return true, nil
+}
+
+func applyDiffParams(c computedFile, res EnvResolution) rules.ApplyEnvDiffParams {
+	return rules.ApplyEnvDiffParams{
+		Child:        c.child,
+		Diff:         c.diff,
+		Decisions:    res.Decisions,
+		FilledValues: res.FilledValues,
+		Prune:        res.Prune,
+		PruneKeys:    res.PruneKeys,
+		SkipKeys:     res.SkipKeys,
+	}
 }
 
 // templateLines reads the committed template (the schema) for a file from the

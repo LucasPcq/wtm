@@ -95,11 +95,11 @@ const (
 	EnvSourceLabelTemplate = "template"
 	EnvSourceLabelMain     = "main"
 	EnvSourceLabelParent   = "parent worktree"
-	// EnvSourceLabelNone is shown when the strategy's value source has no .env file at
-	// all (and no fallback either) — nothing to sync from, so keys come from the
-	// template as placeholders. Typical on a fresh project before any .env is created.
-	EnvPortLinkTwiceFmt = "env_port %s in %s follows %s twice — a key may follow several ports, never the same one"
-	EnvSourceLabelNone  = "template (no .env to sync from)"
+	// EnvSourceLabelNoMainFmt names the file the main checkout lacks when the
+	// strategy reads it (and no fallback either): nothing to sync from, so keys
+	// come from the template as placeholders.
+	EnvPortLinkTwiceFmt     = "env_port %s in %s follows %s twice — a key may follow several ports, never the same one"
+	EnvSourceLabelNoMainFmt = "template (no %s in the main checkout)"
 	// EnvFileUnresolvableFmt names a configured file the repository does not
 	// have anywhere. Nothing can fill it, so the fix is in config.toml.
 	EnvUnresolvableSummaryFmt = "%d configured .env file(s) exist nowhere — fix [env] in config.toml."
@@ -2468,7 +2468,7 @@ const (
 	DaemonStatusUpFmt      = "Daemon running (pid %d)"
 	DaemonStatusVersLabel  = "Version"
 	DaemonStatusJobsLabel  = "Jobs"
-	DaemonStatusJobsFmt    = "%d foreground · %d detached"
+	DaemonStatusJobsFmt    = "%d supervised · %d detached stack(s)"
 	DaemonStatusSocketLbl  = "Socket"
 	DaemonStatusIndexLabel = "Index"
 	DaemonStatusProxyLabel = "Proxy"

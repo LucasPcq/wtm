@@ -716,3 +716,55 @@ func TestSettlingAPortKeepsEachValuesQuoting(t *testing.T) {
 		t.Errorf(".env =\n%s\nwant the source with only its port moved:\n%s", got, dsnEnv)
 	}
 }
+
+// LUC-276 (b): with the worktree's .env deleted, --check reported each linked
+// key as missing from the file, while the apply rebuilt it and settled them.
+func TestACheckOfADeletedEnvPlansThePortsTheApplySettles(t *testing.T) {
+	ctx := testContext(t)
+	withPorts(t, ctx)
+	path := makeWorktree(t, ctx, "feat/a")
+	if err := os.Remove(filepath.Join(path, ".env")); err != nil {
+		t.Fatal(err)
+	}
+
+	checked, _, err := run(ctx, Request{Worktree: "feat/a", Check: true}, flow.Unattended{})
+	if !errors.Is(err, domain.ErrEnvDrift) {
+		t.Fatalf("check err = %v, want the drift of a file to rebuild", err)
+	}
+	applied, _, err := run(ctx, Request{Worktree: "feat/a"}, flow.Unattended{})
+	if err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+
+	statuses := func(plan domain.EnvPortPlan) []domain.EnvPortStatus {
+		var out []domain.EnvPortStatus
+		for _, entry := range plan.Entries {
+			out = append(out, entry.Status)
+		}
+		return out
+	}
+	got, want := statuses(checked.Result.Ports), statuses(applied.Result.Ports)
+	if !slices.Equal(got, want) || slices.Contains(got, domain.EnvPortStatusMissingKey) {
+		t.Errorf("check plans %v, the apply %v", got, want)
+	}
+}
+
+// LUC-276 (c): under strategy main, a file the main checkout lacks left the
+// report saying its keys need a value without naming the file missing.
+func TestAMissingMainCopyIsNamedAsTheSource(t *testing.T) {
+	ctx := testContext(t)
+	ctx.Config.Project.Env.Files = []domain.EnvFile{{Target: ".env", Template: ".env.example"}}
+	path := makeWorktree(t, ctx, "feat/a")
+	if err := os.Remove(filepath.Join(ctx.ProjectDir, ".env")); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(path, ".env.example"), "API_KEY=\n")
+
+	outcome, _, err := run(ctx, Request{Worktree: "feat/a", Check: true}, flow.Unattended{})
+	if !errors.Is(err, domain.ErrEnvDrift) {
+		t.Fatalf("err = %v, want the key needing a value reported as drift", err)
+	}
+	if got, want := outcome.Result.Files[0].Source, "template (no .env in the main checkout)"; got != want {
+		t.Errorf("source = %q, want %q", got, want)
+	}
+}

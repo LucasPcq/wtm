@@ -356,28 +356,30 @@ func TestSyncParentStrictKeyMissing(t *testing.T) {
 	}
 }
 
-// TestSyncNoValueSource: a template exists but no .env anywhere (fresh project) →
-// every key is missing and the source is labelled honestly as template-only.
+// TestSyncNoValueSource: a template exists but the main checkout has no copy of
+// the file → every key is missing, and the source names the file the main
+// checkout lacks, which is why they need a value (LUC-276).
 func TestSyncNoValueSource(t *testing.T) {
 	main := t.TempDir()
 	wt := t.TempDir()
-	writeTestFile(t, filepath.Join(wt, ".env.example"), "API_KEY=changeme\nDB_HOST=localhost")
-	// no .env in main, none in wt.
+	writeTestFile(t, filepath.Join(wt, "apps/api/.env.example"), "API_KEY=changeme\nDB_HOST=localhost")
+	files := []domain.EnvFile{{Target: "apps/api/.env", Template: "apps/api/.env.example"}}
+	want := "template (no apps/api/.env in the main checkout)"
 
 	for _, strat := range []domain.EnvStrategy{domain.EnvStrategyMain, domain.EnvStrategyParent} {
 		res, err := SyncEnv(SyncEnvParams{
 			Branch:       "dev",
 			MainPath:     main,
 			WorktreePath: wt,
-			Files:        baseFiles(),
+			Files:        files,
 			Strategy:     strat,
 			Mode:         domain.EnvModeRefresh,
 		})
 		if err != nil {
 			t.Fatalf("[%s] unexpected error: %v", strat, err)
 		}
-		if res.Files[0].Source != domain.EnvSourceLabelNone {
-			t.Fatalf("[%s] source = %q, want %q", strat, res.Files[0].Source, domain.EnvSourceLabelNone)
+		if res.Files[0].Source != want {
+			t.Fatalf("[%s] source = %q, want %q", strat, res.Files[0].Source, want)
 		}
 		if res.Files[0].ParentFallback {
 			t.Fatalf("[%s] no fallback claim when there is nothing to sync from", strat)
