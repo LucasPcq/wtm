@@ -10,12 +10,11 @@ import (
 const (
 	paramAccepted = "accepted"
 	paramWith     = "with"
-	requiredOneOf = kernel.CodeRequired + ".one_of"
 )
 
 var catalog = map[kernel.Code]string{
 	kernel.CodeRequired:      "{path} is required",
-	requiredOneOf:            "one of {path}, {with} is required",
+	kernel.CodeRequiredOneOf: "one of {path}, {with} is required",
 	kernel.CodeInvalid:       "{path} is invalid",
 	kernel.CodeNotFound:      "{path}: {value} not found",
 	kernel.CodeOneOf:         "{path} must be one of {accepted}, not {value}",
@@ -39,7 +38,7 @@ var catalog = map[kernel.Code]string{
 
 // Message renders code over params; a code missing from the catalogue reads
 // as itself, which the catalogue test forbids.
-func Message(code kernel.Code, params map[string]string) string {
+func Message(code kernel.Code, params kernel.Params) string {
 	template, known := catalog[code]
 	if !known {
 		return string(code)
@@ -53,7 +52,7 @@ func Message(code kernel.Code, params map[string]string) string {
 
 // Field renders a field error, with why it is required when a rule says so.
 func Field(problem kernel.FieldError) string {
-	params := map[string]string{
+	params := kernel.Params{
 		kernel.ParamPath: problem.Path,
 		paramAccepted:    strings.Join(problem.Accepted, ", "),
 		paramWith:        strings.Join(problem.With, ", "),
@@ -61,17 +60,10 @@ func Field(problem kernel.FieldError) string {
 	for key, value := range problem.Params {
 		params[key] = value
 	}
-	message := Message(fieldCode(problem), params)
+	message := Message(problem.Code, params)
 	because := problem.Params[kernel.ParamBecause]
 	if because == "" {
 		return message
 	}
 	return message + ": " + Message(kernel.Code(because), params)
-}
-
-func fieldCode(problem kernel.FieldError) kernel.Code {
-	if problem.Code == kernel.CodeRequired && len(problem.With) > 0 {
-		return requiredOneOf
-	}
-	return problem.Code
 }

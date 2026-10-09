@@ -74,7 +74,7 @@ Every error or guard returns immediately; the happy path is last. Never nest `if
 
 ## 7. No unsafe type assertions
 
-Always comma-ok (`s, ok := v.(string); if !ok { return fmt.Errorf("expected string, got %T", v) }`). Prefer typed interfaces and concrete structs over `any`. Type at the source, not downstream.
+Always comma-ok (`s, ok := v.(string); if !ok { return fmt.Errorf("expected string, got %T", v) }`). Prefer typed interfaces and concrete structs over `any`. Type at the source, not downstream. A value that takes one of a closed set of shapes is a sealed interface (an unexported method) with one type per shape, declared `//go-sumtype:decl` on a line of its own so `make lint` checks every type switch over it (`kernel.Error`, `kernel.Value`) — never one struct whose fields are valid only for some value of another.
 
 ## 8. Comments — the exception, not the rule
 
@@ -143,7 +143,7 @@ Every commit message — subject and body — is in English, whatever language t
 ## 11. Validate before commit
 
 ```
-make lint          # fmt + vet + arch (tools/archlint) + dead (deadcode) + staticcheck — all gating
+make lint          # fmt + vet + arch (tools/archlint) + dead (deadcode) + sumtype (go-sumtype) + staticcheck — all gating
 make test          # go test ./... -race -count=1
 make docs          # regenerate docs/ from the Cobra tree
 make demos         # re-record the README GIFs (needs vhs)
@@ -151,6 +151,7 @@ make release-notes VERSION=x.y.z   # print a CHANGELOG section as release notes
 make dupl          # clone report, informative only
 ```
 
+- Tests of the engine (`internal/kernel/` and the layers built on it) use testify (`assert`, `require`); each test file holds only `Test…` functions, the example and fakes in `fixture_test.go`, shared helpers in `helpers_test.go`. The rest of the repository keeps stdlib `testing`.
 - A new architectural rule goes into `tools/archlint`, not into a paragraph here. `.archlint-migrating` and `.deadcode-ignore` may only shrink; a new entry needs a stated reason. See `docs/dev/lint.md`.
 - `.claude/hooks/pre-commit-gates.sh` runs `make lint` and a `go mod tidy` check on every `git commit` and blocks it on failure. It does not run the tests. `WTM_SKIP_GATES=1 git commit …` only when the gate itself is wrong.
 - **Invoke the `build-validator` subagent before marking any task done** — it adds the `-race` test suite, dependency hygiene and the duplication report.

@@ -51,14 +51,29 @@ type FieldSpec struct {
 	Constraints  Constraints `json:"constraints"`
 }
 
-// Value is a field's value whatever its type: text and select in Text, bool in
-// Bool, lists in List, decisions in Decisions.
-type Value struct {
-	Text      string            `json:"text,omitempty"`
-	Bool      bool              `json:"bool,omitempty"`
-	List      []string          `json:"list,omitempty"`
-	Decisions map[string]string `json:"decisions,omitempty"`
+//go-sumtype:decl Value
+
+// Value is one of Text, Bool, List or Decisions: the Go type of a request
+// field decides which, and Set refuses any other. nil is no value.
+type Value interface {
+	value()
 }
+
+// Text is the value of a text or a select field, or of a named string type.
+type Text string
+
+type Bool bool
+
+// List is the value of a multiselect, reorder or textlist field.
+type List []string
+
+// Decisions is a choice per key.
+type Decisions map[string]string
+
+func (Text) value()      {}
+func (Bool) value()      {}
+func (List) value()      {}
+func (Decisions) value() {}
 
 type Origin string
 
@@ -93,8 +108,8 @@ type FieldState struct {
 }
 
 type Badge struct {
-	Code   Code              `json:"code"`
-	Params map[string]string `json:"params,omitempty"`
+	Code   Code   `json:"code"`
+	Params Params `json:"params,omitempty"`
 }
 
 type Option struct {

@@ -2,49 +2,15 @@ package kerneltest_test
 
 import (
 	"context"
-	"fmt"
-	"slices"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/LucasPcq/wtm/internal/kernel"
 	"github.com/LucasPcq/wtm/internal/kernel/kerneltest"
 )
-
-// spy stands in for *testing.T to see what a check reports.
-type spy struct {
-	testing.TB
-	failures []string
-}
-
-func (s *spy) Helper() {}
-
-func (s *spy) Errorf(format string, args ...any) {
-	s.failures = append(s.failures, fmt.Sprintf(format, args...))
-}
-
-type options struct {
-	Mode string `json:"mode"`
-}
-
-type request struct {
-	Branches []string `json:"branches"`
-	From     string   `json:"from"`
-	Force    bool     `json:"force"`
-	Options  options  `json:"options"`
-}
-
-type facts struct{ Base string }
-
-func fromField(dependsOn ...string) kernel.FieldDef[request, facts] {
-	return kernel.FieldDef[request, facts]{
-		Spec: kernel.FieldSpec{Path: "from", Type: kernel.FieldSelect, DependsOn: dependsOn},
-		Skip: func(req request, _ facts) (bool, kernel.Code) { return req.Options.Mode == "detached", "test.detached" },
-		Default: func(req request, f facts) (kernel.Fallback, bool) {
-			return kernel.Fallback{Value: kernel.Value{Text: f.Base}, Origin: kernel.OriginDefault}, len(req.Branches) > 0
-		},
-	}
-}
 
 func TestCheckDependsOnPassesAFieldThatDeclaresWhatItReads(t *testing.T) {
 	s := &spy{}
@@ -53,9 +19,7 @@ func TestCheckDependsOnPassesAFieldThatDeclaresWhatItReads(t *testing.T) {
 		Request: request{Branches: []string{"feat/x"}},
 		Facts:   facts{Base: "main"},
 	})
-	if len(s.failures) != 0 {
-		t.Errorf("failures = %v", s.failures)
-	}
+	assert.Empty(t, s.failures)
 }
 
 func TestCheckDependsOnCatchesEveryUndeclaredRead(t *testing.T) {
@@ -65,9 +29,8 @@ func TestCheckDependsOnCatchesEveryUndeclaredRead(t *testing.T) {
 		Request: request{Branches: []string{"feat/x"}, Options: options{Mode: "detached"}},
 		Facts:   facts{Base: "main"},
 	})
-	if len(s.failures) != 1 || !strings.Contains(s.failures[0], `"options.mode"`) {
-		t.Errorf("failures = %v", s.failures)
-	}
+	require.Len(t, s.failures, 1)
+	assert.Contains(t, s.failures[0], `"options.mode"`)
 }
 
 func TestCheckDependsOnRefusesAPathThatNamesNoField(t *testing.T) {
@@ -78,25 +41,8 @@ func TestCheckDependsOnRefusesAPathThatNamesNoField(t *testing.T) {
 			{Spec: kernel.FieldSpec{Path: "force", DependsOn: []string{"ghost"}}},
 		},
 	})
-	if len(s.failures) != 2 {
-		t.Errorf("failures = %v", s.failures)
-	}
+	assert.Len(t, s.failures, 2)
 }
-
-type store struct{ entries []string }
-
-func (s *store) add(name string) func(context.Context) error {
-	return func(context.Context) error { s.entries = append(s.entries, name); return nil }
-}
-
-func (s *store) remove(name string) func(context.Context) error {
-	return func(context.Context) error {
-		s.entries = slices.DeleteFunc(s.entries, func(entry string) bool { return entry == name })
-		return nil
-	}
-}
-
-func (s *store) snapshot() string { return strings.Join(s.entries, ",") }
 
 func TestCheckSagaPassesASagaThatUndoesEverything(t *testing.T) {
 	disk := &store{entries: []string{"main"}}
@@ -113,9 +59,7 @@ func TestCheckSagaPassesASagaThatUndoesEverything(t *testing.T) {
 		},
 		Snapshot: disk.snapshot,
 	})
-	if len(s.failures) != 0 {
-		t.Errorf("failures = %v", s.failures)
-	}
+	assert.Empty(t, s.failures)
 }
 
 func TestCheckSagaCatchesAStepWithNothingToUndoIt(t *testing.T) {
@@ -131,7 +75,5 @@ func TestCheckSagaCatchesAStepWithNothingToUndoIt(t *testing.T) {
 		},
 		Snapshot: disk.snapshot,
 	})
-	if len(s.failures) == 0 || !strings.Contains(strings.Join(s.failures, "\n"), "step meta") {
-		t.Errorf("failures = %v", s.failures)
-	}
+	assert.Contains(t, strings.Join(s.failures, "\n"), "step meta")
 }

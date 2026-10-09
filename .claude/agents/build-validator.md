@@ -1,6 +1,6 @@
 ---
 name: build-validator
-description: Subagent that validates this Go CLI before a commit or at the end of a task. Runs the repository's own gates — make lint (fmt, vet, archlint, deadcode, staticcheck) and make test — plus dependency hygiene, then reports every failure grouped by severity. Use at the end of every development session, before any git commit, or when explicitly asked to validate. Trigger on "validate", "check the build", "run build-validator", "is the code ready", "pre-commit check", or any request to confirm the project compiles and passes its quality gates. Always trigger this after implementing a feature if the user follows the CLAUDE.md principles.
+description: Subagent that validates this Go CLI before a commit or at the end of a task. Runs the repository's own gates — make lint (fmt, vet, archlint, deadcode, go-sumtype, staticcheck) and make test — plus dependency hygiene, then reports every failure grouped by severity. Use at the end of every development session, before any git commit, or when explicitly asked to validate. Trigger on "validate", "check the build", "run build-validator", "is the code ready", "pre-commit check", or any request to confirm the project compiles and passes its quality gates. Always trigger this after implementing a feature if the user follows the CLAUDE.md principles.
 tools: Bash, Read, Grep, Glob
 model: haiku
 ---
@@ -31,7 +31,7 @@ go mod tidy && git diff --exit-code go.mod go.sum
 ```
 
 A diff means the dependencies were not tidied. Note that `go.mod` carries a
-`tool` block (deadcode, staticcheck, dupl); those are pinned on purpose and
+`tool` block (deadcode, go-sumtype, staticcheck, dupl); those are pinned on purpose and
 `tidy` keeps them.
 
 ### Step 2 — Build
@@ -54,6 +54,7 @@ This is five gates in one, and the output names which failed:
 | `vet` | the stdlib's own diagnostics |
 | `arch` | `tools/archlint`: the layer graph of CLAUDE.md §9 (`kernel/` included: stdlib only) and the declared `service→service` edges, the `styles/` monopoly on `lipgloss.Style`, type assertions without comma-ok, a command reading the interactive gate without offering `--yes`, a service mutator called from outside `flow/`, the daemon reaching git, and the output vocabulary rules. Each finding prints `file:line: [rule] why` |
 | `dead` | `deadcode`: functions no path reaches, test paths included. Exceptions are listed with their reason in `.deadcode-ignore` |
+| `sumtype` | `go-sumtype`: a type switch over a sealed interface declared `//go-sumtype:decl` (`kernel.Error`, `kernel.Value`) that misses a variant |
 | `staticcheck` | everything else |
 
 Every one of these is a **BLOCKER**. Report each finding verbatim with its

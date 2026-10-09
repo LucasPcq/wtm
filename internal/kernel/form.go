@@ -1,9 +1,6 @@
 package kernel
 
-import (
-	"slices"
-	"strings"
-)
+import "slices"
 
 type EvaluateParams[Req, F any] struct {
 	Fields  []FieldDef[Req, F]
@@ -67,10 +64,7 @@ func settle[Req, F any](params settleParams[Req, F]) (FieldState, Req, error) {
 	if !IsZero(value) {
 		return FieldState{Path: path, Status: FieldProvided, Origin: OriginRequest, Value: value}, params.Request, nil
 	}
-	if params.Field.Default == nil {
-		return FieldState{Path: path, Status: FieldMissing}, params.Request, nil
-	}
-	fallback, ok := params.Field.Default(params.Request, params.Facts)
+	fallback, ok := defaulted(params)
 	if !ok {
 		return FieldState{Path: path, Status: FieldMissing}, params.Request, nil
 	}
@@ -86,6 +80,13 @@ func skipped[Req, F any](params settleParams[Req, F]) (bool, Code) {
 		return false, ""
 	}
 	return params.Field.Skip(params.Request, params.Facts)
+}
+
+func defaulted[Req, F any](params settleParams[Req, F]) (Fallback, bool) {
+	if params.Field.Default == nil {
+		return Fallback{}, false
+	}
+	return params.Field.Default(params.Request, params.Facts)
 }
 
 type fieldProblemsParams[Req, F any] struct {
@@ -106,12 +107,14 @@ func fieldProblems[Req, F any](params fieldProblemsParams[Req, F]) ([]FieldError
 	return params.Field.Validate(params.Request, params.Facts), nil
 }
 
+// attach hands each rule's errors to the field they are about, an entry's
+// to its list.
 func attach(states []FieldState, crossed []FieldError) []FieldState {
 	out := make([]FieldState, len(states))
 	for index, state := range states {
 		out[index] = state
-		out[index].Errors = append(slices.Clip(state.Errors), slices.DeleteFunc(slices.Clone(crossed), func(problem FieldError) bool {
-			return problem.Path != state.Path && !strings.HasPrefix(problem.Path, state.Path+"[")
+		out[index].Errors = append(slices.Clip(state.Errors), without(crossed, func(problem FieldError) bool {
+			return !Within(PathIn{Path: problem.Path, Parent: state.Path})
 		})...)
 	}
 	return out

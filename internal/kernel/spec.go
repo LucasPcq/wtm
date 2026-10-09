@@ -13,7 +13,8 @@ type CheckSpecParams[Req any] struct {
 }
 
 // CheckSpec checks each field against its own declared constraints; rules
-// across fields are Rules' business.
+// across fields are Rules' business. A spec whose type does not fit its
+// field, or whose pattern does not compile, is an error of the command.
 func CheckSpec[Req any](params CheckSpecParams[Req]) ([]FieldError, error) {
 	var problems []FieldError
 	for _, spec := range params.Specs {
@@ -21,13 +22,28 @@ func CheckSpec[Req any](params CheckSpecParams[Req]) ([]FieldError, error) {
 		if err != nil {
 			return nil, err
 		}
-		check, err := checkerOf(spec)
+		check, err := checkerOf(spec, value)
 		if err != nil {
 			return nil, err
 		}
 		problems = append(problems, check.field(value)...)
 	}
 	return problems, nil
+}
+
+// fits says which Value a field type holds.
+func fits(typ FieldType, value Value) bool {
+	switch value.(type) {
+	case Text:
+		return typ == FieldText || typ == FieldSelect
+	case Bool:
+		return typ == FieldBool
+	case List:
+		return typ == FieldMultiSelect || typ == FieldReorder || typ == FieldTextList
+	case Decisions:
+		return typ == FieldDecisions
+	}
+	return false
 }
 
 type checker struct {
@@ -40,7 +56,10 @@ type entry struct {
 	text string
 }
 
-func checkerOf(spec FieldSpec) (checker, error) {
+func checkerOf(spec FieldSpec, value Value) (checker, error) {
+	if !fits(spec.Type, value) {
+		return checker{}, fmt.Errorf("kernel: field %q: a %s field cannot hold a %T", spec.Path, spec.Type, value)
+	}
 	if spec.Constraints.Pattern == "" {
 		return checker{spec: spec}, nil
 	}
@@ -58,24 +77,26 @@ func (c checker) field(value Value) []FieldError {
 	if IsZero(value) {
 		return nil
 	}
-	switch c.spec.Type {
-	case FieldMultiSelect, FieldReorder, FieldTextList:
-		return c.list(value.List)
-	case FieldDecisions:
-		return c.decisions(value.Decisions)
-	case FieldBool:
+	switch v := value.(type) {
+	case Text:
+		return c.entry(entry{path: c.spec.Path, text: string(v)})
+	case List:
+		return c.list(v)
+	case Decisions:
+		return c.decisions(v)
+	case Bool:
 		return nil
 	}
-	return c.entry(entry{path: c.spec.Path, text: value.Text})
+	return nil
 }
 
-func (c checker) list(list []string) []FieldError {
+func (c checker) list(list List) []FieldError {
 	limits := c.spec.Constraints
 	if limits.MinItems > 0 && len(list) < limits.MinItems {
-		return []FieldError{{Path: c.spec.Path, Code: CodeTooFew, Params: limitParam(limits.MinItems)}}
+		return []FieldError{{Path: c.spec.Path, Code: CodeTooFew, Params: Params{ParamLimit: strconv.Itoa(limits.MinItems)}}}
 	}
 	if limits.MaxItems > 0 && len(list) > limits.MaxItems {
-		return []FieldError{{Path: c.spec.Path, Code: CodeTooMany, Params: limitParam(limits.MaxItems)}}
+		return []FieldError{{Path: c.spec.Path, Code: CodeTooMany, Params: Params{ParamLimit: strconv.Itoa(limits.MaxItems)}}}
 	}
 	var problems []FieldError
 	for index, text := range list {
@@ -84,7 +105,7 @@ func (c checker) list(list []string) []FieldError {
 	return problems
 }
 
-func (c checker) decisions(decisions map[string]string) []FieldError {
+func (c checker) decisions(decisions Decisions) []FieldError {
 	keys := make([]string, 0, len(decisions))
 	for key := range decisions {
 		keys = append(keys, key)
@@ -100,22 +121,18 @@ func (c checker) decisions(decisions map[string]string) []FieldError {
 func (c checker) entry(at entry) []FieldError {
 	limits := c.spec.Constraints
 	if len(limits.Enum) > 0 && !slices.Contains(limits.Enum, at.text) {
-		return []FieldError{{Path: at.path, Code: CodeOneOf, Params: map[string]string{ParamValue: at.text}, Accepted: limits.Enum}}
+		return []FieldError{{Path: at.path, Code: CodeOneOf, Params: Params{ParamValue: at.text}, Accepted: limits.Enum}}
 	}
 	if limits.MinLen > 0 && len(at.text) < limits.MinLen {
-		return []FieldError{{Path: at.path, Code: CodeTooShort, Params: limitParam(limits.MinLen)}}
+		return []FieldError{{Path: at.path, Code: CodeTooShort, Params: Params{ParamLimit: strconv.Itoa(limits.MinLen)}}}
 	}
 	if limits.MaxLen > 0 && len(at.text) > limits.MaxLen {
-		return []FieldError{{Path: at.path, Code: CodeTooLong, Params: limitParam(limits.MaxLen)}}
+		return []FieldError{{Path: at.path, Code: CodeTooLong, Params: Params{ParamLimit: strconv.Itoa(limits.MaxLen)}}}
 	}
 	if c.pattern != nil && !c.pattern.MatchString(at.text) {
-		return []FieldError{{Path: at.path, Code: CodePattern, Params: map[string]string{ParamValue: at.text, ParamPattern: limits.Pattern}}}
+		return []FieldError{{Path: at.path, Code: CodePattern, Params: Params{ParamValue: at.text, ParamPattern: limits.Pattern}}}
 	}
 	return nil
-}
-
-func limitParam(limit int) map[string]string {
-	return map[string]string{ParamLimit: strconv.Itoa(limit)}
 }
 
 func IndexPath(path string, index int) string {

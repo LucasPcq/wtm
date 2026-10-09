@@ -7,7 +7,6 @@ import (
 	"maps"
 	"reflect"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/kernel"
@@ -99,7 +98,7 @@ func observe[Req, F any](field kernel.FieldDef[Req, F], req Req, facts F) observ
 func resolves[Req any](t testing.TB, path string) bool {
 	t.Helper()
 	known := slices.ContainsFunc(kernel.Paths[Req](), func(leaf string) bool {
-		return leaf == path || strings.HasPrefix(leaf, path+".")
+		return kernel.Within(kernel.PathIn{Path: leaf, Parent: path})
 	})
 	if !known {
 		var req Req
@@ -123,7 +122,7 @@ func reads[Req, F any](params readsParams[Req, F]) bool {
 	if err != nil {
 		return false
 	}
-	for _, other := range []kernel.Value{{}, changedFrom(value)} {
+	for _, other := range []kernel.Value{nil, changedFrom(value)} {
 		mutated, err := kernel.Set(params.Request, params.Path, other)
 		if err != nil {
 			return false
@@ -137,22 +136,28 @@ func reads[Req, F any](params readsParams[Req, F]) bool {
 
 func declares(dependsOn []string, path string) bool {
 	return slices.ContainsFunc(dependsOn, func(declared string) bool {
-		return path == declared || strings.HasPrefix(path, declared+".")
+		return kernel.Within(kernel.PathIn{Path: path, Parent: declared})
 	})
 }
 
+// changedFrom returns a value of the same shape that differs from value.
 func changedFrom(value kernel.Value) kernel.Value {
-	decisions := maps.Clone(value.Decisions)
-	if decisions == nil {
-		decisions = map[string]string{}
+	switch v := value.(type) {
+	case kernel.Text:
+		return v + changed
+	case kernel.Bool:
+		return !v
+	case kernel.List:
+		return append(slices.Clone(v), changed)
+	case kernel.Decisions:
+		decisions := maps.Clone(v)
+		if decisions == nil {
+			decisions = kernel.Decisions{}
+		}
+		decisions[changed] = changed
+		return decisions
 	}
-	decisions[changed] = changed
-	return kernel.Value{
-		Text:      value.Text + changed,
-		Bool:      !value.Bool,
-		List:      append(slices.Clone(value.List), changed),
-		Decisions: decisions,
-	}
+	return value
 }
 
 func failingAt[D any](saga kernel.Saga[D], point int) kernel.Saga[D] {

@@ -6,39 +6,61 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/LucasPcq/wtm/internal/kernel"
 )
 
-func TestAnErrorReadsAsItsCodeNeverAsASentence(t *testing.T) {
-	bare := &kernel.Error{Kind: kernel.KindConflict, Code: "lock.held"}
-	caused := &kernel.Error{Kind: kernel.KindInternal, Code: kernel.CodeStepFailed, Cause: errBoom}
-	if bare.Error() != "lock.held" || caused.Error() != "unit.step_failed: boom" {
-		t.Errorf("bare = %q, caused = %q", bare.Error(), caused.Error())
+func TestTheKindOfAnErrorIsItsType(t *testing.T) {
+	problem := kernel.Problem{Code: "test.code"}
+	cases := []struct {
+		err  kernel.Error
+		kind kernel.Kind
+	}{
+		{kernel.Invalid(nil), kernel.KindInvalid},
+		{&kernel.RefusedError{Problem: problem}, kernel.KindRefused},
+		{kernel.NotFound(problem), kernel.KindNotFound},
+		{kernel.Conflict(problem), kernel.KindConflict},
+		{kernel.Precondition(problem), kernel.KindPrecondition},
+		{kernel.Cancelled(problem), kernel.KindCancelled},
+		{kernel.Internal(problem), kernel.KindInternal},
+	}
+	for _, c := range cases {
+		assert.Equal(t, c.kind, c.err.Kind())
 	}
 }
 
-func TestAnErrorUnwrapsToItsCause(t *testing.T) {
-	err := fmt.Errorf("apply: %w", &kernel.Error{Kind: kernel.KindInternal, Code: kernel.CodeInternal, Cause: errBoom})
-	if !errors.Is(err, errBoom) {
-		t.Error("the cause is lost")
-	}
-	var known *kernel.Error
-	if !errors.As(err, &known) || known.Code != kernel.CodeInternal {
-		t.Errorf("errors.As = %+v", known)
-	}
-}
-
-func TestInvalidIsThe422NamingEachField(t *testing.T) {
+func TestAnInvalidRequestNamesEachFieldAtFault(t *testing.T) {
 	problems := []kernel.FieldError{{Path: "from", Code: kernel.CodeRequired}, {Path: "branches[1]", Code: kernel.CodeDistinct}}
 	err := kernel.Invalid(problems)
-	if err.Kind != kernel.KindInvalid || err.Code != kernel.CodeInvalidRequest || len(err.Fields) != 2 {
-		t.Errorf("Invalid = %+v", err)
-	}
+	assert.Equal(t, kernel.CodeInvalidRequest, err.Code)
+	assert.Equal(t, problems, err.Fields)
+}
+
+func TestAnErrorReadsAsItsCodeNeverAsASentence(t *testing.T) {
+	assert.Equal(t, "lock.held", kernel.Conflict(kernel.Problem{Code: "lock.held"}).Error())
+	assert.Equal(t, "unit.step_failed: boom", kernel.Internal(kernel.Problem{Code: kernel.CodeStepFailed, Cause: errBoom}).Error())
+}
+
+func TestAnErrorIsFoundThroughWrappingByItsTypeAndItsCause(t *testing.T) {
+	refused := &kernel.RefusedError{Problem: kernel.Problem{Code: "test.dirty", Cause: errBoom}, Blockers: []kernel.Blocker{{Code: "test.dirty", Field: "force"}}}
+	err := fmt.Errorf("clean: %w", refused)
+
+	var asRefused *kernel.RefusedError
+	require.ErrorAs(t, err, &asRefused)
+	assert.Equal(t, "force", asRefused.Blockers[0].Field)
+
+	var asError kernel.Error
+	require.ErrorAs(t, err, &asError)
+	assert.Equal(t, kernel.Code("test.dirty"), asError.Base().Code)
+
+	assert.ErrorIs(t, err, errBoom)
 }
 
 func TestClassifySortsAnyErrorIntoTheTaxonomy(t *testing.T) {
-	refused := &kernel.Error{Kind: kernel.KindRefused, Code: "test.dirty"}
-	params := map[string]string{kernel.ParamStep: "worktree"}
+	refused := &kernel.RefusedError{Problem: kernel.Problem{Code: "test.dirty"}}
+	params := kernel.Params{kernel.ParamStep: "worktree"}
 	cases := []struct {
 		name     string
 		err      error
@@ -46,7 +68,7 @@ func TestClassifySortsAnyErrorIntoTheTaxonomy(t *testing.T) {
 		wantKind kernel.Kind
 		wantCode kernel.Code
 	}{
-		{"an *Error stays as it is, even wrapped", fmt.Errorf("x: %w", refused), kernel.CodeStepFailed, kernel.KindRefused, "test.dirty"},
+		{"an Error stays as it is, even wrapped", fmt.Errorf("x: %w", refused), kernel.CodeStepFailed, kernel.KindRefused, "test.dirty"},
 		{"a cancellation is cancelled", fmt.Errorf("git: %w", context.Canceled), kernel.CodeStepFailed, kernel.KindCancelled, kernel.CodeInterrupted},
 		{"anything else is internal, under the code given", errBoom, kernel.CodeStepFailed, kernel.KindInternal, kernel.CodeStepFailed},
 		{"with no code given, internal", errBoom, "", kernel.KindInternal, kernel.CodeInternal},
@@ -54,12 +76,9 @@ func TestClassifySortsAnyErrorIntoTheTaxonomy(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			got := kernel.Classify(kernel.ClassifyParams{Err: c.err, Code: c.code, Params: params})
-			if got.Kind != c.wantKind || got.Code != c.wantCode {
-				t.Errorf("Classify = %s/%s, want %s/%s", got.Kind, got.Code, c.wantKind, c.wantCode)
-			}
-			if !errors.Is(got, c.err) && got != refused {
-				t.Errorf("the original error is lost: %v", got)
-			}
+			assert.Equal(t, c.wantKind, got.Kind())
+			assert.Equal(t, c.wantCode, got.Base().Code)
+			assert.True(t, errors.Is(got, c.err) || got == kernel.Error(refused), "the original error is kept")
 		})
 	}
 }

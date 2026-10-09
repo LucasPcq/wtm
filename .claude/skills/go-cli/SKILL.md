@@ -856,6 +856,12 @@ Rules:
 
 ## Testing Patterns
 
+The command engine (`internal/kernel/`, and the layers built on it) is tested with
+testify (`assert`, `require`): a test reads as a specification. Each test file holds
+only `Test…` functions; a package's example and fakes live in `fixture_test.go`, the
+helpers its tests share in `helpers_test.go`. The rest of the repository keeps the
+stdlib `testing` style below.
+
 ### Unit tests — config/service/domain
 
 Use `t.TempDir()` as the state dir, write fixtures directly inside it (no nested `.wtm/` segment):

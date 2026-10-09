@@ -7,17 +7,22 @@ import (
 )
 
 // A field's path is its JSON name, dotted through nested structs
-// ("target.from"): the same string in a flag error, the schema and the form.
+// ("target.from"); an entry of a list or of decisions is path[index] or
+// path[key]. The same string names the field in a flag error, the schema and
+// the form.
 
+// Get reads a field as the Value its Go type holds: a string as Text, a bool
+// as Bool, a []string as List, a map[string]string as Decisions.
 func Get[Req any](req Req, path string) (Value, error) {
 	field, err := fieldAt(reflect.ValueOf(req), path)
 	if err != nil {
-		return Value{}, err
+		return nil, err
 	}
 	return valueOf(field, path)
 }
 
-// Set returns a copy of req with path set to value.
+// Set returns a copy of req with path set to value; nil empties the field. A
+// value of another shape than the field's is an error.
 func Set[Req any](req Req, path string, value Value) (Req, error) {
 	copied := reflect.New(reflect.TypeOf(req)).Elem()
 	copied.Set(reflect.ValueOf(req))
@@ -25,7 +30,7 @@ func Set[Req any](req Req, path string, value Value) (Req, error) {
 	if err != nil {
 		return req, err
 	}
-	if err := assign(field, value, path); err != nil {
+	if err := assign(field, assignment{path: path, value: value}); err != nil {
 		return req, err
 	}
 	out, ok := copied.Interface().(Req)
@@ -41,8 +46,33 @@ func Paths[Req any]() []string {
 	return leafPaths(reflect.TypeOf(req), "")
 }
 
+// IsZero is true for no value and for an empty one.
 func IsZero(value Value) bool {
-	return value.Text == "" && !value.Bool && len(value.List) == 0 && len(value.Decisions) == 0
+	switch v := value.(type) {
+	case nil:
+		return true
+	case Text:
+		return v == ""
+	case Bool:
+		return !bool(v)
+	case List:
+		return len(v) == 0
+	case Decisions:
+		return len(v) == 0
+	}
+	return true
+}
+
+type PathIn struct {
+	Path   string
+	Parent string
+}
+
+// Within says whether Path is Parent itself, one of its entries
+// (parent[2]) or a field nested in it (parent.from).
+func Within(in PathIn) bool {
+	rest, found := strings.CutPrefix(in.Path, in.Parent)
+	return found && (rest == "" || strings.HasPrefix(rest, "[") || strings.HasPrefix(rest, "."))
 }
 
 func leafPaths(typ reflect.Type, prefix string) []string {
@@ -108,30 +138,45 @@ func jsonName(field reflect.StructField) (string, bool) {
 func valueOf(field reflect.Value, path string) (Value, error) {
 	switch {
 	case field.Kind() == reflect.String:
-		return Value{Text: field.String()}, nil
+		return Text(field.String()), nil
 	case field.Kind() == reflect.Bool:
-		return Value{Bool: field.Bool()}, nil
+		return Bool(field.Bool()), nil
 	case isStringSlice(field.Type()):
-		return Value{List: stringsOf(field)}, nil
+		return List(stringsOf(field)), nil
 	case isStringMap(field.Type()):
-		return Value{Decisions: decisionsOf(field)}, nil
+		return Decisions(decisionsOf(field)), nil
 	}
-	return Value{}, fmt.Errorf("kernel: path %q: unsupported type %s", path, field.Type())
+	return nil, fmt.Errorf("kernel: path %q: unsupported type %s", path, field.Type())
 }
 
-func assign(field reflect.Value, value Value, path string) error {
-	switch {
-	case field.Kind() == reflect.String:
-		field.SetString(value.Text)
-	case field.Kind() == reflect.Bool:
-		field.SetBool(value.Bool)
-	case isStringSlice(field.Type()):
-		field.Set(sliceOf(field.Type(), value.List))
-	case isStringMap(field.Type()):
-		field.Set(mapOf(field.Type(), value.Decisions))
-	default:
-		return fmt.Errorf("kernel: path %q: unsupported type %s", path, field.Type())
+type assignment struct {
+	path  string
+	value Value
+}
+
+func assign(field reflect.Value, to assignment) error {
+	if to.value == nil {
+		field.Set(reflect.Zero(field.Type()))
+		return nil
 	}
+	switch v := to.value.(type) {
+	case Text:
+		return assignIf(field.Kind() == reflect.String, to, func() { field.SetString(string(v)) })
+	case Bool:
+		return assignIf(field.Kind() == reflect.Bool, to, func() { field.SetBool(bool(v)) })
+	case List:
+		return assignIf(isStringSlice(field.Type()), to, func() { field.Set(sliceOf(field.Type(), v)) })
+	case Decisions:
+		return assignIf(isStringMap(field.Type()), to, func() { field.Set(mapOf(field.Type(), v)) })
+	}
+	return fmt.Errorf("kernel: path %q: unknown value %T", to.path, to.value)
+}
+
+func assignIf(fits bool, to assignment, set func()) error {
+	if !fits {
+		return fmt.Errorf("kernel: path %q: a %T does not fit this field", to.path, to.value)
+	}
+	set()
 	return nil
 }
 
@@ -166,7 +211,7 @@ func decisionsOf(field reflect.Value) map[string]string {
 	return out
 }
 
-func sliceOf(typ reflect.Type, items []string) reflect.Value {
+func sliceOf(typ reflect.Type, items List) reflect.Value {
 	if items == nil {
 		return reflect.Zero(typ)
 	}
@@ -177,7 +222,7 @@ func sliceOf(typ reflect.Type, items []string) reflect.Value {
 	return out
 }
 
-func mapOf(typ reflect.Type, decisions map[string]string) reflect.Value {
+func mapOf(typ reflect.Type, decisions Decisions) reflect.Value {
 	if decisions == nil {
 		return reflect.Zero(typ)
 	}
