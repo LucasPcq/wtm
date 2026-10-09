@@ -9,19 +9,19 @@ import (
 func at(file string) token.Position { return token.Position{Filename: file, Line: 1, Column: 1} }
 
 func TestAMigratingEntryWithoutItsCountIsRefused(t *testing.T) {
-	if _, err := parseMigrating("mutation internal/commands/wt/env\\.go\n"); err == nil {
+	if _, err := parseMigrating("mutation internal/surface/cli/wt/env\\.go\n"); err == nil {
 		t.Error("an entry with no site count was accepted: the list could grow without anyone noticing")
 	}
 }
 
 func TestAMigratingEntryFailsTheSiteBeyondItsCount(t *testing.T) {
-	list, err := parseMigrating("# comment\nmutation internal/commands/wt/env\\.go 1\n")
+	list, err := parseMigrating("# comment\nmutation internal/surface/cli/wt/env\\.go 1\n")
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := judge(judgeParams{Migrating: list, Findings: []finding{
-		{pos: at("internal/commands/wt/env.go"), rule: "mutation", msg: "a"},
-		{pos: at("internal/commands/wt/env.go"), rule: "mutation", msg: "b"},
+		{pos: at("internal/surface/cli/wt/env.go"), rule: "mutation", msg: "a"},
+		{pos: at("internal/surface/cli/wt/env.go"), rule: "mutation", msg: "b"},
 	}})
 	if !got.failed {
 		t.Errorf("two sites under a count of one passed:\n%s", strings.Join(got.lines, "\n"))
@@ -29,12 +29,12 @@ func TestAMigratingEntryFailsTheSiteBeyondItsCount(t *testing.T) {
 }
 
 func TestAMigratingEntryCoveringFewerSitesSaysItCanShrink(t *testing.T) {
-	list, err := parseMigrating("mutation internal/commands/wt/env\\.go 3\nmutation internal/commands/checkout/ 1\n")
+	list, err := parseMigrating("mutation internal/surface/cli/wt/env\\.go 3\nmutation internal/surface/cli/checkout/ 1\n")
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := judge(judgeParams{Migrating: list, Findings: []finding{
-		{pos: at("internal/commands/wt/env.go"), rule: "mutation", msg: "a"},
+		{pos: at("internal/surface/cli/wt/env.go"), rule: "mutation", msg: "a"},
 	}})
 	if got.failed {
 		t.Errorf("a site within its count failed:\n%s", strings.Join(got.lines, "\n"))

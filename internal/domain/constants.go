@@ -687,7 +687,7 @@ const (
 	// What `wtm run proxy status` prints, and the callout it raises when the
 	// redirection is declared but does not reach the proxy that is running.
 	ProxyStatusTitle = "Run proxy"
-	// The readout's fields. Labels only: the alignment is output.Announce's, and
+	// The readout's fields. Labels only: the alignment is render.Announce's, and
 	// hand-spacing it inside the wording is how two sibling readouts ended up
 	// aligned two different ways.
 	ProxyStatusBindLabel    = "Bind port"
@@ -3005,7 +3005,7 @@ const (
 	RunAbortRunningLabel    = "Left running:"
 	RunAbortNotStartedLabel = "Not started: "
 	// The abort's way out reads like every other hint in the tree: one command
-	// per line, through output.NextStep. It used to be one prose string under the
+	// per line, through render.NextStep. It used to be one prose string under the
 	// ephemeral `›`, in a block that stays in the scrollback.
 	RunAbortRetryHint = "wtm run up"
 	RunAbortRetryNote = "re-run once fixed"

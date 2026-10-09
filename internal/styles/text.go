@@ -9,7 +9,7 @@ import (
 )
 
 // Indent is the standard left-padding applied to all formatted output and TUI
-// components. Centralised here so both output/ and tui/ share the same value.
+// components. Centralised here so both surface/cli/render/ and surface/tui/ share the same value.
 const Indent = "  "
 
 var (
@@ -40,8 +40,8 @@ type NextStepParams struct {
 
 // NextStepLine composes the one forward-pointing line of a conclusion: the
 // arrow, the command in bold, and an optional muted gloss. It lives here rather
-// than in output/ because tui/ concludes on the same line — a run recap printed
-// once the view gives the terminal back — and tui/ may not import output/.
+// than in surface/cli/render/ because surface/tui/ concludes on the same line — a run recap printed
+// once the view gives the terminal back — and surface/tui/ may not import surface/cli/render/.
 func NextStepLine(params NextStepParams) string {
 	return Indent + NextStepText(params)
 }

@@ -38,9 +38,9 @@ var layers = map[string]layer{
 	},
 	"flow": {
 		internal: []string{"domain", "rules", "service"},
-		why:      "the run of a command, surface-independent: never cobra, bubbletea, lipgloss, output/, tui/, config/ or commands/ — and therefore never infra/, which needs a service/ wrapper instead",
+		why:      "the run of a command, surface-independent: never cobra, bubbletea, lipgloss, surface/ or config/ — and therefore never infra/, which needs a service/ wrapper instead",
 	},
-	"output": {
+	"surface/cli/render": {
 		internal: []string{"domain", "flow", "rules", "styles"},
 		external: []string{"golang.org/x/term"},
 		why:      "formats and prints, zero decision logic",
@@ -50,13 +50,13 @@ var layers = map[string]layer{
 		external: []string{"github.com/charmbracelet/lipgloss", "github.com/charmbracelet/x/ansi", "github.com/muesli/termenv"},
 		why:      "the only package that instantiates a lipgloss.Style",
 	},
-	"tui": {
+	"surface/tui": {
 		internal: []string{"domain", "flow", "rules", "service", "styles"},
 		external: []string{"github.com/charmbracelet/", "github.com/lrstanley/bubblezone", "golang.org/x/term"},
 		why:      "bubbletea models, rendering only",
 	},
-	"commands": {
-		internal: []string{"config", "domain", "flow", "infra", "output", "rules", "schemas", "service", "styles", "tui"},
+	"surface/cli": {
+		internal: []string{"config", "domain", "flow", "infra", "rules", "schemas", "service", "styles", "surface/cli/render", "surface/tui"},
 		external: []string{"github.com/charmbracelet/bubbletea", "github.com/spf13/cobra", "golang.org/x/term"},
 		why:      "flag wiring, delegating to flow/ and service/",
 	},
@@ -94,7 +94,7 @@ func allowed(own string, spec layer, target string) bool {
 		return true // stdlib
 	}
 	if strings.HasPrefix(target, modulePath+"internal/") {
-		other := strings.Split(strings.TrimPrefix(target, modulePath+"internal/"), "/")[0]
+		other := layerOfPackage(target)
 		if other == own {
 			return true
 		}

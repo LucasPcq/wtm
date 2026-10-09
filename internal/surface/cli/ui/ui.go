@@ -1,0 +1,139 @@
+// Package ui implements `wtm ui`: the full-screen worktree dashboard.
+package ui
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/spf13/cobra"
+	"golang.org/x/term"
+
+	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/service/events"
+	ghservice "github.com/LucasPcq/wtm/internal/service/github"
+	"github.com/LucasPcq/wtm/internal/service/integration"
+	"github.com/LucasPcq/wtm/internal/service/runjobs"
+	"github.com/LucasPcq/wtm/internal/service/selfupdate"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
+	"github.com/LucasPcq/wtm/internal/surface/tui/dashboard"
+)
+
+type NewCmdParams struct {
+	Version string
+}
+
+// NewCmd creates the wtm ui command.
+func NewCmd(params NewCmdParams) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   domain.CmdUI,
+		Short: "Open the worktree dashboard",
+		Long: "Open a full-screen dashboard of the repository's worktrees.\n" +
+			"The Worktrees tab lists them with their git state against both the base branch and\n" +
+			"origin, and their pull requests; the Tree tab lays the same worktrees out as the\n" +
+			"parent-child forest `wtm tree` prints; the Services tab gathers every worktree the\n" +
+			"run daemon holds something up in, with the addresses its jobs answer on. `n`\n" +
+			"creates a worktree; right-click a row (or press `m`) to reparent, sync, or delete\n" +
+			"it; `a` opens the actions that run over several worktrees at once, syncing or\n" +
+			"reparenting a selection of them; `L` reads a job's logs in the detail panel.\n" +
+			"The list follows every worktree created, moved or removed, whoever did it, as\n" +
+			fmt.Sprintf("`wtm events` reports it; its local git state is re-read every %d seconds, when\n", domain.DashboardGitPollSeconds) +
+			"the terminal regains focus and after each action; the detail panel reloads when the selection\n" +
+			"changes or an operation touches it, and pull requests load once. Nothing is\n" +
+			"fetched on its own: `r` fetches the remote and refreshes all of it.\n" +
+			"Press `?` for the key reference.",
+		Example: `  # Press ? inside for the key reference
+  wtm ui`,
+		Args:        cobra.NoArgs,
+		Annotations: map[string]string{domain.AnnotationUncorrelated: domain.AnnotationOn},
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runUI(cmd, params.Version)
+		},
+	}
+	shared.AddOutputFlag(cmd)
+	return cmd
+}
+
+func runUI(cmd *cobra.Command, version string) error {
+	format, _ := cmd.Flags().GetString(domain.FlagOutput)
+	if !rules.IsHumanFormat(format) {
+		return domain.ErrDashboardJSON
+	}
+	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
+		return domain.ErrDashboardNotInteractive
+	}
+
+	dir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+
+	result, err := shared.LoadConfig(cmd, dir)
+	if err != nil {
+		return err
+	}
+
+	return dashboard.Run(cmd.Context(), buildRunParams(cmd.Context(), buildParams{Dir: dir, Result: result, Version: version}))
+}
+
+// buildRunParams assembles the dashboard's inputs from the resolved config and
+// the directory `wtm ui` was actually launched from — split out from runUI so
+// the wiring (Cwd in particular: the raw working directory, not ProjectDir,
+// which LoadConfig may have resolved upward) is asserted directly rather than
+// only reachable by running the dashboard itself, which needs a real terminal.
+type buildParams struct {
+	Dir     string
+	Result  shared.ConfigResult
+	Version string
+}
+
+func buildRunParams(ctx context.Context, params buildParams) dashboard.RunParams {
+	result := params.Result
+	publisher := events.NewPublisher(events.PublisherParams{ProjectDir: result.ProjectDir})
+
+	return dashboard.RunParams{
+		ProjectDir: result.ProjectDir,
+		StateDir:   result.StateDir,
+		Cwd:        infra.ResolvePath(params.Dir),
+		Config:     result.Config,
+		Publisher:  publisher,
+		Version:    params.Version,
+		// Read from the cached state only: the dashboard must not pay a network
+		// round-trip to draw its header.
+		UpgradeLatest: selfupdate.CachedUpgrade(params.Version),
+		PRLoader:      func() ([]domain.PRInfo, domain.GHConnection) { return shared.LoadPRsWithChecks(ctx, result.ProjectDir) },
+		PROpener: func(number int) error {
+			return ghservice.OpenPR(ctx, ghservice.OpenPRParams{ProjectDir: result.ProjectDir, Number: number})
+		},
+		URLOpener: func(url string) error { return integration.OpenURL(ctx, url) },
+		LogsLoader: dashboard.DefaultLogsLoader(ctx, dashboard.LogsLoaderParams{
+			ProjectDir: result.ProjectDir,
+			StateDir:   result.StateDir,
+			Publisher:  publisher,
+		}),
+		BoardLoader: dashboard.DefaultBoardLoader(ctx, dashboard.LogsLoaderParams{
+			ProjectDir: result.ProjectDir,
+			StateDir:   result.StateDir,
+			Publisher:  publisher,
+			PublicPort: func() int {
+				return runjobs.PublicPort(ctx, runjobs.PublicPortParams{StateDir: result.StateDir, Global: result.Config.Global})
+			},
+		}),
+		JobsLoader: func(wake bool) ([]domain.JobInfo, bool) { return runjobs.Read(ctx, wake) },
+		TraceLoader: func(branches []string) map[string]map[string]bool {
+			return runjobs.Traces(runjobs.TracesParams{StateDir: result.StateDir, Branches: branches})
+		},
+		AddressLoader: func(request dashboard.AddressRequest) domain.RunAddresses {
+			return runjobs.Addresses(ctx, runjobs.AddressesParams{
+				ProjectDir: result.ProjectDir,
+				StateDir:   result.StateDir,
+				Config:     request.Config,
+				Branches:   request.Branches,
+				EnvFiles:   result.Config.Project.Env.Files,
+				Global:     result.Config.Global,
+			})
+		},
+	}
+}

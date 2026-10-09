@@ -180,7 +180,7 @@ type ViewsParams struct {
 
 // Views is what one run of `run logs` reports on: the named job, or every job
 // the worktree has anything to show for. It lives here rather than beside the
-// rendering because choosing what to show is a decision, and output/ and tui/
+// rendering because choosing what to show is a decision, and surface/cli/render/ and surface/tui/
 // hold none.
 func Views(params ViewsParams) ([]runlogs.JobView, error) {
 	jobs := params.Board.Jobs()

@@ -66,9 +66,9 @@ type Session struct {
 
 | Implementation | Where | `Ask` | `Confirm` | `Interactive()` |
 | -- | -- | -- | -- | -- |
-| `flowui.Prompter` | `internal/tui/flowui` | `components.RunWizard` | `components.RunStandaloneConfirm` | `true` |
+| `flowui.Prompter` | `internal/surface/tui/flowui` | `components.RunWizard` | `components.RunStandaloneConfirm` | `true` |
 | `flow.Unattended` | `internal/flow/unattended.go` | resolves with no interaction | `false, nil` | `false` |
-| `dashboard.prompter` | `internal/tui/dashboard/prompter.go` | a modal, over a reply channel | a one-question modal | `true` |
+| `dashboard.prompter` | `internal/surface/tui/dashboard/prompter.go` | a modal, over a reply channel | a one-question modal | `true` |
 
 `Unattended` lives in `flow/` because it is the only implementation with no surface dependency, and it carries the bypass taxonomy, which must exist once.
 
@@ -162,7 +162,7 @@ type Step struct {
 | `StepEnvResolve` | a decision per drifting `.env` key (`StepContent.EnvFiles`) | `EnvDecisions` |
 | `StepRecap` | confirmation of the whole session | `Value` |
 
-`flowui` renders every kind; the dashboard's modal renders all but `StepEnvResolve` and refuses an unknown kind (`domain.DashboardUnsupportedStepFmt`) rather than guessing. **A kind that is drawn must be read back**: a kind rendered but not read answers empty, and the flow writes that absence as if it were the answer. `TestEveryDrawableKindIsReadBack` (`internal/tui/flowui`) pins it. Adding a kind means teaching every surface that runs a flow using it.
+`flowui` renders every kind; the dashboard's modal renders all but `StepEnvResolve` and refuses an unknown kind (`domain.DashboardUnsupportedStepFmt`) rather than guessing. **A kind that is drawn must be read back**: a kind rendered but not read answers empty, and the flow writes that absence as if it were the answer. `TestEveryDrawableKindIsReadBack` (`internal/surface/tui/flowui`) pins it. Adding a kind means teaching every surface that runs a flow using it.
 
 **`StepContent`** is what may depend on earlier answers (`Title`, `Options`, `Default`, `Start`, `ExcludeBranches`, `Pinned`, `Banner`, `Blockers`, …). `flow.MergeContent` lays it over the step's static fields, and both surfaces read it through there. A `Load` runs while the step is on screen, so a slow source (`gh`, a worktree's changes) never blocks the wizard. A `Build` runs twice: once before the session's first question, with only the presets known, then again when its step is reached. **A `Build` that reads an earlier answer returns empty content while that answer is missing, never an error**: an error from that first pass aborts the whole session before anything is drawn. `ScriptedPrompter` makes the same first pass, so a flow test catches it.
 
@@ -251,7 +251,7 @@ The write-side counterpart of "a flag never erases a recap line": a re-init step
 - The pre-fill reads the **existing config**, not detection, wherever the config has an opinion (`rules.ProposedScriptKind`, `rules.URLCandidatesFor`).
 - A step that **removes** may only remove what it proposed: `rules.DeselectedJobs` never reaches a job written by `run job add`. Removal goes through `rules.RemoveJob`, which also strips profile entries, `[[env_port]]` and `[[env]]` links, `runs` and `touches`; a rename goes through `rules.RenameJobRefs`, which follows the same five.
 
-`run init`'s services wizard edits structured rows no `StepKind` renders, so it is its own seam, `initrun.Wizard` (`internal/tui/inittui`, or `rules.AutoServicesAnswers` unattended).
+`run init`'s services wizard edits structured rows no `StepKind` renders, so it is its own seam, `initrun.Wizard` (`internal/surface/tui/inittui`, or `rules.AutoServicesAnswers` unattended).
 
 ## A flow that embeds another
 
@@ -295,17 +295,17 @@ type Operation struct {
 }
 ```
 
-What a flow declares about how it is scheduled on a surface that runs several at once. `ModeBlocking` (`clean`) keeps the surface until the run ends; `ModeBackground` (`create`, whose hooks can run long) gives it back and locks its target instead. The target is known only once its step is answered, so the dashboard prompter posts `opTargetMsg` as soon as the session returns; run sessions answer with worktree **paths**, translated once to branches on receipt (`rules.BranchesForPaths`). An operation holds a stage per worktree, so each locked row shows its own progress. The CLI ignores all of it; `internal/tui/dashboard/ops.go` enforces it once.
+What a flow declares about how it is scheduled on a surface that runs several at once. `ModeBlocking` (`clean`) keeps the surface until the run ends; `ModeBackground` (`create`, whose hooks can run long) gives it back and locks its target instead. The target is known only once its step is answered, so the dashboard prompter posts `opTargetMsg` as soon as the session returns; run sessions answer with worktree **paths**, translated once to branches on receipt (`rules.BranchesForPaths`). An operation holds a stage per worktree, so each locked row shows its own progress. The CLI ignores all of it; `internal/surface/tui/dashboard/ops.go` enforces it once.
 
 ### Handing the terminal over
 
-A flow whose surface is a second full-screen program — `run up` and `run logs` in the dashboard — goes through `tea.Exec` with a `tea.ExecCommand` that runs `runview` **in this process**, so its result comes back typed. Bubbletea restores the terminal around it but not the mouse tracking: a mouse-driven surface asks for it again (`internal/tui/dashboard/handoff.go`).
+A flow whose surface is a second full-screen program — `run up` and `run logs` in the dashboard — goes through `tea.Exec` with a `tea.ExecCommand` that runs `runview` **in this process**, so its result comes back typed. Bubbletea restores the terminal around it but not the mouse tracking: a mouse-driven surface asks for it again (`internal/surface/tui/dashboard/handoff.go`).
 
 ## Hook output
 
 A hook phase reports through `flow.HookSink`: `Output`, the raw stream, and `OnHook`, the `domain.HookBeat` of each hook starting and finishing. The flow asks the Presenter for a phase and hands the sink to the service; it never writes itself. `service/hooks` sends both stdout and stderr into `Output` (stderr is also kept for the failure beat) and renders the beats itself only when no `OnHook` was installed.
 
-- **CLI**: `shared.DrawHookPhase`, the only place a hook phase is drawn, tees the stream into the phase's log (`HookPhaseParams.LogPath`) on every path; a terminal gets `output.HookView` (a bounded tail replaced by one result line per hook), anything else the raw stream. See [output.md](output.md).
+- **CLI**: `shared.DrawHookPhase`, the only place a hook phase is drawn, tees the stream into the phase's log (`HookPhaseParams.LogPath`) on every path; a terminal gets `render.HookView` (a bounded tail replaced by one result line per hook), anything else the raw stream. See [output.md](output.md).
 - **Dashboard**: `Output` is a `flow.LineWriter`, which emits one `OutputLineMsg` per `\n` (`Flush` for the trailing fragment); each beat is one more line. It need not be concurrency-safe: `RunHooks` serializes a hook's stdout and stderr copiers before the sink.
 
 ## Publishing what a flow changed
@@ -361,7 +361,7 @@ type recorder struct {
 func (r *recorder) Created(o Outcome) error { r.outcome = o; return nil }
 ```
 
-For the unattended path, `flow.Unattended{}` **is** the double (`internal/flow/unattended_test.go`). The CLI-level tests in `internal/commands/wt` (`create_noninteractive_test.go`, `integration_test.go`, `prune_test.go`) pin what a user observes: do not edit one to make a refactor pass.
+For the unattended path, `flow.Unattended{}` **is** the double (`internal/flow/unattended_test.go`). The CLI-level tests in `internal/surface/cli/wt` (`create_noninteractive_test.go`, `integration_test.go`, `prune_test.go`) pin what a user observes: do not edit one to make a refactor pass.
 
 ## Settled decisions
 

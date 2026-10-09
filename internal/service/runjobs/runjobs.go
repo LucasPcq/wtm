@@ -1,6 +1,6 @@
 // Package runjobs reads the run daemon's index of jobs. It exists so a surface
 // that is not a cobra command — the dashboard — can ask the same question the
-// CLI asks, without reaching into internal/commands.
+// CLI asks, without reaching into internal/surface/cli.
 package runjobs
 
 import (

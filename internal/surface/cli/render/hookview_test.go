@@ -1,0 +1,259 @@
+package render
+
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/creack/pty"
+
+	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/styles"
+)
+
+func runHookView(t *testing.T, logPath string, run func(view *HookView)) string {
+	t.Helper()
+	var buf bytes.Buffer
+	view := NewHookView(HookViewParams{W: &buf, Log: openHookLog(t, logPath), LogPath: logPath})
+	run(view)
+	view.Close()
+	return buf.String()
+}
+
+// openHookLog opens the log the way the surface does, since the view no longer
+// owns it. A nil *os.File in an io.Writer is not a nil writer, so the empty case
+// returns nil explicitly.
+func openHookLog(t *testing.T, path string) io.Writer {
+	t.Helper()
+	log := HookLog(path)
+	if log == nil {
+		return nil
+	}
+	t.Cleanup(func() { _ = log.Close() })
+	return log
+}
+
+// What a hook leaves on screen is its result, not its output: the tail is drawn
+// while it runs and taken back when it ends.
+func TestHookViewLeavesOnlyTheResultLine(t *testing.T) {
+	out := runHookView(t, "", func(view *HookView) {
+		view.OnHook(domain.HookBeat{Cmd: "pnpm install", Started: true})
+		_, _ = view.Write([]byte("resolving\nfetching\n"))
+		view.OnHook(domain.HookBeat{Cmd: "pnpm install", Duration: 12400 * time.Millisecond})
+	})
+
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	last := lines[len(lines)-1]
+	if !strings.Contains(last, "pnpm install (12.4s)") || !strings.Contains(last, domain.HookGlyphDone) {
+		t.Errorf("the phase ended on %q, want the hook's result line", last)
+	}
+	if strings.Count(out, domain.AnsiClearBelow) == 0 {
+		t.Error("the tail was printed and never taken back")
+	}
+}
+
+// A hook that failed is the one time the output matters: the tail it died on
+// stays, and so does the way to the whole of it.
+func TestHookViewKeepsTheTailOfAFailingHook(t *testing.T) {
+	logPath := filepath.Join(t.TempDir(), "on_create"+domain.HooksLogFileExt)
+	var buf bytes.Buffer
+	view := NewHookView(HookViewParams{W: &buf, Log: openHookLog(t, logPath), LogPath: logPath})
+	view.OnHook(domain.HookBeat{Cmd: "pnpm install", Started: true})
+	// stderr reaches the view through the stream, as the runner tees it.
+	_, _ = view.Write([]byte("ERR_PNPM_NO_LOCKFILE\nlockfile is absent\n"))
+
+	// Only the record the hook leaves behind is under test; the live repaints
+	// above it were erased.
+	buf.Reset()
+	view.OnHook(domain.HookBeat{
+		Cmd:      "pnpm install",
+		Duration: 2 * time.Second,
+		Err:      "exit status 1",
+		Stderr:   "lockfile is absent",
+	})
+	view.Close()
+	out := buf.String()
+
+	for _, want := range []string{domain.HookGlyphFailed, "ERR_PNPM_NO_LOCKFILE", "lockfile is absent", logPath} {
+		if !strings.Contains(out, want) {
+			t.Errorf("a failed hook never showed %q:\n%s", want, out)
+		}
+	}
+	// It is in the tail already: printing the beat's copy underneath says the
+	// same line twice, right where the reader is looking for the cause.
+	if got := strings.Count(out, "lockfile is absent"); got != 1 {
+		t.Errorf("the stderr line appears %d times, want once:\n%s", got, out)
+	}
+}
+
+// What the bounded tail dropped is the one thing worth printing again.
+func TestHookViewPrintsTheStderrTheTailLost(t *testing.T) {
+	var buf bytes.Buffer
+	view := NewHookView(HookViewParams{W: &buf})
+	view.OnHook(domain.HookBeat{Cmd: "build", Started: true})
+	_, _ = view.Write([]byte("early failure\n"))
+	for i := 0; i < domain.HookViewTailLines; i++ {
+		_, _ = view.Write([]byte("noise\n"))
+	}
+
+	buf.Reset()
+	view.OnHook(domain.HookBeat{Cmd: "build", Err: "exit status 1", Stderr: "early failure"})
+	view.Close()
+
+	if out := buf.String(); !strings.Contains(out, "early failure") {
+		t.Errorf("the cause scrolled out of the tail and was never printed again:\n%s", out)
+	}
+}
+
+// The log holds what the tail could not, whether or not anything went wrong.
+func TestHookViewLogsTheWholeStream(t *testing.T) {
+	logPath := filepath.Join(t.TempDir(), "on_create"+domain.HooksLogFileExt)
+	runHookView(t, logPath, func(view *HookView) {
+		view.OnHook(domain.HookBeat{Cmd: "seq", Started: true})
+		for i := 0; i < domain.HookViewTailLines*3; i++ {
+			_, _ = view.Write([]byte("line\n"))
+		}
+		view.OnHook(domain.HookBeat{Cmd: "seq"})
+	})
+
+	body, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read log: %v", err)
+	}
+	if got := strings.Count(string(body), "line\n"); got != domain.HookViewTailLines*3 {
+		t.Errorf("log holds %d lines, want every one of the %d written", got, domain.HookViewTailLines*3)
+	}
+}
+
+// A progress bar rewrites one row: it must be drawn without waiting for a
+// newline that never comes, and what it ended on is the one line the record
+// keeps — not one line per frame it drew.
+func TestHookViewRewritesTheRowAProgressBarRedraws(t *testing.T) {
+	var buf bytes.Buffer
+	view := NewHookView(HookViewParams{W: &buf})
+	view.OnHook(domain.HookBeat{Cmd: "docker pull", Started: true})
+
+	_, _ = view.Write([]byte("10%\r"))
+	if !strings.Contains(buf.String(), "10%") {
+		t.Fatal("a row rewritten with no newline was never drawn")
+	}
+
+	_, _ = view.Write([]byte("50%\r100%\r"))
+	buf.Reset()
+	view.OnHook(domain.HookBeat{Cmd: "docker pull", Err: "boom"})
+	view.Close()
+
+	record := buf.String()
+	if strings.Contains(record, "10%") || strings.Contains(record, "50%") {
+		t.Errorf("the record kept every frame the bar drew:\n%s", record)
+	}
+	if !strings.Contains(record, "100%") {
+		t.Errorf("the record lost what the bar ended on:\n%s", record)
+	}
+}
+
+// The repaint moves the cursor back by the number of rows it last printed. If
+// the two ever disagree the block eats the output above it, so the pair is
+// pinned here rather than trusted.
+func TestHookViewMovesBackExactlyTheRowsItPrinted(t *testing.T) {
+	var buf bytes.Buffer
+	view := NewHookView(HookViewParams{W: &buf})
+	view.OnHook(domain.HookBeat{Cmd: "seq", Started: true})
+
+	drawn := strings.Count(buf.String(), "\n")
+	for i := 0; i < domain.HookViewTailLines+3; i++ {
+		buf.Reset()
+		_, _ = view.Write([]byte("a line of hook output\n"))
+
+		up := 0
+		if _, err := fmt.Sscanf(buf.String(), domain.AnsiPrevLineFmt, &up); err != nil {
+			t.Fatalf("repaint %d moved no cursor: %q", i, buf.String())
+		}
+		if up != drawn {
+			t.Fatalf("repaint %d moved back %d rows, want the %d it had printed", i, up, drawn)
+		}
+		drawn = strings.Count(buf.String(), "\n")
+	}
+}
+
+// A tab is a jump to the next stop, so a line holding one is wider than its
+// runes say — and a line drawn wider than the terminal wraps, which is what
+// makes the cursor arithmetic above wrong.
+func TestHookViewMeasuresATabAsTheColumnsItTakes(t *testing.T) {
+	got := styles.ExpandTabs("a\tb")
+	if strings.Contains(got, "\t") || len(got) != 2+domain.TabWidth {
+		t.Errorf("ExpandTabs(%q) = %q, want the tab spelled out", "a\tb", got)
+	}
+}
+
+// A phase drawn inside a block bars the lines it keeps, and nothing else. The
+// cursor moves must reach the terminal untouched: a bar written before one lands
+// on the row the cursor is about to leave, survives the erase below it, and
+// leaves every repaint one column off.
+func TestHookViewBarsTheLinesItKeepsAndNotTheCursorMoves(t *testing.T) {
+	var buf bytes.Buffer
+	// Barred no-ops on anything but a terminal, so the wiring NewHookView does
+	// on a real one is asserted separately below and the bar installed by hand
+	// here.
+	view := NewHookView(HookViewParams{W: &buf})
+	view.line = &barWriter{w: &buf, atLineStart: true}
+
+	view.OnHook(domain.HookBeat{Cmd: "pnpm install", Started: true})
+	_, _ = view.Write([]byte("resolving\n"))
+	if !strings.Contains(buf.String(), domain.AccentBarGlyph) {
+		t.Errorf("the phase drew no bar: %q", buf.String())
+	}
+
+	buf.Reset()
+	view.OnHook(domain.HookBeat{Cmd: "pnpm install"})
+	got := buf.String()
+
+	escape := strings.Index(got, "\x1b[")
+	if escape < 0 {
+		t.Fatalf("the tail was never erased: %q", got)
+	}
+	if strings.Contains(got[:escape], domain.AccentBarGlyph) {
+		t.Errorf("a bar was drawn before the cursor move: %q", got)
+	}
+	if !strings.Contains(got[escape:], domain.AccentBarGlyph) {
+		t.Errorf("the result line that survives must carry the bar: %q", got)
+	}
+}
+
+func TestHookViewRepaintsFromTheStartOfTheRow(t *testing.T) {
+	var buf bytes.Buffer
+	view := NewHookView(HookViewParams{W: &buf})
+	view.OnHook(domain.HookBeat{Cmd: "pnpm install", Started: true})
+	_, _ = view.Write([]byte("^C"))
+
+	buf.Reset()
+	view.OnHook(domain.HookBeat{Cmd: "pnpm install"})
+
+	if !strings.HasPrefix(buf.String(), fmt.Sprintf(domain.AnsiPrevLineFmt, 1)) {
+		t.Errorf("repaint = %q, want it to start with a move to column zero of the row above", buf.String())
+	}
+}
+
+// Bar is what puts the phase inside the run's block; a view that took the flag
+// and drew on the raw stream anyway would leave a hook phase the one thing
+// outside it, which is the whole point of the flag.
+// Barred only wraps a real terminal, so the view is handed a pty.
+func TestNewHookViewBarsOnlyWhenAsked(t *testing.T) {
+	ptmx, tty, err := pty.Open()
+	if err != nil {
+		t.Fatalf("open pty: %v", err)
+	}
+	defer func() { _ = ptmx.Close(); _ = tty.Close() }()
+
+	if view := NewHookView(HookViewParams{W: tty}); view.line != io.Writer(tty) {
+		t.Errorf("without Bar the view draws on the stream itself, got %T", view.line)
+	}
+	if view := NewHookView(HookViewParams{W: tty, Bar: true}); view.line == io.Writer(tty) {
+		t.Errorf("with Bar the view draws through the bar, got the raw stream")
+	}
+}
