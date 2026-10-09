@@ -58,16 +58,22 @@ func RunCommand(params RunCommandParams) error
 
 All domain types, enums, and error sentinels live in `internal/domain/`
 (`constants.go`, `errors.go`, `types.go`, `jobs.go`, `init.go`). Never duplicate a type across packages.
+The command engine's contract is the exception: `internal/kernel/` declares its own vocabulary
+(`Kind`, `Status`, `Reason`, `FieldType`, `kernel.Code`), see `docs/dev/commands.md`.
 
 ### 4. Validate at the boundary
 
 Validate all external input (flags, env vars, config files) in `internal/config/`
-before it reaches the service layer. Use explicit guard clauses.
+before it reaches the service layer. Use explicit guard clauses. A command on the engine declares
+its checks as data instead: `Constraints` in its `FieldSpec`, rules across fields as `kernel.Rules`
+combinators (`Exclusive`, `OneOf`, `Requires`, `RequiredWhen`, `Distinct`, `NotSelfParent`).
 
 ### 5. Centralized constants — no magic strings or numbers
 
 All flag names, command names, exit codes, and format identifiers
-must be declared as constants in `internal/domain/constants.go`.
+must be declared as constants in `internal/domain/constants.go`. The engine's codes are
+`kernel.Code` constants (in `internal/kernel/` or beside the command), each with its English
+in `internal/kernel/text` — a test fails on a code missing from the catalogue.
 
 ```go
 const (
@@ -126,6 +132,10 @@ cmd/
 internal/
   domain/                     ← types, errors, constants only (no methods, no functions)
   rules/                      ← pure business rules (stdlib + domain only, no I/O)
+  kernel/                     ← the command engine's skeleton (stdlib only, no domain):
+                                Command, fields, rules, errors, results, Each / Saga
+    text/                     ←   the message catalogue: kernel.Code + params → English
+    kerneltest/               ←   CheckDependsOn, CheckSaga: the checks every command runs
   config/                     ← load & validate config.toml + run.toml from <git-common-dir>/wtm/
   flow/                       ← THE FLOW of a command, surface-independent
     decide/                   ←   branch/env decisions shared by the create-like flows
@@ -159,6 +169,7 @@ internal/
 - `surface/cli/` has zero business logic
 - `domain/` imports only stdlib (unchanged)
 - `rules/` imports only stdlib + internal/domain
+- `kernel/` imports only the stdlib (not even `domain/`), and writes no text: codes and params only
 - `flow/` imports **only** `internal/service/`, `internal/rules/`, `internal/domain/` and the
   stdlib — never cobra, bubbletea or lipgloss, and never `surface/` or `config/`.
   It therefore cannot reach `infra/` either: add a thin `service/` wrapper
@@ -957,6 +968,7 @@ Before calling `build-validator`, verify manually:
 - [ ] No `lipgloss` imports outside `internal/styles/`
 - [ ] No `cobra` or `bubbletea` imports inside `internal/service/`
 - [ ] Pure functions (no I/O) live in internal/rules/, not in service/
+- [ ] Every new `kernel.Code` has its entry in `internal/kernel/text`
 - [ ] All async service calls in TUI wrapped as `tea.Cmd`
 - [ ] `shared.AddOutputFlag(cmd)` used instead of manual flag registration
 - [ ] `styles.Indent` used instead of literal `"  "` for padding

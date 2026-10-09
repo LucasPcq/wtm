@@ -19,3 +19,7 @@ func TestANestedLayerKeepsItsOwnRow(t *testing.T) {
 func TestTheDomainDeclaresNoFunction(t *testing.T) {
 	runTxtar(t, domainAnalyzer, "domain", internalPrefix+"domain")
 }
+
+func TestTheKernelImportsNothingButTheStdlib(t *testing.T) {
+	runTxtar(t, layersAnalyzer, "layers", internalPrefix+"kernel/text")
+}
