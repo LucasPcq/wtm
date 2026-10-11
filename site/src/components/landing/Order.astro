@@ -1,0 +1,37 @@
+---
+import Session from './Session.astro';
+import { cmd, out } from '../../lib/term.mjs';
+
+// Both replayed from the sandbox repository acme (docs/demos/tree.tape, clean.tape).
+const tree = [
+  cmd('wtm tree'),
+  out(),
+  out('  <span class="b">main</span>'),
+  out('  ├─ <span class="b">feat/login</span>        <span class="y">⚠ needs sync</span>'),
+  out('  │  └─ <span class="b">feat/login-ui</span>'),
+  out('  └─ <span class="b">fix/header</span>        <span class="y">⚠ needs sync</span>'),
+];
+const clean = [
+  cmd('wtm clean feat/login fix/header --yes'),
+  out(),
+  out('  <span class="r">✗</span> 1 worktree(s) cannot be removed safely, so nothing was removed:'),
+  out('      fix/header has uncommitted changes'),
+  out('    pass --force to remove them anyway'),
+];
+---
+<section class="section">
+  <div class="wrap split top">
+    <div>
+      <p class="label">wtm sync</p>
+      <h2>Branches on branches, rebased in order.</h2>
+      <p style="margin-bottom: 24px">When main moves, the whole chain is rebased, parents before children, and stops cleanly on a conflict.</p>
+      <Session title="~/code/acme" lines={tree} />
+    </div>
+    <div>
+      <p class="label">wtm clean · prune</p>
+      <h2>Gone once merged. Never with your work.</h2>
+      <p style="margin-bottom: 24px">One branch, several, or every one whose pull request merged. Uncommitted or unpushed work, an open pull request or a lock stops it until you say --force.</p>
+      <Session title="~/code/acme" lines={clean} />
+    </div>
+  </div>
+</section>

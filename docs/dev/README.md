@@ -13,6 +13,7 @@ Reference documentation for people (and agents) working **on** wtm. It describes
 | [run-addressing.md](run-addressing.md) | Named URLs: proxy vs redirection vs public port, and what `addressing` writes into a `.env` |
 | [shared-services.md](shared-services.md) | `scope = "shared"`: one instance for the repository, one namespace per worktree, and why the job table is the reference count |
 | [lint.md](lint.md) | `make lint` and what each gate holds: the `archlint` rules, the exception files, the pre-commit hook, the rules considered and left out |
+| [identity.md](identity.md) | How wtm looks and speaks outside the terminal: positioning, voice, the colour tokens taken from the CLI, type, logo, layout, motion, anti-patterns, and where each surface applies them |
 | [changelog.md](changelog.md) | How to write `CHANGELOG.md`: the release template, the rules, and how a section becomes the GitHub release notes |
 
 For the coding standards themselves (immutability, struct params, constants, comment density), see [`CLAUDE.md`](../../CLAUDE.md) and the `go-cli` skill in `.claude/skills/go-cli/SKILL.md`.

@@ -1,7 +1,9 @@
-/** @typedef {{ kind: 'cmd', text: string } | { kind: 'out', html: string, delay?: number }} Line */
+/** @typedef {{ kind: 'cmd', text: string } | { kind: 'out', html: string, delay?: number } | { kind: 'note', text: string }} Line */
 
 export const cmd = (text) => ({ kind: 'cmd', text });
 export const out = (html = '', delay) => ({ kind: 'out', html, delay });
+// A shell comment between commands: it closes the previous command's frame.
+export const note = (text) => ({ kind: 'note', text });
 
 const esc = (s) => s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 const RAIL = '<span class="p">┃</span>';
@@ -28,7 +30,7 @@ const railed = (lines) => {
     }
     flush(frame);
     result.push(line);
-    frame = framed(line.text);
+    frame = line.kind === 'cmd' && framed(line.text);
   }
   flush(frame);
   return result;
@@ -36,6 +38,8 @@ const railed = (lines) => {
 
 /** @param {Line[]} lines */
 export const render = (lines) =>
-  railed(lines).map((l) => (l.kind === 'cmd'
-    ? `<span class="ln cmd" data-text="${esc(l.text)}"><span class="typed">${esc(l.text)}</span></span>`
-    : `<span class="ln"${l.delay ? ` data-delay="${l.delay}"` : ''}>${l.html}</span>`)).join('');
+  railed(lines).map((l) => {
+    if (l.kind === 'cmd') return `<span class="ln cmd">${esc(l.text)}</span>`;
+    if (l.kind === 'note') return `<span class="ln m"># ${esc(l.text)}</span>`;
+    return `<span class="ln"${l.delay ? ` data-delay="${l.delay}"` : ''}>${l.html}</span>`;
+  }).join('');

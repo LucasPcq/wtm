@@ -1,113 +1,77 @@
 ---
 title: wtm
-description: One branch, one worktree, one isolated dev stack. A git worktree manager for teams and AI agents working on several branches at once.
+description: Every branch, running. A git worktree manager that gives each branch its own ports, Compose project, database and URL, so you and your coding agents can run several branches side by side.
 template: splash
 editUrl: false
 hero:
-  title: One branch, one worktree, one isolated dev stack.
-  tagline: A worktree manager for teams that work on several branches at once, and let their agents do too.
-  image:
-    file: ../../../../docs/assets/hero.gif
+  title: 'Every branch, <span>running.</span>'
+  tagline: The wtm documentation, in the order a branch lives through it.
   actions:
     - text: Get started
       link: __BASE__/guide/getting-started/
       icon: right-arrow
-    - text: Install
-      link: '#install'
-      variant: secondary
     - text: GitHub
       link: https://github.com/LucasPcq/wtm
       icon: github
       variant: minimal
 ---
 
-import { Card, CardGrid, LinkCard, Tabs, TabItem } from '@astrojs/starlight/components';
-import isolation from '../../../../docs/assets/isolation.gif';
-import dashboard from '../../../../docs/assets/dashboard.gif';
+## Start here
 
-## A worktree ready to code, in one command
-
-`git worktree` gives each branch a directory. Everything else is still on you: copy the `.env`, install dependencies, remember which directory holds which branch, and run two branches' dev servers without them fighting over the same ports, containers and databases.
-
-<CardGrid>
-  <Card title="Provisioned" icon="rocket">
-    `wtm create` copies the `.env` files, runs your `on_create` hooks (`pnpm install`, …) and shifts the ports. `wtm go` jumps into it.
-  </Card>
-  <Card title="Cleaned when merged" icon="approve-check">
-    `wtm prune` removes every worktree whose PR is merged, in one pass, and refuses one that still holds uncommitted or unpushed work.
-  </Card>
-  <Card title="Stacked branches" icon="seti:git">
-    Every worktree records its parent. `wtm tree` draws the forest, `wtm sync` rebases a branch and its descendants in order.
-  </Card>
-  <Card title="Many at once" icon="list-format">
-    `wtm create a b c`, `wtm exec --all -- pnpm test`: one command across worktrees, in parallel, each with its own environment.
-  </Card>
-</CardGrid>
-
-## Your whole stack, once per worktree
-
-Configure it once, share it with `wtm run export`, and every developer and every agent gets the full stack in its own worktree: its own ports, its own `COMPOSE_PROJECT_NAME`, its own database in a shared postgres, its own URL. Two branches run side by side; an agent can start the app it is working on and test it end to end without touching yours.
-
-<img src={isolation.src} alt="wtm run up on two worktrees at once: each runs its own api and web on its own named URLs" />
-
-<CardGrid>
-  <LinkCard title="How wtm run works" href="__BASE__/guide/how-run-works/" description="Jobs, ports and the environment each worktree gets." />
-  <LinkCard title="Shared services" href="__BASE__/guide/shared-services/" description="One postgres for the repository, one database per worktree." />
-</CardGrid>
-
-## Built for agents
-
-wtm is meant to be driven by something other than a person. `wtm agents install` adds a skill that teaches Claude Code or Cursor the commands and their unattended forms. Data commands take `--output json`, every change takes `--yes`, exit codes are stable, and `wtm events` streams every change as JSON Lines.
+Install wtm, let `wtm go` change your directory, and set up a repository once.
 
 ```bash
-wtm create feat/a feat/b --yes --output json
-wtm run up feat/a --yes -d
-wtm events --output json | jq -c 'select(.type == "worktree.provisioned")'
-```
-
-This site is also served as plain text for agents: [`llms.txt`](__BASE__/llms.txt), [`llms-full.txt`](__BASE__/llms-full.txt).
-
-## One screen for all of it
-
-`wtm ui` shows every worktree, the branch tree, PR status and the running services, and updates live as worktrees come and go from any shell or agent.
-
-<img src={dashboard.src} alt="The wtm ui dashboard: worktrees, a new one created from the dashboard, the branch tree" />
-
-## Install
-
-<Tabs syncKey="install">
-  <TabItem label="Homebrew">
-    ```bash
-    brew install LucasPcq/tap/wtm
-    ```
-  </TabItem>
-  <TabItem label="Go">
-    ```bash
-    go install github.com/LucasPcq/wtm@latest
-    ```
-  </TabItem>
-  <TabItem label="Binary">
-    Download the archive for your platform from the [releases](https://github.com/LucasPcq/wtm/releases), then:
-
-    ```bash
-    tar -xzf wtm_*_linux_amd64.tar.gz   # or _linux_arm64, _darwin_amd64, _darwin_arm64
-    sudo mv wtm /usr/local/bin/
-    ```
-  </TabItem>
-</Tabs>
-
-Then let `wtm go` change your directory, and set up a repository:
-
-```bash
+brew install LucasPcq/tap/wtm
 echo 'eval "$(wtm shell-init)"' >> ~/.zshrc   # ~/.bashrc for bash
 cd your-repo && wtm init
 ```
 
-macOS and Linux, amd64 and arm64; Windows through WSL2. A specific version, updating and the other details are in [Installation](__BASE__/guide/installation/).
+[Getting started](__BASE__/guide/getting-started/) takes you from there to two branches running side by side, in ten minutes.
 
-<CardGrid>
-  <LinkCard title="Getting started" href="__BASE__/guide/getting-started/" description="Ten minutes from install to two branches running side by side." />
-  <LinkCard title="Recipes" href="__BASE__/guide/recipes/" description="A pnpm monorepo, a compose app, a shared postgres, agents in parallel." />
-  <LinkCard title="Command reference" href="__BASE__/reference/wtm/" description="Every command and flag, generated from --help." />
-  <LinkCard title="Changelog" href="__BASE__/changelog/" description="What changed in each release." />
-</CardGrid>
+Go, binaries and a specific version: [Installation](__BASE__/guide/installation/).
+
+Linux and WSL2: [Platform support](__BASE__/guide/platform-support/).
+
+## The life of a branch
+
+### Created, ready to code
+
+`wtm create` makes the worktree from any base, copies its `.env` files and runs your hooks.
+
+- [Configuration](__BASE__/guide/configuration/): `config.toml`, how `.env` files are provisioned, `on_create` and `on_clean` hooks.
+- [A pnpm or turbo monorepo](__BASE__/guide/recipes/#a-pnpm-or-turbo-monorepo), [a docker compose app](__BASE__/guide/recipes/#a-docker-compose-app): complete setups to copy.
+
+### Running, each with its own stack
+
+`wtm run up` starts the worktree's jobs on its own ports, under its own Compose project, at its own address. One person describes the stack in `run.toml`, the team imports it.
+
+- [How wtm run works](__BASE__/guide/how-run-works/): the job environment, ports, what `wtm run init` proposes.
+- [Jobs, profiles and runners](__BASE__/guide/jobs-and-profiles/) and [isolation](__BASE__/guide/isolation/): what a worktree runs, and what it shares with its source.
+- [Shared services](__BASE__/guide/shared-services/): one postgres for the repository, a database per worktree.
+- [Named URLs](__BASE__/guide/addressing/) and the [`run.toml` reference](__BASE__/guide/run-toml/).
+
+### Kept in order
+
+Every worktree records the branch it came from; `wtm sync` rebases a chain, parents first.
+
+- [Stacked pull requests](__BASE__/guide/recipes/#stacked-pull-requests): `tree`, `sync` and `reparent` on a real stack.
+
+### Gone once merged
+
+`wtm clean` and `wtm prune` remove worktrees with their jobs and data, and refuse to lose work.
+
+- [Where wtm keeps its state](__BASE__/guide/state/) and [troubleshooting](__BASE__/guide/troubleshooting/): a port in use, a crashed job, a `.env` out of date.
+
+## Agents and integrations
+
+Every change takes `--yes`, every data command `--output json`, and `wtm agents install` teaches your agent the rest.
+
+- [Integrations](__BASE__/guide/integrations/) and [the event stream](__BASE__/guide/events/).
+- [Several AI agents, each in its own worktree](__BASE__/guide/recipes/#several-ai-agents-each-in-its-own-worktree).
+- This site as plain text for agents: [`llms.txt`](__BASE__/llms.txt), [`llms-full.txt`](__BASE__/llms-full.txt).
+
+## Reference
+
+- [Commands](__BASE__/reference/wtm/): every command and flag, generated from `--help`.
+- [Changelog](__BASE__/changelog/) and the migration guides to [0.29](__BASE__/guide/migrating-to-029/) and [0.28](__BASE__/guide/migrating-to-028/).
+- [Compared to other tools](__BASE__/guide/compared/).

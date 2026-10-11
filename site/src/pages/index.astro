@@ -1,24 +1,19 @@
 ---
 import Landing from '../layouts/Landing.astro';
 import Hero from '../components/landing/Hero.astro';
-import Machine from '../components/landing/Machine.astro';
-import Features from '../components/landing/Features.astro';
-import ForAgents from '../components/landing/ForAgents.astro';
-import Compare from '../components/landing/Compare.astro';
-import Shipping from '../components/landing/Shipping.astro';
-import Roadmap from '../components/landing/Roadmap.astro';
-import Founder from '../components/landing/Founder.astro';
-import { releaseFacts } from '../lib/facts.mjs';
-
-const facts = releaseFacts();
+import Stages from '../components/landing/Stages.astro';
+import Run from '../components/landing/Run.astro';
+import Team from '../components/landing/Team.astro';
+import Agents from '../components/landing/Agents.astro';
+import Order from '../components/landing/Order.astro';
+import TryIt from '../components/landing/TryIt.astro';
 ---
-<Landing title="wtm — worktrees isolate code, wtm isolates the runtime" description="A git worktree manager that gives every branch its own ports, Docker Compose project, database and URL, so many Claude Code agents can run their apps on one machine.">
+<Landing title="wtm — the git worktree manager where every branch runs" description="A git worktree manager that gives each branch its own ports, Docker Compose project, database and URL, so you and your coding agents run branches side by side.">
   <Hero />
-  <Machine />
-  <Features />
-  <ForAgents />
-  <Compare />
-  <Shipping facts={facts} />
-  <Roadmap />
-  <Founder />
+  <Stages />
+  <Run />
+  <Team />
+  <Agents />
+  <Order />
+  <TryIt />
 </Landing>
