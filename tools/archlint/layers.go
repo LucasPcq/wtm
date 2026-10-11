@@ -24,6 +24,10 @@ var layers = map[string]layer{
 	"kernel": {
 		why: "the skeleton of the command engine: stdlib only, no business vocabulary, no I/O",
 	},
+	"dispatch": {
+		internal: []string{"domain", "infra", "kernel", "query", "rules"},
+		why:      "the impure half of the engine runs on its own ports: a command's ports reach it as interfaces, never through service/ or a surface",
+	},
 	"infra": {
 		internal: []string{"domain", "rules"},
 		external: []string{"golang.org/x/sys/unix"},
@@ -59,7 +63,7 @@ var layers = map[string]layer{
 		why:      "bubbletea models, rendering only",
 	},
 	"surface/cli": {
-		internal: []string{"config", "domain", "flow", "infra", "rules", "schemas", "service", "styles", "surface/cli/render", "surface/tui"},
+		internal: []string{"config", "dispatch", "domain", "flow", "infra", "kernel", "rules", "schemas", "service", "styles", "surface/cli/render", "surface/tui"},
 		external: []string{"github.com/charmbracelet/bubbletea", "github.com/spf13/cobra", "golang.org/x/term"},
 		why:      "flag wiring, delegating to flow/ and service/",
 	},
@@ -67,9 +71,9 @@ var layers = map[string]layer{
 		why: "the embedded JSON Schema files",
 	},
 	"testutil": {
-		internal: []string{"domain", "flow", "schemas"},
+		internal: []string{"dispatch", "domain", "flow", "kernel", "schemas"},
 		external: []string{"github.com/santhosh-tekuri/jsonschema/"},
-		why:      "test doubles for the flow seams, and the validator a contract test checks a bundled schema with",
+		why:      "test doubles for the flow seams and the dispatch bench, and the validator a contract test checks a bundled schema with",
 	},
 }
 

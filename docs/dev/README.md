@@ -8,6 +8,7 @@ Reference documentation for people (and agents) working **on** wtm. It describes
 | -- | -- |
 | [architecture.md](architecture.md) | The annotated package map, who may call whom and what each interdiction buys, how a command designates a worktree |
 | [commands.md](commands.md) | `internal/kernel/` — the engine's contract: commands, fields and forms, rules across fields, errors and their message catalogue, results, units of work (`Each`, sagas), the checks every command runs |
+| [dispatch.md](dispatch.md) | `internal/dispatch/` — how a command runs: the registry, the form's four calls, the order of a run, its errors, the operation locks and their holder, the fingerprint, progress, hook logs and events, ports, the test bench |
 | [state-files.md](state-files.md) | `internal/infra/fs` — how every file is written (`UpdateFile`, `fs.Change`, where the lock lives), the schema version of each state file and how to raise one, what `statewrite` holds |
 | [flow-layer.md](flow-layer.md) | `internal/flow/` — the three seams, the step model, unattended resolution, embedding, scheduling, events, testing a flow |
 | [adding-a-mutation-command.md](adding-a-mutation-command.md) | End-to-end recipe for a new worktree-mutating command |

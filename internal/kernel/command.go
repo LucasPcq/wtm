@@ -46,9 +46,12 @@ type ApplyInput[Req, F, P any] struct {
 
 // Command is a mutation: Req the payload, F the facts Observe reads, P the
 // plan, D the detail of each item. Only Observe, Choices and Apply do I/O.
+// Forget drops the remembered answers from the facts, for a run that asks
+// again.
 type Command[Req, F, P, D any] struct {
 	Name    string
 	Observe func(context.Context, ObserveScope) (F, error)
+	Forget  func(F) F
 	Fields  []FieldDef[Req, F]
 	Rules   Rules[Req, F]
 	Locks   func(Req) []LockKey

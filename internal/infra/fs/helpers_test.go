@@ -1,10 +1,16 @@
 package fs_test
 
 import (
+	"bufio"
+	"errors"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -16,6 +22,10 @@ import (
 const (
 	envCounterPath   = "WTM_TEST_COUNTER_PATH"
 	envCounterRounds = "WTM_TEST_COUNTER_ROUNDS"
+	envLockPaths     = "WTM_TEST_LOCK_PATHS"
+	envLockInside    = "WTM_TEST_LOCK_INSIDE"
+	envHoldPath      = "WTM_TEST_HOLD_PATH"
+	lockRounds       = 200
 )
 
 // increment adds one to the counter file at path, through UpdateFile.
@@ -99,4 +109,76 @@ func TestHelperProcess(t *testing.T) {
 	for range rounds {
 		increment(t, path)
 	}
+}
+
+func tryLocks(t testing.TB, requests ...fs.LockRequest) fs.Locks {
+	t.Helper()
+	locks, err := fs.TryLocks(fs.TryLocksParams{Requests: requests})
+	require.NoError(t, err)
+	require.True(t, locks.Held)
+	return locks
+}
+
+func heldFiles(t *testing.T, dir string) [][]byte {
+	t.Helper()
+	held, err := fs.HeldFiles(dir)
+	require.NoError(t, err)
+	return held
+}
+
+// waitForLine waits for the child to say it is ready, by printing a line.
+func waitForLine(t *testing.T, out io.Reader) {
+	t.Helper()
+	ready := make(chan error, 1)
+	go func() {
+		_, err := bufio.NewReader(out).ReadString('\n')
+		ready <- err
+	}()
+	select {
+	case err := <-ready:
+		require.NoError(t, err)
+	case <-time.After(10 * time.Second):
+		t.Fatal("the child never said it was ready")
+	}
+}
+
+// TestLockHelperProcess takes the set it is pointed at, in the order given,
+// again and again, and fails if another holder of the set is inside with it.
+func TestLockHelperProcess(t *testing.T) {
+	paths := os.Getenv(envLockPaths)
+	if paths == "" {
+		t.Skip("run by TestSetsTakenInOppositeOrdersNeitherDeadlockNorOverlap")
+	}
+	var requests []fs.LockRequest
+	for _, path := range strings.Split(paths, string(os.PathListSeparator)) {
+		requests = append(requests, fs.LockRequest{Path: path})
+	}
+	inside := os.Getenv(envLockInside)
+	for range lockRounds {
+		locks, err := fs.TryLocks(fs.TryLocksParams{Requests: requests})
+		var busy *fs.BusyError
+		if errors.As(err, &busy) {
+			continue
+		}
+		require.NoError(t, err)
+		marker, err := os.OpenFile(inside, os.O_CREATE|os.O_EXCL, 0o644)
+		require.NoError(t, err, "another process holds the set too")
+		require.NoError(t, marker.Close())
+		require.NoError(t, os.Remove(inside))
+		locks.Release()
+	}
+}
+
+// TestHoldHelperProcess holds the file it is pointed at until it is killed,
+// waiting on its stdin: a process blocked on nothing but a channel would be
+// taken for a deadlock and stopped by the runtime.
+func TestHoldHelperProcess(t *testing.T) {
+	path := os.Getenv(envHoldPath)
+	if path == "" {
+		t.Skip("run by TestAProcessThatDiesHoldsNothing")
+	}
+	_, err := fs.HoldFile(fs.HoldFileParams{Path: path, Data: []byte(`{"op":"child"}`)})
+	require.NoError(t, err)
+	fmt.Println("held")
+	_, _ = io.Copy(io.Discard, os.Stdin)
 }

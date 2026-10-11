@@ -65,3 +65,15 @@ package wt
 import "github.com/LucasPcq/wtm/internal/surface/cli/render"
 
 var _ = render.Message
+-- github.com/LucasPcq/wtm/internal/dispatch/dispatch.go --
+package dispatch
+
+import (
+	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/service/worktree" // want `internal/dispatch must not import "github.com/LucasPcq/wtm/internal/service/worktree" — the impure half of the engine`
+)
+
+var _, _ = infra.GlobalDir, worktree.Create
+
+var _ kernel.Code

@@ -17,6 +17,12 @@ internal/
                                 fields, rules, errors, results, Each / Saga (commands.md)
     text/                     ←   the one catalogue turning a kernel.Code and its params into English
     kerneltest/               ←   the checks every command runs on itself (DependsOn, sagas)
+  dispatch/                   ← the impure half of the engine, the one way a surface reaches a command: registry,
+                                the form's calls, the run (locks → Observe → defaults → Validate → Plan →
+                                fingerprint → Apply), operation locks and holders, hook logs, operation events
+                                (dispatch.md)
+  query/
+    operations/               ←   the operations in progress, read from their holder files
   config/                     ← load & validate config.toml + run.toml from <git-common-dir>/wtm/, plus the global config (config.GlobalPath);
                                 every write puts the file's JSON schema (schemas/) beside it
   flow/                       ← the flow of each command, surface-independent (see below):
@@ -113,7 +119,9 @@ internal/
   infra/                      ← git, and the state not yet moved to a package of its own (repos.json)
     fs/                       ←   the only writer of the files wtm keeps: UpdateFile (lock on <path>.lock, read,
                                   Mutate, temp file + fsync + rename), ReplaceFile for the daemon's index,
-                                  WithFileLock, GlobalDir; Lock.Held says when flock was unavailable
+                                  WithFileLock, GlobalDir; Lock.Held says when flock was unavailable;
+                                  TryLocks (a set, all or none, never waiting), HoldFile / HeldFiles
+                                  (a file held as long as its process runs), OpenLog
     proc/                     ←   starting processes (Command, GroupCommand) and settling them on an
                                   interrupt (Shield, AwaitShields, KillCancelled)
   surface/                    ← the interfaces
@@ -164,6 +172,7 @@ Every arrow that is *missing* is the point:
 | `domain/` holds types, errors and constants only | Nothing can acquire a dependency by hiding behind a method on a shared type. |
 | `rules/` imports only stdlib + `domain/` | Decisions stay testable with no repo, no network, no temp dir. `rules.DecidePush` is a table test, not an integration test. |
 | `kernel/` imports only the stdlib | The skeleton carries no business vocabulary: a command composes `kernel` with `domain/`, never the reverse, so a change to the domain never reaches the contract every command, `dispatch` and surface share. I/O reaches it only as functions it is handed (`Observe`, `Apply`, the `Shield`). |
+| `command/` and `query/` never import `dispatch/` or `surface/`; `surface/` never imports them | A surface reaches a command through `dispatch` only, so the locks, the fingerprint and the events apply whatever the interface; a command never runs another inside its own locks. |
 | `service/` never imports cobra, bubbletea or lipgloss | The git operations are callable from a test, a flow, a daemon — anything that is not a terminal. |
 | `surface/cli/render/` and `surface/tui/` hold no decision logic | Two surfaces can render the same run without disagreeing about what it means. |
 | `styles/` is the only package instantiating `lipgloss.Style` | A theme change is one file. |

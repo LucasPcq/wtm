@@ -27,6 +27,7 @@ var catalog = map[kernel.Code]string{
 	kernel.CodeTooFew:        "{path} needs at least {limit} entries",
 	kernel.CodeTooMany:       "{path} takes at most {limit} entries",
 	kernel.CodePattern:       "{path}: {value} does not match {pattern}",
+	kernel.CodeUnknownField:  "{path} is not a field",
 
 	kernel.CodeInvalidRequest: "the request is invalid",
 	kernel.CodeInternal:       "internal error",
@@ -34,6 +35,11 @@ var catalog = map[kernel.Code]string{
 	kernel.CodeStepFailed:     "{step} failed",
 	kernel.CodeUndoFailed:     "could not undo {step}, left behind: {left}",
 	kernel.CodePhaseFailed:    "{phase} failed",
+
+	kernel.CodeLockHeld:         "{key} is held by {command} (pid {pid})",
+	kernel.CodeLocksUnavailable: "ran without operation locks",
+	kernel.CodePlanStale:        "the facts changed since the preview",
+	kernel.CodeStateSchemaNewer: "{path} is at schema {found}, this wtm supports {supported}",
 }
 
 // Message renders code over params; a code missing from the catalogue reads

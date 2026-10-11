@@ -78,6 +78,15 @@ func TestEveryEventTypeMatchesTheSchema(t *testing.T) {
 		}
 		return raw
 	}
+	operation := domain.EventOperation{Command: "create", Surface: "cli"}
+	ofOperation := func(event domain.Event) json.RawMessage {
+		event.OpID = "1f3a9c0e5b7d2468"
+		raw, err := json.Marshal(stamp(stampParams{Event: event, Repo: repo}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return raw
+	}
 	examples := map[domain.EventType]json.RawMessage{
 		domain.EventRepoAdded:             ofRepo(domain.EventRepoAdded),
 		domain.EventRepoRemoved:           ofRepo(domain.EventRepoRemoved),
@@ -93,6 +102,9 @@ func TestEveryEventTypeMatchesTheSchema(t *testing.T) {
 		domain.EventJobStarted:            ofJob(domain.JobEvent{Type: domain.EventJobStarted, Job: domain.EventJob{Name: "web", Kind: domain.JobKindService, URL: "http://web.feat-a.app.localhost"}}),
 		domain.EventJobExited:             ofJob(domain.JobEvent{Type: domain.EventJobExited, Job: domain.EventJob{Name: "migrate", Kind: domain.JobKindTask}, ExitCode: &zero}),
 		domain.EventJobStopped:            ofJob(domain.JobEvent{Type: domain.EventJobStopped, CorrelationID: "popup-2", Job: domain.EventJob{Name: "web", Kind: domain.JobKindService}}),
+		domain.EventOperationStarted:      ofOperation(domain.Event{Type: domain.EventOperationStarted, Operation: &operation}),
+		domain.EventUnitFinished:          ofOperation(domain.Event{Type: domain.EventUnitFinished, Unit: &domain.EventUnit{Subject: "feat/a", Status: "done"}}),
+		domain.EventOperationFinished:     ofOperation(domain.Event{Type: domain.EventOperationFinished, Operation: &operation, OK: &failed, Code: "lock.held"}),
 		domain.EventJobCrashed:            ofJob(domain.JobEvent{Type: domain.EventJobCrashed, Job: domain.EventJob{Name: "db", Kind: domain.JobKindService, Shared: true}, ExitCode: &exitCode, LastLines: []string{"Error: boom"}, HeldBy: []domain.WorktreeRef{{Branch: "feat/a", Path: identity.Path}}}),
 	}
 	schema := schematest.Compile(t, schemas.Events)

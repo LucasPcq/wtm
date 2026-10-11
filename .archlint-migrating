@@ -6,8 +6,6 @@
 # THIS LIST MAY ONLY SHRINK. A new entry is a decision to take knowingly, and it
 # belongs in a ticket — not a way to get a commit past the linter.
 
-# Logs opened with os.Create: the hook log moves into dispatch, which writes
-# hook logs itself (LUC-287), and the exec log with the run module (step 6 of
-# LUC-283).
-statewrite internal/surface/cli/render/hookview\.go 1
+# The exec log, opened with os.Create: it moves to infra/fs with the run module
+# (step 6 of LUC-283).
 statewrite internal/service/execsvc/execsvc\.go 1

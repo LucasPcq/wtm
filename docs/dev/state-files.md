@@ -39,6 +39,8 @@ lock, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
 
 A lock that cannot be taken (no `flock` on NFS or some WSL mounts, an unwritable directory) does not cancel the write: it runs unprotected and the returned `fs.Lock{Held: false}` says so, which `dispatch` reports as the warning `locks.unavailable`. `fs.WithFileLock` is the same lock around any work (the ordinal allocation's `ordinal.lock`).
 
+These locks are short: one file, one write. The **operation locks** `dispatch` holds for a whole run (`<common>/wtm/locks/`) are another set, taken with `fs.TryLocks` (all or none, never waiting) beside a holder file written by `fs.HoldFile`: see [dispatch.md](dispatch.md#operation-locks).
+
 ## Schema versions
 
 | File | Constant (`domain/statefile`) | Read by |
@@ -58,7 +60,7 @@ A lock that cannot be taken (no `flock` on NFS or some WSL mounts, an unwritable
 
 ## What the lint holds
 
-`statewrite` (`tools/archlint/statewrite.go`) refuses `os.WriteFile`, `os.Create` and `os.Rename`, as a call or a function value, outside `infra/`. Its permanent exceptions are in `stateWriteExempt`, each with its reason; a log still opened with `os.Create` is tracked in `.archlint-migrating` until it moves (see [lint.md](lint.md)). `metawriter` holds `updateMetadata` as the one sink of `meta.json`.
+`statewrite` (`tools/archlint/statewrite.go`) refuses `os.WriteFile`, `os.Create` and `os.Rename`, as a call or a function value, outside `infra/`. Its permanent exceptions are in `stateWriteExempt`, each with its reason; a log is opened through `fs.OpenLog`, and the one still opened with `os.Create` (the `exec` log) is tracked in `.archlint-migrating` until it moves (see [lint.md](lint.md)). `metawriter` holds `updateMetadata` as the one sink of `meta.json`.
 
 ## Testing
 
