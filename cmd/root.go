@@ -16,7 +16,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/selfupdate"
 	"github.com/LucasPcq/wtm/internal/surface/cli/agents"
@@ -146,7 +146,7 @@ func startUpdateCheck(cmd *cobra.Command) {
 	updateCheckStarted = true
 
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
-	updateCheck = selfupdate.StartCheck(selfupdate.StartCheckParams{
+	updateCheck = selfupdate.StartCheck(cmd.Context(), selfupdate.StartCheckParams{
 		Version:     effectiveVersion,
 		Format:      format,
 		Command:     topLevelName(cmd),
@@ -325,9 +325,9 @@ func interruptible() (context.Context, context.CancelFunc) {
 		<-signals
 		cancel()
 		second := <-signals
-		infra.KillCancelled()
+		proc.KillCancelled()
 		go func() { dieOn(<-signals) }()
-		infra.AwaitShields()
+		proc.AwaitShields()
 		dieOn(second)
 	}()
 	stop := func() {
@@ -350,8 +350,8 @@ func dieOn(sig os.Signal) {
 // settle is the last thing a run does: nothing it started may outlive it, and
 // nothing shielded may be cut off half-way by the exit.
 func settle() {
-	infra.KillCancelled()
-	infra.AwaitShields()
+	proc.KillCancelled()
+	proc.AwaitShields()
 }
 
 // Execute runs the root command and exits with the appropriate code.

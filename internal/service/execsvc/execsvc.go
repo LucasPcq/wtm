@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 )
 
 type Target struct {
@@ -94,7 +94,7 @@ func runOne(ctx context.Context, params runOneParams) domain.ExecResult {
 	}
 	out := &lockedWriter{w: io.MultiWriter(sinks...)}
 
-	cmd := infra.GroupCommand(ctx, domain.ShellBin, domain.ShellCommandFlag, params.Command)
+	cmd := proc.GroupCommand(ctx, domain.ShellBin, domain.ShellCommandFlag, params.Command)
 	cmd.Dir = params.Target.Path
 	cmd.Env = params.Target.Env
 	cmd.Stdout, cmd.Stderr = out, out

@@ -43,7 +43,7 @@ func TestSyncExampleStrategyMissingUnresolved(t *testing.T) {
 	writeTestFile(t, filepath.Join(wt, ".env.example"), "API_KEY=changeme\nDB_HOST=localhost")
 	writeTestFile(t, filepath.Join(wt, ".env"), "DB_HOST=localhost")
 
-	res, err := SyncEnv(SyncEnvParams{
+	res, err := SyncEnv(t.Context(), SyncEnvParams{
 		Branch:       "dev",
 		MainPath:     main,
 		WorktreePath: wt,
@@ -77,7 +77,7 @@ func TestSyncMainStrategyAddsSafely(t *testing.T) {
 	writeTestFile(t, filepath.Join(main, ".env"), "API_KEY=secret\nDB_HOST=localhost")
 	writeTestFile(t, filepath.Join(wt, ".env"), "DB_HOST=localhost")
 
-	res, err := SyncEnv(SyncEnvParams{
+	res, err := SyncEnv(t.Context(), SyncEnvParams{
 		Branch:       "dev",
 		MainPath:     main,
 		WorktreePath: wt,
@@ -110,7 +110,7 @@ func TestSyncAddModeIgnoresConflicts(t *testing.T) {
 	writeTestFile(t, filepath.Join(main, ".env"), "DB_HOST=prod")
 	writeTestFile(t, filepath.Join(wt, ".env"), "DB_HOST=localhost")
 
-	res, err := SyncEnv(SyncEnvParams{
+	res, err := SyncEnv(t.Context(), SyncEnvParams{
 		Branch:       "dev",
 		MainPath:     main,
 		WorktreePath: wt,
@@ -138,7 +138,7 @@ func TestSyncRefreshConflictReportOnly(t *testing.T) {
 	writeTestFile(t, filepath.Join(main, ".env"), "DB_HOST=prod")
 	writeTestFile(t, filepath.Join(wt, ".env"), "DB_HOST=localhost")
 
-	res, err := SyncEnv(SyncEnvParams{
+	res, err := SyncEnv(t.Context(), SyncEnvParams{
 		Branch:       "dev",
 		MainPath:     main,
 		WorktreePath: wt,
@@ -169,7 +169,7 @@ func TestSyncRefreshOverwrite(t *testing.T) {
 	writeTestFile(t, filepath.Join(main, ".env"), "DB_HOST=prod")
 	writeTestFile(t, filepath.Join(wt, ".env"), "DB_HOST=localhost")
 
-	res, err := SyncEnv(SyncEnvParams{
+	res, err := SyncEnv(t.Context(), SyncEnvParams{
 		Branch:       "dev",
 		MainPath:     main,
 		WorktreePath: wt,
@@ -207,7 +207,7 @@ func TestSyncPrune(t *testing.T) {
 		Mode:         domain.EnvModeAdd,
 	}
 
-	res, err := SyncEnv(params)
+	res, err := SyncEnv(t.Context(), params)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -219,7 +219,7 @@ func TestSyncPrune(t *testing.T) {
 	}
 
 	params.Prune = true
-	if _, err := SyncEnv(params); err != nil {
+	if _, err := SyncEnv(t.Context(), params); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if got := readFile(t, filepath.Join(wt, ".env")); got != "DB_HOST=localhost" {
@@ -236,7 +236,7 @@ func TestSyncParentFallbackToMain(t *testing.T) {
 	writeTestFile(t, filepath.Join(main, ".env"), "API_KEY=fromMain")
 	// child .env absent — the whole file is drift.
 
-	res, err := SyncEnv(SyncEnvParams{
+	res, err := SyncEnv(t.Context(), SyncEnvParams{
 		Branch:             "dev",
 		MainPath:           main,
 		WorktreePath:       wt,
@@ -270,7 +270,7 @@ func TestSyncParentPrecedesMain(t *testing.T) {
 	writeTestFile(t, filepath.Join(parent, ".env"), "API_KEY=fromParent")
 	// child .env absent — the whole file is drift.
 
-	res, err := SyncEnv(SyncEnvParams{
+	res, err := SyncEnv(t.Context(), SyncEnvParams{
 		Branch:             "dev",
 		MainPath:           main,
 		WorktreePath:       wt,
@@ -301,7 +301,7 @@ func TestSyncParentFileAbsentFallsBackToMain(t *testing.T) {
 	writeTestFile(t, filepath.Join(main, ".env"), "API_KEY=fromMain")
 	// parent worktree exists but has NO .env file for this target.
 
-	res, err := SyncEnv(SyncEnvParams{
+	res, err := SyncEnv(t.Context(), SyncEnvParams{
 		Branch:             "dev",
 		MainPath:           main,
 		WorktreePath:       wt,
@@ -335,7 +335,7 @@ func TestSyncParentStrictKeyMissing(t *testing.T) {
 	writeTestFile(t, filepath.Join(main, ".env"), "API_KEY=fromMain\nMAIN_ONLY=fromMain")
 	writeTestFile(t, filepath.Join(parent, ".env"), "API_KEY=fromParent")
 
-	res, err := SyncEnv(SyncEnvParams{
+	res, err := SyncEnv(t.Context(), SyncEnvParams{
 		Branch:             "dev",
 		MainPath:           main,
 		WorktreePath:       wt,
@@ -367,7 +367,7 @@ func TestSyncNoValueSource(t *testing.T) {
 	want := "template (no apps/api/.env in the main checkout)"
 
 	for _, strat := range []domain.EnvStrategy{domain.EnvStrategyMain, domain.EnvStrategyParent} {
-		res, err := SyncEnv(SyncEnvParams{
+		res, err := SyncEnv(t.Context(), SyncEnvParams{
 			Branch:       "dev",
 			MainPath:     main,
 			WorktreePath: wt,
@@ -398,7 +398,7 @@ func TestSyncCheckNeverWrites(t *testing.T) {
 	writeTestFile(t, filepath.Join(main, ".env"), "API_KEY=secret")
 	writeTestFile(t, filepath.Join(wt, ".env"), "")
 
-	res, err := SyncEnv(SyncEnvParams{
+	res, err := SyncEnv(t.Context(), SyncEnvParams{
 		Branch:       "dev",
 		MainPath:     main,
 		WorktreePath: wt,
@@ -427,7 +427,7 @@ func TestApplyEnvSyncDrivesDecisions(t *testing.T) {
 	writeTestFile(t, filepath.Join(main, ".env"), "DB_HOST=prod")
 	writeTestFile(t, filepath.Join(wt, ".env"), "DB_HOST=localhost")
 
-	res, err := ApplyEnvSync(ApplyEnvSyncParams{
+	res, err := ApplyEnvSync(t.Context(), ApplyEnvSyncParams{
 		Branch:       "dev",
 		MainPath:     main,
 		WorktreePath: wt,
@@ -489,7 +489,7 @@ func TestComputeEnvDiffNoWrite(t *testing.T) {
 
 // TestSyncNoFiles: a project with no configured env files errors clearly.
 func TestSyncNoFiles(t *testing.T) {
-	_, err := SyncEnv(SyncEnvParams{Branch: "dev", Files: nil})
+	_, err := SyncEnv(t.Context(), SyncEnvParams{Branch: "dev", Files: nil})
 	if err != domain.ErrEnvNoFiles {
 		t.Fatalf("err = %v, want ErrEnvNoFiles", err)
 	}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -48,7 +49,7 @@ func EnsureOrdinal(ctx context.Context, params WorktreeRef) (OrdinalClaim, error
 	}
 
 	result := OrdinalClaim{}
-	lockErr := infra.WithFileLock(infra.WithFileLockParams{
+	_, lockErr := fs.WithFileLock(ctx, fs.WithFileLockParams{
 		Path: filepath.Join(params.StateDir, domain.OrdinalLockFileName),
 		Do: func() error {
 			// Everything is read again here, git included. The claim above was
@@ -62,7 +63,7 @@ func EnsureOrdinal(ctx context.Context, params WorktreeRef) (OrdinalClaim, error
 				result = OrdinalClaim{Ordinal: fresh.ordinal}
 				return nil
 			}
-			ordinal, err := persistOrdinal(params, rules.AllocateOrdinal(rules.TakenOrdinals(fresh.others)))
+			ordinal, err := persistOrdinal(ctx, params, rules.AllocateOrdinal(rules.TakenOrdinals(fresh.others)))
 			result = OrdinalClaim{Ordinal: ordinal, Allocated: err == nil}
 			return err
 		},
@@ -123,14 +124,16 @@ func claimFrom(params claimFromParams) (claim, error) {
 	return claim{settled: settled, ordinal: meta.Ordinal, others: others}, nil
 }
 
-func persistOrdinal(params WorktreeRef, ordinal int) (int, error) {
-	meta, err := loadMetadata(params.StateDir, params.Branch)
+func persistOrdinal(ctx context.Context, params WorktreeRef, ordinal int) (int, error) {
+	err := updateMetadata(ctx, updateMetadataParams{
+		StateDir: params.StateDir,
+		Branch:   params.Branch,
+		Update: func(meta domain.WorktreeMetadata, _ error) (domain.WorktreeMetadata, error) {
+			meta.Ordinal = ordinal
+			return meta, nil
+		},
+	})
 	if err != nil {
-		meta = domain.WorktreeMetadata{}
-	}
-	meta.Ordinal = ordinal
-
-	if err := writeMetadata(rules.WorktreeMetaDir(params.StateDir, params.Branch), meta); err != nil {
 		return 0, err
 	}
 	return ordinal, nil

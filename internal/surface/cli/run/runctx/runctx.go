@@ -10,13 +10,16 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	domainstatefile "github.com/LucasPcq/wtm/internal/domain/statefile"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/rules/statefile"
 	"github.com/LucasPcq/wtm/internal/service/runconfig"
 	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
@@ -79,6 +82,11 @@ func Open(params OpenParams) (Context, error) {
 	if runErr != nil && !params.TolerateRunConfig {
 		return Context{}, fmt.Errorf("load run.toml: %w", runErr)
 	}
+	shared.WarnSchemaNewer(params.Cmd, statefile.Schema{
+		Path:      filepath.Join(result.StateDir, domain.RunFileName),
+		Found:     cfg.Schema,
+		Supported: domainstatefile.RunConfigSchema,
+	})
 	if err := rules.ValidateProxy(result.Config.Global.Proxy); err != nil && !params.TolerateRunConfig {
 		return Context{}, err
 	}

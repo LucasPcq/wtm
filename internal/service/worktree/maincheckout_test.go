@@ -78,7 +78,7 @@ func TestRecordNamespacesIsAdditiveAndIdempotent(t *testing.T) {
 
 	record := func(jobs ...string) {
 		t.Helper()
-		if err := worktree.RecordNamespaces(worktree.RecordNamespacesParams{
+		if err := worktree.RecordNamespaces(t.Context(), worktree.RecordNamespacesParams{
 			StateDir: stateDir, Branch: "feat-x", Jobs: jobs,
 		}); err != nil {
 			t.Fatalf("RecordNamespaces: %v", err)
@@ -102,7 +102,7 @@ func TestRecordNamespacesIsAdditiveAndIdempotent(t *testing.T) {
 // The main checkout has no meta.json, and recording must not create one.
 func TestRecordNamespacesCreatesNoMetadata(t *testing.T) {
 	stateDir := t.TempDir()
-	if err := worktree.RecordNamespaces(worktree.RecordNamespacesParams{
+	if err := worktree.RecordNamespaces(t.Context(), worktree.RecordNamespacesParams{
 		StateDir: stateDir, Branch: "main", Jobs: []string{"db"},
 	}); err != nil {
 		t.Fatalf("RecordNamespaces: %v", err)

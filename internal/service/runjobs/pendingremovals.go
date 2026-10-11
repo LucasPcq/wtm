@@ -1,6 +1,8 @@
 package runjobs
 
 import (
+	"context"
+
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
 )
@@ -16,13 +18,15 @@ type QueueRemovalsParams struct {
 
 // QueueRemovals adds what a clean could not give back. An entry already held is
 // not added twice: the same worktree cleaned twice owes one namespace, not two.
-func QueueRemovals(params QueueRemovalsParams) error {
+func QueueRemovals(ctx context.Context, params QueueRemovalsParams) error {
 	if len(params.Refs) == 0 {
 		return nil
 	}
-	return config.WritePendingRemovals(config.WritePendingRemovalsParams{
+	return config.UpdatePendingRemovals(ctx, config.UpdatePendingRemovalsParams{
 		StateDir: params.StateDir,
-		Refs:     mergeRefs(LoadPendingRemovals(params.StateDir), params.Refs),
+		Update: func(held []domain.NamespaceRef) []domain.NamespaceRef {
+			return mergeRefs(held, params.Refs)
+		},
 	})
 }
 
@@ -33,7 +37,7 @@ type SettleRemovalsParams struct {
 
 // SettleRemovals removes what has since been given back. The queue only ever
 // shrinks this way, which is what keeps it from drifting.
-func SettleRemovals(params SettleRemovalsParams) error {
+func SettleRemovals(ctx context.Context, params SettleRemovalsParams) error {
 	if len(params.Refs) == 0 {
 		return nil
 	}
@@ -41,14 +45,18 @@ func SettleRemovals(params SettleRemovalsParams) error {
 	for _, ref := range params.Refs {
 		settled[ref] = true
 	}
-
-	var kept []domain.NamespaceRef
-	for _, ref := range LoadPendingRemovals(params.StateDir) {
-		if !settled[ref] {
-			kept = append(kept, ref)
-		}
-	}
-	return config.WritePendingRemovals(config.WritePendingRemovalsParams{StateDir: params.StateDir, Refs: kept})
+	return config.UpdatePendingRemovals(ctx, config.UpdatePendingRemovalsParams{
+		StateDir: params.StateDir,
+		Update: func(held []domain.NamespaceRef) []domain.NamespaceRef {
+			var kept []domain.NamespaceRef
+			for _, ref := range held {
+				if !settled[ref] {
+					kept = append(kept, ref)
+				}
+			}
+			return kept
+		},
+	})
 }
 
 func mergeRefs(held, added []domain.NamespaceRef) []domain.NamespaceRef {

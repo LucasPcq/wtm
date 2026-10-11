@@ -58,6 +58,7 @@ Check the exit code first, and parse stdout only when it is non-empty. A command
 | `19` | cancelled: an interactive run the user backed out of, or any run interrupted by Ctrl+C, SIGINT or SIGTERM (`--yes` included). See [Interrupting a run](#interrupting-a-run) |
 | `20` | `events` received an event of a newer schema: upgrade wtm |
 | `21` | not in a git repository (the current directory, or `events --repo`) |
+| `22` | a state file (`config.toml`, `run.toml`, a worktree's `meta.json`, `pending-removals.toml`) was written by a newer wtm: this one reads it but refuses to change it. Upgrade wtm. See [State files](state.md#versions) |
 
 `wtm resolve <branch>` and `wtm run url --job <name>` print a bare path or URL for `$(…)`: `cd "$(wtm resolve feat/login)"`. Every flag of every command is in `wtm <command> --help` and the [command reference](../wtm.md).
 

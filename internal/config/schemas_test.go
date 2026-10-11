@@ -40,7 +40,7 @@ func TestWritingAConfigRefreshesItsSchema(t *testing.T) {
 	t.Run("run.toml", func(t *testing.T) {
 		dir := t.TempDir()
 		path := staleSchema(t, dir, schemas.Run)
-		if err := WriteRun(WriteRunParams{StateDir: dir, Force: true}); err != nil {
+		if err := WriteRun(t.Context(), WriteRunParams{StateDir: dir, Force: true}); err != nil {
 			t.Fatal(err)
 		}
 		assertSchema(t, path, schemas.Run)
@@ -48,7 +48,7 @@ func TestWritingAConfigRefreshesItsSchema(t *testing.T) {
 	t.Run("config.toml", func(t *testing.T) {
 		dir := t.TempDir()
 		path := staleSchema(t, dir, schemas.Project)
-		if err := WriteProjectConfig(WriteProjectConfigParams{StateDir: dir, Config: domain.ProjectConfig{Worktrees: domain.WorktreesConfig{BasePath: "../t", BaseBranch: "main"}}}); err != nil {
+		if err := WriteProjectConfig(t.Context(), WriteProjectConfigParams{StateDir: dir, Config: domain.ProjectConfig{Worktrees: domain.WorktreesConfig{BasePath: "../t", BaseBranch: "main"}}}); err != nil {
 			t.Fatal(err)
 		}
 		assertSchema(t, path, schemas.Project)
@@ -56,7 +56,7 @@ func TestWritingAConfigRefreshesItsSchema(t *testing.T) {
 	t.Run("global config.toml", func(t *testing.T) {
 		dir := t.TempDir()
 		path := staleSchema(t, dir, schemas.Global)
-		if err := writeGlobalAt(filepath.Join(dir, domain.GlobalConfigFile), domain.InitGlobalAnswers{Shell: domain.ShellZsh}); err != nil {
+		if err := writeGlobalAt(t.Context(), writeGlobalAtParams{Path: filepath.Join(dir, domain.GlobalConfigFile), Answers: domain.InitGlobalAnswers{Shell: domain.ShellZsh}}); err != nil {
 			t.Fatal(err)
 		}
 		assertSchema(t, path, schemas.Global)

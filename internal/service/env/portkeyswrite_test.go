@@ -21,7 +21,7 @@ func TestWritePortKeysWritesTheValueFileAndItsTemplate(t *testing.T) {
 		}
 	}
 
-	applied, err := WritePortKeys(WritePortKeysParams{
+	applied, err := WritePortKeys(t.Context(), WritePortKeysParams{
 		ProjectDir: dir,
 		Writes: []domain.PortKeyWrite{{
 			Job: "shop-web-dev", Port: "VITE_PORT", Base: 5173,
@@ -55,7 +55,7 @@ func TestWritePortKeysSkipsAnAbsentTemplate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := WritePortKeys(WritePortKeysParams{
+	if _, err := WritePortKeys(t.Context(), WritePortKeysParams{
 		ProjectDir: dir,
 		Writes:     []domain.PortKeyWrite{{Job: "api", Port: "PORT", Base: 4001, File: ".env", Template: ".env.example"}},
 	}); err != nil {
@@ -70,7 +70,7 @@ func TestWritePortKeysSkipsAnAbsentTemplate(t *testing.T) {
 func TestWritePortKeysCreatesTheValueFileItNeeds(t *testing.T) {
 	dir := t.TempDir()
 
-	if _, err := WritePortKeys(WritePortKeysParams{
+	if _, err := WritePortKeys(t.Context(), WritePortKeysParams{
 		ProjectDir: dir,
 		Writes:     []domain.PortKeyWrite{{Job: "reports", Port: "PORT", Base: 5177, File: "apps/reports/.env"}},
 	}); err != nil {
@@ -92,7 +92,7 @@ func TestWritePortKeysIsIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	applied, err := WritePortKeys(WritePortKeysParams{
+	applied, err := WritePortKeys(t.Context(), WritePortKeysParams{
 		ProjectDir: dir,
 		Writes:     []domain.PortKeyWrite{{Job: "api", Port: "PORT", Base: 4001, File: ".env"}},
 	})

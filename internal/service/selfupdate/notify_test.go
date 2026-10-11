@@ -33,7 +33,7 @@ func TestStartCheckSuppressedReturnsNilAndNoticeIsNilSafe(t *testing.T) {
 	hermeticEnv(t)
 	t.Setenv(domain.EnvNoUpdateCheck, "1")
 
-	check := selfupdate.StartCheck(selfupdate.StartCheckParams{
+	check := selfupdate.StartCheck(t.Context(), selfupdate.StartCheckParams{
 		Version:     "0.1.0",
 		Format:      domain.OutputText,
 		Command:     domain.CmdList,
@@ -53,14 +53,14 @@ func TestNoticeServesTheCachedVersionWithoutNetwork(t *testing.T) {
 
 	// A recent check with a newer version cached: no refresh is due, so the
 	// notice must come straight from state with no network call.
-	if err := selfupdate.SaveState(domain.UpdateState{
+	if err := selfupdate.SaveState(t.Context(), domain.UpdateState{
 		CheckedAt:     time.Now(),
 		LatestVersion: "9.9.9",
 	}); err != nil {
 		t.Fatalf("SaveState: %v", err)
 	}
 
-	check := selfupdate.StartCheck(selfupdate.StartCheckParams{
+	check := selfupdate.StartCheck(t.Context(), selfupdate.StartCheckParams{
 		Version:     "0.1.0",
 		Format:      domain.OutputText,
 		Command:     domain.CmdList,
@@ -82,14 +82,14 @@ func TestNoticeServesTheCachedVersionWithoutNetwork(t *testing.T) {
 func TestNoticeSilentWhenCachedVersionIsNotNewer(t *testing.T) {
 	hermeticEnv(t)
 
-	if err := selfupdate.SaveState(domain.UpdateState{
+	if err := selfupdate.SaveState(t.Context(), domain.UpdateState{
 		CheckedAt:     time.Now(),
 		LatestVersion: "0.1.0",
 	}); err != nil {
 		t.Fatalf("SaveState: %v", err)
 	}
 
-	check := selfupdate.StartCheck(selfupdate.StartCheckParams{
+	check := selfupdate.StartCheck(t.Context(), selfupdate.StartCheckParams{
 		Version:     "0.1.0",
 		Format:      domain.OutputText,
 		Command:     domain.CmdList,
@@ -116,14 +116,14 @@ func TestNoticePrefersTheRefreshedVersionOverTheCache(t *testing.T) {
 
 	// Stale enough that a refresh is due, with an older version cached: the
 	// notice must report what the refresh found, not what was on disk.
-	if err := selfupdate.SaveState(domain.UpdateState{
+	if err := selfupdate.SaveState(t.Context(), domain.UpdateState{
 		CheckedAt:     time.Now().Add(-domain.UpdateCheckTTL - time.Hour),
 		LatestVersion: "0.5.0",
 	}); err != nil {
 		t.Fatalf("SaveState: %v", err)
 	}
 
-	check := selfupdate.StartCheck(selfupdate.StartCheckParams{
+	check := selfupdate.StartCheck(t.Context(), selfupdate.StartCheckParams{
 		Version:     "0.1.0",
 		Format:      domain.OutputText,
 		Command:     domain.CmdList,
@@ -161,14 +161,14 @@ func TestNoticeFallsBackToTheCacheWhenTheRefreshIsTooSlow(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if err := selfupdate.SaveState(domain.UpdateState{
+	if err := selfupdate.SaveState(t.Context(), domain.UpdateState{
 		CheckedAt:     time.Now().Add(-domain.UpdateCheckTTL - time.Hour),
 		LatestVersion: "0.5.0",
 	}); err != nil {
 		t.Fatalf("SaveState: %v", err)
 	}
 
-	check := selfupdate.StartCheck(selfupdate.StartCheckParams{
+	check := selfupdate.StartCheck(t.Context(), selfupdate.StartCheckParams{
 		Version:     "0.1.0",
 		Format:      domain.OutputText,
 		Command:     domain.CmdList,
@@ -204,14 +204,14 @@ func TestStartCheckDoesNotReachTheNetworkInsideTheTTL(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if err := selfupdate.SaveState(domain.UpdateState{
+	if err := selfupdate.SaveState(t.Context(), domain.UpdateState{
 		CheckedAt:     time.Now(),
 		LatestVersion: "9.9.9",
 	}); err != nil {
 		t.Fatalf("SaveState: %v", err)
 	}
 
-	check := selfupdate.StartCheck(selfupdate.StartCheckParams{
+	check := selfupdate.StartCheck(t.Context(), selfupdate.StartCheckParams{
 		Version:     "0.1.0",
 		Format:      domain.OutputText,
 		Command:     domain.CmdList,

@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
@@ -62,7 +62,7 @@ func TestCreateIfNotExistsReturnsTheBranchOwnWorktree(t *testing.T) {
 
 	again, err := repo.create(t, "feat/x", true)
 
-	if err != nil || !again.AlreadyExists || infra.ResolvePath(again.Path) != infra.ResolvePath(created.Path) {
+	if err != nil || !again.AlreadyExists || fs.ResolvePath(again.Path) != fs.ResolvePath(created.Path) {
 		t.Fatalf("result = %+v, err = %v, want feat/x's own worktree as already existing", again, err)
 	}
 }

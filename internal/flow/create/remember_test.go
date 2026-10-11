@@ -16,10 +16,10 @@ func rememberingContext(t *testing.T, remembered map[string]string) flow.Context
 	t.Helper()
 	ctx := testContext(t)
 	ctx.Config.Project.Wizard.Remembered = remembered
-	if err := config.WriteRun(config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: portedConfig("")}); err != nil {
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: portedConfig("")}); err != nil {
 		t.Fatalf("write run config: %v", err)
 	}
-	if err := config.WriteProjectConfig(config.WriteProjectConfigParams{StateDir: ctx.StateDir, Config: ctx.Config.Project}); err != nil {
+	if err := config.WriteProjectConfig(t.Context(), config.WriteProjectConfigParams{StateDir: ctx.StateDir, Config: ctx.Config.Project}); err != nil {
 		t.Fatalf("write project config: %v", err)
 	}
 	return ctx

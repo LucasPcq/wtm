@@ -55,7 +55,7 @@ func testContext(t *testing.T) flow.Context {
 func withPorts(t *testing.T, ctx flow.Context) {
 	t.Helper()
 	write(t, filepath.Join(ctx.ProjectDir, ".env"), "SHARED=main\nWEB_PORT=3000\n")
-	if err := config.WriteRun(config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
 		Jobs:     []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}}},
 		EnvPorts: []domain.EnvPortLink{{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"}},
 	}}); err != nil {
@@ -353,7 +353,7 @@ func TestAnIsolationChangeIsPublishedAndAnUnchangedOneIsNot(t *testing.T) {
 func TestRunSettlesTheConfiguredEnvDespiteAnOrphanLink(t *testing.T) {
 	ctx := testContext(t)
 	write(t, filepath.Join(ctx.ProjectDir, ".env"), "SHARED=main\nWEB_PORT=3000\n")
-	if err := config.WriteRun(config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
 		Jobs: []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}}},
 		EnvPorts: []domain.EnvPortLink{
 			{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"},
@@ -623,7 +623,7 @@ func TestWithNoWorktreeGivenThePickerIsAskedFirst(t *testing.T) {
 func TestTheResolverPreviewsALinkedOverwriteOnTheWorktreesPort(t *testing.T) {
 	ctx := testContext(t)
 	write(t, filepath.Join(ctx.ProjectDir, ".env"), "SHARED=main\nDB_URL=postgres://app:main@localhost:3000/db\n")
-	if err := config.WriteRun(config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
 		Jobs:     []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}}},
 		EnvPorts: []domain.EnvPortLink{{File: ".env", Key: "DB_URL", Job: "web", Port: "PORT"}},
 	}}); err != nil {
@@ -686,7 +686,7 @@ const dsnEnv = "WEB_PORT=3000\n" +
 func TestSettlingAPortKeepsEachValuesQuoting(t *testing.T) {
 	ctx := testContext(t)
 	write(t, filepath.Join(ctx.ProjectDir, ".env"), dsnEnv)
-	if err := config.WriteRun(config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
 		Jobs: []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}}},
 		EnvPorts: []domain.EnvPortLink{
 			{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"},

@@ -9,6 +9,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -289,7 +290,7 @@ func collidingUntracked(params untrackedCollisionParams) untrackedCollisions {
 	var collisions untrackedCollisions
 	for _, f := range params.Untracked {
 		targetPath := filepath.Join(params.TargetPath, f)
-		if !infra.FileExists(targetPath) {
+		if !fs.FileExists(targetPath) {
 			continue
 		}
 		sourcePath := filepath.Join(params.SourcePath, f)

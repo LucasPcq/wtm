@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/domain/statefile"
 )
 
 // ExitCode maps a command error to the process exit code. Granular codes let
@@ -27,6 +28,8 @@ func ExitCode(err error) int {
 		return domain.ExitCodeNotGitRepo
 	case errors.Is(err, domain.ErrEventsSchemaNewer):
 		return domain.ExitCodeEventsSchemaNewer
+	case errors.Is(err, statefile.ErrSchemaNewer):
+		return domain.ExitCodeStateSchemaNewer
 	case errors.Is(err, domain.ErrEnvDrift):
 		return domain.ExitCodeEnvDrift
 	case errors.Is(err, domain.ErrUsage):

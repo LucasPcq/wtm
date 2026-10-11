@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/domain/statefile"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -29,6 +30,7 @@ func TestExitCode(t *testing.T) {
 		{"env drift", fmt.Errorf("%w (%w)", domain.ErrEnvDrift, domain.ErrAborted), domain.ExitCodeEnvDrift},
 		{"events schema newer", fmt.Errorf("event v2: %w", domain.ErrEventsSchemaNewer), domain.ExitCodeEventsSchemaNewer},
 		{"not a git repository", fmt.Errorf(domain.NotGitRepoFmt, "/tmp/x", domain.ErrNotGitRepo), domain.ExitCodeNotGitRepo},
+		{"state schema newer", fmt.Errorf("run.toml: %w", statefile.ErrSchemaNewer), domain.ExitCodeStateSchemaNewer},
 		{"context cancelled", fmt.Errorf("git fetch: %w", context.Canceled), domain.ExitCodeCancelled},
 	}
 

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -57,12 +57,20 @@ func loadProjectConfig(path string) (domain.ProjectConfig, error) {
 		return domain.ProjectConfig{}, domain.ErrConfigNotFound
 	}
 
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return domain.ProjectConfig{}, err
+	}
+	return parseProjectConfig(path, data)
+}
+
+func parseProjectConfig(path string, data []byte) (domain.ProjectConfig, error) {
 	var raw rawProjectConfig
 	// hooks.on_create / hooks.on_clean entries are decoded as []interface{}
 	// (string|table union) so the inner table keys (cmd, cwd, continue_on_error)
 	// appear as "undecoded" to the strict checker even though the custom
 	// unmarshaler reads them — skip those sub-trees.
-	if err := decodeStrict(path, &raw, "hooks.on_create", "hooks.on_clean"); err != nil {
+	if err := decodeStrictBytes(path, data, &raw, "hooks.on_create", "hooks.on_clean"); err != nil {
 		return domain.ProjectConfig{}, err
 	}
 
@@ -72,6 +80,7 @@ func loadProjectConfig(path string) (domain.ProjectConfig, error) {
 	}
 
 	cfg := domain.ProjectConfig{
+		Schema: raw.Schema,
 		Worktrees: domain.WorktreesConfig{
 			BasePath:   raw.Worktrees.BasePath,
 			BaseBranch: raw.Worktrees.BaseBranch,
@@ -99,6 +108,7 @@ func buildEnvConfig(raw rawEnvConfig) domain.EnvConfig {
 // rawProjectConfig is the intermediate TOML-decoded structure.
 // Hooks are decoded as raw interfaces to support the string | {cmd,cwd} union.
 type rawProjectConfig struct {
+	Schema    int `toml:"schema"`
 	Worktrees struct {
 		BasePath   string `toml:"base_path"`
 		BaseBranch string `toml:"base_branch"`
@@ -125,7 +135,7 @@ type rawEnvFile struct {
 // GlobalPath is where the machine-level config lives, empty when the OS gives
 // no config directory at all.
 func GlobalPath() string {
-	dir, err := infra.GlobalDir()
+	dir, err := fs.GlobalDir()
 	if err != nil {
 		return ""
 	}

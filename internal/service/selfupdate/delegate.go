@@ -6,7 +6,7 @@ import (
 	"os/exec"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 )
 
 type DelegateParams struct {
@@ -29,7 +29,7 @@ func Delegate(ctx context.Context, params DelegateParams) (ran bool, err error) 
 	}
 
 	for _, argv := range commands {
-		cmd := infra.Command(ctx, argv[0], argv[1:]...)
+		cmd := proc.Command(ctx, argv[0], argv[1:]...)
 		cmd.Stdout = params.Stdout
 		cmd.Stderr = params.Stderr
 		if err := cmd.Run(); err != nil {

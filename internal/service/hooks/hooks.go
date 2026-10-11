@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -123,7 +123,7 @@ func runSingleHook(ctx context.Context, params runSingleHookParams) error {
 	}
 
 	spec := rules.ShellCommand(hook.Cmd)
-	cmd := infra.GroupCommand(ctx, spec.Name, spec.Args...)
+	cmd := proc.GroupCommand(ctx, spec.Name, spec.Args...)
 
 	if hook.Cwd != "" {
 		cmd.Dir = hook.Cwd

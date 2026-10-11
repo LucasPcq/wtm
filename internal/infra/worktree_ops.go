@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 )
 
 // CreateWorktreeParams holds inputs for creating a git worktree.
@@ -29,7 +31,7 @@ func CreateWorktree(ctx context.Context, params CreateWorktreeParams) error {
 }
 
 func createWorktreeNew(ctx context.Context, params CreateWorktreeParams) error {
-	cmd := Command(ctx, "git", "worktree", "add", "--no-track", "-b", params.Branch, params.Path, params.FromBranch)
+	cmd := proc.Command(ctx, "git", "worktree", "add", "--no-track", "-b", params.Branch, params.Path, params.FromBranch)
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -39,7 +41,7 @@ func createWorktreeNew(ctx context.Context, params CreateWorktreeParams) error {
 }
 
 func createWorktreeExisting(ctx context.Context, params CreateWorktreeParams) error {
-	cmd := Command(ctx, "git", "worktree", "add", params.Path, params.Branch)
+	cmd := proc.Command(ctx, "git", "worktree", "add", params.Path, params.Branch)
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -66,7 +68,7 @@ func MoveWorktree(ctx context.Context, params MoveWorktreeParams) error {
 	}
 	args = append(args, params.From, params.To)
 
-	cmd := Command(ctx, "git", args...)
+	cmd := proc.Command(ctx, "git", args...)
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -94,7 +96,7 @@ func RemoveWorktree(ctx context.Context, params RemoveWorktreeParams) error {
 		args = append(args, "--force")
 	}
 
-	cmd := Command(ctx, "git", args...)
+	cmd := proc.Command(ctx, "git", args...)
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -113,7 +115,7 @@ type SudoDeleteDirParams struct {
 // capture the output. Used as a last-resort fallback when `git worktree remove`
 // cannot delete files owned by another user (e.g. root-owned Docker files).
 func SudoDeleteDir(ctx context.Context, params SudoDeleteDirParams) error {
-	cmd := Command(ctx, "sudo", "rm", "-rf", params.Path)
+	cmd := proc.Command(ctx, "sudo", "rm", "-rf", params.Path)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -127,7 +129,7 @@ func SudoDeleteDir(ctx context.Context, params SudoDeleteDirParams) error {
 // (.git/worktrees/<name>) left behind when a worktree directory is removed
 // outside of git (e.g. by SudoDeleteDir).
 func PruneWorktrees(ctx context.Context, projectDir string) error {
-	cmd := Command(ctx, "git", "worktree", "prune")
+	cmd := proc.Command(ctx, "git", "worktree", "prune")
 	cmd.Dir = projectDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {

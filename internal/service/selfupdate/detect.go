@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -66,7 +66,7 @@ func rawGoBinDir(ctx context.Context) string {
 		return bin
 	}
 
-	out, err := infra.Command(ctx, "go", "env", "GOBIN", "GOPATH").Output()
+	out, err := proc.Command(ctx, "go", "env", "GOBIN", "GOPATH").Output()
 	if err == nil {
 		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 		if len(lines) == 2 {

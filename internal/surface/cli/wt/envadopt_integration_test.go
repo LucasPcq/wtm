@@ -25,7 +25,7 @@ func legacyWorktree(t *testing.T) (dir, path string) {
 	if err := os.WriteFile(filepath.Join(stateDir, domain.ConfigFileName), []byte(project), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := config.WriteRun(config.WriteRunParams{StateDir: stateDir, Force: true, Config: domain.RunConfig{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: stateDir, Force: true, Config: domain.RunConfig{
 		Jobs: []domain.JobConfig{
 			{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}},
 			{Name: "db", Kind: domain.JobKindService, Cmd: "docker compose up -d db", Ports: map[string]int{"DB_PORT": 5432}},

@@ -31,7 +31,7 @@ func dirs() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return infra.Toplevel(global) // want `the daemon calls infra\.Toplevel: only GlobalDir is allow-listed`
+	return infra.Toplevel(global) // want `the daemon calls infra\.Toplevel: only GlobalDir and ReplaceFile are allow-listed`
 }
 
 var _ infra.Paths // want `the daemon calls infra\.Paths`

@@ -257,7 +257,7 @@ func (f *pruneFlow) remove(params removeParams) (Outcome, error) {
 
 	reparents := reparentsOf(reparentsOfParams{Reparents: f.plan.Reparents, Pruned: result.Pruned})
 	if params.ReparentChildren {
-		applied, err := worktree.ApplyReparents(worktree.ApplyReparentsParams{Reparents: reparents, StateDir: f.ctx.StateDir})
+		applied, err := worktree.ApplyReparents(f.runCtx, worktree.ApplyReparentsParams{Reparents: reparents, StateDir: f.ctx.StateDir})
 		publish.ReparentedAll(f.runCtx, f.ctx, applied)
 		if err != nil {
 			return Outcome{}, err

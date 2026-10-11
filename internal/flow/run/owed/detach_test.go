@@ -92,10 +92,10 @@ func holdingFixture(t *testing.T) (flow.Context, string) {
 	if err := os.WriteFile(filepath.Join(metaDir, domain.MetaFileName), []byte(`{"source_branch":"main","ordinal":1}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := worktree.RecordNamespaces(worktree.RecordNamespacesParams{StateDir: ctx.StateDir, Branch: "feat-live", Jobs: []string{"postgres"}}); err != nil {
+	if err := worktree.RecordNamespaces(t.Context(), worktree.RecordNamespacesParams{StateDir: ctx.StateDir, Branch: "feat-live", Jobs: []string{"postgres"}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := runjobs.SettleRemovals(runjobs.SettleRemovalsParams{StateDir: ctx.StateDir, Refs: runjobs.LoadPendingRemovals(ctx.StateDir)}); err != nil {
+	if err := runjobs.SettleRemovals(t.Context(), runjobs.SettleRemovalsParams{StateDir: ctx.StateDir, Refs: runjobs.LoadPendingRemovals(ctx.StateDir)}); err != nil {
 		t.Fatal(err)
 	}
 	return ctx, witness
@@ -194,7 +194,7 @@ func TestDropperNamesTheCauseOfADropRefusedByAServiceUp(t *testing.T) {
 // A debt left by an earlier attempt is paid by the drop that succeeds.
 func TestDropperSettlesAnOlderDebtForTheNamespaceItDrops(t *testing.T) {
 	ctx, _ := holdingFixture(t)
-	if err := runjobs.QueueRemovals(runjobs.QueueRemovalsParams{StateDir: ctx.StateDir, Refs: []domain.NamespaceRef{
+	if err := runjobs.QueueRemovals(t.Context(), runjobs.QueueRemovalsParams{StateDir: ctx.StateDir, Refs: []domain.NamespaceRef{
 		{Job: "postgres", Worktree: "feat-live", Ordinal: 1},
 	}}); err != nil {
 		t.Fatal(err)

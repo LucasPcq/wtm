@@ -6,12 +6,13 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 )
 
 // BaseBranch detects the default remote branch for the repo at dir via
 // git symbolic-ref. Returns domain.DefaultBaseBranch if detection fails.
 func BaseBranch(ctx context.Context, dir string) string {
-	cmd := Command(ctx, "git", "symbolic-ref", "refs/remotes/origin/HEAD")
+	cmd := proc.Command(ctx, "git", "symbolic-ref", "refs/remotes/origin/HEAD")
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {
@@ -32,7 +33,7 @@ func BaseBranch(ctx context.Context, dir string) string {
 // "docker compose" as a safe default when neither is detectable.
 func DockerComposeCommand(ctx context.Context) string {
 	if _, err := exec.LookPath(domain.DockerBin); err == nil {
-		if err := Command(ctx, domain.DockerBin, domain.ComposeSubcommand, domain.ComposeVersionArg).Run(); err == nil {
+		if err := proc.Command(ctx, domain.DockerBin, domain.ComposeSubcommand, domain.ComposeVersionArg).Run(); err == nil {
 			return domain.ComposeCommand
 		}
 	}

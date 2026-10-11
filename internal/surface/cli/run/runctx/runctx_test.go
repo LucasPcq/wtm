@@ -29,7 +29,7 @@ func newProject(t *testing.T) project {
 	globaldir.Isolate(t)
 	dir := gittest.InitRepo(t)
 	stateDir := filepath.Join(dir, ".git", domain.StateDirName)
-	if err := config.WriteProject(config.WriteProjectParams{
+	if err := config.WriteProject(t.Context(), config.WriteProjectParams{
 		StateDir: stateDir,
 		Answers:  domain.InitProjectAnswers{BasePath: "../.trees", BaseBranch: "main", EnvStrategy: domain.EnvStrategyExample},
 	}); err != nil {
@@ -40,7 +40,7 @@ func newProject(t *testing.T) project {
 
 func (p project) declare(t *testing.T) {
 	t.Helper()
-	if err := config.WriteRun(config.WriteRunParams{StateDir: p.stateDir, Force: true, Config: domain.RunConfig{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: p.stateDir, Force: true, Config: domain.RunConfig{
 		Jobs: []domain.JobConfig{{Name: "api", Kind: domain.JobKindService, Cmd: "pnpm dev"}},
 	}}); err != nil {
 		t.Fatalf("write run.toml: %v", err)

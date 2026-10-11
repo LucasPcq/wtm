@@ -109,9 +109,9 @@ func settle(ctx context.Context, params settleParams) (domain.EnvPortPlan, error
 	}
 
 	if len(rules.EnvPortRewrites(plan)) == 0 {
-		err = envsvc.ApplyOwnedEnv(resolved)
+		err = envsvc.ApplyOwnedEnv(ctx, resolved)
 	} else {
-		_, err = envsvc.ApplyEnvPorts(resolved)
+		_, err = envsvc.ApplyEnvPorts(ctx, resolved)
 	}
 	if err != nil {
 		return domain.EnvPortPlan{}, err

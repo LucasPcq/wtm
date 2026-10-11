@@ -28,7 +28,7 @@ func setupTestProject(t *testing.T) string {
 	// command resolves its worktree from the current directory.
 	t.Chdir(dir)
 
-	if err := config.WriteProject(config.WriteProjectParams{
+	if err := config.WriteProject(t.Context(), config.WriteProjectParams{
 		StateDir: stateDir,
 		Answers: domain.InitProjectAnswers{
 			BasePath:    "../.trees",
@@ -44,7 +44,7 @@ func setupTestProject(t *testing.T) string {
 
 func writeRunTOML(t *testing.T, stateDir string, cfg domain.RunConfig) {
 	t.Helper()
-	if err := config.WriteRun(config.WriteRunParams{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{
 		StateDir: stateDir,
 		Config:   cfg,
 		Force:    true,

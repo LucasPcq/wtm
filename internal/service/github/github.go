@@ -8,7 +8,7 @@ import (
 	"os/exec"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 )
 
 func ensureGH() error {
@@ -23,7 +23,7 @@ func ensureAuth(ctx context.Context) error {
 	if err := ensureGH(); err != nil {
 		return err
 	}
-	cmd := infra.Command(ctx, "gh", "auth", "status")
+	cmd := proc.Command(ctx, "gh", "auth", "status")
 	if err := cmd.Run(); err != nil {
 		return domain.ErrGHNotAuthenticated
 	}
@@ -31,7 +31,7 @@ func ensureAuth(ctx context.Context) error {
 }
 
 func runGH(ctx context.Context, dir string, args ...string) ([]byte, error) {
-	cmd := infra.Command(ctx, "gh", args...)
+	cmd := proc.Command(ctx, "gh", args...)
 	cmd.Dir = dir
 
 	var stdout, stderr bytes.Buffer

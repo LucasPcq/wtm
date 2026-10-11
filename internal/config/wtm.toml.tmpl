@@ -2,7 +2,9 @@
 
 # wtm — Worktree Manager configuration
 # Docs: https://github.com/LucasPcq/wtm
-
+{{ if .Schema }}
+schema = {{ .Schema }}
+{{ end }}
 [worktrees]
 # Directory where worktrees are created (relative to repo root)
 base_path = "{{ .BasePath }}"

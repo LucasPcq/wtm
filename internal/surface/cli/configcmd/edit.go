@@ -11,7 +11,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
@@ -54,7 +54,7 @@ func runEdit(cmd *cobra.Command, _ []string) error {
 		editor = defaultEditor
 	}
 
-	editCmd := infra.Command(cmd.Context(), editor, path)
+	editCmd := proc.Command(cmd.Context(), editor, path)
 	editCmd.Stdin = os.Stdin
 	editCmd.Stdout = os.Stdout
 	editCmd.Stderr = os.Stderr

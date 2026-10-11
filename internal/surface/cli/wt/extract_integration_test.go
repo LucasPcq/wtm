@@ -269,7 +269,7 @@ func TestExtractSettlesEnvPortsOnTheCreatedTarget(t *testing.T) {
 	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Setenv(domain.EnvGoFile, "")
 
-	if err := config.WriteProject(config.WriteProjectParams{
+	if err := config.WriteProject(t.Context(), config.WriteProjectParams{
 		StateDir: stateDir,
 		Answers: domain.InitProjectAnswers{
 			BasePath:    "../.trees",
@@ -280,7 +280,7 @@ func TestExtractSettlesEnvPortsOnTheCreatedTarget(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("write project config: %v", err)
 	}
-	if err := config.WriteRun(config.WriteRunParams{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{
 		StateDir: stateDir,
 		Force:    true,
 		Config: domain.RunConfig{

@@ -34,7 +34,7 @@ func writeRunToml(t *testing.T, ctx flow.Context, body string) {
 
 func linkedRunConfig(t *testing.T, ctx flow.Context, file string) {
 	t.Helper()
-	if err := config.WriteRun(config.WriteRunParams{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{
 		StateDir: ctx.StateDir,
 		Force:    true,
 		Config: domain.RunConfig{
@@ -131,7 +131,7 @@ func TestRunSettlesTheConfiguredEnvDespiteAnOrphanLink(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(ctx.ProjectDir, ".env"), []byte("WEB_PORT=3000\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := config.WriteRun(config.WriteRunParams{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{
 		StateDir: ctx.StateDir,
 		Force:    true,
 		Config: domain.RunConfig{
@@ -286,7 +286,7 @@ func TestCreateKeepsEachMovedValuesQuoting(t *testing.T) {
 	ctx := testContext(t)
 	ctx.Config.Project.Env.Strategy = domain.EnvStrategyMain
 	ctx.Config.Project.Env.Files = []domain.EnvFile{{Target: ".env"}}
-	if err := config.WriteRun(config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
 		Jobs: []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "true", Ports: map[string]int{"PORT": 3000}}},
 		EnvPorts: []domain.EnvPortLink{
 			{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"},

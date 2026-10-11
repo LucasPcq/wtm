@@ -67,7 +67,7 @@ func runInitGolden(t *testing.T, tc initGoldenCase) string {
 	t.Setenv(domain.EnvStateDir, stateDir)
 	t.Chdir(dir)
 
-	if err := config.WriteProject(config.WriteProjectParams{
+	if err := config.WriteProject(t.Context(), config.WriteProjectParams{
 		StateDir: stateDir,
 		Answers: domain.InitProjectAnswers{
 			BasePath:    "../.trees",

@@ -225,10 +225,11 @@ func (d *Dropper) Drop(ctx context.Context, branch string) []domain.NamespaceOut
 
 	result := drop(ctx, dropParams{Context: d.params.Context, Presenter: d.params.Presenter, Holding: holding, Up: d.up})
 	d.report(result)
-	if err := runjobs.QueueRemovals(runjobs.QueueRemovalsParams{StateDir: d.params.Context.StateDir, Refs: result.Deferred()}); err != nil {
+	record := context.WithoutCancel(ctx)
+	if err := runjobs.QueueRemovals(record, runjobs.QueueRemovalsParams{StateDir: d.params.Context.StateDir, Refs: result.Deferred()}); err != nil {
 		d.params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: err.Error()})
 	}
-	if err := runjobs.SettleRemovals(runjobs.SettleRemovalsParams{StateDir: d.params.Context.StateDir, Refs: result.Released}); err != nil {
+	if err := runjobs.SettleRemovals(record, runjobs.SettleRemovalsParams{StateDir: d.params.Context.StateDir, Refs: result.Released}); err != nil {
 		d.params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: err.Error()})
 	}
 	return outcomesOf(outcomesParams{Config: d.params.Snapshot.Config, Branch: branch, Result: result})

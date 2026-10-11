@@ -67,7 +67,7 @@ func (p cancelOnUpdate) Publish(ctx context.Context, event domain.Event) {
 func TestAnInterruptWhileThePortsSettleNamesTheWorktreeLeftBehind(t *testing.T) {
 	ctx := testContext(t)
 	ctx.Config.Project.Env.Files = []domain.EnvFile{{Target: ".env"}}
-	if err := config.WriteRun(config.WriteRunParams{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{
 		StateDir: ctx.StateDir,
 		Force:    true,
 		Config: domain.RunConfig{

@@ -53,7 +53,7 @@ func settleFixture(t *testing.T) (flow.Context, string) {
 	second := filepath.Join(t.TempDir(), "feature")
 	gittest.Git(t, repo, "worktree", "add", "-b", "feature", second)
 
-	if err := config.WriteRun(config.WriteRunParams{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{
 		StateDir: stateDir,
 		Force:    true,
 		Config: domain.RunConfig{

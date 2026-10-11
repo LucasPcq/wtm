@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 )
 
 // TipParams holds inputs for resolving a ref to a short SHA.
@@ -15,7 +17,7 @@ type TipParams struct {
 
 // Tip returns the short commit SHA a ref points to.
 func Tip(ctx context.Context, params TipParams) (string, error) {
-	cmd := Command(ctx, "git", "-C", params.WorktreePath, "rev-parse", "--short", params.Ref)
+	cmd := proc.Command(ctx, "git", "-C", params.WorktreePath, "rev-parse", "--short", params.Ref)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("git rev-parse %s: %w", params.Ref, err)
@@ -59,9 +61,9 @@ type RebaseOntoParams struct {
 func RebaseOnto(ctx context.Context, params RebaseOntoParams) (RebaseResult, error) {
 	// The rebase may be interrupted, its abort may not: the process waits for
 	// it, so no worktree is left half rebased behind an exit.
-	settled, release := Shield(ctx)
+	settled, release := proc.Shield(ctx)
 	defer release()
-	cmd := Command(ctx, "git", "-C", params.WorktreePath,
+	cmd := proc.Command(ctx, "git", "-C", params.WorktreePath,
 		"rebase", "--onto", params.NewBase, params.Upstream, params.Branch)
 	out, err := cmd.CombinedOutput()
 	if err == nil {
@@ -87,7 +89,7 @@ func RebaseOnto(ctx context.Context, params RebaseOntoParams) (RebaseResult, err
 // conflict markers during a stopped rebase/merge (`git diff --name-only
 // --diff-filter=U`). A clean tree or any error yields nil.
 func ConflictedFiles(ctx context.Context, worktreePath string) []string {
-	cmd := Command(ctx, "git", "-C", worktreePath, "diff", "--name-only", "--diff-filter=U")
+	cmd := proc.Command(ctx, "git", "-C", worktreePath, "diff", "--name-only", "--diff-filter=U")
 	out, err := cmd.Output()
 	if err != nil {
 		return nil
@@ -102,7 +104,7 @@ func ConflictedFiles(ctx context.Context, worktreePath string) []string {
 // abortRebase best-effort aborts an in-progress rebase. A "no rebase in
 // progress" error is expected when the failure happened before any apply.
 func abortRebase(settled context.Context, worktreePath string) {
-	_ = Command(settled, "git", "-C", worktreePath, "rebase", "--abort").Run()
+	_ = proc.Command(settled, "git", "-C", worktreePath, "rebase", "--abort").Run()
 }
 
 // FastForwardParams holds inputs for fast-forwarding a checked-out branch.
@@ -114,7 +116,7 @@ type FastForwardParams struct {
 // FastForwardBranch fast-forwards the branch checked out in WorktreePath to Onto
 // (e.g. origin/main). It fails if the branch has diverged (no fast-forward).
 func FastForwardBranch(ctx context.Context, params FastForwardParams) error {
-	cmd := Command(ctx, "git", "-C", params.WorktreePath, "merge", "--ff-only", params.Onto)
+	cmd := proc.Command(ctx, "git", "-C", params.WorktreePath, "merge", "--ff-only", params.Onto)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git merge --ff-only %s: %s", params.Onto, strings.TrimSpace(string(out)))
@@ -148,7 +150,7 @@ func CommitCount(ctx context.Context, params CommitCountParams) (int, error) {
 }
 
 func revListCount(ctx context.Context, worktreePath, revRange string) (int, error) {
-	cmd := Command(ctx, "git", "-C", worktreePath, "rev-list", "--count", revRange)
+	cmd := proc.Command(ctx, "git", "-C", worktreePath, "rev-list", "--count", revRange)
 	out, err := cmd.Output()
 	if err != nil {
 		return 0, fmt.Errorf("git rev-list --count %s: %w", revRange, err)
@@ -169,7 +171,7 @@ type IsAncestorParams struct {
 
 // IsAncestor reports whether Ancestor is an ancestor of (or equal to) Descendant.
 func IsAncestor(ctx context.Context, params IsAncestorParams) bool {
-	cmd := Command(ctx, "git", "-C", params.WorktreePath,
+	cmd := proc.Command(ctx, "git", "-C", params.WorktreePath,
 		"merge-base", "--is-ancestor", params.Ancestor, params.Descendant)
 	return cmd.Run() == nil
 }
@@ -189,7 +191,7 @@ type RemoteBranchParams struct {
 // remote ref or any error yields false (nothing to integrate). Reads local refs
 // only — no network.
 func RemoteHasUnintegratedCommits(ctx context.Context, params RemoteBranchParams) bool {
-	cmd := Command(ctx, "git", "-C", params.WorktreePath,
+	cmd := proc.Command(ctx, "git", "-C", params.WorktreePath,
 		"cherry", params.Branch, "origin/"+params.Branch)
 	out, err := cmd.Output()
 	if err != nil {
@@ -210,7 +212,7 @@ func RemoteHasUnintegratedCommits(ctx context.Context, params RemoteBranchParams
 // refs only — no network.
 func AheadOfRemote(ctx context.Context, params RemoteBranchParams) bool {
 	remoteRef := "origin/" + params.Branch
-	remoteTip, err := Command(ctx, "git", "-C", params.WorktreePath, "rev-parse", remoteRef).Output()
+	remoteTip, err := proc.Command(ctx, "git", "-C", params.WorktreePath, "rev-parse", remoteRef).Output()
 	if err != nil {
 		// Only treat the branch as pushable when origin/<branch> genuinely does
 		// not exist (a push would create it). Any other rev-parse failure must
@@ -218,7 +220,7 @@ func AheadOfRemote(ctx context.Context, params RemoteBranchParams) bool {
 		// force-push under --push (non-interactive).
 		return !remoteRefExists(ctx, params.WorktreePath, remoteRef)
 	}
-	localTip, err := Command(ctx, "git", "-C", params.WorktreePath, "rev-parse", params.Branch).Output()
+	localTip, err := proc.Command(ctx, "git", "-C", params.WorktreePath, "rev-parse", params.Branch).Output()
 	if err != nil {
 		return false
 	}
@@ -228,7 +230,7 @@ func AheadOfRemote(ctx context.Context, params RemoteBranchParams) bool {
 // remoteRefExists reports whether a remote-tracking ref (e.g. origin/<branch>)
 // is present locally. Reads local refs only — no network.
 func remoteRefExists(ctx context.Context, worktreePath, remoteRef string) bool {
-	cmd := Command(ctx, "git", "-C", worktreePath,
+	cmd := proc.Command(ctx, "git", "-C", worktreePath,
 		"show-ref", "--verify", "--quiet", "refs/remotes/"+remoteRef)
 	return cmd.Run() == nil
 }
@@ -242,7 +244,7 @@ type PushForceParams struct {
 // PushForceWithLease pushes Branch to origin with --force-with-lease, which
 // refuses to overwrite remote commits the local ref has not seen.
 func PushForceWithLease(ctx context.Context, params PushForceParams) error {
-	cmd := Command(ctx, "git", "-C", params.WorktreePath,
+	cmd := proc.Command(ctx, "git", "-C", params.WorktreePath,
 		"push", "--force-with-lease", "origin", params.Branch)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

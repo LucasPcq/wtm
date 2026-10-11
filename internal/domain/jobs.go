@@ -223,6 +223,8 @@ type ProfileConfig struct {
 // [[profile]] block declares one entry; the Go field names are kept plural
 // because they hold the slices of all entries.
 type RunConfig struct {
+	// Schema is the version read from the file, zero when it carries none.
+	Schema int `toml:"schema,omitempty" json:"-"`
 	// PortOffsetBlock spaces two worktrees' declared ports apart. Zero means the
 	// default: a project only sets it to make room for base ports that would
 	// otherwise land a multiple of the block apart.

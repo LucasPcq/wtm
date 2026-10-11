@@ -297,8 +297,8 @@ type RememberParams struct {
 
 // Remember keeps what a confirmed session ticked. Failing to write it costs the
 // next run a question, never this run its worktree.
-func Remember(params RememberParams) {
-	err := memory.Remember(memory.RememberParams{
+func Remember(ctx context.Context, params RememberParams) {
+	err := memory.Remember(ctx, memory.RememberParams{
 		StateDir: params.Context.StateDir,
 		Change:   flow.Remembering(params.Session, params.Answers),
 	})

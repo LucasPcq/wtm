@@ -4609,6 +4609,9 @@ const (
 	// is not in a git repository. 13 is skipped: it once meant a pull request
 	// already existed, and a script reading it that way must not misread it.
 	ExitCodeNotGitRepo = 21
+	// ExitCodeStateSchemaNewer is a write refused because the file it would
+	// change was written by a newer wtm (statefile.ErrSchemaNewer).
+	ExitCodeStateSchemaNewer = 22
 
 	// FlagValueInvalidFmt is every flag value that does not parse.
 	FlagValueInvalidFmt = "invalid --%s value %q: use %s"

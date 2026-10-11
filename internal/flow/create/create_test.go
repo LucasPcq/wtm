@@ -398,7 +398,7 @@ func TestFastForwardSubjectIsSharedWithTheOtherFlows(t *testing.T) {
 func withRunConfig(t *testing.T, f *createFlow, cfg domain.RunConfig) *createFlow {
 	t.Helper()
 	stateDir := t.TempDir()
-	if err := config.WriteRun(config.WriteRunParams{StateDir: stateDir, Force: true, Config: cfg}); err != nil {
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: stateDir, Force: true, Config: cfg}); err != nil {
 		t.Fatalf("write run config: %v", err)
 	}
 	f.ctx.StateDir = stateDir

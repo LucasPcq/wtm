@@ -115,7 +115,7 @@ func (f *checkoutFlow) run(ctx context.Context) (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	decide.Remember(decide.RememberParams{Context: f.ctx, Session: session, Answers: answers, Presenter: f.presenter})
+	decide.Remember(ctx, decide.RememberParams{Context: f.ctx, Session: session, Answers: answers, Presenter: f.presenter})
 
 	pr, found := f.pr(answers)
 	if !found {

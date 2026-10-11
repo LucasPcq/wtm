@@ -45,7 +45,7 @@ func TestCachedUpgrade(t *testing.T) {
 			t.Setenv("HOME", t.TempDir())
 
 			if tc.cached != "" {
-				if err := selfupdate.SaveState(domain.UpdateState{LatestVersion: tc.cached}); err != nil {
+				if err := selfupdate.SaveState(t.Context(), domain.UpdateState{LatestVersion: tc.cached}); err != nil {
 					t.Fatalf("SaveState: %v", err)
 				}
 			}

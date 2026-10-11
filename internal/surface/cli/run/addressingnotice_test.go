@@ -20,7 +20,7 @@ const namedImportPayload = `{"addressing":"names",` +
 
 func withEnvFile(t *testing.T, stateDir string) {
 	t.Helper()
-	if err := config.WriteProject(config.WriteProjectParams{
+	if err := config.WriteProject(t.Context(), config.WriteProjectParams{
 		StateDir: stateDir,
 		Answers: domain.InitProjectAnswers{
 			BasePath:    "../.trees",

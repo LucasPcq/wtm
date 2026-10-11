@@ -38,9 +38,9 @@ func TestApplyEnvPortsWritesEveryLinkedFile(t *testing.T) {
 	writePortsFile(t, dir, ".env", "# db\nDATABASE_URL=postgres://u:pw@localhost:5432/app\nOTHER=keep\n")
 	writePortsFile(t, dir, "apps/web/.env", "VITE_API_URL=http://localhost:3000\n")
 
-	plan, err := ApplyEnvPorts(portsParams(dir))
+	plan, err := ApplyEnvPorts(t.Context(), portsParams(dir))
 	if err != nil {
-		t.Fatalf("ApplyEnvPorts() error = %v", err)
+		t.Fatalf("ApplyEnvPorts(t.Context(), ) error = %v", err)
 	}
 	if len(rules.EnvPortRewrites(plan)) != 2 {
 		t.Fatalf("plan rewrote %d values, want 2: %+v", len(rules.EnvPortRewrites(plan)), plan.Entries)
@@ -60,8 +60,8 @@ func TestApplyEnvPortsLeavesUnlinkedFilesAlone(t *testing.T) {
 	writePortsFile(t, dir, "apps/web/.env", "VITE_API_URL=http://localhost:3000\n")
 	writePortsFile(t, dir, "unrelated.env", "PORT=5432\n")
 
-	if _, err := ApplyEnvPorts(portsParams(dir)); err != nil {
-		t.Fatalf("ApplyEnvPorts() error = %v", err)
+	if _, err := ApplyEnvPorts(t.Context(), portsParams(dir)); err != nil {
+		t.Fatalf("ApplyEnvPorts(t.Context(), ) error = %v", err)
 	}
 	if got := readFile(t, filepath.Join(dir, "unrelated.env")); got != "PORT=5432\n" {
 		t.Errorf("a file no link names was rewritten: %q", got)
@@ -111,8 +111,8 @@ func TestApplyEnvPortsKeepsQuotesCommentsAndCRLF(t *testing.T) {
 	writePortsFile(t, dir, ".env", body)
 	writePortsFile(t, dir, "apps/web/.env", "export VITE_API_URL=\"http://localhost:3000\" # api\n")
 
-	if _, err := ApplyEnvPorts(portsParams(dir)); err != nil {
-		t.Fatalf("ApplyEnvPorts() error = %v", err)
+	if _, err := ApplyEnvPorts(t.Context(), portsParams(dir)); err != nil {
+		t.Fatalf("ApplyEnvPorts(t.Context(), ) error = %v", err)
 	}
 	if got, want := readFile(t, filepath.Join(dir, ".env")), "# db\r\nDATABASE_URL='postgres://u:pa$w0rd@localhost:5442/app' # main db\r\nOTHER=\"keep\"\r\n"; got != want {
 		t.Errorf(".env =\n%q\nwant\n%q", got, want)

@@ -44,6 +44,7 @@ You drive wtm without a terminal a human is watching, so everything below exists
 | `19` | cancelled: an interactive run the user backed out of (Esc, Ctrl-C, "No, cancel", a declined confirmation; nothing changed), or any run interrupted by SIGINT/SIGTERM, `--yes` included. An interrupt stops between two units of work, never half-way: a worktree being created or removed is finished (branch, metadata, data reclaim included), a rebase is aborted (branch unchanged), the hook running is stopped and the next ones never start, jobs already started keep running. The JSON document is still written: items never reached are `skipped` with reason `interrupted` (`create`, `clean`, `prune`) or `status: "cancelled"` (`sync`), and re-running the command finishes the job. A second interrupt quits once any create/remove in flight is done, killed by the signal (`130`) |
 | `20` | `events`: it received an event of a newer schema than its own; wtm must be upgraded |
 | `21` | not in a git repository: the current directory, or the path given (`events --repo`), is outside any git repository (`events --all`, or `events` alone outside a repository, is not an error: it follows every repository) |
+| `22` | a state file the command had to change (`config.toml`, `run.toml`, a worktree's `meta.json`, `pending-removals.toml`) was written by a newer wtm: it is read, never rewritten. Nothing about that file changed; the user must upgrade wtm |
 
 ## Discover names before you act
 

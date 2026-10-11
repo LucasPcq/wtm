@@ -14,6 +14,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 	"github.com/LucasPcq/wtm/internal/rules"
 	wtmevents "github.com/LucasPcq/wtm/internal/service/events"
 	"github.com/LucasPcq/wtm/internal/surface/cli/render"
@@ -182,7 +183,7 @@ func endWhenUnread(ctx context.Context, cmd *cobra.Command) context.Context {
 		return ctx
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	gone := infra.ReaderGone(ctx, infra.ReaderGoneParams{File: out, Every: domain.EventsReaderGoneCheck})
+	gone := proc.ReaderGone(ctx, proc.ReaderGoneParams{File: out, Every: domain.EventsReaderGoneCheck})
 	go func() {
 		select {
 		case <-gone:

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -35,7 +35,7 @@ type StateStore struct {
 // Empty on a machine with no user-config directory at all, which every caller
 // reads the way it reads an absent socket.
 func StatePath() string {
-	dir, err := infra.GlobalDir()
+	dir, err := fs.GlobalDir()
 	if err != nil {
 		return ""
 	}
@@ -93,37 +93,13 @@ func (s *StateStore) Save(records []domain.JobRecord) error {
 	if s.path == "" || s.frozen {
 		return nil
 	}
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
-		return fmt.Errorf("create state dir: %w", err)
-	}
-
 	data, err := json.Marshal(domain.DaemonState{Version: domain.DaemonStateVersion, Jobs: records})
 	if err != nil {
 		return fmt.Errorf("encode job index: %w", err)
 	}
-
-	// Written aside then renamed: a daemon killed mid-write must leave the
-	// previous index intact rather than a truncated file naming half the stacks
-	// it started.
-	tmp, err := os.CreateTemp(filepath.Dir(s.path), domain.DaemonStateFileName+".*")
-	if err != nil {
-		return fmt.Errorf("create temp index: %w", err)
-	}
-	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		os.Remove(tmp.Name())
-		return fmt.Errorf("write job index: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		os.Remove(tmp.Name())
-		return fmt.Errorf("write job index: %w", err)
-	}
-	if err := os.Chmod(tmp.Name(), 0o600); err != nil {
-		os.Remove(tmp.Name())
-		return fmt.Errorf("write job index: %w", err)
-	}
-	if err := os.Rename(tmp.Name(), s.path); err != nil {
-		os.Remove(tmp.Name())
+	// Atomic: a daemon killed mid-write must leave the previous index intact
+	// rather than a truncated file naming half the stacks it started.
+	if err := fs.ReplaceFile(fs.ReplaceFileParams{Path: s.path, Data: data, Perm: 0o600}); err != nil {
 		return fmt.Errorf("write job index: %w", err)
 	}
 	return nil

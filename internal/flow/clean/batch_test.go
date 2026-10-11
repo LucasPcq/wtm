@@ -289,7 +289,7 @@ func TestABatchStatesEachRefusalUnderItsWorktree(t *testing.T) {
 func TestABatchDropsTheDataOfEveryWorktreeItRemoves(t *testing.T) {
 	d := newDataFixture(t)
 	makeWorktree(t, d.ctx, "feat/more")
-	if err := worktree.RecordNamespaces(worktree.RecordNamespacesParams{StateDir: d.ctx.StateDir, Branch: "feat/more", Jobs: []string{"postgres"}}); err != nil {
+	if err := worktree.RecordNamespaces(t.Context(), worktree.RecordNamespacesParams{StateDir: d.ctx.StateDir, Branch: "feat/more", Jobs: []string{"postgres"}}); err != nil {
 		t.Fatal(err)
 	}
 
