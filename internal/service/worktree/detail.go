@@ -74,20 +74,14 @@ func RecordNamespaces(ctx context.Context, params RecordNamespacesParams) error 
 			if readErr != nil {
 				return domain.WorktreeMetadata{}, readErr
 			}
-			meta.Namespaces = withNamespaces(meta.Namespaces, params.Jobs)
+			for _, job := range params.Jobs {
+				if !slices.Contains(meta.Namespaces, job) {
+					meta.Namespaces = append(meta.Namespaces, job)
+				}
+			}
 			return meta, nil
 		},
 	})
-}
-
-func withNamespaces(held, jobs []string) []string {
-	merged := slices.Clone(held)
-	for _, job := range jobs {
-		if !slices.Contains(merged, job) {
-			merged = append(merged, job)
-		}
-	}
-	return merged
 }
 
 // NamespacesOf is what this worktree has to give back when it goes.
