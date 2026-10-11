@@ -368,8 +368,7 @@ Two env-var overrides exist for tests / CI:
    the runner to the shape in "Mutation command" above. Never put the flow in
    `commands/`, and never inject a service closure into a TUI package.
 6. Regenerate the reference and update the guide: `make docs` (writes `docs/`, never
-   hand-edited) and add the command to the `README.md` overview table. See CLAUDE.md
-   "Docs & README".
+   hand-edited); the README has no command table. See CLAUDE.md "Docs & README".
 
 Full recipe, step by step: [`docs/dev/adding-a-mutation-command.md`](../../../docs/dev/adding-a-mutation-command.md).
 

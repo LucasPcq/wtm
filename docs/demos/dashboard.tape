@@ -19,7 +19,7 @@ Sleep 2s
 Down
 Sleep 2s
 Type "n"
-Wait+Screen@15s /Branch name/
+Wait+Screen@15s /Branches/
 Sleep 1.5s
 Type "fix/typo"
 Sleep 1s
