@@ -85,6 +85,8 @@ When a page is renamed or removed, `grep` for its file name across `docs/`, `REA
 cd site && npm test && npm run build    # sync + build; internal links and anchors are validated
 ```
 
+Go tests also read the docs: `internal/commands/agents/events_doc_test.go` requires every final `wtm events` exit code to be named in `docs/guide/events.md`, `docs/guide/recipes.md` and the `using-wtm` skill. A fact a test pins to several pages stays on each of them; run `go test ./internal/commands/agents/` (or `make test`) after editing those pages.
+
 A broken anchor fails the build: renaming a heading breaks every `#anchor` pointing at it, so `grep` the old slug first. Then look at the page in `make site-dev` (sidebar placement, lede, how code and tables render). When the change also touched the landing or the theme, take screenshots with the `wtm-site` skill.
 
 ## Auditing the guide
