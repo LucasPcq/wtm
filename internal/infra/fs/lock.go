@@ -42,7 +42,7 @@ func WithFileLock(ctx context.Context, params WithFileLockParams) (Lock, error) 
 		return Lock{}, err
 	}
 	defer file.Close()
-	defer syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+	defer flock(file, syscall.LOCK_UN)
 
 	return Lock{Held: true}, params.Do()
 }
@@ -55,7 +55,7 @@ func acquire(ctx context.Context, path string) (*os.File, error) {
 		return nil, errUnlockable
 	}
 	for {
-		err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		err := flock(file, syscall.LOCK_EX|syscall.LOCK_NB)
 		if err == nil {
 			return file, nil
 		}
@@ -80,4 +80,15 @@ func openLockFile(path string) (*os.File, error) {
 		return nil, err
 	}
 	return os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
+}
+
+// flock retries a call a signal interrupted: the Go runtime's own preemption
+// signals can, and an interrupted try is no answer about the lock.
+func flock(file *os.File, how int) error {
+	for {
+		err := syscall.Flock(int(file.Fd()), how)
+		if !errors.Is(err, syscall.EINTR) {
+			return err
+		}
+	}
 }

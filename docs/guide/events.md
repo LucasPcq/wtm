@@ -34,6 +34,9 @@ A subscription opens on a **snapshot** (one `snapshot` event listing every workt
 {"v":1,"type":"job.crashed","ts":"…","repo":{…},"worktree":{…},"job":{…},"exit_code":1,"last_lines":["Error: listen EADDRINUSE :::3000"]}
 {"v":1,"type":"job.exited","ts":"…","repo":{…},"worktree":{…},"job":{"name":"migrate","kind":"task"},"exit_code":0}
 {"v":1,"type":"job.stopped","ts":"…","repo":{…},"worktree":{…},"job":{…}}
+{"v":1,"type":"operation.started","ts":"…","repo":{…},"op_id":"1f3a9c0e5b7d2468","operation":{"command":"create","surface":"cli"}}
+{"v":1,"type":"unit.finished","ts":"…","repo":{…},"op_id":"1f3a9c0e5b7d2468","unit":{"subject":"feat/login","status":"done"}}
+{"v":1,"type":"operation.finished","ts":"…","repo":{…},"op_id":"1f3a9c0e5b7d2468","operation":{…},"ok":true}
 ```
 
 | Type | Sent when | Extra field |
@@ -53,10 +56,14 @@ A subscription opens on a **snapshot** (one `snapshot` event listing every workt
 | `job.crashed` | a job ended on its own: a service whose process exited, a task or a detached launcher that exited non-zero | `exit_code` (`-1` when a signal killed it), `last_lines` |
 | `job.exited` | a task exited `0` | `exit_code` |
 | `job.stopped` | `run stop`, `run down` or the job's `stop` command took it down | — |
+| `operation.started` | a command began applying its changes. Only the commands on wtm's operation model send it; none does yet, `create` will be the first | `op_id`, `operation`: `command` and the `surface` it was started from (`cli`, `tui`) |
+| `unit.finished` | one item of that operation is over: a worktree created, a job started | `op_id`, `unit`: `subject` and `status` (`done`, `failed`, `skipped`, `cancelled`) |
+| `operation.finished` | the operation is over, interrupted included | `op_id`, `operation`, `ok`; when `false`, `code`, the failure that ended it (an item that failed alone is in its `unit.finished`) |
 
 - Every event carries `v` (the schema version), `type` and `ts` (RFC 3339, UTC); every event but `ready` carries `repo`, every `worktree.*` event the `worktree` it is about, and every `job.*` event the `worktree` and `job` it is about. A `removed` carries the worktree's last state.
 - `deprovisioned` with `ok: true` is followed by `removed`; `ok: false` means the removal stopped there and the worktree is still on disk. A worktree whose directory is already gone gets `ok: true` only without `on_clean` hooks: with some, they cannot run there and the removal stops.
 - An event published by a command started with `WTM_CORRELATION_ID` carries it as `correlation_id`; see [Recognising your own command](#recognising-your-own-command).
+- The three `operation.*` / `unit.*` events of one run share its `op_id`. A preview (`--dry-run`) and a run refused before it changed anything send none.
 
 ### The worktree identity
 

@@ -30,9 +30,12 @@ func runHookView(t *testing.T, logPath string, run func(view *HookView)) string 
 // returns nil explicitly.
 func openHookLog(t *testing.T, path string) io.Writer {
 	t.Helper()
-	log := HookLog(path)
-	if log == nil {
+	if path == "" {
 		return nil
+	}
+	log, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = log.Close() })
 	return log

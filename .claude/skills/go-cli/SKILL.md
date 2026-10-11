@@ -136,6 +136,10 @@ internal/
                                 Command, fields, rules, errors, results, Each / Saga
     text/                     ←   the message catalogue: kernel.Code + params → English
     kerneltest/               ←   CheckDependsOn, CheckSaga: the checks every command runs
+  dispatch/                   ← the engine's impure half, the one way a surface reaches a command:
+                                registry, form calls, Run (locks → Observe → Validate → Plan →
+                                fingerprint → Apply), operation events (docs/dev/dispatch.md)
+  query/operations/           ← the operations in progress, read from their holder files
   config/                     ← load & validate config.toml + run.toml from <git-common-dir>/wtm/
   flow/                       ← THE FLOW of a command, surface-independent
     decide/                   ←   branch/env decisions shared by the create-like flows
@@ -152,7 +156,8 @@ internal/
     integration/              ←   third-party adapters (VS Code, Cursor)
   styles/                     ← all Lipgloss styles + shared Indent constant
   infra/                      ← git exec
-    fs/                       ←   the only writer of state files: UpdateFile (lock, read, Mutate, atomic rename)
+    fs/                       ←   the only writer of state files: UpdateFile (lock, read, Mutate, atomic rename);
+                                  TryLocks / HoldFile for dispatch's operation locks, OpenLog
     proc/                     ←   Command, GroupCommand, Shield
   surface/                    ← the interfaces
     cli/                      ←   flag wiring only → delegates to flow/service (zero logic)
@@ -165,6 +170,7 @@ internal/
                                     Prompter/Presenter, mouse zones via bubblezone)
   testutil/gittest/           ← shared test helpers (InitRepo, CreateBranch)
   testutil/flowtest/          ← test doubles for the two flow seams (Prompter, Presenter)
+  testutil/dispatchtest/      ← runs a command through dispatch with no surface, on doubles
 ```
 
 **Hard rules:**
@@ -172,6 +178,9 @@ internal/
 - `domain/` imports only stdlib (unchanged)
 - `rules/` imports only stdlib + internal/domain
 - `kernel/` imports only the stdlib (not even `domain/`), and writes no text: codes and params only
+- `dispatch/` imports `kernel`, `domain`, `rules`, `infra` only; `command/` and `query/` never
+  import `dispatch` or `surface/`, `surface/` never imports them, and `command/` never calls
+  `context.Background()`/`context.TODO()` (archlint `engine`)
 - `flow/` imports **only** `internal/service/`, `internal/rules/`, `internal/domain/` and the
   stdlib — never cobra, bubbletea or lipgloss, and never `surface/` or `config/`.
   It therefore cannot reach `infra/` either: add a thin `service/` wrapper
@@ -878,7 +887,9 @@ The command engine and the layers built for it (`internal/kernel/`, `infra/fs`, 
 `statefile` packages, then `dispatch`, `store/`, `infra/git`…) are tested with
 testify (`assert`, `require`): a test reads as a specification. Each test file holds
 only `Test…` functions; a package's example and fakes live in `fixture_test.go`, the
-helpers its tests share in `helpers_test.go`. The rest of the repository keeps the
+helpers its tests share in `helpers_test.go`. A command on the engine is run in its
+tests through `testutil/dispatchtest` (`dispatchtest.New`, `dispatchtest.Run`): the
+outcome, the progress and the events, no surface. The rest of the repository keeps the
 stdlib `testing` style below.
 
 ### Unit tests — config/service/domain

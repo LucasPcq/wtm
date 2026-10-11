@@ -52,7 +52,7 @@ This is five gates in one, and the output names which failed:
 | -- | -- |
 | `fmt` | files `gofmt` would change. It fails rather than rewrites — a formatting fix belongs in the commit that caused it |
 | `vet` | the stdlib's own diagnostics |
-| `arch` | `tools/archlint`: the layer graph of CLAUDE.md §9 (`kernel/` included: stdlib only) and the declared `service→service` edges, the `styles/` monopoly on `lipgloss.Style`, type assertions without comma-ok, a command reading the interactive gate without offering `--yes`, a service mutator called from outside `flow/`, the daemon reaching git, a file written outside `infra/fs` (`statewrite`), and the output vocabulary rules. Each finding prints `file:line: [rule] why` |
+| `arch` | `tools/archlint`: the layer graph of CLAUDE.md §9 (`kernel/` included: stdlib only; `dispatch/` on `kernel`, `domain`, `rules`, `infra` only) and the declared `service→service` edges, the `styles/` monopoly on `lipgloss.Style`, type assertions without comma-ok, a command reading the interactive gate without offering `--yes`, a service mutator called from outside `flow/`, the daemon reaching git, a file written outside `infra/fs` (`statewrite`), a use case (`command/`, `query/`) importing `dispatch` or a surface or a surface importing one, a root context in `command/` (`engine`), and the output vocabulary rules. Each finding prints `file:line: [rule] why` |
 | `dead` | `deadcode`: functions no path reaches, test paths included. Exceptions are listed with their reason in `.deadcode-ignore` |
 | `sumtype` | `go-sumtype`: a type switch over a sealed interface declared `//go-sumtype:decl` (`kernel.Error`, `kernel.Value`) that misses a variant |
 | `staticcheck` | everything else |

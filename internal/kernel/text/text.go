@@ -34,6 +34,13 @@ var catalog = map[kernel.Code]string{
 	kernel.CodeStepFailed:     "{step} failed",
 	kernel.CodeUndoFailed:     "could not undo {step}, left behind: {left}",
 	kernel.CodePhaseFailed:    "{phase} failed",
+
+	// Declared by dispatch, which kernel cannot import.
+	"lock.held":             "{key} is held by another wtm operation: {command} (pid {pid})",
+	"plan.stale":            "the repository changed since the preview (fingerprint {expected}, now {found}): preview again",
+	"state.schema_newer":    "{path} was written by a newer wtm (schema {found}, this one supports {supported}): upgrade wtm to change it",
+	"locks.unavailable":     "the operation locks could not be taken on this filesystem: ran without protection against another wtm command",
+	"request.unknown_field": "{path} is not a field of this request",
 }
 
 // Message renders code over params; a code missing from the catalogue reads

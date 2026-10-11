@@ -2,7 +2,7 @@
 
 Every command of wtm becomes a typed payload that is validated, previewed, then applied, so the CLI, an agent, a future API and a graphical interface drive wtm through the same engine. This page describes the contract that engine is built on: `internal/kernel/`, the pure part every command, `dispatch` and every surface share. It imports only the stdlib (enforced by `tools/archlint`): it carries no business vocabulary, and a command composes it with `internal/domain`, never the reverse.
 
-No command is on the contract yet: `internal/flow/` ([flow-layer.md](flow-layer.md)) still runs every command. `create` is the first to move.
+No command is on the contract yet: `internal/flow/` ([flow-layer.md](flow-layer.md)) still runs every command. `create` is the first to move. A command on the contract runs through `internal/dispatch/` ([dispatch.md](dispatch.md)), which takes its locks, observes, validates, plans and applies it.
 
 ## Vocabulary
 
@@ -25,6 +25,7 @@ No command is on the contract yet: `internal/flow/` ([flow-layer.md](flow-layer.
 type Command[Req, F, P, D any] struct {
 	Name    string
 	Observe func(context.Context, ObserveScope) (F, error)
+	Forget  func(F) F
 	Fields  []FieldDef[Req, F]
 	Rules   Rules[Req, F]
 	Locks   func(Req) []LockKey
@@ -33,7 +34,7 @@ type Command[Req, F, P, D any] struct {
 }
 ```
 
-The only I/O of a command is in `Observe`, `FieldDef.Choices` and `Apply`; each takes a `ctx`. `ObserveScope` is data only (the directory observed from): a command gets its ports (git, the state files, processes) when it is built, never through a kernel type. `ApplyInput` hands `Apply` the request, the facts, the plan, the `Emitter` for progress and the `Shield` its sagas run under. Everything else is a pure function of `(Req, F)`. `Locks` names the operation locks the command needs: the repository (`LockRepo`) or one worktree by its branch (`LockWorktree`), shared or exclusive.
+The only I/O of a command is in `Observe`, `FieldDef.Choices` and `Apply`; each takes a `ctx`. `ObserveScope` is data only (the directory observed from): a command gets its ports (git, the state files, processes) when it is built, never through a kernel type. `ApplyInput` hands `Apply` the request, the facts, the plan, the `Emitter` for progress and the `Shield` its sagas run under. Everything else is a pure function of `(Req, F)`. `Locks` names the operation locks the command needs: the repository (`LockRepo`) or one worktree by its branch (`LockWorktree`), shared or exclusive. `Forget` returns the facts without the answers the user asked to remember: a run that asks again (`--ask`) falls back on each field's other default. An `Operation` is a run in progress as `dispatch` records it (who, from which `Surface`, since when, holding which keys).
 
 ## Fields
 

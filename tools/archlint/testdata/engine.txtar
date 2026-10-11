@@ -1,0 +1,53 @@
+-- github.com/LucasPcq/wtm/internal/dispatch/dispatch.go --
+package dispatch
+
+func Run() error { return nil }
+-- github.com/LucasPcq/wtm/internal/surface/tui/tui.go --
+package tui
+
+func Draw() {}
+-- github.com/LucasPcq/wtm/internal/command/clean/clean.go --
+package clean
+
+func Command() {}
+-- github.com/LucasPcq/wtm/internal/surface/cli/cli.go --
+package cli
+
+import (
+	"github.com/LucasPcq/wtm/internal/command/clean" // want `surface/cli must not import "github.com/LucasPcq/wtm/internal/command/clean": a surface reaches a command through dispatch only`
+	"github.com/LucasPcq/wtm/internal/dispatch"
+)
+
+var _, _ = dispatch.Run, clean.Command
+-- github.com/LucasPcq/wtm/internal/command/create/create.go --
+package create
+
+import (
+	"context"
+
+	"github.com/LucasPcq/wtm/internal/surface/tui" // want `command/create must not import "github.com/LucasPcq/wtm/internal/surface/tui"`
+)
+
+var _ = tui.Draw
+
+func observe(ctx context.Context) error { return ctx.Err() }
+
+func validate() error {
+	return observe(context.Background()) // want `context\.Background in command/`
+}
+
+func skip() error {
+	return observe(context.TODO()) // want `context\.TODO in command/`
+}
+-- github.com/LucasPcq/wtm/internal/query/operations/operations.go --
+package operations
+
+import (
+	"context"
+
+	"github.com/LucasPcq/wtm/internal/dispatch" // want `query/operations must not import "github.com/LucasPcq/wtm/internal/dispatch"`
+)
+
+var _ = dispatch.Run
+
+func run() context.Context { return context.Background() }

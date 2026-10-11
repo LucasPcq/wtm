@@ -8,6 +8,7 @@ Mandatory coding standards for `wtm`. When in doubt, consult the `go-cli` skill 
 | -- | -- |
 | [`docs/dev/architecture.md`](docs/dev/architecture.md) | adding a package, an import between layers, or a `service→service` edge (annotated package map) |
 | [`docs/dev/commands.md`](docs/dev/commands.md) | touching `internal/kernel/`: the engine's contract (fields, rules, errors and their codes, results, `Each` / sagas) |
+| [`docs/dev/dispatch.md`](docs/dev/dispatch.md) | touching `internal/dispatch/`: the registry, the run order, operation locks and holders, the fingerprint, operation events, the test bench |
 | [`docs/dev/state-files.md`](docs/dev/state-files.md) | writing any file, or changing the format of a state file (`fs.UpdateFile`, `fs.Change`, locks, schema versions) |
 | [`docs/dev/flow-layer.md`](docs/dev/flow-layer.md) | touching anything under `internal/flow/`, a Prompter/Presenter, a step kind, or the dashboard's run of a flow |
 | [`docs/dev/adding-a-mutation-command.md`](docs/dev/adding-a-mutation-command.md) | adding a worktree-mutating command |
@@ -90,6 +91,9 @@ internal/
   rules/        pure functions (stdlib + domain only, no I/O)
   kernel/       the command engine's skeleton (stdlib only): fields, rules, errors, results, Each / sagas;
                 text/ its message catalogue, kerneltest/ the checks every command runs
+  dispatch/     the engine's impure half, the one way a surface reaches a command: registry,
+                locks, Observe → Validate → Plan → fingerprint → Apply, operation events
+  query/        the reads on the engine (operations/)
   config/       load & validate config.toml, run.toml, global config; writes the JSON schema beside each
   flow/         each command's flow, surface-independent (one package per command)
   service/      impure orchestration: git exec, I/O, hooks, the run daemon, the event bus
@@ -108,6 +112,7 @@ The annotated map of every sub-package is in `docs/dev/architecture.md`.
 - `domain/` has types, errors and constants only — no methods, no free functions.
 - `rules/` imports only stdlib and `internal/domain` — no I/O, no side effects.
 - `kernel/` imports only the stdlib — no `domain/`, no business vocabulary: a command composes `kernel` with `domain`, never the reverse. I/O reaches it only as functions it is handed (`Observe`, `Apply`, the `Shield`). The engine writes no text: an error, a warning or a progress event is a `kernel.Code` plus params, and `kernel/text` holds the English.
+- `dispatch/` imports only `kernel/`, `domain/`, `rules/` and `infra/`: a command's ports reach it as interfaces. `command/` and `query/` never import `dispatch/` or `surface/`, `surface/` never imports them, and `command/` never calls `context.Background()`/`context.TODO()` (`engine`). See `docs/dev/dispatch.md`.
 - `service/` never imports `cobra`, `bubbletea`, `lipgloss`.
 - `surface/cli/render/` and `surface/tui/` have zero decision logic — only rendering.
 - `styles/` is the only package allowed to instantiate `lipgloss.Style`.

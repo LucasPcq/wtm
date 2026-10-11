@@ -37,6 +37,9 @@ One JSON object per line:
 | `job.crashed` | a job ended on its own: a service that exited, a task or a launcher that failed | `exit_code` (`-1`: killed by a signal), `last_lines`: the last lines it printed |
 | `job.exited` | a task finished with `0` | `exit_code` |
 | `job.stopped` | `run stop`, `run down` or a stop command took it down | — |
+| `operation.started` | a command began applying (only commands on the operation model send it; none yet) | `op_id`, `operation`: `{command, surface}` |
+| `unit.finished` | one item of that operation is over | `op_id`, `unit`: `{subject, status}` (`done`, `failed`, `skipped`, `cancelled`) |
+| `operation.finished` | the operation is over, interrupted included | `op_id`, `operation`, `ok`; on `false`, `code` |
 
 Every `worktree.*` event carries `worktree`: `branch`, `path`, `parent`, `ordinal` (`null` until allocated), `isolation`, `is_main`, `created_at`. Nothing volatile (dirty, ahead, PR, services): read those from `wtm list --output json`.
 

@@ -23,3 +23,7 @@ func TestTheDomainDeclaresNoFunction(t *testing.T) {
 func TestTheKernelImportsNothingButTheStdlib(t *testing.T) {
 	runTxtar(t, layersAnalyzer, "layers", internalPrefix+"kernel/text")
 }
+
+func TestDispatchRunsOnItsOwnPorts(t *testing.T) {
+	runTxtar(t, layersAnalyzer, "layers", internalPrefix+"dispatch")
+}

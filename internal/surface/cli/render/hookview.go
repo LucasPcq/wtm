@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -53,8 +51,7 @@ type HookView struct {
 type HookViewParams struct {
 	W io.Writer
 	// Log is the open log, or nil. The view neither opens nor closes it: the log
-	// is kept whatever the surface draws, so it outlives any one view — see
-	// HookLog.
+	// is kept whatever the surface draws, so it outlives any one view.
 	Log io.Writer
 	// LogPath is what the failure line points the reader at. Empty prints no such
 	// line.
@@ -74,26 +71,6 @@ func NewHookView(params HookViewParams) *HookView {
 		view.log = params.Log
 	}
 	return view
-}
-
-// HookLog opens the file a hook phase's whole output is kept in. Every surface
-// opens it, not only one that collapses the stream: a run whose output the
-// reader could not watch — a pipe, a CI log, a JSON run, a quiet one — is
-// exactly the one whose record has to survive. Nil when there is no path or it
-// cannot be opened: the log is what makes the collapse safe, never what makes
-// the hook run.
-func HookLog(path string) *os.File {
-	if path == "" {
-		return nil
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return nil
-	}
-	file, err := os.Create(path)
-	if err != nil {
-		return nil
-	}
-	return file
 }
 
 // Write splits on carriage returns as well as newlines. A hook that only ever

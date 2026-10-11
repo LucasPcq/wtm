@@ -10,6 +10,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/events"
 	"github.com/LucasPcq/wtm/internal/surface/cli/render"
@@ -83,6 +84,21 @@ type DrawHookPhaseParams struct {
 	Run     func(flow.HookSink) error
 }
 
+// openHookLog opens the file a hook phase's whole output is kept in, whatever
+// the run showed of it: a run nobody could watch is exactly the one whose
+// record has to survive. Nil when there is no path or it cannot be opened: the
+// log never decides whether the hook runs.
+func openHookLog(path string) *os.File {
+	if path == "" {
+		return nil
+	}
+	log, err := fs.OpenLog(path)
+	if err != nil {
+		return nil
+	}
+	return log
+}
+
 // DrawHookPhase draws the phase only where it can be undrawn. A terminal gets a
 // bounded tail replaced by one result line per hook; anything else — a pipe, a
 // CI log, a JSON run, a quiet one — gets the stream whole, which is what a
@@ -91,7 +107,7 @@ type DrawHookPhaseParams struct {
 // its own way to the terminal, and its record must not depend on who was
 // watching.
 func DrawHookPhase(params DrawHookPhaseParams) error {
-	log := render.HookLog(params.LogPath)
+	log := openHookLog(params.LogPath)
 	if log != nil {
 		defer func() { _ = log.Close() }()
 	}
