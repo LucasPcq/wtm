@@ -4,6 +4,7 @@ import starlightLinksValidator from 'starlight-links-validator';
 import starlightLlmsTxt from 'starlight-llms-txt';
 import starlightVersions from 'starlight-versions';
 
+import { pluginConsoleHighlight } from './src/lib/console-highlight.mjs';
 import { archivedVersions, BASE, currentLabel, currentSidebar, SITE_URL } from './site.config.mjs';
 
 const archivedPages = archivedVersions.map(({ slug }) => `${slug}/**`);
@@ -23,7 +24,7 @@ export default defineConfig({
       editLink: { baseUrl: 'https://github.com/LucasPcq/wtm/edit/main/' },
       customCss: ['./src/styles/theme.css'],
       // Shell blocks get no window dots: docs/dev/identity.md, Showing the product.
-      expressiveCode: { defaultProps: { frame: 'code' } },
+      expressiveCode: { defaultProps: { frame: 'code' }, plugins: [pluginConsoleHighlight()] },
       head: [
         { tag: 'meta', attrs: { property: 'og:image', content: socialImage } },
         { tag: 'meta', attrs: { property: 'og:image:width', content: '1280' } },
