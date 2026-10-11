@@ -22,6 +22,8 @@ export default defineConfig({
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/LucasPcq/wtm' }],
       editLink: { baseUrl: 'https://github.com/LucasPcq/wtm/edit/main/' },
       customCss: ['./src/styles/theme.css'],
+      // Shell blocks get no window dots: docs/dev/identity.md, Showing the product.
+      expressiveCode: { defaultProps: { frame: 'code' } },
       head: [
         { tag: 'meta', attrs: { property: 'og:image', content: socialImage } },
         { tag: 'meta', attrs: { property: 'og:image:width', content: '1280' } },
