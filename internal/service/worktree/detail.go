@@ -2,12 +2,11 @@ package worktree
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -68,38 +67,27 @@ func RecordNamespaces(ctx context.Context, params RecordNamespacesParams) error 
 		return nil
 	}
 	return updateMetadata(ctx, updateMetadataParams{
-		StateDir: params.StateDir,
-		Branch:   params.Branch,
+		StateDir:    params.StateDir,
+		Branch:      params.Branch,
+		KeepMissing: true,
 		Update: func(meta domain.WorktreeMetadata, readErr error) (domain.WorktreeMetadata, error) {
-			if errors.Is(readErr, os.ErrNotExist) {
-				return domain.WorktreeMetadata{}, fs.ErrUnchanged
-			}
 			if readErr != nil {
 				return domain.WorktreeMetadata{}, readErr
 			}
-			return recordNamespaces(meta, params.Jobs)
+			meta.Namespaces = withNamespaces(meta.Namespaces, params.Jobs)
+			return meta, nil
 		},
 	})
 }
 
-func recordNamespaces(meta domain.WorktreeMetadata, jobs []string) (domain.WorktreeMetadata, error) {
-	held := make(map[string]bool, len(meta.Namespaces))
-	for _, job := range meta.Namespaces {
-		held[job] = true
-	}
-	changed := false
+func withNamespaces(held, jobs []string) []string {
+	merged := slices.Clone(held)
 	for _, job := range jobs {
-		if held[job] {
-			continue
+		if !slices.Contains(merged, job) {
+			merged = append(merged, job)
 		}
-		held[job] = true
-		meta.Namespaces = append(meta.Namespaces, job)
-		changed = true
 	}
-	if !changed {
-		return domain.WorktreeMetadata{}, fs.ErrUnchanged
-	}
-	return meta, nil
+	return merged
 }
 
 // NamespacesOf is what this worktree has to give back when it goes.

@@ -245,9 +245,12 @@ func occupantOf(ctx context.Context, params occupantParams) (string, error) {
 type updateMetadataParams struct {
 	StateDir string
 	Branch   string
+	// KeepMissing leaves a worktree without a record without one: the main
+	// checkout never gets a meta.json.
+	KeepMissing bool
 	// Update receives the record on disk, or the zero record with the error
-	// that kept it from being read (fs.ErrNotExist when there is none), and
-	// returns the record to write. fs.ErrUnchanged leaves the file as it is.
+	// that kept it from being read (os.ErrNotExist when there is none), and
+	// returns the record to write; one returned unchanged is not rewritten.
 	Update func(stored domain.WorktreeMetadata, readErr error) (domain.WorktreeMetadata, error)
 }
 
@@ -258,12 +261,12 @@ func updateMetadata(ctx context.Context, params updateMetadataParams) error {
 	path := filepath.Join(rules.WorktreeMetaDir(params.StateDir, params.Branch), domain.MetaFileName)
 	_, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
 		Path: path,
-		Mutate: func(current []byte) ([]byte, error) {
+		Mutate: func(current []byte) (fs.Change, error) {
+			if current == nil && params.KeepMissing {
+				return fs.Keep{}, nil
+			}
 			stored, readErr := decodeMetadata(current)
-			if err := statefile.Refusal(statefile.RefusalParams{
-				Path:   path,
-				Schema: statefile.SchemaParams{Found: stored.Schema, Supported: domainstatefile.MetaSchema},
-			}); err != nil {
+			if err := statefile.Refusal(statefile.Schema{Path: path, Found: stored.Schema, Supported: domainstatefile.MetaSchema}); err != nil {
 				return nil, err
 			}
 			next, err := params.Update(stored, readErr)
@@ -275,7 +278,7 @@ func updateMetadata(ctx context.Context, params updateMetadataParams) error {
 			if err != nil {
 				return nil, fmt.Errorf("marshal metadata: %w", err)
 			}
-			return data, nil
+			return fs.Write{Data: data}, nil
 		},
 	})
 	return err

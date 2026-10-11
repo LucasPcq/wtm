@@ -82,9 +82,10 @@ func Open(params OpenParams) (Context, error) {
 	if runErr != nil && !params.TolerateRunConfig {
 		return Context{}, fmt.Errorf("load run.toml: %w", runErr)
 	}
-	shared.WarnSchemaNewer(params.Cmd, statefile.RefusalParams{
-		Path:   filepath.Join(result.StateDir, domain.RunFileName),
-		Schema: statefile.SchemaParams{Found: cfg.Schema, Supported: domainstatefile.RunConfigSchema},
+	shared.WarnSchemaNewer(params.Cmd, statefile.Schema{
+		Path:      filepath.Join(result.StateDir, domain.RunFileName),
+		Found:     cfg.Schema,
+		Supported: domainstatefile.RunConfigSchema,
 	})
 	if err := rules.ValidateProxy(result.Config.Global.Proxy); err != nil && !params.TolerateRunConfig {
 		return Context{}, err

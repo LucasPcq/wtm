@@ -373,13 +373,14 @@ Every write goes through `infra/fs`; `os.WriteFile`, `os.Create` and `os.Rename`
 ```go
 _, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
   Path: path,                       // locks <path>.lock; a file in the user's tree passes LockPath: fs.ScratchLockPath(path)
-  Mutate: func(current []byte) ([]byte, error) {  // current is nil when the file is absent
+  Mutate: func(current []byte) (fs.Change, error) {  // current is nil when the file is absent
     // decode current, change it, encode it — the read happens under the lock
-  },                                // fs.ErrUnchanged leaves the file alone, fs.ErrRemoveFile deletes it
+    return fs.Write{Data: next}, nil                 // or fs.Keep{}, fs.Remove{}
+  },
 })
 ```
 
-A state file read back inside `Mutate` refuses a newer schema first (`statefile.Refusal`, see `config.refuseNewer`), and writes its `schema` key through `statefile.Written`, which omits it at schema 1.
+A state file refuses a newer schema first inside `Mutate` (`statefile.Refusal(statefile.Schema{…})`, a `*statefile.NewerError`, exit 22) and writes its `schema` key through `statefile.Written`, which omits it at schema 1. Contract and how to raise a schema: [`docs/dev/state-files.md`](../../../docs/dev/state-files.md).
 
 ### Adding a new command
 
@@ -873,7 +874,8 @@ Rules:
 
 ## Testing Patterns
 
-The command engine (`internal/kernel/`, and the layers built on it) is tested with
+The command engine and the layers built for it (`internal/kernel/`, `infra/fs`, the
+`statefile` packages, then `dispatch`, `store/`, `infra/git`…) are tested with
 testify (`assert`, `require`): a test reads as a specification. Each test file holds
 only `Test…` functions; a package's example and fakes live in `fixture_test.go`, the
 helpers its tests share in `helpers_test.go`. The rest of the repository keeps the

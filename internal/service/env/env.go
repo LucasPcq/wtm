@@ -111,7 +111,7 @@ func copyFile(ctx context.Context, params copyFileParams) error {
 	_, err = fs.UpdateFile(ctx, fs.UpdateFileParams{
 		Path:     params.Dst,
 		LockPath: fs.ScratchLockPath(params.Dst),
-		Mutate:   func([]byte) ([]byte, error) { return data, nil },
+		Mutate:   func([]byte) (fs.Change, error) { return fs.Write{Data: data}, nil },
 	})
 	return err
 }

@@ -47,14 +47,18 @@ func UpdateRegistry(ctx context.Context, update func([]domain.RegisteredRepo) []
 	}
 	_, err = fs.UpdateFile(ctx, fs.UpdateFileParams{
 		Path: path,
-		Mutate: func(current []byte) ([]byte, error) {
+		Mutate: func(current []byte) (fs.Change, error) {
 			repos, err := decodeRegistry(current)
 			// Unparsable is rebuilt from scratch: every repository rejoins the
 			// next time a command runs in it.
 			if err != nil && !errors.As(err, new(*json.SyntaxError)) && !errors.As(err, new(*json.UnmarshalTypeError)) {
 				return nil, err
 			}
-			return encodeRegistry(update(repos))
+			data, err := encodeRegistry(update(repos))
+			if err != nil {
+				return nil, err
+			}
+			return fs.Write{Data: data}, nil
 		},
 	})
 	return err

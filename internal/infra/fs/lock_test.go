@@ -1,4 +1,4 @@
-package fs
+package fs_test
 
 import (
 	"context"
@@ -8,91 +8,75 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 )
 
 func TestWithFileLockSerializesConcurrentRuns(t *testing.T) {
 	lock := filepath.Join(t.TempDir(), "test.lock")
-
 	var mu sync.Mutex
 	inside, peak := 0, 0
-	var wg sync.WaitGroup
 
+	var wg sync.WaitGroup
 	for range 16 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			_, _ = WithFileLock(t.Context(), WithFileLockParams{Path: lock, Do: func() error {
+		wg.Go(func() {
+			_, err := fs.WithFileLock(t.Context(), fs.WithFileLockParams{Path: lock, Do: func() error {
 				mu.Lock()
 				inside++
-				if inside > peak {
-					peak = inside
-				}
+				peak = max(peak, inside)
 				mu.Unlock()
-
-				// Long enough that an unprotected section would overlap.
-				buf := make([]byte, 4096)
-				for i := range buf {
-					buf[i] = byte(i)
-				}
-
+				time.Sleep(time.Millisecond)
 				mu.Lock()
 				inside--
 				mu.Unlock()
 				return nil
 			}})
-		}()
+			assert.NoError(t, err)
+		})
 	}
 	wg.Wait()
 
-	if peak > 1 {
-		t.Errorf("%d runs were inside the lock at once, want 1", peak)
-	}
+	assert.Equal(t, 1, peak, "runs overlapped inside the lock")
 }
 
-func TestWithFileLockPropagatesError(t *testing.T) {
-	lock := filepath.Join(t.TempDir(), "test.lock")
-	want := os.ErrInvalid
-
-	if _, got := WithFileLock(t.Context(), WithFileLockParams{Path: lock, Do: func() error { return want }}); got != want {
-		t.Errorf("error = %v, want %v", got, want)
-	}
+func TestWithFileLockReturnsWhatTheWorkReturns(t *testing.T) {
+	failed := errors.New("work failed")
+	lock, err := fs.WithFileLock(t.Context(), fs.WithFileLockParams{
+		Path: filepath.Join(t.TempDir(), "test.lock"),
+		Do:   func() error { return failed },
+	})
+	assert.ErrorIs(t, err, failed)
+	assert.True(t, lock.Held)
 }
 
-// A lock that cannot be taken must not cancel the work it was guarding.
-func TestWithFileLockRunsWhenItCannotLock(t *testing.T) {
-	unwritable := filepath.Join(t.TempDir(), "nope")
-	if err := os.WriteFile(unwritable, nil, 0o644); err != nil {
-		t.Fatalf("setup: %v", err)
-	}
+func TestALockThatCannotBeTakenRunsTheWorkUnprotected(t *testing.T) {
+	notADir := filepath.Join(t.TempDir(), "file")
+	require.NoError(t, os.WriteFile(notADir, nil, 0o644))
 
 	ran := false
-	lock, err := WithFileLock(t.Context(), WithFileLockParams{
-		Path: filepath.Join(unwritable, "test.lock"),
+	lock, err := fs.WithFileLock(t.Context(), fs.WithFileLockParams{
+		Path: filepath.Join(notADir, "test.lock"),
 		Do:   func() error { ran = true; return nil },
 	})
-	if err != nil {
-		t.Fatalf("WithFileLock: %v", err)
-	}
-	if !ran {
-		t.Error("the work was skipped because the lock could not be taken")
-	}
-	if lock.Held {
-		t.Error("Held = true for a lock that could not be taken")
-	}
+
+	require.NoError(t, err)
+	assert.True(t, ran, "the work was skipped because the lock could not be taken")
+	assert.False(t, lock.Held)
 }
 
-func TestWithFileLockWithoutWork(t *testing.T) {
-	if _, err := WithFileLock(t.Context(), WithFileLockParams{Path: filepath.Join(t.TempDir(), "test.lock")}); err != nil {
-		t.Errorf("WithFileLock with no work: %v", err)
-	}
+func TestWithFileLockWithoutWorkDoesNothing(t *testing.T) {
+	_, err := fs.WithFileLock(t.Context(), fs.WithFileLockParams{Path: filepath.Join(t.TempDir(), "test.lock")})
+	assert.NoError(t, err)
 }
 
-func TestWithFileLockStopsWaitingWhenCancelled(t *testing.T) {
+func TestWaitingForALockEndsWithTheContext(t *testing.T) {
 	lock := filepath.Join(t.TempDir(), "test.lock")
-	held := make(chan struct{})
-	release := make(chan struct{})
+	held, release := make(chan struct{}), make(chan struct{})
 	go func() {
-		_, _ = WithFileLock(t.Context(), WithFileLockParams{Path: lock, Do: func() error {
+		_, _ = fs.WithFileLock(t.Context(), fs.WithFileLockParams{Path: lock, Do: func() error {
 			close(held)
 			<-release
 			return nil
@@ -104,11 +88,21 @@ func TestWithFileLockStopsWaitingWhenCancelled(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 	defer cancel()
 	ran := false
-	_, err := WithFileLock(ctx, WithFileLockParams{Path: lock, Do: func() error { ran = true; return nil }})
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Errorf("error = %v, want %v", err, context.DeadlineExceeded)
-	}
-	if ran {
-		t.Error("the work ran without the lock it was waiting for")
-	}
+	_, err := fs.WithFileLock(ctx, fs.WithFileLockParams{Path: lock, Do: func() error { ran = true; return nil }})
+
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.False(t, ran, "the work ran without the lock it was waiting for")
+}
+
+func TestAFreeLockIsTakenEvenOnceTheContextIsDone(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	ran := false
+	lock, err := fs.WithFileLock(ctx, fs.WithFileLockParams{
+		Path: filepath.Join(t.TempDir(), "test.lock"),
+		Do:   func() error { ran = true; return nil },
+	})
+	require.NoError(t, err)
+	assert.True(t, ran)
+	assert.True(t, lock.Held)
 }

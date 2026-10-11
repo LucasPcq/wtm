@@ -548,7 +548,7 @@ func writeEnvFile(ctx context.Context, params writeEnvFileParams) error {
 	_, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
 		Path:     params.Path,
 		LockPath: fs.ScratchLockPath(params.Path),
-		Mutate:   func([]byte) ([]byte, error) { return []byte(params.Content), nil },
+		Mutate:   func([]byte) (fs.Change, error) { return fs.Write{Data: []byte(params.Content)}, nil },
 	})
 	return err
 }

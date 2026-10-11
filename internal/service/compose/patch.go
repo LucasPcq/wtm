@@ -149,7 +149,7 @@ func writeFile(ctx context.Context, out patchedFile) error {
 		Path:     out.path,
 		LockPath: fs.ScratchLockPath(out.path),
 		Perm:     out.mode,
-		Mutate:   func([]byte) ([]byte, error) { return []byte(out.content), nil },
+		Mutate:   func([]byte) (fs.Change, error) { return fs.Write{Data: []byte(out.content)}, nil },
 	})
 	if err != nil {
 		return fmt.Errorf(domain.ComposeWriteFileFmt, out.file, err)

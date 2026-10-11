@@ -6,7 +6,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	domainstatefile "github.com/LucasPcq/wtm/internal/domain/statefile"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/rules/statefile"
 	"github.com/LucasPcq/wtm/internal/surface/cli/render"
@@ -16,12 +15,12 @@ import (
 // written by a newer wtm: it is read as far as this one understands it, and a
 // write to it will be refused. On stderr, so it never reaches a caller reading
 // the command's output.
-func WarnSchemaNewer(cmd *cobra.Command, params statefile.RefusalParams) {
+func WarnSchemaNewer(cmd *cobra.Command, schema statefile.Schema) {
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
-	if !rules.IsHumanFormat(format) || !statefile.Newer(params.Schema) {
+	if !rules.IsHumanFormat(format) || !statefile.Newer(schema) {
 		return
 	}
 	render.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
-		render.Callout(w, domainstatefile.SchemaNewerTitle, statefile.NewerLines(params))
+		render.SchemaNewer(w, schema)
 	})
 }

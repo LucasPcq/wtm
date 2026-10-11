@@ -53,7 +53,7 @@ func SaveState(ctx context.Context, state domain.UpdateState) error {
 	}
 	_, err = fs.UpdateFile(ctx, fs.UpdateFileParams{
 		Path:   path,
-		Mutate: func([]byte) ([]byte, error) { return data, nil },
+		Mutate: func([]byte) (fs.Change, error) { return fs.Write{Data: data}, nil },
 	})
 	return err
 }

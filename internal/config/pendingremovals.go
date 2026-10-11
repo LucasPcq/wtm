@@ -58,20 +58,22 @@ func UpdatePendingRemovals(ctx context.Context, params UpdatePendingRemovalsPara
 	path := pendingRemovalsPath(params.StateDir)
 	_, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
 		Path: path,
-		Mutate: func(current []byte) ([]byte, error) {
+		Mutate: func(current []byte) (fs.Change, error) {
 			if err := refuseNewer(refuseNewerParams{Path: path, Current: current, Supported: domainstatefile.PendingRemovalsSchema}); err != nil {
 				return nil, err
 			}
 			next := params.Update(decodePendingRemovals(current))
 			if len(next) == 0 {
-				return nil, fs.ErrRemoveFile
+				return fs.Remove{}, nil
 			}
 			var buf bytes.Buffer
-			err := toml.NewEncoder(&buf).Encode(pendingRemovalsFile{
+			if err := toml.NewEncoder(&buf).Encode(pendingRemovalsFile{
 				Schema:  nonZero(statefile.Written(domainstatefile.PendingRemovalsSchema)),
 				Pending: next,
-			})
-			return buf.Bytes(), err
+			}); err != nil {
+				return nil, err
+			}
+			return fs.Write{Data: buf.Bytes()}, nil
 		},
 	})
 	return err

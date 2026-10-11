@@ -91,7 +91,7 @@ func renderProjectConfig(ctx context.Context, params renderParams) error {
 	path := filepath.Join(params.StateDir, domain.ConfigFileName)
 	_, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
 		Path: path,
-		Mutate: func(current []byte) ([]byte, error) {
+		Mutate: func(current []byte) (fs.Change, error) {
 			if err := refuseNewer(refuseNewerParams{Path: path, Current: current, Supported: domainstatefile.ProjectConfigSchema}); err != nil {
 				return nil, err
 			}
@@ -104,7 +104,7 @@ func renderProjectConfig(ctx context.Context, params renderParams) error {
 			if err := parsedTemplate.Execute(&buf, data); err != nil {
 				return nil, fmt.Errorf("render template: %w", err)
 			}
-			return buf.Bytes(), nil
+			return fs.Write{Data: buf.Bytes()}, nil
 		},
 	})
 	if err != nil {
@@ -128,10 +128,7 @@ func refuseNewer(params refuseNewerParams) error {
 	if _, err := toml.Decode(string(params.Current), &file); err != nil {
 		return nil
 	}
-	return statefile.Refusal(statefile.RefusalParams{
-		Path:   params.Path,
-		Schema: statefile.SchemaParams{Found: file.Schema, Supported: params.Supported},
-	})
+	return statefile.Refusal(statefile.Schema{Path: params.Path, Found: file.Schema, Supported: params.Supported})
 }
 
 type writeSchemaParams struct {
@@ -146,7 +143,7 @@ type writeSchemaParams struct {
 func writeSchema(ctx context.Context, params writeSchemaParams) error {
 	_, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
 		Path:   filepath.Join(params.Dir, domain.SchemasDirName, params.Schema.Filename()),
-		Mutate: func([]byte) ([]byte, error) { return params.Schema.Bytes(), nil },
+		Mutate: func([]byte) (fs.Change, error) { return fs.Write{Data: params.Schema.Bytes()}, nil },
 	})
 	return err
 }
@@ -192,7 +189,7 @@ func WriteRun(ctx context.Context, params WriteRunParams) error {
 	path := filepath.Join(params.StateDir, domain.RunFileName)
 	_, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
 		Path: path,
-		Mutate: func(current []byte) ([]byte, error) {
+		Mutate: func(current []byte) (fs.Change, error) {
 			if current != nil && !params.Force {
 				return nil, ErrRunFileExists
 			}
@@ -204,7 +201,7 @@ func WriteRun(ctx context.Context, params WriteRunParams) error {
 			if err := toml.NewEncoder(&buf).Encode(runFileOf(params.Config)); err != nil {
 				return nil, fmt.Errorf("encode run config: %w", err)
 			}
-			return buf.Bytes(), nil
+			return fs.Write{Data: buf.Bytes()}, nil
 		},
 	})
 	if err != nil {
@@ -271,11 +268,11 @@ type writeGlobalAtParams struct {
 func writeGlobalAt(ctx context.Context, params writeGlobalAtParams) error {
 	_, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
 		Path: params.Path,
-		Mutate: func(current []byte) ([]byte, error) {
+		Mutate: func(current []byte) (fs.Change, error) {
 			if err := refuseNewer(refuseNewerParams{Path: params.Path, Current: current, Supported: domainstatefile.GlobalConfigSchema}); err != nil {
 				return nil, err
 			}
-			return []byte(globalContent(params.Answers)), nil
+			return fs.Write{Data: []byte(globalContent(params.Answers))}, nil
 		},
 	})
 	if err != nil {

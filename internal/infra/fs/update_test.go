@@ -1,4 +1,4 @@
-package fs
+package fs_test
 
 import (
 	"errors"
@@ -8,47 +8,14 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 )
 
-const (
-	envUpdateHelperPath   = "WTM_TEST_UPDATE_HELPER_PATH"
-	envUpdateHelperRounds = "WTM_TEST_UPDATE_HELPER_ROUNDS"
-)
-
-func increment(t testing.TB, path string) Lock {
-	t.Helper()
-	lock, err := UpdateFile(t.Context(), UpdateFileParams{
-		Path: path,
-		Mutate: func(current []byte) ([]byte, error) {
-			count := 0
-			if current != nil {
-				parsed, err := strconv.Atoi(string(current))
-				if err != nil {
-					return nil, err
-				}
-				count = parsed
-			}
-			return []byte(strconv.Itoa(count + 1)), nil
-		},
-	})
-	if err != nil {
-		t.Fatalf("UpdateFile: %v", err)
-	}
-	return lock
-}
-
-func counter(t *testing.T, path string) int {
-	t.Helper()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read: %v", err)
-	}
-	count, err := strconv.Atoi(string(data))
-	if err != nil {
-		t.Fatalf("parse %q: %v", data, err)
-	}
-	return count
-}
+// — Concurrency: no update is lost —
 
 func TestUpdateFileLosesNoConcurrentUpdate(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "state", "counter")
@@ -60,9 +27,7 @@ func TestUpdateFileLosesNoConcurrentUpdate(t *testing.T) {
 	}
 	wg.Wait()
 
-	if got := counter(t, path); got != writers {
-		t.Errorf("counter = %d after %d updates", got, writers)
-	}
+	assert.Equal(t, writers, counter(t, path))
 }
 
 func TestUpdateFileLosesNoUpdateAcrossProcesses(t *testing.T) {
@@ -70,161 +35,160 @@ func TestUpdateFileLosesNoUpdateAcrossProcesses(t *testing.T) {
 	const processes, rounds = 4, 25
 
 	var wg sync.WaitGroup
-	errs := make(chan error, processes)
 	for range processes {
 		wg.Go(func() {
-			cmd := exec.Command(os.Args[0], "-test.run=^TestUpdateFileHelper$")
-			cmd.Env = append(os.Environ(), envUpdateHelperPath+"="+path, envUpdateHelperRounds+"="+strconv.Itoa(rounds))
-			if out, err := cmd.CombinedOutput(); err != nil {
-				errs <- errors.New(string(out))
-			}
+			cmd := exec.Command(os.Args[0], "-test.run=^TestHelperProcess$")
+			cmd.Env = append(os.Environ(), envCounterPath+"="+path, envCounterRounds+"="+strconv.Itoa(rounds))
+			out, err := cmd.CombinedOutput()
+			assert.NoError(t, err, string(out))
 		})
 	}
 	wg.Wait()
-	close(errs)
-	for err := range errs {
-		t.Fatalf("helper process: %v", err)
-	}
 
-	if got := counter(t, path); got != processes*rounds {
-		t.Errorf("counter = %d after %d updates from %d processes", got, processes*rounds, processes)
-	}
+	assert.Equal(t, processes*rounds, counter(t, path))
 }
 
-func TestUpdateFileHelper(t *testing.T) {
-	path := os.Getenv(envUpdateHelperPath)
-	if path == "" {
-		t.Skip("helper process for TestUpdateFileLosesNoUpdateAcrossProcesses")
-	}
-	rounds, err := strconv.Atoi(os.Getenv(envUpdateHelperRounds))
-	if err != nil {
-		t.Fatalf("rounds: %v", err)
-	}
-	for range rounds {
-		increment(t, path)
-	}
-}
+// — What Mutate decides —
 
-func TestUpdateFileHandsNilForAMissingFile(t *testing.T) {
+func TestMutateSeesNilForAMissingFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "absent")
-	var seen []byte
-	called := false
-	if _, err := UpdateFile(t.Context(), UpdateFileParams{Path: path, Mutate: func(current []byte) ([]byte, error) {
-		called, seen = true, current
-		return []byte("x"), nil
-	}}); err != nil {
-		t.Fatalf("UpdateFile: %v", err)
-	}
-	if !called || seen != nil {
-		t.Errorf("Mutate saw %q (called %v), want nil", seen, called)
-	}
+	seen := []byte("not called")
+	_, err := fs.UpdateFile(t.Context(), fs.UpdateFileParams{Path: path, Mutate: func(current []byte) (fs.Change, error) {
+		seen = current
+		return fs.Keep{}, nil
+	}})
+	require.NoError(t, err)
+	assert.Nil(t, seen)
 }
 
-func TestUpdateFileCreatesWithItsPermAndKeepsAnExistingMode(t *testing.T) {
+func TestWriteCreatesWithItsPermAndAnExistingFileKeepsItsMode(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "file")
-	write := func(perm os.FileMode, data string) {
-		t.Helper()
-		if _, err := UpdateFile(t.Context(), UpdateFileParams{Path: path, Perm: perm, Mutate: func([]byte) ([]byte, error) {
-			return []byte(data), nil
-		}}); err != nil {
-			t.Fatalf("UpdateFile: %v", err)
-		}
-	}
-	modeOf := func() os.FileMode {
-		t.Helper()
-		info, err := os.Stat(path)
-		if err != nil {
-			t.Fatalf("stat: %v", err)
-		}
-		return info.Mode().Perm()
-	}
+	set(t, path, "a", 0o600)
+	assert.Equal(t, os.FileMode(0o600), modeOf(t, path))
 
-	write(0o600, "a")
-	if got := modeOf(); got != 0o600 {
-		t.Fatalf("created with %o, want 600", got)
-	}
-	write(0o644, "b")
-	if got := modeOf(); got != 0o600 {
-		t.Errorf("rewritten with %o, want the existing 600", got)
-	}
+	set(t, path, "b", 0o644)
+	assert.Equal(t, os.FileMode(0o600), modeOf(t, path))
+	assert.Equal(t, "b", read(t, path))
 }
 
-func TestUpdateFileLeavesUnchangedContentAlone(t *testing.T) {
+func TestWriteWithoutPermCreatesAReadableFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "file")
-	if err := os.WriteFile(path, []byte("same"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	set(t, path, "a", 0)
+	assert.Equal(t, os.FileMode(0o644), modeOf(t, path))
+}
+
+func TestWritingTheSameContentLeavesTheFileAlone(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "file")
+	writeFixture(t, path, "same")
 	before, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if _, err := UpdateFile(t.Context(), UpdateFileParams{Path: path, Mutate: func(current []byte) ([]byte, error) {
-		return current, nil
-	}}); err != nil {
-		t.Fatalf("UpdateFile: %v", err)
-	}
+	set(t, path, "same", 0)
 
 	after, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !os.SameFile(before, after) {
-		t.Error("an unchanged file was replaced")
-	}
+	require.NoError(t, err)
+	assert.True(t, os.SameFile(before, after), "an unchanged file was replaced")
 }
 
-func TestUpdateFileRemovesOnRequest(t *testing.T) {
+func TestKeepLeavesAMissingFileMissing(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "absent")
+	_, err := fs.UpdateFile(t.Context(), fs.UpdateFileParams{Path: path, Mutate: func([]byte) (fs.Change, error) {
+		return fs.Keep{}, nil
+	}})
+	require.NoError(t, err)
+	assert.NoFileExists(t, path)
+}
+
+func TestRemoveDeletesTheFileAndIsIdempotent(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "file")
-	if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeFixture(t, path, "x")
 	for range 2 {
-		if _, err := UpdateFile(t.Context(), UpdateFileParams{Path: path, Mutate: func([]byte) ([]byte, error) {
-			return nil, ErrRemoveFile
-		}}); err != nil {
-			t.Fatalf("UpdateFile: %v", err)
-		}
+		_, err := fs.UpdateFile(t.Context(), fs.UpdateFileParams{Path: path, Mutate: func([]byte) (fs.Change, error) {
+			return fs.Remove{}, nil
+		}})
+		require.NoError(t, err)
 	}
-	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("file still there: %v", err)
-	}
+	assert.NoFileExists(t, path)
 }
 
-func TestUpdateFileWritesNothingWhenMutateFails(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "file")
-	if err := os.WriteFile(path, []byte("kept"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	want := errors.New("refused")
-	if _, err := UpdateFile(t.Context(), UpdateFileParams{Path: path, Mutate: func([]byte) ([]byte, error) {
-		return []byte("lost"), want
-	}}); !errors.Is(err, want) {
-		t.Fatalf("error = %v, want %v", err, want)
-	}
-	if data, _ := os.ReadFile(path); string(data) != "kept" {
-		t.Errorf("content = %q, want kept", data)
-	}
-	entries, err := os.ReadDir(filepath.Dir(path))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, entry := range entries {
-		if entry.Name() != "file" && entry.Name() != "file"+lockSuffix {
-			t.Errorf("left %s behind", entry.Name())
-		}
-	}
+func TestAFailedMutateWritesNothingAndLeavesNoTemporaryFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "file")
+	writeFixture(t, path, "kept")
+	refused := errors.New("refused")
+
+	_, err := fs.UpdateFile(t.Context(), fs.UpdateFileParams{Path: path, Mutate: func([]byte) (fs.Change, error) {
+		return fs.Write{Data: []byte("lost")}, refused
+	}})
+
+	assert.ErrorIs(t, err, refused)
+	assert.Equal(t, "kept", read(t, path))
+	assert.ElementsMatch(t, []string{"file", "file.lock"}, entries(t, dir))
 }
 
-func TestUpdateFileWritesUnprotectedWhenItCannotLock(t *testing.T) {
+func TestAMutateDecidingNothingIsAnError(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "file")
-	if err := os.Mkdir(path+lockSuffix, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if lock := increment(t, path); lock.Held {
-		t.Error("Held = true for a lock that could not be taken")
-	}
-	if got := counter(t, path); got != 1 {
-		t.Errorf("counter = %d, want 1", got)
-	}
+	_, err := fs.UpdateFile(t.Context(), fs.UpdateFileParams{Path: path, Mutate: func([]byte) (fs.Change, error) {
+		return nil, nil
+	}})
+	assert.Error(t, err)
+	assert.NoFileExists(t, path)
+}
+
+// — Where the lock lives —
+
+func TestTheLockSitsBesideTheFileByDefault(t *testing.T) {
+	dir := t.TempDir()
+	set(t, filepath.Join(dir, "config.toml"), "x", 0)
+	assert.ElementsMatch(t, []string{"config.toml", "config.toml.lock"}, entries(t, dir))
+}
+
+func TestAFileInTheUsersTreeLeavesNoLockFileThere(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".env")
+	_, err := fs.UpdateFile(t.Context(), fs.UpdateFileParams{
+		Path:     path,
+		LockPath: fs.ScratchLockPath(path),
+		Mutate:   func([]byte) (fs.Change, error) { return fs.Write{Data: []byte("PORT=3000\n")}, nil },
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{".env"}, entries(t, dir))
+}
+
+func TestAnUnavailableLockStillWritesAndSaysSo(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "file")
+	require.NoError(t, os.Mkdir(path+".lock", 0o755))
+
+	lock := increment(t, path)
+
+	assert.False(t, lock.Held)
+	assert.Equal(t, 1, counter(t, path))
+}
+
+func TestATakenLockSaysSo(t *testing.T) {
+	lock := increment(t, filepath.Join(t.TempDir(), "file"))
+	assert.True(t, lock.Held)
+}
+
+// — When the disk refuses —
+
+func TestUpdateFileFailsWhenItsDirectoryCannotBeMade(t *testing.T) {
+	notADir := filepath.Join(t.TempDir(), "file")
+	writeFixture(t, notADir, "")
+	_, err := fs.UpdateFile(t.Context(), fs.UpdateFileParams{Path: filepath.Join(notADir, "state.json"), Mutate: func([]byte) (fs.Change, error) {
+		return fs.Write{Data: []byte("{}")}, nil
+	}})
+	assert.Error(t, err)
+}
+
+func TestUpdateFileFailsOnSomethingItCannotRead(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dir")
+	require.NoError(t, os.Mkdir(path, 0o755))
+	called := false
+	_, err := fs.UpdateFile(t.Context(), fs.UpdateFileParams{Path: path, Mutate: func([]byte) (fs.Change, error) {
+		called = true
+		return fs.Keep{}, nil
+	}})
+	assert.Error(t, err)
+	assert.False(t, called)
 }

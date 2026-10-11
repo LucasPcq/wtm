@@ -7,15 +7,17 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain/statefile"
 )
 
-type SchemaParams struct {
-	// Found is the schema read from the file, zero when it carries none.
+// Schema is the version a state file carries against the one this wtm writes.
+type Schema struct {
+	Path string
+	// Found is read from the file, zero when it carries none.
 	Found     int
 	Supported int
 }
 
 // Newer reports a file written by a newer wtm. A file without a schema is at 1.
-func Newer(params SchemaParams) bool {
-	return max(params.Found, 1) > params.Supported
+func Newer(schema Schema) bool {
+	return max(schema.Found, 1) > schema.Supported
 }
 
 // Written is the schema key to write for a file at supported: zero, so omitted,
@@ -27,25 +29,23 @@ func Written(supported int) int {
 	return supported
 }
 
-type RefusalParams struct {
-	Path   string
-	Schema SchemaParams
+// NewerError is a write refused because a newer wtm wrote the file. It carries
+// the schema as data, for an interface to present, and unwraps to
+// statefile.ErrSchemaNewer, which sets the exit code.
+type NewerError struct {
+	Schema
 }
 
-// Refusal is the error of a write refused on a newer schema, nil when the
-// write may go ahead.
-func Refusal(params RefusalParams) error {
-	if !Newer(params.Schema) {
+func (e *NewerError) Error() string {
+	return fmt.Sprintf(statefile.SchemaNewerFmt, e.Path, e.Found, e.Supported)
+}
+
+func (*NewerError) Unwrap() error { return statefile.ErrSchemaNewer }
+
+// Refusal is the error of a write over schema, nil when the write may go ahead.
+func Refusal(schema Schema) error {
+	if !Newer(schema) {
 		return nil
 	}
-	return fmt.Errorf(statefile.SchemaNewerFmt, params.Path, params.Schema.Found, params.Schema.Supported, statefile.ErrSchemaNewer)
-}
-
-// NewerLines say what a newer file costs, in the order a reader needs them.
-func NewerLines(params RefusalParams) []string {
-	return []string{
-		fmt.Sprintf(statefile.SchemaNewerWhyFmt, params.Path, params.Schema.Found, params.Schema.Supported),
-		statefile.SchemaNewerCost,
-		statefile.SchemaNewerFix,
-	}
+	return &NewerError{Schema: schema}
 }
