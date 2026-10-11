@@ -8,6 +8,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -48,7 +49,7 @@ func EnsureOrdinal(ctx context.Context, params WorktreeRef) (OrdinalClaim, error
 	}
 
 	result := OrdinalClaim{}
-	lockErr := infra.WithFileLock(infra.WithFileLockParams{
+	lockErr := fs.WithFileLock(fs.WithFileLockParams{
 		Path: filepath.Join(params.StateDir, domain.OrdinalLockFileName),
 		Do: func() error {
 			// Everything is read again here, git included. The claim above was

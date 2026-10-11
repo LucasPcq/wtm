@@ -1,4 +1,4 @@
-// Package infra provides I/O, git command execution, and filesystem wrappers.
+// Package infra runs git and holds the wtm state that has not moved to its own package yet.
 package infra
 
 import (
@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 )
 
 // ListBranchesParams holds inputs for listing local branches.
@@ -17,7 +18,7 @@ type ListBranchesParams struct {
 
 // ListLocalBranches returns all local branch names sorted alphabetically.
 func ListLocalBranches(ctx context.Context, params ListBranchesParams) ([]string, error) {
-	cmd := Command(ctx, "git", "branch", "--format=%(refname:short)")
+	cmd := proc.Command(ctx, "git", "branch", "--format=%(refname:short)")
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -41,7 +42,7 @@ func ListLocalBranches(ctx context.Context, params ListBranchesParams) ([]string
 // "refs/remotes/origin/HEAD" to the bare remote name "origin" (never to
 // "origin/HEAD"), and no real remote branch shortens to that, so it is dropped.
 func ListRemoteBranches(ctx context.Context, params ListBranchesParams) ([]string, error) {
-	cmd := Command(ctx, "git", "for-each-ref", "--format=%(refname:short)", "refs/remotes/origin")
+	cmd := proc.Command(ctx, "git", "for-each-ref", "--format=%(refname:short)", "refs/remotes/origin")
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -76,7 +77,7 @@ func DeleteLocalBranch(ctx context.Context, params DeleteLocalBranchParams) erro
 		flag = "-D"
 	}
 
-	cmd := Command(ctx, "git", "branch", flag, params.Branch)
+	cmd := proc.Command(ctx, "git", "branch", flag, params.Branch)
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -86,7 +87,7 @@ func DeleteLocalBranch(ctx context.Context, params DeleteLocalBranchParams) erro
 }
 
 func branchExists(ctx context.Context, projectDir string, branch string) bool {
-	cmd := Command(ctx, "git", "rev-parse", "--verify", "refs/heads/"+branch)
+	cmd := proc.Command(ctx, "git", "rev-parse", "--verify", "refs/heads/"+branch)
 	cmd.Dir = projectDir
 	return cmd.Run() == nil
 }
@@ -115,14 +116,14 @@ func BranchOrRemoteExists(ctx context.Context, params BranchOrRemoteExistsParams
 	if branchExists(ctx, params.ProjectDir, params.Ref) {
 		return true
 	}
-	cmd := Command(ctx, "git", "rev-parse", "--verify", "--quiet", "refs/remotes/"+params.Ref)
+	cmd := proc.Command(ctx, "git", "rev-parse", "--verify", "--quiet", "refs/remotes/"+params.Ref)
 	cmd.Dir = params.ProjectDir
 	return cmd.Run() == nil
 }
 
 // CurrentBranch returns the name of the currently checked-out branch.
 func CurrentBranch(ctx context.Context, projectDir string) (string, error) {
-	cmd := Command(ctx, "git", "branch", "--show-current")
+	cmd := proc.Command(ctx, "git", "branch", "--show-current")
 	cmd.Dir = projectDir
 	out, err := cmd.Output()
 	if err != nil {
@@ -149,7 +150,7 @@ type FetchBranchParams struct {
 
 // FetchBranch runs `git fetch origin <branch>` to update the remote-tracking ref.
 func FetchBranch(ctx context.Context, params FetchBranchParams) error {
-	cmd := Command(ctx, "git", "fetch", "origin", params.Branch)
+	cmd := proc.Command(ctx, "git", "fetch", "origin", params.Branch)
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -174,7 +175,7 @@ type FastForwardRefParams struct {
 func FastForwardRef(ctx context.Context, params FastForwardRefParams) error {
 	refspec := params.Branch + ":" + params.Branch
 	remote := strings.TrimSuffix(domain.RemoteBranchPrefix, "/")
-	cmd := Command(ctx, "git", "fetch", remote, refspec)
+	cmd := proc.Command(ctx, "git", "fetch", remote, refspec)
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -195,7 +196,7 @@ type AheadBehindParams struct {
 // <local>...<remote>`. The left count is ahead (local-only commits), the right
 // count is behind (remote-only commits).
 func AheadBehind(ctx context.Context, params AheadBehindParams) (domain.AheadBehind, error) {
-	cmd := Command(ctx, "git", "rev-list", "--left-right", "--count", params.Local+"..."+params.Remote)
+	cmd := proc.Command(ctx, "git", "rev-list", "--left-right", "--count", params.Local+"..."+params.Remote)
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -226,7 +227,7 @@ type FetchParams struct {
 
 // Fetch runs `git fetch origin` to refresh every origin remote-tracking ref.
 func Fetch(ctx context.Context, params FetchParams) error {
-	cmd := Command(ctx, "git", "fetch", "origin")
+	cmd := proc.Command(ctx, "git", "fetch", "origin")
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/events"
 	ghservice "github.com/LucasPcq/wtm/internal/service/github"
@@ -96,7 +96,7 @@ func buildRunParams(ctx context.Context, params buildParams) dashboard.RunParams
 	return dashboard.RunParams{
 		ProjectDir: result.ProjectDir,
 		StateDir:   result.StateDir,
-		Cwd:        infra.ResolvePath(params.Dir),
+		Cwd:        fs.ResolvePath(params.Dir),
 		Config:     result.Config,
 		Publisher:  publisher,
 		Version:    params.Version,

@@ -8,10 +8,11 @@ import (
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 )
 
 func RegistryPath() (string, error) {
-	dir, err := GlobalDir()
+	dir, err := fs.GlobalDir()
 	if err != nil {
 		return "", err
 	}
@@ -47,7 +48,7 @@ func UpdateRegistry(update func([]domain.RegisteredRepo) []domain.RegisteredRepo
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	return WithFileLock(WithFileLockParams{
+	return fs.WithFileLock(fs.WithFileLockParams{
 		Path: filepath.Join(filepath.Dir(path), domain.RegistryLockName),
 		Do: func() error {
 			repos, err := ReadRegistry()

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -35,7 +35,7 @@ type StateStore struct {
 // Empty on a machine with no user-config directory at all, which every caller
 // reads the way it reads an absent socket.
 func StatePath() string {
-	dir, err := infra.GlobalDir()
+	dir, err := fs.GlobalDir()
 	if err != nil {
 		return ""
 	}

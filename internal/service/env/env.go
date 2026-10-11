@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -114,5 +114,5 @@ func copyFile(src string, dst string) error {
 }
 
 func fileExists(path string) bool {
-	return infra.FileExists(path)
+	return fs.FileExists(path)
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 )
 
 type UpstreamsParams struct {
@@ -28,7 +29,7 @@ func Upstreams(ctx context.Context, params UpstreamsParams) (map[string]domain.U
 	for _, branch := range params.Branches {
 		args = append(args, domain.LocalRefPrefix+branch)
 	}
-	cmd := Command(ctx, "git", args...)
+	cmd := proc.Command(ctx, "git", args...)
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.Output()
 	if err != nil {
@@ -62,7 +63,7 @@ func ExistingRemoteRefs(ctx context.Context, params RemoteRefsParams) (map[strin
 	if len(params.Refs) == 0 {
 		return existing, nil
 	}
-	cmd := Command(ctx, "git", append([]string{"ls-remote", params.Remote}, params.Refs...)...)
+	cmd := proc.Command(ctx, "git", append([]string{"ls-remote", params.Remote}, params.Refs...)...)
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.Output()
 	if err != nil {
@@ -90,7 +91,7 @@ func FetchRemoteRefs(ctx context.Context, params RemoteRefsParams) error {
 	if len(params.Refs) == 0 {
 		return nil
 	}
-	cmd := Command(ctx, "git", append([]string{"fetch", "--quiet", params.Remote}, params.Refs...)...)
+	cmd := proc.Command(ctx, "git", append([]string{"fetch", "--quiet", params.Remote}, params.Refs...)...)
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -114,7 +115,7 @@ func DeleteRefs(ctx context.Context, params DeleteRefsParams) error {
 	for _, ref := range params.Refs {
 		fmt.Fprintf(&stdin, "delete %s\n", ref)
 	}
-	cmd := Command(ctx, "git", "update-ref", "--stdin")
+	cmd := proc.Command(ctx, "git", "update-ref", "--stdin")
 	cmd.Dir = params.ProjectDir
 	cmd.Stdin = strings.NewReader(stdin.String())
 	out, err := cmd.CombinedOutput()

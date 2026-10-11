@@ -15,7 +15,8 @@ import (
 	"golang.org/x/term"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 	"github.com/LucasPcq/wtm/internal/rules"
 	ghservice "github.com/LucasPcq/wtm/internal/service/github"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
@@ -93,7 +94,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("list worktrees: %w", err)
 	}
 
-	activeBranch := rules.ActiveWorktree(rules.ActiveWorktreeParams{Cwd: infra.ResolvePath(dir), Statuses: statuses})
+	activeBranch := rules.ActiveWorktree(rules.ActiveWorktreeParams{Cwd: fs.ResolvePath(dir), Statuses: statuses})
 
 	// Non-interactive (JSON or piped text) behaves identically across formats:
 	// PRs are included only with --with-prs, since a pipe can't stream a loader.
@@ -393,7 +394,7 @@ func executeWorktreeAction(ctx context.Context, cmd *cobra.Command, action strin
 
 	case lsActionOpenPR:
 		if pr, ok := findPRForBranch(prs, selected.Branch); ok {
-			return infra.Command(ctx, "open", pr.URL).Run()
+			return proc.Command(ctx, "open", pr.URL).Run()
 		}
 		// PRs may not have finished streaming when the action menu was built;
 		// resolve the URL for this branch directly.
@@ -404,10 +405,10 @@ func executeWorktreeAction(ctx context.Context, cmd *cobra.Command, action strin
 		if !found {
 			return nil
 		}
-		return infra.Command(ctx, "open", url).Run()
+		return proc.Command(ctx, "open", url).Run()
 
 	case lsActionServicesUp:
-		cmd := infra.Command(ctx, bin, domain.CmdRun, domain.CmdUp)
+		cmd := proc.Command(ctx, bin, domain.CmdRun, domain.CmdUp)
 		cmd.Dir = selected.Path
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
@@ -415,7 +416,7 @@ func executeWorktreeAction(ctx context.Context, cmd *cobra.Command, action strin
 		return cmd.Run()
 
 	case lsActionServicesDown:
-		cmd := infra.Command(ctx, bin, domain.CmdRun, domain.CmdDown)
+		cmd := proc.Command(ctx, bin, domain.CmdRun, domain.CmdDown)
 		cmd.Dir = selected.Path
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
@@ -423,7 +424,7 @@ func executeWorktreeAction(ctx context.Context, cmd *cobra.Command, action strin
 		return cmd.Run()
 
 	case lsActionLogs:
-		cmd := infra.Command(ctx, bin, domain.CmdRun, domain.CmdLogs)
+		cmd := proc.Command(ctx, bin, domain.CmdRun, domain.CmdLogs)
 		cmd.Dir = selected.Path
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
@@ -431,7 +432,7 @@ func executeWorktreeAction(ctx context.Context, cmd *cobra.Command, action strin
 		return cmd.Run()
 
 	case lsActionClean:
-		cmd := infra.Command(ctx, bin, domain.CmdClean, selected.Branch)
+		cmd := proc.Command(ctx, bin, domain.CmdClean, selected.Branch)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr

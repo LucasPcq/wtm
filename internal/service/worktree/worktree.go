@@ -11,6 +11,8 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/branch"
 	"github.com/LucasPcq/wtm/internal/service/env"
@@ -42,7 +44,7 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 		return domain.CreateResult{}, err
 	}
 
-	if infra.FileExists(worktreePath) {
+	if fs.FileExists(worktreePath) {
 		occupant, err := occupantOf(ctx, occupantParams{ProjectDir: params.ProjectDir, Path: worktreePath})
 		if err != nil {
 			return domain.CreateResult{}, err
@@ -58,7 +60,7 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 	}
 	// Once git starts adding the worktree, it is created whole — checkout, env
 	// files, metadata — or an interrupt would leave one wtm cannot read.
-	whole, release := infra.Shield(ctx)
+	whole, release := proc.Shield(ctx)
 	defer release()
 
 	reuseBranch := target.State == domain.BranchTargetExisting
@@ -224,9 +226,9 @@ func occupantOf(ctx context.Context, params occupantParams) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	path := infra.ResolvePath(params.Path)
+	path := fs.ResolvePath(params.Path)
 	for _, wt := range worktrees {
-		if infra.ResolvePath(wt.Path) == path {
+		if fs.ResolvePath(wt.Path) == path {
 			return wt.Branch, nil
 		}
 	}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/service/process"
 )
 
@@ -83,7 +84,7 @@ func Prune(params PruneParams) ([]domain.RegisteredRepo, error) {
 }
 
 func initialized(repo domain.RegisteredRepo) bool {
-	return infra.FileExists(filepath.Join(repo.CommonDir, domain.StateDirName, domain.ConfigFileName))
+	return fs.FileExists(filepath.Join(repo.CommonDir, domain.StateDirName, domain.ConfigFileName))
 }
 
 func containsRepo(repos []domain.RegisteredRepo, commonDir string) bool {

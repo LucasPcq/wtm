@@ -1,4 +1,5 @@
-package infra
+// Package proc starts the processes wtm runs and settles them on an interrupt.
+package proc
 
 import (
 	"context"

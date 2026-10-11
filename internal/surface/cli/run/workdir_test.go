@@ -7,7 +7,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow/run/target"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/service/process"
 )
 
@@ -41,7 +41,7 @@ func TestRunStartOnANamedWorktreeUsesItsEnv(t *testing.T) {
 	assertEnv(t, daemon.startEnv(t, "api"), map[string]string{
 		domain.EnvBranch: "feat/elsewhere",
 	})
-	if got, want := daemon.startWorkDir(t, "api"), infra.ResolvePath(other); infra.ResolvePath(got) != want {
+	if got, want := daemon.startWorkDir(t, "api"), fs.ResolvePath(other); fs.ResolvePath(got) != want {
 		t.Errorf("the job was started in %q, want the named worktree %q", got, want)
 	}
 }
@@ -67,8 +67,8 @@ func TestRunStartFromASubdirectoryKeysOnTheWorktree(t *testing.T) {
 		t.Fatalf("run start: %v", err)
 	}
 
-	got := infra.ResolvePath(daemon.startWorkDir(t, "api"))
-	if want := infra.ResolvePath(worktreePath); got != want {
+	got := fs.ResolvePath(daemon.startWorkDir(t, "api"))
+	if want := fs.ResolvePath(worktreePath); got != want {
 		t.Errorf("the job was keyed on %q, want the worktree root %q", got, want)
 	}
 }

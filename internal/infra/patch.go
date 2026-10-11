@@ -5,11 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
+	iofs "io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/LucasPcq/wtm/internal/infra/fs"
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 )
 
 // DiffFilesParams holds inputs for producing a patch of tracked changes.
@@ -28,7 +31,7 @@ func DiffFiles(ctx context.Context, params DiffFilesParams) ([]byte, error) {
 	}
 
 	args := append([]string{"-C", params.WorktreePath, "diff", "HEAD", "--binary", "--"}, params.Files...)
-	cmd := Command(ctx, "git", args...)
+	cmd := proc.Command(ctx, "git", args...)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("git diff: %w", err)
@@ -65,7 +68,7 @@ func ApplyPatch(ctx context.Context, params ApplyPatchParams) error {
 		args = append(args, "--check")
 	}
 
-	cmd := Command(ctx, "git", args...)
+	cmd := proc.Command(ctx, "git", args...)
 	cmd.Stdin = bytes.NewReader(params.Patch)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -96,7 +99,7 @@ func MergeFile(ctx context.Context, params MergeFileParams) (bool, error) {
 	defer os.Remove(base)
 
 	otherPath := filepath.Join(params.SourceWorktree, params.RelPath)
-	if !FileExists(otherPath) {
+	if !fs.FileExists(otherPath) {
 		empty, tmpErr := writeTempFile("wtm-merge-other-*", nil)
 		if tmpErr != nil {
 			return false, tmpErr
@@ -106,7 +109,7 @@ func MergeFile(ctx context.Context, params MergeFileParams) (bool, error) {
 	}
 
 	targetPath := filepath.Join(params.TargetWorktree, params.RelPath)
-	if !FileExists(targetPath) {
+	if !fs.FileExists(targetPath) {
 		if mkErr := os.MkdirAll(filepath.Dir(targetPath), 0o755); mkErr != nil {
 			return false, mkErr
 		}
@@ -115,7 +118,7 @@ func MergeFile(ctx context.Context, params MergeFileParams) (bool, error) {
 		}
 	}
 
-	cmd := Command(ctx, "git", "merge-file",
+	cmd := proc.Command(ctx, "git", "merge-file",
 		"-L", params.TargetBranch, "-L", "base", "-L", "incoming ("+params.SourceBranch+")",
 		targetPath, base, otherPath)
 	out, err := cmd.CombinedOutput()
@@ -133,7 +136,7 @@ func MergeFile(ctx context.Context, params MergeFileParams) (bool, error) {
 // showHead returns the HEAD version of relPath in the worktree, or nil when the
 // file is not tracked at HEAD (e.g. newly added).
 func showHead(ctx context.Context, worktree, relPath string) []byte {
-	cmd := Command(ctx, "git", "-C", worktree, "show", "HEAD:"+relPath)
+	cmd := proc.Command(ctx, "git", "-C", worktree, "show", "HEAD:"+relPath)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil
@@ -170,7 +173,7 @@ func ResetPaths(ctx context.Context, params ResetPathsParams) error {
 	}
 
 	args := append([]string{"-C", params.WorktreePath, "reset", "--quiet", "HEAD", "--"}, params.Files...)
-	cmd := Command(ctx, "git", args...)
+	cmd := proc.Command(ctx, "git", args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git reset: %s: %w", strings.TrimSpace(string(out)), err)
@@ -252,7 +255,7 @@ func IsBinary(params IsBinaryParams) bool {
 }
 
 func copyTree(src, dst string) error {
-	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
+	return filepath.WalkDir(src, func(path string, d iofs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}

@@ -10,7 +10,7 @@ import (
 	"github.com/BurntSushi/toml"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/schemas"
 )
 
@@ -186,7 +186,7 @@ func runFileOf(cfg domain.RunConfig) runFile {
 }
 
 func WriteGlobal(answers domain.InitGlobalAnswers) error {
-	dir, err := infra.GlobalDir()
+	dir, err := fs.GlobalDir()
 	if err != nil {
 		return err
 	}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 )
 
 type RecentCommitsParams struct {
@@ -18,7 +19,7 @@ type RecentCommitsParams struct {
 }
 
 func RecentCommits(ctx context.Context, params RecentCommitsParams) ([]domain.CommitSummary, error) {
-	cmd := Command(ctx, "git", "-C", params.WorktreePath, "log",
+	cmd := proc.Command(ctx, "git", "-C", params.WorktreePath, "log",
 		"--max-count="+strconv.Itoa(params.Limit), "--format="+domain.GitLogFormat)
 	out, err := cmd.Output()
 	if err != nil {
@@ -52,7 +53,7 @@ type DiffShortstatParams struct {
 
 // DiffShortstat measures uncommitted work, index included.
 func DiffShortstat(ctx context.Context, params DiffShortstatParams) (domain.DiffStat, error) {
-	cmd := Command(ctx, "git", "-C", params.WorktreePath, "diff", "HEAD", "--shortstat")
+	cmd := proc.Command(ctx, "git", "-C", params.WorktreePath, "diff", "HEAD", "--shortstat")
 	out, err := cmd.Output()
 	if err != nil {
 		return domain.DiffStat{}, fmt.Errorf("git diff: %w", err)
@@ -96,7 +97,7 @@ type BranchDiffShortstatParams struct {
 // history that has moved on the base side since the branch forked does not
 // get attributed to the branch.
 func BranchDiffShortstat(ctx context.Context, params BranchDiffShortstatParams) (domain.DiffStat, error) {
-	cmd := Command(ctx, "git", "-C", params.WorktreePath, "diff",
+	cmd := proc.Command(ctx, "git", "-C", params.WorktreePath, "diff",
 		params.Base+"..."+params.Branch, "--shortstat")
 	out, err := cmd.Output()
 	if err != nil {

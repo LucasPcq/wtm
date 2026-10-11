@@ -8,7 +8,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
 )
@@ -60,7 +60,7 @@ func liveJobs(jobs []domain.JobInfo) []domain.JobInfo {
 	exists := map[string]bool{}
 	for _, job := range jobs {
 		if _, seen := exists[job.WorkDir]; !seen {
-			exists[job.WorkDir] = infra.FileExists(job.WorkDir)
+			exists[job.WorkDir] = fs.FileExists(job.WorkDir)
 		}
 	}
 	return rules.JobsOfLiveWorktrees(rules.JobsOfLiveWorktreesParams{Jobs: jobs, Exists: exists})

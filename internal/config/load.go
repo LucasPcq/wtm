@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -125,7 +125,7 @@ type rawEnvFile struct {
 // GlobalPath is where the machine-level config lives, empty when the OS gives
 // no config directory at all.
 func GlobalPath() string {
-	dir, err := infra.GlobalDir()
+	dir, err := fs.GlobalDir()
 	if err != nil {
 		return ""
 	}

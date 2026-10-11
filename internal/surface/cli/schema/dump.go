@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/schemas"
 	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
@@ -35,7 +35,7 @@ func runDump(cmd *cobra.Command, _ []string) error {
 	global, _ := cmd.Flags().GetBool(domain.FlagGlobal)
 
 	if global {
-		dir, err := infra.GlobalDir()
+		dir, err := fs.GlobalDir()
 		if err != nil {
 			return err
 		}

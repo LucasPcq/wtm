@@ -8,7 +8,7 @@ import (
 	"runtime"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 )
 
 // OpenURL hands a URL to the desktop's own opener. It returns rather than
@@ -16,7 +16,7 @@ import (
 // reader waits for a window that is not coming.
 func OpenURL(ctx context.Context, url string) error {
 	spec := openerFor(runtime.GOOS)
-	out, err := infra.Command(ctx, spec.Name, append(spec.Args, url)...).CombinedOutput()
+	out, err := proc.Command(ctx, spec.Name, append(spec.Args, url)...).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s %s: %w: %s", spec.Name, url, err, out)
 	}

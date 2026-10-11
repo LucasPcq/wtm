@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 )
 
 const shieldHelperEnv = "WTM_TEST_SHIELD_HELPER"
@@ -72,7 +72,7 @@ func TestASecondInterruptWaitsForAShieldedStep(t *testing.T) {
 	if os.Getenv(shieldHelperEnv) != "" {
 		ctx, stop := interruptible()
 		defer stop()
-		_, release := infra.Shield(ctx)
+		_, release := proc.Shield(ctx)
 		fmt.Println("armed")
 		<-ctx.Done()
 		fmt.Println("cancelled")
@@ -98,7 +98,7 @@ func TestASecondInterruptTakesTheChildItWasStoppingWithIt(t *testing.T) {
 	if os.Getenv(shieldHelperEnv) != "" {
 		ctx, stop := interruptible()
 		defer stop()
-		child := infra.Command(ctx, "sh", "-c", `trap '' INT TERM; echo $$; exec sleep 30`)
+		child := proc.Command(ctx, "sh", "-c", `trap '' INT TERM; echo $$; exec sleep 30`)
 		child.Stdout = os.Stdout
 		_ = child.Run()
 		time.Sleep(time.Minute)

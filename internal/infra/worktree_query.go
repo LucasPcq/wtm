@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 )
 
 // ListWorktreesParams holds inputs for listing worktrees.
@@ -17,7 +18,7 @@ type ListWorktreesParams struct {
 
 // ListWorktrees returns all git worktrees with their path and branch.
 func ListWorktrees(ctx context.Context, params ListWorktreesParams) ([]domain.GitWorktree, error) {
-	cmd := Command(ctx, "git", "worktree", "list", "--porcelain")
+	cmd := proc.Command(ctx, "git", "worktree", "list", "--porcelain")
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.Output()
 	if err != nil {
@@ -75,7 +76,7 @@ func ListWorktrees(ctx context.Context, params ListWorktreesParams) ([]domain.Gi
 // ok=false when no rebase is in progress.
 func rebaseInProgressBranch(ctx context.Context, worktreePath string) (string, bool) {
 	for _, stateDir := range []string{"rebase-merge", "rebase-apply"} {
-		pathOut, err := Command(ctx, "git", "-C", worktreePath,
+		pathOut, err := proc.Command(ctx, "git", "-C", worktreePath,
 			"rev-parse", "--git-path", stateDir+"/head-name").Output()
 		if err != nil {
 			continue
@@ -109,7 +110,7 @@ type FindMainWorktreeParams struct {
 
 // FindMainWorktreePath returns the path of the main (first) worktree.
 func FindMainWorktreePath(ctx context.Context, params FindMainWorktreeParams) (string, error) {
-	cmd := Command(ctx, "git", "worktree", "list", "--porcelain")
+	cmd := proc.Command(ctx, "git", "worktree", "list", "--porcelain")
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.Output()
 	if err != nil {

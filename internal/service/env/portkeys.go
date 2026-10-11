@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -60,7 +60,7 @@ type upsertEnvKeyParams struct {
 }
 
 func upsertEnvKey(params upsertEnvKeyParams) (bool, error) {
-	if !params.Create && !infra.FileExists(params.Path) {
+	if !params.Create && !fs.FileExists(params.Path) {
 		return false, nil
 	}
 

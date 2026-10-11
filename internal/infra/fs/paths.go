@@ -1,4 +1,5 @@
-package infra
+// Package fs is the only writer of the files wtm keeps: atomic, locked updates and the paths they live at.
+package fs
 
 import (
 	"fmt"
