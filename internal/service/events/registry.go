@@ -1,6 +1,7 @@
 package events
 
 import (
+	"context"
 	"encoding/json"
 	"path/filepath"
 	"slices"
@@ -24,7 +25,7 @@ type RegisterParams struct {
 
 // Register enrolls the repository a command runs in, for a global stream to
 // follow. The common case — already listed — reads the file and nothing else.
-func Register(params RegisterParams) error {
+func Register(ctx context.Context, params RegisterParams) error {
 	commonDir := filepath.Dir(params.StateDir)
 	if resolved, err := filepath.EvalSymlinks(commonDir); err == nil {
 		commonDir = resolved
@@ -34,7 +35,7 @@ func Register(params RegisterParams) error {
 		return nil
 	}
 	added := false
-	err := infra.UpdateRegistry(func(repos []domain.RegisteredRepo) []domain.RegisteredRepo {
+	err := infra.UpdateRegistry(ctx, func(repos []domain.RegisteredRepo) []domain.RegisteredRepo {
 		if containsRepo(repos, repo.CommonDir) {
 			return repos
 		}
@@ -46,7 +47,7 @@ func Register(params RegisterParams) error {
 	}
 	bus := busParams{SocketPath: params.SocketPath, CorrelationID: params.CorrelationID}
 	announce(announceParams{Bus: bus, Type: domain.EventRepoAdded, Repo: repo})
-	_, err = Prune(PruneParams(bus))
+	_, err = Prune(ctx, PruneParams(bus))
 	return err
 }
 
@@ -57,13 +58,13 @@ type PruneParams struct {
 
 // Prune drops the repositories that are gone or no longer initialized, and
 // returns the ones left.
-func Prune(params PruneParams) ([]domain.RegisteredRepo, error) {
+func Prune(ctx context.Context, params PruneParams) ([]domain.RegisteredRepo, error) {
 	listed, err := infra.ReadRegistry()
 	if err == nil && !slices.ContainsFunc(listed, func(repo domain.RegisteredRepo) bool { return !initialized(repo) }) {
 		return listed, nil
 	}
 	var kept, dropped []domain.RegisteredRepo
-	err = infra.UpdateRegistry(func(repos []domain.RegisteredRepo) []domain.RegisteredRepo {
+	err = infra.UpdateRegistry(ctx, func(repos []domain.RegisteredRepo) []domain.RegisteredRepo {
 		kept, dropped = nil, nil
 		for _, repo := range repos {
 			if initialized(repo) {

@@ -83,7 +83,7 @@ func LoadConfig(cmd *cobra.Command, dir string) (ConfigResult, error) {
 		return ConfigResult{}, fmt.Errorf("loading config: %w", err)
 	}
 
-	Register(RegisterParams{Root: root, StateDir: stateDir, CorrelationID: CorrelationID(cmd)})
+	Register(cmd.Context(), RegisterParams{Root: root, StateDir: stateDir, CorrelationID: CorrelationID(cmd)})
 	return ConfigResult{Config: cfg, ProjectDir: root, StateDir: stateDir}, nil
 }
 
@@ -96,11 +96,11 @@ type RegisterParams struct {
 // Register enrolls a repository for a global `wtm events`: failing to costs
 // that stream a repository, never the command its run. A state dir moved out
 // of the repository is one the registry cannot tell is still initialized.
-func Register(params RegisterParams) {
+func Register(ctx context.Context, params RegisterParams) {
 	if os.Getenv(domain.EnvStateDir) != "" {
 		return
 	}
-	_ = events.Register(events.RegisterParams{Root: params.Root, StateDir: params.StateDir, CorrelationID: params.CorrelationID})
+	_ = events.Register(ctx, events.RegisterParams{Root: params.Root, StateDir: params.StateDir, CorrelationID: params.CorrelationID})
 }
 
 func CorrelationID(cmd *cobra.Command) string {

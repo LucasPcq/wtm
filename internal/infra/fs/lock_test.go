@@ -1,10 +1,13 @@
 package fs
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestWithFileLockSerializesConcurrentRuns(t *testing.T) {
@@ -18,7 +21,7 @@ func TestWithFileLockSerializesConcurrentRuns(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_ = WithFileLock(WithFileLockParams{Path: lock, Do: func() error {
+			_, _ = WithFileLock(t.Context(), WithFileLockParams{Path: lock, Do: func() error {
 				mu.Lock()
 				inside++
 				if inside > peak {
@@ -50,7 +53,7 @@ func TestWithFileLockPropagatesError(t *testing.T) {
 	lock := filepath.Join(t.TempDir(), "test.lock")
 	want := os.ErrInvalid
 
-	if got := WithFileLock(WithFileLockParams{Path: lock, Do: func() error { return want }}); got != want {
+	if _, got := WithFileLock(t.Context(), WithFileLockParams{Path: lock, Do: func() error { return want }}); got != want {
 		t.Errorf("error = %v, want %v", got, want)
 	}
 }
@@ -63,19 +66,49 @@ func TestWithFileLockRunsWhenItCannotLock(t *testing.T) {
 	}
 
 	ran := false
-	if err := WithFileLock(WithFileLockParams{
+	lock, err := WithFileLock(t.Context(), WithFileLockParams{
 		Path: filepath.Join(unwritable, "test.lock"),
 		Do:   func() error { ran = true; return nil },
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("WithFileLock: %v", err)
 	}
 	if !ran {
 		t.Error("the work was skipped because the lock could not be taken")
 	}
+	if lock.Held {
+		t.Error("Held = true for a lock that could not be taken")
+	}
 }
 
 func TestWithFileLockWithoutWork(t *testing.T) {
-	if err := WithFileLock(WithFileLockParams{Path: filepath.Join(t.TempDir(), "test.lock")}); err != nil {
+	if _, err := WithFileLock(t.Context(), WithFileLockParams{Path: filepath.Join(t.TempDir(), "test.lock")}); err != nil {
 		t.Errorf("WithFileLock with no work: %v", err)
+	}
+}
+
+func TestWithFileLockStopsWaitingWhenCancelled(t *testing.T) {
+	lock := filepath.Join(t.TempDir(), "test.lock")
+	held := make(chan struct{})
+	release := make(chan struct{})
+	go func() {
+		_, _ = WithFileLock(t.Context(), WithFileLockParams{Path: lock, Do: func() error {
+			close(held)
+			<-release
+			return nil
+		}})
+	}()
+	<-held
+	defer close(release)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+	ran := false
+	_, err := WithFileLock(ctx, WithFileLockParams{Path: lock, Do: func() error { ran = true; return nil }})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("error = %v, want %v", err, context.DeadlineExceeded)
+	}
+	if ran {
+		t.Error("the work ran without the lock it was waiting for")
 	}
 }

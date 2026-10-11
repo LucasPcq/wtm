@@ -165,7 +165,7 @@ func watchAllOnce(ctx context.Context, params watchAllOnceParams) watchResult {
 	if deliveries == nil {
 		return failed
 	}
-	repos, err := Prune(PruneParams{SocketPath: params.Socket})
+	repos, err := Prune(ctx, PruneParams{SocketPath: params.Socket})
 	if err != nil {
 		return watchResult{transient: err}
 	}
@@ -197,7 +197,7 @@ func pruneUntilDone(ctx context.Context, socket string) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			_, _ = Prune(PruneParams{SocketPath: socket})
+			_, _ = Prune(ctx, PruneParams{SocketPath: socket})
 		}
 	}
 }

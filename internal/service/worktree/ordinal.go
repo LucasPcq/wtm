@@ -49,7 +49,7 @@ func EnsureOrdinal(ctx context.Context, params WorktreeRef) (OrdinalClaim, error
 	}
 
 	result := OrdinalClaim{}
-	lockErr := fs.WithFileLock(fs.WithFileLockParams{
+	_, lockErr := fs.WithFileLock(ctx, fs.WithFileLockParams{
 		Path: filepath.Join(params.StateDir, domain.OrdinalLockFileName),
 		Do: func() error {
 			// Everything is read again here, git included. The claim above was

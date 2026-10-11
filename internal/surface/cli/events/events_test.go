@@ -300,7 +300,7 @@ func TestOutsideARepositoryEventsFollowsTheRegistry(t *testing.T) {
 	t.Setenv(domain.EnvProjectDir, "")
 	t.Setenv(domain.EnvStateDir, "")
 	dir := initializedRepo(t)
-	if err := wtmevents.Register(wtmevents.RegisterParams{Root: dir, StateDir: filepath.Join(dir, ".git", domain.StateDirName)}); err != nil {
+	if err := wtmevents.Register(t.Context(), wtmevents.RegisterParams{Root: dir, StateDir: filepath.Join(dir, ".git", domain.StateDirName)}); err != nil {
 		t.Fatal(err)
 	}
 	repo, err := worktree.RepoOf(t.Context(), worktree.RepoOfParams{ProjectDir: dir})
@@ -325,7 +325,7 @@ func TestOutsideARepositoryEventsFollowsTheRegistry(t *testing.T) {
 func registeredRepo(t *testing.T) string {
 	t.Helper()
 	dir := initializedRepo(t)
-	if err := wtmevents.Register(wtmevents.RegisterParams{Root: dir, StateDir: filepath.Join(dir, ".git", domain.StateDirName)}); err != nil {
+	if err := wtmevents.Register(t.Context(), wtmevents.RegisterParams{Root: dir, StateDir: filepath.Join(dir, ".git", domain.StateDirName)}); err != nil {
 		t.Fatal(err)
 	}
 	return dir

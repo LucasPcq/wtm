@@ -231,7 +231,7 @@ func createProjectConfig(cmd *cobra.Command, dir, stateDir string, flagged bool)
 		return fmt.Errorf("write project config: %w", err)
 	}
 	if root, err := shared.ProjectRoot(cmd.Context(), dir); err == nil {
-		shared.Register(shared.RegisterParams{Root: root, StateDir: stateDir, CorrelationID: shared.CorrelationID(cmd)})
+		shared.Register(cmd.Context(), shared.RegisterParams{Root: root, StateDir: stateDir, CorrelationID: shared.CorrelationID(cmd)})
 	}
 
 	render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
