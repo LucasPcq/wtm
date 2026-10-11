@@ -6,11 +6,6 @@ editUrl: false
 hero:
   title: 'Every branch, <span>running.</span>'
   tagline: The wtm documentation, in the order a branch lives through it.
-  image:
-    html: |
-      <div class="wtm-start"><p>Start in three commands</p><pre><span>$</span> brew install LucasPcq/tap/wtm
-      <span>$</span> echo 'eval "$(wtm shell-init)"' &gt;&gt; ~/.zshrc
-      <span>$</span> cd your-repo &amp;&amp; wtm init</pre></div>
   actions:
     - text: Get started
       link: __BASE__/guide/getting-started/
@@ -23,7 +18,13 @@ hero:
 
 ## Start here
 
-The three commands above install wtm, let `wtm go` change your directory (`~/.bashrc` for bash), and set up a repository.
+Install wtm, let `wtm go` change your directory, and set up a repository once.
+
+```bash
+brew install LucasPcq/tap/wtm
+echo 'eval "$(wtm shell-init)"' >> ~/.zshrc   # ~/.bashrc for bash
+cd your-repo && wtm init
+```
 
 [Getting started](__BASE__/guide/getting-started/) takes you from there to two branches running side by side, in ten minutes.
 
