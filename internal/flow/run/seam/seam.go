@@ -190,7 +190,7 @@ func (s Seam) Starter(params StartParams) runlogs.StartFunc {
 }
 
 func (s Seam) run(ctx context.Context, sink runlogs.Sink, params StartParams) (runlogs.Outcome, error) {
-	return s.start(ctx, s.recording(recordingParams{Sink: sink, Jobs: params.Jobs}), params)
+	return s.start(ctx, s.recording(ctx, recordingParams{Sink: sink, Jobs: params.Jobs}), params)
 }
 
 type recordingParams struct {
@@ -203,7 +203,7 @@ type recordingParams struct {
 // worktree holds one, `clean` reads it to give back exactly what exists, and a
 // run interrupted after the create would otherwise leave a database nothing
 // will ever drop. A verbatim worktree carves nothing — the daemon refused to.
-func (s Seam) recording(params recordingParams) runlogs.Sink {
+func (s Seam) recording(ctx context.Context, params recordingParams) runlogs.Sink {
 	sink := params.Sink
 	if sink == nil {
 		sink = discard{}
@@ -215,7 +215,7 @@ func (s Seam) recording(params recordingParams) runlogs.Sink {
 	if len(carving) == 0 {
 		return sink
 	}
-	return namespaceRecorder{inner: sink, jobs: carving, stateDir: s.stateDir, worktree: s.worktree}
+	return namespaceRecorder{record: context.WithoutCancel(ctx), inner: sink, jobs: carving, stateDir: s.stateDir, worktree: s.worktree}
 }
 
 type discard struct{}
@@ -223,6 +223,7 @@ type discard struct{}
 func (discard) Emit(runlogs.Event) {}
 
 type namespaceRecorder struct {
+	record   context.Context
 	inner    runlogs.Sink
 	jobs     []string
 	stateDir string
@@ -234,7 +235,7 @@ func (r namespaceRecorder) Emit(event runlogs.Event) {
 	if event.Phase != runlogs.PhaseStarted || !slices.Contains(r.jobs, event.Job) {
 		return
 	}
-	err := worktree.RecordNamespaces(worktree.RecordNamespacesParams{StateDir: r.stateDir, Branch: r.worktree, Jobs: []string{event.Job}})
+	err := worktree.RecordNamespaces(r.record, worktree.RecordNamespacesParams{StateDir: r.stateDir, Branch: r.worktree, Jobs: []string{event.Job}})
 	if err == nil {
 		return
 	}

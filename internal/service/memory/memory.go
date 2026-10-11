@@ -2,7 +2,10 @@
 package memory
 
 import (
+	"context"
+
 	"github.com/LucasPcq/wtm/internal/config"
+	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -11,16 +14,16 @@ type RememberParams struct {
 	Change   rules.RememberedChange
 }
 
-// Remember rewrites config.toml from what is on disk, not from the config the run
-// loaded with its defaults applied, which would write them in.
-func Remember(params RememberParams) error {
+// Remember changes config.toml as it is on disk, not the config the run loaded
+// with its defaults applied, which would write them in.
+func Remember(ctx context.Context, params RememberParams) error {
 	if len(params.Change.Remember) == 0 && len(params.Change.Forget) == 0 {
 		return nil
 	}
-	project, err := config.LoadProjectRaw(params.StateDir)
-	if err != nil {
-		return err
-	}
-	project.Wizard.Remembered = rules.ApplyRemembered(project.Wizard.Remembered, params.Change)
-	return config.WriteProjectConfig(config.WriteProjectConfigParams{StateDir: params.StateDir, Config: project})
+	return config.UpdateProjectConfig(ctx, config.UpdateProjectConfigParams{
+		StateDir: params.StateDir,
+		Update: func(project *domain.ProjectConfig) {
+			project.Wizard.Remembered = rules.ApplyRemembered(project.Wizard.Remembered, params.Change)
+		},
+	})
 }

@@ -22,7 +22,7 @@ func TestSetSourceBranchPreservesOtherFields(t *testing.T) {
 		EnvStrategy:  domain.EnvStrategyParent,
 	})
 
-	res, err := setSourceBranch(setSourceBranchParams{StateDir: stateDir, Branch: "dev/b", NewParent: "feat"})
+	res, err := setSourceBranch(t.Context(), setSourceBranchParams{StateDir: stateDir, Branch: "dev/b", NewParent: "feat"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -55,7 +55,7 @@ func TestApplyReparentsMovesEachChild(t *testing.T) {
 		{Branch: "dev/c", OldParent: "dev/a", NewParent: "feat"},
 	}
 
-	applied, err := ApplyReparents(ApplyReparentsParams{Reparents: moves, StateDir: stateDir})
+	applied, err := ApplyReparents(t.Context(), ApplyReparentsParams{Reparents: moves, StateDir: stateDir})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

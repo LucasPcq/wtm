@@ -42,7 +42,7 @@ func TestARewriteKeepsTheRememberedAnswers(t *testing.T) {
 		Env:       domain.EnvConfig{Strategy: domain.EnvStrategyExample},
 		Wizard:    domain.WizardConfig{Remembered: map[string]string{domain.RememberIsolation: "verbatim", domain.RememberEnvStrategy: "main"}},
 	}
-	if err := WriteProjectConfig(WriteProjectConfigParams{StateDir: dir, Config: cfg}); err != nil {
+	if err := WriteProjectConfig(t.Context(), WriteProjectConfigParams{StateDir: dir, Config: cfg}); err != nil {
 		t.Fatalf("WriteProjectConfig: %v", err)
 	}
 
@@ -58,7 +58,7 @@ func TestARewriteKeepsTheRememberedAnswers(t *testing.T) {
 func TestNothingRememberedWritesNoSection(t *testing.T) {
 	dir := t.TempDir()
 	cfg := domain.ProjectConfig{Worktrees: domain.WorktreesConfig{BasePath: "../.trees", BaseBranch: "main"}}
-	if err := WriteProjectConfig(WriteProjectConfigParams{StateDir: dir, Config: cfg}); err != nil {
+	if err := WriteProjectConfig(t.Context(), WriteProjectConfigParams{StateDir: dir, Config: cfg}); err != nil {
 		t.Fatalf("WriteProjectConfig: %v", err)
 	}
 

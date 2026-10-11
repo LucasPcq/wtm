@@ -25,7 +25,7 @@ func TestWriteProjectRendersValidTOML(t *testing.T) {
 		OnCreate:    []domain.HookCommand{{Cmd: "pnpm install"}},
 	}
 
-	err := WriteProject(WriteProjectParams{
+	err := WriteProject(t.Context(), WriteProjectParams{
 		StateDir: dir,
 		Answers:  answers,
 	})
@@ -74,7 +74,7 @@ func TestWriteProjectEmptyEnvAndHooks(t *testing.T) {
 		EnvStrategy: domain.EnvStrategyExample,
 	}
 
-	err := WriteProject(WriteProjectParams{
+	err := WriteProject(t.Context(), WriteProjectParams{
 		StateDir: dir,
 		Answers:  answers,
 	})
@@ -101,7 +101,7 @@ func TestWriteProjectSkipEnvCommentsSection(t *testing.T) {
 		SkipEnv:    true,
 	}
 
-	if err := WriteProject(WriteProjectParams{StateDir: dir, Answers: answers}); err != nil {
+	if err := WriteProject(t.Context(), WriteProjectParams{StateDir: dir, Answers: answers}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -131,7 +131,7 @@ func TestWriteProjectSkipHooksCommentsSection(t *testing.T) {
 		SkipHooks:   true,
 	}
 
-	if err := WriteProject(WriteProjectParams{StateDir: dir, Answers: answers}); err != nil {
+	if err := WriteProject(t.Context(), WriteProjectParams{StateDir: dir, Answers: answers}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -164,7 +164,7 @@ func TestWriteProjectRoundTripTableFormHook(t *testing.T) {
 		},
 	}
 
-	if err := WriteProject(WriteProjectParams{StateDir: dir, Answers: answers}); err != nil {
+	if err := WriteProject(t.Context(), WriteProjectParams{StateDir: dir, Answers: answers}); err != nil {
 		t.Fatalf("WriteProject: %v", err)
 	}
 
@@ -195,7 +195,7 @@ func TestWriteProjectSkipCleanCommentsSection(t *testing.T) {
 		SkipClean:   true,
 	}
 
-	if err := WriteProject(WriteProjectParams{StateDir: dir, Answers: answers}); err != nil {
+	if err := WriteProject(t.Context(), WriteProjectParams{StateDir: dir, Answers: answers}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -228,7 +228,7 @@ func TestWriteProjectRoundTripOnClean(t *testing.T) {
 		},
 	}
 
-	if err := WriteProject(WriteProjectParams{StateDir: dir, Answers: answers}); err != nil {
+	if err := WriteProject(t.Context(), WriteProjectParams{StateDir: dir, Answers: answers}); err != nil {
 		t.Fatalf("WriteProject: %v", err)
 	}
 
@@ -258,7 +258,7 @@ func TestWriteProjectConfigPreservesAllSections(t *testing.T) {
 		Hooks:     domain.HooksConfig{OnCreate: []domain.HookCommand{{Cmd: "pnpm install"}}},
 	}
 
-	if err := WriteProjectConfig(WriteProjectConfigParams{StateDir: dir, Config: cfg}); err != nil {
+	if err := WriteProjectConfig(t.Context(), WriteProjectConfigParams{StateDir: dir, Config: cfg}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -283,7 +283,7 @@ func TestWriteProjectConfigEmptyEnvStaysCommented(t *testing.T) {
 		// Env.Strategy empty → section must render commented to stay valid.
 	}
 
-	if err := WriteProjectConfig(WriteProjectConfigParams{StateDir: dir, Config: cfg}); err != nil {
+	if err := WriteProjectConfig(t.Context(), WriteProjectConfigParams{StateDir: dir, Config: cfg}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -306,7 +306,7 @@ func TestWriteRunCreatesFile(t *testing.T) {
 		},
 	}
 
-	if err := WriteRun(WriteRunParams{StateDir: dir, Config: cfg}); err != nil {
+	if err := WriteRun(t.Context(), WriteRunParams{StateDir: dir, Config: cfg}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -325,10 +325,10 @@ func TestWriteRunRefusesOverwrite(t *testing.T) {
 		Jobs: []domain.JobConfig{{Name: "a", Kind: domain.JobKindService, Cmd: "echo a"}},
 	}
 
-	if err := WriteRun(WriteRunParams{StateDir: dir, Config: cfg}); err != nil {
+	if err := WriteRun(t.Context(), WriteRunParams{StateDir: dir, Config: cfg}); err != nil {
 		t.Fatalf("first write failed: %v", err)
 	}
-	if err := WriteRun(WriteRunParams{StateDir: dir, Config: cfg}); !errors.Is(err, ErrRunFileExists) {
+	if err := WriteRun(t.Context(), WriteRunParams{StateDir: dir, Config: cfg}); !errors.Is(err, ErrRunFileExists) {
 		t.Errorf("expected ErrRunFileExists, got %v", err)
 	}
 }
@@ -338,14 +338,14 @@ func TestWriteRunForceOverwrites(t *testing.T) {
 	orig := domain.RunConfig{
 		Jobs: []domain.JobConfig{{Name: "old", Kind: domain.JobKindTask, Cmd: "echo old"}},
 	}
-	if err := WriteRun(WriteRunParams{StateDir: dir, Config: orig}); err != nil {
+	if err := WriteRun(t.Context(), WriteRunParams{StateDir: dir, Config: orig}); err != nil {
 		t.Fatalf("first write failed: %v", err)
 	}
 
 	updated := domain.RunConfig{
 		Jobs: []domain.JobConfig{{Name: "new", Kind: domain.JobKindTask, Cmd: "echo new"}},
 	}
-	if err := WriteRun(WriteRunParams{StateDir: dir, Config: updated, Force: true}); err != nil {
+	if err := WriteRun(t.Context(), WriteRunParams{StateDir: dir, Config: updated, Force: true}); err != nil {
 		t.Fatalf("force write failed: %v", err)
 	}
 
@@ -362,9 +362,9 @@ func TestWriteGlobalAt(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "wtm", "config.toml")
 
-	err := writeGlobalAt(path, domain.InitGlobalAnswers{
+	err := writeGlobalAt(t.Context(), writeGlobalAtParams{Path: path, Answers: domain.InitGlobalAnswers{
 		Shell: domain.ShellZsh,
-	})
+	}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -403,7 +403,7 @@ func TestWriteProjectRoundTrip(t *testing.T) {
 		OnCreate:    []domain.HookCommand{{Cmd: "yarn install"}},
 	}
 
-	err := WriteProject(WriteProjectParams{
+	err := WriteProject(t.Context(), WriteProjectParams{
 		StateDir: dir,
 		Answers:  answers,
 	})
@@ -439,7 +439,7 @@ func TestWriteProjectRoundTrip(t *testing.T) {
 // loader ignores and the file's own schema rejects.
 func TestWriteRunOmitsTheSettingsThatAreUnset(t *testing.T) {
 	dir := t.TempDir()
-	if err := WriteRun(WriteRunParams{
+	if err := WriteRun(t.Context(), WriteRunParams{
 		StateDir: dir,
 		Force:    true,
 		Config: domain.RunConfig{
@@ -463,7 +463,7 @@ func TestWriteRunOmitsTheSettingsThatAreUnset(t *testing.T) {
 // A value the project did set has to survive the write and come back.
 func TestWriteRunKeepsTheSettingsThatAreSet(t *testing.T) {
 	dir := t.TempDir()
-	if err := WriteRun(WriteRunParams{
+	if err := WriteRun(t.Context(), WriteRunParams{
 		StateDir: dir,
 		Force:    true,
 		Config: domain.RunConfig{

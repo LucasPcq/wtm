@@ -94,7 +94,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 		return domain.ErrAborted
 	}
 
-	if err := config.WriteRun(config.WriteRunParams{
+	if err := config.WriteRun(cmd.Context(), config.WriteRunParams{
 		StateDir: result.StateDir,
 		Config:   incoming,
 		Force:    true,

@@ -26,7 +26,7 @@ func newReinitTestCmd() *cobra.Command {
 // seedProjectConfig writes a full config.toml into dir for re-init tests.
 func seedProjectConfig(t *testing.T, dir string, cfg domain.ProjectConfig) {
 	t.Helper()
-	if err := config.WriteProjectConfig(config.WriteProjectConfigParams{StateDir: dir, Config: cfg}); err != nil {
+	if err := config.WriteProjectConfig(t.Context(), config.WriteProjectConfigParams{StateDir: dir, Config: cfg}); err != nil {
 		t.Fatalf("seed project config: %v", err)
 	}
 }
@@ -90,7 +90,7 @@ func TestApplyConfigReinitOnlyRewritesRequestedSection(t *testing.T) {
 		EnvFiles:    []domain.EnvFile{{Target: ".env.local", Local: true}},
 	}
 
-	if err := applyConfigReinit(applyReinitParams{
+	if err := applyConfigReinit(t.Context(), applyReinitParams{
 		Out:      io.Discard,
 		StateDir: dir,
 		Sections: []string{domain.SectionEnv},

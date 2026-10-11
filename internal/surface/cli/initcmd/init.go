@@ -137,7 +137,7 @@ func ensureGlobalConfig(cmd *cobra.Command, flagged bool) error {
 		return err
 	}
 
-	if err := config.WriteGlobal(answers); err != nil {
+	if err := config.WriteGlobal(cmd.Context(), answers); err != nil {
 		return fmt.Errorf("write global config: %w", err)
 	}
 
@@ -224,7 +224,7 @@ func createProjectConfig(cmd *cobra.Command, dir, stateDir string, flagged bool)
 		return err
 	}
 
-	if err := config.WriteProject(config.WriteProjectParams{
+	if err := config.WriteProject(cmd.Context(), config.WriteProjectParams{
 		StateDir: stateDir,
 		Answers:  answers,
 	}); err != nil {

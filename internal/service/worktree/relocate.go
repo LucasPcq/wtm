@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
@@ -67,14 +66,19 @@ type AdoptParams struct {
 // already ran jobs holds its ordinal, its isolation and the namespaces clean
 // has to give back. The ordinal is left for the run module to allocate on
 // first use, as for a created worktree.
-func Adopt(params AdoptParams) error {
-	metadata, err := loadMetadata(params.StateDir, params.Branch)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("read metadata for %s: %w", params.Branch, err)
-	}
-	metadata.SourceBranch = params.Parent
-	metadata.CreatedAt = time.Now().UTC().Format(time.RFC3339)
-	return writeMetadata(rules.WorktreeMetaDir(params.StateDir, params.Branch), metadata)
+func Adopt(ctx context.Context, params AdoptParams) error {
+	return updateMetadata(ctx, updateMetadataParams{
+		StateDir: params.StateDir,
+		Branch:   params.Branch,
+		Update: func(metadata domain.WorktreeMetadata, readErr error) (domain.WorktreeMetadata, error) {
+			if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
+				return domain.WorktreeMetadata{}, fmt.Errorf("read metadata for %s: %w", params.Branch, readErr)
+			}
+			metadata.SourceBranch = params.Parent
+			metadata.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+			return metadata, nil
+		},
+	})
 }
 
 type SetBasePathParams struct {
@@ -87,10 +91,10 @@ type SetBasePathParams struct {
 // SetBasePath also retires the previous base_path directory once the moves
 // have emptied it. os.Remove leaves a directory that still holds anything —
 // a worktree a refusal kept there, or files that are not wtm's.
-func SetBasePath(params SetBasePathParams) error {
+func SetBasePath(ctx context.Context, params SetBasePathParams) error {
 	updated := params.Project
 	updated.Worktrees.BasePath = params.BasePath
-	if err := config.WriteProjectConfig(config.WriteProjectConfigParams{
+	if err := config.WriteProjectConfig(ctx, config.WriteProjectConfigParams{
 		StateDir: params.StateDir,
 		Config:   updated,
 	}); err != nil {

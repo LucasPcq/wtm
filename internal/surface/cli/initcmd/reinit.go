@@ -1,6 +1,7 @@
 package initcmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -105,7 +106,7 @@ func runReinit(cmd *cobra.Command, dir, stateDir string, sections []string) erro
 
 	var applyErr error
 	render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-		applyErr = applyConfigReinit(applyReinitParams{
+		applyErr = applyConfigReinit(cmd.Context(), applyReinitParams{
 			Out:      w,
 			StateDir: stateDir,
 			Sections: sections,
@@ -192,7 +193,7 @@ type applyReinitParams struct {
 	Answers  domain.InitProjectAnswers
 }
 
-func applyConfigReinit(params applyReinitParams) error {
+func applyConfigReinit(ctx context.Context, params applyReinitParams) error {
 	stateDir, sections, answers := params.StateDir, params.Sections, params.Answers
 	cfg, err := config.LoadProjectRaw(stateDir)
 	if err != nil {
@@ -211,7 +212,7 @@ func applyConfigReinit(params applyReinitParams) error {
 		cfg.Hooks.OnClean = answers.OnClean
 	}
 
-	if err := config.WriteProjectConfig(config.WriteProjectConfigParams{StateDir: stateDir, Config: cfg}); err != nil {
+	if err := config.WriteProjectConfig(ctx, config.WriteProjectConfigParams{StateDir: stateDir, Config: cfg}); err != nil {
 		return fmt.Errorf("write project config: %w", err)
 	}
 

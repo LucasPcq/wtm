@@ -206,7 +206,7 @@ func (f *relocateFlow) move(res domain.RelocateStepResult) error {
 }
 
 func (f *relocateFlow) adopt(res domain.RelocateStepResult) error {
-	if err := worktree.Adopt(worktree.AdoptParams{
+	if err := worktree.Adopt(f.runCtx, worktree.AdoptParams{
 		StateDir: f.ctx.StateDir,
 		Branch:   res.Branch,
 		Parent:   res.Parent,
@@ -223,7 +223,7 @@ func (f *relocateFlow) rewriteBasePath(result *domain.RelocateResult) error {
 	if result.BasePath == f.configBasePath() {
 		return nil
 	}
-	if err := worktree.SetBasePath(worktree.SetBasePathParams{
+	if err := worktree.SetBasePath(f.runCtx, worktree.SetBasePathParams{
 		ProjectDir: f.ctx.ProjectDir,
 		StateDir:   f.ctx.StateDir,
 		Project:    f.ctx.Config.Project,

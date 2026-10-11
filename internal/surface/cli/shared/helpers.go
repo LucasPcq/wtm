@@ -6,14 +6,17 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
+	domainstatefile "github.com/LucasPcq/wtm/internal/domain/statefile"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/rules/statefile"
 	"github.com/LucasPcq/wtm/internal/service/events"
 )
 
@@ -83,6 +86,14 @@ func LoadConfig(cmd *cobra.Command, dir string) (ConfigResult, error) {
 		return ConfigResult{}, fmt.Errorf("loading config: %w", err)
 	}
 
+	WarnSchemaNewer(cmd, statefile.RefusalParams{
+		Path:   filepath.Join(stateDir, domain.ConfigFileName),
+		Schema: statefile.SchemaParams{Found: cfg.Project.Schema, Supported: domainstatefile.ProjectConfigSchema},
+	})
+	WarnSchemaNewer(cmd, statefile.RefusalParams{
+		Path:   config.GlobalPath(),
+		Schema: statefile.SchemaParams{Found: cfg.Global.Schema, Supported: domainstatefile.GlobalConfigSchema},
+	})
 	Register(cmd.Context(), RegisterParams{Root: root, StateDir: stateDir, CorrelationID: CorrelationID(cmd)})
 	return ConfigResult{Config: cfg, ProjectDir: root, StateDir: stateDir}, nil
 }

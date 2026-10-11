@@ -11,9 +11,13 @@ import (
 
 const defaultPerm os.FileMode = 0o644
 
-// ErrRemoveFile, returned by Mutate, deletes the file instead of writing it,
-// under the same lock.
-var ErrRemoveFile = errors.New("remove the file")
+var (
+	// ErrRemoveFile, returned by Mutate, deletes the file instead of writing it,
+	// under the same lock.
+	ErrRemoveFile = errors.New("remove the file")
+	// ErrUnchanged, returned by Mutate, leaves the file as it is, absent included.
+	ErrUnchanged = errors.New("leave the file as it is")
+)
 
 type UpdateFileParams struct {
 	Path string
@@ -28,11 +32,10 @@ type UpdateFileParams struct {
 // reads the file, hands it to Mutate, then writes the result to a temporary
 // file that is synced and renamed over the original, so a reader sees the old
 // content or the new one, never half of it, and two writers never lose each
-// other's change. Content Mutate leaves unchanged is not rewritten.
+// other's change. Content Mutate leaves unchanged is not rewritten. ctx bounds
+// only the wait for the lock: a free lock is taken even once ctx is done, so the
+// record of work already carried out is not lost to an interrupt.
 func UpdateFile(ctx context.Context, params UpdateFileParams) (Lock, error) {
-	if err := ctx.Err(); err != nil {
-		return Lock{}, err
-	}
 	if err := os.MkdirAll(filepath.Dir(params.Path), 0o755); err != nil {
 		return Lock{}, fmt.Errorf("create %s: %w", filepath.Dir(params.Path), err)
 	}
@@ -52,6 +55,9 @@ func update(params UpdateFileParams) error {
 	next, err := params.Mutate(current)
 	if errors.Is(err, ErrRemoveFile) {
 		return remove(params.Path)
+	}
+	if errors.Is(err, ErrUnchanged) {
+		return nil
 	}
 	if err != nil {
 		return err

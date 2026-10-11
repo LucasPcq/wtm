@@ -27,7 +27,7 @@ func TestApplyReparentsMovesEachToItsParent(t *testing.T) {
 	seedMeta(t, stateDir, "dev/b", domain.WorktreeMetadata{SourceBranch: "dev/a", CreatedAt: "x"})
 	seedMeta(t, stateDir, "dev/c", domain.WorktreeMetadata{SourceBranch: "dev/x", CreatedAt: "x"})
 
-	applied, err := ApplyReparents(ApplyReparentsParams{
+	applied, err := ApplyReparents(t.Context(), ApplyReparentsParams{
 		StateDir: stateDir,
 		Reparents: []domain.ReparentResult{
 			{Branch: "dev/b", OldParent: "dev/a", NewParent: "main"},

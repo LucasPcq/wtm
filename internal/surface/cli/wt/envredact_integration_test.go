@@ -29,7 +29,7 @@ func linkedSecretRepo(t *testing.T, values map[string]string) string {
 	t.Helper()
 	globaldir.Isolate(t)
 	dir := isolationRepo(t)
-	if err := config.WriteRun(config.WriteRunParams{StateDir: filepath.Join(dir, ".git", "wtm"), Force: true, Config: domain.RunConfig{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: filepath.Join(dir, ".git", "wtm"), Force: true, Config: domain.RunConfig{
 		Jobs: []domain.JobConfig{{
 			Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev",
 			Ports: map[string]int{"PORT": 3000},

@@ -59,13 +59,13 @@ func newPruneFixture(t *testing.T, branches ...string) pruneFixture {
 			t.Fatal(err)
 		}
 		paths[branch] = wt.Path
-		if err := worktree.RecordNamespaces(worktree.RecordNamespacesParams{StateDir: ctx.StateDir, Branch: branch, Jobs: []string{"postgres"}}); err != nil {
+		if err := worktree.RecordNamespaces(t.Context(), worktree.RecordNamespacesParams{StateDir: ctx.StateDir, Branch: branch, Jobs: []string{"postgres"}}); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	witness := filepath.Join(t.TempDir(), "witness")
-	if err := config.WriteRun(config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{Jobs: []domain.JobConfig{{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{Jobs: []domain.JobConfig{{
 		Name: "postgres", Kind: domain.JobKindService, Cmd: "true", Scope: domain.JobScopeShared,
 		Namespace: &domain.JobNamespaceConfig{Name: "app_{worktree}", Create: "true", Remove: `echo "$WTM_NAMESPACE" >> ` + witness},
 	}}}}); err != nil {

@@ -84,7 +84,7 @@ func Settle(ctx context.Context, params Params) Result {
 			Text: fmt.Sprintf(domain.PruneSettledNamespaceFmt, name, ref.Job, ref.Worktree),
 		})
 	}
-	_ = runjobs.SettleRemovals(runjobs.SettleRemovalsParams{StateDir: params.Context.StateDir, Refs: done})
+	_ = runjobs.SettleRemovals(context.WithoutCancel(ctx), runjobs.SettleRemovalsParams{StateDir: params.Context.StateDir, Refs: done})
 	return result
 }
 

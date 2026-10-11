@@ -55,7 +55,7 @@ func Save(ctx context.Context, params SaveParams) error {
 	if len(errs) > 0 {
 		return fmt.Errorf("invalid run config: %s", strings.Join(errs, "; "))
 	}
-	return config.WriteRun(config.WriteRunParams{
+	return config.WriteRun(ctx, config.WriteRunParams{
 		StateDir: params.StateDir,
 		Config:   params.Config,
 		Force:    true,

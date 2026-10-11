@@ -32,7 +32,7 @@ func isolationRepo(t *testing.T) string {
 	if err := os.WriteFile(filepath.Join(stateDir, domain.ConfigFileName), []byte(project), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := config.WriteRun(config.WriteRunParams{StateDir: stateDir, Force: true, Config: domain.RunConfig{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: stateDir, Force: true, Config: domain.RunConfig{
 		Jobs: []domain.JobConfig{{
 			Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev",
 			Ports: map[string]int{"PORT": 3000},
@@ -271,7 +271,7 @@ const dsnEnv = "WEB_PORT=3000\n" +
 func dsnRepo(t *testing.T) string {
 	t.Helper()
 	dir := isolationRepo(t)
-	if err := config.WriteRun(config.WriteRunParams{StateDir: filepath.Join(dir, ".git", "wtm"), Force: true, Config: domain.RunConfig{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: filepath.Join(dir, ".git", "wtm"), Force: true, Config: domain.RunConfig{
 		Jobs: []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}}},
 		EnvPorts: []domain.EnvPortLink{
 			{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"},

@@ -10,10 +10,12 @@ import (
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	domainstatefile "github.com/LucasPcq/wtm/internal/domain/statefile"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/infra/proc"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/rules/statefile"
 	"github.com/LucasPcq/wtm/internal/service/branch"
 	"github.com/LucasPcq/wtm/internal/service/env"
 	"github.com/LucasPcq/wtm/internal/service/hooks"
@@ -112,8 +114,13 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 		Isolation:    rules.EffectiveIsolation(params.Isolation),
 	}
 
-	metaDir := rules.WorktreeMetaDir(params.StateDir, params.Branch)
-	if err := writeMetadata(metaDir, metadata); err != nil {
+	if err := updateMetadata(ctx, updateMetadataParams{
+		StateDir: params.StateDir,
+		Branch:   params.Branch,
+		Update: func(domain.WorktreeMetadata, error) (domain.WorktreeMetadata, error) {
+			return metadata, nil
+		},
+	}); err != nil {
 		return domain.CreateResult{}, err
 	}
 	release()
@@ -235,39 +242,52 @@ func occupantOf(ctx context.Context, params occupantParams) (string, error) {
 	return "", nil
 }
 
-func writeMetadata(metaDir string, metadata domain.WorktreeMetadata) error {
-	if err := os.MkdirAll(metaDir, 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", metaDir, err)
-	}
+type updateMetadataParams struct {
+	StateDir string
+	Branch   string
+	// Update receives the record on disk, or the zero record with the error
+	// that kept it from being read (fs.ErrNotExist when there is none), and
+	// returns the record to write. fs.ErrUnchanged leaves the file as it is.
+	Update func(stored domain.WorktreeMetadata, readErr error) (domain.WorktreeMetadata, error)
+}
 
-	data, err := json.MarshalIndent(metadata, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal metadata: %w", err)
-	}
+// updateMetadata is the one write of a worktree's meta.json: a read-modify-write
+// under the file's lock, so two commands changing different fields of the same
+// worktree both land.
+func updateMetadata(ctx context.Context, params updateMetadataParams) error {
+	path := filepath.Join(rules.WorktreeMetaDir(params.StateDir, params.Branch), domain.MetaFileName)
+	_, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
+		Path: path,
+		Mutate: func(current []byte) ([]byte, error) {
+			stored, readErr := decodeMetadata(current)
+			if err := statefile.Refusal(statefile.RefusalParams{
+				Path:   path,
+				Schema: statefile.SchemaParams{Found: stored.Schema, Supported: domainstatefile.MetaSchema},
+			}); err != nil {
+				return nil, err
+			}
+			next, err := params.Update(stored, readErr)
+			if err != nil {
+				return nil, err
+			}
+			next.Schema = statefile.Written(domainstatefile.MetaSchema)
+			data, err := json.MarshalIndent(next, "", "  ")
+			if err != nil {
+				return nil, fmt.Errorf("marshal metadata: %w", err)
+			}
+			return data, nil
+		},
+	})
+	return err
+}
 
-	// Written aside and renamed over: several commands read-modify-write this
-	// file, and a reader landing on a half-written one would see a worktree that
-	// holds no ordinal rather than one whose ordinal it could not read.
-	metaPath := filepath.Join(metaDir, domain.MetaFileName)
-	tmp, err := os.CreateTemp(metaDir, domain.MetaFileName+".*")
-	if err != nil {
-		return fmt.Errorf("write %s: %w", metaPath, err)
+func decodeMetadata(data []byte) (domain.WorktreeMetadata, error) {
+	if data == nil {
+		return domain.WorktreeMetadata{}, os.ErrNotExist
 	}
-	defer os.Remove(tmp.Name())
-
-	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		return fmt.Errorf("write %s: %w", metaPath, err)
+	var meta domain.WorktreeMetadata
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return domain.WorktreeMetadata{}, err
 	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("write %s: %w", metaPath, err)
-	}
-	if err := os.Chmod(tmp.Name(), 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", metaPath, err)
-	}
-	if err := os.Rename(tmp.Name(), metaPath); err != nil {
-		return fmt.Errorf("write %s: %w", metaPath, err)
-	}
-
-	return nil
+	return meta, nil
 }

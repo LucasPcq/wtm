@@ -135,7 +135,7 @@ strategy = "main"
 [[env.file]]
 target = ".env"
 `)
-	if err := config.WriteRun(config.WriteRunParams{StateDir: repo.stateDir, Force: true, Config: domain.RunConfig{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: repo.stateDir, Force: true, Config: domain.RunConfig{
 		Jobs:     []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "true", Ports: map[string]int{"PORT": 3000}}},
 		EnvPorts: []domain.EnvPortLink{{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"}},
 	}}); err != nil {

@@ -189,7 +189,7 @@ func (f *cleanFlow) run() (Outcome, error) {
 		})
 	}
 	if answers.Value(KeyReparent) == orphans.Reparent && len(moved) > 0 {
-		applied, err := worktree.ApplyReparents(worktree.ApplyReparentsParams{Reparents: moved, StateDir: f.ctx.StateDir})
+		applied, err := worktree.ApplyReparents(f.runCtx, worktree.ApplyReparentsParams{Reparents: moved, StateDir: f.ctx.StateDir})
 		publish.ReparentedAll(f.runCtx, f.ctx, applied)
 		if err != nil {
 			return Outcome{}, err

@@ -48,12 +48,14 @@ func SetIsolation(ctx context.Context, params SetIsolationParams) error {
 		return mainIsolation(params.Isolation)
 	}
 
-	meta, err := loadMetadata(params.Ref.StateDir, params.Ref.Branch)
-	if err != nil {
-		meta = domain.WorktreeMetadata{}
-	}
-	meta.Isolation = rules.EffectiveIsolation(params.Isolation)
-	return writeMetadata(rules.WorktreeMetaDir(params.Ref.StateDir, params.Ref.Branch), meta)
+	return updateMetadata(ctx, updateMetadataParams{
+		StateDir: params.Ref.StateDir,
+		Branch:   params.Ref.Branch,
+		Update: func(meta domain.WorktreeMetadata, _ error) (domain.WorktreeMetadata, error) {
+			meta.Isolation = rules.EffectiveIsolation(params.Isolation)
+			return meta, nil
+		},
+	})
 }
 
 // CheckIsolation refuses a choice SetIsolation would refuse, before anything is

@@ -1,12 +1,17 @@
 package config
 
 import (
+	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 
 	"github.com/BurntSushi/toml"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	domainstatefile "github.com/LucasPcq/wtm/internal/domain/statefile"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
+	"github.com/LucasPcq/wtm/internal/rules/statefile"
 )
 
 // pendingRemovalsFile is the queue of namespaces a clean could not give back. A
@@ -14,6 +19,7 @@ import (
 // leaves has to live beside the repository rather than inside the worktree that
 // incurred it.
 type pendingRemovalsFile struct {
+	Schema  *int                  `toml:"schema,omitempty"`
 	Pending []domain.NamespaceRef `toml:"pending"`
 }
 
@@ -25,36 +31,48 @@ func pendingRemovalsPath(stateDir string) string {
 // one: a debt wtm cannot read is one it cannot settle either, and failing
 // `prune` over it would help nobody.
 func LoadPendingRemovals(stateDir string) []domain.NamespaceRef {
+	data, err := os.ReadFile(pendingRemovalsPath(stateDir))
+	if err != nil {
+		return nil
+	}
+	return decodePendingRemovals(data)
+}
+
+func decodePendingRemovals(data []byte) []domain.NamespaceRef {
 	var file pendingRemovalsFile
-	if _, err := toml.DecodeFile(pendingRemovalsPath(stateDir), &file); err != nil {
+	if _, err := toml.Decode(string(data), &file); err != nil {
 		return nil
 	}
 	return file.Pending
 }
 
-type WritePendingRemovalsParams struct {
+type UpdatePendingRemovalsParams struct {
 	StateDir string
-	Refs     []domain.NamespaceRef
+	Update   func([]domain.NamespaceRef) []domain.NamespaceRef
 }
 
-// WritePendingRemovals replaces the queue, removing the file once it is empty so
-// nothing is left claiming a debt that is settled.
-func WritePendingRemovals(params WritePendingRemovalsParams) error {
+// UpdatePendingRemovals changes the queue as it is on disk at the moment of the
+// write, and removes the file once it is empty so nothing is left claiming a
+// debt that is settled.
+func UpdatePendingRemovals(ctx context.Context, params UpdatePendingRemovalsParams) error {
 	path := pendingRemovalsPath(params.StateDir)
-	if len(params.Refs) == 0 {
-		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		return nil
-	}
-
-	if err := os.MkdirAll(params.StateDir, 0o755); err != nil {
-		return err
-	}
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	return toml.NewEncoder(file).Encode(pendingRemovalsFile{Pending: params.Refs})
+	_, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
+		Path: path,
+		Mutate: func(current []byte) ([]byte, error) {
+			if err := refuseNewer(refuseNewerParams{Path: path, Current: current, Supported: domainstatefile.PendingRemovalsSchema}); err != nil {
+				return nil, err
+			}
+			next := params.Update(decodePendingRemovals(current))
+			if len(next) == 0 {
+				return nil, fs.ErrRemoveFile
+			}
+			var buf bytes.Buffer
+			err := toml.NewEncoder(&buf).Encode(pendingRemovalsFile{
+				Schema:  nonZero(statefile.Written(domainstatefile.PendingRemovalsSchema)),
+				Pending: next,
+			})
+			return buf.Bytes(), err
+		},
+	})
+	return err
 }

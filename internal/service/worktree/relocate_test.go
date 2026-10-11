@@ -50,7 +50,7 @@ func TestAdoptKeepsWhatMetaJSONAlreadyHolds(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := Adopt(AdoptParams{StateDir: repo.stateDir, Branch: "feat/x", Parent: "main"}); err != nil {
+	if err := Adopt(t.Context(), AdoptParams{StateDir: repo.stateDir, Branch: "feat/x", Parent: "main"}); err != nil {
 		t.Fatalf("Adopt: %v", err)
 	}
 

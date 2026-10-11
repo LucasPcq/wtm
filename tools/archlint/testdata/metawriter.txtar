@@ -1,13 +1,13 @@
 -- github.com/LucasPcq/wtm/internal/service/worktree/worktree.go --
 package worktree
 
-func writeMetadata() error { return nil }
+func updateMetadata() error { return nil }
 
 func purgeState() {}
 
-func persist() error { return writeMetadata() }
+func persist() error { return updateMetadata() }
 
-func Create() error { return writeMetadata() }
+func Create() error { return updateMetadata() }
 
 func Sneaky() error { return persist() } // want `worktree\.Sneaky writes worktree metadata but is not in the mutators table`
 
@@ -16,15 +16,15 @@ func Purges() { purgeState() } // want `worktree\.Purges writes worktree metadat
 func Reads() error { return nil }
 
 func Closure() func() error { // want `worktree\.Closure writes worktree metadata`
-	return func() error { return writeMetadata() }
+	return func() error { return updateMetadata() }
 }
 
 type T struct{}
 
-func (T) Method() error { return writeMetadata() }
+func (T) Method() error { return updateMetadata() }
 -- github.com/LucasPcq/wtm/internal/service/env/env.go --
 package env
 
-func writeMetadata() error { return nil }
+func updateMetadata() error { return nil }
 
-func Elsewhere() error { return writeMetadata() }
+func Elsewhere() error { return updateMetadata() }

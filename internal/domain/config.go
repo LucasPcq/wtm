@@ -11,6 +11,8 @@ const (
 
 // ProjectConfig maps to .wtm.toml (project-level configuration).
 type ProjectConfig struct {
+	// Schema is the version read from the file, zero when it carries none.
+	Schema    int             `toml:"-" json:"-"`
 	Worktrees WorktreesConfig `toml:"worktrees" json:"worktrees"`
 	Env       EnvConfig       `toml:"env" json:"env"`
 	Hooks     HooksConfig     `toml:"hooks" json:"hooks"`
@@ -59,6 +61,7 @@ type HooksConfig struct {
 
 // GlobalConfig maps to the global wtm config (user-level configuration).
 type GlobalConfig struct {
+	Schema int          `toml:"schema" json:"-"`
 	Shell  ShellType    `toml:"shell"`
 	UI     UIConfig     `toml:"ui"`
 	Proxy  ProxyConfig  `toml:"proxy"`

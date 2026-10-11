@@ -289,7 +289,7 @@ func Run(ctx context.Context, params Params) (Outcome, error) {
 		Existing: envFiles,
 	})
 	if len(addedTargets) > 0 {
-		if err := envsvc.AddEnvTargets(envsvc.AddEnvTargetsParams{
+		if err := envsvc.AddEnvTargets(ctx, envsvc.AddEnvTargetsParams{
 			StateDir: project.StateDir,
 			Project:  project.Config.Project,
 			Targets:  addedTargets,

@@ -49,7 +49,7 @@ func ReparentBatch(ctx context.Context, params domain.ReparentBatchParams) ([]do
 
 	results := make([]domain.ReparentResult, 0, len(branches))
 	for _, branch := range branches {
-		res, err := setSourceBranch(setSourceBranchParams{
+		res, err := setSourceBranch(ctx, setSourceBranchParams{
 			StateDir:  params.StateDir,
 			Branch:    branch,
 			NewParent: params.NewParent,
@@ -73,10 +73,10 @@ type ApplyReparentsParams struct {
 }
 
 // ApplyReparents rewrites each listed child's metadata to point at its NewParent.
-func ApplyReparents(params ApplyReparentsParams) ([]domain.ReparentResult, error) {
+func ApplyReparents(ctx context.Context, params ApplyReparentsParams) ([]domain.ReparentResult, error) {
 	applied := make([]domain.ReparentResult, 0, len(params.Reparents))
 	for _, r := range params.Reparents {
-		res, err := setSourceBranch(setSourceBranchParams{
+		res, err := setSourceBranch(ctx, setSourceBranchParams{
 			StateDir:  params.StateDir,
 			Branch:    r.Branch,
 			NewParent: r.NewParent,
@@ -98,18 +98,22 @@ type setSourceBranchParams struct {
 
 // setSourceBranch updates only the SourceBranch field of a worktree's metadata,
 // preserving CreatedAt and EnvStrategy.
-func setSourceBranch(params setSourceBranchParams) (domain.ReparentResult, error) {
-	meta, err := loadMetadata(params.StateDir, params.Branch)
+func setSourceBranch(ctx context.Context, params setSourceBranchParams) (domain.ReparentResult, error) {
+	old := ""
+	err := updateMetadata(ctx, updateMetadataParams{
+		StateDir: params.StateDir,
+		Branch:   params.Branch,
+		Update: func(meta domain.WorktreeMetadata, readErr error) (domain.WorktreeMetadata, error) {
+			if readErr != nil {
+				return domain.WorktreeMetadata{}, fmt.Errorf("read metadata for %s: %w", params.Branch, readErr)
+			}
+			old = meta.SourceBranch
+			meta.SourceBranch = params.NewParent
+			return meta, nil
+		},
+	})
 	if err != nil {
-		return domain.ReparentResult{}, fmt.Errorf("read metadata for %s: %w", params.Branch, err)
-	}
-
-	old := meta.SourceBranch
-	meta.SourceBranch = params.NewParent
-
-	if err := writeMetadata(rules.WorktreeMetaDir(params.StateDir, params.Branch), meta); err != nil {
 		return domain.ReparentResult{}, err
 	}
-
 	return domain.ReparentResult{Branch: params.Branch, OldParent: old, NewParent: params.NewParent}, nil
 }

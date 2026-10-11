@@ -15,6 +15,8 @@ type Worktree struct {
 // WorktreeMetadata is written to <state-dir>/worktrees/<branch>/meta.json
 // for every worktree managed by wtm.
 type WorktreeMetadata struct {
+	// Schema is omitted while the file is at schema 1.
+	Schema       int         `json:"schema,omitempty"`
 	SourceBranch string      `json:"source_branch"`
 	CreatedAt    string      `json:"created_at"`
 	EnvStrategy  EnvStrategy `json:"env_strategy"`

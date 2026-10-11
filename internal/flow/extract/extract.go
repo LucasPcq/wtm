@@ -134,7 +134,7 @@ func (f *extractFlow) run() (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	decide.Remember(decide.RememberParams{Context: f.ctx, Session: session, Answers: answers, Presenter: f.presenter})
+	decide.Remember(f.runCtx, decide.RememberParams{Context: f.ctx, Session: session, Answers: answers, Presenter: f.presenter})
 	return f.extract(answers)
 }
 

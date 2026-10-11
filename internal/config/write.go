@@ -2,15 +2,17 @@ package config
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/BurntSushi/toml"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	domainstatefile "github.com/LucasPcq/wtm/internal/domain/statefile"
 	"github.com/LucasPcq/wtm/internal/infra/fs"
+	"github.com/LucasPcq/wtm/internal/rules/statefile"
 	"github.com/LucasPcq/wtm/internal/schemas"
 )
 
@@ -20,6 +22,7 @@ var ErrRunFileExists = errors.New("run file already exists")
 // Both the init wizard answers and a full ProjectConfig (for re-init) convert
 // to it, so the template emits every section's actual values.
 type projectTemplateData struct {
+	Schema      int
 	BasePath    string
 	BaseBranch  string
 	SkipEnv     bool
@@ -37,8 +40,10 @@ type WriteProjectParams struct {
 	Answers  domain.InitProjectAnswers
 }
 
-func WriteProject(params WriteProjectParams) error {
-	return renderProjectConfig(params.StateDir, answersToTemplate(params.Answers))
+func WriteProject(ctx context.Context, params WriteProjectParams) error {
+	return renderProjectConfig(ctx, renderParams{StateDir: params.StateDir, Render: func([]byte) (projectTemplateData, error) {
+		return answersToTemplate(params.Answers), nil
+	}})
 }
 
 type WriteProjectConfigParams struct {
@@ -48,42 +53,102 @@ type WriteProjectConfigParams struct {
 
 // WriteProjectConfig re-renders config.toml from a full ProjectConfig, preserving
 // every section's current values (only manual comments are regenerated).
-func WriteProjectConfig(params WriteProjectConfigParams) error {
-	return renderProjectConfig(params.StateDir, configToTemplate(params.Config))
+func WriteProjectConfig(ctx context.Context, params WriteProjectConfigParams) error {
+	return renderProjectConfig(ctx, renderParams{StateDir: params.StateDir, Render: func([]byte) (projectTemplateData, error) {
+		return configToTemplate(params.Config), nil
+	}})
 }
 
-func renderProjectConfig(stateDir string, data projectTemplateData) error {
-	var buf bytes.Buffer
-	if err := parsedTemplate.Execute(&buf, data); err != nil {
-		return fmt.Errorf("render template: %w", err)
-	}
+type UpdateProjectConfigParams struct {
+	StateDir string
+	Update   func(*domain.ProjectConfig)
+}
 
-	if err := os.MkdirAll(stateDir, 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", stateDir, err)
-	}
+// UpdateProjectConfig changes config.toml as it is on disk at the moment of the
+// write, under its lock: no default is added, and no change another process
+// made since this one loaded the config is lost.
+func UpdateProjectConfig(ctx context.Context, params UpdateProjectConfigParams) error {
+	path := filepath.Join(params.StateDir, domain.ConfigFileName)
+	return renderProjectConfig(ctx, renderParams{StateDir: params.StateDir, Render: func(current []byte) (projectTemplateData, error) {
+		if current == nil {
+			return projectTemplateData{}, domain.ErrConfigNotFound
+		}
+		project, err := parseProjectConfig(path, current)
+		if err != nil {
+			return projectTemplateData{}, err
+		}
+		params.Update(&project)
+		return configToTemplate(project), nil
+	}})
+}
 
-	path := filepath.Join(stateDir, domain.ConfigFileName)
-	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", path, err)
-	}
+type renderParams struct {
+	StateDir string
+	Render   func(current []byte) (projectTemplateData, error)
+}
 
-	return writeSchema(stateDir, schemas.Project)
+func renderProjectConfig(ctx context.Context, params renderParams) error {
+	path := filepath.Join(params.StateDir, domain.ConfigFileName)
+	_, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
+		Path: path,
+		Mutate: func(current []byte) ([]byte, error) {
+			if err := refuseNewer(refuseNewerParams{Path: path, Current: current, Supported: domainstatefile.ProjectConfigSchema}); err != nil {
+				return nil, err
+			}
+			data, err := params.Render(current)
+			if err != nil {
+				return nil, err
+			}
+			data.Schema = statefile.Written(domainstatefile.ProjectConfigSchema)
+			var buf bytes.Buffer
+			if err := parsedTemplate.Execute(&buf, data); err != nil {
+				return nil, fmt.Errorf("render template: %w", err)
+			}
+			return buf.Bytes(), nil
+		},
+	})
+	if err != nil {
+		return err
+	}
+	return writeSchema(ctx, writeSchemaParams{Dir: params.StateDir, Schema: schemas.Project})
+}
+
+type refuseNewerParams struct {
+	Path      string
+	Current   []byte
+	Supported int
+}
+
+// refuseNewer stops a write over a file a newer wtm wrote. A file that does not
+// parse has no schema to read and is overwritten, as it always was.
+func refuseNewer(params refuseNewerParams) error {
+	var file struct {
+		Schema int `toml:"schema"`
+	}
+	if _, err := toml.Decode(string(params.Current), &file); err != nil {
+		return nil
+	}
+	return statefile.Refusal(statefile.RefusalParams{
+		Path:   params.Path,
+		Schema: statefile.SchemaParams{Found: file.Schema, Supported: params.Supported},
+	})
+}
+
+type writeSchemaParams struct {
+	Dir    string
+	Schema schemas.Schema
 }
 
 // writeSchema puts this binary's schema beside the file that points at it, on
 // every write rather than once at init: an upgrade otherwise leaves the editor
 // validating against the version the repository was first set up with. Loading
 // writes nothing — `wtm schema dump` refreshes them without touching a config.
-func writeSchema(dir string, schema schemas.Schema) error {
-	schemaDir := filepath.Join(dir, domain.SchemasDirName)
-	if err := os.MkdirAll(schemaDir, 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", schemaDir, err)
-	}
-	path := filepath.Join(schemaDir, schema.Filename())
-	if err := os.WriteFile(path, schema.Bytes(), 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", path, err)
-	}
-	return nil
+func writeSchema(ctx context.Context, params writeSchemaParams) error {
+	_, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
+		Path:   filepath.Join(params.Dir, domain.SchemasDirName, params.Schema.Filename()),
+		Mutate: func([]byte) ([]byte, error) { return params.Schema.Bytes(), nil },
+	})
+	return err
 }
 
 func answersToTemplate(a domain.InitProjectAnswers) projectTemplateData {
@@ -123,37 +188,38 @@ type WriteRunParams struct {
 	Force    bool // overwrite run.toml if it already exists
 }
 
-func WriteRun(params WriteRunParams) error {
+func WriteRun(ctx context.Context, params WriteRunParams) error {
 	path := filepath.Join(params.StateDir, domain.RunFileName)
-
-	if _, err := os.Stat(path); err == nil && !params.Force {
-		return ErrRunFileExists
+	_, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
+		Path: path,
+		Mutate: func(current []byte) ([]byte, error) {
+			if current != nil && !params.Force {
+				return nil, ErrRunFileExists
+			}
+			if err := refuseNewer(refuseNewerParams{Path: path, Current: current, Supported: domainstatefile.RunConfigSchema}); err != nil {
+				return nil, err
+			}
+			var buf bytes.Buffer
+			buf.WriteString("#:schema ./schemas/run.schema.json\n\n")
+			if err := toml.NewEncoder(&buf).Encode(runFileOf(params.Config)); err != nil {
+				return nil, fmt.Errorf("encode run config: %w", err)
+			}
+			return buf.Bytes(), nil
+		},
+	})
+	if err != nil {
+		return err
 	}
-
-	if err := os.MkdirAll(params.StateDir, 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", params.StateDir, err)
-	}
-
-	var buf bytes.Buffer
-	buf.WriteString("#:schema ./schemas/run.schema.json\n\n")
-	if err := toml.NewEncoder(&buf).Encode(runFileOf(params.Config)); err != nil {
-		return fmt.Errorf("encode run config: %w", err)
-	}
-
-	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", path, err)
-	}
-
-	return writeSchema(params.StateDir, schemas.Run)
+	return writeSchema(ctx, writeSchemaParams{Dir: params.StateDir, Schema: schemas.Run})
 }
 
-// runFile is run.toml as it is written. It exists for the two settings whose
-// unset value is zero: the TOML encoder does not honour `omitempty` on a scalar
-// int, so a plain encode wrote `port_offset_block = 0` into every generated
-// file — a value the loader ignores and the file's own schema rejects, since it
-// requires a minimum of 1. A pointer is empty in the way the encoder
-// understands.
+// runFile is run.toml as it is written. It exists for the settings whose unset
+// value is zero: the TOML encoder does not honour `omitempty` on a scalar int,
+// so a plain encode wrote `port_offset_block = 0` into every generated file — a
+// value the loader ignores and the file's own schema rejects, since it requires
+// a minimum of 1. A pointer is empty in the way the encoder understands.
 type runFile struct {
+	Schema           *int               `toml:"schema,omitempty"`
 	PortOffsetBlock  *int               `toml:"port_offset_block,omitempty"`
 	PortProbeTimeout *int               `toml:"port_probe_timeout,omitempty"`
 	Addressing       domain.Addressing  `toml:"addressing,omitempty"`
@@ -168,42 +234,60 @@ type runFile struct {
 
 func runFileOf(cfg domain.RunConfig) runFile {
 	file := runFile{
-		Addressing:  cfg.Addressing,
-		Concurrency: cfg.Concurrency,
-		Isolation:   cfg.Isolation,
-		Jobs:        cfg.Jobs,
-		Profiles:    cfg.Profiles,
-		EnvPorts:    cfg.EnvPorts,
-		EnvValues:   cfg.EnvValues,
-	}
-	if cfg.PortOffsetBlock != 0 {
-		file.PortOffsetBlock = &cfg.PortOffsetBlock
-	}
-	if cfg.PortProbeTimeout != 0 {
-		file.PortProbeTimeout = &cfg.PortProbeTimeout
+		Schema:           nonZero(statefile.Written(domainstatefile.RunConfigSchema)),
+		PortOffsetBlock:  nonZero(cfg.PortOffsetBlock),
+		PortProbeTimeout: nonZero(cfg.PortProbeTimeout),
+		Addressing:       cfg.Addressing,
+		Concurrency:      cfg.Concurrency,
+		Isolation:        cfg.Isolation,
+		Jobs:             cfg.Jobs,
+		Profiles:         cfg.Profiles,
+		EnvPorts:         cfg.EnvPorts,
+		EnvValues:        cfg.EnvValues,
 	}
 	return file
 }
 
-func WriteGlobal(answers domain.InitGlobalAnswers) error {
+func nonZero(value int) *int {
+	if value == 0 {
+		return nil
+	}
+	return &value
+}
+
+func WriteGlobal(ctx context.Context, answers domain.InitGlobalAnswers) error {
 	dir, err := fs.GlobalDir()
 	if err != nil {
 		return err
 	}
-	return writeGlobalAt(filepath.Join(dir, domain.GlobalConfigFile), answers)
+	return writeGlobalAt(ctx, writeGlobalAtParams{Path: filepath.Join(dir, domain.GlobalConfigFile), Answers: answers})
 }
 
-func writeGlobalAt(path string, answers domain.InitGlobalAnswers) error {
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("create config dir: %w", err)
+type writeGlobalAtParams struct {
+	Path    string
+	Answers domain.InitGlobalAnswers
+}
+
+func writeGlobalAt(ctx context.Context, params writeGlobalAtParams) error {
+	_, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
+		Path: params.Path,
+		Mutate: func(current []byte) ([]byte, error) {
+			if err := refuseNewer(refuseNewerParams{Path: params.Path, Current: current, Supported: domainstatefile.GlobalConfigSchema}); err != nil {
+				return nil, err
+			}
+			return []byte(globalContent(params.Answers)), nil
+		},
+	})
+	if err != nil {
+		return err
 	}
+	return writeSchema(ctx, writeSchemaParams{Dir: filepath.Dir(params.Path), Schema: schemas.Global})
+}
 
-	content := fmt.Sprintf("#:schema ./schemas/global.schema.json\n\nshell = %q\n", answers.Shell)
-
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", path, err)
+func globalContent(answers domain.InitGlobalAnswers) string {
+	header := "#:schema ./schemas/global.schema.json\n\n"
+	if schema := statefile.Written(domainstatefile.GlobalConfigSchema); schema != 0 {
+		header += fmt.Sprintf("schema = %d\n\n", schema)
 	}
-
-	return writeSchema(dir, schemas.Global)
+	return header + fmt.Sprintf("shell = %q\n", answers.Shell)
 }

@@ -10,7 +10,7 @@ import (
 // metadataSinks are the two writes of a worktree's meta.json. A function that
 // reaches one changes a worktree's identity, so it belongs in mutators — which
 // is what makes that table complete by construction rather than by memory.
-var metadataSinks = map[string]bool{"writeMetadata": true, "purgeState": true}
+var metadataSinks = map[string]bool{"updateMetadata": true, "purgeState": true}
 
 var metawriterAnalyzer = &analysis.Analyzer{
 	Name: "metawriter",

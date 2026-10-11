@@ -41,13 +41,13 @@ func newDataFixture(t *testing.T) dataFixture {
 	}
 	witness := filepath.Join(t.TempDir(), "witness")
 	remove := `if [ -d "` + wt.Path + `" ]; then echo present; else echo "$WTM_NAMESPACE"; fi >> ` + witness
-	if err := config.WriteRun(config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{Jobs: []domain.JobConfig{{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{Jobs: []domain.JobConfig{{
 		Name: "postgres", Kind: domain.JobKindService, Cmd: "true", Scope: domain.JobScopeShared,
 		Namespace: &domain.JobNamespaceConfig{Name: "app_{worktree}", Create: "true", Remove: remove},
 	}}}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := worktree.RecordNamespaces(worktree.RecordNamespacesParams{StateDir: ctx.StateDir, Branch: "feat/data", Jobs: []string{"postgres"}}); err != nil {
+	if err := worktree.RecordNamespaces(t.Context(), worktree.RecordNamespacesParams{StateDir: ctx.StateDir, Branch: "feat/data", Jobs: []string{"postgres"}}); err != nil {
 		t.Fatal(err)
 	}
 	up := []domain.JobInfo{{Name: "postgres", Status: domain.JobStatusRunning, WorkDir: ctx.ProjectDir}}

@@ -25,7 +25,7 @@ func composeIsolationRepo(t *testing.T) string {
 		t.Fatal(err)
 	}
 	cfg.Jobs = append(cfg.Jobs, domain.JobConfig{Name: "db", Kind: domain.JobKindService, Cmd: "docker compose up"})
-	if err := config.WriteRun(config.WriteRunParams{StateDir: stateDir, Force: true, Config: cfg}); err != nil {
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: stateDir, Force: true, Config: cfg}); err != nil {
 		t.Fatal(err)
 	}
 	return dir
