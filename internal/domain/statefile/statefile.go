@@ -17,10 +17,10 @@ const (
 
 // ErrSchemaNewer is a write refused because the file was written by a newer
 // wtm: this one reads it as far as it understands it, and leaves it alone.
-var ErrSchemaNewer = errors.New("written by a newer wtm")
+var ErrSchemaNewer = errors.New("upgrade wtm to change it")
 
 const (
-	SchemaNewerFmt    = "%s is at schema %d, newer than the %d this wtm writes: upgrade wtm to change it: %w"
+	SchemaNewerFmt    = "%s is at schema %d, newer than the %d this wtm writes: %w"
 	SchemaNewerTitle  = "Written by a newer wtm"
 	SchemaNewerWhyFmt = "%s is at schema %d, newer than the %d this wtm knows"
 	SchemaNewerCost   = "this wtm reads it as far as it understands it, and refuses to write it"
