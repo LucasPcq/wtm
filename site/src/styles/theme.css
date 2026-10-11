@@ -14,6 +14,7 @@
   --sl-color-gray-6: #1a1824;
   --sl-color-black: #14121b;
   --wtm-signature: #e8734a;
+  --wtm-cta-ink: #161616;
 }
 
 :root[data-theme='light'] {
@@ -30,6 +31,7 @@
   --sl-color-gray-7: #f8f7fb;
   --sl-color-black: #fbfafd;
   --wtm-signature: #a6391a;
+  --wtm-cta-ink: #ffffff;
 }
 
 .site-title { gap: 0.5rem; }
@@ -40,5 +42,7 @@ code, kbd, pre { font-size: 0.92em; }
 .sidebar-content a[aria-current='page'] { background: var(--sl-color-accent-low); color: var(--sl-color-accent-high); font-weight: 600; }
 :root[data-theme='light'] .sidebar-content a[aria-current='page'] { color: var(--sl-color-accent); }
 
-.hero h1 { font-stretch: 112%; font-weight: 850; letter-spacing: -0.02em; }
+.hero h1 { font-weight: 300; font-stretch: 70%; letter-spacing: -0.02em; line-height: 0.95; }
+.hero h1 span { display: block; font-weight: 850; font-stretch: 118%; color: var(--wtm-signature); }
+.hero .sl-link-button.primary, .hero .sl-link-button.primary:hover { background: var(--wtm-signature); border-color: var(--wtm-signature); color: var(--wtm-cta-ink); border-radius: 10px; font-weight: 700; }
 .hero img { border-radius: 0.75rem; }
