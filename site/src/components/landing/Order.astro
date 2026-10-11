@@ -24,14 +24,14 @@ const clean = [
     <div>
       <p class="label">wtm sync</p>
       <h2>Branches on branches, rebased in order.</h2>
-      <p style="margin-bottom: 24px">When main moves, the whole chain is rebased, parents before children, and stops cleanly on a conflict.</p>
-      <Session title="~/code/acme" lines={tree} />
+      <p>When main moves, the whole chain is rebased, parents before children, and stops cleanly on a conflict.</p>
+      <Session title="~/code/acme" lines={tree} wrapped />
     </div>
     <div>
       <p class="label">wtm clean · prune</p>
       <h2>Gone once merged. Never with your work.</h2>
-      <p style="margin-bottom: 24px">One branch, several, or every one whose pull request merged. Uncommitted or unpushed work, an open pull request or a lock stops it until you say --force.</p>
-      <Session title="~/code/acme" lines={clean} />
+      <p>One branch, several, or every merged one. Uncommitted or unpushed work, an open pull request or a lock stops it until --force.</p>
+      <Session title="~/code/acme" lines={clean} wrapped />
     </div>
   </div>
 </section>

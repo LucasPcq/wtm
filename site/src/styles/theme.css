@@ -1,6 +1,9 @@
 /* The tokens of docs/dev/identity.md on Starlight's scale; the landing uses the same (landing.css). */
 :root {
   --sl-font: 'Archivo', system-ui, sans-serif;
+  --sl-line-height-headings: 1.15;
+  --sl-text-h2: 1.95rem;
+  --sl-text-h3: 1.35rem;
   --sl-font-mono: 'Martian Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --sl-color-accent-low: #282341;
   --sl-color-accent: #9b8cff;
@@ -50,3 +53,18 @@ code, kbd, pre { font-size: 0.92em; }
 .hero { padding-block: 3rem 1rem; }
 .hero .tagline { text-wrap: balance; }
 .sl-markdown-content p { text-wrap: pretty; }
+
+/* Martian Mono is wide: inline code a step smaller than the text keeps a line even. */
+.sl-markdown-content :not(pre) > code { font-size: 0.8em; padding: 0.15em 0.4em; border-radius: 4px; }
+.sl-markdown-content :is(td, th) :not(pre) > code { font-size: 0.78em; }
+
+/* Titles: the identity's condensed heavy cut, with room above each section. */
+h1#_top, .sl-markdown-content :is(h2, h3) { font-weight: 800; font-stretch: 85%; letter-spacing: -0.01em; }
+h1#_top { font-size: clamp(2.2rem, 4vw, 2.9rem); line-height: 1.05; }
+.sl-markdown-content :not(h1, h2, h3, h4, h5, h6, .sl-heading-wrapper) + .sl-heading-wrapper.level-h2 { margin-top: 3rem; }
+.sl-markdown-content :not(h1, h2, h3, h4, h5, h6, .sl-heading-wrapper) + .sl-heading-wrapper.level-h3 { margin-top: 2.25rem; }
+.sl-markdown-content :is(h2, h3) + * { margin-top: 0.85rem; }
+
+.sl-markdown-content :is(h2, h3, h4) code { font-size: 0.72em; font-weight: 600; display: inline-block; line-height: 1.25; padding: 0 0.3em; }
+/* Starlight's anchor link sits on the baseline at a full line's height, which pushes a wrapped title's last line down. */
+.sl-markdown-content .sl-anchor-link { vertical-align: top; }

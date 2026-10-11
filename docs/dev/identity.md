@@ -88,10 +88,12 @@ Content width 1240 px with 32 px gutters; at phone width every row stacks and wi
 - a tall section with a centred title and a full-width figure below (`run up` and the three worktree identity cards);
 - two equal columns, text beside a terminal (`run.toml`);
 - a heading alone, three short columns, then a full-width terminal (agents and `wtm events`);
-- two equal columns with panels of equal height (`sync`, `clean · prune`);
+- two equal columns with panels of equal height (`sync`, `clean · prune`): label, title, text and panel share a row across the columns (CSS subgrid), the two texts are kept to the same number of lines, and a line too long for the half-width panel wraps with a hanging indent, as a terminal of that width would;
 - a centred closing block (try it: `brew install`, `wtm init`, `wtm create`).
 
 A terminal is never smaller than the text beside it; when the output is long, it goes full width under the text.
+
+**The README** is the product page, about three screens: the banner, one sentence, the hero GIF, six highlights, a two-line install, the four stages of a branch's life (create, run, sync, prune) each in the same shape (heading, one sentence, one command, one visual), the agents paragraph, a row of links. Command tables, install options, comparisons and secondary commands belong in `docs/guide/` or the docs site. Its visuals are recorded from `docs/demos/*.tape` (VHS, `docs/demos/setup.sh`, the wtm theme in `_env.tape`): GIFs via `Output`, stills via `Screenshot`.
 
 ## Motion
 
@@ -110,7 +112,7 @@ The look every agent-tool landing already has, and the generated-design tells th
 | Surface | Where | What it takes |
 | -- | -- | -- |
 | Landing | `site/src/pages/index.astro`, `site/src/components/landing/`, `site/src/styles/landing.css` | Applied. Hero, life of a branch, `run up` cards (values from `machine.mjs`), `run.toml`, agents, `sync` and `clean · prune`, try it |
-| Docs theme | `site/src/styles/theme.css`, `site/astro.config.mjs` | Applied. The tokens (both themes) on Starlight's `--sl-color-*`, Archivo and Martian Mono, the mark as logo |
+| Docs theme | `site/src/styles/theme.css`, `site/astro.config.mjs` | Applied. The tokens (both themes) on Starlight's `--sl-color-*`, Archivo and Martian Mono, the mark as logo, titles in the condensed heavy cut, inline code a step smaller than the text |
 | README | `README.md`, `docs/assets/banner-*.svg` | Applied. The banner (text outlined from Archivo, a dark and a light file behind `<picture>`), one section shape repeated for the four stages, visuals recorded with the wtm VHS theme (`docs/demos/_env.tape`), no command table |
 | Social preview | `site/public/social-preview.png` (1280×640), uploaded by hand in the repository settings | Applied. `bg`, the mark and wordmark, the headline pair, one sentence, the three lanes splitting to the right edge with their URLs. It is the `og:image` / `twitter:image` of every page of the site |
 | Search | `site/src/layouts/Landing.astro`, `site/src/pages/robots.txt.ts`, `site/astro.config.mjs` | Applied. A title with "git worktree manager", a description under 160 characters, a canonical per page, Open Graph and Twitter tags, `SoftwareApplication` JSON-LD, `robots.txt` pointing at the sitemap, `theme-color`, the touch icon |
