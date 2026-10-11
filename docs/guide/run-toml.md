@@ -1,6 +1,6 @@
 # `run.toml` reference
 
-`<git-common-dir>/wtm/run.toml` (`.git/wtm/run.toml` in a normal clone) declares the jobs of the `run` module. It is per-clone and never committed; share it with `wtm run export | wtm run import -`. `wtm run init` writes it from detection, `wtm run job …` / `wtm run profile …` edit it, and a hand edit is fine: the file is validated every time it is read, and every write puts its JSON schema beside it (`schemas/run.schema.json`) for editor autocomplete.
+`<git-common-dir>/wtm/run.toml` (`.git/wtm/run.toml` in a normal clone) declares the jobs of the `run` module. It is per-clone and never committed; share it with `wtm run export > run.json` in one clone and `wtm run import run.json` in another. `wtm run init` writes it from detection, `wtm run job …` / `wtm run profile …` edit it, and a hand edit is fine: the file is validated every time it is read, and every write puts its JSON schema beside it (`schemas/run.schema.json`) for editor autocomplete.
 
 **Validation is strict.** An unknown key, a misspelt `kind`, a reference to an undeclared job, or two links claiming the same key refuse the file, naming the cause. A refused file never fails a core command (`create`, `extract`, `checkout`, `env`, `clean`…): only the run part is skipped, with a warning. `run up` and `run start` refuse it; `run down`, `run stop` and `run ps` warn and carry on, so what is running can always be stopped.
 

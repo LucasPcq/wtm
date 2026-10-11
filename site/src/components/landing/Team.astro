@@ -6,10 +6,10 @@ import { cmd, note, out } from '../../lib/term.mjs';
 const lines = [
   note('once, by the person who knows the stack'),
   cmd('wtm run init'),
-  cmd('wtm run export > acme.run.toml'),
+  cmd('wtm run export > acme-run.json'),
   out(),
   note('everyone else, and their agents'),
-  cmd('wtm run import acme.run.toml'),
+  cmd('wtm run import acme-run.json'),
   cmd('wtm run up'),
 ];
 ---

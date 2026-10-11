@@ -11,10 +11,11 @@ The site is the first thing someone sees of wtm. Its identity — palette, type,
 
 | Surface | Files | Values from |
 | -- | -- | -- |
-| Landing | `site/src/pages/index.astro` (section order), `site/src/components/landing/*.astro`, `site/src/styles/landing.css`, `site/src/layouts/Landing.astro` (nav, footer, meta) | `src/lib/facts.mjs` (latest tag), `src/lib/machine.mjs` (ports, `.env`, URLs, identity cards), `src/lib/term.mjs` (terminal lines) |
+| Landing | `site/src/pages/index.astro` (section order), `site/src/components/landing/*.astro`, `site/src/styles/landing.css`, `site/src/layouts/Landing.astro` (nav, footer, meta) | `src/lib/facts.mjs` (latest tag), `src/lib/machine.mjs` (ports, `.env`, URLs, identity cards), `src/lib/term.mjs` (terminal lines); the hero's motion and the replays are played by `src/lib/play.ts` |
 | Legal pages | `site/src/pages/privacy.astro`, `terms.astro` (same layout and CSS as the landing) | what wtm really sends over the network |
 | Docs theme | `site/src/styles/theme.css`, `site/astro.config.mjs` | the landing's tokens on Starlight's `--sl-*` variables |
 | Docs home | `site/src/docs-home.mdx` (`__BASE__` is replaced at sync) | — |
+| Site config | `site/site.config.mjs`: `DOMAIN` (site URL, base path, `CNAME`, contact address), one archived docs version per earlier minor, read from its tag; `internal/schemas/*.json` are published under `/schemas/` | — |
 | README, banner, social preview | `README.md`, `docs/assets/src/`, `site/public/social-preview.png` | `make demos` for the visuals |
 
 The guide's *content* and its sidebar are not this skill: use `wtm-docs`.

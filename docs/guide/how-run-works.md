@@ -27,11 +27,11 @@ cmd  = "pnpm migrate"
 
 [[profile]]
 name    = "full"
-jobs    = ["docker", "web", "migrate"]
+jobs    = ["docker", "migrate", "web"]   # migrate runs to the end before web starts
 default = true
 ```
 
-- The module is opt-in (`wtm run init`, not `wtm init`), per clone and never committed: share a layout with `wtm run export | wtm run import -`.
+- The module is opt-in (`wtm run init`, not `wtm init`), per clone and never committed: share a layout with `wtm run export > run.json` in one clone and `wtm run import run.json` in another.
 - `cmd` and `stop` are **`/bin/sh` lines**, not argv: quotes, `&&`, pipes, redirections, globs and `${VAR}` behave as in a terminal. POSIX `sh` is used everywhere, never your interactive shell, so a shared `run.toml` behaves the same on every machine.
 - Jobs are scoped per worktree: `docker` started from worktree A runs with `cwd = A`, and a separate process runs from worktree B. `wtm run up feat-a feat-b` brings up several at once, each independent. `wtm run down` stops the current worktree's jobs; `--all` stops every worktree of this repository, never another one.
 - When another worktree's jobs are already running, `run up` asks once about the machine's load: see [Several worktrees at once](jobs-and-profiles.md#several-worktrees-at-once).

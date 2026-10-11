@@ -93,6 +93,8 @@ Content width 1240 px with 32 px gutters; at phone width every row stacks and wi
 
 A terminal is never smaller than the text beside it; when the output is long, it goes full width under the text.
 
+**The README** is the product page, about three screens: the banner, one sentence, the hero GIF, six highlights, a two-line install, the four stages of a branch's life (create, run, sync, prune) each in the same shape (heading, one sentence, one command, one visual), the agents paragraph, a row of links. Command tables, install options, comparisons and secondary commands belong in `docs/guide/` or the docs site. Its visuals are recorded from `docs/demos/*.tape` (VHS, `docs/demos/setup.sh`, the wtm theme in `_env.tape`): GIFs via `Output`, stills via `Screenshot`.
+
 ## Motion
 
 One sequence, played once on load, with a *replay* control: errors visible for about 1.9 s, errors dim, lanes cross-fade to the split (700 ms), windows enter 120 ms apart (600 ms, ease-out, no bounce). Only `opacity` and `transform` animate. With `prefers-reduced-motion`, the page shows the final frame. Nothing else on the page moves: no pulsing dot, no typing effect, no marquee.

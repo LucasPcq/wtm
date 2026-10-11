@@ -24,7 +24,7 @@ All wtm files live under `<git-common-dir>/wtm/` (`.git/wtm/` for a normal clone
 └── pending-removals.toml          # namespace drops a clean still owes
 ```
 
-Each file and each `meta.json` field is described in [Where wtm keeps its state](state.md). Everything is plain TOML, validated at load time: unknown keys are rejected, not silently ignored. Edit by hand, or use `wtm config show` / `wtm config edit` and the `wtm run import` flow.
+Each file and each `meta.json` field is described in [Where wtm keeps its state](state.md). `config.toml` and `run.toml` are TOML, validated at load time: unknown keys are rejected, not silently ignored. Each worktree's `meta.json` is JSON. Edit by hand, or use `wtm config show` / `wtm config edit` and the `wtm run import` flow.
 
 ## Project config: `config.toml`
 
