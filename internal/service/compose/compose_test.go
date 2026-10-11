@@ -170,7 +170,7 @@ func TestPatchRewritesOnlyThePortLines(t *testing.T) {
 		t.Fatalf("want 4 frozen mappings, got %d", len(frozen))
 	}
 
-	if err := PatchAll(PatchAllParams{ProjectDir: dir, ByFile: map[string][]domain.ComposePortBinding{file: frozen}}); err != nil {
+	if err := PatchAll(t.Context(), PatchAllParams{ProjectDir: dir, ByFile: map[string][]domain.ComposePortBinding{file: frozen}}); err != nil {
 		t.Fatalf("patch: %v", err)
 	}
 
@@ -216,7 +216,7 @@ func TestPatchRefusesAFileChangedSinceTheScan(t *testing.T) {
 		}
 	}
 
-	err := PatchAll(PatchAllParams{ProjectDir: dir, ByFile: map[string][]domain.ComposePortBinding{file: frozen}})
+	err := PatchAll(t.Context(), PatchAllParams{ProjectDir: dir, ByFile: map[string][]domain.ComposePortBinding{file: frozen}})
 	if err == nil {
 		t.Fatal("patching a file that moved under us must fail")
 	}
@@ -326,7 +326,7 @@ func TestPatchAllWritesNothingWhenOneFileMoved(t *testing.T) {
 		t.Errorf("VerifyAll must name %s and only it, got %v", moved, failures)
 	}
 
-	if err := PatchAll(PatchAllParams{ProjectDir: dir, ByFile: byFile}); err == nil {
+	if err := PatchAll(t.Context(), PatchAllParams{ProjectDir: dir, ByFile: byFile}); err == nil {
 		t.Fatal("PatchAll must refuse the batch")
 	}
 
@@ -352,7 +352,7 @@ func TestPatchAllPreservesFileMode(t *testing.T) {
 			frozen = append(frozen, b)
 		}
 	}
-	if err := PatchAll(PatchAllParams{ProjectDir: dir, ByFile: map[string][]domain.ComposePortBinding{file: frozen}}); err != nil {
+	if err := PatchAll(t.Context(), PatchAllParams{ProjectDir: dir, ByFile: map[string][]domain.ComposePortBinding{file: frozen}}); err != nil {
 		t.Fatalf("patch: %v", err)
 	}
 
@@ -380,7 +380,7 @@ func TestPatchAllFollowsASymlinkInsteadOfReplacingIt(t *testing.T) {
 	}
 
 	scan := Scan(ScanParams{ProjectDir: dir, File: link})
-	if err := PatchAll(PatchAllParams{ProjectDir: dir, ByFile: map[string][]domain.ComposePortBinding{link: scan.Bindings}}); err != nil {
+	if err := PatchAll(t.Context(), PatchAllParams{ProjectDir: dir, ByFile: map[string][]domain.ComposePortBinding{link: scan.Bindings}}); err != nil {
 		t.Fatalf("patch: %v", err)
 	}
 

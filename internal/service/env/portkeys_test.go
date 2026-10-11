@@ -15,7 +15,7 @@ func TestApplyEnvPortsWritesAnOwnedKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	plan, err := ApplyEnvPorts(EnvPortsParams{
+	plan, err := ApplyEnvPorts(t.Context(), EnvPortsParams{
 		WorktreePath: dir,
 		Owned: []domain.EnvOwnedEntry{
 			{File: ".env", Key: domain.EnvComposeProjectName, Value: "repo-feat-x"},
@@ -43,7 +43,7 @@ func TestApplyEnvPortsRewritesAnOwnedKeyInPlace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := ApplyEnvPorts(EnvPortsParams{
+	if _, err := ApplyEnvPorts(t.Context(), EnvPortsParams{
 		WorktreePath: dir,
 		Owned:        []domain.EnvOwnedEntry{{File: ".env", Key: domain.EnvComposeProjectName, Value: "repo-feat-x"}},
 	}); err != nil {
@@ -87,7 +87,7 @@ func TestApplyOwnedEnvWritesTheIdentityAlone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := ApplyOwnedEnv(EnvPortsParams{
+	err := ApplyOwnedEnv(t.Context(), EnvPortsParams{
 		WorktreePath: dir,
 		Owned:        []domain.EnvOwnedEntry{{File: ".env", Key: domain.EnvComposeProjectName, Value: "repo-feat-x"}},
 	})

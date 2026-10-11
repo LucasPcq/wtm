@@ -35,6 +35,7 @@ Each rule is a `golang.org/x/tools/go/analysis` Analyzer resolved by type — an
 | `metawriter` | an exported function of `service/worktree` that reaches `updateMetadata`/`purgeState` is in the mutators table — the table is complete by construction |
 | `emits` | a `flow/` package calling a mutator publishes that mutator's event, and has a test recording it (`flowtest.Recorder`) |
 | `publish` | `process.Publish` is called from `service/events` only; the `flow` seam's `Publish` from `internal/flow/` only |
+| `statewrite` | `os.WriteFile`, `os.Create` or `os.Rename` outside `infra/`, as a call or a function value: every other write goes through `fs.UpdateFile` (or `fs.ReplaceFile` for the daemon's index). The writers that stay outside for good are in `stateWriteExempt`, each with its reason: log rotation, the binary swap of `upgrade`, `agents install`, `schema dump`, the shell's cd handshake, the proxy's launchd plist, test fixtures |
 | `glyph`, `tuistyle`, `mutedline`, `fontcover` | the output vocabulary, below |
 
 ### The output vocabulary
@@ -57,7 +58,8 @@ A rule belongs in `make lint` when breaking it breaks something — a layer, a r
 ## Exceptions
 
 - **`.deadcode-ignore`** — one regex per line **with its reason**: code reachable by a route the analysis cannot follow (so far, a method satisfying an interface asserted on an `any`). Anything unlisted fails.
-- **`.archlint-migrating`** — `<rule> <path regex> <sites>` lines for what predates a rule; they report as `(migrating)` without failing. **It may only shrink**, and that is checked: each entry — like each rune of `fontLegacy` — records how many sites it covers, one site more fails `make lint`, and a count higher than needed is reported as a note to lower it. A new entry is a decision to take knowingly and belongs in a ticket, never a way to get a commit past the linter. It holds no `chokepoint` entry today: a new one is a regression, not a migration.
+- **`.archlint-migrating`** — `<rule> <path regex> <sites>` lines for what predates a rule; they report as `(migrating)` without failing. **It may only shrink**, and that is checked: each entry — like each rune of `fontLegacy` — records how many sites it covers, one site more fails `make lint`, and a count higher than needed is reported as a note to lower it. A new entry is a decision to take knowingly and belongs in a ticket, never a way to get a commit past the linter. It holds no `chokepoint` entry today: a new one is a regression, not a migration. Its `statewrite` entries are the two logs still opened with `os.Create`, the hook log (leaves with `dispatch`, LUC-287) and the `exec` log (leaves with the run module).
+- **A permanent exception** is not a migration and never goes in `.archlint-migrating`: it is a table in the rule's own file with a reason per entry (`stateWriteExempt`, `daemonInfra`, `fontSafe`).
 
 `make dupl` is deliberately outside `lint`: a clone is a judgement call. Two parallel families over unrelated types — `flow/run/job` and `flow/run/profile` — read better duplicated than behind a generic, so the report informs a review rather than gating one.
 

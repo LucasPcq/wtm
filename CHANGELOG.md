@@ -12,9 +12,11 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 - **"Always use this answer"** in the wizards of `create`, `checkout` and `extract`: tick it with `tab` and the env strategy, the isolation or the source fast-forward is no longer asked in that repository; `--ask` asks again. → [Remembered answers](docs/guide/configuration.md#remembered-answers)
 - **`wtm status [worktree]`** reads a worktree's isolation, missing `.env` files and jobs in one document, each problem with the command that fixes it; `--all` reads every worktree. → [A worktree's state](docs/guide/status.md)
+- **Exit code `22`**: a state file written by a newer wtm is read but never rewritten; upgrade wtm to change it. → [State files](docs/guide/state.md#versions)
 
 ### Fixed
 
+- **Two wtm commands at once** keep each other's change to a worktree's `meta.json` and to the remembered answers, and a crash or an interrupt never leaves a state file, a `.env` or a compose file half written. → [State files](docs/guide/state.md#how-these-files-are-written)
 - **`wtm env`** prints no text read from a value — only the ports and addresses wtm writes and its `[[env]]` values — so no password reaches its text or JSON, whatever the connection-string format. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
 - **`wtm env`** reports what it changes: a verbatim switch shows the port that moved in an origin list, `--check` names the `[[env]]` key it would rewrite, and the wizard previews an overwrite on the worktree's own port. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
 - **`wtm env`** rebuilds a declared `.env` missing from the worktree the way `wtm create` provisions it (the template under `example`), then settles its ports, instead of leaving it absent; `--check` reports it as drift. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)

@@ -51,7 +51,7 @@ func TestEnvValueLinkWritesTheWorktreesNamespaceIntoItsEnv(t *testing.T) {
 		t.Fatalf("resolve: %v", err)
 	}
 
-	if _, err := ApplyEnvPorts(EnvPortsParams{
+	if _, err := ApplyEnvPorts(t.Context(), EnvPortsParams{
 		WorktreePath: dir,
 		Owned:        owned,
 		ValueLinks:   keycloakConfig().EnvValues,

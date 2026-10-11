@@ -10,7 +10,9 @@ One line per package: what it owns. The import rules between them are the next s
 cmd/                          ← entry points, cobra setup only
 internal/
   domain/                     ← types, errors, constants only (no methods, no functions)
+    statefile/                ←   the schema version of each state file, and the error of a file a newer wtm wrote
   rules/                      ← pure functions (stdlib + domain only, no I/O)
+    statefile/                ←   what a state file's schema allows: read, write, or refuse (exit 22)
   kernel/                     ← the skeleton of the command engine (stdlib only, no business vocabulary): Command,
                                 fields, rules, errors, results, Each / Saga (commands.md)
     text/                     ←   the one catalogue turning a kernel.Code and its params into English
@@ -108,7 +110,12 @@ internal/
     execsvc/                  ←   runs one shell line in several worktrees at once
     memory/                   ←   writes the answers the wizard remembers ([wizard.remembered] in config.toml)
   styles/                     ← all Lipgloss styles (only package allowed to instantiate lipgloss.Style)
-  infra/                      ← I/O, git exec, filesystem wrappers
+  infra/                      ← git, and the state not yet moved to a package of its own (repos.json)
+    fs/                       ←   the only writer of the files wtm keeps: UpdateFile (lock on <path>.lock, read,
+                                  Mutate, temp file + fsync + rename), ReplaceFile for the daemon's index,
+                                  WithFileLock, GlobalDir; Lock.Held says when flock was unavailable
+    proc/                     ←   starting processes (Command, GroupCommand) and settling them on an
+                                  interrupt (Shield, AwaitShields, KillCancelled)
   surface/                    ← the interfaces
     cli/                      ←   flag wiring, delegates to flow/service (zero business logic)
       run/runctx/             ←     what every `run` command opens on: its directory, the config,
@@ -167,7 +174,8 @@ Every arrow that is *missing* is the point:
 Two more edges are constrained beyond the diagram:
 
 - `service/x` imports `service/y` only along an edge declared in `tools/archlint` (`serviceEdges`): today `detect→branch`, `events→{process,worktree}`, `process→proxy`, `runconfig→shellcmd`, `runjobs→{process,runconfig,worktree}`, `worktree→{branch,env,github,hooks,process}`.
-- The daemon — `service/process` and `service/proxy`, which it serves — is blind to git: neither imports `service/worktree`, `service/branch`, `service/github`, `service/events` or `config`, and both call only allow-listed `infra/` functions (`GlobalDir`).
+- The daemon — `service/process` and `service/proxy`, which it serves — is blind to git: neither imports `service/worktree`, `service/branch`, `service/github`, `service/events` or `config`, and both call only allow-listed `infra/` functions (`fs.GlobalDir`, `fs.ReplaceFile`).
+- A file is written through `infra/fs` only (`statewrite`): `os.WriteFile`, `os.Create` and `os.Rename` stay inside `infra/`, but for the permanent exceptions listed with their reason in `tools/archlint/statewrite.go`.
 - A service **mutator** (`worktree.Create`, `envsvc.ApplyEnvSync`, `runconfig.Save`, … — the table in `tools/archlint/chokepoint.go`) is called only from `internal/flow/`, whatever the calling layer; a call inside the mutator's own package is its implementation.
 
 None of this is left to review: `make lint` runs `tools/archlint`, and each rule above is one of its analyzers. The full list, and how to add one, is in [lint.md](lint.md).

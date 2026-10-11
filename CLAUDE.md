@@ -93,7 +93,7 @@ internal/
   flow/         each command's flow, surface-independent (one package per command)
   service/      impure orchestration: git exec, I/O, hooks, the run daemon, the event bus
   styles/       all Lipgloss styles
-  infra/        I/O, git exec, filesystem wrappers
+  infra/        git exec; fs/ the only writer of state files (UpdateFile), proc/ processes and the Shield
   surface/      the interfaces
     cli/        flag wiring → flow/service (zero business logic)
       render/   format and print results (zero decision logic)
@@ -114,6 +114,7 @@ The annotated map of every sub-package is in `docs/dev/architecture.md`.
 - `service/x` imports `service/y` only along an edge declared in `tools/archlint` (`serviceEdges`).
 - The daemon (`service/process`, `service/proxy`) is blind to git: no `service/worktree|branch|github|events`, no `config`, only allow-listed `infra/` functions.
 - A service **mutator** (the table in `tools/archlint/chokepoint.go`) is called only from `internal/flow/`.
+- A file is written through `infra/fs` only: `fs.UpdateFile(ctx, {Path, Mutate})` (lock, read, Mutate, atomic rename), never `os.WriteFile`/`os.Create`/`os.Rename` outside `infra/` (`statewrite`). A state file carries `schema` (absent = 1, written from 2 on) and a write refuses a newer one (`statefile.ErrSchemaNewer`, exit 22).
 
 **Every new worktree-mutating command goes through flow/** — no exception. Declare `Request`/`Outcome`/`Presenter`/`Params`/`Run` in `internal/flow/<cmd>/` and its questions as `flow.Step` in `steps.go`; the runner in `surface/cli/` is only flags → `Request` → pick the Prompter and Presenter → `<cmd>.Run`. A runner that inspects state, orders service calls or gates a picker on `interactive` has put the flow in the wrong layer. A flow never frames, never animates, never picks a stream, and **returns** errors rather than presenting them. Recipe: `docs/dev/adding-a-mutation-command.md`; seams and step model: `docs/dev/flow-layer.md`.
 

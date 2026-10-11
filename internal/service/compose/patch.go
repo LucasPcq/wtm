@@ -1,12 +1,14 @@
 package compose
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -57,7 +59,7 @@ type PatchAllParams struct {
 // PatchAll rewrites every file's host ports. It renders all of them first and
 // only then writes, so a position that no longer matches aborts before any file
 // on disk has been touched.
-func PatchAll(params PatchAllParams) error {
+func PatchAll(ctx context.Context, params PatchAllParams) error {
 	files := editedFiles(params.ByFile, params.NamesByFile)
 
 	rendered := make([]patchedFile, 0, len(files))
@@ -78,7 +80,7 @@ func PatchAll(params PatchAllParams) error {
 
 	var written []string
 	for _, out := range rendered {
-		if err := writeFile(out); err != nil {
+		if err := writeFile(ctx, out); err != nil {
 			if len(written) == 0 {
 				return err
 			}
@@ -140,30 +142,16 @@ func renderPatched(params renderPatchedParams) (patchedFile, error) {
 	}, nil
 }
 
-// writeFile replaces the file through a temporary neighbour: a compose file
-// truncated by an interrupted write would take the project's stack down with it.
-func writeFile(out patchedFile) error {
-	temp, err := os.CreateTemp(filepath.Dir(out.path), filepath.Base(out.path)+".wtm-*")
+// writeFile replaces the file atomically: a compose file truncated by an
+// interrupted write would take the project's stack down with it.
+func writeFile(ctx context.Context, out patchedFile) error {
+	_, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
+		Path:     out.path,
+		LockPath: fs.ScratchLockPath(out.path),
+		Perm:     out.mode,
+		Mutate:   func([]byte) ([]byte, error) { return []byte(out.content), nil },
+	})
 	if err != nil {
-		return fmt.Errorf(domain.ComposeWriteFileFmt, out.file, err)
-	}
-	tempPath := temp.Name()
-
-	if _, err := temp.WriteString(out.content); err != nil {
-		temp.Close()
-		os.Remove(tempPath)
-		return fmt.Errorf(domain.ComposeWriteFileFmt, out.file, err)
-	}
-	if err := temp.Close(); err != nil {
-		os.Remove(tempPath)
-		return fmt.Errorf(domain.ComposeWriteFileFmt, out.file, err)
-	}
-	if err := os.Chmod(tempPath, out.mode); err != nil {
-		os.Remove(tempPath)
-		return fmt.Errorf(domain.ComposeWriteFileFmt, out.file, err)
-	}
-	if err := os.Rename(tempPath, out.path); err != nil {
-		os.Remove(tempPath)
 		return fmt.Errorf(domain.ComposeWriteFileFmt, out.file, err)
 	}
 	return nil

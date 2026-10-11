@@ -18,7 +18,7 @@ func TestSaveAndLoadState(t *testing.T) {
 		CheckedAt:     time.Date(2026, 8, 20, 12, 0, 0, 0, time.UTC),
 		LatestVersion: "0.27.0",
 	}
-	if err := selfupdate.SaveState(want); err != nil {
+	if err := selfupdate.SaveState(t.Context(), want); err != nil {
 		t.Fatalf("SaveState: %v", err)
 	}
 

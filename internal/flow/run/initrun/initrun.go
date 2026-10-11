@@ -254,7 +254,7 @@ func Run(ctx context.Context, params Params) (Outcome, error) {
 			EnvFiles:   envFiles,
 		})
 	}
-	writtenKeys, err := envsvc.WritePortKeys(envsvc.WritePortKeysParams{ProjectDir: project.ProjectDir, Writes: portKeys})
+	writtenKeys, err := envsvc.WritePortKeys(ctx, envsvc.WritePortKeysParams{ProjectDir: project.ProjectDir, Writes: portKeys})
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -271,7 +271,7 @@ func Run(ctx context.Context, params Params) (Outcome, error) {
 	// The rewrites come first: a compose templatized without run.toml behind it
 	// keeps binding its defaults, while a run.toml declaring ports the compose
 	// does not read would announce an isolation that is not there.
-	if err := compose.PatchAll(compose.PatchAllParams{
+	if err := compose.PatchAll(ctx, compose.PatchAllParams{
 		ProjectDir:  project.ProjectDir,
 		ByFile:      outcome.Patches,
 		NamesByFile: namePatches,

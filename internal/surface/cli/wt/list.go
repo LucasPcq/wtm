@@ -19,6 +19,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/infra/proc"
 	"github.com/LucasPcq/wtm/internal/rules"
 	ghservice "github.com/LucasPcq/wtm/internal/service/github"
+	"github.com/LucasPcq/wtm/internal/service/shell"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
@@ -385,9 +386,9 @@ func executeWorktreeAction(ctx context.Context, cmd *cobra.Command, action strin
 
 	switch action {
 	case lsActionGo:
-		goFile := os.Getenv(domain.EnvGoFile)
-		if goFile != "" {
-			return os.WriteFile(goFile, []byte(selected.Path), 0o644)
+		if os.Getenv(domain.EnvGoFile) != "" {
+			shell.RequestCd(selected.Path)
+			return nil
 		}
 		fmt.Println(selected.Path)
 		return nil

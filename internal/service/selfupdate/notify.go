@@ -35,7 +35,7 @@ type Check struct {
 // state, so it costs nothing and appears even when the refresh below is slow or
 // fails; the network call only refreshes that cache, at most once per TTL.
 // Returns nil when policy forbids a notice on this run.
-func StartCheck(params StartCheckParams) *Check {
+func StartCheck(ctx context.Context, params StartCheckParams) *Check {
 	gate := rules.ShouldCheckUpdateParams{
 		Version:     params.Version,
 		Format:      params.Format,
@@ -78,7 +78,7 @@ func StartCheck(params StartCheckParams) *Check {
 	// success would let every command re-issue a network call. If it cannot be
 	// persisted at all (no writable config dir), skip the fetch entirely rather
 	// than hit the API on every single invocation.
-	if err := SaveState(domain.UpdateState{CheckedAt: time.Now(), LatestVersion: state.LatestVersion}); err != nil {
+	if err := SaveState(ctx, domain.UpdateState{CheckedAt: time.Now(), LatestVersion: state.LatestVersion}); err != nil {
 		close(check.done)
 		return check
 	}
@@ -95,7 +95,7 @@ func StartCheck(params StartCheckParams) *Check {
 			return
 		}
 
-		_ = SaveState(domain.UpdateState{CheckedAt: time.Now(), LatestVersion: release.Version})
+		_ = SaveState(context.WithoutCancel(ctx), domain.UpdateState{CheckedAt: time.Now(), LatestVersion: release.Version})
 
 		if rules.IsNewerVersion(rules.NewerVersionParams{Current: params.Version, Latest: release.Version}) {
 			check.fresh = release.Version

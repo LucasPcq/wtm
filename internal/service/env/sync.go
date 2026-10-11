@@ -1,6 +1,7 @@
 package env
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"maps"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -128,7 +130,7 @@ type ApplyEnvSyncParams struct {
 // ApplyEnvSync recomputes each file's drift and writes the reconciled content,
 // applying the matching resolution. Files whose reconciled content is unchanged are
 // left untouched. Returns the full result.
-func ApplyEnvSync(params ApplyEnvSyncParams) (domain.EnvSyncResult, error) {
+func ApplyEnvSync(ctx context.Context, params ApplyEnvSyncParams) (domain.EnvSyncResult, error) {
 	if len(params.Files) == 0 {
 		return domain.EnvSyncResult{}, domain.ErrEnvNoFiles
 	}
@@ -149,14 +151,14 @@ func ApplyEnvSync(params ApplyEnvSyncParams) (domain.EnvSyncResult, error) {
 		if err != nil {
 			return domain.EnvSyncResult{}, err
 		}
-		applied, err := applyFile(paths, &c, params.Resolutions[f.Target])
+		applied, err := applyFile(ctx, paths, &c, params.Resolutions[f.Target])
 		if err != nil {
 			return domain.EnvSyncResult{}, err
 		}
 		files = append(files, fileResult(paths, c, applied))
 	}
 
-	ports, err := settleEnvPorts(settleEnvPortsParams{Ports: params.Ports, Write: true, Owned: true})
+	ports, err := settleEnvPorts(ctx, settleEnvPortsParams{Ports: params.Ports, Write: true, Owned: true})
 	if err != nil {
 		return domain.EnvSyncResult{}, err
 	}
@@ -194,7 +196,7 @@ type SyncEnvParams struct {
 // SyncEnv reconciles a worktree's env files non-interactively: it applies safe
 // additions plus any flag-driven decisions (OnConflict, Prune), writing changed
 // files. With Check set it computes and returns the drift without writing anything.
-func SyncEnv(params SyncEnvParams) (domain.EnvSyncResult, error) {
+func SyncEnv(ctx context.Context, params SyncEnvParams) (domain.EnvSyncResult, error) {
 	if len(params.Files) == 0 {
 		return domain.EnvSyncResult{}, domain.ErrEnvNoFiles
 	}
@@ -224,7 +226,7 @@ func SyncEnv(params SyncEnvParams) (domain.EnvSyncResult, error) {
 			files = append(files, fileResult(paths, c, false))
 			continue
 		}
-		applied, err := applyFile(paths, &c, resolution)
+		applied, err := applyFile(ctx, paths, &c, resolution)
 		if err != nil {
 			return domain.EnvSyncResult{}, err
 		}
@@ -234,7 +236,7 @@ func SyncEnv(params SyncEnvParams) (domain.EnvSyncResult, error) {
 	// The ports come last, on files that are now reconciled: the value sources
 	// carry another worktree's port, so applying the offset before the merge
 	// would only see it overwritten.
-	ports, err := settleEnvPorts(settleEnvPortsParams{Ports: params.Ports, Write: !params.Check, Owned: !params.Check, Reconciled: reconciled})
+	ports, err := settleEnvPorts(ctx, settleEnvPortsParams{Ports: params.Ports, Write: !params.Check, Owned: !params.Check, Reconciled: reconciled})
 	if err != nil {
 		return domain.EnvSyncResult{}, err
 	}
@@ -265,7 +267,7 @@ type settleEnvPortsParams struct {
 // resolves what it would do when the caller is reporting rather than writing —
 // a --check run, or one where the user declined the pass. Either way the links
 // still feed the diff's comparison, which is why they are never simply dropped.
-func settleEnvPorts(params settleEnvPortsParams) (domain.EnvPortPlan, error) {
+func settleEnvPorts(ctx context.Context, params settleEnvPortsParams) (domain.EnvPortPlan, error) {
 	if params.Ports.Empty() {
 		return domain.EnvPortPlan{}, nil
 	}
@@ -274,9 +276,9 @@ func settleEnvPorts(params settleEnvPortsParams) (domain.EnvPortPlan, error) {
 		if err != nil || !params.Owned {
 			return plan, err
 		}
-		return plan, ApplyOwnedEnv(params.Ports)
+		return plan, ApplyOwnedEnv(ctx, params.Ports)
 	}
-	plan, err := ApplyEnvPorts(params.Ports)
+	plan, err := ApplyEnvPorts(ctx, params.Ports)
 	plan.Applied = err == nil
 	return plan, err
 }
@@ -482,7 +484,7 @@ func flagResolution(params SyncEnvParams, diff domain.EnvDiff) EnvResolution {
 // applyFile reconciles one file and writes it back when the result differs from the
 // current content, recording on c's diff what it did to each key. Returns
 // whether it wrote.
-func applyFile(paths envPaths, c *computedFile, res EnvResolution) (bool, error) {
+func applyFile(ctx context.Context, paths envPaths, c *computedFile, res EnvResolution) (bool, error) {
 	diff := applyDiffParams(*c, res)
 	reconciled := rules.ApplyEnvDiff(diff)
 	c.diff = rules.EnvDiffActions(diff)
@@ -492,7 +494,7 @@ func applyFile(paths envPaths, c *computedFile, res EnvResolution) (bool, error)
 		return false, nil
 	}
 
-	if err := writeEnvFile(filepath.Join(paths.WorktreePath, c.file.Target), rendered); err != nil {
+	if err := writeEnvFile(ctx, writeEnvFileParams{Path: filepath.Join(paths.WorktreePath, c.file.Target), Content: rendered}); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -535,13 +537,18 @@ func readEnvFile(path string) ([]domain.EnvLine, error) {
 	return rules.ParseEnv(string(data)), nil
 }
 
-// writeEnvFile renders and writes reconciled content, creating parent dirs.
-func writeEnvFile(path, content string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("create directory for %s: %w", path, err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", path, err)
-	}
-	return nil
+type writeEnvFileParams struct {
+	Path    string
+	Content string
+}
+
+// writeEnvFile locks outside the worktree: the .env lives in the user's
+// checkout, where a lock file would show up as an untracked file.
+func writeEnvFile(ctx context.Context, params writeEnvFileParams) error {
+	_, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
+		Path:     params.Path,
+		LockPath: fs.ScratchLockPath(params.Path),
+		Mutate:   func([]byte) ([]byte, error) { return []byte(params.Content), nil },
+	})
+	return err
 }

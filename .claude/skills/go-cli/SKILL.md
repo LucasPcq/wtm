@@ -151,7 +151,9 @@ internal/
     detect/                   ←   auto-detection (package manager, env files, scripts)
     integration/              ←   third-party adapters (VS Code, Cursor)
   styles/                     ← all Lipgloss styles + shared Indent constant
-  infra/                      ← I/O, git exec, filesystem wrappers
+  infra/                      ← git exec
+    fs/                       ←   the only writer of state files: UpdateFile (lock, read, Mutate, atomic rename)
+    proc/                     ←   Command, GroupCommand, Shield
   surface/                    ← the interfaces
     cli/                      ←   flag wiring only → delegates to flow/service (zero logic)
       ui/                     ←     `wtm ui`: refuses JSON + missing TTY, hands off to tui/dashboard
@@ -363,6 +365,21 @@ The git common dir is fetched via `infra.GitCommonDir(GitCommonDirParams{Dir})` 
 Two env-var overrides exist for tests / CI:
 - `WTM_PROJECT_DIR` — bypasses git for the main worktree path
 - `WTM_STATE_DIR`   — bypasses git for the state dir
+
+### Writing a file
+
+Every write goes through `infra/fs`; `os.WriteFile`, `os.Create` and `os.Rename` outside `infra/` fail `make lint` (`statewrite`):
+
+```go
+_, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
+  Path: path,                       // locks <path>.lock; a file in the user's tree passes LockPath: fs.ScratchLockPath(path)
+  Mutate: func(current []byte) ([]byte, error) {  // current is nil when the file is absent
+    // decode current, change it, encode it — the read happens under the lock
+  },                                // fs.ErrUnchanged leaves the file alone, fs.ErrRemoveFile deletes it
+})
+```
+
+A state file read back inside `Mutate` refuses a newer schema first (`statefile.Refusal`, see `config.refuseNewer`), and writes its `schema` key through `statefile.Written`, which omits it at schema 1.
 
 ### Adding a new command
 

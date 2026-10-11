@@ -24,7 +24,7 @@ func TestExampleStrategy(t *testing.T) {
 
 	writeTestFile(t, filepath.Join(main, ".env.example"), "DB_HOST=localhost")
 
-	err := CopyEnvFiles(CopyEnvFilesParams{
+	err := CopyEnvFiles(t.Context(), CopyEnvFilesParams{
 		Strategy:         domain.EnvStrategyExample,
 		Files:            []domain.EnvFile{{Target: ".env", Template: ".env.example"}},
 		TargetDir:        target,
@@ -49,7 +49,7 @@ func TestExampleStrategyPinnedNonExampleTemplate(t *testing.T) {
 
 	writeTestFile(t, filepath.Join(main, ".env.dist"), "FROM_DIST=yes")
 
-	err := CopyEnvFiles(CopyEnvFilesParams{
+	err := CopyEnvFiles(t.Context(), CopyEnvFilesParams{
 		Strategy:         domain.EnvStrategyExample,
 		Files:            []domain.EnvFile{{Target: ".env", Template: ".env.dist"}},
 		TargetDir:        target,
@@ -74,7 +74,7 @@ func TestExampleStrategyProbesCandidatesWhenTemplateEmpty(t *testing.T) {
 
 	writeTestFile(t, filepath.Join(main, ".env.sample"), "FROM_SAMPLE=yes")
 
-	err := CopyEnvFiles(CopyEnvFilesParams{
+	err := CopyEnvFiles(t.Context(), CopyEnvFilesParams{
 		Strategy:         domain.EnvStrategyExample,
 		Files:            []domain.EnvFile{{Target: ".env"}},
 		TargetDir:        target,
@@ -97,7 +97,7 @@ func TestExampleStrategyMissingFile(t *testing.T) {
 	main := t.TempDir()
 	target := t.TempDir()
 
-	err := CopyEnvFiles(CopyEnvFilesParams{
+	err := CopyEnvFiles(t.Context(), CopyEnvFilesParams{
 		Strategy:         domain.EnvStrategyExample,
 		Files:            []domain.EnvFile{{Target: ".env", Template: ".env.example"}},
 		TargetDir:        target,
@@ -118,7 +118,7 @@ func TestMainStrategy(t *testing.T) {
 
 	writeTestFile(t, filepath.Join(main, ".env"), "SECRET=abc")
 
-	err := CopyEnvFiles(CopyEnvFilesParams{
+	err := CopyEnvFiles(t.Context(), CopyEnvFilesParams{
 		Strategy:         domain.EnvStrategyMain,
 		Files:            []domain.EnvFile{{Target: ".env"}},
 		TargetDir:        target,
@@ -142,7 +142,7 @@ func TestParentStrategy(t *testing.T) {
 	writeTestFile(t, filepath.Join(parent, ".env"), "FROM_PARENT=yes")
 	writeTestFile(t, filepath.Join(main, ".env"), "FROM_MAIN=yes")
 
-	err := CopyEnvFiles(CopyEnvFilesParams{
+	err := CopyEnvFiles(t.Context(), CopyEnvFilesParams{
 		Strategy:           domain.EnvStrategyParent,
 		Files:              []domain.EnvFile{{Target: ".env"}},
 		TargetDir:          target,
@@ -166,7 +166,7 @@ func TestParentStrategyFallbackToMain(t *testing.T) {
 
 	writeTestFile(t, filepath.Join(main, ".env"), "FROM_MAIN=yes")
 
-	err := CopyEnvFiles(CopyEnvFilesParams{
+	err := CopyEnvFiles(t.Context(), CopyEnvFilesParams{
 		Strategy:           domain.EnvStrategyParent,
 		Files:              []domain.EnvFile{{Target: ".env"}},
 		TargetDir:          target,
@@ -189,7 +189,7 @@ func TestNestedEnvFiles(t *testing.T) {
 
 	writeTestFile(t, filepath.Join(main, "apps", "api", ".env"), "API_KEY=123")
 
-	err := CopyEnvFiles(CopyEnvFilesParams{
+	err := CopyEnvFiles(t.Context(), CopyEnvFilesParams{
 		Strategy:         domain.EnvStrategyMain,
 		Files:            []domain.EnvFile{{Target: "apps/api/.env"}},
 		TargetDir:        target,
@@ -206,7 +206,7 @@ func TestNestedEnvFiles(t *testing.T) {
 }
 
 func TestEmptyFiles(t *testing.T) {
-	err := CopyEnvFiles(CopyEnvFilesParams{
+	err := CopyEnvFiles(t.Context(), CopyEnvFilesParams{
 		Strategy:         domain.EnvStrategyExample,
 		Files:            nil,
 		TargetDir:        t.TempDir(),

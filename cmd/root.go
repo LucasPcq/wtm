@@ -146,7 +146,7 @@ func startUpdateCheck(cmd *cobra.Command) {
 	updateCheckStarted = true
 
 	format, _ := cmd.Flags().GetString(domain.FlagOutput)
-	updateCheck = selfupdate.StartCheck(selfupdate.StartCheckParams{
+	updateCheck = selfupdate.StartCheck(cmd.Context(), selfupdate.StartCheckParams{
 		Version:     effectiveVersion,
 		Format:      format,
 		Command:     topLevelName(cmd),

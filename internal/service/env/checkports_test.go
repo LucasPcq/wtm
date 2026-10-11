@@ -54,11 +54,11 @@ func TestSyncCheckPlansPortsOnWhatTheApplyWrites(t *testing.T) {
 
 			checkParams := checkPortsParams(main, checkDir)
 			checkParams.Check = true
-			checked, err := SyncEnv(checkParams)
+			checked, err := SyncEnv(t.Context(), checkParams)
 			if err != nil {
 				t.Fatalf("check: %v", err)
 			}
-			applied, err := SyncEnv(checkPortsParams(main, applyDir))
+			applied, err := SyncEnv(t.Context(), checkPortsParams(main, applyDir))
 			if err != nil {
 				t.Fatalf("apply: %v", err)
 			}

@@ -14,7 +14,7 @@ import (
 var (
 	daemonPackages  = []dir{"service/process", "service/proxy"}
 	daemonForbidden = []string{"service/worktree", "service/branch", "service/github", "service/events", "config"}
-	daemonInfra     = map[string]bool{"GlobalDir": true}
+	daemonInfra     = map[string]bool{"GlobalDir": true, "ReplaceFile": true, "ReplaceFileParams": true}
 )
 
 var daemonblindAnalyzer = &analysis.Analyzer{
@@ -42,7 +42,7 @@ func runDaemonBlind(pass *analysis.Pass) (any, error) {
 		if obj.Pkg() == nil || !dir("infra").holds(obj.Pkg().Path()) || !packageLevel(obj) || daemonInfra[obj.Name()] {
 			continue
 		}
-		pass.Reportf(ident.Pos(), "the daemon calls infra.%s: only GlobalDir is allow-listed — the daemon never runs git", obj.Name())
+		pass.Reportf(ident.Pos(), "the daemon calls infra.%s: only GlobalDir and ReplaceFile are allow-listed — the daemon never runs git", obj.Name())
 	}
 	return nil, nil
 }

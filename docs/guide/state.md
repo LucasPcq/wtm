@@ -15,10 +15,19 @@ Everything wtm knows about a repository lives under its git common directory (`.
 ├── hooks/<phase>-<branch>.log  # the raw output of the last on_create / on_clean run
 ├── exec/<branch>.log         # the whole output of the last wtm exec in that worktree
 ├── pending-removals.toml     # namespace drops owed by a clean while their service was down
-└── ordinal.lock              # serialises the allocation of worktree numbers
+├── ordinal.lock              # serialises the allocation of worktree numbers
+└── *.lock                    # one beside each file wtm updates (config.toml.lock, meta.json.lock…)
 ```
 
 `<branch>` is the branch name URL-escaped into one path segment (`feat/x` → `feat%2Fx`).
+
+### How these files are written
+
+Every file wtm keeps is updated the same way: wtm takes a lock on `<file>.lock`, reads the file, changes it, then writes the result to a temporary file it syncs to disk and renames over the original. A reader sees the old content or the new one, never half a file. A worktree's `meta.json`, the remembered answers of `config.toml`, `pending-removals.toml` and `repos.json` are read under that lock too, so two wtm processes changing one of them at the same time both land. The `.env` files and compose files wtm edits in a worktree are written the same way, with their lock in the system's temporary directory so no lock file appears in your checkout. On a filesystem without file locks (NFS, some WSL mounts), the write goes ahead without one.
+
+### Versions
+
+`config.toml`, `run.toml`, `meta.json` and `pending-removals.toml` carry the version of their format: `schema = N` in TOML, `"schema": N` in JSON. A file without the key is at version 1, and wtm writes the key only from version 2 on, so the files written today stay readable by earlier releases. A wtm that meets a file of a newer version than its own reads what it understands of it, warns when that file is `config.toml` or `run.toml`, and refuses to change it: the command stops with exit code `22` and the file is left as it is. Upgrade wtm to change it.
 
 ### `meta.json`
 
@@ -57,7 +66,7 @@ The global config lives in the OS config directory (`~/.config/wtm/` on Linux, `
 ├── wtm.lock      # held by the one daemon running
 ├── jobs.json     # the daemon's index of what it started
 ├── repos.json    # every repository wtm was used in, for `wtm events` run outside one
-└── repos.json.lock
+└── *.lock        # repos.json.lock, state.json.lock, config.toml.lock
 ```
 
 `jobs.json` is what makes the daemon disposable: it exits about 30 s after its last foreground job, detached services keep running without it, and the next daemon reads the index back, so `wtm run ps` still lists a compose stack after a reboot and `wtm run down` still stops it. `wtm run daemon status` reports what is up; `wtm run daemon restart` replaces a daemon of another wtm build.

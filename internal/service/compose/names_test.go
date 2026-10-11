@@ -137,7 +137,7 @@ func TestPatchAllRewritesAbsoluteNames(t *testing.T) {
 		t.Fatalf("expected 3 absolute names, got %d", len(absolute))
 	}
 
-	if err := PatchAll(PatchAllParams{
+	if err := PatchAll(t.Context(), PatchAllParams{
 		ProjectDir: dir,
 		NamesByFile: map[string][]domain.ComposeAbsoluteName{
 			file: absolute,
@@ -181,7 +181,7 @@ func TestPatchAllRewritesPortsAndNamesTogether(t *testing.T) {
 	dir, file := writeCompose(t, both)
 	scan := Scan(ScanParams{ProjectDir: dir, File: file, Project: "app"})
 
-	if err := PatchAll(PatchAllParams{
+	if err := PatchAll(t.Context(), PatchAllParams{
 		ProjectDir:  dir,
 		ByFile:      map[string][]domain.ComposePortBinding{file: scan.Bindings},
 		NamesByFile: map[string][]domain.ComposeAbsoluteName{file: scan.Names},

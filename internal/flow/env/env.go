@@ -248,7 +248,7 @@ type reconcileParams struct {
 
 func (f *envFlow) reconcile(params reconcileParams) (domain.EnvSyncResult, error) {
 	if params.Resolutions != nil {
-		return envsvc.ApplyEnvSync(envsvc.ApplyEnvSyncParams{
+		return envsvc.ApplyEnvSync(f.runCtx, envsvc.ApplyEnvSyncParams{
 			Branch:             params.Target.branch,
 			MainPath:           f.ctx.ProjectDir,
 			WorktreePath:       params.Target.path,
@@ -262,7 +262,7 @@ func (f *envFlow) reconcile(params reconcileParams) (domain.EnvSyncResult, error
 			Reserved:           params.Pass.reserved,
 		})
 	}
-	return envsvc.SyncEnv(envsvc.SyncEnvParams{
+	return envsvc.SyncEnv(f.runCtx, envsvc.SyncEnvParams{
 		Branch:             params.Target.branch,
 		MainPath:           f.ctx.ProjectDir,
 		WorktreePath:       params.Target.path,
@@ -289,7 +289,7 @@ func (f *envFlow) settleIsolation(sw envSwitch) (switchOutcome, error) {
 
 	var outcome switchOutcome
 	if rules.IsVerbatim(sw.isolation) {
-		restored, err := envsvc.ApplyOwnedRestore(sw.restore)
+		restored, err := envsvc.ApplyOwnedRestore(f.runCtx, sw.restore)
 		if err != nil {
 			return switchOutcome{}, err
 		}

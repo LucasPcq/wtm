@@ -92,7 +92,7 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 
 	envFiles := params.Config.Project.Env.Files
 	if len(envFiles) > 0 {
-		copyErr := env.CopyEnvFiles(env.CopyEnvFilesParams{
+		copyErr := env.CopyEnvFiles(ctx, env.CopyEnvFilesParams{
 			Strategy:           strategy,
 			Files:              envFiles,
 			TargetDir:          worktreePath,

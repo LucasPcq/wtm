@@ -161,7 +161,7 @@ items := kernel.Each(ctx, kernel.EachParams[string, Detail]{
 
 - `ctx` is checked before each unit: the units never reached are `skipped / interrupted`. With `StopOnFailure`, those after a failure are `skipped / not_reached`.
 - `Before` (stopping jobs, `on_clean` hooks) checks `ctx` before each prep; an interruption there leaves the item `cancelled` with nothing changed.
-- The saga runs under the `Shield` it is handed (infra's, so a second Ctrl+C waits for it) and goes to the end. A step that fails has the steps done undone in reverse, shielded too; the item is `failed` and nothing is left. A step with no `Undo` relies on the one before it.
+- The saga runs under the `Shield` it is handed (`proc.Shield`, so a second Ctrl+C waits for it) and goes to the end. A step that fails has the steps done undone in reverse, shielded too; the item is `failed` and nothing is left. A step with no `Undo` relies on the one before it.
 - An `Undo` that fails stops the walk back: the item is `failed` with `unit.undo_failed`, `Params[left]` naming what is still standing, and the `FollowUp` of `LeftBehind` (`clean --force` for a worktree).
 - `Commit` runs last, once every step is done; a commit that fails undoes them all. Nothing announces what could still be undone.
 - `Then` checks `ctx` before each phase: an interruption stops the next ones and the item is `cancelled`, its `Detail` keeping what was done. A phase that fails stops the next ones too, the item `failed`.

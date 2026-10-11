@@ -1,6 +1,7 @@
 package env
 
 import (
+	"context"
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -21,16 +22,46 @@ type OwnedRestoreParams struct {
 // PlanOwnedRestore is what putting the owned keys back to the source's values
 // would change, writing nothing.
 func PlanOwnedRestore(params OwnedRestoreParams) ([]domain.EnvRestoredEntry, error) {
-	return restoreOwned(params, false)
+	files, err := planRestore(params)
+	if err != nil {
+		return nil, err
+	}
+	return restoredEntries(files), nil
 }
 
 // ApplyOwnedRestore puts the owned keys back to the source's values — what a
 // verbatim worktree's .env holds — and returns what it changed.
-func ApplyOwnedRestore(params OwnedRestoreParams) ([]domain.EnvRestoredEntry, error) {
-	return restoreOwned(params, true)
+func ApplyOwnedRestore(ctx context.Context, params OwnedRestoreParams) ([]domain.EnvRestoredEntry, error) {
+	files, err := planRestore(params)
+	if err != nil {
+		return nil, err
+	}
+	for _, file := range files {
+		if len(file.Entries) == 0 {
+			continue
+		}
+		if err := writeEnvFile(ctx, writeEnvFileParams{Path: file.Path, Content: rules.RenderEnv(file.Lines)}); err != nil {
+			return nil, err
+		}
+	}
+	return restoredEntries(files), nil
 }
 
-func restoreOwned(params OwnedRestoreParams, write bool) ([]domain.EnvRestoredEntry, error) {
+type restoredFile struct {
+	Path    string
+	Lines   []domain.EnvLine
+	Entries []domain.EnvRestoredEntry
+}
+
+func restoredEntries(files []restoredFile) []domain.EnvRestoredEntry {
+	var restored []domain.EnvRestoredEntry
+	for _, file := range files {
+		restored = append(restored, file.Entries...)
+	}
+	return restored
+}
+
+func planRestore(params OwnedRestoreParams) ([]restoredFile, error) {
 	paths := envPaths{
 		MainPath:           params.MainPath,
 		WorktreePath:       params.WorktreePath,
@@ -38,7 +69,7 @@ func restoreOwned(params OwnedRestoreParams, write bool) ([]domain.EnvRestoredEn
 		Strategy:           params.Strategy,
 	}
 
-	var restored []domain.EnvRestoredEntry
+	var files []restoredFile
 	for _, file := range params.Files {
 		keys := keysOf(params.Keys.Refs, file.Target)
 		if len(keys) == 0 {
@@ -58,15 +89,9 @@ func restoreOwned(params OwnedRestoreParams, write bool) ([]domain.EnvRestoredEn
 		}
 
 		lines, entries := rules.RestoreOwnedEnv(rules.RestoreOwnedEnvParams{File: file.Target, Child: child, Source: source, Keys: keys, PortBases: portBasesOf(params.Keys.PortBases, file.Target)})
-		restored = append(restored, entries...)
-		if !write || len(entries) == 0 {
-			continue
-		}
-		if err := writeEnvFile(path, rules.RenderEnv(lines)); err != nil {
-			return nil, err
-		}
+		files = append(files, restoredFile{Path: path, Lines: lines, Entries: entries})
 	}
-	return restored, nil
+	return files, nil
 }
 
 // provisioningSource is the document a verbatim worktree's file is a copy of:

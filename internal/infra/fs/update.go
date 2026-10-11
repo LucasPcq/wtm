@@ -3,6 +3,8 @@ package fs
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -21,6 +23,9 @@ var (
 
 type UpdateFileParams struct {
 	Path string
+	// LockPath is the lock file, <Path>.lock when empty. A file in the user's
+	// tree takes ScratchLockPath, so no lock file appears in their checkout.
+	LockPath string
 	// Perm applies to a file this update creates; an existing file keeps its mode.
 	Perm os.FileMode
 	// Mutate receives the file's content, nil when it does not exist, and
@@ -40,12 +45,34 @@ func UpdateFile(ctx context.Context, params UpdateFileParams) (Lock, error) {
 		return Lock{}, fmt.Errorf("create %s: %w", filepath.Dir(params.Path), err)
 	}
 	return WithFileLock(ctx, WithFileLockParams{
-		Path: params.Path + lockSuffix,
+		Path: lockPathOf(params),
 		Do:   func() error { return update(params) },
 	})
 }
 
-const lockSuffix = ".lock"
+const (
+	lockSuffix     = ".lock"
+	scratchLockDir = "wtm-locks"
+)
+
+func lockPathOf(params UpdateFileParams) string {
+	if params.LockPath != "" {
+		return params.LockPath
+	}
+	return params.Path + lockSuffix
+}
+
+// ScratchLockPath is the lock of a file wtm writes in the user's tree: in the
+// temporary directory, named after the file's absolute path, so every process
+// updating that file meets on the same lock.
+func ScratchLockPath(path string) string {
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		absolute = path
+	}
+	sum := sha256.Sum256([]byte(absolute))
+	return filepath.Join(os.TempDir(), scratchLockDir, hex.EncodeToString(sum[:16])+lockSuffix)
+}
 
 func update(params UpdateFileParams) error {
 	current, info, err := read(params.Path)
@@ -98,6 +125,22 @@ func remove(path string) error {
 		return err
 	}
 	return nil
+}
+
+type ReplaceFileParams struct {
+	Path string
+	Data []byte
+	Perm os.FileMode
+}
+
+// ReplaceFile writes Data atomically without a lock, for a file one process
+// alone writes by construction (the daemon's job index, under its own lock).
+// Every other file goes through UpdateFile.
+func ReplaceFile(params ReplaceFileParams) error {
+	if err := os.MkdirAll(filepath.Dir(params.Path), 0o755); err != nil {
+		return fmt.Errorf("create %s: %w", filepath.Dir(params.Path), err)
+	}
+	return replace(replaceParams{Path: params.Path, Data: params.Data, Perm: permOf(nil, params.Perm)})
 }
 
 type replaceParams struct {

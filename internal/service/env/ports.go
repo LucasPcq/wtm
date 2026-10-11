@@ -1,6 +1,7 @@
 package env
 
 import (
+	"context"
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -110,7 +111,7 @@ func planOwned(params computeEnvPortsParams) ([]domain.EnvOwnedEntry, error) {
 // ApplyEnvPorts recomputes the plan and writes the rewrites it holds, one file at
 // a time. It returns the plan it acted on, so a caller reports what happened
 // rather than what it intended.
-func ApplyEnvPorts(params EnvPortsParams) (domain.EnvPortPlan, error) {
+func ApplyEnvPorts(ctx context.Context, params EnvPortsParams) (domain.EnvPortPlan, error) {
 	plan, err := ComputeEnvPorts(params)
 	if err != nil {
 		return domain.EnvPortPlan{}, err
@@ -127,12 +128,12 @@ func ApplyEnvPorts(params EnvPortsParams) (domain.EnvPortPlan, error) {
 		if rendered == rules.RenderEnv(lines) {
 			continue
 		}
-		if writeErr := writeEnvFile(path, rendered); writeErr != nil {
+		if writeErr := writeEnvFile(ctx, writeEnvFileParams{Path: path, Content: rendered}); writeErr != nil {
 			return domain.EnvPortPlan{}, writeErr
 		}
 	}
 
-	if err := applyOwned(params, plan); err != nil {
+	if err := applyOwned(ctx, params, plan); err != nil {
 		return domain.EnvPortPlan{}, err
 	}
 
@@ -142,7 +143,7 @@ func ApplyEnvPorts(params EnvPortsParams) (domain.EnvPortPlan, error) {
 // ApplyOwnedEnv writes the worktree identity alone. The port pass is a question
 // the user may answer no to; which worktree this is, is not one of the things
 // being asked.
-func ApplyOwnedEnv(params EnvPortsParams) error {
+func ApplyOwnedEnv(ctx context.Context, params EnvPortsParams) error {
 	if len(params.Owned) == 0 {
 		return nil
 	}
@@ -150,13 +151,13 @@ func ApplyOwnedEnv(params EnvPortsParams) error {
 	if err != nil {
 		return err
 	}
-	return applyOwned(params, plan)
+	return applyOwned(ctx, params, plan)
 }
 
 // applyOwned writes the owned keys one file at a time, after the port rewrites:
 // both touch the same documents, and reading the file back is what keeps the
 // second write from dropping the first.
-func applyOwned(params EnvPortsParams, plan domain.EnvPortPlan) error {
+func applyOwned(ctx context.Context, params EnvPortsParams, plan domain.EnvPortPlan) error {
 	for _, file := range ownedFiles(plan) {
 		path := filepath.Join(params.WorktreePath, file)
 		lines, err := readEnvFile(path)
@@ -176,7 +177,7 @@ func applyOwned(params EnvPortsParams, plan domain.EnvPortPlan) error {
 		if !changed {
 			continue
 		}
-		if err := writeEnvFile(path, rules.RenderEnv(lines)); err != nil {
+		if err := writeEnvFile(ctx, writeEnvFileParams{Path: path, Content: rules.RenderEnv(lines)}); err != nil {
 			return err
 		}
 	}
