@@ -15,7 +15,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'wtm',
-      description: 'One branch, one worktree, one isolated dev stack. A git worktree manager for teams and AI agents.',
+      description: 'Every branch, running. A git worktree manager that gives each branch its own ports, Compose project, database and URL.',
       logo: { src: './src/assets/logo.svg' },
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/LucasPcq/wtm' }],
       editLink: { baseUrl: 'https://github.com/LucasPcq/wtm/edit/main/' },
@@ -23,7 +23,7 @@ export default defineConfig({
       head: [
         { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.googleapis.com' } },
         { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: true } },
-        { tag: 'link', attrs: { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700;800&display=swap' } },
+        { tag: 'link', attrs: { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..900&family=Martian+Mono:wght@300..600&display=swap' } },
       ],
       lastUpdated: false,
       plugins: [

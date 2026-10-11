@@ -1,0 +1,29 @@
+---
+import { base } from '../../lib/base.mjs';
+import { lanes } from '../../lib/machine.mjs';
+
+const cards = lanes().map((lane, i) => ({ ...lane, color: `var(--lane-${i + 1})` }));
+---
+<section class="section tall">
+  <div class="wrap">
+    <div class="centered">
+      <p class="label">wtm run up</p>
+      <h2 class="pair"><span class="nowrap light">Its own stack.</span> <span class="nowrap heavy">Its own URL.</span></h2>
+      <p>Each worktree runs your jobs on shifted ports, its own Compose project and its own database namespace, behind a name instead of a port. Your agent opens its address and checks its own work. <a href={`${base}guide/how-run-works/`}>How wtm run works</a></p>
+    </div>
+    <div class="cards">
+      {cards.map((c) => (
+        <article class="card" style={`--lane: ${c.color}`}>
+          <div class="card-head"><span>{c.branch}</span><span>✓ running</span></div>
+          <dl>
+            <div><dt>url</dt><dd class="url">{c.url}</dd></div>
+            <div><dt>ports</dt><dd>web {c.webPort} · api {c.apiPort}</dd></div>
+            <div><dt>compose</dt><dd>{c.compose}</dd></div>
+            <div><dt>database</dt><dd>{c.database}</dd></div>
+            <div><dt>run by</dt><dd>{c.who}</dd></div>
+          </dl>
+        </article>
+      ))}
+    </div>
+  </div>
+</section>

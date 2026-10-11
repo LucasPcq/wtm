@@ -53,7 +53,7 @@ The palette is the CLI's own: `internal/styles/colors.go` is the source, and a c
 | **Archivo** (variable, `wdth` 62–125) | Headlines, body, UI | Body 16–20 px at weight 400–500 |
 | **Martian Mono** | Commands, replayed output, URLs, labels | 11.5–14.5 px |
 
-Both are OFL fonts on Google Fonts; the site self-hosts them.
+Both are OFL fonts, served by Google Fonts (the privacy page says so).
 
 - **The headline pair:** the first line light and condensed (weight 300, `font-stretch: 70%`), the second heavy and expanded (weight 850, 110–118%), in `signature` on the hero. Section titles reuse the pair when they are two clauses ("Its own stack. Its own URL."), otherwise weight 800 at 80% width. A two-clause title never wraps mid-clause: each clause is `nowrap`.
 - **Labels are commands:** the line above a section title is the command it is about (`wtm run up`, `run.toml`), in Martian Mono and `primary`. No all-caps eyebrows, no numbered labels.
@@ -109,8 +109,8 @@ The look every agent-tool landing already has, and the generated-design tells th
 
 | Surface | Where | What it takes |
 | -- | -- | -- |
-| Landing | `site/src/pages/index.astro`, `site/src/components/landing/` | The layout, the hero sequence and the section shapes above |
-| Docs theme | `site/src/styles/theme.css` | The colour tokens (both themes) mapped onto Starlight's `--sl-color-*`, Archivo and Martian Mono |
+| Landing | `site/src/pages/index.astro`, `site/src/components/landing/`, `site/src/styles/landing.css` | Applied. Hero, life of a branch, `run up` cards (values from `machine.mjs`), `run.toml`, agents, `sync` and `clean · prune`, try it |
+| Docs theme | `site/src/styles/theme.css`, `site/astro.config.mjs` | Applied. The tokens (both themes) on Starlight's `--sl-color-*`, Archivo and Martian Mono, the mark as logo |
 | README | `README.md`, `docs/assets/banner-*.svg` | Applied. The banner (text outlined from Archivo, a dark and a light file behind `<picture>`), one section shape repeated for the four stages, visuals recorded with the wtm VHS theme (`docs/demos/_env.tape`), no command table |
 | Social preview | GitHub repository settings, 1280×640 | `bg`, the mark and wordmark at left, the headline pair, the three lanes splitting toward the right edge |
-| Favicon | `site/public/` | The mark alone |
+| Favicon | `site/public/favicon.svg` | Applied. The mark on `bg` |

@@ -1,0 +1,22 @@
+---
+import Session from './Session.astro';
+import { base } from '../../lib/base.mjs';
+import { cmd, note } from '../../lib/term.mjs';
+
+const lines = [
+  cmd('brew install LucasPcq/tap/wtm'),
+  cmd('cd your-repo && wtm init'),
+  cmd('wtm create feat/try'),
+  note('provisioned, ready to code'),
+];
+---
+<section class="section tall">
+  <div class="wrap try">
+    <h2 class="pair"><span class="light">Try it on</span> <span class="heavy">your repo.</span></h2>
+    <Session title="your terminal" lines={lines} wide />
+    <div class="cta-row">
+      <a class="btn btn-primary" href={`${base}guide/getting-started/`}>Read Getting started</a>
+      <a class="btn" href="https://github.com/LucasPcq/wtm">View on GitHub</a>
+    </div>
+  </div>
+</section>

@@ -1,103 +1,59 @@
 ---
-import Install from './Install.astro';
-import Mark from './Mark.astro';
 import { base } from '../../lib/base.mjs';
-import { cmd, out, render } from '../../lib/term.mjs';
+import { lanes } from '../../lib/machine.mjs';
 
-const before = [
-  cmd('git worktree add ../feat-login feat/login'),
-  out('<span class="m">Preparing worktree (checking out \'feat/login\')</span>'),
-  cmd('git worktree add ../feat-search feat/search'),
-  out('<span class="m">Preparing worktree (checking out \'feat/search\')</span>'),
-  out(),
-  cmd('cd ../feat-login && pnpm dev'),
-  out('  <span class="g">✓</span> ready on http://localhost:3000'),
-  cmd('cd ../feat-search && pnpm dev'),
-  out('  <span class="r">Error: listen EADDRINUSE: address already in use :::3000</span>'),
-  cmd('pnpm db:migrate'),
-  out('  <span class="r">Error: Environment variable not found: DATABASE_URL.</span>'),
-  cmd('docker compose up -d postgres'),
-  out('  <span class="r">Conflict. The container name "/acme-postgres-1" is already in use</span>'),
-];
-const after = [
-  cmd('wtm create feat/login feat/search --yes'),
-  out('  <span class="g">✓</span> feat/login'),
-  out('    <span class="m">../acme.trees/feat-login</span>'),
-  out('  <span class="g">✓</span> feat/search'),
-  out('    <span class="m">../acme.trees/feat-search</span>'),
-  out(),
-  out('  2 created'),
-  out(),
-  cmd('wtm run up feat/login feat/search -d --yes'),
-  out('  <span class="g">✓</span> api started · feat/login · <span class="c">http://api.feat-login.acme.localhost</span>'),
-  out('  <span class="g">✓</span> api started · feat/search · <span class="c">http://api.feat-search.acme.localhost</span>'),
-  out('  <span class="g">✓</span> web started · feat/login · <span class="c">http://web.feat-login.acme.localhost</span>'),
-  out('  <span class="g">✓</span> web started · feat/search · <span class="c">http://web.feat-search.acme.localhost</span>'),
-];
+const install = 'brew install LucasPcq/tap/wtm';
+const windows = lanes().map((lane, i) => ({ ...lane, top: ['18.6%', '50%', '81.4%'][i], color: `var(--lane-${i + 1})`, delay: `${i * 120}ms` }));
 ---
 <section class="hero">
   <div class="wrap">
-    <div class="hero-grid">
-      <div class="hero-copy">
-        <a class="lockup" href={base} aria-label="wtm"><Mark /><b>wtm</b></a>
-        <h1>Worktrees isolate code. <span>wtm isolates the runtime.</span></h1>
-        <p class="tag">for teams and their agents</p>
-        <p class="sub">Every branch gets its own worktree, ports, Docker Compose project, database and URL, so ten Claude Code agents can run their apps on one laptop.</p>
-      </div>
-      <div class="term scenes" id="hero-term">
-        <input type="radio" name="scene" id="scene-before" />
-        <input type="radio" name="scene" id="scene-after" checked />
-        <div class="term-bar">
-          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-          <span class="term-tabs"><label for="scene-before">without wtm</label><label for="scene-after">with wtm</label></span>
+    <div>
+      <h1 class="pair"><span class="light">Every branch,</span><span class="heavy">running.</span></h1>
+      <p class="sub">A git worktree manager that gives each branch its own ports, Compose project, database and URL. Your agents run their app and test their work. Yours keeps running.</p>
+      <div class="cta-row">
+        <div class="install">
+          <code>{install}</code>
+          <button class="copy" type="button" data-copy={install}>copy</button>
         </div>
-        <div class="screen scene" data-scene="before" set:html={render(before)} />
-        <div class="screen scene" data-scene="after" set:html={render(after)} />
-      </div>
-    </div>
-    <div class="hero-foot">
-      <Install />
-      <div class="actions">
         <a class="btn btn-primary" href={`${base}guide/getting-started/`}>Get started</a>
-        <a class="btn" href="https://github.com/LucasPcq/wtm">View on GitHub</a>
       </div>
+      <p class="platforms">macOS · Linux · WSL2 — also <a href={`${base}guide/installation/`}>go install, binaries</a></p>
     </div>
-    <p class="agent-note">Agents: read <a href={`${base}llms.txt`}>llms.txt</a>, then <code>wtm agents install</code>.</p>
+
+    <figure class="collision" data-phase="3" aria-label="Three branches collide on port 3000, then each runs at its own address">
+      <div class="collision-bar">
+        <span>~/code/acme</span>
+        <button class="replay" type="button" hidden>replay</button>
+      </div>
+      <div class="stage">
+        <svg viewBox="0 0 600 440" aria-hidden="true">
+          <circle cx="26" cy="220" r="7" fill="var(--strong)" />
+          <g class="lanes knot" fill="none" stroke-width="7" stroke-linecap="round">
+            <path d="M 30 220 C 70 190, 100 250, 140 230 S 200 200, 240 222 C 262 222, 276 220, 300 220" stroke="var(--lane-1)" />
+            <path d="M 30 220 C 70 250, 110 190, 150 212 S 210 240, 240 220 C 262 220, 276 220, 300 220" stroke="var(--lane-2)" />
+            <path d="M 30 220 C 70 220, 110 240, 150 226 S 205 212, 240 218 C 262 218, 276 220, 300 220" stroke="var(--lane-3)" />
+          </g>
+          <g class="lanes split-lanes" fill="none" stroke-width="7" stroke-linecap="round">
+            <path d="M 30 220 C 90 220, 120 218, 160 214 C 230 206, 236 82, 300 82" stroke="var(--lane-1)" />
+            <path d="M 30 220 C 120 220, 220 220, 300 220" stroke="var(--lane-2)" />
+            <path d="M 30 220 C 90 220, 120 222, 160 226 C 230 234, 236 358, 300 358" stroke="var(--lane-3)" />
+          </g>
+        </svg>
+        <div class="window port-3000">
+          <div class="url">localhost:3000</div>
+          <ul>
+            <li>✗ EADDRINUSE :::3000</li>
+            <li>✗ container "/acme-postgres-1" in use</li>
+            <li>✗ DATABASE_URL not found</li>
+          </ul>
+        </div>
+        {windows.map((w) => (
+          <div class="window arrival" style={`top: ${w.top}; --lane: ${w.color}; --delay: ${w.delay}`}>
+            <div class="url">{w.url}</div>
+            <div class="meta"><span>{w.who} · {w.branch}</span><span>:{w.webPort}</span></div>
+          </div>
+        ))}
+      </div>
+    </figure>
   </div>
 </section>
-
-<script>
-  import { play, stop } from '../../lib/play';
-
-  const term = document.querySelector<HTMLElement>('#hero-term');
-  const before = term?.querySelector('[data-scene="before"]');
-  const after = term?.querySelector('[data-scene="after"]');
-  const beforeInput = term?.querySelector<HTMLInputElement>('#scene-before');
-  const afterInput = term?.querySelector<HTMLInputElement>('#scene-after');
-  let touched = false;
-
-  const show = (scene: 'before' | 'after') => {
-    if (!before || !after || !beforeInput || !afterInput) return;
-    (scene === 'before' ? beforeInput : afterInput).checked = true;
-    stop(scene === 'before' ? after : before);
-    return play(scene === 'before' ? before : after);
-  };
-
-  term?.querySelector('.term-tabs')?.addEventListener('click', (event) => {
-    const label = (event.target as HTMLElement).closest('label');
-    if (!label) return;
-    touched = true;
-    event.preventDefault();
-    show(label.htmlFor === 'scene-before' ? 'before' : 'after');
-  });
-  beforeInput?.addEventListener('change', () => { touched = true; show('before'); });
-  afterInput?.addEventListener('change', () => { touched = true; show('after'); });
-
-  const autoplay = async () => {
-    await show('before');
-    if (touched) return;
-    await new Promise((resolve) => setTimeout(resolve, 1400));
-    if (!touched) show('after');
-  };
-  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) autoplay();
-</script>

@@ -3,11 +3,13 @@ import '../styles/landing.css';
 import Mark from '../components/landing/Mark.astro';
 import { CONTACT, SITE_URL } from '../../site.config.mjs';
 import { base } from '../lib/base.mjs';
+import { releaseFacts } from '../lib/facts.mjs';
 
 interface Props { title: string; description: string }
 const { title, description } = Astro.props;
 const canonical = new URL(base, SITE_URL).href;
 const contact = CONTACT ? `mailto:${CONTACT}` : 'https://github.com/LucasPcq/wtm/issues';
+const { latest } = releaseFacts();
 ---
 <!doctype html>
 <html lang="en">
@@ -24,15 +26,17 @@ const contact = CONTACT ? `mailto:${CONTACT}` : 'https://github.com/LucasPcq/wtm
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..900&family=Martian+Mono:wght@300..600&display=swap" rel="stylesheet" />
   </head>
   <body>
     <header class="nav">
       <div class="wrap">
         <a class="lockup" href={base} aria-label="wtm home"><Mark /><b>wtm</b></a>
-        <a class="link" href={`${base}docs/`}>docs</a>
-        <a class="link optional" href={`${base}changelog/`}>changelog</a>
-        <a class="link" href="https://github.com/LucasPcq/wtm">github</a>
+        {latest ? <a class="version" href={`${base}changelog/`}>v{latest}</a> : <span class="version">wtm</span>}
+        <a class="link" href={`${base}docs/`}>Docs</a>
+        <a class="link optional" href={`${base}guide/`}>Guide</a>
+        <a class="link optional" href={`${base}changelog/`}>Changelog</a>
+        <a class="link boxed" href="https://github.com/LucasPcq/wtm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.9a3.4 3.4 0 0 0-1-2.6c3.2-.4 6.5-1.6 6.5-7A5.4 5.4 0 0 0 20 4.8 5 5 0 0 0 19.9 1S18.7.6 16 2.5a13.4 13.4 0 0 0-7 0C6.3.6 5.1 1 5.1 1A5 5 0 0 0 5 4.8a5.4 5.4 0 0 0-1.5 3.7c0 5.4 3.3 6.6 6.5 7a3.4 3.4 0 0 0-1 2.6V22"></path></svg>GitHub</a>
       </div>
     </header>
     <main><slot /></main>
@@ -51,9 +55,10 @@ const contact = CONTACT ? `mailto:${CONTACT}` : 'https://github.com/LucasPcq/wtm
       </div>
     </footer>
     <script>
-      import { wireSessions } from '../lib/play';
+      import { wireCollision, wireSessions } from '../lib/play';
 
       wireSessions();
+      wireCollision();
       for (const button of document.querySelectorAll<HTMLButtonElement>('button.copy[data-copy]')) {
         button.addEventListener('click', async () => {
           try {

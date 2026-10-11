@@ -1,0 +1,37 @@
+---
+import Session from './Session.astro';
+import { base } from '../../lib/base.mjs';
+import { cmd, out } from '../../lib/term.mjs';
+
+// Replayed from a sandbox run of `wtm events` while an agent worked in acme.
+const events = [
+  cmd('wtm events'),
+  out('<span class="m">= 1 worktree · /code/acme</span>'),
+  out('<span class="m">= watching for changes</span>', 900),
+  out('<span class="g">✓</span> created agent/checkout  <span class="m">/code/acme.trees/agent-checkout</span>', 1300),
+  out('<span class="y">~</span> updated agent/checkout  <span class="m">ordinal=1</span>', 250),
+  out('<span class="g">✓</span> provisioned agent/checkout', 1500),
+  out('<span class="g">✓</span> started api in agent/checkout  <span class="c">http://api.agent-checkout.acme.localhost</span>', 1200),
+  out('<span class="g">✓</span> started web in agent/checkout  <span class="c">http://web.agent-checkout.acme.localhost</span>', 300),
+  out('<span class="r">✗</span> web crashed in agent/checkout <span class="m">(exit 1)</span>', 1900),
+  out('    <span class="m">Error: Cannot find module \'./routes/checkout\'</span>', 80),
+  out('<span class="y">~</span> stopped api in agent/checkout', 1600),
+  out('<span class="g">✓</span> removed agent/search', 1300),
+];
+const points = [
+  { title: 'A skill it already knows', text: 'using-wtm for Claude Code and Cursor: every command and its unattended form.' },
+  { title: 'JSON and --yes everywhere', text: '--output json on data commands, --yes on every change, stable exit codes, versioned contracts.' },
+  { title: 'Every change, as it happens', text: 'wtm events: worktrees created and removed, jobs started and crashed, whoever caused them.' },
+];
+---
+<section class="section agents" id="agents">
+  <div class="wrap">
+    <p class="label">wtm agents install</p>
+    <h2 class="pair"><span class="light">Built to be driven</span><br /><span class="heavy">by an agent.</span></h2>
+    <div class="points">
+      {points.map((p) => (<div><h3>{p.title}</h3><p class="small">{p.text}</p></div>))}
+    </div>
+    <Session title="an agent at work" lines={events} wide />
+    <p class="small" style="margin-top: 20px"><a href={`${base}guide/integrations/`}>Integrations</a> · <a href={`${base}guide/events/`}>The event stream</a> · <a href={`${base}guide/recipes/#several-ai-agents-each-in-its-own-worktree`}>Recipe: agents in parallel</a></p>
+  </div>
+</section>
