@@ -62,6 +62,7 @@ Isolation duplicates everything: … A **shared service** runs once for the whol
 - **Lede**: one to three sentences, before any code block or heading, saying what the page covers and when a reader needs it. It is what the reader uses to decide whether to stay, and what search and `llms.txt` show.
 - **Common case first**, then variations, then edge cases and what wtm does not do. Headings are noun phrases or short statements (`## Changing your mind`, `## What clean and prune do with the data`).
 - **Examples are real.** Output comes from running wtm (the `wtm-sandbox` skill) and is trimmed, never typed from memory. New examples use the sandbox repository `acme`, its branches (`feat/login`, `fix/header`) and the names wtm really derives from them.
+- **Shell blocks**: commands alone go in ` ```bash `; commands with their output go in ` ```console `, each command behind `$ `. The site colours a `console` command exactly like a `bash` one and leaves output plain (`site/src/lib/console-highlight.mjs`).
 - **No hand-written table of contents**: the site shows "On this page", GitHub shows its outline.
 - **State, not history**: describe how wtm works now. "Since 0.28", "we changed", "previously" belong in the changelog or a migration page, never in a concept page.
 - **Links** are relative to the Markdown file (`[run.toml](run-toml.md#job)`), so GitHub and the site both resolve them; `sync-docs.mjs` rewrites them for the site. Never write site-only Markdown.
