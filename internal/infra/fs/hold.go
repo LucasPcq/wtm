@@ -16,12 +16,9 @@ type HoldFileParams struct {
 	Data []byte
 }
 
-// HoldFile writes Data at Path and keeps it locked until Release, which
-// removes it: the file says who holds something for exactly as long as they
-// hold it, and a process that dies lets go of it with its descriptors. The
-// data is written and locked before the file appears under Path, so a reader
-// never finds it half written or unlocked. Where flock is unavailable the file
-// is still written and removed, and Held is false.
+// HoldFile keeps Data at Path, locked, until Release removes it: a process that
+// dies lets go of it with its descriptors. The file is written and locked
+// before it appears, so a reader never finds it half written or unlocked.
 func HoldFile(params HoldFileParams) (Locks, error) {
 	dir := filepath.Dir(params.Path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -46,9 +43,8 @@ func discard(file *os.File, cause error) error {
 	return errors.Join(cause, os.Remove(file.Name()))
 }
 
-// HeldFiles reads every file of dir still held through HoldFile. A file nobody
-// holds was left by a process that died, and is removed. Where flock is
-// unavailable, whether a file is held cannot be told and every one is read.
+// HeldFiles reads the files of dir still held; one nobody holds was left by a
+// dead process and is removed. Without flock every file is read.
 func HeldFiles(dir string) ([][]byte, error) {
 	entries, err := os.ReadDir(dir)
 	if errors.Is(err, os.ErrNotExist) {
@@ -73,8 +69,8 @@ func HeldFiles(dir string) ([][]byte, error) {
 	return held, nil
 }
 
-// removeIfSame removes the stale file only if path still names it, never a
-// file renamed over it since it was opened.
+// removeIfSame never removes a file renamed over the stale one since it was
+// opened.
 func removeIfSame(file *os.File, path string) {
 	opened, err := file.Stat()
 	if err != nil {

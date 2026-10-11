@@ -1,8 +1,5 @@
-// Package dispatchtest runs a command through dispatch with no surface: a
-// request in, the outcome, the progress and the events out. Its ports are
-// doubles (a recorded bus, a fixed clock, numbered operations, a temporary
-// state dir); the ports of a command are doubled beside the package that
-// defines them.
+// Package dispatchtest runs a command through dispatch with no surface, on
+// doubles of dispatch's ports.
 package dispatchtest
 
 import (
@@ -18,10 +15,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/kernel"
 )
 
-// Clock is the time every operation of the bench starts at.
 var Clock = time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)
 
-// Bus records what dispatch publishes.
 type Bus struct {
 	mu     sync.Mutex
 	events []domain.Event
@@ -47,7 +42,6 @@ func (b *Bus) Types() []domain.EventType {
 	return types
 }
 
-// Progress collects what a command emits.
 type Progress struct {
 	mu   sync.Mutex
 	seen []kernel.Progress
@@ -65,8 +59,6 @@ func (p *Progress) Seen() []kernel.Progress {
 	return slices.Clone(p.seen)
 }
 
-// Bench is a dispatcher on doubles; StateDir is where its locks and hook logs
-// land.
 type Bench struct {
 	Dispatcher *dispatch.Dispatcher
 	Bus        *Bus
@@ -75,11 +67,9 @@ type Bench struct {
 }
 
 type BenchParams struct {
-	// StateDir defaults to a temporary directory; another bench pointed at the
-	// same one contends for the same locks.
 	StateDir string
-	// OpPrefix starts each operation id, "op-" by default: two benches on one
-	// state dir need different ones, as two processes draw different ids.
+	// OpPrefix tells apart two benches sharing a state dir, as two processes
+	// draw different ids.
 	OpPrefix string
 }
 
@@ -125,14 +115,12 @@ type RunParams[Req, F, P, D any] struct {
 	Options dispatch.Options
 }
 
-// Ran is what a run returned and what it emitted.
 type Ran[P, D any] struct {
 	Result   dispatch.Result[P, D]
 	Err      error
 	Progress []kernel.Progress
 }
 
-// Run runs a command of the bench the way a surface would, without one.
 func Run[Req, F, P, D any](ctx context.Context, params RunParams[Req, F, P, D]) Ran[P, D] {
 	handle := dispatch.Register(dispatch.RegisterParams[Req, F, P, D]{Dispatcher: params.Bench.Dispatcher, Command: params.Command})
 	progress := &Progress{}

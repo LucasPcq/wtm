@@ -18,12 +18,12 @@ func TestAnOperationIsAnnouncedThenFinishedUnitByUnit(t *testing.T) {
 		Bench:   b,
 		Repo:    &repo{},
 		Request: request{Branches: []string{"feat/a", "feat/b"}},
-		Options: dispatch.Options{Surface: kernel.SurfaceCLI, CorrelationID: "agent-7"},
+		Options: dispatch.Options{Surface: dispatch.SurfaceCLI, CorrelationID: "agent-7"},
 	})
 	require.NoError(t, ran.Err)
 
 	ok := true
-	operation := &domain.EventOperation{Command: commandName, Surface: string(kernel.SurfaceCLI)}
+	operation := &domain.EventOperation{Command: commandName, Surface: string(dispatch.SurfaceCLI)}
 	assert.Equal(t, []domain.Event{
 		{Type: domain.EventOperationStarted, CorrelationID: "agent-7", OpID: "op-1", Operation: operation},
 		{Type: domain.EventUnitFinished, CorrelationID: "agent-7", OpID: "op-1", Unit: &domain.EventUnit{Subject: "feat/a", Status: string(kernel.StatusDone)}},

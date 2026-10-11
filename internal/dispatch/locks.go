@@ -12,6 +12,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/query/operations"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -26,8 +27,6 @@ const (
 	keySeparator     = ":"
 )
 
-// held is what a run holds: its holder file and its locks, or nothing at all
-// when flock is unavailable (Held false).
 type held struct {
 	holder fs.Locks
 	locks  fs.Locks
@@ -40,9 +39,7 @@ func (h held) release() {
 	h.holder.Release()
 }
 
-// lock writes the operation's holder file, then takes its locks, all or none
-// and without waiting: a key another operation holds is a 409 naming it.
-func (d *Dispatcher) lock(operation kernel.Operation) (held, error) {
+func (d *Dispatcher) lock(operation operations.Operation) (held, error) {
 	if d.params.StateDir == "" {
 		return held{}, nil
 	}
@@ -52,8 +49,8 @@ func (d *Dispatcher) lock(operation kernel.Operation) (held, error) {
 	}
 	holder, err := fs.HoldFile(fs.HoldFileParams{Path: d.holderPath(operation.ID), Data: data})
 	if err != nil {
-		// An unwritable state dir does not stop the command, as a missing flock
-		// does not: it runs unprotected and the run warns locks.unavailable.
+		// An unwritable state dir is treated as a missing flock: the run goes on
+		// unprotected and warns.
 		return held{}, nil
 	}
 	requests := make([]fs.LockRequest, 0, len(operation.Locks))
@@ -75,7 +72,7 @@ func (d *Dispatcher) lock(operation kernel.Operation) (held, error) {
 
 type lockHeldParams struct {
 	Path  string
-	Asked kernel.Operation
+	Asked operations.Operation
 }
 
 func (d *Dispatcher) lockHeld(params lockHeldParams) error {
@@ -83,21 +80,21 @@ func (d *Dispatcher) lockHeld(params lockHeldParams) error {
 	if index := slices.IndexFunc(params.Asked.Locks, d.locksAt(params.Path)); index >= 0 {
 		key = keyName(params.Asked.Locks[index])
 	}
-	problem := kernel.Problem{Code: CodeLockHeld, Params: kernel.Params{
-		ParamKey: key, ParamOp: unknownHolder, ParamCommand: unknownHolder, ParamPID: unknownHolder,
+	problem := kernel.Problem{Code: kernel.CodeLockHeld, Params: kernel.Params{
+		kernel.ParamKey: key, kernel.ParamOp: unknownHolder, kernel.ParamCommand: unknownHolder, kernel.ParamPID: unknownHolder,
 	}}
-	operations, _ := d.operations()
-	for _, operation := range operations {
+	running, _ := d.inProgress()
+	for _, operation := range running {
 		if operation.ID == params.Asked.ID || !slices.ContainsFunc(operation.Locks, d.locksAt(params.Path)) {
 			continue
 		}
 		problem.Params = kernel.Params{
-			ParamKey:       key,
-			ParamOp:        string(operation.ID),
-			ParamCommand:   operation.Command,
-			ParamPID:       strconv.Itoa(operation.PID),
-			ParamSurface:   string(operation.Surface),
-			ParamStartedAt: operation.StartedAt.Format(time.RFC3339),
+			kernel.ParamKey:       key,
+			kernel.ParamOp:        string(operation.ID),
+			kernel.ParamCommand:   operation.Command,
+			kernel.ParamPID:       strconv.Itoa(operation.PID),
+			kernel.ParamSurface:   operation.Surface,
+			kernel.ParamStartedAt: operation.StartedAt.Format(time.RFC3339),
 		}
 		break
 	}
@@ -108,7 +105,6 @@ func (d *Dispatcher) locksAt(path string) func(kernel.LockKey) bool {
 	return func(key kernel.LockKey) bool { return d.lockPath(key) == path }
 }
 
-// keyName is how a lock reads to a user: repo, or wt:<branch>.
 func keyName(key kernel.LockKey) string {
 	if key.Scope == kernel.LockWorktree {
 		return string(key.Scope) + keySeparator + key.Name
@@ -116,9 +112,7 @@ func keyName(key kernel.LockKey) string {
 	return string(key.Scope)
 }
 
-// operations reads the holder files still held, oldest first: a file nobody
-// holds any more belongs to a run that ended or died.
-func (d *Dispatcher) operations() ([]kernel.Operation, error) {
+func (d *Dispatcher) inProgress() ([]operations.Operation, error) {
 	if d.params.StateDir == "" {
 		return nil, nil
 	}
@@ -126,16 +120,16 @@ func (d *Dispatcher) operations() ([]kernel.Operation, error) {
 	if err != nil {
 		return nil, err
 	}
-	operations := make([]kernel.Operation, 0, len(files))
+	found := make([]operations.Operation, 0, len(files))
 	for _, data := range files {
-		var operation kernel.Operation
+		var operation operations.Operation
 		if err := json.Unmarshal(data, &operation); err != nil {
 			continue
 		}
-		operations = append(operations, operation)
+		found = append(found, operation)
 	}
-	slices.SortFunc(operations, func(a, b kernel.Operation) int { return a.StartedAt.Compare(b.StartedAt) })
-	return operations, nil
+	slices.SortFunc(found, func(a, b operations.Operation) int { return a.StartedAt.Compare(b.StartedAt) })
+	return found, nil
 }
 
 func (d *Dispatcher) locksDir() string {
@@ -153,7 +147,6 @@ func (d *Dispatcher) lockPath(key kernel.LockKey) string {
 	return filepath.Join(d.locksDir(), repoLockName+lockFileExt)
 }
 
-// sortedKeys is the command's locks in the order they are recorded.
 func sortedKeys(keys []kernel.LockKey) []kernel.LockKey {
 	sorted := slices.Clone(keys)
 	slices.SortFunc(sorted, func(a, b kernel.LockKey) int {
@@ -162,8 +155,6 @@ func sortedKeys(keys []kernel.LockKey) []kernel.LockKey {
 	return sorted
 }
 
-// Operations are the operations in progress, read from the holder files still
-// held: the port query/operations is built on.
-func (d *Dispatcher) Operations(context.Context) ([]kernel.Operation, error) {
-	return d.operations()
+func (d *Dispatcher) Operations(context.Context) ([]operations.Operation, error) {
+	return d.inProgress()
 }

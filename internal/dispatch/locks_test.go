@@ -23,7 +23,7 @@ func TestAWorktreeHeldByAnotherOperationIsA409NamingItsHolder(t *testing.T) {
 	entered, release := first.held()
 	done := make(chan dispatchtest.Ran[plan, string])
 	go func() {
-		done <- run(t.Context(), runParams{Bench: b, Repo: first, Request: request{Branches: []string{"feat/a"}}, Options: dispatch.Options{Surface: kernel.SurfaceTUI}})
+		done <- run(t.Context(), runParams{Bench: b, Repo: first, Request: request{Branches: []string{"feat/a"}}, Options: dispatch.Options{Surface: dispatch.SurfaceTUI}})
 	}()
 	<-entered
 
@@ -33,14 +33,14 @@ func TestAWorktreeHeldByAnotherOperationIsA409NamingItsHolder(t *testing.T) {
 
 	failure := problem(t, ran.Err)
 	assert.Equal(t, kernel.KindConflict, failure.Kind())
-	assert.Equal(t, dispatch.CodeLockHeld, failure.Base().Code)
+	assert.Equal(t, kernel.CodeLockHeld, failure.Base().Code)
 	assert.Equal(t, kernel.Params{
-		dispatch.ParamKey:       "wt:feat/a",
-		dispatch.ParamOp:        "op-1",
-		dispatch.ParamCommand:   commandName,
-		dispatch.ParamPID:       strconv.Itoa(os.Getpid()),
-		dispatch.ParamSurface:   string(kernel.SurfaceTUI),
-		dispatch.ParamStartedAt: dispatchtest.Clock.Format(time.RFC3339),
+		kernel.ParamKey:       "wt:feat/a",
+		kernel.ParamOp:        "op-1",
+		kernel.ParamCommand:   commandName,
+		kernel.ParamPID:       strconv.Itoa(os.Getpid()),
+		kernel.ParamSurface:   string(dispatch.SurfaceTUI),
+		kernel.ParamStartedAt: dispatchtest.Clock.Format(time.RFC3339),
 	}, failure.Base().Params)
 	assert.Empty(t, second.listed(), "the refused run applied")
 	require.NoError(t, (<-done).Err)
@@ -70,7 +70,7 @@ func TestTheOperationsInProgressAreReadFromTheirHolders(t *testing.T) {
 	entered, release := r.held()
 	done := make(chan dispatchtest.Ran[plan, string])
 	go func() {
-		done <- run(t.Context(), runParams{Bench: b, Repo: r, Request: request{Branches: []string{"feat/a"}}, Options: dispatch.Options{Surface: kernel.SurfaceCLI, CorrelationID: "agent-7"}})
+		done <- run(t.Context(), runParams{Bench: b, Repo: r, Request: request{Branches: []string{"feat/a"}}, Options: dispatch.Options{Surface: dispatch.SurfaceCLI, CorrelationID: "agent-7"}})
 	}()
 	<-entered
 
@@ -81,11 +81,11 @@ func TestTheOperationsInProgressAreReadFromTheirHolders(t *testing.T) {
 	after, err := query.Run(t.Context(), operations.Request{})
 	require.NoError(t, err)
 
-	assert.Equal(t, []kernel.Operation{{
+	assert.Equal(t, []operations.Operation{{
 		ID:            "op-1",
 		PID:           os.Getpid(),
 		Command:       commandName,
-		Surface:       kernel.SurfaceCLI,
+		Surface:       string(dispatch.SurfaceCLI),
 		CorrelationID: "agent-7",
 		StartedAt:     dispatchtest.Clock,
 		Locks: []kernel.LockKey{
@@ -114,8 +114,8 @@ func TestLocksAreTakenWholeAcrossProcesses(t *testing.T) {
 
 	refused := run(t.Context(), runParams{Bench: b, Repo: &repo{}, Request: request{Branches: []string{"feat/a", "feat/b"}}})
 	failure := problem(t, refused.Err)
-	assert.Equal(t, dispatch.CodeLockHeld, failure.Base().Code)
-	assert.Equal(t, strconv.Itoa(child.Process.Pid), failure.Base().Params[dispatch.ParamPID])
+	assert.Equal(t, kernel.CodeLockHeld, failure.Base().Code)
+	assert.Equal(t, strconv.Itoa(child.Process.Pid), failure.Base().Params[kernel.ParamPID])
 
 	alone := run(t.Context(), runParams{Bench: b, Repo: &repo{}, Request: request{Branches: []string{"feat/a"}}})
 	assert.NoError(t, alone.Err, "the refused run kept feat/a")

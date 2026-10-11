@@ -22,7 +22,7 @@ registry := dispatch.Registry{created, dispatch.RegisterQuery(operations.Query(d
 `Now`, `NewOpID` and `Shield` default to the clock, a random id and `proc.Shield`; the test bench replaces them.
 
 - **`Handle[Req, F, P, D]`** is a command bound to its dispatcher: typed, for a surface written for that command.
-- **`Registry`** is the list of what a surface can run, an `Entry` per command or query, found by `Lookup(name)`. An `Entry` erases the types: `Call` reads the request as JSON (its names are the paths of the fields) and answers a sealed `Reply`, a `CommandReply` (the `Result` with its plan and item details as JSON, statuses typed) or a `QueryReply` (the view as JSON). A field the request does not have is a `422` naming it (`request.unknown_field`), never ignored.
+- **`Registry`** is the list of what a surface can run, an `Entry` per command or query, found by `Lookup(name)`. An `Entry` erases the types: `Call` reads the request as JSON (its names are the paths of the fields) and answers a sealed `Reply`, a `CommandReply` (the `Result` with its plan and item details as JSON, statuses typed) or a `QueryReply` (the view as JSON). A field the request does not have is a `422` naming it (`unknown_field`), never ignored.
 
 ## The form
 
@@ -53,17 +53,17 @@ A form keeps the snapshot while the user types: entering a value calls `State` a
 | `DryRun` | stop after `Plan` |
 | `ExpectFingerprint` | the fingerprint a preview returned (`--expect-fingerprint`, a form's recap) |
 | `IgnoreRemembered` | drop the remembered answers before the defaults (`--ask`) |
-| `Surface`, `CorrelationID` | recorded in the holder and on the events |
+| `Surface` (`dispatch.SurfaceCLI`, `SurfaceTUI`…), `CorrelationID` | recorded in the holder and on the events |
 
 `Result{Op, Fingerprint, Plan, Outcome}` carries the plan always and the outcome unless the run was a dry run. A run that could not take its locks (no `flock`, an unwritable state dir) goes on unprotected and says so with the warning `locks.unavailable`, in the outcome and in the plan.
 
 ## Errors
 
-Every error `Run` returns is a `kernel.Error`. The codes of `dispatch` are `kernel.Code` constants in `codes.go`, their messages in `kernel/text`.
+Every error `Run` returns is a `kernel.Error`. Its codes and their params are the engine's, declared in `kernel` beside the others (every surface handles them), with their messages in `kernel/text`.
 
 | Code | Kind | As HTTP | Params |
 | -- | -- | -- | -- |
-| `request.invalid` | `invalid` | 422 | `fields`: each `FieldError`, `request.unknown_field` included |
+| `request.invalid` | `invalid` | 422 | `fields`: each `FieldError`, `unknown_field` included |
 | `lock.held` | `conflict` | 409 | `key` (`repo`, `wt:<branch>`), and the holder: `op`, `command`, `pid`, `surface`, `started_at` |
 | `plan.stale` | `precondition` | 412 | `expected`, `found` |
 | `state.schema_newer` | `precondition` | 412 | `path`, `found`, `supported` |
@@ -86,7 +86,7 @@ Every error `Run` returns is a `kernel.Error`. The codes of `dispatch` are `kern
 - **Without `flock`** (NFS, some WSL mounts) the run is unprotected and warns `locks.unavailable`.
 - **A query locks nothing**: the atomic writes of `infra/fs` give it a file before or after a write, never half of one.
 
-`query/operations` lists the operations in progress from the holder files still held: `operations.Query(d.Operations)`.
+`query/operations` lists the operations in progress from the holder files still held: `operations.Query(d.Operations)`. Its `operations.Operation` is the shape of a holder file.
 
 ## The fingerprint
 
@@ -109,7 +109,7 @@ On the bus (`docs/guide/events.md`) an applied run sends `operation.started`, on
 
 ## What the lint holds
 
-- `layers`: `dispatch` imports `kernel`, `domain`, `rules` and `infra`, never `service/` or a surface.
+- `layers`: `dispatch` imports `kernel`, `domain`, `rules`, `infra` and `query/` (the view of `query/operations` is the shape of its holder files), never `service/` or a surface.
 - `engine` (`tools/archlint/engine.go`): `command/` and `query/` never import `dispatch` or `surface/`; `surface/` never imports `command/` or `query/`; `command/` never calls `context.Background()` or `context.TODO()`.
 
 ## Testing

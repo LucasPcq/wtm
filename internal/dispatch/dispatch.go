@@ -1,7 +1,5 @@
-// Package dispatch is the impure half of the command engine and the one way a
-// surface reaches a command: it takes the operation locks, observes, validates,
-// plans, checks the fingerprint, applies, and publishes what happened, the same
-// way for every command and every surface.
+// Package dispatch is the impure half of the command engine: the one way a
+// surface runs a command.
 package dispatch
 
 import (
@@ -17,18 +15,14 @@ import (
 
 const opIDBytes = 8
 
-// Publisher is the event bus; events.Publisher satisfies it.
 type Publisher interface {
 	Publish(ctx context.Context, event domain.Event)
 }
 
-// Params are the ports dispatch itself runs on. A command gets its own ports
-// (git, the state files, processes) when it is built, never through dispatch.
+// Params are dispatch's own ports; a command gets its ports when it is built.
 type Params struct {
-	// Dir is the directory the surface runs from, what a command observes.
 	Dir string
-	// StateDir is <common>/wtm: the operation locks and the hook logs live
-	// there. Empty runs every command unprotected.
+	// StateDir is <common>/wtm; empty runs every command unprotected.
 	StateDir  string
 	Publisher Publisher
 	Now       func() time.Time
@@ -59,15 +53,19 @@ func randomOpID() kernel.OpID {
 	return kernel.OpID(hex.EncodeToString(raw))
 }
 
-// Options are what a surface asks of one run, beside its request.
+type Surface string
+
+const (
+	SurfaceCLI  Surface = "cli"
+	SurfaceTUI  Surface = "tui"
+	SurfaceHTTP Surface = "http"
+	SurfaceGUI  Surface = "gui"
+)
+
 type Options struct {
-	DryRun bool
-	// ExpectFingerprint is the fingerprint a preview returned: the run is
-	// refused with plan.stale when the facts it reads have changed since.
+	DryRun            bool
 	ExpectFingerprint Fingerprint
-	// IgnoreRemembered drops the remembered answers before the defaults
-	// apply (--ask).
-	IgnoreRemembered bool
-	Surface          kernel.Surface
-	CorrelationID    string
+	IgnoreRemembered  bool
+	Surface           Surface
+	CorrelationID     string
 }

@@ -1,23 +1,33 @@
-// Package operations is the query of the operations in progress: who runs
-// what, from which surface, since when, holding which locks.
+// Package operations is the query of the operations in progress.
 package operations
 
 import (
 	"context"
+	"time"
 
 	"github.com/LucasPcq/wtm/internal/kernel"
 )
 
 const Name = "operations"
 
+// Operation is one run in progress, as dispatch records it in its holder file.
+type Operation struct {
+	ID            kernel.OpID      `json:"op_id"`
+	PID           int              `json:"pid"`
+	Command       string           `json:"command"`
+	Surface       string           `json:"surface"`
+	CorrelationID string           `json:"correlation_id,omitempty"`
+	StartedAt     time.Time        `json:"started_at"`
+	Locks         []kernel.LockKey `json:"locks"`
+}
+
 type Request struct{}
 
 type View struct {
-	Operations []kernel.Operation `json:"operations"`
+	Operations []Operation `json:"operations"`
 }
 
-// List reads the operations in progress; dispatch provides it.
-type List func(context.Context) ([]kernel.Operation, error)
+type List func(context.Context) ([]Operation, error)
 
 func Query(list List) kernel.Query[Request, View] {
 	return kernel.Query[Request, View]{

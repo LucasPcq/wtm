@@ -5,17 +5,18 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/query/operations"
 )
 
-// operationBus publishes an operation's events. They are sent even once the
-// run is interrupted: a consumer must learn how the operation ended.
+// operationBus publishes without cancellation: a consumer must learn how an
+// interrupted operation ended.
 type operationBus struct {
 	ctx       context.Context
 	publisher Publisher
-	operation kernel.Operation
+	operation operations.Operation
 }
 
-func (d *Dispatcher) bus(ctx context.Context, operation kernel.Operation) operationBus {
+func (d *Dispatcher) bus(ctx context.Context, operation operations.Operation) operationBus {
 	return operationBus{ctx: context.WithoutCancel(ctx), publisher: d.params.Publisher, operation: operation}
 }
 
@@ -30,8 +31,6 @@ func (b operationBus) unitFinished(progress kernel.Progress) {
 	}})
 }
 
-// finished carries the code of the failure that ended the operation, if any;
-// the items' own failures are in their unit.finished.
 func (b operationBus) finished(failure kernel.Error) {
 	ok := failure == nil
 	event := domain.Event{Type: domain.EventOperationFinished, Operation: b.described(), OK: &ok}
@@ -42,7 +41,7 @@ func (b operationBus) finished(failure kernel.Error) {
 }
 
 func (b operationBus) described() *domain.EventOperation {
-	return &domain.EventOperation{Command: b.operation.Command, Surface: string(b.operation.Surface)}
+	return &domain.EventOperation{Command: b.operation.Command, Surface: b.operation.Surface}
 }
 
 func (b operationBus) publish(event domain.Event) {

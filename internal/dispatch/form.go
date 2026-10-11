@@ -7,8 +7,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/kernel"
 )
 
-// Handle is one command bound to the dispatcher that runs it: the four calls a
-// form makes, and Run.
 type Handle[Req, F, P, D any] struct {
 	dispatcher *Dispatcher
 	command    kernel.Command[Req, F, P, D]
@@ -25,7 +23,6 @@ func Register[Req, F, P, D any](params RegisterParams[Req, F, P, D]) *Handle[Req
 
 func (h *Handle[Req, F, P, D]) Name() string { return h.command.Name }
 
-// Schema is the form as data, the same for every call: read it once.
 func (h *Handle[Req, F, P, D]) Schema() []kernel.FieldSpec {
 	specs := make([]kernel.FieldSpec, 0, len(h.command.Fields))
 	for _, field := range h.command.Fields {
@@ -34,8 +31,6 @@ func (h *Handle[Req, F, P, D]) Schema() []kernel.FieldSpec {
 	return specs
 }
 
-// Snapshot is what Observe read and its fingerprint. A client keeps it while
-// the user types, and observes again to refresh.
 type Snapshot[F any] struct {
 	Facts       F
 	Fingerprint Fingerprint
@@ -53,8 +48,6 @@ func (h *Handle[Req, F, P, D]) Observe(ctx context.Context) (Snapshot[F], error)
 	return Snapshot[F]{Facts: facts, Fingerprint: fingerprintOf(facts)}, nil
 }
 
-// Forget is the facts without the remembered answers, as a run with
-// IgnoreRemembered reads them: a form asking again (--ask) shows what will run.
 func (h *Handle[Req, F, P, D]) Forget(facts F) F {
 	if h.command.Forget == nil {
 		return facts
@@ -67,7 +60,6 @@ type FormParams[Req, F any] struct {
 	Facts   F
 }
 
-// State is the form computed over a request and the facts: pure, no I/O.
 func (h *Handle[Req, F, P, D]) State(params FormParams[Req, F]) (kernel.Form[Req], error) {
 	form, err := kernel.Evaluate(kernel.EvaluateParams[Req, F]{
 		Fields:  h.command.Fields,
@@ -87,8 +79,6 @@ type ChoicesParams[Req, F any] struct {
 	Facts   F
 }
 
-// Choices loads a field's options, each one that would break a rule arriving
-// disabled with its refusal.
 func (h *Handle[Req, F, P, D]) Choices(ctx context.Context, params ChoicesParams[Req, F]) (kernel.Choices, error) {
 	index := slices.IndexFunc(h.command.Fields, func(field kernel.FieldDef[Req, F]) bool { return field.Spec.Path == params.Path })
 	if index < 0 {
@@ -133,8 +123,8 @@ type candidateParams struct {
 	Option  string
 }
 
-// candidate is the field's value once the option is picked: the option itself
-// for a single choice, added to what is already chosen for a list.
+// candidate is the field's value once the option is picked: added to what is
+// already chosen for a list, so a rule over the list sees the whole of it.
 func candidate(params candidateParams) kernel.Value {
 	switch params.Type {
 	case kernel.FieldMultiSelect, kernel.FieldReorder, kernel.FieldTextList:

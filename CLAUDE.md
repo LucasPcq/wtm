@@ -112,7 +112,7 @@ The annotated map of every sub-package is in `docs/dev/architecture.md`.
 - `domain/` has types, errors and constants only — no methods, no free functions.
 - `rules/` imports only stdlib and `internal/domain` — no I/O, no side effects.
 - `kernel/` imports only the stdlib — no `domain/`, no business vocabulary: a command composes `kernel` with `domain`, never the reverse. I/O reaches it only as functions it is handed (`Observe`, `Apply`, the `Shield`). The engine writes no text: an error, a warning or a progress event is a `kernel.Code` plus params, and `kernel/text` holds the English.
-- `dispatch/` imports only `kernel/`, `domain/`, `rules/` and `infra/`: a command's ports reach it as interfaces. `command/` and `query/` never import `dispatch/` or `surface/`, `surface/` never imports them, and `command/` never calls `context.Background()`/`context.TODO()` (`engine`). See `docs/dev/dispatch.md`.
+- `dispatch/` imports only `kernel/`, `domain/`, `rules/`, `infra/` and `query/`: a command's ports reach it as interfaces. `command/` and `query/` never import `dispatch/` or `surface/`, `surface/` never imports them, and `command/` never calls `context.Background()`/`context.TODO()` (`engine`). See `docs/dev/dispatch.md`.
 - `service/` never imports `cobra`, `bubbletea`, `lipgloss`.
 - `surface/cli/render/` and `surface/tui/` have zero decision logic — only rendering.
 - `styles/` is the only package allowed to instantiate `lipgloss.Style`.

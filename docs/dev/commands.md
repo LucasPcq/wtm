@@ -34,7 +34,7 @@ type Command[Req, F, P, D any] struct {
 }
 ```
 
-The only I/O of a command is in `Observe`, `FieldDef.Choices` and `Apply`; each takes a `ctx`. `ObserveScope` is data only (the directory observed from): a command gets its ports (git, the state files, processes) when it is built, never through a kernel type. `ApplyInput` hands `Apply` the request, the facts, the plan, the `Emitter` for progress and the `Shield` its sagas run under. Everything else is a pure function of `(Req, F)`. `Locks` names the operation locks the command needs: the repository (`LockRepo`) or one worktree by its branch (`LockWorktree`), shared or exclusive. `Forget` returns the facts without the answers the user asked to remember: a run that asks again (`--ask`) falls back on each field's other default. An `Operation` is a run in progress as `dispatch` records it (who, from which `Surface`, since when, holding which keys).
+The only I/O of a command is in `Observe`, `FieldDef.Choices` and `Apply`; each takes a `ctx`. `ObserveScope` is data only (the directory observed from): a command gets its ports (git, the state files, processes) when it is built, never through a kernel type. `ApplyInput` hands `Apply` the request, the facts, the plan, the `Emitter` for progress and the `Shield` its sagas run under. Everything else is a pure function of `(Req, F)`. `Locks` names the operation locks the command needs: the repository (`LockRepo`) or one worktree by its branch (`LockWorktree`), shared or exclusive. `Forget` returns the facts without the answers the user asked to remember: a run that asks again (`--ask`) falls back on each field's other default.
 
 ## Fields
 
@@ -101,7 +101,7 @@ type Failure struct { Problem; kind Kind }                 // kernel.NotFound ·
 
 type FieldError struct {
 	Path     string // "from", "branches[2]", "decisions[PORT]"
-	Code     Code   // required · required_one_of · invalid · not_found · one_of · exclusive_with · requires · distinct · self_parent · too_short · too_long · too_few · too_many · pattern
+	Code     Code   // required · required_one_of · invalid · not_found · one_of · exclusive_with · requires · distinct · self_parent · too_short · too_long · too_few · too_many · pattern · unknown_field
 	Params   Params
 	Accepted []string
 	With     []string
@@ -114,7 +114,7 @@ type FieldError struct {
 
 `Error`, `FieldError`, `Warning`, `Badge` and `Progress` carry a `Code` and `Params`. `internal/kernel/text` is the one catalogue that turns them into English: `text.Message(code, params)` fills `{param}` placeholders, `text.Field(fieldError)` adds the path, the accepted values and the other fields named. The CLI, the `message` of the JSON and a graphical interface all read it, and an interface may present a code differently (a link, a button).
 
-A code is a constant of type `kernel.Code`. `TestEveryCodeDeclaredHasItsMessage` scans every package under `internal/` for those constants and fails on one missing from the catalogue, and on a catalogue entry no constant declares. The catalogue holds the kernel's own codes; where a command's messages live (in `kernel/text`, keyed by the code's string, or beside the command) is settled by the first command on the contract, `create`, and the `…Fmt` templates of `domain/` follow their command there.
+A code is a constant of type `kernel.Code`. `TestEveryCodeDeclaredHasItsMessage` scans every package under `internal/` for those constants and fails on one missing from the catalogue, and on a catalogue entry no constant declares. The catalogue holds the engine's own codes, those of a run included (`lock.held`, `locks.unavailable`, `plan.stale`, `state.schema_newer`, raised by `dispatch`: [dispatch.md](dispatch.md#errors)); where a command's messages live (in `kernel/text`, keyed by the code's string, or beside the command) is settled by the first command on the contract, `create`, and the `…Fmt` templates of `domain/` follow their command there.
 
 ## Results
 

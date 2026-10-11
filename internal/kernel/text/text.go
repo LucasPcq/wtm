@@ -27,6 +27,7 @@ var catalog = map[kernel.Code]string{
 	kernel.CodeTooFew:        "{path} needs at least {limit} entries",
 	kernel.CodeTooMany:       "{path} takes at most {limit} entries",
 	kernel.CodePattern:       "{path}: {value} does not match {pattern}",
+	kernel.CodeUnknownField:  "{path} is not a field",
 
 	kernel.CodeInvalidRequest: "the request is invalid",
 	kernel.CodeInternal:       "internal error",
@@ -35,12 +36,10 @@ var catalog = map[kernel.Code]string{
 	kernel.CodeUndoFailed:     "could not undo {step}, left behind: {left}",
 	kernel.CodePhaseFailed:    "{phase} failed",
 
-	// Declared by dispatch, which kernel cannot import.
-	"lock.held":             "{key} is held by another wtm operation: {command} (pid {pid})",
-	"plan.stale":            "the repository changed since the preview (fingerprint {expected}, now {found}): preview again",
-	"state.schema_newer":    "{path} was written by a newer wtm (schema {found}, this one supports {supported}): upgrade wtm to change it",
-	"locks.unavailable":     "the operation locks could not be taken on this filesystem: ran without protection against another wtm command",
-	"request.unknown_field": "{path} is not a field of this request",
+	kernel.CodeLockHeld:         "{key} is held by {command} (pid {pid})",
+	kernel.CodeLocksUnavailable: "ran without operation locks",
+	kernel.CodePlanStale:        "the facts changed since the preview",
+	kernel.CodeStateSchemaNewer: "{path} is at schema {found}, this wtm supports {supported}",
 }
 
 // Message renders code over params; a code missing from the catalogue reads

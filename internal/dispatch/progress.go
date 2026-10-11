@@ -20,9 +20,7 @@ type progressParams struct {
 	Forward kernel.Emitter
 }
 
-// progress is the Emitter Apply is handed: it stamps each event with the
-// operation, publishes the end of each unit, keeps the output of each hook
-// phase in its log, then forwards the event to the surface.
+// progress is the Emitter Apply is handed.
 type progress struct {
 	bus      operationBus
 	forward  kernel.Emitter
@@ -46,9 +44,8 @@ func (p *progress) Emit(event kernel.Progress) {
 	}
 }
 
-// log writes a hook phase's whole output to the file `wtm` points a reader
-// at, whatever the surface chose to show of it. A log that cannot be opened
-// is skipped: it never stops the hook.
+// log keeps a hook phase's whole output whatever the surface shows of it; a
+// log that cannot be opened never stops the hook.
 func (p *progress) log(event kernel.Progress) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -81,7 +78,7 @@ func (p *progress) closeLog(subject string) {
 	}
 }
 
-// close closes the logs of the phases an interruption left open.
+// close closes the logs an interruption left open.
 func (p *progress) close() {
 	p.mu.Lock()
 	defer p.mu.Unlock()

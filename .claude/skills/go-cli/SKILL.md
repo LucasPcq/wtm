@@ -178,7 +178,7 @@ internal/
 - `domain/` imports only stdlib (unchanged)
 - `rules/` imports only stdlib + internal/domain
 - `kernel/` imports only the stdlib (not even `domain/`), and writes no text: codes and params only
-- `dispatch/` imports `kernel`, `domain`, `rules`, `infra` only; `command/` and `query/` never
+- `dispatch/` imports `kernel`, `domain`, `rules`, `infra`, `query` only; `command/` and `query/` never
   import `dispatch` or `surface/`, `surface/` never imports them, and `command/` never calls
   `context.Background()`/`context.TODO()` (archlint `engine`)
 - `flow/` imports **only** `internal/service/`, `internal/rules/`, `internal/domain/` and the

@@ -80,9 +80,9 @@ func TestFactsChangedSinceThePreviewAreA412PlanStale(t *testing.T) {
 
 	failure := problem(t, ran.Err)
 	assert.Equal(t, kernel.KindPrecondition, failure.Kind())
-	assert.Equal(t, dispatch.CodePlanStale, failure.Base().Code)
-	assert.Equal(t, string(preview.Result.Fingerprint), failure.Base().Params[dispatch.ParamExpected])
-	assert.Equal(t, string(ran.Result.Fingerprint), failure.Base().Params[dispatch.ParamFound])
+	assert.Equal(t, kernel.CodePlanStale, failure.Base().Code)
+	assert.Equal(t, string(preview.Result.Fingerprint), failure.Base().Params[kernel.ParamExpected])
+	assert.Equal(t, string(ran.Result.Fingerprint), failure.Base().Params[kernel.ParamFound])
 	assert.Empty(t, r.listed())
 }
 
@@ -94,8 +94,8 @@ func TestAStateFileFromANewerWtmIsA412CarryingItsSchemas(t *testing.T) {
 
 	failure := problem(t, ran.Err)
 	assert.Equal(t, kernel.KindPrecondition, failure.Kind())
-	assert.Equal(t, dispatch.CodeStateSchemaNewer, failure.Base().Code)
-	assert.Equal(t, kernel.Params{kernel.ParamPath: newer.Path, dispatch.ParamFound: "3", dispatch.ParamSupported: "2"}, failure.Base().Params)
+	assert.Equal(t, kernel.CodeStateSchemaNewer, failure.Base().Code)
+	assert.Equal(t, kernel.Params{kernel.ParamPath: newer.Path, kernel.ParamFound: "3", kernel.ParamSupported: "2"}, failure.Base().Params)
 	assert.ErrorIs(t, ran.Err, newer)
 }
 
@@ -131,6 +131,6 @@ func TestWithoutLocksTheRunGoesOnUnprotectedAndSaysSo(t *testing.T) {
 
 	require.NoError(t, ran.Err)
 	require.NotNil(t, ran.Result.Outcome)
-	assert.Equal(t, []kernel.Warning{{Code: dispatch.CodeLocksUnavailable}}, ran.Result.Outcome.Warnings)
+	assert.Equal(t, []kernel.Warning{{Code: kernel.CodeLocksUnavailable}}, ran.Result.Outcome.Warnings)
 	assert.Equal(t, []string{"feat/a"}, r.listed())
 }

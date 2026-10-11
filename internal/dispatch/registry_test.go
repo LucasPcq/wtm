@@ -38,7 +38,7 @@ func TestAFieldTheRequestDoesNotHaveIsRefusedByName(t *testing.T) {
 
 	var invalid *kernel.InvalidError
 	require.ErrorAs(t, err, &invalid)
-	assert.Equal(t, []kernel.FieldError{{Path: "branchs", Code: dispatch.CodeUnknownField}}, invalid.Fields)
+	assert.Equal(t, []kernel.FieldError{{Path: "branchs", Code: kernel.CodeUnknownField}}, invalid.Fields)
 	assert.Empty(t, r.listed())
 }
 

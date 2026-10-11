@@ -8,8 +8,6 @@ import (
 	"syscall"
 )
 
-// LockRequest is one lock of a set taken together: shared lets other shared
-// holders in, exclusive lets no one.
 type LockRequest struct {
 	Path   string
 	Shared bool
@@ -19,25 +17,21 @@ type TryLocksParams struct {
 	Requests []LockRequest
 }
 
-// Locks is a set of locks held together until Release. Held is false where
-// flock is unavailable: nothing is held, and the caller runs unprotected.
+// Locks.Held is false where flock is unavailable: nothing is held.
 type Locks struct {
 	Held   bool
 	files  []*os.File
 	remove string
 }
 
-// BusyError names the lock of a set that another holder kept it from taking.
 type BusyError struct {
 	Path string
 }
 
 func (e *BusyError) Error() string { return "lock held: " + e.Path }
 
-// TryLocks takes every lock of the set or none, without waiting: the paths in
-// sorted order, each tried once, everything taken released on the first
-// refusal. A set that never waits cannot deadlock with another taken in the
-// opposite order.
+// TryLocks takes every lock of the set or none, and never waits: a set that
+// never waits cannot deadlock with another taken in the opposite order.
 func TryLocks(params TryLocksParams) (Locks, error) {
 	taken := Locks{Held: true}
 	for _, request := range merged(params.Requests) {
@@ -55,9 +49,8 @@ func TryLocks(params TryLocksParams) (Locks, error) {
 	return taken, nil
 }
 
-// Release lets go of every lock of the set, in the reverse of the order they
-// were taken; a held file is removed before its lock goes, so nobody reads it
-// as held once it is not.
+// Release removes a held file before its lock goes, so nobody reads it as held
+// once it is not.
 func (l Locks) Release() {
 	if l.remove != "" {
 		_ = os.Remove(l.remove)
@@ -68,8 +61,6 @@ func (l Locks) Release() {
 	}
 }
 
-// merged sorts the set by path and keeps one request per path, exclusive when
-// any of them is.
 func merged(requests []LockRequest) []LockRequest {
 	byPath := map[string]bool{}
 	for _, request := range requests {

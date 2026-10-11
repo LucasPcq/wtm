@@ -11,13 +11,10 @@ import (
 	"github.com/LucasPcq/wtm/internal/kernel"
 )
 
-// Entry is a command or a query of the registry, its types erased: the request
-// arrives as JSON, whose names are the paths of its fields, and the answer
-// leaves as JSON detail under typed statuses. A surface that serves any
-// command (the generated CLI, an API) goes through it.
+// Entry erases a command's or a query's types: the request in and the details
+// out are JSON.
 type Entry interface {
 	Name() string
-	// Schema is nil for a query.
 	Schema() []kernel.FieldSpec
 	Call(ctx context.Context, call Call) (Reply, error)
 }
@@ -30,7 +27,6 @@ type Call struct {
 
 //go-sumtype:decl Reply
 
-// Reply is a command's Result or a query's view, as JSON.
 type Reply interface{ reply() }
 
 type CommandReply struct {
@@ -44,7 +40,6 @@ type QueryReply struct {
 func (CommandReply) reply() {}
 func (QueryReply) reply()   {}
 
-// Registry is the list of what a surface can run.
 type Registry []Entry
 
 func (r Registry) Lookup(name string) (Entry, bool) {
@@ -93,8 +88,8 @@ func erase[P, D any](result Result[P, D]) (Result[json.RawMessage, json.RawMessa
 	return erased, nil
 }
 
-// QueryHandle is one query of the registry. A query locks nothing: the
-// atomic writes guarantee it reads a file as it was before or after a write.
+// QueryHandle locks nothing: an atomic write leaves a file as it was before or
+// after, never half written.
 type QueryHandle[Req, V any] struct {
 	query kernel.Query[Req, V]
 }
@@ -130,13 +125,11 @@ func (h *QueryHandle[Req, V]) Call(ctx context.Context, call Call) (Reply, error
 	return QueryReply{View: data}, nil
 }
 
-// unknownFieldPrefix is how encoding/json words the error of a field the
-// struct does not have: it has no typed error for it.
+// encoding/json has no typed error for an unknown field.
 const unknownFieldPrefix = "json: unknown field "
 
-// decodeRequest reads a request strictly: a field the request does not have
-// is refused by name rather than ignored, so a typo never runs a command with
-// a default in its place.
+// decodeRequest refuses an unknown field: a typo must not run a command with a
+// default in its place.
 func decodeRequest[Req any](raw json.RawMessage) (Req, error) {
 	var request Req
 	if len(bytes.TrimSpace(raw)) == 0 {
@@ -155,7 +148,7 @@ func decodeRequest[Req any](raw json.RawMessage) (Req, error) {
 
 func fieldsOf(err error) []kernel.FieldError {
 	if name, unknown := strings.CutPrefix(err.Error(), unknownFieldPrefix); unknown {
-		return []kernel.FieldError{{Path: strings.Trim(name, `"`), Code: CodeUnknownField}}
+		return []kernel.FieldError{{Path: strings.Trim(name, `"`), Code: kernel.CodeUnknownField}}
 	}
 	var typeErr *json.UnmarshalTypeError
 	if errors.As(err, &typeErr) && typeErr.Field != "" {

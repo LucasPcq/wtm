@@ -1,9 +1,6 @@
 package kernel
 
-import (
-	"context"
-	"time"
-)
+import "context"
 
 // ObserveScope is data only: a command gets its ports when it is built,
 // never through kernel.
@@ -49,17 +46,17 @@ type ApplyInput[Req, F, P any] struct {
 
 // Command is a mutation: Req the payload, F the facts Observe reads, P the
 // plan, D the detail of each item. Only Observe, Choices and Apply do I/O.
+// Forget drops the remembered answers from the facts, for a run that asks
+// again.
 type Command[Req, F, P, D any] struct {
 	Name    string
 	Observe func(context.Context, ObserveScope) (F, error)
-	// Forget returns the facts without the remembered answers, so a run that
-	// asks again (--ask) falls back on each field's other default.
-	Forget func(F) F
-	Fields []FieldDef[Req, F]
-	Rules  Rules[Req, F]
-	Locks  func(Req) []LockKey
-	Plan   func(context.Context, Req, F) (Plan[P], error)
-	Apply  func(context.Context, ApplyInput[Req, F, P]) (Outcome[D], error)
+	Forget  func(F) F
+	Fields  []FieldDef[Req, F]
+	Rules   Rules[Req, F]
+	Locks   func(Req) []LockKey
+	Plan    func(context.Context, Req, F) (Plan[P], error)
+	Apply   func(context.Context, ApplyInput[Req, F, P]) (Outcome[D], error)
 }
 
 // Query is a read: Run returns a view, Stream emits until ctx ends.
@@ -67,26 +64,4 @@ type Query[Req, V any] struct {
 	Name   string
 	Run    func(context.Context, Req) (V, error)
 	Stream func(context.Context, Req, Emitter) error
-}
-
-// Surface is the client an operation was started from.
-type Surface string
-
-const (
-	SurfaceCLI  Surface = "cli"
-	SurfaceTUI  Surface = "tui"
-	SurfaceHTTP Surface = "http"
-	SurfaceGUI  Surface = "gui"
-)
-
-// Operation is a run of a command in progress: who runs it, from where, since
-// when, and the locks it holds.
-type Operation struct {
-	ID            OpID      `json:"op_id"`
-	PID           int       `json:"pid"`
-	Command       string    `json:"command"`
-	Surface       Surface   `json:"surface"`
-	CorrelationID string    `json:"correlation_id,omitempty"`
-	StartedAt     time.Time `json:"started_at"`
-	Locks         []LockKey `json:"locks"`
 }

@@ -25,7 +25,7 @@ var layers = map[string]layer{
 		why: "the skeleton of the command engine: stdlib only, no business vocabulary, no I/O",
 	},
 	"dispatch": {
-		internal: []string{"domain", "infra", "kernel", "rules"},
+		internal: []string{"domain", "infra", "kernel", "query", "rules"},
 		why:      "the impure half of the engine runs on its own ports: a command's ports reach it as interfaces, never through service/ or a surface",
 	},
 	"infra": {

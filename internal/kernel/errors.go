@@ -40,6 +40,7 @@ const (
 	CodeTooFew        Code = "too_few"
 	CodeTooMany       Code = "too_many"
 	CodePattern       Code = "pattern"
+	CodeUnknownField  Code = "unknown_field"
 
 	CodeInvalidRequest Code = "request.invalid"
 	CodeInternal       Code = "internal"
@@ -47,6 +48,11 @@ const (
 	CodeStepFailed     Code = "unit.step_failed"
 	CodeUndoFailed     Code = "unit.undo_failed"
 	CodePhaseFailed    Code = "unit.phase_failed"
+
+	CodeLockHeld         Code = "lock.held"
+	CodeLocksUnavailable Code = "locks.unavailable"
+	CodePlanStale        Code = "plan.stale"
+	CodeStateSchemaNewer Code = "state.schema_newer"
 )
 
 const (
@@ -59,6 +65,16 @@ const (
 	ParamPhase   = "phase"
 	ParamLeft    = "left"
 	ParamStatus  = "status"
+
+	ParamKey       = "key"
+	ParamOp        = "op"
+	ParamCommand   = "command"
+	ParamPID       = "pid"
+	ParamSurface   = "surface"
+	ParamStartedAt = "started_at"
+	ParamExpected  = "expected"
+	ParamFound     = "found"
+	ParamSupported = "supported"
 )
 
 // Problem is what every error carries, whatever its kind.
