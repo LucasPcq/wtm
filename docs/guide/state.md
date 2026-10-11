@@ -20,7 +20,7 @@ Everything wtm knows about a repository lives under its git common directory (`.
 └── ordinal.lock              # serialises the allocation of worktree numbers
 ```
 
-`<branch>` is the branch name URL-escaped into one path segment (`feat/x` → `feat%2Fx`).
+`<branch>` is the branch name URL-escaped into one path segment (`feat/login` → `feat%2Flogin`).
 
 ### `meta.json`
 
@@ -40,7 +40,7 @@ $ cat '.git/wtm/worktrees/feat%2Flogin/meta.json'
 | `created_at` | creation time |
 | `env_strategy` | how its `.env` files were provisioned: `example`, `main` or `parent` |
 | `ordinal` | its stable number, from which its ports are derived (`base + ordinal × port_offset_block`). Allocated on first need and released when the worktree is cleaned; the main checkout is `0` and has no `meta.json` |
-| `isolation` | `isolated` or `verbatim`. Absent on a worktree created before v0.28, whose [adoption](isolation.md#worktrees-created-before-v028) is pending |
+| `isolation` | `isolated` or `verbatim`. Absent on a worktree created before v0.28, whose [adoption](migrating-to-0.28.md#worktrees-created-with-027) is pending |
 | `namespaces` | the shared services it created a namespace in, which `clean` and `prune` drop |
 
 ### `pending-removals.toml`
@@ -62,6 +62,6 @@ The global config lives in the OS config directory (`~/.config/wtm/` on Linux, `
 └── repos.json.lock
 ```
 
-`jobs.json` is what makes the daemon disposable: it exits about 30 s after its last foreground job, detached services keep running without it, and the next daemon reads the index back, so `wtm run ps` still lists a compose stack after a reboot and `wtm run down` still stops it. `wtm run daemon status` reports what is up; `wtm run daemon restart` replaces a daemon of another wtm build.
+What the daemon does with these files is in [The daemon](how-run-works.md#the-daemon).
 
 On macOS, `wtm run proxy install` adds one file of its own: a LaunchAgent under `~/Library/LaunchAgents`, removed by `wtm run proxy uninstall`.

@@ -1,6 +1,6 @@
 # Compared to other tools
 
-What wtm does that the tools around it do not, and what they do that wtm does not. The facts below were checked against each project's README, documentation or landing page in October 2026; tell us in an issue when one goes stale.
+What wtm does that the tools around it do not, and what they do that wtm does not. The facts below were checked against each project's README, documentation or landing page in October 2026; open an [issue](https://github.com/LucasPcq/wtm/issues/new/choose) when one goes stale.
 
 ## The short version
 

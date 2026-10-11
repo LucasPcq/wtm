@@ -1,5 +1,5 @@
 // What wtm writes for a worktree of the sandbox repository `acme`, following its
-// rules (docs/guide/how-run-works.md, shared-services.md): the main checkout keeps
+// rules (docs/guide/ports-and-env.md, shared-services.md): the main checkout keeps
 // the defaults, worktree n adds n × 10 to every port and names its own resources.
 const REPO = 'acme';
 const BLOCK = 10;

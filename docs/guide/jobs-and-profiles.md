@@ -22,7 +22,7 @@ A **job** is the unit wtm runs, declared as a `[[job]]` in `run.toml`. Its `kind
 
 `cmd` and `stop` are `/bin/sh` lines: quotes, `&&`, pipes and `${VAR}` behave as in a terminal. A job runs in the worktree it was started for (plus its `cwd`), so the same job runs once per worktree, unless it is a [shared service](shared-services.md).
 
-Declare jobs with `wtm run init` (detected from compose files and package scripts) or `wtm run job add`; `wtm run job edit` changes any field from a flag.
+Declare jobs with `wtm run init` (detected from compose files and package scripts) or `wtm run job add`; `wtm run job edit` changes any field from a flag. How a job's ports are declared, shifted per worktree and checked once it is up is in [Ports and .env](ports-and-env.md).
 
 ## Profiles
 
@@ -66,25 +66,14 @@ The runner carries its children's ports and named URLs, and wtm will not start a
 - No view opens unless both stdin and stdout are a terminal (`wtm run up > run.log` included), nor under `--output json`: the run reports itself as lines, which is what a script or an agent gets.
 - Each job's output is also written to `<git-common-dir>/wtm/logs/<branch>/<job>.log` (5 MB × 3 within one run), cleared when the job starts, so `run logs` replays a job that is no longer running: `wtm run logs --job api`, or `--output json` for the last 1000 lines of each job.
 
-## Checking the ports
-
-Declaring a port only injects a variable. Once the jobs are up, `run up` and `run start` dial each declared port and report the ones nothing answers on, the sign of a command that never read its variable (an example is in [The port check](how-run-works.md#the-port-check)). The check never fails the run and stops as soon as every port answers.
-
-| Switch | Where | Effect |
-| --- | --- | --- |
-| `--no-probe` | `run up`, `run start` | skips the check for one run |
-| `probe = false` | a `[[job]]` | skips it for that job; an interactive run offers to write it for a warning that comes back every time |
-| `port_probe_timeout` | top of `run.toml` | the budget in seconds (15 by default; a negative value turns the check off) |
-| `binds_no_port = true` | a service | listens on nothing by design (a watcher, a worker, a runner whose children hold the ports), so wtm stops offering it a port |
-
 ## Several worktrees at once
 
 ```bash
-wtm run up feat/a feat/b -d     # two stacks side by side, each on its own ports
-wtm run up feat/c --exclusive   # stop the other worktrees' jobs first
+wtm run up feat/login fix/header -d   # two stacks side by side, each on its own ports
+wtm run up feat/login --exclusive     # stop the other worktrees' jobs first
 ```
 
-The first time `run up` or `run start` finds jobs running in another worktree, it asks what to do about the machine's load, and can remember the answer as `concurrency = "parallel" | "exclusive"` at the top of `run.toml`. `--parallel` and `--exclusive` answer for one run; `--exclusive` is refused on several worktrees, since it stops all but one, and `--yes` alone keeps the others running.
+The first time `run up` or `run start` finds jobs running in another worktree, it asks whether to keep them running (parallel) or stop them first (exclusive), and can remember the answer as `concurrency = "parallel" | "exclusive"` at the top of `run.toml`. `--parallel` and `--exclusive` answer for one run; `--exclusive` is refused on several worktrees, since it stops all but one, and `--yes` alone keeps the others running.
 
 Worktrees that share their ports (a [verbatim](isolation.md) worktree and its source) cannot run together whatever the setting: `run up` and `run start` offer to stop the other one or not to start, and refuse under `--yes` unless `--exclusive` was given.
 

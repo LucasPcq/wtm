@@ -38,6 +38,7 @@ Linux and WSL2: [Platform support](__BASE__/guide/platform-support/).
 
 `wtm create` makes the worktree from any base, copies its `.env` files and runs your hooks.
 
+- [Creating worktrees](__BASE__/guide/creating-worktrees/): several at once, from a pull request, extracted from uncommitted work.
 - [Configuration](__BASE__/guide/configuration/): `config.toml`, how `.env` files are provisioned, `on_create` and `on_clean` hooks.
 - [A pnpm or turbo monorepo](__BASE__/guide/recipes/#a-pnpm-or-turbo-monorepo), [a docker compose app](__BASE__/guide/recipes/#a-docker-compose-app): complete setups to copy.
 
@@ -54,12 +55,13 @@ Linux and WSL2: [Platform support](__BASE__/guide/platform-support/).
 
 Every worktree records the branch it came from; `wtm sync` rebases a chain, parents first.
 
-- [Stacked pull requests](__BASE__/guide/recipes/#stacked-pull-requests): `tree`, `sync` and `reparent` on a real stack.
+- [Stacked branches](__BASE__/guide/stacked-branches/): `tree`, `sync`, `fast-forward` and `reparent` on a real stack.
 
 ### Gone once merged
 
 `wtm clean` and `wtm prune` remove worktrees with their jobs and data, and refuse to lose work.
 
+- [Removing worktrees](__BASE__/guide/removing-worktrees/): the safety refusals, `--force`, orphaned children.
 - [Where wtm keeps its state](__BASE__/guide/state/) and [troubleshooting](__BASE__/guide/troubleshooting/): a port in use, a crashed job, a `.env` out of date.
 
 ## Agents and integrations

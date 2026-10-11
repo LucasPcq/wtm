@@ -11,15 +11,19 @@ How wtm works beyond `--help`. Every flag of every command is in `wtm <command> 
 
 ## Worktrees
 
-- **[Configuration](configuration.md)**: `config.toml`, how `.env` files are provisioned, `on_create` / `on_clean` hooks, the environment of `wtm exec`, the global config.
+- **[Creating worktrees](creating-worktrees.md)**: `wtm create` from a branch, several at once or on an existing branch, `wtm checkout` from a pull request, `wtm extract` to split uncommitted work, the wizard and `--yes`.
+- **[Stacked branches](stacked-branches.md)**: each worktree's parent, the tree and its badges, syncing a stack parents first, fast-forward, reparent, merged parents and orphans.
+- **[Removing worktrees](removing-worktrees.md)**: `clean` and `prune`, the safety refusals, `--force` and `--yes`, orphaned children, the branch and the data.
+- **[Configuration](configuration.md)**: `config.toml`, how `.env` files are provisioned, `on_create` / `on_clean` hooks, the environment of `wtm exec`, moving worktrees, the global config.
 - **[Where wtm keeps its state](state.md)**: the files under `<git-common-dir>/wtm/` and beside the global config.
 
 ## Dev stacks with `wtm run`
 
 Opt-in: nothing in this section applies until `wtm run init` writes `run.toml`.
 
-- **[How `wtm run` works](how-run-works.md)**: the job environment, ports, what `run init` proposes, compose project names.
-- **[Jobs, profiles and runners](jobs-and-profiles.md)**: services and tasks, what `run up` starts, the run view, port checks.
+- **[How `wtm run` works](how-run-works.md)**: the job environment, compose project names, what `run init` proposes, the daemon.
+- **[Ports and .env](ports-and-env.md)**: declaring ports, the port check, what `run init` detects in compose and env files, `[[env_port]]` and `[[env]]` links.
+- **[Jobs, profiles and runners](jobs-and-profiles.md)**: services and tasks, what `run up` starts, the run view, several worktrees at once.
 - **[Isolation](isolation.md)**: isolated or verbatim, what a worktree shares with its source, and `touches` for data it does not own.
 - **[Shared services](shared-services.md)**: one postgres for the repository, a namespace per worktree.
 - **[Named URLs](addressing.md)**: one address per job and worktree, the run proxy, port 80 on macOS.
@@ -32,7 +36,7 @@ Opt-in: nothing in this section applies until `wtm run init` writes `run.toml`.
 
 ## Recipes and help
 
-- **[Recipes](recipes.md)**: complete setups to copy: a pnpm/turbo monorepo, a docker compose app, a shared postgres, agents in parallel, stacked PRs, one command across worktrees.
+- **[Recipes](recipes.md)**: complete setups to copy: a pnpm/turbo monorepo, a docker compose app, a shared postgres, agents in parallel, sharing `run.toml` with the team, one command across worktrees.
 - **[Troubleshooting](troubleshooting.md)**: a port in use, a crashed job, `wtm go` not changing directory, `.env` drift, and the other usual suspects.
 
 ## Upgrading
