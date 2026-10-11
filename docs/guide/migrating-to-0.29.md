@@ -1,5 +1,7 @@
 # Migrating to 0.29
 
+0.29 lets `create` and `clean` act on several worktrees in one run. Their JSON output becomes an envelope, the wizard asks for a list of branches, and two exit codes change.
+
 ## `wtm create --output json` answers with an envelope
 
 `create` can now make several worktrees in one run, so its JSON document is always an envelope, even for a single branch.

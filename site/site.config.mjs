@@ -6,6 +6,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { guideSections } from './src/lib/guide.mjs';
+
 export const SITE = dirname(fileURLToPath(import.meta.url));
 export const REPO = dirname(SITE);
 // The site's own domain once it has one: SITE_URL, BASE, the CNAME file and the
@@ -80,8 +82,8 @@ const referenceItems = () => {
   ];
 };
 
-export const currentSidebar = [
-  { label: 'Guide', items: [{ autogenerate: { directory: 'guide' } }] },
+export const currentSidebar = () => [
+  ...guideSections(readFileSync(join(REPO, 'docs/guide/README.md'), 'utf8')),
   { label: 'Command reference', collapsed: true, items: referenceItems() },
   { slug: 'changelog' },
   { label: 'Contributing', collapsed: true, items: [{ autogenerate: { directory: 'dev' } }] },

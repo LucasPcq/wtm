@@ -1,4 +1,4 @@
-# The event stream: `wtm events`
+# The event stream
 
 `wtm events` tells whatever reads it what wtm does to a repository's worktrees and their jobs, as it happens, whoever does it: a command in another shell, an agent, or the `wtm ui` dashboard (itself one of its readers). A terminal plugin opens a pane for a new worktree, an editor closes the window of a removed one, an agent waits for a sibling to finish provisioning or learns that the server it started an hour ago crashed, all without polling `wtm list` or `wtm run ps`.
 

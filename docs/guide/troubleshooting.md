@@ -2,15 +2,6 @@
 
 Common problems, what causes them, and the command that fixes each one.
 
-- [A port is already in use](#a-port-is-already-in-use)
-- [A job is reported crashed](#a-job-is-reported-crashed)
-- [The daemon is another version](#the-daemon-is-another-version)
-- [A stack started by 0.27 is still running](#a-stack-started-by-027-is-still-running)
-- [`wtm go` does not change directory](#wtm-go-does-not-change-directory)
-- [No `run.toml` (exit 16)](#no-runtoml-exit-16)
-- [A named URL does not answer](#a-named-url-does-not-answer)
-- [A `.env` is out of date](#a-env-is-out-of-date)
-
 ## A port is already in use
 
 **Symptom.** `wtm run up` reports a job started, then `wtm run ps` shows it `crashed`, and its log ends with `Address already in use` (or `EADDRINUSE`).

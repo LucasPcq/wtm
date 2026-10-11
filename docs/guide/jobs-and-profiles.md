@@ -1,5 +1,7 @@
 # Jobs, profiles and runners
 
+A `run.toml` is made of jobs, the commands wtm starts, and profiles, the named groups `wtm run up` brings up. This page covers both, how they are run and watched, and what happens when several worktrees run at once.
+
 ```bash
 wtm run job add db  --cmd 'docker compose up -d' --stop 'docker compose down' --port DB_PORT=5432 --yes
 wtm run job add migrate --kind task --cmd 'pnpm db:migrate' --yes

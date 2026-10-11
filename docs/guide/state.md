@@ -1,5 +1,7 @@
 # Where wtm keeps its state
 
+wtm keeps its files in two places: per repository under the git common directory, and per machine beside the global config.
+
 ## Per repository: `<git-common-dir>/wtm/`
 
 Everything wtm knows about a repository lives under its git common directory (`.git/wtm/` in a normal clone). Git never commits anything inside `.git/`, so none of it reaches your teammates or `git status`.

@@ -1,5 +1,7 @@
 # Configuration
 
+How wtm creates a worktree is set once per repository by `wtm init`: where worktrees go, which branch they start from, how `.env` files reach them and which hooks run. A global config holds what is per machine.
+
 ```bash
 wtm init                       # the wizard: worktree location, base branch, .env provisioning, hooks
 wtm config show                # the resolved project config

@@ -53,7 +53,7 @@ export default defineConfig({
           exclude: archivedPages,
         }),
       ],
-      sidebar: currentSidebar,
+      sidebar: currentSidebar(),
     }),
   ],
 });

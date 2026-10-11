@@ -1,5 +1,7 @@
 # Named URLs and addressing
 
+Every job `wtm run` starts can be reached two ways: on its own port, or at a name that tells the worktree apart. This page covers both, the run proxy that serves the names, and what an address written into a `.env` holds.
+
 ```console
 $ wtm run url feat/x --job shop-api
 http://api.feat-x.myrepo.localhost:11080

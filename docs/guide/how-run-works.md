@@ -1,5 +1,7 @@
 # How `wtm run` works
 
+`wtm run` starts your dev stack once per worktree, each with its own ports, Compose project and data. This page explains the model: the jobs, the environment each one receives, the ports and the daemon that keeps them running.
+
 `wtm run init` writes `.git/wtm/run.toml` from the compose files and package scripts it detects; `wtm run up` starts it, once per worktree:
 
 ```toml

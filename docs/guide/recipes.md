@@ -2,13 +2,6 @@
 
 Complete setups for common projects. Each one shows the `run.toml` it ends with (in `.git/wtm/run.toml`) and the commands that use it. `wtm run init` writes most of this from detection; the recipes show where to take it by hand, with `wtm run job add|edit` or an editor. Every key is described in the [`run.toml` reference](run-toml.md).
 
-- [A pnpm or turbo monorepo](#a-pnpm-or-turbo-monorepo)
-- [A docker compose app](#a-docker-compose-app)
-- [One postgres, a database per worktree](#one-postgres-a-database-per-worktree)
-- [Several AI agents, each in its own worktree](#several-ai-agents-each-in-its-own-worktree)
-- [Stacked pull requests](#stacked-pull-requests)
-- [Run a command across worktrees](#run-a-command-across-worktrees)
-
 ## A pnpm or turbo monorepo
 
 One root script (`turbo run dev`, `pnpm -r --parallel run dev`) starts every app. Declare each app as a job with its own port, then the root script as a **runner** that `runs` them:

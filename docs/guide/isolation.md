@@ -1,4 +1,4 @@
-# Isolation: isolated or verbatim
+# Isolation
 
 Two worktrees of the same repository run the same services. Isolation keeps them from colliding on a port, a Docker container or a database, and each worktree decides once whether it wants it:
 
