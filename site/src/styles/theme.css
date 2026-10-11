@@ -46,3 +46,13 @@ code, kbd, pre { font-size: 0.92em; }
 .hero h1 span { display: block; font-weight: 850; font-stretch: 118%; color: var(--wtm-signature); }
 .hero .sl-link-button.primary, .hero .sl-link-button.primary:hover { background: var(--wtm-signature); border-color: var(--wtm-signature); color: var(--wtm-cta-ink); border-radius: 10px; font-weight: 700; }
 .hero img { border-radius: 0.75rem; }
+
+.hero { padding-block: 3rem 1rem; }
+.wtm-start { width: 100%; max-width: 38rem; border: 1px solid var(--sl-color-gray-5); border-radius: 14px; background: var(--sl-color-gray-6); text-align: left; }
+.wtm-start p { margin: 0; padding: 0.9rem 1.25rem 0; font: 0.75rem var(--sl-font-mono); color: var(--sl-color-gray-3); }
+.wtm-start pre { margin: 0; padding: 0.75rem 1.25rem 1.1rem; font: 0.74rem/2 var(--sl-font-mono); color: var(--sl-color-white); white-space: pre; overflow-x: auto; background: none; border: 0; }
+.wtm-start pre span { color: var(--sl-color-gray-4); }
+@media (min-width: 50rem) { .hero { grid-template-columns: 1fr 1fr; } }
+.hero > .hero-html { width: 100%; max-width: 38rem; }
+.hero .tagline { text-wrap: balance; }
+.sl-markdown-content p { text-wrap: pretty; }
