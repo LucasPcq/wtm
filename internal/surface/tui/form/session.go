@@ -35,6 +35,7 @@ type session struct {
 	preview  *dispatch.CommandReply
 	failure  error
 	stale    bool
+	width    int
 	err      error
 	program  func(components.RunWizardParams) (components.WizardModel, error)
 	loading  func(components.LoadingParams) error
@@ -144,12 +145,7 @@ func (s *session) fill() (bool, error) {
 	return ok && recap.Value() == applyValue, nil
 }
 
-func (s *session) initCmd() tea.Cmd {
-	if s.stale {
-		return tea.Batch(pending, func() tea.Msg { return staleMsg{} })
-	}
-	return pending
-}
+func (s *session) initCmd() tea.Cmd { return pending }
 
 // steps is a step per field, then the recap; the fields before the first one
 // asked are settled up front, since only the flags decide them.

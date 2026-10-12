@@ -197,7 +197,7 @@ type pathDetail struct{}
 func (pathDetail) Plan(detail json.RawMessage) []styles.PlanRow {
 	var p plan
 	_ = json.Unmarshal(detail, &p)
-	return []styles.PlanRow{{Label: "Worktrees", Value: fmt.Sprintf("%d to make", len(p.Branches))}}
+	return []styles.PlanRow{{Label: "Worktrees", Values: []string{fmt.Sprintf("%d to make", len(p.Branches))}}}
 }
 
 func (pathDetail) Item(w io.Writer, item kernel.Item[json.RawMessage]) {

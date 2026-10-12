@@ -16,6 +16,8 @@ const (
 	planText      = "Computing the plan…"
 	recapName     = "Confirm"
 	recapTitle    = "Apply this plan?"
+	failedTitle   = "Cannot apply this plan"
+	detailIndent  = "    "
 	applyLabel    = "Yes, apply"
 	applyValue    = "apply"
 	notACommand   = "the entry answered no plan"

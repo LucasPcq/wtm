@@ -69,5 +69,5 @@ func TestTheFormDrawsThePlanAsTheCommandsDetailDoes(t *testing.T) {
 	w.run(t, runParams{Args: []string{commandName, "feat/a"}, TTY: true})
 
 	assert.Equal(t, pathDetail{}, detail)
-	assert.Equal(t, []styles.PlanRow{{Label: "Worktrees", Value: "1 to make"}}, detail.Plan(json.RawMessage(`{"branches":["feat/a"]}`)))
+	assert.Equal(t, []styles.PlanRow{{Label: "Worktrees", Values: []string{"1 to make"}}}, detail.Plan(json.RawMessage(`{"branches":["feat/a"]}`)))
 }

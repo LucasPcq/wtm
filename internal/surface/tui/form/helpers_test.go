@@ -7,10 +7,12 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/require"
 
 	"github.com/LucasPcq/wtm/internal/dispatch"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/kernel"
 	"github.com/LucasPcq/wtm/internal/styles"
 	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 	"github.com/LucasPcq/wtm/internal/testutil/dispatchtest"
@@ -47,7 +49,7 @@ func newWorld(t *testing.T, r *repo, params worldParams) *world {
 		Options: params.Options,
 		Names:   func(path string) string { return "--" + path },
 		Plan: func(detail json.RawMessage) []styles.PlanRow {
-			return []styles.PlanRow{{Label: "Plan", Value: string(detail)}}
+			return []styles.PlanRow{{Label: "Plan", Values: []string{string(detail)}}}
 		},
 		Progress: progress,
 	})
@@ -164,7 +166,7 @@ func answers(cmd tea.Cmd) []tea.Msg {
 	var own []tea.Msg
 	for _, msg := range collect(cmd) {
 		switch msg.(type) {
-		case pendingMsg, staleMsg, choicesMsg, refreshedMsg, previewMsg:
+		case pendingMsg, choicesMsg, refreshedMsg, previewMsg:
 			own = append(own, msg)
 		}
 	}
@@ -222,6 +224,21 @@ func requestOf(t *testing.T, raw json.RawMessage) request {
 	var decoded request
 	require.NoError(t, json.Unmarshal(raw, &decoded))
 	return decoded
+}
+
+// recapView is the recap as the wizard draws it, alone, colours dropped.
+func (w *world) recapView(t *testing.T) string {
+	t.Helper()
+	step := w.session.recapStep()
+	step.Model, step.Build, step.OnEnter = w.session.recapModel(), nil, nil
+	d := start(t, components.RunWizardParams{Steps: []components.Step{step}})
+	return ansi.Strip(d.view())
+}
+
+func previewOf(detail string, warnings ...kernel.Warning) *dispatch.CommandReply {
+	return &dispatch.CommandReply{Result: dispatch.Result[json.RawMessage, json.RawMessage]{
+		Plan: kernel.Plan[json.RawMessage]{Detail: json.RawMessage(detail), Warnings: warnings},
+	}}
 }
 
 func dispatchDryRun() dispatch.Options { return dispatch.Options{DryRun: true} }

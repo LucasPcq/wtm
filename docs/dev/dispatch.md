@@ -19,6 +19,8 @@ created := dispatch.Register(dispatch.RegisterParams[create.Request, create.Fact
 registry := dispatch.Registry{created, dispatch.RegisterQuery(operations.Query(d.Operations))}
 ```
 
+`Register` panics on a command whose plan detail `P` is not a struct: every surface shows a plan as its fields ([output.md](output.md#a-command-on-the-engine)).
+
 `Dispatcher.Registry()` is the registry the surfaces serve, built on that dispatcher: every command with its real ports, every query. A command enters the product by its line there. The command line reads it once on a dispatcher with no `Params` for the names and the fields (that dispatcher is never run), then on the dispatcher of the repository a command runs in.
 
 `Now`, `NewOpID` and `Shield` default to the clock, a random id and `proc.Shield`; the test bench replaces them.

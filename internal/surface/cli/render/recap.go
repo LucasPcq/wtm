@@ -25,19 +25,34 @@ type RecapParams struct {
 }
 
 // Recap is what a dry run answers: the plan, then the fingerprint of the facts
-// it was computed on, which --expect-fingerprint hands back to apply it.
+// it was computed on, which --expect-fingerprint hands back to apply it. A plan
+// that does nothing offers nothing to apply.
 func Recap(w io.Writer, params RecapParams) {
 	SectionTitle(w, fmt.Sprintf(recapTitleFmt, params.Command))
 	warnings := make([]string, 0, len(params.Warnings))
 	for _, warning := range params.Warnings {
 		warnings = append(warnings, WarningMessage(warning))
 	}
-	plan := styles.RenderPlan(styles.PlanParams{Rows: params.Detail.Plan(params.Plan), Warnings: warnings})
+	rows := params.Detail.Plan(params.Plan)
+	plan := styles.RenderPlan(styles.PlanParams{Rows: rows, Warnings: warnings, Width: max(TerminalWidthOf(w)-len(Indent), 0)})
 	for line := range strings.Lines(plan) {
-		fmt.Fprintln(w, Indent+strings.TrimSuffix(line, "\n"))
+		indented(w, strings.TrimSuffix(line, "\n"))
+	}
+	if len(warnings) > 0 {
+		fmt.Fprintln(w)
 	}
 	InfoLine(w, fingerprintLabel, params.Fingerprint)
-	NextSteps(w, params.Next)
+	if len(rows) > 0 {
+		NextSteps(w, params.Next)
+	}
+}
+
+func indented(w io.Writer, line string) {
+	if line == "" {
+		fmt.Fprintln(w)
+		return
+	}
+	fmt.Fprintln(w, Indent+line)
 }
 
 // View is a query's answer as label-value rows.

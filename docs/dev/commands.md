@@ -13,7 +13,7 @@ No command is on the contract yet: `internal/flow/` ([flow-layer.md](flow-layer.
 | Request | the typed payload; its JSON names are the paths of its fields |
 | Facts | the snapshot of the repository a command reads in `Observe`, independent of the request |
 | `FieldDef` / `FieldSpec` / `FieldState` / `Choices` | a field's behaviour, its schema, its state in a form, its options |
-| `Plan[P]` | what `Apply` will do: the dry run |
+| `Plan[P]` | what `Apply` will do: the dry run; `P` is a struct, shown as its fields |
 | `Outcome[D]` | what `Apply` did: one `Item[D]` per subject, plus `FollowUps` and `Warnings` |
 | `FollowUp` | a next command proposed with its request filled in |
 | `Progress` | what a command emits while it applies, as data |

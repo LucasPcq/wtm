@@ -18,8 +18,6 @@ type pendingMsg struct{}
 
 func pending() tea.Msg { return pendingMsg{} }
 
-type staleMsg struct{}
-
 type choicesMsg struct {
 	index   int
 	key     string
@@ -44,9 +42,9 @@ func (s *session) handle(w *components.WizardModel, msg tea.Msg) (tea.Cmd, bool)
 	switch m := msg.(type) {
 	case pendingMsg:
 		return s.start(w), true
-	case staleMsg:
-		w.SetBanner(components.WizardBanner{Title: message(kernel.CodePlanStale, nil)})
-		return nil, true
+	case tea.WindowSizeMsg:
+		s.resized(w, m)
+		return nil, false
 	case choicesMsg:
 		return s.chosen(w, m), true
 	case refreshedMsg:
