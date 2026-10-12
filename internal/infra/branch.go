@@ -1,4 +1,4 @@
-// Package infra runs git and holds the wtm state that has not moved to its own package yet.
+// Package infra runs git for the commands still on flow/ and holds the wtm state that has not moved to its own package yet.
 package infra
 
 import (

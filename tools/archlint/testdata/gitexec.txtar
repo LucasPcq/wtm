@@ -1,0 +1,70 @@
+-- github.com/LucasPcq/wtm/internal/infra/proc/proc.go --
+package proc
+
+import (
+	"context"
+	"os/exec"
+)
+
+func Command(ctx context.Context, name string, args ...string) *exec.Cmd {
+	return exec.CommandContext(ctx, name, args...)
+}
+
+func GroupCommand(ctx context.Context, name string, args ...string) *exec.Cmd {
+	return exec.CommandContext(ctx, name, args...)
+}
+-- github.com/LucasPcq/wtm/internal/infra/git/repo.go --
+package git
+
+import (
+	"context"
+
+	"github.com/LucasPcq/wtm/internal/infra/proc"
+)
+
+func Run(ctx context.Context) error { return proc.Command(ctx, "git", "status").Run() }
+-- github.com/LucasPcq/wtm/internal/infra/branch.go --
+package infra
+
+import (
+	"context"
+
+	"github.com/LucasPcq/wtm/internal/infra/proc"
+)
+
+func Fetch(ctx context.Context) error {
+	return proc.Command(ctx, "git", "fetch", "origin").Run() // want `git run outside infra/git: call it through git\.Repo`
+}
+
+func Open(ctx context.Context, url string) error { return proc.Command(ctx, "open", url).Run() }
+-- github.com/LucasPcq/wtm/internal/service/bad/bad.go --
+package bad
+
+import (
+	"context"
+	"os/exec"
+
+	"github.com/LucasPcq/wtm/internal/infra/proc"
+)
+
+const program = "git"
+
+func Plain() error {
+	return exec.Command("git", "status").Run() // want `git run outside infra/git`
+}
+
+func WithContext(ctx context.Context) error {
+	return exec.CommandContext(ctx, program, "status").Run() // want `git run outside infra/git`
+}
+
+func Grouped(ctx context.Context) error {
+	return proc.GroupCommand(ctx, "git", "gc").Run() // want `git run outside infra/git`
+}
+
+func Gh(ctx context.Context) error { return proc.Command(ctx, "gh", "pr", "list").Run() }
+-- github.com/LucasPcq/wtm/internal/testutil/gittest/gittest.go --
+package gittest
+
+import "os/exec"
+
+func InitRepo(dir string) error { return exec.Command("git", "init", dir).Run() }

@@ -116,7 +116,12 @@ internal/
     execsvc/                  ←   runs one shell line in several worktrees at once
     memory/                   ←   writes the answers the wizard remembers ([wizard.remembered] in config.toml)
   styles/                     ← all Lipgloss styles (only package allowed to instantiate lipgloss.Style), and what every surface draws alike: an intro, a recap, the rows of a plan (RenderPlan)
-  infra/                      ← git, and the state not yet moved to a package of its own (repos.json)
+  infra/                      ← the git functions of the commands still on flow/, and the state not yet
+                                  moved to a package of its own (repos.json)
+    git/                      ←   the one way the engine reaches git (git.md): Repo (a directory and its
+                                  remote, -C everywhere), Reader (Worktrees, MainWorktree, Branches,
+                                  RefExists, AheadBehind) and Writer (AddWorktree, RemoveWorktree,
+                                  DeleteBranch, Fetch, FetchRef, FastForwardRef, MergeFFOnly); no decision
     fs/                       ←   the only writer of the files wtm keeps: UpdateFile (lock on <path>.lock, read,
                                   Mutate, temp file + fsync + rename), ReplaceFile for the daemon's index,
                                   WithFileLock, GlobalDir; Lock.Held says when flock was unavailable;
@@ -196,6 +201,7 @@ Two more edges are constrained beyond the diagram:
 
 - `service/x` imports `service/y` only along an edge declared in `tools/archlint` (`serviceEdges`): today `detect→branch`, `events→{process,worktree}`, `process→proxy`, `runconfig→shellcmd`, `runjobs→{process,runconfig,worktree}`, `worktree→{branch,env,github,hooks,process}`.
 - The daemon — `service/process` and `service/proxy`, which it serves — is blind to git: neither imports `service/worktree`, `service/branch`, `service/github`, `service/events` or `config`, and both call only allow-listed `infra/` functions (`fs.GlobalDir`, `fs.ReplaceFile`).
+- git is run by `infra/git` only (`gitexec`); the files at the root of `infra/` that still run it, for the commands on `flow/`, are tracked in `.archlint-migrating`.
 - A file is written through `infra/fs` only (`statewrite`): `os.WriteFile`, `os.Create` and `os.Rename` stay inside `infra/`, but for the permanent exceptions listed with their reason in `tools/archlint/statewrite.go`.
 - A service **mutator** (`worktree.Create`, `envsvc.ApplyEnvSync`, `runconfig.Save`, … — the table in `tools/archlint/chokepoint.go`) is called only from `internal/flow/`, whatever the calling layer; a call inside the mutator's own package is its implementation.
 

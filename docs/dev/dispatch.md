@@ -121,7 +121,7 @@ On the bus (`docs/guide/events.md`) an applied run sends `operation.started`, on
 
 ## Ports
 
-`kernel` imports only the stdlib, so a port never travels through its types (`kernel.ObserveScope` is data only). A command receives its ports when it is built, `create.Command(ports)`, and captures them in `Observe`, `Choices` and `Apply`. Each port is an interface declared beside what it wraps (`infra/git`, `store/`, `infra/proc`), with its double in `testutil/`; `Dispatcher.Registry` builds each command with the real ones, from the dispatcher's `Dir`. `dispatch` runs on its own ports only: `Params` above.
+`kernel` imports only the stdlib, so a port never travels through its types (`kernel.ObserveScope` is data only). A command receives its ports when it is built, `create.Command(ports)`, and captures them in `Observe`, `Choices` and `Apply`. Each port is an interface declared beside what it wraps (`infra/git`, `store/`, `infra/proc`), with its double in `testutil/`; `Dispatcher.Registry` builds each command with the real ones, from the dispatcher's `Dir`: git is `git.Reader` and `git.Writer`, built as `git.Repo{Dir: d.params.Dir, Remote: domain.OriginRemote}` and doubled by `gittest.Fake` ([git.md](git.md)). `dispatch` runs on its own ports only: `Params` above.
 
 ## What the lint holds
 
@@ -130,6 +130,6 @@ On the bus (`docs/guide/events.md`) an applied run sends `operation.started`, on
 
 ## Testing
 
-`internal/testutil/dispatchtest` runs a command through `dispatch` with no surface: `dispatchtest.New(t, BenchParams{})` is a dispatcher on doubles (a recording `Bus`, a fixed `Clock`, operations numbered `op-1`, `op-2`…, a temporary state dir), and `dispatchtest.Run(ctx, RunParams{Bench, Command, Request, Options})` returns the `Result`, the error and the `Progress` collected. A command's own ports are doubled beside the package that declares them. It replaces `flowtest` as the commands migrate.
+`internal/testutil/dispatchtest` runs a command through `dispatch` with no surface: `dispatchtest.New(t, BenchParams{})` is a dispatcher on doubles (a recording `Bus`, a fixed `Clock`, operations numbered `op-1`, `op-2`…, a temporary state dir), and `dispatchtest.Run(ctx, RunParams{Bench, Command, Request, Options})` returns the `Result`, the error and the `Progress` collected. A command's own ports are doubled in `testutil/` (git by `gittest.Fake`). It replaces `flowtest` as the commands migrate.
 
 The tests of `internal/dispatch` follow the kernel's layout, with testify: a test file per source file holding only `Test…` functions (`fill_test.go` for the `Fillable`); `fixture_test.go`, an example shaped like `create` over a fake repository; `helpers_test.go`, the helpers and `TestHelperProcess`, which holds locks from another process for the all-or-nothing test.

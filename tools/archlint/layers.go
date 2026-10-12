@@ -76,9 +76,9 @@ var layers = map[string]layer{
 		why: "the embedded JSON Schema files",
 	},
 	"testutil": {
-		internal: []string{"dispatch", "domain", "flow", "kernel", "schemas"},
+		internal: []string{"dispatch", "domain", "flow", "infra", "kernel", "schemas"},
 		external: []string{"github.com/santhosh-tekuri/jsonschema/"},
-		why:      "test doubles for the flow seams and the dispatch bench, and the validator a contract test checks a bundled schema with",
+		why:      "test doubles for the flow seams, the dispatch bench and the ports of infra/, and the validator a contract test checks a bundled schema with",
 	},
 }
 

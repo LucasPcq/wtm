@@ -154,7 +154,11 @@ internal/
     detect/                   ←   auto-detection (package manager, env files, scripts)
     integration/              ←   third-party adapters (VS Code, Cursor)
   styles/                     ← all Lipgloss styles + shared Indent constant
-  infra/                      ← git exec
+  infra/                      ← the git functions of the commands still on flow/ (gitexec migrating)
+    git/                      ←   the one way the engine reaches git (docs/dev/git.md): Repo{Dir, Remote},
+                                  Reader (Worktrees, MainWorktree, Branches, RefExists, AheadBehind),
+                                  Writer (AddWorktree, RemoveWorktree, DeleteBranch, Fetch, FetchRef,
+                                  FastForwardRef, MergeFFOnly), *git.Error; no decision
     fs/                       ←   the only writer of state files: UpdateFile (lock, read, Mutate, atomic rename);
                                   TryLocks / HoldFile for dispatch's operation locks, OpenLog
     proc/                     ←   Command, GroupCommand, Shield
@@ -175,7 +179,8 @@ internal/
                                     between flow.Step and components.Step)
       dashboard/              ←     `wtm ui`, the second surface over flow/ (its own
                                     Prompter/Presenter, mouse zones via bubblezone)
-  testutil/gittest/           ← shared test helpers (InitRepo, CreateBranch)
+  testutil/gittest/           ← real repositories for tests (InitRepo, CreateBranch, Git, Output,
+                                AddOrigin…) and Fake, git in memory: the double of git.Reader/Writer
   testutil/flowtest/          ← test doubles for the two flow seams (Prompter, Presenter)
   testutil/dispatchtest/      ← runs a command through dispatch with no surface, on doubles
 ```
@@ -897,9 +902,9 @@ Rules:
 
 ## Testing Patterns
 
-The command engine and the layers built for it (`internal/kernel/`, `infra/fs`, the
-`statefile` packages, `dispatch`, the generated command line in `surface/cli` and its
-rendering, the form in `surface/tui/form`, then `store/`, `infra/git`…) are tested with
+The command engine and the layers built for it (`internal/kernel/`, `infra/fs`, `infra/git`,
+the `statefile` packages, `dispatch`, the generated command line in `surface/cli` and its
+rendering, the form in `surface/tui/form`, then `store/`…) are tested with
 testify (`assert`, `require`): a test reads as a specification. Each test file holds
 only `Test…` functions; a package's example and fakes live in `fixture_test.go`, the
 helpers its tests share in `helpers_test.go`. A command on the engine is run in its
@@ -998,7 +1003,14 @@ edited is a behavior change, and needs to be named as one.
 ```go
 gittest.InitRepo(t)           // temp git repo with initial commit
 gittest.CreateBranch(t, dir, name) // create a local branch
+gittest.Output(t, dir, args...)    // run git, return its trimmed output
+gittest.NewFake(gittest.FakeParams{Main, Branch, Local, Remote, AheadBehind, Fail})
+                                   // git in memory, a git.Reader and git.Writer for a command's tests
 ```
+
+A layer on the engine reaches git through `git.Repo` only (`gitexec`): no `exec.Command("git", …)`,
+no `proc.Command(ctx, "git", …)` outside `internal/infra/git`. `gittest.Fake` agrees with git
+case by case (`internal/infra/git/contract_test.go`): add a case there when it learns a method.
 
 `internal/testutil/flowtest/flowtest.go`: `ScriptedPrompter` (a `flow.Prompter`) and
 `Recorder` (a `flow.Presenter`) — see above.

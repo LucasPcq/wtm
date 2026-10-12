@@ -9,6 +9,7 @@ Mandatory coding standards for `wtm`. When in doubt, consult the `go-cli` skill 
 | [`docs/dev/architecture.md`](docs/dev/architecture.md) | adding a package, an import between layers, or a `service→service` edge (annotated package map) |
 | [`docs/dev/commands.md`](docs/dev/commands.md) | touching `internal/kernel/`: the engine's contract (fields, rules, errors and their codes, results, `Each` / sagas) |
 | [`docs/dev/dispatch.md`](docs/dev/dispatch.md) | touching `internal/dispatch/`: the registry, the run order, operation locks and holders, the fingerprint, operation events, the test bench |
+| [`docs/dev/git.md`](docs/dev/git.md) | touching `internal/infra/git` or reaching git from a layer on the engine (`git.Repo`, `Reader` / `Writer`, `Ref`, `*git.Error`, the double `gittest.Fake`, `gitexec`) |
 | [`docs/dev/state-files.md`](docs/dev/state-files.md) | writing any file, or changing the format of a state file (`fs.UpdateFile`, `fs.Change`, locks, schema versions) |
 | [`docs/dev/form.md`](docs/dev/form.md) | touching `internal/surface/tui/form`: the interactive form of a command on the engine (its loop over `dispatch`, which field it asks, a field per type, remembering, the recap and the run) |
 | [`docs/dev/flow-layer.md`](docs/dev/flow-layer.md) | touching anything under `internal/flow/`, a Prompter/Presenter, a step kind, or the dashboard's run of a flow |
@@ -100,7 +101,9 @@ internal/
   flow/         each command's flow, surface-independent (one package per command)
   service/      impure orchestration: git exec, I/O, hooks, the run daemon, the event bus
   styles/       all Lipgloss styles
-  infra/        git exec; fs/ the only writer of state files (UpdateFile), proc/ processes and the Shield
+  infra/        git/ the one way the engine reaches git (git.Repo); fs/ the only writer of state files
+                (UpdateFile), proc/ processes and the Shield; at its root, the git functions of the
+                commands still on flow/
   surface/      the interfaces
     cli/        the root (signals, --quiet, exit code); the commands generated from the
                 dispatch registry (cli.Bind); flag wiring → flow for the others (zero business logic)
@@ -126,6 +129,7 @@ The annotated map of every sub-package is in `docs/dev/architecture.md`.
 - `service/x` imports `service/y` only along an edge declared in `tools/archlint` (`serviceEdges`).
 - The daemon (`service/process`, `service/proxy`) is blind to git: no `service/worktree|branch|github|events`, no `config`, only allow-listed `infra/` functions.
 - A service **mutator** (the table in `tools/archlint/chokepoint.go`) is called only from `internal/flow/`.
+- git is run by `infra/git` only (`gitexec`): a layer on the engine reaches it through `git.Reader` / `git.Writer`; the git functions at the root of `infra/`, for the commands still on `flow/`, are tracked in `.archlint-migrating` and leave with their last caller. See `docs/dev/git.md`.
 - A file is written through `infra/fs` only: `fs.UpdateFile(ctx, {Path, Mutate})` (lock, read, `Mutate` decides an `fs.Change`, atomic rename), never `os.WriteFile`/`os.Create`/`os.Rename` outside `infra/` (`statewrite`). A state file carries `schema` (absent = 1, written from 2 on) and a write refuses a newer one (`*statefile.NewerError`, exit 22). See `docs/dev/state-files.md`.
 
 **Every new worktree-mutating command goes through flow/** — no exception. Declare `Request`/`Outcome`/`Presenter`/`Params`/`Run` in `internal/flow/<cmd>/` and its questions as `flow.Step` in `steps.go`; the runner in `surface/cli/` is only flags → `Request` → pick the Prompter and Presenter → `<cmd>.Run`. A runner that inspects state, orders service calls or gates a picker on `interactive` has put the flow in the wrong layer. A flow never frames, never animates, never picks a stream, and **returns** errors rather than presenting them. Recipe: `docs/dev/adding-a-mutation-command.md`; seams and step model: `docs/dev/flow-layer.md`.
@@ -166,7 +170,7 @@ make release-notes VERSION=x.y.z   # print a CHANGELOG section as release notes
 make dupl          # clone report, informative only
 ```
 
-- Tests of the engine and of the layers built for it (`internal/kernel/`, `infra/fs`, the `statefile` packages, `dispatch`, the generated command line in `surface/cli` and its rendering, the form in `surface/tui/form`, then `store/`, `infra/git`…) use testify (`assert`, `require`); each test file holds only `Test…` functions, the example and fakes in `fixture_test.go`, shared helpers in `helpers_test.go`. The rest of the repository keeps stdlib `testing`.
+- Tests of the engine and of the layers built for it (`internal/kernel/`, `infra/fs`, `infra/git`, the `statefile` packages, `dispatch`, the generated command line in `surface/cli` and its rendering, the form in `surface/tui/form`, then `store/`…) use testify (`assert`, `require`); each test file holds only `Test…` functions, the example and fakes in `fixture_test.go`, shared helpers in `helpers_test.go`. The rest of the repository keeps stdlib `testing`.
 - A new architectural rule goes into `tools/archlint`, not into a paragraph here. `.archlint-migrating` and `.deadcode-ignore` may only shrink; a new entry needs a stated reason. See `docs/dev/lint.md`.
 - `.claude/hooks/pre-commit-gates.sh` runs `make lint` and a `go mod tidy` check on every `git commit` and blocks it on failure. It does not run the tests. `WTM_SKIP_GATES=1 git commit …` only when the gate itself is wrong.
 - **Invoke the `build-validator` subagent before marking any task done** — it adds the `-race` test suite, dependency hygiene and the duplication report.
