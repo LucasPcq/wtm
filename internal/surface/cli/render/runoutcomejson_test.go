@@ -3,10 +3,9 @@ package render_test
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/charmbracelet/x/ansi"
 	"strings"
 	"testing"
-
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow/runlogs"
