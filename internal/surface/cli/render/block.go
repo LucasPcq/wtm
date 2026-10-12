@@ -253,6 +253,10 @@ type AnnounceItem struct {
 // vertical padding.
 func Announce(w io.Writer, title string, items []AnnounceItem) {
 	SectionTitle(w, title)
+	announceRows(w, items)
+}
+
+func announceRows(w io.Writer, items []AnnounceItem) {
 	width := 0
 	for _, item := range items {
 		width = max(width, len(item.Label))

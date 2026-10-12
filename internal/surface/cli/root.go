@@ -358,22 +358,35 @@ func settle() {
 func Execute() {
 	ctx, stop := interruptible()
 	defer stop()
-	executed, runErr := rootCmd.ExecuteContextC(ctx)
-	runErr = rules.BackedOut(rules.BackedOutParams{Err: runErr, Cancelled: executed != nil && shared.Cancelled(executed)})
-	err := rules.Interrupted(rules.InterruptedParams{Err: runErr, Signalled: ctx.Err() != nil})
-	settle()
-	if err != nil {
-		// ErrAborted means the command already printed its own report; just
-		// propagate the non-zero exit without a second error line — unless --quiet
-		// discarded that report, in which case this is the only line there is.
-		if !errors.Is(err, domain.ErrAborted) || humanOutputSilenced {
-			render.Blank(os.Stderr)
-			reportFailure(os.Stderr, err)
-			render.Blank(os.Stderr)
-		}
-		printUpdateNotice(ctx)
-		os.Exit(rules.ExitCode(err))
-	}
-
+	code := execute(ctx, executeParams{Root: rootCmd, Stderr: os.Stderr})
 	printUpdateNotice(ctx)
+	if code != domain.ExitCodeOK {
+		os.Exit(code)
+	}
+}
+
+type executeParams struct {
+	Root   *cobra.Command
+	Stderr io.Writer
+}
+
+// execute runs the tree and answers the exit code, once nothing it started is
+// left running.
+func execute(ctx context.Context, params executeParams) int {
+	executed, runErr := params.Root.ExecuteContextC(ctx)
+	backedOut := rules.BackedOut(rules.BackedOutParams{Err: runErr, Cancelled: executed != nil && shared.Cancelled(executed)})
+	err := rules.Interrupted(rules.InterruptedParams{Err: backedOut, Signalled: ctx.Err() != nil})
+	settle()
+	if err == nil {
+		return domain.ExitCodeOK
+	}
+	// ErrAborted means the command already printed its own report; just
+	// propagate the non-zero exit without a second error line — unless --quiet
+	// discarded that report, in which case this is the only line there is.
+	if !errors.Is(err, domain.ErrAborted) || humanOutputSilenced {
+		render.Blank(params.Stderr)
+		reportFailure(params.Stderr, err)
+		render.Blank(params.Stderr)
+	}
+	return exitCode(err)
 }

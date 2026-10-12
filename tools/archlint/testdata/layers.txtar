@@ -59,6 +59,17 @@ import (
 )
 
 func Message() bool { return shared.Interactive() }
+-- github.com/LucasPcq/wtm/internal/surface/cli/render/engine.go --
+package render
+
+import (
+	"github.com/LucasPcq/wtm/internal/dispatch" // want `internal/surface/cli/render must not import "github.com/LucasPcq/wtm/internal/dispatch" — formats and prints`
+	"github.com/LucasPcq/wtm/internal/kernel"
+)
+
+var _ kernel.Code
+
+var _ = dispatch.Run
 -- github.com/LucasPcq/wtm/internal/surface/cli/wt/wt.go --
 package wt
 
@@ -77,3 +88,5 @@ import (
 var _, _ = infra.GlobalDir, worktree.Create
 
 var _ kernel.Code
+
+func Run() {}

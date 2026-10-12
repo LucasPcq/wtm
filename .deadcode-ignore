@@ -6,3 +6,7 @@
 # its step models as `any` and type-asserts `rowless` on them.
 TextInputModel\.helpRowless
 TextListModel\.helpRowless
+#
+# Foundations of the command engine (LUC-283) that the pilot `create` consumes
+# (step 3): no command is generated from the registry before it.
+^internal/surface/cli/bind\.go:.*unreachable func: Bind$
