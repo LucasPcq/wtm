@@ -90,3 +90,15 @@ var _, _ = infra.GlobalDir, worktree.Create
 var _ kernel.Code
 
 func Run() {}
+-- github.com/LucasPcq/wtm/internal/surface/tui/form/form.go --
+package form
+
+import (
+	"github.com/LucasPcq/wtm/internal/dispatch"
+	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/service/worktree" // want `internal/surface/tui/form must not import "github.com/LucasPcq/wtm/internal/service/worktree" — the form of a command on the engine`
+)
+
+var _, _ = dispatch.Run, worktree.Create
+
+var _ kernel.Code

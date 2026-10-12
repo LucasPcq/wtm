@@ -11,7 +11,7 @@ import (
 
 func TestAFieldsPathIsItsJSONNameDottedThroughNestedStructs(t *testing.T) {
 	assert.Equal(t,
-		[]string{"branches", "from", "isolation", "push", "no_push", "url_host", "url_port", "decisions", "target.from"},
+		[]string{"branches", "from", "isolation", "push", "no_push", "url_host", "url_port", "decisions", "target.from", "remember"},
 		kernel.Paths[request]())
 }
 

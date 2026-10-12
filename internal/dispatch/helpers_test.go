@@ -89,3 +89,11 @@ func TestHelperProcess(t *testing.T) {
 	})
 	require.NoError(t, ran.Err)
 }
+
+// fillable is the example's entry as a form fills it.
+func fillable(t testing.TB, h *dispatch.Handle[request, facts, plan, string]) dispatch.Fillable {
+	t.Helper()
+	f, ok := h.Fillable()
+	require.True(t, ok)
+	return f
+}

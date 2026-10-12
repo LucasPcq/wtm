@@ -20,6 +20,7 @@ type Engine struct {
 	registry   func(*dispatch.Dispatcher) dispatch.Registry
 	dispatcher func(context.Context) (*dispatch.Dispatcher, error)
 	form       Form
+	confirm    Confirm
 	bindings   map[string]*binding
 }
 
@@ -27,10 +28,11 @@ type EngineParams struct {
 	Registry   func(*dispatch.Dispatcher) dispatch.Registry
 	Dispatcher func(context.Context) (*dispatch.Dispatcher, error)
 	Form       Form
+	Confirm    Confirm
 }
 
 func NewEngine(params EngineParams) *Engine {
-	return &Engine{registry: params.Registry, dispatcher: params.Dispatcher, form: params.Form, bindings: map[string]*binding{}}
+	return &Engine{registry: params.Registry, dispatcher: params.Dispatcher, form: params.Form, confirm: params.Confirm, bindings: map[string]*binding{}}
 }
 
 // Form runs a command interactively: it fills the request, shows the plan and
@@ -39,14 +41,28 @@ func NewEngine(params EngineParams) *Engine {
 type Form func(ctx context.Context, params FormParams) (dispatch.Reply, error)
 
 type FormParams struct {
-	Entry    dispatch.Entry
+	Entry    dispatch.Fillable
 	Request  json.RawMessage
 	Options  dispatch.Options
 	Names    render.Names
+	Detail   render.Detail
 	Progress kernel.Emitter
 }
 
-var production = NewEngine(EngineParams{Registry: (*dispatch.Dispatcher).Registry, Dispatcher: projectDispatcher})
+// Confirm asks whether to run a follow-up once an interactive run concluded.
+type Confirm func(params ConfirmParams) (bool, error)
+
+type ConfirmParams struct {
+	Command string
+	Note    string
+}
+
+var production = NewEngine(EngineParams{
+	Registry:   (*dispatch.Dispatcher).Registry,
+	Dispatcher: projectDispatcher,
+	Form:       interactiveForm,
+	Confirm:    confirmFollowUp,
+})
 
 // projectDispatcher runs on the repository the command is run from: its main
 // worktree, its state directory, its event bus.
