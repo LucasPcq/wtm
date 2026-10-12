@@ -1,5 +1,5 @@
-// Package cmd defines the Cobra command tree for the wtm CLI.
-package cmd
+// Package cli is the command line: the Cobra tree, its run and its exit code.
+package cli
 
 import (
 	"context"
