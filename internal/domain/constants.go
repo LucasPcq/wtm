@@ -2321,6 +2321,11 @@ const (
 	// <state-dir>/worktrees/<branch>/.
 	MetaFileName = "meta.json"
 
+	// The .env files create could not provision as their strategy asked, on stderr.
+	EnvNoTemplateWarningFmt     = "warning: no template found for %s, skipping\n"
+	EnvSourceMissingWarningFmt  = "warning: %s not found in %s, skipping\n"
+	EnvParentFallbackWarningFmt = "warning: %s not found in parent worktree, falling back to main\n"
+
 	// Cobra group IDs — one per section of the root --help output.
 	CmdGroupWorktrees = "worktrees"
 	CmdGroupNavigate  = "navigate"

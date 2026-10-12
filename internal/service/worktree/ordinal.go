@@ -10,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/store"
 )
 
 // WorktreeRef names one worktree: the repository it belongs to, where its state
@@ -125,12 +126,12 @@ func claimFrom(params claimFromParams) (claim, error) {
 }
 
 func persistOrdinal(ctx context.Context, params WorktreeRef, ordinal int) (int, error) {
-	err := updateMetadata(ctx, updateMetadataParams{
-		StateDir: params.StateDir,
-		Branch:   params.Branch,
-		Update: func(meta domain.WorktreeMetadata, _ error) (domain.WorktreeMetadata, error) {
+	err := (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
+		Branch:  params.Branch,
+		Missing: store.MissingCreate,
+		Change: func(meta *domain.WorktreeMetadata) error {
 			meta.Ordinal = ordinal
-			return meta, nil
+			return nil
 		},
 	})
 	if err != nil {
@@ -183,9 +184,5 @@ func otherHolders(params otherHoldersParams) ([]rules.OrdinalHolder, error) {
 // ever deletes — leaving it behind would keep its ordinal reserved for good.
 // Best effort: leftover state is not worth failing a removal that happened.
 func purgeState(ref WorktreeRef) {
-	dir := rules.PurgeableMetaDir(rules.PurgeableMetaDirParams{StateDir: ref.StateDir, Branch: ref.Branch})
-	if dir == "" {
-		return
-	}
-	_ = os.RemoveAll(dir)
+	_ = (store.MetaDisk{StateDir: ref.StateDir}).Purge(ref.Branch)
 }

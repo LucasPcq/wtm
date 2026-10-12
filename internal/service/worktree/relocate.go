@@ -2,17 +2,16 @@ package worktree
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
+	"github.com/LucasPcq/wtm/internal/store"
 )
 
 type PlanRelocateParams struct {
@@ -67,16 +66,13 @@ type AdoptParams struct {
 // has to give back. The ordinal is left for the run module to allocate on
 // first use, as for a created worktree.
 func Adopt(ctx context.Context, params AdoptParams) error {
-	return updateMetadata(ctx, updateMetadataParams{
-		StateDir: params.StateDir,
-		Branch:   params.Branch,
-		Update: func(metadata domain.WorktreeMetadata, readErr error) (domain.WorktreeMetadata, error) {
-			if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
-				return domain.WorktreeMetadata{}, fmt.Errorf("read metadata for %s: %w", params.Branch, readErr)
-			}
+	return (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
+		Branch:  params.Branch,
+		Missing: store.MissingCreate,
+		Change: func(metadata *domain.WorktreeMetadata) error {
 			metadata.SourceBranch = params.Parent
 			metadata.CreatedAt = time.Now().UTC().Format(time.RFC3339)
-			return metadata, nil
+			return nil
 		},
 	})
 }
@@ -92,9 +88,8 @@ type SetBasePathParams struct {
 // have emptied it. os.Remove leaves a directory that still holds anything —
 // a worktree a refusal kept there, or files that are not wtm's.
 func SetBasePath(ctx context.Context, params SetBasePathParams) error {
-	if err := config.UpdateProjectConfig(ctx, config.UpdateProjectConfigParams{
-		StateDir: params.StateDir,
-		Update:   func(project *domain.ProjectConfig) { project.Worktrees.BasePath = params.BasePath },
+	if err := (store.ConfigDisk{StateDir: params.StateDir}).Update(ctx, func(project *domain.ProjectConfig) {
+		project.Worktrees.BasePath = params.BasePath
 	}); err != nil {
 		return fmt.Errorf("update config base_path: %w", err)
 	}

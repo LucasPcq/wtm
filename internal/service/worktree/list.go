@@ -2,9 +2,7 @@ package worktree
 
 import (
 	"context"
-	"encoding/json"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -106,15 +104,10 @@ func buildStatus(ctx context.Context, params buildStatusParams) domain.WorktreeS
 // meta.json. Falls back to the worktree directory mtime when meta is absent
 // (e.g. worktrees created outside wtm).
 func worktreeCreatedAt(stateDir, branch, fallbackPath string) time.Time {
-	metaPath := filepath.Join(rules.WorktreeMetaDir(stateDir, branch), domain.MetaFileName)
-	data, err := os.ReadFile(metaPath)
-	if err == nil {
-		var meta domain.WorktreeMetadata
-		if json.Unmarshal(data, &meta) == nil && meta.CreatedAt != "" {
-			t, parseErr := time.Parse(time.RFC3339, meta.CreatedAt)
-			if parseErr == nil {
-				return t
-			}
+	meta, err := loadMetadata(stateDir, branch)
+	if err == nil && meta.CreatedAt != "" {
+		if t, parseErr := time.Parse(time.RFC3339, meta.CreatedAt); parseErr == nil {
+			return t
 		}
 	}
 

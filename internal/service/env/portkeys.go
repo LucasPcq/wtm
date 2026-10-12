@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/store"
 )
 
 type WritePortKeysParams struct {
@@ -61,18 +61,12 @@ type upsertEnvKeyParams struct {
 }
 
 func upsertEnvKey(ctx context.Context, params upsertEnvKeyParams) (bool, error) {
-	if !params.Create && !fs.FileExists(params.Path) {
-		return false, nil
-	}
-
-	lines, err := readEnvFile(params.Path)
-	if err != nil {
-		return false, err
-	}
-
-	updated, changed := rules.UpsertEnvPair(rules.UpsertEnvPairParams{Lines: lines, Key: params.Key, Value: params.Value})
-	if !changed {
-		return false, nil
-	}
-	return true, writeEnvFile(ctx, writeEnvFileParams{Path: params.Path, Content: rules.RenderEnv(updated)})
+	return store.EnvDisk{}.Edit(ctx, store.EnvEdit{
+		Path:   params.Path,
+		Create: params.Create,
+		Edit: func(lines []domain.EnvLine) []domain.EnvLine {
+			updated, _ := rules.UpsertEnvPair(rules.UpsertEnvPairParams{Lines: lines, Key: params.Key, Value: params.Value})
+			return updated
+		},
+	})
 }

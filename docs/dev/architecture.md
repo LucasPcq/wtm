@@ -24,7 +24,11 @@ internal/
   query/
     operations/               ←   the operations in progress, read from their holder files
   config/                     ← load & validate config.toml + run.toml from <git-common-dir>/wtm/, plus the global config (config.GlobalPath);
-                                every write puts the file's JSON schema (schemas/) beside it
+                                every write puts the file's JSON schema (schemas/) beside it; ReviseProject is
+                                config.toml with a change applied, for store/ to write
+  store/                      ← the one writer of each state file (store.md): Meta (meta.json: Load, Records,
+                                Update, Purge), ProjectConfig (config.toml: Remember, ConfigDisk.Update),
+                                EnvFiles (the .env files: Copy, Edit), each on disk and doubled in testutil/storetest
   flow/                       ← the flow of each command, surface-independent (see below):
                                 the vocabulary (Step, Session, Prompter, Presenter, Publisher)
     publish/                  ←   the event a flow publishes after a change to a worktree's
@@ -114,7 +118,7 @@ internal/
     portprobe/                ←   is anything listening on a port
     shellcmd/                 ←   checks that a config command is a valid /bin/sh line
     execsvc/                  ←   runs one shell line in several worktrees at once
-    memory/                   ←   writes the answers the wizard remembers ([wizard.remembered] in config.toml)
+    memory/                   ←   the answers the wizard remembers ([wizard.remembered] in config.toml), through store/
   styles/                     ← all Lipgloss styles (only package allowed to instantiate lipgloss.Style), and what every surface draws alike: an intro, a recap, the rows of a plan (RenderPlan)
   infra/                      ← the git functions of the commands still on flow/, and the state not yet
                                   moved to a package of its own (repos.json)
@@ -202,6 +206,7 @@ Two more edges are constrained beyond the diagram:
 - `service/x` imports `service/y` only along an edge declared in `tools/archlint` (`serviceEdges`): today `detect→branch`, `events→{process,worktree}`, `process→proxy`, `runconfig→shellcmd`, `runjobs→{process,runconfig,worktree}`, `worktree→{branch,env,github,hooks,process}`.
 - The daemon — `service/process` and `service/proxy`, which it serves — is blind to git: neither imports `service/worktree`, `service/branch`, `service/github`, `service/events` or `config`, and both call only allow-listed `infra/` functions (`fs.GlobalDir`, `fs.ReplaceFile`).
 - git is run by `infra/git` only (`gitexec`); the files at the root of `infra/` that still run it, for the commands on `flow/`, are tracked in `.archlint-migrating`.
+- `store/` imports `config/`, `domain/`, `infra/` and `rules/`; `service/` and `testutil/` reach it, `flow/` never does. An exported function of `service/worktree` that reaches a write of `store.Meta` is a mutator (`metawriter`).
 - A file is written through `infra/fs` only (`statewrite`): `os.WriteFile`, `os.Create` and `os.Rename` stay inside `infra/`, but for the permanent exceptions listed with their reason in `tools/archlint/statewrite.go`.
 - A service **mutator** (`worktree.Create`, `envsvc.ApplyEnvSync`, `runconfig.Save`, … — the table in `tools/archlint/chokepoint.go`) is called only from `internal/flow/`, whatever the calling layer; a call inside the mutator's own package is its implementation.
 

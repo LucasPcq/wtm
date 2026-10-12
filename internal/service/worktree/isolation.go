@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/config"
+	"github.com/LucasPcq/wtm/internal/store"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
@@ -48,12 +49,12 @@ func SetIsolation(ctx context.Context, params SetIsolationParams) error {
 		return mainIsolation(params.Isolation)
 	}
 
-	return updateMetadata(ctx, updateMetadataParams{
-		StateDir: params.Ref.StateDir,
-		Branch:   params.Ref.Branch,
-		Update: func(meta domain.WorktreeMetadata, _ error) (domain.WorktreeMetadata, error) {
+	return (store.MetaDisk{StateDir: params.Ref.StateDir}).Update(ctx, store.MetaUpdate{
+		Branch:  params.Ref.Branch,
+		Missing: store.MissingCreate,
+		Change: func(meta *domain.WorktreeMetadata) error {
 			meta.Isolation = rules.EffectiveIsolation(params.Isolation)
-			return meta, nil
+			return nil
 		},
 	})
 }

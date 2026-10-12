@@ -1,14 +1,9 @@
 package worktree
 
 import (
-	"encoding/json"
-	"net/url"
-	"os"
-	"path/filepath"
 	"slices"
-	"sort"
 
-	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/store"
 )
 
 type NamespaceHoldersParams struct {
@@ -17,35 +12,17 @@ type NamespaceHoldersParams struct {
 }
 
 // NamespaceHolders names the worktrees whose meta.json records a namespace in
-// this shared job. It reads every record on disk rather than the live
-// worktrees: a record is what clean drops by, whether or not git still lists
-// the worktree.
+// this shared job, sorted.
 func NamespaceHolders(params NamespaceHoldersParams) []string {
-	root := filepath.Join(params.StateDir, domain.WorktreesSubdir)
-	entries, err := os.ReadDir(root)
+	records, err := (store.MetaDisk{StateDir: params.StateDir}).Records()
 	if err != nil {
 		return nil
 	}
-
 	var holders []string
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
+	for _, record := range records {
+		if slices.Contains(record.Meta.Namespaces, params.Job) {
+			holders = append(holders, record.Branch)
 		}
-		data, err := os.ReadFile(filepath.Join(root, entry.Name(), domain.MetaFileName))
-		if err != nil {
-			continue
-		}
-		var meta domain.WorktreeMetadata
-		if json.Unmarshal(data, &meta) != nil || !slices.Contains(meta.Namespaces, params.Job) {
-			continue
-		}
-		branch, err := url.PathUnescape(entry.Name())
-		if err != nil {
-			branch = entry.Name()
-		}
-		holders = append(holders, branch)
 	}
-	sort.Strings(holders)
 	return holders
 }

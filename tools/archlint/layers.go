@@ -38,8 +38,12 @@ var layers = map[string]layer{
 		external: []string{"github.com/BurntSushi/toml"},
 		why:      "load and validate the config files",
 	},
-	"service": {
+	"store": {
 		internal: []string{"config", "domain", "infra", "rules"},
+		why:      "the one writer of each state file: config/ keeps loading and validating, store/ writes",
+	},
+	"service": {
+		internal: []string{"config", "domain", "infra", "rules", "store"},
 		external: []string{"github.com/creack/pty", "go.yaml.in/yaml/v3"},
 		why:      "impure orchestration: no cobra, no bubbletea, no lipgloss",
 	},
@@ -76,9 +80,9 @@ var layers = map[string]layer{
 		why: "the embedded JSON Schema files",
 	},
 	"testutil": {
-		internal: []string{"dispatch", "domain", "flow", "infra", "kernel", "schemas"},
+		internal: []string{"dispatch", "domain", "flow", "infra", "kernel", "rules", "schemas", "store"},
 		external: []string{"github.com/santhosh-tekuri/jsonschema/"},
-		why:      "test doubles for the flow seams, the dispatch bench and the ports of infra/, and the validator a contract test checks a bundled schema with",
+		why:      "test doubles for the flow seams, the dispatch bench and the ports of infra/ and store/, and the validator a contract test checks a bundled schema with",
 	},
 }
 

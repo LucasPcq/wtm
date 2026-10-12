@@ -300,14 +300,13 @@ func TestWriteProjectConfigEmptyEnvStaysCommented(t *testing.T) {
 
 func TestEnvFilesWithoutAStrategyStayLiveAndTakeTheDefault(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, domain.ConfigFileName, minimalToml)
-
-	err := UpdateProjectConfig(t.Context(), UpdateProjectConfigParams{StateDir: dir, Update: func(project *domain.ProjectConfig) {
+	revised, err := ReviseProject(ReviseProjectParams{Path: filepath.Join(dir, domain.ConfigFileName), Current: []byte(minimalToml), Update: func(project *domain.ProjectConfig) {
 		project.Env.Files = []domain.EnvFile{{Target: ".env"}}
 	}})
 	if err != nil {
-		t.Fatalf("UpdateProjectConfig: %v", err)
+		t.Fatalf("ReviseProject: %v", err)
 	}
+	writeFile(t, dir, domain.ConfigFileName, string(revised))
 
 	data, _ := os.ReadFile(filepath.Join(dir, domain.ConfigFileName))
 	if strings.Contains(string(data), "\nstrategy = ") {

@@ -7,6 +7,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/store"
 )
 
 // ReparentBatch changes the recorded parent (source_branch) of one or more worktrees
@@ -100,16 +101,12 @@ type setSourceBranchParams struct {
 // preserving CreatedAt and EnvStrategy.
 func setSourceBranch(ctx context.Context, params setSourceBranchParams) (domain.ReparentResult, error) {
 	old := ""
-	err := updateMetadata(ctx, updateMetadataParams{
-		StateDir: params.StateDir,
-		Branch:   params.Branch,
-		Update: func(meta domain.WorktreeMetadata, readErr error) (domain.WorktreeMetadata, error) {
-			if readErr != nil {
-				return domain.WorktreeMetadata{}, fmt.Errorf("read metadata for %s: %w", params.Branch, readErr)
-			}
+	err := (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
+		Branch: params.Branch,
+		Change: func(meta *domain.WorktreeMetadata) error {
 			old = meta.SourceBranch
 			meta.SourceBranch = params.NewParent
-			return meta, nil
+			return nil
 		},
 	})
 	if err != nil {

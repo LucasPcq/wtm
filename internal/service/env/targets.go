@@ -3,8 +3,8 @@ package env
 import (
 	"context"
 
-	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/store"
 )
 
 type AddEnvTargetsParams struct {
@@ -14,10 +14,7 @@ type AddEnvTargetsParams struct {
 
 // AddEnvTargets appends provisioning targets to config.toml as it is on disk.
 func AddEnvTargets(ctx context.Context, params AddEnvTargetsParams) error {
-	return config.UpdateProjectConfig(ctx, config.UpdateProjectConfigParams{
-		StateDir: params.StateDir,
-		Update: func(project *domain.ProjectConfig) {
-			project.Env.Files = append(project.Env.Files, params.Targets...)
-		},
+	return store.ConfigDisk{StateDir: params.StateDir}.Update(ctx, func(project *domain.ProjectConfig) {
+		project.Env.Files = append(project.Env.Files, params.Targets...)
 	})
 }

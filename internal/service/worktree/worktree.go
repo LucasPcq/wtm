@@ -3,22 +3,20 @@ package worktree
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	domainstatefile "github.com/LucasPcq/wtm/internal/domain/statefile"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/infra/proc"
 	"github.com/LucasPcq/wtm/internal/rules"
-	"github.com/LucasPcq/wtm/internal/rules/statefile"
 	"github.com/LucasPcq/wtm/internal/service/branch"
-	"github.com/LucasPcq/wtm/internal/service/env"
 	"github.com/LucasPcq/wtm/internal/service/hooks"
+	"github.com/LucasPcq/wtm/internal/store"
 )
 
 // Create orchestrates worktree creation: git worktree add, env copy, metadata, hooks.
@@ -92,7 +90,7 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 
 	envFiles := params.Config.Project.Env.Files
 	if len(envFiles) > 0 {
-		copyErr := env.CopyEnvFiles(ctx, env.CopyEnvFilesParams{
+		warnings, copyErr := store.EnvDisk{}.Copy(ctx, store.EnvCopy{
 			Strategy:           strategy,
 			Files:              envFiles,
 			TargetDir:          worktreePath,
@@ -102,6 +100,7 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 		if copyErr != nil {
 			return domain.CreateResult{}, fmt.Errorf("copy env files: %w", copyErr)
 		}
+		warnEnv(os.Stderr, warnings)
 	}
 
 	// No ordinal: it is the run module's, allocated the first time something
@@ -114,11 +113,12 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 		Isolation:    rules.EffectiveIsolation(params.Isolation),
 	}
 
-	if err := updateMetadata(ctx, updateMetadataParams{
-		StateDir: params.StateDir,
-		Branch:   params.Branch,
-		Update: func(domain.WorktreeMetadata, error) (domain.WorktreeMetadata, error) {
-			return metadata, nil
+	if err := (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
+		Branch:  params.Branch,
+		Missing: store.MissingCreate,
+		Change: func(stored *domain.WorktreeMetadata) error {
+			*stored = metadata
+			return nil
 		},
 	}); err != nil {
 		return domain.CreateResult{}, err
@@ -242,55 +242,15 @@ func occupantOf(ctx context.Context, params occupantParams) (string, error) {
 	return "", nil
 }
 
-type updateMetadataParams struct {
-	StateDir string
-	Branch   string
-	// KeepMissing leaves a worktree without a record without one: the main
-	// checkout never gets a meta.json.
-	KeepMissing bool
-	// Update receives the record on disk, or the zero record with the error
-	// that kept it from being read (os.ErrNotExist when there is none), and
-	// returns the record to write; one returned unchanged is not rewritten.
-	Update func(stored domain.WorktreeMetadata, readErr error) (domain.WorktreeMetadata, error)
-}
-
-// updateMetadata is the one write of a worktree's meta.json: a read-modify-write
-// under the file's lock, so two commands changing different fields of the same
-// worktree both land.
-func updateMetadata(ctx context.Context, params updateMetadataParams) error {
-	path := filepath.Join(rules.WorktreeMetaDir(params.StateDir, params.Branch), domain.MetaFileName)
-	_, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
-		Path: path,
-		Mutate: func(current []byte) (fs.Change, error) {
-			if current == nil && params.KeepMissing {
-				return fs.Keep{}, nil
-			}
-			stored, readErr := decodeMetadata(current)
-			if err := statefile.Refusal(statefile.Schema{Path: path, Found: stored.Schema, Supported: domainstatefile.MetaSchema}); err != nil {
-				return nil, err
-			}
-			next, err := params.Update(stored, readErr)
-			if err != nil {
-				return nil, err
-			}
-			next.Schema = statefile.Written(domainstatefile.MetaSchema)
-			data, err := json.MarshalIndent(next, "", "  ")
-			if err != nil {
-				return nil, fmt.Errorf("marshal metadata: %w", err)
-			}
-			return fs.Write{Data: data}, nil
-		},
-	})
-	return err
-}
-
-func decodeMetadata(data []byte) (domain.WorktreeMetadata, error) {
-	if data == nil {
-		return domain.WorktreeMetadata{}, os.ErrNotExist
+func warnEnv(w io.Writer, warnings []store.EnvWarning) {
+	for _, warning := range warnings {
+		switch warning := warning.(type) {
+		case store.NoTemplate:
+			fmt.Fprintf(w, domain.EnvNoTemplateWarningFmt, warning.Target)
+		case store.SourceMissing:
+			fmt.Fprintf(w, domain.EnvSourceMissingWarningFmt, warning.Target, warning.Dir)
+		case store.ParentFallback:
+			fmt.Fprintf(w, domain.EnvParentFallbackWarningFmt, warning.Target)
+		}
 	}
-	var meta domain.WorktreeMetadata
-	if err := json.Unmarshal(data, &meta); err != nil {
-		return domain.WorktreeMetadata{}, err
-	}
-	return meta, nil
 }

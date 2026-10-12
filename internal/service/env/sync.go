@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/store"
 )
 
 // envPaths are the resolved locations + strategy shared by the compute and apply
@@ -489,15 +489,22 @@ func applyFile(ctx context.Context, paths envPaths, c *computedFile, res EnvReso
 	reconciled := rules.ApplyEnvDiff(diff)
 	c.diff = rules.EnvDiffActions(diff)
 
-	rendered := rules.RenderEnv(reconciled)
-	if rendered == rules.RenderEnv(c.child) && !c.created {
+	if rules.RenderEnv(reconciled) == rules.RenderEnv(c.child) && !c.created {
 		return false, nil
 	}
 
-	if err := writeEnvFile(ctx, writeEnvFileParams{Path: filepath.Join(paths.WorktreePath, c.file.Target), Content: rendered}); err != nil {
-		return false, err
-	}
-	return true, nil
+	return store.EnvDisk{}.Edit(ctx, store.EnvEdit{
+		Path:   filepath.Join(paths.WorktreePath, c.file.Target),
+		Create: c.created,
+		Edit: func(current []domain.EnvLine) []domain.EnvLine {
+			if current == nil {
+				return reconciled
+			}
+			onDisk := diff
+			onDisk.Child = current
+			return rules.ApplyEnvDiff(onDisk)
+		},
+	})
 }
 
 func applyDiffParams(c computedFile, res EnvResolution) rules.ApplyEnvDiffParams {
@@ -514,10 +521,10 @@ func applyDiffParams(c computedFile, res EnvResolution) rules.ApplyEnvDiffParams
 
 // templateLines reads the committed template (the schema) for a file from the
 // target worktree itself — each worktree's branch declares its own expected keys —
-// returning nil when no template exists. resolveTemplateSrc is shared with the
+// returning nil when no template exists. store.TemplateSource is shared with the
 // creation-time provisioning in env.go.
 func templateLines(worktreePath string, f domain.EnvFile) ([]domain.EnvLine, error) {
-	src := resolveTemplateSrc(worktreePath, f)
+	src := store.TemplateSource(worktreePath, f)
 	if src == "" {
 		return nil, nil
 	}
@@ -535,20 +542,4 @@ func readEnvFile(path string) ([]domain.EnvLine, error) {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
 	return rules.ParseEnv(string(data)), nil
-}
-
-type writeEnvFileParams struct {
-	Path    string
-	Content string
-}
-
-// writeEnvFile locks outside the worktree: the .env lives in the user's
-// checkout, where a lock file would show up as an untracked file.
-func writeEnvFile(ctx context.Context, params writeEnvFileParams) error {
-	_, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
-		Path:     params.Path,
-		LockPath: fs.ScratchLockPath(params.Path),
-		Mutate:   func([]byte) (fs.Change, error) { return fs.Write{Data: []byte(params.Content)}, nil },
-	})
-	return err
 }

@@ -25,7 +25,7 @@ lock, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
 
 `fs.Change` is a sealed union (`//go-sumtype:decl Change`): a decision about the file is one of three shapes, never a byte slice whose `nil` means something.
 
-**Read inside `Mutate`.** The lock only prevents a lost update if the change is computed from `current`. A writer that renders a value it loaded earlier is atomic but can still overwrite another process's change: `run.toml` (`config.WriteRun`), the full re-render of `config.toml` (`config.WriteProjectConfig`, by a re-init only). The read-modify-write writers are `updateMetadata` (`meta.json`), `config.UpdateProjectConfig` (every other change to `config.toml`: the remembered answers, `base_path` from `relocate`, the `.env` targets from `run init`), `config.UpdatePendingRemovals` and `infra.UpdateRegistry` (`repos.json`).
+**Read inside `Mutate`.** The lock only prevents a lost update if the change is computed from `current`. A writer that renders a value it loaded earlier is atomic but can still overwrite another process's change: `run.toml` (`config.WriteRun`), the full re-render of `config.toml` (`config.WriteProjectConfig`, by a re-init only). The read-modify-write writers are `store.MetaDisk.Update` (`meta.json`), `store.ConfigDisk` (every other change to `config.toml`: the remembered answers, `base_path` from `relocate`, the `.env` targets from `run init`), `store.EnvDisk.Edit` (the managed `.env` files), `config.UpdatePendingRemovals` and `infra.UpdateRegistry` (`repos.json`). `store/` is the one writer of the files it owns ([store.md](store.md)).
 
 **`ctx` bounds the wait for the lock, nothing else.** A free lock is taken even once `ctx` is done: a write that records work already carried out (a namespace created, a removal owed) must not be lost to an interrupt. A caller writing such a record after the interruptible part of its run passes `context.WithoutCancel(ctx)`, so it waits for a busy lock too.
 
@@ -48,7 +48,7 @@ These locks are short: one file, one write. The **operation locks** `dispatch` h
 | `config.toml` | `ProjectConfigSchema` | `config.Load`, `config.LoadProjectRaw` |
 | global `config.toml` | `GlobalConfigSchema` | `config.LoadGlobal` |
 | `run.toml` | `RunConfigSchema` | `config.LoadRun` |
-| `meta.json` | `MetaSchema` | `service/worktree` (`loadMetadata`) |
+| `meta.json` | `MetaSchema` | `store.MetaDisk` (`Load`, `Records`) |
 | `pending-removals.toml` | `PendingRemovalsSchema` | `config.LoadPendingRemovals` |
 
 - A file without `schema` is at 1. The key is written only from schema 2 on (`statefile.Written`): the TOML loaders of earlier releases reject an unknown key, so a file written at schema 1 stays readable by them.
@@ -60,8 +60,8 @@ These locks are short: one file, one write. The **operation locks** `dispatch` h
 
 ## What the lint holds
 
-`statewrite` (`tools/archlint/statewrite.go`) refuses `os.WriteFile`, `os.Create` and `os.Rename`, as a call or a function value, outside `infra/`. Its permanent exceptions are in `stateWriteExempt`, each with its reason; a log is opened through `fs.OpenLog`, and the one still opened with `os.Create` (the `exec` log) is tracked in `.archlint-migrating` until it moves (see [lint.md](lint.md)). `metawriter` holds `updateMetadata` as the one sink of `meta.json`.
+`statewrite` (`tools/archlint/statewrite.go`) refuses `os.WriteFile`, `os.Create` and `os.Rename`, as a call or a function value, outside `infra/`. Its permanent exceptions are in `stateWriteExempt`, each with its reason; a log is opened through `fs.OpenLog`, and the one still opened with `os.Create` (the `exec` log) is tracked in `.archlint-migrating` until it moves (see [lint.md](lint.md)). `metawriter` holds the writes of `store.Meta` as the sinks of `meta.json` ([store.md](store.md#what-the-lint-holds)).
 
 ## Testing
 
-`internal/infra/fs` is tested like the kernel: testify, a test file per source file holding only `Test…` functions, the shared helpers in `helpers_test.go`. Concurrency is tested for real — goroutines, and processes started from the test binary (`TestHelperProcess`) — under `-race`. A writer built on `UpdateFile` tests its own refusal of a newer schema: the file at schema N+1 is read, the write returns `statefile.ErrSchemaNewer`, the file is byte for byte unchanged (`internal/config/statefile_test.go`, `internal/service/worktree/metadata_test.go`).
+`internal/infra/fs` is tested like the kernel: testify, a test file per source file holding only `Test…` functions, the shared helpers in `helpers_test.go`. Concurrency is tested for real — goroutines, and processes started from the test binary (`TestHelperProcess`) — under `-race`. A writer built on `UpdateFile` tests its own refusal of a newer schema: the file at schema N+1 is read, the write returns `statefile.ErrSchemaNewer`, the file is byte for byte unchanged (`internal/config/statefile_test.go`, `internal/store/meta_test.go`, `internal/store/config_test.go`).

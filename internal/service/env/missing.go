@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/store"
 )
 
 type MissingTargetsParams struct {
@@ -24,7 +25,7 @@ func MissingTargets(params MissingTargetsParams) []domain.EnvMissingFile {
 		if fileExists(filepath.Join(params.WorktreePath, file.Target)) {
 			continue
 		}
-		template := resolveTemplateSrc(params.WorktreePath, file) != ""
+		template := store.TemplateSource(params.WorktreePath, file) != ""
 		missing = append(missing, domain.EnvMissingFile{
 			Target:      file.Target,
 			Scaffolded:  scaffolds(scaffoldsParams{MissingTargetsParams: params, File: file, Template: template}),

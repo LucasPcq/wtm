@@ -59,27 +59,35 @@ func WriteProjectConfig(ctx context.Context, params WriteProjectConfigParams) er
 	}})
 }
 
-type UpdateProjectConfigParams struct {
-	StateDir string
-	Update   func(*domain.ProjectConfig)
+type ReviseProjectParams struct {
+	Path    string
+	Current []byte
+	Update  func(*domain.ProjectConfig)
 }
 
-// UpdateProjectConfig changes config.toml as it is on disk at the moment of the
-// write, under its lock: no default is added, and no change another process
-// made since this one loaded the config is lost.
-func UpdateProjectConfig(ctx context.Context, params UpdateProjectConfigParams) error {
-	path := filepath.Join(params.StateDir, domain.ConfigFileName)
-	return renderProjectConfig(ctx, renderParams{StateDir: params.StateDir, Render: func(current []byte) (projectTemplateData, error) {
-		if current == nil {
-			return projectTemplateData{}, domain.ErrConfigNotFound
-		}
-		project, err := parseProjectConfig(path, current)
-		if err != nil {
-			return projectTemplateData{}, err
-		}
-		params.Update(&project)
-		return configToTemplate(project), nil
-	}})
+// ReviseProject is config.toml as Current holds it with Update applied, for the
+// writer that reads the file under its lock: the file is parsed without the
+// defaults Load adds, so none is written in.
+func ReviseProject(params ReviseProjectParams) ([]byte, error) {
+	if params.Current == nil {
+		return nil, domain.ErrConfigNotFound
+	}
+	if err := refuseNewer(refuseNewerParams{Path: params.Path, Current: params.Current, Supported: domainstatefile.ProjectConfigSchema}); err != nil {
+		return nil, err
+	}
+	project, err := parseProjectConfig(params.Path, params.Current)
+	if err != nil {
+		return nil, err
+	}
+	params.Update(&project)
+	data := configToTemplate(project)
+	data.Schema = statefile.Written(domainstatefile.ProjectConfigSchema)
+	return executeProjectTemplate(data)
+}
+
+// WriteProjectSchema puts this binary's schema of config.toml beside it.
+func WriteProjectSchema(ctx context.Context, stateDir string) error {
+	return writeSchema(ctx, writeSchemaParams{Dir: stateDir, Schema: schemas.Project})
 }
 
 type renderParams struct {
@@ -100,17 +108,25 @@ func renderProjectConfig(ctx context.Context, params renderParams) error {
 				return nil, err
 			}
 			data.Schema = statefile.Written(domainstatefile.ProjectConfigSchema)
-			var buf bytes.Buffer
-			if err := parsedTemplate.Execute(&buf, data); err != nil {
-				return nil, fmt.Errorf("render template: %w", err)
+			rendered, err := executeProjectTemplate(data)
+			if err != nil {
+				return nil, err
 			}
-			return fs.Write{Data: buf.Bytes()}, nil
+			return fs.Write{Data: rendered}, nil
 		},
 	})
 	if err != nil {
 		return err
 	}
-	return writeSchema(ctx, writeSchemaParams{Dir: params.StateDir, Schema: schemas.Project})
+	return WriteProjectSchema(ctx, params.StateDir)
+}
+
+func executeProjectTemplate(data projectTemplateData) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := parsedTemplate.Execute(&buf, data); err != nil {
+		return nil, fmt.Errorf("render template: %w", err)
+	}
+	return buf.Bytes(), nil
 }
 
 type refuseNewerParams struct {

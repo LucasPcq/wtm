@@ -6,6 +6,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/store"
 )
 
 // EnvPortsParams locates the .env files a set of links names and the offset the
@@ -118,18 +119,12 @@ func ApplyEnvPorts(ctx context.Context, params EnvPortsParams) (domain.EnvPortPl
 	}
 
 	for _, file := range rewrittenFiles(plan) {
-		path := filepath.Join(params.WorktreePath, file)
-		lines, readErr := readEnvFile(path)
-		if readErr != nil {
-			return domain.EnvPortPlan{}, readErr
-		}
-
-		rendered := rules.RenderEnv(rules.ApplyEnvPorts(lines, entriesForFile(plan, file)))
-		if rendered == rules.RenderEnv(lines) {
-			continue
-		}
-		if writeErr := writeEnvFile(ctx, writeEnvFileParams{Path: path, Content: rendered}); writeErr != nil {
-			return domain.EnvPortPlan{}, writeErr
+		entries := entriesForFile(plan, file)
+		if _, err := (store.EnvDisk{}).Edit(ctx, store.EnvEdit{
+			Path: filepath.Join(params.WorktreePath, file),
+			Edit: func(lines []domain.EnvLine) []domain.EnvLine { return rules.ApplyEnvPorts(lines, entries) },
+		}); err != nil {
+			return domain.EnvPortPlan{}, err
 		}
 	}
 
@@ -159,29 +154,24 @@ func ApplyOwnedEnv(ctx context.Context, params EnvPortsParams) error {
 // second write from dropping the first.
 func applyOwned(ctx context.Context, params EnvPortsParams, plan domain.EnvPortPlan) error {
 	for _, file := range ownedFiles(plan) {
-		path := filepath.Join(params.WorktreePath, file)
-		lines, err := readEnvFile(path)
-		if err != nil {
-			return err
-		}
-
-		changed := false
-		for _, entry := range plan.Owned {
-			if entry.File != file {
-				continue
-			}
-			updated, wrote := rules.UpsertEnvPair(rules.UpsertEnvPairParams{Lines: lines, Key: entry.Key, Value: entry.Value})
-			lines = updated
-			changed = changed || wrote
-		}
-		if !changed {
-			continue
-		}
-		if err := writeEnvFile(ctx, writeEnvFileParams{Path: path, Content: rules.RenderEnv(lines)}); err != nil {
+		if _, err := (store.EnvDisk{}).Edit(ctx, store.EnvEdit{
+			Path:   filepath.Join(params.WorktreePath, file),
+			Create: true,
+			Edit:   func(lines []domain.EnvLine) []domain.EnvLine { return upsertOwned(lines, plan.Owned, file) },
+		}); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func upsertOwned(lines []domain.EnvLine, owned []domain.EnvOwnedEntry, file string) []domain.EnvLine {
+	for _, entry := range owned {
+		if entry.File == file {
+			lines, _ = rules.UpsertEnvPair(rules.UpsertEnvPairParams{Lines: lines, Key: entry.Key, Value: entry.Value})
+		}
+	}
+	return lines
 }
 
 func ownedFiles(plan domain.EnvPortPlan) []string {

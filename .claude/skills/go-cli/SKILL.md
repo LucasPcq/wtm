@@ -140,13 +140,15 @@ internal/
                                 fingerprint → Apply), operation events (docs/dev/dispatch.md)
   query/operations/           ← the operations in progress, read from their holder files
   config/                     ← load & validate config.toml + run.toml from <git-common-dir>/wtm/
+  store/                      ← the one writer of each state file (docs/dev/store.md): Meta (meta.json),
+                                ProjectConfig (config.toml: Remember), EnvFiles (.env: Copy, Edit)
   flow/                       ← THE FLOW of a command, surface-independent
     decide/                   ←   branch/env decisions shared by the create-like flows
     create/                   ←   `wtm create`: the run (create.go) + its questions (steps.go)
     clean/                    ←   `wtm clean`: the run (clean.go) + its questions (steps.go)
   service/                    ← impure orchestration only (git exec, I/O, hooks):
     worktree/                 ←   create, list, clean, resolve
-    env/                      ←   .env file provisioning strategies
+    env/                      ←   what the .env files hold (sync, ports, owned keys), written by store/
     hooks/                    ←   on_create hook execution
     shell/                    ←   shell integration generation (zsh, bash, fish)
     process/                  ←   daemon, job manager, socket client
@@ -183,6 +185,8 @@ internal/
                                 AddOrigin…) and Fake, git in memory: the double of git.Reader/Writer
   testutil/flowtest/          ← test doubles for the two flow seams (Prompter, Presenter)
   testutil/dispatchtest/      ← runs a command through dispatch with no surface, on doubles
+  testutil/storetest/         ← Fake, the state files in memory: the double of store.Meta,
+                                ProjectConfig and EnvFiles
 ```
 
 **Hard rules:**
@@ -904,7 +908,10 @@ Rules:
 
 The command engine and the layers built for it (`internal/kernel/`, `infra/fs`, `infra/git`,
 the `statefile` packages, `dispatch`, the generated command line in `surface/cli` and its
-rendering, the form in `surface/tui/form`, then `store/`…) are tested with
+rendering, the form in `surface/tui/form`, `store/`…) are laid out one subject per
+file, named after what it declares: a port's interface, its types and its implementation
+share one file (`infra/git/read.go` and `write.go`, `store/meta.go`, `config.go`, `env.go`),
+never an interfaces-only file beside the code. They are tested with
 testify (`assert`, `require`): a test reads as a specification. Each test file holds
 only `Test…` functions; a package's example and fakes live in `fixture_test.go`, the
 helpers its tests share in `helpers_test.go`. A command on the engine is run in its
