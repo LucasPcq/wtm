@@ -32,7 +32,7 @@ Each rule is a `golang.org/x/tools/go/analysis` Analyzer resolved by type — an
 | `typeassert` | a type assertion without comma-ok |
 | `yesflag` | a command that reads the interactive gate (`shared.Interactive`) without offering `--yes` (`shared.AddYesFlag`) |
 | `chokepoint` | a service mutator called from anywhere but `internal/flow/` |
-| `metawriter` | an exported function of `service/worktree` that reaches `updateMetadata`/`purgeState` is in the mutators table — the table is complete by construction |
+| `metawriter` | an exported function of `service/worktree` that reaches `Update` or `Purge` of `store.Meta` (the one writer of `meta.json`, [store.md](store.md)) is in the mutators table — the table is complete by construction |
 | `emits` | a `flow/` package calling a mutator publishes that mutator's event, and has a test recording it (`flowtest.Recorder`) |
 | `publish` | `process.Publish` is called from `service/events` only; the `flow` seam's `Publish` from `internal/flow/` only |
 | `statewrite` | `os.WriteFile`, `os.Create` or `os.Rename` outside `infra/`, as a call or a function value: every other write goes through `fs.UpdateFile` (or `fs.ReplaceFile` for the daemon's index). The writers that stay outside for good are in `stateWriteExempt`, each with its reason: log rotation, the binary swap of `upgrade`, `agents install`, `schema dump`, the shell's cd handshake, the proxy's launchd plist, test fixtures |

@@ -7,14 +7,17 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// metadataSinks are the two writes of a worktree's meta.json. A function that
-// reaches one changes a worktree's identity, so it belongs in mutators — which
-// is what makes that table complete by construction rather than by memory.
-var metadataSinks = map[string]bool{"updateMetadata": true, "purgeState": true}
+// metaWrites are the writes of a worktree's meta.json, methods of store.Meta
+// and of its implementations. A function of service/worktree that reaches one
+// changes a worktree's identity, so it belongs in mutators — which is what
+// makes that table complete by construction rather than by memory.
+var metaWrites = map[string]bool{"Update": true, "Purge": true}
+
+var metaWriters = map[string]bool{"Meta": true, "MetaDisk": true}
 
 var metawriterAnalyzer = &analysis.Analyzer{
 	Name: "metawriter",
-	Doc:  "an exported function of service/worktree that writes metadata is in the mutators table (methods are out of scope)",
+	Doc:  "an exported function of service/worktree that writes metadata (store.Meta's Update or Purge) is in the mutators table (methods are out of scope)",
 	Run:  runMetawriter,
 }
 
@@ -22,9 +25,9 @@ func runMetawriter(pass *analysis.Pass) (any, error) {
 	if internalPath(pass.Pkg.Path()) != "service/worktree" {
 		return nil, nil
 	}
-	calls, decls := callGraph(pass)
-	writes := reachingSinks(calls)
-	for fn, decl := range decls {
+	graph := callGraph(pass)
+	writes := reachingSinks(graph)
+	for fn, decl := range graph.decls {
 		if !fn.Exported() || !writes[fn] || isMutator(fn) {
 			continue
 		}
@@ -37,11 +40,17 @@ func runMetawriter(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
-// callGraph maps each function declared in the package to the functions of the
-// same package it calls, closures included.
-func callGraph(pass *analysis.Pass) (map[*types.Func][]*types.Func, map[*types.Func]*ast.FuncDecl) {
-	calls := map[*types.Func][]*types.Func{}
-	decls := map[*types.Func]*ast.FuncDecl{}
+type packageCalls struct {
+	// calls maps each function declared in the package to the functions of
+	// the same package it calls, closures included.
+	calls map[*types.Func][]*types.Func
+	// sinks are the functions that call a write of store.Meta themselves.
+	sinks map[*types.Func]bool
+	decls map[*types.Func]*ast.FuncDecl
+}
+
+func callGraph(pass *analysis.Pass) packageCalls {
+	graph := packageCalls{calls: map[*types.Func][]*types.Func{}, sinks: map[*types.Func]bool{}, decls: map[*types.Func]*ast.FuncDecl{}}
 	for _, file := range pass.Files {
 		for _, d := range file.Decls {
 			decl, ok := d.(*ast.FuncDecl)
@@ -52,33 +61,56 @@ func callGraph(pass *analysis.Pass) (map[*types.Func][]*types.Func, map[*types.F
 			if !ok {
 				continue
 			}
-			decls[fn] = decl
+			graph.decls[fn] = decl
 			ast.Inspect(decl.Body, func(node ast.Node) bool {
 				ident, ok := node.(*ast.Ident)
 				if !ok {
 					return true
 				}
 				callee, ok := pass.TypesInfo.Uses[ident].(*types.Func)
-				if ok && callee.Pkg() == pass.Pkg {
-					calls[fn] = append(calls[fn], callee)
+				switch {
+				case !ok:
+				case callee.Pkg() == pass.Pkg:
+					graph.calls[fn] = append(graph.calls[fn], callee)
+				case isMetaWrite(callee):
+					graph.sinks[fn] = true
 				}
 				return true
 			})
 		}
 	}
-	return calls, decls
+	return graph
 }
 
-func reachingSinks(calls map[*types.Func][]*types.Func) map[*types.Func]bool {
+func isMetaWrite(fn *types.Func) bool {
+	if fn.Pkg() == nil || internalPath(fn.Pkg().Path()) != "store" || !metaWrites[fn.Name()] {
+		return false
+	}
+	sig, ok := fn.Type().(*types.Signature)
+	if !ok || sig.Recv() == nil {
+		return false
+	}
+	recv := sig.Recv().Type()
+	if pointer, ok := recv.(*types.Pointer); ok {
+		recv = pointer.Elem()
+	}
+	named, ok := recv.(*types.Named)
+	return ok && metaWriters[named.Obj().Name()]
+}
+
+func reachingSinks(graph packageCalls) map[*types.Func]bool {
 	writes := map[*types.Func]bool{}
+	for fn := range graph.sinks {
+		writes[fn] = true
+	}
 	for changed := true; changed; {
 		changed = false
-		for fn, callees := range calls {
+		for fn, callees := range graph.calls {
 			if writes[fn] {
 				continue
 			}
 			for _, callee := range callees {
-				if metadataSinks[callee.Name()] || writes[callee] {
+				if writes[callee] {
 					writes[fn] = true
 					changed = true
 					break

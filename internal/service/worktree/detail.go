@@ -2,12 +2,10 @@ package worktree
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"slices"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/store"
 )
 
 // ParentBranchParams holds inputs for resolving a worktree's parent branch.
@@ -42,12 +40,7 @@ func loadSourceBranch(stateDir, branch string) string {
 }
 
 func loadMetadata(stateDir, branch string) (domain.WorktreeMetadata, error) {
-	metaPath := filepath.Join(rules.WorktreeMetaDir(stateDir, branch), domain.MetaFileName)
-	data, err := os.ReadFile(metaPath)
-	if err != nil {
-		return domain.WorktreeMetadata{}, err
-	}
-	return decodeMetadata(data)
+	return (store.MetaDisk{StateDir: stateDir}).Load(branch)
 }
 
 type RecordNamespacesParams struct {
@@ -66,20 +59,16 @@ func RecordNamespaces(ctx context.Context, params RecordNamespacesParams) error 
 	if len(params.Jobs) == 0 {
 		return nil
 	}
-	return updateMetadata(ctx, updateMetadataParams{
-		StateDir:    params.StateDir,
-		Branch:      params.Branch,
-		KeepMissing: true,
-		Update: func(meta domain.WorktreeMetadata, readErr error) (domain.WorktreeMetadata, error) {
-			if readErr != nil {
-				return domain.WorktreeMetadata{}, readErr
-			}
+	return (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
+		Branch:  params.Branch,
+		Missing: store.MissingSkip,
+		Change: func(meta *domain.WorktreeMetadata) error {
 			for _, job := range params.Jobs {
 				if !slices.Contains(meta.Namespaces, job) {
 					meta.Namespaces = append(meta.Namespaces, job)
 				}
 			}
-			return meta, nil
+			return nil
 		},
 	})
 }

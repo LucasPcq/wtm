@@ -44,7 +44,8 @@ func TestProjectConfigAtANewerSchemaIsReadButNeverRewritten(t *testing.T) {
 	}
 
 	assertRefusedNewer(t, WriteProjectConfig(t.Context(), WriteProjectConfigParams{StateDir: dir, Config: cfg.Project}))
-	assertRefusedNewer(t, UpdateProjectConfig(t.Context(), UpdateProjectConfigParams{StateDir: dir, Update: func(*domain.ProjectConfig) {}}))
+	_, err = ReviseProject(ReviseProjectParams{Path: path, Current: []byte(content), Update: func(*domain.ProjectConfig) {}})
+	assertRefusedNewer(t, err)
 	if got := readBack(t, path); got != content {
 		t.Errorf("config.toml rewritten:\n%s", got)
 	}
@@ -114,16 +115,15 @@ func TestStateFilesAreWrittenWithoutASchemaKeyAtSchemaOne(t *testing.T) {
 	}
 }
 
-func TestUpdateProjectConfigChangesOnlyWhatItIsAskedTo(t *testing.T) {
+func TestReviseProjectChangesOnlyWhatItIsAskedTo(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, domain.ConfigFileName, minimalToml)
-
-	err := UpdateProjectConfig(t.Context(), UpdateProjectConfigParams{StateDir: dir, Update: func(project *domain.ProjectConfig) {
+	revised, err := ReviseProject(ReviseProjectParams{Path: filepath.Join(dir, domain.ConfigFileName), Current: []byte(minimalToml), Update: func(project *domain.ProjectConfig) {
 		project.Wizard.Remembered = map[string]string{domain.RememberIsolation: "verbatim"}
 	}})
 	if err != nil {
-		t.Fatalf("UpdateProjectConfig: %v", err)
+		t.Fatalf("ReviseProject: %v", err)
 	}
+	writeFile(t, dir, domain.ConfigFileName, string(revised))
 
 	project, err := LoadProjectRaw(dir)
 	if err != nil {
@@ -134,6 +134,13 @@ func TestUpdateProjectConfigChangesOnlyWhatItIsAskedTo(t *testing.T) {
 	}
 	if project.Wizard.Remembered[domain.RememberIsolation] != "verbatim" {
 		t.Errorf("remembered = %v", project.Wizard.Remembered)
+	}
+}
+
+func TestReviseProjectNeedsAFile(t *testing.T) {
+	_, err := ReviseProject(ReviseProjectParams{Path: domain.ConfigFileName, Update: func(*domain.ProjectConfig) {}})
+	if !errors.Is(err, domain.ErrConfigNotFound) {
+		t.Errorf("error = %v, want %v", err, domain.ErrConfigNotFound)
 	}
 }
 

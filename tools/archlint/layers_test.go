@@ -27,3 +27,10 @@ func TestTheKernelImportsNothingButTheStdlib(t *testing.T) {
 func TestDispatchRunsOnItsOwnPorts(t *testing.T) {
 	runTxtar(t, layersAnalyzer, "layers", internalPrefix+"dispatch")
 }
+
+func TestTheStoreWritesForTheServicesNeverForAFlow(t *testing.T) {
+	runTxtar(t, layersAnalyzer, "layers",
+		internalPrefix+"store",
+		internalPrefix+"flow/leaky",
+	)
+}

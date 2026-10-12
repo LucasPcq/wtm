@@ -6,6 +6,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/store"
 )
 
 // OwnedRestoreParams locates a worktree, the source its .env files were copied
@@ -40,7 +41,7 @@ func ApplyOwnedRestore(ctx context.Context, params OwnedRestoreParams) ([]domain
 		if len(file.Entries) == 0 {
 			continue
 		}
-		if err := writeEnvFile(ctx, writeEnvFileParams{Path: file.Path, Content: rules.RenderEnv(file.Lines)}); err != nil {
+		if _, err := (store.EnvDisk{}).Edit(ctx, store.EnvEdit{Path: file.Path, Edit: file.Restore}); err != nil {
 			return nil, err
 		}
 	}
@@ -49,8 +50,9 @@ func ApplyOwnedRestore(ctx context.Context, params OwnedRestoreParams) ([]domain
 
 type restoredFile struct {
 	Path    string
-	Lines   []domain.EnvLine
 	Entries []domain.EnvRestoredEntry
+	// Restore puts the owned keys back in the lines read under the file's lock.
+	Restore func([]domain.EnvLine) []domain.EnvLine
 }
 
 func restoredEntries(files []restoredFile) []domain.EnvRestoredEntry {
@@ -88,8 +90,13 @@ func planRestore(params OwnedRestoreParams) ([]restoredFile, error) {
 			return nil, err
 		}
 
-		lines, entries := rules.RestoreOwnedEnv(rules.RestoreOwnedEnvParams{File: file.Target, Child: child, Source: source, Keys: keys, PortBases: portBasesOf(params.Keys.PortBases, file.Target)})
-		files = append(files, restoredFile{Path: path, Lines: lines, Entries: entries})
+		restore := rules.RestoreOwnedEnvParams{File: file.Target, Child: child, Source: source, Keys: keys, PortBases: portBasesOf(params.Keys.PortBases, file.Target)}
+		_, entries := rules.RestoreOwnedEnv(restore)
+		files = append(files, restoredFile{Path: path, Entries: entries, Restore: func(current []domain.EnvLine) []domain.EnvLine {
+			restore.Child = current
+			lines, _ := rules.RestoreOwnedEnv(restore)
+			return lines
+		}})
 	}
 	return files, nil
 }

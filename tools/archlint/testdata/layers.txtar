@@ -102,3 +102,24 @@ import (
 var _, _ = dispatch.Run, worktree.Create
 
 var _ kernel.Code
+-- github.com/LucasPcq/wtm/internal/config/config.go --
+package config
+
+func Load() {}
+-- github.com/LucasPcq/wtm/internal/store/store.go --
+package store
+
+import (
+	"github.com/LucasPcq/wtm/internal/config"
+	"github.com/LucasPcq/wtm/internal/service/worktree" // want `internal/store must not import "github.com/LucasPcq/wtm/internal/service/worktree" — the one writer of each state file`
+)
+
+var _, _ = config.Load, worktree.Create
+
+func Remember() {}
+-- github.com/LucasPcq/wtm/internal/flow/leaky/leaky.go --
+package leaky
+
+import "github.com/LucasPcq/wtm/internal/store" // want `internal/flow must not import "github.com/LucasPcq/wtm/internal/store"`
+
+var _ = store.Remember

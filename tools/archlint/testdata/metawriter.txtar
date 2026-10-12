@@ -1,30 +1,52 @@
+-- github.com/LucasPcq/wtm/internal/store/store.go --
+package store
+
+type Meta interface {
+	Load(branch string) error
+	Update(branch string) error
+	Purge(branch string) error
+}
+
+type MetaDisk struct{}
+
+func (MetaDisk) Load(string) error   { return nil }
+func (MetaDisk) Update(string) error { return nil }
+func (MetaDisk) Purge(string) error  { return nil }
+
+type ConfigDisk struct{}
+
+func (ConfigDisk) Update(string) error { return nil }
 -- github.com/LucasPcq/wtm/internal/service/worktree/worktree.go --
 package worktree
 
-func updateMetadata() error { return nil }
+import "github.com/LucasPcq/wtm/internal/store"
 
-func purgeState() {}
+func persist() error { return store.MetaDisk{}.Update("a") }
 
-func persist() error { return updateMetadata() }
+func purgeState() { _ = store.MetaDisk{}.Purge("a") }
 
-func Create() error { return updateMetadata() }
+func Create() error { return persist() }
 
 func Sneaky() error { return persist() } // want `worktree\.Sneaky writes worktree metadata but is not in the mutators table`
 
 func Purges() { purgeState() } // want `worktree\.Purges writes worktree metadata`
 
-func Reads() error { return nil }
+func Direct(meta store.Meta) error { return meta.Update("a") } // want `worktree\.Direct writes worktree metadata`
+
+func Reads() error { return store.MetaDisk{}.Load("a") }
+
+func SetBasePath() error { return store.ConfigDisk{}.Update("a") }
 
 func Closure() func() error { // want `worktree\.Closure writes worktree metadata`
-	return func() error { return updateMetadata() }
+	return func() error { return persist() }
 }
 
 type T struct{}
 
-func (T) Method() error { return updateMetadata() }
+func (T) Method() error { return persist() }
 -- github.com/LucasPcq/wtm/internal/service/env/env.go --
 package env
 
-func updateMetadata() error { return nil }
+import "github.com/LucasPcq/wtm/internal/store"
 
-func Elsewhere() error { return updateMetadata() }
+func Elsewhere() error { return store.MetaDisk{}.Update("a") }
