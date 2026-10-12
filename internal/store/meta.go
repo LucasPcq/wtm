@@ -1,3 +1,4 @@
+// Package store is the one writer of each state file: a worktree's meta.json, the changes to config.toml and the .env files wtm manages.
 package store
 
 import (
@@ -16,6 +17,41 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/rules/statefile"
 )
+
+// Meta is the record wtm keeps of each worktree, <common>/wtm/worktrees/<branch>/meta.json.
+type Meta interface {
+	// Load is the record on disk; an absent one is an error wrapping os.ErrNotExist.
+	Load(branch string) (domain.WorktreeMetadata, error)
+	// Records are every record that reads, by branch; one that does not read is left out.
+	Records() ([]MetaRecord, error)
+	Update(ctx context.Context, update MetaUpdate) error
+	// Purge drops the record and its directory: nothing is left to hold an ordinal.
+	Purge(branch string) error
+}
+
+type MetaRecord struct {
+	Branch string
+	Meta   domain.WorktreeMetadata
+}
+
+// Missing is what Update does with a record it finds absent.
+type Missing int
+
+const (
+	// MissingCreate starts from the zero record, also when the stored one does not read.
+	MissingCreate Missing = iota
+	// MissingSkip writes nothing: the main checkout never gets a record.
+	MissingSkip
+	// MissingRefuse returns an error wrapping os.ErrNotExist.
+	MissingRefuse
+)
+
+type MetaUpdate struct {
+	Branch  string
+	Missing Missing
+	// Change edits the record read under the lock; one left unchanged is not rewritten.
+	Change func(*domain.WorktreeMetadata) error
+}
 
 // MetaDisk keeps the records under StateDir, <common>/wtm.
 type MetaDisk struct {

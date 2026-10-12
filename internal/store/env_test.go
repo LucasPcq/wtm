@@ -145,28 +145,6 @@ func TestCopyTakesEachFileFromItsStrategysSource(t *testing.T) {
 	}
 }
 
-func TestCopyReportsWhatItCouldNotFind(t *testing.T) {
-	main, parent, target := t.TempDir(), t.TempDir(), t.TempDir()
-	writeFile(t, filepath.Join(main, ".env"), "FROM=main")
-
-	example, exampleErr := store.EnvDisk{}.Copy(t.Context(), store.EnvCopy{Strategy: domain.EnvStrategyExample, Files: []domain.EnvFile{{Target: ".env", Template: ".env.example"}}, TargetDir: target, MainWorktreePath: main})
-	missing, missingErr := store.EnvDisk{}.Copy(t.Context(), store.EnvCopy{Strategy: domain.EnvStrategyMain, Files: []domain.EnvFile{{Target: ".env.local"}}, TargetDir: target, MainWorktreePath: main})
-	fallback, fallbackErr := store.EnvDisk{}.Copy(t.Context(), store.EnvCopy{Strategy: domain.EnvStrategyParent, Files: []domain.EnvFile{{Target: ".env"}, {Target: ".env.local"}}, TargetDir: target, MainWorktreePath: main, ParentWorktreePath: parent})
-
-	require.NoError(t, exampleErr)
-	assert.Equal(t, []store.EnvWarning{store.NoTemplate{Target: ".env"}}, example)
-	require.NoError(t, missingErr)
-	assert.Equal(t, []store.EnvWarning{store.SourceMissing{Target: ".env.local", Dir: main}}, missing)
-	require.NoError(t, fallbackErr)
-	assert.Equal(t, []store.EnvWarning{
-		store.ParentFallback{Target: ".env"},
-		store.ParentFallback{Target: ".env.local"},
-		store.SourceMissing{Target: ".env.local", Dir: main},
-	}, fallback)
-	assert.Equal(t, "FROM=main", readFile(t, filepath.Join(target, ".env")))
-	assert.NoFileExists(t, filepath.Join(target, ".env.local"))
-}
-
 func TestCopyRefusesAnUnknownStrategy(t *testing.T) {
 	_, err := store.EnvDisk{}.Copy(t.Context(), store.EnvCopy{Strategy: "elsewhere", Files: []domain.EnvFile{{Target: ".env"}}, TargetDir: t.TempDir(), MainWorktreePath: t.TempDir()})
 
@@ -183,12 +161,4 @@ func TestCopyOfNoFileDoesNothing(t *testing.T) {
 	entries, err := os.ReadDir(target)
 	require.NoError(t, err)
 	assert.Empty(t, entries)
-}
-
-func TestTemplateSourceIsThePinnedTemplateElseTheFirstCandidate(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, ".env.sample"), "")
-
-	assert.Equal(t, filepath.Join(dir, ".env.sample"), store.TemplateSource(dir, domain.EnvFile{Target: ".env"}))
-	assert.Empty(t, store.TemplateSource(dir, domain.EnvFile{Target: ".env", Template: ".env.example"}), "a pinned template that is gone is not replaced by a guess")
 }

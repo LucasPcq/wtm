@@ -10,6 +10,11 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
+// ProjectConfig is config.toml, changed as it is on disk under its lock.
+type ProjectConfig interface {
+	Remember(ctx context.Context, change rules.RememberedChange) error
+}
+
 // ConfigDisk is <StateDir>/config.toml.
 type ConfigDisk struct {
 	StateDir string
