@@ -908,7 +908,10 @@ Rules:
 
 The command engine and the layers built for it (`internal/kernel/`, `infra/fs`, `infra/git`,
 the `statefile` packages, `dispatch`, the generated command line in `surface/cli` and its
-rendering, the form in `surface/tui/form`, `store/`…) are tested with
+rendering, the form in `surface/tui/form`, `store/`…) are laid out one subject per
+file, named after what it declares: a port's interface, its types and its implementation
+share one file (`infra/git/read.go` and `write.go`, `store/meta.go`, `config.go`, `env.go`),
+never an interfaces-only file beside the code. They are tested with
 testify (`assert`, `require`): a test reads as a specification. Each test file holds
 only `Test…` functions; a package's example and fakes live in `fixture_test.go`, the
 helpers its tests share in `helpers_test.go`. A command on the engine is run in its
