@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/query/operations"
 )
 
 // Entry erases a command's or a query's types: the request in and the details
@@ -41,6 +42,11 @@ func (CommandReply) reply() {}
 func (QueryReply) reply()   {}
 
 type Registry []Entry
+
+// Registry is every command and query the surfaces serve, on d.
+func (d *Dispatcher) Registry() Registry {
+	return Registry{RegisterQuery(operations.Query(d.Operations))}
+}
 
 func (r Registry) Lookup(name string) (Entry, bool) {
 	index := slices.IndexFunc(r, func(entry Entry) bool { return entry.Name() == name })
