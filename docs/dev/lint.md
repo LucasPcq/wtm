@@ -58,7 +58,7 @@ A rule belongs in `make lint` when breaking it breaks something — a layer, a r
 
 ## Exceptions
 
-- **`.deadcode-ignore`** — one regex per line **with its reason**: code reachable by a route the analysis cannot follow (so far, a method satisfying an interface asserted on an `any`). Anything unlisted fails.
+- **`.deadcode-ignore`** — one regex per line **with its reason**: code reachable by a route the analysis cannot follow (a method satisfying an interface asserted on an `any`), and the foundations of the command engine no command calls yet (`cli.Bind`, until the pilot `create` of step 3 of LUC-283 removes its entry). Anything unlisted fails.
 - **`.archlint-migrating`** — `<rule> <path regex> <sites>` lines for what predates a rule; they report as `(migrating)` without failing. **It may only shrink**, and that is checked: each entry — like each rune of `fontLegacy` — records how many sites it covers, one site more fails `make lint`, and a count higher than needed is reported as a note to lower it. A new entry is a decision to take knowingly and belongs in a ticket, never a way to get a commit past the linter. It holds no `chokepoint` entry today: a new one is a regression, not a migration. Its one `statewrite` entry is the `exec` log, still opened with `os.Create` until the run module moves to the engine.
 - **A permanent exception** is not a migration and never goes in `.archlint-migrating`: it is a table in the rule's own file with a reason per entry (`stateWriteExempt`, `daemonInfra`, `fontSafe`).
 

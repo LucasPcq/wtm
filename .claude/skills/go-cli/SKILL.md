@@ -126,8 +126,7 @@ code, in the same change.
 ### 9. Clean architecture layers
 
 ```
-cmd/
-  root.go                     ← cobra root, version, help
+main.go                       ← the entry point: cli.Execute
 
 internal/
   domain/                     ← types, errors, constants only (no methods, no functions)
@@ -160,9 +159,14 @@ internal/
                                   TryLocks / HoldFile for dispatch's operation locks, OpenLog
     proc/                     ←   Command, GroupCommand, Shield
   surface/                    ← the interfaces
-    cli/                      ←   flag wiring only → delegates to flow/service (zero logic)
+    cli/                      ←   the command line (docs/dev/cli.md): root.go (tree, version, help),
+                                  signal.go, quiet.go, abort.go, exit.go (exit codes); bind.go
+                                  (cli.Bind: a command generated from the dispatch registry),
+                                  run.go (its one run); flag wiring → flow for the others (zero logic)
       ui/                     ←     `wtm ui`: refuses JSON + missing TTY, hands off to tui/dashboard
-      render/                 ←     format and print results (zero decision logic)
+      render/                 ←     format and print results (zero decision logic); envelope.go,
+                                    outcome.go, recap.go, failure.go, progress.go: the generic
+                                    rendering of a kernel result and the v2 envelope
     tui/                      ←   Bubbletea models (zero business logic, rendering only)
       flowui/                 ←     runs a flow.Session as the CLI wizard (the only translator
                                     between flow.Step and components.Step)
@@ -187,7 +191,11 @@ internal/
   instead (e.g. `worktree.FindByBranch`, `worktree.ListAll`). `build-validator` step 6
   checks this mechanically.
 - `service/` has zero imports of `cobra`, `bubbletea`, `lipgloss`
-- `surface/cli/render/` and `surface/tui/` have zero decision logic — only rendering
+- `surface/cli/render/` and `surface/tui/` have zero decision logic — only rendering;
+  `render` reads results from `kernel`, never runs anything through `dispatch`
+- A command on the engine gets its command line from `cli.Bind` (flags from its fields, the
+  generic run, rendering and v2 envelope); it adds only its `cli.Doc`, a positional, a renamed
+  flag and its `render.Detail` or `GenericDetail()` — never a runner of its own
 - `styles/` is the only package allowed to instantiate `lipgloss.Style`
 
 **The `flow/` layer — where the flow of a mutation command lives.** A command that
@@ -884,12 +892,15 @@ Rules:
 ## Testing Patterns
 
 The command engine and the layers built for it (`internal/kernel/`, `infra/fs`, the
-`statefile` packages, then `dispatch`, `store/`, `infra/git`…) are tested with
+`statefile` packages, `dispatch`, the generated command line in `surface/cli` and its
+rendering, then `store/`, `infra/git`…) are tested with
 testify (`assert`, `require`): a test reads as a specification. Each test file holds
 only `Test…` functions; a package's example and fakes live in `fixture_test.go`, the
 helpers its tests share in `helpers_test.go`. A command on the engine is run in its
 tests through `testutil/dispatchtest` (`dispatchtest.New`, `dispatchtest.Run`): the
-outcome, the progress and the events, no surface. The rest of the repository keeps the
+outcome, the progress and the events, no surface; its command line through a root of its
+own served by a `cli.Engine` on that bench, down to the exit code (`surface/cli`
+`helpers_test.go`, `world.run`). The rest of the repository keeps the
 stdlib `testing` style below.
 
 ### Unit tests — config/service/domain
@@ -1005,6 +1016,7 @@ Before calling `build-validator`, verify manually:
 - [ ] No `cobra` or `bubbletea` imports inside `internal/service/`
 - [ ] Pure functions (no I/O) live in internal/rules/, not in service/
 - [ ] Every new `kernel.Code` has its entry in `internal/kernel/text`
+- [ ] Every entry of `Dispatcher.Registry` has its `cli.Bind` (with a `Detail` or `GenericDetail()`) or its reason in `unbound`
 - [ ] All async service calls in TUI wrapped as `tea.Cmd`
 - [ ] `shared.AddOutputFlag(cmd)` used instead of manual flag registration
 - [ ] `styles.Indent` used instead of literal `"  "` for padding

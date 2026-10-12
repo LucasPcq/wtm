@@ -7,7 +7,7 @@ wtm is a Cobra CLI with two interactive surfaces (an inline wizard and the `wtm 
 One line per package: what it owns. The import rules between them are the next section.
 
 ```
-cmd/                          ← entry points, cobra setup only
+main.go                       ← the entry point: cli.Execute
 internal/
   domain/                     ← types, errors, constants only (no methods, no functions)
     statefile/                ←   the schema version of each state file, and the error of a file a newer wtm wrote
@@ -125,7 +125,9 @@ internal/
     proc/                     ←   starting processes (Command, GroupCommand) and settling them on an
                                   interrupt (Shield, AwaitShields, KillCancelled)
   surface/                    ← the interfaces
-    cli/                      ←   flag wiring, delegates to flow/service (zero business logic)
+    cli/                      ←   the command line (zero business logic, cli.md): the root, its signals,
+                                  --quiet and exit code; the commands generated from the dispatch
+                                  registry (cli.Bind); the flag wiring of the commands still on flow/
       run/runctx/             ←     what every `run` command opens on: its directory, the config,
                                     run.toml, the opt-in guard and the prompt gate
       daemon/                 ←     the hidden `daemon` command and the macOS port-80 relay launchd runs
@@ -133,7 +135,8 @@ internal/
       events/                 ←     `wtm events`: the stream (text or JSON Lines) over service/events.Watch,
                                     or WatchAll outside any repository
       versioncmd/             ←     `wtm version`: the binary's version and each machine contract's (`events`)
-      render/                 ←     format and print results (zero decision logic)
+      render/                 ←     format and print results (zero decision logic); for a command on the
+                                    engine, the generic rendering of a kernel result and the v2 envelope
     tui/                      ←   Bubbletea models (zero business logic, rendering only)
       flowui/                 ←     runs a flow.Session as a wizard (the only translator
                                     between flow.Step and components.Step)
@@ -153,6 +156,8 @@ flowchart TD
   commands --> output["surface/cli/render/"]
   commands --> tui["surface/tui/"]
   commands --> config["config/"]
+  commands --> dispatch["dispatch/"]
+  output --> kernel["kernel/"]
   tui --> flow
   flow --> service["service/"]
   flow --> rules["rules/"]
@@ -174,7 +179,7 @@ Every arrow that is *missing* is the point:
 | `kernel/` imports only the stdlib | The skeleton carries no business vocabulary: a command composes `kernel` with `domain/`, never the reverse, so a change to the domain never reaches the contract every command, `dispatch` and surface share. I/O reaches it only as functions it is handed (`Observe`, `Apply`, the `Shield`). |
 | `command/` and `query/` never import `dispatch/` or `surface/`; `surface/` never imports them | A surface reaches a command through `dispatch` only, so the locks, the fingerprint and the events apply whatever the interface; a command never runs another inside its own locks. |
 | `service/` never imports cobra, bubbletea or lipgloss | The git operations are callable from a test, a flow, a daemon — anything that is not a terminal. |
-| `surface/cli/render/` and `surface/tui/` hold no decision logic | Two surfaces can render the same run without disagreeing about what it means. |
+| `surface/cli/render/` and `surface/tui/` hold no decision logic | Two surfaces can render the same run without disagreeing about what it means. `render` reads a command's results from `kernel`, never runs one through `dispatch`. |
 | `styles/` is the only package instantiating `lipgloss.Style` | A theme change is one file. |
 | `flow/` imports only `service/`, `rules/`, `domain/` and the stdlib | The flow cannot grow a dependency on the surface that runs it. This is what makes a second surface possible at all — see below. |
 
