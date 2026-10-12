@@ -33,18 +33,19 @@ type ProgressViewParams struct {
 // signal: the first cancels the run's context and the view says so, the second
 // is the root's to handle.
 type ProgressView struct {
-	w       io.Writer
-	human   bool
-	live    bool
-	mu      sync.Mutex
-	unit    string
-	status  string
-	painted bool
-	hook    *HookView
-	phase   domain.HookBeat
-	started time.Time
-	stop    context.CancelFunc
-	closed  bool
+	w         io.Writer
+	human     bool
+	live      bool
+	mu        sync.Mutex
+	unit      string
+	status    string
+	painted   bool
+	hook      *HookView
+	phase     string
+	phaseOpen bool
+	started   time.Time
+	stop      context.CancelFunc
+	closed    bool
 }
 
 // NewProgressView watches ctx until Close: a cancelled run reads "Cancelling…"
@@ -82,14 +83,9 @@ func (v *ProgressView) Emit(event kernel.Progress) {
 	if !v.human {
 		return
 	}
-	if event.Kind == kernel.ProgressPhaseStarted {
-		v.phaseStarted(event)
-		return
-	}
-	if !v.live {
-		return
-	}
 	switch event.Kind {
+	case kernel.ProgressPhaseStarted:
+		v.phase, v.phaseOpen, v.started = fmt.Sprintf(phaseLabelFmt, event.Params[kernel.ParamPhase], event.Subject), false, time.Now()
 	case kernel.ProgressPhaseFinished:
 		v.phaseFinished()
 	case kernel.ProgressUnitStarted:
@@ -104,8 +100,12 @@ func (v *ProgressView) Emit(event kernel.Progress) {
 	}
 }
 
-// output passes a hook's line on as it came, unless a live phase tails it.
+// output passes a hook's line on as it came, under the title of its phase or
+// in its live tail; a phase that prints nothing — a saga step — shows nothing.
 func (v *ProgressView) output(line string) {
+	if v.human && v.phase != "" && !v.phaseOpen {
+		v.openPhase()
+	}
 	if v.hook != nil {
 		_, _ = io.WriteString(v.hook, line+lineEnd)
 		return
@@ -113,23 +113,24 @@ func (v *ProgressView) output(line string) {
 	_, _ = io.WriteString(v.w, line+lineEnd)
 }
 
-func (v *ProgressView) phaseStarted(event kernel.Progress) {
-	label := fmt.Sprintf(phaseLabelFmt, event.Params[kernel.ParamPhase], event.Subject)
+func (v *ProgressView) openPhase() {
+	v.phaseOpen = true
 	if !v.live {
-		SectionTitle(v.w, label)
+		SectionTitle(v.w, v.phase)
 		return
 	}
 	v.erase()
-	v.phase, v.started = domain.HookBeat{Cmd: label, Started: true}, time.Now()
 	v.hook = NewHookView(HookViewParams{W: v.w})
-	v.hook.OnHook(v.phase)
+	v.hook.OnHook(domain.HookBeat{Cmd: v.phase, Started: true})
 }
 
 func (v *ProgressView) phaseFinished() {
+	label := v.phase
+	v.phase, v.phaseOpen = "", false
 	if v.hook == nil {
 		return
 	}
-	v.hook.OnHook(domain.HookBeat{Cmd: v.phase.Cmd, Duration: time.Since(v.started)})
+	v.hook.OnHook(domain.HookBeat{Cmd: label, Duration: time.Since(v.started)})
 	v.hook = nil
 	v.paint()
 }

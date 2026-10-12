@@ -93,3 +93,16 @@ func TestAPhaseCutShortLeavesNoTailBehind(t *testing.T) {
 	assert.True(t, strings.HasSuffix(out.String(), domain.AnsiClearBelow), "%q", out.String())
 	assert.NotContains(t, plain(out.String()), "✓")
 }
+
+func TestAPhaseThatPrintsNothingShowsNothing(t *testing.T) {
+	for _, live := range []bool{false, true} {
+		var out bytes.Buffer
+		view := render.NewProgressView(t.Context(), render.ProgressViewParams{W: &out, Human: true, Live: live})
+		report := kernel.Report(view, "feat/a")
+
+		report.Phase("worktree")()
+		view.Close()
+
+		assert.Empty(t, out.String(), "live: %v", live)
+	}
+}
