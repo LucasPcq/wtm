@@ -2,8 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -20,15 +18,9 @@ func interactiveForm(ctx context.Context, params FormParams) (dispatch.Reply, er
 		Request:  params.Request,
 		Options:  params.Options,
 		Names:    params.Names,
-		Plan:     func(detail json.RawMessage) string { return planOf(params, detail) },
+		Plan:     params.Detail.Plan,
 		Progress: params.Progress,
 	})
-}
-
-func planOf(params FormParams, detail json.RawMessage) string {
-	var b strings.Builder
-	params.Detail.Plan(&b, detail)
-	return b.String()
 }
 
 func confirmFollowUp(params ConfirmParams) (bool, error) {

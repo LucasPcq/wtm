@@ -1,7 +1,6 @@
 package form
 
 import (
-	"encoding/json"
 	"errors"
 	"strings"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/dispatch"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/styles"
 	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
@@ -67,18 +67,11 @@ func (s *session) recapText() string {
 	if s.preview == nil {
 		return s.describe(s.failure)
 	}
-	lines := []string{s.plan(s.preview.Plan.Detail)}
+	warnings := make([]string, 0, len(s.preview.Plan.Warnings))
 	for _, warning := range s.preview.Plan.Warnings {
-		lines = append(lines, domain.GlyphAttention+" "+message(warning.Code, warning.Params))
+		warnings = append(warnings, message(warning.Code, warning.Params))
 	}
-	return strings.Join(lines, "\n")
-}
-
-func (s *session) plan(detail json.RawMessage) string {
-	if s.params.Plan == nil {
-		return string(detail)
-	}
-	return strings.TrimRight(s.params.Plan(detail), "\n")
+	return styles.RenderPlan(styles.PlanParams{Rows: s.params.Plan(s.preview.Plan.Detail), Warnings: warnings})
 }
 
 type recapParams struct {

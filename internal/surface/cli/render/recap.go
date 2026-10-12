@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/styles"
 )
 
 const (
@@ -26,9 +28,13 @@ type RecapParams struct {
 // it was computed on, which --expect-fingerprint hands back to apply it.
 func Recap(w io.Writer, params RecapParams) {
 	SectionTitle(w, fmt.Sprintf(recapTitleFmt, params.Command))
-	params.Detail.Plan(w, params.Plan)
+	warnings := make([]string, 0, len(params.Warnings))
 	for _, warning := range params.Warnings {
-		Warning(w, WarningMessage(warning))
+		warnings = append(warnings, WarningMessage(warning))
+	}
+	plan := styles.RenderPlan(styles.PlanParams{Rows: params.Detail.Plan(params.Plan), Warnings: warnings})
+	for line := range strings.Lines(plan) {
+		fmt.Fprintln(w, Indent+strings.TrimSuffix(line, "\n"))
 	}
 	InfoLine(w, fingerprintLabel, params.Fingerprint)
 	NextSteps(w, params.Next)

@@ -20,7 +20,7 @@ type Params struct {
 	Request  json.RawMessage
 	Options  dispatch.Options
 	Names    func(path string) string
-	Plan     func(detail json.RawMessage) string
+	Plan     func(detail json.RawMessage) []styles.PlanRow
 	Progress kernel.Emitter
 }
 

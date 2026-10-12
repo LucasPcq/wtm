@@ -86,7 +86,7 @@ func TestADryRunShowsThePlanAndItsFingerprintAndAppliesNothing(t *testing.T) {
 
 	require.Equal(t, domain.ExitCodeOK, got.Code, got.Stderr)
 	assert.Contains(t, got.Stdout, "make · dry run, nothing applied")
-	assert.Contains(t, got.Stdout, "isolation")
+	assert.Contains(t, got.Stdout, "Isolation")
 	assert.Contains(t, got.Stdout, "fingerprint")
 	assert.Contains(t, got.Stdout, "wtm make feat/a --expect-fingerprint ")
 	assert.Empty(t, w.Repo.listed())
@@ -279,6 +279,6 @@ func TestACommandsOwnDetailShowsItsPlanAndItsDoneItems(t *testing.T) {
 	preview := w.run(t, args(commandName, "feat/a", "feat/b", "--dry-run"))
 	applied := w.run(t, args(commandName, "feat/a", "--yes"))
 
-	assert.Contains(t, preview.Stdout, "will make 2 worktrees")
+	assert.Contains(t, preview.Stdout, "2 to make")
 	assert.Contains(t, applied.Stdout, "feat/a  /wt/feat/a")
 }

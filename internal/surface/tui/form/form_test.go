@@ -15,7 +15,7 @@ func TestAConfirmedRecapAppliesThePlanItShowed(t *testing.T) {
 
 	reply, err := w.script(t, func(d *driver) {
 		fillAll(d)
-		assert.Contains(t, d.view(), `plan {"branches":["feat/a"],"from":"main"}`)
+		assert.Contains(t, d.view(), `{"branches":["feat/a"],"from":"main"}`)
 		d.key("enter")
 	})
 

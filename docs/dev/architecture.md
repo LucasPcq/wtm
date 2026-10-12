@@ -115,7 +115,7 @@ internal/
     shellcmd/                 ←   checks that a config command is a valid /bin/sh line
     execsvc/                  ←   runs one shell line in several worktrees at once
     memory/                   ←   writes the answers the wizard remembers ([wizard.remembered] in config.toml)
-  styles/                     ← all Lipgloss styles (only package allowed to instantiate lipgloss.Style)
+  styles/                     ← all Lipgloss styles (only package allowed to instantiate lipgloss.Style), and what every surface draws alike: an intro, a recap, the rows of a plan (RenderPlan)
   infra/                      ← git, and the state not yet moved to a package of its own (repos.json)
     fs/                       ←   the only writer of the files wtm keeps: UpdateFile (lock on <path>.lock, read,
                                   Mutate, temp file + fsync + rename), ReplaceFile for the daemon's index,

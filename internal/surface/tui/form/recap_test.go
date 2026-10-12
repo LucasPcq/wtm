@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/LucasPcq/wtm/internal/dispatch"
@@ -32,7 +33,7 @@ func TestTheRecapIsThePlanAsTheCommandDrawsItThenItsWarnings(t *testing.T) {
 
 	assert.Contains(t, view, applyLabel)
 	assert.Contains(t, view, domain.WizardCancelLabel)
-	assert.Equal(t, "plan {\"branches\":[\"feat/a\"]}\n"+domain.GlyphAttention+" ran without operation locks", w.session.recapText())
+	assert.Equal(t, "Plan  {\"branches\":[\"feat/a\"]}\n"+domain.GlyphAttention+" ran without operation locks", ansi.Strip(w.session.recapText()))
 }
 
 func TestChoicesThatFailEndTheRunWithTheirError(t *testing.T) {

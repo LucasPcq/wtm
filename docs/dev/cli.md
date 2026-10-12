@@ -23,7 +23,7 @@ var createCmd = cli.Bind(create.Name, cli.Doc{
 | -- | -- |
 | `Positional(path)` | the field takes the arguments instead of a flag: all of them for a list field, one otherwise (two is a `422 too_many`). A bool or decisions field cannot be positional |
 | `Flag(FlagParams{Path, Name, Short})` | the field's flag is spelled `Name` instead of its path, or gets a short form |
-| `Detail(render.Detail)` | the command renders its plan and its done items itself |
+| `Detail(render.Detail)` | the command gives the rows of its plan and renders its done items itself |
 | `GenericDetail()` | the generic rendering is declared enough |
 
 ## Flags

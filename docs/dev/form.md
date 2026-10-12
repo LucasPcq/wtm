@@ -10,7 +10,7 @@ reply, err := form.Run(ctx, form.Params{
 	Request:  request,   // what the flags filled, as JSON
 	Options:  options,   // --ask, --dry-run, the correlation id
 	Names:    spell,     // a field's spelling on the command line: --from, <branches>
-	Plan:     plan,      // the plan as the command's render.Detail draws it
+	Plan:     rows,      // the rows of a plan: the command's render.Detail.Plan
 	Progress: view,      // the progress view of the command line, on stderr
 })
 ```
@@ -22,7 +22,7 @@ The command line calls it on an interactive run of a command — stdin a termina
 1. **`Observe` once**, behind a loading box: the facts and their fingerprint, kept while the user types. On `--ask`, `Forget` drops the remembered answers from the facts the form evaluates on; the facts as observed still say what they were.
 2. **A step per field** of the schema, in order, then the recap. A step is built when the wizard enters it: the request is the flags' plus the answer of every step asked before, `State` is called on it (pure, no I/O), and the field is asked or settled.
 3. **`Choices`** for an asked field that has them, cached under the field's path and the values of what it `DependsOn`: they are listed again only when one of those changes.
-4. **The recap**: `Run` with `DryRun`, then the plan, its warnings, « Yes, apply » / « No, cancel ».
+4. **The recap**: `Run` with `DryRun`, then the plan and its warnings drawn by `styles.RenderPlan`, as the dry run of the command line draws them ([output.md](output.md#a-command-on-the-engine)), « Yes, apply » / « No, cancel ».
 5. **The run**: once the wizard ends, `Run` with the fingerprint of the plan shown and `Surface: dispatch.SurfaceTUI`; its progress goes to the view the command line handed over, outside the wizard, so Ctrl+C is a signal again.
 6. **`412 plan.stale`** (the facts changed while the recap was on screen): the form observes again and reopens on the recap, every field answered before settled, the new plan shown under a banner saying the facts changed.
 

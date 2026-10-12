@@ -11,6 +11,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/dispatch"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/styles"
 	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 	"github.com/LucasPcq/wtm/internal/testutil/dispatchtest"
 )
@@ -41,11 +42,13 @@ func newWorld(t *testing.T, r *repo, params worldParams) *world {
 	require.True(t, ok)
 	progress := &dispatchtest.Progress{}
 	s := newSession(t.Context(), Params{
-		Entry:    entry,
-		Request:  json.RawMessage(params.Request),
-		Options:  params.Options,
-		Names:    func(path string) string { return "--" + path },
-		Plan:     func(detail json.RawMessage) string { return "plan " + string(detail) },
+		Entry:   entry,
+		Request: json.RawMessage(params.Request),
+		Options: params.Options,
+		Names:   func(path string) string { return "--" + path },
+		Plan: func(detail json.RawMessage) []styles.PlanRow {
+			return []styles.PlanRow{{Label: "Plan", Value: string(detail)}}
+		},
 		Progress: progress,
 	})
 	s.loading = func(params components.LoadingParams) error { return params.Work() }

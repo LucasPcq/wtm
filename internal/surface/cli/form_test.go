@@ -10,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/dispatch"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/styles"
 	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 )
 
@@ -68,5 +69,5 @@ func TestTheFormDrawsThePlanAsTheCommandsDetailDoes(t *testing.T) {
 	w.run(t, runParams{Args: []string{commandName, "feat/a"}, TTY: true})
 
 	assert.Equal(t, pathDetail{}, detail)
-	assert.Contains(t, planOf(FormParams{Detail: detail}, json.RawMessage(`{"branches":["feat/a"]}`)), "will make 1 worktrees")
+	assert.Equal(t, []styles.PlanRow{{Label: "Worktrees", Value: "1 to make"}}, detail.Plan(json.RawMessage(`{"branches":["feat/a"]}`)))
 }
