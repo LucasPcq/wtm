@@ -50,7 +50,8 @@ func SetIsolation(ctx context.Context, params SetIsolationParams) error {
 	}
 
 	return (store.MetaDisk{StateDir: params.Ref.StateDir}).Update(ctx, store.MetaUpdate{
-		Branch: params.Ref.Branch,
+		Branch:  params.Ref.Branch,
+		Missing: store.MissingCreate,
 		Change: func(meta *domain.WorktreeMetadata) error {
 			meta.Isolation = rules.EffectiveIsolation(params.Isolation)
 			return nil

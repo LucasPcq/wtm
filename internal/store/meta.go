@@ -37,13 +37,14 @@ type MetaRecord struct {
 // Missing is what Update does with a record it finds absent.
 type Missing int
 
+// The zero value refuses: a writer that creates a record says so.
 const (
+	// MissingRefuse returns an error wrapping os.ErrNotExist.
+	MissingRefuse Missing = iota
 	// MissingCreate starts from the zero record, also when the stored one does not read.
-	MissingCreate Missing = iota
+	MissingCreate
 	// MissingSkip writes nothing: the main checkout never gets a record.
 	MissingSkip
-	// MissingRefuse returns an error wrapping os.ErrNotExist.
-	MissingRefuse
 )
 
 type MetaUpdate struct {

@@ -67,7 +67,8 @@ type AdoptParams struct {
 // first use, as for a created worktree.
 func Adopt(ctx context.Context, params AdoptParams) error {
 	return (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
-		Branch: params.Branch,
+		Branch:  params.Branch,
+		Missing: store.MissingCreate,
 		Change: func(metadata *domain.WorktreeMetadata) error {
 			metadata.SourceBranch = params.Parent
 			metadata.CreatedAt = time.Now().UTC().Format(time.RFC3339)

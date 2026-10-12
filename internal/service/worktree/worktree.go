@@ -114,7 +114,8 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 	}
 
 	if err := (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
-		Branch: params.Branch,
+		Branch:  params.Branch,
+		Missing: store.MissingCreate,
 		Change: func(stored *domain.WorktreeMetadata) error {
 			*stored = metadata
 			return nil

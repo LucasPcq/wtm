@@ -30,9 +30,11 @@ err := meta.Update(ctx, store.MetaUpdate{
 
 | `Missing` | Absent record | Unreadable record |
 | -- | -- | -- |
-| `MissingCreate` (zero value) | `Change` starts from the zero record | `Change` starts from the zero record |
+| `MissingRefuse` (zero value) | an error wrapping `os.ErrNotExist` | an error |
+| `MissingCreate` | `Change` starts from the zero record | `Change` starts from the zero record |
 | `MissingSkip` | nothing is written: the main checkout never gets a record | an error |
-| `MissingRefuse` | an error wrapping `os.ErrNotExist` | an error |
+
+The zero value refuses: a writer that creates a record says so (`Create`, the ordinal, the isolation, `Adopt`), and one that forgets creates nothing.
 
 - `Purge` drops the record's directory, its lock included: a record left behind would keep its ordinal reserved. A branch that does not name one directory under `worktrees/` purges nothing (`rules.PurgeableMetaDir`).
 

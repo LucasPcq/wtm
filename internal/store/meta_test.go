@@ -30,7 +30,7 @@ func TestARecordIsKeptUnderItsEncodedBranch(t *testing.T) {
 	stateDir := t.TempDir()
 	meta := store.MetaDisk{StateDir: stateDir}
 
-	require.NoError(t, meta.Update(t.Context(), store.MetaUpdate{Branch: "feat/a", Change: func(m *domain.WorktreeMetadata) error {
+	require.NoError(t, meta.Update(t.Context(), store.MetaUpdate{Branch: "feat/a", Missing: store.MissingCreate, Change: func(m *domain.WorktreeMetadata) error {
 		m.SourceBranch = "main"
 		return nil
 	}}))
@@ -88,6 +88,19 @@ func TestUpdateOfAnAbsentRecordFollowsMissing(t *testing.T) {
 			assert.Equal(t, want.wantRecord, loadErr == nil)
 		})
 	}
+}
+
+func TestAnUpdateThatSaysNothingOfAnAbsentRecordCreatesNone(t *testing.T) {
+	meta := store.MetaDisk{StateDir: t.TempDir()}
+
+	err := meta.Update(t.Context(), store.MetaUpdate{Branch: "feat/a", Change: func(m *domain.WorktreeMetadata) error {
+		m.Ordinal = 1
+		return nil
+	}})
+
+	require.ErrorIs(t, err, os.ErrNotExist)
+	_, loadErr := meta.Load("feat/a")
+	require.ErrorIs(t, loadErr, os.ErrNotExist)
 }
 
 func TestAnUnreadableRecordIsRebuiltOnlyWhenMissingCreates(t *testing.T) {

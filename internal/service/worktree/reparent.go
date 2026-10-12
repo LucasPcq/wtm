@@ -102,8 +102,7 @@ type setSourceBranchParams struct {
 func setSourceBranch(ctx context.Context, params setSourceBranchParams) (domain.ReparentResult, error) {
 	old := ""
 	err := (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
-		Branch:  params.Branch,
-		Missing: store.MissingRefuse,
+		Branch: params.Branch,
 		Change: func(meta *domain.WorktreeMetadata) error {
 			old = meta.SourceBranch
 			meta.SourceBranch = params.NewParent
