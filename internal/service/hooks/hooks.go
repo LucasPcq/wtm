@@ -1,4 +1,4 @@
-// Package hooks implements the execution engine for on_create hooks.
+// Package hooks runs a worktree's lifecycle hooks, in order, and reports what they print and how they ended.
 package hooks
 
 import (

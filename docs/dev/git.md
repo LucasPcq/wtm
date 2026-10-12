@@ -38,7 +38,7 @@ worktrees, err := repo.Worktrees(ctx)
 | `FastForwardRef(branch)` | `fetch <Remote> <branch>:<branch>`: a branch checked out nowhere; git refuses anything but a fast-forward |
 | `MergeFFOnly{Worktree, Onto}` | `git -C <Worktree> merge --ff-only <Onto>`: a branch a worktree has checked out |
 
-A new branch is born with its worktree: `AddWorktree` with `NewBranch` is the whole `worktree` step of a saga, and there is no separate branch creation to undo. Its undo is `RemoveWorktree`, then `DeleteBranch` only when the step created the branch. `Checkout` is a sealed union: the start point exists only for a new branch.
+A new branch is born with its worktree: `AddWorktree` with `NewBranch` is the whole `worktree` step of a saga, and there is no separate branch creation to undo. Its undo is `RemoveWorktree`, then `DeleteBranch` only when the step created the branch: the pair is `service/gitwt` ([services.md](services.md)). `Checkout` is a sealed union: the start point exists only for a new branch.
 
 ## Errors
 

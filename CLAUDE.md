@@ -10,6 +10,7 @@ Mandatory coding standards for `wtm`. When in doubt, consult the `go-cli` skill 
 | [`docs/dev/commands.md`](docs/dev/commands.md) | touching `internal/kernel/`: the engine's contract (fields, rules, errors and their codes, results, `Each` / sagas) |
 | [`docs/dev/dispatch.md`](docs/dev/dispatch.md) | touching `internal/dispatch/`: the registry, the run order, operation locks and holders, the fingerprint, operation events, the test bench |
 | [`docs/dev/git.md`](docs/dev/git.md) | touching `internal/infra/git` or reaching git from a layer on the engine (`git.Repo`, `Reader` / `Writer`, `Ref`, `*git.Error`, the double `gittest.Fake`, `gitexec`) |
+| [`docs/dev/services.md`](docs/dev/services.md) | touching `service/gitwt`, `service/identity`, `service/runenv` or `hooks.Execute`, the services a command on the engine reaches a worktree through (reader or mutator, the snapshot, `Allocate`, what publishes) |
 | [`docs/dev/store.md`](docs/dev/store.md) | writing `meta.json`, `config.toml` or a managed `.env` (`store.Meta`, `ProjectConfig`, `EnvFiles`, the double `storetest.Fake`) |
 | [`docs/dev/state-files.md`](docs/dev/state-files.md) | writing any file, or changing the format of a state file (`fs.UpdateFile`, `fs.Change`, locks, schema versions) |
 | [`docs/dev/form.md`](docs/dev/form.md) | touching `internal/surface/tui/form`: the interactive form of a command on the engine (its loop over `dispatch`, which field it asks, a field per type, remembering, the recap and the run) |
@@ -92,7 +93,8 @@ Aim for near-zero comments; encode meaning in names and signatures (`Skip func(A
 main.go         the entry point: cli.Execute
 internal/
   domain/       types, errors, constants only
-  rules/        pure functions (stdlib + domain only, no I/O)
+  rules/        pure functions (stdlib + domain only, no I/O); a new decision goes in the sub-package
+                of its subject (rules/worktree, rules/runenv, rules/statefile), never at the root
   kernel/       the command engine's skeleton (stdlib only): fields, rules, errors, results, Each / sagas;
                 text/ its message catalogue, kerneltest/ the checks every command runs
   dispatch/     the engine's impure half, the one way a surface reaches a command: registry,
@@ -101,7 +103,8 @@ internal/
   config/       load & validate config.toml, run.toml, global config; writes the JSON schema beside each
   store/        the one writer of each state file: meta.json, config.toml's changes, the managed .env files
   flow/         each command's flow, surface-independent (one package per command)
-  service/      impure orchestration: git exec, I/O, hooks, the run daemon, the event bus
+  service/      impure orchestration: git exec, I/O, hooks, the run daemon, the event bus; gitwt,
+                identity, runenv and hooks.Execute are the engine's, a reader or a mutator each
   styles/       all Lipgloss styles
   infra/        git/ the one way the engine reaches git (git.Repo); fs/ the only writer of state files
                 (UpdateFile), proc/ processes and the Shield; at its root, the git functions of the
@@ -174,7 +177,7 @@ make release-notes VERSION=x.y.z   # print a CHANGELOG section as release notes
 make dupl          # clone report, informative only
 ```
 
-- Tests of the engine and of the layers built for it (`internal/kernel/`, `infra/fs`, `infra/git`, the `statefile` packages, `dispatch`, the generated command line in `surface/cli` and its rendering, the form in `surface/tui/form`, `store/`…) use testify (`assert`, `require`); each test file holds only `Test…` functions, the example and fakes in `fixture_test.go`, shared helpers in `helpers_test.go`. The rest of the repository keeps stdlib `testing`.
+- Tests of the engine and of the layers built for it (`internal/kernel/`, `infra/fs`, `infra/git`, the `statefile` packages, `dispatch`, the generated command line in `surface/cli` and its rendering, the form in `surface/tui/form`, `store/`, the engine's services `service/gitwt`, `identity`, `runenv`, `hooks.Execute` and the `rules/` sub-packages…) use testify (`assert`, `require`); each test file holds only `Test…` functions, the example and fakes in `fixture_test.go`, shared helpers in `helpers_test.go`. The rest of the repository keeps stdlib `testing`.
 - A new architectural rule goes into `tools/archlint`, not into a paragraph here. `.archlint-migrating` and `.deadcode-ignore` may only shrink; a new entry needs a stated reason. See `docs/dev/lint.md`.
 - `.claude/hooks/pre-commit-gates.sh` runs `make lint` and a `go mod tidy` check on every `git commit` and blocks it on failure. It does not run the tests. `WTM_SKIP_GATES=1 git commit …` only when the gate itself is wrong.
 - **Invoke the `build-validator` subagent before marking any task done** — it adds the `-race` test suite, dependency hygiene and the duplication report.
