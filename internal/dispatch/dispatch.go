@@ -52,20 +52,3 @@ func randomOpID() kernel.OpID {
 	_, _ = rand.Read(raw)
 	return kernel.OpID(hex.EncodeToString(raw))
 }
-
-type Surface string
-
-const (
-	SurfaceCLI  Surface = "cli"
-	SurfaceTUI  Surface = "tui"
-	SurfaceHTTP Surface = "http"
-	SurfaceGUI  Surface = "gui"
-)
-
-type Options struct {
-	DryRun            bool
-	ExpectFingerprint Fingerprint
-	IgnoreRemembered  bool
-	Surface           Surface
-	CorrelationID     string
-}

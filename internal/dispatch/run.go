@@ -11,6 +11,23 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules/statefile"
 )
 
+type Surface string
+
+const (
+	SurfaceCLI  Surface = "cli"
+	SurfaceTUI  Surface = "tui"
+	SurfaceHTTP Surface = "http"
+	SurfaceGUI  Surface = "gui"
+)
+
+type Options struct {
+	DryRun            bool
+	ExpectFingerprint Fingerprint
+	IgnoreRemembered  bool
+	Surface           Surface
+	CorrelationID     string
+}
+
 type RunParams[Req any] struct {
 	Request  Req
 	Options  Options
