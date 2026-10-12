@@ -11,6 +11,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/styles"
 )
 
 // The tests of the generated command line share one example, shaped like
@@ -193,10 +194,10 @@ func inventoryQuery(r *repo) kernel.Query[struct{}, inventory] {
 // of each worktree made.
 type pathDetail struct{}
 
-func (pathDetail) Plan(w io.Writer, detail json.RawMessage) {
+func (pathDetail) Plan(detail json.RawMessage) []styles.PlanRow {
 	var p plan
 	_ = json.Unmarshal(detail, &p)
-	fmt.Fprintf(w, "  will make %d worktrees\n", len(p.Branches))
+	return []styles.PlanRow{{Label: "Worktrees", Values: []string{fmt.Sprintf("%d to make", len(p.Branches))}}}
 }
 
 func (pathDetail) Item(w io.Writer, item kernel.Item[json.RawMessage]) {

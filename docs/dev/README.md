@@ -13,6 +13,7 @@ Reference documentation for people (and agents) working **on** wtm. It describes
 | [flow-layer.md](flow-layer.md) | `internal/flow/` — the three seams, the step model, unattended resolution, embedding, scheduling, events, testing a flow |
 | [adding-a-mutation-command.md](adding-a-mutation-command.md) | End-to-end recipe for a new worktree-mutating command |
 | [cli.md](cli.md) | `internal/surface/cli` — the command line: a command generated from the registry (`cli.Bind`, its flags), its run, the parity of the registry and the tree, the root (signals, `--quiet`, exit code) |
+| [form.md](form.md) | `internal/surface/tui/form` — the interactive form of a command on the engine: its loop over `dispatch`, which field it asks, a field per type, choices and refresh, remembering, the recap and the run, backing out |
 | [output.md](output.md) | What a command prints: the one question a block has to answer, the frame and the accent bar, the four levels, the two shapes of a conclusion, the glyph vocabulary, `--quiet`, a command on the engine (generic rendering, the v2 envelope, exit codes) |
 | [run-addressing.md](run-addressing.md) | Named URLs: proxy vs redirection vs public port, and what `addressing` writes into a `.env` |
 | [shared-services.md](shared-services.md) | `scope = "shared"`: one instance for the repository, one namespace per worktree, and why the job table is the reference count |

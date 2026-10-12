@@ -2,7 +2,7 @@
 
 `internal/dispatch/` is the impure half of the command engine, beside the pure contract of [commands.md](commands.md): the one way a surface reaches a command or a query. It takes the operation locks, observes, fills in the defaults, validates, plans, checks the fingerprint, applies and publishes what happened, in the same order for every command, so the locks, the fingerprint and the events apply whatever the surface (the CLI, the form, later an API).
 
-Its surfaces are the generated command line ([cli.md](cli.md)) and, next, the form (LUC-289). No command runs through it yet: the registry holds the `operations` query, and `create` is the first command (step 3 of LUC-283).
+Its surfaces are the generated command line ([cli.md](cli.md)) and the interactive form ([form.md](form.md)). No command runs through it yet: the registry holds the `operations` query, and `create` is the first command (step 3 of LUC-283).
 
 ## Building it
 
@@ -19,12 +19,14 @@ created := dispatch.Register(dispatch.RegisterParams[create.Request, create.Fact
 registry := dispatch.Registry{created, dispatch.RegisterQuery(operations.Query(d.Operations))}
 ```
 
+`Register` panics on a command whose plan detail `P` is not a struct: every surface shows a plan as its fields ([output.md](output.md#a-command-on-the-engine)).
+
 `Dispatcher.Registry()` is the registry the surfaces serve, built on that dispatcher: every command with its real ports, every query. A command enters the product by its line there. The command line reads it once on a dispatcher with no `Params` for the names and the fields (that dispatcher is never run), then on the dispatcher of the repository a command runs in.
 
 `Now`, `NewOpID` and `Shield` default to the clock, a random id and `proc.Shield`; the test bench replaces them.
 
 - **`Handle[Req, F, P, D]`** is a command bound to its dispatcher: typed, for a surface written for that command.
-- **`Registry`** is the list of what a surface can run, an `Entry` per command or query, found by `Lookup(name)`. An `Entry` erases the types: `Call` reads the request as JSON (its names are the paths of the fields) and answers a sealed `Reply`, a `CommandReply` (the `Result` with its plan and item details as JSON, statuses typed) or a `QueryReply` (the view as JSON). A field the request does not have is a `422` naming it (`unknown_field`), never ignored.
+- **`Registry`** is the list of what a surface can run, an `Entry` per command or query, found by `Lookup(name)`. An `Entry` erases the types: `Call` reads the request as JSON (its names are the paths of the fields) and answers a sealed `Reply`, a `CommandReply` (the `Result` with its plan and item details as JSON, statuses typed) or a `QueryReply` (the view as JSON). A field the request does not have is a `422` naming it (`unknown_field`), never ignored. `Entry.Fillable()` is the entry a form fills: a command's, never a query's.
 
 ## The form
 
@@ -36,6 +38,18 @@ registry := dispatch.Registry{created, dispatch.RegisterQuery(operations.Query(d
 | `Choices(ctx, ChoicesParams{Path, Request, Facts})` | the field's options, each that would break a rule carrying its `Refusal` (`kernel.Disabled`) | the field's own I/O |
 
 A form keeps the snapshot while the user types: entering a value calls `State` again, never `Observe`. The fingerprint of the snapshot shown in the recap is the one handed to `Run`.
+
+A surface that serves every command reaches the same calls through a `Fillable`, with no type of the command's: the request is JSON, decoded as `Call` decodes it (a field the request does not have is a `422`), and the facts are an opaque `Observed` the entry hands back to itself.
+
+| `Fillable` | The `Handle` call |
+| -- | -- |
+| `Observe(ctx)` → `Observed{Fingerprint}` | `Observe` |
+| `Forget(Observed)` | `Forget`, the fingerprint kept: it is the one of the facts as observed |
+| `State(FillParams{Request, Facts})` → `kernel.Form[json.RawMessage]` | `State` |
+| `Choices(ctx, FillChoicesParams{Path, Request, Facts})` | `Choices` |
+| `Set(SetParams{Request, Path, Value})` → the request with the value at its path | `kernel.Set` on the typed request: a value of the wrong shape is a `422` |
+
+Facts another entry observed are an internal error.
 
 ## The run
 
@@ -118,4 +132,4 @@ On the bus (`docs/guide/events.md`) an applied run sends `operation.started`, on
 
 `internal/testutil/dispatchtest` runs a command through `dispatch` with no surface: `dispatchtest.New(t, BenchParams{})` is a dispatcher on doubles (a recording `Bus`, a fixed `Clock`, operations numbered `op-1`, `op-2`…, a temporary state dir), and `dispatchtest.Run(ctx, RunParams{Bench, Command, Request, Options})` returns the `Result`, the error and the `Progress` collected. A command's own ports are doubled beside the package that declares them. It replaces `flowtest` as the commands migrate.
 
-The tests of `internal/dispatch` follow the kernel's layout, with testify: a test file per source file holding only `Test…` functions; `fixture_test.go`, an example shaped like `create` over a fake repository; `helpers_test.go`, the helpers and `TestHelperProcess`, which holds locks from another process for the all-or-nothing test.
+The tests of `internal/dispatch` follow the kernel's layout, with testify: a test file per source file holding only `Test…` functions (`fill_test.go` for the `Fillable`); `fixture_test.go`, an example shaped like `create` over a fake repository; `helpers_test.go`, the helpers and `TestHelperProcess`, which holds locks from another process for the all-or-nothing test.

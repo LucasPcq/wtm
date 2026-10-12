@@ -3,13 +3,12 @@ package render_test
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/styles"
 	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 )
 
@@ -71,30 +70,32 @@ func TestADoneItemIsShownByTheCommandsOwnDetail(t *testing.T) {
 }
 
 func TestTheGenericPlanIsItsFieldsInTheirOwnOrder(t *testing.T) {
-	var out bytes.Buffer
+	rows := render.GenericDetail{}.Plan(json.RawMessage(`{"isolation":"isolated","branches":["feat/a","feat/b"],"count":2,"nested":{"a":1}}`))
 
-	render.GenericDetail{}.Plan(&out, json.RawMessage(`{"isolation":"isolated","branches":["feat/a","feat/b"],"count":2,"nested":{"a":1}}`))
-
-	assert.Equal(t, lines(
-		"  isolation  isolated",
-		"  branches   feat/a, feat/b",
-		"  count      2",
-		`  nested     {"a":1}`,
-	), plain(out.String()))
+	assert.Equal(t, []styles.PlanRow{
+		{Label: "Isolation", Values: []string{"isolated"}},
+		{Label: "Branches", Values: []string{"feat/a", "feat/b"}},
+		{Label: "Count", Values: []string{"2"}},
+		{Label: "Nested", Values: []string{`{"a":1}`}},
+	}, rows)
 }
 
-func TestAPlanThatIsNotAnObjectIsOneLine(t *testing.T) {
-	var out bytes.Buffer
+func TestAPlanThatIsNotAnObjectIsOneRowWithoutALabel(t *testing.T) {
+	rows := render.GenericDetail{}.Plan(json.RawMessage(`"feat/a"`))
 
-	render.GenericDetail{}.Plan(&out, json.RawMessage(`"feat/a"`))
-
-	assert.Equal(t, "    feat/a\n", plain(out.String()))
+	assert.Equal(t, []styles.PlanRow{{Values: []string{"feat/a"}}}, rows)
 }
 
-type pathDetail struct{}
+func TestAGenericPlanSpellsEachKeyAsALabelAndEachValueAsText(t *testing.T) {
+	rows := render.GenericDetail{}.Plan(json.RawMessage(`{"branches":["feat/a","feat/b"],"base_branch":"main","pushAfter":true,"hooks":[],"env":{".env":"link",".env.local":"copy"},"ports":3,"note":null}`))
 
-func (pathDetail) Plan(io.Writer, json.RawMessage) {}
-
-func (pathDetail) Item(w io.Writer, item kernel.Item[json.RawMessage]) {
-	fmt.Fprintf(w, "    %s  %s\n", item.Subject, item.Detail)
+	assert.Equal(t, []styles.PlanRow{
+		{Label: "Branches", Values: []string{"feat/a", "feat/b"}},
+		{Label: "Base branch", Values: []string{"main"}},
+		{Label: "Push after", Values: []string{"yes"}},
+		{Label: "Hooks", Values: []string{"none"}},
+		{Label: "Env", Values: []string{".env → link", ".env.local → copy"}},
+		{Label: "Ports", Values: []string{"3"}},
+		{Label: "Note", Values: []string{"none"}},
+	}, rows)
 }

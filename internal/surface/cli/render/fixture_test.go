@@ -3,6 +3,8 @@ package render_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"strings"
 	"sync"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/styles"
 )
 
 // The helpers the tests of the engine's rendering share.
@@ -25,6 +28,14 @@ func asFlag(path string) string {
 }
 
 // plain is what a terminal shows of out, without its escapes.
+type pathDetail struct{}
+
+func (pathDetail) Plan(json.RawMessage) []styles.PlanRow { return nil }
+
+func (pathDetail) Item(w io.Writer, item kernel.Item[json.RawMessage]) {
+	fmt.Fprintf(w, "    %s  %s\n", item.Subject, item.Detail)
+}
+
 func plain(out string) string {
 	return ansi.Strip(out)
 }

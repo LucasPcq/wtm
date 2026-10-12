@@ -21,38 +21,37 @@ var (
 	// IntroNote renders the secondary "Detected: …" line of an intro callout.
 	IntroNote = lipgloss.NewStyle().Foreground(ColorSuccess).Italic(true)
 
-	// RecapTitle renders the header of a final recap step as a filled pill, so the
-	// recap reads immediately as the synthesis / action point — visually distinct
-	// from a plain intro callout title.
+	// RecapTitle renders the header of a recap in a command's frame as a filled
+	// pill: the contrast element of the command line's output (output.md).
 	RecapTitle = lipgloss.NewStyle().
 			Background(ColorPrimary).
 			Foreground(ColorBadgeFg).
 			Bold(true).
 			PaddingLeft(1).
 			PaddingRight(1)
+
+	// WizardRecapTitle renders the header of a wizard's last step: no fill and no
+	// padding, so its first letter stands in the column of the plan beneath.
+	WizardRecapTitle = lipgloss.NewStyle().Foreground(ColorPrimary).Bold(true)
 )
 
-// RenderRecap renders a final recap block: a filled "Review & confirm" header
-// pill above a word-wrapped body (the selection recap + any ⚠ warnings), inside
-// the same accent bar as an intro. The filled header sets it apart from an intro
-// callout so it reads as the synthesis and action point.
+// RenderRecap renders a final recap block: a "Review & confirm" header above a
+// word-wrapped body (the selection recap + any ⚠ warnings), inside the same
+// accent bar as an intro. In a frame the header is a pill; in a wizard it is
+// plain, aligned on the body.
 func RenderRecap(p IntroParams) string {
-	width := p.Width
-	if width <= 0 {
-		width = 80
-	}
-	box, chrome := recapBox(p)
-	inner := width - chrome
-	if inner < 24 {
-		inner = 24
-	}
+	box, inner := recapBox(p)
 	title := p.Title
 	if title == "" {
 		title = "Review & confirm"
 	}
 
 	var b strings.Builder
-	b.WriteString(RecapTitle.Render(title))
+	heading := WizardRecapTitle
+	if p.InFrame {
+		heading = RecapTitle
+	}
+	b.WriteString(heading.Render(title))
 	b.WriteString("\n\n")
 	b.WriteString(p.Body)
 	if p.Note != "" {
@@ -76,14 +75,25 @@ type IntroParams struct {
 	InFrame bool
 }
 
-// recapBox is the box a recap is drawn in, and how much room it costs. In a
+// RecapBodyWidth is how many columns the body of a recap has: what a plan
+// drawn in it wraps at.
+func RecapBodyWidth(params IntroParams) int {
+	box, inner := recapBox(params)
+	return inner - box.GetHorizontalPadding()
+}
+
+// recapBox is the box a recap is drawn in, and the width it is given. In a
 // frame it is a plain indent: the frame's own bar is the marker.
 func recapBox(params IntroParams) (lipgloss.Style, int) {
+	width := params.Width
+	if width <= 0 {
+		width = 80
+	}
 	if params.InFrame {
-		return lipgloss.NewStyle().MarginLeft(2), 4
+		return lipgloss.NewStyle().MarginLeft(2), max(width-4, 24)
 	}
 	// Margin (2) + border (1) + left padding (2) + right slack.
-	return IntroBox, 8
+	return IntroBox, max(width-8, 24)
 }
 
 // RenderIntro renders a section-intro callout: a bold title, a word-wrapped

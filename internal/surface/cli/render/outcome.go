@@ -5,11 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
+	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/kernel"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/styles"
 )
 
 const (
@@ -22,7 +26,11 @@ const (
 	labelSkipped   = "skipped"
 	labelCancelled = "cancelled"
 	listSeparator  = ", "
+	pairFmt        = "%s " + domain.MoveArrowGlyph + " %s"
+	jsonNull       = "null"
 )
+
+var yesNo = map[bool]string{true: "yes", false: "no"}
 
 var reasonLabels = map[kernel.Reason]string{
 	kernel.ReasonInterrupted: "interrupted",
@@ -32,19 +40,25 @@ var reasonLabels = map[kernel.Reason]string{
 	kernel.ReasonLocked:      "locked",
 }
 
-// Detail renders what belongs to one command in its results: the plan a dry
-// run shows, and a done item worth a line of its own — a path, a URL.
+// Detail renders what belongs to one command in its results: the rows of the
+// plan a dry run and the form's recap show, drawn alike by styles.RenderPlan,
+// and a done item worth a line of its own — a path, a URL.
 type Detail interface {
-	Plan(w io.Writer, detail json.RawMessage)
+	Plan(detail json.RawMessage) []styles.PlanRow
 	Item(w io.Writer, item kernel.Item[json.RawMessage])
 }
 
 // GenericDetail is the detail of a command with nothing of its own to show: the
-// plan as label-value rows, each done item folded into the count.
+// plan's fields as rows, in their order, each done item folded into the count.
 type GenericDetail struct{}
 
-func (GenericDetail) Plan(w io.Writer, detail json.RawMessage) {
-	announceRows(w, rowsOf(detail))
+func (GenericDetail) Plan(detail json.RawMessage) []styles.PlanRow {
+	fields := fieldsOf(detail)
+	rows := make([]styles.PlanRow, 0, len(fields))
+	for _, field := range fields {
+		rows = append(rows, styles.PlanRow{Label: labelOfKey(field.key), Values: valuesOf(field.value)})
+	}
+	return rows
 }
 
 func (GenericDetail) Item(io.Writer, kernel.Item[json.RawMessage]) {}
@@ -157,47 +171,108 @@ func itemWhy(item kernel.Item[json.RawMessage]) string {
 // rowsOf reads a detail object as rows in its own key order; a detail that is
 // not an object is one row with no label.
 func rowsOf(detail json.RawMessage) []AnnounceItem {
-	decoder := json.NewDecoder(bytes.NewReader(detail))
-	if token, err := decoder.Token(); err != nil || token != json.Delim('{') {
-		return []AnnounceItem{{Value: scalarText(detail)}}
-	}
-	var rows []AnnounceItem
-	for decoder.More() {
-		row, ok := nextRow(decoder)
-		if !ok {
-			return rows
-		}
-		rows = append(rows, row)
+	fields := fieldsOf(detail)
+	rows := make([]AnnounceItem, 0, len(fields))
+	for _, field := range fields {
+		rows = append(rows, AnnounceItem{Label: field.key, Value: joined(valuesOf(field.value))})
 	}
 	return rows
 }
 
-func nextRow(decoder *json.Decoder) (AnnounceItem, bool) {
+type field struct {
+	key   string
+	value json.RawMessage
+}
+
+// fieldsOf reads a detail object's fields in its own key order; a detail that
+// is not an object is one field with no key.
+func fieldsOf(detail json.RawMessage) []field {
+	decoder := json.NewDecoder(bytes.NewReader(detail))
+	if token, err := decoder.Token(); err != nil || token != json.Delim('{') {
+		return []field{{value: detail}}
+	}
+	var fields []field
+	for decoder.More() {
+		next, ok := nextField(decoder)
+		if !ok {
+			return fields
+		}
+		fields = append(fields, next)
+	}
+	return fields
+}
+
+func nextField(decoder *json.Decoder) (field, bool) {
 	token, err := decoder.Token()
 	if err != nil {
-		return AnnounceItem{}, false
+		return field{}, false
 	}
 	key, ok := token.(string)
 	if !ok {
-		return AnnounceItem{}, false
+		return field{}, false
 	}
 	var value json.RawMessage
 	if err := decoder.Decode(&value); err != nil {
-		return AnnounceItem{}, false
+		return field{}, false
 	}
-	return AnnounceItem{Label: key, Value: scalarText(value)}, true
+	return field{key: key, value: value}, true
 }
 
-// scalarText shows a string bare and a list of strings joined; anything else
-// as its JSON.
-func scalarText(value json.RawMessage) string {
+// valuesOf shows a string bare, a yes or a no, a list of strings as its items
+// and a map of strings as its pairs; nothing as none, anything else as its JSON.
+func valuesOf(value json.RawMessage) []string {
+	trimmed := bytes.TrimSpace(value)
+	if string(trimmed) == jsonNull {
+		return []string{domain.SummaryNone}
+	}
 	var text string
-	if json.Unmarshal(value, &text) == nil {
-		return text
+	if json.Unmarshal(trimmed, &text) == nil {
+		return []string{text}
+	}
+	var flag bool
+	if json.Unmarshal(trimmed, &flag) == nil {
+		return []string{yesNo[flag]}
 	}
 	var list []string
-	if json.Unmarshal(value, &list) == nil {
-		return strings.Join(list, listSeparator)
+	if json.Unmarshal(trimmed, &list) == nil {
+		return orNone(list)
 	}
-	return string(bytes.TrimSpace(value))
+	var pairs map[string]string
+	if json.Unmarshal(trimmed, &pairs) == nil {
+		shown := make([]string, 0, len(pairs))
+		for _, key := range slices.Sorted(maps.Keys(pairs)) {
+			shown = append(shown, fmt.Sprintf(pairFmt, key, pairs[key]))
+		}
+		return orNone(shown)
+	}
+	return []string{string(trimmed)}
+}
+
+func orNone(values []string) []string {
+	if len(values) == 0 {
+		return []string{domain.SummaryNone}
+	}
+	return values
+}
+
+func joined(values []string) string { return strings.Join(values, listSeparator) }
+
+// labelOfKey spells a key of a plan as a label: base_branch, base-branch and
+// baseBranch read Base branch.
+func labelOfKey(key string) string {
+	var b strings.Builder
+	for i, r := range key {
+		switch {
+		case r == '_' || r == '-':
+			b.WriteRune(' ')
+		case i == 0:
+			b.WriteRune(unicode.ToUpper(r))
+		case unicode.IsUpper(r):
+			b.WriteRune(' ')
+			b.WriteRune(unicode.ToLower(r))
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }

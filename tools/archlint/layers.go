@@ -62,8 +62,13 @@ var layers = map[string]layer{
 		external: []string{"github.com/charmbracelet/", "github.com/lrstanley/bubblezone", "golang.org/x/term"},
 		why:      "bubbletea models, rendering only",
 	},
+	"surface/tui/form": {
+		internal: []string{"dispatch", "domain", "kernel", "styles", "surface/tui"},
+		external: []string{"github.com/charmbracelet/"},
+		why:      "the form of a command on the engine, drawn with the wizard's components: it reaches the command through dispatch only, never flow/ or service/",
+	},
 	"surface/cli": {
-		internal: []string{"config", "dispatch", "domain", "flow", "infra", "kernel", "rules", "schemas", "service", "styles", "surface/cli/render", "surface/tui"},
+		internal: []string{"config", "dispatch", "domain", "flow", "infra", "kernel", "rules", "schemas", "service", "styles", "surface/cli/render", "surface/tui", "surface/tui/form"},
 		external: []string{"github.com/charmbracelet/bubbletea", "github.com/spf13/cobra", "golang.org/x/term"},
 		why:      "the command line: the commands generated from the dispatch registry, and the flag wiring of the commands still on flow/",
 	},

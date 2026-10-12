@@ -30,7 +30,8 @@ type world struct {
 }
 
 type worldParams struct {
-	Form Form
+	Form    Form
+	Confirm Confirm
 	// Detail is the example command's own rendering; none declares the
 	// generic one.
 	Detail render.Detail
@@ -49,6 +50,7 @@ func newWorld(t testing.TB, params worldParams) *world {
 		},
 		Dispatcher: func(context.Context) (*dispatch.Dispatcher, error) { return b.Dispatcher, nil },
 		Form:       params.Form,
+		Confirm:    params.Confirm,
 	})
 	return &world{Repo: r, Bench: b, Engine: engine, detail: detailOption(params.Detail)}
 }
@@ -170,4 +172,24 @@ func fieldsOf(t *testing.T, err kernel.Error) []kernel.FieldError {
 	invalid, ok := err.(*kernel.InvalidError)
 	require.True(t, ok, "got %T", err)
 	return invalid.Fields
+}
+
+// applyingForm is a form that asks nothing: it runs the request it is given,
+// keeping each one.
+func applyingForm(asked *[]string) Form {
+	return func(ctx context.Context, params FormParams) (dispatch.Reply, error) {
+		*asked = append(*asked, string(params.Request))
+		return params.Entry.Call(ctx, dispatch.Call{Request: params.Request, Options: params.Options, Progress: params.Progress})
+	}
+}
+
+// answering confirms the follow-ups with answers in turn, then declines.
+func answering(offered *[]string, answers ...bool) Confirm {
+	return func(params ConfirmParams) (bool, error) {
+		*offered = append(*offered, params.Command)
+		if len(*offered) > len(answers) {
+			return false, nil
+		}
+		return answers[len(*offered)-1], nil
+	}
 }

@@ -10,6 +10,7 @@ Mandatory coding standards for `wtm`. When in doubt, consult the `go-cli` skill 
 | [`docs/dev/commands.md`](docs/dev/commands.md) | touching `internal/kernel/`: the engine's contract (fields, rules, errors and their codes, results, `Each` / sagas) |
 | [`docs/dev/dispatch.md`](docs/dev/dispatch.md) | touching `internal/dispatch/`: the registry, the run order, operation locks and holders, the fingerprint, operation events, the test bench |
 | [`docs/dev/state-files.md`](docs/dev/state-files.md) | writing any file, or changing the format of a state file (`fs.UpdateFile`, `fs.Change`, locks, schema versions) |
+| [`docs/dev/form.md`](docs/dev/form.md) | touching `internal/surface/tui/form`: the interactive form of a command on the engine (its loop over `dispatch`, which field it asks, a field per type, remembering, the recap and the run) |
 | [`docs/dev/flow-layer.md`](docs/dev/flow-layer.md) | touching anything under `internal/flow/`, a Prompter/Presenter, a step kind, or the dashboard's run of a flow |
 | [`docs/dev/adding-a-mutation-command.md`](docs/dev/adding-a-mutation-command.md) | adding a worktree-mutating command |
 | [`docs/dev/cli.md`](docs/dev/cli.md) | touching `internal/surface/cli` itself: the root (signals, `--quiet`, exit code), a command generated from the registry (`cli.Bind`, its flags, its run), parity |
@@ -105,7 +106,8 @@ internal/
                 dispatch registry (cli.Bind); flag wiring → flow for the others (zero business logic)
       render/   format and print results (zero decision logic); the generic rendering of a
                 kernel result and the v2 envelope
-    tui/        Bubbletea models (rendering only): flowui (wizard), dashboard (`wtm ui`), runview
+    tui/        Bubbletea models (rendering only): form (the form of a command on the engine),
+                flowui (the wizard of a command on flow/), dashboard (`wtm ui`), runview
 ```
 
 The annotated map of every sub-package is in `docs/dev/architecture.md`.
@@ -118,6 +120,7 @@ The annotated map of every sub-package is in `docs/dev/architecture.md`.
 - `dispatch/` imports only `kernel/`, `domain/`, `rules/`, `infra/` and `query/`: a command's ports reach it as interfaces. `command/` and `query/` never import `dispatch/` or `surface/`, `surface/` never imports them, and `command/` never calls `context.Background()`/`context.TODO()` (`engine`). See `docs/dev/dispatch.md`.
 - `service/` never imports `cobra`, `bubbletea`, `lipgloss`.
 - `surface/cli/render/` and `surface/tui/` have zero decision logic — only rendering. `render` reads results from `kernel/`, never runs anything through `dispatch/`.
+- `surface/tui/form` reaches a command through `dispatch/` only (`Entry.Fillable`), never `flow/` or `service/`: it asks `State` and `Choices` what a field is rather than deciding it.
 - `styles/` is the only package allowed to instantiate `lipgloss.Style`.
 - `flow/` imports **only** `internal/service/`, `internal/rules/`, `internal/domain/` and the stdlib — never cobra, bubbletea, lipgloss, `surface/`, `config/` or `infra/`. Need something from `infra/`? Add a thin `service/` wrapper (e.g. `worktree.FindByBranch`).
 - `service/x` imports `service/y` only along an edge declared in `tools/archlint` (`serviceEdges`).
@@ -163,7 +166,7 @@ make release-notes VERSION=x.y.z   # print a CHANGELOG section as release notes
 make dupl          # clone report, informative only
 ```
 
-- Tests of the engine and of the layers built for it (`internal/kernel/`, `infra/fs`, the `statefile` packages, `dispatch`, the generated command line in `surface/cli` and its rendering, then `store/`, `infra/git`…) use testify (`assert`, `require`); each test file holds only `Test…` functions, the example and fakes in `fixture_test.go`, shared helpers in `helpers_test.go`. The rest of the repository keeps stdlib `testing`.
+- Tests of the engine and of the layers built for it (`internal/kernel/`, `infra/fs`, the `statefile` packages, `dispatch`, the generated command line in `surface/cli` and its rendering, the form in `surface/tui/form`, then `store/`, `infra/git`…) use testify (`assert`, `require`); each test file holds only `Test…` functions, the example and fakes in `fixture_test.go`, shared helpers in `helpers_test.go`. The rest of the repository keeps stdlib `testing`.
 - A new architectural rule goes into `tools/archlint`, not into a paragraph here. `.archlint-migrating` and `.deadcode-ignore` may only shrink; a new entry needs a stated reason. See `docs/dev/lint.md`.
 - `.claude/hooks/pre-commit-gates.sh` runs `make lint` and a `go mod tidy` check on every `git commit` and blocks it on failure. It does not run the tests. `WTM_SKIP_GATES=1 git commit …` only when the gate itself is wrong.
 - **Invoke the `build-validator` subagent before marking any task done** — it adds the `-race` test suite, dependency hygiene and the duplication report.

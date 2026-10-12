@@ -168,6 +168,9 @@ internal/
                                     outcome.go, recap.go, failure.go, progress.go: the generic
                                     rendering of a kernel result and the v2 envelope
     tui/                      ←   Bubbletea models (zero business logic, rendering only)
+      form/                   ←     the interactive form of a command on the engine: a wizard drawn
+                                    from its schema, state and choices through dispatch.Fillable,
+                                    its recap a dry run (docs/dev/form.md)
       flowui/                 ←     runs a flow.Session as the CLI wizard (the only translator
                                     between flow.Step and components.Step)
       dashboard/              ←     `wtm ui`, the second surface over flow/ (its own
@@ -193,6 +196,8 @@ internal/
 - `service/` has zero imports of `cobra`, `bubbletea`, `lipgloss`
 - `surface/cli/render/` and `surface/tui/` have zero decision logic — only rendering;
   `render` reads results from `kernel`, never runs anything through `dispatch`
+- `surface/tui/form` reaches a command through `dispatch` only (`Entry.Fillable`), never `flow/`
+  or `service/`: which field is asked, its errors and its options come from `State` and `Choices`
 - A command on the engine gets its command line from `cli.Bind` (flags from its fields, the
   generic run, rendering and v2 envelope); it adds only its `cli.Doc`, a positional, a renamed
   flag and its `render.Detail` or `GenericDetail()` — never a runner of its own
@@ -785,8 +790,9 @@ known:
 Each screen lives in its own package under `internal/surface/tui/`:
 ```
 internal/surface/tui/
-  components/      ← shared primitives (wizard, selectlist, multiselect, confirm)
-  flowui/          ← runs a flow.Session as the CLI wizard (every migrated command)
+  components/      ← shared primitives (wizard, selectlist, multiselect, confirm, decisionlist)
+  form/            ← the form of a command on the engine, over dispatch (docs/dev/form.md)
+  flowui/          ← runs a flow.Session as the CLI wizard (every command still on flow/)
   dashboard/       ← `wtm ui`, the second surface over flow/
   runview/         ← a job's PTY output replayed through a terminal emulator
   inittui/         ← global + project init wizards
@@ -893,7 +899,7 @@ Rules:
 
 The command engine and the layers built for it (`internal/kernel/`, `infra/fs`, the
 `statefile` packages, `dispatch`, the generated command line in `surface/cli` and its
-rendering, then `store/`, `infra/git`…) are tested with
+rendering, the form in `surface/tui/form`, then `store/`, `infra/git`…) are tested with
 testify (`assert`, `require`): a test reads as a specification. Each test file holds
 only `Test…` functions; a package's example and fakes live in `fixture_test.go`, the
 helpers its tests share in `helpers_test.go`. A command on the engine is run in its

@@ -115,7 +115,7 @@ internal/
     shellcmd/                 ←   checks that a config command is a valid /bin/sh line
     execsvc/                  ←   runs one shell line in several worktrees at once
     memory/                   ←   writes the answers the wizard remembers ([wizard.remembered] in config.toml)
-  styles/                     ← all Lipgloss styles (only package allowed to instantiate lipgloss.Style)
+  styles/                     ← all Lipgloss styles (only package allowed to instantiate lipgloss.Style), and what every surface draws alike: an intro, a recap, the rows of a plan (RenderPlan)
   infra/                      ← git, and the state not yet moved to a package of its own (repos.json)
     fs/                       ←   the only writer of the files wtm keeps: UpdateFile (lock on <path>.lock, read,
                                   Mutate, temp file + fsync + rename), ReplaceFile for the daemon's index,
@@ -138,6 +138,9 @@ internal/
       render/                 ←     format and print results (zero decision logic); for a command on the
                                     engine, the generic rendering of a kernel result and the v2 envelope
     tui/                      ←   Bubbletea models (zero business logic, rendering only)
+      form/                   ←     the interactive form of a command on the engine: a wizard drawn from
+                                    the command's schema, state and choices, its recap the plan of a dry
+                                    run, reached through dispatch only (form.md)
       flowui/                 ←     runs a flow.Session as a wizard (the only translator
                                     between flow.Step and components.Step)
       dashboard/              ←     `wtm ui`: the full-screen worktree dashboard, the second
@@ -158,6 +161,9 @@ flowchart TD
   commands --> config["config/"]
   commands --> dispatch["dispatch/"]
   output --> kernel["kernel/"]
+  commands --> form["surface/tui/form/"]
+  form --> dispatch
+  form --> kernel
   tui --> flow
   flow --> service["service/"]
   flow --> rules["rules/"]
@@ -179,7 +185,8 @@ Every arrow that is *missing* is the point:
 | `kernel/` imports only the stdlib | The skeleton carries no business vocabulary: a command composes `kernel` with `domain/`, never the reverse, so a change to the domain never reaches the contract every command, `dispatch` and surface share. I/O reaches it only as functions it is handed (`Observe`, `Apply`, the `Shield`). |
 | `command/` and `query/` never import `dispatch/` or `surface/`; `surface/` never imports them | A surface reaches a command through `dispatch` only, so the locks, the fingerprint and the events apply whatever the interface; a command never runs another inside its own locks. |
 | `service/` never imports cobra, bubbletea or lipgloss | The git operations are callable from a test, a flow, a daemon — anything that is not a terminal. |
-| `surface/cli/render/` and `surface/tui/` hold no decision logic | Two surfaces can render the same run without disagreeing about what it means. `render` reads a command's results from `kernel`, never runs one through `dispatch`. |
+| `surface/cli/render/` and `surface/tui/` hold no decision logic | Two surfaces can render the same run without disagreeing about what it means. `render` reads a command's results from `kernel`, never runs one through `dispatch`. The form asks `dispatch` what a field is (`State`, `Choices`) rather than deciding it. |
+| `surface/tui/form/` reaches a command through `dispatch` only, never `flow/` or `service/` | One form serves every command of the registry without knowing its types, and asks what any other surface would. |
 | `styles/` is the only package instantiating `lipgloss.Style` | A theme change is one file. |
 | `flow/` imports only `service/`, `rules/`, `domain/` and the stdlib | The flow cannot grow a dependency on the surface that runs it. This is what makes a second surface possible at all — see below. |
 

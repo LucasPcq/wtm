@@ -13,11 +13,12 @@ import (
 )
 
 // Entry erases a command's or a query's types: the request in and the details
-// out are JSON.
+// out are JSON. Only a command is Fillable: a query has no form.
 type Entry interface {
 	Name() string
 	Schema() []kernel.FieldSpec
 	Call(ctx context.Context, call Call) (Reply, error)
+	Fillable() (Fillable, bool)
 }
 
 type Call struct {

@@ -67,7 +67,7 @@ A visual system holds by its contrasts, not by its repetitions. If everything is
 | **A pill-titled block** (`styles.RenderRecap`) | a state you come back to | `init`, `run up`, `run down` |
 | **A callout** (`render.Callout`, bordered) | something still to act on | port isolation, proxy hints, withheld bindings |
 
-The pill is the contrast element and stays rare. A one-line conclusion in a box is five lines of chrome around one line of content — that is the reductio, and it is why the box is not the standard.
+The pill is the contrast element and stays rare. A wizard's last step draws the same block with a plain title (`styles.WizardRecapTitle`), its first letter in the column of the plan beneath: there the accent bar alone sets the block apart. A one-line conclusion in a box is five lines of chrome around one line of content — that is the reductio, and it is why the box is not the standard.
 
 ## The two shapes of a conclusion
 
@@ -199,10 +199,19 @@ A document that is a protocol elsewhere is not reused for output: `domain.JobInf
 
 A command generated from the registry ([cli.md](cli.md)) prints nothing of its own: its run is drawn by the generic rendering of `render`, from the `Result` dispatch returns, and every sentence comes from `kernel/text`. A command adds only its `render.Detail`, or declares `render.GenericDetail` enough.
 
+A plan is rows, never text: `Detail.Plan` turns the plan's detail into `styles.PlanRow`s (a label, its values), and `styles.RenderPlan` draws them the same in the dry run of the command line and in the recap of the form ([form.md](form.md)). A command chooses what its plan says, never how it looks:
+
+- labels aligned and muted, the values in a column after them;
+- a list that fits on its line joined (`feat/a, feat/b`), otherwise one item per line in the column of the values; a long value wraps in that column, at its spaces only, so a branch is never cut at a hyphen (the terminal's width in the command line, the recap's box in the form);
+- the warnings after a blank line, each behind `!`;
+- no row: `= nothing to do`, and nothing to apply — no `→` line in the dry run, no « Yes, apply » in the form.
+
+`GenericDetail` makes a row of each field of the detail, in its order: the key spelled as a label (`base_branch`, `baseBranch` → `Base branch`), a string bare, a bool `yes`/`no`, a list as its items, a map of strings as its pairs (`.env → link`), `null` and an empty list as `none`, anything else as its JSON. A plan's detail is always an object: `dispatch.Register` refuses a command whose `P` is not a struct.
+
 | Run | Human (`render`) | Stream |
 | -- | -- | -- |
 | applied | `Outcome`: a headline with the worst result and the count (`✓ create: 2 done`, `✗ create: 1 done · 1 failed`, `= create: nothing to do`), the done items only as `Detail.Item` shows them, every other item named with why (`✗ feat/b  worktree failed: …`, `! feat/c  not reached`), the warnings, the follow-ups as the command line that runs them (`→`) | stdout |
-| dry run | `Recap`: the plan (`Detail.Plan`; generically its fields as rows, in their order), its warnings, `fingerprint  <hash>`, and `→` the line that applies it with `--expect-fingerprint` | stdout |
+| dry run | `Recap`: the plan and its warnings (`styles.RenderPlan` on `Detail.Plan`), a blank line, `fingerprint  <hash>`, and `→` the line that applies it with `--expect-fingerprint` | stdout |
 | refused before applying | `Failure`: the error's sentence, then each field to fix by its flag (`<branches> is required`), each blocker and the flag that lifts it; a `412 plan.stale` points at a new `--dry-run` | stderr |
 | while applying | `ProgressView`: a `›` line for the unit at work and its status, a phase that prints (a hook) as a `HookView` replaced by `✓ on_create · feat/a (2.1s)` — one that prints nothing, a saga step, shows nothing, `Cancelling…` once the run's context is cancelled; erased before the conclusion. Off a terminal, a phase that prints is a title and its raw output; in JSON, the raw output alone | stderr |
 

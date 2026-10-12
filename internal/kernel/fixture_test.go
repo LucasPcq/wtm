@@ -29,6 +29,7 @@ type request struct {
 	URLPort   string            `json:"url_port,omitempty"`
 	Decisions map[string]string `json:"decisions,omitempty"`
 	Target    target            `json:"target"`
+	Remember  []string          `json:"remember,omitempty"`
 }
 
 type facts struct {

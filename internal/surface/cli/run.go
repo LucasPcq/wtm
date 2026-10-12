@@ -55,8 +55,19 @@ func (b *binding) run(cmd *cobra.Command, args []string) error {
 	if invalid != nil {
 		return b.fail(cmd, failParams{Route: way, Err: invalid})
 	}
-	reply, err := b.call(cmd, callParams{Route: way, Request: request})
-	return b.conclude(cmd, concludeParams{Route: way, Request: request, Reply: reply, Err: err})
+	return b.execute(cmd, callParams{Route: way, Request: request})
+}
+
+// execute calls, concludes, then offers the follow-ups of an interactive run
+// one by one: the failure of the run itself is the one that exits.
+func (b *binding) execute(cmd *cobra.Command, params callParams) error {
+	reply, err := b.call(cmd, params)
+	concluded := b.conclude(cmd, concludeParams{Route: params.Route, Request: params.Request, Reply: reply, Err: err})
+	followed := b.follow(cmd, followParams{Route: params.Route, Reply: reply})
+	if concluded != nil {
+		return concluded
+	}
+	return followed
 }
 
 type callParams struct {
@@ -76,8 +87,9 @@ func (b *binding) call(cmd *cobra.Command, params callParams) (dispatch.Reply, k
 	}
 	view := render.NewProgressView(ctx, render.ProgressViewParams{W: cmd.ErrOrStderr(), Human: params.Route.Human, Live: render.IsTerminal(cmd.ErrOrStderr())})
 	defer view.Close()
-	if params.Route.Interactive && b.engine.form != nil {
-		reply, err := b.engine.form(ctx, FormParams{Entry: entry, Request: params.Request, Options: params.Route.Options, Names: b.spell, Progress: view})
+	fillable, isCommand := entry.Fillable()
+	if params.Route.Interactive && b.engine.form != nil && isCommand {
+		reply, err := b.engine.form(ctx, FormParams{Entry: fillable, Request: params.Request, Options: params.Route.Options, Names: b.spell, Detail: b.detail, Progress: view})
 		return reply, classified(err)
 	}
 	reply, err := entry.Call(ctx, dispatch.Call{Request: params.Request, Options: params.Route.Options, Progress: view})
