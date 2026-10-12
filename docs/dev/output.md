@@ -178,6 +178,8 @@ It never touches a machine contract: `--output json` still emits its document, a
 
 The corollary is easy to lose. `domain.ErrAborted` means *the command already printed its own report*, and that stops being true the moment the report went to `io.Discard`: a run that exits non-zero having written nothing to either stream cannot be told from one that hung. So `--quiet` records that it silenced the writers, `Execute` prints the error even for `ErrAborted` when it did, and a site returning that sentinel over a refusal wraps its cause (`fmt.Errorf("%w: %s", domain.ErrAborted, …)`) so there is something to print. The same rule reaches the hook runner: with no reporter installed nobody has drawn the hook's result line, so `service/hooks` names the failing command in the error rather than leaving it anonymous.
 
+A command on the engine returns its report already written, wrapped with the one-line form of its failure (`render.FailureLine`): that line is what `Execute` prints when `--quiet` threw the report away.
+
 It is orthogonal to `--yes`, like the two bypass axes: `--quiet` still asks, `--yes` still reports, and a script that wants neither passes both.
 
 ## The machine contract
@@ -187,9 +189,58 @@ It is orthogonal to `--yes`, like the two bypass axes: `--quiet` still asks, `--
 - **One shape per command.** A command that acts on worktrees answers with an array of per-worktree documents even for one worktree (`run up`, `run down`, `run stop`, `run logs`); a single-subject command answers with one object (`run start`, `run job|profile add|edit|rm`). A shape that changed with the arity made every caller branch on how many worktrees it had named.
 - **A worktree is `branch` + `path`**, both, always — never `worktree` or `work_dir`. `domain.WorktreeRef` is the type when nothing else rides along. A job object is keyed `name`; anything pointing at a job from another object calls it `job`.
 - **`status` never claims an act that did not happen.** A stop that found nothing up is `not_running`, never `stopped`; a start that found the service already up is `already_running`, never `started`; a shared job let go of is `released`.
-- **Exit codes are part of the document.** `rules.ExitCode` maps the sentinels: `2` for a command line refused before the command ran (`cmd/usage.go` wraps cobra's flag and argument errors, an unknown `--output`, and `--output json` without `--yes` on a command marked by `shared.RequireYesInJSON`, in `domain.ErrUsage`; a refusal a command makes itself — a positional that does not parse, `--all` with a name — goes through `rules.Usage`, and belongs in the command's `Args` when it reads only the arguments), `14` for a job or profile run.toml does not declare (`ErrJobNotFound`, `ErrProfileNotFound`), checked by `target.RequireDeclared` before a flow asks anything or wakes the daemon.
+- **Exit codes are part of the document.** `rules.ExitCode` maps the sentinels: `2` for a command line refused before the command ran (`surface/cli/usage.go` wraps cobra's flag and argument errors, an unknown `--output`, and `--output json` without `--yes` on a command marked by `shared.RequireYesInJSON`, in `domain.ErrUsage`; a refusal a command makes itself — a positional that does not parse, `--all` with a name — goes through `rules.Usage`, and belongs in the command's `Args` when it reads only the arguments), `14` for a job or profile run.toml does not declare (`ErrJobNotFound`, `ErrProfileNotFound`), checked by `target.RequireDeclared` before a flow asks anything or wakes the daemon.
+
+A command on the engine follows the same rules through one envelope and one table of exit codes, below.
 
 A document that is a protocol elsewhere is not reused for output: `domain.JobInfo` is what the daemon speaks, so `run ps` writes `domain.RunningJob`, and renaming a key there never needs a daemon restart. `run list`, `run export` and `run import` are the exception to the naming rule on purpose — they are run.toml as JSON, and keep its keys (`job`, `profile`, `env_port`).
+
+## A command on the engine
+
+A command generated from the registry ([cli.md](cli.md)) prints nothing of its own: its run is drawn by the generic rendering of `render`, from the `Result` dispatch returns, and every sentence comes from `kernel/text`. A command adds only its `render.Detail`, or declares `render.GenericDetail` enough.
+
+| Run | Human (`render`) | Stream |
+| -- | -- | -- |
+| applied | `Outcome`: a headline with the worst result and the count (`✓ create: 2 done`, `✗ create: 1 done · 1 failed`, `= create: nothing to do`), the done items only as `Detail.Item` shows them, every other item named with why (`✗ feat/b  worktree failed: …`, `! feat/c  not reached`), the warnings, the follow-ups as the command line that runs them (`→`) | stdout |
+| dry run | `Recap`: the plan (`Detail.Plan`; generically its fields as rows, in their order), its warnings, `fingerprint  <hash>`, and `→` the line that applies it with `--expect-fingerprint` | stdout |
+| refused before applying | `Failure`: the error's sentence, then each field to fix by its flag (`<branches> is required`), each blocker and the flag that lifts it; a `412 plan.stale` points at a new `--dry-run` | stderr |
+| while applying | `ProgressView`: a `›` line for the unit at work and its status, a phase that prints (a hook) as a `HookView` replaced by `✓ on_create · feat/a (2.1s)` — one that prints nothing, a saga step, shows nothing, `Cancelling…` once the run's context is cancelled; erased before the conclusion. Off a terminal, a phase that prints is a title and its raw output; in JSON, the raw output alone | stderr |
+
+The view never takes raw mode: Ctrl+C reaches the process as a signal, so the first cancels the run's context and the second is the root's (`surface/cli/signal`), as for every command. The hook log is dispatch's to write, never the surface's.
+
+### The envelope
+
+In JSON, every run — a refusal before it started included, a flag cobra could not parse too — writes one document on stdout:
+
+```json
+{ "v": 2, "command": "create", "ok": false, "op": "3f2a…",
+  "items": [ { "subject": "feat/x", "status": "skipped", "reason": "interrupted", "detail": null } ],
+  "follow_ups": [ { "command": "create", "request": { "branches": ["feat/x"] }, "code": "…" } ],
+  "warnings": [ { "code": "locks.unavailable", "message": "ran without operation locks" } ],
+  "error": { "kind": "conflict", "code": "lock.held", "message": "repo is held by prune (pid 4121)", "params": { … } } }
+```
+
+- `v` is `2` (`render.EnvelopeVersion`); `command` the entry's name; `ok` false whenever there is an `error`.
+- `op` is the operation's id, the one its `operation.*` events and its holder file carry.
+- An applied run has `items`; a dry run has `plan` (the plan's detail) and `fingerprint` instead; a query has `view`. `follow_ups` and `warnings` are always arrays.
+- `error` is the `kernel.Error` serialised (`kind`, `code`, `params`, `follow_up`), plus `message` from `kernel/text`; an `invalid` one lists its `fields`, each with its `path` in the request, the `flag` that sets it and its `message`; a `refused` one its `blockers`, with the `flag` that lifts each. An item's `error` has the same shape.
+- `--yes` is implied: accepted, without effect.
+
+### Exit codes
+
+A command on the engine exits on its error's code when the table lists it, else on its kind (`surface/cli/exit.go`):
+
+| | Exit |
+| -- | -- |
+| `state.schema_newer` | 22 |
+| `invalid` | 2 |
+| `cancelled` | 19 |
+| `refused` | 23 |
+| `conflict` (`lock.held`) | 24 |
+| `precondition` (`plan.stale`) | 25 |
+| `not_found`, `internal` | 1, or the code of the sentinel an internal error wraps (`21` outside a repository) |
+
+A batch exits on its first interrupted item (cancelled, or skipped because of the interrupt), else on its first failed item, else 0. A command's own codes take the numbers its legacy errors had (10 to 18) as it migrates. The legacy commands keep `rules.ExitCode`.
 
 ## Showing without keeping
 

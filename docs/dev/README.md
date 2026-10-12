@@ -12,7 +12,8 @@ Reference documentation for people (and agents) working **on** wtm. It describes
 | [state-files.md](state-files.md) | `internal/infra/fs` — how every file is written (`UpdateFile`, `fs.Change`, where the lock lives), the schema version of each state file and how to raise one, what `statewrite` holds |
 | [flow-layer.md](flow-layer.md) | `internal/flow/` — the three seams, the step model, unattended resolution, embedding, scheduling, events, testing a flow |
 | [adding-a-mutation-command.md](adding-a-mutation-command.md) | End-to-end recipe for a new worktree-mutating command |
-| [output.md](output.md) | What a command prints: the one question a block has to answer, the frame and the accent bar, the four levels, the two shapes of a conclusion, the glyph vocabulary, `--quiet` |
+| [cli.md](cli.md) | `internal/surface/cli` — the command line: a command generated from the registry (`cli.Bind`, its flags), its run, the parity of the registry and the tree, the root (signals, `--quiet`, exit code) |
+| [output.md](output.md) | What a command prints: the one question a block has to answer, the frame and the accent bar, the four levels, the two shapes of a conclusion, the glyph vocabulary, `--quiet`, a command on the engine (generic rendering, the v2 envelope, exit codes) |
 | [run-addressing.md](run-addressing.md) | Named URLs: proxy vs redirection vs public port, and what `addressing` writes into a `.env` |
 | [shared-services.md](shared-services.md) | `scope = "shared"`: one instance for the repository, one namespace per worktree, and why the job table is the reference count |
 | [lint.md](lint.md) | `make lint` and what each gate holds: the `archlint` rules, the exception files, the pre-commit hook, the rules considered and left out |

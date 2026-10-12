@@ -67,3 +67,16 @@ func TestANameTheRegistryDoesNotHoldIsNotFound(t *testing.T) {
 	_, found := registry(t, &repo{}).Lookup("nowhere")
 	assert.False(t, found)
 }
+
+func TestTheRegistryServesTheQueryOfTheOperationsInProgress(t *testing.T) {
+	registry := bench(t).Dispatcher.Registry()
+
+	entry, found := registry.Lookup(operations.Name)
+
+	require.True(t, found)
+	reply, err := entry.Call(t.Context(), dispatch.Call{})
+	require.NoError(t, err)
+	view, ok := reply.(dispatch.QueryReply)
+	require.True(t, ok, "got %T", reply)
+	assert.JSONEq(t, `{"operations":[]}`, string(view.View))
+}

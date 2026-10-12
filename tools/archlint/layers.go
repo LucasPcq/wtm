@@ -48,9 +48,9 @@ var layers = map[string]layer{
 		why:      "the run of a command, surface-independent: never cobra, bubbletea, lipgloss, surface/ or config/ — and therefore never infra/, which needs a service/ wrapper instead",
 	},
 	"surface/cli/render": {
-		internal: []string{"domain", "flow", "rules", "styles"},
+		internal: []string{"domain", "flow", "kernel", "rules", "styles"},
 		external: []string{"golang.org/x/term"},
-		why:      "formats and prints, zero decision logic",
+		why:      "formats and prints, zero decision logic: it reads a command's results from the kernel, never runs one through dispatch",
 	},
 	"styles": {
 		internal: []string{"domain"},
@@ -65,7 +65,7 @@ var layers = map[string]layer{
 	"surface/cli": {
 		internal: []string{"config", "dispatch", "domain", "flow", "infra", "kernel", "rules", "schemas", "service", "styles", "surface/cli/render", "surface/tui"},
 		external: []string{"github.com/charmbracelet/bubbletea", "github.com/spf13/cobra", "golang.org/x/term"},
-		why:      "flag wiring, delegating to flow/ and service/",
+		why:      "the command line: the commands generated from the dispatch registry, and the flag wiring of the commands still on flow/",
 	},
 	"schemas": {
 		why: "the embedded JSON Schema files",

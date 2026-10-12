@@ -15,8 +15,8 @@ vet:
 # fmt fails rather than rewrites: a formatting fix belongs in the commit that
 # caused it, not in the one that ran the linter.
 fmt:
-	@test -z "$$(gofmt -l cmd internal tools *.go)" || \
-		{ echo "gofmt needed:"; gofmt -l cmd internal tools *.go; exit 1; }
+	@test -z "$$(gofmt -l internal tools *.go)" || \
+		{ echo "gofmt needed:"; gofmt -l internal tools *.go; exit 1; }
 
 # arch checks the rules of CLAUDE.md section 9 that no general-purpose linter
 # knows about: layers and service edges, the styles monopoly, comma-ok
@@ -54,7 +54,7 @@ lint: fmt vet arch dead sumtype
 # one. Raise the threshold to see only the large ones.
 DUPL_THRESHOLD ?= 75
 dupl:
-	@find cmd internal -name '*.go' ! -name '*_test.go' > /tmp/wtm-dupl-files
+	@find internal -name '*.go' ! -name '*_test.go' > /tmp/wtm-dupl-files
 	@go tool dupl -t $(DUPL_THRESHOLD) -files < /tmp/wtm-dupl-files
 
 tidy:

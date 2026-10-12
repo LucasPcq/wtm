@@ -2,7 +2,7 @@
 
 `internal/dispatch/` is the impure half of the command engine, beside the pure contract of [commands.md](commands.md): the one way a surface reaches a command or a query. It takes the operation locks, observes, fills in the defaults, validates, plans, checks the fingerprint, applies and publishes what happened, in the same order for every command, so the locks, the fingerprint and the events apply whatever the surface (the CLI, the form, later an API).
 
-No command runs through it yet: `create` is the first (step 3 of LUC-283), the generated CLI (LUC-288) and the form (LUC-289) are its first surfaces.
+Its surfaces are the generated command line ([cli.md](cli.md)) and, next, the form (LUC-289). No command runs through it yet: the registry holds the `operations` query, and `create` is the first command (step 3 of LUC-283).
 
 ## Building it
 
@@ -18,6 +18,8 @@ created := dispatch.Register(dispatch.RegisterParams[create.Request, create.Fact
 })
 registry := dispatch.Registry{created, dispatch.RegisterQuery(operations.Query(d.Operations))}
 ```
+
+`Dispatcher.Registry()` is the registry the surfaces serve, built on that dispatcher: every command with its real ports, every query. A command enters the product by its line there. The command line reads it once on a dispatcher with no `Params` for the names and the fields (that dispatcher is never run), then on the dispatcher of the repository a command runs in.
 
 `Now`, `NewOpID` and `Shield` default to the clock, a random id and `proc.Shield`; the test bench replaces them.
 
@@ -105,7 +107,7 @@ On the bus (`docs/guide/events.md`) an applied run sends `operation.started`, on
 
 ## Ports
 
-`kernel` imports only the stdlib, so a port never travels through its types (`kernel.ObserveScope` is data only). A command receives its ports when it is built, `create.Command(ports)`, and captures them in `Observe`, `Choices` and `Apply`. Each port is an interface declared beside what it wraps (`infra/git`, `store/`, `infra/proc`), with its double in `testutil/`; `dispatch` builds the registry with the real ones. `dispatch` runs on its own ports only: `Params` above.
+`kernel` imports only the stdlib, so a port never travels through its types (`kernel.ObserveScope` is data only). A command receives its ports when it is built, `create.Command(ports)`, and captures them in `Observe`, `Choices` and `Apply`. Each port is an interface declared beside what it wraps (`infra/git`, `store/`, `infra/proc`), with its double in `testutil/`; `Dispatcher.Registry` builds each command with the real ones, from the dispatcher's `Dir`. `dispatch` runs on its own ports only: `Params` above.
 
 ## What the lint holds
 

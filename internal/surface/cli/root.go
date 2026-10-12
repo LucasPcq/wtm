@@ -1,5 +1,5 @@
-// Package cmd defines the Cobra command tree for the wtm CLI.
-package cmd
+// Package cli is the command line: the Cobra tree, its run and its exit code.
+package cli
 
 import (
 	"context"
@@ -7,16 +7,13 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra/proc"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/selfupdate"
 	"github.com/LucasPcq/wtm/internal/surface/cli/agents"
@@ -198,65 +195,6 @@ func rootRunE(cmd *cobra.Command, _ []string) error {
 	return cmd.Help()
 }
 
-// silenceHumanOutput is the whole of --quiet: the command's writers become
-// io.Discard, so every framed conclusion, notice and progress line goes nowhere
-// while the exit code and the error still do — Execute prints those to
-// os.Stderr, not through the command.
-//
-// It never touches a machine contract: --output json still emits its document,
-// and a command whose stdout IS the answer (a path, a script, a URL) says so
-// with an annotation. Asking for less noise is not asking for less answer.
-func silenceHumanOutput(cmd *cobra.Command) {
-	quiet, _ := cmd.Flags().GetBool(domain.FlagQuiet)
-	if !quiet {
-		return
-	}
-	// Text is the only human format. Every other one — json, mermaid, whatever is
-	// added next — is a document someone asked for, and --quiet is about noise.
-	if format, _ := cmd.Flags().GetString(domain.FlagOutput); format != "" && format != domain.OutputText {
-		return
-	}
-	if cmd.Annotations[domain.AnnotationMachineOutput] != "" {
-		return
-	}
-	cmd.SetOut(io.Discard)
-	cmd.SetErr(io.Discard)
-	humanOutputSilenced = true
-}
-
-// humanOutputSilenced records that --quiet actually took a command's writers
-// away. It is what makes ErrAborted safe: that sentinel means "the report is
-// already on screen", which stops being true the moment the screen was
-// io.Discard.
-var humanOutputSilenced bool
-
-// abortLine is what a silenced run says instead of nothing. A wrapped cause is
-// printed as it is; the bare sentinel has no text worth reading, so it points at
-// the flag that took the report away rather than pretending to explain.
-func abortLine(err error) string {
-	if errors.Is(err, domain.ErrLeftBehind) {
-		return err.Error()
-	}
-	if errors.Is(err, domain.ErrCancelled) {
-		return domain.AbortedMessage
-	}
-	if errors.Is(err, domain.ErrAborted) && err.Error() == domain.ErrAborted.Error() {
-		return domain.QuietAbortedMessage
-	}
-	return err.Error()
-}
-
-// reportFailure prints a bare interrupt in the register of a run the user backed
-// out of — `=`, nothing failed — and anything else, a worktree an interrupt left
-// behind included, as the failure it is.
-func reportFailure(w io.Writer, err error) {
-	if errors.Is(err, domain.ErrCancelled) && !errors.Is(err, domain.ErrLeftBehind) {
-		render.Unchanged(w, abortLine(err))
-		return
-	}
-	render.Error(w, abortLine(err))
-}
-
 func globalUpdateCheck() *bool {
 	cfg, err := config.LoadGlobal()
 	if err != nil {
@@ -314,66 +252,39 @@ func Root() *cobra.Command {
 	return rootCmd
 }
 
-// interruptible is the root context. The first interrupt cancels it; the
-// second ends the process — once no shielded git step is left half done, and
-// after killing whatever a cancellation is still waiting on.
-func interruptible() (context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(context.Background())
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-signals
-		cancel()
-		second := <-signals
-		proc.KillCancelled()
-		go func() { dieOn(<-signals) }()
-		proc.AwaitShields()
-		dieOn(second)
-	}()
-	stop := func() {
-		signal.Stop(signals)
-		cancel()
-	}
-	return ctx, stop
-}
-
-// dieOn ends the process the way the default handler would have: by the signal.
-func dieOn(sig os.Signal) {
-	signal.Reset(sig)
-	unix, ok := sig.(syscall.Signal)
-	if !ok {
-		os.Exit(domain.ExitCodeCancelled)
-	}
-	_ = syscall.Kill(os.Getpid(), unix)
-}
-
-// settle is the last thing a run does: nothing it started may outlive it, and
-// nothing shielded may be cut off half-way by the exit.
-func settle() {
-	proc.KillCancelled()
-	proc.AwaitShields()
-}
-
 // Execute runs the root command and exits with the appropriate code.
 func Execute() {
 	ctx, stop := interruptible()
 	defer stop()
-	executed, runErr := rootCmd.ExecuteContextC(ctx)
-	runErr = rules.BackedOut(rules.BackedOutParams{Err: runErr, Cancelled: executed != nil && shared.Cancelled(executed)})
-	err := rules.Interrupted(rules.InterruptedParams{Err: runErr, Signalled: ctx.Err() != nil})
-	settle()
-	if err != nil {
-		// ErrAborted means the command already printed its own report; just
-		// propagate the non-zero exit without a second error line — unless --quiet
-		// discarded that report, in which case this is the only line there is.
-		if !errors.Is(err, domain.ErrAborted) || humanOutputSilenced {
-			render.Blank(os.Stderr)
-			reportFailure(os.Stderr, err)
-			render.Blank(os.Stderr)
-		}
-		printUpdateNotice(ctx)
-		os.Exit(rules.ExitCode(err))
-	}
-
+	code := execute(ctx, executeParams{Root: rootCmd, Stderr: os.Stderr})
 	printUpdateNotice(ctx)
+	if code != domain.ExitCodeOK {
+		os.Exit(code)
+	}
+}
+
+type executeParams struct {
+	Root   *cobra.Command
+	Stderr io.Writer
+}
+
+// execute runs the tree and answers the exit code, once nothing it started is
+// left running.
+func execute(ctx context.Context, params executeParams) int {
+	executed, runErr := params.Root.ExecuteContextC(ctx)
+	backedOut := rules.BackedOut(rules.BackedOutParams{Err: runErr, Cancelled: executed != nil && shared.Cancelled(executed)})
+	err := rules.Interrupted(rules.InterruptedParams{Err: backedOut, Signalled: ctx.Err() != nil})
+	settle()
+	if err == nil {
+		return domain.ExitCodeOK
+	}
+	// ErrAborted means the command already printed its own report; just
+	// propagate the non-zero exit without a second error line — unless --quiet
+	// discarded that report, in which case this is the only line there is.
+	if !errors.Is(err, domain.ErrAborted) || humanOutputSilenced {
+		render.Blank(params.Stderr)
+		reportFailure(params.Stderr, err)
+		render.Blank(params.Stderr)
+	}
+	return exitCode(err)
 }
