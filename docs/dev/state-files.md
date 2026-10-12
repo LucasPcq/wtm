@@ -25,7 +25,7 @@ lock, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
 
 `fs.Change` is a sealed union (`//go-sumtype:decl Change`): a decision about the file is one of three shapes, never a byte slice whose `nil` means something.
 
-**Read inside `Mutate`.** The lock only prevents a lost update if the change is computed from `current`. A writer that renders a value it loaded earlier is atomic but can still overwrite another process's change: `run.toml` (`config.WriteRun`), the full re-render of `config.toml` (`config.WriteProjectConfig`). The read-modify-write writers are `updateMetadata` (`meta.json`), `config.UpdateProjectConfig` (the remembered answers), `config.UpdatePendingRemovals` and `infra.UpdateRegistry` (`repos.json`).
+**Read inside `Mutate`.** The lock only prevents a lost update if the change is computed from `current`. A writer that renders a value it loaded earlier is atomic but can still overwrite another process's change: `run.toml` (`config.WriteRun`), the full re-render of `config.toml` (`config.WriteProjectConfig`, by a re-init only). The read-modify-write writers are `updateMetadata` (`meta.json`), `config.UpdateProjectConfig` (every other change to `config.toml`: the remembered answers, `base_path` from `relocate`, the `.env` targets from `run init`), `config.UpdatePendingRemovals` and `infra.UpdateRegistry` (`repos.json`).
 
 **`ctx` bounds the wait for the lock, nothing else.** A free lock is taken even once `ctx` is done: a write that records work already carried out (a namespace created, a removal owed) must not be lost to an interrupt. A caller writing such a record after the interruptible part of its run passes `context.WithoutCancel(ctx)`, so it waits for a busy lock too.
 

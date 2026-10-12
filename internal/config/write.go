@@ -162,13 +162,13 @@ func answersToTemplate(a domain.InitProjectAnswers) projectTemplateData {
 	}
 }
 
-// configToTemplate renders an empty env strategy as a commented (skipped)
-// section so the file stays valid.
+// configToTemplate comments out an [env] section only when it is empty: one
+// with files and no strategy leaves the strategy to its default at load.
 func configToTemplate(c domain.ProjectConfig) projectTemplateData {
 	return projectTemplateData{
 		BasePath:    c.Worktrees.BasePath,
 		BaseBranch:  c.Worktrees.BaseBranch,
-		SkipEnv:     c.Env.Strategy == "",
+		SkipEnv:     c.Env.Strategy == "" && len(c.Env.Files) == 0,
 		EnvStrategy: string(c.Env.Strategy),
 		EnvFiles:    c.Env.Files,
 		SkipHooks:   false,

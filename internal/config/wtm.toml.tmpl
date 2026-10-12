@@ -25,7 +25,11 @@ base_branch = "{{ .BaseBranch }}"
 # target = ".env"
 # template = ".env.example"
 {{- else }}
+{{- if .EnvStrategy }}
 strategy = "{{ .EnvStrategy }}"
+{{- else }}
+# strategy = "example"
+{{- end }}
 
 # Each value file to provision, with its committed template (if any).
 {{- range .EnvFiles }}

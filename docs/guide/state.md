@@ -23,7 +23,7 @@ Everything wtm knows about a repository lives under its git common directory (`.
 
 ### How these files are written
 
-Every file wtm keeps is updated the same way: wtm takes a lock on `<file>.lock`, reads the file, changes it, then writes the result to a temporary file it syncs to disk and renames over the original. A reader sees the old content or the new one, never half a file. A worktree's `meta.json`, the remembered answers of `config.toml`, `pending-removals.toml` and `repos.json` are read under that lock too, so two wtm processes changing one of them at the same time both land. The `.env` files and compose files wtm edits in a worktree are written the same way, with their lock in the system's temporary directory so no lock file appears in your checkout. On a filesystem without file locks (NFS, some WSL mounts), the write goes ahead without one.
+Every file wtm keeps is updated the same way: wtm takes a lock on `<file>.lock`, reads the file, changes it, then writes the result to a temporary file it syncs to disk and renames over the original. A reader sees the old content or the new one, never half a file. A worktree's `meta.json`, `config.toml` (except on a re-init, which rewrites it whole), `pending-removals.toml` and `repos.json` are read under that lock too, so two wtm processes changing one of them at the same time both land. The `.env` files and compose files wtm edits in a worktree are written the same way, with their lock in the system's temporary directory so no lock file appears in your checkout. On a filesystem without file locks (NFS, some WSL mounts), the write goes ahead without one.
 
 ### Versions
 

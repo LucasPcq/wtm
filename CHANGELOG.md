@@ -17,6 +17,7 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 ### Fixed
 
 - **Two wtm commands at once** keep each other's change to a worktree's `meta.json` and to the remembered answers, and a crash or an interrupt never leaves a state file, a `.env` or a compose file half written. → [State files](docs/guide/state.md#how-these-files-are-written)
+- **`wtm relocate`** and **`wtm run init`** change only `base_path` or the `.env` targets of `config.toml`: they no longer write the defaults in, nor erase an answer remembered in the meantime. → [Remembered answers](docs/guide/configuration.md#remembered-answers)
 - **`wtm env`** prints no text read from a value — only the ports and addresses wtm writes and its `[[env]]` values — so no password reaches its text or JSON, whatever the connection-string format. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
 - **`wtm env`** reports what it changes: a verbatim switch shows the port that moved in an origin list, `--check` names the `[[env]]` key it would rewrite, and the wizard previews an overwrite on the worktree's own port. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
 - **`wtm env`** rebuilds a declared `.env` missing from the worktree the way `wtm create` provisions it (the template under `example`), then settles its ports, instead of leaving it absent; `--check` reports it as drift. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)

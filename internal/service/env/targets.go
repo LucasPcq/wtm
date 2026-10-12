@@ -9,14 +9,15 @@ import (
 
 type AddEnvTargetsParams struct {
 	StateDir string
-	Project  domain.ProjectConfig
 	Targets  []domain.EnvFile
 }
 
-// AddEnvTargets appends provisioning targets to config.toml. Project is the
-// config as loaded: the file is re-rendered whole from it.
+// AddEnvTargets appends provisioning targets to config.toml as it is on disk.
 func AddEnvTargets(ctx context.Context, params AddEnvTargetsParams) error {
-	project := params.Project
-	project.Env.Files = append(project.Env.Files, params.Targets...)
-	return config.WriteProjectConfig(ctx, config.WriteProjectConfigParams{StateDir: params.StateDir, Config: project})
+	return config.UpdateProjectConfig(ctx, config.UpdateProjectConfigParams{
+		StateDir: params.StateDir,
+		Update: func(project *domain.ProjectConfig) {
+			project.Env.Files = append(project.Env.Files, params.Targets...)
+		},
+	})
 }
