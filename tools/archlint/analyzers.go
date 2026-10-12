@@ -20,4 +20,5 @@ var analyzers = []*analysis.Analyzer{
 	publishAnalyzer,
 	statewriteAnalyzer,
 	engineAnalyzer,
+	gitexecAnalyzer,
 }

@@ -9,3 +9,17 @@
 # The exec log, opened with os.Create: it moves to infra/fs with the run module
 # (step 6 of LUC-283).
 statewrite internal/service/execsvc/execsvc\.go 1
+
+# git run from the root of infra/, for the commands not yet on the engine (LUC-290): each
+# file leaves the list as its last caller moves to infra/git (steps 3 to 10 of
+# LUC-283).
+gitexec internal/infra/branch\.go 10
+gitexec internal/infra/git_paths\.go 3
+gitexec internal/infra/history\.go 3
+gitexec internal/infra/patch\.go 5
+gitexec internal/infra/rebase\.go 12
+gitexec internal/infra/status\.go 4
+gitexec internal/infra/tools\.go 1
+gitexec internal/infra/upstream\.go 4
+gitexec internal/infra/worktree_ops\.go 5
+gitexec internal/infra/worktree_query\.go 3

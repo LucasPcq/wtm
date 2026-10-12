@@ -48,6 +48,19 @@ func Git(t testing.TB, dir string, args ...string) {
 	}
 }
 
+// Output runs a git command in dir and returns its trimmed output, failing the
+// test on error.
+func Output(t testing.TB, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git %s: %v", strings.Join(args, " "), err)
+	}
+	return strings.TrimSpace(string(out))
+}
+
 // AddOrigin creates a bare repository outside dir, registers it as origin and
 // pushes the current branch with an upstream. It is what makes upstream state
 // (ahead/behind, and the "[gone]" prune looks for) reproducible in a test.
