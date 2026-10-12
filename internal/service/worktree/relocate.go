@@ -82,25 +82,23 @@ func Adopt(ctx context.Context, params AdoptParams) error {
 }
 
 type SetBasePathParams struct {
-	ProjectDir string
-	StateDir   string
-	Project    domain.ProjectConfig
-	BasePath   string
+	ProjectDir       string
+	StateDir         string
+	PreviousBasePath string
+	BasePath         string
 }
 
 // SetBasePath also retires the previous base_path directory once the moves
 // have emptied it. os.Remove leaves a directory that still holds anything —
 // a worktree a refusal kept there, or files that are not wtm's.
 func SetBasePath(ctx context.Context, params SetBasePathParams) error {
-	updated := params.Project
-	updated.Worktrees.BasePath = params.BasePath
-	if err := config.WriteProjectConfig(ctx, config.WriteProjectConfigParams{
+	if err := config.UpdateProjectConfig(ctx, config.UpdateProjectConfigParams{
 		StateDir: params.StateDir,
-		Config:   updated,
+		Update:   func(project *domain.ProjectConfig) { project.Worktrees.BasePath = params.BasePath },
 	}); err != nil {
 		return fmt.Errorf("update config base_path: %w", err)
 	}
-	_ = os.Remove(filepath.Join(params.ProjectDir, params.Project.Worktrees.BasePath))
+	_ = os.Remove(filepath.Join(params.ProjectDir, params.PreviousBasePath))
 	return nil
 }
 

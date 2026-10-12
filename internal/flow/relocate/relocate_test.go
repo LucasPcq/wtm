@@ -33,6 +33,9 @@ func testContext(t *testing.T) flow.Context {
 	if err := os.MkdirAll(stateDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(stateDir, domain.ConfigFileName), []byte("[worktrees]\nbase_path = \"../.trees\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	config := domain.Config{}
 	config.Project.Worktrees.BasePath = "../.trees"
 	config.Project.Worktrees.BaseBranch = "main"

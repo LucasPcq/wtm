@@ -224,10 +224,10 @@ func (f *relocateFlow) rewriteBasePath(result *domain.RelocateResult) error {
 		return nil
 	}
 	if err := worktree.SetBasePath(f.runCtx, worktree.SetBasePathParams{
-		ProjectDir: f.ctx.ProjectDir,
-		StateDir:   f.ctx.StateDir,
-		Project:    f.ctx.Config.Project,
-		BasePath:   result.BasePath,
+		ProjectDir:       f.ctx.ProjectDir,
+		StateDir:         f.ctx.StateDir,
+		PreviousBasePath: f.configBasePath(),
+		BasePath:         result.BasePath,
 	}); err != nil {
 		return err
 	}

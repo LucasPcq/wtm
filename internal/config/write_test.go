@@ -298,6 +298,30 @@ func TestWriteProjectConfigEmptyEnvStaysCommented(t *testing.T) {
 	}
 }
 
+func TestEnvFilesWithoutAStrategyStayLiveAndTakeTheDefault(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, domain.ConfigFileName, minimalToml)
+
+	err := UpdateProjectConfig(t.Context(), UpdateProjectConfigParams{StateDir: dir, Update: func(project *domain.ProjectConfig) {
+		project.Env.Files = []domain.EnvFile{{Target: ".env"}}
+	}})
+	if err != nil {
+		t.Fatalf("UpdateProjectConfig: %v", err)
+	}
+
+	data, _ := os.ReadFile(filepath.Join(dir, domain.ConfigFileName))
+	if strings.Contains(string(data), "\nstrategy = ") {
+		t.Errorf("default strategy written in:\n%s", data)
+	}
+	cfg, err := Load(LoadParams{StateDir: dir})
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(cfg.Project.Env.Files) != 1 || cfg.Project.Env.Strategy != domain.DefaultEnvStrategy {
+		t.Errorf("env = %+v, want the file under the default strategy", cfg.Project.Env)
+	}
+}
+
 func TestWriteRunCreatesFile(t *testing.T) {
 	dir := t.TempDir()
 	cfg := domain.RunConfig{
