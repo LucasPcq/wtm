@@ -1,10 +1,11 @@
 // Command archlint checks the architecture rules of CLAUDE.md that no
 // general-purpose linter knows about: the mechanical half of section 9.
 //
-// Usage: go run ./tools/archlint [-warn rule,rule] [dir]
+// Usage: go run ./tools/archlint [-warn rule,rule] [-tracked] [dir]
 //
 // Each rule is a go/analysis Analyzer and reports `file:line:col: [rule] message`;
-// a non-empty report exits 1. A rule named in -warn reports without failing.
+// a non-empty report exits 1. A rule named in -warn reports without failing; a
+// site .archlint-migrating covers is counted, and listed with -tracked.
 package main
 
 import (
@@ -27,12 +28,15 @@ import (
 // together they compile every file of the tree.
 var targetSystems = []string{"darwin", "linux", "freebsd"}
 
+// loadMode loads every dependency with its syntax: writesink carries its facts
+// across packages, so the checker runs it on what each package imports.
 const loadMode = packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
 	packages.NeedImports | packages.NeedTypes | packages.NeedTypesSizes |
-	packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedModule
+	packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedModule | packages.NeedDeps
 
 func main() {
 	warn := flag.String("warn", "", "comma-separated rules that report without failing")
+	tracked := flag.Bool("tracked", false, "print each site .archlint-migrating covers")
 	flag.Parse()
 
 	root := "internal"
@@ -59,15 +63,18 @@ func main() {
 		os.Exit(2)
 	}
 
-	verdict := judge(judgeParams{Findings: findings, Migrating: migrating, Warned: warned})
+	verdict := judge(judgeParams{Findings: findings, Migrating: migrating, Warned: warned, Tracked: *tracked})
 	for _, line := range verdict.lines {
 		fmt.Println(line)
 	}
 	for _, note := range verdict.notes {
 		fmt.Println("archlint: note:", note)
 	}
+	if verdict.tracked > 0 && !*tracked {
+		fmt.Printf("archlint: %d site(s) tracked in .archlint-migrating (-tracked lists them)\n", verdict.tracked)
+	}
 	if verdict.failed {
-		fmt.Fprintf(os.Stderr, "\narchlint: %d finding(s) — see CLAUDE.md section 9\n", len(findings))
+		fmt.Fprintf(os.Stderr, "\narchlint: %d finding(s) — see CLAUDE.md section 9\n", verdict.failures)
 		os.Exit(1)
 	}
 	fmt.Printf("archlint: %s clean\n", root)

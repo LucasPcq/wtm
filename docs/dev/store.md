@@ -60,6 +60,8 @@ A command on the engine receives these interfaces when it is built (`create.Comm
 ## What the lint holds
 
 - `layers`: `store` imports `config`, `domain`, `infra` and `rules`. `service` and `testutil` may import it; `flow` may not, and reaches it through a service (`service/memory`).
+- `stateowner` (`tools/archlint/stateowner.go`): `fs.UpdateFile` and `fs.RemoveDir` are called from `store/` only, so a state file has one owner. The state files not yet in `store/` (`run.toml`, `pending-removals.toml`, `repos.json`, the renders of the inits, the compose patches, `selfupdate`'s `state.json`) are tracked in `.archlint-migrating` until their command moves.
+- `writesink`: every write method of the three interfaces is a mutator, inferred from its implementation (`Meta.Update` writes because `MetaDisk.Update` does), so a reader of the engine that calls one is refused ([lint.md](lint.md)).
 - `metawriter` (`tools/archlint/metawriter.go`): an exported function of `service/worktree` that reaches `Update` or `Purge` of `store.Meta` (or `MetaDisk`) is in the mutators table.
 
 ## Testing

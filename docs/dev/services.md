@@ -87,7 +87,7 @@ The four packages duplicate what `service/worktree` does for the commands on `fl
 
 ## What the lint holds
 
-The `service` row of `layers` keeps `kernel/` out of the four packages, and `publish` keeps them from publishing; they import no other service, so `serviceEdges` holds no edge for them. The rule that a reader reaches no write sink, and that a mutator is called only from `command/`, is the write-sink lint ([lint.md](lint.md)), to arm on these four packages; until then `chokepoint` covers only the mutators of the code on `flow/`.
+The `service` row of `layers` keeps `kernel/` out of the four packages, and `publish` keeps them from publishing; they import no other service, so `serviceEdges` holds no edge for them. `writesink` ([lint.md](lint.md)) reads the table above from the code: a function that reaches a write sink (a write of `store/`, a method of `git.Writer`, a program started by `infra/proc`) is a mutator, any other a reader. A mutator of these four packages is called only from `command/`, another service or `flow/`, never from `query/`, a surface or `dispatch`, and no reader of a command (`Observe`, `Choices`, `Plan`…) reaches one. `writesink_test.go` checks that the code classifies them as the table does. The four are listed in `engineServices`; the services of the next migrations join it, and `chokepoint` keeps the hand-written table of the mutators of the code on `flow/`.
 
 ## Testing
 

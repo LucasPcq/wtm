@@ -10,17 +10,35 @@ package bad
 import "os"
 
 func Write(path string) error {
-	return os.WriteFile(path, nil, 0o644) // want `os\.WriteFile outside infra/: write through fs\.UpdateFile`
+	return os.WriteFile(path, nil, 0o644) // want `os\.WriteFile outside infra/: write through infra/fs`
 }
 
 func Truncate(path string) error {
-	_, err := os.Create(path) // want `os\.Create outside infra/: write through fs\.UpdateFile`
+	_, err := os.Create(path) // want `os\.Create outside infra/: write through infra/fs`
 	return err
 }
 
-var rename = os.Rename // want `os\.Rename outside infra/: write through fs\.UpdateFile`
+var rename = os.Rename // want `os\.Rename outside infra/: write through infra/fs`
+
+func Delete(path string) error {
+	return os.Remove(path) // want `os\.Remove outside infra/: write through infra/fs`
+}
+
+func Purge(dir string) error {
+	return os.RemoveAll(dir) // want `os\.RemoveAll outside infra/: write through infra/fs`
+}
+
+func Append(path string) (*os.File, error) {
+	return os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644) // want `os\.OpenFile outside infra/: write through infra/fs`
+}
+
+func Open(path string, flags int) (*os.File, error) {
+	return os.OpenFile(path, flags, 0o644) // want `os\.OpenFile outside infra/`
+}
 
 func Read(path string) ([]byte, error) { return os.ReadFile(path) }
+
+func ReadOpen(path string) (*os.File, error) { return os.OpenFile(path, os.O_RDONLY, 0) }
 -- github.com/LucasPcq/wtm/internal/service/shell/shell.go --
 package shell
 

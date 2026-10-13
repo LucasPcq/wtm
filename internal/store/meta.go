@@ -143,7 +143,7 @@ func (m MetaDisk) Purge(branch string) error {
 	if dir == "" {
 		return nil
 	}
-	return os.RemoveAll(dir)
+	return fs.RemoveDir(dir)
 }
 
 type storedMetaParams struct {

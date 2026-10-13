@@ -196,11 +196,17 @@ internal/
 **Hard rules:**
 - `surface/cli/` has zero business logic
 - `domain/` imports only stdlib (unchanged)
-- `rules/` imports only stdlib + internal/domain
+- `rules/` imports only stdlib + internal/domain; the roots of `rules/` and `domain/` only shrink:
+  no new file nor exported symbol there (archlint `rootfreeze`)
 - `kernel/` imports only the stdlib (not even `domain/`), and writes no text: codes and params only
 - `dispatch/` imports `kernel`, `domain`, `rules`, `infra`, `query` only; `command/` and `query/` never
   import `dispatch` or `surface/`, `surface/` never imports them, and `command/` never calls
   `context.Background()`/`context.TODO()` (archlint `engine`)
+- On the engine a function reads or writes, never both (archlint `writesink`, inferred from the
+  code): nothing in `query/` nor in `Observe`, `Choices` or `Plan` reaches a write sink, and a
+  mutator of the engine's services is called from `command/` only. Only `dispatch` publishes
+  (`publish`): a mutator returns what it changed (`identity.Claim.Allocated`), the command reports it
+- Every package of `service/`, `infra/` and `store/` opens with a one-sentence package doc (`pkgdoc`)
 - `flow/` imports **only** `internal/service/`, `internal/rules/`, `internal/domain/` and the
   stdlib — never cobra, bubbletea or lipgloss, and never `surface/` or `config/`.
   It therefore cannot reach `infra/` either: add a thin `service/` wrapper
@@ -403,7 +409,7 @@ Two env-var overrides exist for tests / CI:
 
 ### Writing a file
 
-Every write goes through `infra/fs`; `os.WriteFile`, `os.Create` and `os.Rename` outside `infra/` fail `make lint` (`statewrite`):
+Every write goes through `infra/fs`; `os.WriteFile`, `os.Create`, `os.Rename`, `os.Remove`, `os.RemoveAll` and a writing `os.OpenFile` outside `infra/` fail `make lint` (`statewrite`), and a state file is written by its owner in `store/`, the only caller of `fs.UpdateFile` (`stateowner`):
 
 ```go
 _, err := fs.UpdateFile(ctx, fs.UpdateFileParams{

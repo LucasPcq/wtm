@@ -1,0 +1,43 @@
+-- github.com/LucasPcq/wtm/internal/rules/sync.go --
+package rules // want `sync\.go at the root of rules/, which only shrinks: a new file goes into the sub-package of its subject`
+
+import "strings"
+
+type PushDecision string // want `rules\.PushDecision at the root of rules/, which only shrinks: put it in the sub-package of its subject`
+
+const (
+	PushSkip PushDecision = "skip" // want `rules\.PushSkip at the root of rules/`
+	pushAsk  PushDecision = "ask"
+)
+
+func DecidePush(remote string) PushDecision { // want `rules\.DecidePush at the root of rules/`
+	if strings.TrimSpace(remote) == "" {
+		return PushSkip
+	}
+	return pushAsk
+}
+
+func (d PushDecision) Pushes() bool { return d != PushSkip } // want `rules\.Pushes at the root of rules/`
+
+func trim(s string) string { return strings.TrimSpace(s) }
+-- github.com/LucasPcq/wtm/internal/rules/worktree/creation.go --
+package worktree
+
+func NeedsOrdinal(isolated bool) bool { return isolated }
+-- github.com/LucasPcq/wtm/internal/domain/constants.go --
+package domain // want `constants\.go at the root of domain/`
+
+const (
+	FlagOutput = "output" // want `domain\.FlagOutput at the root of domain/`
+	flagHidden = "hidden"
+)
+
+var Version, Commit = "dev", "none" // want `domain\.Version at the root of domain/` `domain\.Commit at the root of domain/`
+-- github.com/LucasPcq/wtm/internal/domain/statefile/statefile.go --
+package statefile
+
+type NewerError struct{ Path string }
+-- github.com/LucasPcq/wtm/internal/rules/helpers.go --
+package rules // want `helpers\.go at the root of rules/`
+
+func clamp(n int) int { return max(n, 0) }
