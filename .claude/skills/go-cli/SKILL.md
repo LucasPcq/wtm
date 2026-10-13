@@ -130,7 +130,8 @@ main.go                       ← the entry point: cli.Execute
 
 internal/
   domain/                     ← types, errors, constants only (no methods, no functions)
-  rules/                      ← pure business rules (stdlib + domain only, no I/O)
+  rules/                      ← pure business rules (stdlib + domain only, no I/O); a new decision goes in
+                                the sub-package of its subject (rules/worktree, rules/runenv), never at the root
   kernel/                     ← the command engine's skeleton (stdlib only, no domain):
                                 Command, fields, rules, errors, results, Each / Saga
     text/                     ←   the message catalogue: kernel.Code + params → English
@@ -147,9 +148,12 @@ internal/
     create/                   ←   `wtm create`: the run (create.go) + its questions (steps.go)
     clean/                    ←   `wtm clean`: the run (clean.go) + its questions (steps.go)
   service/                    ← impure orchestration only (git exec, I/O, hooks):
-    worktree/                 ←   create, list, clean, resolve
+    worktree/                 ←   create, list, clean, resolve (the commands on flow/)
+    gitwt/                    ←   Add / Remove: the Do and the Undo of a saga's worktree step (docs/dev/services.md)
+    identity/                 ←   Read → Snapshot (Ordinal, Isolation, IsMain, NameClash…), Allocate under ordinal.lock
+    runenv/                   ←   JobEnv, ComposeProject, Env: the run environment from a RunConfig and an Identity
     env/                      ←   what the .env files hold (sync, ports, owned keys), written by store/
-    hooks/                    ←   on_create hook execution
+    hooks/                    ←   RunHooks (flow/), Execute (the engine: each line to Output, nothing printed)
     shell/                    ←   shell integration generation (zsh, bash, fish)
     process/                  ←   daemon, job manager, socket client
     github/                   ←   PR operations via gh CLI
@@ -898,7 +902,7 @@ Rules:
 - **`Muted` has two jobs and no third**: chrome (labels, table headers, tree connectors) and a non-event line. Secondary detail — a branch list under a count, a failure's captured output — is **indented, not muted**.
 - **A conclusion is not optional**, an empty inventory is `=` (`render.UnchangedLine` for a formatter returning a body), an abort is `=` with one wording (`domain.AbortedMessage`), and a hint is always `render.NextStep`.
 - **A block has to earn its place**: it prints when it changes what the reader does next. Success contracts to a count, anomalies are named one by one; detail belongs to the command whose subject it is (ports → `wtm env`, not `create`); a successful run has a fixed shape whatever happened. See [`docs/dev/output.md`](../../../docs/dev/output.md), "The one question".
-- **A hook phase is shown, not kept**: `render.HookView` draws a bounded tail and replaces it with one result line per hook. Terminals only (`render.IsTerminal`) — a pipe or `--output json` gets the raw stream. Every path goes through `surface/cli/shared.DrawHookPhase`, which opens `<state-dir>/hooks/<phase>-<branch>.log` and tees the raw stream into it whatever it draws, and which always hands the sink the command's own writer (a nil sink falls back to `os.Stderr` and escapes `--quiet`). The phase reports through `flow.HookSink` (output + `domain.HookBeat`); `service/hooks` renders only its no-reporter fallback.
+- **A hook phase is shown, not kept**: `render.HookView` draws a bounded tail and replaces it with one result line per hook. Terminals only (`render.IsTerminal`) — a pipe or `--output json` gets the raw stream. Every path goes through `surface/cli/shared.DrawHookPhase`, which opens `<state-dir>/hooks/<phase>-<branch>.log` and tees the raw stream into it whatever it draws, and which always hands the sink the command's own writer (a nil sink falls back to `os.Stderr` and escapes `--quiet`). The phase reports through `flow.HookSink` (output + `domain.HookBeat`); `service/hooks` renders only its no-reporter fallback. On the engine, `hooks.Execute` hands each line to the command's `kernel.Report(…).Output`, `dispatch` keeps the log and the generic rendering draws the phase.
 - **TUI views own their single top/bottom blank** (`WizardModel`/`standaloneModel`
   both open with one leading `\n`); don't add a manual blank before launching a wizard.
 
@@ -908,7 +912,8 @@ Rules:
 
 The command engine and the layers built for it (`internal/kernel/`, `infra/fs`, `infra/git`,
 the `statefile` packages, `dispatch`, the generated command line in `surface/cli` and its
-rendering, the form in `surface/tui/form`, `store/`…) are laid out one subject per
+rendering, the form in `surface/tui/form`, `store/`, the engine's services `service/gitwt`,
+`identity`, `runenv`, `hooks.Execute`…) are laid out one subject per
 file, named after what it declares: a port's interface, its types and its implementation
 share one file (`infra/git/read.go` and `write.go`, `store/meta.go`, `config.go`, `env.go`),
 never an interfaces-only file beside the code. They are tested with

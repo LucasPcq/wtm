@@ -92,9 +92,16 @@ internal/
                                     `Wizard` seam, not a flow.Session), write run.toml,
                                     compose and .env files
   service/                    ← impure orchestration only (git exec, I/O, hooks):
-    worktree/                 ←   git worktree operations (create, list, remove)
+    worktree/                 ←   git worktree operations (create, list, remove), for the commands on flow/
+    gitwt/                    ←   a git worktree's lifecycle for the engine (services.md): Add and Remove,
+                                  the Do and the Undo of a saga's worktree step
+    identity/                 ←   who a worktree is (services.md): one Snapshot (number, isolation, main,
+                                  derived names, where a branch is out) read once; Allocate the one mutator
+    runenv/                   ←   a worktree's run environment (services.md): JobEnv, ComposeProject, Env,
+                                  from the run.toml and the identity the caller read
     env/                      ←   .env provisioning (create) + drift reconciliation (`wtm env`, sync.go)
-    hooks/                    ←   on_create / on_clean hook execution (a /bin/sh line each)
+    hooks/                    ←   on_create / on_clean hook execution (a /bin/sh line each): RunHooks for
+                                  flow/, Execute for the engine (each line to its caller, nothing printed)
     shell/                    ←   shell integration generation (zsh, bash, fish)
     integration/              ←   third-party adapters: handing a URL to the desktop's
                                   own opener (editor/agent detection lives in detect/)
@@ -206,6 +213,7 @@ Two more edges are constrained beyond the diagram:
 - `service/x` imports `service/y` only along an edge declared in `tools/archlint` (`serviceEdges`): today `detect→branch`, `events→{process,worktree}`, `process→proxy`, `runconfig→shellcmd`, `runjobs→{process,runconfig,worktree}`, `worktree→{branch,env,github,hooks,process}`.
 - The daemon — `service/process` and `service/proxy`, which it serves — is blind to git: neither imports `service/worktree`, `service/branch`, `service/github`, `service/events` or `config`, and both call only allow-listed `infra/` functions (`fs.GlobalDir`, `fs.ReplaceFile`).
 - git is run by `infra/git` only (`gitexec`); the files at the root of `infra/` that still run it, for the commands on `flow/`, are tracked in `.archlint-migrating`.
+- The services a command on the engine reaches (`service/gitwt`, `identity`, `runenv`, `hooks.Execute`, [services.md](services.md)) import no other service, never `kernel/`, and publish nothing: a mutator returns what it changed, and `dispatch` publishes it.
 - `store/` imports `config/`, `domain/`, `infra/` and `rules/`; `service/` and `testutil/` reach it, `flow/` never does. An exported function of `service/worktree` that reaches a write of `store.Meta` is a mutator (`metawriter`).
 - A file is written through `infra/fs` only (`statewrite`): `os.WriteFile`, `os.Create` and `os.Rename` stay inside `infra/`, but for the permanent exceptions listed with their reason in `tools/archlint/statewrite.go`.
 - A service **mutator** (`worktree.Create`, `envsvc.ApplyEnvSync`, `runconfig.Save`, … — the table in `tools/archlint/chokepoint.go`) is called only from `internal/flow/`, whatever the calling layer; a call inside the mutator's own package is its implementation.
