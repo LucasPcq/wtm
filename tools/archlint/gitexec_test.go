@@ -8,5 +8,7 @@ func TestGitexecKeepsGitInsideInfraGit(t *testing.T) {
 		internalPrefix+"infra",
 		internalPrefix+"service/bad",
 		internalPrefix+"testutil/gittest",
+		internalPrefix+"service/wrap",
+		internalPrefix+"service/caller",
 	)
 }

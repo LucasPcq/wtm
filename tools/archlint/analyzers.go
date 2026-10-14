@@ -14,6 +14,7 @@ var analyzers = []*analysis.Analyzer{
 	mutedlineAnalyzer,
 	fontcoverAnalyzer,
 	servicedagAnalyzer,
+	commanddagAnalyzer,
 	daemonblindAnalyzer,
 	metawriterAnalyzer,
 	emitsAnalyzer,
@@ -26,4 +27,7 @@ var analyzers = []*analysis.Analyzer{
 	engineAnalyzer,
 	gitexecAnalyzer,
 	catalogAnalyzer,
+	portsAnalyzer,
+	enginetextAnalyzer,
+	portbuildAnalyzer,
 }

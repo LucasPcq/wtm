@@ -38,3 +38,33 @@ func TestTheStoreWritesForTheServicesNeverForAFlow(t *testing.T) {
 		internalPrefix+"flow/leaky",
 	)
 }
+
+func TestACommandReachesTheWorldThroughItsPortsOnly(t *testing.T) {
+	runTxtar(t, layersAnalyzer, "layers",
+		internalPrefix+"command/create",
+		internalPrefix+"command/prune",
+		internalPrefix+"query/status",
+	)
+}
+
+func TestTheRegistryAndTheLegacyBridgeAreReachedFromTheCommandLineOnly(t *testing.T) {
+	runTxtar(t, layersAnalyzer, "layers",
+		internalPrefix+"registry",
+		internalPrefix+"flow/legacy",
+		internalPrefix+"flow/extract",
+		internalPrefix+"surface/cli/root",
+		internalPrefix+"surface/tui/dash",
+		internalPrefix+"testutil/commandtest",
+	)
+}
+
+func TestTheKernelAndTheRulesDoNoIO(t *testing.T) {
+	runTxtar(t, layersAnalyzer, "layers",
+		internalPrefix+"rules/pure",
+		internalPrefix+"kernel",
+	)
+}
+
+func TestAPackageWithoutARowIsAFinding(t *testing.T) {
+	runTxtar(t, layersAnalyzer, "layers", internalPrefix+"newlayer")
+}

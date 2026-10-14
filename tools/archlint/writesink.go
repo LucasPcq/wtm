@@ -16,18 +16,51 @@ import (
 var writeSinks = []objectRef{
 	{Path: "os", Name: "WriteFile"},
 	{Path: "os", Name: "Create"},
+	{Path: "os", Name: "CreateTemp"},
 	{Path: "os", Name: "Rename"},
 	{Path: "os", Name: "Remove"},
 	{Path: "os", Name: "RemoveAll"},
 	{Path: "os", Name: "OpenFile"},
+	{Path: "os", Name: "Mkdir"},
+	{Path: "os", Name: "MkdirAll"},
+	{Path: "os", Name: "MkdirTemp"},
+	{Path: "os", Name: "Symlink"},
+	{Path: "os", Name: "Link"},
+	{Path: "os", Name: "Chmod"},
+	{Path: "os", Name: "Chown"},
+	{Path: "os", Name: "Lchown"},
+	{Path: "os", Name: "Chtimes"},
+	{Path: "os", Name: "Truncate"},
+	{Path: "os", Name: "Setenv"},
+	{Path: "os", Name: "Unsetenv"},
+	{Path: "os", Name: "Clearenv"},
+	{Path: "os", Name: "Chdir"},
 	{Path: "os/exec", Name: "Command"},
 	{Path: "os/exec", Name: "CommandContext"},
+	{Path: "syscall", Name: "Kill"},
 	{Path: internalPrefix + "infra/fs", Name: "UpdateFile"},
 	{Path: internalPrefix + "infra/fs", Name: "RemoveDir"},
 	{Path: internalPrefix + "infra/fs", Name: "ReplaceFile"},
 	{Path: internalPrefix + "infra/fs", Name: "OpenLog"},
 	{Path: internalPrefix + "infra/proc", Name: "Command"},
 	{Path: internalPrefix + "infra/proc", Name: "GroupCommand"},
+}
+
+// methodSinks are the methods of the stdlib that write: a file written
+// through its handle, a process signalled.
+var methodSinks = []methodRef{
+	{Path: "os", Recv: "File", Names: []string{"Write", "WriteString", "WriteAt", "ReadFrom", "Truncate", "Chmod", "Chown", "Chdir"}},
+	{Path: "os", Recv: "Process", Names: []string{"Kill", "Signal"}},
+}
+
+type methodRef struct {
+	Path  string
+	Recv  string
+	Names []string
+}
+
+func (ref methodRef) holds(fn *types.Func) bool {
+	return fn.Pkg() != nil && fn.Pkg().Path() == ref.Path && receiverName(fn) == ref.Recv && slices.Contains(ref.Names, fn.Name())
 }
 
 // writePorts are the interfaces of infra/ whose every method writes: a call
@@ -43,15 +76,28 @@ var writePorts = []objectRef{
 var engineServices = []dir{"service/gitwt", "service/identity", "service/runenv", "service/hooks"}
 
 // mutatorCallers may call a mutator of the engine's services: a command's
-// Apply, a service composing it into a mutator of its own, and the bridge of
-// the commands still on flow/.
-var mutatorCallers = []dir{"command", "service", "flow"}
+// Apply, and a service composing it into a mutator of its own. The commands
+// still on flow/ reach the engine through flow/legacy, which runs a command
+// through dispatch.
+var mutatorCallers = []dir{"command", "service"}
 
 // readOnly are the packages that never write: a query only reads.
 var readOnly = []dir{"query"}
 
-// writingField is the one function of the engine's contract that writes; every
-// other one (Observe, Choices, Plan, Skip, Run…) is a reader.
+// readerFields are the functions of the engine's contract that only read, by
+// the type that holds them. Apply writes, and what it builds — a saga, its
+// steps, a phase — runs inside it.
+var readerFields = map[objectRef][]string{
+	{Path: internalPrefix + "kernel", Name: "Command"}:   {"Observe", "Forget", "Locks", "Plan"},
+	{Path: internalPrefix + "kernel", Name: "FieldDef"}:  {"Skip", "Default", "Validate", "Choices"},
+	{Path: internalPrefix + "kernel", Name: "Query"}:     {"Run", "Stream"},
+	{Path: internalPrefix + "kernel", Name: "Rule"}:      {"Check"},
+	{Path: internalPrefix + "kernel", Name: "Condition"}: {"Holds"},
+	{Path: internalPrefix + "dispatch", Name: "Events"}:  {"Committed", "PhaseDone", "Finished"},
+}
+
+var applyField = objectRef{Path: internalPrefix + "kernel", Name: "Command"}
+
 const writingField = "Apply"
 
 // mutatorFact marks a function that reaches a write sink, with the chain of
@@ -104,7 +150,7 @@ func writeOf(pass *analysis.Pass, writes map[*types.Func]string, fn *types.Func)
 	if via, ok := writes[fn]; ok {
 		return chain(fn, via), true
 	}
-	if slices.ContainsFunc(writeSinks, func(ref objectRef) bool { return refers(fn, ref) }) {
+	if slices.ContainsFunc(writeSinks, func(ref objectRef) bool { return refers(fn, ref) }) || slices.ContainsFunc(methodSinks, func(ref methodRef) bool { return ref.holds(fn) }) {
 		return qualified(fn), true
 	}
 	fact := new(mutatorFact)
@@ -302,57 +348,116 @@ func (c writeCheck) readOnlyPackage() {
 	}
 }
 
-// readerFields refuses a write from any function of a literal of the engine's
-// contract but Apply, whether written in place or named.
+// readerFields refuses a write from a reader function of the engine's
+// contract, given in a literal or assigned to its field, written in place,
+// named, or built by a factory. Nothing inside Apply is a reader.
 func (c writeCheck) readerFields() {
 	for _, file := range c.pass.Files {
+		inApply := map[ast.Expr]bool{}
 		ast.Inspect(file, func(node ast.Node) bool {
-			lit, ok := node.(*ast.CompositeLit)
-			if !ok || !kernelContract(c.pass.TypesInfo.TypeOf(lit)) {
-				return true
-			}
-			for _, elt := range lit.Elts {
-				field, ok := elt.(*ast.KeyValueExpr)
-				if !ok {
-					continue
+			switch n := node.(type) {
+			case ast.Expr:
+				if inApply[n] {
+					return false
 				}
-				key, ok := field.Key.(*ast.Ident)
-				if !ok || key.Name == writingField {
-					continue
+				if lit, ok := n.(*ast.CompositeLit); ok {
+					c.contractLiteral(contractLiteralParams{Lit: lit, InApply: inApply})
 				}
-				c.readerBody(key.Name, field.Value)
+			case *ast.AssignStmt:
+				c.contractAssignment(n)
 			}
 			return true
 		})
 	}
 }
 
-func (c writeCheck) readerBody(field string, value ast.Expr) {
-	if lit, ok := value.(*ast.FuncLit); ok {
-		ast.Inspect(lit.Body, func(node ast.Node) bool {
-			c.refuse(node, "%s, in "+field+": only Apply writes, the rest of a command reads (docs/dev/lint.md, writesink)")
-			return true
-		})
-		return
-	}
-	var name *ast.Ident
-	switch v := value.(type) {
-	case *ast.Ident:
-		name = v
-	case *ast.SelectorExpr:
-		name = v.Sel
-	default:
-		return
-	}
-	c.refuse(name, "%s, as "+field+": only Apply writes, the rest of a command reads (docs/dev/lint.md, writesink)")
+type contractLiteralParams struct {
+	Lit     *ast.CompositeLit
+	InApply map[ast.Expr]bool
 }
 
-func kernelContract(typ types.Type) bool {
+func (c writeCheck) contractLiteral(params contractLiteralParams) {
+	holder, readers := contractOf(c.pass.TypesInfo.TypeOf(params.Lit))
+	for _, elt := range params.Lit.Elts {
+		field, ok := elt.(*ast.KeyValueExpr)
+		if !ok {
+			continue
+		}
+		key, ok := field.Key.(*ast.Ident)
+		if !ok {
+			continue
+		}
+		if holder == applyField && key.Name == writingField {
+			params.InApply[field.Value] = true
+			continue
+		}
+		if slices.Contains(readers, key.Name) {
+			c.readerBody(key.Name, field.Value)
+		}
+	}
+}
+
+func (c writeCheck) contractAssignment(assign *ast.AssignStmt) {
+	if len(assign.Lhs) != len(assign.Rhs) {
+		return
+	}
+	for index, lhs := range assign.Lhs {
+		sel, ok := lhs.(*ast.SelectorExpr)
+		if !ok {
+			continue
+		}
+		_, readers := contractOf(c.pass.TypesInfo.TypeOf(sel.X))
+		if slices.Contains(readers, sel.Sel.Name) {
+			c.readerBody(sel.Sel.Name, assign.Rhs[index])
+		}
+	}
+}
+
+// contractOf names the type of the contract a value is, and its reader fields.
+func contractOf(typ types.Type) (objectRef, []string) {
 	if pointer, ok := typ.(*types.Pointer); ok {
 		typ = pointer.Elem()
 	}
 	named, ok := typ.(*types.Named)
-	return ok && named.Obj().Pkg() != nil && named.Obj().Pkg().Path() == internalPrefix+"kernel"
+	if !ok || named.Obj().Pkg() == nil {
+		return objectRef{}, nil
+	}
+	ref := objectRef{Path: named.Obj().Pkg().Path(), Name: named.Obj().Name()}
+	return ref, readerFields[ref]
+}
+
+func (c writeCheck) readerBody(field string, value ast.Expr) {
+	switch v := ast.Unparen(value).(type) {
+	case *ast.FuncLit:
+		ast.Inspect(v.Body, func(node ast.Node) bool {
+			c.refuse(node, "%s, in "+field+": only Apply writes, the rest of a command reads (docs/dev/lint.md, writesink)")
+			return true
+		})
+	case *ast.CallExpr:
+		if name := funcName(v.Fun); name != nil {
+			c.refuse(name, "%s, building "+field+": only Apply writes, the rest of a command reads (docs/dev/lint.md, writesink)")
+		}
+	default:
+		if name := funcName(v); name != nil {
+			c.refuse(name, "%s, as "+field+": only Apply writes, the rest of a command reads (docs/dev/lint.md, writesink)")
+		}
+	}
+}
+
+// funcName is the identifier naming the function an expression refers to:
+// f, pkg.F, recv.method, f[T].
+func funcName(expr ast.Expr) *ast.Ident {
+	switch e := ast.Unparen(expr).(type) {
+	case *ast.Ident:
+		return e
+	case *ast.SelectorExpr:
+		return e.Sel
+	case *ast.IndexExpr:
+		return funcName(e.X)
+	case *ast.IndexListExpr:
+		return funcName(e.X)
+	}
+	return nil
 }
 
 // engineMutatorCalls refuses a mutator of the engine's services called from a
@@ -368,7 +473,7 @@ func (c writeCheck) engineMutatorCalls() {
 				return true
 			}
 			if path, ok := writeOf(c.pass, c.writes, callee); ok {
-				c.pass.Reportf(node.Pos(), "%s, called from %s: a mutator of the engine's services is called from command/ only (docs/dev/services.md, writesink)", written(path), internalPath(c.pass.Pkg.Path()))
+				c.pass.Reportf(node.Pos(), "%s, called from %s: a mutator of the engine's services is called from command/ or another service only (docs/dev/services.md, writesink)", written(path), internalPath(c.pass.Pkg.Path()))
 			}
 			return true
 		})

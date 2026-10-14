@@ -86,3 +86,26 @@ func TestALegacyRuneUnderItsCountSaysItCanShrink(t *testing.T) {
 		t.Errorf("report = %q, want ▸ lowered to 1 and ⚠ named as gone", all)
 	}
 }
+
+// The site past an entry's count is the one sorted last, not the new one: the
+// report lists every site of the entry, so the new symbol is always in it.
+func TestAnEntryOverItsCountListsEverySiteItCovers(t *testing.T) {
+	list, err := parseMigrating("rootfreeze internal/rules/plural\\.go 1\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := judge(judgeParams{Migrating: list, Findings: []finding{
+		{pos: at("internal/rules/plural.go"), rule: "rootfreeze", msg: "rules.NewRule"},
+		{pos: at("internal/rules/plural.go"), rule: "rootfreeze", msg: "rules.Plural"},
+	}})
+	lines := strings.Join(got.lines, "\n")
+	if !got.failed || got.failures != 1 {
+		t.Errorf("failed %v with %d failure(s), want one failure", got.failed, got.failures)
+	}
+	if !strings.Contains(lines, "rules.NewRule") || !strings.Contains(lines, "rules.Plural") {
+		t.Errorf("lines = %q, want both sites of the entry listed", lines)
+	}
+	if !strings.Contains(strings.Join(got.notes, "\n"), "the new one is among the sites listed above") {
+		t.Errorf("notes = %q, want the overflow named", got.notes)
+	}
+}

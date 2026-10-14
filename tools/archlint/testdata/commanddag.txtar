@@ -1,0 +1,16 @@
+-- github.com/LucasPcq/wtm/internal/command/create/create.go --
+package create
+
+type Request struct{ Branch string }
+-- github.com/LucasPcq/wtm/internal/command/create/createtest/createtest.go --
+package createtest
+
+import "github.com/LucasPcq/wtm/internal/command/create"
+
+var _ create.Request
+-- github.com/LucasPcq/wtm/internal/command/provision/provision.go --
+package provision
+
+import "github.com/LucasPcq/wtm/internal/command/create" // want `internal/command/provision must not import "github.com/LucasPcq/wtm/internal/command/create" — undeclared edge: declare it in commandEdges`
+
+var _ create.Request

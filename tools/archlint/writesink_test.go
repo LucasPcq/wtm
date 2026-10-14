@@ -21,6 +21,7 @@ func TestAWriteIsReachedOnlyFromAMutatorsCaller(t *testing.T) {
 		internalPrefix+"flow/create",
 		internalPrefix+"surface/cli/wt",
 		internalPrefix+"dispatch",
+		internalPrefix+"registry",
 	)
 }
 

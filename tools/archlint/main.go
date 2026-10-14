@@ -5,7 +5,8 @@
 //
 // Each rule is a go/analysis Analyzer and reports `file:line:col: [rule] message`;
 // a non-empty report exits 1. A rule named in -warn reports without failing; a
-// site .archlint-migrating covers is counted, and listed with -tracked.
+// site .archlint-migrating covers is counted, and listed with -tracked. The
+// exception files never grow past their ceilings (ceiling.go).
 package main
 
 import (
@@ -57,6 +58,13 @@ func main() {
 		os.Exit(2)
 	}
 
+	deadcode, err := loadDeadcodeIgnore()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "archlint:", err)
+		os.Exit(2)
+	}
+	over := overCeiling(migrating, deadcode)
+
 	findings, err := analyze(analyzeParams{Root: root, Systems: targetSystems})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "archlint:", err)
@@ -73,8 +81,11 @@ func main() {
 	if verdict.tracked > 0 && !*tracked {
 		fmt.Printf("archlint: %d site(s) tracked in .archlint-migrating (-tracked lists them)\n", verdict.tracked)
 	}
-	if verdict.failed {
-		fmt.Fprintf(os.Stderr, "\narchlint: %d finding(s) — see CLAUDE.md section 9\n", verdict.failures)
+	for _, line := range over {
+		fmt.Println("archlint:", line)
+	}
+	if verdict.failed || len(over) > 0 {
+		fmt.Fprintf(os.Stderr, "\narchlint: %d finding(s) — see CLAUDE.md section 9\n", verdict.failures+len(over))
 		os.Exit(1)
 	}
 	fmt.Printf("archlint: %s clean\n", root)

@@ -9,5 +9,7 @@ func TestEveryLowerPackageSaysItsResponsibility(t *testing.T) {
 		internalPrefix+"infra/git",
 		internalPrefix+"store",
 		internalPrefix+"rules",
+		internalPrefix+"command/create",
+		internalPrefix+"kernel",
 	)
 }

@@ -3,14 +3,66 @@ package kernel
 
 import "context"
 
-type ObserveScope struct{ Dir string }
+type Reporter struct{}
+
+type Milestones struct {
+	Committed func()
+	Finished  func()
+}
+
+type ApplyInput[F any] struct {
+	Facts      F
+	Milestones Milestones
+}
 
 type Command[F any] struct {
 	Name    string
-	Observe func(context.Context, ObserveScope) (F, error)
+	Observe func(context.Context) (F, error)
+	Fields  []FieldDef[F]
+	Locks   func(F) []string
 	Plan    func(context.Context, F) error
-	Apply   func(context.Context, F) error
+	Apply   func(context.Context, ApplyInput[F]) error
 }
+
+type FieldDef[F any] struct {
+	Validate func(F) []string
+	Choices  func(context.Context, F) ([]string, error)
+}
+
+type Prep struct {
+	Name string
+	Run  func(context.Context, Reporter) error
+}
+
+type SagaStep struct {
+	Name string
+	Do   func(context.Context, Reporter) error
+	Undo func(context.Context) error
+}
+
+type Saga struct {
+	Steps  []SagaStep
+	Commit func(context.Context) error
+}
+
+type Phase struct {
+	Name string
+	Log  string
+	Run  func(context.Context, Reporter) error
+}
+
+type Unit struct {
+	Before []Prep
+	Saga   Saga
+	Then   []Phase
+}
+
+type EachParams struct {
+	Units      []Unit
+	Milestones Milestones
+}
+
+func Each(ctx context.Context, params EachParams) error { return nil }
 
 type Query[V any] struct {
 	Run func(context.Context) (V, error)
@@ -155,6 +207,7 @@ package create
 
 import (
 	"context"
+	"os"
 
 	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/infra/git"
@@ -169,24 +222,80 @@ type ports struct {
 	meta store.Meta
 }
 
+type Ports = ports
+
 func Command(p ports) kernel.Command[identity.Snapshot] { // want Command:"mutator via identity.Allocate"
 	return kernel.Command[identity.Snapshot]{
 		Name: "create",
-		Observe: func(ctx context.Context, scope kernel.ObserveScope) (identity.Snapshot, error) {
+		Observe: func(ctx context.Context) (identity.Snapshot, error) {
 			if err := identity.Allocate(p.meta); err != nil { // want `identity\.Allocate writes \(identity\.claim → store\.Meta\.Update → fs\.UpdateFile\), in Observe: only Apply writes`
 				return identity.Snapshot{}, err
 			}
 			return identity.Snapshot{}, nil
 		},
+		Fields: []kernel.FieldDef[identity.Snapshot]{{
+			Validate: func(identity.Snapshot) []string {
+				_ = os.MkdirAll("x", 0o755) // want `os\.MkdirAll writes, in Validate: only Apply writes`
+				return nil
+			},
+			Choices: func(ctx context.Context, _ identity.Snapshot) ([]string, error) { return nil, p.meta.Update("feat") }, // want `store\.Meta\.Update writes \(fs\.UpdateFile\), in Choices: only Apply writes`
+		}},
 		Plan: p.plan, // want `create\.ports\.plan writes \(fs\.UpdateFile\), as Plan: only Apply writes`
-		Apply: func(ctx context.Context, snapshot identity.Snapshot) error {
+		Apply: func(ctx context.Context, in kernel.ApplyInput[identity.Snapshot]) error {
 			if err := identity.Allocate(p.meta); err != nil {
 				return err
 			}
-			return gitwt.Add(p.git, "feat")
+			return kernel.Each(ctx, kernel.EachParams{Milestones: in.Milestones, Units: []kernel.Unit{{
+				Before: []kernel.Prep{{Name: "fetch", Run: func(ctx context.Context, _ kernel.Reporter) error { return p.meta.Update("fetch") }}},
+				Saga: kernel.Saga{
+					Steps: []kernel.SagaStep{{
+						Name: "worktree",
+						Do:   func(ctx context.Context, _ kernel.Reporter) error { return gitwt.Add(p.git, "feat") },
+						Undo: func(ctx context.Context) error { return gitwt.Add(p.git, "undo") },
+					}},
+					Commit: func(ctx context.Context) error { return p.meta.Update("feat") },
+				},
+				Then: []kernel.Phase{{Name: "hooks", Run: func(ctx context.Context, _ kernel.Reporter) error { return p.meta.Update("feat") }}},
+			}}})
 		},
 	}
 }
+
+// A saga built outside the literal is still Apply's: its steps write.
+func unit(p ports) kernel.Unit { // want unit:"mutator via gitwt.Add → git.Writer.AddWorktree"
+	return kernel.Unit{Saga: kernel.Saga{Steps: []kernel.SagaStep{{
+		Do: func(ctx context.Context, _ kernel.Reporter) error { return gitwt.Add(p.git, "feat") },
+	}}}}
+}
+
+func Built(p ports) kernel.Command[identity.Snapshot] { // want Built:"mutator via create.observer → store.Meta.Update → fs.UpdateFile"
+	return kernel.Command[identity.Snapshot]{
+		Observe: observer(p), // want `create\.observer writes \(store\.Meta\.Update → fs\.UpdateFile\), building Observe: only Apply writes`
+		Locks:   locks(p),
+	}
+}
+
+func observer(p ports) func(context.Context) (identity.Snapshot, error) { // want observer:"mutator via store.Meta.Update → fs.UpdateFile"
+	return func(ctx context.Context) (identity.Snapshot, error) {
+		return identity.Snapshot{}, p.meta.Update("feat")
+	}
+}
+
+func locks(p ports) func(identity.Snapshot) []string {
+	return func(identity.Snapshot) []string { return nil }
+}
+
+func Assigned(p ports) kernel.Command[identity.Snapshot] { // want Assigned:"mutator via os.Setenv"
+	var command kernel.Command[identity.Snapshot]
+	command.Locks = func(identity.Snapshot) []string {
+		_ = os.Setenv("A", "b") // want `os\.Setenv writes, in Locks: only Apply writes`
+		return nil
+	}
+	command.Apply = func(ctx context.Context, _ kernel.ApplyInput[identity.Snapshot]) error { return os.Chdir("/") }
+	return command
+}
+
+func Events(p ports) error { return p.meta.Update("feat") } // want Events:"mutator via store.Meta.Update → fs.UpdateFile"
 
 func (p ports) plan(ctx context.Context, snapshot identity.Snapshot) error { // want plan:"mutator via fs.UpdateFile"
 	return fs.UpdateFile("plan")
@@ -199,7 +308,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/store"
 )
 
-func Run(meta store.Meta) error { return identity.Allocate(meta) } // want Run:"mutator via identity.Allocate → identity.claim"
+func Run(meta store.Meta) error { return identity.Allocate(meta) } // want Run:"mutator via identity.Allocate → identity.claim" `identity\.Allocate writes \(identity\.claim → store\.Meta\.Update → fs\.UpdateFile\), called from flow/create: a mutator of the engine's services is called from command/ or another service only`
 -- github.com/LucasPcq/wtm/internal/surface/cli/wt/wt.go --
 package wt
 
@@ -211,7 +320,7 @@ import (
 )
 
 func Add(writer git.Writer) error { // want Add:"mutator via gitwt.Add → git.Writer.AddWorktree"
-	return gitwt.Add(writer, "feat") // want `gitwt\.Add writes \(git\.Writer\.AddWorktree\), called from surface/cli/wt: a mutator of the engine's services is called from command/ only`
+	return gitwt.Add(writer, "feat") // want `gitwt\.Add writes \(git\.Writer\.AddWorktree\), called from surface/cli/wt: a mutator of the engine's services is called from command/ or another service only`
 }
 
 func Show(reader git.Reader, meta store.Meta) (identity.Snapshot, error) { return identity.Read(reader, meta) }
@@ -221,6 +330,10 @@ var number = identity.Allocate // want `identity\.Allocate writes \(identity\.cl
 package dispatch
 
 import "github.com/LucasPcq/wtm/internal/service/hooks"
+
+type Events struct {
+	Committed func() error
+}
 
 func Run() error { // want Run:"mutator via hooks.Execute → proc.Command"
 	return hooks.Execute("on_create") // want `hooks\.Execute writes \(proc\.Command\), called from dispatch`
@@ -239,3 +352,27 @@ import "github.com/LucasPcq/wtm/internal/service/runenv"
 func Keep() error { // want Keep:"mutator via runenv.Save"
 	return runenv.Save(1) // want `runenv\.Save writes \(fs\.UpdateFile\), in query/status`
 }
+-- github.com/LucasPcq/wtm/internal/query/status/handle.go --
+package status
+
+import "os"
+
+func Log(file *os.File) error { // want Log:"mutator via os.File.WriteString"
+	_, err := file.WriteString("x") // want `os\.File\.WriteString writes, in query/status`
+	return err
+}
+
+func Stop(process *os.Process) error { return process.Kill() } // want Stop:"mutator via os.Process.Kill" `os\.Process\.Kill writes, in query/status`
+-- github.com/LucasPcq/wtm/internal/registry/registry.go --
+package registry
+
+import (
+	"github.com/LucasPcq/wtm/internal/command/create"
+	"github.com/LucasPcq/wtm/internal/dispatch"
+)
+
+func Events() dispatch.Events { // want Events:"mutator via registry.committed"
+	return dispatch.Events{Committed: committed} // want `registry\.committed writes \(create\.Events → store\.Meta\.Update → fs\.UpdateFile\), as Committed: only Apply writes`
+}
+
+func committed() error { return create.Events(create.Ports{}) } // want committed:"mutator via create.Events → store.Meta.Update → fs.UpdateFile"
