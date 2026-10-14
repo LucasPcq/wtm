@@ -103,7 +103,7 @@ type verdict struct {
 
 func judge(params judgeParams) verdict {
 	var result verdict
-	used := make([]int, len(params.Migrating.entries))
+	used := sitesPerEntry(params)
 	for _, f := range params.Findings {
 		if f.note {
 			result.notes = append(result.notes, fmt.Sprintf("[%s] %s", f.rule, f.msg))
@@ -113,6 +113,9 @@ func judge(params judgeParams) verdict {
 		if tag == "" || tag == tagOverBudget {
 			result.failed = true
 			result.failures++
+		}
+		if tag == tagOverEntry {
+			result.tracked++
 		}
 		if tag == tagMigrating && f.legacy == "" {
 			result.tracked++
@@ -128,15 +131,34 @@ func judge(params judgeParams) verdict {
 			result.notes = append(result.notes, fmt.Sprintf(".archlint-migrating: %q covers nothing any more — remove it", entry.line))
 		case used[index] < entry.budget:
 			result.notes = append(result.notes, fmt.Sprintf(".archlint-migrating: %q covers %d site(s) — lower it to %d", entry.line, used[index], used[index]))
+		case used[index] > entry.budget:
+			result.failed = true
+			result.failures += used[index] - entry.budget
+			result.notes = append(result.notes, fmt.Sprintf(".archlint-migrating: %q covers %d sites, %d more than its count: the new one is among the sites listed above — the list may only shrink", entry.line, used[index], used[index]-entry.budget))
 		}
 	}
 	return result
+}
+
+// sitesPerEntry counts the sites each entry of .archlint-migrating covers.
+func sitesPerEntry(params judgeParams) []int {
+	used := make([]int, len(params.Migrating.entries))
+	for _, f := range params.Findings {
+		if f.note || f.legacy != "" || params.Warned[f.rule] {
+			continue
+		}
+		if index := params.Migrating.match(f); index >= 0 {
+			used[index]++
+		}
+	}
+	return used
 }
 
 const (
 	tagWarning    = " (warning)"
 	tagMigrating  = " (migrating)"
 	tagOverBudget = " (over its recorded count — the list may only shrink)"
+	tagOverEntry  = " (migrating, its entry over its count)"
 )
 
 type tagParams struct {
@@ -161,9 +183,8 @@ func tagOf(params tagParams) string {
 	if index < 0 {
 		return ""
 	}
-	params.Used[index]++
 	if params.Used[index] > params.Migrating.entries[index].budget {
-		return tagOverBudget
+		return tagOverEntry
 	}
 	return tagMigrating
 }

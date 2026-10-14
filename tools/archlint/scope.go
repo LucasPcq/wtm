@@ -3,7 +3,10 @@ package main
 import (
 	"go/ast"
 	"go/types"
+	"slices"
 	"strings"
+
+	"golang.org/x/tools/go/analysis"
 )
 
 const (
@@ -67,4 +70,12 @@ type dir string
 func (d dir) holds(pkgPath string) bool {
 	rel := internalPath(pkgPath)
 	return rel == string(d) || strings.HasPrefix(rel, string(d)+"/")
+}
+
+// firstFile is where a finding about a whole package points: its first file by
+// name, the same on every run.
+func firstFile(pass *analysis.Pass) *ast.File {
+	return slices.MinFunc(pass.Files, func(a, b *ast.File) int {
+		return strings.Compare(pass.Fset.Position(a.Package).Filename, pass.Fset.Position(b.Package).Filename)
+	})
 }

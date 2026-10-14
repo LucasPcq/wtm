@@ -18,3 +18,8 @@ Package store is the one owner of each state file.
 package store
 -- github.com/LucasPcq/wtm/internal/rules/rules.go --
 package rules
+-- github.com/LucasPcq/wtm/internal/command/create/create.go --
+package create // want `package command/create has no package doc`
+-- github.com/LucasPcq/wtm/internal/kernel/kernel.go --
+// Package kernel is the contract of the command engine.
+package kernel

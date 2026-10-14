@@ -215,3 +215,11 @@ rootfreeze internal/rules/validate\.go 15
 rootfreeze internal/rules/workspace\.go 5
 rootfreeze internal/rules/worktree\.go 20
 rootfreeze internal/rules/worktreestatus\.go 13
+
+# Real ports built outside internal/registry (LUC-300): the services of the
+# commands still on flow/ build store's ports on the state dir they are handed;
+# each site leaves as its command moves onto the engine and takes its ports
+# from the registry (steps 3 to 10 of LUC-283).
+portbuild internal/service/env/ 8
+portbuild internal/service/memory/ 1
+portbuild internal/service/worktree/ 11

@@ -82,10 +82,23 @@ import (
 
 type Announcer interface{ Publish(domain.Event) }
 
-func Apply(a Announcer, p dispatch.Publisher) {
+type Bus interface{ Emit([]domain.Event) }
+
+func Apply(a Announcer, p dispatch.Publisher, bus Bus, send func(domain.Event)) {
 	a.Publish(domain.Event{}) // want `command/create publishes: in the engine only dispatch publishes`
 	p.Publish(domain.Event{}) // want `command/create publishes`
+	bus.Emit(nil)             // want `command/create hands a domain\.Event to a port`
+	send(domain.Event{})      // want `command/create hands a domain\.Event to a port`
 }
+
+func Events(created bool) []domain.Event {
+	if !created {
+		return nil
+	}
+	return append([]domain.Event{}, event())
+}
+
+func event() domain.Event { return domain.Event{} }
 -- github.com/LucasPcq/wtm/internal/service/identity/identity.go --
 package identity
 

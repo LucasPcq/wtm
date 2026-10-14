@@ -17,6 +17,7 @@ func TestAMutatorIsReachedOnlyFromFlow(t *testing.T) {
 		internalPrefix+"flow/run/seam",
 		internalPrefix+"surface/cli/wt",
 		internalPrefix+"surface/tui/dash",
+		internalPrefix+"command/create",
 	)
 }
 

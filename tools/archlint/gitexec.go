@@ -1,8 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"go/ast"
 	"go/constant"
+	"go/token"
+	"go/types"
 	"slices"
 
 	"golang.org/x/tools/go/analysis"
@@ -11,11 +14,18 @@ import (
 // processStarts are the calls that start a program by name. Given "git", they
 // bypass infra/git: its one parser per output, its remote handed in, its
 // errors returned rather than read as a default.
-var processStarts = []objectRef{
-	{Path: "os/exec", Name: "Command"},
-	{Path: "os/exec", Name: "CommandContext"},
-	{Path: internalPrefix + "infra/proc", Name: "Command"},
-	{Path: internalPrefix + "infra/proc", Name: "GroupCommand"},
+var processStarts = []processStart{
+	{ref: objectRef{Path: "os/exec", Name: "Command"}, program: 0},
+	{ref: objectRef{Path: "os/exec", Name: "CommandContext"}, program: 1},
+	{ref: objectRef{Path: internalPrefix + "infra/proc", Name: "Command"}, program: 1},
+	{ref: objectRef{Path: internalPrefix + "infra/proc", Name: "GroupCommand"}, program: 1},
+}
+
+// processStart is a call that starts a program, the one its argument at
+// index program names.
+type processStart struct {
+	ref     objectRef
+	program int
 }
 
 // gitExecExempt are the packages that run git for good outside infra/git.
@@ -25,20 +35,36 @@ var gitExecExempt = map[string]string{
 
 const gitProgram = "git"
 
+// programFact marks a function that starts the program its parameter Index
+// names: a wrapper given "git" runs git as surely as exec.Command does.
+type programFact struct{ Index int }
+
+func (*programFact) AFact() {}
+
+func (f *programFact) String() string {
+	return fmt.Sprintf("starts the program its parameter %d names", f.Index)
+}
+
 var gitexecAnalyzer = &analysis.Analyzer{
-	Name: "gitexec",
-	Doc:  "git is run only by infra/git",
-	Run:  runGitexec,
+	Name:      "gitexec",
+	Doc:       "git is run only by infra/git",
+	Run:       runGitexec,
+	FactTypes: []analysis.Fact{new(programFact)},
 }
 
 func runGitexec(pass *analysis.Pass) (any, error) {
+	check := gitCheck{pass: pass, wrappers: map[*types.Func]int{}, gitVars: gitVarsOf(pass)}
+	check.findWrappers()
+	for fn, index := range check.wrappers {
+		pass.ExportObjectFact(fn, &programFact{Index: index})
+	}
 	if dir("infra/git").holds(pass.Pkg.Path()) || exemptFromGitexec(pass.Pkg.Path()) {
 		return nil, nil
 	}
 	for _, file := range pass.Files {
 		ast.Inspect(file, func(node ast.Node) bool {
 			call, ok := node.(*ast.CallExpr)
-			if ok && startsGit(pass, call) {
+			if ok && slices.ContainsFunc(check.gitArgs(call), check.isGit) {
 				pass.Reportf(call.Pos(), "git run outside infra/git: call it through git.Repo (docs/dev/git.md, gitexec)")
 			}
 			return true
@@ -47,15 +73,170 @@ func runGitexec(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
-func startsGit(pass *analysis.Pass, call *ast.CallExpr) bool {
-	obj := objectOf(pass.TypesInfo, call.Fun)
-	if !slices.ContainsFunc(processStarts, func(ref objectRef) bool { return refers(obj, ref) }) {
+type gitCheck struct {
+	pass     *analysis.Pass
+	wrappers map[*types.Func]int
+	gitVars  map[*types.Var]bool
+}
+
+// gitArgs are the arguments of a call that may say "git": any string a
+// start is given ("env", "git", …), the program a wrapper passes on.
+func (c gitCheck) gitArgs(call *ast.CallExpr) []ast.Expr {
+	if _, ok := c.startOf(call); ok {
+		return slices.DeleteFunc(slices.Clone(call.Args), func(arg ast.Expr) bool { return !isString(c.pass.TypesInfo.TypeOf(arg)) })
+	}
+	return c.programArg(call)
+}
+
+// programArg is the argument naming the program a start or a wrapper runs.
+func (c gitCheck) programArg(call *ast.CallExpr) []ast.Expr {
+	index, ok := c.startOf(call)
+	if !ok {
+		fn, isFunc := objectOf(c.pass.TypesInfo, ast.Unparen(call.Fun)).(*types.Func)
+		if !isFunc {
+			return nil
+		}
+		index, ok = c.wrapperIndex(fn.Origin())
+	}
+	if !ok || index >= len(call.Args) {
+		return nil
+	}
+	return call.Args[index : index+1]
+}
+
+func (c gitCheck) startOf(call *ast.CallExpr) (int, bool) {
+	obj := objectOf(c.pass.TypesInfo, ast.Unparen(call.Fun))
+	for _, start := range processStarts {
+		if refers(obj, start.ref) {
+			return start.program, true
+		}
+	}
+	return 0, false
+}
+
+func (c gitCheck) wrapperIndex(fn *types.Func) (int, bool) {
+	if index, ok := c.wrappers[fn]; ok {
+		return index, true
+	}
+	fact := new(programFact)
+	if fn.Pkg() != c.pass.Pkg && c.pass.ImportObjectFact(fn, fact) {
+		return fact.Index, true
+	}
+	return 0, false
+}
+
+func isString(typ types.Type) bool {
+	basic, ok := typ.(*types.Basic)
+	return ok && basic.Info()&types.IsString != 0
+}
+
+func (c gitCheck) isGit(arg ast.Expr) bool {
+	value := c.pass.TypesInfo.Types[arg].Value
+	if value != nil {
+		return value.Kind() == constant.String && constant.StringVal(value) == gitProgram
+	}
+	ident, ok := ast.Unparen(arg).(*ast.Ident)
+	if !ok {
 		return false
 	}
-	return slices.ContainsFunc(call.Args, func(arg ast.Expr) bool {
-		value := pass.TypesInfo.Types[arg].Value
-		return value != nil && value.Kind() == constant.String && constant.StringVal(value) == gitProgram
+	variable, ok := c.pass.TypesInfo.Uses[ident].(*types.Var)
+	return ok && c.gitVars[variable]
+}
+
+// findWrappers marks each function of the package that passes one of its
+// parameters on as the program a start or another wrapper runs.
+func (c gitCheck) findWrappers() {
+	for changed := true; changed; {
+		changed = false
+		for _, file := range c.pass.Files {
+			for _, d := range file.Decls {
+				decl, ok := d.(*ast.FuncDecl)
+				if !ok || decl.Body == nil {
+					continue
+				}
+				fn, ok := c.pass.TypesInfo.Defs[decl.Name].(*types.Func)
+				if !ok {
+					continue
+				}
+				if _, known := c.wrappers[fn]; known {
+					continue
+				}
+				if index, ok := c.passesParam(decl); ok {
+					c.wrappers[fn] = index
+					changed = true
+				}
+			}
+		}
+	}
+}
+
+func (c gitCheck) passesParam(decl *ast.FuncDecl) (int, bool) {
+	params := paramsOf(c.pass, decl)
+	found, at := false, 0
+	ast.Inspect(decl.Body, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok || found {
+			return !found
+		}
+		for _, arg := range c.programArg(call) {
+			ident, ok := ast.Unparen(arg).(*ast.Ident)
+			if !ok {
+				continue
+			}
+			if index := slices.Index(params, c.pass.TypesInfo.Uses[ident]); index >= 0 {
+				found, at = true, index
+				return false
+			}
+		}
+		return true
 	})
+	return at, found
+}
+
+func paramsOf(pass *analysis.Pass, decl *ast.FuncDecl) []types.Object {
+	var params []types.Object
+	for _, field := range decl.Type.Params.List {
+		for _, name := range field.Names {
+			params = append(params, pass.TypesInfo.Defs[name])
+		}
+	}
+	return params
+}
+
+// gitVarsOf are the variables of the package declared with "git" as their
+// value: `var program = "git"` names git as the constant does.
+func gitVarsOf(pass *analysis.Pass) map[*types.Var]bool {
+	vars := map[*types.Var]bool{}
+	mark := func(name *ast.Ident, value ast.Expr) {
+		tv := pass.TypesInfo.Types[value]
+		variable, ok := pass.TypesInfo.Defs[name].(*types.Var)
+		if ok && tv.Value != nil && tv.Value.Kind() == constant.String && constant.StringVal(tv.Value) == gitProgram {
+			vars[variable] = true
+		}
+	}
+	for _, file := range pass.Files {
+		ast.Inspect(file, func(node ast.Node) bool {
+			switch n := node.(type) {
+			case *ast.ValueSpec:
+				for index, name := range n.Names {
+					if index < len(n.Values) {
+						mark(name, n.Values[index])
+					}
+				}
+			case *ast.AssignStmt:
+				if n.Tok != token.DEFINE || len(n.Lhs) != len(n.Rhs) {
+					return true
+				}
+				for index, lhs := range n.Lhs {
+					if name, ok := lhs.(*ast.Ident); ok {
+						mark(name, n.Rhs[index])
+					}
+				}
+			}
+			return true
+		})
+	}
+	return vars
 }
 
 func exemptFromGitexec(pkgPath string) bool {

@@ -68,3 +68,51 @@ package gittest
 import "os/exec"
 
 func InitRepo(dir string) error { return exec.Command("git", "init", dir).Run() }
+-- github.com/LucasPcq/wtm/internal/service/wrap/wrap.go --
+package wrap
+
+import (
+	"context"
+	"os/exec"
+
+	"github.com/LucasPcq/wtm/internal/infra/proc"
+)
+
+var tool = "git"
+
+func Variable() error {
+	return exec.Command(tool, "status").Run() // want `git run outside infra/git`
+}
+
+func Local() error {
+	name := "git"
+	return exec.Command(name, "status").Run() // want `git run outside infra/git`
+}
+
+func run(name string, args ...string) error { return exec.Command(name, args...).Run() } // want run:"starts the program its parameter 0 names"
+
+func runIn(ctx context.Context, dir string, name string) error { return start(ctx, name) } // want runIn:"starts the program its parameter 2 names"
+
+func start(ctx context.Context, name string) error { return proc.Command(ctx, name).Run() } // want start:"starts the program its parameter 1 names"
+
+func Wrapped() error {
+	return run("git", "status") // want `git run outside infra/git`
+}
+
+func Twice(ctx context.Context) error {
+	return runIn(ctx, "git", "git") // want `git run outside infra/git`
+}
+
+func Directory(ctx context.Context) error { return runIn(ctx, "git", "make") }
+
+func Gh() error { return run("gh", "pr", "list") }
+
+func Run(name string) error { return run(name) } // want Run:"starts the program its parameter 0 names"
+-- github.com/LucasPcq/wtm/internal/service/caller/caller.go --
+package caller
+
+import "github.com/LucasPcq/wtm/internal/service/wrap"
+
+func Status() error { return wrap.Run("git") } // want `git run outside infra/git`
+
+func Make() error { return wrap.Run("make") }
