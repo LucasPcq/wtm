@@ -174,7 +174,8 @@ func (s Snapshot) NameClash(branch string) (domain.WorktreeNameClash, bool) {
 	return rules.WorktreeNameClash(rules.WorktreeNameClashParams{Branch: branch, Live: live})
 }
 
-// CheckedOutAt is the worktree that has branch out, empty when none does.
+// CheckedOutAt is the worktree that has branch out, as git writes its path,
+// empty when none does.
 func (s Snapshot) CheckedOutAt(branch string) string {
 	for _, wt := range s.Worktrees {
 		if branchOf(wt) == branch {
@@ -184,11 +185,12 @@ func (s Snapshot) CheckedOutAt(branch string) string {
 	return ""
 }
 
-// Occupant is the branch of the worktree registered at path, empty when none
-// is or its HEAD is detached.
-func (s Snapshot) Occupant(path string) string {
+// Occupant is the branch of the worktree registered at a location, empty when
+// none is or its HEAD is detached. git records a path with its symlinks
+// resolved: a path as spelled would never match.
+func (s Snapshot) Occupant(at git.Location) string {
 	for _, wt := range s.Worktrees {
-		if wt.Path == path {
+		if wt.Path == at.Path {
 			return branchOf(wt)
 		}
 	}

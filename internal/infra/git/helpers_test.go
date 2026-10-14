@@ -19,7 +19,7 @@ const remote = "origin"
 // newRepo is a real repository on main, at the path git reports for it.
 func newRepo(t *testing.T) git.Repo {
 	t.Helper()
-	return git.Repo{Dir: resolved(t, gittest.InitRepo(t)), Remote: remote}
+	return git.Repo{Dir: gittest.Resolved(t, gittest.InitRepo(t)), Remote: remote}
 }
 
 // newRepoWithOrigin is newRepo with main pushed to a bare origin, returned too.
@@ -27,20 +27,6 @@ func newRepoWithOrigin(t *testing.T) (git.Repo, string) {
 	t.Helper()
 	repo := newRepo(t)
 	return repo, gittest.AddOrigin(t, repo.Dir)
-}
-
-// tempDir is where a worktree goes: macOS reaches its temp dir through a
-// symlink that git resolves.
-func tempDir(t *testing.T) string {
-	t.Helper()
-	return resolved(t, t.TempDir())
-}
-
-func resolved(t *testing.T, path string) string {
-	t.Helper()
-	real, err := filepath.EvalSymlinks(path)
-	require.NoError(t, err)
-	return real
 }
 
 func commitFile(t *testing.T, dir, name, content string) {
@@ -77,7 +63,7 @@ func checkOutFeature(t *testing.T, dir string, linked bool) string {
 		gittest.Git(t, dir, "checkout", "feature")
 		return dir
 	}
-	where := filepath.Join(tempDir(t), "feature")
+	where := filepath.Join(gittest.TempDir(t), "feature")
 	gittest.Git(t, dir, "worktree", "add", where, "feature")
 	return where
 }
@@ -105,4 +91,25 @@ func paths(worktrees []git.Worktree) []string {
 		all = append(all, worktree.Path)
 	}
 	return all
+}
+
+func refExists(t *testing.T, reader git.Reader, ref git.Ref) bool {
+	t.Helper()
+	exists, err := reader.RefExists(t.Context(), ref)
+	require.NoError(t, err)
+	return exists
+}
+
+func tip(t *testing.T, reader git.Reader, ref git.Ref) string {
+	t.Helper()
+	commit, err := reader.Tip(t.Context(), ref)
+	require.NoError(t, err)
+	return commit
+}
+
+func aheadBehind(t *testing.T, reader git.Reader, params git.AheadBehindParams) git.AheadBehind {
+	t.Helper()
+	counts, err := reader.AheadBehind(t.Context(), params)
+	require.NoError(t, err)
+	return counts
 }

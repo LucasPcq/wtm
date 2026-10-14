@@ -17,7 +17,7 @@ import (
 func TestAddWorktreeOnANewBranchStartsFromWithoutTrackingIt(t *testing.T) {
 	repo, _ := newRepoWithOrigin(t)
 	commitFile(t, repo.Dir, "local", "1")
-	path := filepath.Join(tempDir(t), "topic")
+	path := filepath.Join(gittest.TempDir(t), "topic")
 
 	err := repo.AddWorktree(t.Context(), git.AddWorktreeParams{Path: path, Checkout: git.NewBranch{Name: "topic", From: git.RemoteBranch{Name: "main"}}})
 
@@ -30,7 +30,7 @@ func TestAddWorktreeOnANewBranchStartsFromWithoutTrackingIt(t *testing.T) {
 func TestAddWorktreeChecksOutAnExistingBranch(t *testing.T) {
 	repo := newRepo(t)
 	gittest.CreateBranch(t, repo.Dir, "feature")
-	path := filepath.Join(tempDir(t), "feature")
+	path := filepath.Join(gittest.TempDir(t), "feature")
 
 	err := repo.AddWorktree(t.Context(), git.AddWorktreeParams{Path: path, Checkout: git.ExistingBranch{Name: "feature"}})
 
@@ -41,15 +41,28 @@ func TestAddWorktreeChecksOutAnExistingBranch(t *testing.T) {
 func TestAddWorktreeFailsWithWhatGitSaid(t *testing.T) {
 	repo := newRepo(t)
 
-	checkedOut := repo.AddWorktree(t.Context(), git.AddWorktreeParams{Path: filepath.Join(tempDir(t), "main"), Checkout: git.ExistingBranch{Name: "main"}})
-	noFrom := repo.AddWorktree(t.Context(), git.AddWorktreeParams{Path: filepath.Join(tempDir(t), "topic"), Checkout: git.NewBranch{Name: "topic"}})
-	noCheckout := repo.AddWorktree(t.Context(), git.AddWorktreeParams{Path: filepath.Join(tempDir(t), "none")})
+	checkedOut := repo.AddWorktree(t.Context(), git.AddWorktreeParams{Path: filepath.Join(gittest.TempDir(t), "main"), Checkout: git.ExistingBranch{Name: "main"}})
+	noFrom := repo.AddWorktree(t.Context(), git.AddWorktreeParams{Path: filepath.Join(gittest.TempDir(t), "topic"), Checkout: git.NewBranch{Name: "topic"}})
+	noCheckout := repo.AddWorktree(t.Context(), git.AddWorktreeParams{Path: filepath.Join(gittest.TempDir(t), "none")})
 
 	var gitErr *git.Error
 	require.ErrorAs(t, checkedOut, &gitErr)
 	assert.Contains(t, gitErr.Stderr, "main")
 	require.Error(t, noFrom)
 	require.Error(t, noCheckout)
+}
+
+func TestAddWorktreeRefusesABranchOnlyTheRemoteHasRatherThanCreateOne(t *testing.T) {
+	repo, _ := newRepoWithOrigin(t)
+	gittest.Git(t, repo.Dir, "push", "origin", "main:remote-only")
+	gittest.Git(t, repo.Dir, "fetch", "origin")
+
+	err := repo.AddWorktree(t.Context(), git.AddWorktreeParams{Path: filepath.Join(gittest.TempDir(t), "remote-only"), Checkout: git.ExistingBranch{Name: "remote-only"}})
+
+	require.ErrorIs(t, err, git.ErrNoLocalBranch)
+	exists, existsErr := repo.RefExists(t.Context(), git.LocalBranch{Name: "remote-only"})
+	require.NoError(t, existsErr)
+	assert.False(t, exists)
 }
 
 // — Undo: RemoveWorktree and DeleteBranch put the repository back —
@@ -60,7 +73,7 @@ func TestRemoveWorktreeAndDeleteBranchUndoAnAdd(t *testing.T) {
 	require.NoError(t, err)
 	branchesBefore, err := repo.Branches(t.Context())
 	require.NoError(t, err)
-	path := filepath.Join(tempDir(t), "topic")
+	path := filepath.Join(gittest.TempDir(t), "topic")
 	require.NoError(t, repo.AddWorktree(t.Context(), git.AddWorktreeParams{Path: path, Checkout: git.NewBranch{Name: "topic", From: git.LocalBranch{Name: "main"}}}))
 
 	require.NoError(t, repo.RemoveWorktree(t.Context(), git.RemoveWorktreeParams{Path: path, Force: true}))
@@ -77,7 +90,7 @@ func TestRemoveWorktreeAndDeleteBranchUndoAnAdd(t *testing.T) {
 
 func TestRemoveWorktreeKeepsADirtyWorktreeWithoutForce(t *testing.T) {
 	repo := newRepo(t)
-	path := filepath.Join(tempDir(t), "dirty")
+	path := filepath.Join(gittest.TempDir(t), "dirty")
 	require.NoError(t, repo.AddWorktree(t.Context(), git.AddWorktreeParams{Path: path, Checkout: git.NewBranch{Name: "dirty", From: git.LocalBranch{Name: "main"}}}))
 	require.NoError(t, os.WriteFile(filepath.Join(path, "untracked"), []byte("work"), 0o644))
 
@@ -137,8 +150,12 @@ func TestFastForwardRefMovesABranchCheckedOutNowhere(t *testing.T) {
 	gittest.PushBranch(t, repo.Dir, "feature")
 	tip := advanceOnOrigin(t, origin, "feature")
 
-	require.NoError(t, repo.FastForwardRef(t.Context(), "feature"))
+	from := head(t, repo.Dir, "feature")
 
+	move, err := repo.FastForwardRef(t.Context(), "feature")
+
+	require.NoError(t, err)
+	assert.Equal(t, git.Move{From: from, To: tip}, move)
 	assert.Equal(t, tip, head(t, repo.Dir, "feature"))
 }
 
@@ -151,8 +168,8 @@ func TestFastForwardRefRefusesWhatIsNotAFastForward(t *testing.T) {
 	advanceOnOrigin(t, origin, "diverged")
 	advanceOnOrigin(t, origin, "main")
 
-	diverged := repo.FastForwardRef(t.Context(), "diverged")
-	checkedOut := repo.FastForwardRef(t.Context(), "main")
+	_, diverged := repo.FastForwardRef(t.Context(), "diverged")
+	_, checkedOut := repo.FastForwardRef(t.Context(), "main")
 
 	var gitErr *git.Error
 	require.ErrorAs(t, diverged, &gitErr)
@@ -164,9 +181,12 @@ func TestMergeFFOnlyMovesTheBranchOfAWorktree(t *testing.T) {
 	tip := advanceOnOrigin(t, origin, "main")
 	require.NoError(t, repo.FetchRef(t.Context(), "main"))
 
-	err := repo.MergeFFOnly(t.Context(), git.MergeFFOnlyParams{Worktree: repo.Dir, Onto: git.RemoteBranch{Name: "main"}})
+	from := head(t, repo.Dir, "main")
+
+	move, err := repo.MergeFFOnly(t.Context(), git.MergeFFOnlyParams{Worktree: repo.Dir, Onto: git.RemoteBranch{Name: "main"}})
 
 	require.NoError(t, err)
+	assert.Equal(t, git.Move{From: from, To: tip}, move)
 	assert.Equal(t, tip, head(t, repo.Dir, "main"))
 }
 
@@ -176,8 +196,8 @@ func TestMergeFFOnlyRefusesWhatIsNotAFastForward(t *testing.T) {
 	advanceOnOrigin(t, origin, "main")
 	require.NoError(t, repo.FetchRef(t.Context(), "main"))
 
-	diverged := repo.MergeFFOnly(t.Context(), git.MergeFFOnlyParams{Worktree: repo.Dir, Onto: git.RemoteBranch{Name: "main"}})
-	noOnto := repo.MergeFFOnly(t.Context(), git.MergeFFOnlyParams{Worktree: repo.Dir})
+	_, diverged := repo.MergeFFOnly(t.Context(), git.MergeFFOnlyParams{Worktree: repo.Dir, Onto: git.RemoteBranch{Name: "main"}})
+	_, noOnto := repo.MergeFFOnly(t.Context(), git.MergeFFOnlyParams{Worktree: repo.Dir})
 
 	var gitErr *git.Error
 	require.ErrorAs(t, diverged, &gitErr)

@@ -1,6 +1,7 @@
 package git_test
 
 import (
+	"context"
 	"os/exec"
 	"testing"
 
@@ -58,4 +59,17 @@ func TestAnErrorWithoutAnExitStatusSaysWhy(t *testing.T) {
 	require.ErrorAs(t, err, &gitErr)
 	assert.Equal(t, -1, gitErr.Exit)
 	assert.Contains(t, err.Error(), "executable file not found")
+}
+
+func TestAnInterruptedCallIsTheContextsError(t *testing.T) {
+	repo, _ := newRepoWithOrigin(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	err := repo.Fetch(ctx)
+
+	var gitErr *git.Error
+	require.ErrorAs(t, err, &gitErr)
+	assert.Equal(t, -1, gitErr.Exit)
+	assert.ErrorIs(t, err, context.Canceled)
 }
