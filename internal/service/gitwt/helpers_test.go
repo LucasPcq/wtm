@@ -8,8 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The few helpers the tests share. Everything a test file holds is a test.
-
 // untracked leaves a file the steps after an add would: a copied .env.
 func untracked(t *testing.T, path string) {
 	t.Helper()

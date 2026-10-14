@@ -19,18 +19,12 @@ type AllocateParams struct {
 	Branch   string
 }
 
-// Claim is a worktree's number, and whether this call gave it: only an
-// allocation is a change for the caller to publish. Unlocked is an allocation
-// made without its locks, which the caller reports.
 type Claim struct {
 	Ordinal   int
 	Allocated bool
 	Unlocked  bool
 }
 
-// Allocate gives the worktree the smallest number no live worktree holds, the
-// first time one is needed, and keeps it after. The main checkout is 0 and
-// never written.
 func Allocate(ctx context.Context, params AllocateParams) (Claim, error) {
 	if params.StateDir == "" || params.Branch == "" {
 		return Claim{}, domain.ErrOrdinalRefIncomplete
@@ -43,9 +37,7 @@ func Allocate(ctx context.Context, params AllocateParams) (Claim, error) {
 	lock, err := fs.WithFileLock(ctx, fs.WithFileLockParams{
 		Path: filepath.Join(params.StateDir, domain.OrdinalLockFileName),
 		Do: func() error {
-			// Everything is read again under the lock, git included: the
-			// snapshot above may predate a worktree another process has since
-			// created and numbered.
+			// Read again under the lock, git included: the snapshot above may predate a worktree another process has since numbered.
 			snapshot, err := Read(ctx, ReadParams{Git: params.Git, Meta: params.Meta})
 			if err != nil {
 				return err

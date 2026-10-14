@@ -8,10 +8,6 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// A real port — a type of store/ or infra/git implementing an interface of its
-// package (store.MetaDisk, git.Repo) — is built once, by the composition root,
-// on the dispatcher's directories: a command that builds its own writes where
-// no test double can follow, and on a directory dispatch did not lock.
 var (
 	portPackages = []dir{"store", "infra/git"}
 	portBuilders = []dir{"registry", "testutil"}
@@ -41,8 +37,6 @@ func runPortbuild(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
-// builtType is the type a node makes a value of: a literal, new(T), or a
-// variable declared with T and no value.
 func builtType(pass *analysis.Pass, node ast.Node) (types.Type, bool) {
 	switch n := node.(type) {
 	case *ast.CompositeLit:
@@ -59,8 +53,6 @@ func builtType(pass *analysis.Pass, node ast.Node) (types.Type, bool) {
 	return nil, false
 }
 
-// realPort names a type of a port package implementing one of its interfaces;
-// a sealed one (git.Ref) is a closed set of values, not a port.
 func realPort(typ types.Type) (string, bool) {
 	named, ok := typ.(*types.Named)
 	if !ok || named.Obj().Pkg() == nil || types.IsInterface(named) {

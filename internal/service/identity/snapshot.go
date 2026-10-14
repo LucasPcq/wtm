@@ -14,7 +14,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/store"
 )
 
-// Snapshot is read once; every question below is answered from it.
 type Snapshot struct {
 	Worktrees []git.Worktree
 	// Records holds one entry per live worktree on a branch.
@@ -29,12 +28,8 @@ type Recorded struct {
 	Meta domain.WorktreeMetadata
 }
 
-// Unrecorded is a worktree wtm never wrote for: the main checkout, or one
-// created by hand.
 type Unrecorded struct{}
 
-// Unreadable is kept rather than failing the snapshot: a neighbour's broken
-// record fails only the question that needs it.
 type Unreadable struct {
 	Err error
 }
@@ -48,9 +43,7 @@ type ReadParams struct {
 	Meta store.Meta
 }
 
-// Read loads each live worktree's record by Load rather than Records: Records
-// skips what it cannot read, and an unreadable number must never be handed out
-// again.
+// Read loads each record by Load rather than Records: Records skips what it cannot read, and an unreadable number must never be handed out again.
 func Read(ctx context.Context, params ReadParams) (Snapshot, error) {
 	worktrees, err := params.Git.Worktrees(ctx)
 	if err != nil {
@@ -83,8 +76,7 @@ func recordOf(params recordOfParams) Record {
 	return Recorded{Meta: stored}
 }
 
-// branchOf is empty for a worktree git cannot name: a detached HEAD has no
-// record to look up, and keeps whatever it was given under the branch it left.
+// branchOf is empty for a detached HEAD: it keeps whatever it was given under the branch it left.
 func branchOf(wt git.Worktree) string {
 	switch state := wt.State.(type) {
 	case git.OnBranch:
@@ -105,9 +97,7 @@ func (s Snapshot) IsMain(branch string) bool {
 	return false
 }
 
-// Ordinal never allocates: a worktree without a settled number answers
-// domain.ErrOrdinalUnallocated. A number another live worktree also claims is
-// not settled, so whichever of the two sorts last is reallocated.
+// Ordinal takes a number another live worktree also claims as unsettled: whichever of the two sorts last is reallocated.
 func (s Snapshot) Ordinal(branch string) (int, error) {
 	if s.IsMain(branch) {
 		return domain.MainWorktreeOrdinal, nil
@@ -123,9 +113,7 @@ func (s Snapshot) Ordinal(branch string) (int, error) {
 	return recorded.Meta.Ordinal, nil
 }
 
-// others is what every live worktree but this one holds. A record that exists
-// but cannot be read is an error, not a worktree holding nothing: handing its
-// number to someone else is the collision numbering exists to prevent.
+// others fails on a record that exists but cannot be read: handing its number to someone else is the collision numbering exists to prevent.
 func (s Snapshot) others(branch string) ([]rules.OrdinalHolder, error) {
 	holders := make([]rules.OrdinalHolder, 0, len(s.Worktrees))
 	for _, wt := range s.Worktrees {
@@ -148,8 +136,6 @@ func (s Snapshot) others(branch string) ([]rules.OrdinalHolder, error) {
 	return holders, nil
 }
 
-// Isolation is the recorded choice; a worktree with no readable record, the
-// main checkout among them, is isolated.
 func (s Snapshot) Isolation(branch string) domain.Isolation {
 	recorded, ok := s.Records[branch].(Recorded)
 	if !ok {
@@ -163,9 +149,6 @@ func (s Snapshot) Managed(branch string) bool {
 	return ok && worktree.Managed(recorded.Meta)
 }
 
-// NameClash finds a live worktree whose derived names branch would share. The
-// names exist for the run module only: a caller asks when run.toml declares
-// jobs.
 func (s Snapshot) NameClash(branch string) (domain.WorktreeNameClash, bool) {
 	live := make([]string, 0, len(s.Worktrees))
 	for _, wt := range s.Worktrees {
@@ -174,8 +157,6 @@ func (s Snapshot) NameClash(branch string) (domain.WorktreeNameClash, bool) {
 	return rules.WorktreeNameClash(rules.WorktreeNameClashParams{Branch: branch, Live: live})
 }
 
-// CheckedOutAt is the worktree that has branch out, as git writes its path,
-// empty when none does.
 func (s Snapshot) CheckedOutAt(branch string) string {
 	for _, wt := range s.Worktrees {
 		if branchOf(wt) == branch {
@@ -185,9 +166,7 @@ func (s Snapshot) CheckedOutAt(branch string) string {
 	return ""
 }
 
-// Occupant is the branch of the worktree registered at a location, empty when
-// none is or its HEAD is detached. git records a path with its symlinks
-// resolved: a path as spelled would never match.
+// Occupant compares the path git records, its symlinks resolved: a path as spelled would never match.
 func (s Snapshot) Occupant(at git.Location) string {
 	for _, wt := range s.Worktrees {
 		if wt.Path == at.Path {

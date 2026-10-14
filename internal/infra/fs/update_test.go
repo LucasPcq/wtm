@@ -15,8 +15,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/infra/fs"
 )
 
-// — Concurrency: no update is lost —
-
 func TestUpdateFileLosesNoConcurrentUpdate(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "state", "counter")
 	const writers = 32
@@ -47,8 +45,6 @@ func TestUpdateFileLosesNoUpdateAcrossProcesses(t *testing.T) {
 
 	assert.Equal(t, processes*rounds, counter(t, path))
 }
-
-// — What Mutate decides —
 
 func TestMutateSeesNilForAMissingFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "absent")
@@ -135,8 +131,6 @@ func TestAMutateDecidingNothingIsAnError(t *testing.T) {
 	assert.NoFileExists(t, path)
 }
 
-// — Where the lock lives —
-
 func TestTheLockSitsBesideTheFileByDefault(t *testing.T) {
 	dir := t.TempDir()
 	set(t, filepath.Join(dir, "config.toml"), "x", 0)
@@ -170,8 +164,6 @@ func TestATakenLockSaysSo(t *testing.T) {
 	assert.True(t, lock.Held)
 }
 
-// — When the disk refuses —
-
 func TestUpdateFileFailsWhenItsDirectoryCannotBeMade(t *testing.T) {
 	notADir := filepath.Join(t.TempDir(), "file")
 	writeFixture(t, notADir, "")
@@ -191,4 +183,14 @@ func TestUpdateFileFailsOnSomethingItCannotRead(t *testing.T) {
 	}})
 	assert.Error(t, err)
 	assert.False(t, called)
+}
+
+func TestRemoveDirDropsTheDirectoryAndWhatItHolds(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "worktrees", "feat-a")
+	writeFixture(t, filepath.Join(dir, "meta.json"), "{}")
+
+	require.NoError(t, fs.RemoveDir(dir))
+
+	assert.NoDirExists(t, dir)
+	require.NoError(t, fs.RemoveDir(dir), "an absent directory is already removed")
 }

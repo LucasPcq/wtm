@@ -12,8 +12,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/testutil/storetest"
 )
 
-// The few helpers the tests share. Everything a test file holds is a test.
-
 func jobEnv(t *testing.T, params runenv.Params) map[string]string {
 	t.Helper()
 	env, err := runenv.JobEnv(params)

@@ -10,12 +10,6 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// fontSafe is every non-letter rune a string may put on a screen. It was
-// measured, not chosen: present in all of Cascadia Code, DejaVu Sans Mono, Fira
-// Code, Hack, IBM Plex Mono, Inconsolata, JetBrains Mono, Roboto Mono, Source
-// Code Pro, Ubuntu Mono, Menlo, Monaco and SF Mono. A rune a font lacks is drawn
-// from a fallback face, often wider than the cell, and eats the space after it —
-// which is how `↻ Updated profile` lost its space in Ghostty.
 var fontSafe = map[rune]string{
 	'§': "", '·': "", '×': "", '—': "", '•': "", '…': "", '‹': "", '›': "", '−': "",
 	'✓': "missing from Hack, Monaco and Roboto/Ubuntu Mono, kept as the success glyph every CLI uses",
@@ -26,10 +20,6 @@ var fontSafe = map[rune]string{
 	'↓': "missing only from Roboto/Ubuntu Mono",
 }
 
-// fontLegacy predates the rule, each rune with the number of sites it had. Each
-// reports once as migrating; a site beyond its count fails, and a count higher
-// than needed is reported to be lowered — the list may only shrink, towards a
-// rune of fontSafe.
 var fontLegacy = map[rune]int{
 	'↗': 1, '⊘': 1, '⋯': 2, '▸': 21, '▾': 2, '▶': 1, '◆': 1,
 	'◈': 1, '◉': 1, '○': 5, '◌': 1, '●': 12, '⚠': 17, '❯': 2,
@@ -43,8 +33,8 @@ func legacyBudgets() map[string]int {
 	return budgets
 }
 
-// isTerminalDrawn is box drawing and block elements, which terminals render as
-// their own sprites rather than from the font.
+// Box drawing and block elements are rendered by terminals as their own
+// sprites rather than from the font.
 func isTerminalDrawn(r rune) bool {
 	return r >= 0x2500 && r <= 0x259F
 }

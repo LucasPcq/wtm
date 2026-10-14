@@ -1,7 +1,6 @@
 package main
 
 import (
-	"go/ast"
 	"slices"
 	"strconv"
 	"strings"
@@ -9,11 +8,6 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// layers is CLAUDE.md's dependency table, written once. A layer may import the
-// internal packages listed and the external ones listed, plus the stdlib and
-// itself. Anything else is a finding — so a new dependency is a deliberate edit
-// here rather than something that lands unnoticed. An entry may name part of a
-// layer (infra/git), and a package of internal/ with no row is a finding too.
 var layers = map[string]layer{
 	"domain": {
 		why: "types, errors and constants only",
@@ -105,10 +99,6 @@ var layers = map[string]layer{
 	},
 }
 
-// serviceEdges is the service row of the layers table split one level down:
-// service/x may import service/y only along an edge declared here. A daemon
-// that starts importing git, or a cycle in the making, is then an edit to this
-// table rather than an import nobody saw.
 var serviceEdges = map[string][]string{
 	"detect":    {"branch"},
 	"events":    {"process", "worktree"},
@@ -118,19 +108,15 @@ var serviceEdges = map[string][]string{
 	"worktree":  {"branch", "env", "github", "hooks", "process"},
 }
 
-// commandEdges is the command row split one level down, as serviceEdges is
-// the service row: a command composes another only along an edge declared here.
 var commandEdges = map[string][]string{}
 
 type layer struct {
 	internal []string
 	external []string
-	// noIO refuses the stdlib packages that reach outside the process.
-	noIO bool
-	why  string
+	noIO     bool
+	why      string
 }
 
-// ioPackages are the stdlib packages a layer without I/O never imports;
 // pureNetwork parse an address and nothing more.
 var (
 	ioPackages  = []string{"os", "io/ioutil", "net", "syscall"}
@@ -153,8 +139,6 @@ func allowed(own string, spec layer, target string) bool {
 	return false
 }
 
-// admits tells whether an entry of a row names the target's layer, or a part
-// of it holding the target.
 func admits(entries []string, target string) bool {
 	other := layerOfPackage(target)
 	return slices.ContainsFunc(entries, func(entry string) bool {
@@ -201,85 +185,4 @@ func runLayers(pass *analysis.Pass) (any, error) {
 		}
 	}
 	return nil, nil
-}
-
-var domainAnalyzer = &analysis.Analyzer{
-	Name: "domain",
-	Doc:  "internal/domain declares types, errors and constants only",
-	Run:  runDomain,
-}
-
-func runDomain(pass *analysis.Pass) (any, error) {
-	if layerOfPackage(pass.Pkg.Path()) != "domain" {
-		return nil, nil
-	}
-	for _, file := range pass.Files {
-		for _, decl := range file.Decls {
-			fn, ok := decl.(*ast.FuncDecl)
-			if !ok {
-				continue
-			}
-			pass.Reportf(fn.Pos(), "internal/domain declares %q: this layer holds types, errors and constants only — a function over the domain belongs in internal/rules", fn.Name.Name)
-		}
-	}
-	return nil, nil
-}
-
-// edgesTable is a layer split one level down: a package of root/x imports one
-// of root/y only along an edge of table.
-type edgesTable struct {
-	root  dir
-	edges map[string][]string
-	name  string
-}
-
-var (
-	serviceDAG = edgesTable{root: "service", edges: serviceEdges, name: "serviceEdges"}
-	commandDAG = edgesTable{root: "command", edges: commandEdges, name: "commandEdges"}
-)
-
-var servicedagAnalyzer = &analysis.Analyzer{
-	Name: "servicedag",
-	Doc:  "a service package imports another only along a declared edge",
-	Run:  serviceDAG.run,
-}
-
-var commanddagAnalyzer = &analysis.Analyzer{
-	Name: "commanddag",
-	Doc:  "a command package imports another only along a declared edge",
-	Run:  commandDAG.run,
-}
-
-func (table edgesTable) run(pass *analysis.Pass) (any, error) {
-	own := table.top(pass.Pkg.Path())
-	if own == "" {
-		return nil, nil
-	}
-	for _, file := range pass.Files {
-		for _, imp := range file.Imports {
-			target, err := strconv.Unquote(imp.Path.Value)
-			if err != nil {
-				continue
-			}
-			other := table.top(target)
-			if other == "" || other == own || slices.Contains(table.edges[own], other) {
-				continue
-			}
-			pass.Reportf(imp.Pos(), "internal/%s/%s must not import %q — undeclared edge: declare it in %s (tools/archlint/layers.go), see CLAUDE.md section 9", table.root, own, target, table.name)
-		}
-	}
-	return nil, nil
-}
-
-// top is the package of the table a package belongs to ("process" for
-// service/process/processtest), or "" outside its root.
-func (table edgesTable) top(pkgPath string) string {
-	if !table.root.holds(pkgPath) {
-		return ""
-	}
-	parts := strings.Split(internalPath(pkgPath), "/")
-	if len(parts) < 2 {
-		return ""
-	}
-	return parts[1]
 }

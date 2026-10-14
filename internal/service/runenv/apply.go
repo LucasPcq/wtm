@@ -14,17 +14,12 @@ type ApplyParams struct {
 	Writes EnvWrites
 }
 
-// Applied is what Apply did: the plan as the files read under their locks
-// made it, the targets it rewrote, and whether a write ran without its lock.
 type Applied struct {
 	Plan     domain.EnvPortPlan
 	Files    []string
 	Unlocked bool
 }
 
-// Apply brings the worktree's .env files in line with the writes, one Edit
-// per file: each file's change is planned from the lines read under its lock,
-// never from a read made before it.
 func Apply(ctx context.Context, params ApplyParams) (Applied, error) {
 	writes := params.Writes
 	if writes.Empty() {
@@ -61,8 +56,7 @@ type editedParams struct {
 	Lines  []domain.EnvLine
 }
 
-// edited rewrites the ports before the owned keys, as the reconciliation of
-// wtm env does: both act on the same document.
+// edited rewrites the ports before the owned keys, as wtm env does: both act on the same document.
 func edited(params editedParams) []domain.EnvLine {
 	plan := planOf(planOfParams{
 		Writes: params.Writes,
@@ -102,7 +96,6 @@ type ownedOfParams struct {
 	Lines map[string][]domain.EnvLine
 }
 
-// ownedOf marks each owned key the file did not already hold.
 func ownedOf(params ownedOfParams) []domain.EnvOwnedEntry {
 	if len(params.Owned) == 0 {
 		return nil
@@ -154,8 +147,6 @@ func linksIn(params linksInParams) []domain.EnvPortLink {
 	return links
 }
 
-// ownsKeyIn creates the file a key wtm owns lands in; a file only linked stays
-// absent, its links reported missing.
 type ownsKeyInParams struct {
 	Owned []domain.EnvOwnedEntry
 	File  string

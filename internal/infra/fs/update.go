@@ -11,16 +11,12 @@ import (
 
 //go-sumtype:decl Change
 
-// Change is what Mutate decides for the file: Write, Keep or Remove.
 type Change interface{ change() }
 
-// Write replaces the file's content; content equal to what is there is not rewritten.
 type Write struct{ Data []byte }
 
-// Keep leaves the file as it is, an absent one included.
 type Keep struct{}
 
-// Remove deletes the file, under the same lock.
 type Remove struct{}
 
 func (Write) change()  {}
@@ -30,22 +26,12 @@ func (Remove) change() {}
 var errNoChange = errors.New("update decided no change: Mutate returned a nil Change")
 
 type UpdateFileParams struct {
-	Path string
-	// LockPath is the lock file, <Path>.lock when empty. A file in the user's
-	// tree takes ScratchLockPath, so no lock file appears in their checkout.
+	Path     string
 	LockPath string
-	// Perm applies to a file this update creates; an existing file keeps its mode.
-	Perm os.FileMode
-	// Mutate receives the file's content, nil when it does not exist.
-	Mutate func(current []byte) (Change, error)
+	Perm     os.FileMode
+	Mutate   func(current []byte) (Change, error)
 }
 
-// UpdateFile is the one way wtm writes a file it keeps: it locks the file,
-// reads it, hands it to Mutate and writes what Mutate decides atomically, so a
-// reader sees the old content or the new one, never half of it, and two
-// writers never lose each other's change. ctx bounds only the wait for the
-// lock: a free lock is taken even once ctx is done, so the record of work
-// already carried out is not lost to an interrupt.
 func UpdateFile(ctx context.Context, params UpdateFileParams) (Lock, error) {
 	if err := os.MkdirAll(filepath.Dir(params.Path), 0o755); err != nil {
 		return Lock{}, fmt.Errorf("create %s: %w", filepath.Dir(params.Path), err)
@@ -106,4 +92,8 @@ func remove(path string) error {
 		return err
 	}
 	return nil
+}
+
+func RemoveDir(path string) error {
+	return os.RemoveAll(path)
 }

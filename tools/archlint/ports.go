@@ -8,11 +8,6 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// A use case's ports are the interfaces of store/, infra/git and infra/proc:
-// writesink knows which of their methods write. One declared beside the
-// command is a port it cannot see through, so a write behind it would pass
-// for a read. A sealed interface — unexported methods only — is a closed set
-// of values, not a port.
 var portsAnalyzer = &analysis.Analyzer{
 	Name: "ports",
 	Doc:  "command/ and query/ declare no interface with an exported method: their ports are those of store/, infra/git and infra/proc",

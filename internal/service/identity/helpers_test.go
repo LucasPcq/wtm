@@ -13,8 +13,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
 
-// The few helpers the tests share. Everything a test file holds is a test.
-
 const (
 	envStateDir = "WTM_TEST_IDENTITY_STATE_DIR"
 	envRepo     = "WTM_TEST_IDENTITY_REPO"
@@ -44,7 +42,6 @@ func TestHelperProcess(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// repoWithWorktrees is a real repository with a worktree for each branch.
 func repoWithWorktrees(t *testing.T, branches ...string) string {
 	t.Helper()
 	dir := gittest.InitRepo(t)

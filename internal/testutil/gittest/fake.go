@@ -12,10 +12,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/infra/git"
 )
 
-// Fake is git in memory: what its writes change, its reads give back, and it
-// refuses what git refuses, so an undo is tested against the state it restores.
-// A branch is its history, the commits from the root, so a count and a
-// fast-forward follow what the writes did.
+// Fake keeps a branch as its history, the commits from the root, so a count and
+// a fast-forward follow what the writes did.
 type Fake struct {
 	mu        sync.Mutex
 	dir       string
@@ -29,32 +27,20 @@ type Fake struct {
 	calls     []string
 }
 
-// FakeParams starts the fake, and Build a real repository alike.
 type FakeParams struct {
-	// Main is the main worktree, on Branch; Dir is where the repository is seen
-	// from, Main when empty.
-	Main   string
-	Dir    string
-	Branch string
-	Local  []string
-	// Remote are the remote's branches, fetched.
-	Remote []string
-	// Worktrees are linked to Main; a branch one has out is a local branch.
+	Main      string
+	Dir       string
+	Branch    string
+	Local     []string
+	Remote    []string
 	Worktrees []git.Worktree
-	// Folders are taken, holding files, and no worktree.
-	Folders []string
-	// Dirty are worktrees with changes, which a removal keeps without Force.
-	Dirty []string
-	// Commits are a branch's past the root, oldest first: two branches share
-	// the commits they name alike.
-	Commits map[git.Ref][]string
-	// Origin is what the remote has of a branch and was not fetched yet.
-	Origin map[string][]string
-	// Fail is the error a method returns instead of running, keyed by its name.
-	Fail map[string]error
+	Folders   []string
+	Dirty     []string
+	Commits   map[git.Ref][]string
+	Origin    map[string][]string
+	Fail      map[string]error
 }
 
-// Root is the first commit of every history.
 const Root = "root"
 
 type history []string
@@ -104,7 +90,6 @@ func NewFake(params FakeParams) *Fake {
 	return f
 }
 
-// Calls are the methods run, writes and reads, each with its main argument.
 func (f *Fake) Calls() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -412,7 +397,6 @@ func (f *Fake) head() history {
 	return f.local[state.Branch]
 }
 
-// worktreeOf is the innermost worktree path is in.
 func (f *Fake) worktreeOf(path string) int {
 	found := -1
 	for i, worktree := range f.worktrees {
@@ -486,7 +470,6 @@ func sharedLength(a, b history) int {
 	return shared
 }
 
-// within is path itself or a path below it.
 func within(path, root string) bool {
 	return path == root || strings.HasPrefix(path, root+string(filepath.Separator))
 }

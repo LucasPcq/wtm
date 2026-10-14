@@ -16,8 +16,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/testutil/globaldir"
 )
 
-const sparseConfig = "[worktrees]\nbase_path = \"../.trees\"\n\n[[env.file]]\ntarget = \".env\"\n"
-
 func TestRememberWritesNoDefaultThatWasNotInTheFile(t *testing.T) {
 	globaldir.Isolate(t)
 	stateDir := t.TempDir()

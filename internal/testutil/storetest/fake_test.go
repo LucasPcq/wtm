@@ -14,9 +14,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/testutil/storetest"
 )
 
-// The fake's agreement with the disk is tested in internal/store
-// (contract_test.go); here, what only the fake does.
-
 func TestAFakeMethodGivenAnErrorFailsWithoutRunning(t *testing.T) {
 	full := errors.New("disk full")
 	fake := storetest.NewFake(storetest.FakeParams{

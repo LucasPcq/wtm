@@ -1,12 +1,4 @@
-// Command archlint checks the architecture rules of CLAUDE.md that no
-// general-purpose linter knows about: the mechanical half of section 9.
-//
-// Usage: go run ./tools/archlint [-warn rule,rule] [-tracked] [dir]
-//
-// Each rule is a go/analysis Analyzer and reports `file:line:col: [rule] message`;
-// a non-empty report exits 1. A rule named in -warn reports without failing; a
-// site .archlint-migrating covers is counted, and listed with -tracked. The
-// exception files never grow past their ceilings (ceiling.go).
+// Command archlint checks the architecture rules of CLAUDE.md that no general-purpose linter knows about.
 package main
 
 import (
@@ -22,15 +14,10 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// targetSystems are loaded in turn because go/packages keeps only the files a
-// build would compile: peerpid_linux.go and the proxy's *_other.go would drop
-// out on a Mac, and peerpid_other.go (!darwin && !linux) on both, which the
-// parse-everything walk this replaced never let happen. A test checks that
-// together they compile every file of the tree.
+// go/packages keeps only the files a build would compile: peerpid_linux.go and
+// the proxy's *_other.go drop out on a Mac, peerpid_other.go on both.
 var targetSystems = []string{"darwin", "linux", "freebsd"}
 
-// loadMode loads every dependency with its syntax: writesink carries its facts
-// across packages, so the checker runs it on what each package imports.
 const loadMode = packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
 	packages.NeedImports | packages.NeedTypes | packages.NeedTypesSizes |
 	packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedModule | packages.NeedDeps

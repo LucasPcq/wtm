@@ -1,4 +1,4 @@
-// Package gittest provides helpers for creating real git repositories in tests.
+// Package gittest gives tests a git repository, real or in memory.
 package gittest
 
 import (
@@ -9,8 +9,7 @@ import (
 	"testing"
 )
 
-// InitRepo creates a temporary git repository with an initial empty commit.
-// The repository path is returned; cleanup is handled by t.TempDir().
+// InitRepo is a repository on main with an initial empty commit.
 func InitRepo(t testing.TB) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -38,7 +37,6 @@ func CreateBranch(t testing.TB, dir, name string) {
 	Git(t, dir, "branch", name)
 }
 
-// Git runs a git command in dir, failing the test on error.
 func Git(t testing.TB, dir string, args ...string) {
 	t.Helper()
 	cmd := exec.Command("git", args...)
@@ -48,8 +46,6 @@ func Git(t testing.TB, dir string, args ...string) {
 	}
 }
 
-// Output runs a git command in dir and returns its trimmed output, failing the
-// test on error.
 func Output(t testing.TB, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", args...)
@@ -61,9 +57,8 @@ func Output(t testing.TB, dir string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// AddOrigin creates a bare repository outside dir, registers it as origin and
-// pushes the current branch with an upstream. It is what makes upstream state
-// (ahead/behind, and the "[gone]" prune looks for) reproducible in a test.
+// AddOrigin pushes the current branch, with an upstream, to a bare origin
+// outside dir.
 func AddOrigin(t testing.TB, dir string) string {
 	t.Helper()
 	remote := t.TempDir()

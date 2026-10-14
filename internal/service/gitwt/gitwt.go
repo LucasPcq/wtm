@@ -8,17 +8,13 @@ import (
 	"github.com/LucasPcq/wtm/internal/infra/git"
 )
 
-// Params are one worktree's: Add creates it, Remove given the same Params
-// undoes it, so the two are the Do and the Undo of a saga's worktree step.
 type Params struct {
 	Git      git.ReadWriter
 	Path     string
 	Checkout git.Checkout
 }
 
-// Add checks no guard: what may be added was decided from a snapshot read
-// under the operation's locks. A saga never undoes a Do that failed, so an add
-// git refuses after creating the branch deletes it here.
+// Add deletes a branch `worktree add -b` created before refusing the path: a saga never undoes a Do that failed.
 func Add(ctx context.Context, params Params) error {
 	add := git.AddWorktreeParams{Path: params.Path, Checkout: params.Checkout}
 	created, ok := params.Checkout.(git.NewBranch)
@@ -37,9 +33,7 @@ func Add(ctx context.Context, params Params) error {
 	return errors.Join(err, dropLeft(ctx, dropLeftParams{Git: params.Git, Branch: branch}))
 }
 
-// Remove forces: an undone worktree holds what the steps after the add put in
-// it, and a branch born with it has no commit of its own to lose. A branch
-// that existed before the add is never deleted.
+// Remove forces: the steps after the add put files in the worktree, and a branch born with it has no commit to lose.
 func Remove(ctx context.Context, params Params) error {
 	if err := params.Git.RemoveWorktree(ctx, git.RemoveWorktreeParams{Path: params.Path, Force: true}); err != nil {
 		return err

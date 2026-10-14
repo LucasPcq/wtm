@@ -21,7 +21,6 @@ func runConfig() domain.RunConfig {
 	}}
 }
 
-// params is a worktree of the project, reading the files given.
 func params(identity runenv.Identity, files map[string]string) runenv.Params {
 	return runenv.Params{ProjectDir: projectDir, Run: runConfig(), Identity: identity, Files: storetest.NewFake(storetest.FakeParams{Files: files})}
 }

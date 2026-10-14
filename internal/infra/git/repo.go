@@ -1,4 +1,4 @@
-// Package git is the one way the engine's layers reach git: a repository and its remote, read and written by plain calls that decide nothing.
+// Package git is the one way the engine's layers reach git.
 package git
 
 import (
@@ -14,13 +14,11 @@ import (
 	"github.com/LucasPcq/wtm/internal/infra/proc"
 )
 
-// Repo is a repository seen from Dir, whose remote branches live under Remote.
 type Repo struct {
 	Dir    string
 	Remote string
 }
 
-// ReadWriter is a writer that reads what it is about to change.
 type ReadWriter interface {
 	Reader
 	Writer

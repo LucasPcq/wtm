@@ -16,35 +16,26 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
-// RunHooksParams holds inputs for executing lifecycle hooks.
 type RunHooksParams struct {
 	Hooks   []domain.HookCommand
 	WorkDir string
 	Vars    rules.TemplateVars
-	// Env is what the hook learns about the worktree it runs in, the same
-	// vocabulary a run job gets. A hook that tears down docker needs the
-	// worktree's compose project as much as the job that brought it up.
-	Env    map[string]string
-	Output io.Writer // if nil, uses os.Stdout/Stderr (CLI mode). Set to capture output (TUI mode).
-	// OnHook receives each hook starting and finishing. A surface that reports
-	// those beats itself sets it; nil falls back to writing them to Output, which
-	// is the only rendering this package does and only because someone must.
+	// Env is the vocabulary a run job gets: a hook that tears down docker needs the worktree's compose project as much as the job that brought it up.
+	Env map[string]string
+	// Output nil writes to os.Stderr.
+	Output io.Writer
+	// OnHook nil writes the beats to Output.
 	OnHook func(domain.HookBeat)
 }
 
-// RunHooks executes each hook command sequentially with template interpolation.
-// Stops on first error unless the hook has ContinueOnError set, and on an
-// interrupt whatever it has: the hook running is stopped, the rest never start.
+// RunHooks stops on an interrupt whatever ContinueOnError says: the hook running is stopped, the rest never start.
 func RunHooks(ctx context.Context, params RunHooksParams) error {
 	output := params.Output
 	if output == nil {
 		output = os.Stderr
 	}
 
-	// os/exec gives a hook two copier goroutines — Stdout and Stderr are distinct
-	// writer values, so it never dedupes them — and a sink is not required to be
-	// safe for concurrent use. Serializing here means every surface gets that for
-	// free, rather than each having to defend itself.
+	// os/exec copies Stdout and Stderr from two goroutines (distinct writer values are never deduped), and a sink need not be safe for concurrent use.
 	sink := &syncWriter{w: output}
 
 	report := params.OnHook
@@ -100,11 +91,7 @@ func (s *syncWriter) Write(p []byte) (int, error) {
 	return s.w.Write(p)
 }
 
-// writerReporter is the fallback rendering for a caller that gave no reporter:
-// three visually separated beats — the command, its live output, the result —
-// so a streamed install is readable with nobody drawing anything. It is the only
-// formatting this package does, and only because someone has to when a caller
-// declines to.
+// writerReporter is the fallback rendering for a caller that gave no reporter: the command, its live output, the result.
 func writerReporter(w io.Writer) func(domain.HookBeat) {
 	return func(beat domain.HookBeat) {
 		if beat.Started {
@@ -132,9 +119,7 @@ func runSingleHook(ctx context.Context, params runSingleHookParams) error {
 	}
 	cmd.Env = hookEnv(params.Env)
 
-	// stderr goes to the sink as well as into the buffer: a great many tools put
-	// their progress there, and a surface showing only stdout would sit silent
-	// for the whole hook and keep a log that is not the whole output.
+	// stderr goes to the sink too: many tools put their progress there.
 	var stderr bytes.Buffer
 	cmd.Stdout = params.Output
 	cmd.Stderr = io.MultiWriter(&stderr, params.Output)
@@ -168,10 +153,7 @@ func runSingleHook(ctx context.Context, params runSingleHookParams) error {
 	return nil
 }
 
-// hookEnv layers the worktree's variables over this process's environment. Nil
-// leaves it as it is: this process is the user's own command, so what it
-// inherited is the user's. Given variables replace every inherited worktree one,
-// so a name the worktree leaves unset is not filled by the launching shell's.
+// hookEnv replaces every inherited worktree variable when given some, so a name the worktree leaves unset is not filled by the launching shell's.
 func hookEnv(overrides map[string]string) []string {
 	if len(overrides) == 0 {
 		return nil

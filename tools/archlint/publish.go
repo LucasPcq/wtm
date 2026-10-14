@@ -9,19 +9,12 @@ import (
 )
 
 var (
-	processPublish = objectRef{Path: internalPrefix + "service/process", Name: "Publish"}
-	// busSeams are the flow types whose Publish only a flow may call: an event
-	// published from anywhere else reports a change no flow made, which no other
-	// surface could replay.
-	busSeams = map[string]bool{"Publisher": true, "Context": true}
-	// dispatchPublisher is the engine's one way out for an event: dispatch
-	// publishes what a command reports, stamped with its operation.
+	processPublish    = objectRef{Path: internalPrefix + "service/process", Name: "Publish"}
+	busSeams          = map[string]bool{"Publisher": true, "Context": true}
 	dispatchPublisher = objectRef{Path: internalPrefix + "dispatch", Name: "Publisher"}
 	domainEvent       = objectRef{Path: internalPrefix + "domain", Name: "Event"}
 )
 
-// silentPackages publish nothing at all, whatever the bus: a mutator returns
-// what it changed and the command reports it.
 func silentPackages() []dir { return append([]dir{"command", "query"}, engineServices...) }
 
 var publishAnalyzer = &analysis.Analyzer{
@@ -63,8 +56,6 @@ func runPublish(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
-// flowSeamOf names the flow type a Publish call goes through, empty when it is
-// not one of the bus seams.
 func flowSeamOf(pass *analysis.Pass, sel *ast.SelectorExpr) string {
 	selection, ok := pass.TypesInfo.Selections[sel]
 	if !ok || selection.Obj().Name() != "Publish" {
@@ -90,7 +81,6 @@ func publishes(pass *analysis.Pass, expr ast.Expr) bool {
 	return ok && fn.Name() == "Publish"
 }
 
-// receivedBy tells a Publish called on ref, an interface of a named package.
 func receivedBy(pass *analysis.Pass, sel *ast.SelectorExpr, ref objectRef) bool {
 	selection, ok := pass.TypesInfo.Selections[sel]
 	if !ok || selection.Obj().Name() != "Publish" {
@@ -104,9 +94,6 @@ func receivedBy(pass *analysis.Pass, sel *ast.SelectorExpr, ref objectRef) bool 
 	return ok && named.Obj().Pkg() != nil && named.Obj().Pkg().Path() == ref.Path && named.Obj().Name() == ref.Name
 }
 
-// handsOnEvent tells a call that takes a domain.Event, or a slice of them,
-// through what the package cannot see into: an interface's method or a
-// function value, whatever its name.
 func handsOnEvent(pass *analysis.Pass, call *ast.CallExpr) bool {
 	sig, ok := pass.TypesInfo.TypeOf(call.Fun).(*types.Signature)
 	if !ok || !dynamicCall(pass, call) {

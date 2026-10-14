@@ -13,11 +13,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
 
-// The double a command is tested on behaves as git does: each case runs on a
-// repository gittest.Build makes and on the gittest.Fake started from the same
-// seed, and must end the same.
-
-// Both list the linked worktrees sorted by path.
 func TestTheFakeAndGitReadTheSameRepository(t *testing.T) {
 	for _, impl := range implementations(t) {
 		t.Run(impl.name, func(t *testing.T) {

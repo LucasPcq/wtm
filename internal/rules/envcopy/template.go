@@ -6,8 +6,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
-// TemplateCandidates are where file's template may be in dir, in order: the
-// one detection pinned, else each conventional spelling.
+// TemplateCandidates are in order: the one detection pinned, else each conventional spelling.
 func TemplateCandidates(dir string, file domain.EnvFile) []string {
 	if file.Template != "" {
 		return []string{filepath.Join(dir, file.Template)}
@@ -19,7 +18,6 @@ func TemplateCandidates(dir string, file domain.EnvFile) []string {
 	return candidates
 }
 
-// Template is the first candidate present, "" when none is.
 func Template(candidates []string, present map[string]bool) string {
 	for _, candidate := range candidates {
 		if present[candidate] {

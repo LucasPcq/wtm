@@ -15,19 +15,13 @@ type finding struct {
 	pos  token.Position
 	rule string
 	msg  string
-	// legacy marks what predates its rule and is tracked in the code rather than
-	// in .archlint-migrating, keyed so its sites collapse to one line.
-	legacy string
-	// overBudget is a legacy key with more sites than its recorded count.
+	// legacy keys a site tracked in the code (fontLegacy) rather than in
+	// .archlint-migrating, so its sites collapse to one line.
+	legacy     string
 	overBudget bool
-	// note reports without being a site: a count that can be lowered.
-	note bool
+	note       bool
 }
 
-// migrating is what predates a rule and is tracked out rather than fixed on the
-// spot. It reports without failing, and the list may only ever shrink: each
-// entry records how many sites it covers, a site beyond that count fails, and a
-// count higher than needed is reported to be lowered.
 type migratingList struct {
 	entries []migratingEntry
 }
@@ -87,16 +81,13 @@ type judgeParams struct {
 	Findings  []finding
 	Migrating migratingList
 	Warned    map[string]bool
-	// Tracked prints each site .archlint-migrating covers; otherwise they are
-	// only counted, so a run shows what fails and what to lower.
-	Tracked bool
+	Tracked   bool
 }
 
 type verdict struct {
-	lines   []string
-	notes   []string
-	tracked int
-	// failures counts the findings that fail the run.
+	lines    []string
+	notes    []string
+	tracked  int
 	failures int
 	failed   bool
 }
@@ -140,7 +131,6 @@ func judge(params judgeParams) verdict {
 	return result
 }
 
-// sitesPerEntry counts the sites each entry of .archlint-migrating covers.
 func sitesPerEntry(params judgeParams) []int {
 	used := make([]int, len(params.Migrating.entries))
 	for _, f := range params.Findings {
@@ -191,12 +181,10 @@ func tagOf(params tagParams) string {
 
 type collapseLegacyParams struct {
 	Findings []finding
-	// Budgets is the recorded site count of each legacy key.
-	Budgets map[string]int
+	Budgets  map[string]int
 }
 
-// collapseLegacy keeps the first site of each legacy key and counts the rest,
-// so a tracked debt is one line of the report rather than a page of it.
+// A tracked debt is one line of the report rather than a page of it.
 func collapseLegacy(params collapseLegacyParams) []finding {
 	findings := params.Findings
 	sort.SliceStable(findings, func(i, j int) bool {

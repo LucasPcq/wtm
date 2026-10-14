@@ -18,11 +18,9 @@ func init() {
 	inflight.cond = sync.NewCond(&inflight.Mutex)
 }
 
-// Shield is a context no cancellation reaches, for a step that must not stop
-// half-way once started: a worktree half removed, a branch left behind its
-// worktree. A child started under it runs in its own process group, out of
-// reach of the terminal's Ctrl-C, and the process does not exit before release
-// is called (AwaitShields).
+// Shield: a child started under it runs in its own process group, out of reach
+// of the terminal's Ctrl-C, and the process does not exit before release is
+// called (AwaitShields).
 func Shield(ctx context.Context) (context.Context, func()) {
 	inflight.Lock()
 	inflight.open++
@@ -44,7 +42,6 @@ func shielded(ctx context.Context) bool {
 	return on
 }
 
-// AwaitShields returns once no shielded step is running.
 func AwaitShields() {
 	inflight.Lock()
 	defer inflight.Unlock()

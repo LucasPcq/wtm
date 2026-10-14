@@ -192,21 +192,6 @@ func TestRunHooksFailureDoesNotRepeatTheCommand(t *testing.T) {
 	}
 }
 
-// unguardedSink is a sink that keeps state without protecting it, which is what
-// every surface's sink is: os/exec hands a hook two copier goroutines — Stdout
-// and Stderr are distinct writer values, so it never dedupes them — and both
-// land here. Under -race this fails unless the runner serializes them.
-type unguardedSink struct {
-	lines int
-	body  []byte
-}
-
-func (s *unguardedSink) Write(p []byte) (int, error) {
-	s.body = append(s.body, p...)
-	s.lines++
-	return len(p), nil
-}
-
 func TestRunHooksSerializesTheTwoStreamsOntoOneSink(t *testing.T) {
 	sink := &unguardedSink{}
 	err := RunHooks(t.Context(), RunHooksParams{

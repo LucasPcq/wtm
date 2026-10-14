@@ -12,9 +12,6 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// The engine writes no text: an error is a kernel.Code and its params, the
-// English is in the catalogue. Wrapping an error ("%w") says nothing, so it
-// passes; a code is a constant, so the catalogue can hold its message.
 var (
 	textErrors = []objectRef{{Path: "errors", Name: "New"}, {Path: "fmt", Name: "Errorf"}}
 	kernelCode = objectRef{Path: internalPrefix + "kernel", Name: "Code"}

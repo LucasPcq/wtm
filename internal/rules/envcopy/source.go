@@ -16,14 +16,12 @@ type Request struct {
 	ParentWorktreePath string
 }
 
-// Source is one copy to make.
 type Source struct {
 	Src string
 	Dst string
 }
 
-// Candidates are the paths whose presence decides the copy, for the caller to
-// stat before Sources decides.
+// Candidates are the paths whose presence decides the copy, for the caller to stat before Sources decides.
 func Candidates(request Request) ([]string, error) {
 	var paths []string
 	for _, file := range request.Files {
@@ -49,8 +47,7 @@ type SourcesParams struct {
 	Present map[string]bool
 }
 
-// Sources is where each file comes from under its strategy, and what could
-// not be found: the parent strategy falls back to the main checkout.
+// Sources falls back from the parent to the main checkout under the parent strategy.
 func Sources(params SourcesParams) ([]Source, []Warning, error) {
 	var sources []Source
 	var warnings []Warning

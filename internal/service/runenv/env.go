@@ -11,38 +11,31 @@ import (
 type EnvParams struct {
 	Params
 	WorktreePath string
-	// EnvFiles are the targets config.toml declares: a link naming any other
-	// file is left out.
+	// EnvFiles are the targets config.toml declares: a link naming any other file is left out.
 	EnvFiles []domain.EnvFile
-	// Proxy is the machine's [proxy] table, PublicPort what a named URL
-	// announces, zero when nothing serves names: the caller asks the daemon.
-	Proxy      domain.ProxyConfig
+	Proxy    domain.ProxyConfig
+	// PublicPort is what a named URL announces, zero when nothing serves names: the caller asks the daemon.
 	PublicPort int
 }
 
-// EnvWrites is what the worktree's .env files are brought in line with; the
-// zero value is nothing to write.
 type EnvWrites struct {
 	WorktreePath string
 	Links        []domain.EnvPortLink
 	// ValueLinks is nil on the main checkout, whose [[env]] keys are plain keys.
 	ValueLinks []domain.EnvValueLink
-	// Owned are the keys wtm writes whole: COMPOSE_PROJECT_NAME and the [[env]]
-	// values, or on the main checkout the template values they go back to.
-	Owned   []domain.EnvOwnedEntry
-	Bases   map[domain.PortRef]int
-	Shared  map[string]bool
-	Offset  int
-	Block   int
-	Origins rules.OriginContext
+	Owned      []domain.EnvOwnedEntry
+	Bases      map[domain.PortRef]int
+	Shared     map[string]bool
+	Offset     int
+	Block      int
+	Origins    rules.OriginContext
 }
 
 func (w EnvWrites) Empty() bool {
 	return len(w.Links) == 0 && len(w.Owned) == 0
 }
 
-// Env resolves the writes; a verbatim worktree resolves to none, which is what
-// makes every writer leave its .env exactly as it was copied.
+// Env resolves a verbatim worktree to no write, which is what makes every writer leave its .env exactly as it was copied.
 func Env(params EnvParams) (EnvWrites, error) {
 	envCase := caseOf(params.Identity)
 	if _, verbatim := envCase.(envcase.Verbatim); verbatim {
@@ -64,9 +57,7 @@ func Env(params EnvParams) (EnvWrites, error) {
 		return EnvWrites{}, err
 	}
 
-	// The environment rather than the ordinal alone: it settles the offset and
-	// the worktree label in one place, so a .env and the route a job answers
-	// under never disagree on which worktree they belong to.
+	// The environment rather than the ordinal: a .env and the route a job answers under never disagree on which worktree they belong to.
 	env, err := JobEnv(params.Params)
 	if err != nil {
 		return EnvWrites{}, err
@@ -117,8 +108,7 @@ type valuesForParams struct {
 	Stamps []domain.EnvOwnedEntry
 }
 
-// valuesFor leaves the main checkout's [[env]] keys plain: a value wtm stamped
-// there goes back to the template's.
+// valuesFor leaves the main checkout's [[env]] keys plain: a value wtm stamped there goes back to the template's.
 func valuesFor(params valuesForParams) ([]domain.EnvValueLink, []domain.EnvOwnedEntry, error) {
 	if _, main := params.Case.(envcase.Main); !main {
 		return params.Links, params.Stamps, nil

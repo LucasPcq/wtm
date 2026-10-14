@@ -7,8 +7,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
-// composeEnvFiles reads the main checkout's .env in each directory a compose
-// stack starts from.
 func composeEnvFiles(params Params) ([][]domain.EnvLine, error) {
 	dirs := rules.ComposeProjectDirs(params.Run)
 	if len(dirs) == 0 {
@@ -30,8 +28,6 @@ type mainValueRepairsParams struct {
 	Stamps []domain.EnvOwnedEntry
 }
 
-// mainValueRepairs reads the main checkout's files and their templates for the
-// [[env]] values wtm once wrote there, and plans putting them back.
 func mainValueRepairs(params mainValueRepairsParams) ([]domain.EnvOwnedEntry, error) {
 	files := params.Env.Files
 	mainPath := params.Env.WorktreePath
