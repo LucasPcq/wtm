@@ -102,7 +102,7 @@ Two things the count is deliberately not. It is not "the .env holds ports": a va
 
 Do not add a main-shaped condition here.
 
-**The address a surface hands out is the name, whatever the `.env` spells.** It used to follow the file — a worktree still on ports was handed `http://localhost:<port>` everywhere — and the result was that the one URL a reader came for disappeared on the checkout they use most, with the reason in a callout at the very bottom. Now every surface hands out the published name, and a worktree whose `.env` is out of step gets **one** `!` line naming the command that aligns it (`rules.AddressingDriftLine`; `rules.AddressedByPort` only picks which of its two sentences). The trade is explicit: until that command runs, a cross-origin call made through the name is refused, and the line is what says so. `--raw` on `run url` / `run open` still gives the port.
+**The address a surface hands out is the name, whatever the `.env` spells.** Following the file would hand a worktree still on ports `http://localhost:<port>` everywhere, so the one URL a reader came for would disappear on the checkout they use most. Every surface hands out the published name, and a worktree whose `.env` is out of step gets **one** `!` line naming the command that aligns it (`rules.AddressingDriftLine`; `rules.AddressedByPort` only picks which of its two sentences). The trade is explicit: until that command runs, a cross-origin call made through the name is refused, and the line is what says so. `--raw` on `run url` / `run open` still gives the port.
 
 ## Where to reach it — one model for every surface
 

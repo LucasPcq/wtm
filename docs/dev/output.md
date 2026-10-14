@@ -28,7 +28,7 @@ Three registers, and only the third may grow with what happened:
 
 Progress is erased, so it is never barred and never framed — the bar marks what stays. Attention is the only register allowed one line per item.
 
-The corollary is that **everything a run says while it is still running, and keeps, is one block**. A migrated command's status lines and hook phases used to write straight to stderr, which left them the only human output outside the bar; `shared.OpenBlock` puts them inside one, and the conclusion is a second block on stdout — which is what "exactly once" already allows.
+The corollary is that **everything a run says while it is still running, and keeps, is one block**. A flow's status lines and hook phases go inside one, opened by `shared.OpenBlock`, rather than straight to stderr outside the bar; the conclusion is a second block on stdout — which is what "exactly once" already allows.
 
 **A surface remembers where its last block left the cursor**, and that is why the bookkeeping lives in `render` rather than in the presenter. The blank closing a block and the blank opening the next are the same line on screen, so a caller deciding whether to open one cannot answer from what it did itself: the frame beside it is written by code that never sees it — `run up`'s own frame around a job's output is the case that made this necessary. `FrameStart` therefore writes no blank on a surface already at a boundary, writes the separator on one whose block is still open, and `BlockOpen` is what `OpenBlock` and `syncPresenter.section` both read. stdout and stderr are **one** surface when both are the same terminal: the reader sees one column of blocks, whichever stream wrote them.
 
@@ -126,7 +126,7 @@ The table above was already written, and the surface diverged anyway — because
 
 Which kills `render.Danger`, and with it the third failure register. `!` is something left to do, `✗` is a failure; a refusal and a crash are the same register, and which of the two it was belongs in the sentence. The old boundary was decided file by file — `sync` and `relocate` called a blockage `Danger`, `fast-forward` called the same idea `Warning`.
 
-**2. Every glyph is one column.** `!` used to render as a filled chip carrying its own padding, so an attention line sat two columns wider — and read louder — than the failure line under it. `internal/surface/cli/render/env.go` had already left the vocabulary over this, rendering a bare `!` because the badge "made the rows wander a column apart". Badges belong to the TUI, where a chip is a widget; a line of CLI output is text. One column is also a property of the **font**, not only of the rune: a glyph the terminal's font lacks is drawn from a fallback face, often wider, and overflows onto the space after it. `↻` did exactly that under JetBrains Mono (Ghostty's default), which is why the update glyph is `~`. `make lint` holds this through `archlint`'s `fontcover` rule: a non-letter rune in any string of `internal/` must belong to `fontSafe`, measured as present in thirteen common monospace fonts (box drawing and block elements are exempt, terminals draw those themselves). The runes that predated the rule — `▸`, `⚠`, `●`… — are listed in `fontLegacy`, report as migrating, and that list may only shrink.
+**2. Every glyph is one column.** A glyph drawn as a filled chip carries its own padding, so an attention line would sit two columns wider — and read louder — than the failure line under it, and the rows of a block wander a column apart. Badges belong to the TUI, where a chip is a widget; a line of CLI output is text. One column is also a property of the **font**, not only of the rune: a glyph the terminal's font lacks is drawn from a fallback face, often wider, and overflows onto the space after it. `↻` did exactly that under JetBrains Mono (Ghostty's default), which is why the update glyph is `~`. `make lint` holds this through `archlint`'s `fontcover` rule: a non-letter rune in any string of `internal/` must belong to `fontSafe`, measured as present in thirteen common monospace fonts (box drawing and block elements are exempt, terminals draw those themselves). The runes that predated the rule — `▸`, `⚠`, `●`… — are listed in `fontLegacy`, report as migrating, and that list may only shrink.
 
 **3. `Muted` has exactly two jobs, and detail is not one of them.**
 
@@ -166,7 +166,7 @@ The alignment belongs to `Announce`, never to the wording: a format string spell
 
 **A diff is not a register.** `wtm env` prints `+` / `!` / `−` per key — every key under `--check`, and under an apply only what it left for the reader, what it did being one counted line per file (`rules.EnvFileTally`) — and that is deliberate: those runes describe a *change to a line of a file*, not the state of a run, and they read as a column down the left of a file block rather than as the head of a conclusion. It is the one vocabulary outside the table, it is confined to `surface/cli/render/env.go`, and adding a second one is a decision to argue for here first.
 
-**The status palette names states, never identities.** `run logs` used to cycle green and yellow across job prefixes, so in the one command whose body is job output, yellow meant "job 3". A label saying where a line came from is chrome.
+**The status palette names states, never identities.** A job prefix in `run logs` is not coloured by job: cycling green and yellow across prefixes would make yellow mean "job 3" in the one command whose body is job output. A label saying where a line came from is chrome.
 
 **`render.Message` — the bare line, carrying no status — is not for a conclusion.** It is the most-called helper in the tree, and that is the symptom it names: when nothing in the vocabulary fits, people fall back to a line that says nothing. A conclusion line carries a glyph or is an aligned field.
 
@@ -250,7 +250,7 @@ A command on the engine exits on its error's code when the table lists it, else 
 | `precondition` (`plan.stale`) | 25 |
 | `not_found`, `internal` | 1, or the code of the sentinel an internal error wraps (`21` outside a repository) |
 
-A batch exits on its first interrupted item (cancelled, or skipped because of the interrupt), else on its first failed item, else 0. A command's own codes take the numbers its legacy errors had (10 to 18) as it migrates. The legacy commands keep `rules.ExitCode`.
+A batch exits on its first interrupted item (cancelled, or skipped because of the interrupt), else on its first failed item, else 0. A command on the engine keeps, as its own codes, the numbers its legacy errors had (10 to 18). The legacy commands keep `rules.ExitCode`.
 
 ## Showing without keeping
 
@@ -258,7 +258,7 @@ A hook that runs for forty seconds has to be visible while it runs — silence r
 
 It applies to a terminal this process may repaint. A pipe, a CI log or `--output json` gets the raw stream, unconditionally.
 
-Both paths go through one function, `surface/cli/shared.DrawHookPhase`, and it is one function on purpose: two paths to it — the migrated commands through `CLIPresenter`, `extract` and `checkout` through a helper of their own, since gone — drifted apart once, and a hook has to read the same whichever command ran it. It owns the log rather than the view, opening `<state-dir>/hooks/<phase>-<branch>.log` and teeing the raw stream into it on **every** path: the run whose output the reader could not watch is exactly the one whose record has to survive. And it always hands the sink a real writer — the command's own — because a sink left nil falls back to `os.Stderr` in the runner, which is how a hook finds its way onto a terminal that asked for `--quiet`.
+Both paths go through one function, `surface/cli/shared.DrawHookPhase`, and it is one function on purpose: every command on `flow/` reaches it through `CLIPresenter`, and a hook has to read the same whichever command ran it, which two paths to it would not keep. It owns the log rather than the view, opening `<state-dir>/hooks/<phase>-<branch>.log` and teeing the raw stream into it on **every** path: the run whose output the reader could not watch is exactly the one whose record has to survive. And it always hands the sink a real writer — the command's own — because a sink left nil falls back to `os.Stderr` in the runner, which is how a hook finds its way onto a terminal that asked for `--quiet`.
 
 A hook's own bytes are never barred, for the same reason progress is not: `barWriter` re-marks the row after every carriage return, so a bar drawn over a redrawing progress line lands on top of its content. The rule reaches the run module too — `render.RunPrinter` bars the lines it composes and writes a job's chunks through untouched.
 

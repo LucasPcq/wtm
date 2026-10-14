@@ -1,6 +1,6 @@
 # `internal/flow/` — how a command runs
 
-A *flow* is everything a command does between "the flags are parsed" and "the result is printed": the questions it asks and in what order, which ones it may skip, the safety checks, the service calls, the phases it reports, the events it publishes. It is written once, in `internal/flow/<command>/`, and three surfaces run it: the CLI wizard, the unattended CLI, and the dashboard. Which command runs on which surface is the table in [architecture.md](architecture.md#where-each-flow-runs); the recipe for a new one is [adding-a-mutation-command.md](adding-a-mutation-command.md).
+A *flow* is everything a command does between "the flags are parsed" and "the result is printed": the questions it asks and in what order, which ones it may skip, the safety checks, the service calls, the phases it reports, the events it publishes. It is written once, in `internal/flow/<command>/`, and three surfaces run it: the CLI wizard, the unattended CLI, and the dashboard. It is the model of every command not yet on the engine: a new command is written on the engine instead ([adding-a-mutation-command.md](adding-a-mutation-command.md)), and a command leaves `flow/` when it moves there. Which command runs on which surface is the table in [architecture.md](architecture.md#where-each-command-runs).
 
 - [The shape of a flow](#the-shape-of-a-flow)
 - [The three seams](#the-three-seams)
