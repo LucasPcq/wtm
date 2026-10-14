@@ -127,6 +127,8 @@ On the bus (`docs/guide/events.md`) an applied run sends `operation.started`, on
 
 - `layers`: `dispatch` imports `kernel`, `domain`, `rules`, `infra` and `query/` (the view of `query/operations` is the shape of its holder files), never `service/` or a surface.
 - `engine` (`tools/archlint/engine.go`): `command/` and `query/` never import `dispatch` or `surface/`; `surface/` never imports `command/` or `query/`; `command/` never calls `context.Background()` or `context.TODO()`.
+- `publish`: `dispatch.Publisher.Publish` is called from `dispatch/` only, and `command/`, `query/` and the engine's services publish nothing; an event is what a command reports.
+- `writesink`: only `Apply` writes. Every other function of a command (`Observe`, `Choices`, `Plan`, `Skip`…) and every query reaches no write sink, and `dispatch` calls no mutator of the engine's services ([lint.md](lint.md)).
 
 ## Testing
 

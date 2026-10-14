@@ -1,0 +1,241 @@
+-- github.com/LucasPcq/wtm/internal/kernel/kernel.go --
+package kernel
+
+import "context"
+
+type ObserveScope struct{ Dir string }
+
+type Command[F any] struct {
+	Name    string
+	Observe func(context.Context, ObserveScope) (F, error)
+	Plan    func(context.Context, F) error
+	Apply   func(context.Context, F) error
+}
+
+type Query[V any] struct {
+	Run func(context.Context) (V, error)
+}
+-- github.com/LucasPcq/wtm/internal/infra/fs/fs.go --
+package fs
+
+import "os"
+
+func UpdateFile(path string) error { return os.WriteFile(path, nil, 0o644) }
+
+func FileExists(path string) bool { _, err := os.Stat(path); return err == nil }
+-- github.com/LucasPcq/wtm/internal/infra/proc/proc.go --
+package proc
+
+import "os/exec"
+
+func Command(name string) *exec.Cmd { return exec.Command(name) }
+-- github.com/LucasPcq/wtm/internal/infra/git/git.go --
+package git
+
+import "github.com/LucasPcq/wtm/internal/infra/proc"
+
+type Reader interface{ Worktrees() ([]string, error) }
+
+type Writer interface{ AddWorktree(path string) error }
+
+type Repo struct{ Dir string }
+
+func (r Repo) Worktrees() ([]string, error) { return nil, proc.Command("git").Run() }
+
+func (r Repo) AddWorktree(path string) error { return proc.Command("git").Run() }
+-- github.com/LucasPcq/wtm/internal/store/store.go --
+package store
+
+import (
+	"os"
+
+	"github.com/LucasPcq/wtm/internal/infra/fs"
+)
+
+type Meta interface {
+	Load(branch string) ([]byte, error)
+	Update(branch string) error
+}
+
+type MetaDisk struct{ StateDir string }
+
+func (m MetaDisk) Load(branch string) ([]byte, error) { return os.ReadFile(m.StateDir) }
+
+func (m MetaDisk) Update(branch string) error { return fs.UpdateFile(m.StateDir) }
+-- github.com/LucasPcq/wtm/internal/service/identity/identity.go --
+package identity
+
+import (
+	"github.com/LucasPcq/wtm/internal/infra/git"
+	"github.com/LucasPcq/wtm/internal/store"
+)
+
+type Snapshot struct{ Worktrees []string }
+
+func Read(reader git.Reader, meta store.Meta) (Snapshot, error) {
+	worktrees, err := reader.Worktrees()
+	if err != nil {
+		return Snapshot{}, err
+	}
+	_, err = meta.Load("main")
+	return Snapshot{Worktrees: worktrees}, err
+}
+
+func (s Snapshot) Managed(path string) bool { return len(s.Worktrees) > 0 }
+
+func Allocate(meta store.Meta) error { return claim(meta) } // want Allocate:"mutator via identity.claim → store.Meta.Update → fs.UpdateFile"
+
+func claim(meta store.Meta) error { return meta.Update("feat") } // want claim:"mutator via store.Meta.Update → fs.UpdateFile"
+
+var allocate = func(meta store.Meta) error { return Allocate(meta) }
+-- github.com/LucasPcq/wtm/internal/service/gitwt/gitwt.go --
+package gitwt
+
+import "github.com/LucasPcq/wtm/internal/infra/git"
+
+func Add(writer git.Writer, path string) error { return writer.AddWorktree(path) } // want Add:"mutator via git.Writer.AddWorktree$"
+
+func AddOnRepo(repo git.Repo, path string) error { return repo.AddWorktree(path) } // want AddOnRepo:"mutator via git.Repo.AddWorktree$"
+
+func List(repo git.Repo) ([]string, error) { return repo.Worktrees() }
+-- github.com/LucasPcq/wtm/internal/service/hooks/hooks.go --
+package hooks
+
+import "github.com/LucasPcq/wtm/internal/infra/proc"
+
+func Execute(command string) error { return proc.Command(command).Run() } // want Execute:"mutator via proc.Command$"
+-- github.com/LucasPcq/wtm/internal/service/runenv/runenv.go --
+package runenv
+
+import (
+	"os"
+
+	"github.com/LucasPcq/wtm/internal/infra/fs"
+)
+
+func Env(path string) ([]byte, error) {
+	if !fs.FileExists(path) {
+		return nil, nil
+	}
+	return os.ReadFile(path)
+}
+-- github.com/LucasPcq/wtm/internal/service/worktree/worktree.go --
+package worktree
+
+import "github.com/LucasPcq/wtm/internal/service/hooks"
+
+func Create(command string) error { return hooks.Execute(command) } // want Create:"mutator via hooks.Execute → proc.Command"
+-- github.com/LucasPcq/wtm/internal/query/status/status.go --
+package status
+
+import (
+	"context"
+
+	"github.com/LucasPcq/wtm/internal/infra/git"
+	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/service/identity"
+	"github.com/LucasPcq/wtm/internal/store"
+)
+
+func Query(reader git.Reader, meta store.Meta) kernel.Query[identity.Snapshot] {
+	return kernel.Query[identity.Snapshot]{Run: func(context.Context) (identity.Snapshot, error) {
+		return identity.Read(reader, meta)
+	}}
+}
+
+func Number(meta store.Meta) error { // want Number:"mutator via identity.Allocate"
+	return identity.Allocate(meta) // want `identity\.Allocate writes \(identity\.claim → store\.Meta\.Update → fs\.UpdateFile\), in query/status: a query only reads`
+}
+
+func Touch(meta store.Meta) error { // want Touch:"mutator via store.Meta.Update"
+	return meta.Update("feat") // want `store\.Meta\.Update writes \(fs\.UpdateFile\), in query/status`
+}
+-- github.com/LucasPcq/wtm/internal/command/create/create.go --
+package create
+
+import (
+	"context"
+
+	"github.com/LucasPcq/wtm/internal/infra/fs"
+	"github.com/LucasPcq/wtm/internal/infra/git"
+	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/service/gitwt"
+	"github.com/LucasPcq/wtm/internal/service/identity"
+	"github.com/LucasPcq/wtm/internal/store"
+)
+
+type ports struct {
+	git  git.Writer
+	meta store.Meta
+}
+
+func Command(p ports) kernel.Command[identity.Snapshot] { // want Command:"mutator via identity.Allocate"
+	return kernel.Command[identity.Snapshot]{
+		Name: "create",
+		Observe: func(ctx context.Context, scope kernel.ObserveScope) (identity.Snapshot, error) {
+			if err := identity.Allocate(p.meta); err != nil { // want `identity\.Allocate writes \(identity\.claim → store\.Meta\.Update → fs\.UpdateFile\), in Observe: only Apply writes`
+				return identity.Snapshot{}, err
+			}
+			return identity.Snapshot{}, nil
+		},
+		Plan: p.plan, // want `create\.ports\.plan writes \(fs\.UpdateFile\), as Plan: only Apply writes`
+		Apply: func(ctx context.Context, snapshot identity.Snapshot) error {
+			if err := identity.Allocate(p.meta); err != nil {
+				return err
+			}
+			return gitwt.Add(p.git, "feat")
+		},
+	}
+}
+
+func (p ports) plan(ctx context.Context, snapshot identity.Snapshot) error { // want plan:"mutator via fs.UpdateFile"
+	return fs.UpdateFile("plan")
+}
+-- github.com/LucasPcq/wtm/internal/flow/create/create.go --
+package create
+
+import (
+	"github.com/LucasPcq/wtm/internal/service/identity"
+	"github.com/LucasPcq/wtm/internal/store"
+)
+
+func Run(meta store.Meta) error { return identity.Allocate(meta) } // want Run:"mutator via identity.Allocate → identity.claim"
+-- github.com/LucasPcq/wtm/internal/surface/cli/wt/wt.go --
+package wt
+
+import (
+	"github.com/LucasPcq/wtm/internal/infra/git"
+	"github.com/LucasPcq/wtm/internal/service/gitwt"
+	"github.com/LucasPcq/wtm/internal/service/identity"
+	"github.com/LucasPcq/wtm/internal/store"
+)
+
+func Add(writer git.Writer) error { // want Add:"mutator via gitwt.Add → git.Writer.AddWorktree"
+	return gitwt.Add(writer, "feat") // want `gitwt\.Add writes \(git\.Writer\.AddWorktree\), called from surface/cli/wt: a mutator of the engine's services is called from command/ only`
+}
+
+func Show(reader git.Reader, meta store.Meta) (identity.Snapshot, error) { return identity.Read(reader, meta) }
+
+var number = identity.Allocate // want `identity\.Allocate writes \(identity\.claim → store\.Meta\.Update → fs\.UpdateFile\), called from surface/cli/wt`
+-- github.com/LucasPcq/wtm/internal/dispatch/dispatch.go --
+package dispatch
+
+import "github.com/LucasPcq/wtm/internal/service/hooks"
+
+func Run() error { // want Run:"mutator via hooks.Execute → proc.Command"
+	return hooks.Execute("on_create") // want `hooks\.Execute writes \(proc\.Command\), called from dispatch`
+}
+-- github.com/LucasPcq/wtm/internal/service/runenv/generic.go --
+package runenv
+
+import "github.com/LucasPcq/wtm/internal/infra/fs"
+
+func Save[T any](value T) error { return fs.UpdateFile("x") } // want Save:"mutator via fs.UpdateFile"
+-- github.com/LucasPcq/wtm/internal/query/status/generic.go --
+package status
+
+import "github.com/LucasPcq/wtm/internal/service/runenv"
+
+func Keep() error { // want Keep:"mutator via runenv.Save"
+	return runenv.Save(1) // want `runenv\.Save writes \(fs\.UpdateFile\), in query/status`
+}

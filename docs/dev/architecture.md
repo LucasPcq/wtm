@@ -9,9 +9,11 @@ One line per package: what it owns. The import rules between them are the next s
 ```
 main.go                       ← the entry point: cli.Execute
 internal/
-  domain/                     ← types, errors, constants only (no methods, no functions)
+  domain/                     ← types, errors, constants only (no methods, no functions); its root only shrinks,
+                                new code goes into the sub-package of its subject
     statefile/                ←   the schema version of each state file, and the error of a file a newer wtm wrote
-  rules/                      ← pure functions (stdlib + domain only, no I/O)
+  rules/                      ← pure functions (stdlib + domain only, no I/O); its root only shrinks, new code goes
+                                into the sub-package of its subject
     statefile/                ←   what a state file's schema allows: read, write, or refuse (exit 22)
   kernel/                     ← the skeleton of the command engine (stdlib only, no business vocabulary): Command,
                                 fields, rules, errors, results, Each / Saga (commands.md)
@@ -215,7 +217,11 @@ Two more edges are constrained beyond the diagram:
 - git is run by `infra/git` only (`gitexec`); the files at the root of `infra/` that still run it, for the commands on `flow/`, are tracked in `.archlint-migrating`.
 - The services a command on the engine reaches (`service/gitwt`, `identity`, `runenv`, `hooks.Execute`, [services.md](services.md)) import no other service, never `kernel/`, and publish nothing: a mutator returns what it changed, and `dispatch` publishes it.
 - `store/` imports `config/`, `domain/`, `infra/` and `rules/`; `service/` and `testutil/` reach it, `flow/` never does. An exported function of `service/worktree` that reaches a write of `store.Meta` is a mutator (`metawriter`).
-- A file is written through `infra/fs` only (`statewrite`): `os.WriteFile`, `os.Create` and `os.Rename` stay inside `infra/`, but for the permanent exceptions listed with their reason in `tools/archlint/statewrite.go`.
+- A file is written through `infra/fs` only (`statewrite`): `os.WriteFile`, `os.Create`, `os.Rename`, `os.Remove`, `os.RemoveAll` and a writing `os.OpenFile` stay inside `infra/`, but for the permanent exceptions listed with their reason in `tools/archlint/statewrite.go`. A state file is written by its owner in `store/` only (`stateowner`): `fs.UpdateFile` and `fs.RemoveDir` are called from nowhere else.
+- A function that reaches a write sink is a mutator, inferred from the code (`writesink`): nothing in `query/` nor in a reader of a command (`Observe`, `Choices`, `Plan`…) reaches one, and a mutator of the engine's services is called from `command/` only (or another service, or `flow/`).
+- In the engine, `dispatch` alone publishes, through its `Publisher` (`publish`): `command/`, `query/` and the engine's services call no `Publish`.
+- Every package of `service/`, `infra/` and `store/` says its one responsibility in its package doc (`pkgdoc`).
+- The roots of `rules/` and `domain/` only shrink (`rootfreeze`): no new file or exported symbol there; new code goes into the sub-package of its subject, a presentation rule into the surface that uses it.
 - A service **mutator** (`worktree.Create`, `envsvc.ApplyEnvSync`, `runconfig.Save`, … — the table in `tools/archlint/chokepoint.go`) is called only from `internal/flow/`, whatever the calling layer; a call inside the mutator's own package is its implementation.
 
 None of this is left to review: `make lint` runs `tools/archlint`, and each rule above is one of its analyzers. The full list, and how to add one, is in [lint.md](lint.md).

@@ -10,5 +10,9 @@ func TestOnlyTheBusPublishes(t *testing.T) {
 		internalPrefix+"flow",
 		internalPrefix+"flow/create",
 		internalPrefix+"surface/tui/dash",
+		internalPrefix+"dispatch",
+		internalPrefix+"surface/cli/run",
+		internalPrefix+"command/create",
+		internalPrefix+"service/identity",
 	)
 }

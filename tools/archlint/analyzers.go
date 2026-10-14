@@ -19,6 +19,10 @@ var analyzers = []*analysis.Analyzer{
 	emitsAnalyzer,
 	publishAnalyzer,
 	statewriteAnalyzer,
+	stateownerAnalyzer,
+	writesinkAnalyzer,
+	pkgdocAnalyzer,
+	rootfreezeAnalyzer,
 	engineAnalyzer,
 	gitexecAnalyzer,
 }

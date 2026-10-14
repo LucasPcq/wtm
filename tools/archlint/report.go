@@ -87,12 +87,18 @@ type judgeParams struct {
 	Findings  []finding
 	Migrating migratingList
 	Warned    map[string]bool
+	// Tracked prints each site .archlint-migrating covers; otherwise they are
+	// only counted, so a run shows what fails and what to lower.
+	Tracked bool
 }
 
 type verdict struct {
-	lines  []string
-	notes  []string
-	failed bool
+	lines   []string
+	notes   []string
+	tracked int
+	// failures counts the findings that fail the run.
+	failures int
+	failed   bool
 }
 
 func judge(params judgeParams) verdict {
@@ -106,6 +112,13 @@ func judge(params judgeParams) verdict {
 		tag := tagOf(tagParams{Finding: f, Migrating: params.Migrating, Used: used, Warned: params.Warned})
 		if tag == "" || tag == tagOverBudget {
 			result.failed = true
+			result.failures++
+		}
+		if tag == tagMigrating && f.legacy == "" {
+			result.tracked++
+			if !params.Tracked {
+				continue
+			}
 		}
 		result.lines = append(result.lines, fmt.Sprintf("%s:%d:%d: [%s]%s %s", f.pos.Filename, f.pos.Line, f.pos.Column, f.rule, tag, f.msg))
 	}

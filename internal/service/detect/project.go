@@ -1,3 +1,5 @@
+// Package detect reads what a project already holds — its .env files, compose
+// files, package manager, scripts and agents — to propose `wtm init`'s answers.
 package detect
 
 import (

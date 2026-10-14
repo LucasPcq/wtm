@@ -92,7 +92,8 @@ Aim for near-zero comments; encode meaning in names and signatures (`Skip func(A
 ```
 main.go         the entry point: cli.Execute
 internal/
-  domain/       types, errors, constants only
+  domain/       types, errors, constants only; a new one goes in the sub-package of its subject
+                (domain/statefile), never at the root, which only shrinks
   rules/        pure functions (stdlib + domain only, no I/O); a new decision goes in the sub-package
                 of its subject (rules/worktree, rules/runenv, rules/statefile), never at the root
   kernel/       the command engine's skeleton (stdlib only): fields, rules, errors, results, Each / sagas;
@@ -134,10 +135,12 @@ The annotated map of every sub-package is in `docs/dev/architecture.md`.
 - `service/x` imports `service/y` only along an edge declared in `tools/archlint` (`serviceEdges`).
 - The daemon (`service/process`, `service/proxy`) is blind to git: no `service/worktree|branch|github|events`, no `config`, only allow-listed `infra/` functions.
 - A service **mutator** (the table in `tools/archlint/chokepoint.go`) is called only from `internal/flow/`.
+- On the engine a function is a **reader or a mutator**, inferred from the code (`writesink`): one that reaches a write sink (a write of `store/`, a method of `git.Writer`, `infra/proc`, `infra/fs`) is a mutator. Nothing in `query/` nor in a reader of a command (`Observe`, `Choices`, `Plan`…) reaches one; a mutator of the engine's services (`engineServices`) is called from `command/` only (or another service, or `flow/`). In the engine only `dispatch` publishes (`publish`): a mutator returns what it changed, the command reports it.
+- Every package of `service/`, `infra/` and `store/` has a package doc stating its one responsibility (`pkgdoc`). The roots of `rules/` and `domain/` only shrink (`rootfreeze`): no new file nor exported symbol there.
 - git is run by `infra/git` only (`gitexec`): a layer on the engine reaches it through `git.Reader` / `git.Writer`; the git functions at the root of `infra/`, for the commands still on `flow/`, are tracked in `.archlint-migrating` and leave with their last caller. See `docs/dev/git.md`.
 - `meta.json`, the changes to `config.toml` (the remembered answers, `base_path`, the `.env` targets) and the managed `.env` files are written by `store/` only, each through its interface (`store.Meta`, `ProjectConfig`, `EnvFiles`) doubled by `storetest.Fake`; `config/` loads and validates, `init`'s full render stays in `config/` until its migration. See `docs/dev/store.md`.
 - **A file is named after what it declares**, and a port lives with its implementation: its interface, the types it takes and returns and the implementation share one file (`infra/git/read.go`, `store/meta.go`), never an interfaces-only file beside the code. A type a whole package turns around (`dispatch.Handle`) has its own file; options sit beside the call that takes them.
-- A file is written through `infra/fs` only: `fs.UpdateFile(ctx, {Path, Mutate})` (lock, read, `Mutate` decides an `fs.Change`, atomic rename), never `os.WriteFile`/`os.Create`/`os.Rename` outside `infra/` (`statewrite`). A state file carries `schema` (absent = 1, written from 2 on) and a write refuses a newer one (`*statefile.NewerError`, exit 22). See `docs/dev/state-files.md`.
+- A file is written through `infra/fs` only: `fs.UpdateFile(ctx, {Path, Mutate})` (lock, read, `Mutate` decides an `fs.Change`, atomic rename), never `os.WriteFile`/`os.Create`/`os.Rename`/`os.Remove`/`os.RemoveAll`/a writing `os.OpenFile` outside `infra/` (`statewrite`), and `fs.UpdateFile` only from `store/`, the owner of each state file (`stateowner`). A state file carries `schema` (absent = 1, written from 2 on) and a write refuses a newer one (`*statefile.NewerError`, exit 22). See `docs/dev/state-files.md`.
 
 **Every new worktree-mutating command goes through flow/** — no exception. Declare `Request`/`Outcome`/`Presenter`/`Params`/`Run` in `internal/flow/<cmd>/` and its questions as `flow.Step` in `steps.go`; the runner in `surface/cli/` is only flags → `Request` → pick the Prompter and Presenter → `<cmd>.Run`. A runner that inspects state, orders service calls or gates a picker on `interactive` has put the flow in the wrong layer. A flow never frames, never animates, never picks a stream, and **returns** errors rather than presenting them. Recipe: `docs/dev/adding-a-mutation-command.md`; seams and step model: `docs/dev/flow-layer.md`.
 

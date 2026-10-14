@@ -60,7 +60,7 @@ These locks are short: one file, one write. The **operation locks** `dispatch` h
 
 ## What the lint holds
 
-`statewrite` (`tools/archlint/statewrite.go`) refuses `os.WriteFile`, `os.Create` and `os.Rename`, as a call or a function value, outside `infra/`. Its permanent exceptions are in `stateWriteExempt`, each with its reason; a log is opened through `fs.OpenLog`, and the one still opened with `os.Create` (the `exec` log) is tracked in `.archlint-migrating` until it moves (see [lint.md](lint.md)). `metawriter` holds the writes of `store.Meta` as the sinks of `meta.json` ([store.md](store.md#what-the-lint-holds)).
+`statewrite` (`tools/archlint/statewrite.go`) refuses `os.WriteFile`, `os.Create`, `os.Rename`, `os.Remove`, `os.RemoveAll` and an `os.OpenFile` that may write, as a call or a function value, outside `infra/`. Its permanent exceptions are in `stateWriteExempt`, each with its reason; a log is opened through `fs.OpenLog`, a directory wtm keeps is dropped by `fs.RemoveDir`, and what still writes by hand for the commands on `flow/` (the `exec` log, the daemon's lock, the directories `relocate` and `extract` remove) is tracked in `.archlint-migrating` until it moves (see [lint.md](lint.md)). `stateowner` keeps `fs.UpdateFile` and `fs.RemoveDir` to `store/`, the owner of each state file ([store.md](store.md#what-the-lint-holds)).
 
 ## Testing
 

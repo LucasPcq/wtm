@@ -1,3 +1,4 @@
+// Package github reads a branch's pull requests through the gh CLI.
 package github
 
 import (

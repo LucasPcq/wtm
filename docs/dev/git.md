@@ -50,7 +50,7 @@ A command receives the `Reader` and the `Writer` when it is built (`create.Comma
 
 ## What the lint holds
 
-`gitexec` (`tools/archlint/gitexec.go`) refuses a program started as `"git"` (`exec.Command`, `exec.CommandContext`, `proc.Command`, `proc.GroupCommand`) outside `infra/git`. Its one permanent exception is `testutil`, whose helpers build real repositories. The files at the root of `infra/` that still run git are in `.archlint-migrating`, each with its count of calls, and leave it with their last caller.
+`gitexec` (`tools/archlint/gitexec.go`) refuses a program started as `"git"` (`exec.Command`, `exec.CommandContext`, `proc.Command`, `proc.GroupCommand`) outside `infra/git`. Its one permanent exception is `testutil`, whose helpers build real repositories. The files at the root of `infra/` that still run git are in `.archlint-migrating`, each with its count of calls, and leave it with their last caller. `writesink` (`tools/archlint/writesink.go`) takes every method of `git.Writer`, on the interface and on `git.Repo`, as a write sink: a function that calls one is a mutator, one that calls only `git.Reader` stays a reader ([lint.md](lint.md)).
 
 ## Testing
 
