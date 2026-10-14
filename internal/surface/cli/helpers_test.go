@@ -1,14 +1,18 @@
 package cli
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
+	"os"
+	"os/exec"
 	"strings"
+	"syscall"
 	"testing"
-
-	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/require"
+	"time"
 
 	"github.com/LucasPcq/wtm/internal/dispatch"
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -16,12 +20,11 @@ import (
 	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 	"github.com/LucasPcq/wtm/internal/testutil/dispatchtest"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"github.com/stretchr/testify/require"
 )
 
-// The few helpers the tests share. Everything a test file holds is a test.
-
-// world is the example served on a command line of its own: the repository,
-// the bench dispatch runs on, the engine binding them.
 type world struct {
 	Repo   *repo
 	Bench  *dispatchtest.Bench
@@ -32,9 +35,7 @@ type world struct {
 type worldParams struct {
 	Form    Form
 	Confirm Confirm
-	// Detail is the example command's own rendering; none declares the
-	// generic one.
-	Detail render.Detail
+	Detail  render.Detail
 }
 
 func newWorld(t testing.TB, params worldParams) *world {
@@ -62,8 +63,6 @@ func detailOption(detail render.Detail) Option {
 	return Detail(detail)
 }
 
-// root is the tree the commands of the example hang from, with the hooks and
-// the flags of the real one.
 func (w *world) root() *cobra.Command {
 	root := &cobra.Command{
 		Use:                domain.AppName,
@@ -90,12 +89,10 @@ type ran struct {
 
 type runParams struct {
 	Args []string
-	// TTY says stdin is a terminal.
-	TTY bool
-	Ctx context.Context
+	TTY  bool
+	Ctx  context.Context
 }
 
-// run executes the command line as the binary does, down to its exit code.
 func (w *world) run(t *testing.T, params runParams) ran {
 	t.Helper()
 	stdinWas := shared.StdinIsTerminal
@@ -121,8 +118,7 @@ func args(words ...string) runParams {
 	return runParams{Args: words}
 }
 
-// envelope is a run's JSON document, decoded loosely so a test reads keys the
-// way an agent does.
+// Decoded loosely, so a test reads the keys the way an agent does.
 type envelope struct {
 	V           int               `json:"v"`
 	Command     string            `json:"command"`
@@ -154,19 +150,16 @@ func decode(t *testing.T, stdout string) envelope {
 	return doc
 }
 
-// binding is the example command bound alone, to read what Bind generated.
 func (w *world) binding(t *testing.T, options ...Option) (*cobra.Command, *binding) {
 	t.Helper()
 	cmd := w.Engine.Bind(commandName, Doc{Use: commandName}, options...)
 	return cmd, w.Engine.bindings[commandName]
 }
 
-// stripGlyph reads a failure line without the glyph that opens it.
 func stripGlyph(line string) string {
 	return strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), domain.GlyphFailure))
 }
 
-// fieldsOf is what an invalid request names.
 func fieldsOf(t *testing.T, err kernel.Error) []kernel.FieldError {
 	t.Helper()
 	invalid, ok := err.(*kernel.InvalidError)
@@ -174,8 +167,6 @@ func fieldsOf(t *testing.T, err kernel.Error) []kernel.FieldError {
 	return invalid.Fields
 }
 
-// applyingForm is a form that asks nothing: it runs the request it is given,
-// keeping each one.
 func applyingForm(asked *[]string) Form {
 	return func(ctx context.Context, params FormParams) (dispatch.Reply, error) {
 		*asked = append(*asked, string(params.Request))
@@ -183,7 +174,6 @@ func applyingForm(asked *[]string) Form {
 	}
 }
 
-// answering confirms the follow-ups with answers in turn, then declines.
 func answering(offered *[]string, answers ...bool) Confirm {
 	return func(params ConfirmParams) (bool, error) {
 		*offered = append(*offered, params.Command)
@@ -193,3 +183,125 @@ func answering(offered *[]string, answers ...bool) Confirm {
 		return answers[len(*offered)-1], nil
 	}
 }
+
+func quietTestCmd(t *testing.T, args ...string) *cobra.Command {
+	t.Helper()
+	cmd := &cobra.Command{Use: "probe", RunE: func(*cobra.Command, []string) error { return nil }}
+	cmd.Flags().Bool(domain.FlagQuiet, false, "")
+	cmd.Flags().String(domain.FlagOutput, domain.OutputText, "")
+	if err := cmd.Flags().Parse(args); err != nil {
+		t.Fatalf("parse flags: %v", err)
+	}
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	return cmd
+}
+
+func silenced(cmd *cobra.Command) bool {
+	return cmd.OutOrStdout() == io.Discard && cmd.ErrOrStderr() == io.Discard
+}
+
+const shieldHelperEnv = "WTM_TEST_SHIELD_HELPER"
+
+type interruptHelper struct {
+	cmd   *exec.Cmd
+	lines *bufio.Scanner
+}
+
+func startHelper(t *testing.T, test string) interruptHelper {
+	t.Helper()
+	helper := exec.Command(os.Args[0], "-test.run=^"+test+"$")
+	helper.Env = append(os.Environ(), shieldHelperEnv+"=1")
+	stdout, err := helper.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := helper.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = helper.Process.Kill() })
+	return interruptHelper{cmd: helper, lines: bufio.NewScanner(stdout)}
+}
+
+func (h interruptHelper) expect(t *testing.T, want string) string {
+	t.Helper()
+	if !h.lines.Scan() {
+		t.Fatalf("helper ended before saying %q", want)
+	}
+	if want != "" && h.lines.Text() != want {
+		t.Fatalf("helper said %q, want %q", h.lines.Text(), want)
+	}
+	return h.lines.Text()
+}
+
+func (h interruptHelper) diesOnSIGINT(t *testing.T) {
+	t.Helper()
+	done := make(chan error, 1)
+	go func() { done <- h.cmd.Wait() }()
+	select {
+	case err := <-done:
+		var exitErr *exec.ExitError
+		status, ok := syscall.WaitStatus(0), false
+		if errors.As(err, &exitErr) {
+			status, ok = exitErr.Sys().(syscall.WaitStatus)
+		}
+		if !ok || !status.Signaled() || status.Signal() != syscall.SIGINT {
+			t.Fatalf("helper ended with %v, want SIGINT", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the second interrupt did not end the run")
+	}
+}
+
+type exclusivePair struct {
+	cmd  *cobra.Command
+	args []string
+}
+
+func exclusivePairs(cmd *cobra.Command) []exclusivePair {
+	var pairs []exclusivePair
+	seen := map[string]bool{}
+	cmd.LocalFlags().VisitAll(func(f *pflag.Flag) {
+		for _, group := range f.Annotations[domain.AnnotationMutuallyExclusive] {
+			if seen[group] {
+				continue
+			}
+			seen[group] = true
+			names := strings.Fields(group)
+			for i, first := range names {
+				for _, second := range names[i+1:] {
+					path := strings.Fields(cmd.CommandPath())[1:]
+					args := append(path, flagArg(cmd, first), flagArg(cmd, second))
+					pairs = append(pairs, exclusivePair{cmd: cmd, args: args})
+				}
+			}
+		}
+	})
+	for _, sub := range cmd.Commands() {
+		pairs = append(pairs, exclusivePairs(sub)...)
+	}
+	return pairs
+}
+
+func flagArg(cmd *cobra.Command, name string) string {
+	if cmd.Flags().Lookup(name).Value.Type() == "bool" {
+		return "--" + name
+	}
+	return "--" + name + "=x"
+}
+
+func resetFlags(cmd *cobra.Command) {
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		_ = f.Value.Set(f.DefValue)
+		f.Changed = false
+	})
+}
+
+func walk(cmd *cobra.Command, visit func(*cobra.Command)) {
+	visit(cmd)
+	for _, sub := range cmd.Commands() {
+		walk(sub, visit)
+	}
+}
+
+const interruptHelperEnv = "WTM_TEST_INTERRUPT_HELPER"

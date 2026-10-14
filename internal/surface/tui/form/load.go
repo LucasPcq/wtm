@@ -12,11 +12,15 @@ import (
 	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
-// pendingMsg starts the load the step just built asked for: a Build cannot
-// return a command, the step's OnEnter (or the wizard's first one) can.
+// A Build cannot return a command, an OnEnter can: the load a Build asks for waits for it.
 type pendingMsg struct{}
 
 func pending() tea.Msg { return pendingMsg{} }
+
+type load struct {
+	text string
+	run  tea.Cmd
+}
 
 type choicesMsg struct {
 	index   int
@@ -69,8 +73,6 @@ func (s *session) start(w *components.WizardModel) tea.Cmd {
 	return tea.Batch(w.StartLoading(next.text), next.run)
 }
 
-// choicesFor is the field's choices, from the cache keyed by what they depend
-// on; a miss leaves the load pending and the field with no option yet.
 func (s *session) choicesFor(params fieldParams) kernel.Choices {
 	spec := s.fields[params.Index]
 	if spec.Choices == kernel.ChoicesNone {
@@ -88,8 +90,6 @@ func (s *session) choicesFor(params fieldParams) kernel.Choices {
 	return kernel.Choices{}
 }
 
-// choicesKey is the field and the values of what it depends on: choices are
-// fetched again only when one of those changes.
 func choicesKey(spec kernel.FieldSpec, form kernel.Form[json.RawMessage]) string {
 	parts := []string{spec.Path}
 	for _, path := range spec.DependsOn {
@@ -115,14 +115,12 @@ func (s *session) chosen(w *components.WizardModel, m choicesMsg) tea.Cmd {
 	return nil
 }
 
-// refreshable is a searched list not being filtered: there r types a letter.
+// While the list is filtered, r types a letter.
 func (s *session) refreshable(w *components.WizardModel) bool {
 	list, isList := w.CurrentStepModel().(components.SelectListModel)
 	return w.CurrentStepCanRefresh() && !w.Loading() && isList && !list.Filtering()
 }
 
-// refresh observes again: the facts the choices came from are stale, and so is
-// every choice cached on them.
 func (s *session) refresh() tea.Msg {
 	observed, err := s.params.Entry.Observe(s.ctx)
 	return refreshedMsg{observed: observed, err: err}

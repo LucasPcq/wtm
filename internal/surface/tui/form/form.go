@@ -1,6 +1,4 @@
-// Package form is the interactive form of a command on the engine: it fills
-// the request from the command's schema, state and choices, shows the plan,
-// then runs the plan it showed.
+// Package form is the interactive form of a command on the engine.
 package form
 
 import (
@@ -26,10 +24,7 @@ type Params struct {
 	Catalog  text.Catalog
 }
 
-// Run asks what the request lacks, previews it and applies the plan the recap
-// showed; facts that changed meanwhile bring the recap back with the new plan.
-// Backing out is a kernel.Cancelled. The form draws no conclusion: the reply
-// is concluded as a run without a form is.
+// Run returns a kernel.Cancelled when the user backs out.
 func Run(ctx context.Context, params Params) (dispatch.Reply, error) {
 	styles.UseRendererOn(os.Stderr)
 	s := newSession(ctx, params)
@@ -67,8 +62,6 @@ func (s *session) run() (dispatch.Reply, error) {
 	}
 }
 
-// call runs the request the form filled, on the TUI's behalf, with the options
-// the command line was given.
 func (s *session) call(options dispatch.Options) (dispatch.Reply, error) {
 	options.IgnoreRemembered = s.params.Options.IgnoreRemembered
 	options.CorrelationID = s.params.Options.CorrelationID

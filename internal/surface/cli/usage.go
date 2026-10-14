@@ -13,9 +13,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
-// markUsageErrors routes every refusal cobra makes on its own — a flag, a value
-// or an argument count — through ErrUsage. The root's Args is set because cobra
-// only reports an unknown top-level command when it has none.
+// cobra reports an unknown top-level command only when the root has no Args.
 func markUsageErrors(root *cobra.Command) {
 	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return rules.Usage(err) })
 	if root.Args == nil {
@@ -26,7 +24,7 @@ func markUsageErrors(root *cobra.Command) {
 
 func wrapArgs(cmd *cobra.Command) {
 	// cobra answers a group that cannot run with its help before it reads the
-	// arguments, so `wtm run bogus` exited 0. A group runs its help itself.
+	// arguments, exiting 0 on `wtm run bogus`: a group runs its help itself.
 	if cmd.HasParent() && cmd.HasSubCommands() && !cmd.Runnable() {
 		cmd.Args = unknownCommand
 		cmd.RunE = func(c *cobra.Command, _ []string) error { return c.Help() }
@@ -39,8 +37,8 @@ func wrapArgs(cmd *cobra.Command) {
 	}
 }
 
-// validateFlagGroups runs cobra's own required-flag and flag-group checks ahead
-// of cobra, which returns them raw after the hooks, past the FlagErrorFunc.
+// cobra runs these checks after the hooks and returns them raw, past the
+// FlagErrorFunc.
 func validateFlagGroups(cmd *cobra.Command) error {
 	if err := cmd.ValidateRequiredFlags(); err != nil {
 		return rules.Usage(err)

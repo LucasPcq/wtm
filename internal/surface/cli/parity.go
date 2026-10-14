@@ -20,8 +20,6 @@ const (
 	missingReason  = "the registry does not hold it"
 )
 
-// unbound lists the entries of the registry the command line does not serve,
-// each with why.
 var unbound = map[string]string{
 	"operations": "a query: queries get their commands at step 7 of LUC-283",
 }
@@ -32,9 +30,6 @@ type parityParams struct {
 	Unbound  map[string]string
 }
 
-// parityGaps is what keeps the command line from serving the registry whole:
-// an entry with no command and no declared reason, a command with no rendering
-// declared, an exclusion that no longer holds.
 func parityGaps(params parityParams) []string {
 	served := servedEntries(params.Root)
 	var gaps []string
@@ -60,8 +55,6 @@ func parityGaps(params parityParams) []string {
 	return gaps
 }
 
-// servedEntries maps each entry a command of the tree serves to the rendering
-// it declared.
 func servedEntries(root *cobra.Command) map[string]string {
 	served := map[string]string{}
 	var walk func(*cobra.Command)

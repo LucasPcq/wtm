@@ -3,16 +3,10 @@ package kernel
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
-// A field's path is its JSON name, dotted through nested structs
-// ("target.from"); an entry of a list or of decisions is path[index] or
-// path[key]. The same string names the field in a flag error, the schema and
-// the form.
-
-// Get reads a field as the Value its Go type holds: a string as Text, a bool
-// as Bool, a []string as List, a map[string]string as Decisions.
 func Get[Req any](req Req, path string) (Value, error) {
 	field, err := fieldAt(reflect.ValueOf(req), path)
 	if err != nil {
@@ -21,8 +15,6 @@ func Get[Req any](req Req, path string) (Value, error) {
 	return valueOf(field, path)
 }
 
-// Set returns a copy of req with path set to value; nil empties the field. A
-// value of another shape than the field's is an error.
 func Set[Req any](req Req, path string, value Value) (Req, error) {
 	copied := reflect.New(reflect.TypeOf(req)).Elem()
 	copied.Set(reflect.ValueOf(req))
@@ -40,27 +32,9 @@ func Set[Req any](req Req, path string, value Value) (Req, error) {
 	return out, nil
 }
 
-// Paths lists every leaf field of Req, nested structs walked through.
 func Paths[Req any]() []string {
 	var req Req
 	return leafPaths(reflect.TypeOf(req), "")
-}
-
-// IsZero is true for no value and for an empty one.
-func IsZero(value Value) bool {
-	switch v := value.(type) {
-	case nil:
-		return true
-	case Text:
-		return v == ""
-	case Bool:
-		return !bool(v)
-	case List:
-		return len(v) == 0
-	case Decisions:
-		return len(v) == 0
-	}
-	return true
 }
 
 type PathIn struct {
@@ -68,11 +42,13 @@ type PathIn struct {
 	Parent string
 }
 
-// Within says whether Path is Parent itself, one of its entries
-// (parent[2]) or a field nested in it (parent.from).
 func Within(in PathIn) bool {
 	rest, found := strings.CutPrefix(in.Path, in.Parent)
 	return found && (rest == "" || strings.HasPrefix(rest, "[") || strings.HasPrefix(rest, "."))
+}
+
+func IndexPath(path string, index int) string {
+	return path + "[" + strconv.Itoa(index) + "]"
 }
 
 func leafPaths(typ reflect.Type, prefix string) []string {

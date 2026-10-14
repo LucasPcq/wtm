@@ -15,9 +15,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
-// Engine is what the generated commands run on: the registry, and the
-// dispatcher it is reached through, built only once a command runs — the tree
-// is built outside any repository, for --help and the docs.
 type Engine struct {
 	registry   func(*dispatch.Dispatcher) dispatch.Registry
 	dispatcher func(context.Context) (*dispatch.Dispatcher, error)
@@ -34,17 +31,12 @@ type EngineParams struct {
 	Confirm    Confirm
 }
 
-// NewEngine builds the catalogue of the registry at once: two entries spelling
-// one code stop wtm at start-up, before any command runs.
 func NewEngine(params EngineParams) *Engine {
 	engine := &Engine{registry: params.Registry, dispatcher: params.Dispatcher, form: params.Form, confirm: params.Confirm, bindings: map[string]*binding{}}
 	engine.catalog = engine.schema().Catalog()
 	return engine
 }
 
-// Form runs a command interactively: it fills the request, shows the plan and
-// asks before applying it. Without one, an interactive run takes the
-// unattended route.
 type Form func(ctx context.Context, params FormParams) (dispatch.Reply, error)
 
 type FormParams struct {
@@ -57,7 +49,6 @@ type FormParams struct {
 	Catalog  text.Catalog
 }
 
-// Confirm asks whether to run a follow-up once an interactive run concluded.
 type Confirm func(params ConfirmParams) (bool, error)
 
 type ConfirmParams struct {
@@ -72,8 +63,6 @@ var production = NewEngine(EngineParams{
 	Confirm:    confirmFollowUp,
 })
 
-// projectDispatcher runs on the repository the command is run from: its main
-// worktree, its state directory, its event bus.
 func projectDispatcher(ctx context.Context) (*dispatch.Dispatcher, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -94,8 +83,6 @@ func projectDispatcher(ctx context.Context) (*dispatch.Dispatcher, error) {
 	}), nil
 }
 
-// schema reads the registry with no dispatcher behind it: enough for names and
-// fields, never called.
 func (e *Engine) schema() dispatch.Registry {
 	return e.registry(dispatch.New(dispatch.Params{}))
 }

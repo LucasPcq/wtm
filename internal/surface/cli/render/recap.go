@@ -26,9 +26,6 @@ type RecapParams struct {
 	Catalog     text.Catalog
 }
 
-// Recap is what a dry run answers: the plan, then the fingerprint of the facts
-// it was computed on, which --expect-fingerprint hands back to apply it. A plan
-// that does nothing offers nothing to apply.
 func Recap(w io.Writer, params RecapParams) {
 	SectionTitle(w, fmt.Sprintf(recapTitleFmt, params.Command))
 	warnings := make([]string, 0, len(params.Warnings))
@@ -55,9 +52,4 @@ func indented(w io.Writer, line string) {
 		return
 	}
 	fmt.Fprintln(w, Indent+line)
-}
-
-// View is a query's answer as label-value rows.
-func View(w io.Writer, command string, view json.RawMessage) {
-	Announce(w, command, rowsOf(view))
 }

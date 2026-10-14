@@ -22,8 +22,6 @@ type entry struct {
 	Value any
 }
 
-// request is the JSON request the command line gives: a flag only when it was
-// passed, so that a default stays dispatch's to decide.
 func (b *binding) request(cmd *cobra.Command, args []string) (json.RawMessage, kernel.Error) {
 	if len(args) > 0 && b.positional == "" {
 		invalid := kernel.Invalid(nil)
@@ -44,8 +42,7 @@ func (b *binding) request(cmd *cobra.Command, args []string) (json.RawMessage, k
 	return data, nil
 }
 
-// entries reads a flag only through the getter of the type Bind gave it: an
-// error there is a flag bound by hand against its field.
+// An error from a flag's getter is a flag bound by hand against its field.
 func (b *binding) entries(cmd *cobra.Command, args []string) ([]entry, []kernel.FieldError, error) {
 	var entries []entry
 	var problems []kernel.FieldError
@@ -119,7 +116,6 @@ func positionalValue(spec kernel.FieldSpec, args []string) valueRead {
 	return valueRead{Value: args[0], Given: true}
 }
 
-// decisions reads KEY=VALUE pairs; a pair with no key is refused on its field.
 func decisions(path string, pairs []string) valueRead {
 	chosen := make(map[string]string, len(pairs))
 	for _, pair := range pairs {
@@ -132,7 +128,6 @@ func decisions(path string, pairs []string) valueRead {
 	return valueRead{Value: chosen, Given: true}
 }
 
-// nested turns dotted paths into the objects the request's JSON names.
 func nested(entries []entry) map[string]any {
 	root := map[string]any{}
 	for _, entry := range entries {

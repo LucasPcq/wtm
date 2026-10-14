@@ -2,10 +2,6 @@ package dispatch_test
 
 import (
 	"context"
-	"fmt"
-	"io"
-	"os"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,8 +11,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/query/operations"
 	"github.com/LucasPcq/wtm/internal/testutil/dispatchtest"
 )
-
-// The few helpers the tests share. Everything a test file holds is a test.
 
 const (
 	envStateDir = "WTM_TEST_DISPATCH_STATE"
@@ -54,14 +48,12 @@ func operationsQuery(b *dispatchtest.Bench) *dispatch.QueryHandle[operations.Req
 	return dispatch.RegisterQuery(dispatch.RegisterQueryParams[operations.Request, operations.View]{Query: operations.Query(b.Dispatcher.Operations)})
 }
 
-// registry holds the example command and the operations query.
 func registry(t *testing.T, r *repo) dispatch.Registry {
 	t.Helper()
 	b := bench(t)
 	return dispatch.Registry{handle(b, r), operationsQuery(b)}
 }
 
-// problem is the kernel error a run failed with.
 func problem(t testing.TB, err error) kernel.Error {
 	t.Helper()
 	var failure kernel.Error
@@ -69,33 +61,6 @@ func problem(t testing.TB, err error) kernel.Error {
 	return failure
 }
 
-// TestHelperProcess is the body of the process the cross-process test starts:
-// it creates the branches it is given through dispatch, on the state dir it
-// is pointed at, says so, and holds their locks until its stdin closes. A
-// read keeps it waiting where a blocked channel alone would be taken for a
-// deadlock, and the process killed.
-func TestHelperProcess(t *testing.T) {
-	stateDir := os.Getenv(envStateDir)
-	if stateDir == "" {
-		t.Skip("run by TestLocksAreTakenWholeAcrossProcesses")
-	}
-	r := &repo{}
-	entered, release := r.held()
-	go func() {
-		<-entered
-		fmt.Println(readyLine)
-		_, _ = io.Copy(io.Discard, os.Stdin)
-		release()
-	}()
-	ran := run(t.Context(), runParams{
-		Bench:   dispatchtest.New(t, dispatchtest.BenchParams{StateDir: stateDir, OpPrefix: "child-"}),
-		Repo:    r,
-		Request: request{Branches: strings.Split(os.Getenv(envBranches), ",")},
-	})
-	require.NoError(t, ran.Err)
-}
-
-// fillable is the example's entry as a form fills it.
 func fillable(t testing.TB, h *dispatch.Handle[request, facts, plan, detail]) dispatch.Fillable {
 	t.Helper()
 	f, ok := h.Fillable()
@@ -121,8 +86,6 @@ func kindOf(progress kernel.Progress) string {
 	return ""
 }
 
-// holding runs create on branches through b and keeps it in Apply, its locks
-// held, until the release it returns.
 func holding(t *testing.T, b *dispatchtest.Bench, branches ...string) (release func()) {
 	t.Helper()
 	r := &repo{}

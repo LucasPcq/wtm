@@ -1,5 +1,4 @@
-// Package registry is the composition root of the engine: every command and
-// query the surfaces serve, built with its real ports on a dispatcher.
+// Package registry is the composition root of the engine: every command and query the surfaces serve, with its real ports.
 package registry
 
 import (

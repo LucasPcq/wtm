@@ -32,8 +32,6 @@ func TestEachItemConstructorSetsAConsistentStatus(t *testing.T) {
 	}
 }
 
-// The JSON names are the contract agents read: these tests pin them.
-
 func TestAnOutcomeReadsAsTheJSONAgentsRead(t *testing.T) {
 	left := kernel.Internal(kernel.Problem{
 		Code:   kernel.CodeUndoFailed,

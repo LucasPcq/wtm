@@ -1,5 +1,4 @@
-// Package dispatch is the impure half of the command engine: the one way a
-// surface runs a command.
+// Package dispatch is the impure half of the command engine: the one way a surface runs a command.
 package dispatch
 
 import (
@@ -19,11 +18,9 @@ type Publisher interface {
 	Publish(ctx context.Context, event domain.Event)
 }
 
-// Params are dispatch's own ports; a command gets its ports when it is built.
 type Params struct {
-	Dir string
-	// StateDir is <common>/wtm; empty runs every command unprotected.
-	StateDir  string
+	Dir       string
+	StateDir  string // empty: every command runs unprotected
 	Publisher Publisher
 	Now       func() time.Time
 	NewOpID   func() kernel.OpID

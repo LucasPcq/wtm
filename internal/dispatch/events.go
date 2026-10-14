@@ -9,16 +9,11 @@ import (
 	"github.com/LucasPcq/wtm/internal/kernel"
 )
 
-// EventOf is a milestone of a unit with the facts the run observed: what a
-// command needs to say what changed, without reading the repository again.
 type EventOf[F, M any] struct {
 	Facts     F
 	Milestone M
 }
 
-// Events are pure functions of a command, one per milestone: the events to
-// publish when a unit's saga commits, a phase after it is done, the unit is
-// over. A nil one publishes nothing.
 type Events[F, D any] struct {
 	Committed func(EventOf[F, kernel.Committed[D]]) []domain.Event
 	PhaseDone func(EventOf[F, kernel.PhaseDone[D]]) []domain.Event
@@ -56,8 +51,6 @@ func milestones[F, D any](params milestonesParams[F, D]) kernel.Milestones[D] {
 	}
 }
 
-// operationBus publishes without cancellation: a consumer must learn how an
-// interrupted operation ended.
 type operationBus struct {
 	ctx       context.Context
 	publisher Publisher
@@ -65,6 +58,7 @@ type operationBus struct {
 	operation operation.Operation
 }
 
+// Without cancellation: a consumer must learn how an interrupted operation ended.
 func (d *Dispatcher) bus(ctx context.Context, operation operation.Operation) operationBus {
 	return operationBus{ctx: context.WithoutCancel(ctx), publisher: d.params.Publisher, now: d.params.Now, operation: operation}
 }

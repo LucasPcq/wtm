@@ -1,6 +1,7 @@
 package kernel_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -165,4 +166,27 @@ func TestAFormThatForgetsStillSaysWhatIsRemembered(t *testing.T) {
 	assert.Equal(t, kernel.Text("isolated"), forgot.States[0].Value, "the field falls back on its other default")
 	assert.Equal(t, kernel.OriginDefault, forgot.States[0].Origin)
 	assert.Equal(t, kernel.Text("verbatim"), forgot.States[0].Remembered, "and still says what the repository remembers")
+}
+
+func TestAFieldStateReadsBackFromItsJSON(t *testing.T) {
+	states := []kernel.FieldState{
+		{Path: "from", Status: kernel.FieldDefaulted, Origin: kernel.OriginConfig, Value: kernel.Text("main"), Remembered: kernel.Text("dev")},
+		{Path: "push", Status: kernel.FieldProvided, Origin: kernel.OriginRequest, Value: kernel.Bool(true)},
+		{Path: "branches", Status: kernel.FieldProvided, Origin: kernel.OriginRequest, Value: kernel.List{"a", "b"}},
+		{Path: "decisions", Status: kernel.FieldDefaulted, Value: kernel.Decisions{"PORT": "keep"}},
+		{Path: "message", Status: kernel.FieldSkipped, SkipReason: "test.not_needed"},
+		{Path: "target", Status: kernel.FieldMissing, Errors: []kernel.FieldError{{Path: "target", Code: kernel.CodeRequired}}},
+	}
+	for _, state := range states {
+		data, err := json.Marshal(state)
+		require.NoError(t, err)
+		var decoded kernel.FieldState
+		require.NoError(t, json.Unmarshal(data, &decoded))
+		assert.Equal(t, state, decoded, string(data))
+	}
+}
+
+func TestAFieldStateWhoseValueIsNoValueIsRefused(t *testing.T) {
+	var decoded kernel.FieldState
+	assert.Error(t, json.Unmarshal([]byte(`{"path":"x","status":"provided","value":3}`), &decoded))
 }

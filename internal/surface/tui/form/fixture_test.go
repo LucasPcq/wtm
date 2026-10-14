@@ -9,10 +9,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/kernel"
 )
 
-// The tests share one example, shaped like `wtm create` with a field of every
-// type: a request, the facts read from a fake repository that counts what it
-// is asked and is also the disk Apply writes to, and the command itself.
-
 const (
 	commandName = "make"
 	base        = "main"
@@ -49,7 +45,6 @@ type plan struct {
 	From     string   `json:"from"`
 }
 
-// repo is the fake repository. It counts every Observe and every Choices.
 type repo struct {
 	mu         sync.Mutex
 	existing   []string
@@ -68,8 +63,7 @@ func (r *repo) observe() facts {
 	return facts{Existing: slices.Clone(r.existing), Remembered: r.remembered}
 }
 
-// changed replaces the branches under the lock: the form observes from its own
-// goroutine while a test changes the repository.
+// The form observes from its own goroutine while a test changes the repository.
 func (r *repo) changed(existing ...string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -85,7 +79,6 @@ func (r *repo) asked(path string) {
 	r.choices[path]++
 }
 
-// io is how many times the command did I/O: observed, or listed choices.
 func (r *repo) io() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()

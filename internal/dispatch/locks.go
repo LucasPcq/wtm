@@ -2,7 +2,6 @@ package dispatch
 
 import (
 	"cmp"
-	"context"
 	"encoding/json"
 	"errors"
 	"path/filepath"
@@ -29,8 +28,6 @@ const (
 
 var errUnnamedLock = errors.New("a worktree lock names no worktree")
 
-// held is the holder file and the locks an operation took, which grow once
-// the defaults of its request name more.
 type held struct {
 	dispatcher *Dispatcher
 	operation  operation.Operation
@@ -70,8 +67,7 @@ func (d *Dispatcher) lock(params lockParams) (*held, error) {
 	}
 	holder, err := fs.HoldFile(fs.HoldFileParams{Path: d.holderPath(operation.ID), Data: data})
 	if err != nil {
-		// An unwritable state dir is treated as a missing flock: the run goes on
-		// unprotected and warns.
+		// An unwritable state dir is a missing flock: unprotected, with a warning.
 		return taken, nil
 	}
 	taken.holder = holder
@@ -84,8 +80,6 @@ func (d *Dispatcher) lock(params lockParams) (*held, error) {
 	return taken, nil
 }
 
-// grow takes the keys the operation does not hold yet, all or none and without
-// waiting, and says whether it took any: the facts read before may be stale.
 func (h *held) grow(keys []kernel.LockKey) (bool, error) {
 	if err := named(keys); err != nil {
 		return false, err
@@ -109,8 +103,7 @@ func (h *held) grow(keys []kernel.LockKey) (bool, error) {
 	return true, nil
 }
 
-// rewrite lists every lock taken in the holder file; a holder that cannot be
-// rewritten keeps the keys it listed, and only a 409 names its holder less well.
+// A holder left as it was only makes a 409 name it less well.
 func (h *held) rewrite() {
 	data, err := json.Marshal(h.operation)
 	if err != nil {
@@ -142,7 +135,6 @@ func (d *Dispatcher) tryLocks(params lockKeysParams) (fs.Locks, error) {
 	return locks, nil
 }
 
-// named refuses a worktree key with no name: it would lock no worktree.
 func named(keys []kernel.LockKey) error {
 	if !slices.ContainsFunc(keys, func(key kernel.LockKey) bool { return key.Scope == kernel.LockWorktree && key.Name == "" }) {
 		return nil
@@ -196,26 +188,6 @@ func keyName(key operation.Lock) string {
 	return key.Scope
 }
 
-func (d *Dispatcher) inProgress() ([]operation.Operation, error) {
-	if d.params.StateDir == "" {
-		return nil, nil
-	}
-	files, err := fs.HeldFiles(filepath.Join(d.locksDir(), operationsDir))
-	if err != nil {
-		return nil, err
-	}
-	found := make([]operation.Operation, 0, len(files))
-	for _, data := range files {
-		var operation operation.Operation
-		if err := json.Unmarshal(data, &operation); err != nil {
-			continue
-		}
-		found = append(found, operation)
-	}
-	slices.SortFunc(found, func(a, b operation.Operation) int { return a.StartedAt.Compare(b.StartedAt) })
-	return found, nil
-}
-
 func (d *Dispatcher) locksDir() string {
 	return filepath.Join(d.params.StateDir, locksDirName)
 }
@@ -237,8 +209,4 @@ func sortedKeys(keys []kernel.LockKey) []kernel.LockKey {
 		return cmp.Or(cmp.Compare(a.Scope, b.Scope), cmp.Compare(a.Name, b.Name))
 	})
 	return sorted
-}
-
-func (d *Dispatcher) Operations(context.Context) ([]operation.Operation, error) {
-	return d.inProgress()
 }

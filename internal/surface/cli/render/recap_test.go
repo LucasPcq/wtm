@@ -51,11 +51,3 @@ func TestARecapOfAPlanThatDoesNothingOffersNothingToApply(t *testing.T) {
 		"  fingerprint  abc",
 	), plain(out.String()))
 }
-
-func TestAViewIsItsFieldsUnderTheQuerysName(t *testing.T) {
-	var out bytes.Buffer
-
-	render.View(&out, "inventory", json.RawMessage(`{"worktrees":["feat/a"]}`))
-
-	assert.Equal(t, lines("  inventory", "  worktrees  feat/a"), plain(out.String()))
-}

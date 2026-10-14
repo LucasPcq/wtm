@@ -9,9 +9,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/kernel"
 )
 
-// The few helpers the tests share. Everything a test file holds is a test.
-
-// rules starts a chain of rules over the example request.
 type rules = kernel.Rules[request, facts]
 
 func checkRules(t *testing.T, chain rules, req request, f facts) []kernel.FieldError {
@@ -21,7 +18,6 @@ func checkRules(t *testing.T, chain rules, req request, f facts) []kernel.FieldE
 	return problems
 }
 
-// baseFallback defaults a field to the base branch of the facts, as config.
 func baseFallback(_ request, f facts) (kernel.Fallback, bool) {
 	return kernel.Fallback{Value: kernel.Text(f.Base), Origin: kernel.OriginConfig}, f.Base != ""
 }
@@ -40,8 +36,6 @@ func evaluate(t *testing.T, params kernel.EvaluateParams[request, facts]) kernel
 	return form
 }
 
-// worktreeUnit is a unit shaped like create's: a saga that adds a worktree
-// then its metadata, committed as the worktree's path, then the phases given.
 func worktreeUnit(d *disk, branch string, then ...kernel.Phase[string]) kernel.Unit[string] {
 	return kernel.Unit[string]{
 		Saga: kernel.Saga[string]{
@@ -59,13 +53,11 @@ func phase(name string, run func(context.Context, string) (string, error)) kerne
 	return kernel.Phase[string]{Name: name, Run: func(ctx context.Context, _ kernel.Reporter, detail string) (string, error) { return run(ctx, detail) }}
 }
 
-// each runs Each over branches, each named by itself.
 func each(ctx context.Context, params kernel.EachParams[string, string]) []kernel.Item[string] {
 	params.Subject = func(branch string) string { return branch }
 	return kernel.Each(ctx, params)
 }
 
-// outcomes reads items back as "subject:status/reason", one per item.
 func outcomes(items []kernel.Item[string]) []string {
 	out := make([]string, 0, len(items))
 	for _, item := range items {
@@ -74,7 +66,6 @@ func outcomes(items []kernel.Item[string]) []string {
 	return out
 }
 
-// states reads a form back as "path:status", one per field.
 func states(form kernel.Form[request]) []string {
 	out := make([]string, 0, len(form.States))
 	for _, state := range form.States {

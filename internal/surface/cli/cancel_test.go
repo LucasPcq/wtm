@@ -14,10 +14,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 )
 
-// A run the user backed out of ends the process on its own code, so a shell
-// chaining `wtm create x && wtm go x` stops there; the `=` line it printed is
-// the whole report.
-func TestABackedOutRunExitsCancelled(t *testing.T) {
+func TestABackedOutRunExitsCancelledSoAChainedCommandStopsThere(t *testing.T) {
 	cmd := &cobra.Command{}
 	shared.MarkCancelled(cmd)
 
@@ -48,8 +45,6 @@ func TestTheMarkDoesNotOutliveItsRun(t *testing.T) {
 	}
 }
 
-// An interrupt that left a worktree behind says so: "Aborted." alone hid a
-// worktree the reader did not know had been created.
 func TestAnInterruptThatLeftSomethingBehindIsNamed(t *testing.T) {
 	err := fmt.Errorf(domain.CreateSetupInterruptedFmt, domain.ErrLeftBehind, "/trees/feat-x")
 	interrupted := rules.Interrupted(rules.InterruptedParams{Err: err, Signalled: true})
@@ -65,9 +60,7 @@ func TestAnInterruptThatLeftSomethingBehindIsNamed(t *testing.T) {
 	}
 }
 
-// A bare interrupt reads like a run the user backed out of — nothing failed —
-// while one that left a worktree behind stays a failure the reader must act on.
-func TestAnInterruptIsReportedInTheBackedOutRegister(t *testing.T) {
+func TestABareInterruptReadsAsBackedOutAndOneThatLeftSomethingBehindAsAFailure(t *testing.T) {
 	var bare, left bytes.Buffer
 	reportFailure(&bare, fmt.Errorf("%w: git fetch: signal: interrupt", domain.ErrCancelled))
 	reportFailure(&left, fmt.Errorf(domain.CreateSetupInterruptedFmt, domain.ErrLeftBehind, "/trees/feat-x"))

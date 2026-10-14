@@ -1,18 +1,7 @@
 // Package text turns a code of the engine and its params into English, from the catalogue of the registry served.
 package text
 
-import (
-	"fmt"
-	"strings"
-
-	"github.com/LucasPcq/wtm/internal/kernel"
-)
-
-const (
-	paramAccepted = "accepted"
-	paramWith     = "with"
-	duplicateFmt  = "text: code %q has two messages"
-)
+import "github.com/LucasPcq/wtm/internal/kernel"
 
 const (
 	codeStatusDone        kernel.Code = "status.done"
@@ -27,8 +16,6 @@ const (
 	codeReasonIncomplete  kernel.Code = "reason.incomplete"
 )
 
-// Messages are the templates of the codes one package declares, each filled
-// by its {param}.
 type Messages map[kernel.Code]string
 
 var kernelMessages = Messages{
@@ -86,72 +73,4 @@ var reasonCodes = map[kernel.Reason]kernel.Code{
 	kernel.ReasonUnsafe:      codeReasonUnsafe,
 	kernel.ReasonLocked:      codeReasonLocked,
 	kernel.ReasonIncomplete:  codeReasonIncomplete,
-}
-
-// Catalog is the kernel's messages and those of every entry a surface serves.
-type Catalog struct {
-	messages Messages
-}
-
-// NewCatalog panics on a code two sets spell: a code means one thing, and the
-// registry is built at startup, before anything runs.
-func NewCatalog(sets ...Messages) Catalog {
-	merged := Messages{}
-	for _, set := range append([]Messages{kernelMessages}, sets...) {
-		for code, template := range set {
-			if _, taken := merged[code]; taken {
-				panic(fmt.Sprintf(duplicateFmt, code))
-			}
-			merged[code] = template
-		}
-	}
-	return Catalog{messages: merged}
-}
-
-// Message renders code over params; a code missing from the catalogue reads
-// as itself, which the catalog rule of archlint forbids.
-func (c Catalog) Message(code kernel.Code, params kernel.Params) string {
-	template, known := c.messages[code]
-	if !known {
-		return string(code)
-	}
-	pairs := make([]string, 0, 2*len(params))
-	for key, value := range params {
-		pairs = append(pairs, "{"+key+"}", value)
-	}
-	return strings.NewReplacer(pairs...).Replace(template)
-}
-
-// Field renders a field error, with why it is required when a rule says so.
-func (c Catalog) Field(problem kernel.FieldError) string {
-	params := kernel.Params{
-		kernel.ParamPath: problem.Path,
-		paramAccepted:    strings.Join(problem.Accepted, ", "),
-		paramWith:        strings.Join(problem.With, ", "),
-	}
-	for key, value := range problem.Params {
-		params[key] = value
-	}
-	message := c.Message(problem.Code, params)
-	because := problem.Params[kernel.ParamBecause]
-	if because == "" {
-		return message
-	}
-	return message + ": " + c.Message(kernel.Code(because), params)
-}
-
-func (c Catalog) Status(status kernel.Status) string {
-	code, known := statusCodes[status]
-	if !known {
-		return string(status)
-	}
-	return c.Message(code, nil)
-}
-
-func (c Catalog) Reason(reason kernel.Reason) string {
-	code, known := reasonCodes[reason]
-	if !known {
-		return string(reason)
-	}
-	return c.Message(code, nil)
 }

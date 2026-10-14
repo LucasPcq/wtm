@@ -1,9 +1,66 @@
 package kernel
 
-import "slices"
+import (
+	"encoding/json"
+	"slices"
+)
 
-// EvaluateParams: with Forget, the form is evaluated on the facts it returns,
-// and each field still says what the facts as given remember for it.
+type Origin string
+
+const (
+	OriginRequest    Origin = "request"
+	OriginRemembered Origin = "remembered"
+	OriginConfig     Origin = "config"
+	OriginDefault    Origin = "default"
+)
+
+type Fallback struct {
+	Value  Value
+	Origin Origin
+}
+
+type FieldStatus string
+
+const (
+	FieldMissing   FieldStatus = "missing"
+	FieldProvided  FieldStatus = "provided"
+	FieldDefaulted FieldStatus = "defaulted"
+	FieldSkipped   FieldStatus = "skipped"
+)
+
+type FieldState struct {
+	Path       string       `json:"path"`
+	Status     FieldStatus  `json:"status"`
+	Origin     Origin       `json:"origin,omitempty"`
+	Value      Value        `json:"value"`
+	Remembered Value        `json:"remembered,omitempty"`
+	SkipReason Code         `json:"skip_reason,omitempty"`
+	Errors     []FieldError `json:"errors,omitempty"`
+}
+
+func (s *FieldState) UnmarshalJSON(data []byte) error {
+	type plain FieldState
+	var decoded struct {
+		plain
+		Value      json.RawMessage `json:"value"`
+		Remembered json.RawMessage `json:"remembered"`
+	}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	value, err := decodeValue(decoded.Value)
+	if err != nil {
+		return err
+	}
+	remembered, err := decodeValue(decoded.Remembered)
+	if err != nil {
+		return err
+	}
+	*s = FieldState(decoded.plain)
+	s.Value, s.Remembered = value, remembered
+	return nil
+}
+
 type EvaluateParams[Req, F any] struct {
 	Fields  []FieldDef[Req, F]
 	Rules   Rules[Req, F]
@@ -12,8 +69,6 @@ type EvaluateParams[Req, F any] struct {
 	Forget  func(F) F
 }
 
-// Form is a request with its defaults applied, the state of every field and
-// what keeps it from running.
 type Form[Req any] struct {
 	Request  Req          `json:"request"`
 	States   []FieldState `json:"states"`
@@ -21,8 +76,6 @@ type Form[Req any] struct {
 	Complete bool         `json:"complete"`
 }
 
-// Evaluate fills in defaults field by field, in declaration order (a Skip
-// reads the defaults of the fields before it), then validates the whole.
 func Evaluate[Req, F any](params EvaluateParams[Req, F]) (Form[Req], error) {
 	request := params.Request
 	facts := params.Facts
@@ -125,8 +178,6 @@ func fieldProblems[Req, F any](params fieldProblemsParams[Req, F]) ([]FieldError
 	return params.Field.Validate(params.Request, params.Facts), nil
 }
 
-// attach hands each rule's errors to the field they are about, an entry's
-// to its list.
 func attach(states []FieldState, crossed []FieldError) []FieldState {
 	out := make([]FieldState, len(states))
 	for index, state := range states {

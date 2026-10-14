@@ -22,8 +22,6 @@ type DependsOnParams[Req, F any] struct {
 	Facts   F
 }
 
-// CheckDependsOn changes, one at a time, every field a FieldDef does not
-// declare in DependsOn, and fails when Skip, Default or Validate notices.
 func CheckDependsOn[Req, F any](t testing.TB, params DependsOnParams[Req, F]) {
 	t.Helper()
 	for _, field := range params.Fields {
@@ -50,8 +48,6 @@ type SagaParams[D any] struct {
 	Snapshot func() string
 }
 
-// CheckSaga fails each step of the saga in turn, then its commit, and wants
-// the state back exactly as it was each time.
 func CheckSaga[D any](t testing.TB, params SagaParams[D]) {
 	t.Helper()
 	steps := len(params.Saga().Steps)
@@ -94,7 +90,6 @@ func observe[Req, F any](field kernel.FieldDef[Req, F], req Req, facts F) observ
 	return seen
 }
 
-// resolves accepts a leaf field or a nested struct holding some.
 func resolves[Req any](t testing.TB, path string) bool {
 	t.Helper()
 	known := slices.ContainsFunc(kernel.Paths[Req](), func(leaf string) bool {
@@ -115,8 +110,6 @@ type readsParams[Req, F any] struct {
 	Baseline observation
 }
 
-// reads tries the field at Path emptied, then changed: either one is enough
-// to show the FieldDef looks at it.
 func reads[Req, F any](params readsParams[Req, F]) bool {
 	value, err := kernel.Get(params.Request, params.Path)
 	if err != nil {
@@ -140,7 +133,6 @@ func declares(dependsOn []string, path string) bool {
 	})
 }
 
-// changedFrom returns a value of the same shape that differs from value.
 func changedFrom(value kernel.Value) kernel.Value {
 	switch v := value.(type) {
 	case kernel.Text:

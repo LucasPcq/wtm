@@ -10,7 +10,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/kernel"
 )
 
-// spy stands in for *testing.T to see what a check reports.
 type spy struct {
 	testing.TB
 	failures []string

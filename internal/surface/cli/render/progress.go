@@ -23,16 +23,9 @@ type ProgressViewParams struct {
 	W       io.Writer
 	Human   bool
 	Catalog text.Catalog
-	// Live redraws in place: a terminal the view may repaint.
-	Live bool
+	Live    bool
 }
 
-// ProgressView shows a run while it applies, on stderr, and keeps nothing of it
-// but the line each hook phase leaves: the conclusion says what happened.
-//
-// It never takes the terminal into raw mode, so Ctrl+C reaches the process as a
-// signal: the first cancels the run's context and the view says so, the second
-// is the root's to handle.
 type ProgressView struct {
 	w         io.Writer
 	human     bool
@@ -50,8 +43,6 @@ type ProgressView struct {
 	closed    bool
 }
 
-// NewProgressView watches ctx until Close: a cancelled run reads "Cancelling…"
-// while it unwinds.
 func NewProgressView(ctx context.Context, params ProgressViewParams) *ProgressView {
 	watch, stop := context.WithCancel(ctx)
 	view := &ProgressView{w: params.W, human: params.Human, catalog: params.Catalog, live: params.Human && params.Live, stop: stop}
@@ -103,8 +94,6 @@ func (v *ProgressView) Emit(event kernel.Progress) {
 	}
 }
 
-// output passes a hook's line on as it came, under the title of its phase or
-// in its live tail; a phase that prints nothing — a saga step — shows nothing.
 func (v *ProgressView) output(line string) {
 	if v.human && v.phase != "" && !v.phaseOpen {
 		v.openPhase()
@@ -147,8 +136,6 @@ func (v *ProgressView) paint() {
 	v.painted = true
 }
 
-// width leaves room for the indent and the glyph; a stream with no width of
-// its own gets the hook view's.
 func (v *ProgressView) width() int {
 	cols := TerminalWidthOf(v.w)
 	if cols <= 0 {
@@ -176,8 +163,6 @@ func (v *ProgressView) erase() {
 	v.painted = false
 }
 
-// Close erases what is still drawn; a phase an interruption cut short leaves no
-// half-drawn tail above the conclusion.
 func (v *ProgressView) Close() {
 	v.stop()
 	v.mu.Lock()
