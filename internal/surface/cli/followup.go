@@ -18,18 +18,20 @@ const (
 	shellSpecial  = " \t\n'\"$`\\|&;<>()*?[]{}~#!"
 	quoteFmt      = "'%s'"
 	quoteEscape   = `'\''`
+	unspelledFmt  = "the request for %s is no object: %w"
 )
 
 // followUps spells each follow-up as the command line that runs it.
-func (b *binding) followUps(followUps []kernel.FollowUp) []render.NextStepParams {
+func (b *binding) followUps(followUps []kernel.FollowUp) ([]render.NextStepParams, error) {
 	steps := make([]render.NextStepParams, 0, len(followUps))
 	for _, followUp := range followUps {
-		steps = append(steps, render.NextStepParams{
-			Command: b.engine.commandLine(lineParams{Target: followUp.Command, Request: followUp.Request}),
-			Note:    b.engine.catalog.Message(followUp.Code, followUp.Params),
-		})
+		line, err := b.engine.commandLine(lineParams{Target: followUp.Command, Request: followUp.Request})
+		if err != nil {
+			return nil, err
+		}
+		steps = append(steps, render.NextStepParams{Command: line, Note: b.engine.catalog.Message(followUp.Code, followUp.Params)})
 	}
-	return steps
+	return steps, nil
 }
 
 type rerunParams struct {
@@ -39,12 +41,16 @@ type rerunParams struct {
 }
 
 // rerun is this command's line for the same request, plus one engine flag.
-func (b *binding) rerun(params rerunParams) string {
-	words := []string{b.engine.commandLine(lineParams{Target: b.name, Request: params.Request}), flagPrefix + params.Flag}
+func (b *binding) rerun(params rerunParams) (string, error) {
+	line, err := b.engine.commandLine(lineParams{Target: b.name, Request: params.Request})
+	if err != nil {
+		return "", err
+	}
+	words := []string{line, flagPrefix + params.Flag}
 	if params.Value != "" {
 		words = append(words, params.Value)
 	}
-	return strings.Join(words, wordSeparator)
+	return strings.Join(words, wordSeparator), nil
 }
 
 type lineParams struct {
@@ -53,10 +59,15 @@ type lineParams struct {
 }
 
 // commandLine spells a request for the command target: through its binding
-// when it is served here, as kebab-case flags otherwise.
-func (e *Engine) commandLine(params lineParams) string {
+// when it is served here, as kebab-case flags otherwise. A request that is not
+// an object is an error of the command that proposed it.
+func (e *Engine) commandLine(params lineParams) (string, error) {
 	var request map[string]any
-	_ = json.Unmarshal(params.Request, &request)
+	if len(params.Request) > 0 {
+		if err := json.Unmarshal(params.Request, &request); err != nil {
+			return "", kernel.Internal(kernel.Problem{Code: kernel.CodeInternal, Cause: fmt.Errorf(unspelledFmt, params.Target, err)})
+		}
+	}
 	target := e.bindings[params.Target]
 	var args, flags []string
 	for _, leaf := range leaves(leavesParams{Target: target, Object: request}) {
@@ -67,7 +78,7 @@ func (e *Engine) commandLine(params lineParams) string {
 		flags = append(flags, flagWords(flagWordsParams{Flag: flagSpelling(target, leaf.Path), Value: leaf.Value})...)
 	}
 	words := append([]string{commandPath(target, params.Target)}, args...)
-	return strings.Join(append(words, flags...), wordSeparator)
+	return strings.Join(append(words, flags...), wordSeparator), nil
 }
 
 func commandPath(target *binding, name string) string {

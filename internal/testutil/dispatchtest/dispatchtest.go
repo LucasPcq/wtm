@@ -111,6 +111,7 @@ func New(t testing.TB, params BenchParams) *Bench {
 type RunParams[Req, F, P, D any] struct {
 	Bench   *Bench
 	Command kernel.Command[Req, F, P, D]
+	Events  dispatch.Events[F, D]
 	Request Req
 	Options dispatch.Options
 }
@@ -122,7 +123,7 @@ type Ran[P, D any] struct {
 }
 
 func Run[Req, F, P, D any](ctx context.Context, params RunParams[Req, F, P, D]) Ran[P, D] {
-	handle := dispatch.Register(dispatch.RegisterParams[Req, F, P, D]{Dispatcher: params.Bench.Dispatcher, Command: params.Command})
+	handle := dispatch.Register(dispatch.RegisterParams[Req, F, P, D]{Dispatcher: params.Bench.Dispatcher, Command: params.Command, Events: params.Events})
 	progress := &Progress{}
 	result, err := handle.Run(ctx, dispatch.RunParams[Req]{Request: params.Request, Options: params.Options, Progress: progress})
 	return Ran[P, D]{Result: result, Err: err, Progress: progress.Seen()}

@@ -22,7 +22,7 @@ func TestAWorktreeHeldByAnotherOperationIsA409NamingItsHolder(t *testing.T) {
 	b := bench(t)
 	first := &repo{}
 	entered, release := first.held()
-	done := make(chan dispatchtest.Ran[plan, string])
+	done := make(chan dispatchtest.Ran[plan, detail])
 	go func() {
 		done <- run(t.Context(), runParams{Bench: b, Repo: first, Request: request{Branches: []string{"feat/a"}}, Options: dispatch.Options{Surface: dispatch.SurfaceTUI}})
 	}()
@@ -51,7 +51,7 @@ func TestOperationsOnOtherWorktreesRunSideBySide(t *testing.T) {
 	b := bench(t)
 	first := &repo{}
 	entered, release := first.held()
-	done := make(chan dispatchtest.Ran[plan, string])
+	done := make(chan dispatchtest.Ran[plan, detail])
 	go func() {
 		done <- run(t.Context(), runParams{Bench: b, Repo: first, Request: request{Branches: []string{"feat/a"}}})
 	}()
@@ -69,7 +69,7 @@ func TestTheOperationsInProgressAreReadFromTheirHolders(t *testing.T) {
 	query := operationsQuery(b)
 	r := &repo{}
 	entered, release := r.held()
-	done := make(chan dispatchtest.Ran[plan, string])
+	done := make(chan dispatchtest.Ran[plan, detail])
 	go func() {
 		done <- run(t.Context(), runParams{Bench: b, Repo: r, Request: request{Branches: []string{"feat/a"}}, Options: dispatch.Options{Surface: dispatch.SurfaceCLI, CorrelationID: "agent-7"}})
 	}()
@@ -125,4 +125,72 @@ func TestLocksAreTakenWholeAcrossProcesses(t *testing.T) {
 	_ = child.Wait()
 	after := run(t.Context(), runParams{Bench: b, Repo: &repo{}, Request: request{Branches: []string{"feat/b"}}})
 	assert.NoError(t, after.Err, "a dead process still held feat/b")
+}
+
+func TestADryRunTakesNoLock(t *testing.T) {
+	b := bench(t)
+	release := holding(t, b, "feat/a")
+	defer release()
+
+	ran := run(t.Context(), runParams{Bench: b, Repo: &repo{}, Request: request{Branches: []string{"feat/a"}}, Options: dispatch.Options{DryRun: true}})
+
+	require.NoError(t, ran.Err, "a preview is never refused for a lock: the fingerprint guards the run that applies it")
+	running, err := b.Dispatcher.Operations(t.Context())
+	require.NoError(t, err)
+	assert.Len(t, running, 1, "a dry run leaves no holder")
+}
+
+func TestTheLocksADefaultNamesAreTakenBeforeApply(t *testing.T) {
+	b := bench(t)
+	release := holding(t, b, "feat/a")
+	defer release()
+	r := &repo{base: "feat/a"}
+
+	ran := run(t.Context(), runParams{Bench: b, Repo: r, Request: request{}})
+
+	failure := problem(t, ran.Err)
+	assert.Equal(t, kernel.CodeLockHeld, failure.Base().Code)
+	assert.Equal(t, "wt:feat/a", failure.Base().Params[kernel.ParamKey])
+	assert.Empty(t, r.listed(), "the branch a default named was created under no lock")
+}
+
+func TestTakingMoreLocksReadsTheFactsAgain(t *testing.T) {
+	given := &repo{base: "feat/a"}
+	require.NoError(t, run(t.Context(), runParams{Bench: bench(t), Repo: given, Request: request{Branches: []string{"feat/a"}}}).Err)
+	assert.Equal(t, 1, given.observations(), "the request named every lock it needed")
+
+	defaulted := &repo{base: "feat/a"}
+	require.NoError(t, run(t.Context(), runParams{Bench: bench(t), Repo: defaulted, Request: request{}}).Err)
+	assert.Equal(t, 2, defaulted.observations(), "the facts read before the lock was taken may be stale")
+	assert.Equal(t, []string{"feat/a"}, defaulted.listed())
+}
+
+func TestTheHolderListsTheLocksTheDefaultsAdded(t *testing.T) {
+	b := bench(t)
+	r := &repo{base: "feat/a"}
+	entered, release := r.held()
+	done := make(chan dispatchtest.Ran[plan, detail])
+	go func() { done <- run(t.Context(), runParams{Bench: b, Repo: r, Request: request{}}) }()
+	<-entered
+
+	running, err := b.Dispatcher.Operations(t.Context())
+	release()
+	require.NoError(t, (<-done).Err)
+	require.NoError(t, err)
+	require.Len(t, running, 1)
+	assert.Equal(t, []operation.Lock{
+		{Scope: string(kernel.LockRepo), Mode: string(kernel.LockShared)},
+		{Scope: string(kernel.LockWorktree), Name: "feat/a", Mode: string(kernel.LockExclusive)},
+	}, running[0].Locks)
+}
+
+func TestAWorktreeLockWithNoNameIsRefused(t *testing.T) {
+	r := &repo{lockOf: func(request) []kernel.LockKey {
+		return []kernel.LockKey{{Scope: kernel.LockWorktree, Mode: kernel.LockExclusive}}
+	}}
+
+	ran := run(t.Context(), runParams{Bench: bench(t), Repo: r, Request: request{Branches: []string{"feat/a"}}})
+
+	assert.Equal(t, kernel.KindInternal, problem(t, ran.Err).Kind())
+	assert.Empty(t, r.listed())
 }

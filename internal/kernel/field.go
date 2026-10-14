@@ -1,6 +1,11 @@
 package kernel
 
-import "context"
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+)
 
 // FieldType is the shape of a value, never its subject: a branch picker is a
 // select whose choices are searched.
@@ -98,13 +103,67 @@ const (
 	FieldSkipped   FieldStatus = "skipped"
 )
 
+// FieldState is a field in a form. Remembered is the answer the repository
+// remembers for it, kept when the run forgets it (--ask).
 type FieldState struct {
 	Path       string       `json:"path"`
 	Status     FieldStatus  `json:"status"`
 	Origin     Origin       `json:"origin,omitempty"`
 	Value      Value        `json:"value"`
+	Remembered Value        `json:"remembered,omitempty"`
 	SkipReason Code         `json:"skip_reason,omitempty"`
 	Errors     []FieldError `json:"errors,omitempty"`
+}
+
+// UnmarshalJSON reads each Value by its JSON shape: a string is Text, a bool
+// Bool, an array List, an object Decisions.
+func (s *FieldState) UnmarshalJSON(data []byte) error {
+	type plain FieldState
+	var decoded struct {
+		plain
+		Value      json.RawMessage `json:"value"`
+		Remembered json.RawMessage `json:"remembered"`
+	}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	value, err := decodeValue(decoded.Value)
+	if err != nil {
+		return err
+	}
+	remembered, err := decodeValue(decoded.Remembered)
+	if err != nil {
+		return err
+	}
+	*s = FieldState(decoded.plain)
+	s.Value, s.Remembered = value, remembered
+	return nil
+}
+
+func decodeValue(raw json.RawMessage) (Value, error) {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		return nil, nil
+	}
+	switch trimmed[0] {
+	case '"':
+		return decodeAs[Text](trimmed)
+	case 't', 'f':
+		return decodeAs[Bool](trimmed)
+	case '[':
+		return decodeAs[List](trimmed)
+	case '{':
+		return decodeAs[Decisions](trimmed)
+	}
+	return nil, fmt.Errorf("kernel: %s is not a value", trimmed)
+}
+
+func decodeAs[V Value](raw []byte) (Value, error) {
+	var value V
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return nil, err
+	}
+	return value, nil
 }
 
 type Badge struct {

@@ -56,7 +56,7 @@ A follow-up, and the next step of a recap or a `412`, is printed as the command 
 
 ## Exit codes
 
-`exitCode` (`exit.go`) reads a failure of the engine by its code — the `ExitCodes` of the entry that ran (`reported` carries them), then `exitByCode`, the engine's own (`state.schema_newer` → 22) — then by its kind (`invalid` 2, `cancelled` 19, `refused` 23, `conflict` 24, `precondition` 25, the rest 1). An `internal` error, and every error of a legacy command, goes to `rules.ExitCode`, which finds the sentinel it wraps. A batch exits on its first interrupted item, else its first failed item (`outcomeFailure`). A migrated command keeps the number its legacy error had in its own `ExitCodes` ([commands.md](commands.md#a-commands-codes)).
+`exitCode` (`exit.go`) reads a failure of the engine by its code — the `ExitCodes` of the entry that ran (`reported` carries them), then `exitByCode`, the engine's own (`state.schema_newer` → 22) — then by its kind (`invalid` 2, `cancelled` 19, `refused` 23, `conflict` 24, `precondition` 25, the rest 1). An `internal` error, and every error of a legacy command, goes to `rules.ExitCode`, which finds the sentinel it wraps. A batch exits on its outcome's failure, the rule `operation.finished` publishes too (`kernel.Outcome.Failure`: its first interrupted item, else its first failed item). A migrated command keeps the number its legacy error had in its own `ExitCodes` ([commands.md](commands.md#a-commands-codes)).
 
 ## Parity
 

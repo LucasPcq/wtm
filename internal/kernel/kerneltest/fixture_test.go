@@ -48,8 +48,8 @@ func fromField(dependsOn ...string) kernel.FieldDef[request, facts] {
 
 type store struct{ entries []string }
 
-func (s *store) add(name string) func(context.Context) error {
-	return func(context.Context) error { s.entries = append(s.entries, name); return nil }
+func (s *store) add(name string) func(context.Context, kernel.Reporter) error {
+	return func(context.Context, kernel.Reporter) error { s.entries = append(s.entries, name); return nil }
 }
 
 func (s *store) remove(name string) func(context.Context) error {

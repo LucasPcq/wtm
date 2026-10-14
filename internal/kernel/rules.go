@@ -1,9 +1,12 @@
 package kernel
 
 import (
+	"fmt"
 	"reflect"
 	"slices"
 )
+
+const ruleShapeFmt = "kernel: rule %s: %s holds a %T, not a %s"
 
 // Rule is a rule across fields, kept as data: the form reads Paths to know
 // which options a rule may disable.
@@ -46,7 +49,7 @@ func (rules Rules[Req, F]) With(rule Rule[Req, F]) Rules[Req, F] {
 }
 
 // reads adds a rule that checks the values at paths, read for it.
-func (rules Rules[Req, F]) reads(code Code, paths []string, check func(reading[Req, F]) []FieldError) Rules[Req, F] {
+func (rules Rules[Req, F]) reads(code Code, paths []string, check func(reading[Req, F]) ([]FieldError, error)) Rules[Req, F] {
 	return rules.With(Rule[Req, F]{Code: code, Paths: paths, Check: func(req Req, facts F) ([]FieldError, error) {
 		values := make([]Value, 0, len(paths))
 		for _, path := range paths {
@@ -56,75 +59,92 @@ func (rules Rules[Req, F]) reads(code Code, paths []string, check func(reading[R
 			}
 			values = append(values, value)
 		}
-		return check(reading[Req, F]{values: values, request: req, facts: facts}), nil
+		return check(reading[Req, F]{values: values, request: req, facts: facts})
 	}})
+}
+
+// shaped is the value of a rule's field as the shape the rule reads: none is
+// its zero, another shape is an error of the command.
+func shaped[V Value](code Code, path string, value Value) (V, error) {
+	var zero V
+	if value == nil {
+		return zero, nil
+	}
+	typed, ok := value.(V)
+	if !ok {
+		return zero, fmt.Errorf(ruleShapeFmt, code, path, value, reflect.TypeFor[V]().Name())
+	}
+	return typed, nil
 }
 
 // Exclusive refuses more than one of paths set.
 func (rules Rules[Req, F]) Exclusive(paths ...string) Rules[Req, F] {
-	return rules.reads(CodeExclusiveWith, paths, func(read reading[Req, F]) []FieldError {
-		return exclusive(setAmong(paths, read.values))
+	return rules.reads(CodeExclusiveWith, paths, func(read reading[Req, F]) ([]FieldError, error) {
+		return exclusive(setAmong(paths, read.values)), nil
 	})
 }
 
 // OneOf wants exactly one of paths set.
 func (rules Rules[Req, F]) OneOf(paths ...string) Rules[Req, F] {
-	return rules.reads(CodeRequiredOneOf, paths, func(read reading[Req, F]) []FieldError {
+	return rules.reads(CodeRequiredOneOf, paths, func(read reading[Req, F]) ([]FieldError, error) {
 		set := setAmong(paths, read.values)
 		if len(set) > 0 {
-			return exclusive(set)
+			return exclusive(set), nil
 		}
-		return []FieldError{{Path: paths[0], Code: CodeRequiredOneOf, With: paths[1:]}}
+		return []FieldError{{Path: paths[0], Code: CodeRequiredOneOf, With: paths[1:]}}, nil
 	})
 }
 
 func (rules Rules[Req, F]) Requires(rule RequiresRule) Rules[Req, F] {
 	paths := append([]string{rule.Field}, rule.Needs...)
-	return rules.reads(CodeRequires, paths, func(read reading[Req, F]) []FieldError {
+	return rules.reads(CodeRequires, paths, func(read reading[Req, F]) ([]FieldError, error) {
 		set := setAmong(paths, read.values)
 		if !slices.Contains(set, rule.Field) {
-			return nil
+			return nil, nil
 		}
 		missing := without(rule.Needs, func(need string) bool { return slices.Contains(set, need) })
 		if len(missing) == 0 {
-			return nil
+			return nil, nil
 		}
-		return []FieldError{{Path: rule.Field, Code: CodeRequires, With: missing}}
+		return []FieldError{{Path: rule.Field, Code: CodeRequires, With: missing}}, nil
 	})
 }
 
 func (rules Rules[Req, F]) RequiredWhen(path string, when Condition[Req, F]) Rules[Req, F] {
-	return rules.reads(CodeRequired, []string{path}, func(read reading[Req, F]) []FieldError {
+	return rules.reads(CodeRequired, []string{path}, func(read reading[Req, F]) ([]FieldError, error) {
 		if !IsZero(read.values[0]) || !when.Holds(read.request, read.facts) {
-			return nil
+			return nil, nil
 		}
-		return []FieldError{{Path: path, Code: CodeRequired, Params: Params{ParamBecause: string(when.Code)}}}
+		return []FieldError{{Path: path, Code: CodeRequired, Params: Params{ParamBecause: string(when.Code)}}}, nil
 	})
 }
 
 // Distinct refuses an entry given twice in a list.
 func (rules Rules[Req, F]) Distinct(path string) Rules[Req, F] {
-	return rules.reads(CodeDistinct, []string{path}, func(read reading[Req, F]) []FieldError {
-		list, _ := read.values[0].(List)
+	return rules.reads(CodeDistinct, []string{path}, func(read reading[Req, F]) ([]FieldError, error) {
+		list, err := shaped[List](CodeDistinct, path, read.values[0])
+		if err != nil {
+			return nil, err
+		}
 		var problems []FieldError
 		for index, entry := range list {
 			if slices.Contains(list[:index], entry) {
 				problems = append(problems, FieldError{Path: IndexPath(path, index), Code: CodeDistinct, Params: Params{ParamValue: entry}})
 			}
 		}
-		return problems
+		return problems, nil
 	})
 }
 
 // NotSelfParent refuses a parent that is also one of the children it would
 // be the parent of; Children is a list or a single text field.
 func (rules Rules[Req, F]) NotSelfParent(rule SelfParentRule) Rules[Req, F] {
-	return rules.reads(CodeSelfParent, []string{rule.Parent, rule.Children}, func(read reading[Req, F]) []FieldError {
-		parent, _ := read.values[0].(Text)
-		if parent == "" || !holds(read.values[1], string(parent)) {
-			return nil
+	return rules.reads(CodeSelfParent, []string{rule.Parent, rule.Children}, func(read reading[Req, F]) ([]FieldError, error) {
+		parent, err := shaped[Text](CodeSelfParent, rule.Parent, read.values[0])
+		if err != nil || parent == "" || !holds(read.values[1], string(parent)) {
+			return nil, err
 		}
-		return []FieldError{{Path: rule.Parent, Code: CodeSelfParent, Params: Params{ParamValue: string(parent)}, With: []string{rule.Children}}}
+		return []FieldError{{Path: rule.Parent, Code: CodeSelfParent, Params: Params{ParamValue: string(parent)}, With: []string{rule.Children}}}, nil
 	})
 }
 

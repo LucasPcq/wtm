@@ -19,13 +19,14 @@ func TestAReporterSaysEachThingAboutItsSubject(t *testing.T) {
 	finished()
 	report.UnitFinished(kernel.StatusDone)
 
+	subject := kernel.Of{Subject: "feat/x"}
 	assert.Equal(t, []kernel.Progress{
-		{Subject: "feat/x", Kind: kernel.ProgressUnitStarted},
-		{Subject: "feat/x", Kind: kernel.ProgressPhaseStarted, Params: kernel.Params{kernel.ParamPhase: "hooks"}},
-		{Subject: "feat/x", Kind: kernel.ProgressOutput, Line: "npm install"},
-		{Subject: "feat/x", Kind: kernel.ProgressStatus, Code: "test.installing", Params: kernel.Params{"package": "left-pad"}},
-		{Subject: "feat/x", Kind: kernel.ProgressPhaseFinished, Params: kernel.Params{kernel.ParamPhase: "hooks"}},
-		{Subject: "feat/x", Kind: kernel.ProgressUnitFinished, Params: kernel.Params{kernel.ParamStatus: "done"}},
+		&kernel.UnitStarted{Of: subject},
+		&kernel.PhaseStarted{Of: subject, Phase: "hooks"},
+		&kernel.Output{Of: subject, Line: "npm install"},
+		&kernel.StatusChanged{Of: subject, Code: "test.installing", Params: kernel.Params{"package": "left-pad"}},
+		&kernel.PhaseFinished{Of: subject, Phase: "hooks"},
+		&kernel.UnitFinished{Of: subject, Status: kernel.StatusDone},
 	}, got)
 }
 
@@ -36,4 +37,10 @@ func TestAReporterWithNoEmitterSaysNothing(t *testing.T) {
 		report.Phase("hooks")()
 		report.Output("line")
 	})
+}
+
+func TestAReporterKeepsTheWarningsAboutItsSubject(t *testing.T) {
+	report := kernel.Report(nil, "feat/x")
+	report.Warn(kernel.Warning{Code: "test.env_skipped", Params: kernel.Params{"file": ".env"}})
+	assert.Equal(t, []kernel.Warning{{Code: "test.env_skipped", Params: kernel.Params{"file": ".env"}}}, report.Warnings())
 }

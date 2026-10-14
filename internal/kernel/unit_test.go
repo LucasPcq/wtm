@@ -46,7 +46,7 @@ func TestEachUnitSaysWhatItIsDoingAsItGoes(t *testing.T) {
 		Emit:  progress,
 		Unit: func(branch string) kernel.Unit[string] {
 			unit := worktreeUnit(&disk{}, branch, phase("hooks", func(_ context.Context, path string) (string, error) { return path, nil }))
-			unit.Before = []kernel.Prep{{Name: "stop jobs", Run: func(context.Context) error { return nil }}}
+			unit.Before = []kernel.Prep{{Name: "stop jobs", Run: func(context.Context, kernel.Reporter) error { return nil }}}
 			return unit
 		},
 	})
@@ -127,7 +127,7 @@ func TestAnUndoThatFailsNamesWhatIsLeftAndProposesTheFollowUp(t *testing.T) {
 			return kernel.Unit[string]{Saga: kernel.Saga[string]{
 				Steps: []kernel.SagaStep{
 					{Name: "worktree", Do: d.add("a"), Undo: d.remove("a")},
-					{Name: "meta", Do: d.add("a/meta"), Undo: fail},
+					{Name: "meta", Do: d.add("a/meta"), Undo: failUndo},
 					{Name: "publish", Do: fail},
 				},
 				LeftBehind: cleanIt,
@@ -148,7 +148,7 @@ func TestAnUndoThatFailsWithNothingToProposeHasNoFollowUp(t *testing.T) {
 		Items: []string{"a"},
 		Unit: func(string) kernel.Unit[string] {
 			return kernel.Unit[string]{Saga: kernel.Saga[string]{Steps: []kernel.SagaStep{
-				{Name: "worktree", Do: func(context.Context) error { return nil }, Undo: fail},
+				{Name: "worktree", Do: func(context.Context, kernel.Reporter) error { return nil }, Undo: failUndo},
 				{Name: "meta", Do: fail},
 			}}}
 		},
@@ -163,7 +163,7 @@ func TestAnInterruptedBatchFinishesTheUnitUnderWayAndStopsThere(t *testing.T) {
 	d := &disk{}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	interrupt := func(context.Context) error { cancel(); return nil }
+	interrupt := func(context.Context, kernel.Reporter) error { cancel(); return nil }
 	items := each(ctx, kernel.EachParams[string, string]{
 		Items: []string{"a", "b", "c"},
 		Unit: func(branch string) kernel.Unit[string] {
@@ -190,8 +190,8 @@ func TestTheSagaRunsUnderTheShieldItIsHanded(t *testing.T) {
 		Shield: shield,
 		Unit: func(string) kernel.Unit[string] {
 			return kernel.Unit[string]{Saga: kernel.Saga[string]{Steps: []kernel.SagaStep{
-				{Name: "worktree", Do: func(context.Context) error { cancel(); return nil }},
-				{Name: "meta", Do: func(ctx context.Context) error { stepSawTheCancel = ctx.Err() != nil; return nil }},
+				{Name: "worktree", Do: func(context.Context, kernel.Reporter) error { cancel(); return nil }},
+				{Name: "meta", Do: func(ctx context.Context, _ kernel.Reporter) error { stepSawTheCancel = ctx.Err() != nil; return nil }},
 			}}}
 		},
 	})
@@ -205,7 +205,7 @@ func TestAnInterruptInThePrepLeavesTheUnitUntouched(t *testing.T) {
 	d := &disk{}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	stopJobs := kernel.Prep{Name: "stop jobs", Run: func(context.Context) error { cancel(); return context.Canceled }}
+	stopJobs := kernel.Prep{Name: "stop jobs", Run: func(context.Context, kernel.Reporter) error { cancel(); return context.Canceled }}
 	items := each(ctx, kernel.EachParams[string, string]{
 		Items: []string{"a"},
 		Unit: func(branch string) kernel.Unit[string] {
@@ -228,7 +228,7 @@ func TestAnInterruptBetweenThePrepAndTheSagaStartsNoSaga(t *testing.T) {
 		Items: []string{"a"},
 		Unit: func(branch string) kernel.Unit[string] {
 			unit := worktreeUnit(d, branch)
-			unit.Before = []kernel.Prep{{Name: "check", Run: func(context.Context) error { cancel(); return nil }}}
+			unit.Before = []kernel.Prep{{Name: "check", Run: func(context.Context, kernel.Reporter) error { cancel(); return nil }}}
 			return unit
 		},
 	})
@@ -239,7 +239,7 @@ func TestAnInterruptBetweenThePrepAndTheSagaStartsNoSaga(t *testing.T) {
 func TestAFailureTheInterruptCausedCountsAsCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	hookKilled := func(context.Context) error { cancel(); return errBoom }
+	hookKilled := func(context.Context, kernel.Reporter) error { cancel(); return errBoom }
 	items := each(ctx, kernel.EachParams[string, string]{
 		Items:         []string{"a", "b", "c"},
 		StopOnFailure: true,
@@ -263,7 +263,7 @@ func TestAnInterruptDuringThenKeepsTheCommitAndNamesWhatWasNotDone(t *testing.T)
 		Items: []string{"a", "b"},
 		Unit:  func(branch string) kernel.Unit[string] { return worktreeUnit(d, branch, ports, hooks) },
 	})
-	assert.Equal(t, []string{"a:cancelled/interrupted", "b:skipped/interrupted"}, outcomes(items))
+	assert.Equal(t, []string{"a:cancelled/incomplete", "b:skipped/interrupted"}, outcomes(items), "a's saga committed, a phase did not finish")
 	assert.False(t, hooksRan, "the phases after the interrupt never run")
 	assert.Equal(t, []string{"a", "a/meta"}, d.list(), "the saga stays")
 	assert.Equal(t, "/wt/a ports=3000", items[0].Detail, "the item keeps what was done")
@@ -294,7 +294,7 @@ func TestARefusalInThePrepKeepsItsOwnType(t *testing.T) {
 	items := each(context.Background(), kernel.EachParams[string, string]{
 		Items: []string{"a"},
 		Unit: func(string) kernel.Unit[string] {
-			return kernel.Unit[string]{Before: []kernel.Prep{{Name: "check", Run: func(context.Context) error { return refused }}}}
+			return kernel.Unit[string]{Before: []kernel.Prep{{Name: "check", Run: func(context.Context, kernel.Reporter) error { return refused }}}}
 		},
 	})
 	assert.Equal(t, kernel.Error(refused), items[0].Error)
@@ -309,7 +309,7 @@ func TestAPhaseThatFailsKeepsTheCommitAndStopsTheNextPhases(t *testing.T) {
 		Items: []string{"a"},
 		Unit:  func(branch string) kernel.Unit[string] { return worktreeUnit(d, branch, ports, hooks) },
 	})
-	assert.Equal(t, []string{"a:failed/"}, outcomes(items))
+	assert.Equal(t, []string{"a:failed/incomplete"}, outcomes(items), "a's saga committed, a phase did not finish")
 	assert.Equal(t, "/wt/a", items[0].Detail)
 	assert.False(t, hooksRan)
 	assert.Equal(t, []string{"a", "a/meta"}, d.list())
@@ -328,4 +328,116 @@ func TestAFailureStopsTheBatchOnlyWhenAskedTo(t *testing.T) {
 	assert.Equal(t, []string{"a:failed/", "b:skipped/not_reached"}, outcomes(stopped))
 	carried := each(context.Background(), kernel.EachParams[string, string]{Items: []string{"a", "b"}, Unit: failingA})
 	assert.Equal(t, []string{"a:failed/", "b:done/"}, outcomes(carried))
+}
+
+// — Milestones, warnings and logs —
+
+func TestMilestonesFollowTheUnitAsItGoes(t *testing.T) {
+	var said []string
+	milestones := kernel.Milestones[string]{
+		Committed: func(m kernel.Committed[string]) { said = append(said, "committed "+m.Subject+" "+m.Detail) },
+		PhaseDone: func(m kernel.PhaseDone[string]) { said = append(said, "done "+m.Phase+" "+m.Detail) },
+		Finished:  func(item kernel.Item[string]) { said = append(said, "finished "+item.Subject+" "+string(item.Status)) },
+	}
+	hooks := phase("hooks", func(_ context.Context, path string) (string, error) {
+		said = append(said, "hooks run")
+		return path + " hooked", nil
+	})
+	each(context.Background(), kernel.EachParams[string, string]{
+		Items:      []string{"a"},
+		Milestones: milestones,
+		Unit:       func(branch string) kernel.Unit[string] { return worktreeUnit(&disk{}, branch, hooks) },
+	})
+	assert.Equal(t, []string{"committed a /wt/a", "hooks run", "done hooks /wt/a hooked", "finished a done"}, said)
+}
+
+func TestAFailedSagaIsNeverCommittedButItsUnitFinishes(t *testing.T) {
+	var said []string
+	milestones := kernel.Milestones[string]{
+		Committed: func(kernel.Committed[string]) { said = append(said, "committed") },
+		Finished:  func(item kernel.Item[string]) { said = append(said, "finished "+string(item.Status)) },
+	}
+	each(context.Background(), kernel.EachParams[string, string]{
+		Items:      []string{"a"},
+		Milestones: milestones,
+		Unit: func(string) kernel.Unit[string] {
+			return kernel.Unit[string]{Saga: kernel.Saga[string]{Steps: []kernel.SagaStep{{Name: "worktree", Do: fail}}}}
+		},
+	})
+	assert.Equal(t, []string{"finished failed"}, said)
+}
+
+func TestAUnitNeverReachedHasNoMilestone(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	each(ctx, kernel.EachParams[string, string]{
+		Items:      []string{"a"},
+		Milestones: kernel.Milestones[string]{Finished: func(kernel.Item[string]) { t.Fatal("a unit never reached finished") }},
+		Unit:       func(branch string) kernel.Unit[string] { return worktreeUnit(&disk{}, branch) },
+	})
+}
+
+func TestTheUnitFinishesBeforeItSaysSo(t *testing.T) {
+	var said []string
+	progress := kernel.EmitFunc(func(p kernel.Progress) {
+		if _, finished := p.(*kernel.UnitFinished); finished {
+			said = append(said, "unit.finished")
+		}
+	})
+	each(context.Background(), kernel.EachParams[string, string]{
+		Items:      []string{"a"},
+		Emit:       progress,
+		Milestones: kernel.Milestones[string]{Finished: func(kernel.Item[string]) { said = append(said, "finished") }},
+		Unit:       func(branch string) kernel.Unit[string] { return worktreeUnit(&disk{}, branch) },
+	})
+	assert.Equal(t, []string{"finished", "unit.finished"}, said)
+}
+
+func TestEachStepIsHandedTheReporterOfItsItem(t *testing.T) {
+	progress := &recorder{}
+	warning := kernel.Warning{Code: "test.env_skipped"}
+	items := each(context.Background(), kernel.EachParams[string, string]{
+		Items: []string{"a"},
+		Emit:  progress,
+		Unit: func(string) kernel.Unit[string] {
+			return kernel.Unit[string]{
+				Before: []kernel.Prep{{Name: "stop jobs", Run: func(_ context.Context, report kernel.Reporter) error { report.Output("stopping"); return nil }}},
+				Saga: kernel.Saga[string]{
+					Steps:  []kernel.SagaStep{{Name: "env", Do: func(_ context.Context, report kernel.Reporter) error { report.Warn(warning); return nil }}},
+					Commit: func(context.Context) (string, error) { return "/wt/a", nil },
+				},
+				Then: []kernel.Phase[string]{{Name: "hooks", Run: func(_ context.Context, report kernel.Reporter, path string) (string, error) {
+					report.Output("installing")
+					return path, nil
+				}}},
+			}
+		},
+	})
+	assert.Equal(t, []kernel.Warning{warning}, items[0].Warnings, "a warning a step reports lands on its item")
+	assert.Contains(t, progress.lines(), "a output stopping")
+	assert.Contains(t, progress.lines(), "a output installing")
+}
+
+func TestAPhaseNamesTheLogItsOutputIsKeptIn(t *testing.T) {
+	var started []kernel.PhaseStarted
+	progress := kernel.EmitFunc(func(p kernel.Progress) {
+		if phase, ok := p.(*kernel.PhaseStarted); ok {
+			started = append(started, *phase)
+		}
+	})
+	each(context.Background(), kernel.EachParams[string, string]{
+		Items: []string{"a"},
+		Emit:  progress,
+		Unit: func(branch string) kernel.Unit[string] {
+			unit := worktreeUnit(&disk{}, branch)
+			unit.Before = []kernel.Prep{{Name: "on_clean", Log: "/logs/clean", Run: func(context.Context, kernel.Reporter) error { return nil }}}
+			unit.Then = []kernel.Phase[string]{{Name: "on_create", Log: "/logs/create", Run: func(_ context.Context, _ kernel.Reporter, path string) (string, error) { return path, nil }}}
+			return unit
+		},
+	})
+	logs := map[string]string{}
+	for _, phase := range started {
+		logs[phase.Phase] = phase.Log
+	}
+	assert.Equal(t, map[string]string{"on_clean": "/logs/clean", "worktree": "", "meta": "", "on_create": "/logs/create"}, logs)
 }

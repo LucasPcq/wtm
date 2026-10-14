@@ -55,17 +55,16 @@ func TestAnUnknownFieldInAFilledRequestIsA422(t *testing.T) {
 	assert.Equal(t, kernel.KindInvalid, problem(t, err).Kind())
 }
 
-func TestForgettingKeepsTheFingerprintAndDropsTheRememberedAnswer(t *testing.T) {
+func TestAStateThatIgnoresTheRememberedAnswerStillCarriesIt(t *testing.T) {
 	f := fillable(t, handle(bench(t), &repo{remembered: verbatim}))
 	observed, err := f.Observe(t.Context())
 	require.NoError(t, err)
 
-	forgotten := f.Forget(observed)
-	form, err := f.State(dispatch.FillParams{Request: json.RawMessage(`{"branches":["feat/a"]}`), Facts: forgotten})
+	form, err := f.State(dispatch.FillParams{Request: json.RawMessage(`{"branches":["feat/a"]}`), Facts: observed, IgnoreRemembered: true})
 
 	require.NoError(t, err)
-	assert.Equal(t, observed.Fingerprint, forgotten.Fingerprint)
-	assert.Equal(t, kernel.Text(isolated), form.States[2].Value)
+	assert.Equal(t, kernel.Text(isolated), form.States[2].Value, "the field falls back on its other default")
+	assert.Equal(t, kernel.Text(verbatim), form.States[2].Remembered, "one State says what is remembered too")
 }
 
 func TestTheChoicesOfAFillableCarryTheirRefusal(t *testing.T) {

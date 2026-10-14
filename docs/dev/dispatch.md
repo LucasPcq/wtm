@@ -17,13 +17,14 @@ created := dispatch.Register(dispatch.RegisterParams[create.Request, create.Fact
 	Command:    create.Command(ports),
 	Messages:   create.Messages,  // its codes in English (commands.md#messages)
 	ExitCodes:  create.ExitCodes, // the exit codes of its own
+	Events:     create.Events(),  // the events of its milestones
 })
 listed := dispatch.RegisterQuery(dispatch.RegisterQueryParams[operations.Request, operations.View]{
 	Query: operations.Query(d.Operations),
 })
 ```
 
-`Register` panics on a command whose plan detail `P` is not a struct: every surface shows a plan as its fields ([output.md](output.md#a-command-on-the-engine)).
+`Register` panics on a command whose plan detail `P` is not a struct: every surface shows a plan as its fields ([output.md](output.md#a-command-on-the-engine)). `Events` is how the command says what its units changed ([below](#progress-hook-logs-and-events)); a command with none publishes only the operation's events.
 
 `internal/registry` is the composition root: `registry.Production(d)` is the registry the surfaces serve, built on that dispatcher, every command with its real ports on its `Dir` and `StateDir` ([Ports](#ports)), every query. It is the only package that imports `command/` and `query/`; only the production engine of `surface/cli` imports it (and `tools/gendocs` through `cli.Root()`). `dispatch` imports neither, nor `store/`. A command enters the product by its line there. The command line reads it once on a dispatcher with no `Params` for the names, the fields and the catalogue (that dispatcher is never run), then on the dispatcher of the repository a command runs in.
 
@@ -38,7 +39,7 @@ listed := dispatch.RegisterQuery(dispatch.RegisterQueryParams[operations.Request
 | -- | -- | -- |
 | `Schema()` | the `FieldSpec` of every field | none: read it once |
 | `Observe(ctx)` | `Snapshot{Facts, Fingerprint}` | the command's I/O; observe again to refresh |
-| `State(FormParams{Request, Facts})` | `kernel.Form`: each field's state, the defaults filled in, `Complete` | pure, `kernel.Evaluate` |
+| `State(FormParams{Request, Facts, IgnoreRemembered})` | `kernel.Form`: each field's state, the defaults filled in, `Complete`; with `IgnoreRemembered`, evaluated on the facts `Forget` returns, each field carrying what they remembered (`FieldState.Remembered`) | pure, `kernel.Evaluate` |
 | `Choices(ctx, ChoicesParams{Path, Request, Facts})` | the field's options, each that would break a rule carrying its `Refusal` (`kernel.Disabled`) | the field's own I/O |
 
 A form keeps the snapshot while the user types: entering a value calls `State` again, never `Observe`. The fingerprint of the snapshot shown in the recap is the one handed to `Run`.
@@ -48,24 +49,23 @@ A surface that serves every command reaches the same calls through a `Fillable`,
 | `Fillable` | The `Handle` call |
 | -- | -- |
 | `Observe(ctx)` → `Observed{Fingerprint}` | `Observe` |
-| `Forget(Observed)` | `Forget`, the fingerprint kept: it is the one of the facts as observed |
-| `State(FillParams{Request, Facts})` → `kernel.Form[json.RawMessage]` | `State` |
-| `Choices(ctx, FillChoicesParams{Path, Request, Facts})` | `Choices` |
+| `State(FillParams{Request, Facts, IgnoreRemembered})` → `kernel.Form[json.RawMessage]` | `State` |
+| `Choices(ctx, FillChoicesParams{Path, Request, Facts, IgnoreRemembered})` | `Choices`, on the facts `Forget` returns when `IgnoreRemembered` is set |
 | `Set(SetParams{Request, Path, Value})` → the request with the value at its path | `kernel.Set` on the typed request: a value of the wrong shape is a `422` |
 
-Facts another entry observed are an internal error.
+Facts another entry observed are an internal error. The choices of a path that names no field are a `404` with `unknown_field`. An option is judged as the value it would set (`kernel.Disabled`): the list once it is added for a list field, the bool it spells for a `bool` field; an option of a `decisions` field is a choice for one key among several and is not judged alone.
 
 ## The run
 
 `Handle.Run(ctx, RunParams{Request, Options, Progress})` goes through these steps, always in this order:
 
-1. **Locks.** The holder file, then the command's locks (`Command.Locks(req)`), all or none and without waiting. A key another operation holds is a `409 lock.held`.
+1. **Locks** of the request as received. The holder file, then the command's locks (`Command.Locks(req)`), all or none and without waiting. A key another operation holds is a `409 lock.held`. A dry run takes none, holder included: the fingerprint guards the run that applies its plan.
 2. **`Observe`**, under the locks: no other wtm process changes the facts between here and the end of `Apply`. The fingerprint is computed now.
-3. **`Forget`**, when `IgnoreRemembered` is set (`--ask`): the facts lose the remembered answers, so each field falls back on its other default.
-4. **Defaults and validation**, `kernel.Evaluate`: an incomplete request is a `422` naming its fields.
+3. **Defaults and validation**, `kernel.Evaluate`, on the facts `Forget` returns when `IgnoreRemembered` is set (`--ask`), so each field falls back on its other default: an incomplete request is a `422` naming its fields.
+4. **Locks of the complete request.** The keys `Command.Locks` names once the defaults are filled in (a branch a default chose) and the operation does not hold yet, all or none and without waiting (`409` otherwise); the holder file is rewritten to list them. When any were taken, back to step 2: the facts read before may be stale.
 5. **`Plan`.** A dry run stops here and returns the plan and the fingerprint: nothing applied, nothing published.
 6. **The fingerprint check.** `ExpectFingerprint` different from the facts just read is a `412 plan.stale`.
-7. **`Apply`**, handed the request with its defaults, the facts, the plan, the progress `Emitter` and the `Shield`.
+7. **`Apply`**, handed the request with its defaults, the facts, the plan, the progress `Emitter`, the `Shield` and the `Milestones`. The plan's warnings are carried into the outcome's, first and once each.
 8. **Release** of the locks, then the `Result`.
 
 | `Options` | |
@@ -88,7 +88,7 @@ Every error `Run` returns is a `kernel.Error`. Its codes and their params are th
 | `plan.stale` | `precondition` | 412 | `expected`, `found` |
 | `state.schema_newer` | `precondition` | 412 | `path`, `found`, `supported` |
 
-`state.schema_newer` is the `*statefile.NewerError` a write returns (exit code `22`), found by `errors.As` wherever it was wrapped. Anything else goes through `kernel.Classify`: a cancellation is `cancelled`, the rest `internal`.
+`state.schema_newer` is the `*statefile.NewerError` a write returns (exit code `22`), found by `errors.As` wherever it was wrapped. Anything else goes through `kernel.Classify`: a cancellation is `cancelled`, the rest `internal`, an error of the command among them: facts that do not encode as JSON (no fingerprint could guard a run on them), a worktree lock with no name.
 
 ## Operation locks
 
@@ -102,7 +102,8 @@ Every error `Run` returns is a `kernel.Error`. Its codes and their params are th
 - **All or nothing, never waiting.** `fs.TryLocks` takes the keys in sorted order, each with `LOCK_NB`, and releases them all on the first refusal. Two sets taken in opposite orders cannot deadlock.
 - **The holder is a file per operation**: `{op_id, pid, command, surface, correlation_id, started_at, locks}`, written and locked before it appears (`fs.HoldFile`), removed on release. The lock files themselves hold nothing, so several shared holders of `repo.lock` are each named by their own file. A `409` names the operation whose holder lists the refused key.
 - **A dead process holds nothing.** Its locks go with its descriptors; its holder file is no longer locked, and `fs.HeldFiles` removes it on the next read. There is no force-unlock.
-- **From before `Observe` to the end of `Apply`.** No nested run: `command/` never imports `dispatch`, a command made of others declares the union of their keys, and a `FollowUp` is a new call.
+- **A worktree key names its worktree.** `Command.Locks` leaves out a branch it does not know yet (an empty field before its default); a `LockWorktree` key with no name is an internal error.
+- **From before `Observe` to the end of `Apply`**, grown once the defaults name more keys. No nested run: `command/` never imports `dispatch`, a command made of others declares the union of their keys, and a `FollowUp` is a new call.
 - **Without `flock`** (NFS, some WSL mounts) the run is unprotected and warns `locks.unavailable`.
 - **A query locks nothing**: the atomic writes of `infra/fs` give it a file before or after a write, never half of one.
 
@@ -117,15 +118,27 @@ The fingerprint is the SHA-256 of the facts as JSON (maps in key order), cut to 
 `Apply` is handed an `Emitter` that, for each `kernel.Progress`:
 
 - stamps it with the operation's `op_id`;
-- writes the output of a hook phase (a phase named `on_create` or `on_clean`) to its log, `rules.HooksLogPath` under the state dir, opened by `fs.OpenLog` when the phase starts and closed when it ends, whatever the surface shows of it;
+- writes the output of a phase that names its `Log` (a hook phase: the command computes `rules.HooksLogPath`) to that file, opened by `fs.OpenLog` when the phase starts and closed when it ends, whatever the surface shows of it; `dispatch` knows no hook;
 - publishes `unit.finished` when a unit ends;
 - forwards it to the surface's `Progress`.
 
-On the bus (`docs/guide/events.md`) an applied run sends `operation.started`, one `unit.finished` per item, then `operation.finished` with `ok` and, on failure, the error's `code`. Each carries `op_id` and the `correlation_id`. They are sent even once the run is interrupted. A dry run and a run refused before `Apply` publish nothing. Output lines never go on the bus.
+`Apply` is also handed the `Milestones` of its units. `dispatch` passes each, with the facts the run observed, to the command's `Events`, pure functions declared at registration:
+
+```go
+type Events[F, D any] struct {
+	Committed func(EventOf[F, kernel.Committed[D]]) []domain.Event // the saga committed, before the first phase
+	PhaseDone func(EventOf[F, kernel.PhaseDone[D]]) []domain.Event // a phase after it finished
+	Finished  func(EventOf[F, kernel.Item[D]]) []domain.Event      // the unit is over
+}
+```
+
+Each returns the `domain.Event`s to publish (none, one or several), built from the facts and the detail without reading the repository again; `dispatch` stamps them (`ts` from its clock, `op_id`, `correlation_id`) and publishes them at once. For `create`: `worktree.created` at the commit, before `on_create`; `worktree.updated` after the phase that allocated the ordinal; `worktree.provisioned` when the unit is over. `kernel` gives a milestone no meaning; the command does.
+
+On the bus (`docs/guide/events.md`) an applied run sends `operation.started`, the events of its commands' milestones, one `unit.finished` per item, then `operation.finished` with `ok` and, on failure, the `code` of `Outcome.Failure()` (an interruption first, else the first item that failed) or of the error `Apply` returned. Each carries `op_id`, `ts` and the `correlation_id`; the publisher keeps them. They are sent even once the run is interrupted. A dry run and a run refused before `Apply` publish nothing. Output lines never go on the bus.
 
 ## Ports
 
-`kernel` imports only the stdlib, so a port never travels through its types (`kernel.ObserveScope` is data only). A command receives its ports when it is built, `create.Command(ports)`, and captures them in `Observe`, `Choices` and `Apply`. Each port is an interface declared beside what it wraps (`infra/git`, `store/`, `infra/proc`), with its double in `testutil/`; `registry.Production` builds each command with the real ones, on the dispatcher's `Dir` and `StateDir`: git is `git.Reader` and `git.Writer`, built as `git.Repo{Dir: <Dir>, Remote: domain.OriginRemote}` and doubled by `gittest.Fake` ([git.md](git.md)); the state files are `store.Meta`, `store.ProjectConfig` and `store.EnvFiles`, built as `store.MetaDisk{StateDir: <StateDir>}`, `store.ConfigDisk{StateDir: <StateDir>}` and `store.EnvDisk{}` and doubled by `storetest.Fake` ([store.md](store.md)). `dispatch` runs on its own ports only: `Params` above.
+`kernel` imports only the stdlib, so a port never travels through its types. A command receives its ports, and the directory they work in, when it is built, `create.Command(ports)`, and captures them in `Observe`, `Choices` and `Apply`. Each port is an interface declared beside what it wraps (`infra/git`, `store/`, `infra/proc`), with its double in `testutil/`; `registry.Production` builds each command with the real ones, on the dispatcher's `Dir` and `StateDir`: git is `git.Reader` and `git.Writer`, built as `git.Repo{Dir: <Dir>, Remote: domain.OriginRemote}` and doubled by `gittest.Fake` ([git.md](git.md)); the state files are `store.Meta`, `store.ProjectConfig` and `store.EnvFiles`, built as `store.MetaDisk{StateDir: <StateDir>}`, `store.ConfigDisk{StateDir: <StateDir>}` and `store.EnvDisk{}` and doubled by `storetest.Fake` ([store.md](store.md)). `dispatch` runs on its own ports only: `Params` above.
 
 ## What the lint holds
 
@@ -137,6 +150,6 @@ On the bus (`docs/guide/events.md`) an applied run sends `operation.started`, on
 
 ## Testing
 
-`internal/testutil/dispatchtest` runs a command through `dispatch` with no surface: `dispatchtest.New(t, BenchParams{})` is a dispatcher on doubles (a recording `Bus`, a fixed `Clock`, operations numbered `op-1`, `op-2`…, a temporary state dir), and `dispatchtest.Run(ctx, RunParams{Bench, Command, Request, Options})` returns the `Result`, the error and the `Progress` collected. A command's own ports are doubled in `testutil/` (git by `gittest.Fake`, the state files by `storetest.Fake`). It replaces `flowtest` as the commands migrate.
+`internal/testutil/dispatchtest` runs a command through `dispatch` with no surface: `dispatchtest.New(t, BenchParams{})` is a dispatcher on doubles (a recording `Bus`, a fixed `Clock`, operations numbered `op-1`, `op-2`…, a temporary state dir), and `dispatchtest.Run(ctx, RunParams{Bench, Command, Events, Request, Options})` returns the `Result`, the error and the `Progress` collected. A command's own ports are doubled in `testutil/` (git by `gittest.Fake`, the state files by `storetest.Fake`). It replaces `flowtest` as the commands migrate.
 
-The tests of `internal/dispatch` follow the kernel's layout, with testify: a test file per source file holding only `Test…` functions (`fill_test.go` for the `Fillable`); `fixture_test.go`, an example shaped like `create` over a fake repository; `helpers_test.go`, the helpers and `TestHelperProcess`, which holds locks from another process for the all-or-nothing test.
+The tests of `internal/dispatch` follow the kernel's layout, with testify: a test file per source file holding only `Test…` functions (`fill_test.go` for the `Fillable`); `fixture_test.go`, an example shaped like `create` over a fake repository, with its `Events` (created at the commit, updated once `allocate` gave the ordinal, provisioned at the end) and a command of `bool` and `decisions` fields; `helpers_test.go`, the helpers and `TestHelperProcess`, which holds locks from another process for the all-or-nothing test.

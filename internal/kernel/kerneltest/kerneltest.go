@@ -163,7 +163,7 @@ func changedFrom(value kernel.Value) kernel.Value {
 func failingAt[D any](saga kernel.Saga[D], point int) kernel.Saga[D] {
 	steps := slices.Clone(saga.Steps)
 	if point < len(steps) {
-		steps[point].Do = func(context.Context) error { return errInjected }
+		steps[point].Do = func(context.Context, kernel.Reporter) error { return errInjected }
 		return kernel.Saga[D]{Steps: steps, Commit: saga.Commit, LeftBehind: saga.LeftBehind}
 	}
 	commit := func(context.Context) (D, error) {

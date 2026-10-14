@@ -96,7 +96,7 @@ func erase[P, D any](result Result[P, D]) (Result[json.RawMessage, json.RawMessa
 		if err != nil {
 			return Result[json.RawMessage, json.RawMessage]{}, err
 		}
-		items = append(items, kernel.Item[json.RawMessage]{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Error: item.Error, Detail: detail})
+		items = append(items, kernel.Retype(kernel.RetypeParams[D, json.RawMessage]{Item: item, Detail: detail}))
 	}
 	erased.Outcome = &kernel.Outcome[json.RawMessage]{Items: items, FollowUps: result.Outcome.FollowUps, Warnings: result.Outcome.Warnings}
 	return erased, nil

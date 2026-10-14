@@ -51,7 +51,7 @@ func TestACancelledRunSaysItIsCancelling(t *testing.T) {
 	var out syncBuffer
 	ctx, cancel := context.WithCancel(t.Context())
 	view := render.NewProgressView(ctx, render.ProgressViewParams{Catalog: catalog, W: &out, Human: true, Live: true})
-	view.Emit(kernel.Progress{Kind: kernel.ProgressUnitStarted, Subject: "feat/a"})
+	view.Emit(&kernel.UnitStarted{Of: kernel.Of{Subject: "feat/a"}})
 
 	cancel()
 

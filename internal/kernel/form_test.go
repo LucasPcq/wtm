@@ -140,3 +140,29 @@ func TestADefaultOfAnotherShapeThanTheFieldIsAnError(t *testing.T) {
 	})
 	assert.Error(t, err)
 }
+
+func TestAFormThatForgetsStillSaysWhatIsRemembered(t *testing.T) {
+	remembered := kernel.FieldDef[request, facts]{
+		Spec: kernel.FieldSpec{Path: "isolation", Type: kernel.FieldSelect, Label: "Isolation", Rememberable: true},
+		Default: func(_ request, f facts) (kernel.Fallback, bool) {
+			if f.Base == "remembered" {
+				return kernel.Fallback{Value: kernel.Text("verbatim"), Origin: kernel.OriginRemembered}, true
+			}
+			return kernel.Fallback{Value: kernel.Text("isolated"), Origin: kernel.OriginDefault}, true
+		},
+	}
+	params := kernel.EvaluateParams[request, facts]{
+		Fields: []kernel.FieldDef[request, facts]{remembered},
+		Facts:  facts{Base: "remembered"},
+	}
+
+	kept := evaluate(t, params)
+	assert.Equal(t, kernel.Text("verbatim"), kept.States[0].Value)
+	assert.Nil(t, kept.States[0].Remembered, "a form that forgets nothing does not repeat it")
+
+	params.Forget = func(f facts) facts { f.Base = ""; return f }
+	forgot := evaluate(t, params)
+	assert.Equal(t, kernel.Text("isolated"), forgot.States[0].Value, "the field falls back on its other default")
+	assert.Equal(t, kernel.OriginDefault, forgot.States[0].Origin)
+	assert.Equal(t, kernel.Text("verbatim"), forgot.States[0].Remembered, "and still says what the repository remembers")
+}

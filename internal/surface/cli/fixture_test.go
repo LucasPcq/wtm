@@ -83,8 +83,8 @@ func (r *repo) observe() facts {
 	return facts{Existing: slices.Clone(r.existing), Remembered: r.remembered}
 }
 
-func (r *repo) add(branch string) func(context.Context) error {
-	return func(context.Context) error {
+func (r *repo) add(branch string) func(context.Context, kernel.Reporter) error {
+	return func(context.Context, kernel.Reporter) error {
 		if branch == failing {
 			return errStep
 		}
@@ -121,7 +121,7 @@ func (r *repo) exists(branch string) {
 func makeCommand(r *repo) kernel.Command[request, facts, plan, string] {
 	return kernel.Command[request, facts, plan, string]{
 		Name: commandName,
-		Observe: func(context.Context, kernel.ObserveScope) (facts, error) {
+		Observe: func(context.Context) (facts, error) {
 			return r.observe(), nil
 		},
 		Forget: func(f facts) facts {
@@ -157,7 +157,7 @@ func makeCommand(r *repo) kernel.Command[request, facts, plan, string] {
 		Plan: func(_ context.Context, req request, _ facts) (kernel.Plan[plan], error) {
 			return kernel.Plan[plan]{Detail: plan{Branches: req.Branches, Isolation: req.Isolation}}, nil
 		},
-		Apply: func(ctx context.Context, in kernel.ApplyInput[request, facts, plan]) (kernel.Outcome[string], error) {
+		Apply: func(ctx context.Context, in kernel.ApplyInput[request, facts, plan, string]) (kernel.Outcome[string], error) {
 			if r.applyErr != nil {
 				return kernel.Outcome[string]{}, r.applyErr
 			}
@@ -175,8 +175,8 @@ func makeCommand(r *repo) kernel.Command[request, facts, plan, string] {
 						},
 						Then: []kernel.Phase[string]{{
 							Name: string(domain.HookOnCreate),
-							Run: func(_ context.Context, path string) (string, error) {
-								kernel.Report(in.Emit, branch).Output(hookLine)
+							Run: func(_ context.Context, report kernel.Reporter, path string) (string, error) {
+								report.Output(hookLine)
 								return path, nil
 							},
 						}},

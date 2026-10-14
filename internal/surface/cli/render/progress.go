@@ -78,27 +78,28 @@ func (v *ProgressView) cancelling(watch, run context.Context) {
 func (v *ProgressView) Emit(event kernel.Progress) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	if event.Kind == kernel.ProgressOutput {
-		v.output(event.Line)
+	if output, ok := event.(*kernel.Output); ok {
+		v.output(output.Line)
 		return
 	}
 	if !v.human {
 		return
 	}
-	switch event.Kind {
-	case kernel.ProgressPhaseStarted:
-		v.phase, v.phaseOpen, v.started = fmt.Sprintf(phaseLabelFmt, event.Params[kernel.ParamPhase], event.Subject), false, time.Now()
-	case kernel.ProgressPhaseFinished:
+	switch e := event.(type) {
+	case *kernel.PhaseStarted:
+		v.phase, v.phaseOpen, v.started = fmt.Sprintf(phaseLabelFmt, e.Phase, e.Subject), false, time.Now()
+	case *kernel.PhaseFinished:
 		v.phaseFinished()
-	case kernel.ProgressUnitStarted:
-		v.unit, v.status = event.Subject, ""
+	case *kernel.UnitStarted:
+		v.unit, v.status = e.Subject, ""
 		v.paint()
-	case kernel.ProgressStatus:
-		v.status = v.catalog.Message(event.Code, event.Params)
+	case *kernel.StatusChanged:
+		v.status = v.catalog.Message(e.Code, e.Params)
 		v.paint()
-	case kernel.ProgressUnitFinished:
+	case *kernel.UnitFinished:
 		v.unit, v.status = "", ""
 		v.erase()
+	case *kernel.Output:
 	}
 }
 

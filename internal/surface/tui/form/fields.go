@@ -75,8 +75,8 @@ func (s *session) selectList(params selectParams) components.SelectListModel {
 		return components.NewSelectList(list)
 	}
 	list.Toggle = domain.RememberToggleLabel
-	list.ToggleOn = s.ticked(spec.Path)
-	if recalled, ok := s.recalled(params.Request, spec.Path); ok {
+	list.ToggleOn = slices.Contains(s.ticked, spec.Path)
+	if recalled := stateAt(params.Form, spec.Path).Remembered; recalled != nil {
 		list.ToggleOn, list.Start = true, textOf(recalled)
 	}
 	return components.NewSelectList(list)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -13,6 +14,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/kernel"
 	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
+
+const rememberShapeFmt = "the remember field holds a %T"
 
 // session is one run of the form. The facts are observed once and kept while
 // the user types: a value is checked by State, which is pure, and the choices
@@ -24,8 +27,8 @@ type session struct {
 	remember bool
 	given    json.RawMessage
 	flagged  map[string]bool
+	ticked   []string
 	answered map[string]bool
-	observed dispatch.Observed
 	facts    dispatch.Observed
 	choices  map[string]kernel.Choices
 	decided  []decision
@@ -83,20 +86,15 @@ func (s *session) observe() error {
 	return nil
 }
 
-// setFacts keeps the facts as observed beside the ones the form evaluates: on
-// --ask those forget the remembered answers, the observed ones still say what
-// they were.
 func (s *session) setFacts(observed dispatch.Observed) {
-	s.observed, s.facts = observed, observed
-	if s.params.Options.IgnoreRemembered {
-		s.facts = s.params.Entry.Forget(observed)
-	}
+	s.facts = observed
 	s.choices = map[string]kernel.Choices{}
 }
 
-// flag notes the fields the command line answered: the trail names their flag.
+// flag notes the fields the command line answered, whose flag the trail
+// names, and the answers it asked to remember.
 func (s *session) flag() error {
-	form, err := s.params.Entry.State(dispatch.FillParams{Request: s.given, Facts: s.facts})
+	form, err := s.params.Entry.State(s.fillParams(s.given))
 	if err != nil {
 		return err
 	}
@@ -106,7 +104,19 @@ func (s *session) flag() error {
 			s.flagged[state.Path] = true
 		}
 	}
+	remembered := stateAt(form, kernel.RememberPath).Value
+	ticked, ok := remembered.(kernel.List)
+	if !ok && remembered != nil {
+		return fmt.Errorf(rememberShapeFmt, remembered)
+	}
+	s.ticked = ticked
 	return nil
+}
+
+// fillParams is the call of State on request: on --ask, the facts forget the
+// remembered answers and each field still carries its own.
+func (s *session) fillParams(request json.RawMessage) dispatch.FillParams {
+	return dispatch.FillParams{Request: request, Facts: s.facts, IgnoreRemembered: s.params.Options.IgnoreRemembered}
 }
 
 // fill runs the wizard and says whether the recap was confirmed.
@@ -277,37 +287,12 @@ func (s *session) set(request json.RawMessage, path string, value kernel.Value) 
 }
 
 func (s *session) stateOf(request json.RawMessage) (kernel.Form[json.RawMessage], bool) {
-	form, err := s.params.Entry.State(dispatch.FillParams{Request: request, Facts: s.facts})
+	form, err := s.params.Entry.State(s.fillParams(request))
 	if err != nil {
 		s.fail(err)
 		return form, false
 	}
 	return form, true
-}
-
-// recalled is the answer the repository remembers for path, read on the facts
-// as observed: on --ask its box opens ticked on it.
-func (s *session) recalled(request json.RawMessage, path string) (kernel.Value, bool) {
-	if !s.params.Options.IgnoreRemembered {
-		return nil, false
-	}
-	form, err := s.params.Entry.State(dispatch.FillParams{Request: request, Facts: s.observed})
-	if err != nil {
-		return nil, false
-	}
-	state := stateAt(form, path)
-	return state.Value, state.Origin == kernel.OriginRemembered
-}
-
-// ticked is whether the flags already asked to remember path.
-func (s *session) ticked(path string) bool {
-	var given struct {
-		Remember []string `json:"remember"`
-	}
-	if json.Unmarshal(s.given, &given) != nil {
-		return false
-	}
-	return slices.Contains(given.Remember, path)
 }
 
 // fail keeps the first failure of a call to the engine: the wizard quits on
@@ -336,7 +321,7 @@ func (s *session) check(params checkParams) error {
 	if err != nil {
 		return err
 	}
-	form, err := s.params.Entry.State(dispatch.FillParams{Request: request, Facts: s.facts})
+	form, err := s.params.Entry.State(s.fillParams(request))
 	if err != nil {
 		return err
 	}

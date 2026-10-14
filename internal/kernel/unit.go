@@ -11,14 +11,16 @@ import (
 type Shield func(context.Context) (context.Context, func())
 
 // Prep runs before the saga and may be interrupted: nothing has changed yet.
+// Log is the file its output is kept in, when it has one.
 type Prep struct {
 	Name string
-	Run  func(context.Context) error
+	Log  string
+	Run  func(context.Context, Reporter) error
 }
 
 type SagaStep struct {
 	Name string
-	Do   func(context.Context) error
+	Do   func(context.Context, Reporter) error
 	Undo func(context.Context) error
 }
 
@@ -34,7 +36,8 @@ type Saga[D any] struct {
 // Phase runs after the commit: interruptible, never undone.
 type Phase[D any] struct {
 	Name string
-	Run  func(context.Context, D) (D, error)
+	Log  string
+	Run  func(context.Context, Reporter, D) (D, error)
 }
 
 type Unit[D any] struct {
@@ -43,12 +46,50 @@ type Unit[D any] struct {
 	Then   []Phase[D]
 }
 
+type Committed[D any] struct {
+	Subject string
+	Detail  D
+}
+
+type PhaseDone[D any] struct {
+	Subject string
+	Phase   string
+	Detail  D
+}
+
+// Milestones is told where each unit stands, as it gets there: its saga
+// committed, a phase after it done, the unit over. A nil func is told nothing.
+type Milestones[D any] struct {
+	Committed func(Committed[D])
+	PhaseDone func(PhaseDone[D])
+	Finished  func(Item[D])
+}
+
+func (m Milestones[D]) committed(milestone Committed[D]) {
+	if m.Committed != nil {
+		m.Committed(milestone)
+	}
+}
+
+func (m Milestones[D]) phaseDone(milestone PhaseDone[D]) {
+	if m.PhaseDone != nil {
+		m.PhaseDone(milestone)
+	}
+}
+
+func (m Milestones[D]) finished(item Item[D]) {
+	if m.Finished != nil {
+		m.Finished(item)
+	}
+}
+
 type EachParams[T, D any] struct {
 	Items         []T
 	Subject       func(T) string
 	Unit          func(T) Unit[D]
 	Emit          Emitter
 	Shield        Shield
+	Milestones    Milestones[D]
 	StopOnFailure bool
 }
 
@@ -61,7 +102,7 @@ func Each[T, D any](ctx context.Context, params EachParams[T, D]) []Item[D] {
 			return append(items, unreached(unreachedParams[T, D]{Each: params, From: index, Reason: ReasonInterrupted})...)
 		}
 		subject := params.Subject(it)
-		run := unitRun[D]{item: ItemFor[D](subject), report: Report(params.Emit, subject), shield: shieldOr(params.Shield)}
+		run := unitRun[D]{subject: subject, report: Report(params.Emit, subject), shield: shieldOr(params.Shield), milestones: params.Milestones}
 		item := run.unit(ctx, params.Unit(it))
 		items = append(items, item)
 		if item.Status == StatusFailed && params.StopOnFailure {
@@ -87,22 +128,29 @@ func unreached[T, D any](params unreachedParams[T, D]) []Item[D] {
 }
 
 type unitRun[D any] struct {
-	item   ItemOf[D]
-	report Reporter
-	shield Shield
+	subject    string
+	report     Reporter
+	shield     Shield
+	milestones Milestones[D]
 }
 
 func (r unitRun[D]) unit(ctx context.Context, unit Unit[D]) Item[D] {
 	r.report.UnitStarted()
 	item := r.body(ctx, unit)
+	r.milestones.finished(item)
 	r.report.UnitFinished(item.Status)
 	return item
+}
+
+// item builds the unit's item with the warnings its steps reported.
+func (r unitRun[D]) item() ItemOf[D] {
+	return ItemFor[D](r.subject).Warned(r.report.Warnings()...)
 }
 
 func (r unitRun[D]) body(ctx context.Context, unit Unit[D]) Item[D] {
 	var none D
 	for _, prep := range unit.Before {
-		if err := r.phase(ctx, phaseRun{name: prep.Name, run: prep.Run}); err != nil {
+		if err := r.phase(ctx, phaseRun{started: PhaseStarted{Phase: prep.Name, Log: prep.Log}, run: prep.Run}); err != nil {
 			return r.stopped(stopped[D]{ctx: ctx, err: err, phase: prep.Name, detail: none})
 		}
 	}
@@ -111,29 +159,31 @@ func (r unitRun[D]) body(ctx context.Context, unit Unit[D]) Item[D] {
 	}
 	detail, failure := r.saga(ctx, unit.Saga)
 	if failure != nil {
-		return r.item.Failed(failure, none)
+		return r.item().Failed(failure, none)
 	}
+	r.milestones.committed(Committed[D]{Subject: r.subject, Detail: detail})
 	for _, then := range unit.Then {
 		next, err := r.then(ctx, phaseOf[D]{phase: then, detail: detail})
 		if err != nil {
-			return r.stopped(stopped[D]{ctx: ctx, err: err, phase: then.Name, detail: detail})
+			return r.stopped(stopped[D]{ctx: ctx, err: err, phase: then.Name, detail: detail, committed: true})
 		}
 		detail = next
+		r.milestones.phaseDone(PhaseDone[D]{Subject: r.subject, Phase: then.Name, Detail: detail})
 	}
-	return r.item.Done(detail)
+	return r.item().Done(detail)
 }
 
 type phaseRun struct {
-	name string
-	run  func(context.Context) error
+	started PhaseStarted
+	run     func(context.Context, Reporter) error
 }
 
 func (r unitRun[D]) phase(ctx context.Context, phase phaseRun) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	defer r.report.Phase(phase.name)()
-	return phase.run(ctx)
+	defer r.report.phase(phase.started)()
+	return phase.run(ctx, r.report)
 }
 
 type phaseOf[D any] struct {
@@ -145,8 +195,8 @@ func (r unitRun[D]) then(ctx context.Context, step phaseOf[D]) (D, error) {
 	if err := ctx.Err(); err != nil {
 		return step.detail, err
 	}
-	defer r.report.Phase(step.phase.Name)()
-	next, err := step.phase.Run(ctx, step.detail)
+	defer r.report.phase(PhaseStarted{Phase: step.phase.Name, Log: step.phase.Log})()
+	next, err := step.phase.Run(ctx, r.report, step.detail)
 	if err != nil {
 		return step.detail, err
 	}
@@ -158,7 +208,7 @@ func (r unitRun[D]) saga(ctx context.Context, saga Saga[D]) (D, Error) {
 	shielded, release := r.shield(ctx)
 	defer release()
 	for index, step := range saga.Steps {
-		if err := r.phase(shielded, phaseRun{name: step.Name, run: step.Do}); err != nil {
+		if err := r.phase(shielded, phaseRun{started: PhaseStarted{Phase: step.Name}, run: step.Do}); err != nil {
 			failure := Classify(ClassifyParams{Err: err, Code: CodeStepFailed, Params: Params{ParamStep: step.Name}})
 			return none, undo(shielded, undoParams[D]{Saga: saga, Done: index, Failure: failure})
 		}
@@ -220,10 +270,11 @@ func stuck[D any](params stuckParams[D]) Error {
 }
 
 type stopped[D any] struct {
-	ctx    context.Context
-	err    error
-	phase  string
-	detail D
+	ctx       context.Context
+	err       error
+	phase     string
+	detail    D
+	committed bool
 }
 
 // stopped files a unit stopped outside its saga: a failure the interruption
@@ -233,10 +284,17 @@ func (r unitRun[D]) stopped(end stopped[D]) Item[D] {
 	if end.phase != "" {
 		params[ParamPhase] = end.phase
 	}
+	failure := Classify(ClassifyParams{Err: end.err, Code: CodePhaseFailed, Params: params})
 	if end.ctx.Err() != nil {
-		return r.item.Cancelled(Cancelled(Problem{Code: CodeInterrupted, Params: params, Cause: end.err}), end.detail)
+		failure = Cancelled(Problem{Code: CodeInterrupted, Params: params, Cause: end.err})
 	}
-	return r.item.Failed(Classify(ClassifyParams{Err: end.err, Code: CodePhaseFailed, Params: params}), end.detail)
+	if end.committed {
+		return r.item().Incomplete(failure, end.detail)
+	}
+	if failure.Kind() == KindCancelled {
+		return r.item().Cancelled(failure, end.detail)
+	}
+	return r.item().Failed(failure, end.detail)
 }
 
 func shieldOr(shield Shield) Shield {

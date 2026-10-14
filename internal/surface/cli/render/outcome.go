@@ -62,11 +62,17 @@ type OutcomeParams struct {
 
 // Outcome is the conclusion of a run: one headline carrying the worst result
 // and the count, the done items only as the command's detail shows them, then
-// every other item named with why.
+// every other item named with why, and each warning about an item named with
+// its subject.
 func Outcome(w io.Writer, params OutcomeParams) {
 	headline(w, params)
 	for _, item := range params.Items {
 		outcomeItem(w, outcomeItemParams{Item: item, Detail: params.Detail, Catalog: params.Catalog})
+	}
+	for _, item := range params.Items {
+		for _, warning := range item.Warnings {
+			Warning(w, fmt.Sprintf(itemLineFmt, item.Subject, params.Catalog.Message(warning.Code, warning.Params)))
+		}
 	}
 	for _, warning := range params.Warnings {
 		Warning(w, params.Catalog.Message(warning.Code, warning.Params))

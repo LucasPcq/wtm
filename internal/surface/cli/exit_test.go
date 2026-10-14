@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
@@ -70,25 +69,4 @@ func TestAnInterruptedRunExits19WhateverItsError(t *testing.T) {
 	err := fmt.Errorf("%w: %w", domain.ErrCancelled, kernel.Internal(kernel.Problem{Code: kernel.CodeStepFailed}))
 
 	assert.Equal(t, domain.ExitCodeCancelled, exitCode(err))
-}
-
-func TestABatchExitsOnItsInterruptedItemFirstThenItsFirstFailure(t *testing.T) {
-	first := kernel.Internal(kernel.Problem{Code: kernel.CodeStepFailed, Params: kernel.Params{kernel.ParamStep: "one"}})
-	second := kernel.Internal(kernel.Problem{Code: kernel.CodeStepFailed, Params: kernel.Params{kernel.ParamStep: "two"}})
-	done := kernel.Item[json.RawMessage]{Subject: "a", Status: kernel.StatusDone}
-	failedOne := kernel.Item[json.RawMessage]{Subject: "b", Status: kernel.StatusFailed, Error: first}
-	failedTwo := kernel.Item[json.RawMessage]{Subject: "c", Status: kernel.StatusFailed, Error: second}
-	notReached := kernel.Item[json.RawMessage]{Subject: "d", Status: kernel.StatusSkipped, Reason: kernel.ReasonInterrupted}
-
-	assert.Nil(t, outcomeFailure([]kernel.Item[json.RawMessage]{done}))
-	assert.Equal(t, first, outcomeFailure([]kernel.Item[json.RawMessage]{done, failedOne, failedTwo}))
-	assert.Equal(t, kernel.KindCancelled, outcomeFailure([]kernel.Item[json.RawMessage]{failedOne, notReached}).Kind())
-}
-
-func TestACancelledItemExitsOnItsOwnError(t *testing.T) {
-	own := kernel.Cancelled(kernel.Problem{Code: kernel.CodeInterrupted, Params: kernel.Params{kernel.ParamPhase: "on_create"}})
-
-	failure := outcomeFailure([]kernel.Item[json.RawMessage]{{Subject: "a", Status: kernel.StatusCancelled, Error: own}})
-
-	assert.Equal(t, own, failure)
 }

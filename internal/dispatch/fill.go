@@ -16,7 +16,6 @@ const factsMismatchFmt = "facts of %T handed to %s"
 type Fillable interface {
 	Entry
 	Observe(ctx context.Context) (Observed, error)
-	Forget(observed Observed) Observed
 	State(params FillParams) (kernel.Form[json.RawMessage], error)
 	Choices(ctx context.Context, params FillChoicesParams) (kernel.Choices, error)
 	Set(params SetParams) (json.RawMessage, error)
@@ -30,14 +29,16 @@ type Observed struct {
 }
 
 type FillParams struct {
-	Request json.RawMessage
-	Facts   Observed
+	Request          json.RawMessage
+	Facts            Observed
+	IgnoreRemembered bool
 }
 
 type FillChoicesParams struct {
-	Path    string
-	Request json.RawMessage
-	Facts   Observed
+	Path             string
+	Request          json.RawMessage
+	Facts            Observed
+	IgnoreRemembered bool
 }
 
 type SetParams struct {
@@ -66,22 +67,12 @@ func (f fillable[Req, F, P, D]) Observe(ctx context.Context) (Observed, error) {
 	return Observed{facts: snapshot.Facts, Fingerprint: snapshot.Fingerprint}, nil
 }
 
-// Forget keeps the fingerprint: it is the one of the facts as observed, which
-// a run compares before it forgets anything.
-func (f fillable[Req, F, P, D]) Forget(observed Observed) Observed {
-	facts, err := f.facts(observed)
-	if err != nil {
-		return observed
-	}
-	return Observed{facts: f.Handle.Forget(facts), Fingerprint: observed.Fingerprint}
-}
-
 func (f fillable[Req, F, P, D]) State(params FillParams) (kernel.Form[json.RawMessage], error) {
 	request, facts, err := f.inputs(params.Request, params.Facts)
 	if err != nil {
 		return kernel.Form[json.RawMessage]{}, err
 	}
-	form, err := f.Handle.State(FormParams[Req, F]{Request: request, Facts: facts})
+	form, err := f.Handle.State(FormParams[Req, F]{Request: request, Facts: facts, IgnoreRemembered: params.IgnoreRemembered})
 	if err != nil {
 		return kernel.Form[json.RawMessage]{}, err
 	}
@@ -96,6 +87,9 @@ func (f fillable[Req, F, P, D]) Choices(ctx context.Context, params FillChoicesP
 	request, facts, err := f.inputs(params.Request, params.Facts)
 	if err != nil {
 		return kernel.Choices{}, err
+	}
+	if params.IgnoreRemembered {
+		facts = f.Handle.Forget(facts)
 	}
 	return f.Handle.Choices(ctx, ChoicesParams[Req, F]{Path: params.Path, Request: request, Facts: facts})
 }

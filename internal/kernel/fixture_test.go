@@ -39,7 +39,9 @@ type facts struct {
 
 var errBoom = errors.New("boom")
 
-func fail(context.Context) error { return errBoom }
+func fail(context.Context, kernel.Reporter) error { return errBoom }
+
+func failUndo(context.Context) error { return errBoom }
 
 // disk is what units write: the names that exist, in order.
 type disk struct {
@@ -47,8 +49,8 @@ type disk struct {
 	entries []string
 }
 
-func (d *disk) add(name string) func(context.Context) error {
-	return func(context.Context) error {
+func (d *disk) add(name string) func(context.Context, kernel.Reporter) error {
+	return func(context.Context, kernel.Reporter) error {
 		d.mu.Lock()
 		defer d.mu.Unlock()
 		d.entries = append(d.entries, name)
@@ -89,16 +91,27 @@ func (r *recorder) lines() []string {
 	defer r.mu.Unlock()
 	lines := make([]string, 0, len(r.seen))
 	for _, progress := range r.seen {
-		line := progress.Subject + " " + string(progress.Kind)
-		if phase := progress.Params[kernel.ParamPhase]; phase != "" {
-			line += " " + phase
-		}
-		if status := progress.Params[kernel.ParamStatus]; status != "" {
-			line += " " + status
-		}
-		lines = append(lines, line)
+		lines = append(lines, progress.Base().Subject+" "+line(progress))
 	}
 	return lines
+}
+
+func line(progress kernel.Progress) string {
+	switch p := progress.(type) {
+	case *kernel.UnitStarted:
+		return "unit.started"
+	case *kernel.UnitFinished:
+		return "unit.finished " + string(p.Status)
+	case *kernel.PhaseStarted:
+		return "phase.started " + p.Phase
+	case *kernel.PhaseFinished:
+		return "phase.finished " + p.Phase
+	case *kernel.Output:
+		return "output " + p.Line
+	case *kernel.StatusChanged:
+		return "status " + string(p.Code)
+	}
+	return ""
 }
 
 // The example command: `create`, declared the way a command on the engine is.
@@ -150,14 +163,14 @@ func createRules() rules {
 }
 
 func createUnit(d *disk, branch string) kernel.Unit[string] {
-	configure := kernel.Phase[string]{Name: "configure", Run: func(_ context.Context, path string) (string, error) { return path + " configured", nil }}
+	configure := phase("configure", func(_ context.Context, path string) (string, error) { return path + " configured", nil })
 	return worktreeUnit(d, branch, configure)
 }
 
 func createCommand(d *disk) kernel.Command[request, facts, createPlan, string] {
 	return kernel.Command[request, facts, createPlan, string]{
 		Name: "create",
-		Observe: func(context.Context, kernel.ObserveScope) (facts, error) {
+		Observe: func(context.Context) (facts, error) {
 			return facts{Existing: []string{"feat/old"}, Base: "main"}, nil
 		},
 		Fields: createFields(),
@@ -172,13 +185,14 @@ func createCommand(d *disk) kernel.Command[request, facts, createPlan, string] {
 		Plan: func(_ context.Context, req request, _ facts) (kernel.Plan[createPlan], error) {
 			return kernel.Plan[createPlan]{Detail: createPlan{Branches: req.Branches, From: req.From}}, nil
 		},
-		Apply: func(ctx context.Context, in kernel.ApplyInput[request, facts, createPlan]) (kernel.Outcome[string], error) {
+		Apply: func(ctx context.Context, in kernel.ApplyInput[request, facts, createPlan, string]) (kernel.Outcome[string], error) {
 			items := kernel.Each(ctx, kernel.EachParams[string, string]{
-				Items:   in.Plan.Detail.Branches,
-				Subject: func(branch string) string { return branch },
-				Unit:    func(branch string) kernel.Unit[string] { return createUnit(d, branch) },
-				Emit:    in.Emit,
-				Shield:  in.Shield,
+				Items:      in.Plan.Detail.Branches,
+				Subject:    func(branch string) string { return branch },
+				Unit:       func(branch string) kernel.Unit[string] { return createUnit(d, branch) },
+				Emit:       in.Emit,
+				Shield:     in.Shield,
+				Milestones: in.Milestones,
 			})
 			return kernel.Outcome[string]{Items: items}, nil
 		},
