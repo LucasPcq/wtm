@@ -1,25 +1,48 @@
 package runenv_test
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/service/runenv"
+	"github.com/LucasPcq/wtm/internal/store"
+	"github.com/LucasPcq/wtm/internal/testutil/storetest"
 )
 
 // The few helpers the tests share. Everything a test file holds is a test.
 
-// projectDir is the main checkout, named after the project.
-func projectDir(t *testing.T) string {
+func jobEnv(t *testing.T, params runenv.Params) map[string]string {
 	t.Helper()
-	dir := filepath.Join(t.TempDir(), project)
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, "infra"), 0o755))
-	return dir
+	env, err := runenv.JobEnv(params)
+	require.NoError(t, err)
+	return env
 }
 
-func writeFile(t *testing.T, path, content string) {
+func composeProject(t *testing.T, params runenv.Params) string {
 	t.Helper()
-	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
-	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+	name, err := runenv.ComposeProject(params)
+	require.NoError(t, err)
+	return name
+}
+
+func writes(t *testing.T, params runenv.EnvParams) runenv.EnvWrites {
+	t.Helper()
+	resolved, err := runenv.Env(params)
+	require.NoError(t, err)
+	return resolved
+}
+
+func file(t *testing.T, files *storetest.Fake, path string) string {
+	t.Helper()
+	content, ok := files.File(path)
+	require.True(t, ok, "%s is not there", path)
+	return content
+}
+
+// editTo is another process rewriting a file whole.
+func editTo(path, content string) store.EnvEdit {
+	return store.EnvEdit{Path: path, Create: true, Edit: func([]domain.EnvLine) []domain.EnvLine { return rules.ParseEnv(content) }}
 }

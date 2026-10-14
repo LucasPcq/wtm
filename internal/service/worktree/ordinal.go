@@ -126,7 +126,7 @@ func claimFrom(params claimFromParams) (claim, error) {
 }
 
 func persistOrdinal(ctx context.Context, params WorktreeRef, ordinal int) (int, error) {
-	err := (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
+	_, err := (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
 		Branch:  params.Branch,
 		Missing: store.MissingCreate,
 		Change: func(meta *domain.WorktreeMetadata) error {

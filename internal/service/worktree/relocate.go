@@ -66,7 +66,7 @@ type AdoptParams struct {
 // has to give back. The ordinal is left for the run module to allocate on
 // first use, as for a created worktree.
 func Adopt(ctx context.Context, params AdoptParams) error {
-	return (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
+	_, err := (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
 		Branch:  params.Branch,
 		Missing: store.MissingCreate,
 		Change: func(metadata *domain.WorktreeMetadata) error {
@@ -75,6 +75,7 @@ func Adopt(ctx context.Context, params AdoptParams) error {
 			return nil
 		},
 	})
+	return err
 }
 
 type SetBasePathParams struct {
@@ -88,7 +89,7 @@ type SetBasePathParams struct {
 // have emptied it. os.Remove leaves a directory that still holds anything —
 // a worktree a refusal kept there, or files that are not wtm's.
 func SetBasePath(ctx context.Context, params SetBasePathParams) error {
-	if err := (store.ConfigDisk{StateDir: params.StateDir}).Update(ctx, func(project *domain.ProjectConfig) {
+	if _, err := (store.ConfigDisk{StateDir: params.StateDir}).Update(ctx, func(project *domain.ProjectConfig) {
 		project.Worktrees.BasePath = params.BasePath
 	}); err != nil {
 		return fmt.Errorf("update config base_path: %w", err)

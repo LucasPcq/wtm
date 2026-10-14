@@ -8,8 +8,8 @@ Each function is a **reader** (it reads, never writes, fetches or allocates) or 
 | -- | -- | -- | -- |
 | `service/gitwt` | a git worktree's lifecycle: added with its branch, removed with what the add created | — | `Add`, `Remove` |
 | `service/identity` | who a worktree is, read from one snapshot; only `Allocate` gives it a number | `Read`, the methods of `Snapshot` | `Allocate` |
-| `service/runenv` | a worktree's run environment, from the `run.toml` and the identity it is handed | `JobEnv`, `ComposeProject`, `Env` | — |
-| `service/hooks` | a worktree's lifecycle hooks, run in order, with what they print and how they ended | — | `Execute` (and `RunHooks`, for the commands on `flow/`) |
+| `service/runenv` | a worktree's run environment, from the `run.toml` and the identity it is handed | `JobEnv`, `ComposeProject`, `Env` | `Apply` |
+| `service/hooks` | a worktree's lifecycle hooks | — | `Execute` (and `RunHooks`, for the commands on `flow/`) |
 
 ## gitwt: a worktree as a saga step
 
@@ -39,21 +39,22 @@ step := kernel.SagaStep{
 | `NameClash(branch)` | a live worktree whose derived names the branch would share; asked when `run.toml` declares jobs |
 | `CheckedOutAt(branch)`, `Occupant(path)` | where a branch is out, which branch a folder holds: the inputs of `rules/worktree.CreationOf` |
 
-`Allocate(ctx, AllocateParams{Git, Meta, StateDir, Branch})` gives the smallest number no live worktree holds and writes it by `store.Meta.Update`. It takes `ordinal.lock` under the state dir and reads the snapshot again under it, git included, since a snapshot read before the lock may predate a worktree another process has since numbered. It returns `Claim{Ordinal, Allocated}`: `Allocated` is the change the command reports, for `dispatch` to publish `worktree.updated`.
+`Allocate(ctx, AllocateParams{Git, Meta, StateDir, Branch})` gives the smallest number no live worktree holds and writes it by `store.Meta.Update`. It takes `ordinal.lock` under the state dir and reads the snapshot again under it, git included, since a snapshot read before the lock may predate a worktree another process has since numbered. It returns `Claim{Ordinal, Allocated, Unlocked}`: `Allocated` is the change the command reports, for `dispatch` to publish `worktree.updated`; `Unlocked` is an allocation made without `ordinal.lock` or the record's lock, which the command reports as `locks.unavailable`.
 
 ## runenv: the run environment from what the caller read
 
-`runenv.Params{ProjectDir, Run, Identity}` carries everything: the `domain.RunConfig` loaded once, and the `Identity{Branch, Ordinal, IsMain, Isolation}` read from the snapshot, the number settled by `Allocate` first, since nothing here allocates. `rules/runenv.CaseOf` decides which environment applies: `Verbatim` (nothing), `Main` (its own compose project, its `[[env]]` keys plain), or `Linked` (offset by its ordinal, names derived from its branch).
+`runenv.Params{ProjectDir, Run, Identity, Files}` carries everything: the `domain.RunConfig` loaded once, the `Identity{Branch, Ordinal, IsMain, Isolation}` read from the snapshot, the number settled by `Allocate` first, since nothing here allocates, and the `store.EnvFiles` it reads and writes the `.env` files through. `rules/runenv.CaseOf` decides which environment applies: `Verbatim` (nothing), `Main` (its own compose project, its `[[env]]` keys plain), or `Linked` (offset by its ordinal, names derived from its branch).
 
 - `JobEnv` is what its jobs and hooks learn: identity, offset, declared ports.
 - `ComposeProject` is the `COMPOSE_PROJECT_NAME` written into its `.env`.
 - `Env(EnvParams{Params, WorktreePath, EnvFiles, Proxy, PublicPort})` is `EnvWrites`, what its `.env` files are brought in line with: the `[[env_port]]` links, the `[[env]]` value links, the keys wtm writes whole, the bases, the offset. The public port is the caller's to ask the daemon.
+- `Apply(ctx, ApplyParams{Files, Writes})` writes them: one `EnvFiles.Edit` per file, whose change (the ports rewritten, then the keys wtm owns) is planned from the lines read under the file's lock, never from the read `Env` made. A file only linked stays absent, its keys reported missing; a file a key wtm owns lands in is created. It returns `Applied{Plan, Files, Unlocked}`: the plan as the files read under their locks made it (`Plan.Applied`, each owned key's `Changed`), the targets it rewrote, and whether a write ran without its lock.
 
-Its one read is the main checkout's own `.env` files: the compose project they name, the template values a stamped `[[env]]` key goes back to. What it resolves is written by `store.EnvFiles.Edit`; the copy at creation is `store.EnvFiles.Copy`.
+Its one read is the main checkout's own `.env` files, through `EnvFiles.Read` and `EnvFiles.Template`: the compose project they name, the template values a stamped `[[env]]` key goes back to. A file that does not read is an error, as is an offset that does not parse: `JobEnv`, `ComposeProject` and `Env` return it, never a guess. The copy at creation is `store.EnvFiles.Copy`.
 
 ## hooks.Execute: lines as progress
 
-`Execute(ctx, ExecuteParams{Hooks, WorkDir, Vars, Env, Output})` runs the hooks one after another, as `RunHooks` does, and prints nothing: each line they print, stdout and stderr alike, goes to `Output`, a hook's unfinished last line flushed when it ends. The command runs it inside the phase it opens and hands it its progress:
+`Execute(ctx, ExecuteParams{Hooks, WorkDir, Vars, Env, Output, OnHook})` runs the hooks one after another, as `RunHooks` does, and prints nothing: each line they print, stdout and stderr alike, goes to `Output`, a hook's unfinished last line flushed when it ends, and each hook starting and ending goes to `OnHook` as a `domain.HookBeat`, the end with its duration, its error and its stderr, a failure `continue_on_error` went past included. The command runs it inside the phase it opens and hands it its progress:
 
 ```go
 kernel.Phase[CreateDetail]{Name: string(domain.HookOnCreate), Run: func(ctx context.Context, detail CreateDetail) (CreateDetail, error) {
@@ -61,7 +62,7 @@ kernel.Phase[CreateDetail]{Name: string(domain.HookOnCreate), Run: func(ctx cont
 }}
 ```
 
-It writes no log: `dispatch` keeps the phase's lines in `hooks/<phase>-<branch>.log`, and the generic rendering draws the phase. The error is the result: a `hooks.Failure` naming the hook (`domain.ErrHookFailed`, its exit code), `domain.ErrHookStopped` for a hook interrupted, with its lines emitted up to the interruption, or `domain.ErrCancelled` for an interrupt between two hooks.
+It writes no log: `dispatch` keeps the phase's lines in `hooks/<phase>-<branch>.log`, and the generic rendering draws the phase. The error is the result: a `hooks.Failure` naming the hook, which is either `domain.ErrHookFailed` with its exit code or `domain.ErrHookStopped` for a hook interrupted, with its lines emitted up to the interruption, never both; or `domain.ErrCancelled` for an interrupt between two hooks.
 
 ## Decisions in `rules/<subject>`
 
@@ -69,6 +70,7 @@ What these services decide is pure, in a sub-package named after its subject:
 
 - `rules/worktree`: `CreationOf` decides what a worktree asked for becomes before git adds anything (`Add`, `Unchanged` under `--if-not-exists`, `CheckedOutElsewhere`, `PathTaken`), the branch asked before the folder; `Managed` is a worktree wtm recorded a creation for.
 - `rules/runenv`: `CaseOf`, the environment a worktree is given.
+- `rules/envcopy`: where each `.env` of a new worktree is copied from under its strategy, the parent falling back to the main checkout, and what could not be (`Warning`); the template a file is provisioned from.
 
 The rules they share with `service/worktree` (`AllocateOrdinal`, `KeepsOrdinal`, `WorktreeJobEnv`, `EnvValueWrites`…) are still at the root of `rules/`. They move to their subject with the migration of `create`, which is their first caller on the engine.
 
@@ -83,6 +85,10 @@ The four packages duplicate what `service/worktree` does for the commands on `fl
 | `worktree.Ordinal`, `IsolationOf`, `IsMain`, `CheckNameFree`, `isManaged` | `identity.Snapshot` and its methods |
 | the guards of `worktree.Create` | `rules/worktree.CreationOf` |
 | `worktree.BranchEnv`, `ResolveEnvPorts` | `runenv.JobEnv`, `runenv.Env` |
+| `env.EnvPortsParams` | `runenv.EnvWrites` |
+| `env.ApplyEnvPorts`, `env.ApplyOwnedEnv` | `runenv.Apply` |
+| `env.MainEnvValueRepairs`, `env.stampsFile` | `runenv.mainValueRepairs`, `runenv.stampsFile` |
+| `worktree.composeEnvFiles` (`jobenv.go`) | `runenv.composeEnvFiles` |
 | `worktree.RunCreateHooks` | `hooks.Execute` |
 
 ## What the lint holds
@@ -95,5 +101,5 @@ The four packages are tested like the kernel: testify, a test file per source fi
 
 - `gitwt`: each add and its remove end in the state they started from, for a new and an existing branch, on a real repository and on `gittest.Fake`.
 - `identity`: reading twice calls nothing but `Worktrees` and `Load`; `Allocate` from several processes on a real repository never gives a number twice.
-- `runenv`: each case, verbatim, main and linked, on a `RunConfig` given in the test.
-- `hooks`: a hook interrupted is reported stopped, its lines emitted up to the interruption.
+- `runenv`: each case, verbatim, main and linked, on a `RunConfig` given in the test and the files of a `storetest.Fake`; `Apply` writes what it planned from the lines read under the lock, a second `Apply` changes nothing.
+- `hooks`: a hook interrupted is reported stopped, never failed, its lines emitted up to the interruption; each hook's beats reach `OnHook`, a failure gone past included.

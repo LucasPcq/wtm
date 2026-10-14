@@ -61,7 +61,7 @@ type upsertEnvKeyParams struct {
 }
 
 func upsertEnvKey(ctx context.Context, params upsertEnvKeyParams) (bool, error) {
-	return store.EnvDisk{}.Edit(ctx, store.EnvEdit{
+	written, err := store.EnvDisk{}.Edit(ctx, store.EnvEdit{
 		Path:   params.Path,
 		Create: params.Create,
 		Edit: func(lines []domain.EnvLine) []domain.EnvLine {
@@ -69,4 +69,5 @@ func upsertEnvKey(ctx context.Context, params upsertEnvKeyParams) (bool, error) 
 			return updated
 		},
 	})
+	return written.Changed, err
 }

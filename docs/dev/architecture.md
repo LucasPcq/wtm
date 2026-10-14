@@ -15,6 +15,7 @@ internal/
   rules/                      ← pure functions (stdlib + domain only, no I/O); its root only shrinks, new code goes
                                 into the sub-package of its subject
     statefile/                ←   what a state file's schema allows: read, write, or refuse (exit 22)
+    envcopy/                  ←   where each .env of a new worktree is copied from, and what could not be
   kernel/                     ← the skeleton of the command engine (stdlib only, no business vocabulary): Command,
                                 fields, rules, errors, results, Each / Saga (commands.md)
     text/                     ←   the one catalogue turning a kernel.Code and its params into English

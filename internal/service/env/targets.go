@@ -14,7 +14,8 @@ type AddEnvTargetsParams struct {
 
 // AddEnvTargets appends provisioning targets to config.toml as it is on disk.
 func AddEnvTargets(ctx context.Context, params AddEnvTargetsParams) error {
-	return store.ConfigDisk{StateDir: params.StateDir}.Update(ctx, func(project *domain.ProjectConfig) {
+	_, err := store.ConfigDisk{StateDir: params.StateDir}.Update(ctx, func(project *domain.ProjectConfig) {
 		project.Env.Files = append(project.Env.Files, params.Targets...)
 	})
+	return err
 }

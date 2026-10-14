@@ -30,10 +30,10 @@ func TestARecordIsKeptUnderItsEncodedBranch(t *testing.T) {
 	stateDir := t.TempDir()
 	meta := store.MetaDisk{StateDir: stateDir}
 
-	require.NoError(t, meta.Update(t.Context(), store.MetaUpdate{Branch: "feat/a", Missing: store.MissingCreate, Change: func(m *domain.WorktreeMetadata) error {
+	require.NoError(t, errOf(meta.Update(t.Context(), store.MetaUpdate{Branch: "feat/a", Missing: store.MissingCreate, Change: func(m *domain.WorktreeMetadata) error {
 		m.SourceBranch = "main"
 		return nil
-	}}))
+	}})))
 
 	assert.FileExists(t, filepath.Join(stateDir, domain.WorktreesSubdir, "feat%2Fa", domain.MetaFileName))
 	assert.NotContains(t, readFile(t, metaPath(stateDir, "feat/a")), "schema", "the key is written from schema 2 on")
@@ -50,10 +50,10 @@ func TestUpdateChangesOnlyWhatItIsAskedTo(t *testing.T) {
 	writeRecord(t, stateDir, "feat/a", domain.WorktreeMetadata{SourceBranch: "main", CreatedAt: "2026-01-02T03:04:05Z", Ordinal: 2})
 	meta := store.MetaDisk{StateDir: stateDir}
 
-	require.NoError(t, meta.Update(t.Context(), store.MetaUpdate{Branch: "feat/a", Change: func(m *domain.WorktreeMetadata) error {
+	require.NoError(t, errOf(meta.Update(t.Context(), store.MetaUpdate{Branch: "feat/a", Change: func(m *domain.WorktreeMetadata) error {
 		m.Isolation = domain.IsolationVerbatim
 		return nil
-	}}))
+	}})))
 
 	got, err := meta.Load("feat/a")
 	require.NoError(t, err)
@@ -74,7 +74,7 @@ func TestUpdateOfAnAbsentRecordFollowsMissing(t *testing.T) {
 			stateDir := t.TempDir()
 			meta := store.MetaDisk{StateDir: stateDir}
 
-			err := meta.Update(t.Context(), store.MetaUpdate{Branch: "feat/a", Missing: missing, Change: func(m *domain.WorktreeMetadata) error {
+			_, err := meta.Update(t.Context(), store.MetaUpdate{Branch: "feat/a", Missing: missing, Change: func(m *domain.WorktreeMetadata) error {
 				m.SourceBranch = "main"
 				return nil
 			}})
@@ -93,7 +93,7 @@ func TestUpdateOfAnAbsentRecordFollowsMissing(t *testing.T) {
 func TestAnUpdateThatSaysNothingOfAnAbsentRecordCreatesNone(t *testing.T) {
 	meta := store.MetaDisk{StateDir: t.TempDir()}
 
-	err := meta.Update(t.Context(), store.MetaUpdate{Branch: "feat/a", Change: func(m *domain.WorktreeMetadata) error {
+	_, err := meta.Update(t.Context(), store.MetaUpdate{Branch: "feat/a", Change: func(m *domain.WorktreeMetadata) error {
 		m.Ordinal = 1
 		return nil
 	}})
@@ -108,10 +108,10 @@ func TestAnUnreadableRecordIsRebuiltOnlyWhenMissingCreates(t *testing.T) {
 	writeMeta(t, stateDir, "feat/a", "{not json")
 	meta := store.MetaDisk{StateDir: stateDir}
 	setOrdinal := func(missing store.Missing) error {
-		return meta.Update(t.Context(), store.MetaUpdate{Branch: "feat/a", Missing: missing, Change: func(m *domain.WorktreeMetadata) error {
+		return errOf(meta.Update(t.Context(), store.MetaUpdate{Branch: "feat/a", Missing: missing, Change: func(m *domain.WorktreeMetadata) error {
 			m.Ordinal = 4
 			return nil
-		}})
+		}}))
 	}
 
 	require.Error(t, setOrdinal(store.MissingRefuse))
@@ -130,7 +130,7 @@ func TestARecordAtANewerSchemaIsReadButNeverRewritten(t *testing.T) {
 	meta := store.MetaDisk{StateDir: stateDir}
 
 	got, loadErr := meta.Load("feat/a")
-	err := meta.Update(t.Context(), store.MetaUpdate{Branch: "feat/a", Change: func(m *domain.WorktreeMetadata) error {
+	_, err := meta.Update(t.Context(), store.MetaUpdate{Branch: "feat/a", Change: func(m *domain.WorktreeMetadata) error {
 		m.Ordinal = 1
 		return nil
 	}})
@@ -147,7 +147,7 @@ func TestAChangeThatFailsWritesNothing(t *testing.T) {
 	before := readFile(t, metaPath(stateDir, "feat/a"))
 	refused := assert.AnError
 
-	err := store.MetaDisk{StateDir: stateDir}.Update(t.Context(), store.MetaUpdate{Branch: "feat/a", Change: func(m *domain.WorktreeMetadata) error {
+	_, err := store.MetaDisk{StateDir: stateDir}.Update(t.Context(), store.MetaUpdate{Branch: "feat/a", Change: func(m *domain.WorktreeMetadata) error {
 		m.SourceBranch = "other"
 		return refused
 	}})
@@ -164,7 +164,7 @@ func TestMetaUpdatesFromSeveralGoroutinesAllLand(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for i := range updates {
-		wg.Go(func() { assert.NoError(t, meta.Update(t.Context(), addNamespace("db"+strconv.Itoa(i)))) })
+		wg.Go(func() { assert.NoError(t, errOf(meta.Update(t.Context(), addNamespace("db"+strconv.Itoa(i))))) })
 	}
 	wg.Wait()
 

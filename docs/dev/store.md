@@ -8,15 +8,22 @@
 | -- | -- | -- | -- |
 | `store.Meta` | `MetaDisk{StateDir}` | `<common>/wtm/worktrees/<branch>/meta.json` | `Load`, `Records`, `Update`, `Purge` |
 | `store.ProjectConfig` | `ConfigDisk{StateDir}` | `<common>/wtm/config.toml` | `Remember` (and `ConfigDisk.Update`) |
-| `store.EnvFiles` | `EnvDisk{}` | a worktree's `.env` files | `Copy`, `Edit` |
+| `store.EnvFiles` | `EnvDisk{}` | a worktree's `.env` files | `Read`, `Template`, `Copy`, `Edit` |
 
 `run.toml`, `pending-removals.toml`, the logs and the full re-render of `config.toml` by `init` keep their writers in `config/` and `service/` until their commands migrate.
+
+## What a write says
+
+Every write returns what it did, for the command to report: `store.Written{Changed, Unlocked}` from `Meta.Update`, `ProjectConfig.Remember` (and `ConfigDisk.Update`) and `EnvFiles.Edit`, `store.EnvCopied{Files, Warnings, Unlocked}` from `EnvFiles.Copy`.
+
+- `Changed` is a file rewritten: a write whose content is the one on disk is not, and says so.
+- `Unlocked` is a write that ran without its file lock, on a filesystem without `flock` (`fs.Lock.Held` false): the write landed, and the command carries the warning `locks.unavailable` in its outcome.
 
 ## `meta.json`: `store.Meta`
 
 ```go
 meta := store.MetaDisk{StateDir: stateDir}
-err := meta.Update(ctx, store.MetaUpdate{
+written, err := meta.Update(ctx, store.MetaUpdate{
 	Branch:  branch,
 	Missing: store.MissingSkip,
 	Change:  func(m *domain.WorktreeMetadata) error { m.Namespaces = append(m.Namespaces, job); return nil },
@@ -26,7 +33,7 @@ err := meta.Update(ctx, store.MetaUpdate{
 - The record of `feat/x` is under `worktrees/feat%2Fx/` (`rules.WorktreeMetaDir`), locked by `meta.json.lock` beside it.
 - `Load` reads without the lock: a write renames a whole file over the record. An absent record is an error wrapping `os.ErrNotExist`. A record at a newer schema is read.
 - `Records` is every record that reads, sorted by branch, read from disk rather than from the live worktrees: the namespaces a removed worktree still holds are found by it.
-- `Update` is a read-modify-write under the lock: `Change` edits the record as it is on disk, so two commands changing different fields both land. A record written at a newer schema is refused (`*statefile.NewerError`), a `Change` that returns an error writes nothing, and a record left unchanged is not rewritten.
+- `Update` is a read-modify-write under the lock: `Change` edits the record as it is on disk, so two commands changing different fields both land. A record written at a newer schema is refused (`*statefile.NewerError`), a `Change` that returns an error writes nothing, and a record left unchanged is not rewritten (`Changed` is false).
 
 | `Missing` | Absent record | Unreadable record |
 | -- | -- | -- |
@@ -46,16 +53,17 @@ The zero value refuses: a writer that creates a record says so (`Create`, the or
 
 ## The `.env` files: `store.EnvFiles`
 
-- `Copy(ctx, EnvCopy{Strategy, Files, TargetDir, MainWorktreePath, ParentWorktreePath})` provisions a new worktree's files from the source its strategy names (`example`: the template, `main`, `parent` falling back to `main`). It returns what it could not provision as `[]store.EnvWarning`, a sealed union: `NoTemplate`, `SourceMissing`, `ParentFallback`. It never prints them: a command on the engine carries them as `kernel.Warning` in its outcome, and `service/worktree.Create` writes them on stderr for the commands still on `flow/`.
+- `Copy(ctx, envcopy.Request{Strategy, Files, TargetDir, MainWorktreePath, ParentWorktreePath})` provisions a new worktree's files from the source its strategy names (`example`: the template, `main`, `parent` falling back to `main`). Which source that is, is decided in `rules/envcopy`: `Candidates` names the paths whose presence decides it, the store stats each with `fs.Exists` (a path that cannot be stat'ed is an error, never taken for absent), and `Sources` decides from the set present. `EnvCopied` names the files it wrote and what it could not provision, `[]envcopy.Warning`, a sealed union: `NoTemplate`, `SourceMissing`, `ParentFallback`. It never prints them: a command on the engine carries them as `kernel.Warning` in its outcome, and `service/worktree.Create` writes them on stderr for the commands still on `flow/`.
 - `Edit(ctx, EnvEdit{Path, Create, Edit})` reads the file under its lock, hands its lines to `Edit` and writes what comes back. Lines are parsed and rendered by `rules.ParseEnv` and `rules.RenderEnv`, so a changed key keeps its place, its comment and its `export`, and the user's lines, comments, order and line endings stay as they were. A file that renders as it was is not rewritten (`changed` is false). An absent file stays absent unless `Create` is set: the value file is created, the committed template never.
 - The lock is `fs.ScratchLockPath(path)`, in the temporary directory: no lock file appears in the user's checkout.
-- `TemplateSource(dir, file)` is the template provisioning copies, the one detection pinned or else the first candidate on disk. `CopySources` and `EditEnv` are the decisions of `Copy` and `Edit` without the disk, shared with the double.
+- `Read(path)` is a file's lines, none for an absent file; `Template(dir, file)` is the template provisioning copies, the one detection pinned or else the first candidate on disk (`envcopy.TemplateCandidates`, `envcopy.Template`). A layer on the engine reads a `.env` through them, never `os.ReadFile`: `service/runenv` reads the main checkout's own files so.
+- `EditEnv` is the decision of `Edit` without the disk, shared with the double.
 
-Every writer of a `.env` in `service/env` goes through `Edit`: the ports (`ApplyEnvPorts`), the keys wtm owns (`ApplyOwnedEnv`, `WritePortKeys`), the restore of a verbatim worktree and the sync of `wtm env`. Each computes its change from the lines read under the lock, never from a read made before it.
+Every writer of a `.env` goes through `Edit` and computes its change from the lines read under the lock, never from a read made before it. On the engine that is `runenv.Apply` ([services.md](services.md#runenv-the-run-environment-from-what-the-caller-read)); in `service/env`, for the commands still on `flow/`, the ports (`ApplyEnvPorts`), the keys wtm owns (`ApplyOwnedEnv`, `WritePortKeys`), the restore of a verbatim worktree and the sync of `wtm env`.
 
 ## Ports
 
-A command on the engine receives these interfaces when it is built (`create.Command(ports)`, [dispatch.md](dispatch.md#ports)). `Dispatcher.Registry` builds it with `store.MetaDisk{StateDir}` and `store.ConfigDisk{StateDir}`, on the dispatcher's `StateDir`, and `store.EnvDisk{}`. Its tests run on `storetest.Fake` (`internal/testutil/storetest`): the records, `config.toml` and the files in memory, where what its writes change its reads give back and it refuses what the disk refuses. `FakeParams.Fail` makes a method fail without running, `Calls()` lists the calls made, and `Config()` and `File(path)` show what it holds.
+A command on the engine receives these interfaces when it is built (`create.Command(ports)`, [dispatch.md](dispatch.md#ports)). `Dispatcher.Registry` builds it with `store.MetaDisk{StateDir}` and `store.ConfigDisk{StateDir}`, on the dispatcher's `StateDir`, and `store.EnvDisk{}`. Its tests run on `storetest.Fake` (`internal/testutil/storetest`): the records, `config.toml` and the files in memory, where what its writes change its reads give back, it says what they changed and it refuses what the disk refuses. `FakeParams.Unreadable` holds a `meta.json` that does not read (`Load` fails, `Records` leaves it out, `Update` overwrites it under `MissingCreate` only), `FakeParams.Fail` makes a method fail without running, `Calls()` lists the calls made, and `Config()` and `File(path)` show what it holds. Its writes are never `Unlocked`.
 
 ## What the lint holds
 
@@ -66,4 +74,4 @@ A command on the engine receives these interfaces when it is built (`create.Comm
 
 ## Testing
 
-`internal/store` is tested like the kernel: testify, a test file per source file holding only `Test…` functions, the shared helpers in `helpers_test.go`. Concurrency is tested for real, under `-race`: updates of one `meta.json` from goroutines and from processes started from the test binary (`TestHelperProcess`), remembered answers and `.env` edits from goroutines. A record and a `config.toml` without `schema` read as they always did, and a file at a newer schema is refused byte for byte. `contract_test.go` runs the same cases on the disk and on `storetest.Fake`: the records, the memory, the copy and the edits end the same, and both refuse the same calls without changing anything.
+`internal/store` is tested like the kernel: testify, a test file per source file holding only `Test…` functions, the shared helpers in `helpers_test.go`. Concurrency is tested for real, under `-race`: updates of one `meta.json` from goroutines and from processes started from the test binary (`TestHelperProcess`), remembered answers and `.env` edits from goroutines. A record and a `config.toml` without `schema` read as they always did, and a file at a newer schema is refused byte for byte. `contract_test.go` runs the same cases on the disk and on `storetest.Fake`: the records, a record that does not read, the memory, the copy, the reads and the edits end the same, each write says the same change, and both refuse the same calls without changing anything.

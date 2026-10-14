@@ -2,6 +2,7 @@
 package store
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -24,7 +25,7 @@ type Meta interface {
 	Load(branch string) (domain.WorktreeMetadata, error)
 	// Records are every record that reads, by branch; one that does not read is left out.
 	Records() ([]MetaRecord, error)
-	Update(ctx context.Context, update MetaUpdate) error
+	Update(ctx context.Context, update MetaUpdate) (Written, error)
 	// Purge drops the record and its directory: nothing is left to hold an ordinal.
 	Purge(branch string) error
 }
@@ -110,9 +111,10 @@ func (m MetaDisk) Records() ([]MetaRecord, error) {
 
 // Update is the one write of a record: a read-modify-write under its lock, so
 // two commands changing different fields of the same worktree both land.
-func (m MetaDisk) Update(ctx context.Context, update MetaUpdate) error {
+func (m MetaDisk) Update(ctx context.Context, update MetaUpdate) (Written, error) {
 	path := m.path(update.Branch)
-	_, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
+	changed := false
+	lock, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
 		Path: path,
 		Mutate: func(current []byte) (fs.Change, error) {
 			if current == nil && update.Missing == MissingSkip {
@@ -130,10 +132,17 @@ func (m MetaDisk) Update(ctx context.Context, update MetaUpdate) error {
 			if err != nil {
 				return nil, fmt.Errorf("marshal metadata: %w", err)
 			}
+			if bytes.Equal(current, data) {
+				return fs.Keep{}, nil
+			}
+			changed = true
 			return fs.Write{Data: data}, nil
 		},
 	})
-	return err
+	if err != nil {
+		return Written{}, err
+	}
+	return Written{Changed: changed, Unlocked: !lock.Held}, nil
 }
 
 // Purge is best effort for its caller, a removal that already happened, but

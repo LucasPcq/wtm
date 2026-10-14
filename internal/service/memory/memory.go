@@ -14,5 +14,6 @@ type RememberParams struct {
 }
 
 func Remember(ctx context.Context, params RememberParams) error {
-	return store.ConfigDisk{StateDir: params.StateDir}.Remember(ctx, params.Change)
+	_, err := store.ConfigDisk{StateDir: params.StateDir}.Remember(ctx, params.Change)
+	return err
 }

@@ -32,6 +32,7 @@ var engineMutators = map[string]bool{
 	"identity.Allocate": true,
 	"hooks.Execute":     true,
 	"hooks.RunHooks":    true,
+	"runenv.Apply":      true,
 }
 
 func TestTheEngineServicesAreClassifiedAsTheirDocSays(t *testing.T) {

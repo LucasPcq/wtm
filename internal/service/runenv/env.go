@@ -1,9 +1,7 @@
 package runenv
 
 import (
-	"fmt"
 	"path/filepath"
-	"strconv"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -51,7 +49,10 @@ func Env(params EnvParams) (EnvWrites, error) {
 		return EnvWrites{}, nil
 	}
 	cfg, _ := rules.PartitionEnvTargets(rules.PartitionEnvTargetsParams{Config: params.Run, Files: params.EnvFiles})
-	owned := ownedWrites(ownedWritesParams{Env: params, Config: cfg})
+	owned, err := ownedWrites(ownedWritesParams{Env: params, Config: cfg})
+	if err != nil {
+		return EnvWrites{}, err
+	}
 
 	if len(cfg.EnvPorts) == 0 && len(cfg.EnvValues) == 0 {
 		if len(owned) == 0 {
@@ -66,10 +67,13 @@ func Env(params EnvParams) (EnvWrites, error) {
 	// The environment rather than the ordinal alone: it settles the offset and
 	// the worktree label in one place, so a .env and the route a job answers
 	// under never disagree on which worktree they belong to.
-	env := JobEnv(params.Params)
-	offset, err := strconv.Atoi(env[domain.EnvPortOffset])
+	env, err := JobEnv(params.Params)
 	if err != nil {
-		return EnvWrites{}, fmt.Errorf("resolve port offset: %w", err)
+		return EnvWrites{}, err
+	}
+	offset, err := offsetOf(env)
+	if err != nil {
+		return EnvWrites{}, err
 	}
 	origins := rules.OriginContext{
 		Addressing: rules.EffectiveAddressing(cfg),
@@ -119,7 +123,7 @@ func valuesFor(params valuesForParams) ([]domain.EnvValueLink, []domain.EnvOwned
 	if _, main := params.Case.(envcase.Main); !main {
 		return params.Links, params.Stamps, nil
 	}
-	repairs, err := mainValueRepairs(mainValueRepairsParams{MainPath: params.Env.WorktreePath, Files: params.Env.EnvFiles, Stamps: params.Stamps})
+	repairs, err := mainValueRepairs(mainValueRepairsParams{Env: params.Env, Stamps: params.Stamps})
 	return nil, repairs, err
 }
 
@@ -128,15 +132,19 @@ type ownedWritesParams struct {
 	Config domain.RunConfig
 }
 
-func ownedWrites(params ownedWritesParams) []domain.EnvOwnedEntry {
+func ownedWrites(params ownedWritesParams) ([]domain.EnvOwnedEntry, error) {
 	if len(rules.OwnedEnvTargets(rules.OwnedEnvTargetsParams{Config: params.Config, EnvFiles: params.Env.EnvFiles})) == 0 {
-		return nil
+		return nil, nil
+	}
+	composeProject, err := ComposeProject(params.Env.Params)
+	if err != nil {
+		return nil, err
 	}
 	return rules.OwnedEnvWrites(rules.OwnedEnvWritesParams{
 		Config:   params.Config,
 		EnvFiles: params.Env.EnvFiles,
-		Values:   map[string]string{domain.EnvComposeProjectName: ComposeProject(params.Env.Params)},
-	})
+		Values:   map[string]string{domain.EnvComposeProjectName: composeProject},
+	}), nil
 }
 
 func jobsByName(cfg domain.RunConfig) map[string]domain.JobConfig {

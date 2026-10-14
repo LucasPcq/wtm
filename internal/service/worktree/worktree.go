@@ -14,6 +14,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/infra/proc"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/rules/envcopy"
 	"github.com/LucasPcq/wtm/internal/service/branch"
 	"github.com/LucasPcq/wtm/internal/service/hooks"
 	"github.com/LucasPcq/wtm/internal/store"
@@ -90,7 +91,7 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 
 	envFiles := params.Config.Project.Env.Files
 	if len(envFiles) > 0 {
-		warnings, copyErr := store.EnvDisk{}.Copy(ctx, store.EnvCopy{
+		copied, copyErr := store.EnvDisk{}.Copy(ctx, envcopy.Request{
 			Strategy:           strategy,
 			Files:              envFiles,
 			TargetDir:          worktreePath,
@@ -100,7 +101,7 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 		if copyErr != nil {
 			return domain.CreateResult{}, fmt.Errorf("copy env files: %w", copyErr)
 		}
-		warnEnv(os.Stderr, warnings)
+		warnEnv(os.Stderr, copied.Warnings)
 	}
 
 	// No ordinal: it is the run module's, allocated the first time something
@@ -113,7 +114,7 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 		Isolation:    rules.EffectiveIsolation(params.Isolation),
 	}
 
-	if err := (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
+	if _, err := (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
 		Branch:  params.Branch,
 		Missing: store.MissingCreate,
 		Change: func(stored *domain.WorktreeMetadata) error {
@@ -242,14 +243,14 @@ func occupantOf(ctx context.Context, params occupantParams) (string, error) {
 	return "", nil
 }
 
-func warnEnv(w io.Writer, warnings []store.EnvWarning) {
+func warnEnv(w io.Writer, warnings []envcopy.Warning) {
 	for _, warning := range warnings {
 		switch warning := warning.(type) {
-		case store.NoTemplate:
+		case envcopy.NoTemplate:
 			fmt.Fprintf(w, domain.EnvNoTemplateWarningFmt, warning.Target)
-		case store.SourceMissing:
+		case envcopy.SourceMissing:
 			fmt.Fprintf(w, domain.EnvSourceMissingWarningFmt, warning.Target, warning.Dir)
-		case store.ParentFallback:
+		case envcopy.ParentFallback:
 			fmt.Fprintf(w, domain.EnvParentFallbackWarningFmt, warning.Target)
 		}
 	}

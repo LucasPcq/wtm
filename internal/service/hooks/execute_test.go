@@ -91,3 +91,24 @@ func TestAnInterruptBeforeAHookStartsNone(t *testing.T) {
 
 	require.ErrorIs(t, err, domain.ErrCancelled)
 }
+
+func TestEachHookSaysWhenItStartsAndHowItEndedAFailureGonePastIncluded(t *testing.T) {
+	var beats []domain.HookBeat
+
+	err := hooks.Execute(t.Context(), hooks.ExecuteParams{
+		Hooks:   []domain.HookCommand{{Cmd: "echo broken >&2; exit 2", ContinueOnError: true}, {Cmd: "true"}},
+		WorkDir: t.TempDir(),
+		OnHook:  func(beat domain.HookBeat) { beats = append(beats, beat) },
+	})
+
+	require.NoError(t, err)
+	require.Len(t, beats, 4)
+	assert.True(t, beats[0].Started)
+	assert.False(t, beats[1].Started)
+	assert.Equal(t, "echo broken >&2; exit 2", beats[1].Cmd)
+	assert.NotEmpty(t, beats[1].Err)
+	assert.Equal(t, "broken", beats[1].Stderr)
+	assert.Positive(t, beats[1].Duration)
+	assert.True(t, beats[2].Started)
+	assert.Empty(t, beats[3].Err)
+}

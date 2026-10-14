@@ -101,7 +101,7 @@ type setSourceBranchParams struct {
 // preserving CreatedAt and EnvStrategy.
 func setSourceBranch(ctx context.Context, params setSourceBranchParams) (domain.ReparentResult, error) {
 	old := ""
-	err := (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
+	_, err := (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
 		Branch: params.Branch,
 		Change: func(meta *domain.WorktreeMetadata) error {
 			old = meta.SourceBranch

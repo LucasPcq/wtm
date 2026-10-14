@@ -1,64 +1,59 @@
 package runenv
 
 import (
-	"errors"
-	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
-	"github.com/LucasPcq/wtm/internal/store"
 )
 
-type composeEnvFilesParams struct {
-	Dir    string
-	Config domain.RunConfig
-}
-
-// composeEnvFiles reads the .env of each directory a compose stack starts from.
-// A .env that cannot be read counts as one that names nothing.
-func composeEnvFiles(params composeEnvFilesParams) [][]domain.EnvLine {
-	dirs := rules.ComposeProjectDirs(params.Config)
+// composeEnvFiles reads the main checkout's .env in each directory a compose
+// stack starts from.
+func composeEnvFiles(params Params) ([][]domain.EnvLine, error) {
+	dirs := rules.ComposeProjectDirs(params.Run)
 	if len(dirs) == 0 {
 		dirs = []string{"."}
 	}
 	files := make([][]domain.EnvLine, 0, len(dirs))
 	for _, dir := range dirs {
-		data, err := os.ReadFile(filepath.Join(params.Dir, dir, domain.EnvFileName))
+		lines, err := params.Files.Read(filepath.Join(params.ProjectDir, dir, domain.EnvFileName))
 		if err != nil {
-			continue
+			return nil, err
 		}
-		files = append(files, rules.ParseEnv(string(data)))
+		files = append(files, lines)
 	}
-	return files
+	return files, nil
 }
 
 type mainValueRepairsParams struct {
-	MainPath string
-	Files    []domain.EnvFile
-	Stamps   []domain.EnvOwnedEntry
+	Env    EnvParams
+	Stamps []domain.EnvOwnedEntry
 }
 
 // mainValueRepairs reads the main checkout's files and their templates for the
 // [[env]] values wtm once wrote there, and plans putting them back.
 func mainValueRepairs(params mainValueRepairsParams) ([]domain.EnvOwnedEntry, error) {
+	files := params.Env.Files
+	mainPath := params.Env.WorktreePath
 	current := map[string][]domain.EnvLine{}
 	template := map[string][]domain.EnvLine{}
-	for _, file := range params.Files {
+	for _, file := range params.Env.EnvFiles {
 		if !stampsFile(stampsFileParams{Stamps: params.Stamps, Target: file.Target}) {
 			continue
 		}
-		lines, err := readEnvFile(filepath.Join(params.MainPath, file.Target))
+		lines, err := files.Read(filepath.Join(mainPath, file.Target))
 		if err != nil {
 			return nil, err
 		}
 		current[file.Target] = lines
-		source := store.TemplateSource(params.MainPath, file)
+		source, err := files.Template(mainPath, file)
+		if err != nil {
+			return nil, err
+		}
 		if source == "" {
 			continue
 		}
-		if template[file.Target], err = readEnvFile(source); err != nil {
+		if template[file.Target], err = files.Read(source); err != nil {
 			return nil, err
 		}
 	}
@@ -77,16 +72,4 @@ func stampsFile(params stampsFileParams) bool {
 		}
 	}
 	return false
-}
-
-// readEnvFile reads an absent file as an empty one.
-func readEnvFile(path string) ([]domain.EnvLine, error) {
-	data, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", path, err)
-	}
-	return rules.ParseEnv(string(data)), nil
 }

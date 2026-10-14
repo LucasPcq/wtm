@@ -1,4 +1,4 @@
-// Package fs is the only writer of the files wtm keeps: atomic, locked updates and the paths they live at.
+// Package fs is the only writer of the files wtm keeps.
 package fs
 
 import (
@@ -29,13 +29,22 @@ func GlobalDir() (string, error) {
 }
 
 // ScratchLockPath is the lock of a file wtm writes in the user's tree: in the
-// temporary directory, named after the file's absolute path, so every process
-// updating that file meets on the same lock.
+// temporary directory, named after the file's resolved path, so every process
+// updating that file meets on the same lock whatever spelling it was given.
 func ScratchLockPath(path string) string {
+	sum := sha256.Sum256([]byte(resolvedFile(path)))
+	return filepath.Join(os.TempDir(), scratchLockDir, hex.EncodeToString(sum[:16])+lockSuffix)
+}
+
+// resolvedFile resolves the directory when the file does not exist yet: its
+// first write and the ones after must take the same lock.
+func resolvedFile(path string) string {
 	absolute, err := filepath.Abs(path)
 	if err != nil {
 		absolute = path
 	}
-	sum := sha256.Sum256([]byte(absolute))
-	return filepath.Join(os.TempDir(), scratchLockDir, hex.EncodeToString(sum[:16])+lockSuffix)
+	if resolved, err := filepath.EvalSymlinks(absolute); err == nil {
+		return resolved
+	}
+	return filepath.Join(ResolvePath(filepath.Dir(absolute)), filepath.Base(absolute))
 }

@@ -1,14 +1,28 @@
 package fs
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 )
 
-// FileExists reports whether a file exists at the given path.
-func FileExists(path string) bool {
+// Exists is false only for a path that is not there: a path that cannot be
+// stat'ed for another reason is an error, never taken for absent.
+func Exists(path string) (bool, error) {
 	_, err := os.Stat(path)
-	return err == nil
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// FileExists takes any error for absence, for the commands still on flow/.
+func FileExists(path string) bool {
+	exists, err := Exists(path)
+	return exists && err == nil
 }
 
 // ResolvePath follows symlinks so two spellings of the same directory compare

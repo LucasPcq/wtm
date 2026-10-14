@@ -23,7 +23,7 @@ func TestRememberWritesNoDefaultThatWasNotInTheFile(t *testing.T) {
 	stateDir := t.TempDir()
 	writeFile(t, filepath.Join(stateDir, domain.ConfigFileName), sparseConfig)
 
-	require.NoError(t, store.ConfigDisk{StateDir: stateDir}.Remember(t.Context(), rules.RememberedChange{Remember: map[string]string{domain.RememberIsolation: "verbatim"}}))
+	require.NoError(t, errOf(store.ConfigDisk{StateDir: stateDir}.Remember(t.Context(), rules.RememberedChange{Remember: map[string]string{domain.RememberIsolation: "verbatim"}})))
 
 	project, err := config.LoadProjectRaw(stateDir)
 	require.NoError(t, err)
@@ -37,10 +37,10 @@ func TestRememberKeepsAndForgetsOnTopOfWhatIsOnDisk(t *testing.T) {
 	stateDir := t.TempDir()
 	writeFile(t, filepath.Join(stateDir, domain.ConfigFileName), sparseConfig+"\n[wizard.remembered]\nisolation = \"verbatim\"\nenv_strategy = \"parent\"\n")
 
-	require.NoError(t, store.ConfigDisk{StateDir: stateDir}.Remember(t.Context(), rules.RememberedChange{
+	require.NoError(t, errOf(store.ConfigDisk{StateDir: stateDir}.Remember(t.Context(), rules.RememberedChange{
 		Remember: map[string]string{domain.RememberSourceUpdate: "ff"},
 		Forget:   []string{domain.RememberIsolation},
-	}))
+	})))
 
 	project, err := config.LoadProjectRaw(stateDir)
 	require.NoError(t, err)
@@ -55,7 +55,7 @@ func TestRemembersFromSeveralGoroutinesAllLand(t *testing.T) {
 	var wg sync.WaitGroup
 	for key, value := range answers {
 		wg.Go(func() {
-			assert.NoError(t, store.ConfigDisk{StateDir: stateDir}.Remember(t.Context(), rules.RememberedChange{Remember: map[string]string{key: value}}))
+			assert.NoError(t, errOf(store.ConfigDisk{StateDir: stateDir}.Remember(t.Context(), rules.RememberedChange{Remember: map[string]string{key: value}})))
 		})
 	}
 	wg.Wait()
@@ -68,13 +68,13 @@ func TestRemembersFromSeveralGoroutinesAllLand(t *testing.T) {
 func TestAnEmptyChangeWritesNothing(t *testing.T) {
 	stateDir := t.TempDir()
 
-	require.NoError(t, store.ConfigDisk{StateDir: stateDir}.Remember(t.Context(), rules.RememberedChange{}))
+	require.NoError(t, errOf(store.ConfigDisk{StateDir: stateDir}.Remember(t.Context(), rules.RememberedChange{})))
 
 	assert.NoFileExists(t, filepath.Join(stateDir, domain.ConfigFileName))
 }
 
 func TestRememberNeedsAConfig(t *testing.T) {
-	err := store.ConfigDisk{StateDir: t.TempDir()}.Remember(t.Context(), rules.RememberedChange{Remember: map[string]string{domain.RememberIsolation: "verbatim"}})
+	_, err := store.ConfigDisk{StateDir: t.TempDir()}.Remember(t.Context(), rules.RememberedChange{Remember: map[string]string{domain.RememberIsolation: "verbatim"}})
 
 	require.ErrorIs(t, err, domain.ErrConfigNotFound)
 }
@@ -85,7 +85,7 @@ func TestAConfigAtANewerSchemaIsNeverRewritten(t *testing.T) {
 	path := filepath.Join(stateDir, domain.ConfigFileName)
 	writeFile(t, path, content)
 
-	err := store.ConfigDisk{StateDir: stateDir}.Remember(t.Context(), rules.RememberedChange{Remember: map[string]string{domain.RememberIsolation: "verbatim"}})
+	_, err := store.ConfigDisk{StateDir: stateDir}.Remember(t.Context(), rules.RememberedChange{Remember: map[string]string{domain.RememberIsolation: "verbatim"}})
 
 	require.ErrorIs(t, err, domainstatefile.ErrSchemaNewer)
 	assert.Equal(t, content, readFile(t, path))
@@ -95,9 +95,9 @@ func TestUpdateWritesTheSchemaBesideTheConfig(t *testing.T) {
 	stateDir := t.TempDir()
 	writeFile(t, filepath.Join(stateDir, domain.ConfigFileName), sparseConfig)
 
-	require.NoError(t, store.ConfigDisk{StateDir: stateDir}.Update(t.Context(), func(project *domain.ProjectConfig) {
+	require.NoError(t, errOf(store.ConfigDisk{StateDir: stateDir}.Update(t.Context(), func(project *domain.ProjectConfig) {
 		project.Worktrees.BasePath = "../elsewhere"
-	}))
+	})))
 
 	project, err := config.LoadProjectRaw(stateDir)
 	require.NoError(t, err)
