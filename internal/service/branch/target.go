@@ -19,7 +19,7 @@ func Target(ctx context.Context, params BranchParams) domain.BranchTarget {
 		ProjectDir: params.ProjectDir,
 		Branch:     params.Branch,
 	}) {
-		return domain.BranchTarget{State: domain.BranchTargetNew, Branch: params.Branch}
+		return domain.BranchTarget{State: domain.BranchTargetNew, Branch: params.Branch, Upstream: remoteCounterpart(ctx, params)}
 	}
 
 	state, ab := Divergence(ctx, params)
@@ -44,4 +44,12 @@ func Target(ctx context.Context, params BranchParams) domain.BranchTarget {
 		Origin:       state,
 		AheadBehind:  ab,
 	}
+}
+
+func remoteCounterpart(ctx context.Context, params BranchParams) string {
+	remote := domain.RemoteBranchPrefix + params.Branch
+	if !infra.BranchOrRemoteExists(ctx, infra.BranchOrRemoteExistsParams{ProjectDir: params.ProjectDir, Ref: remote}) {
+		return ""
+	}
+	return remote
 }

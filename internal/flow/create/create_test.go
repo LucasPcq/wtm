@@ -1014,3 +1014,88 @@ func TestAWizardBranchSharingAnotherWorktreeFolderIsRefused(t *testing.T) {
 		t.Errorf("outcome = %+v, want feat/x failed with exit %d and nothing returned", outcome, domain.ExitCodeWorktreeExists)
 	}
 }
+
+// pushedOnly leaves name on origin alone, one commit past main, with no local
+// branch: the state a branch someone else pushed is in after a fetch.
+func pushedOnly(t *testing.T, ctx flow.Context, name string) string {
+	t.Helper()
+	gittest.AddOrigin(t, ctx.ProjectDir)
+	gittest.Git(t, ctx.ProjectDir, "checkout", "-b", name)
+	gittest.Git(t, ctx.ProjectDir, "commit", "--allow-empty", "-m", "pushed work")
+	gittest.PushBranch(t, ctx.ProjectDir, name)
+	gittest.Git(t, ctx.ProjectDir, "checkout", "main")
+	gittest.Git(t, ctx.ProjectDir, "branch", "-D", name)
+	return revParse(t, ctx.ProjectDir, domain.RemoteBranchPrefix+name)
+}
+
+func upstreamOf(t *testing.T, dir, branchName string) string {
+	t.Helper()
+	out, err := exec.Command("git", "-C", dir, "rev-parse", "--abbrev-ref", branchName+"@{upstream}").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func assertResumed(t *testing.T, result domain.CreateResult, tip string) {
+	t.Helper()
+	if head := revParse(t, result.Path, "HEAD"); head != tip {
+		t.Errorf("worktree HEAD = %s, want origin's tip %s", head, tip)
+	}
+	if got, want := upstreamOf(t, result.Path, result.Branch), domain.RemoteBranchPrefix+result.Branch; got != want {
+		t.Errorf("upstream = %q, want %q", got, want)
+	}
+	if result.Upstream != domain.RemoteBranchPrefix+result.Branch {
+		t.Errorf("result upstream = %q, want it reported", result.Upstream)
+	}
+	if result.Metadata.SourceBranch != "main" {
+		t.Errorf("source_branch = %q, want the base branch recorded as the sync parent", result.Metadata.SourceBranch)
+	}
+}
+
+// LUC-305: a branch only on origin was created from main, without upstream.
+func TestARemoteOnlyBranchStartsFromOriginAndTracksIt(t *testing.T) {
+	ctx := testContext(t)
+	tip := pushedOnly(t, ctx, "feat/remote")
+
+	outcome, err := Run(t.Context(), Params{Context: ctx, Request: Request{Branches: []string{"feat/remote"}}, Prompter: flow.Unattended{}, Presenter: newRecorder()})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	assertResumed(t, outcome.Results[0], tip)
+}
+
+func TestTheWizardResumesARemoteOnlyBranch(t *testing.T) {
+	ctx := testContext(t)
+	tip := pushedOnly(t, ctx, "feat/remote")
+	if prompt := newFlow(t, Request{}, decide.MemoizedTarget(t.Context(), ctx.ProjectDir)).sourceUpdate(answers(map[string]string{KeyBranch: "feat/remote", KeySource: "main"})); prompt.SkipReason != domain.CheckoutSourceUpdateSkipNew {
+		t.Errorf("skip reason = %q, want the branch named as starting from origin", prompt.SkipReason)
+	}
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{
+		KeyBranch: "feat/remote", KeySource: "main", KeyEnv: "", KeyRecap: confirmCreate,
+	}}
+
+	outcome, err := Run(t.Context(), Params{Context: ctx, Prompter: prompter, Presenter: newRecorder()})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	assertResumed(t, outcome.Results[0], tip)
+	recap := prompter.Content[KeyRecap].Description
+	for _, want := range []string{"Branch:    feat/remote (resumes origin/feat/remote)", "Parent:    main"} {
+		if !strings.Contains(recap, want) {
+			t.Errorf("recap %q should contain %q", recap, want)
+		}
+	}
+	if _, asked := prompter.Content[KeySourceUpdate]; asked {
+		t.Error("a branch resumed from origin has nothing to fast-forward")
+	}
+}
+
+func TestEntryBadgeNamesARemoteBranch(t *testing.T) {
+	f := newFlow(t, Request{}, func(string) domain.BranchTarget {
+		return domain.BranchTarget{State: domain.BranchTargetNew, Upstream: "origin/feat/remote"}
+	})
+	if got := f.entryBadge("feat/remote").Text; got != badgeRemote {
+		t.Errorf("badge = %q, want %q", got, badgeRemote)
+	}
+}

@@ -19,6 +19,8 @@ type CreateWorktreeParams struct {
 	// with -b; FromBranch is then irrelevant. The caller decides — it already
 	// inspected the branch to reject one checked out elsewhere.
 	ReuseBranch bool
+	// Track sets FromBranch, a remote branch, as the new branch's upstream.
+	Track bool
 }
 
 // CreateWorktree creates a git worktree, either on a new branch (-b, from
@@ -31,7 +33,12 @@ func CreateWorktree(ctx context.Context, params CreateWorktreeParams) error {
 }
 
 func createWorktreeNew(ctx context.Context, params CreateWorktreeParams) error {
-	cmd := proc.Command(ctx, "git", "worktree", "add", "--no-track", "-b", params.Branch, params.Path, params.FromBranch)
+	// --no-track by default: a branch started from origin/main must not pull from it.
+	track := "--no-track"
+	if params.Track {
+		track = "--track"
+	}
+	cmd := proc.Command(ctx, "git", "worktree", "add", track, "-b", params.Branch, params.Path, params.FromBranch)
 	cmd.Dir = params.ProjectDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {

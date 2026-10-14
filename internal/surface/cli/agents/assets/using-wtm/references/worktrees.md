@@ -44,6 +44,10 @@ What wtm will not do is **guess its parent**. The branch was created outside wtm
 
 Only a branch **another worktree already holds** is refused (exit `10`).
 
+## A branch only on origin
+
+A branch that exists only on origin (fetched, no local branch) is resumed, not recreated: `create <branch>` starts the local branch from `origin/<branch>` and tracks it, so the pushed work is in the worktree and `git pull`/`git push` need no `-u`. The branch's `results` entry sets `upstream: "origin/<branch>"`. `--from` is then the **parent recorded for `wtm sync`**, not a start point; without it the base branch is recorded, `--yes` included. `checkout` and `extract --to` start a branch only on origin the same way.
+
 ## Isolation at creation
 
 `create`, `extract` and `checkout` take `--isolation isolated|verbatim`: how the new worktree stands against its source. Without it, your paths take a [remembered answer](#remembered-answers), else `run.toml`'s `isolation`, else `isolated`.

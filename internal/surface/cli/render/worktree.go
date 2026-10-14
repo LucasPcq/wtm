@@ -275,9 +275,14 @@ type CreateResultParams struct {
 	// its text and severity (shared.ReusedBranchNote); this only renders it.
 	ReusedNote        string
 	ReusedNoteWarning bool
+	// Upstream is the remote branch a branch only on origin started from and
+	// tracks, which retitles the headline and relabels From as the sync parent.
+	Upstream string
 	// GoCommand is the ready-to-run jump-in command (e.g. "wtm go feat-x").
 	GoCommand string
 }
+
+const resumedHeadlineFmt = "Created worktree %s from %s, tracking it"
 
 type CreateBatchRow struct {
 	Branch        string
@@ -320,8 +325,8 @@ func FormatCreateBatch(w io.Writer, p CreateBatchParams) {
 
 // FormatCreateResult prints the create conclusion: a ✓ headline, an aligned
 // summary (from / env / path), then a highlighted `wtm go` step to jump straight
-// into the new worktree. A reused branch says so in the headline and labels its
-// source "parent", since it was not a start-point. The idempotent already-exists
+// into the new worktree. A reused branch, or one resumed from origin, says so in
+// the headline and labels its source "parent", since it was not a start-point. The idempotent already-exists
 // case collapses to a single line + the jump-in step. Raw body — the caller's
 // frame owns the outer padding.
 func FormatCreateResult(w io.Writer, p CreateResultParams) {
@@ -336,6 +341,10 @@ func FormatCreateResult(w io.Writer, p CreateResultParams) {
 	sourceLabel := domain.CreateRecapLabelFrom
 	if p.ExistingBranch {
 		headline = fmt.Sprintf(domain.BranchReusedHeadline, p.Branch)
+		sourceLabel = domain.CreateRecapLabelParent
+	}
+	if p.Upstream != "" {
+		headline = fmt.Sprintf(resumedHeadlineFmt, p.Branch, p.Upstream)
 		sourceLabel = domain.CreateRecapLabelParent
 	}
 

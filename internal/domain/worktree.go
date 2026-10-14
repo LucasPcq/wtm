@@ -181,6 +181,9 @@ type CreateResult struct {
 	// created (OriginState empty) or up to date.
 	OriginAhead  int `json:"origin_ahead,omitempty"`
 	OriginBehind int `json:"origin_behind,omitempty"`
+	// Upstream is the remote branch a branch only on origin was created from and
+	// now tracks. Empty when the branch was new or reused.
+	Upstream string `json:"upstream,omitempty"`
 	// Isolation is the worktree's, recorded or, for one that predates the
 	// choice, what it reads as.
 	Isolation Isolation `json:"isolation,omitempty"`

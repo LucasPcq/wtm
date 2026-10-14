@@ -121,6 +121,7 @@ func (p createPresenter) single(result domain.CreateResult, from string) {
 			ExistingBranch:    result.ExistingBranch,
 			ReusedNote:        reusedNote.Text,
 			ReusedNoteWarning: reusedNote.Warning,
+			Upstream:          result.Upstream,
 			GoCommand:         fmt.Sprintf(domain.GoCommandFmt, result.Branch),
 		})
 	})
