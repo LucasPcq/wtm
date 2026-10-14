@@ -15,7 +15,7 @@ import (
 
 func TestAMachineRunGetsTheHooksOutputAndNothingElse(t *testing.T) {
 	var out bytes.Buffer
-	view := render.NewProgressView(t.Context(), render.ProgressViewParams{W: &out})
+	view := render.NewProgressView(t.Context(), render.ProgressViewParams{Catalog: catalog, W: &out})
 
 	emitRun(view)
 	view.Close()
@@ -25,7 +25,7 @@ func TestAMachineRunGetsTheHooksOutputAndNothingElse(t *testing.T) {
 
 func TestAHumanRunOffATerminalTitlesEachPhase(t *testing.T) {
 	var out bytes.Buffer
-	view := render.NewProgressView(t.Context(), render.ProgressViewParams{W: &out, Human: true})
+	view := render.NewProgressView(t.Context(), render.ProgressViewParams{Catalog: catalog, W: &out, Human: true})
 
 	emitRun(view)
 	view.Close()
@@ -35,7 +35,7 @@ func TestAHumanRunOffATerminalTitlesEachPhase(t *testing.T) {
 
 func TestALiveRunErasesWhatItDrewAndKeepsTheLineOfEachPhase(t *testing.T) {
 	var out bytes.Buffer
-	view := render.NewProgressView(t.Context(), render.ProgressViewParams{W: &out, Human: true, Live: true})
+	view := render.NewProgressView(t.Context(), render.ProgressViewParams{Catalog: catalog, W: &out, Human: true, Live: true})
 
 	emitRun(view)
 	view.Close()
@@ -50,7 +50,7 @@ func TestALiveRunErasesWhatItDrewAndKeepsTheLineOfEachPhase(t *testing.T) {
 func TestACancelledRunSaysItIsCancelling(t *testing.T) {
 	var out syncBuffer
 	ctx, cancel := context.WithCancel(t.Context())
-	view := render.NewProgressView(ctx, render.ProgressViewParams{W: &out, Human: true, Live: true})
+	view := render.NewProgressView(ctx, render.ProgressViewParams{Catalog: catalog, W: &out, Human: true, Live: true})
 	view.Emit(kernel.Progress{Kind: kernel.ProgressUnitStarted, Subject: "feat/a"})
 
 	cancel()
@@ -62,7 +62,7 @@ func TestACancelledRunSaysItIsCancelling(t *testing.T) {
 func TestAClosedViewDrawsNothingMore(t *testing.T) {
 	var out syncBuffer
 	ctx, cancel := context.WithCancel(t.Context())
-	view := render.NewProgressView(ctx, render.ProgressViewParams{W: &out, Human: true, Live: true})
+	view := render.NewProgressView(ctx, render.ProgressViewParams{Catalog: catalog, W: &out, Human: true, Live: true})
 	view.Close()
 
 	cancel()
@@ -82,7 +82,7 @@ func emitRun(view *render.ProgressView) {
 
 func TestAPhaseCutShortLeavesNoTailBehind(t *testing.T) {
 	var out bytes.Buffer
-	view := render.NewProgressView(t.Context(), render.ProgressViewParams{W: &out, Human: true, Live: true})
+	view := render.NewProgressView(t.Context(), render.ProgressViewParams{Catalog: catalog, W: &out, Human: true, Live: true})
 	report := kernel.Report(view, "feat/a")
 	report.UnitStarted()
 	report.Phase("on_create")
@@ -97,7 +97,7 @@ func TestAPhaseCutShortLeavesNoTailBehind(t *testing.T) {
 func TestAPhaseThatPrintsNothingShowsNothing(t *testing.T) {
 	for _, live := range []bool{false, true} {
 		var out bytes.Buffer
-		view := render.NewProgressView(t.Context(), render.ProgressViewParams{W: &out, Human: true, Live: live})
+		view := render.NewProgressView(t.Context(), render.ProgressViewParams{Catalog: catalog, W: &out, Human: true, Live: live})
 		report := kernel.Report(view, "feat/a")
 
 		report.Phase("worktree")()

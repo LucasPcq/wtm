@@ -85,11 +85,11 @@ func (b *binding) call(cmd *cobra.Command, params callParams) (dispatch.Reply, k
 	if !found {
 		return nil, classified(fmt.Errorf(unknownEntryFmt, b.name))
 	}
-	view := render.NewProgressView(ctx, render.ProgressViewParams{W: cmd.ErrOrStderr(), Human: params.Route.Human, Live: render.IsTerminal(cmd.ErrOrStderr())})
+	view := render.NewProgressView(ctx, render.ProgressViewParams{W: cmd.ErrOrStderr(), Human: params.Route.Human, Catalog: b.engine.catalog, Live: render.IsTerminal(cmd.ErrOrStderr())})
 	defer view.Close()
 	fillable, isCommand := entry.Fillable()
 	if params.Route.Interactive && b.engine.form != nil && isCommand {
-		reply, err := b.engine.form(ctx, FormParams{Entry: fillable, Request: params.Request, Options: params.Route.Options, Names: b.spell, Detail: b.detail, Progress: view})
+		reply, err := b.engine.form(ctx, FormParams{Entry: fillable, Request: params.Request, Options: params.Route.Options, Names: b.spell, Detail: b.detail, Progress: view, Catalog: b.engine.catalog})
 		return reply, classified(err)
 	}
 	reply, err := entry.Call(ctx, dispatch.Call{Request: params.Request, Options: params.Route.Options, Progress: view})
@@ -137,7 +137,7 @@ func (b *binding) concludeCommand(cmd *cobra.Command, params commandParams) erro
 	switch {
 	case outcome != nil:
 		render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-			render.Outcome(w, render.OutcomeParams{Command: b.name, Items: outcome.Items, Warnings: outcome.Warnings, FollowUps: b.followUps(outcome.FollowUps), Detail: b.detail})
+			render.Outcome(w, render.OutcomeParams{Command: b.name, Items: outcome.Items, Warnings: outcome.Warnings, FollowUps: b.followUps(outcome.FollowUps), Detail: b.detail, Catalog: b.engine.catalog})
 		})
 	case params.Err != nil:
 		return b.fail(cmd, failParams{Route: params.Route, Err: params.Err, Request: params.Request})
@@ -150,6 +150,7 @@ func (b *binding) concludeCommand(cmd *cobra.Command, params commandParams) erro
 				Fingerprint: string(params.Result.Fingerprint),
 				Next:        []render.NextStepParams{{Command: b.rerun(rerunParams{Request: params.Request, Flag: flagExpectFingerprint, Value: string(params.Result.Fingerprint)}), Note: applyNote}},
 				Detail:      b.detail,
+				Catalog:     b.engine.catalog,
 			})
 		})
 	}
@@ -186,7 +187,7 @@ func (b *binding) envelope(params envelopeParams) render.EnvelopeParams {
 		FollowUps:   reach.FollowUps,
 		Warnings:    reach.Warnings,
 		Err:         params.Failure,
-		Names:       b.spell,
+		Wording:     b.wording(),
 	}
 }
 
@@ -216,7 +217,7 @@ type queryParams struct {
 
 func (b *binding) concludeQuery(cmd *cobra.Command, params queryParams) error {
 	if !params.Route.Human {
-		return render.WriteEnvelope(cmd.OutOrStdout(), render.EnvelopeParams{Command: b.name, OK: true, View: params.View, Names: b.spell})
+		return render.WriteEnvelope(cmd.OutOrStdout(), render.EnvelopeParams{Command: b.name, OK: true, View: params.View, Wording: b.wording()})
 	}
 	render.Frame(cmd.OutOrStdout(), func(w io.Writer) { render.View(w, b.name, params.View) })
 	return nil
@@ -232,13 +233,13 @@ type failParams struct {
 // failure on stderr.
 func (b *binding) fail(cmd *cobra.Command, params failParams) error {
 	if !params.Route.Human {
-		if err := render.WriteEnvelope(cmd.OutOrStdout(), render.EnvelopeParams{Command: b.name, Err: params.Err, Names: b.spell}); err != nil {
+		if err := render.WriteEnvelope(cmd.OutOrStdout(), render.EnvelopeParams{Command: b.name, Err: params.Err, Wording: b.wording()}); err != nil {
 			return err
 		}
 		return b.reported(params.Err)
 	}
 	render.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
-		render.Failure(w, render.FailureParams{Err: params.Err, Names: b.spell, Next: b.failureNext(params)})
+		render.Failure(w, render.FailureParams{Err: params.Err, Wording: b.wording(), Next: b.failureNext(params)})
 	})
 	return b.reported(params.Err)
 }
@@ -266,5 +267,9 @@ func (b *binding) reported(failure kernel.Error) error {
 	if failure == nil {
 		return nil
 	}
-	return &reported{failure: failure, line: render.FailureLine(failure, b.spell)}
+	return &reported{failure: failure, line: b.wording().FailureLine(failure), exitCodes: b.exitCodes}
+}
+
+func (b *binding) wording() render.Wording {
+	return render.Wording{Catalog: b.engine.catalog, Names: b.spell}
 }

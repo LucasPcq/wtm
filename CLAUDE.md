@@ -60,7 +60,7 @@ func Connect(params ConnectParams) error
 
 ## 3. Shared types — no duplication
 
-Types, enums, sentinel errors and constants are defined once in `internal/domain/`. Pure functions with no I/O (lookups, transforms, classification) live in `internal/rules/`. The engine's contract is the exception: `internal/kernel/` declares its own vocabulary (`Kind`, `Status`, `Reason`, `FieldType`, the `kernel.Code` constants), and a migrated command declares its codes as `kernel.Code` constants beside it, each with its message in `kernel/text`.
+Types, enums, sentinel errors and constants are defined once in `internal/domain/`. Pure functions with no I/O (lookups, transforms, classification) live in `internal/rules/`. The engine's contract is the exception: `internal/kernel/` declares its own vocabulary (`Kind`, `Status`, `Reason`, `FieldType`, the `kernel.Code` constants), and a migrated command declares its codes as `kernel.Code` constants beside it, each with its message in its `text.Messages`, handed to `dispatch.Register` with its own exit codes (`docs/dev/commands.md`).
 
 ## 4. Validate all external input
 

@@ -16,7 +16,7 @@ import (
 func TestAnEnvelopeAlwaysHasItsVersionCommandAndLists(t *testing.T) {
 	var out bytes.Buffer
 
-	require.NoError(t, render.WriteEnvelope(&out, render.EnvelopeParams{Command: "make", OK: true, Names: asFlag}))
+	require.NoError(t, render.WriteEnvelope(&out, render.EnvelopeParams{Command: "make", OK: true, Wording: wording}))
 
 	assert.JSONEq(t, `{"v":2,"command":"make","ok":true,"follow_ups":[],"warnings":[]}`, out.String())
 }
@@ -34,7 +34,7 @@ func TestAnAppliedRunWritesItsItemsWithTheirErrorsInWords(t *testing.T) {
 		},
 		Warnings: []kernel.Warning{{Code: kernel.CodeLocksUnavailable}},
 		Err:      failure,
-		Names:    asFlag,
+		Wording:  wording,
 	}))
 
 	assert.JSONEq(t, `{
@@ -57,7 +57,7 @@ func TestAnInvalidRequestNamesEachFieldByItsPathAndItsFlag(t *testing.T) {
 		{Path: "from", Code: kernel.CodeExclusiveWith, With: []string{"target.base"}},
 	})
 
-	require.NoError(t, render.WriteEnvelope(&out, render.EnvelopeParams{Command: "make", Err: invalid, Names: asFlag}))
+	require.NoError(t, render.WriteEnvelope(&out, render.EnvelopeParams{Command: "make", Err: invalid, Wording: wording}))
 
 	assert.JSONEq(t, `{
 		"v": 2, "command": "make", "ok": false, "follow_ups": [], "warnings": [],
@@ -75,7 +75,7 @@ func TestARefusalNamesEachBlockerAndTheFlagThatLiftsIt(t *testing.T) {
 		Blockers: []kernel.Blocker{{Code: kernel.CodeLocksUnavailable, Field: "force"}, {Code: kernel.CodeInterrupted}},
 	}
 
-	require.NoError(t, render.WriteEnvelope(&out, render.EnvelopeParams{Command: "clean", Err: refused, Names: asFlag}))
+	require.NoError(t, render.WriteEnvelope(&out, render.EnvelopeParams{Command: "clean", Err: refused, Wording: wording}))
 
 	assert.JSONEq(t, `{
 		"v": 2, "command": "clean", "ok": false, "follow_ups": [], "warnings": [],
@@ -91,7 +91,7 @@ func TestARefusalNamesEachBlockerAndTheFlagThatLiftsIt(t *testing.T) {
 func TestADryRunWritesItsPlanAndFingerprint(t *testing.T) {
 	var out bytes.Buffer
 
-	require.NoError(t, render.WriteEnvelope(&out, render.EnvelopeParams{Command: "make", OK: true, Plan: json.RawMessage(`{"branches":["feat/a"]}`), Fingerprint: "abc", Names: asFlag}))
+	require.NoError(t, render.WriteEnvelope(&out, render.EnvelopeParams{Command: "make", OK: true, Plan: json.RawMessage(`{"branches":["feat/a"]}`), Fingerprint: "abc", Wording: wording}))
 
 	assert.JSONEq(t, `{"v":2,"command":"make","ok":true,"plan":{"branches":["feat/a"]},"fingerprint":"abc","follow_ups":[],"warnings":[]}`, out.String())
 }

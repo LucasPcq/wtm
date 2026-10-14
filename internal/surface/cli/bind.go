@@ -77,6 +77,7 @@ type binding struct {
 	detail     render.Detail
 	detailKind string
 	cmd        *cobra.Command
+	exitCodes  map[kernel.Code]int
 }
 
 // Bind generates the command named name from the registry.
@@ -91,7 +92,7 @@ func (e *Engine) Bind(name string, doc Doc, options ...Option) *cobra.Command {
 	if !found {
 		panic(fmt.Sprintf(unknownEntryFmt, name))
 	}
-	b := &binding{name: name, engine: e, specs: entry.Schema(), renamed: map[string]FlagParams{}, detail: render.GenericDetail{}}
+	b := &binding{name: name, engine: e, specs: entry.Schema(), exitCodes: entry.ExitCodes(), renamed: map[string]FlagParams{}, detail: render.GenericDetail{}}
 	for _, option := range options {
 		option(b)
 	}

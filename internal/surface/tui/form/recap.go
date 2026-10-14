@@ -85,13 +85,13 @@ func (s *session) recapModel() components.SelectListModel {
 func (s *session) recapText(rows []styles.PlanRow) string {
 	warnings := make([]string, 0, len(s.preview.Plan.Warnings))
 	for _, warning := range s.preview.Plan.Warnings {
-		warnings = append(warnings, message(warning.Code, warning.Params))
+		warnings = append(warnings, s.message(warning.Code, warning.Params))
 	}
 	plan := styles.RenderPlan(styles.PlanParams{Rows: rows, Warnings: warnings, Width: styles.RecapBodyWidth(styles.IntroParams{Width: s.width})})
 	if !s.stale {
 		return plan
 	}
-	return styles.Warning.Render(domain.GlyphAttention) + " " + message(kernel.CodePlanStale, nil) + "\n\n" + plan
+	return styles.Warning.Render(domain.GlyphAttention) + " " + s.message(kernel.CodePlanStale, nil) + "\n\n" + plan
 }
 
 type recapParams struct {
@@ -120,7 +120,7 @@ func (s *session) describe(err error) string {
 		return failed + err.Error()
 	}
 	base := failure.Base()
-	lines := []string{failed + message(base.Code, base.Params)}
+	lines := []string{failed + s.message(base.Code, base.Params)}
 	switch detailed := failure.(type) {
 	case *kernel.InvalidError:
 		for _, field := range detailed.Fields {
@@ -128,7 +128,7 @@ func (s *session) describe(err error) string {
 		}
 	case *kernel.RefusedError:
 		for _, blocker := range detailed.Blockers {
-			lines = append(lines, detailIndent+message(blocker.Code, blocker.Params))
+			lines = append(lines, detailIndent+s.message(blocker.Code, blocker.Params))
 		}
 	case *kernel.Failure:
 	}

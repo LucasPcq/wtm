@@ -11,6 +11,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/kernel/text"
 	"github.com/LucasPcq/wtm/internal/styles"
 )
 
@@ -30,7 +31,14 @@ const (
 	worktreeRoot = "/wt/"
 )
 
+const codeBranchTaken kernel.Code = "branch.taken"
+
 var errStep = errors.New("git worktree add: exit status 128")
+
+var (
+	makeMessages  = text.Messages{codeBranchTaken: "{branch} is taken"}
+	makeExitCodes = map[kernel.Code]int{codeBranchTaken: domain.ExitCodeWorktreeExists}
+)
 
 type target struct {
 	Base string `json:"base"`
@@ -66,6 +74,7 @@ type repo struct {
 	remembered string
 	worktrees  []string
 	applyErr   error
+	taken      string
 }
 
 func (r *repo) observe() facts {
@@ -151,6 +160,9 @@ func makeCommand(r *repo) kernel.Command[request, facts, plan, string] {
 		Apply: func(ctx context.Context, in kernel.ApplyInput[request, facts, plan]) (kernel.Outcome[string], error) {
 			if r.applyErr != nil {
 				return kernel.Outcome[string]{}, r.applyErr
+			}
+			if r.taken != "" && slices.Contains(in.Request.Branches, r.taken) {
+				return kernel.Outcome[string]{}, kernel.Conflict(kernel.Problem{Code: codeBranchTaken, Params: kernel.Params{"branch": r.taken}})
 			}
 			items := kernel.Each(ctx, kernel.EachParams[string, string]{
 				Items:   in.Plan.Detail.Branches,

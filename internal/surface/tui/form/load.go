@@ -107,7 +107,7 @@ func (s *session) chosen(w *components.WizardModel, m choicesMsg) tea.Cmd {
 	}
 	s.choices[m.key] = m.choices
 	if m.choices.Banner != nil {
-		w.SetBanner(components.WizardBanner{Title: message(m.choices.Banner.Code, m.choices.Banner.Params)})
+		w.SetBanner(components.WizardBanner{Title: s.message(m.choices.Banner.Code, m.choices.Banner.Params)})
 	}
 	if m.index == s.at {
 		w.UpdateStepModel(m.index, func(any) any { return s.build(m.index, w.Steps()[:m.index]) })

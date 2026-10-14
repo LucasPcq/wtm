@@ -13,6 +13,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/dispatch"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/kernel/text"
 	"github.com/LucasPcq/wtm/internal/styles"
 	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 	"github.com/LucasPcq/wtm/internal/testutil/dispatchtest"
@@ -52,6 +53,7 @@ func newWorld(t *testing.T, r *repo, params worldParams) *world {
 			return []styles.PlanRow{{Label: "Plan", Values: []string{string(detail)}}}
 		},
 		Progress: progress,
+		Catalog:  text.NewCatalog(),
 	})
 	s.loading = func(params components.LoadingParams) error { return params.Work() }
 	return &world{Repo: r, Progress: progress, session: s}

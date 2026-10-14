@@ -12,13 +12,15 @@ internal/
   domain/                     ← types, errors, constants only (no methods, no functions); its root only shrinks,
                                 new code goes into the sub-package of its subject
     statefile/                ←   the schema version of each state file, and the error of a file a newer wtm wrote
+    operation/                ←   the holder file of an operation in progress, which dispatch writes and query/operations lists
   rules/                      ← pure functions (stdlib + domain only, no I/O); its root only shrinks, new code goes
                                 into the sub-package of its subject
     statefile/                ←   what a state file's schema allows: read, write, or refuse (exit 22)
     envcopy/                  ←   where each .env of a new worktree is copied from, and what could not be
   kernel/                     ← the skeleton of the command engine (stdlib only, no business vocabulary): Command,
                                 fields, rules, errors, results, Each / Saga (commands.md)
-    text/                     ←   the one catalogue turning a kernel.Code and its params into English
+    text/                     ←   text.Messages and text.Catalog: a kernel.Code and its params into English, the
+                                kernel's messages and those each entry of the registry declares
     kerneltest/               ←   the checks every command runs on itself (DependsOn, sagas)
   dispatch/                   ← the impure half of the engine, the one way a surface reaches a command: registry,
                                 the form's calls, the run (locks → Observe → defaults → Validate → Plan →
@@ -26,6 +28,8 @@ internal/
                                 (dispatch.md)
   query/
     operations/               ←   the operations in progress, read from their holder files
+  registry/                   ← the composition root: every command and query with its real ports (registry.Production),
+                                the only importer of command/ and query/, imported by surface/cli (dispatch.md)
   config/                     ← load & validate config.toml + run.toml from <git-common-dir>/wtm/, plus the global config (config.GlobalPath);
                                 every write puts the file's JSON schema (schemas/) beside it; ReviseProject is
                                 config.toml with a change applied, for store/ to write

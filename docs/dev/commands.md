@@ -113,9 +113,32 @@ type FieldError struct {
 
 ## Messages
 
-`Error`, `FieldError`, `Warning`, `Badge` and `Progress` carry a `Code` and `Params`. `internal/kernel/text` is the one catalogue that turns them into English: `text.Message(code, params)` fills `{param}` placeholders, `text.Field(fieldError)` adds the path, the accepted values and the other fields named. The CLI, the `message` of the JSON and a graphical interface all read it, and an interface may present a code differently (a link, a button).
+The engine writes no text at run time. An error, a field error, a refusal, a warning, a badge, a progress status, and the status and reason of an item are a `Code` and its `Params`; the English is a catalogue's. What a command declares about its fields is not run-time text: `FieldSpec.Label`, `Title` and `Description`, and those `kernel.Remember` builds, are data of the command's schema, written beside it and read as they are by a form, the flags, the JSON schema and the docs.
 
-A code is a constant of type `kernel.Code`. `TestEveryCodeDeclaredHasItsMessage` scans every package under `internal/` for those constants and fails on one missing from the catalogue, and on a catalogue entry no constant declares. The catalogue holds the engine's own codes, those of a run included (`lock.held`, `locks.unavailable`, `plan.stale`, `state.schema_newer`, raised by `dispatch`: [dispatch.md](dispatch.md#errors)); where a command's messages live (in `kernel/text`, keyed by the code's string, or beside the command) is settled by the first command on the contract, `create`, and the `…Fmt` templates of `domain/` follow their command there.
+`internal/kernel/text` turns a code into English. `text.Messages` maps the codes one package declares to their templates, each `{param}` filled from `Params`. `text.NewCatalog(sets...)` is the kernel's messages — its own codes, those of a run (`lock.held`, `locks.unavailable`, `plan.stale`, `state.schema_newer`, raised by `dispatch`: [dispatch.md](dispatch.md#errors)) and the label of each `Status` and `Reason` (`status.done`, `reason.not_reached`…) — plus each set it is handed; a code two sets spell panics. There is no global catalogue: `dispatch.Registry.Catalog()` builds the one of the entries a surface serves, and the surface hands it on, to `render` (`render.Wording`) and to the form (`form.Params.Catalog`). `Catalog.Message(code, params)` fills a template, `Catalog.Field(fieldError)` adds the path, the accepted values and the other fields named, `Catalog.Status` and `Catalog.Reason` label an item. The CLI, the `message` of the JSON and a graphical interface all read it, and an interface may present a code differently (a link, a button).
+
+### A command's codes
+
+A command declares its codes, their messages and the exit codes of its own beside it:
+
+```go
+// command/create
+const CodeBranchTaken kernel.Code = "create.branch_taken"
+
+var Messages = text.Messages{
+	CodeBranchTaken: "{branch} is taken",
+}
+
+var ExitCodes = map[kernel.Code]int{
+	CodeBranchTaken: domain.ExitCodeWorktreeExists,
+}
+```
+
+`internal/registry` hands both to `dispatch.Register` (`RegisterParams.Messages` and `ExitCodes`, `RegisterQueryParams` for a query), and the entry exposes them (`Entry.Messages()`, `Entry.ExitCodes()`). `ExitCodes` keeps the number the legacy command exited with; a code it does not list exits on its kind ([cli.md](cli.md#exit-codes)). The `…Fmt` templates of `domain/` move into a command's `Messages` as it migrates.
+
+A command turns each sentinel it expects into a typed error with its code: the `domain.ErrBranchNotFound` a port returns becomes `kernel.NotFound(kernel.Problem{Code: CodeBranchNotFound, Params: …, Cause: err})`, never an `internal` that happens to wrap it. `internal` is for the unexpected: it reads as "internal error" with its cause, and exits on the code of the sentinel it wraps (`rules.ExitCode`), as a legacy command does.
+
+`make lint` holds it (`catalog`, `tools/archlint/catalog.go`): every `kernel.Code` declared in `kernel/`, `dispatch/`, `command/` or `query/` — a typed constant, or a conversion of a constant, `kernel.Code("…")` — has its key in a `text.Messages` of its own package, the kernel's in `kernel/text`'s. A key written as a bare string is refused: a message speaks a declared code.
 
 ## Results
 

@@ -237,7 +237,7 @@ func (s *session) skipReason(spec kernel.FieldSpec, state kernel.FieldState) str
 	if state.SkipReason == "" {
 		return notNeeded
 	}
-	return message(state.SkipReason, kernel.Params{kernel.ParamPath: labelOf(spec)})
+	return s.message(state.SkipReason, kernel.Params{kernel.ParamPath: labelOf(spec)})
 }
 
 // requestFrom is the request the flags gave, with the answer of every step

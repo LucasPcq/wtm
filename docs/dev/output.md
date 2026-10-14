@@ -197,7 +197,7 @@ A document that is a protocol elsewhere is not reused for output: `domain.JobInf
 
 ## A command on the engine
 
-A command generated from the registry ([cli.md](cli.md)) prints nothing of its own: its run is drawn by the generic rendering of `render`, from the `Result` dispatch returns, and every sentence comes from `kernel/text`. A command adds only its `render.Detail`, or declares `render.GenericDetail` enough.
+A command generated from the registry ([cli.md](cli.md)) prints nothing of its own: its run is drawn by the generic rendering of `render`, from the `Result` dispatch returns, and every sentence comes from the catalogue of the registry ([commands.md](commands.md#messages)). A command adds only its `render.Detail`, or declares `render.GenericDetail` enough.
 
 A plan is rows, never text: `Detail.Plan` turns the plan's detail into `styles.PlanRow`s (a label, its values), and `styles.RenderPlan` draws them the same in the dry run of the command line and in the recap of the form ([form.md](form.md)). A command chooses what its plan says, never how it looks:
 
@@ -232,7 +232,7 @@ In JSON, every run — a refusal before it started included, a flag cobra could 
 - `v` is `2` (`render.EnvelopeVersion`); `command` the entry's name; `ok` false whenever there is an `error`.
 - `op` is the operation's id, the one its `operation.*` events and its holder file carry.
 - An applied run has `items`; a dry run has `plan` (the plan's detail) and `fingerprint` instead; a query has `view`. `follow_ups` and `warnings` are always arrays.
-- `error` is the `kernel.Error` serialised (`kind`, `code`, `params`, `follow_up`), plus `message` from `kernel/text`; an `invalid` one lists its `fields`, each with its `path` in the request, the `flag` that sets it and its `message`; a `refused` one its `blockers`, with the `flag` that lifts each. An item's `error` has the same shape.
+- `error` is the `kernel.Error` serialised (`kind`, `code`, `params`, `follow_up`), plus `message` from the catalogue; an `invalid` one lists its `fields`, each with its `path` in the request, the `flag` that sets it and its `message`; a `refused` one its `blockers`, with the `flag` that lifts each. An item's `error` has the same shape.
 - `--yes` is implied: accepted, without effect.
 
 ### Exit codes

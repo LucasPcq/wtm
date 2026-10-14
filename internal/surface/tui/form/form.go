@@ -11,6 +11,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/dispatch"
 	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/kernel/text"
 	"github.com/LucasPcq/wtm/internal/styles"
 	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
@@ -22,6 +23,7 @@ type Params struct {
 	Names    func(path string) string
 	Plan     func(detail json.RawMessage) []styles.PlanRow
 	Progress kernel.Emitter
+	Catalog  text.Catalog
 }
 
 // Run asks what the request lacks, previews it and applies the plan the recap

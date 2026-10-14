@@ -14,7 +14,7 @@ import (
 func TestARecapIsThePlanThenItsFingerprintThenHowToApplyIt(t *testing.T) {
 	var out bytes.Buffer
 
-	render.Recap(&out, render.RecapParams{
+	render.Recap(&out, render.RecapParams{Catalog: catalog,
 		Command:     "make",
 		Plan:        json.RawMessage(`{"branches":["feat/a"]}`),
 		Warnings:    []kernel.Warning{{Code: kernel.CodeLocksUnavailable}},
@@ -37,7 +37,7 @@ func TestARecapIsThePlanThenItsFingerprintThenHowToApplyIt(t *testing.T) {
 func TestARecapOfAPlanThatDoesNothingOffersNothingToApply(t *testing.T) {
 	var out bytes.Buffer
 
-	render.Recap(&out, render.RecapParams{
+	render.Recap(&out, render.RecapParams{Catalog: catalog,
 		Command:     "make",
 		Plan:        json.RawMessage(`{}`),
 		Fingerprint: "abc",

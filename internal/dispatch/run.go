@@ -6,8 +6,8 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/LucasPcq/wtm/internal/domain/operation"
 	"github.com/LucasPcq/wtm/internal/kernel"
-	"github.com/LucasPcq/wtm/internal/query/operations"
 	"github.com/LucasPcq/wtm/internal/rules/statefile"
 )
 
@@ -48,12 +48,12 @@ func (h *Handle[Req, F, P, D]) Run(ctx context.Context, params RunParams[Req]) (
 	operation := h.operation(params)
 	taken, err := h.dispatcher.lock(operation)
 	if err != nil {
-		return Result[P, D]{Op: operation.ID}, err
+		return Result[P, D]{Op: kernel.OpID(operation.ID)}, err
 	}
 	defer taken.release()
 
 	result, err := h.run(ctx, runParams[Req]{RunParams: params, Operation: operation})
-	result.Op = operation.ID
+	result.Op = kernel.OpID(operation.ID)
 	if taken.protected() {
 		return result, err
 	}
@@ -65,25 +65,36 @@ func (h *Handle[Req, F, P, D]) Run(ctx context.Context, params RunParams[Req]) (
 	return result, err
 }
 
-func (h *Handle[Req, F, P, D]) operation(params RunParams[Req]) operations.Operation {
+func (h *Handle[Req, F, P, D]) operation(params RunParams[Req]) operation.Operation {
 	var keys []kernel.LockKey
 	if h.command.Locks != nil {
 		keys = sortedKeys(h.command.Locks(params.Request))
 	}
-	return operations.Operation{
-		ID:            h.dispatcher.params.NewOpID(),
+	return operation.Operation{
+		ID:            string(h.dispatcher.params.NewOpID()),
 		PID:           os.Getpid(),
 		Command:       h.command.Name,
 		Surface:       string(params.Options.Surface),
 		CorrelationID: params.Options.CorrelationID,
 		StartedAt:     h.dispatcher.params.Now().UTC(),
-		Locks:         keys,
+		Locks:         recorded(keys),
 	}
+}
+
+func recorded(keys []kernel.LockKey) []operation.Lock {
+	if keys == nil {
+		return nil
+	}
+	locks := make([]operation.Lock, 0, len(keys))
+	for _, key := range keys {
+		locks = append(locks, operation.Lock{Scope: string(key.Scope), Name: key.Name, Mode: string(key.Mode)})
+	}
+	return locks
 }
 
 type runParams[Req any] struct {
 	RunParams[Req]
-	Operation operations.Operation
+	Operation operation.Operation
 }
 
 func (h *Handle[Req, F, P, D]) run(ctx context.Context, params runParams[Req]) (Result[P, D], error) {

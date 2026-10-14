@@ -21,6 +21,8 @@ const (
 	worktreeStep = "worktree"
 )
 
+const codeBranchTaken kernel.Code = "branch.taken"
+
 type request struct {
 	Branches  []string `json:"branches"`
 	From      string   `json:"from"`

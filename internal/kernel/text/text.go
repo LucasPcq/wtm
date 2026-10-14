@@ -1,7 +1,8 @@
-// Package text is the one catalogue that turns a kernel code and its params into English.
+// Package text turns a code of the engine and its params into English, from the catalogue of the registry served.
 package text
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/kernel"
@@ -10,9 +11,26 @@ import (
 const (
 	paramAccepted = "accepted"
 	paramWith     = "with"
+	duplicateFmt  = "text: code %q has two messages"
 )
 
-var catalog = map[kernel.Code]string{
+const (
+	codeStatusDone        kernel.Code = "status.done"
+	codeStatusFailed      kernel.Code = "status.failed"
+	codeStatusSkipped     kernel.Code = "status.skipped"
+	codeStatusCancelled   kernel.Code = "status.cancelled"
+	codeReasonInterrupted kernel.Code = "reason.interrupted"
+	codeReasonNotReached  kernel.Code = "reason.not_reached"
+	codeReasonUnchanged   kernel.Code = "reason.unchanged"
+	codeReasonUnsafe      kernel.Code = "reason.unsafe"
+	codeReasonLocked      kernel.Code = "reason.locked"
+)
+
+// Messages are the templates of the codes one package declares, each filled
+// by its {param}.
+type Messages map[kernel.Code]string
+
+var kernelMessages = Messages{
 	kernel.CodeRequired:      "{path} is required",
 	kernel.CodeRequiredOneOf: "one of {path}, {with} is required",
 	kernel.CodeInvalid:       "{path} is invalid",
@@ -40,12 +58,57 @@ var catalog = map[kernel.Code]string{
 	kernel.CodeLocksUnavailable: "ran without operation locks",
 	kernel.CodePlanStale:        "the facts changed since the preview",
 	kernel.CodeStateSchemaNewer: "{path} is at schema {found}, this wtm supports {supported}",
+
+	codeStatusDone:        "done",
+	codeStatusFailed:      "failed",
+	codeStatusSkipped:     "skipped",
+	codeStatusCancelled:   "cancelled",
+	codeReasonInterrupted: "interrupted",
+	codeReasonNotReached:  "not reached",
+	codeReasonUnchanged:   "unchanged",
+	codeReasonUnsafe:      "unsafe",
+	codeReasonLocked:      "locked",
+}
+
+var statusCodes = map[kernel.Status]kernel.Code{
+	kernel.StatusDone:      codeStatusDone,
+	kernel.StatusFailed:    codeStatusFailed,
+	kernel.StatusSkipped:   codeStatusSkipped,
+	kernel.StatusCancelled: codeStatusCancelled,
+}
+
+var reasonCodes = map[kernel.Reason]kernel.Code{
+	kernel.ReasonInterrupted: codeReasonInterrupted,
+	kernel.ReasonNotReached:  codeReasonNotReached,
+	kernel.ReasonUnchanged:   codeReasonUnchanged,
+	kernel.ReasonUnsafe:      codeReasonUnsafe,
+	kernel.ReasonLocked:      codeReasonLocked,
+}
+
+// Catalog is the kernel's messages and those of every entry a surface serves.
+type Catalog struct {
+	messages Messages
+}
+
+// NewCatalog panics on a code two sets spell: a code means one thing, and the
+// registry is built at startup, before anything runs.
+func NewCatalog(sets ...Messages) Catalog {
+	merged := Messages{}
+	for _, set := range append([]Messages{kernelMessages}, sets...) {
+		for code, template := range set {
+			if _, taken := merged[code]; taken {
+				panic(fmt.Sprintf(duplicateFmt, code))
+			}
+			merged[code] = template
+		}
+	}
+	return Catalog{messages: merged}
 }
 
 // Message renders code over params; a code missing from the catalogue reads
-// as itself, which the catalogue test forbids.
-func Message(code kernel.Code, params kernel.Params) string {
-	template, known := catalog[code]
+// as itself, which the catalog rule of archlint forbids.
+func (c Catalog) Message(code kernel.Code, params kernel.Params) string {
+	template, known := c.messages[code]
 	if !known {
 		return string(code)
 	}
@@ -57,7 +120,7 @@ func Message(code kernel.Code, params kernel.Params) string {
 }
 
 // Field renders a field error, with why it is required when a rule says so.
-func Field(problem kernel.FieldError) string {
+func (c Catalog) Field(problem kernel.FieldError) string {
 	params := kernel.Params{
 		kernel.ParamPath: problem.Path,
 		paramAccepted:    strings.Join(problem.Accepted, ", "),
@@ -66,10 +129,26 @@ func Field(problem kernel.FieldError) string {
 	for key, value := range problem.Params {
 		params[key] = value
 	}
-	message := Message(problem.Code, params)
+	message := c.Message(problem.Code, params)
 	because := problem.Params[kernel.ParamBecause]
 	if because == "" {
 		return message
 	}
-	return message + ": " + Message(kernel.Code(because), params)
+	return message + ": " + c.Message(kernel.Code(because), params)
+}
+
+func (c Catalog) Status(status kernel.Status) string {
+	code, known := statusCodes[status]
+	if !known {
+		return string(status)
+	}
+	return c.Message(code, nil)
+}
+
+func (c Catalog) Reason(reason kernel.Reason) string {
+	code, known := reasonCodes[reason]
+	if !known {
+		return string(reason)
+	}
+	return c.Message(code, nil)
 }
