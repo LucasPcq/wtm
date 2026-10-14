@@ -17,14 +17,19 @@ created := dispatch.Register(dispatch.RegisterParams[create.Request, create.Fact
 	Command:    create.Command(ports),
 	Messages:   create.Messages,  // its codes in English (commands.md#messages)
 	ExitCodes:  create.ExitCodes, // the exit codes of its own
-	Events:     create.Events(),  // the events of its milestones
+	Events: dispatch.Events[create.Facts, create.Detail]{ // the events of its milestones
+		Committed: func(e dispatch.EventOf[create.Facts, kernel.Committed[create.Detail]]) []domain.Event {
+			return create.Created(e.Facts, e.Milestone)
+		},
+		// PhaseDone, Finished: create.Updated, create.Provisioned, wrapped alike
+	},
 })
 listed := dispatch.RegisterQuery(dispatch.RegisterQueryParams[operations.Request, operations.View]{
 	Query: operations.Query(d.Operations),
 })
 ```
 
-`Register` panics on a command whose plan detail `P` is not a struct: every surface shows a plan as its fields ([output.md](output.md#a-command-on-the-engine)). `Events` is how the command says what its units changed ([below](#progress-hook-logs-and-events)); a command with none publishes only the operation's events.
+`Register` panics on a command whose plan detail `P` is not a struct: every surface shows a plan as its fields ([output.md](output.md#a-command-on-the-engine)). `Events` is how the command says what its units changed ([below](#progress-hook-logs-and-events)); a command with none publishes only the operation's events. A command never imports `dispatch` (`engine`), so it cannot name `dispatch.Events`: it exposes pure functions over its facts and a `kernel` milestone, and the registry wraps them at registration.
 
 `internal/registry` is the composition root: `registry.Production(d)` is the registry the surfaces serve, built on that dispatcher, every command with its real ports on its `Dir` and `StateDir` ([Ports](#ports)), every query. It is the only package that imports `command/` and `query/`; only the production engine of `surface/cli` imports it (and `tools/gendocs` through `cli.Root()`). `dispatch` imports neither, nor `store/`. A command enters the product by its line there. The command line reads it once on a dispatcher with no `Params` for the names, the fields and the catalogue (that dispatcher is never run), then on the dispatcher of the repository a command runs in.
 
@@ -132,7 +137,7 @@ type Events[F, D any] struct {
 }
 ```
 
-Each returns the `domain.Event`s to publish (none, one or several), built from the facts and the detail without reading the repository again; `dispatch` stamps them (`ts` from its clock, `op_id`, `correlation_id`) and publishes them at once. For `create`: `worktree.created` at the commit, before `on_create`; `worktree.updated` after the phase that allocated the ordinal; `worktree.provisioned` when the unit is over. `kernel` gives a milestone no meaning; the command does.
+Each returns the `domain.Event`s to publish (none, one or several), built from the facts and the detail without reading the repository again; `dispatch` stamps them (`ts` from its clock, `op_id`, `correlation_id`) and publishes them at once. For `create`: `worktree.created` at the commit, before `on_create`; `worktree.updated` after the phase that allocated the ordinal; `worktree.provisioned` when the unit is over. `kernel` gives a milestone no meaning; the command does, in functions of its own over `kernel` types (`func(Facts, kernel.Committed[Detail]) []domain.Event`) that the registry wraps into `Events`.
 
 On the bus (`docs/guide/events.md`) an applied run sends `operation.started`, the events of its commands' milestones, one `unit.finished` per item, then `operation.finished` with `ok` and, on failure, the `code` of `Outcome.Failure()` (an interruption first, else the first item that failed) or of the error `Apply` returned. Each carries `op_id`, `ts` and the `correlation_id`; the publisher keeps them. They are sent even once the run is interrupted. A dry run and a run refused before `Apply` publish nothing. Output lines never go on the bus.
 

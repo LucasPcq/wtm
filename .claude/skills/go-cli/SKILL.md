@@ -54,7 +54,7 @@ func RunCommand(params RunCommandParams) error
 
 ### 3. Shared types — single source of truth
 
-All domain types, enums, and error sentinels live in `internal/domain/` (`constants.go`, `errors.go`, `types.go`, `jobs.go`, `init.go`). Never duplicate a type across packages. The command engine's contract is the exception: `internal/kernel/` declares its own vocabulary (`Kind`, `Status`, `Reason`, `FieldType`, `kernel.Code`), see `docs/dev/commands.md`.
+All domain types, enums, and error sentinels live in `internal/domain/` (`constants.go`, `errors.go`, `jobs.go`, `init.go`…, and the sub-package of a subject). Never duplicate a type across packages. The command engine's contract is the exception: `internal/kernel/` declares its own vocabulary (`Kind`, `Status`, `Reason`, `FieldType`, `kernel.Code`), see `docs/dev/commands.md`.
 
 ### 4. Validate at the boundary
 
@@ -160,10 +160,12 @@ internal/
     cli/                      ←   the command line (docs/dev/cli.md): root.go (tree, version, help),
                                   signal.go, quiet.go, abort.go, exit.go (exit codes); bind.go
                                   (cli.Bind: a command generated from the dispatch registry),
-                                  run.go (its one run); flag wiring → flow for the others (zero logic)
+                                  run.go (its one run), conclusion.go, envelope.go, commandline.go
+                                  (a follow-up as a command line); flag wiring → flow for the others
       ui/                     ←     `wtm ui`: refuses JSON + missing TTY, hands off to tui/dashboard
-      render/                 ←     format and print results (zero decision logic); envelope.go,
-                                    outcome.go, recap.go, failure.go, progress.go: the generic
+      render/                 ←     format and print results (zero decision logic); detail.go
+                                    (render.Detail, GenericDetail), envelope.go, outcome.go, recap.go,
+                                    failure.go, progress.go (the progress view), view.go (a query's view): the generic
                                     rendering of a kernel result and the v2 envelope
     tui/                      ←   Bubbletea models (zero business logic, rendering only)
       form/                   ←     the interactive form of a command on the engine: a wizard drawn

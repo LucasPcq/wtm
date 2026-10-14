@@ -193,7 +193,7 @@ dispatch.Register(dispatch.RegisterParams[create.Request, create.Facts, create.P
 	}),
 	Messages:  create.Messages,
 	ExitCodes: create.ExitCodes,
-	Events:    createEvents(), // create.Created, Updated, Provisioned wrapped
+	Events:    createEvents(), // the registry's wrapping of create.Created, Updated, Provisioned
 }),
 ```
 
