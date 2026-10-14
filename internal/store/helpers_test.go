@@ -70,6 +70,11 @@ func TestHelperProcess(t *testing.T) {
 	require.NoError(t, err)
 	meta := store.MetaDisk{StateDir: stateDir}
 	for round := range rounds {
-		require.NoError(t, meta.Update(t.Context(), addNamespace(os.Getenv(envJob)+strconv.Itoa(round))))
+		require.NoError(t, errOf(meta.Update(t.Context(), addNamespace(os.Getenv(envJob)+strconv.Itoa(round)))))
 	}
+}
+
+// errOf is the error of a write whose result the test does not look at.
+func errOf(_ store.Written, err error) error {
+	return err
 }

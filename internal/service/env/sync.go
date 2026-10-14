@@ -493,7 +493,7 @@ func applyFile(ctx context.Context, paths envPaths, c *computedFile, res EnvReso
 		return false, nil
 	}
 
-	return store.EnvDisk{}.Edit(ctx, store.EnvEdit{
+	written, err := store.EnvDisk{}.Edit(ctx, store.EnvEdit{
 		Path:   filepath.Join(paths.WorktreePath, c.file.Target),
 		Create: c.created,
 		Edit: func(current []domain.EnvLine) []domain.EnvLine {
@@ -505,6 +505,7 @@ func applyFile(ctx context.Context, paths envPaths, c *computedFile, res EnvReso
 			return rules.ApplyEnvDiff(onDisk)
 		},
 	})
+	return written.Changed, err
 }
 
 func applyDiffParams(c computedFile, res EnvResolution) rules.ApplyEnvDiffParams {
@@ -521,12 +522,11 @@ func applyDiffParams(c computedFile, res EnvResolution) rules.ApplyEnvDiffParams
 
 // templateLines reads the committed template (the schema) for a file from the
 // target worktree itself — each worktree's branch declares its own expected keys —
-// returning nil when no template exists. store.TemplateSource is shared with the
-// creation-time provisioning in env.go.
+// returning nil when no template exists.
 func templateLines(worktreePath string, f domain.EnvFile) ([]domain.EnvLine, error) {
-	src := store.TemplateSource(worktreePath, f)
-	if src == "" {
-		return nil, nil
+	src, err := store.EnvDisk{}.Template(worktreePath, f)
+	if src == "" || err != nil {
+		return nil, err
 	}
 	return readEnvFile(src)
 }

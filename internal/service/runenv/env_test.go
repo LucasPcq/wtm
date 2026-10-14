@@ -1,7 +1,6 @@
 package runenv_test
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,10 +8,11 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/service/runenv"
+	"github.com/LucasPcq/wtm/internal/testutil/storetest"
 )
 
 func TestALinkedWorktreeGetsItsPortsAndItsComposeProject(t *testing.T) {
-	params := linked(t)
+	params := linked()
 
 	writes, err := runenv.Env(params)
 
@@ -27,7 +27,7 @@ func TestALinkedWorktreeGetsItsPortsAndItsComposeProject(t *testing.T) {
 }
 
 func TestAVerbatimWorktreeGetsNothingWritten(t *testing.T) {
-	params := linked(t)
+	params := linked()
 	params.Identity.Isolation = domain.IsolationVerbatim
 
 	writes, err := runenv.Env(params)
@@ -38,7 +38,7 @@ func TestAVerbatimWorktreeGetsNothingWritten(t *testing.T) {
 }
 
 func TestAProjectWithNoLinkAndNoComposeStackWritesNothing(t *testing.T) {
-	params := linked(t)
+	params := linked()
 	params.Run = domain.RunConfig{Jobs: runConfig().Jobs[:1]}
 
 	writes, err := runenv.Env(params)
@@ -48,7 +48,7 @@ func TestAProjectWithNoLinkAndNoComposeStackWritesNothing(t *testing.T) {
 }
 
 func TestAProjectWithOnlyAComposeStackWritesItsNameAlone(t *testing.T) {
-	params := linked(t)
+	params := linked()
 	params.Run.EnvPorts = nil
 
 	writes, err := runenv.Env(params)
@@ -59,7 +59,7 @@ func TestAProjectWithOnlyAComposeStackWritesItsNameAlone(t *testing.T) {
 }
 
 func TestALinkToAFileNotDeclaredIsLeftOut(t *testing.T) {
-	params := linked(t)
+	params := linked()
 	params.EnvFiles = []domain.EnvFile{{Target: "infra/.env"}}
 
 	writes, err := runenv.Env(params)
@@ -69,7 +69,7 @@ func TestALinkToAFileNotDeclaredIsLeftOut(t *testing.T) {
 }
 
 func TestAProxyPortOutOfRangeIsRefused(t *testing.T) {
-	params := linked(t)
+	params := linked()
 	params.Proxy = domain.ProxyConfig{Port: 70000}
 
 	_, err := runenv.Env(params)
@@ -78,11 +78,11 @@ func TestAProxyPortOutOfRangeIsRefused(t *testing.T) {
 }
 
 func TestTheMainCheckoutKeepsItsOwnComposeProjectAndPlainEnvKeys(t *testing.T) {
-	params := linked(t)
+	params := linked()
 	params.Run.EnvValues = []domain.EnvValueLink{{File: ".env", Key: "DATABASE", Job: "web"}}
 	params.Identity = runenv.Identity{Branch: "chore/dev", IsMain: true}
 	params.WorktreePath = params.ProjectDir
-	writeFile(t, filepath.Join(params.ProjectDir, "infra", domain.EnvFileName), "COMPOSE_PROJECT_NAME=stack\n")
+	params.Files = storetest.NewFake(storetest.FakeParams{Files: map[string]string{projectDir + "/infra/.env": "COMPOSE_PROJECT_NAME=stack\n"}})
 
 	writes, err := runenv.Env(params)
 
@@ -93,13 +93,15 @@ func TestTheMainCheckoutKeepsItsOwnComposeProjectAndPlainEnvKeys(t *testing.T) {
 }
 
 func TestAValueStampedIntoTheMainCheckoutGoesBackToItsTemplate(t *testing.T) {
-	params := linked(t)
+	params := linked()
 	params.Run.EnvValues = []domain.EnvValueLink{{File: ".env", Key: "DATABASE", Job: "web", Value: "stamped"}}
 	params.EnvFiles = []domain.EnvFile{{Target: ".env", Template: ".env.template"}}
 	params.Identity = runenv.Identity{Branch: "main", IsMain: true}
 	params.WorktreePath = params.ProjectDir
-	writeFile(t, filepath.Join(params.ProjectDir, ".env"), "DATABASE=stamped\n")
-	writeFile(t, filepath.Join(params.ProjectDir, ".env.template"), "DATABASE=app\n")
+	params.Files = storetest.NewFake(storetest.FakeParams{Files: map[string]string{
+		projectDir + "/.env":          "DATABASE=stamped\n",
+		projectDir + "/.env.template": "DATABASE=app\n",
+	}})
 
 	writes, err := runenv.Env(params)
 

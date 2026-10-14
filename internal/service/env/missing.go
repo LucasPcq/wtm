@@ -25,7 +25,8 @@ func MissingTargets(params MissingTargetsParams) []domain.EnvMissingFile {
 		if fileExists(filepath.Join(params.WorktreePath, file.Target)) {
 			continue
 		}
-		template := store.TemplateSource(params.WorktreePath, file) != ""
+		source, err := store.EnvDisk{}.Template(params.WorktreePath, file)
+		template := err == nil && source != ""
 		missing = append(missing, domain.EnvMissingFile{
 			Target:      file.Target,
 			Scaffolded:  scaffolds(scaffoldsParams{MissingTargetsParams: params, File: file, Template: template}),

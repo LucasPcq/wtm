@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
 	"testing"
 
@@ -64,6 +65,27 @@ func TestAllocateRefusesToNumberPastAnUnreadableNeighbour(t *testing.T) {
 
 	require.ErrorIs(t, err, domain.ErrOrdinalUnreadable)
 	assert.NotContains(t, meta.Calls(), "Update feat/b")
+}
+
+func TestAllocateRefusesToNumberPastANeighbourWhoseRecordDoesNotRead(t *testing.T) {
+	repo, _ := fakes(t, nil, "feat/a", "feat/b")
+	meta := storetest.NewFake(storetest.FakeParams{Unreadable: []string{"feat/a"}})
+
+	_, err := identity.Allocate(t.Context(), identity.AllocateParams{Git: repo, Meta: meta, StateDir: t.TempDir(), Branch: "feat/b"})
+
+	require.ErrorIs(t, err, domain.ErrOrdinalUnreadable)
+	assert.NotContains(t, meta.Calls(), "Update feat/b")
+}
+
+func TestAllocateSaysItRanWithoutItsLock(t *testing.T) {
+	repo, meta := fakes(t, nil, "feat/a")
+	stateDir := filepath.Join(t.TempDir(), "not-a-directory")
+	require.NoError(t, os.WriteFile(stateDir, nil, 0o644))
+
+	claim, err := identity.Allocate(t.Context(), identity.AllocateParams{Git: repo, Meta: meta, StateDir: stateDir, Branch: "feat/a"})
+
+	require.NoError(t, err)
+	assert.Equal(t, identity.Claim{Ordinal: 1, Allocated: true, Unlocked: true}, claim)
 }
 
 func TestAllocateNeedsAStateDirAndABranch(t *testing.T) {

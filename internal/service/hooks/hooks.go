@@ -1,4 +1,4 @@
-// Package hooks runs a worktree's lifecycle hooks, in order, and reports what they print and how they ended.
+// Package hooks runs a worktree's lifecycle hooks.
 package hooks
 
 import (

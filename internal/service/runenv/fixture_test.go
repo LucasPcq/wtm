@@ -1,13 +1,16 @@
 package runenv_test
 
 import (
-	"testing"
-
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/service/runenv"
+	"github.com/LucasPcq/wtm/internal/testutil/storetest"
 )
 
-const project = "shop"
+const (
+	project    = "shop"
+	projectDir = "/repo/shop"
+	worktree   = "/wt/feat-a"
+)
 
 // web is a per-worktree job on port 3000, infra a shared compose stack started
 // from infra/.
@@ -18,15 +21,19 @@ func runConfig() domain.RunConfig {
 	}}
 }
 
+// params is a worktree of the project, reading the files given.
+func params(identity runenv.Identity, files map[string]string) runenv.Params {
+	return runenv.Params{ProjectDir: projectDir, Run: runConfig(), Identity: identity, Files: storetest.NewFake(storetest.FakeParams{Files: files})}
+}
+
 // linked is a numbered worktree whose .env carries web's port and whose
 // infra/.env names its compose project.
-func linked(t *testing.T) runenv.EnvParams {
-	t.Helper()
-	run := runConfig()
-	run.EnvPorts = []domain.EnvPortLink{{File: ".env", Key: "PORT", Job: "web", Port: "http"}}
+func linked() runenv.EnvParams {
+	base := params(runenv.Identity{Branch: "feat/a", Ordinal: 2}, nil)
+	base.Run.EnvPorts = []domain.EnvPortLink{{File: ".env", Key: "PORT", Job: "web", Port: "http"}}
 	return runenv.EnvParams{
-		Params:       runenv.Params{ProjectDir: projectDir(t), Run: run, Identity: runenv.Identity{Branch: "feat/a", Ordinal: 2}},
-		WorktreePath: t.TempDir(),
+		Params:       base,
+		WorktreePath: worktree,
 		EnvFiles:     []domain.EnvFile{{Target: ".env"}, {Target: "infra/.env"}},
 	}
 }

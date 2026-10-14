@@ -20,10 +20,12 @@ type AllocateParams struct {
 }
 
 // Claim is a worktree's number, and whether this call gave it: only an
-// allocation is a change for the caller to publish.
+// allocation is a change for the caller to publish. Unlocked is an allocation
+// made without its locks, which the caller reports.
 type Claim struct {
 	Ordinal   int
 	Allocated bool
+	Unlocked  bool
 }
 
 // Allocate gives the worktree the smallest number no live worktree holds, the
@@ -38,7 +40,7 @@ func Allocate(ctx context.Context, params AllocateParams) (Claim, error) {
 	}
 
 	var claim Claim
-	_, err := fs.WithFileLock(ctx, fs.WithFileLockParams{
+	lock, err := fs.WithFileLock(ctx, fs.WithFileLockParams{
 		Path: filepath.Join(params.StateDir, domain.OrdinalLockFileName),
 		Do: func() error {
 			// Everything is read again under the lock, git included: the
@@ -55,6 +57,7 @@ func Allocate(ctx context.Context, params AllocateParams) (Claim, error) {
 	if err != nil {
 		return Claim{}, err
 	}
+	claim.Unlocked = claim.Unlocked || !lock.Held
 	return claim, nil
 }
 
@@ -86,7 +89,7 @@ func allocateIn(ctx context.Context, params allocateInParams) (Claim, error) {
 		return Claim{}, err
 	}
 	next := rules.AllocateOrdinal(rules.TakenOrdinals(others))
-	err = params.Allocate.Meta.Update(ctx, store.MetaUpdate{
+	written, err := params.Allocate.Meta.Update(ctx, store.MetaUpdate{
 		Branch:  branch,
 		Missing: store.MissingCreate,
 		Change: func(meta *domain.WorktreeMetadata) error {
@@ -97,5 +100,5 @@ func allocateIn(ctx context.Context, params allocateInParams) (Claim, error) {
 	if err != nil {
 		return Claim{}, err
 	}
-	return Claim{Ordinal: next, Allocated: true}, nil
+	return Claim{Ordinal: next, Allocated: true, Unlocked: written.Unlocked}, nil
 }

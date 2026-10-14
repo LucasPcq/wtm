@@ -49,7 +49,7 @@ func SetIsolation(ctx context.Context, params SetIsolationParams) error {
 		return mainIsolation(params.Isolation)
 	}
 
-	return (store.MetaDisk{StateDir: params.Ref.StateDir}).Update(ctx, store.MetaUpdate{
+	_, err = (store.MetaDisk{StateDir: params.Ref.StateDir}).Update(ctx, store.MetaUpdate{
 		Branch:  params.Ref.Branch,
 		Missing: store.MissingCreate,
 		Change: func(meta *domain.WorktreeMetadata) error {
@@ -57,6 +57,7 @@ func SetIsolation(ctx context.Context, params SetIsolationParams) error {
 			return nil
 		},
 	})
+	return err
 }
 
 // CheckIsolation refuses a choice SetIsolation would refuse, before anything is

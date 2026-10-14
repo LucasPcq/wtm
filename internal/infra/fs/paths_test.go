@@ -24,6 +24,18 @@ func TestScratchLockPathIsOneLockPerFileOutsideItsDirectory(t *testing.T) {
 	assert.NotEqual(t, dir, filepath.Dir(lock))
 }
 
+func TestScratchLockPathIsTheSameThroughASymlinkedDirectory(t *testing.T) {
+	dir := t.TempDir()
+	real := filepath.Join(dir, "real")
+	require.NoError(t, os.Mkdir(real, 0o755))
+	link := filepath.Join(dir, "link")
+	require.NoError(t, os.Symlink(real, link))
+
+	assert.Equal(t, fs.ScratchLockPath(filepath.Join(real, ".env")), fs.ScratchLockPath(filepath.Join(link, ".env")), "absent file")
+	writeFixture(t, filepath.Join(real, ".env"), "")
+	assert.Equal(t, fs.ScratchLockPath(filepath.Join(real, ".env")), fs.ScratchLockPath(filepath.Join(link, ".env")), "present file")
+}
+
 func TestGlobalDirIsUnderTheUserConfigDirectory(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	configDir, err := os.UserConfigDir()

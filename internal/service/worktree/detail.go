@@ -59,7 +59,7 @@ func RecordNamespaces(ctx context.Context, params RecordNamespacesParams) error 
 	if len(params.Jobs) == 0 {
 		return nil
 	}
-	return (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
+	_, err := (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
 		Branch:  params.Branch,
 		Missing: store.MissingSkip,
 		Change: func(meta *domain.WorktreeMetadata) error {
@@ -71,6 +71,7 @@ func RecordNamespaces(ctx context.Context, params RecordNamespacesParams) error 
 			return nil
 		},
 	})
+	return err
 }
 
 // NamespacesOf is what this worktree has to give back when it goes.

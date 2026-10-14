@@ -34,10 +34,12 @@ lock, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
 | File | Lock | Why |
 | -- | -- | -- |
 | wtm's own state (`.git/wtm/…`, the global directory) | `<path>.lock`, beside it | visible next to what it guards |
-| a file in the user's tree (`.env`, a compose file) | `LockPath: fs.ScratchLockPath(path)` | in the temporary directory, named after the absolute path: no lock file in the user's checkout |
+| a file in the user's tree (`.env`, a compose file) | `LockPath: fs.ScratchLockPath(path)` | in the temporary directory, named after the resolved path (symlinks followed, the directory's when the file does not exist yet): no lock file in the user's checkout, and one lock for a file whatever spelling reaches it |
 | `jobs.json` | none: `fs.ReplaceFile` | the daemon is its only writer, under `wtm.lock` |
 
-A lock that cannot be taken (no `flock` on NFS or some WSL mounts, an unwritable directory) does not cancel the write: it runs unprotected and the returned `fs.Lock{Held: false}` says so, which `dispatch` reports as the warning `locks.unavailable`. `fs.WithFileLock` is the same lock around any work (the ordinal allocation's `ordinal.lock`).
+A lock that cannot be taken (no `flock` on NFS or some WSL mounts, an unwritable directory) does not cancel the write: it runs unprotected and the returned `fs.Lock{Held: false}` says so. `store/` passes it on as `Written.Unlocked` ([store.md](store.md#what-a-write-says)), `identity.Allocate` as `Claim.Unlocked`, and the command reports it as the warning `locks.unavailable`.
+
+Whether a file is there is `fs.Exists(path) (bool, error)`: only a path that does not exist is absent, any other failure to stat it is an error. `fs.FileExists`, which takes any error for absence, is for the commands still on `flow/`. `fs.WithFileLock` is the same lock around any work (the ordinal allocation's `ordinal.lock`).
 
 These locks are short: one file, one write. The **operation locks** `dispatch` holds for a whole run (`<common>/wtm/locks/`) are another set, taken with `fs.TryLocks` (all or none, never waiting) beside a holder file written by `fs.HoldFile`: see [dispatch.md](dispatch.md#operation-locks).
 
