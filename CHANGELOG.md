@@ -37,6 +37,7 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 - **A flag answers its wizard question** instead of only preselecting it: `wtm sync --keep-conflict` no longer asks "On conflict", and `create`, `checkout` and `extract --ff` no longer offer the fast-forward of a source behind origin; the trail reads the flag (`· --keep-conflict`, `· --ff`). → [Stacked pull requests](docs/guide/recipes.md#stacked-pull-requests)
 - **`wtm run down`** settles a crashed job: `wtm status` and `run ps` read it `stopped` instead of reporting the crash again. → [Event stream](docs/guide/events.md)
 - **`wtm env --check`** on a missing `.env` plans the ports the apply settles instead of "no such key in this file", and names the file the main checkout lacks when keys need a value.
+- **`wtm init`** writes `--install-command`, `--clean-command` and every other value into `config.toml` exactly as given: a quote no longer breaks the file for every later command, and a backslash is no longer read back as another character.
 - **`wtm run daemon status`** reads jobs as supervised or detached stacks, a `run up -d` job being supervised, and no longer counts a claim on a shared service.
 
 ## [0.29.2] - 2026-10-06
