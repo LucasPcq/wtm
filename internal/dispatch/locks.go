@@ -27,47 +27,131 @@ const (
 	keySeparator     = ":"
 )
 
+var errUnnamedLock = errors.New("a worktree lock names no worktree")
+
+// held is the holder file and the locks an operation took, which grow once
+// the defaults of its request name more.
 type held struct {
-	holder fs.Locks
-	locks  fs.Locks
+	dispatcher *Dispatcher
+	operation  operation.Operation
+	keys       []kernel.LockKey
+	holder     fs.Locks
+	locks      []fs.Locks
 }
 
-func (h held) protected() bool { return h.holder.Held && h.locks.Held }
+type lockParams struct {
+	Operation operation.Operation
+	Keys      []kernel.LockKey
+}
 
-func (h held) release() {
-	h.locks.Release()
+func (h *held) protected() bool {
+	return h.holder.Held && !slices.ContainsFunc(h.locks, func(locks fs.Locks) bool { return !locks.Held })
+}
+
+func (h *held) release() {
+	for _, locks := range slices.Backward(h.locks) {
+		locks.Release()
+	}
 	h.holder.Release()
 }
 
-func (d *Dispatcher) lock(operation operation.Operation) (held, error) {
+func (d *Dispatcher) lock(params lockParams) (*held, error) {
+	operation := params.Operation
+	taken := &held{dispatcher: d, operation: operation, keys: params.Keys}
+	if err := named(params.Keys); err != nil {
+		return nil, err
+	}
 	if d.params.StateDir == "" {
-		return held{}, nil
+		return taken, nil
 	}
 	data, err := json.Marshal(operation)
 	if err != nil {
-		return held{}, kernel.Internal(kernel.Problem{Code: kernel.CodeInternal, Cause: err})
+		return nil, kernel.Internal(kernel.Problem{Code: kernel.CodeInternal, Cause: err})
 	}
 	holder, err := fs.HoldFile(fs.HoldFileParams{Path: d.holderPath(operation.ID), Data: data})
 	if err != nil {
 		// An unwritable state dir is treated as a missing flock: the run goes on
 		// unprotected and warns.
-		return held{}, nil
+		return taken, nil
 	}
-	requests := make([]fs.LockRequest, 0, len(operation.Locks))
-	for _, key := range operation.Locks {
+	taken.holder = holder
+	locks, err := d.tryLocks(lockKeysParams{Keys: operation.Locks, Asked: operation})
+	if err != nil {
+		taken.release()
+		return nil, err
+	}
+	taken.locks = []fs.Locks{locks}
+	return taken, nil
+}
+
+// grow takes the keys the operation does not hold yet, all or none and without
+// waiting, and says whether it took any: the facts read before may be stale.
+func (h *held) grow(keys []kernel.LockKey) (bool, error) {
+	if err := named(keys); err != nil {
+		return false, err
+	}
+	missing := slices.DeleteFunc(slices.Clone(keys), func(key kernel.LockKey) bool {
+		return slices.ContainsFunc(h.keys, sameLock(key))
+	})
+	if len(missing) == 0 || !h.protected() {
+		return false, nil
+	}
+	all := sortedKeys(append(slices.Clone(h.keys), missing...))
+	asked := h.operation
+	asked.Locks = recorded(all)
+	locks, err := h.dispatcher.tryLocks(lockKeysParams{Keys: recorded(missing), Asked: asked})
+	if err != nil {
+		return false, err
+	}
+	h.locks = append(h.locks, locks)
+	h.keys, h.operation = all, asked
+	h.rewrite()
+	return true, nil
+}
+
+// rewrite lists every lock taken in the holder file; a holder that cannot be
+// rewritten keeps the keys it listed, and only a 409 names its holder less well.
+func (h *held) rewrite() {
+	data, err := json.Marshal(h.operation)
+	if err != nil {
+		return
+	}
+	if holder, err := fs.Rehold(fs.ReholdParams{Held: h.holder, Data: data}); err == nil {
+		h.holder = holder
+	}
+}
+
+type lockKeysParams struct {
+	Keys  []operation.Lock
+	Asked operation.Operation
+}
+
+func (d *Dispatcher) tryLocks(params lockKeysParams) (fs.Locks, error) {
+	requests := make([]fs.LockRequest, 0, len(params.Keys))
+	for _, key := range params.Keys {
 		requests = append(requests, fs.LockRequest{Path: d.lockPath(key), Shared: key.Mode == string(kernel.LockShared)})
 	}
 	locks, err := fs.TryLocks(fs.TryLocksParams{Requests: requests})
 	var busy *fs.BusyError
 	if errors.As(err, &busy) {
-		holder.Release()
-		return held{}, d.lockHeld(lockHeldParams{Path: busy.Path, Asked: operation})
+		return fs.Locks{}, d.lockHeld(lockHeldParams{Path: busy.Path, Asked: params.Asked})
 	}
 	if err != nil {
-		holder.Release()
-		return held{}, kernel.Internal(kernel.Problem{Code: kernel.CodeInternal, Cause: err})
+		return fs.Locks{}, kernel.Internal(kernel.Problem{Code: kernel.CodeInternal, Cause: err})
 	}
-	return held{holder: holder, locks: locks}, nil
+	return locks, nil
+}
+
+// named refuses a worktree key with no name: it would lock no worktree.
+func named(keys []kernel.LockKey) error {
+	if !slices.ContainsFunc(keys, func(key kernel.LockKey) bool { return key.Scope == kernel.LockWorktree && key.Name == "" }) {
+		return nil
+	}
+	return kernel.Internal(kernel.Problem{Code: kernel.CodeInternal, Cause: errUnnamedLock})
+}
+
+func sameLock(key kernel.LockKey) func(kernel.LockKey) bool {
+	return func(other kernel.LockKey) bool { return other.Scope == key.Scope && other.Name == key.Name }
 }
 
 type lockHeldParams struct {

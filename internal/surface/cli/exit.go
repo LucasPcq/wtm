@@ -1,9 +1,7 @@
 package cli
 
 import (
-	"encoding/json"
 	"errors"
-	"slices"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/kernel"
@@ -64,34 +62,6 @@ func exitOfKind(kind kernel.Kind) int {
 	default:
 		return domain.ExitCodeError
 	}
-}
-
-// outcomeFailure is the error a batch exits on: an interrupted item first —
-// cancelled, or never reached because of the interrupt — else the first that
-// failed, else none.
-func outcomeFailure(items []kernel.Item[json.RawMessage]) kernel.Error {
-	if at := slices.IndexFunc(items, interrupted); at >= 0 {
-		return cancelledItem(items[at])
-	}
-	if at := slices.IndexFunc(items, failed); at >= 0 {
-		return items[at].Error
-	}
-	return nil
-}
-
-func interrupted(item kernel.Item[json.RawMessage]) bool {
-	return item.Status == kernel.StatusCancelled || item.Reason == kernel.ReasonInterrupted
-}
-
-func failed(item kernel.Item[json.RawMessage]) bool {
-	return item.Status == kernel.StatusFailed
-}
-
-func cancelledItem(item kernel.Item[json.RawMessage]) kernel.Error {
-	if item.Error != nil {
-		return item.Error
-	}
-	return kernel.Cancelled(kernel.Problem{Code: kernel.CodeInterrupted})
 }
 
 // reported is a failure whose report is written already, on screen or in the

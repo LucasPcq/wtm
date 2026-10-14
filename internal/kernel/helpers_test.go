@@ -56,7 +56,7 @@ func worktreeUnit(d *disk, branch string, then ...kernel.Phase[string]) kernel.U
 }
 
 func phase(name string, run func(context.Context, string) (string, error)) kernel.Phase[string] {
-	return kernel.Phase[string]{Name: name, Run: run}
+	return kernel.Phase[string]{Name: name, Run: func(ctx context.Context, _ kernel.Reporter, detail string) (string, error) { return run(ctx, detail) }}
 }
 
 // each runs Each over branches, each named by itself.

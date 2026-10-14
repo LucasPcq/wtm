@@ -15,13 +15,17 @@ type Handle[Req, F, P, D any] struct {
 	command    kernel.Command[Req, F, P, D]
 	messages   text.Messages
 	exitCodes  map[kernel.Code]int
+	events     Events[F, D]
 }
 
+// RegisterParams: Events turns the milestones of the command's units into the
+// events dispatch publishes.
 type RegisterParams[Req, F, P, D any] struct {
 	Dispatcher *Dispatcher
 	Command    kernel.Command[Req, F, P, D]
 	Messages   text.Messages
 	ExitCodes  map[kernel.Code]int
+	Events     Events[F, D]
 }
 
 // Register panics on a plan whose detail is not a struct: every surface shows
@@ -30,7 +34,7 @@ func Register[Req, F, P, D any](params RegisterParams[Req, F, P, D]) *Handle[Req
 	if detail := reflect.TypeFor[P](); detail.Kind() != reflect.Struct {
 		panic(fmt.Sprintf(planShapeFmt, params.Command.Name, detail))
 	}
-	return &Handle[Req, F, P, D]{dispatcher: params.Dispatcher, command: params.Command, messages: params.Messages, exitCodes: params.ExitCodes}
+	return &Handle[Req, F, P, D]{dispatcher: params.Dispatcher, command: params.Command, messages: params.Messages, exitCodes: params.ExitCodes, events: params.Events}
 }
 
 func (h *Handle[Req, F, P, D]) Name() string { return h.command.Name }

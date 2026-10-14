@@ -30,7 +30,10 @@ func (b *binding) request(cmd *cobra.Command, args []string) (json.RawMessage, k
 		invalid.Cause = fmt.Errorf(unexpectedArgumentFmt, args[0])
 		return nil, invalid
 	}
-	entries, problems := b.entries(cmd, args)
+	entries, problems, err := b.entries(cmd, args)
+	if err != nil {
+		return nil, kernel.Internal(kernel.Problem{Code: kernel.CodeInternal, Cause: err})
+	}
 	if len(problems) > 0 {
 		return nil, kernel.Invalid(problems)
 	}
@@ -41,11 +44,16 @@ func (b *binding) request(cmd *cobra.Command, args []string) (json.RawMessage, k
 	return data, nil
 }
 
-func (b *binding) entries(cmd *cobra.Command, args []string) ([]entry, []kernel.FieldError) {
+// entries reads a flag only through the getter of the type Bind gave it: an
+// error there is a flag bound by hand against its field.
+func (b *binding) entries(cmd *cobra.Command, args []string) ([]entry, []kernel.FieldError, error) {
 	var entries []entry
 	var problems []kernel.FieldError
 	for _, spec := range b.specs {
 		read := b.value(valueParams{Cmd: cmd, Spec: spec, Args: args})
+		if read.Err != nil {
+			return nil, nil, read.Err
+		}
 		if read.Problem != nil {
 			problems = append(problems, *read.Problem)
 		}
@@ -53,7 +61,7 @@ func (b *binding) entries(cmd *cobra.Command, args []string) ([]entry, []kernel.
 			entries = append(entries, entry{Path: spec.Path, Value: read.Value})
 		}
 	}
-	return entries, problems
+	return entries, problems, nil
 }
 
 type valueParams struct {
@@ -66,6 +74,7 @@ type valueRead struct {
 	Value   any
 	Given   bool
 	Problem *kernel.FieldError
+	Err     error
 }
 
 func (b *binding) value(params valueParams) valueRead {
@@ -79,17 +88,20 @@ func (b *binding) value(params valueParams) valueRead {
 	flags := params.Cmd.Flags()
 	switch params.Spec.Type {
 	case kernel.FieldBool:
-		value, _ := flags.GetBool(name)
-		return valueRead{Value: value, Given: true}
+		value, err := flags.GetBool(name)
+		return valueRead{Value: value, Given: true, Err: err}
 	case kernel.FieldTextList, kernel.FieldMultiSelect, kernel.FieldReorder:
-		value, _ := flags.GetStringArray(name)
-		return valueRead{Value: value, Given: true}
+		value, err := flags.GetStringArray(name)
+		return valueRead{Value: value, Given: true, Err: err}
 	case kernel.FieldDecisions:
-		value, _ := flags.GetStringArray(name)
+		value, err := flags.GetStringArray(name)
+		if err != nil {
+			return valueRead{Err: err}
+		}
 		return decisions(params.Spec.Path, value)
 	default:
-		value, _ := flags.GetString(name)
-		return valueRead{Value: value, Given: true}
+		value, err := flags.GetString(name)
+		return valueRead{Value: value, Given: true, Err: err}
 	}
 }
 

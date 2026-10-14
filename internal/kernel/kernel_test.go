@@ -24,7 +24,7 @@ func TestACommandGoesFromAnEmptyFormToItsOutcome(t *testing.T) {
 	}
 
 	// Observe reads the repository once; nothing the user types reads it again.
-	f, err := create.Observe(ctx, kernel.ObserveScope{Dir: "/repo"})
+	f, err := create.Observe(ctx)
 	require.NoError(t, err)
 
 	// An empty request names what is missing: the 422 an agent gets.
@@ -58,7 +58,7 @@ func TestACommandGoesFromAnEmptyFormToItsOutcome(t *testing.T) {
 	plan, err := create.Plan(ctx, complete.Request, f)
 	require.NoError(t, err)
 	progress := &recorder{}
-	outcome, err := create.Apply(ctx, kernel.ApplyInput[request, facts, createPlan]{Request: complete.Request, Facts: f, Plan: plan, Emit: progress})
+	outcome, err := create.Apply(ctx, kernel.ApplyInput[request, facts, createPlan, string]{Request: complete.Request, Facts: f, Plan: plan, Emit: progress})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"feat/old:done/", "feat/new:done/"}, outcomes(outcome.Items))
 	assert.Equal(t, "/wt/feat/new configured", outcome.Items[1].Detail)

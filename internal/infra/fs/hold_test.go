@@ -64,3 +64,17 @@ func TestAProcessThatDiesHoldsNothing(t *testing.T) {
 	_ = cmd.Wait()
 	assert.Empty(t, heldFiles(t, dir))
 }
+
+func TestAReheldFileHoldsTheNewDataAndIsGoneOnRelease(t *testing.T) {
+	dir := t.TempDir()
+	held, err := fs.HoldFile(fs.HoldFileParams{Path: filepath.Join(dir, "op-1.json"), Data: []byte(`{"locks":1}`)})
+	require.NoError(t, err)
+
+	reheld, err := fs.Rehold(fs.ReholdParams{Held: held, Data: []byte(`{"locks":2}`)})
+	require.NoError(t, err)
+	assert.True(t, reheld.Held)
+	assert.Equal(t, [][]byte{[]byte(`{"locks":2}`)}, heldFiles(t, dir), "the old lock going did not take the new file with it")
+
+	reheld.Release()
+	assert.Empty(t, entries(t, dir))
+}

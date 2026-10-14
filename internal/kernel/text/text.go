@@ -24,6 +24,7 @@ const (
 	codeReasonUnchanged   kernel.Code = "reason.unchanged"
 	codeReasonUnsafe      kernel.Code = "reason.unsafe"
 	codeReasonLocked      kernel.Code = "reason.locked"
+	codeReasonIncomplete  kernel.Code = "reason.incomplete"
 )
 
 // Messages are the templates of the codes one package declares, each filled
@@ -68,6 +69,7 @@ var kernelMessages = Messages{
 	codeReasonUnchanged:   "unchanged",
 	codeReasonUnsafe:      "unsafe",
 	codeReasonLocked:      "locked",
+	codeReasonIncomplete:  "incomplete",
 }
 
 var statusCodes = map[kernel.Status]kernel.Code{
@@ -83,6 +85,7 @@ var reasonCodes = map[kernel.Reason]kernel.Code{
 	kernel.ReasonUnchanged:   codeReasonUnchanged,
 	kernel.ReasonUnsafe:      codeReasonUnsafe,
 	kernel.ReasonLocked:      codeReasonLocked,
+	kernel.ReasonIncomplete:  codeReasonIncomplete,
 }
 
 // Catalog is the kernel's messages and those of every entry a surface serves.

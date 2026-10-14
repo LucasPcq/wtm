@@ -2,72 +2,64 @@ package dispatch
 
 import (
 	"io"
-	"slices"
 	"sync"
 
-	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/kernel"
-	"github.com/LucasPcq/wtm/internal/rules"
 )
 
 const lineEnd = "\n"
 
-var hookPhases = []domain.HookEvent{domain.HookOnCreate, domain.HookOnClean}
+// progress is the Emitter Apply is handed.
+type progress struct {
+	bus     operationBus
+	forward kernel.Emitter
+	mu      sync.Mutex
+	logs    map[string]io.WriteCloser
+}
 
 type progressParams struct {
 	Bus     operationBus
 	Forward kernel.Emitter
 }
 
-// progress is the Emitter Apply is handed.
-type progress struct {
-	bus      operationBus
-	forward  kernel.Emitter
-	stateDir string
-	mu       sync.Mutex
-	logs     map[string]io.WriteCloser
-}
-
-func (d *Dispatcher) progress(params progressParams) *progress {
-	return &progress{bus: params.Bus, forward: params.Forward, stateDir: d.params.StateDir, logs: map[string]io.WriteCloser{}}
+func newProgress(params progressParams) *progress {
+	return &progress{bus: params.Bus, forward: params.Forward, logs: map[string]io.WriteCloser{}}
 }
 
 func (p *progress) Emit(event kernel.Progress) {
-	event.Op = kernel.OpID(p.bus.operation.ID)
+	event.Base().Op = kernel.OpID(p.bus.operation.ID)
 	p.log(event)
-	if event.Kind == kernel.ProgressUnitFinished {
-		p.bus.unitFinished(event)
+	if finished, ok := event.(*kernel.UnitFinished); ok {
+		p.bus.unitFinished(finished)
 	}
 	if p.forward != nil {
 		p.forward.Emit(event)
 	}
 }
 
-// log keeps a hook phase's whole output whatever the surface shows of it; a
-// log that cannot be opened never stops the hook.
+// log keeps the whole output of a phase that names its log, whatever the
+// surface shows of it; a log that cannot be opened never stops the phase.
 func (p *progress) log(event kernel.Progress) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	phase := domain.HookEvent(event.Params[kernel.ParamPhase])
-	switch event.Kind {
-	case kernel.ProgressPhaseStarted:
-		if p.stateDir == "" || !slices.Contains(hookPhases, phase) {
+	switch e := event.(type) {
+	case *kernel.PhaseStarted:
+		if e.Log == "" {
 			return
 		}
-		file, err := fs.OpenLog(rules.HooksLogPath(rules.HooksLogPathParams{StateDir: p.stateDir, Phase: phase, Branch: event.Subject}))
+		file, err := fs.OpenLog(e.Log)
 		if err != nil {
 			return
 		}
-		p.logs[event.Subject] = file
-	case kernel.ProgressOutput:
-		if file, open := p.logs[event.Subject]; open {
-			_, _ = io.WriteString(file, event.Line+lineEnd)
+		p.logs[e.Subject] = file
+	case *kernel.Output:
+		if file, open := p.logs[e.Subject]; open {
+			_, _ = io.WriteString(file, e.Line+lineEnd)
 		}
-	case kernel.ProgressPhaseFinished:
-		if slices.Contains(hookPhases, phase) {
-			p.closeLog(event.Subject)
-		}
+	case *kernel.PhaseFinished:
+		p.closeLog(e.Subject)
+	case *kernel.UnitStarted, *kernel.UnitFinished, *kernel.StatusChanged:
 	}
 }
 

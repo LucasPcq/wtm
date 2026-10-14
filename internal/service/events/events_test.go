@@ -136,6 +136,21 @@ func TestAPublisherStampsItsCorrelationID(t *testing.T) {
 	}
 }
 
+func TestAnEventStampedByItsOperationKeepsItsTimeAndCorrelation(t *testing.T) {
+	noDaemonSpawn(t)
+	f := newWatchFixture(t)
+	w := f.watch(t)
+	w.next(t)
+	w.next(t)
+	stamped := domain.Event{Type: domain.EventOperationStarted, TS: "2026-10-11T12:00:00Z", CorrelationID: "agent-7"}
+
+	NewPublisher(PublisherParams{ProjectDir: f.projectDir, SocketPath: f.socket, CorrelationID: "popup-1"}).Publish(t.Context(), stamped)
+
+	if got := w.next(t); got.TS != stamped.TS || got.CorrelationID != "agent-7" {
+		t.Fatalf("event = %+v", got)
+	}
+}
+
 func TestASnapshotNeverCarriesACorrelationID(t *testing.T) {
 	noDaemonSpawn(t)
 	t.Setenv(domain.EnvCorrelationID, "popup-1")

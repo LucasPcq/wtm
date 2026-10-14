@@ -149,6 +149,17 @@ func TestARuleOnAPathThatNamesNoFieldIsAnError(t *testing.T) {
 	}
 }
 
+func TestARuleOverAFieldOfAnotherShapeIsAnError(t *testing.T) {
+	broken := []rules{
+		rules{}.Distinct("from"),
+		rules{}.NotSelfParent(kernel.SelfParentRule{Parent: "branches", Children: "from"}),
+	}
+	for _, chain := range broken {
+		_, err := kernel.CheckRules(kernel.CheckRulesParams[request, facts]{Rules: chain, Request: request{From: "x", Branches: []string{"x", "x"}}})
+		assert.Error(t, err, "%s: a rule must not read a field it cannot check as nothing to check", chain[0].Code)
+	}
+}
+
 func TestAnOptionThatWouldBreakARuleArrivesDisabledWithItsReason(t *testing.T) {
 	chain := rules{}.
 		NotSelfParent(kernel.SelfParentRule{Parent: "from", Children: "branches"}).

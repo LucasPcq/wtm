@@ -96,8 +96,8 @@ func (r *repo) io() int {
 	return total
 }
 
-func (r *repo) add(branch string) func(context.Context) error {
-	return func(context.Context) error {
+func (r *repo) add(branch string) func(context.Context, kernel.Reporter) error {
+	return func(context.Context, kernel.Reporter) error {
 		r.mu.Lock()
 		defer r.mu.Unlock()
 		r.worktrees = append(r.worktrees, branch)
@@ -175,7 +175,7 @@ func makeCommand(r *repo) kernel.Command[request, facts, plan, string] {
 	defs := fields(r)
 	return kernel.Command[request, facts, plan, string]{
 		Name: commandName,
-		Observe: func(context.Context, kernel.ObserveScope) (facts, error) {
+		Observe: func(context.Context) (facts, error) {
 			return r.observe(), nil
 		},
 		Forget: func(f facts) facts {
@@ -189,7 +189,7 @@ func makeCommand(r *repo) kernel.Command[request, facts, plan, string] {
 		Plan: func(_ context.Context, req request, _ facts) (kernel.Plan[plan], error) {
 			return kernel.Plan[plan]{Detail: plan{Branches: req.Branches, From: req.From}}, nil
 		},
-		Apply: func(ctx context.Context, in kernel.ApplyInput[request, facts, plan]) (kernel.Outcome[string], error) {
+		Apply: func(ctx context.Context, in kernel.ApplyInput[request, facts, plan, string]) (kernel.Outcome[string], error) {
 			r.mu.Lock()
 			r.applied = append(r.applied, in.Request)
 			r.mu.Unlock()

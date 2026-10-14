@@ -45,10 +45,11 @@ func (b *binding) follow(cmd *cobra.Command, params followParams) error {
 		if !served {
 			continue
 		}
-		yes, err := b.engine.confirm(ConfirmParams{
-			Command: b.engine.commandLine(lineParams{Target: followUp.Command, Request: followUp.Request}),
-			Note:    b.engine.catalog.Message(followUp.Code, followUp.Params),
-		})
+		line, err := b.engine.commandLine(lineParams{Target: followUp.Command, Request: followUp.Request})
+		if err != nil {
+			return err
+		}
+		yes, err := b.engine.confirm(ConfirmParams{Command: line, Note: b.engine.catalog.Message(followUp.Code, followUp.Params)})
 		if err != nil {
 			return err
 		}

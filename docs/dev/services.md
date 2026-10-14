@@ -19,7 +19,7 @@ Each function is a **reader** (it reads, never writes, fetches or allocates) or 
 worktree := gitwt.Params{Git: ports.Git, Path: path, Checkout: git.NewBranch{Name: branch, From: from}}
 step := kernel.SagaStep{
 	Name: "worktree",
-	Do:   func(ctx context.Context) error { return gitwt.Add(ctx, worktree) },
+	Do:   func(ctx context.Context, _ kernel.Reporter) error { return gitwt.Add(ctx, worktree) },
 	Undo: func(ctx context.Context) error { return gitwt.Remove(ctx, worktree) },
 }
 ```
@@ -57,12 +57,16 @@ Its one read is the main checkout's own `.env` files, through `EnvFiles.Read` an
 `Execute(ctx, ExecuteParams{Hooks, WorkDir, Vars, Env, Output, OnHook})` runs the hooks one after another, as `RunHooks` does, and prints nothing: each line they print, stdout and stderr alike, goes to `Output`, a hook's unfinished last line flushed when it ends, and each hook starting and ending goes to `OnHook` as a `domain.HookBeat`, the end with its duration, its error and its stderr, a failure `continue_on_error` went past included. The command runs it inside the phase it opens and hands it its progress:
 
 ```go
-kernel.Phase[CreateDetail]{Name: string(domain.HookOnCreate), Run: func(ctx context.Context, detail CreateDetail) (CreateDetail, error) {
-	return detail, hooks.Execute(ctx, hooks.ExecuteParams{Hooks: cfg.Hooks.OnCreate, WorkDir: detail.Path, Output: kernel.Report(in.Emit, branch).Output})
-}}
+kernel.Phase[CreateDetail]{
+	Name: string(domain.HookOnCreate),
+	Log:  rules.HooksLogPath(rules.HooksLogPathParams{StateDir: stateDir, Phase: domain.HookOnCreate, Branch: branch}),
+	Run: func(ctx context.Context, report kernel.Reporter, detail CreateDetail) (CreateDetail, error) {
+		return detail, hooks.Execute(ctx, hooks.ExecuteParams{Hooks: cfg.Hooks.OnCreate, WorkDir: detail.Path, Output: report.Output})
+	},
+}
 ```
 
-It writes no log: `dispatch` keeps the phase's lines in `hooks/<phase>-<branch>.log`, and the generic rendering draws the phase. The error is the result: a `hooks.Failure` naming the hook, which is either `domain.ErrHookFailed` with its exit code or `domain.ErrHookStopped` for a hook interrupted, with its lines emitted up to the interruption, never both; or `domain.ErrCancelled` for an interrupt between two hooks.
+It writes no log: the phase names its `Log`, `dispatch` keeps the phase's lines there, and the generic rendering draws the phase. The error is the result: a `hooks.Failure` naming the hook, which is either `domain.ErrHookFailed` with its exit code or `domain.ErrHookStopped` for a hook interrupted, with its lines emitted up to the interruption, never both; or `domain.ErrCancelled` for an interrupt between two hooks.
 
 ## Decisions in `rules/<subject>`
 

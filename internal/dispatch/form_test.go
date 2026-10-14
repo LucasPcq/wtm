@@ -1,6 +1,7 @@
 package dispatch_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -68,7 +69,45 @@ func TestAFieldWithoutChoicesHasNone(t *testing.T) {
 func TestTheChoicesOfAPathThatIsNoFieldAreNotFound(t *testing.T) {
 	_, err := handle(bench(t), &repo{}).Choices(t.Context(), dispatch.ChoicesParams[request, facts]{Path: "nowhere"})
 
-	assert.Equal(t, kernel.KindNotFound, problem(t, err).Kind())
+	failure := problem(t, err)
+	assert.Equal(t, kernel.KindNotFound, failure.Kind())
+	assert.Equal(t, kernel.CodeUnknownField, failure.Base().Code)
+	assert.Equal(t, kernel.Params{kernel.ParamPath: "nowhere"}, failure.Base().Params, "the path is no value that was not found")
+}
+
+func TestABoolOptionIsJudgedAsTheBoolItSets(t *testing.T) {
+	h := dispatch.Register(dispatch.RegisterParams[toggles, struct{}, plan, detail]{Dispatcher: bench(t).Dispatcher, Command: togglesCommand()})
+
+	choices, err := h.Choices(t.Context(), dispatch.ChoicesParams[toggles, struct{}]{Path: "push", Request: toggles{NoPush: true}})
+
+	require.NoError(t, err)
+	require.Len(t, choices.Options, 2)
+	require.NotNil(t, choices.Options[0].Refusal, "pushing would break the rule no_push holds")
+	assert.Equal(t, kernel.CodeExclusiveWith, choices.Options[0].Refusal.Code)
+	assert.Nil(t, choices.Options[1].Refusal)
+}
+
+func TestTheOptionsOfADecisionsFieldAreNotJudgedAlone(t *testing.T) {
+	h := dispatch.Register(dispatch.RegisterParams[toggles, struct{}, plan, detail]{Dispatcher: bench(t).Dispatcher, Command: togglesCommand()})
+
+	choices, err := h.Choices(t.Context(), dispatch.ChoicesParams[toggles, struct{}]{Path: "decisions", Request: toggles{}})
+
+	require.NoError(t, err)
+	assert.Len(t, choices.Options, 2)
+}
+
+func TestFactsThatCannotBeFingerprintedAreAnInternalError(t *testing.T) {
+	h := dispatch.Register(dispatch.RegisterParams[request, unencodable, plan, detail]{
+		Dispatcher: bench(t).Dispatcher,
+		Command: kernel.Command[request, unencodable, plan, detail]{
+			Name:    "broken",
+			Observe: func(context.Context) (unencodable, error) { return unencodable{Watch: make(chan int)}, nil },
+		},
+	})
+
+	_, err := h.Observe(t.Context())
+
+	assert.Equal(t, kernel.KindInternal, problem(t, err).Kind(), "facts no fingerprint can guard are never run on")
 }
 
 func TestAFormAskingAgainSeesTheFactsWithoutTheRememberedAnswers(t *testing.T) {

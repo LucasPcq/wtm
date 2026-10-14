@@ -36,17 +36,18 @@ type runParams struct {
 	Options dispatch.Options
 }
 
-func run(ctx context.Context, params runParams) dispatchtest.Ran[plan, string] {
-	return dispatchtest.Run(ctx, dispatchtest.RunParams[request, facts, plan, string]{
+func run(ctx context.Context, params runParams) dispatchtest.Ran[plan, detail] {
+	return dispatchtest.Run(ctx, dispatchtest.RunParams[request, facts, plan, detail]{
 		Bench:   params.Bench,
 		Command: createCommand(params.Repo),
+		Events:  createEvents(),
 		Request: params.Request,
 		Options: params.Options,
 	})
 }
 
-func handle(b *dispatchtest.Bench, r *repo) *dispatch.Handle[request, facts, plan, string] {
-	return dispatch.Register(dispatch.RegisterParams[request, facts, plan, string]{Dispatcher: b.Dispatcher, Command: createCommand(r)})
+func handle(b *dispatchtest.Bench, r *repo) *dispatch.Handle[request, facts, plan, detail] {
+	return dispatch.Register(dispatch.RegisterParams[request, facts, plan, detail]{Dispatcher: b.Dispatcher, Command: createCommand(r), Events: createEvents()})
 }
 
 func operationsQuery(b *dispatchtest.Bench) *dispatch.QueryHandle[operations.Request, operations.View] {
@@ -95,9 +96,42 @@ func TestHelperProcess(t *testing.T) {
 }
 
 // fillable is the example's entry as a form fills it.
-func fillable(t testing.TB, h *dispatch.Handle[request, facts, plan, string]) dispatch.Fillable {
+func fillable(t testing.TB, h *dispatch.Handle[request, facts, plan, detail]) dispatch.Fillable {
 	t.Helper()
 	f, ok := h.Fillable()
 	require.True(t, ok)
 	return f
+}
+
+func kindOf(progress kernel.Progress) string {
+	switch progress.(type) {
+	case *kernel.UnitStarted:
+		return "unit.started"
+	case *kernel.UnitFinished:
+		return "unit.finished"
+	case *kernel.PhaseStarted:
+		return "phase.started"
+	case *kernel.PhaseFinished:
+		return "phase.finished"
+	case *kernel.Output:
+		return "output"
+	case *kernel.StatusChanged:
+		return "status"
+	}
+	return ""
+}
+
+// holding runs create on branches through b and keeps it in Apply, its locks
+// held, until the release it returns.
+func holding(t *testing.T, b *dispatchtest.Bench, branches ...string) (release func()) {
+	t.Helper()
+	r := &repo{}
+	entered, let := r.held()
+	done := make(chan dispatchtest.Ran[plan, detail], 1)
+	go func() { done <- run(t.Context(), runParams{Bench: b, Repo: r, Request: request{Branches: branches}}) }()
+	<-entered
+	return func() {
+		let()
+		require.NoError(t, (<-done).Err)
+	}
 }

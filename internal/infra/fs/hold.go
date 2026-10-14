@@ -38,6 +38,23 @@ func HoldFile(params HoldFileParams) (Locks, error) {
 	return Locks{Held: held, files: []*os.File{file}, remove: params.Path}, nil
 }
 
+type ReholdParams struct {
+	Held Locks
+	Data []byte
+}
+
+// Rehold puts Data in place of a file HoldFile holds, with no moment the path
+// holds nothing: the new file is renamed over the old before its lock goes.
+func Rehold(params ReholdParams) (Locks, error) {
+	next, err := HoldFile(HoldFileParams{Path: params.Held.remove, Data: params.Data})
+	if err != nil {
+		return params.Held, err
+	}
+	params.Held.remove = ""
+	params.Held.Release()
+	return next, nil
+}
+
 func discard(file *os.File, cause error) error {
 	file.Close()
 	return errors.Join(cause, os.Remove(file.Name()))

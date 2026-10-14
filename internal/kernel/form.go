@@ -2,11 +2,14 @@ package kernel
 
 import "slices"
 
+// EvaluateParams: with Forget, the form is evaluated on the facts it returns,
+// and each field still says what the facts as given remember for it.
 type EvaluateParams[Req, F any] struct {
 	Fields  []FieldDef[Req, F]
 	Rules   Rules[Req, F]
 	Request Req
 	Facts   F
+	Forget  func(F) F
 }
 
 // Form is a request with its defaults applied, the state of every field and
@@ -22,15 +25,22 @@ type Form[Req any] struct {
 // reads the defaults of the fields before it), then validates the whole.
 func Evaluate[Req, F any](params EvaluateParams[Req, F]) (Form[Req], error) {
 	request := params.Request
+	facts := params.Facts
+	if params.Forget != nil {
+		facts = params.Forget(params.Facts)
+	}
 	states := make([]FieldState, 0, len(params.Fields))
 	var problems []FieldError
 	for _, field := range params.Fields {
-		state, filled, err := settle(settleParams[Req, F]{Field: field, Request: request, Facts: params.Facts})
+		state, filled, err := settle(settleParams[Req, F]{Field: field, Request: request, Facts: facts})
 		if err != nil {
 			return Form[Req]{}, err
 		}
+		if params.Forget != nil {
+			state.Remembered = remembered(settleParams[Req, F]{Field: field, Request: request, Facts: params.Facts})
+		}
 		request = filled
-		found, err := fieldProblems(fieldProblemsParams[Req, F]{Field: field, State: state, Request: request, Facts: params.Facts})
+		found, err := fieldProblems(fieldProblemsParams[Req, F]{Field: field, State: state, Request: request, Facts: facts})
 		if err != nil {
 			return Form[Req]{}, err
 		}
@@ -38,7 +48,7 @@ func Evaluate[Req, F any](params EvaluateParams[Req, F]) (Form[Req], error) {
 		states = append(states, state)
 		problems = append(problems, found...)
 	}
-	crossed, err := CheckRules(CheckRulesParams[Req, F]{Rules: params.Rules, Request: request, Facts: params.Facts})
+	crossed, err := CheckRules(CheckRulesParams[Req, F]{Rules: params.Rules, Request: request, Facts: facts})
 	if err != nil {
 		return Form[Req]{}, err
 	}
@@ -80,6 +90,14 @@ func skipped[Req, F any](params settleParams[Req, F]) (bool, Code) {
 		return false, ""
 	}
 	return params.Field.Skip(params.Request, params.Facts)
+}
+
+func remembered[Req, F any](params settleParams[Req, F]) Value {
+	fallback, ok := defaulted(params)
+	if !ok || fallback.Origin != OriginRemembered {
+		return nil
+	}
+	return fallback.Value
 }
 
 func defaulted[Req, F any](params settleParams[Req, F]) (Fallback, bool) {

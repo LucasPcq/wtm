@@ -64,7 +64,6 @@ const (
 	ParamStep    = "step"
 	ParamPhase   = "phase"
 	ParamLeft    = "left"
-	ParamStatus  = "status"
 
 	ParamKey       = "key"
 	ParamOp        = "op"

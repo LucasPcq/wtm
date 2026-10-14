@@ -27,7 +27,7 @@ func TestACommandRunsFromItsJSONRequest(t *testing.T) {
 	require.NotNil(t, command.Outcome)
 	require.Len(t, command.Outcome.Items, 1)
 	assert.Equal(t, kernel.StatusDone, command.Outcome.Items[0].Status)
-	assert.JSONEq(t, `"/wt/feat/a"`, string(command.Outcome.Items[0].Detail))
+	assert.JSONEq(t, `{"path":"/wt/feat/a","ordinal":1}`, string(command.Outcome.Items[0].Detail))
 	assert.Equal(t, []string{"feat/a"}, r.listed())
 }
 
@@ -74,7 +74,7 @@ func TestAnEntryCarriesTheMessagesAndExitCodesItWasRegisteredWith(t *testing.T) 
 	messages := text.Messages{codeBranchTaken: "{branch} is taken"}
 	exitCodes := map[kernel.Code]int{codeBranchTaken: 7}
 
-	command := dispatch.Register(dispatch.RegisterParams[request, facts, plan, string]{Dispatcher: b.Dispatcher, Command: createCommand(&repo{}), Messages: messages, ExitCodes: exitCodes})
+	command := dispatch.Register(dispatch.RegisterParams[request, facts, plan, detail]{Dispatcher: b.Dispatcher, Command: createCommand(&repo{}), Messages: messages, ExitCodes: exitCodes})
 	query := dispatch.RegisterQuery(dispatch.RegisterQueryParams[operations.Request, operations.View]{Query: operations.Query(b.Dispatcher.Operations), Messages: messages, ExitCodes: exitCodes})
 
 	for _, entry := range []dispatch.Entry{command, query} {
@@ -85,7 +85,7 @@ func TestAnEntryCarriesTheMessagesAndExitCodesItWasRegisteredWith(t *testing.T) 
 
 func TestTheCatalogueOfARegistrySpeaksTheKernelAndEveryEntry(t *testing.T) {
 	b := bench(t)
-	command := dispatch.Register(dispatch.RegisterParams[request, facts, plan, string]{Dispatcher: b.Dispatcher, Command: createCommand(&repo{}), Messages: text.Messages{codeBranchTaken: "{branch} is taken"}})
+	command := dispatch.Register(dispatch.RegisterParams[request, facts, plan, detail]{Dispatcher: b.Dispatcher, Command: createCommand(&repo{}), Messages: text.Messages{codeBranchTaken: "{branch} is taken"}})
 
 	catalog := dispatch.Registry{command, operationsQuery(b)}.Catalog()
 
@@ -96,7 +96,7 @@ func TestTheCatalogueOfARegistrySpeaksTheKernelAndEveryEntry(t *testing.T) {
 func TestTwoEntriesSpellingOneCodeStopTheStart(t *testing.T) {
 	b := bench(t)
 	messages := text.Messages{codeBranchTaken: "{branch} is taken"}
-	command := dispatch.Register(dispatch.RegisterParams[request, facts, plan, string]{Dispatcher: b.Dispatcher, Command: createCommand(&repo{}), Messages: messages})
+	command := dispatch.Register(dispatch.RegisterParams[request, facts, plan, detail]{Dispatcher: b.Dispatcher, Command: createCommand(&repo{}), Messages: messages})
 	query := dispatch.RegisterQuery(dispatch.RegisterQueryParams[operations.Request, operations.View]{Query: operations.Query(b.Dispatcher.Operations), Messages: messages})
 
 	assert.PanicsWithValue(t, `text: code "branch.taken" has two messages`, func() { dispatch.Registry{command, query}.Catalog() })

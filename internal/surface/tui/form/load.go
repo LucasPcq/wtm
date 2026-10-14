@@ -82,7 +82,7 @@ func (s *session) choicesFor(params fieldParams) kernel.Choices {
 	}
 	request, facts := params.Request, s.facts
 	s.pending = &load{text: choicesText, run: func() tea.Msg {
-		choices, err := s.params.Entry.Choices(s.ctx, dispatch.FillChoicesParams{Path: spec.Path, Request: request, Facts: facts})
+		choices, err := s.params.Entry.Choices(s.ctx, dispatch.FillChoicesParams{Path: spec.Path, Request: request, Facts: facts, IgnoreRemembered: s.params.Options.IgnoreRemembered})
 		return choicesMsg{index: params.Index, key: key, choices: choices, err: err}
 	}}
 	return kernel.Choices{}

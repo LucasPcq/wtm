@@ -24,9 +24,10 @@ func TestARunAppliesThePlanAndReturnsItsOutcome(t *testing.T) {
 	assert.NotEmpty(t, ran.Result.Fingerprint)
 	assert.Equal(t, plan{Branches: []string{"feat/a", "feat/b"}, Isolation: isolated}, ran.Result.Plan.Detail)
 	require.NotNil(t, ran.Result.Outcome)
-	assert.Equal(t, []kernel.Item[string]{
-		{Subject: "feat/a", Status: kernel.StatusDone, Detail: "/wt/feat/a"},
-		{Subject: "feat/b", Status: kernel.StatusDone, Detail: "/wt/feat/b"},
+	one, two := 1, 2
+	assert.Equal(t, []kernel.Item[detail]{
+		{Subject: "feat/a", Status: kernel.StatusDone, Detail: detail{Path: "/wt/feat/a", Ordinal: &one}},
+		{Subject: "feat/b", Status: kernel.StatusDone, Detail: detail{Path: "/wt/feat/b", Ordinal: &two}},
 	}, ran.Result.Outcome.Items)
 	assert.Empty(t, ran.Result.Outcome.Warnings)
 	assert.Equal(t, []string{"feat/a", "feat/b"}, r.listed())
@@ -133,4 +134,24 @@ func TestWithoutLocksTheRunGoesOnUnprotectedAndSaysSo(t *testing.T) {
 	require.NotNil(t, ran.Result.Outcome)
 	assert.Equal(t, []kernel.Warning{{Code: kernel.CodeLocksUnavailable}}, ran.Result.Outcome.Warnings)
 	assert.Equal(t, []string{"feat/a"}, r.listed())
+}
+
+func TestThePlansWarningsAreCarriedIntoTheOutcomeOnce(t *testing.T) {
+	shared, planned, own := kernel.Warning{Code: "test.diverged"}, kernel.Warning{Code: "test.stale_base"}, kernel.Warning{Code: "test.env_fallback"}
+	r := &repo{planWarnings: []kernel.Warning{shared, planned}, applyWarnings: []kernel.Warning{shared, own}}
+
+	ran := run(t.Context(), runParams{Bench: bench(t), Repo: r, Request: request{Branches: []string{"feat/a"}}})
+
+	require.NoError(t, ran.Err)
+	require.NotNil(t, ran.Result.Outcome)
+	assert.Equal(t, []kernel.Warning{shared, planned, own}, ran.Result.Outcome.Warnings, "the plan's warnings first, each once")
+}
+
+func TestARunWhoseItemFailedStillReturnsItsOutcome(t *testing.T) {
+	ran := run(t.Context(), runParams{Bench: bench(t), Repo: &repo{hookErr: errors.New("exit 1")}, Request: request{Branches: []string{"feat/a"}}})
+
+	require.NoError(t, ran.Err, "an item that failed is in the outcome, not the run's error")
+	require.NotNil(t, ran.Result.Outcome)
+	assert.Equal(t, kernel.ReasonIncomplete, ran.Result.Outcome.Items[0].Reason)
+	assert.Equal(t, kernel.CodePhaseFailed, ran.Result.Outcome.Failure().Base().Code)
 }

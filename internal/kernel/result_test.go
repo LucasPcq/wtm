@@ -24,6 +24,8 @@ func TestEachItemConstructorSetsAConsistentStatus(t *testing.T) {
 		{"skipped", of.Skipped(kernel.ReasonLocked), kernel.Item[string]{Subject: "feat/x", Status: kernel.StatusSkipped, Reason: kernel.ReasonLocked}},
 		{"failed", of.Failed(failure, ""), kernel.Item[string]{Subject: "feat/x", Status: kernel.StatusFailed, Error: failure}},
 		{"cancelled", of.Cancelled(interrupted, "/wt/x"), kernel.Item[string]{Subject: "feat/x", Status: kernel.StatusCancelled, Reason: kernel.ReasonInterrupted, Error: interrupted, Detail: "/wt/x"}},
+		{"incomplete, failed", of.Incomplete(failure, "/wt/x"), kernel.Item[string]{Subject: "feat/x", Status: kernel.StatusFailed, Reason: kernel.ReasonIncomplete, Error: failure, Detail: "/wt/x"}},
+		{"incomplete, interrupted", of.Incomplete(interrupted, "/wt/x"), kernel.Item[string]{Subject: "feat/x", Status: kernel.StatusCancelled, Reason: kernel.ReasonIncomplete, Error: interrupted, Detail: "/wt/x"}},
 	}
 	for _, c := range cases {
 		assert.Equal(t, c.want, c.got, c.name)
@@ -92,5 +94,41 @@ func TestEachKindOfErrorReadsAsTheJSONAgentsRead(t *testing.T) {
 			require.NoError(t, err)
 			assert.JSONEq(t, c.want, string(got))
 		})
+	}
+}
+
+func TestAnItemCarriesTheWarningsAboutItsSubject(t *testing.T) {
+	warning := kernel.Warning{Code: "test.env_skipped"}
+	item := kernel.ItemFor[string]("feat/x").Warned(warning).Done("/wt/x")
+	assert.Equal(t, []kernel.Warning{warning}, item.Warnings)
+}
+
+func TestRetypeKeepsAllButTheDetail(t *testing.T) {
+	failure := kernel.Internal(kernel.Problem{Code: kernel.CodePhaseFailed})
+	item := kernel.ItemFor[string]("feat/x").Warned(kernel.Warning{Code: "test.w"}).Incomplete(failure, "/wt/x")
+	got := kernel.Retype(kernel.RetypeParams[string, int]{Item: item, Detail: 7})
+	assert.Equal(t, kernel.Item[int]{Subject: "feat/x", Status: kernel.StatusFailed, Reason: kernel.ReasonIncomplete, Error: failure, Warnings: item.Warnings, Detail: 7}, got)
+}
+
+func TestAnOutcomeFailsOnAnInterruptionFirstThenOnItsFirstFailure(t *testing.T) {
+	of := kernel.ItemFor[string]
+	first := kernel.Internal(kernel.Problem{Code: kernel.CodeStepFailed})
+	second := kernel.Internal(kernel.Problem{Code: kernel.CodePhaseFailed})
+	interrupted := kernel.Cancelled(kernel.Problem{Code: kernel.CodeInterrupted, Params: kernel.Params{kernel.ParamPhase: "hooks"}})
+	cases := []struct {
+		name  string
+		items []kernel.Item[string]
+		want  kernel.Error
+	}{
+		{"all done", []kernel.Item[string]{of("a").Done(""), of("b").Unchanged("")}, nil},
+		{"no item", nil, nil},
+		{"first failure", []kernel.Item[string]{of("a").Done(""), of("b").Failed(first, ""), of("c").Failed(second, "")}, first},
+		{"incomplete", []kernel.Item[string]{of("a").Incomplete(second, "")}, second},
+		{"cancelled before a failure", []kernel.Item[string]{of("a").Failed(first, ""), of("b").Cancelled(interrupted, "")}, interrupted},
+		{"never reached", []kernel.Item[string]{of("a").Failed(first, ""), of("b").Skipped(kernel.ReasonInterrupted)}, kernel.Cancelled(kernel.Problem{Code: kernel.CodeInterrupted})},
+		{"not reached after a failure", []kernel.Item[string]{of("a").Failed(first, ""), of("b").Skipped(kernel.ReasonNotReached)}, first},
+	}
+	for _, c := range cases {
+		assert.Equal(t, c.want, kernel.Outcome[string]{Items: c.items}.Failure(), c.name)
 	}
 }

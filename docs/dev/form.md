@@ -19,10 +19,10 @@ The command line calls it on an interactive run of a command — stdin a termina
 
 ## The loop
 
-1. **`Observe` once**, behind a loading box: the facts and their fingerprint, kept while the user types. On `--ask`, `Forget` drops the remembered answers from the facts the form evaluates on; the facts as observed still say what they were.
+1. **`Observe` once**, behind a loading box: the facts and their fingerprint, kept while the user types. On `--ask`, every `State` and `Choices` is called with `IgnoreRemembered`: the field falls back on its other default, and its state still carries the remembered answer (`FieldState.Remembered`), so one `State` says both.
 2. **A step per field** of the schema, in order, then the recap. A step is built when the wizard enters it: the request is the flags' plus the answer of every step asked before, `State` is called on it (pure, no I/O), and the field is asked or settled.
 3. **`Choices`** for an asked field that has them, cached under the field's path and the values of what it `DependsOn`: they are listed again only when one of those changes.
-4. **The recap**: `Run` with `DryRun`, then the plan and its warnings drawn by `styles.RenderPlan` at the width of the recap's box, as the dry run of the command line draws them ([output.md](output.md#a-command-on-the-engine)), « Yes, apply » / « No, cancel ». A plan with nothing to do offers only « No, cancel ». A dry run that fails titles the step « Cannot apply this plan » and says why under « Review & confirm »: `✗` and the error's sentence, each field or blocker it names indented beneath, « No, cancel » alone.
+4. **The recap**: `Run` with `DryRun` (no operation lock, no holder: another run in progress on the same worktree never refuses a preview), then the plan and its warnings drawn by `styles.RenderPlan` at the width of the recap's box, as the dry run of the command line draws them ([output.md](output.md#a-command-on-the-engine)), « Yes, apply » / « No, cancel ». A plan with nothing to do offers only « No, cancel ». A dry run that fails titles the step « Cannot apply this plan » and says why under « Review & confirm »: `✗` and the error's sentence, each field or blocker it names indented beneath, « No, cancel » alone.
 5. **The run**: once the wizard ends, `Run` with the fingerprint of the plan shown and `Surface: dispatch.SurfaceTUI`; its progress goes to the view the command line handed over, outside the wizard, so Ctrl+C is a signal again.
 6. **`412 plan.stale`** (the facts changed while the recap was on screen): the form observes again and reopens on the recap, every field answered before settled, the new plan shown under `! the facts changed since the preview`, inside the recap.
 
@@ -57,7 +57,7 @@ The choices of a field are its `Choices`, else the values its `Enum` accepts. A 
 
 ## Remembering
 
-A command that declares `kernel.Remember` ([commands.md](commands.md#fields)) gets the "Always use this answer in this repo" box on each rememberable `select`, flipped with tab. The form never shows the `remember` field itself: it writes the paths whose box is ticked into it, and the command's `Apply` keeps them. On `--ask`, the box opens ticked on the answer the repository remembers.
+A command that declares `kernel.Remember` ([commands.md](commands.md#fields)) gets the "Always use this answer in this repo" box on each rememberable `select`, flipped with tab. The form never shows the `remember` field itself: it writes the paths whose box is ticked into it, and the command's `Apply` keeps them. A box opens ticked when the flags already named its path (`--remember`), read from the state of the `remember` field like any other; on `--ask`, it opens ticked on the field's `Remembered` answer.
 
 ## Backing out
 

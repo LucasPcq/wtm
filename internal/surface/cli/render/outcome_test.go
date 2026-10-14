@@ -99,3 +99,24 @@ func TestAGenericPlanSpellsEachKeyAsALabelAndEachValueAsText(t *testing.T) {
 		{Label: "Note", Values: []string{"none"}},
 	}, rows)
 }
+
+func TestAWarningAboutAnItemIsNamedWithItsSubject(t *testing.T) {
+	var out bytes.Buffer
+	item := kernel.ItemFor[json.RawMessage]("feat/a").Warned(kernel.Warning{Code: kernel.CodeLocksUnavailable}).Done(nil)
+
+	render.Outcome(&out, render.OutcomeParams{Catalog: catalog, Command: "make", Items: []kernel.Item[json.RawMessage]{item}, Detail: render.GenericDetail{}})
+
+	assert.Equal(t, lines(
+		"  ✓ make: 1 done",
+		"  ! feat/a  ran without operation locks",
+	), plain(out.String()))
+}
+
+func TestAnItemWhoseSagaStandsButAPhaseDidNotFinishSaysWhy(t *testing.T) {
+	var out bytes.Buffer
+	item := kernel.Item[json.RawMessage]{Subject: "feat/a", Status: kernel.StatusCancelled, Reason: kernel.ReasonIncomplete}
+
+	render.Outcome(&out, render.OutcomeParams{Catalog: catalog, Command: "make", Items: []kernel.Item[json.RawMessage]{item}, Detail: render.GenericDetail{}})
+
+	assert.Contains(t, plain(out.String()), "feat/a  incomplete")
+}

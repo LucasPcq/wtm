@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 
@@ -136,19 +137,27 @@ func (b *binding) concludeCommand(cmd *cobra.Command, params commandParams) erro
 	outcome := params.Result.Outcome
 	switch {
 	case outcome != nil:
+		next, err := b.followUps(outcome.FollowUps)
+		if err != nil {
+			return b.fail(cmd, failParams{Route: params.Route, Err: classified(err)})
+		}
 		render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-			render.Outcome(w, render.OutcomeParams{Command: b.name, Items: outcome.Items, Warnings: outcome.Warnings, FollowUps: b.followUps(outcome.FollowUps), Detail: b.detail, Catalog: b.engine.catalog})
+			render.Outcome(w, render.OutcomeParams{Command: b.name, Items: outcome.Items, Warnings: outcome.Warnings, FollowUps: next, Detail: b.detail, Catalog: b.engine.catalog})
 		})
 	case params.Err != nil:
 		return b.fail(cmd, failParams{Route: params.Route, Err: params.Err, Request: params.Request})
 	default:
+		apply, err := b.rerun(rerunParams{Request: params.Request, Flag: flagExpectFingerprint, Value: string(params.Result.Fingerprint)})
+		if err != nil {
+			return b.fail(cmd, failParams{Route: params.Route, Err: classified(err)})
+		}
 		render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
 			render.Recap(w, render.RecapParams{
 				Command:     b.name,
 				Plan:        params.Result.Plan.Detail,
 				Warnings:    params.Result.Plan.Warnings,
 				Fingerprint: string(params.Result.Fingerprint),
-				Next:        []render.NextStepParams{{Command: b.rerun(rerunParams{Request: params.Request, Flag: flagExpectFingerprint, Value: string(params.Result.Fingerprint)}), Note: applyNote}},
+				Next:        []render.NextStepParams{{Command: apply, Note: applyNote}},
 				Detail:      b.detail,
 				Catalog:     b.engine.catalog,
 			})
@@ -164,7 +173,7 @@ func firstFailure(params commandParams) kernel.Error {
 	if params.Result.Outcome == nil {
 		return nil
 	}
-	return outcomeFailure(params.Result.Outcome.Items)
+	return params.Result.Outcome.Failure()
 }
 
 type envelopeParams struct {
@@ -238,21 +247,26 @@ func (b *binding) fail(cmd *cobra.Command, params failParams) error {
 		}
 		return b.reported(params.Err)
 	}
+	next, err := b.failureNext(params)
+	if err != nil {
+		return b.fail(cmd, failParams{Route: params.Route, Err: kernel.Internal(kernel.Problem{Code: kernel.CodeInternal, Cause: errors.Join(err, params.Err)})})
+	}
 	render.Frame(cmd.ErrOrStderr(), func(w io.Writer) {
-		render.Failure(w, render.FailureParams{Err: params.Err, Wording: b.wording(), Next: b.failureNext(params)})
+		render.Failure(w, render.FailureParams{Err: params.Err, Wording: b.wording(), Next: next})
 	})
 	return b.reported(params.Err)
 }
 
 // failureNext is what to run next: the follow-up the error carries, or a new
 // preview when the facts changed under the one the run expected.
-func (b *binding) failureNext(params failParams) []render.NextStepParams {
+func (b *binding) failureNext(params failParams) ([]render.NextStepParams, error) {
 	base := params.Err.Base()
 	if base.Code == kernel.CodePlanStale {
-		return []render.NextStepParams{{Command: b.rerun(rerunParams{Request: params.Request, Flag: domain.FlagDryRun}), Note: replanNote}}
+		line, err := b.rerun(rerunParams{Request: params.Request, Flag: domain.FlagDryRun})
+		return []render.NextStepParams{{Command: line, Note: replanNote}}, err
 	}
 	if base.FollowUp == nil {
-		return nil
+		return nil, nil
 	}
 	return b.followUps([]kernel.FollowUp{*base.FollowUp})
 }
