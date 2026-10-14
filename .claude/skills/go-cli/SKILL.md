@@ -103,7 +103,7 @@ if !ok {
 
 ### 8. Comments — the exception, not the rule
 
-Aim for near-zero comments: encode the meaning in names and signatures instead (`Skip func(Answers) (skip bool, reason string)` needs no prose). Comment only the why the code cannot carry — a non-obvious decision, an ordering constraint, a workaround with its issue reference — plus a one-line package comment. Godoc on an exported symbol only when its name and signature leave a caller guessing, never systematically. When you modify a file, strip the comments in it that restate the code, in the same change.
+Aim for near-zero comments, as the engine has them: encode the meaning in names and signatures instead (`Skip func(Answers) (skip bool, reason string)` needs no prose). Comment only the why the code cannot carry — a quirk of git, macOS or `flock`, a workaround with its reference, an ordering invariant, a non-obvious decision — plus a one-line package doc. Godoc on an exported symbol only when its name and signature leave a caller guessing, never systematically; never on an unexported declaration: its why goes in the body, beside the line it explains. No architecture prose (it goes to `docs/dev/`), no section banner nor copied header in a test file. On the engine's packages `make lint` holds these shapes and a per-package ceiling of comment lines that only goes down (archlint `comments`). When you modify a file, strip the comments in it that restate the code, in the same change.
 
 ### 9. Clean architecture layers
 

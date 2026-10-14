@@ -56,13 +56,13 @@ type editedParams struct {
 	Lines  []domain.EnvLine
 }
 
-// edited rewrites the ports before the owned keys, as wtm env does: both act on the same document.
 func edited(params editedParams) []domain.EnvLine {
 	plan := planOf(planOfParams{
 		Writes: params.Writes,
 		Links:  linksIn(linksInParams{Links: params.Writes.Links, File: params.File}),
 		Lines:  map[string][]domain.EnvLine{params.File: params.Lines},
 	})
+	// The ports before the owned keys, as wtm env does: both act on the same document.
 	lines := rules.ApplyEnvPorts(params.Lines, plan.Entries)
 	for _, entry := range params.Writes.Owned {
 		if entry.File == params.File {

@@ -37,10 +37,10 @@ func head(t *testing.T, dir, ref string) string {
 	return gittest.Output(t, dir, "rev-parse", ref)
 }
 
-// advanceOnOrigin commits to branch on the remote from a clone of its own, so
-// the repository under test only learns of it by fetching.
 func advanceOnOrigin(t *testing.T, origin, branch string) string {
 	t.Helper()
+	// A clone of its own: the repository under test only learns of the commit by
+	// fetching.
 	clone := filepath.Join(t.TempDir(), "clone")
 	gittest.Git(t, t.TempDir(), "clone", origin, clone)
 	gittest.Git(t, clone, "config", "user.email", "test@test.com")
@@ -62,7 +62,6 @@ func checkOutFeature(t *testing.T, dir string, linked bool) string {
 	return where
 }
 
-// rebase onto main stops on a conflict, leaving the rebase in progress.
 func rebase(t *testing.T, dir, backend string) {
 	t.Helper()
 	out, err := exec.Command("git", "-C", dir, "rebase", backend, "main").CombinedOutput()

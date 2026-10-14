@@ -103,12 +103,12 @@ func (h *held) grow(keys []kernel.LockKey) (bool, error) {
 	return true, nil
 }
 
-// A holder left as it was only makes a 409 name it less well.
 func (h *held) rewrite() {
 	data, err := json.Marshal(h.operation)
 	if err != nil {
 		return
 	}
+	// A holder left as it was only makes a 409 name it less well.
 	if holder, err := fs.Rehold(fs.ReholdParams{Held: h.holder, Data: data}); err == nil {
 		h.holder = holder
 	}

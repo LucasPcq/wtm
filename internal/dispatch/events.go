@@ -58,8 +58,8 @@ type operationBus struct {
 	operation operation.Operation
 }
 
-// Without cancellation: a consumer must learn how an interrupted operation ended.
 func (d *Dispatcher) bus(ctx context.Context, operation operation.Operation) operationBus {
+	// Without cancellation: a consumer must learn how an interrupted operation ended.
 	return operationBus{ctx: context.WithoutCancel(ctx), publisher: d.params.Publisher, now: d.params.Now, operation: operation}
 }
 

@@ -85,7 +85,12 @@ Always comma-ok (`s, ok := v.(string); if !ok { return fmt.Errorf("expected stri
 
 ## 8. Comments — the exception, not the rule
 
-Aim for near-zero comments; encode meaning in names and signatures (`Skip func(Answers) (skip bool, reason string)` needs no prose). Write one only for: **why, never what** (a non-obvious decision, an ordering constraint, an invariant); a workaround with its reference; a one-line package comment; godoc on an exported symbol only when its name and signature leave a caller guessing. Architecture belongs in `docs/`, not in header comments. `internal/flow` (~10% comment lines) is the density ceiling for a package. When you modify a file, delete the comments in it that restate the code.
+The engine is the reference (`kernel/` holds one comment line in 1,500 of code): encode meaning in names and signatures (`Skip func(Answers) (skip bool, reason string)` needs no prose).
+
+- **What stays:** a quirk of git, macOS or `flock` the code cannot show; a workaround with its reference; an ordering invariant or a non-obvious decision (**why, never what**); a one-line package doc; godoc on an exported symbol whose name and signature leave a caller guessing.
+- **What goes:** a comment that restates the name or the code; a doc comment on an unexported declaration (its why moves into the body, beside the line it explains); architecture prose (→ `docs/dev/`); section banners and copied headers in test files.
+
+On the engine's packages (`kernel`, `dispatch`, `command`, `query`, `registry`, `flow/legacy`, `store`, `infra/git|fs|proc`, the engine's services, `rules/<subject>`, `domain/<subject>`, `surface/tui/form`) `make lint` holds the shapes and a per-package ceiling of comment lines that only goes down (`comments`, `docs/dev/lint.md`). When you modify any file, delete the comments in it that restate the code.
 
 ## 9. Clean architecture layers
 

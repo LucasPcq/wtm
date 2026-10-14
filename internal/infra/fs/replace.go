@@ -39,8 +39,6 @@ type replaceParams struct {
 	Perm os.FileMode
 }
 
-// replace writes beside the file, syncs, then renames over it: the rename is
-// what makes the write all or nothing.
 func replace(params replaceParams) error {
 	dir := filepath.Dir(params.Path)
 	tmp, err := os.CreateTemp(dir, "."+filepath.Base(params.Path)+".*")
@@ -56,6 +54,7 @@ func replace(params replaceParams) error {
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("write %s: %w", params.Path, err)
 	}
+	// The rename is what makes the write all or nothing.
 	if err := os.Rename(tmp.Name(), params.Path); err != nil {
 		return fmt.Errorf("write %s: %w", params.Path, err)
 	}
@@ -73,14 +72,14 @@ func writeSynced(tmp *os.File, params replaceParams) error {
 	return tmp.Sync()
 }
 
-// syncDir makes the rename itself durable. Some filesystems refuse to sync a
-// directory; the file is already in place by then, so that is not worth failing.
 func syncDir(dir string) {
 	handle, err := os.Open(dir)
 	if err != nil {
 		return
 	}
 	defer handle.Close()
+	// The rename made durable. Some filesystems refuse to sync a directory: the file
+	// is in place already, which is not worth failing over.
 	_ = handle.Sync()
 }
 

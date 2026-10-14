@@ -72,7 +72,6 @@ func TestHelperProcess(t *testing.T) {
 	}
 }
 
-// errOf is the error of a write whose result the test does not look at.
 func errOf(_ store.Written, err error) error {
 	return err
 }

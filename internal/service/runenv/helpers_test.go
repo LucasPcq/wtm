@@ -40,7 +40,6 @@ func file(t *testing.T, files *storetest.Fake, path string) string {
 	return content
 }
 
-// editTo is another process rewriting a file whole.
 func editTo(path, content string) store.EnvEdit {
 	return store.EnvEdit{Path: path, Create: true, Edit: func([]domain.EnvLine) []domain.EnvLine { return rules.ParseEnv(content) }}
 }

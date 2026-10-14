@@ -31,8 +31,6 @@ func ScratchLockPath(path string) string {
 	return filepath.Join(os.TempDir(), scratchLockDir, hex.EncodeToString(sum[:16])+lockSuffix)
 }
 
-// resolvedFile resolves the directory when the file does not exist yet: its
-// first write and the ones after must take the same lock.
 func resolvedFile(path string) string {
 	absolute, err := filepath.Abs(path)
 	if err != nil {
@@ -41,6 +39,8 @@ func resolvedFile(path string) string {
 	if resolved, err := filepath.EvalSymlinks(absolute); err == nil {
 		return resolved
 	}
+	// A file that does not exist yet: its directory is resolved, so its first write
+	// and the ones after take the same lock.
 	return filepath.Join(ResolvePath(filepath.Dir(absolute)), filepath.Base(absolute))
 }
 

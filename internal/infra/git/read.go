@@ -246,11 +246,11 @@ func parseAheadBehind(out string) (AheadBehind, error) {
 	return AheadBehind{Ahead: ahead, Behind: behind}, nil
 }
 
-// parseWorktrees reads -z porcelain: one attribute per NUL-terminated field, an
-// empty field closing each worktree, so a path holds any byte but NUL.
 func parseWorktrees(out string) []Worktree {
 	var worktrees []Worktree
 	var current *Worktree
+	// -z porcelain: one attribute per NUL-terminated field, an empty field closing
+	// each worktree, so a path holds any byte but NUL.
 	for _, field := range strings.Split(out, "\x00") {
 		key, value, _ := strings.Cut(field, " ")
 		switch {
@@ -275,8 +275,6 @@ func parseWorktrees(out string) []Worktree {
 	return worktrees
 }
 
-// detachedState reads the worktree's admin directory: a rebase in progress
-// leaves the branch it moves in head-name, which git worktree list never shows.
 func detachedState(path string) (State, error) {
 	adminDir, err := adminDirOf(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -285,6 +283,8 @@ func detachedState(path string) (State, error) {
 	if err != nil {
 		return nil, err
 	}
+	// A rebase in progress leaves the branch it moves in head-name, which git
+	// worktree list never shows.
 	headNames, err := rebaseHeadNames(adminDir)
 	if err != nil {
 		return nil, err
@@ -314,8 +314,6 @@ func stateOf(params worktree.RebasingParams) State {
 	return Detached{}
 }
 
-// adminDirOf follows the worktree's .git: the directory itself in the main
-// worktree, a `gitdir:` file, relative or absolute, in a linked one.
 func adminDirOf(path string) (string, error) {
 	dotGit := filepath.Join(path, ".git")
 	info, err := os.Stat(dotGit)

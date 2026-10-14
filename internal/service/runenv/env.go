@@ -108,11 +108,11 @@ type valuesForParams struct {
 	Stamps []domain.EnvOwnedEntry
 }
 
-// valuesFor leaves the main checkout's [[env]] keys plain: a value wtm stamped there goes back to the template's.
 func valuesFor(params valuesForParams) ([]domain.EnvValueLink, []domain.EnvOwnedEntry, error) {
 	if _, main := params.Case.(envcase.Main); !main {
 		return params.Links, params.Stamps, nil
 	}
+	// The main checkout's [[env]] keys stay plain: a value wtm stamped there goes back to the template's.
 	repairs, err := mainValueRepairs(mainValueRepairsParams{Env: params.Env, Stamps: params.Stamps})
 	return nil, repairs, err
 }

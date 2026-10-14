@@ -86,14 +86,13 @@ func HeldFiles(dir string) ([][]byte, error) {
 	return held, nil
 }
 
-// removeIfSame never removes a file renamed over the stale one since it was
-// opened.
 func removeIfSame(file *os.File, path string) {
 	opened, err := file.Stat()
 	if err != nil {
 		return
 	}
 	current, err := os.Stat(path)
+	// A file renamed over the stale one since it was opened is not the stale one.
 	if err != nil || !os.SameFile(opened, current) {
 		return
 	}

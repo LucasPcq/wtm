@@ -76,13 +76,13 @@ func recordOf(params recordOfParams) Record {
 	return Recorded{Meta: stored}
 }
 
-// branchOf is empty for a detached HEAD: it keeps whatever it was given under the branch it left.
 func branchOf(wt git.Worktree) string {
 	switch state := wt.State.(type) {
 	case git.OnBranch:
 		return state.Branch
 	case git.Rebasing:
 		return state.Branch
+	// A detached HEAD keeps whatever it was given under the branch it left.
 	case git.Detached, git.Bare:
 	}
 	return ""
@@ -113,7 +113,6 @@ func (s Snapshot) Ordinal(branch string) (int, error) {
 	return recorded.Meta.Ordinal, nil
 }
 
-// others fails on a record that exists but cannot be read: handing its number to someone else is the collision numbering exists to prevent.
 func (s Snapshot) others(branch string) ([]rules.OrdinalHolder, error) {
 	holders := make([]rules.OrdinalHolder, 0, len(s.Worktrees))
 	for _, wt := range s.Worktrees {
@@ -129,6 +128,7 @@ func (s Snapshot) others(branch string) ([]rules.OrdinalHolder, error) {
 		case Recorded:
 			holders = append(holders, rules.OrdinalHolder{Branch: other, Ordinal: record.Meta.Ordinal})
 		case Unreadable:
+			// Handing an unreadable record's number to someone else is the collision numbering exists to prevent.
 			return nil, fmt.Errorf("%w: %s: %w", domain.ErrOrdinalUnreadable, other, record.Err)
 		case Unrecorded:
 		}
