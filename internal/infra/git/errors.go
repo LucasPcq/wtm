@@ -6,7 +6,7 @@ import (
 )
 
 // Error is a git call that failed. Exit is -1 when git did not run to an exit
-// status: missing from PATH, or killed.
+// status: missing from PATH, or interrupted, when Err is the context's error.
 type Error struct {
 	Args   []string
 	Exit   int
@@ -24,4 +24,7 @@ func (e *Error) Error() string {
 
 func (e *Error) Unwrap() error { return e.Err }
 
-var errNoRef = errors.New("no ref given")
+var (
+	ErrNoLocalBranch = errors.New("no local branch")
+	errNoRef         = errors.New("no ref given")
+)

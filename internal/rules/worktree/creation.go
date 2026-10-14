@@ -1,4 +1,4 @@
-// Package worktree decides what becomes of a worktree: whether one asked for is added, already there or refused, and whether wtm manages it.
+// Package worktree decides what becomes of a worktree: whether one asked for is added, already there or refused, whether wtm manages it, and what its detached HEAD is.
 package worktree
 
 import "github.com/LucasPcq/wtm/internal/domain"

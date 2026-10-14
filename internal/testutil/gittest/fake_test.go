@@ -34,26 +34,50 @@ func TestAFakeRecordsEveryCallInOrder(t *testing.T) {
 	require.NoError(t, fake.FetchRef(t.Context(), "main"))
 	_, err := fake.Worktrees(t.Context())
 	require.NoError(t, err)
-	require.NoError(t, fake.MergeFFOnly(t.Context(), git.MergeFFOnlyParams{Worktree: "/repo", Onto: git.RemoteBranch{Name: "main"}}))
+	_, err = fake.MergeFFOnly(t.Context(), git.MergeFFOnlyParams{Worktree: "/repo", Onto: git.RemoteBranch{Name: "main"}})
+	require.NoError(t, err)
 
 	assert.Equal(t, []string{"FetchRef main", "Worktrees ", "MergeFFOnly /repo"}, fake.Calls())
 }
 
-func TestAFakeCountsWhatItIsGiven(t *testing.T) {
-	pair := git.AheadBehindParams{Of: git.LocalBranch{Name: "main"}, Against: git.RemoteBranch{Name: "main"}}
-	fake := gittest.NewFake(gittest.FakeParams{Main: "/repo", Branch: "main", Remote: []string{"main"}, AheadBehind: map[git.AheadBehindParams]git.AheadBehind{pair: {Ahead: 1, Behind: 3}}})
+func TestAFakeCommitIsItsName(t *testing.T) {
+	fake := gittest.NewFake(gittest.FakeParams{Main: "/repo", Branch: "main", Commits: map[git.Ref][]string{git.LocalBranch{Name: "main"}: {"first", "second"}}})
 
-	counts, err := fake.AheadBehind(t.Context(), pair)
+	tip, err := fake.Tip(t.Context(), git.LocalBranch{Name: "main"})
+	main, mainErr := fake.MainWorktree(t.Context())
 
 	require.NoError(t, err)
-	assert.Equal(t, git.AheadBehind{Ahead: 1, Behind: 3}, counts)
+	assert.Equal(t, "second", tip)
+	require.NoError(t, mainErr)
+	assert.Equal(t, "second", main.Head)
 }
 
-func TestAFakeFastForwardsABranchCheckedOutNowhere(t *testing.T) {
-	fake := gittest.NewFake(gittest.FakeParams{Main: "/repo", Branch: "main", Local: []string{"feature"}, Remote: []string{"main", "feature"}})
+func TestAFakeSeenFromALinkedWorktreeMergesIntoItsHead(t *testing.T) {
+	seed := func(dir string) gittest.FakeParams {
+		return gittest.FakeParams{
+			Main:      "/repo",
+			Dir:       dir,
+			Branch:    "main",
+			Local:     []string{"part"},
+			Worktrees: []git.Worktree{{Path: "/wt/feature", State: git.OnBranch{Branch: "feature"}}},
+			Commits:   map[git.Ref][]string{git.LocalBranch{Name: "feature"}: {"work"}, git.LocalBranch{Name: "part"}: {"work"}},
+		}
+	}
+	fromFeature := gittest.NewFake(seed("/wt/feature/sub"))
+	fromMain := gittest.NewFake(seed(""))
 
-	require.NoError(t, fake.FastForwardRef(t.Context(), "feature"))
-	require.NoError(t, fake.Fetch(t.Context()))
-	require.Error(t, fake.FastForwardRef(t.Context(), "gone"))
-	require.Error(t, fake.MergeFFOnly(t.Context(), git.MergeFFOnlyParams{Worktree: "/elsewhere", Onto: git.RemoteBranch{Name: "main"}}))
+	top, err := fromFeature.Toplevel(t.Context())
+
+	require.NoError(t, err)
+	assert.Equal(t, "/wt/feature", top)
+	require.NoError(t, fromFeature.DeleteBranch(t.Context(), git.DeleteBranchParams{Name: "part"}))
+	require.Error(t, fromMain.DeleteBranch(t.Context(), git.DeleteBranchParams{Name: "part"}))
+}
+
+func TestAFakeMergeOnADetachedHeadIsNotModelled(t *testing.T) {
+	fake := gittest.NewFake(gittest.FakeParams{Main: "/repo", Branch: "main", Remote: []string{"main"}, Worktrees: []git.Worktree{{Path: "/wt/detached", State: git.Detached{}}}})
+
+	_, err := fake.MergeFFOnly(t.Context(), git.MergeFFOnlyParams{Worktree: "/wt/detached", Onto: git.RemoteBranch{Name: "main"}})
+
+	require.Error(t, err)
 }

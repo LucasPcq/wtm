@@ -20,10 +20,13 @@ type Repo struct {
 	Remote string
 }
 
-var (
-	_ Reader = Repo{}
-	_ Writer = Repo{}
-)
+// ReadWriter is a writer that reads what it is about to change.
+type ReadWriter interface {
+	Reader
+	Writer
+}
+
+var _ ReadWriter = Repo{}
 
 func (r Repo) git(ctx context.Context, args ...string) ([]byte, error) {
 	return run(ctx, append([]string{"-C", r.Dir}, args...))
@@ -37,7 +40,11 @@ func run(ctx context.Context, args []string) ([]byte, error) {
 	cmd.Env = slices.DeleteFunc(os.Environ(), repoScoped)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	err := cmd.Run()
+	if err != nil && ctx.Err() != nil {
+		return nil, &Error{Args: args, Exit: -1, Stderr: strings.TrimSpace(stderr.String()), Err: ctx.Err()}
+	}
+	if err != nil {
 		return nil, &Error{Args: args, Exit: exitCode(err), Stderr: strings.TrimSpace(stderr.String()), Err: err}
 	}
 	return stdout.Bytes(), nil

@@ -2,6 +2,7 @@ package identity_test
 
 import (
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -127,6 +128,20 @@ func TestWhereABranchIsOutAndWhatAFolderHolds(t *testing.T) {
 
 	assert.Equal(t, "/wt/feat/a", snapshot.CheckedOutAt("feat/a"))
 	assert.Empty(t, snapshot.CheckedOutAt("feat/b"))
-	assert.Equal(t, "feat/a", snapshot.Occupant("/wt/feat/a"))
-	assert.Empty(t, snapshot.Occupant("/wt/feat-a"))
+	assert.Equal(t, "feat/a", snapshot.Occupant(git.Location{Path: "/wt/feat/a", Exists: true}))
+	assert.Empty(t, snapshot.Occupant(git.Location{Path: "/wt/feat-a"}))
+}
+
+func TestAFolderReachedThroughASymlinkHoldsTheBranchGitRecorded(t *testing.T) {
+	dir := gittest.InitRepo(t)
+	path := filepath.Join(gittest.Symlinked(t), "feat-a")
+	gittest.Git(t, dir, "worktree", "add", "-q", "-b", "feat/a", path)
+	repo := git.Repo{Dir: dir, Remote: "origin"}
+	at, err := repo.Locate(t.Context(), path)
+	require.NoError(t, err)
+
+	snapshot := read(t, repo, storetest.NewFake(storetest.FakeParams{}))
+
+	assert.Equal(t, "feat/a", snapshot.Occupant(at))
+	assert.Equal(t, at.Path, snapshot.CheckedOutAt("feat/a"))
 }

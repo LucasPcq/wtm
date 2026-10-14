@@ -24,7 +24,7 @@ step := kernel.SagaStep{
 }
 ```
 
-`Add` checks no guard: what may be added is decided in `Observe`, from a snapshot read under the operation's locks (`rules/worktree.CreationOf`, below). `Remove` forces the removal, since the steps after the add put files in the worktree, then deletes the branch only when `Checkout` is a `NewBranch`: a branch that existed before the add is never deleted.
+`gitwt.Params.Git` is a `git.ReadWriter`. `Add` checks no guard: what may be added is decided in `Observe`, from a snapshot read under the operation's locks (`rules/worktree.CreationOf`, below). A saga never undoes a `Do` that failed, and `worktree add -b` refused for its path leaves the branch it created ([git.md](git.md#writing-gitwriter)): `Add` reads whether the branch existed before, and deletes it when the add failed and left it. `Remove` forces the removal, since the steps after the add put files in the worktree, then deletes the branch only when `Checkout` is a `NewBranch`: a branch that existed before the add is never deleted.
 
 ## identity: one snapshot, one allocation
 
@@ -37,7 +37,7 @@ step := kernel.SagaStep{
 | `Isolation(branch)` | the recorded choice; isolated without a readable record |
 | `Managed(branch)` | wtm recorded its creation (`rules/worktree.Managed`) |
 | `NameClash(branch)` | a live worktree whose derived names the branch would share; asked when `run.toml` declares jobs |
-| `CheckedOutAt(branch)`, `Occupant(path)` | where a branch is out, which branch a folder holds: the inputs of `rules/worktree.CreationOf` |
+| `CheckedOutAt(branch)`, `Occupant(location)` | where a branch is out, as git writes the path; which branch the folder at a `git.Location` holds (read by `git.Reader.Locate`, which resolves the symlinks git resolved): the inputs of `rules/worktree.CreationOf`, with `Location.Exists` |
 
 `Allocate(ctx, AllocateParams{Git, Meta, StateDir, Branch})` gives the smallest number no live worktree holds and writes it by `store.Meta.Update`. It takes `ordinal.lock` under the state dir and reads the snapshot again under it, git included, since a snapshot read before the lock may predate a worktree another process has since numbered. It returns `Claim{Ordinal, Allocated, Unlocked}`: `Allocated` is the change the command reports, for `dispatch` to publish `worktree.updated`; `Unlocked` is an allocation made without `ordinal.lock` or the record's lock, which the command reports as `locks.unavailable`.
 
@@ -68,7 +68,7 @@ It writes no log: `dispatch` keeps the phase's lines in `hooks/<phase>-<branch>.
 
 What these services decide is pure, in a sub-package named after its subject:
 
-- `rules/worktree`: `CreationOf` decides what a worktree asked for becomes before git adds anything (`Add`, `Unchanged` under `--if-not-exists`, `CheckedOutElsewhere`, `PathTaken`), the branch asked before the folder; `Managed` is a worktree wtm recorded a creation for.
+- `rules/worktree`: `CreationOf` decides what a worktree asked for becomes before git adds anything (`Add`, `Unchanged` under `--if-not-exists`, `CheckedOutElsewhere`, `PathTaken`), the branch asked before the folder; `Managed` is a worktree wtm recorded a creation for; `RebasingBranch` is what a detached `HEAD` is, for `infra/git`.
 - `rules/runenv`: `CaseOf`, the environment a worktree is given.
 - `rules/envcopy`: where each `.env` of a new worktree is copied from under its strategy, the parent falling back to the main checkout, and what could not be (`Warning`); the template a file is provisioned from.
 
@@ -99,7 +99,7 @@ The `service` row of `layers` keeps `kernel/` out of the four packages, and `pub
 
 The four packages are tested like the kernel: testify, a test file per source file holding only `Test…` functions, the shared helpers in `helpers_test.go`.
 
-- `gitwt`: each add and its remove end in the state they started from, for a new and an existing branch, on a real repository and on `gittest.Fake`.
+- `gitwt`: each add and its remove end in the state they started from, for a new and an existing branch, and a refused add changes nothing, a branch `worktree add -b` left included, on `gittest.Build` and `gittest.Fake` from one seed reached through a symlink.
 - `identity`: reading twice calls nothing but `Worktrees` and `Load`; `Allocate` from several processes on a real repository never gives a number twice.
 - `runenv`: each case, verbatim, main and linked, on a `RunConfig` given in the test and the files of a `storetest.Fake`; `Apply` writes what it planned from the lines read under the lock, a second `Apply` changes nothing.
 - `hooks`: a hook interrupted is reported stopped, never failed, its lines emitted up to the interruption; each hook's beats reach `OnHook`, a failure gone past included.
