@@ -201,7 +201,7 @@ Every prep, step and phase is handed the `Reporter` of its item (`kernel.Report(
 
 `Progress` is a sealed union (`//go-sumtype:decl`), each kind its own type, all embedding `Of{Op, Subject}`: `*UnitStarted`, `*PhaseStarted{Phase, Log}` and `*PhaseFinished{Phase}` per prep, step and phase, `*Output{Line}`, `*StatusChanged{Code, Params}`, then `*UnitFinished{Status}`. A surface reads it with a type switch, which `make lint` holds to every kind.
 
-`Milestones[D]` are told where each unit stands, typed by its detail: `Committed{Subject, Detail}` once its saga committed, before the first phase; `PhaseDone{Subject, Phase, Detail}` after each phase of `Then` that finished; `Finished(Item)` once the unit is over, before its `unit.finished`. A unit never reached has none; a saga that failed has no `Committed`. `kernel` gives them no meaning: `dispatch` hands them to the command's `Events` ([dispatch.md](dispatch.md#progress-hook-logs-and-events)).
+`Milestones[D]` are told where each unit stands, typed by its detail: `Committed{Subject, Detail}` once its saga committed, before the first phase; `PhaseDone{Subject, Phase, Detail}` after each phase of `Then` that finished; `Finished(Item)` once the unit is over, before its `unit.finished`. A unit never reached has none; a saga that failed has no `Committed`. `kernel` gives them no meaning: the command declares, over these types, the pure functions that turn each into its `domain.Event`s, and the registry hands them to `dispatch` as its `Events` ([dispatch.md](dispatch.md#progress-hook-logs-and-events)).
 
 `kerneltest.CheckSaga` fails each step of a saga in turn, then its commit, and wants the state back exactly as it was each time: every command runs it on its sagas.
 

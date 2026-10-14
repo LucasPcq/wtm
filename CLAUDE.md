@@ -15,7 +15,7 @@ Mandatory coding standards for `wtm`. When in doubt, consult the `go-cli` skill 
 | [`docs/dev/state-files.md`](docs/dev/state-files.md) | writing any file, or changing the format of a state file (`fs.UpdateFile`, `fs.Change`, locks, schema versions) |
 | [`docs/dev/form.md`](docs/dev/form.md) | touching `internal/surface/tui/form`: the interactive form of a command on the engine (its loop over `dispatch`, which field it asks, a field per type, remembering, the recap and the run) |
 | [`docs/dev/flow-layer.md`](docs/dev/flow-layer.md) | touching anything under `internal/flow/`, a Prompter/Presenter, a step kind, or the dashboard's run of a flow |
-| [`docs/dev/adding-a-mutation-command.md`](docs/dev/adding-a-mutation-command.md) | adding a worktree-mutating command |
+| [`docs/dev/adding-a-mutation-command.md`](docs/dev/adding-a-mutation-command.md) | adding a worktree-mutating command or moving one onto the engine: the recipe of a command in `internal/command/` (ports, `Observe`, fields, codes, saga, events, registry, `cli.Bind`, tests), the `flow/legacy` bridge, the recipe of a command still on `flow/` |
 | [`docs/dev/cli.md`](docs/dev/cli.md) | touching `internal/surface/cli` itself: the root (signals, `--quiet`, exit code), a command generated from the registry (`cli.Bind`, its flags, its run), parity |
 | [`docs/dev/output.md`](docs/dev/output.md) | adding a command or changing what one prints (frame, glyphs, block helpers, `--quiet`, JSON contract, hook view, the generic rendering and the v2 envelope of a command on the engine) |
 | [`docs/dev/lint.md`](docs/dev/lint.md) | adding an `archlint` rule or an exception, or when `make lint` fails and the reason is unclear |
@@ -60,7 +60,7 @@ func Connect(params ConnectParams) error
 
 ## 3. Shared types — no duplication
 
-Types, enums, sentinel errors and constants are defined once in `internal/domain/`. Pure functions with no I/O (lookups, transforms, classification) live in `internal/rules/`. The engine's contract is the exception: `internal/kernel/` declares its own vocabulary (`Kind`, `Status`, `Reason`, `FieldType`, the `kernel.Code` constants), and a migrated command declares its codes as `kernel.Code` constants beside it, each with its message in its `text.Messages`, handed to `dispatch.Register` with its own exit codes (`docs/dev/commands.md`).
+Types, enums, sentinel errors and constants are defined once in `internal/domain/`. Pure functions with no I/O (lookups, transforms, classification) live in `internal/rules/`. The engine's contract is the exception: `internal/kernel/` declares its own vocabulary (`Kind`, `Status`, `Reason`, `FieldType`, the `kernel.Code` constants), and a command on the engine declares its codes as `kernel.Code` constants beside it, each with its message in its `text.Messages`, handed to `dispatch.Register` with its own exit codes (`docs/dev/commands.md`).
 
 ## 4. Validate all external input
 
@@ -68,7 +68,7 @@ Config files, CLI flags and environment variables are validated at the boundary 
 
 ## 5. Centralized constants — no magic strings or numbers
 
-Every string key, exit code, flag name, env var name and format identifier is a named constant in `internal/domain/constants.go`, except the engine's codes and params, which live in `internal/kernel/` and beside each migrated command, and what only the generated command line knows (`--expect-fingerprint`, the exit codes 23–25 of the engine's kinds), declared in `internal/surface/cli`.
+Every string key, exit code, flag name, env var name and format identifier is a named constant in `internal/domain/constants.go`, except the engine's codes and params, which live in `internal/kernel/` and beside each command on the engine, and what only the generated command line knows (`--expect-fingerprint`, the exit codes 23–25 of the engine's kinds), declared in `internal/surface/cli`.
 
 ```go
 // ❌ os.Exit(1); cmd.Flags().String("output", ...)
@@ -100,10 +100,16 @@ internal/
                 text/ its message catalogue, kerneltest/ the checks every command runs
   dispatch/     the engine's impure half, the one way a surface reaches a command: registry,
                 locks, Observe → Validate → Plan → fingerprint → Apply, operation events
+  command/      the mutations on the engine, one package per command (create/ is the first,
+                written by its pilot): request, facts, fields, plan, Apply, its codes
   query/        the reads on the engine (operations/)
+  registry/     the composition root: every command and query with its real ports, handed to
+                dispatch; the only importer of command/ and query/
   config/       load & validate config.toml, run.toml, global config; writes the JSON schema beside each
   store/        the one writer of each state file: meta.json, config.toml's changes, the managed .env files
-  flow/         each command's flow, surface-independent (one package per command)
+  flow/         the flow of each command not yet on the engine, surface-independent (one package
+                per command); legacy/ the one-way bridge of those that use a command on the engine
+                (written by the create pilot)
   service/      impure orchestration: git exec, I/O, hooks, the run daemon, the event bus; gitwt,
                 identity, runenv and hooks.Execute are the engine's, a reader or a mutator each
   styles/       all Lipgloss styles
@@ -126,23 +132,23 @@ The annotated map of every sub-package is in `docs/dev/architecture.md`.
 - `domain/` has types, errors and constants only — no methods, no free functions.
 - `rules/` imports only stdlib and `internal/domain` — no I/O, no side effects.
 - `kernel/` imports only the stdlib — no `domain/`, no business vocabulary: a command composes `kernel` with `domain`, never the reverse. I/O reaches it only as functions it is handed (`Observe`, `Apply`, the `Shield`). The engine writes no text: an error, a warning or a progress event is a `kernel.Code` plus params, and `kernel/text` holds the English.
-- `dispatch/` imports only `kernel/`, `domain/`, `rules/`, `infra/` and `query/`: a command's ports reach it as interfaces. `command/` and `query/` never import `dispatch/` or `surface/`, `surface/` never imports them, and `command/` never calls `context.Background()`/`context.TODO()` (`engine`). See `docs/dev/dispatch.md`.
+- `dispatch/` imports only `kernel/`, `domain/`, `rules/` and `infra/`: a command's ports reach it as interfaces, and `internal/registry` builds the production registry (`registry.Production`), the only package importing `command/` and `query/` and building their real ports (`testutil/`'s doubles aside), itself imported only by `surface/cli`. `command/` and `query/` never import `dispatch/` or `surface/`, `surface/` never imports them, and `command/` never calls `context.Background()`/`context.TODO()` (`engine`). See `docs/dev/dispatch.md`.
 - `service/` never imports `cobra`, `bubbletea`, `lipgloss`.
 - `surface/cli/render/` and `surface/tui/` have zero decision logic — only rendering. `render` reads results from `kernel/`, never runs anything through `dispatch/`.
 - `surface/tui/form` reaches a command through `dispatch/` only (`Entry.Fillable`), never `flow/` or `service/`: it asks `State` and `Choices` what a field is rather than deciding it.
 - `styles/` is the only package allowed to instantiate `lipgloss.Style`.
-- `flow/` imports **only** `internal/service/`, `internal/rules/`, `internal/domain/` and the stdlib — never cobra, bubbletea, lipgloss, `surface/`, `config/` or `infra/`. Need something from `infra/`? Add a thin `service/` wrapper (e.g. `worktree.FindByBranch`).
+- `flow/` imports **only** `internal/service/`, `internal/rules/`, `internal/domain/` and the stdlib — never cobra, bubbletea, lipgloss, `surface/`, `config/` or `infra/`. Need something from `infra/`? Add a thin `service/` wrapper (e.g. `worktree.FindByBranch`). `flow/legacy`, the bridge the create pilot writes, is the one package of `flow/` allowed to reach `kernel/` and `dispatch/`, never `command/`; nothing on the engine imports it, and its consumers get it through an interface they declare, built by `surface/cli`.
 - `service/x` imports `service/y` only along an edge declared in `tools/archlint` (`serviceEdges`).
 - The daemon (`service/process`, `service/proxy`) is blind to git: no `service/worktree|branch|github|events`, no `config`, only allow-listed `infra/` functions.
-- A service **mutator** (the table in `tools/archlint/chokepoint.go`) is called only from `internal/flow/`.
+- A service **mutator** of the commands on `flow/` (the table in `tools/archlint/chokepoint.go`) is called only from `internal/flow/`, never from `command/`.
 - On the engine a function is a **reader or a mutator**, inferred from the code (`writesink`): one that reaches a write sink (a write of `store/`, a method of `git.Writer`, `infra/proc`, `infra/fs`) is a mutator. Nothing in `query/` nor in a reader of a command (`Observe`, `Choices`, `Plan`…) reaches one; a mutator of the engine's services (`engineServices`) is called from `command/` or another service only. In the engine only `dispatch` publishes (`publish`): a mutator returns what it changed, the command reports it.
 - Every package of `service/`, `infra/`, `store/` and of the engine has a package doc stating its one responsibility (`pkgdoc`). The roots of `rules/` and `domain/` only shrink (`rootfreeze`): no new file nor exported symbol there.
 - git is run by `infra/git` only (`gitexec`): a layer on the engine reaches it through `git.Reader` / `git.Writer`; the git functions at the root of `infra/`, for the commands still on `flow/`, are tracked in `.archlint-migrating` and leave with their last caller. See `docs/dev/git.md`.
-- `meta.json`, the changes to `config.toml` (the remembered answers, `base_path`, the `.env` targets) and the managed `.env` files are written by `store/` only, each through its interface (`store.Meta`, `ProjectConfig`, `EnvFiles`) doubled by `storetest.Fake`; `config/` loads and validates, `init`'s full render stays in `config/` until its migration. See `docs/dev/store.md`.
+- `meta.json`, the changes to `config.toml` (the remembered answers, `base_path`, the `.env` targets) and the managed `.env` files are written by `store/` only, each through its interface (`store.Meta`, `ProjectConfig`, `EnvFiles`) doubled by `storetest.Fake`; `config/` loads and validates, `init`'s full render stays in `config/` until `init` is on the engine. See `docs/dev/store.md`.
 - **A file is named after what it declares**, and a port lives with its implementation: its interface, the types it takes and returns and the implementation share one file (`infra/git/read.go`, `store/meta.go`), never an interfaces-only file beside the code. A type a whole package turns around (`dispatch.Handle`) has its own file; options sit beside the call that takes them.
 - A file is written through `infra/fs` only: `fs.UpdateFile(ctx, {Path, Mutate})` (lock, read, `Mutate` decides an `fs.Change`, atomic rename), never `os.WriteFile`/`os.Create`/`os.Rename`/`os.Remove`/`os.RemoveAll`/a writing `os.OpenFile` outside `infra/` (`statewrite`), and `fs.UpdateFile` only from `store/`, the owner of each state file (`stateowner`). A state file carries `schema` (absent = 1, written from 2 on) and a write refuses a newer one (`*statefile.NewerError`, exit 22). See `docs/dev/state-files.md`.
 
-**Every new worktree-mutating command goes through flow/** — no exception. Declare `Request`/`Outcome`/`Presenter`/`Params`/`Run` in `internal/flow/<cmd>/` and its questions as `flow.Step` in `steps.go`; the runner in `surface/cli/` is only flags → `Request` → pick the Prompter and Presenter → `<cmd>.Run`. A runner that inspects state, orders service calls or gates a picker on `interactive` has put the flow in the wrong layer. A flow never frames, never animates, never picks a stream, and **returns** errors rather than presenting them. Recipe: `docs/dev/adding-a-mutation-command.md`; seams and step model: `docs/dev/flow-layer.md`.
+**Every new worktree-mutating command is written on the engine** — a `kernel.Command` in `internal/command/<name>/` (its ports, `Observe`, fields, rules, locks, codes, `Plan`, `Apply` as a saga through `kernel.Each`, its events), its line in `registry.Production`, its command line from `cli.Bind`; a command still on `flow/` moves there the same way. Recipe: `docs/dev/adding-a-mutation-command.md`. A change to a command still on `flow/` keeps its model: `Request`/`Outcome`/`Presenter`/`Params`/`Run` in `internal/flow/<cmd>/`, its questions as `flow.Step` in `steps.go`, a runner that is only flags → `Request` → Prompter and Presenter → `<cmd>.Run`; a flow never frames, never picks a stream, and **returns** errors (`docs/dev/flow-layer.md`).
 
 **Output** — each command frames its human output exactly once (`render.Frame`, or `FrameStart`/`FrameEnd`) and the body writes to the writer `Frame` hands it; JSON and machine output are never framed. A block prints only if it changes what the reader does next: success contracts to a count, anomalies are named one by one. Glyph runes come from `domain` constants, the glyph carries the only colour on its line, and `Muted` is for chrome and non-event lines only. Full rules: `docs/dev/output.md`.
 
@@ -152,7 +158,7 @@ The annotated map of every sub-package is in `docs/dev/architecture.md`.
 
 ### Bypass flags — two orthogonal axes
 
-Every worktree-mutating command (`create`, `clean`, `sync`, `fast-forward`, `prune`, `relocate`, `reparent`, `extract`, `checkout`, `env`, plus `init`/`run init`) follows this model:
+Every worktree-mutating command still on `flow/` (`create`, `clean`, `sync`, `fast-forward`, `prune`, `relocate`, `reparent`, `extract`, `checkout`, `env`), and `init`/`run init`, which are off `flow/` and wire it by hand, follow this model:
 
 - **`--yes` / `-y` — the confirmation axis: fully unattended, zero prompts.** Each input resolves as:
   1. **Decision / confirmation** → its flag, else the **remembered answer** (`[wizard.remembered]`, ticked "Always use this answer" in the wizard), else a documented **safe default**, never destructive (`sync --yes` does not push; `extract --yes` aborts on conflict; `clean`/`prune --yes` leave orphans unless `--reparent-children`). Only a `StepSelect` opting in with `Step.Memory` remembers, never a confirmation or a destructive option (`rules.RememberableValues`); `--ask` ignores the memory for one run.
@@ -161,7 +167,9 @@ Every worktree-mutating command (`create`, `clean`, `sync`, `fast-forward`, `pru
 - `--yes` is the only spelling of that axis — no `--non-interactive`. JSON mode requires `--yes` on a command still on `flow/`; on a command on the engine JSON is unattended already, and `--yes` is accepted without effect.
 - **`--force` — the safety axis, strictly separate.** It only lifts safety refusals (dirty / unpushed / open PR / locked). It does **not** imply `--yes`: `--force` alone still runs the wizard and asks to confirm, with `--force` threaded in as a preset.
 
-Implementation: `interactive := isTTY && rules.IsHumanFormat(format) && !yes`; a migrated command expresses case 2 as a step `Resolve` that names the flag (see `internal/flow/sync/steps.go`). Decision defaults go through a pure rule where one exists (`rules.DecidePush`).
+Implementation: `interactive := isTTY && rules.IsHumanFormat(format) && !yes`; a command on `flow/` expresses case 2 as a step `Resolve` that names the flag (see `internal/flow/sync/steps.go`). Decision defaults go through a pure rule where one exists (`rules.DecidePush`).
+
+**On the engine** the same model is data: a field left empty takes its `Default` (a `FieldSpec.Rememberable` field's remembered answer first, kept through `kernel.Remember`, ignored for one run by `--ask`), a field with no default is a `422 required` naming its flag, `--yes` only keeps the form away, and is accepted without effect in JSON, which is unattended already.
 
 **Recap completeness:** a flag or a remembered answer never makes a recap line disappear, nor its line in the wizard trail — the recap reads the step's answer, else the flag/arg that resolved it (`Session.Presets`, or `Step.Given` for a step its `Skip` can rule out). A flag answers its step, never only preselects it. **Re-init completeness:** a re-init step shows the complete candidate list, pre-filled from the config on disk, and reads an answer that may be empty as `(value, asked)` so a step never reinstates what the user removed. Details: `docs/dev/flow-layer.md`.
 

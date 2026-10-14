@@ -41,7 +41,7 @@ Two mechanisms, not two spellings of one:
 
 It is retried within `domain.NamespaceCreateTimeout`: the service it talks to was started moments ago, so a first refusal means "postgres is not accepting connections yet" far more often than it means the command is wrong. The budget is what stops a genuinely wrong command retrying for ever. It cannot tell a refusal that will pass from one that never will — which is exactly why the idempotence is the command's job and not wtm's guess.
 
-The daemon is what runs it, and a daemon that considered itself idle while doing so used to exit under its own handler: a shared service launches detached, so nothing is left `Running` to keep it alive. The idle watcher counts connections in flight beside the running jobs.
+The daemon is what runs it, and its idle watcher counts connections in flight beside the running jobs: a shared service launches detached, so nothing is left `Running` to keep the daemon alive, and one that counted only its jobs would exit under its own handler mid-command.
 
 An absent `[job.namespace]` is a valid answer: shared for good, one instance and one set of data.
 
