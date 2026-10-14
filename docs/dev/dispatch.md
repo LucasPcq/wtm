@@ -15,18 +15,22 @@ d := dispatch.New(dispatch.Params{
 created := dispatch.Register(dispatch.RegisterParams[create.Request, create.Facts, create.Plan, create.Detail]{
 	Dispatcher: d,
 	Command:    create.Command(ports),
+	Messages:   create.Messages,  // its codes in English (commands.md#messages)
+	ExitCodes:  create.ExitCodes, // the exit codes of its own
 })
-registry := dispatch.Registry{created, dispatch.RegisterQuery(operations.Query(d.Operations))}
+listed := dispatch.RegisterQuery(dispatch.RegisterQueryParams[operations.Request, operations.View]{
+	Query: operations.Query(d.Operations),
+})
 ```
 
 `Register` panics on a command whose plan detail `P` is not a struct: every surface shows a plan as its fields ([output.md](output.md#a-command-on-the-engine)).
 
-`Dispatcher.Registry()` is the registry the surfaces serve, built on that dispatcher: every command with its real ports, every query. A command enters the product by its line there. The command line reads it once on a dispatcher with no `Params` for the names and the fields (that dispatcher is never run), then on the dispatcher of the repository a command runs in.
+`internal/registry` is the composition root: `registry.Production(d)` is the registry the surfaces serve, built on that dispatcher, every command with its real ports on its `Dir` and `StateDir` ([Ports](#ports)), every query. It is the only package that imports `command/` and `query/`; only the production engine of `surface/cli` imports it (and `tools/gendocs` through `cli.Root()`). `dispatch` imports neither, nor `store/`. A command enters the product by its line there. The command line reads it once on a dispatcher with no `Params` for the names, the fields and the catalogue (that dispatcher is never run), then on the dispatcher of the repository a command runs in.
 
 `Now`, `NewOpID` and `Shield` default to the clock, a random id and `proc.Shield`; the test bench replaces them.
 
 - **`Handle[Req, F, P, D]`** is a command bound to its dispatcher: typed, for a surface written for that command.
-- **`Registry`** is the list of what a surface can run, an `Entry` per command or query, found by `Lookup(name)`. An `Entry` erases the types: `Call` reads the request as JSON (its names are the paths of the fields) and answers a sealed `Reply`, a `CommandReply` (the `Result` with its plan and item details as JSON, statuses typed) or a `QueryReply` (the view as JSON). A field the request does not have is a `422` naming it (`unknown_field`), never ignored. `Entry.Fillable()` is the entry a form fills: a command's, never a query's.
+- **`Registry`** is the list of what a surface can run, an `Entry` per command or query, found by `Lookup(name)`. An `Entry` erases the types: `Call` reads the request as JSON (its names are the paths of the fields) and answers a sealed `Reply`, a `CommandReply` (the `Result` with its plan and item details as JSON, statuses typed) or a `QueryReply` (the view as JSON). A field the request does not have is a `422` naming it (`unknown_field`), never ignored. `Entry.Fillable()` is the entry a form fills: a command's, never a query's. `Entry.Messages()` and `Entry.ExitCodes()` are what it was registered with, and `Registry.Catalog()` is the catalogue of the kernel and of every entry, which panics on a code two entries spell ([commands.md](commands.md#messages)).
 
 ## The form
 
@@ -102,7 +106,7 @@ Every error `Run` returns is a `kernel.Error`. Its codes and their params are th
 - **Without `flock`** (NFS, some WSL mounts) the run is unprotected and warns `locks.unavailable`.
 - **A query locks nothing**: the atomic writes of `infra/fs` give it a file before or after a write, never half of one.
 
-`query/operations` lists the operations in progress from the holder files still held: `operations.Query(d.Operations)`. Its `operations.Operation` is the shape of a holder file.
+`query/operations` lists the operations in progress from the holder files still held: `operations.Query(d.Operations)`. A holder file is an `operation.Operation` (`internal/domain/operation`), which `dispatch` writes and the query lists.
 
 ## The fingerprint
 
@@ -121,11 +125,12 @@ On the bus (`docs/guide/events.md`) an applied run sends `operation.started`, on
 
 ## Ports
 
-`kernel` imports only the stdlib, so a port never travels through its types (`kernel.ObserveScope` is data only). A command receives its ports when it is built, `create.Command(ports)`, and captures them in `Observe`, `Choices` and `Apply`. Each port is an interface declared beside what it wraps (`infra/git`, `store/`, `infra/proc`), with its double in `testutil/`; `Dispatcher.Registry` builds each command with the real ones, from the dispatcher's `Dir` and `StateDir`: git is `git.Reader` and `git.Writer`, built as `git.Repo{Dir: d.params.Dir, Remote: domain.OriginRemote}` and doubled by `gittest.Fake` ([git.md](git.md)); the state files are `store.Meta`, `store.ProjectConfig` and `store.EnvFiles`, built as `store.MetaDisk{StateDir: d.params.StateDir}`, `store.ConfigDisk{StateDir: d.params.StateDir}` and `store.EnvDisk{}` and doubled by `storetest.Fake` ([store.md](store.md)). `dispatch` runs on its own ports only: `Params` above.
+`kernel` imports only the stdlib, so a port never travels through its types (`kernel.ObserveScope` is data only). A command receives its ports when it is built, `create.Command(ports)`, and captures them in `Observe`, `Choices` and `Apply`. Each port is an interface declared beside what it wraps (`infra/git`, `store/`, `infra/proc`), with its double in `testutil/`; `registry.Production` builds each command with the real ones, on the dispatcher's `Dir` and `StateDir`: git is `git.Reader` and `git.Writer`, built as `git.Repo{Dir: <Dir>, Remote: domain.OriginRemote}` and doubled by `gittest.Fake` ([git.md](git.md)); the state files are `store.Meta`, `store.ProjectConfig` and `store.EnvFiles`, built as `store.MetaDisk{StateDir: <StateDir>}`, `store.ConfigDisk{StateDir: <StateDir>}` and `store.EnvDisk{}` and doubled by `storetest.Fake` ([store.md](store.md)). `dispatch` runs on its own ports only: `Params` above.
 
 ## What the lint holds
 
-- `layers`: `dispatch` imports `kernel`, `domain`, `rules`, `infra` and `query/` (the view of `query/operations` is the shape of its holder files), never `service/` or a surface.
+- `layers`: `dispatch` imports `kernel`, `domain`, `rules` and `infra`, never `command/`, `query/`, `store/`, `service/` or a surface; `registry` imports what it assembles (`command/`, `query/`, `dispatch`, `kernel`, `domain`, `infra`, `store/`), and `surface/cli` imports it.
+- `catalog`: every code `dispatch`, `command/` and `query/` declare has its message in the `text.Messages` of its package ([commands.md](commands.md#messages)).
 - `engine` (`tools/archlint/engine.go`): `command/` and `query/` never import `dispatch` or `surface/`; `surface/` never imports `command/` or `query/`; `command/` never calls `context.Background()` or `context.TODO()`.
 - `publish`: `dispatch.Publisher.Publish` is called from `dispatch/` only, and `command/`, `query/` and the engine's services publish nothing; an event is what a command reports.
 - `writesink`: only `Apply` writes. Every other function of a command (`Observe`, `Choices`, `Plan`, `Skip`…) and every query reaches no write sink, and `dispatch` calls no mutator of the engine's services ([lint.md](lint.md)).

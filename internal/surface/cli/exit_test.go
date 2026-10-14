@@ -37,6 +37,16 @@ func TestACodeWithAnExitOfItsOwnExitsOnIt(t *testing.T) {
 	assert.Equal(t, domain.ExitCodeStateSchemaNewer, exitCode(newer))
 }
 
+func TestTheEntrysOwnExitCodeComesBeforeTheEnginesAndTheKind(t *testing.T) {
+	taken := kernel.Conflict(kernel.Problem{Code: codeBranchTaken})
+	newer := kernel.Precondition(kernel.Problem{Code: kernel.CodeStateSchemaNewer})
+	exitCodes := map[kernel.Code]int{codeBranchTaken: domain.ExitCodeWorktreeExists, kernel.CodeStateSchemaNewer: domain.ExitCodeError}
+
+	assert.Equal(t, domain.ExitCodeWorktreeExists, exitCode(&reported{failure: taken, exitCodes: exitCodes}))
+	assert.Equal(t, domain.ExitCodeError, exitCode(&reported{failure: newer, exitCodes: exitCodes}))
+	assert.Equal(t, exitCodeConflict, exitCode(&reported{failure: taken}))
+}
+
 func TestAnInternalErrorKeepsTheCodeOfTheSentinelItWraps(t *testing.T) {
 	notARepo := kernel.Internal(kernel.Problem{Code: kernel.CodeInternal, Cause: fmt.Errorf("resolve: %w", domain.ErrNotGitRepo)})
 

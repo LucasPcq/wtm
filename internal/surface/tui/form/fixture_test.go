@@ -68,6 +68,14 @@ func (r *repo) observe() facts {
 	return facts{Existing: slices.Clone(r.existing), Remembered: r.remembered}
 }
 
+// changed replaces the branches under the lock: the form observes from its own
+// goroutine while a test changes the repository.
+func (r *repo) changed(existing ...string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.existing = existing
+}
+
 func (r *repo) asked(path string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

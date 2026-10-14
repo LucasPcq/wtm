@@ -54,7 +54,7 @@ func TestSlowChoicesShowTheFieldUntilTheyArrive(t *testing.T) {
 func TestRefreshObservesAgainAndListsWhatIsNew(t *testing.T) {
 	r := &repo{}
 	d := newWorld(t, r, worldParams{Request: `{"branches":["feat/a"]}`}).open(t)
-	r.existing = []string{"feat/new"}
+	r.changed("feat/new")
 
 	d.key("r")
 

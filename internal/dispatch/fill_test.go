@@ -9,14 +9,13 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/dispatch"
 	"github.com/LucasPcq/wtm/internal/kernel"
-	"github.com/LucasPcq/wtm/internal/query/operations"
 )
 
 func TestOnlyACommandIsFillable(t *testing.T) {
 	b := bench(t)
 
 	_, command := handle(b, &repo{}).Fillable()
-	_, query := dispatch.RegisterQuery(operations.Query(b.Dispatcher.Operations)).Fillable()
+	_, query := operationsQuery(b).Fillable()
 
 	assert.True(t, command)
 	assert.False(t, query)

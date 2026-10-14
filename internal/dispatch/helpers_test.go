@@ -49,11 +49,15 @@ func handle(b *dispatchtest.Bench, r *repo) *dispatch.Handle[request, facts, pla
 	return dispatch.Register(dispatch.RegisterParams[request, facts, plan, string]{Dispatcher: b.Dispatcher, Command: createCommand(r)})
 }
 
+func operationsQuery(b *dispatchtest.Bench) *dispatch.QueryHandle[operations.Request, operations.View] {
+	return dispatch.RegisterQuery(dispatch.RegisterQueryParams[operations.Request, operations.View]{Query: operations.Query(b.Dispatcher.Operations)})
+}
+
 // registry holds the example command and the operations query.
 func registry(t *testing.T, r *repo) dispatch.Registry {
 	t.Helper()
 	b := bench(t)
-	return dispatch.Registry{handle(b, r), dispatch.RegisterQuery(operations.Query(b.Dispatcher.Operations))}
+	return dispatch.Registry{handle(b, r), operationsQuery(b)}
 }
 
 // problem is the kernel error a run failed with.

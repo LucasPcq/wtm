@@ -73,7 +73,8 @@ combinators (`Exclusive`, `OneOf`, `Requires`, `RequiredWhen`, `Distinct`, `NotS
 All flag names, command names, exit codes, and format identifiers
 must be declared as constants in `internal/domain/constants.go`. The engine's codes are
 `kernel.Code` constants (in `internal/kernel/` or beside the command), each with its English
-in `internal/kernel/text` — a test fails on a code missing from the catalogue.
+in a `text.Messages` of its package (the kernel's in `internal/kernel/text`) — `make lint`
+(`catalog`) fails on a code missing from it.
 
 ```go
 const (
@@ -140,6 +141,7 @@ internal/
                                 registry, form calls, Run (locks → Observe → Validate → Plan →
                                 fingerprint → Apply), operation events (docs/dev/dispatch.md)
   query/operations/           ← the operations in progress, read from their holder files
+  registry/                   ← the composition root: every command and query with its real ports
   config/                     ← load & validate config.toml + run.toml from <git-common-dir>/wtm/
   store/                      ← the one writer of each state file (docs/dev/store.md): Meta (meta.json),
                                 ProjectConfig (config.toml: Remember), EnvFiles (.env: Copy, Edit)
@@ -1051,8 +1053,8 @@ Before calling `build-validator`, verify manually:
 - [ ] No `lipgloss` imports outside `internal/styles/`
 - [ ] No `cobra` or `bubbletea` imports inside `internal/service/`
 - [ ] Pure functions (no I/O) live in internal/rules/, not in service/
-- [ ] Every new `kernel.Code` has its entry in `internal/kernel/text`
-- [ ] Every entry of `Dispatcher.Registry` has its `cli.Bind` (with a `Detail` or `GenericDetail()`) or its reason in `unbound`
+- [ ] Every new `kernel.Code` has its entry in the `text.Messages` of its package, handed to `dispatch.Register`
+- [ ] Every entry of `registry.Production` has its `cli.Bind` (with a `Detail` or `GenericDetail()`) or its reason in `unbound`
 - [ ] All async service calls in TUI wrapped as `tea.Cmd`
 - [ ] `shared.AddOutputFlag(cmd)` used instead of manual flag registration
 - [ ] `styles.Indent` used instead of literal `"  "` for padding

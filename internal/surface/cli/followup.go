@@ -8,7 +8,6 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/kernel"
-	"github.com/LucasPcq/wtm/internal/kernel/text"
 	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 )
 
@@ -27,7 +26,7 @@ func (b *binding) followUps(followUps []kernel.FollowUp) []render.NextStepParams
 	for _, followUp := range followUps {
 		steps = append(steps, render.NextStepParams{
 			Command: b.engine.commandLine(lineParams{Target: followUp.Command, Request: followUp.Request}),
-			Note:    text.Message(followUp.Code, followUp.Params),
+			Note:    b.engine.catalog.Message(followUp.Code, followUp.Params),
 		})
 	}
 	return steps

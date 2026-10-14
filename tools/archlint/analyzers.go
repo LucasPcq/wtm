@@ -25,4 +25,5 @@ var analyzers = []*analysis.Analyzer{
 	rootfreezeAnalyzer,
 	engineAnalyzer,
 	gitexecAnalyzer,
+	catalogAnalyzer,
 }

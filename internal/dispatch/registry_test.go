@@ -9,6 +9,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/dispatch"
 	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/kernel/text"
 	"github.com/LucasPcq/wtm/internal/query/operations"
 )
 
@@ -68,15 +69,35 @@ func TestANameTheRegistryDoesNotHoldIsNotFound(t *testing.T) {
 	assert.False(t, found)
 }
 
-func TestTheRegistryServesTheQueryOfTheOperationsInProgress(t *testing.T) {
-	registry := bench(t).Dispatcher.Registry()
+func TestAnEntryCarriesTheMessagesAndExitCodesItWasRegisteredWith(t *testing.T) {
+	b := bench(t)
+	messages := text.Messages{codeBranchTaken: "{branch} is taken"}
+	exitCodes := map[kernel.Code]int{codeBranchTaken: 7}
 
-	entry, found := registry.Lookup(operations.Name)
+	command := dispatch.Register(dispatch.RegisterParams[request, facts, plan, string]{Dispatcher: b.Dispatcher, Command: createCommand(&repo{}), Messages: messages, ExitCodes: exitCodes})
+	query := dispatch.RegisterQuery(dispatch.RegisterQueryParams[operations.Request, operations.View]{Query: operations.Query(b.Dispatcher.Operations), Messages: messages, ExitCodes: exitCodes})
 
-	require.True(t, found)
-	reply, err := entry.Call(t.Context(), dispatch.Call{})
-	require.NoError(t, err)
-	view, ok := reply.(dispatch.QueryReply)
-	require.True(t, ok, "got %T", reply)
-	assert.JSONEq(t, `{"operations":[]}`, string(view.View))
+	for _, entry := range []dispatch.Entry{command, query} {
+		assert.Equal(t, messages, entry.Messages())
+		assert.Equal(t, exitCodes, entry.ExitCodes())
+	}
+}
+
+func TestTheCatalogueOfARegistrySpeaksTheKernelAndEveryEntry(t *testing.T) {
+	b := bench(t)
+	command := dispatch.Register(dispatch.RegisterParams[request, facts, plan, string]{Dispatcher: b.Dispatcher, Command: createCommand(&repo{}), Messages: text.Messages{codeBranchTaken: "{branch} is taken"}})
+
+	catalog := dispatch.Registry{command, operationsQuery(b)}.Catalog()
+
+	assert.Equal(t, "feat/a is taken", catalog.Message(codeBranchTaken, kernel.Params{"branch": "feat/a"}))
+	assert.Equal(t, "the facts changed since the preview", catalog.Message(kernel.CodePlanStale, nil))
+}
+
+func TestTwoEntriesSpellingOneCodeStopTheStart(t *testing.T) {
+	b := bench(t)
+	messages := text.Messages{codeBranchTaken: "{branch} is taken"}
+	command := dispatch.Register(dispatch.RegisterParams[request, facts, plan, string]{Dispatcher: b.Dispatcher, Command: createCommand(&repo{}), Messages: messages})
+	query := dispatch.RegisterQuery(dispatch.RegisterQueryParams[operations.Request, operations.View]{Query: operations.Query(b.Dispatcher.Operations), Messages: messages})
+
+	assert.PanicsWithValue(t, `text: code "branch.taken" has two messages`, func() { dispatch.Registry{command, query}.Catalog() })
 }

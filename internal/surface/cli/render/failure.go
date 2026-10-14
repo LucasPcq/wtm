@@ -16,18 +16,25 @@ const (
 	detailLineFmt  = "%s%s%s\n"
 )
 
+// Wording is how a surface words what the engine reports: the catalogue of the
+// registry it serves, and its spelling of each field.
+type Wording struct {
+	Catalog text.Catalog
+	Names   Names
+}
+
 type FailureParams struct {
-	Err   kernel.Error
-	Names Names
-	Next  []NextStepParams
+	Err     kernel.Error
+	Wording Wording
+	Next    []NextStepParams
 }
 
 // Failure is the report of a run that did not apply: the error's sentence,
 // then what it names one by one — each field to fix, each refusal and what
 // lifts it.
 func Failure(w io.Writer, params FailureParams) {
-	Error(w, ErrorMessage(params.Err))
-	for _, line := range failureDetails(params.Err, params.Names) {
+	Error(w, params.Wording.Error(params.Err))
+	for _, line := range params.Wording.failureDetails(params.Err) {
 		fmt.Fprintf(w, detailLineFmt, Indent, Indent, line)
 	}
 	NextSteps(w, params.Next)
@@ -35,26 +42,26 @@ func Failure(w io.Writer, params FailureParams) {
 
 // FailureLine is the failure on one line, for a run whose report --quiet threw
 // away.
-func FailureLine(err kernel.Error, names Names) string {
-	details := failureDetails(err, names)
+func (wd Wording) FailureLine(err kernel.Error) string {
+	details := wd.failureDetails(err)
 	if len(details) == 0 {
-		return ErrorMessage(err)
+		return wd.Error(err)
 	}
-	return ErrorMessage(err) + causeSeparator + strings.Join(details, fieldSeparator)
+	return wd.Error(err) + causeSeparator + strings.Join(details, fieldSeparator)
 }
 
-func failureDetails(err kernel.Error, names Names) []string {
+func (wd Wording) failureDetails(err kernel.Error) []string {
 	switch typed := err.(type) {
 	case *kernel.InvalidError:
 		lines := make([]string, 0, len(typed.Fields))
 		for _, field := range typed.Fields {
-			lines = append(lines, FieldMessage(field, names))
+			lines = append(lines, wd.Field(field))
 		}
 		return lines
 	case *kernel.RefusedError:
 		lines := make([]string, 0, len(typed.Blockers))
 		for _, blocker := range typed.Blockers {
-			lines = append(lines, blockerLine(blocker, names))
+			lines = append(lines, wd.blockerLine(blocker))
 		}
 		return lines
 	case *kernel.Failure:
@@ -63,12 +70,12 @@ func failureDetails(err kernel.Error, names Names) []string {
 	return nil
 }
 
-// ErrorMessage is the error's sentence from the catalogue. An error the engine
-// could not name more precisely — internal, or invalid with no field to point
-// at — keeps its cause: it is all the reader has to go on.
-func ErrorMessage(err kernel.Error) string {
+// Error is the error's sentence from the catalogue. An error the engine could
+// not name more precisely — internal, or invalid with no field to point at —
+// keeps its cause: it is all the reader has to go on.
+func (wd Wording) Error(err kernel.Error) string {
 	base := err.Base()
-	message := text.Message(base.Code, base.Params)
+	message := wd.Catalog.Message(base.Code, base.Params)
 	if base.Cause == nil || !keepsCause(err) {
 		return message
 	}
@@ -87,29 +94,29 @@ func keepsCause(err kernel.Error) bool {
 	return false
 }
 
-// FieldMessage names the field, and the fields it is checked against, the way
-// the surface spells them.
-func FieldMessage(field kernel.FieldError, names Names) string {
+// Field names the field, and the fields it is checked against, the way the
+// surface spells them.
+func (wd Wording) Field(field kernel.FieldError) string {
 	spelled := field
-	spelled.Path = names(field.Path)
+	spelled.Path = wd.Names(field.Path)
 	spelled.With = make([]string, 0, len(field.With))
 	for _, path := range field.With {
-		spelled.With = append(spelled.With, names(path))
+		spelled.With = append(spelled.With, wd.Names(path))
 	}
-	return text.Field(spelled)
+	return wd.Catalog.Field(spelled)
 }
 
-func BlockerMessage(blocker kernel.Blocker) string {
-	return text.Message(blocker.Code, blocker.Params)
+func (wd Wording) Blocker(blocker kernel.Blocker) string {
+	return wd.Catalog.Message(blocker.Code, blocker.Params)
 }
 
-func blockerLine(blocker kernel.Blocker, names Names) string {
+func (wd Wording) blockerLine(blocker kernel.Blocker) string {
 	if blocker.Field == "" {
-		return BlockerMessage(blocker)
+		return wd.Blocker(blocker)
 	}
-	return fmt.Sprintf(liftedByFmt, BlockerMessage(blocker), names(blocker.Field))
+	return fmt.Sprintf(liftedByFmt, wd.Blocker(blocker), wd.Names(blocker.Field))
 }
 
-func WarningMessage(warning kernel.Warning) string {
-	return text.Message(warning.Code, warning.Params)
+func (wd Wording) Warning(warning kernel.Warning) string {
+	return wd.Catalog.Message(warning.Code, warning.Params)
 }

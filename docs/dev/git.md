@@ -46,7 +46,7 @@ A failed call returns a `*git.Error{Args, Exit, Stderr, Err}`: the arguments, gi
 
 ## Ports
 
-A command receives the `Reader` and the `Writer` when it is built (`create.Command(ports)`, [dispatch.md](dispatch.md#ports)): `Dispatcher.Registry` builds it with `git.Repo{Dir: <the dispatcher's Dir>, Remote: domain.OriginRemote}`. Its tests run on `gittest.Fake` (`internal/testutil/gittest`), git in memory: what its writes change its reads give back, it refuses what git refuses, `FakeParams.Fail` makes a method fail without running, and `Calls()` lists the calls made.
+A command receives the `Reader` and the `Writer` when it is built (`create.Command(ports)`, [dispatch.md](dispatch.md#ports)): `registry.Production` builds it with `git.Repo{Dir: <the dispatcher's Dir>, Remote: domain.OriginRemote}`. Its tests run on `gittest.Fake` (`internal/testutil/gittest`), git in memory: what its writes change its reads give back, it refuses what git refuses, `FakeParams.Fail` makes a method fail without running, and `Calls()` lists the calls made.
 
 ## What the lint holds
 

@@ -23,7 +23,7 @@ func TestAFollowUpIsTheCommandLineThatRunsItWithItsReason(t *testing.T) {
 
 	assert.Len(t, steps, 1)
 	assert.Equal(t, "wtm make feat/a feat/b --env PORT=3000 --ff --isolation verbatim --target-base main", steps[0].Command)
-	assert.Equal(t, text.Message(kernel.CodeLocksUnavailable, nil), steps[0].Note)
+	assert.Equal(t, text.NewCatalog().Message(kernel.CodeLocksUnavailable, nil), steps[0].Note)
 }
 
 func TestAFollowUpForACommandNotServedHereIsSpelledInKebabCase(t *testing.T) {

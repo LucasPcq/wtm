@@ -20,8 +20,9 @@ const (
 )
 
 type ProgressViewParams struct {
-	W     io.Writer
-	Human bool
+	W       io.Writer
+	Human   bool
+	Catalog text.Catalog
 	// Live redraws in place: a terminal the view may repaint.
 	Live bool
 }
@@ -35,6 +36,7 @@ type ProgressViewParams struct {
 type ProgressView struct {
 	w         io.Writer
 	human     bool
+	catalog   text.Catalog
 	live      bool
 	mu        sync.Mutex
 	unit      string
@@ -52,7 +54,7 @@ type ProgressView struct {
 // while it unwinds.
 func NewProgressView(ctx context.Context, params ProgressViewParams) *ProgressView {
 	watch, stop := context.WithCancel(ctx)
-	view := &ProgressView{w: params.W, human: params.Human, live: params.Human && params.Live, stop: stop}
+	view := &ProgressView{w: params.W, human: params.Human, catalog: params.Catalog, live: params.Human && params.Live, stop: stop}
 	if view.live {
 		go view.cancelling(watch, ctx)
 	}
@@ -92,7 +94,7 @@ func (v *ProgressView) Emit(event kernel.Progress) {
 		v.unit, v.status = event.Subject, ""
 		v.paint()
 	case kernel.ProgressStatus:
-		v.status = text.Message(event.Code, event.Params)
+		v.status = v.catalog.Message(event.Code, event.Params)
 		v.paint()
 	case kernel.ProgressUnitFinished:
 		v.unit, v.status = "", ""

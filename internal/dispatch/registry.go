@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/kernel"
-	"github.com/LucasPcq/wtm/internal/query/operations"
+	"github.com/LucasPcq/wtm/internal/kernel/text"
 )
 
 // Entry erases a command's or a query's types: the request in and the details
@@ -17,6 +17,8 @@ import (
 type Entry interface {
 	Name() string
 	Schema() []kernel.FieldSpec
+	Messages() text.Messages
+	ExitCodes() map[kernel.Code]int
 	Call(ctx context.Context, call Call) (Reply, error)
 	Fillable() (Fillable, bool)
 }
@@ -44,9 +46,14 @@ func (QueryReply) reply()   {}
 
 type Registry []Entry
 
-// Registry is every command and query the surfaces serve, on d.
-func (d *Dispatcher) Registry() Registry {
-	return Registry{RegisterQuery(operations.Query(d.Operations))}
+// Catalog speaks the kernel's codes and those of every entry; it panics on a
+// code two entries declare.
+func (r Registry) Catalog() text.Catalog {
+	sets := make([]text.Messages, 0, len(r))
+	for _, entry := range r {
+		sets = append(sets, entry.Messages())
+	}
+	return text.NewCatalog(sets...)
 }
 
 func (r Registry) Lookup(name string) (Entry, bool) {
@@ -98,15 +105,25 @@ func erase[P, D any](result Result[P, D]) (Result[json.RawMessage, json.RawMessa
 // QueryHandle locks nothing: an atomic write leaves a file as it was before or
 // after, never half written.
 type QueryHandle[Req, V any] struct {
-	query kernel.Query[Req, V]
+	query     kernel.Query[Req, V]
+	messages  text.Messages
+	exitCodes map[kernel.Code]int
 }
 
-func RegisterQuery[Req, V any](query kernel.Query[Req, V]) *QueryHandle[Req, V] {
-	return &QueryHandle[Req, V]{query: query}
+type RegisterQueryParams[Req, V any] struct {
+	Query     kernel.Query[Req, V]
+	Messages  text.Messages
+	ExitCodes map[kernel.Code]int
 }
 
-func (h *QueryHandle[Req, V]) Name() string               { return h.query.Name }
-func (h *QueryHandle[Req, V]) Schema() []kernel.FieldSpec { return nil }
+func RegisterQuery[Req, V any](params RegisterQueryParams[Req, V]) *QueryHandle[Req, V] {
+	return &QueryHandle[Req, V]{query: params.Query, messages: params.Messages, exitCodes: params.ExitCodes}
+}
+
+func (h *QueryHandle[Req, V]) Name() string                   { return h.query.Name }
+func (h *QueryHandle[Req, V]) Schema() []kernel.FieldSpec     { return nil }
+func (h *QueryHandle[Req, V]) Messages() text.Messages        { return h.messages }
+func (h *QueryHandle[Req, V]) ExitCodes() map[kernel.Code]int { return h.exitCodes }
 
 func (h *QueryHandle[Req, V]) Run(ctx context.Context, request Req) (V, error) {
 	view, err := h.query.Run(ctx, request)

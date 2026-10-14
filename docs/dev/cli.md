@@ -12,12 +12,12 @@
 
 ```go
 // surface/cli/create.go
-var createCmd = cli.Bind(create.Name, cli.Doc{
+var createCmd = cli.Bind(domain.CmdCreate, cli.Doc{
 	Use: domain.CmdCreate + " [branch...]", Short: "…", Long: "…", Example: "…",
 }, cli.Positional("branches"), cli.Flag(cli.FlagParams{Path: "fast_forward", Name: "ff"}), cli.Detail(createDetail{}))
 ```
 
-`Bind` looks the name up in the registry (`Dispatcher.Registry`, read on a dispatcher with no `Params`: the tree is built outside any repository, for `--help` and the docs) and panics on a name it does not hold, so a wrong name never reaches a user. `Doc` is what only a terminal reads; the rest comes from the command's `FieldSpec`s.
+The name is a constant of `domain`, the one the command declares as its `Name`: `surface/` never imports `command/` (`engine`). `Bind` looks the name up in the registry (`registry.Production`, read on a dispatcher with no `Params`: the tree is built outside any repository, for `--help` and the docs) and panics on a name it does not hold, so a wrong name never reaches a user. The engine builds the catalogue of that registry once, in `NewEngine`: two entries spelling one code stop wtm at start-up. Every sentence of a run comes from it. `Doc` is what only a terminal reads; the rest comes from the command's `FieldSpec`s.
 
 | Option | |
 | -- | -- |
@@ -56,7 +56,7 @@ A follow-up, and the next step of a recap or a `412`, is printed as the command 
 
 ## Exit codes
 
-`exitCode` (`exit.go`) reads a failure of the engine by its code (`exitByCode`: `state.schema_newer` → 22), then its kind (`invalid` 2, `cancelled` 19, `refused` 23, `conflict` 24, `precondition` 25, the rest 1). An `internal` error, and every error of a legacy command, goes to `rules.ExitCode`, which finds the sentinel it wraps. A batch exits on its first interrupted item, else its first failed item (`outcomeFailure`). A migrated command's own codes are added to `exitByCode` with the number its legacy error had.
+`exitCode` (`exit.go`) reads a failure of the engine by its code — the `ExitCodes` of the entry that ran (`reported` carries them), then `exitByCode`, the engine's own (`state.schema_newer` → 22) — then by its kind (`invalid` 2, `cancelled` 19, `refused` 23, `conflict` 24, `precondition` 25, the rest 1). An `internal` error, and every error of a legacy command, goes to `rules.ExitCode`, which finds the sentinel it wraps. A batch exits on its first interrupted item, else its first failed item (`outcomeFailure`). A migrated command keeps the number its legacy error had in its own `ExitCodes` ([commands.md](commands.md#a-commands-codes)).
 
 ## Parity
 
@@ -64,11 +64,10 @@ A follow-up, and the next step of a recap or a `412`, is printed as the command 
 
 ## Adding a command to the command line
 
-1. Its line in `Dispatcher.Registry`, with its real ports.
+1. Its line in `registry.Production`, with its real ports, its `Messages` and its `ExitCodes`.
 2. A file in `surface/cli` with its `cli.Bind`: `Doc`, the positional, a renamed flag if the legacy command had one, its `Detail` or `GenericDetail()`.
 3. Attached to the root in `root.go`, in its group.
-4. Its own codes in `exitByCode` when a legacy exit code must survive.
-5. `make docs`: the flags and their help come from the fields.
+4. `make docs`: the flags and their help come from the fields.
 
 ## What the lint holds
 

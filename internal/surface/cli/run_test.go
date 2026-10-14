@@ -177,6 +177,22 @@ func TestAFailureOfApplyIsReportedOnStderr(t *testing.T) {
 	assert.Empty(t, got.Stdout)
 }
 
+func TestAFailureOfTheCommandsOwnIsWordedAndExitsAsItDeclared(t *testing.T) {
+	w := newWorld(t, worldParams{})
+	w.Repo.taken = "feat/a"
+
+	human := w.run(t, args(commandName, "feat/a", "--yes"))
+	machine := decode(t, w.run(t, args(commandName, "feat/a", "--output", "json")).Stdout)
+	quiet := w.run(t, args("--quiet", commandName, "feat/a", "--yes"))
+
+	assert.Equal(t, domain.ExitCodeWorktreeExists, human.Code)
+	assert.Contains(t, human.Stderr, "feat/a is taken")
+	require.NotNil(t, machine.Error)
+	assert.Equal(t, "feat/a is taken", machine.Error.Message)
+	assert.Equal(t, domain.ExitCodeWorktreeExists, quiet.Code)
+	assert.Contains(t, quiet.Stderr, "feat/a is taken")
+}
+
 func TestQuietSilencesTheReportButNotTheFailureLineNorTheEnvelope(t *testing.T) {
 	w := newWorld(t, worldParams{})
 

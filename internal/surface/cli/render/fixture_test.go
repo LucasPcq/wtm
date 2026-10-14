@@ -12,7 +12,9 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/kernel/text"
 	"github.com/LucasPcq/wtm/internal/styles"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 )
 
 // The helpers the tests of the engine's rendering share.
@@ -26,6 +28,11 @@ const (
 func asFlag(path string) string {
 	return "--" + path
 }
+
+var (
+	catalog = text.NewCatalog()
+	wording = render.Wording{Catalog: catalog, Names: asFlag}
+)
 
 // plain is what a terminal shows of out, without its escapes.
 type pathDetail struct{}

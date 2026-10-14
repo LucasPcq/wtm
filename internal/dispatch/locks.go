@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/LucasPcq/wtm/internal/domain/operation"
 	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/kernel"
-	"github.com/LucasPcq/wtm/internal/query/operations"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -39,7 +39,7 @@ func (h held) release() {
 	h.holder.Release()
 }
 
-func (d *Dispatcher) lock(operation operations.Operation) (held, error) {
+func (d *Dispatcher) lock(operation operation.Operation) (held, error) {
 	if d.params.StateDir == "" {
 		return held{}, nil
 	}
@@ -55,7 +55,7 @@ func (d *Dispatcher) lock(operation operations.Operation) (held, error) {
 	}
 	requests := make([]fs.LockRequest, 0, len(operation.Locks))
 	for _, key := range operation.Locks {
-		requests = append(requests, fs.LockRequest{Path: d.lockPath(key), Shared: key.Mode == kernel.LockShared})
+		requests = append(requests, fs.LockRequest{Path: d.lockPath(key), Shared: key.Mode == string(kernel.LockShared)})
 	}
 	locks, err := fs.TryLocks(fs.TryLocksParams{Requests: requests})
 	var busy *fs.BusyError
@@ -72,7 +72,7 @@ func (d *Dispatcher) lock(operation operations.Operation) (held, error) {
 
 type lockHeldParams struct {
 	Path  string
-	Asked operations.Operation
+	Asked operation.Operation
 }
 
 func (d *Dispatcher) lockHeld(params lockHeldParams) error {
@@ -90,7 +90,7 @@ func (d *Dispatcher) lockHeld(params lockHeldParams) error {
 		}
 		problem.Params = kernel.Params{
 			kernel.ParamKey:       key,
-			kernel.ParamOp:        string(operation.ID),
+			kernel.ParamOp:        operation.ID,
 			kernel.ParamCommand:   operation.Command,
 			kernel.ParamPID:       strconv.Itoa(operation.PID),
 			kernel.ParamSurface:   operation.Surface,
@@ -101,18 +101,18 @@ func (d *Dispatcher) lockHeld(params lockHeldParams) error {
 	return kernel.Conflict(problem)
 }
 
-func (d *Dispatcher) locksAt(path string) func(kernel.LockKey) bool {
-	return func(key kernel.LockKey) bool { return d.lockPath(key) == path }
+func (d *Dispatcher) locksAt(path string) func(operation.Lock) bool {
+	return func(key operation.Lock) bool { return d.lockPath(key) == path }
 }
 
-func keyName(key kernel.LockKey) string {
-	if key.Scope == kernel.LockWorktree {
-		return string(key.Scope) + keySeparator + key.Name
+func keyName(key operation.Lock) string {
+	if key.Scope == string(kernel.LockWorktree) {
+		return key.Scope + keySeparator + key.Name
 	}
-	return string(key.Scope)
+	return key.Scope
 }
 
-func (d *Dispatcher) inProgress() ([]operations.Operation, error) {
+func (d *Dispatcher) inProgress() ([]operation.Operation, error) {
 	if d.params.StateDir == "" {
 		return nil, nil
 	}
@@ -120,15 +120,15 @@ func (d *Dispatcher) inProgress() ([]operations.Operation, error) {
 	if err != nil {
 		return nil, err
 	}
-	found := make([]operations.Operation, 0, len(files))
+	found := make([]operation.Operation, 0, len(files))
 	for _, data := range files {
-		var operation operations.Operation
+		var operation operation.Operation
 		if err := json.Unmarshal(data, &operation); err != nil {
 			continue
 		}
 		found = append(found, operation)
 	}
-	slices.SortFunc(found, func(a, b operations.Operation) int { return a.StartedAt.Compare(b.StartedAt) })
+	slices.SortFunc(found, func(a, b operation.Operation) int { return a.StartedAt.Compare(b.StartedAt) })
 	return found, nil
 }
 
@@ -136,12 +136,12 @@ func (d *Dispatcher) locksDir() string {
 	return filepath.Join(d.params.StateDir, locksDirName)
 }
 
-func (d *Dispatcher) holderPath(id kernel.OpID) string {
-	return filepath.Join(d.locksDir(), operationsDir, string(id)+holderFileExt)
+func (d *Dispatcher) holderPath(id string) string {
+	return filepath.Join(d.locksDir(), operationsDir, id+holderFileExt)
 }
 
-func (d *Dispatcher) lockPath(key kernel.LockKey) string {
-	if key.Scope == kernel.LockWorktree {
+func (d *Dispatcher) lockPath(key operation.Lock) string {
+	if key.Scope == string(kernel.LockWorktree) {
 		return filepath.Join(d.locksDir(), worktreeLocksDir, rules.EncodeBranchSegment(key.Name)+lockFileExt)
 	}
 	return filepath.Join(d.locksDir(), repoLockName+lockFileExt)
@@ -155,6 +155,6 @@ func sortedKeys(keys []kernel.LockKey) []kernel.LockKey {
 	return sorted
 }
 
-func (d *Dispatcher) Operations(context.Context) ([]operations.Operation, error) {
+func (d *Dispatcher) Operations(context.Context) ([]operation.Operation, error) {
 	return d.inProgress()
 }

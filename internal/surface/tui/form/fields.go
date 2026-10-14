@@ -108,7 +108,7 @@ func (s *session) textList(params textListParams) components.TextListModel {
 			if index < 0 || len(params.Choices.Options[index].Badges) == 0 {
 				return components.Badge{}
 			}
-			return badgeOf(params.Choices.Options[index].Badges[0])
+			return s.badgeOf(params.Choices.Options[index].Badges[0])
 		},
 	})
 }
@@ -136,7 +136,7 @@ func (s *session) selectItems(choices kernel.Choices) []components.SelectItem {
 	found := choices.Options
 	items := make([]components.SelectItem, 0, len(found))
 	for _, option := range found {
-		item := components.SelectItem{Label: labelOfOption(option), Value: option.Value, Danger: option.Danger, Badges: badgesOf(option.Badges)}
+		item := components.SelectItem{Label: labelOfOption(option), Value: option.Value, Danger: option.Danger, Badges: s.badgesOf(option.Badges)}
 		if option.Refusal != nil {
 			item.Disabled = true
 			item.Badges = append(item.Badges, components.Badge{Text: s.fieldMessage(*option.Refusal), Variant: components.BadgeWarning})
@@ -149,7 +149,7 @@ func (s *session) selectItems(choices kernel.Choices) []components.SelectItem {
 func (s *session) multiItems(choices kernel.Choices, selected []string) []components.MultiSelectItem {
 	items := make([]components.MultiSelectItem, 0, len(choices.Options))
 	for _, option := range choices.Options {
-		badges := badgesOf(option.Badges)
+		badges := s.badgesOf(option.Badges)
 		if option.Refusal != nil {
 			badges = append(badges, components.Badge{Text: s.fieldMessage(*option.Refusal), Variant: components.BadgeWarning})
 		}

@@ -6,7 +6,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/dispatch"
-	"github.com/LucasPcq/wtm/internal/kernel/text"
 	"github.com/LucasPcq/wtm/internal/surface/tui/form"
 )
 
@@ -20,6 +19,7 @@ func interactiveForm(ctx context.Context, params FormParams) (dispatch.Reply, er
 		Names:    params.Names,
 		Plan:     params.Detail.Plan,
 		Progress: params.Progress,
+		Catalog:  params.Catalog,
 	})
 }
 
@@ -47,7 +47,7 @@ func (b *binding) follow(cmd *cobra.Command, params followParams) error {
 		}
 		yes, err := b.engine.confirm(ConfirmParams{
 			Command: b.engine.commandLine(lineParams{Target: followUp.Command, Request: followUp.Request}),
-			Note:    text.Message(followUp.Code, followUp.Params),
+			Note:    b.engine.catalog.Message(followUp.Code, followUp.Params),
 		})
 		if err != nil {
 			return err

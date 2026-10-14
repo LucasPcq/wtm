@@ -23,18 +23,30 @@ var exitByCode = map[kernel.Code]int{
 	kernel.CodeStateSchemaNewer: domain.ExitCodeStateSchemaNewer,
 }
 
-// exitCode reads a failure of the engine by its code, then its kind; an error
-// it did not classify, internal or from a legacy command, keeps the code of
-// the sentinel it wraps.
+// exitCode reads a failure of the engine by its code, the entry's own first,
+// then by its kind; an error it did not classify, internal or from a legacy
+// command, keeps the code of the sentinel it wraps.
 func exitCode(err error) int {
 	var failure kernel.Error
 	if errors.Is(err, domain.ErrCancelled) || !errors.As(err, &failure) || failure.Kind() == kernel.KindInternal {
 		return rules.ExitCode(err)
 	}
+	if code, own := entryExitCode(err); own {
+		return code
+	}
 	if code, listed := exitByCode[failure.Base().Code]; listed {
 		return code
 	}
 	return exitOfKind(failure.Kind())
+}
+
+func entryExitCode(err error) (int, bool) {
+	var report *reported
+	if !errors.As(err, &report) {
+		return 0, false
+	}
+	code, own := report.exitCodes[report.failure.Base().Code]
+	return code, own
 }
 
 func exitOfKind(kind kernel.Kind) int {
@@ -86,8 +98,9 @@ func cancelledItem(item kernel.Item[json.RawMessage]) kernel.Error {
 // envelope: Execute turns it into an exit code, and into its line only when
 // --quiet threw the report away.
 type reported struct {
-	failure kernel.Error
-	line    string
+	failure   kernel.Error
+	line      string
+	exitCodes map[kernel.Code]int
 }
 
 func (r *reported) Error() string { return r.line }

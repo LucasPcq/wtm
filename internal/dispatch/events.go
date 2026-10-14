@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/domain/operation"
 	"github.com/LucasPcq/wtm/internal/kernel"
-	"github.com/LucasPcq/wtm/internal/query/operations"
 )
 
 // operationBus publishes without cancellation: a consumer must learn how an
@@ -13,10 +13,10 @@ import (
 type operationBus struct {
 	ctx       context.Context
 	publisher Publisher
-	operation operations.Operation
+	operation operation.Operation
 }
 
-func (d *Dispatcher) bus(ctx context.Context, operation operations.Operation) operationBus {
+func (d *Dispatcher) bus(ctx context.Context, operation operation.Operation) operationBus {
 	return operationBus{ctx: context.WithoutCancel(ctx), publisher: d.params.Publisher, operation: operation}
 }
 
@@ -48,7 +48,7 @@ func (b operationBus) publish(event domain.Event) {
 	if b.publisher == nil {
 		return
 	}
-	event.OpID = string(b.operation.ID)
+	event.OpID = b.operation.ID
 	event.CorrelationID = b.operation.CorrelationID
 	b.publisher.Publish(b.ctx, event)
 }

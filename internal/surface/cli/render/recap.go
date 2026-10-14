@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/kernel/text"
 	"github.com/LucasPcq/wtm/internal/styles"
 )
 
@@ -22,6 +23,7 @@ type RecapParams struct {
 	Fingerprint string
 	Next        []NextStepParams
 	Detail      Detail
+	Catalog     text.Catalog
 }
 
 // Recap is what a dry run answers: the plan, then the fingerprint of the facts
@@ -31,7 +33,7 @@ func Recap(w io.Writer, params RecapParams) {
 	SectionTitle(w, fmt.Sprintf(recapTitleFmt, params.Command))
 	warnings := make([]string, 0, len(params.Warnings))
 	for _, warning := range params.Warnings {
-		warnings = append(warnings, WarningMessage(warning))
+		warnings = append(warnings, params.Catalog.Message(warning.Code, warning.Params))
 	}
 	rows := params.Detail.Plan(params.Plan)
 	plan := styles.RenderPlan(styles.PlanParams{Rows: rows, Warnings: warnings, Width: max(TerminalWidthOf(w)-len(Indent), 0)})

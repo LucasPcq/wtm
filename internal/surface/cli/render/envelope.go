@@ -27,7 +27,7 @@ type EnvelopeParams struct {
 	FollowUps   []kernel.FollowUp
 	Warnings    []kernel.Warning
 	Err         kernel.Error
-	Names       Names
+	Wording     Wording
 }
 
 type envelope struct {
@@ -90,30 +90,30 @@ func WriteEnvelope(w io.Writer, params EnvelopeParams) error {
 		Fingerprint: params.Fingerprint,
 		View:        params.View,
 		FollowUps:   orEmpty(params.FollowUps),
-		Warnings:    envelopeWarnings(params.Warnings),
-		Error:       envelopeErrorOf(params.Err, params.Names),
+		Warnings:    params.Wording.envelopeWarnings(params.Warnings),
+		Error:       params.Wording.envelopeErrorOf(params.Err),
 	}
 	for _, item := range params.Items {
 		doc.Items = append(doc.Items, envelopeItem{
 			Subject: item.Subject,
 			Status:  item.Status,
 			Reason:  item.Reason,
-			Error:   envelopeErrorOf(item.Error, params.Names),
+			Error:   params.Wording.envelopeErrorOf(item.Error),
 			Detail:  item.Detail,
 		})
 	}
 	return encodeJSON(w, doc)
 }
 
-func envelopeWarnings(warnings []kernel.Warning) []envelopeWarning {
+func (wd Wording) envelopeWarnings(warnings []kernel.Warning) []envelopeWarning {
 	out := make([]envelopeWarning, 0, len(warnings))
 	for _, warning := range warnings {
-		out = append(out, envelopeWarning{Code: warning.Code, Params: warning.Params, Message: WarningMessage(warning)})
+		out = append(out, envelopeWarning{Code: warning.Code, Params: warning.Params, Message: wd.Warning(warning)})
 	}
 	return out
 }
 
-func envelopeErrorOf(err kernel.Error, names Names) *envelopeError {
+func (wd Wording) envelopeErrorOf(err kernel.Error) *envelopeError {
 	if err == nil {
 		return nil
 	}
@@ -121,29 +121,29 @@ func envelopeErrorOf(err kernel.Error, names Names) *envelopeError {
 	doc := &envelopeError{
 		Kind:     err.Kind(),
 		Code:     base.Code,
-		Message:  ErrorMessage(err),
+		Message:  wd.Error(err),
 		Params:   base.Params,
 		FollowUp: base.FollowUp,
 	}
 	switch typed := err.(type) {
 	case *kernel.InvalidError:
 		for _, field := range typed.Fields {
-			doc.Fields = append(doc.Fields, envelopeField{FieldError: field, Flag: names(field.Path), Message: FieldMessage(field, names)})
+			doc.Fields = append(doc.Fields, envelopeField{FieldError: field, Flag: wd.Names(field.Path), Message: wd.Field(field)})
 		}
 	case *kernel.RefusedError:
 		for _, blocker := range typed.Blockers {
-			doc.Blockers = append(doc.Blockers, envelopeBlocker{Blocker: blocker, Flag: blockerFlag(blocker, names), Message: BlockerMessage(blocker)})
+			doc.Blockers = append(doc.Blockers, envelopeBlocker{Blocker: blocker, Flag: wd.blockerFlag(blocker), Message: wd.Blocker(blocker)})
 		}
 	case *kernel.Failure:
 	}
 	return doc
 }
 
-func blockerFlag(blocker kernel.Blocker, names Names) string {
+func (wd Wording) blockerFlag(blocker kernel.Blocker) string {
 	if blocker.Field == "" {
 		return ""
 	}
-	return names(blocker.Field)
+	return wd.Names(blocker.Field)
 }
 
 // orEmpty keeps a list key an array: a reader never tells null from none.

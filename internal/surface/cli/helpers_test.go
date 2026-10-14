@@ -44,8 +44,8 @@ func newWorld(t testing.TB, params worldParams) *world {
 	engine := NewEngine(EngineParams{
 		Registry: func(d *dispatch.Dispatcher) dispatch.Registry {
 			return dispatch.Registry{
-				dispatch.Register(dispatch.RegisterParams[request, facts, plan, string]{Dispatcher: d, Command: makeCommand(r)}),
-				dispatch.RegisterQuery(inventoryQuery(r)),
+				dispatch.Register(dispatch.RegisterParams[request, facts, plan, string]{Dispatcher: d, Command: makeCommand(r), Messages: makeMessages, ExitCodes: makeExitCodes}),
+				dispatch.RegisterQuery(dispatch.RegisterQueryParams[struct{}, inventory]{Query: inventoryQuery(r)}),
 			}
 		},
 		Dispatcher: func(context.Context) (*dispatch.Dispatcher, error) { return b.Dispatcher, nil },

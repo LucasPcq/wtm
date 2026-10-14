@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/LucasPcq/wtm/internal/dispatch"
+	"github.com/LucasPcq/wtm/internal/domain/operation"
 	"github.com/LucasPcq/wtm/internal/kernel"
 	"github.com/LucasPcq/wtm/internal/query/operations"
 	"github.com/LucasPcq/wtm/internal/testutil/dispatchtest"
@@ -65,7 +66,7 @@ func TestOperationsOnOtherWorktreesRunSideBySide(t *testing.T) {
 
 func TestTheOperationsInProgressAreReadFromTheirHolders(t *testing.T) {
 	b := bench(t)
-	query := dispatch.RegisterQuery(operations.Query(b.Dispatcher.Operations))
+	query := operationsQuery(b)
 	r := &repo{}
 	entered, release := r.held()
 	done := make(chan dispatchtest.Ran[plan, string])
@@ -81,16 +82,16 @@ func TestTheOperationsInProgressAreReadFromTheirHolders(t *testing.T) {
 	after, err := query.Run(t.Context(), operations.Request{})
 	require.NoError(t, err)
 
-	assert.Equal(t, []operations.Operation{{
+	assert.Equal(t, []operation.Operation{{
 		ID:            "op-1",
 		PID:           os.Getpid(),
 		Command:       commandName,
 		Surface:       string(dispatch.SurfaceCLI),
 		CorrelationID: "agent-7",
 		StartedAt:     dispatchtest.Clock,
-		Locks: []kernel.LockKey{
-			{Scope: kernel.LockRepo, Mode: kernel.LockShared},
-			{Scope: kernel.LockWorktree, Name: "feat/a", Mode: kernel.LockExclusive},
+		Locks: []operation.Lock{
+			{Scope: string(kernel.LockRepo), Mode: string(kernel.LockShared)},
+			{Scope: string(kernel.LockWorktree), Name: "feat/a", Mode: string(kernel.LockExclusive)},
 		},
 	}}, during.Operations)
 	assert.Empty(t, after.Operations)

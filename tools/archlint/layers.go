@@ -25,8 +25,12 @@ var layers = map[string]layer{
 		why: "the skeleton of the command engine: stdlib only, no business vocabulary, no I/O",
 	},
 	"dispatch": {
-		internal: []string{"domain", "infra", "kernel", "query", "rules"},
+		internal: []string{"domain", "infra", "kernel", "rules"},
 		why:      "the impure half of the engine runs on its own ports: a command's ports reach it as interfaces, never through service/ or a surface",
+	},
+	"registry": {
+		internal: []string{"command", "dispatch", "domain", "infra", "kernel", "query", "store"},
+		why:      "the composition root: every command and query with its real ports, the only importer of command/ and query/",
 	},
 	"infra": {
 		internal: []string{"domain", "rules"},
@@ -72,7 +76,7 @@ var layers = map[string]layer{
 		why:      "the form of a command on the engine, drawn with the wizard's components: it reaches the command through dispatch only, never flow/ or service/",
 	},
 	"surface/cli": {
-		internal: []string{"config", "dispatch", "domain", "flow", "infra", "kernel", "rules", "schemas", "service", "styles", "surface/cli/render", "surface/tui", "surface/tui/form"},
+		internal: []string{"config", "dispatch", "domain", "flow", "infra", "kernel", "registry", "rules", "schemas", "service", "styles", "surface/cli/render", "surface/tui", "surface/tui/form"},
 		external: []string{"github.com/charmbracelet/bubbletea", "github.com/spf13/cobra", "golang.org/x/term"},
 		why:      "the command line: the commands generated from the dispatch registry, and the flag wiring of the commands still on flow/",
 	},

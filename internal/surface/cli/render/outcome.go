@@ -12,33 +12,21 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/kernel/text"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/styles"
 )
 
 const (
-	headlineFmt    = "%s: %s"
-	itemLineFmt    = "%s  %s"
-	nothingToDo    = "nothing to do"
-	labelDone      = "done"
-	labelUnchanged = "unchanged"
-	labelFailed    = "failed"
-	labelSkipped   = "skipped"
-	labelCancelled = "cancelled"
-	listSeparator  = ", "
-	pairFmt        = "%s " + domain.MoveArrowGlyph + " %s"
-	jsonNull       = "null"
+	headlineFmt   = "%s: %s"
+	itemLineFmt   = "%s  %s"
+	nothingToDo   = "nothing to do"
+	listSeparator = ", "
+	pairFmt       = "%s " + domain.MoveArrowGlyph + " %s"
+	jsonNull      = "null"
 )
 
 var yesNo = map[bool]string{true: "yes", false: "no"}
-
-var reasonLabels = map[kernel.Reason]string{
-	kernel.ReasonInterrupted: "interrupted",
-	kernel.ReasonNotReached:  "not reached",
-	kernel.ReasonUnchanged:   "unchanged",
-	kernel.ReasonUnsafe:      "unsafe",
-	kernel.ReasonLocked:      "locked",
-}
 
 // Detail renders what belongs to one command in its results: the rows of the
 // plan a dry run and the form's recap show, drawn alike by styles.RenderPlan,
@@ -69,6 +57,7 @@ type OutcomeParams struct {
 	Warnings  []kernel.Warning
 	FollowUps []NextStepParams
 	Detail    Detail
+	Catalog   text.Catalog
 }
 
 // Outcome is the conclusion of a run: one headline carrying the worst result
@@ -77,10 +66,10 @@ type OutcomeParams struct {
 func Outcome(w io.Writer, params OutcomeParams) {
 	headline(w, params)
 	for _, item := range params.Items {
-		outcomeItem(w, outcomeItemParams{Item: item, Detail: params.Detail})
+		outcomeItem(w, outcomeItemParams{Item: item, Detail: params.Detail, Catalog: params.Catalog})
 	}
 	for _, warning := range params.Warnings {
-		Warning(w, WarningMessage(warning))
+		Warning(w, params.Catalog.Message(warning.Code, warning.Params))
 	}
 	NextSteps(w, params.FollowUps)
 }
@@ -91,7 +80,7 @@ func headline(w io.Writer, params OutcomeParams) {
 		return
 	}
 	count := tally(params.Items)
-	line := fmt.Sprintf(headlineFmt, params.Command, rules.Tally(count.parts()...))
+	line := fmt.Sprintf(headlineFmt, params.Command, rules.Tally(count.parts(params.Catalog)...))
 	switch {
 	case count.failed > 0:
 		Error(w, line)
@@ -132,19 +121,20 @@ func (c itemCount) add(item kernel.Item[json.RawMessage]) itemCount {
 	return c
 }
 
-func (c itemCount) parts() []domain.TallyPart {
+func (c itemCount) parts(catalog text.Catalog) []domain.TallyPart {
 	return []domain.TallyPart{
-		{Count: c.done, Label: labelDone},
-		{Count: c.unchanged, Label: labelUnchanged},
-		{Count: c.failed, Label: labelFailed},
-		{Count: c.skipped, Label: labelSkipped},
-		{Count: c.cancelled, Label: labelCancelled},
+		{Count: c.done, Label: catalog.Status(kernel.StatusDone)},
+		{Count: c.unchanged, Label: catalog.Reason(kernel.ReasonUnchanged)},
+		{Count: c.failed, Label: catalog.Status(kernel.StatusFailed)},
+		{Count: c.skipped, Label: catalog.Status(kernel.StatusSkipped)},
+		{Count: c.cancelled, Label: catalog.Status(kernel.StatusCancelled)},
 	}
 }
 
 type outcomeItemParams struct {
-	Item   kernel.Item[json.RawMessage]
-	Detail Detail
+	Item    kernel.Item[json.RawMessage]
+	Detail  Detail
+	Catalog text.Catalog
 }
 
 func outcomeItem(w io.Writer, params outcomeItemParams) {
@@ -155,17 +145,17 @@ func outcomeItem(w io.Writer, params outcomeItemParams) {
 			params.Detail.Item(w, item)
 		}
 	case kernel.StatusFailed:
-		Error(w, fmt.Sprintf(itemLineFmt, item.Subject, itemWhy(item)))
+		Error(w, fmt.Sprintf(itemLineFmt, item.Subject, itemWhy(params)))
 	case kernel.StatusSkipped, kernel.StatusCancelled:
-		Warning(w, fmt.Sprintf(itemLineFmt, item.Subject, itemWhy(item)))
+		Warning(w, fmt.Sprintf(itemLineFmt, item.Subject, itemWhy(params)))
 	}
 }
 
-func itemWhy(item kernel.Item[json.RawMessage]) string {
-	if item.Error != nil {
-		return ErrorMessage(item.Error)
+func itemWhy(params outcomeItemParams) string {
+	if params.Item.Error != nil {
+		return Wording{Catalog: params.Catalog}.Error(params.Item.Error)
 	}
-	return reasonLabels[item.Reason]
+	return params.Catalog.Reason(params.Item.Reason)
 }
 
 // rowsOf reads a detail object as rows in its own key order; a detail that is

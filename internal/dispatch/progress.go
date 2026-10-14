@@ -34,7 +34,7 @@ func (d *Dispatcher) progress(params progressParams) *progress {
 }
 
 func (p *progress) Emit(event kernel.Progress) {
-	event.Op = p.bus.operation.ID
+	event.Op = kernel.OpID(p.bus.operation.ID)
 	p.log(event)
 	if event.Kind == kernel.ProgressUnitFinished {
 		p.bus.unitFinished(event)

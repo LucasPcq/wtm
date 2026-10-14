@@ -82,14 +82,29 @@ package dispatch
 import (
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/query/operations" // want `internal/dispatch must not import "github.com/LucasPcq/wtm/internal/query/operations" — the impure half of the engine`
 	"github.com/LucasPcq/wtm/internal/service/worktree" // want `internal/dispatch must not import "github.com/LucasPcq/wtm/internal/service/worktree" — the impure half of the engine`
 )
 
-var _, _ = infra.GlobalDir, worktree.Create
+var _, _, _ = infra.GlobalDir, worktree.Create, operations.Query
 
 var _ kernel.Code
 
 func Run() {}
+-- github.com/LucasPcq/wtm/internal/query/operations/operations.go --
+package operations
+
+func Query() {}
+-- github.com/LucasPcq/wtm/internal/registry/registry.go --
+package registry
+
+import (
+	"github.com/LucasPcq/wtm/internal/dispatch"
+	"github.com/LucasPcq/wtm/internal/query/operations"
+	"github.com/LucasPcq/wtm/internal/service/worktree" // want `internal/registry must not import "github.com/LucasPcq/wtm/internal/service/worktree" — the composition root`
+)
+
+var _, _, _ = dispatch.Run, operations.Query, worktree.Create
 -- github.com/LucasPcq/wtm/internal/surface/tui/form/form.go --
 package form
 

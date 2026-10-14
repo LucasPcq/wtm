@@ -8,6 +8,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/dispatch"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/kernel"
+	"github.com/LucasPcq/wtm/internal/kernel/text"
+	"github.com/LucasPcq/wtm/internal/registry"
 	"github.com/LucasPcq/wtm/internal/service/events"
 	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
@@ -22,6 +24,7 @@ type Engine struct {
 	form       Form
 	confirm    Confirm
 	bindings   map[string]*binding
+	catalog    text.Catalog
 }
 
 type EngineParams struct {
@@ -31,8 +34,12 @@ type EngineParams struct {
 	Confirm    Confirm
 }
 
+// NewEngine builds the catalogue of the registry at once: two entries spelling
+// one code stop wtm at start-up, before any command runs.
 func NewEngine(params EngineParams) *Engine {
-	return &Engine{registry: params.Registry, dispatcher: params.Dispatcher, form: params.Form, confirm: params.Confirm, bindings: map[string]*binding{}}
+	engine := &Engine{registry: params.Registry, dispatcher: params.Dispatcher, form: params.Form, confirm: params.Confirm, bindings: map[string]*binding{}}
+	engine.catalog = engine.schema().Catalog()
+	return engine
 }
 
 // Form runs a command interactively: it fills the request, shows the plan and
@@ -47,6 +54,7 @@ type FormParams struct {
 	Names    render.Names
 	Detail   render.Detail
 	Progress kernel.Emitter
+	Catalog  text.Catalog
 }
 
 // Confirm asks whether to run a follow-up once an interactive run concluded.
@@ -58,7 +66,7 @@ type ConfirmParams struct {
 }
 
 var production = NewEngine(EngineParams{
-	Registry:   (*dispatch.Dispatcher).Registry,
+	Registry:   registry.Production,
 	Dispatcher: projectDispatcher,
 	Form:       interactiveForm,
 	Confirm:    confirmFollowUp,

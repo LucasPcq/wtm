@@ -84,7 +84,7 @@ func TestFactsThatChangedBeforeTheConfirmationBringTheRecapBack(t *testing.T) {
 	reply, err := w.script(t,
 		func(d *driver) {
 			fillAll(d)
-			r.existing = []string{"feat/elsewhere"}
+			r.changed("feat/elsewhere")
 			d.key("enter")
 		},
 		func(d *driver) {

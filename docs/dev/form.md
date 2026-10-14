@@ -53,7 +53,7 @@ A field answered before a `412` is settled on the second pass. The fields before
 | `textlist` | `components.TextList`, each entry badged as its choice is | an entry is refused on the errors `State` finds on that entry (`branches[2]`), the field on its own |
 | `decisions` | `components.DecisionList`: a row per key of the value, ←→ among the choices | enter: `State` on the map |
 
-The choices of a field are its `Choices`, else the values its `Enum` accepts. A `select` in `search` mode (`kernel.ChoicesSearch`) is the branch picker: `/` filters, `r` observes again and lists the choices anew (every cached choice is dropped with the facts it came from). Badges, a choice's banner and every refusal are `kernel.Code`s rendered by `kernel/text`; a field is named by its `Label` in a message, where the command line spells it as a flag. What only the form says (the loading lines, the recap's title and options) is a constant in `text.go`.
+The choices of a field are its `Choices`, else the values its `Enum` accepts. A `select` in `search` mode (`kernel.ChoicesSearch`) is the branch picker: `/` filters, `r` observes again and lists the choices anew (every cached choice is dropped with the facts it came from). Badges, a choice's banner and every refusal are `kernel.Code`s rendered by the catalogue the command line hands the form (`Params.Catalog`, [commands.md](commands.md#messages)); a field is named by its `Label` in a message, where the command line spells it as a flag. What only the form says (the loading lines, the recap's title and options) is a constant in `text.go`.
 
 ## Remembering
 

@@ -15,7 +15,7 @@ import (
 func TestASuccessfulRunContractsToItsCount(t *testing.T) {
 	var out bytes.Buffer
 
-	render.Outcome(&out, render.OutcomeParams{Command: "make", Items: []kernel.Item[json.RawMessage]{done("feat/a"), done("feat/b"), unchanged("feat/c")}, Detail: render.GenericDetail{}})
+	render.Outcome(&out, render.OutcomeParams{Catalog: catalog, Command: "make", Items: []kernel.Item[json.RawMessage]{done("feat/a"), done("feat/b"), unchanged("feat/c")}, Detail: render.GenericDetail{}})
 
 	assert.Equal(t, lines("  ✓ make: 2 done · 1 unchanged"), plain(out.String()))
 }
@@ -24,7 +24,7 @@ func TestEveryItemThatIsNotDoneIsNamedWithWhy(t *testing.T) {
 	var out bytes.Buffer
 	failure := kernel.Internal(kernel.Problem{Code: kernel.CodeStepFailed, Params: kernel.Params{kernel.ParamStep: "worktree"}})
 
-	render.Outcome(&out, render.OutcomeParams{
+	render.Outcome(&out, render.OutcomeParams{Catalog: catalog,
 		Command: "make",
 		Items: []kernel.Item[json.RawMessage]{
 			done("feat/a"),
@@ -56,7 +56,7 @@ func TestTheHeadlineCarriesTheWorstResult(t *testing.T) {
 	}
 	for _, c := range cases {
 		var out bytes.Buffer
-		render.Outcome(&out, render.OutcomeParams{Command: "make", Items: c.items, Detail: render.GenericDetail{}})
+		render.Outcome(&out, render.OutcomeParams{Catalog: catalog, Command: "make", Items: c.items, Detail: render.GenericDetail{}})
 		assert.Equal(t, c.want, plain(out.String()))
 	}
 }
@@ -64,7 +64,7 @@ func TestTheHeadlineCarriesTheWorstResult(t *testing.T) {
 func TestADoneItemIsShownByTheCommandsOwnDetail(t *testing.T) {
 	var out bytes.Buffer
 
-	render.Outcome(&out, render.OutcomeParams{Command: "make", Items: []kernel.Item[json.RawMessage]{done("feat/a"), unchanged("feat/b")}, Detail: pathDetail{}})
+	render.Outcome(&out, render.OutcomeParams{Catalog: catalog, Command: "make", Items: []kernel.Item[json.RawMessage]{done("feat/a"), unchanged("feat/b")}, Detail: pathDetail{}})
 
 	assert.Equal(t, lines("  ✓ make: 1 done · 1 unchanged", "    feat/a  \"/wt/feat/a\""), plain(out.String()))
 }
