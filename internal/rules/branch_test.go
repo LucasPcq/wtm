@@ -85,18 +85,19 @@ func TestShouldOfferFastForward(t *testing.T) {
 
 func TestSourceIsStartPoint(t *testing.T) {
 	cases := []struct {
-		name  string
-		state domain.BranchTargetState
-		want  bool
+		name   string
+		target domain.BranchTarget
+		want   bool
 	}{
-		{"a new branch starts from the source", domain.BranchTargetNew, true},
-		{"a reused branch carries its own history", domain.BranchTargetExisting, false},
-		{"a taken branch never starts from the source", domain.BranchTargetCheckedOut, false},
+		{"a new branch starts from the source", domain.BranchTarget{State: domain.BranchTargetNew}, true},
+		{"a branch only on origin starts from origin", domain.BranchTarget{State: domain.BranchTargetNew, Upstream: "origin/feat"}, false},
+		{"a reused branch carries its own history", domain.BranchTarget{State: domain.BranchTargetExisting}, false},
+		{"a taken branch never starts from the source", domain.BranchTarget{State: domain.BranchTargetCheckedOut}, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := SourceIsStartPoint(c.state); got != c.want {
-				t.Errorf("SourceIsStartPoint(%v) = %v, want %v", c.state, got, c.want)
+			if got := SourceIsStartPoint(c.target); got != c.want {
+				t.Errorf("SourceIsStartPoint(%+v) = %v, want %v", c.target, got, c.want)
 			}
 		})
 	}

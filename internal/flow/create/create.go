@@ -244,7 +244,7 @@ func (f *createFlow) provisionOne(params provisionParams) (domain.CreateResult, 
 		_ = branch.FastForwardIfBehind(f.runCtx, branch.BranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branchName})
 	}
 	startPoint := fromBranch
-	if !rules.SourceIsStartPoint(target.State) {
+	if !rules.SourceIsStartPoint(target) {
 		startPoint = ""
 	}
 

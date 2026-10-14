@@ -57,13 +57,13 @@ type SourceUpdateParams struct {
 
 // SourceUpdate classifies the divergence from origin of whichever branch the
 // worktree starts from: the target branch when it already exists locally (its
-// commits are what gets checked out), the source branch otherwise.
+// commits are what gets checked out), its origin counterpart when it exists only
+// there, the source branch otherwise.
 func SourceUpdate(ctx context.Context, params SourceUpdateParams) SourceUpdatePrompt {
-	subject := params.Source
-	if params.Target != nil && params.Branch != "" &&
-		params.Target(params.Branch).State == domain.BranchTargetExisting {
-		subject = params.Branch
+	if upstream := upstreamOf(params); upstream != "" {
+		return SourceUpdatePrompt{Branch: upstream, SkipReason: domain.CheckoutSourceUpdateSkipNew}
 	}
+	subject := startOf(params)
 	if subject == "" {
 		return SourceUpdatePrompt{SkipReason: domain.SourceUpdateSkipNoSource}
 	}
@@ -93,6 +93,23 @@ func SourceUpdate(ctx context.Context, params SourceUpdateParams) SourceUpdatePr
 	return SourceUpdatePrompt{Branch: subject, SkipReason: domain.SourceUpdateSkipUpToDate}
 }
 
+func startOf(params SourceUpdateParams) string {
+	if params.Target == nil || params.Branch == "" {
+		return params.Source
+	}
+	if params.Target(params.Branch).State == domain.BranchTargetExisting {
+		return params.Branch
+	}
+	return params.Source
+}
+
+func upstreamOf(params SourceUpdateParams) string {
+	if params.Target == nil || params.Branch == "" {
+		return ""
+	}
+	return params.Target(params.Branch).Upstream
+}
+
 type FastForwardSubjectParams struct {
 	Target     domain.BranchTarget
 	FromBranch string
@@ -102,7 +119,7 @@ type FastForwardSubjectParams struct {
 // FastForwardSubject names the branch a fast-forward updates: the source for a
 // branch git is about to create, the worktree's own branch when it already exists.
 func FastForwardSubject(params FastForwardSubjectParams) string {
-	if rules.SourceIsStartPoint(params.Target.State) {
+	if rules.SourceIsStartPoint(params.Target) {
 		return params.FromBranch
 	}
 	return params.Branch

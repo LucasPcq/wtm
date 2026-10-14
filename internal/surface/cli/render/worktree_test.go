@@ -300,3 +300,17 @@ func TestFormatCleanBatchCountsAndNamesAnomalies(t *testing.T) {
 		}
 	}
 }
+
+func TestFormatCreateResultSaysABranchResumesOrigin(t *testing.T) {
+	var buf bytes.Buffer
+	FormatCreateResult(&buf, CreateResultParams{
+		Branch: "feat/x", From: "main", EnvStrategy: "main", Path: ".worktrees/feat-x",
+		Upstream: "origin/feat/x", GoCommand: "wtm go feat/x",
+	})
+	out := buf.String()
+	for _, want := range []string{"Created worktree feat/x from origin/feat/x, tracking it", domain.CreateRecapLabelParent} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output should contain %q:\n%s", want, out)
+		}
+	}
+}

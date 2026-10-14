@@ -69,8 +69,9 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 		ProjectDir:  params.ProjectDir,
 		Path:        worktreePath,
 		Branch:      params.Branch,
-		FromBranch:  params.FromBranch,
+		FromBranch:  rules.FirstNonEmpty(target.Upstream, params.FromBranch),
 		ReuseBranch: reuseBranch,
+		Track:       target.Upstream != "",
 	}); err != nil {
 		return domain.CreateResult{}, err
 	}
@@ -145,6 +146,7 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 		Branch:   params.Branch,
 		Path:     worktreePath,
 		Metadata: metadata,
+		Upstream: target.Upstream,
 	}
 	if reuseBranch {
 		result.ExistingBranch = true
