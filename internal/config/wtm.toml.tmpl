@@ -7,10 +7,10 @@ schema = {{ .Schema }}
 {{ end }}
 [worktrees]
 # Directory where worktrees are created (relative to repo root)
-base_path = "{{ .BasePath }}"
+base_path = {{ toml .BasePath }}
 
 # Branch used as the default base for new worktrees
-base_branch = "{{ .BaseBranch }}"
+base_branch = {{ toml .BaseBranch }}
 
 [env]
 # Strategy for provisioning .env files in new worktrees:
@@ -26,7 +26,7 @@ base_branch = "{{ .BaseBranch }}"
 # template = ".env.example"
 {{- else }}
 {{- if .EnvStrategy }}
-strategy = "{{ .EnvStrategy }}"
+strategy = {{ toml .EnvStrategy }}
 {{- else }}
 # strategy = "example"
 {{- end }}
@@ -35,9 +35,9 @@ strategy = "{{ .EnvStrategy }}"
 {{- range .EnvFiles }}
 
 [[env.file]]
-target = "{{ .Target }}"
+target = {{ toml .Target }}
 {{- if .Template }}
-template = "{{ .Template }}"
+template = {{ toml .Template }}
 {{- end }}
 {{- if .Local }}
 local = true
@@ -55,9 +55,9 @@ on_create = []
 on_create = [
 {{- range .OnCreate }}
 {{- if or .Cwd .ContinueOnError }}
-  { cmd = "{{ .Cmd }}"{{ if .Cwd }}, cwd = "{{ .Cwd }}"{{ end }}{{ if .ContinueOnError }}, continue_on_error = true{{ end }} },
+  { cmd = {{ toml .Cmd }}{{ if .Cwd }}, cwd = {{ toml .Cwd }}{{ end }}{{ if .ContinueOnError }}, continue_on_error = true{{ end }} },
 {{- else }}
-  "{{ .Cmd }}",
+  {{ toml .Cmd }},
 {{- end }}
 {{- end }}
 ]
@@ -74,9 +74,9 @@ on_clean = []
 on_clean = [
 {{- range .OnClean }}
 {{- if or .Cwd .ContinueOnError }}
-  { cmd = "{{ .Cmd }}"{{ if .Cwd }}, cwd = "{{ .Cwd }}"{{ end }}{{ if .ContinueOnError }}, continue_on_error = true{{ end }} },
+  { cmd = {{ toml .Cmd }}{{ if .Cwd }}, cwd = {{ toml .Cwd }}{{ end }}{{ if .ContinueOnError }}, continue_on_error = true{{ end }} },
 {{- else }}
-  "{{ .Cmd }}",
+  {{ toml .Cmd }},
 {{- end }}
 {{- end }}
 ]
@@ -87,6 +87,6 @@ on_clean = [
 # --ask asks them again; deleting a line forgets it.
 [wizard.remembered]
 {{- range $id, $value := .Remembered }}
-{{ $id }} = "{{ $value }}"
+{{ tomlKey $id }} = {{ toml $value }}
 {{- end }}
 {{- end }}

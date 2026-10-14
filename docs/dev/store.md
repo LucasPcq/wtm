@@ -10,7 +10,7 @@
 | `store.ProjectConfig` | `ConfigDisk{StateDir}` | `<common>/wtm/config.toml` | `Remember` (and `ConfigDisk.Update`) |
 | `store.EnvFiles` | `EnvDisk{}` | a worktree's `.env` files | `Read`, `Template`, `Copy`, `Edit` |
 
-`run.toml`, `pending-removals.toml`, the logs and the full re-render of `config.toml` by `init` keep their writers in `config/` and `service/` until their commands migrate.
+`run.toml`, `pending-removals.toml`, the logs and the full re-render of `config.toml` by `init` keep their writers in `config/` and `service/` until their commands migrate. Every render of `config.toml` (`config/wtm.toml.tmpl`, the re-init's and `ReviseProject`'s alike) writes a value only through the template functions `toml` and `tomlKey`, spelt by the TOML encoder, never between literal quotes: a hook command, a path or a remembered answer round-trips whatever quotes, backslashes or newlines it holds.
 
 ## What a write says
 

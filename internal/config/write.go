@@ -288,7 +288,11 @@ func writeGlobalAt(ctx context.Context, params writeGlobalAtParams) error {
 			if err := refuseNewer(refuseNewerParams{Path: params.Path, Current: current, Supported: domainstatefile.GlobalConfigSchema}); err != nil {
 				return nil, err
 			}
-			return fs.Write{Data: []byte(globalContent(params.Answers))}, nil
+			content, err := globalContent(params.Answers)
+			if err != nil {
+				return nil, err
+			}
+			return fs.Write{Data: []byte(content)}, nil
 		},
 	})
 	if err != nil {
@@ -297,10 +301,11 @@ func writeGlobalAt(ctx context.Context, params writeGlobalAtParams) error {
 	return writeSchema(ctx, writeSchemaParams{Dir: filepath.Dir(params.Path), Schema: schemas.Global})
 }
 
-func globalContent(answers domain.InitGlobalAnswers) string {
+func globalContent(answers domain.InitGlobalAnswers) (string, error) {
 	header := "#:schema ./schemas/global.schema.json\n\n"
 	if schema := statefile.Written(domainstatefile.GlobalConfigSchema); schema != 0 {
 		header += fmt.Sprintf("schema = %d\n\n", schema)
 	}
-	return header + fmt.Sprintf("shell = %q\n", answers.Shell)
+	shell, err := tomlString(string(answers.Shell))
+	return header + "shell = " + shell + "\n", err
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -139,5 +140,30 @@ func TestInitFromASubdirectoryRegistersTheRepositoryRoot(t *testing.T) {
 	root, _ := filepath.EvalSymlinks(dir)
 	if repos, _ := infra.ReadRegistry(); len(repos) != 1 || repos[0].Root != root {
 		t.Fatalf("registered %+v, want the root %s", repos, root)
+	}
+}
+
+func TestInitYesWritesHookCommandsVerbatim(t *testing.T) {
+	for name, command := range map[string]string{
+		"double quotes": `echo "x" > f`,
+		"backslash":     `copy C:\tmp\new f`,
+		"single quotes": `printf '%s' it's`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := freshProject(t)
+
+			out, err := runInitCmd(t, "--"+domain.FlagYes, "--"+domain.FlagInstallCommand, command, "--"+domain.FlagCleanCommand, command)
+			if err != nil {
+				t.Fatalf("init: %v\n%s", err, out)
+			}
+			cfg, err := config.LoadProjectRaw(filepath.Dir(projectConfigPath(t, dir)))
+			if err != nil {
+				t.Fatalf("reload: %v", err)
+			}
+			want := []domain.HookCommand{{Cmd: command}}
+			if !reflect.DeepEqual(cfg.Hooks.OnCreate, want) || !reflect.DeepEqual(cfg.Hooks.OnClean, want) {
+				t.Errorf("on_create = %+v, on_clean = %+v, want %+v for both", cfg.Hooks.OnCreate, cfg.Hooks.OnClean, want)
+			}
+		})
 	}
 }

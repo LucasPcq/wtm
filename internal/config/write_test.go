@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -513,5 +514,41 @@ func TestWriteRunKeepsTheSettingsThatAreSet(t *testing.T) {
 	}
 	if len(got.EnvPorts) != 1 || len(got.Jobs) != 1 {
 		t.Errorf("tables lost: %+v", got)
+	}
+}
+
+func TestWriteProjectConfigEncodesEveryStringItWrites(t *testing.T) {
+	dir := t.TempDir()
+	awkward := "say \"hi\" \\ C:\\tmp 'q'\nnext\ttab \x7f"
+	want := domain.ProjectConfig{
+		Worktrees: domain.WorktreesConfig{BasePath: "../" + awkward, BaseBranch: "feat/" + awkward},
+		Env: domain.EnvConfig{Strategy: domain.EnvStrategyExample, Files: []domain.EnvFile{
+			{Target: awkward + "/.env", Template: awkward + "/.env.example"},
+		}},
+		Hooks: domain.HooksConfig{
+			OnCreate: []domain.HookCommand{{Cmd: awkward}, {Cmd: awkward, Cwd: awkward, ContinueOnError: true}},
+			OnClean:  []domain.HookCommand{{Cmd: awkward}, {Cmd: awkward, Cwd: awkward}},
+		},
+		Wizard: domain.WizardConfig{Remembered: map[string]string{
+			domain.RememberIsolation: awkward,
+			"a key = \"x\"":          awkward,
+		}},
+	}
+
+	if err := WriteProjectConfig(t.Context(), WriteProjectConfigParams{StateDir: dir, Config: want}); err != nil {
+		t.Fatalf("WriteProjectConfig: %v", err)
+	}
+	path := filepath.Join(dir, domain.ConfigFileName)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := parseProjectConfig(path, data)
+	if err != nil {
+		t.Fatalf("reload: %v\n%s", err, data)
+	}
+	got.Schema = 0
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("reloaded config differs\n got: %#v\nwant: %#v", got, want)
 	}
 }
