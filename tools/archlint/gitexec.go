@@ -11,9 +11,6 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// processStarts are the calls that start a program by name. Given "git", they
-// bypass infra/git: its one parser per output, its remote handed in, its
-// errors returned rather than read as a default.
 var processStarts = []processStart{
 	{ref: objectRef{Path: "os/exec", Name: "Command"}, program: 0},
 	{ref: objectRef{Path: "os/exec", Name: "CommandContext"}, program: 1},
@@ -21,22 +18,17 @@ var processStarts = []processStart{
 	{ref: objectRef{Path: internalPrefix + "infra/proc", Name: "GroupCommand"}, program: 1},
 }
 
-// processStart is a call that starts a program, the one its argument at
-// index program names.
 type processStart struct {
 	ref     objectRef
-	program int
+	program int // the index of the argument naming the program
 }
 
-// gitExecExempt are the packages that run git for good outside infra/git.
 var gitExecExempt = map[string]string{
 	"testutil": "test helpers build real repositories with git itself",
 }
 
 const gitProgram = "git"
 
-// programFact marks a function that starts the program its parameter Index
-// names: a wrapper given "git" runs git as surely as exec.Command does.
 type programFact struct{ Index int }
 
 func (*programFact) AFact() {}
@@ -79,8 +71,7 @@ type gitCheck struct {
 	gitVars  map[*types.Var]bool
 }
 
-// gitArgs are the arguments of a call that may say "git": any string a
-// start is given ("env", "git", …), the program a wrapper passes on.
+// Any string a start is given may say "git" (`env git …`).
 func (c gitCheck) gitArgs(call *ast.CallExpr) []ast.Expr {
 	if _, ok := c.startOf(call); ok {
 		return slices.DeleteFunc(slices.Clone(call.Args), func(arg ast.Expr) bool { return !isString(c.pass.TypesInfo.TypeOf(arg)) })
@@ -88,7 +79,6 @@ func (c gitCheck) gitArgs(call *ast.CallExpr) []ast.Expr {
 	return c.programArg(call)
 }
 
-// programArg is the argument naming the program a start or a wrapper runs.
 func (c gitCheck) programArg(call *ast.CallExpr) []ast.Expr {
 	index, ok := c.startOf(call)
 	if !ok {
@@ -143,8 +133,6 @@ func (c gitCheck) isGit(arg ast.Expr) bool {
 	return ok && c.gitVars[variable]
 }
 
-// findWrappers marks each function of the package that passes one of its
-// parameters on as the program a start or another wrapper runs.
 func (c gitCheck) findWrappers() {
 	for changed := true; changed; {
 		changed = false
@@ -203,8 +191,6 @@ func paramsOf(pass *analysis.Pass, decl *ast.FuncDecl) []types.Object {
 	return params
 }
 
-// gitVarsOf are the variables of the package declared with "git" as their
-// value: `var program = "git"` names git as the constant does.
 func gitVarsOf(pass *analysis.Pass) map[*types.Var]bool {
 	vars := map[*types.Var]bool{}
 	mark := func(name *ast.Ident, value ast.Expr) {

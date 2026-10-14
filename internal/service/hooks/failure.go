@@ -5,9 +5,10 @@ import (
 	"os/exec"
 )
 
-// Failure names the hook that failed or was stopped, for a reader that
-// reports it rather than prints it. Err carries which: domain.ErrHookFailed or
-// domain.ErrHookStopped.
+// signalledExitCode is the code os/exec gives a hook killed by a signal: it never exited with one.
+const signalledExitCode = -1
+
+// Failure names the hook; Err is domain.ErrHookFailed or domain.ErrHookStopped.
 type Failure struct {
 	Cmd      string
 	ExitCode *int
@@ -26,8 +27,7 @@ type failureParams struct {
 func failureOf(params failureParams) Failure {
 	failure := Failure{Cmd: params.Cmd, Err: params.Wrapped}
 	var exit *exec.ExitError
-	// -1 is a hook killed by a signal: it never exited with a code.
-	if errors.As(params.Cause, &exit) && exit.ExitCode() >= 0 {
+	if errors.As(params.Cause, &exit) && exit.ExitCode() > signalledExitCode {
 		code := exit.ExitCode()
 		failure.ExitCode = &code
 	}

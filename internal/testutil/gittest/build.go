@@ -10,9 +10,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/infra/git"
 )
 
-// Build is a real repository started as NewFake starts the fake, with an
-// origin beside it, so a contract test runs one seed on both. Its commits are
-// empty, named by their message.
 func Build(t testing.TB, params FakeParams) git.Repo {
 	t.Helper()
 	main := params.Main

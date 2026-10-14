@@ -16,15 +16,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/store"
 )
 
-const userEnv = "# database\nDB_HOST=localhost\nWEB_PORT=3000 # the dev server\n\nexport API_KEY=secret\r\n"
-
-func upsert(key, value string) func([]domain.EnvLine) []domain.EnvLine {
-	return func(lines []domain.EnvLine) []domain.EnvLine {
-		updated, _ := rules.UpsertEnvPair(rules.UpsertEnvPairParams{Lines: lines, Key: key, Value: value})
-		return updated
-	}
-}
-
 func TestAnOwnedKeyChangesNothingElseInTheFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), ".env")
 	writeFile(t, path, userEnv)

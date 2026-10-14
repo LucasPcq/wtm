@@ -17,8 +17,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/infra/fs"
 )
 
-// The few helpers the tests share. Everything a test file holds is a test.
-
 const (
 	envCounterPath   = "WTM_TEST_COUNTER_PATH"
 	envCounterRounds = "WTM_TEST_COUNTER_ROUNDS"
@@ -28,7 +26,6 @@ const (
 	lockRounds       = 200
 )
 
-// increment adds one to the counter file at path, through UpdateFile.
 func increment(t testing.TB, path string) fs.Lock {
 	t.Helper()
 	lock, err := fs.UpdateFile(t.Context(), fs.UpdateFileParams{
@@ -56,7 +53,6 @@ func counter(t *testing.T, path string) int {
 	return count
 }
 
-// set writes content through UpdateFile, creating the file with perm.
 func set(t *testing.T, path, content string, perm os.FileMode) {
 	t.Helper()
 	_, err := fs.UpdateFile(t.Context(), fs.UpdateFileParams{Path: path, Perm: perm, Mutate: func([]byte) (fs.Change, error) {
@@ -79,7 +75,6 @@ func modeOf(t *testing.T, path string) os.FileMode {
 	return info.Mode().Perm()
 }
 
-// entries names what a directory holds.
 func entries(t *testing.T, dir string) []string {
 	t.Helper()
 	listed, err := os.ReadDir(dir)
@@ -126,7 +121,6 @@ func heldFiles(t *testing.T, dir string) [][]byte {
 	return held
 }
 
-// waitForLine waits for the child to say it is ready, by printing a line.
 func waitForLine(t *testing.T, out io.Reader) {
 	t.Helper()
 	ready := make(chan error, 1)

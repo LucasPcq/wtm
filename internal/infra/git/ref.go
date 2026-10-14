@@ -2,8 +2,6 @@ package git
 
 //go-sumtype:decl Ref
 
-// Ref is a branch, local or on the repository's remote: no caller spells the
-// remote's name.
 type Ref interface{ ref() }
 
 type LocalBranch struct {

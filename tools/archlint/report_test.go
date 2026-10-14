@@ -1,12 +1,9 @@
 package main
 
 import (
-	"go/token"
 	"strings"
 	"testing"
 )
-
-func at(file string) token.Position { return token.Position{Filename: file, Line: 1, Column: 1} }
 
 func TestAMigratingEntryWithoutItsCountIsRefused(t *testing.T) {
 	if _, err := parseMigrating("mutation internal/surface/cli/wt/env\\.go\n"); err == nil {

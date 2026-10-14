@@ -8,11 +8,6 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// The use cases of the engine reach nothing but their ports: a command never
-// calls dispatch (a nested run would take its locks twice; a follow-up is a new
-// call) nor a surface, and a surface reaches a command only through dispatch,
-// so the locks, the fingerprint and the events always apply. Skip, Default and
-// Validate are pure: a command has no root context to do I/O with.
 var (
 	useCases          = []dir{"command", "query"}
 	useCaseForbidden  = []dir{"dispatch", "surface"}

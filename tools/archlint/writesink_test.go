@@ -1,7 +1,6 @@
 package main
 
 import (
-	"go/types"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
@@ -23,17 +22,6 @@ func TestAWriteIsReachedOnlyFromAMutatorsCaller(t *testing.T) {
 		internalPrefix+"dispatch",
 		internalPrefix+"registry",
 	)
-}
-
-// The engine's services as docs/dev/services.md classifies them: every other
-// exported function or method of the four packages is a reader.
-var engineMutators = map[string]bool{
-	"gitwt.Add":         true,
-	"gitwt.Remove":      true,
-	"identity.Allocate": true,
-	"hooks.Execute":     true,
-	"hooks.RunHooks":    true,
-	"runenv.Apply":      true,
 }
 
 func TestTheEngineServicesAreClassifiedAsTheirDocSays(t *testing.T) {
@@ -64,23 +52,4 @@ func TestTheEngineServicesAreClassifiedAsTheirDocSays(t *testing.T) {
 			t.Errorf("%s: no such function", name)
 		}
 	}
-}
-
-func exportedFuncs(pkg *types.Package) []*types.Func {
-	var funcs []*types.Func
-	for _, name := range pkg.Scope().Names() {
-		switch obj := pkg.Scope().Lookup(name).(type) {
-		case *types.Func:
-			if obj.Exported() {
-				funcs = append(funcs, obj)
-			}
-		case *types.TypeName:
-			for method := range types.NewMethodSet(types.NewPointer(obj.Type())).Methods() {
-				if fn, ok := method.Obj().(*types.Func); ok && fn.Exported() && fn.Pkg() == pkg {
-					funcs = append(funcs, fn)
-				}
-			}
-		}
-	}
-	return funcs
 }

@@ -5,8 +5,6 @@ import (
 	"strings"
 )
 
-// Error is a git call that failed. Exit is -1 when git did not run to an exit
-// status: missing from PATH, or interrupted, when Err is the context's error.
 type Error struct {
 	Args   []string
 	Exit   int

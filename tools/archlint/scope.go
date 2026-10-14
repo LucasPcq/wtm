@@ -22,8 +22,8 @@ func internalPath(pkgPath string) string {
 	return rest
 }
 
-// layerOfPackage is the longest row of the layers table holding the package:
-// surface/cli/render sits inside surface/cli and is a layer of its own.
+// The longest row wins: surface/cli/render sits inside surface/cli and is a
+// layer of its own.
 func layerOfPackage(pkgPath string) string {
 	longest := ""
 	for name := range layers {
@@ -42,8 +42,6 @@ type objectRef struct {
 	Name string
 }
 
-// objectOf resolves what an expression names through the type checker, so an
-// aliased import names the same object as the plain one.
 func objectOf(info *types.Info, expr ast.Expr) types.Object {
 	switch e := expr.(type) {
 	case *ast.SelectorExpr:
@@ -64,7 +62,6 @@ func refers(obj types.Object, ref objectRef) bool {
 	return obj != nil && obj.Pkg() != nil && obj.Pkg().Path() == ref.Path && obj.Name() == ref.Name && packageLevel(obj)
 }
 
-// dir is a package directory under internal/, holding itself and its subpackages.
 type dir string
 
 func (d dir) holds(pkgPath string) bool {
@@ -72,8 +69,8 @@ func (d dir) holds(pkgPath string) bool {
 	return rel == string(d) || strings.HasPrefix(rel, string(d)+"/")
 }
 
-// firstFile is where a finding about a whole package points: its first file by
-// name, the same on every run.
+// A finding about a whole package points at its first file by name, the same
+// on every run.
 func firstFile(pass *analysis.Pass) *ast.File {
 	return slices.MinFunc(pass.Files, func(a, b *ast.File) int {
 		return strings.Compare(pass.Fset.Position(a.Package).Filename, pass.Fset.Position(b.Package).Filename)

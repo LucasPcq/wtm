@@ -14,9 +14,8 @@ type ReplaceFileParams struct {
 	Perm os.FileMode
 }
 
-// ReplaceFile writes Data atomically without a lock, for a file one process
-// alone writes by construction (the daemon's job index, under its own lock).
-// Every other file goes through UpdateFile.
+// ReplaceFile takes no lock: it is for a file one process alone writes by
+// construction (the daemon's job index, under its own lock).
 func ReplaceFile(params ReplaceFileParams) error {
 	if err := os.MkdirAll(filepath.Dir(params.Path), 0o755); err != nil {
 		return fmt.Errorf("create %s: %w", filepath.Dir(params.Path), err)
@@ -83,4 +82,13 @@ func syncDir(dir string) {
 	}
 	defer handle.Close()
 	_ = handle.Sync()
+}
+
+// OpenLog is not UpdateFile: a log is streamed as the output comes, and
+// nothing reads it back to decide.
+func OpenLog(path string) (*os.File, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return nil, err
+	}
+	return os.Create(path)
 }

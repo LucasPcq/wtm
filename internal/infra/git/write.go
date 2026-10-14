@@ -7,8 +7,6 @@ import (
 	"strings"
 )
 
-// Writer is what a command changes in git. A new branch is born with its
-// worktree, by AddWorktree: there is no separate branch creation to undo.
 type Writer interface {
 	AddWorktree(ctx context.Context, params AddWorktreeParams) error
 	RemoveWorktree(ctx context.Context, params RemoveWorktreeParams) error
@@ -21,7 +19,6 @@ type Writer interface {
 
 //go-sumtype:decl Checkout
 
-// Checkout is the branch a new worktree has checked out.
 type Checkout interface{ checkout() }
 
 // NewBranch never tracks From: a remote start point is not an upstream.
@@ -59,8 +56,6 @@ type MergeFFOnlyParams struct {
 	Onto     Ref
 }
 
-// Move is where a fast-forward took a branch; From is empty for a branch it
-// created, and equals To when there was nothing to bring.
 type Move struct {
 	From string
 	To   string
@@ -109,22 +104,16 @@ func (r Repo) DeleteBranch(ctx context.Context, params DeleteBranchParams) error
 	return err
 }
 
-// Fetch refreshes every branch of the remote, for a branch picker's refresh.
 func (r Repo) Fetch(ctx context.Context) error {
 	_, err := r.git(ctx, "fetch", r.Remote)
 	return err
 }
 
-// FetchRef refreshes the remote branch alone; the local branch stays put.
 func (r Repo) FetchRef(ctx context.Context, branch string) error {
 	_, err := r.git(ctx, "fetch", r.Remote, "--", branch)
 	return err
 }
 
-// FastForwardRef moves a local branch checked out nowhere to its remote tip,
-// creating it when it is absent. git refuses anything but a fast-forward, and a
-// branch a worktree has checked out: that one moves by MergeFFOnly, inside its
-// worktree.
 func (r Repo) FastForwardRef(ctx context.Context, branch string) (Move, error) {
 	local := LocalBranch{Name: branch}
 	from, err := r.tipIfAny(ctx, local)

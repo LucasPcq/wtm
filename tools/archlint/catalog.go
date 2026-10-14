@@ -12,10 +12,6 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// A code with no message reaches its reader as its bare key. The kernel's
-// codes are spoken by kernel/text, which imports kernel and so is analysed
-// after it: kernel hands them over as a fact. Every other package of the
-// engine speaks its own codes, in a text.Messages beside them.
 var (
 	catalogScope    = []dir{"kernel", "dispatch", "command", "query"}
 	codeRef         = objectRef{Path: internalPrefix + "kernel", Name: "Code"}
@@ -91,8 +87,6 @@ func declaredCodes(pass *analysis.Pass) []declaredCode {
 	return declared
 }
 
-// spokenCodes are the keys of the package's text.Messages; a key written as a
-// bare string is reported, since no constant declares it.
 func spokenCodes(pass *analysis.Pass) map[string]bool {
 	spoken := map[string]bool{}
 	for _, file := range pass.Files {

@@ -8,14 +8,6 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// mutators are the service calls that change a worktree. Each is called from
-// internal/flow only, whatever the caller's layer: a command, the dashboard or
-// another service reaching one directly is a mutation no flow sees, so no
-// second surface can run it and no event can report it. A call inside the
-// mutator's own package is its implementation, not an escape.
-//
-// events are the domain events a flow publishes after the call (rule emits);
-// none for a change that is not part of a worktree's identity.
 type mutator struct {
 	pkg    string
 	name   string
@@ -92,8 +84,8 @@ func isMutator(fn *types.Func) bool {
 	return false
 }
 
-// qualifierOf is the package as the caller spelled it, so the message points at
-// the text a reader will search for.
+// The package as the caller spelled it, so the message points at the text a
+// reader will search for.
 func qualifierOf(sel *ast.SelectorExpr, fn *types.Func) string {
 	if ident, ok := sel.X.(*ast.Ident); ok {
 		return ident.Name

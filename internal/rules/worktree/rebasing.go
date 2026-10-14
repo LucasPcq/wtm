@@ -6,16 +6,13 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
-// RebasingParams is what a worktree's admin directory says of its detached
-// HEAD: the head-name a rebase in progress leaves, one per backend found.
+// RebasingParams holds the head-name a rebase in progress leaves in a worktree's admin directory, one per backend found.
 type RebasingParams struct {
 	DirGone   bool
 	HeadNames []string
 }
 
-// RebasingBranch is the branch a rebase in progress will move, empty for a
-// HEAD merely detached. A worktree whose directory is gone has nothing left to
-// say: it is merely detached.
+// RebasingBranch reads a worktree whose directory is gone as merely detached: it has nothing left to say.
 func RebasingBranch(params RebasingParams) string {
 	if params.DirGone {
 		return ""

@@ -8,8 +8,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/infra/git"
 )
 
-// State is what a test compares of a repository before and after: its
-// worktrees and its branches.
 type State struct {
 	Worktrees []git.Worktree
 	Branches  git.Branches

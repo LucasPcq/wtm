@@ -14,22 +14,14 @@ type ExecuteParams struct {
 	Hooks   []domain.HookCommand
 	WorkDir string
 	Vars    rules.TemplateVars
-	// Env is what the hook learns about the worktree, nil to leave it the
-	// environment this process inherited.
+	// Env nil leaves the hook the environment this process inherited.
 	Env map[string]string
-	// Output gets each line the hooks print, stdout and stderr alike, as it
-	// comes; a command hands it its progress for the hook phase.
+	// Output gets each line the hooks print, stdout and stderr alike.
 	Output func(line string)
-	// OnHook gets each hook starting and ending, with its duration, and its
-	// error even when continue_on_error goes past it.
+	// OnHook gets each hook's end with its error even when continue_on_error goes past it.
 	OnHook func(domain.HookBeat)
 }
 
-// Execute runs the hooks as RunHooks does, printing nothing and writing no
-// log: each line goes to Output, each start and end to OnHook, and the error
-// is the result, a Failure naming the hook, or an interrupt. A hook
-// interrupted has its lines emitted up to the interruption, its last
-// unfinished one included.
 func Execute(ctx context.Context, params ExecuteParams) error {
 	sink := &lines{emit: params.Output}
 	return RunHooks(ctx, RunHooksParams{
@@ -49,8 +41,7 @@ func Execute(ctx context.Context, params ExecuteParams) error {
 	})
 }
 
-// lines turns the hooks' byte stream into whole lines; a hook's unfinished
-// last line is flushed when it ends, never joined to the next hook's first.
+// lines flushes a hook's unfinished last line when it ends, never joined to the next hook's first.
 type lines struct {
 	mu   sync.Mutex
 	emit func(string)

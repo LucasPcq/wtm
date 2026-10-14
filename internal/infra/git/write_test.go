@@ -12,8 +12,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
 
-// — AddWorktree: a new branch is born with its worktree —
-
 func TestAddWorktreeOnANewBranchStartsFromWithoutTrackingIt(t *testing.T) {
 	repo, _ := newRepoWithOrigin(t)
 	commitFile(t, repo.Dir, "local", "1")
@@ -64,8 +62,6 @@ func TestAddWorktreeRefusesABranchOnlyTheRemoteHasRatherThanCreateOne(t *testing
 	require.NoError(t, existsErr)
 	assert.False(t, exists)
 }
-
-// — Undo: RemoveWorktree and DeleteBranch put the repository back —
 
 func TestRemoveWorktreeAndDeleteBranchUndoAnAdd(t *testing.T) {
 	repo := newRepo(t)
@@ -118,8 +114,6 @@ func TestDeleteBranchKeepsAnUnmergedBranchWithoutForce(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, exists)
 }
-
-// — Fetch, FetchRef, and moving a branch to its remote tip —
 
 func TestFetchBringsEveryRemoteBranch(t *testing.T) {
 	repo, origin := newRepoWithOrigin(t)

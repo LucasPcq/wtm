@@ -7,10 +7,6 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// metaWrites are the writes of a worktree's meta.json, methods of store.Meta
-// and of its implementations. A function of service/worktree that reaches one
-// changes a worktree's identity, so it belongs in mutators — which is what
-// makes that table complete by construction rather than by memory.
 var metaWrites = map[string]bool{"Update": true, "Purge": true}
 
 var metaWriters = map[string]bool{"Meta": true, "MetaDisk": true}
@@ -41,10 +37,7 @@ func runMetawriter(pass *analysis.Pass) (any, error) {
 }
 
 type packageCalls struct {
-	// calls maps each function declared in the package to the functions of
-	// the same package it calls, closures included.
-	calls map[*types.Func][]*types.Func
-	// sinks are the functions that call a write of store.Meta themselves.
+	calls map[*types.Func][]*types.Func // closures included
 	sinks map[*types.Func]bool
 	decls map[*types.Func]*ast.FuncDecl
 }

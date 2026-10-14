@@ -23,7 +23,6 @@ type EnvFiles interface {
 	Edit(ctx context.Context, edit EnvEdit) (Written, error)
 }
 
-// EnvCopied is what a copy did: the files it wrote, those it could not provision.
 type EnvCopied struct {
 	Files    []string
 	Warnings []envcopy.Warning
@@ -31,15 +30,13 @@ type EnvCopied struct {
 }
 
 type EnvEdit struct {
-	Path string
-	// Create writes a file that does not exist; otherwise an absent file stays absent.
+	Path   string
 	Create bool
 	// Edit receives the lines read under the lock, nil for an absent file.
 	Edit func([]domain.EnvLine) []domain.EnvLine
 }
 
-// EnvDisk writes the .env files in place, each locked by fs.ScratchLockPath:
-// a lock file beside it would show up in the user's checkout.
+// EnvDisk locks each file by fs.ScratchLockPath: a lock file beside it would show up in the user's checkout.
 type EnvDisk struct{}
 
 var _ EnvFiles = EnvDisk{}
@@ -64,8 +61,6 @@ func (EnvDisk) Template(dir string, file domain.EnvFile) (string, error) {
 	return envcopy.Template(candidates, present), nil
 }
 
-// Copy provisions the files of a new worktree from the source its strategy
-// names; a file with no source is skipped and reported, never an error.
 func (EnvDisk) Copy(ctx context.Context, request envcopy.Request) (EnvCopied, error) {
 	candidates, err := envcopy.Candidates(request)
 	if err != nil {
@@ -93,9 +88,6 @@ func (EnvDisk) Copy(ctx context.Context, request envcopy.Request) (EnvCopied, er
 	return copied, nil
 }
 
-// Edit reads the file under its lock and writes what edit makes of it, so an
-// edit computed from the lines never overwrites a change made since. A file
-// that renders as it was is not rewritten.
 func (EnvDisk) Edit(ctx context.Context, edit EnvEdit) (Written, error) {
 	changed := false
 	lock, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
@@ -117,12 +109,10 @@ func (EnvDisk) Edit(ctx context.Context, edit EnvEdit) (Written, error) {
 }
 
 type EditEnvParams struct {
-	Edit EnvEdit
-	// Current is the file's content, nil when it does not exist.
+	Edit    EnvEdit
 	Current []byte
 }
 
-// EditEnv is what an Edit writes over Current, and whether it writes at all.
 func EditEnv(params EditEnvParams) ([]byte, bool) {
 	if params.Current == nil && !params.Edit.Create {
 		return nil, false

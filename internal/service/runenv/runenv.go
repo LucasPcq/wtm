@@ -12,8 +12,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/store"
 )
 
-// Identity is the worktree as its caller read it: the number is settled
-// before anything here resolves, since nothing here allocates.
 type Identity struct {
 	Branch    string
 	Ordinal   int
@@ -22,17 +20,13 @@ type Identity struct {
 }
 
 type Params struct {
-	// ProjectDir is the main checkout: the project's name, and where its own
-	// .env files are.
+	// ProjectDir is the main checkout: the project's name, and where its own .env files are.
 	ProjectDir string
 	Run        domain.RunConfig
 	Identity   Identity
-	// Files reads the main checkout's own .env files.
-	Files store.EnvFiles
+	Files      store.EnvFiles
 }
 
-// JobEnv is what a worktree's jobs and hooks learn about it: its identity, its
-// offset and its declared ports.
 func JobEnv(params Params) (map[string]string, error) {
 	composeProject, err := jobComposeProject(params)
 	if err != nil {
@@ -54,8 +48,7 @@ func JobEnv(params Params) (map[string]string, error) {
 	return rules.WithPortEnv(env, rules.LifecyclePorts(rules.LifecyclePortsParams{Config: params.Run, PortOffset: offset})), nil
 }
 
-// offsetOf reads the offset back from the environment rather than recomputing
-// it, so a hook, a job and a .env of the same worktree never disagree on it.
+// offsetOf reads the offset back rather than recomputing it, so a hook, a job and a .env of one worktree never disagree on it.
 func offsetOf(env map[string]string) (int, error) {
 	offset, err := strconv.Atoi(env[domain.EnvPortOffset])
 	if err != nil {
@@ -64,8 +57,7 @@ func offsetOf(env map[string]string) (int, error) {
 	return offset, nil
 }
 
-// jobComposeProject is empty for wtm to derive it from the branch; only the
-// main checkout's is set on purpose, read from its own .env.
+// jobComposeProject is empty for wtm to derive it from the branch; only the main checkout's is set, read from its own .env.
 func jobComposeProject(params Params) (string, error) {
 	if _, main := caseOf(params.Identity).(envcase.Main); !main {
 		return "", nil
@@ -73,10 +65,7 @@ func jobComposeProject(params Params) (string, error) {
 	return mainComposeProject(params)
 }
 
-// ComposeProject is the COMPOSE_PROJECT_NAME written into the worktree's .env:
-// derived from the branch, never from the variable this process carries, and
-// for the main checkout the name its jobs run under, which never follows its
-// branch. A verbatim worktree gets none.
+// ComposeProject never reads the variable this process carries; the main checkout's is the name its jobs run under, which never follows its branch.
 func ComposeProject(params Params) (string, error) {
 	switch caseOf(params.Identity).(type) {
 	case envcase.Verbatim:

@@ -6,9 +6,6 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// stateWrites are the writes of a file wtm keeps. Called from anywhere, a state
-// file has as many owners as callers, each with its own idea of its schema;
-// store/ is its one owner, behind an interface a fake doubles.
 var stateWrites = []objectRef{
 	{Path: internalPrefix + "infra/fs", Name: "UpdateFile"},
 	{Path: internalPrefix + "infra/fs", Name: "RemoveDir"},

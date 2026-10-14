@@ -14,8 +14,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/store"
 )
 
-// The few helpers the tests share. Everything a test file holds is a test.
-
 const (
 	envStateDir = "WTM_TEST_STORE_STATE_DIR"
 	envJob      = "WTM_TEST_STORE_JOB"
@@ -77,4 +75,18 @@ func TestHelperProcess(t *testing.T) {
 // errOf is the error of a write whose result the test does not look at.
 func errOf(_ store.Written, err error) error {
 	return err
+}
+
+func records(t *testing.T, meta store.Meta) []store.MetaRecord {
+	t.Helper()
+	all, err := meta.Records()
+	require.NoError(t, err)
+	return all
+}
+
+func upsert(key, value string) func([]domain.EnvLine) []domain.EnvLine {
+	return func(lines []domain.EnvLine) []domain.EnvLine {
+		updated, _ := rules.UpsertEnvPair(rules.UpsertEnvPairParams{Lines: lines, Key: key, Value: value})
+		return updated
+	}
 }

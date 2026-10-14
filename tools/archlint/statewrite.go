@@ -11,9 +11,6 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// fileWrites are the writes that bypass infra/fs: a file truncated in place
-// by os.WriteFile or os.Create is half a file to whoever reads it meanwhile,
-// a hand-rolled rename or removal takes no lock.
 var fileWrites = []objectRef{
 	{Path: "os", Name: "WriteFile"},
 	{Path: "os", Name: "Create"},
@@ -24,14 +21,11 @@ var fileWrites = []objectRef{
 }
 
 var (
-	openFile = objectRef{Path: "os", Name: "OpenFile"}
-	// openWriteFlags are the os.OpenFile flags that make it a write; a flag
-	// argument the checker cannot fold counts as one.
+	openFile       = objectRef{Path: "os", Name: "OpenFile"}
 	openWriteFlags = []string{"O_WRONLY", "O_RDWR", "O_CREATE", "O_APPEND", "O_TRUNC"}
 )
 
-// stateWriteExempt are the writers that stay outside infra/fs for good, keyed
-// by package and, when only one file of it is exempt, by that file.
+// Keyed by package, or by file when only one file of the package is exempt.
 var stateWriteExempt = map[string]string{
 	"service/process/logstore.go":   "log rotation renames and appends job logs, which are streams, not state",
 	"service/process/daemon.go":     "the daemon clears its own stale socket, which is not a file",
@@ -73,8 +67,6 @@ func writesAFile(obj types.Object) bool {
 	return slices.ContainsFunc(fileWrites, func(ref objectRef) bool { return refers(obj, ref) })
 }
 
-// readOnlyOpens are the os.OpenFile calls whose flags fold to a constant with
-// no write bit: they read, whatever their spelling.
 func readOnlyOpens(pass *analysis.Pass) map[*ast.Ident]bool {
 	reads := map[*ast.Ident]bool{}
 	for _, file := range pass.Files {

@@ -7,8 +7,6 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// documented are the layers whose every package states its one responsibility
-// in its package doc: a sentence that needs an "and" is two packages.
 var documented = []dir{"service", "infra", "store", "kernel", "dispatch", "command", "query", "registry", "flow/legacy"}
 
 var pkgdocAnalyzer = &analysis.Analyzer{

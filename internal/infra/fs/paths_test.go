@@ -46,3 +46,16 @@ func TestGlobalDirIsUnderTheUserConfigDirectory(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, configDir, filepath.Dir(dir))
 }
+
+func TestResolvePathFollowsSymlinksAndKeepsWhatItCannotResolve(t *testing.T) {
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	target := filepath.Join(dir, "target")
+	require.NoError(t, os.Mkdir(target, 0o755))
+	link := filepath.Join(dir, "link")
+	require.NoError(t, os.Symlink(target, link))
+
+	assert.Equal(t, target, fs.ResolvePath(link))
+	missing := filepath.Join(dir, "missing")
+	assert.Equal(t, missing, fs.ResolvePath(missing))
+}

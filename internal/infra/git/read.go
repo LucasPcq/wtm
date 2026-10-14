@@ -13,7 +13,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules/worktree"
 )
 
-// Reader is what a command observes of git.
 type Reader interface {
 	Worktrees(ctx context.Context) ([]Worktree, error)
 	MainWorktree(ctx context.Context) (Worktree, error)
@@ -26,7 +25,7 @@ type Reader interface {
 	AheadBehind(ctx context.Context, params AheadBehindParams) (AheadBehind, error)
 }
 
-// Worktree is one entry of `git worktree list`; the first is the main one.
+// Worktree is one entry of `git worktree list`: git lists the main one first.
 type Worktree struct {
 	Path     string
 	Head     string
@@ -38,15 +37,12 @@ type Worktree struct {
 
 //go-sumtype:decl State
 
-// State is what a worktree has checked out.
 type State interface{ state() }
 
 type OnBranch struct {
 	Branch string
 }
 
-// Rebasing is a HEAD detached by a rebase in progress, on the branch the
-// rebase will move.
 type Rebasing struct {
 	Branch string
 }
@@ -60,8 +56,6 @@ func (Rebasing) state() {}
 func (Detached) state() {}
 func (Bare) state()     {}
 
-// Location is a path as git writes it, its symlinks resolved, and whether
-// anything is there.
 type Location struct {
 	Path   string
 	Exists bool
@@ -79,7 +73,6 @@ type AheadBehindParams struct {
 	Against Ref
 }
 
-// AheadBehind counts the commits Of has that Against lacks, and the reverse.
 type AheadBehind struct {
 	Ahead  int
 	Behind int
@@ -119,19 +112,16 @@ func (r Repo) MainWorktree(ctx context.Context) (Worktree, error) {
 	return worktrees[0], nil
 }
 
-// Toplevel is the root of the worktree Dir is in, as git writes it.
 func (r Repo) Toplevel(ctx context.Context) (string, error) {
 	out, err := r.git(ctx, "rev-parse", "--show-toplevel")
 	return strings.TrimSpace(string(out)), err
 }
 
-// GitCommonDir is the .git every worktree of the repository shares.
 func (r Repo) GitCommonDir(ctx context.Context) (string, error) {
 	out, err := r.git(ctx, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	return strings.TrimSpace(string(out)), err
 }
 
-// Locate reads a relative path from Dir, as `git -C` does.
 func (r Repo) Locate(_ context.Context, path string) (Location, error) {
 	absolute := path
 	if !filepath.IsAbs(path) {
@@ -215,7 +205,6 @@ func (r Repo) RefExists(ctx context.Context, ref Ref) (bool, error) {
 	return true, nil
 }
 
-// Tip is the commit a ref points at; an absent ref is an error.
 func (r Repo) Tip(ctx context.Context, ref Ref) (string, error) {
 	name, err := r.refName(ref)
 	if err != nil {

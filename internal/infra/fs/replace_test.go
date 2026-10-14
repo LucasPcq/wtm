@@ -36,3 +36,16 @@ func TestReplaceFileFailsWhenItsDirectoryCannotBeMade(t *testing.T) {
 	writeFixture(t, notADir, "")
 	assert.Error(t, fs.ReplaceFile(fs.ReplaceFileParams{Path: filepath.Join(notADir, "jobs.json"), Data: []byte("{}")}))
 }
+
+func TestALogReplacesTheOneThePreviousRunLeft(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hooks", "on_create.log")
+	writeFixture(t, path, "the previous run\n")
+
+	log, err := fs.OpenLog(path)
+	require.NoError(t, err)
+	_, err = log.WriteString("this run\n")
+	require.NoError(t, err)
+	require.NoError(t, log.Close())
+
+	assert.Equal(t, "this run\n", read(t, path))
+}

@@ -7,8 +7,6 @@ import (
 	"strings"
 )
 
-// overCeiling is what the exception files hold beyond their ceilings: each
-// line a reason the run fails.
 func overCeiling(migrating migratingList, deadcode []string) []string {
 	var over []string
 	for _, entry := range migrating.entries {
@@ -51,10 +49,6 @@ func parseDeadcodeIgnore(data string) []string {
 	return patterns
 }
 
-// migratingCeiling is .archlint-migrating at its largest: each entry it may
-// hold, with the most sites it may cover. Shrinking the file needs no edit
-// here; an entry it does not list, or a count above its own, fails — growing
-// the list is an edit to archlint, in review.
 var migratingCeiling = map[string]int{
 	`portbuild internal/service/env/`:                    8,
 	`portbuild internal/service/memory/`:                 1,
@@ -252,8 +246,6 @@ var migratingCeiling = map[string]int{
 	`rootfreeze internal/rules/worktreestatus\.go`:       13,
 }
 
-// deadcodeCeiling is .deadcode-ignore at its largest: a pattern it does not
-// list fails.
 var deadcodeCeiling = []string{
 	`TextInputModel\.helpRowless`,
 	`TextListModel\.helpRowless`,

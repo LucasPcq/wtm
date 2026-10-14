@@ -8,10 +8,6 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// frozenRoots are the packages that only shrink: each file at their root and
-// each exported symbol in it is old code, tracked per file in
-// .archlint-migrating until its commands move it into the sub-package of its
-// subject.
 var frozenRoots = []string{"rules", "domain"}
 
 var rootfreezeAnalyzer = &analysis.Analyzer{

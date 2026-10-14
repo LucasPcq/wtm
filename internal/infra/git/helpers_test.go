@@ -12,17 +12,13 @@ import (
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
 
-// The few helpers the tests share. Everything a test file holds is a test.
-
 const remote = "origin"
 
-// newRepo is a real repository on main, at the path git reports for it.
 func newRepo(t *testing.T) git.Repo {
 	t.Helper()
 	return git.Repo{Dir: gittest.Resolved(t, gittest.InitRepo(t)), Remote: remote}
 }
 
-// newRepoWithOrigin is newRepo with main pushed to a bare origin, returned too.
 func newRepoWithOrigin(t *testing.T) (git.Repo, string) {
 	t.Helper()
 	repo := newRepo(t)
@@ -55,8 +51,6 @@ func advanceOnOrigin(t *testing.T, origin, branch string) string {
 	return head(t, clone, "HEAD")
 }
 
-// checkOutFeature checks feature out in a new linked worktree, or in the main
-// one, and says where.
 func checkOutFeature(t *testing.T, dir string, linked bool) string {
 	t.Helper()
 	if !linked {
@@ -75,7 +69,6 @@ func rebase(t *testing.T, dir, backend string) {
 	require.Error(t, err, "the rebase was meant to stop on a conflict: %s", out)
 }
 
-// upstreamOf is empty for a branch that tracks nothing.
 func upstreamOf(t *testing.T, dir, branch string) string {
 	t.Helper()
 	out, err := exec.Command("git", "-C", dir, "config", "branch."+branch+".merge").Output()

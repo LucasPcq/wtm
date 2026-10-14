@@ -1,4 +1,3 @@
-// Package store is the one writer of each state file: a worktree's meta.json, the changes to config.toml and the .env files wtm manages.
 package store
 
 import (
@@ -21,12 +20,13 @@ import (
 
 // Meta is the record wtm keeps of each worktree, <common>/wtm/worktrees/<branch>/meta.json.
 type Meta interface {
-	// Load is the record on disk; an absent one is an error wrapping os.ErrNotExist.
+	// Load reads an absent record as an error wrapping os.ErrNotExist.
 	Load(branch string) (domain.WorktreeMetadata, error)
-	// Records are every record that reads, by branch; one that does not read is left out.
+	// Records reads the records on disk, not the live worktrees: clean gives back by a record whether or not git still lists its worktree.
 	Records() ([]MetaRecord, error)
+	// Update is a read-modify-write under the record's lock, so two commands changing different fields both land.
 	Update(ctx context.Context, update MetaUpdate) (Written, error)
-	// Purge drops the record and its directory: nothing is left to hold an ordinal.
+	// Purge drops the record's directory, so nothing is left to hold an ordinal.
 	Purge(branch string) error
 }
 
@@ -35,14 +35,12 @@ type MetaRecord struct {
 	Meta   domain.WorktreeMetadata
 }
 
-// Missing is what Update does with a record it finds absent.
+// Missing is what Update does with an absent record; the zero value refuses, so a writer that creates a record says so.
 type Missing int
 
-// The zero value refuses: a writer that creates a record says so.
 const (
-	// MissingRefuse returns an error wrapping os.ErrNotExist.
 	MissingRefuse Missing = iota
-	// MissingCreate starts from the zero record, also when the stored one does not read.
+	// MissingCreate also starts from the zero record when the stored one does not read.
 	MissingCreate
 	// MissingSkip writes nothing: the main checkout never gets a record.
 	MissingSkip
@@ -51,11 +49,9 @@ const (
 type MetaUpdate struct {
 	Branch  string
 	Missing Missing
-	// Change edits the record read under the lock; one left unchanged is not rewritten.
-	Change func(*domain.WorktreeMetadata) error
+	Change  func(*domain.WorktreeMetadata) error
 }
 
-// MetaDisk keeps the records under StateDir, <common>/wtm.
 type MetaDisk struct {
 	StateDir string
 }
@@ -75,8 +71,6 @@ func (m MetaDisk) Load(branch string) (domain.WorktreeMetadata, error) {
 	return decodeMeta(data)
 }
 
-// Records reads every record on disk rather than the live worktrees: a record
-// is what clean gives back by, whether or not git still lists its worktree.
 func (m MetaDisk) Records() ([]MetaRecord, error) {
 	root := filepath.Join(m.StateDir, domain.WorktreesSubdir)
 	entries, err := os.ReadDir(root)
@@ -109,8 +103,6 @@ func (m MetaDisk) Records() ([]MetaRecord, error) {
 	return records, nil
 }
 
-// Update is the one write of a record: a read-modify-write under its lock, so
-// two commands changing different fields of the same worktree both land.
 func (m MetaDisk) Update(ctx context.Context, update MetaUpdate) (Written, error) {
 	path := m.path(update.Branch)
 	changed := false
@@ -145,8 +137,6 @@ func (m MetaDisk) Update(ctx context.Context, update MetaUpdate) (Written, error
 	return Written{Changed: changed, Unlocked: !lock.Held}, nil
 }
 
-// Purge is best effort for its caller, a removal that already happened, but
-// says what it could not remove.
 func (m MetaDisk) Purge(branch string) error {
 	dir := rules.PurgeableMetaDir(rules.PurgeableMetaDirParams{StateDir: m.StateDir, Branch: branch})
 	if dir == "" {

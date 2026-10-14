@@ -12,10 +12,9 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
-// Command is exec.CommandContext with a cancellation a child can clean up
-// after, as it would after a Ctrl-C at the terminal: SIGINT, SIGTERM a grace
-// later, and the kill once WaitDelay runs out — to the child and to what it
-// started.
+// Command cancels as a Ctrl-C at the terminal would, so the child can clean up
+// after itself: SIGINT, SIGTERM a grace later, the kill once WaitDelay runs out
+// — to the child and to what it started.
 func Command(ctx context.Context, name string, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, name, args...)
 	if shielded(ctx) {

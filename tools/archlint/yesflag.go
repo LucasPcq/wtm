@@ -14,9 +14,7 @@ var (
 	yesFlag         = objectRef{Path: internalPrefix + "surface/cli/shared", Name: "AddYesFlag"}
 )
 
-// yesflagAnalyzer enforces the confirmation axis: a file that builds a command
-// and reads the prompt-capability gate registers --yes on it. A helper that
-// merely takes a command has no flags of its own to register.
+// A helper that merely takes a command has no flags of its own to register.
 var yesflagAnalyzer = &analysis.Analyzer{
 	Name: "yesflag",
 	Doc:  "a command reading the interactive gate registers --yes",

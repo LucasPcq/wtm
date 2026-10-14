@@ -23,7 +23,6 @@ func fakes(t *testing.T, records map[string]domain.WorktreeMetadata, branches ..
 	return repo, storetest.NewFake(storetest.FakeParams{Meta: records})
 }
 
-// snapshotOf reads the snapshot of fakes started with records and branches.
 func snapshotOf(t *testing.T, records map[string]domain.WorktreeMetadata, branches ...string) identity.Snapshot {
 	t.Helper()
 	repo, meta := fakes(t, records, branches...)

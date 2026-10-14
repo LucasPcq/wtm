@@ -14,8 +14,6 @@ type implementation struct {
 	root string
 }
 
-// implementations start alike, seen through a symlink: main checked out,
-// feature beside it, main on the remote, a folder taken and a worktree gone.
 func implementations(t *testing.T) []implementation {
 	t.Helper()
 	gitRoot, fakeRoot := gittest.Symlinked(t), gittest.Symlinked(t)

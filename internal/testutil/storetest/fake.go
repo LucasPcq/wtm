@@ -18,8 +18,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/store"
 )
 
-// Fake is the state files in memory: what its writes change, its reads give
-// back, and it refuses what the disk refuses.
 type Fake struct {
 	mu         sync.Mutex
 	meta       map[string]domain.WorktreeMetadata
@@ -30,16 +28,15 @@ type Fake struct {
 	calls      []string
 }
 
-// FakeParams starts the fake: the records by branch, the branches whose
-// meta.json does not read, config.toml (nil when there is none), every file by
-// path — the .env files and the sources a copy reads — and the error a method
-// returns instead of running, keyed by its name.
 type FakeParams struct {
-	Meta       map[string]domain.WorktreeMetadata
+	Meta map[string]domain.WorktreeMetadata
+	// Unreadable are the branches whose meta.json does not read.
 	Unreadable []string
 	Config     *domain.ProjectConfig
-	Files      map[string]string
-	Fail       map[string]error
+	// Files holds every file by path: the .env files and the sources a copy reads.
+	Files map[string]string
+	// Fail is the error a method returns instead of running, keyed by its name.
+	Fail map[string]error
 }
 
 var (
@@ -71,14 +68,13 @@ func NewFake(params FakeParams) *Fake {
 	return fake
 }
 
-// Calls are the methods run, writes and reads, each with its main argument.
+// Calls are the methods run, each with its main argument.
 func (f *Fake) Calls() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return slices.Clone(f.calls)
 }
 
-// Config is config.toml as the fake holds it, false when there is none.
 func (f *Fake) Config() (domain.ProjectConfig, bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -88,7 +84,6 @@ func (f *Fake) Config() (domain.ProjectConfig, bool) {
 	return *f.config, true
 }
 
-// File is the content of a file the fake holds.
 func (f *Fake) File(path string) (string, bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

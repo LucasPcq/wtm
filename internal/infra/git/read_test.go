@@ -12,8 +12,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
 
-// — What git worktree list shows —
-
 func TestWorktreesListsTheMainWorktreeFirstOnItsBranch(t *testing.T) {
 	repo := newRepo(t)
 	linked := filepath.Join(gittest.TempDir(t), "feature")
@@ -81,8 +79,6 @@ func TestWorktreesReadsABareRepository(t *testing.T) {
 	assert.Equal(t, []git.Worktree{{Path: bare, Main: true, State: git.Bare{}}}, worktrees)
 }
 
-// — A rebase in progress: HEAD is detached, the branch is in the admin dir —
-
 func TestWorktreesReadsTheBranchOfARebaseInProgress(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -112,8 +108,6 @@ func TestWorktreesReadsTheBranchOfARebaseInProgress(t *testing.T) {
 	}
 }
 
-// — The main worktree, from anywhere —
-
 func TestMainWorktreeIsTheFirstEvenSeenFromALinkedOne(t *testing.T) {
 	repo := newRepo(t)
 	linked := filepath.Join(gittest.TempDir(t), "feature")
@@ -137,8 +131,6 @@ func TestWorktreesFailsOutsideARepository(t *testing.T) {
 	assert.Equal(t, 128, gitErr.Exit)
 	require.ErrorAs(t, mainErr, &gitErr)
 }
-
-// — Where the repository is —
 
 func TestToplevelIsTheRootOfTheWorktreeAsGitWritesIt(t *testing.T) {
 	repo := newRepo(t)
@@ -170,8 +162,6 @@ func TestLocateResolvesWhatExistsAndKeepsTheRest(t *testing.T) {
 	assert.Equal(t, git.Location{Path: filepath.Join(gittest.Resolved(t, link), "a", "b")}, absent)
 }
 
-// — Branches —
-
 func TestBranchesSplitsLocalFromRemoteAndDropsTheRemoteHead(t *testing.T) {
 	repo, _ := newRepoWithOrigin(t)
 	gittest.CreateBranch(t, repo.Dir, "feature")
@@ -198,8 +188,6 @@ func TestBranchesFollowsTheRemoteItIsGiven(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"feature"}, branches.Remote)
 }
-
-// — RefExists: one form, an absence is not an error —
 
 func TestRefExistsTellsAPresentRefFromAnAbsentOne(t *testing.T) {
 	repo, _ := newRepoWithOrigin(t)
@@ -235,8 +223,6 @@ func TestRefExistsFailsRatherThanAnswerAbsent(t *testing.T) {
 	assert.Equal(t, 128, gitErr.Exit)
 	require.Error(t, noRefErr)
 }
-
-// — AheadBehind —
 
 func TestAheadBehindCountsBothSides(t *testing.T) {
 	repo := newRepo(t)

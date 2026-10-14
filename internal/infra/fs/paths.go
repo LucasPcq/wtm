@@ -16,10 +16,8 @@ const (
 	scratchLockDir = "wtm-locks"
 )
 
-// GlobalDir is wtm's own directory under the OS user-config directory. It is
-// resolved, never spelled: os.UserConfigDir is ~/.config on Linux and
-// ~/Library/Application Support on macOS, so any literal path is wrong on one
-// of the two.
+// GlobalDir is resolved, never spelled: the user-config directory is ~/.config
+// on Linux and ~/Library/Application Support on macOS.
 func GlobalDir() (string, error) {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
@@ -28,9 +26,6 @@ func GlobalDir() (string, error) {
 	return filepath.Join(configDir, domain.GlobalConfigDir), nil
 }
 
-// ScratchLockPath is the lock of a file wtm writes in the user's tree: in the
-// temporary directory, named after the file's resolved path, so every process
-// updating that file meets on the same lock whatever spelling it was given.
 func ScratchLockPath(path string) string {
 	sum := sha256.Sum256([]byte(resolvedFile(path)))
 	return filepath.Join(os.TempDir(), scratchLockDir, hex.EncodeToString(sum[:16])+lockSuffix)
@@ -47,4 +42,14 @@ func resolvedFile(path string) string {
 		return resolved
 	}
 	return filepath.Join(ResolvePath(filepath.Dir(absolute)), filepath.Base(absolute))
+}
+
+// ResolvePath follows symlinks: on macOS /var and /private/var are the same
+// place. A path it cannot resolve is returned as it is.
+func ResolvePath(path string) string {
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return path
+	}
+	return resolved
 }
