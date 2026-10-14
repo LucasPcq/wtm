@@ -251,3 +251,21 @@ var deadcodeCeiling = []string{
 	`TextListModel\.helpRowless`,
 	`^internal/surface/cli/bind\.go:.*unreachable func: Bind$`,
 }
+
+var commentCeiling = map[string]int{
+	`dispatch`:         13,
+	`domain/operation`: 1,
+	`infra/fs`:         40,
+	`infra/git`:        19,
+	`infra/proc`:       36,
+	`rules/envcopy`:    4,
+	`rules/runenv`:     2,
+	`rules/statefile`:  4,
+	`rules/worktree`:   6,
+	`service/gitwt`:    5,
+	`service/hooks`:    42,
+	`service/identity`: 9,
+	`service/runenv`:   11,
+	`store`:            20,
+	`surface/tui/form`: 9,
+}

@@ -90,9 +90,9 @@ type recapParams struct {
 	Apply       bool
 }
 
-// While the plan loads the recap offers no option: enter cannot apply a plan nobody has seen.
 func recapList(params recapParams) components.SelectListModel {
 	var items []components.SelectItem
+	// While the plan loads the recap offers no option: enter cannot apply a plan nobody has seen.
 	if params.Apply {
 		items = append(items, components.SelectItem{Label: applyLabel, Value: applyValue}, components.SelectItem{Separator: true})
 	}

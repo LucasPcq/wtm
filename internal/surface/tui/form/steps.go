@@ -87,10 +87,10 @@ func (s *session) decide(i int, form kernel.Form[json.RawMessage]) decision {
 	return decision{asked: true, offered: state.Value, origin: state.Origin}
 }
 
-// settledBy is never empty: an empty Settled would not settle the step.
 func (s *session) settledBy(spec kernel.FieldSpec, state kernel.FieldState) string {
 	shown := valueText(state.Value)
 	if shown == "" {
+		// An empty Settled would not settle the step.
 		shown = domain.SummaryNone
 	}
 	if !s.flagged[spec.Path] {

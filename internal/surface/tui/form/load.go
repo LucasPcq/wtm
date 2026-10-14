@@ -12,7 +12,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
-// A Build cannot return a command, an OnEnter can: the load a Build asks for waits for it.
 type pendingMsg struct{}
 
 func pending() tea.Msg { return pendingMsg{} }
@@ -44,6 +43,7 @@ func (s *session) handle(w *components.WizardModel, msg tea.Msg) (tea.Cmd, bool)
 		return tea.Quit, true
 	}
 	switch m := msg.(type) {
+	// A Build cannot return a command, an OnEnter can: the load a Build asks for waits for it.
 	case pendingMsg:
 		return s.start(w), true
 	case tea.WindowSizeMsg:
@@ -115,9 +115,9 @@ func (s *session) chosen(w *components.WizardModel, m choicesMsg) tea.Cmd {
 	return nil
 }
 
-// While the list is filtered, r types a letter.
 func (s *session) refreshable(w *components.WizardModel) bool {
 	list, isList := w.CurrentStepModel().(components.SelectListModel)
+	// While the list is filtered, r types a letter.
 	return w.CurrentStepCanRefresh() && !w.Loading() && isList && !list.Filtering()
 }
 

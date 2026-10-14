@@ -12,8 +12,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/testutil/storetest"
 )
 
-// fakes is a repository on main with a worktree for each branch, and their
-// records.
 func fakes(t *testing.T, records map[string]domain.WorktreeMetadata, branches ...string) (*gittest.Fake, *storetest.Fake) {
 	t.Helper()
 	repo := gittest.NewFake(gittest.FakeParams{Main: "/repo", Branch: "main"})

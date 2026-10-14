@@ -41,7 +41,6 @@ func Execute(ctx context.Context, params ExecuteParams) error {
 	})
 }
 
-// lines flushes a hook's unfinished last line when it ends, never joined to the next hook's first.
 type lines struct {
 	mu   sync.Mutex
 	emit func(string)
@@ -69,6 +68,7 @@ func (l *lines) flush() {
 	if l.buf.Len() == 0 {
 		return
 	}
+	// A hook's unfinished last line goes out when it ends, never joined to the next hook's first.
 	rest := l.buf.String()
 	l.buf.Reset()
 	l.send(rest)

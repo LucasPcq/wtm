@@ -5,7 +5,6 @@ import (
 	"os/exec"
 )
 
-// signalledExitCode is the code os/exec gives a hook killed by a signal: it never exited with one.
 const signalledExitCode = -1
 
 // Failure names the hook; Err is domain.ErrHookFailed or domain.ErrHookStopped.
@@ -27,6 +26,7 @@ type failureParams struct {
 func failureOf(params failureParams) Failure {
 	failure := Failure{Cmd: params.Cmd, Err: params.Wrapped}
 	var exit *exec.ExitError
+	// os/exec gives a hook killed by a signal a negative code: it never exited with one.
 	if errors.As(params.Cause, &exit) && exit.ExitCode() > signalledExitCode {
 		code := exit.ExitCode()
 		failure.ExitCode = &code

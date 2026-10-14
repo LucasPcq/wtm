@@ -30,11 +30,11 @@ func (r Repo) git(ctx context.Context, args ...string) ([]byte, error) {
 	return run(ctx, append([]string{"-C", r.Dir}, args...))
 }
 
-// run scrubs the repository-scoped variables a hook inherits: GIT_DIR would
-// otherwise win over -C, and every call would read the repository it names.
 func run(ctx context.Context, args []string) ([]byte, error) {
 	var stdout, stderr bytes.Buffer
 	cmd := proc.Command(ctx, "git", args...)
+	// The repository-scoped variables a hook inherits go: GIT_DIR would otherwise
+	// win over -C, and every call would read the repository it names.
 	cmd.Env = slices.DeleteFunc(os.Environ(), repoScoped)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

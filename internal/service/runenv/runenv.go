@@ -48,8 +48,8 @@ func JobEnv(params Params) (map[string]string, error) {
 	return rules.WithPortEnv(env, rules.LifecyclePorts(rules.LifecyclePortsParams{Config: params.Run, PortOffset: offset})), nil
 }
 
-// offsetOf reads the offset back rather than recomputing it, so a hook, a job and a .env of one worktree never disagree on it.
 func offsetOf(env map[string]string) (int, error) {
+	// Read back rather than recomputed, so a hook, a job and a .env of one worktree never disagree on it.
 	offset, err := strconv.Atoi(env[domain.EnvPortOffset])
 	if err != nil {
 		return 0, fmt.Errorf("resolve port offset: %w", err)
@@ -57,9 +57,9 @@ func offsetOf(env map[string]string) (int, error) {
 	return offset, nil
 }
 
-// jobComposeProject is empty for wtm to derive it from the branch; only the main checkout's is set, read from its own .env.
 func jobComposeProject(params Params) (string, error) {
 	if _, main := caseOf(params.Identity).(envcase.Main); !main {
+		// Empty for wtm to derive it from the branch; only the main checkout's is set, read from its own .env.
 		return "", nil
 	}
 	return mainComposeProject(params)

@@ -19,7 +19,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/testutil/dispatchtest"
 )
 
-// The fakes answer at once: only a cursor blink or a spinner tick waits longer.
 const settleWithin = 50 * time.Millisecond
 
 type worldParams struct {
@@ -100,13 +99,13 @@ func (d *driver) send(msg tea.Msg) {
 	d.run(d.update(msg))
 }
 
-// update leaves the command unrun: a test looks at the wizard while a load is in flight.
 func (d *driver) update(msg tea.Msg) tea.Cmd {
 	d.t.Helper()
 	next, cmd := d.model.Update(msg)
 	model, ok := next.(components.WizardModel)
 	require.True(d.t, ok)
 	d.model = model
+	// Left unrun: a test looks at the wizard while a load is in flight.
 	return cmd
 }
 
@@ -181,6 +180,7 @@ func collect(cmd tea.Cmd) []tea.Msg {
 			msgs = append(msgs, collect(inner)...)
 		}
 		return msgs
+	// The fakes answer at once: only a cursor blink or a spinner tick waits longer.
 	case <-time.After(settleWithin):
 		return nil
 	}
@@ -197,7 +197,6 @@ func (d *driver) trail() []string {
 	return lines
 }
 
-// fillAll keeps what each field offers, branches named feat/a.
 func fillAll(d *driver) {
 	d.typed("feat/a")
 	d.key("enter")

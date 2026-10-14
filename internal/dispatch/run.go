@@ -83,8 +83,6 @@ type settled[Req, F any] struct {
 	Form     kernel.Form[Req]
 }
 
-// A lock the defaults name and the request did not is taken, then the facts
-// observed again: another process may have changed what it guards in between.
 func (h *Handle[Req, F, P, D]) settle(ctx context.Context, params runParams[Req]) (settled[Req, F], error) {
 	for {
 		snapshot, err := h.Observe(ctx)
@@ -101,6 +99,8 @@ func (h *Handle[Req, F, P, D]) settle(ctx context.Context, params runParams[Req]
 		if params.Held == nil {
 			return settled[Req, F]{Snapshot: snapshot, Form: form}, nil
 		}
+		// A lock the defaults name and the request did not is taken, then the facts
+		// observed again: another process may have changed what it guards in between.
 		grown, err := params.Held.grow(h.locks(form.Request))
 		if err != nil || !grown {
 			return settled[Req, F]{Snapshot: snapshot, Form: form}, err

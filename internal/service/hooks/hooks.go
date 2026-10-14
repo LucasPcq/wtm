@@ -91,7 +91,6 @@ func (s *syncWriter) Write(p []byte) (int, error) {
 	return s.w.Write(p)
 }
 
-// writerReporter is the fallback rendering for a caller that gave no reporter: the command, its live output, the result.
 func writerReporter(w io.Writer) func(domain.HookBeat) {
 	return func(beat domain.HookBeat) {
 		if beat.Started {
@@ -153,10 +152,10 @@ func runSingleHook(ctx context.Context, params runSingleHookParams) error {
 	return nil
 }
 
-// hookEnv replaces every inherited worktree variable when given some, so a name the worktree leaves unset is not filled by the launching shell's.
 func hookEnv(overrides map[string]string) []string {
 	if len(overrides) == 0 {
 		return nil
 	}
+	// Every inherited worktree variable is cleared, so a name the worktree leaves unset is not filled by the launching shell's.
 	return rules.MergeEnv(rules.MergeEnvParams{Env: os.Environ(), Clear: domain.WorktreeScopedEnv, Overrides: overrides})
 }

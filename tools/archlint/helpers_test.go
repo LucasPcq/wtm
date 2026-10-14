@@ -1,6 +1,7 @@
 package main
 
 import (
+	"go/ast"
 	"go/constant"
 	"go/token"
 	"go/types"
@@ -75,3 +76,13 @@ func eventTypesOf(domain *types.Package) map[string]bool {
 }
 
 func at(file string) token.Position { return token.Position{Filename: file, Line: 1, Column: 1} }
+
+func loadedTests(pass *analysis.Pass) ([]*ast.File, error) {
+	var tests []*ast.File
+	for _, file := range pass.Files {
+		if isTestFile(pass, file) {
+			tests = append(tests, file)
+		}
+	}
+	return tests, nil
+}

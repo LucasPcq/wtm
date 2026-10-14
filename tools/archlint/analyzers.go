@@ -30,4 +30,5 @@ var analyzers = []*analysis.Analyzer{
 	portsAnalyzer,
 	enginetextAnalyzer,
 	portbuildAnalyzer,
+	commentsAnalyzer,
 }

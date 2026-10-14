@@ -37,7 +37,6 @@ func (p *progress) Emit(event kernel.Progress) {
 	}
 }
 
-// A log that cannot be opened never stops its phase.
 func (p *progress) log(event kernel.Progress) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -46,6 +45,7 @@ func (p *progress) log(event kernel.Progress) {
 		if e.Log == "" {
 			return
 		}
+		// A log that cannot be opened never stops its phase.
 		file, err := fs.OpenLog(e.Log)
 		if err != nil {
 			return

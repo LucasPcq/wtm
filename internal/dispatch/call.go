@@ -69,7 +69,6 @@ func erase[P, D any](result Result[P, D]) (Result[json.RawMessage, json.RawMessa
 	return erased, nil
 }
 
-// encoding/json has no typed error for an unknown field.
 const unknownFieldPrefix = "json: unknown field "
 
 func decodeRequest[Req any](raw json.RawMessage) (Req, error) {
@@ -89,6 +88,7 @@ func decodeRequest[Req any](raw json.RawMessage) (Req, error) {
 }
 
 func fieldsOf(err error) []kernel.FieldError {
+	// encoding/json has no typed error for an unknown field.
 	if name, unknown := strings.CutPrefix(err.Error(), unknownFieldPrefix); unknown {
 		return []kernel.FieldError{{Path: strings.Trim(name, `"`), Code: kernel.CodeUnknownField}}
 	}

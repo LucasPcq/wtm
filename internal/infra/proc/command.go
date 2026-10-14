@@ -22,6 +22,9 @@ func Command(ctx context.Context, name string, args ...string) *exec.Cmd {
 	}
 	cmd.Cancel = func() error {
 		group, _ := syscall.Getpgid(cmd.Process.Pid)
+		// The process table reaches what the child started — git's ssh or upload-pack —
+		// which git does not stop when it is stopped itself. Only what is still in the
+		// child's group is ever signalled: a daemon git started to outlive it has left it.
 		family := rules.Descendants(rules.DescendantsParams{Links: processTable(), Root: cmd.Process.Pid, Group: group})
 		tree := func(signal syscall.Signal) error {
 			err := cmd.Process.Signal(signal)
@@ -33,14 +36,12 @@ func Command(ctx context.Context, name string, args ...string) *exec.Cmd {
 		stopping(func() { _ = tree(syscall.SIGKILL) })
 		return escalate(tree)
 	}
+	// killDelay also bounds how long Wait holds on to a pipe a finished child left
+	// open (a job it backgrounded).
 	cmd.WaitDelay = killDelay
 	return cmd
 }
 
-// processTable is read to reach what the child started — git's ssh or
-// upload-pack — which git does not stop when it is stopped itself. Only what
-// is still in the child's group is ever signalled: a daemon git started to
-// outlive it has left it.
 func processTable() []domain.ProcessLink {
 	table, err := exec.Command("ps", "-Ao", "pid=,ppid=,pgid=").Output()
 	if err != nil {
@@ -66,8 +67,6 @@ func GroupCommand(ctx context.Context, name string, args ...string) *exec.Cmd {
 	return cmd
 }
 
-// killDelay is also how long Wait holds on to a pipe a finished child left
-// open (a job it backgrounded): WaitDelay bounds both.
 const killDelay = domain.SubprocessInterruptGrace + domain.ExecPipeGrace
 
 func escalate(signal func(syscall.Signal) error) error {

@@ -78,11 +78,11 @@ func openLockFile(path string) (*os.File, error) {
 	return os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
 }
 
-// flock retries a call a signal interrupted: the Go runtime's own preemption
-// signals can, and an interrupted try is no answer about the lock.
 func flock(file *os.File, how int) error {
 	for {
 		err := syscall.Flock(int(file.Fd()), how)
+		// The Go runtime's own preemption signals interrupt a call, and an interrupted
+		// try is no answer about the lock.
 		if !errors.Is(err, syscall.EINTR) {
 			return err
 		}

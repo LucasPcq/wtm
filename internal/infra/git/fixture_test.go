@@ -13,8 +13,6 @@ type port interface {
 	git.Writer
 }
 
-// implementation is a repository seen through root, a symlink git resolves:
-// at names a path as git writes it.
 type implementation struct {
 	name string
 	port port
@@ -24,6 +22,7 @@ type implementation struct {
 
 func implementations(t *testing.T) []implementation {
 	t.Helper()
+	// Each root is a symlink git resolves: at names a path as git writes it.
 	gitRoot, fakeRoot := gittest.Symlinked(t), gittest.Symlinked(t)
 	return []implementation{
 		{name: "git", port: gittest.Build(t, seed(gitRoot)), root: gitRoot, at: under(t, gitRoot)},
@@ -31,9 +30,6 @@ func implementations(t *testing.T) []implementation {
 	}
 }
 
-// seed is main checked out, a worktree of every kind beside it, and a remote
-// that has moved on since the last fetch: main and feature ahead, diverged
-// rewritten, pushed new.
 func seed(root string) gittest.FakeParams {
 	return gittest.FakeParams{
 		Main:   filepath.Join(root, "main"),
