@@ -104,16 +104,13 @@ func init() {
 	markUsageErrors(rootCmd)
 }
 
-// version reads the one symbol goreleaser stamps, domain.Version — the same one
-// the run daemon compares across its socket. A second stamped target would let a
-// client and its daemon disagree about which build each is.
+// The one symbol goreleaser stamps, and the one the run daemon compares across
+// its socket: a second stamped target would let a client and its daemon
+// disagree about which build each is.
 var version = domain.Version
 
-// effectiveVersion is what every consumer reads: the linked version, or the
-// module version recovered from the build info for a `go install` binary.
-// Resolved as a package-level initializer, not inside init(): Go orders var
-// initialization by dependency, so every command constructed below already sees
-// the final value regardless of the order they are registered in.
+// A package-level initializer, not init(): Go orders var initialization by
+// dependency, so every command built in init already sees the final value.
 var effectiveVersion = selfupdate.ResolveVersion(version)
 
 var (
@@ -121,9 +118,8 @@ var (
 	updateCheckStarted bool
 )
 
-// topLevelName is the executed command's name directly under root, which is what
-// the exclusion list names: the runnable leaves are `completion zsh` and
-// `schema dump`, not their parents, so cmd.Name() would let both slip through.
+// The exclusion list names top-level commands: the runnable leaves are
+// `completion zsh` and `schema dump`, so cmd.Name() would let both slip through.
 func topLevelName(cmd *cobra.Command) string {
 	for cmd.HasParent() && cmd.Parent().HasParent() {
 		cmd = cmd.Parent()
@@ -132,10 +128,9 @@ func topLevelName(cmd *cobra.Command) string {
 	return cmd.Name()
 }
 
-// startUpdateCheck arms the passive check once per run. It is called from both
-// PersistentPreRun and the help function because cobra short-circuits on the
-// --help flag before any Run hook fires; the guard keeps the second caller from
-// discarding an in-flight check started by the first.
+// Called from PersistentPreRun and from the help function, since cobra answers
+// --help before any hook fires; the guard keeps the second caller from
+// discarding the check the first started.
 func startUpdateCheck(cmd *cobra.Command) {
 	if updateCheckStarted {
 		return
@@ -204,8 +199,7 @@ func globalUpdateCheck() *bool {
 	return cfg.Update.Check
 }
 
-// printUpdateNotice drains the passive check started in PersistentPreRun. It is
-// nil-safe: a suppressed check leaves updateCheck nil.
+// A suppressed check leaves updateCheck nil, and Notice is nil-safe.
 func printUpdateNotice(ctx context.Context) {
 	if quiet, _ := rootCmd.Flags().GetBool(domain.FlagQuiet); quiet {
 		return
@@ -221,7 +215,6 @@ func printUpdateNotice(ctx context.Context) {
 }
 
 func init() {
-	// Override the global help function to add consistent padding around help text.
 	defaultHelp := rootCmd.HelpFunc()
 	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		startUpdateCheck(cmd)
@@ -229,7 +222,6 @@ func init() {
 		w := cmd.OutOrStdout()
 		render.Blank(w)
 
-		// Temporarily swap the output writer to capture and indent the help text.
 		orig := cmd.OutOrStdout()
 		var buf strings.Builder
 		cmd.SetOut(&buf)
@@ -246,13 +238,10 @@ func init() {
 	})
 }
 
-// Root returns the fully assembled root command. It exists so tooling (e.g. the
-// docs generator under tools/gendocs) can walk the command tree without invoking it.
 func Root() *cobra.Command {
 	return rootCmd
 }
 
-// Execute runs the root command and exits with the appropriate code.
 func Execute() {
 	ctx, stop := interruptible()
 	defer stop()
@@ -268,8 +257,6 @@ type executeParams struct {
 	Stderr io.Writer
 }
 
-// execute runs the tree and answers the exit code, once nothing it started is
-// left running.
 func execute(ctx context.Context, params executeParams) int {
 	executed, runErr := params.Root.ExecuteContextC(ctx)
 	backedOut := rules.BackedOut(rules.BackedOutParams{Err: runErr, Cancelled: executed != nil && shared.Cancelled(executed)})
@@ -278,9 +265,6 @@ func execute(ctx context.Context, params executeParams) int {
 	if err == nil {
 		return domain.ExitCodeOK
 	}
-	// ErrAborted means the command already printed its own report; just
-	// propagate the non-zero exit without a second error line — unless --quiet
-	// discarded that report, in which case this is the only line there is.
 	if !errors.Is(err, domain.ErrAborted) || humanOutputSilenced {
 		render.Blank(params.Stderr)
 		reportFailure(params.Stderr, err)

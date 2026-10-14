@@ -9,10 +9,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/kernel"
 )
 
-// The tests share one example, shaped like `wtm create`: a request naming
-// branches to create, the facts read from the repository, fakes of what the
-// command touches, and the command itself, declared at the end.
-
 type isolation string
 
 type target struct {
@@ -43,7 +39,6 @@ func fail(context.Context, kernel.Reporter) error { return errBoom }
 
 func failUndo(context.Context) error { return errBoom }
 
-// disk is what units write: the names that exist, in order.
 type disk struct {
 	mu      sync.Mutex
 	entries []string
@@ -73,7 +68,6 @@ func (d *disk) list() []string {
 	return slices.Clone(d.entries)
 }
 
-// recorder is an Emitter keeping every Progress it is handed.
 type recorder struct {
 	mu   sync.Mutex
 	seen []kernel.Progress
@@ -85,7 +79,6 @@ func (r *recorder) Emit(progress kernel.Progress) {
 	r.seen = append(r.seen, progress)
 }
 
-// lines reads the progress back as "subject kind phase", one per event.
 func (r *recorder) lines() []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -113,8 +106,6 @@ func line(progress kernel.Progress) string {
 	}
 	return ""
 }
-
-// The example command: `create`, declared the way a command on the engine is.
 
 type createPlan struct {
 	Branches []string

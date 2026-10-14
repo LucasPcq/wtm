@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
@@ -65,7 +64,6 @@ func TestOutputFormatAcceptsWhatTheCommandDeclares(t *testing.T) {
 	}
 }
 
-// A group run bare still shows its help, and exits 0.
 func TestABareGroupShowsItsHelp(t *testing.T) {
 	var out bytes.Buffer
 	rootCmd.SetArgs([]string{domain.CmdRun})
@@ -79,7 +77,6 @@ func TestABareGroupShowsItsHelp(t *testing.T) {
 	}
 }
 
-// `wtm version` repeats cobra's --version line, and --version keeps printing it.
 func TestVersionCommandAndFlagPrintTheSameLine(t *testing.T) {
 	line := func(args ...string) string {
 		var out bytes.Buffer
@@ -130,53 +127,8 @@ func TestEveryMutuallyExclusivePairExitsWithTheUsageCode(t *testing.T) {
 	}
 }
 
-type exclusivePair struct {
-	cmd  *cobra.Command
-	args []string
-}
-
-func exclusivePairs(cmd *cobra.Command) []exclusivePair {
-	var pairs []exclusivePair
-	seen := map[string]bool{}
-	cmd.LocalFlags().VisitAll(func(f *pflag.Flag) {
-		for _, group := range f.Annotations[domain.AnnotationMutuallyExclusive] {
-			if seen[group] {
-				continue
-			}
-			seen[group] = true
-			names := strings.Fields(group)
-			for i, first := range names {
-				for _, second := range names[i+1:] {
-					path := strings.Fields(cmd.CommandPath())[1:]
-					args := append(path, flagArg(cmd, first), flagArg(cmd, second))
-					pairs = append(pairs, exclusivePair{cmd: cmd, args: args})
-				}
-			}
-		}
-	})
-	for _, sub := range cmd.Commands() {
-		pairs = append(pairs, exclusivePairs(sub)...)
-	}
-	return pairs
-}
-
-func flagArg(cmd *cobra.Command, name string) string {
-	if cmd.Flags().Lookup(name).Value.Type() == "bool" {
-		return "--" + name
-	}
-	return "--" + name + "=x"
-}
-
-func resetFlags(cmd *cobra.Command) {
-	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		_ = f.Value.Set(f.DefValue)
-		f.Changed = false
-	})
-}
-
-// Every command that could ask refuses --output json without --yes as a usage
-// error, before it reads anything (LUC-273). The list is spelled out so that a
-// command losing its mark fails here rather than slipping back to exit 1.
+// The list is spelled out so that a command losing its mark fails here rather
+// than slipping back to exit 1 (LUC-273).
 func TestJSONWithoutYesIsAUsageError(t *testing.T) {
 	want := map[string]string{
 		"wtm create":       "--yes",
@@ -256,12 +208,5 @@ func TestJSONRunsUnattendedUnderAnyFlagThatKeepsTheCommandFromAsking(t *testing.
 				t.Errorf("refused: %v", err)
 			}
 		})
-	}
-}
-
-func walk(cmd *cobra.Command, visit func(*cobra.Command)) {
-	visit(cmd)
-	for _, sub := range cmd.Commands() {
-		walk(sub, visit)
 	}
 }

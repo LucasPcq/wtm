@@ -2,9 +2,7 @@ package form
 
 import (
 	"encoding/json"
-	"fmt"
 	"maps"
-	"reflect"
 	"slices"
 	"strings"
 
@@ -19,8 +17,6 @@ type fieldParams struct {
 	Form    kernel.Form[json.RawMessage]
 }
 
-// model draws a field by the shape of its value, offering the value State
-// gives it. A field whose choices are still loading shows none yet.
 func (s *session) model(params fieldParams) any {
 	spec := s.fields[params.Index]
 	value := stateAt(params.Form, spec.Path).Value
@@ -61,9 +57,6 @@ type selectParams struct {
 	Value   kernel.Value
 }
 
-// selectList offers "always use this answer" on a rememberable field of a
-// command that remembers; asked again on --ask, it opens ticked on the answer
-// the repository remembers.
 func (s *session) selectList(params selectParams) components.SelectListModel {
 	spec := s.fields[params.Index]
 	start := textOf(params.Value)
@@ -88,8 +81,6 @@ type textListParams struct {
 	Entries []string
 }
 
-// textList refuses an entry on the errors State finds on that entry alone, and
-// badges it as its choice is badged.
 func (s *session) textList(params textListParams) components.TextListModel {
 	spec := s.fields[params.Index]
 	return components.NewTextList(components.NewTextListParams{
@@ -113,8 +104,6 @@ func (s *session) textList(params textListParams) components.TextListModel {
 	})
 }
 
-// options are the field's choices, else the values its Enum accepts; the
-// pinned option comes first.
 func options(choices kernel.Choices, accepted []string) []kernel.Option {
 	if len(choices.Options) == 0 {
 		found := make([]kernel.Option, 0, len(accepted))
@@ -158,7 +147,6 @@ func (s *session) multiItems(choices kernel.Choices, selected []string) []compon
 	return items
 }
 
-// reorderItems keep the order the value gives, then whatever choice it lacks.
 func reorderItems(choices kernel.Choices, ordered []string) []components.ReorderItem {
 	labels := map[string]string{}
 	values := slices.Clone(ordered)
@@ -179,7 +167,6 @@ func reorderItems(choices kernel.Choices, ordered []string) []components.Reorder
 	return items
 }
 
-// decisionRows are the keys of the value, each choosing among the options.
 func decisionRows(choices kernel.Choices, value kernel.Value) []components.DecisionRow {
 	decided, _ := value.(kernel.Decisions)
 	values := make([]string, 0, len(choices.Options))
@@ -191,80 +178,6 @@ func decisionRows(choices kernel.Choices, value kernel.Value) []components.Decis
 		rows = append(rows, components.DecisionRow{Key: key, Options: values, Choice: decided[key]})
 	}
 	return rows
-}
-
-// valueOf reads a step's answer back as the value of its field.
-func valueOf(model any) kernel.Value {
-	switch answered := model.(type) {
-	case components.TextInputModel:
-		return kernel.Text(answered.Value())
-	case components.ConfirmModel:
-		return kernel.Bool(answered.Confirmed())
-	case components.SelectListModel:
-		return kernel.Text(answered.Value())
-	case components.MultiSelectModel:
-		return kernel.List(answered.Values())
-	case components.ReorderListModel:
-		return kernel.List(answered.Values())
-	case components.TextListModel:
-		return kernel.List(answered.Values())
-	case components.DecisionListModel:
-		return kernel.Decisions(answered.Values())
-	}
-	return nil
-}
-
-// summary is the answer in the trail, with where it came from when the user
-// kept what a default offered.
-func (s *session) summary(i int, model any) string {
-	value := valueOf(model)
-	decided := s.decided[i]
-	kept := decided.origin == kernel.OriginDefault || decided.origin == kernel.OriginConfig
-	if !kept || !reflect.DeepEqual(value, decided.offered) {
-		return valueText(value)
-	}
-	return trailOf(valueText(value), string(decided.origin))
-}
-
-func valueText(value kernel.Value) string {
-	switch shown := value.(type) {
-	case kernel.Text:
-		return string(shown)
-	case kernel.Bool:
-		if shown {
-			return yesText
-		}
-		return noText
-	case kernel.List:
-		if len(shown) == 0 {
-			return domain.SummaryNone
-		}
-		return strings.Join(shown, listSeparator)
-	case kernel.Decisions:
-		pairs := make([]string, 0, len(shown))
-		for _, key := range slices.Sorted(maps.Keys(shown)) {
-			pairs = append(pairs, fmt.Sprintf(pairFmt, key, shown[key]))
-		}
-		if len(pairs) == 0 {
-			return domain.SummaryNone
-		}
-		return strings.Join(pairs, listSeparator)
-	}
-	return ""
-}
-
-func trailOf(value, origin string) string {
-	return fmt.Sprintf(trailFmt, value, origin)
-}
-
-func textOf(value kernel.Value) string {
-	shown, _ := value.(kernel.Text)
-	return string(shown)
-}
-
-func list(value kernel.Value) []string {
-	shown, _ := value.(kernel.List)
-	return shown
 }
 
 func placeholder(spec kernel.FieldSpec) components.SelectListModel {

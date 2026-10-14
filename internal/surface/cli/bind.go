@@ -28,8 +28,6 @@ const (
 	detailGeneric          = "generic"
 )
 
-// Doc is what only a terminal reads about a command; its flags come from the
-// registry.
 type Doc struct {
 	Use     string
 	Short   string
@@ -39,8 +37,6 @@ type Doc struct {
 
 type Option func(*binding)
 
-// Positional takes the field at path from the arguments rather than a flag: a
-// list field all of them, any other field one.
 func Positional(path string) Option {
 	return func(b *binding) { b.positional = path }
 }
@@ -51,23 +47,18 @@ type FlagParams struct {
 	Short string
 }
 
-// Flag spells a field's flag other than its path in kebab case, or gives it a
-// short form.
 func Flag(params FlagParams) Option {
 	return func(b *binding) { b.renamed[params.Path] = params }
 }
 
-// Detail renders what is the command's own in its plan and its items.
 func Detail(detail render.Detail) Option {
 	return func(b *binding) { b.detail, b.detailKind = detail, detailOwn }
 }
 
-// GenericDetail declares the generic rendering enough for the command.
 func GenericDetail() Option {
 	return func(b *binding) { b.detail, b.detailKind = render.GenericDetail{}, detailGeneric }
 }
 
-// binding is one command of the registry served on the command line.
 type binding struct {
 	name       string
 	engine     *Engine
@@ -80,13 +71,10 @@ type binding struct {
 	exitCodes  map[kernel.Code]int
 }
 
-// Bind generates the command named name from the registry.
 func Bind(name string, doc Doc, options ...Option) *cobra.Command {
 	return production.Bind(name, doc, options...)
 }
 
-// Bind panics on a name the registry does not hold, as the tree is built at
-// start-up: a wrong name never reaches a user.
 func (e *Engine) Bind(name string, doc Doc, options ...Option) *cobra.Command {
 	entry, found := e.schema().Lookup(name)
 	if !found {
@@ -150,7 +138,6 @@ func fieldUsage(spec kernel.FieldSpec) string {
 	return spec.Label
 }
 
-// addEngineFlags adds what every command of the registry takes, once.
 func (b *binding) addEngineFlags(cmd *cobra.Command) {
 	shared.AddYesFlag(cmd, yesUsage)
 	shared.AddOutputFlag(cmd)
@@ -181,8 +168,6 @@ func (b *binding) spec(path string) (kernel.FieldSpec, bool) {
 	return b.specs[at], true
 }
 
-// spell names a field path the way the command line takes it: its flag, or
-// its positional; an entry keeps its index ("<branches>[2]").
 func (b *binding) spell(path string) string {
 	field, index, indexed := strings.Cut(path, "[")
 	entry := entrySuffix(index, indexed)

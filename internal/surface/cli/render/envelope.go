@@ -7,15 +7,12 @@ import (
 	"github.com/LucasPcq/wtm/internal/kernel"
 )
 
-// EnvelopeVersion is the "v" of every document a command on the engine writes.
 const EnvelopeVersion = 2
 
-// Names spells a field path the way the surface asks for it: a flag, a
-// positional. A path it does not know comes back unchanged.
+// Names spells a field path as the surface takes it; a path it does not know
+// comes back unchanged.
 type Names func(path string) string
 
-// EnvelopeParams is what a run produced; the envelope always has the same
-// keys, whichever of them the run reached.
 type EnvelopeParams struct {
 	Command     string
 	OK          bool
@@ -146,7 +143,6 @@ func (wd Wording) blockerFlag(blocker kernel.Blocker) string {
 	return wd.Names(blocker.Field)
 }
 
-// orEmpty keeps a list key an array: a reader never tells null from none.
 func orEmpty[T any](list []T) []T {
 	if list == nil {
 		return []T{}

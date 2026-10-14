@@ -70,16 +70,6 @@ func TestAClosedViewDrawsNothingMore(t *testing.T) {
 	assert.Never(t, func() bool { return out.Len() > 0 }, waitFor, tick)
 }
 
-func emitRun(view *render.ProgressView) {
-	report := kernel.Report(view, "feat/a")
-	report.UnitStarted()
-	report.Status(kernel.CodeLocksUnavailable, nil)
-	finished := report.Phase("on_create")
-	report.Output("installing")
-	finished()
-	report.UnitFinished(kernel.StatusDone)
-}
-
 func TestAPhaseCutShortLeavesNoTailBehind(t *testing.T) {
 	var out bytes.Buffer
 	view := render.NewProgressView(t.Context(), render.ProgressViewParams{Catalog: catalog, W: &out, Human: true, Live: true})

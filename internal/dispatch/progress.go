@@ -10,7 +10,6 @@ import (
 
 const lineEnd = "\n"
 
-// progress is the Emitter Apply is handed.
 type progress struct {
 	bus     operationBus
 	forward kernel.Emitter
@@ -38,8 +37,7 @@ func (p *progress) Emit(event kernel.Progress) {
 	}
 }
 
-// log keeps the whole output of a phase that names its log, whatever the
-// surface shows of it; a log that cannot be opened never stops the phase.
+// A log that cannot be opened never stops its phase.
 func (p *progress) log(event kernel.Progress) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -70,7 +68,6 @@ func (p *progress) closeLog(subject string) {
 	}
 }
 
-// close closes the logs an interruption left open.
 func (p *progress) close() {
 	p.mu.Lock()
 	defer p.mu.Unlock()

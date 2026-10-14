@@ -11,10 +11,6 @@ import (
 	"time"
 )
 
-const interruptHelperEnv = "WTM_TEST_INTERRUPT_HELPER"
-
-// The first interrupt cancels the run; the second is the default one, so a run
-// slow to unwind can still be killed outright.
 func TestFirstInterruptCancelsSecondKills(t *testing.T) {
 	if os.Getenv(interruptHelperEnv) != "" {
 		ctx, stop := interruptible()

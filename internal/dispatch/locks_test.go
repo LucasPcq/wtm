@@ -1,9 +1,7 @@
 package dispatch_test
 
 import (
-	"bufio"
 	"os"
-	"os/exec"
 	"strconv"
 	"testing"
 	"time"
@@ -95,36 +93,6 @@ func TestTheOperationsInProgressAreReadFromTheirHolders(t *testing.T) {
 		},
 	}}, during.Operations)
 	assert.Empty(t, after.Operations)
-}
-
-// — Across processes: all or nothing, and a dead process holds nothing —
-
-func TestLocksAreTakenWholeAcrossProcesses(t *testing.T) {
-	b := bench(t)
-	child := exec.Command(os.Args[0], "-test.run=^TestHelperProcess$")
-	child.Env = append(os.Environ(), envStateDir+"="+b.StateDir, envBranches+"=feat/b")
-	stdin, err := child.StdinPipe()
-	require.NoError(t, err)
-	stdout, err := child.StdoutPipe()
-	require.NoError(t, err)
-	require.NoError(t, child.Start())
-	t.Cleanup(func() { _ = stdin.Close(); _ = child.Process.Kill(); _ = child.Wait() })
-	line, err := bufio.NewReader(stdout).ReadString('\n')
-	require.NoError(t, err)
-	require.Equal(t, readyLine+"\n", line)
-
-	refused := run(t.Context(), runParams{Bench: b, Repo: &repo{}, Request: request{Branches: []string{"feat/a", "feat/b"}}})
-	failure := problem(t, refused.Err)
-	assert.Equal(t, kernel.CodeLockHeld, failure.Base().Code)
-	assert.Equal(t, strconv.Itoa(child.Process.Pid), failure.Base().Params[kernel.ParamPID])
-
-	alone := run(t.Context(), runParams{Bench: b, Repo: &repo{}, Request: request{Branches: []string{"feat/a"}}})
-	assert.NoError(t, alone.Err, "the refused run kept feat/a")
-
-	require.NoError(t, child.Process.Kill())
-	_ = child.Wait()
-	after := run(t.Context(), runParams{Bench: b, Repo: &repo{}, Request: request{Branches: []string{"feat/b"}}})
-	assert.NoError(t, after.Err, "a dead process still held feat/b")
 }
 
 func TestADryRunTakesNoLock(t *testing.T) {

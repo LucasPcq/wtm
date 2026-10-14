@@ -21,7 +21,6 @@ const (
 	unspelledFmt  = "the request for %s is no object: %w"
 )
 
-// followUps spells each follow-up as the command line that runs it.
 func (b *binding) followUps(followUps []kernel.FollowUp) ([]render.NextStepParams, error) {
 	steps := make([]render.NextStepParams, 0, len(followUps))
 	for _, followUp := range followUps {
@@ -40,7 +39,6 @@ type rerunParams struct {
 	Value   string
 }
 
-// rerun is this command's line for the same request, plus one engine flag.
 func (b *binding) rerun(params rerunParams) (string, error) {
 	line, err := b.engine.commandLine(lineParams{Target: b.name, Request: params.Request})
 	if err != nil {
@@ -58,9 +56,6 @@ type lineParams struct {
 	Request json.RawMessage
 }
 
-// commandLine spells a request for the command target: through its binding
-// when it is served here, as kebab-case flags otherwise. A request that is not
-// an object is an error of the command that proposed it.
 func (e *Engine) commandLine(params lineParams) (string, error) {
 	var request map[string]any
 	if len(params.Request) > 0 {
@@ -101,8 +96,6 @@ type leavesParams struct {
 	Object map[string]any
 }
 
-// leaves walks the request's objects in key order down to the values a flag
-// takes; a decisions field is a value, not an object to walk.
 func leaves(params leavesParams) []entry {
 	keys := make([]string, 0, len(params.Object))
 	for key := range params.Object {
@@ -181,7 +174,6 @@ func quoteAll(words []string) []string {
 	return out
 }
 
-// quote leaves a plain word bare and single-quotes anything a shell would read.
 func quote(word string) string {
 	if word != "" && !strings.ContainsAny(word, shellSpecial) {
 		return word

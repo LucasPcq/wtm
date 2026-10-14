@@ -39,8 +39,6 @@ func (h *Handle[Req, F, P, D]) Forget(facts F) F {
 	return h.command.Forget(facts)
 }
 
-// FormParams: with IgnoreRemembered, the form is evaluated on the facts the
-// command forgets, each field still carrying what they remembered.
 type FormParams[Req, F any] struct {
 	Request          Req
 	Facts            F
@@ -121,10 +119,6 @@ type candidateParams struct {
 	Option  string
 }
 
-// candidate is the field's value once the option is picked: added to what is
-// already chosen for a list, so a rule over the list sees the whole of it. An
-// option of a decisions field is a choice for one key among several: it is
-// not judged alone.
 func candidate(params candidateParams) (kernel.Value, bool, error) {
 	switch params.Type {
 	case kernel.FieldMultiSelect, kernel.FieldReorder, kernel.FieldTextList:

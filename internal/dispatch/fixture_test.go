@@ -12,10 +12,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
-// The tests share one example, shaped like `wtm create`: a request naming
-// branches to create, the facts read from a fake repository that is also the
-// disk Apply writes to, and the command itself, declared at the end.
-
 const (
 	commandName   = "create"
 	isolated      = "isolated"
@@ -45,18 +41,12 @@ type plan struct {
 	Isolation string   `json:"isolation"`
 }
 
-// detail is what a unit did: the worktree's path, the ordinal the allocate
-// phase gave it, and the hook that failed, if one did.
 type detail struct {
 	Path       string `json:"path"`
 	Ordinal    *int   `json:"ordinal,omitempty"`
 	HookFailed bool   `json:"hook_failed,omitempty"`
 }
 
-// repo is the fake repository: what Observe reads, what Apply changes. When
-// hold is set, Apply says so on entered and waits for hold to close. A hook
-// that runs calls onHook first, and fails with hookErr when it is set; its
-// output is kept under logDir when it is set.
 type repo struct {
 	mu            sync.Mutex
 	existing      []string
@@ -140,7 +130,6 @@ func (r *repo) observations() int {
 	return r.observed
 }
 
-// held makes the next Apply wait until release is called.
 func (r *repo) held() (entered <-chan struct{}, release func()) {
 	r.hold, r.entered = make(chan struct{}), make(chan struct{})
 	var once sync.Once
@@ -228,8 +217,6 @@ func createCommand(r *repo) kernel.Command[request, facts, plan, detail] {
 	}
 }
 
-// createLocks are the locks of create: the repository shared, each branch
-// exclusive.
 func createLocks(req request) []kernel.LockKey {
 	keys := []kernel.LockKey{{Scope: kernel.LockRepo, Mode: kernel.LockShared}}
 	for _, branch := range req.Branches {
@@ -238,9 +225,6 @@ func createLocks(req request) []kernel.LockKey {
 	return keys
 }
 
-// createEvents says what create changed, as wtm create does today: created
-// at the commit, before on_create; updated once allocate gave the ordinal;
-// provisioned once the unit is over, whether its hook ran or failed.
 func createEvents() dispatch.Events[facts, detail] {
 	return dispatch.Events[facts, detail]{
 		Committed: func(e dispatch.EventOf[facts, kernel.Committed[detail]]) []domain.Event {
@@ -271,8 +255,6 @@ func identity(f facts, branch string, d detail) *domain.WorktreeIdentity {
 	return &domain.WorktreeIdentity{Branch: branch, Path: d.Path, Parent: f.Base, Ordinal: d.Ordinal}
 }
 
-// toggles is a request whose fields are a bool and a decision per key, for the
-// options of fields that are not text.
 type toggles struct {
 	Push      bool              `json:"push"`
 	NoPush    bool              `json:"no_push"`
@@ -297,7 +279,6 @@ func togglesCommand() kernel.Command[toggles, struct{}, plan, detail] {
 	}
 }
 
-// unencodable is facts JSON cannot encode.
 type unencodable struct {
 	Watch chan int `json:"watch"`
 }

@@ -174,7 +174,7 @@ The alignment belongs to `Announce`, never to the wording: a format string spell
 
 The output axis, and nothing else. It replaces the command's writers with `io.Discard`, so every framed conclusion, notice and progress line goes nowhere — while the error and the exit code still arrive, because `Execute` prints those to `os.Stderr` rather than through the command.
 
-It never touches a machine contract: `--output json` still emits its document, and a command whose stdout **is** the answer declares `domain.AnnotationMachineOutput` and is left alone. Asking for less noise is not asking for less answer.
+It never touches a machine contract: text is the only human format, so every other `--output` (json, mermaid…) still emits its document, and a command whose stdout **is** the answer declares `domain.AnnotationMachineOutput` and is left alone. Asking for less noise is not asking for less answer.
 
 The corollary is easy to lose. `domain.ErrAborted` means *the command already printed its own report*, and that stops being true the moment the report went to `io.Discard`: a run that exits non-zero having written nothing to either stream cannot be told from one that hung. So `--quiet` records that it silenced the writers, `Execute` prints the error even for `ErrAborted` when it did, and a site returning that sentinel over a refusal wraps its cause (`fmt.Errorf("%w: %s", domain.ErrAborted, …)`) so there is something to print. The same rule reaches the hook runner: with no reporter installed nobody has drawn the hook's result line, so `service/hooks` names the failing command in the error rather than leaving it anonymous.
 
@@ -212,7 +212,8 @@ A plan is rows, never text: `Detail.Plan` turns the plan's detail into `styles.P
 | -- | -- | -- |
 | applied | `Outcome`: a headline with the worst result and the count (`✓ create: 2 done`, `✗ create: 1 done · 1 failed`, `= create: nothing to do`), the done items only as `Detail.Item` shows them, every other item named with why (`✗ feat/b  worktree failed: …`, `! feat/c  not reached`), the warnings, the follow-ups as the command line that runs them (`→`) | stdout |
 | dry run | `Recap`: the plan and its warnings (`styles.RenderPlan` on `Detail.Plan`), a blank line, `fingerprint  <hash>`, and `→` the line that applies it with `--expect-fingerprint` | stdout |
-| refused before applying | `Failure`: the error's sentence, then each field to fix by its flag (`<branches> is required`), each blocker and the flag that lifts it; a `412 plan.stale` points at a new `--dry-run` | stderr |
+| query | `View`: the view's fields as label-value rows under the query's name | stdout |
+| refused before applying | `Failure`: the error's sentence, then each field to fix by its flag (`<branches> is required`), each blocker and the flag that lifts it; a `412 plan.stale` points at a new `--dry-run`. An `internal` error, or an `invalid` one naming no field, keeps its cause after the sentence: it is all the reader has to go on | stderr |
 | while applying | `ProgressView`: a `›` line for the unit at work and its status, a phase that prints (a hook) as a `HookView` replaced by `✓ on_create · feat/a (2.1s)` — one that prints nothing, a saga step, shows nothing, `Cancelling…` once the run's context is cancelled; erased before the conclusion. Off a terminal, a phase that prints is a title and its raw output; in JSON, the raw output alone | stderr |
 
 The view never takes raw mode: Ctrl+C reaches the process as a signal, so the first cancels the run's context and the second is the root's (`surface/cli/signal`), as for every command. The hook log is dispatch's to write, never the surface's.

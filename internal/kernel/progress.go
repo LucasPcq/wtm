@@ -5,9 +5,6 @@ import (
 	"sync"
 )
 
-type OpID string
-
-// Of is what every progress carries, whatever its kind.
 type Of struct {
 	Op      OpID   `json:"op,omitempty"`
 	Subject string `json:"subject,omitempty"`
@@ -17,8 +14,6 @@ func (o *Of) Base() *Of { return o }
 
 //go-sumtype:decl Progress
 
-// Progress is what a command says while it applies, as data: the kind is the
-// type. Build it through a Reporter.
 type Progress interface {
 	Base() *Of
 	progress()
@@ -33,7 +28,6 @@ type UnitFinished struct {
 	Status Status `json:"status"`
 }
 
-// PhaseStarted names the log the phase's output is kept in, when it has one.
 type PhaseStarted struct {
 	Of
 	Phase string `json:"phase"`
@@ -45,7 +39,6 @@ type PhaseFinished struct {
 	Phase string `json:"phase"`
 }
 
-// Output is one raw line of a hook or a process, never a message of the engine.
 type Output struct {
 	Of
 	Line string `json:"line"`
@@ -64,7 +57,6 @@ func (*PhaseFinished) progress() {}
 func (*Output) progress()        {}
 func (*StatusChanged) progress() {}
 
-// Emitter is a carrier, like io.Writer.
 type Emitter interface {
 	Emit(Progress)
 }
@@ -73,8 +65,6 @@ type EmitFunc func(Progress)
 
 func (f EmitFunc) Emit(progress Progress) { f(progress) }
 
-// Reporter emits the progress of one subject and keeps the warnings about it;
-// a nil Emitter drops the progress.
 type Reporter struct {
 	emit     Emitter
 	subject  string
@@ -98,7 +88,6 @@ func (r Reporter) UnitFinished(status Status) {
 	r.send(&UnitFinished{Status: status})
 }
 
-// Phase announces a phase and returns what announces its end.
 func (r Reporter) Phase(name string) (finished func()) {
 	return r.phase(PhaseStarted{Phase: name})
 }
@@ -116,7 +105,6 @@ func (r Reporter) Status(code Code, params Params) {
 	r.send(&StatusChanged{Code: code, Params: params})
 }
 
-// Warn keeps a warning about the subject: Each hands it to the subject's item.
 func (r Reporter) Warn(warning Warning) {
 	r.warnings.mu.Lock()
 	defer r.warnings.mu.Unlock()

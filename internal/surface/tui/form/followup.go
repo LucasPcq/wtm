@@ -14,8 +14,7 @@ type FollowUpParams struct {
 	Note    string
 }
 
-// FollowUp asks whether to run what a command proposes next; backing out is
-// a no.
+// FollowUp reads backing out as a no.
 func FollowUp(params FollowUpParams) (bool, error) {
 	description := params.Command
 	if params.Note != "" {

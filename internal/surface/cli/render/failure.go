@@ -16,8 +16,6 @@ const (
 	detailLineFmt  = "%s%s%s\n"
 )
 
-// Wording is how a surface words what the engine reports: the catalogue of the
-// registry it serves, and its spelling of each field.
 type Wording struct {
 	Catalog text.Catalog
 	Names   Names
@@ -29,9 +27,6 @@ type FailureParams struct {
 	Next    []NextStepParams
 }
 
-// Failure is the report of a run that did not apply: the error's sentence,
-// then what it names one by one — each field to fix, each refusal and what
-// lifts it.
 func Failure(w io.Writer, params FailureParams) {
 	Error(w, params.Wording.Error(params.Err))
 	for _, line := range params.Wording.failureDetails(params.Err) {
@@ -40,8 +35,6 @@ func Failure(w io.Writer, params FailureParams) {
 	NextSteps(w, params.Next)
 }
 
-// FailureLine is the failure on one line, for a run whose report --quiet threw
-// away.
 func (wd Wording) FailureLine(err kernel.Error) string {
 	details := wd.failureDetails(err)
 	if len(details) == 0 {
@@ -70,9 +63,6 @@ func (wd Wording) failureDetails(err kernel.Error) []string {
 	return nil
 }
 
-// Error is the error's sentence from the catalogue. An error the engine could
-// not name more precisely — internal, or invalid with no field to point at —
-// keeps its cause: it is all the reader has to go on.
 func (wd Wording) Error(err kernel.Error) string {
 	base := err.Base()
 	message := wd.Catalog.Message(base.Code, base.Params)
@@ -94,8 +84,6 @@ func keepsCause(err kernel.Error) bool {
 	return false
 }
 
-// Field names the field, and the fields it is checked against, the way the
-// surface spells them.
 func (wd Wording) Field(field kernel.FieldError) string {
 	spelled := field
 	spelled.Path = wd.Names(field.Path)

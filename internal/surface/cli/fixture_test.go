@@ -15,10 +15,9 @@ import (
 	"github.com/LucasPcq/wtm/internal/styles"
 )
 
-// The tests of the generated command line share one example, shaped like
-// `wtm create`: a request with a field of each kind the flags are generated
-// from, the facts read from a fake repository that is also the disk Apply
-// writes to, the command itself, and a query beside it.
+// The example, shaped like `wtm create`: a field of each kind a flag is
+// generated from, a fake repository that is also the disk Apply writes to, and
+// a query beside it.
 
 const (
 	commandName  = "make"
@@ -67,7 +66,6 @@ type inventory struct {
 	Worktrees []string `json:"worktrees"`
 }
 
-// repo is the fake repository: what Observe reads, what Apply changes.
 type repo struct {
 	mu         sync.Mutex
 	existing   []string
@@ -110,8 +108,7 @@ func (r *repo) listed() []string {
 	return slices.Clone(r.worktrees)
 }
 
-// exists changes the facts, as another process would between a preview and
-// its run.
+// As another process would between a preview and its run.
 func (r *repo) exists(branch string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -202,8 +199,6 @@ func inventoryQuery(r *repo) kernel.Query[struct{}, inventory] {
 	}
 }
 
-// pathDetail is a command's own rendering: the plan's branches, and the path
-// of each worktree made.
 type pathDetail struct{}
 
 func (pathDetail) Plan(detail json.RawMessage) []styles.PlanRow {

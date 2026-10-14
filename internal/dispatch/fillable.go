@@ -10,9 +10,6 @@ import (
 
 const factsMismatchFmt = "facts of %T handed to %s"
 
-// Fillable is a command's entry as a form fills it: the calls of its Handle
-// with the request as JSON and the facts kept opaque, so one form serves every
-// command of the registry without knowing its types.
 type Fillable interface {
 	Entry
 	Observe(ctx context.Context) (Observed, error)
@@ -21,8 +18,6 @@ type Fillable interface {
 	Set(params SetParams) (json.RawMessage, error)
 }
 
-// Observed is a snapshot whose facts a surface never reads: it hands them back
-// to the entry that observed them.
 type Observed struct {
 	facts       any
 	Fingerprint Fingerprint
@@ -47,8 +42,6 @@ type SetParams struct {
 	Value   kernel.Value
 }
 
-// fillable embeds the Handle for Name, Schema and Call; its own methods shadow
-// the typed calls of the same name.
 type fillable[Req, F, P, D any] struct {
 	*Handle[Req, F, P, D]
 }
@@ -56,8 +49,6 @@ type fillable[Req, F, P, D any] struct {
 func (h *Handle[Req, F, P, D]) Fillable() (Fillable, bool) {
 	return fillable[Req, F, P, D]{h}, true
 }
-
-func (*QueryHandle[Req, V]) Fillable() (Fillable, bool) { return nil, false }
 
 func (f fillable[Req, F, P, D]) Observe(ctx context.Context) (Observed, error) {
 	snapshot, err := f.Handle.Observe(ctx)
@@ -94,8 +85,6 @@ func (f fillable[Req, F, P, D]) Choices(ctx context.Context, params FillChoicesP
 	return f.Handle.Choices(ctx, ChoicesParams[Req, F]{Path: params.Path, Request: request, Facts: facts})
 }
 
-// Set goes through the typed request, so a value of the wrong shape for its
-// field is refused as kernel.Set refuses it.
 func (f fillable[Req, F, P, D]) Set(params SetParams) (json.RawMessage, error) {
 	request, err := decodeRequest[Req](params.Request)
 	if err != nil {

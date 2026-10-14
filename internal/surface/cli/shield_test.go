@@ -1,11 +1,8 @@
 package cli
 
 import (
-	"bufio"
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"syscall"
 	"testing"
@@ -14,60 +11,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/infra/proc"
 )
 
-const shieldHelperEnv = "WTM_TEST_SHIELD_HELPER"
-
-type interruptHelper struct {
-	cmd   *exec.Cmd
-	lines *bufio.Scanner
-}
-
-func startHelper(t *testing.T, test string) interruptHelper {
-	t.Helper()
-	helper := exec.Command(os.Args[0], "-test.run=^"+test+"$")
-	helper.Env = append(os.Environ(), shieldHelperEnv+"=1")
-	stdout, err := helper.StdoutPipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := helper.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = helper.Process.Kill() })
-	return interruptHelper{cmd: helper, lines: bufio.NewScanner(stdout)}
-}
-
-func (h interruptHelper) expect(t *testing.T, want string) string {
-	t.Helper()
-	if !h.lines.Scan() {
-		t.Fatalf("helper ended before saying %q", want)
-	}
-	if want != "" && h.lines.Text() != want {
-		t.Fatalf("helper said %q, want %q", h.lines.Text(), want)
-	}
-	return h.lines.Text()
-}
-
-func (h interruptHelper) diesOnSIGINT(t *testing.T) {
-	t.Helper()
-	done := make(chan error, 1)
-	go func() { done <- h.cmd.Wait() }()
-	select {
-	case err := <-done:
-		var exitErr *exec.ExitError
-		status, ok := syscall.WaitStatus(0), false
-		if errors.As(err, &exitErr) {
-			status, ok = exitErr.Sys().(syscall.WaitStatus)
-		}
-		if !ok || !status.Signaled() || status.Signal() != syscall.SIGINT {
-			t.Fatalf("helper ended with %v, want SIGINT", err)
-		}
-	case <-time.After(10 * time.Second):
-		t.Fatal("the second interrupt did not end the run")
-	}
-}
-
-// A second Ctrl-C does not cut a shielded step — a worktree half removed — off:
-// the process ends once it is done, not before.
 func TestASecondInterruptWaitsForAShieldedStep(t *testing.T) {
 	if os.Getenv(shieldHelperEnv) != "" {
 		ctx, stop := interruptible()
@@ -92,8 +35,6 @@ func TestASecondInterruptWaitsForAShieldedStep(t *testing.T) {
 	helper.diesOnSIGINT(t)
 }
 
-// A child that ignores the interrupt is killed with the process that gave up
-// waiting for it, instead of outliving it.
 func TestASecondInterruptTakesTheChildItWasStoppingWithIt(t *testing.T) {
 	if os.Getenv(shieldHelperEnv) != "" {
 		ctx, stop := interruptible()

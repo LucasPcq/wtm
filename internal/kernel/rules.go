@@ -8,20 +8,14 @@ import (
 
 const ruleShapeFmt = "kernel: rule %s: %s holds a %T, not a %s"
 
-// Rule is a rule across fields, kept as data: the form reads Paths to know
-// which options a rule may disable.
 type Rule[Req, F any] struct {
 	Code  Code
 	Paths []string
 	Check func(Req, F) ([]FieldError, error)
 }
 
-// Rules is built by chaining combinators, the types given once:
-// kernel.Rules[Request, Facts]{}.Distinct("branches").RequiredWhen(…).
 type Rules[Req, F any] []Rule[Req, F]
 
-// Condition is a pure predicate over the request and the facts; Code says
-// why it holds, for the message.
 type Condition[Req, F any] struct {
 	Code  Code
 	Holds func(Req, F) bool
@@ -37,7 +31,6 @@ type SelfParentRule struct {
 	Children string
 }
 
-// reading is what a combinator checks: the values at its paths, in order.
 type reading[Req, F any] struct {
 	values  []Value
 	request Req
@@ -48,7 +41,6 @@ func (rules Rules[Req, F]) With(rule Rule[Req, F]) Rules[Req, F] {
 	return append(slices.Clip(rules), rule)
 }
 
-// reads adds a rule that checks the values at paths, read for it.
 func (rules Rules[Req, F]) reads(code Code, paths []string, check func(reading[Req, F]) ([]FieldError, error)) Rules[Req, F] {
 	return rules.With(Rule[Req, F]{Code: code, Paths: paths, Check: func(req Req, facts F) ([]FieldError, error) {
 		values := make([]Value, 0, len(paths))
@@ -63,8 +55,6 @@ func (rules Rules[Req, F]) reads(code Code, paths []string, check func(reading[R
 	}})
 }
 
-// shaped is the value of a rule's field as the shape the rule reads: none is
-// its zero, another shape is an error of the command.
 func shaped[V Value](code Code, path string, value Value) (V, error) {
 	var zero V
 	if value == nil {
@@ -77,14 +67,12 @@ func shaped[V Value](code Code, path string, value Value) (V, error) {
 	return typed, nil
 }
 
-// Exclusive refuses more than one of paths set.
 func (rules Rules[Req, F]) Exclusive(paths ...string) Rules[Req, F] {
 	return rules.reads(CodeExclusiveWith, paths, func(read reading[Req, F]) ([]FieldError, error) {
 		return exclusive(setAmong(paths, read.values)), nil
 	})
 }
 
-// OneOf wants exactly one of paths set.
 func (rules Rules[Req, F]) OneOf(paths ...string) Rules[Req, F] {
 	return rules.reads(CodeRequiredOneOf, paths, func(read reading[Req, F]) ([]FieldError, error) {
 		set := setAmong(paths, read.values)
@@ -119,7 +107,6 @@ func (rules Rules[Req, F]) RequiredWhen(path string, when Condition[Req, F]) Rul
 	})
 }
 
-// Distinct refuses an entry given twice in a list.
 func (rules Rules[Req, F]) Distinct(path string) Rules[Req, F] {
 	return rules.reads(CodeDistinct, []string{path}, func(read reading[Req, F]) ([]FieldError, error) {
 		list, err := shaped[List](CodeDistinct, path, read.values[0])
@@ -136,8 +123,6 @@ func (rules Rules[Req, F]) Distinct(path string) Rules[Req, F] {
 	})
 }
 
-// NotSelfParent refuses a parent that is also one of the children it would
-// be the parent of; Children is a list or a single text field.
 func (rules Rules[Req, F]) NotSelfParent(rule SelfParentRule) Rules[Req, F] {
 	return rules.reads(CodeSelfParent, []string{rule.Parent, rule.Children}, func(read reading[Req, F]) ([]FieldError, error) {
 		parent, err := shaped[Text](CodeSelfParent, rule.Parent, read.values[0])
@@ -174,8 +159,6 @@ type DisabledParams[Req, F any] struct {
 	Candidate Value
 }
 
-// Disabled says whether picking Candidate for Path would break a rule that
-// holds today, and which: the form shows the option disabled with it.
 func Disabled[Req, F any](params DisabledParams[Req, F]) (*FieldError, error) {
 	touching := Rules[Req, F](without(params.Rules, func(rule Rule[Req, F]) bool {
 		return !slices.Contains(rule.Paths, params.Path)
@@ -222,7 +205,6 @@ func exclusive(set []string) []FieldError {
 	return problems
 }
 
-// holds says whether a list or a text field holds text.
 func holds(value Value, text string) bool {
 	switch v := value.(type) {
 	case List:
@@ -235,7 +217,6 @@ func holds(value Value, text string) bool {
 	return false
 }
 
-// without returns a copy of items with those drop matches left out.
 func without[T any](items []T, drop func(T) bool) []T {
 	return slices.DeleteFunc(slices.Clone(items), drop)
 }

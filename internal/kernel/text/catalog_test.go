@@ -9,8 +9,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/kernel/text"
 )
 
-const codeBranchTaken kernel.Code = "branch.taken"
-
 func TestAMessageFillsEveryParam(t *testing.T) {
 	assert.Equal(t, "could not undo env, left behind: worktree,env",
 		text.NewCatalog().Message(kernel.CodeUndoFailed, kernel.Params{kernel.ParamStep: "env", kernel.ParamLeft: "worktree,env"}))

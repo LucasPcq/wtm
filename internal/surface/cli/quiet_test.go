@@ -1,32 +1,11 @@
 package cli
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"testing"
-
-	"github.com/spf13/cobra"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 )
-
-func quietTestCmd(t *testing.T, args ...string) *cobra.Command {
-	t.Helper()
-	cmd := &cobra.Command{Use: "probe", RunE: func(*cobra.Command, []string) error { return nil }}
-	cmd.Flags().Bool(domain.FlagQuiet, false, "")
-	cmd.Flags().String(domain.FlagOutput, domain.OutputText, "")
-	if err := cmd.Flags().Parse(args); err != nil {
-		t.Fatalf("parse flags: %v", err)
-	}
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-	return cmd
-}
-
-func silenced(cmd *cobra.Command) bool {
-	return cmd.OutOrStdout() == io.Discard && cmd.ErrOrStderr() == io.Discard
-}
 
 func TestQuietSilencesHumanOutput(t *testing.T) {
 	cmd := quietTestCmd(t, "--quiet")
@@ -36,8 +15,6 @@ func TestQuietSilencesHumanOutput(t *testing.T) {
 	}
 }
 
-// A caller asking for less noise did not ask for less answer: the machine
-// contracts are what --quiet must never touch.
 func TestQuietLeavesMachineOutputAlone(t *testing.T) {
 	json := quietTestCmd(t, "--quiet", "--output", domain.OutputJSON)
 	silenceHumanOutput(json)
@@ -61,8 +38,6 @@ func TestWithoutQuietNothingIsSilenced(t *testing.T) {
 	}
 }
 
-// --quiet takes the report away, so ErrAborted — which means "the report is
-// already on screen" — stops being a reason to say nothing.
 func TestQuietRecordsThatTheReportWasDiscarded(t *testing.T) {
 	humanOutputSilenced = false
 	t.Cleanup(func() { humanOutputSilenced = false })
@@ -78,8 +53,6 @@ func TestQuietRecordsThatTheReportWasDiscarded(t *testing.T) {
 	}
 }
 
-// A run that exits non-zero with nothing on either stream cannot be told from
-// one that hung.
 func TestAbortLineStandsInForADiscardedReport(t *testing.T) {
 	if got := abortLine(domain.ErrAborted); got != domain.QuietAbortedMessage {
 		t.Errorf("abortLine(bare) = %q, want the stand-in message", got)

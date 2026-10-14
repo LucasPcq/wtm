@@ -12,9 +12,6 @@ type CheckSpecParams[Req any] struct {
 	Specs   []FieldSpec
 }
 
-// CheckSpec checks each field against its own declared constraints; rules
-// across fields are Rules' business. A spec whose type does not fit its
-// field, or whose pattern does not compile, is an error of the command.
 func CheckSpec[Req any](params CheckSpecParams[Req]) ([]FieldError, error) {
 	var problems []FieldError
 	for _, spec := range params.Specs {
@@ -31,7 +28,6 @@ func CheckSpec[Req any](params CheckSpecParams[Req]) ([]FieldError, error) {
 	return problems, nil
 }
 
-// fits says which Value a field type holds.
 func fits(typ FieldType, value Value) bool {
 	switch value.(type) {
 	case Text:
@@ -133,8 +129,4 @@ func (c checker) entry(at entry) []FieldError {
 		return []FieldError{{Path: at.path, Code: CodePattern, Params: Params{ParamValue: at.text, ParamPattern: limits.Pattern}}}
 	}
 	return nil
-}
-
-func IndexPath(path string, index int) string {
-	return path + "[" + strconv.Itoa(index) + "]"
 }

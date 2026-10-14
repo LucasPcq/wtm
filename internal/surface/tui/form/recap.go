@@ -13,8 +13,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/surface/tui/components"
 )
 
-// recapStep is the plan of a dry run on the request filled so far: nothing
-// is applied before the user has seen what it does.
 func (s *session) recapStep() components.Step {
 	return components.Step{
 		Name:    recapName,
@@ -26,8 +24,6 @@ func (s *session) recapStep() components.Step {
 	}
 }
 
-// buildRecap shows no option until the plan arrives, so enter cannot apply a
-// plan nobody has seen.
 func (s *session) buildRecap(prev []components.Step) any {
 	request := s.requestFrom(prev)
 	s.request, s.preview, s.failure = request, nil, nil
@@ -57,8 +53,6 @@ func (s *session) previewed(w *components.WizardModel, m previewMsg) {
 	s.redraw(w)
 }
 
-// resized draws the recap again at the wizard's new width: a plan wraps at the
-// width of the box it is drawn in.
 func (s *session) resized(w *components.WizardModel, m tea.WindowSizeMsg) {
 	s.width = m.Width
 	if s.preview != nil || s.failure != nil {
@@ -70,8 +64,6 @@ func (s *session) redraw(w *components.WizardModel) {
 	w.UpdateStepModel(len(s.fields), func(any) any { return s.recapModel() })
 }
 
-// recapModel is the plan as the command shows it, with its warnings, or why
-// there is none; only a plan that does something can be applied.
 func (s *session) recapModel() components.SelectListModel {
 	if s.preview == nil {
 		return recapList(recapParams{Title: failedTitle, Description: s.describe(s.failure)})
@@ -80,8 +72,6 @@ func (s *session) recapModel() components.SelectListModel {
 	return recapList(recapParams{Title: recapTitle, Description: s.recapText(rows), Apply: len(rows) > 0})
 }
 
-// recapText is the plan and its warnings, under a notice when the facts it was
-// first computed on changed.
 func (s *session) recapText(rows []styles.PlanRow) string {
 	warnings := make([]string, 0, len(s.preview.Plan.Warnings))
 	for _, warning := range s.preview.Plan.Warnings {
@@ -100,6 +90,7 @@ type recapParams struct {
 	Apply       bool
 }
 
+// While the plan loads the recap offers no option: enter cannot apply a plan nobody has seen.
 func recapList(params recapParams) components.SelectListModel {
 	var items []components.SelectItem
 	if params.Apply {
@@ -111,8 +102,6 @@ func recapList(params recapParams) components.SelectListModel {
 	return components.NewSelectList(components.NewSelectListParams{Title: params.Title, Description: params.Description, Items: items})
 }
 
-// describe is a failure as the recap says it: its message as an error, then
-// each field or blocker it names beneath.
 func (s *session) describe(err error) string {
 	failed := styles.DangerText.Render(domain.GlyphFailure) + " "
 	var failure kernel.Error
