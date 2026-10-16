@@ -28,6 +28,8 @@ internal/
                                 (dispatch.md)
   command/                    ← the mutations on the engine, one package per command, run through dispatch only
                                 (none yet: create/ is written by its pilot; adding-a-mutation-command.md)
+    provision/                ←   the unit that gives a branch its worktree (saga: worktree, .env, meta.json;
+                                  then ordinal, ports, on_create), shared by the commands that create one, never registered
   query/
     operations/               ←   the operations in progress, read from their holder files
   registry/                   ← the composition root: every command and query with its real ports (registry.Production),

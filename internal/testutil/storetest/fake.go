@@ -1,4 +1,4 @@
-// Package storetest doubles the ports of store: the state files in memory.
+// Package storetest doubles the ports of store: the state files in memory, or the real ones on a test's state dir.
 package storetest
 
 import (
