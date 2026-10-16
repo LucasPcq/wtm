@@ -23,6 +23,7 @@ type Reader interface {
 	RefExists(ctx context.Context, ref Ref) (bool, error)
 	Tip(ctx context.Context, ref Ref) (string, error)
 	AheadBehind(ctx context.Context, params AheadBehindParams) (AheadBehind, error)
+	Dirty(ctx context.Context, worktree string) (bool, error)
 }
 
 // Worktree is one entry of `git worktree list`: git lists the main one first.
@@ -340,4 +341,12 @@ func adminDirOf(path string) (string, error) {
 		return adminDir, nil
 	}
 	return filepath.Join(path, adminDir), nil
+}
+
+func (r Repo) Dirty(ctx context.Context, worktree string) (bool, error) {
+	out, err := Repo{Dir: worktree, Remote: r.Remote}.git(ctx, "status", "--porcelain")
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(string(out)) != "", nil
 }

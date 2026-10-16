@@ -204,6 +204,19 @@ func (f *Fake) AheadBehind(_ context.Context, params git.AheadBehindParams) (git
 	return git.AheadBehind{Ahead: len(of) - shared, Behind: len(against) - shared}, nil
 }
 
+func (f *Fake) Dirty(_ context.Context, worktree string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("Dirty", worktree); err != nil {
+		return false, err
+	}
+	path := realPath(worktree)
+	if f.worktreeAt(path) < 0 {
+		return false, fmt.Errorf("gittest: %s is not a worktree", path)
+	}
+	return slices.Contains(f.dirty, path), nil
+}
+
 // AddWorktree creates a new branch before it looks at the path, as git does:
 // an add refused for its path leaves the branch.
 func (f *Fake) AddWorktree(_ context.Context, params git.AddWorktreeParams) error {
