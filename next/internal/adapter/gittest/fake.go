@@ -19,7 +19,6 @@ import (
 type Fake struct {
 	mu        sync.Mutex
 	worktrees []worktree.Worktree
-	locked    []string
 	gone      []string
 	local     map[string]history
 	remote    map[string]history
@@ -38,7 +37,6 @@ type FakeParams struct {
 	Local     []string
 	Remote    []string
 	Worktrees []worktree.Worktree
-	Locked    []string
 	Gone      []string
 	Folders   []string
 	Empty     []string
@@ -57,7 +55,6 @@ func NewFake(params FakeParams) *Fake {
 		local:     map[string]history{},
 		remote:    map[string]history{},
 		origin:    map[string]history{},
-		locked:    realPaths(params.Locked),
 		gone:      realPaths(params.Gone),
 		folders:   realPaths(params.Folders),
 		empty:     realPaths(params.Empty),
@@ -141,16 +138,16 @@ func (f *Fake) Branches(context.Context) (branch.Branches, error) {
 	return branch.Branches{Local: branchesOf(f.local), Remote: branchesOf(f.remote)}, nil
 }
 
-func (f *Fake) AheadBehind(_ context.Context, params branch.AheadBehindParams) (branch.AheadBehind, error) {
+func (f *Fake) AheadBehind(_ context.Context, name string) (branch.AheadBehind, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if err := f.enter("AheadBehind", fmt.Sprint(params.Of, params.Against)); err != nil {
+	if err := f.enter("AheadBehind", name); err != nil {
 		return branch.AheadBehind{}, err
 	}
-	of, ofOK := f.historyOf(params.Of)
-	against, againstOK := f.historyOf(params.Against)
+	of, ofOK := f.historyOf(branch.LocalBranch{Name: name})
+	against, againstOK := f.historyOf(branch.RemoteBranch{Name: name})
 	if !ofOK || !againstOK {
-		return branch.AheadBehind{}, fmt.Errorf("gittest: unknown ref in %v", params)
+		return branch.AheadBehind{}, fmt.Errorf("gittest: unknown ref %s or its remote", name)
 	}
 	shared := sharedLength(of, against)
 	return branch.AheadBehind{Ahead: len(of) - shared, Behind: len(against) - shared}, nil
@@ -235,8 +232,6 @@ func (f *Fake) RemoveWorktree(_ context.Context, path string) error {
 		return fmt.Errorf("gittest: %s is not a worktree", resolved)
 	case f.worktrees[index].Main:
 		return fmt.Errorf("gittest: %s is the main worktree", resolved)
-	case slices.Contains(f.locked, resolved):
-		return fmt.Errorf("gittest: %s is locked", resolved)
 	}
 	f.worktrees = slices.Delete(f.worktrees, index, index+1)
 	f.dirty = slices.DeleteFunc(f.dirty, func(dirty string) bool { return dirty == resolved })
@@ -278,59 +273,55 @@ func (f *Fake) FetchRef(_ context.Context, name string) error {
 	return nil
 }
 
-func (f *Fake) FastForwardRef(_ context.Context, name string) (branch.Move, error) {
+func (f *Fake) FastForwardRef(_ context.Context, name string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := f.enter("FastForwardRef", name); err != nil {
-		return branch.Move{}, err
+		return err
 	}
 	commits, ok := f.origin[name]
 	if !ok {
-		return branch.Move{}, fmt.Errorf("gittest: no remote branch %s", name)
+		return fmt.Errorf("gittest: no remote branch %s", name)
 	}
 	if f.checkedOut(name) {
-		return branch.Move{}, fmt.Errorf("gittest: branch %s is checked out", name)
+		return fmt.Errorf("gittest: branch %s is checked out", name)
 	}
 	f.remote[name] = commits
-	local, existed := f.local[name]
-	if existed && !local.within(commits) {
-		return branch.Move{}, fmt.Errorf("gittest: %s is not a fast-forward", name)
+	if local, existed := f.local[name]; existed && !local.within(commits) {
+		return fmt.Errorf("gittest: %s is not a fast-forward", name)
 	}
 	f.local[name] = slices.Clone(commits)
-	if !existed {
-		return branch.Move{To: commits.tip()}, nil
-	}
-	return branch.Move{From: local.tip(), To: commits.tip()}, nil
+	return nil
 }
 
-func (f *Fake) MergeFFOnly(_ context.Context, merge worktree.Merge) (branch.Move, error) {
+func (f *Fake) MergeFFOnly(_ context.Context, merge worktree.Merge) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := f.enter("MergeFFOnly", merge.Path); err != nil {
-		return branch.Move{}, err
+		return err
 	}
 	resolved := realPath(merge.Path)
 	index := f.worktreeAt(resolved)
 	if index < 0 || slices.Contains(f.gone, resolved) {
-		return branch.Move{}, fmt.Errorf("gittest: %s is not a worktree", merge.Path)
+		return fmt.Errorf("gittest: %s is not a worktree", merge.Path)
 	}
 	onto, ok := f.historyOf(merge.Onto)
 	if !ok {
-		return branch.Move{}, fmt.Errorf("gittest: unknown ref %v", merge.Onto)
+		return fmt.Errorf("gittest: unknown ref %v", merge.Onto)
 	}
 	state, ok := f.worktrees[index].State.(worktree.OnBranch)
 	if !ok {
-		return branch.Move{}, fmt.Errorf("gittest: %s is on no branch", merge.Path)
+		return fmt.Errorf("gittest: %s is on no branch", merge.Path)
 	}
 	local := f.local[state.Branch]
 	switch {
 	case onto.within(local):
-		return branch.Move{From: local.tip(), To: local.tip()}, nil
+		return nil
 	case !local.within(onto):
-		return branch.Move{}, fmt.Errorf("gittest: %v is not a fast-forward of %s", merge.Onto, state.Branch)
+		return fmt.Errorf("gittest: %v is not a fast-forward of %s", merge.Onto, state.Branch)
 	}
 	f.local[state.Branch] = slices.Clone(onto)
-	return branch.Move{From: local.tip(), To: onto.tip()}, nil
+	return nil
 }
 
 func (f *Fake) enter(method, argument string) error {

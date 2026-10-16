@@ -252,9 +252,6 @@ func buildWorktree(t testing.TB, params buildWorktreeParams) {
 	case worktree.Detached, worktree.Bare:
 		Git(t, params.Main, "worktree", "add", "-q", "--detach", path, params.Root)
 	}
-	if slices.Contains(params.Seed.Locked, path) {
-		Git(t, params.Main, "worktree", "lock", path)
-	}
 	if slices.Contains(params.Seed.Gone, path) {
 		if err := os.RemoveAll(path); err != nil {
 			t.Fatal(err)

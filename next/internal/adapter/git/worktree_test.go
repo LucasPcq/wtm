@@ -231,11 +231,10 @@ func TestTheFakeAndGitReadTheSameRepository(t *testing.T) {
 					{Path: at("dirty"), State: worktree.OnBranch{Branch: "dirty"}},
 					{Path: at("gone"), State: worktree.OnBranch{Branch: "gone"}},
 					{Path: at("linked"), State: worktree.OnBranch{Branch: "linked"}},
-					{Path: at("locked"), State: worktree.OnBranch{Branch: "locked"}},
 					{Path: at("rebasing"), State: worktree.Rebasing{Branch: "rebasing"}},
 				},
 				Branches: branch.Branches{
-					Local:  named("dirty", "diverged", "feature", "gone", "linked", "locked", "main", "rebasing", "unmerged"),
+					Local:  named("dirty", "diverged", "feature", "gone", "linked", "main", "rebasing", "unmerged"),
 					Remote: named("diverged", "feature", "main", "remote-only"),
 				},
 			}, gittest.StateOf(t, impl.port))
@@ -390,9 +389,6 @@ func TestTheFakeAndGitRefuseTheSameWorktreeChanges(t *testing.T) {
 		}},
 		{name: "removing the main worktree", call: func(t *testing.T, impl implementation) error {
 			return impl.port.RemoveWorktree(t.Context(), filepath.Join(impl.root, "main"))
-		}},
-		{name: "removing a locked worktree", call: func(t *testing.T, impl implementation) error {
-			return impl.port.RemoveWorktree(t.Context(), filepath.Join(impl.root, "locked"))
 		}},
 		{name: "removing what is not a worktree", call: func(t *testing.T, impl implementation) error {
 			return impl.port.RemoveWorktree(t.Context(), filepath.Join(impl.root, "taken"))

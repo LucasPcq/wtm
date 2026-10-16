@@ -3,7 +3,6 @@ package events
 
 import (
 	"encoding/json"
-	"errors"
 	"net"
 	"os"
 	"path/filepath"
@@ -18,7 +17,6 @@ const (
 	globalDirName  = "wtm"
 	socketName     = "wtm.sock"
 	actionPublish  = "publish"
-	statusOK       = "ok"
 )
 
 type PublisherParams struct {
@@ -78,7 +76,7 @@ func (p Publisher) Publish(event wtm.Event) {
 	if err != nil {
 		return
 	}
-	_ = p.send(payload)
+	p.send(payload)
 }
 
 type request struct {
@@ -87,29 +85,18 @@ type request struct {
 	Payload json.RawMessage `json:"payload,omitempty"`
 }
 
-type response struct {
-	Status  string `json:"status"`
-	Message string `json:"message,omitempty"`
-}
-
-func (p Publisher) send(payload json.RawMessage) error {
+func (p Publisher) send(payload json.RawMessage) {
 	conn, err := net.DialTimeout("unix", p.socketPath, publishTimeout)
 	if err != nil {
-		return err
+		return
 	}
 	defer conn.Close()
-	if err := conn.SetDeadline(time.Now().Add(publishTimeout)); err != nil {
-		return err
+	if conn.SetDeadline(time.Now().Add(publishTimeout)) != nil {
+		return
 	}
-	if err := json.NewEncoder(conn).Encode(request{Action: actionPublish, Repo: p.repo.CommonDir, Payload: payload}); err != nil {
-		return err
+	if json.NewEncoder(conn).Encode(request{Action: actionPublish, Repo: p.repo.CommonDir, Payload: payload}) != nil {
+		return
 	}
-	var answer response
-	if err := json.NewDecoder(conn).Decode(&answer); err != nil {
-		return err
-	}
-	if answer.Status != statusOK {
-		return errors.New(answer.Message)
-	}
-	return nil
+	var reply json.RawMessage
+	_ = json.NewDecoder(conn).Decode(&reply)
 }

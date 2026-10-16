@@ -110,9 +110,9 @@ func tip(t *testing.T, reader port, ref branch.Ref) string {
 	return commit
 }
 
-func aheadBehind(t *testing.T, reader port, params branch.AheadBehindParams) branch.AheadBehind {
+func aheadBehind(t *testing.T, reader port, name string) branch.AheadBehind {
 	t.Helper()
-	counts, err := reader.AheadBehind(t.Context(), params)
+	counts, err := reader.AheadBehind(t.Context(), name)
 	require.NoError(t, err)
 	return counts
 }

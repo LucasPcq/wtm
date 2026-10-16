@@ -31,12 +31,9 @@ func TestFastForwardRefMovesABranchCheckedOutNowhere(t *testing.T) {
 	gittest.CreateBranch(t, repo.Dir, "feature")
 	gittest.PushBranch(t, repo.Dir, "feature")
 	pushed := advanceOnOrigin(t, origin, "feature")
-	from := head(t, repo.Dir, "feature")
 
-	move, err := repo.FastForwardRef(t.Context(), "feature")
+	require.NoError(t, repo.FastForwardRef(t.Context(), "feature"))
 
-	require.NoError(t, err)
-	assert.Equal(t, branch.Move{From: from, To: pushed}, move)
 	assert.Equal(t, pushed, head(t, repo.Dir, "feature"))
 }
 
@@ -49,8 +46,8 @@ func TestFastForwardRefRefusesWhatIsNotAFastForward(t *testing.T) {
 	advanceOnOrigin(t, origin, "diverged")
 	advanceOnOrigin(t, origin, "main")
 
-	_, diverged := repo.FastForwardRef(t.Context(), "diverged")
-	_, checkedOut := repo.FastForwardRef(t.Context(), "main")
+	diverged := repo.FastForwardRef(t.Context(), "diverged")
+	checkedOut := repo.FastForwardRef(t.Context(), "main")
 
 	var gitErr *git.Error
 	require.ErrorAs(t, diverged, &gitErr)
@@ -61,12 +58,9 @@ func TestMergeFFOnlyMovesTheBranchOfAWorktree(t *testing.T) {
 	repo, origin := newRepoWithOrigin(t)
 	pushed := advanceOnOrigin(t, origin, "main")
 	require.NoError(t, repo.FetchRef(t.Context(), "main"))
-	from := head(t, repo.Dir, "main")
 
-	move, err := repo.MergeFFOnly(t.Context(), worktree.Merge{Path: repo.Dir, Onto: branch.RemoteBranch{Name: "main"}})
+	require.NoError(t, repo.MergeFFOnly(t.Context(), worktree.Merge{Path: repo.Dir, Onto: branch.RemoteBranch{Name: "main"}}))
 
-	require.NoError(t, err)
-	assert.Equal(t, branch.Move{From: from, To: pushed}, move)
 	assert.Equal(t, pushed, head(t, repo.Dir, "main"))
 }
 
@@ -76,8 +70,8 @@ func TestMergeFFOnlyRefusesWhatIsNotAFastForward(t *testing.T) {
 	advanceOnOrigin(t, origin, "main")
 	require.NoError(t, repo.FetchRef(t.Context(), "main"))
 
-	_, diverged := repo.MergeFFOnly(t.Context(), worktree.Merge{Path: repo.Dir, Onto: branch.RemoteBranch{Name: "main"}})
-	_, noOnto := repo.MergeFFOnly(t.Context(), worktree.Merge{Path: repo.Dir})
+	diverged := repo.MergeFFOnly(t.Context(), worktree.Merge{Path: repo.Dir, Onto: branch.RemoteBranch{Name: "main"}})
+	noOnto := repo.MergeFFOnly(t.Context(), worktree.Merge{Path: repo.Dir})
 
 	var gitErr *git.Error
 	require.ErrorAs(t, diverged, &gitErr)
@@ -87,11 +81,9 @@ func TestMergeFFOnlyRefusesWhatIsNotAFastForward(t *testing.T) {
 func TestTheFakeAndGitFetchWhatTheRemoteHas(t *testing.T) {
 	for _, impl := range implementations(t) {
 		t.Run(impl.name, func(t *testing.T) {
-			pair := branch.AheadBehindParams{Of: branch.LocalBranch{Name: "main"}, Against: branch.RemoteBranch{Name: "main"}}
-
 			require.NoError(t, impl.port.FetchRef(t.Context(), "main"))
 
-			assert.Equal(t, branch.AheadBehind{Behind: 1}, aheadBehind(t, impl.port, pair))
+			assert.Equal(t, branch.AheadBehind{Behind: 1}, aheadBehind(t, impl.port, "main"))
 			assert.False(t, has(t, impl.port, branch.RemoteBranch{Name: "pushed"}))
 		})
 	}
@@ -103,16 +95,15 @@ func TestTheFakeAndGitFastForwardABranchCheckedOutNowhere(t *testing.T) {
 			feature := branch.LocalBranch{Name: "feature"}
 			from := tip(t, impl.port, feature)
 
-			moved, movedErr := impl.port.FastForwardRef(t.Context(), "feature")
-			created, createdErr := impl.port.FastForwardRef(t.Context(), "pushed")
+			movedErr := impl.port.FastForwardRef(t.Context(), "feature")
+			createdErr := impl.port.FastForwardRef(t.Context(), "pushed")
 
 			require.NoError(t, movedErr)
-			assert.Equal(t, branch.Move{From: from, To: tip(t, impl.port, branch.RemoteBranch{Name: "feature"})}, moved)
-			assert.NotEqual(t, moved.From, moved.To)
-			assert.Equal(t, branch.AheadBehind{}, aheadBehind(t, impl.port, branch.AheadBehindParams{Of: feature, Against: branch.RemoteBranch{Name: "feature"}}))
+			assert.NotEqual(t, from, tip(t, impl.port, feature))
+			assert.Equal(t, tip(t, impl.port, branch.RemoteBranch{Name: "feature"}), tip(t, impl.port, feature))
+			assert.Equal(t, branch.AheadBehind{}, aheadBehind(t, impl.port, "feature"))
 			require.NoError(t, createdErr)
-			assert.Equal(t, branch.Move{To: tip(t, impl.port, branch.LocalBranch{Name: "pushed"})}, created)
-			assert.Equal(t, tip(t, impl.port, branch.RemoteBranch{Name: "pushed"}), created.To)
+			assert.Equal(t, tip(t, impl.port, branch.RemoteBranch{Name: "pushed"}), tip(t, impl.port, branch.LocalBranch{Name: "pushed"}))
 		})
 	}
 }
@@ -123,7 +114,7 @@ func TestTheFakeAndGitRefuseANonFastForwardButStillFetch(t *testing.T) {
 			local := tip(t, impl.port, branch.LocalBranch{Name: "diverged"})
 			fetched := tip(t, impl.port, branch.RemoteBranch{Name: "diverged"})
 
-			_, err := impl.port.FastForwardRef(t.Context(), "diverged")
+			err := impl.port.FastForwardRef(t.Context(), "diverged")
 
 			require.Error(t, err)
 			assert.Equal(t, local, tip(t, impl.port, branch.LocalBranch{Name: "diverged"}))
@@ -140,14 +131,15 @@ func TestTheFakeAndGitMergeAFastForwardInAWorktree(t *testing.T) {
 			from := tip(t, impl.port, main)
 			require.NoError(t, impl.port.FetchRef(t.Context(), "main"))
 
-			moved, movedErr := impl.port.MergeFFOnly(t.Context(), onto)
-			again, againErr := impl.port.MergeFFOnly(t.Context(), onto)
+			movedErr := impl.port.MergeFFOnly(t.Context(), onto)
+			moved := tip(t, impl.port, main)
+			againErr := impl.port.MergeFFOnly(t.Context(), onto)
 
 			require.NoError(t, movedErr)
-			assert.Equal(t, branch.Move{From: from, To: tip(t, impl.port, branch.RemoteBranch{Name: "main"})}, moved)
-			assert.Equal(t, moved.To, tip(t, impl.port, main))
+			assert.NotEqual(t, from, moved)
+			assert.Equal(t, tip(t, impl.port, branch.RemoteBranch{Name: "main"}), moved)
 			require.NoError(t, againErr)
-			assert.Equal(t, branch.Move{From: moved.To, To: moved.To}, again)
+			assert.Equal(t, moved, tip(t, impl.port, main))
 		})
 	}
 }
@@ -161,15 +153,15 @@ func TestTheFakeAndGitRefuseTheSameRemoteChanges(t *testing.T) {
 			return impl.port.FetchRef(t.Context(), "nope")
 		}},
 		{name: "fast-forwarding a branch checked out", call: func(t *testing.T, impl implementation) error {
-			_, err := impl.port.FastForwardRef(t.Context(), "main")
+			err := impl.port.FastForwardRef(t.Context(), "main")
 			return err
 		}},
 		{name: "merging onto an unknown ref", call: func(t *testing.T, impl implementation) error {
-			_, err := impl.port.MergeFFOnly(t.Context(), worktree.Merge{Path: filepath.Join(impl.root, "main"), Onto: branch.RemoteBranch{Name: "nope"}})
+			err := impl.port.MergeFFOnly(t.Context(), worktree.Merge{Path: filepath.Join(impl.root, "main"), Onto: branch.RemoteBranch{Name: "nope"}})
 			return err
 		}},
 		{name: "merging what is not a fast-forward", call: func(t *testing.T, impl implementation) error {
-			_, err := impl.port.MergeFFOnly(t.Context(), worktree.Merge{Path: filepath.Join(impl.root, "linked"), Onto: branch.LocalBranch{Name: "unmerged"}})
+			err := impl.port.MergeFFOnly(t.Context(), worktree.Merge{Path: filepath.Join(impl.root, "linked"), Onto: branch.LocalBranch{Name: "unmerged"}})
 			return err
 		}},
 	}

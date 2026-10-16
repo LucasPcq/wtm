@@ -10,16 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAHookLogIsNamedAfterItsPhaseAndItsEscapedBranch(t *testing.T) {
-	assert.Equal(t, filepath.Join("/state", "hooks", "on_create-feat%2Fx.log"), HookLogPath(HookLogParams{StateDir: "/state", Phase: "on_create", Branch: "feat/x"}))
-}
-
-func TestAPhaseOnSeveralWorktreesHasNoBranchInItsLogName(t *testing.T) {
-	assert.Equal(t, filepath.Join("/state", "hooks", "on_clean.log"), HookLogPath(HookLogParams{StateDir: "/state", Phase: "on_clean"}))
+func TestAHookLogIsNamedAfterItsEscapedBranch(t *testing.T) {
+	assert.Equal(t, filepath.Join("/state", "hooks", "on_create-feat%2Fx.log"), HookLogPath(HookLogParams{StateDir: "/state", Branch: "feat/x"}))
 }
 
 func TestNoStateDirMeansNoLog(t *testing.T) {
-	assert.Empty(t, HookLogPath(HookLogParams{Phase: "on_create", Branch: "feat/x"}))
+	assert.Empty(t, HookLogPath(HookLogParams{Branch: "feat/x"}))
 }
 
 func TestAHookLogHoldsOnlyTheLastRun(t *testing.T) {

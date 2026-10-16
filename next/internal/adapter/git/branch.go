@@ -50,12 +50,12 @@ func (r Repo) Branches(ctx context.Context) (branch.Branches, error) {
 	return branches, nil
 }
 
-func (r Repo) AheadBehind(ctx context.Context, params branch.AheadBehindParams) (branch.AheadBehind, error) {
-	of, err := r.refName(params.Of)
+func (r Repo) AheadBehind(ctx context.Context, name string) (branch.AheadBehind, error) {
+	of, err := r.refName(branch.LocalBranch{Name: name})
 	if err != nil {
 		return branch.AheadBehind{}, err
 	}
-	against, err := r.refName(params.Against)
+	against, err := r.refName(branch.RemoteBranch{Name: name})
 	if err != nil {
 		return branch.AheadBehind{}, err
 	}
@@ -98,13 +98,4 @@ func (r Repo) refExists(ctx context.Context, ref branch.Ref) (bool, error) {
 		return false, nil
 	}
 	return err == nil, err
-}
-
-func (r Repo) tip(ctx context.Context, ref branch.Ref) (string, error) {
-	name, err := r.refName(ref)
-	if err != nil {
-		return "", err
-	}
-	out, err := r.git(ctx, "rev-parse", "--verify", name)
-	return strings.TrimSpace(string(out)), err
 }

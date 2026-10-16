@@ -41,27 +41,13 @@ func TestBranchesFollowsTheRemoteItIsGiven(t *testing.T) {
 	assert.Equal(t, []string{"feature"}, gittest.Names(branches.Remote))
 }
 
-func TestAheadBehindCountsBothSides(t *testing.T) {
-	repo := newRepo(t)
-	gittest.CreateBranch(t, repo.Dir, "feature")
-	commitFile(t, repo.Dir, "main-only", "1")
-	gittest.Git(t, repo.Dir, "checkout", "feature")
-	commitFile(t, repo.Dir, "feature-only", "1")
-	commitFile(t, repo.Dir, "feature-only", "2")
-
-	counts, err := repo.AheadBehind(t.Context(), branch.AheadBehindParams{Of: branch.LocalBranch{Name: "feature"}, Against: branch.LocalBranch{Name: "main"}})
-
-	require.NoError(t, err)
-	assert.Equal(t, branch.AheadBehind{Ahead: 2, Behind: 1}, counts)
-}
-
 func TestAheadBehindAgainstTheRemoteBranch(t *testing.T) {
 	repo, origin := newRepoWithOrigin(t)
 	commitFile(t, repo.Dir, "local", "1")
 	advanceOnOrigin(t, origin, "main")
 	require.NoError(t, repo.FetchRef(t.Context(), "main"))
 
-	counts, err := repo.AheadBehind(t.Context(), branch.AheadBehindParams{Of: branch.LocalBranch{Name: "main"}, Against: branch.RemoteBranch{Name: "main"}})
+	counts, err := repo.AheadBehind(t.Context(), "main")
 
 	require.NoError(t, err)
 	assert.Equal(t, branch.AheadBehind{Ahead: 1, Behind: 1}, counts)
@@ -69,16 +55,11 @@ func TestAheadBehindAgainstTheRemoteBranch(t *testing.T) {
 
 func TestAheadBehindFailsOnAnUnknownRefRatherThanCountZero(t *testing.T) {
 	repo := newRepo(t)
-	main := branch.LocalBranch{Name: "main"}
 
-	_, unknownErr := repo.AheadBehind(t.Context(), branch.AheadBehindParams{Of: main, Against: branch.RemoteBranch{Name: "main"}})
-	_, noOfErr := repo.AheadBehind(t.Context(), branch.AheadBehindParams{Against: main})
-	_, noAgainstErr := repo.AheadBehind(t.Context(), branch.AheadBehindParams{Of: main})
+	_, err := repo.AheadBehind(t.Context(), "main")
 
 	var gitErr *git.Error
-	require.ErrorAs(t, unknownErr, &gitErr)
-	require.Error(t, noOfErr)
-	require.Error(t, noAgainstErr)
+	require.ErrorAs(t, err, &gitErr)
 }
 
 func TestDeleteBranchDropsABranchEvenUnmerged(t *testing.T) {
@@ -101,9 +82,8 @@ func TestTheFakeAndGitAgreeOnTheTipsAndCountsOfTheirBranches(t *testing.T) {
 			assert.False(t, has(t, impl.port, branch.LocalBranch{Name: "remote-only"}))
 			assert.True(t, has(t, impl.port, branch.RemoteBranch{Name: "remote-only"}))
 			assert.False(t, has(t, impl.port, branch.RemoteBranch{Name: "pushed"}))
-			assert.Equal(t, branch.AheadBehind{}, aheadBehind(t, impl.port, branch.AheadBehindParams{Of: main, Against: branch.RemoteBranch{Name: "main"}}))
-			assert.Equal(t, branch.AheadBehind{Ahead: 1}, aheadBehind(t, impl.port, branch.AheadBehindParams{Of: branch.LocalBranch{Name: "unmerged"}, Against: main}))
-			assert.Equal(t, branch.AheadBehind{Ahead: 1, Behind: 1}, aheadBehind(t, impl.port, branch.AheadBehindParams{Of: branch.LocalBranch{Name: "linked"}, Against: branch.LocalBranch{Name: "unmerged"}}))
+			assert.Equal(t, branch.AheadBehind{}, aheadBehind(t, impl.port, "main"))
+			assert.Equal(t, branch.AheadBehind{Ahead: 1}, aheadBehind(t, impl.port, "diverged"))
 			assert.Equal(t, tip(t, impl.port, main), tip(t, impl.port, branch.RemoteBranch{Name: "feature"}))
 			assert.NotEqual(t, tip(t, impl.port, main), tip(t, impl.port, branch.LocalBranch{Name: "unmerged"}))
 			assert.NotEqual(t, tip(t, impl.port, branch.LocalBranch{Name: "diverged"}), tip(t, impl.port, branch.RemoteBranch{Name: "diverged"}))
@@ -126,7 +106,7 @@ func TestTheFakeAndGitRefuseTheSameBranchChanges(t *testing.T) {
 			return impl.port.DeleteBranch(t.Context(), "nope")
 		}},
 		{name: "counting against an unknown ref", call: func(t *testing.T, impl implementation) error {
-			_, err := impl.port.AheadBehind(t.Context(), branch.AheadBehindParams{Of: branch.LocalBranch{Name: "main"}, Against: branch.RemoteBranch{Name: "nope"}})
+			_, err := impl.port.AheadBehind(t.Context(), "unmerged")
 			return err
 		}},
 	}

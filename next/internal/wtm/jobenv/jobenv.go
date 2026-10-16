@@ -9,7 +9,19 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/wtm/run"
 )
 
-const ComposeProjectKey = "COMPOSE_PROJECT_NAME"
+const (
+	ComposeProjectKey = "COMPOSE_PROJECT_NAME"
+	worktreeKey       = "WTM_WORKTREE"
+	branchKey         = "WTM_BRANCH"
+	ordinalKey        = "WTM_ORDINAL"
+	portOffsetKey     = "WTM_PORT_OFFSET"
+	projectKey        = "WTM_PROJECT"
+	isolationKey      = "WTM_ISOLATION"
+)
+
+func Keys() []string {
+	return []string{worktreeKey, branchKey, ordinalKey, portOffsetKey, projectKey, isolationKey, ComposeProjectKey}
+}
 
 type Params struct {
 	Branch     string
@@ -21,12 +33,12 @@ type Params struct {
 
 func JobEnv(params Params) map[string]string {
 	env := map[string]string{
-		"WTM_WORKTREE":    branch.Slug(params.Branch),
-		"WTM_BRANCH":      params.Branch,
-		"WTM_ORDINAL":     strconv.Itoa(params.Ordinal),
-		"WTM_PORT_OFFSET": strconv.Itoa(params.Offset()),
-		"WTM_PROJECT":     branch.HostLabel(params.Project()),
-		"WTM_ISOLATION":   string(params.Isolation.Effective()),
+		worktreeKey:   branch.Slug(params.Branch),
+		branchKey:     params.Branch,
+		ordinalKey:    strconv.Itoa(params.Ordinal),
+		portOffsetKey: strconv.Itoa(params.Offset()),
+		projectKey:    branch.HostLabel(params.Project()),
+		isolationKey:  string(params.Isolation.Effective()),
 	}
 	if name := params.ComposeProject(); name != "" {
 		env[ComposeProjectKey] = name

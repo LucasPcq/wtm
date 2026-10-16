@@ -42,8 +42,8 @@ func TestAFailedHookReturnsItsCommandAndExitCodeAndStopsTheChain(t *testing.T) {
 
 	var failure *Failure
 	require.ErrorAs(t, err, &failure)
-	assert.ErrorIs(t, err, ErrHookFailed)
-	assert.NotErrorIs(t, err, ErrHookStopped)
+	assert.ErrorContains(t, err, "hook failed")
+	assert.NotContains(t, err.Error(), "hook stopped")
 	assert.Equal(t, "exit 3", failure.Cmd)
 	require.NotNil(t, failure.ExitCode)
 	assert.Equal(t, 3, *failure.ExitCode)
@@ -110,14 +110,13 @@ func TestAHookRunsInItsOwnCwdElseInTheWorktree(t *testing.T) {
 	out := &collected{}
 
 	err := RunHooks(t.Context(), HooksParams{
-		Hooks:   []project.Hook{{Cmd: "pwd -P"}, {Cmd: "pwd -P", Cwd: elsewhere}, {Cmd: "pwd -P", Cwd: "apps"}, {Cmd: "pwd -P", Cwd: "{{worktree}}/apps"}},
+		Hooks:   []project.Hook{{Cmd: "pwd -P"}, {Cmd: "pwd -P", Cwd: elsewhere}, {Cmd: "pwd -P", Cwd: "apps"}},
 		WorkDir: worktree,
-		Vars:    hookvars.Vars{Worktree: worktree},
 		Output:  out.add,
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []string{resolved(t, worktree), resolved(t, elsewhere), resolved(t, filepath.Join(worktree, "apps")), resolved(t, filepath.Join(worktree, "apps"))}, out.all())
+	assert.Equal(t, []string{resolved(t, worktree), resolved(t, elsewhere), resolved(t, filepath.Join(worktree, "apps"))}, out.all())
 }
 
 func TestAPlaceholderPathReachesTheCommandAsSpelledOnDisk(t *testing.T) {
@@ -132,7 +131,12 @@ func TestAPlaceholderPathReachesTheCommandAsSpelledOnDisk(t *testing.T) {
 				{Cmd: "printf %s '{{worktree}}' > '{{root}}/single'"},
 			}
 
-			err := RunHooks(t.Context(), HooksParams{Hooks: hooks, WorkDir: worktree, Vars: hookvars.Vars{Worktree: worktree, Root: root}})
+			vars := hookvars.Vars{Worktree: worktree, Root: root}
+			for i, hook := range hooks {
+				hooks[i] = vars.Hook(hook)
+			}
+
+			err := RunHooks(t.Context(), HooksParams{Hooks: hooks, WorkDir: worktree})
 
 			require.NoError(t, err)
 			for _, file := range []string{"unquoted", "double", "single"} {
@@ -153,6 +157,7 @@ func TestTheEnvGivenWinsAndNoInheritedWorktreeVariableFillsOneLeftUnset(t *testi
 		Hooks:   []project.Hook{{Cmd: `echo "[$WTM_PORT_OFFSET][$COMPOSE_PROJECT_NAME]"`}},
 		WorkDir: t.TempDir(),
 		Env:     map[string]string{"WTM_PORT_OFFSET": "20"},
+		Unset:   []string{"WTM_PORT_OFFSET", "COMPOSE_PROJECT_NAME"},
 		Output:  out.add,
 	})
 
@@ -180,9 +185,9 @@ func TestACancelledRunStopsTheHookInFlightAndNamesItStopped(t *testing.T) {
 	var failure *Failure
 	require.ErrorAs(t, err, &failure)
 	assert.Equal(t, "sleep 30", failure.Cmd)
-	assert.ErrorIs(t, err, ErrHookStopped)
+	assert.ErrorContains(t, err, "hook stopped")
 	assert.ErrorIs(t, err, context.Canceled)
-	assert.NotErrorIs(t, err, ErrHookFailed)
+	assert.NotContains(t, err.Error(), "hook failed")
 	assert.NotContains(t, err.Error(), "exit status")
 	assert.Less(t, time.Since(begin), interruptGrace)
 }
@@ -202,7 +207,7 @@ func TestAnInterruptedHookKeepsItsOutputSoFar(t *testing.T) {
 		},
 	})
 
-	require.ErrorIs(t, err, ErrHookStopped)
+	require.ErrorContains(t, err, "hook stopped")
 	assert.Equal(t, []string{"a", "b", "partial"}, out.all())
 }
 
@@ -261,7 +266,7 @@ func TestACancelledHookIsInterruptedBeforeItIsTerminated(t *testing.T) {
 		},
 	})
 
-	require.ErrorIs(t, err, ErrHookStopped)
+	require.ErrorContains(t, err, "hook stopped")
 	assert.Equal(t, []string{"ready", "int"}, out.all())
 }
 
@@ -279,7 +284,7 @@ func TestACancelledHookTakesAGrandchildItStartedWithIt(t *testing.T) {
 	})
 	t.Cleanup(func() { _ = syscall.Kill(grandchild, syscall.SIGKILL) })
 
-	require.ErrorIs(t, err, ErrHookStopped)
+	require.ErrorContains(t, err, "hook stopped")
 	require.Positive(t, grandchild)
 	assert.Eventually(t, func() bool { return syscall.Kill(grandchild, 0) != nil }, 2*interruptGrace, 20*time.Millisecond)
 }

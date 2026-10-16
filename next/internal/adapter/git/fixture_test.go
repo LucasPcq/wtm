@@ -18,14 +18,14 @@ type port interface {
 	GitCommonDir(ctx context.Context) (string, error)
 	Locate(ctx context.Context, path string) (worktree.Location, error)
 	Branches(ctx context.Context) (branch.Branches, error)
-	AheadBehind(ctx context.Context, params branch.AheadBehindParams) (branch.AheadBehind, error)
+	AheadBehind(ctx context.Context, name string) (branch.AheadBehind, error)
 	Dirty(ctx context.Context, path string) (bool, error)
 	AddWorktree(ctx context.Context, addition worktree.Addition) error
 	RemoveWorktree(ctx context.Context, path string) error
 	DeleteBranch(ctx context.Context, name string) error
 	FetchRef(ctx context.Context, name string) error
-	FastForwardRef(ctx context.Context, name string) (branch.Move, error)
-	MergeFFOnly(ctx context.Context, merge worktree.Merge) (branch.Move, error)
+	FastForwardRef(ctx context.Context, name string) error
+	MergeFFOnly(ctx context.Context, merge worktree.Merge) error
 }
 
 type implementation struct {
@@ -53,12 +53,10 @@ func seed(root string) gittest.FakeParams {
 		Worktrees: []worktree.Worktree{
 			{Path: filepath.Join(root, "linked"), State: worktree.OnBranch{Branch: "linked"}},
 			{Path: filepath.Join(root, "dirty"), State: worktree.OnBranch{Branch: "dirty"}},
-			{Path: filepath.Join(root, "locked"), State: worktree.OnBranch{Branch: "locked"}},
 			{Path: filepath.Join(root, "gone"), State: worktree.OnBranch{Branch: "gone"}},
 			{Path: filepath.Join(root, "detached"), State: worktree.Detached{}},
 			{Path: filepath.Join(root, "rebasing"), State: worktree.Rebasing{Branch: "rebasing"}},
 		},
-		Locked:  []string{filepath.Join(root, "locked")},
 		Gone:    []string{filepath.Join(root, "gone")},
 		Folders: []string{filepath.Join(root, "taken")},
 		Empty:   []string{filepath.Join(root, "empty")},

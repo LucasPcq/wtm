@@ -1,6 +1,8 @@
 package jobenv
 
 import (
+	"maps"
+	"slices"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm/run"
@@ -58,4 +60,10 @@ func TestALinkedWorktreesJobsRunOffsetByItsNumber(t *testing.T) {
 
 func TestAVerbatimWorktreesJobsRunOnTheBasePorts(t *testing.T) {
 	assert.Equal(t, "3000", JobEnv(shopParams("feat/a", 2, run.Verbatim))["http"])
+}
+
+func TestTheKeysAreEveryKeyAJobEnvironmentHoldsBesideItsPorts(t *testing.T) {
+	env := JobEnv(Params{Branch: "feat/x", ProjectDir: "/src/app"})
+
+	assert.ElementsMatch(t, Keys(), slices.Collect(maps.Keys(env)))
 }

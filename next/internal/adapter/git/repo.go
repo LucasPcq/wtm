@@ -6,8 +6,6 @@ import (
 	"context"
 	"errors"
 	"os"
-	"os/exec"
-	"slices"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
@@ -52,7 +50,7 @@ func (r Repo) git(ctx context.Context, args ...string) ([]byte, error) {
 	full := append([]string{"-C", r.Dir}, args...)
 	var stdout, stderr bytes.Buffer
 	cmd := shell.Command(ctx, "git", full...)
-	cmd.Env = childEnv()
+	cmd.Env = shell.Environ(shell.EnvironParams{Unset: repoScopedEnv, Set: promptless()})
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
@@ -60,28 +58,19 @@ func (r Repo) git(ctx context.Context, args ...string) ([]byte, error) {
 		return nil, &Error{Args: full, Exit: -1, Stderr: strings.TrimSpace(stderr.String()), Err: ctx.Err()}
 	}
 	if err != nil {
-		return nil, &Error{Args: full, Exit: exitCode(err), Stderr: strings.TrimSpace(stderr.String()), Err: err}
+		code, exited := shell.ExitCode(err)
+		if !exited {
+			code = -1
+		}
+		return nil, &Error{Args: full, Exit: code, Stderr: strings.TrimSpace(stderr.String()), Err: err}
 	}
 	return stdout.Bytes(), nil
 }
 
-func childEnv() []string {
-	env := append(slices.DeleteFunc(os.Environ(), repoScoped), "GIT_TERMINAL_PROMPT=0")
-	if _, set := os.LookupEnv("GIT_SSH_COMMAND"); !set {
-		env = append(env, "GIT_SSH_COMMAND=ssh -o BatchMode=yes")
+func promptless() map[string]string {
+	set := map[string]string{"GIT_TERMINAL_PROMPT": "0"}
+	if _, own := os.LookupEnv("GIT_SSH_COMMAND"); !own {
+		set["GIT_SSH_COMMAND"] = "ssh -o BatchMode=yes"
 	}
-	return env
-}
-
-func repoScoped(entry string) bool {
-	name, _, _ := strings.Cut(entry, "=")
-	return slices.Contains(repoScopedEnv, name)
-}
-
-func exitCode(err error) int {
-	var exit *exec.ExitError
-	if errors.As(err, &exit) {
-		return exit.ExitCode()
-	}
-	return -1
+	return set
 }

@@ -30,8 +30,7 @@ func TestAFakeRecordsEveryCallInOrder(t *testing.T) {
 	require.NoError(t, fake.FetchRef(t.Context(), "main"))
 	_, err := fake.Worktrees(t.Context())
 	require.NoError(t, err)
-	_, err = fake.MergeFFOnly(t.Context(), worktree.Merge{Path: "/repo", Onto: branch.RemoteBranch{Name: "main"}})
-	require.NoError(t, err)
+	require.NoError(t, fake.MergeFFOnly(t.Context(), worktree.Merge{Path: "/repo", Onto: branch.RemoteBranch{Name: "main"}}))
 
 	assert.Equal(t, []string{"FetchRef main", "Worktrees ", "MergeFFOnly /repo"}, fake.Calls())
 }
@@ -48,7 +47,7 @@ func TestAFakeCommitIsItsName(t *testing.T) {
 func TestAFakeMergeOnADetachedHeadIsNotModelled(t *testing.T) {
 	fake := NewFake(FakeParams{Main: "/repo", Branch: "main", Remote: []string{"main"}, Worktrees: []worktree.Worktree{{Path: "/wt/detached", State: worktree.Detached{}}}})
 
-	_, err := fake.MergeFFOnly(t.Context(), worktree.Merge{Path: "/wt/detached", Onto: branch.RemoteBranch{Name: "main"}})
+	err := fake.MergeFFOnly(t.Context(), worktree.Merge{Path: "/wt/detached", Onto: branch.RemoteBranch{Name: "main"}})
 
 	require.Error(t, err)
 }

@@ -12,13 +12,13 @@ import (
 
 const (
 	hookLogDir       = "hooks"
+	hookLogPhase     = "on_create"
 	hookLogSeparator = "-"
 	hookLogExt       = ".log"
 )
 
 type HookLogParams struct {
 	StateDir string
-	Phase    string
 	Branch   string
 }
 
@@ -26,11 +26,7 @@ func HookLogPath(params HookLogParams) string {
 	if params.StateDir == "" {
 		return ""
 	}
-	name := params.Phase
-	if params.Branch != "" {
-		name += hookLogSeparator + url.PathEscape(params.Branch)
-	}
-	return filepath.Join(params.StateDir, hookLogDir, name+hookLogExt)
+	return filepath.Join(params.StateDir, hookLogDir, hookLogPhase+hookLogSeparator+url.PathEscape(params.Branch)+hookLogExt)
 }
 
 type linesParams struct {
