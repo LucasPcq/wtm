@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 )
 
 type Kind string
@@ -97,3 +98,17 @@ func AsError(params AsErrorParams) *Error {
 	}
 	return &Error{Kind: KindInternal, Code: CodeInternal, Message: "internal error", Params: params.Params, Cause: params.Err}
 }
+
+var ErrSchemaNewer = errors.New("state file written by a newer wtm")
+
+type SchemaNewer struct {
+	Path      string
+	Found     int
+	Supported int
+}
+
+func (e *SchemaNewer) Error() string {
+	return fmt.Sprintf("%s is at schema %d, newer than the %d this wtm writes: upgrade wtm to change it", e.Path, e.Found, e.Supported)
+}
+
+func (*SchemaNewer) Unwrap() error { return ErrSchemaNewer }

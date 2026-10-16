@@ -132,3 +132,15 @@ func TestOnlyALinkedWorktreesLinksNeedItsOrdinal(t *testing.T) {
 	assert.False(t, NeedsOrdinal(NeedsOrdinalParams{Run: run.Config{}}))
 	assert.False(t, NeedsOrdinal(NeedsOrdinalParams{Isolation: run.Verbatim, Run: ports}))
 }
+
+func TestAProxyPortOutOfRangeIsRefusedOnlyWhenLinksNeedIt(t *testing.T) {
+	params := linkedResolve()
+	params.Proxy = project.Proxy{Port: 70000}
+
+	_, err := Resolve(params)
+	assert.EqualError(t, err, "invalid [proxy] port 70000 in config.toml — use 1-65535, or leave it out for 11080")
+
+	params.Run.EnvPorts = nil
+	_, err = Resolve(params)
+	assert.NoError(t, err)
+}

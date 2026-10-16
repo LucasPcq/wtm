@@ -24,6 +24,7 @@ func NeedsOrdinal(params NeedsOrdinalParams) bool {
 type ResolveParams struct {
 	jobenv.Params
 	Files      []project.EnvFile
+	Proxy      project.Proxy
 	PublicPort int
 }
 
@@ -43,6 +44,9 @@ func Resolve(params ResolveParams) (Writes, error) {
 	owned := ownedWrites(ownedWritesParams{Run: kept, Files: params.Files, ComposeProject: params.ComposeProject()})
 	if len(kept.EnvPorts) == 0 && len(kept.EnvValues) == 0 {
 		return Writes{owned: owned}, nil
+	}
+	if err := params.Proxy.Problem(); err != nil {
+		return Writes{}, err
 	}
 	settled := worktree{
 		Addressing: effectiveAddressing(kept),

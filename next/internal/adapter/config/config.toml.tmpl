@@ -1,0 +1,92 @@
+#:schema ./schemas/project.schema.json
+
+# wtm — Worktree Manager configuration
+# Docs: https://github.com/LucasPcq/wtm
+{{ if .Schema }}
+schema = {{ .Schema }}
+{{ end }}
+[worktrees]
+# Directory where worktrees are created (relative to repo root)
+base_path = {{ toml .BasePath }}
+
+# Branch used as the default base for new worktrees
+base_branch = {{ toml .BaseBranch }}
+
+[env]
+# Strategy for provisioning .env files in new worktrees:
+#   example — copy .env.example and rename to .env
+#   main    — copy .env from the main checkout
+#   parent  — copy .env from the source worktree
+{{- if .SkipEnv }}
+# Skipped during init. Uncomment to enable .env provisioning.
+# strategy = "example"
+#
+# [[env.file]]
+# target = ".env"
+# template = ".env.example"
+{{- else }}
+{{- if .EnvStrategy }}
+strategy = {{ toml .EnvStrategy }}
+{{- else }}
+# strategy = "example"
+{{- end }}
+
+# Each value file to provision, with its committed template (if any).
+{{- range .EnvFiles }}
+
+[[env.file]]
+target = {{ toml .Target }}
+{{- if .Template }}
+template = {{ toml .Template }}
+{{- end }}
+{{- if .Local }}
+local = true
+{{- end }}
+{{- end }}
+{{- end }}
+
+[hooks]
+# Commands run after creating a new worktree
+{{- if .SkipHooks }}
+# Skipped during init. Add setup commands to run on worktree creation, e.g.:
+#   on_create = ["pnpm install"]
+on_create = []
+{{- else }}
+on_create = [
+{{- range .OnCreate }}
+{{- if or .Cwd .ContinueOnError }}
+  { cmd = {{ toml .Cmd }}{{ if .Cwd }}, cwd = {{ toml .Cwd }}{{ end }}{{ if .ContinueOnError }}, continue_on_error = true{{ end }} },
+{{- else }}
+  {{ toml .Cmd }},
+{{- end }}
+{{- end }}
+]
+{{- end }}
+
+# Commands run right before removing a worktree (e.g. tear down external
+# resources like Docker). A non-zero exit aborts the removal unless the entry
+# sets continue_on_error.
+{{- if .SkipClean }}
+# Skipped during init. Add teardown commands to run before removal, e.g.:
+#   on_clean = ["docker compose down"]
+on_clean = []
+{{- else }}
+on_clean = [
+{{- range .OnClean }}
+{{- if or .Cwd .ContinueOnError }}
+  { cmd = {{ toml .Cmd }}{{ if .Cwd }}, cwd = {{ toml .Cwd }}{{ end }}{{ if .ContinueOnError }}, continue_on_error = true{{ end }} },
+{{- else }}
+  {{ toml .Cmd }},
+{{- end }}
+{{- end }}
+]
+{{- end }}
+{{- if .Remembered }}
+
+# Answers the wizard no longer asks, kept by "Always use this answer".
+# --ask asks them again; deleting a line forgets it.
+[wizard.remembered]
+{{- range $id, $value := .Remembered }}
+{{ tomlKey $id }} = {{ toml $value }}
+{{- end }}
+{{- end }}

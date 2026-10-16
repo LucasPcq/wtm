@@ -1,6 +1,13 @@
 // Package project is what a slice reads of a repository's config.toml and of the global settings.
 package project
 
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrConfigNotFound = errors.New("config file not found")
+
 const (
 	DefaultBasePath   = "../.trees"
 	DefaultBaseBranch = "main"
@@ -54,4 +61,16 @@ func (g Global) ProxyPort() int {
 		return g.Proxy.Port
 	}
 	return defaultProxyPort
+}
+
+const (
+	portMin = 1
+	portMax = 65535
+)
+
+func (p Proxy) Problem() error {
+	if p.Port == 0 || (p.Port >= portMin && p.Port <= portMax) {
+		return nil
+	}
+	return fmt.Errorf("invalid [proxy] port %d in config.toml — use %d-%d, or leave it out for %d", p.Port, portMin, portMax, defaultProxyPort)
 }

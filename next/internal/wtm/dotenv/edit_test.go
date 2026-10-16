@@ -180,3 +180,22 @@ func TestAKeyJustAddedCanBeSetAgain(t *testing.T) {
 	assert.True(t, changed)
 	assert.Equal(t, "A=1\nK=y\n", string(Render(lines)))
 }
+
+func TestAnEditWritesOnlyWhatChangesAndCreatesOnlyWhenAsked(t *testing.T) {
+	add := func(lines []Line) []Line {
+		out, _ := Set(SetParams{Lines: lines, Key: "K", Value: "v"})
+		return out
+	}
+
+	_, absent := Edit{Edit: add}.Over(nil)
+	created, create := Edit{Create: true, Edit: add}.Over(nil)
+	_, same := Edit{Edit: add}.Over([]byte("K=v\n"))
+	changed, change := Edit{Edit: add}.Over([]byte("A=1\n"))
+
+	assert.False(t, absent)
+	assert.True(t, create)
+	assert.Equal(t, "K=v", string(created))
+	assert.False(t, same)
+	assert.True(t, change)
+	assert.Equal(t, "A=1\nK=v\n", string(changed))
+}

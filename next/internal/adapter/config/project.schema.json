@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/LucasPcq/wtm/main/schemas/project.schema.json",
+  "title": "wtm project config",
+  "description": "Schema for .wtm/config.toml — per-project settings versioned with the repo.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Version of this file's format. Absent means 1; wtm writes it from 2 on, and a wtm that knows an older version reads the file but refuses to write it."
+    },
+    "worktrees": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "base_path": {
+          "type": "string",
+          "description": "Directory where worktrees are created, relative to the project root. Defaults to ../.trees."
+        },
+        "base_branch": {
+          "type": "string",
+          "description": "Default base branch for new worktrees. Usually `main` or `master`."
+        }
+      }
+    },
+    "env": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": ["example", "main", "parent"],
+          "description": "How .env files are provisioned in new worktrees. example = copy .env.example as .env; main = copy from the main checkout; parent = copy from the source worktree (--from), fall back to main."
+        },
+        "file": {
+          "type": "array",
+          "description": "Detected env value files and their committed templates. Each entry pins a value target to the schema template it derives from.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["target"],
+            "properties": {
+              "target": {
+                "type": "string",
+                "description": "The .env value file to provision, relative to the project root (e.g. .env, apps/api/.env, .env.local)."
+              },
+              "template": {
+                "type": "string",
+                "description": "The committed schema template this value derives from (e.g. .env.example). Empty when the file has no template."
+              },
+              "local": {
+                "type": "boolean",
+                "description": "Marks a machine-local override (.env.local). Informational only — it stays syncable."
+              }
+            }
+          }
+        }
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "on_create": {
+          "type": "array",
+          "description": "Commands to run after a worktree is created. Entries can be a plain string or a table {cmd, cwd, continue_on_error}.",
+          "items": {
+            "oneOf": [
+              { "type": "string", "description": "Shell command to run in the new worktree." },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["cmd"],
+                "properties": {
+                  "cmd": { "type": "string", "description": "Shell command to run." },
+                  "cwd": { "type": "string", "description": "Working directory relative to the worktree root." },
+                  "continue_on_error": { "type": "boolean", "description": "If true, a non-zero exit doesn't abort subsequent hooks." }
+                }
+              }
+            ]
+          }
+        },
+        "on_clean": {
+          "type": "array",
+          "description": "Commands to run right before a worktree is removed (e.g. tearing down external resources like Docker). Entries can be a plain string or a table {cmd, cwd, continue_on_error}. A non-zero exit aborts the removal unless continue_on_error is set.",
+          "items": {
+            "oneOf": [
+              { "type": "string", "description": "Shell command to run in the worktree before removal." },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["cmd"],
+                "properties": {
+                  "cmd": { "type": "string", "description": "Shell command to run." },
+                  "cwd": { "type": "string", "description": "Working directory relative to the worktree root." },
+                  "continue_on_error": { "type": "boolean", "description": "If true, a non-zero exit doesn't abort subsequent hooks or the removal." }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "wizard": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "remembered": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Answers the wizard no longer asks in this repository, written by its \"Always use this answer\" toggle. They apply under --yes too; an explicit flag still wins, and --ask asks them again.",
+          "properties": {
+            "env_strategy": { "type": "string", "enum": ["example", "main", "parent"], "description": "The env strategy create and checkout use without asking." },
+            "isolation": { "type": "string", "enum": ["isolated", "verbatim"], "description": "The isolation create, checkout and extract give a new worktree without asking." },
+            "source_update": { "type": "string", "enum": ["ff", "keep"], "description": "Whether a source branch behind origin is fast-forwarded (ff) or kept as-is (keep), without asking." }
+          }
+        }
+      }
+    }
+  }
+}

@@ -126,3 +126,9 @@ func fromParent(params sourceOfParams) (string, []Warning) {
 func unknownStrategy(strategy project.EnvStrategy) error {
 	return fmt.Errorf("unknown env strategy: %s", strategy)
 }
+
+type Copied struct {
+	Files    []string
+	Warnings []Warning
+	Unlocked bool
+}

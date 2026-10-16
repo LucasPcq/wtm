@@ -33,3 +33,22 @@ func MetaDir(params MetaDirParams) (string, bool) {
 	}
 	return filepath.Join(params.StateDir, metaDirName, segment), true
 }
+
+type MetaRecord struct {
+	Branch string
+	Meta   Meta
+}
+
+type Missing int
+
+const (
+	MissingRefuse Missing = iota
+	MissingCreate
+	MissingSkip
+)
+
+type MetaUpdate struct {
+	Branch  string
+	Missing Missing
+	Change  func(*Meta) error
+}

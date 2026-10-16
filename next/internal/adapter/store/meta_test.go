@@ -1,0 +1,301 @@
+package store
+
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+	"sync"
+	"testing"
+
+	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestARecordWithoutSchemaReadsAsItAlwaysDid(t *testing.T) {
+	stateDir := t.TempDir()
+	writeMeta(t, stateDir, "feat/a", `{"source_branch": "main", "created_at": "2026-01-02T03:04:05Z", "env_strategy": "parent", "ordinal": 3, "namespaces": ["db"], "isolation": "verbatim"}`)
+
+	meta, err := Meta{StateDir: stateDir}.Load("feat/a")
+
+	require.NoError(t, err)
+	assert.Equal(t, worktree.Meta{SourceBranch: "main", CreatedAt: "2026-01-02T03:04:05Z", EnvStrategy: project.EnvParent, Ordinal: 3, Namespaces: []string{"db"}, Isolation: run.Verbatim}, meta)
+}
+
+func TestARecordIsWrittenByteForByteAsWtmWritesIt(t *testing.T) {
+	stateDir := t.TempDir()
+	meta := Meta{StateDir: stateDir}
+
+	written, err := meta.Update(t.Context(), worktree.MetaUpdate{Branch: "refactor/next-create-pilot", Missing: worktree.MissingCreate, Change: func(m *worktree.Meta) error {
+		m.SourceBranch = "0.30.0"
+		m.CreatedAt = "2026-10-16T20:37:05Z"
+		m.EnvStrategy = project.EnvParent
+		m.Isolation = run.Isolated
+		return nil
+	}})
+
+	require.NoError(t, err)
+	assert.True(t, written.Changed)
+	path := filepath.Join(stateDir, "worktrees", "refactor%2Fnext-create-pilot", "meta.json")
+	assert.Equal(t, realRecord, readFile(t, path))
+	loaded, err := meta.Load("refactor/next-create-pilot")
+	require.NoError(t, err)
+	assert.Equal(t, worktree.Meta{SourceBranch: "0.30.0", CreatedAt: "2026-10-16T20:37:05Z", EnvStrategy: project.EnvParent, Isolation: run.Isolated}, loaded)
+}
+
+func TestARecordWtmWroteReadsAndRewritesToTheSameBytes(t *testing.T) {
+	stateDir := t.TempDir()
+	writeMeta(t, stateDir, "refactor/next-create-pilot", realRecord)
+	meta := Meta{StateDir: stateDir}
+
+	written, err := meta.Update(t.Context(), worktree.MetaUpdate{Branch: "refactor/next-create-pilot", Change: func(*worktree.Meta) error { return nil }})
+
+	require.NoError(t, err)
+	assert.False(t, written.Changed)
+	assert.Equal(t, realRecord, readFile(t, metaPath(t, stateDir, "refactor/next-create-pilot")))
+}
+
+func TestARecordIsKeptUnderItsEncodedBranch(t *testing.T) {
+	stateDir := t.TempDir()
+	meta := Meta{StateDir: stateDir}
+
+	require.NoError(t, errOf(meta.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Missing: worktree.MissingCreate, Change: func(m *worktree.Meta) error {
+		m.SourceBranch = "main"
+		return nil
+	}})))
+
+	assert.FileExists(t, filepath.Join(stateDir, "worktrees", "feat%2Fa", "meta.json"))
+	assert.NotContains(t, readFile(t, metaPath(t, stateDir, "feat/a")), "schema", "the key is written from schema 2 on")
+}
+
+func TestLoadOfAnAbsentRecordIsNotExist(t *testing.T) {
+	_, err := Meta{StateDir: t.TempDir()}.Load("feat/a")
+
+	require.ErrorIs(t, err, os.ErrNotExist)
+}
+
+func TestABranchThatIsNoPathSegmentHasNoRecord(t *testing.T) {
+	meta := Meta{StateDir: t.TempDir()}
+
+	_, loadErr := meta.Load("..")
+	_, updateErr := meta.Update(t.Context(), worktree.MetaUpdate{Branch: "..", Missing: worktree.MissingCreate, Change: func(*worktree.Meta) error { return nil }})
+
+	assert.Error(t, loadErr)
+	assert.Error(t, updateErr)
+}
+
+func TestUpdateChangesOnlyWhatItIsAskedTo(t *testing.T) {
+	stateDir := t.TempDir()
+	writeRecord(t, stateDir, "feat/a", worktree.Meta{SourceBranch: "main", CreatedAt: "2026-01-02T03:04:05Z", Ordinal: 2})
+	meta := Meta{StateDir: stateDir}
+
+	require.NoError(t, errOf(meta.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Change: func(m *worktree.Meta) error {
+		m.Isolation = run.Verbatim
+		return nil
+	}})))
+
+	got, err := meta.Load("feat/a")
+	require.NoError(t, err)
+	assert.Equal(t, worktree.Meta{SourceBranch: "main", CreatedAt: "2026-01-02T03:04:05Z", Ordinal: 2, Isolation: run.Verbatim}, got)
+}
+
+func TestUpdateOfAnAbsentRecordFollowsMissing(t *testing.T) {
+	cases := map[worktree.Missing]struct {
+		wantErr    bool
+		wantRecord bool
+	}{
+		worktree.MissingCreate: {wantRecord: true},
+		worktree.MissingSkip:   {},
+		worktree.MissingRefuse: {wantErr: true},
+	}
+	for missing, want := range cases {
+		t.Run(strconv.Itoa(int(missing)), func(t *testing.T) {
+			meta := Meta{StateDir: t.TempDir()}
+
+			_, err := meta.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Missing: missing, Change: func(m *worktree.Meta) error {
+				m.SourceBranch = "main"
+				return nil
+			}})
+
+			if want.wantErr {
+				require.ErrorIs(t, err, os.ErrNotExist)
+			} else {
+				require.NoError(t, err)
+			}
+			_, loadErr := meta.Load("feat/a")
+			assert.Equal(t, want.wantRecord, loadErr == nil)
+		})
+	}
+}
+
+func TestAnUpdateThatSaysNothingOfAnAbsentRecordCreatesNone(t *testing.T) {
+	meta := Meta{StateDir: t.TempDir()}
+
+	_, err := meta.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Change: func(m *worktree.Meta) error {
+		m.Ordinal = 1
+		return nil
+	}})
+
+	require.ErrorIs(t, err, os.ErrNotExist)
+	_, loadErr := meta.Load("feat/a")
+	require.ErrorIs(t, loadErr, os.ErrNotExist)
+}
+
+func TestAnUnreadableRecordIsRebuiltOnlyWhenMissingCreates(t *testing.T) {
+	stateDir := t.TempDir()
+	writeMeta(t, stateDir, "feat/a", "{not json")
+	meta := Meta{StateDir: stateDir}
+	setOrdinal := func(missing worktree.Missing) error {
+		return errOf(meta.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Missing: missing, Change: func(m *worktree.Meta) error {
+			m.Ordinal = 4
+			return nil
+		}}))
+	}
+
+	require.Error(t, setOrdinal(worktree.MissingRefuse))
+	require.Error(t, setOrdinal(worktree.MissingSkip))
+	assert.Equal(t, "{not json", readFile(t, metaPath(t, stateDir, "feat/a")))
+	require.NoError(t, setOrdinal(worktree.MissingCreate))
+	got, err := meta.Load("feat/a")
+	require.NoError(t, err)
+	assert.Equal(t, worktree.Meta{Ordinal: 4}, got)
+}
+
+func TestARecordAtANewerSchemaIsReadButNeverRewritten(t *testing.T) {
+	stateDir := t.TempDir()
+	content := `{"schema": 99, "source_branch": "main"}`
+	writeMeta(t, stateDir, "feat/a", content)
+	meta := Meta{StateDir: stateDir}
+
+	got, loadErr := meta.Load("feat/a")
+	_, err := meta.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Change: func(m *worktree.Meta) error {
+		m.Ordinal = 1
+		return nil
+	}})
+
+	require.NoError(t, loadErr)
+	assert.Equal(t, 99, got.Schema)
+	require.ErrorIs(t, err, wtm.ErrSchemaNewer)
+	var newer *wtm.SchemaNewer
+	require.ErrorAs(t, err, &newer)
+	assert.Equal(t, 99, newer.Found)
+	assert.Equal(t, 1, newer.Supported)
+	assert.Equal(t, content, readFile(t, metaPath(t, stateDir, "feat/a")))
+}
+
+func TestAChangeThatFailsWritesNothing(t *testing.T) {
+	stateDir := t.TempDir()
+	writeRecord(t, stateDir, "feat/a", worktree.Meta{SourceBranch: "main"})
+	before := readFile(t, metaPath(t, stateDir, "feat/a"))
+	refused := assert.AnError
+
+	_, err := Meta{StateDir: stateDir}.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Change: func(m *worktree.Meta) error {
+		m.SourceBranch = "other"
+		return refused
+	}})
+
+	require.ErrorIs(t, err, refused)
+	assert.Equal(t, before, readFile(t, metaPath(t, stateDir, "feat/a")))
+}
+
+func TestMetaUpdatesFromSeveralGoroutinesAllLand(t *testing.T) {
+	stateDir := t.TempDir()
+	writeRecord(t, stateDir, "feat/a", worktree.Meta{SourceBranch: "main"})
+	meta := Meta{StateDir: stateDir}
+	const updates = 16
+
+	var wg sync.WaitGroup
+	for i := range updates {
+		wg.Go(func() { assert.NoError(t, errOf(meta.Update(t.Context(), addNamespace("db"+strconv.Itoa(i))))) })
+	}
+	wg.Wait()
+
+	got, err := meta.Load("feat/a")
+	require.NoError(t, err)
+	assert.Len(t, got.Namespaces, updates)
+	assert.Equal(t, "main", got.SourceBranch)
+}
+
+func TestMetaUpdatesFromSeveralProcessesAllLand(t *testing.T) {
+	stateDir := t.TempDir()
+	writeRecord(t, stateDir, "feat/a", worktree.Meta{SourceBranch: "main"})
+	const processes, rounds = 4, 10
+
+	var wg sync.WaitGroup
+	for process := range processes {
+		wg.Go(func() {
+			cmd := exec.Command(os.Args[0], "-test.run=^TestTheProcessTheCrossProcessTestStarts$")
+			cmd.Env = append(os.Environ(), envStateDir+"="+stateDir, envJob+"="+"p"+strconv.Itoa(process)+"-", envRounds+"="+strconv.Itoa(rounds))
+			out, err := cmd.CombinedOutput()
+			assert.NoError(t, err, string(out))
+		})
+	}
+	wg.Wait()
+
+	got, err := Meta{StateDir: stateDir}.Load("feat/a")
+	require.NoError(t, err)
+	assert.Len(t, got.Namespaces, processes*rounds)
+	assert.Equal(t, "main", got.SourceBranch)
+}
+
+func TestTheProcessTheCrossProcessTestStarts(t *testing.T) {
+	stateDir := os.Getenv(envStateDir)
+	if stateDir == "" {
+		t.Skip("run by TestMetaUpdatesFromSeveralProcessesAllLand")
+	}
+	rounds, err := strconv.Atoi(os.Getenv(envRounds))
+	require.NoError(t, err)
+	meta := Meta{StateDir: stateDir}
+	for round := range rounds {
+		require.NoError(t, errOf(meta.Update(t.Context(), addNamespace(os.Getenv(envJob)+strconv.Itoa(round)))))
+	}
+}
+
+func TestRecordsAreEveryRecordThatReadsByBranch(t *testing.T) {
+	stateDir := t.TempDir()
+	writeRecord(t, stateDir, "feat/b", worktree.Meta{SourceBranch: "main"})
+	writeRecord(t, stateDir, "feat/a", worktree.Meta{Namespaces: []string{"db"}})
+	writeMeta(t, stateDir, "broken", "{not json")
+	require.NoError(t, os.MkdirAll(filepath.Join(stateDir, "worktrees", "empty"), 0o755))
+
+	records, err := Meta{StateDir: stateDir}.Records()
+
+	require.NoError(t, err)
+	assert.Equal(t, []worktree.MetaRecord{
+		{Branch: "feat/a", Meta: worktree.Meta{Namespaces: []string{"db"}}},
+		{Branch: "feat/b", Meta: worktree.Meta{SourceBranch: "main"}},
+	}, records)
+}
+
+func TestNoRecordsIsNoError(t *testing.T) {
+	records, err := Meta{StateDir: t.TempDir()}.Records()
+
+	require.NoError(t, err)
+	assert.Empty(t, records)
+}
+
+func TestPurgeDropsTheRecordAndItsDirectory(t *testing.T) {
+	stateDir := t.TempDir()
+	writeRecord(t, stateDir, "feat/a", worktree.Meta{Ordinal: 2})
+	meta := Meta{StateDir: stateDir}
+
+	require.NoError(t, meta.Purge("feat/a"))
+
+	assert.NoDirExists(t, filepath.Dir(metaPath(t, stateDir, "feat/a")))
+	require.NoError(t, meta.Purge("feat/a"), "an absent record is already purged")
+}
+
+func TestPurgeNeverReachesOutsideItsRecord(t *testing.T) {
+	stateDir := t.TempDir()
+	writeRecord(t, stateDir, "feat/a", worktree.Meta{Ordinal: 2})
+	meta := Meta{StateDir: stateDir}
+
+	require.NoError(t, meta.Purge(""))
+	require.NoError(t, meta.Purge(".."))
+
+	assert.FileExists(t, metaPath(t, stateDir, "feat/a"))
+}

@@ -1,6 +1,7 @@
 package dotenv
 
 import (
+	"bytes"
 	"slices"
 	"strings"
 )
@@ -159,4 +160,25 @@ func reparsesTo(raw string, want Line) bool {
 	}
 	got := parsed[0]
 	return got.Kind == Pair && got.Key == want.Key && got.Value == want.Value && got.Export == want.Export
+}
+
+type Edit struct {
+	Path   string
+	Create bool
+	Edit   func([]Line) []Line
+}
+
+func (e Edit) Over(current []byte) ([]byte, bool) {
+	if current == nil && !e.Create {
+		return nil, false
+	}
+	var lines []Line
+	if current != nil {
+		lines = Parse(current)
+	}
+	rendered := Render(e.Edit(lines))
+	if current != nil && bytes.Equal(rendered, Render(lines)) {
+		return nil, false
+	}
+	return rendered, true
 }

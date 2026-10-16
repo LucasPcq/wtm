@@ -1,0 +1,55 @@
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/stretchr/testify/require"
+)
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+}
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return string(data)
+}
+
+func stateWithConfig(t *testing.T, content string) string {
+	t.Helper()
+	stateDir := t.TempDir()
+	writeFile(t, filepath.Join(stateDir, "config.toml"), content)
+	return stateDir
+}
+
+func stateWithRun(t *testing.T, content string) string {
+	t.Helper()
+	stateDir := t.TempDir()
+	writeFile(t, filepath.Join(stateDir, "run.toml"), content)
+	return stateDir
+}
+
+func loadState(t *testing.T, stateDir string) (project.Config, project.Global, error) {
+	t.Helper()
+	return Load(LoadParams{StateDir: stateDir, GlobalPath: filepath.Join(t.TempDir(), "config.toml")})
+}
+
+func loadWithGlobal(t *testing.T, global string) (project.Global, error) {
+	t.Helper()
+	globalPath := filepath.Join(t.TempDir(), "config.toml")
+	writeFile(t, globalPath, global)
+	_, loaded, err := Load(LoadParams{StateDir: stateWithConfig(t, minimalConfig), GlobalPath: globalPath})
+	return loaded, err
+}
+
+func golden(t *testing.T, name string) string {
+	t.Helper()
+	return readFile(t, filepath.Join("testdata", name))
+}
