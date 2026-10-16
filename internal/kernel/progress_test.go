@@ -17,7 +17,7 @@ func TestAReporterSaysEachThingAboutItsSubject(t *testing.T) {
 	finished := report.Phase("hooks")
 	report.Output("npm install")
 	report.Status("test.installing", kernel.Params{"package": "left-pad"})
-	finished()
+	finished(false)
 	report.UnitFinished(kernel.StatusDone)
 
 	subject := kernel.Of{Subject: "feat/x"}
@@ -31,11 +31,20 @@ func TestAReporterSaysEachThingAboutItsSubject(t *testing.T) {
 	}, got)
 }
 
+func TestAPhaseSaysWhenItFailed(t *testing.T) {
+	var got []kernel.Progress
+	report := kernel.Report(kernel.EmitFunc(func(progress kernel.Progress) { got = append(got, progress) }), "feat/x")
+
+	report.Phase("hooks")(true)
+
+	assert.Equal(t, &kernel.PhaseFinished{Of: kernel.Of{Subject: "feat/x"}, Phase: "hooks", Failed: true}, got[1])
+}
+
 func TestAReporterWithNoEmitterSaysNothing(t *testing.T) {
 	report := kernel.Report(nil, "feat/x")
 	assert.NotPanics(t, func() {
 		report.UnitStarted()
-		report.Phase("hooks")()
+		report.Phase("hooks")(false)
 		report.Output("line")
 	})
 }

@@ -13,6 +13,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/styles"
 )
 
+var failedBeat = map[bool]string{true: "failed"}
+
 const (
 	unitStatusFmt = "%s · %s"
 	phaseLabelFmt = "%s · %s"
@@ -37,6 +39,7 @@ type ProgressView struct {
 	painted   bool
 	hook      *HookView
 	phase     string
+	phaseLog  string
 	phaseOpen bool
 	started   time.Time
 	stop      context.CancelFunc
@@ -78,9 +81,9 @@ func (v *ProgressView) Emit(event kernel.Progress) {
 	}
 	switch e := event.(type) {
 	case *kernel.PhaseStarted:
-		v.phase, v.phaseOpen, v.started = fmt.Sprintf(phaseLabelFmt, e.Phase, e.Subject), false, time.Now()
+		v.phase, v.phaseLog, v.phaseOpen, v.started = fmt.Sprintf(phaseLabelFmt, e.Phase, e.Subject), e.Log, false, time.Now()
 	case *kernel.PhaseFinished:
-		v.phaseFinished()
+		v.phaseFinished(e.Failed)
 	case *kernel.UnitStarted:
 		v.unit, v.status = e.Subject, ""
 		v.paint()
@@ -112,17 +115,17 @@ func (v *ProgressView) openPhase() {
 		return
 	}
 	v.erase()
-	v.hook = NewHookView(HookViewParams{W: v.w})
+	v.hook = NewHookView(HookViewParams{W: v.w, LogPath: v.phaseLog})
 	v.hook.OnHook(domain.HookBeat{Cmd: v.phase, Started: true})
 }
 
-func (v *ProgressView) phaseFinished() {
+func (v *ProgressView) phaseFinished(failed bool) {
 	label := v.phase
-	v.phase, v.phaseOpen = "", false
+	v.phase, v.phaseLog, v.phaseOpen = "", "", false
 	if v.hook == nil {
 		return
 	}
-	v.hook.OnHook(domain.HookBeat{Cmd: label, Duration: time.Since(v.started)})
+	v.hook.OnHook(domain.HookBeat{Cmd: label, Duration: time.Since(v.started), Err: failedBeat[failed]})
 	v.hook = nil
 	v.paint()
 }

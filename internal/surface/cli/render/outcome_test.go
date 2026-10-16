@@ -86,5 +86,19 @@ func TestAnItemWhoseSagaStandsButAPhaseDidNotFinishSaysWhy(t *testing.T) {
 
 	render.Outcome(&out, render.OutcomeParams{Catalog: catalog, Command: "make", Items: []kernel.Item[json.RawMessage]{item}, Detail: render.GenericDetail{}})
 
-	assert.Contains(t, plain(out.String()), "feat/a  incomplete")
+	assert.Contains(t, plain(out.String()), "feat/a  left incomplete")
+}
+
+func TestAnIncompleteItemSaysWhyAndIsShownByItsDetailSinceItStands(t *testing.T) {
+	var out bytes.Buffer
+	failure := kernel.Cancelled(kernel.Problem{Code: kernel.CodeInterrupted})
+	item := kernel.Item[json.RawMessage]{Subject: "feat/a", Status: kernel.StatusCancelled, Reason: kernel.ReasonIncomplete, Error: failure, Detail: json.RawMessage(`"/wt/feat/a"`)}
+
+	render.Outcome(&out, render.OutcomeParams{Catalog: catalog, Command: "make", Items: []kernel.Item[json.RawMessage]{item}, Detail: pathDetail{}})
+
+	assert.Equal(t, lines(
+		"  ! make: 1 cancelled",
+		"  ! feat/a  interrupted · left incomplete",
+		"    feat/a  \"/wt/feat/a\"",
+	), plain(out.String()))
 }

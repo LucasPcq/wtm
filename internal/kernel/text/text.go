@@ -56,7 +56,7 @@ var kernelMessages = Messages{
 	codeReasonUnchanged:   "unchanged",
 	codeReasonUnsafe:      "unsafe",
 	codeReasonLocked:      "locked",
-	codeReasonIncomplete:  "incomplete",
+	codeReasonIncomplete:  "left incomplete",
 }
 
 var statusCodes = map[kernel.Status]kernel.Code{

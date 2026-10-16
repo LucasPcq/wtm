@@ -84,13 +84,30 @@ func TestAPhaseCutShortLeavesNoTailBehind(t *testing.T) {
 	assert.NotContains(t, plain(out.String()), "✓")
 }
 
+func TestAPhaseThatFailedKeepsItsTailAndPointsAtItsLog(t *testing.T) {
+	var out bytes.Buffer
+	view := render.NewProgressView(t.Context(), render.ProgressViewParams{Catalog: catalog, W: &out, Human: true, Live: true})
+	report := kernel.Report(view, "feat/a")
+	report.UnitStarted()
+	view.Emit(&kernel.PhaseStarted{Of: kernel.Of{Subject: "feat/a"}, Phase: "on_create", Log: "/state/hooks/on_create-feat%2Fa.log"})
+	report.Output("network unreachable")
+	view.Emit(&kernel.PhaseFinished{Of: kernel.Of{Subject: "feat/a"}, Phase: "on_create", Failed: true})
+	view.Close()
+
+	shown := plain(out.String())
+	assert.Contains(t, shown, "✗ on_create · feat/a")
+	assert.NotContains(t, shown, "✓")
+	assert.Contains(t, shown, "network unreachable")
+	assert.Contains(t, shown, "/state/hooks/on_create-feat%2Fa.log")
+}
+
 func TestAPhaseThatPrintsNothingShowsNothing(t *testing.T) {
 	for _, live := range []bool{false, true} {
 		var out bytes.Buffer
 		view := render.NewProgressView(t.Context(), render.ProgressViewParams{Catalog: catalog, W: &out, Human: true, Live: live})
 		report := kernel.Report(view, "feat/a")
 
-		report.Phase("worktree")()
+		report.Phase("worktree")(false)
 		view.Close()
 
 		assert.Empty(t, out.String(), "live: %v", live)

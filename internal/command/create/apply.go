@@ -40,7 +40,7 @@ func (r applyRun) fastForward(ctx context.Context) []kernel.Warning {
 		}
 		finished := kernel.Report(r.in.Emit, subject).Phase(PhaseFastForward)
 		warning, failed := r.advance(ctx, subject)
-		finished()
+		finished(failed)
 		if failed && ctx.Err() == nil {
 			warnings = append(warnings, warning)
 		}

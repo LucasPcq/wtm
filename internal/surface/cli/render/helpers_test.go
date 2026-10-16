@@ -58,6 +58,6 @@ func emitRun(view *render.ProgressView) {
 	report.Status(kernel.CodeLocksUnavailable, nil)
 	finished := report.Phase("on_create")
 	report.Output("installing")
-	finished()
+	finished(false)
 	report.UnitFinished(kernel.StatusDone)
 }

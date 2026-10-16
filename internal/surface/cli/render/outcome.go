@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	headlineFmt = "%s: %s"
-	itemLineFmt = "%s  %s"
-	nothingToDo = "nothing to do"
+	headlineFmt     = "%s: %s"
+	itemLineFmt     = "%s  %s"
+	nothingToDo     = "nothing to do"
+	reasonSeparator = " · "
 )
 
 type OutcomeParams struct {
@@ -117,11 +118,19 @@ func outcomeItem(w io.Writer, params outcomeItemParams) {
 	case kernel.StatusSkipped, kernel.StatusCancelled:
 		Warning(w, fmt.Sprintf(itemLineFmt, item.Subject, itemWhy(params)))
 	}
+	if item.Reason == kernel.ReasonIncomplete {
+		params.Detail.Item(w, item)
+	}
 }
 
 func itemWhy(params outcomeItemParams) string {
-	if params.Item.Error != nil {
-		return Wording{Catalog: params.Catalog}.Error(params.Item.Error)
+	item := params.Item
+	if item.Error == nil {
+		return params.Catalog.Reason(item.Reason)
 	}
-	return params.Catalog.Reason(params.Item.Reason)
+	why := Wording{Catalog: params.Catalog}.Error(item.Error)
+	if item.Reason != kernel.ReasonIncomplete {
+		return why
+	}
+	return why + reasonSeparator + params.Catalog.Reason(item.Reason)
 }

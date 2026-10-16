@@ -102,8 +102,10 @@ func (r unitRun[D]) phase(ctx context.Context, phase phaseRun) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	defer r.report.phase(phase.started)()
-	return phase.run(ctx, r.report)
+	finished := r.report.phase(phase.started)
+	err := phase.run(ctx, r.report)
+	finished(err != nil)
+	return err
 }
 
 type phaseOf[D any] struct {
@@ -115,8 +117,9 @@ func (r unitRun[D]) then(ctx context.Context, step phaseOf[D]) (D, error) {
 	if err := ctx.Err(); err != nil {
 		return step.detail, err
 	}
-	defer r.report.phase(PhaseStarted{Phase: step.phase.Name, Log: step.phase.Log})()
+	finished := r.report.phase(PhaseStarted{Phase: step.phase.Name, Log: step.phase.Log})
 	next, err := step.phase.Run(ctx, r.report, step.detail)
+	finished(err != nil)
 	if err != nil {
 		return step.detail, err
 	}

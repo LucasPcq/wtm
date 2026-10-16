@@ -36,7 +36,8 @@ type PhaseStarted struct {
 
 type PhaseFinished struct {
 	Of
-	Phase string `json:"phase"`
+	Phase  string `json:"phase"`
+	Failed bool   `json:"failed,omitempty"`
 }
 
 type Output struct {
@@ -88,13 +89,13 @@ func (r Reporter) UnitFinished(status Status) {
 	r.send(&UnitFinished{Status: status})
 }
 
-func (r Reporter) Phase(name string) (finished func()) {
+func (r Reporter) Phase(name string) (finished func(failed bool)) {
 	return r.phase(PhaseStarted{Phase: name})
 }
 
-func (r Reporter) phase(started PhaseStarted) (finished func()) {
+func (r Reporter) phase(started PhaseStarted) (finished func(failed bool)) {
 	r.send(&started)
-	return func() { r.send(&PhaseFinished{Phase: started.Phase}) }
+	return func(failed bool) { r.send(&PhaseFinished{Phase: started.Phase, Failed: failed}) }
 }
 
 func (r Reporter) Output(line string) {
