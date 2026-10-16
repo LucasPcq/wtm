@@ -6,14 +6,14 @@ func Render(lines []Line) []byte {
 	crlf := endsInCRLF(lines)
 	parts := make([]string, len(lines))
 	for i, line := range lines {
-		part := line.Raw
-		if line.Kind == Pair && line.Raw == "" {
-			part = renderPair(line)
+		parts[i] = line.Raw
+		if line.Kind != Pair || line.Raw != "" {
+			continue
 		}
-		if crlf && i < len(lines)-1 && !strings.HasSuffix(part, carriageRet) {
-			part += carriageRet
+		parts[i] = renderPair(line)
+		if crlf && i < len(lines)-1 {
+			parts[i] += carriageRet
 		}
-		parts[i] = part
 	}
 	return []byte(strings.Join(parts, "\n"))
 }
@@ -41,21 +41,35 @@ func renderPair(line Line) string {
 }
 
 func renderValue(value string) string {
-	if strings.Contains(value, interpolation) && !strings.ContainsRune(value, singleQuote) {
-		return string(singleQuote) + value + string(singleQuote)
+	single := string(singleQuote) + value + string(singleQuote)
+	double := string(doubleQuote) + value + string(doubleQuote)
+	forms := []string{value, double, single}
+	if strings.Contains(value, interpolation) {
+		forms = []string{single, value, double}
 	}
-	if !needsQuote(value) {
-		return value
+	for _, form := range forms {
+		if readsAs(form, value) {
+			return form
+		}
 	}
 	return string(doubleQuote) + strings.ReplaceAll(value, `"`, `\"`) + string(doubleQuote)
 }
 
+func readsAs(form, value string) bool {
+	if form == value && unsafeBare(value) {
+		return false
+	}
+	parsed := Parse([]byte("K=" + form))
+	return len(parsed) == 1 && parsed[0].Kind == Pair && parsed[0].Value == value
+}
+
 func needsQuote(value string) bool {
+	return unsafeBare(value) || strings.Contains(value, `"`)
+}
+
+func unsafeBare(value string) bool {
 	if value == "" {
 		return false
 	}
-	if strings.ContainsAny(value, " \t\n\"") {
-		return true
-	}
-	return isQuote(value[0]) || value[0] == '#'
+	return strings.ContainsAny(value, " \t\n") || isQuote(value[0]) || value[0] == '#'
 }

@@ -31,6 +31,9 @@ func TestAFileRoundTripsByteForByte(t *testing.T) {
 		{"empty value", "KEY=\n"},
 		{"internal whitespace unquoted", "KEY=hello world\n"},
 		{"escaped quote in double quotes", "KEY=\"he said \\\"hi\\\"\"\n"},
+		{"mostly CRLF with one LF line", "A=1\r\nB=2\r\nC=3\n"},
+		{"LF before a CRLF multiline value", "U=x\nM=\"multi\r\nline\"\r\n"},
+		{"a byte order mark", "\ufeffBOM=1\nA=2\n"},
 		{"everything at once, CRLF, no final newline", "# app settings\r\n\r\nexport API_PORT=4002 # api\r\nDATABASE_URL=\"postgres://u:p@localhost:5432/db?sslmode=disable\"\r\nREDIS_URL='redis://u:pa$w0rd@localhost:6379/0'\r\n\r\nGREETING=hello world\r\nEMPTY=\r\n  INDENTED = spaced\r\nnot a pair\r\nLAST=1"},
 	}
 	for _, tc := range cases {
@@ -51,7 +54,7 @@ func TestANewPairIsRenderedCanonically(t *testing.T) {
 		{"export prefix preserved", Line{Kind: Pair, Key: "FOO", Value: "bar", Export: true}, "export FOO=bar"},
 		{"value with equals stays bare", Line{Kind: Pair, Key: "KEY", Value: "a=b"}, "KEY=a=b"},
 		{"inline-comment-like value is quoted", Line{Kind: Pair, Key: "KEY", Value: "val # x"}, `KEY="val # x"`},
-		{"embedded double quote is escaped", Line{Kind: Pair, Key: "KEY", Value: `say "hi"`}, `KEY="say \"hi\""`},
+		{"embedded double quote takes single quotes", Line{Kind: Pair, Key: "KEY", Value: `say "hi"`}, `KEY='say "hi"'`},
 		{"a dollar takes single quotes", Line{Kind: Pair, Key: "PW", Value: "pa$w0rd"}, "PW='pa$w0rd'"},
 		{"empty value stays bare", Line{Kind: Pair, Key: "KEY", Value: ""}, "KEY="},
 	}

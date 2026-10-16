@@ -99,3 +99,46 @@ func TestAValueSetOnAPairWithoutItsTextIsRenderedCanonically(t *testing.T) {
 	require.Empty(t, line.Raw)
 	assert.Equal(t, `A="hello world"`, string(Render([]Line{line})))
 }
+
+func TestAValueHoldingQuotesReadsBackAsSet(t *testing.T) {
+	for _, value := range []string{`say "hi"`, `a"b`, `"lead`, `it's`, `pa$w"rd`, `it's"fine`} {
+		t.Run(value, func(t *testing.T) {
+			lines, changed := Set(SetParams{Lines: Parse([]byte("A=1\n")), Key: "A", Value: value})
+			require.True(t, changed)
+
+			assert.Equal(t, value, valueOf(t, Render(lines), "A"))
+			_, again := Set(SetParams{Lines: Parse(Render(lines)), Key: "A", Value: value})
+			assert.False(t, again, "a second Set of the same value changes nothing")
+		})
+	}
+}
+
+func TestAnAddedKeyIsNotSwallowedByAnEarlierUnterminatedQuote(t *testing.T) {
+	lines, _ := Set(SetParams{Lines: Parse([]byte("N='open\n")), Key: "W", Value: "it's"})
+
+	rendered := Render(lines)
+
+	assert.Equal(t, "it's", valueOf(t, rendered, "W"))
+	assert.Contains(t, string(rendered), "N='open")
+}
+
+func TestAKeyAfterAByteOrderMarkIsSetInPlace(t *testing.T) {
+	lines, _ := Set(SetParams{Lines: Parse([]byte("\ufeffBOM=1\n")), Key: "BOM", Value: "2"})
+
+	assert.Equal(t, "\ufeffBOM=2\n", string(Render(lines)))
+}
+
+func TestAKeyAddedAfterAnUnterminatedLastLineOfACRLFFileKeepsItCRLF(t *testing.T) {
+	lines, _ := Set(SetParams{Lines: Parse([]byte("A=1\r\nB=2")), Key: "C", Value: "3"})
+
+	assert.Equal(t, "A=1\r\nB=2\r\nC=3", string(Render(lines)))
+}
+
+func TestAValueNoQuotingCanHoldIsWrittenOnceAndThenLeftAlone(t *testing.T) {
+	first, _ := Set(SetParams{Lines: Parse([]byte("A=1\n")), Key: "A", Value: `it's "fine"`})
+
+	_, again := Set(SetParams{Lines: Parse(Render(first)), Key: "A", Value: `it's "fine"`})
+
+	assert.Equal(t, "A=\"it's \\\"fine\\\"\"\n", string(Render(first)))
+	assert.False(t, again)
+}

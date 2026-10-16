@@ -73,7 +73,7 @@ func TestAnUnknownStrategyIsRefused(t *testing.T) {
 	request := Request{Strategy: "elsewhere", Files: []project.EnvFile{{Target: ".env"}}}
 
 	_, _, err := Sources(SourcesParams{Request: request})
-	assert.Error(t, err)
+	assert.EqualError(t, err, "unknown env strategy: elsewhere")
 	_, err = Candidates(request)
-	assert.Error(t, err)
+	assert.EqualError(t, err, "unknown env strategy: elsewhere")
 }

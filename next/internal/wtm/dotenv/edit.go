@@ -36,18 +36,60 @@ func Set(params SetParams) ([]Line, bool) {
 		if line.Kind != Pair || line.Key != params.Key {
 			continue
 		}
-		if line.Value == params.Value {
+		edited := line.WithValue(params.Value)
+		if line.Value == params.Value || edited.Raw == line.Raw {
 			return params.Lines, false
 		}
 		out := slices.Clone(params.Lines)
-		out[i] = line.WithValue(params.Value)
+		out[i] = edited
 		return out, true
 	}
-	at := len(params.Lines)
-	for at > 0 && params.Lines[at-1].Kind == Blank {
-		at--
+	return params.appended(), true
+}
+
+func (params SetParams) appended() []Line {
+	end := len(params.Lines)
+	for end > 0 && params.Lines[end-1].Kind == Blank {
+		end--
 	}
-	return slices.Insert(slices.Clone(params.Lines), at, Line{Kind: Pair, Key: params.Key, Value: params.Value}), true
+	for at := end; at >= 0; at-- {
+		out := params.insertedAt(at)
+		if params.heldBy(out) {
+			return out
+		}
+	}
+	return params.insertedAt(end)
+}
+
+func (params SetParams) insertedAt(at int) []Line {
+	out := slices.Insert(slices.Clone(params.Lines), at, Line{Kind: Pair, Key: params.Key, Value: params.Value})
+	previous := at - 1
+	if at == len(params.Lines) && previous >= 0 && out[previous].Raw != "" && endsInCRLF(params.Lines) && !strings.HasSuffix(out[previous].Raw, carriageRet) {
+		out[previous].Raw += carriageRet
+	}
+	return out
+}
+
+func (params SetParams) heldBy(lines []Line) bool {
+	pairs, held := 0, false
+	for _, line := range Parse(Render(lines)) {
+		if line.Kind != Pair {
+			continue
+		}
+		pairs++
+		held = held || line.Key == params.Key && line.Value == params.Value
+	}
+	return held && pairs == countPairs(lines)
+}
+
+func countPairs(lines []Line) int {
+	count := 0
+	for _, line := range lines {
+		if line.Kind == Pair {
+			count++
+		}
+	}
+	return count
 }
 
 type valueSpan struct {

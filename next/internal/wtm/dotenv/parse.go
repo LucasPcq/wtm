@@ -27,15 +27,20 @@ const (
 	singleQuote   = '\''
 	carriageRet   = "\r"
 	interpolation = "$"
+	byteOrderMark = string('\ufeff')
 )
 
 func Parse(data []byte) []Line {
-	physical := strings.Split(string(data), "\n")
+	text, marked := strings.CutPrefix(string(data), byteOrderMark)
+	physical := strings.Split(text, "\n")
 	lines := make([]Line, 0, len(physical))
 	for i := 0; i < len(physical); i++ {
 		line, extra := classify(physical, i)
 		lines = append(lines, line)
 		i += extra
+	}
+	if marked {
+		lines[0].Raw = byteOrderMark + lines[0].Raw
 	}
 	return lines
 }

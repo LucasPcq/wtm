@@ -36,6 +36,12 @@ func TestEachLineIsClassified(t *testing.T) {
 	}
 }
 
+func TestAByteOrderMarkDoesNotHideTheFirstKey(t *testing.T) {
+	lines := Parse([]byte("\ufeffBOM=1\n"))
+
+	assert.Equal(t, Line{Kind: Pair, Key: "BOM", Value: "1", Raw: "\ufeffBOM=1"}, lines[0])
+}
+
 func TestAQuotedValueSpansLines(t *testing.T) {
 	lines := Parse([]byte("CERT=\"-----BEGIN-----\nMIIB\n-----END-----\"\nNEXT=1"))
 
