@@ -6,45 +6,8 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules/branch"
 )
-
-// ClassifyDivergence maps a local branch's ahead/behind commit counts (relative
-// to its origin counterpart) to a DivergenceState.
-func ClassifyDivergence(ahead, behind int) domain.DivergenceState {
-	if ahead > 0 && behind > 0 {
-		return domain.DivergenceDiverged
-	}
-	if behind > 0 {
-		return domain.DivergenceBehind
-	}
-	if ahead > 0 {
-		return domain.DivergenceAhead
-	}
-	return domain.DivergenceUpToDate
-}
-
-// IsRemoteBranch reports whether name is an origin remote-tracking ref
-// ("origin/feature") rather than a bare local branch name.
-func IsRemoteBranch(name string) bool {
-	return strings.HasPrefix(name, domain.RemoteBranchPrefix)
-}
-
-// DivergenceStateString maps a DivergenceState to its JSON label. It returns ""
-// for DivergenceUnknown (no origin counterpart) so callers omit the field.
-func DivergenceStateString(state domain.DivergenceState) string {
-	switch state {
-	case domain.DivergenceUpToDate:
-		return domain.DivergenceLabelUpToDate
-	case domain.DivergenceBehind:
-		return domain.DivergenceLabelBehind
-	case domain.DivergenceAhead:
-		return domain.DivergenceLabelAhead
-	case domain.DivergenceDiverged:
-		return domain.DivergenceLabelDiverged
-	default:
-		return ""
-	}
-}
 
 // BranchCandidateExists reports whether ref matches a known start-point (a local
 // branch or a remote-tracking ref like origin/x) in candidates.
@@ -67,16 +30,6 @@ func ShouldOfferFastForward(state domain.DivergenceState) bool {
 // origin, and the source then merely records the sync parent in metadata.
 func SourceIsStartPoint(target domain.BranchTarget) bool {
 	return target.State == domain.BranchTargetNew && target.Upstream == ""
-}
-
-// ParentMustBeExplicit reports whether the sync parent has to be named by the
-// caller rather than defaulted. A branch that already exists was created outside
-// wtm, so nothing in the repo says what it was branched off — defaulting to the
-// base branch would record a guess that sync, tree and reparent then treat as
-// fact. A branch git is about to create has no such ambiguity: its start-point
-// is its parent.
-func ParentMustBeExplicit(state domain.BranchTargetState) bool {
-	return state == domain.BranchTargetExisting
 }
 
 // MergeBranchCandidatesParams holds inputs for MergeBranchCandidates. Local and
@@ -119,7 +72,7 @@ func MergeBranchCandidates(params MergeBranchCandidatesParams) []domain.BranchCa
 		if d, ok := params.Divergence[b]; ok {
 			candidate.Ahead = d.Ahead
 			candidate.Behind = d.Behind
-			candidate.State = ClassifyDivergence(d.Ahead, d.Behind)
+			candidate.State = branch.Divergence(d.Ahead, d.Behind)
 		}
 		candidates = append(candidates, candidate)
 	}

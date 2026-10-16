@@ -13,6 +13,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/infra/git"
 	"github.com/LucasPcq/wtm/internal/kernel"
 	"github.com/LucasPcq/wtm/internal/rules"
+	rulebranch "github.com/LucasPcq/wtm/internal/rules/branch"
 	"github.com/LucasPcq/wtm/internal/rules/worktree"
 	"github.com/LucasPcq/wtm/internal/service/identity"
 )
@@ -188,7 +189,7 @@ func (f Facts) divergence(branch string) (domain.DivergenceState, domain.AheadBe
 		return domain.DivergenceUnknown, domain.AheadBehind{}
 	}
 	counts := f.Divergence[branch]
-	return rules.ClassifyDivergence(counts.Ahead, counts.Behind), domain.AheadBehind{Ahead: counts.Ahead, Behind: counts.Behind}
+	return rulebranch.Divergence(counts.Ahead, counts.Behind), domain.AheadBehind{Ahead: counts.Ahead, Behind: counts.Behind}
 }
 
 func (f Facts) pathOf(branch string) string {

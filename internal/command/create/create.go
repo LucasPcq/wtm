@@ -10,7 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra/git"
 	"github.com/LucasPcq/wtm/internal/kernel"
-	"github.com/LucasPcq/wtm/internal/rules"
+	rulebranch "github.com/LucasPcq/wtm/internal/rules/branch"
 	"github.com/LucasPcq/wtm/internal/store"
 )
 
@@ -52,5 +52,5 @@ func locks(req Request) []kernel.LockKey {
 }
 
 func fastForwardsSource(req Request) bool {
-	return req.FastForward && req.From != "" && !rules.IsRemoteBranch(req.From) && !slices.Contains(req.Branches, req.From)
+	return req.FastForward && req.From != "" && !rulebranch.IsRemote(req.From) && !slices.Contains(req.Branches, req.From)
 }

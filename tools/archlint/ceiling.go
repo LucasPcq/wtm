@@ -110,7 +110,7 @@ var migratingCeiling = map[string]int{
 	`rootfreeze internal/rules/age\.go`:                  5,
 	`rootfreeze internal/rules/baseports\.go`:            4,
 	`rootfreeze internal/rules/batch\.go`:                5,
-	`rootfreeze internal/rules/branch\.go`:               12,
+	`rootfreeze internal/rules/branch\.go`:               8,
 	`rootfreeze internal/rules/branchlist\.go`:           3,
 	`rootfreeze internal/rules/branchname\.go`:           2,
 	`rootfreeze internal/rules/browserports\.go`:         2,
@@ -242,7 +242,7 @@ var migratingCeiling = map[string]int{
 	`rootfreeze internal/rules/usage\.go`:                4,
 	`rootfreeze internal/rules/validate\.go`:             15,
 	`rootfreeze internal/rules/workspace\.go`:            5,
-	`rootfreeze internal/rules/worktree\.go`:             20,
+	`rootfreeze internal/rules/worktree\.go`:             18,
 	`rootfreeze internal/rules/worktreestatus\.go`:       13,
 }
 
@@ -257,6 +257,7 @@ var commentCeiling = map[string]int{
 	`infra/fs`:         40,
 	`infra/git`:        19,
 	`infra/proc`:       36,
+	`rules/branch`:     2,
 	`rules/envcopy`:    4,
 	`rules/runenv`:     2,
 	`rules/statefile`:  4,

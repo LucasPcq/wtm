@@ -8,6 +8,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/kernel"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/rules/envcopy"
 	"github.com/LucasPcq/wtm/internal/rules/worktree"
 )
 
@@ -130,7 +131,7 @@ func planWarnings(params planWarningsParams) []kernel.Warning {
 
 func parentFallsBack(params planWarningsParams) bool {
 	creates := slices.ContainsFunc(params.Branches, func(planned Planned) bool { return planned.Action != ActionUnchanged })
-	return creates && rules.ParentEnvFallsBackToMain(rules.ParentEnvFallbackParams{
+	return creates && envcopy.ParentFallsBackToMain(envcopy.ParentFallbackParams{
 		Strategy:          params.Request.EnvFrom,
 		HasCopyFiles:      len(params.Facts.Config.Env.Files) > 0,
 		SourceHasWorktree: params.Facts.Identity.CheckedOutAt(params.Request.From) != "",

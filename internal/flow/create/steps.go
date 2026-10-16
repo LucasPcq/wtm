@@ -10,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow/decide"
 	"github.com/LucasPcq/wtm/internal/flow/envports"
 	"github.com/LucasPcq/wtm/internal/rules"
+	rulebranch "github.com/LucasPcq/wtm/internal/rules/branch"
 	"github.com/LucasPcq/wtm/internal/service/branch"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
@@ -195,7 +196,7 @@ func (f *createFlow) sourceStep() flow.Step {
 // then treat as fact.
 func (f *createFlow) resolveSource(answers flow.Answers) (flow.Answer, error) {
 	for _, name := range f.branches(answers) {
-		if rules.ParentMustBeExplicit(f.target(name).State) {
+		if rulebranch.ParentMustBeExplicit(f.target(name).State) {
 			return flow.Answer{}, fmt.Errorf(domain.ParentRequiredFmt, name, domain.FlagFrom)
 		}
 	}

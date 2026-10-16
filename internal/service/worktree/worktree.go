@@ -14,6 +14,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/infra/proc"
 	"github.com/LucasPcq/wtm/internal/rules"
+	rulebranch "github.com/LucasPcq/wtm/internal/rules/branch"
 	"github.com/LucasPcq/wtm/internal/rules/envcopy"
 	"github.com/LucasPcq/wtm/internal/service/branch"
 	"github.com/LucasPcq/wtm/internal/service/hooks"
@@ -150,7 +151,7 @@ func Create(ctx context.Context, params domain.CreateParams) (domain.CreateResul
 	}
 	if reuseBranch {
 		result.ExistingBranch = true
-		result.OriginState = rules.DivergenceStateString(target.Origin)
+		result.OriginState = rulebranch.DivergenceLabel(target.Origin)
 		result.OriginAhead = target.AheadBehind.Ahead
 		result.OriginBehind = target.AheadBehind.Behind
 	}
@@ -219,7 +220,7 @@ type EnvFallbackParams struct {
 // before creating.
 func EnvParentFallsBackToMain(ctx context.Context, params EnvFallbackParams) bool {
 	strategy := rules.ResolveEnvStrategy(params.Config.Project.Env.Strategy, params.EnvOverride)
-	return rules.ParentEnvFallsBackToMain(rules.ParentEnvFallbackParams{
+	return envcopy.ParentFallsBackToMain(envcopy.ParentFallbackParams{
 		Strategy:          strategy,
 		HasCopyFiles:      len(params.Config.Project.Env.Files) > 0,
 		SourceHasWorktree: parentWorktreePath(ctx, params.ProjectDir, params.Source) != "",

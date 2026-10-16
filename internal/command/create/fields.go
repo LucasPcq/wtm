@@ -10,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/infra/git"
 	"github.com/LucasPcq/wtm/internal/kernel"
 	"github.com/LucasPcq/wtm/internal/rules"
+	rulebranch "github.com/LucasPcq/wtm/internal/rules/branch"
 	"github.com/LucasPcq/wtm/internal/rules/worktree"
 )
 
@@ -158,7 +159,7 @@ func defaultSource(req Request, f Facts) (kernel.Fallback, bool) {
 
 func anyExisting(req Request, f Facts) bool {
 	return slices.ContainsFunc(req.Branches, func(branch string) bool {
-		return rules.ParentMustBeExplicit(f.target(branch).State)
+		return rulebranch.ParentMustBeExplicit(f.target(branch).State)
 	})
 }
 

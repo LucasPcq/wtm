@@ -10,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/infra/git"
 	"github.com/LucasPcq/wtm/internal/kernel"
 	"github.com/LucasPcq/wtm/internal/rules"
+	rulebranch "github.com/LucasPcq/wtm/internal/rules/branch"
 	"github.com/LucasPcq/wtm/internal/service/identity"
 )
 
@@ -154,7 +155,7 @@ func originOf(f Facts, planned Planned) provision.Origin {
 	switch planned.Action {
 	case ActionCheckOut:
 		state, counts := f.divergence(planned.Branch)
-		return provision.Origin{ExistingBranch: true, OriginState: rules.DivergenceStateString(state), OriginAhead: counts.Ahead, OriginBehind: counts.Behind}
+		return provision.Origin{ExistingBranch: true, OriginState: rulebranch.DivergenceLabel(state), OriginAhead: counts.Ahead, OriginBehind: counts.Behind}
 	case ActionResume:
 		return provision.Origin{Upstream: planned.Upstream}
 	case ActionCreate, ActionUnchanged:

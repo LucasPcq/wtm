@@ -8,27 +8,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
-func TestParentEnvFallsBackToMain(t *testing.T) {
-	cases := []struct {
-		name   string
-		params ParentEnvFallbackParams
-		want   bool
-	}{
-		{"parent + no worktree + copyfiles", ParentEnvFallbackParams{Strategy: domain.EnvStrategyParent, HasCopyFiles: true, SourceHasWorktree: false}, true},
-		{"parent + has worktree", ParentEnvFallbackParams{Strategy: domain.EnvStrategyParent, HasCopyFiles: true, SourceHasWorktree: true}, false},
-		{"parent + no copyfiles", ParentEnvFallbackParams{Strategy: domain.EnvStrategyParent, HasCopyFiles: false, SourceHasWorktree: false}, false},
-		{"main strategy", ParentEnvFallbackParams{Strategy: domain.EnvStrategyMain, HasCopyFiles: true, SourceHasWorktree: false}, false},
-		{"example strategy", ParentEnvFallbackParams{Strategy: domain.EnvStrategyExample, HasCopyFiles: true, SourceHasWorktree: false}, false},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			if got := ParentEnvFallsBackToMain(c.params); got != c.want {
-				t.Errorf("ParentEnvFallsBackToMain(%+v) = %v, want %v", c.params, got, c.want)
-			}
-		})
-	}
-}
-
 func TestSanitizeBranchName(t *testing.T) {
 	tests := []struct {
 		input string

@@ -9,6 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/envports"
 	"github.com/LucasPcq/wtm/internal/rules"
+	rulebranch "github.com/LucasPcq/wtm/internal/rules/branch"
 	"github.com/LucasPcq/wtm/internal/service/branch"
 	"github.com/LucasPcq/wtm/internal/service/memory"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
@@ -67,7 +68,7 @@ func SourceUpdate(ctx context.Context, params SourceUpdateParams) SourceUpdatePr
 	if subject == "" {
 		return SourceUpdatePrompt{SkipReason: domain.SourceUpdateSkipNoSource}
 	}
-	if rules.IsRemoteBranch(subject) {
+	if rulebranch.IsRemote(subject) {
 		return SourceUpdatePrompt{Branch: subject, SkipReason: domain.SourceUpdateSkipRemote}
 	}
 

@@ -23,45 +23,6 @@ func TestBranchCandidateExists(t *testing.T) {
 	}
 }
 
-func TestClassifyDivergence(t *testing.T) {
-	cases := []struct {
-		name   string
-		ahead  int
-		behind int
-		want   domain.DivergenceState
-	}{
-		{"up to date", 0, 0, domain.DivergenceUpToDate},
-		{"ahead", 2, 0, domain.DivergenceAhead},
-		{"behind", 0, 5, domain.DivergenceBehind},
-		{"diverged", 2, 5, domain.DivergenceDiverged},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			if got := ClassifyDivergence(c.ahead, c.behind); got != c.want {
-				t.Errorf("ClassifyDivergence(%d, %d) = %v, want %v", c.ahead, c.behind, got, c.want)
-			}
-		})
-	}
-}
-
-func TestDivergenceStateString(t *testing.T) {
-	cases := []struct {
-		state domain.DivergenceState
-		want  string
-	}{
-		{domain.DivergenceUpToDate, domain.DivergenceLabelUpToDate},
-		{domain.DivergenceBehind, domain.DivergenceLabelBehind},
-		{domain.DivergenceAhead, domain.DivergenceLabelAhead},
-		{domain.DivergenceDiverged, domain.DivergenceLabelDiverged},
-		{domain.DivergenceUnknown, ""},
-	}
-	for _, c := range cases {
-		if got := DivergenceStateString(c.state); got != c.want {
-			t.Errorf("DivergenceStateString(%v) = %q, want %q", c.state, got, c.want)
-		}
-	}
-}
-
 func TestShouldOfferFastForward(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -98,25 +59,6 @@ func TestSourceIsStartPoint(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			if got := SourceIsStartPoint(c.target); got != c.want {
 				t.Errorf("SourceIsStartPoint(%+v) = %v, want %v", c.target, got, c.want)
-			}
-		})
-	}
-}
-
-func TestParentMustBeExplicit(t *testing.T) {
-	cases := []struct {
-		name  string
-		state domain.BranchTargetState
-		want  bool
-	}{
-		{"an existing branch has no inferable parent", domain.BranchTargetExisting, true},
-		{"a new branch's parent is its start-point", domain.BranchTargetNew, false},
-		{"a taken branch never reaches the question", domain.BranchTargetCheckedOut, false},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			if got := ParentMustBeExplicit(c.state); got != c.want {
-				t.Errorf("ParentMustBeExplicit(%v) = %v, want %v", c.state, got, c.want)
 			}
 		})
 	}

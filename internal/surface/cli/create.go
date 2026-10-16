@@ -12,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/kernel"
 	"github.com/LucasPcq/wtm/internal/rules"
+	rulebranch "github.com/LucasPcq/wtm/internal/rules/branch"
 	"github.com/LucasPcq/wtm/internal/styles"
 	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 )
@@ -171,7 +172,7 @@ func reusedNote(branch string, created createItem) (string, bool) {
 	if !created.ExistingBranch {
 		return "", false
 	}
-	switch rules.ClassifyDivergence(created.OriginAhead, created.OriginBehind) {
+	switch rulebranch.Divergence(created.OriginAhead, created.OriginBehind) {
 	case domain.DivergenceBehind:
 		return fmt.Sprintf(domain.BranchReusedBehindWarning, branch, created.OriginBehind), true
 	case domain.DivergenceDiverged:

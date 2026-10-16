@@ -81,7 +81,7 @@ rootfreeze internal/rules/addressing\.go 7
 rootfreeze internal/rules/age\.go 5
 rootfreeze internal/rules/baseports\.go 4
 rootfreeze internal/rules/batch\.go 5
-rootfreeze internal/rules/branch\.go 12
+rootfreeze internal/rules/branch\.go 8
 rootfreeze internal/rules/branchlist\.go 3
 rootfreeze internal/rules/branchname\.go 2
 rootfreeze internal/rules/browserports\.go 2
@@ -213,7 +213,7 @@ rootfreeze internal/rules/urlcandidates\.go 7
 rootfreeze internal/rules/usage\.go 4
 rootfreeze internal/rules/validate\.go 15
 rootfreeze internal/rules/workspace\.go 5
-rootfreeze internal/rules/worktree\.go 20
+rootfreeze internal/rules/worktree\.go 18
 rootfreeze internal/rules/worktreestatus\.go 13
 
 # Real ports built outside internal/registry (LUC-300): the services of the

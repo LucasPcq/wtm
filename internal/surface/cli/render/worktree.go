@@ -9,6 +9,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
+	rulebranch "github.com/LucasPcq/wtm/internal/rules/branch"
 	"github.com/LucasPcq/wtm/internal/styles"
 )
 
@@ -222,7 +223,7 @@ func matchOrigin(s domain.WorktreeStatus) *domain.WorktreeListOrigin {
 	return &domain.WorktreeListOrigin{
 		Ahead:  s.OriginAhead,
 		Behind: s.OriginBehind,
-		State:  rules.DivergenceStateString(s.OriginState),
+		State:  rulebranch.DivergenceLabel(s.OriginState),
 	}
 }
 

@@ -79,23 +79,6 @@ func ResolveEnvStrategy(strategy domain.EnvStrategy, override string) domain.Env
 	return strategy
 }
 
-// ParentEnvFallbackParams holds inputs for ParentEnvFallsBackToMain.
-type ParentEnvFallbackParams struct {
-	Strategy          domain.EnvStrategy
-	HasCopyFiles      bool
-	SourceHasWorktree bool
-}
-
-// ParentEnvFallsBackToMain reports whether provisioning .env with the "parent"
-// strategy will silently fall back to the main worktree because the source branch
-// has no local worktree to copy from. Only meaningful when files are configured to
-// be copied.
-func ParentEnvFallsBackToMain(params ParentEnvFallbackParams) bool {
-	return params.HasCopyFiles &&
-		params.Strategy == domain.EnvStrategyParent &&
-		!params.SourceHasWorktree
-}
-
 // SortStatuses sorts worktree statuses: parent first, then children by creation date (oldest first).
 func SortStatuses(statuses []domain.WorktreeStatus) {
 	sort.SliceStable(statuses, func(i, j int) bool {

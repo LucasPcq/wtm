@@ -12,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
+	rulebranch "github.com/LucasPcq/wtm/internal/rules/branch"
 )
 
 // ListParams holds inputs for listing branch candidates.
@@ -63,7 +64,7 @@ func Divergence(ctx context.Context, params BranchParams) (domain.DivergenceStat
 	if err != nil {
 		return domain.DivergenceUnknown, domain.AheadBehind{}
 	}
-	return rules.ClassifyDivergence(ab.Ahead, ab.Behind), ab
+	return rulebranch.Divergence(ab.Ahead, ab.Behind), ab
 }
 
 // FastForwardIfBehind is the non-interactive counterpart of the create wizard's
@@ -73,7 +74,7 @@ func Divergence(ctx context.Context, params BranchParams) (domain.DivergenceStat
 // failure) is left untouched — creation then proceeds from the local branch
 // as-is, mirroring the "keep the local version" choice offered interactively.
 func FastForwardIfBehind(ctx context.Context, params BranchParams) error {
-	if rules.IsRemoteBranch(params.Branch) {
+	if rulebranch.IsRemote(params.Branch) {
 		return nil
 	}
 	if err := FastForwardToOrigin(ctx, params); err != nil {
@@ -130,7 +131,7 @@ func Check(ctx context.Context, params BranchParams) (domain.FastForwardCheck, e
 	}
 	check.HasUpstream = true
 	check.Ahead, check.Behind = ab.Ahead, ab.Behind
-	check.State = rules.ClassifyDivergence(ab.Ahead, ab.Behind)
+	check.State = rulebranch.Divergence(ab.Ahead, ab.Behind)
 
 	wt, err := infra.FindWorktreeByBranch(ctx, infra.FindWorktreeByBranchParams{
 		ProjectDir: params.ProjectDir,
