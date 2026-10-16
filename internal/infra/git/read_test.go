@@ -174,7 +174,11 @@ func TestBranchesSplitsLocalFromRemoteAndDropsTheRemoteHead(t *testing.T) {
 	branches, err := repo.Branches(t.Context())
 
 	require.NoError(t, err)
-	assert.Equal(t, git.Branches{Local: []string{"feature", "local-only", "main"}, Remote: []string{"feature", "main"}}, branches)
+	main := gittest.Output(t, repo.Dir, "rev-parse", "main")
+	assert.Equal(t, git.Branches{
+		Local:  []git.Branch{{Name: "feature", Tip: main}, {Name: "local-only", Tip: main}, {Name: "main", Tip: main}},
+		Remote: []git.Branch{{Name: "feature", Tip: main}, {Name: "main", Tip: main}},
+	}, branches)
 }
 
 func TestBranchesFollowsTheRemoteItIsGiven(t *testing.T) {
@@ -186,7 +190,7 @@ func TestBranchesFollowsTheRemoteItIsGiven(t *testing.T) {
 	branches, err := repo.Branches(t.Context())
 
 	require.NoError(t, err)
-	assert.Equal(t, []string{"feature"}, branches.Remote)
+	assert.Equal(t, []string{"feature"}, gittest.Names(branches.Remote))
 }
 
 func TestRefExistsTellsAPresentRefFromAnAbsentOne(t *testing.T) {

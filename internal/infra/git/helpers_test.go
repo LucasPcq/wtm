@@ -105,3 +105,25 @@ func aheadBehind(t *testing.T, reader git.Reader, params git.AheadBehindParams) 
 	require.NoError(t, err)
 	return counts
 }
+
+func named(names ...string) []git.Branch {
+	branches := make([]git.Branch, 0, len(names))
+	for _, name := range names {
+		branches = append(branches, git.Branch{Name: name})
+	}
+	return branches
+}
+
+func tipsOf(t *testing.T, reader git.Reader) map[git.Ref]string {
+	t.Helper()
+	branches, err := reader.Branches(t.Context())
+	require.NoError(t, err)
+	tips := map[git.Ref]string{}
+	for _, branch := range branches.Local {
+		tips[git.LocalBranch{Name: branch.Name}] = branch.Tip
+	}
+	for _, branch := range branches.Remote {
+		tips[git.RemoteBranch{Name: branch.Name}] = branch.Tip
+	}
+	return tips
+}

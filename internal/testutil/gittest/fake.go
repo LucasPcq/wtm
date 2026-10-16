@@ -155,7 +155,15 @@ func (f *Fake) Branches(context.Context) (git.Branches, error) {
 	if err := f.enter("Branches", ""); err != nil {
 		return git.Branches{}, err
 	}
-	return git.Branches{Local: slices.Sorted(maps.Keys(f.local)), Remote: slices.Sorted(maps.Keys(f.remote))}, nil
+	return git.Branches{Local: branchesOf(f.local), Remote: branchesOf(f.remote)}, nil
+}
+
+func branchesOf(refs map[string]history) []git.Branch {
+	branches := make([]git.Branch, 0, len(refs))
+	for _, name := range slices.Sorted(maps.Keys(refs)) {
+		branches = append(branches, git.Branch{Name: name, Tip: refs[name].tip()})
+	}
+	return branches
 }
 
 func (f *Fake) RefExists(_ context.Context, ref git.Ref) (bool, error) {

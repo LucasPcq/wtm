@@ -40,8 +40,8 @@ func TestTheFakeAndGitReadTheSameRepository(t *testing.T) {
 					{Path: at("rebasing"), State: git.Rebasing{Branch: "rebasing"}},
 				},
 				Branches: git.Branches{
-					Local:  []string{"dirty", "diverged", "feature", "gone", "linked", "locked", "main", "rebasing", "unmerged"},
-					Remote: []string{"diverged", "feature", "main", "remote-only"},
+					Local:  named("dirty", "diverged", "feature", "gone", "linked", "locked", "main", "rebasing", "unmerged"),
+					Remote: named("diverged", "feature", "main", "remote-only"),
 				},
 			}, gittest.StateOf(t, impl.port))
 		})
@@ -65,6 +65,20 @@ func TestTheFakeAndGitAgreeOnWhatARefIs(t *testing.T) {
 			assert.NotEqual(t, tip(t, impl.port, main), tip(t, impl.port, git.LocalBranch{Name: "unmerged"}))
 			_, err := impl.port.Tip(ctx, git.LocalBranch{Name: "nope"})
 			require.Error(t, err)
+		})
+	}
+}
+
+func TestTheFakeAndGitListEachBranchWithItsTip(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			tips := tipsOf(t, impl.port)
+
+			for ref, listed := range tips {
+				assert.Equal(t, tip(t, impl.port, ref), listed, ref)
+			}
+			assert.Equal(t, tips[git.LocalBranch{Name: "main"}], tips[git.RemoteBranch{Name: "feature"}])
+			assert.NotEqual(t, tips[git.LocalBranch{Name: "diverged"}], tips[git.RemoteBranch{Name: "diverged"}])
 		})
 	}
 }
@@ -104,7 +118,7 @@ func TestTheFakeAndGitAgreeOnAnAddAndItsUndo(t *testing.T) {
 			require.NoError(t, impl.port.DeleteBranch(ctx, git.DeleteBranchParams{Name: "topic", Force: true}))
 
 			assert.Equal(t, append(before.Worktrees, git.Worktree{Path: impl.at("topic"), State: git.OnBranch{Branch: "topic"}}), added.Worktrees)
-			assert.Contains(t, added.Branches.Local, "topic")
+			assert.Contains(t, gittest.Names(added.Branches.Local), "topic")
 			assert.Equal(t, before, gittest.StateOf(t, impl.port))
 		})
 	}
@@ -122,7 +136,7 @@ func TestTheFakeAndGitLeaveTheBranchOfAnAddRefusedForItsPath(t *testing.T) {
 				require.Error(t, err)
 				after := gittest.StateOf(t, impl.port)
 				assert.Equal(t, before.Worktrees, after.Worktrees)
-				assert.Equal(t, slices.Sorted(slices.Values(append(slices.Clone(before.Branches.Local), branch))), after.Branches.Local)
+				assert.Equal(t, slices.Sorted(slices.Values(append(gittest.Names(before.Branches.Local), branch))), gittest.Names(after.Branches.Local))
 			})
 		}
 	}

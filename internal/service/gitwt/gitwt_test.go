@@ -26,7 +26,7 @@ func TestAnAddOnANewBranchAndItsRemoveEndWhereTheyStarted(t *testing.T) {
 			require.NoError(t, gitwt.Remove(ctx, params))
 
 			assert.Equal(t, append(before.Worktrees, git.Worktree{Path: filepath.Join(gittest.Resolved(t, impl.root), "topic"), State: git.OnBranch{Branch: "topic"}}), added.Worktrees)
-			assert.Equal(t, []string{"feature", "gone", "main", "topic"}, added.Branches.Local)
+			assert.Equal(t, []string{"feature", "gone", "main", "topic"}, gittest.Names(added.Branches.Local))
 			assert.Equal(t, before, gittest.StateOf(t, impl.port))
 		})
 	}

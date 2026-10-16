@@ -24,7 +24,7 @@ worktrees, err := repo.Worktrees(ctx)
 | `Toplevel` | `rev-parse --show-toplevel` | the root of the worktree `Dir` is in, as git writes it |
 | `GitCommonDir` | `rev-parse --path-format=absolute --git-common-dir` | the `.git` every worktree shares |
 | `Locate(path)` | — (the disk) | `Location{Path, Exists}`: the path as git would record it (the symlinks of the part that exists resolved, the rest as written; a relative path read from `Dir`), and whether anything is there |
-| `Branches` | `for-each-ref refs/heads refs/remotes/<Remote>` | `Branches{Local, Remote}`, named without their prefix, without `<Remote>/HEAD` |
+| `Branches` | `for-each-ref refs/heads refs/remotes/<Remote>` | `Branches{Local, Remote}`, each a `Branch{Name, Tip}` named without its prefix, without `<Remote>/HEAD`: one call says which branches exist and where each points |
 | `RefExists(Ref)` | `show-ref --verify --quiet` | exit `1` is an absent ref; any other failure is an error, never an absence |
 | `Tip(Ref)` | `rev-parse --verify` | the commit the ref points at; an absent ref is an error |
 | `AheadBehind{Of, Against}` | `rev-list --left-right --count Of...Against` | the commits `Of` has that `Against` lacks, and the reverse |

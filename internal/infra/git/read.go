@@ -64,8 +64,13 @@ type Location struct {
 // Branches are named without their prefix: Remote holds `feature`, not
 // `origin/feature`.
 type Branches struct {
-	Local  []string
-	Remote []string
+	Local  []Branch
+	Remote []Branch
+}
+
+type Branch struct {
+	Name string
+	Tip  string
 }
 
 type AheadBehindParams struct {
@@ -169,19 +174,19 @@ func RealPath(path string) (string, error) {
 
 func (r Repo) Branches(ctx context.Context) (Branches, error) {
 	remotePrefix := r.remotePrefix()
-	out, err := r.git(ctx, "for-each-ref", "--format=%(refname)", strings.TrimSuffix(headsPrefix, "/"), strings.TrimSuffix(remotePrefix, "/"))
+	out, err := r.git(ctx, "for-each-ref", "--format=%(objectname) %(refname)", strings.TrimSuffix(headsPrefix, "/"), strings.TrimSuffix(remotePrefix, "/"))
 	if err != nil {
 		return Branches{}, err
 	}
 	var branches Branches
 	for line := range strings.Lines(string(out)) {
-		refname := strings.TrimSpace(line)
+		tip, refname, _ := strings.Cut(strings.TrimSpace(line), " ")
 		if local, ok := strings.CutPrefix(refname, headsPrefix); ok {
-			branches.Local = append(branches.Local, local)
+			branches.Local = append(branches.Local, Branch{Name: local, Tip: tip})
 			continue
 		}
 		if remote, ok := strings.CutPrefix(refname, remotePrefix); ok && remote != remoteHead {
-			branches.Remote = append(branches.Remote, remote)
+			branches.Remote = append(branches.Remote, Branch{Name: remote, Tip: tip})
 		}
 	}
 	return branches, nil

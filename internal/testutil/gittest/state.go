@@ -13,7 +13,7 @@ type State struct {
 	Branches  git.Branches
 }
 
-// StateOf leaves out each Head: the fake's commits are names, git's hashes.
+// StateOf leaves out each Head and Tip: the fake's commits are names, git's hashes.
 func StateOf(t testing.TB, reader git.Reader) State {
 	t.Helper()
 	worktrees, err := reader.Worktrees(t.Context())
@@ -27,7 +27,14 @@ func StateOf(t testing.TB, reader git.Reader) State {
 	for i := range worktrees {
 		worktrees[i].Head = ""
 	}
-	return State{Worktrees: worktrees, Branches: branches}
+	return State{Worktrees: worktrees, Branches: git.Branches{Local: untipped(branches.Local), Remote: untipped(branches.Remote)}}
+}
+
+func untipped(branches []git.Branch) []git.Branch {
+	for i := range branches {
+		branches[i].Tip = ""
+	}
+	return branches
 }
 
 // TempDir is a temporary directory as git writes it: macOS reaches its own
@@ -55,4 +62,12 @@ func Symlinked(t testing.TB) string {
 		t.Fatal(err)
 	}
 	return link
+}
+
+func Names(branches []git.Branch) []string {
+	names := make([]string, 0, len(branches))
+	for _, branch := range branches {
+		names = append(names, branch.Name)
+	}
+	return names
 }
