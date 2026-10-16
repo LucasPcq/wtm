@@ -18,3 +18,19 @@ type TrackingBranch struct{ Name string }
 func (NewBranch) checkout()      {}
 func (ExistingBranch) checkout() {}
 func (TrackingBranch) checkout() {}
+
+func CreatedBranch(checkout Checkout) (string, bool) {
+	switch c := checkout.(type) {
+	case NewBranch:
+		return c.Name, true
+	case TrackingBranch:
+		return c.Name, true
+	case ExistingBranch:
+	}
+	return "", false
+}
+
+type Addition struct {
+	Path     string
+	Checkout Checkout
+}

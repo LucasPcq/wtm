@@ -30,3 +30,18 @@ const (
 	Ahead    Divergence = "ahead"
 	Diverged Divergence = "diverged"
 )
+
+type Branches struct {
+	Local  []Branch
+	Remote []Branch
+}
+
+type AheadBehindParams struct {
+	Of      Ref
+	Against Ref
+}
+
+type Move struct {
+	From string
+	To   string
+}

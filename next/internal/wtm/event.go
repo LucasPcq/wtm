@@ -33,6 +33,14 @@ type WorktreeProvisioned struct {
 	ExitCode *int
 }
 
+type OperationStarted struct{ Command, Surface string }
+
+type OperationFinished struct {
+	Command, Surface string
+	OK               bool
+	Code             string
+}
+
 func (UnitStarted) event()         {}
 func (PhaseStarted) event()        {}
 func (PhaseFinished) event()       {}
@@ -41,5 +49,7 @@ func (UnitFinished) event()        {}
 func (WorktreeCreated) event()     {}
 func (WorktreeNumbered) event()    {}
 func (WorktreeProvisioned) event() {}
+func (OperationStarted) event()    {}
+func (OperationFinished) event()   {}
 
 type Report func(Event)
