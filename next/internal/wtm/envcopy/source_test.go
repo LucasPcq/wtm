@@ -1,6 +1,7 @@
 package envcopy
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
@@ -11,9 +12,9 @@ import (
 func TestSourcesNameWhatTheyCouldNotFind(t *testing.T) {
 	present := map[string]bool{"/main/.env": true}
 
-	example, exampleWarnings := sources(t, SourcesParams{Request: Request{Strategy: project.EnvExample, Files: []project.EnvFile{{Target: ".env", Template: ".env.example"}}, TargetDir: "/wt", MainPath: "/main"}, Present: present})
-	missing, missingWarnings := sources(t, SourcesParams{Request: Request{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env.local"}}, TargetDir: "/wt", MainPath: "/main"}, Present: present})
-	fallback, fallbackWarnings := sources(t, SourcesParams{Request: Request{Strategy: project.EnvParent, Files: []project.EnvFile{{Target: ".env"}, {Target: ".env.local"}}, TargetDir: "/wt", MainPath: "/main", ParentPath: "/parent"}, Present: present})
+	example, exampleWarnings := sources(t, SourcesParams{Request: Request{Strategy: project.EnvExample, Files: []project.EnvFile{{Target: ".env", Template: ".env.example"}}, TargetDir: "/wt", MainPath: "/main"}, Exists: existsIn(present)})
+	missing, missingWarnings := sources(t, SourcesParams{Request: Request{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env.local"}}, TargetDir: "/wt", MainPath: "/main"}, Exists: existsIn(present)})
+	fallback, fallbackWarnings := sources(t, SourcesParams{Request: Request{Strategy: project.EnvParent, Files: []project.EnvFile{{Target: ".env"}, {Target: ".env.local"}}, TargetDir: "/wt", MainPath: "/main", ParentPath: "/parent"}, Exists: existsIn(present)})
 
 	assert.Empty(t, example)
 	assert.Equal(t, []Warning{NoTemplate{Target: ".env"}}, exampleWarnings)
@@ -30,7 +31,7 @@ func TestSourcesNameWhatTheyCouldNotFind(t *testing.T) {
 func TestTheMainStrategyCopiesFromTheMainCheckout(t *testing.T) {
 	request := Request{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: "apps/api/.env"}}, TargetDir: "/wt", MainPath: "/main"}
 
-	found, warnings := sources(t, SourcesParams{Request: request, Present: map[string]bool{"/main/apps/api/.env": true}})
+	found, warnings := sources(t, SourcesParams{Request: request, Exists: existsIn(map[string]bool{"/main/apps/api/.env": true})})
 
 	assert.Equal(t, []Source{{From: "/main/apps/api/.env", To: "/wt/apps/api/.env"}}, found)
 	assert.Empty(t, warnings)
@@ -39,7 +40,7 @@ func TestTheMainStrategyCopiesFromTheMainCheckout(t *testing.T) {
 func TestTheParentStrategyCopiesFromTheParentWhenItHoldsTheFile(t *testing.T) {
 	request := Request{Strategy: project.EnvParent, Files: []project.EnvFile{{Target: ".env"}}, TargetDir: "/wt", MainPath: "/main", ParentPath: "/parent"}
 
-	found, warnings := sources(t, SourcesParams{Request: request, Present: map[string]bool{"/parent/.env": true, "/main/.env": true}})
+	found, warnings := sources(t, SourcesParams{Request: request, Exists: existsIn(map[string]bool{"/parent/.env": true, "/main/.env": true})})
 
 	assert.Equal(t, []Source{{From: "/parent/.env", To: "/wt/.env"}}, found)
 	assert.Empty(t, warnings)
@@ -48,7 +49,7 @@ func TestTheParentStrategyCopiesFromTheParentWhenItHoldsTheFile(t *testing.T) {
 func TestTheParentStrategyWithoutAParentWorktreeCopiesFromMainSilently(t *testing.T) {
 	request := Request{Strategy: project.EnvParent, Files: []project.EnvFile{{Target: ".env"}}, TargetDir: "/wt", MainPath: "/main"}
 
-	found, warnings := sources(t, SourcesParams{Request: request, Present: map[string]bool{"/main/.env": true}})
+	found, warnings := sources(t, SourcesParams{Request: request, Exists: existsIn(map[string]bool{"/main/.env": true})})
 
 	assert.Equal(t, []Source{{From: "/main/.env", To: "/wt/.env"}}, found)
 	assert.Empty(t, warnings)
@@ -57,11 +58,11 @@ func TestTheParentStrategyWithoutAParentWorktreeCopiesFromMainSilently(t *testin
 func TestCandidatesAreEveryPathSourcesMayLookAt(t *testing.T) {
 	files := []project.EnvFile{{Target: ".env"}}
 
-	example, err := Candidates(Request{Strategy: project.EnvExample, Files: files, MainPath: "/main"})
+	example, err := candidates(Request{Strategy: project.EnvExample, Files: files, MainPath: "/main"})
 	require.NoError(t, err)
-	parent, err := Candidates(Request{Strategy: project.EnvParent, Files: files, MainPath: "/main", ParentPath: "/parent"})
+	parent, err := candidates(Request{Strategy: project.EnvParent, Files: files, MainPath: "/main", ParentPath: "/parent"})
 	require.NoError(t, err)
-	main, err := Candidates(Request{Strategy: project.EnvMain, Files: files, MainPath: "/main"})
+	main, err := candidates(Request{Strategy: project.EnvMain, Files: files, MainPath: "/main"})
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"/main/.env.example", "/main/.env.dist", "/main/.env.sample", "/main/.env.template", "/main/.env.tmpl"}, example)
@@ -74,6 +75,15 @@ func TestAnUnknownStrategyIsRefused(t *testing.T) {
 
 	_, _, err := Sources(SourcesParams{Request: request})
 	assert.EqualError(t, err, "unknown env strategy: elsewhere")
-	_, err = Candidates(request)
+	_, err = candidates(request)
 	assert.EqualError(t, err, "unknown env strategy: elsewhere")
+}
+
+func TestAPathThatCannotBeCheckedStopsTheSources(t *testing.T) {
+	denied := errors.New("permission denied")
+	request := Request{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env"}}, TargetDir: "/wt", MainPath: "/main"}
+
+	_, _, err := Sources(SourcesParams{Request: request, Exists: func(string) (bool, error) { return false, denied }})
+
+	assert.ErrorIs(t, err, denied)
 }

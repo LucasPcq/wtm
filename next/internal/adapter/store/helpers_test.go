@@ -45,7 +45,7 @@ func readFile(t *testing.T, path string) string {
 }
 
 func addNamespace(job string) worktree.MetaUpdate {
-	return worktree.MetaUpdate{Branch: "feat/a", Missing: worktree.MissingRefuse, Change: func(meta *worktree.Meta) error {
+	return worktree.MetaUpdate{Branch: "feat/a", Change: func(meta *worktree.Meta) error {
 		meta.Namespaces = append(meta.Namespaces, job)
 		return nil
 	}}

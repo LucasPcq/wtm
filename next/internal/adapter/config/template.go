@@ -8,7 +8,6 @@ import (
 	"text/template"
 
 	"github.com/BurntSushi/toml"
-	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
 )
 
@@ -18,15 +17,12 @@ var configTemplate string
 var parsedTemplate = template.Must(template.New("config.toml").Funcs(template.FuncMap{"toml": tomlString, "tomlKey": tomlKey}).Parse(configTemplate))
 
 type templateData struct {
-	Schema      int
 	BasePath    string
 	BaseBranch  string
 	SkipEnv     bool
 	EnvStrategy string
 	EnvFiles    []project.EnvFile
-	SkipHooks   bool
 	OnCreate    []project.Hook
-	SkipClean   bool
 	OnClean     []project.Hook
 	Remembered  map[string]string
 }
@@ -34,7 +30,6 @@ type templateData struct {
 func render(saved savedProject) ([]byte, error) {
 	config := saved.Config
 	data := templateData{
-		Schema:      statefile.Stamp(projectSchema),
 		BasePath:    config.Worktrees.BasePath,
 		BaseBranch:  config.Worktrees.BaseBranch,
 		SkipEnv:     config.Env.Strategy == "" && len(config.Env.Files) == 0,

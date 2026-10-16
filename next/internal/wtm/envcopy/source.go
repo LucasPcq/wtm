@@ -21,7 +21,7 @@ type Source struct {
 	To   string
 }
 
-func Candidates(request Request) ([]string, error) {
+func candidates(request Request) ([]string, error) {
 	var paths []string
 	for _, file := range request.Files {
 		switch request.Strategy {
@@ -53,14 +53,35 @@ func parentCandidates(params requestFile) []string {
 
 type SourcesParams struct {
 	Request Request
-	Present map[string]bool
+	Exists  func(path string) (bool, error)
 }
 
 func Sources(params SourcesParams) ([]Source, []Warning, error) {
+	paths, err := candidates(params.Request)
+	if err != nil {
+		return nil, nil, err
+	}
+	present := map[string]bool{}
+	for _, path := range paths {
+		exists, err := params.Exists(path)
+		if err != nil {
+			return nil, nil, err
+		}
+		present[path] = exists
+	}
+	return sourcesOf(presentParams{Request: params.Request, Present: present})
+}
+
+type presentParams struct {
+	Request Request
+	Present map[string]bool
+}
+
+func sourcesOf(params presentParams) ([]Source, []Warning, error) {
 	var sources []Source
 	var warnings []Warning
 	for _, file := range params.Request.Files {
-		from, fileWarnings, err := sourceOf(sourceOfParams{SourcesParams: params, File: file})
+		from, fileWarnings, err := sourceOf(sourceOfParams{presentParams: params, File: file})
 		if err != nil {
 			return nil, nil, err
 		}
@@ -73,7 +94,7 @@ func Sources(params SourcesParams) ([]Source, []Warning, error) {
 }
 
 type sourceOfParams struct {
-	SourcesParams
+	presentParams
 	File project.EnvFile
 }
 

@@ -2,6 +2,7 @@ package statefile
 
 import (
 	"errors"
+	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -80,18 +81,6 @@ func TestKeepLeavesAMissingFileMissing(t *testing.T) {
 	assert.NoFileExists(t, path)
 }
 
-func TestRemoveDeletesTheFileAndIsIdempotent(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "file")
-	writeFixture(t, path, "x")
-
-	for range 2 {
-		_, err := Update(t.Context(), UpdateParams{Path: path, Mutate: func([]byte) (Change, error) { return Remove{}, nil }})
-		require.NoError(t, err)
-	}
-
-	assert.NoFileExists(t, path)
-}
-
 func TestAMutateDecidingNothingIsAnError(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "file")
 
@@ -127,14 +116,14 @@ func TestAnUnavailableLockStillWritesAndSaysSo(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "file")
 	require.NoError(t, os.Mkdir(path+".lock", 0o755))
 
-	lock := increment(t, path)
+	written := increment(t, path)
 
-	assert.False(t, lock.Held)
+	assert.True(t, written.Unlocked)
 	assert.Equal(t, 1, counter(t, path))
 }
 
 func TestATakenLockSaysSo(t *testing.T) {
-	assert.True(t, increment(t, filepath.Join(t.TempDir(), "file")).Held)
+	assert.False(t, increment(t, filepath.Join(t.TempDir(), "file")).Unlocked)
 }
 
 func TestAnUpdateFailsWhenItsDirectoryCannotBeMade(t *testing.T) {
@@ -217,4 +206,17 @@ func TestAProcessWhoseFilesCannotGrow(t *testing.T) {
 	}})
 
 	require.ErrorIs(t, err, syscall.EFBIG)
+}
+
+func TestAnUpdateSaysWhetherItChangedTheFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "file")
+	write := func(content string) wtm.Written {
+		written, err := Update(t.Context(), UpdateParams{Path: path, Mutate: func([]byte) (Change, error) { return Write{Data: []byte(content)}, nil }})
+		require.NoError(t, err)
+		return written
+	}
+
+	assert.True(t, write("a").Changed)
+	assert.False(t, write("a").Changed)
+	assert.True(t, write("b").Changed)
 }

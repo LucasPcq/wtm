@@ -8,19 +8,8 @@ type Schema struct {
 	Supported int
 }
 
-func Newer(schema Schema) bool {
-	return max(schema.Found, 1) > schema.Supported
-}
-
-func Stamp(supported int) int {
-	if supported <= 1 {
-		return 0
-	}
-	return supported
-}
-
 func Refusal(schema Schema) error {
-	if !Newer(schema) {
+	if max(schema.Found, 1) <= schema.Supported {
 		return nil
 	}
 	return &wtm.SchemaNewer{Path: schema.Path, Found: schema.Found, Supported: schema.Supported}

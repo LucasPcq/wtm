@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"os"
 	"path/filepath"
 )
@@ -18,11 +19,8 @@ type Write struct{ Data []byte }
 
 type Keep struct{}
 
-type Remove struct{}
-
-func (Write) change()  {}
-func (Keep) change()   {}
-func (Remove) change() {}
+func (Write) change() {}
+func (Keep) change()  {}
 
 const lockSuffix = ".lock"
 
@@ -35,38 +33,41 @@ type UpdateParams struct {
 	Mutate   func(current []byte) (Change, error)
 }
 
-func Update(ctx context.Context, params UpdateParams) (Lock, error) {
+func Update(ctx context.Context, params UpdateParams) (wtm.Written, error) {
 	if err := os.MkdirAll(filepath.Dir(params.Path), 0o755); err != nil {
-		return Lock{}, fmt.Errorf("create %s: %w", filepath.Dir(params.Path), err)
+		return wtm.Written{}, fmt.Errorf("create %s: %w", filepath.Dir(params.Path), err)
 	}
 	lockPath := params.LockPath
 	if lockPath == "" {
 		lockPath = params.Path + lockSuffix
 	}
-	return WithLock(ctx, WithLockParams{Path: lockPath, Do: func() error { return update(params) }})
+	changed := false
+	held, err := withLock(ctx, lockParams{Path: lockPath, Do: func() (err error) {
+		changed, err = update(params)
+		return err
+	}})
+	return wtm.Written{Changed: changed, Unlocked: !held}, err
 }
 
-func update(params UpdateParams) error {
+func update(params UpdateParams) (bool, error) {
 	current, info, err := read(params.Path)
 	if err != nil {
-		return err
+		return false, err
 	}
 	change, err := params.Mutate(current)
 	if err != nil {
-		return err
+		return false, err
 	}
 	switch next := change.(type) {
 	case Keep:
-		return nil
-	case Remove:
-		return remove(params.Path)
+		return false, nil
 	case Write:
 		if info != nil && bytes.Equal(current, next.Data) {
-			return nil
+			return false, nil
 		}
-		return replace(replaceParams{Path: params.Path, Data: next.Data, Perm: permOf(info, params.Perm)})
+		return true, replace(replaceParams{Path: params.Path, Data: next.Data, Perm: permOf(info, params.Perm)})
 	}
-	return errNoChange
+	return false, errNoChange
 }
 
 func read(path string) ([]byte, os.FileInfo, error) {
@@ -82,13 +83,6 @@ func read(path string) ([]byte, os.FileInfo, error) {
 		return nil, nil, err
 	}
 	return data, info, nil
-}
-
-func remove(path string) error {
-	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	return nil
 }
 
 func RemoveDir(path string) error {

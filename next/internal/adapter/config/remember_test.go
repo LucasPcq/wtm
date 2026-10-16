@@ -100,7 +100,6 @@ func TestAConfigAtANewerSchemaIsNeverRewritten(t *testing.T) {
 
 	_, err := Remember(t.Context(), RememberParams{StateDir: stateDir, Answers: map[string]string{project.RememberIsolation: "verbatim"}})
 
-	require.ErrorIs(t, err, wtm.ErrSchemaNewer)
 	var newer *wtm.SchemaNewer
 	require.ErrorAs(t, err, &newer)
 	assert.Equal(t, 99, newer.Found)

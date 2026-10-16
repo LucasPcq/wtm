@@ -12,3 +12,7 @@ func sources(t *testing.T, params SourcesParams) ([]Source, []Warning) {
 	require.NoError(t, err)
 	return found, warnings
 }
+
+func existsIn(present map[string]bool) func(string) (bool, error) {
+	return func(path string) (bool, error) { return present[path], nil }
+}

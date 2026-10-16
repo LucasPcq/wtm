@@ -2,9 +2,7 @@
 
 # wtm — Worktree Manager configuration
 # Docs: https://github.com/LucasPcq/wtm
-{{ if .Schema }}
-schema = {{ .Schema }}
-{{ end }}
+
 [worktrees]
 # Directory where worktrees are created (relative to repo root)
 base_path = {{ toml .BasePath }}
@@ -47,11 +45,6 @@ local = true
 
 [hooks]
 # Commands run after creating a new worktree
-{{- if .SkipHooks }}
-# Skipped during init. Add setup commands to run on worktree creation, e.g.:
-#   on_create = ["pnpm install"]
-on_create = []
-{{- else }}
 on_create = [
 {{- range .OnCreate }}
 {{- if or .Cwd .ContinueOnError }}
@@ -61,16 +54,10 @@ on_create = [
 {{- end }}
 {{- end }}
 ]
-{{- end }}
 
 # Commands run right before removing a worktree (e.g. tear down external
 # resources like Docker). A non-zero exit aborts the removal unless the entry
 # sets continue_on_error.
-{{- if .SkipClean }}
-# Skipped during init. Add teardown commands to run before removal, e.g.:
-#   on_clean = ["docker compose down"]
-on_clean = []
-{{- else }}
 on_clean = [
 {{- range .OnClean }}
 {{- if or .Cwd .ContinueOnError }}
@@ -80,7 +67,6 @@ on_clean = [
 {{- end }}
 {{- end }}
 ]
-{{- end }}
 {{- if .Remembered }}
 
 # Answers the wizard no longer asks, kept by "Always use this answer".

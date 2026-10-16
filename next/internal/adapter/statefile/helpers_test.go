@@ -1,6 +1,7 @@
 package statefile
 
 import (
+	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -15,9 +16,9 @@ const (
 	envGrowPath      = "WTM_NEXT_TEST_GROW_PATH"
 )
 
-func increment(t testing.TB, path string) Lock {
+func increment(t testing.TB, path string) wtm.Written {
 	t.Helper()
-	lock, err := Update(t.Context(), UpdateParams{
+	written, err := Update(t.Context(), UpdateParams{
 		Path: path,
 		Mutate: func(current []byte) (Change, error) {
 			count := 0
@@ -32,7 +33,7 @@ func increment(t testing.TB, path string) Lock {
 		},
 	})
 	require.NoError(t, err)
-	return lock
+	return written
 }
 
 func counter(t *testing.T, path string) int {

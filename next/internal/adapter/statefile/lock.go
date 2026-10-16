@@ -19,29 +19,22 @@ const (
 
 var errUnlockable = errors.New("lock unavailable")
 
-type Lock struct {
-	Held bool
-}
-
-type WithLockParams struct {
+type lockParams struct {
 	Path string
 	Do   func() error
 }
 
-func WithLock(ctx context.Context, params WithLockParams) (Lock, error) {
-	if params.Do == nil {
-		return Lock{Held: true}, nil
-	}
+func withLock(ctx context.Context, params lockParams) (bool, error) {
 	file, err := acquire(ctx, params.Path)
 	if errors.Is(err, errUnlockable) {
-		return Lock{}, params.Do()
+		return false, params.Do()
 	}
 	if err != nil {
-		return Lock{}, err
+		return false, err
 	}
 	defer file.Close()
 	defer flock(file, syscall.LOCK_UN)
-	return Lock{Held: true}, params.Do()
+	return true, params.Do()
 }
 
 func acquire(ctx context.Context, path string) (*os.File, error) {

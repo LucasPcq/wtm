@@ -1,7 +1,6 @@
 package config
 
 import (
-	"bytes"
 	"context"
 	_ "embed"
 	"maps"
@@ -31,28 +30,20 @@ func Remember(ctx context.Context, params RememberParams) (wtm.Written, error) {
 		return wtm.Written{}, nil
 	}
 	path := filepath.Join(params.StateDir, configFileName)
-	changed := false
-	lock, err := statefile.Update(ctx, statefile.UpdateParams{
+	written, err := statefile.Update(ctx, statefile.UpdateParams{
 		Path: path,
 		Mutate: func(current []byte) (statefile.Change, error) {
 			next, err := remembered(rememberedParams{Path: path, Current: current, Answers: params.Answers})
 			if err != nil {
 				return nil, err
 			}
-			if bytes.Equal(current, next) {
-				return statefile.Keep{}, nil
-			}
-			changed = true
 			return statefile.Write{Data: next}, nil
 		},
 	})
 	if err != nil {
 		return wtm.Written{}, err
 	}
-	if err := writeSchema(ctx, params.StateDir); err != nil {
-		return wtm.Written{}, err
-	}
-	return wtm.Written{Changed: changed, Unlocked: !lock.Held}, nil
+	return written, writeSchema(ctx, params.StateDir)
 }
 
 type rememberedParams struct {

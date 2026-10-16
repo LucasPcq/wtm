@@ -1,7 +1,6 @@
 package storetest
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm"
@@ -12,41 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestAFakeMethodGivenAnErrorFailsWithoutRunning(t *testing.T) {
-	full := errors.New("disk full")
-	fake := NewFake(FakeParams{
-		Config: &project.Config{},
-		Fail:   map[string]error{"Update": full, "Remember": full, "Edit": full},
-	})
-
-	_, updateErr := fake.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Missing: worktree.MissingCreate, Change: func(*worktree.Meta) error { return nil }})
-	_, rememberErr := fake.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
-	_, editErr := fake.Edit(t.Context(), dotenv.Edit{Path: "/wt/.env", Create: true, Edit: func(lines []dotenv.Line) []dotenv.Line { return lines }})
-
-	require.ErrorIs(t, updateErr, full)
-	require.ErrorIs(t, rememberErr, full)
-	require.ErrorIs(t, editErr, full)
-	records, err := fake.Records()
-	require.NoError(t, err)
-	assert.Empty(t, records)
-	config, ok := fake.Config()
-	require.True(t, ok)
-	assert.Empty(t, config.Remembered)
-	_, exists := fake.File("/wt/.env")
-	assert.False(t, exists)
-}
-
-func TestAFakeRecordsEveryCallInOrder(t *testing.T) {
-	fake := NewFake(FakeParams{})
-
-	_, _ = fake.Load("feat/a")
-	require.NoError(t, fake.Purge("feat/a"))
-	_, err := fake.Copy(t.Context(), envcopy.Request{Strategy: project.EnvMain, TargetDir: "/wt"})
-	require.NoError(t, err)
-
-	assert.Equal(t, []string{"Load feat/a", "Purge feat/a", "Copy /wt"}, fake.Calls())
-}
 
 func TestAFakeWithoutAConfigRefusesToRemember(t *testing.T) {
 	fake := NewFake(FakeParams{})
@@ -71,18 +35,6 @@ func TestAFakeRemembersOnTopOfWhatItHoldsAndNeverForgets(t *testing.T) {
 	assert.Equal(t, map[string]string{project.RememberEnvStrategy: "main", project.RememberIsolation: "verbatim"}, config.Remembered)
 }
 
-func TestAFakeRecordThatDoesNotReadIsLeftOutOfTheRecords(t *testing.T) {
-	fake := NewFake(FakeParams{
-		Meta:       map[string]worktree.Meta{"feat/a": {Ordinal: 1}},
-		Unreadable: []string{"feat/a"},
-	})
-
-	records, err := fake.Records()
-
-	require.NoError(t, err)
-	assert.Empty(t, records)
-}
-
 func TestAFakeRecordAtANewerSchemaIsNeverRewritten(t *testing.T) {
 	fake := NewFake(FakeParams{Meta: map[string]worktree.Meta{"feat/a": {Schema: 99, SourceBranch: "main"}}})
 
@@ -91,7 +43,8 @@ func TestAFakeRecordAtANewerSchemaIsNeverRewritten(t *testing.T) {
 		return nil
 	}})
 
-	require.ErrorIs(t, err, wtm.ErrSchemaNewer)
+	var refusal *wtm.SchemaNewer
+	require.ErrorAs(t, err, &refusal)
 	meta, ok := fake.Meta("feat/a")
 	require.True(t, ok)
 	assert.Equal(t, worktree.Meta{Schema: 99, SourceBranch: "main"}, meta)
@@ -145,7 +98,7 @@ func TestAFakeUpdateThatChangesNoByteOfTheRecordChangesNothing(t *testing.T) {
 func TestAFakeRecordIsStoredAsItsJSONReadsBack(t *testing.T) {
 	fake := NewFake(FakeParams{})
 
-	_, err := fake.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Missing: worktree.MissingCreate, Change: func(meta *worktree.Meta) error {
+	_, err := fake.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Change: func(meta *worktree.Meta) error {
 		meta.Namespaces = []string{}
 		return nil
 	}})
@@ -160,14 +113,11 @@ func TestAFakeRefusesABranchThatIsNoPathSegmentAsTheStoreDoes(t *testing.T) {
 	fake := NewFake(FakeParams{})
 
 	_, loadErr := fake.Load("..")
-	_, updateErr := fake.Update(t.Context(), worktree.MetaUpdate{Branch: "..", Missing: worktree.MissingCreate, Change: func(*worktree.Meta) error { return nil }})
+	_, updateErr := fake.Update(t.Context(), worktree.MetaUpdate{Branch: "..", Change: func(*worktree.Meta) error { return nil }})
 
 	assert.Error(t, loadErr)
 	assert.Error(t, updateErr)
 	assert.NoError(t, fake.Purge(".."))
-	records, err := fake.Records()
-	require.NoError(t, err)
-	assert.Empty(t, records)
 }
 
 func TestAFakeConfigAtANewerSchemaOrThatDoesNotParseIsNeverRemembered(t *testing.T) {

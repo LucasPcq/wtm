@@ -117,21 +117,6 @@ func (f *Fake) Load(branch string) (worktree.Meta, error) {
 	return meta, nil
 }
 
-func (f *Fake) Records() ([]worktree.MetaRecord, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if err := f.enter("Records", ""); err != nil {
-		return nil, err
-	}
-	var records []worktree.MetaRecord
-	for _, branch := range slices.Sorted(maps.Keys(f.meta)) {
-		if !f.unreadable[branch] {
-			records = append(records, worktree.MetaRecord{Branch: branch, Meta: f.meta[branch]})
-		}
-	}
-	return records, nil
-}
-
 func (f *Fake) Update(_ context.Context, update worktree.MetaUpdate) (wtm.Written, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -141,15 +126,15 @@ func (f *Fake) Update(_ context.Context, update worktree.MetaUpdate) (wtm.Writte
 	if err := segmentOf(update.Branch); err != nil {
 		return wtm.Written{}, err
 	}
-	stored, err := f.stored(update)
-	if err != nil || stored == nil {
+	stored, err := f.stored(update.Branch)
+	if err != nil {
 		return wtm.Written{}, err
 	}
-	next := *stored
+	next := stored
 	if err := update.Change(&next); err != nil {
 		return wtm.Written{}, err
 	}
-	next.Schema = statefile.Stamp(metaSchema)
+	next.Schema = 0
 	written, err := json.MarshalIndent(next, "", "  ")
 	if err != nil {
 		return wtm.Written{}, err
@@ -175,24 +160,15 @@ func segmentOf(branch string) error {
 	return nil
 }
 
-func (f *Fake) stored(update worktree.MetaUpdate) (*worktree.Meta, error) {
-	if f.unreadable[update.Branch] && update.Missing == worktree.MissingCreate {
-		return &worktree.Meta{}, nil
+func (f *Fake) stored(branch string) (worktree.Meta, error) {
+	stored, ok := f.meta[branch]
+	if !ok || f.unreadable[branch] {
+		return worktree.Meta{}, nil
 	}
-	if f.unreadable[update.Branch] {
-		return nil, unreadable(update.Branch)
+	if err := statefile.Refusal(statefile.Schema{Path: branch, Found: stored.Schema, Supported: metaSchema}); err != nil {
+		return worktree.Meta{}, err
 	}
-	stored, ok := f.meta[update.Branch]
-	switch {
-	case !ok && update.Missing == worktree.MissingSkip:
-		return nil, nil
-	case !ok && update.Missing == worktree.MissingRefuse:
-		return nil, fmt.Errorf("storetest: no record of %s: %w", update.Branch, os.ErrNotExist)
-	}
-	if err := statefile.Refusal(statefile.Schema{Path: update.Branch, Found: stored.Schema, Supported: metaSchema}); err != nil {
-		return nil, err
-	}
-	return &stored, nil
+	return stored, nil
 }
 
 func (f *Fake) Purge(branch string) error {
@@ -258,11 +234,7 @@ func (f *Fake) Copy(_ context.Context, request envcopy.Request) (envcopy.Copied,
 	if err := f.enter("Copy", request.TargetDir); err != nil {
 		return envcopy.Copied{}, err
 	}
-	candidates, err := envcopy.Candidates(request)
-	if err != nil {
-		return envcopy.Copied{}, err
-	}
-	sources, warnings, err := envcopy.Sources(envcopy.SourcesParams{Request: request, Present: f.present(candidates)})
+	sources, warnings, err := envcopy.Sources(envcopy.SourcesParams{Request: request, Exists: f.exists})
 	if err != nil {
 		return envcopy.Copied{}, err
 	}
@@ -295,12 +267,9 @@ func (f *Fake) Edit(_ context.Context, edit dotenv.Edit) (wtm.Written, error) {
 	return wtm.Written{Changed: true}, nil
 }
 
-func (f *Fake) present(paths []string) map[string]bool {
-	present := map[string]bool{}
-	for _, path := range paths {
-		_, present[path] = f.files[path]
-	}
-	return present
+func (f *Fake) exists(path string) (bool, error) {
+	_, ok := f.files[path]
+	return ok, nil
 }
 
 func (f *Fake) enter(method, arg string) error {

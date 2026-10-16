@@ -30,7 +30,7 @@ func TestARecordIsWrittenByteForByteAsWtmWritesIt(t *testing.T) {
 	stateDir := t.TempDir()
 	meta := Meta{StateDir: stateDir}
 
-	written, err := meta.Update(t.Context(), worktree.MetaUpdate{Branch: "refactor/next-create-pilot", Missing: worktree.MissingCreate, Change: func(m *worktree.Meta) error {
+	written, err := meta.Update(t.Context(), worktree.MetaUpdate{Branch: "refactor/next-create-pilot", Change: func(m *worktree.Meta) error {
 		m.SourceBranch = "0.30.0"
 		m.CreatedAt = "2026-10-16T20:37:05Z"
 		m.EnvStrategy = project.EnvParent
@@ -63,7 +63,7 @@ func TestARecordIsKeptUnderItsEncodedBranch(t *testing.T) {
 	stateDir := t.TempDir()
 	meta := Meta{StateDir: stateDir}
 
-	require.NoError(t, errOf(meta.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Missing: worktree.MissingCreate, Change: func(m *worktree.Meta) error {
+	require.NoError(t, errOf(meta.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Change: func(m *worktree.Meta) error {
 		m.SourceBranch = "main"
 		return nil
 	}})))
@@ -82,7 +82,7 @@ func TestABranchThatIsNoPathSegmentHasNoRecord(t *testing.T) {
 	meta := Meta{StateDir: t.TempDir()}
 
 	_, loadErr := meta.Load("..")
-	_, updateErr := meta.Update(t.Context(), worktree.MetaUpdate{Branch: "..", Missing: worktree.MissingCreate, Change: func(*worktree.Meta) error { return nil }})
+	_, updateErr := meta.Update(t.Context(), worktree.MetaUpdate{Branch: "..", Change: func(*worktree.Meta) error { return nil }})
 
 	assert.Error(t, loadErr)
 	assert.Error(t, updateErr)
@@ -103,63 +103,31 @@ func TestUpdateChangesOnlyWhatItIsAskedTo(t *testing.T) {
 	assert.Equal(t, worktree.Meta{SourceBranch: "main", CreatedAt: "2026-01-02T03:04:05Z", Ordinal: 2, Isolation: run.Verbatim}, got)
 }
 
-func TestUpdateOfAnAbsentRecordFollowsMissing(t *testing.T) {
-	cases := map[worktree.Missing]struct {
-		wantErr    bool
-		wantRecord bool
-	}{
-		worktree.MissingCreate: {wantRecord: true},
-		worktree.MissingSkip:   {},
-		worktree.MissingRefuse: {wantErr: true},
-	}
-	for missing, want := range cases {
-		t.Run(strconv.Itoa(int(missing)), func(t *testing.T) {
-			meta := Meta{StateDir: t.TempDir()}
-
-			_, err := meta.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Missing: missing, Change: func(m *worktree.Meta) error {
-				m.SourceBranch = "main"
-				return nil
-			}})
-
-			if want.wantErr {
-				require.ErrorIs(t, err, os.ErrNotExist)
-			} else {
-				require.NoError(t, err)
-			}
-			_, loadErr := meta.Load("feat/a")
-			assert.Equal(t, want.wantRecord, loadErr == nil)
-		})
-	}
-}
-
-func TestAnUpdateThatSaysNothingOfAnAbsentRecordCreatesNone(t *testing.T) {
+func TestUpdateOfAnAbsentRecordCreatesIt(t *testing.T) {
 	meta := Meta{StateDir: t.TempDir()}
 
 	_, err := meta.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Change: func(m *worktree.Meta) error {
-		m.Ordinal = 1
+		m.SourceBranch = "main"
 		return nil
 	}})
 
-	require.ErrorIs(t, err, os.ErrNotExist)
-	_, loadErr := meta.Load("feat/a")
-	require.ErrorIs(t, loadErr, os.ErrNotExist)
+	require.NoError(t, err)
+	got, err := meta.Load("feat/a")
+	require.NoError(t, err)
+	assert.Equal(t, "main", got.SourceBranch)
 }
 
-func TestAnUnreadableRecordIsRebuiltOnlyWhenMissingCreates(t *testing.T) {
+func TestAnUnreadableRecordIsRebuilt(t *testing.T) {
 	stateDir := t.TempDir()
 	writeMeta(t, stateDir, "feat/a", "{not json")
 	meta := Meta{StateDir: stateDir}
-	setOrdinal := func(missing worktree.Missing) error {
-		return errOf(meta.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Missing: missing, Change: func(m *worktree.Meta) error {
-			m.Ordinal = 4
-			return nil
-		}}))
-	}
 
-	require.Error(t, setOrdinal(worktree.MissingRefuse))
-	require.Error(t, setOrdinal(worktree.MissingSkip))
-	assert.Equal(t, "{not json", readFile(t, metaPath(t, stateDir, "feat/a")))
-	require.NoError(t, setOrdinal(worktree.MissingCreate))
+	_, err := meta.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Change: func(m *worktree.Meta) error {
+		m.Ordinal = 4
+		return nil
+	}})
+
+	require.NoError(t, err)
 	got, err := meta.Load("feat/a")
 	require.NoError(t, err)
 	assert.Equal(t, worktree.Meta{Ordinal: 4}, got)
@@ -179,7 +147,6 @@ func TestARecordAtANewerSchemaIsReadButNeverRewritten(t *testing.T) {
 
 	require.NoError(t, loadErr)
 	assert.Equal(t, 99, got.Schema)
-	require.ErrorIs(t, err, wtm.ErrSchemaNewer)
 	var newer *wtm.SchemaNewer
 	require.ErrorAs(t, err, &newer)
 	assert.Equal(t, 99, newer.Found)
@@ -253,29 +220,6 @@ func TestTheProcessTheCrossProcessTestStarts(t *testing.T) {
 	for round := range rounds {
 		require.NoError(t, errOf(meta.Update(t.Context(), addNamespace(os.Getenv(envJob)+strconv.Itoa(round)))))
 	}
-}
-
-func TestRecordsAreEveryRecordThatReadsByBranch(t *testing.T) {
-	stateDir := t.TempDir()
-	writeRecord(t, stateDir, "feat/b", worktree.Meta{SourceBranch: "main"})
-	writeRecord(t, stateDir, "feat/a", worktree.Meta{Namespaces: []string{"db"}})
-	writeMeta(t, stateDir, "broken", "{not json")
-	require.NoError(t, os.MkdirAll(filepath.Join(stateDir, "worktrees", "empty"), 0o755))
-
-	records, err := Meta{StateDir: stateDir}.Records()
-
-	require.NoError(t, err)
-	assert.Equal(t, []worktree.MetaRecord{
-		{Branch: "feat/a", Meta: worktree.Meta{Namespaces: []string{"db"}}},
-		{Branch: "feat/b", Meta: worktree.Meta{SourceBranch: "main"}},
-	}, records)
-}
-
-func TestNoRecordsIsNoError(t *testing.T) {
-	records, err := Meta{StateDir: t.TempDir()}.Records()
-
-	require.NoError(t, err)
-	assert.Empty(t, records)
 }
 
 func TestPurgeDropsTheRecordAndItsDirectory(t *testing.T) {

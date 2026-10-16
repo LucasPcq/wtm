@@ -12,8 +12,8 @@ func TestTheTemplateIsThePinnedOneElseTheFirstConventionalSpellingPresent(t *tes
 	pinned := Request{Strategy: project.EnvExample, Files: []project.EnvFile{{Target: ".env", Template: ".env.example"}}, TargetDir: "/wt", MainPath: "/main"}
 	present := map[string]bool{"/main/.env.sample": true, "/main/.env.tmpl": true}
 
-	found, _ := sources(t, SourcesParams{Request: guessed, Present: present})
-	gone, warnings := sources(t, SourcesParams{Request: pinned, Present: present})
+	found, _ := sources(t, SourcesParams{Request: guessed, Exists: existsIn(present)})
+	gone, warnings := sources(t, SourcesParams{Request: pinned, Exists: existsIn(present)})
 
 	assert.Equal(t, []Source{{From: "/main/.env.sample", To: "/wt/.env"}}, found)
 	assert.Empty(t, gone, "a pinned template that is gone is not replaced by a guess")

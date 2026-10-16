@@ -1,7 +1,6 @@
 package store
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -29,15 +28,7 @@ func (EnvFiles) Read(path string) ([]dotenv.Line, error) {
 }
 
 func (EnvFiles) Copy(ctx context.Context, request envcopy.Request) (envcopy.Copied, error) {
-	candidates, err := envcopy.Candidates(request)
-	if err != nil {
-		return envcopy.Copied{}, err
-	}
-	present, err := presentOf(candidates)
-	if err != nil {
-		return envcopy.Copied{}, err
-	}
-	sources, warnings, err := envcopy.Sources(envcopy.SourcesParams{Request: request, Present: present})
+	sources, warnings, err := envcopy.Sources(envcopy.SourcesParams{Request: request, Exists: exists})
 	if err != nil {
 		return envcopy.Copied{}, err
 	}
@@ -56,8 +47,7 @@ func (EnvFiles) Copy(ctx context.Context, request envcopy.Request) (envcopy.Copi
 }
 
 func (EnvFiles) Edit(ctx context.Context, edit dotenv.Edit) (wtm.Written, error) {
-	changed := false
-	lock, err := statefile.Update(ctx, statefile.UpdateParams{
+	return statefile.Update(ctx, statefile.UpdateParams{
 		Path:     edit.Path,
 		LockPath: statefile.ScratchLockPath(edit.Path),
 		Perm:     ownerOnly,
@@ -66,26 +56,17 @@ func (EnvFiles) Edit(ctx context.Context, edit dotenv.Edit) (wtm.Written, error)
 			if !write {
 				return statefile.Keep{}, nil
 			}
-			changed = true
 			return statefile.Write{Data: next}, nil
 		},
 	})
-	if err != nil {
-		return wtm.Written{}, err
-	}
-	return wtm.Written{Changed: changed, Unlocked: !lock.Held}, nil
 }
 
-func presentOf(paths []string) (map[string]bool, error) {
-	present := map[string]bool{}
-	for _, path := range paths {
-		_, err := os.Stat(path)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return nil, err
-		}
-		present[path] = err == nil
+func exists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
 	}
-	return present, nil
+	return err == nil, err
 }
 
 func copyFile(ctx context.Context, source envcopy.Source) (wtm.Written, error) {
@@ -97,21 +78,10 @@ func copyFile(ctx context.Context, source envcopy.Source) (wtm.Written, error) {
 	if err != nil {
 		return wtm.Written{}, fmt.Errorf("read %s: %w", source.From, err)
 	}
-	changed := false
-	lock, err := statefile.Update(ctx, statefile.UpdateParams{
+	return statefile.Update(ctx, statefile.UpdateParams{
 		Path:     source.To,
 		LockPath: statefile.ScratchLockPath(source.To),
 		Perm:     info.Mode().Perm(),
-		Mutate: func(current []byte) (statefile.Change, error) {
-			if current != nil && bytes.Equal(current, data) {
-				return statefile.Keep{}, nil
-			}
-			changed = true
-			return statefile.Write{Data: data}, nil
-		},
+		Mutate:   func([]byte) (statefile.Change, error) { return statefile.Write{Data: data}, nil },
 	})
-	if err != nil {
-		return wtm.Written{}, err
-	}
-	return wtm.Written{Changed: changed, Unlocked: !lock.Held}, nil
 }
