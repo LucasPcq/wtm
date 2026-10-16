@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"slices"
 	"testing"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/app/provision"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
@@ -111,6 +113,33 @@ func TestAnInterruptBeforeTheStartCreatesNothing(t *testing.T) {
 	assert.Equal(t, wtm.CodeInterrupted, outcome.Err.Code)
 	assert.Empty(t, report.all())
 	assert.Empty(t, files.Calls())
+}
+
+func TestADeadlinePassedBeforeTheStartIsAnInterrupt(t *testing.T) {
+	w, _ := inMemory(t, seeds{})
+	ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+	defer cancel()
+
+	outcome := provision.Run(ctx, w.params(&recorder{}))
+
+	assert.Equal(t, wtm.StatusCancelled, outcome.Status)
+	assert.Equal(t, wtm.KindCancelled, outcome.Err.Kind)
+	assert.Equal(t, wtm.CodeInterrupted, outcome.Err.Code)
+	assert.Equal(t, "interrupted", outcome.Err.Message)
+	assert.ErrorIs(t, outcome.Err, context.DeadlineExceeded)
+}
+
+func TestTheNumberIsAnnouncedOnceItsPhaseHasFinished(t *testing.T) {
+	w, _ := inMemory(t, seeds{})
+	report := &recorder{}
+
+	provision.Run(t.Context(), portLinked(w.params(report)))
+
+	events := report.all()
+	finished := slices.Index(events, wtm.Event(wtm.PhaseFinished{Subject: branchName, Phase: "ordinal"}))
+	require.Positive(t, finished)
+	_, numbered := events[finished+1].(wtm.WorktreeNumbered)
+	assert.True(t, numbered, events[finished+1])
 }
 
 func TestAnInterruptDuringTheAddFinishesItsEnvAndRecordThenStops(t *testing.T) {

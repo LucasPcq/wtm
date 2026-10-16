@@ -101,7 +101,7 @@ func Run(ctx context.Context, params Params) Outcome {
 	p := &provisioning{Params: params}
 	p.kept, p.ignored = settle.Targets(settle.TargetsParams{Run: params.Project.Run, Files: params.Project.EnvFiles})
 	if err := ctx.Err(); err != nil {
-		return p.outcome(Outcome{Status: wtm.StatusCancelled, Reason: wtm.ReasonInterrupted, Err: wtm.AsError(wtm.AsErrorParams{Err: err})})
+		return p.outcome(Outcome{Status: wtm.StatusCancelled, Reason: wtm.ReasonInterrupted, Err: interrupted(interruption{Err: err})})
 	}
 	provisioned, failure := p.add(ctx)
 	if failure != nil {
@@ -143,12 +143,16 @@ func (p *provisioning) phases(provisioned *Provisioned) []phase {
 
 func (p *provisioning) complete(ctx context.Context, provisioned Provisioned) Outcome {
 	for _, next := range p.phases(&provisioned) {
+		numbered := provisioned.Ordinal != nil
 		err := ctx.Err()
 		if err == nil {
 			err = p.do(ctx, next)
 		}
 		if err != nil {
 			return p.stopped(ctx, stop{Err: err, Phase: next.name, Provisioned: provisioned})
+		}
+		if !numbered && provisioned.Ordinal != nil {
+			p.Report(wtm.WorktreeNumbered{Worktree: p.identity(provisioned)})
 		}
 	}
 	return p.outcome(Outcome{Status: wtm.StatusDone, Provisioned: provisioned})
@@ -172,10 +176,18 @@ func (p *provisioning) stopped(ctx context.Context, s stop) Outcome {
 	failure := wtm.AsError(wtm.AsErrorParams{Err: s.Err, Code: "unit.phase_failed", Message: s.Phase + " failed", Params: params})
 	status := wtm.StatusFailed
 	if ctx.Err() != nil {
-		failure = &wtm.Error{Kind: wtm.KindCancelled, Code: wtm.CodeInterrupted, Message: "interrupted", Params: params, Cause: s.Err}
-		status = wtm.StatusCancelled
+		failure, status = interrupted(interruption{Err: s.Err, Params: params}), wtm.StatusCancelled
 	}
 	return p.outcome(Outcome{Status: status, Reason: wtm.ReasonIncomplete, Err: failure, Provisioned: s.Provisioned})
+}
+
+type interruption struct {
+	Err    error
+	Params wtm.Params
+}
+
+func interrupted(i interruption) *wtm.Error {
+	return &wtm.Error{Kind: wtm.KindCancelled, Code: wtm.CodeInterrupted, Message: "interrupted", Params: i.Params, Cause: i.Err}
 }
 
 func (p *provisioning) outcome(outcome Outcome) Outcome {

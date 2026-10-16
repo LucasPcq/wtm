@@ -163,3 +163,16 @@ func TestAnEnvValueThatCannotBeExpandedIsAnErrorOfRunToml(t *testing.T) {
 	require.True(t, fromValue)
 	assert.Equal(t, `env API in .env: no job named "ghost"`, value.Error())
 }
+
+func TestAnOriginWithoutTheRunProxyIsNoErrorOfRunToml(t *testing.T) {
+	params := linkedResolve()
+	params.Run.Addressing = run.AddressNames
+	params.Run.Jobs[0].URL = &run.URL{Port: "http"}
+	params.Run.EnvValues = []run.EnvValueLink{{File: ".env", Key: "API", Job: params.Run.Jobs[0].Name, Value: "{origin}"}}
+
+	_, err := Resolve(params)
+
+	_, inRunToml := errors.AsType[*ValueError](err)
+	require.ErrorIs(t, err, errNoProxy)
+	assert.False(t, inRunToml)
+}

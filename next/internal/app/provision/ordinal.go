@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/jobenv"
 	"github.com/LucasPcq/wtm/next/internal/wtm/settle"
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
@@ -38,7 +37,6 @@ func (p *provisioning) number(ctx context.Context, provisioned *Provisioned) err
 		return nil
 	}
 	provisioned.Ordinal = &ordinal
-	p.Report(wtm.WorktreeNumbered{Worktree: p.identity(*provisioned)})
 	return nil
 }
 

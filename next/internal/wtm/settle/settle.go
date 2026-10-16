@@ -2,6 +2,7 @@
 package settle
 
 import (
+	"errors"
 	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
@@ -61,6 +62,9 @@ func Resolve(params ResolveParams) (Writes, error) {
 		Shared:     jobenv.SharedJobs(kept),
 	}
 	values, err := settled.valueWrites(kept.EnvValues)
+	if errors.Is(err, errNoProxy) {
+		return Writes{}, err
+	}
 	if err != nil {
 		return Writes{}, &ValueError{Err: err}
 	}

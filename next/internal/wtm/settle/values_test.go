@@ -65,13 +65,23 @@ func TestAValueRefusesANamespaceOnAJobWithoutOne(t *testing.T) {
 	assert.EqualError(t, err, `env K in .env: job "keycloak" declares no [job.namespace], so {namespace} means nothing`)
 }
 
-func TestAValueRefusesAnOriginNothingServes(t *testing.T) {
+func TestAValueRefusesAnOriginOfAJobWithoutAddress(t *testing.T) {
+	job := sharedKeycloakJob()
+	job.URL = nil
+
+	_, err := keycloakWorktree(job).expand(keycloakValue("{origin}/realms/{namespace}"))
+
+	assert.EqualError(t, err, `env K in .env: job "keycloak" publishes no address, so {origin} has no answer — publish a [job.url] for it, or write the host yourself`)
+}
+
+func TestAValueRefusesAnOriginWhileTheRunProxyServesNoPort(t *testing.T) {
 	settled := keycloakWorktree(sharedKeycloakJob())
 	settled.PublicPort = 0
 
 	_, err := settled.expand(keycloakValue("{origin}/realms/{namespace}"))
 
-	assert.EqualError(t, err, `env K in .env: job "keycloak" publishes no address, so {origin} has no answer — publish a [job.url] for it, or write the host yourself`)
+	assert.ErrorIs(t, err, errNoProxy)
+	assert.EqualError(t, err, `env K in .env: {origin} of job "keycloak" is served by the run proxy, which serves no port: enable the proxy, or write the host yourself`)
 }
 
 func TestAValueOnAJobRunTomlDoesNotDeclareIsRefused(t *testing.T) {

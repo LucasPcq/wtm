@@ -95,6 +95,19 @@ func TestALinkToAnEnvConfigTomlDoesNotDeclareIsNamedAndLeftOut(t *testing.T) {
 	assert.Equal(t, "PORT=3010\n", readFile(t, filepath.Join(w.path(branchName), ".env")))
 }
 
+func TestAnOriginWithoutTheRunProxyIsAProxyToFixNotARunToml(t *testing.T) {
+	w := onDisk(t)
+	params := portLinked(w.params(&recorder{}))
+	params.Project.Run.Addressing = run.AddressNames
+	params.Project.Run.Jobs[0].URL = &run.URL{Port: "http"}
+	params.Project.Run.EnvValues = []run.EnvValueLink{{File: ".env", Key: "API", Job: "web", Value: "{origin}"}}
+
+	outcome := provision.Run(t.Context(), params)
+
+	require.Equal(t, []string{"provision.ports_not_settled"}, codes(outcome.Warnings))
+	assert.Equal(t, "env API in .env: {origin} of job \"web\" is served by the run proxy, which serves no port: enable the proxy, or write the host yourself — ports not settled — run `wtm env feat/x` once this is fixed", outcome.Warnings[0].Message)
+}
+
 func TestAPortPassThatFailsNeverFailsTheWorktree(t *testing.T) {
 	w, _ := inMemory(t, seeds{Store: storetest.FakeParams{Fail: map[string]error{"Edit": errors.New("read-only file system")}}})
 

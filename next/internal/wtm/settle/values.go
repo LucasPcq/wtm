@@ -26,6 +26,7 @@ var (
 	namespaceToken = regexp.MustCompile(`\{[a-zA-Z_]+\}`)
 
 	errNamespaceUnknownToken = errors.New("unknown placeholder in a [job.namespace] value")
+	errNoProxy               = errors.New("served by the run proxy, which serves no port")
 )
 
 type ValueError struct{ Err error }
@@ -62,6 +63,9 @@ func (w worktree) expand(link run.EnvValueLink) (string, error) {
 		value = strings.ReplaceAll(value, tokenNamespace, namespace)
 	}
 	origin := w.valueOrigin(job)
+	if strings.Contains(value, tokenOrigin) && origin == "" && job.URL != nil && w.Addressing == run.AddressNames {
+		return "", fmt.Errorf("env %s in %s: {origin} of job %q is %w: enable the proxy, or write the host yourself", link.Key, link.File, job.Name, errNoProxy)
+	}
 	if strings.Contains(value, tokenOrigin) && origin == "" {
 		return "", fmt.Errorf("env %s in %s: job %q publishes no address, so {origin} has no answer — publish a [job.url] for it, or write the host yourself", link.Key, link.File, job.Name)
 	}

@@ -10,21 +10,23 @@ import (
 )
 
 func (p *provisioning) undo(ctx context.Context, failure *wtm.Error) *wtm.Error {
-	err := p.Deps.Git.RemoveWorktree(ctx, p.Worktree.Path)
-	if name, created := worktree.CreatedBranch(p.Worktree.Checkout); created && err == nil {
-		err = p.Deps.Git.DeleteBranch(ctx, name)
+	if err := p.Deps.Git.RemoveWorktree(ctx, p.Worktree.Path); err != nil {
+		return p.leftBehind(leftBehind{Failure: failure, Err: err, Worktree: true})
 	}
-	if err == nil {
+	name, created := worktree.CreatedBranch(p.Worktree.Checkout)
+	if !created {
 		return failure
 	}
-	return &wtm.Error{
-		Kind:     wtm.KindInternal,
-		Code:     "unit.undo_failed",
-		Message:  "could not undo worktree, left behind: worktree",
-		Params:   wtm.Params{"step": "worktree", "left": "worktree"},
-		FollowUp: p.leftBehind(),
-		Cause:    errors.Join(failure, err),
+	if err := p.Deps.Git.DeleteBranch(ctx, name); err != nil {
+		return p.leftBehind(leftBehind{Failure: failure, Err: err})
 	}
+	return failure
+}
+
+type leftBehind struct {
+	Failure  *wtm.Error
+	Err      error
+	Worktree bool
 }
 
 type cleanRequest struct {
@@ -32,14 +34,23 @@ type cleanRequest struct {
 	Force    bool     `json:"force"`
 }
 
-func (p *provisioning) leftBehind() *wtm.FollowUp {
+func (p *provisioning) leftBehind(left leftBehind) *wtm.Error {
 	branch, path := p.Worktree.Branch, p.Worktree.Path
 	request, _ := json.Marshal(cleanRequest{Branches: []string{branch}, Force: true})
-	return &wtm.FollowUp{
-		Command: "clean",
-		Request: request,
-		Code:    "provision.left_behind",
-		Message: "branch " + branch + " is left half-created at " + path + ": remove it with `wtm clean --force " + branch + "`",
-		Params:  wtm.Params{"branch": branch, "path": path},
+	clean := "remove it with `wtm clean --force " + branch + "`"
+	message, kept := "could not delete the branch, left behind: branch", "branch"
+	followUp := &wtm.FollowUp{Message: "branch " + branch + " is left behind: " + clean, Params: wtm.Params{"branch": branch}}
+	if left.Worktree {
+		message, kept = "could not remove the worktree, left behind: worktree", "worktree"
+		followUp = &wtm.FollowUp{Message: "branch " + branch + " is left half-created at " + path + ": " + clean, Params: wtm.Params{"branch": branch, "path": path}}
+	}
+	followUp.Command, followUp.Request, followUp.Code = "clean", request, "provision.left_behind"
+	return &wtm.Error{
+		Kind:     wtm.KindInternal,
+		Code:     "unit.undo_failed",
+		Message:  message,
+		Params:   wtm.Params{"left": kept},
+		FollowUp: followUp,
+		Cause:    errors.Join(left.Failure, left.Err),
 	}
 }
