@@ -12,10 +12,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
 )
 
-func (p *provisioning) hookLog() string {
-	return hook.LogPath(hook.LogPathParams{StateDir: p.Project.StateDir, Branch: p.Worktree.Branch})
-}
-
 func (p *provisioning) runHooks(ctx context.Context, provisioned Provisioned) error {
 	vars := hookvars.Vars{Worktree: p.Worktree.Path, Branch: p.Worktree.Branch, Root: p.Project.MainPath, FromBranch: p.Worktree.Source}
 	hooks := make([]project.Hook, 0, len(p.Project.OnCreate))
@@ -28,7 +24,7 @@ func (p *provisioning) runHooks(ctx context.Context, provisioned Provisioned) er
 		Env:     p.hookEnv(provisioned.Ordinal),
 		Unset:   jobenv.Keys(),
 		Output:  func(line string) { p.Report(wtm.Output{Subject: p.Worktree.Branch, Line: line}) },
-		Log:     p.hookLog(),
+		Log:     p.hookLog,
 	})
 }
 

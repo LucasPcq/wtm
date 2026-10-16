@@ -16,7 +16,7 @@ func (p *provisioning) settlesPorts() bool {
 	switch {
 	case p.Project.RunErr != nil || len(p.ignored) > 0:
 		return true
-	case p.isolation() == run.Verbatim:
+	case p.Worktree.Isolation == run.Verbatim:
 		return false
 	case len(p.kept.EnvPorts) > 0 || len(p.kept.EnvValues) > 0:
 		return true
@@ -32,14 +32,14 @@ func (p *provisioning) settle(ctx context.Context, provisioned *Provisioned) err
 	for _, link := range p.ignored {
 		p.warn(ignoredWarning(link))
 	}
-	if p.isolation() == run.Verbatim || p.portsNeedOrdinal() && provisioned.Ordinal == nil {
+	if p.Worktree.Isolation == run.Verbatim || p.portsNeedOrdinal() && provisioned.Ordinal == nil {
 		return nil
 	}
 	writes, err := settle.Resolve(settle.ResolveParams{
 		Params:     p.jobParams(provisioned.Ordinal),
 		Files:      p.Project.EnvFiles,
 		Proxy:      p.Project.Global.Proxy,
-		PublicPort: p.publicPort(ctx),
+		PublicPort: p.Deps.PublicPort(ctx, p.Project.Global.ProxyPort()),
 	})
 	if _, inRunToml := errors.AsType[*settle.ValueError](err); inRunToml {
 		p.warn(p.notSettled(notSettled{Cause: err, InRunToml: true}))
@@ -62,18 +62,11 @@ func (p *provisioning) settle(ctx context.Context, provisioned *Provisioned) err
 }
 
 func (p *provisioning) jobParams(ordinal *int) jobenv.Params {
-	params := jobenv.Params{Branch: p.Worktree.Branch, ProjectDir: p.Project.MainPath, Isolation: p.isolation(), Run: p.Project.Run}
+	params := jobenv.Params{Branch: p.Worktree.Branch, ProjectDir: p.Project.MainPath, Isolation: p.Worktree.Isolation, Run: p.Project.Run}
 	if ordinal != nil {
 		params.Ordinal = *ordinal
 	}
 	return params
-}
-
-func (p *provisioning) publicPort(ctx context.Context) int {
-	if len(p.kept.EnvPorts) == 0 && len(p.kept.EnvValues) == 0 {
-		return 0
-	}
-	return p.Deps.PublicPort(ctx, p.Project.Global.ProxyPort())
 }
 
 func (p *provisioning) apply(ctx context.Context, writes settle.Writes) (settle.Plan, error) {

@@ -22,23 +22,12 @@ func TestAWorktreeIsAddedWithItsEnvAndItsRecord(t *testing.T) {
 
 	require.Equal(t, wtm.StatusDone, outcome.Status, outcome.Err)
 	meta := worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvMain, Isolation: run.Isolated}
-	assert.Equal(t, provision.Provisioned{Path: w.path(branchName), Metadata: meta}, outcome.Provisioned)
+	assert.Equal(t, provision.Provisioned{Meta: meta}, outcome.Provisioned)
 	assert.Empty(t, outcome.Warnings)
 	assert.Equal(t, mainEnv, readFile(t, filepath.Join(w.path(branchName), ".env")))
 	recorded, err := w.meta.Load(branchName)
 	require.NoError(t, err)
 	assert.Equal(t, meta, recorded)
-}
-
-func TestAnExistingBranchCarriesWhereItStandsAgainstOrigin(t *testing.T) {
-	w := onDisk(t)
-	params := w.existing(&recorder{})
-	params.Worktree.Origin = provision.Origin{ExistingBranch: true, OriginState: "behind", OriginBehind: 2}
-
-	outcome := provision.Run(t.Context(), params)
-
-	require.Equal(t, wtm.StatusDone, outcome.Status, outcome.Err)
-	assert.Equal(t, params.Worktree.Origin, outcome.Provisioned.Origin)
 }
 
 func TestEachEnvThatCouldNotBeCopiedIsAWarning(t *testing.T) {

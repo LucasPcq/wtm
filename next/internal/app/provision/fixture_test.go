@@ -104,7 +104,6 @@ func (w world) existing(report *recorder) provision.Params {
 	params.Worktree.Branch = existing
 	params.Worktree.Path = w.path(existing)
 	params.Worktree.Checkout = worktree.ExistingBranch{Name: existing}
-	params.Worktree.Origin = provision.Origin{ExistingBranch: true}
 	return params
 }
 

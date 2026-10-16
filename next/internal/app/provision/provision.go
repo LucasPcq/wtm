@@ -63,15 +63,6 @@ type Worktree struct {
 	ParentPath string
 	Strategy   project.EnvStrategy
 	Isolation  run.Isolation
-	Origin     Origin
-}
-
-type Origin struct {
-	ExistingBranch bool   `json:"existing_branch"`
-	OriginState    string `json:"origin_state,omitempty"`
-	OriginAhead    int    `json:"origin_ahead,omitempty"`
-	OriginBehind   int    `json:"origin_behind,omitempty"`
-	Upstream       string `json:"upstream,omitempty"`
 }
 
 type Params struct {
@@ -82,11 +73,9 @@ type Params struct {
 }
 
 type Provisioned struct {
-	Path     string        `json:"path"`
-	Metadata worktree.Meta `json:"metadata"`
-	Origin
-	Ordinal  *int            `json:"ordinal,omitempty"`
-	EnvPorts settle.Redacted `json:"env_ports,omitzero"`
+	Meta     worktree.Meta
+	Ordinal  *int
+	EnvPorts settle.Redacted
 }
 
 type Outcome struct {
@@ -98,7 +87,8 @@ type Outcome struct {
 }
 
 func Run(ctx context.Context, params Params) Outcome {
-	p := &provisioning{Params: params}
+	params.Worktree.Isolation = params.Worktree.Isolation.Effective()
+	p := &provisioning{Params: params, hookLog: hook.LogPath(hook.LogPathParams{StateDir: params.Project.StateDir, Branch: params.Worktree.Branch})}
 	p.kept, p.ignored = settle.Targets(settle.TargetsParams{Run: params.Project.Run, Files: params.Project.EnvFiles})
 	if err := ctx.Err(); err != nil {
 		return p.outcome(Outcome{Status: wtm.StatusCancelled, Reason: wtm.ReasonInterrupted, Err: interrupted(interruption{Err: err})})
@@ -117,6 +107,7 @@ type provisioning struct {
 	Params
 	kept     run.Config
 	ignored  []settle.Ignored
+	hookLog  string
 	warnings []wtm.Warning
 	unlocked bool
 }
@@ -136,7 +127,7 @@ func (p *provisioning) phases(provisioned *Provisioned) []phase {
 		phases = append(phases, phase{name: "ports", run: func(ctx context.Context) error { return p.settle(ctx, provisioned) }})
 	}
 	if len(p.Project.OnCreate) > 0 {
-		phases = append(phases, phase{name: "on_create", log: p.hookLog(), run: func(ctx context.Context) error { return p.runHooks(ctx, *provisioned) }})
+		phases = append(phases, phase{name: "on_create", log: p.hookLog, run: func(ctx context.Context) error { return p.runHooks(ctx, *provisioned) }})
 	}
 	return phases
 }
@@ -205,25 +196,18 @@ func (p *provisioning) warn(warning wtm.Warning) {
 func (p *provisioning) identity(provisioned Provisioned) worktree.Identity {
 	return worktree.Identity{
 		Branch:    p.Worktree.Branch,
-		Path:      provisioned.Path,
-		Parent:    provisioned.Metadata.SourceBranch,
+		Path:      p.Worktree.Path,
+		Parent:    provisioned.Meta.SourceBranch,
 		Ordinal:   provisioned.Ordinal,
-		Isolation: provisioned.Metadata.Isolation,
-		CreatedAt: provisioned.Metadata.CreatedAt,
+		Isolation: provisioned.Meta.Isolation,
+		CreatedAt: provisioned.Meta.CreatedAt,
 	}
 }
 
 func (p *provisioning) provisionedEvent(outcome Outcome) wtm.WorktreeProvisioned {
 	event := wtm.WorktreeProvisioned{Worktree: p.identity(outcome.Provisioned), OK: outcome.Status == wtm.StatusDone}
-	if outcome.Err == nil {
-		return event
-	}
 	if failure, ok := errors.AsType[*hook.Failure](outcome.Err); ok {
 		event.Hook, event.ExitCode = failure.Cmd, failure.ExitCode
 	}
 	return event
-}
-
-func (p *provisioning) isolation() run.Isolation {
-	return p.Worktree.Isolation.Effective()
 }

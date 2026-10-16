@@ -18,11 +18,11 @@ func (p *provisioning) needsOrdinal() bool {
 }
 
 func (p *provisioning) portsNeedOrdinal() bool {
-	return settle.NeedsOrdinal(settle.NeedsOrdinalParams{Isolation: p.isolation(), Run: p.kept})
+	return settle.NeedsOrdinal(settle.NeedsOrdinalParams{Isolation: p.Worktree.Isolation, Run: p.kept})
 }
 
 func (p *provisioning) hooksReadRun() bool {
-	return len(p.Project.OnCreate) > 0 && p.Project.RunErr == nil && jobenv.HooksReadRun(jobenv.HooksReadRunParams{Run: p.Project.Run, Isolation: p.isolation()})
+	return len(p.Project.OnCreate) > 0 && jobenv.HooksReadRun(jobenv.HooksReadRunParams{Run: p.Project.Run, Isolation: p.Worktree.Isolation})
 }
 
 func (p *provisioning) number(ctx context.Context, provisioned *Provisioned) error {

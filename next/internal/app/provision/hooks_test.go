@@ -35,7 +35,6 @@ func TestAHookThatFailsLeavesTheWorktreeIncomplete(t *testing.T) {
 	assert.Equal(t, "unit.phase_failed", outcome.Err.Code)
 	assert.Equal(t, wtm.Params{"phase": "on_create"}, outcome.Err.Params)
 	assert.Equal(t, "on_create failed: hook failed: exit status 3", outcome.Err.Error())
-	assert.Equal(t, w.path(branchName), outcome.Provisioned.Path)
 	assert.DirExists(t, w.path(branchName))
 	provisioned, ok := report.worktreeEvents()[1].(wtm.WorktreeProvisioned)
 	require.True(t, ok)
@@ -75,6 +74,8 @@ func TestAHookReadsTheRunEnvironmentOnlyWhenTheRunReachesHooks(t *testing.T) {
 	provision.Run(t.Context(), hooked(onDisk(t).params(plain), echo))
 	provision.Run(t.Context(), hooked(composed(onDisk(t).params(composedReport)), echo))
 
+	assert.Equal(t, []string{"worktree", "env", "meta", "on_create"}, plain.phases())
+	assert.Equal(t, []string{"worktree", "env", "meta", "ordinal", "ports", "on_create"}, composedReport.phases())
 	assert.Equal(t, []string{"offset=90 project="}, plain.lines())
 	require.Len(t, composedReport.lines(), 1)
 	assert.True(t, strings.HasPrefix(composedReport.lines()[0], "offset=10 project=main-feat-x"), composedReport.lines())

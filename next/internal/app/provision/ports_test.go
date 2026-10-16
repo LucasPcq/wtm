@@ -15,10 +15,12 @@ import (
 
 func TestAPortLinkedWorktreeIsNumberedAndItsEnvMovedOntoItsPorts(t *testing.T) {
 	w := onDisk(t)
+	report := &recorder{}
 
-	outcome := provision.Run(t.Context(), portLinked(w.params(&recorder{})))
+	outcome := provision.Run(t.Context(), portLinked(w.params(report)))
 
 	require.Equal(t, wtm.StatusDone, outcome.Status, outcome.Err)
+	assert.Equal(t, []string{"worktree", "env", "meta", "ordinal", "ports"}, report.phases())
 	require.NotNil(t, outcome.Provisioned.Ordinal)
 	assert.Equal(t, 1, *outcome.Provisioned.Ordinal)
 	assert.True(t, outcome.Provisioned.EnvPorts.Applied)
@@ -34,17 +36,33 @@ func TestAPortLinkedWorktreeIsNumberedAndItsEnvMovedOntoItsPorts(t *testing.T) {
 
 func TestARunConfigThatDoesNotLoadLeavesTheEnvAsCopiedAndSaysWhy(t *testing.T) {
 	w := onDisk(t)
-	params := portLinked(w.params(&recorder{}))
+	report := &recorder{}
+	params := portLinked(w.params(report))
 	params.Project.RunErr = errors.New("run.toml: line 3")
 
 	outcome := provision.Run(t.Context(), params)
 
 	require.Equal(t, wtm.StatusDone, outcome.Status, outcome.Err)
+	assert.Equal(t, []string{"worktree", "env", "meta", "ports"}, report.phases())
 	assert.Equal(t, []wtm.Warning{{
 		Code:    "provision.ports_not_settled_run",
 		Message: "run.toml: line 3 — ports not settled — run `wtm env feat/x` once run.toml is fixed",
 		Params:  wtm.Params{"branch": branchName, "cause": "run.toml: line 3"},
 	}}, outcome.Warnings)
+	assert.Nil(t, outcome.Provisioned.Ordinal)
+	assert.Equal(t, mainEnv, readFile(t, filepath.Join(w.path(branchName), ".env")))
+}
+
+func TestAVerbatimWorktreeKeepsItsEnvAsCopiedAndHasNoNumber(t *testing.T) {
+	w := onDisk(t)
+	report := &recorder{}
+	params := portLinked(w.params(report))
+	params.Worktree.Isolation = run.Verbatim
+
+	outcome := provision.Run(t.Context(), params)
+
+	require.Equal(t, wtm.StatusDone, outcome.Status, outcome.Err)
+	assert.Equal(t, []string{"worktree", "env", "meta"}, report.phases())
 	assert.Nil(t, outcome.Provisioned.Ordinal)
 	assert.Equal(t, mainEnv, readFile(t, filepath.Join(w.path(branchName), ".env")))
 }

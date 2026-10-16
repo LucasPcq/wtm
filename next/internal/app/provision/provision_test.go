@@ -2,7 +2,6 @@ package provision_test
 
 import (
 	"context"
-	"errors"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -24,47 +23,6 @@ func TestAProjectWithoutRunConfigOrHooksStopsAtItsRecord(t *testing.T) {
 
 	require.Equal(t, wtm.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []string{"worktree", "env", "meta"}, report.phases())
-}
-
-func TestALinkedWorktreeWithPortLinksIsNumberedThenSettled(t *testing.T) {
-	w, _ := inMemory(t, seeds{})
-	report := &recorder{}
-
-	provision.Run(t.Context(), portLinked(w.params(report)))
-
-	assert.Equal(t, []string{"worktree", "env", "meta", "ordinal", "ports"}, report.phases())
-}
-
-func TestAVerbatimWorktreeIsNeitherNumberedNorSettled(t *testing.T) {
-	w, _ := inMemory(t, seeds{})
-	report := &recorder{}
-	params := portLinked(w.params(report))
-	params.Worktree.Isolation = run.Verbatim
-
-	provision.Run(t.Context(), params)
-
-	assert.Equal(t, []string{"worktree", "env", "meta"}, report.phases())
-}
-
-func TestARunConfigThatDoesNotLoadStillHasItsPortPassToSaySo(t *testing.T) {
-	w, _ := inMemory(t, seeds{})
-	report := &recorder{}
-	params := portLinked(w.params(report))
-	params.Project.RunErr = errors.New("run.toml: line 3")
-
-	provision.Run(t.Context(), params)
-
-	assert.Equal(t, []string{"worktree", "env", "meta", "ports"}, report.phases())
-}
-
-func TestHooksAreNumberedFirstOnlyWhenTheyReadTheRunEnvironment(t *testing.T) {
-	plain, composedReport := &recorder{}, &recorder{}
-
-	provision.Run(t.Context(), hooked(onDisk(t).params(plain), "true"))
-	provision.Run(t.Context(), hooked(composed(onDisk(t).params(composedReport)), "true"))
-
-	assert.Equal(t, []string{"worktree", "env", "meta", "on_create"}, plain.phases())
-	assert.Equal(t, []string{"worktree", "env", "meta", "ordinal", "ports", "on_create"}, composedReport.phases())
 }
 
 func TestAWorktreeIsCreatedNumberedThenProvisionedInThatOrder(t *testing.T) {

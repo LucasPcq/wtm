@@ -22,7 +22,7 @@ func (p *provisioning) add(ctx context.Context) (Provisioned, *wtm.Error) {
 	if err := p.do(shielded, phase{name: "meta", run: func(ctx context.Context) error { return p.record(ctx, meta) }}); err != nil {
 		return Provisioned{}, p.undo(shielded, stepFailed("meta", err))
 	}
-	return Provisioned{Path: p.Worktree.Path, Metadata: meta, Origin: p.Worktree.Origin}, nil
+	return Provisioned{Meta: meta}, nil
 }
 
 func stepFailed(step string, err error) *wtm.Error {
@@ -38,7 +38,7 @@ func (p *provisioning) meta() worktree.Meta {
 		SourceBranch: p.Worktree.Source,
 		CreatedAt:    p.Deps.Now().UTC().Format(time.RFC3339),
 		EnvStrategy:  p.Worktree.Strategy,
-		Isolation:    p.isolation(),
+		Isolation:    p.Worktree.Isolation,
 	}
 }
 
