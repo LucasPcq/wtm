@@ -1,23 +1,19 @@
 package branch
 
-import (
-	"strings"
-
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-)
+import "strings"
 
 const remotePrefix = "origin/"
 
-func Divergence(ab wtm.AheadBehind) wtm.Divergence {
+func (ab AheadBehind) Divergence() Divergence {
 	switch {
 	case ab.Ahead > 0 && ab.Behind > 0:
-		return wtm.Diverged
+		return Diverged
 	case ab.Behind > 0:
-		return wtm.Behind
+		return Behind
 	case ab.Ahead > 0:
-		return wtm.Ahead
+		return Ahead
 	}
-	return wtm.UpToDate
+	return UpToDate
 }
 
 func IsRemote(name string) bool {

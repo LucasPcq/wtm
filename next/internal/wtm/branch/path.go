@@ -1,6 +1,9 @@
 package branch
 
-import "strings"
+import (
+	"net/url"
+	"strings"
+)
 
 const (
 	hostLabelMaxLen = 63
@@ -9,6 +12,10 @@ const (
 
 func PathSegment(name string) string {
 	return strings.ReplaceAll(name, "/", "-")
+}
+
+func StateSegment(name string) string {
+	return url.PathEscape(name)
 }
 
 func Slug(name string) string {

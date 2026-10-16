@@ -20,8 +20,6 @@ func Blank(name string) bool {
 
 func reason(name string) string {
 	switch {
-	case Blank(name):
-		return "it is empty"
 	case name == "@", name == "HEAD":
 		return "it is reserved by git"
 	case strings.HasPrefix(name, "-"):

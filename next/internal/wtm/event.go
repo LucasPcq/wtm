@@ -1,5 +1,7 @@
 package wtm
 
+import "github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+
 //go-sumtype:decl Event
 
 type Event interface{ event() }
@@ -20,12 +22,12 @@ type UnitFinished struct {
 	Status  Status
 }
 
-type WorktreeCreated struct{ Worktree Identity }
+type WorktreeCreated struct{ Worktree worktree.Identity }
 
-type WorktreeNumbered struct{ Worktree Identity }
+type WorktreeNumbered struct{ Worktree worktree.Identity }
 
 type WorktreeProvisioned struct {
-	Worktree Identity
+	Worktree worktree.Identity
 	OK       bool
 	Hook     string
 	ExitCode *int

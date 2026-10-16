@@ -1,4 +1,4 @@
-// Package wtm is the domain of wtm-next: its nouns, errors, warnings and events, pure and stdlib only.
+// Package wtm is the contract every use case speaks: errors, warnings, events and outcomes.
 package wtm
 
 import (
@@ -54,28 +54,46 @@ type FollowUp struct {
 }
 
 func (e *Error) Error() string {
+	if e == nil {
+		return "<nil *wtm.Error>"
+	}
 	if e.Cause == nil {
 		return e.Message
 	}
 	return e.Message + ": " + e.Cause.Error()
 }
 
-func (e *Error) Unwrap() error { return e.Cause }
+func (e *Error) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Cause
+}
 
 func Invalid(fields []FieldError) *Error {
 	return &Error{Kind: KindInvalid, Code: CodeInvalidRequest, Message: "the request is invalid", Fields: fields}
 }
 
-func AsError(err error) *Error {
-	if err == nil {
+type AsErrorParams struct {
+	Err     error
+	Code    string
+	Message string
+	Params  Params
+}
+
+func AsError(params AsErrorParams) *Error {
+	if params.Err == nil {
 		return nil
 	}
 	var known *Error
-	if errors.As(err, &known) {
+	if errors.As(params.Err, &known) && known != nil {
 		return known
 	}
-	if errors.Is(err, context.Canceled) {
-		return &Error{Kind: KindCancelled, Code: CodeInterrupted, Message: "interrupted", Cause: err}
+	if errors.Is(params.Err, context.Canceled) {
+		return &Error{Kind: KindCancelled, Code: CodeInterrupted, Message: "interrupted", Params: params.Params, Cause: params.Err}
 	}
-	return &Error{Kind: KindInternal, Code: CodeInternal, Message: "internal error", Cause: err}
+	if params.Code != "" {
+		return &Error{Kind: KindInternal, Code: params.Code, Message: params.Message, Params: params.Params, Cause: params.Err}
+	}
+	return &Error{Kind: KindInternal, Code: CodeInternal, Message: "internal error", Params: params.Params, Cause: params.Err}
 }

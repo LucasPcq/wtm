@@ -17,8 +17,7 @@ func TestANameGitRefusesSaysWhy(t *testing.T) {
 		name string
 		want string
 	}{
-		{"", `"" is not a valid branch name: it is empty`},
-		{"  ", `"  " is not a valid branch name: it is empty`},
+		{"  ", `"  " is not a valid branch name: it cannot hold a space, a control character or any of ~ ^ : ? * [ \`},
 		{"@", `"@" is not a valid branch name: it is reserved by git`},
 		{"HEAD", `"HEAD" is not a valid branch name: it is reserved by git`},
 		{"-x", `"-x" is not a valid branch name: it cannot start with -`},
@@ -47,6 +46,10 @@ func TestANameGitRefusesSaysWhy(t *testing.T) {
 			assert.EqualError(t, Problem(tc.name), tc.want)
 		})
 	}
+}
+
+func TestAnEmptyNameIsLeftToTheCallerAsTheEngineDid(t *testing.T) {
+	assert.NoError(t, Problem(""))
 }
 
 func TestABlankNameIsBlank(t *testing.T) {

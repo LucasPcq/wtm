@@ -49,3 +49,9 @@ func TestAHostLabelIsOneDNSLabel(t *testing.T) {
 		})
 	}
 }
+
+func TestAStateSegmentEscapesTheSlashesAPathSegmentTurnsIntoDashes(t *testing.T) {
+	assert.Equal(t, "feat%2Fx", StateSegment("feat/x"))
+	assert.Equal(t, "feat-x", StateSegment("feat-x"))
+	assert.NotEqual(t, StateSegment("feat/x"), StateSegment("feat-x"))
+}
