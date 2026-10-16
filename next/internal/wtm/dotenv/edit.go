@@ -52,22 +52,32 @@ func (params SetParams) appended() []Line {
 	for end > 0 && params.Lines[end-1].Kind == Blank {
 		end--
 	}
-	for at := end; at >= 0; at-- {
-		out := params.insertedAt(at)
-		if params.heldBy(out) {
-			return out
-		}
+	if out := params.insertedAt(end); params.heldBy(out) {
+		return out
 	}
-	return params.insertedAt(end)
+	return params.insertedAt(0)
 }
 
 func (params SetParams) insertedAt(at int) []Line {
-	out := slices.Insert(slices.Clone(params.Lines), at, Line{Kind: Pair, Key: params.Key, Value: params.Value})
-	previous := at - 1
-	if at == len(params.Lines) && previous >= 0 && out[previous].Raw != "" && endsInCRLF(params.Lines) && !strings.HasSuffix(out[previous].Raw, carriageRet) {
-		out[previous].Raw += carriageRet
+	pair := Line{Kind: Pair, Key: params.Key, Value: params.Value}
+	out := slices.Insert(slices.Clone(params.Lines), at, pair)
+	crlf := endsInCRLF(params.Lines)
+	switch {
+	case len(params.Lines) == 0:
+	case at == len(params.Lines) && crlf && out[at-1].Raw != "" && !strings.HasSuffix(out[at-1].Raw, carriageRet):
+		out[at-1].Raw += carriageRet
+	case at == 0 && strings.HasPrefix(out[1].Raw, byteOrderMark):
+		out[1].Raw = strings.TrimPrefix(out[1].Raw, byteOrderMark)
+		out[0].Raw = byteOrderMark + renderPair(pair) + lineEnd(crlf)
 	}
 	return out
+}
+
+func lineEnd(crlf bool) string {
+	if crlf {
+		return carriageRet
+	}
+	return ""
 }
 
 func (params SetParams) heldBy(lines []Line) bool {

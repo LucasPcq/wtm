@@ -142,3 +142,32 @@ func TestAValueNoQuotingCanHoldIsWrittenOnceAndThenLeftAlone(t *testing.T) {
 	assert.Equal(t, "A=\"it's \\\"fine\\\"\"\n", string(Render(first)))
 	assert.False(t, again)
 }
+
+func TestAKeyAddedToAByteOrderMarkAloneComesAfterTheMark(t *testing.T) {
+	cases := map[string]string{
+		"\ufeff":     "\ufeffK=V\n",
+		"\ufeff\n\n": "\ufeffK=V\n\n\n",
+		"\ufeff\r\n": "\ufeffK=V\r\n\r\n",
+	}
+	for content, want := range cases {
+		t.Run(content, func(t *testing.T) {
+			lines, _ := Set(SetParams{Lines: Parse([]byte(content)), Key: "K", Value: "V"})
+
+			assert.Equal(t, want, string(Render(lines)))
+			assert.Equal(t, "V", valueOf(t, Render(lines), "K"))
+		})
+	}
+}
+
+func TestAKeyMovedToTheTopOfAMarkedFileTakesTheMark(t *testing.T) {
+	lines, _ := Set(SetParams{Lines: Parse([]byte("\ufeffN='open\n")), Key: "W", Value: "it's"})
+
+	assert.Equal(t, "\ufeffW=it's\nN='open\n", string(Render(lines)))
+}
+
+func TestAKeySetOnNoLinesIsTheWholeFile(t *testing.T) {
+	lines, changed := Set(SetParams{Key: "K", Value: "V"})
+
+	assert.True(t, changed)
+	assert.Equal(t, "K=V", string(Render(lines)))
+}
