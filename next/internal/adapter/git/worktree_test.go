@@ -411,3 +411,30 @@ func TestTheFakeAndGitRefuseTheSameWorktreeChanges(t *testing.T) {
 		}
 	}
 }
+
+func TestTheFakeAndGitAddIntoAnEmptyFolder(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			location, err := impl.port.Locate(t.Context(), filepath.Join(impl.root, "empty"))
+			require.NoError(t, err)
+			require.True(t, location.Exists)
+
+			err = impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "empty"), Checkout: worktree.NewBranch{Name: "into-empty", From: branch.LocalBranch{Name: "main"}}})
+
+			require.NoError(t, err)
+			assert.Contains(t, gittest.StateOf(t, impl.port).Worktrees, worktree.Worktree{Path: impl.at("empty"), State: worktree.OnBranch{Branch: "into-empty"}})
+		})
+	}
+}
+
+func TestTheFakeLocatesARelativePathFromTheRepositoryDirectory(t *testing.T) {
+	root := gittest.Symlinked(t)
+	params := seed(root)
+	params.Dir = filepath.Join(root, "linked")
+	fake := gittest.NewFake(params)
+
+	location, err := fake.Locate(t.Context(), "../taken")
+
+	require.NoError(t, err)
+	assert.Equal(t, worktree.Location{Path: under(t, root)("taken"), Exists: true}, location)
+}

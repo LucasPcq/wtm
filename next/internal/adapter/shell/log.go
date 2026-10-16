@@ -39,14 +39,26 @@ type linesParams struct {
 }
 
 type lines struct {
-	mu   sync.Mutex
-	emit func(string)
-	log  io.WriteCloser
-	buf  bytes.Buffer
+	mu      sync.Mutex
+	emit    func(string)
+	logPath string
+	opened  bool
+	log     io.WriteCloser
+	buf     bytes.Buffer
 }
 
 func newLines(params linesParams) *lines {
-	return &lines{emit: params.Emit, log: openLog(params.Log)}
+	return &lines{emit: params.Emit, logPath: params.Log}
+}
+
+func (l *lines) openLog() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.opened {
+		return
+	}
+	l.opened = true
+	l.log = openLog(l.logPath)
 }
 
 func openLog(path string) io.WriteCloser {

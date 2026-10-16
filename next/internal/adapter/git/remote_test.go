@@ -1,8 +1,11 @@
 package git_test
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
@@ -182,4 +185,35 @@ func TestTheFakeAndGitRefuseTheSameRemoteChanges(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestAFetchThatWouldPromptForCredentialsFailsAtOnce(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("WWW-Authenticate", `Basic realm="git"`)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	t.Cleanup(server.Close)
+	repo := newRepo(t)
+	gittest.Git(t, repo.Dir, "remote", "add", "origin", server.URL+"/repo.git")
+
+	begin := time.Now()
+	err := repo.FetchRef(t.Context(), "main")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "terminal prompts disabled")
+	assert.Less(t, time.Since(begin), 5*time.Second)
+}
+
+func TestAnSSHFetchNeverAsksAndKeepsTheUsersOwnSSHCommand(t *testing.T) {
+	record := fakeSSH(t)
+	repo := newRepo(t)
+	gittest.Git(t, repo.Dir, "remote", "add", "origin", "ssh://git@wtm-next.invalid/repo.git")
+
+	_ = repo.FetchRef(t.Context(), "main")
+	assert.Contains(t, contentOf(t, record), "BatchMode=yes")
+
+	t.Setenv("GIT_SSH_COMMAND", "ssh -o User=mine")
+	_ = repo.FetchRef(t.Context(), "main")
+	assert.Contains(t, contentOf(t, record), "User=mine")
+	assert.NotContains(t, lastLine(contentOf(t, record)), "BatchMode")
 }

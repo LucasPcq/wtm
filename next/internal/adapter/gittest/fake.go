@@ -1,6 +1,7 @@
 package gittest
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -24,6 +25,8 @@ type Fake struct {
 	remote    map[string]history
 	origin    map[string]history
 	folders   []string
+	empty     []string
+	dir       string
 	dirty     []string
 	fail      map[string]error
 	calls     []string
@@ -38,6 +41,8 @@ type FakeParams struct {
 	Locked    []string
 	Gone      []string
 	Folders   []string
+	Empty     []string
+	Dir       string
 	Dirty     []string
 	Commits   map[branch.Ref][]string
 	Origin    map[string][]string
@@ -55,6 +60,8 @@ func NewFake(params FakeParams) *Fake {
 		locked:    realPaths(params.Locked),
 		gone:      realPaths(params.Gone),
 		folders:   realPaths(params.Folders),
+		empty:     realPaths(params.Empty),
+		dir:       realPath(cmp.Or(params.Dir, params.Main)),
 		dirty:     realPaths(params.Dirty),
 		fail:      params.Fail,
 	}
@@ -119,10 +126,10 @@ func (f *Fake) Locate(_ context.Context, path string) (worktree.Location, error)
 	}
 	absolute := path
 	if !filepath.IsAbs(path) {
-		absolute = filepath.Join(f.worktrees[0].Path, path)
+		absolute = filepath.Join(f.dir, path)
 	}
 	resolved := realPath(absolute)
-	return worktree.Location{Path: resolved, Exists: f.taken(resolved)}, nil
+	return worktree.Location{Path: resolved, Exists: f.taken(resolved) || slices.Contains(f.empty, resolved)}, nil
 }
 
 func (f *Fake) Branches(context.Context) (branch.Branches, error) {
@@ -156,7 +163,7 @@ func (f *Fake) Dirty(_ context.Context, path string) (bool, error) {
 		return false, err
 	}
 	resolved := realPath(path)
-	if f.worktreeAt(resolved) < 0 {
+	if f.worktreeAt(resolved) < 0 || slices.Contains(f.gone, resolved) {
 		return false, fmt.Errorf("gittest: %s is not a worktree", resolved)
 	}
 	return slices.Contains(f.dirty, resolved), nil

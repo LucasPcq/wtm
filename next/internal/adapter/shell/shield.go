@@ -2,6 +2,8 @@ package shell
 
 import (
 	"context"
+	"maps"
+	"slices"
 	"sync"
 )
 
@@ -9,8 +11,8 @@ var inflight = struct {
 	sync.Mutex
 	cond     *sync.Cond
 	open     int
-	stopping []func()
-}{}
+	stopping map[*escalation]func()
+}{stopping: map[*escalation]func(){}}
 
 func init() {
 	inflight.cond = sync.NewCond(&inflight.Mutex)
@@ -42,16 +44,26 @@ func AwaitShields() {
 
 func KillCancelled() {
 	inflight.Lock()
-	kills := inflight.stopping
-	inflight.stopping = nil
+	kills := slices.Collect(maps.Values(inflight.stopping))
 	inflight.Unlock()
 	for _, kill := range kills {
 		kill()
 	}
 }
 
-func stopping(kill func()) {
+type stoppingParams struct {
+	Process *escalation
+	Kill    func()
+}
+
+func stopping(params stoppingParams) {
 	inflight.Lock()
 	defer inflight.Unlock()
-	inflight.stopping = append(inflight.stopping, kill)
+	inflight.stopping[params.Process] = params.Kill
+}
+
+func stopped(process *escalation) {
+	inflight.Lock()
+	defer inflight.Unlock()
+	delete(inflight.stopping, process)
 }

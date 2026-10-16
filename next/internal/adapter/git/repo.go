@@ -52,7 +52,7 @@ func (r Repo) git(ctx context.Context, args ...string) ([]byte, error) {
 	full := append([]string{"-C", r.Dir}, args...)
 	var stdout, stderr bytes.Buffer
 	cmd := shell.Command(ctx, "git", full...)
-	cmd.Env = slices.DeleteFunc(os.Environ(), repoScoped)
+	cmd.Env = childEnv()
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
@@ -63,6 +63,14 @@ func (r Repo) git(ctx context.Context, args ...string) ([]byte, error) {
 		return nil, &Error{Args: full, Exit: exitCode(err), Stderr: strings.TrimSpace(stderr.String()), Err: err}
 	}
 	return stdout.Bytes(), nil
+}
+
+func childEnv() []string {
+	env := append(slices.DeleteFunc(os.Environ(), repoScoped), "GIT_TERMINAL_PROMPT=0")
+	if _, set := os.LookupEnv("GIT_SSH_COMMAND"); !set {
+		env = append(env, "GIT_SSH_COMMAND=ssh -o BatchMode=yes")
+	}
+	return env
 }
 
 func repoScoped(entry string) bool {

@@ -43,3 +43,12 @@ func TestALogThatCannotBeOpenedNeverStopsTheHooks(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"ok"}, out.all())
 }
+
+func TestNoHookToRunLeavesNoLog(t *testing.T) {
+	log := filepath.Join(t.TempDir(), "hooks", "on_create-feat.log")
+
+	require.NoError(t, RunHooks(t.Context(), HooksParams{WorkDir: t.TempDir(), Log: log}))
+	require.NoError(t, RunHooks(t.Context(), HooksParams{Hooks: []project.Hook{{Cmd: "  "}}, WorkDir: t.TempDir(), Log: log}))
+
+	assert.NoFileExists(t, log)
+}

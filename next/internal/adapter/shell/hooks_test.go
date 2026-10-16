@@ -300,3 +300,14 @@ func TestTheTwoStreamsReachTheOutputOneLineAtATime(t *testing.T) {
 	defer mu.Unlock()
 	assert.Equal(t, 20, lines)
 }
+
+func TestAHookThatBackgroundsAJobSucceedsWithoutWaitingForIt(t *testing.T) {
+	out := &collected{}
+	begin := time.Now()
+
+	err := RunHooks(t.Context(), HooksParams{Hooks: []project.Hook{{Cmd: "sleep 7 & echo started"}}, WorkDir: t.TempDir(), Output: out.add})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"started"}, out.all())
+	assert.Less(t, time.Since(begin), 5*time.Second)
+}

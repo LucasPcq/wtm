@@ -110,3 +110,17 @@ func TestKillCancelledStopsAChildThatIgnoresEveryPoliteSignal(t *testing.T) {
 		require.FailNow(t, "the child outlived KillCancelled")
 	}
 }
+
+func TestACancelledChildThatEndedLeavesNothingToKill(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cmd := Command(ctx, "sh", "-c", `trap 'exit 0' INT; while :; do sleep 0.05; done`)
+	require.NoError(t, cmd.Start())
+	time.Sleep(100 * time.Millisecond)
+
+	cancel()
+	_ = cmd.Wait()
+
+	inflight.Lock()
+	defer inflight.Unlock()
+	assert.Empty(t, inflight.stopping)
+}

@@ -74,6 +74,7 @@ func runHook(ctx context.Context, run hookRun) error {
 	if strings.TrimSpace(run.Hook.Cmd) == "" {
 		return nil
 	}
+	run.Sink.openLog()
 	cmd := Command(ctx, shellBin, shellCommandFlag, run.Hook.Cmd)
 	cmd.Dir = hookDir(run)
 	cmd.Env = hookEnv(run.Params.Env)
@@ -81,7 +82,7 @@ func runHook(ctx context.Context, run hookRun) error {
 	cmd.Stderr = run.Sink
 	err := cmd.Run()
 	switch {
-	case err == nil:
+	case err == nil, errors.Is(err, exec.ErrWaitDelay) && cmd.ProcessState.Success():
 		return nil
 	case ctx.Err() != nil:
 		return &Failure{Cmd: run.Hook.Cmd, Err: fmt.Errorf("%w: %w", ErrHookStopped, ctx.Err())}

@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
@@ -130,4 +131,28 @@ func leaveAFile(t *testing.T, path string) {
 		return
 	}
 	require.NoError(t, os.WriteFile(filepath.Join(path, ".env"), []byte("PORT=3000\n"), 0o644))
+}
+
+func fakeSSH(t *testing.T) string {
+	t.Helper()
+	bin := t.TempDir()
+	record := filepath.Join(t.TempDir(), "ssh-args")
+	script := "#!/bin/sh\necho \"$@\" >> " + record + "\nexit 255\n"
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "ssh"), []byte(script), 0o755))
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("GIT_SSH_COMMAND", "")
+	require.NoError(t, os.Unsetenv("GIT_SSH_COMMAND"))
+	return record
+}
+
+func contentOf(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return string(data)
+}
+
+func lastLine(content string) string {
+	lines := strings.Split(strings.TrimSpace(content), "\n")
+	return lines[len(lines)-1]
 }

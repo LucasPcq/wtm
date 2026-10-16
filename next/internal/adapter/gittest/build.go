@@ -163,6 +163,11 @@ func Build(t testing.TB, params FakeParams) git.Repo {
 	for _, folder := range params.Folders {
 		writeFile(t, filepath.Join(folder, "work"))
 	}
+	for _, folder := range params.Empty {
+		if err := os.MkdirAll(folder, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
 	return git.Repo{Dir: main, Remote: origin}
 }
 

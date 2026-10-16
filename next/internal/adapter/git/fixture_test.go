@@ -61,6 +61,7 @@ func seed(root string) gittest.FakeParams {
 		Locked:  []string{filepath.Join(root, "locked")},
 		Gone:    []string{filepath.Join(root, "gone")},
 		Folders: []string{filepath.Join(root, "taken")},
+		Empty:   []string{filepath.Join(root, "empty")},
 		Dirty:   []string{filepath.Join(root, "dirty")},
 		Commits: map[branch.Ref][]string{
 			branch.LocalBranch{Name: "unmerged"}: {"unmerged work"},
