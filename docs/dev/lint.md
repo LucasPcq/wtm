@@ -59,7 +59,16 @@ A glyph table alone does not hold a surface of sixty commands: "nothing to do" g
 | `glyph` | a vocabulary rune written as a literal — `"✓"`, `"!"`, `"→"` … — instead of its `domain` constant, which is how a seventh glyph appears and how an existing one takes a second meaning |
 | `tuistyle` | `styles.Badge*` or `styles.Dashboard*` used from `internal/surface/cli/render`: a badge is a widget, and its padding made an attention line two columns wider than the failure line under it |
 | `mutedline` | `Message(w, styles.Muted.Render(x))` — a bare line muted whole, which is the `=` register with its glyph filed off |
-| `fontcover` | a non-letter rune missing from common monospace fonts, in any string of `internal/` — the terminal borrows it from a wider fallback face and it eats the space after it. The allowed set, `fontSafe`, was measured over thirteen fonts (Cascadia Code, DejaVu Sans Mono, Fira Code, Hack, IBM Plex Mono, Inconsolata, JetBrains Mono, Roboto Mono, Source Code Pro, Ubuntu Mono, Menlo, Monaco, SF Mono); `fontLegacy` holds the runes that predate the rule and may only shrink. Box drawing and block elements pass: terminals draw them as their own sprites |
+| `fontcover` | a non-letter rune missing from common monospace fonts, in any string of `internal/` and `next/` — the terminal borrows it from a wider fallback face and it eats the space after it. The allowed set, `fontSafe`, was measured over thirteen fonts (Cascadia Code, DejaVu Sans Mono, Fira Code, Hack, IBM Plex Mono, Inconsolata, JetBrains Mono, Roboto Mono, Source Code Pro, Ubuntu Mono, Menlo, Monaco, SF Mono); `fontLegacy` holds the runes that predate the rule and may only shrink. Box drawing and block elements pass: terminals draw them as their own sprites |
+
+### `next/`
+
+The driver loads `internal/` and `next/` in one run (`go run ./tools/archlint [root…]`, both by default). The rules written for `internal/` act on its packages only (`internalOnly` in `analyzers.go`); `typeassert` and `fontcover`, which hold for any Go code of the project, act on both. Two rules are `next/`'s own, from [`next/README.md`](../../next/README.md):
+
+| Rule | Catches |
+| -- | -- |
+| `next` | an import outside the package's row of the `next/` import table (`wtm/`, `app/`, `app/<slice>`, `adapter/<name>`, `surface/*`, `cmd/`), a package in no row (the root of `next/` included), an import of `internal/` from a source or a test file, and a fake (`adapter/<name>test` beside an `adapter/<name>`) imported from anything but a test or its own adapter |
+| `nextcomments` | a package of `next/` without a one-line package doc, a banner or header in a test file, and a package whose other comment lines — godoc included, tests included; free are the package doc and a bare directive (`//go:build`, `//go:embed`, `//go:generate`, `//go-sumtype:decl <Type>`, `//nolint:<linters>` with nothing after) — differ from its line in `.next-comments` (absent = 0). Above is a finding to delete comments or raise the line in review; below is a finding to lower it, so a ceiling only goes down by itself. A line whose package no longer exists, or a package with two lines, stops archlint |
 
 ### Adding a rule
 

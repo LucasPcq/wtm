@@ -24,8 +24,9 @@ internal/
 | `wtm`, `wtm/*` | stdlib, `wtm/*` |
 | `app/<slice>` | `wtm/*`, `app/provision`, stdlib — never another slice, `adapter/*`, `surface/*`, `app` |
 | `app` | `app/*`, `wtm/*`, stdlib |
-| `adapter/<name>` | `wtm/*`, `adapter/statefile`, stdlib, third party — never `app/*`, `surface/*`, another adapter |
+| `adapter/<name>` | `wtm/*`, `adapter/statefile`, `adapter/shell` (the one way to start a child), stdlib, third party — never `app/*`, `surface/*`, another adapter |
 | `adapter/<name>test` | what `adapter/<name>` may, and `adapter/<name>`; imported from a `_test.go` only |
+| any test | never `github.com/LucasPcq/wtm/internal/…` |
 | `surface/*` | `app`, `app/<slice>` (request and result types), `wtm/*`, `surface/*`, third party — never `adapter/*` |
 | `cmd/wtm-next` | anything under `next/` |
 
@@ -33,7 +34,7 @@ A slice declares the interfaces it needs in the file of the struct that holds th
 
 ## Comments
 
-One line of package doc per package, godoc where an exported name leaves a caller guessing, and otherwise only a why the code cannot show. `.next-comments` holds each package's count of the other lines (absent = 0); `make lint` (rule `nextcomments`) refuses a package above or below it.
+Close to zero. Each package has a one-line package doc; every other comment line counts, godoc and tests included, except a bare directive (`//go:build`, `//go:embed`, `//go:generate`, `//go-sumtype:decl <Type>`, `//nolint:<linters>`, nothing after). A line earns its place only as a why the code cannot show. `.next-comments` holds each package's count (absent = 0); `make lint` (rule `nextcomments`) refuses a package above it (delete, or raise the count in review) or below it (lower the count).
 
 ## Cancellation
 

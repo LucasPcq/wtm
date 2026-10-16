@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"go/ast"
 	"os"
+	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -12,7 +14,10 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-const nextPrefix = modulePath + "next/"
+const (
+	nextModule = modulePath + "next"
+	nextPrefix = nextModule + "/"
+)
 
 type nextLayer string
 
@@ -27,8 +32,9 @@ const (
 
 const sharedSlice = "provision"
 
+var sharedAdapters = []string{"statefile", "shell"}
+
 type nextPackage struct {
-	path  string
 	layer nextLayer
 	unit  string
 }
@@ -37,93 +43,155 @@ var nextWhy = map[nextLayer]string{
 	nextDomain:  "the domain is pure: the stdlib and wtm/* only",
 	nextSlice:   "a use case reaches the world through the interfaces it declares: wtm/*, app/provision and the stdlib, never another slice, an adapter, a surface or app",
 	nextApp:     "the API every surface calls: app/*, wtm/* and the stdlib, never an adapter",
-	nextAdapter: "an adapter reaches wtm/*, adapter/statefile, the stdlib and third parties, never app/*, a surface or another adapter",
+	nextAdapter: "an adapter reaches wtm/*, adapter/statefile, adapter/shell, the stdlib and third parties, never app/*, a surface or another adapter",
 	nextSurface: "a surface calls the app: app, app/<slice>, wtm/*, surface/* and third parties, never an adapter",
 	nextCmd:     "the composition root wires what is under next/",
 }
 
-var nextAnalyzer = &analysis.Analyzer{
-	Name: "next",
-	Doc:  "a package of next/ imports only what its row of next/README.md allows, never internal/, and a fake only from a test",
-	Run:  runNext,
+var nextAnalyzer = newNextAnalyzer(testFilesOnDisk)
+
+func newNextAnalyzer(testsOf testFiles) *analysis.Analyzer {
+	return &analysis.Analyzer{
+		Name: "next",
+		Doc:  "a package of next/ imports only what its row of next/README.md allows, never internal/ (its tests neither), and a fake only from a test",
+		Run:  func(pass *analysis.Pass) (any, error) { return runNext(pass, testsOf) },
+	}
 }
 
-func runNext(pass *analysis.Pass) (any, error) {
+func runNext(pass *analysis.Pass, testsOf testFiles) (any, error) {
 	rel, ok := nextRel(pass)
 	if !ok {
 		return nil, nil
 	}
-	from, ok := nextPackageOf(pass.Pkg.Path())
+	from, ok := nextPackageOf(rel)
 	if !ok {
 		pass.Reportf(firstFile(pass).Package, "next/%s is in no row of next/'s import table: place it under wtm/, app/, adapter/, surface/ or cmd/ (next/README.md)", rel)
 		return nil, nil
 	}
-	for _, file := range pass.Files {
-		if isTestFile(pass, file) {
-			continue
+	fakes, err := fakesOf(nextRoot(pass, rel))
+	if err != nil {
+		return nil, err
+	}
+	sources := slices.DeleteFunc(slices.Clone(pass.Files), func(file *ast.File) bool { return isTestFile(pass, file) })
+	for _, spec := range importsOf(sources) {
+		target, err := strconv.Unquote(spec.Path.Value)
+		if err != nil {
+			return nil, err
 		}
-		for _, spec := range file.Imports {
-			target, err := strconv.Unquote(spec.Path.Value)
-			if err != nil {
-				return nil, err
-			}
-			if why, refused := nextRefuses(from, target); refused {
-				pass.Reportf(spec.Pos(), "next/%s must not import %q — %s (next/README.md)", rel, target, why)
-			}
+		if why, refused := nextRefuses(nextImport{From: from, Target: target, Fakes: fakes}); refused {
+			pass.Reportf(spec.Pos(), "next/%s must not import %q — %s (next/README.md)", rel, target, why)
+		}
+	}
+	tests, err := testsOf(pass)
+	if err != nil {
+		return nil, err
+	}
+	for _, spec := range importsOf(tests) {
+		if target, err := strconv.Unquote(spec.Path.Value); err == nil && strings.HasPrefix(target, internalPrefix) {
+			pass.Reportf(spec.Pos(), "a test of next/%s must not import %q — next/ never imports internal/, its tests neither (next/README.md)", rel, target)
 		}
 	}
 	return nil, nil
 }
 
-// A test binary's generated main package is not code anyone wrote.
-func nextRel(pass *analysis.Pass) (string, bool) {
-	rel, ok := strings.CutPrefix(pass.Pkg.Path(), nextPrefix)
-	return rel, ok && len(pass.Files) > 0 && !strings.HasSuffix(rel, ".test")
+func importsOf(files []*ast.File) []*ast.ImportSpec {
+	var specs []*ast.ImportSpec
+	for _, file := range files {
+		specs = append(specs, file.Imports...)
+	}
+	return specs
 }
 
-func nextPackageOf(pkgPath string) (nextPackage, bool) {
-	rel, ok := strings.CutPrefix(pkgPath, nextPrefix)
-	if !ok {
+func nextRel(pass *analysis.Pass) (string, bool) {
+	rel, ok := cutNext(pass.Pkg.Path())
+	// analysistest also loads the main package go test generates for a test binary.
+	generated := pass.Pkg.Name() == "main" && strings.HasSuffix(rel, ".test")
+	return rel, ok && len(pass.Files) > 0 && !generated
+}
+
+func cutNext(pkgPath string) (string, bool) {
+	if pkgPath == nextModule {
+		return "", true
+	}
+	return strings.CutPrefix(pkgPath, nextPrefix)
+}
+
+func nextPackageOf(rel string) (nextPackage, bool) {
+	parts := strings.Split(rel, "/")
+	if len(parts) < 2 {
 		return nextPackage{}, false
 	}
-	parts := strings.Split(rel, "/")
-	unit := func() string {
-		if len(parts) < 3 {
-			return ""
-		}
-		return parts[2]
+	nested := len(parts) > 2
+	unit := ""
+	if nested {
+		unit = parts[2]
 	}
 	switch {
 	case parts[0] == "cmd":
-		return nextPackage{path: rel, layer: nextCmd}, true
-	case len(parts) < 2 || parts[0] != "internal":
+		return nextPackage{layer: nextCmd}, true
+	case parts[0] != "internal":
 		return nextPackage{}, false
 	case parts[1] == "wtm":
-		return nextPackage{path: rel, layer: nextDomain}, true
-	case parts[1] == "app" && len(parts) == 2:
-		return nextPackage{path: rel, layer: nextApp}, true
+		return nextPackage{layer: nextDomain}, true
+	case parts[1] == "app" && !nested:
+		return nextPackage{layer: nextApp}, true
 	case parts[1] == "app":
-		return nextPackage{path: rel, layer: nextSlice, unit: unit()}, true
-	case parts[1] == "adapter" && len(parts) > 2:
-		return nextPackage{path: rel, layer: nextAdapter, unit: unit()}, true
-	case parts[1] == "surface" && len(parts) > 2:
-		return nextPackage{path: rel, layer: nextSurface, unit: unit()}, true
+		return nextPackage{layer: nextSlice, unit: unit}, true
+	case parts[1] == "adapter" && nested:
+		return nextPackage{layer: nextAdapter, unit: unit}, true
+	case parts[1] == "surface" && nested:
+		return nextPackage{layer: nextSurface, unit: unit}, true
 	}
 	return nextPackage{}, false
 }
 
-func nextRefuses(from nextPackage, target string) (string, bool) {
-	if strings.HasPrefix(target, internalPrefix) {
+func nextRoot(pass *analysis.Pass, rel string) string {
+	dirPath := filepath.Dir(pass.Fset.File(firstFile(pass).Pos()).Name())
+	return strings.TrimSuffix(strings.TrimSuffix(dirPath, filepath.FromSlash(rel)), string(filepath.Separator))
+}
+
+func fakesOf(root string) (map[string]bool, error) {
+	// A fake is the adapter <name>test beside an adapter <name>: a "contest" with no "con" is an adapter.
+	entries, err := os.ReadDir(filepath.Join(root, "internal", "adapter"))
+	if os.IsNotExist(err) {
+		return map[string]bool{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	adapters := map[string]bool{}
+	for _, entry := range entries {
+		adapters[entry.Name()] = entry.IsDir()
+	}
+	fakes := map[string]bool{}
+	for name := range adapters {
+		subject, isTestName := strings.CutSuffix(name, "test")
+		fakes[name] = isTestName && adapters[subject]
+	}
+	return fakes, nil
+}
+
+type nextImport struct {
+	From   nextPackage
+	Target string
+	Fakes  map[string]bool
+}
+
+func nextRefuses(imp nextImport) (string, bool) {
+	if strings.HasPrefix(imp.Target, internalPrefix) {
 		return "next/ never imports internal/: copy what it needs and give it a home", true
 	}
-	to, inNext := nextPackageOf(target)
-	if inNext && isFake(to) && !(from.layer == nextAdapter && from.unit == to.unit) {
+	rel, inNext := cutNext(imp.Target)
+	to, inRow := nextPackageOf(rel)
+	inNext = inNext && inRow
+	fake := inNext && to.layer == nextAdapter && imp.Fakes[to.unit]
+	if fake && !(imp.From.layer == nextAdapter && imp.From.unit == to.unit) {
 		return "a fake is imported from a _test.go only", true
 	}
-	if nextAdmits(from, nextTarget{path: target, pkg: to, inNext: inNext}) {
+	if nextAdmits(imp, nextTarget{path: imp.Target, pkg: to, inNext: inNext}) {
 		return "", false
 	}
-	return nextWhy[from.layer], true
+	return nextWhy[imp.From.layer], true
 }
 
 type nextTarget struct {
@@ -132,7 +200,8 @@ type nextTarget struct {
 	inNext bool
 }
 
-func nextAdmits(from nextPackage, to nextTarget) bool {
+func nextAdmits(imp nextImport, to nextTarget) bool {
+	from := imp.From
 	stdlib := !strings.Contains(strings.Split(to.path, "/")[0], ".")
 	thirdParty := !stdlib && !strings.HasPrefix(to.path, modulePath)
 	in := func(layers ...nextLayer) bool { return to.inNext && slices.Contains(layers, to.pkg.layer) }
@@ -144,7 +213,7 @@ func nextAdmits(from nextPackage, to nextTarget) bool {
 	case nextApp:
 		return stdlib || in(nextDomain, nextSlice)
 	case nextAdapter:
-		return stdlib || thirdParty || in(nextDomain) || in(nextAdapter) && admitsAdapter(from, to.pkg)
+		return stdlib || thirdParty || in(nextDomain) || in(nextAdapter) && admitsAdapter(imp, to.pkg)
 	case nextSurface:
 		return stdlib || thirdParty || in(nextDomain, nextApp, nextSlice, nextSurface)
 	case nextCmd:
@@ -153,12 +222,9 @@ func nextAdmits(from nextPackage, to nextTarget) bool {
 	return false
 }
 
-func admitsAdapter(from, to nextPackage) bool {
-	return to.unit == from.unit || to.unit == "statefile" || from.unit == to.unit+"test"
-}
-
-func isFake(pkg nextPackage) bool {
-	return pkg.layer == nextAdapter && strings.HasSuffix(pkg.unit, "test")
+func admitsAdapter(imp nextImport, to nextPackage) bool {
+	from := imp.From
+	return to.unit == from.unit || slices.Contains(sharedAdapters, to.unit) || imp.Fakes[from.unit] && from.unit == to.unit+"test"
 }
 
 type nextCommentsParams struct {
@@ -171,7 +237,7 @@ var nextCommentsAnalyzer = newNextCommentsAnalyzer(nextCommentsParams{Tests: tes
 func newNextCommentsAnalyzer(params nextCommentsParams) *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name: "nextcomments",
-		Doc:  "a package of next/ has a one-line package doc and, beside it and the godoc of its exported symbols, exactly the comment lines its ceiling in .next-comments allows",
+		Doc:  "a package of next/ has a one-line package doc and, beside it and the bare directives, exactly the comment lines its ceiling in .next-comments allows, godoc included",
 		Run:  func(pass *analysis.Pass) (any, error) { return runNextComments(pass, params) },
 	}
 }
@@ -197,7 +263,7 @@ func runNextComments(pass *analysis.Pass, params nextCommentsParams) (any, error
 	}
 	lines := 0
 	for _, file := range append(sources, tests...) {
-		lines += commentLines(pass.Fset, file, godoc(file))
+		lines += commentLines(pass.Fset, file, nextDirective)
 	}
 	ceiling := ceilings[rel]
 	switch {
@@ -222,29 +288,16 @@ func checkNextPackageDoc(pass *analysis.Pass, rel string, sources []*ast.File) {
 	}
 }
 
-func godoc(file *ast.File) map[*ast.CommentGroup]bool {
-	docs := map[*ast.CommentGroup]bool{file.Doc: true}
-	for _, decl := range file.Decls {
-		switch d := decl.(type) {
-		case *ast.FuncDecl:
-			docs[d.Doc] = d.Name.IsExported()
-		case *ast.GenDecl:
-			docs[d.Doc] = slices.ContainsFunc(declaredNames(d.Specs), (*ast.Ident).IsExported)
-			for _, spec := range d.Specs {
-				addSpecDoc(docs, spec)
-			}
-		}
-	}
-	return docs
+var nextDirectives = []*regexp.Regexp{
+	regexp.MustCompile(`^//go:build \S.*$`),
+	regexp.MustCompile(`^//go:embed \S.*$`),
+	regexp.MustCompile(`^//go:generate \S.*$`),
+	regexp.MustCompile(`^//go-sumtype:decl \w+$`),
+	regexp.MustCompile(`^//nolint:[\w,-]+$`),
 }
 
-func addSpecDoc(docs map[*ast.CommentGroup]bool, spec ast.Spec) {
-	switch s := spec.(type) {
-	case *ast.TypeSpec:
-		docs[s.Doc] = s.Name.IsExported()
-	case *ast.ValueSpec:
-		docs[s.Doc] = slices.ContainsFunc(s.Names, (*ast.Ident).IsExported)
-	}
+func nextDirective(comment *ast.Comment) bool {
+	return slices.ContainsFunc(nextDirectives, func(form *regexp.Regexp) bool { return form.MatchString(comment.Text) })
 }
 
 func ceilingsOnDisk() (map[string]int, error) {
@@ -255,13 +308,20 @@ func ceilingsOnDisk() (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	return parseNextCeilings(string(data))
+	ceilings, err := parseNextCeilings(string(data))
+	if err != nil {
+		return nil, err
+	}
+	if stale := staleCeilings(staleCeilingsParams{Root: "next", Ceilings: ceilings}); len(stale) > 0 {
+		return nil, fmt.Errorf(".next-comments: no package under next/ for %s — remove its line", strings.Join(stale, ", "))
+	}
+	return ceilings, nil
 }
 
 func parseNextCeilings(data string) (map[string]int, error) {
 	ceilings := map[string]int{}
-	for _, line := range strings.Split(data, "\n") {
-		line = strings.TrimSpace(line)
+	for _, raw := range strings.Split(data, "\n") {
+		line := strings.TrimSpace(raw)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
@@ -273,7 +333,27 @@ func parseNextCeilings(data string) (map[string]int, error) {
 		if err != nil || count < 0 {
 			return nil, fmt.Errorf(".next-comments: %q: the count must be a number of lines", line)
 		}
+		if _, seen := ceilings[fields[0]]; seen {
+			return nil, fmt.Errorf(".next-comments: %s has two lines", fields[0])
+		}
 		ceilings[fields[0]] = count
 	}
 	return ceilings, nil
+}
+
+type staleCeilingsParams struct {
+	Root     string
+	Ceilings map[string]int
+}
+
+func staleCeilings(params staleCeilingsParams) []string {
+	var stale []string
+	for pkg := range params.Ceilings {
+		matches, err := filepath.Glob(filepath.Join(params.Root, filepath.FromSlash(pkg), "*.go"))
+		if err != nil || len(matches) == 0 {
+			stale = append(stale, pkg)
+		}
+	}
+	slices.Sort(stale)
+	return stale
 }

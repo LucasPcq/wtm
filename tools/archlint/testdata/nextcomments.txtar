@@ -1,10 +1,22 @@
 -- github.com/LucasPcq/wtm/next/internal/wtm/branch/branch.go --
+//go:build !plan9
+
 // Package branch names branches.
-package branch
+package branch // want `next/internal/wtm/branch has 6 comment lines, above its ceiling of 0 in .next-comments`
 
 import "strings"
 
+//go-sumtype:decl Ref
+type Ref interface{ ref() }
+
+//nolint:unused
+var unusedName = ""
+
+//nolint this is an essay
+var essay = ""
+
 // Problem says why a name is not a branch name.
+// It spans two lines.
 func Problem(name string) string {
 	// git refuses a name ending in .lock
 	if strings.HasSuffix(name, ".lock") {
@@ -13,13 +25,12 @@ func Problem(name string) string {
 	return ""
 }
 
-// Clash is two names git cannot hold together.
-type Clash struct {
-	A, B string
-}
+type clash struct{}
 
-//go:noinline
-func trimmed(name string) string { return strings.TrimSpace(name) }
+// Name is exported on an unexported type.
+func (clash) Name() string { return "" }
+
+func trimmed(name string) string { return strings.TrimSpace(name) + essay + unusedName }
 -- github.com/LucasPcq/wtm/next/internal/wtm/branch/branch_test.go --
 package branch
 
@@ -37,7 +48,6 @@ package dotenv
 // lines is what a file holds.
 type lines []string
 
-// Parse splits a file into lines.
 func Parse(data string) lines {
 	// a CRLF file stays CRLF
 	return lines{data}
@@ -45,7 +55,6 @@ func Parse(data string) lines {
 -- github.com/LucasPcq/wtm/next/internal/wtm/envcopy/envcopy.go --
 package envcopy // want `next/internal/wtm/envcopy has no package doc`
 
-// Sources says where each env file comes from.
 func Sources() []string { return nil }
 -- github.com/LucasPcq/wtm/next/internal/adapter/shell/shell.go --
 // Package shell runs hook processes.

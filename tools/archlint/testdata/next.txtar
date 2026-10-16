@@ -46,6 +46,17 @@ import (
 )
 
 var _ context.Context
+-- github.com/LucasPcq/wtm/next/internal/app/create/create_test.go --
+package create
+
+import (
+	"testing"
+
+	_ "github.com/LucasPcq/wtm/internal/domain" // want `a test of next/internal/app/create must not import "github.com/LucasPcq/wtm/internal/domain"`
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/gittest"
+)
+
+func TestCreate(t *testing.T) {}
 -- github.com/LucasPcq/wtm/next/internal/app/app.go --
 // Package app is the API every surface calls.
 package app
@@ -57,11 +68,18 @@ import (
 -- github.com/LucasPcq/wtm/next/internal/adapter/statefile/statefile.go --
 // Package statefile writes state files atomically.
 package statefile
+-- github.com/LucasPcq/wtm/next/internal/adapter/shell/shell.go --
+// Package shell starts child processes.
+package shell
+-- github.com/LucasPcq/wtm/next/internal/adapter/contest/contest.go --
+// Package contest is an adapter whose name ends in test.
+package contest
 -- github.com/LucasPcq/wtm/next/internal/adapter/git/git.go --
 // Package git runs git.
 package git
 
 import (
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	_ "github.com/LucasPcq/wtm/next/internal/adapter/statefile"
 	_ "github.com/LucasPcq/wtm/next/internal/wtm"
 	_ "github.com/spf13/cobra"
@@ -79,6 +97,7 @@ import (
 	_ "github.com/LucasPcq/wtm/next/internal/adapter/git" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/adapter/git" — an adapter`
 	_ "github.com/LucasPcq/wtm/next/internal/adapter/gittest" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/adapter/gittest" — a fake`
 	_ "github.com/LucasPcq/wtm/next/internal/app" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/app" — an adapter`
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/contest" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/adapter/contest" — an adapter`
 )
 -- github.com/LucasPcq/wtm/next/internal/surface/output/output.go --
 // Package output prints results.
@@ -118,3 +137,6 @@ func main() {}
 -- github.com/LucasPcq/wtm/next/internal/stray/stray.go --
 // Package stray sits in no row.
 package stray // want `next/internal/stray is in no row of next/'s import table`
+-- github.com/LucasPcq/wtm/next/doc.go --
+// Package next sits at the root.
+package next // want `next/ is in no row of next/'s import table`
