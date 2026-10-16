@@ -27,9 +27,9 @@ func main() {
 	tracked := flag.Bool("tracked", false, "print each site .archlint-migrating covers")
 	flag.Parse()
 
-	root := "internal"
+	roots := []string{"internal", "next"}
 	if flag.NArg() > 0 {
-		root = flag.Arg(0)
+		roots = flag.Args()
 	}
 
 	warned := map[string]bool{}
@@ -52,7 +52,7 @@ func main() {
 	}
 	over := overCeiling(migrating, deadcode)
 
-	findings, err := analyze(analyzeParams{Root: root, Systems: targetSystems})
+	findings, err := analyze(analyzeParams{Roots: roots, Systems: targetSystems})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "archlint:", err)
 		os.Exit(2)
@@ -75,11 +75,11 @@ func main() {
 		fmt.Fprintf(os.Stderr, "\narchlint: %d finding(s) — see CLAUDE.md section 9\n", verdict.failures+len(over))
 		os.Exit(1)
 	}
-	fmt.Printf("archlint: %s clean\n", root)
+	fmt.Printf("archlint: %s clean\n", strings.Join(roots, ", "))
 }
 
 type analyzeParams struct {
-	Root    string
+	Roots   []string
 	Systems []string
 }
 
@@ -90,7 +90,7 @@ func analyze(params analyzeParams) ([]finding, error) {
 	}
 	var batches [][]finding
 	for _, goos := range params.Systems {
-		batch, err := analyzeFor(analyzeForParams{Root: params.Root, GOOS: goos, Cwd: cwd})
+		batch, err := analyzeFor(analyzeForParams{Roots: params.Roots, GOOS: goos, Cwd: cwd})
 		if err != nil {
 			return nil, err
 		}
@@ -107,14 +107,18 @@ func analyze(params analyzeParams) ([]finding, error) {
 }
 
 type analyzeForParams struct {
-	Root string
-	GOOS string
-	Cwd  string
+	Roots []string
+	GOOS  string
+	Cwd   string
 }
 
 func analyzeFor(params analyzeForParams) ([]finding, error) {
 	config := &packages.Config{Mode: loadMode, Env: append(os.Environ(), "GOOS="+params.GOOS, "CGO_ENABLED=0")}
-	pkgs, err := packages.Load(config, "./"+filepath.ToSlash(params.Root)+"/...")
+	patterns := make([]string, 0, len(params.Roots))
+	for _, root := range params.Roots {
+		patterns = append(patterns, "./"+filepath.ToSlash(root)+"/...")
+	}
+	pkgs, err := packages.Load(config, patterns...)
 	if err != nil {
 		return nil, err
 	}

@@ -1,0 +1,73 @@
+-- github.com/LucasPcq/wtm/next/internal/wtm/branch/branch.go --
+// Package branch names branches.
+package branch
+
+import "strings"
+
+// Problem says why a name is not a branch name.
+func Problem(name string) string {
+	// git refuses a name ending in .lock
+	if strings.HasSuffix(name, ".lock") {
+		return "ends with .lock"
+	}
+	return ""
+}
+
+// Clash is two names git cannot hold together.
+type Clash struct {
+	A, B string
+}
+
+//go:noinline
+func trimmed(name string) string { return strings.TrimSpace(name) }
+-- github.com/LucasPcq/wtm/next/internal/wtm/branch/branch_test.go --
+package branch
+
+import "testing"
+
+func TestProblem(t *testing.T) {
+	_ = Problem("x")
+	_ = trimmed("x")
+}
+-- github.com/LucasPcq/wtm/next/internal/wtm/dotenv/dotenv.go --
+// Package dotenv parses .env files. // want `next/internal/wtm/dotenv has a package doc of 2 lines`
+// It keeps their format.
+package dotenv
+
+// lines is what a file holds.
+type lines []string
+
+// Parse splits a file into lines.
+func Parse(data string) lines {
+	// a CRLF file stays CRLF
+	return lines{data}
+}
+-- github.com/LucasPcq/wtm/next/internal/wtm/envcopy/envcopy.go --
+package envcopy // want `next/internal/wtm/envcopy has no package doc`
+
+// Sources says where each env file comes from.
+func Sources() []string { return nil }
+-- github.com/LucasPcq/wtm/next/internal/adapter/shell/shell.go --
+// Package shell runs hook processes.
+package shell // want `next/internal/adapter/shell has [45] comment lines, above its ceiling of 1 in .next-comments`
+
+// group is the process group of a child.
+type group int
+
+func signal() {
+	// SIGINT first: npm treats a second one as a force
+	// then SIGTERM
+}
+-- github.com/LucasPcq/wtm/next/internal/adapter/shell/shell_test.go --
+package shell
+
+import "testing"
+
+// ---- signals ---- // want `section banner in a test file`
+
+func TestSignal(t *testing.T) { signal() }
+-- github.com/LucasPcq/wtm/next/internal/adapter/oplock/oplock.go --
+// Package oplock takes the operation locks.
+package oplock // want `next/internal/adapter/oplock has 1 comment lines, under its ceiling of 2 in .next-comments`
+
+func Take() {}

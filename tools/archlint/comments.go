@@ -189,7 +189,7 @@ func checkCeiling(pass *analysis.Pass, files []*ast.File) {
 	pkg := internalPath(pass.Pkg.Path())
 	lines := 0
 	for _, file := range files {
-		lines += commentLines(pass.Fset, file)
+		lines += commentLines(pass.Fset, file, map[*ast.CommentGroup]bool{file.Doc: true})
 	}
 	ceiling := commentCeiling[pkg]
 	if lines <= ceiling {
@@ -198,10 +198,10 @@ func checkCeiling(pass *analysis.Pass, files []*ast.File) {
 	pass.Reportf(firstFile(pass).Package, "package %s has %d comment lines, above its ceiling of %d: delete the comments that restate the code; one that earns its place raises commentCeiling (tools/archlint/ceiling.go), in review (CLAUDE.md §8, comments)", pkg, lines, ceiling)
 }
 
-func commentLines(fset *token.FileSet, file *ast.File) int {
+func commentLines(fset *token.FileSet, file *ast.File, skipped map[*ast.CommentGroup]bool) int {
 	lines := map[int]bool{}
 	for _, group := range file.Comments {
-		if group == file.Doc {
+		if skipped[group] {
 			continue
 		}
 		for _, comment := range group.List {

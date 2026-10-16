@@ -1,0 +1,120 @@
+-- github.com/spf13/cobra/cobra.go --
+package cobra
+
+type Command struct{}
+-- github.com/LucasPcq/wtm/internal/domain/domain.go --
+package domain
+
+type Worktree struct{}
+-- github.com/LucasPcq/wtm/next/internal/wtm/wtm.go --
+// Package wtm is the domain.
+package wtm
+
+type Worktree struct{}
+-- github.com/LucasPcq/wtm/next/internal/wtm/branch/branch.go --
+// Package branch names branches.
+package branch
+
+import (
+	"strings"
+
+	_ "github.com/LucasPcq/wtm/next/internal/wtm"
+	_ "github.com/spf13/cobra" // want `next/internal/wtm/branch must not import "github.com/spf13/cobra" — the domain`
+)
+
+var _ = strings.TrimSpace
+-- github.com/LucasPcq/wtm/next/internal/app/provision/provision.go --
+// Package provision makes a new worktree whole.
+package provision
+
+import _ "github.com/LucasPcq/wtm/next/internal/wtm"
+-- github.com/LucasPcq/wtm/next/internal/app/clean/clean.go --
+// Package clean removes worktrees.
+package clean
+-- github.com/LucasPcq/wtm/next/internal/app/create/create.go --
+// Package create creates worktrees.
+package create
+
+import (
+	"context"
+
+	_ "github.com/LucasPcq/wtm/internal/domain" // want `next/internal/app/create must not import "github.com/LucasPcq/wtm/internal/domain" — next/ never imports internal/`
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/git" // want `next/internal/app/create must not import "github.com/LucasPcq/wtm/next/internal/adapter/git" — a use case`
+	_ "github.com/LucasPcq/wtm/next/internal/app/clean" // want `next/internal/app/create must not import "github.com/LucasPcq/wtm/next/internal/app/clean" — a use case`
+	_ "github.com/LucasPcq/wtm/next/internal/app/provision"
+	_ "github.com/LucasPcq/wtm/next/internal/wtm/branch"
+)
+
+var _ context.Context
+-- github.com/LucasPcq/wtm/next/internal/app/app.go --
+// Package app is the API every surface calls.
+package app
+
+import (
+	_ "github.com/LucasPcq/wtm/next/internal/app/create"
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/git" // want `next/internal/app must not import "github.com/LucasPcq/wtm/next/internal/adapter/git" — the API`
+)
+-- github.com/LucasPcq/wtm/next/internal/adapter/statefile/statefile.go --
+// Package statefile writes state files atomically.
+package statefile
+-- github.com/LucasPcq/wtm/next/internal/adapter/git/git.go --
+// Package git runs git.
+package git
+
+import (
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/statefile"
+	_ "github.com/LucasPcq/wtm/next/internal/wtm"
+	_ "github.com/spf13/cobra"
+)
+-- github.com/LucasPcq/wtm/next/internal/adapter/gittest/fake.go --
+// Package gittest is a stateful fake of git.
+package gittest
+
+import _ "github.com/LucasPcq/wtm/next/internal/adapter/git"
+-- github.com/LucasPcq/wtm/next/internal/adapter/store/store.go --
+// Package store writes the state files.
+package store
+
+import (
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/git" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/adapter/git" — an adapter`
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/gittest" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/adapter/gittest" — a fake`
+	_ "github.com/LucasPcq/wtm/next/internal/app" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/app" — an adapter`
+)
+-- github.com/LucasPcq/wtm/next/internal/surface/output/output.go --
+// Package output prints results.
+package output
+-- github.com/LucasPcq/wtm/next/internal/surface/cli/root.go --
+// Package cli is the command line.
+package cli
+
+import (
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/store" // want `next/internal/surface/cli must not import "github.com/LucasPcq/wtm/next/internal/adapter/store" — a surface`
+	_ "github.com/LucasPcq/wtm/next/internal/app"
+	_ "github.com/LucasPcq/wtm/next/internal/app/create"
+	_ "github.com/LucasPcq/wtm/next/internal/surface/output"
+	_ "github.com/LucasPcq/wtm/next/internal/wtm"
+	_ "github.com/spf13/cobra"
+)
+-- github.com/LucasPcq/wtm/next/internal/surface/cli/root_test.go --
+package cli
+
+import (
+	"testing"
+
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/gittest"
+)
+
+func TestRoot(t *testing.T) {}
+-- github.com/LucasPcq/wtm/next/cmd/wtm-next/main.go --
+// Command wtm-next wires the adapters into the app.
+package main
+
+import (
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/store"
+	_ "github.com/LucasPcq/wtm/next/internal/surface/cli"
+)
+
+func main() {}
+-- github.com/LucasPcq/wtm/next/internal/stray/stray.go --
+// Package stray sits in no row.
+package stray // want `next/internal/stray is in no row of next/'s import table`

@@ -1,0 +1,3 @@
+# The comment lines each package of next/ may hold beside its package doc and the godoc of its exported symbols:
+# `<package under next/> <lines>`, absent = 0. archlint (nextcomments) refuses a count above or below its line,
+# so a ceiling only goes down by itself and goes up in review.
