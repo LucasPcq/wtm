@@ -3,9 +3,11 @@ package config
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm/run"
@@ -124,7 +126,7 @@ func (j jobFile) scopeProblems() []string {
 	case j.Namespace.Name == "" || j.Namespace.Create == "":
 		return []string{fmt.Sprintf("job %q: a [job.namespace] block needs both a name and a create command", j.Name)}
 	}
-	for _, value := range append([]string{j.Namespace.Name}, mapValues(j.Namespace.Env)...) {
+	for _, value := range slices.AppendSeq([]string{j.Namespace.Name}, maps.Values(j.Namespace.Env)) {
 		expanded := strings.NewReplacer(namespaceProbe, probeWorktree, "{ordinal}", "0").Replace(value)
 		if leftover := namespaceToken.FindString(expanded); leftover != "" {
 			return []string{fmt.Sprintf("job %q: unknown placeholder in a [job.namespace] value: %s", j.Name, leftover)}
@@ -163,12 +165,4 @@ func (j jobFile) job() run.Job {
 		job.Namespace = &run.Namespace{Name: j.Namespace.Name, Create: j.Namespace.Create, Remove: j.Namespace.Remove, Env: j.Namespace.Env}
 	}
 	return job
-}
-
-func mapValues(values map[string]string) []string {
-	out := make([]string, 0, len(values))
-	for _, value := range values {
-		out = append(out, value)
-	}
-	return out
 }

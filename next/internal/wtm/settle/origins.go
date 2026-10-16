@@ -1,6 +1,7 @@
 package settle
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 
@@ -24,10 +25,7 @@ func jobHostLabel(job run.Job) string {
 	if job.URL == nil {
 		return ""
 	}
-	if job.URL.Host != "" {
-		return job.URL.Host
-	}
-	return branch.HostLabel(job.Name)
+	return cmp.Or(job.URL.Host, branch.HostLabel(job.Name))
 }
 
 func (w worktree) routeHost(job run.Job) string {
@@ -185,8 +183,7 @@ func isRouteAuthority(params routeAuthorityParams) bool {
 	host, _ := splitHostPort(params.Authority)
 	prefix := params.JobLabel + "."
 	suffix := "." + branch.HostLabel(params.Project) + "." + proxyTLD
-	if !strings.HasPrefix(host, prefix) || !strings.HasSuffix(host, suffix) || len(host) <= len(prefix)+len(suffix) {
-		return false
-	}
-	return !strings.Contains(host[len(prefix):len(host)-len(suffix)], ".")
+	rest, isJob := strings.CutPrefix(host, prefix)
+	label, inProject := strings.CutSuffix(rest, suffix)
+	return isJob && inProject && label != "" && !strings.Contains(label, ".")
 }

@@ -63,10 +63,8 @@ func remembered(params rememberedParams) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	answers := maps.Clone(saved.Config.Remembered)
-	if answers == nil {
-		answers = map[string]string{}
-	}
+	answers := map[string]string{}
+	maps.Copy(answers, saved.Config.Remembered)
 	maps.Copy(answers, params.Answers)
 	saved.Config.Remembered = answers
 	return render(saved)

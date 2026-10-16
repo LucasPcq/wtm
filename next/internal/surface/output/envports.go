@@ -3,7 +3,7 @@ package output
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm/settle"
@@ -67,16 +67,12 @@ func anomalyReason(entry settle.Entry) string {
 }
 
 func filesOf(entries []settle.Entry) []string {
-	seen := map[string]bool{}
-	var files []string
+	files := make([]string, 0, len(entries))
 	for _, entry := range entries {
-		if !seen[entry.File] {
-			seen[entry.File] = true
-			files = append(files, entry.File)
-		}
+		files = append(files, entry.File)
 	}
-	sort.Strings(files)
-	return files
+	slices.Sort(files)
+	return slices.Compact(files)
 }
 
 type fileRuleParams struct {

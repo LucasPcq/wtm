@@ -35,13 +35,13 @@ func splitAuthority(rest string) (string, string, string) {
 }
 
 func replaceAuthority(element, origin string) string {
-	at := strings.Index(element, schemeSeparator)
-	userinfo, _, tail := splitAuthority(element[at+len(schemeSeparator):])
+	_, rest, _ := strings.Cut(element, schemeSeparator)
+	userinfo, _, tail := splitAuthority(rest)
 	if userinfo == "" {
 		return origin + tail
 	}
-	cut := strings.Index(origin, schemeSeparator) + len(schemeSeparator)
-	return origin[:cut] + userinfo + origin[cut:] + tail
+	scheme, host, _ := strings.Cut(origin, schemeSeparator)
+	return scheme + schemeSeparator + userinfo + host + tail
 }
 
 func splitHostPort(authority string) (string, int) {

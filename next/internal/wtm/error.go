@@ -86,8 +86,7 @@ func AsError(params AsErrorParams) *Error {
 	if params.Err == nil {
 		return nil
 	}
-	var known *Error
-	if errors.As(params.Err, &known) && known != nil {
+	if known, ok := errors.AsType[*Error](params.Err); ok && known != nil {
 		return known
 	}
 	if errors.Is(params.Err, context.Canceled) {

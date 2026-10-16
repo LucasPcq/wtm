@@ -1,6 +1,7 @@
 package branch
 
 import (
+	"cmp"
 	"net/url"
 	"strings"
 )
@@ -27,11 +28,7 @@ func Slug(name string) string {
 			return '-'
 		}
 	}, strings.ToLower(name))
-	slug := strings.TrimLeft(mapped, "-_")
-	if slug == "" {
-		return fallbackName
-	}
-	return slug
+	return cmp.Or(strings.TrimLeft(mapped, "-_"), fallbackName)
 }
 
 func HostLabel(name string) string {
@@ -49,10 +46,7 @@ func HostLabel(name string) string {
 	if len(label) > hostLabelMaxLen {
 		label = strings.Trim(label[:hostLabelMaxLen], "-")
 	}
-	if label == "" {
-		return fallbackName
-	}
-	return label
+	return cmp.Or(label, fallbackName)
 }
 
 func collapseDashes(s string) string {

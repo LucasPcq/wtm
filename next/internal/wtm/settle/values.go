@@ -80,22 +80,20 @@ type valueOf struct {
 func (w worktree) expandPorts(params valueOf) (string, error) {
 	value := params.Link.Value
 	for {
-		start := strings.Index(value, tokenPortPrefix)
-		if start < 0 {
+		before, rest, found := strings.Cut(value, tokenPortPrefix)
+		if !found {
 			return value, nil
 		}
-		end := strings.Index(value[start:], "}")
-		if end < 0 {
+		name, after, closed := strings.Cut(rest, "}")
+		if !closed {
 			return "", fmt.Errorf("env %s in %s: a {port.…} placeholder is never closed", params.Link.Key, params.Link.File)
 		}
-		end += start
-		name := value[start+len(tokenPortPrefix) : end]
 		base, declared := params.Job.Ports[name]
 		if !declared {
 			return "", fmt.Errorf("env %s in %s: job %q declares no port named %q", params.Link.Key, params.Link.File, params.Job.Name, name)
 		}
 		port := jobenv.ResolvedPort(jobenv.ResolvedPortParams{Base: base, Offset: w.Offset, Shared: params.Job.Scope == run.Shared})
-		value = value[:start] + strconv.Itoa(port) + value[end+1:]
+		value = before + strconv.Itoa(port) + after
 	}
 }
 
@@ -113,7 +111,7 @@ func (w worktree) linkNamespace(params valueOf) (string, error) {
 func (w worktree) namespace(namespace run.Namespace) (string, error) {
 	replacer := strings.NewReplacer(tokenWorktree, w.Slug, tokenOrdinal, strconv.Itoa(w.Ordinal))
 	name := replacer.Replace(namespace.Name)
-	for _, value := range append([]string{namespace.Name}, slices.Collect(maps.Values(namespace.Env))...) {
+	for _, value := range slices.AppendSeq([]string{namespace.Name}, maps.Values(namespace.Env)) {
 		if leftover := namespaceToken.FindString(replacer.Replace(value)); leftover != "" {
 			return "", fmt.Errorf("%w: %s", errNamespaceUnknownToken, leftover)
 		}

@@ -2,6 +2,7 @@ package settle
 
 import (
 	"maps"
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm/dotenv"
@@ -26,10 +27,8 @@ func planOne(t *testing.T, params planOneParams) Entry {
 }
 
 func cookieParent(host string) string {
-	for i := 0; i < len(host); i++ {
-		if host[i] == '.' {
-			return host[i+1:]
-		}
+	if _, parent, found := strings.Cut(host, "."); found {
+		return parent
 	}
 	return host
 }

@@ -2,8 +2,9 @@ package config
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
-	"sort"
+	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm/jobenv"
 	"github.com/LucasPcq/wtm/next/internal/wtm/run"
@@ -41,9 +42,8 @@ func (f runFile) collisions() []string {
 	block := jobenv.OffsetBlock(run.Config{PortOffsetBlock: f.PortOffsetBlock})
 	decls := f.declarations()
 	var problems []string
-	for i := range decls {
-		for j := i + 1; j < len(decls); j++ {
-			a, b := decls[i], decls[j]
+	for i, a := range decls {
+		for _, b := range decls[i+1:] {
 			gap := max(b.Base-a.Base, a.Base-b.Base)
 			meets := gap%block == 0
 			if a.Shared && b.Shared {
@@ -65,12 +65,7 @@ func (f runFile) collisions() []string {
 func (f runFile) declarations() []declaration {
 	var decls []declaration
 	for _, job := range f.Jobs {
-		names := make([]string, 0, len(job.Ports))
-		for name := range job.Ports {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		for _, name := range names {
+		for _, name := range slices.Sorted(maps.Keys(job.Ports)) {
 			decls = append(decls, declaration{Job: job.Name, Name: name, Base: job.Ports[name], Shared: job.Scope == string(run.Shared)})
 		}
 	}

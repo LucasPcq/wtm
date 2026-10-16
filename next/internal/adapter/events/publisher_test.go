@@ -23,8 +23,7 @@ func TestAWorktreeCreatedIsPublishedAsTheDaemonRelaysIt(t *testing.T) {
 func TestAWorktreeNumberedIsAnUpdateOfItsOrdinal(t *testing.T) {
 	daemon := listen(t)
 	numbered := identity()
-	ordinal := 3
-	numbered.Ordinal = &ordinal
+	numbered.Ordinal = new(3)
 
 	publisherOn(t, daemon).Publish(wtm.WorktreeNumbered{Worktree: numbered})
 

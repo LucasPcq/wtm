@@ -93,8 +93,7 @@ func (r Repo) refExists(ctx context.Context, ref branch.Ref) (bool, error) {
 		return false, err
 	}
 	_, err = r.git(ctx, "show-ref", "--verify", "--quiet", name)
-	var gitErr *Error
-	if errors.As(err, &gitErr) && gitErr.Exit == 1 {
+	if gitErr, ok := errors.AsType[*Error](err); ok && gitErr.Exit == 1 {
 		return false, nil
 	}
 	return err == nil, err

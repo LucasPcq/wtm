@@ -356,12 +356,8 @@ func (f *Fake) historyOf(ref branch.Ref) (history, bool) {
 }
 
 func (f *Fake) taken(path string) bool {
-	for _, w := range f.worktrees {
-		if !slices.Contains(f.gone, w.Path) && within(w.Path, path) {
-			return true
-		}
-	}
-	return slices.ContainsFunc(f.folders, func(folder string) bool { return within(folder, path) })
+	live := func(w worktree.Worktree) bool { return !slices.Contains(f.gone, w.Path) && within(w.Path, path) }
+	return slices.ContainsFunc(f.worktrees, live) || slices.ContainsFunc(f.folders, func(folder string) bool { return within(folder, path) })
 }
 
 func (f *Fake) worktreeAt(path string) int {

@@ -2,12 +2,13 @@
 package config
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
@@ -107,15 +108,9 @@ func parseProject(params parseParams) (savedProject, error) {
 }
 
 func withDefaults(config project.Config) project.Config {
-	if config.Worktrees.BasePath == "" {
-		config.Worktrees.BasePath = project.DefaultBasePath
-	}
-	if config.Worktrees.BaseBranch == "" {
-		config.Worktrees.BaseBranch = project.DefaultBaseBranch
-	}
-	if config.Env.Strategy == "" {
-		config.Env.Strategy = project.DefaultEnvStrategy
-	}
+	config.Worktrees.BasePath = cmp.Or(config.Worktrees.BasePath, project.DefaultBasePath)
+	config.Worktrees.BaseBranch = cmp.Or(config.Worktrees.BaseBranch, project.DefaultBaseBranch)
+	config.Env.Strategy = cmp.Or(config.Env.Strategy, project.DefaultEnvStrategy)
 	return config
 }
 
@@ -157,12 +152,7 @@ func isTemplateOf(file project.EnvFile) bool {
 }
 
 func validateRemembered(remembered map[string]string) error {
-	ids := make([]string, 0, len(remembered))
-	for id := range remembered {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	for _, id := range ids {
+	for _, id := range slices.Sorted(maps.Keys(remembered)) {
 		allowed, known := project.RememberableValues(id)
 		if !known {
 			return fmt.Errorf("unknown remembered answer %q in [wizard.remembered] (expected one of %s)", id, strings.Join(project.RememberIDs(), ", "))

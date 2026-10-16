@@ -23,8 +23,8 @@ func TestOnlyAFileAboveWhatThisWtmWritesIsRefused(t *testing.T) {
 func TestAWriteOverANewerFileIsRefusedWithItsSchema(t *testing.T) {
 	err := Refusal(Schema{Path: "/repo/.git/wtm/run.toml", Found: 2, Supported: 1})
 
-	var newer *wtm.SchemaNewer
-	require.True(t, errors.As(err, &newer))
+	newer, ok := errors.AsType[*wtm.SchemaNewer](err)
+	require.True(t, ok)
 	assert.Equal(t, wtm.SchemaNewer{Path: "/repo/.git/wtm/run.toml", Found: 2, Supported: 1}, *newer)
 	assert.Equal(t, "/repo/.git/wtm/run.toml is at schema 2, newer than the 1 this wtm writes: upgrade wtm to change it", err.Error())
 }

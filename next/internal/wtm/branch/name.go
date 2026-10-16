@@ -3,6 +3,7 @@ package branch
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -39,12 +40,9 @@ func reason(name string) string {
 }
 
 func badComponent(name string) bool {
-	for _, component := range strings.Split(name, "/") {
-		if strings.HasPrefix(component, ".") || strings.HasSuffix(component, ".lock") {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(strings.Split(name, "/"), func(component string) bool {
+		return strings.HasPrefix(component, ".") || strings.HasSuffix(component, ".lock")
+	})
 }
 
 func forbiddenInRef(r rune) bool {

@@ -25,13 +25,6 @@ func (i Isolation) Effective() Isolation {
 }
 
 func (c Config) IsolationApplies() bool {
-	if len(c.EnvPorts) > 0 || len(c.EnvValues) > 0 {
-		return true
-	}
-	for _, job := range c.Jobs {
-		if len(job.Ports) > 0 || job.HasNamespace() || job.RunsCompose() {
-			return true
-		}
-	}
-	return false
+	isolates := func(job Job) bool { return len(job.Ports) > 0 || job.HasNamespace() || job.RunsCompose() }
+	return len(c.EnvPorts) > 0 || len(c.EnvValues) > 0 || slices.ContainsFunc(c.Jobs, isolates)
 }

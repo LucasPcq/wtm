@@ -22,15 +22,12 @@ func Shield(ctx context.Context) (context.Context, func()) {
 	inflight.Lock()
 	inflight.open++
 	inflight.Unlock()
-	var once sync.Once
-	release := func() {
-		once.Do(func() {
-			inflight.Lock()
-			inflight.open--
-			inflight.cond.Broadcast()
-			inflight.Unlock()
-		})
-	}
+	release := sync.OnceFunc(func() {
+		inflight.Lock()
+		inflight.open--
+		inflight.cond.Broadcast()
+		inflight.Unlock()
+	})
 	return context.WithoutCancel(ctx), release
 }
 

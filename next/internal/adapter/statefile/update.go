@@ -3,12 +3,14 @@ package statefile
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"os"
 	"path/filepath"
+
+	"github.com/LucasPcq/wtm/next/internal/wtm"
 )
 
 //go-sumtype:decl Change
@@ -37,10 +39,7 @@ func Update(ctx context.Context, params UpdateParams) (wtm.Written, error) {
 	if err := os.MkdirAll(filepath.Dir(params.Path), 0o755); err != nil {
 		return wtm.Written{}, fmt.Errorf("create %s: %w", filepath.Dir(params.Path), err)
 	}
-	lockPath := params.LockPath
-	if lockPath == "" {
-		lockPath = params.Path + lockSuffix
-	}
+	lockPath := cmp.Or(params.LockPath, params.Path+lockSuffix)
 	changed := false
 	held, err := WithLock(ctx, LockParams{Path: lockPath, Do: func() (err error) {
 		changed, err = update(params)

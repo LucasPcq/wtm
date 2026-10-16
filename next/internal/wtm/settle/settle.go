@@ -2,6 +2,8 @@
 package settle
 
 import (
+	"slices"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
 	"github.com/LucasPcq/wtm/next/internal/wtm/dotenv"
 	"github.com/LucasPcq/wtm/next/internal/wtm/jobenv"
@@ -88,12 +90,7 @@ func (w Writes) Files() []string {
 }
 
 func (w Writes) Creates(file string) bool {
-	for _, entry := range w.owned {
-		if entry.File == file {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(w.owned, func(entry OwnedEntry) bool { return entry.File == file })
 }
 
 type EditParams struct {

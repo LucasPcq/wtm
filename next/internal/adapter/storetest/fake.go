@@ -199,10 +199,8 @@ func (f *Fake) Remember(_ context.Context, answers map[string]string) (wtm.Writt
 	if err := statefile.Refusal(statefile.Schema{Path: "config.toml", Found: f.configSchema, Supported: 1}); err != nil {
 		return wtm.Written{}, err
 	}
-	remembered := maps.Clone(f.config.Remembered)
-	if remembered == nil {
-		remembered = map[string]string{}
-	}
+	remembered := map[string]string{}
+	maps.Copy(remembered, f.config.Remembered)
 	maps.Copy(remembered, answers)
 	if maps.Equal(remembered, f.config.Remembered) {
 		return wtm.Written{}, nil

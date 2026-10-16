@@ -27,8 +27,8 @@ func Environ(params EnvironParams) []string {
 }
 
 func ExitCode(err error) (int, bool) {
-	var exit *exec.ExitError
-	if !errors.As(err, &exit) || exit.ExitCode() < 0 {
+	exit, ok := errors.AsType[*exec.ExitError](err)
+	if !ok || exit.ExitCode() < 0 {
 		return 0, false
 	}
 	return exit.ExitCode(), true

@@ -67,15 +67,15 @@ func parsePair(physical []string, start int) (Line, int, bool) {
 	if export {
 		content = strings.TrimLeft(after, " \t")
 	}
-	eq := strings.Index(content, assign)
-	if eq < 0 {
+	before, rest, found := strings.Cut(content, assign)
+	if !found {
 		return Line{}, 0, false
 	}
-	key := strings.TrimSpace(content[:eq])
+	key := strings.TrimSpace(before)
 	if !validKey(key) {
 		return Line{}, 0, false
 	}
-	value, extra, ok := parseValue(valueText{rest: content[eq+1:], physical: physical, start: start})
+	value, extra, ok := parseValue(valueText{rest: rest, physical: physical, start: start})
 	if !ok {
 		return Line{}, 0, false
 	}

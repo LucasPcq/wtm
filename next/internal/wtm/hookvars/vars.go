@@ -2,6 +2,7 @@
 package hookvars
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
@@ -57,9 +58,9 @@ func (v Vars) placeholders() []string {
 }
 
 func placeholderAt(s string, pairs []string) (string, int, bool) {
-	for i := 0; i < len(pairs); i += 2 {
-		if strings.HasPrefix(s, pairs[i]) {
-			return pairs[i+1], len(pairs[i]), true
+	for pair := range slices.Chunk(pairs, 2) {
+		if strings.HasPrefix(s, pair[0]) {
+			return pair[1], len(pair[0]), true
 		}
 	}
 	return "", 0, false

@@ -154,7 +154,7 @@ func (r Repo) RemoveWorktree(ctx context.Context, path string) error {
 func parseWorktrees(out string) []worktree.Worktree {
 	var worktrees []worktree.Worktree
 	var current *worktree.Worktree
-	for _, field := range strings.Split(out, "\x00") {
+	for field := range strings.SplitSeq(out, "\x00") {
 		key, value, _ := strings.Cut(field, " ")
 		switch {
 		case key == "worktree":
