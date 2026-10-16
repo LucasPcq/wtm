@@ -128,3 +128,16 @@ func TestApplyingWritesNothingForAVerbatimWorktree(t *testing.T) {
 	assert.Empty(t, applied.Changed)
 	assert.Equal(t, map[string]string{".env": "PORT=3000\n"}, applied.Files)
 }
+
+func TestEmptyWritesSettleIntoNoPlan(t *testing.T) {
+	assert.Equal(t, Plan{}, Writes{}.Settled(nil))
+}
+
+func TestAValueLinkOnTheComposeProjectWinsOverTheDerivedName(t *testing.T) {
+	params := linkedResolve()
+	params.Run.EnvValues = []run.EnvValueLink{{File: "infra/.env", Key: "COMPOSE_PROJECT_NAME", Job: "infra", Value: "custom-{worktree}"}}
+
+	applied := applyWrites(resolvedWrites(t, params), map[string]string{".env": "PORT=3000\n"})
+
+	assert.Equal(t, "COMPOSE_PROJECT_NAME=custom-feat-a", applied.Files["infra/.env"])
+}

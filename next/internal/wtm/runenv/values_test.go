@@ -119,3 +119,10 @@ func TestANamespaceNameRefusesAnUnknownPlaceholder(t *testing.T) {
 func TestANamespaceNameLeavesShellVariablesAlone(t *testing.T) {
 	assert.Equal(t, "db_$USER", expandedNamespace(t, namespaceParams{Namespace: run.Namespace{Name: "db_$USER"}, Worktree: "feat_x"}))
 }
+
+func TestANamespaceRefusesAnUnknownPlaceholderInItsEnv(t *testing.T) {
+	_, err := expandNamespace(namespaceParams{Namespace: run.Namespace{Name: "realm_{worktree}", Env: map[string]string{"REALM": "{branch}"}}, Worktree: "feat-x"})
+
+	assert.ErrorIs(t, err, errNamespaceUnknownToken)
+	assert.ErrorContains(t, err, "{branch}")
+}

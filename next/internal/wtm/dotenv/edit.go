@@ -37,7 +37,7 @@ func Set(params SetParams) ([]Line, bool) {
 			continue
 		}
 		edited := line.WithValue(params.Value)
-		if line.Value == params.Value || edited.Raw == line.Raw {
+		if line.Value == params.Value || line.Raw != "" && edited.Raw == line.Raw {
 			return params.Lines, false
 		}
 		out := slices.Clone(params.Lines)

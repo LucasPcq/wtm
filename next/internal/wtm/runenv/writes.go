@@ -116,6 +116,9 @@ func (w Writes) Edit(params EditParams) []dotenv.Line {
 }
 
 func (w Writes) Settled(read map[string][]dotenv.Line) Plan {
+	if w.Empty() {
+		return Plan{}
+	}
 	plan := w.plan(planOfParams{Links: w.links, Lines: read})
 	plan.Owned = w.ownedOver(read)
 	plan.Applied = true

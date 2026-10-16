@@ -3,7 +3,9 @@ package runenv
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -97,9 +99,13 @@ type namespaceParams struct {
 }
 
 func expandNamespace(params namespaceParams) (string, error) {
-	name := strings.NewReplacer(tokenWorktree, params.Worktree, tokenOrdinal, strconv.Itoa(params.Ordinal)).Replace(params.Namespace.Name)
-	if leftover := namespaceToken.FindString(name); leftover != "" {
-		return "", fmt.Errorf("%w: %s", errNamespaceUnknownToken, leftover)
+	replacer := strings.NewReplacer(tokenWorktree, params.Worktree, tokenOrdinal, strconv.Itoa(params.Ordinal))
+	name := replacer.Replace(params.Namespace.Name)
+	values := append([]string{name}, slices.Collect(maps.Values(params.Namespace.Env))...)
+	for _, value := range values {
+		if leftover := namespaceToken.FindString(replacer.Replace(value)); leftover != "" {
+			return "", fmt.Errorf("%w: %s", errNamespaceUnknownToken, leftover)
+		}
 	}
 	return name, nil
 }

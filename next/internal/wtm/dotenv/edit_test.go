@@ -171,3 +171,12 @@ func TestAKeySetOnNoLinesIsTheWholeFile(t *testing.T) {
 	assert.True(t, changed)
 	assert.Equal(t, "K=V", string(Render(lines)))
 }
+
+func TestAKeyJustAddedCanBeSetAgain(t *testing.T) {
+	lines, _ := Set(SetParams{Lines: Parse([]byte("A=1\n")), Key: "K", Value: "x"})
+
+	lines, changed := Set(SetParams{Lines: lines, Key: "K", Value: "y"})
+
+	assert.True(t, changed)
+	assert.Equal(t, "A=1\nK=y\n", string(Render(lines)))
+}
