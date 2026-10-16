@@ -13,6 +13,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/wtm/envcopy"
 )
 
+const ownerOnly os.FileMode = 0o600
+
 type EnvFiles struct{}
 
 func (EnvFiles) Read(path string) ([]dotenv.Line, error) {
@@ -58,6 +60,7 @@ func (EnvFiles) Edit(ctx context.Context, edit dotenv.Edit) (wtm.Written, error)
 	lock, err := statefile.Update(ctx, statefile.UpdateParams{
 		Path:     edit.Path,
 		LockPath: statefile.ScratchLockPath(edit.Path),
+		Perm:     ownerOnly,
 		Mutate: func(current []byte) (statefile.Change, error) {
 			next, write := edit.Over(current)
 			if !write {
@@ -90,10 +93,15 @@ func copyFile(ctx context.Context, source envcopy.Source) (wtm.Written, error) {
 	if err != nil {
 		return wtm.Written{}, fmt.Errorf("read %s: %w", source.From, err)
 	}
+	info, err := os.Stat(source.From)
+	if err != nil {
+		return wtm.Written{}, fmt.Errorf("read %s: %w", source.From, err)
+	}
 	changed := false
 	lock, err := statefile.Update(ctx, statefile.UpdateParams{
 		Path:     source.To,
 		LockPath: statefile.ScratchLockPath(source.To),
+		Perm:     info.Mode().Perm(),
 		Mutate: func(current []byte) (statefile.Change, error) {
 			if current != nil && bytes.Equal(current, data) {
 				return statefile.Keep{}, nil

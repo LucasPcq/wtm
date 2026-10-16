@@ -139,3 +139,16 @@ func TestAScratchLockIsTheSameThroughASymlinkedDirectory(t *testing.T) {
 	writeFixture(t, filepath.Join(real, ".env"), "")
 	assert.Equal(t, ScratchLockPath(filepath.Join(real, ".env")), ScratchLockPath(filepath.Join(link, ".env")), "present file")
 }
+
+func TestALockFileThatIsASymlinkIsNotFollowed(t *testing.T) {
+	dir := t.TempDir()
+	victim := filepath.Join(dir, "victim")
+	require.NoError(t, os.WriteFile(victim, []byte("untouched"), 0o600))
+	lockPath := filepath.Join(dir, "x.lock")
+	require.NoError(t, os.Symlink(victim, lockPath))
+
+	lock, err := WithLock(t.Context(), WithLockParams{Path: lockPath, Do: func() error { return nil }})
+
+	require.NoError(t, err)
+	assert.False(t, lock.Held)
+}

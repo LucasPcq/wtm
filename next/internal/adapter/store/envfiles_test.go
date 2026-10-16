@@ -201,3 +201,29 @@ func TestReadTakesAnAbsentFileForNoLines(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "A=1\n", string(dotenv.Render(lines)))
 }
+
+func TestACopyKeepsTheModeOfItsSource(t *testing.T) {
+	main, worktree := t.TempDir(), t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(main, ".env"), []byte("SECRET=1\n"), 0o600))
+
+	_, err := EnvFiles{}.Copy(t.Context(), envcopy.Request{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env"}}, TargetDir: worktree, MainPath: main})
+	require.NoError(t, err)
+
+	info, err := os.Stat(filepath.Join(worktree, ".env"))
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+}
+
+func TestAnEnvFileAnEditCreatesIsReadableByItsOwnerOnly(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ".env")
+
+	_, err := EnvFiles{}.Edit(t.Context(), dotenv.Edit{Path: path, Create: true, Edit: func(lines []dotenv.Line) []dotenv.Line {
+		out, _ := dotenv.Set(dotenv.SetParams{Lines: lines, Key: "K", Value: "v"})
+		return out
+	}})
+	require.NoError(t, err)
+
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+}
