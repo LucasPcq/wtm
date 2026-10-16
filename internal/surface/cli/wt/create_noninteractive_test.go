@@ -1,13 +1,13 @@
 package wt
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
+	"github.com/LucasPcq/wtm/internal/command/create"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/kernel"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
 
@@ -41,25 +41,8 @@ func TestWtCreateWithoutBranchNameErrors(t *testing.T) {
 	createRepo(t)
 
 	_, _, err := runWtCmd(t, domain.CmdCreate, "--"+domain.FlagYes)
-	if err == nil {
-		t.Fatal("expected a missing branch name to error under --yes")
-	}
-	if !strings.Contains(err.Error(), "branch name is required") {
-		t.Errorf("error %q should say the branch name is required", err)
-	}
-}
-
-// TestWtCreateJSONRequiresYes: prompts cannot run in JSON mode, so the
-// confirmation axis must be bypassed explicitly.
-func TestWtCreateJSONRequiresYes(t *testing.T) {
-	createRepo(t)
-
-	_, _, err := runWtCmd(t, domain.CmdCreate, "feat/x", "--from", "main", "--output", domain.OutputJSON)
-	if err == nil {
-		t.Fatal("expected --output json without --yes to be rejected")
-	}
-	if !strings.Contains(err.Error(), "--"+domain.FlagYes) {
-		t.Errorf("error %q should direct to --%s", err, domain.FlagYes)
+	if code := fieldCodes(t, err)[create.PathBranches]; code != kernel.CodeRequired {
+		t.Errorf("refused on %q, want the branches required", code)
 	}
 }
 
@@ -80,8 +63,8 @@ func TestWtCreateMissingBaseBranchErrors(t *testing.T) {
 	}
 
 	_, _, err := runWtCmd(t, domain.CmdCreate, "feat/x", "--output", domain.OutputJSON, "--"+domain.FlagYes)
-	if !errors.Is(err, domain.ErrBranchNotFound) {
-		t.Fatalf("error = %v, want it to wrap ErrBranchNotFound", err)
+	if code := fieldCodes(t, err)[create.PathFrom]; code != kernel.CodeNotFound {
+		t.Fatalf("refused on %q, want the base branch not found", code)
 	}
 }
 
@@ -94,11 +77,8 @@ func TestWtCreateValidatesFromBeforeTheParentGuard(t *testing.T) {
 
 	_, _, err := runWtCmd(t, domain.CmdCreate, "feat/existing", "--from", "ghost",
 		"--output", domain.OutputJSON, "--"+domain.FlagYes)
-	if !errors.Is(err, domain.ErrBranchNotFound) {
-		t.Fatalf("error = %v, want it to wrap ErrBranchNotFound", err)
-	}
-	if strings.Contains(err.Error(), "--"+domain.FlagFrom+" ") {
-		t.Errorf("error %q should report the unknown branch, not ask for the flag again", err)
+	if codes := fieldCodes(t, err); len(codes) != 1 || codes[create.PathFrom] != kernel.CodeNotFound {
+		t.Fatalf("refused on %v, want only the unknown --from", codes)
 	}
 }
 
@@ -200,24 +180,5 @@ func TestWtCreateWithoutFFDoesNotTouchTheSource(t *testing.T) {
 
 	if got := revParse(t, work, "main"); got != staleTip {
 		t.Errorf("main moved to %s under --yes without --ff, want unchanged %s", got, staleTip)
-	}
-}
-
-// TestWtCreateTextModeWithoutTerminalTakesTheFlagPath: the wizard needs a TTY, so
-// a piped human-format run resolves from the flags like --yes does — including the
-// missing-branch error.
-func TestWtCreateTextModeWithoutTerminalTakesTheFlagPath(t *testing.T) {
-	createRepo(t)
-
-	if _, _, err := runWtCmd(t, domain.CmdCreate); err == nil {
-		t.Fatal("expected the flag path to require a branch name without a terminal")
-	}
-
-	stdout, _, err := runWtCmd(t, domain.CmdCreate, "feat/piped", "--from", "main")
-	if err != nil {
-		t.Fatalf("wt create in text mode: %v", err)
-	}
-	if !strings.Contains(stdout, "feat/piped") {
-		t.Errorf("stdout %q should recap the created worktree", stdout)
 	}
 }

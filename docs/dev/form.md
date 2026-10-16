@@ -1,6 +1,6 @@
 # The form — how a command on the engine is asked for
 
-`internal/surface/tui/form` is the interactive form of every command of the registry: a terminal wizard drawn from the command's schema, state and choices, whose recap is the plan of a dry run and whose confirmation runs that plan. It reaches the command through `dispatch` only ([dispatch.md](dispatch.md)), on the contract of [commands.md](commands.md), and is the `cli.Form` of the production engine ([cli.md](cli.md)). No command reaches it yet: the registry holds the `operations` query, and `create` is the first command (step 3 of LUC-283). `flowui` and `inittui` serve the commands still on `flow/` until each is migrated; the dashboard's modal (step 9) and the `records` field of the inits (step 8) come later.
+`internal/surface/tui/form` is the interactive form of every command of the registry: a terminal wizard drawn from the command's schema, state and choices, whose recap is the plan of a dry run and whose confirmation runs that plan. It reaches the command through `dispatch` only ([dispatch.md](dispatch.md)), on the contract of [commands.md](commands.md), and is the `cli.Form` of the production engine ([cli.md](cli.md)). `create` is the first command it asks. `flowui` and `inittui` serve the commands still on `flow/` until each is migrated; the dashboard's modal (step 9) and the `records` field of the inits (step 8) come later.
 
 ## Running it
 

@@ -131,7 +131,6 @@ func TestEveryMutuallyExclusivePairExitsWithTheUsageCode(t *testing.T) {
 // than slipping back to exit 1 (LUC-273).
 func TestJSONWithoutYesIsAUsageError(t *testing.T) {
 	want := map[string]string{
-		"wtm create":       "--yes",
 		"wtm checkout":     "--yes",
 		"wtm extract":      "--yes",
 		"wtm exec":         "--yes",

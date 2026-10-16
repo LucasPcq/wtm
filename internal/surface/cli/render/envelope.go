@@ -42,11 +42,12 @@ type envelope struct {
 }
 
 type envelopeItem struct {
-	Subject string          `json:"subject"`
-	Status  kernel.Status   `json:"status"`
-	Reason  kernel.Reason   `json:"reason,omitempty"`
-	Error   *envelopeError  `json:"error,omitempty"`
-	Detail  json.RawMessage `json:"detail"`
+	Subject  string            `json:"subject"`
+	Status   kernel.Status     `json:"status"`
+	Reason   kernel.Reason     `json:"reason,omitempty"`
+	Error    *envelopeError    `json:"error,omitempty"`
+	Warnings []envelopeWarning `json:"warnings,omitempty"`
+	Detail   json.RawMessage   `json:"detail"`
 }
 
 type envelopeWarning struct {
@@ -92,11 +93,12 @@ func WriteEnvelope(w io.Writer, params EnvelopeParams) error {
 	}
 	for _, item := range params.Items {
 		doc.Items = append(doc.Items, envelopeItem{
-			Subject: item.Subject,
-			Status:  item.Status,
-			Reason:  item.Reason,
-			Error:   params.Wording.envelopeErrorOf(item.Error),
-			Detail:  item.Detail,
+			Subject:  item.Subject,
+			Status:   item.Status,
+			Reason:   item.Reason,
+			Error:    params.Wording.envelopeErrorOf(item.Error),
+			Warnings: params.Wording.itemWarnings(item.Warnings),
+			Detail:   item.Detail,
 		})
 	}
 	return encodeJSON(w, doc)
@@ -108,6 +110,13 @@ func (wd Wording) envelopeWarnings(warnings []kernel.Warning) []envelopeWarning 
 		out = append(out, envelopeWarning{Code: warning.Code, Params: warning.Params, Message: wd.Warning(warning)})
 	}
 	return out
+}
+
+func (wd Wording) itemWarnings(warnings []kernel.Warning) []envelopeWarning {
+	if len(warnings) == 0 {
+		return nil
+	}
+	return wd.envelopeWarnings(warnings)
 }
 
 func (wd Wording) envelopeErrorOf(err kernel.Error) *envelopeError {

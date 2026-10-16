@@ -168,11 +168,12 @@ type fieldProblemsParams[Req, F any] struct {
 }
 
 func fieldProblems[Req, F any](params fieldProblemsParams[Req, F]) ([]FieldError, error) {
-	if params.State.Status == FieldSkipped {
+	skipped := params.State.Status == FieldSkipped
+	if skipped && IsZero(params.State.Value) {
 		return nil, nil
 	}
 	found, err := CheckSpec(CheckSpecParams[Req]{Request: params.Request, Specs: []FieldSpec{params.Field.Spec}})
-	if err != nil || len(found) > 0 || params.Field.Validate == nil {
+	if err != nil || len(found) > 0 || skipped || params.Field.Validate == nil {
 		return found, err
 	}
 	return params.Field.Validate(params.Request, params.Facts), nil

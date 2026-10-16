@@ -62,7 +62,7 @@ func (u unit) settle(ctx context.Context, report kernel.Reporter, detail Detail)
 		return detail, nil
 	}
 	warnUnlocked(warnUnlockedParams{Report: report, Unlocked: applied.Unlocked})
-	detail.EnvPorts = applied.Plan
+	detail.EnvPorts = rules.RedactEnvPortPlan(applied.Plan)
 	return detail, nil
 }
 

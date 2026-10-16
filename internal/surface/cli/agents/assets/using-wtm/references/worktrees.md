@@ -24,29 +24,30 @@ Everything here assumes the driving rules of `SKILL.md`: `--output json` on data
 
 ## `create`
 
-`wtm create <branch>... --from <base> --yes --output json` makes one worktree per branch, one after the other, provisions each `.env` and runs the `on_create` hooks. Once the run starts, the JSON is always an envelope, even for one branch: `{"results": [<create result>...], "failed": [{"branch", "path"?, "error", "exit_code"}...]}`. Every field named below lives on a branch's entry in `results`; read `.results[0]` for a single branch.
+`wtm create <branch>... --from <base> --output json` makes one worktree per branch, one after the other, provisions each `.env` and runs the `on_create` hooks. It writes the v2 envelope (see `json.md`): one item per branch in `items`, read `.items[0]` for a single branch. In JSON it never asks anything, so `--yes` is not needed (accepted, without effect).
 
-- **Several branches in one call** share `--from`, `--env-from`, `--isolation` and `--ff`. A failing branch does not stop the others: it lands in `failed` (with `path` when the worktree exists but a hook failed), the others in `results`, and the exit code is the first failure's. A branch listed twice is refused before anything is created (exit `2`), as are two branches reducing to the same name when `run.toml` declares jobs (exit `10`). Either refusal writes no envelope, only the error on stderr. Under `--ff`, the shared source is fast-forwarded once, and each existing branch of the list on its own (best effort, even when the source was already up to date).
-
+- **Preview, then apply exactly that**: `--dry-run` writes the plan (per branch `create`, `check_out`, `resume` or `unchanged`, the source, what gets fast-forwarded) and a `fingerprint`; `--expect-fingerprint <hash>` applies it only if nothing changed since (exit `25` otherwise, nothing applied).
+- **Several branches in one call** share `--from`, `--env-from`, `--isolation` and `--ff`. Everything that would stop a branch is checked first, against the repository as it is: a branch listed twice, one another worktree holds, a folder already taken, an invalid name, two branches reducing to the same name when `run.toml` declares jobs. Any of them refuses the **whole** call before anything is created (exit `2`), the envelope's `error.fields` naming each entry (`branches[1]`) and why. Once it runs, a branch whose hook fails does not stop the others: its item is `failed` with `reason: "incomplete"` (the worktree exists), and the exit code is the first failure's.
 - `--from` accepts a remote ref (`origin/x`).
-- `--if-not-exists` makes it idempotent. It is about the **worktree**, not the branch: an existing branch with no worktree is still created. It also no-ops on a worktree holding the branch outside `base_path` and returns that path, even the **main** worktree's own path if the branch is checked out there (still `already_exists: true` in its `results` entry, just not a directory under `base_path`). It never returns another branch's worktree: when the branch's folder is held by a branch with the same folder name (`feat-x` for `feat/x`), or is a directory that is no worktree, the create fails with exit `10`, flag or not.
-- `--ff` fast-forwards a behind-only `--from` branch to origin first, so the worktree starts up to date. A diverged branch is left as is (no prompt in JSON mode).
+- `--if-not-exists` makes it idempotent. It is about the **worktree**, not the branch: an existing branch with no worktree is still created. It no-ops on a worktree holding the branch, even outside `base_path` or the **main** worktree's own path, and returns it as an item `done` with `reason: "unchanged"`. It never returns another branch's worktree: a folder held by a branch with the same folder name (`feat-x` for `feat/x`), or a directory that is no worktree, is refused (`create.name_clash`, `create.path_exists`), flag or not.
+- `--ff` fast-forwards first the branch each worktree starts from, when it is behind origin: the shared source for a new branch, the branch itself for an existing one. It is best effort: a source that has diverged, or whose worktree holds uncommitted changes, starts as it is, and the envelope's `warnings` say so (`create.ff_dirty`, `create.ff_failed`).
 - `--isolation isolated|verbatim`: see [Isolation at creation](#isolation-at-creation).
-- **A name two worktrees would share is refused** (exit `10`, before anything is created) when `run.toml` declares a job: `feat.x` next to a live `feat/x` would get the same compose project, namespaces and proxy host (`feat-x`), and `feat/a_b` next to `feat/a-b` the same host. The error names both branches and the shared name: pick another branch name. The same holds for `extract --to` and `checkout`.
-- **The run module never fails a creation.** A `run.toml` that cannot be read or is refused (an unknown key, a job `kind` other than `service`/`task`, a global `[proxy] port` outside 1-65535), or a neighbour's unreadable `meta.json`, only skips the port pass: the worktree is created, the `.env` copied as is, the hooks run, and the JSON carries a `warnings` array naming the cause and "ports not settled, run `wtm env <branch>` once run.toml is fixed". Fix the cause, then run that command. An `[[env_port]]` or `[[env]]` on a file `config.toml` does not provision skips only that link: the rest of the pass runs and `warnings` names the link as ignored.
-- On an isolated worktree, `create` settles the `.env` port values onto the ports the worktree binds (the `[[env_port]]` pass, see `run-config.md`), and reports it as `env_ports` in the branch's `results` entry.
+- **A name two worktrees would share is refused** when `run.toml` declares a job: `feat.x` next to a live `feat/x` would get the same compose project, namespaces and proxy host (`feat-x`), and `feat/a_b` next to `feat/a-b` the same host. The field error names both branches and the shared name: pick another branch name. The same holds for `extract --to` and `checkout` (exit `10` there).
+- **The run module never fails a creation.** A `run.toml` that cannot be read or is refused, or a neighbour's unreadable `meta.json`, only skips the port pass: the worktree is created, the `.env` copied as is, the hooks run, and the item's `warnings` name the cause and "ports not settled, run `wtm env <branch>` once …". Fix the cause, then run that command. An `[[env_port]]` or `[[env]]` on a file `config.toml` does not provision skips only that link.
+- On an isolated worktree, `create` settles the `.env` port values onto the ports the worktree binds (the `[[env_port]]` pass, see `run-config.md`), and reports it as `env_ports` in the item's `detail`.
+- **Another wtm operation on the same worktree** makes the call refuse with `conflict` / `lock.held` (exit `24`), naming the operation that holds it; nothing is created. Retry once it is done.
 
 ## An existing local branch
 
-An existing local branch is not an obstacle, and there is no `wtm clean` to run first. `create <branch>` checks out a same-named local branch **as is**, keeping commits that were never pushed; it never deletes or resets it. The branch's `results` entry sets `existing_branch: true` and `origin_state` (`up-to-date`/`behind`/`ahead`/`diverged`) so you can tell reuse from creation.
+An existing local branch is not an obstacle, and there is no `wtm clean` to run first. `create <branch>` checks out a same-named local branch **as is**, keeping commits that were never pushed; it never deletes or resets it. The item's `detail` sets `existing_branch: true` and `origin_state` (`up-to-date`/`behind`/`ahead`/`diverged`) so you can tell reuse from creation.
 
 What wtm will not do is **guess its parent**. The branch was created outside wtm, so `--from` stops being a start point and names the **parent to record for `wtm sync`**, and it is **required**: the command errors instead of guessing, because `sync` and `tree` would treat the guess as fact. Ask the user which branch it stacks on if you do not know. `--ff` then updates `<branch>` itself rather than the source.
 
-Only a branch **another worktree already holds** is refused (exit `10`).
+Only a branch **another worktree already holds** is refused (`create.checked_out_elsewhere`, exit `2` on `create`, `10` on `checkout`).
 
 ## A branch only on origin
 
-A branch that exists only on origin (fetched, no local branch) is resumed, not recreated: `create <branch>` starts the local branch from `origin/<branch>` and tracks it, so the pushed work is in the worktree and `git pull`/`git push` need no `-u`. The branch's `results` entry sets `upstream: "origin/<branch>"`. `--from` is then the **parent recorded for `wtm sync`**, not a start point; without it the base branch is recorded, `--yes` included. `checkout` and `extract --to` start a branch only on origin the same way.
+A branch that exists only on origin (fetched, no local branch) is resumed, not recreated: `create <branch>` starts the local branch from `origin/<branch>` and tracks it, so the pushed work is in the worktree and `git pull`/`git push` need no `-u`. The item's `detail` sets `upstream: "origin/<branch>"`. `--from` is then the **parent recorded for `wtm sync`**, not a start point; without it the base branch is recorded, `--yes` included. `checkout` and `extract --to` start a branch only on origin the same way.
 
 ## Isolation at creation
 
@@ -55,14 +56,14 @@ A branch that exists only on origin (fetched, no local branch) is resumed, not r
 - `isolated`: wtm writes the worktree's own ports, `COMPOSE_PROJECT_NAME` and `[[env]]` namespaces into its `.env`, and runs its jobs on the same shifted ports.
 - `verbatim`: the `.env` stays byte for byte as copied, and the worktree's jobs run on its source's ports. Such a worktree **cannot run while its source does**.
 
-`--isolation` only answers a creation. On a worktree `--if-not-exists` found already there, or an existing `extract --to` target, it is ignored; when it differs from the worktree's, a `warnings` entry says so and names `wtm env <branch> --isolation …`. The full model is in `run-config.md` (Isolation).
+`--isolation` only answers a creation. On a worktree `--if-not-exists` found already there, or an existing `extract --to` target, it is ignored: the item's `detail.metadata.isolation` is the worktree's own (`extract` adds a `warnings` entry naming `wtm env <branch> --isolation …`). To change it, run `wtm env <branch> --isolation …`. The full model is in `run-config.md` (Isolation).
 
 ## Remembered answers
 
 In the interactive wizard of `create`, `checkout` and `extract`, the user can tick "Always use this answer in this repo" on three questions: the env strategy, the isolation and whether to fast-forward a source behind origin. The answer lands in `config.toml` under `[wizard.remembered]` (`env_strategy`, `isolation`, `source_update`), and **it applies under `--yes` and `--output json` too**: it stands in for the flag you did not pass, ahead of the config default.
 
 - **For a guaranteed result, pass the flag**: `--env-from`, `--isolation`, `--ff`. A flag always wins over a remembered answer.
-- The JSON says what settled each of these answers: `origins` (see `json.md`). `"remembered"` means the user's memory chose, not your command.
+- `create`'s `--remember env_from|isolation|fast_forward` keeps the answer of this run, once a worktree is created. Do not pass it on your own initiative: it is the user's preference.
 - `--ask` ignores the memory for one run: under `--yes` the answers fall back to the config and the safe defaults. It forgets nothing.
 - Never edit `[wizard.remembered]` on your own initiative: it is the user's preference. Nothing destructive can be remembered.
 

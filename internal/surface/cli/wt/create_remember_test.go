@@ -21,21 +21,20 @@ func rememberInConfig(t *testing.T, dir, section string) {
 	}
 }
 
-// A remembered answer is a local default: --yes takes it, and the JSON names it
-// as such, so a script can tell it from what it asked for.
-func TestWtCreateYesTakesTheRememberedAnswerAndReportsItsOrigin(t *testing.T) {
+// A remembered answer is a local default: --yes takes it, a flag wins over it,
+// and --ask ignores it.
+func TestWtCreateYesTakesTheRememberedAnswer(t *testing.T) {
 	dir := createRepo(t)
 	rememberInConfig(t, dir, "env_strategy = \"main\"\n")
 
 	tests := []struct {
-		name   string
-		args   []string
-		want   domain.EnvStrategy
-		origin domain.AnswerOrigin
+		name string
+		args []string
+		want domain.EnvStrategy
 	}{
-		{"remembered", nil, domain.EnvStrategyMain, domain.AnswerOriginRemembered},
-		{"--env-from wins", []string{"--" + domain.FlagEnvFrom, string(domain.EnvStrategyParent)}, domain.EnvStrategyParent, domain.AnswerOriginFlag},
-		{"--ask ignores the memory", []string{"--" + domain.FlagAsk}, domain.EnvStrategyExample, domain.AnswerOriginConfig},
+		{"remembered", nil, domain.EnvStrategyMain},
+		{"--env-from wins", []string{"--" + domain.FlagEnvFrom, string(domain.EnvStrategyParent)}, domain.EnvStrategyParent},
+		{"--ask ignores the memory", []string{"--" + domain.FlagAsk}, domain.EnvStrategyExample},
 	}
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -48,9 +47,6 @@ func TestWtCreateYesTakesTheRememberedAnswerAndReportsItsOrigin(t *testing.T) {
 			got := decodeCreated(t, stdout)
 			if got.Metadata.EnvStrategy != tt.want {
 				t.Errorf("env_strategy = %q, want %q", got.Metadata.EnvStrategy, tt.want)
-			}
-			if origin := got.Origins[domain.RememberEnvStrategy]; origin != tt.origin {
-				t.Errorf("origins.env_strategy = %q, want %q", origin, tt.origin)
 			}
 		})
 	}

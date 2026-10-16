@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"slices"
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -246,127 +245,6 @@ func matchRunningServices(worktreePath string, services []domain.JobInfo) []stri
 	return names
 }
 
-// WriteWorktreeCreateJSON writes the JSON payload for `create`.
-func WriteWorktreeCreateJSON(w io.Writer, batch domain.CreateBatchResult) error {
-	results := slices.Clone(batch.Results)
-	for i, result := range results {
-		results[i].EnvPorts = rules.RedactEnvPortPlan(result.EnvPorts)
-	}
-	batch.Results = results
-	return encodeJSON(w, batch)
-}
-
-// CreateResultParams holds inputs for the framed create conclusion.
-type CreateResultParams struct {
-	Branch        string
-	AlreadyExists bool
-	From          string
-	EnvStrategy   string
-	// EnvNote qualifies the env line with what the port pass did — a count and an
-	// offset, resolved by the caller (rules.EnvPortSettlementNote). Empty when the
-	// run moved no linked value.
-	EnvNote string
-	Path    string
-	// ExistingBranch reports that an existing local branch was checked out as-is,
-	// which retitles the headline and relabels From as the sync parent.
-	ExistingBranch bool
-	// ReusedNote, set only when ExistingBranch, states how the reused branch
-	// relates to origin (behind, diverged, or up to date) — the caller resolves
-	// its text and severity (shared.ReusedBranchNote); this only renders it.
-	ReusedNote        string
-	ReusedNoteWarning bool
-	// Upstream is the remote branch a branch only on origin started from and
-	// tracks, which retitles the headline and relabels From as the sync parent.
-	Upstream string
-	// GoCommand is the ready-to-run jump-in command (e.g. "wtm go feat-x").
-	GoCommand string
-}
-
-const resumedHeadlineFmt = "Created worktree %s from %s, tracking it"
-
-type CreateBatchRow struct {
-	Branch        string
-	Path          string
-	AlreadyExists bool
-}
-
-type CreateBatchParams struct {
-	Created []CreateBatchRow
-	Failed  []domain.BatchFailure
-	Skipped []domain.PruneSkip
-}
-
-func FormatCreateBatch(w io.Writer, p CreateBatchParams) {
-	created, existed := 0, 0
-	for _, row := range p.Created {
-		if row.AlreadyExists {
-			existed++
-			Unchanged(w, fmt.Sprintf(domain.CreateBatchExistsFmt, row.Branch))
-		} else {
-			created++
-			Success(w, row.Branch)
-		}
-		Message(w, Indent+row.Path)
-	}
-	for _, failure := range p.Failed {
-		Error(w, fmt.Sprintf(domain.BatchFailedFmt, failure.Branch, failure.Error))
-	}
-	for _, skip := range p.Skipped {
-		Warning(w, fmt.Sprintf(domain.PruneSkippedFmt, skip.Branch, rules.PruneReasonLabel(skip.Reason)))
-	}
-	Blank(w)
-	Message(w, rules.Tally(
-		domain.TallyPart{Count: created, Label: domain.TallyCreated},
-		domain.TallyPart{Count: existed, Label: domain.TallyAlreadyExisted},
-		domain.TallyPart{Count: len(p.Skipped), Label: domain.TallySkipped},
-		domain.TallyPart{Count: len(p.Failed), Label: domain.TallyFailed},
-	))
-}
-
-// FormatCreateResult prints the create conclusion: a ✓ headline, an aligned
-// summary (from / env / path), then a highlighted `wtm go` step to jump straight
-// into the new worktree. A reused branch, or one resumed from origin, says so in
-// the headline and labels its source "parent", since it was not a start-point. The idempotent already-exists
-// case collapses to a single line + the jump-in step. Raw body — the caller's
-// frame owns the outer padding.
-func FormatCreateResult(w io.Writer, p CreateResultParams) {
-	if p.AlreadyExists {
-		Unchanged(w, fmt.Sprintf("Worktree %s already exists at %s", p.Branch, p.Path))
-		Blank(w)
-		NextStep(w, NextStepParams{Command: p.GoCommand})
-		return
-	}
-
-	headline := fmt.Sprintf("Created worktree %s", p.Branch)
-	sourceLabel := domain.CreateRecapLabelFrom
-	if p.ExistingBranch {
-		headline = fmt.Sprintf(domain.BranchReusedHeadline, p.Branch)
-		sourceLabel = domain.CreateRecapLabelParent
-	}
-	if p.Upstream != "" {
-		headline = fmt.Sprintf(resumedHeadlineFmt, p.Branch, p.Upstream)
-		sourceLabel = domain.CreateRecapLabelParent
-	}
-
-	Success(w, headline)
-	Blank(w)
-	writeAlignedFields(w, []domain.RecapField{
-		{Label: sourceLabel, Value: p.From},
-		{Label: domain.CreateRecapLabelEnv, Value: withNote(noteParams{Value: p.EnvStrategy, Note: p.EnvNote})},
-		{Label: domain.CreateRecapLabelPath, Value: p.Path},
-	})
-	if p.ReusedNote != "" {
-		Blank(w)
-		if p.ReusedNoteWarning {
-			Warning(w, p.ReusedNote)
-		} else {
-			Message(w, p.ReusedNote)
-		}
-	}
-	Blank(w)
-	NextStep(w, NextStepParams{Command: p.GoCommand})
-}
-
 type PRCheckoutResultParams struct {
 	Number            int
 	Branch            string
@@ -395,18 +273,6 @@ func FormatPRCheckoutResult(w io.Writer, p PRCheckoutResultParams) {
 	}
 	Blank(w)
 	NextStep(w, NextStepParams{Command: p.GoCommand})
-}
-
-type noteParams struct {
-	Value string
-	Note  string
-}
-
-func withNote(params noteParams) string {
-	if params.Note == "" {
-		return params.Value
-	}
-	return params.Value + styles.Muted.Render(domain.EnvRecapNoteSeparator+params.Note)
 }
 
 // writeAlignedFields prints indented "label   value" rows with values aligned to a

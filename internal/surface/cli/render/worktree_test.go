@@ -214,34 +214,6 @@ func TestAnsiOverheadPlainString(t *testing.T) {
 // The port pass rides on the env line as a count. It is the whole of what create
 // says about it: the values are in the .env the run just wrote, and `wtm env` is
 // the command they belong to.
-func TestFormatCreateResultCarriesThePortPassAsANote(t *testing.T) {
-	render := func(note string) string {
-		var buf bytes.Buffer
-		FormatCreateResult(&buf, CreateResultParams{
-			Branch:      "feat/x",
-			From:        "main",
-			EnvStrategy: "main",
-			EnvNote:     note,
-			Path:        ".worktrees/feat-x",
-			GoCommand:   "wtm go feat/x",
-		})
-		return buf.String()
-	}
-
-	with := render("4 port(s) shifted (+10)")
-	if !strings.Contains(with, "main") || !strings.Contains(with, "4 port(s) shifted (+10)") {
-		t.Errorf("the env line dropped its note:\n%s", with)
-	}
-	if strings.Count(with, "\n") != strings.Count(render(""), "\n") {
-		t.Errorf("the note cost the recap a line:\n%s", with)
-	}
-	if strings.Contains(render(""), domain.EnvRecapNoteSeparator) {
-		t.Errorf("a run that moved nothing still printed a separator:\n%s", render(""))
-	}
-}
-
-// checkout concludes like create: the port pass rides on a labelled env row
-// instead of a bare line under the headline.
 func TestFormatPRCheckoutResultLabelsTheEnvNote(t *testing.T) {
 	var buf bytes.Buffer
 	FormatPRCheckoutResult(&buf, PRCheckoutResultParams{
@@ -253,20 +225,6 @@ func TestFormatPRCheckoutResultLabelsTheEnvNote(t *testing.T) {
 	for _, want := range []string{"Checked out PR #42 (feat/x)", domain.CreateRecapLabelEnv, "4 ports settled (offset +10)", domain.CreateRecapLabelPath, ".worktrees/feat-x"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q:\n%s", want, out)
-		}
-	}
-}
-
-func TestFormatCreateBatchCountsAndNamesFailures(t *testing.T) {
-	var b strings.Builder
-	FormatCreateBatch(&b, CreateBatchParams{
-		Created: []CreateBatchRow{{Branch: "feat/a", Path: ".worktrees/feat-a"}, {Branch: "feat/c", Path: ".worktrees/feat-c", AlreadyExists: true}},
-		Failed:  []domain.BatchFailure{{Branch: "feat/b", Error: "path exists"}},
-	})
-	out := ansi.Strip(b.String())
-	for _, want := range []string{"feat/a", ".worktrees/feat-a", "feat/c already exists", "feat/b — path exists", "1 created", "1 already existed", "1 failed"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("readout %q should contain %q", out, want)
 		}
 	}
 }
@@ -297,20 +255,6 @@ func TestFormatCleanBatchCountsAndNamesAnomalies(t *testing.T) {
 	for _, want := range []string{"2 removed", "1 already absent", "1 skipped", "1 failed", "feat/a, feat/c", "feat/b — locked", "feat/d", "leaf"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("readout missing %q:\n%s", want, out)
-		}
-	}
-}
-
-func TestFormatCreateResultSaysABranchResumesOrigin(t *testing.T) {
-	var buf bytes.Buffer
-	FormatCreateResult(&buf, CreateResultParams{
-		Branch: "feat/x", From: "main", EnvStrategy: "main", Path: ".worktrees/feat-x",
-		Upstream: "origin/feat/x", GoCommand: "wtm go feat/x",
-	})
-	out := buf.String()
-	for _, want := range []string{"Created worktree feat/x from origin/feat/x, tracking it", domain.CreateRecapLabelParent} {
-		if !strings.Contains(out, want) {
-			t.Errorf("output should contain %q:\n%s", want, out)
 		}
 	}
 }

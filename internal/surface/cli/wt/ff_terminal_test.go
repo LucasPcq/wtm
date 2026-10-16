@@ -41,33 +41,6 @@ func cancelledCreate(extra map[string]string) *flowtest.ScriptedPrompter {
 	return &flowtest.ScriptedPrompter{Answers: answers}
 }
 
-// LUC-281: on a terminal, --ff answered nothing and the wizard still offered the
-// fast-forward the flag had already accepted.
-func TestCreateFFIsNotAskedOnATerminal(t *testing.T) {
-	behindRepo(t)
-	prompter := cancelledCreate(nil)
-	onATerminal(t, prompter)
-
-	_, _, _ = runWtCmd(t, domain.CmdCreate, "feat/new", "--from", "parent", "--"+domain.FlagFF)
-	if _, asked := prompter.Content[createflow.KeySourceUpdate]; asked {
-		t.Fatalf("--ff answers the source update, yet asked %q", prompter.AskedKeys())
-	}
-	if _, reached := prompter.Content[createflow.KeyRecap]; !reached {
-		t.Fatalf("the wizard must reach its recap, asked %q", prompter.AskedKeys())
-	}
-}
-
-func TestCreateAsksTheSourceUpdateWithoutFF(t *testing.T) {
-	behindRepo(t)
-	prompter := cancelledCreate(map[string]string{createflow.KeySourceUpdate: domain.SourceUpdateKeep})
-	onATerminal(t, prompter)
-
-	_, _, _ = runWtCmd(t, domain.CmdCreate, "feat/new", "--from", "parent")
-	if _, asked := prompter.Content[createflow.KeySourceUpdate]; !asked {
-		t.Fatalf("without --ff a behind source must be offered its fast-forward, asked %q", prompter.AskedKeys())
-	}
-}
-
 func TestExtractFFIsNotAskedOnATerminal(t *testing.T) {
 	behindRepo(t)
 	src := createWorktree(t, "src")

@@ -5,6 +5,7 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 ## Contents
 
 - [General rules](#general-rules)
+- [The v2 envelope (`create`)](#the-v2-envelope-create)
 - [Worktrees: `list`, `tree`, `resolve`](#worktrees-list-tree-resolve)
 - [`create`, `extract`, `checkout`](#create-extract-checkout)
 - [`env_ports` and the `ports` block](#env_ports-and-the-ports-block)
@@ -23,9 +24,26 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 
 - JSON goes to stdout; human text and warnings go to stderr.
 - **Check the exit code, and parse stdout only if it is non-empty.** A command that got far enough to have per-item results writes its **whole** document and *then* exits `1` (`run up`, `run down`, `prune`, `sync`, `fast-forward`): read it either way, the entries say which item failed. One exception: `sync --push` whose push fails exits before writing the document. One that failed before that (no such job, daemon refused, config invalid) writes **nothing** on stdout and puts the reason on stderr.
-- `--output json` requires `--yes` on every mutating command (`--dry-run` also does for `sync`, `prune`, `relocate`; `--check` for `env`, `upgrade`). Without it the command exits `2` before doing anything, with nothing on stdout.
+- `--output json` requires `--yes` on every mutating command still on the v1 contract (`--dry-run` also does for `sync`, `prune`, `relocate`; `--check` for `env`, `upgrade`). Without it the command exits `2` before doing anything, with nothing on stdout. A command on the v2 envelope (`create`) is unattended in JSON already: `--yes` is accepted and changes nothing.
 - `--quiet` never affects the JSON.
 - One command streams instead of writing one document: `events`, one JSON object per line, never ending on its own. Its contract is in `references/events.md`.
+
+## The v2 envelope (`create`)
+
+A command on wtm's command engine writes one document on stdout for **every** run, a refusal before anything started included, and `"v": 2` says so. Today that is `create`; the other commands move to it one by one, each release saying which.
+
+```json
+{ "v": 2, "command": "create", "ok": true, "op": "3f2a…",
+  "items": [ { "subject": "feat/x", "status": "done", "detail": { … },
+               "warnings": [ { "code": "provision.ports_not_settled", "params": { … }, "message": "…" } ] } ],
+  "follow_ups": [], "warnings": [] }
+```
+
+- `ok` is false whenever there is an `error`. `follow_ups` and `warnings` are always arrays; an item's `warnings` are about its subject, the top-level ones about the run.
+- An applied run has `items`: one per subject, `status` `done` / `failed` / `skipped` / `cancelled`, and a `reason` when it says more: `unchanged` (done, nothing to do), `incomplete` (the worktree exists but a later phase, such as `on_create`, failed or was interrupted), `interrupted`, `not_reached`. A `failed` item carries its `error`.
+- `--dry-run` writes `plan` (what an apply would do) and `fingerprint` instead of `items`. Pass that fingerprint back with `--expect-fingerprint <hash>` to apply exactly what was previewed: if the repository changed in between, the run is refused with `precondition` / `plan.stale` (exit `25`) and nothing is applied.
+- `error` is `{kind, code, message, params?, follow_up?}`. `kind` is `invalid` (exit `2`), `conflict` (exit `24`: `lock.held`, another wtm operation holds this worktree or the repository; its `params` name the holder), `precondition` (exit `25`, or the command's own code: `create.config_not_found` exits `12`), `refused` (exit `23`), `cancelled` (exit `19`), `not_found` or `internal` (exit `1`). An `invalid` error lists its `fields`, each `{path, code, flag, message}`: `path` is the request field (`branches[1]`, `from`), `flag` how you set it (`--from`, `<branches>[1]`), `code` why (`required`, `not_found`, `create.checked_out_elsewhere`…). **Branch on `code`, show `message`.**
+- Exit codes: `0` when no item failed; a failed item exits on its error; an interrupted run `19`.
 
 ## Worktrees: `list`, `tree`, `resolve`
 
@@ -38,16 +56,18 @@ What `--output json` gives you, command by command. The payload mirrors wtm's Go
 
 ## `create`, `extract`, `checkout`
 
-`create` wraps its results in an envelope, even for one branch: `{"results": [...], "failed": [{"branch", "path"?, "error", "exit_code"}...], "skipped"?: [{"branch", "reason": "interrupted"}]}`. After an interrupt (exit `19`), a `failed` entry with a `path` was created but not set up (ports, `on_create` hooks), and `skipped` lists the branches never reached. The fields below sit on each entry of `results`; `extract` and `checkout` carry them at the top level. A refusal before anything is created (a bad `--from` or `--env-from`, a name clash, a repeated branch, a branch another worktree holds) writes no envelope: it is an error on stderr with its exit code. See `worktrees.md`.
+`create` writes the [v2 envelope](#the-v2-envelope-create): one item per branch, its `subject` the branch, its `detail`:
 
-- `already_exists: true` when `create --if-not-exists` found the worktree (with its path, possibly outside `base_path`, even the main checkout's).
-- `existing_branch: true` and `origin_state` (`up-to-date` / `behind` / `ahead` / `diverged`) when a same-named local branch was reused as is.
+- `path`: the worktree; `metadata`: what wtm recorded (`source_branch`, the parent `wtm sync` follows; `env_strategy`; `isolation`, `isolated` or `verbatim`; `created_at`).
+- `existing_branch: true` and `origin_state` (`up-to-date` / `behind` / `ahead` / `diverged`, with `origin_ahead` / `origin_behind`) when a same-named local branch was checked out as is.
 - `upstream: "origin/<branch>"` when the branch existed only on origin: the local branch was created from it and tracks it.
-- `isolation`: the worktree's, `isolated` or `verbatim` (for `extract`, the target's).
-- `env_ports`: present when the port pass ran and the project links anything (shape below). Absent for a verbatim worktree, a project linking nothing, or a pass that could not run.
-- `warnings`: a `run.toml` link ignored because its `.env` is not a configured `[env]` target, why the port pass could not run ("ports not settled, run `wtm env <branch>` once run.toml is fixed"), that `--isolation` differed from an existing worktree's and was ignored, or that `--env-from parent` copied the `.env` from the main checkout because the parent has no worktree.
-- `origins`: what settled each answer the wizard can remember, keyed `env_strategy`, `isolation`, `source_update`: `flag`, `remembered` (the user's `[wizard.remembered]`, see `worktrees.md`), `config` (`config.toml` or `run.toml`) or `default`. A question that did not apply has no key (`isolation` with nothing to isolate, `source_update` with a source not behind, `env_strategy` on `extract`).
-- `extract` file entries may carry `"status": "renamed"` with `"orig_path"`.
+- `ordinal`: the worktree's number, when this run needed one (its ports).
+- `env_ports`: present when the port pass ran and the project links anything (shape below). Absent for a verbatim worktree, a project linking nothing, or a pass that could not run (an item warning then says why).
+- An item `done` with `reason: "unchanged"` is `--if-not-exists` finding the worktree; its `detail.path` is where it is, possibly outside `base_path`, even the main checkout.
+- The item's `warnings`: an `.env` that could not be copied, a `run.toml` link ignored because its `.env` is not a configured `[env]` target, a port pass that could not run ("ports not settled, run `wtm env <branch>` once …"). The run's `warnings`: a source that could not be fast-forwarded (`create.ff_failed`, `create.ff_dirty`), a diverged source, `--env-from parent` falling back to the main checkout's `.env`.
+- A refusal before anything is created is the envelope's `error`, kind `invalid` (exit `2`), one `fields` entry per problem: `create.checked_out_elsewhere`, `create.name_clash`, `create.path_exists`, `create.branch_name_invalid` on `branches[i]`, `distinct` on a branch listed twice, `not_found` on an unknown `from`, `required` on `from` for a branch that already exists (`params.because: create.parent_required`). A missing config is kind `precondition`, code `create.config_not_found`, exit `12`.
+
+`extract` and `checkout` are still on the v1 contract: they carry the same fields as `create`'s `detail`, at the top level, plus `already_exists: true` when the worktree was found, `isolation`, and `warnings` as strings. `extract` file entries may carry `"status": "renamed"` with `"orig_path"`. See `worktrees.md`.
 
 ## `env_ports` and the `ports` block
 

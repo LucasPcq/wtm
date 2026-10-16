@@ -104,7 +104,7 @@ var migratingCeiling = map[string]int{
 	`rootfreeze internal/domain/tree\.go`:                16,
 	`rootfreeze internal/domain/upgrade\.go`:             15,
 	`rootfreeze internal/domain/version\.go`:             2,
-	`rootfreeze internal/domain/worktree\.go`:            29,
+	`rootfreeze internal/domain/worktree\.go`:            28,
 	`rootfreeze internal/domain/worktreestatus\.go`:      12,
 	`rootfreeze internal/rules/addressing\.go`:           7,
 	`rootfreeze internal/rules/age\.go`:                  5,
@@ -249,7 +249,6 @@ var migratingCeiling = map[string]int{
 var deadcodeCeiling = []string{
 	`TextInputModel\.helpRowless`,
 	`TextListModel\.helpRowless`,
-	`^internal/surface/cli/bind\.go:.*unreachable func: Bind$`,
 }
 
 var commentCeiling = map[string]int{

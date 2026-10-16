@@ -50,6 +50,7 @@ func init() {
 	for _, cmd := range wt.NewCmds() {
 		rootCmd.AddCommand(cmd)
 	}
+	rootCmd.AddCommand(newCreateCmd(Bind))
 	rootCmd.AddCommand(run.NewCmd())
 
 	uiCmd := ui.NewCmd(ui.NewCmdParams{Version: effectiveVersion})

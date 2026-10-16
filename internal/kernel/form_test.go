@@ -73,19 +73,35 @@ func TestASkipSeesTheDefaultsOfTheFieldsBeforeIt(t *testing.T) {
 	assert.Equal(t, []string{"from:defaulted", "isolation:skipped"}, states(form))
 }
 
-func TestASkippedFieldIsNeitherRequiredNorChecked(t *testing.T) {
+func TestASkippedFieldIsNeitherRequiredNorValidated(t *testing.T) {
+	skipped := func(given request) kernel.Form[request] {
+		return evaluate(t, kernel.EvaluateParams[request, facts]{
+			Fields: []kernel.FieldDef[request, facts]{{
+				Spec: kernel.FieldSpec{Path: "from", Type: kernel.FieldText, Required: true, Constraints: kernel.Constraints{MinLen: 3}},
+				Skip: func(request, facts) (bool, kernel.Code) { return true, "test.skip" },
+				Validate: func(request, facts) []kernel.FieldError {
+					return []kernel.FieldError{{Path: "from", Code: "test.never"}}
+				},
+			}},
+			Request: given,
+		})
+	}
+
+	assert.True(t, skipped(request{}).Complete)
+	assert.True(t, skipped(request{From: "main"}).Complete)
+}
+
+func TestTheValueGivenToASkippedFieldStillHoldsToItsConstraints(t *testing.T) {
 	form := evaluate(t, kernel.EvaluateParams[request, facts]{
 		Fields: []kernel.FieldDef[request, facts]{{
-			Spec: kernel.FieldSpec{Path: "from", Type: kernel.FieldText, Required: true, Constraints: kernel.Constraints{MinLen: 10}},
+			Spec: kernel.FieldSpec{Path: "from", Type: kernel.FieldText, Constraints: kernel.Constraints{MinLen: 3}},
 			Skip: func(request, facts) (bool, kernel.Code) { return true, "test.skip" },
-			Validate: func(request, facts) []kernel.FieldError {
-				return []kernel.FieldError{{Path: "from", Code: "test.never"}}
-			},
 		}},
 		Request: request{From: "x"},
 	})
-	assert.True(t, form.Complete)
-	assert.Empty(t, form.Errors)
+
+	assert.False(t, form.Complete)
+	assert.Equal(t, []kernel.FieldError{{Path: "from", Code: kernel.CodeTooShort, Params: kernel.Params{kernel.ParamLimit: "3"}}}, form.Errors)
 }
 
 func TestValidateRunsOnlyOnceTheConstraintsHold(t *testing.T) {

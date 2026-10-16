@@ -1,11 +1,11 @@
 package wt
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/LucasPcq/wtm/internal/command/create"
 	"github.com/LucasPcq/wtm/internal/domain"
 )
 
@@ -17,8 +17,8 @@ func TestCreateRefusesAClashingName(t *testing.T) {
 	}
 
 	_, _, err := runWtCmd(t, domain.CmdCreate, "feat.x", "--from", "main", "--yes")
-	if !errors.Is(err, domain.ErrWorktreeNameTaken) {
-		t.Fatalf("create feat.x = %v, want ErrWorktreeNameTaken", err)
+	if code := fieldCodes(t, err)["branches[0]"]; code != create.CodeNameClash {
+		t.Fatalf("create feat.x refused on %q, want %q", code, create.CodeNameClash)
 	}
 	if _, statErr := os.Stat(filepath.Join(dir, "..", ".trees", "feat.x")); !os.IsNotExist(statErr) {
 		t.Errorf("feat.x was created anyway: %v", statErr)

@@ -6,21 +6,11 @@ The second half of this page, [A command on `flow/`](#a-command-on-flow), is the
 
 A read-only command (`list`, `tree`, `resolve`) needs none of this: parse flags, call the service, hand the result to `surface/cli/render/`. It becomes a `kernel.Query` in `internal/query/` when queries get their commands.
 
-## What exists and what the pilot writes
+## What exists
 
-The engine is built, with no command on it yet: `registry.Production` holds the `operations` query alone. Each piece the recipe names is one of these:
+`create` is on the engine, the reference for the next command: `internal/command/create` (its request, facts, fields, plan, apply, events and codes), `internal/command/provision` (the unit that gives a branch its worktree, which `checkout` and `extract` reuse), its line in `registry.Production` with its real ports, and its command line in `surface/cli/create.go` (`cli.Bind`, its `createDetail`). Under it: `kernel`, `kernel/text`, `kernel/kerneltest`; `dispatch` and `testutil/dispatchtest`; the ports `infra/git` (`gittest.Fake`, `gittest.Build`) and `store/` (`storetest.Fake`, `storetest.OnDisk`); the engine's services `service/gitwt`, `identity`, `runenv`, `hooks.Execute`; `cli.Bind`, `render.Detail`, the v2 envelope and the form.
 
-| Exists today | Written by the `create` pilot |
-| -- | -- |
-| `internal/kernel` (`Command`, fields, rules, errors, `Each`), `kernel/text`, `kernel/kerneltest` | `internal/command/create/`, the first package of `internal/command/` |
-| `internal/dispatch` (`Register`, `Events`, locks, fingerprint), `testutil/dispatchtest` | its line in `registry.Production` |
-| `internal/registry` (`Production`), `query/operations` | `surface/cli/create.go`, its `cli.Bind`, replacing `surface/cli/wt/create.go` |
-| `cli.Bind`, `render.Detail`, the v2 envelope, the form (`surface/tui/form`) | `internal/flow/legacy`, the bridge (below) |
-| the ports: `infra/git` (`git.Repo`, `gittest.Fake`), `store/` (`MetaDisk`, `ConfigDisk`, `EnvDisk`, `storetest.Fake`) | the `rules/` and `domain/` sub-packages its decisions move to |
-| the engine's services: `service/gitwt`, `identity`, `runenv`, `hooks.Execute` | |
-| the `archlint` rows of `command/` and `flow/legacy`, armed before those packages exist | |
-
-The examples below are written for `command/create`; the create-shaped fixtures of the engine are the working version of each one:
+The examples below are written for `command/create`, which is their working version; the create-shaped fixtures of the engine show each piece alone:
 
 | Fixture | Shows |
 | -- | -- |
@@ -267,14 +257,9 @@ In the PR that moves the command:
 5. The table of [architecture.md](architecture.md#where-each-command-runs).
 6. The `build-validator` subagent, and the command seen running in the `wtm-sandbox`.
 
-## The bridge: `flow/legacy`
+## The consumers still on `flow/`
 
-Two consumers on `flow/` use `create` today: `flow/extract`, which embeds create's steps (`create.Embed`) and provisions a new target through them, and the dashboard (`startCreate` in `surface/tui/dashboard/actions.go`), which runs `createflow.Run` in a modal. Once `create` is on the engine, they reach it through `internal/flow/legacy`, which the pilot writes:
-
-- **One way.** `flow/legacy` imports `kernel`, `dispatch`, `flow`, `domain` and `rules`, never `command/`; nothing on the engine imports it, and only `surface/cli` does (`layers`). The other packages of `flow/` still reach neither `kernel` nor `dispatch`.
-- **Through interfaces the consumers declare.** `flow/extract` declares, in `flow` terms, what it needs of create — its steps, their presets, the recap lines, the provision of one branch — where `create.Embedded` is today; the dashboard declares what it runs. `surface/cli` builds `flow/legacy` from the registry's entry and hands it to both; the dashboard never imports `flow/legacy` or `dispatch`.
-- **`flow/create`** leaves with the pilot: its run is the command's, its steps the command's fields, and what `extract` embeds is answered by the bridge over the entry (`State`, `Choices`, a run).
-- **`flowtest`** stays the double of the commands on `flow/`: `flow/extract` keeps its tests, with a double of the interface it declares in place of `create.Embed`. A command on the engine is tested with `dispatchtest`.
+`flow/extract`, which embeds create's steps (`create.Embed`), and the dashboard (`startCreate` in `surface/tui/dashboard/actions.go`), which runs `createflow.Run` in a modal, still use `internal/flow/create`. There is no bridge from the old model to the new one: each moves onto the engine itself — `extract` as a command of its own reusing `command/provision`, the dashboard hosting `surface/tui/form` in its modal — and `flow/create` leaves with the last of them.
 
 ## A command on `flow/`
 

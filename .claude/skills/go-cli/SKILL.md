@@ -122,7 +122,7 @@ internal/
                                 registry, form calls, Run (locks → Observe → Validate → Plan →
                                 fingerprint → Apply), operation events (docs/dev/dispatch.md)
   command/                    ← the mutations on the engine, one package per command, run through dispatch
-                                (none yet: create/ is written by its pilot; docs/dev/adding-a-mutation-command.md)
+                                (create/, provision/ its unit shared with checkout and extract; docs/dev/adding-a-mutation-command.md)
   query/operations/           ← the operations in progress, read from their holder files
   registry/                   ← the composition root (registry.Production): every command and query with its
                                 real ports; the only importer of command/ and query/ (testutil/ aside), imported by surface/cli

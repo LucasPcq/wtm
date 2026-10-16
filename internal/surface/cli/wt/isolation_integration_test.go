@@ -191,24 +191,6 @@ func TestCreateJSONOfAVerbatimWorktreeHasNoPortPass(t *testing.T) {
 	}
 }
 
-func TestCreateWarnsAnIsolationTheExistingWorktreeIgnores(t *testing.T) {
-	isolationRepo(t)
-	if _, _, err := runWtCmd(t, domain.CmdCreate, "feat/e", "--from", "main", "--yes"); err != nil {
-		t.Fatalf("create: %v", err)
-	}
-	out, _, err := runWtCmd(t, domain.CmdCreate, "feat/e", "--from", "main", "--yes", "--"+domain.FlagIfNotExists, "--"+domain.FlagIsolation, "verbatim", "--output", domain.OutputJSON)
-	if err != nil {
-		t.Fatalf("create --if-not-exists: %v", err)
-	}
-	res := decodeCreated(t, out)
-	if !res.AlreadyExists || res.Isolation != domain.IsolationIsolated {
-		t.Errorf("result = %+v, want the existing isolated worktree", res)
-	}
-	if len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], "--isolation verbatim ignored") {
-		t.Errorf("warnings = %v, want the ignored flag named", res.Warnings)
-	}
-}
-
 func TestExtractJSONReportsTheTargetsIsolationAndEnvPorts(t *testing.T) {
 	dir := isolationRepo(t)
 	writeWorktreeFile(t, dir, "moved.txt", "x\n")

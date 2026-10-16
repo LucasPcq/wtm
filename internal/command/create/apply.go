@@ -120,7 +120,7 @@ func (r applyRun) unitParams(planned Planned) provision.UnitParams {
 			Source:     req.From,
 			ParentPath: f.Identity.CheckedOutAt(req.From),
 			Strategy:   req.EnvFrom,
-			Isolation:  r.in.Plan.Detail.Isolation,
+			Isolation:  isolationOf(req, f),
 			Origin:     originOf(f, planned),
 		},
 	}

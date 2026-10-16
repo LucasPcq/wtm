@@ -50,6 +50,25 @@ func TestAnAppliedRunWritesItsItemsWithTheirErrorsInWords(t *testing.T) {
 	}`, out.String())
 }
 
+func TestAnItemKeepsTheWarningsAboutItsSubject(t *testing.T) {
+	var out bytes.Buffer
+
+	require.NoError(t, render.WriteEnvelope(&out, render.EnvelopeParams{
+		Command: "make",
+		OK:      true,
+		Items:   []kernel.Item[json.RawMessage]{{Subject: "feat/a", Status: kernel.StatusDone, Warnings: []kernel.Warning{{Code: kernel.CodeLocksUnavailable}}, Detail: json.RawMessage(`"/wt/feat/a"`)}},
+		Wording: wording,
+	}))
+
+	assert.JSONEq(t, `{
+		"v": 2, "command": "make", "ok": true,
+		"items": [{"subject": "feat/a", "status": "done", "detail": "/wt/feat/a",
+		           "warnings": [{"code": "locks.unavailable", "message": "ran without operation locks"}]}],
+		"follow_ups": [],
+		"warnings": []
+	}`, out.String())
+}
+
 func TestAnInvalidRequestNamesEachFieldByItsPathAndItsFlag(t *testing.T) {
 	var out bytes.Buffer
 	invalid := kernel.Invalid([]kernel.FieldError{

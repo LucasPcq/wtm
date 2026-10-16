@@ -6,16 +6,27 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 ### Breaking
 
+- **`wtm create --output json`** writes the v2 envelope, a refusal included: read `.items[0].detail.path` instead of `.results[0].path`. → [Migrating to 0.30](docs/guide/migrating-to-0.30.md)
+- **`wtm create`** exits `2` for a request it refuses (a branch held elsewhere, a taken folder, an unknown `--from`) instead of `10` / `11`, the reason in `error.fields`. → [Migrating to 0.30](docs/guide/migrating-to-0.30.md#exit-codes-of-create)
+- **`wtm create a b c`** refuses the whole call, nothing created, when one branch's folder is taken. → [Migrating to 0.30](docs/guide/migrating-to-0.30.md#a-batch-is-checked-whole-before-it-runs)
 - **`env_ports` and `env --output json`** no longer carry linked values (`current_value`, `new_value`, `foreign_host`, restored `from` / `to`): read `moves` and restored `ports`, or pass `wtm env --show-values`. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
 
 ### Added
 
+- **`wtm create --dry-run`** prints the plan and its fingerprint; **`--expect-fingerprint`** applies exactly that plan, or refuses with exit `25` if the repository changed. → [Migrating to 0.30](docs/guide/migrating-to-0.30.md)
+- **`wtm create --remember env_from|isolation|fast_forward`** keeps an answer for the repository once a worktree is created. → [Remembered answers](docs/guide/configuration.md#remembered-answers)
+- **Operation locks**: a second wtm on a worktree `create` is working on exits `24`, naming the operation that holds it. → [State files](docs/guide/state.md#locks)
 - **"Always use this answer"** in the wizards of `create`, `checkout` and `extract`: tick it with `tab` and the env strategy, the isolation or the source fast-forward is no longer asked in that repository; `--ask` asks again. → [Remembered answers](docs/guide/configuration.md#remembered-answers)
 - **`wtm status [worktree]`** reads a worktree's isolation, missing `.env` files and jobs in one document, each problem with the command that fixes it; `--all` reads every worktree. → [A worktree's state](docs/guide/status.md)
 - **Exit code `22`**: a state file written by a newer wtm is read but never rewritten; upgrade wtm to change it. → [State files](docs/guide/state.md#versions)
 
+### Changed
+
+- **`wtm create --output json`** needs no `--yes`; **`--ff`** never asks to go on from a source it could not fast-forward, it warns instead. → [Migrating to 0.30](docs/guide/migrating-to-0.30.md)
+
 ### Fixed
 
+- **`wtm create`** that fails after `git worktree add` (copying a `.env`, writing its record) removes the worktree and the branch it created instead of leaving them half made.
 - **Two wtm commands at once** keep each other's change to a worktree's `meta.json`, to the remembered answers and to a key of a `.env` wtm manages, and a crash or an interrupt never leaves a state file, a `.env` or a compose file half written. → [State files](docs/guide/state.md#how-these-files-are-written)
 - **`wtm relocate`** and **`wtm run init`** change only `base_path` or the `.env` targets of `config.toml`: they no longer write the defaults in, nor erase an answer remembered in the meantime. → [Remembered answers](docs/guide/configuration.md#remembered-answers)
 - **`wtm env`** prints no text read from a value — only the ports and addresses wtm writes and its `[[env]]` values — so no password reaches its text or JSON, whatever the connection-string format. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)

@@ -2,7 +2,7 @@
 
 `internal/dispatch/` is the impure half of the command engine, beside the pure contract of [commands.md](commands.md): the one way a surface reaches a command or a query. It takes the operation locks, observes, fills in the defaults, validates, plans, checks the fingerprint, applies and publishes what happened, in the same order for every command, so the locks, the fingerprint and the events apply whatever the surface (the CLI, the form, later an API).
 
-Its surfaces are the generated command line ([cli.md](cli.md)) and the interactive form ([form.md](form.md)). No command runs through it yet: the registry holds the `operations` query, and `create` is the first command (step 3 of LUC-283).
+Its surfaces are the generated command line ([cli.md](cli.md)) and the interactive form ([form.md](form.md)). The registry holds `create`, the first command, and the `operations` query.
 
 ## Building it
 

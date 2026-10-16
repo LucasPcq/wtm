@@ -2,6 +2,7 @@ package render
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 	"unicode"
@@ -231,7 +232,7 @@ func renderEnvSurfaces(t *testing.T, value, source string) []string {
 			outs = append(outs, text.String(), json.String())
 		}
 		var create, extract, checkout bytes.Buffer
-		if err := WriteWorktreeCreateJSON(&create, domain.CreateBatchResult{Results: []domain.CreateResult{{EnvPorts: plan}}}); err != nil {
+		if err := json.NewEncoder(&create).Encode(rules.RedactEnvPortPlan(plan)); err != nil {
 			t.Fatal(err)
 		}
 		if err := WriteExtractJSON(&extract, domain.ExtractResult{EnvPorts: plan}); err != nil {

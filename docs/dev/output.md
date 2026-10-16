@@ -232,7 +232,7 @@ In JSON, every run — a refusal before it started included, a flag cobra could 
 
 - `v` is `2` (`render.EnvelopeVersion`); `command` the entry's name; `ok` false whenever there is an `error`.
 - `op` is the operation's id, the one its `operation.*` events and its holder file carry.
-- An applied run has `items`; a dry run has `plan` (the plan's detail) and `fingerprint` instead; a query has `view`. `follow_ups` and `warnings` are always arrays.
+- An applied run has `items`, each with the `warnings` about its subject when it has any (each a `code`, its `params` and its `message`); a dry run has `plan` (the plan's detail) and `fingerprint` instead; a query has `view`. `follow_ups` and `warnings` are always arrays.
 - `error` is the `kernel.Error` serialised (`kind`, `code`, `params`, `follow_up`), plus `message` from the catalogue; an `invalid` one lists its `fields`, each with its `path` in the request, the `flag` that sets it and its `message`; a `refused` one its `blockers`, with the `flag` that lifts each. An item's `error` has the same shape.
 - `--yes` is implied: accepted, without effect.
 
@@ -250,7 +250,7 @@ A command on the engine exits on its error's code when the table lists it, else 
 | `precondition` (`plan.stale`) | 25 |
 | `not_found`, `internal` | 1, or the code of the sentinel an internal error wraps (`21` outside a repository) |
 
-A batch exits on its first interrupted item (cancelled, or skipped because of the interrupt), else on its first failed item, else 0. A command on the engine keeps, as its own codes, the numbers its legacy errors had (10 to 18). The legacy commands keep `rules.ExitCode`.
+A batch exits on its first interrupted item (cancelled, or skipped because of the interrupt), else on its first failed item, else 0. A command on the engine declares an exit code of its own only for an error that ends the whole run (`create.config_not_found` → 12); an invalid request exits 2 whatever the field, the reason being in the envelope (`error.fields[].code`). The legacy commands keep `rules.ExitCode`.
 
 ## Showing without keeping
 

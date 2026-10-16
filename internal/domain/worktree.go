@@ -210,13 +210,6 @@ type BatchFailure struct {
 	Privileged bool `json:"-"`
 }
 
-type CreateBatchResult struct {
-	Results []CreateResult `json:"results"`
-	Failed  []BatchFailure `json:"failed"`
-	// Skipped are the branches an interrupt stopped the run before: nothing created.
-	Skipped []PruneSkip `json:"skipped,omitempty"`
-}
-
 // CleanParams holds inputs for cleaning a worktree.
 type CleanParams struct {
 	ProjectDir string

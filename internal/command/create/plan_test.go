@@ -23,7 +23,15 @@ func TestThePlanSaysWhatBecomesOfEachBranch(t *testing.T) {
 	}, plan.Detail.Branches)
 	assert.Equal(t, "main", plan.Detail.From)
 	assert.Equal(t, domain.EnvStrategyMain, plan.Detail.EnvFrom)
-	assert.Equal(t, domain.IsolationIsolated, plan.Detail.Isolation)
+	assert.Empty(t, plan.Detail.Isolation)
+}
+
+func TestThePlanNamesTheIsolationOnlyWhenTheRunIsolatesSomething(t *testing.T) {
+	w := newWorld(t, seed{Run: jobs})
+
+	plan := w.preview(t, create.Request{Branches: []string{branch}, Isolation: domain.IsolationVerbatim})
+
+	assert.Equal(t, domain.IsolationVerbatim, plan.Detail.Isolation)
 }
 
 func TestThePlanFastForwardsOnlyWhatIsBehindAndOnlyWhenAsked(t *testing.T) {

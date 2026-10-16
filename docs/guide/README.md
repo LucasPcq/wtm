@@ -34,5 +34,6 @@ Opt-in: nothing in this section applies until `wtm run init` writes `run.toml`.
 
 ## Upgrading
 
+- **[Migrating to 0.30](migrating-to-0.30.md)**: `wtm create`'s v2 JSON envelope, its exit codes, the batch checked whole.
 - **[Migrating to 0.29](migrating-to-0.29.md)**: the `create` / `clean --output json` envelopes, two exit codes.
 - **[Migrating to 0.28](migrating-to-0.28.md)**: the `run` module, hooks, commands and JSON that changed since 0.27.

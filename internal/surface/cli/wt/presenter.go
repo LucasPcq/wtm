@@ -8,7 +8,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	cleanflow "github.com/LucasPcq/wtm/internal/flow/clean"
-	createflow "github.com/LucasPcq/wtm/internal/flow/create"
 	envflow "github.com/LucasPcq/wtm/internal/flow/env"
 	execflow "github.com/LucasPcq/wtm/internal/flow/exec"
 	extractflow "github.com/LucasPcq/wtm/internal/flow/extract"
@@ -38,93 +37,6 @@ func batchFailed(p shared.CLIPresenter, failure domain.BatchFailure) {
 	}
 	render.Error(shared.OpenBlock(p.Cmd.ErrOrStderr(), false),
 		fmt.Sprintf(domain.BatchFailedFmt, failure.Branch, failure.Error))
-}
-
-type createPresenter struct {
-	shared.CLIPresenter
-	config shared.ConfigResult
-}
-
-func (p createPresenter) BranchStarted(progress flow.Progress) {
-	batchStarted(p.CLIPresenter, progress)
-}
-
-func (p createPresenter) BranchCreated(domain.CreateResult) {}
-
-func (p createPresenter) BranchFailed(failure domain.BatchFailure) {
-	batchFailed(p.CLIPresenter, failure)
-}
-
-func (p createPresenter) Created(outcome createflow.Outcome) error {
-	if p.Format == domain.OutputJSON {
-		return render.WriteWorktreeCreateJSON(p.Cmd.OutOrStdout(), domain.CreateBatchResult{
-			Results: nonNil(outcome.Results),
-			Failed:  nonNil(outcome.Failed),
-			Skipped: outcome.Skipped,
-		})
-	}
-	switch {
-	case len(outcome.Results)+len(outcome.Failed)+len(outcome.Skipped) > 1:
-		p.batch(outcome)
-	case len(outcome.Results) == 1:
-		p.single(outcome.Results[0], outcome.FromBranch)
-	}
-	return nil
-}
-
-func nonNil[T any](items []T) []T {
-	if items == nil {
-		return []T{}
-	}
-	return items
-}
-
-func (p createPresenter) batch(outcome createflow.Outcome) {
-	rows := make([]render.CreateBatchRow, 0, len(outcome.Results))
-	for _, result := range outcome.Results {
-		rows = append(rows, render.CreateBatchRow{
-			Branch:        result.Branch,
-			Path:          createDisplayPath(displayPathParams{Config: p.config.Config, ProjectDir: p.config.ProjectDir, Path: result.Path}),
-			AlreadyExists: result.AlreadyExists,
-		})
-	}
-	render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-		render.FormatCreateBatch(w, render.CreateBatchParams{Created: rows, Failed: outcome.Failed, Skipped: outcome.Skipped})
-	})
-}
-
-func (p createPresenter) single(result domain.CreateResult, from string) {
-	// A reused branch's divergence from origin is the one thing "Created worktree x
-	// on existing branch" would leave out, and a prompt-free run has no wizard to
-	// have shown it.
-	var reusedNote shared.ReusedBranchNoteResult
-	if result.ExistingBranch {
-		reusedNote = shared.ReusedBranchNote(shared.ReusedBranchNoteParams{
-			Branch: result.Branch,
-			Ahead:  result.OriginAhead,
-			Behind: result.OriginBehind,
-		})
-	}
-
-	render.Frame(p.Cmd.OutOrStdout(), func(w io.Writer) {
-		render.FormatCreateResult(w, render.CreateResultParams{
-			Branch:        result.Branch,
-			AlreadyExists: result.AlreadyExists,
-			From:          from,
-			EnvStrategy:   string(result.Metadata.EnvStrategy),
-			EnvNote:       rules.EnvPortSettlementNote(result.EnvPorts),
-			Path: createDisplayPath(displayPathParams{
-				Config:     p.config.Config,
-				ProjectDir: p.config.ProjectDir,
-				Path:       result.Path,
-			}),
-			ExistingBranch:    result.ExistingBranch,
-			ReusedNote:        reusedNote.Text,
-			ReusedNoteWarning: reusedNote.Warning,
-			Upstream:          result.Upstream,
-			GoCommand:         fmt.Sprintf(domain.GoCommandFmt, result.Branch),
-		})
-	})
 }
 
 type cleanPresenter struct {
@@ -445,4 +357,11 @@ func (p extractPresenter) Extracted(outcome extractflow.Outcome) error {
 		}
 	})
 	return nil
+}
+
+func nonNil[T any](items []T) []T {
+	if items == nil {
+		return []T{}
+	}
+	return items
 }

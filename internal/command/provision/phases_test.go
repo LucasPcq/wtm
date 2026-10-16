@@ -27,6 +27,9 @@ func TestAPortLinkedWorktreeIsNumberedAndItsEnvMovedOntoItsPorts(t *testing.T) {
 	assert.Equal(t, 1, *item.Detail.Ordinal)
 	assert.True(t, item.Detail.Allocated)
 	assert.True(t, item.Detail.EnvPorts.Applied)
+	for _, entry := range item.Detail.EnvPorts.Entries {
+		assert.Empty(t, entry.CurrentValue+entry.NewValue+entry.ForeignHost, "a value of the .env left the worktree")
+	}
 	assert.NotContains(t, readFile(t, filepath.Join(w.path(branch), ".env")), "PORT=3000")
 	recorded, err := w.meta.Load(branch)
 	require.NoError(t, err)

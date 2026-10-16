@@ -16,6 +16,10 @@ Everything wtm knows about a repository lives under its git common directory (`.
 ├── exec/<branch>.log         # the whole output of the last wtm exec in that worktree
 ├── pending-removals.toml     # namespace drops owed by a clean while their service was down
 ├── ordinal.lock              # serialises the allocation of worktree numbers
+├── locks/                    # the operations in progress (wtm create today)
+│   ├── repo.lock             #   held shared by each operation, exclusive by one that changes them all
+│   ├── wt/<branch>.lock      #   held by the operation changing that worktree
+│   └── ops/<op_id>.json      #   who holds them: command, pid, surface, since when, which keys
 └── *.lock                    # one beside each file wtm updates (config.toml.lock, meta.json.lock…)
 ```
 
@@ -24,6 +28,10 @@ Everything wtm knows about a repository lives under its git common directory (`.
 ### How these files are written
 
 Every file wtm keeps is updated the same way: wtm takes a lock on `<file>.lock`, reads the file, changes it, then writes the result to a temporary file it syncs to disk and renames over the original. A reader sees the old content or the new one, never half a file. A worktree's `meta.json`, `config.toml` (except on a re-init, which rewrites it whole), `pending-removals.toml` and `repos.json` are read under that lock too, so two wtm processes changing one of them at the same time both land. The `.env` files wtm edits in a worktree (its ports, the keys it owns, a sync) are read under their lock too, and compose files are written the same way; their lock is in the system's temporary directory so no lock file appears in your checkout. On a filesystem without file locks (NFS, some WSL mounts), the write goes ahead without one.
+
+### Locks
+
+A command on wtm's engine (`wtm create` today) takes its locks before it reads the repository and keeps them until it is done: `repo.lock` shared, and the lock of each worktree it changes. It takes them all or none and never waits: a lock another wtm holds makes it stop at once, nothing changed, with exit code `24` and the operation that holds it named, read from its file under `locks/ops/`. A process that dies holds nothing: its locks go with it and its file is removed the next time one is read. `--dry-run` takes none.
 
 ### Versions
 

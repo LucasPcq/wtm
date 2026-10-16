@@ -105,8 +105,8 @@ internal/
                 text/ its message catalogue, kerneltest/ the checks every command runs
   dispatch/     the engine's impure half, the one way a surface reaches a command: registry,
                 locks, Observe → Validate → Plan → fingerprint → Apply, operation events
-  command/      the mutations on the engine, one package per command (create/ is the first,
-                written by its pilot): request, facts, fields, plan, Apply, its codes
+  command/      the mutations on the engine, one package per command (create/; provision/ the
+                unit shared by those that create a worktree): request, facts, fields, plan, Apply, codes
   query/        the reads on the engine (operations/)
   registry/     the composition root: every command and query with its real ports, handed to
                 dispatch; the only importer of command/ and query/

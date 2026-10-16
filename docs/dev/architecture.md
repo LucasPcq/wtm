@@ -1,6 +1,6 @@
 # Architecture — the layers and what they buy
 
-wtm is a Cobra CLI with interactive surfaces (an inline wizard, the form of a command on the engine, the `wtm ui` dashboard) over one set of git operations. The layering exists so that a command is written once and served by every surface. On the engine, a command is a `kernel.Command` in `command/`, assembled by `registry/` and reached through `dispatch/` ([commands.md](commands.md), [dispatch.md](dispatch.md)); no command is there yet, `create` is the first. Every other command is a *flow* in `flow/` — the order of its questions, its safety checks, its service calls — replayed by the wizard and the dashboard ([flow-layer.md](flow-layer.md)).
+wtm is a Cobra CLI with interactive surfaces (an inline wizard, the form of a command on the engine, the `wtm ui` dashboard) over one set of git operations. The layering exists so that a command is written once and served by every surface. On the engine, a command is a `kernel.Command` in `command/`, assembled by `registry/` and reached through `dispatch/` ([commands.md](commands.md), [dispatch.md](dispatch.md)); `create` is there, the first. Every other command is a *flow* in `flow/` — the order of its questions, its safety checks, its service calls — replayed by the wizard and the dashboard ([flow-layer.md](flow-layer.md)).
 
 ## The map
 
@@ -346,11 +346,11 @@ The ordinal is part of the identity, so the env readers never allocate it: `JobE
 
 ## Where each command runs
 
-A new worktree-mutating command is written on the engine, and each command below moves there in turn, `create` first — see [adding-a-mutation-command.md](adding-a-mutation-command.md). Today every one is still a flow; the surfaces each is wired into:
+A new worktree-mutating command is written on the engine, and each command below moves there in turn — see [adding-a-mutation-command.md](adding-a-mutation-command.md). `create` is on the engine; every other one is still a flow. The surfaces each is wired into:
 
 | Command | Flow lives in | Surfaces |
 | -- | -- | -- |
-| `create` | `internal/flow/create` | CLI wizard, unattended, dashboard |
+| `create` | `internal/command/create` (the engine); `internal/flow/create` for the dashboard and `extract` until they move | CLI form, unattended, JSON v2; dashboard |
 | `clean` | `internal/flow/clean` | CLI wizard, unattended, dashboard |
 | `reparent` | `internal/flow/reparent` | CLI wizard, unattended, dashboard |
 | `prune` | `internal/flow/prune` | CLI wizard, unattended, dashboard |

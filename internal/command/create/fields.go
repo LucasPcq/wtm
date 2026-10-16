@@ -19,10 +19,11 @@ const (
 	labelIfNotExists = "If not exists"
 	describeBranches = "The branches to create a worktree for; one that already exists is checked out as it is"
 	describeSource   = "The branch a new branch starts from, or the parent recorded for wtm sync of one that already exists"
-	describeEnv      = "How the .env files of the new worktrees are provisioned"
-	describeFF       = "Fast-forward to origin first the branch each worktree starts from, when it is behind"
+	describeEnv      = "How the .env files of the new worktrees are provisioned: example (from its template), main (copied from the main checkout) or parent (from the source's worktree); defaults to config.toml's strategy"
+	describeIsolate  = "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated"
+	describeFF       = "Fast-forward to origin first the branch each worktree starts from, when it is behind; one that has diverged or holds uncommitted changes starts as it is"
 	describeIfNot    = "Succeed without a change when the worktree already exists (idempotent)"
-	describeRemember = "The answers to always use in this repository"
+	describeRemember = "The answers to always use in this repository: env_from, isolation, fast_forward"
 	updateFF         = "ff"
 	updateKeep       = "keep"
 )
@@ -218,7 +219,7 @@ func envField() kernel.FieldDef[Request, Facts] {
 func isolationField() kernel.FieldDef[Request, Facts] {
 	return kernel.FieldDef[Request, Facts]{
 		Spec: kernel.FieldSpec{
-			Path: PathIsolation, Type: kernel.FieldSelect, Label: domain.IsolationStepName, Description: domain.IsolationStepDescription,
+			Path: PathIsolation, Type: kernel.FieldSelect, Label: domain.IsolationStepName, Description: describeIsolate,
 			Rememberable: true, Constraints: kernel.Constraints{Enum: isolations},
 		},
 		Skip: func(_ Request, f Facts) (bool, kernel.Code) {

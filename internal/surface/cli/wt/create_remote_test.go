@@ -7,8 +7,6 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	createflow "github.com/LucasPcq/wtm/internal/flow/create"
-	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
 )
 
 // pushedOnlyRepo is a project whose branch exists only on origin, one commit
@@ -59,25 +57,4 @@ func TestWtCreateResumesARemoteOnlyBranch(t *testing.T) {
 		t.Errorf("result = %+v, want upstream origin/feat/remote on a branch created locally", got)
 	}
 	assertTracksOrigin(t, work, "feat/remote", tip)
-}
-
-func TestWtCreateWizardResumesARemoteOnlyBranch(t *testing.T) {
-	work, tip := pushedOnlyRepo(t, "feat/remote")
-	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{
-		createflow.KeyBranch:    "feat/remote",
-		createflow.KeySource:    "main",
-		createflow.KeyEnv:       "",
-		createflow.KeyIsolation: string(domain.IsolationIsolated),
-		createflow.KeyRecap:     "create",
-	}}
-	onATerminal(t, prompter)
-
-	stdout, _, err := runWtCmd(t, domain.CmdCreate)
-	if err != nil {
-		t.Fatalf("create: %v", err)
-	}
-	assertTracksOrigin(t, work, "feat/remote", tip)
-	if !strings.Contains(stdout, "from origin/feat/remote") {
-		t.Errorf("output %q should say the branch resumes origin/feat/remote", stdout)
-	}
 }

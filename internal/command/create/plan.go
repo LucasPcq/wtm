@@ -24,7 +24,7 @@ type Plan struct {
 	Branches    []Planned          `json:"branches"`
 	From        string             `json:"from,omitempty"`
 	EnvFrom     domain.EnvStrategy `json:"env_from"`
-	Isolation   domain.Isolation   `json:"isolation"`
+	Isolation   domain.Isolation   `json:"isolation,omitempty"`
 	FastForward []string           `json:"fast_forward,omitempty"`
 	Remember    []string           `json:"remember,omitempty"`
 }
@@ -50,7 +50,7 @@ func plan(_ context.Context, req Request, f Facts) (kernel.Plan[Plan], error) {
 			Branches:    branches,
 			From:        req.From,
 			EnvFrom:     req.EnvFrom,
-			Isolation:   isolationOf(req, f),
+			Isolation:   plannedIsolation(req, f),
 			FastForward: fastForwarded(req, f),
 			Remember:    req.Remember,
 		},
@@ -85,6 +85,13 @@ func plannedOf(params plannedParams) (Planned, error) {
 		return Planned{Branch: branch, Path: path, Action: ActionResume, Upstream: target.Upstream}, nil
 	}
 	return Planned{Branch: branch, Path: path, Action: ActionCreate}, nil
+}
+
+func plannedIsolation(req Request, f Facts) domain.Isolation {
+	if !rules.IsolationApplies(f.Run) {
+		return ""
+	}
+	return isolationOf(req, f)
 }
 
 func isolationOf(req Request, f Facts) domain.Isolation {

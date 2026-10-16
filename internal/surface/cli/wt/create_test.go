@@ -1,15 +1,15 @@
 package wt
 
 import (
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/LucasPcq/wtm/internal/command/create"
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/kernel"
 	"github.com/LucasPcq/wtm/internal/testutil/gittest"
 )
 
@@ -112,17 +112,8 @@ func TestWtCreateBranchCheckedOutElsewhereFails(t *testing.T) {
 	gitRun(t, dir, "worktree", "add", filepath.Join(t.TempDir(), "taken"), branch)
 
 	_, _, err := runWtCmd(t, domain.CmdCreate, branch, "--output", domain.OutputJSON, "--"+domain.FlagYes)
-	if err == nil {
-		t.Fatal("expected an error for a branch already checked out elsewhere")
-	}
-	if !errors.Is(err, domain.ErrWorktreeExists) {
-		t.Errorf("error = %v, want it to wrap ErrWorktreeExists", err)
-	}
-	if code := rules.ExitCode(err); code != domain.ExitCodeWorktreeExists {
-		t.Errorf("exit code = %d, want %d", code, domain.ExitCodeWorktreeExists)
-	}
-	if !strings.Contains(err.Error(), "wtm go "+branch) {
-		t.Errorf("error %q should hint at `wtm go %s`", err, branch)
+	if code := fieldCodes(t, err)["branches[0]"]; code != create.CodeCheckedOutElsewhere {
+		t.Errorf("refused on %q, want %q", code, create.CodeCheckedOutElsewhere)
 	}
 }
 
@@ -185,10 +176,10 @@ func TestWtCreateRefusesTheWorktreeOfABranchSharingItsName(t *testing.T) {
 			args := append([]string{domain.CmdCreate, "feat/x", "--from", "main", "--output", domain.OutputJSON, "--" + domain.FlagYes}, flags...)
 			stdout, _, err := runWtCmd(t, args...)
 
-			if !errors.Is(err, domain.ErrWorktreeNameTaken) || rules.ExitCode(err) != domain.ExitCodeWorktreeExists {
-				t.Errorf("err = %v (exit %d), want ErrWorktreeNameTaken, exit %d", err, rules.ExitCode(err), domain.ExitCodeWorktreeExists)
+			if code := fieldCodes(t, err)["branches[0]"]; code != create.CodeNameClash {
+				t.Errorf("refused on %q, want %q", code, create.CodeNameClash)
 			}
-			if strings.Contains(stdout, "already_exists\": true") {
+			if strings.Contains(stdout, `"unchanged"`) {
 				t.Errorf("stdout hands out feat-x's worktree:\n%s", stdout)
 			}
 		})
@@ -245,11 +236,8 @@ func TestWtCreateExistingBranchRequiresFrom(t *testing.T) {
 	gittest.CreateBranch(t, dir, branch)
 
 	_, _, err := runWtCmd(t, domain.CmdCreate, branch, "--output", domain.OutputJSON, "--"+domain.FlagYes)
-	if err == nil {
-		t.Fatal("an existing branch must not silently inherit base_branch as its parent")
-	}
-	if !strings.Contains(err.Error(), "--"+domain.FlagFrom) {
-		t.Errorf("error %q should name the --%s flag", err, domain.FlagFrom)
+	if code := fieldCodes(t, err)[create.PathFrom]; code != kernel.CodeRequired {
+		t.Errorf("refused on %q, want --%s required", code, domain.FlagFrom)
 	}
 
 	// A branch git creates keeps its base_branch default — its start-point is a fact.

@@ -17,6 +17,9 @@ import (
 
 func runWtCmd(t *testing.T, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
+	if len(args) > 0 && args[0] == domain.CmdCreate {
+		return createThroughEngine(t, args[1:])
+	}
 	root := &cobra.Command{Use: domain.AppName}
 	root.AddGroup(
 		&cobra.Group{ID: domain.CmdGroupWorktrees, Title: domain.CmdGroupWorktreesTitle},

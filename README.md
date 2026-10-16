@@ -215,7 +215,7 @@ Everything below is also on the **[documentation site](https://wtm.sh/docs/)**, 
 - **[User guide](docs/guide/README.md):** [configuration](docs/guide/configuration.md), [isolation](docs/guide/isolation.md), [jobs and profiles](docs/guide/jobs-and-profiles.md), [how `wtm run` works](docs/guide/how-run-works.md), [shared services](docs/guide/shared-services.md), [named URLs](docs/guide/addressing.md), the [`run.toml` reference](docs/guide/run-toml.md), [where wtm keeps its state](docs/guide/state.md).
 - **For integrations:** [integrations](docs/guide/integrations.md), [the event stream](docs/guide/events.md), and [`llms.txt`](llms.txt), the same pages as an index for LLMs and agents.
 - **[Command reference](docs/wtm.md)**, generated from `--help`.
-- **[Changelog](CHANGELOG.md)**, and the migration guides: [to 0.29](docs/guide/migrating-to-0.29.md) (the `create` / `clean` JSON envelope), [to 0.28](docs/guide/migrating-to-0.28.md) (from 0.27).
+- **[Changelog](CHANGELOG.md)**, and the migration guides: [to 0.30](docs/guide/migrating-to-0.30.md) (`create`'s v2 envelope), [to 0.29](docs/guide/migrating-to-0.29.md) (the `create` / `clean` JSON envelope), [to 0.28](docs/guide/migrating-to-0.28.md) (from 0.27).
 
 ## Contributing
 

@@ -75,7 +75,7 @@ rootfreeze internal/domain/tone\.go 6
 rootfreeze internal/domain/tree\.go 16
 rootfreeze internal/domain/upgrade\.go 15
 rootfreeze internal/domain/version\.go 2
-rootfreeze internal/domain/worktree\.go 29
+rootfreeze internal/domain/worktree\.go 28
 rootfreeze internal/domain/worktreestatus\.go 12
 rootfreeze internal/rules/addressing\.go 7
 rootfreeze internal/rules/age\.go 5

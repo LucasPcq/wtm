@@ -19,36 +19,42 @@ wtm events --output json | jq -c 'select(.type == "worktree.provisioned")'
 ## The contract: `--yes` and `--output json`
 
 - **`--output json`** on every data command writes one JSON document on stdout. Human text, warnings and errors go to stderr, so stdout parses as is.
-- **`--yes`** on every command that changes something, or could ask: it never prompts. A decision takes its flag, else a documented safe default that is never destructive (`sync --yes` does not push, `extract --yes` aborts on conflict, `clean --yes` leaves children orphaned unless `--reparent-children`). A required choice with no safe default is an error naming the missing flag, never a picker. JSON mode requires `--yes` on a mutating command: without it, the command exits `2` before doing anything.
+- **`--yes`** on every command that changes something, or could ask: it never prompts. A decision takes its flag, else a documented safe default that is never destructive (`sync --yes` does not push, `extract --yes` aborts on conflict, `clean --yes` leaves children orphaned unless `--reparent-children`). A required choice with no safe default is an error naming the missing flag, never a picker. JSON mode requires `--yes` on a mutating command: without it, the command exits `2` before doing anything. `wtm create`, the first command on the v2 envelope, is unattended in JSON already and needs no `--yes`.
 - **`--force`** is a separate axis: it lifts safety refusals (dirty, unpushed, open PR, locked, foreign data) and never implies `--yes`.
 - **`--quiet`** silences the human report only: errors, the exit code and the JSON still come through.
 
 ```console
-$ wtm create feat/login --if-not-exists --yes --output json
+$ wtm create feat/login --if-not-exists --output json
 {
-  "results": [
+  "v": 2,
+  "command": "create",
+  "ok": true,
+  "op": "3f2a9c01e4b7d6a8",
+  "items": [
     {
-      "branch": "feat/login",
-      "path": "/code/.trees/feat-login",
-      "metadata": {"source_branch": "main", "created_at": "2026-10-04T16:52:28Z", "env_strategy": "example", "isolation": "isolated"},
-      "already_exists": false,
-      "existing_branch": false,
-      "isolation": "isolated"
+      "subject": "feat/login",
+      "status": "done",
+      "detail": {
+        "path": "/code/.trees/feat-login",
+        "metadata": {"source_branch": "main", "created_at": "2026-10-04T16:52:28Z", "env_strategy": "example", "isolation": "isolated"},
+        "existing_branch": false
+      }
     }
   ],
-  "failed": []
+  "follow_ups": [],
+  "warnings": []
 }
 ```
 
-Check the exit code first, and parse stdout only when it is non-empty. A command that got far enough to have per-item results (`create`, `clean`, `exec`, `run up`, `sync`, `prune`…) writes its whole document, then exits non-zero, with the failures named in it: `create` and `clean` exit with the first failure's code, `exec` with `1`. One that failed before writes nothing on stdout. The exit codes are stable:
+Check the exit code first, and parse stdout only when it is non-empty. A command that got far enough to have per-item results (`create`, `clean`, `exec`, `run up`, `sync`, `prune`…) writes its whole document, then exits non-zero, with the failures named in it: `create` and `clean` exit with the first failure's code, `exec` with `1`. One that failed before writes nothing on stdout, except `create`, whose v2 envelope carries the refusal in `error`, each field it names with its `code` ([Migrating to 0.30](migrating-to-0.30.md)). The exit codes are stable:
 
 | Code | Means |
 | --- | --- |
 | `0` | success |
 | `1` | a generic error; `exec` when any command failed |
 | `2` | bad usage: an unknown flag or command, a value or an argument that does not parse (`checkout feat/c`), two flags that cannot be combined, too many arguments, `--output json` without `--yes` |
-| `10` | the worktree or its path already exists (`create --if-not-exists` turns it into a success when the worktree there holds the requested branch, never when it is another branch's, e.g. `feat-x` for `feat/x`) |
-| `11` | the branch does not exist |
+| `10` | the worktree or its path already exists. `create` exits `2` there, the reason in `error.fields[].code`; `--if-not-exists` turns it into a success when the worktree there holds the requested branch, never when it is another branch's, e.g. `feat-x` for `feat/x` |
+| `11` | the branch does not exist (`create`: `2`, code `not_found`) |
 | `12` | the repository was never initialized with wtm (`wtm init`) |
 | `14` | a job or profile `run.toml` does not declare |
 | `15` | `extract`: the changes conflict with the target worktree |
@@ -59,6 +65,9 @@ Check the exit code first, and parse stdout only when it is non-empty. A command
 | `20` | `events` received an event of a newer schema: upgrade wtm |
 | `21` | not in a git repository (the current directory, or `events --repo`) |
 | `22` | a state file (`config.toml`, `run.toml`, a worktree's `meta.json`, `pending-removals.toml`) was written by a newer wtm: this one reads it but refuses to change it. Upgrade wtm. See [State files](state.md#versions) |
+| `23` | a command on the v2 envelope refused for safety: `error.blockers` name each refusal and the flag that lifts it |
+| `24` | another wtm operation holds the worktree or the repository (`lock.held`, named in `error.params`); nothing changed. See [Locks](state.md#locks) |
+| `25` | the repository changed since the `--dry-run` whose `--expect-fingerprint` was passed (`plan.stale`); nothing changed: preview again |
 
 `wtm resolve <branch>` and `wtm run url --job <name>` print a bare path or URL for `$(…)`: `cd "$(wtm resolve feat/login)"`. Every flag of every command is in `wtm <command> --help` and the [command reference](../wtm.md).
 
