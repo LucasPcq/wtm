@@ -7,7 +7,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-var documented = []dir{"service", "infra", "store", "kernel", "dispatch", "command", "query", "registry", "flow/legacy"}
+var documented = []dir{"service", "infra", "store", "kernel", "dispatch", "command", "query", "registry"}
 
 var pkgdocAnalyzer = &analysis.Analyzer{
 	Name: "pkgdoc",

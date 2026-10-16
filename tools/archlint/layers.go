@@ -33,10 +33,6 @@ var layers = map[string]layer{
 		internal: append([]string{"command", "config", "dispatch", "domain", "infra", "kernel", "query", "rules", "service/process", "store"}, engineServicePaths()...),
 		why:      "the composition root: every command and query with its real ports, handed to dispatch; the only importer of command/ and query/, imported by the production wiring of the surfaces only; service/process answers the daemon's public proxy port until its client is the port infra/daemon (step 6 of LUC-283)",
 	},
-	"flow/legacy": {
-		internal: []string{"dispatch", "domain", "flow", "kernel", "rules"},
-		why:      "the one-way bridge of the commands still on flow/ to the engine: it reaches a command through dispatch, never command/, and nothing on the engine imports it",
-	},
 	"dispatch": {
 		internal: []string{"domain", "infra", "kernel", "rules"},
 		why:      "the impure half of the engine runs on its own ports: a command's ports reach it as interfaces, never through service/ or a surface",
@@ -85,7 +81,7 @@ var layers = map[string]layer{
 		why:      "the form of a command on the engine, drawn with the wizard's components: it reaches the command through dispatch only, never flow/ or service/",
 	},
 	"surface/cli": {
-		internal: []string{"config", "dispatch", "domain", "flow", "flow/legacy", "infra", "kernel", "registry", "rules", "schemas", "service", "styles", "surface/cli/render", "surface/tui", "surface/tui/form"},
+		internal: []string{"config", "dispatch", "domain", "flow", "infra", "kernel", "registry", "rules", "schemas", "service", "styles", "surface/cli/render", "surface/tui", "surface/tui/form"},
 		external: []string{"github.com/charmbracelet/bubbletea", "github.com/spf13/cobra", "golang.org/x/term"},
 		why:      "the command line: the commands generated from the dispatch registry, and the flag wiring of the commands still on flow/",
 	},

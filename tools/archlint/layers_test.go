@@ -42,16 +42,13 @@ func TestTheStoreWritesForTheServicesNeverForAFlow(t *testing.T) {
 func TestACommandReachesTheWorldThroughItsPortsOnly(t *testing.T) {
 	runTxtar(t, layersAnalyzer, "layers",
 		internalPrefix+"command/create",
-		internalPrefix+"command/prune",
 		internalPrefix+"query/status",
 	)
 }
 
-func TestTheRegistryAndTheLegacyBridgeAreReachedFromTheCommandLineOnly(t *testing.T) {
+func TestTheRegistryIsReachedFromTheCommandLineOnly(t *testing.T) {
 	runTxtar(t, layersAnalyzer, "layers",
 		internalPrefix+"registry",
-		internalPrefix+"flow/legacy",
-		internalPrefix+"flow/extract",
 		internalPrefix+"surface/cli/root",
 		internalPrefix+"surface/tui/dash",
 		internalPrefix+"testutil/commandtest",

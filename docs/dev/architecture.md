@@ -44,9 +44,6 @@ internal/
                                 EnvFiles (the .env files: Copy, Edit), each on disk and doubled in testutil/storetest
   flow/                       ← the flow of each command not yet on the engine, surface-independent
                                 (flow-layer.md): the vocabulary (Step, Session, Prompter, Presenter, Publisher)
-    legacy/                   ←   the one-way bridge of the flows that use a command on the engine (extract's
-                                  create, the dashboard's), reached through interfaces they declare
-                                  (written by the create pilot)
     publish/                  ←   the event a flow publishes after a change to a worktree's
                                   identity, read back from git and meta.json (`wtm events`)
     ordinal/                  ←   allocating a worktree's ordinal from the flow that needs it,
@@ -191,7 +188,6 @@ flowchart TD
   cli --> dispatch["dispatch/"]
   cli --> form["surface/tui/form/"]
   cli --> output["surface/cli/render/"]
-  cli --> legacy["flow/legacy"]
   cli --> flow["flow/"]
   cli --> tui["surface/tui/"]
   cli --> config["config/"]
@@ -201,8 +197,6 @@ flowchart TD
   form --> dispatch
   form --> kernel
   output --> kernel["kernel/"]
-  legacy --> dispatch
-  legacy --> flow
   dispatch --> kernel
   dispatch --> infra["infra/"]
   command --> kernel
@@ -236,7 +230,6 @@ Every arrow that is *missing* is the point:
 | `kernel/` imports only the stdlib | The skeleton carries no business vocabulary: a command composes `kernel` with `domain/`, never the reverse, so a change to the domain never reaches the contract every command, `dispatch` and surface share. I/O reaches it only as functions it is handed (`Observe`, `Apply`, the `Shield`). |
 | `command/` and `query/` never import `dispatch/` or `surface/`; `surface/` never imports them | A surface reaches a command through `dispatch` only, so the locks, the fingerprint and the events apply whatever the interface; a command never runs another inside its own locks. |
 | `registry/` alone imports `command/` and `query/`, and builds their real ports (`testutil/`'s doubles aside); only `surface/cli` imports it | One place says what the product serves and on which disk; `dispatch` stays a generic engine over its own ports, and a test runs a command on doubles without the registry. |
-| `flow/legacy` (written by the create pilot) imports `kernel/`, `dispatch/` and `flow/`, never `command/`; nothing on the engine imports it | Once `create` is on the engine, a flow that still uses it (`extract`, which calls `create.Embed` today) goes through `dispatch` like any surface, and the engine never learns the old model exists. |
 | `service/` never imports cobra, bubbletea or lipgloss | The git operations are callable from a test, a flow, a daemon — anything that is not a terminal. |
 | `surface/cli/render/` and `surface/tui/` hold no decision logic | Two surfaces can render the same run without disagreeing about what it means. `render` reads a command's results from `kernel`, never runs one through `dispatch`. The form asks `dispatch` what a field is (`State`, `Choices`) rather than deciding it. |
 | `surface/tui/form/` reaches a command through `dispatch` only, never `flow/` or `service/` | One form serves every command of the registry without knowing its types, and asks what any other surface would. |
@@ -248,7 +241,7 @@ Every arrow that is *missing* is the point:
 Two more edges are constrained beyond the diagram:
 
 - `service/x` imports `service/y` only along an edge declared in `tools/archlint` (`serviceEdges`): today `detect→branch`, `events→{process,worktree}`, `process→proxy`, `runconfig→shellcmd`, `runjobs→{process,runconfig,worktree}`, `worktree→{branch,env,github,hooks,process}`. `command/x` imports `command/y` only along an edge of `commandEdges`: today `create→provision`.
-- `command/` and `query/` reach `domain/`, `rules/`, `kernel/`, `store/`, `config/`, `infra/git`, `infra/fs`, `infra/proc` and the engine's services only; an interface they declare is sealed, never a port (`ports`), they build no error from English text (`enginetext`), and they never build a real port: `store.MetaDisk`, `git.Repo` and the like are built by `registry/` alone (`portbuild`). `registry/` is the only package importing them (with `testutil/`, for the doubles), and `surface/cli` the only one importing `registry/` and `flow/legacy`, the bridge that reaches a command through `dispatch`. `kernel/` and `rules/` import no stdlib package that does I/O (`os`, `net`, `syscall`).
+- `command/` and `query/` reach `domain/`, `rules/`, `kernel/`, `store/`, `config/`, `infra/git`, `infra/fs`, `infra/proc` and the engine's services only; an interface they declare is sealed, never a port (`ports`), they build no error from English text (`enginetext`), and they never build a real port: `store.MetaDisk`, `git.Repo` and the like are built by `registry/` alone (`portbuild`). `registry/` is the only package importing them (with `testutil/`, for the doubles), and `surface/cli` the only one importing `registry/`. `kernel/` and `rules/` import no stdlib package that does I/O (`os`, `net`, `syscall`).
 - The daemon — `service/process` and `service/proxy`, which it serves — is blind to git: neither imports `service/worktree`, `service/branch`, `service/github`, `service/events` or `config`, and both call only allow-listed `infra/` functions (`fs.GlobalDir`, `fs.ReplaceFile`).
 - git is run by `infra/git` only (`gitexec`); the files at the root of `infra/` that still run it, for the commands on `flow/`, are tracked in `.archlint-migrating`.
 - The services a command on the engine reaches (`service/gitwt`, `identity`, `runenv`, `hooks.Execute`, [services.md](services.md)) import no other service, never `kernel/`, and publish nothing: a mutator returns what it changed, and `dispatch` publishes it.
@@ -256,7 +249,7 @@ Two more edges are constrained beyond the diagram:
 - A file is written through `infra/fs` only (`statewrite`): `os.WriteFile`, `os.Create`, `os.Rename`, `os.Remove`, `os.RemoveAll` and a writing `os.OpenFile` stay inside `infra/`, but for the permanent exceptions listed with their reason in `tools/archlint/statewrite.go`. A state file is written by its owner in `store/` only (`stateowner`): `fs.UpdateFile` and `fs.RemoveDir` are called from nowhere else.
 - A function that reaches a write sink is a mutator, inferred from the code (`writesink`): nothing in `query/` nor in a reader of a command (`Observe`, `Choices`, `Plan`…) reaches one, and a mutator of the engine's services is called from `command/` or another service only.
 - In the engine, `dispatch` alone publishes, through its `Publisher` (`publish`): `command/`, `query/` and the engine's services call no `Publish`.
-- Every package of `service/`, `infra/`, `store/` and of the engine (`kernel/`, `dispatch/`, `command/`, `query/`, `registry/`, `flow/legacy`) says its one responsibility in its package doc (`pkgdoc`).
+- Every package of `service/`, `infra/`, `store/` and of the engine (`kernel/`, `dispatch/`, `command/`, `query/`, `registry/`) says its one responsibility in its package doc (`pkgdoc`).
 - The roots of `rules/` and `domain/` only shrink (`rootfreeze`): no new file or exported symbol there; new code goes into the sub-package of its subject, a presentation rule into the surface that uses it.
 - A service **mutator** (`worktree.Create`, `envsvc.ApplyEnvSync`, `runconfig.Save`, … — the table in `tools/archlint/chokepoint.go`) is called only from `internal/flow/`, whatever the calling layer; a call inside the mutator's own package is its implementation.
 

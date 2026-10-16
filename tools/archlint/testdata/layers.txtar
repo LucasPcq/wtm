@@ -183,12 +183,6 @@ import (
 var _ flow.Step
 
 var _, _, _ = infra.GlobalDir, worktree.Create, render.Message
--- github.com/LucasPcq/wtm/internal/command/prune/prune.go --
-package prune
-
-import "github.com/LucasPcq/wtm/internal/flow/legacy" // want `internal/command must not import "github.com/LucasPcq/wtm/internal/flow/legacy"`
-
-var _ = legacy.Bridge
 -- github.com/LucasPcq/wtm/internal/query/status/status.go --
 package status
 
@@ -200,31 +194,6 @@ import (
 var _ git.Repo
 
 var _ = worktree.Create
--- github.com/LucasPcq/wtm/internal/flow/legacy/legacy.go --
-package legacy
-
-import (
-	"github.com/LucasPcq/wtm/internal/command/create" // want `internal/flow/legacy must not import "github.com/LucasPcq/wtm/internal/command/create" — the one-way bridge`
-	"github.com/LucasPcq/wtm/internal/dispatch"
-	"github.com/LucasPcq/wtm/internal/flow"
-	"github.com/LucasPcq/wtm/internal/kernel"
-)
-
-var _ = dispatch.Run
-
-var _ flow.Step
-
-var _ kernel.Code
-
-var _ = create.Apply
-
-func Bridge() {}
--- github.com/LucasPcq/wtm/internal/flow/extract/extract.go --
-package extract
-
-import "github.com/LucasPcq/wtm/internal/flow/legacy" // want `internal/flow must not import "github.com/LucasPcq/wtm/internal/flow/legacy"`
-
-var _ = legacy.Bridge
 -- github.com/LucasPcq/wtm/internal/registry/registry.go --
 package registry
 
@@ -243,12 +212,9 @@ func Build() {}
 -- github.com/LucasPcq/wtm/internal/surface/cli/root/root.go --
 package root
 
-import (
-	"github.com/LucasPcq/wtm/internal/flow/legacy"
-	"github.com/LucasPcq/wtm/internal/registry"
-)
+import "github.com/LucasPcq/wtm/internal/registry"
 
-var _, _ = legacy.Bridge, registry.Build
+var _ = registry.Build
 -- github.com/LucasPcq/wtm/internal/surface/tui/dash/dash.go --
 package dash
 

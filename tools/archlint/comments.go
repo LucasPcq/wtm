@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	commentedPackages = []dir{"kernel", "dispatch", "command", "query", "registry", "flow/legacy", "store", "infra/git", "infra/fs", "infra/proc", "surface/tui/form"}
+	commentedPackages = []dir{"kernel", "dispatch", "command", "query", "registry", "store", "infra/git", "infra/fs", "infra/proc", "surface/tui/form"}
 	commentedSubjects = []dir{"rules", "domain"}
 	bannerRuns        = []string{"----", "====", "****", "####", "~~~~", "____"}
 )

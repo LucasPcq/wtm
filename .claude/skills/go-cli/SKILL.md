@@ -130,8 +130,6 @@ internal/
   store/                      ← the one writer of each state file (docs/dev/store.md): Meta (meta.json),
                                 ProjectConfig (config.toml: Remember), EnvFiles (.env: Copy, Edit)
   flow/                       ← the flow of each command not yet on the engine, surface-independent
-    legacy/                   ←   the one-way bridge of the flows that use a command on the engine
-                                  (extract's create, the dashboard's), written by the create pilot
     decide/                   ←   branch/env decisions shared by the create-like flows
     create/                   ←   `wtm create`: the run (create.go) + its questions (steps.go)
     clean/                    ←   `wtm clean`: the run (clean.go) + its questions (steps.go)
@@ -190,9 +188,8 @@ internal/
 - `kernel/` imports only the stdlib (not even `domain/`), and writes no text: codes and params only
 - `dispatch/` imports `kernel`, `domain`, `rules`, `infra` only, never `command/`, `query/` or `store/` (`registry/` assembles them); `command/` and `query/` never import `dispatch` or `surface/`, `surface/` never imports them, and `command/` never calls `context.Background()`/`context.TODO()` (archlint `engine`)
 - On the engine a function reads or writes, never both (archlint `writesink`, inferred from the code): nothing in `query/` nor in `Observe`, `Choices` or `Plan` reaches a write sink, and a mutator of the engine's services is called from `command/` only. Only `dispatch` publishes (`publish`): a mutator returns what it changed (`identity.Claim.Allocated`), the command reports it
-- Every package of `service/`, `infra/`, `store/` and of the engine (`kernel/`, `dispatch/`, `command/`, `query/`, `registry/`, `flow/legacy`) opens with a one-sentence package doc (`pkgdoc`)
+- Every package of `service/`, `infra/`, `store/` and of the engine (`kernel/`, `dispatch/`, `command/`, `query/`, `registry/`) opens with a one-sentence package doc (`pkgdoc`)
 - `flow/` imports **only** `internal/service/`, `internal/rules/`, `internal/domain/` and the stdlib — never cobra, bubbletea or lipgloss, and never `surface/` or `config/`. It therefore cannot reach `infra/` either: add a thin `service/` wrapper instead (e.g. `worktree.FindByBranch`, `worktree.ListAll`). `build-validator` step 6 checks this mechanically.
-- `flow/legacy`, the bridge the create pilot writes, is the one package of `flow/` allowed to reach `kernel/` and `dispatch/`, never `command/`; nothing on the engine imports it, and only `surface/cli` does
 - `service/` has zero imports of `cobra`, `bubbletea`, `lipgloss`
 - `surface/cli/render/` and `surface/tui/` have zero decision logic — only rendering; `render` reads results from `kernel`, never runs anything through `dispatch`
 - `surface/tui/form` reaches a command through `dispatch` only (`Entry.Fillable`), never `flow/` or `service/`: which field is asked, its errors and its options come from `State` and `Choices`
@@ -209,7 +206,7 @@ internal/
 
 Steps are `flow.Step` values (`Kind`, `Key`, `Label`, `Title`, `Description`, `Options`, `Skip`, `Build`, `Load`, `Resolve`, `Summarize`, `Flag`). `flow.Operation` (`Kind`, `Mode`, `TargetKey`) is what a flow declares about how a surface must schedule it; the CLI ignores it, `surface/tui/dashboard/ops.go` enforces it.
 
-`create`, `checkout`, `extract`, `clean`, `reparent`, `prune`, `relocate`, `sync`, `fast-forward` and `env` are on `flow/` today. A flow that creates a worktree as part of its own run embeds create's steps through `create.Embed` instead of redeclaring them (`extract`); once `create` is on the engine, `extract` and the dashboard reach it through `flow/legacy`. Full reference: [`docs/dev/flow-layer.md`](../../../docs/dev/flow-layer.md).
+`create` is on the engine; `checkout`, `extract`, `clean`, `reparent`, `prune`, `relocate`, `sync`, `fast-forward` and `env` are on `flow/` today. `extract` embeds create's steps through `create.Embed` (`flow/create`), which the dashboard also runs: both move onto the engine themselves, with no bridge, and `flow/create` leaves with them. Full reference: [`docs/dev/flow-layer.md`](../../../docs/dev/flow-layer.md).
 
 ### 10. Validate before commit — run `build-validator`
 

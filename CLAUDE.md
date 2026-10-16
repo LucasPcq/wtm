@@ -15,7 +15,7 @@ Mandatory coding standards for `wtm`. When in doubt, consult the `go-cli` skill 
 | [`docs/dev/state-files.md`](docs/dev/state-files.md) | writing any file, or changing the format of a state file (`fs.UpdateFile`, `fs.Change`, locks, schema versions) |
 | [`docs/dev/form.md`](docs/dev/form.md) | touching `internal/surface/tui/form`: the interactive form of a command on the engine (its loop over `dispatch`, which field it asks, a field per type, remembering, the recap and the run) |
 | [`docs/dev/flow-layer.md`](docs/dev/flow-layer.md) | touching anything under `internal/flow/`, a Prompter/Presenter, a step kind, or the dashboard's run of a flow |
-| [`docs/dev/adding-a-mutation-command.md`](docs/dev/adding-a-mutation-command.md) | adding a worktree-mutating command or moving one onto the engine: the recipe of a command in `internal/command/` (ports, `Observe`, fields, codes, saga, events, registry, `cli.Bind`, tests), the `flow/legacy` bridge, the recipe of a command still on `flow/` |
+| [`docs/dev/adding-a-mutation-command.md`](docs/dev/adding-a-mutation-command.md) | adding a worktree-mutating command or moving one onto the engine: the recipe of a command in `internal/command/` (ports, `Observe`, fields, codes, saga, events, registry, `cli.Bind`, tests), the consumers of `flow/create` still on `flow/`, the recipe of a command still on `flow/` |
 | [`docs/dev/cli.md`](docs/dev/cli.md) | touching `internal/surface/cli` itself: the root (signals, `--quiet`, exit code), a command generated from the registry (`cli.Bind`, its flags, its run), parity |
 | [`docs/dev/output.md`](docs/dev/output.md) | adding a command or changing what one prints (frame, glyphs, block helpers, `--quiet`, JSON contract, hook view, the generic rendering and the v2 envelope of a command on the engine) |
 | [`docs/dev/lint.md`](docs/dev/lint.md) | adding an `archlint` rule or an exception, or when `make lint` fails and the reason is unclear |
@@ -90,7 +90,7 @@ The engine is the reference (`kernel/` holds one comment line in 1,500 of code):
 - **What stays:** a quirk of git, macOS or `flock` the code cannot show; a workaround with its reference; an ordering invariant or a non-obvious decision (**why, never what**); a one-line package doc; godoc on an exported symbol whose name and signature leave a caller guessing.
 - **What goes:** a comment that restates the name or the code; a doc comment on an unexported declaration (its why moves into the body, beside the line it explains); architecture prose (→ `docs/dev/`); section banners and copied headers in test files.
 
-On the engine's packages (`kernel`, `dispatch`, `command`, `query`, `registry`, `flow/legacy`, `store`, `infra/git|fs|proc`, the engine's services, `rules/<subject>`, `domain/<subject>`, `surface/tui/form`) `make lint` holds the shapes and a per-package ceiling of comment lines that only goes down (`comments`, `docs/dev/lint.md`). When you modify any file, delete the comments in it that restate the code.
+On the engine's packages (`kernel`, `dispatch`, `command`, `query`, `registry`, `store`, `infra/git|fs|proc`, the engine's services, `rules/<subject>`, `domain/<subject>`, `surface/tui/form`) `make lint` holds the shapes and a per-package ceiling of comment lines that only goes down (`comments`, `docs/dev/lint.md`). When you modify any file, delete the comments in it that restate the code.
 
 ## 9. Clean architecture layers
 
@@ -113,8 +113,7 @@ internal/
   config/       load & validate config.toml, run.toml, global config; writes the JSON schema beside each
   store/        the one writer of each state file: meta.json, config.toml's changes, the managed .env files
   flow/         the flow of each command not yet on the engine, surface-independent (one package
-                per command); legacy/ the one-way bridge of those that use a command on the engine
-                (written by the create pilot)
+                per command); create/ stays for extract and the dashboard until they move
   service/      impure orchestration: git exec, I/O, hooks, the run daemon, the event bus; gitwt,
                 identity, runenv and hooks.Execute are the engine's, a reader or a mutator each
   styles/       all Lipgloss styles
@@ -142,7 +141,7 @@ The annotated map of every sub-package is in `docs/dev/architecture.md`.
 - `surface/cli/render/` and `surface/tui/` have zero decision logic — only rendering. `render` reads results from `kernel/`, never runs anything through `dispatch/`.
 - `surface/tui/form` reaches a command through `dispatch/` only (`Entry.Fillable`), never `flow/` or `service/`: it asks `State` and `Choices` what a field is rather than deciding it.
 - `styles/` is the only package allowed to instantiate `lipgloss.Style`.
-- `flow/` imports **only** `internal/service/`, `internal/rules/`, `internal/domain/` and the stdlib — never cobra, bubbletea, lipgloss, `surface/`, `config/` or `infra/`. Need something from `infra/`? Add a thin `service/` wrapper (e.g. `worktree.FindByBranch`). `flow/legacy`, the bridge the create pilot writes, is the one package of `flow/` allowed to reach `kernel/` and `dispatch/`, never `command/`; nothing on the engine imports it, and its consumers get it through an interface they declare, built by `surface/cli`.
+- `flow/` imports **only** `internal/service/`, `internal/rules/`, `internal/domain/` and the stdlib — never cobra, bubbletea, lipgloss, `surface/`, `config/` or `infra/`. Need something from `infra/`? Add a thin `service/` wrapper (e.g. `worktree.FindByBranch`).
 - `service/x` imports `service/y` only along an edge declared in `tools/archlint` (`serviceEdges`).
 - The daemon (`service/process`, `service/proxy`) is blind to git: no `service/worktree|branch|github|events`, no `config`, only allow-listed `infra/` functions.
 - A service **mutator** of the commands on `flow/` (the table in `tools/archlint/chokepoint.go`) is called only from `internal/flow/`, never from `command/`.
