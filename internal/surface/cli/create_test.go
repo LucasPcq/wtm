@@ -68,6 +68,17 @@ func TestCreateInJSONIsTheEnvelopeAndNeedsNoYes(t *testing.T) {
 	assert.Equal(t, treeOf(dir, "feat/a"), envelope.Items[0].Detail.Path)
 }
 
+func TestCreateShowsTheWorktreeRelativeToWhereItRuns(t *testing.T) {
+	dir := createProject(t)
+	t.Chdir(dir)
+
+	got := runCreate(t, "feat/a")
+
+	require.Equal(t, 0, got.Code, got.Stderr)
+	assert.Contains(t, got.Stdout, filepath.Join("..", ".trees", "feat-a"))
+	assert.NotContains(t, got.Stdout, "private")
+}
+
 func TestCreateWithoutABranchIsAUsageErrorNamingTheArgument(t *testing.T) {
 	createProject(t)
 

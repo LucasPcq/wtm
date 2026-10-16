@@ -182,12 +182,20 @@ func reusedNote(branch string, created createItem) (string, bool) {
 	return "", false
 }
 
+func resolvedOr(path string) string {
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return path
+	}
+	return resolved
+}
+
 func shownPath(path string) string {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return path
 	}
-	relative, err := filepath.Rel(cwd, path)
+	relative, err := filepath.Rel(resolvedOr(cwd), resolvedOr(path))
 	if err != nil {
 		return path
 	}

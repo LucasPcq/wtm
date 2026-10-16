@@ -26,11 +26,11 @@ const (
 
 var Messages = text.Messages{
 	CodeEnvNoTemplate:      "no template found for {target}, skipping",
-	CodeEnvSourceMissing:   "{target} not found in {dir}, skipping",
-	CodeEnvParentFallback:  "{target} not found in parent worktree, falling back to main",
+	CodeEnvSourceMissing:   "file {target} not found in {dir}, skipping",
+	CodeEnvParentFallback:  "file {target} not found in the parent worktree, copied from main",
 	CodeEnvPortIgnored:     "env_port {key} in {file} ignored: not a configured env file — add it to [env] in config.toml or drop the link",
 	CodeEnvValueIgnored:    "env {key} in {file} ignored: not a configured env file — add it to [env] in config.toml or drop the link",
 	CodePortsNotSettled:    "{cause} — ports not settled — run `wtm env {branch}` once this is fixed",
 	CodePortsNotSettledRun: "{cause} — ports not settled — run `wtm env {branch}` once run.toml is fixed",
-	CodeLeftBehind:         "{branch} is left half-created at {path}: remove it with `wtm clean --force {branch}`",
+	CodeLeftBehind:         "branch {branch} is left half-created at {path}: remove it with `wtm clean --force {branch}`",
 }
