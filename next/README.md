@@ -40,7 +40,7 @@ A slice declares the interfaces it needs in the file of the struct that holds th
 
 ## Comments
 
-Close to zero. Each package has a one-line package doc; every other comment line counts, godoc and tests included, except a bare directive (`//go:build`, `//go:embed`, `//go:generate`, `//go-sumtype:decl <Type>`, `//nolint:<linters>`, nothing after). A line earns its place only as a why the code cannot show. `.next-comments` holds each package's count (absent = 0); `make lint` (rule `nextcomments`) refuses a package above it (delete, or raise the count in review) or below it (lower the count).
+Close to zero. Each package has a one-line package doc; every other comment line counts, godoc and tests included, except a directive (`//go:…`, `//go-sumtype:…`) and a `//nolint:<linters>` with nothing after it. A line earns its place only as a why the code cannot show. `.next-comments` holds each package's count (absent = 0); `make lint` (rule `nextcomments`) refuses a package above it (delete, or raise the count in review) or below it (lower the count).
 
 ## Cancellation
 

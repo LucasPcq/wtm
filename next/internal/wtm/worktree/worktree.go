@@ -2,11 +2,9 @@
 package worktree
 
 type Worktree struct {
-	Path     string
-	Main     bool
-	Locked   bool
-	Prunable bool
-	State    State
+	Path  string
+	Main  bool
+	State State
 }
 
 //go-sumtype:decl State

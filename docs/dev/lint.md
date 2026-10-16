@@ -67,8 +67,8 @@ The driver loads `internal/` and `next/` in one run (`go run ./tools/archlint [r
 
 | Rule | Catches |
 | -- | -- |
-| `next` | an import outside the package's row of the `next/` import table (`wtm/`, `app/`, `app/<slice>`, `adapter/<name>`, `surface/*`, `cmd/`), a package in no row (the root of `next/` included), an import of `internal/` from a source or a test file, and a fake (`adapter/<name>test` beside an `adapter/<name>`) imported from anything but a test or its own adapter |
-| `nextcomments` | a package of `next/` without a one-line package doc, a banner or header in a test file, and a package whose other comment lines — godoc included, tests included; free are the package doc and a bare directive (`//go:build`, `//go:embed`, `//go:generate`, `//go-sumtype:decl <Type>`, `//nolint:<linters>` with nothing after) — differ from its line in `.next-comments` (absent = 0). Above is a finding to delete comments or raise the line in review; below is a finding to lower it, so a ceiling only goes down by itself. A line whose package no longer exists, or a package with two lines, stops archlint |
+| `next` | an import outside the package's row of the `next/` import table (`wtm/`, `app/`, `app/<slice>`, `adapter/<name>`, `surface/*`, `cmd/`), a package in no row (the root of `next/` included), an import of `internal/` from a source or a test file, and a fake (`adapter/<name>test`) imported from anything but a test or the adapter it fakes |
+| `nextcomments` | a package of `next/` without a one-line package doc, a banner or header in a test file, and a package whose other comment lines — godoc included, tests included; free are the package doc, a directive (`//go:…`, `//go-sumtype:…`) and a `//nolint:<linters>` with nothing after it — differ from its line in `.next-comments` (absent = 0). Above is a finding to delete comments or raise the line in review; below is a finding to lower it, so a ceiling only goes down by itself. A line whose package no longer exists, or a package with two lines, stops archlint |
 
 ### Adding a rule
 

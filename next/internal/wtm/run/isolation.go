@@ -1,5 +1,7 @@
 package run
 
+import "slices"
+
 type Isolation string
 
 const (
@@ -12,7 +14,7 @@ func Isolations() []Isolation {
 }
 
 func (i Isolation) Valid() bool {
-	return i == Isolated || i == Verbatim
+	return slices.Contains(Isolations(), i)
 }
 
 func (i Isolation) Effective() Isolation {

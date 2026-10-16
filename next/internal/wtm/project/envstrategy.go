@@ -1,5 +1,7 @@
 package project
 
+import "slices"
+
 type EnvStrategy string
 
 const (
@@ -15,5 +17,5 @@ func EnvStrategies() []EnvStrategy {
 }
 
 func (s EnvStrategy) Valid() bool {
-	return s == EnvExample || s == EnvMain || s == EnvParent
+	return slices.Contains(EnvStrategies(), s)
 }

@@ -71,9 +71,6 @@ package statefile
 -- github.com/LucasPcq/wtm/next/internal/adapter/shell/shell.go --
 // Package shell starts child processes.
 package shell
--- github.com/LucasPcq/wtm/next/internal/adapter/contest/contest.go --
-// Package contest is an adapter whose name ends in test.
-package contest
 -- github.com/LucasPcq/wtm/next/internal/adapter/git/git.go --
 // Package git runs git.
 package git
@@ -97,7 +94,6 @@ import (
 	_ "github.com/LucasPcq/wtm/next/internal/adapter/git" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/adapter/git" — an adapter`
 	_ "github.com/LucasPcq/wtm/next/internal/adapter/gittest" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/adapter/gittest" — a fake`
 	_ "github.com/LucasPcq/wtm/next/internal/app" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/app" — an adapter`
-	_ "github.com/LucasPcq/wtm/next/internal/adapter/contest" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/adapter/contest" — an adapter`
 )
 -- github.com/LucasPcq/wtm/next/internal/surface/output/output.go --
 // Package output prints results.

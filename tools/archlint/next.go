@@ -68,17 +68,13 @@ func runNext(pass *analysis.Pass, testsOf testFiles) (any, error) {
 		pass.Reportf(firstFile(pass).Package, "next/%s is in no row of next/'s import table: place it under wtm/, app/, adapter/, surface/ or cmd/ (next/README.md)", rel)
 		return nil, nil
 	}
-	fakes, err := fakesOf(nextRoot(pass, rel))
-	if err != nil {
-		return nil, err
-	}
 	sources := slices.DeleteFunc(slices.Clone(pass.Files), func(file *ast.File) bool { return isTestFile(pass, file) })
 	for _, spec := range importsOf(sources) {
 		target, err := strconv.Unquote(spec.Path.Value)
 		if err != nil {
 			return nil, err
 		}
-		if why, refused := nextRefuses(nextImport{From: from, Target: target, Fakes: fakes}); refused {
+		if why, refused := nextRefuses(nextImport{From: from, Target: target}); refused {
 			pass.Reportf(spec.Pos(), "next/%s must not import %q — %s (next/README.md)", rel, target, why)
 		}
 	}
@@ -145,36 +141,9 @@ func nextPackageOf(rel string) (nextPackage, bool) {
 	return nextPackage{}, false
 }
 
-func nextRoot(pass *analysis.Pass, rel string) string {
-	dirPath := filepath.Dir(pass.Fset.File(firstFile(pass).Pos()).Name())
-	return strings.TrimSuffix(strings.TrimSuffix(dirPath, filepath.FromSlash(rel)), string(filepath.Separator))
-}
-
-func fakesOf(root string) (map[string]bool, error) {
-	// A fake is the adapter <name>test beside an adapter <name>: a "contest" with no "con" is an adapter.
-	entries, err := os.ReadDir(filepath.Join(root, "internal", "adapter"))
-	if os.IsNotExist(err) {
-		return map[string]bool{}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	adapters := map[string]bool{}
-	for _, entry := range entries {
-		adapters[entry.Name()] = entry.IsDir()
-	}
-	fakes := map[string]bool{}
-	for name := range adapters {
-		subject, isTestName := strings.CutSuffix(name, "test")
-		fakes[name] = isTestName && adapters[subject]
-	}
-	return fakes, nil
-}
-
 type nextImport struct {
 	From   nextPackage
 	Target string
-	Fakes  map[string]bool
 }
 
 func nextRefuses(imp nextImport) (string, bool) {
@@ -184,7 +153,7 @@ func nextRefuses(imp nextImport) (string, bool) {
 	rel, inNext := cutNext(imp.Target)
 	to, inRow := nextPackageOf(rel)
 	inNext = inNext && inRow
-	fake := inNext && to.layer == nextAdapter && imp.Fakes[to.unit]
+	fake := inNext && to.layer == nextAdapter && strings.HasSuffix(to.unit, "test")
 	if fake && !(imp.From.layer == nextAdapter && imp.From.unit == to.unit) {
 		return "a fake is imported from a _test.go only", true
 	}
@@ -224,7 +193,7 @@ func nextAdmits(imp nextImport, to nextTarget) bool {
 
 func admitsAdapter(imp nextImport, to nextPackage) bool {
 	from := imp.From
-	return to.unit == from.unit || slices.Contains(sharedAdapters, to.unit) || imp.Fakes[from.unit] && from.unit == to.unit+"test"
+	return to.unit == from.unit || slices.Contains(sharedAdapters, to.unit) || from.unit == to.unit+"test"
 }
 
 type nextCommentsParams struct {
@@ -288,16 +257,10 @@ func checkNextPackageDoc(pass *analysis.Pass, rel string, sources []*ast.File) {
 	}
 }
 
-var nextDirectives = []*regexp.Regexp{
-	regexp.MustCompile(`^//go:build \S.*$`),
-	regexp.MustCompile(`^//go:embed \S.*$`),
-	regexp.MustCompile(`^//go:generate \S.*$`),
-	regexp.MustCompile(`^//go-sumtype:decl \w+$`),
-	regexp.MustCompile(`^//nolint:[\w,-]+$`),
-}
+var bareNolint = regexp.MustCompile(`^//nolint:[\w,-]+$`)
 
 func nextDirective(comment *ast.Comment) bool {
-	return slices.ContainsFunc(nextDirectives, func(form *regexp.Regexp) bool { return form.MatchString(comment.Text) })
+	return directive(comment) && (!strings.HasPrefix(comment.Text, "//nolint") || bareNolint.MatchString(comment.Text))
 }
 
 func ceilingsOnDisk() (map[string]int, error) {
