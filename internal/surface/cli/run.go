@@ -29,7 +29,7 @@ func (b *binding) route(cmd *cobra.Command) route {
 	ask, _ := flags.GetBool(domain.FlagAsk)
 	return route{
 		Human:       rules.IsHumanFormat(format),
-		Interactive: shared.Interactive(shared.UnattendedParams{TTY: shared.StdinIsTerminal(), Format: format, Yes: yes}),
+		Interactive: expected == "" && shared.Interactive(shared.UnattendedParams{TTY: shared.StdinIsTerminal(), Format: format, Yes: yes}),
 		Options: dispatch.Options{
 			DryRun:            dryRun,
 			ExpectFingerprint: dispatch.Fingerprint(expected),

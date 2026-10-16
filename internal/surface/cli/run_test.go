@@ -231,13 +231,15 @@ func TestOnlyAFullyInteractiveRunGoesThroughTheForm(t *testing.T) {
 	unattended := w.run(t, runParams{Args: []string{commandName, "feat/b", "--yes"}, TTY: true})
 	machine := w.run(t, runParams{Args: []string{commandName, "feat/c", "--output", "json"}, TTY: true})
 	offTerminal := w.run(t, runParams{Args: []string{commandName, "feat/d"}})
+	preview := decode(t, w.run(t, args(commandName, "feat/e", "--dry-run", "--output", "json")).Stdout)
+	confirmed := w.run(t, runParams{Args: []string{commandName, "feat/e", "--expect-fingerprint", preview.Fingerprint}, TTY: true})
 
 	assert.Equal(t, []string{`{"branches":["feat/a"]}`}, asked)
 	assert.Equal(t, domain.ExitCodeCancelled, interactive.Code)
-	for _, got := range []ran{unattended, machine, offTerminal} {
+	for _, got := range []ran{unattended, machine, offTerminal, confirmed} {
 		assert.Equal(t, domain.ExitCodeOK, got.Code, got.Stderr)
 	}
-	assert.Equal(t, []string{"feat/b", "feat/c", "feat/d"}, w.Repo.listed())
+	assert.Equal(t, []string{"feat/b", "feat/c", "feat/d", "feat/e"}, w.Repo.listed())
 }
 
 func TestAFlagTheCommandDoesNotTakeIsA422WithItsEnvelope(t *testing.T) {

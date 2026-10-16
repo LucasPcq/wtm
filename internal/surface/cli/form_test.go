@@ -71,3 +71,16 @@ func TestTheFormDrawsThePlanAsTheCommandsDetailDoes(t *testing.T) {
 	assert.Equal(t, pathDetail{}, detail)
 	assert.Equal(t, []styles.PlanRow{{Label: "Worktrees", Values: []string{"1 to make"}}}, detail.Plan(json.RawMessage(`{"branches":["feat/a"]}`)))
 }
+
+func TestAfterADryRunInTheFormTheApplyLineCarriesTheAnswersGiven(t *testing.T) {
+	form := func(ctx context.Context, params FormParams) (dispatch.Reply, error) {
+		answered := json.RawMessage(`{"branches":["feat/a"],"isolation":"verbatim"}`)
+		return params.Entry.Call(ctx, dispatch.Call{Request: answered, Options: params.Options, Progress: params.Progress})
+	}
+	w := newWorld(t, worldParams{Form: form})
+
+	got := w.run(t, runParams{Args: []string{commandName, "feat/a", "--dry-run", "--ask"}, TTY: true})
+
+	assert.Equal(t, domain.ExitCodeOK, got.Code, got.Stderr)
+	assert.Contains(t, got.Stdout, "wtm make feat/a --isolation verbatim --ask --expect-fingerprint ")
+}

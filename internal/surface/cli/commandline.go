@@ -14,7 +14,6 @@ import (
 const (
 	wordSeparator = " "
 	pairFmt       = "%s=%s"
-	falseFmt      = "%s=false"
 	shellSpecial  = " \t\n'\"$`\\|&;<>()*?[]{}~#!"
 	quoteFmt      = "'%s'"
 	quoteEscape   = `'\''`
@@ -35,6 +34,7 @@ func (b *binding) followUps(followUps []kernel.FollowUp) ([]render.NextStepParam
 
 type rerunParams struct {
 	Request json.RawMessage
+	Ask     bool
 	Flag    string
 	Value   string
 }
@@ -44,7 +44,11 @@ func (b *binding) rerun(params rerunParams) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	words := []string{line, flagPrefix + params.Flag}
+	words := []string{line}
+	if params.Ask {
+		words = append(words, flagPrefix+domain.FlagAsk)
+	}
+	words = append(words, flagPrefix+params.Flag)
 	if params.Value != "" {
 		words = append(words, params.Value)
 	}
@@ -110,9 +114,28 @@ func leaves(params leavesParams) []entry {
 			found = append(found, leaves(leavesParams{Target: params.Target, Prefix: path + pathSeparator, Object: object})...)
 			continue
 		}
+		if unset(params.Object[key]) {
+			continue
+		}
 		found = append(found, entry{Path: path, Value: params.Object[key]})
 	}
 	return found
+}
+
+func unset(value any) bool {
+	switch v := value.(type) {
+	case nil:
+		return true
+	case bool:
+		return !v
+	case string:
+		return v == ""
+	case []any:
+		return len(v) == 0
+	case map[string]any:
+		return len(v) == 0
+	}
+	return false
 }
 
 func isDecisions(target *binding, path string) bool {
@@ -131,10 +154,7 @@ type flagWordsParams struct {
 func flagWords(params flagWordsParams) []string {
 	switch value := params.Value.(type) {
 	case bool:
-		if value {
-			return []string{params.Flag}
-		}
-		return []string{fmt.Sprintf(falseFmt, params.Flag)}
+		return []string{params.Flag}
 	case map[string]any:
 		keys := make([]string, 0, len(value))
 		for key := range value {

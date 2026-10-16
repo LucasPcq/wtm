@@ -28,11 +28,19 @@ type concludeParams struct {
 func (b *binding) conclude(cmd *cobra.Command, params concludeParams) error {
 	switch reply := params.Reply.(type) {
 	case dispatch.CommandReply:
+		params.Request = ranOr(reply.Request, params.Request)
 		return b.concludeCommand(cmd, commandParams{concludeParams: params, Result: reply.Result})
 	case dispatch.QueryReply:
 		return b.concludeQuery(cmd, queryParams{Route: params.Route, View: reply.View})
 	}
 	return b.fail(cmd, failParams{Route: params.Route, Err: params.Err, Request: params.Request})
+}
+
+func ranOr(ran, given json.RawMessage) json.RawMessage {
+	if len(ran) == 0 {
+		return given
+	}
+	return ran
 }
 
 type commandParams struct {
@@ -61,7 +69,7 @@ func (b *binding) concludeCommand(cmd *cobra.Command, params commandParams) erro
 	case params.Err != nil:
 		return b.fail(cmd, failParams{Route: params.Route, Err: params.Err, Request: params.Request})
 	default:
-		apply, err := b.rerun(rerunParams{Request: params.Request, Flag: flagExpectFingerprint, Value: string(params.Result.Fingerprint)})
+		apply, err := b.rerun(rerunParams{Request: params.Request, Ask: params.Route.Options.IgnoreRemembered, Flag: flagExpectFingerprint, Value: string(params.Result.Fingerprint)})
 		if err != nil {
 			return b.fail(cmd, failParams{Route: params.Route, Err: classified(err)})
 		}
@@ -129,7 +137,7 @@ func (b *binding) fail(cmd *cobra.Command, params failParams) error {
 func (b *binding) failureNext(params failParams) ([]render.NextStepParams, error) {
 	base := params.Err.Base()
 	if base.Code == kernel.CodePlanStale {
-		line, err := b.rerun(rerunParams{Request: params.Request, Flag: domain.FlagDryRun})
+		line, err := b.rerun(rerunParams{Request: params.Request, Ask: params.Route.Options.IgnoreRemembered, Flag: domain.FlagDryRun})
 		return []render.NextStepParams{{Command: line, Note: replanNote}}, err
 	}
 	if base.FollowUp == nil {

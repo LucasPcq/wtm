@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/kernel"
 	"github.com/LucasPcq/wtm/internal/kernel/text"
 )
@@ -28,13 +29,23 @@ func TestAFollowUpIsTheCommandLineThatRunsItWithItsReason(t *testing.T) {
 	assert.Equal(t, text.NewCatalog().Message(kernel.CodeLocksUnavailable, nil), steps[0].Note)
 }
 
+func TestAFieldLeftAtItsZeroValueIsLeftOutOfTheLineAsTheEngineReadsItUnset(t *testing.T) {
+	w := newWorld(t, worldParams{})
+	w.root()
+
+	line, err := w.Engine.commandLine(lineParams{Target: commandName, Request: json.RawMessage(`{"branches":["feat/a"],"from":"","isolation":"verbatim","fast_forward":false,"env":null,"target":{"base":""}}`)})
+
+	require.NoError(t, err)
+	assert.Equal(t, "wtm make feat/a --isolation verbatim", line)
+}
+
 func TestAFollowUpForACommandNotServedHereIsSpelledInKebabCase(t *testing.T) {
 	w := newWorld(t, worldParams{})
 
-	line, err := w.Engine.commandLine(lineParams{Target: "clean", Request: json.RawMessage(`{"branches":["feat/a"],"keep_branch":false}`)})
+	line, err := w.Engine.commandLine(lineParams{Target: "clean", Request: json.RawMessage(`{"branches":["feat/a"],"keep_branch":true}`)})
 
 	require.NoError(t, err)
-	assert.Equal(t, "wtm clean --branches feat/a --keep-branch=false", line)
+	assert.Equal(t, "wtm clean --branches feat/a --keep-branch", line)
 }
 
 func TestAWordAShellWouldReadIsQuoted(t *testing.T) {
@@ -53,6 +64,17 @@ func TestARerunRepeatsTheRequestWithOneEngineFlag(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "wtm make feat/a --expect-fingerprint abc", line)
+}
+
+func TestARerunOfARunThatIgnoredTheRememberedAnswersIgnoresThemToo(t *testing.T) {
+	w := newWorld(t, worldParams{})
+	w.root()
+	b := w.Engine.bindings[commandName]
+
+	line, err := b.rerun(rerunParams{Request: json.RawMessage(`{"branches":["feat/a"]}`), Ask: true, Flag: domain.FlagDryRun})
+
+	require.NoError(t, err)
+	assert.Equal(t, "wtm make feat/a --ask --dry-run", line)
 }
 
 func TestAFailureCarryingAFollowUpPointsAtIt(t *testing.T) {

@@ -22,6 +22,7 @@ type Reply interface{ reply() }
 
 type CommandReply struct {
 	Result[json.RawMessage, json.RawMessage]
+	Request json.RawMessage
 }
 
 type QueryReply struct {
@@ -41,7 +42,7 @@ func (h *Handle[Req, F, P, D]) Call(ctx context.Context, call Call) (Reply, erro
 	if encodeErr != nil {
 		return nil, classify(encodeErr)
 	}
-	return CommandReply{Result: erased}, err
+	return CommandReply{Result: erased, Request: call.Request}, err
 }
 
 func erase[P, D any](result Result[P, D]) (Result[json.RawMessage, json.RawMessage], error) {
