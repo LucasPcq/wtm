@@ -35,7 +35,7 @@ Read [commands.md](commands.md) (the contract) and [dispatch.md](dispatch.md) (h
 
 `internal/command/create/`, one file per subject, each named after what it declares: the request and its facts, the fields, the plan, the apply, the events, the codes. Its package doc says its one responsibility in a sentence (`pkgdoc`).
 
-It imports `kernel`, `domain`, `rules`, `config`, `store`, `infra/git`, `infra/fs`, `infra/proc` and the engine's services — never `dispatch`, a surface, `flow/`, the root of `infra/` or a service of the commands on `flow/` (`layers`, `engine`). Another command only along an edge of `commandEdges` (`commanddag`), empty today: a command made of others declares the union of their locks and calls their pieces, never their `Apply` through `dispatch`.
+It imports `kernel`, `domain`, `rules`, `config`, `store`, `infra/git`, `infra/fs`, `infra/proc` and the engine's services — never `dispatch`, a surface, `flow/`, the root of `infra/` or a service of the commands on `flow/` (`layers`, `engine`). Another command only along an edge of `commandEdges` (`commanddag`), today `create→provision`, the shared unit of the commands that create a worktree: a command made of others declares the union of their locks and calls their pieces, never their `Apply` through `dispatch`.
 
 ## 2. Request, facts, plan, detail
 

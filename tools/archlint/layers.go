@@ -30,8 +30,8 @@ var layers = map[string]layer{
 		why:      "a read of the engine reaches the world through the ports a command does",
 	},
 	"registry": {
-		internal: append([]string{"command", "config", "dispatch", "domain", "infra", "kernel", "query", "rules", "store"}, engineServicePaths()...),
-		why:      "the composition root: every command and query with its real ports, handed to dispatch; the only importer of command/ and query/, imported by the production wiring of the surfaces only",
+		internal: append([]string{"command", "config", "dispatch", "domain", "infra", "kernel", "query", "rules", "service/process", "store"}, engineServicePaths()...),
+		why:      "the composition root: every command and query with its real ports, handed to dispatch; the only importer of command/ and query/, imported by the production wiring of the surfaces only; service/process answers the daemon's public proxy port until its client is the port infra/daemon (step 6 of LUC-283)",
 	},
 	"flow/legacy": {
 		internal: []string{"dispatch", "domain", "flow", "kernel", "rules"},
@@ -108,7 +108,9 @@ var serviceEdges = map[string][]string{
 	"worktree":  {"branch", "env", "github", "hooks", "process"},
 }
 
-var commandEdges = map[string][]string{}
+var commandEdges = map[string][]string{
+	"create": {"provision"},
+}
 
 type layer struct {
 	internal []string

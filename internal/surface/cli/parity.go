@@ -22,6 +22,7 @@ const (
 
 var unbound = map[string]string{
 	"operations": "a query: queries get their commands at step 7 of LUC-283",
+	"create":     "served by surface/cli/wt/create.go on flow/ until its cli.Bind replaces it, in the next commit of LUC-308",
 }
 
 type parityParams struct {

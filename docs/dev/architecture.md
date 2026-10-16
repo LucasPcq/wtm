@@ -27,7 +27,9 @@ internal/
                                 fingerprint → Apply), operation locks and holders, hook logs, operation events
                                 (dispatch.md)
   command/                    ← the mutations on the engine, one package per command, run through dispatch only
-                                (none yet: create/ is written by its pilot; adding-a-mutation-command.md)
+                                (adding-a-mutation-command.md)
+    create/                   ←   `wtm create`: a worktree per branch asked, from one source; its source fast-forwarded
+                                  first when asked, each branch a provision unit, the answers kept once one is created
     provision/                ←   the unit that gives a branch its worktree (saga: worktree, .env, meta.json;
                                   then ordinal, ports, on_create), shared by the commands that create one, never registered
   query/
@@ -245,7 +247,7 @@ Every arrow that is *missing* is the point:
 
 Two more edges are constrained beyond the diagram:
 
-- `service/x` imports `service/y` only along an edge declared in `tools/archlint` (`serviceEdges`): today `detect→branch`, `events→{process,worktree}`, `process→proxy`, `runconfig→shellcmd`, `runjobs→{process,runconfig,worktree}`, `worktree→{branch,env,github,hooks,process}`. `command/x` imports `command/y` only along an edge of `commandEdges`, empty today.
+- `service/x` imports `service/y` only along an edge declared in `tools/archlint` (`serviceEdges`): today `detect→branch`, `events→{process,worktree}`, `process→proxy`, `runconfig→shellcmd`, `runjobs→{process,runconfig,worktree}`, `worktree→{branch,env,github,hooks,process}`. `command/x` imports `command/y` only along an edge of `commandEdges`: today `create→provision`.
 - `command/` and `query/` reach `domain/`, `rules/`, `kernel/`, `store/`, `config/`, `infra/git`, `infra/fs`, `infra/proc` and the engine's services only; an interface they declare is sealed, never a port (`ports`), they build no error from English text (`enginetext`), and they never build a real port: `store.MetaDisk`, `git.Repo` and the like are built by `registry/` alone (`portbuild`). `registry/` is the only package importing them (with `testutil/`, for the doubles), and `surface/cli` the only one importing `registry/` and `flow/legacy`, the bridge that reaches a command through `dispatch`. `kernel/` and `rules/` import no stdlib package that does I/O (`os`, `net`, `syscall`).
 - The daemon — `service/process` and `service/proxy`, which it serves — is blind to git: neither imports `service/worktree`, `service/branch`, `service/github`, `service/events` or `config`, and both call only allow-listed `infra/` functions (`fs.GlobalDir`, `fs.ReplaceFile`).
 - git is run by `infra/git` only (`gitexec`); the files at the root of `infra/` that still run it, for the commands on `flow/`, are tracked in `.archlint-migrating`.

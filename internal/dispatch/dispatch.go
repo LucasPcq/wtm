@@ -49,3 +49,7 @@ func randomOpID() kernel.OpID {
 	_, _ = rand.Read(raw)
 	return kernel.OpID(hex.EncodeToString(raw))
 }
+
+func (d *Dispatcher) Dir() string { return d.params.Dir }
+
+func (d *Dispatcher) StateDir() string { return d.params.StateDir }
