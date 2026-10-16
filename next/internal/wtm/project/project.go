@@ -43,3 +43,15 @@ type Proxy struct {
 	Port    int
 	Enabled *bool
 }
+
+const defaultProxyPort = 11080
+
+func (g Global) ProxyPort() int {
+	if g.Proxy.Enabled != nil && !*g.Proxy.Enabled {
+		return 0
+	}
+	if g.Proxy.Port > 0 {
+		return g.Proxy.Port
+	}
+	return defaultProxyPort
+}

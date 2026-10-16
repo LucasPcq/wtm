@@ -12,12 +12,17 @@ internal/
     worktree/          a worktree as git lists it, its checkout, its meta.json record and its identity
     project/           what a slice reads of config.toml and the global settings
     run/               what a slice reads of run.toml, isolation included
-                       (the domain grows a sub-package per subject: dotenv, envcopy, runenv, hookvars; worktree may import branch, project and run, which import nothing else of the domain)
+    dotenv/            .env files parsed and rendered byte for byte
+    envcopy/           where each .env of a new worktree is copied from
+    jobenv/            the environment a job or a hook of a worktree runs with
+    settle/            what wtm writes into a new worktree's .env files (imports jobenv)
+    hookvars/          the template variables of a hook command
+                       (worktree may import branch, project and run, which import nothing else of the domain)
   app/                 the API every surface calls: locks, fingerprint, events around each use case
     <slice>/           one use case (create); provision/ is the one shared by several (a new worktree made whole)
   adapter/             what the app reaches out to: git, statefile, store, config, shell, oplock, events, proxyport
     <name>test/        a stateful fake of an adapter, for tests
-  surface/             what calls the app: cli, output, form
+  surface/             what calls the app: cli, output (what wtm-next prints), form
 ```
 No file format lives in `wtm/`: `adapter/config` owns the shapes of `config.toml` and `run.toml` (every key, strict decode) and maps them onto `wtm/project` and `wtm/run`. `worktree.Meta` keeps its JSON tags, because `meta.json` is the record itself, shared with `wtm`; `worktree.Identity` keeps those of the events payload.
 

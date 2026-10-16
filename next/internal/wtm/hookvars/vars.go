@@ -21,9 +21,6 @@ func (v Vars) Hook(hook project.Hook) project.Hook {
 }
 
 func (v Vars) Plain(s string) string {
-	if s == "" {
-		return s
-	}
 	return strings.NewReplacer(v.placeholders()...).Replace(s)
 }
 
