@@ -36,7 +36,7 @@ worktrees, err := repo.Worktrees(ctx)
 
 | Method | git | Returns |
 | -- | -- | -- |
-| `AddWorktree{Path, Checkout}` | `NewBranch{Name, From}`: `worktree add --no-track -b <Name> <Path> <From>`; `ExistingBranch{Name}`: `worktree add <Path> <Name>`, once `RefExists` found the local branch | — |
+| `AddWorktree{Path, Checkout}` | `NewBranch{Name, From}`: `worktree add --no-track -b <Name> <Path> <From>`; `ExistingBranch{Name}`: `worktree add <Path> <Name>`, once `RefExists` found the local branch; `TrackingBranch{Name}`: `worktree add --track -b <Name> <Path> <Remote>/<Name>`, a branch only the remote has, resumed | — |
 | `RemoveWorktree{Path, Force}` | `worktree remove [--force] <Path>` | — |
 | `DeleteBranch{Name, Force}` | `branch -d` or `-D` | — |
 | `Fetch` | `fetch <Remote>`: every branch, for a branch picker's refresh | — |
@@ -46,11 +46,11 @@ worktrees, err := repo.Worktrees(ctx)
 
 `Move` is where a fast-forward took the branch, read by `rev-parse` before and after: `From` is empty for a branch `FastForwardRef` created, and equals `To` when there was nothing to bring.
 
-A new branch is born with its worktree: `AddWorktree` with `NewBranch` is the whole `worktree` step of a saga, and there is no separate branch creation to undo. Its undo is `RemoveWorktree`, then `DeleteBranch` only when the step created the branch: the pair is `service/gitwt` ([services.md](services.md)). `Checkout` is a sealed union: the start point exists only for a new branch.
+A new branch is born with its worktree: `AddWorktree` with `NewBranch` is the whole `worktree` step of a saga, and there is no separate branch creation to undo. Its undo is `RemoveWorktree`, then `DeleteBranch` only when the step created the branch: the pair is `service/gitwt` ([services.md](services.md)). `Checkout` is a sealed union: the start point exists only for a new branch. `git.CreatedBranch(checkout)` names the branch an add creates (`NewBranch`, `TrackingBranch`), the one its undo deletes.
 
 What git does that a caller would not guess, each held by a test on real git:
 
-- `worktree add <path> <name>` on a branch only the remote has creates a local branch tracking it, and no flag or setting stops it (`--no-guess-remote` only covers an add without a branch). `AddWorktree` with `ExistingBranch` refuses that case with `git.ErrNoLocalBranch` instead; a remote branch is checked out as `NewBranch{From: RemoteBranch}`.
+- `worktree add <path> <name>` on a branch only the remote has creates a local branch tracking it, and no flag or setting stops it (`--no-guess-remote` only covers an add without a branch). `AddWorktree` with `ExistingBranch` refuses that case with `git.ErrNoLocalBranch` instead; a remote branch is resumed as `TrackingBranch`, or started from as `NewBranch{From: RemoteBranch}`.
 - `worktree add -b` creates the branch before it looks at the path: refused for a folder that holds files, or for a worktree whose directory is gone, it leaves the branch. `gitwt.Add` deletes it.
 - `worktree remove --force` keeps a locked worktree (git wants `--force` twice); a worktree whose directory is gone is removed without `--force`.
 - `fetch <Remote> b:b` refused as no fast-forward still moves `<Remote>/b`.

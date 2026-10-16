@@ -32,6 +32,24 @@ func TestAnAddOnANewBranchAndItsRemoveEndWhereTheyStarted(t *testing.T) {
 	}
 }
 
+func TestAnAddOfABranchOnlyTheRemoteHasAndItsRemoveEndWhereTheyStarted(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			ctx := t.Context()
+			before := gittest.StateOf(t, impl.port)
+			params := gitwt.Params{Git: impl.port, Path: filepath.Join(impl.root, "resumed"), Checkout: git.TrackingBranch{Name: "remote-only"}}
+
+			require.NoError(t, gitwt.Add(ctx, params))
+			added := gittest.StateOf(t, impl.port)
+			untracked(t, params.Path)
+			require.NoError(t, gitwt.Remove(ctx, params))
+
+			assert.Contains(t, gittest.Names(added.Branches.Local), "remote-only")
+			assert.Equal(t, before, gittest.StateOf(t, impl.port))
+		})
+	}
+}
+
 func TestTheRemoveOfAnExistingBranchKeepsTheBranch(t *testing.T) {
 	for _, impl := range implementations(t) {
 		t.Run(impl.name, func(t *testing.T) {

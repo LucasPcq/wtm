@@ -17,11 +17,11 @@ type Params struct {
 // Add deletes a branch `worktree add -b` created before refusing the path: a saga never undoes a Do that failed.
 func Add(ctx context.Context, params Params) error {
 	add := git.AddWorktreeParams{Path: params.Path, Checkout: params.Checkout}
-	created, ok := params.Checkout.(git.NewBranch)
+	created, ok := git.CreatedBranch(params.Checkout)
 	if !ok {
 		return params.Git.AddWorktree(ctx, add)
 	}
-	branch := git.LocalBranch{Name: created.Name}
+	branch := git.LocalBranch{Name: created}
 	existed, err := params.Git.RefExists(ctx, branch)
 	if err != nil {
 		return err
@@ -38,11 +38,11 @@ func Remove(ctx context.Context, params Params) error {
 	if err := params.Git.RemoveWorktree(ctx, git.RemoveWorktreeParams{Path: params.Path, Force: true}); err != nil {
 		return err
 	}
-	created, ok := params.Checkout.(git.NewBranch)
+	created, ok := git.CreatedBranch(params.Checkout)
 	if !ok {
 		return nil
 	}
-	return params.Git.DeleteBranch(ctx, git.DeleteBranchParams{Name: created.Name, Force: true})
+	return params.Git.DeleteBranch(ctx, git.DeleteBranchParams{Name: created, Force: true})
 }
 
 type dropLeftParams struct {

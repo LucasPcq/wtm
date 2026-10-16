@@ -24,7 +24,7 @@ step := kernel.SagaStep{
 }
 ```
 
-`gitwt.Params.Git` is a `git.ReadWriter`. `Add` checks no guard: what may be added is decided in `Observe`, from a snapshot read under the operation's locks (`rules/worktree.CreationOf`, below). A saga never undoes a `Do` that failed, and `worktree add -b` refused for its path leaves the branch it created ([git.md](git.md#writing-gitwriter)): `Add` reads whether the branch existed before, and deletes it when the add failed and left it. `Remove` forces the removal, since the steps after the add put files in the worktree, then deletes the branch only when `Checkout` is a `NewBranch`: a branch that existed before the add is never deleted.
+`gitwt.Params.Git` is a `git.ReadWriter`. `Add` checks no guard: what may be added is decided in `Observe`, from a snapshot read under the operation's locks (`rules/worktree.CreationOf`, below). A saga never undoes a `Do` that failed, and `worktree add -b` refused for its path leaves the branch it created ([git.md](git.md#writing-gitwriter)): `Add` reads whether the branch existed before, and deletes it when the add failed and left it. `Remove` forces the removal, since the steps after the add put files in the worktree, then deletes the branch only when the add created it (`git.CreatedBranch`: a `NewBranch` or a `TrackingBranch`): a branch that existed before the add is never deleted.
 
 ## identity: one snapshot, one allocation
 

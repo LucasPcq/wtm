@@ -28,7 +28,7 @@ func seed(root string) gittest.FakeParams {
 		Main:      filepath.Join(root, "main"),
 		Branch:    "main",
 		Local:     []string{"feature"},
-		Remote:    []string{"main"},
+		Remote:    []string{"main", "remote-only"},
 		Worktrees: []git.Worktree{{Path: filepath.Join(root, "gone"), Prunable: true, State: git.OnBranch{Branch: "gone"}}},
 		Folders:   []string{filepath.Join(root, "taken")},
 	}

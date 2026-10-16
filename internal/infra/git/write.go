@@ -33,8 +33,24 @@ type ExistingBranch struct {
 	Name string
 }
 
+type TrackingBranch struct {
+	Name string
+}
+
 func (NewBranch) checkout()      {}
 func (ExistingBranch) checkout() {}
+func (TrackingBranch) checkout() {}
+
+func CreatedBranch(checkout Checkout) (string, bool) {
+	switch c := checkout.(type) {
+	case NewBranch:
+		return c.Name, true
+	case TrackingBranch:
+		return c.Name, true
+	case ExistingBranch:
+	}
+	return "", false
+}
 
 type AddWorktreeParams struct {
 	Path     string
@@ -81,6 +97,9 @@ func (r Repo) AddWorktree(ctx context.Context, params AddWorktreeParams) error {
 			return fmt.Errorf("%w: %s", ErrNoLocalBranch, checkout.Name)
 		}
 		_, err = r.git(ctx, "worktree", "add", "--", params.Path, checkout.Name)
+		return err
+	case TrackingBranch:
+		_, err := r.git(ctx, "worktree", "add", "--track", "-b", checkout.Name, "--", params.Path, r.remotePrefix()+checkout.Name)
 		return err
 	}
 	return errNoCheckout

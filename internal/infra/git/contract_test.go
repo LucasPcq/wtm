@@ -140,6 +140,22 @@ func TestTheFakeAndGitAgreeOnAnAddAndItsUndo(t *testing.T) {
 	}
 }
 
+func TestTheFakeAndGitStartATrackingBranchWhereTheRemoteOneIs(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			added := impl.port.AddWorktree(ctx, git.AddWorktreeParams{Path: filepath.Join(impl.root, "resumed"), Checkout: git.TrackingBranch{Name: "remote-only"}})
+			twice := impl.port.AddWorktree(ctx, git.AddWorktreeParams{Path: filepath.Join(impl.root, "again"), Checkout: git.TrackingBranch{Name: "feature"}})
+
+			require.NoError(t, added)
+			assert.Equal(t, tip(t, impl.port, git.RemoteBranch{Name: "remote-only"}), tip(t, impl.port, git.LocalBranch{Name: "remote-only"}))
+			assert.Contains(t, paths(gittest.StateOf(t, impl.port).Worktrees), impl.at("resumed"))
+			require.Error(t, twice)
+		})
+	}
+}
+
 func TestTheFakeAndGitLeaveTheBranchOfAnAddRefusedForItsPath(t *testing.T) {
 	for _, impl := range implementations(t) {
 		for _, folder := range []string{"taken", "gone"} {

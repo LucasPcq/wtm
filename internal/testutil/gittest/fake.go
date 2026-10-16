@@ -245,6 +245,16 @@ func (f *Fake) AddWorktree(_ context.Context, params git.AddWorktreeParams) erro
 			return fmt.Errorf("gittest: branch %s is checked out", checkout.Name)
 		}
 		return f.add(path, checkout.Name)
+	case git.TrackingBranch:
+		if _, ok := f.local[checkout.Name]; ok {
+			return fmt.Errorf("gittest: branch %s already exists", checkout.Name)
+		}
+		from, ok := f.remote[checkout.Name]
+		if !ok {
+			return fmt.Errorf("gittest: invalid start point %s/%s", "origin", checkout.Name)
+		}
+		f.local[checkout.Name] = slices.Clone(from)
+		return f.add(path, checkout.Name)
 	}
 	return fmt.Errorf("gittest: no checkout given")
 }

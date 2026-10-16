@@ -25,6 +25,20 @@ func TestAddWorktreeOnANewBranchStartsFromWithoutTrackingIt(t *testing.T) {
 	assert.Empty(t, upstreamOf(t, repo.Dir, "topic"))
 }
 
+func TestAddWorktreeOnABranchOnlyTheRemoteHasTracksIt(t *testing.T) {
+	repo, _ := newRepoWithOrigin(t)
+	gittest.Git(t, repo.Dir, "push", "-q", "origin", "main:remote-only")
+	gittest.Git(t, repo.Dir, "fetch", "-q", "origin")
+	path := filepath.Join(gittest.TempDir(t), "remote-only")
+
+	err := repo.AddWorktree(t.Context(), git.AddWorktreeParams{Path: path, Checkout: git.TrackingBranch{Name: "remote-only"}})
+
+	require.NoError(t, err)
+	assert.Equal(t, head(t, repo.Dir, "origin/remote-only"), head(t, path, "HEAD"))
+	assert.Equal(t, "remote-only", gittest.Output(t, path, "branch", "--show-current"))
+	assert.Contains(t, upstreamOf(t, repo.Dir, "remote-only"), "refs/heads/remote-only")
+}
+
 func TestAddWorktreeChecksOutAnExistingBranch(t *testing.T) {
 	repo := newRepo(t)
 	gittest.CreateBranch(t, repo.Dir, "feature")
