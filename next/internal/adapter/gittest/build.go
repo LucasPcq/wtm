@@ -194,7 +194,7 @@ func (b builder) tip(commits []string) string {
 func localBranches(params FakeParams) []string {
 	names := append([]string{params.Branch}, params.Local...)
 	for _, w := range params.Worktrees {
-		if name := branchOf(w); name != "" {
+		if name := w.Branch(); name != "" {
 			names = append(names, name)
 		}
 	}

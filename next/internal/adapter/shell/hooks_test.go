@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/hook"
 	"github.com/LucasPcq/wtm/next/internal/wtm/hookvars"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
 	"github.com/stretchr/testify/assert"
@@ -20,7 +21,7 @@ import (
 func TestEachLineAHookPrintsReachesTheOutputStdoutAndStderrAlike(t *testing.T) {
 	out := &collected{}
 
-	err := RunHooks(t.Context(), HooksParams{Hooks: []project.Hook{{Cmd: "echo one; echo two >&2"}}, WorkDir: t.TempDir(), Output: out.add})
+	err := RunHooks(t.Context(), hook.Chain{Hooks: []project.Hook{{Cmd: "echo one; echo two >&2"}}, WorkDir: t.TempDir(), Output: out.add})
 
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"one", "two"}, out.all())
@@ -29,7 +30,7 @@ func TestEachLineAHookPrintsReachesTheOutputStdoutAndStderrAlike(t *testing.T) {
 func TestAnUnfinishedLineEndsWithItsHook(t *testing.T) {
 	out := &collected{}
 
-	err := RunHooks(t.Context(), HooksParams{Hooks: []project.Hook{{Cmd: "printf first"}, {Cmd: "printf second"}}, WorkDir: t.TempDir(), Output: out.add})
+	err := RunHooks(t.Context(), hook.Chain{Hooks: []project.Hook{{Cmd: "printf first"}, {Cmd: "printf second"}}, WorkDir: t.TempDir(), Output: out.add})
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"first", "second"}, out.all())
@@ -38,9 +39,9 @@ func TestAnUnfinishedLineEndsWithItsHook(t *testing.T) {
 func TestAFailedHookReturnsItsCommandAndExitCodeAndStopsTheChain(t *testing.T) {
 	out := &collected{}
 
-	err := RunHooks(t.Context(), HooksParams{Hooks: []project.Hook{{Cmd: "exit 3"}, {Cmd: "echo never"}}, WorkDir: t.TempDir(), Output: out.add})
+	err := RunHooks(t.Context(), hook.Chain{Hooks: []project.Hook{{Cmd: "exit 3"}, {Cmd: "echo never"}}, WorkDir: t.TempDir(), Output: out.add})
 
-	var failure *Failure
+	var failure *hook.Failure
 	require.ErrorAs(t, err, &failure)
 	assert.ErrorContains(t, err, "hook failed")
 	assert.NotContains(t, err.Error(), "hook stopped")
@@ -54,9 +55,9 @@ func TestAFailedHookReturnsItsCommandAndExitCodeAndStopsTheChain(t *testing.T) {
 func TestAFailedHooksOutputIsInItsLogFile(t *testing.T) {
 	log := filepath.Join(t.TempDir(), "hooks", "on_create-feat%2Fx.log")
 
-	err := RunHooks(t.Context(), HooksParams{Hooks: []project.Hook{{Cmd: "echo installing; echo broken >&2; exit 3"}}, WorkDir: t.TempDir(), Log: log})
+	err := RunHooks(t.Context(), hook.Chain{Hooks: []project.Hook{{Cmd: "echo installing; echo broken >&2; exit 3"}}, WorkDir: t.TempDir(), Log: log})
 
-	var failure *Failure
+	var failure *hook.Failure
 	require.ErrorAs(t, err, &failure)
 	assert.Equal(t, 3, *failure.ExitCode)
 	content, readErr := os.ReadFile(log)
@@ -66,9 +67,9 @@ func TestAFailedHooksOutputIsInItsLogFile(t *testing.T) {
 }
 
 func TestAHookKilledBySignalHasNoExitCode(t *testing.T) {
-	err := RunHooks(t.Context(), HooksParams{Hooks: []project.Hook{{Cmd: "kill -9 $$"}}, WorkDir: t.TempDir()})
+	err := RunHooks(t.Context(), hook.Chain{Hooks: []project.Hook{{Cmd: "kill -9 $$"}}, WorkDir: t.TempDir()})
 
-	var failure *Failure
+	var failure *hook.Failure
 	require.ErrorAs(t, err, &failure)
 	assert.Nil(t, failure.ExitCode)
 }
@@ -77,25 +78,25 @@ func TestContinueOnErrorGoesPastAFailedHook(t *testing.T) {
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "ran")
 
-	err := RunHooks(t.Context(), HooksParams{Hooks: []project.Hook{{Cmd: "false", ContinueOnError: true}, {Cmd: "touch " + marker}}, WorkDir: dir})
+	err := RunHooks(t.Context(), hook.Chain{Hooks: []project.Hook{{Cmd: "false", ContinueOnError: true}, {Cmd: "touch " + marker}}, WorkDir: dir})
 
 	require.NoError(t, err)
 	assert.FileExists(t, marker)
 }
 
 func TestNoHookRunsNothing(t *testing.T) {
-	assert.NoError(t, RunHooks(t.Context(), HooksParams{WorkDir: t.TempDir()}))
+	assert.NoError(t, RunHooks(t.Context(), hook.Chain{WorkDir: t.TempDir()}))
 }
 
 func TestABlankCommandIsSkipped(t *testing.T) {
-	assert.NoError(t, RunHooks(t.Context(), HooksParams{Hooks: []project.Hook{{Cmd: "   "}}, WorkDir: t.TempDir()}))
+	assert.NoError(t, RunHooks(t.Context(), hook.Chain{Hooks: []project.Hook{{Cmd: "   "}}, WorkDir: t.TempDir()}))
 }
 
 func TestACommandIsAShellLine(t *testing.T) {
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "chained")
 
-	err := RunHooks(t.Context(), HooksParams{Hooks: []project.Hook{{Cmd: "echo first > " + marker + " && echo second >> " + marker}}, WorkDir: dir})
+	err := RunHooks(t.Context(), hook.Chain{Hooks: []project.Hook{{Cmd: "echo first > " + marker + " && echo second >> " + marker}}, WorkDir: dir})
 
 	require.NoError(t, err)
 	content, readErr := os.ReadFile(marker)
@@ -109,7 +110,7 @@ func TestAHookRunsInItsOwnCwdElseInTheWorktree(t *testing.T) {
 	require.NoError(t, os.Mkdir(filepath.Join(worktree, "apps"), 0o755))
 	out := &collected{}
 
-	err := RunHooks(t.Context(), HooksParams{
+	err := RunHooks(t.Context(), hook.Chain{
 		Hooks:   []project.Hook{{Cmd: "pwd -P"}, {Cmd: "pwd -P", Cwd: elsewhere}, {Cmd: "pwd -P", Cwd: "apps"}},
 		WorkDir: worktree,
 		Output:  out.add,
@@ -136,7 +137,7 @@ func TestAPlaceholderPathReachesTheCommandAsSpelledOnDisk(t *testing.T) {
 				hooks[i] = vars.Hook(hook)
 			}
 
-			err := RunHooks(t.Context(), HooksParams{Hooks: hooks, WorkDir: worktree})
+			err := RunHooks(t.Context(), hook.Chain{Hooks: hooks, WorkDir: worktree})
 
 			require.NoError(t, err)
 			for _, file := range []string{"unquoted", "double", "single"} {
@@ -153,7 +154,7 @@ func TestTheEnvGivenWinsAndNoInheritedWorktreeVariableFillsOneLeftUnset(t *testi
 	t.Setenv("WTM_PORT_OFFSET", "90")
 	out := &collected{}
 
-	err := RunHooks(t.Context(), HooksParams{
+	err := RunHooks(t.Context(), hook.Chain{
 		Hooks:   []project.Hook{{Cmd: `echo "[$WTM_PORT_OFFSET][$COMPOSE_PROJECT_NAME]"`}},
 		WorkDir: t.TempDir(),
 		Env:     map[string]string{"WTM_PORT_OFFSET": "20"},
@@ -169,7 +170,7 @@ func TestWithoutEnvAHookInheritsTheProcessEnvironment(t *testing.T) {
 	t.Setenv("COMPOSE_PROJECT_NAME", "inherited")
 	out := &collected{}
 
-	err := RunHooks(t.Context(), HooksParams{Hooks: []project.Hook{{Cmd: "echo $COMPOSE_PROJECT_NAME"}}, WorkDir: t.TempDir(), Output: out.add})
+	err := RunHooks(t.Context(), hook.Chain{Hooks: []project.Hook{{Cmd: "echo $COMPOSE_PROJECT_NAME"}}, WorkDir: t.TempDir(), Output: out.add})
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"inherited"}, out.all())
@@ -180,9 +181,9 @@ func TestACancelledRunStopsTheHookInFlightAndNamesItStopped(t *testing.T) {
 	time.AfterFunc(200*time.Millisecond, cancel)
 	begin := time.Now()
 
-	err := RunHooks(ctx, HooksParams{Hooks: []project.Hook{{Cmd: "sleep 30"}, {Cmd: "echo never"}}, WorkDir: t.TempDir()})
+	err := RunHooks(ctx, hook.Chain{Hooks: []project.Hook{{Cmd: "sleep 30"}, {Cmd: "echo never"}}, WorkDir: t.TempDir()})
 
-	var failure *Failure
+	var failure *hook.Failure
 	require.ErrorAs(t, err, &failure)
 	assert.Equal(t, "sleep 30", failure.Cmd)
 	assert.ErrorContains(t, err, "hook stopped")
@@ -196,7 +197,7 @@ func TestAnInterruptedHookKeepsItsOutputSoFar(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	out := &collected{}
 
-	err := RunHooks(ctx, HooksParams{
+	err := RunHooks(ctx, hook.Chain{
 		Hooks:   []project.Hook{{Cmd: "printf 'a\\nb\\npartial'; sleep 30"}},
 		WorkDir: t.TempDir(),
 		Output: func(line string) {
@@ -217,7 +218,7 @@ func TestAnInterruptStopsTheChainPastContinueOnError(t *testing.T) {
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "ran")
 
-	err := RunHooks(ctx, HooksParams{Hooks: []project.Hook{{Cmd: "sleep 30", ContinueOnError: true}, {Cmd: "touch " + marker, ContinueOnError: true}}, WorkDir: dir})
+	err := RunHooks(ctx, hook.Chain{Hooks: []project.Hook{{Cmd: "sleep 30", ContinueOnError: true}, {Cmd: "touch " + marker, ContinueOnError: true}}, WorkDir: dir})
 
 	require.ErrorIs(t, err, context.Canceled)
 	assert.NoFileExists(t, marker)
@@ -228,7 +229,7 @@ func TestAnInterruptBeforeTheFirstHookStartsNone(t *testing.T) {
 	cancel()
 	out := &collected{}
 
-	err := RunHooks(ctx, HooksParams{Hooks: []project.Hook{{Cmd: "echo never"}, {Cmd: "echo never"}}, WorkDir: t.TempDir(), Output: out.add})
+	err := RunHooks(ctx, hook.Chain{Hooks: []project.Hook{{Cmd: "echo never"}, {Cmd: "echo never"}}, WorkDir: t.TempDir(), Output: out.add})
 
 	require.ErrorIs(t, err, context.Canceled)
 	assert.Equal(t, "context canceled: 2 hook(s) not run", err.Error())
@@ -240,7 +241,7 @@ func TestAnInterruptBetweenHooksStartsNoMore(t *testing.T) {
 	dir := t.TempDir()
 	second, third := filepath.Join(dir, "second"), filepath.Join(dir, "third")
 
-	err := RunHooks(ctx, HooksParams{
+	err := RunHooks(ctx, hook.Chain{
 		Hooks:   []project.Hook{{Cmd: "echo first"}, {Cmd: "touch " + second}, {Cmd: "touch " + third}},
 		WorkDir: dir,
 		Output:  func(string) { cancel() },
@@ -255,7 +256,7 @@ func TestACancelledHookIsInterruptedBeforeItIsTerminated(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	out := &collected{}
 
-	err := RunHooks(ctx, HooksParams{
+	err := RunHooks(ctx, hook.Chain{
 		Hooks:   []project.Hook{{Cmd: `trap 'echo int; exit 3' INT; echo ready; while :; do sleep 0.05; done`}},
 		WorkDir: t.TempDir(),
 		Output: func(line string) {
@@ -274,7 +275,7 @@ func TestACancelledHookTakesAGrandchildItStartedWithIt(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	var grandchild int
 
-	err := RunHooks(ctx, HooksParams{
+	err := RunHooks(ctx, hook.Chain{
 		Hooks:   []project.Hook{{Cmd: "sleep 30 & echo $!; wait"}},
 		WorkDir: t.TempDir(),
 		Output: func(line string) {
@@ -294,7 +295,7 @@ func TestTheTwoStreamsReachTheOutputOneLineAtATime(t *testing.T) {
 	lines := 0
 	unguarded := func(string) { lines++ }
 
-	err := RunHooks(t.Context(), HooksParams{
+	err := RunHooks(t.Context(), hook.Chain{
 		Hooks:   []project.Hook{{Cmd: "for i in 1 2 3 4 5 6 7 8 9 10; do echo out; echo err >&2; done"}},
 		WorkDir: t.TempDir(),
 		Output:  unguarded,
@@ -310,7 +311,7 @@ func TestAHookThatBackgroundsAJobSucceedsWithoutWaitingForIt(t *testing.T) {
 	out := &collected{}
 	begin := time.Now()
 
-	err := RunHooks(t.Context(), HooksParams{Hooks: []project.Hook{{Cmd: "sleep 7 & echo started"}}, WorkDir: t.TempDir(), Output: out.add})
+	err := RunHooks(t.Context(), hook.Chain{Hooks: []project.Hook{{Cmd: "sleep 7 & echo started"}}, WorkDir: t.TempDir(), Output: out.add})
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"started"}, out.all())

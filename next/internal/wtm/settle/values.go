@@ -28,6 +28,11 @@ var (
 	errNamespaceUnknownToken = errors.New("unknown placeholder in a [job.namespace] value")
 )
 
+type ValueError struct{ Err error }
+
+func (e *ValueError) Error() string { return e.Err.Error() }
+func (e *ValueError) Unwrap() error { return e.Err }
+
 func (w worktree) valueWrites(links []run.EnvValueLink) ([]OwnedEntry, error) {
 	writes := make([]OwnedEntry, 0, len(links))
 	for _, link := range links {

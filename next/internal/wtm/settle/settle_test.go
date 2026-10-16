@@ -1,6 +1,7 @@
 package settle
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
@@ -143,4 +144,22 @@ func TestAProxyPortOutOfRangeIsRefusedOnlyWhenLinksNeedIt(t *testing.T) {
 	params.Run.EnvPorts = nil
 	_, err = Resolve(params)
 	assert.NoError(t, err)
+}
+
+func TestAnEnvValueThatCannotBeExpandedIsAnErrorOfRunToml(t *testing.T) {
+	params := linkedResolve()
+	params.Run.EnvValues = []run.EnvValueLink{{File: ".env", Key: "API", Job: "ghost", Value: "x"}}
+	params.Proxy = project.Proxy{Port: 70000}
+	broken := linkedResolve()
+	broken.Run.EnvValues = params.Run.EnvValues
+
+	_, proxyErr := Resolve(params)
+	_, valueErr := Resolve(broken)
+
+	_, fromProxy := errors.AsType[*ValueError](proxyErr)
+	value, fromValue := errors.AsType[*ValueError](valueErr)
+	require.Error(t, proxyErr)
+	assert.False(t, fromProxy)
+	require.True(t, fromValue)
+	assert.Equal(t, `env API in .env: no job named "ghost"`, value.Error())
 }

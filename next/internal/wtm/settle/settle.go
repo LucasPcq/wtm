@@ -60,7 +60,7 @@ func Resolve(params ResolveParams) (Writes, error) {
 	}
 	values, err := settled.valueWrites(kept.EnvValues)
 	if err != nil {
-		return Writes{}, err
+		return Writes{}, &ValueError{Err: err}
 	}
 	return Writes{links: kept.EnvPorts, owned: append(owned, values...), bases: portBases(kept), block: jobenv.OffsetBlock(kept), worktree: settled}, nil
 }

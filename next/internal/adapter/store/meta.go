@@ -15,6 +15,7 @@ import (
 
 const (
 	metaFileName  = "meta.json"
+	ordinalLock   = "ordinal.lock"
 	metaSchema    = 1
 	jsonIndent    = "  "
 	errNoMetaPath = "no meta.json path for branch %q"
@@ -69,12 +70,8 @@ func (m Meta) Update(ctx context.Context, update worktree.MetaUpdate) (wtm.Writt
 	})
 }
 
-func (m Meta) Purge(branch string) error {
-	dir, ok := worktree.MetaDir(worktree.MetaDirParams{StateDir: m.StateDir, Branch: branch})
-	if !ok {
-		return nil
-	}
-	return statefile.RemoveDir(dir)
+func (m Meta) LockOrdinals(ctx context.Context, do func() error) (bool, error) {
+	return statefile.WithLock(ctx, statefile.LockParams{Path: filepath.Join(m.StateDir, ordinalLock), Do: do})
 }
 
 type parseParams struct {

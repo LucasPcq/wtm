@@ -42,7 +42,7 @@ func Update(ctx context.Context, params UpdateParams) (wtm.Written, error) {
 		lockPath = params.Path + lockSuffix
 	}
 	changed := false
-	held, err := withLock(ctx, lockParams{Path: lockPath, Do: func() (err error) {
+	held, err := WithLock(ctx, LockParams{Path: lockPath, Do: func() (err error) {
 		changed, err = update(params)
 		return err
 	}})
@@ -83,8 +83,4 @@ func read(path string) ([]byte, os.FileInfo, error) {
 		return nil, nil, err
 	}
 	return data, info, nil
-}
-
-func RemoveDir(path string) error {
-	return os.RemoveAll(path)
 }

@@ -1,6 +1,7 @@
 package storetest
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm"
@@ -117,7 +118,6 @@ func TestAFakeRefusesABranchThatIsNoPathSegmentAsTheStoreDoes(t *testing.T) {
 
 	assert.Error(t, loadErr)
 	assert.Error(t, updateErr)
-	assert.NoError(t, fake.Purge(".."))
 }
 
 func TestAFakeConfigAtANewerSchemaOrThatDoesNotParseIsNeverRemembered(t *testing.T) {
@@ -132,4 +132,21 @@ func TestAFakeConfigAtANewerSchemaOrThatDoesNotParseIsNeverRemembered(t *testing
 	assert.Error(t, brokenErr)
 	config, _ := newer.Config()
 	assert.Empty(t, config.Remembered)
+}
+
+func TestAFakeNumbersUnderItsLockAndCanFailToTakeIt(t *testing.T) {
+	refused := errors.New("no lock")
+	fake := NewFake(FakeParams{})
+	failing := NewFake(FakeParams{Fail: map[string]error{"LockOrdinals": refused}})
+
+	held, err := fake.LockOrdinals(t.Context(), func() error {
+		_, err := fake.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Change: func(m *worktree.Meta) error { m.Ordinal = 1; return nil }})
+		return err
+	})
+	_, failed := failing.LockOrdinals(t.Context(), func() error { return nil })
+
+	require.NoError(t, err)
+	assert.True(t, held)
+	assert.Equal(t, []string{"LockOrdinals ", "Update feat/a"}, fake.Calls())
+	require.ErrorIs(t, failed, refused)
 }

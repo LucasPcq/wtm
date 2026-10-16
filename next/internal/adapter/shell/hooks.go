@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/hook"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
 )
 
@@ -16,25 +17,7 @@ const (
 	shellCommandFlag = "-c"
 )
 
-type Failure struct {
-	Cmd      string
-	ExitCode *int
-	Err      error
-}
-
-func (f *Failure) Error() string { return f.Err.Error() }
-func (f *Failure) Unwrap() error { return f.Err }
-
-type HooksParams struct {
-	Hooks   []project.Hook
-	WorkDir string
-	Env     map[string]string
-	Unset   []string
-	Output  func(line string)
-	Log     string
-}
-
-func RunHooks(ctx context.Context, params HooksParams) error {
+func RunHooks(ctx context.Context, params hook.Chain) error {
 	sink := newLines(linesParams{Emit: params.Output, Log: params.Log})
 	defer sink.close()
 	for index, hook := range params.Hooks {
@@ -53,7 +36,7 @@ func RunHooks(ctx context.Context, params HooksParams) error {
 
 type hookRun struct {
 	Hook   project.Hook
-	Params HooksParams
+	Params hook.Chain
 	Sink   *lines
 }
 
@@ -72,9 +55,9 @@ func runHook(ctx context.Context, run hookRun) error {
 	case err == nil, errors.Is(err, exec.ErrWaitDelay) && cmd.ProcessState.Success():
 		return nil
 	case ctx.Err() != nil:
-		return &Failure{Cmd: run.Hook.Cmd, Err: fmt.Errorf("hook stopped: %w", ctx.Err())}
+		return &hook.Failure{Cmd: run.Hook.Cmd, Err: fmt.Errorf("hook stopped: %w", ctx.Err())}
 	}
-	failure := &Failure{Cmd: run.Hook.Cmd, Err: fmt.Errorf("hook failed: %w", err)}
+	failure := &hook.Failure{Cmd: run.Hook.Cmd, Err: fmt.Errorf("hook failed: %w", err)}
 	if code, exited := ExitCode(err); exited {
 		failure.ExitCode = &code
 	}
@@ -91,7 +74,7 @@ func hookDir(run hookRun) string {
 	return filepath.Join(run.Params.WorkDir, run.Hook.Cwd)
 }
 
-func hookEnv(params HooksParams) []string {
+func hookEnv(params hook.Chain) []string {
 	if len(params.Env) == 0 {
 		return nil
 	}

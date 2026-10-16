@@ -171,18 +171,14 @@ func (f *Fake) stored(branch string) (worktree.Meta, error) {
 	return stored, nil
 }
 
-func (f *Fake) Purge(branch string) error {
+func (f *Fake) LockOrdinals(_ context.Context, do func() error) (bool, error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
-	if err := f.enter("Purge", branch); err != nil {
-		return err
+	err := f.enter("LockOrdinals", "")
+	f.mu.Unlock()
+	if err != nil {
+		return false, err
 	}
-	if segmentOf(branch) != nil {
-		return nil
-	}
-	delete(f.meta, branch)
-	delete(f.unreadable, branch)
-	return nil
+	return true, do()
 }
 
 func (f *Fake) Remember(_ context.Context, answers map[string]string) (wtm.Written, error) {

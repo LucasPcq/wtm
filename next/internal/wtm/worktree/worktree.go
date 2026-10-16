@@ -30,3 +30,14 @@ type Merge struct {
 	Path string
 	Onto branch.Ref
 }
+
+func (w Worktree) Branch() string {
+	switch state := w.State.(type) {
+	case OnBranch:
+		return state.Branch
+	case Rebasing:
+		return state.Branch
+	case Detached, Bare:
+	}
+	return ""
+}

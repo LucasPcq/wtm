@@ -151,16 +151,6 @@ func TestAnUpdateFailsOnSomethingItCannotRead(t *testing.T) {
 	assert.False(t, called)
 }
 
-func TestRemoveDirDropsTheDirectoryAndWhatItHolds(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "worktrees", "feat-a")
-	writeFixture(t, filepath.Join(dir, "meta.json"), "{}")
-
-	require.NoError(t, RemoveDir(dir))
-
-	assert.NoDirExists(t, dir)
-	require.NoError(t, RemoveDir(dir), "an absent directory is already removed")
-}
-
 func TestAFailedMutateIsNeverSeenHalfWritten(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file")

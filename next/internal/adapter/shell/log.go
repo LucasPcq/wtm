@@ -3,31 +3,11 @@ package shell
 import (
 	"bytes"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 )
-
-const (
-	hookLogDir       = "hooks"
-	hookLogPhase     = "on_create"
-	hookLogSeparator = "-"
-	hookLogExt       = ".log"
-)
-
-type HookLogParams struct {
-	StateDir string
-	Branch   string
-}
-
-func HookLogPath(params HookLogParams) string {
-	if params.StateDir == "" {
-		return ""
-	}
-	return filepath.Join(params.StateDir, hookLogDir, hookLogPhase+hookLogSeparator+url.PathEscape(params.Branch)+hookLogExt)
-}
 
 type linesParams struct {
 	Emit func(string)

@@ -222,24 +222,26 @@ func TestTheProcessTheCrossProcessTestStarts(t *testing.T) {
 	}
 }
 
-func TestPurgeDropsTheRecordAndItsDirectory(t *testing.T) {
+func TestNumberingRunsUnderTheOrdinalLockWtmTakes(t *testing.T) {
 	stateDir := t.TempDir()
-	writeRecord(t, stateDir, "feat/a", worktree.Meta{Ordinal: 2})
-	meta := Meta{StateDir: stateDir}
+	ran := false
 
-	require.NoError(t, meta.Purge("feat/a"))
+	held, err := Meta{StateDir: stateDir}.LockOrdinals(t.Context(), func() error { ran = true; return nil })
 
-	assert.NoDirExists(t, filepath.Dir(metaPath(t, stateDir, "feat/a")))
-	require.NoError(t, meta.Purge("feat/a"), "an absent record is already purged")
+	require.NoError(t, err)
+	assert.True(t, held)
+	assert.True(t, ran)
+	assert.FileExists(t, filepath.Join(stateDir, "ordinal.lock"))
 }
 
-func TestPurgeNeverReachesOutsideItsRecord(t *testing.T) {
-	stateDir := t.TempDir()
-	writeRecord(t, stateDir, "feat/a", worktree.Meta{Ordinal: 2})
-	meta := Meta{StateDir: stateDir}
+func TestNumberingWhereTheLockCannotBeTakenRunsUnlocked(t *testing.T) {
+	stateDir := filepath.Join(t.TempDir(), "file")
+	require.NoError(t, os.WriteFile(stateDir, nil, 0o644))
+	ran := false
 
-	require.NoError(t, meta.Purge(""))
-	require.NoError(t, meta.Purge(".."))
+	held, err := Meta{StateDir: stateDir}.LockOrdinals(t.Context(), func() error { ran = true; return nil })
 
-	assert.FileExists(t, metaPath(t, stateDir, "feat/a"))
+	require.NoError(t, err)
+	assert.False(t, held)
+	assert.True(t, ran)
 }

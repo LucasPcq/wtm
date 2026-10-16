@@ -68,7 +68,7 @@ func NewFake(params FakeParams) *Fake {
 	for _, w := range params.Worktrees {
 		w.Path = realPath(w.Path)
 		f.worktrees = append(f.worktrees, w)
-		if name := branchOf(w); name != "" {
+		if name := w.Branch(); name != "" {
 			f.local[name] = historyOf(params.Commits, branch.LocalBranch{Name: name})
 		}
 	}
@@ -369,7 +369,7 @@ func (f *Fake) worktreeAt(path string) int {
 }
 
 func (f *Fake) checkedOut(name string) bool {
-	return slices.ContainsFunc(f.worktrees, func(w worktree.Worktree) bool { return branchOf(w) == name })
+	return slices.ContainsFunc(f.worktrees, func(w worktree.Worktree) bool { return w.Branch() == name })
 }
 
 func branchesOf(refs map[string]history) []branch.Branch {
@@ -382,17 +382,6 @@ func branchesOf(refs map[string]history) []branch.Branch {
 
 func historyOf(commits map[branch.Ref][]string, ref branch.Ref) history {
 	return append(history{Root}, commits[ref]...)
-}
-
-func branchOf(w worktree.Worktree) string {
-	switch state := w.State.(type) {
-	case worktree.OnBranch:
-		return state.Branch
-	case worktree.Rebasing:
-		return state.Branch
-	case worktree.Detached, worktree.Bare:
-	}
-	return ""
 }
 
 func (h history) tip() string { return h[len(h)-1] }

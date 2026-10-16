@@ -19,12 +19,12 @@ const (
 
 var errUnlockable = errors.New("lock unavailable")
 
-type lockParams struct {
+type LockParams struct {
 	Path string
 	Do   func() error
 }
 
-func withLock(ctx context.Context, params lockParams) (bool, error) {
+func WithLock(ctx context.Context, params LockParams) (bool, error) {
 	file, err := acquire(ctx, params.Path)
 	if errors.Is(err, errUnlockable) {
 		return false, params.Do()
