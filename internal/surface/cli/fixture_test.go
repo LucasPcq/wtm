@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"slices"
 	"sync"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/kernel"
 	"github.com/LucasPcq/wtm/internal/kernel/text"
 	"github.com/LucasPcq/wtm/internal/styles"
+	"github.com/LucasPcq/wtm/internal/surface/cli/render"
 )
 
 // The example, shaped like `wtm create`: a field of each kind a flag is
@@ -207,8 +207,8 @@ func (pathDetail) Plan(detail json.RawMessage) []styles.PlanRow {
 	return []styles.PlanRow{{Label: "Worktrees", Values: []string{fmt.Sprintf("%d to make", len(p.Branches))}}}
 }
 
-func (pathDetail) Item(w io.Writer, item kernel.Item[json.RawMessage]) {
+func (pathDetail) Item(item kernel.Item[json.RawMessage]) render.ItemView {
 	var path string
 	_ = json.Unmarshal(item.Detail, &path)
-	fmt.Fprintf(w, "    %s  %s\n", item.Subject, path)
+	return render.ItemView{Rows: []styles.PlanRow{{Label: item.Subject, Values: []string{path}}}}
 }

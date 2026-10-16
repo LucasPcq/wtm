@@ -37,9 +37,12 @@ func TestEveryItemThatIsNotDoneIsNamedWithWhy(t *testing.T) {
 
 	assert.Equal(t, lines(
 		"  ✗ make: 1 done · 1 failed · 1 skipped",
+		"",
+		"  ! ran without operation locks",
+		"",
 		"  ✗ feat/b  worktree failed",
 		"  ! feat/c  not reached",
-		"  ! ran without operation locks",
+		"",
 		"  → wtm make feat/b   retry",
 	), plain(out.String()))
 }
@@ -51,7 +54,7 @@ func TestTheHeadlineCarriesTheWorstResult(t *testing.T) {
 	}{
 		{nil, "  = make: nothing to do\n"},
 		{[]kernel.Item[json.RawMessage]{unchanged("a")}, "  = make: 1 unchanged\n"},
-		{[]kernel.Item[json.RawMessage]{done("a"), {Subject: "b", Status: kernel.StatusCancelled, Reason: kernel.ReasonInterrupted}}, "  ! make: 1 done · 1 cancelled\n  ! b  interrupted\n"},
+		{[]kernel.Item[json.RawMessage]{done("a"), {Subject: "b", Status: kernel.StatusCancelled, Reason: kernel.ReasonInterrupted}}, "  ! make: 1 done · 1 cancelled\n\n  ! b  interrupted\n"},
 	}
 	for _, c := range cases {
 		var out bytes.Buffer
@@ -60,12 +63,25 @@ func TestTheHeadlineCarriesTheWorstResult(t *testing.T) {
 	}
 }
 
-func TestADoneItemIsShownByTheCommandsOwnDetail(t *testing.T) {
+func TestTheConclusionIsThePlanAppliedWithWhatEachItemAdds(t *testing.T) {
 	var out bytes.Buffer
 
-	render.Outcome(&out, render.OutcomeParams{Catalog: catalog, Command: "make", Items: []kernel.Item[json.RawMessage]{done("feat/a"), unchanged("feat/b")}, Detail: pathDetail{}})
+	render.Outcome(&out, render.OutcomeParams{
+		Catalog: catalog, Command: "make", Plan: json.RawMessage(`{"from":"main"}`),
+		Items:  []kernel.Item[json.RawMessage]{done("feat/a"), done("feat/b")},
+		Detail: planAndPath{},
+	})
 
-	assert.Equal(t, lines("  ✓ make: 1 done · 1 unchanged", "    feat/a  \"/wt/feat/a\""), plain(out.String()))
+	assert.Equal(t, lines(
+		"  ✓ make: 2 done",
+		"",
+		"  From    main",
+		"  feat/a  \"/wt/feat/a\"",
+		"  feat/b  \"/wt/feat/b\"",
+		"",
+		"  → wtm go feat/a",
+		"  → wtm go feat/b",
+	), plain(out.String()))
 }
 
 func TestAWarningAboutAnItemIsNamedWithItsSubject(t *testing.T) {
@@ -76,6 +92,7 @@ func TestAWarningAboutAnItemIsNamedWithItsSubject(t *testing.T) {
 
 	assert.Equal(t, lines(
 		"  ✓ make: 1 done",
+		"",
 		"  ! feat/a  ran without operation locks",
 	), plain(out.String()))
 }
@@ -98,7 +115,11 @@ func TestAnIncompleteItemSaysWhyAndIsShownByItsDetailSinceItStands(t *testing.T)
 
 	assert.Equal(t, lines(
 		"  ! make: 1 cancelled",
+		"",
+		"  feat/a  \"/wt/feat/a\"",
+		"",
 		"  ! feat/a  interrupted · left incomplete",
-		"    feat/a  \"/wt/feat/a\"",
+		"",
+		"  → wtm go feat/a",
 	), plain(out.String()))
 }

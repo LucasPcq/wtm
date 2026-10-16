@@ -56,7 +56,7 @@ func (b *binding) concludeCommand(cmd *cobra.Command, params commandParams) erro
 			return b.fail(cmd, failParams{Route: params.Route, Err: classified(err)})
 		}
 		render.Frame(cmd.OutOrStdout(), func(w io.Writer) {
-			render.Outcome(w, render.OutcomeParams{Command: b.name, Items: outcome.Items, Warnings: outcome.Warnings, FollowUps: next, Detail: b.detail, Catalog: b.engine.catalog})
+			render.Outcome(w, render.OutcomeParams{Command: b.name, Plan: params.Result.Plan.Detail, Items: outcome.Items, Warnings: outcome.Warnings, FollowUps: next, Detail: b.detail, Catalog: b.engine.catalog})
 		})
 	case params.Err != nil:
 		return b.fail(cmd, failParams{Route: params.Route, Err: params.Err, Request: params.Request})

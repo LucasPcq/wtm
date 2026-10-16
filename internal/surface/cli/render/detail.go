@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"maps"
 	"slices"
 	"strings"
@@ -25,7 +24,14 @@ var yesNo = map[bool]string{true: "yes", false: "no"}
 
 type Detail interface {
 	Plan(detail json.RawMessage) []styles.PlanRow
-	Item(w io.Writer, item kernel.Item[json.RawMessage])
+	Item(item kernel.Item[json.RawMessage]) ItemView
+}
+
+// ItemView is what one item adds to the plan once applied: its rows, its anomalies, the commands that follow from it.
+type ItemView struct {
+	Rows      []styles.PlanRow
+	Anomalies []string
+	Next      []NextStepParams
 }
 
 type GenericDetail struct{}
@@ -39,7 +45,7 @@ func (GenericDetail) Plan(detail json.RawMessage) []styles.PlanRow {
 	return rows
 }
 
-func (GenericDetail) Item(io.Writer, kernel.Item[json.RawMessage]) {}
+func (GenericDetail) Item(kernel.Item[json.RawMessage]) ItemView { return ItemView{} }
 
 type field struct {
 	key   string

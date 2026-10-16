@@ -3,9 +3,9 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -59,6 +59,7 @@ const (
 	existingSuffix = " (existing)"
 	resumesFmt     = "%s (resumes %s)"
 	openSuffix     = " (already open)"
+	alreadyOpen    = "already open"
 	actionCreate   = "create"
 	actionCheckOut = "check_out"
 	actionResume   = "resume"
@@ -153,19 +154,38 @@ type createItem struct {
 	EnvPorts       domain.EnvPortPlan `json:"env_ports"`
 }
 
-func (createDetail) Item(w io.Writer, item kernel.Item[json.RawMessage]) {
+func (createDetail) Item(item kernel.Item[json.RawMessage]) render.ItemView {
 	var created createItem
 	if json.Unmarshal(item.Detail, &created) != nil {
-		return
+		return render.ItemView{}
 	}
-	render.InfoLine(w, item.Subject, shownPath(created.Path))
-	if note, warns := reusedNote(item.Subject, created); warns {
-		render.Warning(w, note)
+	return render.ItemView{
+		Rows:      []styles.PlanRow{{Label: item.Subject, Values: []string{shownPath(created.Path) + itemNote(item, created)}}},
+		Anomalies: anomaliesOf(item.Subject, created),
+		Next:      []render.NextStepParams{{Command: fmt.Sprintf(domain.GoCommandFmt, item.Subject)}},
 	}
-	if anomalies := rules.EnvPortAnomalyLines(created.EnvPorts); len(anomalies) > 0 {
-		render.Section(w, domain.EnvPortAnomaliesTitle, anomalies)
+}
+
+func itemNote(item kernel.Item[json.RawMessage], created createItem) string {
+	note := rules.EnvPortSettlementNote(created.EnvPorts)
+	if item.Reason == kernel.ReasonUnchanged {
+		note = alreadyOpen
 	}
-	render.NextStep(w, render.NextStepParams{Command: fmt.Sprintf(domain.GoCommandFmt, item.Subject)})
+	if note == "" {
+		return ""
+	}
+	return styles.Muted.Render(domain.EnvRecapNoteSeparator + note)
+}
+
+func anomaliesOf(branch string, created createItem) []string {
+	var anomalies []string
+	if note, warns := reusedNote(branch, created); warns {
+		anomalies = append(anomalies, note)
+	}
+	if lines := rules.EnvPortAnomalyLines(created.EnvPorts); len(lines) > 0 {
+		anomalies = append(anomalies, domain.EnvPortAnomaliesTitle+"\n"+strings.Join(lines, "\n"))
+	}
+	return anomalies
 }
 
 func reusedNote(branch string, created createItem) (string, bool) {

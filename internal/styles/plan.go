@@ -10,9 +10,10 @@ import (
 )
 
 const (
-	planGap       = "  "
-	planSeparator = ", "
-	nothingToDo   = "nothing to do"
+	planGap          = "  "
+	planContinuation = "  "
+	planSeparator    = ", "
+	nothingToDo      = "nothing to do"
 )
 
 // PlanRow is one line of a plan as every surface shows it: what the plan sets,
@@ -39,7 +40,13 @@ func RenderPlan(params PlanParams) string {
 		lines = append(lines, "")
 	}
 	for _, warning := range params.Warnings {
-		lines = append(lines, Warning.Render(domain.GlyphAttention)+" "+warning)
+		first, rest, _ := strings.Cut(warning, "\n")
+		lines = append(lines, Warning.Render(domain.GlyphAttention)+" "+first)
+		for _, line := range strings.Split(rest, "\n") {
+			if line != "" {
+				lines = append(lines, planContinuation+line)
+			}
+		}
 	}
 	return strings.Join(lines, "\n")
 }

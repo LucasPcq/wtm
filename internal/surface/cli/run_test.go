@@ -289,12 +289,13 @@ func TestAnInterruptedRunExitsCancelled(t *testing.T) {
 	assert.Equal(t, string(kernel.KindCancelled), doc.Error.Kind)
 }
 
-func TestACommandsOwnDetailShowsItsPlanAndItsDoneItems(t *testing.T) {
+func TestACommandsConclusionIsItsPlanAppliedWithItsDoneItems(t *testing.T) {
 	w := newWorld(t, worldParams{Detail: pathDetail{}})
 
 	preview := w.run(t, args(commandName, "feat/a", "feat/b", "--dry-run"))
 	applied := w.run(t, args(commandName, "feat/a", "--yes"))
 
 	assert.Contains(t, preview.Stdout, "2 to make")
-	assert.Contains(t, applied.Stdout, "feat/a  /wt/feat/a")
+	assert.Contains(t, applied.Stdout, "Worktrees  1 to make")
+	assert.Regexp(t, `feat/a +/wt/feat/a`, applied.Stdout)
 }

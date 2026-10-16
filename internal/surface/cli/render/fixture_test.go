@@ -2,8 +2,6 @@ package render_test
 
 import (
 	"encoding/json"
-	"fmt"
-	"io"
 
 	"github.com/LucasPcq/wtm/internal/kernel"
 	"github.com/LucasPcq/wtm/internal/kernel/text"
@@ -20,8 +18,14 @@ type pathDetail struct{}
 
 func (pathDetail) Plan(json.RawMessage) []styles.PlanRow { return nil }
 
-func (pathDetail) Item(w io.Writer, item kernel.Item[json.RawMessage]) {
-	fmt.Fprintf(w, "    %s  %s\n", item.Subject, item.Detail)
+func (pathDetail) Item(item kernel.Item[json.RawMessage]) render.ItemView {
+	return render.ItemView{Rows: []styles.PlanRow{{Label: item.Subject, Values: []string{string(item.Detail)}}}, Next: []render.NextStepParams{{Command: "wtm go " + item.Subject}}}
+}
+
+type planAndPath struct{ pathDetail }
+
+func (planAndPath) Plan(detail json.RawMessage) []styles.PlanRow {
+	return render.GenericDetail{}.Plan(detail)
 }
 
 func done(subject string) kernel.Item[json.RawMessage] {

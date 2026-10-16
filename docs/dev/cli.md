@@ -23,7 +23,7 @@ The name is a constant of `domain`, the one the command declares as its `Name`: 
 | -- | -- |
 | `Positional(path)` | the field takes the arguments instead of a flag: all of them for a list field, one otherwise (two is a `422 too_many`). A bool or decisions field cannot be positional |
 | `Flag(FlagParams{Path, Name, Short})` | the field's flag is spelled `Name` instead of its path, or gets a short form |
-| `Detail(render.Detail)` | the command gives the rows of its plan and renders its done items itself |
+| `Detail(render.Detail)` | the command gives the rows of its plan, and what each item adds to it once applied (`render.ItemView`: rows, anomalies, the commands that follow) |
 | `GenericDetail()` | the generic rendering is declared enough |
 
 ## Flags

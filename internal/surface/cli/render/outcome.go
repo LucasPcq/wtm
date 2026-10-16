@@ -4,11 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
+	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/kernel"
 	"github.com/LucasPcq/wtm/internal/kernel/text"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/styles"
 )
 
 const (
@@ -20,6 +23,7 @@ const (
 
 type OutcomeParams struct {
 	Command   string
+	Plan      json.RawMessage
 	Items     []kernel.Item[json.RawMessage]
 	Warnings  []kernel.Warning
 	FollowUps []NextStepParams
@@ -29,18 +33,71 @@ type OutcomeParams struct {
 
 func Outcome(w io.Writer, params OutcomeParams) {
 	headline(w, params)
+	applied := appliedOf(params)
+	if len(applied.rows) > 0 {
+		Blank(w)
+		plan := styles.RenderPlan(styles.PlanParams{Rows: applied.rows, Warnings: applied.warnings, Width: max(TerminalWidthOf(w)-len(Indent), 0)})
+		for line := range strings.Lines(plan) {
+			indented(w, strings.TrimSuffix(line, "\n"))
+		}
+	}
+	if len(applied.rows) == 0 && len(applied.warnings) > 0 {
+		Blank(w)
+		for _, warning := range applied.warnings {
+			Warning(w, warning)
+		}
+	}
+	unfinished := slices.DeleteFunc(slices.Clone(params.Items), finished)
+	if len(unfinished) > 0 {
+		Blank(w)
+	}
+	for _, item := range unfinished {
+		outcomeItem(w, outcomeItemParams{Item: item, Catalog: params.Catalog})
+	}
+	next := append(applied.next, params.FollowUps...)
+	if len(next) > 0 {
+		Blank(w)
+		NextSteps(w, next)
+	}
+}
+
+type applied struct {
+	rows     []styles.PlanRow
+	warnings []string
+	next     []NextStepParams
+}
+
+func appliedOf(params OutcomeParams) applied {
+	var result applied
+	if len(params.Plan) > 0 && len(params.Items) > 0 {
+		result.rows = params.Detail.Plan(params.Plan)
+	}
 	for _, item := range params.Items {
-		outcomeItem(w, outcomeItemParams{Item: item, Detail: params.Detail, Catalog: params.Catalog})
+		if !standing(item) {
+			continue
+		}
+		view := params.Detail.Item(item)
+		result.rows = append(result.rows, view.Rows...)
+		result.warnings = append(result.warnings, view.Anomalies...)
+		result.next = append(result.next, view.Next...)
 	}
 	for _, item := range params.Items {
 		for _, warning := range item.Warnings {
-			Warning(w, fmt.Sprintf(itemLineFmt, item.Subject, params.Catalog.Message(warning.Code, warning.Params)))
+			result.warnings = append(result.warnings, fmt.Sprintf(itemLineFmt, item.Subject, params.Catalog.Message(warning.Code, warning.Params)))
 		}
 	}
 	for _, warning := range params.Warnings {
-		Warning(w, params.Catalog.Message(warning.Code, warning.Params))
+		result.warnings = append(result.warnings, params.Catalog.Message(warning.Code, warning.Params))
 	}
-	NextSteps(w, params.FollowUps)
+	return result
+}
+
+func finished(item kernel.Item[json.RawMessage]) bool {
+	return item.Status == kernel.StatusDone
+}
+
+func standing(item kernel.Item[json.RawMessage]) bool {
+	return item.Status == kernel.StatusDone || item.Reason == kernel.ReasonIncomplete
 }
 
 func headline(w io.Writer, params OutcomeParams) {
@@ -102,24 +159,17 @@ func (c itemCount) parts(catalog text.Catalog) []domain.TallyPart {
 
 type outcomeItemParams struct {
 	Item    kernel.Item[json.RawMessage]
-	Detail  Detail
 	Catalog text.Catalog
 }
 
 func outcomeItem(w io.Writer, params outcomeItemParams) {
 	item := params.Item
 	switch item.Status {
-	case kernel.StatusDone:
-		if item.Reason != kernel.ReasonUnchanged {
-			params.Detail.Item(w, item)
-		}
 	case kernel.StatusFailed:
 		Error(w, fmt.Sprintf(itemLineFmt, item.Subject, itemWhy(params)))
 	case kernel.StatusSkipped, kernel.StatusCancelled:
 		Warning(w, fmt.Sprintf(itemLineFmt, item.Subject, itemWhy(params)))
-	}
-	if item.Reason == kernel.ReasonIncomplete {
-		params.Detail.Item(w, item)
+	case kernel.StatusDone:
 	}
 }
 

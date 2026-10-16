@@ -67,3 +67,15 @@ func TestAValueLongerThanItsLineIsCutHard(t *testing.T) {
 		t.Errorf("RenderPlan() =\n%s\nwant\n%s", got, want)
 	}
 }
+
+func TestAWarningOnSeveralLinesKeepsItsLinesUnderItsText(t *testing.T) {
+	got := renderedPlan(PlanParams{
+		Rows:     []PlanRow{{Label: "From", Values: []string{"main"}}},
+		Warnings: []string{"ports in anomaly\nPORT   3000  no such key\nAPI    3001  shared"},
+	})
+
+	want := "From  main\n\n! ports in anomaly\n  PORT   3000  no such key\n  API    3001  shared"
+	if got != want {
+		t.Errorf("RenderPlan() =\n%s\nwant\n%s", got, want)
+	}
+}
