@@ -35,23 +35,33 @@ func GlobalPath() string {
 	return filepath.Join(dir, globalConfigDir, configFileName)
 }
 
-func loadGlobal(path string) (project.Global, error) {
+type loadedGlobal struct {
+	Global project.Global
+	Shell  string
+}
+
+func (g loadedGlobal) validate() error {
+	switch g.Shell {
+	case "", "zsh", "bash", "fish":
+		return nil
+	}
+	return errInvalidShell
+}
+
+func loadGlobal(path string) (loadedGlobal, error) {
 	if path == "" {
-		return project.Global{}, nil
+		return loadedGlobal{}, nil
 	}
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return project.Global{}, nil
+		return loadedGlobal{}, nil
 	}
 	if err != nil {
-		return project.Global{}, err
+		return loadedGlobal{}, err
 	}
 	var file globalFile
 	if err := decodeStrict(strictParams{Source: path, Data: data, Out: &file}); err != nil {
-		return project.Global{}, err
+		return loadedGlobal{}, err
 	}
-	if file.Shell != "" && file.Shell != "zsh" && file.Shell != "bash" && file.Shell != "fish" {
-		return project.Global{}, errInvalidShell
-	}
-	return project.Global{Proxy: project.Proxy{Port: file.Proxy.Port, Enabled: file.Proxy.Enabled}}, nil
+	return loadedGlobal{Global: project.Global{Proxy: project.Proxy{Port: file.Proxy.Port, Enabled: file.Proxy.Enabled}}, Shell: file.Shell}, nil
 }

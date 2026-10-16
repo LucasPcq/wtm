@@ -45,11 +45,30 @@ ports = { DB_PORT = 5432 }
 	assert.Equal(t, map[string]int{"DB_PORT": 5432}, cfg.Jobs[1].Ports)
 }
 
-func TestCollidingPortsAreNoLongerRefusedOnRead(t *testing.T) {
-	cfg, err := LoadRun(stateWithRun(t, "[[job]]\nname = \"web\"\nkind = \"service\"\ncmd = \"pnpm dev\"\nports = { PORT = 3000, ADMIN = 3010 }\n"))
+func TestAPortRunTomlWouldWriteWrongIsRefused(t *testing.T) {
+	cases := []struct {
+		name string
+		jobs string
+		want string
+	}{
+		{"a port outside the range a socket binds", "[[job]]\nname = \"web\"\nports = { PORT = 99999 }\n", `invalid run config: job "web": port PORT is 99999, outside 1-65535`},
+		{"a port name no shell can export", "[[job]]\nname = \"web\"\nports = { 1PORT = 3000 }\n", `invalid run config: job "web": port "1PORT" is not a valid environment variable name`},
+		{"two jobs on the same base", "[[job]]\nname = \"a\"\nports = { A = 3000 }\n\n[[job]]\nname = \"b\"\nports = { B = 3000 }\n", `invalid run config: ports A (job "a") and B (job "b") both declare base 3000 — they would bind the same port in every worktree`},
+		{"two bases a block apart", "[[job]]\nname = \"web\"\nports = { ADMIN = 3010, PORT = 3000 }\n", `invalid run config: ports ADMIN (job "web", base 3010) and PORT (job "web", base 3000) collide 1 worktree(s) apart with a port_offset_block of 10 — move one base so the gap between them is not a multiple of 10`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := LoadRun(stateWithRun(t, tc.jobs))
 
-	require.NoError(t, err)
-	assert.Len(t, cfg.Jobs, 1)
+			assert.EqualError(t, err, tc.want)
+		})
+	}
+}
+
+func TestTwoSharedJobsOnDifferentBasesNeverCollide(t *testing.T) {
+	_, err := LoadRun(stateWithRun(t, "[[job]]\nname = \"pg\"\nscope = \"shared\"\nports = { PG = 5432 }\n\n[[job]]\nname = \"redis\"\nscope = \"shared\"\nports = { REDIS = 5442 }\n"))
+
+	assert.NoError(t, err)
 }
 
 func TestADuplicateJobNameStillLoads(t *testing.T) {

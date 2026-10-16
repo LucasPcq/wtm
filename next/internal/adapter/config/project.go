@@ -71,7 +71,10 @@ func Load(params LoadParams) (project.Config, project.Global, error) {
 	if err := validateProject(config); err != nil {
 		return project.Config{}, project.Global{}, err
 	}
-	return config, global, nil
+	if err := global.validate(); err != nil {
+		return project.Config{}, project.Global{}, err
+	}
+	return config, global.Global, nil
 }
 
 type parseParams struct {

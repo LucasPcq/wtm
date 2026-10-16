@@ -4,9 +4,11 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"sync"
+	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -183,4 +185,36 @@ func TestAFailedMutateIsNeverSeenHalfWritten(t *testing.T) {
 	assert.ErrorIs(t, err, refused)
 	assert.Equal(t, "kept", contentOf(t, path))
 	assert.ElementsMatch(t, []string{"file", "file.lock"}, entries(t, dir))
+}
+
+func TestAWriteFailingMidwayLeavesTheOriginalAndNoTemporaryFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "state.json")
+	set(t, setParams{Path: path, Content: "original"})
+	cmd := exec.Command(os.Args[0], "-test.run=^TestAProcessWhoseFilesCannotGrow$")
+	cmd.Env = append(os.Environ(), envGrowPath+"="+path)
+
+	out, err := cmd.CombinedOutput()
+
+	require.NoError(t, err, string(out))
+	assert.Equal(t, "original", contentOf(t, path))
+	assert.ElementsMatch(t, []string{"state.json", "state.json.lock"}, entries(t, dir))
+}
+
+func TestAProcessWhoseFilesCannotGrow(t *testing.T) {
+	path := os.Getenv(envGrowPath)
+	if path == "" {
+		t.Skip("run by TestAWriteFailingMidwayLeavesTheOriginalAndNoTemporaryFile")
+	}
+	signal.Ignore(syscall.SIGXFSZ)
+	var limit syscall.Rlimit
+	require.NoError(t, syscall.Getrlimit(syscall.RLIMIT_FSIZE, &limit))
+	limit.Cur = 4
+	require.NoError(t, syscall.Setrlimit(syscall.RLIMIT_FSIZE, &limit))
+
+	_, err := Update(t.Context(), UpdateParams{Path: path, Mutate: func([]byte) (Change, error) {
+		return Write{Data: []byte("a write far longer than four bytes")}, nil
+	}})
+
+	require.ErrorIs(t, err, syscall.EFBIG)
 }

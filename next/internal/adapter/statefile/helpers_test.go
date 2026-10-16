@@ -12,6 +12,7 @@ import (
 const (
 	envCounterPath   = "WTM_NEXT_TEST_COUNTER_PATH"
 	envCounterRounds = "WTM_NEXT_TEST_COUNTER_ROUNDS"
+	envGrowPath      = "WTM_NEXT_TEST_GROW_PATH"
 )
 
 func increment(t testing.TB, path string) Lock {

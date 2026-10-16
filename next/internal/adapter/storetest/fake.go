@@ -2,11 +2,12 @@
 package storetest
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"os"
-	"reflect"
 	"slices"
 	"sync"
 
@@ -21,29 +22,35 @@ import (
 const metaSchema = 1
 
 type Fake struct {
-	mu         sync.Mutex
-	meta       map[string]worktree.Meta
-	unreadable map[string]bool
-	config     *project.Config
-	files      map[string]string
-	fail       map[string]error
-	calls      []string
+	mu               sync.Mutex
+	meta             map[string]worktree.Meta
+	unreadable       map[string]bool
+	config           *project.Config
+	configSchema     int
+	configUnreadable bool
+	files            map[string]string
+	fail             map[string]error
+	calls            []string
 }
 
 type FakeParams struct {
-	Meta       map[string]worktree.Meta
-	Unreadable []string
-	Config     *project.Config
-	Files      map[string]string
-	Fail       map[string]error
+	Meta             map[string]worktree.Meta
+	Unreadable       []string
+	Config           *project.Config
+	ConfigSchema     int
+	ConfigUnreadable bool
+	Files            map[string]string
+	Fail             map[string]error
 }
 
 func NewFake(params FakeParams) *Fake {
 	fake := &Fake{
-		meta:       maps.Clone(params.Meta),
-		unreadable: map[string]bool{},
-		files:      maps.Clone(params.Files),
-		fail:       params.Fail,
+		meta:             maps.Clone(params.Meta),
+		unreadable:       map[string]bool{},
+		files:            maps.Clone(params.Files),
+		fail:             params.Fail,
+		configSchema:     params.ConfigSchema,
+		configUnreadable: params.ConfigUnreadable,
 	}
 	for _, branch := range params.Unreadable {
 		fake.unreadable[branch] = true
@@ -97,6 +104,9 @@ func (f *Fake) Load(branch string) (worktree.Meta, error) {
 	if err := f.enter("Load", branch); err != nil {
 		return worktree.Meta{}, err
 	}
+	if err := segmentOf(branch); err != nil {
+		return worktree.Meta{}, err
+	}
 	if f.unreadable[branch] {
 		return worktree.Meta{}, unreadable(branch)
 	}
@@ -128,6 +138,9 @@ func (f *Fake) Update(_ context.Context, update worktree.MetaUpdate) (wtm.Writte
 	if err := f.enter("Update", update.Branch); err != nil {
 		return wtm.Written{}, err
 	}
+	if err := segmentOf(update.Branch); err != nil {
+		return wtm.Written{}, err
+	}
 	stored, err := f.stored(update)
 	if err != nil || stored == nil {
 		return wtm.Written{}, err
@@ -137,13 +150,29 @@ func (f *Fake) Update(_ context.Context, update worktree.MetaUpdate) (wtm.Writte
 		return wtm.Written{}, err
 	}
 	next.Schema = statefile.Stamp(metaSchema)
+	written, err := json.MarshalIndent(next, "", "  ")
+	if err != nil {
+		return wtm.Written{}, err
+	}
 	previous, held := f.meta[update.Branch]
-	if held && !f.unreadable[update.Branch] && reflect.DeepEqual(previous, next) {
+	before, _ := json.MarshalIndent(previous, "", "  ")
+	if held && !f.unreadable[update.Branch] && bytes.Equal(before, written) {
 		return wtm.Written{}, nil
 	}
-	f.meta[update.Branch] = next
+	var reread worktree.Meta
+	if err := json.Unmarshal(written, &reread); err != nil {
+		return wtm.Written{}, err
+	}
+	f.meta[update.Branch] = reread
 	delete(f.unreadable, update.Branch)
 	return wtm.Written{Changed: true}, nil
+}
+
+func segmentOf(branch string) error {
+	if _, ok := worktree.MetaDir(worktree.MetaDirParams{StateDir: "/", Branch: branch}); !ok {
+		return fmt.Errorf("storetest: no meta.json path for branch %q", branch)
+	}
+	return nil
 }
 
 func (f *Fake) stored(update worktree.MetaUpdate) (*worktree.Meta, error) {
@@ -172,6 +201,9 @@ func (f *Fake) Purge(branch string) error {
 	if err := f.enter("Purge", branch); err != nil {
 		return err
 	}
+	if segmentOf(branch) != nil {
+		return nil
+	}
 	delete(f.meta, branch)
 	delete(f.unreadable, branch)
 	return nil
@@ -188,6 +220,12 @@ func (f *Fake) Remember(_ context.Context, answers map[string]string) (wtm.Writt
 	}
 	if f.config == nil {
 		return wtm.Written{}, project.ErrConfigNotFound
+	}
+	if f.configUnreadable {
+		return wtm.Written{}, fmt.Errorf("storetest: config.toml does not parse")
+	}
+	if err := statefile.Refusal(statefile.Schema{Path: "config.toml", Found: f.configSchema, Supported: 1}); err != nil {
+		return wtm.Written{}, err
 	}
 	remembered := maps.Clone(f.config.Remembered)
 	if remembered == nil {

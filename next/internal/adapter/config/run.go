@@ -92,7 +92,7 @@ func LoadRun(stateDir string) (run.Config, error) {
 }
 
 func (f runFile) problems() []string {
-	var problems []string
+	problems := f.portProblems()
 	if f.Addressing != "" && f.Addressing != string(run.AddressPorts) && f.Addressing != string(run.AddressNames) {
 		problems = append(problems, fmt.Sprintf("unknown addressing %q (expected %q or %q)", f.Addressing, run.AddressPorts, run.AddressNames))
 	}

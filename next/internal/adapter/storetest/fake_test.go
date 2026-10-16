@@ -127,3 +127,59 @@ func TestAFakeReadsTheLinesOfAFileItHoldsAndNoneOfOneItLacks(t *testing.T) {
 	assert.Nil(t, absent)
 	assert.Equal(t, []string{"Read /wt/.env", "Read /wt/.env.local"}, fake.Calls())
 }
+
+func TestAFakeUpdateThatChangesNoByteOfTheRecordChangesNothing(t *testing.T) {
+	fake := NewFake(FakeParams{Meta: map[string]worktree.Meta{"feat/a": {SourceBranch: "main"}}})
+
+	written, err := fake.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Change: func(meta *worktree.Meta) error {
+		meta.Namespaces = []string{}
+		return nil
+	}})
+
+	require.NoError(t, err)
+	assert.Equal(t, wtm.Written{}, written)
+	stored, _ := fake.Meta("feat/a")
+	assert.Nil(t, stored.Namespaces)
+}
+
+func TestAFakeRecordIsStoredAsItsJSONReadsBack(t *testing.T) {
+	fake := NewFake(FakeParams{})
+
+	_, err := fake.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Missing: worktree.MissingCreate, Change: func(meta *worktree.Meta) error {
+		meta.Namespaces = []string{}
+		return nil
+	}})
+
+	require.NoError(t, err)
+	stored, ok := fake.Meta("feat/a")
+	require.True(t, ok)
+	assert.Nil(t, stored.Namespaces)
+}
+
+func TestAFakeRefusesABranchThatIsNoPathSegmentAsTheStoreDoes(t *testing.T) {
+	fake := NewFake(FakeParams{})
+
+	_, loadErr := fake.Load("..")
+	_, updateErr := fake.Update(t.Context(), worktree.MetaUpdate{Branch: "..", Missing: worktree.MissingCreate, Change: func(*worktree.Meta) error { return nil }})
+
+	assert.Error(t, loadErr)
+	assert.Error(t, updateErr)
+	assert.NoError(t, fake.Purge(".."))
+	records, err := fake.Records()
+	require.NoError(t, err)
+	assert.Empty(t, records)
+}
+
+func TestAFakeConfigAtANewerSchemaOrThatDoesNotParseIsNeverRemembered(t *testing.T) {
+	newer := NewFake(FakeParams{Config: &project.Config{}, ConfigSchema: 2})
+	broken := NewFake(FakeParams{Config: &project.Config{}, ConfigUnreadable: true})
+
+	_, newerErr := newer.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
+	_, brokenErr := broken.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
+
+	var refusal *wtm.SchemaNewer
+	assert.ErrorAs(t, newerErr, &refusal)
+	assert.Error(t, brokenErr)
+	config, _ := newer.Config()
+	assert.Empty(t, config.Remembered)
+}

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
@@ -67,4 +68,15 @@ func TestAGlobalConfigThatIsNotTOMLIsRefused(t *testing.T) {
 	_, err := loadWithGlobal(t, "[proxy\n")
 
 	assert.ErrorContains(t, err, "global config")
+}
+
+func TestTheProjectIsCheckedBeforeTheShellAndTheShellErrorStandsAlone(t *testing.T) {
+	globalPath := filepath.Join(t.TempDir(), "config.toml")
+	writeFile(t, globalPath, "shell = \"powershell\"\n")
+
+	_, _, bad := Load(LoadParams{StateDir: stateWithConfig(t, "[env]\nstrategy = \"bogus\"\n"), GlobalPath: globalPath})
+	_, _, shell := Load(LoadParams{StateDir: stateWithConfig(t, minimalConfig), GlobalPath: globalPath})
+
+	assert.EqualError(t, bad, "invalid env strategy: must be example, main, or parent")
+	assert.EqualError(t, shell, "invalid shell type: must be zsh, bash, or fish")
 }
