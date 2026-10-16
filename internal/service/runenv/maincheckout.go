@@ -7,14 +7,19 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
-func composeEnvFiles(params Params) ([][]domain.EnvLine, error) {
+type composeEnvFilesParams struct {
+	Params
+	Root string
+}
+
+func composeEnvFiles(params composeEnvFilesParams) ([][]domain.EnvLine, error) {
 	dirs := rules.ComposeProjectDirs(params.Run)
 	if len(dirs) == 0 {
 		dirs = []string{"."}
 	}
 	files := make([][]domain.EnvLine, 0, len(dirs))
 	for _, dir := range dirs {
-		lines, err := params.Files.Read(filepath.Join(params.ProjectDir, dir, domain.EnvFileName))
+		lines, err := params.Files.Read(filepath.Join(params.Root, dir, domain.EnvFileName))
 		if err != nil {
 			return nil, err
 		}

@@ -41,7 +41,7 @@ func Env(params EnvParams) (EnvWrites, error) {
 	if _, verbatim := envCase.(envcase.Verbatim); verbatim {
 		return EnvWrites{}, nil
 	}
-	cfg, _ := rules.PartitionEnvTargets(rules.PartitionEnvTargetsParams{Config: params.Run, Files: params.EnvFiles})
+	cfg, _ := envcase.Targets(envcase.TargetsParams{Run: params.Run, Files: params.EnvFiles})
 	owned, err := ownedWrites(ownedWritesParams{Env: params, Config: cfg})
 	if err != nil {
 		return EnvWrites{}, err

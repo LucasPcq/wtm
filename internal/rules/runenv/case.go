@@ -1,4 +1,4 @@
-// Package runenv decides which environment a worktree's .env files and jobs are given: none, the main checkout's own, or a linked worktree's.
+// Package runenv decides which environment a worktree's .env files and jobs are given: none, the main checkout's own, or a linked worktree's, and which of its links apply.
 package runenv
 
 import "github.com/LucasPcq/wtm/internal/domain"

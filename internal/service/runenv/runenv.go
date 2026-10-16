@@ -85,7 +85,7 @@ func caseOf(identity Identity) envcase.Case {
 }
 
 func mainComposeProject(params Params) (string, error) {
-	files, err := composeEnvFiles(params)
+	files, err := composeEnvFiles(composeEnvFilesParams{Params: params, Root: params.ProjectDir})
 	if err != nil {
 		return "", err
 	}
