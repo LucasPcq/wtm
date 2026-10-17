@@ -281,7 +281,8 @@ func (c *Command[R, Q, O]) Argv(command string, req R) []string {
 		flags = append(flags, given{name: flagName(field), words: flagWords(field, req.Values(field.Spec().Path))})
 	}
 
-	remember := domain.TextListField{FieldSpec: domain.FieldSpec{Flag: "--" + domain.PathRemember}}
+	// --remember is a string array, which reads each value as it is, not as CSV.
+	remember := domain.SelectField{FieldSpec: domain.FieldSpec{Flag: "--" + domain.PathRemember}}
 	flags = append(flags, given{name: domain.PathRemember, words: flagWords(remember, req.Values(domain.PathRemember))})
 	slices.SortFunc(flags, func(a, b given) int { return cmp.Compare(a.name, b.name) })
 	for _, flag := range flags {
@@ -293,6 +294,15 @@ func (c *Command[R, Q, O]) Argv(command string, req R) []string {
 	}
 
 	return argv
+}
+
+// csvField is value as a list flag reads it back as one entry: pflag reads a list flag as a line of CSV, so a value holding a comma, a quote or a newline is quoted the CSV way.
+func csvField(value string) string {
+	if !strings.ContainsAny(value, ",\"\n") {
+		return value
+	}
+
+	return `"` + strings.ReplaceAll(value, `"`, `""`) + `"`
 }
 
 // flagWords are the words that give field its values: a switch as --name or --name=false, a list as one flag per value, any other as the flag then its value.
@@ -307,7 +317,9 @@ func flagWords(field domain.Field, values []string) []string {
 			} else {
 				words = append(words, name+"="+value)
 			}
-		case domain.SelectField, domain.TextField, domain.MultiSelectField, domain.TextListField:
+		case domain.MultiSelectField, domain.TextListField:
+			words = append(words, name, csvField(value))
+		case domain.SelectField, domain.TextField:
 			words = append(words, name, value)
 		}
 	}

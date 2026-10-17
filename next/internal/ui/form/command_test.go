@@ -84,3 +84,12 @@ func TestTheCommandLineSpellsThePositionalWordsThenTheFlagsSortedThenAsk(t *test
 	assert.Equal(t, []string{"wtm-next", "fake", "feat/a", "it's", "--ff=false", "--files", "a.txt", "--files", "b.txt", "--from", "main", "--keep", "--name", "two words", "--remember", "mode", "--ask"}, argv)
 	assert.Equal(t, `wtm-next fake feat/a 'it'\''s' --ff=false --files a.txt --files b.txt --from main --keep --name 'two words' --remember mode --ask`, output.Line(argv))
 }
+
+func TestAListEntryWithACommaReadsBackAsOneEntry(t *testing.T) {
+	req := request{"files": {"a,b.txt", `say "hi".txt`, "c.txt"}}
+	argv := fakeCommand().Argv("wtm-next fake", req)
+
+	command, cmd := bound(t, argv[2:]...)
+
+	assert.Equal(t, req, command.request(cmd, nil))
+}
