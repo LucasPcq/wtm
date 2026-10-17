@@ -23,6 +23,6 @@ Reference documentation for people (and agents) working **on** wtm. It describes
 | [lint.md](lint.md) | `make lint` and what each gate holds: the `archlint` rules, the exception files, the pre-commit hook, the rules considered and left out |
 | [changelog.md](changelog.md) | How to write `CHANGELOG.md`: the release template, the rules, and how a section becomes the GitHub release notes |
 
-For the coding standards themselves (immutability, struct params, constants, comments), see [`CLAUDE.md`](../../CLAUDE.md) and the `go-cli` skill in `.claude/skills/go-cli/SKILL.md`.
+For the coding standards themselves (immutability, struct params, constants, comments), see [`CLAUDE.md`](../../CLAUDE.md), the `go-style` skill (`.claude/skills/go-style/`, Go conventions with their sources) and, for `next/`, the `go-architecture` skill (`.claude/skills/go-architecture/`).
 
 To see a change working in the real binary — an isolated sandbox driven with tmux, or recorded with VHS, optionally before/after — use the `wtm-sandbox` skill (`.claude/skills/wtm-sandbox/`). To open a pull request (base branch from `wtm tree`, that terminal proof attached with `gh --attach`, body template), use the `open-pr` skill (`.claude/skills/open-pr/`).

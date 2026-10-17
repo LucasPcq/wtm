@@ -10,17 +10,20 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
 const (
-	runFileName    = "run.toml"
+	runFileName = "run.toml"
+	// probeWorktree and namespaceProbe expand a namespace value for a made-up
+	// worktree, so a placeholder left over is one wtm does not know.
 	probeWorktree  = "probe"
 	namespaceProbe = "{worktree}"
 )
 
 var namespaceToken = regexp.MustCompile(`\{[a-zA-Z_]+\}`)
 
+// runFile is the shape of run.toml, every key it may hold.
 type runFile struct {
 	Schema           int           `toml:"schema"`
 	PortOffsetBlock  int           `toml:"port_offset_block"`
@@ -44,6 +47,7 @@ type runFile struct {
 	Isolation   string `toml:"isolation"`
 }
 
+// jobFile is one [[job]] of run.toml.
 type jobFile struct {
 	Name  string         `toml:"name"`
 	Kind  string         `toml:"kind"`
@@ -68,39 +72,50 @@ type jobFile struct {
 	} `toml:"namespace"`
 }
 
+// profileFile is one [[profile]] of run.toml.
 type profileFile struct {
 	Name    string   `toml:"name"`
 	Jobs    []string `toml:"jobs"`
 	Default bool     `toml:"default"`
 }
 
-func LoadRun(stateDir string) (run.Config, error) {
-	path := filepath.Join(stateDir, runFileName)
+// LoadRun returns the project's run.toml; a missing file is an empty run
+// config. An unknown key is an error, and so is an invalid value: the error
+// lists every problem found (ports, addressing, isolation, kinds, scopes,
+// namespaces), not only the first.
+func (p Project) LoadRun() (project.Run, error) {
+	path := filepath.Join(p.StateDir, runFileName)
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return run.Config{}, nil
+		return project.Run{}, nil
 	}
 	if err != nil {
-		return run.Config{}, err
+		return project.Run{}, err
 	}
+
 	var file runFile
 	if err := decodeStrict(strictParams{Source: path, Data: data, Out: &file}); err != nil {
-		return run.Config{}, err
+		return project.Run{}, err
 	}
+
 	if problems := file.problems(); len(problems) > 0 {
-		return run.Config{}, fmt.Errorf("invalid run config: %s", strings.Join(problems, "; "))
+		return project.Run{}, fmt.Errorf("invalid run config: %s", strings.Join(problems, "; "))
 	}
+
 	return file.config(), nil
 }
 
+// problems lists every invalid value of the file, each naming its key.
 func (f runFile) problems() []string {
 	problems := f.portProblems()
-	if f.Addressing != "" && f.Addressing != string(run.AddressPorts) && f.Addressing != string(run.AddressNames) {
-		problems = append(problems, fmt.Sprintf("unknown addressing %q (expected %q or %q)", f.Addressing, run.AddressPorts, run.AddressNames))
+
+	if f.Addressing != "" && f.Addressing != string(project.AddressPorts) && f.Addressing != string(project.AddressNames) {
+		problems = append(problems, fmt.Sprintf("unknown addressing %q (expected %q or %q)", f.Addressing, project.AddressPorts, project.AddressNames))
 	}
-	if f.Isolation != "" && !run.Isolation(f.Isolation).Valid() {
-		problems = append(problems, fmt.Sprintf("unknown isolation %q (expected %q or %q)", f.Isolation, run.Isolated, run.Verbatim))
+	if f.Isolation != "" && !project.Isolation(f.Isolation).Valid() {
+		problems = append(problems, fmt.Sprintf("unknown isolation %q (expected %q or %q)", f.Isolation, project.Isolated, project.Verbatim))
 	}
+
 	for _, job := range f.Jobs {
 		problems = append(problems, job.problems()...)
 	}
@@ -109,23 +124,28 @@ func (f runFile) problems() []string {
 
 func (j jobFile) problems() []string {
 	var problems []string
-	if j.Kind != "" && j.Kind != string(run.Service) && j.Kind != string(run.Task) {
+	if j.Kind != "" && j.Kind != string(project.Service) && j.Kind != string(project.Task) {
 		problems = append(problems, fmt.Sprintf("job %q: unknown kind %q (expected service or task)", j.Name, j.Kind))
 	}
+
 	return append(problems, j.scopeProblems()...)
 }
 
+// scopeProblems refuses an unknown scope and a [job.namespace] block that is
+// incomplete, set on a job that is not shared, or that names a placeholder wtm
+// does not expand.
 func (j jobFile) scopeProblems() []string {
 	switch {
-	case j.Scope != string(run.PerWorktree) && j.Scope != string(run.Shared):
-		return []string{fmt.Sprintf("job %q: unknown scope %q (expected %q)", j.Name, j.Scope, run.Shared)}
+	case j.Scope != string(project.PerWorktree) && j.Scope != string(project.Shared):
+		return []string{fmt.Sprintf("job %q: unknown scope %q (expected %q)", j.Name, j.Scope, project.Shared)}
 	case j.Namespace == nil:
 		return nil
-	case j.Scope != string(run.Shared):
+	case j.Scope != string(project.Shared):
 		return []string{fmt.Sprintf(`job %q: [job.namespace] only means something on a job with scope = "shared"`, j.Name)}
 	case j.Namespace.Name == "" || j.Namespace.Create == "":
 		return []string{fmt.Sprintf("job %q: a [job.namespace] block needs both a name and a create command", j.Name)}
 	}
+
 	for _, value := range slices.AppendSeq([]string{j.Namespace.Name}, maps.Values(j.Namespace.Env)) {
 		expanded := strings.NewReplacer(namespaceProbe, probeWorktree, "{ordinal}", "0").Replace(value)
 		if leftover := namespaceToken.FindString(expanded); leftover != "" {
@@ -135,34 +155,37 @@ func (j jobFile) scopeProblems() []string {
 	return nil
 }
 
-func (f runFile) config() run.Config {
-	config := run.Config{
+// config maps the file onto the run config a use case reads.
+func (f runFile) config() project.Run {
+	config := project.Run{
 		PortOffsetBlock: f.PortOffsetBlock,
-		Addressing:      run.Addressing(f.Addressing),
-		Isolation:       run.Isolation(f.Isolation),
+		Addressing:      project.Addressing(f.Addressing),
+		Isolation:       project.Isolation(f.Isolation),
 	}
+
 	for _, job := range f.Jobs {
 		config.Jobs = append(config.Jobs, job.job())
 	}
 	for _, profile := range f.Profiles {
-		config.Profiles = append(config.Profiles, run.Profile{Name: profile.Name, Jobs: profile.Jobs, Default: profile.Default})
+		config.Profiles = append(config.Profiles, project.Profile{Name: profile.Name, Jobs: profile.Jobs, Default: profile.Default})
 	}
 	for _, link := range f.EnvPorts {
-		config.EnvPorts = append(config.EnvPorts, run.EnvPortLink{File: link.File, Key: link.Key, Job: link.Job, Port: link.Port})
+		config.EnvPorts = append(config.EnvPorts, project.EnvPortLink{File: link.File, Key: link.Key, Job: link.Job, Port: link.Port})
 	}
 	for _, link := range f.EnvValues {
-		config.EnvValues = append(config.EnvValues, run.EnvValueLink{File: link.File, Key: link.Key, Job: link.Job, Value: link.Value})
+		config.EnvValues = append(config.EnvValues, project.EnvValueLink{File: link.File, Key: link.Key, Job: link.Job, Value: link.Value})
 	}
 	return config
 }
 
-func (j jobFile) job() run.Job {
-	job := run.Job{Name: j.Name, Kind: run.JobKind(j.Kind), Cmd: j.Cmd, Stop: j.Stop, Cwd: j.Cwd, Ports: j.Ports, Scope: run.Scope(j.Scope)}
+func (j jobFile) job() project.Job {
+	job := project.Job{Name: j.Name, Kind: project.JobKind(j.Kind), Cmd: j.Cmd, Stop: j.Stop, Cwd: j.Cwd, Ports: j.Ports, Scope: project.Scope(j.Scope)}
+
 	if j.URL != nil {
-		job.URL = &run.URL{Port: j.URL.Port, Host: j.URL.Host}
+		job.URL = &project.URL{Port: j.URL.Port, Host: j.URL.Host}
 	}
 	if j.Namespace != nil {
-		job.Namespace = &run.Namespace{Name: j.Namespace.Name, Create: j.Namespace.Create, Remove: j.Namespace.Remove, Env: j.Namespace.Env}
+		job.Namespace = &project.Namespace{Name: j.Namespace.Name, Create: j.Namespace.Create, Remove: j.Namespace.Remove, Env: j.Namespace.Env}
 	}
 	return job
 }

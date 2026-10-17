@@ -22,7 +22,7 @@ func TestALockSerializesConcurrentRuns(t *testing.T) {
 	var wg sync.WaitGroup
 	for range 16 {
 		wg.Go(func() {
-			_, err := WithLock(t.Context(), LockParams{Path: lock, Do: func() error {
+			_, err := WithLock(t.Context(), lock, func() error {
 				mu.Lock()
 				inside++
 				peak = max(peak, inside)
@@ -32,7 +32,7 @@ func TestALockSerializesConcurrentRuns(t *testing.T) {
 				inside--
 				mu.Unlock()
 				return nil
-			}})
+			})
 			assert.NoError(t, err)
 		})
 	}
@@ -44,7 +44,7 @@ func TestALockSerializesConcurrentRuns(t *testing.T) {
 func TestALockReturnsWhatTheWorkReturns(t *testing.T) {
 	failed := errors.New("work failed")
 
-	held, err := WithLock(t.Context(), LockParams{Path: filepath.Join(t.TempDir(), "test.lock"), Do: func() error { return failed }})
+	held, err := WithLock(t.Context(), filepath.Join(t.TempDir(), "test.lock"), func() error { return failed })
 
 	assert.ErrorIs(t, err, failed)
 	assert.True(t, held)
@@ -55,7 +55,7 @@ func TestALockThatCannotBeTakenRunsTheWorkUnprotected(t *testing.T) {
 	writeFixture(t, notADir, "")
 	ran := false
 
-	held, err := WithLock(t.Context(), LockParams{Path: filepath.Join(notADir, "test.lock"), Do: func() error { ran = true; return nil }})
+	held, err := WithLock(t.Context(), filepath.Join(notADir, "test.lock"), func() error { ran = true; return nil })
 
 	require.NoError(t, err)
 	assert.True(t, ran, "the work was skipped because the lock could not be taken")
@@ -68,7 +68,7 @@ func TestALockInADirectoryThatRefusesItDegradesToUnlocked(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
 	ran := false
 
-	held, err := WithLock(t.Context(), LockParams{Path: filepath.Join(dir, "test.lock"), Do: func() error { ran = true; return nil }})
+	held, err := WithLock(t.Context(), filepath.Join(dir, "test.lock"), func() error { ran = true; return nil })
 
 	require.NoError(t, err)
 	assert.True(t, ran)
@@ -79,11 +79,11 @@ func TestWaitingForALockEndsWithTheContext(t *testing.T) {
 	lock := filepath.Join(t.TempDir(), "test.lock")
 	held, release := make(chan struct{}), make(chan struct{})
 	go func() {
-		_, _ = WithLock(t.Context(), LockParams{Path: lock, Do: func() error {
+		_, _ = WithLock(t.Context(), lock, func() error {
 			close(held)
 			<-release
 			return nil
-		}})
+		})
 	}()
 	<-held
 	defer close(release)
@@ -91,7 +91,7 @@ func TestWaitingForALockEndsWithTheContext(t *testing.T) {
 	defer cancel()
 	ran := false
 
-	_, err := WithLock(ctx, LockParams{Path: lock, Do: func() error { ran = true; return nil }})
+	_, err := WithLock(ctx, lock, func() error { ran = true; return nil })
 
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 	assert.False(t, ran, "the work ran without the lock it was waiting for")
@@ -102,7 +102,7 @@ func TestAFreeLockIsTakenEvenOnceTheContextIsDone(t *testing.T) {
 	cancel()
 	ran := false
 
-	held, err := WithLock(ctx, LockParams{Path: filepath.Join(t.TempDir(), "test.lock"), Do: func() error { ran = true; return nil }})
+	held, err := WithLock(ctx, filepath.Join(t.TempDir(), "test.lock"), func() error { ran = true; return nil })
 
 	require.NoError(t, err)
 	assert.True(t, ran)
@@ -123,14 +123,14 @@ func TestAScratchLockIsOneLockPerFileOutsideItsDirectory(t *testing.T) {
 
 func TestAScratchLockIsTheSameThroughASymlinkedDirectory(t *testing.T) {
 	dir := t.TempDir()
-	real := filepath.Join(dir, "real")
-	require.NoError(t, os.Mkdir(real, 0o755))
+	target := filepath.Join(dir, "real")
+	require.NoError(t, os.Mkdir(target, 0o755))
 	link := filepath.Join(dir, "link")
-	require.NoError(t, os.Symlink(real, link))
+	require.NoError(t, os.Symlink(target, link))
 
-	assert.Equal(t, ScratchLockPath(filepath.Join(real, ".env")), ScratchLockPath(filepath.Join(link, ".env")), "absent file")
-	writeFixture(t, filepath.Join(real, ".env"), "")
-	assert.Equal(t, ScratchLockPath(filepath.Join(real, ".env")), ScratchLockPath(filepath.Join(link, ".env")), "present file")
+	assert.Equal(t, ScratchLockPath(filepath.Join(target, ".env")), ScratchLockPath(filepath.Join(link, ".env")), "absent file")
+	writeFixture(t, filepath.Join(target, ".env"), "")
+	assert.Equal(t, ScratchLockPath(filepath.Join(target, ".env")), ScratchLockPath(filepath.Join(link, ".env")), "present file")
 }
 
 func TestALockFileThatIsASymlinkIsNotFollowed(t *testing.T) {
@@ -140,7 +140,7 @@ func TestALockFileThatIsASymlinkIsNotFollowed(t *testing.T) {
 	lockPath := filepath.Join(dir, "x.lock")
 	require.NoError(t, os.Symlink(victim, lockPath))
 
-	held, err := WithLock(t.Context(), LockParams{Path: lockPath, Do: func() error { return nil }})
+	held, err := WithLock(t.Context(), lockPath, func() error { return nil })
 
 	require.NoError(t, err)
 	assert.False(t, held)

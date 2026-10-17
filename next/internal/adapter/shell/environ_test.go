@@ -13,7 +13,7 @@ func TestAnEnvironmentDropsWhatIsUnsetAndSetsWhatIsGiven(t *testing.T) {
 	t.Setenv("WTM_NEXT_DROPPED", "dropped")
 	t.Setenv("WTM_NEXT_REPLACED", "old")
 
-	env := Environ(EnvironParams{Unset: []string{"WTM_NEXT_DROPPED"}, Set: map[string]string{"WTM_NEXT_REPLACED": "new", "WTM_NEXT_ADDED": "added"}})
+	env := Environ([]string{"WTM_NEXT_DROPPED"}, map[string]string{"WTM_NEXT_REPLACED": "new", "WTM_NEXT_ADDED": "added"})
 
 	assert.Contains(t, env, "WTM_NEXT_KEPT=kept")
 	assert.Contains(t, env, "WTM_NEXT_REPLACED=new")

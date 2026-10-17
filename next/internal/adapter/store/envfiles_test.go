@@ -7,10 +7,12 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/dotenv"
-	"github.com/LucasPcq/wtm/next/internal/wtm/envcopy"
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
+
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
+
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,7 +24,7 @@ func TestAnOwnedKeyChangesNothingElseInTheFile(t *testing.T) {
 	written, err := EnvFiles{}.Edit(t.Context(), dotenv.Edit{Path: path, Edit: upsert("WEB_PORT", "3100")})
 
 	require.NoError(t, err)
-	assert.Equal(t, wtm.Written{Changed: true}, written)
+	assert.Equal(t, domain.Written{Changed: true}, written)
 	assert.Equal(t, "# database\nDB_HOST=localhost\nWEB_PORT=3100 # the dev server\n\nexport API_KEY=secret\r\n", readFile(t, path))
 }
 
@@ -127,7 +129,7 @@ func TestCopyTakesEachFileFromItsStrategysSource(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			target := t.TempDir()
 
-			copied, err := EnvFiles{}.Copy(t.Context(), envcopy.Request{Strategy: tc.strategy, Files: []project.EnvFile{tc.file}, TargetDir: target, MainPath: main, ParentPath: tc.parent})
+			copied, err := EnvFiles{}.Copy(t.Context(), env.CopyRequest{Strategy: tc.strategy, Files: []project.EnvFile{tc.file}, TargetDir: target, MainPath: main, ParentPath: tc.parent})
 
 			require.NoError(t, err)
 			assert.Empty(t, copied.Warnings)
@@ -138,15 +140,15 @@ func TestCopyTakesEachFileFromItsStrategysSource(t *testing.T) {
 }
 
 func TestCopyNamesWhatItCouldNotFind(t *testing.T) {
-	copied, err := EnvFiles{}.Copy(t.Context(), envcopy.Request{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env.local"}}, TargetDir: t.TempDir(), MainPath: "/nowhere"})
+	copied, err := EnvFiles{}.Copy(t.Context(), env.CopyRequest{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env.local"}}, TargetDir: t.TempDir(), MainPath: "/nowhere"})
 
 	require.NoError(t, err)
 	assert.Empty(t, copied.Files)
-	assert.Equal(t, []envcopy.Warning{envcopy.SourceMissing{Target: ".env.local", Dir: "/nowhere"}}, copied.Warnings)
+	assert.Equal(t, []env.CopyWarning{env.SourceMissing{Target: ".env.local", Dir: "/nowhere"}}, copied.Warnings)
 }
 
 func TestCopyRefusesAnUnknownStrategy(t *testing.T) {
-	_, err := EnvFiles{}.Copy(t.Context(), envcopy.Request{Strategy: "elsewhere", Files: []project.EnvFile{{Target: ".env"}}, TargetDir: t.TempDir(), MainPath: t.TempDir()})
+	_, err := EnvFiles{}.Copy(t.Context(), env.CopyRequest{Strategy: "elsewhere", Files: []project.EnvFile{{Target: ".env"}}, TargetDir: t.TempDir(), MainPath: t.TempDir()})
 
 	assert.EqualError(t, err, "unknown env strategy: elsewhere")
 }
@@ -154,10 +156,10 @@ func TestCopyRefusesAnUnknownStrategy(t *testing.T) {
 func TestCopyOfNoFileDoesNothing(t *testing.T) {
 	target := t.TempDir()
 
-	copied, err := EnvFiles{}.Copy(t.Context(), envcopy.Request{Strategy: project.EnvExample, TargetDir: target, MainPath: t.TempDir()})
+	copied, err := EnvFiles{}.Copy(t.Context(), env.CopyRequest{Strategy: project.EnvExample, TargetDir: target, MainPath: t.TempDir()})
 
 	require.NoError(t, err)
-	assert.Equal(t, envcopy.Copied{}, copied)
+	assert.Equal(t, env.Copied{}, copied)
 	entries, err := os.ReadDir(target)
 	require.NoError(t, err)
 	assert.Empty(t, entries)
@@ -168,7 +170,7 @@ func TestACopyOverAnIdenticalFileWritesNothing(t *testing.T) {
 	writeFile(t, filepath.Join(main, ".env"), "FROM=main")
 	writeFile(t, filepath.Join(target, ".env"), "FROM=main")
 
-	copied, err := EnvFiles{}.Copy(t.Context(), envcopy.Request{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env"}}, TargetDir: target, MainPath: main})
+	copied, err := EnvFiles{}.Copy(t.Context(), env.CopyRequest{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env"}}, TargetDir: target, MainPath: main})
 
 	require.NoError(t, err)
 	assert.Empty(t, copied.Files)
@@ -184,7 +186,7 @@ func TestACopySourceThatCannotBeStatedIsAnErrorNotASkip(t *testing.T) {
 	require.NoError(t, os.Chmod(sealed, 0o000))
 	t.Cleanup(func() { _ = os.Chmod(sealed, 0o755) })
 
-	_, err := EnvFiles{}.Copy(t.Context(), envcopy.Request{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: "apps/.env"}}, TargetDir: t.TempDir(), MainPath: main})
+	_, err := EnvFiles{}.Copy(t.Context(), env.CopyRequest{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: "apps/.env"}}, TargetDir: t.TempDir(), MainPath: main})
 
 	require.ErrorIs(t, err, os.ErrPermission)
 }
@@ -206,7 +208,7 @@ func TestACopyKeepsTheModeOfItsSource(t *testing.T) {
 	main, worktree := t.TempDir(), t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(main, ".env"), []byte("SECRET=1\n"), 0o600))
 
-	_, err := EnvFiles{}.Copy(t.Context(), envcopy.Request{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env"}}, TargetDir: worktree, MainPath: main})
+	_, err := EnvFiles{}.Copy(t.Context(), env.CopyRequest{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env"}}, TargetDir: worktree, MainPath: main})
 	require.NoError(t, err)
 
 	info, err := os.Stat(filepath.Join(worktree, ".env"))

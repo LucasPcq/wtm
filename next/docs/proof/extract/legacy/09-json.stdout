@@ -1,0 +1,77 @@
+{
+  "files": [
+    {
+      "path": "apps/web/login.ts",
+      "status": "untracked"
+    }
+  ],
+  "target_path": "<SB>/acme.trees/feat-json",
+  "target_branch": "feat/json",
+  "source_branch": "feat/login",
+  "kept": false,
+  "conflicts": null,
+  "isolation": "isolated",
+  "env_ports": {
+    "offset": 60,
+    "entries": [
+      {
+        "file": "apps/web/.env",
+        "key": "PORT",
+        "port": "PORT",
+        "base": 24200,
+        "resolved": 24260,
+        "moves": [
+          {
+            "port": "PORT",
+            "job": "web",
+            "base": 24200,
+            "resolved": 24260
+          }
+        ],
+        "addressing": "ports",
+        "status": "rewrite"
+      },
+      {
+        "file": "apps/web/.env",
+        "key": "API_URL",
+        "port": "PORT",
+        "base": 24201,
+        "resolved": 24261,
+        "moves": [
+          {
+            "port": "PORT",
+            "job": "api",
+            "base": 24201,
+            "resolved": 24261,
+            "origin": "http://api.feat-json.acme.localhost:24202"
+          }
+        ],
+        "addressing": "names",
+        "status": "rewrite"
+      },
+      {
+        "file": "apps/api/.env",
+        "key": "PORT",
+        "port": "PORT",
+        "base": 24201,
+        "resolved": 24261,
+        "moves": [
+          {
+            "port": "PORT",
+            "job": "api",
+            "base": 24201,
+            "resolved": 24261
+          }
+        ],
+        "addressing": "ports",
+        "status": "rewrite"
+      }
+    ],
+    "addressing": "names",
+    "public_port": 24202,
+    "applied": true
+  },
+  "origins": {
+    "isolation": "default"
+  }
+}

@@ -1,10 +1,12 @@
 package events
 
 import (
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
+// repo, operation, unit and message are the shape of an event on the wire, as
+// wtm's daemon and wtm events read it (schema v1).
 type repo struct {
 	Root      string `json:"root"`
 	CommonDir string `json:"common_dir"`
@@ -37,21 +39,23 @@ type message struct {
 	Code          string             `json:"code,omitempty"`
 }
 
-func messageOf(event wtm.Event) (message, bool) {
+// messageOf returns the wire message of event and reports whether wtm
+// publishes it at all; units started, phases and output stay in the process.
+func messageOf(event domain.Event) (message, bool) {
 	switch e := event.(type) {
-	case wtm.WorktreeCreated:
+	case domain.WorktreeCreated:
 		return message{Type: "worktree.created", Worktree: &e.Worktree}, true
-	case wtm.WorktreeNumbered:
+	case domain.WorktreeNumbered:
 		return message{Type: "worktree.updated", Worktree: &e.Worktree, Changed: []string{"ordinal"}}, true
-	case wtm.WorktreeProvisioned:
+	case domain.WorktreeProvisioned:
 		return message{Type: "worktree.provisioned", Worktree: &e.Worktree, OK: &e.OK, Hook: e.Hook, ExitCode: e.ExitCode}, true
-	case wtm.OperationStarted:
+	case domain.OperationStarted:
 		return message{Type: "operation.started", Operation: &operation{Command: e.Command, Surface: e.Surface}}, true
-	case wtm.UnitFinished:
+	case domain.UnitFinished:
 		return message{Type: "unit.finished", Unit: &unit{Subject: e.Subject, Status: string(e.Status)}}, true
-	case wtm.OperationFinished:
+	case domain.OperationFinished:
 		return message{Type: "operation.finished", Operation: &operation{Command: e.Command, Surface: e.Surface}, OK: &e.OK, Code: e.Code}, true
-	case wtm.UnitStarted, wtm.PhaseStarted, wtm.PhaseFinished, wtm.Output:
+	case domain.UnitStarted, domain.PhaseStarted, domain.PhaseFinished, domain.Output:
 	}
 	return message{}, false
 }

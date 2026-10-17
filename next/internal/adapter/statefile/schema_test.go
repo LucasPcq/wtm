@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,9 +23,9 @@ func TestOnlyAFileAboveWhatThisWtmWritesIsRefused(t *testing.T) {
 func TestAWriteOverANewerFileIsRefusedWithItsSchema(t *testing.T) {
 	err := Refusal(Schema{Path: "/repo/.git/wtm/run.toml", Found: 2, Supported: 1})
 
-	newer, ok := errors.AsType[*wtm.SchemaNewer](err)
+	newer, ok := errors.AsType[*domain.SchemaNewer](err)
 	require.True(t, ok)
-	assert.Equal(t, wtm.SchemaNewer{Path: "/repo/.git/wtm/run.toml", Found: 2, Supported: 1}, *newer)
+	assert.Equal(t, domain.SchemaNewer{Path: "/repo/.git/wtm/run.toml", Found: 2, Supported: 1}, *newer)
 	assert.Equal(t, "/repo/.git/wtm/run.toml is at schema 2, newer than the 1 this wtm writes: upgrade wtm to change it", err.Error())
 }
 

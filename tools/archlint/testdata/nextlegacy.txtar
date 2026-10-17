@@ -40,14 +40,14 @@ func Add(ctx context.Context, dir string) error {
 	}
 	return os.Rename(dir+"/meta.json.tmp", dir+"/meta.json")
 }
--- github.com/LucasPcq/wtm/next/internal/surface/output/style.go --
+-- github.com/LucasPcq/wtm/next/internal/ui/output/style.go --
 // Package output prints results.
 package output
 
 import "github.com/charmbracelet/lipgloss"
 
 var Accent = lipgloss.NewStyle()
--- github.com/LucasPcq/wtm/next/internal/wtm/assert/assert.go --
+-- github.com/LucasPcq/wtm/next/internal/domain/assert/assert.go --
 // Package assert holds an unguarded assertion.
 package assert
 

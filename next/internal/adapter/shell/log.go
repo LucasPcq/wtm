@@ -9,11 +9,9 @@ import (
 	"sync"
 )
 
-type linesParams struct {
-	Emit func(string)
-	Log  string
-}
-
+// lines is the sink of a hook chain's output: it splits what the hooks write
+// into lines and hands each to emit and to the log file, opened on the first
+// hook that runs. It is safe for a hook's stdout and stderr to write at once.
 type lines struct {
 	mu      sync.Mutex
 	emit    func(string)
@@ -23,8 +21,8 @@ type lines struct {
 	buf     bytes.Buffer
 }
 
-func newLines(params linesParams) *lines {
-	return &lines{emit: params.Emit, logPath: params.Log}
+func newLines(emit func(string), log string) *lines {
+	return &lines{emit: emit, logPath: log}
 }
 
 func (l *lines) openLog() {
@@ -33,10 +31,14 @@ func (l *lines) openLog() {
 	if l.opened {
 		return
 	}
+
 	l.opened = true
 	l.log = openLog(l.logPath)
 }
 
+// openLog creates the log file at path, its directory included, and returns
+// nil when path is empty or the file cannot be created: a log never fails a
+// hook.
 func openLog(path string) io.WriteCloser {
 	if path == "" {
 		return nil
@@ -44,6 +46,7 @@ func openLog(path string) io.WriteCloser {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil
 	}
+
 	file, err := os.Create(path)
 	if err != nil {
 		return nil
@@ -51,10 +54,13 @@ func openLog(path string) io.WriteCloser {
 	return file
 }
 
+// Write sends every complete line of p, the rest of an earlier write before
+// it, and keeps an unfinished last line for the next write or flush.
 func (l *lines) Write(p []byte) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.buf.Write(p)
+
 	for {
 		line, err := l.buf.ReadString('\n')
 		if err != nil {
@@ -66,12 +72,14 @@ func (l *lines) Write(p []byte) (int, error) {
 	}
 }
 
+// flush sends the unfinished last line a hook left, if any.
 func (l *lines) flush() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.buf.Len() == 0 {
 		return
 	}
+
 	rest := l.buf.String()
 	l.buf.Reset()
 	l.send(rest)

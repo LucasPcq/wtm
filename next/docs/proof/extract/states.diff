@@ -1,0 +1,42 @@
+=== 01-dir-to-new-branch: exit legacy 0, next 0
+=== 02-copy-to-existing: exit legacy 0, next 0
+=== 03-rename-and-delete: exit legacy 0, next 0
+=== 04-existing-local-without-from: exit legacy 1, next 2
+=== 05-conflict-dirty-target: exit legacy 15, next 15
+=== 06-resolve: exit legacy 0, next 0
+=== 07-conflict-committed-in-target: exit legacy 15, next 15
+--- /Users/lucaspicque/Documents/Dev/wtm.worktrees/refactor-next-create-slice/next/docs/proof/extract/legacy/07-conflict-committed-in-target.state	2026-10-17 17:29:00
++++ /Users/lucaspicque/Documents/Dev/wtm.worktrees/refactor-next-create-slice/next/docs/proof/extract/next/07-conflict-committed-in-target.state	2026-10-17 17:29:04
+@@ -13,8 +13,6 @@
+    apps/api/new/deep/y.txt 9063a9f0e032
+    apps/api/new/x.txt 6fcf9dfbd479
+ ## feat-c status
+- M README.md
+-   README.md cfe9a2ed459a
+ ## feat-login status
+  M README.md
+ ?? apps/web/login.ts
+=== 08-nothing-to-extract: exit legacy 0, next 0
+--- /Users/lucaspicque/Documents/Dev/wtm.worktrees/refactor-next-create-slice/next/docs/proof/extract/legacy/08-nothing-to-extract.state	2026-10-17 17:29:00
++++ /Users/lucaspicque/Documents/Dev/wtm.worktrees/refactor-next-create-slice/next/docs/proof/extract/next/08-nothing-to-extract.state	2026-10-17 17:29:04
+@@ -13,8 +13,6 @@
+    apps/api/new/deep/y.txt 9063a9f0e032
+    apps/api/new/x.txt 6fcf9dfbd479
+ ## feat-c status
+- M README.md
+-   README.md cfe9a2ed459a
+ ## feat-login status
+  M README.md
+ ?? apps/web/login.ts
+=== 09-json: exit legacy 0, next 0
+--- /Users/lucaspicque/Documents/Dev/wtm.worktrees/refactor-next-create-slice/next/docs/proof/extract/legacy/09-json.state	2026-10-17 17:29:00
++++ /Users/lucaspicque/Documents/Dev/wtm.worktrees/refactor-next-create-slice/next/docs/proof/extract/next/09-json.state	2026-10-17 17:29:04
+@@ -14,8 +14,6 @@
+    apps/api/new/deep/y.txt 9063a9f0e032
+    apps/api/new/x.txt 6fcf9dfbd479
+ ## feat-c status
+- M README.md
+-   README.md cfe9a2ed459a
+ ## feat-json status
+ ?? apps/web/login.ts
+    apps/web/login.ts 2baaedadd43f

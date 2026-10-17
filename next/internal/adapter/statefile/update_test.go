@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -201,7 +201,7 @@ func TestAProcessWhoseFilesCannotGrow(t *testing.T) {
 
 func TestAnUpdateSaysWhetherItChangedTheFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "file")
-	write := func(content string) wtm.Written {
+	write := func(content string) domain.Written {
 		written, err := Update(t.Context(), UpdateParams{Path: path, Mutate: func([]byte) (Change, error) { return Write{Data: []byte(content)}, nil }})
 		require.NoError(t, err)
 		return written

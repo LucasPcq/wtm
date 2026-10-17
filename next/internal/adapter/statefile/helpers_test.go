@@ -6,18 +6,22 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 
 	"github.com/stretchr/testify/require"
 )
 
+// The variables that turn the test binary into a helper process: the counter
+// file it increments, how many times, and the file it grows.
 const (
 	envCounterPath   = "WTM_NEXT_TEST_COUNTER_PATH"
 	envCounterRounds = "WTM_NEXT_TEST_COUNTER_ROUNDS"
 	envGrowPath      = "WTM_NEXT_TEST_GROW_PATH"
 )
 
-func increment(t testing.TB, path string) wtm.Written {
+// increment adds one to the counter file at path through Update, the way two
+// racing processes do in the tests.
+func increment(t testing.TB, path string) domain.Written {
 	t.Helper()
 	written, err := Update(t.Context(), UpdateParams{
 		Path: path,
@@ -37,6 +41,7 @@ func increment(t testing.TB, path string) wtm.Written {
 	return written
 }
 
+// counter returns the number in the counter file at path.
 func counter(t *testing.T, path string) int {
 	t.Helper()
 	count, err := strconv.Atoi(contentOf(t, path))
@@ -44,12 +49,14 @@ func counter(t *testing.T, path string) int {
 	return count
 }
 
+// setParams is the file set writes, its content and its permissions.
 type setParams struct {
 	Path    string
 	Content string
 	Perm    os.FileMode
 }
 
+// set writes params.Content to params.Path through Update.
 func set(t *testing.T, params setParams) {
 	t.Helper()
 	_, err := Update(t.Context(), UpdateParams{Path: params.Path, Perm: params.Perm, Mutate: func([]byte) (Change, error) {
@@ -72,10 +79,12 @@ func modeOf(t *testing.T, path string) os.FileMode {
 	return info.Mode().Perm()
 }
 
+// entries returns the names in dir, to check a write left no temporary file.
 func entries(t *testing.T, dir string) []string {
 	t.Helper()
 	listed, err := os.ReadDir(dir)
 	require.NoError(t, err)
+
 	names := make([]string, 0, len(listed))
 	for _, entry := range listed {
 		names = append(names, entry.Name())

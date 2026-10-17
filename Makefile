@@ -2,7 +2,7 @@ BINARY      := wtm
 BINARY_NEXT := wtm-next
 BUILD_DIR   := bin
 
-.PHONY: build next test vet fmt lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
+.PHONY: build next test vet fmt lint next-lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
 
 build:
 	go build -o $(BUILD_DIR)/$(BINARY) .
@@ -49,16 +49,23 @@ dead-strict:
 sumtype:
 	go tool go-sumtype $$(go list ./...)
 
-lint: fmt vet arch dead sumtype
+lint: fmt vet arch dead sumtype next-lint
 	go tool staticcheck ./...
 
-# dupl reports token-level clones. It is not part of `lint`: a clone is a
-# judgement call — two parallel families over unrelated types read better
-# duplicated than behind a generic — so it informs a review rather than gating
-# one. Raise the threshold to see only the large ones.
+# next-lint holds next/ to Go's doc-comment and naming conventions with revive
+# (next/revive.toml); staticcheck already runs every check on next/ from
+# next/staticcheck.conf.
+next-lint:
+	go tool revive -config next/revive.toml -formatter plain ./next/...
+
+# dupl reports token-level clones in internal/ and next/. It is not part of
+# `lint`: a clone is a judgement call — two parallel families over unrelated
+# types (create and extract in next/) read better duplicated than behind a
+# generic — so it informs a review rather than gating one. Raise the threshold
+# to see only the large ones.
 DUPL_THRESHOLD ?= 75
 dupl:
-	@find internal -name '*.go' ! -name '*_test.go' > /tmp/wtm-dupl-files
+	@find internal next -name '*.go' ! -name '*_test.go' > /tmp/wtm-dupl-files
 	@go tool dupl -t $(DUPL_THRESHOLD) -files < /tmp/wtm-dupl-files
 
 tidy:

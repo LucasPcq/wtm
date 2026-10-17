@@ -1,0 +1,30 @@
+package cli
+
+import (
+	"testing"
+
+	"github.com/LucasPcq/wtm/next/internal/command/extract"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestTheRequestIsSpelledWithItsFlagsInOrderAndQuoted(t *testing.T) {
+	req := extract.Request{
+		Source:      "feat/login",
+		Files:       []string{"apps/api", "two words.txt"},
+		To:          "feat/split",
+		From:        "main",
+		FastForward: new(true),
+		Isolation:   project.Verbatim,
+		Keep:        new(false),
+		OnConflict:  extract.OnConflictResolve,
+		Remember:    []string{"isolation"},
+		Ask:         true,
+	}
+
+	assert.Equal(t, `wtm-next extract feat/login --files apps/api --files 'two words.txt' --to feat/split --ff --from main --isolation verbatim --keep=false --on-conflict resolve --remember isolation --ask`, extractLine{Command: "wtm-next extract", Request: req}.String())
+}
+
+func TestAnUnsetRequestIsTheBareCommand(t *testing.T) {
+	assert.Equal(t, "wtm-next extract", extractLine{Command: "wtm-next extract"}.String())
+}

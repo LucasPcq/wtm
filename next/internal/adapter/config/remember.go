@@ -8,8 +8,8 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
 const (
@@ -20,20 +20,21 @@ const (
 //go:embed project.schema.json
 var projectSchemaJSON []byte
 
-type RememberParams struct {
-	StateDir string
-	Answers  map[string]string
-}
-
-func Remember(ctx context.Context, params RememberParams) (wtm.Written, error) {
-	if len(params.Answers) == 0 {
-		return wtm.Written{}, nil
+// Remember merges answers into the [wizard.remembered] table of the
+// project's config.toml, re-rendering the file, then writes the JSON schema
+// beside it. It returns what it wrote; no answers write nothing. A missing
+// config.toml is project.ErrConfigNotFound, and a config.toml written by a
+// newer wtm is refused with the statefile's schema error.
+func (p Project) Remember(ctx context.Context, answers map[string]string) (domain.Written, error) {
+	if len(answers) == 0 {
+		return domain.Written{}, nil
 	}
-	path := filepath.Join(params.StateDir, configFileName)
+
+	path := filepath.Join(p.StateDir, configFileName)
 	written, err := statefile.Update(ctx, statefile.UpdateParams{
 		Path: path,
 		Mutate: func(current []byte) (statefile.Change, error) {
-			next, err := remembered(rememberedParams{Path: path, Current: current, Answers: params.Answers})
+			next, err := remembered(path, current, answers)
 			if err != nil {
 				return nil, err
 			}
@@ -41,45 +42,51 @@ func Remember(ctx context.Context, params RememberParams) (wtm.Written, error) {
 		},
 	})
 	if err != nil {
-		return wtm.Written{}, err
+		return domain.Written{}, err
 	}
-	return written, writeSchema(ctx, params.StateDir)
+
+	return written, writeSchema(ctx, p.StateDir)
 }
 
-type rememberedParams struct {
-	Path    string
-	Current []byte
-	Answers map[string]string
-}
-
-func remembered(params rememberedParams) ([]byte, error) {
-	if params.Current == nil {
+// remembered returns the config.toml current with answers merged over the
+// answers it already remembers, an answer given now winning.
+func remembered(path string, current []byte, answers map[string]string) ([]byte, error) {
+	if current == nil {
 		return nil, project.ErrConfigNotFound
 	}
-	if err := refuseNewer(parseParams{Path: params.Path, Data: params.Current}); err != nil {
+
+	if err := refuseNewer(path, current); err != nil {
 		return nil, err
 	}
-	saved, err := parseProject(parseParams{Path: params.Path, Data: params.Current})
+
+	saved, err := parseProject(path, current)
 	if err != nil {
 		return nil, err
 	}
-	answers := map[string]string{}
-	maps.Copy(answers, saved.Config.Remembered)
-	maps.Copy(answers, params.Answers)
-	saved.Config.Remembered = answers
+
+	merged := map[string]string{}
+	maps.Copy(merged, saved.Config.Remembered)
+	maps.Copy(merged, answers)
+	saved.Config.Remembered = merged
 	return render(saved)
 }
 
-func refuseNewer(params parseParams) error {
+// refuseNewer returns the statefile's refusal when data carries a schema newer
+// than this wtm writes.
+func refuseNewer(path string, data []byte) error {
 	var file struct {
 		Schema int `toml:"schema"`
 	}
-	if _, err := toml.Decode(string(params.Data), &file); err != nil {
+	if _, err := toml.Decode(string(data), &file); err != nil {
+		// parseProject reports a malformed file with its position.
 		return nil
 	}
-	return statefile.Refusal(statefile.Schema{Path: params.Path, Found: file.Schema, Supported: projectSchema})
+
+	return statefile.Refusal(statefile.Schema{Path: path, Found: file.Schema, Supported: projectSchema})
 }
 
+// writeSchema writes the JSON schema config.toml's first line points editors
+// to, so it matches the version that wrote the file.
 func writeSchema(ctx context.Context, stateDir string) error {
 	_, err := statefile.Update(ctx, statefile.UpdateParams{
 		Path:   filepath.Join(stateDir, schemasDirName, schemaFileName),

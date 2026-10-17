@@ -4,13 +4,16 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
 const (
@@ -21,45 +24,89 @@ const (
 	errNoMetaPath = "no meta.json path for branch %q"
 )
 
+// Meta reads and writes the meta.json record of each worktree, under the
+// project's state directory StateDir.
 type Meta struct {
 	StateDir string
 }
 
+// path returns where the record of branch lives, or an error for a branch name
+// that maps onto no directory.
 func (m Meta) path(branch string) (string, error) {
 	dir, ok := worktree.MetaDir(worktree.MetaDirParams{StateDir: m.StateDir, Branch: branch})
 	if !ok {
 		return "", fmt.Errorf(errNoMetaPath, branch)
 	}
+
 	return filepath.Join(dir, metaFileName), nil
 }
 
+// Load returns the record of branch. A missing record is an error wrapping
+// os.ErrNotExist; a record that does not decode is the JSON error.
 func (m Meta) Load(branch string) (worktree.Meta, error) {
 	path, err := m.path(branch)
 	if err != nil {
 		return worktree.Meta{}, err
 	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return worktree.Meta{}, err
 	}
+
 	return decodeMeta(data)
 }
 
-func (m Meta) Update(ctx context.Context, update worktree.MetaUpdate) (wtm.Written, error) {
+// List returns the branches that have a record directory, none when the state
+// directory holds no record yet.
+func (m Meta) List() ([]string, error) {
+	// MetaDir names the directory every record sits in; any branch locates it.
+	dir, ok := worktree.MetaDir(worktree.MetaDirParams{StateDir: m.StateDir, Branch: "_"})
+	if !ok {
+		return nil, nil
+	}
+
+	entries, err := os.ReadDir(filepath.Dir(dir))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("list records: %w", err)
+	}
+
+	var branches []string
+	for _, entry := range entries {
+		branch, err := url.PathUnescape(entry.Name())
+		if err != nil || !entry.IsDir() || worktree.StateSegment(branch) != entry.Name() {
+			continue
+		}
+		branches = append(branches, branch)
+	}
+	return branches, nil
+}
+
+// Update applies update.Change to the record of update.Branch under its lock,
+// starting from an empty record when there is none or it does not decode, and
+// returns what it wrote. A record written by a newer wtm is refused with a
+// *domain.SchemaNewer, and an error of Change leaves the record as it was.
+func (m Meta) Update(ctx context.Context, update worktree.MetaUpdate) (domain.Written, error) {
 	path, err := m.path(update.Branch)
 	if err != nil {
-		return wtm.Written{}, err
+		return domain.Written{}, err
 	}
+
 	return statefile.Update(ctx, statefile.UpdateParams{
 		Path: path,
 		Mutate: func(current []byte) (statefile.Change, error) {
-			stored, err := storedMeta(parseParams{Path: path, Current: current})
+			stored, err := storedMeta(path, current)
 			if err != nil {
 				return nil, err
 			}
 			if err := update.Change(&stored); err != nil {
 				return nil, err
 			}
+
+			// Schema 1 is written as no schema at all, the way wtm writes it.
 			stored.Schema = 0
 			data, err := json.MarshalIndent(stored, "", jsonIndent)
 			if err != nil {
@@ -70,23 +117,26 @@ func (m Meta) Update(ctx context.Context, update worktree.MetaUpdate) (wtm.Writt
 	})
 }
 
+// LockOrdinals runs do holding the project's ordinal lock, so two processes
+// never hand the same ordinal to two worktrees, and reports whether the lock
+// was held (do runs unlocked where it cannot be taken).
 func (m Meta) LockOrdinals(ctx context.Context, do func() error) (bool, error) {
-	return statefile.WithLock(ctx, statefile.LockParams{Path: filepath.Join(m.StateDir, ordinalLock), Do: do})
+	return statefile.WithLock(ctx, filepath.Join(m.StateDir, ordinalLock), do)
 }
 
-type parseParams struct {
-	Path    string
-	Current []byte
-}
-
-func storedMeta(params parseParams) (worktree.Meta, error) {
-	stored, err := decodeMeta(params.Current)
-	if params.Current == nil || err != nil {
+// storedMeta returns the record current holds, an empty one when there is
+// none or it does not decode, so a broken record is rewritten rather than
+// blocking every write; a record of a newer schema is refused.
+func storedMeta(path string, current []byte) (worktree.Meta, error) {
+	stored, err := decodeMeta(current)
+	if current == nil || err != nil {
 		return worktree.Meta{}, nil
 	}
-	if err := statefile.Refusal(statefile.Schema{Path: params.Path, Found: stored.Schema, Supported: metaSchema}); err != nil {
+
+	if err := statefile.Refusal(statefile.Schema{Path: path, Found: stored.Schema, Supported: metaSchema}); err != nil {
 		return worktree.Meta{}, err
 	}
+
 	return stored, nil
 }
 

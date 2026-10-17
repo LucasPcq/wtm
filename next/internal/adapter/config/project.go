@@ -11,7 +11,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
 const (
@@ -21,6 +21,7 @@ const (
 
 var templateSuffixes = [...]string{".example", ".dist", ".sample", ".template", ".tmpl"}
 
+// projectFile is the shape of a project's config.toml, every key it may hold.
 type projectFile struct {
 	Schema    int `toml:"schema"`
 	Worktrees struct {
@@ -41,18 +42,26 @@ type projectFile struct {
 	} `toml:"wizard"`
 }
 
+// savedProject is config.toml as written on disk, before defaults: the config a
+// use case reads and the on_clean hooks, which only a rewrite of the file needs.
 type savedProject struct {
 	Config  project.Config
 	OnClean []project.Hook
 }
 
-type LoadParams struct {
+// Project reads and writes the config of the project whose state lives in
+// StateDir, with the global config at GlobalPath ("" for none).
+type Project struct {
 	StateDir   string
 	GlobalPath string
 }
 
-func Load(params LoadParams) (project.Config, project.Global, error) {
-	path := filepath.Join(params.StateDir, configFileName)
+// Load returns the project's config.toml with its defaults applied, and the
+// global config. A missing config.toml is project.ErrConfigNotFound, wrapped;
+// a missing global config is an empty one. An unknown key, a malformed hook or
+// an invalid value in either file is an error naming it.
+func (p Project) Load() (project.Config, project.Global, error) {
+	path := filepath.Join(p.StateDir, configFileName)
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return project.Config{}, project.Global{}, fmt.Errorf("project config: %w", project.ErrConfigNotFound)
@@ -60,14 +69,17 @@ func Load(params LoadParams) (project.Config, project.Global, error) {
 	if err != nil {
 		return project.Config{}, project.Global{}, fmt.Errorf("project config: %w", err)
 	}
-	saved, err := parseProject(parseParams{Path: path, Data: data})
+
+	saved, err := parseProject(path, data)
 	if err != nil {
 		return project.Config{}, project.Global{}, fmt.Errorf("project config: %w", err)
 	}
-	global, err := loadGlobal(params.GlobalPath)
+
+	global, err := loadGlobal(p.GlobalPath)
 	if err != nil {
 		return project.Config{}, project.Global{}, fmt.Errorf("global config: %w", err)
 	}
+
 	config := withDefaults(saved.Config)
 	if err := validateProject(config); err != nil {
 		return project.Config{}, project.Global{}, err
@@ -75,27 +87,28 @@ func Load(params LoadParams) (project.Config, project.Global, error) {
 	if err := global.validate(); err != nil {
 		return project.Config{}, project.Global{}, err
 	}
+
 	return config, global.Global, nil
 }
 
-type parseParams struct {
-	Path string
-	Data []byte
-}
-
-func parseProject(params parseParams) (savedProject, error) {
+// parseProject decodes the config.toml read from path, strictly, without
+// applying defaults nor validating values.
+func parseProject(path string, data []byte) (savedProject, error) {
 	var file projectFile
-	if err := decodeStrict(strictParams{Source: params.Path, Data: params.Data, Out: &file, Ignore: hookTables}); err != nil {
+	if err := decodeStrict(strictParams{Source: path, Data: data, Out: &file, Ignore: hookTables}); err != nil {
 		return savedProject{}, err
 	}
+
 	onCreate, onClean, err := file.Hooks.decode()
 	if err != nil {
 		return savedProject{}, fmt.Errorf("parse hooks: %w", err)
 	}
+
 	files := make([]project.EnvFile, len(file.Env.File))
 	for i, f := range file.Env.File {
 		files[i] = project.EnvFile{Target: f.Target, Template: f.Template, Local: f.Local}
 	}
+
 	return savedProject{
 		Config: project.Config{
 			Worktrees:  project.Worktrees{BasePath: file.Worktrees.BasePath, BaseBranch: file.Worktrees.BaseBranch},
@@ -125,12 +138,16 @@ func validateProject(config project.Config) error {
 	if !config.Env.Strategy.Valid() {
 		return errInvalidEnvStrategy
 	}
+
 	if err := validateEnvFiles(config.Env.Files); err != nil {
 		return err
 	}
+
 	return validateRemembered(config.Remembered)
 }
 
+// validateEnvFiles refuses an env file without a target, a target declared
+// twice, and a template that is not its target with a known template suffix.
 func validateEnvFiles(files []project.EnvFile) error {
 	seen := make(map[string]bool, len(files))
 	for _, file := range files {
@@ -147,10 +164,15 @@ func validateEnvFiles(files []project.EnvFile) error {
 	return nil
 }
 
+// isTemplateOf reports whether file's template is its target followed by one
+// of the known template suffixes.
 func isTemplateOf(file project.EnvFile) bool {
 	return slices.ContainsFunc(templateSuffixes[:], func(suffix string) bool { return file.Target+suffix == file.Template })
 }
 
+// validateRemembered refuses a remembered answer whose question is unknown or
+// whose value is not one that question may remember, checked in sorted order
+// so the first error is the same on every run.
 func validateRemembered(remembered map[string]string) error {
 	for _, id := range slices.Sorted(maps.Keys(remembered)) {
 		allowed, known := project.RememberableValues(id)

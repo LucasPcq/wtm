@@ -7,8 +7,8 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
-	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -102,6 +102,53 @@ func TestWorktreesReadsTheBranchOfARebaseInProgress(t *testing.T) {
 	}
 }
 
+func TestARebaseBegunDetachedIsOnNoBranch(t *testing.T) {
+	repo := newRepo(t)
+	commitFile(t, repo.Dir, "file", "base")
+	gittest.CreateBranch(t, repo.Dir, "feature")
+	commitFile(t, repo.Dir, "file", "main")
+	where := checkOutFeature(t, repo.Dir, true)
+	commitFile(t, where, "file", "feature")
+	gittest.Git(t, where, "checkout", "-q", "--detach")
+	rebase(t, where, "--merge")
+
+	worktrees, err := repo.Worktrees(t.Context())
+
+	require.NoError(t, err)
+	assert.Equal(t, worktree.Detached{}, worktrees[len(worktrees)-1].State)
+}
+
+func TestWorktreesReadsTheBranchABisectStartedFrom(t *testing.T) {
+	cases := []struct {
+		name     string
+		detached bool
+		want     worktree.State
+	}{
+		{name: "from a branch", want: worktree.Bisecting{Branch: "feature"}},
+		{name: "from a detached HEAD", detached: true, want: worktree.Detached{}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			repo := newRepo(t)
+			gittest.CreateBranch(t, repo.Dir, "feature")
+			where := checkOutFeature(t, repo.Dir, true)
+			good := head(t, where, "HEAD")
+			for _, content := range []string{"1", "2", "3"} {
+				commitFile(t, where, "file", content)
+			}
+			if c.detached {
+				gittest.Git(t, where, "checkout", "-q", "--detach")
+			}
+			gittest.Git(t, where, "bisect", "start", "HEAD", good)
+
+			worktrees, err := repo.Worktrees(t.Context())
+
+			require.NoError(t, err)
+			assert.Equal(t, c.want, worktrees[len(worktrees)-1].State)
+		})
+	}
+}
+
 func TestMainWorktreeIsTheFirstEvenSeenFromALinkedOne(t *testing.T) {
 	repo := newRepo(t)
 	linked := filepath.Join(gittest.TempDir(t), "feature")
@@ -158,7 +205,7 @@ func TestAnAddOnANewBranchStartsFromItWithoutTrackingIt(t *testing.T) {
 	commitFile(t, repo.Dir, "local", "1")
 	path := filepath.Join(gittest.TempDir(t), "topic")
 
-	err := repo.AddWorktree(t.Context(), worktree.Addition{Path: path, Checkout: worktree.NewBranch{Name: "topic", From: branch.RemoteBranch{Name: "main"}}})
+	err := repo.AddWorktree(t.Context(), worktree.Addition{Path: path, Checkout: worktree.NewBranch{Name: "topic", From: worktree.RemoteBranch{Name: "main"}}})
 
 	require.NoError(t, err)
 	assert.Equal(t, head(t, repo.Dir, "origin/main"), head(t, path, "HEAD"))
@@ -199,7 +246,7 @@ func TestAnAddRefusesABranchOnlyTheRemoteHasRatherThanCreateOne(t *testing.T) {
 
 	require.ErrorIs(t, err, git.ErrNoLocalBranch)
 	assert.EqualError(t, err, "no local branch: remote-only")
-	assert.False(t, has(t, repo, branch.LocalBranch{Name: "remote-only"}))
+	assert.False(t, has(t, repo, worktree.LocalBranch{Name: "remote-only"}))
 }
 
 func TestAnAddWithoutACheckoutOrAStartPointIsRefused(t *testing.T) {
@@ -233,7 +280,7 @@ func TestTheFakeAndGitReadTheSameRepository(t *testing.T) {
 					{Path: at("linked"), State: worktree.OnBranch{Branch: "linked"}},
 					{Path: at("rebasing"), State: worktree.Rebasing{Branch: "rebasing"}},
 				},
-				Branches: branch.Branches{
+				Branches: worktree.Branches{
 					Local:  named("dirty", "diverged", "feature", "gone", "linked", "main", "rebasing", "unmerged"),
 					Remote: named("diverged", "feature", "main", "remote-only"),
 				},
@@ -271,7 +318,7 @@ func TestTheFakeAndGitUndoAnAddOnANewBranchToWhereTheyStarted(t *testing.T) {
 			before := gittest.StateOf(t, impl.port)
 			path := filepath.Join(impl.root, "topic")
 
-			require.NoError(t, impl.port.AddWorktree(t.Context(), worktree.Addition{Path: path, Checkout: worktree.NewBranch{Name: "topic", From: branch.RemoteBranch{Name: "main"}}}))
+			require.NoError(t, impl.port.AddWorktree(t.Context(), worktree.Addition{Path: path, Checkout: worktree.NewBranch{Name: "topic", From: worktree.RemoteBranch{Name: "main"}}}))
 			added := gittest.StateOf(t, impl.port)
 			leaveAFile(t, path)
 			require.NoError(t, impl.port.RemoveWorktree(t.Context(), path))
@@ -309,7 +356,7 @@ func TestTheFakeAndGitStartATrackingBranchWhereTheRemoteOneIs(t *testing.T) {
 			twice := impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "again"), Checkout: worktree.TrackingBranch{Name: "feature"}})
 
 			require.NoError(t, added)
-			assert.Equal(t, tip(t, impl.port, branch.RemoteBranch{Name: "remote-only"}), tip(t, impl.port, branch.LocalBranch{Name: "remote-only"}))
+			assert.Equal(t, tip(t, impl.port, worktree.RemoteBranch{Name: "remote-only"}), tip(t, impl.port, worktree.LocalBranch{Name: "remote-only"}))
 			assert.Contains(t, paths(gittest.StateOf(t, impl.port).Worktrees), impl.at("resumed"))
 			require.Error(t, twice)
 			leaveAFile(t, path)
@@ -326,7 +373,7 @@ func TestTheFakeAndGitDropTheBranchAnAddRefusedForItsPathLeft(t *testing.T) {
 			t.Run(impl.name+": "+folder, func(t *testing.T) {
 				before := gittest.StateOf(t, impl.port)
 
-				err := impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, folder), Checkout: worktree.NewBranch{Name: "into-" + folder, From: branch.LocalBranch{Name: "main"}}})
+				err := impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, folder), Checkout: worktree.NewBranch{Name: "into-" + folder, From: worktree.LocalBranch{Name: "main"}}})
 
 				require.Error(t, err)
 				assert.Equal(t, before, gittest.StateOf(t, impl.port))
@@ -340,7 +387,7 @@ func TestTheFakeAndGitKeepABranchThatExistedBeforeARefusedAdd(t *testing.T) {
 		t.Run(impl.name, func(t *testing.T) {
 			before := gittest.StateOf(t, impl.port)
 
-			err := impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "taken"), Checkout: worktree.NewBranch{Name: "feature", From: branch.LocalBranch{Name: "main"}}})
+			err := impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "taken"), Checkout: worktree.NewBranch{Name: "feature", From: worktree.LocalBranch{Name: "main"}}})
 
 			require.Error(t, err)
 			assert.Equal(t, before, gittest.StateOf(t, impl.port))
@@ -379,10 +426,10 @@ func TestTheFakeAndGitRefuseTheSameWorktreeChanges(t *testing.T) {
 			return impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "taken"), Checkout: worktree.ExistingBranch{Name: "feature"}})
 		}},
 		{name: "a new branch that exists", call: func(t *testing.T, impl implementation) error {
-			return impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "new"), Checkout: worktree.NewBranch{Name: "feature", From: branch.LocalBranch{Name: "main"}}})
+			return impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "new"), Checkout: worktree.NewBranch{Name: "feature", From: worktree.LocalBranch{Name: "main"}}})
 		}},
 		{name: "a start point that does not exist", call: func(t *testing.T, impl implementation) error {
-			return impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "new"), Checkout: worktree.NewBranch{Name: "topic", From: branch.RemoteBranch{Name: "nope"}}})
+			return impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "new"), Checkout: worktree.NewBranch{Name: "topic", From: worktree.RemoteBranch{Name: "nope"}}})
 		}},
 		{name: "an existing branch that does not exist", call: func(t *testing.T, impl implementation) error {
 			return impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "new"), Checkout: worktree.ExistingBranch{Name: "nope"}})
@@ -415,7 +462,7 @@ func TestTheFakeAndGitAddIntoAnEmptyFolder(t *testing.T) {
 			require.NoError(t, err)
 			require.True(t, location.Exists)
 
-			err = impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "empty"), Checkout: worktree.NewBranch{Name: "into-empty", From: branch.LocalBranch{Name: "main"}}})
+			err = impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "empty"), Checkout: worktree.NewBranch{Name: "into-empty", From: worktree.LocalBranch{Name: "main"}}})
 
 			require.NoError(t, err)
 			assert.Contains(t, gittest.StateOf(t, impl.port).Worktrees, worktree.Worktree{Path: impl.at("empty"), State: worktree.OnBranch{Branch: "into-empty"}})

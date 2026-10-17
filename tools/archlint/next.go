@@ -1,15 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"go/ast"
-	"os"
-	"path/filepath"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 
 	"golang.org/x/tools/go/analysis"
 )
@@ -23,14 +18,18 @@ type nextLayer string
 
 const (
 	nextDomain  nextLayer = "domain"
-	nextSlice   nextLayer = "slice"
-	nextApp     nextLayer = "app"
+	nextService nextLayer = "service"
+	nextCommand nextLayer = "command"
 	nextAdapter nextLayer = "adapter"
-	nextSurface nextLayer = "surface"
+	nextCLI     nextLayer = "command/cli"
+	nextUI      nextLayer = "ui"
 	nextCmd     nextLayer = "cmd"
 )
 
-const sharedSlice = "provision"
+const (
+	cliService = "operation"
+	cliDir     = "cli"
+)
 
 var sharedAdapters = []string{"statefile", "shell"}
 
@@ -40,11 +39,12 @@ type nextPackage struct {
 }
 
 var nextWhy = map[nextLayer]string{
-	nextDomain:  "the domain is pure: the stdlib and wtm/* only",
-	nextSlice:   "a use case reaches the world through the interfaces it declares: wtm/*, app/provision and the stdlib, never another slice, an adapter, a surface or app",
-	nextApp:     "the API every surface calls: app/*, wtm/* and the stdlib, never an adapter",
-	nextAdapter: "an adapter reaches wtm/*, adapter/statefile, adapter/shell, the stdlib and third parties, never app/*, a surface or another adapter",
-	nextSurface: "a surface calls the app: app, app/<slice>, wtm/*, surface/* and third parties, never an adapter",
+	nextDomain:  "the domain is pure: the stdlib and domain/* only",
+	nextService: "a service reaches the world through the ports it declares: domain/* and the stdlib, never another service, a command, an adapter or ui/*",
+	nextCommand: "a use case orchestrates services and reaches the world through the ports it declares: domain/*, service/* and the stdlib, never another command, its own cli, an adapter or ui/*",
+	nextCLI:     "a command's cli drives its own use case: command/<its name>, service/operation, domain/*, ui/*, the stdlib and third parties, never another command, an adapter or another service",
+	nextAdapter: "an adapter reaches domain/*, adapter/statefile, adapter/shell, the stdlib and third parties, never a service, a command or ui/*, nor another adapter",
+	nextUI:      "ui/ is the presentation kit every command's cli shares and knows no command: domain/*, ui/*, the stdlib and third parties, never a command, a service or an adapter",
 	nextCmd:     "the composition root wires what is under next/",
 }
 
@@ -65,7 +65,7 @@ func runNext(pass *analysis.Pass, testsOf testFiles) (any, error) {
 	}
 	from, ok := nextPackageOf(rel)
 	if !ok {
-		pass.Reportf(firstFile(pass).Package, "next/%s is in no row of next/'s import table: place it under wtm/, app/, adapter/, surface/ or cmd/ (next/README.md)", rel)
+		pass.Reportf(firstFile(pass).Package, "next/%s is in no row of next/'s import table: place it under domain/, service/, command/ (its cli/ beside it), adapter/, ui/ or cmd/ (next/README.md)", rel)
 		return nil, nil
 	}
 	sources := slices.DeleteFunc(slices.Clone(pass.Files), func(file *ast.File) bool { return isTestFile(pass, file) })
@@ -127,16 +127,18 @@ func nextPackageOf(rel string) (nextPackage, bool) {
 		return nextPackage{layer: nextCmd}, true
 	case parts[0] != "internal":
 		return nextPackage{}, false
-	case parts[1] == "wtm":
+	case parts[1] == "domain":
 		return nextPackage{layer: nextDomain}, true
-	case parts[1] == "app" && !nested:
-		return nextPackage{layer: nextApp}, true
-	case parts[1] == "app":
-		return nextPackage{layer: nextSlice, unit: unit}, true
+	case parts[1] == "service" && nested:
+		return nextPackage{layer: nextService, unit: unit}, true
+	case parts[1] == "command" && len(parts) > 3 && parts[3] == cliDir:
+		return nextPackage{layer: nextCLI, unit: unit}, true
+	case parts[1] == "command" && nested:
+		return nextPackage{layer: nextCommand, unit: unit}, true
 	case parts[1] == "adapter" && nested:
 		return nextPackage{layer: nextAdapter, unit: unit}, true
-	case parts[1] == "surface" && nested:
-		return nextPackage{layer: nextSurface, unit: unit}, true
+	case parts[1] == "ui" && nested:
+		return nextPackage{layer: nextUI, unit: unit}, true
 	}
 	return nextPackage{}, false
 }
@@ -177,14 +179,16 @@ func nextAdmits(imp nextImport, to nextTarget) bool {
 	switch from.layer {
 	case nextDomain:
 		return stdlib || in(nextDomain)
-	case nextSlice:
-		return stdlib || in(nextDomain) || in(nextSlice) && (to.pkg.unit == from.unit || to.pkg.unit == sharedSlice)
-	case nextApp:
-		return stdlib || in(nextDomain, nextSlice)
+	case nextService:
+		return stdlib || in(nextDomain)
+	case nextCommand:
+		return stdlib || in(nextDomain, nextService) || in(nextCommand) && to.pkg.unit == from.unit
 	case nextAdapter:
 		return stdlib || thirdParty || in(nextDomain) || in(nextAdapter) && admitsAdapter(imp, to.pkg)
-	case nextSurface:
-		return stdlib || thirdParty || in(nextDomain, nextApp, nextSlice, nextSurface)
+	case nextCLI:
+		return stdlib || thirdParty || in(nextDomain, nextUI) || in(nextService) && to.pkg.unit == cliService || in(nextCommand) && to.pkg.unit == from.unit
+	case nextUI:
+		return stdlib || thirdParty || in(nextDomain, nextUI)
 	case nextCmd:
 		return stdlib || thirdParty || to.inNext
 	}
@@ -194,129 +198,4 @@ func nextAdmits(imp nextImport, to nextTarget) bool {
 func admitsAdapter(imp nextImport, to nextPackage) bool {
 	from := imp.From
 	return to.unit == from.unit || slices.Contains(sharedAdapters, to.unit) || from.unit == to.unit+"test"
-}
-
-type nextCommentsParams struct {
-	Tests    testFiles
-	Ceilings func() (map[string]int, error)
-}
-
-var nextCommentsAnalyzer = newNextCommentsAnalyzer(nextCommentsParams{Tests: testFilesOnDisk, Ceilings: sync.OnceValues(ceilingsOnDisk)})
-
-func newNextCommentsAnalyzer(params nextCommentsParams) *analysis.Analyzer {
-	return &analysis.Analyzer{
-		Name: "nextcomments",
-		Doc:  "a package of next/ has a one-line package doc and, beside it and the bare directives, exactly the comment lines its ceiling in .next-comments allows, godoc included",
-		Run:  func(pass *analysis.Pass) (any, error) { return runNextComments(pass, params) },
-	}
-}
-
-func runNextComments(pass *analysis.Pass, params nextCommentsParams) (any, error) {
-	rel, ok := nextRel(pass)
-	if !ok {
-		return nil, nil
-	}
-	ceilings, err := params.Ceilings()
-	if err != nil {
-		return nil, err
-	}
-	tests, err := params.Tests(pass)
-	if err != nil {
-		return nil, err
-	}
-	sources := slices.DeleteFunc(slices.Clone(pass.Files), func(file *ast.File) bool { return isTestFile(pass, file) })
-	checkNextPackageDoc(pass, rel, sources)
-	for _, file := range tests {
-		checkTestHeader(pass, file)
-		checkBanners(pass, file)
-	}
-	lines := 0
-	for _, file := range append(sources, tests...) {
-		lines += commentLines(pass.Fset, file, nextDirective)
-	}
-	ceiling := ceilings[rel]
-	switch {
-	case lines > ceiling:
-		pass.Reportf(firstFile(pass).Package, "next/%s has %d comment lines, above its ceiling of %d in .next-comments: delete the comments that restate the code; one that earns its place raises the ceiling, in review", rel, lines, ceiling)
-	case lines < ceiling:
-		pass.Reportf(firstFile(pass).Package, "next/%s has %d comment lines, under its ceiling of %d in .next-comments: lower it, a ceiling only goes down", rel, lines, ceiling)
-	}
-	return nil, nil
-}
-
-func checkNextPackageDoc(pass *analysis.Pass, rel string, sources []*ast.File) {
-	documented := slices.DeleteFunc(slices.Clone(sources), func(file *ast.File) bool { return file.Doc == nil })
-	if len(documented) == 0 {
-		pass.Reportf(firstFile(pass).Package, "next/%s has no package doc: say its one responsibility in one line", rel)
-		return
-	}
-	for _, file := range documented {
-		if span := lineSpan(pass.Fset, file.Doc); span > 1 {
-			pass.Reportf(file.Doc.Pos(), "next/%s has a package doc of %d lines: say its one responsibility in one line, the rest goes to next/README.md", rel, span)
-		}
-	}
-}
-
-var bareNolint = regexp.MustCompile(`^//nolint:[\w,-]+$`)
-
-func nextDirective(comment *ast.Comment) bool {
-	return directive(comment) && (!strings.HasPrefix(comment.Text, "//nolint") || bareNolint.MatchString(comment.Text))
-}
-
-func ceilingsOnDisk() (map[string]int, error) {
-	data, err := os.ReadFile(".next-comments")
-	if os.IsNotExist(err) {
-		return map[string]int{}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	ceilings, err := parseNextCeilings(string(data))
-	if err != nil {
-		return nil, err
-	}
-	if stale := staleCeilings(staleCeilingsParams{Root: "next", Ceilings: ceilings}); len(stale) > 0 {
-		return nil, fmt.Errorf(".next-comments: no package under next/ for %s — remove its line", strings.Join(stale, ", "))
-	}
-	return ceilings, nil
-}
-
-func parseNextCeilings(data string) (map[string]int, error) {
-	ceilings := map[string]int{}
-	for _, raw := range strings.Split(data, "\n") {
-		line := strings.TrimSpace(raw)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) != 2 {
-			return nil, fmt.Errorf(".next-comments: %q is not `<package under next/> <comment lines>`", line)
-		}
-		count, err := strconv.Atoi(fields[1])
-		if err != nil || count < 0 {
-			return nil, fmt.Errorf(".next-comments: %q: the count must be a number of lines", line)
-		}
-		if _, seen := ceilings[fields[0]]; seen {
-			return nil, fmt.Errorf(".next-comments: %s has two lines", fields[0])
-		}
-		ceilings[fields[0]] = count
-	}
-	return ceilings, nil
-}
-
-type staleCeilingsParams struct {
-	Root     string
-	Ceilings map[string]int
-}
-
-func staleCeilings(params staleCeilingsParams) []string {
-	var stale []string
-	for pkg := range params.Ceilings {
-		matches, err := filepath.Glob(filepath.Join(params.Root, filepath.FromSlash(pkg), "*.go"))
-		if err != nil || len(matches) == 0 {
-			stale = append(stale, pkg)
-		}
-	}
-	slices.Sort(stale)
-	return stale
 }

@@ -4,11 +4,13 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/dotenv"
-	"github.com/LucasPcq/wtm/next/internal/wtm/envcopy"
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
+
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
+
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,8 +31,8 @@ func TestAFakeRemembersOnTopOfWhatItHoldsAndNeverForgets(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NoError(t, againErr)
-	assert.Equal(t, wtm.Written{Changed: true}, written)
-	assert.Equal(t, wtm.Written{}, again)
+	assert.Equal(t, domain.Written{Changed: true}, written)
+	assert.Equal(t, domain.Written{}, again)
 	config, ok := fake.Config()
 	require.True(t, ok)
 	assert.Equal(t, map[string]string{project.RememberEnvStrategy: "main", project.RememberIsolation: "verbatim"}, config.Remembered)
@@ -44,7 +46,7 @@ func TestAFakeRecordAtANewerSchemaIsNeverRewritten(t *testing.T) {
 		return nil
 	}})
 
-	var refusal *wtm.SchemaNewer
+	var refusal *domain.SchemaNewer
 	require.ErrorAs(t, err, &refusal)
 	meta, ok := fake.Meta("feat/a")
 	require.True(t, ok)
@@ -54,7 +56,7 @@ func TestAFakeRecordAtANewerSchemaIsNeverRewritten(t *testing.T) {
 func TestAFakeCopiesAndEditsTheFilesItHolds(t *testing.T) {
 	fake := NewFake(FakeParams{Files: map[string]string{"/main/.env": "PORT=3000\n"}})
 
-	copied, copyErr := fake.Copy(t.Context(), envcopy.Request{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env"}}, TargetDir: "/wt", MainPath: "/main"})
+	copied, copyErr := fake.Copy(t.Context(), env.CopyRequest{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env"}}, TargetDir: "/wt", MainPath: "/main"})
 	written, editErr := fake.Edit(t.Context(), dotenv.Edit{Path: "/wt/.env", Edit: func(lines []dotenv.Line) []dotenv.Line {
 		updated, _ := dotenv.Set(dotenv.SetParams{Lines: lines, Key: "PORT", Value: "3010"})
 		return updated
@@ -91,7 +93,7 @@ func TestAFakeUpdateThatChangesNoByteOfTheRecordChangesNothing(t *testing.T) {
 	}})
 
 	require.NoError(t, err)
-	assert.Equal(t, wtm.Written{}, written)
+	assert.Equal(t, domain.Written{}, written)
 	stored, _ := fake.Meta("feat/a")
 	assert.Nil(t, stored.Namespaces)
 }
@@ -127,7 +129,7 @@ func TestAFakeConfigAtANewerSchemaOrThatDoesNotParseIsNeverRemembered(t *testing
 	_, newerErr := newer.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
 	_, brokenErr := broken.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
 
-	var refusal *wtm.SchemaNewer
+	var refusal *domain.SchemaNewer
 	assert.ErrorAs(t, newerErr, &refusal)
 	assert.Error(t, brokenErr)
 	config, _ := newer.Config()

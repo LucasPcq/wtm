@@ -3,9 +3,11 @@ package git_test
 import (
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,9 +25,9 @@ func TestBranchesSplitsLocalFromRemoteAndDropsTheRemoteHead(t *testing.T) {
 
 	require.NoError(t, err)
 	main := gittest.Output(t, repo.Dir, "rev-parse", "main")
-	assert.Equal(t, branch.Branches{
-		Local:  []branch.Branch{{Name: "feature", Tip: main}, {Name: "local-only", Tip: main}, {Name: "main", Tip: main}},
-		Remote: []branch.Branch{{Name: "feature", Tip: main}, {Name: "main", Tip: main}},
+	assert.Equal(t, worktree.Branches{
+		Local:  []worktree.Branch{{Name: "feature", Tip: main}, {Name: "local-only", Tip: main}, {Name: "main", Tip: main}},
+		Remote: []worktree.Branch{{Name: "feature", Tip: main}, {Name: "main", Tip: main}},
 	}, branches)
 }
 
@@ -50,7 +52,7 @@ func TestAheadBehindAgainstTheRemoteBranch(t *testing.T) {
 	counts, err := repo.AheadBehind(t.Context(), "main")
 
 	require.NoError(t, err)
-	assert.Equal(t, branch.AheadBehind{Ahead: 1, Behind: 1}, counts)
+	assert.Equal(t, worktree.AheadBehind{Ahead: 1, Behind: 1}, counts)
 }
 
 func TestAheadBehindFailsOnAnUnknownRefRatherThanCountZero(t *testing.T) {
@@ -70,23 +72,23 @@ func TestDeleteBranchDropsABranchEvenUnmerged(t *testing.T) {
 
 	require.NoError(t, repo.DeleteBranch(t.Context(), "unmerged"))
 
-	assert.False(t, has(t, repo, branch.LocalBranch{Name: "unmerged"}))
+	assert.False(t, has(t, repo, worktree.LocalBranch{Name: "unmerged"}))
 }
 
 func TestTheFakeAndGitAgreeOnTheTipsAndCountsOfTheirBranches(t *testing.T) {
 	for _, impl := range implementations(t) {
 		t.Run(impl.name, func(t *testing.T) {
-			main := branch.LocalBranch{Name: "main"}
+			main := worktree.LocalBranch{Name: "main"}
 
-			assert.True(t, has(t, impl.port, branch.LocalBranch{Name: "feature"}))
-			assert.False(t, has(t, impl.port, branch.LocalBranch{Name: "remote-only"}))
-			assert.True(t, has(t, impl.port, branch.RemoteBranch{Name: "remote-only"}))
-			assert.False(t, has(t, impl.port, branch.RemoteBranch{Name: "pushed"}))
-			assert.Equal(t, branch.AheadBehind{}, aheadBehind(t, impl.port, "main"))
-			assert.Equal(t, branch.AheadBehind{Ahead: 1}, aheadBehind(t, impl.port, "diverged"))
-			assert.Equal(t, tip(t, impl.port, main), tip(t, impl.port, branch.RemoteBranch{Name: "feature"}))
-			assert.NotEqual(t, tip(t, impl.port, main), tip(t, impl.port, branch.LocalBranch{Name: "unmerged"}))
-			assert.NotEqual(t, tip(t, impl.port, branch.LocalBranch{Name: "diverged"}), tip(t, impl.port, branch.RemoteBranch{Name: "diverged"}))
+			assert.True(t, has(t, impl.port, worktree.LocalBranch{Name: "feature"}))
+			assert.False(t, has(t, impl.port, worktree.LocalBranch{Name: "remote-only"}))
+			assert.True(t, has(t, impl.port, worktree.RemoteBranch{Name: "remote-only"}))
+			assert.False(t, has(t, impl.port, worktree.RemoteBranch{Name: "pushed"}))
+			assert.Equal(t, worktree.AheadBehind{}, aheadBehind(t, impl.port, "main"))
+			assert.Equal(t, worktree.AheadBehind{Ahead: 1}, aheadBehind(t, impl.port, "diverged"))
+			assert.Equal(t, tip(t, impl.port, main), tip(t, impl.port, worktree.RemoteBranch{Name: "feature"}))
+			assert.NotEqual(t, tip(t, impl.port, main), tip(t, impl.port, worktree.LocalBranch{Name: "unmerged"}))
+			assert.NotEqual(t, tip(t, impl.port, worktree.LocalBranch{Name: "diverged"}), tip(t, impl.port, worktree.RemoteBranch{Name: "diverged"}))
 		})
 	}
 }

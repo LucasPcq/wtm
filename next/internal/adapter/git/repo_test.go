@@ -12,8 +12,8 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
-	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -86,7 +86,7 @@ func TestAGitChildRunsInAProcessGroupOfItsOwn(t *testing.T) {
 	hook := filepath.Join(repo.Dir, ".git", "hooks", "post-checkout")
 	require.NoError(t, os.WriteFile(hook, []byte("#!/bin/sh\nps -o pgid= -p $$ > "+recorded+"\n"), 0o755))
 
-	err := repo.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(gittest.TempDir(t), "topic"), Checkout: worktree.NewBranch{Name: "topic", From: branch.LocalBranch{Name: "main"}}})
+	err := repo.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(gittest.TempDir(t), "topic"), Checkout: worktree.NewBranch{Name: "topic", From: worktree.LocalBranch{Name: "main"}}})
 
 	require.NoError(t, err)
 	content, err := os.ReadFile(recorded)

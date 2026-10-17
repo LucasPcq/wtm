@@ -63,12 +63,13 @@ A glyph table alone does not hold a surface of sixty commands: "nothing to do" g
 
 ### `next/`
 
-The driver loads `internal/` and `next/` in one run (`go run ./tools/archlint [root…]`, both by default). The rules written for `internal/` act on its packages only (`internalOnly` in `analyzers.go`); `typeassert` and `fontcover`, which hold for any Go code of the project, act on both. Two rules are `next/`'s own, from [`next/README.md`](../../next/README.md):
+The driver loads `internal/` and `next/` in one run (`go run ./tools/archlint [root…]`, both by default). The rules written for `internal/` act on its packages only (`internalOnly` in `analyzers.go`); `typeassert` and `fontcover`, which hold for any Go code of the project, act on both. One rule is `next/`'s own, from [`next/README.md`](../../next/README.md):
 
 | Rule | Catches |
 | -- | -- |
 | `next` | an import outside the package's row of the `next/` import table (`wtm/`, `app/`, `app/<slice>`, `adapter/<name>`, `surface/*`, `cmd/`), a package in no row (the root of `next/` included), an import of `internal/` from a source or a test file, and a fake (`adapter/<name>test`) imported from anything but a test or the adapter it fakes |
-| `nextcomments` | a package of `next/` without a one-line package doc, a banner or header in a test file, and a package whose other comment lines — godoc included, tests included; free are the package doc, a directive (`//go:…`, `//go-sumtype:…`) and a `//nolint:<linters>` with nothing after it — differ from its line in `.next-comments` (absent = 0). Above is a finding to delete comments or raise the line in review; below is a finding to lower it, so a ceiling only goes down by itself. A line whose package no longer exists, or a package with two lines, stops archlint |
+
+Comments in `next/` follow Go's doc-comment conventions (the `go-style` skill): `staticcheck` runs every check there, the naming and doc-comment ones included (`next/staticcheck.conf`, which staticcheck reads for the packages under it), and `make next-lint` runs revive with `next/revive.toml` (`exported`, `package-comments`, naming and error-flow rules). `next-lint` is not part of `make lint` yet.
 
 ### Adding a rule
 

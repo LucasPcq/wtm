@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/BurntSushi/toml"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,7 +16,7 @@ import (
 func TestRememberingReRendersTheConfigAsWtmWritesIt(t *testing.T) {
 	stateDir := stateWithConfig(t, golden(t, "full.before.toml"))
 
-	written, err := Remember(t.Context(), RememberParams{StateDir: stateDir, Answers: map[string]string{project.RememberIsolation: "verbatim"}})
+	written, err := Project{StateDir: stateDir}.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
 
 	require.NoError(t, err)
 	assert.True(t, written.Changed)
@@ -26,7 +26,7 @@ func TestRememberingReRendersTheConfigAsWtmWritesIt(t *testing.T) {
 func TestRememberingWritesNoDefaultThatWasNotInTheFile(t *testing.T) {
 	stateDir := stateWithConfig(t, golden(t, "sparse.before.toml"))
 
-	_, err := Remember(t.Context(), RememberParams{StateDir: stateDir, Answers: map[string]string{project.RememberIsolation: "verbatim"}})
+	_, err := Project{StateDir: stateDir}.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
 
 	require.NoError(t, err)
 	assert.Equal(t, golden(t, "sparse.after.toml"), readFile(t, filepath.Join(stateDir, "config.toml")))
@@ -38,7 +38,7 @@ func TestRememberingWritesNoDefaultThatWasNotInTheFile(t *testing.T) {
 func TestRememberingAddsToWhatIsOnDiskAndNeverForgets(t *testing.T) {
 	stateDir := stateWithConfig(t, minimalConfig+"\n[wizard.remembered]\nisolation = \"verbatim\"\nenv_strategy = \"parent\"\n")
 
-	_, err := Remember(t.Context(), RememberParams{StateDir: stateDir, Answers: map[string]string{project.RememberSourceUpdate: "ff", project.RememberEnvStrategy: "main"}})
+	_, err := Project{StateDir: stateDir}.Remember(t.Context(), map[string]string{project.RememberSourceUpdate: "ff", project.RememberEnvStrategy: "main"})
 
 	require.NoError(t, err)
 	cfg, _, err := loadState(t, stateDir)
@@ -49,7 +49,7 @@ func TestRememberingAddsToWhatIsOnDiskAndNeverForgets(t *testing.T) {
 func TestRememberingWhatIsAlreadyRememberedChangesNothing(t *testing.T) {
 	stateDir := stateWithConfig(t, golden(t, "full.after.toml"))
 
-	written, err := Remember(t.Context(), RememberParams{StateDir: stateDir, Answers: map[string]string{project.RememberIsolation: "verbatim"}})
+	written, err := Project{StateDir: stateDir}.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
 
 	require.NoError(t, err)
 	assert.False(t, written.Changed)
@@ -63,7 +63,7 @@ func TestRemembersFromSeveralGoroutinesAllLand(t *testing.T) {
 	var wg sync.WaitGroup
 	for key, value := range answers {
 		wg.Go(func() {
-			_, err := Remember(t.Context(), RememberParams{StateDir: stateDir, Answers: map[string]string{key: value}})
+			_, err := Project{StateDir: stateDir}.Remember(t.Context(), map[string]string{key: value})
 			assert.NoError(t, err)
 		})
 	}
@@ -77,10 +77,10 @@ func TestRemembersFromSeveralGoroutinesAllLand(t *testing.T) {
 func TestNoAnswerWritesNothing(t *testing.T) {
 	stateDir := t.TempDir()
 
-	written, err := Remember(t.Context(), RememberParams{StateDir: stateDir})
+	written, err := Project{StateDir: stateDir}.Remember(t.Context(), nil)
 
 	require.NoError(t, err)
-	assert.Equal(t, wtm.Written{}, written)
+	assert.Equal(t, domain.Written{}, written)
 	assert.NoFileExists(t, filepath.Join(stateDir, "config.toml"))
 	assert.NoDirExists(t, filepath.Join(stateDir, "schemas"))
 }
@@ -88,7 +88,7 @@ func TestNoAnswerWritesNothing(t *testing.T) {
 func TestRememberingNeedsAConfig(t *testing.T) {
 	stateDir := t.TempDir()
 
-	_, err := Remember(t.Context(), RememberParams{StateDir: stateDir, Answers: map[string]string{project.RememberIsolation: "verbatim"}})
+	_, err := Project{StateDir: stateDir}.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
 
 	require.ErrorIs(t, err, project.ErrConfigNotFound)
 	assert.NoFileExists(t, filepath.Join(stateDir, "config.toml"))
@@ -98,9 +98,9 @@ func TestAConfigAtANewerSchemaIsNeverRewritten(t *testing.T) {
 	content := newerSchema + golden(t, "sparse.before.toml")
 	stateDir := stateWithConfig(t, content)
 
-	_, err := Remember(t.Context(), RememberParams{StateDir: stateDir, Answers: map[string]string{project.RememberIsolation: "verbatim"}})
+	_, err := Project{StateDir: stateDir}.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
 
-	var newer *wtm.SchemaNewer
+	var newer *domain.SchemaNewer
 	require.ErrorAs(t, err, &newer)
 	assert.Equal(t, 99, newer.Found)
 	assert.Equal(t, 1, newer.Supported)
@@ -110,7 +110,7 @@ func TestAConfigAtANewerSchemaIsNeverRewritten(t *testing.T) {
 func TestASchemaOneConfigIsWrittenWithoutASchemaKey(t *testing.T) {
 	stateDir := stateWithConfig(t, "schema = 1\n"+golden(t, "sparse.before.toml"))
 
-	_, err := Remember(t.Context(), RememberParams{StateDir: stateDir, Answers: map[string]string{project.RememberIsolation: "verbatim"}})
+	_, err := Project{StateDir: stateDir}.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
 
 	require.NoError(t, err)
 	assert.Equal(t, golden(t, "sparse.after.toml"), readFile(t, filepath.Join(stateDir, "config.toml")))
@@ -119,7 +119,7 @@ func TestASchemaOneConfigIsWrittenWithoutASchemaKey(t *testing.T) {
 func TestRememberingWritesTheSchemaBesideTheConfig(t *testing.T) {
 	stateDir := stateWithConfig(t, golden(t, "sparse.before.toml"))
 
-	_, err := Remember(t.Context(), RememberParams{StateDir: stateDir, Answers: map[string]string{project.RememberIsolation: "verbatim"}})
+	_, err := Project{StateDir: stateDir}.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
 
 	require.NoError(t, err)
 	want, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "internal", "schemas", "project.schema.json"))
@@ -130,7 +130,7 @@ func TestRememberingWritesTheSchemaBesideTheConfig(t *testing.T) {
 func TestAnEmptyEnvSectionStaysCommented(t *testing.T) {
 	stateDir := stateWithConfig(t, "[worktrees]\nbase_path = \"../.trees\"\nbase_branch = \"main\"\n")
 
-	_, err := Remember(t.Context(), RememberParams{StateDir: stateDir, Answers: map[string]string{project.RememberIsolation: "verbatim"}})
+	_, err := Project{StateDir: stateDir}.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
 
 	require.NoError(t, err)
 	content := readFile(t, filepath.Join(stateDir, "config.toml"))
@@ -144,7 +144,7 @@ func TestAnEmptyEnvSectionStaysCommented(t *testing.T) {
 func TestEnvFilesWithoutAStrategyStayLiveAndTakeTheDefaultOnLoad(t *testing.T) {
 	stateDir := stateWithConfig(t, golden(t, "sparse.before.toml"))
 
-	_, err := Remember(t.Context(), RememberParams{StateDir: stateDir, Answers: map[string]string{project.RememberIsolation: "verbatim"}})
+	_, err := Project{StateDir: stateDir}.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
 
 	require.NoError(t, err)
 	assert.NotContains(t, readFile(t, filepath.Join(stateDir, "config.toml")), "\nstrategy = ")
@@ -156,7 +156,7 @@ func TestEnvFilesWithoutAStrategyStayLiveAndTakeTheDefaultOnLoad(t *testing.T) {
 func TestEveryStringIsEncodedSoItReadsBackAsWritten(t *testing.T) {
 	stateDir := stateWithConfig(t, awkwardConfig)
 
-	_, err := Remember(t.Context(), RememberParams{StateDir: stateDir, Answers: map[string]string{project.RememberIsolation: awkward, "a key = \"x\"": awkward}})
+	_, err := Project{StateDir: stateDir}.Remember(t.Context(), map[string]string{project.RememberIsolation: awkward, "a key = \"x\"": awkward})
 
 	require.NoError(t, err)
 	var decoded struct {
@@ -192,7 +192,7 @@ func TestEveryStringIsEncodedSoItReadsBackAsWritten(t *testing.T) {
 func TestRememberingKeepsTheCleanHooks(t *testing.T) {
 	stateDir := stateWithConfig(t, golden(t, "full.before.toml"))
 
-	_, err := Remember(t.Context(), RememberParams{StateDir: stateDir, Answers: map[string]string{project.RememberIsolation: "verbatim"}})
+	_, err := Project{StateDir: stateDir}.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
 
 	require.NoError(t, err)
 	assert.Contains(t, readFile(t, filepath.Join(stateDir, "config.toml")), "on_clean = [\n  \"docker compose down\",\n]")

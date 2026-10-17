@@ -7,10 +7,12 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/stretchr/testify/require"
 )
 
+// take returns the locks taken, failing the test on an error, and releases
+// them when the test ends.
 func take(t *testing.T, taken func() (*Held, error)) *Held {
 	t.Helper()
 	held, err := taken()
@@ -19,9 +21,10 @@ func take(t *testing.T, taken func() (*Held, error)) *Held {
 	return held
 }
 
-func refusal(t *testing.T, err error) *wtm.Error {
+// refusal returns err as the *domain.Error it must be.
+func refusal(t *testing.T, err error) *domain.Error {
 	t.Helper()
-	failure, ok := errors.AsType[*wtm.Error](err)
+	failure, ok := errors.AsType[*domain.Error](err)
 	require.True(t, ok, err)
 	return failure
 }
@@ -45,6 +48,8 @@ func writeFile(t *testing.T, path, content string) {
 	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
 }
 
+// flockExclusive takes file's exclusive lock without waiting, as another
+// process would, bypassing statefile.
 func flockExclusive(file *os.File) error {
 	return syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
 }
