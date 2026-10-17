@@ -178,3 +178,56 @@ func TestAFlagErrorPointsAtTheHelp(t *testing.T) {
 	assert.Equal(t, uicli.ExitUsage, got.Code)
 	assert.Equal(t, "\n  ✗ the request is invalid: unknown flag: --bogus\n  → wtm-next extract --help\n\n", got.Stderr)
 }
+
+func TestAUsageErrorIsInTheEnvelopeOnlyWhenTheArgumentsAskForJSON(t *testing.T) {
+	cases := map[string]struct {
+		Words   []string
+		JSON    bool
+		Message string
+	}{
+		"--output json after an unknown flag":      {Words: []string{source, "--nope", "--output", "json"}, JSON: true, Message: "unknown flag: --nope"},
+		"a second positional with --output json":   {Words: []string{source, other, "--output", "json"}, JSON: true, Message: "accepts at most 1 arg(s), received 2"},
+		"an unknown format before an unknown flag": {Words: []string{source, "--output", "yaml", "--nope"}, Message: "unknown flag: --nope"},
+	}
+	for name, c := range cases {
+		got := runExtract(t, newWorld(seed{}), c.Words...)
+
+		assert.Equal(t, uicli.ExitUsage, got.Code, name)
+		if !c.JSON {
+			assert.Empty(t, got.Stdout, name)
+			assert.Equal(t, "\n  ✗ the request is invalid: "+c.Message+"\n  → wtm-next extract --help\n\n", got.Stderr, name)
+			continue
+		}
+		assert.Empty(t, got.Stderr, name)
+		doc := decoded(t, got.Stdout)
+		assert.Equal(t, "extract", doc.Command, name)
+		require.NotNil(t, doc.Error, name)
+		assert.Equal(t, "the request is invalid: "+c.Message, doc.Error.Message, name)
+	}
+}
+
+func TestFFAndKeepEnterTheRequestOnlyWhenGiven(t *testing.T) {
+	cases := map[string]struct {
+		Flags []string
+		Line  string
+	}{
+		"neither":  {Line: "→ wtm-next extract feat/login --files old.txt --to feat/other --expect-fingerprint"},
+		"both off": {Flags: []string{"--ff=false", "--keep=false"}, Line: "→ wtm-next extract feat/login --files old.txt --to feat/other --ff=false --keep=false --expect-fingerprint"},
+		"both on":  {Flags: []string{"--ff", "--keep"}, Line: "→ wtm-next extract feat/login --files old.txt --to feat/other --ff --keep --expect-fingerprint"},
+	}
+	for name, c := range cases {
+		words := append([]string{source, "--files", "old.txt", "--to", other, "--dry-run"}, c.Flags...)
+		got := runExtract(t, newWorld(seed{}), words...)
+
+		require.Equal(t, uicli.ExitOK, got.Code, name+": "+got.Stderr)
+		assert.Contains(t, got.Stdout, c.Line, name)
+	}
+}
+
+func TestAnUnknownOutputFormatIsRefusedAsText(t *testing.T) {
+	got := runExtract(t, newWorld(seed{}), source, "--files", "old.txt", "--to", other, "--output", "yaml")
+
+	assert.Equal(t, uicli.ExitUsage, got.Code)
+	assert.Empty(t, got.Stdout)
+	assert.Equal(t, "\n  ✗ invalid --output \"yaml\": expected one of text, json\n  → wtm-next extract --help\n\n", got.Stderr)
+}

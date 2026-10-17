@@ -48,7 +48,11 @@ func (w *wizard) standing(s step) form.Standing {
 	case stepFastForward:
 		st, flagged = form.Standing{Value: yesNo(q.FastForward.Value), Origin: q.FastForward.Origin, Skip: q.FastForward.Skip}, w.given.FastForward != nil
 	case stepIfNotExists:
-		st = form.Standing{Value: yesNo(q.IfNotExists.Value), Skip: q.IfNotExists.Skip}
+		// The question skips a step only its flag sets; given, the flag stands in the trail instead.
+		st, flagged = form.Standing{Value: yesNo(q.IfNotExists.Value)}, w.given.IfNotExists
+		if !flagged {
+			st.Skip = q.IfNotExists.Skip
+		}
 	case stepRecap, stepCount:
 	}
 

@@ -163,3 +163,10 @@ func TestADryRunAsksTheQuestionsAndNoConfirmation(t *testing.T) {
 	assert.Equal(t, form.Finished, d.w.Ending())
 	assert.Nil(t, d.c.preview)
 }
+
+func TestIfNotExistsGivenByItsFlagStandsInTheTrail(t *testing.T) {
+	d := open(t, wizardParams{App: newApp(seed{}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample, IfNotExists: true}})
+
+	assert.Equal(t, int(stepRecap), d.w.Current())
+	assert.Contains(t, d.screen(), "✓ If not exists: yes · --if-not-exists")
+}

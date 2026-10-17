@@ -30,8 +30,7 @@ func runExtract(t *testing.T, w world, words ...string) printed {
 	t.Helper()
 	streams, _, stdout, stderr := output.Test()
 	root := uicli.NewRoot("1.2.3", streams, []*cobra.Command{New(streams, w.open)})
-	root.SetArgs(append([]string{"extract"}, words...))
-	code := uicli.Execute(t.Context(), root)
+	code := uicli.Execute(t.Context(), root, append([]string{"extract"}, words...))
 	return printed{Stdout: stdout.String(), Stderr: stderr.String(), Code: code}
 }
 

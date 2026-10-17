@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	tea "github.com/charmbracelet/bubbletea"
@@ -84,4 +85,13 @@ func picks() []Pick {
 		{Label: "b.txt", Value: "b.txt", Tag: "untracked"},
 		{Label: "notes.md", Value: "notes.md"},
 	}
+}
+
+// enters is a terminal on which the user keeps pressing enter.
+type enters struct{}
+
+func (enters) Read(p []byte) (int, error) {
+	time.Sleep(time.Millisecond)
+	p[0] = '\r'
+	return 1, nil
 }

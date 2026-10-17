@@ -98,13 +98,6 @@ func New(streams *output.Streams, open func(ctx context.Context) (Project, error
 	_ = cmd.RegisterFlagCompletionFunc("env-from", cobra.FixedCompletions(create.Names(project.EnvStrategies()), cobra.ShellCompDirectiveNoFileComp))
 	_ = cmd.RegisterFlagCompletionFunc("isolation", cobra.FixedCompletions(create.Names(project.Isolations()), cobra.ShellCompDirectiveNoFileComp))
 
-	// A flag cobra cannot parse is refused as any invalid request is: framed, or in the envelope.
-	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
-		invalid := domain.Invalid(nil)
-		invalid.Cause = err
-		return c.misused(cmd, invalid)
-	})
-
 	return cmd
 }
 

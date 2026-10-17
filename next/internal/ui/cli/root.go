@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
@@ -36,9 +37,7 @@ func Main(params Params) int {
 	ctx, stop := interruptible(params)
 	defer stop()
 
-	root := NewRoot(params.Version, params.Streams, params.Commands)
-	root.SetArgs(params.Args)
-	code := Execute(ctx, root)
+	code := Execute(ctx, NewRoot(params.Version, params.Streams, params.Commands), params.Args)
 
 	params.KillCancelled()
 	params.AwaitShields()
@@ -74,9 +73,10 @@ func NewRoot(version string, streams *output.Streams, commands []*cobra.Command)
 	return root
 }
 
-// Execute runs root under ctx and returns the exit code of its outcome.
-// A [*Failed] has been rendered by its command unless it is quiet, in which case Execute prints its one line; any other error is a usage error, printed with the failing command's help as the next step.
-func Execute(ctx context.Context, root *cobra.Command) int {
+// Execute runs root with args under ctx and returns the exit code of its outcome.
+// A [*Failed] has been rendered by its command unless it is quiet, in which case Execute prints its one line; any other error is a usage error, in the envelope when args ask for JSON, else printed with the failing command's help as the next step.
+func Execute(ctx context.Context, root *cobra.Command, args []string) int {
+	root.SetArgs(args)
 	failing, err := root.ExecuteContextC(ctx)
 	if err == nil {
 		return ExitOK
@@ -92,11 +92,37 @@ func Execute(ctx context.Context, root *cobra.Command) int {
 		return exitCode(failure, ctx.Err() != nil)
 	}
 
-	usage := domain.InvalidMessage(err.Error())
+	usage := domain.Invalid(nil)
+	usage.Cause = err
+	if asksJSON(args) {
+		if err := output.Envelope(root.OutOrStdout(), output.EnvelopeParams{Command: failing.Name(), Err: usage}); err != nil {
+			return ExitError
+		}
+		return ExitUsage
+	}
+
 	output.Frame(stderr, func(w io.Writer) {
 		output.Failure(w, output.FailureParams{Err: usage, Next: []output.NextStep{HelpStep(failing)}})
 	})
 	return ExitUsage
+}
+
+// asksJSON reports whether args ask for the JSON envelope, read without cobra since a usage error may stop its parsing before --output: the last --output before "--" says exactly json.
+func asksJSON(args []string) bool {
+	format := ""
+	for i, arg := range args {
+		if arg == "--" {
+			break
+		}
+		if value, ok := strings.CutPrefix(arg, "--output="); ok {
+			format = value
+		}
+		if arg == "--output" && i+1 < len(args) {
+			format = args[i+1]
+		}
+	}
+
+	return format == OutputJSON
 }
 
 // HelpStep returns the next step that shows cmd's help.

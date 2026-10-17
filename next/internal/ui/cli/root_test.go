@@ -17,13 +17,21 @@ func TestAnUnknownFlagOfTheRootIsAUsageError(t *testing.T) {
 	got := runIn(t, "--nope")
 
 	assert.Equal(t, ExitUsage, got.Code)
-	assert.Equal(t, "\n  ✗ unknown flag: --nope\n  → wtm-next --help\n\n", got.Stderr)
+	assert.Equal(t, "\n  ✗ the request is invalid: unknown flag: --nope\n  → wtm-next --help\n\n", got.Stderr)
 }
 
 func TestAnUnknownCommandIsAUsageError(t *testing.T) {
 	got := runIn(t, "nope")
 
 	assert.Equal(t, ExitUsage, got.Code)
-	assert.Contains(t, got.Stderr, `✗ unknown command "nope" for "wtm-next"`)
+	assert.Contains(t, got.Stderr, `✗ the request is invalid: unknown command "nope" for "wtm-next"`)
 	assert.Contains(t, got.Stderr, "→ wtm-next --help")
+}
+
+func TestAUsageErrorOfTheRootIsInTheEnvelopeWhenJSONWasAsked(t *testing.T) {
+	got := runIn(t, "nope", "--output", "json")
+
+	assert.Equal(t, ExitUsage, got.Code)
+	assert.Empty(t, got.Stderr)
+	assert.Contains(t, got.Stdout, `"message": "the request is invalid: unknown command \"nope\" for \"wtm-next\""`)
 }

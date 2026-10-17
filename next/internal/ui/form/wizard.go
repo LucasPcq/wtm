@@ -370,7 +370,7 @@ func (w *Wizard) back() tea.Cmd {
 	}
 
 	for s := to + 1; s <= w.current; s++ {
-		w.marks[s] = mark{}
+		w.marks[s], w.answered[s] = mark{}, false
 		if s < w.recapAt() {
 			w.script.Steps[s].Reset()
 		}

@@ -231,3 +231,74 @@ func TestKeysTypedWhileTheRepositoryIsReadAreReplayedInOrder(t *testing.T) {
 	assert.Equal(t, "no", f.second.answer)
 	assert.Equal(t, 3, f.observed)
 }
+
+func TestGoingBackInARestartedFormAsksAgainTheStepsItResets(t *testing.T) {
+	f := newFake()
+	f.first.standing = Standing{Skip: "not yet"}
+	d := open(t, Params{Script: f.script()})
+	d.keys("down", "enter")
+	require.Equal(t, 2, d.w.Current())
+
+	f.first.standing = Standing{}
+	again := start(d.w.Again())
+	again.keys("enter")
+	require.Equal(t, 2, again.w.Current())
+	again.keys("esc", "enter")
+
+	assert.Equal(t, 1, again.w.Current())
+	assert.NotContains(t, again.screen(), "✓ Second:")
+}
+
+func TestAStalePlanAsksAgainAndAppliesUnderThePreviewOfTheNewForm(t *testing.T) {
+	f := newFake()
+	script := f.script()
+	previews := 0
+	script.Preview = func(context.Context) (func(), error) { previews++; return func() {}, nil }
+	var appliedAfter []int
+	script.Apply = func(context.Context) error {
+		appliedAfter = append(appliedAfter, previews)
+		if len(appliedAfter) == 1 {
+			return errStale
+		}
+		return nil
+	}
+	ios, _, _, _ := output.Test()
+
+	err := Run(t.Context(), Params{Script: script}, enters{}, ios.Err)
+
+	require.NoError(t, err)
+	assert.Equal(t, []int{1, 2}, appliedAfter)
+}
+
+func TestAFailedApplyEndsTheRunWithoutAskingAgain(t *testing.T) {
+	f := newFake()
+	failed := errors.New("hook failed")
+	f.applyErr = failed
+	ios, _, _, _ := output.Test()
+
+	err := Run(t.Context(), Params{Script: f.script()}, enters{}, ios.Err)
+
+	assert.ErrorIs(t, err, failed)
+	assert.Equal(t, 1, f.applied)
+}
+
+func TestAReadThatFailsAfterAnAnswerEndsTheRun(t *testing.T) {
+	f := newFake()
+	failed := errors.New("repository gone")
+	script := f.script()
+	reads := 0
+	script.Observe = func(context.Context) (func(), error) {
+		reads++
+		if reads > 1 {
+			return func() {}, failed
+		}
+		return func() {}, nil
+	}
+	ios, _, _, _ := output.Test()
+
+	err := Run(t.Context(), Params{Script: script}, enters{}, ios.Err)
+
+	assert.ErrorIs(t, err, failed)
+	assert.Equal(t, 2, reads)
+	assert.Zero(t, f.applied)
+}

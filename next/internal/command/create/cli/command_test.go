@@ -266,3 +266,30 @@ func TestDashNIsTheDryRun(t *testing.T) {
 	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
 	assert.Contains(t, got.Stdout, "create · dry run, nothing applied")
 }
+
+func TestAFlagErrorIsInTheEnvelopeOnlyWhenTheArgumentsAskForJSON(t *testing.T) {
+	cases := map[string]struct {
+		Words []string
+		JSON  bool
+	}{
+		"--output json after the bad flag":       {Words: []string{branchName, "--nope", "--output", "json"}, JSON: true},
+		"--output=json after the bad flag":       {Words: []string{branchName, "--nope", "--output=json"}, JSON: true},
+		"an unknown format before the bad flag":  {Words: []string{branchName, "--output", "yaml", "--nope"}},
+		"json overridden by a later --output":    {Words: []string{branchName, "--nope", "--output", "json", "--output", "yaml"}},
+		"--output json only after the separator": {Words: []string{branchName, "--nope", "--", "--output", "json"}},
+	}
+	for name, c := range cases {
+		got := runCreate(t, newWorld(seed{}), c.Words...)
+
+		assert.Equal(t, uicli.ExitUsage, got.Code, name)
+		if !c.JSON {
+			assert.Empty(t, got.Stdout, name)
+			assert.Equal(t, "\n  ✗ the request is invalid: unknown flag: --nope\n  → wtm-next create --help\n\n", got.Stderr, name)
+			continue
+		}
+		assert.Empty(t, got.Stderr, name)
+		doc := decoded(t, got.Stdout)
+		require.NotNil(t, doc.Error, name)
+		assert.Equal(t, "the request is invalid: unknown flag: --nope", doc.Error.Message, name)
+	}
+}
