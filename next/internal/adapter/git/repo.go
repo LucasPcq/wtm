@@ -33,7 +33,10 @@ func (e *Error) Error() string {
 
 func (e *Error) Unwrap() error { return e.Err }
 
-var ErrNoLocalBranch = errors.New("no local branch")
+var (
+	ErrNoLocalBranch = errors.New("no local branch")
+	ErrNotRepository = errors.New("not a git repository")
+)
 
 var repoScopedEnv = []string{
 	"GIT_DIR",
@@ -61,6 +64,9 @@ func (r Repo) git(ctx context.Context, args ...string) ([]byte, error) {
 		code, exited := shell.ExitCode(err)
 		if !exited {
 			code = -1
+		}
+		if strings.Contains(stderr.String(), ErrNotRepository.Error()) {
+			err = errors.Join(ErrNotRepository, err)
 		}
 		return nil, &Error{Args: full, Exit: code, Stderr: strings.TrimSpace(stderr.String()), Err: err}
 	}

@@ -95,3 +95,9 @@ func TestAGitChildRunsInAProcessGroupOfItsOwn(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEqual(t, syscall.Getpgrp(), pgid)
 }
+
+func TestAFolderOutsideAnyRepositoryIsNoRepository(t *testing.T) {
+	_, err := git.Repo{Dir: t.TempDir()}.MainWorktree(t.Context())
+
+	assert.ErrorIs(t, err, git.ErrNotRepository)
+}

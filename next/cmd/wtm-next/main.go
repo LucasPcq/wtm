@@ -2,14 +2,20 @@
 package main
 
 import (
-	"context"
 	"os"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/surface/cli"
 )
 
 var version = "dev"
 
 func main() {
-	os.Exit(cli.Execute(context.Background(), cli.NewRoot(version)))
+	os.Exit(cli.Main(cli.Params{
+		Version:       version,
+		Args:          os.Args[1:],
+		Open:          open,
+		KillCancelled: shell.KillCancelled,
+		AwaitShields:  shell.AwaitShields,
+	}))
 }

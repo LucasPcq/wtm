@@ -25,7 +25,7 @@ func TestAQuietFailureIsOneLineWithItsFields(t *testing.T) {
 	internal := &wtm.Error{Kind: wtm.KindInternal, Code: "internal", Message: "internal error", Cause: errors.New("disk full")}
 	notFound := &wtm.Error{Kind: wtm.KindPrecondition, Code: "create.config_not_found", Message: "no wtm config found — run `wtm init` first", Cause: errors.New("project config: config file not found")}
 
-	assert.Equal(t, "the request is invalid: branch feat/x is checked out at /p — run `wtm go feat/x` to jump in; <branches>[1]: feat/x is given twice; --env-from must be one of example, main, parent, not copy; --from is required: a branch that already exists locally needs its parent named (it can't be inferred, and `wtm sync` needs it)", FailureLine(invalid()))
-	assert.Equal(t, "internal error: disk full", FailureLine(internal))
-	assert.Equal(t, "no wtm config found — run `wtm init` first", FailureLine(notFound))
+	assert.Equal(t, "the request is invalid: branch feat/x is checked out at /p — run `wtm go feat/x` to jump in; <branches>[1]: feat/x is given twice; --env-from must be one of example, main, parent, not copy; --from is required: a branch that already exists locally needs its parent named (it can't be inferred, and `wtm sync` needs it)", failureLine(invalid()))
+	assert.Equal(t, "internal error: disk full", failureLine(internal))
+	assert.Equal(t, "no wtm config found — run `wtm init` first", failureLine(notFound))
 }

@@ -1,0 +1,245 @@
+package cli
+
+import (
+	"context"
+	"io"
+	"os"
+	"strings"
+
+	"github.com/LucasPcq/wtm/next/internal/app"
+	"github.com/LucasPcq/wtm/next/internal/app/create"
+	"github.com/LucasPcq/wtm/next/internal/surface/output"
+	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+	"github.com/spf13/cobra"
+	"golang.org/x/term"
+)
+
+const (
+	createShort = "Create one or more worktrees"
+	createLong  = "Create one or more git worktrees with env provisioning, metadata, and hooks.\n" +
+		"Several branches are created one after the other from the same source; a failure\n" +
+		"does not stop the others, and the run ends with what was created and what failed.\n" +
+		"A branch that already exists locally is checked out as-is, keeping its commits;\n" +
+		"its parent can't be inferred, so --from then names the branch recorded for `wtm sync`.\n" +
+		"A branch only origin has is created from it, tracking it.\n" +
+		"When run.toml declares jobs, a branch whose derived name a live worktree or another\n" +
+		"branch of the run already carries (feat.x next to feat/x) is refused.\n" +
+		"Without arguments, the form asks for the branches: tab adds another, enter continues."
+	createExample = `  # Answer the form: branches, source, env strategy, isolation
+  wtm create
+
+  # Three worktrees from the base branch, no prompts
+  wtm create feat/login feat/billing fix/header --yes
+
+  # A stacked branch on top of feat/login
+  wtm create feat/login-ui --from feat/login --yes
+
+  # See the plan first, then apply exactly that plan
+  wtm create feat/login --dry-run
+  wtm create feat/login --expect-fingerprint <hash>
+
+  # For a script or an agent: idempotent, with the v2 JSON envelope
+  wtm create feat/login --if-not-exists --output json`
+
+	fromUsage        = "The branch a new branch starts from, or the parent recorded for wtm sync of one that already exists"
+	envFromUsage     = "How the .env files of the new worktrees are provisioned: example (from its template), main (copied from the main checkout) or parent (from the source's worktree); defaults to config.toml's strategy"
+	isolationUsage   = "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated"
+	ffUsage          = "Fast-forward to origin first the branch each worktree starts from, when it is behind; one that has diverged or holds uncommitted changes starts as it is"
+	ifNotExistsUsage = "Succeed without a change when the worktree already exists (idempotent)"
+	rememberUsage    = "The answers to always use in this repository: env_from, isolation, fast_forward (repeatable)"
+	yesUsage         = "Run unattended: no question, no confirmation; what is not given takes its default"
+	outputUsage      = "Output format: text or json"
+	dryRunUsage      = "Show the plan and its fingerprint, apply nothing"
+	expectUsage      = "Apply only if the facts still have this fingerprint, the one --dry-run printed"
+	askUsage         = "Ask again the questions this repository remembers an answer to, to change or forget it"
+
+	flagFF     = "ff"
+	outputText = "text"
+	outputJSON = "json"
+	applyNote  = "apply this plan"
+	replanNote = "the plan the facts give now"
+)
+
+type createCommand struct {
+	open        func(ctx context.Context) (Project, error)
+	from        string
+	envFrom     string
+	isolation   string
+	ff          bool
+	ifNotExists bool
+	remember    []string
+	yes         bool
+	output      string
+	dryRun      bool
+	expect      string
+	ask         bool
+	quiet       bool
+}
+
+func newCreate(open func(ctx context.Context) (Project, error)) *cobra.Command {
+	c := &createCommand{open: open}
+	cmd := &cobra.Command{Use: "create [branch...]", Short: createShort, Long: createLong, Example: createExample, Args: cobra.ArbitraryArgs, RunE: c.run}
+	flags := cmd.Flags()
+	flags.StringVar(&c.from, "from", "", fromUsage)
+	flags.StringVar(&c.envFrom, "env-from", "", envFromUsage)
+	flags.StringVar(&c.isolation, "isolation", "", isolationUsage)
+	flags.BoolVar(&c.ff, flagFF, false, ffUsage)
+	flags.BoolVar(&c.ifNotExists, "if-not-exists", false, ifNotExistsUsage)
+	flags.StringArrayVar(&c.remember, "remember", nil, rememberUsage)
+	flags.BoolVarP(&c.yes, "yes", "y", false, yesUsage)
+	flags.StringVar(&c.output, "output", outputText, outputUsage)
+	flags.BoolVar(&c.dryRun, "dry-run", false, dryRunUsage)
+	flags.StringVar(&c.expect, "expect-fingerprint", "", expectUsage)
+	flags.BoolVar(&c.ask, "ask", false, askUsage)
+	_ = cmd.RegisterFlagCompletionFunc("env-from", cobra.FixedCompletions(names(project.EnvStrategies()), cobra.ShellCompDirectiveNoFileComp))
+	_ = cmd.RegisterFlagCompletionFunc("isolation", cobra.FixedCompletions(names(run.Isolations()), cobra.ShellCompDirectiveNoFileComp))
+	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		invalid := wtm.Invalid(nil)
+		invalid.Cause = err
+		return c.fail(cmd, invalid, create.Request{})
+	})
+	return cmd
+}
+
+func (c *createCommand) run(cmd *cobra.Command, args []string) error {
+	c.quiet, _ = cmd.Flags().GetBool(flagQuiet)
+	req := c.request(cmd, args)
+	if c.output != outputText && c.output != outputJSON {
+		refused := &wtm.Error{Kind: wtm.KindInvalid, Code: wtm.CodeInvalidRequest, Message: `invalid --output "` + c.output + `": expected one of text, json`}
+		c.output = outputText
+		return c.fail(cmd, refused, req)
+	}
+	if c.interactive(cmd) {
+		return c.fail(cmd, &wtm.Error{Kind: wtm.KindInvalid, Code: wtm.CodeInvalidRequest, Message: "the form is not yet available: pass --yes"}, req)
+	}
+	ctx := cmd.Context()
+	project, err := c.open(ctx)
+	if err != nil {
+		return c.fail(cmd, wtm.AsError(wtm.AsErrorParams{Err: err}), req)
+	}
+	_, stderr := c.streams(cmd)
+	progress := output.NewProgress(ctx, output.ProgressParams{W: stderr, Human: c.human(), Live: output.IsTerminal(stderr)})
+	outcome, err := project.App.Create(ctx, app.CreateParams{Request: req, DryRun: c.dryRun, ExpectFingerprint: c.expect, Report: progress.Report})
+	progress.Close()
+	return c.conclude(cmd, concluded{Outcome: outcome, Err: wtm.AsError(wtm.AsErrorParams{Err: err}), Request: req, Cwd: project.Cwd})
+}
+
+func (c *createCommand) request(cmd *cobra.Command, args []string) create.Request {
+	req := create.Request{
+		From:        c.from,
+		EnvFrom:     project.EnvStrategy(c.envFrom),
+		Isolation:   run.Isolation(c.isolation),
+		IfNotExists: c.ifNotExists,
+		Remember:    c.remember,
+		Ask:         c.ask,
+	}
+	for _, arg := range args {
+		req.Branches = append(req.Branches, strings.TrimSpace(arg))
+	}
+	if cmd.Flags().Changed(flagFF) {
+		req.FastForward = new(c.ff)
+	}
+	return req
+}
+
+func (c *createCommand) human() bool {
+	return c.output == outputText
+}
+
+func (c *createCommand) interactive(cmd *cobra.Command) bool {
+	stdin, ok := cmd.InOrStdin().(*os.File)
+	return ok && term.IsTerminal(int(stdin.Fd())) && c.expect == "" && c.human() && !c.yes
+}
+
+func (c *createCommand) streams(cmd *cobra.Command) (io.Writer, io.Writer) {
+	if c.quiet && c.human() {
+		return io.Discard, io.Discard
+	}
+	return cmd.OutOrStdout(), cmd.ErrOrStderr()
+}
+
+type concluded struct {
+	Outcome app.CreateOutcome
+	Err     *wtm.Error
+	Request create.Request
+	Cwd     string
+}
+
+func (c *createCommand) conclude(cmd *cobra.Command, done concluded) error {
+	failure := done.Err
+	if failure == nil && done.Outcome.Result != nil {
+		failure = done.Outcome.Result.Failure()
+	}
+	stdout, _ := c.streams(cmd)
+	if !c.human() {
+		if err := output.Envelope(stdout, output.EnvelopeParams{Outcome: done.Outcome, Err: done.Err}); err != nil {
+			return c.failed(wtm.AsError(wtm.AsErrorParams{Err: err}))
+		}
+		return c.failed(failure)
+	}
+	line := createLine{Command: cmd.CommandPath(), Request: done.Request}
+	switch {
+	case done.Err != nil:
+		return c.fail(cmd, done.Err, done.Request)
+	case done.Outcome.Result == nil:
+		apply := line.String() + " --expect-fingerprint " + done.Outcome.Fingerprint
+		output.Frame(stdout, func(w io.Writer) { output.DryRun(w, output.DryRunParams{Outcome: done.Outcome, Apply: apply}) })
+		return nil
+	}
+	followUps, err := itemFollowUps(done.Outcome.Result.Items)
+	if err != nil {
+		return c.fail(cmd, wtm.AsError(wtm.AsErrorParams{Err: err}), done.Request)
+	}
+	output.Frame(stdout, func(w io.Writer) {
+		output.Outcome(w, output.OutcomeParams{Outcome: done.Outcome, FollowUps: followUps, Cwd: done.Cwd})
+	})
+	return c.failed(failure)
+}
+
+func (c *createCommand) fail(cmd *cobra.Command, failure *wtm.Error, req create.Request) error {
+	stdout, stderr := c.streams(cmd)
+	if !c.human() {
+		if err := output.Envelope(stdout, output.EnvelopeParams{Err: failure}); err != nil {
+			return c.failed(wtm.AsError(wtm.AsErrorParams{Err: err}))
+		}
+		return c.failed(failure)
+	}
+	var next []output.NextStep
+	if failure.Code == "plan.stale" {
+		next = []output.NextStep{{Command: createLine{Command: cmd.CommandPath(), Request: req}.String() + " --dry-run", Note: replanNote}}
+	}
+	output.Frame(stderr, func(w io.Writer) { output.Failure(w, output.FailureParams{Err: failure, Next: next}) })
+	return c.failed(failure)
+}
+
+func (c *createCommand) failed(failure *wtm.Error) error {
+	if failure == nil {
+		return nil
+	}
+	return &failed{Err: failure, Quiet: c.quiet && c.human()}
+}
+
+func itemFollowUps(items []create.Item) ([]output.NextStep, error) {
+	var steps []output.NextStep
+	for _, item := range items {
+		if item.Err == nil || item.Err.FollowUp == nil {
+			continue
+		}
+		line, err := followUpLine(item.Err.FollowUp)
+		if err != nil {
+			return nil, err
+		}
+		steps = append(steps, output.NextStep{Command: line, Note: item.Err.FollowUp.Message})
+	}
+	return steps, nil
+}
+
+func names[T ~string](values []T) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		out = append(out, string(value))
+	}
+	return out
+}

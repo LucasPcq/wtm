@@ -71,6 +71,21 @@ func TestAnInterruptSaysWhatIsBeingFinished(t *testing.T) {
 	assert.Equal(t, "  Cancelling — finishing env of feat/x; Ctrl+C again to stop now\n", out.String())
 }
 
+func TestAnInterruptIsSaidBeforeTheEventsThatFollowIt(t *testing.T) {
+	var out bytes.Buffer
+	ctx, cancel := context.WithCancel(t.Context())
+	progress := NewProgress(ctx, ProgressParams{W: &out, Human: true})
+	progress.Report(wtm.UnitStarted{Subject: "feat/x"})
+	progress.Report(wtm.PhaseStarted{Subject: "feat/x", Phase: "on_create"})
+
+	cancel()
+	progress.Report(wtm.PhaseFinished{Subject: "feat/x", Phase: "on_create", Failed: true})
+	progress.Report(wtm.UnitFinished{Subject: "feat/x", Status: wtm.StatusCancelled})
+	progress.Close()
+
+	assert.Equal(t, "  Cancelling — finishing on_create of feat/x; Ctrl+C again to stop now\n", out.String())
+}
+
 func TestAFinishedRunPrintsNoCancelling(t *testing.T) {
 	var out bytes.Buffer
 	ctx, cancel := context.WithCancel(t.Context())

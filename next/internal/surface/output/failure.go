@@ -20,7 +20,11 @@ func Failure(w io.Writer, params FailureParams) {
 	nextSteps(w, params.Next)
 }
 
-func FailureLine(err *wtm.Error) string {
+func QuietFailure(w io.Writer, err *wtm.Error) {
+	errorLine(w, failureLine(err))
+}
+
+func failureLine(err *wtm.Error) string {
 	fields := fieldLines(err)
 	if len(fields) == 0 {
 		return errorText(err)

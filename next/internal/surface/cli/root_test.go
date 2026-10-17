@@ -1,28 +1,28 @@
 package cli
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestTheRootPrintsItsVersion(t *testing.T) {
-	root := NewRoot("1.2.3")
-	var out bytes.Buffer
-	root.SetOut(&out)
-	root.SetArgs([]string{"--version"})
+	got := runIn(t, newWorld(seed{}), "--version")
 
-	code := Execute(t.Context(), root)
-
-	assert.Equal(t, exitOK, code)
-	assert.Equal(t, "wtm-next version 1.2.3\n", out.String())
+	assert.Equal(t, exitOK, got.Code)
+	assert.Equal(t, "wtm-next version 1.2.3\n", got.Stdout)
 }
 
-func TestAnUnknownFlagFails(t *testing.T) {
-	root := NewRoot("1.2.3")
-	root.SetErr(&bytes.Buffer{})
-	root.SetArgs([]string{"--nope"})
+func TestAnUnknownFlagOfTheRootIsAUsageError(t *testing.T) {
+	got := runIn(t, newWorld(seed{}), "--nope")
 
-	assert.Equal(t, exitError, Execute(t.Context(), root))
+	assert.Equal(t, exitUsage, got.Code)
+	assert.Equal(t, "\n  ✗ unknown flag: --nope\n\n", got.Stderr)
+}
+
+func TestAnUnknownCommandIsAUsageError(t *testing.T) {
+	got := runIn(t, newWorld(seed{}), "nope")
+
+	assert.Equal(t, exitUsage, got.Code)
+	assert.Contains(t, got.Stderr, `✗ unknown command "nope" for "wtm-next"`)
 }

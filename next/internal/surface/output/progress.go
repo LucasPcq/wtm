@@ -29,29 +29,33 @@ type Progress struct {
 	phaseLog  string
 	phaseOpen bool
 	started   time.Time
+	run       context.Context
 	stop      context.CancelFunc
+	announced bool
 	closed    bool
 }
 
 func NewProgress(ctx context.Context, params ProgressParams) *Progress {
 	watch, stop := context.WithCancel(ctx)
-	progress := &Progress{w: params.W, human: params.Human, live: params.Human && params.Live, stop: stop}
+	progress := &Progress{w: params.W, human: params.Human, live: params.Human && params.Live, run: ctx, stop: stop}
 	if params.Human {
-		go progress.cancelling(watch, ctx)
+		go progress.cancelling(watch)
 	}
 	return progress
 }
 
-func (p *Progress) cancelling(watch, run context.Context) {
+func (p *Progress) cancelling(watch context.Context) {
 	<-watch.Done()
-	if run.Err() == nil {
-		return
-	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.closed {
+	p.announce()
+}
+
+func (p *Progress) announce() {
+	if p.closed || p.announced || p.run.Err() == nil {
 		return
 	}
+	p.announced = true
 	p.status = p.cancellingMessage()
 	if !p.live {
 		message(p.w, p.status)
@@ -77,6 +81,9 @@ func (p *Progress) cancellingMessage() string {
 func (p *Progress) Report(event wtm.Event) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if p.human {
+		p.announce()
+	}
 	if output, ok := event.(wtm.Output); ok {
 		p.output(output.Line)
 		return
