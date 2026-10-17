@@ -75,3 +75,7 @@ Go's doc-comment conventions, as the `go-style` skill states them ([`comments.md
 - **The first Ctrl+C** cancels the operation: the worktree being added finishes its add, env copy and meta record (a shielded section), its hooks are stopped, and the later worktrees are skipped as interrupted. In human mode it prints `Cancelling — finishing <step> of <branch>; Ctrl+C again to stop now` on stderr. The command exits 19.
 - **The second Ctrl+C** stops at once: the running children's groups are killed and the command exits 130.
 - **A detached caller** (an HTTP or desktop adapter, later) passes the use case its own operation context, never a request's: a client that disconnects does not cancel the operation, an explicit cancel acts as the first Ctrl+C and a forced one as the second.
+
+## The branch
+
+`next/` lives on the `0.31.0` branch, cut from `main` at 0.30.1. A fix to the legacy `wtm` is made on `main` and `main` is merged into `0.31.0`, so `next/` always runs against the legacy it will replace and the formats it writes. Each command migrated to `next/` arrives by its own pull request to `0.31.0`, with its proof against the legacy command in `docs/proof/`.
