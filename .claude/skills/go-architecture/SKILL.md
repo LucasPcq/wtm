@@ -19,13 +19,13 @@ next/
       rules.go          pure: facts → plan
       questions.go      pure: the request, its form model, its validation
       cli/              its driving adapter: cobra command, flags, wizard steps, output
-    service/            what use cases call: operation (locks, plan under them, fingerprint, events), provision (a new worktree made whole)
-    domain/             the model, pure: errors, events, operations, question vocabulary; worktree/, project/, env/, dotenv/
+    service/            what use cases call: operation (locks, plan under them, fingerprint, events), provision (a new worktree made whole) + <name>test contracts (operationtest)
+    domain/             the model, pure: errors, events, operations and their run options, question vocabulary; worktree/, project/, env/, dotenv/
     adapter/<name>/     driven adapters implementing the ports (git, store, config, shell, oplock, events…) + <name>test fakes
     ui/                 the presentation kit, knowing no command: cli (root, exit codes, signals), output (frames, envelope), form (wizard engine, components)
 ```
 
-Dependencies point inward, checked by `make lint` (archlint `next`): `domain` imports nothing of next/; a `service` imports `domain`; a `command` imports `domain` and `service`; its `cli/` imports its command, `service/operation`, `domain` and `ui`; an `adapter` imports `domain`; `ui` imports `domain`; only `cmd/wtm-next` sees everything. A command never imports another command.
+Dependencies point inward, checked by `make lint` (archlint `next`): `domain` imports nothing of next/; a `service` imports `domain`; a `command` imports `domain` and `service`; its `cli/` imports its command, `domain` and `ui`, never a service; an `adapter` imports `domain`; `ui` imports `domain`; only `cmd/wtm-next` sees everything. A command never imports another command.
 
 Why a package per command, when the Go guides prefer a package per concept and Ben Johnson warns against grouping by module: a command *is* a concept with its own API (its request, its plan, its outcome), large CLIs do the same (the GitHub CLI's `pkg/cmd/<group>/<cmd>/`), and the two risks of grouping by feature are closed by construction — import cycles by the dependency rule above, repeated names (`create.CreateRequest`) by naming inside the package (`create.Request`). Ports follow go-style `interfaces.md`: each use case declares, consumer-side, the small interfaces it calls.
 
@@ -34,7 +34,7 @@ Why a package per command, when the Go guides prefer a package per concept and B
 `wtm-next create feat/x --from main`, hop by hop:
 
 1. `cmd/wtm-next/main.go`: the root runs with each command's CLI registered.
-2. `command/create/cli/command.go`: flags → `create.Request` + `operation.Options`; the wizard on a terminal, else `UseCase.Run`.
+2. `command/create/cli/command.go`: flags → `create.Request` + `domain.RunOptions`; the wizard on a terminal, else `UseCase.Run`.
 3. `command/create/usecase.go` → `Run`: begin the operation (locks), plan under the locks, fingerprint, stop on a dry run, refuse a stale plan, apply between the events.
 4. `Plan`: `Observe` reads the repository through the ports of `port.go`; `Resolve` (`questions.go`) settles the request; `Decide` (`rules.go`) makes the plan.
 5. `Apply`: its steps, calling `service/provision` for each new worktree.

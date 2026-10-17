@@ -102,7 +102,7 @@ type Detail struct {
 // Run
 
 // Run carries out the request under its operation: it takes the locks, plans under them, fingerprints the plan, stops on a dry run, refuses a stale plan, stops when there is nothing to extract and applies it between the operation's started and finished events. An error returned is a refusal before the apply; a failure during the apply is in the Outcome's Result.
-func (u UseCase) Run(ctx context.Context, req Request, opts operation.Options) (Outcome, error) {
+func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (Outcome, error) {
 	// 1. Take the operation's locks before reading anything, so the facts cannot change under the plan.
 	op, err := u.Operations.Begin(name, req.Locks(), opts)
 	if err != nil {

@@ -17,7 +17,7 @@ func service(l *locker, p *publisher) Service {
 	}
 }
 
-func begun(t *testing.T, h *hold, opts Options) *Op {
+func begun(t *testing.T, h *hold, opts domain.RunOptions) *Op {
 	t.Helper()
 	op, err := service(&locker{hold: h}, &publisher{}).Begin("create", []domain.Lock{repoLock}, opts)
 	if err != nil {

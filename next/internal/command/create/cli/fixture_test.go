@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
@@ -19,7 +21,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
-	"github.com/spf13/cobra"
 )
 
 const (
@@ -285,7 +286,7 @@ type refusing struct {
 	err error
 }
 
-func (r refusing) Run(context.Context, create.Request, operation.Options) (create.Outcome, error) {
+func (r refusing) Run(context.Context, create.Request, domain.RunOptions) (create.Outcome, error) {
 	return create.Outcome{}, r.err
 }
 
@@ -297,7 +298,7 @@ type previewing struct {
 	held     []string
 }
 
-func (p *previewing) Run(ctx context.Context, req create.Request, opts operation.Options) (create.Outcome, error) {
+func (p *previewing) Run(ctx context.Context, req create.Request, opts domain.RunOptions) (create.Outcome, error) {
 	if opts.DryRun {
 		p.previews++
 		outcome, err := p.useCase.Run(ctx, req, opts)

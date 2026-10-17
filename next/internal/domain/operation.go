@@ -78,3 +78,20 @@ func CorrelationProblem(id string) error {
 
 	return nil
 }
+
+// CodePlanStale is the code of the refusal of a plan that no longer matches the fingerprint of its preview.
+const CodePlanStale = "plan.stale"
+
+// RunOptions are how a surface runs an operation.
+type RunOptions struct {
+	DryRun            bool   // plan without taking locks, stop after the fingerprint
+	ExpectFingerprint string // refuse to apply a plan whose fingerprint differs; empty accepts any
+	Surface           string // the surface that started the operation (cli, ui…), recorded in its events
+	Report            Report // receives each event as it is published; may be nil
+}
+
+// PlanStale reports whether err is the refusal of a plan the facts changed under.
+func PlanStale(err error) bool {
+	found, ok := errors.AsType[*Error](err)
+	return ok && found.Code == CodePlanStale
+}

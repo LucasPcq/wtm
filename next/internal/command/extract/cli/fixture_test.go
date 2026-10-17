@@ -159,7 +159,7 @@ type previewing struct {
 	held     []string
 }
 
-func (p *previewing) Run(ctx context.Context, req extract.Request, opts operation.Options) (extract.Outcome, error) {
+func (p *previewing) Run(ctx context.Context, req extract.Request, opts domain.RunOptions) (extract.Outcome, error) {
 	if opts.DryRun {
 		p.previews++
 		outcome, err := p.useCase.Run(ctx, req, opts)

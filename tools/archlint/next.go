@@ -20,18 +20,19 @@ const (
 type nextLayer string
 
 const (
-	nextDomain  nextLayer = "domain"
-	nextService nextLayer = "service"
-	nextCommand nextLayer = "command"
-	nextAdapter nextLayer = "adapter"
-	nextCLI     nextLayer = "command/cli"
-	nextUI      nextLayer = "ui"
-	nextCmd     nextLayer = "cmd"
+	nextDomain      nextLayer = "domain"
+	nextService     nextLayer = "service"
+	nextServiceTest nextLayer = "service/test"
+	nextCommand     nextLayer = "command"
+	nextAdapter     nextLayer = "adapter"
+	nextCLI         nextLayer = "command/cli"
+	nextUI          nextLayer = "ui"
+	nextCmd         nextLayer = "cmd"
 )
 
 const (
-	cliService = "operation"
 	cliDir     = "cli"
+	testSuffix = "test"
 )
 
 var sharedAdapters = []string{"statefile", "shell"}
@@ -42,13 +43,14 @@ type nextPackage struct {
 }
 
 var nextWhy = map[nextLayer]string{
-	nextDomain:  "the domain is pure: the stdlib and domain/* only",
-	nextService: "a service reaches the world through the ports it declares: domain/* and the stdlib, never another service, a command, an adapter or ui/*",
-	nextCommand: "a use case orchestrates services and reaches the world through the ports it declares: domain/*, service/* and the stdlib, never another command, its own cli, an adapter or ui/*",
-	nextCLI:     "a command's cli drives its own use case: command/<its name>, service/operation, domain/*, ui/*, the stdlib and third parties, never another command, an adapter or another service",
-	nextAdapter: "an adapter reaches domain/*, adapter/statefile, adapter/shell, the stdlib and third parties, never a service, a command or ui/*, nor another adapter",
-	nextUI:      "ui/ is the presentation kit every command's cli shares and knows no command: domain/*, ui/*, the stdlib and third parties, never a command, a service or an adapter",
-	nextCmd:     "the composition root wires what is under next/",
+	nextDomain:      "the domain is pure: the stdlib and domain/* only",
+	nextService:     "a service reaches the world through the ports it declares: domain/* and the stdlib, never another service, a command, an adapter or ui/*",
+	nextCommand:     "a use case orchestrates services and reaches the world through the ports it declares: domain/*, service/* and the stdlib, never another command, its own cli, an adapter or ui/*",
+	nextServiceTest: "a service's test kit checks what the service promises: service/<its name>, domain/*, the stdlib and third parties, never another service, a command, an adapter or ui/*",
+	nextCLI:         "a command's cli drives its own use case: command/<its name>, domain/*, ui/*, the stdlib and third parties, never another command, a service or an adapter",
+	nextAdapter:     "an adapter reaches domain/*, adapter/statefile, adapter/shell, the stdlib and third parties, never a service, a command or ui/*, nor another adapter",
+	nextUI:          "ui/ is the presentation kit every command's cli shares and knows no command: domain/*, ui/*, the stdlib and third parties, never a command, a service or an adapter",
+	nextCmd:         "the composition root wires what is under next/",
 }
 
 var nextAnalyzer = newNextAnalyzer(testFilesOnDisk)
@@ -160,6 +162,8 @@ func nextPackageOf(rel string) (nextPackage, bool) {
 		return nextPackage{}, false
 	case parts[1] == "domain":
 		return nextPackage{layer: nextDomain}, true
+	case parts[1] == "service" && nested && strings.HasSuffix(unit, testSuffix):
+		return nextPackage{layer: nextServiceTest, unit: unit}, true
 	case parts[1] == "service" && nested:
 		return nextPackage{layer: nextService, unit: unit}, true
 	case parts[1] == "command" && len(parts) > 3 && parts[3] == cliDir:
@@ -186,8 +190,8 @@ func nextRefuses(imp nextImport) (string, bool) {
 	rel, inNext := cutNext(imp.Target)
 	to, inRow := nextPackageOf(rel)
 	inNext = inNext && inRow
-	fake := inNext && to.layer == nextAdapter && strings.HasSuffix(to.unit, "test")
-	if fake && !(imp.From.layer == nextAdapter && imp.From.unit == to.unit) {
+	fake := inNext && (to.layer == nextAdapter && strings.HasSuffix(to.unit, testSuffix) || to.layer == nextServiceTest)
+	if fake && !(imp.From.layer == to.layer && imp.From.unit == to.unit) {
 		return "a fake is imported from a _test.go only", true
 	}
 	if nextAdmits(imp, nextTarget{path: imp.Target, pkg: to, inNext: inNext}) {
@@ -214,10 +218,12 @@ func nextAdmits(imp nextImport, to nextTarget) bool {
 		return stdlib || in(nextDomain)
 	case nextCommand:
 		return stdlib || in(nextDomain, nextService) || in(nextCommand) && to.pkg.unit == from.unit
+	case nextServiceTest:
+		return stdlib || thirdParty || in(nextDomain) || in(nextService) && from.unit == to.pkg.unit+testSuffix
 	case nextAdapter:
 		return stdlib || thirdParty || in(nextDomain) || in(nextAdapter) && admitsAdapter(imp, to.pkg)
 	case nextCLI:
-		return stdlib || thirdParty || in(nextDomain, nextUI) || in(nextService) && to.pkg.unit == cliService || in(nextCommand) && to.pkg.unit == from.unit
+		return stdlib || thirdParty || in(nextDomain, nextUI) || in(nextCommand) && to.pkg.unit == from.unit
 	case nextUI:
 		return stdlib || thirdParty || in(nextDomain, nextUI)
 	case nextCmd:
@@ -228,5 +234,5 @@ func nextAdmits(imp nextImport, to nextTarget) bool {
 
 func admitsAdapter(imp nextImport, to nextPackage) bool {
 	from := imp.From
-	return to.unit == from.unit || slices.Contains(sharedAdapters, to.unit) || from.unit == to.unit+"test"
+	return to.unit == from.unit || slices.Contains(sharedAdapters, to.unit) || from.unit == to.unit+testSuffix
 }

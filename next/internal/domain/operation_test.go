@@ -2,6 +2,7 @@ package domain
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -52,4 +53,11 @@ func TestWorktreeLocksLeaveTheirArgumentAsItWas(t *testing.T) {
 	WorktreeLocks(worktrees)
 
 	assert.Equal(t, []string{"b", "", "a"}, worktrees)
+}
+
+func TestOnlyTheRefusalOfAStalePlanIsPlanStale(t *testing.T) {
+	assert.True(t, PlanStale(&Error{Kind: KindPrecondition, Code: CodePlanStale}))
+	assert.False(t, PlanStale(nil))
+	assert.False(t, PlanStale(errors.New("boom")))
+	assert.False(t, PlanStale(&Error{Kind: KindConflict, Code: "lock.held"}))
 }

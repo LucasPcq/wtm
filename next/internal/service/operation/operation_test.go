@@ -6,15 +6,16 @@ import (
 	"os"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/LucasPcq/wtm/next/internal/domain"
 )
 
 func TestBeginRecordsTheOperationAndTakesItsLocks(t *testing.T) {
 	l := &locker{hold: &hold{}}
 
-	op, err := service(l, &publisher{}).Begin("create", []domain.Lock{repoLock}, Options{Surface: "cli"})
+	op, err := service(l, &publisher{}).Begin("create", []domain.Lock{repoLock}, domain.RunOptions{Surface: "cli"})
 
 	require.NoError(t, err)
 	assert.Equal(t, "op-1", op.ID)
@@ -25,7 +26,7 @@ func TestBeginRecordsTheOperationAndTakesItsLocks(t *testing.T) {
 func TestBeginOnADryRunTakesNoLock(t *testing.T) {
 	l := &locker{hold: &hold{}}
 
-	op, err := service(l, &publisher{}).Begin("create", []domain.Lock{repoLock}, Options{DryRun: true})
+	op, err := service(l, &publisher{}).Begin("create", []domain.Lock{repoLock}, domain.RunOptions{DryRun: true})
 
 	require.NoError(t, err)
 	assert.Equal(t, "op-1", op.ID)
@@ -35,7 +36,7 @@ func TestBeginOnADryRunTakesNoLock(t *testing.T) {
 func TestBeginReturnsTheOpWithTheLockersError(t *testing.T) {
 	held := &domain.Error{Kind: domain.KindConflict, Code: "lock.held"}
 
-	op, err := service(&locker{err: held}, &publisher{}).Begin("create", []domain.Lock{repoLock}, Options{})
+	op, err := service(&locker{err: held}, &publisher{}).Begin("create", []domain.Lock{repoLock}, domain.RunOptions{})
 
 	assert.ErrorIs(t, err, held)
 	require.NotNil(t, op)
@@ -44,7 +45,7 @@ func TestBeginReturnsTheOpWithTheLockersError(t *testing.T) {
 }
 
 func TestPlanUnderLocksPlansOnceOnADryRun(t *testing.T) {
-	op := begun(t, &hold{}, Options{DryRun: true})
+	op := begun(t, &hold{}, domain.RunOptions{DryRun: true})
 	plans := 0
 
 	got, _, err := PlanUnderLocks(t.Context(), op, func(context.Context) (plan, []domain.Warning, error) {
@@ -59,7 +60,7 @@ func TestPlanUnderLocksPlansOnceOnADryRun(t *testing.T) {
 
 func TestPlanUnderLocksPlansAgainOnlyWhenItTookANewLock(t *testing.T) {
 	h := &hold{held: []domain.Lock{repoLock}}
-	op := begun(t, h, Options{})
+	op := begun(t, h, domain.RunOptions{})
 	plans := 0
 
 	_, _, err := PlanUnderLocks(t.Context(), op, func(context.Context) (plan, []domain.Warning, error) {
@@ -75,7 +76,7 @@ func TestPlanUnderLocksPlansAgainOnlyWhenItTookANewLock(t *testing.T) {
 func TestPlanUnderLocksReturnsThePlannersError(t *testing.T) {
 	failed := errors.New("observe failed")
 
-	_, _, err := PlanUnderLocks(t.Context(), begun(t, &hold{}, Options{}), func(context.Context) (plan, []domain.Warning, error) {
+	_, _, err := PlanUnderLocks(t.Context(), begun(t, &hold{}, domain.RunOptions{}), func(context.Context) (plan, []domain.Warning, error) {
 		return plan{}, nil, failed
 	})
 
@@ -102,31 +103,25 @@ func TestFingerprintFailsOnAValueJSONCannotEncode(t *testing.T) {
 }
 
 func TestExpectRefusesADifferentFingerprintAsStale(t *testing.T) {
-	err := begun(t, &hold{}, Options{ExpectFingerprint: "aaa"}).Expect("bbb")
+	err := begun(t, &hold{}, domain.RunOptions{ExpectFingerprint: "aaa"}).Expect("bbb")
 
 	found, ok := errors.AsType[*domain.Error](err)
 	require.True(t, ok, "Expect(%q) = %v, want a *domain.Error", "bbb", err)
 	assert.Equal(t, domain.KindPrecondition, found.Kind)
-	assert.Equal(t, CodePlanStale, found.Code)
+	assert.Equal(t, domain.CodePlanStale, found.Code)
 	assert.Equal(t, domain.Params{"expected": "aaa", "found": "bbb"}, found.Params)
-	assert.True(t, Stale(err))
+	assert.True(t, domain.PlanStale(err))
 }
 
 func TestExpectAcceptsTheSameFingerprintOrNone(t *testing.T) {
-	assert.NoError(t, begun(t, &hold{}, Options{ExpectFingerprint: "aaa"}).Expect("aaa"))
-	assert.NoError(t, begun(t, &hold{}, Options{}).Expect("bbb"))
-}
-
-func TestStaleIsFalseForAnyOtherError(t *testing.T) {
-	assert.False(t, Stale(nil))
-	assert.False(t, Stale(errors.New("boom")))
-	assert.False(t, Stale(&domain.Error{Kind: domain.KindConflict, Code: "lock.held"}))
+	assert.NoError(t, begun(t, &hold{}, domain.RunOptions{ExpectFingerprint: "aaa"}).Expect("aaa"))
+	assert.NoError(t, begun(t, &hold{}, domain.RunOptions{}).Expect("bbb"))
 }
 
 func TestStartedAndFinishedReportTheEventsInOrder(t *testing.T) {
 	p := &publisher{}
 	var surfaced []domain.Event
-	op, err := service(&locker{hold: &hold{}}, p).Begin("create", nil, Options{Surface: "cli", Report: func(e domain.Event) { surfaced = append(surfaced, e) }})
+	op, err := service(&locker{hold: &hold{}}, p).Begin("create", nil, domain.RunOptions{Surface: "cli", Report: func(e domain.Event) { surfaced = append(surfaced, e) }})
 	require.NoError(t, err)
 
 	report := op.Started()
@@ -145,7 +140,7 @@ func TestStartedAndFinishedReportTheEventsInOrder(t *testing.T) {
 
 func TestFinishedCarriesTheFailuresCode(t *testing.T) {
 	p := &publisher{}
-	op, err := service(&locker{hold: &hold{}}, p).Begin("create", nil, Options{Surface: "cli"})
+	op, err := service(&locker{hold: &hold{}}, p).Begin("create", nil, domain.RunOptions{Surface: "cli"})
 	require.NoError(t, err)
 
 	op.Started()
@@ -157,7 +152,7 @@ func TestFinishedCarriesTheFailuresCode(t *testing.T) {
 func TestWarningsAddsLocksUnavailableWhenUnprotectedAndKeepsEachOnce(t *testing.T) {
 	dirty := domain.Warning{Code: "create.ff_dirty", Message: "dirty", Params: domain.Params{"branch": "main"}}
 
-	got := begun(t, &hold{unprotected: true}, Options{}).Warnings([]domain.Warning{dirty, dirty})
+	got := begun(t, &hold{unprotected: true}, domain.RunOptions{}).Warnings([]domain.Warning{dirty, dirty})
 
 	assert.Equal(t, []domain.Warning{dirty, domain.LocksUnavailable}, got)
 }
@@ -165,13 +160,13 @@ func TestWarningsAddsLocksUnavailableWhenUnprotectedAndKeepsEachOnce(t *testing.
 func TestWarningsAddsNothingWhenProtected(t *testing.T) {
 	dirty := domain.Warning{Code: "create.ff_dirty", Message: "dirty"}
 
-	assert.Equal(t, []domain.Warning{dirty}, begun(t, &hold{}, Options{}).Warnings([]domain.Warning{dirty}))
+	assert.Equal(t, []domain.Warning{dirty}, begun(t, &hold{}, domain.RunOptions{}).Warnings([]domain.Warning{dirty}))
 }
 
 func TestEndReleasesTheLocks(t *testing.T) {
 	h := &hold{}
 
-	begun(t, h, Options{}).End()
+	begun(t, h, domain.RunOptions{}).End()
 
 	assert.True(t, h.released)
 }
@@ -179,7 +174,7 @@ func TestEndReleasesTheLocks(t *testing.T) {
 func TestEndIsSafeOnAnOpThatHoldsNone(t *testing.T) {
 	h := &hold{}
 
-	begun(t, h, Options{DryRun: true}).End()
+	begun(t, h, domain.RunOptions{DryRun: true}).End()
 
 	assert.False(t, h.released)
 }

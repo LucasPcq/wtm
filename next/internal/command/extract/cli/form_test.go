@@ -3,15 +3,15 @@ package cli
 import (
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/service/operation"
-	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
 func TestTheRecapAppliesThePlanItPreviewedAndPreviewsAgainWhenItTurnedStale(t *testing.T) {
-	stale := &domain.Error{Kind: domain.KindPrecondition, Code: operation.CodePlanStale}
+	stale := &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodePlanStale}
 	app := &previewing{useCase: newWorld(seed{}).usecase(), errs: []error{stale, nil}}
 	streams, _, _, _ := output.Test()
 	req := settled()

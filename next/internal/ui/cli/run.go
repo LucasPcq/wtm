@@ -66,6 +66,16 @@ func (r *Run) FailWith(failure *domain.Error, next []output.NextStep) error {
 	return r.Failed(failure)
 }
 
+// Refuse prints failure as FailWith does; the refusal of a stale plan is followed by line, the command line of the request, run again with --dry-run to preview the plan the facts give now.
+func (r *Run) Refuse(failure *domain.Error, line string) error {
+	var next []output.NextStep
+	if failure.Code == domain.CodePlanStale {
+		next = []output.NextStep{{Command: line + " --dry-run", Note: output.ReplanNote}}
+	}
+
+	return r.FailWith(failure, next)
+}
+
 // Envelope writes the v2 JSON envelope doc on stdout and returns its failure; an envelope that cannot be written is the failure.
 func (r *Run) Envelope(doc output.EnvelopeParams) error {
 	if err := output.Envelope(r.Streams.Out, doc); err != nil {
