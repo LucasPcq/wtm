@@ -156,3 +156,51 @@ func lastLine(content string) string {
 	lines := strings.Split(strings.TrimSpace(content), "\n")
 	return lines[len(lines)-1]
 }
+
+type pair struct {
+	repo   git.Repo
+	source string
+	target string
+}
+
+const numbered = "1\n2\n3\n4\n5\n6\n7\n8\n9\n"
+
+func sourceAndTarget(t *testing.T) pair {
+	t.Helper()
+	repo := newRepo(t)
+	for name, content := range map[string]string{"a.txt": numbered, "c.txt": numbered, "gone.txt": "gone\n", "README.md": "readme\n", ".gitignore": "ignored.log\n"} {
+		write(t, filepath.Join(repo.Dir, name), content)
+	}
+	gittest.Git(t, repo.Dir, "add", "-A")
+	gittest.Git(t, repo.Dir, "commit", "-q", "-m", "base")
+	target := filepath.Join(gittest.TempDir(t), "split")
+	gittest.Git(t, repo.Dir, "worktree", "add", "-q", "-b", "split", target)
+	return pair{repo: repo, source: repo.Dir, target: target}
+}
+
+func (p pair) move(changes ...worktree.Change) worktree.Move {
+	return worktree.Move{Source: p.source, Target: p.target, Changes: changes, SourceLabel: "main", TargetLabel: "split"}
+}
+
+func (p pair) check(changes ...worktree.Change) worktree.ConflictCheck {
+	return worktree.ConflictCheck{Source: p.source, Target: p.target, Changes: changes}
+}
+
+func write(t *testing.T, path, content string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+}
+
+func replaceLine(content string, line int, with string) string {
+	lines := strings.Split(content, "\n")
+	lines[line-1] = with
+	return strings.Join(lines, "\n")
+}
+
+func porcelain(t *testing.T, dir string) []string {
+	t.Helper()
+	out, err := exec.Command("git", "-C", dir, "status", "--porcelain", "--untracked-files=all").Output()
+	require.NoError(t, err)
+	return strings.FieldsFunc(string(out), func(r rune) bool { return r == '\n' })
+}

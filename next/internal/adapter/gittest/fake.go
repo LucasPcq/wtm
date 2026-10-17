@@ -13,6 +13,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
@@ -29,6 +30,9 @@ type Fake struct {
 	dirty     []string
 	fail      map[string]error
 	calls     []string
+	changes   map[string][]worktree.Change
+	conflicts map[string]worktree.ConflictKind
+	moves     []worktree.Move
 }
 
 type FakeParams struct {
@@ -45,6 +49,8 @@ type FakeParams struct {
 	Commits   map[worktree.Ref][]string
 	Origin    map[string][]string
 	Fail      map[string]error
+	Changes   map[string][]worktree.Change
+	Conflicts map[string]worktree.ConflictKind
 }
 
 type history []string
@@ -61,6 +67,11 @@ func NewFake(params FakeParams) *Fake {
 		dir:       realPath(cmp.Or(params.Dir, params.Main)),
 		dirty:     realPaths(params.Dirty),
 		fail:      params.Fail,
+		changes:   map[string][]worktree.Change{},
+		conflicts: params.Conflicts,
+	}
+	for dir, changes := range params.Changes {
+		f.changes[realPath(dir)] = changes
 	}
 	for _, name := range append([]string{params.Branch}, params.Local...) {
 		f.local[name] = historyOf(params.Commits, worktree.LocalBranch{Name: name})
@@ -322,6 +333,71 @@ func (f *Fake) MergeFFOnly(_ context.Context, merge worktree.Merge) error {
 	}
 	f.local[state.Branch] = slices.Clone(onto)
 	return nil
+}
+
+func (f *Fake) Moves() []worktree.Move {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.moves)
+}
+
+func (f *Fake) Changes(_ context.Context, dir string) ([]worktree.Change, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("Changes", dir); err != nil {
+		return nil, err
+	}
+	return slices.Clone(f.changes[realPath(dir)]), nil
+}
+
+func (f *Fake) Conflicts(_ context.Context, check worktree.ConflictCheck) ([]worktree.Conflict, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("Conflicts", cmp.Or(check.Target, check.TargetRef)); err != nil {
+		return nil, err
+	}
+	return f.conflictsOf(check.Changes), nil
+}
+
+func (f *Fake) Move(_ context.Context, move worktree.Move) (worktree.Moved, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("Move", move.Target); err != nil {
+		return worktree.Moved{}, err
+	}
+	f.moves = append(f.moves, move)
+	conflicts := f.conflictsOf(move.Changes)
+	binary := slices.ContainsFunc(conflicts, func(c worktree.Conflict) bool { return c.Kind == worktree.ConflictBinary })
+	if binary || (len(conflicts) > 0 && !move.Resolve) {
+		return worktree.Moved{}, domain.ExtractConflict(domain.ExtractConflictParams{Conflicts: conflicts, Target: move.TargetLabel})
+	}
+	target := realPath(move.Target)
+	f.changes[target] = append(f.changes[target], move.Changes...)
+	if len(conflicts) > 0 {
+		merged := make([]string, 0, len(conflicts))
+		for _, c := range conflicts {
+			merged = append(merged, c.Path)
+		}
+		return worktree.Moved{Merged: merged, Kept: true}, nil
+	}
+	if move.Keep {
+		return worktree.Moved{Kept: true}, nil
+	}
+	source := realPath(move.Source)
+	f.changes[source] = slices.DeleteFunc(f.changes[source], func(c worktree.Change) bool { return slices.Contains(move.Changes, c) })
+	return worktree.Moved{}, nil
+}
+
+func (f *Fake) conflictsOf(changes []worktree.Change) []worktree.Conflict {
+	var conflicts []worktree.Conflict
+	for _, change := range changes {
+		for _, path := range []string{change.Path, change.OrigPath} {
+			if kind, ok := f.conflicts[path]; ok && path != "" {
+				conflicts = append(conflicts, worktree.Conflict{Path: path, Kind: kind})
+			}
+		}
+	}
+	return conflicts
 }
 
 func (f *Fake) enter(method, argument string) error {

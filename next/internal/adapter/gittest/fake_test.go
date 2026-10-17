@@ -2,6 +2,7 @@ package gittest
 
 import (
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
@@ -59,4 +60,39 @@ func TestAFakeAddThatCannotDropTheBranchItLeftSaysSo(t *testing.T) {
 
 	require.ErrorIs(t, err, refused)
 	assert.Contains(t, fake.Calls(), "DeleteBranch topic")
+}
+
+func TestAFakeMoveTakesTheChangesFromTheSourceToTheTarget(t *testing.T) {
+	moved := []worktree.Change{{Path: "a.go", Status: worktree.ChangeModified}}
+	left := worktree.Change{Path: "b.go", Status: worktree.ChangeUntracked}
+	fake := NewFake(FakeParams{Main: "/repo", Branch: "main", Changes: map[string][]worktree.Change{"/repo": append(slices.Clone(moved), left)}})
+
+	result, err := fake.Move(t.Context(), worktree.Move{Source: "/repo", Target: "/wt/split", Changes: moved})
+
+	require.NoError(t, err)
+	assert.Equal(t, worktree.Moved{}, result)
+	source, _ := fake.Changes(t.Context(), "/repo")
+	target, _ := fake.Changes(t.Context(), "/wt/split")
+	assert.Equal(t, []worktree.Change{left}, source)
+	assert.Equal(t, moved, target)
+	assert.Equal(t, []worktree.Move{{Source: "/repo", Target: "/wt/split", Changes: moved}}, fake.Moves())
+}
+
+func TestAFakeConflictRefusesAMoveUnlessResolvedAndAResolvedOneKeepsTheSource(t *testing.T) {
+	changes := []worktree.Change{{Path: "a.go", Status: worktree.ChangeModified}, {Path: "b.go", Status: worktree.ChangeModified}}
+	fake := NewFake(FakeParams{Main: "/repo", Branch: "main", Changes: map[string][]worktree.Change{"/repo": changes}, Conflicts: map[string]worktree.ConflictKind{"a.go": worktree.ConflictModified}})
+	move := worktree.Move{Source: "/repo", Target: "/wt/split", Changes: changes, TargetLabel: "split"}
+
+	conflicts, err := fake.Conflicts(t.Context(), worktree.ConflictCheck{Source: "/repo", TargetRef: "split", Changes: changes})
+	require.NoError(t, err)
+	_, refused := fake.Move(t.Context(), move)
+	move.Resolve = true
+	resolved, err := fake.Move(t.Context(), move)
+
+	assert.Equal(t, []worktree.Conflict{{Path: "a.go", Kind: worktree.ConflictModified}}, conflicts)
+	require.ErrorContains(t, refused, `a.go was also modified in "split"`)
+	require.NoError(t, err)
+	assert.Equal(t, worktree.Moved{Merged: []string{"a.go"}, Kept: true}, resolved)
+	source, _ := fake.Changes(t.Context(), "/repo")
+	assert.Equal(t, changes, source)
 }

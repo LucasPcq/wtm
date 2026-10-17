@@ -50,9 +50,16 @@ var repoScopedEnv = []string{
 }
 
 func (r Repo) git(ctx context.Context, args ...string) ([]byte, error) {
+	return r.gitWith(ctx, nil, args...)
+}
+
+func (r Repo) gitWith(ctx context.Context, stdin []byte, args ...string) ([]byte, error) {
 	full := append([]string{"-C", r.Dir}, args...)
 	var stdout, stderr bytes.Buffer
 	cmd := shell.Command(ctx, "git", full...)
+	if stdin != nil {
+		cmd.Stdin = bytes.NewReader(stdin)
+	}
 	cmd.Env = shell.Environ(shell.EnvironParams{Unset: repoScopedEnv, Set: promptless()})
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
