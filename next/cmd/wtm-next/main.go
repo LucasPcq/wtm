@@ -5,7 +5,9 @@ import (
 	"os"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
-	"github.com/LucasPcq/wtm/next/internal/surface/cli"
+	createcli "github.com/LucasPcq/wtm/next/internal/command/create/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/spf13/cobra"
 )
 
 var version = "dev"
@@ -14,7 +16,7 @@ func main() {
 	os.Exit(cli.Main(cli.Params{
 		Version:       version,
 		Args:          os.Args[1:],
-		Open:          open,
+		Commands:      []*cobra.Command{createcli.New(openCreate)},
 		KillCancelled: shell.KillCancelled,
 		AwaitShields:  shell.AwaitShields,
 	}))

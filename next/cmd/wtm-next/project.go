@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
+	createcli "github.com/LucasPcq/wtm/next/internal/command/create/cli"
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/surface/cli"
 )
 
 const (
@@ -18,23 +18,36 @@ const (
 	stateDirName  = "wtm"
 )
 
-func open(ctx context.Context) (cli.Project, error) {
+type project struct {
+	Wire wireParams
+	Cwd  string
+}
+
+func openCreate(ctx context.Context) (createcli.Project, error) {
+	opened, err := open(ctx)
+	if err != nil {
+		return createcli.Project{}, err
+	}
+	return createcli.Project{UseCase: wire(opened.Wire), Cwd: opened.Cwd}, nil
+}
+
+func open(ctx context.Context) (project, error) {
 	if err := domain.CorrelationProblem(os.Getenv(correlationIDEnv)); err != nil {
-		return cli.Project{}, domain.InvalidMessage("$" + correlationIDEnv + " " + err.Error() + ": invalid correlation id")
+		return project{}, domain.InvalidMessage("$" + correlationIDEnv + " " + err.Error() + ": invalid correlation id")
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
-		return cli.Project{}, err
+		return project{}, err
 	}
 	params, err := locate(ctx, cwd)
 	if err != nil {
-		return cli.Project{}, err
+		return project{}, err
 	}
 	resolved, err := git.RealPath(cwd)
 	if err != nil {
-		return cli.Project{}, err
+		return project{}, err
 	}
-	return cli.Project{Create: wire(params), Cwd: resolved}, nil
+	return project{Wire: params, Cwd: resolved}, nil
 }
 
 func locate(ctx context.Context, cwd string) (wireParams, error) {

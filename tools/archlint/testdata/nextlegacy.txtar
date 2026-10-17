@@ -40,7 +40,7 @@ func Add(ctx context.Context, dir string) error {
 	}
 	return os.Rename(dir+"/meta.json.tmp", dir+"/meta.json")
 }
--- github.com/LucasPcq/wtm/next/internal/surface/output/style.go --
+-- github.com/LucasPcq/wtm/next/internal/ui/output/style.go --
 // Package output prints results.
 package output
 

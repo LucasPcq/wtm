@@ -1,0 +1,281 @@
+package cli
+
+import (
+	"context"
+	"errors"
+	"path/filepath"
+	"time"
+
+	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
+	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
+	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/operation"
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
+	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/spf13/cobra"
+)
+
+const (
+	mainPath    = "/repo/main"
+	stateDir    = "/repo/main/.git/wtm"
+	branchName  = "feat/x"
+	fingerprint = "0123456789abcdef01234567"
+)
+
+var createdAt = time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
+
+type seed struct {
+	Remembered map[string]string
+	OnCreate   []project.Hook
+	Linked     []string
+	Behind     bool
+	RunHooks   func(ctx context.Context, chain env.HookChain) error
+	Locks      error
+	Open       error
+	GitFails   map[string]error
+	StoreFails map[string]error
+}
+
+type world struct {
+	git   *gittest.Fake
+	store *storetest.Fake
+	seed  seed
+}
+
+func newWorld(s seed) world {
+	commits := map[worktree.Ref][]string{}
+	if s.Behind {
+		commits[worktree.RemoteBranch{Name: "main"}] = []string{"upstream main"}
+	}
+	var linked []worktree.Worktree
+	for _, name := range s.Linked {
+		linked = append(linked, worktree.Worktree{Path: filepath.Join("/elsewhere", worktree.PathSegment(name)), State: worktree.OnBranch{Branch: name}})
+	}
+	config := project.Config{
+		Worktrees:  project.Worktrees{BasePath: project.DefaultBasePath, BaseBranch: project.DefaultBaseBranch},
+		Env:        project.Env{Strategy: project.EnvExample},
+		OnCreate:   s.OnCreate,
+		Remembered: s.Remembered,
+	}
+	return world{
+		git:   gittest.NewFake(gittest.FakeParams{Main: mainPath, Branch: "main", Remote: []string{"main"}, Worktrees: linked, Commits: commits, Fail: s.GitFails}),
+		store: storetest.NewFake(storetest.FakeParams{Config: &config, Fail: s.StoreFails}),
+		seed:  s,
+	}
+}
+
+func (w world) params(args []string) uicli.Params {
+	return uicli.Params{Version: "1.2.3", Args: args, Commands: []*cobra.Command{New(w.open)}, KillCancelled: shell.KillCancelled, AwaitShields: shell.AwaitShields}
+}
+
+func (w world) open(context.Context) (Project, error) {
+	if w.seed.Open != nil {
+		return Project{}, w.seed.Open
+	}
+	return Project{UseCase: w.usecase(), Cwd: mainPath}, nil
+}
+
+func (w world) usecase() create.UseCase {
+	runHooks := w.seed.RunHooks
+	if runHooks == nil {
+		runHooks = func(context.Context, env.HookChain) error { return nil }
+	}
+	return create.UseCase{
+		Git:     w.git,
+		Config:  stored{w.store},
+		Answers: w.store,
+		Operations: operation.Service{
+			Locker:    locker{err: w.seed.Locks},
+			Publisher: locker{},
+			NewOpID:   func() string { return "op-1" },
+			Now:       func() time.Time { return createdAt },
+		},
+		Provision: provision.Deps{
+			Git:        w.git,
+			Meta:       w.store,
+			EnvFiles:   w.store,
+			RunHooks:   runHooks,
+			PublicPort: func(context.Context, int) int { return 0 },
+			Shield:     shell.Shield,
+			Now:        func() time.Time { return createdAt },
+		},
+		MainPath: mainPath,
+		StateDir: stateDir,
+	}
+}
+
+type stored struct {
+	*storetest.Fake
+}
+
+func (s stored) Load() (project.Config, project.Global, error) {
+	config, found := s.Config()
+	if !found {
+		return project.Config{}, project.Global{}, project.ErrConfigNotFound
+	}
+	return config, project.Global{}, nil
+}
+
+func (stored) LoadRun() (project.Run, error) { return project.Run{}, nil }
+
+type locker struct {
+	err error
+}
+
+func (l locker) Take(domain.Operation) (operation.Hold, error) {
+	if l.err != nil {
+		return nil, l.err
+	}
+	return held{}, nil
+}
+
+func (locker) Open(domain.Operation) domain.Report { return func(domain.Event) {} }
+
+type held struct{}
+
+func (held) Grow([]domain.Lock) (bool, error) { return false, nil }
+func (held) Protected() bool                  { return true }
+func (held) Release()                         {}
+
+func hookFails(context.Context, env.HookChain) error {
+	return errors.New("hook failed: exit status 3")
+}
+
+var meta = worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvExample, Isolation: project.Isolated}
+
+const (
+	cwd   = "/repo/main"
+	trees = "/repo/main/.trees"
+)
+
+func twoCreated(trees string) create.Outcome {
+	return create.Outcome{
+		Op: "op-1",
+		Plan: create.Plan{
+			Branches: []create.BranchPlan{
+				{Branch: "feat/a", Path: filepath.Join(trees, "feat-a"), Action: create.ActionCreate},
+				{Branch: "feat/b", Path: filepath.Join(trees, "feat-b"), Action: create.ActionCreate},
+			},
+			From:    "main",
+			EnvFrom: project.EnvExample,
+		},
+		Fingerprint: "0123456789abcdef01234567",
+		Result: &create.Result{Items: []create.Item{
+			{Subject: "feat/a", Status: domain.StatusDone, Detail: &create.Detail{Path: filepath.Join(trees, "feat-a"), Metadata: meta}},
+			{Subject: "feat/b", Status: domain.StatusDone, Detail: &create.Detail{Path: filepath.Join(trees, "feat-b"), Metadata: meta}},
+		}},
+	}
+}
+
+func mixed(trees string) create.Outcome {
+	hook := &domain.Error{Kind: domain.KindInternal, Code: "unit.phase_failed", Message: "on_create failed", Params: domain.Params{"phase": "on_create"}, Cause: errors.New("hook failed: exit status 3")}
+	return create.Outcome{
+		Op: "op-2",
+		Plan: create.Plan{
+			Branches: []create.BranchPlan{
+				{Branch: "feature", Path: filepath.Join(trees, "feature"), Action: create.ActionCheckOut},
+				{Branch: "linked", Path: "/repo/main/elsewhere/linked", Action: create.ActionUnchanged},
+				{Branch: "feat/c", Path: filepath.Join(trees, "feat-c"), Action: create.ActionCreate},
+				{Branch: "feat/d", Path: filepath.Join(trees, "feat-d"), Action: create.ActionCreate},
+				{Branch: "remote-only", Path: filepath.Join(trees, "remote-only"), Action: create.ActionResume, Upstream: "origin/remote-only"},
+			},
+			From:      "main",
+			EnvFrom:   project.EnvMain,
+			Isolation: project.Isolated,
+		},
+		Warnings: []domain.Warning{{Code: "create.ff_dirty", Message: "couldn't fast-forward main: its worktree has uncommitted changes — it starts from your local branch", Params: domain.Params{"branch": "main"}}},
+		Result: &create.Result{Items: []create.Item{
+			{Subject: "feature", Status: domain.StatusDone, Detail: &create.Detail{
+				Path: filepath.Join(trees, "feature"), Metadata: meta,
+				Standing: create.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 2},
+				EnvPorts: env.Redacted{Offset: 10, Applied: true, Entries: []env.Entry{
+					{File: ".env", Key: "PORT", Port: "http", Base: 3000, Resolved: 3010, Status: env.StatusRewrite},
+					{File: ".env", Key: "DB", Port: "pg", Base: 5432, Status: env.StatusMissingKey},
+				}},
+			}},
+			{Subject: "linked", Status: domain.StatusDone, Reason: domain.ReasonUnchanged, Detail: &create.Detail{Path: "/repo/main/elsewhere/linked", Metadata: worktree.Meta{SourceBranch: "main"}}},
+			{Subject: "feat/c", Status: domain.StatusFailed, Reason: domain.ReasonIncomplete, Err: hook, Warnings: []domain.Warning{{Code: "provision.env_no_template", Message: "no template found for .env, skipping", Params: domain.Params{"target": ".env"}}}, Detail: &create.Detail{Path: filepath.Join(trees, "feat-c"), Metadata: meta}},
+			{Subject: "feat/d", Status: domain.StatusCancelled, Reason: domain.ReasonIncomplete, Err: &domain.Error{Kind: domain.KindCancelled, Code: "unit.interrupted", Message: "interrupted", Params: domain.Params{"phase": "on_create"}}, Detail: &create.Detail{Path: filepath.Join(trees, "feat-d"), Metadata: meta}},
+			{Subject: "remote-only", Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted},
+		}},
+	}
+}
+
+func invalid() *domain.Error {
+	return domain.Invalid([]domain.FieldError{
+		{Path: "branches[0]", Code: "create.checked_out_elsewhere", Template: "branch {branch} is checked out at {path} — run `wtm go {branch}` to jump in", Params: domain.Params{"branch": "feat/x", "path": "/p"}},
+		{Path: "branches[1]", Code: "distinct", Template: "{path}: {value} is given twice", Params: domain.Params{"value": "feat/x"}},
+		{Path: "env_from", Code: "one_of", Template: "{path} must be one of {accepted}, not {value}", Params: domain.Params{"value": "copy"}, Accepted: []string{"example", "main", "parent"}},
+		{Path: "from", Code: "required", Template: "{path} is required: a branch that already exists locally needs its parent named (it can't be inferred, and `wtm sync` needs it)", Params: domain.Params{"because": "create.parent_required"}},
+	})
+}
+
+func newApp(s seed) create.UseCase {
+	commits := map[worktree.Ref][]string{}
+	if s.Behind {
+		commits[worktree.RemoteBranch{Name: "main"}] = []string{"upstream main"}
+	}
+	var linked []worktree.Worktree
+	for _, name := range s.Linked {
+		linked = append(linked, worktree.Worktree{Path: "/elsewhere/" + worktree.PathSegment(name), State: worktree.OnBranch{Branch: name}})
+	}
+	var remote []string
+	if s.Behind {
+		remote = []string{"main"}
+	}
+	git := gittest.NewFake(gittest.FakeParams{Main: mainPath, Branch: "main", Local: []string{"feature"}, Remote: remote, Worktrees: linked, Commits: commits})
+	config := project.Config{
+		Worktrees:  project.Worktrees{BasePath: project.DefaultBasePath, BaseBranch: project.DefaultBaseBranch},
+		Env:        project.Env{Strategy: project.EnvExample, Files: []project.EnvFile{{Target: ".env"}}},
+		Remembered: s.Remembered,
+	}
+	store := storetest.NewFake(storetest.FakeParams{Config: &config})
+	return create.UseCase{
+		Git:     git,
+		Config:  loaded{config: config},
+		Answers: store,
+		Operations: operation.Service{
+			Locker:    held{},
+			Publisher: held{},
+			NewOpID:   func() string { return "op-1" },
+			Now:       func() time.Time { return createdAt },
+		},
+		Provision: provision.Deps{
+			Git:        git,
+			Meta:       store,
+			EnvFiles:   store,
+			RunHooks:   func(context.Context, env.HookChain) error { return nil },
+			PublicPort: func(context.Context, int) int { return 0 },
+			Shield:     shell.Shield,
+			Now:        func() time.Time { return createdAt },
+		},
+		MainPath: mainPath,
+		StateDir: mainPath + "/.git/wtm",
+	}
+}
+
+type loaded struct {
+	config project.Config
+}
+
+func (l loaded) Load() (project.Config, project.Global, error) {
+	return l.config, project.Global{}, nil
+}
+func (loaded) LoadRun() (project.Run, error) { return project.Run{}, nil }
+
+func (held) Take(domain.Operation) (operation.Hold, error) { return held{}, nil }
+func (held) Open(domain.Operation) domain.Report           { return func(domain.Event) {} }
+
+type refusing struct {
+	useCase
+	err error
+}
+
+func (r refusing) Run(context.Context, create.Request, operation.Options) (create.Outcome, error) {
+	return create.Outcome{}, r.err
+}

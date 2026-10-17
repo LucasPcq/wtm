@@ -4,4 +4,4 @@
 internal/adapter/statefile 2
 internal/adapter/oplock 1
 internal/service/operation 1
-internal/surface/output 2
+internal/ui/output 2

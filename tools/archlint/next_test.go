@@ -17,7 +17,10 @@ func TestANextPackageImportsOnlyWhatItsRowAllows(t *testing.T) {
 		nextPrefix+"internal/adapter/git",
 		nextPrefix+"internal/adapter/gittest",
 		nextPrefix+"internal/adapter/store",
-		nextPrefix+"internal/surface/cli",
+		nextPrefix+"internal/ui/output",
+		nextPrefix+"internal/ui/cli",
+		nextPrefix+"internal/command/create/cli",
+		nextPrefix+"internal/command/clean",
 		nextPrefix+"cmd/wtm-next",
 		nextPrefix+"internal/stray",
 	)
@@ -66,7 +69,7 @@ func TestTheRulesWrittenForInternalLeaveNextAlone(t *testing.T) {
 			runTxtar(t, a, "nextlegacy",
 				nextPrefix+"internal/adapter/git",
 				nextPrefix+"internal/adapter/shell",
-				nextPrefix+"internal/surface/output",
+				nextPrefix+"internal/ui/output",
 			)
 		})
 	}

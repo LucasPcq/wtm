@@ -40,6 +40,8 @@ import (
 -- github.com/LucasPcq/wtm/next/internal/command/clean/clean.go --
 // Package clean removes worktrees.
 package clean
+
+import _ "github.com/LucasPcq/wtm/next/internal/command/clean/cli" // want `next/internal/command/clean must not import "github.com/LucasPcq/wtm/next/internal/command/clean/cli" — a use case`
 -- github.com/LucasPcq/wtm/next/internal/command/create/create.go --
 // Package create creates worktrees.
 package create
@@ -53,7 +55,7 @@ import (
 	_ "github.com/LucasPcq/wtm/next/internal/domain/branch"
 	_ "github.com/LucasPcq/wtm/next/internal/service/operation"
 	_ "github.com/LucasPcq/wtm/next/internal/service/provision"
-	_ "github.com/LucasPcq/wtm/next/internal/surface/output" // want `next/internal/command/create must not import "github.com/LucasPcq/wtm/next/internal/surface/output" — a use case`
+	_ "github.com/LucasPcq/wtm/next/internal/ui/output" // want `next/internal/command/create must not import "github.com/LucasPcq/wtm/next/internal/ui/output" — a use case`
 )
 
 var _ context.Context
@@ -99,23 +101,47 @@ import (
 	_ "github.com/LucasPcq/wtm/next/internal/command/create" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/command/create" — an adapter`
 	_ "github.com/LucasPcq/wtm/next/internal/service/operation" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/service/operation" — an adapter`
 )
--- github.com/LucasPcq/wtm/next/internal/surface/output/output.go --
+-- github.com/LucasPcq/wtm/next/internal/ui/output/output.go --
 // Package output prints results.
 package output
--- github.com/LucasPcq/wtm/next/internal/surface/cli/root.go --
-// Package cli is the command line.
+
+import (
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/statefile" // want `next/internal/ui/output must not import "github.com/LucasPcq/wtm/next/internal/adapter/statefile" — ui/ is`
+	_ "github.com/LucasPcq/wtm/next/internal/command/clean" // want `next/internal/ui/output must not import "github.com/LucasPcq/wtm/next/internal/command/clean" — ui/ is`
+	_ "github.com/LucasPcq/wtm/next/internal/domain"
+	_ "github.com/LucasPcq/wtm/next/internal/service/operation" // want `next/internal/ui/output must not import "github.com/LucasPcq/wtm/next/internal/service/operation" — ui/ is`
+	_ "github.com/spf13/cobra"
+)
+-- github.com/LucasPcq/wtm/next/internal/ui/cli/root.go --
+// Package cli is the root of the command line.
 package cli
 
 import (
-	_ "github.com/LucasPcq/wtm/next/internal/adapter/store" // want `next/internal/surface/cli must not import "github.com/LucasPcq/wtm/next/internal/adapter/store" — a surface`
+	_ "github.com/LucasPcq/wtm/next/internal/command/clean/cli" // want `next/internal/ui/cli must not import "github.com/LucasPcq/wtm/next/internal/command/clean/cli" — ui/ is`
+	_ "github.com/LucasPcq/wtm/next/internal/domain"
+	_ "github.com/LucasPcq/wtm/next/internal/ui/output"
+	_ "github.com/spf13/cobra"
+)
+-- github.com/LucasPcq/wtm/next/internal/command/clean/cli/command.go --
+// Package cli is clean's command line.
+package cli
+-- github.com/LucasPcq/wtm/next/internal/command/create/cli/command.go --
+// Package cli is create's command line.
+package cli
+
+import (
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/store" // want `next/internal/command/create/cli must not import "github.com/LucasPcq/wtm/next/internal/adapter/store" — a command's cli`
+	_ "github.com/LucasPcq/wtm/next/internal/command/clean" // want `next/internal/command/create/cli must not import "github.com/LucasPcq/wtm/next/internal/command/clean" — a command's cli`
+	_ "github.com/LucasPcq/wtm/next/internal/command/clean/cli" // want `next/internal/command/create/cli must not import "github.com/LucasPcq/wtm/next/internal/command/clean/cli" — a command's cli`
 	_ "github.com/LucasPcq/wtm/next/internal/command/create"
 	_ "github.com/LucasPcq/wtm/next/internal/domain"
 	_ "github.com/LucasPcq/wtm/next/internal/service/operation"
-	_ "github.com/LucasPcq/wtm/next/internal/service/provision" // want `next/internal/surface/cli must not import "github.com/LucasPcq/wtm/next/internal/service/provision" — a surface`
-	_ "github.com/LucasPcq/wtm/next/internal/surface/output"
+	_ "github.com/LucasPcq/wtm/next/internal/service/provision" // want `next/internal/command/create/cli must not import "github.com/LucasPcq/wtm/next/internal/service/provision" — a command's cli`
+	_ "github.com/LucasPcq/wtm/next/internal/ui/cli"
+	_ "github.com/LucasPcq/wtm/next/internal/ui/output"
 	_ "github.com/spf13/cobra"
 )
--- github.com/LucasPcq/wtm/next/internal/surface/cli/root_test.go --
+-- github.com/LucasPcq/wtm/next/internal/command/create/cli/command_test.go --
 package cli
 
 import (
@@ -124,14 +150,15 @@ import (
 	_ "github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 )
 
-func TestRoot(t *testing.T) {}
+func TestCommand(t *testing.T) {}
 -- github.com/LucasPcq/wtm/next/cmd/wtm-next/main.go --
 // Command wtm-next wires the adapters into the use cases.
 package main
 
 import (
 	_ "github.com/LucasPcq/wtm/next/internal/adapter/store"
-	_ "github.com/LucasPcq/wtm/next/internal/surface/cli"
+	_ "github.com/LucasPcq/wtm/next/internal/command/create/cli"
+	_ "github.com/LucasPcq/wtm/next/internal/ui/cli"
 )
 
 func main() {}

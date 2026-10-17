@@ -26,11 +26,15 @@ const (
 	nextService nextLayer = "service"
 	nextCommand nextLayer = "command"
 	nextAdapter nextLayer = "adapter"
-	nextSurface nextLayer = "surface"
+	nextCLI     nextLayer = "command/cli"
+	nextUI      nextLayer = "ui"
 	nextCmd     nextLayer = "cmd"
 )
 
-const surfaceService = "operation"
+const (
+	cliService = "operation"
+	cliDir     = "cli"
+)
 
 var sharedAdapters = []string{"statefile", "shell"}
 
@@ -41,10 +45,11 @@ type nextPackage struct {
 
 var nextWhy = map[nextLayer]string{
 	nextDomain:  "the domain is pure: the stdlib and domain/* only",
-	nextService: "a service reaches the world through the ports it declares: domain/* and the stdlib, never another service, a command, an adapter or a surface",
-	nextCommand: "a use case orchestrates services and reaches the world through the ports it declares: domain/*, service/* and the stdlib, never another command, an adapter or a surface",
-	nextAdapter: "an adapter reaches domain/*, adapter/statefile, adapter/shell, the stdlib and third parties, never a service, a command, a surface or another adapter",
-	nextSurface: "a surface calls the use cases: command/*, service/operation, domain/*, surface/* and third parties, never an adapter",
+	nextService: "a service reaches the world through the ports it declares: domain/* and the stdlib, never another service, a command, an adapter or ui/*",
+	nextCommand: "a use case orchestrates services and reaches the world through the ports it declares: domain/*, service/* and the stdlib, never another command, its own cli, an adapter or ui/*",
+	nextCLI:     "a command's cli drives its own use case: command/<its name>, service/operation, domain/*, ui/*, the stdlib and third parties, never another command, an adapter or another service",
+	nextAdapter: "an adapter reaches domain/*, adapter/statefile, adapter/shell, the stdlib and third parties, never a service, a command or ui/*, nor another adapter",
+	nextUI:      "ui/ is the presentation kit every command's cli shares and knows no command: domain/*, ui/*, the stdlib and third parties, never a command, a service or an adapter",
 	nextCmd:     "the composition root wires what is under next/",
 }
 
@@ -65,7 +70,7 @@ func runNext(pass *analysis.Pass, testsOf testFiles) (any, error) {
 	}
 	from, ok := nextPackageOf(rel)
 	if !ok {
-		pass.Reportf(firstFile(pass).Package, "next/%s is in no row of next/'s import table: place it under domain/, service/, command/, adapter/, surface/ or cmd/ (next/README.md)", rel)
+		pass.Reportf(firstFile(pass).Package, "next/%s is in no row of next/'s import table: place it under domain/, service/, command/ (its cli/ beside it), adapter/, ui/ or cmd/ (next/README.md)", rel)
 		return nil, nil
 	}
 	sources := slices.DeleteFunc(slices.Clone(pass.Files), func(file *ast.File) bool { return isTestFile(pass, file) })
@@ -131,12 +136,14 @@ func nextPackageOf(rel string) (nextPackage, bool) {
 		return nextPackage{layer: nextDomain}, true
 	case parts[1] == "service" && nested:
 		return nextPackage{layer: nextService, unit: unit}, true
+	case parts[1] == "command" && len(parts) > 3 && parts[3] == cliDir:
+		return nextPackage{layer: nextCLI, unit: unit}, true
 	case parts[1] == "command" && nested:
 		return nextPackage{layer: nextCommand, unit: unit}, true
 	case parts[1] == "adapter" && nested:
 		return nextPackage{layer: nextAdapter, unit: unit}, true
-	case parts[1] == "surface" && nested:
-		return nextPackage{layer: nextSurface, unit: unit}, true
+	case parts[1] == "ui" && nested:
+		return nextPackage{layer: nextUI, unit: unit}, true
 	}
 	return nextPackage{}, false
 }
@@ -183,8 +190,10 @@ func nextAdmits(imp nextImport, to nextTarget) bool {
 		return stdlib || in(nextDomain, nextService) || in(nextCommand) && to.pkg.unit == from.unit
 	case nextAdapter:
 		return stdlib || thirdParty || in(nextDomain) || in(nextAdapter) && admitsAdapter(imp, to.pkg)
-	case nextSurface:
-		return stdlib || thirdParty || in(nextDomain, nextCommand, nextSurface) || in(nextService) && to.pkg.unit == surfaceService
+	case nextCLI:
+		return stdlib || thirdParty || in(nextDomain, nextUI) || in(nextService) && to.pkg.unit == cliService || in(nextCommand) && to.pkg.unit == from.unit
+	case nextUI:
+		return stdlib || thirdParty || in(nextDomain, nextUI)
 	case nextCmd:
 		return stdlib || thirdParty || to.inNext
 	}
