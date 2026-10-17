@@ -1,0 +1,35 @@
+{
+  "v": 2,
+  "command": "create",
+  "ok": false,
+  "op": "op-1",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "invalid",
+    "code": "request.invalid",
+    "message": "the request is invalid",
+    "fields": [
+      {
+        "path": "branches[1]",
+        "code": "required",
+        "flag": "<branches>[1]",
+        "message": "<branches>[1] is required"
+      },
+      {
+        "path": "env_from",
+        "code": "one_of",
+        "params": {
+          "value": "copy"
+        },
+        "accepted": [
+          "example",
+          "main",
+          "parent"
+        ],
+        "flag": "--env-from",
+        "message": "--env-from must be one of example, main, parent, not copy"
+      }
+    ]
+  }
+}

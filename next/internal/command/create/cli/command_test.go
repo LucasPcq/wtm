@@ -316,3 +316,27 @@ func TestAnInvalidCorrelationIDIsRefusedBeforeTheProjectIsOpened(t *testing.T) {
 	assert.Contains(t, got.Stderr, "$WTM_CORRELATION_ID contains a control character: invalid correlation id")
 	assert.Empty(t, w.seen.dirs)
 }
+
+func TestTheEnvelopeOfEachEndingIsByteForByte(t *testing.T) {
+	hooked := seed{OnCreate: []project.Hook{{Cmd: "make setup"}}, RunHooks: hookFails}
+	for name, c := range map[string]struct {
+		Seed  seed
+		Words []string
+		Code  int
+	}{
+		"success":     {Words: []string{branchName}, Code: uicli.ExitOK},
+		"invalid":     {Words: []string{"feat/a", "  ", "--env-from", "copy"}, Code: uicli.ExitUsage},
+		"hook_failed": {Seed: hooked, Words: []string{branchName}, Code: uicli.ExitError},
+		"dry_run":     {Words: []string{branchName, "--dry-run"}, Code: uicli.ExitOK},
+		"stale":       {Words: []string{branchName, "--expect-fingerprint", fingerprint}, Code: uicli.ExitPrecondition},
+		"usage":       {Words: []string{branchName, "--nope"}, Code: uicli.ExitUsage},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := runCreate(t, newWorld(c.Seed), append(c.Words, "--output", "json")...)
+
+			assert.Equal(t, c.Code, got.Code, got.Stdout)
+			assert.Empty(t, got.Stderr)
+			golden(t, "envelope_"+name, got.Stdout)
+		})
+	}
+}

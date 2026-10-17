@@ -1,0 +1,27 @@
+{
+  "v": 2,
+  "command": "extract",
+  "ok": true,
+  "op": "op-1",
+  "plan": {
+    "source": "feat/login",
+    "files": [
+      {
+        "path": "old.txt",
+        "status": "deleted"
+      }
+    ],
+    "target": {
+      "branch": "feat/split",
+      "path": "/repo/.trees/feat-split",
+      "action": "create"
+    },
+    "from": "main",
+    "keep": false,
+    "conflicts": [],
+    "on_conflict": "abort"
+  },
+  "fingerprint": "9a887f8d0471c114ed8b1d7d",
+  "follow_ups": [],
+  "warnings": []
+}
