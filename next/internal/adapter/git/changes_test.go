@@ -1,12 +1,12 @@
 package git_test
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 
-	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -187,10 +187,9 @@ func TestAMoveRefusedForConflictsNamesOnlyThemAndTouchesNothing(t *testing.T) {
 
 	_, err := p.repo.Move(t.Context(), p.move(worktree.Change{Path: "a.txt", Status: worktree.ChangeModified}, worktree.Change{Path: "c.txt", Status: worktree.ChangeModified}))
 
-	refusal, ok := err.(*domain.Error)
+	refusal, ok := errors.AsType[*worktree.ConflictRefusal](err)
 	require.True(t, ok, "%v", err)
-	assert.Equal(t, domain.CodeExtractConflict, refusal.Code)
-	assert.Equal(t, `cannot apply the selected changes: a.txt was also modified in "split" — resolve it there, extract to another worktree, or re-run with --on-conflict resolve`, refusal.Message)
+	assert.Equal(t, []worktree.Conflict{{Path: "a.txt", Kind: worktree.ConflictModified}}, refusal.Conflicts)
 	assert.Equal(t, before, [2][]string{porcelain(t, p.source), porcelain(t, p.target)})
 	assert.Equal(t, replaceLine(numbered, 2, "target's two"), contentOf(t, filepath.Join(p.target, "a.txt")))
 }

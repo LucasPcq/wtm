@@ -90,7 +90,7 @@ func TestAFakeConflictRefusesAMoveUnlessResolvedAndAResolvedOneKeepsTheSource(t 
 	resolved, err := fake.Move(t.Context(), move)
 
 	assert.Equal(t, []worktree.Conflict{{Path: "a.go", Kind: worktree.ConflictModified}}, conflicts)
-	require.ErrorContains(t, refused, `a.go was also modified in "split"`)
+	require.Equal(t, &worktree.ConflictRefusal{Conflicts: conflicts}, refused)
 	require.NoError(t, err)
 	assert.Equal(t, worktree.Moved{Merged: []string{"a.go"}, Kept: true}, resolved)
 	source, _ := fake.Changes(t.Context(), "/repo")

@@ -28,7 +28,7 @@ func openCreate(ctx context.Context) (createcli.Project, error) {
 	if err != nil {
 		return createcli.Project{}, err
 	}
-	return createcli.Project{UseCase: wire(opened.Wire), Cwd: opened.Cwd}, nil
+	return createcli.Project{UseCase: wire(opened.Wire).Create, Cwd: opened.Cwd}, nil
 }
 
 func open(ctx context.Context) (project, error) {

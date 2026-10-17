@@ -1,0 +1,151 @@
+package extract_test
+
+import (
+	"context"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/LucasPcq/wtm/next/internal/adapter/config"
+	"github.com/LucasPcq/wtm/next/internal/adapter/git"
+	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
+	"github.com/LucasPcq/wtm/next/internal/adapter/oplock"
+	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
+	"github.com/LucasPcq/wtm/next/internal/adapter/store"
+	"github.com/LucasPcq/wtm/next/internal/command/extract"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/operation"
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
+)
+
+const (
+	source      = "feat/login"
+	other       = "feat/other"
+	split       = "feat/split"
+	existing    = "feature"
+	remote      = "remote-only"
+	projectToml = "[worktrees]\nbase_path = \"../.trees\"\nbase_branch = \"main\"\n"
+	jobsToml    = "[[job]]\nname = \"web\"\nkind = \"service\"\ncmd = \"npm start\"\nports = { PORT = 3000 }\n"
+	remembering = projectToml + "\n[wizard.remembered]\nisolation = \"verbatim\"\nsource_update = \"ff\"\n"
+)
+
+var createdAt = time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
+
+type seed struct {
+	Config string
+	Run    string
+	Behind bool
+}
+
+type world struct {
+	root      string
+	main      string
+	stateDir  string
+	trees     string
+	repo      git.Repo
+	meta      store.Meta
+	published *recorder
+	usecase   extract.UseCase
+}
+
+func newWorld(t *testing.T, s seed) world {
+	t.Helper()
+	root := gittest.TempDir(t)
+	main := filepath.Join(root, "main")
+	commits := map[worktree.Ref][]string{
+		worktree.LocalBranch{Name: existing}:  {"feature work"},
+		worktree.RemoteBranch{Name: existing}: {"feature work"},
+		worktree.RemoteBranch{Name: remote}:   {"remote work"},
+	}
+	if s.Behind {
+		commits[worktree.RemoteBranch{Name: "main"}] = []string{"upstream main"}
+	}
+	repo := gittest.Build(t, gittest.FakeParams{
+		Main:   main,
+		Branch: "main",
+		Local:  []string{existing},
+		Remote: []string{"main", existing, remote},
+		Worktrees: []worktree.Worktree{
+			{Path: linkedPath(root, source), State: worktree.OnBranch{Branch: source}},
+			{Path: linkedPath(root, other), State: worktree.OnBranch{Branch: other}},
+		},
+		Commits: commits,
+	})
+	stateDir := filepath.Join(main, ".git", "wtm")
+	writeFile(t, filepath.Join(stateDir, "config.toml"), configOf(s))
+	if s.Run != "" {
+		writeFile(t, filepath.Join(stateDir, "run.toml"), s.Run)
+	}
+	meta := store.Meta{StateDir: stateDir}
+	projectConfig := config.Project{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")}
+	published := &recorder{}
+	ids := 0
+	return world{
+		root:      root,
+		main:      main,
+		stateDir:  stateDir,
+		trees:     filepath.Join(root, ".trees"),
+		repo:      repo,
+		meta:      meta,
+		published: published,
+		usecase: extract.UseCase{
+			Git:     repo,
+			Config:  projectConfig,
+			Answers: projectConfig,
+			Meta:    meta,
+			Shield:  shell.Shield,
+			Operations: operation.Service{
+				Locker:    locks{oplock.Locks{StateDir: stateDir}},
+				Publisher: published,
+				NewOpID: func() string {
+					ids++
+					return "op-" + string(rune('0'+ids))
+				},
+				Now: func() time.Time { return createdAt },
+			},
+			Provision: provision.Service{
+				Git:        repo,
+				Meta:       meta,
+				EnvFiles:   store.EnvFiles{},
+				RunHooks:   shell.RunHooks,
+				PublicPort: func(context.Context, int) int { return 0 },
+				Shield:     shell.Shield,
+				Now:        func() time.Time { return createdAt },
+			},
+			MainPath: main,
+			StateDir: stateDir,
+		},
+	}
+}
+
+func configOf(s seed) string {
+	if s.Config != "" {
+		return s.Config
+	}
+	return projectToml
+}
+
+func linkedPath(root, name string) string {
+	return filepath.Join(root, "wt-"+worktree.PathSegment(name))
+}
+
+type locks struct {
+	oplock.Locks
+}
+
+func (l locks) Take(op domain.Operation) (operation.Hold, error) {
+	return l.Locks.Take(op)
+}
+
+type interrupting struct {
+	git.Repo
+	cancel context.CancelFunc
+	seen   *error
+}
+
+func (i interrupting) Move(ctx context.Context, move worktree.Move) (worktree.Moved, error) {
+	i.cancel()
+	*i.seen = ctx.Err()
+	return i.Repo.Move(ctx, move)
+}

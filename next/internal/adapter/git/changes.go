@@ -106,13 +106,7 @@ func (r Repo) Move(ctx context.Context, move worktree.Move) (worktree.Moved, err
 		return worktree.Moved{Kept: true}, nil
 	}
 	if err := source.clean(ctx, cleanParams{Patch: whole, Tracked: plan.tracked, Untracked: plan.untracked}); err != nil {
-		return worktree.Moved{}, &domain.Error{
-			Kind:    domain.KindInternal,
-			Code:    domain.CodeExtractHalfMoved,
-			Message: fmt.Sprintf("the changes are in %q but %q still holds them", move.TargetLabel, move.SourceLabel),
-			Params:  domain.Params{"target": move.TargetLabel, "source": move.SourceLabel},
-			Cause:   err,
-		}
+		return worktree.Moved{}, &worktree.HalfMoved{Cause: err}
 	}
 	return worktree.Moved{}, nil
 }
@@ -294,13 +288,13 @@ func (r Repo) plan(ctx context.Context, files []file) (plan, error) {
 	return p, nil
 }
 
-func (p plan) refusal(move worktree.Move) *domain.Error {
+func (p plan) refusal(move worktree.Move) error {
 	binary := false
 	for _, conflict := range p.conflicts {
 		binary = binary || conflict.Kind == worktree.ConflictBinary
 	}
 	if binary || (len(p.conflicts) > 0 && !move.Resolve) {
-		return domain.ExtractConflict(domain.ExtractConflictParams{Conflicts: p.conflicts, Target: move.TargetLabel})
+		return &worktree.ConflictRefusal{Conflicts: p.conflicts}
 	}
 	return nil
 }

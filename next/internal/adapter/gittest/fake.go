@@ -13,7 +13,6 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 
-	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
@@ -369,7 +368,7 @@ func (f *Fake) Move(_ context.Context, move worktree.Move) (worktree.Moved, erro
 	conflicts := f.conflictsOf(move.Changes)
 	binary := slices.ContainsFunc(conflicts, func(c worktree.Conflict) bool { return c.Kind == worktree.ConflictBinary })
 	if binary || (len(conflicts) > 0 && !move.Resolve) {
-		return worktree.Moved{}, domain.ExtractConflict(domain.ExtractConflictParams{Conflicts: conflicts, Target: move.TargetLabel})
+		return worktree.Moved{}, &worktree.ConflictRefusal{Conflicts: conflicts}
 	}
 	target := realPath(move.Target)
 	f.changes[target] = append(f.changes[target], move.Changes...)

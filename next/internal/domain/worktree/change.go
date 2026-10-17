@@ -80,8 +80,28 @@ const (
 )
 
 type Conflict struct {
-	Path string
-	Kind ConflictKind
+	Path string       `json:"path"`
+	Kind ConflictKind `json:"kind"`
+}
+
+type ConflictRefusal struct{ Conflicts []Conflict }
+
+func (r *ConflictRefusal) Error() string {
+	paths := make([]string, 0, len(r.Conflicts))
+	for _, conflict := range r.Conflicts {
+		paths = append(paths, conflict.Path)
+	}
+	return "the selected changes conflict with the target: " + strings.Join(paths, ", ")
+}
+
+type HalfMoved struct{ Cause error }
+
+func (h *HalfMoved) Error() string {
+	return "the changes are in the target but the source still holds them: " + h.Cause.Error()
+}
+
+func (h *HalfMoved) Unwrap() error {
+	return h.Cause
 }
 
 type ConflictCheck struct {

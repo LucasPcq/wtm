@@ -14,6 +14,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/adapter/store"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
@@ -31,7 +32,12 @@ type wireParams struct {
 	CommonDir string
 }
 
-func wire(params wireParams) create.UseCase {
+type app struct {
+	Create  create.UseCase
+	Extract extract.UseCase
+}
+
+func wire(params wireParams) app {
 	repo := git.Repo{Dir: params.MainPath, Remote: remote}
 	projectConfig := config.Project{StateDir: params.StateDir, GlobalPath: config.GlobalPath()}
 	operations := operation.Service{
@@ -50,14 +56,27 @@ func wire(params wireParams) create.UseCase {
 		Shield:     shell.Shield,
 		Now:        time.Now,
 	}
-	return create.UseCase{
-		Git:        repo,
-		Config:     projectConfig,
-		Answers:    projectConfig,
-		Operations: operations,
-		Provision:  provisions,
-		MainPath:   params.MainPath,
-		StateDir:   params.StateDir,
+	return app{
+		Create: create.UseCase{
+			Git:        repo,
+			Config:     projectConfig,
+			Answers:    projectConfig,
+			Operations: operations,
+			Provision:  provisions,
+			MainPath:   params.MainPath,
+			StateDir:   params.StateDir,
+		},
+		Extract: extract.UseCase{
+			Git:        repo,
+			Config:     projectConfig,
+			Answers:    projectConfig,
+			Meta:       provisions.Meta,
+			Shield:     shell.Shield,
+			Operations: operations,
+			Provision:  provisions,
+			MainPath:   params.MainPath,
+			StateDir:   params.StateDir,
+		},
 	}
 }
 
