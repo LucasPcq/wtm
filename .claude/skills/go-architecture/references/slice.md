@@ -93,7 +93,7 @@ The numbered step comments are the one place a body carries a comment per paragr
 
 - `rules.go` is pure (no port, no context): `Facts` and the queries over them, `Decide(facts, req, …) (Plan, []domain.Warning, error)`, the `Plan` type with `Locks()` and `Fingerprinted()`. A refusal decided here carries the command's code.
 - `questions.go` is pure: `Request`, the form model (`Questions`, built from the domain question vocabulary `domain.Choice`, `domain.Confirm`, `domain.Answer`), `Form(facts, req)` and `Resolve(facts, req)` (defaults, then validation into field errors).
-- `port.go` declares only interfaces, one per outside thing the use case reaches (git, config, a store), each with exactly the methods this command calls (go-style `interfaces.md`: consumer-side, small). Services are not ports: the use case holds `operation.Service` and `provision.Service` as concrete fields.
+- `port.go` declares only interfaces, one per outside thing the use case reaches (git, config, a store), each with exactly the methods this command calls (go-style `interfaces.md`: consumer-side, small). Services are not ports: the use case holds `operation.Service` and `provision.Service` as concrete fields, and calls `repository.Observe` as a free function.
 
 ## `cli/`: the driving adapter
 
@@ -105,8 +105,8 @@ A command never imports another command (archlint refuses it). Two commands shar
 
 | What both need | Where | Example |
 | -- | -- | -- |
-| a pure rule or a vocabulary | `domain/…` | `worktree.Place` (where a branch lands), `worktree.Repository` (the facts every command decides from: main path, config, run.toml, snapshot), `worktree.SelectChanges`, `domain.WorktreeLocks`, `domain.IsolationAnswer`, `domain.Choice` |
-| a reading of the repository | a port method returning a domain value, or a service reading through its ports | `worktree.Snapshot` from the git port, `provision.Observe` (config, snapshot, run.toml) |
+| a pure rule or a vocabulary | `domain/…` | `worktree.Place` (where a branch lands), `worktree.StackOf` (the stack of worktrees, from the live ones and their meta records), `worktree.Repository` (the facts every command decides from: main path, config, run.toml, snapshot), `worktree.SelectChanges`, `domain.WorktreeLocks`, `domain.IsolationAnswer`, `domain.Choice` |
+| a reading of the repository | a port method returning a domain value, or a service reading through its ports | `worktree.Snapshot` from the git port, `repository.Observe` (config, snapshot, run.toml) |
 | an orchestration with I/O | `service/<name>` (concrete, its own ports) | `provision.Service.Run`, `provision.Service.FastForwardEach` (typed outcomes each command words as its warnings), `operation.Service` |
 | presentation | `ui/…` | `uicli.Run` (a command's run plumbing: streams, output format, quiet, failures, envelope), the wizard engine, `output.DryRun`, `output.FollowUpSteps` |
 | the command line of another command | injected by `cmd/wtm-next`, the only package that knows every command | `provision.Service.LeftBehind` (the `wtm clean <branch> --force` a failed undo suggests) |

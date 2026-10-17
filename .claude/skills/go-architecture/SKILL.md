@@ -19,8 +19,8 @@ next/
       rules.go          pure: facts → plan
       questions.go      pure: the request, its form model, its validation
       cli/              its driving adapter: cobra command, flags, wizard steps, output
-    service/            what use cases call: operation (locks, plan under them, fingerprint, events), provision (a new worktree made whole) + <name>test contracts (operationtest)
-    domain/             the model, pure: errors, events, operations and their run options, question vocabulary; worktree/, project/, env/, dotenv/
+    service/            what use cases call: operation (locks, plan under them, fingerprint, events), provision (a new worktree made whole), repository (the facts a command decides from) + <name>test contracts (operationtest)
+    domain/             the model, pure: errors, events, operations and their run options, question vocabulary; worktree/ (with the stack graph), project/, env/, dotenv/
     adapter/<name>/     driven adapters implementing the ports (git, store, config, shell, oplock, events…) + <name>test fakes
     ui/                 the presentation kit, knowing no command: cli (root, exit codes, signals), output (frames, envelope), form (wizard engine, components)
 ```
