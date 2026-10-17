@@ -1,0 +1,65 @@
+package provision
+
+import (
+	"context"
+	"time"
+
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+)
+
+// Git is the repository a worktree is added to and a source fast-forwarded in.
+type Git interface {
+	Worktrees(ctx context.Context) ([]worktree.Worktree, error)
+	AddWorktree(ctx context.Context, addition worktree.Addition) error
+	RemoveWorktree(ctx context.Context, path string) error
+	DeleteBranch(ctx context.Context, name string) error
+	FetchRef(ctx context.Context, name string) error
+	FastForwardRef(ctx context.Context, name string) error
+	MergeFFOnly(ctx context.Context, merge worktree.Merge) error
+	Dirty(ctx context.Context, path string) (bool, error)
+}
+
+// Meta is the store of each worktree's meta.json record.
+type Meta interface {
+	Load(branch string) (worktree.Meta, error)
+	List() ([]string, error)
+	Update(ctx context.Context, update worktree.MetaUpdate) (domain.Written, error)
+	// LockOrdinals runs do under the lock that serialises ordinal allocation and
+	// reports whether the lock was held; do runs unlocked when it could not be.
+	LockOrdinals(ctx context.Context, do func() error) (bool, error)
+}
+
+// EnvFiles reads, copies and edits a worktree's .env files.
+type EnvFiles interface {
+	Read(path string) ([]dotenv.Line, error)
+	Copy(ctx context.Context, request env.CopyRequest) (env.Copied, error)
+	Edit(ctx context.Context, edit dotenv.Edit) (domain.Written, error)
+}
+
+// Config loads the project's config.toml with the global settings, and its run.toml; Load fails with project.ErrConfigNotFound when the repository has no wtm config.
+type Config interface {
+	Load() (project.Config, project.Global, error)
+	LoadRun() (project.Run, error)
+}
+
+// Snapshotter reads the repository's snapshot.
+type Snapshotter interface {
+	Snapshot(ctx context.Context) (worktree.Snapshot, error)
+}
+
+// Service provisions new worktrees and fast-forwards their sources for the
+// commands that create one. Every field must be set before Run.
+type Service struct {
+	Git      Git
+	Meta     Meta
+	EnvFiles EnvFiles
+
+	RunHooks   func(ctx context.Context, chain env.HookChain) error // runs the on_create hooks, failing with an *env.HookFailure
+	PublicPort func(ctx context.Context, configured int) int        // the port a named URL announces, given the proxy's configured one; 0 with no proxy
+	Shield     func(ctx context.Context) (context.Context, func())  // a context the first cancel does not reach, and its release
+	Now        func() time.Time
+}

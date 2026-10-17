@@ -1,0 +1,17 @@
+$ wtmx create feat/slow --yes; echo EXIT=$?
+
+┃  ! create: 1 cancelled
+┃
+┃  Branches   feat/slow
+┃  From       main
+┃  Env        main
+┃  Isolation  isolated
+┃  feat/slow  ../acme.trees/feat-slow · 3 ports settled (offset +160)
+┃
+┃  ! feat/slow  interrupted · left incomplete
+┃
+┃  → wtm go feat/slow
+
+EXIT=19
+$
+

@@ -1,0 +1,17 @@
+$ wtmx create --ask; echo EXIT=$?
+
+  Step 4/6 • Isolation
+
+  ✓ Branches: feat/form, topic
+  ✓ Source branch: main
+  ✓ Env strategy: config default
+
+  How the new worktrees run next to their source
+
+▌▸ isolated — each its own ports, compose project and namespaces
+   verbatim — keep the copied .env, one of them runs at a time
+
+   [ ] Always use this answer in this repo
+
+  ↑↓ navigate • tab always use • / filter • enter confirm • esc back
+

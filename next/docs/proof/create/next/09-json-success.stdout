@@ -1,0 +1,85 @@
+{
+  "v": 2,
+  "command": "create",
+  "ok": true,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "feat/json",
+      "status": "done",
+      "detail": {
+        "path": "<SB>/acme.trees/feat-json",
+        "metadata": {
+          "source_branch": "main",
+          "created_at": "<T>",
+          "env_strategy": "example",
+          "isolation": "isolated"
+        },
+        "existing_branch": false,
+        "ordinal": 9,
+        "env_ports": {
+          "offset": 90,
+          "entries": [
+            {
+              "file": "apps/web/.env",
+              "key": "PORT",
+              "port": "PORT",
+              "base": 24100,
+              "resolved": 24190,
+              "moves": [
+                {
+                  "port": "PORT",
+                  "job": "web",
+                  "base": 24100,
+                  "resolved": 24190
+                }
+              ],
+              "addressing": "ports",
+              "status": "rewrite"
+            },
+            {
+              "file": "apps/web/.env",
+              "key": "API_URL",
+              "port": "PORT",
+              "base": 24101,
+              "resolved": 24191,
+              "moves": [
+                {
+                  "port": "PORT",
+                  "job": "api",
+                  "base": 24101,
+                  "resolved": 24191,
+                  "origin": "http://api.feat-json.acme.localhost:24102"
+                }
+              ],
+              "addressing": "names",
+              "status": "rewrite"
+            },
+            {
+              "file": "apps/api/.env",
+              "key": "PORT",
+              "port": "PORT",
+              "base": 24101,
+              "resolved": 24191,
+              "moves": [
+                {
+                  "port": "PORT",
+                  "job": "api",
+                  "base": 24101,
+                  "resolved": 24191
+                }
+              ],
+              "addressing": "ports",
+              "status": "rewrite"
+            }
+          ],
+          "addressing": "names",
+          "public_port": 24102,
+          "applied": true
+        }
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

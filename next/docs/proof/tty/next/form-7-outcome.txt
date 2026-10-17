@@ -1,0 +1,20 @@
+$ wtmx create --ask; echo EXIT=$?
+  ✓ on_create · feat/form (<DUR>)
+  ✓ on_create · topic (<DUR>)
+
+┃  ✓ create: 2 done
+┃
+┃  Branches   feat/form, topic (existing)
+┃  From       main
+┃  Env        main
+┃  Isolation  isolated
+┃  Remember   env_from
+┃  feat/form  ../acme.trees/feat-form · 3 ports settled (offset +140)
+┃  topic      ../acme.trees/topic · 3 ports settled (offset +150)
+┃
+┃  → wtm go feat/form
+┃  → wtm go topic
+
+EXIT=0
+$
+

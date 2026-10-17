@@ -1,0 +1,18 @@
+$ wtmx create --ask; echo EXIT=$?
+
+  Step 3/6 • Env strategy
+
+  ✓ Branches: feat/form, topic
+  ✓ Source branch: main
+
+  How to provision .env files in the new worktrees
+
+▌▸ Use config default (main)
+   example — copy .env.example → .env
+   main — copy .env from the main checkout
+   parent — copy .env from source worktree
+
+   [x] Always use this answer in this repo
+
+  ↑↓ navigate • tab always use • / filter • enter confirm • esc back
+

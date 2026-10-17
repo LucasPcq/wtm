@@ -1,0 +1,24 @@
+$ wtmx create --ask; echo EXIT=$?
+
+  Step 2/6 • Source branch
+
+  ✓ Branches: feat/form, topic
+
+  Parent recorded for `wtm sync` for the existing branches — the new ones start from it
+
+▌▸ main (default)
+   feat/a
+   feat/bad
+   feat/bad-json
+   feat/c
+   feat/env
+   feat/ff
+   feat/idem
+   feat/json
+   feat/one
+   feat/remembered
+   feature
+   remote-only
+
+  ↑↓ navigate • / filter • r refresh • enter confirm • esc back
+

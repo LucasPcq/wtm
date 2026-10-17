@@ -1,0 +1,31 @@
+
+  › feat/a (1/3)
+
+  Hooks · On Create
+
+  → case feat/a in feat/bad*) echo failing; exit 3;; feat/slow*) trap "sleep 2" INT; sleep 30;; *) echo set up feat/a;; esac
+
+set up feat/a
+
+  ✓ case feat/a in feat/bad*) echo failing; exit 3;; feat/slow*) trap "sleep 2" INT; sleep 30;; *) echo set up feat/a;; esac (<DUR>)
+
+  › feat/bad (2/3)
+
+  Hooks · On Create
+
+  → case feat/bad in feat/bad*) echo failing; exit 3;; feat/slow*) trap "sleep 2" INT; sleep 30;; *) echo set up feat/bad;; esac
+
+failing
+
+  ✗ case feat/bad in feat/bad*) echo failing; exit 3;; feat/slow*) trap "sleep 2" INT; sleep 30;; *) echo set up feat/bad;; esac (<DUR>)
+  ✗ feat/bad — on_create: case feat/bad in feat/bad*) echo failing; exit 3;; feat/slow*) trap "sleep 2" INT; sleep 30;; *) echo set up feat/bad;; esac: hook failed: exit status 3
+
+  › feat/c (3/3)
+
+  Hooks · On Create
+
+  → case feat/c in feat/bad*) echo failing; exit 3;; feat/slow*) trap "sleep 2" INT; sleep 30;; *) echo set up feat/c;; esac
+
+set up feat/c
+
+  ✓ case feat/c in feat/bad*) echo failing; exit 3;; feat/slow*) trap "sleep 2" INT; sleep 30;; *) echo set up feat/c;; esac (<DUR>)

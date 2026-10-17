@@ -1,0 +1,12 @@
+
+  ✓ Moved 2 files to feat/misc
+
+    ren  scripts/serve.py
+    del  apps/web/package.json
+
+  source  feat/login · files removed
+  env     3 ports settled (offset +40)
+  path    ../acme.trees/feat-misc
+
+  → wtm go feat/misc
+

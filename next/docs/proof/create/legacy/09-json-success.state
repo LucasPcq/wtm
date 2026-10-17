@@ -1,0 +1,180 @@
+## branches
+feat/a 
+feat/bad 
+feat/c 
+feat/env 
+feat/idem 
+feat/json 
+feat/one 
+feature 
+main 
+remote-only origin/remote-only
+topic 
+## worktrees
+worktree <SB>/acme
+branch refs/heads/main
+worktree <SB>/acme.trees/feat-a
+branch refs/heads/feat/a
+worktree <SB>/acme.trees/feat-bad
+branch refs/heads/feat/bad
+worktree <SB>/acme.trees/feat-c
+branch refs/heads/feat/c
+worktree <SB>/acme.trees/feat-env
+branch refs/heads/feat/env
+worktree <SB>/acme.trees/feat-idem
+branch refs/heads/feat/idem
+worktree <SB>/acme.trees/feat-json
+branch refs/heads/feat/json
+worktree <SB>/acme.trees/feat-one
+branch refs/heads/feat/one
+worktree <SB>/acme.trees/feature
+branch refs/heads/feature
+worktree <SB>/acme.trees/remote-only
+branch refs/heads/remote-only
+## .git/wtm/worktrees/feat%2Fa/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 2,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fbad/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 3,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fc/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 4,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fenv/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "main",
+  "ordinal": 8,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fidem/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 7,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fjson/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 9,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fone/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 1,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feature/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 5,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/remote-only/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 6,
+  "isolation": "isolated"
+}
+## ../acme.trees/feat-a/apps/api/.env
+PORT=24121
+## ../acme.trees/feat-a/apps/web/.env
+PORT=24120
+API_URL=http://api.feat-a.acme.localhost:24102
+## ../acme.trees/feat-bad/apps/api/.env
+PORT=24131
+## ../acme.trees/feat-bad/apps/web/.env
+PORT=24130
+API_URL=http://api.feat-bad.acme.localhost:24102
+## ../acme.trees/feat-c/apps/api/.env
+PORT=24141
+## ../acme.trees/feat-c/apps/web/.env
+PORT=24140
+API_URL=http://api.feat-c.acme.localhost:24102
+## ../acme.trees/feat-env/apps/api/.env
+PORT=24181
+## ../acme.trees/feat-env/apps/web/.env
+PORT=24180
+API_URL=http://api.feat-env.acme.localhost:24102
+## ../acme.trees/feat-idem/apps/api/.env
+PORT=24171
+## ../acme.trees/feat-idem/apps/web/.env
+PORT=24170
+API_URL=http://api.feat-idem.acme.localhost:24102
+## ../acme.trees/feat-json/apps/api/.env
+PORT=24191
+## ../acme.trees/feat-json/apps/web/.env
+PORT=24190
+API_URL=http://api.feat-json.acme.localhost:24102
+## ../acme.trees/feat-one/apps/api/.env
+PORT=24111
+## ../acme.trees/feat-one/apps/web/.env
+PORT=24110
+API_URL=http://api.feat-one.acme.localhost:24102
+## ../acme.trees/feature/apps/api/.env
+PORT=24151
+## ../acme.trees/feature/apps/web/.env
+PORT=24150
+API_URL=http://api.feature.acme.localhost:24102
+## ../acme.trees/remote-only/apps/api/.env
+PORT=24161
+## ../acme.trees/remote-only/apps/web/.env
+PORT=24160
+API_URL=http://api.remote-only.acme.localhost:24102
+## config.toml
+#:schema ./schemas/project.schema.json
+
+# wtm — Worktree Manager configuration
+# Docs: https://github.com/LucasPcq/wtm
+
+[worktrees]
+# Directory where worktrees are created (relative to repo root)
+base_path = "../acme.trees"
+
+# Branch used as the default base for new worktrees
+base_branch = "main"
+
+[env]
+# Strategy for provisioning .env files in new worktrees:
+#   example — copy .env.example and rename to .env
+#   main    — copy .env from the main checkout
+#   parent  — copy .env from the source worktree
+strategy = "example"
+
+# Each value file to provision, with its committed template (if any).
+
+[[env.file]]
+target = "apps/api/.env"
+template = "apps/api/.env.example"
+
+[[env.file]]
+target = "apps/web/.env"
+template = "apps/web/.env.example"
+
+[hooks]
+# Commands run after creating a new worktree
+on_create = [{ cmd = "case {{branch}} in feat/bad*) echo failing; exit 3;; feat/slow*) trap \"sleep 2\" INT; sleep 30;; *) echo set up {{branch}};; esac" }]
+
+# Commands run right before removing a worktree (e.g. tear down external
+# resources like Docker). A non-zero exit aborts the removal unless the entry
+# sets continue_on_error.
+on_clean = [
+]

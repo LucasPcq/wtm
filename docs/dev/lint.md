@@ -3,7 +3,7 @@
 `make lint` is the mechanical half of `CLAUDE.md`. Every rule in it exists because a reviewer would otherwise have to hold the layer rules in their head on every PR, and the ones nobody holds are the ones that drift. Read this before adding a rule, an exception, or arguing that a check is wrong.
 
 ```
-make lint         # fmt + vet + arch + dead + sumtype + staticcheck — all gating
+make lint         # fmt + vet + arch + dead + sumtype + next-lint + staticcheck — all gating
 make test         # go test ./... -race -count=1
 make dupl         # clone report, informative only
 make dead-strict  # deadcode without -test: code only a test still reaches, informative only
@@ -50,7 +50,17 @@ A glyph table alone does not hold a surface of sixty commands: "nothing to do" g
 | `glyph` | a vocabulary rune written as a literal — `"✓"`, `"!"`, `"→"` … — instead of its `domain` constant, which is how a seventh glyph appears and how an existing one takes a second meaning |
 | `tuistyle` | `styles.Badge*` or `styles.Dashboard*` used from `internal/surface/cli/render`: a badge is a widget, and its padding made an attention line two columns wider than the failure line under it |
 | `mutedline` | `Message(w, styles.Muted.Render(x))` — a bare line muted whole, which is the `=` register with its glyph filed off |
-| `fontcover` | a non-letter rune missing from common monospace fonts, in any string of `internal/` — the terminal borrows it from a wider fallback face and it eats the space after it. The allowed set, `fontSafe`, was measured over thirteen fonts (Cascadia Code, DejaVu Sans Mono, Fira Code, Hack, IBM Plex Mono, Inconsolata, JetBrains Mono, Roboto Mono, Source Code Pro, Ubuntu Mono, Menlo, Monaco, SF Mono); `fontLegacy` holds the runes that predate the rule and may only shrink. Box drawing and block elements pass: terminals draw them as their own sprites |
+| `fontcover` | a non-letter rune missing from common monospace fonts, in any string of `internal/` and `next/` — the terminal borrows it from a wider fallback face and it eats the space after it. The allowed set, `fontSafe`, was measured over thirteen fonts (Cascadia Code, DejaVu Sans Mono, Fira Code, Hack, IBM Plex Mono, Inconsolata, JetBrains Mono, Roboto Mono, Source Code Pro, Ubuntu Mono, Menlo, Monaco, SF Mono); `fontLegacy` holds the runes that predate the rule and may only shrink. Box drawing and block elements pass: terminals draw them as their own sprites |
+
+### `next/`
+
+The driver loads `internal/` and `next/` in one run (`go run ./tools/archlint [root…]`, both by default). The rules written for `internal/` act on its packages only (`internalOnly` in `analyzers.go`); `typeassert` and `fontcover`, which hold for any Go code of the project, act on both. One rule is `next/`'s own, from [`next/README.md`](../../next/README.md):
+
+| Rule | Catches |
+| -- | -- |
+| `next` | an import outside the package's row of the `next/` import table (`domain/`, `service/`, `command/<name>`, `command/<name>/cli`, `adapter/<name>`, `ui/`, `cmd/`), a package in no row (the root of `next/` included), an import of `internal/` from a source or a test file, and a fake (`adapter/<name>test`) imported from anything but a test or the adapter it fakes |
+
+Comments in `next/` follow Go's doc-comment conventions (the `go-style` skill): `staticcheck` runs every check there, the naming and doc-comment ones included (`next/staticcheck.conf`, which staticcheck reads for the packages under it), and `make next-lint`, part of `make lint`, runs revive with `next/revive.toml` (`exported`, `package-comments`, naming and error-flow rules).
 
 ### Adding a rule
 

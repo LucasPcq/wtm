@@ -1,0 +1,102 @@
+{
+  "v": 2,
+  "command": "create",
+  "ok": false,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "feat/bad-json",
+      "status": "failed",
+      "reason": "incomplete",
+      "error": {
+        "kind": "internal",
+        "code": "unit.phase_failed",
+        "message": "on_create failed: hook failed: exit status 3",
+        "params": {
+          "phase": "on_create"
+        }
+      },
+      "detail": {
+        "path": "<SB>/acme.trees/feat-bad-json",
+        "metadata": {
+          "source_branch": "main",
+          "created_at": "<T>",
+          "env_strategy": "example",
+          "isolation": "isolated"
+        },
+        "existing_branch": false,
+        "ordinal": 10,
+        "env_ports": {
+          "offset": 100,
+          "entries": [
+            {
+              "file": "apps/web/.env",
+              "key": "PORT",
+              "port": "PORT",
+              "base": 24100,
+              "resolved": 24200,
+              "moves": [
+                {
+                  "port": "PORT",
+                  "job": "web",
+                  "base": 24100,
+                  "resolved": 24200
+                }
+              ],
+              "addressing": "ports",
+              "status": "rewrite"
+            },
+            {
+              "file": "apps/web/.env",
+              "key": "API_URL",
+              "port": "PORT",
+              "base": 24101,
+              "resolved": 24201,
+              "moves": [
+                {
+                  "port": "PORT",
+                  "job": "api",
+                  "base": 24101,
+                  "resolved": 24201,
+                  "origin": "http://api.feat-bad-json.acme.localhost:24102"
+                }
+              ],
+              "addressing": "names",
+              "status": "rewrite"
+            },
+            {
+              "file": "apps/api/.env",
+              "key": "PORT",
+              "port": "PORT",
+              "base": 24101,
+              "resolved": 24201,
+              "moves": [
+                {
+                  "port": "PORT",
+                  "job": "api",
+                  "base": 24101,
+                  "resolved": 24201
+                }
+              ],
+              "addressing": "ports",
+              "status": "rewrite"
+            }
+          ],
+          "addressing": "names",
+          "public_port": 24102,
+          "applied": true
+        }
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "internal",
+    "code": "unit.phase_failed",
+    "message": "on_create failed: hook failed: exit status 3",
+    "params": {
+      "phase": "on_create"
+    }
+  }
+}

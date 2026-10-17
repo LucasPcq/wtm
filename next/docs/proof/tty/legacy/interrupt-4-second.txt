@@ -1,0 +1,9 @@
+$ wtmx create feat/slow2 --yes; echo EXIT=$?
+
+┃  Hooks · On Create
+┃  → case feat/slow2 in feat/bad*) echo failing; exit 3;; feat/slow*) trap "sleep 2" INT; sleep 3…
+^C^C
+$ echo EXIT=$?
+EXIT=130
+$
+

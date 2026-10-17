@@ -1,0 +1,8 @@
+
+  Hooks · On Create
+
+  → case feat/one in feat/bad*) echo failing; exit 3;; feat/slow*) trap "sleep 2" INT; sleep 30;; *) echo set up feat/one;; esac
+
+set up feat/one
+
+  ✓ case feat/one in feat/bad*) echo failing; exit 3;; feat/slow*) trap "sleep 2" INT; sleep 30;; *) echo set up feat/one;; esac (<DUR>)
