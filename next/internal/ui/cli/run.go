@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"io"
+	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
@@ -59,8 +60,30 @@ func (r *Run) Progress(ctx context.Context) *output.Progress {
 
 // FailWith prints failure followed by next, or the envelope that carries it with --output json, and returns the failure that sets the exit code.
 func (r *Run) FailWith(failure *domain.Error, next []output.NextStep) error {
+	return r.fail(failure, nil, next)
+}
+
+// Refuse prints failure as FailWith does, followed by what [Replan] makes of argv, the command line of the request: in the envelope's follow_ups with --output json.
+func (r *Run) Refuse(failure *domain.Error, argv []string) error {
+	return r.fail(failure, Replan(failure, argv), nil)
+}
+
+// Replan returns the follow-up of a stale plan: argv, the command line of the request, run again with --dry-run to preview the plan the facts give now; none for any other failure.
+func Replan(failure *domain.Error, argv []string) []domain.FollowUp {
+	if failure == nil || failure.Code != domain.CodePlanStale {
+		return nil
+	}
+
+	return []domain.FollowUp{{Argv: append(slices.Clone(argv), "--dry-run"), Code: domain.CodeReplan, Message: output.ReplanNote}}
+}
+
+func (r *Run) fail(failure *domain.Error, followUps []domain.FollowUp, next []output.NextStep) error {
 	if !r.Human() {
-		return r.Envelope(domain.Envelope{Command: r.Command, Err: failure})
+		return r.Envelope(domain.Envelope{Command: r.Command, Err: failure, FollowUps: followUps})
+	}
+
+	for _, followUp := range followUps {
+		next = append(next, output.NextStep{Command: output.Line(followUp.Argv), Note: followUp.Message})
 	}
 
 	_, stderr := r.Writers()
@@ -69,16 +92,6 @@ func (r *Run) FailWith(failure *domain.Error, next []output.NextStep) error {
 	})
 
 	return r.Failed(failure)
-}
-
-// Refuse prints failure as FailWith does; the refusal of a stale plan is followed by line, the command line of the request, run again with --dry-run to preview the plan the facts give now.
-func (r *Run) Refuse(failure *domain.Error, line string) error {
-	var next []output.NextStep
-	if failure.Code == domain.CodePlanStale {
-		next = []output.NextStep{{Command: line + " --dry-run", Note: output.ReplanNote}}
-	}
-
-	return r.FailWith(failure, next)
 }
 
 // Envelope writes the v2 JSON envelope doc on stdout, each field it refuses spelled as its flag, and returns its failure; an envelope that cannot be written is the failure.

@@ -13,12 +13,17 @@ type extractLine struct {
 	Request extract.Request
 }
 
-// String spells the command and its request, the flags each only when given.
+// String is the command line of Argv, quoted for the shell.
 func (l extractLine) String() string {
+	return output.Line(l.Argv())
+}
+
+// Argv spells the command and its request word by word, the flags each only when given.
+func (l extractLine) Argv() []string {
 	req := l.Request
-	words := []string{l.Command}
+	words := strings.Fields(l.Command)
 	if req.Source != "" {
-		words = append(words, output.Quote(req.Source))
+		words = append(words, req.Source)
 	}
 
 	for _, file := range req.Files {
@@ -40,5 +45,5 @@ func (l extractLine) String() string {
 		words = append(words, "--ask")
 	}
 
-	return strings.Join(words, " ")
+	return words
 }

@@ -106,7 +106,7 @@ func (c *extractCommand) run(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	useCase, err := c.open(ctx, c.io.Env.ProjectDir)
 	if err != nil {
-		return c.io.Refuse(domain.AsError(domain.AsErrorParams{Err: err}), extractLine{Command: cmd.CommandPath(), Request: req}.String())
+		return c.io.Refuse(domain.AsError(domain.AsErrorParams{Err: err}), extractLine{Command: cmd.CommandPath(), Request: req}.Argv())
 	}
 
 	progress := c.io.Progress(ctx)
@@ -168,16 +168,18 @@ type concluded struct {
 
 // conclude prints how the run ended — the JSON envelope, a refusal, nothing to extract, the dry run and the line that applies it, or the outcome — and returns the failure that sets the exit code.
 func (c *extractCommand) conclude(cmd *cobra.Command, done concluded) error {
+	outcome := done.Outcome
+	line := extractLine{Command: cmd.CommandPath(), Request: done.Request}
 	if !c.io.Human() {
-		return c.io.Envelope(done.Outcome.Envelope(done.Err))
+		doc := done.Outcome.Envelope(done.Err)
+		doc.FollowUps = uicli.Replan(doc.Err, line.Argv())
+		return c.io.Envelope(doc)
 	}
 
 	stdout, _ := c.io.Writers()
-	outcome := done.Outcome
-	line := extractLine{Command: cmd.CommandPath(), Request: done.Request}
 	switch {
 	case done.Err != nil:
-		return c.io.Refuse(done.Err, line.String())
+		return c.io.Refuse(done.Err, line.Argv())
 	case outcome.Result == nil && outcome.Plan.Nothing():
 		output.Frame(stdout, func(w io.Writer) { drawNothing(w, outcome.Plan) })
 		return nil

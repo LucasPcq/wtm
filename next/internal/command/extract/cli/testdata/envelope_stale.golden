@@ -3,7 +3,22 @@
   "command": "extract",
   "ok": false,
   "op": "op-1",
-  "follow_ups": [],
+  "follow_ups": [
+    {
+      "argv": [
+        "wtm-next",
+        "extract",
+        "feat/login",
+        "--files",
+        "old.txt",
+        "--to",
+        "feat/other",
+        "--dry-run"
+      ],
+      "code": "plan.replan",
+      "message": "the plan the facts give now"
+    }
+  ],
   "warnings": [],
   "error": {
     "kind": "precondition",

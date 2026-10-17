@@ -99,7 +99,7 @@ func (c *createCommand) run(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	useCase, err := c.open(ctx, c.io.Env.ProjectDir)
 	if err != nil {
-		return c.io.Refuse(domain.AsError(domain.AsErrorParams{Err: err}), createLine{Command: cmd.CommandPath(), Request: req}.String())
+		return c.io.Refuse(domain.AsError(domain.AsErrorParams{Err: err}), createLine{Command: cmd.CommandPath(), Request: req}.Argv())
 	}
 
 	progress := c.io.Progress(ctx)
@@ -157,15 +157,17 @@ type concluded struct {
 
 // conclude prints how the run ended — the JSON envelope, a refusal, the dry run and the line that applies it, or the outcome — and returns the failure that sets the exit code.
 func (c *createCommand) conclude(cmd *cobra.Command, done concluded) error {
+	line := createLine{Command: cmd.CommandPath(), Request: done.Request}
 	if !c.io.Human() {
-		return c.io.Envelope(done.Outcome.Envelope(done.Err))
+		doc := done.Outcome.Envelope(done.Err)
+		doc.FollowUps = uicli.Replan(doc.Err, line.Argv())
+		return c.io.Envelope(doc)
 	}
 
 	stdout, _ := c.io.Writers()
-	line := createLine{Command: cmd.CommandPath(), Request: done.Request}
 	switch {
 	case done.Err != nil:
-		return c.io.Refuse(done.Err, line.String())
+		return c.io.Refuse(done.Err, line.Argv())
 	case done.Outcome.Result == nil:
 		apply := line.String() + " --expect-fingerprint " + done.Outcome.Fingerprint
 		output.Frame(stdout, func(w io.Writer) {

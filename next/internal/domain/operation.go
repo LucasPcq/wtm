@@ -82,6 +82,9 @@ func CorrelationProblem(id string) error {
 // CodePlanStale is the code of the refusal of a plan that no longer matches the fingerprint of its preview.
 const CodePlanStale = "plan.stale"
 
+// CodeReplan is the code of the follow-up of a stale plan: its dry run, run again on the facts as they are now.
+const CodeReplan = "plan.replan"
+
 // RunOptions are how a surface runs an operation.
 type RunOptions struct {
 	DryRun            bool   // plan without taking locks, stop after the fingerprint

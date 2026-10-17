@@ -3,7 +3,18 @@
   "command": "create",
   "ok": false,
   "op": "op-1",
-  "follow_ups": [],
+  "follow_ups": [
+    {
+      "argv": [
+        "wtm-next",
+        "create",
+        "feat/x",
+        "--dry-run"
+      ],
+      "code": "plan.replan",
+      "message": "the plan the facts give now"
+    }
+  ],
   "warnings": [],
   "error": {
     "kind": "precondition",
