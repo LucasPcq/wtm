@@ -18,7 +18,8 @@ var (
 )
 
 // Worktrees returns the repository's worktrees, the main one first. A detached
-// worktree in the middle of a rebase is reported as rebasing its branch.
+// worktree in the middle of a rebase, or of a bisect, is reported as rebasing
+// the branch it started from.
 func (r Repo) Worktrees(ctx context.Context) ([]worktree.Worktree, error) {
 	out, err := r.git(ctx, "worktree", "list", "--porcelain", "-z")
 	if err != nil {
@@ -204,8 +205,8 @@ func parseWorktrees(out string) []worktree.Worktree {
 }
 
 // detachedState is what a detached worktree is doing: rebasing the branch its
-// rebase state names, or plainly detached. A worktree whose .git is gone reads
-// as detached.
+// rebase or bisect state names, or plainly detached. A worktree whose .git is
+// gone, or whose rebase or bisect began on no branch, reads as detached.
 func detachedState(path string) (worktree.State, error) {
 	adminDir, err := adminDirOf(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -224,12 +225,41 @@ func detachedState(path string) (worktree.State, error) {
 			return nil, err
 		}
 
-		if name := strings.TrimPrefix(strings.TrimSpace(string(headName)), headsPrefix); name != "" {
+		// A rebase begun detached names "detached HEAD", not a branch.
+		if name, ok := strings.CutPrefix(strings.TrimSpace(string(headName)), headsPrefix); ok && name != "" {
 			return worktree.Rebasing{Branch: name}, nil
 		}
 	}
 
-	return worktree.Detached{}, nil
+	return bisectState(adminDir)
+}
+
+// bisectState is the state of a detached worktree whose git directory is
+// adminDir: rebasing the branch a bisect in progress started from, as a rebase
+// is reported, or detached.
+func bisectState(adminDir string) (worktree.State, error) {
+	start, err := os.ReadFile(filepath.Join(adminDir, "BISECT_START"))
+	if errors.Is(err, fs.ErrNotExist) {
+		return worktree.Detached{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// git records the branch's short name, or the commit when the bisect began detached.
+	name := strings.TrimSpace(string(start))
+	if name == "" || isObjectID(name) {
+		return worktree.Detached{}, nil
+	}
+	return worktree.Rebasing{Branch: name}, nil
+}
+
+// isObjectID reports whether s spells a full SHA-1 or SHA-256 object id.
+func isObjectID(s string) bool {
+	if len(s) != 40 && len(s) != 64 {
+		return false
+	}
+	return strings.Trim(s, "0123456789abcdef") == ""
 }
 
 // adminDirOf returns the git directory of the worktree at path: its .git

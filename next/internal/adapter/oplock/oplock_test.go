@@ -117,3 +117,18 @@ func TestGrowingKeepsWhatIsHeldWhenTheDefaultsMove(t *testing.T) {
 	require.NoError(t, json.Unmarshal(read(t, filepath.Join(locks.StateDir, "locks", "ops", "op-1.json")), &recorded))
 	assert.Equal(t, []domain.Lock{repoShared, featA, featB}, recorded.Locks)
 }
+
+func TestReadingTheRecordsRemovesThoseOfDeadOperationsOnly(t *testing.T) {
+	ops := filepath.Join(t.TempDir(), "ops")
+	dead := filepath.Join(ops, "op-dead.json")
+	writeFile(t, dead, `{"op_id":"op-dead","pid":1,"command":"create"}`)
+	live, err := hold(filepath.Join(ops, "op-live.json"), op("op-live"))
+	require.NoError(t, err)
+	defer live.release()
+
+	found := running(ops)
+
+	assert.Equal(t, []domain.Operation{op("op-live")}, found)
+	assert.NoFileExists(t, dead)
+	assert.FileExists(t, live.path)
+}

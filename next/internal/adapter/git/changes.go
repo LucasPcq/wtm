@@ -215,7 +215,9 @@ func (r Repo) files(ctx context.Context, check worktree.ConflictCheck) ([]file, 
 }
 
 // working reads path in the worktree at dir; a missing file, or one under a
-// path that is no longer a directory, is an absent side.
+// path that is no longer a directory, is an absent side. Anything else but a
+// regular file (a symlink, a directory, a nested repository) is refused, so a
+// move never copies what a link points to nor fails halfway.
 func working(dir, path string) (side, error) {
 	full := filepath.Join(dir, path)
 	info, err := os.Lstat(full)
@@ -224,6 +226,9 @@ func working(dir, path string) (side, error) {
 	}
 	if err != nil {
 		return side{}, err
+	}
+	if !info.Mode().IsRegular() {
+		return side{}, domain.InvalidMessage(strings.TrimSuffix(path, "/") + " is not a regular file: only files can be moved")
 	}
 
 	data, err := os.ReadFile(full)
@@ -234,7 +239,8 @@ func working(dir, path string) (side, error) {
 	return side{data: data, present: true, mode: info.Mode().Perm()}, nil
 }
 
-// blob reads path in the tree of rev; a path that is not a file there is an
+// blob reads path in the tree of rev as the worktree would check it out, its
+// smudge and end-of-line filters applied; a path that is not a file there is an
 // absent side.
 func (r Repo) blob(ctx context.Context, rev, path string) (side, error) {
 	out, err := r.git(ctx, "--literal-pathspecs", "ls-tree", "-z", rev, "--", path)
@@ -248,7 +254,7 @@ func (r Repo) blob(ctx context.Context, rev, path string) (side, error) {
 		return side{}, nil
 	}
 
-	data, err := r.git(ctx, "cat-file", "blob", fields[2])
+	data, err := r.git(ctx, "cat-file", "--filters", "--path="+path, fields[2])
 	if err != nil {
 		return side{}, err
 	}
@@ -479,7 +485,7 @@ func (j *journal) undo(ctx context.Context, target Repo) error {
 			errs = append(errs, os.WriteFile(path, f.ours.data, f.ours.mode))
 			continue
 		}
-		if err := os.Remove(path); err != nil && !errors.Is(err, iofs.ErrNotExist) {
+		if err := os.Remove(path); err != nil && !errors.Is(err, iofs.ErrNotExist) && !errors.Is(err, syscall.ENOTDIR) {
 			errs = append(errs, err)
 		}
 	}
@@ -493,13 +499,13 @@ func (j *journal) undo(ctx context.Context, target Repo) error {
 }
 
 // diff returns the binary diff of paths against HEAD in this worktree, nil for
-// no paths.
+// no paths, in the shape git apply reads whatever the user's diff config.
 func (r Repo) diff(ctx context.Context, paths []string) ([]byte, error) {
 	if len(paths) == 0 {
 		return nil, nil
 	}
 
-	return r.git(ctx, append([]string{"--literal-pathspecs", "diff", "HEAD", "--binary", "--"}, paths...)...)
+	return r.git(ctx, append([]string{"--literal-pathspecs", "diff", "HEAD", "--binary", "--no-ext-diff", "--no-textconv", "--no-color", "--src-prefix=a/", "--dst-prefix=b/", "--"}, paths...)...)
 }
 
 // cleanParams is what a move takes out of its source: the patch of its tracked

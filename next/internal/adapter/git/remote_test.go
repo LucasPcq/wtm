@@ -209,3 +209,30 @@ func TestAnSSHFetchNeverAsksAndKeepsTheUsersOwnSSHCommand(t *testing.T) {
 	assert.Contains(t, contentOf(t, record), "User=mine")
 	assert.NotContains(t, lastLine(contentOf(t, record)), "BatchMode")
 }
+
+func TestFetchRefFetchesTheBranchWhenATagHasItsName(t *testing.T) {
+	repo, origin := newRepoWithOrigin(t)
+	gittest.CreateBranch(t, repo.Dir, "rel")
+	gittest.PushBranch(t, repo.Dir, "rel")
+	pushed := advanceOnOrigin(t, origin, "rel")
+	gittest.Git(t, repo.Dir, "tag", "rel")
+	gittest.Git(t, repo.Dir, "push", "-q", "origin", "refs/tags/rel")
+
+	require.NoError(t, repo.FetchRef(t.Context(), "rel"))
+
+	assert.Equal(t, pushed, head(t, repo.Dir, "refs/remotes/origin/rel"))
+}
+
+func TestABranchNamedLikeATagIsFetchedAsABranch(t *testing.T) {
+	repo, origin := newRepoWithOrigin(t)
+	gittest.CreateBranch(t, repo.Dir, "tags/v1")
+	gittest.PushBranch(t, repo.Dir, "tags/v1")
+	pushed := advanceOnOrigin(t, origin, "tags/v1")
+
+	require.NoError(t, repo.FetchRef(t.Context(), "tags/v1"))
+	require.NoError(t, repo.FastForwardRef(t.Context(), "tags/v1"))
+
+	assert.Equal(t, pushed, head(t, repo.Dir, "refs/remotes/origin/tags/v1"))
+	assert.Equal(t, pushed, head(t, repo.Dir, "refs/heads/tags/v1"))
+	assert.Empty(t, gittest.Output(t, repo.Dir, "tag", "--list"))
+}

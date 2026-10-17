@@ -105,7 +105,8 @@ func running(dir string) []domain.Operation {
 }
 
 // readHeld returns the record at path and reports whether its process still
-// holds it: a shared lock that can be taken means none does.
+// holds it: a shared lock that can be taken means none does, and the record,
+// left by a process killed before its release, is removed.
 func readHeld(path string) ([]byte, bool) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -114,9 +115,25 @@ func readHeld(path string) ([]byte, bool) {
 	defer file.Close()
 
 	if statefile.Flock(file, syscall.LOCK_SH|syscall.LOCK_NB) == nil {
+		removeIfSame(file, path)
 		return nil, false
 	}
 
 	data, err := io.ReadAll(file)
 	return data, err == nil
+}
+
+// removeIfSame removes the record at path if it is still the file opened as
+// file: one renamed over it since belongs to a live operation.
+func removeIfSame(file *os.File, path string) {
+	opened, err := file.Stat()
+	if err != nil {
+		return
+	}
+
+	current, err := os.Stat(path)
+	if err != nil || !os.SameFile(opened, current) {
+		return
+	}
+	_ = os.Remove(path)
 }

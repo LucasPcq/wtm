@@ -102,6 +102,53 @@ func TestWorktreesReadsTheBranchOfARebaseInProgress(t *testing.T) {
 	}
 }
 
+func TestARebaseBegunDetachedIsOnNoBranch(t *testing.T) {
+	repo := newRepo(t)
+	commitFile(t, repo.Dir, "file", "base")
+	gittest.CreateBranch(t, repo.Dir, "feature")
+	commitFile(t, repo.Dir, "file", "main")
+	where := checkOutFeature(t, repo.Dir, true)
+	commitFile(t, where, "file", "feature")
+	gittest.Git(t, where, "checkout", "-q", "--detach")
+	rebase(t, where, "--merge")
+
+	worktrees, err := repo.Worktrees(t.Context())
+
+	require.NoError(t, err)
+	assert.Equal(t, worktree.Detached{}, worktrees[len(worktrees)-1].State)
+}
+
+func TestWorktreesReadsTheBranchABisectStartedFrom(t *testing.T) {
+	cases := []struct {
+		name     string
+		detached bool
+		want     worktree.State
+	}{
+		{name: "from a branch", want: worktree.Rebasing{Branch: "feature"}},
+		{name: "from a detached HEAD", detached: true, want: worktree.Detached{}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			repo := newRepo(t)
+			gittest.CreateBranch(t, repo.Dir, "feature")
+			where := checkOutFeature(t, repo.Dir, true)
+			good := head(t, where, "HEAD")
+			for _, content := range []string{"1", "2", "3"} {
+				commitFile(t, where, "file", content)
+			}
+			if c.detached {
+				gittest.Git(t, where, "checkout", "-q", "--detach")
+			}
+			gittest.Git(t, where, "bisect", "start", "HEAD", good)
+
+			worktrees, err := repo.Worktrees(t.Context())
+
+			require.NoError(t, err)
+			assert.Equal(t, c.want, worktrees[len(worktrees)-1].State)
+		})
+	}
+}
+
 func TestMainWorktreeIsTheFirstEvenSeenFromALinkedOne(t *testing.T) {
 	repo := newRepo(t)
 	linked := filepath.Join(gittest.TempDir(t), "feature")
